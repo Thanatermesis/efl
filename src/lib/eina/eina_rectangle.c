@@ -110,6 +110,18 @@ static int _eina_rectangle_log_dom = -1;
 #endif
 #define DBG(...) EINA_LOG_DOM_DBG(_eina_rectangle_log_dom, __VA_ARGS__)
 
+/**
+ * @brief Compares two rectangles based on their area in descending order.
+ *
+ * This function is typically used for sorting rectangles, placing larger
+ * rectangles before smaller ones.
+ *
+ * @param data1 Pointer to the first Eina_Rectangle.
+ * @param data2 Pointer to the second Eina_Rectangle.
+ * @return An integer less than, equal to, or greater than zero if the
+ *         area of r1 is found, respectively, to be greater than,
+ *         equal to, or less than the area of r2.
+ */
 static int
 _eina_rectangle_cmp(const void *data1, const void *data2)
 {
@@ -118,6 +130,18 @@ _eina_rectangle_cmp(const void *data1, const void *data2)
    return (r2->w * r2->h) - (r1->w * r1->h);
 }
 
+/**
+ * @brief Compares two rectangles based on their area in ascending order.
+ *
+ * This function is typically used for sorting rectangles, placing smaller
+ * rectangles before larger ones.
+ *
+ * @param data1 Pointer to the first Eina_Rectangle.
+ * @param data2 Pointer to the second Eina_Rectangle.
+ * @return An integer less than, equal to, or greater than zero if the
+ *         area of r1 is found, respectively, to be less than,
+ *         equal to, or greater than the area of r2.
+ */
 static int
 _eina_rectangle_cmp_asc(const void *data1, const void *data2)
 {
@@ -126,6 +150,19 @@ _eina_rectangle_cmp_asc(const void *data1, const void *data2)
    return (r1->w * r1->h) - (r2->w * r2->h);
 }
 
+/**
+ * @brief Compares two rectangles primarily by their Y coordinate, then by X.
+ *
+ * This function is used for sorting rectangles in a "bottom-left" fashion,
+ * meaning rectangles are first sorted by their top edge (y-coordinate)
+ * and then by their left edge (x-coordinate) for those with the same
+ * y-coordinate.
+ *
+ * @param data1 Pointer to the first Eina_Rectangle.
+ * @param data2 Pointer to the second Eina_Rectangle.
+ * @return An integer based on y-coordinate comparison. If y-coordinates
+ *         are equal, then based on x-coordinate comparison.
+ */
 static int
 _eina_rectangle_cmp_bl(const void *data1, const void *data2)
 {
@@ -137,6 +174,21 @@ _eina_rectangle_cmp_bl(const void *data1, const void *data2)
      return (r1->x) - (r2->x);
 }
 
+/**
+ * @brief Merges a given rectangle with existing rectangles in a list if they are adjacent.
+ *
+ * This function attempts to merge the input rectangle @p r with any existing
+ * rectangles in the @p empty list. Merging occurs if rectangles are perfectly
+ * aligned and adjacent, forming a larger contiguous rectangle. The function
+ * handles different packing strategies, particularly for skyline algorithms.
+ * If @p r has zero width or height, it is freed and the list is returned unchanged.
+ * The input rectangle @p r is consumed (either merged and freed, or added to the list).
+ *
+ * @param empty The list of existing empty rectangles.
+ * @param type The packing algorithm type, influencing merge logic.
+ * @param r The rectangle to merge or add.
+ * @return The updated list of empty rectangles.
+ */
 static Eina_List *
 _eina_rectangle_merge_list(Eina_List *empty, Eina_Rectangle_Packing type, Eina_Rectangle *r)
 {
@@ -223,6 +275,26 @@ start_again:
    return eina_list_append(empty, r);
 }
 
+/**
+ * @brief Finds an empty space in the list of rectangles that can fit a given width and height.
+ *
+ * Iterates through the @p empty list to find a rectangle @p r where
+ * `r->w >= w` and `r->h >= h`. If found, this space is "allocated".
+ * The coordinates of the allocated space are returned in @p x and @p y.
+ * The found rectangle @p r is then split if it's larger than the requested
+ * size. The remaining fragment(s) are re-inserted into the @p empty list
+ * after potentially being merged with other adjacent empty spaces.
+ * The splitting logic depends on the @p type of packing algorithm.
+ *
+ * @param empty The list of empty rectangles to search within.
+ * @param type The packing algorithm type, influencing splitting logic.
+ * @param w The required width.
+ * @param h The required height.
+ * @param[out] x Pointer to store the x-coordinate of the found space. Set to -1 if no space is found.
+ * @param[out] y Pointer to store the y-coordinate of the found space. Set to -1 if no space is found.
+ * @return The updated list of empty rectangles. If no suitable space is found,
+ *         @p x and @p y are set to -1 and the original list is returned.
+ */
 static Eina_List *
 _eina_rectangle_empty_space_find(Eina_List *empty, Eina_Rectangle_Packing type, int w, int h, int *x, int *y)
 {
@@ -300,6 +372,22 @@ _eina_rectangle_empty_space_find(Eina_List *empty, Eina_Rectangle_Packing type, 
    return empty;
 }
 
+/**
+ * @brief Merges a rectangle with adjacent rectangles in a list for skyline packing.
+ *
+ * This function is specific to skyline packing algorithms. It iterates through
+ * the @p empty list and attempts to merge the given rectangle @p r with
+ * adjacent rectangles in the list. Unlike `_eina_rectangle_merge_list`, this
+ * function modifies existing rectangles in the list if they become adjacent
+ * to @p r, effectively extending them. The rectangle @p r itself is not
+ * added to the list or freed by this function; it's used as a reference
+ * to update other rectangles.
+ *
+ * @param empty The list of empty rectangles (skyline segments).
+ * @param r The rectangle (representing a newly freed space or an occupied block)
+ *          to check for merging opportunities against.
+ * @return The original @p empty list, potentially with modified rectangles within it.
+ */
 static Eina_List *
 _eina_rectangle_skyline_merge_list(Eina_List *empty, Eina_Rectangle *r)
 {
@@ -330,6 +418,20 @@ _eina_rectangle_skyline_merge_list(Eina_List *empty, Eina_Rectangle *r)
    return empty;
 }
 
+/**
+ * @brief Updates a list of empty rectangles by subtracting an occupied rectangle.
+ *
+ * This function is used in skyline packing. When a new rectangle (@p rect)
+ * is placed (occupied), this function updates the @p empty list by
+ * "subtracting" the area of @p rect from any overlapping empty rectangles.
+ * An overlapping empty rectangle @p r might be split into multiple smaller
+ * empty rectangles, or resized, to account for the newly occupied space.
+ * New rectangles created from splitting are prepended to the list.
+ *
+ * @param empty The list of empty rectangles (skyline segments).
+ * @param rect The newly occupied rectangle.
+ * @return The updated list of empty rectangles.
+ */
 static Eina_List *
 _eina_rectangle_skyline_list_update(Eina_List *empty, Eina_Rectangle *rect)
 {
@@ -483,6 +585,17 @@ start_again :
    return empty;
 }
 
+/**
+ * @brief Removes redundant (fully contained) rectangles from a skyline list.
+ *
+ * In skyline packing, the list of empty rectangles can sometimes contain
+ * rectangles that are fully enclosed by other, larger empty rectangles.
+ * This function iterates through the @p empty list and removes such
+ * redundant rectangles to keep the list optimized.
+ *
+ * @param empty The list of empty rectangles (skyline segments).
+ * @return The updated list of empty rectangles with duplicates removed.
+ */
 static Eina_List *
 _eina_rectangle_skyline_list_update_duplicate(Eina_List *empty)
 {

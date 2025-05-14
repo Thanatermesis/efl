@@ -4,13 +4,25 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Structure to hold data for the API tests.
+ *
+ * This structure contains the current state of the test and a pointer
+ * to the container box of the clock widget being tested.
+ */
 struct _api_data
 {
-   unsigned int state;  /* What state we are testing       */
-   Evas_Object *box;    /* Used in set_api_state           */
+   unsigned int state;  /**< What state we are testing */
+   Evas_Object *box;    /**< Used in set_api_state */
 };
 typedef struct _api_data api_data;
 
+/**
+ * @brief Enumeration of API test states for the clock widget.
+ *
+ * Each value corresponds to a specific API function or a combination
+ * of them to be tested on the clock widget.
+ */
 enum _api_state
 {
    CLOCK_HIDE_SEC,
@@ -24,6 +36,22 @@ enum _api_state
 };
 typedef enum _api_state api_state;
 
+/**
+ * @brief Array of strings describing the API test states.
+ *
+ * This array maps the enum _api_state values to human-readable strings
+ * for display and debugging purposes. The order of strings must match the
+ * order of values in the _api_state enum.
+ *
+ * @details The array elements correspond to the following tests:
+ * - "Hide Sec": Test for `elm_clock_show_seconds_set(ck, EINA_FALSE)`.
+ * - "Show AM/PM": Test for `elm_clock_show_am_pm_set(ck, EINA_TRUE)`.
+ * - "Show Sec": Test for `elm_clock_show_seconds_set(ck, EINA_TRUE)`.
+ * - "Edit Min": Test for setting edit mode to minutes only.
+ * - "Edit Hour": Test for setting edit mode to hours only.
+ * - "Edit All": Test for setting edit mode to all fields.
+ * - "Hide AM/PM": Test for `elm_clock_show_am_pm_set(ck, EINA_FALSE)`.
+ */
 static const char* api_state_description[] = {
    "Hide Sec",
    "Show AM/PM",
@@ -35,6 +63,14 @@ static const char* api_state_description[] = {
    NULL
 };
 
+/**
+ * @brief Apply a specific API test state to the clock widget.
+ * @param api The API test data structure, containing the state to apply.
+ *
+ * This function gets the first clock widget from the box in `api->box`
+ * and applies a configuration to it based on `api->state`. This is
+ * used to cycle through different clock API tests.
+ */
 static void
 set_api_state(api_data *api)
 {
@@ -85,10 +121,20 @@ set_api_state(api_data *api)
      }
 }
 
+/**
+ * @brief Callback for the "Next API function" button click.
+ * @param data A pointer to the api_data structure.
+ * @param obj The button object that was clicked.
+ * @param event_info Not used.
+ *
+ * This function is called when the "Next API function" button is clicked.
+ * It advances the API test state, applies the new state to the clock widget,
+ * and updates the button's text to show the next state. When all states
+ * have been tested, it disables the button.
+ */
 static void
 _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
-{  /* Will add here a SWITCH command containing code to modify test-object */
-   /* in accordance a->state value. */
+{
    api_data *a = data;
    char str[128];
 
@@ -100,12 +146,34 @@ _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_disabled_set(obj, a->state == API_STATE_LAST);
 }
 
+/**
+ * @brief Callback to free allocated memory when the window is destroyed.
+ * @param data A pointer to the data to be freed (api_data structure).
+ * @param e Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This function is registered with the EVAS_CALLBACK_FREE event on the
+ * window. It is responsible for freeing the `api_data` structure
+ * allocated for the test.
+ */
 static void
 _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Main test function for the clock widget.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This function creates a window and displays multiple instances of the
+ * clock widget with different configurations to test various features
+ * like AM/PM mode, seconds display, and edit mode. It also includes
+ * a button to cycle through API tests on one of the clock instances.
+ */
 void
 test_clock(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -185,6 +253,16 @@ test_clock(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_inf
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback to toggle the edit mode of a clock widget.
+ * @param data A pointer to the clock widget.
+ * @param obj The button object that was clicked.
+ * @param event_info Not used.
+ *
+ * This function is called when the "Edit"/"Done" button is clicked. It
+ * toggles the clock's edit mode via `elm_clock_edit_set()` and updates
+ * the button's label accordingly.
+ */
 static void
 _edit_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -200,6 +278,16 @@ _edit_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_clock_edit_set(ck, EINA_FALSE);
 }
 
+/**
+ * @brief Callback to toggle the 12/24 hour mode of a clock widget.
+ * @param data A pointer to the clock widget.
+ * @param obj The button object that was clicked.
+ * @param event_info Not used.
+ *
+ * This function is called when the "12h"/"24h" button is clicked. It
+ * toggles the AM/PM display on the clock via `elm_clock_show_am_pm_set()`
+ * and updates the button's label accordingly.
+ */
 static void
 _hmode_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -215,6 +303,14 @@ _hmode_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_clock_show_am_pm_set(ck, EINA_FALSE);
 }
 
+/**
+ * @brief Timer callback to pause the clock.
+ * @param data A pointer to the clock widget to be paused.
+ * @return EINA_FALSE to stop the timer from recurring.
+ *
+ * This function is called by a timer. It pauses the given clock widget
+ * and updates the corresponding button's text to "Resume".
+ */
 static Eina_Bool
 _pause_cb(void *data)
 {
@@ -225,6 +321,16 @@ _pause_cb(void *data)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Callback to pause or resume a clock widget.
+ * @param data A pointer to the clock widget.
+ * @param obj The button object that was clicked.
+ * @param event_info Not used.
+ *
+ * Toggles the paused state of the clock. When resuming, it also starts a
+ * 2-second timer that will pause the clock again automatically. This is
+ * to test the pause functionality.
+ */
 static void
 _pause_resume_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -241,6 +347,17 @@ _pause_resume_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNU
    ecore_timer_add(2, _pause_cb, ck);
 }
 
+/**
+ * @brief Test function for clock editing features.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This function creates a window with a clock widget and buttons to test
+ * its editing capabilities. It includes a button to cycle through various
+ * API states related to editing, and buttons to toggle edit mode and
+ * 12/24 hour format.
+ */
 void
 test_clock_edit(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -300,6 +417,17 @@ test_clock_edit(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *even
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for clock's "first interval" feature in edit mode.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This function tests the `elm_clock_first_interval_set()` API. It creates
+ * three clock widgets in edit mode, each with a different first interval
+ * value (0.4s, 1.2s, 2.0s). This interval is the delay before the time value
+ * starts changing continuously when an up/down arrow is held down.
+ */
 void
 test_clock_edit2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -346,6 +474,17 @@ test_clock_edit2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *eve
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for clock's pause and resume functionality.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This function creates a window with a clock and a "Pause" button.
+ * Clicking the button toggles the clock's paused state. The test also
+ * includes a timer that automatically pauses the clock 2 seconds after it's
+ * been resumed, to demonstrate the functionality.
+ */
 void
 test_clock_pause(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

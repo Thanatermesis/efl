@@ -4,6 +4,15 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Callback function for the first button click.
+ *
+ * This function creates and shows a legacy Elementary dialog window.
+ *
+ * @param data The parent Evas_Object (window).
+ * @param obj The Evas_Object that triggered the event (button).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _bt_clicked_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -23,6 +32,17 @@ _bt_clicked_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_U
    evas_object_show(dia);
 }
 
+/**
+ * @brief Callback function for the second button click.
+ *
+ * This function creates and shows a non-resizable EFL UI dialog window.
+ * The dialog's size is fixed by setting min and max hint sizes to the same value
+ * and hint weight to 0.
+ *
+ * @param data The parent Efl_Canvas_Object (window).
+ * @param obj The Evas_Object that triggered the event (button).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _bt2_clicked_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -50,6 +70,15 @@ _bt2_clicked_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_
    efl_content_set(dia, lb);
 }
 
+/**
+ * @brief Callback function for dialog size or hints changed events.
+ *
+ * Updates a label with the dialog's current, minimum (requested and effective),
+ * and maximum sizes.
+ *
+ * @param data The Evas_Object (label) to update with size information.
+ * @param ev The Efl_Event that occurred.
+ */
 static void
 _size_update(void *data, const Efl_Event *ev)
 {
@@ -71,6 +100,17 @@ _size_update(void *data, const Efl_Event *ev)
    elm_object_text_set(lbl, buf);
 }
 
+/**
+ * @brief Callback function for the third button click.
+ *
+ * This function creates and shows an EFL UI dialog window with application-defined
+ * minimum and maximum sizes. The dialog's size information is updated dynamically
+ * in a label within the dialog.
+ *
+ * @param data The parent Efl_Canvas_Object (window).
+ * @param obj The Evas_Object that triggered the event (button).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _bt3_clicked_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -97,6 +137,18 @@ _bt3_clicked_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_
    efl_gfx_hint_size_max_set(dia, EINA_SIZE2D(ELM_SCALE_SIZE(800), ELM_SCALE_SIZE(600)));
 }
 
+/**
+ * @brief Callback function for the fourth button click.
+ *
+ * This function creates and shows an EFL UI dialog window that is centered
+ * on the screen and has application-defined minimum and maximum sizes.
+ * The dialog's size information is updated dynamically in a label.
+ * The parent of this dialog is the main loop, not a specific window.
+ *
+ * @param data Unused.
+ * @param obj The Evas_Object that triggered the event (button).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _bt4_clicked_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -126,6 +178,20 @@ _bt4_clicked_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *even
    efl_ui_win_center(dia, EINA_TRUE, EINA_TRUE);
 }
 
+/**
+ * @brief Main test function for window dialogs.
+ *
+ * This function creates a main window and adds several buttons to it.
+ * Each button, when clicked, demonstrates a different type of dialog window:
+ * - A legacy Elementary dialog.
+ * - A non-resizable EFL UI dialog.
+ * - An EFL UI dialog with min/max sizes.
+ * - A centered EFL UI dialog with min/max sizes.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_win_dialog(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

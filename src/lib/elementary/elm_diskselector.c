@@ -60,6 +60,12 @@ _elm_diskselector_efl_ui_l10n_translation_update(Eo *obj EINA_UNUSED, Elm_Diskse
      elm_wdg_item_translate(EO_OBJ(it));
 }
 
+/**
+ * @brief Updates the visual state of all displayable items to indicate
+ *        which one is currently selected.
+ * @param item The item to be marked as selected. Its corresponding
+ *             round items will also be updated.
+ */
 static void
 _selected_item_indicate(Elm_Diskselector_Item_Data *item)
 {
@@ -79,6 +85,11 @@ _selected_item_indicate(Elm_Diskselector_Item_Data *item)
      }
 }
 
+/**
+ * @brief Selects the given item, updates its visual state, and
+ *        triggers associated callbacks.
+ * @param it The diskselector item to select.
+ */
 static void
 _item_select(Elm_Diskselector_Item_Data *it)
 {
@@ -94,6 +105,11 @@ _item_select(Elm_Diskselector_Item_Data *it)
    evas_object_smart_callback_call(WIDGET(it), "selected", eo_it);
 }
 
+/**
+ * @brief Counts the number of UTF-8 characters in a string.
+ * @param str The UTF-8 string.
+ * @return The number of characters in the string.
+ */
 static int
 _letters_count(const char *str)
 {
@@ -109,6 +125,14 @@ _letters_count(const char *str)
    return chnum;
 }
 
+/**
+ * @brief Finds the byte position of the Nth UTF-8 character in a string.
+ * @param str The UTF-8 string.
+ * @param length The number of UTF-8 characters to count.
+ * @return The byte offset from the start of the string to the
+ *         character immediately following the Nth character, or the byte
+ *         offset to the end of the string if it has fewer than N characters.
+ */
 static int
 _letters_check(const char *str,
                int length)
@@ -125,6 +149,12 @@ _letters_check(const char *str,
 
    return pos;
 }
+
+/**
+ * @brief Emits an Edje signal on the item's view based on whether it
+ *        contains an icon only, text only, or both.
+ * @param it The diskselector item.
+ */
 static void
 _item_signal_emit(Elm_Diskselector_Item_Data *it)
 {
@@ -136,6 +166,14 @@ _item_signal_emit(Elm_Diskselector_Item_Data *it)
      edje_object_signal_emit(VIEW(it), "elm,state,text,icon", "elm");
 }
 
+/**
+ * @brief Idle enterer callback to update item labels, potentially truncating
+ *        them based on their visibility and position within the diskselector.
+ *        This is used to shorten labels of items that are partially visible
+ *        or at the sides.
+ * @param data The Evas_Object (diskselector widget) pointer.
+ * @return ECORE_CALLBACK_CANCEL to remove the idle enterer.
+ */
 static Eina_Bool
 _string_check_idle_enterer_cb(void *data)
 {
@@ -227,6 +265,12 @@ _string_check_idle_enterer_cb(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Ensures that the string check (label truncation) logic is executed.
+ *        It cancels any pending idle enterer for string checking and then
+ *        calls the string check callback directly.
+ * @param data The Evas_Object (diskselector widget) pointer.
+ */
 static void
 _string_check(void *data)
 {
@@ -239,6 +283,12 @@ _string_check(void *data)
    _string_check_idle_enterer_cb(data);
 }
 
+/**
+ * @brief Idle enterer callback to scroll the diskselector to make the
+ *        currently selected item fully visible and centered if possible.
+ * @param data The Evas_Object (diskselector widget) pointer.
+ * @return ECORE_CALLBACK_CANCEL to remove the idle enterer.
+ */
 static Eina_Bool
 _scroller_move(void *data)
 {
@@ -294,6 +344,11 @@ _resize_cb(void *data EINA_UNUSED,
            Evas_Object *obj,
            void *event_info EINA_UNUSED)
 {
+   /**
+    * @brief Callback for Evas resize events on the diskselector widget.
+    * It recalculates minimum sizes, resizes the internal box holding items,
+    * and updates scroller paging. It also schedules a scroller move if needed.
+    */
    Evas_Coord w, h, vw = 0, vh = 0, mw = 0, mh = 0;
    ELM_DISKSELECTOR_DATA_GET(obj, sd);
    ELM_WIDGET_DATA_GET_OR_RETURN(obj, wd);
@@ -332,6 +387,12 @@ _resize_cb(void *data EINA_UNUSED,
      sd->scroller_move_idle_enterer = ecore_idle_enterer_before_add(_scroller_move, obj);
 }
 
+/**
+ * @brief Cleans up resources associated with a diskselector item,
+ *        decrementing the total item count and freeing stringshares.
+ *        Does not remove the item from lists or delete its Evas objects.
+ * @param item The diskselector item to clean up.
+ */
 static void
 _item_del(Elm_Diskselector_Item_Data *item)
 {
@@ -343,6 +404,11 @@ _item_del(Elm_Diskselector_Item_Data *item)
    evas_object_del(item->icon);
 }
 
+/**
+ * @brief Triggers a re-evaluation of the diskselector's sizing.
+ *        Essentially a wrapper around _resize_cb.
+ * @param obj The diskselector widget.
+ */
 static void
 _sizing_eval(Evas_Object *obj)
 {

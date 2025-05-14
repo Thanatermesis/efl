@@ -43,7 +43,19 @@ EOAPI EFL_VOID_FUNC_BODYV_CONST(elm_obj_gengrid_align_get, EFL_FUNC_CALL(align_x
 
 void _elm_gengrid_filled_set(Eo *obj, Elm_Gengrid_Data *pd, Eina_Bool fill);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the "filled" property set operation.
+ *
+ * This function is utilized by the Eolian reflection system to set the "filled"
+ * property of an Elm_Gengrid object using an Eina_Value. It converts the
+ * Eina_Value to an Eina_Bool and then calls the concrete implementation
+ * _elm_gengrid_filled_set().
+ *
+ * @param obj The Elm_Gengrid object.
+ * @param val An Eina_Value containing the boolean value for the "filled" state.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code if conversion fails.
+ */
 static Eina_Error
 __eolian_elm_gengrid_filled_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -63,7 +75,17 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_gengrid_filled_set, EFL_FUNC_CALL(fill), Eina_
 
 Eina_Bool _elm_gengrid_filled_get(const Eo *obj, Elm_Gengrid_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the "filled" property get operation.
+ *
+ * This function is utilized by the Eolian reflection system to get the "filled"
+ * property of an Elm_Gengrid object and return it as an Eina_Value. It calls
+ * the concrete implementation _elm_gengrid_filled_get() and wraps the result.
+ *
+ * @param obj The Elm_Gengrid object.
+ * @return An Eina_Value containing the boolean "filled" state.
+ */
 static Eina_Value
 __eolian_elm_gengrid_filled_get_reflect(const Eo *obj)
 {
@@ -75,7 +97,16 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_gengrid_filled_get, Eina_Bool, 0);
 
 void _elm_gengrid_multi_select_set(Eo *obj, Elm_Gengrid_Data *pd, Eina_Bool multi);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the "multi_select" property set operation.
+ *
+ * Used by the Eolian reflection system to set the "multi_select" property.
+ * Converts an Eina_Value to Eina_Bool and calls elm_obj_gengrid_multi_select_set().
+ * @param obj The Elm_Gengrid object.
+ * @param val Eina_Value containing the boolean for "multi_select".
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 static Eina_Error
 __eolian_elm_gengrid_multi_select_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -95,7 +126,15 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_gengrid_multi_select_set, EFL_FUNC_CALL(multi)
 
 Eina_Bool _elm_gengrid_multi_select_get(const Eo *obj, Elm_Gengrid_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the "multi_select" property get operation.
+ *
+ * Used by the Eolian reflection system to get the "multi_select" property.
+ * Calls elm_obj_gengrid_multi_select_get() and wraps the Eina_Bool result in an Eina_Value.
+ * @param obj The Elm_Gengrid object.
+ * @return Eina_Value containing the "multi_select" state.
+ */
 static Eina_Value
 __eolian_elm_gengrid_multi_select_get_reflect(const Eo *obj)
 {
@@ -123,7 +162,16 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_gengrid_select_mode_get, Elm_Object_Select_Mod
 
 void _elm_gengrid_reorder_mode_set(Eo *obj, Elm_Gengrid_Data *pd, Eina_Bool reorder_mode);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the "reorder_mode" property set operation.
+ *
+ * Used by the Eolian reflection system to set the "reorder_mode" property.
+ * Converts an Eina_Value to Eina_Bool and calls elm_obj_gengrid_reorder_mode_set().
+ * @param obj The Elm_Gengrid object.
+ * @param val Eina_Value containing the boolean for "reorder_mode".
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 static Eina_Error
 __eolian_elm_gengrid_reorder_mode_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -143,7 +191,15 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_gengrid_reorder_mode_set, EFL_FUNC_CALL(reorde
 
 Eina_Bool _elm_gengrid_reorder_mode_get(const Eo *obj, Elm_Gengrid_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the "reorder_mode" property get operation.
+ *
+ * Used by the Eolian reflection system to get the "reorder_mode" property.
+ * Calls elm_obj_gengrid_reorder_mode_get() and wraps the Eina_Bool result in an Eina_Value.
+ * @param obj The Elm_Gengrid object.
+ * @return Eina_Value containing the "reorder_mode" state.
+ */
 static Eina_Value
 __eolian_elm_gengrid_reorder_mode_get_reflect(const Eo *obj)
 {
@@ -155,7 +211,16 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_gengrid_reorder_mode_get, Eina_Bool, 0);
 
 void _elm_gengrid_highlight_mode_set(Eo *obj, Elm_Gengrid_Data *pd, Eina_Bool highlight);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the "highlight_mode" property set operation.
+ *
+ * Used by the Eolian reflection system to set the "highlight_mode" property.
+ * Converts an Eina_Value to Eina_Bool and calls elm_obj_gengrid_highlight_mode_set().
+ * @param obj The Elm_Gengrid object.
+ * @param val Eina_Value containing the boolean for "highlight_mode".
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 static Eina_Error
 __eolian_elm_gengrid_highlight_mode_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -175,7 +240,15 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_gengrid_highlight_mode_set, EFL_FUNC_CALL(high
 
 Eina_Bool _elm_gengrid_highlight_mode_get(const Eo *obj, Elm_Gengrid_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the "highlight_mode" property get operation.
+ *
+ * Used by the Eolian reflection system to get the "highlight_mode" property.
+ * Calls elm_obj_gengrid_highlight_mode_get() and wraps the Eina_Bool result in an Eina_Value.
+ * @param obj The Elm_Gengrid object.
+ * @return Eina_Value containing the "highlight_mode" state.
+ */
 static Eina_Value
 __eolian_elm_gengrid_highlight_mode_get_reflect(const Eo *obj)
 {
@@ -207,7 +280,16 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_gengrid_multi_select_mode_get, Elm_Object_Mult
 
 void _elm_gengrid_horizontal_set(Eo *obj, Elm_Gengrid_Data *pd, Eina_Bool horizontal);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the "horizontal" property set operation.
+ *
+ * Used by the Eolian reflection system to set the "horizontal" property.
+ * Converts an Eina_Value to Eina_Bool and calls elm_obj_gengrid_horizontal_set().
+ * @param obj The Elm_Gengrid object.
+ * @param val Eina_Value containing the boolean for "horizontal" mode.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 static Eina_Error
 __eolian_elm_gengrid_horizontal_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -227,7 +309,15 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_gengrid_horizontal_set, EFL_FUNC_CALL(horizont
 
 Eina_Bool _elm_gengrid_horizontal_get(const Eo *obj, Elm_Gengrid_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the "horizontal" property get operation.
+ *
+ * Used by the Eolian reflection system to get the "horizontal" property.
+ * Calls elm_obj_gengrid_horizontal_get() and wraps the Eina_Bool result in an Eina_Value.
+ * @param obj The Elm_Gengrid object.
+ * @return Eina_Value containing the "horizontal" mode state.
+ */
 static Eina_Value
 __eolian_elm_gengrid_horizontal_get_reflect(const Eo *obj)
 {
@@ -400,7 +490,17 @@ Efl_Ui_Focus_Object *_elm_gengrid_efl_ui_focus_manager_manager_focus_get(const E
 
 Efl_Ui_Focus_Object *_elm_gengrid_efl_ui_focus_manager_move(Eo *obj, Elm_Gengrid_Data *pd, Efl_Ui_Focus_Direction direction);
 
-
+/**
+ * @internal
+ * @brief Initializes the Elm_Gengrid Efl_Class structure.
+ *
+ * This function is called once during class construction. It sets up
+ * the Evas Object operations (methods), Eolian property reflection capabilities,
+ * and other class-specific initializations for Elm_Gengrid.
+ *
+ * @param klass The Efl_Class (Elm_Gengrid_Class) to initialize.
+ * @return EINA_TRUE on successful initialization, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_gengrid_class_initializer(Efl_Class *klass)
 {

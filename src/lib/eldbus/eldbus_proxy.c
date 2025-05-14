@@ -9,35 +9,59 @@
  * Eldbus_Proxy_Context_Event
  */
 
+/**
+ * @internal
+ * @brief Represents a callback registered for a proxy event.
+ *
+ * This structure holds information about a single callback function
+ * registered to be invoked when a specific Eldbus_Proxy_Event_Type occurs.
+ * It's part of an Eina_Inlist to allow multiple callbacks for the same event.
+ */
 typedef struct _Eldbus_Proxy_Context_Event_Cb
 {
-   EINA_INLIST;
-   Eldbus_Proxy_Event_Cb cb;
-   const void          *cb_data;
-   Eina_Bool            deleted : 1;
+   EINA_INLIST; /**< Macro to make this struct usable with Eina_Inlist */
+   Eldbus_Proxy_Event_Cb cb; /**< The user-provided callback function */
+   const void          *cb_data; /**< User data to be passed to the callback */
+   Eina_Bool            deleted : 1; /**< Flag to mark if the callback is scheduled for deletion */
 } Eldbus_Proxy_Context_Event_Cb;
 
+/**
+ * @internal
+ * @brief Manages event callbacks for a specific proxy event type.
+ *
+ * This structure holds a list of registered callbacks (Eldbus_Proxy_Context_Event_Cb)
+ * for a particular Eldbus_Proxy_Event_Type. It also manages the state during
+ * callback invocation to handle safe deletion of callbacks.
+ */
 typedef struct _Eldbus_Proxy_Context_Event
 {
-   Eina_Inlist *list;
-   int          walking;
-   Eina_List   *to_delete;
+   Eina_Inlist *list; /**< Inlist of Eldbus_Proxy_Context_Event_Cb for this event type */
+   int          walking; /**< Counter to detect if we are currently iterating (walking) the callback list. Used to prevent modification during iteration. */
+   Eina_List   *to_delete; /**< List of callbacks to be deleted after the current iteration finishes. */
 } Eldbus_Proxy_Context_Event;
 
+/**
+ * @internal
+ * @brief Represents a D-Bus proxy object.
+ *
+ * This structure encapsulates all the necessary information for interacting
+ * with a remote D-Bus object's interface. It manages references, pending calls,
+ * signal handlers, and properties associated with the proxy.
+ */
 struct _Eldbus_Proxy
 {
-   EINA_MAGIC;
+   EINA_MAGIC; /**< Magic number for type checking */
    int                       refcount;
-   Eldbus_Object             *obj;
-   const char               *interface;
-   Eina_Inlist              *pendings;
-   Eina_List                *handlers;
-   Eina_Inlist              *cbs_free;
-   Eina_Inlist              *data;
-   Eldbus_Proxy_Context_Event event_handlers[ELDBUS_PROXY_EVENT_LAST];
-   Eina_Hash *props;
-   Eldbus_Signal_Handler *properties_changed;
-   Eina_Bool monitor_enabled:1;
+   Eldbus_Object             *obj; /**< The parent Eldbus_Object this proxy belongs to */
+   const char               *interface; /**< The D-Bus interface name this proxy represents */
+   Eina_Inlist              *pendings; /**< Inlist of Eldbus_Pending calls associated with this proxy */
+   Eina_List                *handlers; /**< List of Eldbus_Signal_Handler instances attached to this proxy */
+   Eina_Inlist              *cbs_free; /**< Inlist of Eldbus_Free_Cb callbacks to be called when the proxy is freed */
+   Eina_Inlist              *data; /**< Inlist for storing arbitrary user data associated with this proxy (key-value pairs) */
+   Eldbus_Proxy_Context_Event event_handlers[ELDBUS_PROXY_EVENT_LAST]; /**< Array to store event handlers for different proxy event types */
+   Eina_Hash *props; /**< Hash table for caching properties of this proxy, if monitoring is enabled or properties are fetched. Keys are property names (const char *), values are Eina_Value*. */
+   Eldbus_Signal_Handler *properties_changed; /**< Signal handler for the standard org.freedesktop.DBus.Properties.PropertiesChanged signal */
+   Eina_Bool monitor_enabled:1; /**< Flag indicating if property monitoring is active for this proxy */
 };
 
 #define ELDBUS_PROXY_CHECK(proxy)                         \
@@ -94,6 +118,16 @@ static void _eldbus_proxy_event_callback_call(Eldbus_Proxy *proxy, Eldbus_Proxy_
 static void _eldbus_proxy_context_event_cb_del(Eldbus_Proxy_Context_Event *ce, Eldbus_Proxy_Context_Event_Cb *ctx);
 static void _on_signal_handler_free(void *data, const void *dead_pointer);
 
+/**
+ * @internal
+ * @brief Invokes ELDBUS_PROXY_EVENT_DEL callbacks and clears them.
+ *
+ * This function is called when a proxy is being deleted. It triggers any
+ * registered ELDBUS_PROXY_EVENT_DEL callbacks and then removes them to
+ * prevent double invocation during the final cleanup in _eldbus_proxy_clear.
+ *
+ * @param proxy The proxy object that is being deleted.
+ */
 static void
 _eldbus_proxy_call_del(Eldbus_Proxy *proxy)
 {
@@ -115,6 +149,18 @@ _eldbus_proxy_call_del(Eldbus_Proxy *proxy)
      }
 }
 
+/**
+ * @internal
+ * @brief Cleans up resources associated with an Eldbus_Proxy.
+ *
+ * This function is responsible for releasing resources held by the proxy,
+ * such as signal handlers, pending calls, and free callbacks. It's typically
+ * called when the proxy's reference count drops to zero or when its parent
+ * object is freed. It also calls _eldbus_proxy_call_del to handle DEL event
+ * callbacks.
+ *
+ * @param proxy The proxy object to clear.
+ */
 static void
 _eldbus_proxy_clear(Eldbus_Proxy *proxy)
 {
@@ -155,6 +201,17 @@ _eldbus_proxy_clear(Eldbus_Proxy *proxy)
    proxy->refcount = 0;
 }
 
+/**
+ * @internal
+ * @brief Frees the memory allocated for an Eldbus_Proxy structure.
+ *
+ * This function performs the final cleanup and deallocation of the proxy
+ * object itself. It iterates through event handlers, frees associated lists,
+ * unreferences the interface string, and finally frees the proxy structure.
+ * This is called after _eldbus_proxy_clear has run.
+ *
+ * @param proxy The proxy object to free.
+ */
 static void
 _eldbus_proxy_free(Eldbus_Proxy *proxy)
 {
@@ -192,6 +249,19 @@ _eldbus_proxy_free(Eldbus_Proxy *proxy)
    free(proxy);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when the parent Eldbus_Object of a proxy is freed.
+ *
+ * This function is registered as a free callback with the parent Eldbus_Object.
+ * When the parent object is freed, this callback ensures that the associated
+ * proxy is also properly cleaned up and freed. It first deletes all associated
+ * user data, then calls _eldbus_proxy_clear to release resources, and finally
+ * _eldbus_proxy_free to deallocate the proxy structure.
+ *
+ * @param data The Eldbus_Proxy object associated with the freed Eldbus_Object.
+ * @param dead_pointer The Eldbus_Object that is being freed (unused).
+ */
 static void
 _on_object_free(void *data, const void *dead_pointer EINA_UNUSED)
 {
@@ -235,8 +305,20 @@ cleanup:
    return NULL;
 }
 
+// Forward declaration, actual definition is later in the file.
 static void _on_signal_handler_free(void *data, const void *dead_pointer);
 
+/**
+ * @internal
+ * @brief Decrements the reference count of an Eldbus_Proxy and frees it if count reaches zero.
+ *
+ * This is the internal implementation for unreferencing a proxy. It decrements
+ * the refcount. If the refcount becomes zero, it removes the object free callback,
+ * deletes all associated user data, clears proxy resources via _eldbus_proxy_clear,
+ * and finally frees the proxy structure via _eldbus_proxy_free.
+ *
+ * @param proxy The proxy object to unreference.
+ */
 static void
 _eldbus_proxy_unref(Eldbus_Proxy *proxy)
 {
@@ -309,9 +391,29 @@ eldbus_proxy_data_del(Eldbus_Proxy *proxy, const char *key)
    return eldbus_data_del(&(((Eldbus_Proxy *)proxy)->data), key);
 }
 
+/**
+ * @internal
+ * @brief Converts a D-Bus variant (from a message iterator) to an Eina_Value and stores it in a hash.
+ *
+ * This function takes a D-Bus message iterator pointing to a variant,
+ * extracts its value, converts it into an Eina_Value, and then sets or updates
+ * this Eina_Value in the provided Eina_Hash (props) using the given key.
+ * If the key doesn't exist in the hash, a new Eina_Value is created and added.
+ * If it exists, the existing Eina_Value is updated.
+ *
+ * The D-Bus variant is expected to be a struct containing a single element,
+ * which is the actual value of the property. This is typical for how properties
+ * are represented in D-Bus (e.g., in PropertiesChanged signals or GetAll results).
+ *
+ * @param props The Eina_Hash (property cache) where the Eina_Value will be stored.
+ * @param key The property name (key for the hash).
+ * @param var An Eldbus_Message_Iter pointing to the D-Bus variant (typically 'v').
+ * @return The Eina_Value that was set or updated in the hash.
+ */
 static Eina_Value *
 _iter_hash_value_set(Eina_Hash *props, const char *key, Eldbus_Message_Iter *var) EINA_ARG_NONNULL(1, 2, 3)
 {
+   // Convert the D-Bus variant (expected to be a struct with one member) to an Eina_Value.
    Eina_Value *st_value = _message_iter_struct_to_eina_value(var);
    Eina_Value *value;
    Eina_Value stack_value;
@@ -333,6 +435,20 @@ _iter_hash_value_set(Eina_Hash *props, const char *key, Eldbus_Message_Iter *var
    return value;
 }
 
+/**
+ * @internal
+ * @brief Callback function for iterating over changed properties in a D-Bus PropertiesChanged signal.
+ *
+ * This function is used with eldbus_message_iter_dict_iterate to process each
+ * property in the "properties changed" dictionary of a PropertiesChanged signal.
+ * For each property, it updates the local property cache (proxy->props) using
+ * _iter_hash_value_set and then triggers the ELDBUS_PROXY_EVENT_PROPERTY_CHANGED
+ * event for that specific property.
+ *
+ * @param data The Eldbus_Proxy instance.
+ * @param key The name of the property that changed (const char *).
+ * @param var An Eldbus_Message_Iter pointing to the new D-Bus variant value of the property.
+ */
 static void
 _property_changed_iter(void *data, const void *key, Eldbus_Message_Iter *var)
 {
@@ -348,11 +464,28 @@ _property_changed_iter(void *data, const void *key, Eldbus_Message_Iter *var)
                                      &event);
 }
 
+/**
+ * @internal
+ * @brief Handles the org.freedesktop.DBus.Properties.PropertiesChanged signal.
+ *
+ * This function is registered as a callback for the PropertiesChanged signal.
+ * It parses the signal message, which contains the interface name, a dictionary
+ * of changed properties (name to new variant value), and an array of invalidated
+ * property names.
+ *
+ * It iterates through the changed properties, updating the local cache and
+ * emitting ELDBUS_PROXY_EVENT_PROPERTY_CHANGED events.
+ * It then iterates through the invalidated properties, removing them from the
+ * cache and emitting ELDBUS_PROXY_EVENT_PROPERTY_REMOVED events.
+ *
+ * @param data The Eldbus_Proxy instance.
+ * @param msg The Eldbus_Message containing the PropertiesChanged signal data.
+ */
 static void
 _properties_changed(void *data, const Eldbus_Message *msg)
 {
    Eldbus_Proxy *proxy = data;
-   Eldbus_Message_Iter *array, *invalidate;
+   Eldbus_Message_Iter *array, *invalidate; // Iterators for changed properties dictionary and invalidated properties array
    const char *iface;
    const char *invalidate_prop;
 
@@ -378,6 +511,16 @@ _properties_changed(void *data, const Eldbus_Message *msg)
      }
 }
 
+/**
+ * @internal
+ * @brief Frees an Eina_Value stored in the properties cache.
+ *
+ * This function is used as a callback for eina_hash_string_superfast_new
+ * to automatically free Eina_Value objects when they are removed from the
+ * proxy's properties cache (proxy->props).
+ *
+ * @param data The Eina_Value to be freed.
+ */
 static void
 _props_cache_free(void *data)
 {
@@ -424,6 +567,16 @@ eldbus_proxy_event_callback_add(Eldbus_Proxy *proxy, Eldbus_Proxy_Event_Type typ
      }
 }
 
+/**
+ * @internal
+ * @brief Deletes a specific event callback context.
+ *
+ * Removes the given Eldbus_Proxy_Context_Event_Cb (ctx) from the event
+ * context's (ce) list of callbacks and frees the memory associated with ctx.
+ *
+ * @param ce The Eldbus_Proxy_Context_Event from which to remove the callback.
+ * @param ctx The Eldbus_Proxy_Context_Event_Cb to remove and free.
+ */
 static void
 _eldbus_proxy_context_event_cb_del(Eldbus_Proxy_Context_Event *ce, Eldbus_Proxy_Context_Event_Cb *ctx)
 {
@@ -495,6 +648,21 @@ eldbus_proxy_event_callback_del(Eldbus_Proxy *proxy, Eldbus_Proxy_Event_Type typ
      }
 }
 
+/**
+ * @internal
+ * @brief Invokes all registered callbacks for a given proxy event type.
+ *
+ * Iterates through the list of registered callbacks for the specified event type
+ * and calls each one. It handles safe deletion of callbacks by marking them
+ * as deleted if a deletion request occurs during the iteration, and then
+ * actually removing them after the iteration is complete.
+ *
+ * @param proxy The Eldbus_Proxy instance.
+ * @param type The Eldbus_Proxy_Event_Type for which to call callbacks.
+ * @param event_info The event-specific data to pass to the callbacks.
+ *                   For example, for ELDBUS_PROXY_EVENT_PROPERTY_CHANGED, this would be
+ *                   an Eldbus_Proxy_Event_Property_Changed struct.
+ */
 static void
 _eldbus_proxy_event_callback_call(Eldbus_Proxy *proxy, Eldbus_Proxy_Event_Type type, const void *event_info)
 {
@@ -542,6 +710,23 @@ _on_proxy_message_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *pend
    cb(data, msg, pending);
 }
 
+/**
+ * @internal
+ * @brief Internal implementation for sending a message via a proxy.
+ *
+ * This function sends a message through the connection associated with the proxy.
+ * If a callback `cb` is provided, it wraps this callback with `_on_proxy_message_cb`
+ * to manage the pending call's lifecycle within the proxy's list of pendings.
+ * The original user callback and the proxy itself are stored as data on the
+ * Eldbus_Pending object.
+ *
+ * @param proxy The proxy through which to send the message.
+ * @param msg The message to send.
+ * @param cb User callback for the reply or NULL if no reply/callback is needed.
+ * @param cb_data User data for the callback.
+ * @param timeout Timeout in milliseconds.
+ * @return An Eldbus_Pending object if a callback is provided, otherwise NULL.
+ */
 static Eldbus_Pending *
 _eldbus_proxy_send(Eldbus_Proxy *proxy, Eldbus_Message *msg, Eldbus_Message_Cb cb, const void *cb_data, double timeout)
 {
@@ -564,6 +749,18 @@ _eldbus_proxy_send(Eldbus_Proxy *proxy, Eldbus_Message *msg, Eldbus_Message_Cb c
    return pending;
 }
 
+/**
+ * @internal
+ * @brief Internal implementation for sending a message and blocking for a reply.
+ *
+ * This function simply forwards the call to the connection's send_and_block
+ * function, using the connection associated with the proxy's object.
+ *
+ * @param proxy The proxy through which to send the message.
+ * @param msg The message to send.
+ * @param timeout Timeout in milliseconds.
+ * @return The reply message, an error message, or NULL on timeout/error.
+ */
 static Eldbus_Message *
 _eldbus_proxy_send_and_block(Eldbus_Proxy *proxy, Eldbus_Message *msg, double timeout)
 {
@@ -601,6 +798,23 @@ eldbus_proxy_method_call_new(Eldbus_Proxy *proxy, const char *member)
    return msg;
 }
 
+/**
+ * @internal
+ * @brief Internal implementation for calling a D-Bus method with va_list arguments.
+ *
+ * This function creates a new method call message, appends arguments from the
+ * va_list based on the provided signature, and then sends the message using
+ * _eldbus_proxy_send.
+ *
+ * @param proxy The proxy on which to call the method.
+ * @param member The name of the method to call.
+ * @param cb Callback for the reply.
+ * @param cb_data User data for the callback.
+ * @param timeout Timeout in milliseconds.
+ * @param signature D-Bus signature string for the arguments.
+ * @param ap va_list of arguments.
+ * @return An Eldbus_Pending object for the method call.
+ */
 static Eldbus_Pending *
 _eldbus_proxy_vcall(Eldbus_Proxy *proxy, const char *member, Eldbus_Message_Cb cb, const void *cb_data, double timeout, const char *signature, va_list ap)
 {
@@ -620,6 +834,40 @@ _eldbus_proxy_vcall(Eldbus_Proxy *proxy, const char *member, Eldbus_Message_Cb c
 EAPI Eldbus_Pending *
 eldbus_proxy_call(Eldbus_Proxy *proxy, const char *member, Eldbus_Message_Cb cb, const void *cb_data, double timeout, const char *signature, ...)
 {
+   /**
+    * @page eldbus_proxy_call_example Eldbus_proxy_call Example
+    *
+    * @code
+    * // Example: Calling a method "TestMethod" on interface "com.example.Interface"
+    * // which takes an integer (i) and a string (s) and returns a boolean (b).
+    *
+    * void on_method_reply(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
+    * {
+    *    Eldbus_Proxy *proxy = data;
+    *    const char *errname, *errmsg;
+    *    Eina_Bool result;
+    *
+    *    if (eldbus_message_error_get(msg, &errname, &errmsg))
+    *    {
+    *        fprintf(stderr, "Error: %s %s\n", errname, errmsg);
+    *        return;
+    *    }
+    *
+    *    if (!eldbus_message_arguments_get(msg, "b", &result))
+    *    {
+    *        fprintf(stderr, "Error getting arguments from reply\n");
+    *        return;
+    *    }
+    *    printf("Method returned: %s\n", result ? "true" : "false");
+    * }
+    *
+    * // ... assuming proxy is a valid Eldbus_Proxy* ...
+    * int32_t my_int = 42;
+    * const char *my_string = "hello world";
+    *
+    * eldbus_proxy_call(proxy, "TestMethod", on_method_reply, proxy, -1, "is", my_int, my_string);
+    * @endcode
+    */
    Eldbus_Pending *pending;
    va_list ap;
 
@@ -663,6 +911,30 @@ eldbus_proxy_signal_handler_add(Eldbus_Proxy *proxy, const char *member, Eldbus_
    ELDBUS_PROXY_CHECK_RETVAL(proxy, NULL);
    EINA_SAFETY_ON_NULL_RETURN_VAL(cb, NULL);
 
+   /**
+    * Example of cb_data usage:
+    * @code
+    * typedef struct {
+    *     int id;
+    *     const char *description;
+    * } MySignalData;
+    *
+    * void my_signal_callback(void *data, const Eldbus_Message *message) {
+    *     MySignalData *signal_info = data;
+    *     // Process signal using signal_info->id and signal_info->description
+    *     // ... extract arguments from message ...
+    * }
+    *
+    * MySignalData *user_data = malloc(sizeof(MySignalData));
+    * user_data->id = 123;
+    * user_data->description = "Handler for MySignal";
+    *
+    * // Assuming 'proxy' is a valid Eldbus_Proxy* for the desired interface
+    * // and 'MySignal' is the signal name.
+    * eldbus_proxy_signal_handler_add(proxy, "MySignal", my_signal_callback, user_data);
+    * // Remember to free user_data when the signal handler is removed or proxy is freed.
+    * @endcode
+    */
    name = eldbus_object_bus_name_get(proxy->obj);
    path = eldbus_object_path_get(proxy->obj);
 
@@ -700,6 +972,48 @@ _type_is_number(char sig)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Set a property value on a remote object.
+ *
+ * This function calls the "Set" method of the "org.freedesktop.DBus.Properties"
+ * interface on the remote object to set the value of a property.
+ *
+ * @param proxy The proxy object.
+ * @param name The name of the property to set.
+ * @param sig The D-Bus signature string of the property's value.
+ *            Example: "s" for string, "i" for int32, "b" for boolean.
+ * @param value A pointer to the value to set. For basic types, this is a direct pointer
+ *              to the value (e.g., `int *` for signature "i", `const char **` for "s").
+ *              For complex types (structs, arrays), this should be an Eina_Value
+ *              pointer representing the structure or array, and you should use
+ *              eldbus_proxy_property_value_set instead, or construct the message manually.
+ *              However, for basic types passed by pointer (like `const char *`),
+ *              you pass `&my_string_ptr`.
+ * @param cb Callback function to be invoked when the reply is received.
+ * @param data User data to be passed to the callback function.
+ * @return An #Eldbus_Pending object representing the asynchronous method call,
+ *         or @c NULL on error.
+ *
+ * @note For setting properties with complex types (structs, arrays not of basic types),
+ *       it's generally easier to use eldbus_proxy_property_value_set() or
+ *       construct the Eldbus_Message manually and use eldbus_proxy_send().
+ *
+ * Example for basic types:
+ * @code
+ * int32_t new_int_val = 123;
+ * const char *new_str_val = "hello";
+ * Eina_Bool new_bool_val = EINA_TRUE;
+ *
+ * // Set an integer property "IntProperty"
+ * eldbus_proxy_property_set(proxy, "IntProperty", "i", &new_int_val, on_set_reply_cb, NULL);
+ *
+ * // Set a string property "StringProperty"
+ * eldbus_proxy_property_set(proxy, "StringProperty", "s", &new_str_val, on_set_reply_cb, NULL);
+ *
+ * // Set a boolean property "BoolProperty"
+ * eldbus_proxy_property_set(proxy, "BoolProperty", "b", &new_bool_val, on_set_reply_cb, NULL);
+ * @endcode
+ */
 EAPI Eldbus_Pending *
 eldbus_proxy_property_set(Eldbus_Proxy *proxy, const char *name, const char *sig, const void *value, Eldbus_Message_Cb cb, const void *data)
 {
@@ -732,6 +1046,53 @@ eldbus_proxy_property_set(Eldbus_Proxy *proxy, const char *name, const char *sig
    return eldbus_proxy_send(proxy->obj->properties, msg, cb, data, -1);
 }
 
+/**
+ * @brief Set a property value on a remote object using an Eina_Value.
+ *
+ * This function calls the "Set" method of the "org.freedesktop.DBus.Properties"
+ * interface on the remote object to set the value of a property.
+ * The value is provided as an Eina_Value.
+ *
+ * @param proxy The proxy object.
+ * @param name The name of the property to set.
+ * @param sig The D-Bus signature string of the property's value.
+ *            Example: "s" for string, "(is)" for a struct of int and string, "ai" for an array of integers.
+ * @param value An Eina_Value containing the value to set. The type of the Eina_Value
+ *              must be compatible with the D-Bus signature `sig`.
+ *              For basic types, it's a simple Eina_Value.
+ *              For structs, it's an Eina_Value of type EINA_VALUE_TYPE_STRUCT.
+ *              For arrays, it's an Eina_Value of type EINA_VALUE_TYPE_ARRAY.
+ * @param cb Callback function to be invoked when the reply is received.
+ * @param data User data to be passed to the callback function.
+ * @return An #Eldbus_Pending object representing the asynchronous method call,
+ *         or @c NULL on error.
+ *
+ * Example for an array of strings (as):
+ * @code
+ * Eina_Value array_val;
+ * eina_value_array_setup(&array_val, EINA_VALUE_TYPE_STRING, 0);
+ * eina_value_array_append(&array_val, "item1");
+ * eina_value_array_append(&array_val, "item2");
+ *
+ * eldbus_proxy_property_value_set(proxy, "StringArrayProperty", "as", &array_val, on_set_reply_cb, NULL);
+ * eina_value_flush(&array_val);
+ * @endcode
+ *
+ * Example for a struct (is) - a struct with an int and a string:
+ * @code
+ * Eina_Value struct_val;
+ * Eina_Value_Struct_Desc desc = EINA_VALUE_STRUCT_DESC_DEFAULT("MyStruct", NULL);
+ * eina_value_struct_desc_member_add(&desc, "field_int", EINA_VALUE_TYPE_INT);
+ * eina_value_struct_desc_member_add(&desc, "field_str", EINA_VALUE_TYPE_STRING);
+ *
+ * eina_value_struct_setup(&struct_val, &desc);
+ * eina_value_struct_set(&struct_val, "field_int", 123);
+ * eina_value_struct_set(&struct_val, "field_str", "hello struct");
+ *
+ * eldbus_proxy_property_value_set(proxy, "MyStructProperty", "(is)", &struct_val, on_set_reply_cb, NULL);
+ * eina_value_flush(&struct_val);
+ * @endcode
+ */
 EAPI Eldbus_Pending *
 eldbus_proxy_property_value_set(Eldbus_Proxy *proxy, const char *name, const char *sig, const Eina_Value *value, Eldbus_Message_Cb cb, const void *data)
 {
@@ -797,6 +1158,19 @@ _property_iter(void *data, const void *key, Eldbus_Message_Iter *var)
    _iter_hash_value_set(proxy->props, skey, var);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a monitored proxy is deleted.
+ *
+ * This function is registered as an ELDBUS_PROXY_EVENT_DEL callback when
+ * eldbus_proxy_properties_monitor is enabled. If the proxy is deleted while
+ * the initial "GetAll" properties call is still pending, this callback
+ * cancels that pending call to prevent issues.
+ *
+ * @param data The Eldbus_Pending object for the "GetAll" call.
+ * @param proxy The proxy being deleted (unused).
+ * @param event_info Event information (unused).
+ */
 static void
 _on_monitored_proxy_del(void *data, Eldbus_Proxy *proxy EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -804,11 +1178,26 @@ _on_monitored_proxy_del(void *data, Eldbus_Proxy *proxy EINA_UNUSED, void *event
    eldbus_pending_cancel(pending);
 }
 
+/**
+ * @internal
+ * @brief Callback for the reply of the "GetAll" properties method.
+ *
+ * This function is invoked when the reply to the "GetAll" method call (initiated
+ * by eldbus_proxy_properties_monitor) is received. It parses the dictionary of
+ * properties from the message, populates the local property cache (proxy->props)
+ * using _property_iter, and then triggers the ELDBUS_PROXY_EVENT_PROPERTY_LOADED
+ * event. It also unregisters the _on_monitored_proxy_del callback as the
+ * initial fetch is now complete or has failed.
+ *
+ * @param data The Eldbus_Proxy instance.
+ * @param msg The reply message from the "GetAll" call.
+ * @param pending The Eldbus_Pending object for the "GetAll" call.
+ */
 static void
 _props_get_all(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
 {
    Eldbus_Proxy *proxy = data;
-   Eldbus_Message_Iter *dict;
+   Eldbus_Message_Iter *dict; // Iterator for the dictionary of properties a{sv}
    const char *name, *error_msg;
    Eldbus_Proxy_Event_Property_Loaded event;
 

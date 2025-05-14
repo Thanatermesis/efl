@@ -4,6 +4,17 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Test function for an Edje external button.
+ *
+ * This function creates a new window and loads an Edje layout
+ * that contains an external button. This is used to test the
+ * integration of an Elementary button widget within an Edje design.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_external_button(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -25,6 +36,17 @@ test_external_button(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void 
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for an Edje external slider.
+ *
+ * This function creates a new window and loads an Edje layout
+ * that contains an external slider. This is used to test the
+ * integration of an Elementary slider widget within an Edje design.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_external_slider(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -46,6 +68,17 @@ test_external_slider(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void 
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for an Edje external scroller.
+ *
+ * This function creates a new window and loads an Edje layout
+ * that contains an external scroller. This is used to test the
+ * integration of an Elementary scroller widget within an Edje design.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_external_scroller(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -67,6 +100,16 @@ test_external_scroller(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, voi
    evas_object_show(win);
 }
 
+/**
+ * @brief Deletes an Ecore_Timer when its associated object is deleted.
+ *
+ * This callback is triggered by the EFL_EVENT_DEL event. It ensures that
+ * the timer is properly cleaned up to prevent leaks when the object
+ * it's associated with is destroyed.
+ *
+ * @param data The Ecore_Timer to delete.
+ * @param ev The Efl_Event data (unused).
+ */
 static void
 _timer_del(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -74,6 +117,22 @@ _timer_del(void *data, const Efl_Event *ev EINA_UNUSED)
    ecore_timer_del(t);
 }
 
+/**
+ * @brief Timer callback to animate progress bars.
+ *
+ * This function is called periodically by an Ecore_Timer. It updates
+ * the value of several progress bars embedded in an Edje object to
+ * demonstrate their animation. It also tests different methods for
+ * updating external parts, including direct object manipulation,
+ * the Edje_External_Param API, and the EFL Efl.Ui.Range API.
+ *
+ * When the progress reaches 1.0, the animation stops, the timer is
+ * cancelled, and related buttons are re-enabled.
+ *
+ * @param data The Edje Evas_Object containing the progress bars.
+ * @return ECORE_CALLBACK_RENEW to continue the timer, or
+ *         ECORE_CALLBACK_CANCEL to stop it.
+ */
 static Eina_Bool
 _timer_cb(void *data)
 {
@@ -138,6 +197,18 @@ _timer_cb(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Callback for the "clicked" event on a button.
+ *
+ * This function is called when the "Start" button in the progress bar
+ * test is clicked. It disables the control buttons, resets the progress
+ * bars to their initial state, and starts an Ecore_Timer to drive the
+ * progress animation via `_timer_cb`.
+ *
+ * @param data The Edje Evas_Object containing the progress bars and buttons.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _bt_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -186,6 +257,18 @@ _bt_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    efl_event_callback_add(edje, EFL_EVENT_DEL, _timer_del, t);
 }
 
+/**
+ * @brief Test function for Edje external progress bars.
+ *
+ * This function creates a window with a layout containing several
+ * external progress bar widgets and a button to control them. It demonstrates
+ * how to interact with embedded Elementary widgets from the C code,
+ * including setting up callbacks for user interaction.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_external_pbar(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -211,6 +294,17 @@ test_external_pbar(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *e
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for an Edje external video player.
+ *
+ * Creates a window and loads an Edje layout that embeds a video player
+ * widget. This tests the capability of integrating a video player as an
+ * external part within an Edje design.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_external_video(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -232,6 +326,17 @@ test_external_video(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for an Edje external icon.
+ *
+ * Creates a window and loads an Edje layout that contains an external
+ * icon. It also emits a signal to start animations defined in the
+ * Edje theme, testing the interaction between C code and Edje signals.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_external_icon(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -255,6 +360,18 @@ test_external_icon(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *e
    evas_object_show(win);
 }
 
+/**
+ * @brief Genlist item text provider callback.
+ *
+ * This function is called by the genlist widget to get the text for an
+ * item. It simply duplicates the string passed as the `data` parameter.
+ * The caller is responsible for freeing the returned string.
+ *
+ * @param data A pointer to a string to be displayed as the item's label.
+ * @param obj The genlist object (unused).
+ * @param part The theme part name (unused).
+ * @return A newly allocated string containing the item's text.
+ */
 static char *
 text_get_cb(void        *data,
             Evas_Object *obj  EINA_UNUSED,
@@ -263,6 +380,17 @@ text_get_cb(void        *data,
    return strdup(data);
 }
 
+/**
+ * @brief Callback for genlist item selection.
+ *
+ * This function is called when a genlist item is selected. It retrieves
+ * the data associated with the selected item and sets it as the text
+ * of the "info" part in the main layout.
+ *
+ * @param data The main layout Evas_Object.
+ * @param obj The genlist widget (unused).
+ * @param info The selected Elm_Object_Item.
+ */
 static void
 action_cb(void        *data,
           Evas_Object *obj  EINA_UNUSED,
@@ -274,6 +402,18 @@ action_cb(void        *data,
    elm_layout_text_set(lay, "info", elm_object_item_data_get(item));
 }
 
+/**
+ * @brief Callback for a combobox item "pressed" event.
+ *
+ * This function is called when an item in the combobox's dropdown list
+ * is pressed. It updates the combobox's main text to match the selected
+ * item's text, closes the dropdown, and moves the cursor to the end of
+ * the entry.
+ *
+ * @param data Unused.
+ * @param obj The combobox Evas_Object.
+ * @param info The pressed Elm_Object_Item.
+ */
 static void
 _cb_pressed_cb(void        *data EINA_UNUSED,
                Evas_Object *obj,
@@ -287,6 +427,21 @@ _cb_pressed_cb(void        *data EINA_UNUSED,
    elm_entry_cursor_end_set(obj);
 }
 
+/**
+ * @brief Test function for an Edje external combobox.
+ *
+ * This function creates a window and a layout containing an external
+ * combobox widget. It populates the combobox with a list of strings
+ * from an array and sets up a callback to handle item selection.
+ * This demonstrates how to programmatically control an external
+ * combobox defined in an Edje file.
+ * The `info` array holds the string values for the combobox items, e.g.:
+ * `{"Label", "Button", "Combobox", ...}`
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_external_combobox(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

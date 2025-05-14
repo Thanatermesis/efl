@@ -23,6 +23,20 @@
 #include "eina_bezier.h"
 #include "eina_util.h"
 
+/**
+ * @internal
+ * @brief Calculates the first derivative of a cubic Bezier curve at a given parameter t.
+ *
+ * The first derivative p'(t) gives the tangent vector to the curve at point t.
+ * The formula used is:
+ * p'(t) = 3 * (-(1-t)^2 * p0 + (1 - 4t + 3t^2) * p1 + (2t - 3t^2) * p2 + t^2 * p3)
+ * where p0 is the start point, p1 and p2 are control points, and p3 is the end point.
+ *
+ * @param bz The Bezier curve.
+ * @param t The parameter value (usually between 0 and 1).
+ * @param[out] px Pointer to store the x-component of the derivative.
+ * @param[out] py Pointer to store the y-component of the derivative.
+ */
 static void
 _eina_bezier_1st_derivative(const Eina_Bezier *bz,
                             double t,
@@ -41,9 +55,22 @@ _eina_bezier_1st_derivative(const Eina_Bezier *bz,
    *py = 3 * ( a * bz->start.y + b * bz->ctrl_start.y + c * bz->ctrl_end.y + d * bz->end.y);
 }
 
-// Approximate sqrt(x*x + y*y) using the alpha max plus beta min algorithm.
-// This uses alpha = 1, beta = 3/8, which results in a maximum error of less
-// than 7% compared to the correct value.
+/**
+ * @internal
+ * @brief Approximates the Euclidean distance between two points (x1, y1) and (x2, y2).
+ *
+ * This function uses the "alpha max plus beta min" algorithm to approximate
+ * sqrt((x2-x1)^2 + (y2-y1)^2).
+ * With alpha = 1 and beta = 3/8 (0.375), this algorithm provides a fast
+ * approximation with a maximum error of less than 7%.
+ * The formula is: max(|dx|, |dy|) + 0.375 * min(|dx|, |dy|), where dx = x2-x1 and dy = y2-y1.
+ *
+ * @param x1 The x-coordinate of the first point.
+ * @param y1 The y-coordinate of the first point.
+ * @param x2 The x-coordinate of the second point.
+ * @param y2 The y-coordinate of the second point.
+ * @return The approximated distance between the two points.
+ */
 static double
 _line_length(double x1, double y1, double x2, double y2)
 {
@@ -56,6 +83,18 @@ _line_length(double x1, double y1, double x2, double y2)
    return (x > y ? x + 0.375 * y : y + 0.375 * x);
 }
 
+/**
+ * @internal
+ * @brief Splits a cubic Bezier curve into two new cubic Bezier curves at t=0.5.
+ *
+ * This function uses de Casteljau's algorithm to subdivide the Bezier curve @p b
+ * exactly in half. The resulting two curves, @p first and @p second, together
+ * represent the same path as the original curve @p b.
+ *
+ * @param b The original Bezier curve to be split.
+ * @param[out] first Pointer to store the first half of the split Bezier curve.
+ * @param[out] second Pointer to store the second half of the split Bezier curve.
+ */
 static void
 _eina_bezier_split(const Eina_Bezier *b,
                    Eina_Bezier *first, Eina_Bezier *second)
@@ -80,6 +119,23 @@ _eina_bezier_split(const Eina_Bezier *b,
    first->end.y = second->start.y = (first->ctrl_end.y + second->ctrl_start.y) * 0.5;
 }
 
+/**
+ * @internal
+ * @brief Recursively approximates the length of a cubic Bezier curve.
+ *
+ * This function uses a recursive subdivision approach. It first calculates the
+ * sum of the lengths of the three line segments connecting the four control points
+ * (start, ctrl_start, ctrl_end, end). It also calculates the length of the chord
+ * (the line segment directly connecting the start and end points).
+ * If these two lengths are sufficiently close (EINA_FLT_EQ), it returns the
+ * sum of the control point line segments as the approximation.
+ * Otherwise, it splits the Bezier curve in half (at t=0.5) and recursively calls
+ * itself on the two sub-curves, summing their lengths.
+ * The line lengths are approximated using _line_length().
+ *
+ * @param b The Bezier curve for which to calculate the length.
+ * @return The approximated length of the Bezier curve.
+ */
 static float
 _eina_bezier_length_helper(const Eina_Bezier *b)
 {
@@ -189,6 +245,22 @@ eina_bezier_length_get(const Eina_Bezier *b)
    return _eina_bezier_length_helper(b);
 }
 
+/**
+ * @internal
+ * @brief Splits a Bezier curve at parameter t, returning the left part and modifying the original to be the right part.
+ *
+ * This function uses de Casteljau's algorithm to split the Bezier curve @p b at a given
+ * parameter @p t.
+ * The portion of the curve from its original start up to the point at parameter @p t
+ * is stored in @p left.
+ * The original Bezier curve @p b is modified in place to become the portion of the
+ * curve from the point at parameter @p t to its original end.
+ * If @p left is NULL, a local Eina_Bezier is used, effectively discarding the left part.
+ *
+ * @param[in,out] b The Bezier curve to be split. On output, this will be the right part of the split.
+ * @param t The parameter value (between 0.0 and 1.0) at which to split the curve.
+ * @param[out] left Pointer to store the left part of the split Bezier curve. Can be NULL.
+ */
 static void
 _eina_bezier_split_left(Eina_Bezier *b, double t, Eina_Bezier *left)
 {

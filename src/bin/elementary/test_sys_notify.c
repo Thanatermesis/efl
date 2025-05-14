@@ -6,13 +6,34 @@
 #define WIDTH  320
 #define HEIGHT 160
 
+/**
+ * @brief Holds data for the system notification test.
+ *
+ * This struct is used to pass around data between callbacks, including UI
+ * elements and event handlers that need to be managed throughout the lifecycle
+ * of the test application.
+ */
 struct _Sys_Notify_Data {
-    Evas_Object *l;
-    Evas_Object *n;
-    Ecore_Event_Handler *handlers[2];
+    Evas_Object *l; /**< A label widget to display status. */
+    Evas_Object *n; /**< A notify widget to show messages within the window. */
+    Ecore_Event_Handler *handlers[2]; /**< Array to hold event handlers for system notification events. */
 };
 typedef struct _Sys_Notify_Data Sys_Notify_Data;
 
+/**
+ * @brief Handles system notification events.
+ *
+ * This function is registered as a callback for two types of system notification
+ * events: ELM_EVENT_SYS_NOTIFY_NOTIFICATION_CLOSED and
+ * ELM_EVENT_SYS_NOTIFY_ACTION_INVOKED. It prints details of the received
+ * event to standard output.
+ *
+ * @param data User data. Not used in this function.
+ * @param type The type of the event.
+ * @param event The event-specific data structure.
+ * @return ECORE_CALLBACK_DONE if the event is handled, otherwise
+ *         ECORE_CALLBACK_PASS_ON.
+ */
 static Eina_Bool
 _ev_handler(void *data EINA_UNUSED,
             int type,
@@ -39,6 +60,16 @@ _ev_handler(void *data EINA_UNUSED,
    return ECORE_CALLBACK_DONE;
 }
 
+/**
+ * @brief Callback executed after a system notification is sent.
+ *
+ * This function is invoked when the system notification sent by
+ * elm_sys_notify_send() has been processed. It updates a label in the
+ * application window to indicate completion and shows an in-app notification.
+ *
+ * @param data A pointer to the Sys_Notify_Data struct.
+ * @param id The ID of the notification that was sent. Not used here.
+ */
 static void _sys_notify_cb(void *data, unsigned int id EINA_UNUSED)
 {
    Sys_Notify_Data *notify_data = data;
@@ -47,6 +78,17 @@ static void _sys_notify_cb(void *data, unsigned int id EINA_UNUSED)
    evas_object_show(notify_data->n);
 }
 
+/**
+ * @brief Callback for the 'clicked' event on the send button.
+ *
+ * This function is triggered when the user clicks the "Send Notification" button.
+ * It retrieves the summary and body text from the entry widgets and calls
+ * elm_sys_notify_send() to dispatch a system notification.
+ *
+ * @param data A pointer to the Sys_Notify_Data struct.
+ * @param obj The button object that was clicked.
+ * @param event_info Extra event information. Not used here.
+ */
 static void
 _bt_clicked(void *data,
             Evas_Object *obj,
@@ -61,6 +103,18 @@ _bt_clicked(void *data,
                        -1, _sys_notify_cb, data);
 }
 
+/**
+ * @brief Callback for the EVAS_CALLBACK_DEL event on the main window.
+ *
+ * This function is responsible for cleaning up resources when the main window is
+ * deleted. It deletes the registered ecore event handlers and frees the
+ * Sys_Notify_Data struct.
+ *
+ * @param data A pointer to the Sys_Notify_Data struct to be freed.
+ * @param e The Evas canvas. Not used here.
+ * @param obj The window object being deleted. Not used here.
+ * @param event_info Extra event information. Not used here.
+ */
 static void
 _test_sys_notify_win_del_cb(void *data,
                             Evas *e EINA_UNUSED,
@@ -74,6 +128,19 @@ _test_sys_notify_win_del_cb(void *data,
    free(notify_data);
 }
 
+/**
+ * @brief Main function to set up and run the system notification test.
+ *
+ * This function creates the main window and all the UI elements for the test,
+ * including entry fields for the notification summary and body, and a button to
+ * send the notification. It also initializes the system notification service,
+ * allocates the data structure, and sets up event handlers for system
+ * notification events and window deletion.
+ *
+ * @param data User data from the test infrastructure. Not used.
+ * @param obj The parent object from the test infrastructure. Not used.
+ * @param event_info Event info from the test infrastructure. Not used.
+ */
 void
 test_sys_notify(void *data EINA_UNUSED,
                 Evas_Object *obj EINA_UNUSED,

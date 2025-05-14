@@ -1,3 +1,11 @@
+/**
+ * @file
+ * @brief This file implements the Efl.Io.Copier class, which is responsible for
+ * copying data from a source Efl.Io.Reader to a destination Efl.Io.Writer.
+ * It handles buffering, progress reporting, and various events related to the
+ * copy operation.
+ */
+
 #define EFL_IO_COPIER_PROTECTED 1
 
 #ifdef HAVE_CONFIG_H
@@ -10,30 +18,51 @@
 #define MY_CLASS EFL_IO_COPIER_CLASS
 #define DEF_READ_CHUNK_SIZE 4096
 
+/**
+ * @brief Private data structure for the Efl_Io_Copier class.
+ */
 typedef struct _Efl_Io_Copier_Data
 {
-   Efl_Io_Reader *source;
-   Efl_Io_Writer *destination;
-   Eina_Future *inactivity_timer;
-   Eina_Future *job;
-   Eina_Binbuf *buf;
-   Eina_Slice line_delimiter;
-   size_t buffer_limit;
-   size_t read_chunk_size;
+   Efl_Io_Reader *source; /**< The source reader to copy data from. */
+   Efl_Io_Writer *destination; /**< The destination writer to copy data to. */
+   Eina_Future *inactivity_timer; /**< Future for handling inactivity timeout. */
+   Eina_Future *job; /**< Future for the main copy job. */
+   Eina_Binbuf *buf; /**< Internal buffer for storing data read from source before writing to destination. */
+   Eina_Slice line_delimiter; /**< Optional delimiter for line-based events. If set, EFL_IO_COPIER_EVENT_LINE is emitted. */
+   size_t buffer_limit; /**< Maximum size of the internal buffer. 0 means no limit. */
+   size_t read_chunk_size; /**< Size of chunks to read from the source. */
    struct {
-      uint64_t read, written, total;
-   } progress;
-   double timeout_inactivity;
-   Eina_Bool closed;
-   Eina_Bool done;
-   Eina_Bool force_dispatch;
-   Eina_Bool close_on_exec;
-   Eina_Bool close_on_invalidate;
+      uint64_t read; /**< Total bytes read from the source. */
+      uint64_t written; /**< Total bytes written to the destination. */
+      uint64_t total; /**< Total size of the source, if known (from Efl.Io.Sizer). */
+   } progress; /**< Progress of the copy operation. */
+   double timeout_inactivity; /**< Inactivity timeout in seconds. If no data is processed for this duration, an error event is emitted. */
+   Eina_Bool closed; /**< Flag indicating if the copier has been closed. */
+   Eina_Bool done; /**< Flag indicating if the copy operation is complete (EOS from source and buffer flushed). */
+   Eina_Bool force_dispatch; /**< Flag to force dispatching data events even if line delimiter is not found. Used during flush or close. */
+   Eina_Bool close_on_exec; /**< Flag to close the copier when exec() is called. */
+   Eina_Bool close_on_invalidate; /**< Flag to close the copier when the object is invalidated. */
 } Efl_Io_Copier_Data;
 
+/**
+ * @brief Writes data from the internal buffer to the destination.
+ * @param o The Efl_Io_Copier object.
+ * @param pd The private data of the Efl_Io_Copier object.
+ */
 static void _efl_io_copier_write(Eo *o, Efl_Io_Copier_Data *pd);
+
+/**
+ * @brief Reads data from the source into the internal buffer.
+ * @param o The Efl_Io_Copier object.
+ * @param pd The private data of the Efl_Io_Copier object.
+ */
 static void _efl_io_copier_read(Eo *o, Efl_Io_Copier_Data *pd);
 
+/**
+ * @brief Debug macro for logging copier state.
+ * @param o The Efl_Io_Copier object.
+ * @param pd The private data of the Efl_Io_Copier object.
+ */
 #define _COPIER_DBG(o, pd) \
   do \
     { \
@@ -71,6 +100,15 @@ static void _efl_io_copier_read(Eo *o, Efl_Io_Copier_Data *pd);
     } \
   while (0)
 
+/**
+ * @brief Callback function triggered when the inactivity timer expires.
+ *
+ * Emits an EFL_IO_COPIER_EVENT_ERROR event with ETIMEDOUT.
+ * @param o The Efl_Io_Copier object.
+ * @param data User data (unused).
+ * @param v The Eina_Value associated with the future (unused).
+ * @return The input Eina_Value v.
+ */
 static Eina_Value
 _efl_io_copier_timeout_inactivity_cb(Eo *o, void *data EINA_UNUSED, const Eina_Value v)
 {
@@ -79,6 +117,14 @@ _efl_io_copier_timeout_inactivity_cb(Eo *o, void *data EINA_UNUSED, const Eina_V
    return v;
 }
 
+/**
+ * @brief Reschedules the inactivity timer.
+ *
+ * If an existing timer is active, it's cancelled. A new timer is scheduled
+ * if `pd->timeout_inactivity` is greater than 0.
+ * @param o The Efl_Io_Copier object.
+ * @param pd The private data of the Efl_Io_Copier object.
+ */
 static void
 _efl_io_copier_timeout_inactivity_reschedule(Eo *o, Efl_Io_Copier_Data *pd)
 {
@@ -90,6 +136,17 @@ _efl_io_copier_timeout_inactivity_reschedule(Eo *o, Efl_Io_Copier_Data *pd)
                    .storage = &pd->inactivity_timer);
 }
 
+/**
+ * @brief Main job function for the copier.
+ *
+ * This function attempts to read from the source and write to the destination.
+ * It also handles progress updates and checks for completion (EOS).
+ * It is scheduled as a future to run in the main loop.
+ * @param o The Efl_Io_Copier object.
+ * @param data User data (unused).
+ * @param v The Eina_Value associated with the future (unused).
+ * @return The input Eina_Value v.
+ */
 static Eina_Value
 _efl_io_copier_job(Eo *o, void *data EINA_UNUSED, const Eina_Value v)
 {
@@ -128,6 +185,14 @@ _efl_io_copier_job(Eo *o, void *data EINA_UNUSED, const Eina_Value v)
    return v;
 }
 
+/**
+ * @brief Schedules the main copier job if not already scheduled.
+ *
+ * If the object is invalidated, the job is run immediately. Otherwise,
+ * it's scheduled as a future in the main loop.
+ * @param o The Efl_Io_Copier object.
+ * @param pd The private data of the Efl_Io_Copier object.
+ */
 static void
 _efl_io_copier_job_schedule(Eo *o, Efl_Io_Copier_Data *pd)
 {
@@ -153,6 +218,14 @@ _efl_io_copier_job_schedule(Eo *o, Efl_Io_Copier_Data *pd)
  * internal binbuf may be modified from inside event calls.
  *
  * parameter slice_of_binbuf must have mem pointing to pd->binbuf
+ *
+ * @param o The Efl_Io_Copier object.
+ * @param pd The private data of the Efl_Io_Copier object.
+ * @param slice_of_binbuf A slice of the internal buffer that has been processed (read or written).
+ *                        This slice is used to emit DATA and LINE events.
+ * @return The potentially modified slice_of_binbuf. Callbacks might alter the buffer,
+ *         so the returned slice reflects the valid portion after event processing.
+ *         Returns a zero-length slice if the copier was closed during callbacks.
  */
 static Eina_Slice
 _efl_io_copier_dispatch_data_events(Eo *o, Efl_Io_Copier_Data *pd, Eina_Slice slice_of_binbuf)
@@ -217,6 +290,13 @@ _efl_io_copier_read(Eo *o, Efl_Io_Copier_Data *pd)
    size_t used, expand_size;
 
    EINA_SAFETY_ON_TRUE_RETURN(pd->closed);
+
+   /* Try to read data from source into the buffer.
+    * Respects buffer_limit and read_chunk_size.
+    * Emits ERROR event on failure.
+    * Emits DATA/LINE events if there's no destination.
+    * Schedules the job for further processing.
+    */
 
    expand_size = pd->read_chunk_size;
    used = eina_binbuf_length_get(pd->buf);
@@ -286,6 +366,15 @@ _efl_io_copier_write(Eo *o, Efl_Io_Copier_Data *pd)
    EINA_SAFETY_ON_TRUE_RETURN(pd->closed);
    EINA_SAFETY_ON_NULL_RETURN(pd->buf);
 
+   /* Try to write data from the buffer to the destination.
+    * If line_delimiter is set, it tries to write complete lines unless
+    * force_dispatch is true or source is EOS and buffer is full.
+    * Emits ERROR event on failure.
+    * Dispatches DATA/LINE events for the written data.
+    * Removes written data from the buffer.
+    * Schedules the job for further processing.
+    */
+
    ro_slice = eina_binbuf_slice_get(pd->buf);
    if (ro_slice.len == 0)
      {
@@ -336,6 +425,13 @@ _efl_io_copier_write(Eo *o, Efl_Io_Copier_Data *pd)
    _efl_io_copier_job_schedule(o, pd);
 }
 
+/**
+ * @brief Event callback for EFL_IO_READER_EVENT_CAN_READ_CHANGED on the source.
+ *
+ * Schedules the copier job if the source becomes readable.
+ * @param data The Efl_Io_Copier object.
+ * @param event The event information (unused).
+ */
 static void
 _efl_io_copier_source_can_read_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -349,6 +445,13 @@ _efl_io_copier_source_can_read_changed(void *data, const Efl_Event *event EINA_U
      _efl_io_copier_job_schedule(o, pd);
 }
 
+/**
+ * @brief Event callback for EFL_IO_READER_EVENT_EOS on the source.
+ *
+ * Schedules the copier job to process the EOS condition.
+ * @param data The Efl_Io_Copier object.
+ * @param event The event information (unused).
+ */
 static void
 _efl_io_copier_source_eos(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -361,6 +464,14 @@ _efl_io_copier_source_eos(void *data, const Efl_Event *event EINA_UNUSED)
    _efl_io_copier_job_schedule(o, pd);
 }
 
+/**
+ * @brief Applies the source size to the copier's progress and destination.
+ *
+ * Updates `pd->progress.total`. If the destination is an Efl_Io_Sizer,
+ * it attempts to resize the destination. Emits EFL_IO_COPIER_EVENT_PROGRESS.
+ * @param o The Efl_Io_Copier object.
+ * @param pd The private data of the Efl_Io_Copier object.
+ */
 static void
 _efl_io_copier_source_size_apply(Eo *o, Efl_Io_Copier_Data *pd)
 {
@@ -375,6 +486,13 @@ _efl_io_copier_source_size_apply(Eo *o, Efl_Io_Copier_Data *pd)
    efl_event_callback_call(o, EFL_IO_COPIER_EVENT_PROGRESS, NULL);
 }
 
+/**
+ * @brief Event callback for EFL_IO_SIZER_EVENT_SIZE_CHANGED on the source.
+ *
+ * Calls _efl_io_copier_source_size_apply to update progress and destination size.
+ * @param data The Efl_Io_Copier object.
+ * @param event The event information (unused).
+ */
 static void
 _efl_io_copier_source_resized(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -383,6 +501,13 @@ _efl_io_copier_source_resized(void *data, const Efl_Event *event EINA_UNUSED)
    _efl_io_copier_source_size_apply(o, pd);
 }
 
+/**
+ * @brief Event callback for EFL_IO_CLOSER_EVENT_CLOSED on the source.
+ *
+ * Schedules the copier job to handle the source closure.
+ * @param data The Efl_Io_Copier object.
+ * @param event The event information (unused).
+ */
 static void
 _efl_io_copier_source_closed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -395,6 +520,9 @@ _efl_io_copier_source_closed(void *data, const Efl_Event *event EINA_UNUSED)
    _efl_io_copier_job_schedule(o, pd);
 }
 
+/**
+ * @brief Array of callbacks for source events.
+ */
 EFL_CALLBACKS_ARRAY_DEFINE(source_cbs,
                           { EFL_IO_READER_EVENT_CAN_READ_CHANGED, _efl_io_copier_source_can_read_changed },
                           { EFL_IO_READER_EVENT_EOS, _efl_io_copier_source_eos });
@@ -451,6 +579,13 @@ _efl_io_copier_source_set(Eo *o, Efl_Io_Copier_Data *pd, Efl_Io_Reader *source)
      }
 }
 
+/**
+ * @brief Event callback for EFL_IO_WRITER_EVENT_CAN_WRITE_CHANGED on the destination.
+ *
+ * Schedules the copier job if the destination becomes writable.
+ * @param data The Efl_Io_Copier object.
+ * @param event The event information (unused).
+ */
 static void
 _efl_io_copier_destination_can_write_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -464,6 +599,15 @@ _efl_io_copier_destination_can_write_changed(void *data, const Efl_Event *event 
      _efl_io_copier_job_schedule(o, pd);
 }
 
+/**
+ * @brief Event callback for EFL_IO_CLOSER_EVENT_CLOSED on the destination.
+ *
+ * If the internal buffer is empty, sets the copier to done.
+ * Otherwise, if there's pending data, emits an EFL_IO_COPIER_EVENT_ERROR
+ * with EBADF, as data cannot be written to a closed destination.
+ * @param data The Efl_Io_Copier object.
+ * @param event The event information (unused).
+ */
 static void
 _efl_io_copier_destination_closed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -488,6 +632,9 @@ _efl_io_copier_destination_closed(void *data, const Efl_Event *event EINA_UNUSED
      }
 }
 
+/**
+ * @brief Array of callbacks for destination events.
+ */
 EFL_CALLBACKS_ARRAY_DEFINE(destination_cbs,
                           { EFL_IO_WRITER_EVENT_CAN_WRITE_CHANGED, _efl_io_copier_destination_can_write_changed });
 

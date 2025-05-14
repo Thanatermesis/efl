@@ -20,19 +20,37 @@
 
 // 1024 entries == 16k or 32k (32 or 64bit) for eo call stack. that's 1023
 // imbricated/recursive calls it can handle before barfing. i'd say that's ok
-#define EFL_OBJECT_CALL_STACK_DEPTH_MIN 1024
+#define EFL_OBJECT_CALL_STACK_DEPTH_MIN 1024 /**< Minimum depth of the Eo call stack. */
 
+/**
+ * @brief Represents the Eo call stack for a thread or the main loop.
+ *
+ * This structure manages an array of Eo_Stack_Frame objects, acting as
+ * a call stack for Eo object operations, primarily for the efl_add fallback.
+ */
 typedef struct _Efl_Object_Call_Stack {
-   Eo_Stack_Frame *frames;
-   Eo_Stack_Frame *frame_ptr;
+   Eo_Stack_Frame *frames;    /**< Pointer to the array of stack frames. */
+   Eo_Stack_Frame *frame_ptr; /**< Pointer to the current (top) stack frame. */
 } Efl_Object_Call_Stack;
 
+/**< Total size in bytes of the Eo call stack frames array. */
 #define EFL_OBJECT_CALL_STACK_SIZE (EFL_OBJECT_CALL_STACK_DEPTH_MIN * sizeof(Eo_Stack_Frame))
 
 static Eina_TLS _eo_call_stack_key = 0;
 
-#define MEM_PAGE_SIZE 4096
+#define MEM_PAGE_SIZE 4096 /**< Assumed memory page size for mmap optimizations. */
 
+/**
+ * @internal
+ * @brief Allocates memory for the Eo call stack.
+ *
+ * Attempts to use mmap for anonymous memory allocation if available and not
+ * disabled, falling back to calloc otherwise. This is to potentially enhance
+ * security and allow for memory advisement.
+ *
+ * @param size The number of bytes to allocate.
+ * @return A pointer to the allocated memory, or @c NULL on failure.
+ */
 static void *
 _eo_call_stack_mem_alloc(size_t size)
 {
@@ -72,6 +90,15 @@ _eo_call_stack_mem_alloc(size_t size)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Frees memory previously allocated for the Eo call stack.
+ *
+ * Uses munmap if the memory was allocated via mmap, otherwise uses free.
+ *
+ * @param ptr Pointer to the memory to free.
+ * @param size The size of the memory block (used for munmap).
+ */
 static void
 _eo_call_stack_mem_free(void *ptr, size_t size)
 {
@@ -90,6 +117,15 @@ _eo_call_stack_mem_free(void *ptr, size_t size)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Creates and initializes a new Eo call stack.
+ *
+ * Allocates memory for the Efl_Object_Call_Stack structure and its
+ * internal frames array.
+ *
+ * @return A pointer to the newly created Efl_Object_Call_Stack, or @c NULL on failure.
+ */
 static Efl_Object_Call_Stack *
 _eo_call_stack_create(void)
 {
@@ -112,6 +148,14 @@ _eo_call_stack_create(void)
    return stack;
 }
 
+/**
+ * @internal
+ * @brief Frees an Eo call stack and its associated resources.
+ *
+ * This function is suitable for use as a TLS destructor.
+ *
+ * @param ptr A pointer to the Efl_Object_Call_Stack to be freed.
+ */
 static void
 _eo_call_stack_free(void *ptr)
 {
@@ -125,10 +169,26 @@ _eo_call_stack_free(void *ptr)
    free(stack);
 }
 
-static Efl_Object_Call_Stack *main_loop_stack = NULL;
+static Efl_Object_Call_Stack *main_loop_stack = NULL; /**< Global call stack for the main loop thread. */
 
+/**
+ * @internal
+ * @brief Macro to get the appropriate call stack.
+ *
+ * Returns the main_loop_stack if currently in the main loop thread,
+ * otherwise retrieves/creates the thread-specific call stack.
+ */
 #define _EFL_OBJECT_CALL_STACK_GET() ((EINA_LIKELY(eina_main_loop_is())) ? main_loop_stack : _eo_call_stack_get_thread())
 
+/**
+ * @internal
+ * @brief Retrieves or creates the Eo call stack for the current non-main thread.
+ *
+ * Uses Thread Local Storage (TLS) to manage per-thread call stacks.
+ * If a stack doesn't exist for the current thread, it's created.
+ *
+ * @return A pointer to the current thread's Efl_Object_Call_Stack.
+ */
 static inline Efl_Object_Call_Stack *
 _eo_call_stack_get_thread(void)
 {
@@ -142,12 +202,28 @@ _eo_call_stack_get_thread(void)
    return stack;
 }
 
+/**
+ * @brief Retrieves the Eo object from the top of the current call stack.
+ *
+ * This function is used to get the context object during an efl_add operation,
+ * particularly for fallback scenarios.
+ *
+ * @return Pointer to the Eo object at the top of the stack.
+ * @see _efl_add_fallback_stack_push
+ * @see _efl_add_fallback_stack_pop
+ */
 EO_API Eo *
 _efl_added_get(void)
 {
    return _EFL_OBJECT_CALL_STACK_GET()->frame_ptr->obj;
 }
 
+/**
+ * @internal
+ * @brief Pushes a new frame onto the Eo call stack for the current thread.
+ * @copydetails _efl_add_fallback_stack_push
+ * @note This is the internal implementation.
+ */
 Eo_Stack_Frame *
 _efl_add_fallback_stack_push(Eo *obj)
 {
@@ -163,6 +239,12 @@ _efl_add_fallback_stack_push(Eo *obj)
    return stack->frame_ptr;
 }
 
+/**
+ * @internal
+ * @brief Pops the current frame from the Eo call stack for the current thread.
+ * @copydetails _efl_add_fallback_stack_pop
+ * @note This is the internal implementation.
+ */
 Eo_Stack_Frame *
 _efl_add_fallback_stack_pop(void)
 {
@@ -177,6 +259,12 @@ _efl_add_fallback_stack_pop(void)
    return stack->frame_ptr;
 }
 
+/**
+ * @internal
+ * @brief Initializes the efl_add fallback mechanism.
+ * @copydetails _efl_add_fallback_init
+ * @note This is the internal implementation.
+ */
 Eina_Bool
 _efl_add_fallback_init(void)
 {
@@ -202,6 +290,12 @@ _efl_add_fallback_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the efl_add fallback mechanism.
+ * @copydetails _efl_add_fallback_shutdown
+ * @note This is the internal implementation.
+ */
 Eina_Bool
 _efl_add_fallback_shutdown(void)
 {

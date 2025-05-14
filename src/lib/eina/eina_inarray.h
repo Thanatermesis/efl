@@ -319,14 +319,29 @@ EINA_API int eina_inarray_push(Eina_Inarray *array,
  * @brief Allocates new item at the end of the array.
  *
  * @param[in] array The array object
- * @param[in] size  The number of new item to allocate
+ * @param[in] size  The number of new items to allocate space for at the end of the array.
+ *                  Each item will have the `member_size` defined when the array was created or configured.
+ * @return A pointer to the beginning of the newly allocated space for the first new item,
+ *         or @c NULL if allocation fails or @p size is 0.
  *
  * @note The returned pointer is only valid until you use any other eina_inarray
- *       function.
+ *       function that might cause a reallocation (e.g., push, insert, grow, resize).
+ * @par Example
+ * @code
+ * // Assuming 'ia' is an Eina_Inarray initialized for 'int's
+ * // Eina_Inarray *ia = eina_inarray_new(sizeof(int), 0);
+ * int *new_elements = eina_inarray_grow(ia, 3); // Grow by 3 ints
+ * if (new_elements) {
+ *     new_elements[0] = 10;
+ *     new_elements[1] = 20;
+ *     new_elements[2] = 30;
+ *     // ia now contains these 3 integers
+ * }
+ * @endcode
  *
  * @since 1.8
  */
-EINA_API void *eina_inarray_grow(Eina_Inarray *array, unsigned int size);
+EINA_API void *eina_inarray_grow(Eina_Inarray *array, unsigned int size) EINA_ARG_NONNULL(1) EINA_WARN_UNUSED_RESULT;
 
 /**
  * @brief Copies the data to the array at a position found by the comparison function.
@@ -455,9 +470,11 @@ EINA_API Eina_Bool eina_inarray_insert_at(Eina_Inarray *array,
  * @brief Opens a space at the given position, returning its pointer.
  *
  * @param[in] array The array object
- * @param[in] position The position to insert first member at (open/allocate space)
- * @param[in] member_count The number of times @c member_size bytes are allocated
- * @return A pointer to the first member memory allocated, otherwise @c NULL on errors
+ * @param[in] position The index at which to allocate space for new members.
+ * @param[in] member_count The number of new members to allocate space for.
+ *                         Each member will have the `member_size` defined when the array was created or configured.
+ * @return A pointer to the memory allocated for the first new member at the specified @p position,
+ *         otherwise @c NULL on errors (e.g., allocation failure, @p position out of bounds, @p member_count is 0).
  *
  * @note This is similar to eina_inarray_insert_at(), but useful if the
  *       members contents are still unknown or unallocated. It makes
@@ -474,6 +491,28 @@ EINA_API Eina_Bool eina_inarray_insert_at(Eina_Inarray *array,
  *       eina_inarray_count()), then the member is appended.
  *
  * @note If @a position is bigger than the array length, it fails.
+ *
+ * @par Example
+ * @code
+ * typedef struct {
+ *     int id;
+ *     double value;
+ * } MyStruct;
+ *
+ * // Assuming 'ia' is an Eina_Inarray initialized for 'MyStruct'
+ * // Eina_Inarray *ia = eina_inarray_new(sizeof(MyStruct), 0);
+ * // eina_inarray_push(ia, &(MyStruct){.id = 1, .value = 1.0}); // Add one initial element
+ *
+ * MyStruct *new_space = eina_inarray_alloc_at(ia, 0, 2); // Allocate space for 2 MyStructs at the beginning
+ * if (new_space) {
+ *     new_space[0].id = 100;
+ *     new_space[0].value = 10.0;
+ *     new_space[1].id = 101;
+ *     new_space[1].value = 11.0;
+ *     // The original element is now at index 2.
+ *     // The memory for new_space[0] and new_space[1] is uninitialized before assignment.
+ * }
+ * @endcode
  *
  * @since 1.2
  */

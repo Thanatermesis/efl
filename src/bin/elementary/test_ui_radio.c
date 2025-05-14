@@ -17,6 +17,15 @@ const char *countries[] =
 };
 #define MAX_INDEX 8
 
+/**
+ * @brief Callback function invoked when the selection of a radio button changes.
+ *
+ * This function prints a message to the console indicating whether the radio
+ * button that triggered the event has been selected or unselected.
+ *
+ * @param data Unused user data pointer.
+ * @param ev The event information, containing the radio button object.
+ */
 static void
 _check_button_selection_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -26,6 +35,23 @@ _check_button_selection_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
      printf("Object %p is now unselected\n", ev->object);
 }
 
+/**
+ * @brief Creates a series of radio buttons.
+ *
+ * This function iterates through the global `countries` array and creates
+ * a radio button for each country. Each radio button is configured with a
+ * state value and text.
+ *
+ * @param win The parent window to which the radio buttons are added.
+ * @return An Eina_Array containing the created Efl_Ui_Radio widgets.
+ *         The caller is responsible for freeing this array.
+ *         Example of the returned array structure:
+ *         [
+ *           (Efl_Ui_Radio *) rbtn_germany,
+ *           (Efl_Ui_Radio *) rbtn_usa,
+ *           ...
+ *         ]
+ */
 static Eina_Array*
 create_radios(Efl_Ui_Win *win)
 {
@@ -43,6 +69,16 @@ create_radios(Efl_Ui_Win *win)
    return arr;
 }
 
+/**
+ * @brief Callback function for the 'value_changed' event on the radio group.
+ *
+ * This function is called when the selected radio button within the group
+ * changes. It retrieves the new selected index and prints the corresponding
+ * country name.
+ *
+ * @param data Unused user data pointer.
+ * @param ev The event information, containing the radio group object.
+ */
 static void
 _value_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -60,6 +96,15 @@ _value_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 
 }
 
+/**
+ * @brief Callback function to programmatically select a radio button.
+ *
+ * This is triggered by a button click and sets the 'selected' property of a
+ * specific radio button to EINA_TRUE.
+ *
+ * @param data A pointer to the Efl_Ui_Check (radio button) to be selected.
+ * @param ev Unused event information.
+ */
 static void
 _select_btn_clicked(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -68,6 +113,16 @@ _select_btn_clicked(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_selectable_selected_set(c, EINA_TRUE);
 }
 
+/**
+ * @brief Callback function to set the selected value of the radio group.
+ *
+ * Triggered by a button click, this function directly sets the selected
+ * value of the radio group, which in turn selects the corresponding radio
+ * button.
+ *
+ * @param data A pointer to the Efl_Ui_Radio_Group.
+ * @param ev Unused event information.
+ */
 static void
 _set_selected_btn_clicked(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -76,6 +131,17 @@ _set_selected_btn_clicked(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_radio_group_selected_value_set(group, 0);
 }
 
+/**
+ * @brief Toggles a fallback selection on the radio group.
+ *
+ * When clicked, this function checks if a fallback selection is already set
+ * on the radio group. If not, it sets the fifth radio button ("UK") as the
+ * fallback. If a fallback is already set, it clears it. A fallback selection
+ * is used when no item is selected and one is requested.
+ *
+ * @param data A pointer to the Efl_Ui_Radio_Group (or any Efl_Ui_Selectable).
+ * @param ev Unused event information.
+ */
 static void
 _set_fallback_radio_btn_clicked(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -85,6 +151,14 @@ _set_fallback_radio_btn_clicked(void *data, const Efl_Event *ev EINA_UNUSED)
      efl_ui_selectable_fallback_selection_set(data, NULL);
 }
 
+/**
+ * @brief Sets up and runs the Efl.Ui.Radio test.
+ *
+ * This function creates a window and populates it with a radio box containing
+ * several radio buttons. It also adds buttons to test different interactions
+ * with the radio buttons and the radio group, such as programmatic selection,
+ * setting group value, and toggling a fallback selection.
+ */
 void test_efl_ui_radio(void *data EINA_UNUSED,
                                    Eo *obj EINA_UNUSED,
                                    void *event_info EINA_UNUSED)

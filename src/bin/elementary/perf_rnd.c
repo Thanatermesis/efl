@@ -1,4 +1,11 @@
+/** @brief The current read position in the random number table `r`. */
 static int rp = 0;
+/**
+ * @brief A precomputed table of 65536 pseudo-random 16-bit unsigned integers.
+ *
+ * This table is used by rnd() to generate 32-bit random numbers. The values
+ * themselves and their order contribute to the pseudo-randomness of the output.
+ */
 static const unsigned short r[65536] =
 {
 11423, 23305, 22422, 3286, 28841, 6652, 3499, 3618, 8363, 31491, 15444, 5852, 19081, 28074, 15631, 28112, 32389, 13015, 26077, 16467, 10087, 12788, 9679, 15525, 29177, 24, 1856, 21048, 2684, 5022, 8091, 14107, 28327, 30513, 17394, 24400, 4397, 20893, 28018, 12761, 19616, 10695, 18613, 5930, 6001, 1477, 1274, 5622, 14492, 27351, 22089,
@@ -1027,12 +1034,28 @@ static const unsigned short r[65536] =
 7968, 2599, 8735, 29790, 6290, 30746, 32702, 4455, 16084, 13228, 29890, 28634, 5614, 3659, 22541, 13680, 13544, 6990, 4032, 29236, 23846, 12513, 28685, 12501, 1470, 25253, 25536, 8868, 10340, 1045, 27154, 18308, 3644, 3122, 15330, 9934, 1100, 15264, 14389, 17184, 28493, 11512, 13050, 1339, 15171, 2823, 15020, 28715, 9814, 19052, 25184, 892, 31565, 21101, 13394, 267, 13586, 6162, 9135, 23926, 7207, 3522, 9466, 10852
 };
 
+/**
+ * @brief Resets the random number generator.
+ *
+ * This function seeds the generator by resetting the read position `rp` to 0.
+ * It should be called to start a new, predictable sequence of pseudo-random numbers.
+ */
 void
 srnd(void)
 {
    rp = 0;
 }
 
+/**
+ * @brief Generates a 32-bit pseudo-random number.
+ *
+ * This function generates a pseudo-random number by combining two 16-bit values
+ * from the precomputed table `r`. The logic uses the current read position `rp`
+ * to fetch a value, then uses that value to jump to a new position in the table,
+ * providing a non-linear sequence. This approach is designed for performance.
+ *
+ * @return A 32-bit pseudo-random unsigned integer.
+ */
 unsigned int
 rnd(void)
 {

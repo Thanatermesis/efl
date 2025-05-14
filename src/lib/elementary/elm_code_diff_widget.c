@@ -14,6 +14,17 @@
 #define _ELM_CODE_DIFF_WIDGET_TYPE_REMOVED "removed"
 #define _ELM_CODE_DIFF_WIDGET_TYPE_CHANGED "changed"
 
+/**
+ * @brief Parses a single line from a diff and appends its content to the left and/or right panes.
+ *
+ * Depending on the line prefix ('+', '-', or other), this function determines
+ * whether the line represents an addition, a deletion, or an unchanged line,
+ * and updates the corresponding Elm_Code_File objects.
+ *
+ * @param line The diff line to parse.
+ * @param left The Elm_Code_File representing the left (original) side of the diff.
+ * @param right The Elm_Code_File representing the right (changed) side of the diff.
+ */
 static void
 _elm_code_diff_widget_parse_diff_line(Elm_Code_Line *line, Elm_Code_File *left, Elm_Code_File *right)
 {
@@ -44,6 +55,23 @@ _elm_code_diff_widget_parse_diff_line(Elm_Code_Line *line, Elm_Code_File *left, 
      }
 }
 
+/**
+ * @brief Parses the entire content of a diff file and populates two Elm_Code_File objects
+ * representing the left (original) and right (changed) views of the diff.
+ *
+ * It iterates through each line of the input `diff` file.
+ * Lines starting with 'd', 'i', or 'n' (typically diff command/index lines) are
+ * added to both left and right views.
+ * Other lines are processed based on an offset, which helps to distinguish
+ * between lines belonging to the left file, right file, or lines needing
+ * further parsing by `_elm_code_diff_widget_parse_diff_line`.
+ * After processing all lines, it triggers a re-parse for both left and right
+ * Elm_Code_File objects to apply syntax highlighting and other features.
+ *
+ * @param diff The Elm_Code_File containing the diff content to be parsed.
+ * @param left The Elm_Code_File to populate with the left (original) side of the diff.
+ * @param right The Elm_Code_File to populate with the right (changed) side of the diff.
+ */
 static void
 _elm_code_diff_widget_parse_diff(Elm_Code_File *diff, Elm_Code_File *left, Elm_Code_File *right)
 {
@@ -80,6 +108,18 @@ _elm_code_diff_widget_parse_diff(Elm_Code_File *diff, Elm_Code_File *left, Elm_C
    _elm_code_parse_file(right->parent, right);
 }
 
+/**
+ * @brief Creates a new diff widget.
+ *
+ * This function sets up a horizontal pane with two Elm_Code_Widget instances,
+ * one for the left side and one for the right side of the diff.
+ * It then parses the provided `code` (which should contain diff content)
+ * and populates the two widgets.
+ *
+ * @param parent The parent Evas_Object.
+ * @param code The Elm_Code object containing the diff data.
+ * @return The newly created Evas_Object for the diff widget (an elm_panes).
+ */
 EAPI Evas_Object *
 elm_code_diff_widget_add(Evas_Object *parent, Elm_Code *code)
 {
@@ -119,6 +159,13 @@ elm_code_diff_widget_add(Evas_Object *parent, Elm_Code *code)
    return hbox;
 }
 
+/**
+ * @brief Sets the font name and size for both panes of the diff widget.
+ *
+ * @param widget The diff widget (the Evas_Object returned by elm_code_diff_widget_add).
+ * @param name The name of the font to use.
+ * @param size The size of the font.
+ */
 EAPI void
 elm_code_diff_widget_font_set(Evas_Object *widget, const char *name, int size)
 {

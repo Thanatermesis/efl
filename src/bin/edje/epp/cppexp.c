@@ -146,6 +146,20 @@ struct operation {
 
 /* maybe needs to actually deal with floating point numbers */
 
+/**
+ * @brief Parses a numeric constant from a string.
+ *
+ * This function handles integer constants in decimal, octal, and hexadecimal formats,
+ * including suffixes like 'u' and 'l'. It detects and reports overflows and
+ * the use of floating-point numbers, which are not allowed in preprocessor
+ * expressions. The parsed value and its properties (like whether it's unsigned)
+ * are stored in the provided operation structure.
+ *
+ * @param op Pointer to the operation structure to store the result.
+ * @param pfile The preprocessor file context for error reporting.
+ * @param start Pointer to the beginning of the number string.
+ * @param olen The length of the number string.
+ */
 static void
 parse_number(struct operation *op, cpp_reader * pfile, const char *start,
 	     int olen)
@@ -271,6 +285,19 @@ static struct token tokentab2[] = {
 
 /* Read one token. */
 
+/**
+ * @brief Reads the next token from the preprocessor input stream.
+ *
+ * This function acts as a lexical analyzer for C preprocessor expressions. It reads
+ * characters from the input stream and groups them into tokens such as numbers,
+ * character constants, operators, and identifiers. It handles whitespace and
+ * comments by skipping them. The resulting token is represented in the `op`
+ * structure. For identifiers, it treats them as having a value of 0, as per
+ * C preprocessor rules.
+ *
+ * @param op Pointer to the operation structure to store the parsed token.
+ * @param pfile The preprocessor file context from which to read.
+ */
 static void
 cpp_lex(struct operation *op, cpp_reader * pfile)
 {
@@ -482,20 +509,27 @@ cpp_lex(struct operation *op, cpp_reader * pfile)
      }
 }
 
-/* Parse a C escape sequence.  STRING_PTR points to a variable
- * containing a pointer to the string to parse.  That pointer
- * is updated past the characters we use.  The value of the
- * escape sequence is returned.
- * 
- * A negative value means the sequence \ newline was seen,
- * which is supposed to be equivalent to nothing at all.
- * 
- * If \ is followed by a null character, we return a negative
- * value and leave the string pointer pointing at the null character.
- * 
- * If \ is followed by 000, we return 0 and leave the string pointer
- * after the zeros.  A value of 0 does not mean end of string.  */
-
+/**
+ * @brief Parses a C-style escape sequence from a string.
+ *
+ * This function interprets an escape sequence starting with a backslash (`\`)
+ * and returns its integer value. It handles standard escapes (like `\n`, `\t`),
+ * octal (`\ooo`), and hexadecimal (`\xhh`) notations. The pointer to the string
+ * is advanced past the parsed escape sequence.
+ *
+ * A negative value is returned for `\` followed by a newline, which is
+ * supposed to be equivalent to nothing at all.
+ * If `\` is followed by a null character, we return a negative value and
+ * leave the string pointer pointing at the null character.
+ * If `\` is followed by `000`, we return 0 and leave the string pointer
+ * after the zeros. A value of 0 does not mean end of string.
+ *
+ * @param pfile The preprocessor file context for warning/error reporting.
+ * @param string_ptr A pointer to a character pointer. On entry, `*string_ptr`
+ *                   points to the character after the backslash. On exit, it is
+ *                   updated to point after the consumed sequence.
+ * @return The integer value of the escape sequence. For example, `\n` returns 10.
+ */
 int
 cpp_parse_escape(cpp_reader * pfile, char **string_ptr)
 {
@@ -596,6 +630,14 @@ cpp_parse_escape(cpp_reader * pfile, char **string_ptr)
      }
 }
 
+/**
+ * @brief Reports an integer overflow in a preprocessor expression.
+ *
+ * This function is called when an arithmetic operation results in an overflow.
+ * It issues a pedantic warning if the corresponding compiler flag is set.
+ *
+ * @param pfile The preprocessor file context for issuing the warning.
+ */
 static void
 integer_overflow(cpp_reader * pfile)
 {
@@ -603,6 +645,20 @@ integer_overflow(cpp_reader * pfile)
       cpp_pedwarn(pfile, "integer overflow in preprocessor expression");
 }
 
+/**
+ * @brief Performs a left bit-shift operation with overflow checking.
+ *
+ * This function calculates `a << b`. It handles both signed and unsigned
+ * operands. For signed operands, it checks for overflow, which is
+ * undefined behavior in C. A shift amount greater than or equal to the
+ * width of the type is handled.
+ *
+ * @param pfile The preprocessor file context for reporting overflow.
+ * @param a The value to be shifted.
+ * @param unsignedp Non-zero if `a` should be treated as unsigned.
+ * @param b The number of bits to shift left.
+ * @return The result of the left shift.
+ */
 static long
 left_shift(cpp_reader * pfile, long a, int unsignedp, unsigned long b)
 {
@@ -624,6 +680,19 @@ left_shift(cpp_reader * pfile, long a, int unsignedp, unsigned long b)
      }
 }
 
+/**
+ * @brief Performs a right bit-shift operation.
+ *
+ * This function calculates `a >> b`. It performs an arithmetic shift for
+ * signed values and a logical shift for unsigned values. A shift amount
+ * greater than or equal to the width of the type is handled.
+ *
+ * @param pfile The preprocessor file context (unused).
+ * @param a The value to be shifted.
+ * @param unsignedp Non-zero if `a` should be treated as unsigned.
+ * @param b The number of bits to shift right.
+ * @return The result of the right shift.
+ */
 static long
 right_shift(cpp_reader * pfile EINA_UNUSED, long a, int unsignedp,
 	    unsigned long b)
@@ -663,9 +732,35 @@ right_shift(cpp_reader * pfile EINA_UNUSED, long a, int unsignedp,
   top->unsignedp = 0;\
   top->value = (unsigned1 || unsigned2) ? (unsigned long) v1 OP (unsigned long) v2 : (v1 OP v2)
 
-/* Parse and evaluate a C expression, reading from PFILE.
- * Returns the value of the expression.  */
-
+/**
+ * @brief Parses and evaluates a C preprocessor expression.
+ *
+ * This function implements an operator-precedence parser to evaluate integer
+ * constant expressions found in directives like `#if` and `#elif`. It reads tokens
+ * from the preprocessor file stream, and evaluates them according to C operator
+ * precedence rules. It supports all standard C integer arithmetic, bitwise, logical,
+ * and comparison operators, as well as the ternary operator (`?:`).
+ * Short-circuiting for `&&`, `||`, and `?:` is also handled.
+ *
+ * The parser uses a stack of `struct operation` elements to manage operators and
+ * operands. The first element on the stack acts as a bottom marker.
+ * When an operand is parsed, its value is stored in the `value` field of the
+ * current `top` of stack element. When an operator is parsed, the stack is
+ * pushed and the new `top` stores the operator. This means the left operand's
+ * value is in `top[-1].value` and the right operand's value will be put into
+ * `top[0].value`.
+ *
+ * For `1 + 2`, the stack would look like this before reduction:
+ * - `stack[0]`: holds value `1`.
+ * - `stack[1]`: holds operator `+` and value `2`.
+ *
+ * The parser reduces expressions on the stack when an operator of lower
+ * precedence is encountered, or at the end of the expression.
+ *
+ * @param pfile The preprocessor file context from which to read the expression.
+ * @return The resulting value of the evaluated expression as a HOST_WIDE_INT.
+ *         On syntax error, it reports the error and returns 0.
+ */
 HOST_WIDE_INT
 cpp_parse_expr(cpp_reader * pfile)
 {

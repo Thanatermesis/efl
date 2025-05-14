@@ -3,6 +3,17 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback function for when a position is selected on an actionslider.
+ *
+ * This function is called when the user selects a position on the actionslider.
+ * It prints the selected position's label and debug information about the
+ * indicator, magnet, and enabled positions of the actionslider.
+ *
+ * @param data User data pointer (unused).
+ * @param obj The actionslider object.
+ * @param event_info The selected position's label.
+ */
 static void _pos_selected_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info)
 {
    Elm_Actionslider_Pos ipos, mpos, epos;
@@ -67,6 +78,18 @@ static void _pos_selected_cb(void *data EINA_UNUSED, Evas_Object *obj, void *eve
      }
 }
 
+/**
+ * @brief Callback function to change magnet position based on slider position.
+ *
+ * This function is triggered when the slider's position changes. It sets the
+ * magnet position to either left or right, making the slider snap to the
+ * respective side it was moved towards.
+ *
+ * @param data User data pointer (unused).
+ * @param obj The actionslider object.
+ * @param event_info The position which the slider has passed, as a string
+ *                   (e.g., "left", "right").
+ */
 static void
 _position_change_magnetic_cb(void *data EINA_UNUSED, Evas_Object * obj, void *event_info)
 {
@@ -76,6 +99,19 @@ _position_change_magnetic_cb(void *data EINA_UNUSED, Evas_Object * obj, void *ev
      elm_actionslider_magnet_pos_set(obj, ELM_ACTIONSLIDER_RIGHT);
 }
 
+/**
+ * @brief Callback function to enable or disable magnet positions.
+ *
+ * This function is called when the slider's position changes. It adjusts the
+ * magnet position based on the slider's movement. Moving left sets the magnet
+ * to the center, and moving right disables the magnet. This demonstrates
+ * dynamic changes to the snapping behavior.
+ *
+ * @param data User data pointer (unused).
+ * @param obj The actionslider object.
+ * @param event_info The position which the slider has passed, as a string
+ *                   (e.g., "left", "right").
+ */
 static void
 _magnet_enable_disable_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info)
 {
@@ -85,6 +121,17 @@ _magnet_enable_disable_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_
       elm_actionslider_magnet_pos_set(obj, ELM_ACTIONSLIDER_NONE);
 }
 
+/**
+ * @brief Test function for the Efl Actionslider widget.
+ *
+ * This function creates a window and adds several actionslider widgets with
+ * various configurations to demonstrate different styles and functionalities,
+ * such as indicator positions, magnet positions, enabled positions, and callbacks.
+ *
+ * @param data User data pointer (unused).
+ * @param obj Parent object (unused).
+ * @param event_info Event info (unused).
+ */
 void
 test_actionslider(void *data EINA_UNUSED, Evas_Object * obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

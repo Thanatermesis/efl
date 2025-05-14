@@ -5,6 +5,19 @@
 
 #define MY_CLASS EFL_CANVAS_VG_CONTAINER_CLASS
 
+/**
+ * @internal
+ * @brief Callback function invoked when an Efl.Object is invalidated.
+ *
+ * This function is responsible for cleaning up references to child Efl_VG objects
+ * when the container itself is invalidated. It iterates through the children
+ * and calls efl_unref() on each to release its reference. This is crucial
+ * because when a container is copied, its children are also copied (duplicated
+ * via efl_add_ref()), and thus must be unreferenced when the original is no longer needed.
+ *
+ * @param data User data passed to the callback (unused in this function).
+ * @param event Information about the event that triggered the callback.
+ */
 static void
 _invalidate_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {

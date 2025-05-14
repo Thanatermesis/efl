@@ -4,12 +4,26 @@
 #ifndef _ELM_HOVERSEL_ITEM_EO_CLASS_TYPE
 #define _ELM_HOVERSEL_ITEM_EO_CLASS_TYPE
 
+/**
+ * @brief Represents an item in a Hoversel widget.
+ * @ingroup Elm_Hoversel_Item_Group
+ */
 typedef Eo Elm_Hoversel_Item;
 
 #endif
 
 #ifndef _ELM_HOVERSEL_ITEM_EO_TYPES
 #define _ELM_HOVERSEL_ITEM_EO_TYPES
+
+/**
+ * @def _ELM_HOVERSEL_ITEM_EO_TYPES
+ * @brief Marker for future hoversel item specific Evas_Object_Event_Cb related types.
+ *
+ * This block is reserved for potential future type definitions specific to
+ * Elm_Hoversel_Item, such as event callback types or custom data structures.
+ * Currently, it does not define any types.
+ * @ingroup Elm_Hoversel_Item_Group
+ */
 
 
 #endif

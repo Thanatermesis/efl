@@ -15,14 +15,69 @@ static int _efreet_utils_log_dom = -1;
 #include "Efreet.h"
 #include "efreet_private.h"
 
+/**
+ * @internal
+ * @brief Checks if a given path is within one of the Efreet default directories for a specific section.
+ * @param section The FDO section (e.g., "applications").
+ * @param path The absolute path to check.
+ * @return The base directory string (owned by Eina_Stringshare) if the path is within a default directory, otherwise NULL.
+ *         The caller receives a new reference to the stringshare string and is responsible for freeing it if it's not the one returned (meaning path was not in default).
+ *         If the path is found within a default directory, the returned string is the matching base directory.
+ */
 static char *efreet_util_path_in_default(const char *section, const char *path);
 
+/**
+ * @internal
+ * @brief Matches a string against a glob pattern.
+ * @param str The string to match.
+ * @param glob The glob pattern.
+ * @return 1 if the string matches the pattern, 0 otherwise.
+ */
 static int  efreet_util_glob_match(const char *str, const char *glob);
 
+/**
+ * @internal
+ * @brief Helper function to find .menu files in a specific configuration directory.
+ * @param menus An existing Eina_List to append found menu file paths to, or NULL to create a new list.
+ * @param config_dir The configuration directory to search within (e.g., "~/.config" or a system config dir).
+ * @return An Eina_List of menu file paths (const char *). Each string is a duplicated path and must be freed by the caller.
+ *         The list itself must be freed using eina_list_free().
+ */
 static Eina_List *efreet_util_menus_find_helper(Eina_List *menus, const char *config_dir);
 
+/**
+ * @internal
+ * @brief Finds a single Efreet_Desktop entry from the cache based on a search key and one or two values.
+ * @param search The base name for the cache files (e.g., "name", "generic_name", "startup_wm_class").
+ *               This is used to construct cache hash filename like "name_hash".
+ * @param what1 The primary value to search for in the cache.
+ * @param what2 An optional secondary value to search for if the primary is not found or not applicable (e.g., for wm_class). Can be NULL.
+ * @return A pointer to an Efreet_Desktop object if found, otherwise NULL. The desktop entry is refcounted; use efreet_desktop_unref() when done.
+ */
 static Efreet_Desktop *efreet_util_cache_find(const char *search, const char *what1, const char *what2);
+
+/**
+ * @internal
+ * @brief Retrieves a list of Efreet_Desktop entries from the cache that match a specific value for a given search key.
+ * @param search The base name for the cache files (e.g., "mime_types", "categories").
+ *               This is used to construct cache hash filename like "mime_types_hash".
+ * @param what The value to search for within the specified cache.
+ * @return An Eina_List of Efreet_Desktop objects. The list itself and its contents (Efreet_Desktop pointers)
+ *         must be freed by the caller (e.g., EINA_LIST_FREE(list, desktop) efreet_desktop_unref(desktop);).
+ *         Desktop entries are refcounted.
+ */
 static Eina_List *efreet_util_cache_list(const char *search, const char *what);
+
+/**
+ * @internal
+ * @brief Retrieves a list of Efreet_Desktop entries from the cache where a specific field matches a glob pattern.
+ * @param search The base name for the cache files (e.g., "name", "generic_name", "comment").
+ *               This is used to construct cache list filename like "name_list" and hash filename "name_hash".
+ * @param what The glob pattern to match against the values in the cache. If "*" or NULL, can match all entries depending on implementation.
+ * @return An Eina_List of Efreet_Desktop objects. The list itself and its contents (Efreet_Desktop pointers)
+ *         must be freed by the caller (e.g., EINA_LIST_FREE(list, desktop) efreet_desktop_unref(desktop);).
+ *         Desktop entries are refcounted.
+ */
 static Eina_List *efreet_util_cache_glob_list(const char *search, const char *what);
 
 static Eina_Lock _lock;
@@ -73,6 +128,23 @@ efreet_util_shutdown(void)
     return init;
 }
 
+/**
+ * @internal
+ * @brief Checks if a given path is within one of the Efreet default directories for a specific section.
+ *
+ * This function iterates through the standard FDO base directories (XDG_DATA_HOME, XDG_DATA_DIRS)
+ * combined with the provided @p section (e.g., "applications") to see if the @p path
+ * starts with any of these.
+ *
+ * @param section The FDO section (e.g., "applications", "icons").
+ * @param path The absolute path to check.
+ * @return If @p path is inside one of the default directories for @p section,
+ *         a stringshared pointer to that base directory is returned. The caller
+ *         receives a new reference to this stringshare if it's not the one that was matched.
+ *         Otherwise, returns NULL.
+ *         Example: if path is "/home/user/.local/share/applications/foo.desktop" and section is "applications",
+ *         and "/home/user/.local/share/" is XDG_DATA_HOME, this might return "/home/user/.local/share/applications".
+ */
 static char *
 efreet_util_path_in_default(const char *section, const char *path)
 {
@@ -170,6 +242,20 @@ efreet_util_desktop_file_id_find(const char *file_id)
     return ret;
 }
 
+/**
+ * @internal
+ * @brief Extracts the arguments string from a command line.
+ *
+ * This function parses a command string and returns everything after the first
+ * whitespace sequence that is not within quotes. It handles single and double
+ * quotes, as well as escaped characters.
+ *
+ * @param cmd The command string (e.g., "gedit %F", "mycommand -o file --with-space \"spaced arg\"").
+ * @return A newly allocated string containing the arguments. If no arguments are found,
+ *         an empty string is returned. The caller must free this string.
+ *         Returns NULL on allocation failure.
+ *         Example: for "gedit %F", it returns "%F". For "mycommand", it returns "".
+ */
 static char *
 efreet_util_cmd_args_get(const char *cmd)
 {
@@ -321,6 +407,14 @@ done:
     return bestret;
 }
 
+/**
+ * @brief Find a desktop by name
+ *
+ * return value must be freed by efreet_desktop_free
+ *
+ * @param name the name
+ * @return a desktop
+ */
 EAPI Efreet_Desktop *
 efreet_util_desktop_name_find(const char *name)
 {
@@ -438,6 +532,20 @@ efreet_util_desktop_environments_list(void)
     return ret;
 }
 
+/**
+ * @internal
+ * @brief Matches a string against a glob pattern.
+ *
+ * This function provides a simple glob matching capability.
+ * It handles the '*' wildcard.
+ *
+ * @param str The string to test.
+ * @param glob The glob pattern to match against @p str.
+ * @return 1 if @p str matches @p glob, 0 otherwise.
+ *         Returns 0 if either @p str or @p glob is NULL.
+ *         If @p glob is an empty string, it only matches an empty @p str.
+ *         If @p glob is "*", it matches any @p str (including empty).
+ */
 static int
 efreet_util_glob_match(const char *str, const char *glob)
 {
@@ -469,6 +577,22 @@ efreet_util_menus_find(void)
     return menus;
 }
 
+/**
+ * @internal
+ * @brief Helper function to find .menu files in a specific configuration directory.
+ *
+ * This function scans the "menus" subdirectory of @p config_dir for files
+ * ending with the ".menu" extension. Found paths are duplicated and added to
+ * the @p menus list.
+ *
+ * @param menus An Eina_List to which found menu file paths (char *) will be appended.
+ *              If NULL, a new list will be created (though current usage passes an existing list).
+ * @param config_dir The base configuration directory to search within (e.g., "/home/user/.config", "/etc/xdg").
+ *                   The function will look into a "menus" subdirectory of this path.
+ * @return The @p menus list with appended menu file paths. Each path string is
+ *         newly allocated with strdup() and must be freed by the caller when the list is cleared.
+ *         The list itself is managed by the caller.
+ */
 static Eina_List *
 efreet_util_menus_find_helper(Eina_List *menus, const char *config_dir)
 {
@@ -496,6 +620,21 @@ efreet_util_menus_find_helper(Eina_List *menus, const char *config_dir)
     return menus;
 }
 
+/**
+ * @internal
+ * @brief Finds a single Efreet_Desktop entry from the cache.
+ *
+ * This function queries the Efreet cache for a desktop entry. It constructs
+ * a cache key (e.g., "name_hash") from @p search and looks up @p what1 (and
+ * optionally @p what2) in this hash. The first matching desktop entry found is returned.
+ *
+ * @param search A string prefix used to determine the cache file, e.g., "name", "generic_name", "startup_wm_class".
+ *               This will be used to look for a hash named, for example, "name_hash".
+ * @param what1 The primary key to search for in the hash.
+ * @param what2 An optional secondary key to search for if @p what1 is not found or if applicable (e.g. for WM_CLASS where name and class can be used). Can be NULL.
+ * @return An Efreet_Desktop* if a match is found, otherwise NULL. The returned desktop
+ *         is refcounted; use efreet_desktop_unref() when no longer needed.
+ */
 static Efreet_Desktop *
 efreet_util_cache_find(const char *search, const char *what1, const char *what2)
 {
@@ -525,6 +664,28 @@ efreet_util_cache_find(const char *search, const char *what1, const char *what2)
     return ret;
 }
 
+/**
+ * @internal
+ * @brief Retrieves a list of Efreet_Desktop entries from the cache matching a key.
+ *
+ * This function queries the Efreet cache. It constructs a cache key (e.g., "mime_types_hash")
+ * from @p search and looks up @p what in this hash. All desktop entries associated
+ * with this key are returned in a list.
+ *
+ * @param search A string prefix used to determine the cache file, e.g., "mime_types", "categories".
+ *               This will be used to look for a hash named, for example, "mime_types_hash".
+ * @param what The key to search for in the hash (e.g., a specific MIME type or category name).
+ * @return An Eina_List* of Efreet_Desktop* entries. Returns NULL if @p what is NULL or
+ *         if the cache cannot be accessed. The caller is responsible for freeing the list
+ *         (e.g., using EINA_LIST_FREE and efreet_desktop_unref() for each item).
+ *         Each Efreet_Desktop in the list is refcounted.
+ *         Example of returned list structure for `search="categories", what="AudioVideo"`:
+ *         Eina_List [
+ *           Efreet_Desktop* (for app1.desktop that is in AudioVideo),
+ *           Efreet_Desktop* (for app2.desktop that is in AudioVideo),
+ *           ...
+ *         ]
+ */
 static Eina_List *
 efreet_util_cache_list(const char *search, const char *what)
 {
@@ -554,6 +715,29 @@ efreet_util_cache_list(const char *search, const char *what)
     return ret;
 }
 
+/**
+ * @internal
+ * @brief Retrieves a list of Efreet_Desktop entries from the cache where a field matches a glob pattern.
+ *
+ * This function iterates through a list of known values for a field (e.g., all known application names,
+ * obtained from a cache like "name_list"). For each value that matches the @p what glob pattern,
+ * it then retrieves all associated desktop files from a corresponding hash cache (e.g., "name_hash").
+ *
+ * @param search A string prefix used to determine the cache files, e.g., "name", "generic_name", "comment".
+ *               This will be used to look for a list like "name_list" and a hash like "name_hash".
+ * @param what The glob pattern to match against the field values. If "*" or NULL, it may match all entries,
+ *             depending on the specific implementation (currently, "*" is treated as match-all by setting `what` to NULL).
+ * @return An Eina_List* of Efreet_Desktop* entries. Returns NULL if @p what is NULL (unless it was "*")
+ *         or if the cache cannot be accessed. The caller is responsible for freeing the list
+ *         (e.g., using EINA_LIST_FREE and efreet_desktop_unref() for each item).
+ *         Each Efreet_Desktop in the list is refcounted.
+ *         Example of returned list structure for `search="name", what="G*"` (apps starting with G):
+ *         Eina_List [
+ *           Efreet_Desktop* (for gedit.desktop),
+ *           Efreet_Desktop* (for gimp.desktop),
+ *           ...
+ *         ]
+ */
 static Eina_List *
 efreet_util_cache_glob_list(const char *search, const char *what)
 {
@@ -599,6 +783,16 @@ efreet_util_cache_glob_list(const char *search, const char *what)
 
 /*
  * Needs EAPI because of helper binaries
+ */
+/**
+ * @brief Frees an Eina_Hash table with a custom data free callback.
+ * @param hash The Eina_Hash table to free.
+ * @param free_cb The callback function to free the data stored in the hash.
+ *
+ * Needs EAPI because of helper binaries that might link against efreet
+ * and use this utility for cleaning up hash tables they create, ensuring
+ * they use the same memory management context if that were relevant, or simply
+ * for convenience if they also use Eina.
  */
 EAPI void
 efreet_hash_free(Eina_Hash *hash, Eina_Free_Cb free_cb)

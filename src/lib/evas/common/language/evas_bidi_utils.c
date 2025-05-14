@@ -44,7 +44,18 @@
 #endif
 
 #ifdef EVAS_FRIBIDI_EINA_UNICODE_UNEQUAL
-/* Convert bidichar to eina_unicode assume both are valid pointers */
+/**
+ * @internal
+ * Converts a FriBidiChar string to an Eina_Unicode string.
+ * This function is used when SIZEOF_FRIBIDICHAR != SIZEOF_EINA_UNICODE.
+ * It assumes both destination and source pointers are valid and that
+ * the destination buffer is large enough to hold the converted string,
+ * including the null terminator.
+ *
+ * @param dest Pointer to the destination Eina_Unicode buffer.
+ * @param src Pointer to the source FriBidiChar string.
+ * @return Pointer to the destination buffer (dest), or NULL if src or dest is NULL.
+ */
 static Eina_Unicode *
 _evas_bidi_fribidichar_to_unicode(Eina_Unicode *dest, const FriBidiChar *src)
 {
@@ -56,7 +67,18 @@ _evas_bidi_fribidichar_to_unicode(Eina_Unicode *dest, const FriBidiChar *src)
    return ret;
 }
 
-/* Convert eina_unicode to bidi_char assume both are valid pointers */
+/**
+ * @internal
+ * Converts an Eina_Unicode string to a FriBidiChar string.
+ * This function is used when SIZEOF_FRIBIDICHAR != SIZEOF_EINA_UNICODE.
+ * It assumes both destination and source pointers are valid and that
+ * the destination buffer is large enough to hold the converted string,
+ * including the null terminator.
+ *
+ * @param dest Pointer to the destination FriBidiChar buffer.
+ * @param src Pointer to the source Eina_Unicode string.
+ * @return Pointer to the destination buffer (dest), or NULL if src or dest is NULL.
+ */
 static FriBidiChar *
 _evas_bidi_unicode_to_fribidichar(FriBidiChar *dest, const Eina_Unicode *src)
 {

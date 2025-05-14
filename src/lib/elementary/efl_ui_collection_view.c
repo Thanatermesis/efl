@@ -28,81 +28,112 @@ typedef struct _Efl_Ui_Collection_Item Efl_Ui_Collection_Item;
 typedef struct _Efl_Ui_Collection_Item_Lookup Efl_Ui_Collection_Item_Lookup;
 typedef struct _Efl_Ui_Collection_Request Efl_Ui_Collection_Request;
 
+/**
+ * @brief Represents a single item in the collection view, linking its graphical entity
+ *        with its data model.
+ */
 struct _Efl_Ui_Collection_Item
 {
-   Efl_Gfx_Entity *entity;
-   Efl_Model *model;
+   Efl_Gfx_Entity *entity; /**< The graphical entity (widget) representing the item. NULL if not realized. */
+   Efl_Model *model;       /**< The data model associated with this item. */
 };
 
+/**
+ * @brief Structure used for caching collection items in an Rbtree for efficient lookup by index.
+ */
 struct _Efl_Ui_Collection_Item_Lookup
 {
-   EINA_RBTREE;
+   EINA_RBTREE; /**< Macro to embed rbtree node data. */
 
-   unsigned int index;
-   Efl_Ui_Collection_Item item;
+   unsigned int index; /**< The numerical index of the item in the collection. */
+   Efl_Ui_Collection_Item item; /**< The actual collection item data. */
 };
 
+/**
+ * @brief Represents a segment of the collection's items, typically those currently
+ *        or nearly visible, or pre-cached. Used when VIEWPORT_ENABLE is defined.
+ */
 struct _Efl_Ui_Collection_Viewport
 {
-   Efl_Ui_Collection_Item *items;
+   Efl_Ui_Collection_Item *items; /**< Array of items within this viewport segment. */
 
-   unsigned int offset;
-   uint16_t count;
+   unsigned int offset; /**< The starting index in the overall collection for this viewport. */
+   uint16_t count;      /**< The number of items this viewport segment can hold. */
 };
 
+/**
+ * @brief Represents an asynchronous request for data (models or entities) for a range of items.
+ */
 struct _Efl_Ui_Collection_Request
 {
-   Eina_Future *f;
+   Eina_Future *f; /**< The future associated with this data fetching operation. */
 
-   unsigned int offset;
-   unsigned int length;
+   unsigned int offset; /**< Starting index of the items requested. */
+   unsigned int length; /**< Number of items requested from the offset. */
 
-   Eina_Bool need_size : 1;
-   Eina_Bool need_entity : 1;
-   Eina_Bool entity_requested : 1;
+   Eina_Bool need_size : 1;    /**< Flag indicating if item sizes are needed for this request. */
+   Eina_Bool need_entity : 1;  /**< Flag indicating if graphical entities are needed for this request. */
+   Eina_Bool entity_requested : 1; /**< Flag indicating if the entity creation part of the future has been chained. */
 };
 
+/**
+ * @brief Private data for the Efl_Ui_Collection_View widget.
+ */
 struct _Efl_Ui_Collection_View_Data
 {
-   Efl_Ui_Factory *factory;
+   Efl_Ui_Factory *factory; /**< Factory used to create item widgets from models. */
    Efl_Ui_Position_Manager_Entity *manager;
    Efl_Ui_Scroll_Manager *scroller;
    Efl_Ui_Pan *pan;
-   Efl_Gfx_Entity *sizer;
-   Efl_Model *model;
-   Efl_Model *multi_selectable_async_model;
+   Efl_Gfx_Entity *sizer; /**< A sizer object used by the pan to define content size. */
+   Efl_Model *model; /**< The primary data model for the collection. May be a composite model. */
+   Efl_Model *multi_selectable_async_model; /**< Model handling multi-selection, potentially an internal wrapper. */
 
 #ifdef VIEWPORT_ENABLE
+   /**
+    * @brief Array of viewports for managing item realization. Typically includes
+    *        previous, current, and next segments of visible items.
+    *        Example: `viewport[0]` = previous, `viewport[1]` = current, `viewport[2]` = next.
+    */
    Efl_Ui_Collection_Viewport *viewport[3];
 #endif
-   Eina_Rbtree *cache;
+   Eina_Rbtree *cache; /**< Rbtree cache for Efl_Ui_Collection_Item_Lookup, storing items not in the active viewport(s). */
 
-   Eina_List *requests; // Array of Efl_Ui_Collection_Request in progress
+   Eina_List *requests; /**< List of active Efl_Ui_Collection_Request for fetching item data. */
 
+   /**
+    * @brief Stores references to focus-related items.
+    */
    struct {
-      Efl_Gfx_Entity *last; // The last item of the collection, so focus can start by the end if necessary.
-      Efl_Gfx_Entity *previously; // The previously selected item in the collection, so focus can come back to it.
+      Efl_Gfx_Entity *last;       /**< The last realized item in the collection, for focusing from the end. */
+      Efl_Gfx_Entity *previously; /**< The previously focused item, to restore focus. */
    } focus;
 
-   unsigned int start_id;
-   unsigned int end_id;
+   unsigned int start_id; /**< Start index of the currently visible range (used with VIEWPORT_ENABLE or for caching logic). */
+   unsigned int end_id;   /**< End index of the currently visible range (used with VIEWPORT_ENABLE or for caching logic). */
 
-   Eina_Size2D content_min_size;
+   Eina_Size2D content_min_size; /**< Minimum size of the content, calculated by the position manager. */
 
-   Efl_Ui_Layout_Orientation direction;
-   Efl_Ui_Select_Mode mode;
+   Efl_Ui_Layout_Orientation direction; /**< Layout direction (vertical or horizontal). */
+   Efl_Ui_Select_Mode mode;             /**< Current selection mode (single, multi, etc.). */
 
+   /**
+    * @brief Flags indicating whether the collection view should match its content's width/height.
+    */
    struct {
-      Eina_Bool w : 1;
-      Eina_Bool h : 1;
+      Eina_Bool w : 1; /**< Match content width. */
+      Eina_Bool h : 1; /**< Match content height. */
    } match_content;
 
-   Efl_Ui_Position_Manager_Request_Range current_range;
+   Efl_Ui_Position_Manager_Request_Range current_range; /**< The current range of items requested by the position manager for visibility. */
 };
 
+/**
+ * @brief Private data for the custom Focus Manager of Efl_Ui_Collection_View.
+ */
 struct _Efl_Ui_Collection_View_Focus_Manager_Data
 {
-   Efl_Ui_Collection_View *collection;
+   Efl_Ui_Collection_View *collection; /**< Pointer back to the collection view this manager belongs to. */
 };
 
 static const char *COLLECTION_VIEW_MANAGED = "_collection_view.managed";
@@ -116,6 +147,15 @@ static const char *COLLECTION_VIEW_MANAGED_YES = "yes";
 static Eina_Bool _entity_request(Efl_Ui_Collection_View *obj, Efl_Ui_Collection_Request *request);
 static void _idle_cb(void *data, const Efl_Event *event);
 
+/**
+ * @brief Rbtree lookup function to find an Efl_Ui_Collection_Item_Lookup by its index.
+ *
+ * @param node The rbtree node to compare.
+ * @param key Pointer to an unsigned int representing the index to search for.
+ * @param length Unused.
+ * @param data Unused.
+ * @return 0 if match, 1 if node->index > key, -1 if node->index < key.
+ */
 static int
 _cache_tree_lookup(const Eina_Rbtree *node, const void *key,
                    int length EINA_UNUSED, void *data EINA_UNUSED)
@@ -130,6 +170,14 @@ _cache_tree_lookup(const Eina_Rbtree *node, const void *key,
    return 0;
 }
 
+/**
+ * @brief Rbtree comparison function for Efl_Ui_Collection_Item_Lookup nodes, based on their index.
+ *
+ * @param left The left rbtree node.
+ * @param right The right rbtree node.
+ * @param data Unused.
+ * @return EINA_RBTREE_LEFT if left->index < right->index, EINA_RBTREE_RIGHT otherwise.
+ */
 static Eina_Rbtree_Direction
 _cache_tree_cmp(const Eina_Rbtree *left, const Eina_Rbtree *right, void *data EINA_UNUSED)
 {
@@ -139,6 +187,16 @@ _cache_tree_cmp(const Eina_Rbtree *left, const Eina_Rbtree *right, void *data EI
    return l->index < r->index ? EINA_RBTREE_LEFT : EINA_RBTREE_RIGHT;
 }
 
+/**
+ * @brief Callback for the error case of an efl_model_property_set future.
+ *        It reverts the item's selected state to match the model's state if the
+ *        model property set operation failed (e.g., selection was denied by the model).
+ *
+ * @param item The UI item whose selection state might need reverting.
+ * @param data Unused.
+ * @param err The error that occurred during the model property set.
+ * @return An Eina_Value initialized with the passed error.
+ */
 static Eina_Value
 _undo_item_selected_then(Eo *item, void *data EINA_UNUSED, Eina_Error err)
 {
@@ -150,12 +208,23 @@ _undo_item_selected_then(Eo *item, void *data EINA_UNUSED, Eina_Error err)
    eina_value_bool_get(get, &model_selected);
    eina_value_free(get);
 
+   // If the item's visual selected state differs from the model's actual selected state (after a failed set),
+   // revert the item's visual state to match the model.
    if ((!!model_selected) != (!!item_selected))
      efl_ui_selectable_selected_set(item, model_selected);
 
    return eina_value_error_init(err);
 }
 
+/**
+ * @brief Callback triggered when an item's 'selected' state changes.
+ *        This function synchronizes the item's selected state with its underlying model's
+ *        'self.selected' property. If the model rejects the change, _undo_item_selected_then
+ *        is called to revert the UI.
+ *
+ * @param data Unused.
+ * @param ev The event information, where ev->object is the item whose selection changed.
+ */
 static void
 _selected_item_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -183,11 +252,19 @@ _selected_item_cb(void *data EINA_UNUSED, const Efl_Event *ev)
    eina_value_flush(&set);
 }
 
+/**
+ * @brief Callback to redirect input events (press, unpress, click, longpress) from individual items
+ *        to the collection view itself, but as item-specific events (e.g., EFL_UI_EVENT_ITEM_CLICKED).
+ *
+ * @param data The collection view object (Eo *obj).
+ * @param ev The original input event from the item. ev->object is the item.
+ */
 static void
 _redirect_item_cb(void *data, const Efl_Event *ev)
 {
-   Eo *obj = data;
+   Eo *obj = data; // The collection view instance
 
+// Macro to simplify redirecting click-like events.
 #define REDIRECT_EVT(Desc, Item_Desc)                           \
    if (Desc == ev->desc)                                        \
      {                                                          \
@@ -199,6 +276,7 @@ _redirect_item_cb(void *data, const Efl_Event *ev)
                                                                 \
         efl_event_callback_call(obj, Item_Desc, &item_clicked); \
      }
+// Macro to simplify redirecting press/unpress events.
 #define REDIRECT_EVT_PRESS(Desc, Item_Desc)                           \
    if (Desc == ev->desc)                                        \
      {                                                          \
@@ -228,6 +306,19 @@ EFL_CALLBACKS_ARRAY_DEFINE(active_item_cbs,
   { EFL_INPUT_EVENT_CLICKED, _redirect_item_cb },
   { EFL_INPUT_EVENT_CLICKED_ANY, _redirect_item_cb });
 
+/**
+ * @brief Cleans up an item's graphical entity.
+ *        This includes removing event callbacks, unreferencing the entity,
+ *        emitting an UNREALIZED event, and either releasing it via the factory
+ *        immediately or scheduling it for batch release.
+ *
+ * @param obj The collection view instance.
+ * @param factory The factory used to create the entity.
+ * @param item The collection item whose entity needs cleanup.
+ * @param scheduled_release Optional Eina_Array. If provided, the entity is added
+ *                          to this array for later batch release. If NULL, released immediately.
+ *                          Example of scheduled_release elements: `[entity1, entity2, ...]`
+ */
 static void
 _entity_cleanup(Efl_Ui_Collection_View *obj, Efl_Ui_Factory *factory,
                 Efl_Ui_Collection_Item *item, Eina_Array *scheduled_release)
@@ -250,15 +341,31 @@ _entity_cleanup(Efl_Ui_Collection_View *obj, Efl_Ui_Factory *factory,
      }
 }
 
+/**
+ * @brief Cleans up a full collection item, including its model and entity.
+ *
+ * @param obj The collection view instance.
+ * @param factory The factory used for entity creation/release.
+ * @param item The collection item to clean up.
+ * @param scheduled_release Optional Eina_Array for batch entity release.
+ *                          Passed to _entity_cleanup.
+ */
 static void
 _item_cleanup(Efl_Ui_Collection_View *obj, Efl_Ui_Factory *factory,
               Efl_Ui_Collection_Item *item, Eina_Array *scheduled_release)
 {
-   efl_replace(&item->model, NULL);
+   efl_replace(&item->model, NULL); // Unref the model associated with the item.
 
-   _entity_cleanup(obj, factory, item, scheduled_release);
+   _entity_cleanup(obj, factory, item, scheduled_release); // Clean up the entity.
 }
 
+/**
+ * @brief Frees an Efl_Ui_Collection_Item_Lookup node from the rbtree cache.
+ *        This is typically used as a callback for eina_rbtree_delete.
+ *
+ * @param node The rbtree node (castable to Efl_Ui_Collection_Item_Lookup *) to free.
+ * @param data The collection view instance (Eo *obj).
+ */
 static void
 _cache_item_free(Eina_Rbtree *node, void *data)
 {

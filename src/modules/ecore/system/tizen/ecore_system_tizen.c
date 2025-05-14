@@ -6,6 +6,10 @@
 #include <vconf.h>
 #include <locale.h>
 
+/**
+ * @internal
+ * @brief Log domain for ecore_system_tizen.
+ */
 static int _log_dom = -1;
 
 #ifdef CRI
@@ -28,6 +32,16 @@ static int _log_dom = -1;
 #endif
 #define DBG(...) EINA_LOG_DOM_DBG(_log_dom, __VA_ARGS__)
 
+/**
+ * @internal
+ * @brief Callback for VCONFKEY_SYSMAN_LOW_MEMORY key changes.
+ *
+ * This function is called when the system's low memory status changes.
+ * It updates the Ecore memory state accordingly.
+ *
+ * @param node The keynode that changed (unused).
+ * @param data User data passed to the callback (unused).
+ */
 static void _low_mem_key_changed_cb(keynode_t *node EINA_UNUSED, void *data EINA_UNUSED)
 {
    int status;
@@ -41,6 +55,17 @@ static void _low_mem_key_changed_cb(keynode_t *node EINA_UNUSED, void *data EINA
      ecore_memory_state_set(ECORE_MEMORY_STATE_LOW);
 }
 
+/**
+ * @internal
+ * @brief Callback for VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW key changes.
+ *
+ * This function is called when the battery charging state changes.
+ * It updates the Ecore power state based on whether the device is charging
+ * or, if not charging, the battery status (normal, full, or low).
+ *
+ * @param node The keynode that changed (unused).
+ * @param data User data passed to the callback (unused).
+ */
 static void _charge_key_changed_cb(keynode_t *node EINA_UNUSED, void *data EINA_UNUSED)
 {
    int charging, status;
@@ -63,11 +88,34 @@ static void _charge_key_changed_cb(keynode_t *node EINA_UNUSED, void *data EINA_
      ecore_power_state_set(ECORE_POWER_STATE_LOW);
 }
 
+/**
+ * @internal
+ * @brief Callback for VCONFKEY_SYSMAN_BATTERY_STATUS_LOW key changes.
+ *
+ * This function is called when the low battery status changes.
+ * It simply calls _charge_key_changed_cb to re-evaluate the power state.
+ *
+ * @param node The keynode that changed (unused).
+ * @param data User data passed to the callback (unused).
+ */
 static void _low_batt_key_changed_cb(keynode_t *node EINA_UNUSED, void *data EINA_UNUSED)
 {
    _charge_key_changed_cb(NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for VCONFKEY_LANGSET key changes.
+ *
+ * This function is called when the system language setting changes.
+ * It updates the LANG and LC_MESSAGES environment variables and
+ * sets the locale. If this is not the initial call, it also
+ * triggers an ECORE_EVENT_LOCALE_CHANGED event.
+ *
+ * @param node The keynode that changed (unused).
+ * @param first A flag indicating if this is the first call during initialization.
+ *              (1 if first call, NULL otherwise).
+ */
 static void _lang_key_changed_cb(keynode_t *node EINA_UNUSED, void *first)
 {
    char *lang;
@@ -85,6 +133,20 @@ static void _lang_key_changed_cb(keynode_t *node EINA_UNUSED, void *first)
    free(lang);
 }
 
+/**
+ * @internal
+ * @brief Callback for VCONFKEY_REGIONFORMAT key changes.
+ *
+ * This function is called when the system region format setting changes.
+ * It updates various LC_* environment variables related to regional formatting
+ * (e.g., LC_CTYPE, LC_NUMERIC, LC_TIME) and sets the locale.
+ * If this is not the initial call, it also triggers an
+ * ECORE_EVENT_LOCALE_CHANGED event.
+ *
+ * @param node The keynode that changed (unused).
+ * @param first A flag indicating if this is the first call during initialization.
+ *              (1 if first call, NULL otherwise).
+ */
 static void _region_fmt_key_changed_cb(keynode_t *node EINA_UNUSED, void *first)
 {
    char *region;
@@ -111,11 +173,31 @@ static void _region_fmt_key_changed_cb(keynode_t *node EINA_UNUSED, void *first)
    free(region);
 }
 
+/**
+ * @internal
+ * @brief Callback for VCONFKEY_REGIONFORMAT_TIME1224 key changes.
+ *
+ * This function is called when the system time format (12/24 hour) changes.
+ * It triggers an ECORE_EVENT_LOCALE_CHANGED event.
+ *
+ * @param node The keynode that changed (unused).
+ * @param data User data passed to the callback (unused).
+ */
 static void _time_fmt_key_changed_cb(keynode_t *node EINA_UNUSED, void *data EINA_UNUSED)
 {
    ecore_event_add(ECORE_EVENT_LOCALE_CHANGED, NULL, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Initializes the ecore_system_tizen module.
+ *
+ * Registers the log domain and sets up vconf listeners for various system
+ * keys related to memory, power, and locale. It also calls the
+ * respective callbacks initially to set the current state.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _ecore_system_tizen_init(void)
 {
@@ -184,6 +266,12 @@ err_low_memory:
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the ecore_system_tizen module.
+ *
+ * Unregisters vconf listeners and unregisters the log domain.
+ */
 static void
 _ecore_system_tizen_shutdown(void)
 {

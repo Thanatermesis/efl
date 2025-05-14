@@ -8,19 +8,35 @@
 
 static const int default_font_size = 48;
 
+/**
+ * @brief Structure to associate an image file with a source name for filters.
+ *
+ * This allows filter code to reference images by a simple name (e.g., 'wood')
+ * instead of a full path.
+ */
 typedef struct _Filter_Image
 {
-   const char *path;
-   const char *src_name;
+   const char *path;      /**< Filesystem path to the image file (e.g., "wood_01.jpg"). */
+   const char *src_name;  /**< Name used to reference the image in filter code (e.g., "wood"). */
 } Filter_Image;
 
+/**
+ * @brief Structure defining a graphics filter template.
+ */
 typedef struct _Filter
 {
-   const char *name;
-   const char *code;
-   const Filter_Image *images;
+   const char *name;            /**< Display name of the filter (e.g., "Fire glow"). */
+   const char *code;            /**< Lua-based source code for the filter. */
+   const Filter_Image *images;  /**< Optional array of images required by this filter. Can be NULL. */
 } Filter;
 
+/**
+ * @brief Array of available images for filters.
+ * Each element is a Filter_Image struct.
+ * @code
+ * { "path/to/image.jpg", "source_name_in_filter" }
+ * @endcode
+ */
 static const Filter_Image images[] = {
    { "plant_01.jpg", "plant" },
    { "rock_01.jpg", "rock" },
@@ -48,6 +64,14 @@ static const Filter_Image images_anim[] = {
 };
 
 /* builtin filter examples */
+/**
+ * @brief Array of predefined filter templates.
+ * Each element is a Filter struct with a name, Lua-based filter code,
+ * and an optional list of images required by the filter.
+ * @code
+ * { "Filter Name", "lua_filter_code", array_of_filter_images }
+ * @endcode
+ */
 static const Filter templates[] = {
    { "Custom", NULL, NULL },
    { "BLUR",
@@ -140,6 +164,11 @@ static const Filter templates[] = {
 };
 
 
+/**
+ * @brief Populates the filter selection spinner with predefined templates.
+ *
+ * @param obj The spinner widget to populate.
+ */
 static void
 _spinner_fill(Eo *obj)
 {
@@ -156,6 +185,13 @@ _spinner_fill(Eo *obj)
    elm_spinner_wrap_set(obj, 1);
 }
 
+/**
+ * @brief Applies a filter program to the main text and textblock objects.
+ *
+ * @param win The application window, used to retrieve object references.
+ * @param code The filter source code to apply.
+ * @param name The name of the filter program (e.g., for textblock styles).
+ */
 static void
 _filter_apply(Eo *win, const char *code, const char *name)
 {
@@ -168,6 +204,17 @@ _filter_apply(Eo *win, const char *code, const char *name)
    efl_gfx_filter_program_set(tb, code, "main");
 }
 
+/**
+ * @brief Callback invoked when the filter spinner's value changes.
+ *
+ * This function retrieves the selected filter from the `templates` array,
+ * updates the code editor with the filter's code, and applies the filter.
+ * It also sets up any required image sources for the filter.
+ *
+ * @param data The application window.
+ * @param obj The spinner object that triggered the event (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _spinner_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -200,6 +247,19 @@ _spinner_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
      }
 }
 
+/**
+ * @brief Callback function executed when the filter code in the textbox changes.
+ *
+ * This function is scheduled by _code_changed_hack(). It reads the new filter
+ * code from the textbox, applies it, and resets the filter selection
+ * spinner to "Custom". It also handles replacing UTF-8 paragraph separators
+ * with newlines, which can be inserted by the textbox widget.
+ *
+ * @param data The application window.
+ * @param v The future value (unused).
+ * @param dead The dead future (unused).
+ * @return Eina_Value The original value `v`.
+ */
 static Eina_Value
 _code_changed(void *data, const Eina_Value v,
               const Eina_Future *dead EINA_UNUSED)
@@ -233,6 +293,17 @@ _code_changed(void *data, const Eina_Value v,
    return v;
 }
 
+/**
+ * @brief Schedules the _code_changed() function to run after a delay.
+ *
+ * This is a workaround for handling the EFL_TEXT_INTERACTIVE_EVENT_CHANGED_USER
+ * event. It ensures that the code processing happens in the next main loop
+ * iteration, avoiding potential issues with immediate processing while the
+ * user is still typing.
+ *
+ * @param data The application window.
+ * @param ev The event information (unused).
+ */
 static void
 _code_changed_hack(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -243,6 +314,15 @@ _code_changed_hack(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_future_then(data, f);
 }
 
+/**
+ * @brief Callback to adjust the minimum size of the text object when it resizes.
+ *
+ * This ensures that the layout correctly accommodates the text object's
+ * dimensions after a filter is applied, which may change its size.
+ *
+ * @param data User data (unused).
+ * @param ev The resize event, containing the text object.
+ */
 static void
 _text_resize(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -252,6 +332,16 @@ _text_resize(void *data EINA_UNUSED, const Efl_Event *ev)
    efl_gfx_hint_size_min_set(ev->object, sz);
 }
 
+/**
+ * @brief Callback to adjust the minimum size of the textblock object when it resizes.
+ *
+ * This calculates the total required size, including native text dimensions
+ * and style insets (padding), and sets it as the object's minimum size. This
+ * is necessary for the layout to correctly handle the textblock's size.
+ *
+ * @param data User data (unused).
+ * @param ev The resize or style change event, containing the textblock object.
+ */
 static void
 _textblock_resize(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -262,6 +352,17 @@ _textblock_resize(void *data EINA_UNUSED, const Efl_Event *ev)
    efl_gfx_hint_size_min_set(ev->object, EINA_SIZE2D(w + l + r, h + t + b));
 }
 
+/**
+ * @brief Callback invoked when an image in the source list is clicked.
+ *
+ * This prepends a line to the filter code editor to define the clicked
+ * image as a buffer source (e.g., "wood = buffer { src = 'wood' }").
+ * It also sets the image as a filter source for both the text and
+ * textblock objects.
+ *
+ * @param data The application window.
+ * @param ev The click event on the image object.
+ */
 static void
 _img_click(void *data, const Efl_Event *ev)
 {
@@ -289,6 +390,12 @@ _img_click(void *data, const Efl_Event *ev)
    efl_gfx_filter_source_set(tb, name, ev->object);
 }
 
+/**
+ * @brief Callback to change the font size of the main text object.
+ *
+ * @param data The application window.
+ * @param ev The spinner event from which to get the new font size.
+ */
 static void
 _font_size_change(void *data, const Efl_Event *ev)
 {
@@ -299,6 +406,14 @@ _font_size_change(void *data, const Efl_Event *ev)
    efl_text_font_size_set(text, elm_spinner_value_get(ev->object));
 }
 
+/**
+ * @brief Callback to trigger the flip animation between views.
+ *
+ * Flips between the single text object view and the textblock object view.
+ *
+ * @param data The application window.
+ * @param ev The click event (unused).
+ */
 static void
 _flip_click(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -309,6 +424,17 @@ _flip_click(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_flip_go(flip, EFL_UI_FLIP_MODE_CROSS_FADE);
 }
 
+/**
+ * @brief Callback for when the color selector's value changes.
+ *
+ * It retrieves the selected color and updates the 'myColor' variable
+ * in the filter programs for both the text and textblock objects. The color
+ * is passed as a string like "color(r, g, b, a)".
+ *
+ * @param data The application window.
+ * @param obj The color selector object.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _colsel_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -327,6 +453,22 @@ _colsel_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    efl_gfx_filter_data_set(tb, efl_name_get(colsel), buf, 1);
 }
 
+/**
+ * @brief The main test function for Gfx Filters.
+ *
+ * This function sets up the entire UI for the Gfx Filter Editor, including:
+ * - The main window.
+ * - Controls for selecting filters, changing font size, and flipping views.
+ * - A list of available image sources.
+ * - A color selector for dynamic filter parameters.
+ * - A split view with the filter output on one side and the code editor on the other.
+ * - Two views to flip between: one with a simple Evas_Object_Text and another
+ *   with an Evas_Object_Textblock to test filters on both.
+ *
+ * @param data User data (unused).
+ * @param obj The parent object (unused).
+ * @param event_info Event-specific information (unused).
+ */
 void
 test_gfx_filters(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

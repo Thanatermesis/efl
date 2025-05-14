@@ -5,10 +5,42 @@
 #include <hardware/hardware.h>
 #include <android-config.h>
 
+/** @brief Pointer to the hardware composer layer for the framebuffer.
+ * This layer is used by the 'present' function to submit the rendered buffer.
+ * It is initialized in create_hwcomposernativewindow().
+ */
 static hwc_layer_1_t *fblayer;
+
+/** @brief Pointer to the hardware composer device.
+ *  Initialized in create_hwcomposernativewindow() and used for display operations.
+ */
 static hwc_composer_device_1_t *hwcDevicePtr;
+
+/** @brief Array of display contents lists for hardware composer.
+ *  mList[0] typically corresponds to the primary display.
+ *  Each element is a hwc_display_contents_1_t*, which contains an array of layers.
+ *  Example structure:
+ *  mList -> [ hwc_display_contents_1_t* (for HWC_DISPLAY_PRIMARY),
+ *             hwc_display_contents_1_t* (for HWC_DISPLAY_EXTERNAL, if any),
+ *             ... ]
+ *  mList[0]->hwLayers -> [ hwc_layer_1_t (layer 0), hwc_layer_1_t (layer 1), ... ]
+ *  Initialized in create_hwcomposernativewindow().
+ */
 static hwc_display_contents_1_t **mList;
 
+/**
+ * @brief Presents a rendered buffer to the display using Android's HWComposer.
+ *
+ * This function is typically used as a callback for HWCNativeWindow.
+ * It takes a new buffer, assigns it to the HWComposer layer, and then
+ * tells HWComposer to prepare and set the new display contents.
+ * Fence synchronization is handled to manage buffer acquisition and release.
+ *
+ * @param user_data Custom user data passed to the callback (currently unused).
+ * @param window The ANativeWindow associated with this presentation (currently unused).
+ * @param buffer The ANativeWindowBuffer containing the pixels to be displayed.
+ *               The buffer's handle is assigned to fblayer->handle.
+ */
 void present(void *user_data, struct ANativeWindow *window,
 	                                   struct ANativeWindowBuffer *buffer)
 {
@@ -32,7 +64,18 @@ void present(void *user_data, struct ANativeWindow *window,
 	}
 }
 
-
+/**
+ * @brief Creates an EGLNativeWindowType suitable for use with HWComposer.
+ *
+ * This function initializes the HWComposer module and device, configures
+ * display properties, and sets up the necessary layer list structure (mList)
+ * for rendering. The global static variables hwcDevicePtr, mList, and fblayer
+ * are initialized here.
+ * It then creates an HWCNativeWindow using these configurations.
+ *
+ * @return An EGLNativeWindowType (which is a struct ANativeWindow*) on success,
+ *         or NULL on failure. This window can be used to create an EGLSurface.
+ */
 EGLNativeWindowType create_hwcomposernativewindow(void)
 {
 	int err;
@@ -110,10 +153,25 @@ EGLNativeWindowType create_hwcomposernativewindow(void)
 }
 
 /* local variables */
+/** @brief Pointer to the currently active Outbuf window for EGLFS. */
 static Outbuf *_evas_eglfs_window = NULL;
+/** @brief Shared EGL context, potentially across multiple Outbuf instances. */
 static EGLContext context = EGL_NO_CONTEXT;
+/** @brief Counter for active Outbuf windows. */
 static int win_count = 0;
 
+/**
+ * @brief Makes the EGL context of a given Outbuf current or releases the current context.
+ *
+ * This function is typically used as a callback for graphics synchronization primitives,
+ * allowing rendering operations to be performed on the correct EGL context and surface.
+ *
+ * @param data A void pointer to an Outbuf structure.
+ * @param doit A void pointer interpreted as a boolean. If non-NULL (true),
+ *             the Outbuf's EGL context and surface are made current.
+ *             If NULL (false), the current EGL context is released.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., eglMakeCurrent fails).
+ */
 static Eina_Bool
 _evas_outbuf_make_current(void *data, void *doit)
 {
@@ -137,10 +195,36 @@ _evas_outbuf_make_current(void *data, void *doit)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback function for HWComposer presentation.
+ *
+ * This function is intended to be a callback, likely for HWCNativeWindow's present mechanism,
+ * but its current implementation is empty.
+ *
+ * @param user_data Custom user data.
+ * @param window The ANativeWindow.
+ * @param buffer The ANativeWindowBuffer being presented.
+ */
 void _hwcomposer_present_cb(void *user_data, struct ANativeWindow *window, struct ANativeWindowBuffer *buffer)
 {
 }
 
+/**
+ * @brief Sets up EGL for a given Outbuf.
+ *
+ * This function initializes the EGL display, chooses an EGL configuration,
+ * creates an EGL window surface, and an EGL context. It also performs
+ * HWComposer initialization similar to `create_hwcomposernativewindow`
+ * (using local variables for hwcDevicePtr, list, mList) and creates an
+ * EGLNativeWindowType via `create_hwcomposernativewindow` to be used for the EGL surface.
+ * Additionally, it queries GL information, checks for blacklisted drivers,
+ * and initializes the Evas GL common context.
+ *
+ * @param ob Pointer to the Outbuf structure to set up.
+ *           The ob->egl members (disp, config, surface, context) will be populated.
+ *           ob->gl_context will be initialized.
+ * @return EINA_TRUE on successful EGL setup, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _evas_outbuf_egl_setup(Outbuf *ob)
 {

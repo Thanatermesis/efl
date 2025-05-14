@@ -71,6 +71,20 @@ efreet_ini_new(const char *file)
  *         file fails to parse or if the file doesn't exist
  * @brief Parses the ini file @a file into an Eina_Hash
  */
+/**
+ * @internal
+ * @brief Parses an INI file and stores its contents in a hash table.
+ * @param file The path to the INI file to parse.
+ * @return Returns an Eina_Hash containing the parsed INI data,
+ *         where keys are section names and values are hashes of key-value pairs.
+ *         Returns NULL on failure (e.g., file not found, memory allocation error, parse error).
+ *
+ * This function reads an INI file line by line. It identifies sections
+ * (e.g., `[SectionName]`) and key-value pairs (e.g., `key=value`).
+ * Comments (lines starting with '#') and empty lines are skipped.
+ * Whitespace around keys, values, and section names is trimmed.
+ * Values can be unescaped using efreet_ini_unescape().
+ */
 static Eina_Hash *
 efreet_ini_parse(const char *file)
 {
@@ -84,6 +98,7 @@ efreet_ini_parse(const char *file)
     if (!f)
       return NULL;
 
+    /* Outer hash: section name (char *) -> section_hash (Eina_Hash *) */
     data = eina_hash_string_small_new(EINA_FREE_CB(eina_hash_free));
     if (!data) goto error;
 
@@ -127,8 +142,10 @@ efreet_ini_parse(const char *file)
                 memcpy(header, head_start, len - 1);
                 header[len - 1] = '\0';
 
+                /* Inner hash: key (char *) -> value (char * from eina_stringshare_add) */
                 section = eina_hash_string_small_new(EINA_FREE_CB(eina_stringshare_del));
 
+                /* If section already exists, it will be replaced. */
                 eina_hash_del_by_key(data, header);
                 eina_hash_add(data, header, section);
             }
@@ -504,9 +521,18 @@ efreet_ini_key_unset(Efreet_Ini *ini, const char *key)
 }
 
 /**
- * @param str The string to unescape
- * @return An allocated unescaped string
- * @brief Unescapes backslash escapes in a string
+ * @param str The string to unescape. It is expected to be a NUL-terminated string.
+ * @return Returns a new eina_stringshared string that is the unescaped version of @p str.
+ *         The caller does not own the returned string but should stringshare_del it when no longer needed if obtained directly.
+ *         If no escape sequences are found, a stringshared version of the original string is returned.
+ * @brief Unescapes backslash escape sequences in a string.
+ *        Supported sequences:
+ *        - `\s` -> space
+ *        - `\n` -> newline
+ *        - `\t` -> tab
+ *        - `\r` -> carriage return
+ *        - `\\` -> backslash
+ *        Unknown escape sequences (e.g., `\a`) are preserved literally (e.g., `\a`).
  */
 static const char *
 efreet_ini_unescape(const char *str)
@@ -556,6 +582,18 @@ efreet_ini_unescape(const char *str)
     return eina_stringshare_add(buf);
 }
 
+/**
+ * @internal
+ * @brief Callback function used by eina_hash_foreach to save a section to a file.
+ * @param hash The hash table being iterated (unused).
+ * @param key The section name (char *).
+ * @param value The hash table representing the section's key-value pairs (Eina_Hash *).
+ * @param fdata A pointer to the FILE object to write to.
+ * @return EINA_TRUE to continue iteration, EINA_FALSE to stop.
+ *
+ * This function writes a section header (e.g., `[SectionName]`) to the file
+ * and then iterates over the key-value pairs in that section to save them.
+ */
 static Eina_Bool
 efreet_ini_section_save(const Eina_Hash *hash EINA_UNUSED, const void *key, void *value, void *fdata)
 {
@@ -566,6 +604,17 @@ efreet_ini_section_save(const Eina_Hash *hash EINA_UNUSED, const void *key, void
     return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Callback function used by eina_hash_foreach to save a key-value pair to a file.
+ * @param hash The hash table being iterated (unused).
+ * @param key The key name (char *).
+ * @param value The value string (char *).
+ * @param fdata A pointer to the FILE object to write to.
+ * @return EINA_TRUE to continue iteration, EINA_FALSE to stop.
+ *
+ * This function writes a key-value pair (e.g., `key=value`) to the file.
+ */
 static Eina_Bool
 efreet_ini_value_save(const Eina_Hash *hash EINA_UNUSED, const void *key, void *value, void *fdata)
 {

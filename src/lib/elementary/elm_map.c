@@ -115,6 +115,19 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {NULL, NULL}
 };
 
+/**
+ * @internal
+ * @brief Sets the pan position of the map's panning sub-object.
+ *
+ * This function updates the internal scroll position (pan_x, pan_y) of the
+ * map pan object. If the new position is different from the current one,
+ * it marks the object as changed, potentially triggering a redraw or layout update.
+ *
+ * @param obj The Evas object associated with the map pan.
+ * @param psd Pointer to the private data of the Elm_Map_Pan_Data.
+ * @param x The target x-coordinate for the pan position.
+ * @param y The target y-coordinate for the pan position.
+ */
 EOLIAN static void
 _elm_map_pan_elm_pan_pos_set(Eo *obj, Elm_Map_Pan_Data *psd, Evas_Coord x, Evas_Coord y)
 {
@@ -126,6 +139,17 @@ _elm_map_pan_elm_pan_pos_set(Eo *obj, Elm_Map_Pan_Data *psd, Evas_Coord x, Evas_
    evas_object_smart_changed(obj);
 }
 
+/**
+ * @internal
+ * @brief Gets the current pan position of the map's panning sub-object.
+ *
+ * Retrieves the current internal scroll position (pan_x, pan_y) of the map pan object.
+ *
+ * @param obj The Evas object (unused).
+ * @param psd Pointer to the private data of the Elm_Map_Pan_Data.
+ * @param x Pointer to store the current x-coordinate of the pan position. Can be NULL.
+ * @param y Pointer to store the current y-coordinate of the pan position. Can be NULL.
+ */
 EOLIAN static void
 _elm_map_pan_elm_pan_pos_get(const Eo *obj EINA_UNUSED, Elm_Map_Pan_Data *psd, Evas_Coord *x, Evas_Coord *y)
 {
@@ -133,6 +157,19 @@ _elm_map_pan_elm_pan_pos_get(const Eo *obj EINA_UNUSED, Elm_Map_Pan_Data *psd, E
    if (y) *y = psd->wsd->pan_y;
 }
 
+/**
+ * @internal
+ * @brief Gets the maximum possible pan position for the map's panning sub-object.
+ *
+ * The maximum pan position is determined by the difference between the content size
+ * and the pan object's own dimensions. If the content is smaller than the pan object
+ * in a dimension, the maximum pan for that dimension is 0.
+ *
+ * @param obj The Evas object associated with the map pan.
+ * @param psd Pointer to the private data of the Elm_Map_Pan_Data.
+ * @param x Pointer to store the maximum x-coordinate for panning. Can be NULL.
+ * @param y Pointer to store the maximum y-coordinate for panning. Can be NULL.
+ */
 EOLIAN static void
 _elm_map_pan_elm_pan_pos_max_get(const Eo *obj, Elm_Map_Pan_Data *psd, Evas_Coord *x, Evas_Coord *y)
 {
@@ -148,6 +185,17 @@ _elm_map_pan_elm_pan_pos_max_get(const Eo *obj, Elm_Map_Pan_Data *psd, Evas_Coor
    if (y) *y = oh;
 }
 
+/**
+ * @internal
+ * @brief Gets the minimum possible pan position for the map's panning sub-object.
+ *
+ * Typically, the minimum pan position is (0,0).
+ *
+ * @param obj The Evas object (unused).
+ * @param _pd Pointer to the private data (unused).
+ * @param x Pointer to store the minimum x-coordinate for panning (usually 0). Can be NULL.
+ * @param y Pointer to store the minimum y-coordinate for panning (usually 0). Can be NULL.
+ */
 EOLIAN static void
 _elm_map_pan_elm_pan_pos_min_get(const Eo *obj EINA_UNUSED, Elm_Map_Pan_Data *_pd EINA_UNUSED, Evas_Coord *x, Evas_Coord *y)
 {
@@ -155,6 +203,18 @@ _elm_map_pan_elm_pan_pos_min_get(const Eo *obj EINA_UNUSED, Elm_Map_Pan_Data *_p
    if (y) *y = 0;
 }
 
+/**
+ * @internal
+ * @brief Gets the content size of the map's panning sub-object.
+ *
+ * Retrieves the dimensions of the content that the pan object is displaying.
+ * This is used to calculate scroll limits.
+ *
+ * @param obj The Evas object (unused).
+ * @param psd Pointer to the private data of the Elm_Map_Pan_Data.
+ * @param w Pointer to store the width of the content. Can be NULL.
+ * @param h Pointer to store the height of the content. Can be NULL.
+ */
 EOLIAN static void
 _elm_map_pan_elm_pan_content_size_get(const Eo *obj EINA_UNUSED, Elm_Map_Pan_Data *psd, Evas_Coord *w, Evas_Coord *h)
 {

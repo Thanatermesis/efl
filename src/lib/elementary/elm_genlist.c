@@ -181,12 +181,27 @@ static const Elm_Action key_actions[] = {
    {NULL, NULL}
 };
 
+/**
+ * @internal
+ * @brief Frees the memory allocated for a size cache entry.
+ * @param data Pointer to the size cache data to be freed.
+ */
 static void
 _size_cache_free(void *data)
 {
    if(data) free(data);
 }
 
+/**
+ * @internal
+ * @brief Checks if an item is not selectable.
+ *
+ * This function determines if an item cannot be selected based on the
+ * genlist's select mode or the item's individual select mode.
+ *
+ * @param it The genlist item to check.
+ * @return @c EINA_TRUE if the item is not selectable, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _is_no_select(Elm_Gen_Item *it)
 {
@@ -200,6 +215,19 @@ _is_no_select(Elm_Gen_Item *it)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Sets the position of the genlist pan object.
+ *
+ * This function is called when the pan object's position changes. It updates
+ * the internal pan coordinates and determines the new anchor item and anchor_y
+ * based on the new position.
+ *
+ * @param obj The Evas object (pan).
+ * @param psd The pan specific data.
+ * @param x The new x-coordinate of the pan.
+ * @param y The new y-coordinate of the pan.
+ */
 EOLIAN static void
 _elm_genlist_pan_elm_pan_pos_set(Eo *obj, Elm_Genlist_Pan_Data *psd, Evas_Coord x, Evas_Coord y)
 {
@@ -233,6 +261,15 @@ done:
    if (!sd->reorder_move_animator) evas_object_smart_changed(obj);
 }
 
+/**
+ * @internal
+ * @brief Gets the position of the genlist pan object.
+ *
+ * @param obj The Evas object (pan).
+ * @param psd The pan specific data.
+ * @param x Pointer to store the x-coordinate.
+ * @param y Pointer to store the y-coordinate.
+ */
 EOLIAN static void
 _elm_genlist_pan_elm_pan_pos_get(const Eo *obj EINA_UNUSED, Elm_Genlist_Pan_Data *psd, Evas_Coord *x, Evas_Coord *y)
 {
@@ -240,6 +277,18 @@ _elm_genlist_pan_elm_pan_pos_get(const Eo *obj EINA_UNUSED, Elm_Genlist_Pan_Data
    if (y) *y = psd->wsd->pan_y;
 }
 
+/**
+ * @internal
+ * @brief Gets the maximum scrollable position of the genlist pan object.
+ *
+ * The maximum position is calculated based on the total content size (minw, minh)
+ * and the current viewport size of the pan object.
+ *
+ * @param obj The Evas object (pan).
+ * @param psd The pan specific data.
+ * @param x Pointer to store the maximum x-coordinate.
+ * @param y Pointer to store the maximum y-coordinate.
+ */
 EOLIAN static void
 _elm_genlist_pan_elm_pan_pos_max_get(const Eo *obj, Elm_Genlist_Pan_Data *psd, Evas_Coord *x, Evas_Coord *y)
 {
@@ -254,6 +303,17 @@ _elm_genlist_pan_elm_pan_pos_max_get(const Eo *obj, Elm_Genlist_Pan_Data *psd, E
    if (y) *y = oh;
 }
 
+/**
+ * @internal
+ * @brief Gets the minimum scrollable position of the genlist pan object.
+ *
+ * For genlist, the minimum position is always (0,0).
+ *
+ * @param obj The Evas object (pan).
+ * @param _pd The pan specific data (unused).
+ * @param x Pointer to store the minimum x-coordinate (will be 0).
+ * @param y Pointer to store the minimum y-coordinate (will be 0).
+ */
 EOLIAN static void
 _elm_genlist_pan_elm_pan_pos_min_get(const Eo *obj EINA_UNUSED, Elm_Genlist_Pan_Data *_pd EINA_UNUSED, Evas_Coord *x, Evas_Coord *y)
 {
@@ -261,6 +321,17 @@ _elm_genlist_pan_elm_pan_pos_min_get(const Eo *obj EINA_UNUSED, Elm_Genlist_Pan_
    if (y) *y = 0;
 }
 
+/**
+ * @internal
+ * @brief Gets the total content size of the genlist pan object.
+ *
+ * This is the overall size of all items within the genlist.
+ *
+ * @param obj The Evas object (pan).
+ * @param psd The pan specific data.
+ * @param w Pointer to store the total content width.
+ * @param h Pointer to store the total content height.
+ */
 EOLIAN static void
 _elm_genlist_pan_elm_pan_content_size_get(const Eo *obj EINA_UNUSED, Elm_Genlist_Pan_Data *psd, Evas_Coord *w, Evas_Coord *h)
 {
@@ -268,6 +339,16 @@ _elm_genlist_pan_elm_pan_content_size_get(const Eo *obj EINA_UNUSED, Elm_Genlist
    if (h) *h = psd->wsd->minh;
 }
 
+/**
+ * @internal
+ * @brief Handles deletion of the genlist pan object.
+ *
+ * This function cleans up resources associated with the pan object,
+ * specifically deleting any pending resize job.
+ *
+ * @param obj The Evas object (pan) being deleted.
+ * @param psd The pan specific data.
+ */
 EOLIAN static void
 _elm_genlist_pan_efl_canvas_group_group_del(Eo *obj, Elm_Genlist_Pan_Data *psd)
 {
@@ -276,6 +357,17 @@ _elm_genlist_pan_efl_canvas_group_group_del(Eo *obj, Elm_Genlist_Pan_Data *psd)
    efl_canvas_group_del(efl_super(obj, MY_PAN_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Sets the graphical position of the genlist pan object.
+ *
+ * This is part of the Efl.Gfx.Entity interface implementation for the pan.
+ * It marks the pan as changed and triggers a smart recalculation.
+ *
+ * @param obj The Evas object (pan).
+ * @param psd The pan specific data.
+ * @param pos The new 2D position.
+ */
 EOLIAN static void
 _elm_genlist_pan_efl_gfx_entity_position_set(Eo *obj, Elm_Genlist_Pan_Data *psd, Eina_Position2D pos)
 {
@@ -288,6 +380,15 @@ _elm_genlist_pan_efl_gfx_entity_position_set(Eo *obj, Elm_Genlist_Pan_Data *psd,
    evas_object_smart_changed(obj);
 }
 
+/**
+ * @internal
+ * @brief Job function to handle pan resize.
+ *
+ * This job is scheduled when the pan object is resized, especially in
+ * ELM_LIST_COMPRESS mode, to re-evaluate the sizing of the main genlist widget.
+ *
+ * @param data The genlist pan object.
+ */
 static void
 _elm_genlist_pan_smart_resize_job(void *data)
 {
@@ -297,6 +398,19 @@ _elm_genlist_pan_smart_resize_job(void *data)
    psd->resize_job = NULL;
 }
 
+/**
+ * @internal
+ * @brief Sets the graphical size of the genlist pan object.
+ *
+ * This is part of the Efl.Gfx.Entity interface implementation for the pan.
+ * If the genlist is in ELM_LIST_COMPRESS mode and the width changes,
+ * a resize job is scheduled. It also marks the pan as changed and triggers
+ * recalculations if necessary.
+ *
+ * @param obj The Evas object (pan).
+ * @param psd The pan specific data.
+ * @param size The new 2D size.
+ */
 EOLIAN static void
 _elm_genlist_pan_efl_gfx_entity_size_set(Eo *obj, Elm_Genlist_Pan_Data *psd, Eina_Size2D size)
 {
@@ -327,6 +441,24 @@ super:
    efl_gfx_entity_size_set(efl_super(obj, MY_PAN_CLASS), size);
 }
 
+/**
+ * @internal
+ * @brief Realizes (sets) the text parts of a genlist item.
+ *
+ * This function iterates through the text parts defined in the item's theme
+ * (or a specific subset if @p parts is provided) and calls the item class's
+ * @c text_get callback to retrieve the text for each part. The retrieved
+ * text is then set on the corresponding Edje part of the item's view.
+ * It also emits a visibility signal for each part.
+ *
+ * @param it The genlist item.
+ * @param target The Edje object representing the item's view.
+ * @param source In/out parameter. A list of text part names. If @c *source is
+ *               NULL, it will be populated from the "texts" data of @p target.
+ *               This list is used to iterate over the text parts.
+ * @param parts A glob pattern specifying which text parts to realize. If NULL,
+ *              all parts in @p source are realized.
+ */
 static void
 _item_text_realize(Elm_Gen_Item *it,
                    Evas_Object *target,
@@ -366,6 +498,17 @@ _item_text_realize(Elm_Gen_Item *it,
      }
 }
 
+/**
+ * @internal
+ * @brief Recursively calculates the layout of a widget and its children.
+ *
+ * This function is used to ensure that widgets, especially those used as
+ * content within genlist items, have their sizes calculated correctly before
+ * being displayed or used in further layout calculations. It traverses down
+ * the widget hierarchy.
+ *
+ * @param obj The widget object to calculate.
+ */
 static void
 _widget_calculate_recursive(Eo *obj)
 {
@@ -394,6 +537,41 @@ _widget_calculate_recursive(Eo *obj)
    efl_canvas_group_calculate(obj);
 }
 
+/**
+ * @internal
+ * @brief Realizes (sets/swallows) the content parts of a genlist item.
+ *
+ * This function iterates through the content swallow parts defined in the
+ * item's theme (identified by @p src, e.g., "contents" or "flips") or a
+ * specific subset if @p parts is provided. It calls the item class's
+ * @c reusable_content_get or @c content_get callback to retrieve the Evas
+ * object for each part.
+ *
+ * If a new content object is provided (different from any existing one), it's
+ * processed:
+ * - Added to the content_item_map for focus management.
+ * - If it's a widget, its layout is calculated recursively.
+ * - Swallowed into the target Edje object.
+ * - Added as a sub-object to the genlist item.
+ * - Its focusability and disabled state are set based on the item.
+ * - Appended to the @p contents list.
+ * - A visibility signal is emitted.
+ *
+ * Old content objects that are replaced are removed from @p contents, deleted,
+ * and removed from the content_item_map.
+ *
+ * @param it The genlist item.
+ * @param target The Edje object representing the item's view.
+ * @param contents In/out parameter. A list of currently swallowed content objects.
+ *                 This list is updated by the function. If @p parts is NULL,
+ *                 all existing contents in this list are deleted first.
+ * @param src The Edje data key (e.g., "contents", "flips") to get the list of
+ *            swallow part names from @p target.
+ * @param parts A glob pattern specifying which content parts to realize. If NULL,
+ *              all parts from @p src are realized.
+ * @param calc If EINA_TRUE, indicates this is part of a size calculation phase,
+ *             and full widget evaluation might be skipped for unfocusable items.
+ */
 static void
 _item_content_realize(Elm_Gen_Item *it,
                       Evas_Object *target,
@@ -491,6 +669,21 @@ out:
      }
 }
 
+/**
+ * @internal
+ * @brief Realizes (sets) the state parts of a genlist item.
+ *
+ * This function iterates through the state parts defined in the item's theme
+ * (or a specific subset if @p parts is provided) and calls the item class's
+ * @c state_get callback to retrieve the boolean state for each part.
+ * Based on the returned state, it emits either "elm,state,PART_NAME,active"
+ * or "elm,state,PART_NAME,passive" signal to the item's Edje view.
+ *
+ * @param it The genlist item.
+ * @param target The Edje object representing the item's view.
+ * @param parts A glob pattern specifying which state parts to realize. If NULL,
+ *              all parts defined in the "states" data of @p target are realized.
+ */
 static void
 _item_state_realize(Elm_Gen_Item *it, Evas_Object *target, const char *parts)
 {
@@ -523,7 +716,19 @@ _item_state_realize(Elm_Gen_Item *it, Evas_Object *target, const char *parts)
 }
 
 /**
- * Apply the right style for the created item view.
+ * @internal
+ * @brief Apply the right style for the created item view.
+ *
+ * This function determines the correct Edje group for the item's view based
+ * on its type (tree/item), genlist mode (compress/normal), whether it's a
+ * "decorate_it" item, its order (odd/even for decorate_it), and the
+ * user-provided style. It then applies this theme to the view object.
+ * It also handles mirrored mode, scaling, and reads stacking information
+ * from the theme.
+ *
+ * @param it The genlist item.
+ * @param view The Edje object for the item's view.
+ * @param style The base style name for the item (e.g., "default").
  */
 static void
 _view_style_update(Elm_Gen_Item *it, Evas_Object *view, const char *style)
@@ -589,7 +794,16 @@ _view_style_update(Elm_Gen_Item *it, Evas_Object *view, const char *style)
 }
 
 /**
- * Create a VIEW(it) during _item_realize()
+ * @internal
+ * @brief Create a VIEW(it) during _item_realize()
+ *
+ * Allocates a new Edje object for the item's view, adds it as a smart
+ * member to the genlist's pan object, and as a sub-object to the genlist item
+ * widget. It then applies the appropriate style to the view.
+ *
+ * @param it The genlist item for which to create the view.
+ * @param style The style name to apply to the view.
+ * @return The newly created Evas_Object for the item's view.
  */
 static Evas_Object *
 _view_create(Elm_Gen_Item *it, const char *style)
@@ -604,6 +818,21 @@ _view_create(Elm_Gen_Item *it, const char *style)
    return view;
 }
 
+/**
+ * @internal
+ * @brief Clears the texts and contents of an item's view.
+ *
+ * Sets all text parts in @p view to NULL and frees the @p texts list.
+ * If @p contents is provided, it deletes all Evas_Objects in the @p contents
+ * list and frees the list itself.
+ *
+ * @param view The Edje object (item's view) to clear.
+ * @param texts In/out parameter. Pointer to a list of text part names.
+ *              The list will be freed and @c *texts set to NULL.
+ * @param contents In/out parameter. Optional pointer to a list of content objects.
+ *                 If not NULL, objects in the list are deleted, the list is freed,
+ *                 and @c *contents set to NULL.
+ */
 static void
 _view_clear(Evas_Object *view, Eina_List **texts, Eina_List **contents)
 {
@@ -622,6 +851,18 @@ _view_clear(Evas_Object *view, Eina_List **texts, Eina_List **contents)
      }
 }
 
+/**
+ * @internal
+ * @brief Scrolls the genlist to make a specific item visible.
+ *
+ * This function is called when @c sd->show_item is set. It calculates the
+ * target scroll position based on @c sd->scroll_to_type (top, middle, bottom, in)
+ * and then calls either elm_interface_scrollable_region_bring_in() or
+ * elm_interface_scrollable_content_region_show() to perform the scroll.
+ * After scrolling, it resets flags related to item showing.
+ *
+ * @param sd The genlist's private data.
+ */
 static void
 _item_scroll(Elm_Genlist_Data *sd)
 {
@@ -691,6 +932,20 @@ _item_scroll(Elm_Genlist_Data *sd)
    sd->check_scroll = EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Unrealizes a single genlist item.
+ *
+ * This function handles the process of an item no longer being visible
+ * or needed in its realized (fully created Evas object) state.
+ * It clears timers, text/content from the view, cancels tracking,
+ * emits "unrealized" signals/callbacks, and calls the internal _item_unrealize
+ * which might move the item's view to a cache.
+ *
+ * @param it The genlist item to unrealize.
+ * @param calc If EINA_TRUE, this is part of a calculation phase, and the
+ *             "unrealized" event/callback might be skipped.
+ */
 static void
 _elm_genlist_item_unrealize(Elm_Gen_Item *it,
                             Eina_Bool calc)
@@ -725,6 +980,18 @@ _elm_genlist_item_unrealize(Elm_Gen_Item *it,
    evas_event_thaw_eval(e);
 }
 
+/**
+ * @internal
+ * @brief Unrealizes all items within an item block.
+ *
+ * Iterates through items in the block. If an item is not a group item or
+ * the block must be recalculated, it unrealizes the item (unless it's
+ * currently being dragged or is a pinned item). If no items are being
+ * dragged, the block itself is marked as unrealized and its focus adapter
+ * is cleaned up.
+ *
+ * @param itb The item block to unrealize.
+ */
 static void
 _item_block_unrealize(Item_Block *itb)
 {
@@ -772,6 +1039,16 @@ _item_block_unrealize(Item_Block *itb)
    evas_event_thaw_eval(e);
 }
 
+/**
+ * @internal
+ * @brief Idler callback to trigger a canvas group change on the genlist.
+ *
+ * This is used when a block's `must_recalc` flag was set, indicating that
+ * a full recalculation and redraw is needed.
+ *
+ * @param data The genlist object.
+ * @return ECORE_CALLBACK_CANCEL to remove the idler.
+ */
 static Eina_Bool
 _must_recalc_idler(void *data)
 {
@@ -782,6 +1059,30 @@ _must_recalc_idler(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @internal
+ * @brief Main calculation job for the genlist.
+ *
+ * This function is responsible for iterating through all item blocks,
+ * recalculating their sizes and positions if necessary, and updating the
+ * overall minimum width/height of the genlist content.
+ *
+ * - Updates genlist width (@c sd->w) based on pan object's width.
+ * - Iterates through blocks:
+ *   - If a block has changed or `must_recalc` is set, it calls
+ *     `_item_block_recalc()` to update item sizes within that block.
+ *     Subsequent blocks are unrealized if a previous one was recalculated.
+ *   - Updates block's y-position, height, and width.
+ *   - Tracks overall minimum content width (@c minw) and height (@c minh).
+ * - If `minw` changed, updates all blocks to this new width.
+ * - Updates `sd->minw` and `sd->minh`, potentially triggering sizing
+ *   evaluation and scroll position adjustments.
+ * - If `did_must_recalc` is true, schedules `_must_recalc_idler`.
+ * - If `sd->check_scroll` is true (an item needs to be shown), calls `_item_scroll()`.
+ * - Triggers a smart change on the pan object.
+ *
+ * @param data The genlist's private data (Elm_Genlist_Data *).
+ */
 static void
 _calc_job(void *data)
 {
@@ -917,6 +1218,22 @@ _calc_job(void *data)
    evas_event_thaw_eval(e);
 }
 
+/**
+ * @internal
+ * @brief Calculates the size hints for the genlist widget.
+ *
+ * This function is the Efl.Canvas.Group group_calculate implementation.
+ * It determines the minimum and maximum size hints for the genlist.
+ * - If in ELM_LIST_COMPRESS mode and viewport width changed, it marks all
+ *   blocks for recalculation and frees size caches.
+ * - Calls `_calc_job()` if `sd->need_calc` is true.
+ * - Adjusts min/max width/height based on `sd->scr_minw`, `sd->scr_minh`,
+ *   `sd->realminw`, `sd->minh`, and the edje resize object's min size (`vmw`, `vmh`).
+ * - Sets the final min/max size hints on the genlist object.
+ *
+ * @param obj The genlist Evas object.
+ * @param sd The genlist's private data.
+ */
 EOLIAN static void
 _elm_genlist_efl_canvas_group_group_calculate(Eo *obj, Elm_Genlist_Data *sd)
 {
@@ -989,6 +1306,19 @@ _elm_genlist_efl_canvas_group_group_calculate(Eo *obj, Elm_Genlist_Data *sd)
    evas_object_size_hint_max_set(obj, maxw, maxh);
 }
 
+/**
+ * @internal
+ * @brief Callback for content minimum limit changes from the scroller.
+ *
+ * Updates `sd->scr_minw` and `sd->scr_minh` based on the scroller's
+ * notification about whether content is limited by width or height.
+ * This is ignored if the genlist mode is ELM_LIST_LIMIT or ELM_LIST_EXPAND.
+ * Triggers a sizing evaluation of the genlist.
+ *
+ * @param obj The genlist Evas object.
+ * @param w EINA_TRUE if content width is limited by viewport, EINA_FALSE otherwise.
+ * @param h EINA_TRUE if content height is limited by viewport, EINA_FALSE otherwise.
+ */
 static void
 _content_min_limit_cb(Evas_Object *obj,
                       Eina_Bool w,
@@ -1004,6 +1334,15 @@ _content_min_limit_cb(Evas_Object *obj,
    elm_layout_sizing_eval(obj);
 }
 
+/**
+ * @internal
+ * @brief Recursively emits contract signals for an item and its sub-items.
+ *
+ * This is used during tree contraction effects to ensure all relevant items
+ * receive the "elm,state,contract_flip" signal.
+ *
+ * @param eo_it The genlist item object to process.
+ */
 static void
 _item_contract_emit(Elm_Object_Item *eo_it)
 {
@@ -1020,6 +1359,18 @@ _item_contract_emit(Elm_Object_Item *eo_it)
      if (eo_it2) _item_contract_emit(eo_it2);
 }
 
+/**
+ * @internal
+ * @brief Prepares items for a tree expansion/contraction effect.
+ *
+ * Iterates through the sub-items of the given item (@p it).
+ * - If expanding: emits "elm,state,hide" to sub-items.
+ * - If contracting: calls `_item_contract_emit()` for sub-items.
+ * - Marks unrealized sub-items with `tree_effect_hide_me = EINA_TRUE`.
+ *
+ * @param it The parent item whose sub-items are being prepared for the effect.
+ * @return ECORE_CALLBACK_CANCEL (this function is often used as a one-shot callback).
+ */
 static int
 _item_tree_effect_before(Elm_Gen_Item *it)
 {
@@ -1049,7 +1400,19 @@ _item_tree_effect_before(Elm_Gen_Item *it)
    return ECORE_CALLBACK_CANCEL;
 }
 
-/* returns true if change occurred */
+/**
+ * @internal
+ * @brief Sets the position and size of an item's view and shows it.
+ *
+ * Freezes Evas events, sets the geometry of the @p view, shows it,
+ * then thaws Evas events.
+ *
+ * @param it The genlist item (used to get widget and Evas instance).
+ * @param view The Evas_Object (item's view) to position.
+ * @param it_x The target x-coordinate for the view.
+ * @param it_y The target y-coordinate for the view.
+ * @return EINA_TRUE if the position actually changed, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _item_position(Elm_Gen_Item *it,
                Evas_Object *view,
@@ -1071,6 +1434,18 @@ _item_position(Elm_Gen_Item *it,
    return (pos.x != it_x) || (pos.y != it_y);
 }
 
+/**
+ * @internal
+ * @brief Handles visual effects for items during tree expand/contract animations.
+ *
+ * This function is called during the tree animation. It iterates through items
+ * relative to `sd->expanded_next_item` and applies visual changes (like emitting
+ * "flip_item" or "hide" signals and repositioning) based on the animation progress
+ * and whether it's an expand or contract operation.
+ *
+ * @param sd The genlist's private data.
+ * @param y The current vertical offset or progress of the animation.
+ */
 static void
 _item_tree_effect(Elm_Genlist_Data *sd,
                   int y)
@@ -1132,6 +1507,12 @@ _item_tree_effect(Elm_Genlist_Data *sd,
      }
 }
 
+/**
+ * @internal
+ * @brief Clears (deletes) all sub-items of a given genlist item.
+ *
+ * @param it The parent genlist item whose sub-items are to be cleared.
+ */
 static void
 _item_sub_items_clear(Elm_Gen_Item *it)
 {
@@ -1146,6 +1527,17 @@ _item_sub_items_clear(Elm_Gen_Item *it)
      efl_del(eo_it2);
 }
 
+/**
+ * @internal
+ * @brief Handles automatic scrolling after a tree item is expanded.
+ *
+ * If `sd->expanded_item` is set and `sd->auto_scroll_enabled` is true,
+ * this function attempts to scroll the last sub-item of the expanded item
+ * into view. If the sub-item is queued or not yet calculated, scrolling
+ * is deferred by setting `show_me` on the item.
+ *
+ * @param sd The genlist's private data.
+ */
 static void
 _item_auto_scroll(Elm_Genlist_Data *sd)
 {
@@ -1170,6 +1562,23 @@ _item_auto_scroll(Elm_Genlist_Data *sd)
      }
 }
 
+/**
+ * @internal
+ * @brief Finalizes the tree expansion/contraction effect.
+ *
+ * This function is called when the tree effect animation completes or is stopped.
+ * - If contracting, clears sub-items of `sd->expanded_item`.
+ * - Marks all affected sub-items' `tree_effect_finished` to true.
+ * - If expanding, emits "show" signals to sub-items.
+ * - May unrealize and reposition items if expanding and items were shifted.
+ * - Calls `_item_auto_scroll()` to potentially scroll new items into view.
+ * - Hides the event blocker rectangle.
+ * - Resets `move_effect_mode` and frees `move_items`.
+ * - Emits "changed" event for the pan and "tree,effect,finished" for the genlist.
+ * - Stops the tree effect animator.
+ *
+ * @param sd The genlist's private data.
+ */
 static void
 _item_tree_effect_finish(Elm_Genlist_Data *sd)
 {

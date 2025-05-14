@@ -37,14 +37,21 @@
  * @cond LOCAL
  */
 
+/**
+ * @struct _Eina_Lalloc
+ * @brief Represents a lazy allocator instance.
+ *
+ * This structure holds the state and configuration for a lazy allocator,
+ * managing a block of memory that can be expanded on demand.
+ */
 struct _Eina_Lalloc
 {
-   void *data;
-   int num_allocated;
-   int num_elements;
-   int acc;
-   Eina_Lalloc_Alloc alloc_cb;
-   Eina_Lalloc_Free free_cb;
+   void *data;  /**< Pointer to the user-provided data structure that this allocator manages. */
+   int num_allocated; /**< The current number of items for which space has been allocated. This may be greater than num_elements. */
+   int num_elements;  /**< The number of items currently considered "in use" or "added" by the user. */
+   int acc; /**< Accumulator used to determine the next allocation size, typically for exponential growth (e.g., 2^acc). */
+   Eina_Lalloc_Alloc alloc_cb; /**< Callback function provided by the user to perform the actual memory allocation. */
+   Eina_Lalloc_Free free_cb;   /**< Callback function provided by the user to free the managed memory. */
 };
 
 /**

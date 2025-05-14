@@ -1,3 +1,12 @@
+/**
+ * @file
+ * @brief Udev sensor module for Eeze.
+ *
+ * This module provides an interface to udev for discovering and reading
+ * sensor data, currently focusing on temperature sensors. It registers
+ * itself with the Eeze sensor core to make its functionality available.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
@@ -20,8 +29,18 @@ static int _eeze_sensor_udev_log_dom = -1;
 
 static Eeze_Sensor_Module *esensor_module;
 
-static Eina_List *devices;
+static Eina_List *devices; /**< List of discovered udev sensor devices (syspaths). */
 
+/**
+ * @brief Dummy free function for ecore events.
+ *
+ * This function is used as a callback for ecore_event_add. It does nothing
+ * because the event data (Eeze_Sensor_Obj) is managed by this module and
+ * should not be freed by the ecore event system.
+ *
+ * @param user_data Unused.
+ * @param func_data Unused.
+ */
 static void
 _dummy_free(void *user_data EINA_UNUSED, void *func_data EINA_UNUSED)
 {
@@ -30,6 +49,14 @@ _dummy_free(void *user_data EINA_UNUSED, void *func_data EINA_UNUSED)
  */
 }
 
+/**
+ * @brief Initializes the udev sensor module.
+ *
+ * This function is called when the module is loaded. It discovers available
+ * temperature sensors via udev and populates the sensor list for the module.
+ *
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 udev_init(void)
 {
@@ -43,6 +70,14 @@ udev_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Shuts down the udev sensor module.
+ *
+ * This function is called when the module is unloaded. It frees the list
+ * of discovered udev devices.
+ *
+ * @return @c EINA_TRUE on success.
+ */
 static Eina_Bool
 udev_shutdown(void)
 {
@@ -53,6 +88,20 @@ udev_shutdown(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Reads temperature data from discovered udev sensors.
+ *
+ * Iterates through the list of `devices` (which are syspaths to sensor devices).
+ * For each device, it attempts to read temperature values from sysfs attributes
+ * like "temp1_input", "temp2_input", etc. It averages the readings from all
+ * available sensors.
+ *
+ * The sysfs attribute "tempX_input" is expected to provide temperature in
+ * millidegrees Celsius.
+ *
+ * @return The average temperature in Celsius, or -274.0 (below absolute zero)
+ *         if no devices are found or no valid readings are obtained.
+ */
 static double
 _udev_read(void)
 {
@@ -94,6 +143,17 @@ _udev_read(void)
    return temp;
 }
 
+/**
+ * @brief Synchronously reads data from a specified sensor object.
+ *
+ * Updates the sensor object with the latest data based on its type.
+ * Currently, only supports EEZE_SENSOR_TYPE_TEMPERATURE.
+ *
+ * @param obj The sensor object to read data into.
+ *            The `obj->data[0]` will be filled with the temperature.
+ *            `obj->timestamp` will be updated.
+ * @return @c EINA_TRUE on successful read, @c EINA_FALSE otherwise (e.g., unsupported sensor type).
+ */
 static Eina_Bool
 udev_read(Eeze_Sensor_Obj *obj)
 {
@@ -115,6 +175,20 @@ udev_read(Eeze_Sensor_Obj *obj)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Asynchronously reads data from a specified sensor object.
+ *
+ * Reads the sensor data and then adds an ecore event to notify listeners.
+ * Currently, only supports EEZE_SENSOR_TYPE_TEMPERATURE, for which it
+ * adds an EEZE_SENSOR_EVENT_TEMPERATURE event.
+ *
+ * @param obj The sensor object to read data from and include in the event.
+ *            The `obj->data[0]` will be filled with the temperature.
+ *            `obj->timestamp` will be updated.
+ * @param user_data Custom data to associate with the sensor object, passed
+ *                  through to the event.
+ * @return @c EINA_TRUE on successful initiation of async read, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 udev_async_read(Eeze_Sensor_Obj *obj, void *user_data)
 {
@@ -141,6 +215,8 @@ udev_async_read(Eeze_Sensor_Obj *obj, void *user_data)
 /* This function gets called when the module is loaded from the disk. Its the
  * entry point to anything in this module. After setting ourself up we register
  * into the core of eeze sensor to make our functionality available.
+ *
+ * @return @c EINA_TRUE on successful initialization, @c EINA_FALSE otherwise.
  */
 static Eina_Bool
 sensor_udev_init(void)

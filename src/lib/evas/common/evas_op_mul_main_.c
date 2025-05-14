@@ -1,23 +1,144 @@
 #include "evas_common_private.h"
 
+/**
+ * @brief Array of function pointers for span operations using multiplication.
+ *
+ * This 5-dimensional array stores pointers to functions that perform
+ * multiplication-based graphics operations on spans of pixels. The dimensions
+ * represent:
+ * - Source pixel properties (e.g., alpha, no alpha)
+ * - Source mask properties (e.g., alpha, no alpha)
+ * - Source color properties (e.g., alpha, no alpha, solid)
+ * - Destination pixel properties (e.g., alpha, no alpha)
+ * - CPU-specific implementations (e.g., C, MMX)
+ *
+ * Example: op_mul_span_funcs[SP_AN][SM_N][SC_N][DP_AN][CPU_C] would point to a C
+ * function for a span operation with no source alpha, no source mask, no source
+ * color alpha, and no destination alpha.
+ */
 static RGBA_Gfx_Func     op_mul_span_funcs[SP_LAST][SM_LAST][SC_LAST][DP_LAST][CPU_LAST];
+
+/**
+ * @brief Array of function pointers for point operations using multiplication.
+ *
+ * This 5-dimensional array stores pointers to functions that perform
+ * multiplication-based graphics operations on single pixels (points). The
+ * dimensions are similar to op_mul_span_funcs:
+ * - Source pixel properties
+ * - Source mask properties
+ * - Source color properties
+ * - Destination pixel properties
+ * - CPU-specific implementations
+ *
+ * Example: op_mul_pt_funcs[SP][SM_AS][SC_AA][DP][CPU_MMX] would point to an MMX
+ * function for a point operation with source alpha, alpha source mask,
+ * alpha source color, and destination alpha.
+ */
 static RGBA_Gfx_Pt_Func  op_mul_pt_funcs[SP_LAST][SM_LAST][SC_LAST][DP_LAST][CPU_LAST];
 
+/**
+ * @brief Initializes the multiplication operation functions.
+ *
+ * This function populates the op_mul_span_funcs and op_mul_pt_funcs arrays
+ * with appropriate function pointers for different CPU capabilities (C, MMX).
+ */
 static void op_mul_init(void);
+/**
+ * @brief Shuts down the multiplication operation functions.
+ *
+ * Currently, this function is a placeholder and does not perform any actions.
+ */
 static void op_mul_shutdown(void);
 
+/**
+ * @brief Retrieves a span processing function for pixel data.
+ * @param src_alpha EINA_TRUE if source has alpha, EINA_FALSE otherwise.
+ * @param src_sparse_alpha EINA_TRUE if source alpha is sparse (not used by this op).
+ * @param dst_alpha EINA_TRUE if destination has alpha, EINA_FALSE otherwise.
+ * @param pixels Number of pixels in the span (not used by this op to select function).
+ * @return A function pointer to the appropriate span processing function.
+ */
 static RGBA_Gfx_Func op_mul_pixel_span_get(Eina_Bool src_alpha, Eina_Bool src_sparse_alpha, Eina_Bool dst_alpha, int pixels);
+/**
+ * @brief Retrieves a span processing function for color data.
+ * @param col The color to use (DATA32 format, ARGB).
+ * @param dst_alpha EINA_TRUE if destination has alpha, EINA_FALSE otherwise.
+ * @param pixels Number of pixels in the span (not used by this op to select function).
+ * @return A function pointer to the appropriate span processing function.
+ */
 static RGBA_Gfx_Func op_mul_color_span_get(DATA32 col, Eina_Bool dst_alpha, int pixels);
+/**
+ * @brief Retrieves a span processing function for pixel and color data.
+ * @param src_alpha EINA_TRUE if source has alpha, EINA_FALSE otherwise.
+ * @param src_sparse_alpha EINA_TRUE if source alpha is sparse (not used by this op).
+ * @param col The color to use (DATA32 format, ARGB).
+ * @param dst_alpha EINA_TRUE if destination has alpha, EINA_FALSE otherwise.
+ * @param pixels Number of pixels in the span (not used by this op to select function).
+ * @return A function pointer to the appropriate span processing function.
+ */
 static RGBA_Gfx_Func op_mul_pixel_color_span_get(Eina_Bool src_alpha, Eina_Bool src_sparse_alpha, DATA32 col, Eina_Bool dst_alpha, int pixels);
+/**
+ * @brief Retrieves a span processing function for mask and color data.
+ * @param col The color to use (DATA32 format, ARGB).
+ * @param dst_alpha EINA_TRUE if destination has alpha, EINA_FALSE otherwise (not used by this op).
+ * @param pixels Number of pixels in the span (not used by this op to select function).
+ * @return A function pointer to the appropriate span processing function.
+ */
 static RGBA_Gfx_Func op_mul_mask_color_span_get(DATA32 col, Eina_Bool dst_alpha, int pixels);
+/**
+ * @brief Retrieves a span processing function for pixel and mask data.
+ * @param src_alpha EINA_TRUE if source has alpha, EINA_FALSE otherwise.
+ * @param src_sparse_alpha EINA_TRUE if source alpha is sparse (not used by this op).
+ * @param dst_alpha EINA_TRUE if destination has alpha, EINA_FALSE otherwise (not used by this op).
+ * @param pixels Number of pixels in the span (not used by this op to select function).
+ * @return A function pointer to the appropriate span processing function.
+ */
 static RGBA_Gfx_Func op_mul_pixel_mask_span_get(Eina_Bool src_alpha, Eina_Bool src_sparse_alpha, Eina_Bool dst_alpha, int pixels);
 
+/**
+ * @brief Retrieves a point processing function for pixel data.
+ * @param src_alpha EINA_TRUE if source has alpha, EINA_FALSE otherwise.
+ * @param dst_alpha EINA_TRUE if destination has alpha, EINA_FALSE otherwise.
+ * @return A function pointer to the appropriate point processing function.
+ */
 static RGBA_Gfx_Pt_Func op_mul_pixel_pt_get(Eina_Bool src_alpha, Eina_Bool dst_alpha);
+/**
+ * @brief Retrieves a point processing function for color data.
+ * @param col The color to use (DATA32 format, ARGB).
+ * @param dst_alpha EINA_TRUE if destination has alpha, EINA_FALSE otherwise.
+ * @return A function pointer to the appropriate point processing function.
+ */
 static RGBA_Gfx_Pt_Func op_mul_color_pt_get(DATA32 col, Eina_Bool dst_alpha);
+/**
+ * @brief Retrieves a point processing function for pixel and color data.
+ * @param src_alpha EINA_TRUE if source has alpha, EINA_FALSE otherwise.
+ * @param col The color to use (DATA32 format, ARGB).
+ * @param dst_alpha EINA_TRUE if destination has alpha, EINA_FALSE otherwise.
+ * @return A function pointer to the appropriate point processing function.
+ */
 static RGBA_Gfx_Pt_Func op_mul_pixel_color_pt_get(Eina_Bool src_alpha, DATA32 col, Eina_Bool dst_alpha);
+/**
+ * @brief Retrieves a point processing function for mask and color data.
+ * @param col The color to use (DATA32 format, ARGB).
+ * @param dst_alpha EINA_TRUE if destination has alpha, EINA_FALSE otherwise (not used by this op).
+ * @return A function pointer to the appropriate point processing function.
+ */
 static RGBA_Gfx_Pt_Func op_mul_mask_color_pt_get(DATA32 col, Eina_Bool dst_alpha);
+/**
+ * @brief Retrieves a point processing function for pixel and mask data.
+ * @param src_alpha EINA_TRUE if source has alpha, EINA_FALSE otherwise.
+ * @param dst_alpha EINA_TRUE if destination has alpha, EINA_FALSE otherwise (not used by this op).
+ * @return A function pointer to the appropriate point processing function.
+ */
 static RGBA_Gfx_Pt_Func op_mul_pixel_mask_pt_get(Eina_Bool src_alpha, Eina_Bool dst_alpha);
 
+/**
+ * @brief Defines the compositor for multiplication operations.
+ *
+ * This structure holds the name of the compositor and pointers to various
+ * functions that handle different types of multiplication operations (span, point,
+ * color, pixel, mask).
+ */
 static RGBA_Gfx_Compositor  _composite_mul = { "mul",
  op_mul_init, op_mul_shutdown,
  op_mul_pixel_span_get, op_mul_color_span_get,
@@ -28,6 +149,15 @@ static RGBA_Gfx_Compositor  _composite_mul = { "mul",
  op_mul_pixel_mask_pt_get
  };
 
+/**
+ * @brief Gets the multiplication graphics compositor.
+ *
+ * This function returns a pointer to the _composite_mul structure, which
+ * contains all the necessary functions for performing multiplication-based
+ * graphics operations.
+ *
+ * @return A pointer to the RGBA_Gfx_Compositor structure for "mul" operations.
+ */
 RGBA_Gfx_Compositor  *
 evas_common_gfx_compositor_mul_get(void)
 {
@@ -88,6 +218,18 @@ op_mul_shutdown(void)
 {
 }
 
+/**
+ * @brief Selects the appropriate CPU-specific span function.
+ *
+ * This function attempts to find an MMX-optimized function first if available,
+ * otherwise, it falls back to a C implementation.
+ *
+ * @param s Source pixel property index (SP_*).
+ * @param m Source mask property index (SM_*).
+ * @param c Source color property index (SC_*).
+ * @param d Destination pixel property index (DP_*).
+ * @return A function pointer to the selected span processing function.
+ */
 static RGBA_Gfx_Func
 mul_gfx_span_func_cpu(int s, int m, int c, int d)
 {
@@ -184,6 +326,18 @@ op_mul_pixel_mask_span_get(Eina_Bool src_alpha, Eina_Bool src_sparse_alpha EINA_
    return mul_gfx_span_func_cpu(s, m, c, d);
 }
 
+/**
+ * @brief Selects the appropriate CPU-specific point function.
+ *
+ * This function attempts to find an MMX-optimized function first if available,
+ * otherwise, it falls back to a C implementation.
+ *
+ * @param s Source pixel property index (SP_*).
+ * @param m Source mask property index (SM_*).
+ * @param c Source color property index (SC_*).
+ * @param d Destination pixel property index (DP_*).
+ * @return A function pointer to the selected point processing function.
+ */
 static RGBA_Gfx_Pt_Func
 mul_gfx_pt_func_cpu(int s, int m, int c, int d)
 {

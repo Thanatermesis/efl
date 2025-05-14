@@ -11,6 +11,13 @@ typedef struct _Testitem
 } Testitem;
 
 static Elm_Genlist_Item_Class itc1;
+/**
+ * @brief Get the text for a genlist item.
+ * @param data The item data, which is an integer cast to a pointer.
+ * @param obj The genlist object.
+ * @param part The theme part name.
+ * @return A newly allocated string for the item's text.
+ */
 static char *glf_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
    char buf[256];
@@ -18,6 +25,13 @@ static char *glf_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *
    return strdup(buf);
 }
 
+/**
+ * @brief Get the content for a genlist item (an icon).
+ * @param data The item data (unused).
+ * @param obj The genlist object.
+ * @param part The theme part name.
+ * @return A new icon object.
+ */
 static Evas_Object *glf_content_get(void *data EINA_UNUSED, Evas_Object *obj, const char *part EINA_UNUSED)
 {
    char buf[PATH_MAX];
@@ -27,20 +41,46 @@ static Evas_Object *glf_content_get(void *data EINA_UNUSED, Evas_Object *obj, co
    evas_object_size_hint_aspect_set(ic, EVAS_ASPECT_CONTROL_VERTICAL, 1, 1);
    return ic;
 }
+/**
+ * @brief Get the state for a genlist item.
+ * @param data The item data (unused).
+ * @param obj The genlist object (unused).
+ * @param part The theme part name (unused).
+ * @return EINA_FALSE always.
+ */
 static Eina_Bool glf_state_get(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
    return EINA_FALSE;
 }
+/**
+ * @brief Callback for genlist item deletion.
+ * @param data The item data (unused).
+ * @param obj The genlist object (unused).
+ */
 static void glf_del(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Callback for genlist item selection.
+ * @param data The data associated with the item when it was added.
+ * @param obj The genlist object.
+ * @param event_info The selected item pointer.
+ */
 static void
 gl_sel(void *data, Evas_Object *obj, void *event_info)
 {
    printf("sel item data [%p] on genlist obj [%p], item pointer [%p]\n", data, obj, event_info);
 }
 
+/**
+ * @brief Animator callback to move the genlist horizontally.
+ *
+ * The movement is based on a sine wave, creating a smooth
+ * back-and-forth floating effect.
+ * @param data The genlist object to animate.
+ * @return ECORE_CALLBACK_RENEW to continue the animation.
+ */
 static Eina_Bool
 anim(void *data)
 {
@@ -53,6 +93,17 @@ anim(void *data)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Callback for window deletion.
+ *
+ * This function is registered on the window's DEL event and is responsible
+ * for cleaning up the Ecore_Animator to prevent it from running after
+ * the target object (the genlist) is gone.
+ * @param data The Ecore_Animator to delete.
+ * @param evas The evas canvas (unused).
+ * @param obj The window object (unused).
+ * @param event_info Event-specific data (unused).
+ */
 static void
 _del(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -61,6 +112,17 @@ _del(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *eve
    ecore_animator_del(ani);
 }
 
+/**
+ * @brief The main test function for the floating genlist.
+ *
+ * This function creates a window and a genlist. The genlist is
+ * populated with items and is animated to move horizontally, emulating
+ * a "floating" effect. This tests the behavior of Evas objects
+ * being animated outside of their initial parent window geometry.
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_floating(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

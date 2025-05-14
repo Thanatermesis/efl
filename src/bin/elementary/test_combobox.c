@@ -9,6 +9,11 @@
 
 #include <Elementary.h>
 
+/**
+ * @brief Callback for the "clicked" smart event of the combobox.
+ *
+ * This function is called when the hover button of the combobox is clicked.
+ */
 static void
 _combobox_clicked_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                      void *event_info EINA_UNUSED)
@@ -16,6 +21,12 @@ _combobox_clicked_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    printf("Hover button is clicked and 'clicked' callback is called.\n");
 }
 
+/**
+ * @brief Callback for the "item,selected" smart event of the combobox.
+ *
+ * This function is called when an item from the combobox list is selected.
+ * @param event_info The selected Elm_Object_Item.
+ */
 static void
 _combobox_item_selected_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                            void *event_info)
@@ -24,6 +35,11 @@ _combobox_item_selected_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    printf("'item,selected' callback is called. (selected item : %s)\n", txt);
 }
 
+/**
+ * @brief Callback for the "dismissed" smart event of the combobox.
+ *
+ * This function is called when the combobox's item list is dismissed (hidden).
+ */
 static void
 _combobox_dismissed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                        void *event_info EINA_UNUSED)
@@ -31,6 +47,11 @@ _combobox_dismissed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    printf("'dismissed' callback is called.\n");
 }
 
+/**
+ * @brief Callback for the "expanded" smart event of the combobox.
+ *
+ * This function is called when the combobox's item list is expanded (shown).
+ */
 static void
 _combobox_expanded_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                        void *event_info EINA_UNUSED)
@@ -38,6 +59,15 @@ _combobox_expanded_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    printf("'expanded' callback is called.\n");
 }
 
+/**
+ * @brief Callback for the "item,pressed" smart event of the combobox.
+ *
+ * This is called when an item is pressed. It updates the combobox text to match
+ * the selected item, dismisses the dropdown list, and places the cursor at the
+ * end of the text.
+ * @param obj The combobox widget.
+ * @param event_info The pressed Elm_Object_Item.
+ */
 static void
 _combobox_item_pressed_cb(void *data EINA_UNUSED, Evas_Object *obj,
                       void *event_info)
@@ -49,6 +79,13 @@ _combobox_item_pressed_cb(void *data EINA_UNUSED, Evas_Object *obj,
    elm_entry_cursor_end_set(obj);
 }
 
+/**
+ * @brief Genlist item class function to get the item text.
+ *
+ * @param data The item data, an integer cast to void*.
+ * @return A newly allocated string for the item's text. The caller is
+ * responsible for freeing it. E.g., "Item # 5".
+ */
 static char *
 gl_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
@@ -57,6 +94,13 @@ gl_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUS
    return strdup(buf);
 }
 
+/**
+ * @brief Genlist item class function to get the item content.
+ *
+ * @param obj The genlist object.
+ * @param part The theme part for which to get the content. E.g., "elm.swallow.end".
+ * @return A new Evas_Object (an icon) to be displayed as content for the item.
+ */
 static Evas_Object *gl_content_get(void *data EINA_UNUSED, Evas_Object *obj,
                                     const char *part)
 {
@@ -71,6 +115,13 @@ static Evas_Object *gl_content_get(void *data EINA_UNUSED, Evas_Object *obj,
    return ic;
 }
 
+/**
+ * @brief Genlist item class function to get the item state.
+ *
+ * In this test, items do not have a state, so it always returns EINA_FALSE.
+ *
+ * @return EINA_FALSE, indicating no special state for the item.
+ */
 static Eina_Bool gl_state_get(void *data EINA_UNUSED,
                                Evas_Object *obj EINA_UNUSED,
                                const char *part EINA_UNUSED)
@@ -78,6 +129,17 @@ static Eina_Bool gl_state_get(void *data EINA_UNUSED,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Genlist item class function to filter items.
+ *
+ * This function determines if an item should be shown based on the filter key.
+ * It performs a case-insensitive search of the filter key within the item's text.
+ * An empty key matches all items.
+ *
+ * @param data The item data, an integer cast to void*.
+ * @param key The filter string, e.g., "Item # 1".
+ * @return @c EINA_TRUE if the item should be displayed, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 gl_filter_get(void *data, Evas_Object *obj EINA_UNUSED, void *key)
 {
@@ -91,6 +153,13 @@ gl_filter_get(void *data, Evas_Object *obj EINA_UNUSED, void *key)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Callback to restart genlist filtering.
+ *
+ * This is called on the "changed" event of the combobox. It initiates filtering
+ * on the combobox's genlist using the current text of the combobox as the filter key.
+ * @param obj The combobox widget.
+ */
 static void
 _gl_filter_restart_cb(void *data EINA_UNUSED,
                        Evas_Object *obj,
@@ -99,6 +168,11 @@ _gl_filter_restart_cb(void *data EINA_UNUSED,
    elm_genlist_filter_set(obj, (void *)elm_object_text_get(obj));
 }
 
+/**
+ * @brief Callback for when genlist filtering is finished.
+ *
+ * This function is called on the "filter,done" event of the combobox.
+ */
 static void
 _gl_filter_finished_cb(void *data EINA_UNUSED,
                        Evas_Object *obj EINA_UNUSED,
@@ -107,6 +181,16 @@ _gl_filter_finished_cb(void *data EINA_UNUSED,
    printf("Filter finished\n");
 }
 
+/**
+ * @brief The main test function for the combobox widget.
+ *
+ * This function creates a window and populates it with several combobox
+ * widgets to demonstrate different features and configurations:
+ * - A combobox with a short list inside a frame.
+ * - A combobox with a long list and various callbacks attached, including filtering.
+ * - A disabled combobox.
+ * - Another combobox with a short list in a frame.
+ */
 void
 test_combobox(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
               void *event_info EINA_UNUSED)

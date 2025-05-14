@@ -21,6 +21,14 @@
 
 static Ecore_Audio_Module *alsa_module = NULL;
 
+/**
+ * @brief Creates a new ALSA output object.
+ *
+ * This function initializes an ALSA playback stream and sets its parameters.
+ *
+ * @param output The Ecore_Audio_Object to initialize as an ALSA output.
+ * @return The initialized Ecore_Audio_Object on success, NULL on failure.
+ */
 static Ecore_Audio_Object *
 _alsa_output_new(Ecore_Audio_Object *output)
 {
@@ -60,12 +68,29 @@ err:
    return NULL;
 }
 
+/**
+ * @brief Deletes an ALSA output object.
+ *
+ * Frees the private ALSA data associated with the output object.
+ *
+ * @param output The Ecore_Audio_Object to delete.
+ */
 static void
 _alsa_output_del(Ecore_Audio_Object *output)
 {
    free(output->module_data);
 }
 
+/**
+ * @brief Asynchronous callback for ALSA output.
+ *
+ * This function is called periodically by a timer to read audio data from
+ * the input, and write it to the ALSA playback device. It handles
+ * buffer availability and recovers from ALSA errors.
+ *
+ * @param output The Ecore_Audio_Object representing the ALSA output.
+ * @return EINA_TRUE to continue the timer, EINA_FALSE to stop.
+ */
 static Eina_Bool
 _alsa_output_async_cb(Ecore_Audio_Object *output)
 {
@@ -100,9 +125,22 @@ recover:
    return EINA_TRUE;
 }
 
+/**
+ * @brief Adds an input to an ALSA output.
+ *
+ * This function currently starts a timer that periodically calls
+ * _alsa_output_async_cb to process audio data.
+ *
+ * @param output The Ecore_Audio_Object representing the ALSA output.
+ * @param input The Ecore_Audio_Object representing the input to add (currently unused in this function).
+ */
 static void
-_alsa_output_add_input(Ecore_Audio_Object *output, Ecore_Audio_Object *input)
+_alsa_output_add_input(Ecore_Audio_Object *output, Ecore_Audio_Object *input EINA_UNUSED)
 {
+   // TODO: The 'input' parameter is not used. It might be intended for future use
+   // where multiple inputs could be mixed or selected.
+   // For now, the callback _alsa_output_async_cb fetches the first input
+   // from out->inputs.
    ecore_timer_add(0.3, _alsa_output_async_cb, output);
 }
 

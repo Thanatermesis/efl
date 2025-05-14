@@ -21,12 +21,33 @@
 
 #define MY_CLASS_NAME_LEGACY "elm_datetime"
 
+/**
+ * @internal
+ * @brief Class constructor for the Efl_Ui_Clock_Legacy class.
+ *
+ * This function is called once when the class is initialized.
+ * It registers the legacy "elm_datetime" type with the Evas smart legacy system.
+ *
+ * @param[in] klass The Efl_Class to be constructed.
+ */
 static void
 _efl_ui_clock_legacy_class_constructor(Efl_Class *klass)
 {
    evas_smart_legacy_type_register(MY_CLASS_NAME_LEGACY, klass);
 }
 
+/**
+ * @internal
+ * @brief Object constructor for instances of Efl_Ui_Clock_Legacy.
+ *
+ * This function is called when a new instance of Efl_Ui_Clock_Legacy is created.
+ * It calls the superclass's constructor, sets the Evas object type
+ * to "elm_datetime", and initializes legacy child focus handling.
+ *
+ * @param[in] obj The Efl_Object (Evas_Object) to construct.
+ * @param[in] pd Private data for the object (unused in this function).
+ * @return The constructed Efl_Object.
+ */
 EOLIAN static Eo *
 _efl_ui_clock_legacy_efl_object_constructor(Eo *obj, void *pd EINA_UNUSED)
 {
@@ -60,6 +81,18 @@ elm_datetime_format_get(const Evas_Object *obj)
    return efl_ui_clock_format_get(obj);
 }
 
+/**
+ * @internal
+ * @brief Converts Elm_Datetime_Field_Type to Efl_Ui_Clock_Type.
+ *
+ * This utility function maps the legacy Elm_Datetime_Field_Type enum values
+ * to their corresponding Efl_Ui_Clock_Type enum values.
+ *
+ * @param[in] type The Elm_Datetime_Field_Type value to convert.
+ *                 Example: ELM_DATETIME_MONTH
+ * @return The corresponding Efl_Ui_Clock_Type value.
+ *         Example: EFL_UI_CLOCK_TYPE_MONTH
+ */
 static Efl_Ui_Clock_Type
 adjust_field_type(Elm_Datetime_Field_Type type)
 {

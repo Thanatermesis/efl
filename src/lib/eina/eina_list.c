@@ -174,6 +174,16 @@ static int _eina_list_log_dom = -1;
 #endif
 #define DBG(...) EINA_LOG_DOM_DBG(_eina_list_log_dom, __VA_ARGS__)
 
+/**
+ * @internal
+ * @brief Allocates a new Eina_List_Accounting structure from the mempool.
+ * @param list Unused parameter, kept for historical reasons or potential future use.
+ * @return A pointer to the newly allocated Eina_List_Accounting structure, or NULL on failure.
+ *
+ * This function allocates memory for an Eina_List_Accounting structure using
+ * a dedicated mempool. It also sets a magic number for debugging if EINA_LIST_MAGIC
+ * is defined.
+ */
 static inline Eina_List_Accounting *
 _eina_list_mempool_accounting_new(EINA_UNUSED Eina_List *list)
 {
@@ -190,18 +200,43 @@ _eina_list_mempool_accounting_new(EINA_UNUSED Eina_List *list)
    return tmp;
 }
 
+/**
+ * @internal
+ * @brief Frees an Eina_List_Accounting structure back to its mempool.
+ * @param accounting Pointer to the Eina_List_Accounting structure to free.
+ *
+ * This function is a callback used by the eina_freeq system to return
+ * an Eina_List_Accounting structure to its mempool.
+ */
 static void
 _eina_list_accounting_free(void *accounting)
 {
    eina_mempool_free(_eina_list_accounting_mp, accounting);
 }
 
+/**
+ * @internal
+ * @brief Frees an Eina_List node structure back to its mempool.
+ * @param list Pointer to the Eina_List node structure to free.
+ *
+ * This function is a callback used by the eina_freeq system to return
+ * an Eina_List node structure to its mempool.
+ */
 static void
 _eina_list_list_free(void *list)
 {
    eina_mempool_free(_eina_list_mp, list);
 }
 
+/**
+ * @internal
+ * @brief Schedules an Eina_List_Accounting structure to be freed via eina_freeq.
+ * @param accounting Pointer to the Eina_List_Accounting structure to be freed.
+ *
+ * This function adds the given accounting structure to the main eina_freeq,
+ * which will later call _eina_list_accounting_free to return it to the mempool.
+ * If EINA_LIST_MAGIC is defined, it performs a magic check and clears the magic number.
+ */
 static inline void
 _eina_list_mempool_accounting_free(Eina_List_Accounting *accounting)
 {
@@ -212,6 +247,18 @@ _eina_list_mempool_accounting_free(Eina_List_Accounting *accounting)
    eina_freeq_ptr_main_add(accounting, _eina_list_accounting_free, sizeof(*accounting));
 }
 
+/**
+ * @internal
+ * @brief Allocates a new Eina_List node from the mempool, trying to place it near existing nodes.
+ * @param before A pointer to an Eina_List node that the new node might be placed before.
+ * @param after A pointer to an Eina_List node that the new node might be placed after.
+ * @return A pointer to the newly allocated Eina_List node, or NULL on failure.
+ *
+ * This function allocates memory for an Eina_List node using a dedicated mempool.
+ * It attempts to allocate the new node near the `before` or `after` nodes if provided,
+ * which can improve cache locality. It also sets a magic number for debugging if
+ * EINA_LIST_MAGIC is defined.
+ */
 static inline Eina_List *
 _eina_list_mempool_list_new(Eina_List *before, Eina_List *after)
 {
@@ -225,6 +272,18 @@ _eina_list_mempool_list_new(Eina_List *before, Eina_List *after)
 #endif
    return tmp;
 }
+
+/**
+ * @internal
+ * @brief Schedules an Eina_List node to be freed via eina_freeq.
+ * @param list Pointer to the Eina_List node to be freed.
+ *
+ * This function handles the freeing of an Eina_List node. It decrements the count
+ * in its associated accounting structure. If the count reaches zero, the accounting
+ * structure itself is also scheduled for freeing. The list node is then added to the
+ * main eina_freeq, which will later call _eina_list_list_free to return it to the mempool.
+ * If EINA_LIST_MAGIC is defined, it performs a magic check and clears the magic number.
+ */
 static inline void
 _eina_list_mempool_list_free(Eina_List *list)
 {
@@ -243,6 +302,18 @@ _eina_list_mempool_list_free(Eina_List *list)
    eina_freeq_ptr_main_add(list, _eina_list_list_free, sizeof(*list));
 }
 
+/**
+ * @internal
+ * @brief Initializes the accounting structure for a new list.
+ * @param list The first node of the newly created list.
+ * @return The list pointer, or NULL if accounting allocation fails.
+ *
+ * This function is called when a new list is created (e.g., by appending to a NULL list).
+ * It allocates a new Eina_List_Accounting structure, sets its initial `last` pointer
+ * to the given list node, and initializes the `count` to 1.
+ * If EINA_LIST_MAGIC is defined, it performs a magic check on the list node.
+ * If accounting allocation fails, the list node is freed and NULL is returned.
+ */
 static Eina_List *
 _eina_list_setup_accounting(Eina_List *list)
 {
@@ -263,6 +334,16 @@ on_error:
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Updates the accounting information when a new node is added to an existing list.
+ * @param list An existing node in the list (often the head, used to access accounting).
+ * @param new_list The newly added list node.
+ *
+ * This function increments the count in the list's accounting structure and assigns
+ * the same accounting structure to the new_list node.
+ * If EINA_LIST_MAGIC is defined, it performs magic checks on both list nodes.
+ */
 static inline void
 _eina_list_update_accounting(Eina_List *list, Eina_List *new_list)
 {
@@ -289,6 +370,17 @@ static Eina_Mempool2 _eina_list_accounting_mempool =
 };
 #endif
 
+/**
+ * @internal
+ * @brief Advances the list iterator to the next element.
+ * @param it The list iterator.
+ * @param data Pointer to a void pointer where the data of the next element will be stored.
+ * @return #EINA_TRUE if a next element is found, #EINA_FALSE otherwise.
+ *
+ * This function is part of the Eina_Iterator interface for Eina_List.
+ * It retrieves the data of the current element, then advances the iterator
+ * to the next element in the list.
+ */
 static Eina_Bool
 eina_list_iterator_next(Eina_Iterator_List *it, void **data)
 {
@@ -303,6 +395,17 @@ eina_list_iterator_next(Eina_Iterator_List *it, void **data)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Advances the list iterator to the previous element (for reversed iteration).
+ * @param it The list iterator (configured for reversed iteration).
+ * @param data Pointer to a void pointer where the data of the previous element will be stored.
+ * @return #EINA_TRUE if a previous element is found, #EINA_FALSE otherwise.
+ *
+ * This function is part of the Eina_Iterator interface for Eina_List, specifically
+ * used by reversed iterators. It retrieves the data of the current element, then
+ * advances the iterator to the previous element in the list.
+ */
 static Eina_Bool
 eina_list_iterator_prev(Eina_Iterator_List *it, void **data)
 {
@@ -317,6 +420,15 @@ eina_list_iterator_prev(Eina_Iterator_List *it, void **data)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Gets the container (the list itself) from a list iterator.
+ * @param it The list iterator.
+ * @return A pointer to the head of the Eina_List being iterated.
+ *
+ * This function is part of the Eina_Iterator interface for Eina_List.
+ * It returns the underlying list that the iterator is operating on.
+ */
 static Eina_List *
 eina_list_iterator_get_container(Eina_Iterator_List *it)
 {
@@ -324,6 +436,14 @@ eina_list_iterator_get_container(Eina_Iterator_List *it)
    return (Eina_List *)it->head;
 }
 
+/**
+ * @internal
+ * @brief Frees a list iterator.
+ * @param it The list iterator to free.
+ *
+ * This function is part of the Eina_Iterator interface for Eina_List.
+ * It frees the memory allocated for the Eina_Iterator_List structure.
+ */
 static void
 eina_list_iterator_free(Eina_Iterator_List *it)
 {
@@ -331,6 +451,19 @@ eina_list_iterator_free(Eina_Iterator_List *it)
    MAGIC_FREE(it);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the data at a specific index using a list accessor.
+ * @param it The list accessor.
+ * @param idx The index of the element to retrieve.
+ * @param data Pointer to a void pointer where the data of the element will be stored.
+ * @return #EINA_TRUE if the element is found at the index, #EINA_FALSE otherwise.
+ *
+ * This function is part of the Eina_Accessor interface for Eina_List.
+ * It provides access to list elements by index. It optimizes traversal by
+ * starting from the current position, the beginning, or the end of the list,
+ * depending on which is closer to the target index.
+ */
 static Eina_Bool
 eina_list_accessor_get_at(Eina_Accessor_List *it, unsigned int idx, void **data)
 {
@@ -392,6 +525,15 @@ eina_list_accessor_get_at(Eina_Accessor_List *it, unsigned int idx, void **data)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Gets the container (the list itself) from a list accessor.
+ * @param it The list accessor.
+ * @return A pointer to the head of the Eina_List being accessed.
+ *
+ * This function is part of the Eina_Accessor interface for Eina_List.
+ * It returns the underlying list that the accessor is operating on.
+ */
 static Eina_List *
 eina_list_accessor_get_container(Eina_Accessor_List *it)
 {
@@ -399,6 +541,14 @@ eina_list_accessor_get_container(Eina_Accessor_List *it)
    return (Eina_List *)it->head;
 }
 
+/**
+ * @internal
+ * @brief Frees a list accessor.
+ * @param it The list accessor to free.
+ *
+ * This function is part of the Eina_Accessor interface for Eina_List.
+ * It frees the memory allocated for the Eina_Accessor_List structure.
+ */
 static void
 eina_list_accessor_free(Eina_Accessor_List *it)
 {
@@ -406,6 +556,16 @@ eina_list_accessor_free(Eina_Accessor_List *it)
    MAGIC_FREE(it);
 }
 
+/**
+ * @internal
+ * @brief Clones a list accessor.
+ * @param list The list accessor to clone.
+ * @return A new Eina_Accessor instance that is a copy of the original, or NULL on failure.
+ *
+ * This function is part of the Eina_Accessor interface for Eina_List.
+ * It creates a new accessor that shares the same state (current position, etc.)
+ * as the original accessor.
+ */
 static Eina_Accessor*
 eina_list_accessor_clone(Eina_Accessor_List *list)
 {
@@ -422,6 +582,19 @@ eina_list_accessor_clone(Eina_Accessor_List *list)
    return &ac->accessor;
 }
 
+/**
+ * @internal
+ * @brief Rebuilds the `prev` pointers for a list after sorting.
+ * @param list The head of the list whose `prev` pointers need to be rebuilt.
+ *             The list is assumed to be correctly linked via `next` pointers.
+ * @return The last element of the list (the new tail).
+ *
+ * After a sort operation (like merge sort), the `next` pointers are correctly
+ * set up to form the sorted list, but the `prev` pointers might be inconsistent.
+ * This function iterates through the list using the `next` pointers and correctly
+ * sets all `prev` pointers. It returns the last node encountered, which is the
+ * new tail of the sorted list.
+ */
 static Eina_List *
 eina_list_sort_rebuild_prev(Eina_List *list)
 {
@@ -439,6 +612,20 @@ eina_list_sort_rebuild_prev(Eina_List *list)
    return prev;
 }
 
+/**
+ * @internal
+ * @brief Merges two sorted sub-lists into a single sorted list.
+ * @param a The first sorted sub-list.
+ * @param b The second sorted sub-list.
+ * @param func The comparison function to determine the order of elements.
+ * @return The head of the newly merged and sorted list.
+ *
+ * This function is a core part of the merge sort algorithm used by eina_list_sort().
+ * It takes two lists, `a` and `b`, which are already sorted, and merges them
+ * into a single list that is also sorted according to the `func` comparator.
+ * The `prev` pointers are not maintained by this function; they are rebuilt later
+ * by `eina_list_sort_rebuild_prev`.
+ */
 static Eina_List *
 eina_list_sort_merge(Eina_List *a, Eina_List *b, Eina_Compare_Cb func)
 {

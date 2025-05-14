@@ -2,6 +2,15 @@
 
 #define MY_CLASS EFL_CANVAS_GESTURE_RECOGNIZER_ZOOM_CLASS
 
+/**
+ * @internal
+ * @brief Resets the internal state of the zoom recognizer.
+ *
+ * This function is called to clear all tracking data related to an ongoing
+ * or completed zoom gesture, preparing the recognizer for a new gesture.
+ *
+ * @param pd Pointer to the private data of the zoom recognizer.
+ */
 static void
 _reset_recognizer(Efl_Canvas_Gesture_Recognizer_Zoom_Data *pd)
 {
@@ -16,6 +25,23 @@ _reset_recognizer(Efl_Canvas_Gesture_Recognizer_Zoom_Data *pd)
 
 #define memset do not use memset to reset zoom data, use _reset_recognizer
 
+/**
+ * @internal
+ * @brief Computes the zoom factor based on the current finger positions.
+ *
+ * This function calculates the zoom ratio relative to the initial distance
+ * between two touch points. It also handles zoom distance tolerance,
+ * preventing small movements from triggering a zoom.
+ *
+ * @param pd Pointer to the private data of the zoom recognizer.
+ * @param zd Pointer to the zoom gesture data to be updated.
+ * @param xx1 X-coordinate of the first touch point.
+ * @param yy1 Y-coordinate of the first touch point.
+ * @param xx2 X-coordinate of the second touch point.
+ * @param yy2 Y-coordinate of the second touch point.
+ * @param zoom_finger_factor Factor to apply to the zoom calculation.
+ * @return The computed zoom factor. A value of 1.0 means no zoom.
+ */
 static double
 _zoom_compute(Efl_Canvas_Gesture_Recognizer_Zoom_Data *pd,
               Efl_Canvas_Gesture_Zoom_Data *zd,
@@ -74,12 +100,40 @@ _zoom_compute(Efl_Canvas_Gesture_Recognizer_Zoom_Data *pd,
    return rt;
 }
 
+/**
+ * @internal
+ * @brief Gets the Efl_Class for the zoom gesture.
+ *
+ * This function returns the specific Efl_Class associated with zoom gestures,
+ * which is EFL_CANVAS_GESTURE_ZOOM_CLASS.
+ *
+ * @param obj The Efl_Canvas_Gesture_Recognizer_Zoom object (unused).
+ * @param pd The private data of the zoom recognizer (unused).
+ * @return The Efl_Class for zoom gestures.
+ */
 EOLIAN static const Efl_Class *
 _efl_canvas_gesture_recognizer_zoom_efl_canvas_gesture_recognizer_type_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Gesture_Recognizer_Zoom_Data *pd EINA_UNUSED)
 {
    return EFL_CANVAS_GESTURE_ZOOM_CLASS;
 }
 
+/**
+ * @internal
+ * @brief Recognizes a zoom gesture based on touch events.
+ *
+ * This is the core function that processes touch events to determine if a
+ * zoom gesture is occurring. It manages the state of the gesture (e.g.,
+ * starting, updating, finishing, canceling) based on the number of touch
+ * points and their movement.
+ *
+ * @param obj The Efl_Canvas_Gesture_Recognizer_Zoom object.
+ * @param pd Pointer to the private data of the zoom recognizer.
+ * @param gesture The Efl_Canvas_Gesture object to update with gesture information.
+ * @param watched The Efl_Object being watched for gestures.
+ * @param event The Efl_Canvas_Gesture_Touch event that triggered the recognition.
+ * @return An Efl_Canvas_Gesture_Recognizer_Result indicating the outcome of
+ *         the recognition process (e.g., TRIGGER, FINISH, CANCEL, IGNORE, MAYBE).
+ */
 EOLIAN static Efl_Canvas_Gesture_Recognizer_Result
 _efl_canvas_gesture_recognizer_zoom_efl_canvas_gesture_recognizer_recognize(Eo *obj,
                                                                             Efl_Canvas_Gesture_Recognizer_Zoom_Data *pd,

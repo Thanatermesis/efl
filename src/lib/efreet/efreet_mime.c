@@ -150,6 +150,12 @@ static Eina_File *mimedb = NULL;
 static unsigned char *mimedb_ptr = NULL;
 static size_t mimedb_size = 0;
 
+/**
+ * @internal
+ * @brief Closes and unmaps the mime database cache file.
+ * @return No value.
+ * @note This function resets the global mimedb variables to a clean state.
+ */
 static void
 _efreet_mimedb_shutdown(void)
 {
@@ -163,6 +169,13 @@ _efreet_mimedb_shutdown(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Updates the mime database cache by re-opening and mapping the cache file.
+ * @return No value.
+ * @note This function handles both big-endian and little-endian cache files.
+ * It performs a sanity check on the file magic number "EfrEeT-MiMeS-001".
+ */
 static void
 _efreet_mimedb_update(void)
 {
@@ -212,6 +225,13 @@ _efreet_mimedb_update(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Retrieves a string from the mapped mime database.
+ * @param offset The offset from the start of the database file.
+ * @return The string at the given offset, or NULL on error.
+ * @note The offset is checked against the database size to prevent out-of-bounds access.
+ */
 static const char *
 _efreet_mimedb_str_get(unsigned int offset)
 {
@@ -220,6 +240,13 @@ _efreet_mimedb_str_get(unsigned int offset)
    return (const char *)(mimedb_ptr + offset);
 }
 
+/**
+ * @internal
+ * @brief Retrieves an unsigned integer from the mapped mime database.
+ * @param index The index of the integer to retrieve, after the header.
+ * @return The integer at the given index, or 0 on error.
+ * @note The database is treated as an array of unsigned integers after the 16-byte header.
+ */
 static unsigned int
 _efreet_mimedb_uint_get(unsigned int index)
 // index is the unit NUMBER AFTER the header
@@ -231,6 +258,11 @@ _efreet_mimedb_uint_get(unsigned int index)
    return *ptr;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the total number of mime types in the database.
+ * @return The number of mime types.
+ */
 static unsigned int
 _efreet_mimedb_mime_count(void)
 {
@@ -247,12 +279,23 @@ _efreet_mimedb_mime_get(unsigned int num)
 }
 */
 
+/**
+ * @internal
+ * @brief Retrieves the total number of file extensions in the database.
+ * @return The number of file extensions.
+ */
 static unsigned int
 _efreet_mimedb_extn_count(void)
 {
    return _efreet_mimedb_uint_get(1 + _efreet_mimedb_mime_count());
 }
 
+/**
+ * @internal
+ * @brief Retrieves a file extension string from the database by its index.
+ * @param num The index of the extension to retrieve.
+ * @return The file extension string, or NULL if not found.
+ */
 static const char *
 _efreet_mimedb_extn_get(unsigned int num)
 {
@@ -261,6 +304,12 @@ _efreet_mimedb_extn_get(unsigned int num)
    return  _efreet_mimedb_str_get(offset);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the mime type associated with a file extension from the database by its index.
+ * @param num The index of the extension's mime type to retrieve.
+ * @return The mime type string, or NULL if not found.
+ */
 static const char *
 _efreet_mimedb_extn_mime_get(unsigned int num)
 {
@@ -269,6 +318,13 @@ _efreet_mimedb_extn_mime_get(unsigned int num)
    return  _efreet_mimedb_str_get(offset);
 }
 
+/**
+ * @internal
+ * @brief Finds the mime type for a given file extension using a binary search.
+ * @param extn The file extension to find (e.g., ".txt").
+ * @return The mime type for the extension, or NULL if not found.
+ * @note The extensions in the database are sorted, which allows for an efficient binary search.
+ */
 static const char *
 _efreet_mimedb_extn_find(const char *extn)
 {
@@ -317,6 +373,11 @@ _efreet_mimedb_extn_find(const char *extn)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the total number of glob patterns in the database.
+ * @return The number of glob patterns.
+ */
 static unsigned int
 _efreet_mimedb_glob_count(void)
 {
@@ -325,6 +386,12 @@ _efreet_mimedb_glob_count(void)
       1 + (_efreet_mimedb_extn_count() * 2));
 }
 
+/**
+ * @internal
+ * @brief Retrieves a glob pattern string from the database by its index.
+ * @param num The index of the glob pattern to retrieve.
+ * @return The glob pattern string (e.g., "*.txt"), or NULL if not found.
+ */
 static const char *
 _efreet_mimedb_glob_get(unsigned int num)
 {
@@ -335,6 +402,12 @@ _efreet_mimedb_glob_get(unsigned int num)
    return  _efreet_mimedb_str_get(offset);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the mime type associated with a glob pattern from the database by its index.
+ * @param num The index of the glob pattern's mime type to retrieve.
+ * @return The mime type string, or NULL if not found.
+ */
 static const char *
 _efreet_mimedb_glob_mime_get(unsigned int num)
 {
@@ -347,6 +420,14 @@ _efreet_mimedb_glob_mime_get(unsigned int num)
 
 /** --------------------------------- **/
 
+/**
+ * @internal
+ * @brief Initializes the mime type handling system.
+ * @return The new init count.
+ * @note This is called from efreet_init() and should not be called directly.
+ * It sets up logging, checks endianness, loads the mime database, and
+ * initializes magic and glob data.
+ */
 int
 efreet_internal_mime_init(void)
 {
@@ -381,6 +462,13 @@ shutdown_efreet:
    return --_efreet_mime_init_count;
  }
 
+/**
+ * @internal
+ * @brief Shuts down the mime type handling system.
+ * @return The new init count.
+ * @note This is called from efreet_shutdown() and should not be called
+ * directly. It cleans up all resources allocated by the mime system.
+ */
 int
 efreet_internal_mime_shutdown(void)
 {
@@ -416,18 +504,54 @@ efreet_internal_mime_shutdown(void)
    return _efreet_mime_init_count;
 }
 
+/**
+ * @brief Initializes the Efreet_Mime library.
+ * @return The new init count.
+ *
+ * This function initializes the Efreet_Mime library and should be called
+ * before any other Efreet_Mime functions are used. It calls efreet_init()
+ * internally, so you do not need to call that separately.
+ */
 EAPI int
 efreet_mime_init(void)
 {
    return efreet_init();
 }
 
+/**
+ * @brief Shuts down the Efreet_Mime library.
+ * @return The new init count.
+ *
+ * This function shuts down the Efreet_Mime library, freeing any resources
+ * it was using. It calls efreet_shutdown() internally.
+ */
 EAPI int
 efreet_mime_shutdown(void)
 {
    return efreet_shutdown();
 }
 
+/**
+ * @brief Retrieves the mime type for the given file.
+ * @param file The path to the file.
+ * @return The mime type string for the file, or @c NULL if one cannot be found.
+ *
+ * This function determines the mime type of a file based on a set of checks
+ * in a specific order of precedence:
+ * 1. Special file check (e.g., directory, socket).
+ * 2. Magic number check with priority > 80.
+ * 3. Glob pattern matching.
+ * 4. Magic number check with priority <= 80.
+ * 5. Fallback check (e.g., text/plain, application/octet-stream).
+ *
+ * The returned string is an Eina_Stringshare, so it should not be freed.
+ * For example:
+ * @code
+ * const char *mime = efreet_mime_type_get("/path/to/my.document.pdf");
+ * if (mime) printf("Mime type is: %s\n", mime);
+ * // Mime type is: application/pdf
+ * @endcode
+ */
 EAPI const char *
 efreet_mime_type_get(const char *file)
 {
@@ -454,6 +578,30 @@ efreet_mime_type_get(const char *file)
    return efreet_mime_fallback_check(file);
 }
 
+/**
+ * @brief Retrieves the icon path for a given mime type, theme, and size.
+ * @param mime The mime type (e.g. "text/plain").
+ * @param theme The icon theme to use.
+ * @param size The desired icon size.
+ * @return The path to the icon, or @c NULL if not found.
+ *
+ * This function searches for an appropriate icon according to the Icon Naming
+ * Specification. It checks for icons in the following order:
+ * 1. An icon with the name `mime-type` (with '/' replaced by '-').
+ * 2. `desktop_environment-mime-type`.
+ * 3. `desktop_environment-mime-type` (generic).
+ * 4. `mime-type-x-generic`.
+ * 5. `mime-type-generic`.
+ *
+ * The result is stringshared and should not be freed. The function also caches
+ * results for faster lookups.
+ *
+ * For example:
+ * @code
+ * const char *icon = efreet_mime_type_icon_get("application/pdf", "hicolor", 64);
+ * if (icon) printf("Icon path: %s\n", icon);
+ * @endcode
+ */
 EAPI const char *
 efreet_mime_type_icon_get(const char *mime, const char *theme, unsigned int size)
 {
@@ -533,6 +681,12 @@ efreet_mime_type_icon_get(const char *mime, const char *theme, unsigned int size
    return icon;
 }
 
+/**
+ * @brief Clears the entire mime type icon cache.
+ *
+ * This function frees all entries in the mime icon cache. It is useful
+ * if the icon theme has changed and the cache needs to be invalidated.
+ */
 EAPI void
 efreet_mime_type_cache_clear(void)
 {
@@ -544,6 +698,13 @@ efreet_mime_type_cache_clear(void)
    mime_icons = eina_hash_stringshared_new(EINA_FREE_CB(efreet_mime_icon_entry_head_free));
 }
 
+/**
+ * @brief Flushes aged entries from the mime type icon cache.
+ *
+ * This function checks the icon cache and removes entries that are older
+ * than a certain threshold or if the cache exceeds its maximum size.
+ * It is called automatically but can be called manually to force a flush.
+ */
 EAPI void
 efreet_mime_type_cache_flush(void)
 {
@@ -551,6 +712,16 @@ efreet_mime_type_cache_flush(void)
 }
 
 
+/**
+ * @brief Retrieves the mime type for a file based on its magic data.
+ * @param file The path to the file.
+ * @return The mime type string, or @c NULL if no match is found.
+ *
+ * This function reads the beginning of the file and compares it against a
+ * database of known "magic" byte sequences to determine the mime type.
+ * It checks all magic rules regardless of priority. The returned string is
+ * stringshared and should not be freed.
+ */
 EAPI const char *
 efreet_mime_magic_type_get(const char *file)
 {
@@ -558,6 +729,16 @@ efreet_mime_magic_type_get(const char *file)
    return efreet_mime_magic_check_priority(file, 0, 0);
 }
 
+/**
+ * @brief Retrieves the mime type for a file based on filename glob patterns.
+ * @param file The path to the file.
+ * @return The mime type string, or @c NULL if no match is found.
+ *
+ * This function matches the filename against a list of glob patterns (e.g., "*.txt")
+ * to determine the mime type. It first checks for extensions (e.g. ".txt") and then
+ * falls back to full glob matching. The check is case-insensitive. The returned
+ * string is stringshared and should not be freed.
+ */
 EAPI const char *
 efreet_mime_globs_type_get(const char *file)
 {
@@ -605,6 +786,22 @@ efreet_mime_globs_type_get(const char *file)
    return NULL;
 }
 
+/**
+ * @brief Retrieves the mime type for special file types (e.g., directories).
+ * @param file The path to the file.
+ * @return The mime type string, or @c NULL if it's not a special file type.
+ *
+ * This function uses stat() to check if the file is a special type like a
+ * directory, a symbolic link, a socket, etc.
+ *
+ * Possible return values include:
+ * - "inode/directory"
+ * - "inode/symlink"
+ * - "inode/fifo"
+ * - "inode/socket"
+ *
+ * The returned string is stringshared and should not be freed.
+ */
 EAPI const char *
 efreet_mime_special_type_get(const char *file)
 {
@@ -612,6 +809,19 @@ efreet_mime_special_type_get(const char *file)
    return efreet_mime_special_check(file);
 }
 
+/**
+ * @brief Provides a fallback mime type for a file.
+ * @param file The path to the file.
+ * @return The fallback mime type string.
+ *
+ * This function is used when other methods of mime type detection fail. It
+ * returns:
+ * - "application/x-executable" if the file is executable.
+ * - "text/plain" if the file appears to be text.
+ * - "application/octet-stream" if the file appears to be binary.
+ *
+ * The returned string is stringshared and should not be freed.
+ */
 EAPI const char *
 efreet_mime_fallback_type_get(const char *file)
 {
@@ -839,10 +1049,11 @@ efreet_mime_fallback_check(const char *file)
 
 /**
  * @internal
- * @param in Number to count the digits
- * @return Returns number of digits
- * @brief Calculates and returns the number of digits
- * in a number.
+ * @brief Calculates and returns the number of digits in an integer.
+ * @param in The integer to check.
+ * @return The number of decimal digits in the integer.
+ *
+ * For example, efreet_mime_count_digits(123) would return 3.
  */
 static int
 efreet_mime_count_digits(int in)
@@ -857,9 +1068,12 @@ efreet_mime_count_digits(int in)
 
 /**
  * @internal
- * @param file File to parse
- * @return Returns no value
- * @brief Loads a magic file and adds information to magics list
+ * @brief Loads a single magic file and parses it.
+ * @param file The path to the magic file.
+ * @return No value.
+ *
+ * This function memory-maps the given magic file and passes its contents
+ * to efreet_mime_shared_mimeinfo_magic_parse() to be parsed.
  */
 static void
 efreet_mime_shared_mimeinfo_magic_load(const char *file)
@@ -918,6 +1132,15 @@ efreet_mime_shared_mimeinfo_magic_load(const char *file)
  * If missing, indent defaults to 0, range-length to 1, the word-size to 1,
  * and the mask to all 'one' bits.  In our case, mask is null as it is
  * quicker, uses less memory and will achieve the same exact effect.
+ */
+/**
+ * @internal
+ * @brief Parses the content of a magic file.
+ * @param data The memory-mapped content of the magic file.
+ * @param size The size of the data.
+ * @return No value.
+ * @note This function parses the binary magic file format as specified by
+ * freedesktop.org. It builds up the `magics` list with the parsed rules.
  */
 static void
 efreet_mime_shared_mimeinfo_magic_parse(char *data, int size)
@@ -1093,12 +1316,15 @@ efreet_mime_shared_mimeinfo_magic_parse(char *data, int size)
 
 /**
  * @internal
- * @param file File to check
- * @param start Start priority, if 0 start at beginning
- * @param end End priority, should be less then start
- * unless start
- * @return Returns mime type for file if found, NULL if not
- * @brief Applies magic rules to a file given a start and end priority
+ * @brief Checks a file against magic rules within a given priority range.
+ * @param file The path to the file to check.
+ * @param start The starting priority of rules to check (inclusive). If 0, check all higher priorities.
+ * @param end The ending priority of rules to check (exclusive). If 0, check all lower priorities.
+ * @return The mime type if a match is found, otherwise @c NULL.
+ *
+ * This function iterates through the loaded magic rules. A rule is only
+ * checked if its priority falls within the [end, start] range. For a rule to
+ * match, all its entries must match sequentially.
  */
 static const char *
 efreet_mime_magic_check_priority(const char *file,
@@ -1189,9 +1415,10 @@ efreet_mime_magic_check_priority(const char *file,
 
 /**
  * @internal
- * @param data Data pointer that is being destroyed
- * @return Returns no value
- * @brief Callback for magics destroy
+ * @brief Frees an Efreet_Mime_Magic structure.
+ * @param data The Efreet_Mime_Magic to free.
+ * @return No value.
+ * @note This is a callback function for eina_list_free().
  */
 static void
 efreet_mime_magic_free(void *data)
@@ -1205,9 +1432,10 @@ efreet_mime_magic_free(void *data)
 
 /**
  * @internal
- * @param data Data pointer that is being destroyed
- * @return Returns no value
- * @brief Callback for magic entry destroy
+ * @brief Frees an Efreet_Mime_Magic_Entry structure.
+ * @param data The Efreet_Mime_Magic_Entry to free.
+ * @return No value.
+ * @note This is a callback function for eina_list_free().
  */
 static void
 efreet_mime_magic_entry_free(void *data)
@@ -1222,10 +1450,11 @@ efreet_mime_magic_entry_free(void *data)
 
 /**
  * @internal
- * @param str String (filename) to match
- * @param glob Glob to match str to
- * @return Returns 1 on success, 0 on failure
- * @brief Compares str to glob, case sensitive
+ * @brief Performs a case-sensitive glob match.
+ * @param str The string to check (e.g., a filename).
+ * @param glob The glob pattern to match against.
+ * @return 1 on match, 0 on no match.
+ * @note This is a wrapper around eina_fnmatch.
  */
 static int
 efreet_mime_glob_match(const char *str, const char *glob)
@@ -1242,10 +1471,11 @@ efreet_mime_glob_match(const char *str, const char *glob)
 
 /**
  * @internal
- * @param str String (filename) to match
- * @param glob Glob to match str to
- * @return Returns 1 on success, 0 on failure
- * @brief Compares str to glob, case insensitive (expects str already in lower case)
+ * @brief Performs a case-insensitive glob match.
+ * @param str The string to check (e.g., a filename), must be pre-converted to lowercase.
+ * @param glob The glob pattern to match against.
+ * @return 1 on match, 0 on no match.
+ * @note This function converts the glob pattern to lowercase before matching.
  */
 static int
 efreet_mime_glob_case_match(char *str, const char *glob)
@@ -1266,6 +1496,16 @@ efreet_mime_glob_case_match(char *str, const char *glob)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Flushes the mime icon cache.
+ * @param now The current time from ecore_loop_time_get().
+ * @return No value.
+ *
+ * This function is responsible for cache eviction. It is triggered periodically
+ * or when the cache grows too large. It removes the least recently used
+ * items to stay within EFREET_MIME_ICONS_MAX_POPULATION.
+ */
 static void
 efreet_mime_icons_flush(double now)
 {
@@ -1295,6 +1535,12 @@ efreet_mime_icons_flush(double now)
    efreet_mime_icons_debug();
 }
 
+/**
+ * @internal
+ * @brief Frees a single mime icon cache entry.
+ * @param node The entry to free.
+ * @return No value.
+ */
 static void
 efreet_mime_icon_entry_free(Efreet_Mime_Icon_Entry *node)
 {
@@ -1303,6 +1549,13 @@ efreet_mime_icon_entry_free(Efreet_Mime_Icon_Entry *node)
    free(node);
 }
 
+/**
+ * @internal
+ * @brief Frees a mime icon cache head entry and all its associated icon entries.
+ * @param entry The head entry to free.
+ * @return No value.
+ * @note This is used as a EINA_FREE_CB for the mime_icons hash.
+ */
 static void
 efreet_mime_icon_entry_head_free(Efreet_Mime_Icon_Entry_Head *entry)
 {
@@ -1317,6 +1570,14 @@ efreet_mime_icon_entry_head_free(Efreet_Mime_Icon_Entry_Head *entry)
    free(entry);
 }
 
+/**
+ * @internal
+ * @brief Creates a new mime icon cache entry.
+ * @param icon The icon name (stringshared).
+ * @param theme The theme name (stringshared).
+ * @param size The icon size.
+ * @return The newly allocated entry, or NULL on failure.
+ */
 static Efreet_Mime_Icon_Entry *
 efreet_mime_icon_entry_new(const char *icon,
                            const char *theme,
@@ -1335,6 +1596,19 @@ efreet_mime_icon_entry_new(const char *icon,
    return entry;
 }
 
+/**
+ * @internal
+ * @brief Adds a mime icon to the cache.
+ * @param mime The mime type (stringshared).
+ * @param icon The icon name (stringshared).
+ * @param theme The theme name (stringshared).
+ * @param size The icon size.
+ * @return No value.
+ *
+ * If an entry for the mime type already exists, the new icon information is
+ * prepended to its list. Otherwise, a new head entry is created. The entry
+ * is promoted to the front of the LRU list.
+ */
 static void
 efreet_mime_icon_entry_add(const char *mime,
                            const char *icon,
@@ -1383,6 +1657,17 @@ efreet_mime_icon_entry_add(const char *mime,
    efreet_mime_icons_flush(entry->timestamp);
 }
 
+/**
+ * @internal
+ * @brief Finds a mime icon in the cache.
+ * @param mime The mime type (stringshared).
+ * @param theme The theme name (stringshared).
+ * @param size The icon size.
+ * @return The icon name if found, otherwise @c NULL.
+ *
+ * If an entry is found, it is promoted to the front of the LRU list to
+ * mark it as recently used.
+ */
 static const char *
 efreet_mime_icon_entry_find(const char *mime,
                             const char *theme,
@@ -1417,6 +1702,14 @@ efreet_mime_icon_entry_find(const char *mime,
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Dumps the current state of the mime icon cache for debugging.
+ * @return No value.
+ * @note This function is only compiled if EFREET_MIME_ICONS_DEBUG is defined.
+ * It prints information about each cached item, including its age, to help
+ * debug cache behavior and expiry.
+ */
 #ifdef EFREET_MIME_ICONS_DEBUG
 static void
 efreet_mime_icons_debug(void)

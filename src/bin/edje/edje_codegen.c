@@ -340,6 +340,16 @@ static Eina_List *externals = NULL;
   "void *data);\n"
 
 typedef struct _Part_External_Info Part_External_Info;
+/**
+ * @struct _Part_External_Info
+ * @brief Holds information about an external part for code generation.
+ *
+ * @var _Part_External_Info::description The API description of the part.
+ * @var _Part_External_Info::name The name of the part in the Edje file.
+ * @var _Part_External_Info::source The source identifier for the external part type.
+ * @var _Part_External_Info::apiname Sanitized C-friendly name for the generated API.
+ * @var _Part_External_Info::draggable True if the part is draggable.
+ */
 struct _Part_External_Info
 {
    const char *description, *name, *source;
@@ -368,6 +378,18 @@ const Ecore_Getopt optdesc = {
    }
 };
 
+/**
+ * @brief Normalizes a filename to be used as a C header guard.
+ *
+ * This function takes a filename, extracts the basename (discarding the path),
+ * converts it to uppercase, and replaces dots with underscores. The resulting
+ * string is suitable for use in preprocessor defines for header guards.
+ * e.g., "my_header.h" becomes "MY_HEADER_H".
+ *
+ * @param filename The input filename.
+ * @return A newly allocated string with the standardized header name. The caller
+ *         is responsible for freeing this string.
+ */
 static char *
 _standardizes_header(const char *filename)
 {
@@ -385,6 +407,17 @@ _standardizes_header(const char *filename)
    return str;
 }
 
+/**
+ * @brief Opens the source and header files for writing.
+ *
+ * Both files are opened in binary write mode ('wb') to ensure consistent
+ * line endings across different operating systems.
+ *
+ * @param source The path to the C source file to be created.
+ * @param header The path to the C header file to be created.
+ * @return EINA_TRUE on success, EINA_FALSE on failure. If opening the source
+ *         file fails, the already opened header file is closed.
+ */
 static Eina_Bool
 _open_file_descriptors(const char *source, const char *header)
 {
@@ -403,6 +436,11 @@ err:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Closes the global source and header file descriptors.
+ *
+ * @return EINA_TRUE if both files were closed successfully, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _close_file_descriptors(void)
 {
@@ -417,6 +455,17 @@ _close_file_descriptors(void)
    return ret;
 }
 
+/**
+ * @brief Writes the initial boilerplate to the source and header files.
+ *
+ * For the header file, this includes the header guard and necessary C includes.
+ * For the source file, it includes a reference to its own header file.
+ * It uses the H_HEADER and C_HEADER macros.
+ *
+ * @param filename The name of the header file, used to generate the
+ *        header guard and the include statement in the source file.
+ * @return EINA_TRUE on success, EINA_FALSE on write error.
+ */
 static Eina_Bool
 _write_headers(const char *filename)
 {
@@ -440,6 +489,16 @@ _write_headers(const char *filename)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Writes the footer to the header file.
+ *
+ * This typically consists of closing the header guard block (`#endif`).
+ * It uses the H_FOOTER macro.
+ *
+ * @param filename The name of the header file, used to generate the
+ *        matching header guard name.
+ * @return EINA_TRUE on success, EINA_FALSE on write error.
+ */
 static Eina_Bool
 _write_footer(const char *filename)
 {
@@ -459,6 +518,16 @@ _write_footer(const char *filename)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Generates the main object creation function.
+ *
+ * This function writes a helper function (e.g., `my_prefix_object_add`)
+ * to both the source and header files. This generated function simplifies
+ * creating the Edje object and loading the correct file and group.
+ * It uses the C_CODEGEN_OBJECT_ADD and H_CODEGEN_OBJECT_ADD macros.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE on write error.
+ */
 static Eina_Bool
 _write_object_get(void)
 {
@@ -475,6 +544,17 @@ _write_object_get(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Generates all getter/setter functions for a draggable part.
+ *
+ * For a given part that is identified as draggable, this function generates
+ * a comprehensive set of wrapper functions for interacting with its drag
+ * properties (value, size, page, step) and actions.
+ *
+ * @param apiname The sanitized C-friendly name of the part.
+ * @param partname The actual name of the part in the Edje file.
+ * @return EINA_TRUE on success, EINA_FALSE on write error.
+ */
 static Eina_Bool
 _write_part_draggable(const char *apiname, const char *partname)
 {
@@ -519,6 +599,18 @@ _write_part_draggable(const char *apiname, const char *partname)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Generates getter and setter functions for a single parameter of an
+ * external part.
+ *
+ * Based on the parameter's type (int, double, string, etc.), this function
+ * selects the appropriate code generation macros to create `_set` and `_get`
+ * functions for that specific parameter.
+ *
+ * @param info A struct containing information about the external part.
+ * @param param A struct containing information about the parameter.
+ * @return EINA_TRUE on success, EINA_FALSE on write error.
+ */
 static Eina_Bool
 _write_part_external_param(const Part_External_Info *info,
                            const Edje_External_Param_Info *param)
@@ -582,6 +674,20 @@ _write_part_external_param(const Part_External_Info *info,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Processes and generates code for all queued external parts.
+ *
+ * This function iterates over all available Edje external types. For each
+ * type, it finds all matching parts that were previously queued in the
+ * `parts` list. It then generates the necessary C functions for each
+ * part's parameters and draggable properties if applicable.
+ *
+ * Processed parts are removed from the input list.
+ *
+ * @param parts A pointer to an Eina_List of @ref Part_External_Info
+ *        structures. The list will be modified.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _write_part_external(Eina_List **parts)
 {
@@ -660,6 +766,21 @@ end:
    return ret;
 }
 
+/**
+ * @brief Generates API functions for a standard (non-external) part.
+ *
+ * Depending on the part type (BOX, TABLE, TEXT, SWALLOW), this function
+ * generates the relevant set of functions for manipulating that part (e.g.,
+ * `_append` for BOX, `_set` for TEXT). It also handles generating draggable
+ * functions if the part is draggable.
+ *
+ * @param apiname The sanitized C-friendly name of the part.
+ * @param partname The actual name of the part in the Edje file.
+ * @param parttype The type of the part.
+ * @param description An optional API description for the part.
+ * @param draggable A flag indicating if the part is draggable.
+ * @return EINA_TRUE on success, EINA_FALSE on write error.
+ */
 static Eina_Bool
 _write_part(const char *apiname, const char *partname, Edje_Part_Type parttype,
             const char *description, Eina_Bool draggable)
@@ -732,6 +853,15 @@ err:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Checks if a character is a valid character for a C identifier.
+ *
+ * Note: This function only checks if the character is alphanumeric. It does
+ * not validate its position (e.g., a number at the start of an identifier).
+ *
+ * @param c The character to check.
+ * @return EINA_TRUE if the character is allowed, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _c_id_allowed(char c)
 {
@@ -742,6 +872,17 @@ _c_id_allowed(char c)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Sanitizes a string to be a valid C identifier.
+ *
+ * Replaces any character that is not alphanumeric with an underscore ('_').
+ * This is used to convert Edje part/program names into safe names for C
+ * functions.
+ *
+ * @param orig The original string.
+ * @return A newly allocated string containing the sanitized name. The caller
+ *         is responsible for freeing this string. Returns NULL if input is NULL.
+ */
 static char *
 _api_name_fix(const char *orig)
 {
@@ -762,6 +903,17 @@ _api_name_fix(const char *orig)
    return strdup(buf);
 }
 
+/**
+ * @brief Retrieves and sanitizes the API name for a given part.
+ *
+ * It fetches the API name defined in the EDC source for a part and then
+ * sanitizes it using @ref _api_name_fix to make it a valid C identifier.
+ *
+ * @param ed The Edje edit object.
+ * @param program The name of the part.
+ * @return A newly allocated string with the sanitized API name, or NULL if
+ *         the part does not have an API name. The caller must free the string.
+ */
 static char *
 _part_api_name_get(Evas_Object *ed, const char *program)
 {
@@ -775,6 +927,18 @@ _part_api_name_get(Evas_Object *ed, const char *program)
    return fix;
 }
 
+/**
+ * @brief Parses all parts in the Edje object's group and generates code.
+ *
+ * This function iterates through all parts of the loaded group. For each part,
+ * it determines its type and properties (e.g., draggable).
+ * Standard parts are processed immediately to generate C code.
+ * External parts are collected into a list and processed in a separate step
+ * by @ref _write_part_external.
+ *
+ * @param ed The Edje edit object, with a file and group already loaded.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _parse_parts(Evas_Object *ed)
 {
@@ -858,6 +1022,18 @@ end:
    return ret;
 }
 
+/**
+ * @brief Generates a function to emit a signal for a program.
+ *
+ * This creates a wrapper function, e.g., `my_prefix_my_program_emit()`, that
+ * simplifies emitting a specific signal from the Edje object.
+ *
+ * @param apiname The sanitized C-friendly name of the program.
+ * @param source The source string for the signal.
+ * @param sig The signal string.
+ * @param description An optional API description for the program.
+ * @return EINA_TRUE on success, EINA_FALSE on write error.
+ */
 static Eina_Bool
 _write_program_emit(const char *apiname, const char *source, const char *sig,
                     const char *description)
@@ -888,6 +1064,21 @@ err:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Generates functions to add and delete callbacks for a program's signal.
+ *
+ * This creates two wrapper functions:
+ * - `..._callback_add()` to attach a callback using `edje_object_signal_callback_add()`.
+ * - `..._callback_del_full()` to detach a callback using `edje_object_signal_callback_del_full()`.
+ *
+ * These are generated for programs of type `SIGNAL_EMIT`.
+ *
+ * @param apiname The sanitized C-friendly name of the program.
+ * @param source The source string for the signal.
+ * @param sig The signal string.
+ * @param description An optional API description for the program.
+ * @return EINA_TRUE on success, EINA_FALSE on write error.
+ */
 static Eina_Bool
 _write_program_add(const char *apiname, const char *source, const char *sig,
                    const char *description)
@@ -928,6 +1119,17 @@ err:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Retrieves and sanitizes the API name for a given program.
+ *
+ * It fetches the API name defined in the EDC source for a program and then
+ * sanitizes it using @ref _api_name_fix to make it a valid C identifier.
+ *
+ * @param ed The Edje edit object.
+ * @param program The name of the program.
+ * @return A newly allocated string with the sanitized API name, or NULL if
+ *         the program does not have an API name. The caller must free the string.
+ */
 static char *
 _program_api_name_get(Evas_Object *ed, const char *program)
 {
@@ -941,6 +1143,16 @@ _program_api_name_get(Evas_Object *ed, const char *program)
    return fix;
 }
 
+/**
+ * @brief Parses all programs in the Edje object's group and generates code.
+ *
+ * Iterates through all programs in the loaded group. For each program with
+ * an API name, it generates corresponding `_emit` and/or `_callback_add`/`_del`
+ * functions based on its properties.
+ *
+ * @param ed The Edje edit object, with a file and group already loaded.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _parse_programs(Evas_Object *ed)
 {
@@ -1020,6 +1232,16 @@ _parse_programs(Evas_Object *ed)
    return ret;
 }
 
+/**
+ * @brief Checks if a given module name is in the list of required external modules.
+ *
+ * The list of externals is populated by `_parse()`. This function is a helper
+ * to determine if a module available in the system is actually needed by the
+ * current Edje group.
+ *
+ * @param module The name of the module to check.
+ * @return EINA_TRUE if the module is in the `externals` list, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _module_matches(const char *module)
 {
@@ -1035,6 +1257,18 @@ _module_matches(const char *module)
    return EINA_FALSE;
 }
 
+/**
+ * @brief The main parsing and code generation routine.
+ *
+ * This function orchestrates the entire process:
+ * 1. Creates a temporary Edje object.
+ * 2. Loads the specified file and group.
+ * 3. Retrieves the list of required external modules.
+ * 4. Loads the required modules.
+ * 5. Calls `_parse_parts()` and `_parse_programs()` to generate the code.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE on any failure during the process.
+ */
 static Eina_Bool
 _parse(void)
 {

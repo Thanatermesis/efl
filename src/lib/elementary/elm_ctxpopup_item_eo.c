@@ -1,15 +1,29 @@
 
+/** @brief Internal implementation of the @ref elm_obj_ctxpopup_item_prev_get API. */
 Elm_Widget_Item *_elm_ctxpopup_item_prev_get(const Eo *obj, Elm_Ctxpopup_Item_Data *pd);
 
 EOAPI EFL_FUNC_BODY_CONST(elm_obj_ctxpopup_item_prev_get, Elm_Widget_Item *, NULL);
 
+/** @brief Internal implementation of the @ref elm_obj_ctxpopup_item_next_get API. */
 Elm_Widget_Item *_elm_ctxpopup_item_next_get(const Eo *obj, Elm_Ctxpopup_Item_Data *pd);
 
 EOAPI EFL_FUNC_BODY_CONST(elm_obj_ctxpopup_item_next_get, Elm_Widget_Item *, NULL);
 
+/** @brief Internal implementation of the @ref elm_obj_ctxpopup_item_selected_set API. */
 void _elm_ctxpopup_item_selected_set(Eo *obj, Elm_Ctxpopup_Item_Data *pd, Eina_Bool selected);
 
-
+/**
+ * @brief Eolian reflection function for the "selected" property setter.
+ *
+ * This function is used by the Eolian reflection system to allow setting
+ * the "selected" property via its name. It converts an Eina_Value
+ * (expected to be a boolean) and calls the concrete C setter
+ * @ref elm_obj_ctxpopup_item_selected_set.
+ *
+ * @param obj The Eolian object.
+ * @param val The Eina_Value containing the new boolean state for "selected".
+ * @return EINA_ERROR_NO_ERROR on success, or an error code if conversion or setting fails.
+ */
 static Eina_Error
 __eolian_elm_ctxpopup_item_selected_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -27,9 +41,19 @@ __eolian_elm_ctxpopup_item_selected_set_reflect(Eo *obj, Eina_Value val)
 
 EOAPI EFL_VOID_FUNC_BODYV(elm_obj_ctxpopup_item_selected_set, EFL_FUNC_CALL(selected), Eina_Bool selected);
 
+/** @brief Internal implementation of the @ref elm_obj_ctxpopup_item_selected_get API. */
 Eina_Bool _elm_ctxpopup_item_selected_get(const Eo *obj, Elm_Ctxpopup_Item_Data *pd);
 
-
+/**
+ * @brief Eolian reflection function for the "selected" property getter.
+ *
+ * This function is used by the Eolian reflection system to allow getting
+ * the "selected" property via its name. It calls the concrete C getter
+ * @ref elm_obj_ctxpopup_item_selected_get and wraps the result in an Eina_Value.
+ *
+ * @param obj The Eolian object.
+ * @return An Eina_Value containing the boolean state of "selected".
+ */
 static Eina_Value
 __eolian_elm_ctxpopup_item_selected_get_reflect(const Eo *obj)
 {
@@ -39,49 +63,64 @@ __eolian_elm_ctxpopup_item_selected_get_reflect(const Eo *obj)
 
 EOAPI EFL_FUNC_BODY_CONST(elm_obj_ctxpopup_item_selected_get, Eina_Bool, 0);
 
+/** @brief Internal implementation of the @ref elm_obj_ctxpopup_item_init API. */
 void _elm_ctxpopup_item_init(Eo *obj, Elm_Ctxpopup_Item_Data *pd, Evas_Smart_Cb func, const void *data);
 
 EOAPI EFL_VOID_FUNC_BODYV(elm_obj_ctxpopup_item_init, EFL_FUNC_CALL(func, data), Evas_Smart_Cb func, const void *data);
 
+/** @brief Implements the @ref efl_constructor method for Elm.Ctxpopup.Item. */
 Efl_Object *_elm_ctxpopup_item_efl_object_constructor(Eo *obj, Elm_Ctxpopup_Item_Data *pd);
 
-
+/** @brief Implements the @ref efl_destructor method for Elm.Ctxpopup.Item. */
 void _elm_ctxpopup_item_efl_object_destructor(Eo *obj, Elm_Ctxpopup_Item_Data *pd);
 
-
+/** @brief Implements the @ref elm_wdg_item_disable method for Elm.Ctxpopup.Item. */
 void _elm_ctxpopup_item_elm_widget_item_disable(Eo *obj, Elm_Ctxpopup_Item_Data *pd);
 
 
+/** @brief Implements the @ref elm_wdg_item_signal_emit method for Elm.Ctxpopup.Item. */
 void _elm_ctxpopup_item_elm_widget_item_signal_emit(Eo *obj, Elm_Ctxpopup_Item_Data *pd, const char *emission, const char *source);
 
-
+/** @brief Implements the @ref elm_wdg_item_del_pre method for Elm.Ctxpopup.Item. */
 void _elm_ctxpopup_item_elm_widget_item_del_pre(Eo *obj, Elm_Ctxpopup_Item_Data *pd);
 
-
+/** @brief Implements the @ref elm_wdg_item_part_text_set method for Elm.Ctxpopup.Item. */
 void _elm_ctxpopup_item_elm_widget_item_part_text_set(Eo *obj, Elm_Ctxpopup_Item_Data *pd, const char *part, const char *label);
 
 
+/** @brief Implements the @ref elm_wdg_item_part_text_get method for Elm.Ctxpopup.Item. */
 const char *_elm_ctxpopup_item_elm_widget_item_part_text_get(const Eo *obj, Elm_Ctxpopup_Item_Data *pd, const char *part);
 
-
+/** @brief Implements the @ref elm_wdg_item_part_content_set method for Elm.Ctxpopup.Item. */
 void _elm_ctxpopup_item_elm_widget_item_part_content_set(Eo *obj, Elm_Ctxpopup_Item_Data *pd, const char *part, Efl_Canvas_Object *content);
 
 
+/** @brief Implements the @ref elm_wdg_item_part_content_get method for Elm.Ctxpopup.Item. */
 Efl_Canvas_Object *_elm_ctxpopup_item_elm_widget_item_part_content_get(const Eo *obj, Elm_Ctxpopup_Item_Data *pd, const char *part);
 
-
+/** @brief Implements the @ref elm_wdg_item_part_content_unset method for Elm.Ctxpopup.Item. */
 Efl_Canvas_Object *_elm_ctxpopup_item_elm_widget_item_part_content_unset(Eo *obj, Elm_Ctxpopup_Item_Data *pd, const char *part);
 
-
+/** @brief Implements the @ref elm_wdg_item_focus_set method for Elm.Ctxpopup.Item. */
 void _elm_ctxpopup_item_elm_widget_item_item_focus_set(Eo *obj, Elm_Ctxpopup_Item_Data *pd, Eina_Bool focused);
 
 
+/** @brief Implements the @ref elm_wdg_item_focus_get method for Elm.Ctxpopup.Item. */
 Eina_Bool _elm_ctxpopup_item_elm_widget_item_item_focus_get(const Eo *obj, Elm_Ctxpopup_Item_Data *pd);
 
-
+/** @brief Implements the @ref efl_access_widget_action_elm_actions_get method for Elm.Ctxpopup.Item. */
 const Efl_Access_Action_Data *_elm_ctxpopup_item_efl_access_widget_action_elm_actions_get(const Eo *obj, Elm_Ctxpopup_Item_Data *pd);
 
-
+/**
+ * @brief Initializes the Elm_Ctxpopup_Item Efl class.
+ *
+ * This function is called once by the EFL system to set up the
+ * Elm_Ctxpopup_Item class. It defines the Eolian operations (methods)
+ * and property reflection handlers for this class.
+ *
+ * @param klass The Efl_Class pointer representing the Elm_Ctxpopup_Item class.
+ * @return @c EINA_TRUE on successful initialization, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_ctxpopup_item_class_initializer(Efl_Class *klass)
 {

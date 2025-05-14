@@ -181,7 +181,10 @@ EINA_API Eina_Bool   eina_error_msg_modify(Eina_Error  error,
  *
  * @return The last error or 0 (#EINA_ERROR_NO_ERROR).
  *
- * @note This function is thread safe @since 1.10, but slower to use.
+ * @note This function is thread safe @since 1.10. It uses thread-local storage
+ *       to store the error value for each thread, making it safe to use in
+ *       multi-threaded applications. This can be slower than accessing a
+ *       global variable.
  */
 EINA_API Eina_Error  eina_error_get(void);
 
@@ -195,18 +198,25 @@ EINA_API Eina_Error  eina_error_get(void);
  * @note This is also used to clear previous errors, in which case @p err should
  *        be @c 0 (#EINA_ERROR_NO_ERROR).
  *
- * @note This function is thread safe @since 1.10, but slower to use.
+ * @note This function is thread safe @since 1.10. It uses thread-local storage
+ *       to store the error value for each thread, making it safe to use in
+ *       multi-threaded applications. This can be slower than accessing a
+ *       global variable.
  */
 EINA_API void        eina_error_set(Eina_Error err);
 
 /**
  * @brief Returns the description of the given error number.
- * @details This function returns the description of an error that has been
- *          registered by eina_error_msg_register(). If an incorrect error is
- *          given, then @c NULL is returned.
- * @param[in] error The error number
- * @return The description of the error
+ * @details This function returns the description of an error. It can handle
+ *          both errors registered with eina_error_msg_register() and standard
+ *          system `errno` codes.
  *
+ *          If an unknown or invalid error code is given, or if the error code
+ *          is 0 (EINA_ERROR_NO_ERROR), then @c NULL is returned.
+ * @param[in] error The error number (either an Eina-registered error or a system `errno`).
+ *                  Example: `ENOMEM`, or a value returned by `eina_error_msg_register()`.
+ * @return The description of the error, or @c NULL on failure. The returned string is
+ *         read-only and may be stringshared.
  */
 EINA_API const char *eina_error_msg_get(Eina_Error error) EINA_PURE;
 

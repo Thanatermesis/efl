@@ -4,6 +4,23 @@
 
 #include <Efl_Ui.h>
 
+/**
+ * @file
+ * @brief This file contains tests for Efl_Ui_Item widgets.
+ */
+
+/**
+ * @brief Creates and configures a new UI item.
+ *
+ * This function creates a new UI item of the given class, sets its text,
+ * content (a colored rectangle), and an extra check widget. It also sets
+ * a minimum size based on the item class and an index.
+ *
+ * @param box The parent container widget to add the item to.
+ * @param c The Efl_Class of the item to create (e.g., EFL_UI_GRID_DEFAULT_ITEM_CLASS).
+ * @param i An integer index used for text generation and conditional sizing/coloring.
+ * @return The newly created Efl_Ui_Widget item.
+ */
 static Efl_Ui_Widget*
 _item_add(Eo *box, const Efl_Class *c, int i)
 {
@@ -47,6 +64,18 @@ _item_add(Eo *box, const Efl_Class *c, int i)
    return il;
 }
 
+/**
+ * @brief Test function for various Efl_Ui_Item types.
+ *
+ * This function creates a window and a box container, then populates the
+ * box with different types of UI items, including default grid items,
+ * default list items, list placeholder items, group items, and tab bar items.
+ * Some items are set to a disabled state.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void test_efl_ui_item(void *data EINA_UNUSED,
                       Efl_Object *obj EINA_UNUSED,
                       void *event_info EINA_UNUSED)

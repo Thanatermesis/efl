@@ -32,9 +32,32 @@
 
 #include "cpplib.h"
 
-/* Print the file names and line numbers of the #include
- * commands which led to the current file.  */
-
+/**
+ * @brief Prints the "In file included from..." chain for nested includes.
+ *
+ * This function is intended to show the chain of #include directives that leads
+ * to the current file being processed, similar to how a compiler reports the
+ * context of an error or warning. It traverses the include stack backwards.
+ *
+ * For example, an ideal output for a nested include might be:
+ * @code
+ * In file included from main.c:1,
+ *                  from header.h:5:
+ * @endcode
+ *
+ * A call to this function is typically followed by a message-printing function
+ * (like cpp_file_line_for_message()) that prints the location of a specific
+ * warning or error.
+ *
+ * To avoid redundant output, it prints the include stack only once per location,
+ * using the `pfile->input_stack_listing_current` flag as a guard. This flag
+ * should be reset when the file or line number changes.
+ *
+ * @note The current implementation does not print the filenames and line numbers
+ * in the include chain, only the "In file included" preamble and separators.
+ *
+ * @param pfile The CPP reader context, which contains the include stack.
+ */
 void
 cpp_print_containing_files(cpp_reader * pfile)
 {
@@ -76,6 +99,22 @@ cpp_print_containing_files(cpp_reader * pfile)
    pfile->input_stack_listing_current = 1;
 }
 
+/**
+ * @brief Prints the file, line, and optional column number for a message.
+ *
+ * Formats and prints a standard "filename:line:column: " or "filename:line: "
+ * prefix to stderr. This is typically used before an error or warning message to
+ * indicate its origin.
+ *
+ * For example:
+ * - `cpp_file_line_for_message(pfile, "foo.c", 10, 5)` prints `foo.c:10:5: `.
+ * - `cpp_file_line_for_message(pfile, "foo.c", 10, 0)` prints `foo.c:10: `.
+ *
+ * @param pfile The CPP reader context (currently unused).
+ * @param filename The name of the file where the message originates.
+ * @param line The line number in the file.
+ * @param column The column number in the file. If 0 or less, it's omitted.
+ */
 void
 cpp_file_line_for_message(cpp_reader * pfile EINA_UNUSED, const char *filename,
 			  int line, int column)
@@ -90,7 +129,20 @@ cpp_file_line_for_message(cpp_reader * pfile EINA_UNUSED, const char *filename,
      }
 }
 
-/* IS_ERROR is 1 for error, 0 for warning */
+/**
+ * @brief Prints a message (error or warning) to stderr, using a va_list.
+ *
+ * This is a variadic argument version for printing messages. It increments
+ * the error count in the pfile context if the message is an error. The message
+ * is always terminated by a newline character.
+ *
+ * @param pfile The CPP reader context, used to count errors.
+ * @param is_error A flag indicating the message type.
+ *                 - If non-zero, it's an error and `pfile->errors` is incremented.
+ *                 - If zero, it's a warning, and "warning: " is prepended to the message.
+ * @param msg The format string for the message (printf-style).
+ * @param args The va_list of arguments for the format string.
+ */
 void
 cpp_message_v(cpp_reader * pfile, int is_error, const char *msg, va_list args)
 {
@@ -102,6 +154,18 @@ cpp_message_v(cpp_reader * pfile, int is_error, const char *msg, va_list args)
    fprintf(stderr, "\n");
 }
 
+/**
+ * @brief Prints a message (error or warning) to stderr.
+ *
+ * This function is a wrapper around cpp_message_v() that handles a
+ * variable number of arguments directly. If it's an error, it increments
+ * the error count in the pfile context.
+ *
+ * @param pfile The CPP reader context, used to count errors.
+ * @param is_error A flag indicating the message type. See cpp_message_v() for details.
+ * @param msg The format string for the message (printf-style).
+ * @param ... Additional arguments for the format string.
+ */
 void
 cpp_message(cpp_reader * pfile, int is_error, const char *msg, ...)
 {
@@ -114,6 +178,17 @@ cpp_message(cpp_reader * pfile, int is_error, const char *msg, ...)
    va_end(args);
 }
 
+/**
+ * @brief Prints a fatal error message to stderr and exits, using a va_list.
+ *
+ * This function constructs a fatal error message and terminates the program.
+ * The program name (from the global `progname` variable) is prepended to the
+ * message. A newline is appended. The program then exits with `FATAL_EXIT_CODE`.
+ * This function does not return.
+ *
+ * @param msg The format string for the fatal error message (printf-style).
+ * @param args The va_list of arguments for the format string.
+ */
 static void
 cpp_fatal_v(const char *msg, va_list args)
 {
@@ -123,6 +198,17 @@ cpp_fatal_v(const char *msg, va_list args)
    exit(FATAL_EXIT_CODE);
 }
 
+/**
+ * @brief Prints a fatal error message to stderr and exits.
+ *
+ * This function is a wrapper around cpp_fatal_v() that handles a variable
+ * number of arguments directly. It prepends the program name to the message
+ * and terminates the program with `FATAL_EXIT_CODE`.
+ * This function does not return.
+ *
+ * @param msg The format string for the fatal error message (printf-style).
+ * @param ... Additional arguments for the format string.
+ */
 void
 cpp_fatal(const char *msg, ...)
 {
@@ -135,6 +221,21 @@ cpp_fatal(const char *msg, ...)
    va_end(args);
 }
 
+/**
+ * @brief Prints a system error message (like perror) and then exits fatally.
+ *
+ * This function is used for handling fatal errors related to system calls (e.g.,
+ * file I/O). It calls `cpp_perror_with_name()` to print a system error message
+ * (based on `errno`) associated with the given `name`. After printing the
+ * message, it terminates the program.
+ *
+ * The exit code is platform-dependent: `vaxc$errno` on VMS, `FATAL_EXIT_CODE`
+ * otherwise. This function does not return.
+ *
+ * @param pfile The CPP reader context, passed to cpp_perror_with_name().
+ * @param name A string, typically a filename or operation, that was involved
+ *             in the system call that failed. E.g., "opening file 'foo.h'".
+ */
 void
 cpp_pfatal_with_name(cpp_reader * pfile, const char *name)
 {

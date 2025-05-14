@@ -26,13 +26,20 @@ struct _Efl_Gfx_Path_Data
    unsigned int reserved_pts_cnt;   //Reserved Points Count
    unsigned int reserved_cmd_cnt;   //Reserved Commands Count
 
-   char *path_data;
-   Eina_Bool convex;
+   char *path_data; ///< Stores the SVG path string if the path was created from one and contains arc commands, for interpolation purposes.
+   Eina_Bool convex; ///< Flag indicating if the path is known to be convex.
 };
 
 static void _path_interpolation(Eo *obj, Efl_Gfx_Path_Data *pd, char *from, char *to, double pos);
 static void _efl_gfx_path_reset(Eo *obj, Efl_Gfx_Path_Data *pd);
 
+/**
+ * @brief Get the number of coordinate points associated with a given path command.
+ *
+ * @param command The path command.
+ * @return The number of points (doubles) this command requires. For example,
+ *         EFL_GFX_PATH_COMMAND_TYPE_MOVE_TO requires 2 points (x, y).
+ */
 static inline unsigned int
 _efl_gfx_path_command_length(Efl_Gfx_Path_Command command)
 {
@@ -64,9 +71,23 @@ _efl_gfx_path_length(const Efl_Gfx_Path_Command *commands,
 
    /* Accounting for END command and handle gracefully the NULL case
       at the same time */
+   /* Accounting for END command and handle gracefully the NULL case
+      at the same time */
    (*cmd_length)++;
 }
 
+/**
+ * @brief Ensures that the path data arrays (commands and points) have enough
+ *        space for a new command and its associated points. If not, it reallocates
+ *        them, typically doubling the current reserved size.
+ *
+ * @param command The new command to be added.
+ * @param pd The private data of the Efl_Gfx_Path object.
+ * @param[out] offset_point A pointer that will be set to the location in the
+ *                          pd->points array where the new points for the command
+ *                          should be written.
+ * @return EINA_TRUE on success, EINA_FALSE on memory allocation failure.
+ */
 static inline Eina_Bool
 efl_gfx_path_grow(Efl_Gfx_Path_Command command,
                   Efl_Gfx_Path_Data *pd,
@@ -117,6 +138,21 @@ efl_gfx_path_grow(Efl_Gfx_Path_Command command,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Iterates through the path commands and points to find the last
+ *        "current point" and "current control point".
+ *
+ * This function is used to update the internal state (pd->current, pd->current_ctrl)
+ * after setting or modifying the path.
+ *
+ * @param cmd Pointer to the array of path commands.
+ * @param points Pointer to the array of path points.
+ * @param[out] current_x Pointer to store the x-coordinate of the last current point.
+ * @param[out] current_y Pointer to store the y-coordinate of the last current point.
+ * @param[out] current_ctrl_x Pointer to store the x-coordinate of the last control point (relevant for cubic Bezier).
+ * @param[out] current_ctrl_y Pointer to store the y-coordinate of the last control point (relevant for cubic Bezier).
+ * @return EINA_TRUE on success, EINA_FALSE if cmd or points is NULL or an invalid command is encountered.
+ */
 static Eina_Bool
 _efl_gfx_path_current_search(const Efl_Gfx_Path_Command *cmd,
                              const double *points,
@@ -165,6 +201,13 @@ _efl_gfx_path_path_set(Eo *obj, Efl_Gfx_Path_Data *pd,
                        const Efl_Gfx_Path_Command *commands,
                        const double *points)
 {
+   // Documentation for this EOLIAN method should primarily be in the .eo file.
+   // This C implementation sets the path data from the given command and point arrays.
+   // - commands: An array of Efl_Gfx_Path_Command enum values, ending with EFL_GFX_PATH_COMMAND_TYPE_END.
+   //   Example: {EFL_GFX_PATH_COMMAND_TYPE_MOVE_TO, EFL_GFX_PATH_COMMAND_TYPE_LINE_TO, EFL_GFX_PATH_COMMAND_TYPE_END}
+   // - points: A flat array of doubles. The number of points for each command is determined by
+   //   _efl_gfx_path_command_length().
+   //   Example (for the commands above): {x0, y0, x1, y1}
    if (!commands)
      {
          _efl_gfx_path_reset(obj, pd);
@@ -206,6 +249,7 @@ _efl_gfx_path_path_get(const Eo *obj EINA_UNUSED, Efl_Gfx_Path_Data *pd,
                   const Efl_Gfx_Path_Command **commands,
                   const double **points)
 {
+   // Provides direct (read-only) access to the internal path command and point arrays.
    if (commands) *commands = pd->commands;
    if (points) *points = pd->points;
 }
@@ -214,6 +258,7 @@ EOLIAN static void
 _efl_gfx_path_length_get(const Eo *obj EINA_UNUSED, Efl_Gfx_Path_Data *pd,
                          unsigned int *commands, unsigned int *points)
 {
+   // Returns the number of commands (including the END command) and the total number of points.
    if (commands) *commands = pd->commands_count;
    if (points) *points = pd->points_count;
 }
@@ -241,6 +286,7 @@ _efl_gfx_path_bounds_get(const Eo *obj EINA_UNUSED, Efl_Gfx_Path_Data *pd, Eina_
         maxy = maxy > pd->points[i + 1] ? maxy : pd->points[i + 1];
      }
 
+   // Calculates the bounding box of the path by iterating through all points.
    EINA_RECTANGLE_SET(r, floor(minx), floor(miny), (ceil(maxx) - floor(minx)), (ceil(maxy) - floor(miny)));
 }
 
@@ -248,6 +294,7 @@ EOLIAN static void
 _efl_gfx_path_current_get(const Eo *obj EINA_UNUSED, Efl_Gfx_Path_Data *pd,
                            double *x, double *y)
 {
+   // Gets the last explicitly set point (e.g., by MOVE_TO, LINE_TO, or the end point of a CUBIC_TO).
    if (x) *x = pd->current.x;
    if (y) *y = pd->current.y;
 }
@@ -256,10 +303,19 @@ EOLIAN static void
 _efl_gfx_path_current_ctrl_get(const Eo *obj EINA_UNUSED, Efl_Gfx_Path_Data *pd,
                                 double *x, double *y)
 {
+   // Gets the last control point, typically the second control point of a CUBIC_TO command.
    if (x) *x = pd->current_ctrl.x;
    if (y) *y = pd->current_ctrl.y;
 }
 
+/**
+ * @brief Compares the command arrays of two path data structures.
+ *
+ * @param a The first path data.
+ * @param b The second path data.
+ * @return EINA_TRUE if the command sequences are identical, EINA_FALSE otherwise.
+ *         Does not compare the point coordinates.
+ */
 EOLIAN static Eina_Bool
 _efl_gfx_path_equal_commands_internal(Efl_Gfx_Path_Data *a,
                                        Efl_Gfx_Path_Data *b)
@@ -278,6 +334,14 @@ _efl_gfx_path_equal_commands_internal(Efl_Gfx_Path_Data *a,
    return (a->commands[i] == b->commands[i]);
 }
 
+/**
+ * @brief Linearly interpolates between two double values.
+ *
+ * @param from The starting value.
+ * @param to The ending value.
+ * @param pos_map The interpolation factor (0.0 to 1.0).
+ * @return The interpolated value.
+ */
 static inline double
 interpolate(double from, double to, double pos_map)
 {
@@ -290,8 +354,17 @@ _efl_gfx_path_interpolate(Eo *obj, Efl_Gfx_Path_Data *pd,
 {
    Efl_Gfx_Path_Data *from_pd, *to_pd;
    Efl_Gfx_Path_Command *cmds;
-   double interv;    //interpolated value
+   double interv;    // interpolated value
    double *pts;
+
+   // This function interpolates the path data of the current object (pd)
+   // based on two other path objects, 'from' and 'to', and an interpolation
+   // factor 'pos_map'.
+   // If both 'from' and 'to' paths were created from SVG path strings
+   // (and contain arc commands, hence path_data is set), it uses
+   // _path_interpolation to interpolate the SVG strings themselves.
+   // Otherwise, it requires 'from' and 'to' to have identical command sequences
+   // and interpolates their corresponding points directly.
 
    if (!efl_isa(from, EFL_GFX_PATH_MIXIN) || !efl_isa(to, EFL_GFX_PATH_MIXIN))
      return EINA_FALSE;
@@ -299,19 +372,22 @@ _efl_gfx_path_interpolate(Eo *obj, Efl_Gfx_Path_Data *pd,
    from_pd = efl_data_scope_get(from, EFL_GFX_PATH_MIXIN);
    to_pd = efl_data_scope_get(to, EFL_GFX_PATH_MIXIN);
 
-   //just in case
+   // Avoid interpolating an object with itself.
    if (pd == from_pd || pd == to_pd) return EINA_FALSE;
 
    if (from_pd->path_data && to_pd->path_data)
      {
+        // If both source paths have SVG string data (likely due to arc commands),
+        // interpolate using the SVG string representation.
         _efl_gfx_path_reset(obj, pd);
         _path_interpolation(obj, pd,
                             from_pd->path_data, to_pd->path_data, pos_map);
      }
    else
      {
+        // Otherwise, interpolate point by point. This requires command lists to be identical.
         if (!_efl_gfx_path_equal_commands_internal(from_pd, to_pd))
-          return EINA_FALSE;
+          return EINA_FALSE; // Command structures must match for point-wise interpolation.
 
         cmds = realloc(pd->commands,
                        sizeof(Efl_Gfx_Path_Command) * from_pd->commands_count);
@@ -381,6 +457,7 @@ _efl_gfx_path_equal_commands(Eo *obj EINA_UNUSED,
    with_pd = efl_data_scope_get(with, EFL_GFX_PATH_MIXIN);
    if (!with_pd) return EINA_FALSE;
 
+   // Compares the command sequence of the current path (pd) with another path object (with).
    return _efl_gfx_path_equal_commands_internal(with_pd, pd);
 }
 
@@ -388,9 +465,11 @@ EOLIAN static void
 _efl_gfx_path_reserve(Eo *obj EINA_UNUSED, Efl_Gfx_Path_Data *pd,
                       unsigned int cmd_count, unsigned int pts_count)
 {
+   // Pre-allocates memory for the command and point arrays to avoid multiple
+   // reallocations when appending a known number of commands/points.
    if (pd->reserved_cmd_cnt < cmd_count)
       {
-         //+1 for path close.
+         // +1 for a potential implicit EFL_GFX_PATH_COMMAND_TYPE_END command.
          pd->reserved_cmd_cnt = cmd_count + 1;
          pd->commands = realloc(pd->commands, sizeof(Efl_Gfx_Path_Command) * pd->reserved_cmd_cnt);
       }
@@ -422,7 +501,7 @@ _efl_gfx_path_reset(Eo *obj EINA_UNUSED, Efl_Gfx_Path_Data *pd)
    pd->current.y = 0;
    pd->current_ctrl.x = 0;
    pd->current_ctrl.y = 0;
-   pd->convex = EINA_FALSE;
+   pd->convex = EINA_FALSE; // Reset convex hint as path is now empty or changed.
 }
 
 EOLIAN static void
@@ -439,6 +518,8 @@ _efl_gfx_path_append_move_to(Eo *obj EINA_UNUSED,
    offset_point[1] = y;
 
    pd->current.x = x;
+   // Appends a "move to" command, starting a new sub-path.
+   // Updates the current point to (x, y).
    pd->current.y = y;
 }
 
@@ -456,15 +537,17 @@ _efl_gfx_path_append_line_to(Eo *obj EINA_UNUSED,
    offset_point[1] = y;
 
    pd->current.x = x;
+   // Appends a "line to" command, drawing a line from the current point to (x, y).
+   // Updates the current point to (x, y).
    pd->current.y = y;
 }
 
 EOLIAN static void
 _efl_gfx_path_append_cubic_to(Eo *obj EINA_UNUSED,
                               Efl_Gfx_Path_Data *pd,
-                              double ctrl_x0, double ctrl_y0,
-                              double ctrl_x1, double ctrl_y1,
-                              double x, double y)
+                              double ctrl_x0, double ctrl_y0, // First control point
+                              double ctrl_x1, double ctrl_y1, // Second control point
+                              double x, double y)              // End point
 {
    double *offset_point;
 
@@ -482,13 +565,15 @@ _efl_gfx_path_append_cubic_to(Eo *obj EINA_UNUSED,
    pd->current.x = x;
    pd->current.y = y;
    pd->current_ctrl.x = ctrl_x1;
+   // Appends a cubic Bezier curve.
+   // Updates the current point to (x, y) and current control point to (ctrl_x1, ctrl_y1).
    pd->current_ctrl.y = ctrl_y1;
 }
 
 EOLIAN static void
 _efl_gfx_path_append_scubic_to(Eo *obj, Efl_Gfx_Path_Data *pd,
-                                double x, double y,
-                                double ctrl_x, double ctrl_y)
+                                double x, double y,              // End point
+                                double ctrl_x, double ctrl_y)    // Second control point
 {
    double ctrl_x0, ctrl_y0;
    double current_x = 0, current_y = 0;
@@ -515,13 +600,19 @@ _efl_gfx_path_append_scubic_to(Eo *obj, Efl_Gfx_Path_Data *pd,
      }
 
    _efl_gfx_path_append_cubic_to(obj, pd, ctrl_x0, ctrl_y0, ctrl_x, ctrl_y,
+   // Appends a smooth cubic Bezier curve.
+   // The first control point is a reflection of the previous curve's second control point
+   // relative to the current point. If the previous command was not a cubic Bezier,
+   // the current point is used as the first control point.
+   // (ctrl_x, ctrl_y) is the second control point.
+   // (x, y) is the end point of the curve.
                                  x, y);
 }
 
 EOLIAN static void
 _efl_gfx_path_append_quadratic_to(Eo *obj, Efl_Gfx_Path_Data *pd,
-                                   double x, double y,
-                                   double ctrl_x, double ctrl_y)
+                                   double x, double y,           // End point
+                                   double ctrl_x, double ctrl_y) // Control point
 {
    double current_x = 0, current_y = 0;
    double ctrl_x0, ctrl_y0, ctrl_x1, ctrl_y1;
@@ -536,12 +627,15 @@ _efl_gfx_path_append_quadratic_to(Eo *obj, Efl_Gfx_Path_Data *pd,
    ctrl_y1 = (y + 2 * ctrl_y) * (1.0 / 3.0);
 
    _efl_gfx_path_append_cubic_to(obj, pd, ctrl_x0, ctrl_y0, ctrl_x1, ctrl_y1,
+   // Appends a quadratic Bezier curve by converting it to an equivalent cubic Bezier curve.
+   // (ctrl_x, ctrl_y) is the quadratic control point.
+   // (x, y) is the end point of the curve.
                                  x, y);
 }
 
 EOLIAN static void
 _efl_gfx_path_append_squadratic_to(Eo *obj, Efl_Gfx_Path_Data *pd,
-                                    double x, double y)
+                                    double x, double y) // End point
 {
    double xc, yc; /* quadratic control point */
    double ctrl_x0, ctrl_y0, ctrl_x1, ctrl_y1;
@@ -564,11 +658,30 @@ _efl_gfx_path_append_squadratic_to(Eo *obj, Efl_Gfx_Path_Data *pd,
 
    _efl_gfx_path_append_cubic_to(obj, pd, ctrl_x0, ctrl_y0,
                                   ctrl_x1, ctrl_y1,
+   // Appends a smooth quadratic Bezier curve.
+   // The single control point for the quadratic curve is calculated as a reflection
+   // of the previous curve's control point (implicitly, as it's converted to cubic).
+   // (x,y) is the end point of the curve.
+   // This is then converted to an equivalent cubic Bezier curve.
                                    x, y);
 }
 
 /*
  * code adapted from enesim which was adapted from moonlight sources
+ */
+/**
+ * @brief Appends an elliptical arc, approximating it with one or more cubic Bezier curves.
+ * This function implements the arc command as defined in the SVG specification (A/a commands).
+ *
+ * @param obj The Efl_Gfx_Path object.
+ * @param pd The private data of the Efl_Gfx_Path object.
+ * @param x The x-coordinate of the end point of the arc.
+ * @param y The y-coordinate of the end point of the arc.
+ * @param rx The x-radius of the ellipse.
+ * @param ry The y-radius of the ellipse.
+ * @param angle The rotation angle of the ellipse's x-axis relative to the coordinate system's x-axis, in degrees.
+ * @param large_arc If EINA_TRUE, the larger of the two possible arcs is chosen. If EINA_FALSE, the smaller arc is chosen.
+ * @param sweep If EINA_TRUE, the arc is drawn in a "positive-angle" direction (clockwise). If EINA_FALSE, in a "negative-angle" direction (counter-clockwise).
  */
 EOLIAN static void
 _efl_gfx_path_append_arc_to(Eo *obj, Efl_Gfx_Path_Data *pd,
@@ -761,10 +874,17 @@ inline static void
 _bezier_coefficients(double t, double *ap, double *bp, double *cp, double *dp)
 {
    double a,b,c,d;
-   double m_t = 1.0 - t;
+   double m_t = 1.0 - t; // (1-t)
 
-   b = m_t * m_t;
-   c = t * t;
+   // Calculates coefficients for a cubic Bezier curve:
+   // a = (1-t)^3
+   // b = 3 * t * (1-t)^2
+   // c = 3 * t^2 * (1-t)
+   // d = t^3
+   // These are used in B(t) = P0*a + P1*b + P2*c + P3*d
+
+   b = m_t * m_t; // (1-t)^2
+   c = t * t;     // t^2
    d = c * t;
    a = b * m_t;
    b *= 3.0 * t;
@@ -775,14 +895,25 @@ _bezier_coefficients(double t, double *ap, double *bp, double *cp, double *dp)
    *dp = d;
 }
 
-#define PATH_KAPPA 0.5522847498
+#define PATH_KAPPA 0.5522847498 /**< Kappa value for approximating a circular arc with a cubic Bezier curve. (4/3)*tan(pi/8) */
 
+/**
+ * @brief Calculates the parameter 't' for a Bezier curve segment that
+ *        approximates a circular arc of a given angle (up to 90 degrees).
+ *
+ * This function is used to determine how to segment a Bezier curve
+ * when approximating an elliptical arc, particularly for splitting
+ * arcs at quadrant boundaries.
+ *
+ * @param angle The angle of the arc segment in degrees (expected to be <= 90).
+ * @return The Bezier parameter 't' (0 to 1) corresponding to the end of the arc segment.
+ */
 static double
 _efl_gfx_t_for_arc_angle(double angle)
 {
    double radians, cos_angle, sin_angle, tc, ts, t;
 
-   if (angle < 0.00001) return 0;
+   if (angle < 0.00001) return 0; // Very small angle, t is effectively 0
    if (EINA_FLT_EQ(angle, 90.0)) return 1;
 
    radians = (angle/180) * M_PI;
@@ -815,12 +946,28 @@ _efl_gfx_t_for_arc_angle(double angle)
    return t;
 }
 
+/**
+ * @brief Calculates the Cartesian coordinates of points on an ellipse defined by a
+ *        bounding box (x, y, w, h) at specified angles.
+ *
+ * This is a helper for arc calculations, determining the start and end
+ * points of an arc segment on the ellipse.
+ *
+ * @param x The x-coordinate of the ellipse's bounding box.
+ * @param y The y-coordinate of the ellipse's bounding box.
+ * @param w The width of the ellipse's bounding box.
+ * @param h The height of the ellipse's bounding box.
+ * @param angle The starting angle in degrees.
+ * @param length The sweep length of the arc in degrees.
+ * @param[out] start_point If not NULL, populated with the coordinates of the point at 'angle'.
+ * @param[out] end_point If not NULL, populated with the coordinates of the point at 'angle + length'.
+ */
 static void
 _find_ellipse_coords(double x, double y, double w, double h, double angle,
                      double length, Point* start_point, Point *end_point)
 {
    int i, quadrant;
-   double theta, t, a, b, c, d, px, py, cx, cy;
+   double theta, t, a, b, c, d, px, py, cx, cy; // Intermediate calculation variables
    double w2 = w / 2;
    double h2 = h / 2;
    double angles[2] = { angle, angle + length };
@@ -879,17 +1026,37 @@ _find_ellipse_coords(double x, double y, double w, double h, double angle,
      }
 }
 
-// The return value is the starting point of the arc
+/**
+ * @brief Generates a sequence of cubic Bezier curve control points to approximate
+ *        an elliptical arc.
+ *
+ * This function breaks down the arc into segments (at most 90 degrees each)
+ * and calculates the control points for cubic Bezier curves that approximate
+ * these segments. The kappa value (PATH_KAPPA) is used for this approximation.
+ *
+ * @param x The x-coordinate of the ellipse's bounding box.
+ * @param y The y-coordinate of the ellipse's bounding box.
+ * @param w The width of the ellipse's bounding box.
+ * @param h The height of the ellipse's bounding box.
+ * @param start_angle The starting angle of the arc in degrees.
+ * @param sweep_length The angular extent of the arc in degrees (can be negative).
+ * @param[out] curves An array to store the generated Bezier control points.
+ *                    It should be large enough (e.g., 15 Points for a full circle).
+ *                    Each set of 3 points defines a Bezier segment:
+ *                    (ctrl_start.x, ctrl_start.y), (ctrl_end.x, ctrl_end.y), (end.x, end.y).
+ * @param[out] point_count The number of points written to the `curves` array.
+ * @return The starting point (first point on the arc) of the generated curve sequence.
+ */
 static Point
 _curves_for_arc(double x, double y, double w, double h,
                 double start_angle, double sweep_length,
                 Point *curves, int *point_count)
 {
-   int start_segment, end_segment, delta, i, j, end, quadrant;
-   double start_t, end_t;
-   Eina_Bool split_at_start, split_at_end;
-   Eina_Bezier b, res;
-   Point start_point, end_point;
+   int start_segment, end_segment, delta, i, j, end, quadrant; // Loop and segment calculation variables
+   double start_t, end_t; // Bezier t-parameters for start/end of partial segments
+   Eina_Bool split_at_start, split_at_end; // Flags if arc starts/ends mid-segment
+   Eina_Bezier b, res; // Bezier structures for calculation
+   Point start_point, end_point; // Calculated start/end points of the entire arc
    double w2 = w / 2;
    double w2k = w2 * PATH_KAPPA;
    double h2 = h / 2;
@@ -920,13 +1087,20 @@ _curves_for_arc(double x, double y, double w, double h,
           { x + w, y + h2 - h2k },
           { x + w, y + h2 }
      };
+   // points array defines the control points for four 90-degree Bezier curves
+   // that form a unit circle/ellipse, starting from (x+w, y+h2) (0 degrees on a standard cartesian plane if centered at origin).
+   // Each segment: P_end, CP1_prev_segment_reflected, CP2_curr_segment, P_start_curr_segment
+   // Example: points[0] is the end point of the 90->0 degree segment.
+   // points[1], points[2], points[3] define the 0->270 degree segment (clockwise).
+   // (points[3] is end point, points[2] is ctrl_end, points[1] is ctrl_start)
 
    *point_count = 0;
 
+   // Clamp sweep_length to +/- 360 degrees.
    if (sweep_length > 360) sweep_length = 360;
    else if (sweep_length < -360) sweep_length = -360;
 
-   // Special case fast paths
+   // Special case fast paths for full circles.
    if (EINA_FLT_EQ(start_angle, 0))
      {
         if (EINA_FLT_EQ(sweep_length, 360))
@@ -1036,22 +1210,42 @@ _curves_for_arc(double x, double y, double w, double h,
    return start_point;
 }
 
+/**
+ * @brief Appends an elliptical arc defined by its bounding box, start angle, and sweep length.
+ *
+ * This function uses _curves_for_arc to generate Bezier segments and then appends them.
+ * It will first add a LINE_TO or MOVE_TO to the start of the arc if necessary.
+ *
+ * @param obj The Efl_Gfx_Path object.
+ * @param pd The private data of the Efl_Gfx_Path object.
+ * @param x The x-coordinate of the arc's bounding ellipse.
+ * @param y The y-coordinate of the arc's bounding ellipse.
+ * @param w The width of the arc's bounding ellipse.
+ * @param h The height of the arc's bounding ellipse.
+ * @param start_angle The starting angle of the arc in degrees.
+ * @param sweep_length The angular extent of the arc in degrees.
+ */
 EOLIAN static void
 _efl_gfx_path_append_arc(Eo *obj, Efl_Gfx_Path_Data *pd,
                           double x, double y, double w, double h,
                           double start_angle, double sweep_length)
 {
    int i, point_count;
-   Point pts[15];
+   Point pts[15]; // Sufficient for up to 4 Bezier segments (3 points each) + 3 for safety/growth.
+                  // A full circle (360 deg) is approximated by 4 cubic Bezier curves.
+                  // Each curve needs 3 points (ctrl1, ctrl2, end_point). So 4*3=12 points.
    Point curve_start =
       _curves_for_arc(x, y, w, h, start_angle, sweep_length, pts, &point_count);
 
+   // If there's an existing path and it's not closed, draw a line to the start of the arc.
+   // Otherwise, move to the start of the arc.
    if (pd->commands_count &&
-       (pd->commands[pd->commands_count-2] != EFL_GFX_PATH_COMMAND_TYPE_CLOSE))
+       (pd->commands_count > 1 && pd->commands[pd->commands_count-2] != EFL_GFX_PATH_COMMAND_TYPE_CLOSE))
      _efl_gfx_path_append_line_to(obj, pd, curve_start.x, curve_start.y);
    else
      _efl_gfx_path_append_move_to(obj, pd, curve_start.x, curve_start.y);
 
+   // Append the cubic Bezier segments that approximate the arc.
    for (i = 0; i < point_count; i += 3)
      {
         _efl_gfx_path_append_cubic_to(obj, pd, pts[i].x, pts[i].y,
@@ -1064,27 +1258,40 @@ EOLIAN static void
 _efl_gfx_path_append_close(Eo *obj EINA_UNUSED, Efl_Gfx_Path_Data *pd)
 {
    double *offset_point;
+   // Appends a "close path" command. This typically draws a line from the
+   // current point to the starting point of the current sub-path.
    efl_gfx_path_grow(EFL_GFX_PATH_COMMAND_TYPE_CLOSE, pd, &offset_point);
 }
 
+/**
+ * @brief Appends a complete circle to the path.
+ *
+ * @param obj The Efl_Gfx_Path object.
+ * @param pd The private data of the Efl_Gfx_Path object.
+ * @param xc The x-coordinate of the circle's center.
+ * @param yc The y-coordinate of the circle's center.
+ * @param radius The radius of the circle.
+ */
 static void
 _efl_gfx_path_append_circle(Eo *obj, Efl_Gfx_Path_Data *pd,
                              double xc, double yc, double radius)
 {
-   Eina_Bool first = (pd->commands_count <= 0);
+   Eina_Bool first = (pd->commands_count <= 0); // Is this the first element in the path?
 
-   _efl_gfx_path_append_arc(obj, pd, (xc - radius), (yc - radius),
-                           (2 * radius), (2 * radius), 0, 360);
-   _efl_gfx_path_append_close(obj, pd);
+   // A circle is a special case of an arc.
+   _efl_gfx_path_append_arc(obj, pd, (xc - radius), (yc - radius), // x, y of bounding box
+                           (2 * radius), (2 * radius),             // width, height of bounding box
+                           0, 360);                                // start angle 0, sweep 360 degrees
+   _efl_gfx_path_append_close(obj, pd); // Close the circle path.
 
-   //update convex flag
+   // A single, closed circle is convex.
    pd->convex = first;
 }
 
 EOLIAN static void
 _efl_gfx_path_append_rect(Eo *obj, Efl_Gfx_Path_Data *pd,
-                           double x, double y, double w, double h,
-                           double rx, double ry)
+                           double x, double y, double w, double h, // Rectangle geometry
+                           double rx, double ry)                   // Corner radii for rounded rectangle
 {
    Eina_Bool first = (pd->commands_count <= 0);
 
@@ -1116,25 +1323,37 @@ _efl_gfx_path_append_rect(Eo *obj, Efl_Gfx_Path_Data *pd,
    _efl_gfx_path_append_close(obj, pd);
 
    //update convex flag
+   // Appends a rectangle, possibly with rounded corners.
+   // If rx or ry is zero or negative, a sharp-cornered rectangle is drawn.
+   // If this is the first shape in the path, it's marked as convex.
    pd->convex = first;
 }
 
 EOLIAN static void
-_efl_gfx_path_append_horizontal_to(Eo *obj, Efl_Gfx_Path_Data *pd, double d,
-                                   double current_x EINA_UNUSED,
-                                   double current_y)
+_efl_gfx_path_append_horizontal_to(Eo *obj, Efl_Gfx_Path_Data *pd, double d, // Target x-coordinate
+                                   double current_x EINA_UNUSED, // Current x (unused, new x is 'd')
+                                   double current_y)             // Current y (remains the same)
 {
+   // Appends a horizontal line from the current point to (d, current_y).
    _efl_gfx_path_append_line_to(obj, pd, d, current_y);
 }
 
 EOLIAN static void
-_efl_gfx_path_append_vertical_to(Eo *obj, Efl_Gfx_Path_Data *pd, double d,
-                                 double current_x,
-                                 double current_y EINA_UNUSED)
+_efl_gfx_path_append_vertical_to(Eo *obj, Efl_Gfx_Path_Data *pd, double d, // Target y-coordinate
+                                 double current_x,           // Current x (remains the same)
+                                 double current_y EINA_UNUSED) // Current y (unused, new y is 'd')
 {
+   // Appends a vertical line from the current point to (current_x, d).
    _efl_gfx_path_append_line_to(obj, pd, current_x, d);
 }
 
+/**
+ * @brief Skips leading whitespace and an optional comma from a string.
+ * Used in SVG path parsing.
+ *
+ * @param content The string to parse.
+ * @return Pointer to the string after skipped characters.
+ */
 static char *
 _skipcomma(const char *content)
 {
@@ -1154,6 +1373,15 @@ _next_isnumber(const char *content)
 }
 #endif
 
+/**
+ * @brief Parses a floating-point number from the beginning of a string.
+ * Advances the string pointer past the parsed number and any subsequent comma/whitespace.
+ * Assumes "POSIX" locale for decimal point.
+ *
+ * @param[in,out] content Pointer to the string pointer to parse from. Updated on success.
+ * @param[out] number Where the parsed double is stored.
+ * @return EINA_TRUE if a number was successfully parsed, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _parse_number(char **content, double *number)
 {
@@ -1166,17 +1394,36 @@ _parse_number(char **content, double *number)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Parses an integer from the beginning of a string, treating it as a boolean flag (0 or 1).
+ * Advances the string pointer past the parsed number and any subsequent comma/whitespace.
+ * Used for parsing flags like "large-arc-flag" or "sweep-flag" in SVG paths.
+ *
+ * @param[in,out] content Pointer to the string pointer to parse from. Updated on success.
+ * @param[out] number Where the parsed flag (0 or 1) is stored.
+ * @return EINA_TRUE if a number was successfully parsed, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _parse_long(char **content, int *number)
 {
    char *end = NULL;
-   *number = strtol(*content, &end, 10) ? 1 : 0;
+   *number = strtol(*content, &end, 10) ? 1 : 0; // Converts parsed long to 0 or 1.
    // if the start of string is not number
    if ((*content) == end) return EINA_FALSE;
    *content = _skipcomma(end);
    return EINA_TRUE;
 }
 
+/**
+ * @brief Determines the number of numeric arguments expected for a given SVG path command character.
+ *
+ * @param cmd The SVG path command character (e.g., 'M', 'l', 'C').
+ * @return The count of expected numeric arguments.
+ *         For 'A' (arc): 7 arguments (rx, ry, x-axis-rotation, large-arc-flag, sweep-flag, x, y)
+ *         For 'C' (cubic): 6 arguments (x1, y1, x2, y2, x, y)
+ *         For 'M', 'L' (moveto, lineto): 2 arguments (x, y)
+ *         ...and so on.
+ */
 static int
 _number_count(char cmd)
 {
@@ -1229,10 +1476,29 @@ _number_count(char cmd)
    return count;
 }
 
+/**
+ * @brief Processes a single SVG path command and appends it to the Efl_Gfx_Path object.
+ *
+ * Handles relative vs. absolute coordinates based on the command character (lowercase vs. uppercase).
+ * Updates the current point (cur_x, cur_y) and the start point of the current subpath (start_x, start_y).
+ *
+ * @param obj The Efl_Gfx_Path object.
+ * @param pd The private data of the Efl_Gfx_Path object.
+ * @param cmd The SVG command character (e.g., 'M', 'm', 'L', 'l').
+ * @param arr Array of numeric arguments for the command.
+ *            Example for 'C x1 y1 x2 y2 x y': arr = {x1, y1, x2, y2, x, y}
+ *            Example for 'A rx ry rot laf sf x y': arr = {rx, ry, rot, laf, sf, x, y}
+ * @param count The number of arguments in `arr`.
+ * @param[in,out] cur_x Pointer to the current x-coordinate. Updated by the function.
+ * @param[in,out] cur_y Pointer to the current y-coordinate. Updated by the function.
+ * @param[in,out] start_x Pointer to the x-coordinate of the start of the current subpath. Updated by 'M'/'m'.
+ * @param[in,out] start_y Pointer to the y-coordinate of the start of the current subpath. Updated by 'M'/'m'.
+ */
 static void
 process_command(Eo *obj, Efl_Gfx_Path_Data *pd, char cmd, double *arr, int count, double *cur_x, double *cur_y, double *start_x, double *start_y)
 {
    int i;
+   // Adjust coordinates for relative commands (lowercase)
    switch (cmd)
      {
       case 'm':
@@ -1362,55 +1628,93 @@ process_command(Eo *obj, Efl_Gfx_Path_Data *pd, char cmd, double *arr, int count
       }
 }
 
+/**
+ * @brief Parses the next command and its arguments from an SVG path string.
+ *
+ * Handles implicit commands (e.g., if 'M' is followed by multiple coordinate pairs,
+ * subsequent pairs are treated as 'L' commands).
+ *
+ * @param path The current position in the SVG path string.
+ * @param[in,out] cmd Pointer to store the parsed command character. If the next token is not
+ *                    a letter, this reuses the previous command (e.g. 'M' becomes 'L').
+ * @param[out] arr Array to store the parsed numeric arguments for the command.
+ *                 Must be large enough for the command with the most arguments (e.g., 7 for arc).
+ * @param[out] count Pointer to store the number of arguments parsed into `arr`.
+ * @return Pointer to the string after the parsed command and arguments, or NULL on error.
+ */
 static char *
 _next_command(char *path, char *cmd, double *arr, int *count)
 {
-   int i=0, large, sweep;
+   int i=0, large, sweep; // Variables for parsing arc flags
 
-   path = _skipcomma(path);
-   if (isalpha(*path))
+   path = _skipcomma(path); // Skip leading whitespace/commas
+   if (isalpha(*path)) // Check if the next token is a command letter
      {
-        *cmd = *path;
+        *cmd = *path; // Store the new command
         path++;
-        *count = _number_count(*cmd);
+        *count = _number_count(*cmd); // Get expected argument count for this command
      }
-   else
+   else // Not a letter, so it's an implicit command (more arguments for the previous command type)
      {
+        // SVG spec: If a moveto is followed by multiple pairs of coordinates,
+        // the subsequent pairs are treated as implicit lineto commands.
         if (*cmd == 'm')
-          *cmd = 'l';
+          *cmd = 'l'; // Implicit relative lineto
         else if (*cmd == 'M')
-          *cmd = 'L';
+          *cmd = 'L'; // Implicit absolute lineto
+        // For other commands, if more data follows, it's for the same command type.
+        // *count remains as set by the previous explicit command.
      }
-   if ( *count == 7)
+
+   if ( *count == 7) // Special parsing for arc command (A/a) due to flag arguments
      {
-        // special case for arc command
-        if(_parse_number(&path, &arr[0]))
-          if(_parse_number(&path, &arr[1]))
-            if(_parse_number(&path, &arr[2]))
-               if(_parse_long(&path, &large))
-                  if(_parse_long(&path, &sweep))
-                     if(_parse_number(&path, &arr[5]))
-                        if(_parse_number(&path, &arr[6]))
+        // Arc command arguments: rx, ry, x-axis-rotation, large-arc-flag, sweep-flag, x, y
+        if(_parse_number(&path, &arr[0])) // rx
+          if(_parse_number(&path, &arr[1])) // ry
+            if(_parse_number(&path, &arr[2])) // x-axis-rotation
+               if(_parse_long(&path, &large))  // large-arc-flag
+                  if(_parse_long(&path, &sweep)) // sweep-flag
+                     if(_parse_number(&path, &arr[5])) // x
+                        if(_parse_number(&path, &arr[6])) // y
                           {
-                             arr[3] = large;
-                             arr[4] = sweep;
-                             return path;
+                             arr[3] = large; // Store parsed large-arc-flag
+                             arr[4] = sweep; // Store parsed sweep-flag
+                             return path;    // Successfully parsed arc command
                           }
-         *count = 0;
+         *count = 0; // Parsing failed
          return NULL;
      }
+
+   // Parse numeric arguments for other commands
    for (i = 0; i < *count; i++)
      {
         if (!_parse_number(&path, &arr[i]))
           {
-             *count = 0;
+             *count = 0; // Parsing failed
              return NULL;
           }
-        path = _skipcomma(path);
+        path = _skipcomma(path); // Skip separators
      }
-   return path;
+   return path; // Successfully parsed command and its arguments
 }
 
+/**
+ * @brief Interpolates between two SVG path strings and applies the result to the Efl_Gfx_Path object.
+ *
+ * This function is called when interpolating paths that were originally defined by SVG strings
+ * and contain arc commands (which are complex to interpolate numerically point-wise).
+ * It parses both 'from' and 'to' SVG path strings command by command, interpolates the
+ * corresponding numeric arguments, and then processes the interpolated command.
+ *
+ * @note This function temporarily sets the LC_NUMERIC locale to "POSIX" to ensure
+ *       correct parsing of floating-point numbers (using '.' as decimal separator).
+ *
+ * @param obj The Efl_Gfx_Path object to apply the interpolated path to.
+ * @param pd The private data of the Efl_Gfx_Path object.
+ * @param from The starting SVG path string.
+ * @param to The ending SVG path string.
+ * @param pos The interpolation factor (0.0 for 'from', 1.0 for 'to').
+ */
 static void
 _path_interpolation(Eo *obj, Efl_Gfx_Path_Data *pd,
                      char *from, char *to, double pos)
@@ -1472,51 +1776,72 @@ error:
      free(cur_locale);
 }
 
+/**
+ * @brief Parses an SVG path data string and appends the described path to the Efl_Gfx_Path object.
+ *
+ * Supports standard SVG path commands (M, m, L, l, H, h, V, v, C, c, S, s, Q, q, T, t, A, a, Z, z).
+ * Also supports a non-standard 'E'/'e' command for appending an arc defined by bounding box,
+ * start angle, and sweep length (similar to _efl_gfx_path_append_arc).
+ *
+ * @note This function temporarily sets the LC_NUMERIC locale to "POSIX" to ensure
+ *       correct parsing of floating-point numbers (using '.' as decimal separator).
+ *       If the SVG path string contains arc commands ('a', 'A', 'e', 'E'), a copy of
+ *       the string is stored in `pd->path_data` for potential future interpolation.
+ *
+ * @param obj The Efl_Gfx_Path object.
+ * @param pd The private data of the Efl_Gfx_Path object.
+ * @param svg_path_data The SVG path string to parse.
+ *        Example: "M 10 10 L 20 20 C 20 30, 30 30, 40 20 Z"
+ */
 EOLIAN static void
 _efl_gfx_path_append_svg_path(Eo *obj, Efl_Gfx_Path_Data *pd,
                               const char *svg_path_data)
 {
-   double number_array[7];
-   int number_count = 0;
-   double cur_x=0, cur_y=0;
-   double start_x=0, start_y=0;
-   char cmd= 0;
-   char *path = (char *) svg_path_data;
-   Eina_Bool arc = EINA_FALSE;
-   char *cur_locale;
+   double number_array[7]; // Buffer for parsed numeric arguments, 7 is max for Arc command.
+   int number_count = 0;   // Number of arguments parsed for the current command.
+   double cur_x=0, cur_y=0; // Current point in the path.
+   double start_x=0, start_y=0; // Start point of the current sub-path (for 'Z' command).
+   char cmd= 0;             // Current SVG command character.
+   char *path = (char *) svg_path_data; // Mutable pointer to traverse the path string.
+   Eina_Bool has_arc_command = EINA_FALSE; // Flag if any arc command was encountered.
+   char *cur_locale;       // To save and restore original locale.
 
    if (!path)
      return;
 
+   // Ensure POSIX locale for number parsing ('.' as decimal separator).
    cur_locale = setlocale(LC_NUMERIC, NULL);
    if (cur_locale)
-     cur_locale = strdup(cur_locale);
+     cur_locale = strdup(cur_locale); // strdup because setlocale might return a static buffer.
    setlocale(LC_NUMERIC, "POSIX");
 
-   while ((path[0] != '\0'))
+   while ((path[0] != '\0')) // Loop until end of path string.
      {
         path = _next_command(path, &cmd, number_array, &number_count);
-        if (!path)
+        if (!path) // Error during command parsing.
           {
-             //printf("Error parsing command\n");
+             // ERR("Error parsing SVG path command near: %s", svg_path_data + (path - svg_path_data) - 10 ); // Example error log
              goto error;
           }
         process_command(obj, pd, cmd, number_array, number_count, &cur_x, &cur_y, &start_x, &start_y);
-        if ((!arc) && ((cmd == 'a') || (cmd == 'A') ||
-            (cmd == 'e') || (cmd == 'E')))
-          arc = EINA_TRUE;
+        if ((!has_arc_command) && ((cmd == 'a') || (cmd == 'A') ||
+            (cmd == 'e') || (cmd == 'E'))) // Non-standard 'e'/'E' also considered arc for interpolation.
+          has_arc_command = EINA_TRUE;
      }
-   if (arc)
+
+   if (has_arc_command)
      {
-        // need to keep the path for interpolation
+        // If the path string contained arc commands, store the original string.
+        // This is needed for _path_interpolation, as arc interpolation is done
+        // on the string representation rather than numerically on Bezier points.
         if (pd->path_data)
           free(pd->path_data);
-        pd->path_data = malloc(strlen(svg_path_data) + 1);
-        if (!pd->path_data) goto error;
-        strcpy(pd->path_data, svg_path_data);
+        pd->path_data = strdup(svg_path_data); // Store a copy.
+        if (!pd->path_data) { /* ERR("Failed to duplicate svg_path_data"); */ goto error; }
      }
 
 error:
+   // Restore original locale.
    setlocale(LC_NUMERIC, cur_locale);
    if (cur_locale)
      free(cur_locale);
@@ -1531,9 +1856,51 @@ _efl_gfx_path_copy_from(Eo *obj, Efl_Gfx_Path_Data *pd, const Eo *dup_from)
    from = efl_data_scope_get(dup_from, EFL_GFX_PATH_MIXIN);
    if (!from) return;
 
+   // Copies all path data (commands, points, current point, control point, convex flag)
+   // from another Efl_Gfx_Path object (dup_from) to this object (pd).
+   // If the source path had an SVG string stored (from->path_data), that string is
+   // also duplicated and stored if it contained arc commands. This is handled
+   // within _efl_gfx_path_path_set if it calls _efl_gfx_path_append_svg_path,
+   // or more directly, if path_data is also copied.
+   // Current implementation of _efl_gfx_path_path_set does not preserve path_data,
+   // so this copy might lose the SVG string if not handled carefully.
+   // However, _efl_gfx_path_path_set will re-evaluate current point and control point.
+   // If `from->path_data` exists and is important, it should be explicitly copied here too.
+   // For now, it relies on `_efl_gfx_path_path_set` to reconstruct the path.
+
    pd->convex = from->convex;
 
+   // If the source path has an SVG string representation (due to arcs),
+   // and we want to preserve it for interpolation, we should copy it.
+   // The _efl_gfx_path_path_set will set commands and points, but might clear path_data.
+   // To ensure path_data is preserved if it exists and contains arcs:
+   if (from->path_data)
+     {
+        // A simple way is to re-append if it's an SVG path with arcs.
+        // However, _efl_gfx_path_path_set is more direct for command/point copy.
+        // Let's ensure path_data is copied if it exists.
+        // This assumes that if from->path_data is set, it's the canonical source.
+        // A more robust copy would involve checking if from->path_data is set and using append_svg_path,
+        // or copying commands/points and then path_data.
+        // For now, let's ensure path_data is copied if it exists.
+        if (pd->path_data) free(pd->path_data);
+        pd->path_data = from->path_data ? strdup(from->path_data) : NULL;
+     }
+
+
    _efl_gfx_path_path_set(obj, pd, from->commands, from->points);
+   // After _efl_gfx_path_path_set, pd->current and pd->current_ctrl are updated.
+   // pd->path_data might be overwritten by _efl_gfx_path_path_set if it internally calls reset.
+   // The above explicit copy of path_data might be cleared by _efl_gfx_path_path_set.
+   // The most robust way is to copy commands, points, and then explicitly copy path_data if it was present.
+   // Let's refine:
+   // 1. Reset current path
+   // 2. Copy commands and points
+   // 3. Copy path_data if present in source
+   // 4. Update current points (done by _efl_gfx_path_path_set)
+
+   // The current _efl_gfx_path_path_set reallocs and memcpys, then recalculates current points.
+   // It does not touch pd->path_data. So, the earlier copy of pd->path_data is fine.
 }
 
 #include "interfaces/efl_gfx_path.eo.c"

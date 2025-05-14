@@ -3,6 +3,18 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback for the "changed" event of the color selector.
+ *
+ * This function is called whenever the color in the color selector is
+ * changed by the user. It retrieves the new color, prints it to stdout,
+ * and applies it to a rectangle object provided in the @p data parameter.
+ * The color is premultiplied before being set to the rectangle.
+ *
+ * @param data The Evas_Object (a rectangle) to apply the color to.
+ * @param obj The color selector widget that triggered the event.
+ * @param event_info Unused event information.
+ */
 static void
 _colorselector_changed_cb(void *data, Evas_Object *obj,
                           void *event_info EINA_UNUSED)
@@ -16,6 +28,16 @@ _colorselector_changed_cb(void *data, Evas_Object *obj,
    evas_object_color_set(re, r, g, b, a);
 }
 
+/**
+ * @brief Callback for the "color,item,selected" event of the color selector.
+ *
+ * This function is called when a color item from the palette is selected.
+ * It retrieves the color of the selected item and prints it to stdout.
+ *
+ * @param data Unused user data.
+ * @param obj Unused object that triggered the event.
+ * @param event_info The selected Elm_Object_Item.
+ */
 static void
 _color_item_selected_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                         void *event_info)
@@ -27,6 +49,16 @@ _color_item_selected_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    printf("Selected Color Palette [r=%d g=%d b=%d a=%d]\n", r, g, b, a);
 }
 
+/**
+ * @brief Callback for the "color,item,longpressed" event of the color selector.
+ *
+ * This function is called when a color item from the palette is long-pressed.
+ * It retrieves the color of the long-pressed item and prints its details to stdout.
+ *
+ * @param data Unused user data.
+ * @param obj Unused object that triggered the event.
+ * @param event_info The long-pressed Elm_Object_Item.
+ */
 static void
 _color_item_longpressed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                            void *event_info)
@@ -39,6 +71,12 @@ _color_item_longpressed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
           color_it, r, g, b, a);
 }
 
+/**
+ * @brief Callback to set the color selector mode to PALETTE.
+ * @param data The color selector widget.
+ * @param obj Unused button object.
+ * @param event_info Unused event info.
+ */
 static void
 _palette_cb(void *data, Evas_Object *obj EINA_UNUSED,
             void *event_info EINA_UNUSED)
@@ -47,6 +85,12 @@ _palette_cb(void *data, Evas_Object *obj EINA_UNUSED,
    elm_colorselector_mode_set(cs, ELM_COLORSELECTOR_PALETTE);
 }
 
+/**
+ * @brief Callback to set the color selector mode to COMPONENTS.
+ * @param data The color selector widget.
+ * @param obj Unused button object.
+ * @param event_info Unused event info.
+ */
 static void
 _components_cb(void *data, Evas_Object *obj EINA_UNUSED,
                void *event_info EINA_UNUSED)
@@ -55,6 +99,12 @@ _components_cb(void *data, Evas_Object *obj EINA_UNUSED,
    elm_colorselector_mode_set(cs, ELM_COLORSELECTOR_COMPONENTS);
 }
 
+/**
+ * @brief Callback to set the color selector mode to BOTH.
+ * @param data The color selector widget.
+ * @param obj Unused button object.
+ * @param event_info Unused event info.
+ */
 static void
 _both_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -62,6 +112,12 @@ _both_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_colorselector_mode_set(cs, ELM_COLORSELECTOR_BOTH);
 }
 
+/**
+ * @brief Callback to set the color selector mode to PICKER.
+ * @param data The color selector widget.
+ * @param obj Unused button object.
+ * @param event_info Unused event info.
+ */
 static void
 _picker_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -69,6 +125,12 @@ _picker_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSE
    elm_colorselector_mode_set(cs, ELM_COLORSELECTOR_PICKER);
 }
 
+/**
+ * @brief Callback to set the color selector mode to ALL.
+ * @param data The color selector widget.
+ * @param obj Unused button object.
+ * @param event_info Unused event info.
+ */
 static void
 _all_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -76,6 +138,19 @@ _all_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_colorselector_mode_set(cs, ELM_COLORSELECTOR_ALL);
 }
 
+/**
+ * @brief Main function to set up and run the color selector test.
+ *
+ * This function creates a window, a color selector widget, a rectangle
+ * to display the selected color, and several buttons to change the
+ * color selector's mode. It demonstrates how to create a color selector,
+ * populate its palette, set an initial color, and connect callbacks for
+ * various events.
+ *
+ * @param data Unused user data.
+ * @param obj Unused object.
+ * @param event_info Unused event info.
+ */
 void
 test_colorselector(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                    void *event_info EINA_UNUSED)

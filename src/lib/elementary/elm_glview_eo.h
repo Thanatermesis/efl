@@ -4,6 +4,9 @@
 #ifndef _ELM_GLVIEW_EO_CLASS_TYPE
 #define _ELM_GLVIEW_EO_CLASS_TYPE
 
+/** @brief Represents an Elementary GLView object.
+ * @ingroup Elm_Glview_Group
+ */
 typedef Eo Elm_Glview;
 
 #endif
@@ -114,6 +117,11 @@ typedef enum
 #endif
 /** Elementary GL view class
  *
+ * @ingroup Elm_Glview
+ */
+
+/**
+ * @brief Get the Efl_Class for the Elm_Glview class.
  * @ingroup Elm_Glview
  */
 #define ELM_GLVIEW_CLASS elm_glview_class_get()

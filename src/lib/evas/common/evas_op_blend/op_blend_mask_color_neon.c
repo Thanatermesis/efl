@@ -20,6 +20,22 @@
 /* blend mask x color -> dst */
 
 #ifdef BUILD_NEON
+/**
+ * @brief Blend a color with a destination buffer using a mask, optimized for NEON.
+ *
+ * This function applies a color 'c' to a destination buffer 'd' based on a mask 'm'.
+ * The operation is d = (c * m) + (d * (1 - (c * m)_alpha)).
+ * It processes 'l' pixels. The source buffer 's' is unused.
+ *
+ * @param s Unused source buffer pointer.
+ * @param m Pointer to the mask data (array of DATA8). Each byte represents the alpha of the mask for a pixel.
+ *          Example: [m0, m1, m2, m3, ...]
+ * @param c The color to blend (DATA32, ARGB format).
+ *          Example: 0xAARRGGBB
+ * @param d Pointer to the destination buffer (array of DATA32, ARGB format). This buffer is read and written to.
+ *          Example: [d0, d1, d2, d3, ...] where dN is a pixel.
+ * @param l The number of pixels to process.
+ */
 static void
 _op_blend_mas_c_dp_neon(DATA32 *s EINA_UNUSED, DATA8 *m, DATA32 c, DATA32 *d, int l) {
 #ifdef BUILD_NEON_INTRINSICS
@@ -274,6 +290,23 @@ _op_blend_mas_c_dp_neon(DATA32 *s EINA_UNUSED, DATA8 *m, DATA32 c, DATA32 *d, in
 #endif
 
 #ifdef BUILD_NEON
+/**
+ * @brief Blend a color with a destination buffer using a mask, with color alpha not pre-multiplied, optimized for NEON.
+ *
+ * This function is similar to _op_blend_mas_c_dp_neon but handles cases where the
+ * color 'c' does not have its alpha pre-multiplied.
+ * The operation is d = d + (c - d) * m.
+ * It processes 'l' pixels. The source buffer 's' is unused.
+ *
+ * @param s Unused source buffer pointer.
+ * @param m Pointer to the mask data (array of DATA8). Each byte represents the alpha of the mask for a pixel.
+ *          Example: [m0, m1, m2, m3, ...]
+ * @param c The color to blend (DATA32, ARGB format, alpha not pre-multiplied).
+ *          Example: 0xAARRGGBB
+ * @param d Pointer to the destination buffer (array of DATA32, ARGB format). This buffer is read and written to.
+ *          Example: [d0, d1, d2, d3, ...] where dN is a pixel.
+ * @param l The number of pixels to process.
+ */
 static void
 _op_blend_mas_can_dp_neon(DATA32 *s EINA_UNUSED, DATA8 *m, DATA32 c, DATA32 *d, int l) {
 #ifdef BUILD_NEON_INTRINSICS
@@ -631,6 +664,13 @@ _op_blend_mas_can_dp_neon(DATA32 *s EINA_UNUSED, DATA8 *m, DATA32 c, DATA32 *d, 
 #define _op_blend_mas_can_dpan_neon _op_blend_mas_can_dp_neon
 #define _op_blend_mas_caa_dpan_neon _op_blend_mas_caa_dp_neon
 
+/**
+ * @brief Initializes the NEON-optimized span blending functions for mask and color operations.
+ *
+ * This function assigns the NEON-specific implementations of blending operations
+ * (mask x color -> destination) to the global function pointer table `op_blend_span_funcs`.
+ * It covers various combinations of source, mask, and color properties.
+ */
 static void
 init_blend_mask_color_span_funcs_neon(void)
 {
@@ -647,10 +687,23 @@ init_blend_mask_color_span_funcs_neon(void)
 #endif
 
 #ifdef BUILD_NEON
+/**
+ * @brief Blends a single point (pixel) using a mask and color, optimized for NEON (though this specific version uses generic C ops).
+ *
+ * This function calculates the resulting pixel color when blending a color 'c'
+ * onto a destination pixel '*d' using a mask value 'm'.
+ * The source pixel 's' is effectively the masked color.
+ * The operation is: *d = ( (*d)_alpha_of_masked_color * masked_color) + (*d * (1 - masked_color_alpha) )
+ *
+ * @param s The source color, effectively pre-multiplied by mask: MUL_SYM(m, c).
+ * @param m The mask value (DATA8) for the pixel.
+ * @param c The color to blend (DATA32, ARGB format).
+ * @param d Pointer to the destination pixel (DATA32, ARGB format). This pixel is read and written to.
+ */
 static void
 _op_blend_pt_mas_c_dp_neon(DATA32 s, DATA8 m, DATA32 c, DATA32 *d) {
    s = MUL_SYM(m, c);
-   c = 256 - (s >> 24);
+   c = 256 - (s >> 24); // c becomes 1 - alpha_of_masked_color (scaled to 256)
    *d = MUL_SYM(*d >> 24, s) + MUL_256(c, *d);
 }
 
@@ -664,6 +717,14 @@ _op_blend_pt_mas_c_dp_neon(DATA32 s, DATA8 m, DATA32 c, DATA32 *d) {
 #define _op_blend_pt_mas_can_dpan_neon _op_blend_pt_mas_can_dp_neon
 #define _op_blend_pt_mas_caa_dpan_neon _op_blend_pt_mas_caa_dp_neon
 
+/**
+ * @brief Initializes the NEON-optimized point blending functions for mask and color operations.
+ *
+ * This function assigns the NEON-specific (or NEON-proxied) implementations of
+ * single-pixel blending operations (mask x color -> destination) to the global
+ * function pointer table `op_blend_pt_funcs`.
+ * It covers various combinations of source, mask, and color properties.
+ */
 static void
 init_blend_mask_color_pt_funcs_neon(void)
 {
@@ -684,6 +745,23 @@ init_blend_mask_color_pt_funcs_neon(void)
 /* blend_rel mask x color -> dst */
 
 #ifdef BUILD_NEON
+/**
+ * @brief Blend a color with a destination buffer using a mask, relative mode, optimized for NEON.
+ *
+ * This function applies a color 'c' to a destination buffer 'd' based on a mask 'm',
+ * using a "relative" blending mode.
+ * The operation is: d = (d_alpha * (c * m)) + (d * (1 - (c * m)_alpha)).
+ * It processes 'l' pixels. The source buffer 's' is unused.
+ *
+ * @param s Unused source buffer pointer.
+ * @param m Pointer to the mask data (array of DATA8). Each byte represents the alpha of the mask for a pixel.
+ *          Example: [m0, m1, m2, m3, ...]
+ * @param c The color to blend (DATA32, ARGB format).
+ *          Example: 0xAARRGGBB
+ * @param d Pointer to the destination buffer (array of DATA32, ARGB format). This buffer is read and written to.
+ *          Example: [d0, d1, d2, d3, ...] where dN is a pixel.
+ * @param l The number of pixels to process.
+ */
 static void
 _op_blend_rel_mas_c_dp_neon(DATA32 *s EINA_UNUSED, DATA8 *m, DATA32 c, DATA32 *d, int l) {
    uint16x8_t dc0_16x8;
@@ -835,6 +913,14 @@ _op_blend_rel_mas_c_dp_neon(DATA32 *s EINA_UNUSED, DATA8 *m, DATA32 c, DATA32 *d
 #define _op_blend_rel_mas_can_dpan_neon _op_blend_mas_can_dpan_neon
 #define _op_blend_rel_mas_caa_dpan_neon _op_blend_mas_caa_dpan_neon
 
+/**
+ * @brief Initializes the NEON-optimized relative span blending functions for mask and color operations.
+ *
+ * This function assigns the NEON-specific implementations of "relative" blending
+ * operations (mask x color -> destination) to the global function pointer table
+ * `op_blend_rel_span_funcs`.
+ * It covers various combinations of source, mask, and color properties.
+ */
 static void
 init_blend_rel_mask_color_span_funcs_neon(void)
 {
@@ -851,10 +937,24 @@ init_blend_rel_mask_color_span_funcs_neon(void)
 #endif
 
 #ifdef BUILD_NEON
+/**
+ * @brief Blends a single point (pixel) using a mask and color in relative mode, optimized for NEON (though this specific version uses generic C ops).
+ *
+ * This function calculates the resulting pixel color when blending a color 'c'
+ * onto a destination pixel '*d' using a mask value 'm' in "relative" mode.
+ * The source pixel 's' is effectively the masked color.
+ * The operation is: *d = ( (*d)_alpha * masked_color) + (*d * (1 - masked_color_alpha) )
+ * Note: This function has the same implementation as _op_blend_pt_mas_c_dp_neon.
+ *
+ * @param s The source color, effectively pre-multiplied by mask: MUL_SYM(m, c).
+ * @param m The mask value (DATA8) for the pixel.
+ * @param c The color to blend (DATA32, ARGB format).
+ * @param d Pointer to the destination pixel (DATA32, ARGB format). This pixel is read and written to.
+ */
 static void
 _op_blend_rel_pt_mas_c_dp_neon(DATA32 s, DATA8 m, DATA32 c, DATA32 *d) {
    s = MUL_SYM(m, c);
-   c = 256 - (s >> 24);
+   c = 256 - (s >> 24); // c becomes 1 - alpha_of_masked_color (scaled to 256)
    *d = MUL_SYM(*d >> 24, s) + MUL_256(c, *d);
 }
 
@@ -867,6 +967,14 @@ _op_blend_rel_pt_mas_c_dp_neon(DATA32 s, DATA8 m, DATA32 c, DATA32 *d) {
 #define _op_blend_rel_pt_mas_can_dpan_neon _op_blend_pt_mas_can_dpan_neon
 #define _op_blend_rel_pt_mas_caa_dpan_neon _op_blend_pt_mas_caa_dpan_neon
 
+/**
+ * @brief Initializes the NEON-optimized relative point blending functions for mask and color operations.
+ *
+ * This function assigns the NEON-specific (or NEON-proxied) implementations of
+ * single-pixel "relative" blending operations (mask x color -> destination) to the
+ * global function pointer table `op_blend_rel_pt_funcs`.
+ * It covers various combinations of source, mask, and color properties.
+ */
 static void
 init_blend_rel_mask_color_pt_funcs_neon(void)
 {

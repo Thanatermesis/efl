@@ -52,8 +52,30 @@
          return (ret);                                       \
   } while (0)
 
+/**
+ * @internal
+ * @brief List of all configured SOCKS proxies.
+ * This list stores pointers to Ecore_Con_Socks (or its versioned variants like
+ * Ecore_Con_Socks_v5) structures.
+ */
 static Eina_List *ecore_con_socks_proxies = NULL;
 
+/**
+ * @internal
+ * @brief Finds an existing SOCKS proxy configuration.
+ *
+ * This function searches the internal list of SOCKS proxies for a match
+ * based on version, IP, port, username, and password (for SOCKSv5).
+ *
+ * @param version The SOCKS protocol version (4 or 5).
+ * @param ip The IP address of the SOCKS proxy server.
+ * @param port The port number of the SOCKS proxy server. Can be -1 to match any port.
+ * @param username The username for authentication (if any).
+ * @param ulen The length of the username.
+ * @param password The password for SOCKSv5 authentication (if any).
+ * @param plen The length of the password.
+ * @return A pointer to the found Ecore_Con_Socks structure, or NULL if not found.
+ */
 static Ecore_Con_Socks *
 _ecore_con_socks_find(unsigned char version, const char *ip, int port, const char *username, size_t ulen, const char *password, size_t plen)
 {
@@ -79,6 +101,17 @@ _ecore_con_socks_find(unsigned char version, const char *ip, int port, const cha
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Frees a SOCKS proxy configuration.
+ *
+ * This function releases the memory associated with an Ecore_Con_Socks
+ * structure, including its stringshared members. It also ensures that
+ * if this proxy was set as a one-time or global proxy, those references
+ * are cleared.
+ *
+ * @param ecs The SOCKS proxy configuration to free.
+ */
 static void
 _ecore_con_socks_free(Ecore_Con_Socks *ecs)
 {
@@ -91,6 +124,13 @@ _ecore_con_socks_free(Ecore_Con_Socks *ecs)
    free(ecs);
 }
 
+/**
+ * @brief Shuts down the SOCKS proxy subsystem.
+ *
+ * This function frees all configured SOCKS proxies and resets any
+ * global or one-time proxy settings. It should be called during
+ * Ecore_Con shutdown.
+ */
 void
 ecore_con_socks_shutdown(void)
 {
@@ -101,6 +141,20 @@ ecore_con_socks_shutdown(void)
    _ecore_con_proxy_global = NULL;
 }
 
+/**
+ * @brief Initializes the SOCKS proxy subsystem.
+ *
+ * This function attempts to read SOCKS proxy configuration from
+ * environment variables (ECORE_CON_SOCKS_V4 or ECORE_CON_SOCKS_V5).
+ * If a valid configuration is found, it adds and applies it as a global proxy.
+ * The environment variable format is:
+ * ECORE_CON_SOCKS_V4=[user@]host-port:[1|0]
+ * ECORE_CON_SOCKS_V5=[user@]host-port:[1|0]
+ * where the final [1|0] indicates whether DNS lookups should be performed
+ * by the proxy (1) or locally (0).
+ *
+ * This function is typically called during Ecore_Con initialization.
+ */
 void
 ecore_con_socks_init(void)
 {
@@ -172,6 +226,20 @@ ecore_con_socks_init(void)
  * General Socks API.
  */
 
+/**
+ * @brief Adds a SOCKSv4 proxy server configuration.
+ *
+ * If a proxy with the same IP, port, and username already exists,
+ * a pointer to the existing configuration is returned. Otherwise, a new
+ * configuration is created and added to the internal list.
+ *
+ * @param ip The IP address of the SOCKSv4 proxy server. Must not be NULL or empty.
+ * @param port The port number of the SOCKSv4 proxy server (0-65535).
+ * @param username Optional username for SOCKSv4 authentication (max 255 chars).
+ *                 Can be NULL if no username is required.
+ * @return A pointer to the Ecore_Con_Socks structure representing the proxy,
+ *         or NULL on failure (e.g., invalid parameters).
+ */
 ECORE_CON_API Ecore_Con_Socks *
 ecore_con_socks4_remote_add(const char *ip, int port, const char *username)
 {
@@ -201,6 +269,17 @@ ecore_con_socks4_remote_add(const char *ip, int port, const char *username)
    return ecs;
 }
 
+/**
+ * @brief Checks if a SOCKSv4 proxy server configuration exists.
+ *
+ * @param ip The IP address of the SOCKSv4 proxy server. Must not be NULL or empty.
+ * @param port The port number of the SOCKSv4 proxy server.
+ *             Use -1 to match any port for the given IP and username.
+ * @param username Optional username for SOCKSv4 authentication.
+ *                 If NULL, checks for proxies without a username.
+ *                 If an empty string, it's considered an invalid parameter.
+ * @return EINA_TRUE if the proxy configuration exists, EINA_FALSE otherwise or on invalid input.
+ */
 ECORE_CON_API Eina_Bool
 ecore_con_socks4_remote_exists(const char *ip, int port, const char *username)
 {
@@ -209,6 +288,19 @@ ecore_con_socks4_remote_exists(const char *ip, int port, const char *username)
    return !!_ecore_con_socks_find(4, ip, port, username, username ? strlen(username) : 0, NULL, 0);
 }
 
+/**
+ * @brief Deletes a SOCKSv4 proxy server configuration.
+ *
+ * Removes the specified SOCKSv4 proxy from the internal list and frees
+ * its associated resources.
+ *
+ * @param ip The IP address of the SOCKSv4 proxy server. Must not be NULL or empty.
+ * @param port The port number of the SOCKSv4 proxy server.
+ *             Use -1 to match any port for the given IP and username.
+ * @param username Optional username for SOCKSv4 authentication.
+ *                 If NULL, matches proxies without a username.
+ *                 If an empty string, it's considered an invalid parameter and the function returns.
+ */
 ECORE_CON_API void
 ecore_con_socks4_remote_del(const char *ip, int port, const char *username)
 {
@@ -223,6 +315,23 @@ ecore_con_socks4_remote_del(const char *ip, int port, const char *username)
    _ecore_con_socks_free((Ecore_Con_Socks *)v4);
 }
 
+/**
+ * @brief Adds a SOCKSv5 proxy server configuration.
+ *
+ * If a proxy with the same IP, port, username, and password already exists,
+ * a pointer to the existing configuration is returned. Otherwise, a new
+ * configuration is created and added to the internal list.
+ *
+ * @param ip The IP address of the SOCKSv5 proxy server. Must not be NULL or empty.
+ * @param port The port number of the SOCKSv5 proxy server (0-65535).
+ * @param username Optional username for SOCKSv5 authentication (max 255 chars).
+ *                 Can be NULL if no username is required.
+ * @param password Optional password for SOCKSv5 authentication (max 255 chars).
+ *                 Can be NULL if no password is required.
+ *                 Required if username is provided.
+ * @return A pointer to the Ecore_Con_Socks structure (cast from Ecore_Con_Socks_v5)
+ *         representing the proxy, or NULL on failure (e.g., invalid parameters).
+ */
 ECORE_CON_API Ecore_Con_Socks *
 ecore_con_socks5_remote_add(const char *ip, int port, const char *username, const char *password)
 {
@@ -260,6 +369,20 @@ ecore_con_socks5_remote_add(const char *ip, int port, const char *username, cons
    return (Ecore_Con_Socks *)ecs5;
 }
 
+/**
+ * @brief Checks if a SOCKSv5 proxy server configuration exists.
+ *
+ * @param ip The IP address of the SOCKSv5 proxy server. Must not be NULL or empty.
+ * @param port The port number of the SOCKSv5 proxy server.
+ *             Use -1 to match any port for the given IP, username, and password.
+ * @param username Optional username for SOCKSv5 authentication.
+ *                 If NULL, checks for proxies without authentication.
+ *                 If an empty string, it's considered an invalid parameter.
+ * @param password Optional password for SOCKSv5 authentication.
+ *                 If NULL, checks for proxies without a password (relevant if username is also NULL).
+ *                 If an empty string, it's considered an invalid parameter.
+ * @return EINA_TRUE if the proxy configuration exists, EINA_FALSE otherwise or on invalid input.
+ */
 ECORE_CON_API Eina_Bool
 ecore_con_socks5_remote_exists(const char *ip, int port, const char *username, const char *password)
 {
@@ -268,6 +391,22 @@ ecore_con_socks5_remote_exists(const char *ip, int port, const char *username, c
    return !!_ecore_con_socks_find(5, ip, port, username, username ? strlen(username) : 0, password, password ? strlen(password) : 0);
 }
 
+/**
+ * @brief Deletes a SOCKSv5 proxy server configuration.
+ *
+ * Removes the specified SOCKSv5 proxy from the internal list and frees
+ * its associated resources.
+ *
+ * @param ip The IP address of the SOCKSv5 proxy server. Must not be NULL or empty.
+ * @param port The port number of the SOCKSv5 proxy server.
+ *             Use -1 to match any port for the given IP, username, and password.
+ * @param username Optional username for SOCKSv5 authentication.
+ *                 If NULL, matches proxies without authentication.
+ *                 If an empty string, it's considered an invalid parameter and the function returns.
+ * @param password Optional password for SOCKSv5 authentication.
+ *                 If NULL, matches proxies without a password (relevant if username is also NULL).
+ *                 If an empty string, it's considered an invalid parameter and the function returns.
+ */
 ECORE_CON_API void
 ecore_con_socks5_remote_del(const char *ip, int port, const char *username, const char *password)
 {
@@ -283,6 +422,16 @@ ecore_con_socks5_remote_del(const char *ip, int port, const char *username, cons
    _ecore_con_socks_free((Ecore_Con_Socks *)v5);
 }
 
+/**
+ * @brief Sets whether DNS lookups should be performed by the SOCKS proxy.
+ *
+ * For SOCKSv4a and SOCKSv5, the proxy can resolve hostnames.
+ * If enabled, hostnames are sent to the proxy for resolution.
+ * If disabled, Ecore_Con resolves hostnames locally before connecting to the proxy.
+ *
+ * @param ecs The SOCKS proxy configuration.
+ * @param enable EINA_TRUE to enable proxy-side DNS lookup, EINA_FALSE for local lookup.
+ */
 ECORE_CON_API void
 ecore_con_socks_lookup_set(Ecore_Con_Socks *ecs, Eina_Bool enable)
 {
@@ -290,6 +439,13 @@ ecore_con_socks_lookup_set(Ecore_Con_Socks *ecs, Eina_Bool enable)
    ecs->lookup = !!enable;
 }
 
+/**
+ * @brief Gets whether DNS lookups are performed by the SOCKS proxy.
+ *
+ * @param ecs The SOCKS proxy configuration.
+ * @return EINA_TRUE if proxy-side DNS lookup is enabled, EINA_FALSE otherwise.
+ *         Returns EINA_FALSE if ecs is NULL or invalid.
+ */
 ECORE_CON_API Eina_Bool
 ecore_con_socks_lookup_get(Ecore_Con_Socks *ecs)
 {
@@ -297,6 +453,15 @@ ecore_con_socks_lookup_get(Ecore_Con_Socks *ecs)
    return ecs->lookup;
 }
 
+/**
+ * @brief Sets whether the SOCKS connection is for a BIND operation.
+ *
+ * SOCKS protocol supports a BIND command, which is used for scenarios
+ * like FTP where the server connects back to the client.
+ *
+ * @param ecs The SOCKS proxy configuration.
+ * @param is_bind EINA_TRUE if this is for a BIND operation, EINA_FALSE for CONNECT.
+ */
 ECORE_CON_API void
 ecore_con_socks_bind_set(Ecore_Con_Socks *ecs, Eina_Bool is_bind)
 {
@@ -305,6 +470,13 @@ ecore_con_socks_bind_set(Ecore_Con_Socks *ecs, Eina_Bool is_bind)
    ecs->bind = !!is_bind;
 }
 
+/**
+ * @brief Gets whether the SOCKS connection is for a BIND operation.
+ *
+ * @param ecs The SOCKS proxy configuration.
+ * @return EINA_TRUE if this is for a BIND operation, EINA_FALSE otherwise.
+ *         Returns EINA_FALSE if ecs is NULL or invalid.
+ */
 ECORE_CON_API Eina_Bool
 ecore_con_socks_bind_get(Ecore_Con_Socks *ecs)
 {
@@ -313,6 +485,12 @@ ecore_con_socks_bind_get(Ecore_Con_Socks *ecs)
    return ecs->bind;
 }
 
+/**
+ * @brief Gets the SOCKS protocol version of the proxy configuration.
+ *
+ * @param ecs The SOCKS proxy configuration.
+ * @return The SOCKS protocol version (4 or 5), or 0 if ecs is NULL or invalid.
+ */
 ECORE_CON_API unsigned int
 ecore_con_socks_version_get(Ecore_Con_Socks *ecs)
 {
@@ -321,6 +499,15 @@ ecore_con_socks_version_get(Ecore_Con_Socks *ecs)
    return ecs->version;
 }
 
+/**
+ * @brief Deletes a SOCKS proxy server configuration using its handle.
+ *
+ * Removes the specified SOCKS proxy from the internal list and frees
+ * its associated resources. This is an alternative to deleting by
+ * IP/port/credentials.
+ *
+ * @param ecs The SOCKS proxy configuration handle to delete.
+ */
 ECORE_CON_API void
 ecore_con_socks_remote_del(Ecore_Con_Socks *ecs)
 {
@@ -331,12 +518,32 @@ ecore_con_socks_remote_del(Ecore_Con_Socks *ecs)
    _ecore_con_socks_free(ecs);
 }
 
+/**
+ * @brief Applies a SOCKS proxy configuration for the next connection only.
+ *
+ * This sets a one-time SOCKS proxy. The next Ecore_Con connection attempt
+ * will use this proxy, and then this setting will be cleared.
+ * If a global proxy is also set, this one-time proxy takes precedence.
+ *
+ * @param ecs The SOCKS proxy configuration to apply once. Can be NULL to clear
+ *            a previously set one-time proxy.
+ */
 ECORE_CON_API void
 ecore_con_socks_apply_once(Ecore_Con_Socks *ecs)
 {
    _ecore_con_proxy_once = ecs;
 }
 
+/**
+ * @brief Applies a SOCKS proxy configuration globally for all subsequent connections.
+ *
+ * This sets a global SOCKS proxy. All subsequent Ecore_Con connection
+ * attempts will use this proxy unless a one-time proxy is also set
+ * (which would take precedence for that single connection).
+ *
+ * @param ecs The SOCKS proxy configuration to apply globally. Can be NULL to
+ *            disable the global proxy.
+ */
 ECORE_CON_API void
 ecore_con_socks_apply_always(Ecore_Con_Socks *ecs)
 {

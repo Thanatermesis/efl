@@ -29,20 +29,34 @@ static int _evas_loader_jp2k_log_dom = -1;
 #define JP2_MAGIC "\x0d\x0a\x87\x0a"
 #define JP2_RFC3745_MAGIC "\x00\x00\x00\x0c\x6a\x50\x20\x20\x0d\x0a\x87\x0a"
 
+/**
+ * @brief Structure to manage reading from a memory-mapped region.
+ * Used as user data for OpenJPEG stream callbacks.
+ */
 typedef struct
 {
-   unsigned char *base;
-   size_t length;
-   size_t idx;
+   unsigned char *base; /**< Pointer to the start of the mapped memory region. */
+   size_t length; /**< Total size of the mapped memory region. */
+   size_t idx;    /**< Current read position within the mapped region. */
 } Map_St;
 
+/**
+ * @brief Internal data structure for the Evas JP2K loader instance.
+ */
 typedef struct _Evas_Loader_Internal Evas_Loader_Internal;
 struct _Evas_Loader_Internal
 {
-   Eina_File *f;
-   Evas_Image_Load_Opts *opts;
+   Eina_File *f; /**< Eina file handle for the image file. */
+   Evas_Image_Load_Opts *opts; /**< Image loading options (e.g., region, scale). */
 };
 
+/**
+ * @brief OpenJPEG callback function to suppress log messages.
+ * This function is registered with OpenJPEG to prevent it from printing
+ * informational, warning, or error messages to the console.
+ * @param msg The message string from OpenJPEG (unused).
+ * @param client_data User data pointer (unused).
+ */
 static void
 _jp2k_quiet_callback(const char *msg, void *client_data)
 {
@@ -50,6 +64,14 @@ _jp2k_quiet_callback(const char *msg, void *client_data)
    (void)client_data;
 }
 
+/**
+ * @brief OpenJPEG stream read callback function.
+ * Reads data from the memory-mapped region managed by Map_St.
+ * @param buf Buffer to read data into.
+ * @param size Number of bytes to read.
+ * @param data User data pointer (expected to be a Map_St*).
+ * @return The number of bytes actually read, or (OPJ_SIZE_T)-1 on error (EOF).
+ */
 static OPJ_SIZE_T
 _jp2k_read_fn(void *buf, OPJ_SIZE_T size, void *data)
 {
@@ -67,6 +89,13 @@ _jp2k_read_fn(void *buf, OPJ_SIZE_T size, void *data)
    return offset;
 }
 
+/**
+ * @brief OpenJPEG stream skip (seek relative) callback function.
+ * Advances the read position within the memory-mapped region.
+ * @param size Number of bytes to skip (can be negative).
+ * @param data User data pointer (expected to be a Map_St*).
+ * @return The new offset from the beginning of the stream after skipping.
+ */
 static OPJ_OFF_T
 _jp2k_seek_cur_fn(OPJ_OFF_T size, void *data)
 {
@@ -80,6 +109,13 @@ _jp2k_seek_cur_fn(OPJ_OFF_T size, void *data)
    return map->idx;
 }
 
+/**
+ * @brief OpenJPEG stream seek (absolute) callback function.
+ * Sets the read position within the memory-mapped region.
+ * @param size The absolute offset to seek to from the beginning of the stream.
+ * @param data User data pointer (expected to be a Map_St*).
+ * @return OPJ_TRUE on success, OPJ_FALSE on failure (e.g., seeking past EOF).
+ */
 static OPJ_BOOL
 _jp2k_seek_set_fn(OPJ_OFF_T size, void *data)
 {
@@ -93,6 +129,18 @@ _jp2k_seek_set_fn(OPJ_OFF_T size, void *data)
    return OPJ_TRUE;
 }
 
+/**
+ * @brief Reads the header of a JP2K image from a memory buffer.
+ * This function uses OpenJPEG to parse the header and extract image
+ * dimensions and alpha channel presence.
+ * @param[out] w Pointer to store the image width.
+ * @param[out] h Pointer to store the image height.
+ * @param[out] alpha Pointer to store alpha channel presence (1 if present, 0 otherwise).
+ * @param map Pointer to the memory buffer containing the JP2K file data.
+ * @param length Size of the memory buffer.
+ * @param[out] error Pointer to store the Evas load error code.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_head_jp2k_internal(unsigned int *w, unsigned int *h,
 					unsigned char *alpha,
@@ -180,6 +228,18 @@ evas_image_load_file_head_jp2k_internal(unsigned int *w, unsigned int *h,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Decodes the image data of a JP2K image from a memory buffer.
+ * This function uses OpenJPEG to decode the image data and store it
+ * in the provided pixel buffer in ARGB32 format.
+ * @param pixels Pointer to the destination buffer for decoded pixel data (ARGB32).
+ *               The buffer must be pre-allocated with size w * h * 4 bytes.
+ *               Pixel format: 0xAARRGGBB (Alpha, Red, Green, Blue).
+ * @param map Pointer to the memory buffer containing the JP2K file data.
+ * @param length Size of the memory buffer.
+ * @param[out] error Pointer to store the Evas load error code.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_data_jp2k_internal(void *pixels,
                                         void *map, size_t length,
@@ -374,6 +434,17 @@ evas_image_load_file_data_jp2k_internal(void *pixels,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Evas image loader 'open' function for JP2K files.
+ * Called by Evas to open a JP2K image file. Allocates and initializes
+ * the internal loader data structure.
+ * @param f Eina file handle.
+ * @param key Optional key (unused for JP2K).
+ * @param opts Load options.
+ * @param animated Pointer to store animated properties (unused for JP2K).
+ * @param[out] error Pointer to store the Evas load error code.
+ * @return A pointer to the allocated loader data structure on success, NULL on failure.
+ */
 static void *
 evas_image_load_file_open_jp2k(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
 			       Evas_Image_Load_Opts *opts,
@@ -395,12 +466,27 @@ evas_image_load_file_open_jp2k(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
    return loader;
 }
 
+/**
+ * @brief Evas image loader 'close' function for JP2K files.
+ * Called by Evas to close a previously opened JP2K image file handle.
+ * Frees the internal loader data structure.
+ * @param loader_data Pointer to the loader data structure returned by open.
+ */
 static void
 evas_image_load_file_close_jp2k(void *loader_data)
 {
    free(loader_data);
 }
 
+/**
+ * @brief Evas image loader 'head' function for JP2K files.
+ * Called by Evas to read the header information (dimensions, alpha) of the image.
+ * Maps the file to memory and calls the internal header reading function.
+ * @param loader_data Pointer to the loader data structure.
+ * @param[out] prop Pointer to store the image properties (width, height, alpha).
+ * @param[out] error Pointer to store the Evas load error code.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_head_jp2k(void *loader_data,
                                Emile_Image_Property *prop,
@@ -430,6 +516,16 @@ evas_image_load_file_head_jp2k(void *loader_data,
    return val;
 }
 
+/**
+ * @brief Evas image loader 'data' function for JP2K files.
+ * Called by Evas to decode and load the actual image pixel data.
+ * Maps the file to memory and calls the internal data loading function.
+ * @param loader_data Pointer to the loader data structure.
+ * @param prop Image properties (unused in this function but part of the API).
+ * @param pixels Pointer to the destination buffer for decoded pixel data (ARGB32).
+ * @param[out] error Pointer to store the Evas load error code.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_data_jp2k(void *loader_data,
                                Emile_Image_Property *prop EINA_UNUSED,
@@ -460,9 +556,14 @@ evas_image_load_file_data_jp2k(void *loader_data,
    return val;
 }
 
+/**
+ * @brief Structure defining the Evas image loader functions for JP2K.
+ * This structure is registered with Evas to provide the necessary callbacks
+ * for opening, closing, reading header, and reading data for JP2K images.
+ */
 static Evas_Image_Load_Func evas_image_load_jp2k_func =
 {
-  EVAS_IMAGE_LOAD_VERSION,
+  EVAS_IMAGE_LOAD_VERSION, /**< Loader API version. */
   evas_image_load_file_open_jp2k,
   evas_image_load_file_close_jp2k,
   (void*) evas_image_load_file_head_jp2k,
@@ -470,9 +571,16 @@ static Evas_Image_Load_Func evas_image_load_jp2k_func =
   (void*) evas_image_load_file_data_jp2k,
   NULL,
   EINA_TRUE,
-  EINA_TRUE
+  EINA_TRUE /**< Supports loading directly into provided pixel buffer. */
 };
 
+/**
+ * @brief Evas module initialization function.
+ * Called when the Evas JP2K loader module is loaded. Registers the log domain
+ * and sets the loader functions.
+ * @param em The Evas module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -490,6 +598,11 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Evas module shutdown function.
+ * Called when the Evas JP2K loader module is unloaded. Unregisters the log domain.
+ * @param em The Evas module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

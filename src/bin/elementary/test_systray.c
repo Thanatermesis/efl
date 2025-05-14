@@ -16,6 +16,17 @@ static Evas_Object *i    = NULL;
 static Evas_Object *r    = NULL;
 static Eo          *item = NULL;
 
+/**
+ * @brief Handles the ELM_EVENT_SYSTRAY_READY event.
+ *
+ * This function is called when the system tray is ready to accept
+ * new items. It attempts to register the global systray item 'item'.
+ *
+ * @param data User data, unused.
+ * @param type The event type, unused.
+ * @param event The event information, unused.
+ * @return ECORE_CALLBACK_DONE to signify the event has been handled.
+ */
 static Eina_Bool
 _ev_handler(void *data EINA_UNUSED,
             int type EINA_UNUSED,
@@ -36,6 +47,17 @@ _ev_handler(void *data EINA_UNUSED,
    return ECORE_CALLBACK_DONE;
 }
 
+/**
+ * @brief Callback for the 'Update' button's 'clicked' event.
+ *
+ * This function updates the main icon and attention icon of the systray item
+ * based on the current text in the icon name and attention icon name
+ * entry fields.
+ *
+ * @param data User data, unused.
+ * @param obj The button object, unused.
+ * @param event_info The event information, unused.
+ */
 static void
 _bt_clicked(void *data EINA_UNUSED,
             Evas_Object *obj EINA_UNUSED,
@@ -45,6 +67,16 @@ _bt_clicked(void *data EINA_UNUSED,
    elm_obj_systray_att_icon_name_set(item, elm_entry_entry_get(ai));
 }
 
+/**
+ * @brief Callback for the radio buttons' 'changed' event.
+ *
+ * Updates the systray item's status based on the selected radio button's
+ * value. The status can be Passive, Active, or Needs Attention.
+ *
+ * @param data User data, unused.
+ * @param obj The radio button object, unused.
+ * @param event_info The event information, unused.
+ */
 static void
  _r_clicked(void *data EINA_UNUSED,
             Evas_Object *obj EINA_UNUSED,
@@ -53,6 +85,16 @@ static void
    elm_obj_systray_status_set(item, elm_radio_value_get(r));
 }
 
+/**
+ * @brief Callback for systray menu item 'clicked' events.
+ *
+ * Prints the name of the clicked menu item to standard output.
+ * The item's name is passed as the @p data parameter.
+ *
+ * @param data The menu item's data, which is its name.
+ * @param obj The menu object, unused.
+ * @param event_info The event information, unused.
+ */
 static void
 _menu_clicked(void *data,
             Evas_Object *obj EINA_UNUSED,
@@ -61,6 +103,18 @@ _menu_clicked(void *data,
    printf("Menu Item Clicked: %s\n", (const char *) data);
 }
 
+/**
+ * @brief Main function for the systray test application.
+ *
+ * This function creates a window with controls to manipulate a systray item.
+ * It initializes the systray, creates a status notifier item, and provides
+ * UI elements to change the item's icon, attention icon, and status. It also
+ * attaches a context menu to the systray item.
+ *
+ * @param data User data, unused.
+ * @param obj The object that triggered this test function, unused.
+ * @param event_info The event information, unused.
+ */
 void
 test_systray(void *data EINA_UNUSED,
              Evas_Object *obj EINA_UNUSED,

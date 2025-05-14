@@ -2,10 +2,14 @@
 #include <openssl/err.h>
 #include <openssl/dh.h>
 
+/**
+ * @internal
+ * @brief Structure to hold SSL context information.
+ */
 struct _Efl_Net_Ssl_Ctx
 {
-   SSL_CTX *ssl_ctx;
-   Eina_Bool did_certificates;
+   SSL_CTX *ssl_ctx; /**< The OpenSSL SSL_CTX object. */
+   Eina_Bool did_certificates; /**< Flag indicating if certificates were loaded. */
    Eina_Bool is_dialer;
 };
 
@@ -24,6 +28,19 @@ struct _Efl_Net_Ssl_Ctx
 # define ERR_peek_error_line_data(_a, _b, _c, _d) ERR_peek_error_all(_a, _b, NULL, _c, _d)
 #endif
 
+/**
+ * @internal
+ * @brief Checks for and logs OpenSSL errors.
+ *
+ * This function iterates through the OpenSSL error queue, logging each error
+ * using Eina_Log. It's typically called via the
+ * _efl_net_ssl_ctx_check_errors() macro.
+ *
+ * @param file The source file name where the error check is performed.
+ * @param line The line number in the source file.
+ * @param fname The function name where the error check is performed.
+ * @return The first error code encountered, or 0 if no errors.
+ */
 static unsigned long
 __efl_net_ssl_ctx_check_errors(const char *file, int line, const char *fname)
 {
@@ -46,6 +63,20 @@ __efl_net_ssl_ctx_check_errors(const char *file, int line, const char *fname)
    return first;
 }
 
+/**
+ * @internal
+ * @brief Loads certificates, private keys, CRLs, and CAs into the SSL context.
+ *
+ * This function processes the lists of paths provided in the configuration
+ * and attempts to load them into the SSL_CTX. It handles both PEM and ASN1
+ * file types.
+ *
+ * @param ctx The Efl_Net_Ssl_Ctx structure.
+ * @param cfg The configuration containing paths to certificates, keys, etc.
+ *        Example for cfg.certificates (Eina_List of eina_stringshare items):
+ *        certificates: [ "/path/to/cert1.pem", "/path/to/cert2.der" ]
+ * @return 0 on success, or an Eina_Error code on failure.
+ */
 static Eina_Error
 _efl_net_ssl_ctx_load_lists(Efl_Net_Ssl_Ctx *ctx, Efl_Net_Ssl_Ctx_Config cfg)
 {
@@ -254,12 +285,30 @@ _efl_net_ssl_ctx_check_errors();
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Creates a new SSL connection structure (SSL object) from the context.
+ *
+ * @param ctx The Efl_Net_Ssl_Ctx structure.
+ * @return A pointer to the newly created SSL object, or NULL on failure.
+ */
 static void *
 efl_net_ssl_ctx_connection_new(Efl_Net_Ssl_Ctx *ctx)
 {
    return SSL_new(ctx->ssl_ctx);
 }
 
+/**
+ * @internal
+ * @brief Sets up the SSL context based on the provided configuration.
+ *
+ * This function initializes the SSL_CTX, sets the SSL/TLS method (client or server),
+ * configures ciphers, and loads certificates and keys.
+ *
+ * @param ctx The Efl_Net_Ssl_Ctx structure to set up.
+ * @param cfg The configuration for the SSL context.
+ * @return 0 on success, or an Eina_Error code on failure.
+ */
 static Eina_Error
 efl_net_ssl_ctx_setup(Efl_Net_Ssl_Ctx *ctx, Efl_Net_Ssl_Ctx_Config cfg)
 {
@@ -354,6 +403,12 @@ efl_net_ssl_ctx_setup(Efl_Net_Ssl_Ctx *ctx, Efl_Net_Ssl_Ctx_Config cfg)
    return err;
 }
 
+/**
+ * @internal
+ * @brief Tears down and frees the SSL context.
+ *
+ * @param ctx The Efl_Net_Ssl_Ctx structure to tear down.
+ */
 static void
 efl_net_ssl_ctx_teardown(Efl_Net_Ssl_Ctx *ctx)
 {
@@ -364,6 +419,15 @@ efl_net_ssl_ctx_teardown(Efl_Net_Ssl_Ctx *ctx)
      }
 }
 
+/**
+ * @internal
+ * @brief Sets the peer verification mode for the SSL context.
+ *
+ * @param ctx The Efl_Net_Ssl_Ctx structure.
+ * @param verify_mode The desired verification mode.
+ *        Example: EFL_NET_SSL_VERIFY_MODE_REQUIRED
+ * @return 0 on success, or EINVAL if verify_mode is unknown.
+ */
 static Eina_Error
 efl_net_ssl_ctx_verify_mode_set(Efl_Net_Ssl_Ctx *ctx, Efl_Net_Ssl_Verify_Mode verify_mode)
 {
@@ -389,12 +453,31 @@ efl_net_ssl_ctx_verify_mode_set(Efl_Net_Ssl_Ctx *ctx, Efl_Net_Ssl_Verify_Mode ve
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Sets whether to perform hostname verification (OpenSSL specific, often handled by X509_VERIFY_PARAM_set1_host).
+ * @note This is a stub in the current OpenSSL backend implementation.
+ *
+ * @param ctx The Efl_Net_Ssl_Ctx structure.
+ * @param hostname_verify EINA_TRUE to enable hostname verification, EINA_FALSE otherwise.
+ * @return Always returns 0 (success) in this stub implementation.
+ */
 static Eina_Error
 efl_net_ssl_ctx_hostname_verify_set(Efl_Net_Ssl_Ctx *ctx EINA_UNUSED, Eina_Bool hostname_verify EINA_UNUSED)
 {
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Sets the expected hostname for verification (OpenSSL specific, often handled by X509_VERIFY_PARAM_set1_host).
+ * @note This is a stub in the current OpenSSL backend implementation.
+ *
+ * @param ctx The Efl_Net_Ssl_Ctx structure.
+ * @param hostname The hostname to verify against.
+ *        Example: "example.com"
+ * @return Always returns 0 (success) in this stub implementation.
+ */
 static Eina_Error
 efl_net_ssl_ctx_hostname_set(Efl_Net_Ssl_Ctx *ctx EINA_UNUSED, const char *hostname EINA_UNUSED)
 {

@@ -1,3 +1,20 @@
+/**
+ * @file
+ * @brief These routines are for the Efl Ui Progressbar widget.
+ *
+ * The progressbar widget is used to display progress, usually for a
+ * task that will take some time to complete. It can be horizontal or
+ * vertical, and can have a label and an icon.
+ *
+ * The progress value can be set, and the widget will update its
+ * display accordingly. It also supports an "infinite" or "pulse" mode,
+ * where the progressbar animates to indicate that an operation of
+ * unknown duration is in progress.
+ *
+ * Parts of the progressbar can be individually controlled, such as
+ * "efl.cur.progressbar" for the main progress indicator.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include "elementary_config.h"
 #endif
@@ -37,12 +54,24 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {NULL, NULL}
 };
 
+/**
+ * @brief Aliases for content parts of the progressbar.
+ * @details This maps the "icon" part name to the theme part "elm.swallow.content".
+ */
 static const Elm_Layout_Part_Alias_Description _content_aliases[] =
 {
    {"icon", "elm.swallow.content"},
    {NULL, NULL}
 };
 
+/**
+ * @brief Creates a new progress status structure.
+ * @param part_name The name of the progressbar part.
+ * @param val The initial value for this part.
+ * @param exists Boolean indicating if the part currently exists in the theme.
+ * @return A pointer to the newly allocated Efl_Ui_Progress_Status, or NULL on failure.
+ * @internal
+ */
 static Efl_Ui_Progress_Status *
 _progress_status_new(const char *part_name, double val, Eina_Bool exists)
 {
@@ -55,6 +84,11 @@ _progress_status_new(const char *part_name, double val, Eina_Bool exists)
    return ps;
 }
 
+/**
+ * @brief Frees a progress status structure.
+ * @param ps Pointer to the Efl_Ui_Progress_Status to free.
+ * @internal
+ */
 static inline void
 _progress_status_free(Efl_Ui_Progress_Status *ps)
 {
@@ -62,12 +96,26 @@ _progress_status_free(Efl_Ui_Progress_Status *ps)
    free(ps);
 }
 
+/**
+ * @brief Checks if the given orientation is horizontal.
+ * @param dir The layout orientation.
+ * @return EINA_TRUE if horizontal, EINA_FALSE otherwise.
+ * @internal
+ */
 static inline Eina_Bool
 _is_horizontal(Efl_Ui_Layout_Orientation dir)
 {
    return efl_ui_layout_orientation_is_horizontal(dir, EINA_TRUE);
 }
 
+/**
+ * @brief Sets the text of the progressbar's unit/status label.
+ * @param obj The progressbar object.
+ * @internal
+ *
+ * This function updates the label that can display the progress percentage
+ * or a custom format string. It handles legacy and non-legacy modes.
+ */
 static void
 _units_set(Evas_Object *obj)
 {
@@ -105,6 +153,16 @@ _units_set(Evas_Object *obj)
      }
 }
 
+/**
+ * @brief Sets the visual position of the progressbar based on its value.
+ * @param obj The progressbar object.
+ * @internal
+ *
+ * This function iterates through all registered progress parts and updates
+ * their visual representation (e.g., the length of the bar) based on their
+ * current value, min, and max. It also considers mirroring and inverted
+ * orientation.
+ */
 static void
 _val_set(Evas_Object *obj)
 {
@@ -133,6 +191,14 @@ _val_set(Evas_Object *obj)
      }
 }
 
+/**
+ * @brief Synchronizes the widget's theme class based on its orientation.
+ * @param obj The progressbar object.
+ * @param pd The private data of the progressbar.
+ * @internal
+ *
+ * Sets the theme element to "horizontal" or "vertical".
+ */
 static void
 _sync_widget_theme_klass(Eo *obj, Efl_Ui_Progressbar_Data *pd)
 {
@@ -142,6 +208,18 @@ _sync_widget_theme_klass(Eo *obj, Efl_Ui_Progressbar_Data *pd)
      elm_widget_theme_element_set(obj, "vertical");
 }
 
+/**
+ * @brief Applies the theme to the progressbar widget.
+ * @param obj The progressbar object.
+ * @param sd The private data of the progressbar.
+ * @return Eina_Error indicating success or failure.
+ * @internal
+ *
+ * This function is called when the theme needs to be reapplied, for example,
+ * when the orientation changes or the widget is first created. It sets up
+ * signals for pulse mode, unit visibility, and inverted state. It also
+ * updates the spacer size and re-checks for part existence.
+ */
 EOLIAN static Eina_Error
 _efl_ui_progressbar_efl_ui_widget_theme_apply(Eo *obj, Efl_Ui_Progressbar_Data *sd)
 {
@@ -236,6 +314,16 @@ _efl_ui_progressbar_efl_ui_widget_theme_apply(Eo *obj, Efl_Ui_Progressbar_Data *
    return int_ret;
 }
 
+/**
+ * @brief Accessibility callback to get information about the progressbar.
+ * @param data User data (unused).
+ * @param obj The progressbar object.
+ * @return A newly allocated string with accessibility information, or NULL.
+ *         The caller is responsible for freeing the returned string.
+ * @internal
+ *
+ * Returns the custom access info if set, otherwise the main text of the layout.
+ */
 static char *
 _access_info_cb(void *data EINA_UNUSED, Evas_Object *obj)
 {
@@ -247,6 +335,16 @@ _access_info_cb(void *data EINA_UNUSED, Evas_Object *obj)
    return NULL;
 }
 
+/**
+ * @brief Accessibility callback to get the state of the progressbar.
+ * @param data User data (unused).
+ * @param obj The progressbar object.
+ * @return A newly allocated string with the progressbar's state (e.g., value, disabled),
+ *         or NULL. The caller is responsible for freeing the returned string.
+ * @internal
+ *
+ * Provides the current formatted value and disabled state for accessibility services.
+ */
 static char *
 _access_state_cb(void *data EINA_UNUSED, Evas_Object *obj)
 {
@@ -275,6 +373,15 @@ _access_state_cb(void *data EINA_UNUSED, Evas_Object *obj)
    return NULL;
 }
 
+/**
+ * @brief Called when the progressbar object is added to a canvas group.
+ * @param obj The progressbar object.
+ * @param priv The private data of the progressbar.
+ * @internal
+ *
+ * Initializes default values for the progressbar, such as orientation,
+ * value, format string, and spacer object. It also sets up accessibility.
+ */
 EOLIAN static void
 _efl_ui_progressbar_efl_canvas_group_group_add(Eo *obj, Efl_Ui_Progressbar_Data *priv)
 {
@@ -309,6 +416,15 @@ _efl_ui_progressbar_efl_canvas_group_group_add(Eo *obj, Efl_Ui_Progressbar_Data 
      (_elm_access_info_get(obj), ELM_ACCESS_STATE, _access_state_cb, NULL);
 }
 
+/**
+ * @brief Called when the progressbar object is being deleted from a canvas group.
+ * @param obj The progressbar object.
+ * @param sd The private data of the progressbar.
+ * @internal
+ *
+ * Frees resources associated with the progressbar, such as the list of
+ * progress statuses and the format string buffer.
+ */
 EOLIAN static void
 _efl_ui_progressbar_efl_canvas_group_group_del(Eo *obj, Efl_Ui_Progressbar_Data *sd)
 {
@@ -328,6 +444,16 @@ _efl_ui_progressbar_efl_canvas_group_group_del(Eo *obj, Efl_Ui_Progressbar_Data 
    efl_canvas_group_del(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Constructor for the Efl.Ui.Progressbar object.
+ * @param obj The progressbar object being constructed.
+ * @param _pd Private data (unused in this function directly).
+ * @return The constructed object.
+ * @internal
+ *
+ * Sets the default theme class, smart callbacks, accessibility role,
+ * initial range limits, and enables the progress label by default.
+ */
 EOLIAN static Eo *
 _efl_ui_progressbar_efl_object_constructor(Eo *obj, Efl_Ui_Progressbar_Data *_pd EINA_UNUSED)
 {
@@ -342,6 +468,16 @@ _efl_ui_progressbar_efl_object_constructor(Eo *obj, Efl_Ui_Progressbar_Data *_pd
    return obj;
 }
 
+/**
+ * @brief Sets the orientation of the progressbar.
+ * @param obj The progressbar object.
+ * @param sd The private data of the progressbar.
+ * @param dir The new orientation (horizontal or vertical, possibly inverted).
+ * @internal
+ *
+ * If the orientation changes, it updates the internal direction state and
+ * reapplies the theme to reflect the change.
+ */
 EOLIAN static void
 _efl_ui_progressbar_efl_ui_layout_orientable_orientation_set(Eo *obj, Efl_Ui_Progressbar_Data *sd, Efl_Ui_Layout_Orientation dir)
 {
@@ -352,12 +488,29 @@ _efl_ui_progressbar_efl_ui_layout_orientable_orientation_set(Eo *obj, Efl_Ui_Pro
    efl_ui_widget_theme_apply(obj);
 }
 
+/**
+ * @brief Gets the orientation of the progressbar.
+ * @param obj The progressbar object (unused).
+ * @param sd The private data of the progressbar.
+ * @return The current orientation.
+ * @internal
+ */
 EOLIAN static Efl_Ui_Layout_Orientation
 _efl_ui_progressbar_efl_ui_layout_orientable_orientation_get(const Eo *obj EINA_UNUSED, Efl_Ui_Progressbar_Data *sd)
 {
    return sd->dir;
 }
 
+/**
+ * @brief Sets the span size of the progressbar.
+ * @param obj The progressbar object.
+ * @param sd The private data of the progressbar.
+ * @param size The new span size (width for vertical, height for horizontal).
+ * @internal
+ *
+ * This function updates the minimum size of the internal spacer element,
+ * which effectively controls the "thickness" of the progressbar.
+ */
 static void
 _progressbar_span_size_set(Eo *obj, Efl_Ui_Progressbar_Data *sd, Evas_Coord size)
 {
@@ -377,6 +530,19 @@ _progressbar_span_size_set(Eo *obj, Efl_Ui_Progressbar_Data *sd, Evas_Coord size
    efl_canvas_group_change(obj);
 }
 
+/**
+ * @brief Sets the minimum and maximum values for a specific progressbar part.
+ * @param obj The progressbar object.
+ * @param sd The private data of the progressbar.
+ * @param part_name The name of the part to modify (e.g., "efl.cur.progressbar").
+ * @param min The new minimum value.
+ * @param max The new maximum value.
+ * @internal
+ *
+ * Updates or creates a progress status entry for the given part with the new
+ * min/max values. If the part is the main progressbar part ("efl.cur.progressbar"
+ * or "elm.cur.progressbar"), it also updates the overall min/max in the private data.
+ */
 static void
 _progress_part_min_max_set(Eo *obj, Efl_Ui_Progressbar_Data *sd, const char *part_name, double min, double max)
 {
@@ -432,6 +598,17 @@ _progress_part_min_max_set(Eo *obj, Efl_Ui_Progressbar_Data *sd, const char *par
     _val_set(obj);
 }
 
+/**
+ * @brief Internally sets the theme to pulse mode if not already set.
+ * @param obj The progressbar object.
+ * @param sd The private data of the progressbar.
+ * @param pulse EINA_TRUE to enable pulse mode in theme, EINA_FALSE otherwise.
+ * @internal
+ *
+ * This function is for non-legacy progressbars. It changes the internal
+ * pulse flag and reapplies the theme if the state changes. This ensures
+ * the correct Edje signals ("efl,state,pulse" or "efl,state,fraction") are emitted.
+ */
 static void
 _internal_theme_mode_pulse_set(Eo *obj, Efl_Ui_Progressbar_Data *sd, Eina_Bool pulse)
 {
@@ -443,7 +620,20 @@ _internal_theme_mode_pulse_set(Eo *obj, Efl_Ui_Progressbar_Data *sd, Eina_Bool p
    efl_ui_widget_theme_apply(obj);
 }
 
-
+/**
+ * @brief Sets the value for a specific progressbar part.
+ * @param obj The progressbar object.
+ * @param sd The private data of the progressbar.
+ * @param part_name The name of the part to modify.
+ * @param val The new value for the part.
+ * @internal
+ *
+ * Updates or creates a progress status entry for the given part with the new
+ * value. It ensures the value is clamped within the part's min/max range.
+ * If the part is the main progressbar, it also updates the overall value in
+ * private data and triggers relevant events (changed, min_reached, max_reached).
+ * Setting a value implicitly disables pulse mode for the theme.
+ */
 static void
 _progressbar_part_value_set(Eo *obj, Efl_Ui_Progressbar_Data *sd, const char *part_name, double val)
 {
@@ -489,21 +679,30 @@ _progressbar_part_value_set(Eo *obj, Efl_Ui_Progressbar_Data *sd, const char *pa
    else
       ps->val = val;
 
-   _val_set(obj);
-   _units_set(obj);
+   _val_set(obj); // Update visual representation
+   _units_set(obj); // Update text label
+
+   // Emit change events
    if (elm_widget_is_legacy(obj))
      efl_event_callback_legacy_call
        (obj, EFL_UI_RANGE_EVENT_CHANGED, NULL);
    else
      {
         efl_event_callback_call(obj, EFL_UI_RANGE_EVENT_CHANGED, NULL);
-        if (EINA_DBL_EQ(sd->val, min))
+        if (EINA_DBL_EQ(sd->val, min)) // Check against the part's min
           efl_event_callback_call(obj, EFL_UI_RANGE_EVENT_MIN_REACHED, NULL);
-        if (EINA_DBL_EQ(sd->val, max))
+        if (EINA_DBL_EQ(sd->val, max)) // Check against the part's max
           efl_event_callback_call(obj, EFL_UI_RANGE_EVENT_MAX_REACHED, NULL);
      }
 }
 
+/**
+ * @brief Gets the value of a specific progressbar part.
+ * @param sd The private data of the progressbar.
+ * @param part The name of the part.
+ * @return The current value of the part, or 0.0 if the part is not found.
+ * @internal
+ */
 static double
 _progressbar_part_value_get(Efl_Ui_Progressbar_Data *sd, const char* part)
 {
@@ -518,6 +717,16 @@ _progressbar_part_value_get(Efl_Ui_Progressbar_Data *sd, const char* part)
    return 0.0;
 }
 
+/**
+ * @brief Efl.Ui.Range.Display.range_value_set implementation.
+ * @param obj The progressbar object.
+ * @param sd The private data of the progressbar.
+ * @param val The new value for the main progressbar.
+ * @internal
+ *
+ * Sets the value of the main progress indicator part ("elm.cur.progressbar"
+ * for legacy, "efl.cur.progressbar" for non-legacy).
+ */
 EOLIAN static void
 _efl_ui_progressbar_efl_ui_range_display_range_value_set(Eo *obj, Efl_Ui_Progressbar_Data *sd, double val)
 {
@@ -541,6 +750,16 @@ _efl_ui_progressbar_efl_ui_range_display_range_value_set(Eo *obj, Efl_Ui_Progres
      }
 }
 
+/**
+ * @brief Efl.Ui.Range.Display.range_value_get implementation.
+ * @param obj The progressbar object.
+ * @param sd The private data of the progressbar.
+ * @return The current value of the main progressbar.
+ * @internal
+ *
+ * Gets the value of the main progress indicator part. Returns 0.0 if the
+ * part doesn't exist.
+ */
 EOLIAN static double
 _efl_ui_progressbar_efl_ui_range_display_range_value_get(const Eo *obj, Efl_Ui_Progressbar_Data *sd)
 {
@@ -551,6 +770,15 @@ _efl_ui_progressbar_efl_ui_range_display_range_value_get(const Eo *obj, Efl_Ui_P
      return efl_ui_range_value_get(efl_part(obj, "efl.cur.progressbar"));
 }
 
+/**
+ * @brief Applies the current pulse state by emitting Edje signals.
+ * @param obj The progressbar object.
+ * @param sd The private data of the progressbar.
+ * @internal
+ *
+ * Emits "elm,state,pulse,start" or "elm,state,pulse,stop" (or efl equivalents)
+ * based on `sd->pulse_state`.
+ */
 static void
 _apply_pulse_state(Eo *obj, Efl_Ui_Progressbar_Data *sd)
 {
@@ -563,10 +791,21 @@ _apply_pulse_state(Eo *obj, Efl_Ui_Progressbar_Data *sd)
    elm_layout_signal_emit(obj, signal_buffer, emitter);
 }
 
+/**
+ * @brief Sets the infinite (pulse) mode of the progressbar.
+ * @param obj The progressbar object.
+ * @param sd The private data of the progressbar.
+ * @param state EINA_TRUE to enable infinite mode, EINA_FALSE to disable.
+ * @internal
+ *
+ * This function manages the `pulse_state` flag. If the state changes,
+ * it ensures the theme is set to pulse mode (via `_internal_theme_mode_pulse_set`)
+ * and then applies the new pulse state (start/stop signals via `_apply_pulse_state`).
+ */
 EOLIAN static void
 _efl_ui_progressbar_infinite_mode_set(Eo *obj, Efl_Ui_Progressbar_Data *sd, Eina_Bool state)
 {
-   state = !!state;
+   state = !!state; // Normalize to EINA_TRUE or EINA_FALSE
 
    if (sd->pulse_state == state)
      return;
@@ -577,12 +816,33 @@ _efl_ui_progressbar_infinite_mode_set(Eo *obj, Efl_Ui_Progressbar_Data *sd, Eina
    _apply_pulse_state(obj, sd);
 }
 
+/**
+ * @brief Gets the infinite (pulse) mode state of the progressbar.
+ * @param obj The progressbar object (unused).
+ * @param sd The private data of the progressbar.
+ * @return EINA_TRUE if infinite mode is active, EINA_FALSE otherwise.
+ * @internal
+ *
+ * Infinite mode is considered active if both `sd->pulse_state` (user-set intent)
+ * and `sd->pulse` (theme is in pulse mode) are true.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_progressbar_infinite_mode_get(const Eo *obj EINA_UNUSED, Efl_Ui_Progressbar_Data *sd)
 {
    return (sd->pulse_state && sd->pulse);
 }
 
+/**
+ * @brief Efl.Ui.Range.Display.range_limits_set implementation.
+ * @param obj The progressbar object.
+ * @param sd The private data of the progressbar.
+ * @param min The new minimum value for the main progressbar.
+ * @param max The new maximum value for the main progressbar.
+ * @internal
+ *
+ * Sets the min/max limits for the main progress indicator part.
+ * Logs errors if min > max or min == max.
+ */
 EOLIAN static void
 _efl_ui_progressbar_efl_ui_range_display_range_limits_set(Eo *obj, Efl_Ui_Progressbar_Data *sd, double min, double max)
 {
@@ -602,6 +862,17 @@ _efl_ui_progressbar_efl_ui_range_display_range_limits_set(Eo *obj, Efl_Ui_Progre
     _progress_part_min_max_set(obj, sd, "efl.cur.progressbar", min, max);
 }
 
+/**
+ * @brief Efl.Ui.Range.Display.range_limits_get implementation.
+ * @param obj The progressbar object (unused).
+ * @param sd The private data of the progressbar.
+ * @param[out] min Pointer to store the minimum value.
+ * @param[out] max Pointer to store the maximum value.
+ * @internal
+ *
+ * Gets the min/max limits of the main progress indicator part, which are
+ * stored directly in the progressbar's private data (`sd->val_min`, `sd->val_max`).
+ */
 EOLIAN static void
 _efl_ui_progressbar_efl_ui_range_display_range_limits_get(const Eo *obj EINA_UNUSED, Efl_Ui_Progressbar_Data *sd, double *min, double *max)
 {
@@ -611,6 +882,19 @@ _efl_ui_progressbar_efl_ui_range_display_range_limits_get(const Eo *obj EINA_UNU
 
 /* Efl.Part begin */
 
+/**
+ * @brief Efl.Part.part_get implementation.
+ * @param obj The progressbar object.
+ * @param sd Private data (unused in this function directly).
+ * @param part The name of the part to get.
+ * @return The part object if found and supported, otherwise result from superclass.
+ * @internal
+ *
+ * Returns a special part object (EFL_UI_PROGRESSBAR_PART_CLASS) for draggable
+ * parts in legacy mode (any part with drag direction not NONE) or for
+ * "efl.cur.progressbar" in non-legacy mode. This allows these parts to
+ * implement range interfaces.
+ */
 EOLIAN static Eo *
 _efl_ui_progressbar_efl_part_part_get(const Eo *obj, Efl_Ui_Progressbar_Data *sd EINA_UNUSED, const char *part)
 {
@@ -631,15 +915,32 @@ _efl_ui_progressbar_efl_part_part_get(const Eo *obj, Efl_Ui_Progressbar_Data *sd
    return efl_part_get(efl_super(obj, MY_CLASS), part);
 }
 
+/**
+ * @brief Efl.Ui.Range.Display.range_value_set implementation for a progressbar part.
+ * @param obj The part object (EFL_UI_PROGRESSBAR_PART_CLASS).
+ * @param _pd Part private data (unused).
+ * @param val The new value for the part.
+ * @internal
+ *
+ * Retrieves the main progressbar object and its data, then calls
+ * `_progressbar_part_value_set` for the specific part.
+ */
 EOLIAN static void
 _efl_ui_progressbar_part_efl_ui_range_display_range_value_set(Eo *obj, void *_pd EINA_UNUSED, double val)
 {
-  Elm_Part_Data *pd = efl_data_scope_get(obj, EFL_UI_WIDGET_PART_CLASS);
-  Efl_Ui_Progressbar_Data *sd = efl_data_scope_get(pd->obj, EFL_UI_PROGRESSBAR_CLASS);
+  Elm_Part_Data *pd = efl_data_scope_get(obj, EFL_UI_WIDGET_PART_CLASS); // Part data (name, parent obj)
+  Efl_Ui_Progressbar_Data *sd = efl_data_scope_get(pd->obj, EFL_UI_PROGRESSBAR_CLASS); // Main progressbar data
 
   _progressbar_part_value_set(pd->obj, sd, pd->part, val);
 }
 
+/**
+ * @brief Efl.Ui.Range.Display.range_value_get implementation for a progressbar part.
+ * @param obj The part object.
+ * @param _pd Part private data (unused).
+ * @return The current value of the part.
+ * @internal
+ */
 EOLIAN static double
 _efl_ui_progressbar_part_efl_ui_range_display_range_value_get(const Eo *obj, void *_pd EINA_UNUSED)
 {
@@ -649,6 +950,14 @@ _efl_ui_progressbar_part_efl_ui_range_display_range_value_get(const Eo *obj, voi
    return _progressbar_part_value_get(sd, pd->part);
 }
 
+/**
+ * @brief Efl.Ui.Range.Display.range_limits_set implementation for a progressbar part.
+ * @param obj The part object.
+ * @param _pd Part private data (unused).
+ * @param min The new minimum value for the part.
+ * @param max The new maximum value for the part.
+ * @internal
+ */
 EOLIAN static void
 _efl_ui_progressbar_part_efl_ui_range_display_range_limits_set(Eo *obj, void *_pd EINA_UNUSED, double min, double max)
 {
@@ -658,6 +967,17 @@ _efl_ui_progressbar_part_efl_ui_range_display_range_limits_set(Eo *obj, void *_p
   _progress_part_min_max_set(pd->obj, sd, pd->part, min, max);
 }
 
+/**
+ * @brief Efl.Ui.Range.Display.range_limits_get implementation for a progressbar part.
+ * @param obj The part object.
+ * @param _pd Part private data (unused).
+ * @param[out] min Pointer to store the minimum value.
+ * @param[out] max Pointer to store the maximum value.
+ * @internal
+ *
+ * Iterates through the `progress_status` list to find the specified part
+ * and retrieve its min/max values.
+ */
 EOLIAN static void
 _efl_ui_progressbar_part_efl_ui_range_display_range_limits_get(const Eo *obj, void *_pd EINA_UNUSED, double *min, double *max)
 {
@@ -678,6 +998,16 @@ _efl_ui_progressbar_part_efl_ui_range_display_range_limits_get(const Eo *obj, vo
      }
 }
 
+/**
+ * @brief Sets the visibility of the progress label.
+ * @param obj The progressbar object.
+ * @param pd The private data of the progressbar.
+ * @param show EINA_TRUE to show the label, EINA_FALSE to hide it.
+ * @internal
+ *
+ * Updates the `show_progress_label` flag, emits Edje signals to show/hide
+ * the unit text part in the theme, and updates the unit text content.
+ */
 EOLIAN static void
 _efl_ui_progressbar_show_progress_label_set(Eo *obj EINA_UNUSED, Efl_Ui_Progressbar_Data *pd, Eina_Bool show)
 {
@@ -695,12 +1025,28 @@ _efl_ui_progressbar_show_progress_label_set(Eo *obj EINA_UNUSED, Efl_Ui_Progress
    efl_canvas_group_change(obj);
 }
 
+/**
+ * @brief Gets the visibility of the progress label.
+ * @param obj The progressbar object (unused).
+ * @param pd The private data of the progressbar.
+ * @return EINA_TRUE if the label is shown, EINA_FALSE otherwise.
+ * @internal
+ */
 EOLIAN static Eina_Bool
 _efl_ui_progressbar_show_progress_label_get(const Eo *obj EINA_UNUSED, Efl_Ui_Progressbar_Data *pd)
 {
    return pd->show_progress_label;
 }
 
+/**
+ * @brief Efl.Ui.Format.apply_formatted_value implementation.
+ * @param obj The progressbar object.
+ * @param pd Private data (unused).
+ * @internal
+ *
+ * Called when the format string or format function changes. This function
+ * simply calls `_units_set` to update the displayed text.
+ */
 EOLIAN static void
 _efl_ui_progressbar_efl_ui_format_apply_formatted_value(Eo *obj, Efl_Ui_Progressbar_Data *pd EINA_UNUSED)
 {
@@ -729,12 +1075,29 @@ EFL_UI_LAYOUT_CONTENT_ALIASES_IMPLEMENT(efl_ui_progressbar)
 
 #define MY_CLASS_NAME_LEGACY "elm_progressbar"
 
+/**
+ * @brief Legacy class constructor for elm_progressbar.
+ * @param klass The Efl_Class being constructed.
+ * @internal
+ *
+ * Registers the legacy type "elm_progressbar" with the Evas smart system.
+ */
 static void
 _efl_ui_progressbar_legacy_class_constructor(Efl_Class *klass)
 {
    evas_smart_legacy_type_register(MY_CLASS_NAME_LEGACY, klass);
 }
 
+/**
+ * @brief Legacy object constructor for elm_progressbar.
+ * @param obj The legacy progressbar object.
+ * @param pd Private data (unused).
+ * @return The constructed legacy object.
+ * @internal
+ *
+ * Calls the superclass constructor, sets the Evas object type, and
+ * enables legacy focus handling.
+ */
 EOLIAN static Eo *
 _efl_ui_progressbar_legacy_efl_object_constructor(Eo *obj, void *pd EINA_UNUSED)
 {
@@ -744,9 +1107,19 @@ _efl_ui_progressbar_legacy_efl_object_constructor(Eo *obj, void *pd EINA_UNUSED)
    return obj;
 }
 
-/* FIXME: replicated from elm_layout just because progressbar's icon spot
- * is elm.swallow.content, not elm.swallow.icon. Fix that whenever we
- * can changed the theme API */
+/**
+ * @brief Legacy theme_apply implementation for elm_progressbar.
+ * @param obj The legacy progressbar object.
+ * @param _pd Private data (unused).
+ * @return Eina_Error indicating success or failure.
+ * @internal
+ *
+ * FIXME: This is replicated from elm_layout because progressbar's icon spot
+ * is "elm.swallow.content", not "elm.swallow.icon". This should be fixed
+ * when the theme API can be changed.
+ *
+ * Calls the superclass theme_apply and then emits legacy icon signals if finalized.
+ */
 EOLIAN static Eina_Error
 _efl_ui_progressbar_legacy_efl_ui_widget_theme_apply(Eo *obj, void *_pd EINA_UNUSED)
 {
@@ -759,9 +1132,18 @@ _efl_ui_progressbar_legacy_efl_ui_widget_theme_apply(Eo *obj, void *_pd EINA_UNU
    return int_ret;
 }
 
-/* FIXME: replicated from elm_layout just because progressbar's icon spot
- * is elm.swallow.content, not elm.swallow.icon. Fix that whenever we
- * can changed the theme API */
+/**
+ * @brief Legacy sub_object_del implementation for elm_progressbar.
+ * @param obj The legacy progressbar object.
+ * @param _pd Private data (unused).
+ * @param sobj The sub-object being deleted.
+ * @return EINA_TRUE if the sub-object was handled, EINA_FALSE otherwise.
+ * @internal
+ *
+ * FIXME: This is replicated from elm_layout for the same reasons as theme_apply.
+ *
+ * Calls the superclass sub_object_del and then emits legacy icon signals.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_progressbar_legacy_efl_ui_widget_widget_sub_object_del(Eo *obj, void *_pd EINA_UNUSED, Evas_Object *sobj)
 {
@@ -775,9 +1157,19 @@ _efl_ui_progressbar_legacy_efl_ui_widget_widget_sub_object_del(Eo *obj, void *_p
    return EINA_TRUE;
 }
 
-/* FIXME: replicated from elm_layout just because progressbar's icon spot
- * is elm.swallow.content, not elm.swallow.icon. Fix that whenever we
- * can changed the theme API */
+/**
+ * @brief Legacy content_set implementation for elm_progressbar.
+ * @param obj The legacy progressbar object.
+ * @param _pd Private data (unused).
+ * @param part The name of the part to set content for.
+ * @param content The content object.
+ * @return EINA_TRUE if content was set, EINA_FALSE otherwise.
+ * @internal
+ *
+ * FIXME: This is replicated from elm_layout for the same reasons as theme_apply.
+ *
+ * Calls the superclass content_set (via efl_part) and then emits legacy icon signals.
+ */
 static Eina_Bool
 _efl_ui_progressbar_legacy_content_set(Eo *obj, void *_pd EINA_UNUSED, const char *part, Evas_Object *content)
 {
@@ -793,6 +1185,16 @@ _efl_ui_progressbar_legacy_content_set(Eo *obj, void *_pd EINA_UNUSED, const cha
 
 /* Efl.Part for legacy begin */
 
+/**
+ * @brief Checks if a part name corresponds to a special legacy progressbar part.
+ * @param obj The object (unused).
+ * @param part The part name to check.
+ * @return EINA_TRUE if the part is "elm.swallow.content", EINA_FALSE otherwise.
+ * @internal
+ *
+ * This is used by the ELM_PART_OVERRIDE_PARTIAL macro to determine if
+ * the specialized legacy part implementation should be used for content_set.
+ */
 static Eina_Bool
 _part_is_efl_ui_progressbar_legacy_part(const Eo *obj EINA_UNUSED, const char *part)
 {
@@ -805,6 +1207,15 @@ ELM_PART_OVERRIDE_CONTENT_SET_NO_SD(efl_ui_progressbar_legacy)
 
 /* Efl.Part for legacy end */
 
+/**
+ * @brief Adds a new progressbar widget to the given parent Elementary (container) object.
+ * @param parent The parent object.
+ * @return A new progressbar widget handle or @c NULL, on errors.
+ * @ingroup Elm_Progressbar_Group
+ *
+ * This function inserts a new progressbar widget on the canvas.
+ * Default unit format is "%.0f%%".
+ */
 EAPI Evas_Object *
 elm_progressbar_add(Evas_Object *parent)
 {
@@ -815,6 +1226,17 @@ elm_progressbar_add(Evas_Object *parent)
    return obj;
 }
 
+/**
+ * @brief Sets the pulse mode of a progressbar.
+ * @param obj The progressbar object.
+ * @param pulse @c EINA_TRUE to enable pulse mode, @c EINA_FALSE to disable.
+ * @ingroup Elm_Progressbar_Group
+ *
+ * In pulse mode, the progressbar will animate, indicating an ongoing
+ * operation of unknown duration. This function sets the *intention* to use
+ * pulse mode. The actual animation is started/stopped with elm_progressbar_pulse().
+ * This also triggers a theme apply to switch between "fraction" and "pulse" states.
+ */
 EAPI void
 elm_progressbar_pulse_set(Evas_Object *obj, Eina_Bool pulse)
 {
@@ -827,6 +1249,13 @@ elm_progressbar_pulse_set(Evas_Object *obj, Eina_Bool pulse)
    efl_ui_widget_theme_apply(obj);
 }
 
+/**
+ * @brief Gets the pulse mode of a progressbar.
+ * @param obj The progressbar object.
+ * @return @c EINA_TRUE if pulse mode is enabled, @c EINA_FALSE otherwise.
+ * @ingroup Elm_Progressbar_Group
+ * @see elm_progressbar_pulse_set()
+ */
 EAPI Eina_Bool
 elm_progressbar_pulse_get(const Evas_Object *obj)
 {
@@ -834,6 +1263,15 @@ elm_progressbar_pulse_get(const Evas_Object *obj)
    return sd->pulse;
 }
 
+/**
+ * @brief Starts or stops the pulsing animation of a progressbar.
+ * @param obj The progressbar object.
+ * @param state @c EINA_TRUE to start pulsing, @c EINA_FALSE to stop.
+ * @ingroup Elm_Progressbar_Group
+ *
+ * This function actually starts or stops the animation. Pulse mode must
+ * first be enabled by elm_progressbar_pulse_set().
+ */
 EAPI void
 elm_progressbar_pulse(Evas_Object *obj, Eina_Bool state)
 {
@@ -847,6 +1285,15 @@ elm_progressbar_pulse(Evas_Object *obj, Eina_Bool state)
    _apply_pulse_state(obj, sd);
 }
 
+/**
+ * @brief Gets whether the progressbar is currently pulsing.
+ * @param obj The progressbar object.
+ * @return @c EINA_TRUE if the progressbar is pulsing, @c EINA_FALSE otherwise.
+ * @ingroup Elm_Progressbar_Group
+ *
+ * This reflects the actual animation state, which depends on both
+ * elm_progressbar_pulse_set() and elm_progressbar_pulse() having been called appropriately.
+ */
 EAPI Eina_Bool
 elm_progressbar_is_pulsing_get(const Evas_Object *obj)
 {
@@ -854,6 +1301,16 @@ elm_progressbar_is_pulsing_get(const Evas_Object *obj)
    return (sd->pulse_state && sd->pulse);
 }
 
+/**
+ * @brief Sets the value of a specific progressbar part.
+ * @param obj The progressbar object.
+ * @param part The name of the part (e.g., "elm.cur.progressbar").
+ * @param val The value to set (typically between 0.0 and 1.0, unless limits are changed).
+ * @ingroup Elm_Progressbar_Group
+ * @deprecated Use efl_ui_range_value_set(efl_part(obj, part), val) instead.
+ *
+ * This function directly calls the Efl.Ui.Range.Display interface on the part.
+ */
 EAPI void
 elm_progressbar_part_value_set(Evas_Object *obj, const char *part, double val)
 {
@@ -861,12 +1318,27 @@ elm_progressbar_part_value_set(Evas_Object *obj, const char *part, double val)
    efl_ui_range_value_set(efl_part(obj, part), val);
 }
 
+/**
+ * @brief Gets the value of a specific progressbar part.
+ * @param obj The progressbar object.
+ * @param part The name of the part.
+ * @return The current value of the part.
+ * @ingroup Elm_Progressbar_Group
+ * @deprecated Use efl_ui_range_value_get(efl_part(obj, part)) instead.
+ */
 EAPI double
 elm_progressbar_part_value_get(const Evas_Object *obj, const char *part)
 {
    return efl_ui_range_value_get(efl_part(obj, part));
 }
 
+/**
+ * @brief Gets the orientation of a progressbar.
+ * @param obj The progressbar object.
+ * @return @c EINA_TRUE if horizontal, @c EINA_FALSE if vertical.
+ * @ingroup Elm_Progressbar_Group
+ * @deprecated Use efl_ui_layout_orientation_get() and check if it's horizontal.
+ */
 EAPI Eina_Bool
 elm_progressbar_horizontal_get(const Evas_Object *obj)
 {
@@ -875,6 +1347,16 @@ elm_progressbar_horizontal_get(const Evas_Object *obj)
    return _is_horizontal(sd->dir);
 }
 
+/**
+ * @brief Sets the inverted mode of a progressbar.
+ * @param obj The progressbar object.
+ * @param inverted @c EINA_TRUE to invert, @c EINA_FALSE for normal.
+ * @ingroup Elm_Progressbar_Group
+ * @deprecated Use efl_ui_layout_orientation_set() with the inverted flag.
+ *
+ * In inverted mode, the progressbar's values are represented in reverse.
+ * For example, a horizontal progressbar will fill from right to left.
+ */
 EAPI void
 elm_progressbar_inverted_set(Evas_Object *obj, Eina_Bool inverted)
 {
@@ -887,6 +1369,13 @@ elm_progressbar_inverted_set(Evas_Object *obj, Eina_Bool inverted)
    efl_ui_layout_orientation_set(obj, dir);
 }
 
+/**
+ * @brief Gets the inverted mode of a progressbar.
+ * @param obj The progressbar object.
+ * @return @c EINA_TRUE if inverted, @c EINA_FALSE otherwise.
+ * @ingroup Elm_Progressbar_Group
+ * @deprecated Use efl_ui_layout_orientation_get() and check the inverted flag.
+ */
 EAPI Eina_Bool
 elm_progressbar_inverted_get(const Evas_Object *obj)
 {
@@ -895,6 +1384,13 @@ elm_progressbar_inverted_get(const Evas_Object *obj)
    return efl_ui_layout_orientation_is_inverted(sd->dir);
 }
 
+/**
+ * @brief Sets the orientation of a progressbar.
+ * @param obj The progressbar object.
+ * @param horizontal @c EINA_TRUE for horizontal, @c EINA_FALSE for vertical.
+ * @ingroup Elm_Progressbar_Group
+ * @deprecated Use efl_ui_layout_orientation_set() instead.
+ */
 EAPI void
 elm_progressbar_horizontal_set(Evas_Object *obj, Eina_Bool horizontal)
 {
@@ -910,9 +1406,21 @@ elm_progressbar_horizontal_set(Evas_Object *obj, Eina_Bool horizontal)
 typedef struct
 {
    progressbar_func_type format_cb;
-   progressbar_freefunc_type format_free_cb;
+   progressbar_freefunc_type format_free_cb; /**< Legacy free function for the formatted string. */
 } Pb_Format_Wrapper_Data;
 
+/**
+ * @brief Adapter callback to bridge legacy progressbar_func_type to Efl_Ui_Format_Func.
+ * @param data Pointer to Pb_Format_Wrapper_Data containing the legacy callbacks.
+ * @param str The Eina_Strbuf to append the formatted string to.
+ * @param value The Eina_Value (double) representing the progressbar value.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ * @internal
+ *
+ * This function is used when elm_progressbar_unit_format_function_set() is called.
+ * It calls the legacy formatting function and appends its result to the strbuf.
+ * It also handles freeing the string returned by the legacy function if a free_cb is provided.
+ */
 static Eina_Bool
 _format_legacy_to_format_eo_cb(void *data, Eina_Strbuf *str, const Eina_Value value)
 {
@@ -933,6 +1441,11 @@ _format_legacy_to_format_eo_cb(void *data, Eina_Strbuf *str, const Eina_Value va
    return EINA_TRUE;
 }
 
+/**
+ * @brief Free callback for the Pb_Format_Wrapper_Data structure.
+ * @param data Pointer to Pb_Format_Wrapper_Data to be freed.
+ * @internal
+ */
 static void
 _format_legacy_to_format_eo_free_cb(void *data)
 {
@@ -940,6 +1453,18 @@ _format_legacy_to_format_eo_free_cb(void *data)
    free(pfwd);
 }
 
+/**
+ * @brief Sets a custom function to format the progressbar's unit label.
+ * @param obj The progressbar object.
+ * @param func The function to call to get the formatted string.
+ *             It takes a double (the progress value) and returns a char*.
+ * @param free_func A function to free the string returned by @p func.
+ * @ingroup Elm_Progressbar_Group
+ * @deprecated Use efl_ui_format_func_set() instead.
+ *
+ * This allows for dynamic formatting of the label text. The `sd->is_legacy_format_cb`
+ * flag is set to ensure correct value scaling if needed (legacy functions might expect 0-100).
+ */
 EAPI void
 elm_progressbar_unit_format_function_set(Evas_Object *obj, progressbar_func_type func, progressbar_freefunc_type free_func)
 {
@@ -958,10 +1483,21 @@ elm_progressbar_unit_format_function_set(Evas_Object *obj, progressbar_func_type
 typedef struct
 {
    progressbar_func_full_type format_cb;
-   progressbar_freefunc_type format_free_cb;
-   void *format_func_data;
+   progressbar_freefunc_type format_free_cb; /**< Legacy free function for the formatted string. */
+   void *format_func_data; /**< User data for the legacy full format function. */
 } Pb_Full_Format_Wrapper_Data;
 
+/**
+ * @brief Adapter callback to bridge legacy progressbar_func_full_type to Efl_Ui_Format_Func.
+ * @param data Pointer to Pb_Full_Format_Wrapper_Data containing the legacy callbacks and user data.
+ * @param str The Eina_Strbuf to append the formatted string to.
+ * @param value The Eina_Value (double) representing the progressbar value.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ * @internal
+ *
+ * Similar to _format_legacy_to_format_eo_cb, but for the "full" version of the
+ * legacy format function which includes user data.
+ */
 static Eina_Bool
 _format_legacy_to_format_eo_cb_full(void *data, Eina_Strbuf *str, const Eina_Value value)
 {
@@ -982,6 +1518,11 @@ _format_legacy_to_format_eo_cb_full(void *data, Eina_Strbuf *str, const Eina_Val
    return EINA_TRUE;
 }
 
+/**
+ * @brief Free callback for the Pb_Full_Format_Wrapper_Data structure.
+ * @param data Pointer to Pb_Full_Format_Wrapper_Data to be freed.
+ * @internal
+ */
 static void
 _format_legacy_to_format_eo_full_free_cb(void *data)
 {
@@ -989,6 +1530,19 @@ _format_legacy_to_format_eo_full_free_cb(void *data)
    free(pfwd);
 }
 
+/**
+ * @brief Sets a custom function (with user data) to format the progressbar's unit label.
+ * @param obj The progressbar object.
+ * @param func The function to call to get the formatted string.
+ *             It takes a double (progress value) and user data, returning a char*.
+ * @param free_func A function to free the string returned by @p func.
+ * @param data User data to be passed to @p func.
+ * @ingroup Elm_Progressbar_Group
+ * @deprecated Use efl_ui_format_func_set() instead, managing user data within the Efl_Ui_Format_Func itself.
+ *
+ * Similar to elm_progressbar_unit_format_function_set(), but allows passing user data
+ * to the formatting function.
+ */
 EAPI void
 elm_progressbar_unit_format_function_set_full(Evas_Object *obj, progressbar_func_full_type func, progressbar_freefunc_type free_func, void* data)
 {
@@ -1005,6 +1559,15 @@ elm_progressbar_unit_format_function_set_full(Evas_Object *obj, progressbar_func
                           _format_legacy_to_format_eo_full_free_cb);
 }
 
+/**
+ * @brief Sets the span size of the progressbar.
+ * @param obj The progressbar object.
+ * @param size The new span size. For a horizontal progressbar, this is its height.
+ *             For a vertical progressbar, this is its width.
+ * @ingroup Elm_Progressbar_Group
+ *
+ * This controls the "thickness" of the progressbar.
+ */
 EAPI void
 elm_progressbar_span_size_set(Evas_Object *obj, Evas_Coord size)
 {
@@ -1012,6 +1575,13 @@ elm_progressbar_span_size_set(Evas_Object *obj, Evas_Coord size)
    _progressbar_span_size_set(obj, sd, size);
 }
 
+/**
+ * @brief Gets the span size of the progressbar.
+ * @param obj The progressbar object.
+ * @return The span size.
+ * @ingroup Elm_Progressbar_Group
+ * @see elm_progressbar_span_size_set()
+ */
 EAPI Evas_Coord
 elm_progressbar_span_size_get(const Evas_Object *obj)
 {
@@ -1019,6 +1589,17 @@ elm_progressbar_span_size_get(const Evas_Object *obj)
    return sd->size;
 }
 
+/**
+ * @brief Sets the format string for the progressbar's unit label.
+ * @param obj The progressbar object.
+ * @param units The format string (e.g., "%.2f %%", "%1.2f units").
+ *              Must be a C-style printf format specifier for a double.
+ * @ingroup Elm_Progressbar_Group
+ * @deprecated Use efl_ui_format_string_set() with EFL_UI_FORMAT_STRING_TYPE_SIMPLE.
+ *
+ * If @c NULL, the label will be hidden. The `sd->is_legacy_format_string` flag
+ * is set to ensure correct value scaling (legacy format strings often expect 0-100).
+ */
 EAPI void
 elm_progressbar_unit_format_set(Evas_Object *obj, const char *units)
 {
@@ -1028,6 +1609,13 @@ elm_progressbar_unit_format_set(Evas_Object *obj, const char *units)
    efl_ui_format_string_set(obj, units, EFL_UI_FORMAT_STRING_TYPE_SIMPLE);
 }
 
+/**
+ * @brief Gets the format string for the progressbar's unit label.
+ * @param obj The progressbar object.
+ * @return The format string, or @c NULL if not set.
+ * @ingroup Elm_Progressbar_Group
+ * @deprecated Use efl_ui_format_string_get().
+ */
 EAPI const char *
 elm_progressbar_unit_format_get(const Evas_Object *obj)
 {
@@ -1036,12 +1624,26 @@ elm_progressbar_unit_format_get(const Evas_Object *obj)
    return fmt;
 }
 
+/**
+ * @brief Sets the value of the progressbar.
+ * @param obj The progressbar object.
+ * @param val The value (typically between 0.0 and 1.0, unless limits are changed).
+ * @ingroup Elm_Progressbar_Group
+ * @deprecated Use efl_ui_range_value_set() instead.
+ */
 EAPI void
 elm_progressbar_value_set(Evas_Object *obj, double val)
 {
    efl_ui_range_value_set(obj, val);
 }
 
+/**
+ * @brief Gets the value of the progressbar.
+ * @param obj The progressbar object.
+ * @return The current value.
+ * @ingroup Elm_Progressbar_Group
+ * @deprecated Use efl_ui_range_value_get() instead.
+ */
 EAPI double
 elm_progressbar_value_get(const Evas_Object *obj)
 {

@@ -40,6 +40,18 @@
 #define INT_MULT(a,b,t)  ((t) = (a) * (b) + 0x80, ((((t) >> 8) + (t)) >> 8))
 #define LINEAR(x,y,w) ((w*y + x)*4)
 
+/**
+ * @brief Converts RGB color values to HLS (Hue, Luminance, Saturation).
+ *
+ * The input RGB values are modified in place to their HLS equivalents.
+ * Hue is scaled to 0-255.
+ * Luminance is scaled to 0-255.
+ * Saturation is scaled to 0-255.
+ *
+ * @param red Pointer to the red component (0-255), updated to Hue.
+ * @param green Pointer to the green component (0-255), updated to Luminance.
+ * @param blue Pointer to the blue component (0-255), updated to Saturation.
+ */
 static void
 rgb_to_hls (DATA8 *red, DATA8 *green, DATA8 *blue)
 {
@@ -100,6 +112,17 @@ rgb_to_hls (DATA8 *red, DATA8 *green, DATA8 *blue)
 }
 
 
+/**
+ * @brief Helper function for HLS to RGB conversion, used by GIMP.
+ *
+ * Calculates a component value based on hue and two intermediate values
+ * derived from luminance and saturation.
+ *
+ * @param n1 Intermediate value 1.
+ * @param n2 Intermediate value 2.
+ * @param hue Hue value (0-255).
+ * @return The calculated color component value (0-255).
+ */
 static DATA8
 gimp_hls_value (double n1, double n2, double hue)
 {
@@ -122,6 +145,15 @@ gimp_hls_value (double n1, double n2, double hue)
 }
 
 
+/**
+ * @brief Converts HLS (Hue, Luminance, Saturation) color values to RGB.
+ *
+ * The input HLS values are modified in place to their RGB equivalents.
+ *
+ * @param hue Pointer to the Hue component (0-255), updated to Red.
+ * @param lightness Pointer to the Luminance component (0-255), updated to Green.
+ * @param saturation Pointer to the Saturation component (0-255), updated to Blue.
+ */
 static void
 hls_to_rgb (DATA8 *hue, DATA8 *lightness, DATA8 *saturation)
 {
@@ -156,6 +188,18 @@ hls_to_rgb (DATA8 *hue, DATA8 *lightness, DATA8 *saturation)
 }
 
 
+/**
+ * @brief Converts RGB color values to HSV (Hue, Saturation, Value).
+ *
+ * The input RGB values are modified in place to their HSV equivalents.
+ * Hue is scaled to 0-255.
+ * Saturation is scaled to 0-255.
+ * Value (brightness) is scaled to 0-255.
+ *
+ * @param red Pointer to the red component (0-255), updated to Hue.
+ * @param green Pointer to the green component (0-255), updated to Saturation.
+ * @param blue Pointer to the blue component (0-255), updated to Value.
+ */
 static void
 rgb_to_hsv (DATA8 *red, DATA8 *green, DATA8 *blue)
 {
@@ -212,6 +256,15 @@ rgb_to_hsv (DATA8 *red, DATA8 *green, DATA8 *blue)
   *blue  = v;
 }
 
+/**
+ * @brief Converts HSV (Hue, Saturation, Value) color values to RGB.
+ *
+ * The input HSV values are modified in place to their RGB equivalents.
+ *
+ * @param hue Pointer to the Hue component (0-255), updated to Red.
+ * @param saturation Pointer to the Saturation component (0-255), updated to Green.
+ * @param value Pointer to the Value (brightness) component (0-255), updated to Blue.
+ */
 static void
 hsv_to_rgb (DATA8 *hue, DATA8 *saturation, DATA8 *value)
 {
@@ -276,7 +329,24 @@ hsv_to_rgb (DATA8 *hue, DATA8 *saturation, DATA8 *value)
     }
 }
 
-/* translate negative destinations */
+/**
+ * @brief Clips source and destination coordinates to fit within destination bounds.
+ *
+ * Adjusts the source top-left (tl) and bottom-right (br) coordinates,
+ * as well as the destination top-left (x, y) coordinates, to ensure that
+ * the source region to be copied/blended does not extend beyond the
+ * destination image boundaries. This is particularly useful for handling
+ * cases where a layer might be placed partially outside the canvas.
+ *
+ * @param src_tl_x Pointer to the source top-left X coordinate. Modified if dest_x < 0.
+ * @param src_tl_y Pointer to the source top-left Y coordinate. Modified if dest_y < 0.
+ * @param src_br_x Pointer to the source bottom-right X coordinate (exclusive, width). Modified if source exceeds dest_w.
+ * @param src_br_y Pointer to the source bottom-right Y coordinate (exclusive, height). Modified if source exceeds dest_h.
+ * @param dest_x Pointer to the destination X coordinate. Modified to 0 if originally negative.
+ * @param dest_y Pointer to the destination Y coordinate. Modified to 0 if originally negative.
+ * @param dest_w Width of the destination image.
+ * @param dest_h Height of the destination image.
+ */
 static
 void _clip(int * src_tl_x, int * src_tl_y,
 	  int * src_br_x, int * src_br_y,
@@ -302,6 +372,22 @@ void _clip(int * src_tl_x, int * src_tl_y,
 }
 
 // FIXME: make sure layer alpha is used/applied in all cases
+/**
+ * @brief Combines source pixels onto destination pixels using the Normal blending mode.
+ *
+ * This is the standard alpha blending operation.
+ * Pixel data is assumed to be in RGBA format (4 bytes per pixel).
+ * R_VAL, G_VAL, B_VAL, A_VAL macros are used for component access.
+ *
+ * @param src Pointer to the source image pixel data (RGBA array).
+ * @param src_w Width of the source image.
+ * @param src_h Height of the source image.
+ * @param dest Pointer to the destination image pixel data (RGBA array, modified in place).
+ * @param dest_w Width of the destination image.
+ * @param dest_h Height of the destination image.
+ * @param dest_x X-coordinate in the destination image where the top-left of the source image is placed.
+ * @param dest_y Y-coordinate in the destination image where the top-left of the source image is placed.
+ */
 void
 combine_pixels_normal (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, int dest_h, int dest_x, int dest_y)
 {
@@ -353,6 +439,23 @@ combine_pixels_normal (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w
 }
 
 
+/**
+ * @brief Combines source pixels onto destination pixels using the Addition blending mode.
+ *
+ * ResultColor = SourceColor * SourceAlpha + DestinationColor
+ * The alpha channel of the destination is not explicitly modified in this GIMP-like mode,
+ * but the color channels are affected by source alpha.
+ * Pixel data is assumed to be in RGBA format.
+ *
+ * @param src Pointer to the source image pixel data (RGBA array).
+ * @param src_w Width of the source image.
+ * @param src_h Height of the source image.
+ * @param dest Pointer to the destination image pixel data (RGBA array, modified in place).
+ * @param dest_w Width of the destination image.
+ * @param dest_h Height of the destination image.
+ * @param dest_x X-coordinate for the top-left of the source image on the destination.
+ * @param dest_y Y-coordinate for the top-left of the source image on the destination.
+ */
 void
 combine_pixels_add (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, int dest_h, int dest_x, int dest_y)
 {
@@ -386,6 +489,22 @@ combine_pixels_add (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, i
 }
 
 
+/**
+ * @brief Combines source pixels onto destination pixels using the Subtract blending mode.
+ *
+ * ResultColor = DestinationColor - SourceColor * SourceAlpha
+ * The alpha channel of the destination is not explicitly modified.
+ * Pixel data is assumed to be in RGBA format.
+ *
+ * @param src Pointer to the source image pixel data (RGBA array).
+ * @param src_w Width of the source image.
+ * @param src_h Height of the source image.
+ * @param dest Pointer to the destination image pixel data (RGBA array, modified in place).
+ * @param dest_w Width of the destination image.
+ * @param dest_h Height of the destination image.
+ * @param dest_x X-coordinate for the top-left of the source image on the destination.
+ * @param dest_y Y-coordinate for the top-left of the source image on the destination.
+ */
 void
 combine_pixels_sub (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, int dest_h, int dest_x, int dest_y)
 {
@@ -419,6 +538,22 @@ combine_pixels_sub (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, i
 }
 
 
+/**
+ * @brief Combines source pixels onto destination pixels using the Difference blending mode.
+ *
+ * ResultColor = abs(DestinationColor - SourceColor * SourceAlpha)
+ * The alpha channel of the destination is not explicitly modified.
+ * Pixel data is assumed to be in RGBA format.
+ *
+ * @param src Pointer to the source image pixel data (RGBA array).
+ * @param src_w Width of the source image.
+ * @param src_h Height of the source image.
+ * @param dest Pointer to the destination image pixel data (RGBA array, modified in place).
+ * @param dest_w Width of the destination image.
+ * @param dest_h Height of the destination image.
+ * @param dest_x X-coordinate for the top-left of the source image on the destination.
+ * @param dest_y Y-coordinate for the top-left of the source image on the destination.
+ */
 void
 combine_pixels_diff (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, int dest_h, int dest_x, int dest_y)
 {
@@ -452,6 +587,24 @@ combine_pixels_diff (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, 
 }
 
 
+/**
+ * @brief Combines source pixels onto destination pixels using the Darken Only blending mode.
+ *
+ * ResultColor = min(DestinationColor, SourceColor)
+ * This mode does not seem to use source alpha directly for blending the color components,
+ * but rather takes the minimum of corresponding components.
+ * The alpha channel of the destination is not explicitly modified.
+ * Pixel data is assumed to be in RGBA format.
+ *
+ * @param src Pointer to the source image pixel data (RGBA array).
+ * @param src_w Width of the source image.
+ * @param src_h Height of the source image.
+ * @param dest Pointer to the destination image pixel data (RGBA array, modified in place).
+ * @param dest_w Width of the destination image.
+ * @param dest_h Height of the destination image.
+ * @param dest_x X-coordinate for the top-left of the source image on the destination.
+ * @param dest_y Y-coordinate for the top-left of the source image on the destination.
+ */
 void
 combine_pixels_darken (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, int dest_h, int dest_x, int dest_y)
 {
@@ -476,6 +629,24 @@ combine_pixels_darken (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w
 }
 
 
+/**
+ * @brief Combines source pixels onto destination pixels using the Lighten Only blending mode.
+ *
+ * ResultColor = max(DestinationColor, SourceColor)
+ * This mode does not seem to use source alpha directly for blending the color components,
+ * but rather takes the maximum of corresponding components.
+ * The alpha channel of the destination is not explicitly modified.
+ * Pixel data is assumed to be in RGBA format.
+ *
+ * @param src Pointer to the source image pixel data (RGBA array).
+ * @param src_w Width of the source image.
+ * @param src_h Height of the source image.
+ * @param dest Pointer to the destination image pixel data (RGBA array, modified in place).
+ * @param dest_w Width of the destination image.
+ * @param dest_h Height of the destination image.
+ * @param dest_x X-coordinate for the top-left of the source image on the destination.
+ * @param dest_y Y-coordinate for the top-left of the source image on the destination.
+ */
 void
 combine_pixels_lighten (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, int dest_h, int dest_x, int dest_y)
 {
@@ -500,6 +671,23 @@ combine_pixels_lighten (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_
 }
 
 
+/**
+ * @brief Combines source pixels onto destination pixels using the Multiply blending mode.
+ *
+ * ResultColor = (SourceColor * DestinationColor) / 255, blended with DestinationColor based on SourceAlpha.
+ * Specifically: Result = (Dest * Src_Component_Affected_By_Alpha) + (Dest * (1 - Src_Alpha))
+ * The alpha channel of the destination is not explicitly modified.
+ * Pixel data is assumed to be in RGBA format.
+ *
+ * @param src Pointer to the source image pixel data (RGBA array).
+ * @param src_w Width of the source image.
+ * @param src_h Height of the source image.
+ * @param dest Pointer to the destination image pixel data (RGBA array, modified in place).
+ * @param dest_w Width of the destination image.
+ * @param dest_h Height of the destination image.
+ * @param dest_x X-coordinate for the top-left of the source image on the destination.
+ * @param dest_y Y-coordinate for the top-left of the source image on the destination.
+ */
 void
 combine_pixels_mult (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, int dest_h, int dest_x, int dest_y)
 {
@@ -538,6 +726,23 @@ combine_pixels_mult (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, 
 }
 
 
+/**
+ * @brief Combines source pixels onto destination pixels using the Divide blending mode.
+ *
+ * The source pixel components are modified first: Src = min(255, (Dest / (Src + 1)) * 256).
+ * Then, a normal blend is performed using these modified source pixels.
+ * The alpha channel of the destination is affected by the subsequent normal blend.
+ * Pixel data is assumed to be in RGBA format.
+ *
+ * @param src Pointer to the source image pixel data (RGBA array, components are modified).
+ * @param src_w Width of the source image.
+ * @param src_h Height of the source image.
+ * @param dest Pointer to the destination image pixel data (RGBA array, modified in place).
+ * @param dest_w Width of the destination image.
+ * @param dest_h Height of the destination image.
+ * @param dest_x X-coordinate for the top-left of the source image on the destination.
+ * @param dest_y Y-coordinate for the top-left of the source image on the destination.
+ */
 void
 combine_pixels_div (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, int dest_h, int dest_x, int dest_y)
 {
@@ -564,6 +769,23 @@ combine_pixels_div (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, i
 }
 
 
+/**
+ * @brief Combines source pixels onto destination pixels using the Screen blending mode.
+ *
+ * ResultColor = 255 - ((255 - DestinationColor) * (255 - SourceColor)) / 255
+ * This mode does not seem to use source alpha directly for blending the color components.
+ * The alpha channel of the destination is not explicitly modified.
+ * Pixel data is assumed to be in RGBA format.
+ *
+ * @param src Pointer to the source image pixel data (RGBA array).
+ * @param src_w Width of the source image.
+ * @param src_h Height of the source image.
+ * @param dest Pointer to the destination image pixel data (RGBA array, modified in place).
+ * @param dest_w Width of the destination image.
+ * @param dest_h Height of the destination image.
+ * @param dest_x X-coordinate for the top-left of the source image on the destination.
+ * @param dest_y Y-coordinate for the top-left of the source image on the destination.
+ */
 void
 combine_pixels_screen (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, int dest_h, int dest_x, int dest_y)
 {
@@ -588,6 +810,25 @@ combine_pixels_screen (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w
 }
 
 
+/**
+ * @brief Combines source pixels onto destination pixels using the Overlay blending mode.
+ *
+ * Overlay mode combines Multiply and Screen. If the destination color is dark,
+ * it multiplies; if light, it screens.
+ * ResultColor = (DestColor * ScreenResult + (255 - DestColor) * MultiplyResult) / 255
+ * This mode does not seem to use source alpha directly for blending the color components.
+ * The alpha channel of the destination is not explicitly modified.
+ * Pixel data is assumed to be in RGBA format.
+ *
+ * @param src Pointer to the source image pixel data (RGBA array).
+ * @param src_w Width of the source image.
+ * @param src_h Height of the source image.
+ * @param dest Pointer to the destination image pixel data (RGBA array, modified in place).
+ * @param dest_w Width of the destination image.
+ * @param dest_h Height of the destination image.
+ * @param dest_x X-coordinate for the top-left of the source image on the destination.
+ * @param dest_y Y-coordinate for the top-left of the source image on the destination.
+ */
 void
 combine_pixels_overlay (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, int dest_h, int dest_x, int dest_y)
 {
@@ -621,6 +862,27 @@ combine_pixels_overlay (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_
 }
 
 
+/**
+ * @brief Helper function to combine pixels based on HSV components.
+ *
+ * Converts both source and destination pixels to HSV. Then, depending on the mode,
+ * it replaces one of the destination's HSV components (Hue, Saturation, or Value)
+ * with the corresponding component from the source. Finally, it converts the
+ * modified destination HSV pixel back to RGB.
+ * The alpha channel of the destination is not explicitly modified.
+ * Pixel data is assumed to be in RGBA format.
+ *
+ * @param src Pointer to the source image pixel data (RGBA array).
+ * @param src_w Width of the source image.
+ * @param src_h Height of the source image.
+ * @param dest Pointer to the destination image pixel data (RGBA array, modified in place).
+ * @param dest_w Width of the destination image.
+ * @param dest_h Height of the destination image.
+ * @param dest_x X-coordinate for the top-left of the source image on the destination.
+ * @param dest_y Y-coordinate for the top-left of the source image on the destination.
+ * @param mode Integer indicating which HSV component to use from the source:
+ *             0 for Hue, 1 for Saturation, 2 for Value.
+ */
 static void
 combine_pixels_hsv (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, int dest_h, int dest_x, int dest_y, int mode)
 {
@@ -660,6 +922,23 @@ combine_pixels_hsv (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, i
 }
 
 
+/**
+ * @brief Combines source pixels onto destination pixels using Hue blending mode.
+ *
+ * The result has the hue of the source color, and the saturation and value
+ * of the destination color. Uses HSV color space for the operation.
+ * The alpha channel of the destination is not explicitly modified by the HSV helper.
+ * Pixel data is assumed to be in RGBA format.
+ *
+ * @param src Pointer to the source image pixel data (RGBA array).
+ * @param src_w Width of the source image.
+ * @param src_h Height of the source image.
+ * @param dest Pointer to the destination image pixel data (RGBA array, modified in place).
+ * @param dest_w Width of the destination image.
+ * @param dest_h Height of the destination image.
+ * @param dest_x X-coordinate for the top-left of the source image on the destination.
+ * @param dest_y Y-coordinate for the top-left of the source image on the destination.
+ */
 void
 combine_pixels_hue (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, int dest_h, int dest_x, int dest_y)
 {
@@ -667,6 +946,23 @@ combine_pixels_hue (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, i
 }
 
 
+/**
+ * @brief Combines source pixels onto destination pixels using Saturation blending mode.
+ *
+ * The result has the saturation of the source color, and the hue and value
+ * of the destination color. Uses HSV color space for the operation.
+ * The alpha channel of the destination is not explicitly modified by the HSV helper.
+ * Pixel data is assumed to be in RGBA format.
+ *
+ * @param src Pointer to the source image pixel data (RGBA array).
+ * @param src_w Width of the source image.
+ * @param src_h Height of the source image.
+ * @param dest Pointer to the destination image pixel data (RGBA array, modified in place).
+ * @param dest_w Width of the destination image.
+ * @param dest_h Height of the destination image.
+ * @param dest_x X-coordinate for the top-left of the source image on the destination.
+ * @param dest_y Y-coordinate for the top-left of the source image on the destination.
+ */
 void
 combine_pixels_sat (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, int dest_h, int dest_x, int dest_y)
 {
@@ -674,6 +970,23 @@ combine_pixels_sat (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, i
 }
 
 
+/**
+ * @brief Combines source pixels onto destination pixels using Value blending mode.
+ *
+ * The result has the value (brightness) of the source color, and the hue and saturation
+ * of the destination color. Uses HSV color space for the operation.
+ * The alpha channel of the destination is not explicitly modified by the HSV helper.
+ * Pixel data is assumed to be in RGBA format.
+ *
+ * @param src Pointer to the source image pixel data (RGBA array).
+ * @param src_w Width of the source image.
+ * @param src_h Height of the source image.
+ * @param dest Pointer to the destination image pixel data (RGBA array, modified in place).
+ * @param dest_w Width of the destination image.
+ * @param dest_h Height of the destination image.
+ * @param dest_x X-coordinate for the top-left of the source image on the destination.
+ * @param dest_y Y-coordinate for the top-left of the source image on the destination.
+ */
 void
 combine_pixels_val (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, int dest_h, int dest_x, int dest_y)
 {
@@ -681,6 +994,23 @@ combine_pixels_val (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, i
 }
 
 
+/**
+ * @brief Combines source pixels onto destination pixels using Color blending mode.
+ *
+ * The result has the hue and saturation of the source color, and the luminance
+ * of the destination color. Uses HLS color space for the operation.
+ * The alpha channel of the destination is not explicitly modified.
+ * Pixel data is assumed to be in RGBA format.
+ *
+ * @param src Pointer to the source image pixel data (RGBA array).
+ * @param src_w Width of the source image.
+ * @param src_h Height of the source image.
+ * @param dest Pointer to the destination image pixel data (RGBA array, modified in place).
+ * @param dest_w Width of the destination image.
+ * @param dest_h Height of the destination image.
+ * @param dest_x X-coordinate for the top-left of the source image on the destination.
+ * @param dest_y Y-coordinate for the top-left of the source image on the destination.
+ */
 void
 combine_pixels_col (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, int dest_h, int dest_x, int dest_y)
 {
@@ -707,6 +1037,25 @@ combine_pixels_col (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, i
 }
 
 
+/**
+ * @brief Combines source pixels onto destination pixels using Dissolve blending mode.
+ *
+ * For each pixel, a random number is generated. If this number is less than
+ * the source pixel's alpha value, the source pixel (blended normally considering its alpha)
+ * replaces the destination pixel. Otherwise, the destination pixel remains unchanged.
+ * This creates a scattered, dithered effect based on source alpha.
+ * The random number generator is seeded with a constant value for deterministic behavior.
+ * Pixel data is assumed to be in RGBA format.
+ *
+ * @param src Pointer to the source image pixel data (RGBA array).
+ * @param src_w Width of the source image.
+ * @param src_h Height of the source image.
+ * @param dest Pointer to the destination image pixel data (RGBA array, modified in place).
+ * @param dest_w Width of the destination image.
+ * @param dest_h Height of the destination image.
+ * @param dest_x X-coordinate for the top-left of the source image on the destination.
+ * @param dest_y Y-coordinate for the top-left of the source image on the destination.
+ */
 void
 combine_pixels_diss (DATA8* src, int src_w, int src_h, DATA8* dest, int dest_w, int dest_h, int dest_x, int dest_y)
 {

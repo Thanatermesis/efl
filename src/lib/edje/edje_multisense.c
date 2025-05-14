@@ -8,6 +8,16 @@ static int outs = 0;
 static Eina_List *ins = NULL;
 static Eina_Bool outfail = EINA_FALSE;
 
+/**
+ * @brief Callback function invoked when audio playback finishes.
+ *
+ * This function is registered as an event handler for ECORE_AUDIO_IN_EVENT_IN_STOPPED.
+ * It cleans up resources associated with the finished audio input stream by removing
+ * it from the list of active inputs and decrementing its reference count.
+ *
+ * @param data Custom data pointer (unused).
+ * @param event The EFL event information. The event object is the audio input that stopped.
+ */
 static void
 _play_finished(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -16,6 +26,16 @@ _play_finished(void *data EINA_UNUSED, const Efl_Event *event)
 }
 
 #if defined(_WIN32) || defined(HAVE_PULSE)
+/**
+ * @brief Callback function for audio output failure.
+ *
+ * This function is registered as an event handler for context failure events
+ * from the audio output backend (WASAPI or PulseAudio). It marks the output as failed,
+ * preventing further playback attempts, and releases the output object.
+ *
+ * @param data Custom data pointer (unused).
+ * @param event The EFL event information. The event object is the audio output that failed.
+ */
 static void
 _out_fail(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -25,14 +45,27 @@ _out_fail(void *data EINA_UNUSED, const Efl_Event *event)
 }
 #endif
 
+/**
+ * @brief Manages audio data read from an Eet file for Ecore_Audio's VIO.
+ *
+ * This structure holds all necessary information to stream audio data directly
+ * from an Edje file's Eet archive without loading the entire sample into a
+ * separate memory buffer. It is used with the Ecore_Audio VIO (Virtual I/O) interface.
+ */
 struct _edje_multisense_eet_data
 {
-   unsigned int    offset, length;
-   Eet_File       *ef;
-   const char     *data;
-   Ecore_Audio_Vio vio;
+   unsigned int    offset, length; /**< Current read offset and total length of the audio data. */
+   Eet_File       *ef; /**< A handle to the open Eet file, kept to ensure the mmap is valid. */
+   const char     *data; /**< Direct pointer to the audio data within the mmap'd Eet file. */
+   Ecore_Audio_Vio vio; /**< The VIO function table for Ecore_Audio. */
 };
 
+/**
+ * @brief VIO callback to get the total length of the audio data.
+ * @param data A pointer to a struct _edje_multisense_eet_data.
+ * @param eo_obj The Ecore_Audio object (unused).
+ * @return The total length of the audio data in bytes.
+ */
 static int
 eet_snd_file_get_length(void *data, Eo *eo_obj EINA_UNUSED)
 {
@@ -40,6 +73,14 @@ eet_snd_file_get_length(void *data, Eo *eo_obj EINA_UNUSED)
    return vf->length;
 }
 
+/**
+ * @brief VIO callback to seek to a position in the audio data.
+ * @param data A pointer to a struct _edje_multisense_eet_data.
+ * @param eo_obj The Ecore_Audio object (unused).
+ * @param offset The offset to seek to.
+ * @param whence The positioning mode (SEEK_SET, SEEK_CUR, SEEK_END).
+ * @return The new offset from the beginning of the data.
+ */
 static int
 eet_snd_file_seek(void *data, Eo *eo_obj EINA_UNUSED, int offset, int whence)
 {
@@ -65,6 +106,14 @@ eet_snd_file_seek(void *data, Eo *eo_obj EINA_UNUSED, int offset, int whence)
    return vf->offset;
 }
 
+/**
+ * @brief VIO callback to read a chunk of audio data.
+ * @param data A pointer to a struct _edje_multisense_eet_data.
+ * @param eo_obj The Ecore_Audio object (unused).
+ * @param buffer The destination buffer to copy data into.
+ * @param count The number of bytes to read.
+ * @return The number of bytes actually read.
+ */
 static int
 eet_snd_file_read(void *data, Eo *eo_obj EINA_UNUSED, void *buffer, int count)
 {
@@ -77,6 +126,12 @@ eet_snd_file_read(void *data, Eo *eo_obj EINA_UNUSED, void *buffer, int count)
    return count;
 }
 
+/**
+ * @brief VIO callback to get the current read position.
+ * @param data A pointer to a struct _edje_multisense_eet_data.
+ * @param eo_obj The Ecore_Audio object (unused).
+ * @return The current offset in the audio data.
+ */
 static int
 eet_snd_file_tell(void *data, Eo *eo_obj EINA_UNUSED)
 {
@@ -85,6 +140,16 @@ eet_snd_file_tell(void *data, Eo *eo_obj EINA_UNUSED)
    return vf->offset;
 }
 
+/**
+ * @brief Frees the resources associated with an Eet-based audio stream.
+ *
+ * This function is registered as a cleanup callback for the VIO data.
+ * It closes the Eet file handle, which is necessary because the audio data
+ * was accessed via a direct mmap pointer (`eet_read_direct`), and frees the
+ * _edje_multisense_eet_data container.
+ *
+ * @param data A pointer to a struct _edje_multisense_eet_data to be freed.
+ */
 static void
 _free(void *data)
 {
@@ -99,6 +164,16 @@ _free(void *data)
 
 static Eina_Bool _channel_mute_states[8] = { 0 };
 
+/**
+ * @brief Checks if a specific audio channel is muted.
+ *
+ * This function checks both the per-channel mute state and a global mute flag.
+ * Channel 7 is treated as a "master mute" switch.
+ *
+ * @param ed The Edje object (unused).
+ * @param channel The audio channel to check (0-6 for specific channels, 7 for master).
+ * @return @c EINA_TRUE if the channel is muted, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _channel_mute(Edje *ed EINA_UNUSED, int channel)
 {
@@ -112,6 +187,16 @@ _channel_mute(Edje *ed EINA_UNUSED, int channel)
 
 #endif
 
+/**
+ * @brief Sets the mute state for a specific audio channel.
+ *
+ * @param channel The channel to modify. Can be one of EDJE_CHANNEL_MUSIC,
+ *        EDJE_CHANNEL_EFFECT, etc., up to EDJE_CHANNEL_ALL.
+ *        EDJE_CHANNEL_ALL (7) acts as a master mute for all channels.
+ * @param mute EINA_TRUE to mute the channel, EINA_FALSE to unmute.
+ *
+ * @ingroup Edje_Audio
+ */
 EAPI void
 edje_audio_channel_mute_set(Edje_Channel channel, Eina_Bool mute)
 {
@@ -124,6 +209,14 @@ edje_audio_channel_mute_set(Edje_Channel channel, Eina_Bool mute)
 #endif
 }
 
+/**
+ * @brief Gets the mute state of a specific audio channel.
+ *
+ * @param channel The channel to check.
+ * @return @c EINA_TRUE if the channel is muted, @c EINA_FALSE otherwise.
+ *
+ * @ingroup Edje_Audio
+ */
 EAPI Eina_Bool
 edje_audio_channel_mute_get(Edje_Channel channel)
 {
@@ -136,6 +229,21 @@ edje_audio_channel_mute_get(Edje_Channel channel)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Plays a sound sample from an Edje file.
+ *
+ * This is the internal implementation for playing a sound specified in the
+ * "sounds" block of an EDC file. It finds the sample by name, sets up
+ * a VIO stream to read it directly from the Eet-archived Edje file,
+ * and plays it through the Ecore_Audio system.
+ *
+ * @param ed The Edje object containing the sound.
+ * @param sample_name The name of the sample to play.
+ * @param speed The playback speed modifier (1.0 for normal).
+ * @param channel The audio channel to play on.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 Eina_Bool
 _edje_multisense_internal_sound_sample_play(Edje *ed, const char *sample_name, const double speed, int channel)
 {
@@ -261,6 +369,21 @@ _edje_multisense_internal_sound_sample_play(Edje *ed, const char *sample_name, c
 #endif
 }
 
+/**
+ * @internal
+ * @brief Plays a synthesized tone.
+ *
+ * This is the internal implementation for playing a tone specified in the
+ * "sounds" block of an EDC file. It finds the tone definition by name
+ * and uses Ecore_Audio to generate and play a sine wave of the specified
+ * frequency and duration.
+ *
+ * @param ed The Edje object containing the tone definition.
+ * @param tone_name The name of the tone to play.
+ * @param duration The duration of the tone in seconds.
+ * @param channel The audio channel to play on.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 Eina_Bool
 _edje_multisense_internal_sound_tone_play(Edje *ed, const char *tone_name, const double duration, int channel)
 {
@@ -326,6 +449,17 @@ _edje_multisense_internal_sound_tone_play(Edje *ed, const char *tone_name, const
 #endif
 }
 
+/**
+ * @internal
+ * @brief Plays a vibration pattern.
+ *
+ * @note This function is a stub and is not yet implemented.
+ *
+ * @param ed The Edje object.
+ * @param sample_name The name of the vibration sample.
+ * @param repeat The number of times to repeat the vibration.
+ * @return Currently always @c EINA_FALSE.
+ */
 Eina_Bool
 _edje_multisense_internal_vibration_sample_play(Edje *ed EINA_UNUSED, const char *sample_name EINA_UNUSED, int repeat EINA_UNUSED)
 {
@@ -339,6 +473,13 @@ _edje_multisense_internal_vibration_sample_play(Edje *ed EINA_UNUSED, const char
 #endif
 }
 
+/**
+ * @internal
+ * @brief Initializes the multisense (audio) subsystem.
+ *
+ * This function must be called before any other multisense functions.
+ * It initializes the underlying Ecore_Audio library.
+ */
 void
 _edje_multisense_init(void)
 {
@@ -347,6 +488,14 @@ _edje_multisense_init(void)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Shuts down the multisense (audio) subsystem.
+ *
+ * This function cleans up all resources used by the audio system. It stops
+ * any playing sounds, destroys the audio output and input objects, and shuts
+ * down the Ecore_Audio library. It should be called on application exit.
+ */
 void
 _edje_multisense_shutdown(void)
 {

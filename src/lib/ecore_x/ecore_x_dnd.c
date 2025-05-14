@@ -10,28 +10,40 @@
 #include "Ecore_X.h"
 #include "Ecore_X_Atoms.h"
 
-EAPI int ECORE_X_EVENT_XDND_ENTER = 0;
-EAPI int ECORE_X_EVENT_XDND_POSITION = 0;
-EAPI int ECORE_X_EVENT_XDND_STATUS = 0;
-EAPI int ECORE_X_EVENT_XDND_LEAVE = 0;
-EAPI int ECORE_X_EVENT_XDND_DROP = 0;
-EAPI int ECORE_X_EVENT_XDND_FINISHED = 0;
+EAPI int ECORE_X_EVENT_XDND_ENTER = 0; /**< XDND Enter event type */
+EAPI int ECORE_X_EVENT_XDND_POSITION = 0; /**< XDND Position event type */
+EAPI int ECORE_X_EVENT_XDND_STATUS = 0; /**< XDND Status event type */
+EAPI int ECORE_X_EVENT_XDND_LEAVE = 0; /**< XDND Leave event type */
+EAPI int ECORE_X_EVENT_XDND_DROP = 0; /**< XDND Drop event type */
+EAPI int ECORE_X_EVENT_XDND_FINISHED = 0; /**< XDND Finished event type */
 
-static Ecore_X_DND_Source *_source = NULL;
-static Ecore_X_DND_Target *_target = NULL;
-static int _ecore_x_dnd_init_count = 0;
+static Ecore_X_DND_Source *_source = NULL; /**< Global DND source state */
+static Ecore_X_DND_Target *_target = NULL; /**< Global DND target state */
+static int _ecore_x_dnd_init_count = 0; /**< Initialization counter for DND module */
 
+/**
+ * @brief Structure to cache DND versions of windows during a drag operation.
+ * This is used to optimize repeated queries for a window's DND version.
+ */
 typedef struct _Version_Cache_Item
 {
-   Ecore_X_Window win;
-   int            ver;
+   Ecore_X_Window win; /**< The window ID */
+   int            ver; /**< The DND protocol version supported by the window (0 if not DND-aware) */
 } Version_Cache_Item;
-static Version_Cache_Item *_version_cache = NULL;
-static int _version_cache_num = 0, _version_cache_alloc = 0;
+static Version_Cache_Item *_version_cache = NULL; /**< Cache for DND versions of windows */
+static int _version_cache_num = 0, _version_cache_alloc = 0; /**< Number of items and allocated size for _version_cache */
 static void (*_posupdatecb)(void *,
-                            Ecore_X_Xdnd_Position *);
-static void *_posupdatedata;
+                            Ecore_X_Xdnd_Position *); /**< Callback for DND position updates */
+static void *_posupdatedata; /**< User data for the position update callback */
 
+/**
+ * @internal
+ * @brief Initializes the DND module.
+ *
+ * Sets up global DND source and target structures, and registers DND event types.
+ * This function is called internally and uses a counter to manage multiple
+ * initializations.
+ */
 void
 _ecore_x_dnd_init(void)
 {
@@ -67,6 +79,14 @@ _ecore_x_dnd_init(void)
    _ecore_x_dnd_init_count++;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the DND module.
+ *
+ * Frees resources allocated by the DND module, including global DND structures
+ * and event types. This function uses a counter to ensure resources are freed
+ * only when the last user de-initializes the module.
+ */
 void
 _ecore_x_dnd_shutdown(void)
 {
@@ -94,6 +114,22 @@ _ecore_x_dnd_shutdown(void)
    _ecore_x_dnd_init_count = 0;
 }
 
+/**
+ * @internal
+ * @brief Default converter function for DND data.
+ *
+ * This function is used to convert data to a format suitable for X text properties.
+ * It's typically used when setting DND types.
+ *
+ * @param target The target type (unused).
+ * @param data The source data to convert.
+ * @param size The size of the source data.
+ * @param data_ret Pointer to store the converted data.
+ * @param size_ret Pointer to store the size of the converted data.
+ * @param tprop Target property (unused).
+ * @param count Count (unused).
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _ecore_x_dnd_converter_copy(char *target EINA_UNUSED,
                             void *data,
@@ -141,6 +177,17 @@ _ecore_x_dnd_converter_copy(char *target EINA_UNUSED,
      }
 }
 
+/**
+ * @brief Sets a window as DND (Drag and Drop) aware or not.
+ *
+ * This function sets the XDND_AWARE property on the given window.
+ * If @p on is @c EINA_TRUE, the property is set to indicate the window
+ * supports the DND protocol version ECORE_X_DND_VERSION.
+ * If @p on is @c EINA_FALSE, the property is deleted.
+ *
+ * @param win The window to set DND awareness for.
+ * @param on @c EINA_TRUE to make the window DND aware, @c EINA_FALSE otherwise.
+ */
 EAPI void
 ecore_x_dnd_aware_set(Ecore_X_Window win,
                       Eina_Bool on)
@@ -155,6 +202,19 @@ ecore_x_dnd_aware_set(Ecore_X_Window win,
      ecore_x_window_prop_property_del(win, ECORE_X_ATOM_XDND_AWARE);
 }
 
+/**
+ * @brief Gets the DND protocol version supported by a window.
+ *
+ * This function queries the XDND_AWARE property of the given window
+ * to determine the DND protocol version it supports.
+ * During an active drag operation (when _source->state is ECORE_X_DND_SOURCE_DRAGGING),
+ * this function uses an internal cache (_version_cache) to avoid repeated X server queries,
+ * which can be expensive during mouse move events.
+ *
+ * @param win The window to query.
+ * @return The DND protocol version supported by the window, or 0 if the window
+ *         is not DND aware or an error occurs.
+ */
 EAPI int
 ecore_x_dnd_version_get(Ecore_X_Window win)
 {
@@ -226,6 +286,17 @@ ecore_x_dnd_version_get(Ecore_X_Window win)
    return 0;
 }
 
+/**
+ * @brief Checks if a specific DND data type is set for a window.
+ *
+ * This function queries the XDND_TYPE_LIST property of the given window
+ * to see if the specified @p type (e.g., "text/uri-list", "text/plain")
+ * is among the supported data types.
+ *
+ * @param win The window to check.
+ * @param type The DND data type string to check for.
+ * @return @c EINA_TRUE if the type is set, @c EINA_FALSE otherwise or on error.
+ */
 EAPI Eina_Bool
 ecore_x_dnd_type_isset(Ecore_X_Window win,
                        const char *type)
@@ -255,6 +326,18 @@ ecore_x_dnd_type_isset(Ecore_X_Window win,
    return ret;
 }
 
+/**
+ * @brief Adds or removes a DND data type for a window.
+ *
+ * This function modifies the XDND_TYPE_LIST property of the given window.
+ * If @p on is @c EINA_TRUE, the specified @p type is added to the list of
+ * supported data types (prepended to the existing list).
+ * If @p on is @c EINA_FALSE, the specified @p type is removed from the list.
+ *
+ * @param win The window to modify.
+ * @param type The DND data type string (e.g., "text/uri-list").
+ * @param on @c EINA_TRUE to add the type, @c EINA_FALSE to remove it.
+ */
 EAPI void
 ecore_x_dnd_type_set(Ecore_X_Window win,
                      const char *type,
@@ -332,6 +415,18 @@ ecore_x_dnd_type_set(Ecore_X_Window win,
    free(newset);
 }
 
+/**
+ * @brief Sets the list of DND data types supported by a window.
+ *
+ * This function replaces the XDND_TYPE_LIST property of the given window
+ * with a new list of types. For each type, it also registers a default
+ * converter function (_ecore_x_dnd_converter_copy).
+ *
+ * @param win The window to set the types for.
+ * @param types An array of DND data type strings.
+ *              Example: `const char *my_types[] = {"text/plain", "text/uri-list"};`
+ * @param num_types The number of types in the @p types array.
+ */
 EAPI void
 ecore_x_dnd_types_set(Ecore_X_Window win,
                       const char **types,
@@ -363,6 +458,18 @@ ecore_x_dnd_types_set(Ecore_X_Window win,
      }
 }
 
+/**
+ * @brief Sets the list of DND actions supported by a window.
+ *
+ * This function sets the XDND_ACTION_LIST property of the given window.
+ * For each action, it also registers a default converter function
+ * (_ecore_x_dnd_converter_copy).
+ *
+ * @param win The window to set the actions for.
+ * @param actions An array of DND action atoms.
+ *                Example: `Ecore_X_Atom my_actions[] = {ECORE_X_ATOM_XDND_ACTION_COPY, ECORE_X_ATOM_XDND_ACTION_MOVE};`
+ * @param num_actions The number of actions in the @p actions array.
+ */
 EAPI void
 ecore_x_dnd_actions_set(Ecore_X_Window win,
                         Ecore_X_Atom *actions,
@@ -411,12 +518,22 @@ ecore_x_dnd_callback_pos_update_set(
    _posupdatedata = (void *)data; /* Discard the const early */
 }
 
+/**
+ * @internal
+ * @brief Gets the global DND source state.
+ * @return A pointer to the global Ecore_X_DND_Source structure.
+ */
 Ecore_X_DND_Source *
 _ecore_x_dnd_source_get(void)
 {
    return _source;
 }
 
+/**
+ * @internal
+ * @brief Gets the global DND target state.
+ * @return A pointer to the global Ecore_X_DND_Target structure.
+ */
 Ecore_X_DND_Target *
 _ecore_x_dnd_target_get(void)
 {
@@ -424,7 +541,20 @@ _ecore_x_dnd_target_get(void)
 }
 
 
-
+/**
+ * @internal
+ * @brief Internal function to begin a DND operation.
+ *
+ * This function initiates a DND drag. It takes ownership of the XdndSelection,
+ * sets the source window state, and prepares for dragging.
+ *
+ * @param source The source window initiating the drag.
+ * @param self @c EINA_TRUE if this is a self-drag (drag within the same application/toolkit instance),
+ *             @c EINA_FALSE otherwise. If not a self-drag, the source window will be ignored for events.
+ * @param data The data associated with the drag (typically type information).
+ * @param size The size of the data.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 _ecore_x_dnd_begin(Ecore_X_Window source,
                    Eina_Bool self,
@@ -463,6 +593,18 @@ _ecore_x_dnd_begin(Ecore_X_Window source,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Internal function to handle a DND drop.
+ *
+ * This function finalizes a DND operation by sending appropriate messages
+ * (XdndDrop or XdndLeave) to the destination window.
+ *
+ * @param self @c EINA_TRUE if this was a self-drag operation, @c EINA_FALSE otherwise.
+ *             This affects whether the source window's ignore status is reset.
+ * @return @c EINA_TRUE if an XdndDrop message was sent (meaning the drop was on a willing target),
+ *         @c EINA_FALSE otherwise (e.g., dropped on nothing or an unwilling target).
+ */
 static Eina_Bool
 _ecore_x_dnd_drop(Eina_Bool self)
 {
@@ -512,6 +654,18 @@ _ecore_x_dnd_drop(Eina_Bool self)
    return status;
 }
 
+/**
+ * @brief Begins a DND (Drag and Drop) operation from a source window.
+ *
+ * This function initiates a DND drag. It's a wrapper around _ecore_x_dnd_begin,
+ * specifically for non-self-drags (i.e., drags that might go to other applications).
+ *
+ * @param source The source window initiating the drag.
+ * @param data The data associated with the drag (typically type information).
+ *             This data is usually a list of atoms representing the offered types.
+ * @param size The size of the @p data in bytes.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 EAPI Eina_Bool
 ecore_x_dnd_begin(Ecore_X_Window source,
                   unsigned char *data,
@@ -520,12 +674,31 @@ ecore_x_dnd_begin(Ecore_X_Window source,
    return _ecore_x_dnd_begin(source, EINA_FALSE, data, size);
 }
 
+/**
+ * @brief Finalizes a DND (Drag and Drop) operation.
+ *
+ * This function is called when the drag operation is completed (e.g., mouse button released).
+ * It's a wrapper around _ecore_x_dnd_drop for non-self-drags.
+ *
+ * @return @c EINA_TRUE if the drop was on a willing target, @c EINA_FALSE otherwise.
+ */
 EAPI Eina_Bool
 ecore_x_dnd_drop(void)
 {
    return _ecore_x_dnd_drop(EINA_FALSE);
 }
 
+/**
+ * @brief Begins a self-DND (Drag and Drop) operation from a source window.
+ *
+ * This function initiates a DND drag intended for the same application or toolkit instance.
+ * It's a wrapper around _ecore_x_dnd_begin, marking the drag as a "self" drag.
+ *
+ * @param source The source window initiating the drag.
+ * @param data The data associated with the drag (typically type information).
+ * @param size The size of the @p data in bytes.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 EAPI Eina_Bool
 ecore_x_dnd_self_begin(Ecore_X_Window source,
                        unsigned char *data,
@@ -534,12 +707,36 @@ ecore_x_dnd_self_begin(Ecore_X_Window source,
    return _ecore_x_dnd_begin(source, EINA_TRUE, data, size);
 }
 
+/**
+ * @brief Finalizes a self-DND (Drag and Drop) operation.
+ *
+ * This function is called when a self-drag operation is completed.
+ * It's a wrapper around _ecore_x_dnd_drop for self-drags.
+ *
+ * @return @c EINA_TRUE if the drop was on a willing target, @c EINA_FALSE otherwise.
+ */
 EAPI Eina_Bool
 ecore_x_dnd_self_drop(void)
 {
    return _ecore_x_dnd_drop(EINA_TRUE);
 }
 
+/**
+ * @brief Sends an XDND_STATUS message from a target window to a source window.
+ *
+ * This function is called by a DND target window in response to an XDND_POSITION
+ * message from a DND source. It informs the source whether the target is willing
+ * to accept the drop, the action it would perform, and a rectangle within which
+ * further XDND_POSITION messages can be suppressed.
+ *
+ * @param will_accept @c EINA_TRUE if the target will accept the drop, @c EINA_FALSE otherwise.
+ * @param suppress @c EINA_TRUE if the source should suppress sending XDND_POSITION
+ *                 messages while the cursor is within @p rectangle.
+ * @param rectangle The rectangle (x, y, width, height) within which position updates can be suppressed.
+ *                  Example: `Ecore_X_Rectangle rect = {10, 10, 100, 50};`
+ * @param action The DND action atom (e.g., ECORE_X_ATOM_XDND_ACTION_COPY) the target
+ *               will perform if the drop occurs. Set to `None` if @p will_accept is @c EINA_FALSE.
+ */
 EAPI void
 ecore_x_dnd_send_status(Eina_Bool will_accept,
                         Eina_Bool suppress,
@@ -595,6 +792,13 @@ ecore_x_dnd_send_status(Eina_Bool will_accept,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * @brief Sends an XDND_FINISHED message from a target window to a source window.
+ *
+ * This function is called by a DND target window after it has processed a drop
+ * (e.g., after receiving an XDND_DROP message and attempting to retrieve the data).
+ * It informs the source that the DND transaction is complete from the target's perspective.
+ */
 EAPI void
 ecore_x_dnd_send_finished(void)
 {
@@ -627,6 +831,17 @@ ecore_x_dnd_send_finished(void)
    _target->state = ECORE_X_DND_TARGET_IDLE;
 }
 
+/**
+ * @brief Sets the current action for an ongoing DND source operation.
+ *
+ * This function allows the DND source to change its preferred action
+ * (e.g., from move to copy) during a drag. If a drag is in progress,
+ * it may re-send an XDND_POSITION message to the current target
+ * with the updated action.
+ *
+ * @param action The new DND action atom (e.g., ECORE_X_ATOM_XDND_ACTION_COPY,
+ *               ECORE_X_ATOM_XDND_ACTION_MOVE).
+ */
 EAPI void
 ecore_x_dnd_source_action_set(Ecore_X_Atom action)
 {
@@ -635,12 +850,30 @@ ecore_x_dnd_source_action_set(Ecore_X_Atom action)
      _ecore_x_dnd_drag(_source->prev.window, _source->prev.x, _source->prev.y);
 }
 
+/**
+ * @brief Gets the current action for an ongoing DND source operation.
+ *
+ * @return The current DND action atom set by the source.
+ */
 EAPI Ecore_X_Atom
 ecore_x_dnd_source_action_get(void)
 {
    return _source->action;
 }
 
+/**
+ * @internal
+ * @brief Handles the logic for dragging in a DND operation.
+ *
+ * This function is called typically on mouse motion during a DND drag.
+ * It identifies the window under the cursor, sends XDND_ENTER, XDND_LEAVE,
+ * and XDND_POSITION messages as appropriate to potential target windows.
+ * It uses a shadow window tree for efficient window lookup.
+ *
+ * @param root The root window relevant to the current drag coordinates.
+ * @param x The current X coordinate of the cursor.
+ * @param y The current Y coordinate of thecursor.
+ */
 void
 _ecore_x_dnd_drag(Ecore_X_Window root,
                   int x,
@@ -771,6 +1004,19 @@ _ecore_x_dnd_drag(Ecore_X_Window root,
    _source->dest = win;
 }
 
+/**
+ * @brief Aborts an ongoing DND operation initiated by the given source window.
+ *
+ * This function effectively cancels the drag by simulating a drop onto nothing,
+ * thereby cleaning up the DND state. It should be called if the source
+ * decides to cancel the drag (e.g., if the Esc key is pressed).
+ *
+ * @param xwin_source The source window that initiated the DND operation to be aborted.
+ * @return @c EINA_TRUE if the DND operation was successfully aborted (i.e., if
+ *         @p xwin_source matched the current DND source window).
+ *         @c EINA_FALSE otherwise (e.g., if no DND operation was active or
+ *         @p xwin_source was not the initiator).
+ */
 EAPI Eina_Bool
 ecore_x_dnd_abort(Ecore_X_Window xwin_source)
 {

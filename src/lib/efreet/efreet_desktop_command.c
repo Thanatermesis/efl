@@ -22,93 +22,276 @@ extern int _efreet_desktop_log_dom;
 
 /**
  * @internal
- * The different types of commands in an Exec entry
+ * @brief Flags indicating the types of file representations needed for an Exec command.
+ *
+ * These flags determine whether a full path or a URI (or both) is required
+ * when processing files for a desktop entry's Exec command.
  */
 typedef enum Efreet_Desktop_Command_Flag
 {
-    EFREET_DESKTOP_EXEC_FLAG_FULLPATH = 0x0001,
-    EFREET_DESKTOP_EXEC_FLAG_URI      = 0x0002
+    EFREET_DESKTOP_EXEC_FLAG_FULLPATH = 0x0001, /**< Indicates that a full file path is needed. */
+    EFREET_DESKTOP_EXEC_FLAG_URI      = 0x0002  /**< Indicates that a URI representation is needed. */
 } Efreet_Desktop_Command_Flag;
 
 /**
  * @internal
- * Efreet_Desktop_Command
+ * @brief Represents a command to be executed, derived from a desktop entry.
+ *
+ * This structure holds all necessary information to build and execute
+ * a command string based on a desktop file's Exec key. It manages
+ * associated files, callbacks for command execution and progress,
+ * and flags indicating how file arguments should be formatted.
  */
 typedef struct Efreet_Desktop_Command Efreet_Desktop_Command;
 
 /**
  * @internal
- * Holds information on a desktop Exec command entry
+ * @struct Efreet_Desktop_Command
+ * @brief Holds information on a desktop Exec command entry.
+ *
+ * This structure encapsulates the context for generating and executing
+ * commands from a .desktop file, including handling file arguments,
+ * downloads for remote files, and callbacks.
  */
 struct Efreet_Desktop_Command
 {
-  Efreet_Desktop *desktop;
-  int num_pending;
+  Efreet_Desktop *desktop;              /**< The desktop entry this command is for. */
+  int num_pending;                      /**< Number of files pending download or processing. */
 
-  Efreet_Desktop_Command_Flag flags;
+  Efreet_Desktop_Command_Flag flags;    /**< Flags indicating required file representations (path/URI). */
 
-  Efreet_Desktop_Command_Cb cb_command;
-  Efreet_Desktop_Progress_Cb cb_progress;
-  void *data;
+  Efreet_Desktop_Command_Cb cb_command; /**< Callback function to execute the generated command. */
+  Efreet_Desktop_Progress_Cb cb_progress;/**< Callback function for reporting progress (e.g., downloads). */
+  void *data;                           /**< User data to be passed to callbacks. */
 
-  Eina_List *files; /**< list of Efreet_Desktop_Command_File */
+  Eina_List *files;                     /**< List of Efreet_Desktop_Command_File structures representing file arguments. */
 };
 
 /**
  * @internal
- * Efreet_Desktop_Command_File
+ * @brief Represents a file argument for a desktop command.
+ *
+ * This structure stores various representations of a file (directory,
+ * filename, full path, URI) and its processing state, particularly
+ * if it's a remote file requiring download.
  */
 typedef struct Efreet_Desktop_Command_File Efreet_Desktop_Command_File;
 
 /**
  * @internal
- * Stores information on a file passed to the desktop Exec command
+ * @struct Efreet_Desktop_Command_File
+ * @brief Stores information on a file passed to the desktop Exec command.
+ *
+ * This includes different path formats and a flag to indicate if the
+ * file processing is pending (e.g., waiting for a download).
  */
 struct Efreet_Desktop_Command_File
 {
-  Efreet_Desktop_Command *command;
-  char *dir;
-  char *file;
-  char *fullpath;
-  char *uri;
+  Efreet_Desktop_Command *command; /**< The parent command this file belongs to. */
+  char *dir;                       /**< The directory part of the file path. */
+  char *file;                      /**< The filename part of the file path. */
+  char *fullpath;                  /**< The absolute local filesystem path to the file. */
+  char *uri;                       /**< The URI representation of the file. */
 
-  int pending;
+  int pending;                     /**< Boolean flag, true if the file is pending processing (e.g., download). */
 };
 
+/**
+ * @internal
+ * @brief Callback function to execute a command string.
+ * This function is typically called by efreet_desktop_command_get() or
+ * efreet_desktop_command_progress_get() once a command string is fully constructed.
+ * @param data User-provided data.
+ * @param desktop The Efreet_Desktop structure (unused in this specific callback).
+ * @param exec The command string to be executed.
+ * @param remaining The number of remaining commands to be executed (unused in this specific callback).
+ * @return Always returns NULL. The actual return of the executed command is not handled here.
+ */
 static void *efreet_desktop_exec_cb(void *data, Efreet_Desktop *desktop,
                                             char *exec, int remaining);
+/**
+ * @internal
+ * @brief Determines the required file representation flags (fullpath, URI) based on the Exec string.
+ * It parses the Exec string for field codes like %f, %F, %u, %U.
+ * @param desktop The Efreet_Desktop structure containing the Exec string.
+ * @return A bitmask of Efreet_Desktop_Command_Flag values.
+ */
 static int efreet_desktop_command_flags_get(Efreet_Desktop *desktop);
+/**
+ * @internal
+ * @brief Processes a list of generated command strings by calling the command callback for each.
+ * @param command The Efreet_Desktop_Command context.
+ * @param execs An Eina_List of command strings (char *). Each string is a fully formed command.
+ *              Example: `eina_list_append(NULL, "gedit /tmp/file1.txt");`
+ * @return The return value of the last executed command callback.
+ */
 static void *efreet_desktop_command_execs_process(Efreet_Desktop_Command *command, Eina_List *execs);
 
+/**
+ * @internal
+ * @brief Builds a list of executable command strings from the desktop entry's Exec field and file arguments.
+ * It substitutes field codes (e.g., %f, %U, %c) with appropriate values.
+ * @param command The Efreet_Desktop_Command context, containing the desktop entry and processed files.
+ * @return An Eina_List of executable command strings (char *). The caller is responsible for freeing the list and its contents.
+ *         Returns NULL on error.
+ *         Example list structure:
+ *         - "gnome-terminal --profile=Default" (if no file arguments and Exec="gnome-terminal --profile=%c")
+ *         - "cat '/tmp/file A.txt'" (if Exec="cat %f" and one file "/tmp/file A.txt")
+ *         - "vlc '/media/movie.mkv' '/media/sub.srt'" (if Exec="vlc %F" and two files)
+ */
 static Eina_List *efreet_desktop_command_build(Efreet_Desktop_Command *command);
+/**
+ * @internal
+ * @brief Frees an Efreet_Desktop_Command structure and its associated data.
+ * This includes freeing the list of Efreet_Desktop_Command_File structures.
+ * @param command The Efreet_Desktop_Command structure to free.
+ */
 static void efreet_desktop_command_free(Efreet_Desktop_Command *command);
+/**
+ * @internal
+ * @brief Appends a source string to a destination string, quoting it with single quotes.
+ * Handles escaping of single quotes within the source string. The destination buffer is reallocated if necessary.
+ * @param dest The destination string buffer. Will be reallocated if more space is needed.
+ * @param size Pointer to the current allocated size of dest. Will be updated if realloc occurs.
+ * @param len Pointer to the current length of content in dest. Will be updated.
+ * @param src The source string to append and quote.
+ * @return The (potentially reallocated) destination string, or NULL on allocation failure.
+ */
 static char *efreet_desktop_command_append_quoted(char *dest, int *size,
                                                     int *len, char *src);
+/**
+ * @internal
+ * @brief Appends multiple file arguments (paths or URIs) to a command string, based on the specified type.
+ * Each file argument is quoted. The destination buffer is reallocated if necessary.
+ * @param dest The destination string buffer.
+ * @param size Pointer to the current allocated size of dest.
+ * @param len Pointer to the current length of content in dest.
+ * @param command The Efreet_Desktop_Command context, containing the list of files.
+ * @param type The field code type ('F' for multiple fullpaths, 'U' for multiple URIs, etc.).
+ *             The actual appending uses the lowercase version of this type.
+ * @return The (potentially reallocated) destination string, or NULL on allocation failure.
+ */
 static char *efreet_desktop_command_append_multiple(char *dest, int *size, int *len,
                                                     Efreet_Desktop_Command *command,
                                                     char type);
+/**
+ * @internal
+ * @brief Appends a single file argument (path, URI, directory, or filename) to a command string, quoted.
+ * The destination buffer is reallocated if necessary.
+ * @param dest The destination string buffer.
+ * @param size Pointer to the current allocated size of dest.
+ * @param len Pointer to the current length of content in dest.
+ * @param file The Efreet_Desktop_Command_File representing the file argument.
+ * @param type The field code type ('f' for fullpath, 'u' for URI, 'd' for directory, 'n' for filename).
+ * @return The (potentially reallocated) destination string, or NULL on allocation failure.
+ */
 static char *efreet_desktop_command_append_single(char *dest, int *size, int *len,
                                                 Efreet_Desktop_Command_File *file,
                                                 char type);
+/**
+ * @internal
+ * @brief Appends the icon argument (e.g., "--icon /path/to/icon.png") to a command string.
+ * The icon path is quoted. The destination buffer is reallocated if necessary.
+ * @param dest The destination string buffer.
+ * @param size Pointer to the current allocated size of dest.
+ * @param len Pointer to the current length of content in dest.
+ * @param desktop The Efreet_Desktop structure containing the icon information.
+ * @return The (potentially reallocated) destination string, or NULL on allocation failure.
+ */
 static char *efreet_desktop_command_append_icon(char *dest, int *size, int *len,
                                                 Efreet_Desktop *desktop);
 
+/**
+ * @internal
+ * @brief Processes a file argument (path or URI) for a desktop command.
+ * This involves determining if it's a local or remote file, converting "file:" URIs,
+ * and initiating downloads if necessary for remote files when full paths are required.
+ * @param command The Efreet_Desktop_Command context.
+ * @param file A string representing the file, which can be a local path, a "file:" URI, or another URI scheme.
+ *             Example: "/tmp/foo.txt", "file:///tmp/foo.txt", "http://example.com/foo.txt"
+ * @return A newly allocated Efreet_Desktop_Command_File structure, or NULL on failure.
+ *         The caller is responsible for freeing the returned structure if not NULL.
+ */
 static Efreet_Desktop_Command_File *efreet_desktop_command_file_process(
                                                     Efreet_Desktop_Command *command,
                                                     const char *file);
+/**
+ * @internal
+ * @brief Extracts the local path from a "file:" URI.
+ * Handles various forms of "file:" URIs, including those with hostnames (e.g., "file://localhost/path").
+ * @param uri The "file:" URI string. Example: "file:///etc/fstab", "file:/tmp/test.txt"
+ * @return A pointer to the path component within the URI string, or NULL if the URI is not local or malformed.
+ *         The returned pointer is part of the input `uri` string, not a new allocation.
+ */
 static const char *efreet_desktop_command_file_uri_process(const char *uri);
+/**
+ * @internal
+ * @brief Frees an Efreet_Desktop_Command_File structure and its string members.
+ * @param file The Efreet_Desktop_Command_File structure to free.
+ */
 static void efreet_desktop_command_file_free(Efreet_Desktop_Command_File *file);
 
+/**
+ * @internal
+ * @brief Callback invoked when a file download initiated by ecore_file_download() completes.
+ * It updates the pending count in the associated Efreet_Desktop_Command. If all pending
+ * operations are complete, it proceeds to build and execute the command(s).
+ * @param data Custom data, expected to be an Efreet_Desktop_Command_File pointer.
+ * @param file The local path of the downloaded file (unused in this function).
+ * @param status The status of the download operation (unused in this function, but should be checked).
+ */
 static void efreet_desktop_cb_download_complete(void *data, const char *file,
                                                                 int status);
+/**
+ * @internal
+ * @brief Callback invoked periodically during a file download to report progress.
+ * It calls the user-provided progress callback, if any.
+ * @param data Custom data, expected to be an Efreet_Desktop_Command_File pointer.
+ * @param file The local path of the file being downloaded (unused in this function).
+ * @param dltotal Total download size.
+ * @param dlnow Current downloaded size.
+ * @param ultotal Total upload size (unused).
+ * @param ulnow Current uploaded size (unused).
+ * @return The return value of the user's progress callback, or 0 if no callback is set.
+ *         A non-zero return from the user callback typically aborts the download.
+ */
 static int efreet_desktop_cb_download_progress(void *data, const char *file,
                                            long int dltotal, long int dlnow,
                                            long int ultotal, long int ulnow);
 
+/**
+ * @internal
+ * @brief Converts a potentially relative path to an absolute path.
+ * If the input path is already absolute, it's duplicated. If relative, it's resolved
+ * against the current working directory.
+ * @param path The input path string (can be relative or absolute).
+ * @return A newly allocated string containing the absolute path, or NULL on failure (e.g., memory allocation, getcwd error).
+ *         The caller is responsible for freeing the returned string.
+ */
 static char *efreet_desktop_command_path_absolute(const char *path);
 
+/**
+ * @internal
+ * @brief Appends a source string to a destination buffer, reallocating the buffer if necessary.
+ * Ensures the destination buffer has enough space for the appended string and a null terminator.
+ * @param dest The destination character buffer. This buffer might be reallocated.
+ * @param size Pointer to the integer holding the current allocated size of `dest`. Updated if realloc occurs.
+ * @param len Pointer to the integer holding the current string length in `dest` (excluding null terminator). Updated after append.
+ * @param src The null-terminated string to append.
+ * @return Pointer to the (possibly reallocated) destination buffer, or NULL if reallocation fails.
+ */
 static char *efreet_string_append(char *dest, int *size,
                                     int *len, const char *src);
+/**
+ * @internal
+ * @brief Appends a single character to a destination buffer, reallocating the buffer if necessary.
+ * This is a convenience wrapper around efreet_string_append().
+ * @param dest The destination character buffer. This buffer might be reallocated.
+ * @param size Pointer to the integer holding the current allocated size of `dest`. Updated if realloc occurs.
+ * @param len Pointer to the integer holding the current string length in `dest` (excluding null terminator). Updated after append.
+ * @param c The character to append.
+ * @return Pointer to the (possibly reallocated) destination buffer, or NULL if reallocation fails.
+ */
 static char *efreet_string_append_char(char *dest, int *size,
                                         int *len, char c);
 
@@ -233,13 +416,7 @@ efreet_desktop_exec_cb(void *data,
     return NULL;
 }
 
-/**
- * @internal
- *
- * @brief Determine which file related field codes are present in the Exec string of a .desktop
- * @params desktop and Efreet Desktop
- * @return a bitmask of file field codes present in exec string
- */
+/* efreet_desktop_command_flags_get already has a Doxygen comment */
 static int
 efreet_desktop_command_flags_get(Efreet_Desktop *desktop)
 {
@@ -282,13 +459,7 @@ efreet_desktop_command_flags_get(Efreet_Desktop *desktop)
 }
 
 
-/**
- * @internal
- *
- * @brief Call the command callback for each exec in the list
- * @param command
- * @param execs
- */
+/* efreet_desktop_command_execs_process already has a Doxygen comment (updated above) */
 static void *
 efreet_desktop_command_execs_process(Efreet_Desktop_Command *command, Eina_List *execs)
 {
@@ -306,14 +477,7 @@ efreet_desktop_command_execs_process(Efreet_Desktop_Command *command, Eina_List 
 }
 
 
-/**
- * @brief Builds the actual exec string from the raw string and a list of
- * processed filename information. The callback passed in to
- * efreet_desktop_command_get is called for each exec string created.
- *
- * @param command the command to build
- * @return a list of executable strings
- */
+/* efreet_desktop_command_build already has a Doxygen comment (updated above) */
 static Eina_List *
 efreet_desktop_command_build(Efreet_Desktop_Command *command)
 {
@@ -474,6 +638,7 @@ error:
     return NULL;
 }
 
+/* efreet_desktop_command_free already has a Doxygen comment (updated above) */
 static void
 efreet_desktop_command_free(Efreet_Desktop_Command *command)
 {
@@ -491,6 +656,7 @@ efreet_desktop_command_free(Efreet_Desktop_Command *command)
     FREE(command);
 }
 
+/* efreet_desktop_command_append_quoted already has a Doxygen comment (updated above) */
 static char *
 efreet_desktop_command_append_quoted(char *dest, int *size, int *len, char *src)
 {
@@ -528,6 +694,7 @@ efreet_desktop_command_append_quoted(char *dest, int *size, int *len, char *src)
     return dest;
 }
 
+/* efreet_desktop_command_append_multiple already has a Doxygen comment (updated above) */
 static char *
 efreet_desktop_command_append_multiple(char *dest, int *size, int *len,
                                         Efreet_Desktop_Command *command,
@@ -557,6 +724,7 @@ efreet_desktop_command_append_multiple(char *dest, int *size, int *len,
     return dest;
 }
 
+/* efreet_desktop_command_append_single already has a Doxygen comment (updated above) */
 static char *
 efreet_desktop_command_append_single(char *dest, int *size, int *len,
                                         Efreet_Desktop_Command_File *file,
@@ -591,6 +759,7 @@ efreet_desktop_command_append_single(char *dest, int *size, int *len,
     return dest;
 }
 
+/* efreet_desktop_command_append_icon already has a Doxygen comment (updated above) */
 static char *
 efreet_desktop_command_append_icon(char *dest, int *size, int *len,
                                             Efreet_Desktop *desktop)
@@ -605,6 +774,13 @@ efreet_desktop_command_append_icon(char *dest, int *size, int *len,
     return dest;
 }
 
+/**
+ * @internal
+ * @brief Checks if a given path string starts with a protocol scheme (e.g., "http:", "ftp:").
+ * A protocol is identified by a colon appearing before any slash.
+ * @param path The path string to check.
+ * @return EINA_TRUE if a protocol is detected, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _is_protocol(const char *path)
 {
@@ -618,10 +794,7 @@ _is_protocol(const char *path)
    return nonlocal;
 }
 
-/**
- * @param command the Efreet_Desktop_Comand that this file is for
- * @param file the filname as either an absolute path, relative path, or URI
- */
+/* efreet_desktop_command_file_process already has a Doxygen comment (updated above) */
 static Efreet_Desktop_Command_File *
 efreet_desktop_command_file_process(Efreet_Desktop_Command *command, const char *file)
 {
@@ -707,12 +880,7 @@ error:
     return NULL;
 }
 
-/**
- * @brief Find the local path portion of a file uri.
- * @param uri a uri beginning with "file"
- * @return the location of the path portion of the uri,
- * or NULL if the file is not on this machine
- */
+/* efreet_desktop_command_file_uri_process already has a Doxygen comment (updated above) */
 static const char *
 efreet_desktop_command_file_uri_process(const char *uri)
 {
@@ -761,6 +929,7 @@ efreet_desktop_command_file_uri_process(const char *uri)
     return path;
 }
 
+/* efreet_desktop_command_file_free already has a Doxygen comment (updated above) */
 static void
 efreet_desktop_command_file_free(Efreet_Desktop_Command_File *file)
 {
@@ -775,6 +944,7 @@ efreet_desktop_command_file_free(Efreet_Desktop_Command_File *file)
 }
 
 
+/* efreet_desktop_cb_download_complete already has a Doxygen comment (updated above) */
 static void
 efreet_desktop_cb_download_complete(void *data, const char *file EINA_UNUSED,
                                                         int status EINA_UNUSED)
@@ -802,6 +972,7 @@ efreet_desktop_cb_download_complete(void *data, const char *file EINA_UNUSED,
     }
 }
 
+/* efreet_desktop_cb_download_progress already has a Doxygen comment (updated above) */
 static int
 efreet_desktop_cb_download_progress(void *data,
                                     const char *file EINA_UNUSED,
@@ -820,11 +991,7 @@ efreet_desktop_cb_download_progress(void *data,
     return 0;
 }
 
-/**
- * @brief Build an absolute path from an absolute or relative one.
- * @param path an absolute or relative path
- * @return an allocated absolute path (must be freed)
- */
+/* efreet_desktop_command_path_absolute already has a Doxygen comment (updated above) */
 static char *
 efreet_desktop_command_path_absolute(const char *path)
 {
@@ -855,9 +1022,7 @@ efreet_desktop_command_path_absolute(const char *path)
     return strdup(path);
 }
 
-/**
- * Append a string to a buffer, reallocating as necessary.
- */
+/* efreet_string_append already has a Doxygen comment (updated above) */
 static char *
 efreet_string_append(char *dest, int *size, int *len, const char *src)
 {
@@ -876,6 +1041,7 @@ efreet_string_append(char *dest, int *size, int *len, const char *src)
    return dest;
 }
 
+/* efreet_string_append_char already has a Doxygen comment (updated above) */
 static char *
 efreet_string_append_char(char *dest, int *size, int *len, char c)
 {

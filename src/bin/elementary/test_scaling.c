@@ -3,18 +3,46 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback function for the "clicked" event on a frame.
+ *
+ * This function is called when a frame is clicked by the user. It prints
+ * "clicked" to standard output.
+ * @param data User data pointer (unused).
+ * @param obj The Evas_Object that emitted the event (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _fr_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("clicked\n");
 }
 
+/**
+ * @brief Callback function for the "close" event on a frame.
+ *
+ * This function is called when a frame's close button is clicked. It prints
+ * "close" to standard output.
+ * @param data User data pointer (unused).
+ * @param obj The Evas_Object that emitted the event (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _fr_close(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("close\n");
 }
 
+/**
+ * @brief Test function for widget scaling.
+ *
+ * This test creates a window with a series of buttons, each with a different
+ * scale factor applied using elm_object_scale_set(). This demonstrates how
+ * scaling affects individual widgets.
+ * @param data User data pointer (unused).
+ * @param obj The Evas_Object that initiated the test (unused).
+ * @param event_info Event-specific information (unused).
+ */
 void
 test_scaling(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -69,6 +97,17 @@ test_scaling(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_i
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for hierarchical widget scaling.
+ *
+ * This test creates a window containing several frames with different scale
+ * factors and styles. Each frame contains a label as a child widget. The
+ * purpose is to verify that child widgets correctly inherit the scale factor
+ * from their parent container.
+ * @param data User data pointer (unused).
+ * @param obj The Evas_Object that initiated the test (unused).
+ * @param event_info Event-specific information (unused).
+ */
 void
 test_scaling2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

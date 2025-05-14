@@ -3,23 +3,49 @@
 #include "evas_engine.h"
 #include "Evas_Engine_Software_DDraw.h"
 
+/** @brief Legacy log domain identifier, potentially unused. */
 int _evas_engine_soft_ddraw_log_dom = -1;
-/* function tables - filled in later (func and parent func) */
-static Evas_Func func, pfunc;
+/** @brief Function table for this engine, inheriting from software_generic. */
+static Evas_Func func;
+/** @brief Function table of the parent engine (software_generic). */
+static Evas_Func pfunc;
 
 /* engine struct data */
 typedef struct _Render_Engine Render_Engine;
 
+/**
+ * @brief Structure holding the private data for the Software DirectDraw render engine instance.
+ *
+ * Contains the generic software rendering data structure, which in turn holds
+ * the specific DirectDraw output buffer (`Outbuf`).
+ */
 struct _Render_Engine
 {
-   Render_Output_Software_Generic generic;
+   Render_Output_Software_Generic generic; /**< Inherited generic software rendering data, including the Outbuf. */
 };
 
 /* log domain variable */
+/** @brief Log domain identifier used by the DBG, INF, WRN, ERR, CRT macros. */
 int _evas_log_dom_module = -1;
 
 /* engine api this module provides */
 
+/**
+ * @brief Sets up the output rendering resources (DirectDraw surfaces) for a given canvas.
+ *
+ * This function is called by Evas core when creating or resizing the output window/surface.
+ * It allocates the engine-specific data (`Render_Engine`), initializes the DirectDraw
+ * output buffer (`Outbuf`) using information from `in`, and sets up the generic
+ * software rendering callbacks.
+ *
+ * @param engine The Evas engine pointer (passed to generic init).
+ * @param in Pointer to Evas_Engine_Info_Software_DDraw containing setup details
+ *           like the target window handle (HWND) and fullscreen flag.
+ * @param w The initial width of the canvas/output in pixels.
+ * @param h The initial height of the canvas/output in pixels.
+ * @return A pointer to the allocated and initialized Render_Engine structure on success, NULL on failure.
+ *         This pointer is stored by Evas core and passed back in subsequent engine calls.
+ */
 static void *
 eng_output_setup(void *engine, void *in, unsigned int w, unsigned int h)
 {
@@ -61,14 +87,35 @@ eng_output_setup(void *engine, void *in, unsigned int w, unsigned int h)
    return NULL;
 }
 
+/**
+ * @brief Configures engine-specific information based on the provided Evas_Engine_Info structure.
+ *
+ * This function is called by Evas core to allow the engine to specify its
+ * capabilities or default settings. Here, it sets the render mode to blocking.
+ *
+ * @param info Pointer to Evas_Engine_Info_Software_DDraw. This function modifies
+ *             fields within this structure.
+ */
 static void
 eng_output_info_setup(void *info)
 {
    Evas_Engine_Info_Software_DDraw *einfo = info;
 
+   /* This engine operates in blocking mode */
    einfo->render_mode = EVAS_RENDER_MODE_BLOCKING;
 }
 
+/**
+ * @brief Frees the rendering engine output resources allocated in eng_output_setup.
+ *
+ * This function is called by Evas core when the canvas associated with this
+ * engine instance is destroyed. It cleans up the generic software rendering
+ * resources (which in turn frees the DirectDraw Outbuf) and frees the
+ * Render_Engine structure itself.
+ *
+ * @param engine The Evas engine pointer (passed to generic clean).
+ * @param data The private Render_Engine data pointer previously returned by eng_output_setup.
+ */
 static void
 eng_output_free(void *engine, void *data)
 {
@@ -81,6 +128,15 @@ eng_output_free(void *engine, void *data)
    free(re);
 }
 
+/**
+ * @brief Reports whether the canvas associated with this engine instance supports an alpha channel.
+ *
+ * This determines if the window itself can be semi-transparent. The DirectDraw
+ * engine, as implemented here, does not support alpha blending at the window level.
+ *
+ * @param engine The Evas engine pointer (unused in this implementation).
+ * @return EINA_TRUE if the canvas supports alpha, EINA_FALSE otherwise. Always returns EINA_FALSE here.
+ */
 static Eina_Bool
 eng_canvas_alpha_get(void *engine EINA_UNUSED)
 {
@@ -89,6 +145,22 @@ eng_canvas_alpha_get(void *engine EINA_UNUSED)
 }
 
 /* module advertising code */
+
+/**
+ * @brief Opens (initializes) the Software DirectDraw engine module.
+ *
+ * This function is called by the Evas module system when loading this engine.
+ * It performs the following steps:
+ * 1. Inherits the function table from the "software_generic" engine.
+ * 2. Registers a specific log domain ("evas-software_ddraw") for this module.
+ * 3. Overrides specific functions in the inherited table with the
+ *    DirectDraw-specific implementations (eng_output_info_setup, eng_output_setup, etc.).
+ * 4. Assigns the final function table to the Evas_Module structure.
+ *
+ * @param em Pointer to the Evas_Module structure representing this engine module.
+ *           The `functions` member will be set by this function.
+ * @return 1 on successful initialization, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -116,6 +188,14 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Closes (shuts down) the Software DirectDraw engine module.
+ *
+ * This function is called by the Evas module system when unloading this engine.
+ * It unregisters the log domain that was registered in module_open.
+ *
+ * @param em Pointer to the Evas_Module structure (unused in this function).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

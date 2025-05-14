@@ -3,6 +3,12 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Triggers a flip animation rotating around the Y center axis.
+ * @param data The flip widget to animate.
+ * @param obj The object on which the event occurred (unused).
+ * @param event_info The event data (unused).
+ */
 void
 my_fl_1(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -10,6 +16,12 @@ my_fl_1(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_flip_go(fl, ELM_FLIP_ROTATE_Y_CENTER_AXIS);
 }
 
+/**
+ * @brief Triggers a flip animation rotating around the X center axis.
+ * @param data The flip widget to animate.
+ * @param obj The object on which the event occurred (unused).
+ * @param event_info The event data (unused).
+ */
 void
 my_fl_2(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -17,6 +29,12 @@ my_fl_2(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_flip_go(fl, ELM_FLIP_ROTATE_X_CENTER_AXIS);
 }
 
+/**
+ * @brief Triggers a flip animation rotating around the XZ center axis.
+ * @param data The flip widget to animate.
+ * @param obj The object on which the event occurred (unused).
+ * @param event_info The event data (unused).
+ */
 void
 my_fl_3(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -24,6 +42,12 @@ my_fl_3(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_flip_go(fl, ELM_FLIP_ROTATE_XZ_CENTER_AXIS);
 }
 
+/**
+ * @brief Triggers a flip animation rotating around the YZ center axis.
+ * @param data The flip widget to animate.
+ * @param obj The object on which the event occurred (unused).
+ * @param event_info The event data (unused).
+ */
 void
 my_fl_4(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -31,6 +55,12 @@ my_fl_4(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_flip_go(fl, ELM_FLIP_ROTATE_YZ_CENTER_AXIS);
 }
 
+/**
+ * @brief Triggers a cube-style flip animation to the left.
+ * @param data The flip widget to animate.
+ * @param obj The object on which the event occurred (unused).
+ * @param event_info The event data (unused).
+ */
 void
 my_fl_5(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -38,6 +68,12 @@ my_fl_5(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_flip_go(fl, ELM_FLIP_CUBE_LEFT);
 }
 
+/**
+ * @brief Triggers a cube-style flip animation to the right.
+ * @param data The flip widget to animate.
+ * @param obj The object on which the event occurred (unused).
+ * @param event_info The event data (unused).
+ */
 void
 my_fl_6(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -45,6 +81,12 @@ my_fl_6(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_flip_go(fl, ELM_FLIP_CUBE_RIGHT);
 }
 
+/**
+ * @brief Triggers a cube-style flip animation upwards.
+ * @param data The flip widget to animate.
+ * @param obj The object on which the event occurred (unused).
+ * @param event_info The event data (unused).
+ */
 void
 my_fl_7(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -52,6 +94,12 @@ my_fl_7(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_flip_go(fl, ELM_FLIP_CUBE_UP);
 }
 
+/**
+ * @brief Triggers a cube-style flip animation downwards.
+ * @param data The flip widget to animate.
+ * @param obj The object on which the event occurred (unused).
+ * @param event_info The event data (unused).
+ */
 void
 my_fl_8(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -59,6 +107,12 @@ my_fl_8(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_flip_go(fl, ELM_FLIP_CUBE_DOWN);
 }
 
+/**
+ * @brief Triggers a cross-fade flip animation.
+ * @param data The flip widget to animate.
+ * @param obj The object on which the event occurred (unused).
+ * @param event_info The event data (unused).
+ */
 void
 my_fl_9(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -66,6 +120,12 @@ my_fl_9(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_flip_go(fl, ELM_FLIP_CROSS_FADE);
 }
 
+/**
+ * @brief Animates the flip widget to show its front content.
+ * @param data The flip widget to animate.
+ * @param obj The object on which the event occurred (unused).
+ * @param event_info The event data (unused).
+ */
 void
 my_fl_front(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -73,6 +133,12 @@ my_fl_front(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    elm_flip_go_to(fl, EINA_TRUE, ELM_FLIP_ROTATE_X_CENTER_AXIS);
 }
 
+/**
+ * @brief Animates the flip widget to show its back content.
+ * @param data The flip widget to animate.
+ * @param obj The object on which the event occurred (unused).
+ * @param event_info The event data (unused).
+ */
 void
 my_fl_back(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -80,6 +146,17 @@ my_fl_back(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSE
    elm_flip_go_to(fl, EINA_FALSE, ELM_FLIP_ROTATE_X_CENTER_AXIS);
 }
 
+/**
+ * @brief Callback for the 'Allow animations' checkbox.
+ *
+ * Depending on the checkbox state, this function sets the back content of the
+ * flip widget. If checked, a layout with buttons is set as the back content.
+ * If unchecked, a background image is set.
+ *
+ * @param data The flip widget.
+ * @param obj The checkbox widget that triggered the event.
+ * @param event_info Event-specific data (unused).
+ */
 static void
 _animations_ck_changed(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -119,6 +196,17 @@ _animations_ck_changed(void *data, Evas_Object *obj, void *event_info EINA_UNUSE
      }
 }
 
+/**
+ * @brief Test case for the Elementary Flip widget.
+ *
+ * Creates a window with a flip widget and several buttons to trigger
+ * different flip animations. A checkbox is provided to dynamically change the
+ * content on the back of the flip widget.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_flip(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -267,6 +355,17 @@ test_flip(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info
    evas_object_show(win);
 }
 
+/**
+ * @brief Second test case for the Elementary Flip widget.
+ *
+ * Creates a window with a flip widget. The front content is a box containing
+ * a toolbar and a list. The back content is a scrollable entry widget.
+ * Buttons are provided to trigger various flip animations.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_flip2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -438,6 +537,18 @@ test_flip2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_inf
    evas_object_show(win);
 }
 
+/**
+ * @brief Third test case demonstrating nested Flip widgets.
+ *
+ * Creates a window with a main flip widget. The front and back contents of
+ * this main flip widget are themselves flip widgets, each with their own
+ * front and back content. Buttons are provided to control the animations of
+ * all three flip widgets.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_flip3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -553,6 +664,16 @@ test_flip3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_inf
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback for the "Flip Go" button in the interactive test.
+ *
+ * Reads the selected animation type from a radio button group and triggers
+ * the corresponding flip animation.
+ *
+ * @param data The main window object, used to retrieve other widgets.
+ * @param obj The button that was clicked (unused).
+ * @param event_info Event-specific data (unused).
+ */
 static void
 my_fl_go(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -573,6 +694,16 @@ my_fl_go(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
      elm_flip_go(fl, ELM_FLIP_PAGE_RIGHT);
 }
 
+/**
+ * @brief Callback for radio button changes in the interactive test.
+ *
+ * Sets the interaction mode of the flip widget based on the selected
+ * radio button's value.
+ *
+ * @param data The main window object, used to retrieve other widgets.
+ * @param obj The radio button that was changed (unused).
+ * @param event_info Event-specific data (unused).
+ */
 static void
 my_fl_ch(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -582,6 +713,18 @@ my_fl_ch(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_flip_interaction_set(fl, elm_radio_value_get(rdg));
 }
 
+/**
+ * @brief Test case for interactive flip modes.
+ *
+ * Creates a window to test user-driven flip interactions (e.g., via swipe).
+ * It includes a flip widget, radio buttons to select the interaction mode
+ * (None, Rotate, Cube, Page), and a "Flip Go" button for manual animation.
+ * The interaction settings like direction and hitsize are also configured.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_flip_interactive(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                       void *event_info EINA_UNUSED)
@@ -696,6 +839,17 @@ test_flip_interactive(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    evas_object_show(win);
 }
 
+/**
+ * @brief Test case for elm_flip_go_to() function.
+ *
+ * Creates a window with a flip widget and two buttons, "Show Front" and
+ * "Show Back". These buttons use elm_flip_go_to() to directly switch to the
+ * desired face of the flip widget with an animation.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_flip_to(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

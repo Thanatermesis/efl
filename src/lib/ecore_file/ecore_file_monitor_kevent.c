@@ -8,36 +8,61 @@
 #include <fcntl.h>
 #include "ecore_file_private.h"
 
+/**
+ * @file ecore_file_monitor_kevent.c
+ * @brief Ecore file monitor backend implementation using kqueue/kevent.
+ *
+ * This backend is specific to BSD-like systems (including macOS)
+ * that provide the kqueue and kevent mechanisms for event notification.
+ */
+
 #define KEVENT_NUM_EVENTS 5
 
 typedef struct _Ecore_File_Monitor_Kevent Ecore_File_Monitor_Kevent;
 
 #define ECORE_FILE_MONITOR_KEVENT(x) ((Ecore_File_Monitor_Kevent *)(x))
 
+/**
+ * @brief Structure for kqueue-based file monitor.
+ *
+ * Extends the base Ecore_File_Monitor structure with kqueue-specific data.
+ */
 struct _Ecore_File_Monitor_Kevent
 {
-   Ecore_File_Monitor  monitor;
-   Eina_List          *prev;
-   int                 fd;
+   Ecore_File_Monitor  monitor; /**< Base monitor structure. */
+   Eina_List          *prev;    /**< List of File_Info for directory content comparison. */
+   int                 fd;      /**< File descriptor associated with the kqueue event. */
 };
 
+/**
+ * @brief Structure to hold information about a file or directory.
+ *
+ * Used to track the state of files within a monitored directory.
+ */
 typedef struct _File_Info File_Info;
 struct _File_Info
 {
-   const char *path;
-   Eina_Stat   st;
+   const char *path; /**< Full path to the file or directory. */
+   Eina_Stat   st;   /**< Stat information for the file or directory. */
 };
 
-static Ecore_Fd_Handler   *_kevent_fdh = NULL;
-static Eina_Hash          *_kevent_monitors = NULL;
+static Ecore_Fd_Handler   *_kevent_fdh = NULL; /**< FD handler for the main kqueue file descriptor. */
+static Eina_Hash          *_kevent_monitors = NULL; /**< Hash table mapping FDs to Ecore_File_Monitor_Kevent structures. */
 
 static Eina_Bool           _ecore_file_monitor_kevent_handler(void *data, Ecore_Fd_Handler *fdh);
 static int                 _ecore_file_monitor_kevent_monitor(Ecore_File_Monitor *em, const char *path);
 static void                _ecore_file_monitor_kevent_find(Ecore_File_Monitor *em);
 static void                _ecore_file_monitor_kevent_hash_del_cb(void *data);
 static Eina_List *         _ecore_file_monitor_kevent_ls(const char *directory);
-static void                _ecore_file_monitor_kevent_ls_free(Eina_List *);
+static void                _ecore_file_monitor_kevent_ls_free(Eina_List *list);
 
+/**
+ * @brief Initializes the kqueue file monitor backend.
+ *
+ * Sets up the global kqueue file descriptor and the FD handler for it.
+ *
+ * @return 1 on success, 0 on failure.
+ */
 int
 ecore_file_monitor_backend_init(void)
 {
@@ -61,6 +86,13 @@ ecore_file_monitor_backend_init(void)
    return 1;
 }
 
+/**
+ * @brief Shuts down the kqueue file monitor backend.
+ *
+ * Frees resources, closes the kqueue file descriptor, and removes the FD handler.
+ *
+ * @return 1 on success (always returns 1 in current implementation).
+ */
 int
 ecore_file_monitor_backend_shutdown(void)
 {
@@ -80,6 +112,14 @@ ecore_file_monitor_backend_shutdown(void)
    return 1;
 }
 
+/**
+ * @brief Adds a path to be monitored by the kqueue backend.
+ *
+ * @param path The file or directory path to monitor.
+ * @param func The callback function to execute when an event occurs.
+ * @param data User data to pass to the callback function.
+ * @return A new Ecore_File_Monitor instance on success, NULL on failure.
+ */
 Ecore_File_Monitor *
 ecore_file_monitor_backend_add(const char *path,
                                void (*func) (void *data, Ecore_File_Monitor *em,
@@ -112,6 +152,19 @@ ecore_file_monitor_backend_add(const char *path,
    return em;
 }
 
+/**
+ * @brief Lists the contents of a directory and stores their stat info.
+ *
+ * This function is used to get the initial state of a monitored directory
+ * and to compare it later for changes.
+ *
+ * @param directory The path to the directory.
+ * @return A list of File_Info structures for each item in the directory,
+ *         or NULL on failure or if the directory is empty.
+ *         Example of Eina_List elements:
+ *         - Element 1: File_Info { path="/tmp/file1.txt", st={...} }
+ *         - Element 2: File_Info { path="/tmp/subdir", st={...} }
+ */
 static Eina_List *
 _ecore_file_monitor_kevent_ls(const char *directory)
 {
@@ -138,6 +191,12 @@ _ecore_file_monitor_kevent_ls(const char *directory)
    return files;
 }
 
+/**
+ * @brief Frees a list of File_Info structures.
+ *
+ * @param list The Eina_List containing File_Info structures to free.
+ *             Each element in the list is a pointer to a File_Info struct.
+ */
 static void
 _ecore_file_monitor_kevent_ls_free(Eina_List *list)
 {
@@ -150,6 +209,15 @@ _ecore_file_monitor_kevent_ls_free(Eina_List *list)
      }
 }
 
+/**
+ * @brief Callback function for when a monitor is deleted from the hash.
+ *
+ * This function is called by eina_hash when an Ecore_File_Monitor
+ * is removed. It closes the associated file descriptor, frees the path stringshare,
+ * frees the list of previous directory contents, and frees the monitor structure itself.
+ *
+ * @param data Pointer to the Ecore_File_Monitor (cast from Ecore_File_Monitor_Kevent).
+ */
 static void
 _ecore_file_monitor_kevent_hash_del_cb(void *data)
 {
@@ -163,12 +231,30 @@ _ecore_file_monitor_kevent_hash_del_cb(void *data)
    free(em);
 }
 
+/**
+ * @brief Deletes a file monitor from the kqueue backend.
+ *
+ * Removes the monitor from the internal hash, which will trigger
+ * _ecore_file_monitor_kevent_hash_del_cb for cleanup.
+ *
+ * @param em The Ecore_File_Monitor to delete.
+ */
 void
 ecore_file_monitor_backend_del(Ecore_File_Monitor *em)
 {
    eina_hash_del(_kevent_monitors, &(ECORE_FILE_MONITOR_KEVENT(em)->fd), em);
 }
 
+/**
+ * @brief FD handler for kqueue events.
+ *
+ * This function is called when there is activity on the main kqueue
+ * file descriptor. It retrieves events and dispatches them.
+ *
+ * @param data Unused user data.
+ * @param fdh The Ecore_Fd_Handler that triggered this callback.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
+ */
 static Eina_Bool
 _ecore_file_monitor_kevent_handler(void *data EINA_UNUSED, Ecore_Fd_Handler *fdh)
 {
@@ -200,6 +286,15 @@ _ecore_file_monitor_kevent_handler(void *data EINA_UNUSED, Ecore_Fd_Handler *fdh
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Compares the current state of a monitored directory with its previous state.
+ *
+ * This function is called when a NOTE_WRITE or NOTE_ATTRIB event occurs on a
+ * monitored directory. It lists the directory's current contents and compares
+ * them to the previously stored list to detect created, deleted, or modified files.
+ *
+ * @param em The Ecore_File_Monitor for the directory.
+ */
 static void
 _ecore_file_monitor_kevent_find(Ecore_File_Monitor *em)
 {
@@ -257,6 +352,16 @@ _ecore_file_monitor_kevent_find(Ecore_File_Monitor *em)
    ECORE_FILE_MONITOR_KEVENT(em)->prev = files;
 }
 
+/**
+ * @brief Sets up a kqueue event for a specific path.
+ *
+ * Opens the path, adds it to the kqueue, and stores initial directory
+ * listing if it's a directory.
+ *
+ * @param em The Ecore_File_Monitor to associate with this path.
+ * @param path The file or directory path to monitor.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 _ecore_file_monitor_kevent_monitor(Ecore_File_Monitor *em, const char *path)
 {

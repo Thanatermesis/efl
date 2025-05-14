@@ -3,6 +3,15 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback function for the "spinner,drag,start" smart event.
+ *
+ * This function is called when the user starts dragging the spinner handle.
+ *
+ * @param data User data pointer (unused).
+ * @param obj The spinner object that emitted the signal (unused).
+ * @param event The event information (unused).
+ */
 static void
 _spinner_drag_start_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                        void *event EINA_UNUSED)
@@ -10,6 +19,15 @@ _spinner_drag_start_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
   printf("spinner drag started\n");
 }
 
+/**
+ * @brief Callback function for the "spinner,drag,stop" smart event.
+ *
+ * This function is called when the user stops dragging the spinner handle.
+ *
+ * @param data User data pointer (unused).
+ * @param obj The spinner object that emitted the signal (unused).
+ * @param event The event information (unused).
+ */
 static void
 _spinner_drag_stop_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                       void *event EINA_UNUSED)
@@ -17,6 +35,24 @@ _spinner_drag_stop_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
   printf("spinner drag stopped\n");
 }
 
+/**
+ * @brief Create a test window for the spinner widget.
+ *
+ * This function creates a window and populates it with various spinner
+ * widgets, each configured differently to test various features of the
+ * spinner widget such as:
+ * - Editable and non-editable modes.
+ * - Custom label formats.
+ * - Step values, min/max ranges, and wrapping.
+ * - Rounding and base values.
+ * - Vertical orientation.
+ * - Disabled state.
+ * - Special text values for specific numeric values (e.g., months).
+ *
+ * @param data User data pointer (unused).
+ * @param obj The object that triggered this test function (unused).
+ * @param event_info Event information (unused).
+ */
 void
 test_spinner(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

@@ -1,9 +1,32 @@
+/**
+ * @file
+ * @brief Implementation of Xlib output buffer handling for Evas software engine.
+ *
+ * This file contains functions for creating, managing, and drawing with
+ * Xlib output buffers, including support for the MIT Shared Memory Extension (SHM)
+ * for improved performance. It also includes functions for converting Evas's
+ * 32-bit RGBA data into 1-bit Xlib masks.
+ */
 #include "evas_common_private.h"
 
 #include "evas_xlib_buffer.h"
 
+/** @brief Global flag to detect X errors during SHM attach test. */
 static int _x_err = 0;
 
+/**
+ * @brief Writes a horizontal line of mask data (1-bit alpha) to an X output buffer.
+ *
+ * Converts the alpha channel of the source DATA32 pixels into a 1-bit mask
+ * line in the destination X_Output_Buffer (which must be configured for 1-bit depth).
+ * Handles X server bit swapping if necessary. Processes pixels from left to right.
+ *
+ * @param buf The Evas Outbuf (contains X display info like bit swap).
+ * @param xob The target X output buffer (must be 1-bit depth).
+ * @param src Pointer to the source DATA32 pixel data (alpha channel is used).
+ * @param w The width of the line in pixels.
+ * @param y The y-coordinate of the line within the X output buffer.
+ */
 void
 evas_software_xlib_x_write_mask_line(Outbuf *buf, X_Output_Buffer *xob, DATA32 *src, int w, int y)
 {
@@ -58,6 +81,19 @@ evas_software_xlib_x_write_mask_line(Outbuf *buf, X_Output_Buffer *xob, DATA32 *
      }
 }
 
+/**
+ * @brief Writes a horizontal line of mask data (1-bit alpha) to an X output buffer, processing source pixels in reverse order.
+ *
+ * Converts the alpha channel of the source DATA32 pixels into a 1-bit mask
+ * line in the destination X_Output_Buffer (which must be configured for 1-bit depth).
+ * Handles X server bit swapping if necessary. Processes pixels from right to left.
+ *
+ * @param buf The Evas Outbuf (contains X display info like bit swap).
+ * @param xob The target X output buffer (must be 1-bit depth).
+ * @param src Pointer to the start of the source DATA32 pixel data (alpha channel is used). Processing starts from src + w - 1.
+ * @param w The width of the line in pixels.
+ * @param y The y-coordinate of the line within the X output buffer.
+ */
 void
 evas_software_xlib_x_write_mask_line_rev(Outbuf *buf, X_Output_Buffer *xob, DATA32 *src, int w, int y)
 {
@@ -112,6 +148,22 @@ evas_software_xlib_x_write_mask_line_rev(Outbuf *buf, X_Output_Buffer *xob, DATA
      }
 }
 
+/**
+ * @brief Writes a vertical line of mask data (1-bit alpha) to an X output buffer.
+ *
+ * Converts the alpha channel of the source DATA32 pixels (arranged vertically
+ * according to the source width `w`) into a 1-bit mask line in the destination
+ * X_Output_Buffer (which must be configured for 1-bit depth). The vertical
+ * line in the source becomes a horizontal line segment in the destination mask.
+ * Handles X server bit swapping if necessary. Processes pixels from top to bottom.
+ *
+ * @param buf The Evas Outbuf (contains X display info like bit swap).
+ * @param xob The target X output buffer (must be 1-bit depth).
+ * @param src Pointer to the source DATA32 pixel data (alpha channel is used).
+ * @param h The height of the vertical line in pixels.
+ * @param ym The y-coordinate within the X output buffer where the horizontal mask line segment starts (acts as the x-coordinate in the 1-bit mask image).
+ * @param w The width (stride) of the source image data in pixels.
+ */
 void
 evas_software_xlib_x_write_mask_line_vert(Outbuf *buf, X_Output_Buffer *xob,
                                           DATA32 *src,
@@ -168,6 +220,22 @@ evas_software_xlib_x_write_mask_line_vert(Outbuf *buf, X_Output_Buffer *xob,
      }
 }
 
+/**
+ * @brief Writes a vertical line of mask data (1-bit alpha) to an X output buffer, processing source pixels in reverse vertical order.
+ *
+ * Converts the alpha channel of the source DATA32 pixels (arranged vertically
+ * according to the source width `w`) into a 1-bit mask line in the destination
+ * X_Output_Buffer (which must be configured for 1-bit depth). The vertical
+ * line in the source becomes a horizontal line segment in the destination mask.
+ * Handles X server bit swapping if necessary. Processes pixels from bottom to top.
+ *
+ * @param buf The Evas Outbuf (contains X display info like bit swap).
+ * @param xob The target X output buffer (must be 1-bit depth).
+ * @param src Pointer to the start of the source DATA32 pixel data (alpha channel is used). Processing starts from src + (h - 1) * w.
+ * @param h The height of the vertical line in pixels.
+ * @param ym The y-coordinate within the X output buffer where the horizontal mask line segment starts (acts as the x-coordinate in the 1-bit mask image).
+ * @param w The width (stride) of the source image data in pixels.
+ */
 void
 evas_software_xlib_x_write_mask_line_vert_rev(Outbuf *buf, X_Output_Buffer *xob,
                                               DATA32 *src,
@@ -224,6 +292,16 @@ evas_software_xlib_x_write_mask_line_vert_rev(Outbuf *buf, X_Output_Buffer *xob,
      }
 }
 
+/**
+ * @brief Checks if the X server connection supports the MIT-SHM extension and if it's usable.
+ *
+ * This function queries the X server for SHM support and performs a test
+ * allocation and attachment to ensure it works correctly. Results are cached
+ * per display connection.
+ *
+ * @param d The X display connection.
+ * @return 1 if SHM is available and usable, 0 otherwise.
+ */
 int
 evas_software_xlib_x_can_do_shm(Display *d)
 {
@@ -252,6 +330,15 @@ evas_software_xlib_x_can_do_shm(Display *d)
    return 0;
 }
 
+/**
+ * @brief Temporary X error handler used during SHM attach testing.
+ *
+ * Sets the global `_x_err` flag if an X error occurs. This allows the
+ * SHM creation code to detect if `XShmAttach` failed silently.
+ *
+ * @param d The X display connection (unused).
+ * @param ev The X error event (unused).
+ */
 static void
 x_output_tmp_x_err(Display *d EINA_UNUSED, XErrorEvent *ev EINA_UNUSED)
 {
@@ -259,8 +346,24 @@ x_output_tmp_x_err(Display *d EINA_UNUSED, XErrorEvent *ev EINA_UNUSED)
    return;
 }
 
-//static int creates = 0;
+//static int creates = 0; // Potential leftover debug counter
 
+/**
+ * @brief Creates a new X output buffer, potentially using SHM.
+ *
+ * Allocates an X_Output_Buffer structure and associated resources (XImage, SHM segment).
+ * It attempts to use SHM if requested (`try_shm` > 0) and falls back to a standard
+ * client-side XImage if SHM fails or is not requested.
+ *
+ * @param d The X display connection.
+ * @param v The X visual to use.
+ * @param depth The color depth of the buffer.
+ * @param w The width of the buffer in pixels.
+ * @param h The height of the buffer in pixels.
+ * @param try_shm 0: Don't try SHM, 1: Try SHM, fallback to XImage, 2: Try SHM, fail if SHM attach fails (used for testing).
+ * @param data Optional pointer to pre-allocated image data. If NULL, data is allocated internally (unless SHM is used). If SHM is used, this parameter is ignored.
+ * @return A pointer to the newly created X_Output_Buffer, or NULL on failure.
+ */
 X_Output_Buffer *
 evas_software_xlib_x_output_buffer_new(Display *d, Visual *v, int depth, int w, int h, int try_shm, void *data)
 {
@@ -370,6 +473,14 @@ evas_software_xlib_x_output_buffer_new(Display *d, Visual *v, int depth, int w, 
    return xob;
 }
 
+/**
+ * @brief Increments the reference count of an X output buffer.
+ *
+ * Used for managing the lifetime of the buffer when shared.
+ *
+ * @param xob The X output buffer to reference.
+ * @return The same X_Output_Buffer pointer passed in, or NULL if refcount would overflow.
+ */
 X_Output_Buffer *
 evas_software_xlib_x_output_buffer_ref(X_Output_Buffer *xob)
 {
@@ -379,6 +490,14 @@ evas_software_xlib_x_output_buffer_ref(X_Output_Buffer *xob)
    return xob;
 }
 
+/**
+ * @brief Decrements the reference count of an X output buffer and frees resources if the count reaches zero.
+ *
+ * Cleans up associated XImage, SHM segment (if used), and the buffer structure itself.
+ *
+ * @param xob The X output buffer to unreference.
+ * @param psync If non-zero, performs an XSync before detaching SHM or destroying the image. This ensures X operations involving the buffer complete before its resources are released.
+ */
 void
 evas_software_xlib_x_output_buffer_unref(X_Output_Buffer *xob, int psync)
 {
@@ -404,6 +523,18 @@ evas_software_xlib_x_output_buffer_unref(X_Output_Buffer *xob, int psync)
    free(xob);
 }
 
+/**
+ * @brief Pastes the content of an X output buffer onto an X drawable (Window or Pixmap).
+ *
+ * Uses `XShmPutImage` if the buffer uses SHM, otherwise uses `XPutImage`.
+ *
+ * @param xob The source X output buffer.
+ * @param d The target X drawable.
+ * @param gc The graphics context to use for the operation.
+ * @param x The destination x-coordinate on the drawable.
+ * @param y The destination y-coordinate on the drawable.
+ * @param psync If non-zero, performs an XSync after putting the image to ensure the drawing operation completes immediately.
+ */
 void
 evas_software_xlib_x_output_buffer_paste(X_Output_Buffer *xob, Drawable d, GC gc, int x, int y, int psync)
 {
@@ -420,6 +551,13 @@ evas_software_xlib_x_output_buffer_paste(X_Output_Buffer *xob, Drawable d, GC gc
      }
 }
 
+/**
+ * @brief Retrieves a pointer to the raw pixel data of an X output buffer.
+ *
+ * @param xob The X output buffer.
+ * @param[out] bytes_per_line_ret Optional pointer to store the bytes per line (stride) of the image data.
+ * @return A pointer to the raw pixel data (DATA8*), which is either the SHM segment address or the allocated buffer for a standard XImage.
+ */
 DATA8 *
 evas_software_xlib_x_output_buffer_data(X_Output_Buffer *xob, int *bytes_per_line_ret)
 {
@@ -427,18 +565,43 @@ evas_software_xlib_x_output_buffer_data(X_Output_Buffer *xob, int *bytes_per_lin
    return (DATA8 *)xob->xim->data;
 }
 
+/**
+ * @brief Gets the color depth (bits per pixel) of the X output buffer.
+ *
+ * This corresponds to the `bits_per_pixel` field of the underlying XImage.
+ *
+ * @param xob The X output buffer.
+ * @return The depth in bits per pixel.
+ */
 int
 evas_software_xlib_x_output_buffer_depth(X_Output_Buffer *xob)
 {
    return xob->xim->bits_per_pixel;
 }
 
+/**
+ * @brief Gets the byte order (LSBFirst or MSBFirst) of the X output buffer's image data.
+ *
+ * This corresponds to the `byte_order` field of the underlying XImage.
+ *
+ * @param xob The X output buffer.
+ * @return The byte order constant (e.g., LSBFirst, MSBFirst).
+ */
 int
 evas_software_xlib_x_output_buffer_byte_order(X_Output_Buffer *xob)
 {
    return xob->xim->byte_order;
 }
 
+/**
+ * @brief Gets the bit order (LSBFirst or MSBFirst) of the X output buffer's image data.
+ *
+ * This corresponds to the `bitmap_bit_order` field of the underlying XImage,
+ * primarily relevant for 1-bit depth images (bitmaps).
+ *
+ * @param xob The X output buffer.
+ * @return The bitmap bit order constant (e.g., LSBFirst, MSBFirst).
+ */
 int
 evas_software_xlib_x_output_buffer_bit_order(X_Output_Buffer *xob)
 {

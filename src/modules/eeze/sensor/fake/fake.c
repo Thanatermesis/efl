@@ -10,20 +10,41 @@
 #include <Eeze_Sensor.h>
 #include "eeze_sensor_private.h"
 
+/**
+ * @file
+ * @brief This Eeze_Sensor module serves as a test harness for development.
+ *
+ * It simulates sensor data without interacting with actual hardware.
+ * It provides fixed data values but uses accurate timestamps.
+ * This is useful for testing applications that consume sensor data
+ * without requiring physical sensors.
+ */
+
 /* This small Eeze_Sensor module is meant to be used as a test harness for
  * developing. It does not gather any real data from hardware sensors. It uses
  * fixed values for the data, but provides the correct timestamp value.
  */
 
-static int _eeze_sensor_fake_log_dom = -1;
+static int _eeze_sensor_fake_log_dom = -1; /**< Log domain for the fake sensor module. */
 
 #ifdef ERR
 #undef ERR
 #endif
 #define ERR(...)  EINA_LOG_DOM_ERR(_eeze_sensor_fake_log_dom, __VA_ARGS__)
 
-static Eeze_Sensor_Module *esensor_module;
+static Eeze_Sensor_Module *esensor_module; /**< Pointer to the Eeze_Sensor_Module structure for this fake module. */
 
+/**
+ * @brief A dummy free function for ecore events.
+ *
+ * This function is used as a callback for ecore_event_add. It intentionally
+ * does nothing, preventing the event data (Eeze_Sensor_Obj) from being freed
+ * by the event system. The module manages the lifecycle of Eeze_Sensor_Obj
+ * instances itself.
+ *
+ * @param user_data Unused.
+ * @param func_data Unused.
+ */
 static void
 _dummy_free(void *user_data EINA_UNUSED, void *func_data EINA_UNUSED)
 {
@@ -32,6 +53,16 @@ _dummy_free(void *user_data EINA_UNUSED, void *func_data EINA_UNUSED)
  */
 }
 
+/**
+ * @brief Initializes the fake sensor module.
+ *
+ * This function is called by the Eeze sensor core when the module is loaded.
+ * It populates the sensor list with all potential sensor types, even if
+ * they are not actively providing data. Each sensor object is allocated
+ * and its type is set.
+ *
+ * @return EINA_TRUE on successful initialization, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 fake_init(void)
 {
@@ -53,12 +84,35 @@ fake_init(void)
 /* We don't have anything to clear when we get unregistered from the core here.
  * This is different in other modules.
  */
+/**
+ * @brief Shuts down the fake sensor module.
+ *
+ * This function is called by the Eeze sensor core when the module is unloaded.
+ * For this fake module, no specific cleanup is required beyond what the core
+ * and the EINA_MODULE_SHUTDOWN macro handle for the sensor_list.
+ *
+ * @return EINA_TRUE always, as shutdown is trivial.
+ */
 static Eina_Bool
 fake_shutdown(void)
 {
    return EINA_TRUE;
 }
 
+/**
+ * @brief Reads data from a simulated sensor synchronously.
+ *
+ * Populates the given Eeze_Sensor_Obj with fixed, hardcoded data based on the
+ * sensor type. The timestamp is set to the current time.
+ *
+ * @param obj Pointer to the Eeze_Sensor_Obj to populate with data.
+ *            The `obj->type` field determines the kind of data generated.
+ *            The `obj->data` array will be filled, e.g.:
+ *            - For ACCELEROMETER: `obj->data[0]=x, obj->data[1]=y, obj->data[2]=z`
+ *            - For LIGHT: `obj->data[0]=lux_value`
+ * @return EINA_TRUE if data was successfully "read" (i.e., generated),
+ *         EINA_FALSE if the sensor type is unknown or unsupported.
+ */
 static Eina_Bool
 fake_read(Eeze_Sensor_Obj *obj)
 {
@@ -96,6 +150,23 @@ fake_read(Eeze_Sensor_Obj *obj)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Initiates an asynchronous "read" from a simulated sensor.
+ *
+ * This function simulates an asynchronous sensor data update. It populates
+ * the Eeze_Sensor_Obj with fixed data and then posts an ecore event
+ * corresponding to the sensor type. The actual data is sent via this event.
+ *
+ * @param obj Pointer to the Eeze_Sensor_Obj representing the sensor.
+ *            The `obj->type` field determines the event type and data structure.
+ *            The `obj->data` array will be filled with hardcoded values, e.g.:
+ *            - For GYROSCOPE: `obj->data[0]=x_rate, obj->data[1]=y_rate, obj->data[2]=z_rate`
+ *            - For PROXIMITY: `obj->data[0]=distance`
+ * @param user_data Custom data to be associated with the sensor object,
+ *                  stored in `obj->user_data`.
+ * @return EINA_TRUE if the asynchronous read was successfully initiated,
+ *         EINA_FALSE if the sensor type is unknown or unsupported.
+ */
 static Eina_Bool
 fake_async_read(Eeze_Sensor_Obj *obj, void *user_data)
 {
@@ -165,6 +236,20 @@ fake_async_read(Eeze_Sensor_Obj *obj, void *user_data)
  * entry point to anything in this module. After setting ourself up we register
  * into the core of eeze sensor to make our functionality available.
  */
+/**
+ * @brief Module initialization function, called when the module is loaded.
+ *
+ * This is the entry point for the fake sensor module. It performs the
+ * following actions:
+ * 1. Registers a log domain for the module.
+ * 2. Allocates and initializes the Eeze_Sensor_Module structure.
+ * 3. Sets up function pointers for init, shutdown, read, and async_read
+ *    to point to the local `fake_*` implementations.
+ * 4. Registers this module with the Eeze sensor core under the name "fake".
+ *
+ * @return EINA_TRUE on successful initialization and registration,
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 sensor_fake_init(void)
 {
@@ -201,6 +286,16 @@ sensor_fake_init(void)
 
 /* Cleanup when the module gets unloaded. Unregister ourself from the core to
  * avoid calls into a not loaded module.
+ */
+/**
+ * @brief Module shutdown function, called when the module is unloaded.
+ *
+ * This function performs cleanup tasks for the fake sensor module:
+ * 1. Unregisters the module from the Eeze sensor core.
+ * 2. Frees all Eeze_Sensor_Obj instances stored in the `sensor_list`.
+ * 3. Unregisters the log domain.
+ * 4. Frees the Eeze_Sensor_Module structure.
+ * 5. Resets static global variables.
  */
 static void
 sensor_fake_shutdown(void)

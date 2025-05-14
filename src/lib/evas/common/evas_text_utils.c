@@ -707,6 +707,20 @@ static const Color_Name_Value color_name_value_sorted[] = {
    COLOR_NAME("yellow4",139,139,0),
 };
 
+/**
+ * @internal
+ * @brief Comparator function for searching color names using bsearch.
+ *
+ * This function is designed to be used with `bsearch` to find a color
+ * by its name in the `color_name_value_sorted` array. It compares a
+ * string key (`value`) with the `name` field of a `Color_Name_Value` struct.
+ *
+ * @param value A pointer to the color name string to search for.
+ * @param element A pointer to a `Color_Name_Value` element in the array.
+ * @return An integer less than, equal to, or greater than zero if the `value`
+ *         string is found, respectively, to be less than, to match, or be
+ *         greater than the `element`'s name.
+ */
 int _color_name_search(const void * value, const void * element)
 {
    return strcmp((char *) value, ((const Color_Name_Value *) element)->name);
@@ -815,6 +829,26 @@ evas_common_text_props_content_unref(Evas_Text_Props *props)
      }
 }
 
+/**
+ * @internal
+ * @brief Moves the cursor to the next or previous cluster boundary.
+ *
+ * This function calculates the character position of the cluster boundary
+ * to the visual left or right of the given position `pos`. The direction
+ * of movement (visual right or left) is determined by the `right` parameter.
+ * This is essential for navigating text with complex scripts (e.g., Arabic,
+ * Devanagari) where a single visual "character" (grapheme cluster) can be
+ * composed of multiple Unicode codepoints and represented by multiple glyphs.
+ *
+ * @param props The text properties containing OpenType info.
+ * @param pos The current logical character position within the text segment.
+ * @param right If `EINA_TRUE`, move to the right cluster boundary; if `EINA_FALSE`,
+ *              move to the left. The interpretation of "right" and "left" is
+ *              visual, not logical.
+ * @return The new logical character position at the cluster boundary. If no
+ *         further cluster is found in the given direction, the original `pos`
+ *         is returned.
+ */
 static int
 _evas_common_text_props_cluster_move(const Evas_Text_Props *props, int pos,
       Eina_Bool right)
@@ -1047,6 +1081,22 @@ evas_common_text_props_merge(Evas_Text_Props *item1,
 }
 
 #ifdef OT_SUPPORT
+/**
+ * @internal
+ * @brief Populates text properties using OpenType-based text shaping.
+ *
+ * This function handles complex text layout by leveraging OpenType features.
+ * It performs text shaping to determine glyph indices, positions, and advances.
+ * It also handles special cases like invisible characters and replacements for
+ * malformed glyph indices.
+ *
+ * @param fi The font instance.
+ * @param text The Unicode string to process.
+ * @param text_props The text properties structure to populate.
+ * @param len The length of the text.
+ * @param mode The processing mode, which can influence shaping behavior.
+ * @param lang The language of the text, used to select appropriate OT features.
+ */
 static inline void
 _content_create_ot(RGBA_Font_Int *fi, const Eina_Unicode *text,
       Evas_Text_Props *text_props, int len, Evas_Text_Props_Mode mode, const char *lang)
@@ -1115,6 +1165,22 @@ _content_create_ot(RGBA_Font_Int *fi, const Eina_Unicode *text,
      }
 }
 #else
+/**
+ * @internal
+ * @brief Populates text properties using a simpler, non-OpenType layout approach.
+ *
+ * This function is used when OpenType support is not available. It handles
+ * basic text layout, including BiDi reordering and kerning. For RTL text,
+ * it performs shaping if BIDI_SUPPORT is enabled.
+ *
+ * @param fi The font instance.
+ * @param text The Unicode string to process.
+ * @param text_props The text properties structure to populate.
+ * @param par_props Bidirectional properties of the paragraph.
+ * @param par_pos The starting position within the paragraph.
+ * @param len The length of the text.
+ * @param mode The processing mode (e.g., to enable shaping for BiDi).
+ */
 static inline void
 _content_create_regular(RGBA_Font_Int *fi, const Eina_Unicode *text,
       Evas_Text_Props *text_props, const Evas_BiDi_Paragraph_Props *par_props,
@@ -1283,6 +1349,20 @@ evas_common_text_props_content_create(void *_fi, const Eina_Unicode *text,
  * @param ch The HEX char.
  * @return numeric value of HEX.
  */
+/**
+ * @internal
+ * @brief Converts a hexadecimal character to its integer value.
+ *
+ * This function takes a character (e.g., 'A', 'f', '9') and returns its
+ * corresponding integer value (10, 15, 9). It handles both uppercase
+ * and lowercase hexadecimal digits.
+ *
+ * @param ch The character to convert.
+ * @param[out] ok A boolean that is set to `EINA_FALSE` if the character
+ *                is not a valid hexadecimal digit. The caller must initialize
+ *                this to `EINA_TRUE`.
+ * @return The integer value of the hex character, or 0 on failure.
+ */
 static int
 _hex_string_get(char ch, Eina_Bool *ok)
 {
@@ -1303,6 +1383,20 @@ _hex_string_get(char ch, Eina_Bool *ok)
  * @return number of spaces removed
  */
 
+/**
+ * @internal
+ * @brief Copies a string to a destination buffer, removing spaces and converting to lowercase.
+ *
+ * This utility function processes a source string by removing all space characters
+ * and converting uppercase ASCII letters to lowercase. The result is stored in
+ * the destination buffer. This is primarily used to normalize color name strings
+ * before lookup.
+ *
+ * @param source The null-terminated source string.
+ * @param dest The destination buffer.
+ * @param max The maximum number of characters to write to `dest`.
+ * @return The number of space characters that were removed.
+ */
 size_t remove_spaces_lowercase(const char* source,char * dest,size_t max)
 {
   size_t spaces=0;
@@ -1333,6 +1427,21 @@ size_t remove_spaces_lowercase(const char* source,char * dest,size_t max)
  * @return if read success
  */
 
+/**
+ * @internal
+ * @brief Reads a byte-sized color component (0-255) from a string.
+ *
+ * This function parses an integer from the beginning of the `source` string.
+ * It validates that the parsed value is within the valid range for a color
+ * component [0, 255].
+ *
+ * @param source The string to read from.
+ * @param[out] next If not NULL, it will be updated to point to the character
+ *                  in the source string after the parsed number.
+ * @param[out] byte If not NULL, the parsed color component value is stored here.
+ * @return `EINA_TRUE` if a valid byte value was successfully parsed,
+ *         `EINA_FALSE` otherwise.
+ */
 Eina_Bool read_byte_color_component(const char* source,char ** next,unsigned char * byte)
 {
   const char *p_start = source;

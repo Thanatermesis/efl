@@ -33,14 +33,42 @@
    (((x) < ((xx) + (ww))) && ((y) < ((yy) + (hh))) && \
        ((x) >= (xx)) && ((y) >= (yy)))
 
+/** @internal
+ * @brief List of all active DRM devices.
+ * Each element is a pointer to an Ecore_Drm_Device structure.
+ */
 static Eina_List *drm_devices;
+
+/** @internal
+ * @brief Flag indicating if the custom DRM vblank-based animator tick source is active.
+ * 1 if active, 0 otherwise.
+ */
 static int ticking = 0;
 
+/** @internal
+ * @brief Globally cached XKB keymap.
+ * This is used to avoid recompiling the keymap for each device if they share the same configuration.
+ */
 struct xkb_keymap *cached_keymap;
+
+/** @internal
+ * @brief Globally cached XKB context.
+ * This is used to avoid creating a new context for each device.
+ */
 struct xkb_context *cached_context;
 
 static void _ecore_drm_tick_source_set(Ecore_Drm_Device *dev);
 
+/**
+ * @internal
+ * @brief Schedules a DRM vblank event for animator ticking.
+ *
+ * This function requests a vblank event from the DRM subsystem. When the
+ * vblank occurs, the registered vblank handler (_ecore_drm_device_cb_vblank)
+ * will be called, which in turn drives the Ecore animator ticks.
+ *
+ * @param dev The Ecore_Drm_Device to schedule the vblank for.
+ */
 static void
 _ecore_drm_tick_schedule(Ecore_Drm_Device *dev)
 {
@@ -58,6 +86,16 @@ _ecore_drm_tick_schedule(Ecore_Drm_Device *dev)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback function to start the custom animator tick source.
+ *
+ * This function is called by Ecore animator when the custom tick source
+ * is activated. It sets the 'ticking' flag and schedules the first
+ * vblank event.
+ *
+ * @param data Pointer to the Ecore_Drm_Device.
+ */
 static void
 _ecore_drm_tick_begin(void *data)
 {
@@ -65,12 +103,32 @@ _ecore_drm_tick_begin(void *data)
    _ecore_drm_tick_schedule(data);
 }
 
+/**
+ * @internal
+ * @brief Callback function to stop the custom animator tick source.
+ *
+ * This function is called by Ecore animator when the custom tick source
+ * is deactivated. It clears the 'ticking' flag.
+ *
+ * @param data Pointer to the Ecore_Drm_Device (unused).
+ */
 static void
 _ecore_drm_tick_end(void *data EINA_UNUSED)
 {
    ticking = 0;
 }
 
+/**
+ * @internal
+ * @brief Sets or unsets the custom DRM vblank-based animator tick source.
+ *
+ * If @p dev is provided, Ecore animator is configured to use custom tick
+ * callbacks (_ecore_drm_tick_begin, _ecore_drm_tick_end) driven by DRM
+ * vblank events. If @p dev is NULL, the animator source is reset to the
+ * default timer-based source.
+ *
+ * @param dev The Ecore_Drm_Device to use for vblank events, or NULL to disable.
+ */
 static void
 _ecore_drm_tick_source_set(Ecore_Drm_Device *dev)
 {
@@ -88,6 +146,21 @@ _ecore_drm_tick_source_set(Ecore_Drm_Device *dev)
    ecore_animator_source_set(ECORE_ANIMATOR_SOURCE_CUSTOM);
 }
 
+/**
+ * @internal
+ * @brief Callback executed when a page flip event occurs.
+ *
+ * This function is registered with the DRM event context and is called by
+ * libdrm when a page flip completes on an output. It updates the current
+ * framebuffer for the output and attempts to queue the next framebuffer if
+ * one was pending.
+ *
+ * @param fd The DRM file descriptor (unused).
+ * @param frame The frame sequence number (unused).
+ * @param sec Seconds part of the event timestamp (unused).
+ * @param usec Microseconds part of the event timestamp (unused).
+ * @param data Pointer to the Ecore_Drm_Output associated with this page flip.
+ */
 static void
 _ecore_drm_device_cb_page_flip(int fd EINA_UNUSED, unsigned int frame EINA_UNUSED, unsigned int sec EINA_UNUSED, unsigned int usec EINA_UNUSED, void *data)
 {
@@ -111,6 +184,20 @@ _ecore_drm_device_cb_page_flip(int fd EINA_UNUSED, unsigned int frame EINA_UNUSE
      }
 }
 
+/**
+ * @internal
+ * @brief Callback executed when a vblank event occurs.
+ *
+ * This function is registered with the DRM event context and is called by
+ * libdrm when a vblank occurs. It triggers an Ecore animator tick and, if
+ * custom ticking is still active, schedules the next vblank event.
+ *
+ * @param fd The DRM file descriptor (unused).
+ * @param frame The frame sequence number (unused).
+ * @param sec Seconds part of the event timestamp (unused).
+ * @param usec Microseconds part of the event timestamp (unused).
+ * @param data Pointer to the Ecore_Drm_Device that requested the vblank.
+ */
 static void
 _ecore_drm_device_cb_vblank(int fd EINA_UNUSED, unsigned int frame EINA_UNUSED, unsigned int sec EINA_UNUSED, unsigned int usec EINA_UNUSED, void *data)
 {
@@ -118,6 +205,18 @@ _ecore_drm_device_cb_vblank(int fd EINA_UNUSED, unsigned int frame EINA_UNUSED, 
    if (ticking) _ecore_drm_tick_schedule(data);
 }
 
+/**
+ * @internal
+ * @brief Ecore Fd Handler callback for DRM events.
+ *
+ * This function is called by the Ecore main loop when there is data to be
+ * read on the DRM file descriptor. It calls drmHandleEvent to process
+ * pending DRM events (like page flips or vblanks).
+ *
+ * @param data Pointer to the Ecore_Drm_Device.
+ * @param hdlr The Ecore_Fd_Handler that triggered this callback (unused).
+ * @return ECORE_CALLBACK_RENEW to keep the handler active, ECORE_CALLBACK_CANCEL on error.
+ */
 static Eina_Bool
 _cb_drm_event_handle(void *data, Ecore_Fd_Handler *hdlr EINA_UNUSED)
 {
@@ -133,6 +232,19 @@ _cb_drm_event_handle(void *data, Ecore_Fd_Handler *hdlr EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Callback for Eeze udev events related to DRM outputs.
+ *
+ * This function is called when Eeze detects a change (add, remove, change)
+ * in DRM devices (outputs). It triggers an update of the output list for
+ * the given Ecore_Drm_Device.
+ *
+ * @param device The udev device path (unused).
+ * @param event The type of udev event (unused).
+ * @param data Pointer to the Ecore_Drm_Device.
+ * @param watch The Eeze_Udev_Watch that triggered this callback (unused).
+ */
 static void
 _ecore_drm_device_cb_output_event(const char *device EINA_UNUSED, Eeze_Udev_Event event EINA_UNUSED, void *data, Eeze_Udev_Watch *watch EINA_UNUSED)
 {
@@ -142,6 +254,19 @@ _ecore_drm_device_cb_output_event(const char *device EINA_UNUSED, Eeze_Udev_Even
    _ecore_drm_outputs_update(dev);
 }
 
+/**
+ * @internal
+ * @brief Retrieves or creates a cached XKB context.
+ *
+ * This function attempts to return a reference to a globally cached
+ * xkb_context. If no context is cached, it creates a new one using
+ * the provided flags. The caller is responsible for calling
+ * xkb_context_unref() on the returned context.
+ *
+ * @param flags Flags to use when creating a new XKB context.
+ *              Example: XKB_CONTEXT_NO_FLAGS.
+ * @return A new or referenced xkb_context, or NULL on failure.
+ */
 struct xkb_context *
 _ecore_drm_device_cached_context_get(enum xkb_context_flags flags)
 {
@@ -151,6 +276,23 @@ _ecore_drm_device_cached_context_get(enum xkb_context_flags flags)
      return xkb_context_ref(cached_context);
 }
 
+/**
+ * @internal
+ * @brief Retrieves or creates a cached XKB keymap.
+ *
+ * This function attempts to return a reference to a globally cached
+ * xkb_keymap. If no keymap is cached, it creates a new one using the
+ * provided context, rule names, and flags. The caller is responsible
+ * for calling xkb_map_unref() on the returned keymap.
+ *
+ * @param ctx The XKB context to use.
+ * @param names Pointer to a struct xkb_rule_names specifying the rules,
+ *              model, layout, variant, and options for the keymap.
+ *              Example: { .rules = "evdev", .model = "pc105", .layout = "us" }
+ * @param flags Flags to use when compiling the new keymap.
+ *              Example: XKB_KEYMAP_COMPILE_NO_FLAGS.
+ * @return A new or referenced xkb_keymap, or NULL on failure.
+ */
 struct xkb_keymap *
 _ecore_drm_device_cached_keymap_get(struct xkb_context *ctx, const struct xkb_rule_names *names, enum xkb_keymap_compile_flags flags)
 {
@@ -161,6 +303,17 @@ _ecore_drm_device_cached_keymap_get(struct xkb_context *ctx, const struct xkb_ru
    return xkb_map_ref(cached_keymap);
 }
 
+/**
+ * @internal
+ * @brief Updates the XKB context for all active DRM devices.
+ *
+ * This function is called when the global XKB context might have changed
+ * (e.g., via ecore_drm_device_keyboard_cached_context_set). It iterates
+ * through all known Ecore_Drm_Device instances and updates their
+ * internal xkb_ctx to reference the new global context.
+ *
+ * @param ctx The new global XKB context to be referenced by devices.
+ */
 void
 _ecore_drm_device_cached_context_update(struct xkb_context *ctx)
 {
@@ -174,6 +327,18 @@ _ecore_drm_device_cached_context_update(struct xkb_context *ctx)
      }
 }
 
+/**
+ * @internal
+ * @brief Updates the XKB keymap for all input devices across all DRM devices and seats.
+ *
+ * This function is called when the global XKB keymap might have changed
+ * (e.g., via ecore_drm_device_keyboard_cached_keymap_set). It iterates
+ * through all Ecore_Drm_Device instances, their associated Ecore_Drm_Seat
+ * instances, and finally their Ecore_Drm_Evdev input devices, updating
+ * each input device's keymap to reference the new global keymap.
+ *
+ * @param map The new global XKB keymap to be referenced by input devices.
+ */
 void
 _ecore_drm_device_cached_keymap_update(struct xkb_keymap *map)
 {

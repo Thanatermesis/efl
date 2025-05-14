@@ -1,5 +1,10 @@
-/*
- * Xinerama code
+/**
+ * @file
+ * @brief Functions for interacting with the X Xinerama extension.
+ *
+ * This file provides functions to query Xinerama screen information,
+ * such as the number of screens and their geometries. Xinerama allows
+ * multiple physical monitors to be treated as a single large virtual screen.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -16,6 +21,19 @@ static XineramaScreenInfo *_xin_info = NULL;
 static int _xin_scr_num = 0;
 #endif /* ifdef ECORE_XINERAMA */
 
+/**
+ * @brief Retrieves the number of screens managed by Xinerama.
+ *
+ * This function queries the X server for Xinerama information and returns
+ * the number of available screens. If Xinerama is not active or not
+ * supported, it returns 0.
+ *
+ * The Xinerama information is cached internally and refreshed on each call
+ * if Xinerama is active.
+ *
+ * @return The number of Xinerama screens, or 0 if Xinerama is not active
+ *         or an error occurs.
+ */
 EAPI int
 ecore_x_xinerama_screen_count_get(void)
 {
@@ -41,6 +59,31 @@ ecore_x_xinerama_screen_count_get(void)
    return 0;
 }
 
+/**
+ * @brief Retrieves the geometry of a specific Xinerama screen.
+ *
+ * This function populates the provided pointers with the x-coordinate,
+ * y-coordinate, width, and height of the specified Xinerama screen.
+ *
+ * If Xinerama is not active or the specified screen number is not found,
+ * this function will return the geometry of the default screen (screen 0)
+ * as reported by the X server (DisplayWidth/DisplayHeight) and return @c EINA_FALSE.
+ *
+ * The screen geometries are based on the cached Xinerama information obtained
+ * from the last call to ecore_x_xinerama_screen_count_get() or a previous
+ * call to this function if Xinerama is active.
+ *
+ * @param[in] screen The screen number whose geometry is to be retrieved.
+ *                   This corresponds to the `screen_number` field in
+ *                   `XineramaScreenInfo`.
+ * @param[out] x Pointer to store the x-coordinate of the screen's origin. Can be NULL.
+ * @param[out] y Pointer to store the y-coordinate of the screen's origin. Can be NULL.
+ * @param[out] w Pointer to store the width of the screen. Can be NULL.
+ * @param[out] h Pointer to store the height of the screen. Can be NULL.
+ * @return @c EINA_TRUE if the Xinerama screen geometry was successfully retrieved,
+ *         @c EINA_FALSE otherwise (e.g., Xinerama not active, screen not found,
+ *         or Xinerama information not available).
+ */
 EAPI Eina_Bool
 ecore_x_xinerama_screen_geometry_get(int screen EINA_UNUSED, // if no xinerama
                                      int *x,

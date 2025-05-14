@@ -1,11 +1,26 @@
 #include "evas_common_private.h"
 #include "evas_engine.h"
 
+/**
+ * @brief Initializes the GDI output buffer module.
+ *
+ * This function is called once to set up any necessary global state for
+ * the GDI output buffer operations. Currently, it does nothing.
+ */
 void
 evas_software_gdi_outbuf_init(void)
 {
 }
 
+/**
+ * @brief Frees the resources associated with a GDI output buffer.
+ *
+ * This function cleans up all resources allocated for the given output buffer,
+ * including pending writes, GDI objects, and the buffer structure itself.
+ * It ensures that all pending operations are flushed or cancelled before freeing.
+ *
+ * @param buf The output buffer to free.
+ */
 void
 evas_software_gdi_outbuf_free(Outbuf *buf)
 {
@@ -33,6 +48,24 @@ evas_software_gdi_outbuf_free(Outbuf *buf)
    free(buf);
 }
 
+/**
+ * @brief Sets up a new GDI output buffer.
+ *
+ * Allocates and initializes a GDI output buffer (`Outbuf`) for rendering
+ * onto a specific window. It configures the buffer based on the provided
+ * dimensions, rotation, and window properties.
+ *
+ * @param width The width of the output buffer in pixels.
+ * @param height The height of the output buffer in pixels.
+ * @param rotation The rotation angle (0, 90, 180, 270 degrees).
+ * @param window The handle to the target window (HWND).
+ * @param borderless Non-zero if the window is borderless.
+ * @param fullscreen Non-zero if the window is fullscreen.
+ * @param region Non-zero if the window shape should be managed using regions (for transparency).
+ * @param mask_dither Non-zero to enable mask dithering (currently unused).
+ * @param destination_alpha Non-zero if the destination surface supports alpha.
+ * @return A pointer to the newly created Outbuf structure, or NULL on failure.
+ */
 Outbuf *
 evas_software_gdi_outbuf_setup(int          width,
                                int          height,
@@ -113,6 +146,19 @@ evas_software_gdi_outbuf_setup(int          width,
    return buf;
 }
 
+/**
+ * @brief Reconfigures an existing GDI output buffer.
+ *
+ * Updates the dimensions and rotation of the output buffer, typically called
+ * when the target window is resized or rotated. It resizes the underlying
+ * GDI bitmap accordingly.
+ *
+ * @param buf The output buffer to reconfigure.
+ * @param width The new width in pixels.
+ * @param height The new height in pixels.
+ * @param rotation The new rotation angle (0, 90, 180, 270 degrees).
+ * @param depth The color depth (currently unused).
+ */
 void
 evas_software_gdi_outbuf_reconfigure(Outbuf      *buf,
                                      int          width,
@@ -130,6 +176,25 @@ evas_software_gdi_outbuf_reconfigure(Outbuf      *buf,
    buf->priv.region_built = 0;
 }
 
+/**
+ * @brief Creates a new image buffer for updating a specific region.
+ *
+ * Allocates an RGBA_Image buffer intended to receive pixel data for a
+ * rectangular region of the output buffer that needs updating. This buffer
+ * might be directly mapped to a GDI buffer or allocated separately depending
+ * on rotation and pixel format compatibility.
+ *
+ * @param buf The output buffer.
+ * @param x The x-coordinate of the update region's top-left corner.
+ * @param y The y-coordinate of the update region's top-left corner.
+ * @param w The width of the update region.
+ * @param h The height of the update region.
+ * @param[out] cx Pointer to store the x-coordinate within the returned image buffer (relative to the buffer itself, usually 0).
+ * @param[out] cy Pointer to store the y-coordinate within the returned image buffer (relative to the buffer itself, usually 0).
+ * @param[out] cw Pointer to store the width of the returned image buffer (usually equals w).
+ * @param[out] ch Pointer to store the height of the returned image buffer (usually equals h).
+ * @return A pointer to an RGBA_Image structure representing the update region buffer. The actual pixel data can be accessed via `im->image.data`. Returns NULL on failure.
+ */
 void *
 evas_software_gdi_outbuf_new_region_for_update(Outbuf *buf,
                                                int     x,
@@ -207,6 +272,23 @@ evas_software_gdi_outbuf_new_region_for_update(Outbuf *buf,
    return im;
 }
 
+/**
+ * @brief Pushes an updated region buffer to the pending writes list.
+ *
+ * Processes the provided RGBA_Image (obtained from
+ * evas_software_gdi_outbuf_new_region_for_update) containing updated pixel data.
+ * It performs color conversion if necessary, handles rotation adjustments,
+ * and potentially calculates the window region for transparency effects.
+ * The processed GDI buffer associated with the update is marked for drawing
+ * during the next flush operation.
+ *
+ * @param buf The output buffer.
+ * @param update The RGBA_Image containing the updated pixel data for the region.
+ * @param x The original x-coordinate of the update region.
+ * @param y The original y-coordinate of the update region.
+ * @param w The original width of the update region.
+ * @param h The original height of the update region.
+ */
 void
 evas_software_gdi_outbuf_push_updated_region(Outbuf     *buf,
                                              RGBA_Image *update,
@@ -434,6 +516,21 @@ evas_software_gdi_outbuf_push_updated_region(Outbuf     *buf,
      }
 }
 
+/**
+ * @brief Flushes pending updates to the GDI window.
+ *
+ * Draws all regions that have been pushed via
+ * evas_software_gdi_outbuf_push_updated_region onto the target window's DC.
+ * It iterates through the `pending_writes` list, pasting each GDI buffer
+ * to its correct location. After drawing, it moves the `pending_writes` list
+ * to `prev_pending_writes` for cleanup in the next idle cycle or flush.
+ *
+ * @param buf The output buffer.
+ * @param surface_damage Rectangles defining damage on the surface (unused).
+ * @param buffer_damage Rectangles defining damage in the buffer (unused).
+ * @param render_mode The rendering mode (e.g., synchronous, asynchronous).
+ *                    EVAS_RENDER_MODE_ASYNC_INIT skips the flush.
+ */
 void
 evas_software_gdi_outbuf_flush(Outbuf *buf, Tilebuf_Rect *surface_damage EINA_UNUSED, Tilebuf_Rect *buffer_damage EINA_UNUSED, Evas_Render_Mode render_mode)
 {
@@ -479,6 +576,16 @@ evas_software_gdi_outbuf_flush(Outbuf *buf, Tilebuf_Rect *surface_damage EINA_UN
    evas_common_cpu_end_opt();
 }
 
+/**
+ * @brief Frees resources associated with previously flushed updates during idle time.
+ *
+ * Cleans up the image buffers and GDI objects stored in the
+ * `prev_pending_writes` list. This list contains updates that were drawn
+ * in the previous flush operation. This function is typically called when
+ * the application is idle to release resources.
+ *
+ * @param buf The output buffer.
+ */
 void
 evas_software_gdi_outbuf_idle_flush(Outbuf *buf)
 {
@@ -500,18 +607,33 @@ evas_software_gdi_outbuf_idle_flush(Outbuf *buf)
      }
 }
 
+/**
+ * @brief Gets the width of the output buffer.
+ * @param buf The output buffer.
+ * @return The width in pixels.
+ */
 int
 evas_software_gdi_outbuf_width_get(Outbuf *buf)
 {
    return buf->width;
 }
 
+/**
+ * @brief Gets the height of the output buffer.
+ * @param buf The output buffer.
+ * @return The height in pixels.
+ */
 int
 evas_software_gdi_outbuf_height_get(Outbuf *buf)
 {
    return buf->height;
 }
 
+/**
+ * @brief Gets the rotation angle of the output buffer.
+ * @param buf The output buffer.
+ * @return The rotation angle (0, 90, 180, or 270).
+ */
 int
 evas_software_gdi_outbuf_rot_get(Outbuf *buf)
 {

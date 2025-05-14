@@ -1,22 +1,64 @@
-
+/**
+ * @brief Legacy wrapper for elm_obj_multibuttonentry_editable_set().
+ *
+ * This function controls if the multibuttonentry is to be editable or not.
+ *
+ * @param[in] obj The object.
+ * @param[in] editable If @c EINA_TRUE, user can add/delete item in
+ * multibuttonentry; if @c EINA_FALSE, the multibuttonentry is non-editable.
+ *
+ * @deprecated Prefer using the Eo API directly.
+ * @see elm_multibuttonentry_editable_set() in elm_multibuttonentry_eo.legacy.h for the original EAPI documentation.
+ */
 EAPI void
 elm_multibuttonentry_editable_set(Elm_Multibuttonentry *obj, Eina_Bool editable)
 {
    elm_obj_multibuttonentry_editable_set(obj, editable);
 }
-
+/**
+ * @brief Legacy wrapper for elm_obj_multibuttonentry_editable_get().
+ *
+ * This function retrieves whether the multibuttonentry is editable.
+ *
+ * @param[in] obj The object.
+ * @return @c EINA_TRUE if the object is editable, @c EINA_FALSE otherwise.
+ *
+ * @deprecated Prefer using the Eo API directly.
+ * @see elm_multibuttonentry_editable_get() in elm_multibuttonentry_eo.legacy.h for the original EAPI documentation.
+ */
 EAPI Eina_Bool
 elm_multibuttonentry_editable_get(const Elm_Multibuttonentry *obj)
 {
    return elm_obj_multibuttonentry_editable_get(obj);
 }
-
+/**
+ * @brief Legacy wrapper for elm_obj_multibuttonentry_expanded_set().
+ *
+ * This function controls the expanded state of the multibuttonentry.
+ *
+ * @param[in] obj The object.
+ * @param[in] expanded If @c EINA_TRUE, the complete entry will be displayed;
+ * if @c EINA_FALSE, only a single line will be displayed.
+ *
+ * @deprecated Prefer using the Eo API directly.
+ * @see elm_multibuttonentry_expanded_set() in elm_multibuttonentry_eo.legacy.h for the original EAPI documentation.
+ */
 EAPI void
 elm_multibuttonentry_expanded_set(Elm_Multibuttonentry *obj, Eina_Bool expanded)
 {
    elm_obj_multibuttonentry_expanded_set(obj, expanded);
 }
-
+/**
+ * @brief Legacy wrapper for elm_obj_multibuttonentry_expanded_get().
+ *
+ * This function retrieves the expanded state of the multibuttonentry.
+ *
+ * @param[in] obj The object.
+ * @return @c EINA_TRUE if the object is in an expanded state, @c EINA_FALSE otherwise.
+ *
+ * @deprecated Prefer using the Eo API directly.
+ * @see elm_multibuttonentry_expanded_get() in elm_multibuttonentry_eo.legacy.h for the original EAPI documentation.
+ */
 EAPI Eina_Bool
 elm_multibuttonentry_expanded_get(const Elm_Multibuttonentry *obj)
 {

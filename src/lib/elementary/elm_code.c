@@ -9,8 +9,29 @@
 
 #include "elm_code_private.h"
 
+/**
+ * @brief Event triggered when a single line has finished loading.
+ *
+ * This event is fired by Elm_Code when a line's content and associated metadata
+ * (like syntax highlighting information) have been fully processed and are ready.
+ * Widgets displaying the code can listen to this event to update their view
+ * incrementally as lines are loaded.
+ *
+ * The event_info for this event is typically an Elm_Code_Line pointer.
+ */
 EAPI const Efl_Event_Description ELM_CODE_EVENT_LINE_LOAD_DONE =
     EFL_EVENT_DESCRIPTION("line,load,done");
+
+/**
+ * @brief Event triggered when the entire file has finished loading.
+ *
+ * This event is fired by Elm_Code when all lines in the associated file
+ * have been loaded and processed. Widgets can use this event to perform
+ * actions that require the full content to be available, such as final
+ * layout adjustments or enabling certain features.
+ *
+ * The event_info for this event is typically NULL or a pointer to the Elm_Code_File.
+ */
 EAPI const Efl_Event_Description ELM_CODE_EVENT_FILE_LOAD_DONE =
     EFL_EVENT_DESCRIPTION("file,load,done");
 

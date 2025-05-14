@@ -7,6 +7,20 @@
 #include "evas_common_private.h"
 #include "evas_private.h"
 
+/**
+ * @brief Reads a multi-byte integer from a memory map.
+ *
+ * This function decodes a variable-length integer format where the most
+ * significant bit of each byte indicates if more bytes follow.
+ *
+ * @param data Pointer to store the decoded unsigned integer.
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total length of the memory-mapped data.
+ * @param position Pointer to the current read position within the map;
+ *                 it will be updated after reading.
+ * @return 0 on success, -1 on error (e.g., read past end of data, or
+ *         integer too long).
+ */
 static int
 read_mb(unsigned int *data, void *map, size_t length, size_t *position)
 {
@@ -25,6 +39,19 @@ read_mb(unsigned int *data, void *map, size_t length, size_t *position)
    return 0;
 }
 
+/**
+ * @brief Opens a WBMP image file for loading.
+ *
+ * This function is part of the Evas image loader interface. For WBMP,
+ * it simply returns the Eina_File handle as the loader_data.
+ *
+ * @param f The Eina_File handle for the image file.
+ * @param key Unused for WBMP.
+ * @param opts Unused for WBMP.
+ * @param animated Unused for WBMP.
+ * @param error Unused for WBMP.
+ * @return The Eina_File handle as a void pointer, to be used as loader_data.
+ */
 static void *
 evas_image_load_file_open_wbmp(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
 			       Evas_Image_Load_Opts *opts EINA_UNUSED,
@@ -34,11 +61,32 @@ evas_image_load_file_open_wbmp(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
    return f;
 }
 
+/**
+ * @brief Closes a WBMP image file after loading.
+ *
+ * This function is part of the Evas image loader interface. For WBMP,
+ * it's a no-op as the Eina_File is managed externally or by other
+ * loader functions.
+ *
+ * @param loader_data Unused for WBMP.
+ */
 static void
 evas_image_load_file_close_wbmp(void *loader_data EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Reads the header of a WBMP image file.
+ *
+ * This function parses the WBMP header to determine image properties like
+ * width and height. It performs basic validation of the WBMP format.
+ *
+ * @param loader_data The Eina_File handle cast to void*.
+ * @param prop Pointer to an Emile_Image_Property struct to store image
+ *             dimensions and other properties.
+ * @param error Pointer to an integer to store an Evas_Load_Error code.
+ * @return EINA_TRUE on successful header parsing, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 evas_image_load_file_head_wbmp(void *loader_data,
 			       Emile_Image_Property *prop,
@@ -96,6 +144,21 @@ evas_image_load_file_head_wbmp(void *loader_data,
    return r;
 }
 
+/**
+ * @brief Loads the image data from a WBMP file.
+ *
+ * This function reads the pixel data from the WBMP file and converts it
+ * into a 32-bit ARGB format (though WBMP is monochrome, so alpha is full
+ * and R, G, B are either 0 or 255).
+ *
+ * @param loader_data The Eina_File handle cast to void*.
+ * @param prop Pointer to an Emile_Image_Property struct containing expected
+ *             image dimensions (already filled by head_wbmp).
+ * @param pixels Pointer to the destination buffer where the decoded image
+ *               data (in DATA32 format) will be stored.
+ * @param error Pointer to an integer to store an Evas_Load_Error code.
+ * @return EINA_TRUE on successful image data loading, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 evas_image_load_file_data_wbmp(void *loader_data,
 			       Emile_Image_Property *prop,
@@ -192,6 +255,15 @@ static Evas_Image_Load_Func evas_image_load_wbmp_func =
    EINA_FALSE
 };
 
+/**
+ * @brief Initializes the WBMP image loader module.
+ *
+ * This function is called when Evas loads the WBMP image loader module.
+ * It registers the loader functions with the Evas module system.
+ *
+ * @param em Pointer to the Evas_Module structure for this loader.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -200,6 +272,14 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Shuts down the WBMP image loader module.
+ *
+ * This function is called when Evas unloads the WBMP image loader module.
+ * For this loader, it's a no-op.
+ *
+ * @param em Unused.
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

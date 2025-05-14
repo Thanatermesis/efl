@@ -5,6 +5,17 @@
 
 static Evas_Object *glb;
 
+/**
+ * @brief Callback for when the "Copy" button is clicked.
+ *
+ * This function retrieves text from the provided entry widget, sets it as the
+ * clipboard content, and also updates a global label to display the current
+ * clipboard text.
+ *
+ * @param data The entry widget (Evas_Object *) to copy text from.
+ * @param obj The button object that triggered the event (unused).
+ * @param event_info Additional event information (unused).
+ */
 static void
 _bt_copy_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -16,6 +27,19 @@ _bt_copy_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA
                          ELM_SEL_FORMAT_TEXT, txt, strlen(txt));
 }
 
+/**
+ * @brief Callback function that receives the content from the clipboard.
+ *
+ * This function is called when clipboard data is received after a paste
+ * request. It checks the format of the data and, if it's plain text,
+ * inserts it into the target entry widget. It also logs the type and
+ * size of the received data.
+ *
+ * @param data The target entry widget (Evas_Object *) for pasting.
+ * @param obj The object that owns the selection (unused).
+ * @param ev The selection event data containing the content and format.
+ * @return EINA_TRUE to indicate the data was handled.
+ */
 static Eina_Bool
 _selection(void *data, Evas_Object *obj EINA_UNUSED, Elm_Selection_Data *ev)
 {
@@ -49,6 +73,16 @@ _selection(void *data, Evas_Object *obj EINA_UNUSED, Elm_Selection_Data *ev)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for when the "Paste" button is clicked.
+ *
+ * This function initiates a request to get text content from the clipboard.
+ * The actual data handling and pasting is done in the _selection callback.
+ *
+ * @param data The entry widget (Evas_Object *) to paste text into.
+ * @param obj The button object that triggered the event (unused).
+ * @param event_info Additional event information (unused).
+ */
 static void
 _bt_paste_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -58,6 +92,16 @@ _bt_paste_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EIN
                          _selection, en);
 }
 
+/**
+ * @brief Callback for when the "Clear" button is clicked.
+ *
+ * This function clears the system clipboard and also clears the text of the
+ * global label that displays the clipboard content.
+ *
+ * @param data The entry widget (Evas_Object *), used to get the parent widget.
+ * @param obj The button object that triggered the event (unused).
+ * @param event_info Additional event information (unused).
+ */
 static void
 _bt_clear_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -67,6 +111,18 @@ _bt_clear_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EIN
    elm_object_cnp_selection_clear(elm_object_parent_widget_get(en), ELM_SEL_TYPE_CLIPBOARD);
 }
 
+/**
+ * @brief Sets up and runs the copy-paste test window.
+ *
+ * This function creates a window containing two entry widgets, buttons for
+ * "Copy", "Paste", and "Clear", and a label to show the current clipboard
+ * contents. It demonstrates the copy and paste functionality within an
+ * Elementary application.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_cnp(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

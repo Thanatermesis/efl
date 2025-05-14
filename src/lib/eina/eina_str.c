@@ -53,6 +53,15 @@
  * Internal helper function used by eina_str_has_suffix() and
  * eina_str_has_extension()
  */
+/**
+ * @internal
+ * @brief Checks if a string ends with a given suffix using a provided comparison function.
+ *
+ * @param str The string to check.
+ * @param suffix The suffix to look for.
+ * @param cmp The comparison function (e.g., strcmp, strcasecmp).
+ * @return EINA_TRUE if @p str ends with @p suffix, EINA_FALSE otherwise or on error.
+ */
 static inline Eina_Bool
 eina_str_has_suffix_helper(const char *str,
                            const char *suffix,
@@ -64,12 +73,37 @@ eina_str_has_suffix_helper(const char *str,
    if ((!str) || (!suffix)) return EINA_FALSE;
    str_len = strlen(str);
    suffix_len = eina_strlen_bounded(suffix, str_len);
-   if (suffix_len == (size_t)-1)
+   if (suffix_len == (size_t)-1) /* eina_strlen_bounded returns (size_t)-1 if suffix is longer than str_len */
       return EINA_FALSE;
 
+   /* Compare the end of str with suffix */
    return cmp(str + str_len - suffix_len, suffix) == 0;
 }
 
+/**
+ * @internal
+ * @brief Core implementation for splitting a string by a delimiter.
+ *
+ * This function tokenizes the string @p str based on the @p delim.
+ * It allocates a single block of memory for the array of string pointers
+ * and the string data itself. The caller is responsible for freeing this
+ * block by freeing the first element of the returned array, and then
+ * the array itself.
+ *
+ * For example, if str = "a:b:c", delim = ":", max_tokens = 0:
+ * Resulting str_array: {ptr_to_"a", ptr_to_"b", ptr_to_"c", NULL}
+ * Memory layout: ["a\0b\0c\0" | ptr_to_"a" | ptr_to_"b" | ptr_to_"c" | NULL] (conceptually)
+ *
+ * @param str The string to split.
+ * @param delim The delimiter string.
+ * @param max_tokens Maximum number of tokens. If 0 or negative, splits as much as possible.
+ *                   If 1, returns the original string in an array.
+ * @param[out] elements Pointer to store the number of tokens found (excluding the final NULL).
+ * @return A newly allocated array of strings (char **), NULL-terminated.
+ *         The strings and the array are in a single malloc'ed block.
+ *         Free with `free(result[0]); free(result);`.
+ *         Returns NULL on error or invalid input.
+ */
 static inline char **
 eina_str_split_full_helper(const char *str,
                            const char *delim,
@@ -319,71 +353,89 @@ eina_strlcpy(char *dst, const char *src, size_t siz)
 #ifdef HAVE_STRLCPY
    return strlcpy(dst, src, siz);
 #else
+   /* Custom implementation of strlcpy if not available in libc.
+    * Copies up to siz-1 characters from src to dst, always NUL-terminating
+    * (unless siz == 0). Returns the length of src (as if not truncated).
+    */
    char *d = dst;
    const char *s = src;
    size_t n = siz;
 
-   /* Copy as many bytes as will fit */
+   /* Copy as many bytes as will fit, including the NUL terminator if encountered. */
    if (n != 0)
       while (--n != 0)
         {
-           if ((*d++ = *s++) == '\0')
-              break;
+           if ((*d++ = *s++) == '\0') /* Copy char and check if it was NUL */
+              break; /* Copied NUL, so src is fully copied and NUL-terminated */
         }
 
-   /* Not enough room in dst, add NUL and traverse rest of src */
+   /* If loop finished due to n == 0 (dst full before src NUL encountered) */
    if (n == 0)
      {
         if (siz != 0)
-           *d = '\0';  /* NUL-terminate dst */
-
+           *d = '\0';  /* NUL-terminate dst if there's space for it */
+        /* Traverse the rest of src to calculate its full length. */
         while (*s++)
            ;
      }
 
-   return(s - src - 1); /* count does not include NUL */
+   return(s - src - 1); /* Total length of src (strlen(src)) */
 #endif
 }
 
 EINA_API size_t
 eina_strlcat(char *dst, const char *src, size_t siz)
 {
+#ifdef HAVE_STRLCAT
+   return strlcat(dst, src, siz);
+#else
+   /* Custom implementation of strlcat if not available in libc.
+    * Appends src to dst, NUL-terminating the result.
+    * siz is the total size of dst.
+    * Returns the total length of the string it tried to create (initial strlen(dst) + strlen(src)).
+    */
    char *d = dst;
    const char *s = src;
    size_t n = siz;
    size_t dlen;
 
-   /* Find the end of dst and adjust bytes left but don't go past end */
+   /* Find the end of dst and calculate remaining space. */
+   /* n will be decremented one past the NUL or end of buffer if NUL not found. */
    while (n-- != 0 && *d != '\0')
       d++;
-   dlen = d - dst;
-   n = siz - dlen;
+   dlen = d - dst; /* Length of initial content in dst. */
+   n = siz - dlen; /* Remaining space in dst for src and NUL. */
 
-   if (n == 0)
-     return(dlen + (s ? strlen(s) : 0));
+   if (n == 0) /* No space left in dst. */
+     return(dlen + (s ? strlen(s) : 0)); /* Return required length. */
 
-   if (s != NULL)
+   if (s != NULL) /* Only append if src is not NULL. */
      {
+        /* Append src to dst. */
         while (*s != '\0') {
-           if (n != 1)
+           if (n != 1) /* Check if there's space for char and NUL. */
              {
                 *d++ = *s;
-                n--;
+                n--; /* Decrement available space. */
              }
-
-           s++;
+           s++; /* Always advance src pointer to calculate full length. */
         }
      }
-   *d = '\0';
+   *d = '\0'; /* NUL-terminate the result. */
 
-   return(dlen + (s - src)); /* count does not include NUL */
+   return(dlen + (s - src)); /* Return total length it tried to create. s-src is strlen(original_src). */
+#endif
 }
 
 EINA_API char *
 eina_strftime(const char *format, const struct tm *tm)
 {
    const size_t flen = strlen(format);
-   size_t buflen = 16; // An arbitrary starting size
+   /* Start with a small buffer, anticipating common date/time formats.
+    * flen can be 0 for empty format string, so ensure buflen is at least 1.
+    */
+   size_t buflen = flen + 16;
+   if (buflen < 16) buflen = 16;
    char *buf = NULL;
 
    do {
@@ -391,23 +443,44 @@ eina_strftime(const char *format, const struct tm *tm)
       size_t len;
 
       tmp = realloc(buf, buflen * sizeof(char));
-      if (!tmp) goto on_error;
+      if (!tmp) goto on_error; /* Allocation failure */
       buf = tmp;
 
       len = strftime(buf, buflen, format, tm);
-      // Check if we have the expected result and return it.
+
+      /* strftime returns 0 if buflen is too small OR if format results in empty string.
+       * If len > 0 and len < buflen, success.
+       * If len == 0 and flen == 0 (empty format), success (empty result).
+       */
       if ((len > 0 && len < buflen) || (len == 0 && flen == 0))
         {
+           /* Shrink buffer to exact size + NUL.
+            * If strftime wrote len characters, the buffer needs len+1 for NUL.
+            */
            tmp = realloc(buf, ((len + 1) * sizeof(char)));
-           buf = tmp;
-           return buf;
+           if (!tmp && len > 0) { /* If realloc to shrink fails, original buf is still valid */
+             /* buf[len] should already be '\0' by strftime if len < buflen */
+             return buf;
+           }
+           /* If tmp is NULL and len is 0, it means realloc(buf, 1) failed.
+            * In this case, the original buf (which might be NULL if first attempt)
+            * or a larger buffer is freed, and NULL is returned via on_error.
+            * However, if len is 0, buf[0] = '\0' is already set by strftime.
+            */
+           buf = tmp; /* Can be NULL if realloc to 1 byte fails */
+           return buf; /* Return potentially shrunk buffer or NULL if realloc failed */
         }
 
-      /* Possibly buf overflowed - try again with a bigger buffer */
-      buflen <<= 1; // multiply buffer size by 2
-   } while (buflen < 128 * flen);
+      /* Buffer was too small (strftime returned 0 and flen > 0, or len == buflen).
+       * Double the buffer size for the next attempt.
+       */
+      buflen <<= 1;
+      /* Protect against huge allocations if flen is very large or format is tricky.
+       * 128 * flen is an arbitrary limit.
+       */
+   } while (buflen < (128 * (flen + 1))); /* +1 to handle flen=0 reasonably */
 
- on_error:
+ on_error: /* Handles allocation errors or if buffer limit exceeded */
    free(buf);
    return NULL;
 }
@@ -463,41 +536,57 @@ eina_str_join_len(char *dst,
                   const char *b,
                   size_t b_len)
 {
+   /* Calculate the total length required for "a" + sep + "b" + NUL. */
    size_t ret = a_len + b_len + 1;
-   size_t off;
+   size_t off; /* Current offset in the destination buffer dst. */
 
+   /* If the provided buffer size is 0, cannot even write a NUL. */
    if (size < 1)
-     return ret;
+     return ret; /* Return the required length. */
 
+   /* If buffer is not large enough to hold string 'a' and a NUL. */
    if (size <= a_len)
      {
-        memcpy(dst, a, size - 1);
-        dst[size - 1] = '\0';
-        return ret;
+        memcpy(dst, a, size - 1); /* Copy as much of 'a' as fits. */
+        dst[size - 1] = '\0';     /* NUL-terminate. */
+        return ret;               /* Return the required length. */
      }
 
+   /* Copy all of string 'a'. */
    memcpy(dst, a, a_len);
-   off = a_len;
+   off = a_len; /* Update offset. */
 
-   if (size <= off + 1)
+   /* If buffer is not large enough to hold 'a', separator, and a NUL. */
+   if (size <= off + 1) /* off + 1 is for separator, NUL comes after */
      {
-        dst[size - 1] = '\0';
-        return ret;
+        /* No space for separator, just NUL-terminate after 'a'.
+         * Note: dst[off] would be the separator. dst[size-1] is the last byte.
+         * If size == off + 1, it means dst[off] is the last byte, so it gets NUL.
+         */
+        dst[off] = '\0';
+        /* However, the standard behavior is to ensure dst[size-1] is NUL if truncated.
+         * If size is exactly a_len + 1, then dst[a_len] (which is dst[off]) gets NUL.
+         */
+        return ret; /* Return the required length. */
      }
 
+   /* Add the separator. */
    dst[off] = sep;
-   off++;
+   off++; /* Update offset. */
 
-   if (size <= off + b_len + 1)
+   /* If buffer is not large enough to hold 'a', separator, 'b', and a NUL. */
+   /* off + b_len for 'b', +1 for NUL. So size must be > off + b_len */
+   if (size <= off + b_len)
      {
-        memcpy(dst + off, b, size - off - 1);
-        dst[size - 1] = '\0';
-        return ret;
+        memcpy(dst + off, b, size - off - 1); /* Copy as much of 'b' as fits. */
+        dst[size - 1] = '\0';                 /* NUL-terminate. */
+        return ret;                           /* Return the required length. */
      }
 
-   memcpy(dst + off, b, b_len);
-   dst[off + b_len] = '\0';
-   return ret;
+   /* Buffer is large enough for "a" + sep + "b" + NUL. */
+   memcpy(dst + off, b, b_len); /* Copy all of string 'b'. */
+   dst[off + b_len] = '\0';     /* NUL-terminate. */
+   return ret;                  /* Return the required length (which is also actual written length excluding NUL). */
 }
 
 #ifdef HAVE_ICONV
@@ -513,52 +602,80 @@ eina_str_convert(const char *enc_from, const char *enc_to, const char *text)
       return NULL;
 
    ic = iconv_open(enc_to, enc_from);
-   if (ic == (iconv_t)(-1))
+   if (ic == (iconv_t)(-1)) /* iconv_open failed */
       return NULL;
 
+   /* Initial allocation for the output buffer. */
    new_txt = malloc(64);
-   inb = strlen(text);
-   outb = 64;
-   inp = text;
-   outp = new_txt;
-   outalloc = 64;
-   outlen = 0;
+   if (!new_txt) /* malloc failed */
+     {
+        iconv_close(ic);
+        return NULL;
+     }
+   inb = strlen(text); /* Bytes remaining in input buffer. */
+   outb = 64;          /* Bytes remaining in output buffer. */
+   inp = text;         /* Pointer to current position in input. */
+   outp = new_txt;     /* Pointer to current position in output. */
+   outalloc = 64;      /* Total allocated size for output buffer. */
+   outlen = 0;         /* Total bytes written to output buffer so far. */
 
+   /* Conversion loop: continues as long as there's input or iconv needs to flush. */
    for (;; )
      {
         size_t count;
 
-        tob = outb;
+        tob = outb; /* Store original outb to calculate bytes written in this iconv call. */
+        /* Perform the conversion. iconv modifies inp, inb, outp, and outb. */
         count = iconv(ic, (char **)&inp, &inb, &outp, &outb);
-        outlen += tob - outb;
-        if (count == (size_t)(-1))
+        outlen += tob - outb; /* Add number of bytes written to outlen. */
+
+        if (count == (size_t)(-1)) /* iconv error. */
           {
-             if (errno == E2BIG)
+             if (errno == E2BIG) /* Output buffer too small. */
                {
-                  new_txt = realloc(new_txt, outalloc + 64);
+                  char *reallocated_txt;
+                  outalloc += 64; /* Increase allocated size. */
+                  reallocated_txt = realloc(new_txt, outalloc);
+                  if (!reallocated_txt) /* realloc failed. */
+                    {
+                       free(new_txt);
+                       new_txt = NULL;
+                       goto close_iconv_and_exit;
+                    }
+                  new_txt = reallocated_txt;
+                  /* Adjust outp to point to the new end of written data. */
                   outp = new_txt + outlen;
-                  outalloc += 64;
-                  outb += 64;
+                  outb += 64; /* Add the newly allocated space to outb. */
                }
-             else
+             else /* Other iconv error (e.g., invalid sequence). */
                {
                   if (new_txt)
                      free(new_txt);
-
                   new_txt = NULL;
-                  break;
+                  goto close_iconv_and_exit;
                }
           }
 
-        if (inb == 0)
+        if (inb == 0) /* All input has been consumed. */
           {
+             /* Ensure NUL termination. Resize if exactly full. */
              if (outalloc == outlen)
-                new_txt = realloc(new_txt, outalloc + 1);
-
-             new_txt[outlen] = 0;
-             break;
+               {
+                  char *reallocated_txt = realloc(new_txt, outalloc + 1);
+                  if (!reallocated_txt)
+                    {
+                       free(new_txt);
+                       new_txt = NULL;
+                       goto close_iconv_and_exit;
+                    }
+                  new_txt = reallocated_txt;
+               }
+             new_txt[outlen] = '\0'; /* Add NUL terminator. */
+             break; /* Conversion successful. */
           }
      }
+
+close_iconv_and_exit:
    iconv_close(ic);
    return new_txt;
 }
@@ -585,17 +702,24 @@ eina_str_convert_len(const char *enc_from, const char *enc_to, const char *text,
    if (!text) return NULL;
 
    ic = iconv_open(enc_to, enc_from);
-   if (ic == (iconv_t)(-1))
+   if (ic == (iconv_t)(-1)) /* iconv_open failed */
       return NULL;
 
+   /* Initial allocation for the output buffer. */
    new_txt = malloc(64);
-   inb = len;
-   outb = 64;
-   inp = text;
-   outp = new_txt;
-   outalloc = 64;
-   outlen = 0;
+   if (!new_txt) /* malloc failed */
+     {
+        iconv_close(ic);
+        return NULL;
+     }
+   inb = len;          /* Bytes remaining in input buffer (using provided length). */
+   outb = 64;          /* Bytes remaining in output buffer. */
+   inp = text;         /* Pointer to current position in input. */
+   outp = new_txt;     /* Pointer to current position in output. */
+   outalloc = 64;      /* Total allocated size for output buffer. */
+   outlen = 0;         /* Total bytes written to output buffer so far. */
 
+   /* Conversion loop, similar to eina_str_convert. */
    for (;; )
      {
         size_t count;
@@ -603,36 +727,55 @@ eina_str_convert_len(const char *enc_from, const char *enc_to, const char *text,
         tob = outb;
         count = iconv(ic, (char **)&inp, &inb, &outp, &outb);
         outlen += tob - outb;
+
         if (count == (size_t)(-1))
           {
-             if (errno == E2BIG)
+             if (errno == E2BIG) /* Output buffer too small. */
                {
-                  new_txt = realloc(new_txt, outalloc + 64);
-                  outp = new_txt + outlen;
+                  char *reallocated_txt;
                   outalloc += 64;
+                  reallocated_txt = realloc(new_txt, outalloc);
+                  if (!reallocated_txt)
+                    {
+                       free(new_txt);
+                       new_txt = NULL;
+                       goto close_iconv_and_exit_len;
+                    }
+                  new_txt = reallocated_txt;
+                  outp = new_txt + outlen;
                   outb += 64;
                }
-             else
+             else /* Other iconv error. */
                {
                   if (new_txt)
                      free(new_txt);
-
                   new_txt = NULL;
-                  break;
+                  goto close_iconv_and_exit_len;
                }
           }
 
-        if (inb == 0)
+        if (inb == 0) /* All input consumed. */
           {
+             /* Ensure NUL termination. */
              if (outalloc == outlen)
-                new_txt = realloc(new_txt, outalloc + 1);
-
-             new_txt[outlen] = 0;
+               {
+                  char *reallocated_txt = realloc(new_txt, outalloc + 1);
+                   if (!reallocated_txt)
+                    {
+                       free(new_txt);
+                       new_txt = NULL;
+                       goto close_iconv_and_exit_len;
+                    }
+                  new_txt = reallocated_txt;
+               }
+             new_txt[outlen] = '\0';
              break;
           }
      }
+
+close_iconv_and_exit_len:
    iconv_close(ic);
-   if (retlen) *retlen = outlen;
+   if (retlen && new_txt) *retlen = outlen; /* Store output length if requested and successful. */
    return new_txt;
 }
 #else
@@ -653,13 +796,20 @@ eina_str_escape(const char *str)
    if (!str)
       return NULL;
 
+   /* Allocate memory for the escaped string.
+    * In the worst case, every character is escaped (e.g., '\\'),
+    * requiring two characters in the output ('\\', '\\') plus NUL.
+    */
    s2 = malloc((strlen(str) * 2) + 1);
    if (!s2)
       return NULL;
 
+   /* Iterate through the input string and copy characters to the output string,
+    * prefixing special characters with a backslash.
+    */
    for (s = str, d = s2; *s != 0; s++, d++)
      {
-        switch (*s)
+        switch (*s) /* Check for characters that need escaping. */
         {
          case ' ':
          case '\\':

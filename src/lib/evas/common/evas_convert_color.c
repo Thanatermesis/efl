@@ -2,6 +2,19 @@
 #include "evas_convert_color.h"
 #include "draw.h"
 
+/**
+ * @brief Premultiplies an array of 16-bit Alpha-Grayscale (AG) pixel data.
+ *
+ * Each DATA16 element is assumed to have Alpha in the high byte and Grayscale
+ * in the low byte (AAGG). The grayscale component is multiplied by the alpha
+ * component.
+ *
+ * @param data Pointer to the array of AG pixel data.
+ *             Example: data[0] = 0xFF80 (Alpha=255, Grayscale=128)
+ * @param len Number of pixels in the data array.
+ * @return The number of pixels that were either fully transparent (alpha=0)
+ *         or fully opaque (alpha=255) before premultiplication.
+ */
 EVAS_API DATA32
 evas_common_convert_ag_premul(DATA16 *data, unsigned int len)
 {
@@ -23,6 +36,18 @@ evas_common_convert_ag_premul(DATA16 *data, unsigned int len)
    return nas;
 }
 
+/**
+ * @brief Unpremultiplies an array of 16-bit Alpha-Grayscale (AG) pixel data.
+ *
+ * Each DATA16 element is assumed to have Alpha in the high byte and Grayscale
+ * in the low byte (AAGG). The grayscale component is divided by the alpha
+ * component. This function includes an optimization for consecutively
+ * identical pixel values.
+ *
+ * @param data Pointer to the array of AG pixel data.
+ *             Example: data[0] = 0xFF80 (Alpha=255, Grayscale=128, premultiplied)
+ * @param len Number of pixels in the data array.
+ */
 EVAS_API void
 evas_common_convert_ag_unpremul(DATA16 *data, unsigned int len)
 {
@@ -63,6 +88,16 @@ evas_common_convert_argb_unpremul(DATA32 *data, unsigned int len)
    return efl_draw_argb_unpremul(data, len);
 }
 
+/**
+ * @brief Premultiplies RGB color components by an alpha value.
+ *
+ * The R, G, B components are modified in place.
+ *
+ * @param a Alpha value (0-255).
+ * @param r Pointer to the Red component (0-255). Modified in place.
+ * @param g Pointer to the Green component (0-255). Modified in place.
+ * @param b Pointer to the Blue component (0-255). Modified in place.
+ */
 EVAS_API void
 evas_common_convert_color_argb_premul(int a, int *r, int *g, int *b)
 {
@@ -72,6 +107,17 @@ evas_common_convert_color_argb_premul(int a, int *r, int *g, int *b)
    if (b) { *b = (a * *b) >> 8; }
 }
 
+/**
+ * @brief Unpremultiplies RGB color components by an alpha value.
+ *
+ * The R, G, B components are modified in place. If alpha is 0,
+ * the function returns without modifying the color components.
+ *
+ * @param a Alpha value (0-255).
+ * @param r Pointer to the Red component (0-255). Modified in place.
+ * @param g Pointer to the Green component (0-255). Modified in place.
+ * @param b Pointer to the Blue component (0-255). Modified in place.
+ */
 EVAS_API void
 evas_common_convert_color_argb_unpremul(int a, int *r, int *g, int *b)
 {
@@ -81,6 +127,16 @@ evas_common_convert_color_argb_unpremul(int a, int *r, int *g, int *b)
    if (b) { *b = (255 * *b) / a; }
 }
 
+/**
+ * @brief Converts HSV (Hue, Saturation, Value) color to RGB (Red, Green, Blue).
+ *
+ * @param h Hue component (0.0-360.0).
+ * @param s Saturation component (0.0-1.0).
+ * @param v Value component (0.0-1.0).
+ * @param r Pointer to store the Red component (0-255).
+ * @param g Pointer to store the Green component (0-255).
+ * @param b Pointer to store the Blue component (0-255).
+ */
 EVAS_API void
 evas_common_convert_color_hsv_to_rgb(float h, float s, float v, int *r, int *g, int *b)
 {
@@ -139,6 +195,18 @@ evas_common_convert_color_hsv_to_rgb(float h, float s, float v, int *r, int *g, 
      }
 }
 
+/**
+ * @brief Converts RGB (Red, Green, Blue) color to HSV (Hue, Saturation, Value).
+ *
+ * This function uses an optimized method to find min/max of RGB components.
+ *
+ * @param r Red component (0-255).
+ * @param g Green component (0-255).
+ * @param b Blue component (0-255).
+ * @param h Pointer to store the Hue component (0.0-360.0).
+ * @param s Pointer to store the Saturation component (0.0-1.0).
+ * @param v Pointer to store the Value component (0.0-1.0).
+ */
 EVAS_API void
 evas_common_convert_color_rgb_to_hsv(int r, int g, int b, float *h, float *s, float *v)
 {
@@ -194,6 +262,18 @@ evas_common_convert_color_rgb_to_hsv(int r, int g, int b, float *h, float *s, fl
      }
 }
 
+/**
+ * @brief Converts HSV (Hue, Saturation, Value) color to RGB (Red, Green, Blue) using integer arithmetic.
+ *
+ * All components are integer values in the range 0-255.
+ *
+ * @param h Hue component (0-255, representing 0-360 degrees, where 255 maps to ~360).
+ * @param s Saturation component (0-255).
+ * @param v Value component (0-255).
+ * @param r Pointer to store the Red component (0-255).
+ * @param g Pointer to store the Green component (0-255).
+ * @param b Pointer to store the Blue component (0-255).
+ */
 EVAS_API void
 evas_common_convert_color_hsv_to_rgb_int(int h, int s, int v, int *r, int *g, int *b)
 {
@@ -234,6 +314,20 @@ evas_common_convert_color_hsv_to_rgb_int(int h, int s, int v, int *r, int *g, in
      }
 }
 
+/**
+ * @brief Converts RGB (Red, Green, Blue) color to HSV (Hue, Saturation, Value) using integer arithmetic.
+ *
+ * All components are integer values in the range 0-255.
+ * The hue output `h` is scaled to 0-1530 to maintain precision with integer arithmetic,
+ * representing 0-360 degrees. (1530 = 6 * 255).
+ *
+ * @param r Red component (0-255).
+ * @param g Green component (0-255).
+ * @param b Blue component (0-255).
+ * @param h Pointer to store the Hue component (0-1530).
+ * @param s Pointer to store the Saturation component (0-255).
+ * @param v Pointer to store the Value component (0-255).
+ */
 EVAS_API void
 evas_common_convert_color_rgb_to_hsv_int(int r, int g, int b, int *h, int *s, int *v)
 {

@@ -11,17 +11,25 @@
 #include "ecore_buffer_private.h"
 #include "ecore_buffer_con.h"
 
+/**
+ * @internal
+ * @brief Represents a consumer of Ecore_Buffer objects.
+ *
+ * This structure manages the consumption of buffers from a buffer queue,
+ * handling communication with the provider and managing the lifecycle of
+ * shared buffers.
+ */
 struct _Ecore_Buffer_Consumer
 {
-   struct bq_consumer *resource;
-   Ecore_Buffer_Queue *ebq;
+   struct bq_consumer *resource; /**< Low-level buffer queue consumer resource. */
+   Ecore_Buffer_Queue *ebq; /**< The Ecore_Buffer_Queue instance used by this consumer. */
    struct
      {
-        void  (*provider_add) (Ecore_Buffer_Consumer *consumer, void *data);
-        void  (*provider_del) (Ecore_Buffer_Consumer *consumer, void *data);
-        void  (*enqueue)      (Ecore_Buffer_Consumer *consumer, void *data);
-        void *data;
-     } cb;
+        void  (*provider_add) (Ecore_Buffer_Consumer *consumer, void *data); /**< Callback for provider connection. */
+        void  (*provider_del) (Ecore_Buffer_Consumer *consumer, void *data); /**< Callback for provider disconnection. */
+        void  (*enqueue)      (Ecore_Buffer_Consumer *consumer, void *data); /**< Callback for buffer enqueue event. */
+        void *data; /**< User data for the callbacks. */
+     } cb; /**< Callbacks for consumer events. */
 };
 
 static void _ecore_buffer_consumer_cb_provider_connected(void *data, struct bq_consumer *bq_consumer);
@@ -34,6 +42,13 @@ static void _ecore_buffer_consumer_cb_add_buffer(void *data, struct bq_consumer 
 static void _ecore_buffer_consumer_cb_buffer_free(Ecore_Buffer *buf, void *data);
 static Eina_Bool _ecore_buffer_consumer_buffer_import(Ecore_Buffer_Consumer *consumer, Shared_Buffer *sb, int32_t seed, Ecore_Export_Type export_type);
 
+/**
+ * @internal
+ * @brief Listener for bq_consumer events.
+ *
+ * This structure maps low-level bq_consumer events to higher-level
+ * Ecore_Buffer_Consumer callbacks.
+ */
 struct bq_consumer_listener _ecore_buffer_consumer_listener =
 {
    _ecore_buffer_consumer_cb_provider_connected,
@@ -45,6 +60,20 @@ struct bq_consumer_listener _ecore_buffer_consumer_listener =
    _ecore_buffer_consumer_cb_add_buffer
 };
 
+/**
+ * @brief Creates a new Ecore_Buffer_Consumer.
+ *
+ * This function initializes a new buffer consumer with a given name,
+ * queue size, and buffer dimensions.
+ *
+ * @param name The name for the consumer. This is used to identify the
+ *             consumer in the system.
+ * @param queue_size The desired size of the buffer queue. If less than
+ *                   the default (2), the default size will be used.
+ * @param w The width of the buffers to be consumed.
+ * @param h The height of the buffers to be consumed.
+ * @return A new Ecore_Buffer_Consumer instance on success, or NULL on failure.
+ */
 EAPI Ecore_Buffer_Consumer *
 ecore_buffer_consumer_new(const char *name, int32_t queue_size, int32_t w, int32_t h)
 {
@@ -90,6 +119,14 @@ ecore_buffer_consumer_new(const char *name, int32_t queue_size, int32_t w, int32
    return consumer;
 }
 
+/**
+ * @brief Frees an Ecore_Buffer_Consumer.
+ *
+ * This function releases all resources associated with the given
+ * buffer consumer.
+ *
+ * @param consumer The Ecore_Buffer_Consumer to free.
+ */
 EAPI void
 ecore_buffer_consumer_free(Ecore_Buffer_Consumer *consumer)
 {
@@ -106,6 +143,18 @@ ecore_buffer_consumer_free(Ecore_Buffer_Consumer *consumer)
    free(consumer);
 }
 
+/**
+ * @brief Releases a buffer back to the provider.
+ *
+ * This function signals that the consumer is done with the specified buffer,
+ * allowing the provider to reuse it.
+ *
+ * @param consumer The Ecore_Buffer_Consumer instance.
+ * @param buffer The Ecore_Buffer to release.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., buffer not
+ *         owned by this consumer, consumer not connected, or buffer not in
+ *         a releasable state).
+ */
 EAPI Eina_Bool
 ecore_buffer_consumer_buffer_release(Ecore_Buffer_Consumer *consumer, Ecore_Buffer *buffer)
 {
@@ -151,6 +200,18 @@ ecore_buffer_consumer_buffer_release(Ecore_Buffer_Consumer *consumer, Ecore_Buff
    return EINA_TRUE;
 }
 
+/**
+ * @brief Dequeues (acquires) a buffer from the provider.
+ *
+ * This function attempts to get the next available buffer from the queue
+ * that has been filled by the provider.
+ *
+ * @param consumer The Ecore_Buffer_Consumer instance.
+ * @return An Ecore_Buffer instance on success, or NULL if no buffer is
+ *         available or an error occurred. The returned buffer should be
+ *         released using ecore_buffer_consumer_buffer_release() when no
+ *         longer needed.
+ */
 EAPI Ecore_Buffer *
 ecore_buffer_consumer_buffer_dequeue(Ecore_Buffer_Consumer *consumer)
 {
@@ -179,6 +240,15 @@ ecore_buffer_consumer_buffer_dequeue(Ecore_Buffer_Consumer *consumer)
    return _shared_buffer_buffer_get(sb);
 }
 
+/**
+ * @brief Checks if the consumer's buffer queue is empty.
+ *
+ * An empty queue means there are no buffers currently available to be
+ * dequeued by the consumer.
+ *
+ * @param consumer The Ecore_Buffer_Consumer instance.
+ * @return EINA_TRUE if the queue is empty, EINA_FALSE otherwise.
+ */
 EAPI Eina_Bool
 ecore_buffer_consumer_queue_is_empty(Ecore_Buffer_Consumer *consumer)
 {
@@ -187,6 +257,15 @@ ecore_buffer_consumer_queue_is_empty(Ecore_Buffer_Consumer *consumer)
    return _ecore_buffer_queue_is_empty(consumer->ebq);
 }
 
+/**
+ * @brief Sets the callback function for provider connection events.
+ *
+ * This callback is invoked when a provider connects to this consumer.
+ *
+ * @param consumer The Ecore_Buffer_Consumer instance.
+ * @param func The callback function to set.
+ * @param data User data to be passed to the callback function.
+ */
 EAPI void
 ecore_buffer_consumer_provider_add_cb_set(Ecore_Buffer_Consumer *consumer, Ecore_Buffer_Consumer_Provider_Add_Cb func, void *data)
 {
@@ -196,6 +275,15 @@ ecore_buffer_consumer_provider_add_cb_set(Ecore_Buffer_Consumer *consumer, Ecore
    consumer->cb.data = data;
 }
 
+/**
+ * @brief Sets the callback function for provider disconnection events.
+ *
+ * This callback is invoked when a provider disconnects from this consumer.
+ *
+ * @param consumer The Ecore_Buffer_Consumer instance.
+ * @param func The callback function to set.
+ * @param data User data to be passed to the callback function.
+ */
 EAPI void
 ecore_buffer_consumer_provider_del_cb_set(Ecore_Buffer_Consumer *consumer, Ecore_Buffer_Consumer_Provider_Del_Cb func, void *data)
 {
@@ -205,6 +293,16 @@ ecore_buffer_consumer_provider_del_cb_set(Ecore_Buffer_Consumer *consumer, Ecore
    consumer->cb.data = data;
 }
 
+/**
+ * @brief Sets the callback function for buffer enqueued events.
+ *
+ * This callback is invoked when a new buffer has been enqueued by the
+ * provider and is available for the consumer.
+ *
+ * @param consumer The Ecore_Buffer_Consumer instance.
+ * @param func The callback function to set.
+ * @param data User data to be passed to the callback function.
+ */
 EAPI void
 ecore_buffer_consumer_buffer_enqueued_cb_set(Ecore_Buffer_Consumer *consumer, Ecore_Buffer_Consumer_Enqueue_Cb func, void *data)
 {
@@ -214,6 +312,17 @@ ecore_buffer_consumer_buffer_enqueued_cb_set(Ecore_Buffer_Consumer *consumer, Ec
    consumer->cb.data = data;
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a provider connects.
+ *
+ * This function is called by the underlying bq_consumer when a provider
+ * establishes a connection. It updates the connection state and triggers
+ * the user-registered callback.
+ *
+ * @param data The Ecore_Buffer_Consumer instance.
+ * @param bq_consumer The bq_consumer resource (unused).
+ */
 static void
 _ecore_buffer_consumer_cb_provider_connected(void *data, struct bq_consumer *bq_consumer EINA_UNUSED)
 {
@@ -228,6 +337,17 @@ _ecore_buffer_consumer_cb_provider_connected(void *data, struct bq_consumer *bq_
    CALLBACK_CALL(consumer, provider_add);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a provider disconnects.
+ *
+ * This function is called by the underlying bq_consumer when a provider
+ * terminates the connection. It updates the connection state, triggers
+ * the user-registered callback, and cleans up any existing shared buffers.
+ *
+ * @param data The Ecore_Buffer_Consumer instance.
+ * @param bq_consumer The bq_consumer resource (unused).
+ */
 static void
 _ecore_buffer_consumer_cb_provider_disconnected(void *data, struct bq_consumer *bq_consumer EINA_UNUSED)
 {
@@ -252,6 +372,23 @@ _ecore_buffer_consumer_cb_provider_disconnected(void *data, struct bq_consumer *
    eina_list_free(clone);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a buffer is attached by the provider.
+ *
+ * This function is called when the provider announces a new buffer.
+ * It creates a corresponding Shared_Buffer object and adds it to the
+ * consumer's queue management.
+ *
+ * @param data The Ecore_Buffer_Consumer instance.
+ * @param bq_consumer The bq_consumer resource (unused).
+ * @param id The bq_buffer resource identifier from the provider.
+ * @param engine The rendering engine name associated with the buffer.
+ * @param width The width of the buffer.
+ * @param height The height of the buffer.
+ * @param format The pixel format of the buffer.
+ * @param flags Flags associated with the buffer.
+ */
 static void
 _ecore_buffer_consumer_cb_buffer_attached(void *data, struct bq_consumer *bq_consumer EINA_UNUSED, struct bq_buffer *id, const char *engine, int32_t width, int32_t height, int32_t format, uint32_t flags)
 {
@@ -270,6 +407,18 @@ _ecore_buffer_consumer_cb_buffer_attached(void *data, struct bq_consumer *bq_con
    bq_buffer_set_user_data(id, sb);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when an Ecore_Buffer associated with a Shared_Buffer is freed.
+ *
+ * This function is registered as a free callback for Ecore_Buffer instances
+ * that are imported by the consumer. It ensures that when the Ecore_Buffer
+ * is no longer needed and freed, the corresponding Shared_Buffer and
+ * bq_buffer resources are also cleaned up.
+ *
+ * @param buf The Ecore_Buffer that is being freed.
+ * @param data The Ecore_Buffer_Consumer instance.
+ */
 static void
 _ecore_buffer_consumer_cb_buffer_free(Ecore_Buffer *buf, void *data)
 {
@@ -288,6 +437,25 @@ _ecore_buffer_consumer_cb_buffer_free(Ecore_Buffer *buf, void *data)
    _shared_buffer_free(sb);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a buffer's ID is set by the provider.
+ *
+ * This function is called when the provider sends information to import
+ * a buffer using an ID (e.g., a TBM surface ID). It triggers the buffer
+ * import process.
+ *
+ * @param data The Ecore_Buffer_Consumer instance.
+ * @param bq_consumer The bq_consumer resource (unused).
+ * @param buffer The bq_buffer resource for which the ID is set.
+ * @param id The ID (e.g., TBM surface ID) for importing the buffer.
+ * @param offset0 Unused offset for plane 0.
+ * @param stride0 Unused stride for plane 0.
+ * @param offset1 Unused offset for plane 1.
+ * @param stride1 Unused stride for plane 1.
+ * @param offset2 Unused offset for plane 2.
+ * @param stride2 Unused stride for plane 2.
+ */
 static void
 _ecore_buffer_consumer_cb_buffer_id_set(void *data, struct bq_consumer *bq_consumer EINA_UNUSED, struct bq_buffer *buffer, int32_t id, int32_t offset0 EINA_UNUSED, int32_t stride0 EINA_UNUSED, int32_t offset1 EINA_UNUSED, int32_t stride1 EINA_UNUSED, int32_t offset2 EINA_UNUSED, int32_t stride2 EINA_UNUSED)
 {
@@ -303,6 +471,25 @@ _ecore_buffer_consumer_cb_buffer_id_set(void *data, struct bq_consumer *bq_consu
      ERR("Failed to import buffer - buffer resource %p", buffer);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a buffer's file descriptor (FD) is set by the provider.
+ *
+ * This function is called when the provider sends information to import
+ * a buffer using a file descriptor (e.g., a DMA-BUF FD). It triggers the
+ * buffer import process.
+ *
+ * @param data The Ecore_Buffer_Consumer instance.
+ * @param bq_consumer The bq_consumer resource (unused).
+ * @param buffer The bq_buffer resource for which the FD is set.
+ * @param fd The file descriptor for importing the buffer.
+ * @param offset0 Unused offset for plane 0.
+ * @param stride0 Unused stride for plane 0.
+ * @param offset1 Unused offset for plane 1.
+ * @param stride1 Unused stride for plane 1.
+ * @param offset2 Unused offset for plane 2.
+ * @param stride2 Unused stride for plane 2.
+ */
 static void
 _ecore_buffer_consumer_cb_buffer_fd_set(void *data, struct bq_consumer *bq_consumer EINA_UNUSED, struct bq_buffer *buffer, int32_t fd, int32_t offset0 EINA_UNUSED, int32_t stride0 EINA_UNUSED, int32_t offset1 EINA_UNUSED, int32_t stride1 EINA_UNUSED, int32_t offset2 EINA_UNUSED, int32_t stride2 EINA_UNUSED)
 {
@@ -318,6 +505,19 @@ _ecore_buffer_consumer_cb_buffer_fd_set(void *data, struct bq_consumer *bq_consu
      ERR("Failed to import buffer - buffer resource %p", buffer);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a buffer is detached by the provider.
+ *
+ * This function is called when the provider signals that a buffer is no
+ * longer available. If the buffer is not currently dequeued by the consumer,
+ * it is freed immediately. Otherwise, it is marked for freeing when the
+ * consumer releases it.
+ *
+ * @param data The Ecore_Buffer_Consumer instance.
+ * @param bq_consumer The bq_consumer resource (unused).
+ * @param id The bq_buffer resource that was detached.
+ */
 static void
 _ecore_buffer_consumer_cb_buffer_detached(void *data, struct bq_consumer *bq_consumer EINA_UNUSED, struct bq_buffer *id)
 {
@@ -344,6 +544,19 @@ _ecore_buffer_consumer_cb_buffer_detached(void *data, struct bq_consumer *bq_con
    _shared_buffer_state_set(sb, SHARED_BUFFER_STATE_DETACH);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a buffer is enqueued by the provider.
+ *
+ * This function is called when the provider has filled a buffer and made it
+ * available to the consumer. It moves the buffer to the consumer's internal
+ * queue and triggers the user-registered enqueue callback.
+ *
+ * @param data The Ecore_Buffer_Consumer instance.
+ * @param bq_consumer The bq_consumer resource (unused).
+ * @param buffer The bq_buffer resource that was enqueued.
+ * @param serial A serial number associated with the enqueue operation (unused).
+ */
 static void
 _ecore_buffer_consumer_cb_add_buffer(void *data, struct bq_consumer *bq_consumer EINA_UNUSED, struct bq_buffer *buffer, uint32_t serial EINA_UNUSED)
 {
@@ -376,6 +589,20 @@ _ecore_buffer_consumer_cb_add_buffer(void *data, struct bq_consumer *bq_consumer
    CALLBACK_CALL(consumer, enqueue);
 }
 
+/**
+ * @internal
+ * @brief Imports a shared buffer into an Ecore_Buffer.
+ *
+ * This function takes a Shared_Buffer (which represents a buffer from the
+ * provider) and an import seed (either an ID or an FD) and creates an
+ * Ecore_Buffer instance from it.
+ *
+ * @param consumer The Ecore_Buffer_Consumer instance.
+ * @param sb The Shared_Buffer to import.
+ * @param seed The import seed (ID or FD).
+ * @param export_type The type of the seed (EXPORT_TYPE_ID or EXPORT_TYPE_FD).
+ * @return EINA_TRUE on successful import, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _ecore_buffer_consumer_buffer_import(Ecore_Buffer_Consumer *consumer, Shared_Buffer *sb, int32_t seed, Ecore_Export_Type export_type)
 {

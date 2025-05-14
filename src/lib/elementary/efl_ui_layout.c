@@ -24,10 +24,14 @@ Eo *_efl_ui_layout_pack_proxy_get(Efl_Ui_Layout *obj, Edje_Part_Type type, const
 static void _efl_model_properties_changed_cb(void *, const Efl_Event *);
 static Eina_Bool _efl_ui_layout_part_cursor_unset(Efl_Ui_Layout_Data *sd, const char *part_name);
 
+/** @brief Signal emitted when the theme has changed. */
 static const char SIG_THEME_CHANGED[] = "theme,changed";
+/** @brief Signal emitted when the layout is focused. */
 const char SIG_LAYOUT_FOCUSED[] = "focused";
+/** @brief Signal emitted when the layout is unfocused. */
 const char SIG_LAYOUT_UNFOCUSED[] = "unfocused";
 
+/** @brief Prefix used for signal connection keys that trigger Edje signals. */
 const char SIGNAL_PREFIX[] = "signal/";
 
 /* smart callbacks coming from elm layout objects: */
@@ -70,20 +74,30 @@ static const char *_efl_ui_layout_swallow_parts[] = {
    NULL
 };
 
+/**
+ * @brief Structure to hold information for signals that are emitted differently
+ * based on the theme version. This allows for compatibility with older themes
+ * while adopting new signal conventions in newer themes.
+ */
 typedef struct _Deferred_Version_Signal
 {
-   Eina_Stringshare *old_sig;
-   Eina_Stringshare *new_sig;
-   unsigned int version_threshold;
+   Eina_Stringshare *old_sig;          /**< The signal string for older theme versions. */
+   Eina_Stringshare *new_sig;          /**< The signal string for newer theme versions. */
+   unsigned int version_threshold; /**< The theme version at which the new signal should be used. */
 } Deferred_Version_Signal;
 
 typedef struct _Efl_Ui_Layout_Factory_Tracking Efl_Ui_Layout_Factory_Tracking;
 
+/**
+ * @brief Structure to track asynchronous content creation requests via Efl_Ui_Factory.
+ * This is used when binding a factory to a part of the layout, allowing content
+ * to be dynamically generated and updated.
+ */
 struct _Efl_Ui_Layout_Factory_Tracking
 {
-   Efl_Ui_Factory *factory;
-   Eina_Future *in_flight;
-   Eina_Stringshare *key;
+   Efl_Ui_Factory *factory;    /**< The factory responsible for creating content. */
+   Eina_Future *in_flight;   /**< A future representing an ongoing content creation request. Can be NULL. */
+   Eina_Stringshare *key;      /**< The property key (often a part name) associated with this factory binding. */
 };
 
 
@@ -93,48 +107,66 @@ typedef struct _Efl_Ui_Layout_Sub_Object_Data   Efl_Ui_Layout_Sub_Object_Data;
 typedef struct _Efl_Ui_Layout_Sub_Object_Cursor Efl_Ui_Layout_Sub_Object_Cursor;
 typedef struct _Efl_Ui_Layout_Sub_Iterator      Efl_Ui_Layout_Sub_Iterator;
 
+/**
+ * @brief Iterator structure for iterating over sub-objects managed by the layout.
+ * This wraps a real Eina_Iterator (typically for a list of sub-objects) and
+ * associates it with the layout object.
+ */
 struct _Efl_Ui_Layout_Sub_Iterator
 {
-   Eina_Iterator  iterator;
-   Eina_Iterator *real_iterator;
-   Efl_Ui_Layout *object;
+   Eina_Iterator  iterator;      /**< The public iterator interface. */
+   Eina_Iterator *real_iterator; /**< The underlying iterator (e.g., list iterator). */
+   Efl_Ui_Layout *object;       /**< The layout object this iterator belongs to. */
 };
 
+/**
+ * @brief Internal data structure to track sub-objects (content, text, packed items)
+ * within the layout. This helps manage their lifecycle and properties.
+ */
 struct _Efl_Ui_Layout_Sub_Object_Data
 {
-   const char  *part;
-   Evas_Object *obj;
+   const char  *part; /**< The name of the Edje part this sub-object is associated with. */
+   Evas_Object *obj;  /**< The actual Evas_Object (sub-object). For TEXT type, this might be an internal access object. */
 
+   /** @brief The type of operation or role this sub-object has within the layout. */
    enum {
-      SWALLOW,
-      BOX_APPEND,
-      BOX_PREPEND,
-      BOX_INSERT_BEFORE,
-      BOX_INSERT_AT,
-      TABLE_PACK,
-      TEXT
+      SWALLOW,            /**< Object is swallowed into a part. */
+      BOX_APPEND,         /**< Object is appended to a box part. */
+      BOX_PREPEND,        /**< Object is prepended to a box part. */
+      BOX_INSERT_BEFORE,  /**< Object is inserted before a reference object in a box part. */
+      BOX_INSERT_AT,      /**< Object is inserted at a specific position in a box part. */
+      TABLE_PACK,         /**< Object is packed into a table part. */
+      TEXT                /**< Represents a text part (no actual Evas_Object stored here directly for the text itself, but `obj` might be an accessibility helper). */
    } type;
 
+   /** @brief Parameters specific to the sub-object type. */
    union {
+      /** @brief Parameters for box operations. */
       union {
-         const Evas_Object *reference;
-         unsigned int       pos;
+         const Evas_Object *reference; /**< For BOX_INSERT_BEFORE: the object to insert before. */
+         unsigned int       pos;       /**< For BOX_INSERT_AT: the position to insert at. */
       } box;
+      /** @brief Parameters for table packing. */
       struct
       {
-         unsigned short col, row, colspan, rowspan;
+         unsigned short col, row, colspan, rowspan; /**< Column, row, column span, and row span for table packing. */
       } table;
    } p;
 };
 
+/**
+ * @brief Internal data structure to manage cursor properties for specific parts
+ * of the layout. This allows different cursors to be displayed over different
+ * areas of the layout widget.
+ */
 struct _Efl_Ui_Layout_Sub_Object_Cursor
 {
-   Evas_Object *obj;
-   const char  *part;
-   const char  *cursor;
-   const char  *style;
+   Evas_Object *obj;        /**< The Evas_Object representing the Edje part object (not the layout itself). */
+   const char  *part;       /**< The name of the Edje part this cursor setting applies to. */
+   const char  *cursor;     /**< The name of the cursor to be set (e.g., "hand", "arrow"). */
+   const char  *style;      /**< The style of the cursor (e.g., "default"). */
 
-   Eina_Bool    engine_only : 1;
+   Eina_Bool    engine_only : 1; /**< If EINA_TRUE, only the Evas engine's cursors are used, bypassing theme search. */
 };
 
 #define MY_CLASS_NAME_LEGACY "elm_layout"
@@ -145,6 +177,14 @@ _efl_ui_layout_base_class_constructor(Efl_Class *klass)
    evas_smart_legacy_type_register(MY_CLASS_NAME_LEGACY, klass);
 }
 
+/**
+ * @brief Callback function invoked when a sub-object's size hints change.
+ * This triggers a recalculation of the layout.
+ * @param data The layout object (Evas_Object *).
+ * @param e The Evas canvas (unused).
+ * @param obj The sub-object whose size hints changed (unused).
+ * @param event_info Additional event information (unused).
+ */
 static void
 _on_sub_object_size_hint_change(void *data,
                                 Evas *e EINA_UNUSED,
@@ -156,6 +196,10 @@ _on_sub_object_size_hint_change(void *data,
    efl_canvas_group_change(data);
 }
 
+/**
+ * @brief Frees resources associated with an Efl_Ui_Layout_Sub_Object_Cursor.
+ * @param pc Pointer to the cursor data to free.
+ */
 static void
 _part_cursor_free(Efl_Ui_Layout_Sub_Object_Cursor *pc)
 {
@@ -166,6 +210,15 @@ _part_cursor_free(Efl_Ui_Layout_Sub_Object_Cursor *pc)
    free(pc);
 }
 
+/**
+ * @brief Evaluates and calculates the minimum and restricted minimum sizes for the layout.
+ * This function takes into account the layout's Edje theme, sub-objects,
+ * finger size adjustments, and any user-defined minimum sizes.
+ *
+ * @param obj The layout Evas_Object.
+ * @param sd The Efl_Ui_Layout_Data private data for the layout.
+ * @param ld The Elm_Layout_Data (mixin) private data for the layout, can be NULL.
+ */
 static void
 _sizing_eval(Evas_Object *obj, Efl_Ui_Layout_Data *sd, Elm_Layout_Data *ld)
 {
@@ -224,6 +277,12 @@ _sizing_eval(Evas_Object *obj, Efl_Ui_Layout_Data *sd, Elm_Layout_Data *ld)
      ld->in_calc = ld->restricted_calc_w = ld->restricted_calc_h = EINA_FALSE;
 }
 
+/**
+ * @brief Sets whether sub-objects should be explicitly recalculated during the layout's sizing evaluation.
+ *
+ * @param obj The layout Eo object.
+ * @param set EINA_TRUE to enable sub-object calculation, EINA_FALSE otherwise.
+ */
 void
 _efl_ui_layout_subobjs_calc_set(Eo *obj, Eina_Bool set)
 {
@@ -232,6 +291,16 @@ _efl_ui_layout_subobjs_calc_set(Eo *obj, Eina_Bool set)
    sd->calc_subobjs = !!set;
 }
 
+/**
+ * @brief Defers the emission of a signal that depends on the theme version.
+ * The appropriate signal (old or new) will be emitted after the theme is fully applied
+ * and the theme version is known.
+ *
+ * @param sd The Efl_Ui_Layout_Data private data.
+ * @param old_sig The signal string to use for older theme versions.
+ * @param new_sig The signal string to use for newer theme versions.
+ * @param version_threshold The theme version at which `new_sig` should be used.
+ */
 static void
 _defer_version_signal(Efl_Ui_Layout_Data *sd, Eina_Stringshare *old_sig, Eina_Stringshare *new_sig, unsigned int version_threshold)
 {
@@ -245,7 +314,16 @@ _defer_version_signal(Efl_Ui_Layout_Data *sd, Eina_Stringshare *old_sig, Eina_St
    eina_inarray_push(sd->deferred_signals, &dvs);
 }
 
-/* common content cases for layout objects: icon and text */
+/**
+ * @brief Emits visibility state signals for common content/text parts.
+ * This function constructs and emits Edje signals indicating whether a
+ * specific type of part (e.g., "icon", "text") is visible or hidden.
+ * The signal format depends on whether the layout is legacy and the theme version.
+ *
+ * @param sd The Efl_Ui_Layout_Data private data.
+ * @param type The type of the part (e.g., "icon", "text", "content").
+ * @param set EINA_TRUE if the part is being set/made visible, EINA_FALSE if unset/hidden.
+ */
 static inline void
 _signals_emit(Efl_Ui_Layout_Data *sd,
               const char *type,
@@ -274,6 +352,15 @@ _signals_emit(Efl_Ui_Layout_Data *sd,
      }
 }
 
+/**
+ * @brief Emits signals related to the visibility of an icon/content part.
+ * This is typically called when content is swallowed or unswallowed from
+ * predefined swallow parts like "efl.icon", "elm.swallow.icon", etc.
+ *
+ * @param sd The Efl_Ui_Layout_Data private data.
+ * @param sub_d The sub-object data for the icon/content part.
+ * @param visible EINA_TRUE if the icon/content is now visible, EINA_FALSE otherwise.
+ */
 static inline void
 _icon_signal_emit(Efl_Ui_Layout_Data *sd,
                   Efl_Ui_Layout_Sub_Object_Data *sub_d,
@@ -327,6 +414,15 @@ _icon_signal_emit(Efl_Ui_Layout_Data *sd,
    efl_layout_signal_process(sd->obj, EINA_FALSE);
 }
 
+/**
+ * @brief Emits signals related to the visibility or content status of a text part.
+ * This is called when text is set or cleared for parts like "efl.text", "elm.text",
+ * or their variants (e.g., "efl.text.sublabel").
+ *
+ * @param sd The Efl_Ui_Layout_Data private data.
+ * @param sub_d The sub-object data for the text part.
+ * @param visible EINA_TRUE if the text is set and non-empty, EINA_FALSE if cleared or empty.
+ */
 static inline void
 _text_signal_emit(Efl_Ui_Layout_Data *sd,
                   Efl_Ui_Layout_Sub_Object_Data *sub_d,
@@ -384,6 +480,13 @@ _text_signal_emit(Efl_Ui_Layout_Data *sd,
    efl_layout_signal_process(sd->obj, EINA_FALSE);
 }
 
+/**
+ * @brief Iterates through all tracked sub-objects and emits their respective
+ * visibility/state signals. This is typically called after a theme change or
+ * initial setup to ensure the Edje theme reflects the current state of all parts.
+ *
+ * @param sd The Efl_Ui_Layout_Data private data.
+ */
 static void
 _parts_signals_emit(Efl_Ui_Layout_Data *sd)
 {
@@ -397,6 +500,12 @@ _parts_signals_emit(Efl_Ui_Layout_Data *sd)
      }
 }
 
+/**
+ * @brief Applies the cursor settings (name, style, engine_only) from an
+ * Efl_Ui_Layout_Sub_Object_Cursor structure to its associated part object.
+ *
+ * @param pc Pointer to the Efl_Ui_Layout_Sub_Object_Cursor data containing the settings.
+ */
 static void
 _part_cursor_part_apply(const Efl_Ui_Layout_Sub_Object_Cursor *pc)
 {
@@ -405,6 +514,14 @@ _part_cursor_part_apply(const Efl_Ui_Layout_Sub_Object_Cursor *pc)
    elm_object_cursor_theme_search_enabled_set(pc->obj, !pc->engine_only);
 }
 
+/**
+ * @brief Applies all stored part-specific cursor settings to the layout.
+ * It iterates through the `parts_cursors` list, retrieves the actual Edje part
+ * object for each, and then applies the stored cursor settings.
+ * Warnings are issued if parts are not found or are not interactive.
+ *
+ * @param sd The Efl_Ui_Layout_Data private data.
+ */
 static void
 _parts_cursors_apply(Efl_Ui_Layout_Data *sd)
 {
@@ -446,6 +563,14 @@ _parts_cursors_apply(Efl_Ui_Layout_Data *sd)
      }
 }
 
+/**
+ * @brief Checks the Edje theme for "focus_highlight" and "access_highlight"
+ * data items and sets the corresponding highlight properties on the widget.
+ * This allows themes to specify whether the widget should display a visual
+ * highlight for focus or accessibility.
+ *
+ * @param obj The layout Evas_Object.
+ */
 static void
 _efl_ui_layout_highlight_in_theme(Evas_Object *obj)
 {
@@ -468,6 +593,13 @@ _efl_ui_layout_highlight_in_theme(Evas_Object *obj)
      elm_widget_access_highlight_in_theme_set(obj, EINA_FALSE);
 }
 
+/**
+ * @brief Emits Edje signals reflecting the widget's enabled/disabled state
+ * and its mirrored (RTL/LTR) status. This ensures the theme can react to
+ * these state changes.
+ *
+ * @param obj The layout Eo object.
+ */
 static void
 _flush_mirrored_state(Eo *obj)
 {
@@ -490,6 +622,16 @@ _flush_mirrored_state(Eo *obj)
    efl_layout_signal_emit(obj, signal, prefix);
 }
 
+/**
+ * @brief Refreshes various visual aspects of the layout.
+ * This includes emitting part signals, applying part cursors, setting mirrored mode,
+ * applying scale, updating theme highlights, and flushing mirrored/disabled states.
+ * It's a central function for ensuring the layout's appearance is up-to-date.
+ *
+ * @param obj The layout Evas_Object.
+ * @param sd The Efl_Ui_Layout_Data private data.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., widget data not found).
+ */
 static Eina_Bool
 _visuals_refresh(Evas_Object *obj,
                  Efl_Ui_Layout_Data *sd)
@@ -521,6 +663,17 @@ _efl_ui_layout_base_efl_ui_widget_disabled_set(Eo *obj, Efl_Ui_Layout_Data *_pd 
    _flush_mirrored_state(obj);
 }
 
+/**
+ * @internal
+ * @brief Internal part of the theme application process for layouts.
+ * This function handles setting the theme on the underlying Edje object
+ * and refreshing visuals. It's called by the main theme_apply function.
+ *
+ * @param obj The layout Eo object.
+ * @param sd The Efl_Ui_Layout_Data private data.
+ * @param[out] widget_data Pointer to store the Elm_Widget_Smart_Data.
+ * @return An Efl_Ui_Theme_Apply_Error code indicating success or failure.
+ */
 static Eina_Error
 _efl_ui_layout_theme_internal(Eo *obj, Efl_Ui_Layout_Data *sd, Elm_Widget_Smart_Data **widget_data)
 {
@@ -553,6 +706,15 @@ _efl_ui_layout_theme_internal(Eo *obj, Efl_Ui_Layout_Data *sd, Elm_Widget_Smart_
    return ret;
 }
 
+/**
+ * @brief Emits all deferred signals.
+ * This function processes signals that were queued because their emission
+ * depends on the theme version, which is only known after the theme is applied.
+ * It iterates through the `deferred_signals` inarray, emitting the appropriate
+ * version of each signal.
+ *
+ * @param pd The Efl_Ui_Layout_Data private data.
+ */
 static void
 _deferred_signals_emit(Efl_Ui_Layout_Data *pd)
 {
@@ -570,6 +732,21 @@ _deferred_signals_emit(Efl_Ui_Layout_Data *pd)
    ELM_SAFE_FREE(pd->deferred_signals, eina_inarray_free);
 }
 
+/**
+ * @brief Applies the widget's theme.
+ * This function orchestrates the theme application process. It calls the
+ * superclass's theme_apply, then the internal layout theme logic.
+ * It also handles theme version checking and emits any deferred signals
+ * once the theme version is known.
+ *
+ * @param obj The layout Eo object.
+ * @param sd The Efl_Ui_Layout_Data private data.
+ * @return An Efl_Ui_Theme_Apply_Error code.
+ *         Returns EFL_UI_THEME_APPLY_ERROR_NONE on success.
+ *         Returns EFL_UI_THEME_APPLY_ERROR_GENERIC on general failure.
+ *         Returns EFL_UI_THEME_APPLY_ERROR_DEFAULT if a default theme was used.
+ *         Returns EFL_UI_THEME_APPLY_ERROR_VERSION if there's a theme version mismatch.
+ */
 EOLIAN static Eina_Error
 _efl_ui_layout_base_efl_ui_widget_theme_apply(Eo *obj, Efl_Ui_Layout_Data *sd)
 {

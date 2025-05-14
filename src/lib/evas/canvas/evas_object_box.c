@@ -1,4 +1,13 @@
 #define EFL_CANVAS_GROUP_PROTECTED
+/**
+ * @file
+ * @brief Evas box object internal implementation.
+ *
+ * This file contains the internal implementation of the Evas box object,
+ * which is a container object that arranges its children in a linear
+ * fashion, either horizontally or vertically. It supports various layout
+ * modes, padding, alignment, and weighting for its children.
+ */
 
 #include "evas_common_private.h"
 #include "evas_private.h"
@@ -11,20 +20,34 @@
 typedef struct _Evas_Object_Box_Iterator Evas_Object_Box_Iterator;
 typedef struct _Evas_Object_Box_Accessor Evas_Object_Box_Accessor;
 
+/**
+ * @internal
+ * @brief Structure for iterating over the children of an Evas_Object_Box.
+ *
+ * This structure wraps a real Eina_Iterator to provide box-specific
+ * iteration capabilities.
+ */
 struct _Evas_Object_Box_Iterator
 {
-   Eina_Iterator iterator;
+   Eina_Iterator iterator; /**< The public Eina_Iterator interface. */
 
-   Eina_Iterator *real_iterator;
-   const Evas_Object *box;
+   Eina_Iterator *real_iterator; /**< The underlying Eina_List iterator. */
+   const Evas_Object *box; /**< The box object being iterated. */
 };
 
+/**
+ * @internal
+ * @brief Structure for accessing children of an Evas_Object_Box by index.
+ *
+ * This structure wraps a real Eina_Accessor to provide box-specific
+ * indexed access capabilities.
+ */
 struct _Evas_Object_Box_Accessor
 {
-   Eina_Accessor accessor;
+   Eina_Accessor accessor; /**< The public Eina_Accessor interface. */
 
-   Eina_Accessor *real_accessor;
-   const Evas_Object *box;
+   Eina_Accessor *real_accessor; /**< The underlying Eina_List accessor. */
+   const Evas_Object *box; /**< The box object being accessed. */
 };
 
 #define SIG_CHILD_ADDED "child,added"
@@ -63,6 +86,13 @@ if (!ptr)                                                               \
    return val;                                                          \
 }
 
+/**
+ * @internal
+ * @brief Advances the box iterator to the next child.
+ * @param it The box iterator.
+ * @param data Pointer to store the next child object.
+ * @return EINA_TRUE if successful, EINA_FALSE otherwise (e.g., end of list).
+ */
 static Eina_Bool
 _evas_object_box_iterator_next(Evas_Object_Box_Iterator *it, void **data)
 {
@@ -74,12 +104,23 @@ _evas_object_box_iterator_next(Evas_Object_Box_Iterator *it, void **data)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Gets the container (box object) for the iterator.
+ * @param it The box iterator.
+ * @return The box object associated with this iterator.
+ */
 static Evas_Object *
 _evas_object_box_iterator_get_container(Evas_Object_Box_Iterator *it)
 {
    return (Evas_Object *)it->box;
 }
 
+/**
+ * @internal
+ * @brief Frees the box iterator.
+ * @param it The box iterator to free.
+ */
 static void
 _evas_object_box_iterator_free(Evas_Object_Box_Iterator *it)
 {
@@ -87,6 +128,14 @@ _evas_object_box_iterator_free(Evas_Object_Box_Iterator *it)
    free(it);
 }
 
+/**
+ * @internal
+ * @brief Gets the child object at a specific index using the accessor.
+ * @param it The box accessor.
+ * @param idx The index of the child to retrieve.
+ * @param data Pointer to store the child object.
+ * @return EINA_TRUE if successful, EINA_FALSE otherwise (e.g., index out of bounds).
+ */
 static Eina_Bool
 _evas_object_box_accessor_get_at(Evas_Object_Box_Accessor *it, unsigned int idx, void **data)
 {
@@ -98,12 +147,23 @@ _evas_object_box_accessor_get_at(Evas_Object_Box_Accessor *it, unsigned int idx,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Gets the container (box object) for the accessor.
+ * @param it The box accessor.
+ * @return The box object associated with this accessor.
+ */
 static Evas_Object *
 _evas_object_box_accessor_get_container(Evas_Object_Box_Accessor *it)
 {
    return (Evas_Object *)it->box;
 }
 
+/**
+ * @internal
+ * @brief Frees the box accessor.
+ * @param it The box accessor to free.
+ */
 static void
 _evas_object_box_accessor_free(Evas_Object_Box_Accessor *it)
 {
@@ -111,6 +171,16 @@ _evas_object_box_accessor_free(Evas_Object_Box_Accessor *it)
    free(it);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a child object is resized.
+ *
+ * Marks the box as changed to trigger a recalculation of its layout if not
+ * currently layouting.
+ *
+ * @param data The box object (user data).
+ * @param event The EFL event information (unused).
+ */
 static void
 _on_child_resize(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -119,6 +189,15 @@ _on_child_resize(void *data, const Efl_Event *event EINA_UNUSED)
    if (!priv->layouting) evas_object_smart_changed(box);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a child object is invalidated (e.g., deleted).
+ *
+ * Removes the child from the box and marks the box as changed.
+ *
+ * @param data The box object (user data).
+ * @param event The EFL event information, containing the invalidated child object.
+ */
 static void
 _on_child_invalidate(void *data, const Efl_Event *event)
 {
@@ -131,6 +210,17 @@ _on_child_invalidate(void *data, const Efl_Event *event)
    evas_object_smart_changed(box);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a child object's hints change.
+ *
+ * Marks the box as changed to trigger a recalculation of its layout.
+ * The check `!priv->layouting` is commented out as some widgets
+ * depend on being able to change hints during layout.
+ *
+ * @param data The box object (user data).
+ * @param event The EFL event information (unused).
+ */
 static void
 _on_child_hints_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -142,12 +232,36 @@ _on_child_hints_changed(void *data, const Efl_Event *event EINA_UNUSED)
      evas_object_smart_changed(box);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when the box object's own hints change.
+ *
+ * Triggers a sizing evaluation for the box itself.
+ *
+ * @param data The box object (user data, unused).
+ * @param evas The Evas canvas (unused).
+ * @param o The box object whose hints changed.
+ * @param einfo Event-specific information (unused).
+ */
 static void
 _on_hints_changed(void *data EINA_UNUSED, Evas *evas EINA_UNUSED, Evas_Object *o , void *einfo EINA_UNUSED)
 {
    _sizing_eval(o);
 }
 
+/**
+ * @internal
+ * @brief Creates a new box option for a child object.
+ *
+ * This function allocates and initializes an Evas_Object_Box_Option structure
+ * which holds a reference to the child object and any associated layout properties.
+ * It calls the internal Eo API `evas_obj_box_internal_option_new`.
+ *
+ * @param o The parent box object.
+ * @param priv The private data of the parent box object (unused).
+ * @param child The child object to create an option for.
+ * @return A pointer to the newly created Evas_Object_Box_Option, or NULL on failure.
+ */
 static Evas_Object_Box_Option *
 _evas_object_box_option_new(Evas_Object *o, Evas_Object_Box_Data *priv EINA_UNUSED, Evas_Object *child)
 {
@@ -169,12 +283,33 @@ EFL_CALLBACKS_ARRAY_DEFINE(evas_object_box_callbacks,
   { EFL_GFX_ENTITY_EVENT_HINTS_CHANGED, _on_child_hints_changed }
 );
 
+/**
+ * @internal
+ * @brief Unregisters event callbacks from a child object.
+ *
+ * These callbacks are used to monitor changes in the child that might
+ * affect the box layout (e.g., resize, invalidate, hints changed).
+ *
+ * @param obj The child object from which to unregister callbacks.
+ * @param parent The parent box object that was listening to these events.
+ */
 static void
 _evas_object_box_child_callbacks_unregister(Evas_Object *obj, Evas_Object *parent)
 {
    efl_event_callback_array_del(obj, evas_object_box_callbacks(), parent);
 }
 
+/**
+ * @internal
+ * @brief Registers event callbacks on a child object.
+ *
+ * These callbacks allow the box to react to changes in its children.
+ *
+ * @param o The parent box object.
+ * @param priv The private data of the parent box object (unused).
+ * @param opt The box option associated with the child.
+ * @return The same box option `opt`.
+ */
 static Evas_Object_Box_Option *
 _evas_object_box_option_callbacks_register(Evas_Object *o, Evas_Object_Box_Data *priv EINA_UNUSED, Evas_Object_Box_Option *opt)
 {

@@ -15,32 +15,46 @@
 
 #endif
 
+/** @brief Initializes YUV conversion lookup tables. */
 static void _evas_yuv_init         (void);
 // Broken atm - the sse and mmx get math.. wrong :(
 //static void _evas_yv12_709torgb_sse(unsigned char **yuv, unsigned char *rgb, int w, int h);
+/** @brief Converts YV12 (BT.601) to RGBA using SSE instructions. */
 static void _evas_yv12torgb_sse    (unsigned char **yuv, unsigned char *rgb, int w, int h);
 // Broken atm - the sse and mmx get math.. wrong :(
 //static void _evas_yv12_709torgb_mmx(unsigned char **yuv, unsigned char *rgb, int w, int h);
+/** @brief Converts YV12 (BT.601) to RGBA using MMX instructions. */
 static void _evas_yv12torgb_mmx    (unsigned char **yuv, unsigned char *rgb, int w, int h);
+/** @brief Converts YV12 (BT.709) to RGBA using a generic raster scan method. */
 static void _evas_yv12_709torgb_raster(unsigned char **yuv, unsigned char *rgb, int w, int h);
+/** @brief Converts YV12 (BT.601) to RGBA using a generic raster scan method. */
 static void _evas_yv12torgb_raster (unsigned char **yuv, unsigned char *rgb, int w, int h);
+/** @brief Converts YUY2 (BT.601) to RGBA using a generic raster scan method. */
 static void _evas_yuy2torgb_raster (unsigned char **yuv, unsigned char *rgb, int w, int h);
+/** @brief Converts NV12 (BT.601) to RGBA using a generic raster scan method. */
 static void _evas_nv12torgb_raster (unsigned char **yuv, unsigned char *rgb, int w, int h);
+/** @brief Converts NV12 Tiled (BT.601) to RGBA using a generic raster scan method. */
 static void _evas_nv12tiledtorgb_raster(unsigned char **yuv, unsigned char *rgb, int w, int h);
 
-#define CRV    104595
-#define CBU    132251
-#define CGU    25624
-#define CGV    53280
+/** @name BT.601 YUV to RGB conversion coefficients (fixed-point) */
+///@{
+#define CRV    104595 ///< Coefficient for V to R conversion (1.596 * 2^16)
+#define CBU    132251 ///< Coefficient for U to B conversion (2.018 * 2^16)
+#define CGU    25624  ///< Coefficient for U to G conversion (0.391 * 2^16)
+#define CGV    53280  ///< Coefficient for V to G conversion (0.813 * 2^16)
 
-#define YMUL   76283
-#define OFF    32768
-#define BITRES 16
+#define YMUL   76283  ///< Coefficient for Y scaling (1.164 * 2^16), applied to (Y - 16)
+#define OFF    32768  ///< Offset for G calculation (0.5 * 2^16), used to round results
+#define BITRES 16     ///< Number of bits for fixed-point precision in intermediate calculations
+///@}
 
-#define CRV709 117504
-#define CBU709 138607
-#define CGU709  13959
-#define CGV709  34996
+/** @name BT.709 YUV to RGB conversion coefficients (fixed-point) */
+///@{
+#define CRV709 117504 ///< Coefficient for V to R conversion (1.793 * 2^16)
+#define CBU709 138607 ///< Coefficient for U to B conversion (2.115 * 2^16)
+#define CGU709  13959 ///< Coefficient for U to G conversion (0.213 * 2^16)
+#define CGV709  34996 ///< Coefficient for V to G conversion (0.534 * 2^16)
+///@}
 
 
 /* calculation float resolution in bits */
@@ -48,27 +62,45 @@ static void _evas_nv12tiledtorgb_raster(unsigned char **yuv, unsigned char *rgb,
 /*    RES = 8 is 8.8 fixed point */
 /*    RES = 4 is 12.4 fixed point */
 /* NB: going above 6 will lead to overflow... :( */
+/** @brief Resolution shift for final color component values.
+ *  This determines the number of fractional bits in the fixed-point arithmetic
+ *  used for MMX/SSE optimized paths. A value of 6 means 10.6 fixed-point.
+ */
 #define RES    6
 
+/** @brief Right-shifts an integer by (BITRES - RES) bits.
+ *  Used to scale down fixed-point coefficients to the working resolution RES.
+ */
 #define RZ(i)  (i >> (BITRES - RES))
+/** @brief Macro to initialize a 4-element array with the same value.
+ *  Used for MMX/SSE constant initialization.
+ */
 #define FOUR(i) {i, i, i, i}
 
 #ifdef BUILD_MMX
-__attribute__ ((aligned (8))) const volatile unsigned short _const_crvcrv[4] = FOUR(RZ(CRV));
-__attribute__ ((aligned (8))) const volatile unsigned short _const_cbucbu[4] = FOUR(RZ(CBU));
-__attribute__ ((aligned (8))) const volatile unsigned short _const_cgucgu[4] = FOUR(RZ(CGU));
-__attribute__ ((aligned (8))) const volatile unsigned short _const_cgvcgv[4] = FOUR(RZ(CGV));
-__attribute__ ((aligned (8))) const volatile unsigned short _const_ymul  [4] = FOUR(RZ(YMUL));
-__attribute__ ((aligned (8))) const volatile unsigned short _const_128   [4] = FOUR(128);
-__attribute__ ((aligned (8))) const volatile unsigned short _const_32    [4] = FOUR(RZ(OFF));
-__attribute__ ((aligned (8))) const volatile unsigned short _const_16    [4] = FOUR(16);
-__attribute__ ((aligned (8))) const volatile unsigned short _const_ff    [4] = FOUR(-1);
+/** @name MMX/SSE constants for BT.601 conversion (scaled by RZ) */
+///@{
+__attribute__ ((aligned (8))) const volatile unsigned short _const_crvcrv[4] = FOUR(RZ(CRV)); ///< Scaled CRV for MMX/SSE
+__attribute__ ((aligned (8))) const volatile unsigned short _const_cbucbu[4] = FOUR(RZ(CBU)); ///< Scaled CBU for MMX/SSE
+__attribute__ ((aligned (8))) const volatile unsigned short _const_cgucgu[4] = FOUR(RZ(CGU)); ///< Scaled CGU for MMX/SSE
+__attribute__ ((aligned (8))) const volatile unsigned short _const_cgvcgv[4] = FOUR(RZ(CGV)); ///< Scaled CGV for MMX/SSE
+__attribute__ ((aligned (8))) const volatile unsigned short _const_ymul  [4] = FOUR(RZ(YMUL)); ///< Scaled YMUL for MMX/SSE
+__attribute__ ((aligned (8))) const volatile unsigned short _const_128   [4] = FOUR(128);   ///< Constant 128 for MMX/SSE (U/V offset)
+__attribute__ ((aligned (8))) const volatile unsigned short _const_32    [4] = FOUR(RZ(OFF)); ///< Scaled OFF for MMX/SSE
+__attribute__ ((aligned (8))) const volatile unsigned short _const_16    [4] = FOUR(16);    ///< Constant 16 for MMX/SSE (Y offset)
+__attribute__ ((aligned (8))) const volatile unsigned short _const_ff    [4] = FOUR(-1);    ///< Constant 0xFFFF for MMX/SSE (alpha channel)
+///@}
 
-__attribute__ ((aligned (8))) const volatile unsigned short _const_crvcrv709[4] = FOUR(RZ(CRV709));
-__attribute__ ((aligned (8))) const volatile unsigned short _const_cbucbu709[4] = FOUR(RZ(CBU709));
-__attribute__ ((aligned (8))) const volatile unsigned short _const_cgucgu709[4] = FOUR(RZ(CGU709));
-__attribute__ ((aligned (8))) const volatile unsigned short _const_cgvcgv709[4] = FOUR(RZ(CGV709));
+/** @name MMX/SSE constants for BT.709 conversion (scaled by RZ) */
+///@{
+__attribute__ ((aligned (8))) const volatile unsigned short _const_crvcrv709[4] = FOUR(RZ(CRV709)); ///< Scaled CRV709 for MMX/SSE
+__attribute__ ((aligned (8))) const volatile unsigned short _const_cbucbu709[4] = FOUR(RZ(CBU709)); ///< Scaled CBU709 for MMX/SSE
+__attribute__ ((aligned (8))) const volatile unsigned short _const_cgucgu709[4] = FOUR(RZ(CGU709)); ///< Scaled CGU709 for MMX/SSE
+__attribute__ ((aligned (8))) const volatile unsigned short _const_cgvcgv709[4] = FOUR(RZ(CGV709)); ///< Scaled CGV709 for MMX/SSE
+///@}
 
+/** @name MMX register load macros for BT.601 constants */
+///@{
 #define CONST_CRVCRV *_const_crvcrv
 #define CONST_CBUCBU *_const_cbucbu
 #define CONST_CGUCGU *_const_cgucgu
@@ -78,44 +110,72 @@ __attribute__ ((aligned (8))) const volatile unsigned short _const_cgvcgv709[4] 
 #define CONST_32     *_const_32
 #define CONST_16     *_const_16
 #define CONST_FF     *_const_ff
+///@}
 
+/** @name MMX register load macros for BT.709 constants */
+///@{
 #define CONST_CRVCRV709 *_const_crvcrv709
 #define CONST_CBUCBU709 *_const_cbucbu709
 #define CONST_CGUCGU709 *_const_cgucgu709
 #define CONST_CGVCGV709 *_const_cgvcgv709
+///@}
 
 /* for C non aligned cleanup */
-const int _crv = RZ(CRV);   /* 1.596 */
-const int _cbu = RZ(CBU);   /* 2.018 */
-const int _cgu = RZ(CGU);   /* 0.391 */
-const int _cgv = RZ(CGV);   /* 0.813 */
+/** @name Scaled BT.601 coefficients for C raster implementation (scaled by RZ) */
+///@{
+const int _crv = RZ(CRV);   ///< Scaled CRV (1.596)
+const int _cbu = RZ(CBU);   ///< Scaled CBU (2.018)
+const int _cgu = RZ(CGU);   ///< Scaled CGU (0.391)
+const int _cgv = RZ(CGV);   ///< Scaled CGV (0.813)
+///@}
 
-const int _crv709 = RZ(CRV709);   /* 1.793 */
-const int _cbu709 = RZ(CBU709);   /* 2.115 */
-const int _cgu709 = RZ(CGU709);   /* 0.213 */
-const int _cgv709 = RZ(CGV709);   /* 0.534 */
+/** @name Scaled BT.709 coefficients for C raster implementation (scaled by RZ) */
+///@{
+const int _crv709 = RZ(CRV709);   ///< Scaled CRV709 (1.793)
+const int _cbu709 = RZ(CBU709);   ///< Scaled CBU709 (2.115)
+const int _cgu709 = RZ(CGU709);   ///< Scaled CGU709 (0.213)
+const int _cgv709 = RZ(CGV709);   ///< Scaled CGV709 (0.534)
+///@}
 
 #endif
 
 /* shortcut speedup lookup-tables */
-static short _v1164[256];
-static short _v1596[256];
-static short _v813[256];
-static short _v391[256];
-static short _v2018[256];
+/** @name Lookup tables for C raster implementations */
+///@{
+static short _v1164[256]; ///< LUT for (Y - 16) * 1.164
+static short _v1596[256]; ///< LUT for (V - 128) * 1.596 (BT.601)
+static short _v813[256];  ///< LUT for (V - 128) * 0.813 (BT.601)
+static short _v391[256];  ///< LUT for (U - 128) * 0.391 (BT.601)
+static short _v2018[256]; ///< LUT for (U - 128) * 2.018 (BT.601)
 
-static short _v1793[256];
-static short _v534[256];
-static short _v213[256];
-static short _v2115[256];
+static short _v1793[256]; ///< LUT for (V - 128) * 1.793 (BT.709)
+static short _v534[256];  ///< LUT for (V - 128) * 0.534 (BT.709)
+static short _v213[256];  ///< LUT for (U - 128) * 0.213 (BT.709)
+static short _v2115[256]; ///< LUT for (U - 128) * 2.115 (BT.709)
 
-static unsigned char _clip_lut[1024];
+static unsigned char _clip_lut[1024]; ///< LUT for clipping values to 0-255 range. Indexed by value + 384.
+///@}
+
+/** @brief Clips a value to the 0-255 range using the _clip_lut.
+ *  @param i The value to clip. The valid input range for `i` to correctly index `_clip_lut` is -384 to 639.
+ */
 #define LUT_CLIP(i) ((_clip_lut+384)[(i)])
 
+/** @brief Alternative clipping macro (seems unused or for specific optimizations).
+ *  Clips value `i`. If the 9th bit (256) is set, it implies a negative overflow
+ *  (assuming a certain range for `i` before this check), and it calculates a
+ *  clipped value. Otherwise, it assumes `i` is positive and within a certain range.
+ *  This macro's logic is highly specific and might be tied to particular
+ *  intermediate calculation ranges in an optimized routine.
+ */
 #define CMP_CLIP(i) ((i&256)? (~(i>>10)) : i);
 
-static int initted = 0;
+static int initted = 0; ///< Flag to check if lookup tables have been initialized.
 
+/**
+ * @brief Converts YUV 4:2:2 planar (BT.709) to RGBA.
+ * @copydetails evas_common_convert_yuv_422p_709_rgba
+ */
 void
 evas_common_convert_yuv_422p_709_rgba(DATA8 **src, DATA8 *dst, int w, int h)
 {
@@ -132,6 +192,10 @@ evas_common_convert_yuv_422p_709_rgba(DATA8 **src, DATA8 *dst, int w, int h)
 }
 
 
+/**
+ * @brief Converts YUV 4:2:2 planar (BT.601) to RGBA.
+ * @copydetails evas_common_convert_yuv_422p_601_rgba
+ */
 void
 evas_common_convert_yuv_422p_601_rgba(DATA8 **src, DATA8 *dst, int w, int h)
 {
@@ -166,6 +230,8 @@ evas_common_convert_yuv_422p_601_rgba(DATA8 **src, DATA8 *dst, int w, int h)
 static void
 _evas_yv12_709torgb_sse(unsigned char **yuv, unsigned char *rgb, int w, int h)
 {
+// This function is commented out in the original code with a note "Broken atm".
+// If it were active, it would convert YV12 (planar Y, V, U) BT.709 to RGBA using SSE.
 #ifdef BUILD_MMX
    int xx, yy;
    register unsigned char *yp1, *up, *vp;
@@ -325,6 +391,27 @@ _evas_yv12_709torgb_sse(unsigned char **yuv, unsigned char *rgb, int w, int h)
 }
 */
 
+/**
+ * @internal
+ * @brief Converts YV12 (planar Y, U, V) with BT.601 coefficients to RGBA using SSE instructions.
+ *
+ * This function processes 8 pixels (two 2x2 blocks of Y values with shared U/V) per iteration.
+ * It uses MMX registers (mm0-mm7) for parallel operations.
+ * The YUV data is expected in planar format:
+ * - yuv[0] to yuv[h-1] point to rows of the Y plane.
+ * - yuv[h] to yuv[h + h/2 - 1] point to rows of the U plane (subsampled).
+ * - yuv[h + h/2] to yuv[h + h - 1] point to rows of the V plane (subsampled).
+ *
+ * The output `rgb` is an array of 32-bit RGBA pixels.
+ *
+ * @param yuv Array of pointers to Y, U, V planes.
+ *            yuv[0..h-1] are Y plane lines.
+ *            yuv[h..(h + h/2 - 1)] are U plane lines.
+ *            yuv[h + h/2 .. (h + h/2 + h/2 - 1)] are V plane lines.
+ * @param rgb Output buffer for RGBA data.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ */
 static void
 _evas_yv12torgb_sse(unsigned char **yuv, unsigned char *rgb, int w, int h)
 {
@@ -492,6 +579,8 @@ _evas_yv12torgb_sse(unsigned char **yuv, unsigned char *rgb, int w, int h)
 static void
 _evas_yv12_709torgb_mmx(unsigned char **yuv, unsigned char *rgb, int w, int h)
 {
+// This function is commented out in the original code with a note "Broken atm".
+// If it were active, it would convert YV12 (planar Y, V, U) BT.709 to RGBA using MMX.
 #ifdef BUILD_MMX
    int xx, yy;
    register unsigned char *yp1, *up, *vp;
@@ -650,6 +739,19 @@ _evas_yv12_709torgb_mmx(unsigned char **yuv, unsigned char *rgb, int w, int h)
 }
 */
 
+/**
+ * @internal
+ * @brief Converts YV12 (planar Y, U, V) with BT.601 coefficients to RGBA using MMX instructions.
+ *
+ * This function is similar in logic to `_evas_yv12torgb_sse` but uses MMX instructions.
+ * It processes 8 pixels per iteration.
+ * The YUV data is expected in planar format as described for `_evas_yv12torgb_sse`.
+ *
+ * @param yuv Array of pointers to Y, U, V planes.
+ * @param rgb Output buffer for RGBA data.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ */
 static void
 _evas_yv12torgb_mmx(unsigned char **yuv, unsigned char *rgb, int w, int h)
 {
@@ -813,6 +915,19 @@ _evas_yv12torgb_mmx(unsigned char **yuv, unsigned char *rgb, int w, int h)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Initializes lookup tables used for C-based YUV to RGB conversion.
+ *
+ * This function precomputes values for various YUV conversion formulas
+ * to speed up the raster conversion functions. It populates:
+ * - `_v1164`: (Y - 16) * 1.164
+ * - `_v1596`, `_v813`, `_v391`, `_v2018`: Coefficients for BT.601 U/V terms.
+ * - `_v1793`, `_v534`, `_v213`, `_v2115`: Coefficients for BT.709 U/V terms.
+ * - `_clip_lut`: A lookup table for clipping color component values to the 0-255 range.
+ *
+ * This function is called once when the first YUV conversion is requested.
+ */
 static void
 _evas_yuv_init(void)
 {
@@ -841,6 +956,22 @@ _evas_yuv_init(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Converts YV12 (planar Y, U, V) with BT.709 coefficients to RGBA using a C raster implementation.
+ *
+ * This function processes a 2x2 block of pixels at a time, sharing U and V values.
+ * It uses precomputed lookup tables (`_v1164`, `_v1793`, etc.) for efficiency.
+ * YUV data format is planar:
+ * - yuv[0] to yuv[h-1] are Y plane rows.
+ * - yuv[h] to yuv[h + h/2 - 1] are U plane rows.
+ * - yuv[h + h/2] to yuv[h + h - 1] are V plane rows.
+ *
+ * @param yuv Array of pointers to Y, U, V planes.
+ * @param rgb Output buffer for RGBA data.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ */
 static void
 _evas_yv12_709torgb_raster(unsigned char **yuv, unsigned char *rgb, int w, int h)
 {
@@ -905,6 +1036,18 @@ _evas_yv12_709torgb_raster(unsigned char **yuv, unsigned char *rgb, int w, int h
      }
 }
 
+/**
+ * @internal
+ * @brief Converts YV12 (planar Y, U, V) with BT.601 coefficients to RGBA using a C raster implementation.
+ *
+ * This function is analogous to `_evas_yv12_709torgb_raster` but uses BT.601
+ * conversion coefficients and corresponding lookup tables (`_v1596`, etc.).
+ *
+ * @param yuv Array of pointers to Y, U, V planes.
+ * @param rgb Output buffer for RGBA data.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ */
 static void
 _evas_yv12torgb_raster(unsigned char **yuv, unsigned char *rgb, int w, int h)
 {
@@ -969,6 +1112,10 @@ _evas_yv12torgb_raster(unsigned char **yuv, unsigned char *rgb, int w, int h)
      }
 }
 
+/**
+ * @brief Converts YUV 4:2:2 interleaved (BT.601) to RGBA.
+ * @copydetails evas_common_convert_yuv_422_601_rgba
+ */
 void
 evas_common_convert_yuv_422_601_rgba(DATA8 **src, DATA8 *dst, int w, int h)
 {
@@ -977,6 +1124,10 @@ evas_common_convert_yuv_422_601_rgba(DATA8 **src, DATA8 *dst, int w, int h)
    _evas_yuy2torgb_raster(src, dst, w, h);
 }
 
+/**
+ * @brief Converts YUV 4:2:0 planar (NV12 like, BT.601) to RGBA.
+ * @copydetails evas_common_convert_yuv_420_601_rgba
+ */
 void
 evas_common_convert_yuv_420_601_rgba(DATA8 **src, DATA8 *dst, int w, int h)
 {
@@ -985,6 +1136,11 @@ evas_common_convert_yuv_420_601_rgba(DATA8 **src, DATA8 *dst, int w, int h)
    _evas_nv12torgb_raster(src, dst, w, h);
 }
 
+/**
+ * @brief Converts YUV 4:2:0 Tiled (BT.601) to RGBA.
+ * @copydetails evas_common_convert_yuv_420T_601_rgba
+ * @note The check `if (initted)` seems like a typo and probably should be `if (!initted)`.
+ */
 void
 evas_common_convert_yuv_420T_601_rgba(DATA8 **src, DATA8 *dst, int w, int h)
 {
@@ -993,6 +1149,19 @@ evas_common_convert_yuv_420T_601_rgba(DATA8 **src, DATA8 *dst, int w, int h)
    _evas_nv12tiledtorgb_raster(src, dst, w, h);
 }
 
+/**
+ * @internal
+ * @brief Converts YUY2/YUYV-like (interleaved YUV 4:2:2, BT.601) to RGBA using a C raster implementation.
+ *
+ * Processes YUV data where components are interleaved in the pattern [Y0, U0, Y1, V0] for every two pixels.
+ * It uses precomputed lookup tables for efficiency.
+ *
+ * @param yuv Array of pointers to rows of interleaved YUV data. Each row `yuv[yy]`
+ *            is `w * 2` bytes long. For example: `[Y0,U0,Y1,V0, Y2,U1,Y3,V1, ...]`.
+ * @param rgb Output buffer for RGBA data.
+ * @param w Width of the image in pixels.
+ * @param h Height of the image in pixels.
+ */
 static void
 _evas_yuy2torgb_raster(unsigned char **yuv, unsigned char *rgb, int w, int h)
 {
@@ -1046,6 +1215,23 @@ _evas_yuy2torgb_raster(unsigned char **yuv, unsigned char *rgb, int w, int h)
      }
 }
 
+/**
+ * @internal
+ * @brief Converts a 2x2 block of YUV420 data to RGBA pixels using C raster operations.
+ *
+ * This inline function is a helper for NV12 and NV12 Tiled conversions.
+ * It takes pointers to Y values for two adjacent pixels in two consecutive lines,
+ * and shared U and V values for this 2x2 block. It outputs four RGBA pixels.
+ *
+ * It can use either lookup tables (MEM_BP defined) or direct calculation for conversion.
+ *
+ * @param yp1 Pointer to the first Y value in the first line of the 2x2 block.
+ * @param yp2 Pointer to the first Y value in the second line of the 2x2 block.
+ * @param up Pointer to the U value (shared for the 2x2 block).
+ * @param vp Pointer to the V value (shared for the 2x2 block).
+ * @param dp1 Pointer to the output RGBA buffer for the first line of the 2x2 block.
+ * @param dp2 Pointer to the output RGBA buffer for the second line of the 2x2 block.
+ */
 static inline void
 _evas_yuv2rgb_420_raster(unsigned char *yp1, unsigned char *yp2, unsigned char *up, unsigned char *vp,
                          unsigned char *dp1, unsigned char *dp2)
@@ -1126,9 +1312,42 @@ _evas_yuv2rgb_420_raster(unsigned char *yp1, unsigned char *yp2, unsigned char *
    *((DATA32 *) dp2) = 0xff000000 + rgb;
 }
 
+/**
+ * @internal
+ * @brief Converts a proprietary tiled YUV 4:2:0 format (BT.601) to RGBA using a C raster implementation.
+ *
+ * This function handles a specific tiled memory layout where Y and UV data are stored in macroblocks.
+ * The exact tiling scheme (Z-order or Morton order variation) is complex and described by the iteration logic.
+ * It iterates over macroblocks, untiles them, and converts them using `_evas_yuv2rgb_420_raster`.
+ *
+ * The `src` array structure is specific to this tiled format:
+ * - `yuv[0]` to `yuv[base_h-1]` (approximately) point to starts of rows of Y macroblocks.
+ * - `yuv[base_h]` onwards point to starts of rows of UV macroblocks.
+ * The exact indexing `yuv[mb_y]`, `yuv[(mb_y >> 1) + base_h]` reflects how macroblock rows are accessed.
+ *
+ * @param yuv Array of pointers to tiled Y and UV data. Structure is specific to the tiled format.
+ * @param rgb Output buffer for RGBA data.
+ * @param w Width of the image in pixels.
+ * @param h Height of the image in pixels.
+ */
 static void
 _evas_nv12tiledtorgb_raster(unsigned char **yuv, unsigned char *rgb, int w, int h)
 {
+/**
+ * @internal
+ * @brief Macro to process one 64x32 Y macroblock and corresponding 64x16 UV macroblock.
+ *
+ * This macro iterates 32 times (for 32 lines in Y, 16 lines in UV).
+ * In each iteration, it processes 64 pixels wide (32 pairs of 2 pixels).
+ * It calls `_evas_yuv2rgb_420_raster` to convert 2x2 YUV blocks to RGBA.
+ *
+ * @param YP1 Pointer to the current Y data in the first line of the current 2-line strip.
+ * @param YP2 Pointer to the current Y data in the second line of the current 2-line strip.
+ * @param UP Pointer to the current U data (interleaved with V).
+ * @param VP Pointer to the current V data (interleaved with U, typically UP+1).
+ * @param DP1 Pointer to the destination RGBA buffer for the first line.
+ * @param DP2 Pointer to the destination RGBA buffer for the second line.
+ */
 #define HANDLE_MACROBLOCK(YP1, YP2, UP, VP, DP1, DP2)                   \
    {                                                                    \
      int i;                                                             \
@@ -1280,6 +1499,25 @@ _evas_nv12tiledtorgb_raster(unsigned char **yuv, unsigned char *rgb, int w, int 
      }
 }
 
+/**
+ * @internal
+ * @brief Converts NV12/NV21 (planar Y, interleaved UV, BT.601) to RGBA using a C raster implementation.
+ *
+ * NV12 format consists of a full-resolution Y plane followed by a half-resolution
+ * plane with interleaved U and V components (U0V0U1V1...). NV21 is similar but with V and U swapped (V0U0V1U1...).
+ * This function expects `src` to provide pointers to rows of the Y plane,
+ * and then pointers to rows of the UV plane.
+ * `yuv[h + (yy >> 1)]` accesses the UV plane row corresponding to Y rows `yy` and `yy+1`.
+ *
+ * @param yuv Array of pointers.
+ *            `yuv[0...h-1]` point to rows of the Y plane.
+ *            `yuv[h...h + h/2 - 1]` point to rows of the interleaved UV plane.
+ *            For NV12, UV plane is U0,V0,U1,V1...
+ *            For NV21, UV plane is V0,U0,V1,U1... (this function treats `up` as U and `vp` as V, so expects NV12)
+ * @param rgb Output buffer for RGBA data.
+ * @param w Width of the image in pixels.
+ * @param h Height of the image in pixels.
+ */
 static void
 _evas_nv12torgb_raster(unsigned char **yuv, unsigned char *rgb, int w, int h)
 {

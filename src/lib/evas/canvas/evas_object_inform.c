@@ -15,6 +15,16 @@ EVAS_API EVAS_API_WEAK const Efl_Event_Description _EFL_GFX_ENTITY_EVENT_IMAGE_U
 
 /* local calls */
 
+/**
+ * @internal
+ * @brief Informs that an Evas object is now visible.
+ *
+ * This function is called when an Evas object becomes visible. It triggers
+ * the EVAS_CALLBACK_SHOW event and the EFL_GFX_ENTITY_EVENT_SHOW Efl event.
+ *
+ * @param eo_obj The Evas object that became visible.
+ * @param obj The protected data of the Evas object.
+ */
 void
 evas_object_inform_call_show(Evas_Object *eo_obj, Evas_Object_Protected_Data *obj)
 {
@@ -25,6 +35,16 @@ evas_object_inform_call_show(Evas_Object *eo_obj, Evas_Object_Protected_Data *ob
    _evas_post_event_callback_call(obj->layer->evas->evas, obj->layer->evas, event_id);
 }
 
+/**
+ * @internal
+ * @brief Informs that an Evas object is now hidden.
+ *
+ * This function is called when an Evas object becomes hidden. It triggers
+ * the EVAS_CALLBACK_HIDE event and the EFL_GFX_ENTITY_EVENT_HIDE Efl event.
+ *
+ * @param eo_obj The Evas object that became hidden.
+ * @param obj The protected data of the Evas object.
+ */
 void
 evas_object_inform_call_hide(Evas_Object *eo_obj, Evas_Object_Protected_Data *obj)
 {
@@ -35,6 +55,17 @@ evas_object_inform_call_hide(Evas_Object *eo_obj, Evas_Object_Protected_Data *ob
    _evas_post_event_callback_call(obj->layer->evas->evas, obj->layer->evas, event_id);
 }
 
+/**
+ * @internal
+ * @brief Informs that an Evas object has moved.
+ *
+ * This function is called when an Evas object's position changes. It triggers
+ * the EVAS_CALLBACK_MOVE event and the EFL_GFX_ENTITY_EVENT_POSITION_CHANGED Efl event.
+ * The event data contains the new position of the object.
+ *
+ * @param eo_obj The Evas object that moved.
+ * @param obj The protected data of the Evas object.
+ */
 void
 evas_object_inform_call_move(Evas_Object *eo_obj, Evas_Object_Protected_Data *obj)
 {
@@ -47,6 +78,17 @@ evas_object_inform_call_move(Evas_Object *eo_obj, Evas_Object_Protected_Data *ob
    _evas_post_event_callback_call(obj->layer->evas->evas, obj->layer->evas, event_id);
 }
 
+/**
+ * @internal
+ * @brief Informs that an Evas object has been resized.
+ *
+ * This function is called when an Evas object's size changes. It triggers
+ * the EVAS_CALLBACK_RESIZE event and the EFL_GFX_ENTITY_EVENT_SIZE_CHANGED Efl event.
+ * The event data contains the new size of the object.
+ *
+ * @param eo_obj The Evas object that was resized.
+ * @param obj The protected data of the Evas object.
+ */
 void
 evas_object_inform_call_resize(Evas_Object *eo_obj, Evas_Object_Protected_Data *obj)
 {
@@ -59,6 +101,17 @@ evas_object_inform_call_resize(Evas_Object *eo_obj, Evas_Object_Protected_Data *
    _evas_post_event_callback_call(obj->layer->evas->evas, obj->layer->evas, event_id);
 }
 
+/**
+ * @internal
+ * @brief Informs that an Evas object's stacking order has changed.
+ *
+ * This function is called when an Evas object's position in the stacking order
+ * (layer or Z-order within a layer) changes. It triggers the EVAS_CALLBACK_RESTACK
+ * event and the EFL_GFX_ENTITY_EVENT_STACKING_CHANGED Efl event.
+ *
+ * @param eo_obj The Evas object whose stacking changed.
+ * @param obj The protected data of the Evas object.
+ */
 void
 evas_object_inform_call_restack(Evas_Object *eo_obj, Evas_Object_Protected_Data *obj)
 {
@@ -69,6 +122,18 @@ evas_object_inform_call_restack(Evas_Object *eo_obj, Evas_Object_Protected_Data 
      _evas_post_event_callback_call(obj->layer->evas->evas, obj->layer->evas, event_id);
 }
 
+/**
+ * @internal
+ * @brief Informs that an Evas object's size hints have changed.
+ *
+ * This function is called when an Evas object's size hints (e.g., min, max,
+ * aspect, align, weight) are modified. It triggers the
+ * EVAS_CALLBACK_CHANGED_SIZE_HINTS event and the
+ * EFL_GFX_ENTITY_EVENT_HINTS_CHANGED Efl event.
+ *
+ * @param eo_obj The Evas object whose size hints changed.
+ * @param obj The protected data of the Evas object.
+ */
 void
 evas_object_inform_call_changed_size_hints(Evas_Object *eo_obj, Evas_Object_Protected_Data *obj)
 {
@@ -78,6 +143,17 @@ evas_object_inform_call_changed_size_hints(Evas_Object *eo_obj, Evas_Object_Prot
    _evas_post_event_callback_call(obj->layer->evas->evas, obj->layer->evas, event_id);
 }
 
+/**
+ * @internal
+ * @brief Informs that an Evas image object has finished preloading its data.
+ *
+ * This function is called when an Evas image object completes its preloading
+ * operation, or if preloading was cancelled. It triggers the
+ * EVAS_CALLBACK_IMAGE_PRELOADED event and the
+ * EFL_GFX_IMAGE_EVENT_IMAGE_PRELOAD Efl event.
+ *
+ * @param eo_obj The Evas image object that finished preloading.
+ */
 void
 evas_object_inform_call_image_preloaded(Evas_Object *eo_obj)
 {
@@ -105,6 +181,16 @@ evas_object_inform_call_image_preloaded(Evas_Object *eo_obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Informs that an Evas image object has unloaded its data.
+ *
+ * This function is called when an Evas image object's data is unloaded from memory.
+ * It triggers the EVAS_CALLBACK_IMAGE_UNLOADED event and the
+ * EFL_GFX_IMAGE_EVENT_IMAGE_UNLOAD Efl event.
+ *
+ * @param eo_obj The Evas image object that was unloaded.
+ */
 void
 evas_object_inform_call_image_unloaded(Evas_Object *eo_obj)
 {
@@ -116,6 +202,18 @@ evas_object_inform_call_image_unloaded(Evas_Object *eo_obj)
    _evas_post_event_callback_call(obj->layer->evas->evas, obj->layer->evas, event_id);
 }
 
+/**
+ * @internal
+ * @brief Informs that an Evas image object's source image has been resized.
+ *
+ * This function is called when the source image data for an Evas image object
+ * has been resized (e.g., due to scaling operations on the image data itself,
+ * not the object's geometry). It triggers the EVAS_CALLBACK_IMAGE_RESIZE event
+ * and the EFL_GFX_IMAGE_EVENT_IMAGE_RESIZED Efl event. The event data contains
+ * the new size of the source image.
+ *
+ * @param eo_obj The Evas image object whose source image was resized.
+ */
 void
 evas_object_inform_call_image_resize(Evas_Object *eo_obj)
 {

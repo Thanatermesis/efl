@@ -28,6 +28,10 @@
 
 typedef struct _External_Lookup External_Lookup;
 typedef struct _Part_Lookup     Part_Lookup;
+/**
+ * @brief Key for looking up part information.
+ * Used in hash tables to resolve part names to IDs or other properties.
+ */
 typedef struct _Part_Lookup_Key Part_Lookup_Key;
 typedef struct _Program_Lookup  Program_Lookup;
 typedef struct _Group_Lookup    Group_Lookup;
@@ -41,210 +45,252 @@ struct _External_Lookup
 
 struct _Part_Lookup_Key
 {
-   Edje_Part_Collection *pc;
+   Edje_Part_Collection *pc; /**< The part collection this key belongs to. */
 
    union
    {
-      int *dest;
+      int *dest; /**< Pointer to an integer destination for the resolved ID (stable allocation). */
       struct
       {
-         unsigned char **base;
-         int             offset;
-      } reallocated;
-   } mem;
-   char    **dest2;
+         unsigned char **base; /**< Base pointer of a reallocated memory block. */
+         int             offset; /**< Offset within the reallocated block where the ID is stored. */
+      } reallocated; /**< Used when the destination memory for the ID might be reallocated. */
+   } mem; /**< Union for destination memory. */
+   char    **dest2; /**< Secondary destination, e.g., for storing a nested part name string after a separator. */
 
-   Eina_Bool stable : 1;
+   Eina_Bool stable : 1; /**< If true, mem.dest is used; otherwise, mem.reallocated is used. */
 };
 
+/**
+ * @brief Structure for storing a part name that needs to be resolved to an ID.
+ */
 struct _Part_Lookup
 {
-   Part_Lookup_Key key;
-   char           *name;
+   Part_Lookup_Key key;  /**< The key containing destination information. */
+   char           *name; /**< The name of the part to look up. */
 };
 
+/**
+ * @brief Structure for looking up program information.
+ * Used to resolve program names or direct Edje_Program pointers to their compiled IDs.
+ */
 struct _Program_Lookup
 {
-   Edje_Part_Collection *pc;
+   Edje_Part_Collection *pc; /**< The part collection this program belongs to. */
 
    union
    {
-      char         *name;
-      Edje_Program *ep;
-   } u;
+      char         *name; /**< The name of the program (if not anonymous). */
+      Edje_Program *ep;   /**< Pointer to the Edje_Program structure (if anonymous or already resolved). */
+   } u; /**< Union for program identification. */
 
-   int                  *dest;
+   int                  *dest; /**< Pointer to store the resolved program ID. */
 
-   Eina_Bool             anonymous : 1;
+   Eina_Bool             anonymous : 1; /**< Flag indicating if the program is anonymous (has no explicit name in EDC). */
 };
 
 struct _Group_Lookup
 {
    char      *name;
-   Edje_Part *part;
+   Edje_Part *part; /**< The part that sources this group, can be NULL. */
 };
 
+/**
+ * @brief Structure for looking up a generic string that needs to be resolved to an integer ID.
+ */
 struct _String_Lookup
 {
-   char *name;
-   int  *dest;
+   char *name; /**< The string name to look up. */
+   int  *dest; /**< Pointer to store the resolved integer ID. */
 };
 
+/**
+ * @brief Structure for looking up image or image set information.
+ */
 struct _Image_Lookup
 {
-   char      *name;
-   int       *dest;
-   Eina_Bool *set;
+   char      *name; /**< The name of the image or image set. */
+   int       *dest; /**< Pointer to store the resolved image/set ID. */
+   Eina_Bool *set;  /**< Pointer to a boolean that will be true if 'name' resolved to a set, false otherwise. */
 };
 
+/**
+ * @brief Structure for replacing placeholder strings in scripts with resolved IDs.
+ */
 struct _Code_Lookup
 {
-   char     *ptr;
-   int       len;
-   int       val;
-   Eina_Bool set;
+   char     *ptr;  /**< Pointer to the placeholder string in the script code. */
+   int       len;  /**< Length of the placeholder string. */
+   int       val;  /**< The resolved integer value (ID) to replace the placeholder. */
+   Eina_Bool set;  /**< True if this lookup refers to an image set. */
 };
 
 typedef struct _Script_Lua_Writer Script_Lua_Writer;
 
+/**
+ * @brief Context for writing Lua script chunks.
+ */
 struct _Script_Lua_Writer
 {
-   char *buf;
-   int   size;
+   char *buf;  /**< Buffer accumulating the Lua bytecode or script text. */
+   int   size; /**< Current size of the buffer. */
 };
 
+/** @brief Context for writing Embryo script data asynchronously. */
 typedef struct _Script_Write    Script_Write;
+/** @brief Context for writing Edje file header data asynchronously. */
 typedef struct _Head_Write      Head_Write;
+/** @brief Context for writing font data asynchronously. */
 typedef struct _Fonts_Write     Fonts_Write;
+/** @brief Context for writing image data asynchronously. */
 typedef struct _Image_Write     Image_Write;
+/** @brief Context for writing sound data asynchronously. */
 typedef struct _Sound_Write     Sound_Write;
+/** @brief Context for writing MO (translation) data asynchronously. */
 typedef struct _Mo_Write        Mo_Write;
+/** @brief Context for writing vibration data asynchronously. */
 typedef struct _Vibration_Write Vibration_Write;
+/** @brief Context for writing group (collection) data asynchronously. */
 typedef struct _Group_Write     Group_Write;
+/** @brief Context for writing license data asynchronously. */
 typedef struct _License_Write   License_Write;
 
 struct _Script_Write
 {
-   Eet_File    *ef;
-   Code        *cd;
-   int          i;
-   Ecore_Exe   *exe;
-   int          tmpn_fd;
-   Eina_Tmpstr *tmpn;
-   Eina_Tmpstr *tmpo;
-   char        *errstr;
+   Eet_File    *ef; /**< Eet file handle for writing. */
+   Code        *cd; /**< Code structure containing script information. */
+   int          i;      /**< Index or ID related to this script. */
+   Ecore_Exe   *exe;    /**< Handle for the Embryo compiler process. */
+   int          tmpn_fd; /**< File descriptor for the temporary source file. */
+   Eina_Tmpstr *tmpn;   /**< Path to the temporary Embryo source file (.sma). */
+   Eina_Tmpstr *tmpo;   /**< Path to the temporary compiled Embryo object file (.amx). */
+   char        *errstr; /**< Stores error messages if an error occurs during processing. */
 };
 
 struct _Head_Write
 {
-   Eet_File *ef;
-   char     *errstr;
+   Eet_File *ef;     /**< Eet file handle for writing. */
+   char     *errstr; /**< Stores error messages. */
 };
 
 struct _Fonts_Write
 {
-   Eet_File  *ef;
-   Edje_Font *fn;
-   char      *errstr;
+   Eet_File  *ef; /**< Eet file handle for writing. */
+   Edje_Font *fn; /**< Font entry to write. */
+   char      *errstr; /**< Stores error messages. */
 };
 
 struct _Image_Write
 {
-   Eet_File                   *ef;
-   Edje_Image_Directory_Entry *img;
-   Evas_Object                *im;
-   Emile_Image_Property        prop;
-   Eina_File                  *f;
-   Emile_Image                *emi;
-   int                         w, h;
-   int                         alpha;
-   unsigned int               *data;
-   char                       *path;
-   char                       *errstr;
+   Eet_File                   *ef;    /**< Eet file handle for writing. */
+   Edje_Image_Directory_Entry *img;  /**< Image directory entry to write. */
+   Evas_Object                *im;   /**< Evas image object used for loading/processing. */
+   Emile_Image_Property        prop;  /**< Properties for Emile (image loading library), e.g., for TGV. */
+   Eina_File                  *f;    /**< File handle for the image source file (e.g., TGV). */
+   Emile_Image                *emi;  /**< Emile image handle (e.g., for TGV). */
+   int                         w, h; /**< Width and height of the image. */
+   int                         alpha;/**< Alpha channel presence flag. */
+   unsigned int               *data; /**< Raw pixel data of the image. */
+   char                       *path; /**< Path to the image file. */
+   char                       *errstr;/**< Stores error messages. */
 };
 
 struct _Sound_Write
 {
-   Eet_File          *ef;
-   Edje_Sound_Sample *sample;
-   int                i;
+   Eet_File          *ef;    /**< Eet file handle for writing. */
+   Edje_Sound_Sample *sample;/**< Sound sample to write. */
+   int                i;     /**< Index of the sound sample. */
 };
 
 struct _Mo_Write
 {
-   Eet_File  *ef;
-   Edje_Mo   *mo_entry;
-   char      *mo_path;
-   Ecore_Exe *exe;
-   char      *errstr;
+   Eet_File  *ef;       /**< Eet file handle for writing. */
+   Edje_Mo   *mo_entry; /**< MO entry to process and write. */
+   char      *mo_path;  /**< Path to the compiled .mo file (may be temporary). */
+   Ecore_Exe *exe;      /**< Handle for msgfmt process if .po to .mo conversion is needed. */
+   char      *errstr;   /**< Stores error messages. */
 };
 
 struct _Vibration_Write
 {
-   Eet_File              *ef;
-   Edje_Vibration_Sample *sample;
-   int                    i;
+   Eet_File              *ef;    /**< Eet file handle for writing. */
+   Edje_Vibration_Sample *sample;/**< Vibration sample to write. */
+   int                    i;     /**< Index of the vibration sample. */
 };
 
 struct _Group_Write
 {
-   Eet_File             *ef;
-   Edje_Part_Collection *pc;
-   char                 *errstr;
+   Eet_File             *ef; /**< Eet file handle for writing. */
+   Edje_Part_Collection *pc; /**< Part collection (group) to write. */
+   char                 *errstr; /**< Stores error messages. */
 };
 
 struct _License_Write
 {
-   Eet_File   *ef;
-   const char *file;
-   Eina_Bool   master;
+   Eet_File   *ef;     /**< Eet file handle for writing. */
+   const char *file;   /**< Path to the license file. */
+   Eina_Bool   master; /**< True if this is the main license, false for additional licenses. */
 };
 
+/**
+ * @brief Structure to map old image IDs to new IDs during image list compaction (currently unused).
+ */
 struct _Image_Unused_Ids
 {
-   int old_id;
-   int new_id;
+   int old_id; /**< The original ID of an image. */
+   int new_id; /**< The new ID after compaction. */
 };
 
 typedef struct _Image_Unused_Ids Image_Unused_Ids;
 
-static int pending_threads = 0;
-static int pending_image_threads = 0;
+static int pending_threads = 0; /**< Counter for general pending asynchronous operations. */
+static int pending_image_threads = 0; /**< Counter for pending asynchronous image processing operations. */
 
 static void data_process_string(Edje_Part_Collection *pc, const char *prefix, char *s, void (*func)(Edje_Part_Collection *pc, char *name, char *ptr, int len));
 
-extern Eina_List *po_files;
+extern Eina_List *po_files; /**< List of .po files to process. */
 
-Edje_File *edje_file = NULL;
-Eina_List *edje_collections = NULL;
-Eina_Hash *edje_collections_lookup = NULL;
-Eina_List *externals = NULL;
-Eina_List *fonts = NULL;
-Eina_List *codes = NULL;
-Eina_List *code_lookups = NULL;
-Eina_List *aliases = NULL;
-Eina_List *color_tree_root = NULL;
-Eina_Hash *color_class_reg = NULL;
+Edje_File *edje_file = NULL; /**< Main structure representing the Edje file being compiled. */
+Eina_List *edje_collections = NULL; /**< List of all Edje_Part_Collection (groups) in the Edje file. */
+Eina_Hash *edje_collections_lookup = NULL; /**< Hash table for quick lookup of collections by their ID. Stores Edje_Part_Collection_Directory_Entry. */
+Eina_List *externals = NULL; /**< List of external parameters defined in the EDC. */
+Eina_List *fonts = NULL; /**< List of font fallbacks (not the main font list in edje_file->fonts). */
+Eina_List *codes = NULL; /**< List of Code structures, each representing a script block (Embryo or Lua). */
+Eina_List *code_lookups = NULL; /**< List of Code_Lookup items for script string replacements. */
+Eina_List *aliases = NULL; /**< List of Edje_Part_Collection_Directory_Entry for aliased collections. */
+Eina_List *color_tree_root = NULL; /**< List of color class names that are at the root of the color class tree. */
+Eina_Hash *color_class_reg = NULL; /**< Hash table to register all unique color class names. */
 
-static Eet_Data_Descriptor *edd_edje_file = NULL;
-static Eet_Data_Descriptor *edd_edje_part_collection = NULL;
+static Eet_Data_Descriptor *edd_edje_file = NULL; /**< Eet Data Descriptor for Edje_File structure. */
+static Eet_Data_Descriptor *edd_edje_part_collection = NULL; /**< Eet Data Descriptor for Edje_Part_Collection structure. */
 
-static Eina_List *program_lookups = NULL;
-static Eina_List *group_lookups = NULL;
-static Eina_List *face_group_lookups = NULL;
-static Eina_List *image_lookups = NULL;
+static Eina_List *program_lookups = NULL; /**< List of Program_Lookup items for resolving program names/references to IDs. */
+static Eina_List *group_lookups = NULL; /**< List of Group_Lookup items for resolving group name references. */
+static Eina_List *face_group_lookups = NULL; /**< List of group names used as 'face' in textblock styles, for validation. */
+static Eina_List *image_lookups = NULL; /**< List of Image_Lookup items for resolving image/set names to IDs. */
 
-static Eina_Hash *part_dest_lookup = NULL;
-static Eina_Hash *part_pc_dest_lookup = NULL;
-static Eina_Hash *groups_sourced = NULL;
+static Eina_Hash *part_dest_lookup = NULL; /**< Hash table for Part_Lookup items, keyed by destination pointer. */
+static Eina_Hash *part_pc_dest_lookup = NULL; /**< Hash table for Part_Lookup items, keyed by (Part_Collection, destination pointer). */
+static Eina_Hash *groups_sourced = NULL; /**< Hash table to keep track of group names that are used as a 'source' for another part, to skip namespace validation for them. */
 
-static Eet_File *cur_ef;
-static int image_num;
-static Ecore_Evas *buffer_ee;
-static int cur_image_entry;
+static Eet_File *cur_ef; /**< Current Eet_File handle used for writing image data. */
+static int image_num; /**< Counter for the number of images written. */
+static Ecore_Evas *buffer_ee; /**< A buffer Ecore_Evas instance used for loading images. */
+static int cur_image_entry; /**< Index of the current image entry being processed in data_write_images. */
 
 static void data_write_images(void);
 
+/**
+ * @brief Logs a critical error message and aborts the compilation process.
+ *
+ * This function prints an error message using the Edje_Cc logging domain,
+ * attempts to delete the partially created output file and watchfile (if any),
+ * and then exits the program with a status of -1.
+ *
+ * @param ef The Eet_File handle (currently unused in the function body but kept for API compatibility).
+ * @param fmt The format string for the error message, similar to printf.
+ * @param ... Variable arguments for the format string.
+ */
 void
 error_and_abort(Eet_File *ef EINA_UNUSED, const char *fmt, ...)
 {
@@ -259,6 +305,17 @@ error_and_abort(Eet_File *ef EINA_UNUSED, const char *fmt, ...)
    exit(-1);
 }
 
+/**
+ * @brief Decrements pending thread counters and potentially quits the main loop.
+ *
+ * This function is called when an asynchronous operation (thread) completes.
+ * It decrements either the general pending thread counter or the image-specific
+ * one. If threading is enabled and the total number of pending threads drops
+ * below a threshold (max_open_files - 2), it may trigger further image writing.
+ * If all pending threads are complete, it quits the Ecore main loop.
+ *
+ * @param img EINA_TRUE if the completed thread was for image processing, EINA_FALSE otherwise.
+ */
 static void
 thread_end(Eina_Bool img)
 {
@@ -274,12 +331,26 @@ thread_end(Eina_Bool img)
    if (pending_threads + pending_image_threads <= 0) ecore_main_loop_quit();
 }
 
+/**
+ * @brief Gets the length of a Part_Lookup_Key for Eina_Hash.
+ * @param key Unused.
+ * @return The size of Part_Lookup_Key.
+ */
 static unsigned int
 _part_lookup_key_length(const void *key EINA_UNUSED)
 {
    return sizeof (Part_Lookup_Key);
 }
 
+/**
+ * @brief Compares two Part_Lookup_Key instances, primarily by Part_Collection pointer,
+ *        then by memory location. For Eina_Hash.
+ * @param key1 First key.
+ * @param key1_length Unused.
+ * @param key2 Second key.
+ * @param key2_length Unused.
+ * @return Difference value for sorting/comparison.
+ */
 static int
 _part_lookup_key_pc_cmp(const void *key1, int key1_length EINA_UNUSED,
                         const void *key2, int key2_length EINA_UNUSED)
@@ -327,6 +398,15 @@ _part_lookup_key_pc_hash(const void *key, int key_length EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Compares two Part_Lookup_Key instances, primarily by memory location.
+ *        For Eina_Hash.
+ * @param key1 First key.
+ * @param key1_length Unused.
+ * @param key2 Second key.
+ * @param key2_length Unused.
+ * @return Difference value for sorting/comparison.
+ */
 static int
 _part_lookup_key_cmp(const void *key1, int key1_length EINA_UNUSED,
                      const void *key2, int key2_length EINA_UNUSED)
@@ -367,6 +447,10 @@ _part_lookup_key_hash(const void *key, int key_length EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Frees a Part_Lookup structure.
+ * @param pl The Part_Lookup to free.
+ */
 static void
 data_part_lookup_free(Part_Lookup *pl)
 {
@@ -374,12 +458,24 @@ data_part_lookup_free(Part_Lookup *pl)
    free(pl);
 }
 
+/**
+ * @brief Frees an Eina_List.
+ * This is a simple wrapper for eina_list_free, suitable for EINA_FREE_CB.
+ * @param list The Eina_List to free.
+ */
 static void
 list_free(void *list)
 {
    eina_list_free(list);
 }
 
+/**
+ * @brief Initializes global data structures used by the Edje compiler.
+ *
+ * This function sets up Eet data descriptors for Edje_File and Edje_Part_Collection,
+ * and initializes hash tables (part_dest_lookup, part_pc_dest_lookup) used for
+ * resolving part name references during compilation.
+ */
 void
 data_setup(void)
 {
@@ -398,6 +494,17 @@ data_setup(void)
                                        8);
 }
 
+/**
+ * @brief Validates an image description within a part.
+ *
+ * Checks if an image ID is set for visible image parts and for all tweens.
+ * Emits warnings or errors if IDs are missing.
+ *
+ * @param pc The part collection.
+ * @param ep The part containing the image description.
+ * @param epd The image description to check.
+ * @param ef The Eet_File handle for error reporting.
+ */
 static void
 check_image_part_desc(Edje_Part_Collection *pc, Edje_Part *ep,
                       Edje_Part_Description_Image *epd, Eet_File *ef)
@@ -421,6 +528,11 @@ check_image_part_desc(Edje_Part_Collection *pc, Edje_Part *ep,
      }
 }
 
+/**
+ * @brief Finds an Edje_Part_Collection by its 'part' (group) name.
+ * @param source The name of the group to find.
+ * @return The Edje_Part_Collection if found, otherwise NULL.
+ */
 static Edje_Part_Collection *
 _source_group_find(const char *source)
 {
@@ -435,6 +547,17 @@ _source_group_find(const char *source)
    return NULL;
 }
 
+/**
+ * @brief Finds a text-type part within a sourced (aliased) group.
+ *
+ * This is used when a part sources another group, and a text property
+ * (like text.source) refers to a part within that sourced group.
+ *
+ * @param pc The current part collection.
+ * @param id_source The ID of the part in 'pc' that sources another group.
+ * @param id_source_part The name of the target text part within the sourced group.
+ * @return The Edje_Part if found and is a text type, otherwise NULL.
+ */
 static Edje_Part *
 _aliased_text_part_find(Edje_Part_Collection *pc,
                         int id_source, const char *id_source_part)
@@ -456,6 +579,17 @@ _aliased_text_part_find(Edje_Part_Collection *pc,
    return NULL;
 }
 
+/**
+ * @brief Validates a text description within a part.
+ *
+ * Checks that `text.source` and `text.text_source` (if set) point to
+ * parts of type TEXT or TEXTBLOCK, either directly or through an aliased part.
+ *
+ * @param pc The part collection.
+ * @param ep The part containing the text description.
+ * @param epd The text description to check.
+ * @param ef The Eet_File handle for error reporting.
+ */
 static void
 check_text_part_desc(Edje_Part_Collection *pc, Edje_Part *ep,
                      Edje_Part_Description_Text *epd, Eet_File *ef)
@@ -503,12 +637,19 @@ check_text_part_desc(Edje_Part_Collection *pc, Edje_Part *ep,
      }
 }
 
-/* This function check loops between groups.
-   For example:
-   > part in group A. It's source is B.
-   > part in group B. It's source is C.
-   > part in group C. It's source is A <- here is error.
-   It's loop that we need to avoid! */
+/**
+ * @brief Checks for recursive loops in group source references.
+ *
+ * Traverses the chain of sourced groups (parts of type GROUP that have a `source`
+ * property) to detect circular dependencies. For example, if group A sources B,
+ * B sources C, and C sources A, this function will detect the loop.
+ *
+ * @param pc The current part collection being checked (or containing the part that sources another group).
+ * @param ep The part of type GROUP whose `source` is being investigated.
+ * @param ef The Eet_File handle for error reporting.
+ * @param group_path A list representing the current path of sourced groups, used to detect recursion.
+ *                   Example: If A sources B, and B sources C, group_path would be ["A", "B"] when checking C.
+ */
 static void
 check_source_links(Edje_Part_Collection *pc, Edje_Part *ep, Eet_File *ef, Eina_List *group_path)
 {
@@ -548,6 +689,16 @@ check_source_links(Edje_Part_Collection *pc, Edje_Part *ep, Eet_File *ef, Eina_L
      }
 }
 
+/**
+ * @brief Validates items packed within BOX or TABLE parts.
+ *
+ * For packed items of type GROUP, ensures a `source` is specified.
+ * For items packed in a TABLE, ensures `col` and `row` are specified.
+ *
+ * @param pc The part collection.
+ * @param ep The BOX or TABLE part containing packed items.
+ * @param ef The Eet_File handle for error reporting.
+ */
 static void
 check_packed_items(Edje_Part_Collection *pc, Edje_Part *ep, Eet_File *ef)
 {
@@ -566,6 +717,16 @@ check_packed_items(Edje_Part_Collection *pc, Edje_Part *ep, Eet_File *ef)
      }
 }
 
+/**
+ * @brief Checks if a part description state has a name.
+ *
+ * Aborts if a state (e.g., "default" 0.0) is missing its name string.
+ *
+ * @param pc The part collection.
+ * @param ep The part containing the description.
+ * @param ed The common description data.
+ * @param ef The Eet_File handle for error reporting.
+ */
 static void
 check_nameless_state(Edje_Part_Collection *pc, Edje_Part *ep, Edje_Part_Description_Common *ed, Eet_File *ef)
 {
@@ -578,12 +739,34 @@ check_nameless_state(Edje_Part_Collection *pc, Edje_Part *ep, Edje_Part_Descript
                    de->entry, ep->name);
 }
 
+/**
+ * @brief Performs checks on a part description's state.
+ * Currently, it only checks for nameless states.
+ *
+ * @param pc The part collection.
+ * @param ep The part containing the description.
+ * @param ed The common description data.
+ * @param ef The Eet_File handle for error reporting.
+ */
 static void
 check_state(Edje_Part_Collection *pc, Edje_Part *ep, Edje_Part_Description_Common *ed, Eet_File *ef)
 {
    check_nameless_state(pc, ep, ed, ef);
 }
 
+/**
+ * @brief Verifies if a part's name conforms to the group's namespace.
+ *
+ * If `namespace_verify` is enabled, this function checks if the part name
+ * starts with the group's namespace prefix (e.g., "group_name/").
+ * This is typically required for certain part types like SWALLOW, BOX, TABLE.
+ *
+ * @param pc The part collection (group).
+ * @param ep The part to verify.
+ * @param ef The Eet_File handle for error reporting.
+ * @param ns_required If true, the namespace is strictly required. If false,
+ *        it's only checked if the part name contains a '.' (dot).
+ */
 static void
 _part_namespace_verify(Edje_Part_Collection *pc, Edje_Part *ep, Eet_File *ef, Eina_Bool ns_required)
 {
@@ -613,6 +796,23 @@ _part_namespace_verify(Edje_Part_Collection *pc, Edje_Part *ep, Eet_File *ef, Ei
      error_and_abort(ef, "Part '%s' from group %s is not properly namespaced (should begin with '%s.')!", ep->name, de->entry, buf);
 }
 
+/**
+ * @brief Performs comprehensive validation checks on an Edje_Part.
+ *
+ * This function orchestrates various checks:
+ * - Ensures a default description exists.
+ * - Validates all states (default and others).
+ * - Performs type-specific checks:
+ *   - IMAGE: Calls `check_image_part_desc`.
+ *   - BOX, TABLE: Calls `check_packed_items`.
+ *   - GROUP: Calls `check_source_links`.
+ *   - TEXT, TEXTBLOCK: Calls `check_text_part_desc`.
+ * - If namespace validation is not skipped for the collection, calls `_part_namespace_verify`.
+ *
+ * @param pc The part collection.
+ * @param ep The part to check.
+ * @param ef The Eet_File handle for error reporting.
+ */
 static void
 check_part(Edje_Part_Collection *pc, Edje_Part *ep, Eet_File *ef)
 {
@@ -640,7 +840,7 @@ check_part(Edje_Part_Collection *pc, Edje_Part *ep, Eet_File *ef)
      check_packed_items(pc, ep, ef);
    else if (ep->type == EDJE_PART_TYPE_GROUP)
      check_source_links(pc, ep, ef, group_path);
-   else if (ep->type == EDJE_PART_TYPE_TEXT)
+   else if (ep->type == EDJE_PART_TYPE_TEXT) // Also applies to TEXTBLOCK due to struct similarity for this check
      {
         check_text_part_desc(pc, ep, (Edje_Part_Description_Text *)ep->default_desc, ef);
 
@@ -655,18 +855,31 @@ check_part(Edje_Part_Collection *pc, Edje_Part *ep, Eet_File *ef)
            case EDJE_PART_TYPE_BOX:
            case EDJE_PART_TYPE_TABLE:
            case EDJE_PART_TYPE_SWALLOW:
-             _part_namespace_verify(pc, ep, ef, 1);
+             _part_namespace_verify(pc, ep, ef, 1); // Namespace strictly required
              break;
            case EDJE_PART_TYPE_TEXT:
            case EDJE_PART_TYPE_TEXTBLOCK:
            case EDJE_PART_TYPE_SPACER:
-             _part_namespace_verify(pc, ep, ef, 0);
+             _part_namespace_verify(pc, ep, ef, 0); // Namespace checked if name contains '.'
              break;
            default: break;
           }
      }
 }
 
+/**
+ * @brief Verifies if a program's emitted signal and source conform to the group's namespace.
+ *
+ * If `namespace_verify` is enabled, this function checks if the signal name
+ * (and potentially source, though source is usually a part name) starts with
+ * the group's namespace prefix. This applies to `SIGNAL_EMIT` actions.
+ * It ignores signals propagated to GROUP parts (containing ':').
+ *
+ * @param pc The part collection (group).
+ * @param ef The Eet_File handle for error reporting.
+ * @param sig The signal name being emitted.
+ * @param src The source string of the signal.
+ */
 static void
 _program_signal_namespace_verify(Edje_Part_Collection *pc, Eet_File *ef, const char *sig, const char *src)
 {
@@ -694,6 +907,20 @@ _program_signal_namespace_verify(Edje_Part_Collection *pc, Eet_File *ef, const c
      error_and_abort(ef, "SIGNAL_EMIT (%s:%s) does not match group namespace (%s)!", sig, src, de->entry);
 }
 
+/**
+ * @brief Validates an Edje_Program.
+ *
+ * This function performs several checks on a program definition:
+ * - Ensures targets are specified for actions that require them (e.g., STATE_SET, DRAG_VAL_SET).
+ * - For SIGNAL_EMIT actions without explicit targets, verifies namespace if applicable.
+ * - For actions targeting parts (like STATE_SET):
+ *   - Verifies that the target part ID is within bounds.
+ *   - For STATE_SET, ensures the specified state (name and value) exists in the target part's descriptions.
+ *
+ * @param pc The part collection containing the program.
+ * @param ep The program to check.
+ * @param ef The Eet_File handle for error reporting.
+ */
 static void
 check_program(Edje_Part_Collection *pc, Edje_Program *ep, Eet_File *ef)
 {
@@ -701,11 +928,11 @@ check_program(Edje_Part_Collection *pc, Edje_Program *ep, Eet_File *ef)
    switch (ep->action)
      {
       case EDJE_ACTION_TYPE_STATE_SET:
-      case EDJE_ACTION_TYPE_ACTION_STOP:
+      case EDJE_ACTION_TYPE_ACTION_STOP: // Note: ACTION_STOP might not always have a conventional part target
       case EDJE_ACTION_TYPE_DRAG_VAL_SET:
       case EDJE_ACTION_TYPE_DRAG_VAL_STEP:
       case EDJE_ACTION_TYPE_DRAG_VAL_PAGE:
-        if (!ep->targets)
+        if (!ep->targets) // This check might be too strict for ACTION_STOP if it can target programs/scripts
           error_and_abort(ef, "Collection %i: target missing in program "
                               "\"%s\"", pc->id, ep->name);
         break;
@@ -715,12 +942,12 @@ check_program(Edje_Part_Collection *pc, Edje_Program *ep, Eet_File *ef)
      }
    Edje_Program_Target *et;
    Eina_List *l;
-   unsigned int i = 0;
+   unsigned int i = 0; // Used for iteration within the loop
 
     if ((!ep->targets) && (ep->action == EDJE_ACTION_TYPE_SIGNAL_EMIT))
       {
          if (!pcp->skip_namespace_validation)
-           _program_signal_namespace_verify(pc, ef, ep->state, ep->state2);
+           _program_signal_namespace_verify(pc, ef, ep->state, ep->state2); // state is signal, state2 is source
       }
 
    EINA_LIST_FOREACH(ep->targets, l, et)
@@ -728,9 +955,8 @@ check_program(Edje_Part_Collection *pc, Edje_Program *ep, Eet_File *ef)
         Edje_Part *part;
 
         /*
-         * we are accessing part with an id,
-         * if actions is ACTION_STOP or ACTION_TYPE_SCRIPT, then id is NOT from the parts array.
-         * In order to not crash here, we should continue here.
+         * For ACTION_STOP or SCRIPT, the target ID might refer to another program's ID
+         * or a script ID, not an index into pc->parts.
          */
         if (ep->action == EDJE_ACTION_TYPE_ACTION_STOP || ep->action == EDJE_ACTION_TYPE_SCRIPT)
           continue;
@@ -743,14 +969,17 @@ check_program(Edje_Part_Collection *pc, Edje_Program *ep, Eet_File *ef)
           }
 
         part = pc->parts[et->id];
-        /* verify existence of description in part */
+        /* verify existence of description in part for STATE_SET action */
         if (ep->action == EDJE_ACTION_TYPE_STATE_SET)
           {
+             // "custom" state is a special case, doesn't need to be pre-defined.
+             // "default" 0.0 is also implicitly available.
              if ((!eina_streq(ep->state, "custom")) &&
                ((!eina_streq(ep->state, "default")) || (!EINA_DBL_EQ(ep->value, 0.0))))
                {
                   Edje_Part_Collection_Directory_Entry *de;
                   Eina_Bool found = EINA_FALSE;
+                  // Check against explicitly defined "other" descriptions
                   for (i = 0; i < part->other.desc_count; i++)
                     {
                        Edje_Part_Description_Common *ed = part->other.desc[i];
@@ -771,7 +1000,16 @@ check_program(Edje_Part_Collection *pc, Edje_Program *ep, Eet_File *ef)
      }
 }
 
-/* reset part counters for alias */
+/**
+ * @brief Resets part type counters for an aliased collection directory entry.
+ *
+ * When a collection is aliased, its directory entry in `edje_file->collection`
+ * initially copies the counters from the original collection. This function
+ * zeros out these counters for the alias, as the alias itself doesn't define
+ * new parts but merely points to an existing collection.
+ *
+ * @param ce The Edje_Part_Collection_Directory_Entry of the alias to clean.
+ */
 static void
 _alias_clean(Edje_Part_Collection_Directory_Entry *ce)
 {

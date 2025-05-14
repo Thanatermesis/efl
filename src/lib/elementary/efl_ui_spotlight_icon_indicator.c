@@ -7,14 +7,29 @@
 #include <Elementary.h>
 #include "elm_priv.h"
 
+/**
+ * @internal
+ * @brief Private data structure for the Efl_Ui_Spotlight_Icon_Indicator class.
+ */
 typedef struct {
-   Efl_Ui_Box *indicator;
-   Efl_Ui_Spotlight_Container *container;
-   Efl_Canvas_Layout *layout;
-   double last_position;
-   Eina_Size2D min, max;
+   Efl_Ui_Box *indicator; /**< The box layout holding individual indicator icons. */
+   Efl_Ui_Spotlight_Container *container; /**< The spotlight container this indicator is bound to. */
+   Efl_Canvas_Layout *layout; /**< The layout used to position the indicator within the container. */
+   double last_position; /**< The last known position of the spotlight. */
+   Eina_Size2D min, max; /**< Minimum and maximum size constraints. */
 } Efl_Ui_Spotlight_Icon_Indicator_Data;
 
+/**
+ * @internal
+ * @brief Sends a layout signal message to an indicator item to update its visual state.
+ *
+ * This is typically used to animate the indicator icon based on its proximity
+ * to the active spotlight position.
+ *
+ * @param item The indicator item (an Efl_Canvas_Layout) to update.
+ * @param val The value to send, usually representing the "activeness" or highlight
+ *            state (e.g., 0.0 for inactive, 1.0 for fully active).
+ */
 static void
 _flush_state(Eo *item, double val)
 {
@@ -23,6 +38,16 @@ _flush_state(Eo *item, double val)
     efl_layout_signal_message_send(item, 1, v);
 }
 
+/**
+ * @internal
+ * @brief Adds a new indicator icon to the indicator bar.
+ *
+ * This function is called when a new item is added to the spotlight container,
+ * requiring a corresponding indicator icon.
+ *
+ * @param obj The Efl_Ui_Spotlight_Icon_Indicator object.
+ * @param pd The private data for the Efl_Ui_Spotlight_Icon_Indicator.
+ */
 static void
 _add_item(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Icon_Indicator_Data *pd)
 {
@@ -39,6 +64,18 @@ _add_item(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Icon_Indicator_Data *pd)
    _flush_state(item, 0.0);
 }
 
+/**
+ * @internal
+ * @brief Updates the visual state of all indicator icons based on the current spotlight position.
+ *
+ * This function determines which indicator icons should be highlighted (and to what degree)
+ * based on their proximity to the `pd->last_position`. It typically highlights the
+ * "closest" icon most strongly and potentially adjacent icons to a lesser degree,
+ * creating a smooth visual transition.
+ *
+ * @param obj The Efl_Ui_Spotlight_Icon_Indicator object.
+ * @param pd The private data for the Efl_Ui_Spotlight_Icon_Indicator.
+ */
 static void
 _flush_position(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Icon_Indicator_Data *pd)
 {
@@ -73,12 +110,30 @@ _flush_position(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Icon_Indicator_Data *pd)
      _flush_state(efl_pack_content_get(pd->indicator, next), fabs(1.0f - fabs((next - pd->last_position))));
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when the spotlight container's size changes.
+ *
+ * Updates the size of the indicator's layout to match the container.
+ *
+ * @param data The indicator layout (Efl_Canvas_Layout *).
+ * @param ev The event information.
+ */
 static void
 _resize_cb(void *data, const Efl_Event *ev)
 {
    efl_gfx_entity_size_set(data, efl_gfx_entity_size_get(ev->object));
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when the spotlight container's position changes.
+ *
+ * Updates the position of the indicator's layout to match the container.
+ *
+ * @param data The indicator layout (Efl_Canvas_Layout *).
+ * @param ev The event information.
+ */
 static void
 _position_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -90,6 +145,19 @@ EFL_CALLBACKS_ARRAY_DEFINE(spotlight_resized,
   {EFL_GFX_ENTITY_EVENT_POSITION_CHANGED, _position_cb},
 )
 
+/**
+ * @internal
+ * @brief Binds the icon indicator to a spotlight container.
+ *
+ * This sets up the necessary layouts and indicator icons based on the
+ * items currently in the spotlight container. It also registers for
+ * size and position changes of the container to keep the indicator
+ * synchronized.
+ *
+ * @param obj The Efl_Ui_Spotlight_Icon_Indicator object.
+ * @param pd The private data for the Efl_Ui_Spotlight_Icon_Indicator.
+ * @param spotlight The Efl_Ui_Spotlight_Container to bind to.
+ */
 EOLIAN static void
 _efl_ui_spotlight_icon_indicator_efl_ui_spotlight_indicator_bind(Eo *obj, Efl_Ui_Spotlight_Icon_Indicator_Data *pd, Efl_Ui_Spotlight_Container *spotlight)
 {
@@ -121,6 +189,18 @@ _efl_ui_spotlight_icon_indicator_efl_ui_spotlight_indicator_bind(Eo *obj, Efl_Ui
      }
 }
 
+/**
+ * @internal
+ * @brief Handles the addition of content to the bound spotlight container.
+ *
+ * Adds a corresponding indicator icon and updates the indicator states.
+ * Ensures the indicator layout remains above the newly added content.
+ *
+ * @param obj The Efl_Ui_Spotlight_Icon_Indicator object.
+ * @param pd The private data for the Efl_Ui_Spotlight_Icon_Indicator.
+ * @param subobj The content item that was added to the spotlight container.
+ * @param index The index at which the content was added (unused).
+ */
 EOLIAN static void
 _efl_ui_spotlight_icon_indicator_efl_ui_spotlight_indicator_content_add(Eo *obj, Efl_Ui_Spotlight_Icon_Indicator_Data *pd, Efl_Gfx_Entity *subobj EINA_UNUSED, int index EINA_UNUSED)
 {
@@ -129,6 +209,19 @@ _efl_ui_spotlight_icon_indicator_efl_ui_spotlight_indicator_content_add(Eo *obj,
    efl_gfx_stack_above(pd->layout, subobj);
 }
 
+/**
+ * @internal
+ * @brief Handles the deletion of content from the bound spotlight container.
+ *
+ * Removes the corresponding indicator icon and updates the indicator states.
+ * It currently removes the first indicator icon, assuming a direct mapping
+ * or that the specific index doesn't matter for this indicator type's visual.
+ *
+ * @param obj The Efl_Ui_Spotlight_Icon_Indicator object.
+ * @param pd The private data for the Efl_Ui_Spotlight_Icon_Indicator.
+ * @param subobj The content item that was removed (unused).
+ * @param index The index from which the content was removed (unused).
+ */
 EOLIAN static void
 _efl_ui_spotlight_icon_indicator_efl_ui_spotlight_indicator_content_del(Eo *obj, Efl_Ui_Spotlight_Icon_Indicator_Data *pd, Efl_Gfx_Entity *subobj EINA_UNUSED, int index EINA_UNUSED)
 {
@@ -136,6 +229,16 @@ _efl_ui_spotlight_icon_indicator_efl_ui_spotlight_indicator_content_del(Eo *obj,
    _flush_position(obj, pd);
 }
 
+/**
+ * @internal
+ * @brief Updates the indicator based on a new spotlight position.
+ *
+ * Stores the new position and triggers a refresh of the indicator icon states.
+ *
+ * @param obj The Efl_Ui_Spotlight_Icon_Indicator object.
+ * @param pd The private data for the Efl_Ui_Spotlight_Icon_Indicator.
+ * @param position The new spotlight position (typically a floating-point index).
+ */
 EOLIAN static void
 _efl_ui_spotlight_icon_indicator_efl_ui_spotlight_indicator_position_update(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Icon_Indicator_Data *pd, double position)
 {
@@ -143,6 +246,15 @@ _efl_ui_spotlight_icon_indicator_efl_ui_spotlight_indicator_position_update(Eo *
    _flush_position(obj, pd);
 }
 
+/**
+ * @internal
+ * @brief Cleans up resources when the icon indicator is destroyed.
+ *
+ * Deletes the indicator layout and the indicator box itself.
+ *
+ * @param obj The Efl_Ui_Spotlight_Icon_Indicator object being destroyed.
+ * @param pd The private data for the Efl_Ui_Spotlight_Icon_Indicator.
+ */
 EOLIAN static void
 _efl_ui_spotlight_icon_indicator_efl_object_destructor(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Icon_Indicator_Data *pd)
 {

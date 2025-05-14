@@ -2,6 +2,13 @@
 
 #include "docs.h"
 
+/**
+ * @internal
+ * @brief Appends a given number of spaces to a string buffer for indentation.
+ * @param[in] buf The string buffer to append to.
+ * @param[in] ind The number of spaces to indent.
+ * @return The number of spaces appended.
+ */
 static int
 _indent_line(Eina_Strbuf *buf, int ind)
 {
@@ -20,6 +27,22 @@ _indent_line(Eina_Strbuf *buf, int ind)
 
 #define SUMMARY_OR_DEFAULT(sum) (sum ? sum : "No description supplied.")
 
+/**
+ * @internal
+ * @brief Generates a C-style reference for a given Eolian reference name.
+ *
+ * This function resolves an Eolian reference name (e.g., "My.Class.method")
+ * into its corresponding C representation. It handles various Eolian object
+ * types like constants, struct fields, enum fields, methods, and properties.
+ * The resolved name is appended to the provided string buffer.
+ *
+ * If the reference cannot be resolved, the original reference name is appended
+ * as a fallback.
+ *
+ * @param[in] state The Eolian state.
+ * @param[in] refn The Eolian reference name to resolve.
+ * @param[in,out] wbuf The string buffer to append the resolved C name to.
+ */
 static void
 _generate_ref(const Eolian_State *state, const char *refn, Eina_Strbuf *wbuf)
 {
@@ -116,6 +139,32 @@ noref:
    eina_strbuf_append(wbuf, refn);
 }
 
+/**
+ * @internal
+ * @brief Appends a formatted documentation section to a buffer.
+ *
+ * This function processes a block of documentation text (`desc`), handling
+ * word wrapping, indentation, and special formatting tags. The formatted text
+ * is appended to `buf`.
+ *
+ * It supports the following special syntax in the input text:
+ * - `Note:`, `Warning:`, `Remark:`, `TODO:`: These are converted to
+ *   `@note`, `@warning`, `@remark`, `@todo` Doxygen commands.
+ * - `\\@`, `\\$`: Escapes for '@' and '$' characters.
+ * - `@ref.name`: Converted to `@ref C_style_name`. The name is resolved
+ *   using _generate_ref().
+ * - `$[...text...]`: Formats `text` with a fixed-width font, using `<tt>`.
+ * - `$name`: Converted to `@c name`.
+ * - Newlines are preserved and formatted correctly within the C-style comment.
+ *
+ * @param[in] state The Eolian state, used for resolving references.
+ * @param[in] desc The description text to append.
+ * @param[in] ind The base indentation level (number of spaces).
+ * @param[in] curl The current line length.
+ * @param[in,out] buf The main string buffer for the final documentation comment.
+ * @param[in,out] wbuf A temporary working buffer for word processing.
+ * @return The updated current line length.
+ */
 static int
 _append_section(const Eolian_State *state, const char *desc, int ind, int curl,
                 Eina_Strbuf *buf, Eina_Strbuf *wbuf)
@@ -258,6 +307,16 @@ split:
    return curl;
 }
 
+/**
+ * @internal
+ * @brief Appends a "@since" version tag to the documentation if available.
+ *
+ * @param[in] since The version string (e.g., "1.2.3"). Can be NULL.
+ * @param[in] indent The indentation level.
+ * @param[in] curl The current line length.
+ * @param[in,out] buf The string buffer to append to.
+ * @return The updated current line length.
+ */
 static int
 _append_since(const char *since, int indent, int curl, Eina_Strbuf *buf)
 {
@@ -274,6 +333,19 @@ _append_since(const char *since, int indent, int curl, Eina_Strbuf *buf)
    return curl;
 }
 
+/**
+ * @internal
+ * @brief Appends an extra line of text to the documentation.
+ *
+ * Used for adding things like `@return` documentation for events.
+ *
+ * @param[in] el The extra text to append. Can be NULL.
+ * @param[in] indent The indentation level.
+ * @param[in] curl The current line length.
+ * @param[in] nl If EINA_TRUE, adds a blank " *" line before the text.
+ * @param[in,out] buf The string buffer to append to.
+ * @return The updated current line length.
+ */
 static int
 _append_extra(const char *el, int indent, int curl, Eina_Bool nl, Eina_Strbuf *buf)
 {
@@ -293,6 +365,17 @@ _append_extra(const char *el, int indent, int curl, Eina_Bool nl, Eina_Strbuf *b
    return curl;
 }
 
+/**
+ * @internal
+ * @brief Sanitizes a group name by replacing dots with underscores.
+ *
+ * This is done to make the group name a valid C identifier for use
+ * with `@ingroup`.
+ *
+ * @param[in] group The group name string.
+ * @return A newly allocated sanitized string, or NULL if input is NULL.
+ *         The caller is responsible for freeing the returned string.
+ */
 static char *
 _sanitize_group(const char *group)
 {
@@ -303,6 +386,14 @@ _sanitize_group(const char *group)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Appends an "@ingroup" tag to the documentation.
+ *
+ * @param[in,out] buf The string buffer to append to.
+ * @param[in] sgrp The sanitized group name. The string is freed by this function.
+ * @param[in] indent The indentation level.
+ */
 static void
 _append_group(Eina_Strbuf *buf, char *sgrp, int indent)
 {
@@ -314,6 +405,21 @@ _append_group(Eina_Strbuf *buf, char *sgrp, int indent)
    free(sgrp);
 }
 
+/**
+ * @internal
+ * @brief Generates a brief, single-line style documentation comment.
+ *
+ * This is used when an Eolian element has only a summary and no detailed
+ * description. The output is formatted like `/**< summary text * /`.
+ *
+ * @param[in] state The Eolian state.
+ * @param[in] summary The summary text.
+ * @param[in] since The "since" version string.
+ * @param[in] group The documentation group.
+ * @param[in] el Extra text to append (e.g., return value info).
+ * @param[in] indent The base indentation level.
+ * @param[in,out] buf The string buffer to write the documentation to.
+ */
 static void
 _gen_doc_brief(const Eolian_State *state, const char *summary, const char *since,
                const char *group, const char *el, int indent, Eina_Strbuf *buf)
@@ -344,6 +450,22 @@ _gen_doc_brief(const Eolian_State *state, const char *summary, const char *since
    eina_strbuf_append(buf, " */");
 }
 
+/**
+ * @internal
+ * @brief Generates a full, multi-line documentation comment.
+ *
+ * This is used when an Eolian element has both a summary and a detailed
+ * description. The output is a standard Doxygen block with `@brief`.
+ *
+ * @param[in] state The Eolian state.
+ * @param[in] summary The summary text.
+ * @param[in] description The detailed description text.
+ * @param[in] since The "since" version string.
+ * @param[in] group The documentation group.
+ * @param[in] el Extra text to append (e.g., return value info).
+ * @param[in] indent The base indentation level.
+ * @param[in,out] buf The string buffer to write the documentation to.
+ */
 static void
 _gen_doc_full(const Eolian_State *state, const char *summary,
               const char *description, const char *since,
@@ -380,6 +502,23 @@ _gen_doc_full(const Eolian_State *state, const char *summary,
    eina_strbuf_free(wbuf);
 }
 
+/**
+ * @internal
+ * @brief Top-level helper for generating a documentation comment string buffer.
+ *
+ * This function inspects the provided Eolian documentation. If a detailed
+ * description exists, it calls _gen_doc_full() to generate a full
+ * documentation block. Otherwise, it calls _gen_doc_brief() for a compact
+ * comment.
+ *
+ * @param[in] state The Eolian state.
+ * @param[in] doc The Eolian documentation object.
+ * @param[in] group The documentation group.
+ * @param[in] el Extra text to append.
+ * @param[in] indent The base indentation level.
+ * @return A new Eina_Strbuf containing the generated documentation comment,
+ *         or NULL if `doc` is NULL. The caller owns the returned buffer.
+ */
 static Eina_Strbuf *
 _gen_doc_buf(const Eolian_State *state, const Eolian_Documentation *doc,
              const char *group, const char *el, int indent)
@@ -399,6 +538,16 @@ _gen_doc_buf(const Eolian_State *state, const Eolian_Documentation *doc,
    return buf;
 }
 
+/**
+ * @internal
+ * @brief Implements the public API function eo_gen_docs_full_gen.
+ *
+ * This function is a simple wrapper around _gen_doc_buf, providing the
+ * public interface for generating documentation from an Eolian_Documentation
+ * object. It passes NULL for the extra line parameter.
+ *
+ * @see eo_gen_docs_full_gen in docs.h
+ */
 Eina_Strbuf *
 eo_gen_docs_full_gen(const Eolian_State *state, const Eolian_Documentation *doc,
                      const char *group, int indent)
@@ -406,6 +555,19 @@ eo_gen_docs_full_gen(const Eolian_State *state, const Eolian_Documentation *doc,
    return _gen_doc_buf(state, doc, group, NULL, indent);
 }
 
+/**
+ * @internal
+ * @brief Implements the public API function eo_gen_docs_event_gen.
+ *
+ * This function generates documentation for an Eolian event. It extracts the
+ * summary, description, and "since" information. It also constructs a
+ * `@return` annotation from the event's type if it has one.
+ * If no formal documentation is available for the event, a default
+ * comment block is generated. Otherwise, it uses _gen_doc_buf to create
+ * the full documentation.
+ *
+ * @see eo_gen_docs_event_gen in docs.h
+ */
 Eina_Strbuf *
 eo_gen_docs_event_gen(const Eolian_State *state, const Eolian_Event *ev,
                       const char *group)
@@ -442,6 +604,30 @@ eo_gen_docs_event_gen(const Eolian_State *state, const Eolian_Event *ev,
    return _gen_doc_buf(state, doc, group, p, 0);
 }
 
+/**
+ * @internal
+ * @brief Implements the public API function eo_gen_docs_func_gen.
+ *
+ * This is a complex documentation generator for functions (methods, properties).
+ * It orchestrates the collection of documentation from various Eolian objects
+ * associated with a function, such as:
+ * - The main implement documentation (for methods or properties).
+ * - Specific documentation for property getters/setters.
+ * - Return value documentation.
+ * - Parameter documentation.
+ *
+ * A key part of its logic is to correctly identify and iterate over parameters,
+ * which can be keys or values for properties. It also handles a special case for
+ * property getters where a single value parameter is treated as the return value
+ * if no explicit return type is defined.
+ *
+ * The function builds a complete Doxygen comment block, including brief summary,
+ * detailed description, parameter list, return value, "since" version, and group.
+ * If only a summary is present, it generates a compact, single-line comment;
+ * otherwise, it creates a full multi-line block.
+ *
+ * @see eo_gen_docs_func_gen in docs.h
+ */
 Eina_Strbuf *
 eo_gen_docs_func_gen(const Eolian_State *state, const Eolian_Function *fid,
                      Eolian_Function_Type ftype, int indent)

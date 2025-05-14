@@ -4,6 +4,10 @@
 #ifndef _ELM_VIEW_FORM_EO_CLASS_TYPE
 #define _ELM_VIEW_FORM_EO_CLASS_TYPE
 
+/**
+ * @brief Opaque handle for Elm_View_Form instances.
+ * @ingroup Elm_View_Form
+ */
 typedef Eo Elm_View_Form;
 
 #endif

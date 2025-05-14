@@ -1,3 +1,12 @@
+/**
+ * @file
+ * @brief Evas image cache internal implementation.
+ *
+ * This file contains the core logic for managing Evas image caches,
+ * including image loading, unloading, LRU (Least Recently Used) eviction,
+ * and preloading mechanisms.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -13,17 +22,31 @@
 
 //#define CACHEDUMP 1
 
-typedef struct _Evas_Cache_Preload Evas_Cache_Preload;
+typedef struct _Evas_Cache_Preload Evas_Cache_Preload; /**< Forward declaration for Evas_Cache_Preload */
 
+/**
+ * @struct _Evas_Cache_Preload
+ * @brief Structure to manage image preloading requests.
+ *
+ * This structure holds an image entry that is currently being preloaded
+ * or is scheduled for preloading. It's part of an EINA_INLIST to
+ * manage a list of such entries.
+ */
 struct _Evas_Cache_Preload
 {
-   EINA_INLIST;
-   Image_Entry *ie;
+   EINA_INLIST;      /**< Macro to make this struct usable with Eina_Inlist */
+   Image_Entry *ie;  /**< Pointer to the image entry being preloaded */
 };
 
 static SLK(engine_lock);
-static int _evas_cache_mutex_init = 0;
+static int _evas_cache_mutex_init = 0; /**< Counter for initializing the engine lock mutex. */
 
+/**
+ * @brief Removes an image entry from the preload list.
+ * @param ie The image entry to remove from preloading.
+ * @param target The specific Evas object target whose preload request is being removed. Can be NULL to remove all targets.
+ * @param force If EINA_TRUE, forcefully cancels the preload operation.
+ */
 static void _evas_cache_image_entry_preload_remove(Image_Entry *ie, const Eo *target, Eina_Bool force);
 
 #define FREESTRC(Var)             \
@@ -33,13 +56,59 @@ static void _evas_cache_image_entry_preload_remove(Image_Entry *ie, const Eo *ta
    Var = NULL;                 \
 }
 
+/**
+ * @brief Adds an image entry to the dirty list.
+ * Dirty images are typically those that have been modified or are
+ * marked for deletion due to inconsistencies (e.g., file changed on disk).
+ * @param im The image entry to add to the dirty list.
+ */
 static void _evas_cache_image_dirty_add(Image_Entry *im);
+
+/**
+ * @brief Removes an image entry from the dirty list.
+ * @param im The image entry to remove from the dirty list.
+ */
 static void _evas_cache_image_dirty_del(Image_Entry *im);
+
+/**
+ * @brief Adds an image entry to the active list.
+ * Active images are those currently in use or recently accessed.
+ * @param im The image entry to add to the active list.
+ */
 static void _evas_cache_image_activ_add(Image_Entry *im);
+
+/**
+ * @brief Removes an image entry from the active list.
+ * @param im The image entry to remove from the active list.
+ */
 static void _evas_cache_image_activ_del(Image_Entry *im);
+
+/**
+ * @brief Adds an image entry to the LRU (Least Recently Used) list.
+ * Images in this list are candidates for eviction when cache limits are reached.
+ * These images have their pixel data loaded.
+ * @param im The image entry to add to the LRU list.
+ */
 static void _evas_cache_image_lru_add(Image_Entry *im);
+
+/**
+ * @brief Removes an image entry from the LRU list.
+ * @param im The image entry to remove from the LRU list.
+ */
 static void _evas_cache_image_lru_del(Image_Entry *im);
+
+/**
+ * @brief Adds an image entry to the LRU "no data" list.
+ * These are images whose metadata is cached, but pixel data is not currently loaded.
+ * They are also candidates for eviction.
+ * @param im The image entry to add to the LRU "no data" list.
+ */
 static void _evas_cache_image_lru_nodata_add(Image_Entry *im);
+
+/**
+ * @brief Removes an image entry from the LRU "no data" list.
+ * @param im The image entry to remove from the LRU "no data" list.
+ */
 static void _evas_cache_image_lru_nodata_del(Image_Entry *im);
 
 static void
@@ -159,6 +228,14 @@ _evas_cache_image_lru_nodata_del(Image_Entry *im)
    im->cache->lru_nodata = eina_inlist_remove(im->cache->lru_nodata, EINA_INLIST_GET(im));
 }
 
+/**
+ * @brief Deletes an image entry from the cache.
+ * This function handles the complete removal of an image entry, including
+ * freeing associated resources, removing it from various cache lists,
+ * and calling appropriate destructors.
+ * @param cache The image cache instance.
+ * @param ie The image entry to delete.
+ */
 static void
 _evas_cache_image_entry_delete(Evas_Cache_Image *cache, Image_Entry *ie)
 {
@@ -194,6 +271,13 @@ _evas_cache_image_entry_delete(Evas_Cache_Image *cache, Image_Entry *ie)
    if ((cache) && (cache->func.dealloc)) cache->func.dealloc(ie);
 }
 
+/**
+ * @brief Compares an Image_Timestamp with stat information.
+ * This is used to check if a cached image file has been modified on disk.
+ * @param tstamp Pointer to the Image_Timestamp structure of the cached image.
+ * @param st Pointer to the struct stat containing file system information of the image file.
+ * @return EINA_TRUE if timestamps and other relevant stat info match, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _timestamp_compare(Image_Timestamp *tstamp, struct stat *st)
 {
@@ -207,6 +291,11 @@ _timestamp_compare(Image_Timestamp *tstamp, struct stat *st)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Populates an Image_Timestamp structure from stat information.
+ * @param tstamp Pointer to the Image_Timestamp structure to populate.
+ * @param st Pointer to the struct stat containing file system information.
+ */
 static void
 _timestamp_build(Image_Timestamp *tstamp, struct stat *st)
 {
@@ -218,6 +307,27 @@ _timestamp_build(Image_Timestamp *tstamp, struct stat *st)
 #endif
 }
 
+/**
+ * @brief Creates a new image cache entry.
+ * This function allocates and initializes a new Image_Entry structure.
+ * It sets up basic properties, file/key information, and load options.
+ * The new entry is added to the active or dirty list depending on whether
+ * a cache key is provided.
+ *
+ * @param cache The image cache instance.
+ * @param hkey The hash key for the image entry. If NULL, the entry is considered "dirty" initially.
+ * @param tstamp The timestamp information for the image file. Can be NULL.
+ * @param f An Eina_File handle if the image is from an mmap'd source. Can be NULL.
+ * @param file The file path of the image. Can be NULL if @p f is provided.
+ * @param key An optional sub-key for the image within the file (e.g., for image collections). Can be NULL.
+ * @param lo Pointer to the image loading options. Can be NULL for default options.
+ * @param error Pointer to an integer to store the error code if creation fails.
+ * @return A pointer to the newly created Image_Entry, or NULL on failure.
+ *         Possible error codes in @p error:
+ *         - EVAS_LOAD_ERROR_GENERIC
+ *         - EVAS_LOAD_ERROR_RESOURCE_ALLOCATION_FAILED
+ *         - Errors from cache->func.constructor
+ */
 static Image_Entry *
 _evas_cache_image_entry_new(Evas_Cache_Image *cache,
                             const char *hkey,
@@ -279,6 +389,17 @@ _evas_cache_image_entry_new(Evas_Cache_Image *cache,
    return ie;
 }
 
+/**
+ * @brief Allocates surface memory for an image entry (internal, lock-held version).
+ * This function is called with the engine_lock held. It ensures that
+ * surface memory is allocated or reallocated for the image entry if the
+ * requested dimensions differ from the currently allocated ones.
+ *
+ * @param cache The image cache instance.
+ * @param ie The image entry for which to allocate surface memory.
+ * @param wmin The minimum width required for the surface.
+ * @param hmin The minimum height required for the surface.
+ */
 static void
 _evas_cache_image_entry_surface_alloc__locked(Evas_Cache_Image *cache,
                                               Image_Entry *ie,
@@ -295,6 +416,17 @@ _evas_cache_image_entry_surface_alloc__locked(Evas_Cache_Image *cache,
    ie->h = hmin;
 }
 
+/**
+ * @brief Allocates surface memory for an image entry.
+ * This function acquires the engine_lock and then calls the internal
+ * _evas_cache_image_entry_surface_alloc__locked function.
+ * It ensures that width and height are at least 1.
+ *
+ * @param cache The image cache instance.
+ * @param ie The image entry for which to allocate surface memory.
+ * @param w The desired width for the surface.
+ * @param h The desired height for the surface.
+ */
 static void
 _evas_cache_image_entry_surface_alloc(Evas_Cache_Image *cache,
                                       Image_Entry *ie, int w, int h)
@@ -306,6 +438,13 @@ _evas_cache_image_entry_surface_alloc(Evas_Cache_Image *cache,
    SLKU(engine_lock);
 }
 
+/**
+ * @brief Checks if an image loading operation has been cancelled.
+ * This function is typically used as a callback for asynchronous tasks
+ * to determine if they should abort.
+ * @param data A pointer to the Image_Entry being loaded.
+ * @return EINA_TRUE if the preload operation for the image is cancelled, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 evas_cache_image_cancelled(void *data)
 {
@@ -318,6 +457,13 @@ evas_cache_image_cancelled(void *data)
    return ret;
 }
 
+/**
+ * @brief Performs the heavy lifting of asynchronous image loading.
+ * This function is executed in a separate thread to load image data
+ * without blocking the main thread. It handles the actual loading
+ * via the cache's load function and manages cancellation flags.
+ * @param data A pointer to the Image_Entry to be loaded.
+ */
 static void
 _evas_cache_image_async_heavy(void *data)
 {
@@ -367,6 +513,12 @@ _evas_cache_image_async_heavy(void *data)
    SLKU(current->lock);
 }
 
+/**
+ * @brief Notifies all targets that an image has been preloaded.
+ * Iterates through the list of targets associated with an image entry
+ * and invokes their respective preloaded callbacks and informs Evas objects.
+ * @param ie The image entry that has finished preloading.
+ */
 static void
 _evas_cache_image_preloaded_notify(Image_Entry *ie)
 {
@@ -387,6 +539,13 @@ _evas_cache_image_preloaded_notify(Image_Entry *ie)
      }
 }
 
+/**
+ * @brief Handles the completion of an asynchronous image load.
+ * This function is called when the asynchronous loading (heavy part)
+ * is finished. It updates the image entry's state, removes it from
+ * preload/pending lists, and notifies targets.
+ * @param data A pointer to the Image_Entry that has been loaded.
+ */
 static void
 _evas_cache_image_async_end(void *data)
 {
@@ -406,6 +565,14 @@ _evas_cache_image_async_end(void *data)
    evas_cache_image_drop(ie);
 }
 
+/**
+ * @brief Handles the cancellation of an asynchronous image load.
+ * This function is called when an asynchronous loading operation
+ * is cancelled. It updates the image entry's state, removes it from
+ * pending lists, and potentially moves it to the LRU list or
+ * notifies targets if the image was already partially loaded.
+ * @param data A pointer to the Image_Entry whose loading is cancelled.
+ */
 static void
 _evas_cache_image_async_cancel(void *data)
 {
@@ -454,8 +621,20 @@ _evas_cache_image_async_cancel(void *data)
    if (cache) evas_cache_image_flush(cache);
 }
 
-// note - preload_add assumes a target is ONLY added ONCE to the image
-// entry. make sure you only add once, or remove first, then add
+/**
+ * @brief Adds a target to an image entry for preloading.
+ * If the image is not already being preloaded, this function initiates
+ * the asynchronous preloading process.
+ * @note A target should only be added once to an image entry.
+ *       If re-adding, ensure it's removed first.
+ *
+ * @param ie The image entry to preload.
+ * @param target The Evas object (Eo) that requests the preload.
+ * @param preloaded_cb Optional callback function to be invoked when preloading is complete for this target.
+ * @param preloaded_data Optional data to be passed to @p preloaded_cb.
+ * @return 1 if the target was successfully added for preloading (or preloading initiated),
+ *         0 if preloading is already done or an error occurred (e.g., memory allocation failed).
+ */
 static int
 _evas_cache_image_entry_preload_add(Image_Entry *ie, const Eo *target, void (*preloaded_cb)(void *), void *preloaded_data)
 {
@@ -496,8 +675,22 @@ _evas_cache_image_entry_preload_add(Image_Entry *ie, const Eo *target, void (*pr
    return 1;
 }
 
-/* force: remove preload forcely. If one object cancel preload and draw image direcltly,
- * all other targets of that preload will be affected this as well. */
+/**
+ * @brief Removes a preload request for an image entry, optionally for a specific target.
+ * If @p force is true, or if removing the target results in no more targets for the image,
+ * the asynchronous preload operation is cancelled.
+ *
+ * @param ie The image entry.
+ * @param target The specific Evas object (Eo) target whose preload request is to be removed.
+ *               If NULL, all targets are effectively cleared (though the loop structure implies
+ *               it's more about finding a specific NULL target, which is unlikely, or handling
+ *               a general cleanup if `force` is true and `target` is NULL).
+ *               The primary use seems to be with a non-NULL target to mark its specific
+ *               preload_cancel flag, or with NULL and `force` to cancel everything.
+ * @param force If EINA_TRUE, the preload operation is forcefully cancelled if no targets remain
+ *              or if this flag itself dictates a forceful stop. This can affect other targets
+ *              if one object cancels and decides to draw the image directly.
+ */
 static void
 _evas_cache_image_entry_preload_remove(Image_Entry *ie, const Eo *target, Eina_Bool force)
 {
@@ -538,6 +731,12 @@ _evas_cache_image_entry_preload_remove(Image_Entry *ie, const Eo *target, Eina_B
 //   evas_cache_image_drop(ie);
 }
 
+/**
+ * @brief Gets the current memory usage of the image cache.
+ * @param cache The image cache instance.
+ * @return The total memory currently used by images in the cache, in bytes.
+ *         Returns 0 if @p cache is NULL.
+ */
 EVAS_API int
 evas_cache_image_usage_get(Evas_Cache_Image *cache)
 {
@@ -545,6 +744,13 @@ evas_cache_image_usage_get(Evas_Cache_Image *cache)
    return cache->usage;
 }
 
+/**
+ * @brief Gets the memory limit of the image cache.
+ * @param cache The image cache instance.
+ * @return The maximum memory limit for the cache, in bytes.
+ *         Returns 0 if @p cache is NULL (though the function returns cache->limit,
+ *         so if cache is NULL, it would dereference NULL. The check prevents this).
+ */
 EVAS_API int
 evas_cache_image_get(Evas_Cache_Image *cache)
 {
@@ -552,6 +758,13 @@ evas_cache_image_get(Evas_Cache_Image *cache)
    return cache->limit;
 }
 
+/**
+ * @brief Sets the memory limit for the image cache.
+ * If the new limit is different from the current one, the cache is flushed
+ * to try to meet the new limit by evicting images if necessary.
+ * @param cache The image cache instance.
+ * @param limit The new maximum memory limit for the cache, in bytes.
+ */
 EVAS_API void
 evas_cache_image_set(Evas_Cache_Image *cache, unsigned int limit)
 {
@@ -564,6 +777,14 @@ evas_cache_image_set(Evas_Cache_Image *cache, unsigned int limit)
    evas_cache_image_flush(cache);
 }
 
+/**
+ * @brief Initializes a new image cache.
+ * Sets up the cache structure, including hash tables for active and inactive
+ * images, and initializes the engine lock if it's the first cache being created.
+ * @param cb A pointer to an Evas_Cache_Image_Func structure containing callback
+ *           functions for cache operations (allocation, deallocation, loading, etc.).
+ * @return A pointer to the newly initialized Evas_Cache_Image instance, or NULL on failure.
+ */
 EVAS_API Evas_Cache_Image *
 evas_cache_image_init(const Evas_Cache_Image_Func *cb)
 {
@@ -585,6 +806,15 @@ evas_cache_image_init(const Evas_Cache_Image_Func *cb)
    return cache;
 }
 
+/**
+ * @brief Callback function used with eina_hash_foreach to collect image entries for deletion.
+ * This function is used during cache shutdown to gather all active image entries.
+ * @param hash The hash table being iterated. (Unused)
+ * @param key The key of the hash entry. (Unused)
+ * @param data The data (Image_Entry pointer) associated with the hash entry.
+ * @param fdata A pointer to an Eina_List pointer (Eina_List **), where the image entry will be prepended.
+ * @return EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 _evas_cache_image_free_cb(EINA_UNUSED const Eina_Hash *hash, EINA_UNUSED const void *key, void *data, void *fdata)
 {
@@ -593,6 +823,14 @@ _evas_cache_image_free_cb(EINA_UNUSED const Eina_Hash *hash, EINA_UNUSED const v
    return EINA_TRUE;
 }
 
+/**
+ * @brief Shuts down an image cache and frees all associated resources.
+ * This function handles the graceful shutdown of the cache. It cancels ongoing
+ * preloads, deletes all image entries (LRU, dirty, active), waits for pending
+ * operations to complete, and frees cache-internal structures.
+ * The engine lock is deinitialized if this is the last cache being shut down.
+ * @param cache The image cache instance to shut down.
+ */
 EVAS_API void
 evas_cache_image_shutdown(Evas_Cache_Image *cache)
 {
@@ -684,6 +922,29 @@ static const Evas_Image_Load_Opts prevent = {
    EINA_FALSE
 };
 
+/**
+ * @brief Appends image loading options to a hash key string.
+ * This function serializes the Evas_Image_Load_Opts structure into a string format
+ * suitable for use as part of a cache key. This ensures that images loaded with
+ * different options (e.g., scaling, DPI, region) are cached separately.
+ * If the provided load options are all default/zero, a default "prevent"
+ * set of options is used.
+ *
+ * @param hkey The character buffer where the serialized load options will be appended.
+ *             It must be large enough to hold the appended string.
+ * @param plo A pointer to a pointer to Evas_Image_Load_Opts.
+ *            If the options are default, *plo might be updated to point to a static 'prevent' options set.
+ * @return The number of bytes written to @p hkey (excluding the null terminator).
+ *
+ * Example of hkey format after appending options:
+ * `original_key_part//@/<scale_down_by>/<dpi>/<w>x<h>/<region_x>+<region_y>.<region_w>x<region_h>[/o]`
+ * - `//@/`: Separator
+ * - `<scale_down_by>`: Integer scale down factor.
+ * - `<dpi>`: Double DPI value.
+ * - `<w>x<h>`: Target load width and height.
+ * - `<region_x>+<region_y>.<region_w>x<region_h>`: Load region.
+ * - `[/o]`: Optional, present if orientation is specified.
+ */
 static size_t
 _evas_cache_image_loadopts_append(char *hkey, Evas_Image_Load_Opts **plo)
 {
@@ -741,6 +1002,23 @@ _evas_cache_image_loadopts_append(char *hkey, Evas_Image_Load_Opts **plo)
    return offset;
 }
 
+/**
+ * @brief Requests an image entry from the cache for a memory-mapped file.
+ * This function attempts to find an existing cache entry for the given mmap'd file,
+ * key, and load options. If not found, a new entry is created.
+ * The cache key is generated based on the Eina_File pointer, the string key, and load options.
+ *
+ * @param cache The image cache instance.
+ * @param f The Eina_File handle for the memory-mapped image. Must not be NULL.
+ * @param key An optional sub-key for the image within the file. Can be NULL.
+ * @param lo Pointer to the image loading options.
+ * @param error Pointer to an integer to store the error code on failure.
+ * @return A pointer to the Image_Entry. The reference count of the entry is incremented.
+ *         Returns NULL on error, with @p error set to an EVAS_LOAD_ERROR_* code.
+ *         Possible error codes:
+ *         - EVAS_LOAD_ERROR_GENERIC (if @p f is NULL)
+ *         - Errors from _evas_cache_image_entry_new()
+ */
 EVAS_API Image_Entry *
 evas_cache_image_mmap_request(Evas_Cache_Image *cache,
                               Eina_File *f, const char *key,
@@ -839,7 +1117,27 @@ evas_cache_image_mmap_request(Evas_Cache_Image *cache,
    return im;
 }
 
-
+/**
+ * @brief Requests an image entry from the cache for a file path.
+ * This function attempts to find an existing cache entry for the given file path,
+ * key, and load options. It checks file timestamps to ensure cache validity.
+ * If a valid entry is not found, a new one is created.
+ * The cache key is generated based on the file path, string key, and load options.
+ *
+ * @param cache The image cache instance.
+ * @param file The path to the image file. Must not be NULL.
+ * @param key An optional sub-key for the image within the file. Can be NULL.
+ * @param lo Pointer to the image loading options.
+ * @param error Pointer to an integer to store the error code on failure.
+ * @return A pointer to the Image_Entry. The reference count of the entry is incremented.
+ *         Returns NULL on error, with @p error set to an EVAS_LOAD_ERROR_* code.
+ *         Possible error codes:
+ *         - EVAS_LOAD_ERROR_GENERIC (if @p file is NULL)
+ *         - EVAS_LOAD_ERROR_DOES_NOT_EXIST
+ *         - EVAS_LOAD_ERROR_RESOURCE_ALLOCATION_FAILED
+ *         - EVAS_LOAD_ERROR_PERMISSION_DENIED
+ *         - Errors from _evas_cache_image_entry_new()
+ */
 EVAS_API Image_Entry *
 evas_cache_image_request(Evas_Cache_Image *cache, const char *file,
                          const char *key, Evas_Image_Load_Opts *lo, int *error)
@@ -990,6 +1288,10 @@ on_stat_error:
    return NULL;
 }
 
+/**
+ * @brief Increments the reference count of an image cache entry.
+ * @param im The image entry to reference.
+ */
 EVAS_API void
 evas_cache_image_ref(Image_Entry *im)
 {
@@ -998,6 +1300,12 @@ evas_cache_image_ref(Image_Entry *im)
    SLKU(engine_lock);
 }
 
+/**
+ * @brief Decrements the reference count of an image cache entry.
+ * If the reference count drops to zero, the image entry may be moved to
+ * the LRU list, deleted (if dirty or load failed), or have its preload cancelled.
+ * @param im The image entry to dereference.
+ */
 EVAS_API void
 evas_cache_image_drop(Image_Entry *im)
 {
@@ -1039,6 +1347,13 @@ evas_cache_image_drop(Image_Entry *im)
      }
 }
 
+/**
+ * @brief Marks an image entry's pixel data as not immediately needed.
+ * If the image has only one reference and is not dirty, it's moved to the
+ * "LRU no data" list. This suggests that its pixel data can be unloaded
+ * to save memory, while keeping its metadata cached.
+ * @param im The image entry.
+ */
 EVAS_API void
 evas_cache_image_data_not_needed(Image_Entry *im)
 {
@@ -1052,6 +1367,23 @@ evas_cache_image_data_not_needed(Image_Entry *im)
    SLKU(engine_lock);
 }
 
+/**
+ * @brief Marks an image entry as dirty, optionally specifying a region.
+ * If the image has multiple references, a copy of the image data is made,
+ * and this new copy is marked dirty. The original image entry's reference
+ * count is decremented. The new (or original, if single-referenced) entry
+ * is moved to the dirty list.
+ *
+ * @param im The image entry to mark as dirty.
+ * @param x The x-coordinate of the dirty region.
+ * @param y The y-coordinate of the dirty region.
+ * @param w The width of the dirty region.
+ * @param h The height of the dirty region.
+ * @return A pointer to the (potentially new) dirty Image_Entry.
+ *         The caller receives a new reference to this entry, and the reference
+ *         to the original @p im is dropped by this function.
+ *         Returns NULL on error (e.g., if copying data fails).
+ */
 EVAS_API Image_Entry *
 evas_cache_image_dirty(Image_Entry *im, unsigned int x, unsigned int y, unsigned int w, unsigned int h)
 {
@@ -1091,6 +1423,18 @@ on_error:
    return NULL;
 }
 
+/**
+ * @brief Ensures an image entry is "alone" (i.e., uniquely referenced and mutable).
+ * If the image entry has more than one reference, a copy of its data is created
+ * to ensure modifications do not affect other users of the original shared data.
+ * The resulting image entry (either the original or the new copy) is marked dirty.
+ *
+ * @param im The image entry to make "alone".
+ * @return A pointer to the "alone" Image_Entry (which might be a new entry if a copy was made).
+ *         The caller receives a new reference to this entry, and the reference
+ *         to the original @p im is dropped by this function.
+ *         Returns NULL on error (e.g., if copying data fails).
+ */
 EVAS_API Image_Entry *
 evas_cache_image_alone(Image_Entry *im)
 {
@@ -1128,6 +1472,20 @@ on_error:
    return NULL;
 }
 
+/**
+ * @brief Creates a new image cache entry from copied pixel data.
+ * A new, "dirty" image entry is created, and the provided pixel data is copied into it.
+ * The new entry is not associated with any file or key initially.
+ *
+ * @param cache The image cache instance.
+ * @param w The width of the image data.
+ * @param h The height of the image data.
+ * @param image_data Pointer to the pixel data to copy.
+ * @param alpha Flag indicating if the image data has an alpha channel.
+ * @param cspace The colorspace of the image data.
+ * @return A pointer to the newly created Image_Entry with a reference count of 1.
+ *         Returns NULL on failure (e.g., allocation error, data copy error).
+ */
 EVAS_API Image_Entry *
 evas_cache_image_copied_data(Evas_Cache_Image *cache,
                              unsigned int w, unsigned int h,
@@ -1163,6 +1521,24 @@ evas_cache_image_copied_data(Evas_Cache_Image *cache,
    return im;
 }
 
+/**
+ * @brief Creates a new image cache entry that directly uses provided pixel data (no copy).
+ * A new, "dirty" image entry is created, and it is configured to use the
+ * @p image_data pointer directly (the data is not copied by this function,
+ * but the underlying engine's `data` callback might copy it).
+ * The new entry is not associated with any file or key initially.
+ *
+ * @param cache The image cache instance.
+ * @param w The width of the image.
+ * @param h The height of the image.
+ * @param image_data Pointer to the pixel data. The lifetime of this data must be
+ *                   managed appropriately by the caller, or the engine's `data`
+ *                   callback must handle it (e.g. by copying).
+ * @param alpha Flag indicating if the image data has an alpha channel.
+ * @param cspace The colorspace of the image data.
+ * @return A pointer to the newly created Image_Entry with a reference count of 1.
+ *         Returns NULL on failure (e.g., allocation error, engine data setup error).
+ */
 EVAS_API Image_Entry *
 evas_cache_image_data(Evas_Cache_Image *cache, unsigned int w, unsigned int h,
                       DATA32 *image_data, int alpha, Evas_Colorspace cspace)
@@ -1196,6 +1572,15 @@ evas_cache_image_data(Evas_Cache_Image *cache, unsigned int w, unsigned int h,
    return im;
 }
 
+/**
+ * @brief Allocates or reallocates the surface for an image entry.
+ * This function ensures that the underlying surface (pixel buffer) for the
+ * image entry has the specified dimensions.
+ *
+ * @param im The image entry.
+ * @param w The desired width for the surface.
+ * @param h The desired height for the surface.
+ */
 EVAS_API void
 evas_cache_image_surface_alloc(Image_Entry *im, unsigned int w, unsigned int h)
 {
@@ -1211,6 +1596,21 @@ evas_cache_image_surface_alloc(Image_Entry *im, unsigned int w, unsigned int h)
    if (cache->func.debug) cache->func.debug("surface-alloc", im);
 }
 
+/**
+ * @brief Creates a new image entry by resizing an existing one.
+ * A new image entry is created with the specified dimensions @p w and @p h.
+ * The content of the original image @p im is scaled or transferred to the new entry.
+ * The original image entry @p im has its reference count decremented twice
+ * (once for the initial ref taken by this function, once because it's being replaced).
+ *
+ * @param im The original image entry to resize.
+ * @param w The new width.
+ * @param h The new height.
+ * @return A pointer to the new Image_Entry with the specified size and content
+ *         from the original, with a reference count of 1.
+ *         Returns NULL on error (e.g., allocation failure, resize operation failure).
+ *         The original @p im is effectively "consumed" by this call on success or failure.
+ */
 EVAS_API Image_Entry *
 evas_cache_image_size_set(Image_Entry *im, unsigned int w, unsigned int h)
 {
@@ -1262,6 +1662,17 @@ on_error:
    return NULL;
 }
 
+/**
+ * @brief Loads the pixel data for an image entry.
+ * If the image data is not already loaded, this function triggers the loading process.
+ * If the image was being preloaded asynchronously, the preload is cancelled,
+ * and loading proceeds synchronously (or waits for async completion).
+ *
+ * @param im The image entry for which to load data.
+ * @return An EVAS_LOAD_ERROR_* code. EVAS_LOAD_ERROR_NONE on success.
+ *         Returns EVAS_LOAD_ERROR_NONE immediately if data is already loaded
+ *         and not animated, or if im->cache is NULL.
+ */
 EVAS_API int
 evas_cache_image_load_data(Image_Entry *im)
 {
@@ -1320,6 +1731,15 @@ evas_cache_image_load_data(Image_Entry *im)
    return error;
 }
 
+/**
+ * @brief Unloads the pixel data for an image entry.
+ * This function releases the pixel data associated with an image entry,
+ * typically to free memory. It calls the cache's destructor function for the entry.
+ * If the image is currently being loaded asynchronously, it attempts to set an
+ * unload_cancel flag.
+ *
+ * @param im The image entry whose data is to be unloaded.
+ */
 EVAS_API void
 evas_cache_image_unload_data(Image_Entry *im)
 {
@@ -1357,6 +1777,16 @@ evas_cache_image_unload_data(Image_Entry *im)
    //FIXME: imagedataunload - inform owners
 }
 
+/**
+ * @brief Callback function used with eina_hash_foreach to unload image data.
+ * This function is used by evas_cache_image_unload_all to iterate through
+ * hash tables of image entries and call evas_cache_image_unload_data on each.
+ * @param hash The hash table being iterated. (Unused)
+ * @param key The key of the hash entry. (Unused)
+ * @param data The data (Image_Entry pointer) associated with the hash entry.
+ * @param fdata User data passed to eina_hash_foreach. (Unused)
+ * @return EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 _evas_cache_image_unload_cb(EINA_UNUSED const Eina_Hash *hash, EINA_UNUSED const void *key, void *data, EINA_UNUSED void *fdata)
 {
@@ -1364,6 +1794,12 @@ _evas_cache_image_unload_cb(EINA_UNUSED const Eina_Hash *hash, EINA_UNUSED const
    return EINA_TRUE;
 }
 
+/**
+ * @brief Unloads pixel data for all unloadable images in the cache.
+ * Iterates through LRU lists and active/inactive hash tables, calling
+ * evas_cache_image_unload_data for each image entry.
+ * @param cache The image cache instance.
+ */
 EVAS_API void
 evas_cache_image_unload_all(Evas_Cache_Image *cache)
 {
@@ -1380,26 +1816,44 @@ evas_cache_image_unload_all(Evas_Cache_Image *cache)
 //////   SLKU(engine_lock);
 }
 
-static int async_frozen = 0;
+static int async_frozen = 0; /**< Counter for freezing asynchronous operations. >0 means frozen. */
 
+/**
+ * @brief Gets the current freeze count for asynchronous cache operations.
+ * @return The number of times async operations have been frozen.
+ *         If > 0, async operations may be deferred or handled differently.
+ */
 EVAS_API int
 evas_cache_async_frozen_get(void)
 {
    return async_frozen;
 }
 
+/**
+ * @brief Increments the freeze counter for asynchronous cache operations.
+ * When frozen, new asynchronous operations might be delayed or queued.
+ */
 EVAS_API void
 evas_cache_async_freeze(void)
 {
    async_frozen++;
 }
 
+/**
+ * @brief Decrements the freeze counter for asynchronous cache operations.
+ * When the counter returns to 0, normal asynchronous operation processing resumes.
+ */
 EVAS_API void
 evas_cache_async_thaw(void)
 {
    async_frozen--;
 }
 
+/**
+ * @brief Checks if an image entry's data is currently loaded.
+ * @param im The image entry to check.
+ * @return EINA_TRUE if the image data is loaded, EINA_FALSE otherwise.
+ */
 EVAS_API Eina_Bool
 evas_cache_image_is_loaded(Image_Entry *im)
 {
@@ -1407,6 +1861,17 @@ evas_cache_image_is_loaded(Image_Entry *im)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Initiates preloading of image data for a specific target.
+ * If the image data is already loaded and available, it notifies the target immediately.
+ * Otherwise, it adds the target to the image entry's preload list and starts
+ * asynchronous preloading if not already in progress.
+ *
+ * @param im The image entry to preload.
+ * @param target The Evas object (Eo) requesting the preload.
+ * @param preloaded_cb Optional callback function to invoke when preloading is complete for this target.
+ * @param preloaded_data Optional data to pass to @p preloaded_cb.
+ */
 EVAS_API void
 evas_cache_image_preload_data(Image_Entry *im, const Eo *target, void (*preloaded_cb)(void *), void *preloaded_data)
 {
@@ -1429,6 +1894,13 @@ evas_cache_image_preload_data(Image_Entry *im, const Eo *target, void (*preloade
    evas_cache_image_drop(im);
 }
 
+/**
+ * @brief Cancels a preload request for an image entry, for a specific target.
+ * @param im The image entry.
+ * @param target The Evas object (Eo) target whose preload request is to be cancelled. Must not be NULL.
+ * @param force If EINA_TRUE, the preload operation is forcefully cancelled if this is the last target
+ *              or if other conditions for forceful cancellation are met.
+ */
 EVAS_API void
 evas_cache_image_preload_cancel(Image_Entry *im, const Eo *target, Eina_Bool force)
 {
@@ -1488,6 +1960,17 @@ _dump_cache(Evas_Cache_Image *cache)
 }
 #endif
 
+/**
+ * @brief Flushes the image cache to reduce memory usage towards its limit.
+ * This function attempts to evict images from the LRU lists (both "data" and "no data")
+ * until the cache usage is within the configured limit. Images from the `lru` list
+ * (with data) are deleted entirely. Images from the `lru_nodata` list have their
+ * surfaces deleted (pixel data freed), but their metadata might remain.
+ *
+ * @param cache The image cache instance.
+ * @return The cache usage in bytes after flushing. Returns -1 if the cache limit
+ *         is set to unlimited. Returns 0 if @p cache is NULL.
+ */
 EVAS_API int
 evas_cache_image_flush(Evas_Cache_Image *cache)
 {
@@ -1522,6 +2005,15 @@ evas_cache_image_flush(Evas_Cache_Image *cache)
    return cache->usage;
 }
 
+/**
+ * @brief Creates an "empty" image cache entry.
+ * This creates a new image entry that is not associated with any file, key, or pixel data initially.
+ * It's a basic, minimal entry.
+ *
+ * @param cache The image cache instance.
+ * @return A pointer to the newly created empty Image_Entry with a reference count of 1.
+ *         Returns NULL on failure (e.g., allocation error).
+ */
 EVAS_API Image_Entry *
 evas_cache_image_empty(Evas_Cache_Image *cache)
 {
@@ -1537,6 +2029,15 @@ evas_cache_image_empty(Evas_Cache_Image *cache)
    return im;
 }
 
+/**
+ * @brief Sets the colorspace for an image entry.
+ * If the new colorspace is different from the current one, this function
+ * updates the image entry's colorspace and calls the engine-specific
+ * `color_space` callback to handle any necessary conversions or updates.
+ *
+ * @param im The image entry.
+ * @param cspace The new Evas_Colorspace to set.
+ */
 EVAS_API void
 evas_cache_image_colorspace(Image_Entry *im, Evas_Colorspace cspace)
 {
@@ -1550,6 +2051,15 @@ done:
    evas_cache_image_drop(im);
 }
 
+/**
+ * @brief Retrieves the private data associated with the cache instance of an image entry.
+ * Each Evas_Cache_Image can have a `void *data` pointer for engine-specific data.
+ * This function allows retrieving that data given an Image_Entry.
+ *
+ * @param im The image entry.
+ * @return The private data pointer from the image entry's cache, or NULL if
+ *         the entry has no cache or the cache has no private data.
+ */
 EVAS_API void *
 evas_cache_private_from_image_entry_get(Image_Entry *im)
 {
@@ -1561,6 +2071,11 @@ evas_cache_private_from_image_entry_get(Image_Entry *im)
    return data;
 }
 
+/**
+ * @brief Retrieves the private data associated with an image cache instance.
+ * @param cache The image cache instance.
+ * @return The private data pointer, or NULL if @p cache is NULL or has no private data.
+ */
 EVAS_API void *
 evas_cache_private_get(Evas_Cache_Image *cache)
 {
@@ -1568,6 +2083,12 @@ evas_cache_private_get(Evas_Cache_Image *cache)
    return cache->data;
 }
 
+/**
+ * @brief Sets the private data for an image cache instance.
+ * This allows associating arbitrary engine-specific data with a cache.
+ * @param cache The image cache instance.
+ * @param data The private data pointer to set.
+ */
 EVAS_API void
 evas_cache_private_set(Evas_Cache_Image *cache, const void *data)
 {
@@ -1575,6 +2096,14 @@ evas_cache_private_set(Evas_Cache_Image *cache, const void *data)
    cache->data = (void *)data;
 }
 
+/**
+ * @brief Retrieves a pointer to the pixel data of an image entry's surface.
+ * This calls the engine-specific `surface_pixels` callback.
+ *
+ * @param im The image entry.
+ * @return A pointer to the pixel data (DATA32 *), or NULL if the entry has no cache
+ *         or the `surface_pixels` callback returns NULL.
+ */
 EVAS_API DATA32 *
 evas_cache_image_pixels(Image_Entry *im)
 {

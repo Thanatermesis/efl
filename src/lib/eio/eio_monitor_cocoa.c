@@ -32,28 +32,41 @@ static CFTimeInterval _latency  = 0.1;
  * @cond LOCAL
  */
 
+/**
+ * @brief Backend data structure for an Eio_Monitor instance.
+ * This structure holds the necessary information for the FSEvents backend
+ * to monitor a specific path.
+ */
 struct _Eio_Monitor_Backend
 {
-   Eio_Monitor *parent;
+   Eio_Monitor *parent; /**< Pointer to the parent Eio_Monitor object. */
    ///the monitored path
-   char *mon_path;
+   char *mon_path; /**< The path that is being monitored, potentially a parent directory. */
    ///the actual file path
-   char *real_path;
+   char *real_path; /**< The canonicalized, absolute path of the item being monitored. */
 };
 
+/**
+ * @brief Structure to hold information about a single FSEvent.
+ * This is used to pass event details from the FSEvents callback
+ * to the main loop for processing.
+ */
 typedef struct _FSEvent_Info FSEvent_Info;
 
 struct _FSEvent_Info {
-   char *path;
-   FSEventStreamEventFlags flags;
+   char *path; /**< The path associated with the event. */
+   FSEventStreamEventFlags flags; /**< The FSEvent flags for this event. */
 
 };
 
+/**
+ * @brief Structure to map FSEvent flags to EIO_MONITOR event codes.
+ */
 typedef struct _Eio_FSEvent_Table Eio_FSEvent_Table;
 
 struct _Eio_FSEvent_Table
 {
-   int mask;
+   int mask; /**< The FSEventStreamEventFlag to match. */
    int *ev_file_code;
    int *ev_dir_code;
 };
@@ -62,20 +75,50 @@ struct _Eio_FSEvent_Table
   { kFSEventStreamEventFlag##FSe, &EIO_MONITOR_##Ef, &EIO_MONITOR_##Ed }
 
 static const Eio_FSEvent_Table match[] = {
-  EIO_FSEVENT_LINE(ItemChangeOwner, FILE_MODIFIED, DIRECTORY_MODIFIED),
-  EIO_FSEVENT_LINE(ItemInodeMetaMod, FILE_MODIFIED, DIRECTORY_MODIFIED),
-  EIO_FSEVENT_LINE(ItemXattrMod, FILE_MODIFIED, DIRECTORY_MODIFIED),
-  EIO_FSEVENT_LINE(ItemModified, FILE_MODIFIED, DIRECTORY_MODIFIED),
-  EIO_FSEVENT_LINE(ItemRemoved, FILE_DELETED, DIRECTORY_DELETED),
-  EIO_FSEVENT_LINE(ItemCreated, FILE_CREATED, DIRECTORY_CREATED),
-  EIO_FSEVENT_LINE(RootChanged, SELF_DELETED, SELF_DELETED)
+  EIO_FSEVENT_LINE(ItemChangeOwner, FILE_MODIFIED, DIRECTORY_MODIFIED), // Owner changed
+  EIO_FSEVENT_LINE(ItemInodeMetaMod, FILE_MODIFIED, DIRECTORY_MODIFIED), // Inode metadata changed
+  EIO_FSEVENT_LINE(ItemXattrMod, FILE_MODIFIED, DIRECTORY_MODIFIED), // Extended attributes modified
+  EIO_FSEVENT_LINE(ItemModified, FILE_MODIFIED, DIRECTORY_MODIFIED), // Content modified
+  EIO_FSEVENT_LINE(ItemRemoved, FILE_DELETED, DIRECTORY_DELETED), // Item removed
+  EIO_FSEVENT_LINE(ItemCreated, FILE_CREATED, DIRECTORY_CREATED), // Item created
+  EIO_FSEVENT_LINE(RootChanged, SELF_DELETED, SELF_DELETED) // Monitored root path changed or unmounted
 };
 
+/**
+ * @brief Global FSEventStream reference.
+ * This stream monitors all paths registered by Eio_Monitor instances.
+ */
 static FSEventStreamRef _stream = NULL;
+/**
+ * @brief Hash table storing Eio_Monitor_Backend instances.
+ * Keyed by the original monitor path provided by the user.
+ * Value is a pointer to Eio_Monitor_Backend.
+ */
 static Eina_Hash *_fsevent_monitors = NULL;
+/**
+ * @brief CoreFoundation mutable array holding CFStringRefs of paths to watch.
+ * This array is passed to FSEventStreamCreate.
+ */
 static CFMutableArrayRef _paths_to_watch = NULL;
+/**
+ * @brief Grand Central Dispatch queue for FSEvents.
+ * Callbacks from FSEvents are dispatched on this queue.
+ */
 static dispatch_queue_t _dispatch_queue;
 
+/**
+ * @brief Processes an FSEvent for a specific monitor.
+ * This function is called via eina_hash_foreach for each active monitor.
+ * It checks if the event path matches the monitor's path and, if so,
+ * translates the FSEvent flags into EIO_MONITOR event codes and sends
+ * the event.
+ *
+ * @param hash The hash table being iterated (unused).
+ * @param key The key of the hash entry (unused).
+ * @param data Pointer to the Eio_Monitor_Backend for the current monitor.
+ * @param fdata Pointer to the FSEvent_Info containing event details.
+ * @return EINA_TRUE to continue iteration, EINA_FALSE to stop.
+ */
 static Eina_Bool
 _handle_fsevent_with_monitor(const Eina_Hash *hash EINA_UNUSED,
                              const void *key EINA_UNUSED,
@@ -128,10 +171,20 @@ _handle_fsevent_with_monitor(const Eina_Hash *hash EINA_UNUSED,
 
    free(tmp);
    //we have found the right event, no need to continue
+   //we have found the right event, no need to continue
    return 0;
 }
 
-
+/**
+ * @brief Handles FSEvents in the main Ecore loop.
+ * This function is called asynchronously in the main thread via
+ * ecore_main_loop_thread_safe_call_async. It iterates through all
+ * registered monitors and dispatches events appropriately.
+ * It also handles kernel dropped events by sending a generic error.
+ *
+ * @param data Pointer to an FSEvent_Info structure containing event details.
+ *             This structure is freed by this function.
+ */
 static void
 _main_loop_send_event(void *data)
 {
@@ -155,10 +208,26 @@ _main_loop_send_event(void *data)
 
  cleanup:
    free(info->path);
+   free(info->path);
    free(info);
 }
 
-
+/**
+ * @brief Callback function for FSEvents.
+ * This function is invoked by the FSEvents service when file system
+ * events occur for the monitored paths. It processes each event,
+ * packages its information into an FSEvent_Info struct, and schedules
+ * _main_loop_send_event to be called on the main Ecore loop.
+ *
+ * @param stream_ref The FSEventStream that generated the event (unused).
+ * @param ctx User-defined context data (unused).
+ * @param count The number of events being reported.
+ * @param event_paths An array of C strings, each representing a path where an event occurred.
+ *                    Example: {"/path/to/file.txt", "/path/to/another_dir"}
+ * @param event_flags An array of FSEventStreamEventFlags, corresponding to each path in event_paths.
+ *                    Example: {kFSEventStreamEventFlagItemCreated, kFSEventStreamEventFlagItemRemoved}
+ * @param event_ids An array of FSEventStreamEventId, corresponding to each event (unused).
+ */
 static void
 _eio_fsevent_cb(ConstFSEventStreamRef stream_ref EINA_UNUSED,
                 void *ctx EINA_UNUSED,
@@ -180,15 +249,41 @@ _eio_fsevent_cb(ConstFSEventStreamRef stream_ref EINA_UNUSED,
         ecore_main_loop_thread_safe_call_async(_main_loop_send_event,
                                                event_info);
      }
+                                               event_info);
+     }
 }
 
+/**
+ * @brief Frees an Eio_Monitor_Backend structure.
+ * This function is used as a callback for eina_hash when deleting entries.
+ *
+ * @param data Pointer to the Eio_Monitor_Backend to be freed.
+ */
 static void
 _eio_fsevent_del(void *data)
 {
    Eio_Monitor_Backend *backend = (Eio_Monitor_Backend *)data;
+   // Note: backend->mon_path and backend->real_path are freed when the monitor is deleted
+   // or when the hash is freed during shutdown.
    free(backend);
 }
 
+/**
+ * @brief Determines the actual path to monitor and the canonical full path.
+ * If the given path is a directory, monpath and fullpath will be the same
+ * canonicalized path. If the given path is a file, monpath will be the
+ * canonicalized path of its parent directory, and fullpath will be the
+ * canonicalized path of the file itself.
+ * This is necessary because FSEvents monitors directories.
+ *
+ * @param path The user-provided path to monitor.
+ * @param[out] monpath Pointer to a string that will be allocated and filled
+ *                     with the path to be actually monitored by FSEvents.
+ *                     The caller is responsible for freeing this string.
+ * @param[out] fullpath Pointer to a string that will be allocated and filled
+ *                      with the canonicalized, absolute version of the input path.
+ *                      The caller is responsible for freeing this string.
+ */
 static void
 _eio_get_monitor_path(const char *path, char **monpath, char **fullpath)
 {
@@ -254,6 +349,11 @@ _eio_get_monitor_path(const char *path, char **monpath, char **fullpath)
  * @endcond
  */
 
+/**
+ * @brief Initializes the FSEvents monitoring backend.
+ * Sets up the dispatch queue, hash table for monitors, and the array
+ * for paths to watch. This must be called before any monitors are added.
+ */
 void eio_monitor_backend_init(void)
 {
    _dispatch_queue = dispatch_queue_create("org.elf.fseventqueue", NULL);
@@ -261,8 +361,15 @@ void eio_monitor_backend_init(void)
    _paths_to_watch = CFArrayCreateMutable(kCFAllocatorDefault,
                                           0,
                                           &kCFTypeArrayCallBacks);
+                                          &kCFTypeArrayCallBacks);
 }
 
+/**
+ * @brief Shuts down the FSEvents monitoring backend.
+ * Stops and releases the FSEventStream, releases the dispatch queue,
+ * frees the hash table of monitors, and releases the paths array.
+ * This should be called when EIO is shutting down.
+ */
 void eio_monitor_backend_shutdown(void)
 {
    if (_stream)
@@ -275,9 +382,20 @@ void eio_monitor_backend_shutdown(void)
    dispatch_release(_dispatch_queue);
    eina_hash_free(_fsevent_monitors);
    CFRelease(_paths_to_watch);
+   CFRelease(_paths_to_watch);
 }
 
-
+/**
+ * @brief Adds a path to be monitored by the FSEvents backend.
+ * This function determines the correct directory to monitor (as FSEvents
+ * works on directories), creates or updates the FSEventStream to include
+ * this path, and stores backend-specific data.
+ * If FSEvents setup fails, it falls back to eio_monitor_fallback_add().
+ *
+ * @param monitor The Eio_Monitor instance requesting to watch a path.
+ *                The monitor->path field specifies the path to watch.
+ *                The monitor->backend field will be set by this function.
+ */
 void eio_monitor_backend_add(Eio_Monitor *monitor)
 {
    Eio_Monitor_Backend *backend;
@@ -347,8 +465,22 @@ void eio_monitor_backend_add(Eio_Monitor *monitor)
    FSEventStreamStart(_stream);
 
 
+   FSEventStreamSetDispatchQueue(_stream, _dispatch_queue);
+   FSEventStreamStart(_stream);
+
+
 }
 
+/**
+ * @brief Removes a path from being monitored by the FSEvents backend.
+ * This function updates the FSEventStream to no longer watch the specified
+ * path. It also cleans up backend-specific data associated with the monitor.
+ * If the FSEventStream was not active, it falls back to eio_monitor_fallback_del().
+ *
+ * @param monitor The Eio_Monitor instance whose path should be removed.
+ *                The monitor->path field specifies the path to stop watching.
+ *                The monitor->backend field will be cleared by this function.
+ */
 void eio_monitor_backend_del(Eio_Monitor *monitor)
 {
    Eio_Monitor_Backend *backend;
@@ -400,10 +532,24 @@ void eio_monitor_backend_del(Eio_Monitor *monitor)
    monitor->backend = NULL;
    if (!backend) return;
 
+   // Free the paths stored in the backend before deleting from hash
+   free(backend->mon_path);
+   free(backend->real_path);
    eina_hash_del(_fsevent_monitors, monitor->path, backend);
 }
 
-Eina_Bool eio_monitor_context_check(const Eio_Monitor *monitor, const char *path)
+/**
+ * @brief Checks if a given path is relevant to a specific monitor.
+ * In the Cocoa FSEvents backend, this function currently always returns EINA_TRUE,
+ * as filtering is primarily handled by comparing the event path prefix with
+ * the monitor's real_path in _handle_fsevent_with_monitor.
+ * More specific context checking could be implemented here if needed.
+ *
+ * @param monitor The monitor instance.
+ * @param path The path of the event to check.
+ * @return EINA_TRUE if the path is relevant to the monitor, EINA_FALSE otherwise.
+ */
+Eina_Bool eio_monitor_context_check(const Eio_Monitor *monitor EINA_UNUSED, const char *path EINA_UNUSED)
 {
    return EINA_TRUE;
 }

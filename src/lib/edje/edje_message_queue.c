@@ -2,16 +2,16 @@
 
 static void _edje_message_propagate_send(Edje *ed, Edje_Queue queue, Edje_Message_Type type, int id, void *emsg, Eina_Bool prop);
 
-static int _injob = 0;
-static Ecore_Job *_job = NULL;
-static Ecore_Timer *_job_loss_timer = NULL;
+static int _injob = 0; /**< Counter to track if we are currently inside an Ecore_Job execution. */
+static Ecore_Job *_job = NULL; /**< Ecore_Job used to process the message queue asynchronously. */
+static Ecore_Timer *_job_loss_timer = NULL; /**< Timer to ensure job processing isn't lost if events are missed. */
 
-static Eina_Inlist *msgq = NULL;
-static Eina_Inlist *tmp_msgq = NULL;
-static int tmp_msgq_processing = 0;
-static int tmp_msgq_restart = 0;
+static Eina_Inlist *msgq = NULL; /**< Main message queue for Edje messages. */
+static Eina_Inlist *tmp_msgq = NULL; /**< Temporary message queue used during processing to handle re-entrant calls. */
+static int tmp_msgq_processing = 0; /**< Flag indicating if the temporary message queue is currently being processed. */
+static int tmp_msgq_restart = 0; /**< Flag to indicate if processing of the temporary queue needs to be restarted. */
 
-static Eina_Inlist *_edje_msg_trash = NULL;
+static Eina_Inlist *_edje_msg_trash = NULL; /**< A list of freed Edje_Message structures for reuse, to reduce malloc/free overhead. */
 
 /*============================================================================*
 *                                   API                                      *
@@ -20,6 +20,15 @@ static Eina_Inlist *_edje_msg_trash = NULL;
 #define INLIST_CONTAINER(container_type, list, list_entry) \
    (container_type *)((unsigned char *)list - offsetof(container_type, list_entry))
 
+/**
+ * @brief Pops an Edje_Message from the trash list for reuse.
+ *
+ * This function retrieves a pre-allocated Edje_Message structure from a
+ * cache (_edje_msg_trash) to avoid repeated malloc calls. If the trash is
+ * empty, it returns NULL.
+ *
+ * @return A pointer to an Edje_Message structure, or NULL if the trash is empty.
+ */
 static Edje_Message *
 _edje_msg_trash_pop(void)
 {
@@ -32,12 +41,28 @@ _edje_msg_trash_pop(void)
    return em;
 }
 
+/**
+ * @brief Pushes an Edje_Message to the trash list for future reuse.
+ *
+ * This function adds an Edje_Message structure (that is no longer needed
+ * immediately) to a cache (_edje_msg_trash) to make it available for
+ * quick reuse later, reducing free/malloc overhead.
+ *
+ * @param em The Edje_Message to add to the trash.
+ */
 static void
 _edje_msg_trash_push(Edje_Message *em)
 {
    _edje_msg_trash = eina_inlist_prepend(_edje_msg_trash, &(em->inlist_main));
 }
 
+/**
+ * @brief Clears all Edje_Message structures from the trash list.
+ *
+ * This function iterates through the _edje_msg_trash list, frees each
+ * Edje_Message structure, and empties the list. This is typically called
+ * during shutdown.
+ */
 static void
 _edje_msg_trash_clear(void)
 {
@@ -50,6 +75,20 @@ _edje_msg_trash_clear(void)
      }
 }
 
+/**
+ * @brief Sends a message to an Edje object and optionally propagates it to its subobjects.
+ *
+ * This function fetches the Edje data associated with the Evas_Object,
+ * then calls _edje_message_propagate_send to queue the message.
+ * If propagation is enabled (implicitly for subobjects here), it recursively
+ * calls itself for all subobjects.
+ *
+ * @param obj The Evas_Object (Edje object) to send the message to.
+ * @param type The type of the message.
+ * @param id The ID of the message.
+ * @param msg A pointer to the message data. The structure of this data depends on the message type.
+ * @param prop EINA_TRUE to indicate this is a propagated message (used internally for subobjects).
+ */
 static void
 _edje_object_message_propagate_send(Evas_Object *obj, Edje_Message_Type type, int id, void *msg, Eina_Bool prop)
 {
@@ -176,6 +215,17 @@ bad_type:
    return;
 }
 
+/**
+ * @brief Processes messages for a specific Edje object, including those from its group.
+ *
+ * This function iterates through messages queued for the given Edje object (`ed`)
+ * and its associated groups. It moves relevant messages from the global queue (`msgq`)
+ * to a temporary queue (`tmp_msgq`) for processing. It handles potential
+ * re-entrancy and message loops by using `tmp_msgq_restart` and a goto limit.
+ *
+ * @param obj The Evas_Object associated with the Edje instance (currently unused in this function).
+ * @param ed The Edje instance whose messages are to be processed.
+ */
 static void
 _edje_object_message_signal_process_do(Eo *obj EINA_UNUSED, Edje *ed)
 {
@@ -285,6 +335,16 @@ _edje_dummy_timer(void *data EINA_UNUSED)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Ecore_Job callback function to process the Edje message queue.
+ *
+ * This function is scheduled as an Ecore_Job to process messages
+ * asynchronously. It ensures that any job loss timer is cleared,
+ * processes the message queue, clears the message trash, and handles
+ * re-entrancy using the _injob counter.
+ *
+ * @param data User data passed to the job function (unused).
+ */
 static void
 _edje_job(void *data EINA_UNUSED)
 {
@@ -300,6 +360,16 @@ _edje_job(void *data EINA_UNUSED)
    _injob--;
 }
 
+/**
+ * @brief Ecore_Timer callback to safeguard against job loss.
+ *
+ * If the main job (`_edje_job`) was expected to run but didn't (e.g., due
+ * to event processing issues), this timer ensures that a new job is added
+ * to process the Edje messages.
+ *
+ * @param data User data passed to the timer callback (unused).
+ * @return ECORE_CALLBACK_CANCEL to automatically delete the timer after it fires.
+ */
 static Eina_Bool
 _edje_job_loss_timer(void *data EINA_UNUSED)
 {
@@ -311,11 +381,24 @@ _edje_job_loss_timer(void *data EINA_UNUSED)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Initializes the Edje message subsystem.
+ *
+ * Currently, this function is a placeholder and does not perform any
+ * specific initialization tasks.
+ */
 void
 _edje_message_init(void)
 {
 }
 
+/**
+ * @brief Shuts down the Edje message subsystem.
+ *
+ * This function clears all pending messages from the queues, cleans up
+ * the message trash, and deletes any active Ecore_Timer or Ecore_Job
+ * related to message processing.
+ */
 void
 _edje_message_shutdown(void)
 {
@@ -333,6 +416,23 @@ _edje_message_shutdown(void)
      }
 }
 
+/**
+ * @brief Sets the message handler callback for an Edje object and its sub-objects.
+ *
+ * This function registers a callback function (`func`) and associated user data (`data`)
+ * to be invoked when an Edje object receives a message of type EDJE_QUEUE_APP.
+ * The callback is also recursively set for all sub-objects of the given Edje object.
+ *
+ * @param ed The Edje object to set the message handler for.
+ * @param func The callback function to handle messages.
+ *             It takes the following arguments:
+ *             - `void *data`: The user data provided when setting the callback.
+ *             - `Evas_Object *obj`: The Edje Evas_Object that received the message.
+ *             - `Edje_Message_Type type`: The type of the message.
+ *             - `int id`: The ID of the message.
+ *             - `void *msg`: A pointer to the message data.
+ * @param data User data to be passed to the callback function.
+ */
 void
 _edje_message_cb_set(Edje *ed, void (*func)(void *data, Evas_Object *obj, Edje_Message_Type type, int id, void *msg), void *data)
 {
@@ -349,6 +449,20 @@ _edje_message_cb_set(Edje *ed, void (*func)(void *data, Evas_Object *obj, Edje_M
      }
 }
 
+/**
+ * @brief Creates a new Edje_Message structure.
+ *
+ * This function allocates and initializes an Edje_Message. It first attempts
+ * to reuse a message structure from the `_edje_msg_trash` cache. If the cache
+ * is empty, it allocates a new structure.
+ * The message count for the associated Edje object is incremented.
+ *
+ * @param ed The Edje object this message is associated with.
+ * @param queue The queue this message belongs to (EDJE_QUEUE_APP or EDJE_QUEUE_SCRIPT).
+ * @param type The type of the message.
+ * @param id The ID of the message.
+ * @return A pointer to the newly created Edje_Message, or NULL on allocation failure.
+ */
 Edje_Message *
 _edje_message_new(Edje *ed, Edje_Queue queue, Edje_Message_Type type, int id)
 {
@@ -366,6 +480,16 @@ _edje_message_new(Edje *ed, Edje_Queue queue, Edje_Message_Type type, int id)
    return em;
 }
 
+/**
+ * @brief Frees an Edje_Message structure and its associated payload.
+ *
+ * This function deallocates the payload (`em->msg`) of an Edje_Message,
+ * depending on its type. After freeing the payload, the Edje_Message
+ * structure itself is not freed directly but pushed onto the `_edje_msg_trash`
+ * list for potential reuse.
+ *
+ * @param em The Edje_Message to free.
+ */
 void
 _edje_message_free(Edje_Message *em)
 {
@@ -492,6 +616,31 @@ _edje_message_free(Edje_Message *em)
    _edje_msg_trash_push(em);
 }
 
+/**
+ * @brief Core function to create, populate, and queue an Edje message.
+ *
+ * This function is responsible for:
+ * 1. Creating a new Edje_Message structure (or reusing one from trash).
+ * 2. Setting up Ecore_Job or Ecore_Timer to ensure the message queue is processed.
+ *    - If called from within an Ecore_Job (`_injob > 0`), it sets a timer
+ *      to avoid issues with job processing.
+ *    - Otherwise, it adds an Ecore_Job to process the queue.
+ * 3. Deep-copying the message payload (`emsg`) based on its `type`. This is
+ *    crucial because the original `emsg` might be a temporary or stack-allocated variable.
+ * 4. Appending the newly created and populated message to the global message queue (`msgq`)
+ *    and to the Edje object's specific message list.
+ *
+ * @param ed The Edje object to which the message is being sent.
+ * @param queue The queue type (EDJE_QUEUE_SCRIPT or EDJE_QUEUE_APP).
+ * @param type The type of the message (e.g., EDJE_MESSAGE_STRING, EDJE_MESSAGE_INT).
+ * @param id An integer identifier for the message.
+ * @param emsg A pointer to the raw message data. The structure of this data
+ *             depends on the `type`. For example:
+ *             - For `EDJE_MESSAGE_STRING`: `Edje_Message_String*`
+ *             - For `EDJE_MESSAGE_INT`: `Edje_Message_Int*`
+ *             - For `EDJE_MESSAGE_FLOAT_SET`: `Edje_Message_Float_Set*` containing an array of doubles.
+ * @param prop A boolean indicating if this message is being propagated (e.g., from a parent to a child Edje object).
+ */
 static void
 _edje_message_propagate_send(Edje *ed, Edje_Queue queue, Edje_Message_Type type, int id, void *emsg, Eina_Bool prop)
 {
@@ -681,12 +830,44 @@ _edje_message_propagate_send(Edje *ed, Edje_Queue queue, Edje_Message_Type type,
    em->edje->messages = eina_inlist_append(em->edje->messages, &(em->inlist_edje));
 }
 
+/**
+ * @brief Utility function to send a message to an Edje object without propagation.
+ *
+ * This is a wrapper around `_edje_message_propagate_send` that explicitly
+ * sets the propagation flag to `EINA_FALSE`.
+ *
+ * @param ed The Edje object to send the message to.
+ * @param queue The queue type for the message.
+ * @param type The type of the message.
+ * @param id The ID of the message.
+ * @param emsg A pointer to the message data.
+ */
 void
 _edje_util_message_send(Edje *ed, Edje_Queue queue, Edje_Message_Type type, int id, void *emsg)
 {
    _edje_message_propagate_send(ed, queue, type, id, emsg, EINA_FALSE);
 }
 
+/**
+ * @brief Pushes message parameters onto the Embryo script stack.
+ *
+ * This function prepares parameters for an Embryo script's "message" handler
+ * based on the content of an Edje_Message.
+ * The first two parameters pushed are always:
+ * 1. The message type (`em->type`) as an Embryo_Cell.
+ * 2. The message ID (`em->id`) as an Embryo_Cell.
+ * Subsequent parameters depend on the message type and its payload.
+ *
+ * For example:
+ * - `EDJE_MESSAGE_STRING`: Pushes the string.
+ * - `EDJE_MESSAGE_INT`: Pushes the integer value.
+ * - `EDJE_MESSAGE_FLOAT_SET`: Pushes each float value in the set.
+ *   The `val` array in `Edje_Message_Float_Set` would be pushed one by one.
+ *   If `((Edje_Message_Float_Set *)em->msg)->val` is `{1.0, 2.5, 3.0}`,
+ *   three float parameters will be pushed onto the Embryo stack.
+ *
+ * @param em The Edje_Message whose parameters are to be pushed.
+ */
 void
 _edje_message_parameters_push(Edje_Message *em)
 {
@@ -813,6 +994,22 @@ _edje_message_parameters_push(Edje_Message *em)
      }
 }
 
+/**
+ * @brief Processes a single Edje_Message.
+ *
+ * This function determines how to handle an incoming Edje_Message based on
+ * its type and queue.
+ * - If the message type is `EDJE_MESSAGE_SIGNAL`, it's handled by `_edje_emit_handle`.
+ * - If the message queue is `EDJE_QUEUE_APP`, the registered C callback
+ *   (`em->edje->message.func`) is invoked.
+ * - If the message queue is `EDJE_QUEUE_SCRIPT`:
+ *   - If Lua scripting is active (`em->edje->L`), `_edje_lua_script_only_message` is called.
+ *   - Otherwise, it attempts to find and execute an Embryo script function named "message".
+ *     It sets up the Embryo VM, pushes parameters using `_edje_message_parameters_push`,
+ *     runs the script, and handles potential errors.
+ *
+ * @param em The Edje_Message to process.
+ */
 void
 _edje_message_process(Edje_Message *em)
 {
@@ -887,6 +1084,26 @@ _edje_message_process(Edje_Message *em)
    embryo_program_vm_pop(em->edje->collection->script);
 }
 
+/**
+ * @brief Processes all messages in the global Edje message queue.
+ *
+ * This function iterates through the main message queue (`msgq`), moving messages
+ * to a temporary queue (`tmp_msgq`) for processing. This is done to handle
+ * cases where processing a message might add new messages to the queue.
+ * It processes messages in batches (up to 8 iterations of filling and draining
+ * `tmp_msgq`) to prevent excessively long processing loops within a single call.
+ * If messages still remain after these iterations (a "self-feeding message loop"),
+ * it schedules a 0-delay timer to re-trigger processing, allowing other events
+ * to be handled.
+ *
+ * During processing, each message is removed from its Edje object's local list
+ * and the global temporary queue, then passed to `_edje_message_process`.
+ * After processing, the message is freed. It also handles Edje object deletion
+ * if `delete_me` is set and no messages are being processed for it.
+ *
+ * The `tmp_msgq_restart` flag is used to signal if re-evaluation of the queue
+ * is needed due to re-entrant calls.
+ */
 void
 _edje_message_queue_process(void)
 {
@@ -962,6 +1179,14 @@ _edje_message_queue_process(void)
      }
 }
 
+/**
+ * @brief Clears all messages from both the main and temporary Edje message queues.
+ *
+ * This function iterates through `msgq` and `tmp_msgq`, removing each message
+ * from its associated Edje object's message list, decrementing the message count
+ * for that object, and then freeing the message structure using `_edje_message_free`.
+ * This is typically used during shutdown or when a major state reset is required.
+ */
 void
 _edje_message_queue_clear(void)
 {
@@ -987,6 +1212,24 @@ _edje_message_queue_clear(void)
      }
 }
 
+/**
+ * @brief Deletes all messages associated with a specific Edje object from the queues.
+ *
+ * This function iterates through the messages currently linked to the given
+ * Edje object (`ed->messages`). For each message found:
+ * 1. It decrements the message count on the Edje object.
+ * 2. It removes the message from either the main queue (`msgq`) or the
+ *    temporary queue (`tmp_msgq`), depending on where it currently resides
+ *    (indicated by `em->in_tmp_msgq`).
+ * 3. It removes the message from the Edje object's own list of messages.
+ * 4. It frees the message using `_edje_message_free`.
+ * The process stops if the Edje object's message count drops to zero.
+ *
+ * This is typically called when an Edje object is being deleted to ensure
+ * no pending messages for it remain in the system.
+ *
+ * @param ed The Edje object whose messages are to be deleted.
+ */
 void
 _edje_message_del(Edje *ed)
 {

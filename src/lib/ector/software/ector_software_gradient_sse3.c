@@ -36,6 +36,20 @@ typedef union { __m128 v; float f[4];} vec4_f;
   *buffer++ = g_data->color_table[index_vec.i[3]]; \
 }
 
+/**
+ * @brief Calculates pre-alignment, 16-byte aligned, and remaining loop counts.
+ *
+ * This function determines how many iterations are needed for:
+ * - Pre-alignment: To align the buffer pointer to a 16-byte boundary.
+ * - 16-byte aligned processing: The main loop processing data in 4-integer (16-byte) chunks.
+ * - Remaining: Any leftover elements after the aligned processing.
+ *
+ * @param buffer Pointer to the data buffer.
+ * @param length Total number of elements in the buffer.
+ * @param lprealign Pointer to store the count for the pre-alignment loop.
+ * @param lby4 Pointer to store the count for the 16-byte aligned loop (number of 4-element chunks).
+ * @param lremaining Pointer to store the count for the remaining elements.
+ */
 static void
 loop_break(unsigned int *buffer, int length, int *lprealign, int *lby4 , int *lremaining)
 {
@@ -59,6 +73,22 @@ loop_break(unsigned int *buffer, int length, int *lprealign, int *lby4 , int *lr
    *lremaining = l3;
 }
 
+/**
+ * @brief SSE3 optimized helper function for radial gradients.
+ *
+ * This function processes pixels for a radial gradient using SSE3 instructions
+ * for improved performance. It handles buffer alignment and processes pixels
+ * in chunks.
+ *
+ * @param buffer The output buffer to store ARGB pixel data.
+ * @param length The number of pixels to process.
+ * @param g_data Pointer to the gradient data structure.
+ * @param det Initial determinant value for the radial calculation.
+ * @param delta_det Change in determinant per pixel.
+ * @param delta_delta_det Change in delta_det per pixel (second-order derivative).
+ * @param b Initial offset value for the radial calculation.
+ * @param delta_b Change in offset per pixel.
+ */
 void
 _radial_helper_sse3(uint32_t *buffer, int length, Ector_Renderer_Software_Gradient_Data *g_data,
                     float det, float delta_det, float delta_delta_det, float b, float delta_b)
@@ -98,6 +128,12 @@ _radial_helper_sse3(uint32_t *buffer, int length, Ector_Renderer_Software_Gradie
    v_delta_delta_det6 = _mm_set1_ps(6 * delta_delta_det);
    v_delta_b4 = _mm_set1_ps(4 * delta_b);
 
+/**
+ * @def FETCH_RADIAL_PROLOGUE
+ * @brief Macro to initialize and update variables for the main radial gradient processing loop.
+ * This macro calculates the gradient index for four pixels simultaneously and updates
+ * the determinant and offset vectors for the next iteration.
+ */
 #define FETCH_RADIAL_PROLOGUE                                           \
    for (i = 0 ; i < lby4 ; i+=4) {                                      \
       __m128 v_index_local = _mm_sub_ps(_mm_sqrt_ps(det_vec.v), b_vec.v); \
@@ -106,6 +142,13 @@ _radial_helper_sse3(uint32_t *buffer, int length, Ector_Renderer_Software_Gradie
       delta_det4_vec.v = _mm_add_ps(delta_det4_vec.v, v_delta_delta_det16); \
       b_vec.v = _mm_add_ps(b_vec.v, v_delta_b4);
 
+/**
+ * @def FETCH_RADIAL_LOOP(FETCH_CLAMP)
+ * @brief Macro defining the main processing loop for radial gradients.
+ * It combines the prologue for variable updates, a clamping mechanism, and
+ * the epilogue for copying data to the buffer.
+ * @param FETCH_CLAMP The specific clamping macro to use (e.g., FETCH_CLAMP_REPEAT_F).
+ */
 #define FETCH_RADIAL_LOOP(FETCH_CLAMP) \
    FETCH_RADIAL_PROLOGUE;              \
    FETCH_CLAMP;                        \
@@ -131,6 +174,19 @@ _radial_helper_sse3(uint32_t *buffer, int length, Ector_Renderer_Software_Gradie
 }
 
 void
+/**
+ * @brief SSE3 optimized helper function for linear gradients.
+ *
+ * This function processes pixels for a linear gradient using SSE3 instructions
+ * for improved performance. It handles buffer alignment and processes pixels
+ * in chunks using fixed-point arithmetic.
+ *
+ * @param buffer The output buffer to store ARGB pixel data.
+ * @param length The number of pixels to process.
+ * @param g_data Pointer to the gradient data structure.
+ * @param t Initial fixed-point position value.
+ * @param inc Increment value for the fixed-point position per pixel.
+ */
 _linear_helper_sse3(uint32_t *buffer, int length, Ector_Renderer_Software_Gradient_Data *g_data, int t, int inc)
 {
    int lprealign, lby4, lremaining, i;
@@ -170,6 +226,12 @@ _linear_helper_sse3(uint32_t *buffer, int length, Ector_Renderer_Software_Gradie
 
    v_reflect_limit = _mm_set1_epi32(2 * GRADIENT_STOPTABLE_SIZE - 1);
 
+/**
+ * @def FETCH_LINEAR_LOOP_PROLOGUE
+ * @brief Macro to initialize and update variables for the main linear gradient processing loop.
+ * This macro calculates the gradient index for four pixels simultaneously using fixed-point
+ * arithmetic and updates the position vector for the next iteration.
+ */
 #define FETCH_LINEAR_LOOP_PROLOGUE                                      \
    for (i = 0 ; i < lby4 ; i+=4) {                                      \
       vec4_i index_vec;                                                 \
@@ -177,17 +239,39 @@ _linear_helper_sse3(uint32_t *buffer, int length, Ector_Renderer_Software_Gradie
       v_index =  _mm_srai_epi32(_mm_add_epi32(t_vec.v, v_fxtpt_size), FIXPT_BITS); \
       t_vec.v = _mm_add_epi32(t_vec.v, v_inc);
 
+/**
+ * @def FETCH_LINEAR_LOOP_CLAMP_REPEAT
+ * @brief Macro for clamping gradient indices using the REPEAT spread method.
+ * The index is masked to wrap around within the color table size.
+ */
 #define FETCH_LINEAR_LOOP_CLAMP_REPEAT                  \
    index_vec.v = _mm_and_si128(v_repeat_mask, v_index);
 
+/**
+ * @def FETCH_LINEAR_LOOP_CLAMP_REFLECT
+ * @brief Macro for clamping gradient indices using the REFLECT spread method.
+ * The index is mirrored at the boundaries of the color table.
+ */
 #define FETCH_LINEAR_LOOP_CLAMP_REFLECT                                 \
    __m128i v_index_i = _mm_and_si128(v_reflect_mask, v_index);          \
    __m128i v_index_i_inv = _mm_sub_epi32(v_reflect_limit, v_index_i);   \
    index_vec.v = _mm_min_epi16(v_index_i, v_index_i_inv);
 
+/**
+ * @def FETCH_LINEAR_LOOP_CLAMP_PAD
+ * @brief Macro for clamping gradient indices using the PAD spread method.
+ * The index is clamped to the min/max valid values of the color table.
+ */
 #define FETCH_LINEAR_LOOP_CLAMP_PAD                                     \
    index_vec.v = _mm_min_epi16(v_max, _mm_max_epi16(v_min, v_index));
 
+/**
+ * @def FETCH_LINEAR_LOOP(FETCH_LINEAR_LOOP_CLAMP)
+ * @brief Macro defining the main processing loop for linear gradients.
+ * It combines the prologue for variable updates, a specific clamping mechanism,
+ * and the epilogue for copying data to the buffer.
+ * @param FETCH_LINEAR_LOOP_CLAMP The specific clamping macro to use (e.g., FETCH_LINEAR_LOOP_CLAMP_REPEAT).
+ */
 #define FETCH_LINEAR_LOOP(FETCH_LINEAR_LOOP_CLAMP)      \
    FETCH_LINEAR_LOOP_PROLOGUE;                          \
    FETCH_LINEAR_LOOP_CLAMP;                             \

@@ -6,6 +6,17 @@
 #include <Elementary.h>
 #include "elm_colorselector_eo.h"
 
+/**
+ * @brief Callback function for radio button changes to set the background size.
+ *
+ * This function is called when a radio button's state changes. It retrieves
+ * the value from the selected radio button and applies it as the load size
+ * for the background object.
+ *
+ * @param data The background object (Evas_Object *o_bg).
+ * @param obj The radio button object that triggered the event.
+ * @param event Unused event information.
+ */
 static void
 _cb_size_radio_changed(void *data, Evas_Object *obj, void *event EINA_UNUSED)
 {
@@ -15,6 +26,16 @@ _cb_size_radio_changed(void *data, Evas_Object *obj, void *event EINA_UNUSED)
    elm_bg_load_size_set(o_bg, size, size);
 }
 
+/**
+ * @brief Callback function for radio button changes to set the background option.
+ *
+ * This function is invoked when the user selects a different radio button
+ * controlling the background's display option (e.g., center, scale, stretch).
+ *
+ * @param data The background object (Evas_Object *o_bg).
+ * @param obj The radio button object that triggered the event.
+ * @param event Unused event information.
+ */
 static void
 _cb_radio_changed(void *data, Evas_Object *obj, void *event EINA_UNUSED)
 {
@@ -23,6 +44,16 @@ _cb_radio_changed(void *data, Evas_Object *obj, void *event EINA_UNUSED)
    elm_bg_option_set(o_bg, elm_radio_value_get((Evas_Object *)obj));
 }
 
+/**
+ * @brief Callback function for the overlay checkbox.
+ *
+ * Toggles the visibility of an overlay on the background object based on the
+ * state of a checkbox. The overlay is loaded from an EDJE file.
+ *
+ * @param data The background object (Evas_Object *o_bg).
+ * @param obj The checkbox object.
+ * @param event Unused event information.
+ */
 static void
 _cb_overlay_changed(void *data, Evas_Object *obj, void *event EINA_UNUSED)
 {
@@ -43,6 +74,20 @@ _cb_overlay_changed(void *data, Evas_Object *obj, void *event EINA_UNUSED)
      elm_object_part_content_set(o_bg, "overlay", NULL);
 }
 
+/**
+ * @brief Callback function to change the background color.
+ *
+ * Sets the background color based on the value of a spinner widget.
+ * The mapping from spinner value to color is hardcoded.
+ * 1 -> White
+ * 2 -> Red
+ * 3 -> Blue
+ * 4 -> Green
+ *
+ * @param data The background object (Evas_Object *o_bg).
+ * @param obj The spinner object.
+ * @param event Unused event information.
+ */
 static void
 _cb_color_changed(void *data, Evas_Object *obj, void *event EINA_UNUSED)
 {
@@ -60,6 +105,13 @@ _cb_color_changed(void *data, Evas_Object *obj, void *event EINA_UNUSED)
      elm_bg_color_set(o_bg, 0, 255, 0);
 }
 
+/**
+ * @brief Test function to display a plain background.
+ *
+ * This test creates a window with a simple, empty background (elm_bg).
+ * It demonstrates how to set up a basic background, including setting
+ * size hints to control window geometry.
+ */
 void
 test_bg_plain(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -93,6 +145,13 @@ test_bg_plain(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for a background with a resizable image.
+ *
+ * This test displays a background with an image and provides radio buttons
+ * to change the `elm_bg_load_size_set()` property, which affects image
+ * quality and memory usage by loading the image at a specific resolution.
+ */
 void
 test_bg_image(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -169,6 +228,13 @@ test_bg_image(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function demonstrating various background options.
+ *
+ * This test showcases different `elm_bg_option_set()` values (Center, Scale,
+ * Stretch, Tile), adding an overlay, and changing the background color.
+ * It uses radio buttons, a checkbox, and a spinner to control these features.
+ */
 void
 test_bg_options(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -281,6 +347,16 @@ test_bg_options(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *even
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback for color selection.
+ *
+ * Called when a color is selected in the color selector. It applies the
+ * selected color to the background of the window.
+ *
+ * @param data The window whose background will be changed (Efl_Ui_Win *).
+ * @param obj The color selector object.
+ * @param event Unused event information.
+ */
 static void
 _colorsel_cb(void *data, Evas_Object *obj, void *event EINA_UNUSED)
 {
@@ -295,6 +371,16 @@ _colorsel_cb(void *data, Evas_Object *obj, void *event EINA_UNUSED)
    fflush(stdout);
 }
 
+/**
+ * @brief Callback to toggle a file as the window background.
+ *
+ * This function is triggered by a click event. It uses the `efl_file_simple_load` API
+ * to set an image file as the window's background. If a background is already set,
+ * it removes it.
+ *
+ * @param data The window (Efl_Ui_Win *).
+ * @param ev The event information.
+ */
 static void
 _file_cb(void *data, const Efl_Event *ev)
 {
@@ -314,6 +400,16 @@ _file_cb(void *data, const Efl_Event *ev)
      }
 }
 
+/**
+ * @brief Callback to toggle an image object as the window background content.
+ *
+ * This function is triggered by a click event. It uses the `efl_content_set` API
+ * to set an `Efl_Ui_Image` object as the content for the window's background part.
+ * If content is already set, it's cleared.
+ *
+ * @param data The window (Efl_Ui_Win *).
+ * @param ev The event information.
+ */
 static void
 _image_cb(void *data, const Efl_Event *ev)
 {
@@ -335,6 +431,13 @@ _image_cb(void *data, const Efl_Event *ev)
      }
 }
 
+/**
+ * @brief Test for manipulating the background of an Efl_Ui_Win directly.
+ *
+ * This test demonstrates using the EO APIs on an `Efl_Ui_Win` to modify
+ * its background. It includes setting a solid color via a color selector,
+ * and setting an image file or an image object as the background content.
+ */
 void
 test_bg_window(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -381,6 +484,15 @@ test_bg_window(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event
    efl_gfx_entity_size_set(win, EINA_SIZE2D(300, 200));
 }
 
+/**
+ * @brief Callback to change the scale method of the background image.
+ *
+ * Invoked when a radio button for scale type is changed. It sets the
+ * `Efl_Gfx_Image_Scale_Method` on the background object.
+ *
+ * @param data The background object (Evas_Object *o_bg).
+ * @param ev The event information, containing the source radio button.
+ */
 static void
 _cb_radio_changed_scale_type(void *data, const Efl_Event *ev)
 {
@@ -392,6 +504,15 @@ _cb_radio_changed_scale_type(void *data, const Efl_Event *ev)
    efl_gfx_image_scale_method_set(o_bg, v);
 }
 
+/**
+ * @brief Callback to toggle the background color.
+ *
+ * Triggered by a checkbox. If checked, sets the background color to a reddish
+ * tint. If unchecked, sets it to white. It also prints the color to stdout.
+ *
+ * @param data The background object (Evas_Object *o_bg).
+ * @param ev The event information, containing the source checkbox.
+ */
 static void
 _cb_check_changed_scale_type(void *data, const Efl_Event *ev)
 {
@@ -409,6 +530,13 @@ _cb_check_changed_scale_type(void *data, const Efl_Event *ev)
    fflush(stdout);
 }
 
+/**
+ * @brief Test for different Efl_Gfx_Image_Scale_Method options on an Efl_Ui_Bg.
+ *
+ * This test demonstrates how various scale methods affect the display of
+ * a background image within an `Efl_Ui_Bg` widget. The scale method can be
+ * changed via radio buttons.
+ */
 void
 test_bg_scale_type(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

@@ -27,18 +27,28 @@
 
 #define MY_CLASS EFL_NET_DIALER_TCP_CLASS
 
+/**
+ * @brief Private data for the Efl_Net_Dialer_Tcp class.
+ */
 typedef struct _Efl_Net_Dialer_Tcp_Data
 {
    struct {
-      Ecore_Thread *thread;
-      Eina_Future *timeout;
-   } connect;
-   Eina_Stringshare *address_dial;
-   Eina_Stringshare *proxy;
-   Eina_Bool connected;
-   double timeout_dial;
+      Ecore_Thread *thread; /**< Thread used for asynchronous connection attempts. */
+      Eina_Future *timeout; /**< Future for handling connection timeouts. */
+   } connect; /**< Data related to the connection process. */
+   Eina_Stringshare *address_dial; /**< The address to dial, as a stringshare. Example: "127.0.0.1:80" or "example.com:443". */
+   Eina_Stringshare *proxy; /**< The proxy URL to use for the connection, if any. Example: "socks5://user:pass@proxy.example.com:1080". */
+   Eina_Bool connected; /**< Flag indicating if the dialer is currently connected. */
+   double timeout_dial; /**< Timeout in seconds for the dial operation. */
 } Efl_Net_Dialer_Tcp_Data;
 
+/**
+ * @brief Stops any ongoing asynchronous connection attempt.
+ *
+ * This function cancels and waits for the connection thread if it's running.
+ *
+ * @param pd Pointer to the private data of the Efl_Net_Dialer_Tcp object.
+ */
 static void
 _efl_net_dialer_tcp_async_stop(Efl_Net_Dialer_Tcp_Data *pd)
 {
@@ -86,6 +96,17 @@ _efl_net_dialer_tcp_efl_object_destructor(Eo *o, Efl_Net_Dialer_Tcp_Data *pd)
    eina_stringshare_replace(&pd->proxy, NULL);
 }
 
+/**
+ * @brief Callback function executed when a connection attempt times out.
+ *
+ * This function is triggered by the timeout future. It stops any async operations,
+ * sets the EOS flag, and emits a EFL_NET_DIALER_EVENT_DIALER_ERROR event.
+ *
+ * @param o The Efl_Net_Dialer_Tcp object.
+ * @param data User data (unused in this context).
+ * @param v The Eina_Value from the future (unused in this context).
+ * @return The input Eina_Value v.
+ */
 static Eina_Value
 _efl_net_dialer_tcp_connect_timeout(Eo *o, void *data EINA_UNUSED, const Eina_Value v)
 {
@@ -101,6 +122,16 @@ _efl_net_dialer_tcp_connect_timeout(Eo *o, void *data EINA_UNUSED, const Eina_Va
    return v;
 }
 
+/**
+ * @brief Schedules a timeout for the connection attempt.
+ *
+ * If a dial timeout is configured (pd->timeout_dial > 0), this function
+ * sets up a future that will trigger _efl_net_dialer_tcp_connect_timeout
+ * after the specified duration.
+ *
+ * @param o The Efl_Net_Dialer_Tcp object.
+ * @param pd Pointer to the private data of the Efl_Net_Dialer_Tcp object.
+ */
 static void
 _timeout_schedule(Eo *o, Efl_Net_Dialer_Tcp_Data *pd)
 {
@@ -109,6 +140,19 @@ _timeout_schedule(Eo *o, Efl_Net_Dialer_Tcp_Data *pd)
                    .storage = &pd->connect.timeout);
 }
 
+/**
+ * @brief Callback function executed when an asynchronous connection attempt completes.
+ *
+ * This function is called by efl_net_ip_connect_async_new when the connection
+ * attempt finishes (either successfully or with an error). It updates the
+ * dialer's state and emits appropriate events.
+ *
+ * @param data The Efl_Net_Dialer_Tcp object (passed as user data).
+ * @param addr The socket address of the connected peer.
+ * @param addrlen The length of the socket address.
+ * @param sockfd The socket file descriptor for the connection.
+ * @param err An Eina_Error code indicating the result of the connection attempt (0 on success).
+ */
 static void
 _efl_net_dialer_tcp_connected(void *data, const struct sockaddr *addr, socklen_t addrlen EINA_UNUSED, SOCKET sockfd, Eina_Error err)
 {

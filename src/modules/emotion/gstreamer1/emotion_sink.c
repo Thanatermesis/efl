@@ -38,6 +38,14 @@ G_DEFINE_TYPE_WITH_CODE(EmotionVideoSink,
 static void unlock_buffer_mutex(EmotionVideoSinkPrivate* priv);
 static void emotion_video_sink_main_render(void *data);
 
+/**
+ * @brief Initializes a new EmotionVideoSink instance.
+ * @param sink The EmotionVideoSink instance to initialize.
+ *
+ * This function is called when a new instance of the sink is created.
+ * It allocates and initializes the private data structure, including
+ * a mutex and condition variable for thread synchronization.
+ */
 static void
 emotion_video_sink_init(EmotionVideoSink* sink)
 {
@@ -55,6 +63,17 @@ emotion_video_sink_init(EmotionVideoSink* sink)
 }
 
 /**** Object methods ****/
+/**
+ * @brief Callback function to clear the Evas object reference when it's deleted.
+ * @param data The private data of the EmotionVideoSink.
+ * @param e The Evas canvas.
+ * @param obj The Evas object that was deleted.
+ * @param event_info Event-specific data.
+ *
+ * This function is registered as a callback for the `EVAS_CALLBACK_DEL` event
+ * on the Evas object. It ensures that the sink does not hold a dangling pointer
+ * to the Evas object after it has been deleted.
+ */
 static void
 _cleanup_priv(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -68,6 +87,17 @@ _cleanup_priv(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_inf
    eina_lock_release(&priv->m);
 }
 
+/**
+ * @brief Sets a property on the EmotionVideoSink object.
+ * @param object A GObject instance.
+ * @param prop_id The ID of the property to set.
+ * @param value The value to set for the property.
+ * @param pspec The GParamSpec for the property.
+ *
+ * This function handles setting GObject properties. It's primarily used
+ * to set the "emotion-object" property, which links this GStreamer sink
+ * to the Emotion object that will display the video.
+ */
 static void
 emotion_video_sink_set_property(GObject * object, guint prop_id,
                              const GValue * value, GParamSpec * pspec)
@@ -103,6 +133,16 @@ emotion_video_sink_set_property(GObject * object, guint prop_id,
    }
 }
 
+/**
+ * @brief Gets a property from the EmotionVideoSink object.
+ * @param object A GObject instance.
+ * @param prop_id The ID of the property to get.
+ * @param value A GValue to store the property value.
+ * @param pspec The GParamSpec for the property.
+ *
+ * This function handles getting GObject properties. It's used to retrieve
+ * the "emotion-object" property.
+ */
 static void
 emotion_video_sink_get_property(GObject * object, guint prop_id,
                              GValue * value, GParamSpec * pspec)
@@ -127,6 +167,14 @@ emotion_video_sink_get_property(GObject * object, guint prop_id,
    }
 }
 
+/**
+ * @brief Disposes of the EmotionVideoSink instance.
+ * @param object The EmotionVideoSink GObject to dispose.
+ *
+ * This is called when the object's refcount drops to zero. It releases
+ * all resources held by the sink, such as unmapping any mapped video frames,
+ * unreferencing buffers, and freeing the mutex and condition variable.
+ */
 static void
 emotion_video_sink_dispose(GObject* object)
 {
@@ -178,6 +226,17 @@ emotion_video_sink_dispose(GObject* object)
 
 /**** BaseSink methods ****/
 
+/**
+ * @brief Sets the capabilities of the sink.
+ * @param bsink The GstBaseSink instance.
+ * @param caps The GstCaps to set.
+ * @return TRUE on success, FALSE on failure.
+ *
+ * This function is called when the sink pad's caps are configured. It
+ * parses the video format from the caps and looks up a suitable color
+ * space converter function to convert the input video format to a format
+ * that Evas can render.
+ */
 gboolean emotion_video_sink_set_caps(GstBaseSink *bsink, GstCaps *caps)
 {
    EmotionVideoSink* sink;
@@ -218,6 +277,14 @@ gboolean emotion_video_sink_set_caps(GstBaseSink *bsink, GstCaps *caps)
    return FALSE;
 }
 
+/**
+ * @brief Starts the sink element.
+ * @param base_sink The GstBaseSink instance.
+ * @return TRUE if start is successful, FALSE otherwise.
+ *
+ * This function is called when the pipeline goes from READY to PAUSED state.
+ * It checks if the emotion object has been set, which is required for rendering.
+ */
 static gboolean
 emotion_video_sink_start(GstBaseSink* base_sink)
 {
@@ -239,6 +306,15 @@ emotion_video_sink_start(GstBaseSink* base_sink)
    return res;
 }
 
+/**
+ * @brief Stops the sink element.
+ * @param base_sink The GstBaseSink instance.
+ * @return Always returns TRUE.
+ *
+ * This function is called when the pipeline goes from PAUSED to READY state.
+ * It cleans up any held resources, like video frames and buffers, to ensure
+ * a clean state. It also signals any waiting threads to unblock.
+ */
 static gboolean
 emotion_video_sink_stop(GstBaseSink* base_sink)
 {
@@ -283,6 +359,15 @@ emotion_video_sink_stop(GstBaseSink* base_sink)
    return TRUE;
 }
 
+/**
+ * @brief Prepares the sink for a state change.
+ * @param object The GstBaseSink instance.
+ * @return The result of the parent class's unlock function.
+ *
+ * This is called before a state change to PAUSED or READY. It marks the sink
+ * as unlocked, causing subsequent buffer submissions in show_frame() to be
+ * rejected.
+ */
 static gboolean
 emotion_video_sink_unlock(GstBaseSink* object)
 {
@@ -300,6 +385,14 @@ emotion_video_sink_unlock(GstBaseSink* object)
                                        (object), TRUE);
 }
 
+/**
+ * @brief Re-enables buffer processing after a state change.
+ * @param object The GstBaseSink instance.
+ * @return The result of the parent class's unlock_stop function.
+ *
+ * This is called after a state change to re-enable buffer processing. It
+ * resets the `unlocked` flag, allowing show_frame() to process buffers again.
+ */
 static gboolean
 emotion_video_sink_unlock_stop(GstBaseSink* object)
 {
@@ -319,6 +412,19 @@ emotion_video_sink_unlock_stop(GstBaseSink* object)
                                        (object), TRUE);
 }
 
+/**
+ * @brief Renders a video frame.
+ * @param vsink The GstVideoSink instance.
+ * @param buffer The GstBuffer containing the video frame to render.
+ * @return A GstFlowReturn code indicating success or failure.
+ *
+ * This function is the core of the video sink. It is called by GStreamer
+ * for each video frame that needs to be displayed. It prepares the buffer
+ * for rendering, dispatches it to the main thread via an async ecore call
+ * (`emotion_video_sink_main_render`), and then waits on a condition
+ * variable for the rendering to complete. This synchronization ensures that
+ * the streaming thread doesn't get ahead of the rendering.
+ */
 static GstFlowReturn
 emotion_video_sink_show_frame(GstVideoSink* vsink, GstBuffer* buffer)
 {
@@ -361,6 +467,13 @@ emotion_video_sink_show_frame(GstVideoSink* vsink, GstBuffer* buffer)
    return GST_FLOW_OK;
 }
 
+/**
+ * @brief Updates and logs the frame rate.
+ * @param priv The private data of the EmotionVideoSink.
+ *
+ * This is a helper function for debugging. If FPS debugging is enabled,
+ * it calculates and potentially prints the current frames per second.
+ */
 static void
 _update_emotion_fps(EmotionVideoSinkPrivate *priv)
 {
@@ -383,6 +496,16 @@ _update_emotion_fps(EmotionVideoSinkPrivate *priv)
      }
 }
 
+/**
+ * @brief Performs the actual rendering of a video frame on the main thread.
+ * @param data A pointer to an Emotion_Gstreamer_Buffer structure.
+ *
+ * This function is called asynchronously on the main (Ecore) thread to
+ * avoid threading issues with Evas. It takes a prepared video buffer,
+ * converts its pixel data if necessary, and sets it on the Evas image
+ * object for display. After rendering, it signals the streaming thread
+ * (waiting in `emotion_video_sink_show_frame`) to continue.
+ */
 static void
 emotion_video_sink_main_render(void *data)
 {
@@ -566,6 +689,16 @@ emotion_video_sink_main_render(void *data)
    _emotion_pending_ecore_end();
 }
 
+/**
+ * @brief Signals the buffer condition variable and marks the sink as unlocked.
+ * @param priv The private data of the EmotionVideoSink.
+ *
+ * This function must be called with the private data's mutex locked.
+ * It sets the `unlocked` flag to `EINA_TRUE` and signals the condition
+ * variable `c`, which typically unblocks a waiting thread in
+ * emotion_video_sink_show_frame(). This is used to handle state changes
+ * like stopping or flushing.
+ */
 /* Must be called with priv->m taken */
 static void
 unlock_buffer_mutex(EmotionVideoSinkPrivate* priv)
@@ -575,6 +708,15 @@ unlock_buffer_mutex(EmotionVideoSinkPrivate* priv)
    eina_condition_signal(&priv->c);
 }
 
+/**
+ * @brief Initializes the EmotionVideoSinkClass.
+ * @param klass The EmotionVideoSinkClass to initialize.
+ *
+ * This function sets up the GObject class, including installing properties,
+ * setting up pad templates, and overriding virtual methods from parent
+ * classes (like GstBaseSink and GstVideoSink) with the sink's specific
+ * implementations.
+ */
 static void
 emotion_video_sink_class_init(EmotionVideoSinkClass* klass)
 {
@@ -611,6 +753,15 @@ emotion_video_sink_class_init(EmotionVideoSinkClass* klass)
    gstvideo_sink_class->show_frame = emotion_video_sink_show_frame;
 }
 
+/**
+ * @brief GStreamer plugin initialization function.
+ * @param plugin The GstPlugin to initialize.
+ * @return TRUE on successful registration, FALSE otherwise.
+ *
+ * This is the entry point for the GStreamer plugin. It registers the
+ * emotion-sink element with the GStreamer framework, making it available
+ * for use in pipelines.
+ */
 gboolean
 gstreamer_plugin_init (GstPlugin * plugin)
 {

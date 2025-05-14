@@ -53,9 +53,16 @@ typedef struct _Eina_Memory_Header Eina_Memory_Header;
      ((ENTRY & EINA_MASK_ENTRY_ID) << EINA_SHIFT_ENTRY_ID)            |  \
      ((GENERATION & EINA_MASK_GENERATIONS) << EINA_SHIFT_GENERATION))
 
+/**
+ * @internal
+ * @brief Header structure prepended to memory blocks allocated via mmap.
+ * This header is used to store the total size of the mmaped region,
+ * allowing it to be correctly munmaped later. It also contains a magic
+ * number for validation.
+ */
 struct _Eina_Memory_Header
 {
-   EINA_MAGIC;
+   EINA_MAGIC; /**< Magic number for runtime integrity checks. */
    size_t size;
 };
 

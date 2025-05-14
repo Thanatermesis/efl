@@ -19,8 +19,30 @@
  *  $ eina_modinfo <module.so>
  */
 
+/**
+ * @file
+ * @brief A utility to display information about an Eina module.
+ *
+ * This program takes a shared object file (.so) as a command-line argument,
+ * loads it as an Eina module, and prints metadata such as version,
+ * description, license, and author.
+ */
+
 #include <Eina.h>
 
+/**
+ * @brief Main function for the eina_modinfo utility.
+ *
+ * Parses command-line arguments, loads the specified Eina module,
+ * retrieves and prints module information, and then cleans up.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv An array of command-line arguments.
+ *             argv[0] is the program name.
+ *             argv[1] is expected to be the path to the Eina module file.
+ * @return 0 on success, 1 if arguments are incorrect, 2 if the module
+ *         cannot be opened, and 3 if the module cannot be loaded.
+ */
 int main(int argc, char **argv)
 {
    Eina_Module *em;

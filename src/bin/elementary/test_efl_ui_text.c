@@ -1,3 +1,8 @@
+/**
+ * @file
+ * @brief This file contains tests for Efl_Ui_Text and Efl_Ui_Textbox.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include "elementary_config.h"
 #endif
@@ -5,6 +10,17 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Applies a text style to a range of text in an Efl_Ui_Textbox object.
+ *
+ * This function creates two cursors, sets their positions, and then applies
+ * the given style attribute between these cursor positions.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param start_pos The starting position for applying the style.
+ * @param end_pos The ending position for applying the style.
+ * @param style A string describing the style to apply (e.g., "font_size=12 font_weight=bold").
+ */
 static void
 _apply_style(Eo *obj, size_t start_pos, size_t end_pos, const char *style)
 {
@@ -22,6 +38,15 @@ _apply_style(Eo *obj, size_t start_pos, size_t end_pos, const char *style)
    efl_del(end);
 }
 
+/**
+ * @brief Creates and configures an Efl_Ui_Textbox object to be used as a label.
+ *
+ * The created textbox is set to be non-editable and packed into the provided box.
+ *
+ * @param win The parent window.
+ * @param bx The box container to pack the label into.
+ * @return The newly created Efl_Ui_Textbox object.
+ */
 static Eo *
 _create_label(Eo *win, Eo *bx)
 {
@@ -33,7 +58,17 @@ _create_label(Eo *win, Eo *bx)
    return en;
 }
 
-
+/**
+ * @brief Test function for demonstrating various text label functionalities.
+ *
+ * This test creates several Efl_Ui_Textbox objects styled as labels
+ * to showcase features like basic text setting, style application,
+ * markup usage, and text wrapping.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_efl_ui_text_label(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -92,12 +127,24 @@ test_efl_ui_text_label(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, voi
    efl_text_multiline_set(en, EINA_TRUE);
 }
 
+/**
+ * @brief Structure to hold test data, specifically for text wrapping modes.
+ */
 typedef struct
 {
-   const char *wrap_mode[4];
-   size_t cur_wrap;
+   const char *wrap_mode[4]; /**< Array of strings representing different wrap modes. Not used in current code. */
+   size_t cur_wrap;           /**< Current wrap mode index. Not used in current code. */
 } Test_Data;
 
+/**
+ * @brief Callback function invoked when the "Sel" button is clicked.
+ *
+ * This function retrieves and prints the currently selected text region
+ * and the selected text itself from an Efl_Ui_Textbox.
+ *
+ * @param data Pointer to the Efl_Ui_Textbox object.
+ * @param event Unused.
+ */
 static void
 _on_bt3_clicked(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -114,6 +161,15 @@ _on_bt3_clicked(void *data, const Efl_Event *event EINA_UNUSED)
    if (s) printf("%s\n", s);
 }
 
+/**
+ * @brief Callback function invoked when the "Wr" (Wrap) button is clicked.
+ *
+ * This function cycles through different text wrapping modes
+ * (NONE, CHAR, WORD, MIXED) for the given Efl_Ui_Textbox object.
+ *
+ * @param data Pointer to the Efl_Ui_Textbox object.
+ * @param event Unused.
+ */
 static void
 _on_bt6_clicked(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -141,6 +197,17 @@ _on_bt6_clicked(void *data, const Efl_Event *event EINA_UNUSED)
    efl_text_wrap_set(text_obj, wrap);
 }
 
+/**
+ * @brief Test function for Efl_Ui_Textbox functionalities.
+ *
+ * This test creates an editable, scrollable Efl_Ui_Textbox with initial
+ * text content and styling. It also adds buttons to interact with
+ * the textbox, such as getting selected text and changing text wrapping.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_efl_ui_text(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -201,6 +268,16 @@ test_efl_ui_text(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *eve
    efl_pack(bx, bx2);
 }
 
+/**
+ * @brief Test function for Efl_Ui_Textbox as an input field.
+ *
+ * This test demonstrates using Efl_Ui_Textbox for single-line and
+ * multi-line text input, including guide text (placeholder).
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_efl_ui_text_inputfield(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

@@ -13,6 +13,13 @@ static Evas_Object *weather[2];
 static int current = 0;
 static Eina_Module *module[2];
 
+/**
+ * @brief Switches to the first city weather view.
+ *
+ * This callback is triggered by the "First city" button. It flips the
+ * panel to show the first weather widget. It has no effect if the first
+ * city is already displayed.
+ */
 static void
 _first_city_cb(void *data EINA_UNUSED, Evas_Object *o EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -21,6 +28,13 @@ _first_city_cb(void *data EINA_UNUSED, Evas_Object *o EINA_UNUSED, void *event_i
    elm_flip_go(fl, ELM_FLIP_ROTATE_YZ_CENTER_AXIS);
 }
 
+/**
+ * @brief Switches to the second city weather view.
+ *
+ * This callback is triggered by the "Second city" button. It flips the
+ * panel to show the second weather widget. It has no effect if the second
+ * city is already displayed.
+ */
 static void
 _second_city_cb(void *dat EINA_UNUSED, Evas_Object *o EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -29,6 +43,13 @@ _second_city_cb(void *dat EINA_UNUSED, Evas_Object *o EINA_UNUSED, void *event_i
    elm_flip_go(fl, ELM_FLIP_ROTATE_XZ_CENTER_AXIS);
 }
 
+/**
+ * @brief Applies the selected city and data source to the current weather view.
+ *
+ * Triggered by the "Apply" button or by pressing 'Enter' in the city
+ * entry. This function updates the currently visible weather widget with
+ * the city code from the text entry and the selected data source module.
+ */
 static void _apply_cb(void *data EINA_UNUSED, Evas_Object *o EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    EWeather *eweather = eweather_object_eweather_get(weather[current]);
@@ -40,6 +61,13 @@ static void _apply_cb(void *data EINA_UNUSED, Evas_Object *o EINA_UNUSED, void *
           current, module[current], eweather, elm_object_text_get(en));
 }
 
+/**
+ * @brief Sets the weather data source plugin.
+ *
+ * This callback is triggered when a user selects a data source from the
+ * hoversel widget. It finds the corresponding plugin module and sets it
+ * for both weather widgets.
+ */
 static void
 _hover_select_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -52,6 +80,17 @@ _hover_select_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *eve
 }
 #endif
 
+/**
+ * @brief Sets up and runs the weather widget test.
+ *
+ * This function creates a window containing a flip panel with two weather
+ * widgets, allowing demonstration of weather display for two different
+ * locations. It also includes controls to switch between cities, select
+ * a data source, and set the city name.
+ *
+ * If the Elementary EWeather component is not available, it simply displays
+ * a label indicating the requirement.
+ */
 void
 test_weather(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

@@ -37,18 +37,36 @@
 static int _ecore_ipc_log_dom = -1;
 
 /****** This swap function are around just for backward compatibility do not remove *******/
+/**
+ * @brief Swaps the byte order of a 16-bit unsigned integer.
+ * @param v The value to swap.
+ * @return The byte-swapped value.
+ * @deprecated This function is for backward compatibility. Use eina_swap16() instead.
+ */
 EAPI unsigned short
 _ecore_ipc_swap_16(unsigned short v)
 {
    return eina_swap16(v);
 }
 
+/**
+ * @brief Swaps the byte order of a 32-bit unsigned integer.
+ * @param v The value to swap.
+ * @return The byte-swapped value.
+ * @deprecated This function is for backward compatibility. Use eina_swap32() instead.
+ */
 EAPI unsigned int
 _ecore_ipc_swap_32(unsigned int v)
 {
    return eina_swap32(v);
 }
 
+/**
+ * @brief Swaps the byte order of a 64-bit unsigned integer.
+ * @param v The value to swap.
+ * @return The byte-swapped value.
+ * @deprecated This function is for backward compatibility. Use eina_swap64() instead.
+ */
 EAPI unsigned long long
 _ecore_ipc_swap_64(unsigned long long v)
 {
@@ -59,6 +77,19 @@ _ecore_ipc_swap_64(unsigned long long v)
 static int _ecore_ipc_dlt_int(int out, int prev, int *mode);
 static int _ecore_ipc_ddlt_int(int in, int prev, int mode);
 
+/**
+ * @brief Encodes an integer value using a delta compression scheme.
+ *
+ * This function calculates a delta value and determines an encoding mode
+ * based on the current value (`out`) and the previous value (`prev`).
+ * The goal is to represent the change efficiently.
+ *
+ * @param out The current integer value to encode.
+ * @param prev The previous integer value for delta calculation.
+ * @param[out] mode Pointer to store the chosen DLT_ (delta type) mode.
+ * @return The delta value to be transmitted, or the value itself if DLT_SET is used.
+ *         Returns 0 for modes like DLT_ZERO, DLT_ONE, DLT_SAME, DLT_SHL, DLT_SHR.
+ */
 static int
 _ecore_ipc_dlt_int(int out, int prev, int *mode)
 {
@@ -145,6 +176,18 @@ _ecore_ipc_dlt_int(int out, int prev, int *mode)
    return out;
 }
 
+/**
+ * @brief Decodes an integer value using a delta compression scheme.
+ *
+ * This function reconstructs the original integer value based on an input
+ * delta value (`in`), the previous reconstructed value (`prev`), and the
+ * encoding mode (`mode`) that was used during encoding by _ecore_ipc_dlt_int().
+ *
+ * @param in The input delta value (or full value for DLT_SET).
+ * @param prev The previous decoded integer value.
+ * @param mode The DLT_ (delta type) mode used for encoding.
+ * @return The reconstructed integer value. Returns 0 for DLT_R1, DLT_R2 or unknown modes.
+ */
 static int
 _ecore_ipc_ddlt_int(int in, int prev, int mode)
 {
@@ -206,11 +249,52 @@ _ecore_ipc_ddlt_int(int in, int prev, int mode)
 
 /* EFL_NET_SERVER_UNIX_CLASS and EFL_NET_DIALER_UNIX_CLASS should be defined at the same time, we're only checking for EFL_NET_SERVER_UNIX_CLASS in shared blocks */
 
+/**
+ * @brief Frees an Ecore_Ipc_Event_Client_Add event.
+ * Decrements the client's event count and deletes the client if marked for deletion and event count is zero.
+ * @param data User data (unused).
+ * @param ev The event structure to free.
+ */
 static void _ecore_ipc_event_client_add_free(void *data, void *ev);
+
+/**
+ * @brief Frees an Ecore_Ipc_Event_Client_Del event.
+ * Decrements the client's event count and deletes the client if marked for deletion and event count is zero.
+ * @param data User data (unused).
+ * @param ev The event structure to free.
+ */
 static void _ecore_ipc_event_client_del_free(void *data, void *ev);
+
+/**
+ * @brief Frees an Ecore_Ipc_Event_Client_Data event, including its data payload.
+ * Decrements the client's event count and deletes the client if marked for deletion and event count is zero.
+ * @param data User data (unused).
+ * @param ev The event structure to free.
+ */
 static void _ecore_ipc_event_client_data_free(void *data, void *ev);
+
+/**
+ * @brief Frees an Ecore_Ipc_Event_Server_Add event.
+ * Decrements the server's event count and deletes the server if marked for deletion and event count is zero.
+ * @param data User data (unused).
+ * @param ev The event structure to free.
+ */
 static void _ecore_ipc_event_server_add_free(void *data, void *ev);
+
+/**
+ * @brief Frees an Ecore_Ipc_Event_Server_Del event.
+ * Decrements the server's event count and deletes the server if marked for deletion and event count is zero.
+ * @param data User data (unused).
+ * @param ev The event structure to free.
+ */
 static void _ecore_ipc_event_server_del_free(void *data, void *ev);
+
+/**
+ * @brief Frees an Ecore_Ipc_Event_Server_Data event, including its data payload.
+ * Decrements the server's event count and deletes the server if marked for deletion and event count is zero.
+ * @param data User data (unused).
+ * @param ev The event structure to free.
+ */
 static void _ecore_ipc_event_server_data_free(void *data, void *ev);
 
 EAPI int ECORE_IPC_EVENT_CLIENT_ADD = 0;
@@ -221,8 +305,14 @@ EAPI int ECORE_IPC_EVENT_CLIENT_DATA = 0;
 EAPI int ECORE_IPC_EVENT_SERVER_DATA = 0;
 
 static int                  _ecore_ipc_init_count = 0;
-static Eina_List           *servers = NULL;
+static Eina_List           *servers = NULL; /// < List of active IPC servers.
 
+/**
+ * @brief Posts an ECORE_IPC_EVENT_SERVER_ADD event.
+ * This event signifies that a server (usually a client connecting to a remote server,
+ * represented as an Ecore_Ipc_Server locally) has successfully connected.
+ * @param svr The IPC server that has been added/connected.
+ */
 static void
 ecore_ipc_post_event_server_add(Ecore_Ipc_Server *svr)
 {
@@ -239,6 +329,12 @@ ecore_ipc_post_event_server_add(Ecore_Ipc_Server *svr)
                    _ecore_ipc_event_server_add_free, NULL);
 }
 
+/**
+ * @brief Posts an ECORE_IPC_EVENT_SERVER_DEL event.
+ * This event signifies that a server (usually a client connecting to a remote server,
+ * represented as an Ecore_Ipc_Server locally) has been disconnected or deleted.
+ * @param svr The IPC server that has been deleted/disconnected.
+ */
 static void
 ecore_ipc_post_event_server_del(Ecore_Ipc_Server *svr)
 {
@@ -255,6 +351,11 @@ ecore_ipc_post_event_server_del(Ecore_Ipc_Server *svr)
                    _ecore_ipc_event_server_del_free, NULL);
 }
 
+/**
+ * @brief Posts an ECORE_IPC_EVENT_CLIENT_ADD event.
+ * This event signifies that a new client has connected to one of our IPC servers.
+ * @param cl The IPC client that has connected.
+ */
 static void
 ecore_ipc_post_event_client_add(Ecore_Ipc_Client *cl)
 {
@@ -271,6 +372,12 @@ ecore_ipc_post_event_client_add(Ecore_Ipc_Client *cl)
                    _ecore_ipc_event_client_add_free, NULL);
 }
 
+/**
+ * @brief Posts an ECORE_IPC_EVENT_CLIENT_DEL event.
+ * This event signifies that an IPC client has disconnected.
+ * The client is marked for deletion before posting the event.
+ * @param cl The IPC client that has disconnected.
+ */
 static void
 ecore_ipc_post_event_client_del(Ecore_Ipc_Client *cl)
 {
@@ -289,6 +396,12 @@ ecore_ipc_post_event_client_del(Ecore_Ipc_Client *cl)
                    _ecore_ipc_event_client_del_free, NULL);
 }
 
+/**
+ * @brief Allocates and initializes a new Ecore_Ipc_Client structure.
+ * The new client is associated with the given server and added to its client list.
+ * @param svr The server to associate the new client with.
+ * @return A pointer to the newly created Ecore_Ipc_Client, or NULL on failure.
+ */
 static Ecore_Ipc_Client *
 ecore_ipc_client_add(Ecore_Ipc_Server *svr)
 {

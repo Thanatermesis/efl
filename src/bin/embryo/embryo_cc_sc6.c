@@ -53,6 +53,19 @@ static int          bytes_in, bytes_out;
 
 /* apparently, strtol() does not work correctly on very large (unsigned)
  * hexadecimal values */
+/**
+ * @brief Converts a hexadecimal string to an unsigned cell value.
+ *
+ * This function parses a hexadecimal string and converts it into a ucell.
+ * It supports an optional leading '-' sign for two's complement negation.
+ * Leading whitespace is ignored.
+ *
+ * @param s Pointer to the string containing the hexadecimal number.
+ *          Example: "0x1a", "1A", "-ff"
+ * @param n If not NULL, this will be updated to point to the character
+ *          in 's' that stopped the scan.
+ * @return The converted ucell value.
+ */
 static ucell
 hex2long(char *s, char **n)
 {
@@ -94,6 +107,15 @@ hex2long(char *s, char **n)
 }
 
 #ifdef WORDS_BIGENDIAN
+/**
+ * @brief Swaps bytes for a 16-bit value if on a big-endian system.
+ *
+ * This function is used to ensure correct byte order for 16-bit data
+ * when writing to or reading from a file format that expects little-endian.
+ *
+ * @param v Pointer to the 16-bit data to be byte-swapped.
+ * @return The pointer 'v' itself, after the data it points to has been modified.
+ */
 static void       *
 align16(void *v)
 {
@@ -107,6 +129,15 @@ align16(void *v)
    return v;
 }
 
+/**
+ * @brief Swaps bytes for a 32-bit value if on a big-endian system.
+ *
+ * This function is used to ensure correct byte order for 32-bit data
+ * when writing to or reading from a file format that expects little-endian.
+ *
+ * @param v Pointer to the 32-bit data to be byte-swapped.
+ * @return The pointer 'v' itself, after the data it points to has been modified.
+ */
 static void        *
 align32(void *v)
 {
@@ -134,6 +165,15 @@ align32(void *v)
 #define aligncell(v)  (v)
 #endif
 
+/**
+ * @brief Advances a string pointer past any leading whitespace characters.
+ *
+ * Whitespace is determined by the sc_isspace() macro.
+ *
+ * @param str The input string.
+ * @return Pointer to the first non-whitespace character in 'str',
+ *         or to the null terminator if the string consists only of whitespace.
+ */
 static char        *
 skipwhitespace(char *str)
 {
@@ -142,6 +182,17 @@ skipwhitespace(char *str)
    return str;
 }
 
+/**
+ * @brief Removes a P-code assembly comment (starting with ';') from a line.
+ *
+ * The comment character ';' and everything after it until the end of the
+ * line is replaced by a newline character followed by a null terminator.
+ * If no comment character is found, the string is returned unchanged.
+ *
+ * @param str The input string, typically a line read from an assembly file.
+ * @return The original pointer 'str', which may have been modified.
+ *         Example: "load.pri 0 ; load 0 to pri" becomes "load.pri 0\n"
+ */
 static char        *
 stripcomment(char *str)
 {
@@ -155,6 +206,19 @@ stripcomment(char *str)
    return str;
 }
 
+/**
+ * @brief Writes one or more cells to the binary file, applying compression if enabled.
+ *
+ * If sc_compress is true, each cell is encoded using a variable-length scheme
+ * where 7 bits of data are stored per byte, with the 8th bit indicating
+ * continuation. This can reduce file size for small cell values.
+ * If compression is not enabled, cells are written directly (after byte alignment
+ * if necessary for big-endian systems).
+ *
+ * @param fbin The output binary file stream.
+ * @param c Pointer to an array of ucell values to write.
+ * @param num The number of ucell values in the array 'c' to write.
+ */
 static void
 write_encoded(FILE * fbin, ucell * c, int num)
 {
@@ -213,6 +277,21 @@ write_encoded(FILE * fbin, ucell * c, int num)
 #pragma argsused
 #endif
 
+/**
+ * @brief Handles opcodes that have no parameters.
+ *
+ * This function is a placeholder or handler for opcodes that do not require
+ * any additional parameters from the assembly line. It typically signifies
+ * an operation that is fully defined by its opcode alone.
+ *
+ * @param fbin File pointer to the binary output file. If NULL, this function
+ *             is being called to calculate size, not to write.
+ * @param params Pointer to the parameter string from the assembly line (unused).
+ * @param opcode The numeric value of the opcode (unused in this specific function,
+ *               but part of the generic OPCODE_PROC signature).
+ * @return 0, as this type of instruction does not add to the code size beyond
+ *         what is accounted for by the caller (e.g. opcode itself).
+ */
 static cell
 noop(FILE * fbin EINA_UNUSED, char *params EINA_UNUSED, cell opcode EINA_UNUSED)
 {
@@ -223,6 +302,17 @@ noop(FILE * fbin EINA_UNUSED, char *params EINA_UNUSED, cell opcode EINA_UNUSED)
 #pragma argsused
 #endif
 
+/**
+ * @brief Handles opcodes that have no parameters but write the opcode itself.
+ *
+ * Writes the opcode to the binary file if fbin is not NULL.
+ *
+ * @param fbin File pointer to the binary output file. If NULL, this function
+ *             is being called to calculate size.
+ * @param params Pointer to the parameter string from the assembly line (unused).
+ * @param opcode The numeric value of the opcode to write.
+ * @return The size contribution of this instruction: 1 opcode.
+ */
 static cell
 parm0(FILE * fbin, char *params EINA_UNUSED, cell opcode)
 {
@@ -231,6 +321,19 @@ parm0(FILE * fbin, char *params EINA_UNUSED, cell opcode)
    return opcodes(1);
 }
 
+/**
+ * @brief Handles opcodes that take one cell-sized parameter.
+ *
+ * Parses one hexadecimal parameter from the params string, and writes the
+ * opcode followed by the parameter to the binary file if fbin is not NULL.
+ *
+ * @param fbin File pointer to the binary output file. If NULL, this function
+ *             is being called to calculate size.
+ * @param params Pointer to the parameter string from the assembly line.
+ *               Example: "1A" (representing a hex value)
+ * @param opcode The numeric value of the opcode to write.
+ * @return The size contribution of this instruction: 1 opcode + 1 argument.
+ */
 static cell
 parm1(FILE * fbin, char *params, cell opcode)
 {
@@ -244,6 +347,19 @@ parm1(FILE * fbin, char *params, cell opcode)
    return opcodes(1) + opargs(1);
 }
 
+/**
+ * @brief Handles opcodes that take two cell-sized parameters.
+ *
+ * Parses two hexadecimal parameters from the params string, and writes the
+ * opcode followed by the two parameters to the binary file if fbin is not NULL.
+ *
+ * @param fbin File pointer to the binary output file. If NULL, this function
+ *             is being called to calculate size.
+ * @param params Pointer to the parameter string from the assembly line.
+ *               Example: "1A FF00" (representing two hex values)
+ * @param opcode The numeric value of the opcode to write.
+ * @return The size contribution of this instruction: 1 opcode + 2 arguments.
+ */
 static cell
 parm2(FILE * fbin, char *params, cell opcode)
 {
@@ -263,6 +379,19 @@ parm2(FILE * fbin, char *params, cell opcode)
 #pragma argsused
 #endif
 
+/**
+ * @brief Handles the "dump" pseudo-instruction to write raw data.
+ *
+ * Parses one or more hexadecimal values from the params string and writes
+ * them directly to the binary file (in the data segment).
+ *
+ * @param fbin File pointer to the binary output file. If NULL, this function
+ *             is being called to calculate size.
+ * @param params Pointer to a string containing space-separated hexadecimal values.
+ *               Example: "01 0203 040506"
+ * @param opcode The numeric value of the opcode (unused for "dump").
+ * @return The total size of the dumped data in bytes.
+ */
 static cell
 do_dump(FILE * fbin, char *params, cell opcode EINA_UNUSED)
 {
@@ -281,6 +410,20 @@ do_dump(FILE * fbin, char *params, cell opcode EINA_UNUSED)
    return num * sizeof(cell);
 }
 
+/**
+ * @brief Handles the "call" instruction.
+ *
+ * Parses a function name from the params string, looks up its address in the
+ * global symbol table, and writes the "call" opcode followed by the function's
+ * address to the binary file.
+ *
+ * @param fbin File pointer to the binary output file. If NULL, this function
+ *             is being called to calculate size.
+ * @param params Pointer to the string containing the function name.
+ *               Example: "MyFunction"
+ * @param opcode The numeric value of the "call" opcode.
+ * @return The size contribution of this instruction: 1 opcode + 1 argument (address).
+ */
 static cell
 do_call(FILE * fbin, char *params, cell opcode)
 {
@@ -314,6 +457,20 @@ do_call(FILE * fbin, char *params, cell opcode)
    return opcodes(1) + opargs(1);
 }
 
+/**
+ * @brief Handles jump instructions (e.g., "jeq", "jump", "jnz").
+ *
+ * Parses a label index from the params string, retrieves the label's address
+ * from the label table (lbltab), and writes the jump opcode followed by the
+ * target address to the binary file.
+ *
+ * @param fbin File pointer to the binary output file. If NULL, this function
+ *             is being called to calculate size.
+ * @param params Pointer to the string containing the label index (as a hex number).
+ *               Example: "0A" (for label L.10)
+ * @param opcode The numeric value of the specific jump opcode (e.g., "jeq").
+ * @return The size contribution of this instruction: 1 opcode + 1 argument (address).
+ */
 static cell
 do_jump(FILE * fbin, char *params, cell opcode)
 {
@@ -333,6 +490,20 @@ do_jump(FILE * fbin, char *params, cell opcode)
    return opcodes(1) + opargs(1);
 }
 
+/**
+ * @brief Handles the "file" instruction, embedding file information.
+ *
+ * This instruction embeds a file ordinal and a filename into the bytecode.
+ * It's used for debugging purposes to map code addresses back to source files.
+ * The format in the binary is: opcode, total_length_of_payload, file_ordinal, filename_string.
+ *
+ * @param fbin File pointer to the binary output file. If NULL, this function
+ *             is being called to calculate size.
+ * @param params Pointer to the string containing the file ordinal (hex) followed by the filename.
+ *               Example: "1 MySourceFile.sma"
+ * @param opcode The numeric value of the "file" opcode.
+ * @return The total size contribution: 1 opcode + 1 arg (length) + payload (ordinal + filename).
+ */
 static cell
 do_file(FILE * fbin, char *params, cell opcode)
 {
@@ -363,6 +534,22 @@ do_file(FILE * fbin, char *params, cell opcode)
    return opcodes(1) + opargs(1) + clen;	/* other argument is in clen */
 }
 
+/**
+ * @brief Handles the "symbol" instruction, embedding symbol information.
+ *
+ * This instruction embeds detailed information about a symbol (variable, function)
+ * into the bytecode for debugging. This includes the symbol's name, offset/address,
+ * memory class (global, local, etc.), and type (function, variable, array).
+ * The format in the binary is: opcode, total_length_of_payload, offset, flags, symbol_name_string.
+ *
+ * @param fbin File pointer to the binary output file. If NULL, this function
+ *             is being called to calculate size.
+ * @param params Pointer to the string containing the symbol name, offset (hex),
+ *               memory class (hex), and type (hex).
+ *               Example: "MyVariable 0A 1 2" (name, offset, mclass, type)
+ * @param opcode The numeric value of the "symbol" opcode.
+ * @return The total size contribution: 1 opcode + 1 arg (length) + payload (offset, flags, name).
+ */
 static cell
 do_symbol(FILE * fbin, char *params, cell opcode)
 {
@@ -406,6 +593,22 @@ do_symbol(FILE * fbin, char *params, cell opcode)
    return opcodes(1) + opargs(1) + clen;	/* other 2 arguments are in clen */
 }
 
+/**
+ * @brief Handles the "switch" instruction.
+ *
+ * This instruction indicates the start of a jump table for a switch statement.
+ * It writes the "switch" opcode followed by the address of the default case
+ * label (or the address immediately following the casetbl if no default).
+ * The actual case table is generated by subsequent "case" instructions.
+ *
+ * @param fbin File pointer to the binary output file. If NULL, this function
+ *             is being called to calculate size.
+ * @param params Pointer to the string containing the label index (hex) for the
+ *               default case or the label after the switch.
+ *               Example: "1C" (for label L.28)
+ * @param opcode The numeric value of the "switch" opcode.
+ * @return The size contribution of this instruction: 1 opcode + 1 argument (address).
+ */
 static cell
 do_switch(FILE * fbin, char *params, cell opcode)
 {
@@ -429,6 +632,23 @@ do_switch(FILE * fbin, char *params, cell opcode)
 #pragma argsused
 #endif
 
+/**
+ * @brief Handles the "case" pseudo-instruction within a switch statement.
+ *
+ * Each "case" instruction defines an entry in the jump table for a switch.
+ * It writes a case value and the address of the corresponding label to the
+ * binary file. This forms part of the data for a preceding "switch" or "casetbl"
+ * instruction.
+ *
+ * @param fbin File pointer to the binary output file. If NULL, this function
+ *             is being called to calculate size.
+ * @param params Pointer to the string containing the case value (hex) and the
+ *               label index (hex).
+ *               Example: "0A 1D" (case value 10, jump to label L.29)
+ * @param opcode The numeric value of the opcode (unused for "case").
+ * @return The size contribution of this instruction: 2 arguments (case value + address).
+ *         Note: Does not include an opcode itself, as it's data for another instruction.
+ */
 static cell
 do_case(FILE * fbin, char *params, cell opcode EINA_UNUSED)
 {
@@ -453,6 +673,20 @@ do_case(FILE * fbin, char *params, cell opcode EINA_UNUSED)
 #pragma argsused
 #endif
 
+/**
+ * @brief Handles the "curfile" pseudo-instruction.
+ *
+ * Sets the current file index (fcurrent) based on the parameter. This index
+ * is used to associate symbols (like static functions or variables) with the
+ * correct source file during symbol lookup (e.g., in do_call).
+ * This instruction itself does not generate any bytecode.
+ *
+ * @param fbin File pointer to the binary output file (unused).
+ * @param params Pointer to the string containing the file index (hex).
+ *               Example: "1"
+ * @param opcode The numeric value of the opcode (unused for "curfile").
+ * @return 0, as this instruction does not generate code.
+ */
 static cell
 curfile(FILE * fbin EINA_UNUSED, char *params, cell opcode EINA_UNUSED)
 {
@@ -609,6 +843,17 @@ static OPCODE       opcodelist[] = {
 };
 
 #define MAX_INSTR_LEN   30
+/**
+ * @brief Finds the index of an opcode in the opcodelist array.
+ *
+ * Performs a case-insensitive binary search for the given instruction mnemonic
+ * in the sorted opcodelist.
+ *
+ * @param instr Pointer to the string containing the instruction mnemonic.
+ * @param maxlen The maximum length of the mnemonic in 'instr'.
+ * @return The index in opcodelist if found, or 0 if not found (index 0
+ *         is reserved for an invalid instruction).
+ */
 static int
 findopcode(char *instr, int maxlen)
 {
@@ -642,6 +887,33 @@ findopcode(char *instr, int maxlen)
    return 0;			/* not found, return special index */
 }
 
+/**
+ * @brief Assembles P-code from an intermediate assembly file into a binary AMX file.
+ *
+ * This function performs the final stage of compilation, converting textual P-code
+ * assembly (generated by earlier compiler stages) into a compact binary format
+ * executable by the Abstract Machine (AMX).
+ *
+ * The process involves:
+ * 1. Calculating sizes and offsets for various sections of the AMX file (header,
+ *    public function table, native function table, etc.).
+ * 2. Writing the AMX header.
+ * 3. Writing the public function table, native function table, library table,
+ *    public variable table, and public tagname table. This includes resolving
+ *    names to offsets in the name table.
+ * 4. Writing the name table itself.
+ * 5. A first pass over the assembly input (fin) to resolve all label addresses.
+ *    Label addresses are stored in `lbltab`. This pass calculates the `codeindex`
+ *    for each instruction.
+ * 6. A second pass (actually two sub-passes, one for code (CSEG) and one for
+ *    data (DSEG)) to generate the actual binary code and data by calling the
+ *    appropriate handler function for each instruction from `opcodelist`.
+ *    These handlers use `write_encoded` to write to the output file (fout).
+ * 7. If compression is enabled, the final size in the header is updated.
+ *
+ * @param fout File pointer to the output binary AMX file (opened in binary write mode).
+ * @param fin File pointer to the input P-code assembly file (opened in text read mode).
+ */
 void
 assemble(FILE * fout, FILE * fin)
 {

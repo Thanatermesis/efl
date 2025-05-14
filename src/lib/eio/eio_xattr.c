@@ -28,6 +28,17 @@
  * @cond LOCAL
  */
 
+/**
+ * @brief Worker thread function to list extended attributes of a directory.
+ *
+ * This function is executed in a separate thread. It iterates over the
+ * extended attributes of the specified directory, filters them if a
+ * filter callback is provided, and sends them back to the main thread
+ * in batches.
+ *
+ * @param data Pointer to Eio_File_Char_Ls structure containing operation details.
+ * @param thread Pointer to the Ecore_Thread executing this function.
+ */
 static void
 _eio_ls_xattr_heavy(void *data, Ecore_Thread *thread)
 {
@@ -89,6 +100,16 @@ _eio_ls_xattr_heavy(void *data, Ecore_Thread *thread)
    async->ls.ls = it;
 }
 
+/**
+ * @brief Worker thread function to get a specific extended attribute of a file.
+ *
+ * This function is executed in a separate thread. It retrieves the value
+ * of a specified extended attribute for a given file. The type of the
+ * attribute (data, string, double, int) is determined by async->op.
+ *
+ * @param data Pointer to Eio_File_Xattr structure containing operation details.
+ * @param thread Pointer to the Ecore_Thread executing this function.
+ */
 static void
 _eio_file_xattr_get(void *data, Ecore_Thread *thread)
 {
@@ -125,6 +146,15 @@ _eio_file_xattr_get(void *data, Ecore_Thread *thread)
      ecore_thread_cancel(thread);
 }
 
+/**
+ * @brief Frees resources associated with an Eio_File_Xattr operation.
+ *
+ * This function releases stringshares for path and attribute, and frees
+ * any data allocated for the attribute value if it was a get operation.
+ * It also frees the base Eio_File structure.
+ *
+ * @param async Pointer to the Eio_File_Xattr structure to free.
+ */
 static void
 _eio_file_xattr_free(Eio_File_Xattr *async)
 {
@@ -138,6 +168,15 @@ _eio_file_xattr_free(Eio_File_Xattr *async)
    eio_file_free(&async->common);
 }
 
+/**
+ * @brief Callback executed in the main thread after _eio_file_xattr_get successfully completes.
+ *
+ * This function invokes the user-provided done callback with the retrieved
+ * extended attribute data, based on the attribute type.
+ *
+ * @param data Pointer to Eio_File_Xattr structure.
+ * @param thread Pointer to the Ecore_Thread (unused).
+ */
 static void
 _eio_file_xattr_get_done(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -166,6 +205,15 @@ _eio_file_xattr_get_done(void *data, Ecore_Thread *thread EINA_UNUSED)
    _eio_file_xattr_free(async);
 }
 
+/**
+ * @brief Callback executed in the main thread if _eio_file_xattr_get encounters an error.
+ *
+ * This function invokes the user-provided error callback and then frees
+ * the Eio_File_Xattr structure.
+ *
+ * @param data Pointer to Eio_File_Xattr structure.
+ * @param thread Pointer to the Ecore_Thread (unused).
+ */
 static void
 _eio_file_xattr_get_error(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -175,6 +223,16 @@ _eio_file_xattr_get_error(void *data, Ecore_Thread *thread EINA_UNUSED)
    _eio_file_xattr_free(async);
 }
 
+/**
+ * @brief Worker thread function to set a specific extended attribute of a file.
+ *
+ * This function is executed in a separate thread. It sets the value
+ * of a specified extended attribute for a given file. The type of the
+ * attribute (data, string, double, int) is determined by async->op.
+ *
+ * @param data Pointer to Eio_File_Xattr structure containing operation details.
+ * @param thread Pointer to the Ecore_Thread executing this function.
+ */
 static void
 _eio_file_xattr_set(void *data, Ecore_Thread *thread)
 {
@@ -211,6 +269,15 @@ _eio_file_xattr_set(void *data, Ecore_Thread *thread)
    if (failure) eio_file_thread_error(&async->common, thread);
 }
 
+/**
+ * @brief Callback executed in the main thread after _eio_file_xattr_set successfully completes.
+ *
+ * This function invokes the user-provided done callback if the thread was not cancelled.
+ * It then frees the Eio_File_Xattr structure.
+ *
+ * @param data Pointer to Eio_File_Xattr structure.
+ * @param thread Pointer to the Ecore_Thread.
+ */
 static void
 _eio_file_xattr_set_done(void *data, Ecore_Thread *thread)
 {
@@ -225,6 +292,15 @@ _eio_file_xattr_set_done(void *data, Ecore_Thread *thread)
    _eio_file_xattr_free(async);
 }
 
+/**
+ * @brief Callback executed in the main thread if _eio_file_xattr_set encounters an error.
+ *
+ * This function invokes the user-provided error callback and then frees
+ * the Eio_File_Xattr structure.
+ *
+ * @param data Pointer to Eio_File_Xattr structure.
+ * @param thread Pointer to the Ecore_Thread (unused).
+ */
 static void
 _eio_file_xattr_set_error(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -234,6 +310,19 @@ _eio_file_xattr_set_error(void *data, Ecore_Thread *thread EINA_UNUSED)
    _eio_file_xattr_free(async);
 }
 
+/**
+ * @brief Sets up an Eio_File_Xattr structure for a get operation.
+ *
+ * Initializes the common Eio_File fields and specific fields for getting
+ * an extended attribute.
+ *
+ * @param async Pointer to the Eio_File_Xattr structure to initialize.
+ * @param path The file path.
+ * @param attribute The name of the extended attribute.
+ * @param error_cb Callback function for errors.
+ * @param data User data for the callbacks.
+ * @return An Eio_File handle for the operation, or NULL on failure.
+ */
 static Eio_File *
 _eio_file_xattr_setup_get(Eio_File_Xattr *async,
 			  const char *path,
@@ -257,6 +346,21 @@ _eio_file_xattr_setup_get(Eio_File_Xattr *async,
    return &async->common;
 }
 
+/**
+ * @brief Sets up an Eio_File_Xattr structure for a set operation.
+ *
+ * Initializes the common Eio_File fields and specific fields for setting
+ * an extended attribute.
+ *
+ * @param async Pointer to the Eio_File_Xattr structure to initialize.
+ * @param path The file path.
+ * @param attribute The name of the extended attribute.
+ * @param flags Flags for the set operation (e.g., EINA_XATTR_CREATE, EINA_XATTR_REPLACE).
+ * @param done_cb Callback function for successful completion.
+ * @param error_cb Callback function for errors.
+ * @param data User data for the callbacks.
+ * @return An Eio_File handle for the operation, or NULL on failure.
+ */
 static Eio_File *
 _eio_file_xattr_setup_set(Eio_File_Xattr *async,
 			  const char *path,
@@ -305,6 +409,25 @@ _eio_file_xattr_setup_set(Eio_File_Xattr *async,
  *                                   API                                      *
  *============================================================================*/
 
+/**
+ * @internal
+ * @brief Internal function to list extended attributes of a file or directory.
+ *
+ * This function serves as a common backend for eio_file_xattr and _eio_file_xattr.
+ * It sets up an asynchronous operation to list extended attributes.
+ * One of main_cb or main_internal_cb must be provided.
+ *
+ * @param path The path to the file or directory.
+ * @param filter_cb Optional callback to filter attributes.
+ * @param main_cb Callback to process each attribute name (string).
+ *        Example: void main_cb(void *data, Eio_File *handler, const char *xattr_name);
+ * @param main_internal_cb Callback to process an array of attribute names.
+ *        Example: void main_internal_cb(void *data, Eio_File *handler, const Eina_Array *xattr_names_array);
+ * @param done_cb Callback when the listing is complete.
+ * @param error_cb Callback if an error occurs.
+ * @param data User data for the callbacks.
+ * @return An Eio_File handle for the operation, or NULL on failure.
+ */
 static Eio_File *
 _eio_file_internal_xattr(const char *path,
                          Eio_Filter_Cb filter_cb,
@@ -349,6 +472,28 @@ _eio_file_internal_xattr(const char *path,
   return &async->ls.common;
 }
 
+/**
+ * @brief Asynchronously lists all extended attributes for a given path.
+ *
+ * This function initiates an asynchronous operation to list the names of
+ * all extended attributes associated with the file or directory specified by @p path.
+ * For each attribute found, @p main_cb is called.
+ *
+ * @param path The path to the file or directory.
+ * @param filter_cb An optional function to filter attribute names.
+ *        It receives user data, the Eio_File handler, and the attribute name.
+ *        Return EINA_TRUE to include the attribute, EINA_FALSE to exclude.
+ *        Example: Eina_Bool filter_cb(void *data, Eio_File *handler, const char *xattr_name);
+ * @param main_cb A callback function invoked for each attribute name found.
+ *        Example: void main_cb(void *data, Eio_File *handler, const char *xattr_name);
+ * @param done_cb A callback function invoked when the listing is complete.
+ *        Example: void done_cb(void *data, Eio_File *handler);
+ * @param error_cb A callback function invoked if an error occurs.
+ *        Example: void error_cb(void *data, Eio_File *handler, int error_code);
+ * @param data User-specific data to be passed to the callbacks.
+ * @return An Eio_File handle for the asynchronous operation, or @c NULL on failure.
+ *         This handle can be used with eio_file_cancel() or eio_file_direct_do().
+ */
 EIO_API Eio_File *
 eio_file_xattr(const char *path,
                Eio_Filter_Cb filter_cb,
@@ -362,6 +507,23 @@ eio_file_xattr(const char *path,
   return _eio_file_internal_xattr(path, filter_cb, main_cb, NULL, done_cb, error_cb, data);
 }
 
+/**
+ * @internal
+ * @brief Asynchronously lists all extended attributes, delivering results as an array.
+ *
+ * Similar to eio_file_xattr(), but calls @p main_internal_cb with an Eina_Array
+ * of attribute names. This is typically used internally or when batch processing
+ * of attribute names is preferred.
+ *
+ * @param path The path to the file or directory.
+ * @param main_internal_cb A callback function invoked with an array of attribute names.
+ *        The Eina_Array contains (char *) elements.
+ *        Example: void main_internal_cb(void *data, Eio_File *handler, const Eina_Array *xattr_names_array);
+ * @param done_cb A callback function invoked when the listing is complete.
+ * @param error_cb A callback function invoked if an error occurs.
+ * @param data User-specific data to be passed to the callbacks.
+ * @return An Eio_File handle for the asynchronous operation, or @c NULL on failure.
+ */
 Eio_File *
 _eio_file_xattr(const char *path,
                 Eio_Array_Cb main_internal_cb,
@@ -374,6 +536,23 @@ _eio_file_xattr(const char *path,
    return _eio_file_internal_xattr(path, NULL, NULL, main_internal_cb, done_cb, error_cb, data);
 }
 
+/**
+ * @brief Asynchronously retrieves an extended attribute as raw data.
+ *
+ * Initiates an asynchronous operation to get the value of the specified
+ * extended attribute @p attribute for the file @p path. The result is
+ * returned as a data buffer and its size.
+ *
+ * @param path The path to the file.
+ * @param attribute The name of the extended attribute to retrieve.
+ * @param done_cb Callback invoked upon successful retrieval.
+ *        It receives the user data, Eio_File handler, a pointer to the attribute data,
+ *        and the size of the data. The data buffer is owned by Eio and freed after the callback.
+ *        Example: void done_cb(void *data, Eio_File *handler, const void *xattr_data, unsigned int xattr_size);
+ * @param error_cb Callback invoked if an error occurs.
+ * @param data User-specific data for the callbacks.
+ * @return An Eio_File handle for the operation, or @c NULL on failure.
+ */
 EIO_API Eio_File *
 eio_file_xattr_get(const char *path,
 		   const char *attribute,
@@ -397,6 +576,23 @@ eio_file_xattr_get(const char *path,
    return _eio_file_xattr_setup_get(async, path, attribute, error_cb, data);
 }
 
+/**
+ * @brief Asynchronously retrieves an extended attribute as a string.
+ *
+ * Initiates an asynchronous operation to get the value of the specified
+ * extended attribute @p attribute for the file @p path. The result is
+ * returned as a null-terminated string.
+ *
+ * @param path The path to the file.
+ * @param attribute The name of the extended attribute to retrieve.
+ * @param done_cb Callback invoked upon successful retrieval.
+ *        It receives user data, Eio_File handler, and the attribute string.
+ *        The string is owned by Eio and freed after the callback.
+ *        Example: void done_cb(void *data, Eio_File *handler, const char *xattr_string);
+ * @param error_cb Callback invoked if an error occurs.
+ * @param data User-specific data for the callbacks.
+ * @return An Eio_File handle for the operation, or @c NULL on failure.
+ */
 EIO_API Eio_File *
 eio_file_xattr_string_get(const char *path,
 			  const char *attribute,
@@ -420,6 +616,22 @@ eio_file_xattr_string_get(const char *path,
    return _eio_file_xattr_setup_get(async, path, attribute, error_cb, data);
 }
 
+/**
+ * @brief Asynchronously retrieves an extended attribute as a double.
+ *
+ * Initiates an asynchronous operation to get the value of the specified
+ * extended attribute @p attribute for the file @p path. The result is
+ * returned as a double-precision floating-point number.
+ *
+ * @param path The path to the file.
+ * @param attribute The name of the extended attribute to retrieve.
+ * @param done_cb Callback invoked upon successful retrieval.
+ *        It receives user data, Eio_File handler, and the attribute value as a double.
+ *        Example: void done_cb(void *data, Eio_File *handler, double xattr_double);
+ * @param error_cb Callback invoked if an error occurs.
+ * @param data User-specific data for the callbacks.
+ * @return An Eio_File handle for the operation, or @c NULL on failure.
+ */
 EIO_API Eio_File *
 eio_file_xattr_double_get(const char *path,
 			  const char *attribute,
@@ -443,6 +655,22 @@ eio_file_xattr_double_get(const char *path,
    return _eio_file_xattr_setup_get(async, path, attribute, error_cb, data);
 }
 
+/**
+ * @brief Asynchronously retrieves an extended attribute as an integer.
+ *
+ * Initiates an asynchronous operation to get the value of the specified
+ * extended attribute @p attribute for the file @p path. The result is
+ * returned as an integer.
+ *
+ * @param path The path to the file.
+ * @param attribute The name of the extended attribute to retrieve.
+ * @param done_cb Callback invoked upon successful retrieval.
+ *        It receives user data, Eio_File handler, and the attribute value as an int.
+ *        Example: void done_cb(void *data, Eio_File *handler, int xattr_int);
+ * @param error_cb Callback invoked if an error occurs.
+ * @param data User-specific data for the callbacks.
+ * @return An Eio_File handle for the operation, or @c NULL on failure.
+ */
 EIO_API Eio_File *
 eio_file_xattr_int_get(const char *path,
 		       const char *attribute,
@@ -466,6 +694,23 @@ eio_file_xattr_int_get(const char *path,
    return _eio_file_xattr_setup_get(async, path, attribute, error_cb, data);
 }
 
+/**
+ * @brief Asynchronously sets an extended attribute as raw data.
+ *
+ * Initiates an asynchronous operation to set the value of the extended
+ * attribute @p attribute for the file @p path using the provided raw data.
+ *
+ * @param path The path to the file.
+ * @param attribute The name of the extended attribute to set.
+ * @param xattr_data Pointer to the data to be set.
+ * @param xattr_size Size of the data in bytes.
+ * @param flags Flags for the operation (e.g., EINA_XATTR_CREATE, EINA_XATTR_REPLACE).
+ * @param done_cb Callback invoked upon successful completion.
+ *        Example: void done_cb(void *data, Eio_File *handler);
+ * @param error_cb Callback invoked if an error occurs.
+ * @param data User-specific data for the callbacks.
+ * @return An Eio_File handle for the operation, or @c NULL on failure.
+ */
 EIO_API Eio_File *
 eio_file_xattr_set(const char *path,
                    const char *attribute,
@@ -496,6 +741,21 @@ eio_file_xattr_set(const char *path,
    return _eio_file_xattr_setup_set(async, path, attribute, flags, done_cb, error_cb, data);
 }
 
+/**
+ * @brief Asynchronously sets an extended attribute as a string.
+ *
+ * Initiates an asynchronous operation to set the value of the extended
+ * attribute @p attribute for the file @p path using the provided null-terminated string.
+ *
+ * @param path The path to the file.
+ * @param attribute The name of the extended attribute to set.
+ * @param xattr_string The null-terminated string to be set.
+ * @param flags Flags for the operation (e.g., EINA_XATTR_CREATE, EINA_XATTR_REPLACE).
+ * @param done_cb Callback invoked upon successful completion.
+ * @param error_cb Callback invoked if an error occurs.
+ * @param data User-specific data for the callbacks.
+ * @return An Eio_File handle for the operation, or @c NULL on failure.
+ */
 EIO_API Eio_File *
 eio_file_xattr_string_set(const char *path,
 			  const char *attribute,
@@ -531,6 +791,21 @@ eio_file_xattr_string_set(const char *path,
    return _eio_file_xattr_setup_set(async, path, attribute, flags, done_cb, error_cb, data);
 }
 
+/**
+ * @brief Asynchronously sets an extended attribute as a double.
+ *
+ * Initiates an asynchronous operation to set the value of the extended
+ * attribute @p attribute for the file @p path using the provided double value.
+ *
+ * @param path The path to the file.
+ * @param attribute The name of the extended attribute to set.
+ * @param xattr_double The double value to be set.
+ * @param flags Flags for the operation (e.g., EINA_XATTR_CREATE, EINA_XATTR_REPLACE).
+ * @param done_cb Callback invoked upon successful completion.
+ * @param error_cb Callback invoked if an error occurs.
+ * @param data User-specific data for the callbacks.
+ * @return An Eio_File handle for the operation, or @c NULL on failure.
+ */
 EIO_API Eio_File *
 eio_file_xattr_double_set(const char *path,
 			  const char *attribute,
@@ -556,6 +831,21 @@ eio_file_xattr_double_set(const char *path,
    return _eio_file_xattr_setup_set(async, path, attribute, flags, done_cb, error_cb, data);
 }
 
+/**
+ * @brief Asynchronously sets an extended attribute as an integer.
+ *
+ * Initiates an asynchronous operation to set the value of the extended
+ * attribute @p attribute for the file @p path using the provided integer value.
+ *
+ * @param path The path to the file.
+ * @param attribute The name of the extended attribute to set.
+ * @param xattr_int The integer value to be set.
+ * @param flags Flags for the operation (e.g., EINA_XATTR_CREATE, EINA_XATTR_REPLACE).
+ * @param done_cb Callback invoked upon successful completion.
+ * @param error_cb Callback invoked if an error occurs.
+ * @param data User-specific data for the callbacks.
+ * @return An Eio_File handle for the operation, or @c NULL on failure.
+ */
 EIO_API Eio_File *
 eio_file_xattr_int_set(const char *path,
 		       const char *attribute,

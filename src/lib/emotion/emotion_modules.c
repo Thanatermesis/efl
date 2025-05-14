@@ -16,22 +16,51 @@ Eina_Bool gstreamer_module_init(void);
 void      gstreamer_module_shutdown(void);
 #endif
 
+/**
+ * @brief Represents a registered emotion engine.
+ * @since 1.2.0
+ *
+ * This structure holds a pointer to the engine's API and its priority,
+ * which is used for sorting available engines.
+ */
 typedef struct _Emotion_Engine_Registry_Entry
 {
-   const Emotion_Engine *engine;
-   int priority;
+   const Emotion_Engine *engine; /**< A pointer to the engine implementation. */
+   int priority;                 /**< The priority of the engine, higher is better. */
 } Emotion_Engine_Registry_Entry;
 
+/** A sorted list of registered Emotion_Engine_Registry_Entry. Sorted by priority. */
 static Eina_List *_emotion_engine_registry = NULL;
+/** An array of discovered Eina_Module handles for emotion engines. */
 static Eina_Array *_emotion_modules = NULL;
+/** A flag to ensure modules are discovered only once. */
 static Eina_Bool _emotion_modules_loaded = EINA_FALSE;
 
+/**
+ * @brief Frees the memory allocated for an Emotion_Engine_Registry_Entry.
+ * @param re The registry entry to free.
+ */
 static void
 _emotion_engine_registry_entry_free(Emotion_Engine_Registry_Entry *re)
 {
    free(re);
 }
 
+/**
+ * @brief Compares two Emotion_Engine_Registry_Entry objects for sorting.
+ *
+ * This function is used to sort the engine registry. The primary sorting key is
+ * the user-defined priority (`b->priority`), in descending order. The secondary
+ * key is the engine's own priority (`b->engine->priority`), also descending.
+ * As a tie-breaker, it uses the engine name alphabetically (`b->engine->name`)
+ * to ensure a stable sort order, which can be helpful for debugging.
+ *
+ * @param pa A pointer to the first Emotion_Engine_Registry_Entry.
+ * @param pb A pointer to the second Emotion_Engine_Registry_Entry.
+ * @return An integer less than, equal to, or greater than zero if the first
+ *         argument is considered to be respectively less than, equal to, or
+ *         greater than the second.
+ */
 static int
 _emotion_engine_registry_entry_cmp(const void *pa, const void *pb)
 {
@@ -48,6 +77,24 @@ _emotion_engine_registry_entry_cmp(const void *pa, const void *pb)
    return r;
 }
 
+/**
+ * @brief Scans for and discovers available Emotion engine modules.
+ *
+ * This function is called on-demand the first time an engine is needed. It
+ * populates the `_emotion_modules` array with `Eina_Module` handles for all
+ * found engine modules.
+ *
+ * It first checks if running in a development tree (via `EFL_RUN_IN_TREE`
+ * environment variable) and if so, finds modules from the build directory.
+ * This is useful for development without installing.
+ *
+ * Otherwise, it searches for modules in the standard system library path for
+ * emotion modules (e.g., `/usr/lib/emotion/modules`).
+ *
+ * Note that this function only finds the modules; it does not load them into
+ * memory until they are actually requested. This is a change from previous
+ * behavior to save memory.
+ */
 static void
 _emotion_modules_load(void)
 {
@@ -105,6 +152,15 @@ _emotion_modules_load(void)
 //     ERR("Couldn't find any emotion engine.");
 }
 
+/**
+ * @brief Initializes the Emotion module system.
+ *
+ * This function must be called at Emotion library initialization.
+ * For statically-linked builds (e.g., `EMOTION_STATIC_BUILD_GSTREAMER1`),
+ * it calls the initialization function of the static module directly.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 Eina_Bool
 emotion_modules_init(void)
 {
@@ -115,6 +171,16 @@ emotion_modules_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Shuts down the Emotion module system.
+ *
+ * This function must be called at Emotion library shutdown. It frees all
+ * loaded modules and cleans up the engine registry. For statically-linked
+ * builds, it also calls the shutdown function of the static module.
+ *
+ * It will issue a warning for any engine that was registered but not
+ * properly unregistered, which might indicate a resource leak in a module.
+ */
 void
 emotion_modules_shutdown(void)
 {
@@ -140,6 +206,20 @@ emotion_modules_shutdown(void)
    _emotion_modules_loaded = EINA_FALSE;
 }
 
+/**
+ * @brief Registers a new playback engine with Emotion.
+ *
+ * This function is called by a module when it is loaded to make its engine
+ * available for use. It validates the engine's API version and adds it to
+ * the global `_emotion_engine_registry`.
+ *
+ * The engine is inserted into the registry in a sorted manner based on its
+ * priority, ensuring that higher-priority engines are tried first.
+ *
+ * @param api A pointer to the `Emotion_Engine` structure provided by the module.
+ *        The `api` structure must be valid for the lifetime of the module.
+ * @return `EINA_TRUE` on successful registration, `EINA_FALSE` otherwise.
+ */
 EMOTION_API Eina_Bool
 _emotion_module_register(const Emotion_Engine *api)
 {
@@ -171,6 +251,18 @@ _emotion_module_register(const Emotion_Engine *api)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Unregisters a playback engine from Emotion.
+ *
+ * This function is called by a module when it is unloaded. It removes the
+ * specified engine from the `_emotion_engine_registry`, making it unavailable
+ * for new playback instances.
+ *
+ * @param api A pointer to the `Emotion_Engine` structure that was previously
+ *            registered.
+ * @return `EINA_TRUE` on successful unregistration, `EINA_FALSE` if the
+ *         engine was not found or if there was an API version mismatch.
+ */
 EMOTION_API Eina_Bool
 _emotion_module_unregister(const Emotion_Engine *api)
 {
@@ -202,13 +294,30 @@ _emotion_module_unregister(const Emotion_Engine *api)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Represents an active instance of a playback engine.
+ *
+ * This structure is a wrapper around a specific engine's implementation.
+ * It holds a pointer to the engine's API, the associated Evas object, and
+ * the private data managed by the engine instance.
+ */
 struct _Emotion_Engine_Instance
 {
-   const Emotion_Engine *api;
-   Evas_Object *obj;
-   void *data;
+   const Emotion_Engine *api; /**< Pointer to the engine's function table. */
+   Evas_Object *obj;          /**< The Evas object this instance is tied to. */
+   void *data;                /**< The engine-specific instance data. */
 };
 
+/**
+ * @brief Macro to safely check if an engine instance and its method are valid.
+ * @param inst The Emotion_Engine_Instance pointer.
+ * @param meth The method name (member of Emotion_Engine).
+ * @param ... The return value on failure.
+ *
+ * This macro checks if the instance is non-NULL and if the requested method
+ * function pointer in its API table is also non-NULL. If either check fails,
+ * it prints a debug message and returns the provided default value.
+ */
 #define EMOTION_ENGINE_INSTANCE_CHECK(inst, meth, ...)  \
   do                                                    \
     {                                                   \
@@ -225,6 +334,15 @@ struct _Emotion_Engine_Instance
     }                                                   \
   while (0)
 
+/**
+ * @brief Macro to safely call an engine method that has no return value.
+ * @param inst The Emotion_Engine_Instance pointer.
+ * @param meth The method name to call.
+ * @param ... The arguments to pass to the method.
+ *
+ * This macro uses `EMOTION_ENGINE_INSTANCE_CHECK` to validate the call, and
+ * if valid, calls the engine method with the provided arguments.
+ */
 #define EMOTION_ENGINE_INSTANCE_CALL(inst, meth, ...)   \
   do                                                    \
     {                                                   \
@@ -233,6 +351,17 @@ struct _Emotion_Engine_Instance
     }                                                   \
   while (0)
 
+/**
+ * @brief Macro to safely call an engine method that returns a value.
+ * @param inst The Emotion_Engine_Instance pointer.
+ * @param meth The method name to call.
+ * @param retval The default value to return if the check fails.
+ * @param ... The arguments to pass to the method.
+ *
+ * This macro uses `EMOTION_ENGINE_INSTANCE_CHECK` to validate the call. If
+ * the check fails, it returns `retval`. Otherwise, it calls the engine method
+ * and returns its result.
+ */
 #define EMOTION_ENGINE_INSTANCE_CALL_RET(inst, meth, retval, ...)       \
   do                                                                    \
     {                                                                   \
@@ -242,6 +371,11 @@ struct _Emotion_Engine_Instance
   while (0)
 
 
+/**
+ * @brief Finds a registered engine by its name.
+ * @param name The name of the engine to find (e.g., "gstreamer1").
+ * @return A pointer to the `Emotion_Engine` if found, otherwise `NULL`.
+ */
 static const Emotion_Engine *
 _emotion_engine_registry_find(const char *name)
 {
@@ -255,6 +389,19 @@ _emotion_engine_registry_find(const char *name)
    return NULL;
 }
 
+/**
+ * @brief Creates and initializes a new Emotion_Engine_Instance wrapper.
+ *
+ * This is a helper function that allocates an `Emotion_Engine_Instance` and
+ * populates it with the provided engine API, Evas object, and engine-specific
+ * data. On allocation failure, it ensures the engine's `del` function is called
+ * to clean up the engine-specific data.
+ *
+ * @param engine The engine API for this instance.
+ * @param obj The Evas object associated with this instance.
+ * @param data The private data returned from the engine's `add` function.
+ * @return A new `Emotion_Engine_Instance` on success, or `NULL` on failure.
+ */
 static Emotion_Engine_Instance *
 _emotion_engine_instance_new(const Emotion_Engine *engine, Evas_Object *obj, void *data)
 {
@@ -270,6 +417,24 @@ _emotion_engine_instance_new(const Emotion_Engine *engine, Evas_Object *obj, voi
    return NULL;
 }
 
+/**
+ * @brief Finds a module handle from the list of discovered modules by its short name.
+ *
+ * This function iterates through the `_emotion_modules` array of module file
+ * paths and tries to match the given short `name` against a component of
+ * the path. This is necessary because `eina_module` works with full file
+ * paths, but users and configuration often refer to engines by a short name
+ * like "gstreamer1".
+ *
+ * The matching logic is designed to extract the module name from a path that
+ * follows a pattern like `.../lib/emotion/modules/gstreamer1/x86_64/main.so`.
+ * In this example, it would extract and compare against "gstreamer1".
+ * It can also match against the architecture component (e.g., "x86_64"),
+ * though this is less common.
+ *
+ * @param name The short name of the module to find (e.g., "gstreamer1").
+ * @return The `Eina_Module` handle if found, otherwise `NULL`.
+ */
 static Eina_Module *
 _find_mod(const char *name)
 {
@@ -328,6 +493,33 @@ _find_mod(const char *name)
    return NULL;
 }
 
+/**
+ * @brief Creates a new instance of an Emotion playback engine.
+ *
+ * This is the main function for obtaining a video playback instance. It handles
+ * the full logic of selecting, loading, and initializing a suitable engine.
+ *
+ * The process is as follows:
+ * 1. Ensures all available modules are discovered via `_emotion_modules_load()`.
+ * 2. If `name` is NULL, it checks the `EMOTION_ENGINE` environment variable.
+ * 3. If a specific `name` is provided (or found in the environment), it attempts
+ *    to find and load that specific module. If the module loads and its engine
+ *    can be initialized, that engine is used.
+ * 4. If no name is specified, or if the requested engine fails, it falls back
+ *    to trying all registered engines in order of priority.
+ * 5. As a last resort if no engines are registered, it attempts to load the
+ *    "gstreamer1" module explicitly.
+ *
+ * The function also temporarily unsets the `DISPLAY` environment variable if
+ * `WAYLAND_DISPLAY` is set, which is a workaround for some backends.
+ *
+ * @param name The preferred engine name (e.g., "gstreamer1"), or NULL to auto-detect.
+ * @param obj The Evas_Object that will display the video.
+ * @param opts A pointer to `Emotion_Module_Options` to specify options like
+ *             disabling video or audio. Can be NULL.
+ * @return A new `Emotion_Engine_Instance` on success, or `NULL` if no suitable
+ *         engine could be initialized.
+ */
 Emotion_Engine_Instance *
 emotion_engine_instance_new(const char *name, Evas_Object *obj, Emotion_Module_Options *opts)
 {
@@ -412,6 +604,23 @@ emotion_engine_instance_new(const char *name, Evas_Object *obj, Emotion_Module_O
    return NULL;
 }
 
+/**
+ * @defgroup Emotion_Engine_Instance_Wrappers Engine Instance API Wrappers
+ * @brief These functions are thin wrappers around the `Emotion_Engine` API.
+ *
+ * Each function corresponds to a function pointer in the `Emotion_Engine`
+ * struct. They perform safety checks using the `EMOTION_ENGINE_INSTANCE_CALL*`
+ * macros and then invoke the actual implementation provided by the engine.
+ * For detailed documentation on what each function does, refer to the
+ * corresponding member in the `Emotion_Engine` struct definition in
+ * `emotion_modules.h`.
+ * @{
+ */
+
+/**
+ * @brief Deletes an engine instance and frees its resources.
+ * @param inst The engine instance to delete.
+ */
 void
 emotion_engine_instance_del(Emotion_Engine_Instance *inst)
 {
@@ -420,6 +629,12 @@ emotion_engine_instance_del(Emotion_Engine_Instance *inst)
    free(inst);
 }
 
+/**
+ * @brief Compares the instance's engine name with a given name.
+ * @param inst The engine instance.
+ * @param name The name to compare against.
+ * @return EINA_TRUE if the names match, EINA_FALSE otherwise.
+ */
 Eina_Bool
 emotion_engine_instance_name_equal(const Emotion_Engine_Instance *inst, const char *name)
 {
@@ -429,6 +644,11 @@ emotion_engine_instance_name_equal(const Emotion_Engine_Instance *inst, const ch
    return strcmp(name, inst->api->name) == 0;
 }
 
+/**
+ * @brief Retrieves the engine-specific data pointer from an instance.
+ * @param inst The engine instance.
+ * @return The internal data pointer managed by the engine.
+ */
 void *
 emotion_engine_instance_data_get(const Emotion_Engine_Instance *inst)
 {
@@ -436,6 +656,12 @@ emotion_engine_instance_data_get(const Emotion_Engine_Instance *inst)
    return inst->data;
 }
 
+/**
+ * @brief Opens a media file for playback.
+ * @param inst The engine instance.
+ * @param file The path to the media file.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 Eina_Bool
 emotion_engine_instance_file_open(Emotion_Engine_Instance *inst, const char *file)
 {
@@ -796,3 +1022,7 @@ emotion_engine_instance_priority_get(const Emotion_Engine_Instance *inst)
 {
    EMOTION_ENGINE_INSTANCE_CALL_RET(inst, priority_get, EINA_FALSE);
 }
+
+/**
+ * @}
+ */

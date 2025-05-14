@@ -15,6 +15,18 @@
 
 #define MY_CLASS_NAME "Efl.Ui.List_Default_Item"
 
+/**
+ * @brief Constructor for the Efl.Ui.List_Default_Item.
+ *
+ * This function is called when a new Efl.Ui.List_Default_Item object is
+ * created. It initializes the object by calling the superclass constructor
+ * and sets a default theme ("list_item") if no theme has been
+ * explicitly set for the widget.
+ *
+ * @param obj The Efl_Object to construct.
+ * @param pd Private data for the object (unused in this function).
+ * @return The constructed Efl_Object, or NULL on failure.
+ */
 EOLIAN static Efl_Object *
 _efl_ui_list_default_item_efl_object_constructor(Eo *obj, void *pd EINA_UNUSED)
 {

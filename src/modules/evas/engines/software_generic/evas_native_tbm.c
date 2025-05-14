@@ -70,6 +70,14 @@ static int (*sym_tbm_surface_map) (tbm_surface_h surface, int opt, tbm_surface_i
 static int (*sym_tbm_surface_unmap) (tbm_surface_h surface) = NULL;
 static int (*sym_tbm_surface_get_info) (tbm_surface_h surface, tbm_surface_info_s *info) = NULL;
 
+/**
+ * @brief Initializes the TBM library handle.
+ * @return The reference count to the library, or 0 on failure.
+ *
+ * This function loads the TBM library dynamically and resolves
+ * required function symbols. It maintains a reference count to ensure
+ * the library is loaded only once.
+ */
 EMODAPI int
 _evas_native_tbm_init(void)
 {
@@ -118,6 +126,12 @@ _evas_native_tbm_init(void)
    return tbm_ref;
 }
 
+/**
+ * @brief Shuts down the TBM library handle.
+ *
+ * This function decrements the reference count for the TBM library.
+ * If the reference count reaches zero, it unloads the library.
+ */
 EMODAPI void
 _evas_native_tbm_shutdown(void)
 {
@@ -136,6 +150,25 @@ _evas_native_tbm_shutdown(void)
      }
 }
 
+/**
+ * @brief Fills Evas plane pointers for YV12 (YVU420) format.
+ * @param evas_data A pre-allocated array of `unsigned char*` pointers, cast to `unsigned char*`.
+ *                  This array will be filled with pointers to each row of each plane.
+ * @param source_data The raw TBM buffer data, containing Y, V, and U planes contiguously.
+ * @param w Width of the video frame.
+ * @param h Height of the video frame.
+ * @param output_height The height to be used for output, might be same as h.
+ *
+ * This function sets up pointers to the Y, U, and V planes for Evas from a
+ * contiguous YV12 (Y, V, U plane order) `source_data` buffer.
+ * Evas expects a YCbCr format which is Y, U, V. This function reorders the
+ * chroma planes from the source data.
+ *
+ * The `rows` array (pointed to by `evas_data`) is structured as follows after filling:
+ * - `rows[0 to rh-1]` point to rows of the Y plane.
+ * - `rows[rh to rh + rh/2 - 1]` point to rows of the U (Cb) plane.
+ * - `rows[rh + rh/2 to rh + rh/2 + rh/2 - 1]` point to rows of the V (Cr) plane.
+ */
 static void
 _evas_video_yv12(unsigned char *evas_data, const unsigned char *source_data, unsigned int w, unsigned int h, unsigned int output_height)
 {
@@ -163,6 +196,23 @@ _evas_video_yv12(unsigned char *evas_data, const unsigned char *source_data, uns
      rows[i] = &source_data[h * stride_y + j * stride_uv];
 }
 
+/**
+ * @brief Fills Evas plane pointers for I420 (YUV420) format.
+ * @param evas_data A pre-allocated array of `unsigned char*` pointers, cast to `unsigned char*`.
+ *                  This array will be filled with pointers to each row of each plane.
+ * @param source_data The raw TBM buffer data, containing Y, U, and V planes contiguously.
+ * @param w Width of the video frame.
+ * @param h Height of the video frame.
+ * @param output_height The height to be used for output, might be same as h.
+ *
+ * This function sets up pointers to the Y, U, and V planes for Evas from a
+ * contiguous I420 (Y, U, V plane order) `source_data` buffer.
+ *
+ * The `rows` array (pointed to by `evas_data`) is structured as follows after filling:
+ * - `rows[0 to rh-1]` point to rows of the Y plane.
+ * - `rows[rh to rh + rh/2 - 1]` point to rows of the U (Cb) plane.
+ * - `rows[rh + rh/2 to rh + rh/2 + rh/2 - 1]` point to rows of the V (Cr) plane.
+ */
 static void
 _evas_video_i420(unsigned char *evas_data, const unsigned char *source_data, unsigned int w, unsigned int h, unsigned int output_height)
 {
@@ -190,6 +240,23 @@ _evas_video_i420(unsigned char *evas_data, const unsigned char *source_data, uns
                             j * stride_uv];
 }
 
+/**
+ * @brief Fills Evas plane pointers for NV12 format.
+ * @param evas_data A pre-allocated array of `unsigned char*` pointers, cast to `unsigned char*`.
+ *                  This array will be filled with pointers to each row of each plane.
+ * @param source_data The raw TBM buffer data, containing Y plane and then an interleaved UV plane.
+ * @param w Width of the video frame.
+ * @param h Height of the video frame (unused).
+ * @param output_height The height to be used for output.
+ *
+ * This function sets up pointers for Evas from an NV12 `source_data` buffer.
+ * NV12 has a full-size Y plane followed by a half-height, full-width plane
+ * with interleaved U and V components.
+ *
+ * The `rows` array (pointed to by `evas_data`) is structured as follows:
+ * - `rows[0 to rh-1]` point to rows of the Y plane.
+ * - `rows[rh to rh + rh/2 - 1]` point to rows of the interleaved UV plane.
+ */
 static void
 _evas_video_nv12(unsigned char *evas_data, const unsigned char *source_data, unsigned int w, unsigned int h EINA_UNUSED, unsigned int output_height)
 {
@@ -208,6 +275,15 @@ _evas_video_nv12(unsigned char *evas_data, const unsigned char *source_data, uns
      rows[i] = &source_data[rh * w + j * w];
 }
 
+/**
+ * @brief Callback to bind a TBM native surface to an Evas image.
+ * @param image The Evas image (RGBA_Image).
+ * @param x, y, w, h Unused region parameters.
+ *
+ * This function is called when Evas needs access to the image pixel data.
+ * It maps the TBM surface to make its memory accessible to the CPU and
+ * sets the Evas image's data pointer to this memory.
+ */
 static void
 _native_bind_cb(void *image, int x EINA_UNUSED, int y EINA_UNUSED, int w EINA_UNUSED, int h EINA_UNUSED)
 {
@@ -228,6 +304,13 @@ _native_bind_cb(void *image, int x EINA_UNUSED, int y EINA_UNUSED, int w EINA_UN
    im->image.data = (DATA32 *)info.planes[0].ptr;
 }
 
+/**
+ * @brief Callback to unbind a TBM native surface from an Evas image.
+ * @param image The Evas image (RGBA_Image).
+ *
+ * This function is called when Evas is finished with the pixel data.
+ * It unmaps the TBM surface, releasing direct CPU access to its memory.
+ */
 static void
 _native_unbind_cb(void *image)
 {
@@ -244,6 +327,14 @@ _native_unbind_cb(void *image)
    sym_tbm_surface_unmap(tbm_surf);
 }
 
+/**
+ * @brief Callback to free a TBM native surface wrapper.
+ * @param image The Evas image (RGBA_Image).
+ *
+ * This function is called when the Evas image is being destroyed.
+ * It frees the `Native` structure associated with the image and
+ * decrements the TBM library reference count.
+ */
 static void
 _native_free_cb(void *image)
 {
@@ -262,6 +353,15 @@ _native_free_cb(void *image)
    _evas_native_tbm_shutdown();
 }
 
+/**
+ * @brief Get the stride of a TBM native surface.
+ * @param data Unused data pointer.
+ * @param native Pointer to an Evas_Native_Surface structure.
+ * @return The stride of the first plane in bytes, or -1 on error.
+ *
+ * This function queries the TBM surface for its information and returns
+ * the stride of its first plane. It also ensures the TBM library is initialized.
+ */
 EMODAPI int
 _evas_native_tbm_surface_stride_get(void *data EINA_UNUSED, void *native)
 {
@@ -285,6 +385,22 @@ _evas_native_tbm_surface_stride_get(void *data EINA_UNUSED, void *native)
    return stride;
  }
 
+/**
+ * @brief Configures an Evas image to use a TBM native surface.
+ * @param data Unused data pointer.
+ * @param image The Evas image (RGBA_Image) to configure.
+ * @param native The Evas_Native_Surface containing the TBM buffer handle.
+ * @return The configured Evas image, or NULL on failure.
+ *
+ * This function adapts an Evas image to use a TBM surface as its data source.
+ * It maps the TBM surface to get its properties (width, height, format),
+ * then configures the Evas image based on the pixel format. For packed RGB
+ * formats, it points the image data directly to the mapped buffer. For
+ * planar YUV formats, it uses helper functions to set up plane pointers.
+ *
+ * It also sets up bind, unbind, and free callbacks on the Evas image to
+ * manage the lifecycle of the TBM surface mapping.
+ */
 EMODAPI void *
 _evas_native_tbm_surface_image_set(void *data EINA_UNUSED, void *image, void *native)
 {

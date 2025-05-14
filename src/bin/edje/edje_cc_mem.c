@@ -7,6 +7,16 @@
 
 #include "edje_cc.h"
 
+/**
+ * @brief Allocates a block of memory and initializes it to zero.
+ *
+ * This function is a wrapper around calloc. If the allocation fails,
+ * it prints an error message to stderr and exits the program.
+ *
+ * @param size The number of bytes to allocate.
+ * @return A pointer to the allocated memory, or NULL on failure (though
+ *         the program will exit before returning NULL in practice).
+ */
 void *
 mem_alloc(size_t size)
 {
@@ -20,6 +30,16 @@ mem_alloc(size_t size)
    return NULL;
 }
 
+/**
+ * @brief Duplicates a string.
+ *
+ * This function is a wrapper around strdup. If the allocation fails,
+ * it prints an error message to stderr and exits the program.
+ *
+ * @param s The null-terminated string to duplicate.
+ * @return A pointer to the newly allocated string, or NULL on failure (though
+ *         the program will exit before returning NULL in practice).
+ */
 char *
 mem_strdup(const char *s)
 {

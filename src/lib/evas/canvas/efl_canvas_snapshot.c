@@ -3,6 +3,17 @@
 
 #define MY_CLASS EFL_CANVAS_SNAPSHOT_CLASS
 
+/**
+ * @internal
+ * @brief Constructor for the Efl_Canvas_Snapshot class.
+ *
+ * This function initializes a new instance of the Efl_Canvas_Snapshot class.
+ * It sets the object to pass events to its parent and marks it as a snapshot object.
+ *
+ * @param[in] eo_obj The Evas object to initialize.
+ * @param[in] pd Private data for the object (unused in this function).
+ * @return The constructed Evas object, or @c NULL on failure.
+ */
 EOLIAN static Eo *
 _efl_canvas_snapshot_efl_object_constructor(Eo *eo_obj, void *pd EINA_UNUSED)
 {

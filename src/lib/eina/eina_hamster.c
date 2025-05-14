@@ -35,11 +35,21 @@
  * @cond LOCAL
  */
 
+/**
+ * @internal
+ * @brief Internal variable storing a numerical representation of the Eina version.
+ *
+ * This variable encodes the major (VMAJ), minor (VMIN), micro (VMIC), and
+ * revision (VREV) numbers into a single integer. This can be useful for
+ * quick numerical comparisons of versions, though it's primarily an
+ * internal mechanism. For example, version 1.2.3 rev 4 would be
+ * (1 * 100 * 100 * 100) + (2 * 100 * 100) + (3 * 100) + 4 = 1020304.
+ */
 static const int _eina_hamster =
-  (VMAJ * 100 * 100 * 100) +
-  (VMIN * 100 * 100      ) +
-  (VMIC * 100            ) +
-  (VREV                  );
+  (VMAJ * 100 * 100 * 100) + /* Major version component */
+  (VMIN * 100 * 100      ) + /* Minor version component */
+  (VMIC * 100            ) + /* Micro version component */
+  (VREV                  );  /* Revision component */
 
 /**
  * @endcond
@@ -53,6 +63,14 @@ static const int _eina_hamster =
 *                                   API                                      *
 *============================================================================*/
 
+/**
+ * @brief Gets the hamster count.
+ * @return The number of available hamsters.
+ *
+ * This function returns how many hamsters you have. Internally, this
+ * value is derived from the Eina library version numbers.
+ * @see eina_version
+ */
 EINA_API int
 eina_hamster_count(void)
 {

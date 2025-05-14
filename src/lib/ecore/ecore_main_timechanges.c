@@ -18,8 +18,19 @@
 
 #ifdef HAVE_SYS_TIMERFD_H
 
+/**
+ * @brief Stores the Efl_Loop_Handler object used for monitoring CLOCK_REALTIME.
+ * This is used to detect system time changes. It is NULL if not currently active.
+ */
 static Eo *realtime_obj = NULL;
 
+/**
+ * @brief Callback function triggered when the timerfd for CLOCK_REALTIME has data to read.
+ * This indicates a potential system time change.
+ *
+ * @param data User data, unused in this callback.
+ * @param event The Efl_Event structure containing event information.
+ */
 static void
 _cb_read(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -35,6 +46,13 @@ _cb_read(void *data EINA_UNUSED, const Efl_Event *event)
    _ecore_main_timechanges_start(loop);
 }
 
+/**
+ * @brief Callback function triggered when the Efl_Loop_Handler object is deleted.
+ * This function closes the associated file descriptor and resets realtime_obj if it matches.
+ *
+ * @param data User data, unused in this callback.
+ * @param event The Efl_Event structure containing event information.
+ */
 static void
 _cb_del(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -48,6 +66,16 @@ EFL_CALLBACKS_ARRAY_DEFINE(_event_watch,
                            { EFL_EVENT_DEL, _cb_del });
 #endif
 
+/**
+ * @brief Starts monitoring for system time changes.
+ *
+ * This function creates a timerfd for CLOCK_REALTIME. The timer is set to
+ * expire at a very distant point in the future (TIME_T_MAX). However, if
+ * the system clock is changed (e.g., by NTP or manually), the timerfd
+ * becomes readable. This event is then used to signal a system time change.
+ *
+ * @param obj The Efl_Loop object to associate the handler with.
+ */
 void
 _ecore_main_timechanges_start(Eo *obj)
 {
@@ -77,6 +105,15 @@ _ecore_main_timechanges_start(Eo *obj)
 #endif
 }
 
+/**
+ * @brief Stops monitoring for system time changes.
+ *
+ * This function deletes the Efl_Loop_Handler object that was created by
+ * _ecore_main_timechanges_start(), effectively stopping the monitoring
+ * of CLOCK_REALTIME for changes.
+ *
+ * @param obj The Efl_Loop object, currently unused but kept for API consistency.
+ */
 void
 _ecore_main_timechanges_stop(Eo *obj EINA_UNUSED)
 {

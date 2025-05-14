@@ -1,26 +1,41 @@
+/**
+ * @brief Represents a vertex in a 2D map, including texture coordinates and color.
+ */
 typedef struct
 {
-   float x, y, u, v;
-   DATA32 c;
+   float x, y; /**< Vertex coordinates in the destination image. */
+   float u, v; /**< Texture coordinates in the source image. */
+   DATA32 c;   /**< Color of the vertex (e.g., 0xAARRGGBB). */
 } Map_Vertex;
 
+/**
+ * @brief Represents a triangle composed of three Map_Vertex instances.
+ * Used for rendering parts of a map.
+ */
 typedef struct
 {
-   Map_Vertex v[3];
+   Map_Vertex v[3]; /**< Array of three vertices defining the triangle. */
 } Map_Tripoly;
 
+/**
+ * @brief Stores anti-aliasing information for a single horizontal line segment (span).
+ * It holds the start and end x-coordinates and coverage details for the left and right edges.
+ */
 typedef struct AALine
 {
-   int x[2];
-   int aa_cov[2];
-   int aa_len[2];
+   int x[2];      /**< x[0] is the start x-coordinate, x[1] is the end x-coordinate of the span. */
+   int aa_cov[2]; /**< aa_cov[0] is coverage for the left edge, aa_cov[1] for the right edge. Values 0-255. */
+   int aa_len[2]; /**< aa_len[0] is the length of the anti-aliased segment on the left edge, aa_len[1] for the right. */
 } AALine;
 
+/**
+ * @brief Container for all anti-aliasing span data for a given y-range.
+ */
 typedef struct AASpans
 {
-   AALine *lines;
-   int ystart;
-   int yend;
+   AALine *lines; /**< Pointer to an array of AALine structures, one for each horizontal line. */
+   int ystart;    /**< The starting y-coordinate for which AA data is stored. */
+   int yend;      /**< The ending y-coordinate (exclusive) for which AA data is stored. */
 } AASpans;
 
 static float dudx, dvdx, dcdx[4];
@@ -35,6 +50,18 @@ static float xa, xb, ua, va, ca[4];
 /************************** ANTI-ALIASING CODE ********************************/
 #ifdef MAP_HIGH_ANTI_ALIASING
 
+/**
+ * @brief Calculates anti-aliasing coverage for irregular (diagonal) edges.
+ * This function determines how much of the edge pixel is covered by the polygon
+ * along a diagonal segment.
+ *
+ * @param spans Array of AALine structures for the image.
+ * @param eidx Edge index (0 for left, 1 for right).
+ * @param y The current y-coordinate (scanline) being processed.
+ * @param diagonal The length of the diagonal segment in pixels.
+ * @param edge_dist Offset from the current y to start applying coverage.
+ * @param reverse If EINA_TRUE, reverses the coverage gradient (e.g., for inward slopes).
+ */
 static void
 _map_irregular_coverage_calc(AALine* spans, int eidx, int y, int diagonal,
                        int edge_dist, Eina_Bool reverse)
@@ -52,6 +79,15 @@ _map_irregular_coverage_calc(AALine* spans, int eidx, int y, int diagonal,
      }
 }
 
+/**
+ * @brief Calculates anti-aliasing coverage for vertical or near-vertical edges.
+ *
+ * @param spans Array of AALine structures for the image.
+ * @param eidx Edge index (0 for left, 1 for right).
+ * @param y The current y-coordinate (scanline) where the vertical segment ends.
+ * @param rewind The vertical length of the edge segment in pixels.
+ * @param reverse If EINA_TRUE, reverses the coverage gradient.
+ */
 static void
 _map_vert_coverage_calc(AALine *spans, int eidx, int y, int rewind, Eina_Bool reverse)
 {
@@ -68,6 +104,17 @@ _map_vert_coverage_calc(AALine *spans, int eidx, int y, int rewind, Eina_Bool re
      }
 }
 
+/**
+ * @brief Calculates anti-aliasing coverage for horizontal or near-horizontal edges.
+ * This typically involves setting a coverage value based on the horizontal length
+ * of the anti-aliased part of the edge.
+ *
+ * @param spans Array of AALine structures for the image.
+ * @param eidx Edge index (0 for left, 1 for right).
+ * @param y The y-coordinate (scanline) of the horizontal segment.
+ * @param x The starting x-coordinate of the segment.
+ * @param x2 The ending x-coordinate of the segment.
+ */
 static void
 _map_horiz_coverage_calc(AALine *spans, int eidx, int y, int x, int x2)
 {
@@ -82,6 +129,26 @@ _map_horiz_coverage_calc(AALine *spans, int eidx, int y, int x, int x2)
  * To understand here AA main logic,
  * Please refer this page: www.hermet.pe.kr/122
 */
+/**
+ * @brief Internal function to calculate anti-aliasing data for a single edge (left or right) of a polygon.
+ * It iterates through the scanlines (y-coordinates) of the edge, determining the type of
+ * segment (horizontal, vertical, diagonal) and calling the appropriate coverage calculation function.
+ *
+ * The `Dir*` macros define the direction of the edge segment relative to the previous segment:
+ * - `DirOutHor`: Moving outwards horizontally.
+ * - `DirOutVer`: Moving outwards vertically.
+ * - `DirInHor`: Moving inwards horizontally.
+ * - `DirInVer`: Moving inwards vertically.
+ * - `DirNone`: No change or straight vertical.
+ *
+ * The `PUSH_VERTEX` macro updates the previous edge point (`p_edge`) and previous x-coordinates (`ptx`)
+ * with the current values.
+ *
+ * @param spans Array of AALine structures, indexed by (current_y - ystart_offset_in_AASpans_struct).
+ * @param eidx Edge index: 0 for the left edge, 1 for the right edge.
+ * @param ystart The starting y-coordinate of the edge in the destination image.
+ * @param yend The ending y-coordinate (exclusive) of the edge in the destination image.
+ */
 static void
 _map_aa_edge_calc_internal(AALine *spans, int eidx, int ystart, int yend)
 {
@@ -255,6 +322,15 @@ do \
      }
 }
 
+/**
+ * @brief Calculates anti-aliasing data for both left and right edges of the polygon.
+ * It calls `_map_aa_edge_calc_internal` for each edge.
+ *
+ * @param spans Array of AALine structures. The array is expected to be indexed by
+ *              (current_y - ystart_offset_in_AASpans_struct), not directly by y.
+ * @param ystart The starting y-coordinate of the polygon section being processed.
+ * @param yend The ending y-coordinate (exclusive) of the polygon section.
+ */
 static void
 _map_aa_edges_calc(AALine *spans, int ystart, int yend)
 {
@@ -266,6 +342,21 @@ _map_aa_edges_calc(AALine *spans, int ystart, int yend)
    _map_aa_edge_calc_internal(spans, 1, ystart, yend);
 }
 
+/**
+ * @brief Allocates and initializes an AASpans structure.
+ * This structure will hold the anti-aliasing information for each scanline
+ * within the specified y-range.
+ *
+ * @param dw Destination image width.
+ * @param dh Destination image height (used to allocate AALine array).
+ * @param ystart The starting y-coordinate for which AA data will be generated.
+ * @param yend The ending y-coordinate (exclusive) for AA data.
+ * @return Pointer to the initialized AASpans structure, or NULL on allocation failure.
+ *         The `lines` array within AASpans is initialized such that:
+ *         `lines[i].x[0]` is set to `dw + 1` (effectively outside the right edge).
+ *         `lines[i].x[1]` is set to `-1` (effectively outside the left edge).
+ *         This ensures that the first encountered x-values for an edge will correctly update these.
+ */
 static AASpans *
 _map_aa_ready(int dw, int dh, int ystart, int yend)
 {
@@ -284,6 +375,17 @@ _map_aa_ready(int dw, int dh, int ystart, int yend)
    return aa_spans;
 }
 
+/**
+ * @brief Applies the calculated anti-aliasing coverage to the destination image.
+ * It first calls `_map_aa_edges_calc` to populate the AA coverage information
+ * and then iterates through the scanlines, blending the edge pixels based on
+ * the coverage values stored in `aa_spans`.
+ *
+ * @param aa_spans Pointer to the AASpans structure containing coverage data.
+ *                 The `lines` array is indexed by (current_y - aa_spans->ystart).
+ * @param dst Pointer to the destination image buffer.
+ * @param dw Width of the destination image.
+ */
 static void
 _map_aa_apply(AASpans *aa_spans, DATA32 *dst, int dw)
 {
@@ -337,6 +439,33 @@ _map_aa_apply(AASpans *aa_spans, DATA32 *dst, int dw)
 #endif
 
 /************************** TEXTURE MAPPING CODE ******************************/
+/**
+ * @brief Renders a horizontal segment of a texture-mapped triangle with linear interpolation.
+ * This function is called for each horizontal segment (scanline part) of a triangle.
+ * It handles texture coordinate interpolation, color blending, and applying a mask if provided.
+ * If `aa_spans` is provided, it records the x-extents of the rendered span for later anti-aliasing.
+ *
+ * @param src Source image.
+ * @param dst Destination image.
+ * @param cx Clip region x-coordinate.
+ * @param cy Clip region y-coordinate.
+ * @param cw Clip region width.
+ * @param ch Clip region height.
+ * @param mask Optional mask image.
+ * @param mx Mask x-coordinate offset.
+ * @param my Mask y-coordinate offset.
+ * @param ystart Starting y-coordinate of the segment to draw.
+ * @param yend Ending y-coordinate (exclusive) of the segment to draw.
+ * @param tbuf Temporary buffer for scanline rendering if blending or masking is needed. If NULL, draws directly to `dst`.
+ * @param func Primary graphics function for compositing pixels (e.g., copy, blend).
+ *             Example: `evas_common_gfx_func_composite_pixel_span_get(...)`.
+ * @param func2 Secondary graphics function, used for pre-applying `mul_col` to `tbuf` before masking.
+ *              Example: `evas_common_gfx_func_composite_pixel_color_span_get(...)`.
+ * @param mul_col Multiplier color (ARGB).
+ * @param aa_spans Anti-aliasing spans structure. If not NULL, x-extents of drawn lines are updated.
+ *                 The `lines` array within `aa_spans` is indexed by (current_y - aa_spans->ystart).
+ * @param col_blend If EINA_TRUE, vertex colors are interpolated and blended with the texture.
+ */
 static void
 _map_triangle_draw_linear(RGBA_Image *src, RGBA_Image *dst,
                           int cx, int cy, int cw, int ch,
@@ -522,6 +651,31 @@ next:
 }
 
 /* This mapping algorithm is based on Mikael Kalms's. */
+/**
+ * @brief Renders a single texture-mapped triangle.
+ * It sorts vertices by Y-coordinate, calculates gradients for texture coordinates (U, V)
+ * and color components, and then splits the triangle into two segments (upper and lower)
+ * to be rendered by `_map_triangle_draw_linear`.
+ *
+ * @param src Source image.
+ * @param dst Destination image.
+ * @param cx Clip region x-coordinate.
+ * @param cy Clip region y-coordinate.
+ * @param cw Clip region width.
+ * @param ch Clip region height.
+ * @param mask Optional mask image.
+ * @param mx Mask x-coordinate offset.
+ * @param my Mask y-coordinate offset.
+ * @param tbuf Temporary buffer for scanline rendering.
+ * @param func Primary graphics function for compositing pixels.
+ * @param func2 Secondary graphics function for pre-applying `mul_col`.
+ * @param poly The triangle to render, defined by three Map_Vertex points.
+ *             Example: poly->v[0] = {x_coord, y_coord, u_tex_coord, v_tex_coord, color_value}
+ * @param mul_col Multiplier color (ARGB).
+ * @param aa_spans Anti-aliasing spans structure. If not NULL, passed to `_map_triangle_draw_linear`.
+ * @param smooth Unused parameter (smooth shading not implemented here for high quality).
+ * @param col_blend If EINA_TRUE, vertex colors are interpolated and blended.
+ */
 static void
 _map_triangle_draw(RGBA_Image *src, RGBA_Image *dst,
                    int cx, int cy, int cw, int ch,
@@ -751,6 +905,37 @@ _map_triangle_draw(RGBA_Image *src, RGBA_Image *dst,
      }
 }
 
+/**
+ * @brief Renders a 4-point perspective transformed map (quadrilateral) from a source image to a destination image.
+ * This is the high-quality version, potentially using anti-aliasing.
+ * The quadrilateral is subdivided into a 2x2 grid of smaller quadrilaterals (making 4 quads total),
+ * and each of these smaller quads is then rendered as two triangles. This results in 8 triangles
+ * being rendered for the input 4 points to improve interpolation quality over a large distorted quad.
+ *
+ * @param src Source RGBA_Image.
+ * @param dst Destination RGBA_Image.
+ * @param cx Clipping region x-coordinate.
+ * @param cy Clipping region y-coordinate.
+ * @param cw Clipping region width.
+ * @param ch Clipping region height.
+ * @param mul_col Multiplier color (ARGB format, e.g., 0xAARRGGBB). Applied to the source pixels.
+ * @param render_op Render operation (e.g., EVAS_RENDER_COPY, EVAS_RENDER_BLEND).
+ * @param p Array of 4 RGBA_Map_Point structures defining the quadrilateral in the destination.
+ *          The points are typically ordered: top-left, top-right, bottom-right, bottom-left.
+ *          Example for `p`:
+ *          p[0] = {fx, fy, z, u, v, col} for top-left point
+ *          p[1] = {fx, fy, z, u, v, col} for top-right point
+ *          p[2] = {fx, fy, z, u, v, col} for bottom-right point
+ *          p[3] = {fx, fy, z, u, v, col} for bottom-left point
+ *          where `fx, fy` are destination coordinates, `u, v` are source texture coordinates (fixed-point),
+ *          and `col` is the vertex color.
+ * @param smooth If EINA_TRUE, enables smooth shading (though actual implementation might differ or be fixed).
+ * @param anti_alias If EINA_TRUE, enables anti-aliasing for polygon edges.
+ * @param level Unused parameter (detail level).
+ * @param mask Optional mask image to apply.
+ * @param mask_x X-offset for the mask image.
+ * @param mask_y Y-offset for the mask image.
+ */
 static void
 _evas_common_map_rgba_internal_high(RGBA_Image *src, RGBA_Image *dst,
                                     int cx, int cy, int cw, int ch,  //clip

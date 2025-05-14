@@ -28,21 +28,37 @@
 typedef struct _Ecore_Buffer_Module_X11_Dri3_Data Ecore_Buffer_Module_X11_Dri3_Data;
 typedef struct _Ecore_Buffer_X11_Dri3_Data Ecore_Buffer_X11_Dri3_Data;
 
+/**
+ * @brief Module-specific data for the X11 DRI3 Ecore_Buffer backend.
+ * This structure holds data global to the DRI3 buffer module, primarily
+ * the Tizen Buffer Manager (tbm_bufmgr) instance.
+ */
 struct _Ecore_Buffer_Module_X11_Dri3_Data {
-     tbm_bufmgr tbm_mgr;
+     tbm_bufmgr tbm_mgr; /**< The Tizen Buffer Manager instance. */
 };
 
+/**
+ * @brief Buffer-specific data for an X11 DRI3 Ecore_Buffer.
+ * This structure holds data for an individual buffer, including its X Pixmap,
+ * TBM surface, dimensions, format, and flags.
+ */
 struct _Ecore_Buffer_X11_Dri3_Data {
-     Ecore_X_Pixmap pixmap;
-     void *tbm_surface;
+     Ecore_X_Pixmap pixmap; /**< The X Pixmap associated with this buffer, if created. */
+     void *tbm_surface; /**< Pointer to the TBM surface. */
      int w;
      int h;
      int stride;
      unsigned int flags;
      Ecore_Buffer_Format format;
-     Eina_Bool is_imported;
+     Eina_Bool is_imported; /**< Flag indicating if the buffer was imported (EINA_TRUE) or allocated (EINA_FALSE). */
 };
 
+/**
+ * @brief Get the number of planes for a given buffer format.
+ *
+ * @param format The Ecore_Buffer_Format to query.
+ * @return The number of planes for the format, or 0 if unknown.
+ */
 static int
 _buf_get_num_planes(Ecore_Buffer_Format format)
 {
@@ -122,6 +138,17 @@ _buf_get_num_planes(Ecore_Buffer_Format format)
    return num_planes;
 }
 
+/**
+ * @brief Get the bits per pixel (bpp) for a given buffer format.
+ *
+ * This function returns the total bits per pixel for a format, which might
+ * differ from the depth (bits used for color information). For planar
+ * formats, this typically represents the bpp of the combined planes if
+ * they were interleaved, or a representative value.
+ *
+ * @param format The Ecore_Buffer_Format to query.
+ * @return The bits per pixel for the format, or 0 if unknown.
+ */
 static int
 _buf_get_bpp(Ecore_Buffer_Format format)
 {
@@ -214,6 +241,17 @@ _buf_get_bpp(Ecore_Buffer_Format format)
    return bpp;
 }
 
+/**
+ * @brief Get the color depth for a given buffer format.
+ *
+ * The depth refers to the number of bits used to represent the color
+ * information of a single pixel, excluding padding bits. For YUV formats,
+ * this function returns 0 as X11 typically doesn't have a direct
+ * representation for their depth.
+ *
+ * @param format The Ecore_Buffer_Format to query.
+ * @return The color depth for the format, or 0 if unknown or not applicable to X.
+ */
 static int
 _buf_get_depth(Ecore_Buffer_Format format)
 {
@@ -307,6 +345,17 @@ _buf_get_depth(Ecore_Buffer_Format format)
    return depth;
 }
 
+/**
+ * @brief Opens a connection to a DRI3 provider.
+ *
+ * This function uses the XCB DRI3 extension to open a device file descriptor
+ * for a given provider (typically the display driver).
+ *
+ * @param dpy The Ecore_X_Display connection.
+ * @param root The root window of the screen.
+ * @param provider The provider to open (usually 0 for the default).
+ * @return The file descriptor on success, or -1 on error.
+ */
 static int
 _dri3_open(Ecore_X_Display *dpy, Ecore_X_Window root, unsigned provider)
 {
@@ -322,6 +371,23 @@ _dri3_open(Ecore_X_Display *dpy, Ecore_X_Window root, unsigned provider)
    return xcb_dri3_open_reply_fds(c, reply)[0];
 }
 
+/**
+ * @brief Creates an X Pixmap from a file descriptor using DRI3.
+ *
+ * This function utilizes the xcb_dri3_pixmap_from_buffer request to create
+ * an X Pixmap from a DMA-BUF file descriptor.
+ *
+ * @param dpy The Ecore_X_Display connection.
+ * @param draw The X Drawable (often the root window) to associate with the pixmap.
+ * @param width The width of the pixmap.
+ * @param height The height of the pixmap.
+ * @param depth The color depth of the pixmap.
+ * @param fd The file descriptor representing the buffer.
+ * @param bpp The bits per pixel of the buffer.
+ * @param stride The stride (bytes per row) of the buffer.
+ * @param size The total size in bytes of the buffer.
+ * @return The Ecore_X_Pixmap on success, or 0 on error.
+ */
 static Ecore_X_Pixmap
 _dri3_pixmap_from_fd(Ecore_X_Display *dpy, Ecore_X_Drawable draw, int width, int height, int depth, int fd, int bpp, int stride, int size)
 {
@@ -342,6 +408,17 @@ _dri3_pixmap_from_fd(Ecore_X_Display *dpy, Ecore_X_Drawable draw, int width, int
    return pixmap;
 }
 
+/**
+ * @brief Initializes the Ecore_Buffer X11 DRI3 backend.
+ *
+ * This function sets up the necessary X11 connection, opens the DRI3 device,
+ * and initializes the Tizen Buffer Manager (TBM).
+ *
+ * @param context Optional context string (unused).
+ * @param options Optional options string (unused).
+ * @return A pointer to Ecore_Buffer_Module_Data on success, NULL on failure.
+ *         The returned data is an Ecore_Buffer_Module_X11_Dri3_Data struct.
+ */
 static Ecore_Buffer_Module_Data
 _ecore_buffer_x11_dri3_init(const char *context EINA_UNUSED, const char *options EINA_UNUSED)
 {
@@ -386,6 +463,15 @@ on_error:
    return NULL;
 }
 
+/**
+ * @brief Shuts down the Ecore_Buffer X11 DRI3 backend.
+ *
+ * This function deinitializes the Tizen Buffer Manager and closes the X11
+ * connection.
+ *
+ * @param bmdata The module data (Ecore_Buffer_Module_X11_Dri3_Data)
+ *               obtained from _ecore_buffer_x11_dri3_init.
+ */
 static void
 _ecore_buffer_x11_dri3_shutdown(Ecore_Buffer_Module_Data bmdata)
 {
@@ -400,6 +486,20 @@ _ecore_buffer_x11_dri3_shutdown(Ecore_Buffer_Module_Data bmdata)
    ecore_x_shutdown();
 }
 
+/**
+ * @brief Allocates a new buffer using the X11 DRI3 backend.
+ *
+ * This function creates a TBM surface for the buffer. The actual X Pixmap
+ * is typically created on demand when _ecore_buffer_x11_dri3_pixmap_get is called.
+ *
+ * @param bmdata Module data (unused in this function but part of the interface).
+ * @param width The desired width of the buffer.
+ * @param height The desired height of the buffer.
+ * @param format The desired Ecore_Buffer_Format of the buffer.
+ * @param flags Creation flags for the buffer (e.g., TBM_BO_SCANOUT).
+ * @return A pointer to Ecore_Buffer_Data on success, NULL on failure.
+ *         The returned data is an Ecore_Buffer_X11_Dri3_Data struct.
+ */
 static Ecore_Buffer_Data
 _ecore_buffer_x11_dri3_buffer_alloc(Ecore_Buffer_Module_Data bmdata EINA_UNUSED, int width, int height, Ecore_Buffer_Format format, unsigned int flags)
 {
@@ -424,7 +524,15 @@ _ecore_buffer_x11_dri3_buffer_alloc(Ecore_Buffer_Module_Data bmdata EINA_UNUSED,
    return buf;
 }
 
-static Ecore_Buffer_Data
+/**
+ * @brief Frees a buffer allocated by the X11 DRI3 backend.
+ *
+ * This function releases the associated X Pixmap (if any) and destroys
+ * the TBM surface.
+ *
+ * @param bmdata Module data (unused in this function but part of the interface).
+ * @param bdata The buffer data (Ecore_Buffer_X11_Dri3_Data) to free.
+ */
 static void
 _ecore_buffer_x11_dri3_buffer_free(Ecore_Buffer_Module_Data bmdata EINA_UNUSED, Ecore_Buffer_Data bdata)
 {
@@ -442,6 +550,18 @@ _ecore_buffer_x11_dri3_buffer_free(Ecore_Buffer_Module_Data bmdata EINA_UNUSED, 
    free(buf);
 }
 
+/**
+ * @brief Exports a buffer for sharing with other processes or APIs.
+ *
+ * This function exports the underlying TBM buffer object (bo) as a
+ * file descriptor (DMA-BUF FD). It only supports single-plane formats.
+ *
+ * @param bmdata Module data (unused).
+ * @param bdata The buffer data (Ecore_Buffer_X11_Dri3_Data) to export.
+ * @param[out] id Pointer to store the exported file descriptor.
+ * @return EXPORT_TYPE_FD on success, EXPORT_TYPE_INVALID on failure or
+ *         if the format is not suitable for direct FD export (e.g., multi-planar).
+ */
 static Ecore_Export_Type
 _ecore_buffer_x11_dri3_buffer_export(Ecore_Buffer_Module_Data bmdata EINA_UNUSED, Ecore_Buffer_Data bdata, int *id)
 {
@@ -460,6 +580,23 @@ _ecore_buffer_x11_dri3_buffer_export(Ecore_Buffer_Module_Data bmdata EINA_UNUSED
    return EXPORT_TYPE_FD;
 }
 
+/**
+ * @brief Imports a buffer from an external source.
+ *
+ * This function imports a buffer from a file descriptor (DMA-BUF FD)
+ * using the Tizen Buffer Manager. It creates a TBM surface from the
+ * imported buffer object.
+ *
+ * @param bmdata The module data (Ecore_Buffer_Module_X11_Dri3_Data).
+ * @param w The width of the buffer to import.
+ * @param h The height of the buffer to import.
+ * @param format The Ecore_Buffer_Format of the buffer.
+ * @param type The type of export (must be EXPORT_TYPE_FD).
+ * @param export_id The file descriptor to import.
+ * @param flags Flags associated with the buffer (passed to TBM).
+ * @return A pointer to Ecore_Buffer_Data (Ecore_Buffer_X11_Dri3_Data) on success,
+ *         NULL on failure.
+ */
 static Ecore_Buffer_Data
 _ecore_buffer_x11_dri3_buffer_import(Ecore_Buffer_Module_Data bmdata, int w, int h, Ecore_Buffer_Format format, Ecore_Export_Type type, int export_id, unsigned int flags)
 {
@@ -522,6 +659,18 @@ _ecore_buffer_x11_dri3_buffer_import(Ecore_Buffer_Module_Data bmdata, int w, int
    return buf;
 }
 
+/**
+ * @brief Gets the X Pixmap associated with an Ecore_Buffer.
+ *
+ * If the Pixmap has not been created yet, this function will create it
+ * using DRI3 from the TBM surface's file descriptor. It only supports
+ * single-plane formats for Pixmap creation. The created Pixmap is cached
+ * in the Ecore_Buffer_X11_Dri3_Data structure.
+ *
+ * @param bmdata Module data (unused).
+ * @param bdata The buffer data (Ecore_Buffer_X11_Dri3_Data).
+ * @return The Ecore_X_Pixmap (which is an XID) on success, or 0 on failure.
+ */
 static Ecore_Pixmap
 _ecore_buffer_x11_dri3_pixmap_get(Ecore_Buffer_Module_Data bmdata EINA_UNUSED, Ecore_Buffer_Data bdata)
 {
@@ -562,6 +711,14 @@ _ecore_buffer_x11_dri3_pixmap_get(Ecore_Buffer_Module_Data bmdata EINA_UNUSED, E
    return buf->pixmap;
 }
 
+/**
+ * @brief Gets the underlying TBM surface associated with an Ecore_Buffer.
+ *
+ * @param bmdata Module data (unused).
+ * @param bdata The buffer data (Ecore_Buffer_X11_Dri3_Data).
+ * @return A pointer to the tbm_surface (void *) on success, or NULL if the
+ *         buffer data is invalid.
+ */
 static void *
 _ecore_buffer_x11_dri3_tbm_bo_get(Ecore_Buffer_Module_Data bmdata EINA_UNUSED, Ecore_Buffer_Data bdata)
 {
@@ -573,24 +730,42 @@ _ecore_buffer_x11_dri3_tbm_bo_get(Ecore_Buffer_Module_Data bmdata EINA_UNUSED, E
    return buf->tbm_surface;
 }
 
+/**
+ * @brief Structure defining the X11 DRI3 Ecore_Buffer backend implementation.
+ *
+ * This structure provides function pointers for all operations supported by
+ * the Ecore_Buffer interface, tailored for the X11 DRI3 mechanism using TBM.
+ */
 static Ecore_Buffer_Backend _ecore_buffer_x11_dri3_backend = {
-     "x11_dri3",
-     &_ecore_buffer_x11_dri3_init,
-     &_ecore_buffer_x11_dri3_shutdown,
-     &_ecore_buffer_x11_dri3_buffer_alloc,
-     &_ecore_buffer_x11_dri3_buffer_free,
-     &_ecore_buffer_x11_dri3_buffer_export,
-     &_ecore_buffer_x11_dri3_buffer_import,
-     NULL,
-     &_ecore_buffer_x11_dri3_pixmap_get,
-     &_ecore_buffer_x11_dri3_tbm_bo_get,
+     "x11_dri3", /**< Name of the backend. */
+     &_ecore_buffer_x11_dri3_init, /**< Function to initialize the backend. */
+     &_ecore_buffer_x11_dri3_shutdown, /**< Function to shutdown the backend. */
+     &_ecore_buffer_x11_dri3_buffer_alloc, /**< Function to allocate a buffer. */
+     &_ecore_buffer_x11_dri3_buffer_free, /**< Function to free a buffer. */
+     &_ecore_buffer_x11_dri3_buffer_export, /**< Function to export a buffer. */
+     &_ecore_buffer_x11_dri3_buffer_import, /**< Function to import a buffer. */
+     NULL, /**< Function to map a buffer (not implemented for DRI3). */
+     &_ecore_buffer_x11_dri3_pixmap_get, /**< Function to get an X Pixmap from a buffer. */
+     &_ecore_buffer_x11_dri3_tbm_bo_get, /**< Function to get the TBM surface from a buffer. */
 };
 
+/**
+ * @brief Registers the X11 DRI3 Ecore_Buffer backend.
+ *
+ * This function is typically called at module load time (EINA_MODULE_INIT).
+ *
+ * @return EINA_TRUE on successful registration, EINA_FALSE otherwise.
+ */
 Eina_Bool x11_dri3_init(void)
 {
    return ecore_buffer_register(&_ecore_buffer_x11_dri3_backend);
 }
 
+/**
+ * @brief Unregisters the X11 DRI3 Ecore_Buffer backend.
+ *
+ * This function is typically called at module unload time (EINA_MODULE_SHUTDOWN).
+ */
 void x11_dri3_shutdown(void)
 {
    ecore_buffer_unregister(&_ecore_buffer_x11_dri3_backend);

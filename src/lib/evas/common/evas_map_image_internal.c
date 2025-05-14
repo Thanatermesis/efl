@@ -1,5 +1,33 @@
 
 // 66.74 % of time
+/**
+ * @brief Renders a perspective transformed source image onto a destination image.
+ *
+ * This function takes a source image and applies a perspective transformation
+ * defined by four points (p[0] to p[3]) before drawing it onto the
+ * destination image. It handles clipping, color multiplication, different
+ * rendering operations, and optional masking.
+ *
+ * @param src Pointer to the source RGBA_Image.
+ * @param dst Pointer to the destination RGBA_Image.
+ * @param clip_x X-coordinate of the clipping region.
+ * @param clip_y Y-coordinate of the clipping region.
+ * @param clip_w Width of the clipping region.
+ * @param clip_h Height of the clipping region.
+ * @param mul_col Multiplication color (0xffffffff for no multiplication).
+ * @param render_op The rendering operation (e.g., EVAS_RENDER_COPY, EVAS_RENDER_BLEND).
+ * @param p Array of 4 RGBA_Map_Point structures defining the
+ *          source quadrilateral's mapping to the destination. Each point has:
+ *          - x, y: Destination coordinates (fixed point).
+ *          - u, v: Source texture coordinates (fixed point).
+ *          - col: Per-vertex color.
+ * @param smooth EINA_TRUE for smooth (bilinear) scaling, EINA_FALSE for nearest-neighbor.
+ * @param anti_alias EINA_TRUE for anti-aliased edges (currently unused).
+ * @param level Detail level for the transformation (currently unused).
+ * @param mask_ie Optional mask image. If NULL, no mask is applied.
+ * @param mask_x X-offset for the mask image.
+ * @param mask_y Y-offset for the mask image.
+ */
 static void
 FUNC_NAME(RGBA_Image *src, RGBA_Image *dst,
           int clip_x, int clip_y, int clip_w, int clip_h,
@@ -132,6 +160,29 @@ FUNC_NAME(RGBA_Image *src, RGBA_Image *dst,
      }
 }
 
+/**
+ * @brief Renders pre-calculated map spans from a source image to a destination image.
+ *
+ * This function is an optimized version that uses pre-calculated span data
+ * (ms) to render the transformed image. It's typically called after
+ * span calculation has been performed. It handles clipping, color
+ * multiplication from the draw context, and optional masking.
+ *
+ * @param src Pointer to the source RGBA_Image.
+ * @param dst Pointer to the destination RGBA_Image.
+ * @param dc Pointer to the RGBA_Draw_Context, containing clipping,
+ *           multiplication color, and render operation information.
+ * @param ms Pointer to const RGBA_Map_Spans structure containing pre-calculated
+ *           span data. This includes:
+ *           - ystart, yend: Vertical range of spans.
+ *           - spans: Array of Line structures.
+ *           - havecol: Flag indicating if per-vertex colors are used.
+ *           - direct: Flag indicating if direct rendering (no buffer) is possible.
+ *           - havea: Flag indicating if source or vertex colors have alpha.
+ * @param smooth EINA_TRUE for smooth (bilinear) scaling, EINA_FALSE for nearest-neighbor.
+ * @param anti_alias EINA_TRUE for anti-aliased edges (currently unused).
+ * @param level Detail level for the transformation (currently unused).
+ */
 static void
 FUNC_NAME_DO(RGBA_Image *src, RGBA_Image *dst,
              RGBA_Draw_Context *dc,

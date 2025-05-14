@@ -5,16 +5,29 @@
 
 #include <Elementary_Cursor.h>
 
+/**
+ * @brief Structure to hold data for the layout API tests.
+ *
+ * This structure maintains the state of the test, references to the
+ * layout objects being tested, and references to child objects
+ * that are manipulated during the tests.
+ */
 struct _api_data
 {
-   unsigned int state;  /* What state we are testing       */
-   Evas_Object *box_layout;
-   Evas_Object *table_layout;
-   Evas_Object *ref;
-   Evas_Object *ref2;
+   unsigned int state;  /**< The current test case from _api_state */
+   Evas_Object *box_layout; /**< The layout object with a box part */
+   Evas_Object *table_layout; /**< The layout object with a table part */
+   Evas_Object *ref; /**< A reference object for insertion/removal tests in box_layout */
+   Evas_Object *ref2; /**< A reference object for unpack tests in table_layout */
 };
 typedef struct _api_data api_data;
 
+/**
+ * @brief Defines the different states for the API tests.
+ *
+ * Each state corresponds to a specific elm_layout_* function call
+ * that will be tested when the "Next API function" button is clicked.
+ */
 enum _api_state
 {
    LAYOUT_BOX_INSERT_AT,
@@ -28,18 +41,56 @@ enum _api_state
 };
 
 typedef enum _api_state api_state;
+
+/**
+ * @brief Callback for button clicks in the first test window.
+ *
+ * When a button is clicked, this function takes the button's text and
+ * sets it as the text for the "text" part of the main layout object.
+ *
+ * @param data The layout object to modify.
+ * @param obj The button that was clicked.
+ * @param event_info Not used.
+ */
 static void
 _clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    elm_object_part_text_set(data, "text", elm_object_text_get(obj));
 }
 
+/**
+ * @brief Callback for signals emitted by the layout.
+ *
+ * This function is registered to receive all signals ("*", "*") from the
+ * layout and prints the emission and source of the signal to stdout.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param emission The signal string.
+ * @param source The source of the signal.
+ */
 static void
 _cb_signal(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, const char *emission, const char *source)
 {
    printf("signal: '%s' '%s'\n", emission, source);
 }
 
+/**
+ * @brief Creates the main test window for `elm_layout`.
+ *
+ * This test function sets up a window demonstrating basic elm_layout usage.
+ * It shows:
+ * - Setting a layout from a theme.
+ * - Setting part text and icons.
+ * - Setting a layout from a custom EDJE file.
+ * - Swallowing objects into layout parts.
+ * - Setting a cursor for a layout part.
+ * - Handling signals from the layout.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_layout(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -105,6 +156,15 @@ test_layout(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
    evas_object_show(win);
 }
 
+/**
+ * @brief Executes a layout API function based on the current test state.
+ *
+ * This function is called to perform a specific layout operation corresponding
+ * to the value of @p api->state. It demonstrates various box and table
+ * manipulation functions of `elm_layout`.
+ *
+ * @param api The test state data.
+ */
 static void
 set_api_state(api_data *api)
 {
@@ -179,6 +239,18 @@ set_api_state(api_data *api)
      }
 }
 
+/**
+ * @brief Callback for the "Next API function" button click.
+ *
+ * This function advances the API test to the next state. It calls
+ * set_api_state() to perform the test, increments the state counter,
+ * updates the button's text to show the next state, and disables the
+ * button when all tests are done.
+ *
+ * @param data The api_data struct.
+ * @param obj The button object.
+ * @param event_info Not used.
+ */
 static void
 _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {  /* Will add here a SWITCH command containing code to modify test-object */
@@ -194,12 +266,35 @@ _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_disabled_set(obj, a->state == API_STATE_LAST);
 }
 
+/**
+ * @brief Cleans up allocated resources.
+ *
+ * This callback is attached to the window's "free" event and is responsible
+ * for freeing the api_data structure allocated for the test.
+ *
+ * @param data The api_data struct to free.
+ * @param e Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Creates a window for interactively testing layout API functions.
+ *
+ * This test sets up a window with two layouts (one box, one table) and
+ * a button. Clicking the button cycles through a series of API tests
+ * defined in _api_state, demonstrating programmatic manipulation of
+ * layout contents (inserting, removing, clearing, etc.).
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_layout2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

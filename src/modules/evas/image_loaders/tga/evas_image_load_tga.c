@@ -27,6 +27,13 @@
 typedef struct _tga_header tga_header;
 typedef struct _tga_footer tga_footer;
 
+/**
+ * @brief Defines the header for a TGA (Truevision Targa) image file.
+ *
+ * This structure is packed to ensure it precisely matches the layout of a TGA
+ * header on disk. It contains metadata about the image such as dimensions,
+ * pixel depth, and image type.
+ */
 struct _tga_header
 {
    unsigned char       idLength;
@@ -43,6 +50,13 @@ struct _tga_header
    unsigned char       descriptor;
 } __attribute__((packed));
 
+/**
+ * @brief Defines the footer for a TGA (Truevision Targa) image file.
+ *
+ * This optional footer provides a way to verify that a file is a valid TGA
+ * file (using the signature). It is part of the TGA 2.0 specification. It
+ * is packed to match the on-disk format.
+ */
 struct _tga_footer
 {
    unsigned int        extensionAreaOffset;
@@ -52,6 +66,20 @@ struct _tga_footer
    char                null;
 } __attribute__((packed));
 
+/**
+ * @brief Opens a TGA file for loading.
+ *
+ * This function is the entry point for loading a TGA image. It is called by
+ * Evas to open a file and prepare it for reading. In this TGA loader, it
+ * simply returns the file handle as no special opening procedure is needed.
+ *
+ * @param f The Eina_File handle to the TGA file.
+ * @param key Unused.
+ * @param opts Unused.
+ * @param animated Unused.
+ * @param error Unused.
+ * @return A void pointer to the loader data, which is the file handle itself.
+ */
 static void *
 evas_image_load_file_open_tga(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
                               Evas_Image_Load_Opts *opts EINA_UNUSED,
@@ -61,11 +89,33 @@ evas_image_load_file_open_tga(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
    return f;
 }
 
+/**
+ * @brief Closes a TGA file after loading.
+ *
+ * This function is called by Evas when it is finished with the image loader.
+ * For this TGA loader, no specific action is required to close the file, as
+ * Eina_File handles are managed by the caller.
+ *
+ * @param loader_data The loader data, which is the file handle. Unused here.
+ */
 static void
 evas_image_load_file_close_tga(void *loader_data EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Reads the header of a TGA file to determine image properties.
+ *
+ * This function reads the TGA header to extract image metadata like width,
+ * height, and whether it has an alpha channel. It performs various checks to
+ * validate the TGA format. It does not load the pixel data.
+ *
+ * @param loader_data The loader data, which is the Eina_File handle.
+ * @param prop A pointer to an Emile_Image_Property struct to be filled with
+ *        image properties.
+ * @param error A pointer to an integer where a load error code can be stored.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_head_tga(void *loader_data,
                               Emile_Image_Property *prop,
@@ -161,6 +211,21 @@ close_file:
    return r;
 }
 
+/**
+ * @brief Loads the actual image data from a TGA file.
+ *
+ * This function reads the pixel data from the TGA file into a provided
+ * buffer. It handles various TGA formats, including uncompressed and
+ * RLE-compressed data, and different pixel depths (8, 16, 24, 32 bpp).
+ * It also handles vertically flipped images.
+ *
+ * @param loader_data The loader data, which is the Eina_File handle.
+ * @param prop The image properties determined by the header loading function.
+ * @param pixels A pointer to the memory buffer where the decoded pixel data
+ *        (in ARGB8888 format) should be stored.
+ * @param error A pointer to an integer where a load error code can be stored.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_data_tga(void *loader_data,
                               Emile_Image_Property *prop,
@@ -573,6 +638,15 @@ static Evas_Image_Load_Func evas_image_load_tga_func =
   EINA_FALSE
 };
 
+/**
+ * @brief Evas module initialization function.
+ *
+ * This function is called by Evas when the TGA loader module is loaded.
+ * It registers the loader's function table with the Evas module system.
+ *
+ * @param em The Evas_Module handle.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -581,6 +655,13 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Evas module shutdown function.
+ *
+ * This function is called by Evas when the TGA loader module is unloaded.
+ *
+ * @param em The Evas_Module handle (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

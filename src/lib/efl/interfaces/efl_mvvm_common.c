@@ -5,16 +5,26 @@
 #include "Efl.h"
 #include "Efl_MVVM_Common.h"
 
+/** @brief Generic unknown error for Efl_Model. */
 EAPI Eina_Error EFL_MODEL_ERROR_UNKNOWN = 0;
+/** @brief Operation not supported error for Efl_Model. */
 EAPI Eina_Error EFL_MODEL_ERROR_NOT_SUPPORTED = 0;
+/** @brief Value not found error for Efl_Model. */
 EAPI Eina_Error EFL_MODEL_ERROR_NOT_FOUND = 0;
+/** @brief Value is read-only error for Efl_Model. */
 EAPI Eina_Error EFL_MODEL_ERROR_READ_ONLY = 0;
+/** @brief Initialization failed error for Efl_Model. */
 EAPI Eina_Error EFL_MODEL_ERROR_INIT_FAILED = 0;
+/** @brief Permission denied error for Efl_Model. */
 EAPI Eina_Error EFL_MODEL_ERROR_PERMISSION_DENIED = 0;
+/** @brief Incorrect value error for Efl_Model. */
 EAPI Eina_Error EFL_MODEL_ERROR_INCORRECT_VALUE = 0;
+/** @brief Invalid object error for Efl_Model. */
 EAPI Eina_Error EFL_MODEL_ERROR_INVALID_OBJECT = 0;
 
+/** @brief Operation not supported error for Efl_Factory. */
 EAPI Eina_Error EFL_FACTORY_ERROR_NOT_SUPPORTED = 0;
+/** @brief Invalid key error for Efl_Property. */
 EAPI Eina_Error EFL_PROPERTY_ERROR_INVALID_KEY = 0;
 
 static const char EFL_MODEL_ERROR_UNKNOWN_STR[]           = "Unknown Error";
@@ -30,7 +40,15 @@ static const char EFL_FACTORY_ERROR_NOT_SUPPORTED_STR[]   = "Operation not suppo
 
 static const char EFL_PROPERTY_ERROR_INVALID_KEY_STR[]    = "Incorrect key provided";
 
-
+/**
+ * @brief Initializes the Efl_Model error messages.
+ *
+ * This function registers static error messages for Efl_Model, Efl_Factory,
+ * and Efl_Property related errors. It should be called once during
+ * application startup.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 EAPI int
 efl_model_init(void)
 {
@@ -57,6 +75,17 @@ efl_model_init(void)
 
 #undef _ERROR
 
+/**
+ * @internal
+ * @brief Notifies listeners that properties on a model have changed.
+ *
+ * This is an internal helper function to construct and dispatch the
+ * EFL_MODEL_EVENT_PROPERTIES_CHANGED event.
+ *
+ * @param model The model on which properties have changed.
+ * @param ... A NULL-terminated list of stringshared property names that have changed.
+ *            Example: "property1", "property2", NULL
+ */
 EAPI void
 _efl_model_properties_changed_internal(const Efl_Model *model, ...)
 {
@@ -84,6 +113,18 @@ _efl_model_properties_changed_internal(const Efl_Model *model, ...)
    eina_array_free(properties);
 }
 
+/**
+ * @brief Notifies that a specific property of a model has been invalidated.
+ *
+ * This function is used to signal that a single property's value is no longer
+ * valid and should be re-fetched or considered stale. It triggers the
+ * EFL_MODEL_EVENT_PROPERTIES_CHANGED event with the `invalidated_properties`
+ * field populated.
+ *
+ * @param model The model whose property has been invalidated.
+ * @param property The name of the property that has been invalidated.
+ *                 Example: "propertyName"
+ */
 EAPI void
 efl_model_property_invalidated_notify(Efl_Model *model, const char *property)
 {
@@ -107,11 +148,47 @@ typedef struct _Efl_Model_Value_Struct_Desc Efl_Model_Value_Struct_Desc;
 
 struct _Efl_Model_Value_Struct_Desc
 {
-   Eina_Value_Struct_Desc base;
-   void *data;
-   Eina_Value_Struct_Member members[];
+   Eina_Value_Struct_Desc base; /**< Base Eina_Value_Struct_Desc structure. */
+   void *data; /**< User data to be passed to the setup_cb. */
+   Eina_Value_Struct_Member members[]; /**< Array of structure members. */
 };
 
+/**
+ * @brief Creates a new Eina_Value_Struct_Desc for use with Efl_Model.
+ *
+ * This function dynamically allocates and initializes a structure description
+ * that can be used to represent complex data types within the Efl_Model framework.
+ * The `setup_cb` is called for each member to configure its name and type.
+ *
+ * The `data` pointer provided to this function will be passed as the first
+ * argument to the `setup_cb` for each member.
+ *
+ * Example of `setup_cb`:
+ * @code
+ * static void
+ * _my_struct_member_setup(void *userdata, unsigned int member_index, Eina_Value_Struct_Member *member_info)
+ * {
+ *    My_Struct_Definition *def = userdata; // User data passed to efl_model_value_struct_description_new
+ *    switch (member_index)
+ *    {
+ *      case 0:
+ *        member_info->name = eina_stringshare_add("name");
+ *        member_info->type = EINA_VALUE_TYPE_STRINGSHARE;
+ *        break;
+ *      case 1:
+ *        member_info->name = eina_stringshare_add("age");
+ *        member_info->type = EINA_VALUE_TYPE_INT;
+ *        break;
+ *    }
+ * }
+ * @endcode
+ *
+ * @param member_count The number of members in the structure. Must be greater than 0.
+ * @param setup_cb A callback function to set up each member of the structure.
+ * @param data User-provided data that will be passed to the `setup_cb`.
+ * @return A newly allocated Eina_Value_Struct_Desc on success, or NULL on failure.
+ *         The caller is responsible for freeing this with efl_model_value_struct_description_free().
+ */
 EAPI Eina_Value_Struct_Desc *
 efl_model_value_struct_description_new(unsigned int member_count, Efl_Model_Value_Struct_Member_Setup_Cb setup_cb, void *data)
 {
@@ -152,6 +229,14 @@ efl_model_value_struct_description_new(unsigned int member_count, Efl_Model_Valu
    return &desc->base;
 }
 
+/**
+ * @brief Frees an Eina_Value_Struct_Desc created by efl_model_value_struct_description_new().
+ *
+ * This function releases the memory allocated for the structure description,
+ * including the stringshared names of its members.
+ *
+ * @param desc The structure description to free. If NULL, the function does nothing.
+ */
 EAPI void
 efl_model_value_struct_description_free(Eina_Value_Struct_Desc *desc)
 {

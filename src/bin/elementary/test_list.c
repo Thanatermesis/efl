@@ -38,6 +38,15 @@ enum _api_state
 };
 typedef enum _api_state api_state;
 
+/**
+ * @brief Tests a specific Elementary List API function based on the state.
+ * @param api The api_data struct containing the list object and current test state.
+ *
+ * This function is the core of the API test. It uses a switch statement
+ * to execute different list operations, such as adding, deleting, or modifying
+ * items and properties. The state is incremented externally to this function,
+ * allowing sequential testing of the API.
+ */
 static void
 set_api_state(api_data *api)
 {
@@ -222,6 +231,16 @@ Scroll to end
      }
 }
 
+/**
+ * @brief Callback for the "Next API function" button.
+ * @param data The api_data struct.
+ * @param obj The button object that was clicked.
+ * @param event_info Not used.
+ *
+ * This function is called when the user clicks the button to trigger the next
+ * API test. It calls set_api_state() to perform the test, increments the
+ * state counter, and updates the button's text to reflect the next state.
+ */
 static void
 _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {  /* Will add here a SWITCH command containing code to modify test-object */
@@ -237,6 +256,15 @@ _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_disabled_set(obj, a->state == API_STATE_LAST);
 }
 
+/**
+ * @brief Shows a given list item.
+ * @param data The Elm_Object_Item to show.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This is a callback function used by buttons to programmatically
+ * show a specific item in the list.
+ */
 static void
 my_show_it(void        *data,
            Evas_Object *obj EINA_UNUSED,
@@ -245,6 +273,9 @@ my_show_it(void        *data,
    elm_list_item_show(data);
 }
 
+/**
+ * @brief Callback for when the list is scrolled to the top edge.
+ */
 static void
 scroll_top(void        *data EINA_UNUSED,
            Evas_Object *obj EINA_UNUSED,
@@ -253,6 +284,9 @@ scroll_top(void        *data EINA_UNUSED,
    printf("Top edge!\n");
 }
 
+/**
+ * @brief Callback for when the list is scrolled to the bottom edge.
+ */
 static void
 scroll_bottom(void        *data EINA_UNUSED,
               Evas_Object *obj EINA_UNUSED,
@@ -261,6 +295,9 @@ scroll_bottom(void        *data EINA_UNUSED,
    printf("Bottom edge!\n");
 }
 
+/**
+ * @brief Callback for a right-click on a list item.
+ */
 static void
 clicked_right(void        *data EINA_UNUSED,
               Evas_Object *obj EINA_UNUSED,
@@ -269,6 +306,9 @@ clicked_right(void        *data EINA_UNUSED,
    printf("Clicked right!\n");
 }
 
+/**
+ * @brief Callback for when the horizontal list is scrolled to the left edge.
+ */
 static void
 scroll_left(void        *data EINA_UNUSED,
             Evas_Object *obj EINA_UNUSED,
@@ -277,6 +317,9 @@ scroll_left(void        *data EINA_UNUSED,
    printf("Left edge!\n");
 }
 
+/**
+ * @brief Callback for when the horizontal list is scrolled to the right edge.
+ */
 static void
 scroll_right(void        *data EINA_UNUSED,
              Evas_Object *obj EINA_UNUSED,
@@ -285,6 +328,16 @@ scroll_right(void        *data EINA_UNUSED,
    printf("Right edge!\n");
 }
 
+/**
+ * @brief Frees data associated with the test window.
+ * @param data The data to be freed (e.g., api_data struct).
+ * @param e Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This callback is triggered when the window is destroyed, ensuring
+ * that dynamically allocated memory is released.
+ */
 static void
 _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
             void *event_info EINA_UNUSED)
@@ -292,6 +345,17 @@ _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    free(data);
 }
 
+/**
+ * @brief Main test function for the Elm_List widget.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This function sets up a window with a vertical list populated with various
+ * items. It includes a button to cycle through a series of API tests
+ * (`set_api_state`), demonstrating the dynamic manipulation of the list.
+ * It also sets up buttons to demonstrate programmatic scrolling to specific items.
+ */
 void
 test_list(void        *data EINA_UNUSED,
           Evas_Object *obj EINA_UNUSED,
@@ -449,6 +513,16 @@ test_list(void        *data EINA_UNUSED,
    evas_object_smart_callback_add(li, "clicked,right", clicked_right, NULL);
 }
 
+/**
+ * @brief Test function for a horizontal Elm_List.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This function creates a window with a horizontal list. It demonstrates
+ * how items are laid out and how edge events (`edge,left`, `edge,right`) work
+ * in horizontal mode. It also shows buttons for programmatic navigation.
+ */
 void
 test_list_horizontal(void        *data EINA_UNUSED,
                      Evas_Object *obj EINA_UNUSED,
@@ -576,6 +650,12 @@ test_list_horizontal(void        *data EINA_UNUSED,
 
 /***********/
 
+/**
+ * @brief Callback to clear all items from a list.
+ * @param data The list widget to clear.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 my_li2_clear(void        *data,
              Evas_Object *obj EINA_UNUSED,
@@ -584,6 +664,15 @@ my_li2_clear(void        *data,
    elm_list_clear(data);
 }
 
+/**
+ * @brief Callback for item selection that immediately deselects the item.
+ * @param data Not used.
+ * @param obj The list widget where the selection occurred.
+ * @param event_info Not used.
+ *
+ * This demonstrates handling a "selected" event and then programmatically
+ * changing the selection state.
+ */
 static void
 my_li2_sel(void        *data EINA_UNUSED,
            Evas_Object *obj,
@@ -594,6 +683,16 @@ my_li2_sel(void        *data EINA_UNUSED,
    printf("item selected\n");
 }
 
+/**
+ * @brief Test function for list selection and clearing.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * Creates a list where one item has a custom selection callback (`my_li2_sel`)
+ * that prevents it from staying selected. It also includes a "Clear" button
+ * to demonstrate removing all items from the list at once.
+ */
 void
 test_list2(void        *data EINA_UNUSED,
            Evas_Object *obj EINA_UNUSED,
@@ -702,6 +801,16 @@ test_list2(void        *data EINA_UNUSED,
 
 /***********/
 
+/**
+ * @brief Simple callback for a button click inside a list item.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This function is used to demonstrate that events on content inside a list
+ * item can be handled separately from item selection events, especially when
+ * event propagation is managed.
+ */
 static void
 _bt_clicked(void        *data EINA_UNUSED,
             Evas_Object *obj EINA_UNUSED,
@@ -710,6 +819,15 @@ _bt_clicked(void        *data EINA_UNUSED,
    printf("button was clicked\n");
 }
 
+/**
+ * @brief Callback for a list item click.
+ * @param data The list widget.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This function is called when a list item is clicked. It retrieves the
+ * selected item and updates a label to show which item was selected.
+ */
 static void
 _it_clicked(void *data, Evas_Object *obj EINA_UNUSED,
                  void *event_info EINA_UNUSED)
@@ -728,6 +846,16 @@ _it_clicked(void *data, Evas_Object *obj EINA_UNUSED,
    elm_object_text_set(lb, str);
 }
 
+/**
+ * @brief Test for list items with complex content and event propagation.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This test creates a list where some items contain a button. It demonstrates
+ * how to handle clicks on the button separately from clicks on the item itself
+ * by using `evas_object_propagate_events_set(EINA_FALSE)` on the button.
+ */
 void
 test_list3(void        *data EINA_UNUSED,
            Evas_Object *obj EINA_UNUSED,
@@ -834,6 +962,14 @@ struct Pginfo
    Evas_Object *naviframe, *win;
 };
 
+/**
+ * @brief Callback for the "back" button in the naviframe.
+ * @param data The Pginfo struct containing the naviframe.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * Pops the current view from the naviframe stack to return to the list.
+ */
 static void
 test_list4_back_cb(void        *data,
                    Evas_Object *obj EINA_UNUSED,
@@ -845,6 +981,16 @@ test_list4_back_cb(void        *data,
    elm_naviframe_item_pop(info->naviframe);
 }
 
+/**
+ * @brief Callback for a swipe gesture on a list item.
+ * @param data The Pginfo struct containing the naviframe and window.
+ * @param obj Not used.
+ * @param event_info The swiped Elm_Object_Item.
+ *
+ * When a list item is swiped, this function pushes a new view onto the
+ * naviframe. The new view displays the detailed data associated with the
+ * swiped item.
+ */
 static void
 test_list4_swipe(void        *data,
                  Evas_Object *obj EINA_UNUSED,
@@ -885,6 +1031,16 @@ test_list4_swipe(void        *data,
    elm_naviframe_item_simple_push(info->naviframe, box);
 }
 
+/**
+ * @brief Test for list integration with a naviframe and swipe gestures.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This test demonstrates a common mobile UI pattern where a list is the main
+ * view in a naviframe. Swiping on an item reveals more details by pushing a
+ * new view. Each item has a static string of text associated with it as its data.
+ */
 void
 test_list4(void        *data EINA_UNUSED,
            Evas_Object *obj EINA_UNUSED,
@@ -983,6 +1139,12 @@ struct list5_data_cb
    Evas_Object *win, *list;
 };
 
+/**
+ * @brief Callback to delete a specific list item.
+ * @param data The Elm_Object_Item to be deleted.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 test_list5_item_del(void        *data,
                     Evas_Object *obj EINA_UNUSED,
@@ -991,6 +1153,16 @@ test_list5_item_del(void        *data,
    elm_object_item_del(data);
 }
 
+/**
+ * @brief Callback for a swipe gesture that reveals a delete button.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info The swiped Elm_Object_Item.
+ *
+ * When an item is swiped, this function creates a "delete" button and sets
+ * it as the "end" content of the item. This is a common swipe-to-reveal-action
+ * pattern. It also modifies the item's main text.
+ */
 static void
 test_list5_swipe(void        *data EINA_UNUSED,
                  Evas_Object *obj EINA_UNUSED,
@@ -1010,6 +1182,15 @@ test_list5_swipe(void        *data EINA_UNUSED,
    elm_object_item_part_text_set(event_info, "default", "Enlightenment");
 }
 
+/**
+ * @brief Test for list items with swipe-to-reveal actions.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This test demonstrates how to implement swipe gestures on list items
+ * to reveal contextual actions, such as a delete button.
+ */
 void
 test_list5(void        *data EINA_UNUSED,
            Evas_Object *obj EINA_UNUSED,
@@ -1039,6 +1220,12 @@ test_list5(void        *data EINA_UNUSED,
    evas_object_show(win);
 }
 
+/**
+ * @brief Selects and brings into view the first item of the list.
+ * @param data The list widget.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _first_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
                   void *event_info EINA_UNUSED)
@@ -1056,6 +1243,12 @@ _first_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
    elm_object_text_set(lb, str);
 }
 
+/**
+ * @brief Selects and brings into view the item previous to the current selection.
+ * @param data The list widget.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _prev_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
                  void *event_info EINA_UNUSED)
@@ -1076,6 +1269,12 @@ _prev_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
    elm_object_text_set(lb, str);
 }
 
+/**
+ * @brief Selects and brings into view the item next to the current selection.
+ * @param data The list widget.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _next_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
                  void *event_info EINA_UNUSED)
@@ -1096,6 +1295,12 @@ _next_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
    elm_object_text_set(lb, str);
 }
 
+/**
+ * @brief Selects and brings into view the last item of the list.
+ * @param data The list widget.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _last_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
                  void *event_info EINA_UNUSED)
@@ -1113,6 +1318,16 @@ _last_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
    elm_object_text_set(lb, str);
 }
 
+/**
+ * @brief Test for programmatic list navigation and selection.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This test provides buttons (First, Prev, Next, Last) to demonstrate
+ * programmatically accessing and manipulating list items and their selection
+ * state. A label at the bottom shows the currently selected item.
+ */
 void
 test_list6(void        *data EINA_UNUSED,
            Evas_Object *obj EINA_UNUSED,
@@ -1186,6 +1401,16 @@ test_list6(void        *data EINA_UNUSED,
    evas_object_show(win);
 }
 
+/**
+ * @brief Item click callback for test_list7.
+ * @param data Not used.
+ * @param li The list widget.
+ * @param event_info Not used.
+ *
+ * This callback is triggered on every click, even on an already selected
+ * item, because the list is in ELM_OBJECT_SELECT_MODE_ALWAYS. It prints
+ * the selected item's text.
+ */
 static void
 _it_clicked_cb(void *data EINA_UNUSED, Evas_Object *li,
                  void *event_info EINA_UNUSED)
@@ -1194,6 +1419,16 @@ _it_clicked_cb(void *data EINA_UNUSED, Evas_Object *li,
    printf("Item clicked. %s is selected\n", elm_object_item_text_get(lit));
 }
 
+/**
+ * @brief Test for ELM_OBJECT_SELECT_MODE_ALWAYS.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This test demonstrates the "always select" mode, where the "selected"
+ * callback is triggered every time an item is clicked, regardless of its
+ * current selection state.
+ */
 void
 test_list7(void        *data EINA_UNUSED,
            Evas_Object *obj EINA_UNUSED,
@@ -1239,8 +1474,26 @@ test_list7(void        *data EINA_UNUSED,
 }
 
 static const char *_list_focus_names[] = {"None", "Square", "Button", "Check", "Box"};
+/**
+ * An array that defines pairs of content types for list items in focus tests.
+ * Each integer value represents two content types, one for the left/start side
+ * and one for the right/end side.
+ * The value is calculated as `(left_type_index * 10) + right_type_index`.
+ * The indices correspond to the `_list_focus_names` array.
+ * For example, a value of 33 means left content is "Check" (index 3) and
+ * right content is "Check" (index 3). A value of 2 means left content is
+ * "None" (index 0) and right is "Button" (index 2).
+ * The array is terminated by -1.
+ */
 static const int _list_focus_combo[] = { 1, 0, 2, 33, 43, 44, 10, 30, 22, 11, 10, -1 };
 
+/**
+ * @brief Creates a content object for a list item in focus tests.
+ * @param obj The parent object.
+ * @param type The type of content to create, based on an index into `_list_focus_names`.
+ * @param horiz Whether the container box should be horizontal or vertical.
+ * @return A new Evas_Object to be used as item content, or NULL on failure.
+ */
 static Evas_Object *
 test_list_focus_content_get(Evas_Object *obj, unsigned type, Eina_Bool horiz)
 {
@@ -1437,6 +1690,17 @@ _focus_button_clicked_cb(void *data, Evas_Object *obj EINA_UNUSED,
    printf("Button clicked: %s\n", (char *)data);
 }
 
+/**
+ * @brief Generic function to set up and run a list focus test.
+ * @param name The name of the window.
+ * @param title The title of the window.
+ * @param horiz EINA_TRUE if the list should be horizontal, EINA_FALSE otherwise.
+ *
+ * This function creates a comprehensive test environment for list focus
+ * behavior. It includes a list with various item types, surrounding widgets
+ * to test focus movement, and a rich set of options to configure focus-related
+ * settings in real-time.
+ */
 static void
 _test_list_focus(const char *name, const char *title, Eina_Bool horiz)
 {
@@ -1711,6 +1975,12 @@ _test_list_focus(const char *name, const char *title, Eina_Bool horiz)
    evas_object_show(win);
 }
 
+/**
+ * @brief Test entry point for vertical list focus.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_list_focus(void        *data EINA_UNUSED,
                 Evas_Object *obj EINA_UNUSED,
@@ -1719,6 +1989,12 @@ test_list_focus(void        *data EINA_UNUSED,
    _test_list_focus("list-focus", "List Focus", EINA_FALSE);
 }
 
+/**
+ * @brief Test entry point for horizontal list focus.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_list_horiz_focus(void        *data EINA_UNUSED,
                       Evas_Object *obj EINA_UNUSED,
@@ -1727,6 +2003,16 @@ test_list_horiz_focus(void        *data EINA_UNUSED,
    _test_list_focus("list-focus-horizontal", "List Focus Horizontal", EINA_TRUE);
 }
 
+/**
+ * @brief Test for list item separators.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This test demonstrates how to create separator items in a list. Separators
+ * are created by adding a regular item and then setting its separator property
+ * to EINA_TRUE.
+ */
 void
 test_list_separator(void        *data EINA_UNUSED,
                     Evas_Object *obj EINA_UNUSED,
@@ -1918,6 +2204,16 @@ _multi_select_frame_create(Evas_Object *bx, List_Multi_Data *ld)
                                   _multi_select_changed_cb, ld);
 }
 
+/**
+ * @brief Test for multi-selection in lists.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This test demonstrates the multi-selection feature of Elm_List. It includes
+ * controls to enable/disable multi-selection and to switch between the
+ * default multi-selection mode and the "with-control" mode (e.g., Ctrl+click).
+ */
 void
 test_list_multi_select(void *data EINA_UNUSED,
                        Evas_Object *obj EINA_UNUSED,

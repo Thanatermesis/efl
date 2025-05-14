@@ -6,10 +6,17 @@
 #include "elm_priv.h"
 #include "efl_ui_spotlight_plain_manager.eo.h"
 
+/**
+ * @brief Private data structure for the Efl_Ui_Spotlight_Container class.
+ *
+ * This structure holds all the internal state of a spotlight container,
+ * including the list of content items, current page, transition information,
+ * and configuration flags.
+ */
 typedef struct _Efl_Ui_Spotlight_Container_Data
 {
-   Eina_List *content_list;
-   Eo *event;
+   Eina_List *content_list; /**< List of Efl_Gfx_Entity objects that are packed into the container. */
+   Eo *event; /**< Legacy event object. TODO: Check if still needed or can be removed/refactored. */
    struct {
       Eina_Size2D sz;
    } page_spec;
@@ -35,11 +42,19 @@ typedef struct _Efl_Ui_Spotlight_Container_Data
    Eina_Bool fill_height: 1;
    Eina_Bool prevent_transition_interaction : 1;
    Eina_Bool animation_enabled_internal : 1;
-   Eina_Bool animation_enabled : 1;
+   Eina_Bool animation_enabled : 1; /**< User-settable flag to enable/disable animations. */
 } Efl_Ui_Spotlight_Container_Data;
 
 #define MY_CLASS EFL_UI_SPOTLIGHT_CONTAINER_CLASS
 
+/**
+ * @brief Finds the next and previous elements in a list relative to a given sub-object.
+ *
+ * @param list The Eina_List to search within.
+ * @param subobj The Efl_Gfx_Entity to find partners for.
+ * @param[out] next Pointer to store the next element.
+ * @param[out] prev Pointer to store the previous element.
+ */
 static void
 _fetch_partners(Eina_List *list, Eo *subobj, Eo **next, Eo **prev)
 {
@@ -48,9 +63,37 @@ _fetch_partners(Eina_List *list, Eo *subobj, Eo **next, Eo **prev)
    *prev = eina_list_data_get(eina_list_prev(node));
 }
 
+/**
+ * @brief Internal function to unpack a single sub-object from the container.
+ *
+ * This function handles the removal of a sub-object from the content list,
+ * updates the UI, and manages the active element if necessary.
+ *
+ * @param obj The spotlight container object.
+ * @param pd The private data of the spotlight container.
+ * @param subobj The sub-object to unpack.
+ * @param index The index of the sub-object in the content list.
+ */
 static void _unpack(Eo *obj, Efl_Ui_Spotlight_Container_Data *pd, Efl_Gfx_Entity *subobj, int index);
+
+/**
+ * @brief Internal function to unpack all sub-objects from the container.
+ *
+ * @param obj The spotlight container object.
+ * @param pd The private data of the spotlight container.
+ * @param clear If EINA_TRUE, also delete the unpacked sub-objects.
+ */
 static void _unpack_all(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Container_Data *pd, Eina_Bool clear);
 
+/**
+ * @brief Clamps an index to indicate if it's out of bounds.
+ *
+ * @param pd The private data of the spotlight container.
+ * @param index The index to clamp.
+ * @return 0 if the index is within bounds or can be rolled over.
+ *         -1 if the index is too small (less than -count).
+ *         1 if the index is too large (greater than count - 1).
+ */
 static int
 clamp_index(Efl_Ui_Spotlight_Container_Data *pd, int index)
 {
@@ -61,6 +104,23 @@ clamp_index(Efl_Ui_Spotlight_Container_Data *pd, int index)
    return 0;
 }
 
+/**
+ * @brief Adjusts an index to roll over within the valid range of content items.
+ *
+ * If the index is negative, it's wrapped around from the end of the list.
+ * If the index is out of bounds, it's clamped to the first or last valid index.
+ * For example, with 3 items:
+ *  - index 0 -> 0
+ *  - index 2 -> 2
+ *  - index 3 -> 2 (clamped to last)
+ *  - index -1 -> 2 (0 + 3 - 1)
+ *  - index -3 -> 0 (0 + 3 - 3)
+ *  - index -4 -> 0 (clamped to first)
+ *
+ * @param pd The private data of the spotlight container.
+ * @param index The index to adjust.
+ * @return The adjusted index, guaranteed to be within [0, count-1] if count > 0.
+ */
 static int
 index_rollover(Efl_Ui_Spotlight_Container_Data *pd, int index)
 {
@@ -74,6 +134,16 @@ index_rollover(Efl_Ui_Spotlight_Container_Data *pd, int index)
    return index;
 }
 
+/**
+ * @brief Finalizes a transition and emits the TRANSITION_END event.
+ *
+ * This function is called when a transition animation completes or is aborted.
+ * It resolves any pending promises related to pop operations and resets
+ * the show_request state.
+ *
+ * @param obj The spotlight container object.
+ * @param pd The private data of the spotlight container.
+ */
 static void
 _transition_end(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Container_Data *pd)
 {
@@ -101,6 +171,18 @@ _transition_end(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Container_Data *pd)
    pd->show_request.to = -1;
 }
 
+/**
+ * @brief Initializes a transition and emits the TRANSITION_START event.
+ *
+ * This function is called when a new transition is initiated, either by user
+ * interaction or programmatically. It sets up the show_request state.
+ *
+ * @param obj The spotlight container object.
+ * @param pd The private data of the spotlight container.
+ * @param from The starting index of the transition.
+ * @param to The target index of the transition.
+ * @param progress The initial progress of the transition (usually the 'from' index).
+ */
 static void
 _transition_start(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Container_Data *pd, int from, int to, double progress)
 {
@@ -120,6 +202,17 @@ _transition_start(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Container_Data *pd, int 
    efl_event_callback_call(obj, EFL_UI_SPOTLIGHT_EVENT_TRANSITION_START, &ev);
 }
 
+/**
+ * @brief Sets the current logical position of the spotlight.
+ *
+ * The position is a floating-point value representing the currently
+ * visible page and the progress towards the next/previous page.
+ * For example, 0.0 is the first page, 0.5 is halfway between the first and second page.
+ *
+ * @param obj The spotlight container object.
+ * @param pd The private data of the spotlight container.
+ * @param progress The new position.
+ */
 static void
 _position_set(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Container_Data *pd, double progress)
 {
@@ -132,6 +225,20 @@ _position_set(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Container_Data *pd, double p
    pd->position = progress;
 }
 
+/**
+ * @brief Manages transition start/end events based on position changes.
+ *
+ * This function is called when the spotlight's position changes. It checks
+ * if the change corresponds to an active show_request (e.g., a call to show_next()).
+ * If the movement is towards the requested target, it continues. If the movement
+ * is away from the target, the current show_request is considered aborted.
+ * If the target position is reached, the transition is considered ended.
+ * If the position changes without an active show_request (e.g., user swipe),
+ * a new implicit transition is started.
+ *
+ * @param obj The spotlight container object.
+ * @param pd The private data of the spotlight container.
+ */
 static void
 _transition_event_emission(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Container_Data *pd)
 {
@@ -157,6 +264,15 @@ _transition_event_emission(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Container_Data 
      }
 }
 
+/**
+ * @brief Calculates and sets the effective page size for the spotlight manager.
+ *
+ * This takes into account the container's own size and the fill_width/fill_height
+ * properties, as well as the user-specified page_spec.sz.
+ *
+ * @param obj The spotlight container object.
+ * @param pd The private data of the spotlight container.
+ */
 static void
 _emit_page_size(Efl_Ui_Spotlight_Container *obj, Efl_Ui_Spotlight_Container_Data *pd)
 {
@@ -219,6 +335,15 @@ _efl_ui_spotlight_container_efl_object_constructor(Eo *obj,
    return obj;
 }
 
+/**
+ * @brief Evaluates and applies the animation enabled state to the transition manager.
+ *
+ * The effective animation state depends on both an internal flag (e.g., during
+ * finalization) and the user-settable `animation_enabled` property.
+ *
+ * @param obj The spotlight container object.
+ * @param pd The private data of the spotlight container.
+ */
 static void
 _animated_transition_manager_eval(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Container_Data *pd)
 {
@@ -262,6 +387,15 @@ _efl_ui_spotlight_container_efl_container_content_count(Eo *obj EINA_UNUSED,
    return eina_list_count(pd->content_list);
 }
 
+/**
+ * @brief Callback for when a child object is invalidated.
+ *
+ * This typically means the child is being deleted. The spotlight container
+ * responds by unpacking (removing) the child.
+ *
+ * @param data The spotlight container object (passed as user data).
+ * @param ev The Efl_Event structure containing event details.
+ */
 static void
 _child_inv(void *data, const Efl_Event *ev)
 {
@@ -301,6 +435,18 @@ EFL_CALLBACKS_ARRAY_DEFINE(children_evt,
   {EFL_GFX_ENTITY_EVENT_HINTS_CHANGED, _hints_changed_cb}
 )
 
+/**
+ * @brief Registers a new child object with the container.
+ *
+ * This involves making the container the parent of the child,
+ * adding event listeners for invalidation and hint changes,
+ * and updating the container's own min/max size hints.
+ *
+ * @param obj The spotlight container object.
+ * @param pd The private data of the spotlight container.
+ * @param subobj The child object to register.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., child already registered).
+ */
 static Eina_Bool
 _register_child(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Container_Data *pd, Efl_Gfx_Entity *subobj)
 {
@@ -322,6 +468,18 @@ _register_child(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Container_Data *pd, Efl_Gf
    return EINA_TRUE;
 }
 
+/**
+ * @brief Updates internal components (manager, indicator) when content is added.
+ *
+ * This function informs the spotlight manager and indicator (if present)
+ * about the newly added content item. It also handles setting the initial
+ * active element if this is the first item being added.
+ *
+ * @param obj The spotlight container object.
+ * @param pd The private data of the spotlight container.
+ * @param subobj The content item that was added.
+ * @param index The index at which the content item was added.
+ */
 static void
 _update_internals(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Container_Data *pd, Efl_Gfx_Entity *subobj EINA_UNUSED, int index)
 {
@@ -437,6 +595,18 @@ _efl_ui_spotlight_container_efl_pack_linear_pack_index_get(Eo *obj EINA_UNUSED,
    return eina_list_data_idx(pd->content_list, (void *)subobj);
 }
 
+/**
+ * @brief Sets the active (current) element in the spotlight.
+ *
+ * This function updates the internal state (`pd->curr.page`),
+ * informs the spotlight manager about the switch, and initiates
+ * a transition if necessary.
+ *
+ * @param obj The spotlight container object.
+ * @param pd The private data of the spotlight container.
+ * @param new_page The new widget to set as active.
+ * @param reason The reason for the switch (e.g., jump, push, pop).
+ */
 static void
 _active_element_set(Eo *obj, Efl_Ui_Spotlight_Container_Data *pd, Efl_Ui_Widget *new_page, Efl_Ui_Spotlight_Manager_Switch_Reason reason)
 {
@@ -639,6 +809,17 @@ _efl_ui_spotlight_container_efl_container_content_iterate(Eo *obj EINA_UNUSED, E
   return eina_list_iterator_new(pd->content_list);
 }
 
+/**
+ * @brief Callback for when the spotlight manager updates its position.
+ *
+ * This function is called by the `Efl_Ui_Spotlight_Manager` when its
+ * internal position (progress) changes, usually due to an ongoing animation
+ * or user interaction. It updates the container's own position and
+ * triggers transition event emissions.
+ *
+ * @param data The spotlight container object (passed as user data).
+ * @param event The Efl_Event structure; event->info is a `double*` to the new progress.
+ */
 static void
 _pos_updated(void *data, const Efl_Event *event)
 {
@@ -734,6 +915,17 @@ _efl_ui_spotlight_container_push(Eo *obj, Efl_Ui_Spotlight_Container_Data *pd EI
    _active_element_set(obj, pd, view, EFL_UI_SPOTLIGHT_MANAGER_SWITCH_REASON_PUSH);
 }
 
+/**
+ * @brief Callback function for `eina_future_then` to delete an object.
+ *
+ * This is used in the pop operation to delete the popped content
+ * after its transition animation (if any) has completed.
+ *
+ * @param data User data (unused in this case).
+ * @param value An Eina_Value containing the Eo object to be deleted.
+ * @param dead_future The future that triggered this callback (unused).
+ * @return An empty Eina_Value.
+ */
 static Eina_Value
 _delete_obj(void *data EINA_UNUSED, const Eina_Value value, const Eina_Future *dead_future EINA_UNUSED)
 {

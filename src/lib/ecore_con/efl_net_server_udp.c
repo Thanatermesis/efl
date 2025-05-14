@@ -28,20 +28,35 @@
 
 #define MY_CLASS EFL_NET_SERVER_UDP_CLASS
 
+/**
+ * @brief Private data for the Efl_Net_Server_Udp class.
+ */
 typedef struct _Efl_Net_Server_Udp_Data
 {
-   Ecore_Thread *resolver;
-   Eina_Hash *clients; /* addr (string) -> client (Efl.Net.Server.Udp.Client) */
+   Ecore_Thread *resolver; /**< Thread used for asynchronous hostname resolution. */
+   Eina_Hash *clients; /**< Hash table mapping client address strings to Efl_Net_Server_Udp_Client objects.
+                           * Key: "IP:port" string.
+                           * Value: Eo * (Efl_Net_Server_Udp_Client). */
    struct {
-      Eina_List *groups; /* list of newly allocated strings */
-      Eina_List *pending; /* list of nodes of groups pending join */
-      uint8_t ttl;
-      Eina_Bool loopback;
-      Eina_Bool ttl_set;
-   } multicast;
-   Eina_Bool dont_route;
+      Eina_List *groups; /**< List of multicast group address strings the server has joined. Each element is a `char *`. */
+      Eina_List *pending; /**< List of multicast group address strings pending to be joined once the server is bound. Each element is a `Eina_List *` node from `groups`. */
+      uint8_t ttl; /**< Time-To-Live for outgoing multicast packets. */
+      Eina_Bool loopback; /**< Whether outgoing multicast packets should be looped back to the local host. 0xff means not set by user. */
+      Eina_Bool ttl_set; /**< Flag indicating if TTL has been explicitly set. */
+   } multicast; /**< Multicast specific data. */
+   Eina_Bool dont_route; /**< SO_DONTROUTE option state. If true, bypass normal routing tables. */
 } Efl_Net_Server_Udp_Data;
 
+/**
+ * @brief Constructor for Efl_Net_Server_Udp.
+ *
+ * Initializes the private data structure for a new UDP server instance.
+ * Sets up the clients hash table and default multicast parameters.
+ *
+ * @param o The Efl_Net_Server_Udp object.
+ * @param pd The private data for the object.
+ * @return The constructed Efl_Object.
+ */
 EOLIAN Efl_Object *
 _efl_net_server_udp_efl_object_constructor(Eo *o, Efl_Net_Server_Udp_Data *pd)
 {
@@ -52,6 +67,16 @@ _efl_net_server_udp_efl_object_constructor(Eo *o, Efl_Net_Server_Udp_Data *pd)
    return efl_constructor(efl_super(o, MY_CLASS));
 }
 
+/**
+ * @brief Destructor for Efl_Net_Server_Udp.
+ *
+ * Cleans up resources used by the UDP server instance.
+ * This includes freeing multicast group lists, cancelling any ongoing resolver thread,
+ * and freeing the clients hash table.
+ *
+ * @param o The Efl_Net_Server_Udp object.
+ * @param pd The private data for the object.
+ */
 EOLIAN void
 _efl_net_server_udp_efl_object_destructor(Eo *o, Efl_Net_Server_Udp_Data *pd)
 {
@@ -78,6 +103,19 @@ _efl_net_server_udp_efl_object_destructor(Eo *o, Efl_Net_Server_Udp_Data *pd)
      }
 }
 
+/**
+ * @brief Binds the server socket to a resolved address.
+ *
+ * This function is called after hostname resolution (if any) is complete.
+ * It creates a socket, sets socket options (IPv6 only, SO_DONTROUTE),
+ * binds the socket to the given address, and then processes any pending
+ * multicast group joins and sets multicast TTL/loopback options.
+ *
+ * @param o The Efl_Net_Server_Udp object.
+ * @param pd The private data for the object.
+ * @param addr The addrinfo structure containing the address to bind to.
+ * @return 0 on success, or an Eina_Error code on failure.
+ */
 static Eina_Error
 _efl_net_server_udp_resolved_bind(Eo *o, Efl_Net_Server_Udp_Data *pd, const struct addrinfo *addr)
 {
@@ -162,6 +200,20 @@ _efl_net_server_udp_resolved_bind(Eo *o, Efl_Net_Server_Udp_Data *pd, const stru
    return err;
 }
 
+/**
+ * @brief Callback function for asynchronous hostname resolution.
+ *
+ * This function is invoked when efl_net_ip_resolve_async_new() completes.
+ * It iterates through the resolved addresses and attempts to bind the server
+ * using _efl_net_server_udp_resolved_bind().
+ *
+ * @param data The Efl_Net_Server_Udp object (passed as user data).
+ * @param host The hostname that was resolved (unused).
+ * @param port The port that was resolved (unused).
+ * @param hints The addrinfo hints used for resolution (unused).
+ * @param result A linked list of addrinfo structures containing resolved addresses.
+ * @param gai_error Error code from getaddrinfo(), 0 on success.
+ */
 static void
 _efl_net_server_udp_resolved(void *data, const char *host EINA_UNUSED, const char *port EINA_UNUSED, const struct addrinfo *hints EINA_UNUSED, struct addrinfo *result, int gai_error)
 {
@@ -193,6 +245,19 @@ _efl_net_server_udp_resolved(void *data, const char *host EINA_UNUSED, const cha
    efl_unref(o);
 }
 
+/**
+ * @brief Activates the server using a pre-existing socket (e.g., from systemd).
+ *
+ * This function handles server activation when the socket is provided by an
+ * external entity like systemd. It performs necessary checks and setup
+ * based on the provided socket.
+ *
+ * @param o The Efl_Net_Server_Udp object.
+ * @param pd The private data for the object (unused).
+ * @param address The address string associated with the activated socket.
+ *                 Example: "127.0.0.1:1234" or "[::1]:1234".
+ * @return 0 on success, or an Eina_Error code on failure.
+ */
 EOLIAN static Eina_Error
 _efl_net_server_udp_efl_net_server_fd_socket_activate(Eo *o, Efl_Net_Server_Udp_Data *pd EINA_UNUSED, const char *address)
 {
@@ -240,6 +305,18 @@ _efl_net_server_udp_efl_net_server_fd_socket_activate(Eo *o, Efl_Net_Server_Udp_
 #endif
 }
 
+/**
+ * @brief Starts the UDP server, listening on the specified address.
+ *
+ * Parses the address string, then either binds directly if it's a numeric IP
+ * or starts an asynchronous resolution process if it's a hostname.
+ *
+ * @param o The Efl_Net_Server_Udp object.
+ * @param pd The private data for the object.
+ * @param address The address string to serve on.
+ *                Examples: "127.0.0.1:1234", "[::1]:5678", "localhost:8080", ":9000" (bind all interfaces, port 9000).
+ * @return 0 on success or if resolution is pending, or an Eina_Error code on immediate failure.
+ */
 EOLIAN static Eina_Error
 _efl_net_server_udp_efl_net_server_serve(Eo *o, Efl_Net_Server_Udp_Data *pd, const char *address)
 {
@@ -288,6 +365,16 @@ _efl_net_server_udp_efl_net_server_serve(Eo *o, Efl_Net_Server_Udp_Data *pd, con
    return err;
 }
 
+/**
+ * @brief Event callback for when a client connection is closed.
+ *
+ * This function is called when an Efl_Net_Server_Udp_Client associated with this
+ * server emits the EFL_IO_CLOSER_EVENT_CLOSED event. It removes the client
+ * from the server's internal tracking.
+ *
+ * @param data The Efl_Net_Server_Udp object (passed as user data).
+ * @param event The Efl_Event structure containing event details. The event->object is the client.
+ */
 static void
 _efl_net_server_udp_client_event_closed(void *data, const Efl_Event *event)
 {
@@ -299,6 +386,16 @@ _efl_net_server_udp_client_event_closed(void *data, const Efl_Event *event)
    eina_hash_del(pd->clients, efl_net_socket_address_remote_get(client), client);
 }
 
+/**
+ * @brief Processes incoming UDP datagrams.
+ *
+ * This function is called when there is data to be read on the server's socket.
+ * It reads a datagram, identifies or creates a client object for the sender,
+ * and feeds the data to that client. It also handles client limits.
+ *
+ * @param o The Efl_Net_Server_Udp object.
+ * @param pd The private data for the object.
+ */
 EOLIAN static void
 _efl_net_server_udp_efl_net_server_fd_process_incoming_data(Eo *o, Efl_Net_Server_Udp_Data *pd)
 {
@@ -400,6 +497,19 @@ _efl_net_server_udp_efl_net_server_fd_process_incoming_data(Eo *o, Efl_Net_Serve
    _efl_net_server_udp_client_feed(client, slice);
 }
 
+/**
+ * @brief Sets the SO_DONTROUTE socket option.
+ *
+ * If true, outgoing packets bypass the normal routing tables and are sent directly
+ * out the interface matching the destination address if possible.
+ * This setting is applied immediately if the socket exists, otherwise it's stored
+ * and applied when the socket is created.
+ *
+ * @param o The Efl_Net_Server_Udp object.
+ * @param pd The private data for the object.
+ * @param dont_route EINA_TRUE to enable SO_DONTROUTE, EINA_FALSE to disable.
+ * @return EINA_TRUE on success, EINA_FALSE on failure to set the option.
+ */
 EOLIAN static Eina_Bool
 _efl_net_server_udp_dont_route_set(Eo *o, Efl_Net_Server_Udp_Data *pd, Eina_Bool dont_route)
 {
@@ -426,6 +536,16 @@ _efl_net_server_udp_dont_route_set(Eo *o, Efl_Net_Server_Udp_Data *pd, Eina_Bool
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the current state of the SO_DONTROUTE socket option.
+ *
+ * If the socket exists, this queries the actual socket option. Otherwise, it returns
+ * the stored desired value.
+ *
+ * @param o The Efl_Net_Server_Udp object.
+ * @param pd The private data for the object.
+ * @return EINA_TRUE if SO_DONTROUTE is or will be enabled, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_net_server_udp_dont_route_get(const Eo *o, Efl_Net_Server_Udp_Data *pd)
 {
@@ -454,6 +574,13 @@ _efl_net_server_udp_dont_route_get(const Eo *o, Efl_Net_Server_Udp_Data *pd)
    return pd->dont_route;
 }
 
+/**
+ * @brief Finds a multicast group address in a list.
+ *
+ * @param lst The Eina_List of C-strings (multicast addresses) to search.
+ * @param address The multicast address string to find.
+ * @return The Eina_List node if found, otherwise NULL.
+ */
 static Eina_List *
 _efl_net_server_udp_multicast_find(const Eina_List *lst, const char *address)
 {
@@ -469,6 +596,18 @@ _efl_net_server_udp_multicast_find(const Eina_List *lst, const char *address)
    return NULL;
 }
 
+/**
+ * @brief Joins a multicast group.
+ *
+ * Adds the specified multicast group address to the server's list of joined groups.
+ * If the server socket is already bound, it attempts to join the group immediately.
+ * Otherwise, the join request is queued and processed when the server binds.
+ *
+ * @param o The Efl_Net_Server_Udp object.
+ * @param pd The private data for the object.
+ * @param address The multicast group address string to join (e.g., "224.0.0.1").
+ * @return 0 on success or if pending, EEXIST if already joined, or another Eina_Error code on failure.
+ */
 EOLIAN static Eina_Error
 _efl_net_server_udp_multicast_join(Eo *o, Efl_Net_Server_Udp_Data *pd, const char *address)
 {
@@ -491,6 +630,17 @@ _efl_net_server_udp_multicast_join(Eo *o, Efl_Net_Server_Udp_Data *pd, const cha
    return efl_net_multicast_join(fd, efl_net_server_fd_family_get(o), address);
 }
 
+/**
+ * @brief Leaves a multicast group.
+ *
+ * Removes the specified multicast group address from the server's list.
+ * If the server socket is bound, it attempts to leave the group immediately.
+ *
+ * @param o The Efl_Net_Server_Udp object.
+ * @param pd The private data for the object.
+ * @param address The multicast group address string to leave.
+ * @return 0 on success, ENOENT if not a member, or another Eina_Error code on failure.
+ */
 EOLIAN static Eina_Error
 _efl_net_server_udp_multicast_leave(Eo *o, Efl_Net_Server_Udp_Data *pd, const char *address)
 {
@@ -518,12 +668,32 @@ _efl_net_server_udp_multicast_leave(Eo *o, Efl_Net_Server_Udp_Data *pd, const ch
    return err;
 }
 
+/**
+ * @brief Gets an iterator over the currently joined multicast groups.
+ *
+ * @param o The Efl_Net_Server_Udp object (unused).
+ * @param pd The private data for the object.
+ * @return An Eina_Iterator that yields `const char *` multicast group addresses.
+ *         The iterator must be freed by the caller.
+ */
 EOLIAN static Eina_Iterator *
 _efl_net_server_udp_multicast_groups_get(Eo *o EINA_UNUSED, Efl_Net_Server_Udp_Data *pd)
 {
    return eina_list_iterator_new(pd->multicast.groups);
 }
 
+/**
+ * @brief Sets the Time-To-Live (TTL) for outgoing multicast packets.
+ *
+ * The TTL controls how many network hops a multicast packet can traverse.
+ * This setting is applied immediately if the socket exists, otherwise it's stored
+ * and applied when the socket is created.
+ *
+ * @param o The Efl_Net_Server_Udp object.
+ * @param pd The private data for the object.
+ * @param ttl The TTL value (typically 1 for same subnet, higher for wider reach).
+ * @return 0 on success, or an Eina_Error code on failure to set the option.
+ */
 EOLIAN static Eina_Error
 _efl_net_server_udp_multicast_time_to_live_set(Eo *o, Efl_Net_Server_Udp_Data *pd, uint8_t ttl)
 {
@@ -546,6 +716,16 @@ _efl_net_server_udp_multicast_time_to_live_set(Eo *o, Efl_Net_Server_Udp_Data *p
    return err;
 }
 
+/**
+ * @brief Gets the current Time-To-Live (TTL) for outgoing multicast packets.
+ *
+ * If the socket exists, this queries the actual socket option. Otherwise, it returns
+ * the stored desired value. The stored value is updated with the queried value if successful.
+ *
+ * @param o The Efl_Net_Server_Udp object.
+ * @param pd The private data for the object.
+ * @return The current TTL value.
+ */
 EOLIAN static uint8_t
 _efl_net_server_udp_multicast_time_to_live_get(const Eo *o, Efl_Net_Server_Udp_Data *pd)
 {
@@ -564,6 +744,20 @@ _efl_net_server_udp_multicast_time_to_live_get(const Eo *o, Efl_Net_Server_Udp_D
    return pd->multicast.ttl;
 }
 
+/**
+ * @brief Sets whether outgoing multicast packets are looped back to the local host.
+ *
+ * If enabled, multicast packets sent by this server will also be received by
+ * local sockets (including itself) that are members of the same multicast group
+ * on the sending interface.
+ * This setting is applied immediately if the socket exists, otherwise it's stored
+ * and applied when the socket is created.
+ *
+ * @param o The Efl_Net_Server_Udp object.
+ * @param pd The private data for the object.
+ * @param loopback EINA_TRUE to enable loopback, EINA_FALSE to disable.
+ * @return 0 on success, or an Eina_Error code on failure to set the option.
+ */
 EOLIAN static Eina_Error
 _efl_net_server_udp_multicast_loopback_set(Eo *o, Efl_Net_Server_Udp_Data *pd, Eina_Bool loopback)
 {
@@ -585,6 +779,16 @@ _efl_net_server_udp_multicast_loopback_set(Eo *o, Efl_Net_Server_Udp_Data *pd, E
    return err;
 }
 
+/**
+ * @brief Gets whether outgoing multicast packets are looped back to the local host.
+ *
+ * If the socket exists, this queries the actual socket option. Otherwise, it returns
+ * the stored desired value. The stored value is updated with the queried value if successful.
+ *
+ * @param o The Efl_Net_Server_Udp object.
+ * @param pd The private data for the object.
+ * @return EINA_TRUE if loopback is or will be enabled, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_net_server_udp_multicast_loopback_get(const Eo *o, Efl_Net_Server_Udp_Data *pd)
 {

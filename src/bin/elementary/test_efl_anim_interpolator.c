@@ -10,6 +10,12 @@
 #define WIN_H (BTN_NUM * BTN_H)
 #define WIN_W WIN_H
 
+/**
+ * @brief Application data structure for the Efl animation interpolator test.
+ *
+ * This structure holds all the necessary data for the test application,
+ * including animations, buttons, and state variables.
+ */
 typedef struct _App_Data
 {
    Efl_Canvas_Animation        *anim[INTERP_NUM];
@@ -21,6 +27,23 @@ typedef struct _App_Data
    Eina_Bool             running_anim_cnt;
 } App_Data;
 
+/**
+ * @brief Creates an Efl_Interpolator based on the given index.
+ *
+ * This function returns a new interpolator instance of a specific type
+ * depending on the `index`. The created interpolator is a child of `win`.
+ *
+ * @param index An integer to select the type of interpolator.
+ *              0: EFL_LINEAR_INTERPOLATOR_CLASS
+ *              1: EFL_SINUSOIDAL_INTERPOLATOR_CLASS
+ *              2: EFL_DECELERATE_INTERPOLATOR_CLASS
+ *              3: EFL_ACCELERATE_INTERPOLATOR_CLASS
+ *              4: EFL_DIVISOR_INTERPOLATOR_CLASS
+ *              5: EFL_BOUNCE_INTERPOLATOR_CLASS
+ *              6: EFL_SPRING_INTERPOLATOR_CLASS
+ * @param win The parent Evas_Object.
+ * @return A new Efl_Interpolator instance, or NULL if index is invalid.
+ */
 static Efl_Interpolator *
 _interpolator_create(int index, Evas_Object *win)
 {
@@ -67,6 +90,18 @@ _interpolator_create(int index, Evas_Object *win)
    return interp;
 }
 
+/**
+ * @brief Callback for the EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_CHANGED event.
+ *
+ * This function is called when an animation starts or ends. It updates the
+ * count of running animations and manages the enabled/disabled state of
+ * the buttons.
+ *
+ * @param data The application data (App_Data *).
+ * @param event The Efl_Event structure. The `info` field contains the animation
+ *              object if it started, or NULL if it ended. The `object` field
+ *              is the animated Efl_Ui_Button.
+ */
 static void
 _anim_changed_cb(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
 {
@@ -99,6 +134,16 @@ _anim_changed_cb(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback for the EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_PROGRESS_UPDATED event.
+ *
+ * This function is called repeatedly as an animation progresses. It prints the
+ * current progress of the animation.
+ *
+ * @param data Unused user data.
+ * @param event The Efl_Event structure. The `info` field contains a pointer
+ *              to a double representing the current progress (from 0.0 to 1.0).
+ */
 static void
 _anim_running_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -111,6 +156,17 @@ EFL_CALLBACKS_ARRAY_DEFINE(animation_stats_cb,
   {EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_PROGRESS_UPDATED, _anim_running_cb },
 )
 
+/**
+ * @brief Starts an animation for a single button.
+ *
+ * This function is a smart callback for the "clicked" event on individual
+ * "Start" buttons. It retrieves the button's index, starts the corresponding
+ * animation, and disables the button and the "Start All" button.
+ *
+ * @param data The application data (App_Data *).
+ * @param obj The Evas_Object that triggered the event (the button).
+ * @param event_info Unused event information.
+ */
 static void
 _anim_start(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -125,6 +181,17 @@ _anim_start(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_disabled_set(ad->start_all_btn, EINA_TRUE);
 }
 
+/**
+ * @brief Starts all animations simultaneously.
+ *
+ * This function is a smart callback for the "clicked" event on the "Start All"
+ * button. It iterates through all defined animations, starts them, and
+ * disables all individual "Start" buttons as well as the "Start All" button.
+ *
+ * @param data The application data (App_Data *).
+ * @param obj The Evas_Object that triggered the event (the "Start All" button).
+ * @param event_info Unused event information.
+ */
 static void
 _anim_start_all(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -141,6 +208,16 @@ _anim_start_all(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_disabled_set(obj, EINA_TRUE);
 }
 
+/**
+ * @brief Callback for the "delete,request" smart event of the window.
+ *
+ * This function is called when the window is closed. It performs cleanup
+ * by unregistering event callbacks and freeing the application data.
+ *
+ * @param data The application data (App_Data *) to be freed.
+ * @param obj Unused window object.
+ * @param event_info Unused event information.
+ */
 static void
 _win_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -156,6 +233,17 @@ _win_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    free(ad);
 }
 
+/**
+ * @brief Main function for the Efl Animation Interpolator test.
+ *
+ * This function sets up the test window, creates various UI elements (labels, buttons),
+ * and initializes animations with different interpolators. It demonstrates how
+ * to use various Efl_Interpolator classes with Efl_Canvas_Animation.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_efl_anim_interpolator(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

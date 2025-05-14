@@ -28,10 +28,30 @@
 
 #define MY_CLASS EFL_NET_SOCKET_UNIX_CLASS
 
+/**
+ * @brief Private data for the Efl_Net_Socket_Unix class.
+ *
+ * This structure holds any private data specific to Efl_Net_Socket_Unix instances.
+ * Currently, it is empty, but it is defined for future extensions and to
+ * maintain consistency with other Efl objects.
+ */
 typedef struct _Efl_Net_Socket_Unix_Data
 {
 } Efl_Net_Socket_Unix_Data;
 
+/**
+ * @internal
+ * @brief Sets the file descriptor for the Unix socket and updates local/remote addresses.
+ *
+ * This function is called when the file descriptor for the Unix socket is set.
+ * It calls the parent class's fd_set method and then, if the fd is valid
+ * and the socket family is AF_UNIX, it retrieves and sets the local and
+ * peer socket addresses.
+ *
+ * @param o The Efl_Net_Socket_Unix object.
+ * @param pd Private data for the Efl_Net_Socket_Unix object (unused).
+ * @param pfd The file descriptor to set.
+ */
 EOLIAN static void
 _efl_net_socket_unix_efl_loop_fd_fd_set(Eo *o, Efl_Net_Socket_Unix_Data *pd EINA_UNUSED, int pfd)
 {

@@ -35,36 +35,56 @@
 #define RTNICENESS 1
 #define NICENESS 5
 
-/*
- * The underlying type of Eina_Thread
+/**
+ * @internal
+ * @brief Represents a thread in the Eina library on Windows.
+ *
+ * This structure holds all the necessary information for managing a thread,
+ * including its handle, ID, state, and cleanup functions.
  */
 struct Thread
 {
-   CRITICAL_SECTION cancel_lock; /* mutex to protect the cancel handle */
-   char name[16]; /* the thread name */
-   HANDLE handle; /* thread handle */
-   void *data; /* on entry, the thread function argument, on exit, the return value */
-   Eina_Thread_Cb fn; /* the thread function */
-   Eina_Array *cleanup_fn;
-   Eina_Array *cleanup_arg;
-   unsigned id; /* thread id */
-   Eina_Bool free_on_exit; /* free the structure when thread exit */
-   volatile Eina_Bool cancel; /* the cancel event handle */
-   volatile Eina_Bool cancellable; /* is cancel enabled? */
+   CRITICAL_SECTION cancel_lock; /**< Mutex to protect cancellation-related members. */
+   char name[16];                /**< The name of the thread, for debugging. */
+   HANDLE handle;                /**< The native Windows thread handle. */
+   void *data;                   /**< User-provided data passed to the thread function, and stores the return value on exit. */
+   Eina_Thread_Cb fn;            /**< The function to be executed by the thread. */
+   Eina_Array *cleanup_fn;       /**< Array of cleanup callback functions (Eina_Thread_Cleanup_Cb). */
+   Eina_Array *cleanup_arg;      /**< Array of arguments for the cleanup callback functions. */
+   unsigned id;                  /**< The Windows thread ID. */
+   Eina_Bool free_on_exit;       /**< Flag indicating if this structure should be freed when the thread exits (used for threads not created by eina_thread_create). */
+   volatile Eina_Bool cancel;    /**< Flag indicating if a cancellation request has been made. */
+   volatile Eina_Bool cancellable; /**< Flag indicating if the thread is currently cancellable. */
 };
 
 typedef struct Thread Thread_t;
 
-/*
- * This TLS stores the Eina_Thread for the current thread
+/**
+ * @internal
+ * @brief Thread-Local Storage (TLS) key for storing the current thread's Thread_t structure.
+ *
+ * This allows `eina_thread_self()` to quickly retrieve the Eina_Thread handle
+ * for the calling thread.
  */
 static DWORD tls_thread_self = 0;
 
+/**
+ * @internal
+ * @brief Represents the main application thread.
+ *
+ * This structure is initialized by `eina_thread_init()` and used to manage
+ * cleanup handlers and cancellation state for the main thread.
+ */
 static Thread_t main_thread = { 0 };
 
-/*
- * If we alloc'ed the Thread_t in eina_thread_self, we set
- * free_on_exit flag to true, we then free it here
+/**
+ * @internal
+ * @brief Frees the Thread_t structure associated with the current thread if it was dynamically allocated.
+ *
+ * This function is typically registered as a TLS cleanup callback or called
+ * when a thread created outside of Eina's management (but later wrapped by
+ * `eina_thread_self()`) exits. It ensures that resources like cleanup function
+ * arrays are released.
  */
 void
 free_thread(void)
@@ -78,6 +98,18 @@ free_thread(void)
      }
 }
 
+/**
+ * @internal
+ * @brief The actual function executed by a new thread created via `eina_thread_create`.
+ *
+ * This function sets up the thread-local storage for `eina_thread_self()`,
+ * registers the thread with the Eina debug system, executes the user-provided
+ * thread function, and performs cleanup.
+ *
+ * @param arg A pointer to the Thread_t structure for this thread.
+ * @return Always 0. The actual return value of the user's thread function
+ *         is stored in `thr->data`.
+ */
 static unsigned
 thread_fn(void *arg)
 {
@@ -90,17 +122,34 @@ thread_fn(void *arg)
    return 0;
 }
 
+/**
+ * @brief Get a handle to the calling thread.
+ *
+ * If the calling thread was created using eina_thread_create(), this
+ * function returns the Eina_Thread handle associated with it.
+ * If the thread was not created by Eina (e.g., the main thread or a
+ * thread created by other means), a new Thread_t structure is allocated,
+ * initialized, and associated with the current native thread. This new
+ * structure will be marked for automatic freeing (`free_on_exit = EINA_TRUE`)
+ * when the thread exits, though the mechanism for this relies on `free_thread`
+ * being called, which might not be guaranteed for non-Eina managed threads
+ * without explicit TLS destructor support or manual cleanup.
+ *
+ * @return A handle to the calling thread. Returns @c NULL on failure (e.g. if
+ *         `eina_thread_init` was not called and TLS allocation fails).
+ */
 EINA_API Eina_Thread
 eina_thread_self(void)
 {
     Thread_t *self = TlsGetValue(tls_thread_self);
     /*
-     * If self is NULL this means
-     * 1) This function was called before eina_thread_init
-     * 2) This thread wasn't created by eina_thread_create
+     * If self is NULL this means:
+     * 1) This function was called before eina_thread_init (for the main thread).
+     * 2) This thread wasn't created by eina_thread_create (it's a foreign thread).
      *
-     * In either case we alloc a new Thread struct and return
-     * it.
+     * In either case, we allocate a new Thread_t struct, associate it with
+     * the current native thread, and return it. This allows foreign threads
+     * to use Eina thread features like cancellation and cleanup handlers.
      */
     if (!self)
       {
@@ -116,12 +165,30 @@ eina_thread_self(void)
     return (Eina_Thread) self;
 }
 
+/**
+ * @brief Compare two thread handles.
+ *
+ * @param t1 The first thread handle.
+ * @param t2 The second thread handle.
+ * @return @c EINA_TRUE if the threads are the same, @c EINA_FALSE otherwise.
+ */
 EINA_API Eina_Bool
 eina_thread_equal(Eina_Thread t1, Eina_Thread t2)
 {
    return ((Thread_t *) t1)->id == ((Thread_t *) t2)->id;
 }
 
+/**
+ * @brief Create a new thread.
+ *
+ * @param[out] t Pointer to store the new thread handle.
+ * @param prio The priority of the new thread.
+ * @param affinity The CPU affinity for the thread. If negative, no affinity is set.
+ *                 The value is a bitmask, where `1 << N` means CPU N.
+ * @param func The function to be executed by the new thread.
+ * @param data User-defined data to be passed to @p func.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 EINA_API Eina_Bool
 eina_thread_create(Eina_Thread *t, Eina_Thread_Priority prio,
                    int affinity, Eina_Thread_Cb func, const void *data)
@@ -190,6 +257,16 @@ fail:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Wait for a thread to terminate.
+ *
+ * This function blocks the calling thread until the specified thread @p t
+ * terminates. After the thread terminates, its resources are cleaned up.
+ *
+ * @param t The thread handle to wait for.
+ * @return The return value of the thread function, or @c EINA_THREAD_JOIN_CANCELED
+ *         if the thread was canceled, or @c NULL on error (e.g., if waiting fails).
+ */
 EINA_API void *
 eina_thread_join(Eina_Thread t)
 {
@@ -210,6 +287,17 @@ eina_thread_join(Eina_Thread t)
    return data;
 }
 
+/**
+ * @brief Set the name of a thread.
+ *
+ * This function sets a human-readable name for the given thread.
+ * The name is truncated if it's longer than 15 characters.
+ * This is primarily used for debugging purposes.
+ *
+ * @param t The thread handle.
+ * @param name The name to set for the thread.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise (though currently always returns EINA_TRUE).
+ */
 EINA_API Eina_Bool
 eina_thread_name_set(Eina_Thread t, const char *name)
 {
@@ -219,6 +307,18 @@ eina_thread_name_set(Eina_Thread t, const char *name)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Request cancellation of a thread.
+ *
+ * This function sets a flag requesting that the specified thread @p t should
+ * cancel its execution. The thread itself must periodically call
+ * eina_thread_cancel_checkpoint() to check this flag and act upon it.
+ *
+ * @param t The thread handle to cancel.
+ * @return @c EINA_TRUE if the cancellation request was successfully made
+ *         (i.e., the thread was cancellable), @c EINA_FALSE otherwise (e.g., if @p t is NULL
+ *         or the thread is not currently cancellable).
+ */
 EINA_API Eina_Bool
 eina_thread_cancel(Eina_Thread t)
 {
@@ -238,6 +338,17 @@ eina_thread_cancel(Eina_Thread t)
     return ret;
 }
 
+/**
+ * @brief Set the cancellability state of the calling thread.
+ *
+ * This function allows a thread to define sections of code where it can
+ * or cannot be canceled.
+ *
+ * @param cancellable If @c EINA_TRUE, the thread can be canceled.
+ *                    If @c EINA_FALSE, cancellation requests are ignored.
+ * @param[out] was_cancellable Optional pointer to store the previous cancellability state.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise (though currently always returns EINA_TRUE).
+ */
 EINA_API Eina_Bool
 eina_thread_cancellable_set(Eina_Bool cancellable, Eina_Bool *was_cancellable)
 {
@@ -251,6 +362,17 @@ eina_thread_cancellable_set(Eina_Bool cancellable, Eina_Bool *was_cancellable)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Check if a cancellation request is pending for the calling thread.
+ *
+ * If the thread is cancellable and a cancellation request has been made
+ * (via eina_thread_cancel()), this function will execute all registered
+ * cleanup handlers and then terminate the calling thread. Otherwise, it
+ * does nothing.
+ *
+ * This function should be called periodically in long-running computations
+ * or blocking operations within a thread to allow for timely cancellation.
+ */
 EINA_API void
 eina_thread_cancel_checkpoint(void)
 {
@@ -277,29 +399,72 @@ eina_thread_cancel_checkpoint(void)
      }
 }
 
+/**
+ * @brief Push a cleanup handler onto the calling thread's cleanup stack.
+ *
+ * Cleanup handlers are functions that are called when a thread exits,
+ * either normally or due to cancellation (via eina_thread_cancel_checkpoint()).
+ * They are called in LIFO (Last-In, First-Out) order.
+ *
+ * @param fn The cleanup handler function.
+ * @param data User-defined data to be passed to the cleanup handler.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure (e.g., memory allocation error).
+ *
+ * @par Example
+ * @code
+ * FILE *f = fopen("example.txt", "w");
+ * if (f) {
+ *     eina_thread_cleanup_push(fclose, f);
+ *     // ... do operations with f ...
+ *     // If thread is cancelled here, fclose(f) will be called.
+ *     eina_thread_cleanup_pop(EINA_TRUE); // fclose(f) called here if not cancelled.
+ * }
+ * @endcode
+ */
 EINA_API Eina_Bool
 eina_thread_cleanup_push(Eina_Thread_Cleanup_Cb fn, void *data)
 {
    Thread_t *t = TlsGetValue(tls_thread_self);
-   assert(t);
+   assert(t); // Should always have a Thread_t via eina_thread_self or thread_fn
 
+   // The cleanup_fn array stores Eina_Thread_Cleanup_Cb function pointers.
+   // Example: [fclose_ptr, free_ptr, custom_cleanup_ptr]
    if (!eina_array_push(t->cleanup_fn, fn))
       return EINA_FALSE;
 
+   // The cleanup_arg array stores void* arguments corresponding to each function.
+   // Example: [file_handle_ptr, memory_block_ptr, custom_data_ptr]
    if (!eina_array_push(t->cleanup_arg, data))
      {
-        eina_array_pop(t->cleanup_fn);
+        eina_array_pop(t->cleanup_fn); // Rollback push to cleanup_fn
         return EINA_FALSE;
      }
 
    return EINA_TRUE;
 }
 
+/**
+ * @brief Pop a cleanup handler from the calling thread's cleanup stack.
+ *
+ * @param execute If non-zero, the popped cleanup handler is executed.
+ *                If zero, the handler is simply removed without execution.
+ *
+ * @par Example
+ * @code
+ * // Assuming a handler was pushed with: eina_thread_cleanup_push(my_cleanup_func, my_data);
+ *
+ * // To execute and remove:
+ * eina_thread_cleanup_pop(EINA_TRUE);
+ *
+ * // To remove without executing:
+ * eina_thread_cleanup_pop(EINA_FALSE);
+ * @endcode
+ */
 EINA_API void
 eina_thread_cleanup_pop(int execute)
 {
    Thread_t *t = TlsGetValue(tls_thread_self);
-   assert(t);
+   assert(t); // Should always have a Thread_t
 
    if (eina_array_count(t->cleanup_fn))
      {
@@ -311,8 +476,24 @@ eina_thread_cleanup_pop(int execute)
      }
 }
 
+/**
+ * @brief A special value returned by eina_thread_join() if the joined thread
+ * was canceled.
+ */
 EINA_API const void *EINA_THREAD_JOIN_CANCELED = (void *) -1L;
 
+/**
+ * @internal
+ * @brief Lowers the scheduling priority of the calling thread.
+ *
+ * This function attempts to make the current thread less favored by the
+ * scheduler. If the thread is a real-time thread (THREAD_PRIORITY_TIME_CRITICAL),
+ * its priority is decreased by `RTNICENESS`. Otherwise, its "niceness" is
+ * increased (priority decreased) by `NICENESS`.
+ *
+ * This function is not part of the public Eina API and is likely used
+ * internally for specific scheduling adjustments.
+ */
 void
 eina_sched_prio_drop(void)
 {
@@ -355,13 +536,25 @@ eina_sched_prio_drop(void)
      }
 }
 
+/**
+ * @brief Initialize the Eina thread system.
+ *
+ * This function must be called from the main thread before any other
+ * Eina thread functions are used. It sets up thread-local storage for
+ * managing Eina_Thread handles and initializes the main thread's
+ * Thread_t structure.
+ *
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ *         Failure can occur if not called from the main loop context
+ *         or if TLS allocation fails.
+ */
 EINA_API Eina_Bool
 eina_thread_init(void)
 {
-   if (!eina_main_loop_is())
+   if (!eina_main_loop_is()) // Ensures this is called in a context where Eina's main loop is recognized
       return EINA_FALSE;
 
-   tls_thread_self = TlsAlloc();
+   tls_thread_self = TlsAlloc(); // Allocate a TLS index
    if (TLS_OUT_OF_INDEXES == tls_thread_self)
       return EINA_FALSE;
 
@@ -386,6 +579,17 @@ eina_thread_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Shut down the Eina thread system.
+ *
+ * This function should be called from the main thread when Eina thread
+ * support is no longer needed, typically during application shutdown.
+ * It releases resources allocated by eina_thread_init(), such as
+ * the TLS index and resources associated with the main thread's
+ * Thread_t structure.
+ *
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise (though currently always returns EINA_TRUE).
+ */
 EINA_API Eina_Bool
 eina_thread_shutdown(void)
 {

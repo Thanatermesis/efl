@@ -1,28 +1,28 @@
-
+/** @copydoc evas_vg_node_transformation_set */
 EVAS_API void
 evas_vg_node_transformation_set(Evas_Vg_Node *obj, const Eina_Matrix3 *m)
 {
    efl_canvas_vg_node_transformation_set(obj, m);
 }
-
+/** @copydoc evas_vg_node_transformation_get */
 EVAS_API const Eina_Matrix3 *
 evas_vg_node_transformation_get(const Evas_Vg_Node *obj)
 {
    return efl_canvas_vg_node_transformation_get(obj);
 }
-
+/** @copydoc evas_vg_node_origin_set */
 EVAS_API void
 evas_vg_node_origin_set(Evas_Vg_Node *obj, double x, double y)
 {
    efl_canvas_vg_node_origin_set(obj, x, y);
 }
-
+/** @copydoc evas_vg_node_origin_get */
 EVAS_API void
 evas_vg_node_origin_get(const Evas_Vg_Node *obj, double *x, double *y)
 {
    efl_canvas_vg_node_origin_get(obj, x, y);
 }
-
+/** @copydoc evas_vg_node_mask_set */
 EVAS_API void
 evas_vg_node_mask_set(Evas_Vg_Node *obj, Evas_Vg_Node *mask, int op EINA_UNUSED)
 {

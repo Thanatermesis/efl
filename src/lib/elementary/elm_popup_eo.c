@@ -169,7 +169,16 @@ const char *_elm_popup_efl_access_object_i18n_name_get(const Eo *obj, Elm_Popup_
 
 Efl_Object *_elm_popup_efl_part_part_get(const Eo *obj, Elm_Popup_Data *pd, const char *name);
 
-
+/**
+ * @brief Initializes the Elm_Popup Efl_Class.
+ *
+ * This function is called once during class construction. It sets up the
+ * Efl_Object operations (method implementations) and property reflection
+ * capabilities for the Elm_Popup class.
+ *
+ * @param klass The Efl_Class to initialize.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_popup_class_initializer(Efl_Class *klass)
 {
@@ -224,6 +233,13 @@ _elm_popup_class_initializer(Efl_Class *klass)
    return efl_class_functions_set(klass, opsp, ropsp);
 }
 
+/**
+ * @brief Describes the Elm_Popup Efl_Class.
+ *
+ * This structure provides metadata for the Elm_Popup class, including its
+ * version, name, type, instance data size, and pointers to initializer and
+ * constructor functions. It is used by EFL_DEFINE_CLASS to register the class.
+ */
 static const Efl_Class_Description _elm_popup_class_desc = {
    EO_VERSION,
    "Elm.Popup",

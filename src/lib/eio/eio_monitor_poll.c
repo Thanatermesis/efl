@@ -28,6 +28,10 @@
  * @cond LOCAL
  */
 
+/**
+ * @brief Structure to hold file status information along with a version.
+ * This is used to detect changes in files monitored by the fallback mechanism.
+ */
 typedef struct _Eio_Monitor_Stat Eio_Monitor_Stat;
 
 struct _Eio_Monitor_Stat
@@ -51,14 +55,25 @@ struct _Eio_Monitor_Backend
 
    Eina_Bool delete_me : 1;
    Eina_Bool initialised : 1;
-   Eina_Bool destroyed : 1;
+   Eina_Bool destroyed : 1; /**< Flag indicating if the monitored path has been detected as destroyed. */
 };
 
-static double fallback_interval = 60.0;
-static Eina_Hash *timer_hash;
+static double fallback_interval = 60.0; /**< Default polling interval in seconds for the fallback monitor. */
+static Eina_Hash *timer_hash; /**< Hash table to store active timers, mapping Eio_Monitor_Backend pointers to Ecore_Timer pointers. */
 
 static Eina_Bool _eio_monitor_fallback_timer_cb(void *data);
 
+/**
+ * @brief Core function for the fallback monitor, executed in a separate thread.
+ *
+ * This function performs the actual polling of the monitored path. It checks
+ * for modifications to the path itself and its children (if it's a directory).
+ * It compares the current state with the previously stored state to detect
+ * created, deleted, or modified files/directories.
+ *
+ * @param data Pointer to the Eio_Monitor_Backend structure.
+ * @param thread Pointer to the Ecore_Thread this function is running in.
+ */
 static void
 _eio_monitor_fallback_heavy_cb(void *data, Ecore_Thread *thread)
 {
@@ -227,6 +242,15 @@ _eio_monitor_fallback_heavy_cb(void *data, Ecore_Thread *thread)
    backend->initialised = EINA_TRUE;
 }
 
+/**
+ * @brief Callback executed when the _eio_monitor_fallback_heavy_cb thread finishes.
+ *
+ * This function cleans up resources if the backend is marked for deletion.
+ * Otherwise, it schedules the next polling operation by adding a timer.
+ *
+ * @param data Pointer to the Eio_Monitor_Backend structure.
+ * @param thread Pointer to the Ecore_Thread that finished (unused).
+ */
 static void
 _eio_monitor_fallback_end_cb(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -245,6 +269,16 @@ _eio_monitor_fallback_end_cb(void *data, Ecore_Thread *thread EINA_UNUSED)
    eina_hash_set(timer_hash, &backend, backend->timer);
 }
 
+/**
+ * @brief Callback executed if the _eio_monitor_fallback_heavy_cb thread is cancelled.
+ *
+ * This function behaves similarly to _eio_monitor_fallback_end_cb.
+ * It cleans up resources if the backend is marked for deletion, or reschedules
+ * the polling timer.
+ *
+ * @param data Pointer to the Eio_Monitor_Backend structure.
+ * @param thread Pointer to the Ecore_Thread that was cancelled (unused).
+ */
 static void
 _eio_monitor_fallback_cancel_cb(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -263,6 +297,16 @@ _eio_monitor_fallback_cancel_cb(void *data, Ecore_Thread *thread EINA_UNUSED)
    eina_hash_set(timer_hash, &backend, backend->timer);
 }
 
+/**
+ * @brief Timer callback to trigger the polling operation.
+ *
+ * This function is called by an Ecore_Timer. It removes itself from the
+ * timer_hash and starts the _eio_monitor_fallback_heavy_cb function in a
+ * new thread.
+ *
+ * @param data Pointer to the Eio_Monitor_Backend structure.
+ * @return EINA_FALSE to indicate the timer should not repeat automatically.
+ */
 static Eina_Bool
 _eio_monitor_fallback_timer_cb(void *data)
 {
@@ -292,24 +336,46 @@ _eio_monitor_fallback_timer_cb(void *data)
 
 #if !defined HAVE_SYS_INOTIFY_H && !defined HAVE_NOTIFY_WIN32 && !defined HAVE_NOTIFY_COCOA \
     && !defined HAVE_NOTIFY_KEVENT
+/**
+ * @brief Initializes the monitor backend (stub for when no native backend is available).
+ * This function is a no-op when only the fallback mechanism is compiled.
+ */
 void eio_monitor_backend_init(void)
 {
 }
 
+/**
+ * @brief Shuts down the monitor backend (stub for when no native backend is available).
+ * This function is a no-op when only the fallback mechanism is compiled.
+ */
 void eio_monitor_backend_shutdown(void)
 {
 }
 
+/**
+ * @brief Adds a path to be monitored by the backend (uses fallback).
+ * @param monitor The Eio_Monitor instance.
+ */
 void eio_monitor_backend_add(Eio_Monitor *monitor)
 {
   eio_monitor_fallback_add(monitor);
 }
 
+/**
+ * @brief Removes a path from being monitored by the backend (uses fallback).
+ * @param monitor The Eio_Monitor instance.
+ */
 void eio_monitor_backend_del(Eio_Monitor *monitor)
 {
   eio_monitor_fallback_del(monitor);
 }
 
+/**
+ * @brief Checks if a path is part of the monitored context (uses fallback).
+ * @param monitor The Eio_Monitor instance.
+ * @param path The path to check.
+ * @return EINA_TRUE if the path is within the monitored context, EINA_FALSE otherwise.
+ */
 Eina_Bool eio_monitor_context_check(const Eio_Monitor *monitor, const char *path)
 {
    return eio_monitor_fallback_context_check(monitor, path);
@@ -317,12 +383,20 @@ Eina_Bool eio_monitor_context_check(const Eio_Monitor *monitor, const char *path
 
 #endif
 
+/**
+ * @brief Initializes the fallback monitoring system.
+ * Creates the hash table used for storing active timers.
+ */
 void
 eio_monitor_fallback_init(void)
 {
    timer_hash = eina_hash_pointer_new(NULL);
 }
 
+/**
+ * @brief Shuts down the fallback monitoring system.
+ * Frees the hash table used for storing active timers.
+ */
 void
 eio_monitor_fallback_shutdown(void)
 {
@@ -330,6 +404,15 @@ eio_monitor_fallback_shutdown(void)
    timer_hash = NULL;
 }
 
+/**
+ * @brief Checks if a given path is a known child of a monitored directory
+ *        when using the fallback monitor.
+ *
+ * @param monitor The Eio_Monitor instance.
+ * @param path The path to check.
+ * @return EINA_TRUE if the path is a known child, EINA_FALSE otherwise.
+ *         Returns EINA_TRUE if the monitor is not using the fallback mechanism.
+ */
 Eina_Bool
 eio_monitor_fallback_context_check(const Eio_Monitor *monitor, const char *path)
 {
@@ -339,6 +422,16 @@ eio_monitor_fallback_context_check(const Eio_Monitor *monitor, const char *path)
    return !!eina_hash_find(backend->children, path);
 }
 
+/**
+ * @brief Adds a path to be monitored using the fallback polling mechanism.
+ *
+ * This function sets up an Eio_Monitor_Backend for the given Eio_Monitor,
+ * initializes its state by performing an initial scan, and then starts
+ * a worker thread to perform the first poll. Subsequent polls are scheduled
+ * via timers.
+ *
+ * @param monitor The Eio_Monitor instance for which to add fallback monitoring.
+ */
 void
 eio_monitor_fallback_add(Eio_Monitor *monitor)
 {
@@ -363,6 +456,15 @@ eio_monitor_fallback_add(Eio_Monitor *monitor)
                                     backend);
 }
 
+/**
+ * @brief Removes a path from fallback monitoring.
+ *
+ * This function marks the associated Eio_Monitor_Backend for deletion.
+ * If there's an active timer or worker thread, it's cancelled.
+ * Resources are then cleaned up.
+ *
+ * @param monitor The Eio_Monitor instance to stop monitoring.
+ */
 void
 eio_monitor_fallback_del(Eio_Monitor *monitor)
 {
@@ -401,6 +503,15 @@ eio_monitor_fallback_del(Eio_Monitor *monitor)
  *============================================================================*/
 
 
+/**
+ * @brief Sets the polling interval for all fallback monitors.
+ *
+ * This function updates the global `fallback_interval` and adjusts the
+ * interval of any currently active Ecore_Timers used by the fallback monitors.
+ *
+ * @param interval The new polling interval in seconds. Must be non-negative.
+ *                 Example: 0.5 for 500 milliseconds.
+ */
 EIO_API void
 eio_monitoring_interval_set(double interval)
 {
@@ -416,6 +527,13 @@ eio_monitoring_interval_set(double interval)
    eina_iterator_free(it);
 }
 
+/**
+ * @brief Checks if a given Eio_Monitor instance is using the fallback polling mechanism.
+ *
+ * @param monitor The Eio_Monitor instance to check.
+ * @return EINA_TRUE if the monitor is using the fallback mechanism, EINA_FALSE otherwise.
+ *         Returns EINA_FALSE if monitor is NULL.
+ */
 EIO_API Eina_Bool
 eio_monitor_fallback_check(const Eio_Monitor *monitor)
 {

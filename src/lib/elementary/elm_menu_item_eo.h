@@ -4,6 +4,10 @@
 #ifndef _ELM_MENU_ITEM_EO_CLASS_TYPE
 #define _ELM_MENU_ITEM_EO_CLASS_TYPE
 
+/**
+ * @brief Represents an Elementary Menu Item object.
+ * @ingroup Elm_Menu_Item
+ */
 typedef Eo Elm_Menu_Item;
 
 #endif
@@ -13,7 +17,11 @@ typedef Eo Elm_Menu_Item;
 
 
 #endif
-/** Elementary menu item class
+/**
+ * @brief Elementary menu item class.
+ *
+ * This macro provides access to the Efl_Class object for Elm_Menu_Item.
+ * It is a shorthand for @ref elm_menu_item_class_get.
  *
  * @ingroup Elm_Menu_Item
  */

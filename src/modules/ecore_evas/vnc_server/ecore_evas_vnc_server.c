@@ -1,3 +1,12 @@
+/**
+ * @file
+ * @brief Ecore_Evas VNC Server module
+ *
+ * This module provides functionality to create a VNC server that mirrors an
+ * Ecore_Evas instance. It allows remote clients to view and interact with
+ * the Evas canvas.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -21,8 +30,8 @@
 #include "ecore_evas_private.h"
 #include "ecore_evas_vnc_server_fb_keymap.h"
 
-static int _ecore_evas_vnc_server_log_dom;
-static unsigned int _available_seat = 1;
+static int _ecore_evas_vnc_server_log_dom; /**< Log domain for the VNC server module. */
+static unsigned int _available_seat = 1; /**< Counter for available seat numbers for VNC clients. Starts at 1. */
 
 #ifdef _WIN32
 # ifndef EFL_MODULE_STATIC
@@ -52,38 +61,57 @@ static unsigned int _available_seat = 1;
 #endif
 #define DBG(...) EINA_LOG_DOM_DBG(_ecore_evas_vnc_server_log_dom, __VA_ARGS__)
 
+/**
+ * @brief Function pointer type for getting key information.
+ *
+ * This function is responsible for translating an rfbKeySym into
+ * Ecore-compatible key name, key string, compose string, and keycode.
+ *
+ * @param key The rfbKeySym to translate.
+ * @param[out] key_name Pointer to store the Ecore key name (e.g., "Shift_L").
+ * @param[out] key_str Pointer to store the Ecore key string (e.g., "Shift_L").
+ * @param[out] compose Pointer to store the Ecore compose string (e.g., "A").
+ * @param[out] keycode Pointer to store the Ecore keycode.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 typedef Eina_Bool (*Ecore_Evas_Vnc_Key_Info_Get)(rfbKeySym key,
                                                  const char **key_name,
                                                  const char **key_str,
                                                  const char **compose,
                                                  int *keycode);
 
+/**
+ * @brief Structure representing the VNC server instance.
+ */
 typedef struct _Ecore_Evas_Vnc_Server {
-   char *frame_buffer;
-   rfbScreenInfoPtr vnc_screen;
-   Ecore_Fd_Handler *vnc_listen_handler;
-   Ecore_Fd_Handler *vnc_listen6_handler;
-   Ecore_Evas_Vnc_Client_Accept_Cb accept_cb;
-   Ecore_Evas_Vnc_Client_Disconnected_Cb disc_cb;
-   void *cb_data;
-   Evas_Object *snapshot;
-   Ecore_Evas *ee;
-   Eina_Tiler *t;
-   Ecore_Evas_Vnc_Key_Info_Get key_info_get_func;
-   double double_click_time;
-   int last_w;
-   int last_h;
+   char *frame_buffer; /**< Raw pixel data for the VNC screen. */
+   rfbScreenInfoPtr vnc_screen; /**< LibVNCServer screen information structure. */
+   Ecore_Fd_Handler *vnc_listen_handler; /**< FD handler for IPv4 listen socket. */
+   Ecore_Fd_Handler *vnc_listen6_handler; /**< FD handler for IPv6 listen socket. */
+   Ecore_Evas_Vnc_Client_Accept_Cb accept_cb; /**< Callback for new client connections. */
+   Ecore_Evas_Vnc_Client_Disconnected_Cb disc_cb; /**< Callback for client disconnections. */
+   void *cb_data; /**< User data for callbacks. */
+   Evas_Object *snapshot; /**< Evas image object used as the source for the VNC framebuffer. */
+   Ecore_Evas *ee; /**< The Ecore_Evas instance being served. */
+   Eina_Tiler *t; /**< Tiler for managing updated regions. */
+   Ecore_Evas_Vnc_Key_Info_Get key_info_get_func; /**< Function to get key information. */
+   double double_click_time; /**< Configured double click time from libVNCServer. */
+   int last_w; /**< Last known width of the framebuffer. */
+   int last_h; /**< Last known height of the framebuffer. */
 } Ecore_Evas_Vnc_Server;
 
+/**
+ * @brief Structure representing client-specific data.
+ */
 typedef struct _Ecore_Evas_Vnc_Server_Client_Data {
-   Ecore_Fd_Handler *handler;
-   Evas_Device *keyboard;
-   Evas_Device *mouse;
-   Evas_Device *seat;
-   unsigned int key_modifiers;
-   time_t last_mouse_button_down;
-   Eina_Bool double_click;
-   Eina_Bool triple_click;
+   Ecore_Fd_Handler *handler; /**< FD handler for the client's socket. */
+   Evas_Device *keyboard; /**< Virtual Evas keyboard device for this client. */
+   Evas_Device *mouse; /**< Virtual Evas mouse device for this client. */
+   Evas_Device *seat; /**< Virtual Evas seat device for this client. */
+   unsigned int key_modifiers; /**< Current state of key modifiers (Shift, Ctrl, Alt, etc.). */
+   time_t last_mouse_button_down; /**< Timestamp of the last mouse button down event, for double/triple click detection. */
+   Eina_Bool double_click; /**< Flag indicating if the last click was a double click. */
+   Eina_Bool triple_click; /**< Flag indicating if the last click was a triple click. */
 } Ecore_Evas_Vnc_Server_Client_Data;
 
 #define VNC_BITS_PER_SAMPLE (8)
@@ -94,6 +122,14 @@ typedef struct _Ecore_Evas_Vnc_Server_Client_Data {
 static void _ecore_evas_vnc_server_ecore_event_generic_free(void *user_data,
                                                             void *func_data);
 
+/**
+ * @brief Iterates through all connected VNC clients and sends updates.
+ *
+ * This function is called when the framebuffer has been modified and updates
+ * need to be pushed to the clients.
+ *
+ * @param vnc_screen The VNC screen information.
+ */
 static void
 _ecore_evas_vnc_server_update_clients(rfbScreenInfoPtr vnc_screen)
 {
@@ -125,6 +161,14 @@ _ecore_evas_vnc_server_update_clients(rfbScreenInfoPtr vnc_screen)
    rfbReleaseClientIterator(itr);
 }
 
+/**
+ * @brief Sets up the pixel format for the VNC server.
+ *
+ * This function configures the server's pixel format. It currently
+ * swaps red and blue channels to handle BGR format.
+ *
+ * @param vnc_screen The VNC screen information.
+ */
 static void
 _ecore_evas_vnc_server_format_setup(rfbScreenInfoPtr vnc_screen)
 {
@@ -136,6 +180,16 @@ _ecore_evas_vnc_server_format_setup(rfbScreenInfoPtr vnc_screen)
    vnc_screen->serverFormat.blueShift = aux;
 }
 
+/**
+ * @brief Callback for activity on the VNC listening socket.
+ *
+ * This function is triggered when there is activity (e.g., a new connection
+ * attempt) on the VNC server's listening socket.
+ *
+ * @param data The rfbScreenInfoPtr.
+ * @param fd_handler The Ecore_Fd_Handler that triggered the callback (unused).
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
+ */
 static Eina_Bool
 _ecore_evas_vnc_server_socket_listen_activity(void *data,
                                               Ecore_Fd_Handler *fd_handler EINA_UNUSED)
@@ -144,6 +198,16 @@ _ecore_evas_vnc_server_socket_listen_activity(void *data,
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Emits an Ecore_Event_Mouse_IO event (mouse in/out).
+ *
+ * This is used to signal when a VNC client's virtual mouse enters or leaves
+ * the Ecore_Evas window area.
+ *
+ * @param server The VNC server instance.
+ * @param dev The Evas_Device (mouse) associated with the client.
+ * @param event_type The type of event (ECORE_EVENT_MOUSE_IN or ECORE_EVENT_MOUSE_OUT).
+ */
 static void
 _ecore_evas_vnc_server_mouse_inout_emit(Ecore_Evas_Vnc_Server *server,
                                         Evas_Device *dev, int event_type)
@@ -157,6 +221,15 @@ _ecore_evas_vnc_server_mouse_inout_emit(Ecore_Evas_Vnc_Server *server,
                    _ecore_evas_vnc_server_ecore_event_generic_free, dev);
 }
 
+/**
+ * @brief Callback invoked when a VNC client disconnects.
+ *
+ * This function cleans up resources associated with the disconnected client,
+ * such as Evas devices and FD handlers. It also calls the user-provided
+ * disconnection callback.
+ *
+ * @param client The rfbClientRec representing the disconnected client.
+ */
 static void
 _ecore_evas_vnc_server_client_gone(rfbClientRec *client)
 {
@@ -180,6 +253,18 @@ _ecore_evas_vnc_server_client_gone(rfbClientRec *client)
    _available_seat--;
 }
 
+/**
+ * @brief Callback for activity on a VNC client's socket.
+ *
+ * This function is triggered when there is data to be read from a connected
+ * VNC client's socket (e.g., input events). It processes the client message
+ * and sends framebuffer updates if pending.
+ *
+ * @param data The rfbClientRec for the active client.
+ * @param fd_handler The Ecore_Fd_Handler (unused).
+ * @return ECORE_CALLBACK_RENEW to keep the handler active, or
+ *         ECORE_CALLBACK_DONE if the client disconnected.
+ */
 static Eina_Bool
 _ecore_evas_vnc_server_client_activity(void *data,
                                        Ecore_Fd_Handler *fd_handler EINA_UNUSED)
@@ -203,6 +288,18 @@ _ecore_evas_vnc_server_client_activity(void *data,
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Callback for new VNC client connections.
+ *
+ * This function is called by libVNCServer when a new client attempts to connect.
+ * It performs setup for the new client, including creating Evas devices (seat,
+ * keyboard, mouse) and setting up an FD handler for client communication.
+ * It also calls the user-provided accept callback.
+ *
+ * @param client The rfbClientRec for the new client.
+ * @return RFB_CLIENT_ACCEPT to accept the connection, or RFB_CLIENT_REFUSE
+ *         to reject it.
+ */
 static enum rfbNewClientAction
 _ecore_evas_vnc_server_client_connection_new(rfbClientRec *client)
 {
@@ -268,6 +365,15 @@ _ecore_evas_vnc_server_client_connection_new(rfbClientRec *client)
    return RFB_CLIENT_REFUSE;
 }
 
+/**
+ * @brief Converts an X11 keysym modifier to an Ecore event modifier.
+ *
+ * @param mod The X11 keysym (e.g., XK_Shift_L, XK_Control_R).
+ * @param[out] is_lock Set to EINA_TRUE if the modifier is a lock key (Caps_Lock, Num_Lock, etc.),
+ *                     EINA_FALSE otherwise.
+ * @return The corresponding ECORE_EVENT_MODIFIER or ECORE_EVENT_LOCK flag,
+ *         or 0 if not a recognized modifier.
+ */
 static unsigned int
 _ecore_evas_vnc_server_modifier_to_ecore_modifier(int mod, Eina_Bool *is_lock)
 {
@@ -303,6 +409,15 @@ _ecore_evas_vnc_server_modifier_to_ecore_modifier(int mod, Eina_Bool *is_lock)
    return 0;
 }
 
+/**
+ * @brief Generic free function for Ecore events.
+ *
+ * This function is used as the free_func for ecore_event_add. It unrefs
+ * the user_data (typically an Evas_Device) and frees the func_data (the event structure).
+ *
+ * @param user_data The Evas_Device associated with the event.
+ * @param func_data The event data structure to be freed.
+ */
 static void
 _ecore_evas_vnc_server_ecore_event_generic_free(void *user_data,
                                                 void *func_data)
@@ -311,6 +426,19 @@ _ecore_evas_vnc_server_ecore_event_generic_free(void *user_data,
    free(func_data);
 }
 
+/**
+ * @brief Default key information getter function.
+ *
+ * This function uses ecore_evas_vnc_server_keysym_to_fb_translate to convert
+ * an rfbKeySym to Ecore key information.
+ *
+ * @param key The rfbKeySym from the VNC client.
+ * @param[out] key_name Pointer to store the Ecore key name.
+ * @param[out] key_str Pointer to store the Ecore key string.
+ * @param[out] compose Pointer to store the Ecore compose string.
+ * @param keycode Unused in this implementation.
+ * @return EINA_TRUE on successful translation, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _ecore_evas_vnc_server_fb_key_info_get(rfbKeySym key,
                                        const char **key_name,
@@ -323,6 +451,17 @@ _ecore_evas_vnc_server_fb_key_info_get(rfbKeySym key,
                                                        compose);
 }
 
+/**
+ * @brief Handles keyboard events from a VNC client.
+ *
+ * This function is called by libVNCServer when a client sends a keyboard event.
+ * It translates the VNC key event into an Ecore_Event_Key and adds it to the
+ * Ecore event queue. It also updates the modifier state for the client.
+ *
+ * @param down RFB_TRUE if the key is pressed, RFB_FALSE if released.
+ * @param key The rfbKeySym of the key.
+ * @param client The rfbClientRec that sent the event.
+ */
 static void
 _ecore_evas_vnc_server_client_keyboard_event(rfbBool down,
                                              rfbKeySym key,
@@ -388,6 +527,16 @@ _ecore_evas_vnc_server_client_keyboard_event(rfbBool down,
                    cdata->keyboard);
 }
 
+/**
+ * @brief Extracts the button number from a VNC button mask.
+ *
+ * VNC button masks are bitfields where bit 0 is button 1, bit 1 is button 2, etc.
+ * This function finds the first set bit and returns its corresponding button number.
+ *
+ * @param mask The VNC pointer button mask.
+ * @return The button number (1-indexed), or 0 if no button is set in the mask.
+ *         For example, a mask of 0x1 returns 1, 0x2 returns 2, 0x4 returns 3.
+ */
 static int
 _ecore_evas_vnc_server_pointer_button_get(int mask)
 {
@@ -398,6 +547,19 @@ _ecore_evas_vnc_server_pointer_button_get(int mask)
     return 0;
 }
 
+/**
+ * @brief Handles pointer (mouse) events from a VNC client.
+ *
+ * This function is called by libVNCServer when a client sends a pointer event
+ * (mouse move, button press/release, wheel). It translates the VNC pointer
+ * event into appropriate Ecore mouse events (move, button, wheel) and adds
+ * them to the Ecore event queue. It also handles double/triple click detection.
+ *
+ * @param button_mask A bitmask representing the state of mouse buttons.
+ * @param x The x-coordinate of the mouse pointer.
+ * @param y The y-coordinate of the mouse pointer.
+ * @param client The rfbClientPtr that sent the event.
+ */
 static void
 _ecore_evas_vnc_server_client_pointer_event(int button_mask,
                                             int x, int y,
@@ -537,6 +699,15 @@ _ecore_evas_vnc_server_client_pointer_event(int button_mask,
                    cdata->mouse);
 }
 
+/**
+ * @brief Initializes the Ecore_Evas VNC server module.
+ *
+ * This function initializes dependent libraries (Eina, Ecore, Ecore_Evas,
+ * Ecore_Event) and registers a log domain for the module. It is called
+ * automatically by EINA_MODULE_INIT.
+ *
+ * @return EINA_TRUE on successful initialization, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _ecore_evas_vnc_server_init(void)
 {
@@ -585,6 +756,12 @@ _ecore_evas_vnc_server_init(void)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Shuts down the Ecore_Evas VNC server module.
+ *
+ * This function unregisters the log domain and shuts down dependent Ecore
+ * libraries. It is called automatically by EINA_MODULE_SHUTDOWN.
+ */
 static void
 _ecore_evas_vnc_server_shutdown(void)
 {
@@ -596,12 +773,32 @@ _ecore_evas_vnc_server_shutdown(void)
    eina_shutdown();
 }
 
+/**
+ * @brief Aligns an integer value to the next multiple of 4.
+ *
+ * This is used to ensure framebuffer dimensions are suitable for libVNCServer.
+ *
+ * @param v The integer value to align.
+ * @return The aligned integer value.
+ */
 static inline int
 align4(int v)
 {
    return ((v / 4) + (v % 4 ? 1 : 0)) * 4;
 }
 
+/**
+ * @brief Callback for Evas post-render events.
+ *
+ * This function is called after Evas finishes rendering a frame. It captures
+ * the rendered image from a snapshot object, copies updated regions to the
+ * VNC server's framebuffer, and marks those regions as modified to be sent
+ * to clients.
+ *
+ * @param data The Evas_Object (snapshot) used for capturing the frame.
+ * @param e The Evas instance (unused).
+ * @param event_info Pointer to Evas_Event_Render_Post containing updated areas.
+ */
 static void
 _ecore_evas_vnc_server_draw(void *data, Evas *e EINA_UNUSED, void *event_info)
 {
@@ -714,6 +911,16 @@ _ecore_evas_vnc_server_draw(void *data, Evas *e EINA_UNUSED, void *event_info)
    _ecore_evas_vnc_server_update_clients(server->vnc_screen);
 }
 
+/**
+ * @brief Callback for the deletion of the snapshot Evas object.
+ *
+ * This function is triggered when the snapshot Evas object (used for
+ * capturing frames) is deleted. It cleans up all resources associated with
+ * the VNC server, including FD handlers, the VNC screen, and allocated memory.
+ *
+ * @param data The Ecore_Evas_Vnc_Server instance.
+ * @param ev The EFL event data (unused).
+ */
 static void
 _ecore_evas_vnc_server_del(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -728,6 +935,40 @@ _ecore_evas_vnc_server_del(void *data, const Efl_Event *ev EINA_UNUSED)
    free(server);
 }
 
+/**
+ * @brief Creates a new VNC server instance for an Ecore_Evas.
+ *
+ * This function sets up and starts a VNC server that mirrors the content
+ * of the given Ecore_Evas.
+ *
+ * @param ee The Ecore_Evas to be served. Must not be NULL.
+ * @param port The port number for the VNC server to listen on. If 0 or negative,
+ *             libVNCServer's default port (usually 5900) will be used.
+ * @param addr The network address to bind to (e.g., "0.0.0.0" for all interfaces,
+ *             "127.0.0.1" for localhost). If NULL, libVNCServer's default behavior
+ *             (usually listening on all available IPv4 and IPv6 interfaces) is used.
+ * @param accept_cb Optional callback function invoked when a new client attempts
+ *                  to connect. Can be used to accept or reject connections.
+ *                  Example:
+ *                  @code
+ *                  Eina_Bool my_accept_cb(void *data, Ecore_Evas *ee, const char *client_ip) {
+ *                      printf("Client %s trying to connect.\n", client_ip);
+ *                      // return EINA_FALSE; to reject
+ *                      return EINA_TRUE; // to accept
+ *                  }
+ *                  @endcode
+ * @param disc_cb Optional callback function invoked when a client disconnects.
+ *                Example:
+ *                @code
+ *                void my_disconnect_cb(void *data, Ecore_Evas *ee, const char *client_ip) {
+ *                    printf("Client %s disconnected.\n", client_ip);
+ *                }
+ *                @endcode
+ * @param data User-specific data to be passed to the accept_cb and disc_cb callbacks.
+ * @return An Evas_Object (snapshot image) on success, or NULL on failure.
+ *         This object is used internally to capture the Ecore_Evas content.
+ *         Deleting this object will shut down and clean up the VNC server.
+ */
 EMODAPI Evas_Object *
 ecore_evas_vnc_server_new(Ecore_Evas *ee, int port, const char *addr,
                           Ecore_Evas_Vnc_Client_Accept_Cb accept_cb,
@@ -830,6 +1071,23 @@ ecore_evas_vnc_server_new(Ecore_Evas *ee, int port, const char *addr,
    return NULL;
 }
 
+/**
+ * @brief Retrieves the last known pointer coordinates for a specific VNC client's mouse.
+ *
+ * This function iterates through connected VNC clients to find the one associated
+ * with the given Evas_Device (mouse) and returns its last reported pointer coordinates.
+ *
+ * @param snapshot The snapshot Evas_Object returned by ecore_evas_vnc_server_new().
+ *                 Must not be NULL.
+ * @param pointer The Evas_Device (mouse) for which to get coordinates. This device
+ *                is one of the virtual mouse devices created for a VNC client.
+ *                Must not be NULL.
+ * @param[out] x Pointer to store the x-coordinate. Can be NULL if not needed.
+ * @param[out] y Pointer to store the y-coordinate. Can be NULL if not needed.
+ * @return EINA_TRUE if the pointer device was found and coordinates were retrieved,
+ *         EINA_FALSE otherwise (e.g., if the snapshot is invalid, the pointer
+ *         device is not associated with any active client, or pointer is NULL).
+ */
 EMODAPI Eina_Bool
 ecore_evas_vnc_server_pointer_xy_get(const Evas_Object *snapshot,
                                      const Evas_Device *pointer,

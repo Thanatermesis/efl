@@ -58,10 +58,32 @@
 *                                  Local                                     *
 *============================================================================*/
 
+/**
+ * @internal
+ * @brief Determines and caches the system's memory page size.
+ *
+ * This function retrieves the system's page size using platform-specific
+ * methods and stores it in the global `_page_size` variable. If detection
+ * fails or returns an invalid value, it defaults to 4096 bytes.
+ */
 static void _eina_page_size(void);
 
 /* FIXME this ifdefs should be replaced */
 #if defined(__i386__) || defined(__x86_64__)
+/**
+ * @internal
+ * @brief Executes the CPUID instruction for x86 architectures.
+ *
+ * This function is a wrapper around the `cpuid` assembly instruction,
+ * ensuring that the `ebx` (or `rbx` for x86_64) register is preserved
+ * for position-independent code (PIC) compatibility.
+ *
+ * @param op The operation code for CPUID (input to EAX).
+ * @param a Pointer to store the EAX register output.
+ * @param b Pointer to store the EBX register output.
+ * @param c Pointer to store the ECX register output.
+ * @param d Pointer to store the EDX register output.
+ */
 /* We save ebx and restore it to be PIC compatible */
 static inline void _x86_cpuid(int op, int *a, int *b, int *c, int *d)
 {
@@ -83,6 +105,16 @@ static inline void _x86_cpuid(int op, int *a, int *b, int *c, int *d)
       : "cc");
 }
 
+/**
+ * @internal
+ * @brief Detects SIMD (Single Instruction, Multiple Data) features on x86 CPUs.
+ *
+ * This function uses the `_x86_cpuid` helper to query CPU capabilities
+ * and sets the corresponding flags in the `features` bitmask.
+ * It checks for MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, and SSE4.2.
+ *
+ * @param features Pointer to an Eina_Cpu_Features bitmask to be updated.
+ */
 static
 void _x86_simd(Eina_Cpu_Features *features)
 {
@@ -127,6 +159,16 @@ void _x86_simd(Eina_Cpu_Features *features)
 #endif
 
 #if defined(HAVE_SYS_AUXV_H) && defined(HAVE_ASM_HWCAP_H) && (defined(__arm__) || defined(__aarch64__)) && defined(__linux__)
+/**
+ * @internal
+ * @brief Detects CPU features on ARM architectures (Linux specific).
+ *
+ * This function uses `getauxval(AT_HWCAP)` to retrieve hardware capabilities
+ * on ARM and AArch64 processors under Linux. It checks for NEON and SVE.
+ * On AArch64, NEON is assumed to be present.
+ *
+ * @param features Pointer to an Eina_Cpu_Features bitmask to be updated.
+ */
 static void
 _arm_cpu_features(Eina_Cpu_Features *features)
 {
@@ -144,6 +186,15 @@ _arm_cpu_features(Eina_Cpu_Features *features)
 #endif
 
 #if defined(HAVE_SYS_AUXV_H) && defined(HAVE_ASM_HWCAP_H) && (defined(__POWERPC__) && defined(__VEC__)) && defined(__linux__)
+/**
+ * @internal
+ * @brief Detects CPU features on PowerPC architectures (Linux specific).
+ *
+ * This function uses `getauxval(AT_HWCAP)` to retrieve hardware capabilities
+ * on PowerPC processors under Linux. It specifically checks for AltiVec support.
+ *
+ * @param features Pointer to an Eina_Cpu_Features bitmask to be updated.
+ */
 static void
 _ppc_cpu_features(Eina_Cpu_Features *features)
 {
@@ -167,6 +218,16 @@ _ppc_cpu_features(Eina_Cpu_Features *features)
  */
 EINA_API Eina_Cpu_Features eina_cpu_features = 0;
 
+/**
+ * @brief Initializes CPU feature detection and other CPU-related information.
+ *
+ * This function populates the global `eina_cpu_features` variable by calling
+ * architecture-specific detection routines (e.g., `_x86_simd`, `_arm_cpu_features`).
+ * It also determines and caches the system's page size by calling `_eina_page_size()`.
+ * This function should be called early during application initialization.
+ *
+ * @return EINA_TRUE on successful initialization, though currently always returns EINA_TRUE.
+ */
 Eina_Bool
 eina_cpu_init(void)
 {
@@ -182,6 +243,15 @@ eina_cpu_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Shuts down CPU-related services.
+ *
+ * Currently, this function is a no-op and always returns EINA_TRUE.
+ * It is provided for symmetry with eina_cpu_init() and potential future use
+ * if any resources need to be explicitly released.
+ *
+ * @return EINA_TRUE.
+ */
 Eina_Bool
 eina_cpu_shutdown(void)
 {
@@ -197,8 +267,28 @@ EINA_API Eina_Cpu_Features eina_cpu_features_get(void)
    return eina_cpu_features;
 }
 
+/**
+ * @internal
+ * @brief Cached value of the number of CPUs.
+ * Initialized to -1, populated by eina_cpu_count_internal().
+ */
 static int _cpu_count = -1;
 
+/**
+ * @internal
+ * @brief Determines the number of online (available) CPUs.
+ *
+ * This function uses platform-specific methods to query the number of
+ * processors currently online.
+ * - On Windows, it uses `GetSystemInfo`.
+ * - On SunOS, GNU, Cygwin, it uses `sysconf(_SC_NPROCESSORS_ONLN)`.
+ * - On BSD variants and macOS, it uses `sysctl` with `CTL_HW` and `HW_AVAILCPU` or `HW_NCPU`.
+ * - On Linux/GLIBC, it uses `sched_getaffinity` and counts set CPUs.
+ * If threading is not available (EFL_HAVE_THREADS is not defined), it defaults to 1.
+ * If a platform is unsupported, an error is printed, and it defaults to 1.
+ *
+ * @return The number of online CPUs, or 1 in case of errors or single-threaded builds.
+ */
 static int
 _eina_cpu_count_internal(void)
 {
@@ -274,6 +364,11 @@ _eina_cpu_count_internal(void)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Cached value of the system page size.
+ * Initialized to 0, populated by _eina_page_size().
+ */
 static int _page_size = 0;
 
 static void
@@ -313,6 +408,16 @@ EINA_API int eina_cpu_count(void)
    return _cpu_count;
 }
 
+/**
+ * @internal
+ * @brief Sets the internal CPU count, potentially overriding with an environment variable.
+ *
+ * This function is intended for internal Eina use, typically called during
+ * initialization. It first checks the "EINA_CPU_FAKE" environment variable.
+ * If set, `_cpu_count` is set to the integer value of this variable.
+ * Otherwise, `_cpu_count` is determined by calling `_eina_cpu_count_internal()`.
+ * This allows developers to simulate different CPU counts for testing.
+ */
 void eina_cpu_count_internal(void)
 {
    if (getenv("EINA_CPU_FAKE"))

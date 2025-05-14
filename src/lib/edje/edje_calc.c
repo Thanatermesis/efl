@@ -45,6 +45,16 @@ static void                          _edje_part_recalc_single(Edje *ed, Edje_Rea
 
 #endif
 
+/**
+ * @internal
+ * @brief Clears and frees resources associated with Edje_Calc_Params.
+ *
+ * This function releases memory allocated for the type-specific data
+ * (common, text, node) and the extended data (map, physics) within
+ * an Edje_Calc_Params structure.
+ *
+ * @param p Pointer to the Edje_Calc_Params structure to clear.
+ */
 void
 _edje_calc_params_clear(Edje_Calc_Params *p)
 {
@@ -68,6 +78,16 @@ _edje_calc_params_clear(Edje_Calc_Params *p)
      }
 }
 
+/**
+ * @internal
+ * @brief Retrieves the Evas object associated with a real part.
+ *
+ * For SWALLOW parts with a swallowed object, it returns the swallowed object.
+ * Otherwise, it returns the part's own Evas object.
+ *
+ * @param ep Pointer to the Edje_Real_Part.
+ * @return The Evas object (Eo *) for the part, or NULL if none.
+ */
 static inline Eo *
 _edje_calc_get_part_object(const Edje_Real_Part *ep)
 {
@@ -77,6 +97,20 @@ _edje_calc_get_part_object(const Edje_Real_Part *ep)
    return ep->object;
 }
 
+/**
+ * @internal
+ * @brief Sets the clipper for a real part based on its current state or default clip settings.
+ *
+ * This function determines the appropriate clipping object for a given Edje_Real_Part.
+ * The clipper can be specified in the part's calculated parameters (pf),
+ * or by the part's `clip_to_id`. If neither is specified, the Edje object's
+ * base clipper is used.
+ *
+ * @param ed Pointer to the Edje object.
+ * @param ep Pointer to the Edje_Real_Part to set the clip for.
+ * @param pf Pointer to the Edje_Calc_Params for the part's current state,
+ *           which might contain an explicit `clip_to` part.
+ */
 static inline void
 _edje_calc_handle_state_clip(Edje *ed, Edje_Real_Part *ep, Edje_Calc_Params *pf)
 {
@@ -93,6 +127,25 @@ _edje_calc_handle_state_clip(Edje *ed, Edje_Real_Part *ep, Edje_Calc_Params *pf)
    evas_object_clip_set(_edje_calc_get_part_object(ep), clip_obj);
 }
 
+/**
+ * @internal
+ * @brief Sets the description position of a real part, applying tweening.
+ *
+ * This function calculates the new description position (`npos`) based on the
+ * input `pos` and the specified tweening `mode`. It uses `ecore_animator_pos_map`
+ * for various tweening modes. If the new position is different from the current
+ * `ep->description_pos`, it updates the part's position and marks the Edje
+ * object as dirty, triggering a recalculation.
+ *
+ * @param ed Pointer to the Edje object.
+ * @param ep Pointer to the Edje_Real_Part whose position is to be set.
+ * @param mode The tweening mode (e.g., EDJE_TWEEN_MODE_LINEAR, EDJE_TWEEN_MODE_SINUSOIDAL).
+ * @param pos The input position, typically between 0.0 and 1.0.
+ * @param v1 Optional parameter for tweening modes like ECORE_POS_MAP_ACCELERATE_FACTOR.
+ * @param v2 Optional parameter for tweening modes like ECORE_POS_MAP_DIVISOR_INTERP.
+ * @param v3 Optional parameter for tweening modes like ECORE_POS_MAP_CUBIC_BEZIER.
+ * @param v4 Optional parameter for tweening modes like ECORE_POS_MAP_CUBIC_BEZIER.
+ */
 void
 _edje_part_pos_set(Edje *ed, Edje_Real_Part *ep, int mode, FLOAT_T pos, FLOAT_T v1, FLOAT_T v2, FLOAT_T v3, FLOAT_T v4)
 {
@@ -239,6 +292,18 @@ _edje_part_pos_set(Edje *ed, Edje_Real_Part *ep, int mode, FLOAT_T pos, FLOAT_T 
  * @param desc Pointer to desc buffer.
  *
  **/
+/**
+ * @internal
+ * @brief Modifies a part description for Right-To-Left (RTL) layout.
+ *
+ * This function adjusts alignment, relative positioning, and offsets
+ * within the given part description to make it suitable for an RTL context.
+ * For example, horizontal alignment is inverted (e.g., 0.2 becomes 0.8).
+ * Relative X coordinates and offsets are also mirrored.
+ *
+ * @param desc Pointer to the Edje_Part_Description_Common to be modified for RTL.
+ *             If NULL, the function does nothing.
+ */
 static void
 _edje_part_make_rtl(Edje_Part_Description_Common *desc)
 {
@@ -271,6 +336,26 @@ _edje_part_make_rtl(Edje_Part_Description_Common *desc)
    desc->rel2.id_x = i;
 }
 
+/**
+ * @internal
+ * @brief Retrieves or creates a custom part description adjusted for orientation (LTR/RTL).
+ *
+ * If the Edje object is in RTL mode and a custom RTL description (`*dst`)
+ * does not already exist, this function will effectively create one by
+ * copying the `src` description and then applying RTL transformations using
+ * `_edje_part_make_rtl`. If an RTL description already exists in `*dst`,
+ * it copies the `src` to `*dst` and then applies RTL transformations.
+ * If not in RTL mode, it simply returns the `src` description.
+ *
+ * @param ed The Edje object, used to check its mirrored (RTL) state.
+ * @param src The source (LTR) part description.
+ * @param dst Pointer to a location where the RTL description is stored or will be stored.
+ *            This can be updated if a new RTL description is created from `src`.
+ * @param type The type of the part (e.g., EDJE_PART_TYPE_RECTANGLE), used to determine
+ *             the size of the description structure for `memcpy`.
+ * @return The appropriate part description (either `src` for LTR, or the
+ *         RTL version from `*dst`).
+ */
 static Edje_Part_Description_Common *
 _edje_get_custom_description_by_orientation(Edje *ed, Edje_Part_Description_Common *src, Edje_Part_Description_Common **dst, unsigned char type)
 {

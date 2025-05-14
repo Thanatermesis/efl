@@ -4,6 +4,18 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Applies a text style to a textblock object.
+ *
+ * This function retrieves a style string from an input object (e.g., a textbox)
+ * and applies it to the given textblock. The style string can contain
+ * various formatting options like font, size, and color.
+ *
+ * @param input The Efl_Ui_Textbox object containing the style string.
+ * @param textblock The Efl_Canvas_Textblock object to which the style will be applied.
+ *
+ * @example style string: "font=Sans font_size=24 color=white"
+ */
 static void
 _apply_style(const Eo *input, Eo *textblock)
 {
@@ -11,6 +23,16 @@ _apply_style(const Eo *input, Eo *textblock)
    efl_canvas_textblock_style_apply(textblock, style);
 }
 
+/**
+ * @brief Callback function invoked when the text in the style input field changes.
+ *
+ * This function is triggered by the EFL_TEXT_INTERACTIVE_EVENT_CHANGED_USER event.
+ * It calls _apply_style() to update the textblock's appearance in real-time
+ * as the user types a new style string.
+ *
+ * @param data The user data passed to the callback, which is the textblock object.
+ * @param ev The event information, where ev->object is the input textbox.
+ */
 static void
 _style_changed_cb(void *data, const Efl_Event *ev)
 {
@@ -18,6 +40,22 @@ _style_changed_cb(void *data, const Efl_Event *ev)
 }
 
 
+/**
+ * @brief UI test for Efl.Canvas.Textblock styles.
+ *
+ * This test creates a window with a live style editor for an Efl.Canvas.Textblock.
+ * The UI consists of:
+ * - A label with instructions.
+ * - A textbox where a user can input a style string.
+ * - A textblock that displays sample text with the applied style.
+ *
+ * The style of the textblock is updated in real-time as the user modifies the
+ * style string in the textbox.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_canvas_textblock(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

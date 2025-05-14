@@ -3,6 +3,16 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback function for the "dayselector,changed" event.
+ *
+ * This function is called when a day in the dayselector is selected or
+ * deselected. It prints the day and its selection state to stderr.
+ *
+ * @param data The user data passed to evas_object_smart_callback_add(), not used here.
+ * @param obj The dayselector object that triggered the event.
+ * @param event_info The day that was changed, of type Elm_Dayselector_Day.
+ */
 static void _changed_cb(void* data EINA_UNUSED, Evas_Object* obj, void* event_info)
 {
    char buf[256];
@@ -39,6 +49,30 @@ static void _changed_cb(void* data EINA_UNUSED, Evas_Object* obj, void* event_in
    fprintf(stderr, "%s = %d\n", buf, checked);
 }
 
+/**
+ * @brief Creates a test window demonstrating various configurations of the elm_dayselector widget.
+ *
+ * This function sets up a window containing several dayselector widgets
+ * to showcase different features like:
+ * - Default initialization.
+ * - Setting Sunday as the start of the week.
+ * - Applying a special style to a day.
+ * - Using custom weekday names.
+ * - A disabled dayselector.
+ *
+ * This function demonstrates how to use an array of C-style strings to set
+ * custom weekday names. The array must contain 7 strings. For example:
+ * @code
+ * // Array with full weekday names
+ * const char *weekdays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+ * // Array with single-letter abbreviations
+ * const char *weekdays2[] = {"S", "M", "T", "W", "T", "F", "S"};
+ * @endcode
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_dayselector(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

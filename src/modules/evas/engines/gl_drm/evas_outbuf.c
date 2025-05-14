@@ -1,15 +1,28 @@
 #include "evas_engine.h"
 
 /* local variables */
+/** @internal Pointer to the currently active Outbuf window for GL operations. */
 static Outbuf *_evas_gl_drm_window = NULL;
+/** @internal Shared EGL context, if contexts can be shared. */
 static EGLContext context = EGL_NO_CONTEXT;
+/** @internal Counter for the number of active Outbuf windows. */
 static int win_count = 0;
 
 #ifdef EGL_MESA_platform_gbm
+/** @internal Function pointer for eglGetPlatformDisplayEXT, used for GBM platform. */
 static PFNEGLGETPLATFORMDISPLAYEXTPROC dlsym_eglGetPlatformDisplayEXT = NULL;
+/** @internal Function pointer for eglCreatePlatformWindowSurfaceEXT, used for GBM platform. */
 static PFNEGLCREATEPLATFORMWINDOWSURFACEEXTPROC dlsym_eglCreatePlatformWindowSurfaceEXT = NULL;
 #endif
 
+/**
+ * @internal
+ * @brief Destroys the GBM surface associated with the output buffer.
+ *
+ * This function releases the GBM surface if it exists.
+ *
+ * @param ob The output buffer (Outbuf) whose GBM surface is to be destroyed.
+ */
 static void
 _evas_outbuf_gbm_surface_destroy(Outbuf *ob)
 {
@@ -21,6 +34,17 @@ _evas_outbuf_gbm_surface_destroy(Outbuf *ob)
      }
 }
 
+/**
+ * @internal
+ * @brief Creates a GBM surface for the output buffer.
+ *
+ * This function creates a GBM surface with the specified width, height,
+ * and format suitable for rendering and scanout.
+ *
+ * @param ob The output buffer (Outbuf) for which to create the GBM surface.
+ * @param w The width of the surface.
+ * @param h The height of the surface.
+ */
 static void
 _evas_outbuf_gbm_surface_create(Outbuf *ob, int w, int h)
 {
@@ -35,6 +59,16 @@ _evas_outbuf_gbm_surface_create(Outbuf *ob, int w, int h)
    if (!ob->surface) ERR("Failed to create gbm surface");
 }
 
+/**
+ * @internal
+ * @brief Callback function for GBM buffer object destruction.
+ *
+ * This function is called when a GBM buffer object (BO) is no longer
+ * needed and is being destroyed. It discards the associated Ecore_Drm2_Fb.
+ *
+ * @param bo The GBM buffer object being destroyed (unused in function).
+ * @param data User data, expected to be an Ecore_Drm2_Fb pointer.
+ */
 static void
 _evas_outbuf_fb_cb_destroy(struct gbm_bo *bo EINA_UNUSED, void *data)
 {
@@ -44,6 +78,18 @@ _evas_outbuf_fb_cb_destroy(struct gbm_bo *bo EINA_UNUSED, void *data)
    if (fb) ecore_drm2_fb_discard(fb);
 }
 
+/**
+ * @internal
+ * @brief Callback function for Ecore_Drm2_Fb release.
+ *
+ * This function is invoked when an Ecore_Drm2 framebuffer (Fb) is released
+ * (e.g., after a page flip). It releases the corresponding GBM buffer.
+ *
+ * @param fb The Ecore_Drm2 framebuffer that was released.
+ * @param status The status of the framebuffer release.
+ *               Only ECORE_DRM2_FB_STATUS_RELEASE triggers action.
+ * @param data User data, expected to be an Outbuf pointer.
+ */
 void
 _evas_outbuf_release_fb(Ecore_Drm2_Fb *fb, Ecore_Drm2_Fb_Status status, void *data)
 {
@@ -58,6 +104,18 @@ _evas_outbuf_release_fb(Ecore_Drm2_Fb *fb, Ecore_Drm2_Fb_Status status, void *da
    gbm_surface_release_buffer(ob->surface, bo);
 }
 
+/**
+ * @internal
+ * @brief Retrieves or creates an Ecore_Drm2_Fb for a GBM buffer object.
+ *
+ * If an Ecore_Drm2_Fb already exists for the given GBM BO (stored as user
+ * data), it is returned. Otherwise, a new Ecore_Drm2_Fb is created from
+ * the GBM BO's properties and associated with it.
+ *
+ * @param ob The output buffer (Outbuf) context.
+ * @param bo The GBM buffer object for which to get/create the framebuffer.
+ * @return A pointer to the Ecore_Drm2_Fb, or NULL on failure.
+ */
 static Ecore_Drm2_Fb *
 _evas_outbuf_fb_get(Outbuf *ob, struct gbm_bo *bo)
 {
@@ -91,6 +149,17 @@ _evas_outbuf_fb_get(Outbuf *ob, struct gbm_bo *bo)
    return fb;
 }
 
+/**
+ * @internal
+ * @brief Handles the buffer swapping logic for DRM/GBM.
+ *
+ * This function locks the front buffer of the GBM surface,
+ * gets/creates an Ecore_Drm2_Fb for it, assigns it to a DRM plane
+ * (if not already assigned or if it needs reassignment), and
+ * schedules a page flip.
+ *
+ * @param ob The output buffer (Outbuf) for which to swap buffers.
+ */
 static void
 _evas_outbuf_buffer_swap(Outbuf *ob)
 {
@@ -117,6 +186,18 @@ _evas_outbuf_buffer_swap(Outbuf *ob)
      WRN("Could not get FBO from Bo");
 }
 
+/**
+ * @internal
+ * @brief Makes the EGL context of the Outbuf current or not current.
+ *
+ * This function is typically used as a callback for
+ * glsym_evas_gl_preload_render_lock to manage EGL context activation.
+ *
+ * @param data User data, expected to be an Outbuf pointer.
+ * @param doit If EINA_TRUE, makes the context current.
+ *             If EINA_FALSE, makes no context current.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _evas_outbuf_make_current(void *data, void *doit)
 {
@@ -140,6 +221,18 @@ _evas_outbuf_make_current(void *data, void *doit)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Initializes EGL extensions required by the GBM platform.
+ *
+ * This function checks for and retrieves function pointers for
+ * EGL_EXT_platform_base and related extensions if EGL_MESA_platform_gbm
+ * is defined. It ensures it's only run once.
+ *
+ * @return EINA_TRUE if initialization was successful or already done,
+ *         EINA_FALSE otherwise (though currently always returns EINA_TRUE
+ *         after the first successful call).
+ */
 static Eina_Bool
 _evas_outbuf_init(void)
 {
@@ -164,6 +257,23 @@ _evas_outbuf_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Sets up EGL for the given output buffer.
+ *
+ * This involves:
+ * - Initializing EGL display connection (trying platform GBM first, then default).
+ * - Choosing an EGL configuration matching GBM format.
+ * - Creating an EGL window surface using the GBM surface.
+ * - Creating an EGL context (sharing with a global context if possible).
+ * - Making the context current.
+ * - Loading GL symbols.
+ * - Performing driver blacklisting checks.
+ * - Creating an Evas GL common context.
+ *
+ * @param ob The output buffer (Outbuf) to set up EGL for.
+ * @return EINA_TRUE on successful EGL setup, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _evas_outbuf_egl_setup(Outbuf *ob)
 {
@@ -376,6 +486,19 @@ err:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Creates a new output buffer (Outbuf) for GL rendering on DRM.
+ *
+ * This function allocates and initializes an Outbuf structure, which
+ * represents a render target (window or surface) for Evas GL operations
+ * using DRM/GBM. It sets up the GBM surface and EGL resources.
+ *
+ * @param info Pointer to Evas_Engine_Info_GL_Drm containing DRM and display properties.
+ * @param w The width of the output buffer.
+ * @param h The height of the output buffer.
+ * @param swap_mode The desired buffer swap mode.
+ * @return A pointer to the newly created Outbuf, or NULL on failure.
+ */
 Outbuf *
 evas_outbuf_new(Evas_Engine_Info_GL_Drm *info, int w, int h, Render_Output_Swap_Mode swap_mode)
 {
@@ -419,6 +542,15 @@ evas_outbuf_new(Evas_Engine_Info_GL_Drm *info, int w, int h, Render_Output_Swap_
    return ob;
 }
 
+/**
+ * @brief Frees an output buffer (Outbuf) and its associated resources.
+ *
+ * This function cleans up all resources tied to the Outbuf, including
+ * the Evas GL context, EGL context, EGL surface, and GBM surface.
+ * It also handles global EGL termination if this is the last Outbuf.
+ *
+ * @param ob The output buffer (Outbuf) to free.
+ */
 void
 evas_outbuf_free(Outbuf *ob)
 {
@@ -458,6 +590,17 @@ evas_outbuf_free(Outbuf *ob)
    free(ob);
 }
 
+/**
+ * @brief Sets the specified output buffer as the current target for GL operations.
+ *
+ * This function ensures that subsequent GL commands are directed to the
+ * EGL context and surface associated with the given Outbuf. It handles
+ * flushing the previous context if a switch occurs.
+ *
+ * @param ob The output buffer (Outbuf) to make current.
+ *           If NULL, it might imply releasing the current context,
+ *           though the primary use is to set a new current Outbuf.
+ */
 void
 evas_outbuf_use(Outbuf *ob)
 {
@@ -496,6 +639,15 @@ evas_outbuf_use(Outbuf *ob)
    if (ob) glsym_evas_gl_common_context_use(ob->gl_context);
 }
 
+/**
+ * @brief Recreates the EGL surface for an output buffer.
+ *
+ * This is used if the EGL surface was previously destroyed (e.g., by
+ * evas_outbuf_unsurf) and needs to be made available again.
+ * It makes the new surface current.
+ *
+ * @param ob The output buffer (Outbuf) whose EGL surface needs recreation.
+ */
 void
 evas_outbuf_resurf(Outbuf *ob)
 {
@@ -522,6 +674,16 @@ evas_outbuf_resurf(Outbuf *ob)
    ob->surf = EINA_TRUE;
 }
 
+/**
+ * @brief Destroys the EGL surface of an output buffer.
+ *
+ * This function is called to release the EGL surface, typically when
+ * the window is hidden or no longer needs to be rendered to directly.
+ * It also clears the current EGL context if it was associated with this Outbuf.
+ * The `EVAS_GL_WIN_RESURF` environment variable can prevent this.
+ *
+ * @param ob The output buffer (Outbuf) whose EGL surface is to be destroyed.
+ */
 void
 evas_outbuf_unsurf(Outbuf *ob)
 {
@@ -545,6 +707,19 @@ evas_outbuf_unsurf(Outbuf *ob)
    ob->surf = EINA_FALSE;
 }
 
+/**
+ * @brief Reconfigures an existing output buffer.
+ *
+ * This function changes the dimensions, rotation, or depth of an Outbuf.
+ * It involves releasing pending framebuffers, destroying and recreating
+ * the GBM surface with new parameters, and then re-setting up EGL.
+ *
+ * @param ob The output buffer (Outbuf) to reconfigure.
+ * @param w The new width.
+ * @param h The new height.
+ * @param rot The new rotation (0, 90, 180, 270 degrees).
+ * @param depth The new color depth (or OUTBUF_DEPTH_INHERIT to keep current).
+ */
 void
 evas_outbuf_reconfigure(Outbuf *ob, int w, int h, int rot, Outbuf_Depth depth)
 {
@@ -566,6 +741,18 @@ evas_outbuf_reconfigure(Outbuf *ob, int w, int h, int rot, Outbuf_Depth depth)
    _evas_outbuf_egl_setup(ob);
 }
 
+/**
+ * @brief Gets the current buffer swap mode, potentially based on EGL_BUFFER_AGE_EXT.
+ *
+ * If the swap mode is set to MODE_AUTO and the EGL_BUFFER_AGE_EXT extension
+ * is available, this function queries the age of the current front buffer.
+ * The age determines the most efficient swap mode (e.g., MODE_COPY, MODE_DOUBLE).
+ * If the age changes unexpectedly, it defaults to MODE_FULL.
+ *
+ * @param ob The output buffer (Outbuf) to query.
+ * @return The determined Render_Output_Swap_Mode. Returns MODE_FULL if
+ *         auto-detection is not enabled/available or on error.
+ */
 Render_Output_Swap_Mode
 evas_outbuf_buffer_state_get(Outbuf *ob)
 {
@@ -611,12 +798,31 @@ evas_outbuf_buffer_state_get(Outbuf *ob)
      return MODE_FULL;
 }
 
+/**
+ * @brief Gets the rotation of the output buffer.
+ *
+ * @param ob The output buffer (Outbuf).
+ * @return The rotation angle in degrees (0, 90, 180, or 270).
+ */
 int
 evas_outbuf_rot_get(Outbuf *ob)
 {
    return ob->rotation;
 }
 
+/**
+ * @brief Prepares the GL context for rendering the first rectangle of an update.
+ *
+ * This function ensures the Outbuf's GL context is current, resizes it if
+ * necessary, flushes any pending operations from previous frames, and starts
+ * a new frame.
+ *
+ * @param ob The output buffer (Outbuf) being updated.
+ * @return EINA_TRUE if window check (_re_wincheck) passes and setup is done,
+ *         EINA_FALSE if preparation should skip (e.g. window not ready).
+ *         Note: The return value seems inverted in its current usage logic;
+ *         it returns EINA_TRUE if _re_wincheck fails, effectively skipping.
+ */
 Eina_Bool
 evas_outbuf_update_region_first_rect(Outbuf *ob)
 {
@@ -634,6 +840,24 @@ evas_outbuf_update_region_first_rect(Outbuf *ob)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Converts Evas coordinates to OpenGL coordinates based on rotation.
+ *
+ * OpenGL typically has its origin at the bottom-left, while Evas might use
+ * top-left. This function also accounts for canvas rotation.
+ *
+ * @param result Pointer to an integer array of size 4, which will be filled
+ *               with `[gl_x, gl_y, gl_w, gl_h]`.
+ *               Example: `int coords[4]; _glcoords_convert(coords, ...);`
+ *                        `coords` will contain `[0, 0, 100, 100]` for a
+ *                        100x100 region at (0,0) in a non-rotated 100x100 surface.
+ * @param ob The output buffer (Outbuf) providing rotation and height context.
+ * @param x The Evas x-coordinate of the rectangle.
+ * @param y The Evas y-coordinate of the rectangle.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ */
 static void
 _glcoords_convert(int *result, Outbuf *ob, int x, int y, int w, int h)
 {
@@ -672,6 +896,19 @@ _glcoords_convert(int *result, Outbuf *ob, int x, int y, int w, int h)
      }
 }
 
+/**
+ * @brief Sets the damage region for the EGL surface, if supported.
+ *
+ * This function informs EGL about which parts of the surface have changed,
+ * potentially allowing for more efficient partial updates. It converts
+ * Evas coordinates from the `damage` list to GL coordinates.
+ *
+ * @param ob The output buffer (Outbuf).
+ * @param damage A linked list of Tilebuf_Rect structures defining the
+ *               damaged areas in Evas coordinates.
+ *               Example: A Tilebuf_Rect might be `{ .x=10, .y=20, .w=100, .h=50 }`.
+ *                        The list is traversed using EINA_INLIST_FOREACH.
+ */
 void
 evas_outbuf_damage_region_set(Outbuf *ob, Tilebuf_Rect *damage)
 {
@@ -692,6 +929,25 @@ evas_outbuf_damage_region_set(Outbuf *ob, Tilebuf_Rect *damage)
      }
 }
 
+/**
+ * @brief Sets up a new region for update, configuring the master clip.
+ *
+ * This function defines the area that will be drawn to. If the update
+ * region is smaller than the full output buffer, it enables and sets
+ * a master clip in the GL context.
+ *
+ * @param ob The output buffer (Outbuf).
+ * @param x The x-coordinate of the update region.
+ * @param y The y-coordinate of the update region.
+ * @param w The width of the update region.
+ * @param h The height of the update region.
+ * @param cx Unused parameter (intended for clip x).
+ * @param cy Unused parameter (intended for clip y).
+ * @param cw Unused parameter (intended for clip width).
+ * @param ch Unused parameter (intended for clip height).
+ * @return A pointer to the default surface of the GL context.
+ *         This is typically `ob->gl_context->def_surface`.
+ */
 void *
 evas_outbuf_update_region_new(Outbuf *ob, int x, int y, int w, int h, int *cx EINA_UNUSED, int *cy EINA_UNUSED, int *cw EINA_UNUSED, int *ch EINA_UNUSED)
 {
@@ -709,6 +965,20 @@ evas_outbuf_update_region_new(Outbuf *ob, int x, int y, int w, int h, int *cx EI
    return ob->gl_context->def_surface;
 }
 
+/**
+ * @brief Pushes an updated region to the display by flushing the GL context.
+ *
+ * This function is called after drawing operations for a specific region
+ * are complete. It flushes the GL command buffer to ensure drawing commands
+ * are processed.
+ *
+ * @param ob The output buffer (Outbuf).
+ * @param update The RGBA_Image containing the updated pixel data (unused).
+ * @param x The x-coordinate of the pushed region (unused).
+ * @param y The y-coordinate of the pushed region (unused).
+ * @param w The width of the pushed region (unused).
+ * @param h The height of the pushed region (unused).
+ */
 void
 evas_outbuf_update_region_push(Outbuf *ob, RGBA_Image *update EINA_UNUSED, int x EINA_UNUSED, int y EINA_UNUSED, int w EINA_UNUSED, int h EINA_UNUSED)
 {
@@ -719,6 +989,25 @@ evas_outbuf_update_region_push(Outbuf *ob, RGBA_Image *update EINA_UNUSED, int x
    glsym_evas_gl_common_context_flush(ob->gl_context);
 }
 
+/**
+ * @brief Flushes all rendering updates to the screen.
+ *
+ * This function finalizes the rendering for the current frame. It ensures
+ * the GL context is current, marks the GL operations as done for the frame,
+ * sets EGL swap interval (vsync), and then swaps the EGL buffers.
+ * If partial updates are supported (via eglSwapBuffersWithDamage) and
+ * `surface_damage` is provided, it attempts a partial swap.
+ * Finally, it calls the internal DRM buffer swap logic.
+ *
+ * @param ob The output buffer (Outbuf) to flush.
+ * @param surface_damage A list of Tilebuf_Rects defining areas damaged on the
+ *                       surface, used for partial swaps if available.
+ *                       May be NULL if no specific damage or for full swap.
+ * @param buffer_damage A list of Tilebuf_Rects defining areas damaged in the
+ *                      backbuffer (unused in this function).
+ * @param render_mode The current Evas render mode. If EVAS_RENDER_MODE_ASYNC_INIT,
+ *                    the function exits early.
+ */
 void
 evas_outbuf_flush(Outbuf *ob, Tilebuf_Rect *surface_damage, Tilebuf_Rect *buffer_damage EINA_UNUSED, Evas_Render_Mode render_mode)
 {
@@ -774,18 +1063,42 @@ end:
    glsym_evas_gl_preload_render_unlock(_evas_outbuf_make_current, ob);
 }
 
+/**
+ * @brief Retrieves the Evas GL context associated with an output buffer.
+ *
+ * @param ob The output buffer (Outbuf).
+ * @return A pointer to the Evas_Engine_GL_Context.
+ */
 Evas_Engine_GL_Context *
 evas_outbuf_gl_context_get(Outbuf *ob)
 {
    return ob->gl_context;
 }
 
+/**
+ * @brief Retrieves the EGL display handle associated with an output buffer.
+ *
+ * @param ob The output buffer (Outbuf).
+ * @return A void pointer to the EGLDisplay.
+ */
 void *
 evas_outbuf_egl_display_get(Outbuf *ob)
 {
    return ob->egl.disp;
 }
 
+/**
+ * @brief Creates a new 3D graphics context (EGL context).
+ *
+ * This function creates an EGL context that is compatible with the
+ * EGL configuration of the provided Outbuf and shares with the
+ * Outbuf's main EGL context.
+ *
+ * @param ob The output buffer (Outbuf) whose EGL display and config are used.
+ * @return A pointer to the newly created Context_3D structure, or NULL on failure.
+ *         The Context_3D structure contains the EGLDisplay, EGLSurface, and
+ *         EGLContext.
+ */
 Context_3D *
 evas_outbuf_gl_context_new(Outbuf *ob)
 {
@@ -816,6 +1129,14 @@ error:
    return NULL;
 }
 
+/**
+ * @brief Frees a 3D graphics context.
+ *
+ * Destroys the EGL context and frees the memory allocated for the
+ * Context_3D structure.
+ *
+ * @param ctx The Context_3D to free.
+ */
 void
 evas_outbuf_gl_context_free(Context_3D *ctx)
 {
@@ -823,6 +1144,11 @@ evas_outbuf_gl_context_free(Context_3D *ctx)
    free(ctx);
 }
 
+/**
+ * @brief Makes a 3D graphics context current for rendering.
+ *
+ * @param ctx The Context_3D to make current.
+ */
 void
 evas_outbuf_gl_context_use(Context_3D *ctx)
 {

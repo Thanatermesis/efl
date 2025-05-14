@@ -5,18 +5,43 @@
 // Use a better formula than R+G+B for rgba to alpha conversion (RGB to YCbCr)
 #define RGBA2ALPHA_WEIGHTED 1
 
+/** @brief Function pointer type for image drawing operations. */
 typedef Eina_Bool (*draw_func) (void *context, const void *src_map, unsigned int src_stride, void *dst_map, unsigned int dst_stride, int src_x, int src_y, int src_w, int src_h, int dst_x, int dst_y, int dst_w, int dst_h, int smooth, Eina_Bool do_async);
+
+/** @brief Internal function to handle blending with tiling/stretching. */
 static Eina_Bool _mapped_blend(void *drawctx, const void *src_map, unsigned int src_stride, void *dst_map, unsigned int dst_stride, Evas_Filter_Fill_Mode fillmode, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh, draw_func image_draw);
 
+/**
+ * @brief Context structure holding parameters for blend drawing operations.
+ */
 typedef struct _Filter_Blend_Draw_Context
 {
-   Efl_Gfx_Render_Op rop;
-   uint32_t color;
-   Eina_Bool alphaonly;
+   Efl_Gfx_Render_Op rop; /**< The rendering operation (e.g., copy, blend). */
+   uint32_t color;        /**< The color multiplier (ARGB format). */
+   Eina_Bool alphaonly;   /**< Flag indicating if only the alpha channel should be processed. */
 } Filter_Blend_Draw_Context;
 
-#define LINELEN(stride, ptr) (stride / (sizeof(*ptr)))
+#define LINELEN(stride, ptr) (stride / (sizeof(*ptr))) /**< Macro to calculate line length in elements. */
 
+/**
+ * @brief Draws an alpha buffer onto another alpha buffer using CPU.
+ * @param context The draw context containing blend parameters.
+ * @param src_map Pointer to the source buffer map.
+ * @param src_stride Stride (bytes per line) of the source buffer.
+ * @param dst_map Pointer to the destination buffer map.
+ * @param dst_stride Stride (bytes per line) of the destination buffer.
+ * @param src_x Source X coordinate.
+ * @param src_y Source Y coordinate.
+ * @param src_w Source width.
+ * @param src_h Source height.
+ * @param dst_x Destination X coordinate.
+ * @param dst_y Destination Y coordinate.
+ * @param dst_w Destination width.
+ * @param dst_h Destination height.
+ * @param smooth Unused smooth flag.
+ * @param do_async Unused async flag.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _image_draw_cpu_alpha_alpha(void *context,
                             const void *src_map, unsigned int src_stride,
@@ -52,6 +77,25 @@ _image_draw_cpu_alpha_alpha(void *context,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Draws an alpha buffer onto an RGBA buffer using CPU, using the alpha as a mask.
+ * @param context The draw context containing blend parameters (rop, color).
+ * @param src_map Pointer to the source alpha buffer map.
+ * @param src_stride Stride (bytes per line) of the source buffer.
+ * @param dst_map Pointer to the destination RGBA buffer map.
+ * @param dst_stride Stride (bytes per line) of the destination buffer.
+ * @param src_x Source X coordinate.
+ * @param src_y Source Y coordinate.
+ * @param src_w Source width.
+ * @param src_h Source height.
+ * @param dst_x Destination X coordinate.
+ * @param dst_y Destination Y coordinate.
+ * @param dst_w Destination width.
+ * @param dst_h Destination height.
+ * @param smooth Unused smooth flag.
+ * @param do_async Unused async flag.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _image_draw_cpu_alpha_rgba(void *context,
                            const void *src_map, unsigned int src_stride,
@@ -87,6 +131,25 @@ _image_draw_cpu_alpha_rgba(void *context,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Draws an RGBA buffer onto another RGBA buffer using CPU.
+ * @param context The draw context containing blend parameters (rop, color).
+ * @param src_map Pointer to the source RGBA buffer map.
+ * @param src_stride Stride (bytes per line) of the source buffer.
+ * @param dst_map Pointer to the destination RGBA buffer map.
+ * @param dst_stride Stride (bytes per line) of the destination buffer.
+ * @param src_x Source X coordinate.
+ * @param src_y Source Y coordinate.
+ * @param src_w Source width.
+ * @param src_h Source height.
+ * @param dst_x Destination X coordinate.
+ * @param dst_y Destination Y coordinate.
+ * @param dst_w Destination width.
+ * @param dst_h Destination height.
+ * @param smooth Unused smooth flag.
+ * @param do_async Unused async flag.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _image_draw_cpu_rgba_rgba(void *context,
                           const void *src_map, unsigned int src_stride,
@@ -125,6 +188,26 @@ _image_draw_cpu_rgba_rgba(void *context,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Draws an RGBA buffer onto an alpha buffer using CPU.
+ * Converts RGBA to grayscale (luminance) or extracts alpha based on context.
+ * @param context The draw context, potentially containing `alphaonly` flag.
+ * @param src_map Pointer to the source RGBA buffer map.
+ * @param src_stride Stride (bytes per line) of the source buffer.
+ * @param dst_map Pointer to the destination alpha buffer map.
+ * @param dst_stride Stride (bytes per line) of the destination buffer.
+ * @param src_x Source X coordinate.
+ * @param src_y Source Y coordinate.
+ * @param src_w Source width.
+ * @param src_h Source height.
+ * @param dst_x Destination X coordinate.
+ * @param dst_y Destination Y coordinate.
+ * @param dst_w Destination width.
+ * @param dst_h Destination height.
+ * @param smooth Unused smooth flag.
+ * @param do_async Unused async flag.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _image_draw_cpu_rgba_alpha(void *context,
                            const void *src_map, unsigned int src_stride,
@@ -188,6 +271,14 @@ _image_draw_cpu_rgba_alpha(void *context,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Generic CPU blend function handler.
+ * Sets up buffers (handling scaling if needed), maps them, creates the draw
+ * context, and calls the appropriate mapped blend function.
+ * @param cmd The filter command containing input/output buffers and draw parameters.
+ * @param image_draw The specific drawing function to use based on buffer formats.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _filter_blend_cpu_generic_do(Evas_Filter_Command *cmd, draw_func image_draw)
 {
@@ -248,33 +339,76 @@ _filter_blend_cpu_generic_do(Evas_Filter_Command *cmd, draw_func image_draw)
 end:
    if (src) ector_buffer_unmap(src_fb->buffer, src, src_len);
    if (dst) ector_buffer_unmap(cmd->output->buffer, dst, dst_len);
+   if (src) ector_buffer_unmap(src_fb->buffer, src, src_len);
+   if (dst) ector_buffer_unmap(cmd->output->buffer, dst, dst_len);
    return ret;
 }
 
+/**
+ * @brief CPU blend function for Alpha -> Alpha format.
+ * @param cmd The filter command.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _filter_blend_cpu_alpha(Evas_Filter_Command *cmd)
 {
    return _filter_blend_cpu_generic_do(cmd, _image_draw_cpu_alpha_alpha);
 }
 
+/**
+ * @brief CPU blend function for Alpha -> RGBA format.
+ * @param cmd The filter command.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _filter_blend_cpu_alpha_rgba(Evas_Filter_Command *cmd)
 {
    return _filter_blend_cpu_generic_do(cmd, _image_draw_cpu_alpha_rgba);
 }
 
+/**
+ * @brief CPU blend function for RGBA -> Alpha format.
+ * @param cmd The filter command.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _filter_blend_cpu_rgba_alpha(Evas_Filter_Command *cmd)
 {
    return _filter_blend_cpu_generic_do(cmd, _image_draw_cpu_rgba_alpha);
 }
 
+/**
+ * @brief CPU blend function for RGBA -> RGBA format.
+ * @param cmd The filter command.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _filter_blend_cpu_rgba(Evas_Filter_Command *cmd)
 {
    return _filter_blend_cpu_generic_do(cmd, _image_draw_cpu_rgba_rgba);
 }
 
+/**
+ * @brief Performs the actual blend operation on mapped buffers, handling fill modes.
+ * This function calculates the necessary tiling or stretching based on the fillmode
+ * and calls the provided image_draw function repeatedly for each tile/section.
+ * @param drawctx The context passed to image_draw.
+ * @param src_map Pointer to the mapped source buffer.
+ * @param src_stride Stride of the source buffer.
+ * @param dst_map Pointer to the mapped destination buffer.
+ * @param dst_stride Stride of the destination buffer.
+ * @param fillmode Specifies how to fill the destination if source is smaller (repeat, stretch).
+ * @param sx Source X offset (should typically be 0).
+ * @param sy Source Y offset (should typically be 0).
+ * @param sw Source width.
+ * @param sh Source height.
+ * @param dx Destination X offset.
+ * @param dy Destination Y offset.
+ * @param dw Destination width.
+ * @param dh Destination height.
+ * @param image_draw The function pointer to the actual pixel drawing routine.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _mapped_blend(void *drawctx,
               const void *src_map, unsigned int src_stride,
@@ -446,6 +580,16 @@ _mapped_blend(void *drawctx,
    return ret;
 }
 
+/**
+ * @brief Gets the appropriate CPU blend function based on input/output buffer formats.
+ * @param cmd The filter command containing buffer information.
+ * @return A function pointer to the correct Software_Filter_Func, or NULL on error.
+ * @see Software_Filter_Func
+ * @see _filter_blend_cpu_alpha
+ * @see _filter_blend_cpu_alpha_rgba
+ * @see _filter_blend_cpu_rgba_alpha
+ * @see _filter_blend_cpu_rgba
+ */
 Software_Filter_Func
 eng_filter_blend_func_get(Evas_Filter_Command *cmd)
 {

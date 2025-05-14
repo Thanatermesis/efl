@@ -8,17 +8,56 @@
 
 #include "edje_cc.h"
 
+/** @internal
+ * @brief Eet data descriptor for a single source file (SrcFile).
+ * Used for serializing/deserializing SrcFile structures.
+ */
 static Eet_Data_Descriptor *_srcfile_edd = NULL;
+/** @internal
+ * @brief Eet data descriptor for a list of source files (SrcFile_List).
+ * Used for serializing/deserializing SrcFile_List structures.
+ */
 static Eet_Data_Descriptor *_srcfile_list_edd = NULL;
 
+/** @internal
+ * @brief Eet data descriptor for an external resource (External).
+ * Used for serializing/deserializing External structures.
+ */
 static Eet_Data_Descriptor *_external_edd = NULL;
+/** @internal
+ * @brief Eet data descriptor for a list of external resources (External_List).
+ * Used for serializing/deserializing External_List structures.
+ */
 static Eet_Data_Descriptor *_external_list_edd = NULL;
 
+/** @internal
+ * @brief Eet data descriptor for a font entry (Edje_Font).
+ * Used for serializing/deserializing Edje_Font structures.
+ */
 static Eet_Data_Descriptor *_font_edd = NULL;
+/** @internal
+ * @brief Eet data descriptor for a list of font entries (Edje_Font_List).
+ * Used for serializing/deserializing Edje_Font_List structures.
+ */
 static Eet_Data_Descriptor *_font_list_edd = NULL;
 
+/** @internal
+ * @brief Global list holding all source files (main file and included files).
+ * Each element is a SrcFile struct.
+ * Example:
+ * srcfiles.list might contain:
+ *   - SrcFile for "main.edc"
+ *   - SrcFile for "includes/buttons.edci" (if included by main.edc)
+ */
 static SrcFile_List srcfiles = {NULL};
 
+/**
+ * @internal
+ * @brief Initializes all Eet data descriptors related to source files,
+ * externals, and fonts.
+ * This function must be called before any serialization or deserialization
+ * of these data types.
+ */
 void
 source_edd(void)
 {
@@ -44,8 +83,28 @@ source_edd(void)
    _edje_data_font_list_desc_make(&_font_list_edd, &_font_edd);
 }
 
+/**
+ * @internal
+ * @brief Forward declaration for recursive include processing.
+ */
 static void source_fetch_file(const char *fil, const char *filname);
 
+/**
+ * @internal
+ * @brief Reads a source file, stores its content, and recursively processes
+ *        #include directives found within it.
+ *
+ * This function opens the specified file, reads its entire content into
+ * memory, and adds it to the global `srcfiles` list. It then scans the
+ * file line by line for `#include` statements. For each valid include,
+ * it recursively calls itself to process the included file.
+ *
+ * @param fil The full path to the source file to be processed.
+ *            Example: "/path/to/project/themes/default.edc"
+ * @param filname The name of the file as it should be stored (often the
+ *                relative name used in the #include directive).
+ *                Example: "default.edc" or "includes/common.edci"
+ */
 static void
 source_fetch_file(const char *fil, const char *filname)
 {
@@ -193,12 +252,32 @@ source_fetch_file(const char *fil, const char *filname)
    fclose(f);
 }
 
+/**
+ * @internal
+ * @brief Initiates the source file fetching process.
+ *
+ * This function serves as the entry point for reading the main input EDC file
+ * and all its recursively included files. It calls source_fetch_file()
+ * with the main input file path and its base name.
+ */
 void
 source_fetch(void)
 {
    source_fetch_file(file_in, ecore_file_file_get(file_in));
 }
 
+/**
+ * @internal
+ * @brief Writes the collected source file data to an Eet file.
+ *
+ * Serializes the global `srcfiles` list (which contains the content of
+ * the main EDC file and all its includes) into the provided Eet file
+ * under the key "edje_sources".
+ *
+ * @param ef Pointer to the opened Eet_File to write to.
+ * @return Returns 1 on success, 0 on failure.
+ *         (Corresponds to eet_data_write return value).
+ */
 int
 source_append(Eet_File *ef)
 {
@@ -206,6 +285,24 @@ source_append(Eet_File *ef)
                          compress_mode);
 }
 
+/**
+ * @internal
+ * @brief Loads source file data from an Eet file.
+ *
+ * Deserializes the source file list (SrcFile_List) stored under the key
+ * "edje_sources" from the provided Eet file.
+ *
+ * @param ef Pointer to the opened Eet_File to read from.
+ * @return A pointer to the loaded SrcFile_List structure, or NULL on failure.
+ *         The caller is responsible for freeing the returned structure if not NULL.
+ *         Example of returned structure:
+ *         SrcFile_List {
+ *           list: Eina_List of SrcFile* {
+ *             SrcFile { name: "main.edc", file: "content of main.edc..." },
+ *             SrcFile { name: "include1.edci", file: "content of include1.edci..." }
+ *           }
+ *         }
+ */
 SrcFile_List *
 source_load(Eet_File *ef)
 {
@@ -215,6 +312,23 @@ source_load(Eet_File *ef)
    return s;
 }
 
+/**
+ * @internal
+ * @brief Saves the font map (list of font names and their file paths) to an Eet file.
+ *
+ * Serializes the provided list of fonts into the Eet file under the key
+ * "edje_source_fontmap".
+ *
+ * @param ef Pointer to the opened Eet_File to write to.
+ * @param font_list An Eina_List where each item is an Edje_Font struct
+ *                  (or compatible, as handled by _font_edd).
+ *                  Example:
+ *                  font_list might contain:
+ *                    - Edje_Font { name: "Sans", file: "/usr/share/fonts/TTF/DejaVuSans.ttf" }
+ *                    - Edje_Font { name: "Mono", file: "/usr/share/fonts/TTF/DejaVuSansMono.ttf" }
+ * @return Returns 1 on success, 0 on failure.
+ *         (Corresponds to eet_data_write return value).
+ */
 int
 source_fontmap_save(Eet_File *ef, Eina_List *font_list)
 {
@@ -225,6 +339,24 @@ source_fontmap_save(Eet_File *ef, Eina_List *font_list)
                          compress_mode);
 }
 
+/**
+ * @internal
+ * @brief Loads the font map from an Eet file.
+ *
+ * Deserializes the font list (Edje_Font_List) stored under the key
+ * "edje_source_fontmap" from the provided Eet file.
+ *
+ * @param ef Pointer to the opened Eet_File to read from.
+ * @return A pointer to the loaded Edje_Font_List structure, or NULL on failure.
+ *         The caller is responsible for freeing the returned structure if not NULL.
+ *         Example of returned structure:
+ *         Edje_Font_List {
+ *           list: Eina_List of Edje_Font* {
+ *             Edje_Font { name: "Sans", file: "/usr/share/fonts/TTF/DejaVuSans.ttf" },
+ *             Edje_Font { name: "Mono", file: "/usr/share/fonts/TTF/DejaVuSansMono.ttf" }
+ *           }
+ *         }
+ */
 Edje_Font_List *
 source_fontmap_load(Eet_File *ef)
 {

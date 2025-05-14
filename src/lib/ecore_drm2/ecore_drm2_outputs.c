@@ -19,6 +19,16 @@ static const char *conn_types[] =
    "DisplayPort", "HDMI-A", "HDMI-B", "TV", "eDP", "Virtual", "DSI",
 };
 
+/**
+ * @internal
+ * @brief Prints debug information for an output.
+ *
+ * This function logs various properties of the given Ecore_Drm2_Output
+ * and its associated drmModeConnector.
+ *
+ * @param output The Ecore_Drm2_Output to debug.
+ * @param conn The drmModeConnector associated with the output.
+ */
 static void
 _output_debug(Ecore_Drm2_Output *output, const drmModeConnector *conn)
 {
@@ -70,6 +80,17 @@ _output_debug(Ecore_Drm2_Output *output, const drmModeConnector *conn)
      }
 }
 
+/**
+ * @internal
+ * @brief Frees an Ecore_Drm2_Event_Output_Changed event.
+ *
+ * This function is a callback used by the ecore event system to free
+ * the memory allocated for an Ecore_Drm2_Event_Output_Changed event,
+ * including its stringshared members.
+ *
+ * @param data User data (unused).
+ * @param event The event to free.
+ */
 static void
 _cb_output_event_free(void *data EINA_UNUSED, void *event)
 {
@@ -82,6 +103,16 @@ _cb_output_event_free(void *data EINA_UNUSED, void *event)
    free(ev);
 }
 
+/**
+ * @internal
+ * @brief Sends an ECORE_DRM2_EVENT_OUTPUT_CHANGED event.
+ *
+ * This function creates and populates an Ecore_Drm2_Event_Output_Changed
+ * event based on the current state of the given Ecore_Drm2_Output,
+ * and then adds it to the ecore event queue.
+ *
+ * @param output The Ecore_Drm2_Output whose state has changed.
+ */
 static void
 _output_event_send(Ecore_Drm2_Output *output)
 {
@@ -124,6 +155,18 @@ _output_event_send(Ecore_Drm2_Output *output)
                    _cb_output_event_free, NULL);
 }
 
+/**
+ * @internal
+ * @brief Parses a string from EDID data.
+ *
+ * This function extracts a string from a given EDID data block,
+ * ensuring it's null-terminated and printable. Non-printable
+ * characters are replaced with '-'. If too many characters are
+ * non-printable, the string is considered invalid and emptied.
+ *
+ * @param data Pointer to the EDID data block (13 bytes expected, 12 for string + null).
+ * @param text Output buffer to store the parsed string (should be at least 13 bytes).
+ */
 static void
 _output_edid_parse_string(const uint8_t *data, char text[])
 {
@@ -152,6 +195,18 @@ _output_edid_parse_string(const uint8_t *data, char text[])
    if (rep > 4) text[0] = '\0';
 }
 
+/**
+ * @internal
+ * @brief Parses EDID data for an output.
+ *
+ * This function extracts PNP ID, serial number, monitor name, and EISA ID
+ * from the raw EDID data.
+ *
+ * @param output The Ecore_Drm2_Output to populate with EDID information.
+ * @param data Pointer to the raw EDID data.
+ * @param len Length of the EDID data.
+ * @return 0 on success, -1 on failure (e.g., invalid EDID header).
+ */
 static int
 _output_edid_parse(Ecore_Drm2_Output *output, const uint8_t *data, size_t len)
 {
@@ -191,6 +246,15 @@ _output_edid_parse(Ecore_Drm2_Output *output, const uint8_t *data, size_t len)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Finds and parses EDID information for an output using atomic KMS state.
+ *
+ * This function retrieves EDID data from the connector's atomic state
+ * and then parses it to populate the output's make, model, and serial.
+ *
+ * @param output The Ecore_Drm2_Output to update.
+ */
 static void
 _output_edid_atomic_find(Ecore_Drm2_Output *output)
 {
@@ -211,6 +275,16 @@ _output_edid_atomic_find(Ecore_Drm2_Output *output)
      }
 }
 
+/**
+ * @internal
+ * @brief Finds and parses EDID information for an output using legacy KMS.
+ *
+ * This function retrieves the EDID blob property from the connector,
+ * parses it, and updates the output's make, model, and serial.
+ *
+ * @param output The Ecore_Drm2_Output to update.
+ * @param conn The drmModeConnector associated with the output.
+ */
 static void
 _output_edid_find(Ecore_Drm2_Output *output, const drmModeConnector *conn)
 {
@@ -249,6 +323,18 @@ _output_edid_find(Ecore_Drm2_Output *output, const drmModeConnector *conn)
    sym_drmModeFreePropertyBlob(blob);
 }
 
+/**
+ * @internal
+ * @brief Finds a suitable CRTC index for a given connector.
+ *
+ * This function iterates through the encoders associated with the connector
+ * to find a connected CRTC. It prioritizes connected connectors.
+ *
+ * @param res Pointer to drmModeRes (DRM resources).
+ * @param conn Pointer to drmModeConnector.
+ * @param fd File descriptor for the DRM device.
+ * @return The index of the CRTC in res->crtcs on success, or -1 if no suitable CRTC is found.
+ */
 static int
 _output_crtc_find(const drmModeRes *res, const drmModeConnector *conn, int fd)
 {
@@ -281,6 +367,17 @@ _output_crtc_find(const drmModeRes *res, const drmModeConnector *conn, int fd)
    return -1;
 }
 
+/**
+ * @internal
+ * @brief Generates a name for an output.
+ *
+ * The name is generated based on the connector type and its ID,
+ * e.g., "HDMI-A-1", "DP-1".
+ *
+ * @param conn The drmModeConnector.
+ * @return A newly allocated string containing the output name.
+ *         The caller is responsible for freeing this string.
+ */
 static char *
 _output_name_get(const drmModeConnector *conn)
 {
@@ -296,6 +393,18 @@ _output_name_get(const drmModeConnector *conn)
    return strdup(name);
 }
 
+/**
+ * @internal
+ * @brief Creates and adds an Ecore_Drm2_Output_Mode to an output.
+ *
+ * This function converts a drmModeModeInfo structure into an
+ * Ecore_Drm2_Output_Mode, calculates the refresh rate, and appends
+ * it to the output's list of modes.
+ *
+ * @param output The Ecore_Drm2_Output to add the mode to.
+ * @param info The drmModeModeInfo describing the mode.
+ * @return A pointer to the newly created Ecore_Drm2_Output_Mode, or NULL on failure.
+ */
 static Ecore_Drm2_Output_Mode *
 _output_mode_add(Ecore_Drm2_Output *output, const drmModeModeInfo *info)
 {
@@ -334,6 +443,18 @@ _output_mode_add(Ecore_Drm2_Output *output, const drmModeModeInfo *info)
    return mode;
 }
 
+/**
+ * @internal
+ * @brief Creates and populates the list of modes for an output.
+ *
+ * This function retrieves all modes reported by the connector and
+ * the current mode from the CRTC. It then determines the current,
+ * preferred, and best available mode for the output.
+ *
+ * @param dev The Ecore_Drm2_Device.
+ * @param output The Ecore_Drm2_Output to populate with modes.
+ * @param conn The drmModeConnector associated with the output.
+ */
 static void
 _output_modes_create(Ecore_Drm2_Device *dev, Ecore_Drm2_Output *output, const drmModeConnector *conn)
 {
@@ -393,6 +514,18 @@ err:
      free(omode);
 }
 
+/**
+ * @internal
+ * @brief Gets the DPMS property for a connector.
+ *
+ * This function iterates through the connector's properties to find
+ * the "DPMS" property.
+ *
+ * @param fd File descriptor for the DRM device.
+ * @param conn The drmModeConnector.
+ * @return A pointer to the drmModePropertyPtr for DPMS, or NULL if not found.
+ *         The caller is responsible for freeing the property if not NULL.
+ */
 static drmModePropertyPtr
 _output_dpms_property_get(int fd, const drmModeConnector *conn)
 {
@@ -412,6 +545,17 @@ _output_dpms_property_get(int fd, const drmModeConnector *conn)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Gets a backlight attribute value.
+ *
+ * Reads a specific attribute (e.g., "max_brightness", "brightness")
+ * from the backlight sysfs path associated with the output.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @param attr The backlight attribute to read.
+ * @return The value of the attribute as a double, or 0.0 on error or if not found.
+ */
 static double
 _output_backlight_value_get(Ecore_Drm2_Output *output, const char *attr)
 {
@@ -429,6 +573,17 @@ _output_backlight_value_get(Ecore_Drm2_Output *output, const char *attr)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Initializes backlight information for an output.
+ *
+ * This function searches for a suitable backlight device in sysfs
+ * based on the connector type. If found, it stores the backlight
+ * type, path, max brightness, and current brightness in the output structure.
+ *
+ * @param output The Ecore_Drm2_Output to initialize backlight for.
+ * @param conn_type The connector type (e.g., DRM_MODE_CONNECTOR_LVDS, DRM_MODE_CONNECTOR_eDP).
+ */
 static void
 _output_backlight_init(Ecore_Drm2_Output *output, unsigned int conn_type)
 {
@@ -474,6 +629,18 @@ _output_backlight_init(Ecore_Drm2_Output *output, unsigned int conn_type)
      eina_stringshare_del(dev);
 }
 
+/**
+ * @internal
+ * @brief Initializes the scale and transform for an output.
+ *
+ * Sets the initial transform and scale for the output. It also adjusts
+ * the output's logical width (output->w) and height (output->h) based
+ * on the transform and scale, if the output is enabled and has a current mode.
+ *
+ * @param output The Ecore_Drm2_Output to initialize.
+ * @param transform The initial Ecore_Drm2_Transform to apply.
+ * @param scale The initial scale factor (e.g., 1, 2).
+ */
 static void
 _output_scale_init(Ecore_Drm2_Output *output, Ecore_Drm2_Transform transform, unsigned int scale)
 {
@@ -507,6 +674,18 @@ _output_scale_init(Ecore_Drm2_Output *output, Ecore_Drm2_Transform transform, un
    output->h /= scale;
 }
 
+/**
+ * @internal
+ * @brief Applies a 2D rotation to an Eina_Matrix3.
+ *
+ * This helper function effectively multiplies the given 3x3 matrix by a
+ * 2D rotation matrix defined by (x, y) and (-y, x) for its first two columns.
+ * It achieves this by converting to 4x4 matrices for multiplication.
+ *
+ * @param matrix The Eina_Matrix3 to rotate.
+ * @param x The x component of the first basis vector of the rotation.
+ * @param y The y component of the first basis vector of the rotation.
+ */
 static void
 _output_matrix_rotate_xy(Eina_Matrix3 *matrix, double x, double y)
 {
@@ -521,6 +700,24 @@ _output_matrix_rotate_xy(Eina_Matrix3 *matrix, double x, double y)
    eina_matrix4_matrix3_to(matrix, &m);
 }
 
+/**
+ * @internal
+ * @brief Updates the transformation matrix for an output.
+ *
+ * This function calculates the 4x4 transformation matrix (`output->matrix`)
+ * and its inverse (`output->inverse`) based on the output's position (x, y),
+ * logical width (w), logical height (h), transform (rotation/flip), and scale.
+ * This matrix can be used to convert coordinates from output space to
+ * screen space.
+ *
+ * The matrix is built by:
+ * 1. Translating by -output->x, -output->y.
+ * 2. Applying flip-specific translation (if flipped).
+ * 3. Applying rotation-specific translation and rotation.
+ * 4. Applying scaling.
+ *
+ * @param output The Ecore_Drm2_Output whose matrix needs updating.
+ */
 static void
 _output_matrix_update(Ecore_Drm2_Output *output)
 {
@@ -572,6 +769,18 @@ _output_matrix_update(Ecore_Drm2_Output *output)
    eina_matrix4_inverse(&output->inverse, &output->matrix);
 }
 
+/**
+ * @internal
+ * @brief Duplicates an Ecore_Drm2_Crtc_State structure.
+ *
+ * Allocates memory for a new Ecore_Drm2_Crtc_State and copies the
+ * content of the provided state into it.
+ *
+ * @param state The Ecore_Drm2_Crtc_State to duplicate.
+ * @return A pointer to the newly allocated and copied Ecore_Drm2_Crtc_State,
+ *         or NULL on allocation failure. The caller is responsible for freeing
+ *         the returned state.
+ */
 static Ecore_Drm2_Crtc_State *
 _atomic_state_crtc_duplicate(Ecore_Drm2_Crtc_State *state)
 {
@@ -585,6 +794,19 @@ _atomic_state_crtc_duplicate(Ecore_Drm2_Crtc_State *state)
    return cstate;
 }
 
+/**
+ * @internal
+ * @brief Retrieves a copy of a CRTC state by ID from an atomic state snapshot.
+ *
+ * Searches through the CRTC states in the given Ecore_Drm2_Atomic_State
+ * for one matching the specified CRTC ID. If found, a duplicate of that
+ * state is returned.
+ *
+ * @param state The Ecore_Drm2_Atomic_State containing various KMS object states.
+ * @param id The CRTC object ID to search for.
+ * @return A pointer to a duplicated Ecore_Drm2_Crtc_State if found,
+ *         otherwise NULL. The caller is responsible for freeing the returned state.
+ */
 static Ecore_Drm2_Crtc_State *
 _output_crtc_state_get(Ecore_Drm2_Atomic_State *state, unsigned int id)
 {
@@ -601,6 +823,18 @@ _output_crtc_state_get(Ecore_Drm2_Atomic_State *state, unsigned int id)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Duplicates an Ecore_Drm2_Connector_State structure.
+ *
+ * Allocates memory for a new Ecore_Drm2_Connector_State and copies the
+ * content of the provided state into it.
+ *
+ * @param state The Ecore_Drm2_Connector_State to duplicate.
+ * @return A pointer to the newly allocated and copied Ecore_Drm2_Connector_State,
+ *         or NULL on allocation failure. The caller is responsible for freeing
+ *         the returned state.
+ */
 static Ecore_Drm2_Connector_State *
 _atomic_state_conn_duplicate(Ecore_Drm2_Connector_State *state)
 {
@@ -614,6 +848,19 @@ _atomic_state_conn_duplicate(Ecore_Drm2_Connector_State *state)
    return cstate;
 }
 
+/**
+ * @internal
+ * @brief Retrieves a copy of a connector state by ID from an atomic state snapshot.
+ *
+ * Searches through the connector states in the given Ecore_Drm2_Atomic_State
+ * for one matching the specified connector ID. If found, a duplicate of that
+ * state is returned.
+ *
+ * @param state The Ecore_Drm2_Atomic_State containing various KMS object states.
+ * @param id The connector object ID to search for.
+ * @return A pointer to a duplicated Ecore_Drm2_Connector_State if found,
+ *         otherwise NULL. The caller is responsible for freeing the returned state.
+ */
 static Ecore_Drm2_Connector_State *
 _output_conn_state_get(Ecore_Drm2_Atomic_State *state, unsigned int id)
 {
@@ -630,6 +877,18 @@ _output_conn_state_get(Ecore_Drm2_Atomic_State *state, unsigned int id)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Duplicates an Ecore_Drm2_Plane_State structure.
+ *
+ * Allocates memory for a new Ecore_Drm2_Plane_State and copies the
+ * content of the provided state into it.
+ *
+ * @param state The Ecore_Drm2_Plane_State to duplicate.
+ * @return A pointer to the newly allocated and copied Ecore_Drm2_Plane_State,
+ *         or NULL on allocation failure. The caller is responsible for freeing
+ *         the returned state.
+ */
 static Ecore_Drm2_Plane_State *
 _atomic_state_plane_duplicate(Ecore_Drm2_Plane_State *state)
 {
@@ -643,6 +902,22 @@ _atomic_state_plane_duplicate(Ecore_Drm2_Plane_State *state)
    return pstate;
 }
 
+/**
+ * @internal
+ * @brief Retrieves copies of plane states associated with a CRTC from an atomic state snapshot.
+ *
+ * Searches through the plane states in the given Ecore_Drm2_Atomic_State.
+ * It collects duplicates of plane states that are either directly assigned to
+ * the given `crtc_id` or whose `possible_crtcs` mask includes the CRTC
+ * indicated by `index`.
+ *
+ * @param state The Ecore_Drm2_Atomic_State containing various KMS object states.
+ * @param crtc_id The CRTC object ID to filter planes for.
+ * @param index The index of the CRTC (used for checking `possible_crtcs` mask).
+ * @return An Eina_List of duplicated Ecore_Drm2_Plane_State structures.
+ *         The caller is responsible for freeing the list and its contents.
+ *         Returns NULL if no matching planes are found or on allocation failure.
+ */
 static Eina_List *
 _output_plane_states_get(Ecore_Drm2_Atomic_State *state, unsigned int crtc_id, int index)
 {
@@ -669,6 +944,26 @@ _output_plane_states_get(Ecore_Drm2_Atomic_State *state, unsigned int crtc_id, i
    return states;
 }
 
+/**
+ * @internal
+ * @brief Creates and initializes a new Ecore_Drm2_Output.
+ *
+ * This function allocates and sets up an Ecore_Drm2_Output structure based on
+ * the provided DRM resources and connector information. It finds a CRTC,
+ * sets up basic properties (name, make, model, physical size, subpixel order),
+ * initializes modes, EDID, backlight, DPMS, gamma, scale, and transform.
+ * If atomic mode setting is used, it also retrieves initial CRTC, connector,
+ * and plane states.
+ *
+ * @param dev The Ecore_Drm2_Device.
+ * @param res DRM resources (drmModeRes).
+ * @param conn The drmModeConnector for this output.
+ * @param x The initial X position of the output.
+ * @param y The initial Y position of the output.
+ * @param[out] w Pointer to store the width of the output's current mode (optional).
+ * @param cloned EINA_TRUE if this output is a clone of another.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _output_create(Ecore_Drm2_Device *dev, const drmModeRes *res, const drmModeConnector *conn, int x, int y, int *w, Eina_Bool cloned)
 {
@@ -781,6 +1076,17 @@ _output_create(Ecore_Drm2_Device *dev, const drmModeRes *res, const drmModeConne
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Finds an Ecore_Drm2_Output by its connector ID.
+ *
+ * Iterates through the list of outputs in the Ecore_Drm2_Device
+ * to find an output matching the given connector ID.
+ *
+ * @param dev The Ecore_Drm2_Device.
+ * @param id The connector ID to search for.
+ * @return A pointer to the Ecore_Drm2_Output if found, otherwise NULL.
+ */
 static Ecore_Drm2_Output *
 _output_find_by_con(Ecore_Drm2_Device *dev, uint32_t id)
 {
@@ -793,6 +1099,19 @@ _output_find_by_con(Ecore_Drm2_Device *dev, uint32_t id)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Updates the state of all outputs for a device.
+ *
+ * This function is typically called in response to a hotplug event.
+ * It refreshes the DRM resources, identifies connected connectors,
+ * creates new Ecore_Drm2_Output instances for newly connected outputs,
+ * and updates the connected/enabled status of existing outputs.
+ * An ECORE_DRM2_EVENT_OUTPUT_CHANGED event is sent for each output
+ * whose state might have changed.
+ *
+ * @param dev The Ecore_Drm2_Device whose outputs need updating.
+ */
 static void
 _outputs_update(Ecore_Drm2_Device *dev)
 {
@@ -871,6 +1190,19 @@ next:
    free(connected);
 }
 
+/**
+ * @internal
+ * @brief Callback for udev output events (hotplug).
+ *
+ * This function is triggered by eeze when a DRM-related udev event occurs
+ * (e.g., monitor connected or disconnected). It calls _outputs_update
+ * to refresh the output list and their states.
+ *
+ * @param device The udev device path (unused).
+ * @param event The type of udev event (unused).
+ * @param data User data, expected to be an Ecore_Drm2_Device pointer.
+ * @param watch The eeze udev watch (unused).
+ */
 static void
 _cb_output_event(const char *device EINA_UNUSED, Eeze_Udev_Event event EINA_UNUSED, void *data, Eeze_Udev_Watch *watch EINA_UNUSED)
 {
@@ -880,6 +1212,17 @@ _cb_output_event(const char *device EINA_UNUSED, Eeze_Udev_Event event EINA_UNUS
    _outputs_update(dev);
 }
 
+/**
+ * @internal
+ * @brief Destroys an Ecore_Drm2_Output instance.
+ *
+ * Frees all resources associated with an Ecore_Drm2_Output, including
+ * atomic state information (if used), mode list, backlight path,
+ * stringshared names, EDID blob, DPMS property, and the output structure itself.
+ *
+ * @param dev The Ecore_Drm2_Device (unused, but part of a potential callback signature).
+ * @param output The Ecore_Drm2_Output to destroy.
+ */
 static void
 _output_destroy(Ecore_Drm2_Device *dev EINA_UNUSED, Ecore_Drm2_Output *output)
 {
@@ -924,8 +1267,19 @@ _output_destroy(Ecore_Drm2_Device *dev EINA_UNUSED, Ecore_Drm2_Output *output)
    free(output);
 }
 
-/* this function is used to indicate if we are in a multi-gpu situation
- * and need to calculate vblank sync with high crtc mask */
+/**
+ * @internal
+ * @brief Determines the vblank flags based on the output's CRTC pipe.
+ *
+ * This function is used to select the correct vblank flags for DRM calls,
+ * particularly in multi-GPU or multi-CRTC scenarios.
+ * - If pipe > 1, it uses DRM_VBLANK_HIGH_CRTC_MASK.
+ * - If pipe == 1, it uses DRM_VBLANK_SECONDARY.
+ * - If pipe == 0 (or less), it uses 0 (primary or default).
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return The DRM vblank flags appropriate for the output's pipe.
+ */
 static unsigned int
 _output_vblank_pipe(Ecore_Drm2_Output *output)
 {
@@ -938,6 +1292,19 @@ _output_vblank_pipe(Ecore_Drm2_Output *output)
      return 0;
 }
 
+/**
+ * @brief Creates and initializes all outputs for a DRM device.
+ *
+ * This function discovers all available connectors on the DRM device,
+ * creates an Ecore_Drm2_Output for each connected one, and initializes them.
+ * It also sets up a udev watch for hotplug events.
+ *
+ * @param device The Ecore_Drm2_Device to create outputs for.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ *
+ * @see _output_create()
+ * @see _cb_output_event()
+ */
 EAPI Eina_Bool
 ecore_drm2_outputs_create(Ecore_Drm2_Device *device)
 {
@@ -994,6 +1361,17 @@ err:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Destroys all outputs associated with a DRM device.
+ *
+ * This function iterates through all Ecore_Drm2_Output instances
+ * managed by the device and calls _output_destroy() for each one.
+ * It also cleans up the udev watch if present.
+ *
+ * @param device The Ecore_Drm2_Device whose outputs are to be destroyed.
+ *
+ * @see _output_destroy()
+ */
 EAPI void
 ecore_drm2_outputs_destroy(Ecore_Drm2_Device *device)
 {
@@ -1005,6 +1383,26 @@ ecore_drm2_outputs_destroy(Ecore_Drm2_Device *device)
      _output_destroy(device, output);
 }
 
+/**
+ * @brief Gets the list of outputs for a DRM device.
+ *
+ * @param device The Ecore_Drm2_Device.
+ * @return A const Eina_List of Ecore_Drm2_Output pointers.
+ *         The list is owned by the device and should not be modified or freed.
+ *         Returns NULL if the device is NULL.
+ *
+ * Example:
+ * @code
+ * Ecore_Drm2_Device *dev = ecore_drm2_device_open(...);
+ * const Eina_List *outputs = ecore_drm2_outputs_get(dev);
+ * Ecore_Drm2_Output *output;
+ * Eina_List *l;
+ * EINA_LIST_FOREACH(outputs, l, output)
+ *   {
+ *      // Do something with output
+ *   }
+ * @endcode
+ */
 EAPI const Eina_List *
 ecore_drm2_outputs_get(Ecore_Drm2_Device *device)
 {
@@ -1012,6 +1410,13 @@ ecore_drm2_outputs_get(Ecore_Drm2_Device *device)
    return device->outputs;
 }
 
+/**
+ * @brief Gets the current DPMS (Display Power Management Signaling) level of an output.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return The DPMS level (e.g., DRM_MODE_DPMS_ON, DRM_MODE_DPMS_STANDBY,
+ *         DRM_MODE_DPMS_SUSPEND, DRM_MODE_DPMS_OFF), or -1 on error.
+ */
 EAPI int
 ecore_drm2_output_dpms_get(Ecore_Drm2_Output *output)
 {
@@ -1043,6 +1448,16 @@ ecore_drm2_output_dpms_get(Ecore_Drm2_Output *output)
    return val;
 }
 
+/**
+ * @brief Sets the DPMS (Display Power Management Signaling) level of an output.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @param level The desired DPMS level (e.g., DRM_MODE_DPMS_ON,
+ *              DRM_MODE_DPMS_OFF).
+ *
+ * If setting DPMS to ON (level 0), this function may also trigger a flip
+ * to ensure the display is active.
+ */
 EAPI void
 ecore_drm2_output_dpms_set(Ecore_Drm2_Output *output, int level)
 {
@@ -1056,6 +1471,19 @@ ecore_drm2_output_dpms_set(Ecore_Drm2_Output *output, int level)
      ecore_drm2_fb_flip(NULL, output);
 }
 
+/**
+ * @brief Gets the EDID (Extended Display Identification Data) of an output as a hex string.
+ *
+ * Retrieves the raw EDID data (first 128 bytes) associated with the output
+ * and converts it into a hexadecimal string.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return A newly allocated string containing the EDID data in hexadecimal format (256 characters + null terminator).
+ *         The caller is responsible for freeing this string.
+ *         Returns NULL on error or if EDID data is unavailable.
+ *
+ * Example return value: "00ffffffffffff00..." (256 hex characters)
+ */
 EAPI char *
 ecore_drm2_output_edid_get(Ecore_Drm2_Output *output)
 {
@@ -1096,6 +1524,13 @@ ecore_drm2_output_edid_get(Ecore_Drm2_Output *output)
    return edid_str;
 }
 
+/**
+ * @brief Checks if an output has an associated backlight control.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return EINA_TRUE if a backlight control path is available for this output,
+ *         EINA_FALSE otherwise.
+ */
 EAPI Eina_Bool
 ecore_drm2_output_backlight_get(Ecore_Drm2_Output *output)
 {
@@ -1103,6 +1538,18 @@ ecore_drm2_output_backlight_get(Ecore_Drm2_Output *output)
    return (output->backlight.path != NULL);
 }
 
+/**
+ * @brief Finds an enabled output that contains the given screen coordinates.
+ *
+ * Iterates through the enabled outputs of the device and checks if the
+ * point (x, y) falls within the output's current mode dimensions and position.
+ *
+ * @param device The Ecore_Drm2_Device.
+ * @param x The X coordinate.
+ * @param y The Y coordinate.
+ * @return A pointer to the Ecore_Drm2_Output containing the coordinates,
+ *         or NULL if no such enabled output is found.
+ */
 EAPI Ecore_Drm2_Output *
 ecore_drm2_output_find(Ecore_Drm2_Device *device, int x, int y)
 {
@@ -1129,6 +1576,16 @@ ecore_drm2_output_find(Ecore_Drm2_Device *device, int x, int y)
    return NULL;
 }
 
+/**
+ * @brief Gets the DPI (Dots Per Inch) of an output.
+ *
+ * Calculates the horizontal and vertical DPI based on the output's
+ * current mode resolution and physical dimensions (from EDID).
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @param[out] xdpi Pointer to store the horizontal DPI. Can be NULL.
+ * @param[out] ydpi Pointer to store the vertical DPI. Can be NULL.
+ */
 EAPI void
 ecore_drm2_output_dpi_get(Ecore_Drm2_Output *output, int *xdpi, int *ydpi)
 {
@@ -1142,6 +1599,12 @@ ecore_drm2_output_dpi_get(Ecore_Drm2_Output *output, int *xdpi, int *ydpi)
      *ydpi = ((25.4 * (output->current_mode->height)) / output->ph);
 }
 
+/**
+ * @brief Gets the CRTC ID associated with an output.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return The CRTC ID, or 0 if output is NULL.
+ */
 EAPI unsigned int
 ecore_drm2_output_crtc_get(Ecore_Drm2_Output *output)
 {
@@ -1149,6 +1612,18 @@ ecore_drm2_output_crtc_get(Ecore_Drm2_Output *output)
    return output->crtc_id;
 }
 
+/**
+ * @brief Gets the most recently submitted or active framebuffer for an output.
+ *
+ * This function checks for framebuffers in the following order:
+ * 1. Pending framebuffer (submitted but not yet flipped to).
+ * 2. Current framebuffer (currently being displayed).
+ * 3. Next framebuffer (prepared for the next flip, if different from pending).
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return A pointer to the Ecore_Drm2_Fb, or NULL if no framebuffer is associated
+ *         or output is NULL.
+ */
 EAPI Ecore_Drm2_Fb *
 ecore_drm2_output_latest_fb_get(Ecore_Drm2_Output *output)
 {
@@ -1158,6 +1633,12 @@ ecore_drm2_output_latest_fb_get(Ecore_Drm2_Output *output)
    return output->next.fb;
 }
 
+/**
+ * @brief Gets whether an output is marked as primary.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return EINA_TRUE if the output is primary, EINA_FALSE otherwise or if output is NULL.
+ */
 EAPI Eina_Bool
 ecore_drm2_output_primary_get(Ecore_Drm2_Output *output)
 {
@@ -1165,6 +1646,15 @@ ecore_drm2_output_primary_get(Ecore_Drm2_Output *output)
    return output->primary;
 }
 
+/**
+ * @brief Sets an output as primary or not.
+ *
+ * Note: This function only sets a flag. The caller is responsible for
+ * ensuring that only one output is primary if such a constraint is desired.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @param primary EINA_TRUE to mark as primary, EINA_FALSE otherwise.
+ */
 EAPI void
 ecore_drm2_output_primary_set(Ecore_Drm2_Output *output, Eina_Bool primary)
 {
@@ -1172,6 +1662,14 @@ ecore_drm2_output_primary_set(Ecore_Drm2_Output *output, Eina_Bool primary)
    output->primary = primary;
 }
 
+/**
+ * @brief Gets whether an output is currently enabled.
+ *
+ * An enabled output is typically connected and has an active mode set.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return EINA_TRUE if the output is enabled, EINA_FALSE otherwise or if output is NULL.
+ */
 EAPI Eina_Bool
 ecore_drm2_output_enabled_get(Ecore_Drm2_Output *output)
 {
@@ -1179,6 +1677,20 @@ ecore_drm2_output_enabled_get(Ecore_Drm2_Output *output)
    return output->enabled;
 }
 
+/**
+ * @brief Enables or disables an output.
+ *
+ * If enabling, sets DPMS to ON.
+ * If disabling:
+ *  - For atomic KMS, it may trigger a flip with a NULL framebuffer to disable.
+ *  - Sets DPMS to OFF.
+ *  - Releases any held framebuffer buffers (current, next, pending).
+ * An ECORE_DRM2_EVENT_OUTPUT_CHANGED event is sent if the state changes.
+ * Does nothing if the output is not connected or already in the desired state.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @param enabled EINA_TRUE to enable, EINA_FALSE to disable.
+ */
 EAPI void
 ecore_drm2_output_enabled_set(Ecore_Drm2_Output *output, Eina_Bool enabled)
 {
@@ -1213,6 +1725,15 @@ ecore_drm2_output_enabled_set(Ecore_Drm2_Output *output, Eina_Bool enabled)
    _output_event_send(output);
 }
 
+/**
+ * @brief Gets the physical size (in millimeters) of an output.
+ *
+ * These values are typically read from the EDID.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @param[out] w Pointer to store the physical width in mm. Can be NULL.
+ * @param[out] h Pointer to store the physical height in mm. Can be NULL.
+ */
 EAPI void
 ecore_drm2_output_physical_size_get(Ecore_Drm2_Output *output, int *w, int *h)
 {
@@ -1225,6 +1746,28 @@ ecore_drm2_output_physical_size_get(Ecore_Drm2_Output *output, int *w, int *h)
    if (h) *h = output->ph;
 }
 
+/**
+ * @brief Gets the list of available modes for an output.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return A const Eina_List of Ecore_Drm2_Output_Mode pointers.
+ *         The list is owned by the output and should not be modified or freed.
+ *         Returns NULL if output is NULL.
+ *
+ * Example:
+ * @code
+ * const Eina_List *modes = ecore_drm2_output_modes_get(output);
+ * Ecore_Drm2_Output_Mode *mode;
+ * Eina_List *l;
+ * EINA_LIST_FOREACH(modes, l, mode)
+ *   {
+ *      int w, h;
+ *      unsigned int refresh, flags;
+ *      ecore_drm2_output_mode_info_get(mode, &w, &h, &refresh, &flags);
+ *      // Use mode info
+ *   }
+ * @endcode
+ */
 EAPI const Eina_List *
 ecore_drm2_output_modes_get(Ecore_Drm2_Output *output)
 {
@@ -1232,6 +1775,15 @@ ecore_drm2_output_modes_get(Ecore_Drm2_Output *output)
    return output->modes;
 }
 
+/**
+ * @brief Gets detailed information about a specific display mode.
+ *
+ * @param mode The Ecore_Drm2_Output_Mode.
+ * @param[out] w Pointer to store the width in pixels. Can be NULL.
+ * @param[out] h Pointer to store the height in pixels. Can be NULL.
+ * @param[out] refresh Pointer to store the refresh rate in Hz. Can be NULL.
+ * @param[out] flags Pointer to store mode flags (e.g., DRM_MODE_TYPE_PREFERRED). Can be NULL.
+ */
 EAPI void
 ecore_drm2_output_mode_info_get(Ecore_Drm2_Output_Mode *mode, int *w, int *h, unsigned int *refresh, unsigned int *flags)
 {
@@ -1248,6 +1800,19 @@ ecore_drm2_output_mode_info_get(Ecore_Drm2_Output_Mode *mode, int *w, int *h, un
    if (flags) *flags = mode->flags;
 }
 
+/**
+ * @internal
+ * @brief Sets the display mode for an output using an atomic KMS commit.
+ *
+ * This function constructs an atomic request to change the mode of the CRTC
+ * associated with the output. If `mode` is NULL, it deactivates the CRTC.
+ * Otherwise, it creates a blob for the new mode info (if not already created)
+ * and sets the CRTC's MODE_ID and ACTIVE properties.
+ *
+ * @param output The Ecore_Drm2_Output whose mode is to be set.
+ * @param mode The Ecore_Drm2_Output_Mode to set. If NULL, the CRTC will be deactivated.
+ * @return EINA_TRUE on successful commit, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _output_mode_atomic_set(Ecore_Drm2_Output *output, Ecore_Drm2_Output_Mode *mode)
 {
@@ -1333,6 +1898,27 @@ err:
    return ret;
 }
 
+/**
+ * @brief Sets the display mode for an output.
+ *
+ * This function changes the active display mode of the specified output.
+ * It also updates the output's logical position (x, y) and its current_mode pointer.
+ *
+ * If `mode` is NULL, this function attempts to turn off the output by setting
+ * a NULL mode on its CRTC.
+ *
+ * Internally, this uses either atomic KMS operations (if `_ecore_drm2_use_atomic` is true)
+ * via `_output_mode_atomic_set`, or legacy `drmModeSetCrtc`.
+ *
+ * @param output The Ecore_Drm2_Output whose mode is to be set.
+ * @param mode The Ecore_Drm2_Output_Mode to set. If NULL, attempts to disable the output.
+ * @param x The new X position for the output.
+ * @param y The new Y position for the output.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ *
+ * @see _output_mode_atomic_set()
+ * @see drmModeSetCrtc()
+ */
 EAPI Eina_Bool
 ecore_drm2_output_mode_set(Ecore_Drm2_Output *output, Ecore_Drm2_Output_Mode *mode, int x, int y)
 {
@@ -1382,6 +1968,16 @@ ecore_drm2_output_mode_set(Ecore_Drm2_Output *output, Ecore_Drm2_Output_Mode *mo
    return ret;
 }
 
+/**
+ * @brief Gets the name of an output.
+ *
+ * The name is typically generated (e.g., "HDMI-A-1", "DP-1").
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return A newly allocated string containing the output's name.
+ *         The caller is responsible for freeing this string.
+ *         Returns NULL if output or its name is NULL.
+ */
 EAPI char *
 ecore_drm2_output_name_get(Ecore_Drm2_Output *output)
 {
@@ -1390,6 +1986,16 @@ ecore_drm2_output_name_get(Ecore_Drm2_Output *output)
    return strdup(output->name);
 }
 
+/**
+ * @brief Gets the model name of an output.
+ *
+ * The model name is typically derived from EDID information.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return A newly allocated string containing the output's model name.
+ *         The caller is responsible for freeing this string.
+ *         Returns NULL if output or its model name is NULL.
+ */
 EAPI char *
 ecore_drm2_output_model_get(Ecore_Drm2_Output *output)
 {
@@ -1398,6 +2004,12 @@ ecore_drm2_output_model_get(Ecore_Drm2_Output *output)
    return strdup(output->model);
 }
 
+/**
+ * @brief Gets whether an output is physically connected.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return EINA_TRUE if the output is connected, EINA_FALSE otherwise or if output is NULL.
+ */
 EAPI Eina_Bool
 ecore_drm2_output_connected_get(Ecore_Drm2_Output *output)
 {
@@ -1405,6 +2017,15 @@ ecore_drm2_output_connected_get(Ecore_Drm2_Output *output)
    return output->connected;
 }
 
+/**
+ * @brief Gets whether an output is considered cloned.
+ *
+ * An output is cloned if its `cloned` flag is set or its
+ * `relative.mode` is ECORE_DRM2_RELATIVE_MODE_CLONE.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return EINA_TRUE if the output is cloned, EINA_FALSE otherwise or if output is NULL.
+ */
 EAPI Eina_Bool
 ecore_drm2_output_cloned_get(Ecore_Drm2_Output *output)
 {
@@ -1413,6 +2034,14 @@ ecore_drm2_output_cloned_get(Ecore_Drm2_Output *output)
            output->relative.mode == ECORE_DRM2_RELATIVE_MODE_CLONE);
 }
 
+/**
+ * @brief Gets the connector type of an output.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return The DRM connector type (e.g., DRM_MODE_CONNECTOR_HDMIA,
+ *         DRM_MODE_CONNECTOR_DisplayPort), or 0 if output is NULL.
+ *         See drm_mode.h for a list of connector types.
+ */
 EAPI unsigned int
 ecore_drm2_output_connector_type_get(Ecore_Drm2_Output *output)
 {
@@ -1420,6 +2049,16 @@ ecore_drm2_output_connector_type_get(Ecore_Drm2_Output *output)
    return output->conn_type;
 }
 
+/**
+ * @brief Checks if a given CRTC can be used by an output.
+ *
+ * This function determines if the specified `crtc` is among the
+ * `possible_crtcs` for any encoder connected to the given `output`.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @param crtc The CRTC ID to check.
+ * @return EINA_TRUE if the CRTC can be used by the output, EINA_FALSE otherwise.
+ */
 EAPI Eina_Bool
 ecore_drm2_output_possible_crtc_get(Ecore_Drm2_Output *output, unsigned int crtc)
 {
@@ -1475,6 +2114,14 @@ next:
    return ret;
 }
 
+/**
+ * @brief Sets user data associated with an output.
+ *
+ * Allows associating arbitrary user-defined data with an Ecore_Drm2_Output.
+ *
+ * @param o The Ecore_Drm2_Output.
+ * @param data Pointer to the user data.
+ */
 EAPI void
 ecore_drm2_output_user_data_set(Ecore_Drm2_Output *o, void *data)
 {
@@ -1483,6 +2130,12 @@ ecore_drm2_output_user_data_set(Ecore_Drm2_Output *o, void *data)
    o->user_data = data;
 }
 
+/**
+ * @brief Gets user data associated with an output.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return Pointer to the user data, or NULL if no data is set or output is NULL.
+ */
 EAPI void *
 ecore_drm2_output_user_data_get(Ecore_Drm2_Output *output)
 {
@@ -1490,6 +2143,25 @@ ecore_drm2_output_user_data_get(Ecore_Drm2_Output *output)
    return output->user_data;
 }
 
+/**
+ * @brief Sets the gamma ramps for an output.
+ *
+ * Applies new gamma correction values to the CRTC associated with the output.
+ * The size of the provided ramps must match the gamma_size supported by the CRTC.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @param size The number of entries in each gamma ramp array.
+ * @param red Array of red channel gamma values.
+ * @param green Array of green channel gamma values.
+ * @param blue Array of blue channel gamma values.
+ *
+ * Example for `red`, `green`, `blue` arrays (size = 256):
+ * @code
+ * uint16_t ramp[256];
+ * for (int i = 0; i < 256; i++) ramp[i] = (i << 8) | i; // Linear ramp
+ * ecore_drm2_output_gamma_set(output, 256, ramp, ramp, ramp);
+ * @endcode
+ */
 EAPI void
 ecore_drm2_output_gamma_set(Ecore_Drm2_Output *output, uint16_t size, uint16_t *red, uint16_t *green, uint16_t *blue)
 {
@@ -1503,6 +2175,27 @@ ecore_drm2_output_gamma_set(Ecore_Drm2_Output *output, uint16_t size, uint16_t *
      ERR("Failed to set gamma for Output %s: %m", output->name);
 }
 
+/**
+ * @brief Gets the supported rotations for an output's primary plane.
+ *
+ * If atomic mode setting is used, this queries the `IN_FORMATS` property
+ * of the primary plane associated with the output to determine supported rotations.
+ * Otherwise, it returns a default set of supported rotations (normal, 90, 180, 270).
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return A bitmask of supported ECORE_DRM2_ROTATION flags
+ *         (e.g., ECORE_DRM2_ROTATION_NORMAL | ECORE_DRM2_ROTATION_90).
+ *         Returns -1 on error or if output is NULL.
+ *
+ * The rotation flags map to DRM_MODE_ROTATE_* and DRM_MODE_REFLECT_* bits.
+ * For example:
+ *  - ECORE_DRM2_ROTATION_NORMAL (1 << 0) -> DRM_MODE_ROTATE_0 (1 << 0)
+ *  - ECORE_DRM2_ROTATION_90   (1 << 1) -> DRM_MODE_ROTATE_90 (1 << 1)
+ *  - ECORE_DRM2_ROTATION_180  (1 << 2) -> DRM_MODE_ROTATE_180 (1 << 2)
+ *  - ECORE_DRM2_ROTATION_270  (1 << 3) -> DRM_MODE_ROTATE_270 (1 << 3)
+ *  - ECORE_DRM2_ROTATION_REFLECT_X (1 << 4) -> DRM_MODE_REFLECT_X (1 << 4)
+ *  - ECORE_DRM2_ROTATION_REFLECT_Y (1 << 5) -> DRM_MODE_REFLECT_Y (1 << 5)
+ */
 EAPI int
 ecore_drm2_output_supported_rotations_get(Ecore_Drm2_Output *output)
 {
@@ -1529,6 +2222,25 @@ ecore_drm2_output_supported_rotations_get(Ecore_Drm2_Output *output)
    return ret;
 }
 
+/**
+ * @brief Sets the rotation for an output.
+ *
+ * This function primarily updates the `output->rotation` field.
+ * Hardware plane rotation via atomic KMS is currently disabled in the code
+ * (see #if 0 block). If it were enabled, it would attempt to set the
+ * 'rotation' property on the primary plane.
+ *
+ * The actual visual rotation is typically handled by software (compositor)
+ * using the value retrieved by `ecore_drm2_output_rotation_get()`.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @param rotation The desired rotation, a bitmask of ECORE_DRM2_ROTATION flags.
+ *                 Only one rotation value (0, 90, 180, 270) should be combined
+ *                 with reflection flags if needed.
+ * @return EINA_TRUE if the rotation value was set internally. If hardware
+ *         rotation were active, it would return EINA_TRUE on successful commit.
+ *         Returns EINA_FALSE if output is NULL.
+ */
 EAPI Eina_Bool
 ecore_drm2_output_rotation_set(Ecore_Drm2_Output *output, int rotation)
 {
@@ -1590,6 +2302,13 @@ err:
    return ret;
 }
 
+/**
+ * @brief Gets the current rotation set for an output.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return The current rotation value (ECORE_DRM2_ROTATION flags),
+ *         or -1 if output is NULL.
+ */
 EAPI int
 ecore_drm2_output_rotation_get(Ecore_Drm2_Output *output)
 {
@@ -1597,6 +2316,23 @@ ecore_drm2_output_rotation_get(Ecore_Drm2_Output *output)
    return output->rotation;
 }
 
+/**
+ * @brief Gets the subpixel order of an output.
+ *
+ * This corresponds to Wayland's wl_output_subpixel enum.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return The subpixel order value (e.g., WL_OUTPUT_SUBPIXEL_HORIZONTAL_RGB),
+ *         or 0 (WL_OUTPUT_SUBPIXEL_UNKNOWN) if output is NULL or unknown.
+ *
+ * Possible return values (matching Wayland):
+ *  - 0: Unknown
+ *  - 1: None
+ *  - 2: Horizontal RGB
+ *  - 3: Horizontal BGR
+ *  - 4: Vertical RGB
+ *  - 5: Vertical BGR
+ */
 EAPI unsigned int
 ecore_drm2_output_subpixel_get(const Ecore_Drm2_Output *output)
 {
@@ -1604,6 +2340,19 @@ ecore_drm2_output_subpixel_get(const Ecore_Drm2_Output *output)
    return output->subpixel;
 }
 
+/**
+ * @internal
+ * @brief Page flip handler for vblank timestamp fallback mechanism.
+ *
+ * This function is called when a page flip event occurs as part of the
+ * `_blanktime_fallback` mechanism. It stores the timestamp of the flip.
+ *
+ * @param fd File descriptor (unused).
+ * @param frame Frame number (unused).
+ * @param sec Seconds part of the timestamp.
+ * @param usec Microseconds part of the timestamp.
+ * @param data User data, expected to be an Ecore_Drm2_Output pointer.
+ */
 static void
 _blank_fallback_handler(int fd EINA_UNUSED, unsigned int frame EINA_UNUSED, unsigned int sec, unsigned int usec, void *data EINA_UNUSED)
 {
@@ -1614,6 +2363,21 @@ _blank_fallback_handler(int fd EINA_UNUSED, unsigned int frame EINA_UNUSED, unsi
    output->fallback_sec = sec;
 }
 
+/**
+ * @internal
+ * @brief Fallback mechanism to get vblank timestamp using a page flip.
+ *
+ * This function is used when `drmWaitVBlank` fails or returns an invalid timestamp.
+ * It attempts to get a timestamp by scheduling a page flip event on the current
+ * framebuffer (if available and no other flip is pending).
+ * This is a workaround for drivers or situations where `drmWaitVBlank` is unreliable.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @param sequence The requested vblank sequence (currently only supports 1).
+ * @param[out] sec Pointer to store the seconds part of the timestamp.
+ * @param[out] usec Pointer to store the microseconds part of the timestamp.
+ * @return 0 on success, -1 on failure.
+ */
 static int
 _blanktime_fallback(Ecore_Drm2_Output *output, int sequence, long *sec, long *usec)
 {
@@ -1648,6 +2412,20 @@ _blanktime_fallback(Ecore_Drm2_Output *output, int sequence, long *sec, long *us
    return 0;
 }
 
+/**
+ * @brief Gets the timestamp of a future vblank event.
+ *
+ * Attempts to get the timestamp for a specified vblank sequence number
+ * using `drmWaitVBlank`. If that fails or returns an invalid timestamp,
+ * it tries a fallback mechanism (`_blanktime_fallback`) which uses a page flip.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @param sequence The desired vblank sequence number (relative to current).
+ *                 Typically 1 for the next vblank.
+ * @param[out] sec Pointer to store the seconds part of the vblank timestamp.
+ * @param[out] usec Pointer to store the microseconds part of the vblank timestamp.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 EAPI Eina_Bool
 ecore_drm2_output_blanktime_get(Ecore_Drm2_Output *output, int sequence, long *sec, long *usec)
 {
@@ -1677,6 +2455,20 @@ ecore_drm2_output_blanktime_get(Ecore_Drm2_Output *output, int sequence, long *s
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets current information about an output's geometry and refresh rate.
+ *
+ * Retrieves the output's current position (x, y), dimensions (width, height),
+ * and refresh rate. The dimensions are adjusted based on the output's rotation
+ * (e.g., for 90/270 degree rotations, width and height are swapped).
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @param[out] x Pointer to store the X position. Can be NULL.
+ * @param[out] y Pointer to store the Y position. Can be NULL.
+ * @param[out] w Pointer to store the width in pixels (adjusted for rotation). Can be NULL.
+ * @param[out] h Pointer to store the height in pixels (adjusted for rotation). Can be NULL.
+ * @param[out] refresh Pointer to store the refresh rate in Hz. Can be NULL.
+ */
 EAPI void
 ecore_drm2_output_info_get(Ecore_Drm2_Output *output, int *x, int *y, int *w, int *h, unsigned int *refresh)
 {
@@ -1709,6 +2501,16 @@ ecore_drm2_output_info_get(Ecore_Drm2_Output *output, int *x, int *y, int *w, in
    if (y) *y = output->y;
 }
 
+/**
+ * @brief Checks if an output has a pending page flip.
+ *
+ * A pending page flip means a framebuffer has been submitted for display
+ * but the display hardware has not yet switched to it.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return EINA_TRUE if there is a pending framebuffer, EINA_FALSE otherwise
+ *         or if output is NULL.
+ */
 EAPI Eina_Bool
 ecore_drm2_output_pending_get(Ecore_Drm2_Output *output)
 {
@@ -1719,6 +2521,16 @@ ecore_drm2_output_pending_get(Ecore_Drm2_Output *output)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Sets the relative positioning mode for an output.
+ *
+ * This is used to describe how an output is positioned relative to another,
+ * e.g., cloned, to the right of, etc. This is typically for higher-level
+ * display configuration logic.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @param mode The Ecore_Drm2_Relative_Mode to set.
+ */
 EAPI void
 ecore_drm2_output_relative_mode_set(Ecore_Drm2_Output *output, Ecore_Drm2_Relative_Mode mode)
 {
@@ -1726,6 +2538,13 @@ ecore_drm2_output_relative_mode_set(Ecore_Drm2_Output *output, Ecore_Drm2_Relati
    output->relative.mode = mode;
 }
 
+/**
+ * @brief Gets the relative positioning mode of an output.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return The Ecore_Drm2_Relative_Mode of the output,
+ *         or ECORE_DRM2_RELATIVE_MODE_UNKNOWN if output is NULL.
+ */
 EAPI Ecore_Drm2_Relative_Mode
 ecore_drm2_output_relative_mode_get(Ecore_Drm2_Output *output)
 {
@@ -1733,6 +2552,16 @@ ecore_drm2_output_relative_mode_get(Ecore_Drm2_Output *output)
    return output->relative.mode;
 }
 
+/**
+ * @brief Sets the name of the output to which this output is positioned relatively.
+ *
+ * Used in conjunction with `ecore_drm2_output_relative_mode_set`.
+ * The `relative` string should be the name of another Ecore_Drm2_Output.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @param relative The name of the output this one is relative to.
+ *                 The string is stringshared.
+ */
 EAPI void
 ecore_drm2_output_relative_to_set(Ecore_Drm2_Output *output, const char *relative)
 {
@@ -1740,6 +2569,13 @@ ecore_drm2_output_relative_to_set(Ecore_Drm2_Output *output, const char *relativ
    eina_stringshare_replace(&output->relative.to, relative);
 }
 
+/**
+ * @brief Gets the name of the output to which this output is positioned relatively.
+ *
+ * @param output The Ecore_Drm2_Output.
+ * @return A const char pointer to the name of the relative output (stringshared).
+ *         Returns NULL if not set or if output is NULL.
+ */
 EAPI const char *
 ecore_drm2_output_relative_to_get(Ecore_Drm2_Output *output)
 {
@@ -1747,6 +2583,28 @@ ecore_drm2_output_relative_to_get(Ecore_Drm2_Output *output)
    return output->relative.to;
 }
 
+/**
+ * @brief Sets the background color for a CRTC using atomic KMS.
+ *
+ * This function updates the 'BACKGROUND' property of the CRTC associated
+ * with the output. The color components are 16-bit values.
+ * This requires atomic mode-setting capabilities and that the CRTC
+ * supports the 'BACKGROUND' property.
+ * After setting the color, it attempts to test the atomic commit.
+ *
+ * @param output The Ecore_Drm2_Output whose CRTC background color is to be set.
+ * @param r Red component (0-65535).
+ * @param g Green component (0-65535).
+ * @param b Blue component (0-65535).
+ * @param a Alpha component (0-65535, typically opaque 65535).
+ * @return EINA_TRUE if the background color property was updated and the atomic test commit
+ *         was successful (or would be successful), EINA_FALSE otherwise (e.g., no atomic state,
+ *         no background property, or commit test failure).
+ *
+ * @note This function relies on `_fb_atomic_flip_test` to apply the change,
+ *       which might not be the most direct way if only background color is changing.
+ *       The actual commit happens as part of a flip operation.
+ */
 EAPI Eina_Bool
 ecore_drm2_output_background_color_set(Ecore_Drm2_Output *output, uint64_t r, uint64_t g, uint64_t b, uint64_t a)
 {

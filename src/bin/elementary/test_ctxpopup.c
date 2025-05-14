@@ -3,14 +3,32 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Global variable to track the mouse down state on the list.
+ * This is used to prevent ctxpopups from opening on mouse up events if a
+ * drag-like motion occurred.
+ */
 static int list_mouse_down = 0;
 
+/**
+ * @brief Callback for the "dismissed" smart event of a ctxpopup.
+ * Deletes the ctxpopup object when it is dismissed.
+ * @param data User data, unused.
+ * @param obj The ctxpopup object that was dismissed.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _dismissed(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    evas_object_del(obj);
 }
 
+/**
+ * @brief Prints the current direction of the ctxpopup.
+ * The direction indicates where the popup appears relative to its parent.
+ * It also prints the auto-hide mode.
+ * @param obj The ctxpopup object.
+ */
 static void
 _print_current_dir(Evas_Object *obj)
 {
@@ -38,6 +56,15 @@ _print_current_dir(Evas_Object *obj)
      printf(" [%s : %d] auto_hide_mode=%d\n", __func__, __LINE__, elm_ctxpopup_auto_hide_disabled_get(obj));
 }
 
+/**
+ * @brief Callback for a button click event.
+ * Toggles the disabled state of the object passed in the @p data parameter.
+ * In this test, it is used to disable/enable the ctxpopup itself from a
+ * button inside its content.
+ * @param data The object to disable/enable (the ctxpopup).
+ * @param obj The button object that was clicked, unused.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _btn_clicked_cb(void *data, Evas_Object *obj EINA_UNUSED,
                 void *event_info EINA_UNUSED)
@@ -46,6 +73,14 @@ _btn_clicked_cb(void *data, Evas_Object *obj EINA_UNUSED,
    elm_object_disabled_set(data, !elm_object_disabled_get(data));
 }
 
+/**
+ * @brief Callback for a button click event to remove an object.
+ * This function deletes the button object itself when clicked.
+ * It's used in a test where a ctxpopup has a button as its content.
+ * @param data User data, unused.
+ * @param obj The button object to be deleted.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _btn_remove_cb(void *data EINA_UNUSED, Evas_Object *obj,
                 void *event_info EINA_UNUSED)
@@ -54,6 +89,13 @@ _btn_remove_cb(void *data EINA_UNUSED, Evas_Object *obj,
    evas_object_del(obj);
 }
 
+/**
+ * @brief Generic callback for ctxpopup item selection.
+ * Prints information about the selected item and then dismisses the ctxpopup.
+ * @param data User data, unused.
+ * @param obj The ctxpopup object.
+ * @param event_info The selected Elm_Object_Item.
+ */
 static void
 _ctxpopup_item_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info)
 {
@@ -64,6 +106,13 @@ _ctxpopup_item_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info)
    elm_ctxpopup_dismiss(obj);
 }
 
+/**
+ * @brief Helper function to create and append a new item to a ctxpopup.
+ * @param obj The ctxpopup object.
+ * @param label The text label for the item.
+ * @param icon The name of a standard icon for the item.
+ * @return The newly created Elm_Object_Item, or NULL on failure.
+ */
 static Elm_Object_Item *
 _ctxpopup_item_new(Evas_Object *obj, const char *label, const char *icon)
 {
@@ -83,6 +132,13 @@ _ctxpopup_item_new(Evas_Object *obj, const char *label, const char *icon)
    return it;
 }
 
+/**
+ * @brief Callback for the "geometry,update" smart event of a ctxpopup.
+ * Prints the new geometry of the ctxpopup.
+ * @param data User data, unused.
+ * @param obj The ctxpopup object, unused.
+ * @param event_info A pointer to an Eina_Rectangle with the new geometry.
+ */
 static void
 _geometry_update(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -90,6 +146,14 @@ _geometry_update(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *eve
    printf("ctxpopup geometry(%d %d %d %d)\n", geom->x, geom->y, geom->w, geom->h);
 }
 
+/**
+ * @brief Callback for selecting the first list item.
+ * Creates a standard ctxpopup with both icons and labels for its items.
+ * One item is pre-selected and another is disabled.
+ * @param data User data, unused.
+ * @param obj The list object.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _list_item_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -120,6 +184,13 @@ _list_item_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UN
    _print_current_dir(ctxpopup);
 }
 
+/**
+ * @brief Callback for selecting the second list item.
+ * Creates a ctxpopup with only icons for its items.
+ * @param data User data, unused.
+ * @param obj The list object.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _list_item_cb2(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -148,6 +219,14 @@ _list_item_cb2(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_U
    _print_current_dir(ctxpopup);
 }
 
+/**
+ * @brief Callback for selecting the third list item.
+ * Creates a ctxpopup with only labels for its items. Also demonstrates
+ * deleting an item immediately after creation.
+ * @param data User data, unused.
+ * @param obj The list object.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _list_item_cb3(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -177,6 +256,13 @@ _list_item_cb3(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_U
    _print_current_dir(ctxpopup);
 }
 
+/**
+ * @brief Callback for selecting the fourth list item.
+ * Creates a horizontal ctxpopup with only icons.
+ * @param data User data, unused.
+ * @param obj The list object.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _list_item_cb4(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -205,6 +291,14 @@ _list_item_cb4(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_U
    _print_current_dir(ctxpopup);
 }
 
+/**
+ * @brief Callback for selecting the fifth list item.
+ * Creates a ctxpopup with custom content: a button inside a scroller.
+ * The button inside can disable/enable the ctxpopup.
+ * @param data User data, unused.
+ * @param obj The list object.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _list_item_cb5(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -244,6 +338,15 @@ _list_item_cb5(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_U
    evas_object_smart_callback_add(btn, "clicked", _btn_clicked_cb, ctxpopup);
 }
 
+/**
+ * @brief Callback for the EVAS_CALLBACK_DEL event on a ctxpopup.
+ * Deletes an associated object when the ctxpopup is deleted.
+ * Used to clean up the image created in the restacking test.
+ * @param data The object to delete (an Evas_Object image).
+ * @param e The Evas canvas, unused.
+ * @param obj The ctxpopup object being deleted, unused.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _ctxpopup_del_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                  void *event_info EINA_UNUSED)
@@ -251,6 +354,15 @@ _ctxpopup_del_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    evas_object_del(data);
 }
 
+/**
+ * @brief Callback for a button click to test object stacking.
+ * Creates an image view and raises the ctxpopup above it, to ensure
+ * the ctxpopup stays on top. Also sets up a callback to delete the
+ * image when the ctxpopup is deleted.
+ * @param data The ctxpopup object.
+ * @param obj The button object that was clicked.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _restack_btn_clicked_cb(void *data, Evas_Object *obj,
                         void *event_info EINA_UNUSED)
@@ -273,6 +385,15 @@ _restack_btn_clicked_cb(void *data, Evas_Object *obj,
                                   _ctxpopup_del_cb, im);
 }
 
+/**
+ * @brief Callback for selecting the sixth list item.
+ * Creates a ctxpopup to test object restacking. The content is a button
+ * that, when clicked, creates an image and ensures the ctxpopup is raised
+ * above it.
+ * @param data User data, unused.
+ * @param obj The list object.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _list_item_cb6(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -313,6 +434,12 @@ _list_item_cb6(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_U
                                   _restack_btn_clicked_cb, ctxpopup);
 }
 
+/**
+ * @brief Callback for a ctxpopup item that disables itself when selected.
+ * @param data User data, unused.
+ * @param obj The ctxpopup object, unused.
+ * @param event_info The selected Elm_Object_Item, which will be disabled.
+ */
 static void
 _ctxpopup_item_disable_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -322,6 +449,12 @@ _ctxpopup_item_disable_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, 
    elm_object_item_disabled_set(event_info, EINA_TRUE);
 }
 
+/**
+ * @brief Callback for a ctxpopup item that deletes the entire ctxpopup when selected.
+ * @param data User data, unused.
+ * @param obj The ctxpopup object to be deleted.
+ * @param event_info The selected Elm_Object_Item.
+ */
 static void
 _ctxpopup_item_delete_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info)
 {
@@ -331,6 +464,16 @@ _ctxpopup_item_delete_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_i
    evas_object_del(obj);
 }
 
+/**
+ * @brief Callback for selecting the seventh list item.
+ * Creates a ctxpopup and tests dynamic item manipulation functions like
+ * elm_ctxpopup_item_prepend(), elm_ctxpopup_item_insert_before(), and
+ * elm_ctxpopup_item_insert_after(). It also uses special callbacks for
+ * some items.
+ * @param data User data, unused.
+ * @param obj The list object.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _list_item_cb7(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -354,6 +497,14 @@ _list_item_cb7(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_U
    _print_current_dir(ctxpopup);
 }
 
+/**
+ * @brief Callback for selecting the eighth list item.
+ * Creates a ctxpopup with auto-hide disabled. This means the popup will
+ * not be dismissed when clicking outside of it.
+ * @param data User data, unused.
+ * @param obj The list object.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _list_item_cb8(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -382,6 +533,14 @@ _list_item_cb8(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_U
    _print_current_dir(ctxpopup);
 }
 
+/**
+ * @brief Callback for ctxpopup items that modify another item.
+ * Depending on the selected item's text, this callback will set or unset
+ * the text or icon of a target item.
+ * @param data The target Elm_Object_Item to be modified.
+ * @param obj The ctxpopup object.
+ * @param event_info The selected Elm_Object_Item that triggered the callback.
+ */
 static void
 _ctxpopup_item_select_cb(void *data, Evas_Object *obj, void *event_info)
 {
@@ -418,6 +577,14 @@ _ctxpopup_item_select_cb(void *data, Evas_Object *obj, void *event_info)
      }
 }
 
+/**
+ * @brief Callback for selecting the ninth list item.
+ * Creates a ctxpopup to test modifying an item's parts (text and content)
+ * dynamically from other items' callbacks.
+ * @param data User data, unused.
+ * @param obj The list object.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _list_item_cb9(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -445,6 +612,14 @@ _list_item_cb9(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_U
    _print_current_dir(ctxpopup);
 }
 
+/**
+ * @brief Callback for selecting the tenth list item.
+ * Creates a ctxpopup with a single button as content. Clicking the button
+ * removes the button itself.
+ * @param data User data, unused.
+ * @param obj The list object.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _list_item_cb10(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -470,6 +645,14 @@ _list_item_cb10(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_
    _print_current_dir(ctxpopup);
 }
 
+/**
+ * @brief Callback for selecting the eleventh list item.
+ * Creates a ctxpopup with a large number of items (100) to test
+ * performance and scrolling behavior.
+ * @param data User data, unused.
+ * @param obj The list object.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _list_item_cb11(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -495,30 +678,70 @@ _list_item_cb11(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_
    evas_object_show(ctxpopup);
 }
 
+/**
+ * @brief Callback for the "selected" smart event on the list.
+ * This is used to immediately unselect a list item after it has been clicked.
+ * This prevents the item from remaining in a selected state visually.
+ * @param data User data, unused.
+ * @param obj The list object, unused.
+ * @param event_info The selected Elm_Object_Item.
+ */
 static void
 _list_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
    elm_list_item_selected_set(event_info, EINA_FALSE);
 }
 
+/**
+ * @brief Callback for the EVAS_CALLBACK_MOUSE_DOWN event on the list.
+ * Increments a counter to track that the mouse button is pressed.
+ * This helps prevent triggering actions on mouse up if a drag occurred.
+ * @param data User data, unused.
+ * @param e The Evas canvas, unused.
+ * @param obj The list object, unused.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _list_mouse_down(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    list_mouse_down++;
 }
 
+/**
+ * @brief Callback for the EVAS_CALLBACK_MOUSE_UP event on the list.
+ * Decrements a counter to track that the mouse button is released.
+ * @param data User data, unused.
+ * @param e The Evas canvas, unused.
+ * @param obj The list object, unused.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _list_mouse_up(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    list_mouse_down--;
 }
 
+/**
+ * @brief Callback for the "delete,request" smart event on the window.
+ * Resets the global list_mouse_down counter when the window is closed.
+ * @param data User data, unused.
+ * @param obj The window object, unused.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _win_del(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    list_mouse_down = 0;
 }
 
+/**
+ * @brief The main function for the Ctxpopup test.
+ * This function creates a window and a list. The list contains several items,
+ * each demonstrating a different feature or use case of the Elm_Ctxpopup widget.
+ * @param data User data, unused.
+ * @param obj The parent object, unused.
+ * @param event_info Event-specific information, unused.
+ */
 void
 test_ctxpopup(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

@@ -62,7 +62,9 @@ EVAS_API Evas_Object_Vg_Fill_Mode evas_object_vg_fill_mode_get(const Evas_Object
  * mapped to the canvas geometry when rendering the vg tree.
  *
  * @param[in] obj The object.
- * @param[in] viewbox viewbox for the vg canvas
+ * @param[in] viewbox viewbox for the vg canvas. This is an Eina_Rect struct,
+ *            typically defined as {int x, y, w, h}. For example:
+ *            @code Eina_Rect r = { .x = 0, .y = 0, .w = 100, .h = 100 }; @endcode
  *
  * @since 1.24
  * @ingroup Evas_Object_Vg_Group

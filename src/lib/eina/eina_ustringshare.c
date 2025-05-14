@@ -57,10 +57,13 @@
 #endif
 #define DBG(...) EINA_LOG_DOM_DBG(_eina_share_ustringshare_log_dom, __VA_ARGS__)
 
+/**< Log domain for eina_ustringshare messages. Registered during module initialization. */
 static int _eina_share_ustringshare_log_dom = -1;
 
 /* The actual share */
+/**< Global Eina_Share instance for managing shared unicode strings. Initialized by eina_ustringshare_init(). */
 static Eina_Share *ustringshare_share;
+/**< Magic string to identify Eina_UStringshare_Node types within the Eina_Share structure. Used for type safety. */
 static const char EINA_MAGIC_USTRINGSHARE_NODE_STR[] = "Eina UStringshare Node";
 
 /*============================================================================*

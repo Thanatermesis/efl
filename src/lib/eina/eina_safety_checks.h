@@ -87,6 +87,13 @@
 #include "eina_config.h"
 #include "eina_error.h"
 
+/**
+ * @brief Error code set when a safety check fails.
+ *
+ * This error is set by _eina_safety_error() when a safety check macro
+ * (e.g., EINA_SAFETY_ON_NULL_RETURN_VAL) detects an issue.
+ * It can be retrieved using eina_error_get().
+ */
 EINA_API extern Eina_Error EINA_ERROR_SAFETY_FAILED;
 
 #ifdef EINA_SAFETY_CHECKS

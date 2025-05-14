@@ -67,15 +67,32 @@ int  (*secsym_tbm_surface_get_info) (void *surface, void *info) = NULL;
 
 static int dbgflushnum = -1;
 
+/**
+ * @internal
+ * @brief Placeholder function for unresolved GL symbols.
+ *
+ * This function is assigned to function pointers that could not be resolved
+ * at runtime. It logs an error message when called, indicating that a required
+ * GL feature is missing.
+ */
 static void
 sym_missing(void)
 {
    ERR("GL symbols missing!");
 }
 
-/* This check is based heavily on the check from libepoxy.
- * Previously we used strstr(), however there are some extensions
- * whose names are subsets of others.
+/**
+ * @internal
+ * @brief Checks if a given extension is present in the GL extension string.
+ *
+ * This function provides a safe way to check for an extension, avoiding
+ * issues with extensions that are substrings of other extensions (e.g.,
+ * "GL_EXT_foo" and "GL_EXT_foo_bar"). It's based on the implementation
+ * from libepoxy.
+ *
+ * @param exts The string of available extensions, space-separated.
+ * @param ext The extension to check for.
+ * @return EINA_TRUE if the extension is found, EINA_FALSE otherwise.
  */
 EMODAPI Eina_Bool
 evas_gl_extension_string_check(const char *exts, const char *ext)
@@ -109,6 +126,22 @@ evas_gl_extension_string_check(const char *exts, const char *ext)
  */
 static Evas_Gl_Extension_String_Check _ckext = evas_gl_extension_string_check;
 
+/**
+ * @internal
+ * @brief Checks for a GL extension using either glGetStringi or a cached string.
+ *
+ * This function abstracts the method of checking for extensions. If `glGetStringi`
+ * is available (GLES 3.0+), it iterates through extensions using that. Otherwise,
+ * it falls back to parsing the monolithic `GL_EXTENSIONS` string, which is
+ * fetched and cached on the first call.
+ *
+ * @param ext The extension name to check for (e.g., "GL_ARB_texture_non_power_of_two").
+ * @param pexts A pointer to a character pointer that holds the cached extensions string.
+ *              This will be populated if not already set.
+ * @param pnum A pointer to an integer that holds the number of extensions.
+ *             Used with `glGetStringi`.
+ * @return EINA_TRUE if the extension is supported, EINA_FALSE otherwise.
+ */
 static int
 _has_ext(const char *ext, const char **pexts, int *pnum)
 {
@@ -145,6 +178,21 @@ _has_ext(const char *ext, const char **pexts, int *pnum)
 
 #ifdef GL_GLES
 
+/**
+ * @internal
+ * @brief A wrapper for eglCreateImage or eglCreateImageKHR.
+ *
+ * This function provides a compatibility layer for creating an EGLImage. It
+ * prefers the KHR version if available and handles the conversion of EGLAttrib
+ * to EGLint arrays as required by the KHR variant.
+ *
+ * @param dpy The EGL display.
+ * @param ctx The EGL context.
+ * @param target The EGL image target type.
+ * @param buffer The client buffer (e.g., a native pixmap).
+ * @param attrib_list A null-terminated list of attributes.
+ * @return An EGLImage handle on success, or NULL on failure.
+ */
 EMODAPI void *
 evas_gl_common_eglCreateImage(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLAttrib *attrib_list)
 {
@@ -168,6 +216,16 @@ evas_gl_common_eglCreateImage(EGLDisplay dpy, EGLContext ctx, EGLenum target, EG
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief A wrapper for eglDestroyImage or eglDestroyImageKHR.
+ *
+ * This function provides a compatibility layer for destroying an EGLImage.
+ *
+ * @param dpy The EGL display.
+ * @param im The EGLImage to destroy.
+ * @return EGL_TRUE on success, EGL_FALSE on failure.
+ */
 EMODAPI int
 evas_gl_common_eglDestroyImage(EGLDisplay dpy, void *im)
 {
@@ -178,7 +236,27 @@ evas_gl_common_eglDestroyImage(EGLDisplay dpy, void *im)
 
 #endif
 
-/* FIXME: return error if a required symbol was not found */
+/**
+ * @internal
+ * @brief Resolves and loads all required and optional OpenGL/EGL function pointers.
+ *
+ * This function is called once to dynamically load GL functions. It uses
+ * `GetProcAddress` (e.g., `eglGetProcAddress` or `glXGetProcAddress`) if provided,
+ * and falls back to `dlsym` to find symbols.
+ *
+ * The logic prioritizes core functions, then ARB extensions, and finally EXT
+ * extensions, especially for Framebuffer Objects (FBOs), to ensure correct
+ * behavior regarding context sharing.
+ *
+ * It also handles platform-specific variants like OES for GLES.
+ * If a required symbol cannot be found, it is replaced with `sym_missing` to
+ * prevent crashes, and an error is logged.
+ *
+ * @param GetProcAddress A function pointer to the platform's `GetProcAddress`
+ *                       implementation (e.g., eglGetProcAddress).
+ * @param extsn The extension string from the current GL context. This is used
+ *              to conditionally load extension functions.
+ */
 EMODAPI void
 evas_gl_symbols(void *(*GetProcAddress)(const char *name), const char *extsn)
 {
@@ -395,6 +473,14 @@ evas_gl_symbols(void *(*GetProcAddress)(const char *name), const char *extsn)
    done = 1;
 }
 
+/**
+ * @internal
+ * @brief Lazily loads symbols from libtbm.so.1 for Tizen Buffer Manager support.
+ *
+ * This function is called to dynamically load functions from the Tizen Buffer
+ * Manager library. It's a no-op on non-Tizen systems. If the library cannot
+ * be opened or a symbol is not found, it fails gracefully.
+ */
 static void
 tbm_symbols(void)
 {
@@ -432,6 +518,22 @@ static void shader_array_flush(Evas_Engine_GL_Context *gc);
 static Evas_Engine_GL_Context *_evas_gl_common_context = NULL;
 static Evas_GL_Shared *shared = NULL;
 
+/**
+ * @internal
+ * @brief Logs a detailed OpenGL error message.
+ *
+ * This function is typically called via the `GLERR` macro. It translates a GL
+ * error code into a human-readable string and logs it along with the file,
+ * function, line number, and the GL operation that caused the error.
+ * For `GL_INVALID_FRAMEBUFFER_OPERATION`, it provides more detailed status
+ * by calling `glCheckFramebufferStatus`.
+ *
+ * @param err The GL error code from `glGetError()`.
+ * @param file The source file where the error occurred.
+ * @param func The function where the error occurred.
+ * @param line The line number where the error occurred.
+ * @param op A string describing the GL operation being performed.
+ */
 EMODAPI void
 __evas_gl_err(int err, const char *file, const char *func, int line, const char *op)
 {
@@ -494,6 +596,26 @@ __evas_gl_err(int err, const char *file, const char *func, int line, const char 
                   file, func, line, "%s: %s", op, errmsg);
 }
 
+/**
+ * @internal
+ * @brief Computes a 4x4 orthographic projection matrix with rotation and perspective options.
+ *
+ * This function generates a matrix similar to `glOrtho`, but adds support for
+ * rotation (0, 90, 180, 270 degrees) and a simple perspective effect controlled
+ * by the `foc` (focal length) parameter.
+ *
+ * The resulting matrix can be used as a projection matrix in shaders to transform
+ * vertex coordinates from object space to clip space.
+ *
+ * @param m Pointer to a 16-element GLfloat array to store the resulting matrix.
+ * @param l, r Left and right vertical clipping planes.
+ * @param t, b Top and bottom horizontal clipping planes.
+ * @param near_, far_ Near and far depth clipping planes.
+ * @param rot Rotation angle in degrees (0, 90, 180, 270).
+ * @param vw, vh Viewport width and height, used for rotation calculations.
+ * @param foc Focal length for perspective effect. 1 for orthographic.
+ * @param orth A factor to control the orthographic-ness. 1.0 for standard ortho.
+ */
 static void
 matrix_ortho(GLfloat *m,
              GLfloat l, GLfloat r,
@@ -551,6 +673,17 @@ matrix_ortho(GLfloat *m,
    m[15] = (m[3] * tx) + (m[7] * ty) + orth;
 }
 
+/**
+ * @internal
+ * @brief Parses the GL_VERSION string to determine the major and minor GL version.
+ *
+ * This function checks for OpenGL ES or desktop OpenGL versions. It supports
+ * parsing various version string formats.
+ *
+ * @param minor_version If not NULL, this will be filled with the minor version number.
+ * @return The major version number (e.g., 2 for GLES 2.0, 3 for GLES 3.0),
+ *         or 0 if the version is unsupported.
+ */
 int
 evas_gl_common_version_check(int *minor_version)
 {

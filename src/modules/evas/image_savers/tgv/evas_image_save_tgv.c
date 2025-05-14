@@ -20,6 +20,17 @@
 # define DEBUG_STATS
 #endif
 
+/**
+ * @brief Calculate the block size exponent for TGV compression based on image dimension.
+ *
+ * This function determines an appropriate block size exponent 'k' such that
+ * the block dimension (4 << k) is suitable for the given image dimension 'size'.
+ * It aims to balance compression efficiency and granularity.
+ * The maximum block size is capped at 256 pixels (k=6).
+ *
+ * @param size The width or height of the image dimension.
+ * @return The calculated block size exponent (0 to 6).
+ */
 static int
 _block_size_get(int size)
 {

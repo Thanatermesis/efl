@@ -10,6 +10,25 @@ extern const DATA8 _evas_dither_128128[128][128];
 #endif
 #endif
 
+/**
+ * @brief Converts a block of RGBA data (2 pixels at a time) to 16bpp RGB (5-6-5 format) with dithering.
+ *
+ * Processes two 32-bit RGBA source pixels and converts them into two 16-bit RGB_565
+ * destination pixels. Dithering is applied to improve color accuracy on the reduced
+ * bit-depth display.
+ *
+ * @param src Pointer to the source image data (array of DATA32). Each DATA32 is an ARGB pixel.
+ *            Example: src[0] = 0xAARRGGBB for the first pixel.
+ * @param dst Pointer to the destination image data (array of DATA8, treated as DATA16).
+ *            Destination stores 16-bit pixels. Example: ((DATA16*)dst)[0] for the first pixel.
+ * @param src_jump Offset in DATA32 units to the next row in the source image.
+ * @param dst_jump Offset in DATA8 units (bytes) to the next row in the destination image.
+ * @param w Width of the image in pixels.
+ * @param h Height of the image in pixels.
+ * @param dith_x X-coordinate offset for the dithering matrix.
+ * @param dith_y Y-coordinate offset for the dithering matrix.
+ * @param pal Palette data (unused in this function).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_rgb_565_dith (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -142,6 +161,22 @@ evas_common_convert_rgba2_to_16bpp_rgb_565_dith (DATA32 *src, DATA8 *dst, int sr
 #endif
 }
 
+/**
+ * @brief Converts a block of RGBA data (1 pixel at a time) to 16bpp RGB (5-6-5 format) with dithering.
+ *
+ * Processes one 32-bit RGBA source pixel and converts it into one 16-bit RGB_565
+ * destination pixel. Dithering is applied to improve color accuracy.
+ *
+ * @param src Pointer to the source image data (array of DATA32). Each DATA32 is an ARGB pixel.
+ * @param dst Pointer to the destination image data (array of DATA8, treated as DATA16).
+ * @param src_jump Offset in DATA32 units to the next row in the source image.
+ * @param dst_jump Offset in DATA8 units (bytes) to the next row in the destination image.
+ * @param w Width of the image in pixels.
+ * @param h Height of the image in pixels.
+ * @param dith_x X-coordinate offset for the dithering matrix.
+ * @param dith_y Y-coordinate offset for the dithering matrix.
+ * @param pal Palette data (unused in this function).
+ */
 void
 evas_common_convert_rgba_to_16bpp_rgb_565_dith (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -223,6 +258,22 @@ evas_common_convert_rgba_to_16bpp_rgb_565_dith (DATA32 *src, DATA8 *dst, int src
 #endif
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp RGB (5-6-5) with dithering and 180-degree rotation.
+ *
+ * Similar to evas_common_convert_rgba2_to_16bpp_rgb_565_dith, but the output is
+ * rotated by 180 degrees. Source pixels are read in reverse order.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_rgb_565_dith_rot_180 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -278,6 +329,22 @@ evas_common_convert_rgba2_to_16bpp_rgb_565_dith_rot_180 (DATA32 *src, DATA8 *dst
    CONVERT_LOOP2_END_ROT_180();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp RGB (5-6-5) with dithering and 180-degree rotation.
+ *
+ * Similar to evas_common_convert_rgba_to_16bpp_rgb_565_dith, but the output is
+ * rotated by 180 degrees. Source pixels are read in reverse order.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_rgb_565_dith_rot_180 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -310,6 +377,22 @@ evas_common_convert_rgba_to_16bpp_rgb_565_dith_rot_180 (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP_END_ROT_180();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp RGB (5-6-5) with dithering and 270-degree rotation.
+ *
+ * Similar to evas_common_convert_rgba2_to_16bpp_rgb_565_dith, but the output is
+ * rotated by 270 degrees (clockwise).
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image (becomes height of destination).
+ * @param h Height of the source image (becomes width of destination).
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_rgb_565_dith_rot_270 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -365,6 +448,22 @@ evas_common_convert_rgba2_to_16bpp_rgb_565_dith_rot_270 (DATA32 *src, DATA8 *dst
    CONVERT_LOOP2_END_ROT_270();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp RGB (5-6-5) with dithering and 270-degree rotation.
+ *
+ * Similar to evas_common_convert_rgba_to_16bpp_rgb_565_dith, but the output is
+ * rotated by 270 degrees (clockwise).
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image (becomes height of destination).
+ * @param h Height of the source image (becomes width of destination).
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_rgb_565_dith_rot_270 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -397,6 +496,22 @@ evas_common_convert_rgba_to_16bpp_rgb_565_dith_rot_270 (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP_END_ROT_270();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp RGB (5-6-5) with dithering and 90-degree rotation.
+ *
+ * Similar to evas_common_convert_rgba2_to_16bpp_rgb_565_dith, but the output is
+ * rotated by 90 degrees (clockwise).
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image (becomes height of destination).
+ * @param h Height of the source image (becomes width of destination).
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_rgb_565_dith_rot_90 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -452,6 +567,22 @@ evas_common_convert_rgba2_to_16bpp_rgb_565_dith_rot_90 (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP2_END_ROT_90();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp RGB (5-6-5) with dithering and 90-degree rotation.
+ *
+ * Similar to evas_common_convert_rgba_to_16bpp_rgb_565_dith, but the output is
+ * rotated by 90 degrees (clockwise).
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image (becomes height of destination).
+ * @param h Height of the source image (becomes width of destination).
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_rgb_565_dith_rot_90 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -484,6 +615,22 @@ evas_common_convert_rgba_to_16bpp_rgb_565_dith_rot_90 (DATA32 *src, DATA8 *dst, 
    CONVERT_LOOP_END_ROT_90();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp BGR (5-6-5 format) with dithering.
+ *
+ * Similar to evas_common_convert_rgba2_to_16bpp_rgb_565_dith, but the output color order
+ * is BGR instead of RGB.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_bgr_565_dith (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -539,6 +686,22 @@ evas_common_convert_rgba2_to_16bpp_bgr_565_dith (DATA32 *src, DATA8 *dst, int sr
    CONVERT_LOOP2_END_ROT_0();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp BGR (5-6-5 format) with dithering.
+ *
+ * Similar to evas_common_convert_rgba_to_16bpp_rgb_565_dith, but the output color order
+ * is BGR instead of RGB.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_bgr_565_dith (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -571,6 +734,21 @@ evas_common_convert_rgba_to_16bpp_bgr_565_dith (DATA32 *src, DATA8 *dst, int src
    CONVERT_LOOP_END_ROT_0();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp BGR (5-6-5) with dithering and 180-degree rotation.
+ *
+ * Combines BGR conversion, 2-pixel processing, dithering, and 180-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_bgr_565_dith_rot_180 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -626,6 +804,21 @@ evas_common_convert_rgba2_to_16bpp_bgr_565_dith_rot_180 (DATA32 *src, DATA8 *dst
    CONVERT_LOOP2_END_ROT_180();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp BGR (5-6-5) with dithering and 180-degree rotation.
+ *
+ * Combines BGR conversion, 1-pixel processing, dithering, and 180-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_bgr_565_dith_rot_180 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -660,6 +853,21 @@ evas_common_convert_rgba_to_16bpp_bgr_565_dith_rot_180 (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP_END_ROT_180();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp BGR (5-6-5) with dithering and 270-degree rotation.
+ *
+ * Combines BGR conversion, 2-pixel processing, dithering, and 270-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image.
+ * @param h Height of the source image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_bgr_565_dith_rot_270 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -715,6 +923,21 @@ evas_common_convert_rgba2_to_16bpp_bgr_565_dith_rot_270 (DATA32 *src, DATA8 *dst
    CONVERT_LOOP2_END_ROT_270();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp BGR (5-6-5) with dithering and 270-degree rotation.
+ *
+ * Combines BGR conversion, 1-pixel processing, dithering, and 270-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image.
+ * @param h Height of the source image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_bgr_565_dith_rot_270 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -747,6 +970,21 @@ evas_common_convert_rgba_to_16bpp_bgr_565_dith_rot_270 (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP_END_ROT_270();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp BGR (5-6-5) with dithering and 90-degree rotation.
+ *
+ * Combines BGR conversion, 2-pixel processing, dithering, and 90-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image.
+ * @param h Height of the source image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_bgr_565_dith_rot_90 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -802,6 +1040,21 @@ evas_common_convert_rgba2_to_16bpp_bgr_565_dith_rot_90 (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP2_END_ROT_90();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp BGR (5-6-5) with dithering and 90-degree rotation.
+ *
+ * Combines BGR conversion, 1-pixel processing, dithering, and 90-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image.
+ * @param h Height of the source image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_bgr_565_dith_rot_90 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -834,6 +1087,22 @@ evas_common_convert_rgba_to_16bpp_bgr_565_dith_rot_90 (DATA32 *src, DATA8 *dst, 
    CONVERT_LOOP_END_ROT_90();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp RGB (4-4-4 format) with dithering.
+ *
+ * Each color channel (Red, Green, Blue) is reduced to 4 bits.
+ * Processes two pixels at a time.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_rgb_444_dith (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -887,6 +1156,22 @@ evas_common_convert_rgba2_to_16bpp_rgb_444_dith (DATA32 *src, DATA8 *dst, int sr
    CONVERT_LOOP2_END_ROT_0();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp RGB (4-4-4 format) with dithering.
+ *
+ * Each color channel (Red, Green, Blue) is reduced to 4 bits.
+ * Processes one pixel at a time.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_rgb_444_dith (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -918,6 +1203,19 @@ evas_common_convert_rgba_to_16bpp_rgb_444_dith (DATA32 *src, DATA8 *dst, int src
    CONVERT_LOOP_END_ROT_0();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp RGB (4-4-4) with dithering and 180-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_rgb_444_dith_rot_180 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -971,6 +1269,19 @@ evas_common_convert_rgba2_to_16bpp_rgb_444_dith_rot_180 (DATA32 *src, DATA8 *dst
    CONVERT_LOOP2_END_ROT_180();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp RGB (4-4-4) with dithering and 180-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_rgb_444_dith_rot_180 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1002,6 +1313,19 @@ evas_common_convert_rgba_to_16bpp_rgb_444_dith_rot_180 (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP_END_ROT_180();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp RGB (4-4-4) with dithering and 270-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image.
+ * @param h Height of the source image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_rgb_444_dith_rot_270 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1055,6 +1379,19 @@ evas_common_convert_rgba2_to_16bpp_rgb_444_dith_rot_270 (DATA32 *src, DATA8 *dst
    CONVERT_LOOP2_END_ROT_270();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp RGB (4-4-4) with dithering and 270-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image.
+ * @param h Height of the source image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_rgb_444_dith_rot_270 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1086,6 +1423,19 @@ evas_common_convert_rgba_to_16bpp_rgb_444_dith_rot_270 (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP_END_ROT_270();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp RGB (4-4-4) with dithering and 90-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image.
+ * @param h Height of the source image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_rgb_444_dith_rot_90 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1139,6 +1489,19 @@ evas_common_convert_rgba2_to_16bpp_rgb_444_dith_rot_90 (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP2_END_ROT_90();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp RGB (4-4-4) with dithering and 90-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image.
+ * @param h Height of the source image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_rgb_444_dith_rot_90 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1170,6 +1533,27 @@ evas_common_convert_rgba_to_16bpp_rgb_444_dith_rot_90 (DATA32 *src, DATA8 *dst, 
    CONVERT_LOOP_END_ROT_90();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to a custom 16bpp RGB (R:4, G:5, B:4 or R:5, G:6, B:5 like) format with dithering.
+ *
+ * The exact bit allocation (R:4 G:5 B:4 for first pixel, R:6 G:4 B:5 for second, or similar, based on shifts)
+ * is specific to this function's implementation details (r << 12 | g << 7 | b << 1 and r << 28 | g << 23 | b << 17).
+ * This appears to be a packed format where two pixels might share bits or have slightly different distributions.
+ * The name "454645" is unusual and might indicate a specific hardware target or a packed pixel format.
+ * For the first pixel: R is shifted by 12, G by 7, B by 1.
+ * For the second pixel: R is shifted by 28, G by 23, B by 17 when packed into a DATA32.
+ * This implies a structure like: [R2(4) G2(5) B2(5)] [R1(4) G1(5) B1(5)] (approximate bits per channel).
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_rgb_454645_dith (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1223,6 +1607,22 @@ evas_common_convert_rgba2_to_16bpp_rgb_454645_dith (DATA32 *src, DATA8 *dst, int
    CONVERT_LOOP2_END_ROT_0();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to a custom 16bpp RGB (R:4, G:5, B:4 or R:5, G:6, B:5 like) format with dithering.
+ *
+ * The pixel format is (R << 12) | (G << 7) | (B << 1). This suggests R:4 bits, G:5 bits, B:5 bits, with the LSB unused or for alpha.
+ * The name "454645" might be a misnomer for single pixel conversion or refers to a family of formats.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_rgb_454645_dith (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1254,6 +1654,19 @@ evas_common_convert_rgba_to_16bpp_rgb_454645_dith (DATA32 *src, DATA8 *dst, int 
    CONVERT_LOOP_END_ROT_0();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp RGB (custom "454645") with dithering and 180-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_rgb_454645_dith_rot_180 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1307,6 +1720,19 @@ evas_common_convert_rgba2_to_16bpp_rgb_454645_dith_rot_180 (DATA32 *src, DATA8 *
    CONVERT_LOOP2_END_ROT_180();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp RGB (custom "454645") with dithering and 180-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_rgb_454645_dith_rot_180 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1338,6 +1764,19 @@ evas_common_convert_rgba_to_16bpp_rgb_454645_dith_rot_180 (DATA32 *src, DATA8 *d
    CONVERT_LOOP_END_ROT_180();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp RGB (custom "454645") with dithering and 270-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image.
+ * @param h Height of the source image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_rgb_454645_dith_rot_270 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1391,6 +1830,19 @@ evas_common_convert_rgba2_to_16bpp_rgb_454645_dith_rot_270 (DATA32 *src, DATA8 *
    CONVERT_LOOP2_END_ROT_270();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp RGB (custom "454645") with dithering and 270-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image.
+ * @param h Height of the source image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_rgb_454645_dith_rot_270 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1422,6 +1874,19 @@ evas_common_convert_rgba_to_16bpp_rgb_454645_dith_rot_270 (DATA32 *src, DATA8 *d
    CONVERT_LOOP_END_ROT_270();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp RGB (custom "454645") with dithering and 90-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image.
+ * @param h Height of the source image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_rgb_454645_dith_rot_90 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1475,6 +1940,19 @@ evas_common_convert_rgba2_to_16bpp_rgb_454645_dith_rot_90 (DATA32 *src, DATA8 *d
    CONVERT_LOOP2_END_ROT_90();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp RGB (custom "454645") with dithering and 90-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image.
+ * @param h Height of the source image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_rgb_454645_dith_rot_90 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1506,6 +1984,22 @@ evas_common_convert_rgba_to_16bpp_rgb_454645_dith_rot_90 (DATA32 *src, DATA8 *ds
    CONVERT_LOOP_END_ROT_90();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp RGB (5-5-5 format) with dithering.
+ *
+ * Each color channel (Red, Green, Blue) is reduced to 5 bits. The highest bit of the 16-bit word is often unused or for alpha.
+ * Processes two pixels at a time.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_rgb_555_dith (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1559,6 +2053,22 @@ evas_common_convert_rgba2_to_16bpp_rgb_555_dith (DATA32 *src, DATA8 *dst, int sr
    CONVERT_LOOP2_END_ROT_0();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp RGB (5-5-5 format) with dithering.
+ *
+ * Each color channel (Red, Green, Blue) is reduced to 5 bits.
+ * Processes one pixel at a time.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_rgb_555_dith (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1590,6 +2100,19 @@ evas_common_convert_rgba_to_16bpp_rgb_555_dith (DATA32 *src, DATA8 *dst, int src
    CONVERT_LOOP_END_ROT_0();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp RGB (5-5-5) with dithering and 180-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_rgb_555_dith_rot_180 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1643,6 +2166,19 @@ evas_common_convert_rgba2_to_16bpp_rgb_555_dith_rot_180 (DATA32 *src, DATA8 *dst
    CONVERT_LOOP2_END_ROT_180();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp RGB (5-5-5) with dithering and 180-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_rgb_555_dith_rot_180 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1674,6 +2210,19 @@ evas_common_convert_rgba_to_16bpp_rgb_555_dith_rot_180 (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP_END_ROT_180();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp RGB (5-5-5) with dithering and 270-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image.
+ * @param h Height of the source image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_rgb_555_dith_rot_270 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1727,6 +2276,19 @@ evas_common_convert_rgba2_to_16bpp_rgb_555_dith_rot_270 (DATA32 *src, DATA8 *dst
    CONVERT_LOOP2_END_ROT_270();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp RGB (5-5-5) with dithering and 270-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image.
+ * @param h Height of the source image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_rgb_555_dith_rot_270 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1758,6 +2320,19 @@ evas_common_convert_rgba_to_16bpp_rgb_555_dith_rot_270 (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP_END_ROT_270();
 }
 
+/**
+ * @brief Converts RGBA data (2 pixels at a time) to 16bpp RGB (5-5-5) with dithering and 90-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image.
+ * @param h Height of the source image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba2_to_16bpp_rgb_555_dith_rot_90 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {
@@ -1811,6 +2386,19 @@ evas_common_convert_rgba2_to_16bpp_rgb_555_dith_rot_90 (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP2_END_ROT_90();
 }
 
+/**
+ * @brief Converts RGBA data (1 pixel at a time) to 16bpp RGB (5-5-5) with dithering and 90-degree rotation.
+ *
+ * @param src Pointer to the source image data.
+ * @param dst Pointer to the destination image data.
+ * @param src_jump Source row stride.
+ * @param dst_jump Destination row stride.
+ * @param w Width of the source image.
+ * @param h Height of the source image.
+ * @param dith_x Dithering X offset.
+ * @param dith_y Dithering Y offset.
+ * @param pal Palette data (unused).
+ */
 void
 evas_common_convert_rgba_to_16bpp_rgb_555_dith_rot_90 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal EINA_UNUSED)
 {

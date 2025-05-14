@@ -41,6 +41,15 @@
 
 #include "eina_private.h"
 
+/**
+ * @internal
+ * @struct _Eina_QuadTree_Root
+ * @brief Represents a node in the quadtree.
+ *
+ * Each root node can have a parent, left and right children (representing
+ * subdivisions of its space), and a list of items that span across its
+ * subdivisions (both). It also tracks whether its 'both' list is sorted.
+ */
 typedef struct _Eina_QuadTree_Root Eina_QuadTree_Root;
 
 static const char EINA_MAGIC_QUADTREE_STR[] = "Eina QuadTree";
@@ -142,8 +151,11 @@ struct _Eina_QuadTree_Item
    EINA_MAGIC
 };
 
+/** @internal @brief Log domain for quadtree operations. */
 static int _eina_quadtree_log_dom = -1;
+/** @internal @brief Memory pool for Eina_QuadTree_Root structures. */
 static Eina_Mempool *eina_quadtree_root_mp = NULL;
+/** @internal @brief Memory pool for Eina_QuadTree_Item structures. */
 static Eina_Mempool *_eina_quadtree_items_mp = NULL;
 
 #ifdef ERR
@@ -156,7 +168,16 @@ static Eina_Mempool *_eina_quadtree_items_mp = NULL;
 #endif
 #define DBG(...) EINA_LOG_DOM_DBG(_eina_quadtree_log_dom, __VA_ARGS__)
 
-
+/**
+ * @internal
+ * @brief Compares two Eina_QuadTree_Item instances based on their index.
+ *
+ * This function is used for sorting items within a quadtree node.
+ *
+ * @param a Pointer to the first Eina_QuadTree_Item.
+ * @param b Pointer to the second Eina_QuadTree_Item.
+ * @return 0 if indices are equal, 1 if a->index > b->index, -1 otherwise.
+ */
 static int
 _eina_quadtree_item_cmp(const void *a, const void *b)
 {
@@ -168,6 +189,17 @@ _eina_quadtree_item_cmp(const void *a, const void *b)
    return -1;
 }
 
+/**
+ * @internal
+ * @brief Frees a quadtree root node and its children recursively.
+ *
+ * This function also frees all items contained within the 'both' list
+ * of each node being freed.
+ *
+ * @param q The main quadtree structure (used for item mempool).
+ * @param root The root node to start freeing from.
+ * @return Always NULL, as the node is freed.
+ */
 static Eina_QuadTree_Root *
 eina_quadtree_root_free(Eina_QuadTree *q, Eina_QuadTree_Root *root)
 {
@@ -190,6 +222,21 @@ eina_quadtree_root_free(Eina_QuadTree *q, Eina_QuadTree_Root *root)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Prepares a quadtree for rebuilding by collecting all items.
+ *
+ * This function traverses the quadtree, moving all visible items from
+ * each node's 'both' list into the 'change' list. Hidden items are
+ * moved to the quadtree's main 'hidden' list. The nodes themselves
+ * are then freed or moved to a trash for later reuse.
+ * This is typically called when the quadtree is resized.
+ *
+ * @param q The main quadtree structure.
+ * @param change Pointer to an Eina_Inlist that will receive all visible items.
+ * @param root The current root node being processed.
+ * @return Always NULL, as the existing tree structure is dismantled.
+ */
 static Eina_QuadTree_Root *
 eina_quadtree_root_rebuild_pre(Eina_QuadTree *q,
                                Eina_Inlist **change,
@@ -227,6 +274,26 @@ eina_quadtree_root_rebuild_pre(Eina_QuadTree *q,
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Splits a list of objects into left, right, or both lists for a quadtree node.
+ *
+ * This function iterates through the `objects` list. For each object, it uses the
+ * provided `func` (either horizontal or vertical callback) to determine if the
+ * object belongs to the left side, right side, or spans both sides of the
+ * current node's space, defined by `border` and `middle`.
+ * If `middle` (representing half the current dimension width/height) is too small (<= 4),
+ * all objects are placed directly into the `root->both` list.
+ *
+ * @param objects An Eina_Inlist of Eina_QuadTree_Item to be split.
+ * @param root The current quadtree node where objects spanning both sides will be stored.
+ * @param left Pointer to an Eina_Inlist to store objects belonging to the "left" (or "top") subdivision.
+ * @param right Pointer to an Eina_Inlist to store objects belonging to the "right" (or "bottom") subdivision.
+ * @param func The callback function (horizontal or vertical) to determine object placement.
+ * @param border The starting coordinate (x or y) of the current node's space.
+ * @param middle The current dimension (width or height) of the node's space.
+ * @return The new middle value (half of the original `middle`), used for recursive subdivision.
+ */
 static size_t
 _eina_quadtree_split(Eina_Inlist *objects,
                      Eina_QuadTree_Root *root,
@@ -337,7 +404,27 @@ _eina_quadtree_split(Eina_Inlist *objects,
    return middle;
 }
 
-
+/**
+ * @internal
+ * @brief Recursively updates or builds a part of the quadtree.
+ *
+ * This function takes a list of `objects` and distributes them into the
+ * quadtree structure starting from the given `root` node. It alternates
+ * between splitting horizontally and vertically (`direction`).
+ * If `root` is NULL, a new node is allocated.
+ * The `objects` are split using `_eina_quadtree_split`, and then
+ * `_eina_quadtree_update` is called recursively for the left/top and
+ * right/bottom children with their respective object lists and adjusted `size`.
+ *
+ * @param q The main quadtree structure.
+ * @param parent The parent of the current `root` node.
+ * @param root The current quadtree node to update. Can be NULL to create a new one.
+ * @param objects An Eina_Inlist of Eina_QuadTree_Item to be inserted/updated in this part of the tree.
+ * @param direction EINA_TRUE for horizontal split, EINA_FALSE for vertical split.
+ * @param size The Eina_Rectangle representing the geometric bounds of the current `root` node.
+ *             This rectangle is modified during recursive calls.
+ * @return The updated (or newly created) `root` node.
+ */
 static Eina_QuadTree_Root *
 _eina_quadtree_update(Eina_QuadTree *q, Eina_QuadTree_Root *parent,
                       Eina_QuadTree_Root *root, Eina_Inlist *objects,
@@ -398,6 +485,18 @@ _eina_quadtree_update(Eina_QuadTree *q, Eina_QuadTree_Root *parent,
    return root;
 }
 
+/**
+ * @internal
+ * @brief Merges a sorted Eina_List of items into a sorted Eina_Inlist.
+ *
+ * This function takes `both` (an Eina_List, assumed to be sorted by item index)
+ * and merges its visible items into `result` (an Eina_Inlist, also assumed to be
+ * sorted by item index), maintaining the sorted order.
+ *
+ * @param result The Eina_Inlist to merge into. Can be NULL.
+ * @param both The Eina_List of Eina_QuadTree_Item to merge from.
+ * @return The merged Eina_Inlist.
+ */
 static Eina_Inlist *
 _eina_quadtree_merge(Eina_Inlist *result,
                      Eina_List *both)
@@ -481,6 +580,27 @@ _eina_quadtree_merge(Eina_Inlist *result,
    return result;
 }
 
+/**
+ * @internal
+ * @brief Recursively collects items that collide with a target rectangle.
+ *
+ * This function traverses the quadtree starting from `root`.
+ * It first merges items from `root->both` into the `result` list if they
+ * are within the `target` area (implicitly, as `_eina_quadtree_merge` adds all visible items,
+ * filtering happens at a higher level or by the nature of quadtree queries).
+ * Then, it checks if the `target` rectangle intersects with the left/top and
+ * right/bottom sub-regions of the current node's `size`. If there's an
+ * intersection, it recursively calls itself for the corresponding child node.
+ * The `direction` flag alternates to switch between horizontal and vertical subdivision checks.
+ *
+ * @param result The Eina_Inlist accumulating colliding items.
+ * @param root The current quadtree node being checked.
+ * @param direction EINA_TRUE for horizontal subdivision, EINA_FALSE for vertical.
+ * @param size The Eina_Rectangle representing the geometric bounds of the current `root` node.
+ *             This rectangle is modified during recursive calls.
+ * @param target The Eina_Rectangle representing the collision query area.
+ * @return The Eina_Inlist containing all items that collide with the `target`.
+ */
 static Eina_Inlist *
 _eina_quadtree_collide(Eina_Inlist *result,
                        Eina_QuadTree_Root *root,
@@ -543,6 +663,17 @@ _eina_quadtree_collide(Eina_Inlist *result,
    return result;
 }
 
+/**
+ * @internal
+ * @brief Removes an item from its current quadtree node.
+ *
+ * This function removes the `object` from its `object->root->both` list.
+ * If the `object->root` becomes empty (no children and no items in `both` list)
+ * and it's not the main root of the quadtree, it is also removed from its parent
+ * and potentially freed or added to the quadtree's root trash.
+ *
+ * @param object The Eina_QuadTree_Item to remove.
+ */
 static void
 _eina_quadtree_remove(Eina_QuadTree_Item *object)
 {

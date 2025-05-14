@@ -30,12 +30,29 @@
 
 #include "cpplib.h"
 
+/**
+ * @brief Handles memory allocation failure by terminating the program.
+ *
+ * This function is called when a memory allocation function (like malloc,
+ * realloc, or calloc) fails. It reports a fatal error and exits, so it
+ * does not return.
+ */
 static void
 memory_full(void)
 {
    cpp_fatal("Memory exhausted.");
 }
 
+/**
+ * @brief Allocates memory and exits on failure.
+ *
+ * This function is a wrapper around malloc(). If malloc() fails, it calls
+ * memory_full() to terminate the program. This ensures that the caller
+ * never receives a NULL pointer.
+ *
+ * @param size The number of bytes to allocate.
+ * @return A pointer to the allocated memory. This function never returns NULL.
+ */
 void               *
 xmalloc(unsigned size)
 {
@@ -48,6 +65,17 @@ xmalloc(unsigned size)
    return 0;
 }
 
+/**
+ * @brief Reallocates memory and exits on failure.
+ *
+ * This function is a wrapper around realloc(). If realloc() fails, it calls
+ * memory_full() to terminate the program. This ensures that the caller
+ * never receives a NULL pointer.
+ *
+ * @param old A pointer to the memory block to be reallocated.
+ * @param size The new size for the memory block, in bytes.
+ * @return A pointer to the reallocated memory. This function never returns NULL.
+ */
 void               *
 xrealloc(void *old, unsigned size)
 {
@@ -58,6 +86,19 @@ xrealloc(void *old, unsigned size)
    return ptr;
 }
 
+/**
+ * @brief Allocates and zero-initializes memory, and exits on failure.
+ *
+ * This function is a wrapper around calloc(). It allocates memory for an
+ * array of `number` elements of `size` bytes each and initializes all bytes
+ * in the allocated storage to zero. If calloc() fails, it calls
+ * memory_full() to terminate the program. This ensures that the caller
+ * never receives a NULL pointer.
+ *
+ * @param number The number of elements to allocate.
+ * @param size The size of each element in bytes.
+ * @return A pointer to the allocated memory. This function never returns NULL.
+ */
 void               *
 xcalloc(unsigned number, unsigned size)
 {

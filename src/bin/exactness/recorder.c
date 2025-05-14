@@ -51,6 +51,12 @@ static Exactness_Unit *_unit = NULL;
 static char *_shot_key = NULL;
 static unsigned int _last_timestamp = 0.0;
 
+/**
+ * @brief Converts an Efl_Pointer_Action to an Exactness_Action_Type.
+ *
+ * @param t The EFL pointer action type.
+ * @return The corresponding exactness action type, or EXACTNESS_ACTION_UNKNOWN.
+ */
 static Exactness_Action_Type
 _event_pointer_type_get(Efl_Pointer_Action t)
 {
@@ -66,12 +72,33 @@ _event_pointer_type_get(Efl_Pointer_Action t)
      }
 }
 
+/**
+ * @brief Writes the recorded test unit data to the output file.
+ *
+ * This function is typically called at the end of a test run to save the
+ * captured events.
+ */
 static void
 _output_write()
 {
    if (_unit) exactness_unit_file_write(_unit, _out_filename);
 }
 
+/**
+ * @brief Creates and adds a new action to the list of recorded actions.
+ *
+ * This function appends a new action to the Exactness_Unit's action list.
+ * It calculates the delay since the last event and copies the event-specific
+ * data. To avoid redundant events, it checks if the new event is identical
+ * to the previous one (same type, timestamp, canvas, and data) and, if so,
+ * does not add it.
+ *
+ * @param type The type of the action to add.
+ * @param n_evas The ID of the Evas canvas where the event occurred.
+ * @param timestamp The timestamp of the event in milliseconds.
+ * @param data A pointer to the action-specific data (e.g., coordinates).
+ * @param len The length of the action-specific data in bytes.
+ */
 static void
 _add_to_list(Exactness_Action_Type type, unsigned int n_evas, unsigned int timestamp, void *data, int len)
 {
@@ -100,12 +127,30 @@ _add_to_list(Exactness_Action_Type type, unsigned int n_evas, unsigned int times
      }
 }
 
+/**
+ * @brief Retrieves the unique ID associated with an Evas canvas.
+ *
+ * This ID is assigned when the Evas canvas is first seen by the recorder.
+ *
+ * @param e The Evas canvas object.
+ * @return The unique integer ID for the canvas.
+ */
 static int
 _evas_id_get(Evas *e)
 {
    return (intptr_t)efl_key_data_get(e, "__evas_id");
 }
 
+/**
+ * @brief Callback for handling pointer-related events (mouse, touch).
+ *
+ * This function is triggered by various pointer events. It extracts relevant
+ * information like timestamp, position, and button from the event and records
+ * it as an action using _add_to_list().
+ *
+ * @param data The Evas canvas Eo object.
+ * @param event The EFL event information.
+ */
 static void
 _event_pointer_cb(void *data, const Efl_Event *event)
 {
@@ -165,6 +210,17 @@ _event_pointer_cb(void *data, const Efl_Event *event)
      }
 }
 
+/**
+ * @brief Callback for handling keyboard events.
+ *
+ * This function processes key down and key up events. It handles special
+ * control keys (like F1 for stabilize, F2 for screenshot, F3 for save)
+ * separately. For regular keys, it records a key up/down action along with
+ * key details like name, symbol, and string.
+ *
+ * @param data The Evas canvas Eo object.
+ * @param event The EFL event information.
+ */
 static void
 _event_key_cb(void *data, const Efl_Event *event)
 {
@@ -229,6 +285,17 @@ EFL_CALLBACKS_ARRAY_DEFINE(_event_pointer_callbacks,
       { EFL_EVENT_KEY_UP, _event_key_cb }
       )
 
+/**
+ * @brief Factory function for creating new Evas canvases.
+ *
+ * This function is set as a callback via ecore_evas_callback_new_set() to
+ * intercept all Evas canvas creations. It assigns a unique ID to each new
+ * canvas and attaches the necessary event listeners for recording.
+ *
+ * @param w The width of the new canvas (unused).
+ * @param h The height of the new canvas (unused).
+ * @return A new Evas canvas object.
+ */
 static Evas *
 _my_evas_new(int w EINA_UNUSED, int h EINA_UNUSED)
 {
@@ -244,6 +311,13 @@ _my_evas_new(int w EINA_UNUSED, int h EINA_UNUSED)
    return e;
 }
 
+/**
+ * @brief Initializes the main test unit data structure.
+ *
+ * This function allocates and initializes the global _unit structure, which
+ * holds all the recorded actions and metadata for a test case. It ensures
+ * this is only done once.
+ */
 static void
 _setup_unit(void)
 {
@@ -252,6 +326,19 @@ _setup_unit(void)
    _unit = calloc(1, sizeof(*_unit));
 }
 
+/**
+ * @brief Sets up a consistent font environment for the test.
+ *
+ * To ensure reproducible rendering, this function configures the application
+ * to use a specific set of fonts. It finds the most recently dated font
+ * subdirectory within the provided `fonts_dir`, creates a temporary
+ * fontconfig file pointing to it, and then sets the `FONTCONFIG_FILE`
+ * environment variable to enforce its use.
+ *
+ * @param fonts_dir The path to the directory containing versioned font
+ *                  subdirectories.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _setup_fonts_dir(const char *fonts_dir)
 {
@@ -285,6 +372,12 @@ _setup_fonts_dir(const char *fonts_dir)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Configures the key used to trigger screenshots.
+ *
+ * It reads the key name from the `SHOT_KEY` environment variable. If the
+ * variable is not set, it falls back to a default value (F2).
+ */
 static void
 _setup_shot_key(void)
 {
@@ -292,6 +385,12 @@ _setup_shot_key(void)
    if (!_shot_key) _shot_key = SHOT_KEY_STR;
 }
 
+/**
+ * @brief Sets up the interception of Ecore_Evas creation.
+ *
+ * This function registers _my_evas_new() as the factory for new Evas canvases
+ * and initializes the base timestamp for event recording.
+ */
 static void
 _setup_ee_creation(void)
 {
@@ -318,6 +417,17 @@ _setup_ee_creation(void)
 #define ORIGINAL_CALL(name, ...) \
    ORIGINAL_CALL_T(int, name, __VA_ARGS__)
 
+/**
+ * @brief Intercepts eina_init() to set up the recorder.
+ *
+ * This is one of the primary entry points for the recorder library. After
+ * calling the original eina_init(), it performs initial setup if this is the
+ * main application process. This includes registering a log domain, reading
+ * environment variables for configuration, and setting up the font
+ * environment.
+ *
+ * @return The return value from the original eina_init().
+ */
 EAPI int
 eina_init(void)
 {
@@ -342,6 +452,15 @@ eina_init(void)
    return original_return;
 }
 
+/**
+ * @brief Intercepts ecore_evas_init() to set up canvas creation hooks.
+ *
+ * After calling the original function, it sets up the mechanism to
+ * intercept Evas canvas creation, allowing the recorder to attach event
+ * listeners.
+ *
+ * @return The return value from the original ecore_evas_init().
+ */
 EAPI int
 ecore_evas_init(void)
 {
@@ -358,6 +477,16 @@ ecore_evas_init(void)
    return original_return;
 }
 
+/**
+ * @brief Intercepts elm_init() to prepare an overlay theme.
+ *
+ * This hook is used to apply a specific theme or overlay, likely to ensure
+ * consistent widget appearance during tests.
+ *
+ * @param argc Argument count for the original elm_init.
+ * @param argv Argument vector for the original elm_init.
+ * @return The return value from the original elm_init().
+ */
 //hook, to hook in our theme
 EAPI int
 elm_init(int argc, char **argv)
@@ -371,6 +500,13 @@ elm_init(int argc, char **argv)
    return original_return;
 }
 
+/**
+ * @brief Intercepts ecore_main_loop_begin() to write output upon exit.
+ *
+ * This function is hooked to detect the end of the application's main loop.
+ * It triggers writing the recorded session to a file. This hook is for
+ * older EFL applications. For newer ones, see efl_loop_begin().
+ */
 EAPI void
 ecore_main_loop_begin(void)
 {
@@ -381,6 +517,16 @@ ecore_main_loop_begin(void)
    (void)original_return;
 }
 
+/**
+ * @brief Intercepts efl_loop_begin() to write output upon exit.
+ *
+ * This function is hooked to detect the end of the application's main loop
+ * for modern, Eo-based EFL applications. It triggers writing the recorded
+ * session to a file.
+ *
+ * @param obj The loop object.
+ * @return The return value from the original efl_loop_begin().
+ */
 EAPI Eina_Value*
 efl_loop_begin(Eo *obj)
 {
@@ -391,6 +537,15 @@ efl_loop_begin(Eo *obj)
    return original_return;
 }
 
+/**
+ * @brief Intercepts eina_shutdown() to ensure output is written.
+ *
+ * This hook acts as a final safeguard to write the recorded data before the
+ * application fully terminates. It includes a check to prevent writing the
+ * output multiple times if other exit hooks have already done so.
+ *
+ * @return The return value from the original eina_shutdown().
+ */
 EAPI int
 eina_shutdown(void)
 {

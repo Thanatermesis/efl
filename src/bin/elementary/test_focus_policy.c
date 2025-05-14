@@ -3,6 +3,17 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback function for radio group "changed" event.
+ *
+ * This function is called when the selected radio button in the group changes.
+ * It sets the focus move policy of the test button based on the selected
+ * radio button's value.
+ *
+ * @param data The test button Evas_Object.
+ * @param obj The radio button Evas_Object that triggered the event.
+ * @param event_info Unused.
+ */
 static void
 _rdg_changed_cb(void *data, Evas_Object *obj,
                 void *event_info EINA_UNUSED)
@@ -30,6 +41,18 @@ _rdg_changed_cb(void *data, Evas_Object *obj,
      }
 }
 
+/**
+ * @brief Test function to demonstrate focus object policies.
+ *
+ * This function creates a window with several buttons and a set of radio
+ * buttons. The radio buttons allow changing the focus move policy of a
+ * specific "test button" to demonstrate how `ELM_FOCUS_MOVE_POLICY_CLICK`,
+ * `ELM_FOCUS_MOVE_POLICY_IN`, and `ELM_FOCUS_MOVE_POLICY_KEY_ONLY` work.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_focus_object_policy(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

@@ -51,12 +51,59 @@
   while (0)
 
 
+/**
+ * @internal
+ * @brief Callback invoked by D-Bus when an object path is unregistered.
+ * This function is responsible for freeing the associated Eldbus_Service_Object.
+ * @param conn The D-Bus connection (unused).
+ * @param user_data Pointer to the Eldbus_Service_Object to be freed.
+ */
 static void _object_unregister(DBusConnection *conn, void *user_data);
+
+/**
+ * @internal
+ * @brief Main handler for incoming D-Bus messages on a registered object path.
+ * It identifies the target interface and method, validates the message signature,
+ * and invokes the appropriate callback.
+ * @param conn The D-Bus connection (unused).
+ * @param message The incoming D-Bus message.
+ * @param user_data Pointer to the Eldbus_Service_Object associated with the message's path.
+ * @return DBUS_HANDLER_RESULT_HANDLED if the message was processed,
+ *         DBUS_HANDLER_RESULT_NOT_YET_HANDLED if the message was not for this handler,
+ *         or DBUS_HANDLER_RESULT_NEED_MEMORY on memory allocation failure.
+ */
 static DBusHandlerResult _object_handler(DBusConnection *conn, DBusMessage *message, void *user_data);
+
+/**
+ * @internal
+ * @brief Frees an Eldbus_Service_Object and its associated resources.
+ * This includes freeing all interfaces, children, and data associated with the object.
+ * @param obj The Eldbus_Service_Object to free.
+ */
 static void _object_free(Eldbus_Service_Object *obj);
+
+/**
+ * @internal
+ * @brief Frees an Eldbus_Service_Interface and its associated resources.
+ * This includes methods, signals, properties, and handles ObjectManager notifications.
+ * @param interface The Eldbus_Service_Interface to free.
+ */
 static void _interface_free(Eldbus_Service_Interface *interface);
+
+/**
+ * @internal
+ * @brief Callback invoked when the Eldbus_Connection is being freed.
+ * This function unregisters the object path from the D-Bus connection.
+ * @param data Pointer to the Eldbus_Service_Object.
+ * @param dead_pointer The Eldbus_Connection being freed (unused).
+ */
 static void _on_connection_free(void *data, const void *dead_pointer);
 
+/**
+ * @internal
+ * @brief D-Bus VTable for object path handling.
+ * Connects D-Bus core callbacks to Eldbus internal handlers.
+ */
 static DBusObjectPathVTable vtable = {
   _object_unregister,
   _object_handler,
@@ -66,10 +113,29 @@ static DBusObjectPathVTable vtable = {
   NULL
 };
 
+/**
+ * @internal @brief Global instance for the org.freedesktop.DBus.Introspectable interface.
+ */
 static Eldbus_Service_Interface *introspectable;
+/**
+ * @internal @brief Global instance for the org.freedesktop.DBus.Properties interface.
+ */
 static Eldbus_Service_Interface *properties_iface;
+/**
+ * @internal @brief Global instance for the org.freedesktop.DBus.ObjectManager interface.
+ */
 static Eldbus_Service_Interface *objmanager;
 
+/**
+ * @internal
+ * @brief Appends D-Bus argument introspection XML to a string buffer.
+ * Generates <arg> tags with type, name, and direction attributes.
+ * @param buf The Eina_Strbuf to append to.
+ * @param args An array of Eldbus_Arg_Info describing the arguments.
+ *             The array is terminated by an entry with a NULL signature.
+ *             Example: `(const Eldbus_Arg_Info[]){ {"s", "name"}, {"i", "value"}, {NULL, NULL} }`
+ * @param direction The direction of the argument ("in" or "out"). Can be NULL.
+ */
 static inline void
 _introspect_arguments_append(Eina_Strbuf *buf, const Eldbus_Arg_Info *args,
                              const char *direction)
@@ -89,6 +155,14 @@ _introspect_arguments_append(Eina_Strbuf *buf, const Eldbus_Arg_Info *args,
      }
 }
 
+/**
+ * @internal
+ * @brief Appends D-Bus signal introspection XML to a string buffer.
+ * Generates a <signal> tag with its name, annotations (like deprecated), and arguments.
+ * @param buf The Eina_Strbuf to append to.
+ * @param sig Pointer to the Eldbus_Signal structure to introspect.
+ *            Example: `const Eldbus_Signal sig = {"NameChanged", ELDBUS_ARGS({"s", "new_name"}), 0};`
+ */
 static inline void
 _introspect_append_signal(Eina_Strbuf *buf, const Eldbus_Signal *sig)
 {
@@ -110,6 +184,17 @@ _introspect_append_signal(Eina_Strbuf *buf, const Eldbus_Signal *sig)
    eina_strbuf_append(buf, "</signal>");
 }
 
+/**
+ * @internal
+ * @brief Appends D-Bus property introspection XML to a string buffer.
+ * Generates a <property> tag with its name, type, access rights (read, write, readwrite),
+ * and annotations (like deprecated).
+ * @param buf The Eina_Strbuf to append to.
+ * @param prop Pointer to the Eldbus_Property structure to introspect.
+ *             Example: `const Eldbus_Property p = {"Version", "s", get_cb, set_cb, 0};`
+ * @param iface The service interface this property belongs to, used to determine
+ *              default get/set functions if property-specific ones are not set.
+ */
 static inline void
 _instrospect_append_property(Eina_Strbuf *buf, const Eldbus_Property *prop, const Eldbus_Service_Interface *iface)
 {
@@ -136,6 +221,15 @@ _instrospect_append_property(Eina_Strbuf *buf, const Eldbus_Property *prop, cons
    eina_strbuf_append(buf, "</property>");
 }
 
+/**
+ * @internal
+ * @brief Appends D-Bus method introspection XML to a string buffer.
+ * Generates a <method> tag with its name, annotations (deprecated, noreply),
+ * and input/output arguments.
+ * @param buf The Eina_Strbuf to append to.
+ * @param method Pointer to the Eldbus_Method structure to introspect.
+ *               Example: `const Eldbus_Method m = {"GetName", NULL, ELDBUS_ARGS({"s", "name"}), cb, 0};`
+ */
 static inline void
 _introspect_append_method(Eina_Strbuf *buf, const Eldbus_Method *method)
 {
@@ -155,9 +249,16 @@ _introspect_append_method(Eina_Strbuf *buf, const Eldbus_Method *method)
 typedef struct _Property
 {
    const Eldbus_Property *property;
-   Eina_Bool is_invalidate:1;
+   Eina_Bool is_invalidate:1; /**< EINA_TRUE if property value is invalidated */
 } Property;
 
+/**
+ * @internal
+ * @brief Appends D-Bus interface introspection XML to a string buffer.
+ * Generates an <interface> tag including all its methods, signals, and properties.
+ * @param buf The Eina_Strbuf to append to.
+ * @param iface Pointer to the Eldbus_Service_Interface to introspect.
+ */
 static void
 _introspect_append_interface(Eina_Strbuf *buf, Eldbus_Service_Interface *iface)
 {
@@ -184,6 +285,16 @@ _introspect_append_interface(Eina_Strbuf *buf, Eldbus_Service_Interface *iface)
    eina_strbuf_append(buf, "</interface>");
 }
 
+/**
+ * @internal
+ * @brief Callback for the "Get" method of the org.freedesktop.DBus.Properties interface.
+ * Retrieves the value of a property.
+ * @param piface The properties interface (org.freedesktop.DBus.Properties).
+ * @param msg The incoming D-Bus message requesting the property.
+ *            Expected arguments: "ss" (interface_name, property_name).
+ * @return A D-Bus message containing the property value as a variant, or an error message.
+ *         Example reply arguments: "v" (value).
+ */
 static Eldbus_Message *
 _cb_property_get(const Eldbus_Service_Interface *piface, const Eldbus_Message *msg)
 {
@@ -237,6 +348,20 @@ not_found:
                                   "Property not found.");
 }
 
+/**
+ * @internal
+ * @brief Helper function to iterate over properties and append them to a dictionary iterator.
+ * Used by _cb_property_getall and _propmgr_iface_props_append.
+ * @param iface The service interface whose properties are being fetched.
+ * @param iterator An iterator over the Property structures of the interface.
+ * @param dict A D-Bus message iterator for a dictionary of type a{sv}.
+ *             Property names and values will be appended to this dictionary.
+ * @param input_msg The original D-Bus message that triggered the GetAll or InterfacesAdded.
+ *                  Can be NULL if not called in response to a client request (e.g., InterfacesAdded).
+ * @param error_reply Pointer to an Eldbus_Message pointer. If an error occurs and
+ *                    input_msg is not NULL, this will be set to an error message.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _props_getall(Eldbus_Service_Interface *iface, Eina_Iterator *iterator, Eldbus_Message_Iter *dict, const Eldbus_Message *input_msg, Eldbus_Message **error_reply)
 {
@@ -272,6 +397,18 @@ _props_getall(Eldbus_Service_Interface *iface, Eina_Iterator *iterator, Eldbus_M
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Callback for the "GetAll" method of the org.freedesktop.DBus.Properties interface.
+ * Retrieves all properties of a given interface.
+ * @param piface The properties interface (org.freedesktop.DBus.Properties).
+ * @param msg The incoming D-Bus message requesting all properties.
+ *            Expected arguments: "s" (interface_name).
+ * @return A D-Bus message containing a dictionary of property names to values, or an error message.
+ *         Example reply arguments: "a{sv}" (dictionary_of_properties).
+ *         The dictionary is an array of structs, where each struct contains a string (property name)
+ *         and a variant (property value). E.g., `[{"Prop1", <VariantForProp1>}, {"Prop2", <VariantForProp2>}]`
+ */
 static Eldbus_Message *
 _cb_property_getall(const Eldbus_Service_Interface *piface, const Eldbus_Message *msg)
 {
@@ -312,6 +449,15 @@ _cb_property_getall(const Eldbus_Service_Interface *piface, const Eldbus_Message
    return reply;
 }
 
+/**
+ * @internal
+ * @brief Callback for the "Set" method of the org.freedesktop.DBus.Properties interface.
+ * Sets the value of a property.
+ * @param piface The properties interface (org.freedesktop.DBus.Properties).
+ * @param msg The incoming D-Bus message attempting to set a property.
+ *            Expected arguments: "ssv" (interface_name, property_name, new_value_variant).
+ * @return A D-Bus method return message on success, or an error message on failure.
+ */
 static Eldbus_Message *
 _cb_property_set(const Eldbus_Service_Interface *piface, const Eldbus_Message *msg)
 {
@@ -349,6 +495,16 @@ _cb_property_set(const Eldbus_Service_Interface *piface, const Eldbus_Message *m
    return reply;
 }
 
+/**
+ * @internal
+ * @brief Callback for the "Introspect" method of the org.freedesktop.DBus.Introspectable interface.
+ * Generates and returns the XML introspection data for the object.
+ * The introspection data is cached and regenerated only if `obj->introspection_dirty` is true.
+ * @param _iface The introspectable interface (org.freedesktop.DBus.Introspectable).
+ * @param message The incoming D-Bus message requesting introspection.
+ * @return A D-Bus message containing the XML introspection string, or NULL on failure.
+ *         Example reply arguments: "s" (xml_data_string).
+ */
 static Eldbus_Message *
 cb_introspect(const Eldbus_Service_Interface *_iface, const Eldbus_Message *message)
 {
@@ -398,9 +554,14 @@ fail:
 }
 
 static const Eldbus_Method introspect = {
-   "Introspect", NULL, ELDBUS_ARGS({ "s", "xml" }), cb_introspect, 0
+   "Introspect", NULL, ELDBUS_ARGS({ "s", "xml" }), cb_introspect, 0 /**< Method definition for Introspect */
 };
 
+/**
+ * @internal
+ * @brief Creates and initializes the global org.freedesktop.DBus.Introspectable interface.
+ * This interface is shared by all service objects.
+ */
 static void
 _introspectable_create(void)
 {
@@ -416,6 +577,11 @@ _introspectable_create(void)
    eina_hash_add(introspectable->methods, introspect.member, &introspect);
 }
 
+/**
+ * @internal
+ * @brief Frees the global default interfaces (Introspectable, Properties, ObjectManager).
+ * Called during eldbus_service_shutdown().
+ */
 static void
 _default_interfaces_free(void)
 {
@@ -457,6 +623,12 @@ static const Eldbus_Signal _properties_signals[] = {
    }
 };
 
+/**
+ * @internal
+ * @brief Creates and initializes the global org.freedesktop.DBus.Properties interface.
+ * This interface is shared by all service objects that expose properties.
+ * It registers the Get, Set, and GetAll methods.
+ */
 static void
 _properties_create(void)
 {
@@ -480,6 +652,18 @@ _properties_create(void)
    eina_array_push(properties_iface->sign_of_signals, "sa{sv}as");
 }
 
+/**
+ * @internal
+ * @brief Appends an interface and its properties to a D-Bus array of dictionary entries.
+ * This is used for constructing the data for ObjectManager.InterfacesAdded signals and
+ * GetManagedObjects replies. The format is a{sa{sv}}.
+ * @param iface The service interface to append.
+ * @param array A D-Bus message iterator for an array of type a{sa{sv}}.
+ *              The structure being appended is `{s, a{sv}}`.
+ *              Example of one element in the outer array:
+ *              `{"com.example.Interface1", [{"PropName", <VariantValue>}, {"OtherProp", <VariantValue2>}]}`
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _propmgr_iface_props_append(Eldbus_Service_Interface *iface, Eldbus_Message_Iter *array)
 {
@@ -504,6 +688,20 @@ _propmgr_iface_props_append(Eldbus_Service_Interface *iface, Eldbus_Message_Iter
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Recursively appends managed objects and their interfaces to a D-Bus array.
+ * This is used for the GetManagedObjects method of the ObjectManager interface.
+ * The format is a{oa{sa{sv}}}.
+ * @param obj The current service object to process.
+ * @param array A D-Bus message iterator for an array of type a{oa{sa{sv}}}.
+ *              The structure being appended is `{o, a{sa{sv}}}`.
+ *              Example of one element in the outer array:
+ *              `{"/com/example/Object1", [{"com.example.Interface1", [{"Prop", <Val>}]}]}`
+ * @param first EINA_TRUE if this is the first call in the recursion (for the root object manager path),
+ *              EINA_FALSE otherwise. The root object itself is not added to the list.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _managed_obj_append(Eldbus_Service_Object *obj, Eldbus_Message_Iter *array, Eina_Bool first)
 {

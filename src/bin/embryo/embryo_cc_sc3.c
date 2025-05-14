@@ -1,4 +1,6 @@
-/*  Small compiler - Recursive descend expresion parser
+/**
+ * @file
+ * @brief Recursive descent expression parser for the Small compiler.
  *
  *  Copyright (c) ITB CompuPhase, 1997-2003
  *
@@ -33,18 +35,89 @@
 
 #include "embryo_cc_sc.h"
 
+/** @brief Skims over terms adjoining || and && operators, implementing short-circuit evaluation.
+ *  @param opstr    Array of operators to look for (e.g., tlOR for ||). List is 0-terminated.
+ *  @param testfunc Function to generate a conditional jump (e.g., jmp_ne0 for ||, jmp_eq0 for &&).
+ *                  This function is called to jump if the condition for "dropping out" is met.
+ *  @param dropval  The value of the expression if an "early drop-out" occurs.
+ *                  For ||, this is 1 (true) if the left-hand side is true.
+ *                  For &&, this is 0 (false) if the left-hand side is false.
+ *  @param endval   The value of the expression if no "early drop-out" occurs (i.e., all parts are evaluated).
+ *                  For ||, this is 0 (false) if all parts are false.
+ *                  For &&, this is 1 (true) if all parts are true.
+ *  @param hier     Function pointer to the next higher precedence level in the expression parser.
+ *  @param lval     Pointer to a 'value' struct to store the result of the parsed sub-expression.
+ *  @return         TRUE if an l-value was processed, FALSE otherwise.
+ */
 static int          skim(int *opstr, void (*testfunc) (int), int dropval,
 			 int endval, int (*hier) (value *), value * lval);
+
+/** @brief Handles the "early drop-out" logic for short-circuit evaluation.
+ *  If lvalue is true, loads the rvalue of lval. If lval is a constant, loads the constant.
+ *  Then, calls testfunc to conditionally jump to exit1.
+ *  @param lvalue   Indicates if lval represents an l-value.
+ *  @param testfunc Function to generate a conditional jump (e.g., jmp_ne0, jmp_eq0).
+ *  @param exit1    Label to jump to if the condition for "dropping out" is met.
+ *  @param lval     Pointer to a 'value' struct representing the current sub-expression.
+ */
 static void         dropout(int lvalue, void (*testfunc) (int val), int exit1,
 			    value * lval);
+
+/** @brief Plunges to a lower hierarchy level for binary operators.
+ *  Parses expressions like `expr op expr op expr ...` where `op` is from `opstr`.
+ *  @param opstr    Array of operator tokens to match for this hierarchy level. 0-terminated.
+ *  @param opoff    Offset to add to the index returned by nextop() to find the operator in op1[].
+ *  @param hier     Function pointer to the next higher precedence level in the expression parser.
+ *  @param lval     Pointer to a 'value' struct to store the result of the parsed expression.
+ *                  Initially holds the left operand, then the result.
+ *  @param forcetag If not NULL, the resulting expression's tag is forced to this tag name.
+ *  @param chkbitwise If TRUE, checks for mixing bitwise and logical operators without parentheses.
+ *  @return         TRUE if an l-value was processed, FALSE otherwise (expression result is not an l-value).
+ */
 static int          plnge(int *opstr, int opoff, int (*hier) (value * lval),
 			  value * lval, char *forcetag, int chkbitwise);
+
+/** @brief Unary plunge to a lower hierarchy level.
+ *  Calls the next higher precedence parsing function. If the result is a constant,
+ *  it delays loading the constant.
+ *  @param hier Function pointer to the next higher precedence level in the expression parser.
+ *  @param lval Pointer to a 'value' struct to store the result of the parsed sub-expression.
+ *  @return     The result of calling `hier(lval)` (TRUE if an l-value, FALSE otherwise).
+ */
 static int          plnge1(int (*hier) (value * lval), value * lval);
+
+/** @brief Binary plunge to a lower hierarchy level, handling two operands.
+ *  Parses `lval1 oper lval2`. Handles constants efficiently and checks for user-defined operators.
+ *  @param oper   Function pointer to the code generation function for the operator (e.g., ob_add).
+ *                If NULL, implies an assignment operation (handled in hier14).
+ *  @param hier   Function pointer to the next higher precedence level for parsing the right operand (lval2).
+ *  @param lval1  Pointer to a 'value' struct for the left operand. Receives the result.
+ *  @param lval2  Pointer to a 'value' struct for the right operand.
+ */
 static void         plnge2(void (*oper) (void),
 			   int (*hier) (value * lval),
 			   value * lval1, value * lval2);
+
+/** @brief Calculates the result of a binary operation on two constant cell values.
+ *  @param left       The left operand.
+ *  @param oper       Function pointer identifying the binary operator (e.g., ob_add, os_le).
+ *  @param right      The right operand.
+ *  @param boolresult For relational operators (<=, >=, <, >), this char is updated
+ *                    to reflect the ongoing boolean result in a chained comparison.
+ *                    The function itself returns `right` for these, but `*boolresult`
+ *                    accumulates the truthiness. For example, in `A < B < C`,
+ *                    `calc(A, os_lt, B, boolresult)` updates `boolresult` based on `A < B`,
+ *                    then `calc(B, os_lt, C, boolresult)` updates it based on `B < C`.
+ *  @return           The result of the operation. For relational ops, returns `right`.
+ */
 static cell         calc(cell left, void (*oper) (), cell right,
 			 char *boolresult);
+
+/** @brief Parses conditional expressions (ternary operator `? :`). Hierarchy level 13.
+ *  Example: `condition ? true_expression : false_expression`
+ *  @param lval Pointer to a 'value' struct to store the result of the expression.
+ *  @return     Always FALSE, as the result of a conditional expression is not an l-value.
+ */
 static int          hier13(value * lval);
 static int          hier12(value * lval);
 static int          hier11(value * lval);
@@ -58,17 +131,69 @@ static int          hier4(value * lval);
 static int          hier3(value * lval);
 static int          hier2(value * lval);
 static int          hier1(value * lval1);
+
+/** @brief Parses primary expressions: literals, variables, function calls, parenthesized expressions.
+ *  This is the highest precedence level for single operands before operators are considered.
+ *  @param lval Pointer to a 'value' struct to store the parsed primary expression.
+ *  @return     TRUE if the primary expression is an l-value (e.g., a variable), FALSE otherwise
+ *              (e.g., a constant, function call result).
+ */
 static int          primary(value * lval);
+
+/** @brief Clears a 'value' struct to a default state.
+ *  @param lval Pointer to the 'value' struct to clear.
+ */
 static void         clear_value(value * lval);
+
+/** @brief Generates code to call a function, handling arguments (default, positional, named).
+ *  @param sym Pointer to the symbol table entry for the function being called.
+ */
 static void         callfunction(symbol * sym);
+
+/** @brief Tests if an operation involves an array and a scalar for pointer arithmetic scaling.
+ *  Used for operations like `array_ptr + integer_offset`.
+ *  @param oper  Function pointer for the binary operator (e.g., ob_add, ob_sub).
+ *  @param lval1 Pointer to the 'value' struct for the left operand.
+ *  @param lval2 Pointer to the 'value' struct for the right operand.
+ *  @return      The shift count (1 for 16-bit cells, 2 for 32-bit cells) if scaling is needed,
+ *               0 otherwise. Scaling is needed if `oper` is + or -, `lval1` is an array,
+ *               and `lval2` is not an array.
+ */
 static int          dbltest(void (*oper) (), value * lval1, value * lval2);
+
+/** @brief Checks if a binary operator is commutative.
+ *  Commutative operators: +, *, ==, !=, &, ^, |
+ *  @param oper Function pointer for the binary operator.
+ *  @return     TRUE if the operator is commutative, FALSE otherwise.
+ */
 static int          commutative(void (*oper) ());
+
+/** @brief Parses and generates code for constants (numbers, strings, literal arrays).
+ *  @param lval Pointer to a 'value' struct to store information about the constant.
+ *              - For numbers: `constval` holds the value, `ident` is `iCONSTEXPR`.
+ *              - For strings: `ident` is `iARRAY`, `constval` is negative of string length in literal table.
+ *              - For literal arrays: `ident` is `iARRAY`, `constval` is size of array in literal table.
+ *                Example: `{10, 20, 30}`
+ *  @return     TRUE if a constant was successfully parsed, FALSE otherwise.
+ */
 static int          constant(value * lval);
 
-static char         lastsymbol[sNAMEMAX + 1];	/* name of last function/variable */
-static int          bitwise_opercount;	/* count of bitwise operators in an expression */
+/** @brief Stores the name of the last encountered symbol (function or variable). Used for error reporting. */
+static char         lastsymbol[sNAMEMAX + 1];
+/** @brief Counts bitwise operators in an expression to enforce operator precedence rules (e.g., disallow `a & b == c` without parentheses). */
+static int          bitwise_opercount;
 
-/* Function addresses of binary operators for signed operations */
+/** @brief Array of function pointers for binary operators, used in expression parsing.
+ * The order and grouping correspond to operator precedence levels (hier3 to hier10).
+ * - Indices 0-2: *, /, % (hier3)
+ * - Indices 3-4: +, - (hier4)
+ * - Indices 5-7: <<, >> (signed), >> (unsigned) (hier5)
+ * - Index 8:     & (hier6)
+ * - Index 9:     ^ (hier7)
+ * - Index 10:    | (hier8)
+ * - Indices 11-14: <=, >=, <, > (hier9)
+ * - Indices 15-16: ==, != (hier10)
+ */
 static void         (*op1[17]) (void) =
 {
    os_mult, os_div, os_mod,	/* hier3, index 0 */
@@ -87,21 +212,26 @@ static void         (*op1[17]) (void) =
  * have the same prototype. As inc() and dec() are special cases already, it
  * is simplest to add two "do-nothing" functions.
  */
+/** @brief Placeholder function for user-defined increment operator. Does nothing itself. */
 static void
 user_inc(void)
 {
 }
+/** @brief Placeholder function for user-defined decrement operator. Does nothing itself. */
 static void
 user_dec(void)
 {
 }
 
-/*
- *  Searches for a binary operator a list of operators. The list is stored in
- *  the array "list". The last entry in the list should be set to 0.
+/**
+ * @brief Searches for a binary operator in a list of operator tokens.
  *
- *  The index of an operator in "list" (if found) is returned in "opidx". If
- *  no operator is found, nextop() returns 0.
+ * The list is stored in the array "list". The last entry in the list should be set to 0.
+ *
+ * @param opidx Pointer to an integer where the index of the found operator in "list" will be stored.
+ * @param list  Null-terminated array of operator tokens to search for.
+ *              Example: `static int list_mul_div_mod[] = { '*', '/', '%', 0 };`
+ * @return      TRUE if an operator from the list is matched with the current token, FALSE otherwise.
  */
 static int
 nextop(int *opidx, int *list)
@@ -122,10 +252,29 @@ nextop(int *opidx, int *list)
    return FALSE;		/* entire list scanned, nothing found */
 }
 
+/**
+ * @brief Checks for and handles user-defined operators.
+ *
+ * If a user-defined operator matching the operation and operand tags is found,
+ * this function generates code to call that user-defined operator function.
+ *
+ * @param oper      Function pointer for the built-in binary or unary operator (e.g., ob_add, neg).
+ *                  If NULL, it signifies an assignment operator (`=`).
+ * @param tag1      Tag of the left operand (or the single operand for unary operators).
+ * @param tag2      Tag of the right operand (unused for unary operators).
+ * @param numparam  Number of parameters for the operator (1 for unary, 2 for binary).
+ * @param lval      For unary ++/-- operators, pointer to the 'value' struct of the operand.
+ *                  This is used to load the value before calling the user operator and
+ *                  store the result afterwards. NULL for other operators.
+ * @param resulttag Pointer to an integer where the tag of the result (from the user-defined function)
+ *                  will be stored.
+ * @return          TRUE if a user-defined operator was found and called, FALSE otherwise.
+ */
 int
 check_userop(void   (*oper) (void), int tag1, int tag2, int numparam,
 	     value * lval, int *resulttag)
 {
+   /** @brief String representations of binary operators, indexed consistently with op1[]. */
    static char        *binoperstr[] = { "*", "/", "%", "+", "-", "", "", "",
       "", "", "", "<=", ">=", "<", ">", "==", "!="
    };
@@ -326,6 +475,15 @@ check_userop(void   (*oper) (void), int tag1, int tag2, int numparam,
    return TRUE;
 }
 
+/**
+ * @brief Checks if an actual tag matches a formal tag, allowing for coercion.
+ *
+ * @param formaltag   The expected tag (e.g., from a function parameter declaration).
+ * @param actualtag   The tag of the expression or variable being checked.
+ * @param allowcoerce If TRUE, allows `actualtag` to be coerced to `formaltag` if `formaltag` is 0 (untagged)
+ *                    and `actualtag` is not a `FIXEDTAG`.
+ * @return            TRUE if the tags match or coercion is allowed and applicable, FALSE otherwise.
+ */
 int
 matchtag(int formaltag, int actualtag, int allowcoerce)
 {
@@ -480,6 +638,18 @@ dropout(int lvalue, void (*testfunc) (int val), int exit1, value * lval)
    (*testfunc) (exit1);
 }
 
+/**
+ * @brief Checks if a function, represented by lval->sym, should return a value
+ *        and if it has been defined to do so.
+ *
+ * This is typically called when a function's result is used in an expression.
+ * If the function is defined, it checks the uRETVALUE usage flag.
+ * If not yet defined, it sets the uRETVALUE flag to enforce a return value
+ * in its eventual definition.
+ *
+ * @param lval Pointer to a 'value' struct. If lval->sym points to a function,
+ *             that function is checked.
+ */
 static void
 checkfunction(value * lval)
 {

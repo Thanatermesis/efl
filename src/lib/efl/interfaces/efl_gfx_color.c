@@ -1,6 +1,18 @@
 #include "config.h"
 #include "Efl.h"
 
+/**
+ * @internal
+ * @brief Converts a hexadecimal character to its integer value.
+ *
+ * This function takes a character representing a hexadecimal digit (0-9, A-F, a-f)
+ * and converts it into its corresponding integer value (0-15).
+ * If the character is not a valid hexadecimal digit, the `ok` flag is set to EINA_FALSE.
+ *
+ * @param[in] ch The character to convert.
+ * @param[out] ok Pointer to a boolean that will be set to EINA_FALSE if ch is not a valid hex digit.
+ * @return The integer value of the hexadecimal character, or 0 if invalid.
+ */
 static int
 _hex_string_get(char ch, Eina_Bool *ok)
 {
@@ -72,6 +84,7 @@ _format_color_parse(const char *str, int slen,
      }
    else v = EINA_FALSE;
 
+   /* Apply pre-multiplied alpha */
    *r = (*r * *a) / 255;
    *g = (*g * *a) / 255;
    *b = (*b * *a) / 255;
@@ -90,6 +103,18 @@ _efl_gfx_color_color_code_set(Eo *obj, void *_pd EINA_UNUSED, const char *colorc
     efl_gfx_color_set(obj, r, g, b, a);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the color of the object as a hexadecimal string.
+ *
+ * The returned string is in the format "#RRGGBBAA".
+ * The string is allocated using eina_slstr_printf and should be freed by the caller
+ * if it's no longer needed and eina_slstr is not being used.
+ *
+ * @param[in] obj The Eolian object.
+ * @param[in] _pd Efl_Gfx_Color_Data (unused).
+ * @return A string representing the color in #RRGGBBAA format, or NULL on error.
+ */
 EOLIAN static const char *
 _efl_gfx_color_color_code_get(const Eo *obj, void *_pd EINA_UNUSED)
 {
@@ -99,6 +124,20 @@ _efl_gfx_color_color_code_get(const Eo *obj, void *_pd EINA_UNUSED)
     return eina_slstr_printf("#%02X%02X%02X%02X", r, g, b, a);
 }
 
+/**
+ * @internal
+ * @brief Sets a color for a specific color class and layer using a hexadecimal string.
+ *
+ * Parses the colorcode string (e.g., "#RRGGBB", "#RRGGBBAA") and applies it
+ * to the specified color_class and layer.
+ *
+ * @param[in] obj The Eolian object.
+ * @param[in] _pd Efl_Gfx_Color_Data (unused).
+ * @param[in] color_class The name of the color class to modify.
+ * @param[in] layer The layer within the color class to modify.
+ * @param[in] colorcode The hexadecimal color string.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., invalid colorcode format).
+ */
 EOLIAN static Eina_Bool
 _efl_gfx_color_class_color_class_code_set(Eo *obj, void *_pd EINA_UNUSED, const char *color_class,
                                     Efl_Gfx_Color_Class_Layer layer, const char *colorcode)
@@ -112,6 +151,20 @@ _efl_gfx_color_class_color_class_code_set(Eo *obj, void *_pd EINA_UNUSED, const 
    return efl_gfx_color_class_set(obj, color_class, layer, r, g, b, a);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the color of a specific color class and layer as a hexadecimal string.
+ *
+ * The returned string is in the format "#RRGGBBAA".
+ * The string is allocated using eina_slstr_printf and should be freed by the caller
+ * if it's no longer needed and eina_slstr is not being used.
+ *
+ * @param[in] obj The Eolian object (unused).
+ * @param[in] pd Efl_Gfx_Color_Data (unused).
+ * @param[in] color_class The name of the color class.
+ * @param[in] layer The layer within the color class.
+ * @return A string representing the color in #RRGGBBAA format if found, otherwise NULL.
+ */
 EOLIAN static const char *
 _efl_gfx_color_class_color_class_code_get(const Eo *obj EINA_UNUSED, void *pd EINA_UNUSED,
                                     const char *color_class, Efl_Gfx_Color_Class_Layer layer)

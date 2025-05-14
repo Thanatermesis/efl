@@ -9,6 +9,13 @@
 typedef struct _External_Emotion_Params External_Emotion_Params;
 typedef struct _External_Emotion_Signals_Proxy_Context External_Emotion_Signals_Proxy_Context;
 
+/**
+ * @brief Structure to hold parameters for an external Emotion object.
+ * This structure is used to parse and store parameters from Edje
+ * data collections, which are then applied to an Emotion object.
+ * The macros _STR, _BOOL, _INT, _DOUBLE are helpers to define
+ * members and their existence flags.
+ */
 struct _External_Emotion_Params
 {
 #define _STR(M) const char *M
@@ -36,11 +43,17 @@ struct _External_Emotion_Params
 #undef _DOUBLE
 };
 
+/**
+ * @brief Context for proxying Emotion object signals to Edje object signals.
+ * This structure holds the necessary information to forward a signal
+ * from an Emotion object to its corresponding Edje object, allowing
+ * Edje themes to react to Emotion events.
+ */
 struct _External_Emotion_Signals_Proxy_Context
 {
-   const char *emission;
-   const char *source;
-   Evas_Object *edje;
+   const char *emission; /**< The signal name to be emitted by the Edje object. */
+   const char *source;   /**< The source part name for the Edje signal. */
+   Evas_Object *edje;    /**< The Edje object that will emit the signal. */
 };
 
 static int _log_dom = -1;
@@ -64,6 +77,14 @@ static const char _external_emotion_engine_def[] =
   "impossible";
 #endif
 
+/**
+ * @brief Frees the context used for signal proxying.
+ * This function is called when the Emotion object is deleted.
+ * @param data The context to free (External_Emotion_Signals_Proxy_Context).
+ * @param e Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _external_emotion_signal_proxy_free_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -71,6 +92,14 @@ _external_emotion_signal_proxy_free_cb(void *data, Evas *e EINA_UNUSED, Evas_Obj
    free(ctxt);
 }
 
+/**
+ * @brief Callback for Emotion object signals that proxies them to an Edje object.
+ * When an Emotion object emits a signal, this function is called,
+ * and it, in turn, emits a corresponding signal on the associated Edje object.
+ * @param data The context containing emission, source, and Edje object (External_Emotion_Signals_Proxy_Context).
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _external_emotion_signal_proxy_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -80,6 +109,19 @@ _external_emotion_signal_proxy_cb(void *data, Evas_Object *obj EINA_UNUSED, void
    edje_object_signal_emit(ctxt->edje, ctxt->emission, ctxt->source);
 }
 
+/**
+ * @brief Creates and initializes an Emotion object for use as an Edje external object.
+ * This function is called by Edje when an "emotion" external part is encountered.
+ * It creates an Emotion object, initializes it with the specified engine, and
+ * sets up signal proxying so that Emotion signals are forwarded to the Edje object.
+ * @param data Unused.
+ * @param evas The Evas canvas.
+ * @param edje The Edje object that contains this external part.
+ * @param params A list of Edje_External_Param defining initial properties.
+ *               Example: A list containing an Edje_External_Param with name "engine" and value "gstreamer1".
+ * @param part_name The name of the Edje part this Emotion object is associated with.
+ * @return A new Evas_Object (Emotion object) on success, or NULL on failure.
+ */
 static Evas_Object *
 _external_emotion_add(void *data EINA_UNUSED, Evas *evas, Evas_Object *edje EINA_UNUSED, const Eina_List *params, const char *part_name)
 {
@@ -134,12 +176,32 @@ _external_emotion_add(void *data EINA_UNUSED, Evas *evas, Evas_Object *edje EINA
    return obj;
 }
 
+/**
+ * @brief Handles signals emitted from Edje to the Emotion external object.
+ * This function is called when Edje emits a signal targeted at this external part.
+ * Currently, it only logs the received signal.
+ * @param data Unused.
+ * @param obj The Emotion object.
+ * @param signal The signal string (e.g., "play", "stop").
+ * @param source The source string of the signal.
+ */
 static void
 _external_emotion_signal(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, const char *signal, const char *source)
 {
    DBG("External Signal received: '%s' '%s'", signal, source);
 }
 
+/**
+ * @brief Sets the state of the Emotion object based on Edje state descriptions.
+ * This function is called by Edje to apply a state (defined in the EDC) to
+ * the Emotion object. It parses parameters from `from_params` or `to_params`
+ * and applies them to the Emotion object.
+ * @param data Unused.
+ * @param obj The Emotion object.
+ * @param from_params The parameters of the starting state (External_Emotion_Params).
+ * @param to_params The parameters of the target state (External_Emotion_Params).
+ * @param pos Unused (represents the position in a transition, not used here).
+ */
 static void
 _external_emotion_state_set(void *data EINA_UNUSED, Evas_Object *obj, const void *from_params, const void *to_params, float pos EINA_UNUSED)
 {
@@ -176,6 +238,17 @@ _external_emotion_state_set(void *data EINA_UNUSED, Evas_Object *obj, const void
 #undef _DOUBLE
 }
 
+/**
+ * @brief Sets a specific parameter on the Emotion object.
+ * This function is called by Edje to set a single parameter on the Emotion object,
+ * typically from an EDC script action like `param_set`.
+ * @param data Unused.
+ * @param obj The Emotion object.
+ * @param param The parameter to set (Edje_External_Param).
+ *              Example: param->name = "file", param->type = EDJE_EXTERNAL_PARAM_TYPE_STRING, param->s = "/path/to/video.mp4".
+ *              Example: param->name = "play", param->type = EDJE_EXTERNAL_PARAM_TYPE_BOOL, param->i = EINA_TRUE.
+ * @return EINA_TRUE if the parameter was successfully set, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _external_emotion_param_set(void *data EINA_UNUSED, Evas_Object *obj, const Edje_External_Param *param)
 {
@@ -254,6 +327,20 @@ _external_emotion_param_set(void *data EINA_UNUSED, Evas_Object *obj, const Edje
    return EINA_FALSE;
 }
 
+/**
+ * @brief Gets a specific parameter from the Emotion object.
+ * This function is called by Edje to retrieve the value of a single parameter
+ * from the Emotion object.
+ * @param data Unused.
+ * @param obj The Emotion object (const, as this is a get operation).
+ * @param param An Edje_External_Param structure to be filled with the parameter's value.
+ *              The `name` field of `param` indicates which parameter to get.
+ *              Example: param->name = "file", param->type = EDJE_EXTERNAL_PARAM_TYPE_STRING.
+ *                       After call, param->s will contain the current file path.
+ *              Example: param->name = "play_length", param->type = EDJE_EXTERNAL_PARAM_TYPE_DOUBLE.
+ *                       After call, param->d will contain the video duration.
+ * @return EINA_TRUE if the parameter was successfully retrieved, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _external_emotion_param_get(void *data EINA_UNUSED, const Evas_Object *obj, Edje_External_Param *param)
 {
@@ -321,6 +408,21 @@ _external_emotion_param_get(void *data EINA_UNUSED, const Evas_Object *obj, Edje
    return EINA_FALSE;
 }
 
+/**
+ * @brief Parses a list of Edje external parameters into an External_Emotion_Params structure.
+ * This function is called by Edje to convert a list of parameters (typically from
+ * an EDC state description) into a custom structure that can be used by
+ * `_external_emotion_state_set`.
+ * @param data Unused.
+ * @param obj Unused.
+ * @param params A list of Edje_External_Param.
+ *               Example: A list containing parameters like:
+ *               - {name="file", type=STRING, s="video.ogv"}
+ *               - {name="play", type=BOOL, i=EINA_TRUE}
+ *               - {name="audio_volume", type=DOUBLE, d=0.5}
+ * @return A pointer to a newly allocated External_Emotion_Params structure filled
+ *         with values from `params`, or NULL on allocation failure.
+ */
 static void *
 _external_emotion_params_parse(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, const Eina_List *params)
 {
@@ -376,6 +478,12 @@ _external_emotion_params_parse(void *data EINA_UNUSED, Evas_Object *obj EINA_UNU
    return p;
 }
 
+/**
+ * @brief Frees an External_Emotion_Params structure.
+ * This function is called by Edje to release the memory allocated by
+ * `_external_emotion_params_parse`.
+ * @param params A pointer to the External_Emotion_Params structure to free.
+ */
 static void
 _external_emotion_params_free(void *params)
 {
@@ -407,12 +515,25 @@ _external_emotion_params_free(void *params)
    free(p);
 }
 
+/**
+ * @brief Gets the human-readable label for this external type.
+ * This label is used in UI elements, like an editor.
+ * @param data Unused.
+ * @return A string literal "Emotion".
+ */
 static const char *
 _external_emotion_label_get(void *data EINA_UNUSED)
 {
     return "Emotion";
 }
 
+/**
+ * @brief Creates an icon for this external type.
+ * This icon is used in UI elements, like an editor, to represent the Emotion external object.
+ * @param data Unused.
+ * @param e The Evas canvas on which to create the icon.
+ * @return An Evas_Object (Edje object) representing the icon, or NULL on failure.
+ */
 static Evas_Object *
 _external_emotion_icon_add(void *data EINA_UNUSED, Evas *e)
 {
@@ -430,6 +551,14 @@ _external_emotion_icon_add(void *data EINA_UNUSED, Evas *e)
    return ic;
 }
 
+/**
+ * @brief Translates a string related to this external type.
+ * This function is intended for internationalization of parameter names or descriptions.
+ * Currently, it returns the original string.
+ * @param data Unused.
+ * @param orig The original string to translate.
+ * @return The translated string (or `orig` if no translation is available).
+ */
 static const char *
 _external_emotion_translate(void *data EINA_UNUSED, const char *orig)
 {
@@ -438,6 +567,26 @@ _external_emotion_translate(void *data EINA_UNUSED, const char *orig)
    return orig;
 }
 
+/**
+ * @brief Array describing the parameters supported by the Emotion external type.
+ * This information is used by tools like Edje editors to provide a UI
+ * for configuring Emotion objects. Each entry defines a parameter's name,
+ * type, default value, and possible choices (for choice types).
+ *
+ * Example structure of elements:
+ * - EDJE_EXTERNAL_PARAM_INFO_CHOICE_FULL("engine", _external_emotion_engine_def, _external_emotion_engines)
+ *   Defines a "choice" parameter named "engine".
+ *   _external_emotion_engine_def is the default value (e.g., "gstreamer1").
+ *   _external_emotion_engines is an array of const char* for available choices (e.g., {"gstreamer1", NULL}).
+ * - EDJE_EXTERNAL_PARAM_INFO_STRING("file")
+ *   Defines a "string" parameter named "file".
+ * - EDJE_EXTERNAL_PARAM_INFO_BOOL_DEFAULT("play", EINA_FALSE)
+ *   Defines a "boolean" parameter named "play" with a default value of EINA_FALSE.
+ * - EDJE_EXTERNAL_PARAM_INFO_DOUBLE("position")
+ *   Defines a "double" parameter named "position".
+ * - EDJE_EXTERNAL_PARAM_INFO_INT_DEFAULT("audio_channel", 0)
+ *   Defines an "integer" parameter named "audio_channel" with a default value of 0.
+ */
 static Edje_External_Param_Info _external_emotion_params[] = {
   EDJE_EXTERNAL_PARAM_INFO_CHOICE_FULL
   ("engine", _external_emotion_engine_def, _external_emotion_engines),
@@ -485,6 +634,13 @@ static Edje_External_Type_Info _external_emotion_types[] =
   {NULL, NULL}
 };
 
+/**
+ * @brief Initializes the Emotion external module.
+ * This function is called when the module is loaded. It registers the
+ * "emotion-externals" log domain and registers the Emotion external type
+ * with Edje.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 external_emotion_mod_init(void)
 {
@@ -494,6 +650,11 @@ external_emotion_mod_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Shuts down the Emotion external module.
+ * This function is called when the module is unloaded. It unregisters
+ * the Emotion external type from Edje and unregisters the log domain.
+ */
 static void
 external_emotion_mod_shutdown(void)
 {

@@ -23,6 +23,19 @@ LONGLONG _evil_time_count;
  *
  */
 
+/**
+ * @brief Return the time spent since the Evil library has been initialized.
+ * @return The time spent in seconds.
+ *
+ * This function returns the time spent since the Evil library has
+ * been initialized. It uses a high-resolution timer (QueryPerformanceCounter)
+ * and then can have a precision up to the nano-second. The precision is
+ * processor dependant. This function can be used to benchmark parts of code
+ * with high precision.
+ *
+ * @see _evil_time_count
+ * @see _evil_time_freq
+ */
 EVIL_API double
 evil_time_get(void)
 {
@@ -39,6 +52,16 @@ evil_time_get(void)
  *
  */
 
+/**
+ * @brief Initiates the use of Windows sockets (Winsock).
+ * @return 1 on success, 0 otherwise.
+ *
+ * This function calls WSAStartup to initialize the Winsock library.
+ * It requests version 2.2 of Winsock. If initialization is successful
+ * and the correct version is supported, it returns 1. Otherwise, it
+ * calls WSACleanup (if WSAStartup succeeded but version is wrong) and
+ * returns 0.
+ */
 EVIL_API int
 evil_sockets_init(void)
 {
@@ -61,6 +84,12 @@ evil_sockets_init(void)
    return 0;
 }
 
+/**
+ * @brief Shuts down the Windows socket system.
+ *
+ * This function calls WSACleanup to terminate the use of the
+ * Winsock library.
+ */
 EVIL_API void
 evil_sockets_shutdown(void)
 {
@@ -70,6 +99,23 @@ evil_sockets_shutdown(void)
 /*
  * The code of the following functions has been kindly offered
  * by Tor Lillqvist.
+ */
+
+/**
+ * @brief Create a pair of connected sockets.
+ * @param[out] fds A pointer to an integer array of size 2.
+ *                 On success, fds[0] will be the read end and
+ *                 fds[1] will be the write end of the pipe.
+ *                 Example: int sockets[2]; evil_pipe(sockets);
+ * @return 0 on success, -1 on error.
+ *
+ * This function creates a pair of connected sockets that emulate a Unix pipe.
+ * It works by creating a listening socket on the loopback interface,
+ * then connecting a client socket to it, and finally accepting the
+ * connection to get the second socket.
+ * The sockets are set to blocking mode after establishment.
+ * If any step fails, previously created sockets are closed, and fds[0]
+ * and fds[1] are set to -1.
  */
 EVIL_API int
 evil_pipe(int *fds)

@@ -5,15 +5,30 @@
 
 typedef struct _App_Data App_Data;
 
+/**
+ * @brief Application specific data structure.
+ * This structure holds all the necessary data for the WM rotation test application.
+ */
 struct _App_Data
 {
-   Eina_Bool    wm_rot_supported;
-   Eina_List   *chs;
-   int          available_rots[4];
-   Evas_Object *lb;
-   Evas_Object *rdg;
+   Eina_Bool    wm_rot_supported; /**< Flag indicating if WM rotation is supported by the window manager. */
+   Eina_List   *chs;             /**< List of Evas_Object check widgets, each representing a potential rotation angle (0, 90, 180, 270). */
+   int          available_rots[4];/**< Array to store the selected available rotation angles. For example: `{0, 90, 270, 0}` if 0, 90, 270 are selected. The fourth element is implicitly 0 if fewer than 4 are selected. */
+   Evas_Object *lb;              /**< Label widget to display the current window rotation. */
+   Evas_Object *rdg;             /**< Radio group widget for selecting the preferred rotation. */
 };
 
+/**
+ * @brief Callback function to set the available rotations for the window.
+ *
+ * This function is triggered when the "Available rotations" button is clicked.
+ * It reads the states of the check boxes and sets the window manager's
+ * available rotations accordingly.
+ *
+ * @param data The Evas_Object (window) passed during callback registration.
+ * @param obj The Evas_Object (button) that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _bt_available_rots_set(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -39,6 +54,17 @@ _bt_available_rots_set(void *data, Evas_Object *obj EINA_UNUSED, void *event_inf
      (win, ad->available_rots, i);
 }
 
+/**
+ * @brief Callback function to set the preferred rotation for the window.
+ *
+ * This function is triggered when the "Preferred rotation" button is clicked.
+ * It reads the selected radio button's value and sets the window manager's
+ * preferred rotation. A value of -1 indicates that the preference should be unset.
+ *
+ * @param data The Evas_Object (window) passed during callback registration.
+ * @param obj The Evas_Object (button) that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _bt_preferred_rot_set(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -62,6 +88,16 @@ _bt_preferred_rot_set(void *data, Evas_Object *obj EINA_UNUSED, void *event_info
      }
 }
 
+/**
+ * @brief Callback function invoked when the window's WM rotation changes.
+ *
+ * This function updates a label in the UI to display the new current rotation
+ * of the window.
+ *
+ * @param data The Evas_Object (window) passed during callback registration.
+ * @param obj The Evas_Object (window) that emitted the "wm,rotation,changed" signal (unused).
+ * @param event Event-specific information (unused).
+ */
 static void
 _win_wm_rotation_changed_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event EINA_UNUSED)
 {
@@ -76,6 +112,16 @@ _win_wm_rotation_changed_cb(void *data, Evas_Object *obj EINA_UNUSED, void *even
    elm_object_text_set(ad->lb, eina_stringshare_add(buf));
 }
 
+/**
+ * @brief Callback function invoked when the window receives a delete request.
+ *
+ * This function is responsible for cleaning up application-specific data,
+ * primarily freeing the App_Data structure and its contents.
+ *
+ * @param data Custom data pointer passed at callback registration (unused here, as App_Data is retrieved from the object).
+ * @param obj The Evas_Object (window) that is being deleted.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _win_del_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -91,6 +137,21 @@ _win_del_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUS
    free(ad);
 }
 
+/**
+ * @brief Main function to set up and run the WM rotation test.
+ *
+ * This function creates the main window and UI elements for testing
+ * window manager rotation capabilities. It initializes UI components for:
+ * - Displaying if WM rotation is supported.
+ * - Setting available rotations (0, 90, 180, 270 degrees).
+ * - Setting a preferred rotation.
+ * - Displaying the current window rotation.
+ * - An entry field for general interaction testing.
+ *
+ * @param data Custom data, unused in this test.
+ * @param obj Parent Evas_Object, unused in this test.
+ * @param event_info Event-specific information, unused in this test.
+ */
 void
 test_win_wm_rotation(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

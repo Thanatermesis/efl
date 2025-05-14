@@ -35,10 +35,22 @@ ecore_x_gc_new(Ecore_X_Drawable draw,
 
    memset(&gcv, 0, sizeof (gcv));
 
+   /*
+    * Iterate through all possible Ecore_X_GC_Value_Mask bits.
+    * If a bit is set in the input value_mask, the corresponding
+    * value from value_list is assigned to the XGCValues structure.
+    * The idx variable tracks the current position in the value_list.
+    * The i variable and the hardcoded limit 22 correspond to the
+    * number of settable XGCValues members through this interface.
+    */
    for (i = 0, idx = 0, mask = 1; i <= 22; i++, mask <<= 1)
      {
-        switch (mask & value_mask)
+        // Check if the current mask bit is set in the user-provided value_mask
+        if (mask & value_mask)
           {
+             // If the bit is set, process the corresponding value
+             switch (mask & value_mask)
+               {
            case ECORE_X_GC_VALUE_MASK_FUNCTION:
              gcv.function = value_list[idx];
              idx++;
@@ -153,8 +165,9 @@ ecore_x_gc_new(Ecore_X_Drawable draw,
              gcv.arc_mode = value_list[idx];
              idx++;
              break;
-          }
-     }
+               } // switch
+          } // if (mask & value_mask)
+     } // for
 
    gc = XCreateGC(_ecore_x_disp, draw, value_mask, &gcv);
    if (_ecore_xlib_sync) ecore_x_sync();

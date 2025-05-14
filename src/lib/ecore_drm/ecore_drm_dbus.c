@@ -28,11 +28,27 @@
 
 #include "ecore_drm_private.h"
 
-static int _dbus_init_count = 0;
+/** @file
+ * @brief Ecore D-Bus integration for DRM session and device management.
+ *
+ * This file handles communication with system services like logind via D-Bus
+ * for managing DRM device access, session control, and device pause/resume events.
+ */
 
-static Eldbus_Connection *dconn;
-static Eldbus_Object *dobj;
+static int _dbus_init_count = 0; /**< Reference counter for D-Bus initialization. */
 
+static Eldbus_Connection *dconn; /**< Eldbus system connection. */
+static Eldbus_Object *dobj; /**< Eldbus object for the logind session. */
+
+/**
+ * @brief Sends a "PauseDeviceComplete" D-Bus signal.
+ *
+ * This function is called after a device pause operation has been completed
+ * locally, to notify logind.
+ *
+ * @param major The major number of the paused device.
+ * @param minor The minor number of the paused device.
+ */
 static void
 _ecore_drm_dbus_device_pause_done(uint32_t major, uint32_t minor)
 {
@@ -56,6 +72,16 @@ _ecore_drm_dbus_device_pause_done(uint32_t major, uint32_t minor)
    eldbus_proxy_send(proxy, msg, NULL, NULL, -1);
 }
 
+/**
+ * @brief Callback for the "SessionRemoved" D-Bus signal.
+ *
+ * This function is invoked when logind signals that a session has been removed.
+ * If the removed session is the current one, it triggers a restoration of
+ * logind state for the Ecore_Drm_Device.
+ *
+ * @param data The Ecore_Drm_Device associated with the session.
+ * @param msg The Eldbus_Message containing signal data.
+ */
 static void
 _cb_session_removed(void *data, const Eldbus_Message *msg)
 {
@@ -81,6 +107,17 @@ _cb_session_removed(void *data, const Eldbus_Message *msg)
      }
 }
 
+/**
+ * @brief Callback for the "PauseDevice" D-Bus signal from logind.
+ *
+ * This function is invoked when logind requests to pause a device.
+ * It checks if the device is a DRM device and if the type is "pause".
+ * If so, it calls _ecore_drm_dbus_device_pause_done to acknowledge
+ * and sends an activation event indicating the device is inactive.
+ *
+ * @param ctxt Unused context data.
+ * @param msg The Eldbus_Message containing signal data (major, minor, type).
+ */
 static void
 _cb_device_paused(void *ctxt EINA_UNUSED, const Eldbus_Message *msg)
 {
@@ -104,6 +141,16 @@ _cb_device_paused(void *ctxt EINA_UNUSED, const Eldbus_Message *msg)
      }
 }
 
+/**
+ * @brief Callback for the "ResumeDevice" D-Bus signal from logind.
+ *
+ * This function is invoked when logind signals that a device has been resumed.
+ * If the resumed device is a DRM device, it sends an activation event
+ * indicating the device is active.
+ *
+ * @param ctxt Unused context data.
+ * @param msg The Eldbus_Message containing signal data (major, minor, fd).
+ */
 static void
 _cb_device_resumed(void *ctxt EINA_UNUSED, const Eldbus_Message *msg)
 {
@@ -124,6 +171,15 @@ _cb_device_resumed(void *ctxt EINA_UNUSED, const Eldbus_Message *msg)
      }
 }
 
+/**
+ * @brief Callback for D-Bus property set operations.
+ *
+ * Logs an error if the property set operation failed.
+ *
+ * @param data Unused context data.
+ * @param msg The Eldbus_Message containing the response.
+ * @param pending Unused Eldbus_Pending object.
+ */
 static void
 _property_response_set(void *data EINA_UNUSED, const Eldbus_Message *msg, Eldbus_Pending *pending EINA_UNUSED)
 {
@@ -133,6 +189,18 @@ _property_response_set(void *data EINA_UNUSED, const Eldbus_Message *msg, Eldbus
      ERR("Eldbus Message error %s - %s\n\n", errname, errmsg);
 }
 
+/**
+ * @brief Callback for D-Bus "PropertiesChanged" events on the session proxy.
+ *
+ * This function is invoked when properties of the logind session object change.
+ * Specifically, it monitors the "Active" property. If "Active" changes (implicitly
+ * to true, as we are taking control), it sets the "Active" property to true and
+ * "State" to "active" on the session object via D-Bus.
+ *
+ * @param data Unused context data.
+ * @param proxy The Eldbus_Proxy on which the property changed.
+ * @param event The Eldbus_Proxy_Event_Property_Changed event data.
+ */
 static void
 _cb_properties_changed(void *data EINA_UNUSED, Eldbus_Proxy *proxy EINA_UNUSED, void *event)
 {
@@ -149,6 +217,15 @@ _cb_properties_changed(void *data EINA_UNUSED, Eldbus_Proxy *proxy EINA_UNUSED, 
      }
 }
 
+/**
+ * @brief Takes control of the current logind session.
+ *
+ * This function sends a "TakeControl" D-Bus message to logind for the
+ * current session. This is typically done to gain exclusive access to
+ * DRM devices.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 Eina_Bool
 _ecore_drm_dbus_session_take(void)
 {
@@ -184,6 +261,15 @@ _ecore_drm_dbus_session_take(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Releases control of the current logind session.
+ *
+ * This function sends a "ReleaseControl" D-Bus message to logind for the
+ * current session. This is done when exclusive access to DRM devices
+ * is no longer needed.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 Eina_Bool
 _ecore_drm_dbus_session_release(void)
 {
@@ -217,6 +303,15 @@ _ecore_drm_dbus_session_release(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Releases a specific device through logind.
+ *
+ * Sends a "ReleaseDevice" D-Bus message to logind for the device
+ * specified by its major and minor numbers.
+ *
+ * @param major The major number of the device to release.
+ * @param minor The minor number of the device to release.
+ */
 void
 _ecore_drm_dbus_device_release(uint32_t major, uint32_t minor)
 {
@@ -241,6 +336,18 @@ _ecore_drm_dbus_device_release(uint32_t major, uint32_t minor)
    eldbus_proxy_send(proxy, msg, NULL, NULL, -1);
 }
 
+/**
+ * @brief Callback for the asynchronous "TakeDevice" D-Bus method call.
+ *
+ * This function is invoked when logind responds to a "TakeDevice" request.
+ * It retrieves the file descriptor (fd) for the opened device and a boolean
+ * indicating if the device was paused. It then calls the original callback
+ * provided to _ecore_drm_dbus_device_take.
+ *
+ * @param data User data, typically the Ecore_Drm_Device.
+ * @param msg The Eldbus_Message containing the reply (fd, paused_status).
+ * @param pending The Eldbus_Pending object for this call.
+ */
 static void
 _cb_device_taken(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
 {
@@ -264,6 +371,20 @@ eldbus_err:
    if (callback) callback(data, fd, b);
 }
 
+/**
+ * @brief Asynchronously takes a device through logind.
+ *
+ * Sends a "TakeDevice" D-Bus message to logind for the device specified by
+ * its major and minor numbers. The result (file descriptor and paused state)
+ * is delivered via the provided callback.
+ *
+ * @param major The major number of the device to take.
+ * @param minor The minor number of the device to take.
+ * @param callback The function to call upon completion.
+ *                 Prototype: `void (*Ecore_Drm_Open_Cb)(void *data, int fd, Eina_Bool paused)`
+ * @param data User data to pass to the callback.
+ * @return 1 on success (request sent), -1 on failure.
+ */
 int
 _ecore_drm_dbus_device_take(uint32_t major, uint32_t minor, Ecore_Drm_Open_Cb callback, void *data)
 {
@@ -291,6 +412,19 @@ _ecore_drm_dbus_device_take(uint32_t major, uint32_t minor, Ecore_Drm_Open_Cb ca
    return 1;
 }
 
+/**
+ * @brief Synchronously takes a device through logind.
+ *
+ * Sends a "TakeDevice" D-Bus message to logind and blocks until a reply
+ * is received or a timeout occurs.
+ *
+ * @param major The major number of the device to take.
+ * @param minor The minor number of the device to take.
+ * @param[out] paused_out Pointer to store the paused state of the device.
+ *                        Set to EINA_TRUE if the device is paused, EINA_FALSE otherwise.
+ * @param timeout The timeout in seconds for the D-Bus call.
+ * @return The file descriptor for the opened device on success, -1 on failure or timeout.
+ */
 int
 _ecore_drm_dbus_device_take_no_pending(uint32_t major, uint32_t minor, Eina_Bool *paused_out, double timeout)
 {
@@ -338,6 +472,18 @@ _ecore_drm_dbus_device_take_no_pending(uint32_t major, uint32_t minor, Eina_Bool
    return fd;
 }
 
+/**
+ * @brief Initializes D-Bus communication for Ecore_Drm.
+ *
+ * Sets up the Eldbus connection to the system bus, gets the logind session
+ * object, and registers signal handlers for session and device events.
+ * This function uses a reference counter; D-Bus is fully initialized only
+ * on the first call and shut down on the last corresponding call to
+ * _ecore_drm_dbus_shutdown.
+ *
+ * @param dev The Ecore_Drm_Device containing session information.
+ * @return The current D-Bus initialization count, or 0 on failure.
+ */
 int
 _ecore_drm_dbus_init(Ecore_Drm_Device *dev)
 {
@@ -424,6 +570,15 @@ conn_err:
    return --_dbus_init_count;
 }
 
+/**
+ * @brief Shuts down D-Bus communication for Ecore_Drm.
+ *
+ * Decrements the D-Bus initialization reference counter. If the counter
+ * reaches zero, it unrefs D-Bus objects, closes the connection, and
+ * shuts down Eldbus.
+ *
+ * @return The current D-Bus initialization count.
+ */
 int
 _ecore_drm_dbus_shutdown(void)
 {

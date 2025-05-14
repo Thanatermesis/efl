@@ -3,11 +3,24 @@
 #include <sys/time.h>
 #include <sys/utsname.h>
 
+/**
+ * @brief Initializes the framebuffer output buffer system.
+ * This function is a placeholder and currently does nothing.
+ */
 void
 evas_fb_outbuf_fb_init(void)
 {
 }
 
+/**
+ * @brief Frees the resources associated with an Outbuf structure.
+ *
+ * This includes freeing the back buffer image cache entry,
+ * releasing the framebuffer mode, cleaning up framebuffer resources,
+ * and freeing the Outbuf structure itself.
+ *
+ * @param buf Pointer to the Outbuf structure to free.
+ */
 void
 evas_fb_outbuf_fb_free(Outbuf *buf)
 {
@@ -18,6 +31,13 @@ evas_fb_outbuf_fb_free(Outbuf *buf)
    free(buf);
 }
 
+/**
+ * @brief Converts an Outbuf_Depth enum to its corresponding bit depth.
+ *
+ * @param depth The Outbuf_Depth enum value.
+ * @return The bit depth as an integer (e.g., 16, 32), or 0 for OUTBUF_DEPTH_INHERIT,
+ *         or -1 if the depth is unknown.
+ */
 static int
 _outbuf_depth_convert(const Outbuf_Depth depth)
 {
@@ -30,6 +50,15 @@ _outbuf_depth_convert(const Outbuf_Depth depth)
    return -1;
 }
 
+/**
+ * @brief Calculates a bitmask from a framebuffer bitfield structure.
+ *
+ * This is used to determine the mask for red, green, or blue components
+ * based on their offset and length in the pixel format.
+ *
+ * @param fbb Pointer to the fb_bitfield structure.
+ * @return The calculated bitmask.
+ */
 static unsigned int
 fb_bitfield_mask_get(const struct fb_bitfield *fbb)
 {
@@ -39,6 +68,18 @@ fb_bitfield_mask_get(const struct fb_bitfield *fbb)
    return mask;
 }
 
+/**
+ * @brief Resets and reconfigures an Outbuf based on new rotation and depth.
+ *
+ * This function updates the buffer's width, height, depth, rotation,
+ * and color masks. It also retrieves the appropriate conversion function.
+ *
+ * @param buf Pointer to the Outbuf to reset.
+ * @param rot The new rotation angle (0, 90, 180, 270).
+ * @param depth The new output buffer depth.
+ * @return EINA_TRUE if the reset was successful and a conversion function
+ *         was found, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _outbuf_reset(Outbuf *buf, int rot, Outbuf_Depth depth)
 {
@@ -93,6 +134,21 @@ _outbuf_reset(Outbuf *buf, int rot, Outbuf_Depth depth)
    return !!conv_func;
 }
 
+/**
+ * @brief Sets up a framebuffer output buffer.
+ *
+ * This involves initializing the framebuffer, setting its mode,
+ * and configuring the Outbuf structure.
+ *
+ * @param w Desired width of the output buffer.
+ * @param h Desired height of the output buffer.
+ * @param rot Rotation angle (0, 90, 180, 270).
+ * @param depth Desired output buffer depth.
+ * @param vt_no Virtual terminal number.
+ * @param dev_no Device number for the framebuffer.
+ * @param refresh Refresh rate.
+ * @return Pointer to the newly created and configured Outbuf, or NULL on failure.
+ */
 Outbuf *
 evas_fb_outbuf_fb_setup_fb(int w, int h, int rot, Outbuf_Depth depth, int vt_no, int dev_no, int refresh)
 {
@@ -146,6 +202,22 @@ evas_fb_outbuf_fb_setup_fb(int w, int h, int rot, Outbuf_Depth depth, int vt_no,
    return buf;
 }
 
+/**
+ * @brief Blits (copies) a rectangular region within the output buffer.
+ *
+ * If a back buffer exists, the blit operation is performed on the back buffer,
+ * and then the corresponding region is updated on the framebuffer.
+ * If no back buffer exists, this function currently has a FIXME for direct
+ * framebuffer copy.
+ *
+ * @param buf Pointer to the Outbuf.
+ * @param src_x X-coordinate of the source rectangle's top-left corner.
+ * @param src_y Y-coordinate of the source rectangle's top-left corner.
+ * @param w Width of the rectangle to blit.
+ * @param h Height of the rectangle to blit.
+ * @param dst_x X-coordinate of the destination rectangle's top-left corner.
+ * @param dst_y Y-coordinate of the destination rectangle's top-left corner.
+ */
 void
 evas_fb_outbuf_fb_blit(Outbuf *buf, int src_x, int src_y, int w, int h, int dst_x, int dst_y)
 {
@@ -164,6 +236,18 @@ evas_fb_outbuf_fb_blit(Outbuf *buf, int src_x, int src_y, int w, int h, int dst_
      }
 }
 
+/**
+ * @brief Updates a rectangular region of the framebuffer from the back buffer.
+ *
+ * This function copies data from the back buffer to the framebuffer,
+ * applying necessary conversions and rotation.
+ *
+ * @param buf Pointer to the Outbuf.
+ * @param x X-coordinate of the region to update.
+ * @param y Y-coordinate of the region to update.
+ * @param w Width of the region to update.
+ * @param h Height of the region to update.
+ */
 void
 evas_fb_outbuf_fb_update(Outbuf *buf, int x, int y, int w, int h)
 {
@@ -240,6 +324,26 @@ evas_fb_outbuf_fb_update(Outbuf *buf, int x, int y, int w, int h)
      }
 }
 
+/**
+ * @brief Gets a pointer to a region for direct update.
+ *
+ * If a back buffer exists, it returns a pointer to the back buffer and sets
+ * cx, cy, cw, ch to the provided x, y, w, h.
+ * If no back buffer exists, it creates a temporary RGBA_Image for the update,
+ * sets cx, cy to 0, 0 and cw, ch to w, h.
+ *
+ * @param buf Pointer to the Outbuf.
+ * @param x X-coordinate of the desired update region.
+ * @param y Y-coordinate of the desired update region.
+ * @param w Width of the desired update region.
+ * @param h Height of the desired update region.
+ * @param[out] cx Pointer to store the X-coordinate of the actual update region.
+ * @param[out] cy Pointer to store the Y-coordinate of the actual update region.
+ * @param[out] cw Pointer to store the width of the actual update region.
+ * @param[out] ch Pointer to store the height of the actual update region.
+ * @return Pointer to the image data to be updated (either back_buf or a temporary image).
+ *         Returns NULL if allocation fails (though current implementation doesn't explicitly show this for the temp image path).
+ */
 void *
 evas_fb_outbuf_fb_new_region_for_update(Outbuf *buf, int x, int y, int w, int h, int *cx, int *cy, int *cw, int *ch)
 {
@@ -264,12 +368,36 @@ evas_fb_outbuf_fb_new_region_for_update(Outbuf *buf, int x, int y, int w, int h,
    return NULL;
 }
 
+/**
+ * @brief Frees a region previously obtained for update.
+ *
+ * If the provided `update` image is not the Outbuf's back buffer (i.e., it was
+ * a temporary buffer), it is dropped from the image cache.
+ *
+ * @param buf Pointer to the Outbuf.
+ * @param update Pointer to the RGBA_Image that was used for update.
+ */
 void
 evas_fb_outbuf_fb_free_region_for_update(Outbuf *buf, RGBA_Image *update)
 {
    if (update != buf->priv.back_buf) evas_cache_image_drop(&update->cache_entry);
 }
 
+/**
+ * @brief Pushes an updated region to the framebuffer.
+ *
+ * If a back buffer exists and the `update` image is different, the `update`
+ * image is blitted to the back buffer first. Then, the specified region
+ * of the back buffer (or the `update` image directly if no back buffer)
+ * is converted and copied to the framebuffer.
+ *
+ * @param buf Pointer to the Outbuf.
+ * @param update Pointer to the RGBA_Image containing the updated pixel data.
+ * @param x X-coordinate of the region to push.
+ * @param y Y-coordinate of the region to push.
+ * @param w Width of the region to push.
+ * @param h Height of the region to push.
+ */
 void
 evas_fb_outbuf_fb_push_updated_region(Outbuf *buf, RGBA_Image *update, int x, int y, int w, int h)
 {
@@ -361,6 +489,18 @@ evas_fb_outbuf_fb_push_updated_region(Outbuf *buf, RGBA_Image *update, int x, in
      }
 }
 
+/**
+ * @brief Reconfigures the output buffer with new dimensions, rotation, or depth.
+ *
+ * This function handles changes to the framebuffer mode and recreates the
+ * back buffer if necessary.
+ *
+ * @param buf Pointer to the Outbuf to reconfigure.
+ * @param w New width.
+ * @param h New height.
+ * @param rot New rotation (0, 90, 180, 270).
+ * @param depth New output buffer depth.
+ */
 void
 evas_fb_outbuf_fb_reconfigure(Outbuf *buf, int w, int h, int rot, Outbuf_Depth depth)
 {
@@ -409,30 +549,55 @@ evas_fb_outbuf_fb_reconfigure(Outbuf *buf, int w, int h, int rot, Outbuf_Depth d
    /* if (dithered) create new backbuf */
 }
 
+/**
+ * @brief Gets the width of the output buffer.
+ * @param buf Pointer to the Outbuf.
+ * @return The width of the buffer in pixels.
+ */
 int
 evas_fb_outbuf_fb_get_width(Outbuf *buf)
 {
    return buf->w;
 }
 
+/**
+ * @brief Gets the height of the output buffer.
+ * @param buf Pointer to the Outbuf.
+ * @return The height of the buffer in pixels.
+ */
 int
 evas_fb_outbuf_fb_get_height(Outbuf *buf)
 {
    return buf->h;
 }
 
+/**
+ * @brief Gets the depth of the output buffer.
+ * @param buf Pointer to the Outbuf.
+ * @return The Outbuf_Depth enum value for the buffer's depth.
+ */
 Outbuf_Depth
 evas_fb_outbuf_fb_get_depth(Outbuf *buf)
 {
    return buf->depth;
 }
 
+/**
+ * @brief Gets the rotation of the output buffer.
+ * @param buf Pointer to the Outbuf.
+ * @return The rotation angle (0, 90, 180, 270).
+ */
 int
 evas_fb_outbuf_fb_get_rot(Outbuf *buf)
 {
    return buf->rot;
 }
 
+/**
+ * @brief Checks if the output buffer has a back buffer.
+ * @param buf Pointer to the Outbuf.
+ * @return 1 if a back buffer exists, 0 otherwise.
+ */
 int
 evas_fb_outbuf_fb_get_have_backbuf(Outbuf *buf)
 {
@@ -440,6 +605,15 @@ evas_fb_outbuf_fb_get_have_backbuf(Outbuf *buf)
    return 0;
 }
 
+/**
+ * @brief Enables or disables the back buffer for the output buffer.
+ *
+ * If enabling, a new back buffer is created if the framebuffer depth is less than 24bpp.
+ * If disabling, the existing back buffer is freed.
+ *
+ * @param buf Pointer to the Outbuf.
+ * @param have_backbuf 1 to enable the back buffer, 0 to disable.
+ */
 void
 evas_fb_outbuf_fb_set_have_backbuf(Outbuf *buf, int have_backbuf)
 {

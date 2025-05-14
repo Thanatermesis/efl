@@ -1,3 +1,11 @@
+/**
+ * @file
+ * @brief This file implements the Ecore_Audio output functionality using WASAPI for Windows.
+ *
+ * It handles audio playback, device management, and event handling specific to the
+ * Windows Audio Session API (WASAPI).
+ */
+
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -30,39 +38,57 @@
 
 static int client_connect_count = 0;
 
-DEFINE_PROPERTYKEY(PKEY_Device_FriendlyName,0xb725f130, 0x47ef, 0x101a, 0xa5, 0xf1, 0x02, 0x60, 0x8c, 0x9e, 0xeb, 0xac, 10);
+DEFINE_PROPERTYKEY(PKEY_Device_FriendlyName,0xb725f130, 0x47ef, 0x101a, 0xa5, 0xf1, 0x02, 0x60, 0x8c, 0x9e, 0xeb, 0xac, 10); /**< Property key for the device friendly name. */
 
+/**
+ * @brief Private data structure for the Ecore_Audio_Wasapi class.
+ *
+ * This structure holds class-level data, such as a list of active outputs
+ * and a job for managing state.
+ */
 struct _Ecore_Audio_Wasapi_Class {
 
-  Ecore_Job *state_job;
-  Eina_List *outputs;
+  Ecore_Job *state_job; /**< Ecore_Job for deferred state management. */
+  Eina_List *outputs;   /**< List of active Ecore_Audio_Out_Wasapi instances. */
 };
 
-typedef struct _Ecore_Audio_Out_Wasapi_Device Ecore_Audio_Out_Wasapi_Device;
-typedef struct _Ecore_Audio_Out_Wasapi_Data Ecore_Audio_Out_Wasapi_Data;
+typedef struct _Ecore_Audio_Out_Wasapi_Device Ecore_Audio_Out_Wasapi_Device; /**< Forward declaration for WASAPI device structure. */
+typedef struct _Ecore_Audio_Out_Wasapi_Data Ecore_Audio_Out_Wasapi_Data;     /**< Forward declaration for WASAPI output instance data. */
 
+/**
+ * @brief Represents a WASAPI audio output device.
+ *
+ * This structure holds references to the COM interfaces for an audio endpoint device
+ * and the device enumerator.
+ */
 struct _Ecore_Audio_Out_Wasapi_Device
 {
-   IMMDevice *pDevice;
-   IMMDeviceEnumerator *pDeviceEnumerator;
+   IMMDevice *pDevice;                 /**< Pointer to the audio endpoint device interface. */
+   IMMDeviceEnumerator *pDeviceEnumerator; /**< Pointer to the device enumerator interface. */
 };
 
+/**
+ * @brief Private data for an Ecore_Audio_Out_Wasapi object instance.
+ *
+ * This structure holds all the necessary WASAPI interfaces, event handles,
+ * and state information for a single audio output stream.
+ */
 struct _Ecore_Audio_Out_Wasapi_Data
 {
-   Eo                   *in;
-   Eo                   *out;
-   IAudioClient         *client;
-   IAudioRenderClient   *render;
-   IAudioStreamVolume   *volume;
-   WAVEFORMATEXTENSIBLE *wave_format;
-   Ecore_Win32_Handler  *handler;
-   HANDLE                event;
-   UINT32                NumBufferFrames;
-   Eina_Bool             spec_format;
-   Eina_Bool             play;
+   Eo                   *in;             /**< The Ecore_Audio_In object providing audio data. */
+   Eo                   *out;            /**< The Ecore_Audio_Out_Wasapi object itself. */
+   IAudioClient         *client;         /**< The main WASAPI audio client interface. */
+   IAudioRenderClient   *render;         /**< Interface for writing audio data to the buffer. */
+   IAudioStreamVolume   *volume;         /**< Interface for controlling stream volume. */
+   WAVEFORMATEXTENSIBLE *wave_format;    /**< The negotiated audio format for the stream. */
+   Ecore_Win32_Handler  *handler;        /**< Handler for WASAPI event notifications. */
+   HANDLE                event;           /**< Event handle signaled by WASAPI when buffer is ready. */
+   UINT32                NumBufferFrames; /**< Total number of frames in the audio buffer. */
+   Eina_Bool             spec_format;     /**< Flag indicating if a specific format was negotiated (as opposed to an exact match). */
+   Eina_Bool             play;            /**< Current playback state (EINA_TRUE if playing). */
 };
 
-Ecore_Audio_Out_Wasapi_Device *device = NULL;
+Ecore_Audio_Out_Wasapi_Device *device = NULL; /**< Global pointer to the WASAPI device structure. This is shared among instances. */
 
 EOLIAN static void
 _ecore_audio_out_wasapi_ecore_audio_volume_set(Eo *eo_obj EINA_UNUSED, Ecore_Audio_Out_Wasapi_Data *_pd, double volume)
@@ -96,6 +122,14 @@ _ecore_audio_out_wasapi_ecore_audio_volume_set(Eo *eo_obj EINA_UNUSED, Ecore_Aud
      }
 }
 
+/**
+ * @brief Cleans up resources associated with a WASAPI output stream.
+ *
+ * This function releases COM interfaces, closes handles, and resets pointers
+ * in the Ecore_Audio_Out_Wasapi_Data structure.
+ *
+ * @param _pd Pointer to the private data of the WASAPI output object.
+ */
 static void
 _clear(Ecore_Audio_Out_Wasapi_Data *_pd)
 {
@@ -111,12 +145,29 @@ _clear(Ecore_Audio_Out_Wasapi_Data *_pd)
    _pd->play    = EINA_FALSE;
 }
 
+/**
+ * @brief Callback function invoked when the output stream is stopped or closed.
+ *
+ * This function calls _clear to release resources.
+ *
+ * @param data Pointer to the Ecore_Audio_Out_Wasapi_Data.
+ * @param event The EFL event data (unused).
+ */
 static void
 _close_cb(void  *data, const Efl_Event *event EINA_UNUSED)
 {
    _clear(data);
 }
 
+/**
+ * @brief Callback function invoked when the input samplerate changes.
+ *
+ * This function attempts to adjust the audio clock of the WASAPI stream
+ * to match the new samplerate from the input.
+ *
+ * @param data Pointer to the Ecore_Audio_Out_Wasapi_Data.
+ * @param event The EFL event data (unused).
+ */
 static void
 _samplerate_changed_cb(void  *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -150,7 +201,17 @@ _samplerate_changed_cb(void  *data, const Efl_Event *event EINA_UNUSED)
    adjustment->lpVtbl->SetSampleRate(adjustment, sr);
 }
 
-
+/**
+ * @brief Callback function for writing audio data to the WASAPI buffer.
+ *
+ * This function is called when WASAPI signals that its buffer is ready for more data.
+ * It reads data from the Ecore_Audio_In source, writes it to the WASAPI render buffer,
+ * and handles playback continuation or stopping.
+ *
+ * @param data Pointer to the Ecore_Audio_Out_Wasapi_Data.
+ * @param wh The Ecore_Win32_Handler that triggered this callback (unused).
+ * @return ECORE_CALLBACK_RENEW to continue processing, ECORE_CALLBACK_CANCEL to stop.
+ */
 static Eina_Bool
 _write_cb(void  *data, Ecore_Win32_Handler *wh EINA_UNUSED)
 {
@@ -238,6 +299,17 @@ _write_cb(void  *data, Ecore_Win32_Handler *wh EINA_UNUSED)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Selects and negotiates the audio format with WASAPI.
+ *
+ * This function attempts to set up a WAVEFORMATEXTENSIBLE structure based on the
+ * properties of the input audio stream (channels, samplerate). It then checks if
+ * WASAPI supports this format, or a close alternative.
+ *
+ * @param _pd Pointer to the private data of the WASAPI output object.
+ * @param in The Ecore_Audio_In object providing the audio data.
+ * @return EINA_TRUE if a suitable format was successfully negotiated, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 wave_format_selection(Ecore_Audio_Out_Wasapi_Data *_pd, Eo *in)
 {
@@ -337,7 +409,17 @@ wave_format_selection(Ecore_Audio_Out_Wasapi_Data *_pd, Eo *in)
    return EINA_TRUE;
 }
 
-
+/**
+ * @brief Initializes the WASAPI audio client.
+ *
+ * This function configures and initializes the IAudioClient interface with the
+ * negotiated wave format and buffer settings. It handles various initialization
+ * error codes, including attempting to re-initialize with adjusted buffer sizes
+ * if AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED is encountered.
+ *
+ * @param _pd Pointer to the private data of the WASAPI output object.
+ * @return EINA_TRUE if the client was successfully initialized, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _client_initialize( Ecore_Audio_Out_Wasapi_Data *_pd )
 {
@@ -472,6 +554,17 @@ _client_initialize( Ecore_Audio_Out_Wasapi_Data *_pd )
    return EINA_TRUE;
 }
 
+/**
+ * @brief Internal helper function to attach an input stream and prepare WASAPI.
+ *
+ * This function activates the IAudioClient, selects the wave format, and initializes
+ * the client. It's called when an Ecore_Audio_In is attached to the output.
+ *
+ * @param eo_obj The Ecore_Audio_Out_Wasapi object (unused).
+ * @param in The Ecore_Audio_In object to attach.
+ * @param _pd Pointer to the private data of the WASAPI output object.
+ * @return EINA_TRUE on successful attachment and initialization, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _input_attach_internal(Eo *eo_obj EINA_UNUSED, Eo *in, Ecore_Audio_Out_Wasapi_Data *_pd)
 {

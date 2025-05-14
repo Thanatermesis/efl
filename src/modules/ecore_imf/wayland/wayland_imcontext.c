@@ -33,58 +33,81 @@
 #define HIDE_TIMER_INTERVAL     0.05
 
 static Eina_Bool _clear_hide_timer(void);
+/** @internal Timer used to delay hiding the input panel. */
 static Ecore_Timer *_hide_timer  = NULL;
 
+/**
+ * @internal
+ * @brief Internal structure representing a Wayland Input Method Context.
+ *
+ * This structure holds all the state associated with a Wayland input method context,
+ * including Wayland protocol objects, preedit information, cursor state, and pending
+ * operations.
+ */
 struct _WaylandIMContext
 {
-   Ecore_IMF_Context *ctx;
+   Ecore_IMF_Context *ctx; /**< The associated Ecore IMF context. */
 
-   struct zwp_text_input_manager_v1 *text_input_manager;
-   struct zwp_text_input_v1 *text_input;
+   struct zwp_text_input_manager_v1 *text_input_manager; /**< Wayland text input manager. */
+   struct zwp_text_input_v1 *text_input; /**< Wayland text input object. */
 
-   Ecore_Wl2_Window *window;
-   Ecore_Wl2_Input  *input;
-   Evas             *canvas;
+   Ecore_Wl2_Window *window; /**< The Ecore Wayland window associated with this context. */
+   Ecore_Wl2_Input  *input;  /**< The Ecore Wayland input device (seat). */
+   Evas             *canvas; /**< The Evas canvas associated with this context. */
 
-   char *preedit_text;
-   char *preedit_commit;
-   char *language;
-   Eina_List *preedit_attrs;
-   int32_t preedit_cursor;
+   char *preedit_text;     /**< Current preedit string. */
+   char *preedit_commit;   /**< Text to commit when preedit is finalized. */
+   char *language;         /**< Current input language/locale (e.g., "en_US"). */
+   Eina_List *preedit_attrs; /**< List of Ecore_IMF_Preedit_Attr for the current preedit_text. */
+   int32_t preedit_cursor; /**< Cursor position within the preedit_text (in characters). */
 
+   /** @internal Structure to hold pending preedit state from the compositor. */
    struct
      {
-        Eina_List *attrs;
-        int32_t cursor;
+        Eina_List *attrs; /**< Pending preedit attributes. */
+        int32_t cursor;   /**< Pending preedit cursor position (byte offset). */
      } pending_preedit;
 
+   /** @internal Structure to hold pending commit state from the compositor. */
    struct
      {
-        int32_t cursor;
-        int32_t anchor;
-        uint32_t delete_index;
-        uint32_t delete_length;
+        int32_t cursor;        /**< Pending cursor position after commit (byte offset). */
+        int32_t anchor;        /**< Pending anchor position after commit (byte offset). */
+        uint32_t delete_index;  /**< Byte offset from cursor to start deletion before commit. */
+        uint32_t delete_length; /**< Number of bytes to delete before commit. */
      } pending_commit;
 
+   /** @internal Structure to hold cursor location information. */
    struct
      {
-        int x;
-        int y;
-        int width;
-        int height;
-        Eina_Bool do_set : 1;
+        int x;      /**< X-coordinate of the cursor rectangle relative to the canvas. */
+        int y;      /**< Y-coordinate of the cursor rectangle relative to the canvas. */
+        int width;  /**< Width of the cursor rectangle. */
+        int height; /**< Height of the cursor rectangle. */
+        Eina_Bool do_set : 1; /**< Flag indicating if the cursor location needs to be sent to the compositor. */
      } cursor_location;
 
-   xkb_mod_mask_t control_mask;
-   xkb_mod_mask_t alt_mask;
-   xkb_mod_mask_t shift_mask;
+   xkb_mod_mask_t control_mask; /**< XKB modifier mask for Control. */
+   xkb_mod_mask_t alt_mask;     /**< XKB modifier mask for Alt. */
+   xkb_mod_mask_t shift_mask;   /**< XKB modifier mask for Shift. */
 
-   uint32_t serial;
-   uint32_t reset_serial;
-   uint32_t content_purpose;
-   uint32_t content_hint;
+   uint32_t serial;          /**< Current serial number for Wayland requests. */
+   uint32_t reset_serial;    /**< Serial number at the time of the last reset. Used to discard outdated events. */
+   uint32_t content_purpose; /**< Current zwp_text_input_v1.content_purpose. */
+   uint32_t content_hint;    /**< Current zwp_text_input_v1.content_hint. */
 };
 
+/**
+ * @internal
+ * @brief Converts a UTF-8 byte offset to a character count.
+ *
+ * Given a UTF-8 string and a byte offset within that string, this function
+ * calculates the number of Unicode characters up to that offset.
+ *
+ * @param str The UTF-8 encoded string.
+ * @param offset The byte offset within the string.
+ * @return The number of characters corresponding to the byte offset.
+ */
 static unsigned int
 utf8_offset_to_characters(const char *str, int offset)
 {
@@ -100,6 +123,16 @@ utf8_offset_to_characters(const char *str, int offset)
    return i;
 }
 
+/**
+ * @internal
+ * @brief Updates the Wayland compositor with the current input state.
+ *
+ * This function sends surrounding text and cursor rectangle information
+ * to the Wayland compositor if they have changed or need to be set.
+ * It should be called when these aspects of the input context change.
+ *
+ * @param imcontext The Wayland input method context.
+ */
 static void
 update_state(WaylandIMContext *imcontext)
 {
@@ -157,6 +190,11 @@ update_state(WaylandIMContext *imcontext)
    _clear_hide_timer();
 }
 
+/**
+ * @internal
+ * @brief Clears (deletes) the input panel hide timer if it exists.
+ * @return EINA_TRUE if a timer was cleared, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _clear_hide_timer(void)
 {
@@ -170,6 +208,11 @@ _clear_hide_timer(void)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Sends a request to the Wayland compositor to hide the input panel.
+ * @param ctx The Ecore IMF context.
+ */
 static void
 _send_input_panel_hide_request(Ecore_IMF_Context *ctx)
 {
@@ -178,6 +221,14 @@ _send_input_panel_hide_request(Ecore_IMF_Context *ctx)
      zwp_text_input_v1_hide_input_panel(imcontext->text_input);
 }
 
+/**
+ * @internal
+ * @brief Timer callback function to hide the input panel.
+ * This function is called when the hide timer expires. It sends a request
+ * to the Wayland compositor to hide the input panel.
+ * @param data The Ecore IMF context passed as user data.
+ * @return ECORE_CALLBACK_CANCEL to automatically delete the timer.
+ */
 static Eina_Bool
 _hide_timer_handler(void *data)
 {
@@ -188,6 +239,12 @@ _hide_timer_handler(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @internal
+ * @brief Starts a timer to hide the input panel after a short delay.
+ * If a timer is already active, this function does nothing.
+ * @param data The Ecore IMF context to be passed to the timer handler.
+ */
 static void
 _input_panel_hide_timer_start(void *data)
 {
@@ -198,6 +255,14 @@ _input_panel_hide_timer_start(void *data)
      }
 }
 
+/**
+ * @internal
+ * @brief Hides the input panel, either instantly or after a delay.
+ * @param ctx The Ecore IMF context.
+ * @param instant If EINA_TRUE, hide immediately. If EINA_FALSE, start a timer
+ *                to hide after a short delay (unless a hide is already pending
+ *                and very close to firing).
+ */
 static void
 _input_panel_hide(Ecore_IMF_Context *ctx, Eina_Bool instant)
 {
@@ -212,6 +277,18 @@ _input_panel_hide(Ecore_IMF_Context *ctx, Eina_Bool instant)
      }
 }
 
+/**
+ * @internal
+ * @brief Checks if a received Wayland event serial is current.
+ *
+ * Wayland events carry serial numbers. This function checks if the given
+ * `serial` is not older than the `reset_serial` of the `imcontext`.
+ * If the serial is outdated, pending preedit and commit data is cleared.
+ *
+ * @param imcontext The Wayland input method context.
+ * @param serial The serial number from the Wayland event.
+ * @return EINA_TRUE if the serial is current, EINA_FALSE if it's outdated.
+ */
 static Eina_Bool
 check_serial(WaylandIMContext *imcontext, uint32_t serial)
 {
@@ -244,6 +321,15 @@ check_serial(WaylandIMContext *imcontext, uint32_t serial)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Clears the current preedit state in the input method context.
+ *
+ * This function frees memory associated with the preedit string, commit string,
+ * and preedit attributes. It also resets the preedit cursor position.
+ *
+ * @param imcontext The Wayland input method context.
+ */
 static void
 clear_preedit(WaylandIMContext *imcontext)
 {
@@ -272,6 +358,20 @@ clear_preedit(WaylandIMContext *imcontext)
    imcontext->preedit_attrs = NULL;
 }
 
+/**
+ * @internal
+ * @brief Wayland listener callback for the 'commit_string' event.
+ *
+ * This function is called by the Wayland compositor when text should be committed
+ * to the application. It handles deleting surrounding text if requested by the
+ * compositor, clears any existing preedit, and then triggers the
+ * ECORE_IMF_CALLBACK_COMMIT event.
+ *
+ * @param data The WaylandIMContext.
+ * @param text_input The Wayland text input object (unused).
+ * @param serial The serial number of the event.
+ * @param text The string to be committed.
+ */
 static void
 text_input_commit_string(void *data,
                          struct zwp_text_input_v1 *text_input EINA_UNUSED,
@@ -342,6 +442,16 @@ text_input_commit_string(void *data,
    ecore_imf_context_event_callback_call(imcontext->ctx, ECORE_IMF_CALLBACK_COMMIT, (void *)text);
 }
 
+/**
+ * @internal
+ * @brief Commits the current preedit string.
+ *
+ * If there is a `preedit_commit` string set (meaning the current preedit
+ * should be committed as a whole), this function triggers the necessary
+ * Ecore IMF callbacks: PREEDIT_CHANGED, PREEDIT_END, and COMMIT.
+ *
+ * @param imcontext The Wayland input method context.
+ */
 static void
 commit_preedit(WaylandIMContext *imcontext)
 {
@@ -363,6 +473,15 @@ commit_preedit(WaylandIMContext *imcontext)
                                          (void *)imcontext->preedit_commit);
 }
 
+/**
+ * @internal
+ * @brief Sets the input focus for the Wayland text input object.
+ *
+ * This function finds the default Wayland input (seat) and activates the
+ * `text_input` object for the given context's window surface.
+ *
+ * @param ctx The Ecore IMF context.
+ */
 static void
 set_focus(Ecore_IMF_Context *ctx)
 {
@@ -383,6 +502,18 @@ set_focus(Ecore_IMF_Context *ctx)
                           ecore_wl2_window_surface_get(imcontext->window));
 }
 
+/**
+ * @internal
+ * @brief Shows the input panel (e.g., virtual keyboard).
+ *
+ * This function ensures the text input object is focused, clears any pending
+ * hide timer, sets content type hints, updates surrounding text, and then
+ * requests the Wayland compositor to show the input panel.
+ *
+ * @param ctx The Ecore IMF context.
+ * @return EINA_TRUE if the request to show the panel was made, EINA_FALSE on failure
+ *         (e.g., context, window, or text_input not available).
+ */
 static Eina_Bool
 show_input_panel(Ecore_IMF_Context *ctx)
 {
@@ -420,6 +551,22 @@ show_input_panel(Ecore_IMF_Context *ctx)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Wayland listener callback for the 'preedit_string' event.
+ *
+ * This function is called by the Wayland compositor to update the preedit string.
+ * It updates the internal preedit state (text, commit string, cursor, attributes)
+ * and triggers ECORE_IMF_CALLBACK_PREEDIT_START (if no preedit was active),
+ * ECORE_IMF_CALLBACK_PREEDIT_CHANGED, and ECORE_IMF_CALLBACK_PREEDIT_END
+ * (if the new preedit string is empty).
+ *
+ * @param data The WaylandIMContext.
+ * @param text_input The Wayland text input object (unused).
+ * @param serial The serial number of the event.
+ * @param text The new preedit string.
+ * @param commit The string that should be committed if this preedit is finalized.
+ */
 static void
 text_input_preedit_string(void *data,
                           struct zwp_text_input_v1 *text_input EINA_UNUSED,
@@ -468,6 +615,21 @@ text_input_preedit_string(void *data,
      }
 }
 
+/**
+ * @internal
+ * @brief Wayland listener callback for the 'delete_surrounding_text' event.
+ *
+ * This function is called by the Wayland compositor to request deletion of text
+ * surrounding the cursor. It stores the deletion parameters in `pending_commit`
+ * (as this deletion often precedes a commit) and triggers the
+ * ECORE_IMF_CALLBACK_DELETE_SURROUNDING event.
+ *
+ * @param data The WaylandIMContext.
+ * @param text_input The Wayland text input object (unused).
+ * @param index Byte offset relative to the cursor position where deletion should start.
+ *              Can be negative.
+ * @param length Number of bytes to delete.
+ */
 static void
 text_input_delete_surrounding_text(void *data,
                                    struct zwp_text_input_v1 *text_input EINA_UNUSED,
@@ -485,6 +647,19 @@ text_input_delete_surrounding_text(void *data,
    ecore_imf_context_event_callback_call(imcontext->ctx, ECORE_IMF_CALLBACK_DELETE_SURROUNDING, &ev);
 }
 
+/**
+ * @internal
+ * @brief Wayland listener callback for the 'cursor_position' event.
+ *
+ * This function is called by the Wayland compositor to inform about the
+ * cursor and anchor positions that should be set after the next commit.
+ * The positions are stored in `pending_commit`.
+ *
+ * @param data The WaylandIMContext.
+ * @param text_input The Wayland text input object (unused).
+ * @param index The new cursor byte offset.
+ * @param anchor The new anchor byte offset (for selections).
+ */
 static void
 text_input_cursor_position(void *data,
                            struct zwp_text_input_v1 *text_input EINA_UNUSED,
@@ -500,6 +675,22 @@ text_input_cursor_position(void *data,
    imcontext->pending_commit.anchor = anchor;
 }
 
+/**
+ * @internal
+ * @brief Wayland listener callback for the 'preedit_styling' event.
+ *
+ * This function is called by the Wayland compositor to provide styling
+ * information for a portion of the preedit string. It creates an
+ * Ecore_IMF_Preedit_Attr structure based on the style and appends it
+ * to the `pending_preedit.attrs` list. These attributes will be applied
+ * when the `preedit_string` event is received.
+ *
+ * @param data The WaylandIMContext.
+ * @param text_input The Wayland text input object (unused).
+ * @param index Starting byte offset of the styled segment in the preedit string.
+ * @param length Length in bytes of the styled segment.
+ * @param style The `zwp_text_input_v1_preedit_style` value.
+ */
 static void
 text_input_preedit_styling(void *data,
                            struct zwp_text_input_v1 *text_input EINA_UNUSED,
@@ -534,6 +725,19 @@ text_input_preedit_styling(void *data,
      eina_list_append(imcontext->pending_preedit.attrs, attr);
 }
 
+/**
+ * @internal
+ * @brief Wayland listener callback for the 'preedit_cursor' event.
+ *
+ * This function is called by the Wayland compositor to set the cursor position
+ * within the preedit string. The position (byte offset) is stored in
+ * `pending_preedit.cursor` and will be applied when the `preedit_string`
+ * event is received.
+ *
+ * @param data The WaylandIMContext.
+ * @param text_input The Wayland text input object (unused).
+ * @param index The new cursor byte offset within the preedit string.
+ */
 static void
 text_input_preedit_cursor(void *data,
                           struct zwp_text_input_v1 *text_input EINA_UNUSED,
@@ -544,6 +748,19 @@ text_input_preedit_cursor(void *data,
    imcontext->pending_preedit.cursor = index;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the XKB modifier index for a given modifier name.
+ *
+ * This function iterates through the `modifiers_map` (provided by the
+ * Wayland compositor) to find the index corresponding to the specified
+ * modifier name (e.g., "Shift", "Control").
+ *
+ * @param modifiers_map A `wl_array` containing null-terminated strings of modifier names.
+ *                      Example: ["Shift", "Control", "Mod1", ...]
+ * @param name The name of the modifier to find (e.g., "Shift").
+ * @return The `xkb_mod_index_t` for the modifier, or `XKB_MOD_INVALID` if not found.
+ */
 static xkb_mod_index_t
 modifiers_get_index(struct wl_array *modifiers_map, const char *name)
 {
@@ -562,6 +779,17 @@ modifiers_get_index(struct wl_array *modifiers_map, const char *name)
    return XKB_MOD_INVALID;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the XKB modifier mask for a given modifier name.
+ *
+ * This function first gets the modifier index using `modifiers_get_index`
+ * and then calculates the corresponding bitmask (1 << index).
+ *
+ * @param modifiers_map A `wl_array` containing null-terminated strings of modifier names.
+ * @param name The name of the modifier to find (e.g., "Control").
+ * @return The `xkb_mod_mask_t` for the modifier, or `XKB_MOD_INVALID` if not found.
+ */
 static xkb_mod_mask_t
 modifiers_get_mask(struct wl_array *modifiers_map, const char *name)
 {
@@ -573,6 +801,19 @@ modifiers_get_mask(struct wl_array *modifiers_map, const char *name)
    return 1 << index;
 }
 
+/**
+ * @internal
+ * @brief Wayland listener callback for the 'modifiers_map' event.
+ *
+ * This function is called by the Wayland compositor to provide the mapping
+ * of modifier names to XKB modifier masks. It stores the masks for Shift,
+ * Control, and Alt (Mod1) in the `imcontext`.
+ *
+ * @param data The WaylandIMContext.
+ * @param text_input The Wayland text input object (unused).
+ * @param map A `wl_array` containing null-terminated strings of modifier names,
+ *            ordered by their XKB modifier index.
+ */
 static void
 text_input_modifiers_map(void *data,
                          struct zwp_text_input_v1 *text_input EINA_UNUSED,
@@ -585,6 +826,23 @@ text_input_modifiers_map(void *data,
    imcontext->alt_mask = modifiers_get_mask(map, "Mod1");
 }
 
+/**
+ * @internal
+ * @brief Wayland listener callback for the 'keysym' event.
+ *
+ * This function is called by the Wayland compositor when a key event occurs
+ * that should be processed by the client (application). It converts the
+ * keysym and modifiers into an Ecore_Event_Key and adds it to the Ecore
+ * event queue (ECORE_EVENT_KEY_DOWN or ECORE_EVENT_KEY_UP).
+ *
+ * @param data The WaylandIMContext.
+ * @param text_input The Wayland text input object (unused).
+ * @param serial The serial number of the event (unused here, but could be used for synchronization).
+ * @param time Timestamp of the event.
+ * @param sym The XKB keysym.
+ * @param state 0 for key release, 1 for key press.
+ * @param modifiers Bitmask of active XKB modifiers.
+ */
 static void
 text_input_keysym(void *data,
                   struct zwp_text_input_v1 *text_input EINA_UNUSED,
@@ -643,6 +901,20 @@ text_input_keysym(void *data,
      ecore_event_add(ECORE_EVENT_KEY_UP, e, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Wayland listener callback for the 'enter' event.
+ *
+ * This function is called by the Wayland compositor when the text input
+ * focus enters a new surface. It calls `update_state` to send current
+ * input state to the compositor and updates `reset_serial` to the current
+ * `serial`. This `reset_serial` is used to ignore stale events that might
+ * arrive after a focus change or reset.
+ *
+ * @param data The WaylandIMContext.
+ * @param text_input The Wayland text input object (unused).
+ * @param surface The Wayland surface that gained focus (unused).
+ */
 static void
 text_input_enter(void *data,
                  struct zwp_text_input_v1 *text_input EINA_UNUSED,
@@ -655,6 +927,17 @@ text_input_enter(void *data,
    imcontext->reset_serial = imcontext->serial;
 }
 
+/**
+ * @internal
+ * @brief Wayland listener callback for the 'leave' event.
+ *
+ * This function is called by the Wayland compositor when the text input
+ * focus leaves the current surface. It commits any pending preedit text
+ * and then clears the preedit state.
+ *
+ * @param data The WaylandIMContext.
+ * @param text_input The Wayland text input object (unused).
+ */
 static void
 text_input_leave(void *data,
                  struct zwp_text_input_v1 *text_input EINA_UNUSED)
@@ -666,6 +949,18 @@ text_input_leave(void *data,
    clear_preedit(imcontext);
 }
 
+/**
+ * @internal
+ * @brief Wayland listener callback for the 'input_panel_state' event.
+ *
+ * This function is called by the Wayland compositor to inform about changes
+ * in the input panel's state (e.g., visibility, position). Currently, this
+ * implementation is a no-op.
+ *
+ * @param data The WaylandIMContext (unused).
+ * @param text_input The Wayland text input object (unused).
+ * @param state The new state of the input panel (unused).
+ */
 static void
 text_input_input_panel_state(void *data EINA_UNUSED,
                              struct zwp_text_input_v1 *text_input EINA_UNUSED,
@@ -673,6 +968,20 @@ text_input_input_panel_state(void *data EINA_UNUSED,
 {
 }
 
+/**
+ * @internal
+ * @brief Wayland listener callback for the 'language' event.
+ *
+ * This function is called by the Wayland compositor to inform about a change
+ * in the input language (locale). If the language has changed, it updates
+ * the `imcontext->language` field and triggers the
+ * ECORE_IMF_INPUT_PANEL_LANGUAGE_EVENT callback.
+ *
+ * @param data The WaylandIMContext.
+ * @param text_input The Wayland text input object (unused).
+ * @param serial The serial number of the event (unused).
+ * @param language The new language string (e.g., "en_US").
+ */
 static void
 text_input_language(void *data,
                     struct zwp_text_input_v1 *text_input EINA_UNUSED,
@@ -703,6 +1012,19 @@ text_input_language(void *data,
       }
 }
 
+/**
+ * @internal
+ * @brief Wayland listener callback for the 'text_direction' event.
+ *
+ * This function is called by the Wayland compositor to inform about a change
+ * in the text direction (e.g., left-to-right, right-to-left). Currently, this
+ * implementation is a no-op.
+ *
+ * @param data The WaylandIMContext (unused).
+ * @param text_input The Wayland text input object (unused).
+ * @param serial The serial number of the event (unused).
+ * @param direction The new text direction (unused).
+ */
 static void
 text_input_text_direction(void *data EINA_UNUSED,
                           struct zwp_text_input_v1 *text_input EINA_UNUSED,
@@ -711,6 +1033,13 @@ text_input_text_direction(void *data EINA_UNUSED,
 {
 }
 
+/**
+ * @internal
+ * @brief Listener for Wayland text_input_v1 events.
+ *
+ * This structure maps Wayland text input protocol events to their
+ * corresponding handler functions.
+ */
 static const struct zwp_text_input_v1_listener text_input_listener =
 {
    text_input_enter,

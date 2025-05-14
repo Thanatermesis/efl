@@ -30,11 +30,28 @@ static int _efreet_icon_cache_log_dom = -1;
 # define O_BINARY 0
 #endif
 
+/** @internal Array of recognized icon file extensions (e.g., ".png", ".svg"). */
 static Eina_Array *exts = NULL;
+/** @internal Array of additional directories to scan for icons. */
 static Eina_Array *extra_dirs = NULL;
+/** @internal Array used to store all stringshared strings for later cleanup. */
 static Eina_Array *strs = NULL;
+/** @internal Hash table of loaded icon themes, mapping theme name (char *) to Efreet_Cache_Icon_Theme *. */
 static Eina_Hash *icon_themes = NULL;
 
+/**
+ * @internal
+ * @brief Checks if a directory has been modified since the last scan.
+ *
+ * This function compares the current state of the directory (mtime, size)
+ * with a cached state. If the directory is new or has changed, its
+ * information is updated in the `dirs` hash.
+ *
+ * @param dirs A hash table storing Efreet_Cache_Directory objects, keyed by directory path.
+ *             This hash is updated if the directory is new.
+ * @param dir The path to the directory to check.
+ * @return EINA_TRUE if the directory was modified or is new, EINA_FALSE otherwise or on error.
+ */
 static Eina_Bool
 cache_directory_modified(Eina_Hash *dirs, const char *dir)
 {
@@ -58,6 +75,15 @@ cache_directory_modified(Eina_Hash *dirs, const char *dir)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Checks if a given file extension is a recognized icon extension.
+ *
+ * It iterates through the global `exts` array to find a match.
+ *
+ * @param ext The file extension to check (e.g., ".png").
+ * @return EINA_TRUE if the extension is recognized, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 cache_extension_lookup(const char *ext)
 {
@@ -70,6 +96,21 @@ cache_extension_lookup(const char *ext)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Scans a single directory for fallback icons.
+ *
+ * This function iterates through files in the given directory. If a file has a
+ * recognized icon extension, it's added to the `icons` hash.
+ * It also checks if the directory itself has been modified using `cache_directory_modified`.
+ *
+ * @param icons A hash table to store found Efreet_Cache_Fallback_Icon objects, keyed by icon name (filename without extension).
+ *              This hash is populated with icons found in the directory.
+ *              Example: icons["my-icon"] = Efreet_Cache_Fallback_Icon for "my-icon.png".
+ * @param dirs A hash table storing Efreet_Cache_Directory objects, used by `cache_directory_modified`.
+ * @param dir The path to the directory to scan.
+ * @return EINA_TRUE on success or if the directory wasn't modified, EINA_FALSE on critical errors (though currently always returns EINA_TRUE).
+ */
 static Eina_Bool
 cache_fallback_scan_dir(Eina_Hash *icons, Eina_Hash *dirs, const char *dir)
 {
@@ -133,6 +174,18 @@ cache_fallback_scan_dir(Eina_Hash *icons, Eina_Hash *dirs, const char *dir)
     return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Scans all standard and extra directories for fallback icons.
+ *
+ * This function iterates through a predefined list of locations where fallback
+ * icons might be found, including user-specific directories, XDG data directories,
+ * and system-wide pixmap directories. It calls `cache_fallback_scan_dir` for each.
+ *
+ * @param icons A hash table to store found Efreet_Cache_Fallback_Icon objects, passed to `cache_fallback_scan_dir`.
+ * @param dirs A hash table storing Efreet_Cache_Directory objects, passed to `cache_fallback_scan_dir`.
+ * @return EINA_TRUE always (potential errors in `cache_fallback_scan_dir` are not propagated as EINA_FALSE).
+ */
 static Eina_Bool
 cache_fallback_scan(Eina_Hash *icons, Eina_Hash *dirs)
 {
@@ -168,6 +221,19 @@ cache_fallback_scan(Eina_Hash *icons, Eina_Hash *dirs)
     return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Checks if any of the directories relevant to fallback icons have changed.
+ *
+ * This function is similar to `cache_fallback_scan` in terms of the directories
+ * it checks, but instead of scanning for icons, it only checks for modifications
+ * using `cache_directory_modified`. It also checks directories previously cached
+ * within the `theme->dirs` hash.
+ *
+ * @param theme The fallback icon theme cache data. `theme->dirs` is used to check
+ *              previously known directories and is updated by `cache_directory_modified`.
+ * @return EINA_TRUE if any relevant directory has changed, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 check_fallback_changed(Efreet_Cache_Icon_Theme *theme)
 {
@@ -221,14 +287,33 @@ check_fallback_changed(Efreet_Cache_Icon_Theme *theme)
     return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Structure to hold information about a scanned file entry.
+ * Used to cache the results of `eina_file_stat_ls` to avoid repeated directory listings.
+ */
 typedef struct
 {
-  char *path;
-  int name_start;
+  char *path;        /**< Full path to the file, duplicated string. */
+  int name_start;    /**< Offset of the filename within the path. */
 } Scanned_Entry;
 
+/** @internal Hash table to cache directory listings. Keys are directory paths (char *), values are Eina_List * of Scanned_Entry *. A special value of (void *)(intptr_t)(-1L) indicates the directory was scanned and found empty or inaccessible. */
 static Eina_Hash *already_scanned_path = NULL;
 
+/**
+ * @internal
+ * @brief Verifies if any directories within a specific icon theme have changed.
+ *
+ * This function iterates through the directories listed in `theme->theme.directories`
+ * (which are relative paths within the theme) and checks each one for modifications
+ * using `cache_directory_modified`. If any directory has changed, `theme->changed`
+ * is set to EINA_TRUE.
+ *
+ * @param theme The icon theme cache data to check and potentially update.
+ *              `theme->dirs` is used by `cache_directory_modified`.
+ *              `theme->changed` is set if modifications are found.
+ */
 static void
 cache_theme_change_verify(Efreet_Cache_Icon_Theme *theme)
 {
@@ -252,6 +337,24 @@ cache_theme_change_verify(Efreet_Cache_Icon_Theme *theme)
    if (changed) theme->changed = changed;
 }
 
+/**
+ * @internal
+ * @brief Scans a specific subdirectory within an icon theme for icons.
+ *
+ * This function processes a single directory (e.g., "48x48/apps") within a theme's path.
+ * It lists files, filters by recognized extensions, and populates the `icons` hash
+ * with `Efreet_Cache_Icon` objects. It uses `already_scanned_path` to cache
+ * directory listings to avoid redundant `eina_file_stat_ls` calls.
+ *
+ * @param theme The current icon theme being processed (used for its name).
+ * @param path The base path of the icon theme (e.g., "/usr/share/icons/Adwaita").
+ * @param dir An `Efreet_Icon_Theme_Directory` structure describing the subdirectory
+ *            to scan (e.g., its name "48x48/apps", type, size).
+ * @param icons A hash table to store found `Efreet_Cache_Icon` objects, keyed by icon name.
+ *              This hash is populated or updated with icons found.
+ *              Example: icons["firefox"] = Efreet_Cache_Icon for "firefox.png".
+ * @return EINA_TRUE on success, EINA_FALSE on critical error (though currently often returns EINA_TRUE even after some errors).
+ */
 static Eina_Bool
 cache_scan_path_dir(Efreet_Icon_Theme *theme,
                     const char *path,
@@ -418,6 +521,19 @@ cache_scan_path_dir(Efreet_Icon_Theme *theme,
     return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Scans all specified subdirectories within a given theme path for icons.
+ *
+ * Iterates over `theme->directories` (e.g., "scalable/apps", "32x32/actions")
+ * and calls `cache_scan_path_dir` for each one, effectively scanning one
+ * base path (e.g., "/usr/share/icons/MyTheme") of an icon theme.
+ *
+ * @param theme The icon theme definition, providing the list of subdirectories to scan.
+ * @param icons The hash table to populate with `Efreet_Cache_Icon` objects.
+ * @param path The base filesystem path for this instance of the theme (e.g., "/usr/share/icons/MyTheme").
+ * @return EINA_TRUE if all subdirectory scans succeed, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 cache_scan_path(Efreet_Icon_Theme *theme, Eina_Hash *icons, const char *path)
 {
@@ -432,6 +548,22 @@ cache_scan_path(Efreet_Icon_Theme *theme, Eina_Hash *icons, const char *path)
     return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Recursively scans an icon theme and its inherited themes.
+ *
+ * This function scans the specified `theme` for icons by iterating through its
+ * `theme->paths` and calling `cache_scan_path` for each. It then recursively
+ * calls itself for any themes listed in `theme->inherits`.
+ * The `themes` hash is used to avoid processing the same theme multiple times.
+ * If a theme has no explicit inherits, "hicolor" is implicitly inherited.
+ *
+ * @param theme The icon theme to scan.
+ * @param themes A hash table to keep track of already scanned themes (Efreet_Icon_Theme*), keyed by internal theme name.
+ *               Prevents redundant scans and circular dependencies.
+ * @param icons A hash table to populate with `Efreet_Cache_Icon` objects from all scanned themes.
+ * @return EINA_TRUE if scanning succeeds for this theme and its inherits, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 cache_scan(Efreet_Icon_Theme *theme, Eina_Hash *themes, Eina_Hash *icons)
 {
@@ -470,6 +602,19 @@ cache_scan(Efreet_Icon_Theme *theme, Eina_Hash *themes, Eina_Hash *icons)
     return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Recursively checks if an icon theme or any of its inherited themes have changed.
+ *
+ * This function first checks if the `theme` itself is marked as changed (`theme->changed`).
+ * If not, it recursively calls itself for any themes listed in `theme->theme.inherits`.
+ * If a theme has no explicit inherits and is not "hicolor", "hicolor" is implicitly checked.
+ * The actual directory modification checks are expected to have been done by
+ * `cache_theme_change_verify` which sets `theme->changed`.
+ *
+ * @param theme The cached icon theme data to check.
+ * @return EINA_TRUE if the theme or any of its inherited themes have changed, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 check_changed(Efreet_Cache_Icon_Theme *theme)
 {
@@ -500,6 +645,18 @@ check_changed(Efreet_Cache_Icon_Theme *theme)
     return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Creates and populates an Efreet_Icon_Theme_Directory structure from an INI file section.
+ *
+ * Reads properties like "Context", "Type", "Size", "MinSize", "MaxSize", "Threshold"
+ * for a given directory section (e.g., "48x48/apps") in an "index.theme" file.
+ *
+ * @param ini The Efreet_Ini object representing the parsed "index.theme" file.
+ * @param name The name of the directory section in the INI file (e.g., "48x48/apps").
+ * @return A newly allocated Efreet_Icon_Theme_Directory structure, or NULL on failure.
+ *         The `name` field in the returned struct is stringshared and added to `strs`.
+ */
 static Efreet_Icon_Theme_Directory *
 icon_theme_directory_new(Efreet_Ini *ini, const char *name)
 {
@@ -568,6 +725,23 @@ icon_theme_directory_new(Efreet_Ini *ini, const char *name)
     return dir;
 }
 
+/**
+ * @internal
+ * @brief Reads and parses an "index.theme" file for a given icon theme.
+ *
+ * Populates the `theme->theme` (Efreet_Icon_Theme) structure with information
+ * from the "index.theme" file located at `path`. This includes the theme's
+ * name, comment, example icon, hidden status, inherited themes, and a list of
+ * its directories (parsed by `icon_theme_directory_new`).
+ * It also checks if the "index.theme" file itself has changed using `efreet_file_cache_fill`
+ * and `efreet_file_cache_check`. If changed, `theme->changed` is set.
+ *
+ * @param theme The cache entry for the icon theme. Its `theme` sub-structure is populated.
+ *              `theme->path`, `theme->check`, `theme->changed`, and `theme->valid` are updated.
+ *              Various string fields are stringshared and added to `strs`.
+ * @param path The full path to the "index.theme" file.
+ * @return EINA_TRUE on successful parsing or if the file hasn't changed, EINA_FALSE on error (e.g., file not found, parse error).
+ */
 static Eina_Bool
 icon_theme_index_read(Efreet_Cache_Icon_Theme *theme, const char *path)
 {
@@ -691,6 +865,20 @@ error:
     return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Scans a base directory (e.g., "/usr/share/icons" or a user's icon directory) for icon theme directories.
+ *
+ * For each subdirectory found (potential icon theme like "Adwaita", "Numix"):
+ * - Creates or retrieves an `Efreet_Cache_Icon_Theme` from the global `icon_themes` hash.
+ * - Updates its list of base paths (`theme->theme.paths`) if the current `dir/theme_name` is new.
+ * - Checks for an "index.theme" file within `dir/theme_name` and parses it using `icon_theme_index_read`
+ *   if the theme isn't already marked as valid or if its directory cache information needs update.
+ * - Updates directory modification times in `theme->dirs`.
+ *
+ * @param dir The base directory to scan for themes (e.g., "~/.local/share/icons", "/usr/share/icons").
+ * @return EINA_TRUE always (errors during processing of individual themes are logged but don't stop the scan).
+ */
 static Eina_Bool
 cache_theme_scan(const char *dir)
 {
@@ -778,6 +966,15 @@ cache_theme_scan(const char *dir)
     return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Creates and locks a lock file to ensure only one instance of the cache generator runs.
+ *
+ * The lock file is created at `efreet_cache_home_get()/efreet/icon_data.lock`.
+ * Uses `fcntl` with `F_WRLCK` and `F_SETLK` for an advisory lock.
+ *
+ * @return File descriptor of the locked file on success, -1 on failure (e.g., already locked, permission error).
+ */
 static int
 cache_lock_file(void)
 {
@@ -803,6 +1000,17 @@ cache_lock_file(void)
     return lockfd;
 }
 
+/**
+ * @internal
+ * @brief Frees resources associated with an Efreet_Cache_Icon_Theme structure.
+ *
+ * This function is typically used as an EINA_FREE_CB for the `icon_themes` hash.
+ * It frees lists (`paths`, `inherits`, `directories`) and the `dirs` hash within the theme.
+ * Note: Stringshared strings within these structures are not freed here; they are
+ * managed by the global `strs` array and `eina_stringshare_del`.
+ *
+ * @param theme The Efreet_Cache_Icon_Theme to free.
+ */
 static void
 icon_theme_free(Efreet_Cache_Icon_Theme *theme)
 {
@@ -815,6 +1023,38 @@ icon_theme_free(Efreet_Cache_Icon_Theme *theme)
     free(theme);
 }
 
+/**
+ * @internal
+ * @brief Main entry point for the Efreet icon cache generator.
+ *
+ * Orchestrates the entire cache creation process:
+ * 1. Initializes Eina, Eet, Ecore, and Efreet.
+ * 2. Parses command-line arguments (verbose, extensions, extra dirs, flush).
+ * 3. Sets process priority to low.
+ * 4. Creates cache directory and lock file.
+ * 5. Loads existing theme cache (`efreet_icon_theme_cache_file()`).
+ * 6. Scans system and user directories for icon themes (`cache_theme_scan`).
+ * 7. For each valid theme:
+ *    a. Verifies if theme directories changed (`cache_theme_change_verify`, `check_changed`).
+ *    b. Opens/creates per-theme icon cache file (`efreet_icon_cache_file()`).
+ *    c. If changed, rescans icons for the theme and its inherits (`cache_scan`).
+ *    d. Writes updated icon data and theme metadata to caches.
+ * 8. Processes fallback icons:
+ *    a. Checks if fallback icon directories changed (`check_fallback_changed`).
+ *    b. If changed, rescans fallback icons (`cache_fallback_scan`).
+ *    c. Writes updated fallback icon data to cache.
+ * 9. Writes overall theme cache version.
+ * 10. Prints 'c' if changes were made, 'n' otherwise.
+ * 11. Cleans up resources and shuts down libraries.
+ *
+ * @param argc Argument count.
+ * @param argv Argument vector. Supported arguments:
+ *             - "-v": Verbose mode.
+ *             - "-e .ext1 .ext2 ...": Specifies recognized icon extensions. (Required)
+ *             - "-d dir1 dir2 ...": Specifies additional directories to scan for icons.
+ *             - "-f": Force flush; treat all themes as changed.
+ * @return 0 on success, -1 on critical failure.
+ */
 int
 main(int argc, char **argv)
 {

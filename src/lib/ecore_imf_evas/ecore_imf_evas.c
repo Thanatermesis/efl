@@ -7,9 +7,24 @@
 #include "ecore_private.h"
 #include "Ecore_IMF_Evas.h"
 
+/**
+ * @internal
+ * @brief An empty string constant used as a default for event string fields.
+ * This is used to avoid NULL strings when Evas event fields are NULL.
+ */
 static const char *_ecore_imf_evas_event_empty = "";
 
-/* Converts the Evas modifiers to Ecore_IMF keyboard modifiers */
+/**
+ * @internal
+ * @brief Converts Evas_Modifier to Ecore_IMF_Keyboard_Modifiers.
+ *
+ * This function maps modifier keys like Control, Alt, Shift, Super, Hyper,
+ * and AltGr from the Evas representation to the Ecore_IMF representation.
+ *
+ * @param evas_modifiers Pointer to the Evas_Modifier structure.
+ * @param imf_keyboard_modifiers Pointer to the Ecore_IMF_Keyboard_Modifiers
+ *                               variable to store the converted modifiers.
+ */
 static void
 _ecore_imf_evas_event_modifiers_wrap(Evas_Modifier *evas_modifiers,
                                      Ecore_IMF_Keyboard_Modifiers *imf_keyboard_modifiers)
@@ -30,7 +45,17 @@ _ecore_imf_evas_event_modifiers_wrap(Evas_Modifier *evas_modifiers,
      *imf_keyboard_modifiers |= ECORE_IMF_KEYBOARD_MODIFIER_ALTGR;
 }
 
-/* Converts the Evas locks to Ecore_IMF keyboard locks */
+/**
+ * @internal
+ * @brief Converts Evas_Lock to Ecore_IMF_Keyboard_Locks.
+ *
+ * This function maps lock keys like Num_Lock, Caps_Lock, and Scroll_Lock
+ * from the Evas representation to the Ecore_IMF representation.
+ *
+ * @param evas_locks Pointer to the Evas_Lock structure.
+ * @param imf_keyboard_locks Pointer to the Ecore_IMF_Keyboard_Locks
+ *                           variable to store the converted locks.
+ */
 static void
 _ecore_imf_evas_event_locks_wrap(Evas_Lock *evas_locks,
                                  Ecore_IMF_Keyboard_Locks *imf_keyboard_locks)
@@ -47,7 +72,17 @@ _ecore_imf_evas_event_locks_wrap(Evas_Lock *evas_locks,
      *imf_keyboard_locks |= ECORE_IMF_KEYBOARD_LOCK_SCROLL;
 }
 
-/* Converts the Evas mouse flags to Ecore_IMF mouse flags */
+/**
+ * @internal
+ * @brief Converts Evas_Button_Flags to Ecore_IMF_Mouse_Flags.
+ *
+ * This function maps mouse button flags like double-click and triple-click
+ * from the Evas representation to the Ecore_IMF representation.
+ *
+ * @param evas_flags The Evas_Button_Flags value.
+ * @param imf_flags Pointer to the Ecore_IMF_Mouse_Flags variable to store
+ *                  the converted flags.
+ */
 static void
 _ecore_imf_evas_event_mouse_flags_wrap(Evas_Button_Flags evas_flags,
                                        Ecore_IMF_Mouse_Flags *imf_flags)
@@ -62,6 +97,16 @@ _ecore_imf_evas_event_mouse_flags_wrap(Evas_Button_Flags evas_flags,
      *imf_flags |= ECORE_IMF_MOUSE_TRIPLE_CLICK;
 }
 
+/**
+ * @brief Wraps an Evas_Event_Mouse_In event into an Ecore_IMF_Event_Mouse_In event.
+ *
+ * This function copies data from an Evas mouse in event structure to an
+ * Ecore_IMF mouse in event structure, including coordinates, button state,
+ * timestamp, modifiers, and locks.
+ *
+ * @param evas_event Pointer to the source Evas_Event_Mouse_In structure.
+ * @param imf_event Pointer to the destination Ecore_IMF_Event_Mouse_In structure.
+ */
 EAPI void
 ecore_imf_evas_event_mouse_in_wrap(Evas_Event_Mouse_In *evas_event,
                                    Ecore_IMF_Event_Mouse_In *imf_event)
@@ -79,6 +124,16 @@ ecore_imf_evas_event_mouse_in_wrap(Evas_Event_Mouse_In *evas_event,
    _ecore_imf_evas_event_locks_wrap(evas_event->locks, &imf_event->locks);
 }
 
+/**
+ * @brief Wraps an Evas_Event_Mouse_Out event into an Ecore_IMF_Event_Mouse_Out event.
+ *
+ * This function copies data from an Evas mouse out event structure to an
+ * Ecore_IMF mouse out event structure, including coordinates, button state,
+ * timestamp, modifiers, and locks.
+ *
+ * @param evas_event Pointer to the source Evas_Event_Mouse_Out structure.
+ * @param imf_event Pointer to the destination Ecore_IMF_Event_Mouse_Out structure.
+ */
 EAPI void
 ecore_imf_evas_event_mouse_out_wrap(Evas_Event_Mouse_Out *evas_event,
                                     Ecore_IMF_Event_Mouse_Out *imf_event)
@@ -96,6 +151,16 @@ ecore_imf_evas_event_mouse_out_wrap(Evas_Event_Mouse_Out *evas_event,
    _ecore_imf_evas_event_locks_wrap(evas_event->locks, &imf_event->locks);
 }
 
+/**
+ * @brief Wraps an Evas_Event_Mouse_Move event into an Ecore_IMF_Event_Mouse_Move event.
+ *
+ * This function copies data from an Evas mouse move event structure to an
+ * Ecore_IMF mouse move event structure, including current and previous coordinates,
+ * button state, timestamp, modifiers, and locks.
+ *
+ * @param evas_event Pointer to the source Evas_Event_Mouse_Move structure.
+ * @param imf_event Pointer to the destination Ecore_IMF_Event_Mouse_Move structure.
+ */
 EAPI void
 ecore_imf_evas_event_mouse_move_wrap(Evas_Event_Mouse_Move *evas_event,
                                      Ecore_IMF_Event_Mouse_Move *imf_event)
@@ -117,6 +182,16 @@ ecore_imf_evas_event_mouse_move_wrap(Evas_Event_Mouse_Move *evas_event,
    _ecore_imf_evas_event_locks_wrap(evas_event->locks, &imf_event->locks);
 }
 
+/**
+ * @brief Wraps an Evas_Event_Mouse_Down event into an Ecore_IMF_Event_Mouse_Down event.
+ *
+ * This function copies data from an Evas mouse down event structure to an
+ * Ecore_IMF mouse down event structure, including button number, coordinates,
+ * timestamp, modifiers, locks, and mouse flags (e.g., double/triple click).
+ *
+ * @param evas_event Pointer to the source Evas_Event_Mouse_Down structure.
+ * @param imf_event Pointer to the destination Ecore_IMF_Event_Mouse_Down structure.
+ */
 EAPI void
 ecore_imf_evas_event_mouse_down_wrap(Evas_Event_Mouse_Down *evas_event,
                                      Ecore_IMF_Event_Mouse_Down *imf_event)
@@ -135,6 +210,16 @@ ecore_imf_evas_event_mouse_down_wrap(Evas_Event_Mouse_Down *evas_event,
    _ecore_imf_evas_event_mouse_flags_wrap(evas_event->flags, &imf_event->flags);
 }
 
+/**
+ * @brief Wraps an Evas_Event_Mouse_Up event into an Ecore_IMF_Event_Mouse_Up event.
+ *
+ * This function copies data from an Evas mouse up event structure to an
+ * Ecore_IMF mouse up event structure, including button number, coordinates,
+ * timestamp, modifiers, locks, and mouse flags.
+ *
+ * @param evas_event Pointer to the source Evas_Event_Mouse_Up structure.
+ * @param imf_event Pointer to the destination Ecore_IMF_Event_Mouse_Up structure.
+ */
 EAPI void
 ecore_imf_evas_event_mouse_up_wrap(Evas_Event_Mouse_Up *evas_event,
                                    Ecore_IMF_Event_Mouse_Up *imf_event)
@@ -153,6 +238,16 @@ ecore_imf_evas_event_mouse_up_wrap(Evas_Event_Mouse_Up *evas_event,
    _ecore_imf_evas_event_mouse_flags_wrap(evas_event->flags, &imf_event->flags);
 }
 
+/**
+ * @brief Wraps an Evas_Event_Mouse_Wheel event into an Ecore_IMF_Event_Mouse_Wheel event.
+ *
+ * This function copies data from an Evas mouse wheel event structure to an
+ * Ecore_IMF mouse wheel event structure, including direction, wheel value (z),
+ * coordinates, timestamp, modifiers, and locks.
+ *
+ * @param evas_event Pointer to the source Evas_Event_Mouse_Wheel structure.
+ * @param imf_event Pointer to the destination Ecore_IMF_Event_Mouse_Wheel structure.
+ */
 EAPI void
 ecore_imf_evas_event_mouse_wheel_wrap(Evas_Event_Mouse_Wheel *evas_event,
                                       Ecore_IMF_Event_Mouse_Wheel *imf_event)
@@ -172,6 +267,17 @@ ecore_imf_evas_event_mouse_wheel_wrap(Evas_Event_Mouse_Wheel *evas_event,
    imf_event->timestamp = evas_event->timestamp;
 }
 
+/**
+ * @brief Wraps an Evas_Event_Key_Down event into an Ecore_IMF_Event_Key_Down event.
+ *
+ * This function copies data from an Evas key down event structure to an
+ * Ecore_IMF key down event structure. This includes key name, key string,
+ * compose string, timestamp, keycode, device information, modifiers, and locks.
+ * If string fields in the Evas event are NULL, they are replaced with an empty string.
+ *
+ * @param evas_event Pointer to the source Evas_Event_Key_Down structure.
+ * @param imf_event Pointer to the destination Ecore_IMF_Event_Key_Down structure.
+ */
 EAPI void
 ecore_imf_evas_event_key_down_wrap(Evas_Event_Key_Down *evas_event,
                                    Ecore_IMF_Event_Key_Down *imf_event)
@@ -203,6 +309,18 @@ ecore_imf_evas_event_key_down_wrap(Evas_Event_Key_Down *evas_event,
    _ecore_imf_evas_event_locks_wrap(evas_event->locks, &imf_event->locks);
 }
 
+/**
+ * @brief Wraps an Evas_Event_Key_Up event into an Ecore_IMF_Event_Key_Up event.
+ *
+ * This function copies data from an Evas key up event structure to an
+ * Ecore_IMF key up event structure. This includes key name, key string,
+ * compose string, timestamp, keycode, device information, modifiers, and locks.
+ * If string fields in the Evas event are NULL, they are replaced with an empty string.
+ * Error logging is performed if either input event structure is NULL.
+ *
+ * @param evas_event Pointer to the source Evas_Event_Key_Up structure.
+ * @param imf_event Pointer to the destination Ecore_IMF_Event_Key_Up structure.
+ */
 EAPI void
 ecore_imf_evas_event_key_up_wrap(Evas_Event_Key_Up *evas_event,
                                  Ecore_IMF_Event_Key_Up *imf_event)

@@ -9,7 +9,19 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_gengrid_item_next_get, Elm_Widget_Item *, NULL
 
 void _elm_gengrid_item_selected_set(Eo *obj, Elm_Gen_Item *pd, Eina_Bool selected);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function for the 'selected' property setter.
+ *
+ * This function is part of the Eolian reflection mechanism. It is called
+ * when the 'selected' property is set via reflection (e.g., through scripting
+ * or introspection). It converts the Eina_Value to the native C type (Eina_Bool)
+ * and calls the actual C implementation (_elm_gengrid_item_selected_set).
+ *
+ * @param obj The Evas Object.
+ * @param val The Eina_Value containing the boolean value to set.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code if conversion fails.
+ */
 static Eina_Error
 __eolian_elm_gengrid_item_selected_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -29,7 +41,18 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_gengrid_item_selected_set, EFL_FUNC_CALL(selec
 
 Eina_Bool _elm_gengrid_item_selected_get(const Eo *obj, Elm_Gen_Item *pd);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function for the 'selected' property getter.
+ *
+ * This function is part of the Eolian reflection mechanism. It is called
+ * when the 'selected' property is accessed via reflection. It calls the
+ * actual C implementation (_elm_gengrid_item_selected_get) and converts
+ * the returned C type (Eina_Bool) to an Eina_Value.
+ *
+ * @param obj The Evas Object.
+ * @return An Eina_Value containing the boolean state of the 'selected' property.
+ */
 static Eina_Value
 __eolian_elm_gengrid_item_selected_get_reflect(const Eo *obj)
 {
@@ -45,7 +68,18 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_gengrid_item_class_get, const Elm_Gengrid_Item
 
 int _elm_gengrid_item_index_get(const Eo *obj, Elm_Gen_Item *pd);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function for the 'index' property getter.
+ *
+ * This function is part of the Eolian reflection mechanism. It is called
+ * when the 'index' property is accessed via reflection. It calls the
+ * actual C implementation (_elm_gengrid_item_index_get) and converts
+ * the returned C type (int) to an Eina_Value.
+ *
+ * @param obj The Evas Object.
+ * @return An Eina_Value containing the integer value of the item's index.
+ */
 static Eina_Value
 __eolian_elm_gengrid_item_index_get_reflect(const Eo *obj)
 {
@@ -99,9 +133,33 @@ void _elm_gengrid_item_all_contents_unset(Eo *obj, Elm_Gen_Item *pd, Eina_List *
 
 EOAPI EFL_VOID_FUNC_BODYV(elm_obj_gengrid_item_all_contents_unset, EFL_FUNC_CALL(l), Eina_List **l);
 
+/**
+ * @internal
+ * @brief Implements the Efl.Object.constructor method for Elm_Gengrid_Item.
+ *
+ * This function is called when a new Elm_Gengrid_Item instance is created.
+ * It performs initial setup for the item. It calls the parent class's
+ * constructor and then may perform additional Gengrid item-specific
+ * initialization.
+ *
+ * @param obj The Evas Object (Elm_Gengrid_Item) being constructed.
+ * @param pd The private data for the Elm_Gengrid_Item instance.
+ * @return The constructed Efl_Object, or NULL on failure.
+ */
 Efl_Object *_elm_gengrid_item_efl_object_constructor(Eo *obj, Elm_Gen_Item *pd);
 
-
+/**
+ * @internal
+ * @brief Implements the Elm.Widget.Item.del_pre method for Elm_Gengrid_Item.
+ *
+ * This function is called just before the Elm_Gengrid_Item is deleted.
+ * It's a pre-deletion hook that allows the item to perform any necessary
+ * cleanup before its resources are freed. For example, it might detach
+ * itself from internal Gengrid structures or free specific data.
+ *
+ * @param obj The Evas Object (Elm_Gengrid_Item) being deleted.
+ * @param pd The private data for the Elm_Gengrid_Item instance.
+ */
 void _elm_gengrid_item_elm_widget_item_del_pre(Eo *obj, Elm_Gen_Item *pd);
 
 
@@ -161,7 +219,19 @@ void _elm_gengrid_item_efl_ui_focus_object_setup_order_non_recursive(Eo *obj, El
 
 Efl_Ui_Focus_Object *_elm_gengrid_item_efl_ui_focus_object_focus_parent_get(const Eo *obj, Elm_Gen_Item *pd);
 
-
+/**
+ * @internal
+ * @brief Initializes the Elm_Gengrid_Item Efl_Class.
+ *
+ * This function is called once when the Elm_Gengrid_Item class is first loaded.
+ * It sets up the Efl_Object_Ops (the vtable) for the class, mapping Eolian
+ * methods to their C implementations. It also registers any Eolian properties
+ * and their reflection functions. This is a critical part of the Eo class
+ * system.
+ *
+ * @param klass The Efl_Class (Elm_Gengrid_Item_Class) to initialize.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_gengrid_item_class_initializer(Efl_Class *klass)
 {
@@ -228,6 +298,16 @@ _elm_gengrid_item_class_initializer(Efl_Class *klass)
    return efl_class_functions_set(klass, opsp, ropsp);
 }
 
+/**
+ * @internal
+ * @brief Describes the Elm_Gengrid_Item Efl_Class.
+ *
+ * This static structure provides metadata for the Elm_Gengrid_Item class,
+ * such as its Eo API version, name, type (regular class), size of its
+ * instance data (Elm_Gen_Item), and pointers to its class initializer,
+ * constructor, and destructor functions. This description is used by the
+ * EFL_DEFINE_CLASS macro to register the class with the Eo system.
+ */
 static const Efl_Class_Description _elm_gengrid_item_class_desc = {
    EO_VERSION,
    "Elm.Gengrid.Item",

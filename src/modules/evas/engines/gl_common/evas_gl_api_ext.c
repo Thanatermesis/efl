@@ -133,6 +133,18 @@ typedef struct _EvasGLImage {
    EGLImageKHR img;
 } EvasGLImage_EGL;
 
+/**
+ * @brief Retrieves the EGLDisplay for the current context or a given Evas_GL instance.
+ *
+ * This function is a helper to get the EGLDisplay. It first tries to get it from
+ * thread-local storage (current context). If that fails, and an `evgl` instance
+ * is provided, it falls back to getting the display from the engine data associated
+ * with that instance. This is crucial for EGL operations that require a display handle.
+ *
+ * @param function The name of the calling function, for logging purposes.
+ * @param evgl A specific Evas_GL instance (optional, used as a fallback).
+ * @return The EGLDisplay handle, or EGL_NO_DISPLAY on failure.
+ */
 static EGLDisplay
 _evgl_egl_display_get(const char *function, Evas_GL *evgl)
 {
@@ -170,6 +182,22 @@ fallback:
    return dpy;
 }
 
+/**
+ * @brief A wrapper around eglCreateImageKHR that handles EvasGLImage creation.
+ *
+ * This function takes Evas-specific arguments, translates them for EGL,
+ * calls the real `eglCreateImage` function, and wraps the resulting
+ * EGLImageKHR in an `EvasGLImage_EGL` struct. It also handles the
+ * conversion of the attribute list from a 0-terminated list to an
+ * EGL_NONE-terminated list.
+ *
+ * @param dpy The EGLDisplay.
+ * @param ctx The EGLContext. Can be EGL_NO_CONTEXT for some targets.
+ * @param target The EGL image target type (e.g., EVAS_GL_TEXTURE_2D).
+ * @param buffer The source buffer for the image (e.g., a native pixmap).
+ * @param attrib_list A 0-terminated list of attributes.
+ * @return A pointer to an `EvasGLImage_EGL` struct on success, or NULL on failure.
+ */
 static void *
 _evgl_eglCreateImageKHR(EGLDisplay dpy, EGLContext ctx,
                         int target, void* buffer, const int *attrib_list)
@@ -209,6 +237,18 @@ _evgl_eglCreateImageKHR(EGLDisplay dpy, EGLContext ctx,
    return img;
 }
 
+/**
+ * @brief Creates an EvasGLImage from the current context.
+ *
+ * This function is the public-facing API implementation for creating an EvasGLImage.
+ * It automatically retrieves the current EGLDisplay. If the target is a 2D texture,
+ * it also retrieves the current EGLContext, as this is required by the EGL spec.
+ *
+ * @param target The image target type (e.g., EVAS_GL_TEXTURE_2D).
+ * @param buffer The source buffer.
+ * @param attrib_list A 0-terminated list of attributes.
+ * @return An opaque EvasGLImage handle, or NULL on failure.
+ */
 static void *
 _evgl_evasglCreateImage(int target, void* buffer, const int *attrib_list)
 {
@@ -231,6 +271,20 @@ _evgl_evasglCreateImage(int target, void* buffer, const int *attrib_list)
    return _evgl_eglCreateImageKHR(dpy, ctx, target, buffer, attrib_list);
 }
 
+/**
+ * @brief Creates an EvasGLImage for a specific Evas_GL context.
+ *
+ * This is an alternative to `_evgl_evasglCreateImage` that allows specifying
+ * the exact Evas_GL instance and context to use, rather than relying on the
+ * current thread's context.
+ *
+ * @param evasgl The Evas_GL instance.
+ * @param evasctx The Evas_GL_Context.
+ * @param target The image target type.
+ * @param buffer The source buffer.
+ * @param attrib_list A 0-terminated list of attributes.
+ * @return An opaque EvasGLImage handle, or NULL on failure.
+ */
 static void *
 _evgl_evasglCreateImageForContext(Evas_GL *evasgl, Evas_GL_Context *evasctx,
                                  int target, void* buffer, const int *attrib_list)
@@ -249,6 +303,14 @@ _evgl_evasglCreateImageForContext(Evas_GL *evasgl, Evas_GL_Context *evasctx,
    return _evgl_eglCreateImageKHR(dpy, ctx, target, buffer, attrib_list);
 }
 
+/**
+ * @brief Destroys an EvasGLImage.
+ *
+ * This function frees the resources associated with an EvasGLImage. It calls
+ * `eglDestroyImage` and then frees the `EvasGLImage_EGL` wrapper struct.
+ *
+ * @param image The EvasGLImage handle to destroy.
+ */
 static void
 _evgl_evasglDestroyImage(EvasGLImage image)
 {
@@ -265,6 +327,17 @@ _evgl_evasglDestroyImage(EvasGLImage image)
    free(img);
 }
 
+/**
+ * @brief Binds an EvasGLImage to a 2D texture target.
+ *
+ * This is a wrapper around `glEGLImageTargetTexture2DOES`. It retrieves the
+ * underlying EGLImageKHR from the EvasGLImage handle and passes it to the
+ * driver function. It ensures that the current context is valid before
+ * proceeding.
+ *
+ * @param target The texture target (e.g., GL_TEXTURE_2D).
+ * @param image The EvasGLImage to bind.
+ */
 static void
 _evgl_glEvasGLImageTargetTexture2D(GLenum target, EvasGLImage image)
 {
@@ -301,6 +374,15 @@ _evgl_glEvasGLImageTargetTexture2D(GLenum target, EvasGLImage image)
    EXT_FUNC(glEGLImageTargetTexture2DOES)(target, img->img);
 }
 
+/**
+ * @brief Binds an EvasGLImage to a renderbuffer storage target.
+ *
+ * This is a wrapper around `glEGLImageTargetRenderbufferStorageOES`. It behaves
+ * similarly to `_evgl_glEvasGLImageTargetTexture2D` but for renderbuffers.
+ *
+ * @param target The renderbuffer target (must be GL_RENDERBUFFER).
+ * @param image The EvasGLImage to bind.
+ */
 static void
 _evgl_glEvasGLImageTargetRenderbufferStorage(GLenum target, EvasGLImage image)
 {
@@ -337,6 +419,17 @@ _evgl_glEvasGLImageTargetRenderbufferStorage(GLenum target, EvasGLImage image)
    EXT_FUNC(glEGLImageTargetRenderbufferStorageOES)(target, img->img);
 }
 
+/**
+ * @brief Creates a sync object for a given Evas_GL instance.
+ *
+ * This is a wrapper for `eglCreateSyncKHR`. It retrieves the EGLDisplay
+ * associated with the Evas_GL instance and creates a fence sync object.
+ *
+ * @param evas_gl The Evas_GL instance.
+ * @param type The type of sync object to create (e.g., EGL_SYNC_FENCE_KHR).
+ * @param attrib_list A list of attributes for the sync object.
+ * @return An `EvasGLSync` handle on success, NULL on failure.
+ */
 static EvasGLSync
 _evgl_evasglCreateSync(Evas_GL *evas_gl,
                       unsigned int type, const int *attrib_list)
@@ -346,6 +439,15 @@ _evgl_evasglCreateSync(Evas_GL *evas_gl,
    return EXT_FUNC_EGL(eglCreateSyncKHR)(dpy, type, attrib_list);
 }
 
+/**
+ * @brief Destroys a sync object.
+ *
+ * Wrapper for `eglDestroySyncKHR`.
+ *
+ * @param evas_gl The Evas_GL instance.
+ * @param sync The sync object to destroy.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _evgl_evasglDestroySync(Evas_GL *evas_gl, EvasGLSync sync)
 {
@@ -354,6 +456,17 @@ _evgl_evasglDestroySync(Evas_GL *evas_gl, EvasGLSync sync)
    return EXT_FUNC_EGL(eglDestroySyncKHR)(dpy, sync);
 }
 
+/**
+ * @brief Blocks the client until a sync object is signaled.
+ *
+ * Wrapper for `eglClientWaitSyncKHR`. This is a client-side wait.
+ *
+ * @param evas_gl The Evas_GL instance.
+ * @param sync The sync object to wait on.
+ * @param flags Flags controlling the wait behavior (e.g., EGL_SYNC_FLUSH_COMMANDS_BIT_KHR).
+ * @param timeout The timeout value in nanoseconds.
+ * @return The wait status (e.g., EGL_CONDITION_SATISFIED_KHR).
+ */
 static int
 _evgl_evasglClientWaitSync(Evas_GL *evas_gl,
                           EvasGLSync sync, int flags, EvasGLTime timeout)
@@ -363,6 +476,16 @@ _evgl_evasglClientWaitSync(Evas_GL *evas_gl,
    return EXT_FUNC_EGL(eglClientWaitSyncKHR)(dpy, sync, flags, timeout);
 }
 
+/**
+ * @brief Manually signals or unsignals a reusable sync object.
+ *
+ * Wrapper for `eglSignalSyncKHR`.
+ *
+ * @param evas_gl The Evas_GL instance.
+ * @param sync The reusable sync object.
+ * @param mode The new state (EGL_SIGNALED_KHR or EGL_UNSIGNALED_KHR).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _evgl_evasglSignalSync(Evas_GL *evas_gl,
                       EvasGLSync sync, unsigned mode)
@@ -372,6 +495,17 @@ _evgl_evasglSignalSync(Evas_GL *evas_gl,
    return EXT_FUNC_EGL(eglSignalSyncKHR)(dpy, sync, mode);
 }
 
+/**
+ * @brief Retrieves an attribute of a sync object.
+ *
+ * Wrapper for `eglGetSyncAttribKHR`.
+ *
+ * @param evas_gl The Evas_GL instance.
+ * @param sync The sync object.
+ * @param attribute The attribute to query (e.g., EGL_SYNC_STATUS_KHR).
+ * @param value A pointer to store the result.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _evgl_evasglGetSyncAttrib(Evas_GL *evas_gl,
                          EvasGLSync sync, int attribute, int *value)
@@ -381,6 +515,17 @@ _evgl_evasglGetSyncAttrib(Evas_GL *evas_gl,
    return EXT_FUNC_EGL(eglGetSyncAttribKHR)(dpy, sync, attribute, value);
 }
 
+/**
+ * @brief Blocks the server (GPU) until a sync object is signaled.
+ *
+ * Wrapper for `eglWaitSyncKHR`. This is a server-side wait. The `flags` parameter
+ * is currently unused in the EGL specification and must be 0.
+ *
+ * @param evas_gl The Evas_GL instance.
+ * @param sync The sync object to wait on.
+ * @param flags Must be 0.
+ * @return EGL_TRUE on success, EGL_FALSE on failure.
+ */
 static int
 _evgl_evasglWaitSync(Evas_GL *evas_gl,
                     EvasGLSync sync, int flags)
@@ -390,6 +535,16 @@ _evgl_evasglWaitSync(Evas_GL *evas_gl,
    return EXT_FUNC_EGL(eglWaitSyncKHR)(dpy, sync, flags);
 }
 
+/**
+ * @brief Binds a Wayland display to an EGL display.
+ *
+ * Wrapper for `eglBindWaylandDisplayWL`. This allows Evas GL to work
+ * with Wayland surfaces.
+ *
+ * @param evas_gl The Evas_GL instance.
+ * @param wl_display A pointer to the `wl_display` object.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _evgl_evasglBindWaylandDisplay(Evas_GL *evas_gl,
                               void *wl_display)
@@ -399,6 +554,15 @@ _evgl_evasglBindWaylandDisplay(Evas_GL *evas_gl,
    return EXT_FUNC_EGL(eglBindWaylandDisplayWL)(dpy, wl_display);
 }
 
+/**
+ * @brief Unbinds a Wayland display from an EGL display.
+ *
+ * Wrapper for `eglUnbindWaylandDisplayWL`.
+ *
+ * @param evas_gl The Evas_GL instance.
+ * @param wl_display A pointer to the `wl_display` object.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _evgl_evasglUnbindWaylandDisplay(Evas_GL *evas_gl,
                                 void *wl_display)
@@ -408,6 +572,18 @@ _evgl_evasglUnbindWaylandDisplay(Evas_GL *evas_gl,
    return EXT_FUNC_EGL(eglUnbindWaylandDisplayWL)(dpy, wl_display);
 }
 
+/**
+ * @brief Queries attributes of a Wayland buffer.
+ *
+ * Wrapper for `eglQueryWaylandBufferWL`. This can be used to get information
+ * like texture format or dimensions from a `wl_buffer`.
+ *
+ * @param evas_gl The Evas_GL instance.
+ * @param buffer The `wl_resource` for the buffer.
+ * @param attribute The attribute to query (e.g., EGL_TEXTURE_FORMAT).
+ * @param value A pointer to store the result.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _evgl_evasglQueryWaylandBuffer(Evas_GL *evas_gl,
                               void *buffer, int attribute, int *value)
@@ -417,6 +593,18 @@ _evgl_evasglQueryWaylandBuffer(Evas_GL *evas_gl,
    return EXT_FUNC_EGL(eglQueryWaylandBufferWL)(dpy, buffer, attribute, value);
 }
 
+/**
+ * @brief Queries the DMA-BUF formats supported by the EGL implementation.
+ *
+ * Wrapper for `eglQueryDmaBufFormatsEXT`. This is used for creating EGLImages
+ * from DMA-BUF file descriptors.
+ *
+ * @param evas_gl The Evas_GL instance.
+ * @param max_formats The maximum number of formats `formats` can hold.
+ * @param formats An array to store the supported FOURCC format codes.
+ * @param num_formats A pointer to store the number of formats returned.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _evgl_evasglQueryDmaBufFormats(Evas_GL *evas_gl,
                                int max_formats, int *formats, int *num_formats)
@@ -426,6 +614,21 @@ _evgl_evasglQueryDmaBufFormats(Evas_GL *evas_gl,
    return EXT_FUNC_EGL(eglQueryDmaBufFormatsEXT)(dpy, max_formats, formats, num_formats);
 }
 
+/**
+ * @brief Queries the DMA-BUF modifiers supported for a given format.
+ *
+ * Wrapper for `eglQueryDmaBufModifiersEXT`. Modifiers describe memory layout
+ * properties like tiling.
+ *
+ * @param evas_gl The Evas_GL instance.
+ * @param format The FOURCC format code.
+ * @param max_modifiers The maximum number of modifiers `modifiers` can hold.
+ * @param modifiers An array to store the supported modifier codes.
+ * @param external_only If not NULL, will be set to EINA_TRUE if only external
+ *                      consumers can use the modifiers.
+ * @param num_modifiers A pointer to store the number of modifiers returned.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _evgl_evasglQueryDmaBufModifiers(Evas_GL *evas_gl,
                                  int format, int max_modifiers, uint64_t *modifiers, Eina_Bool *external_only, int *num_modifiers)
@@ -438,6 +641,19 @@ _evgl_evasglQueryDmaBufModifiers(Evas_GL *evas_gl,
 #else
 #endif
 
+/**
+ * @brief Discards the contents of framebuffer attachments.
+ *
+ * This is a wrapper for `glDiscardFramebufferEXT`. Its main purpose is to
+ * handle a translation of Evas-specific attachment enums (`GL_COLOR_EXT`, etc.)
+ * to standard OpenGL `GL_COLOR_ATTACHMENT0`, etc. when not in direct rendering
+ * mode and the default FBO is being used. This allows Evas code to be a bit
+ * more generic.
+ *
+ * @param target The framebuffer target (e.g., GL_FRAMEBUFFER).
+ * @param numAttachments The number of attachments in the `attachments` array.
+ * @param attachments An array of enums specifying the attachments to discard.
+ */
 static void
 _evgl_glDiscardFramebufferEXT(GLenum target, GLsizei numAttachments, const GLenum* attachments)
 {
@@ -499,6 +715,15 @@ _evgl_glDiscardFramebufferEXT(GLenum target, GLsizei numAttachments, const GLenu
 }
 
 //2.0 ext bodies
+/**
+ * @brief This set of macros defines static wrapper functions for GLES2/GL
+ * extension functions.
+ *
+ * For each function in `evas_gl_api_ext_def.h` enabled for GLES2/GL, a static
+ * function `evgl_name` is created. This wrapper calls the actual extension
+ * function pointer (e.g., `gl_ext_sym_name`) after performing a context restore
+ * check. These wrappers are then assigned to the `Evas_GL_API` structure.
+ */
 #define _EVASGL_EXT_CHECK_SUPPORT(name)
 #define _EVASGL_EXT_DISCARD_SUPPORT()
 #define _EVASGL_EXT_BEGIN(name)
@@ -535,6 +760,15 @@ _evgl_glDiscardFramebufferEXT(GLenum target, GLsizei numAttachments, const GLenu
 #undef _EVASGL_EXT_FUNCTION_DRVFUNC_PROCADDR
 
 //1.1 ext bodies
+/**
+ * @brief This set of macros defines static wrapper functions for GLES1
+ * extension functions.
+ *
+ * For each function in `evas_gl_api_ext_def.h` enabled for GLES1, a static
+ * function `evgl_gles1_name` is created. This wrapper calls the actual extension
+ * function pointer (e.g., `gles1_ext_sym_name`) after a context restore check.
+ * These wrappers are then assigned to the `Evas_GL_API` structure for GLES1.
+ */
 #define _EVASGL_EXT_CHECK_SUPPORT(name)
 #define _EVASGL_EXT_DISCARD_SUPPORT()
 #define _EVASGL_EXT_BEGIN(name)
@@ -571,6 +805,15 @@ _evgl_glDiscardFramebufferEXT(GLenum target, GLsizei numAttachments, const GLenu
 #undef _EVASGL_EXT_FUNCTION_DRVFUNC_PROCADDR
 
 //3.X ext bodies
+/**
+ * @brief This set of macros defines static wrapper functions for GLES3
+ * extension functions.
+ *
+ * For each function in `evas_gl_api_ext_def.h` enabled for GLES3, a static
+ * function `evgl_gles3_name` is created. This wrapper calls the actual extension
+ * function pointer (e.g., `gles3_ext_sym_name`) after a context restore check.
+ * These wrappers are then assigned to the `Evas_GL_API` structure for GLES3.
+ */
 #define _EVASGL_EXT_CHECK_SUPPORT(name)
 #define _EVASGL_EXT_DISCARD_SUPPORT()
 #define _EVASGL_EXT_BEGIN(name)
@@ -606,11 +849,13 @@ _evgl_glDiscardFramebufferEXT(GLenum target, GLsizei numAttachments, const GLenu
 #undef _EVASGL_EXT_FUNCTION_DRVFUNC
 #undef _EVASGL_EXT_FUNCTION_DRVFUNC_PROCADDR
 
-//  0: not initialized,
-//  1: GLESv2 initialized,
-//  3: GLESv1 and GLESv2 initialized,
-//  5: GLESv3 and GLESv2 initialized,
-//  7: GLESv3 + GLESv2  + GLESv1 all initialized.
+/**
+ * @brief Bitmask tracking the initialization status of different extension APIs.
+ *
+ * This variable uses a bitfield to track which API extensions (EGL, GLES1,
+ * GLES2, GLES3) have been initialized. This prevents redundant initialization.
+ * The individual bits are defined by the `EVASGL_API_*_EXT_INITIALIZED` macros.
+ */
 static int _evgl_api_ext_status = 0;
 #define EVASGL_API_GLES2_EXT_INITIALIZED 0x1
 #define EVASGL_API_GLES1_EXT_INITIALIZED 0x2
@@ -786,6 +1031,19 @@ evgl_api_egl_ext_init(void *getproc, const char *glueexts)
 }
 #endif
 
+/**
+ * @brief Initializes GLES2 extension support.
+ *
+ * This function is called once to query and load all supported GLES2 and
+ * desktop GL extensions. It populates the internal extension support flags
+ * and function pointers. It uses the X-macro pattern with `evas_gl_api_ext_def.h`.
+ *
+ * @param getproc A function pointer to `eglGetProcAddress` or similar.
+ * @param glueexts A space-separated string of additional extensions provided
+ *                 by the Evas GL glue layer, which may not be reported by the
+ *                 driver (e.g., for emulated extensions).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 Eina_Bool
 _evgl_api_gles2_ext_init(void *getproc, const char *glueexts)
 {
@@ -1034,6 +1292,18 @@ evgl_api_gles2_ext_get(Evas_GL_API *gl_funcs, void *getproc, const char *glueext
 
 }
 
+/**
+ * @brief Initializes GLES1 extension support.
+ *
+ * This function is called once to query and load all supported GLES1.1
+ * extensions. It populates the internal extension support flags and function
+ * pointers for GLES1. It uses the X-macro pattern with `evas_gl_api_ext_def.h`.
+ * A GLES1 context must be current when this is called.
+ *
+ * @param getproc A function pointer to `eglGetProcAddress` or similar.
+ * @param glueexts A space-separated string of additional extensions.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 Eina_Bool
 _evgl_api_gles1_ext_init(void *getproc, const char *glueexts)
 {
@@ -1322,6 +1592,18 @@ evgl_api_gles1_ext_get(Evas_GL_API *gl_funcs, void *getproc, const char *glueext
 
 }
 
+/**
+ * @brief Initializes GLES3 extension support.
+ *
+ * This function is called once to query and load all supported GLES3
+ * extensions. It populates the internal extension support flags and function
+ * pointers for GLES3. It uses the X-macro pattern with `evas_gl_api_ext_def.h`.
+ * A GLES3 context must be current when this is called.
+ *
+ * @param getproc A function pointer to `eglGetProcAddress` or similar.
+ * @param glueexts A space-separated string of additional extensions.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 Eina_Bool
 _evgl_api_gles3_ext_init(void *getproc, const char *glueexts)
 {

@@ -4,6 +4,7 @@
 #ifndef _EVAS_LINE_EO_CLASS_TYPE
 #define _EVAS_LINE_EO_CLASS_TYPE
 
+/** @brief Represents an Evas Line object. This is an alias for an Eo object specific to Evas Line. */
 typedef Eo Evas_Line;
 
 #endif

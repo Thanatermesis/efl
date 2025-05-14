@@ -1,23 +1,55 @@
+/**
+ * @file
+ * @brief Evas DRM engine implementation.
+ *
+ * This file contains the core implementation of the Evas DRM engine,
+ * integrating with Ecore_Drm2 for hardware interaction and leveraging
+ * the software_generic engine for rendering operations.
+ */
 #include "evas_engine.h"
 #include "../software_generic/evas_native_common.h"
 
+/**
+ * @brief Internal structure for the DRM render engine.
+ *
+ * This structure encapsulates the state of the DRM render engine,
+ * including a generic software rendering component and a pointer
+ * to the Ecore_Drm2_Device.
+ */
 typedef struct _Render_Engine
 {
-   Render_Output_Software_Generic generic;
+   Render_Output_Software_Generic generic; /**< Generic software rendering output information. */
 
-   Ecore_Drm2_Device *dev;
+   Ecore_Drm2_Device *dev; /**< Pointer to the Ecore DRM device. */
 } Render_Engine;
 
+/**
+ * @brief Structure to hold native scanout handler and its data.
+ *
+ * This is used to manage callbacks for native surface scanout status changes.
+ */
 struct scanout_handle
 {
-   Evas_Native_Scanout_Handler handler;
-   void *data;
+   Evas_Native_Scanout_Handler handler; /**< The callback function for scanout events. */
+   void *data; /**< User data to be passed to the scanout handler. */
 };
 
 static Evas_Func func, pfunc;
 
-int _evas_engine_drm_log_dom;
+int _evas_engine_drm_log_dom; /**< Log domain for the Evas DRM engine. */
 
+/**
+ * @brief Sets up the output for the DRM engine.
+ *
+ * This function initializes the rendering engine, creates an output buffer (_outbuf),
+ * and sets up the software_generic rendering pipeline.
+ *
+ * @param engine The Evas generic engine pointer.
+ * @param einfo Pointer to Evas_Engine_Info_Drm containing DRM specific settings.
+ * @param w Initial width of the output.
+ * @param h Initial height of the output.
+ * @return A pointer to the configured Render_Engine, or NULL on failure.
+ */
 static void *
 eng_output_setup(void *engine, void *einfo, unsigned int w, unsigned int h)
 {
@@ -62,6 +94,15 @@ err:
    return NULL;
 }
 
+/**
+ * @brief Sets up engine-specific information.
+ *
+ * This function is called to allow the engine to configure
+ * Evas_Engine_Info_Drm with default or required settings.
+ * Currently, it sets the render_mode to EVAS_RENDER_MODE_BLOCKING.
+ *
+ * @param info Pointer to Evas_Engine_Info_Drm to be configured.
+ */
 static void
 eng_output_info_setup(void *info)
 {
@@ -70,6 +111,20 @@ eng_output_info_setup(void *info)
    einfo->render_mode = EVAS_RENDER_MODE_BLOCKING;
 }
 
+/**
+ * @brief Updates the output configuration.
+ *
+ * This function is called when the output parameters (like width, height,
+ * rotation, or depth) change. It reconfigures the output buffer and
+ * updates the software_generic engine.
+ *
+ * @param engine The Evas generic engine pointer (unused).
+ * @param data Pointer to the Render_Engine.
+ * @param einfo Pointer to Evas_Engine_Info_Drm containing new settings.
+ * @param w New width of the output.
+ * @param h New height of the output.
+ * @return Always returns 1 to indicate success.
+ */
 static int
 eng_output_update(void *engine EINA_UNUSED, void *data, void *einfo, unsigned int w, unsigned int h)
 {
@@ -86,6 +141,15 @@ eng_output_update(void *engine EINA_UNUSED, void *data, void *einfo, unsigned in
    return 1;
 }
 
+/**
+ * @brief Frees the output resources.
+ *
+ * Cleans up the software_generic engine resources and frees the
+ * Render_Engine structure.
+ *
+ * @param engine The Evas generic engine pointer.
+ * @param data Pointer to the Render_Engine to be freed.
+ */
 static void
 eng_output_free(void *engine, void *data)
 {
@@ -95,6 +159,23 @@ eng_output_free(void *engine, void *data)
    free(re);
 }
 
+/**
+ * @brief Imports a dmabuf as an Ecore_Drm2_Fb.
+ *
+ * This function takes dmabuf attributes and imports them to create
+ * an Ecore_Drm2 framebuffer. It assumes a 32-bit depth/bpp for the import.
+ *
+ * @param dev The Ecore_Drm2_Device to import the framebuffer into.
+ * @param attributes Pointer to dmabuf_attributes describing the buffer.
+ *        Example:
+ *        attributes->n_planes = 1;
+ *        attributes->fd[0] = dmabuf_fd;
+ *        attributes->stride[0] = width * 4;
+ *        attributes->width = width;
+ *        attributes->height = height;
+ *        attributes->format = DRM_FORMAT_XRGB8888; (or other compatible format)
+ * @return A pointer to the imported Ecore_Drm2_Fb, or NULL on failure.
+ */
 static Ecore_Drm2_Fb *
 drm_import_simple_dmabuf(Ecore_Drm2_Device *dev, struct dmabuf_attributes *attributes)
 {
@@ -114,6 +195,17 @@ drm_import_simple_dmabuf(Ecore_Drm2_Device *dev, struct dmabuf_attributes *attri
                                       dmabuf_fd, attributes->n_planes);
 }
 
+/**
+ * @brief Callback for Ecore_Drm2_Fb status changes.
+ *
+ * This function is invoked when the status of an Ecore_Drm2_Fb changes
+ * (e.g., scanout on/off, plane assignment). It forwards these status
+ * updates to the Evas_Native_Scanout_Handler if one is registered.
+ *
+ * @param fb The Ecore_Drm2_Fb whose status changed (unused).
+ * @param status The new Ecore_Drm2_Fb_Status.
+ * @param data User data, expected to be a struct scanout_handle.
+ */
 static void
 _eng_fb_release(Ecore_Drm2_Fb *fb EINA_UNUSED, Ecore_Drm2_Fb_Status status, void *data)
 {
@@ -147,6 +239,22 @@ _eng_fb_release(Ecore_Drm2_Fb *fb EINA_UNUSED, Ecore_Drm2_Fb_Status status, void
      }
 }
 
+/**
+ * @brief Assigns an Evas image (specifically a dmabuf native surface) to a DRM plane.
+ *
+ * This function attempts to import a dmabuf-backed Evas image as a DRM
+ * framebuffer and then assign it to an available DRM plane on the output.
+ * It also sets up a handler for framebuffer status changes.
+ *
+ * @param data Pointer to the Render_Engine.
+ * @param image Pointer to the Evas RGBA_Image. The image must be a native
+ *              surface of type EVAS_NATIVE_SURFACE_WL_DMABUF.
+ * @param x The X coordinate for plane placement.
+ * @param y The Y coordinate for plane placement.
+ * @return A pointer to the Ecore_Drm2_Plane if assignment is successful,
+ *         otherwise NULL. The returned plane handle is an opaque type
+ *         for the caller.
+ */
 static void *
 eng_image_plane_assign(void *data, void *image, int x, int y)
 {
@@ -193,6 +301,13 @@ out:
    return plane;
 }
 
+/**
+ * @brief Releases a previously assigned DRM plane.
+ *
+ * @param data Pointer to the Render_Engine (unused).
+ * @param image Pointer to the Evas RGBA_Image (unused).
+ * @param plin The opaque plane handle returned by eng_image_plane_assign.
+ */
 static void
 eng_image_plane_release(void *data EINA_UNUSED, void *image EINA_UNUSED, void *plin)
 {
@@ -201,6 +316,16 @@ eng_image_plane_release(void *data EINA_UNUSED, void *image EINA_UNUSED, void *p
    ecore_drm2_plane_release(plane);
 }
 
+/**
+ * @brief Opens/initializes the Evas DRM engine module.
+ *
+ * This function is the entry point for loading the DRM engine. It inherits
+ * functions from the "software_generic" engine, sets up logging, initializes
+ * Ecore, and overrides specific engine functions with DRM implementations.
+ *
+ * @param em Pointer to the Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -243,6 +368,14 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Closes/deinitializes the Evas DRM engine module.
+ *
+ * This function is called when the engine module is unloaded.
+ * It unregisters the logging domain and shuts down Ecore.
+ *
+ * @param em Pointer to the Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {
@@ -256,9 +389,18 @@ module_close(Evas_Module *em EINA_UNUSED)
    ecore_shutdown();
 }
 
+/**
+ * @brief Evas module API structure for the DRM engine.
+ *
+ * This structure provides metadata and entry points (module_open, module_close)
+ * for the Evas module system.
+ */
 static Evas_Module_Api evas_modapi =
 {
-   EVAS_MODULE_API_VERSION, "drm", "none", { module_open, module_close }
+   EVAS_MODULE_API_VERSION, /**< Evas module API version. */
+   "drm",                   /**< Module name. */
+   "none",                  /**< Module author/licence (conventionally "none" for core Evas modules). */
+   { module_open, module_close } /**< Module open and close function pointers. */
 };
 
 EVAS_MODULE_DEFINE(EVAS_MODULE_TYPE_ENGINE, engine, drm);

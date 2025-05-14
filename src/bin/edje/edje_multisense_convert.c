@@ -1,3 +1,13 @@
+/**
+ * @file
+ * @brief Implementation of sound conversion functions for Edje.
+ *
+ * This file contains the logic for encoding sound files into
+ * FLAC (lossless) or Ogg/Vorbis (lossy) formats, primarily for
+ * embedding within Edje theme files. It relies on libsndfile
+ * for reading various sound formats and libFLAC or libvorbis
+ * for the actual encoding.
+ */
 #include "edje_multisense_convert.h"
 
 #ifdef HAVE_LIBSNDFILE
@@ -11,6 +21,14 @@
 #  include <FLAC/stream_encoder.h>
 # endif
 
+/**
+ * @brief Encodes a sound sample based on its specified compression type.
+ * @param filename Path to the input sound file.
+ * @param sample Edje sound sample metadata.
+ * @param quality Quality for lossy compression (0.0-1.0).
+ * @return Edje_Sound_Encode structure with encoding results.
+ * @see _edje_multisense_encode in edje_multisense_convert.h
+ */
 Edje_Sound_Encode *
 _edje_multisense_encode(const char *filename, Edje_Sound_Sample *sample, double quality EINA_UNUSED)
 {
@@ -82,6 +100,16 @@ _edje_multisense_encode(const char *filename, Edje_Sound_Sample *sample, double 
 }
 
 #ifdef HAVE_LIBFLAC
+/**
+ * @brief Encodes a WAV file to FLAC format.
+ * @param snd_path Path to the input WAV file. This string is modified to
+ *                 append ".flac" and becomes the output path.
+ * @param sfinfo libsndfile info structure for the input file.
+ * @return Const char pointer to the new FLAC file path (same as modified snd_path),
+ *         or NULL on failure. The caller is responsible for freeing the returned string.
+ * @note The function modifies the input `snd_path` string by appending ".flac".
+ *       It also allocates memory for this new path, which the caller must free.
+ */
 const char *
 _edje_multisense_encode_to_flac(char *snd_path, SF_INFO sfinfo)
 {
@@ -193,6 +221,17 @@ _edje_multisense_encode_to_flac(char *snd_path, SF_INFO sfinfo)
 #endif
 
 #ifdef HAVE_VORBIS
+/**
+ * @brief Encodes a WAV file to Ogg/Vorbis format.
+ * @param snd_path Path to the input WAV file. This string is modified to
+ *                 append ".ogg" and becomes the output path.
+ * @param quality Desired Ogg/Vorbis encoding quality (0.0 to 1.0, where 1.0 is highest).
+ * @param sfinfo libsndfile info structure for the input file.
+ * @return Const char pointer to the new Ogg/Vorbis file path (same as modified snd_path),
+ *         or NULL on failure. The caller is responsible for freeing the returned string.
+ * @note The function modifies the input `snd_path` string by appending ".ogg".
+ *       It also allocates memory for this new path, which the caller must free.
+ */
 const char *
 _edje_multisense_encode_to_ogg_vorbis(char *snd_path, double quality, SF_INFO sfinfo)
 {

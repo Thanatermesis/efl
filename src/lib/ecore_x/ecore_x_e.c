@@ -20,11 +20,29 @@
 #include "Ecore_X.h"
 #include "Ecore_X_Atoms.h"
 
+/**
+ * @brief Initializes Ecore_X_E internal state.
+ *
+ * This function currently does nothing but is kept for API compatibility.
+ */
 EAPI void
 ecore_x_e_init(void)
 {
 }
 
+/**
+ * @brief Sets the frame size property for a window.
+ *
+ * This function sets the ECORE_X_ATOM_E_FRAME_SIZE property on the given
+ * window. This property is an array of 4 cardinals representing the
+ * left, right, top, and bottom frame extents.
+ *
+ * @param win The window to set the property on.
+ * @param fl The left frame extent.
+ * @param fr The right frame extent.
+ * @param ft The top frame extent.
+ * @param fb The bottom frame extent.
+ */
 EAPI void
 ecore_x_e_frame_size_set(Ecore_X_Window win,
                          int fl,
@@ -42,6 +60,16 @@ ecore_x_e_frame_size_set(Ecore_X_Window win,
    ecore_x_window_prop_card32_set(win, ECORE_X_ATOM_E_FRAME_SIZE, frames, 4);
 }
 
+/**
+ * @brief Sets the virtual keyboard property for a window.
+ *
+ * This function sets the ECORE_X_ATOM_E_VIRTUAL_KEYBOARD property on the
+ * given window. This property indicates whether the window acts as a
+ * virtual keyboard.
+ *
+ * @param win The window to set the property on.
+ * @param is_keyboard 1 if the window is a virtual keyboard, 0 otherwise.
+ */
 EAPI void
 ecore_x_e_virtual_keyboard_set(Ecore_X_Window win,
                                unsigned int is_keyboard)
@@ -51,6 +79,16 @@ ecore_x_e_virtual_keyboard_set(Ecore_X_Window win,
                                   &is_keyboard, 1);
 }
 
+/**
+ * @brief Gets the virtual keyboard property for a window.
+ *
+ * This function retrieves the ECORE_X_ATOM_E_VIRTUAL_KEYBOARD property from
+ * the given window.
+ *
+ * @param win The window to get the property from.
+ * @return EINA_TRUE if the window is a virtual keyboard, EINA_FALSE otherwise
+ *         or on error.
+ */
 EAPI Eina_Bool
 ecore_x_e_virtual_keyboard_get(Ecore_X_Window win)
 {
@@ -66,6 +104,17 @@ ecore_x_e_virtual_keyboard_get(Ecore_X_Window win)
    return val ? EINA_TRUE : EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Converts an Ecore_X_Atom to an Ecore_X_Virtual_Keyboard_State.
+ *
+ * This is an internal helper function to map X atoms related to virtual
+ * keyboard states to their corresponding enum values.
+ *
+ * @param atom The X atom representing a virtual keyboard state.
+ * @return The corresponding Ecore_X_Virtual_Keyboard_State, or
+ *         ECORE_X_VIRTUAL_KEYBOARD_STATE_UNKNOWN if no match is found.
+ */
 static Ecore_X_Virtual_Keyboard_State
 _ecore_x_e_vkbd_state_get(Ecore_X_Atom atom)
 {
@@ -117,6 +166,16 @@ _ecore_x_e_vkbd_state_get(Ecore_X_Atom atom)
    return ECORE_X_VIRTUAL_KEYBOARD_STATE_UNKNOWN;
 }
 
+/**
+ * @internal
+ * @brief Converts an Ecore_X_Virtual_Keyboard_State to an Ecore_X_Atom.
+ *
+ * This is an internal helper function to map Ecore_X_Virtual_Keyboard_State
+ * enum values to their corresponding X atoms.
+ *
+ * @param state The virtual keyboard state.
+ * @return The corresponding Ecore_X_Atom, or 0 if no match is found.
+ */
 static Ecore_X_Atom
 _ecore_x_e_vkbd_atom_get(Ecore_X_Virtual_Keyboard_State state)
 {
@@ -172,6 +231,16 @@ _ecore_x_e_vkbd_atom_get(Ecore_X_Virtual_Keyboard_State state)
    return 0;
 }
 
+/**
+ * @brief Sets the virtual keyboard state property for a window.
+ *
+ * This function sets the ECORE_X_ATOM_E_VIRTUAL_KEYBOARD_STATE property on
+ * the given window. This property indicates the current state of the
+ * virtual keyboard (e.g., ON, OFF, ALPHA, NUMERIC).
+ *
+ * @param win The window to set the property on.
+ * @param state The desired virtual keyboard state.
+ */
 EAPI void
 ecore_x_e_virtual_keyboard_state_set(Ecore_X_Window win,
                                      Ecore_X_Virtual_Keyboard_State state)
@@ -184,6 +253,17 @@ ecore_x_e_virtual_keyboard_state_set(Ecore_X_Window win,
                                 &atom, 1);
 }
 
+/**
+ * @brief Gets the virtual keyboard state property for a window.
+ *
+ * This function retrieves the ECORE_X_ATOM_E_VIRTUAL_KEYBOARD_STATE property
+ * from the given window.
+ *
+ * @param win The window to get the property from.
+ * @return The current Ecore_X_Virtual_Keyboard_State of the window, or
+ *         ECORE_X_VIRTUAL_KEYBOARD_STATE_UNKNOWN if the property is not set
+ *         or an error occurs.
+ */
 EAPI Ecore_X_Virtual_Keyboard_State
 ecore_x_e_virtual_keyboard_state_get(Ecore_X_Window win)
 {
@@ -197,6 +277,15 @@ ecore_x_e_virtual_keyboard_state_get(Ecore_X_Window win)
    return _ecore_x_e_vkbd_state_get(atom);
 }
 
+/**
+ * @brief Sends a client message to a window to change its virtual keyboard state.
+ *
+ * This function sends an ECORE_X_ATOM_E_VIRTUAL_KEYBOARD_STATE client message
+ * to the specified window, requesting it to change its virtual keyboard state.
+ *
+ * @param win The target window.
+ * @param state The desired virtual keyboard state.
+ */
 EAPI void
 ecore_x_e_virtual_keyboard_state_send(Ecore_X_Window win,
                                       Ecore_X_Virtual_Keyboard_State state)
@@ -208,6 +297,17 @@ ecore_x_e_virtual_keyboard_state_send(Ecore_X_Window win,
                                  0, 0, 0, 0);
 }
 
+/**
+ * @internal
+ * @brief Converts an Ecore_X_Illume_Mode to an Ecore_X_Atom.
+ *
+ * This is an internal helper function to map Ecore_X_Illume_Mode
+ * enum values to their corresponding X atoms.
+ *
+ * @param mode The Illume mode.
+ * @return The corresponding Ecore_X_Atom, or ECORE_X_ILLUME_MODE_UNKNOWN
+ *         if no match is found (which is not a valid Atom but used as a marker).
+ */
 static Ecore_X_Atom
 _ecore_x_e_illume_atom_get(Ecore_X_Illume_Mode mode)
 {

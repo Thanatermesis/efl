@@ -24,17 +24,26 @@
 # define O_BINARY 0
 #endif
 
-static int es_log_dom = -1;
-static int retval = EXIT_SUCCESS;
-static Eet_Data_Descriptor *es_edd = NULL;
-static Eina_List *clients = NULL;
+static int es_log_dom = -1; /**< Log domain for eeze_scanner. */
+static int retval = EXIT_SUCCESS; /**< Program exit value. */
+static Eet_Data_Descriptor *es_edd = NULL; /**< Eet Data Descriptor for Eeze_Scanner_Event. */
+static Eina_List *clients = NULL; /**< List of connected Eet_Connection clients. */
 
-static Eina_List *storage_devices = NULL;
-static Eina_List *storage_cdrom = NULL;
+static Eina_List *storage_devices = NULL; /**< List of syspaths for non-CDROM storage devices. */
+static Eina_List *storage_cdrom = NULL; /**< List of Eeze_Scanner_Device for CDROMs. */
 
-static Eina_List *volume_cdrom = NULL;
-static Eina_List *volume_devices = NULL;
+static Eina_List *volume_cdrom = NULL; /**< List of Eeze_Scanner_Device for CDROM volumes (media inserted). */
+static Eina_List *volume_devices = NULL; /**< List of syspaths for non-CDROM mountable volumes. */
 
+/**
+ * @brief Sends an Eeze_Scanner_Event to all connected clients.
+ *
+ * Serializes and sends the event data over Eet_Connection.
+ *
+ * @param device The syspath of the device.
+ * @param type The type of event (add, remove, change).
+ * @param volume EINA_TRUE if it's a volume event, EINA_FALSE otherwise.
+ */
 static void
 event_send(const char *device, Eeze_Scanner_Event_Type type, Eina_Bool volume)
 {
@@ -62,6 +71,16 @@ event_send(const char *device, Eeze_Scanner_Event_Type type, Eina_Bool volume)
      }
 }
 
+/**
+ * @brief Callback for Eeze disk mount/unmount events.
+ *
+ * Specifically tracks the mounted state of CD-ROM devices.
+ *
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param disk The Eeze_Disk object associated with the event.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
+ */
 static Eina_Bool
 disk_mount(void *data EINA_UNUSED, int type EINA_UNUSED, Eeze_Disk *disk)
 {
@@ -80,6 +99,15 @@ disk_mount(void *data EINA_UNUSED, int type EINA_UNUSED, Eeze_Disk *disk)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Sends initial device and volume state to a newly connected client.
+ *
+ * Iterates through known storage devices, CD-ROMs, and volumes, sending
+ * ADD events for each to the new client.
+ *
+ * @param cl The client object (Eo *).
+ * @param ec The Eet_Connection for the client.
+ */
 static void
 cl_setup(Eo *cl, Eet_Connection *ec)
 {
@@ -119,6 +147,17 @@ cl_setup(Eo *cl, Eet_Connection *ec)
      }
 }
 
+/**
+ * @brief Eet_Connection callback for writing data to a client.
+ *
+ * This function is called by Eet when there is data to be sent to a client.
+ * It uses efl_io_writer_write to send the data.
+ *
+ * @param data Pointer to the data to write.
+ * @param size Size of the data to write.
+ * @param user_data The client object (Eo *) associated with this connection.
+ * @return EINA_TRUE on successful write, EINA_FALSE on failure.
+ */
 static Eina_Bool
 ec_write(const void *data, size_t size, void *user_data)
 {
@@ -137,12 +176,32 @@ ec_write(const void *data, size_t size, void *user_data)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Eet_Connection callback for reading data from a client.
+ *
+ * This function is called by Eet when data is received from a client.
+ * Currently, it's a no-op as eeze_scanner only sends data.
+ *
+ * @param eet_data Pointer to the received data (unused).
+ * @param size Size of the received data (unused).
+ * @param user_data The client object (Eo *) (unused).
+ * @return EINA_TRUE.
+ */
 static Eina_Bool
 ec_read(const void *eet_data EINA_UNUSED, size_t size EINA_UNUSED, void *user_data EINA_UNUSED)
 {
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for EFL_IO_BUFFERED_STREAM_EVENT_READ_FINISHED event on a client.
+ *
+ * This indicates that the read operation on the client's buffered stream has finished.
+ * The client connection is closed if not already.
+ *
+ * @param data The Eet_Connection associated with the client.
+ * @param event The EFL event data.
+ */
 static void
 cl_finished(void *data, const Efl_Event *event)
 {
@@ -155,6 +214,15 @@ cl_finished(void *data, const Efl_Event *event)
      efl_io_closer_close(client);
 }
 
+/**
+ * @brief Callback for EFL_IO_BUFFERED_STREAM_EVENT_ERROR event on a client.
+ *
+ * Handles errors occurring on the client's buffered stream.
+ * The client connection is closed if not already.
+ *
+ * @param data The Eet_Connection associated with the client.
+ * @param event The EFL event data, containing the Eina_Error.
+ */
 static void
 cl_error(void *data, const Efl_Event *event)
 {
@@ -170,6 +238,16 @@ cl_error(void *data, const Efl_Event *event)
 
 static Efl_Callback_Array_Item *cl_cbs(void);
 
+/**
+ * @brief Callback for EFL_IO_CLOSER_EVENT_CLOSED event on a client.
+ *
+ * This is called when a client connection is fully closed.
+ * It cleans up resources associated with the client, including removing it
+ * from the list of active clients and freeing the Eet_Connection.
+ *
+ * @param data The Eet_Connection associated with the client.
+ * @param event The EFL event data.
+ */
 static void
 cl_closed(void *data, const Efl_Event *event)
 {
@@ -188,6 +266,16 @@ EFL_CALLBACKS_ARRAY_DEFINE(cl_cbs,
                            { EFL_IO_BUFFERED_STREAM_EVENT_ERROR, cl_error },
                            { EFL_IO_CLOSER_EVENT_CLOSED, cl_closed });
 
+/**
+ * @brief Callback for EFL_NET_SERVER_EVENT_CLIENT_ADD event.
+ *
+ * This function is called when a new client connects to the server.
+ * It sets up an Eet_Connection for the new client, adds it to the list
+ * of clients, and sends the initial state of devices and volumes.
+ *
+ * @param data User data (unused).
+ * @param event The EFL event data, where event->info is the new client (Eo *).
+ */
 static void
 cl_add(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -208,6 +296,14 @@ cl_add(void *data EINA_UNUSED, const Efl_Event *event)
    cl_setup(client, ec);
 }
 
+/**
+ * @brief Initializes the Eet data descriptor for Eeze_Scanner_Event.
+ *
+ * Sets up the `es_edd` global variable which is used for serializing
+ * event data to clients.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 eet_setup(void)
 {
@@ -228,6 +324,17 @@ eet_setup(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Poller callback for CD-ROM devices.
+ *
+ * This function is periodically called for each CD-ROM device to check
+ * if media has been inserted or removed, as CD-ROMs might not generate
+ * standard udev events for this in all cases. It attempts to open the
+ * device node; success implies media is present.
+ *
+ * @param dev The Eeze_Scanner_Device representing the CD-ROM.
+ * @return EINA_TRUE to continue polling.
+ */
 static Eina_Bool
 cdrom_timer(Eeze_Scanner_Device *dev)
 {
@@ -267,6 +374,14 @@ cdrom_timer(Eeze_Scanner_Device *dev)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Initializes the lists of storage devices and volumes at startup.
+ *
+ * Queries eeze for internal, removable, and CD-ROM drives, as well as
+ * mountable volumes. Sets up pollers for CD-ROM devices.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE if no initial storage devices are found.
+ */
 static Eina_Bool
 storage_setup(void)
 {
@@ -333,6 +448,18 @@ storage_setup(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for udev events related to mountable volumes.
+ *
+ * Handles add, remove, and change events for volumes (partitions, etc.).
+ * Updates internal lists and sends events to clients.
+ * Distinguishes between regular volumes and CD-ROM volumes.
+ *
+ * @param device The syspath of the device that changed.
+ * @param ev The type of udev event.
+ * @param data User data (unused).
+ * @param watch The Eeze_Udev_Watch triggering this callback (unused).
+ */
 static void
 cb_vol_chg(const char *device, Eeze_Udev_Event ev, void *data EINA_UNUSED, Eeze_Udev_Watch *watch EINA_UNUSED)
 {
@@ -376,6 +503,18 @@ cb_vol_chg(const char *device, Eeze_Udev_Event ev, void *data EINA_UNUSED, Eeze_
      }
 }
 
+/**
+ * @brief Callback for udev events related to storage devices (disks).
+ *
+ * Handles add, remove, and change events for storage devices like HDDs, SSDs,
+ * and CD-ROM drives. Updates internal lists and sends events to clients.
+ * For CD-ROMs, it also sets up or tears down the media polling mechanism.
+ *
+ * @param device The syspath of the device that changed.
+ * @param ev The type of udev event.
+ * @param data User data (unused).
+ * @param watch The Eeze_Udev_Watch triggering this callback (unused).
+ */
 static void
 cb_stor_chg(const char *device, Eeze_Udev_Event ev, void *data EINA_UNUSED, Eeze_Udev_Watch *watch EINA_UNUSED)
 {
@@ -433,6 +572,15 @@ cb_stor_chg(const char *device, Eeze_Udev_Event ev, void *data EINA_UNUSED, Eeze
      }
 }
 
+/**
+ * @brief Callback for EFL_NET_SERVER_EVENT_SERVER_ERROR event.
+ *
+ * Handles errors reported by the EFL network server.
+ * Logs the error, sets the program's retval to failure, and quits the main loop.
+ *
+ * @param data User data (unused).
+ * @param event The EFL event data, where event->info is an Eina_Error.
+ */
 static void
 server_error(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -443,6 +591,16 @@ server_error(void *data EINA_UNUSED, const Efl_Event *event)
    ecore_main_loop_quit();
 }
 
+/**
+ * @brief Main function for the eeze_scanner daemon.
+ *
+ * Initializes Efl, Eeze, Eet, and Ecore_Con. Sets up logging,
+ * data serialization, initial storage device scan, udev event watches,
+ * and the IPC server for clients to connect to. Then enters the
+ * Ecore main loop.
+ *
+ * @return EXIT_SUCCESS on normal termination, EXIT_FAILURE on error.
+ */
 int
 main(void)
 {

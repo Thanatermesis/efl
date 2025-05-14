@@ -23,6 +23,16 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {NULL, NULL}
 };
 
+/**
+ * @internal
+ * @brief Prepares the focus composition for the box widget.
+ *
+ * This function retrieves the children of the box, filters out non-widget
+ * children, and sets the remaining widgets as the focus composition elements.
+ *
+ * @param obj The Evas object (box).
+ * @param pd The box's private data (unused).
+ */
 static void
 _elm_box_efl_ui_focus_composition_prepare(Eo *obj, Elm_Box_Data *pd EINA_UNUSED)
 {
@@ -41,6 +51,16 @@ _elm_box_efl_ui_focus_composition_prepare(Eo *obj, Elm_Box_Data *pd EINA_UNUSED)
    efl_ui_focus_composition_elements_set(obj, order);
 }
 
+/**
+ * @internal
+ * @brief Proxy callback for when a child is added to the box.
+ *
+ * This function is called when the ELM_BOX_EVENT_CHILD_ADDED event occurs
+ * on the resize object. It then calls the legacy smart callback for child addition.
+ *
+ * @param data The Evas object (box) passed as user data.
+ * @param event The EFL event information, where event->info is an Evas_Object_Box_Option*.
+ */
 static void
 _child_added_cb_proxy(void *data, const Efl_Event *event)
 {
@@ -49,6 +69,16 @@ _child_added_cb_proxy(void *data, const Efl_Event *event)
    efl_event_callback_legacy_call(box, ELM_BOX_EVENT_CHILD_ADDED, opt->obj);
 }
 
+/**
+ * @internal
+ * @brief Proxy callback for when a child is removed from the box.
+ *
+ * This function is called when the ELM_BOX_EVENT_CHILD_REMOVED event occurs
+ * on the resize object. It then calls the legacy smart callback for child removal.
+ *
+ * @param data The Evas object (box) passed as user data.
+ * @param event The EFL event information, where event->info is the child Evas_Object*.
+ */
 static void
 _child_removed_cb_proxy(void *data, const Efl_Event *event)
 {
@@ -57,6 +87,19 @@ _child_removed_cb_proxy(void *data, const Efl_Event *event)
    efl_event_callback_legacy_call(box, ELM_BOX_EVENT_CHILD_REMOVED, child);
 }
 
+/**
+ * @internal
+ * @brief Applies the theme to the box widget.
+ *
+ * This function calls the superclass's theme apply function and then
+ * triggers a recalculation of the smart object if the theme application
+ * was successful.
+ *
+ * @param obj The Evas object (box).
+ * @param sd The box's private data (unused).
+ * @return Eina_Error Returns EFL_UI_THEME_APPLY_ERROR_GENERIC on failure,
+ *         or the result of the superclass's theme_apply on success.
+ */
 EOLIAN static Eina_Error
 _elm_box_efl_ui_widget_theme_apply(Eo *obj, Elm_Box_Data *sd EINA_UNUSED)
 {
@@ -71,6 +114,17 @@ _elm_box_efl_ui_widget_theme_apply(Eo *obj, Elm_Box_Data *sd EINA_UNUSED)
    return int_ret;
 }
 
+/**
+ * @internal
+ * @brief Evaluates and applies size hints for the box.
+ *
+ * This function retrieves the combined minimum and maximum size hints from
+ * the box's resize object (the actual Evas_Object_Box) and applies them
+ * to the Elm_Box widget itself. This ensures the Elm_Box widget correctly
+ * reports its size needs based on its content.
+ *
+ * @param obj The Evas object (box).
+ */
 static void
 _sizing_eval(Evas_Object *obj)
 {
@@ -88,6 +142,19 @@ _sizing_eval(Evas_Object *obj)
    evas_object_size_hint_max_set(obj, maxw, maxh);
 }
 
+/**
+ * @internal
+ * @brief Callback for when size hints of the resize object change.
+ *
+ * This function is triggered when the EVAS_CALLBACK_CHANGED_SIZE_HINTS
+ * event occurs on the box's internal resize object. It calls _sizing_eval
+ * to update the Elm_Box widget's own size hints.
+ *
+ * @param data The Evas object (box) passed as user data.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas object that emitted the event (the resize_obj, unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _on_size_hints_changed(void *data,
                        Evas *e EINA_UNUSED,
@@ -97,6 +164,18 @@ _on_size_hints_changed(void *data,
    _sizing_eval(data);
 }
 
+/**
+ * @internal
+ * @brief Handles deletion of a sub-object from the box.
+ *
+ * This function calls the superclass's sub_object_del implementation.
+ * If successful, it triggers a re-evaluation of the box's size.
+ *
+ * @param obj The Evas object (box).
+ * @param _pd The box's private data (unused).
+ * @param child The sub-object being deleted.
+ * @return EINA_TRUE if the sub-object was successfully deleted, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _elm_box_efl_ui_widget_widget_sub_object_del(Eo *obj, Elm_Box_Data *_pd EINA_UNUSED, Evas_Object *child)
 {
@@ -110,6 +189,18 @@ _elm_box_efl_ui_widget_widget_sub_object_del(Eo *obj, Elm_Box_Data *_pd EINA_UNU
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Custom layout function for the Evas_Object_Box.
+ *
+ * This function is set as the layout callback for the internal Evas_Object_Box
+ * used by Elm_Box. It calls _els_box_layout to perform the actual layout
+ * based on the box's properties (horizontal, homogeneous, mirrored).
+ *
+ * @param o The Evas_Object_Box being laid out.
+ * @param priv The private data of the Evas_Object_Box.
+ * @param data The Elm_Box widget, passed as user data.
+ */
 static void
 _elm_box_custom_layout(Evas_Object *o,
                        Evas_Object_Box_Data *priv,
@@ -121,6 +212,18 @@ _elm_box_custom_layout(Evas_Object *o,
                    efl_ui_mirrored_get(data));
 }
 
+/**
+ * @internal
+ * @brief Animator callback for box layout transitions.
+ *
+ * This function is called by an ecore_animator during a layout transition.
+ * It simply marks the box as changed, which will trigger the
+ * elm_box_layout_transition function to recalculate and apply the
+ * intermediate state of the animation.
+ *
+ * @param data The Evas object (box) undergoing transition.
+ * @return ECORE_CALLBACK_RENEW to continue the animation.
+ */
 static Eina_Bool
 _transition_animation(void *data)
 {
@@ -129,6 +232,18 @@ _transition_animation(void *data)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @internal
+ * @brief Callback for when a child is added during a layout transition.
+ *
+ * If a child is added to the box while a layout transition is in progress,
+ * this function updates the list of transitioning objects and flags that
+ * the transition coordinates need to be recalculated.
+ *
+ * @param data The Elm_Box_Transition data structure.
+ * @param event The EFL event information, where event->info is an Evas_Object_Box_Option*.
+ *              The Evas_Object_Box_Option contains the child object that was added.
+ */
 static void
 _transition_layout_child_added(void *data, const Efl_Event *event)
 {
@@ -144,6 +259,18 @@ _transition_layout_child_added(void *data, const Efl_Event *event)
    layout_data->recalculate = EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Callback for when a child is removed during a layout transition.
+ *
+ * If a child is removed from the box while a layout transition is in progress,
+ * this function updates the list of transitioning objects and flags that
+ * the transition coordinates need to be recalculated.
+ *
+ * @param data The Elm_Box_Transition data structure.
+ * @param event The EFL event information, where event->info is the child Evas_Object*
+ *              that was removed.
+ */
 static void
 _transition_layout_child_removed(void *data, const Efl_Event *event)
 {
@@ -163,6 +290,18 @@ _transition_layout_child_removed(void *data, const Efl_Event *event)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for when the box itself is resized during a layout transition.
+ *
+ * If the box is resized while a layout transition is in progress,
+ * this function flags that the transition coordinates need to be recalculated.
+ *
+ * @param data The Elm_Box_Transition data structure.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas object that was resized (the box itself, unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _transition_layout_obj_resize_cb(void *data,
                                  Evas *e EINA_UNUSED,
@@ -174,6 +313,29 @@ _transition_layout_obj_resize_cb(void *data,
    layout_data->recalculate = EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Calculates the start and end coordinates for children during a layout transition.
+ *
+ * This function is called at the beginning of a transition or when a recalculation
+ * is needed (e.g., box resize, child added/removed). It captures the current
+ * (start) geometry of each child and then applies the target (end) layout to
+ * determine their final geometries. These start and end states are stored for
+ * interpolation during the animation.
+ *
+ * @param obj The Evas object (box) undergoing transition.
+ * @param priv The private data of the Evas_Object_Box.
+ * @param layout_data The Elm_Box_Transition data structure containing animation parameters
+ *                    and lists of child objects with their start/end geometries.
+ *                    Example `layout_data->objs` element (Transition_Animation_Data):
+ *                    ```
+ *                    {
+ *                       obj = Evas_Object* (child),
+ *                       start = { x, y, w, h } (geometry before end_layout is applied, relative to box),
+ *                       end = { x, y, w, h } (geometry after end_layout is applied, relative to box)
+ *                    }
+ *                    ```
+ */
 static void
 _transition_layout_calculate_coords(Evas_Object *obj,
                                     Evas_Object_Box_Data *priv,
@@ -184,11 +346,14 @@ _transition_layout_calculate_coords(Evas_Object *obj,
    Transition_Animation_Data *tad;
    const double curtime = ecore_loop_time_get();
 
+   // Adjust duration if recalculation happens mid-transition
    layout_data->duration =
      layout_data->duration - (curtime - layout_data->initial_time);
    layout_data->initial_time = curtime;
 
-   evas_object_geometry_get(obj, &x, &y, &w, &h);
+   evas_object_geometry_get(obj, &x, &y, &w, &h); // Box geometry
+
+   // Store start geometry of children (relative to box)
    EINA_LIST_FOREACH(layout_data->objs, l, tad)
      {
         evas_object_geometry_get(tad->obj, &tad->start.x, &tad->start.y,
@@ -196,7 +361,11 @@ _transition_layout_calculate_coords(Evas_Object *obj,
         tad->start.x = tad->start.x - x;
         tad->start.y = tad->start.y - y;
      }
+
+   // Apply end layout to get target geometry
    layout_data->end.layout(obj, priv, layout_data->end.data);
+
+   // Store end geometry of children (relative to box)
    EINA_LIST_FOREACH(layout_data->objs, l, tad)
      {
         evas_object_geometry_get(tad->obj, &tad->end.x, &tad->end.y,
@@ -206,6 +375,21 @@ _transition_layout_calculate_coords(Evas_Object *obj,
      }
 }
 
+/**
+ * @internal
+ * @brief Populates or re-populates the list of children for a layout transition.
+ *
+ * This function clears any existing list of transitioning children and then
+ * iterates over the current children of the Evas_Object_Box, creating a
+ * Transition_Animation_Data entry for each. This is typically called at the
+ * start of a transition.
+ *
+ * @param priv The private data of the Evas_Object_Box, containing the list of children.
+ * @param layout_data The Elm_Box_Transition data structure where the list of
+ *                    Transition_Animation_Data will be stored in `layout_data->objs`.
+ *                    Each element will have `obj` field populated.
+ * @return EINA_TRUE on success, EINA_FALSE if memory allocation fails.
+ */
 static Eina_Bool
 _transition_layout_load_children_list(Evas_Object_Box_Data *priv,
                                       Elm_Box_Transition *layout_data)
@@ -233,6 +417,21 @@ _transition_layout_load_children_list(Evas_Object_Box_Data *priv,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Starts the layout transition animation.
+ *
+ * This function initializes the transition process. It applies the initial
+ * layout, records the start time, loads the list of children to be animated,
+ * calculates their start and end coordinates, sets up event callbacks for
+ * resize and child modifications, and starts the ecore animator.
+ *
+ * @param obj The Evas object (box) undergoing transition.
+ * @param priv The private data of the Evas_Object_Box.
+ * @param layout_data The Elm_Box_Transition data structure containing animation parameters.
+ * @param transition_animation_cb The animator callback function (typically _transition_animation).
+ * @return EINA_TRUE on success, EINA_FALSE if loading children list fails.
+ */
 static Eina_Bool
 _transition_layout_animation_start(Evas_Object *obj,
                                    Evas_Object_Box_Data *priv,
@@ -240,6 +439,7 @@ _transition_layout_animation_start(Evas_Object *obj,
                                    Eina_Bool (*transition_animation_cb)
                                    (void *data))
 {
+   // Apply the starting layout to establish initial positions
    layout_data->start.layout(obj, priv, layout_data->start.data);
    layout_data->box = obj;
    layout_data->initial_time = ecore_loop_time_get();
@@ -265,6 +465,15 @@ _transition_layout_animation_start(Evas_Object *obj,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Stops the layout transition animation.
+ *
+ * This function marks the animation as ended, deletes the ecore animator,
+ * and calls the user-provided transition end callback, if any.
+ *
+ * @param layout_data The Elm_Box_Transition data structure.
+ */
 static void
 _transition_layout_animation_stop(Elm_Box_Transition *layout_data)
 {
@@ -276,6 +485,21 @@ _transition_layout_animation_stop(Elm_Box_Transition *layout_data)
      layout_data->transition_end_cb(layout_data->transition_end_data);
 }
 
+/**
+ * @internal
+ * @brief Executes one step of the layout transition animation.
+ *
+ * This function is called repeatedly during the animation (typically from
+ * elm_box_layout_transition, which is triggered by the animator). It calculates
+ * the current progress of the animation and interpolates the geometry (position
+ * and size) of each child object between its start and end states.
+ *
+ * @param obj The Evas object (box) undergoing transition.
+ * @param priv The private data of the Evas_Object_Box (unused in current logic but passed by caller).
+ * @param layout_data The Elm_Box_Transition data structure containing animation state
+ *                    and child object geometries.
+ * @param curtime The current time, used to calculate animation progress.
+ */
 static void
 _transition_layout_animation_exec(Evas_Object *obj,
                                   Evas_Object_Box_Data *priv EINA_UNUSED,

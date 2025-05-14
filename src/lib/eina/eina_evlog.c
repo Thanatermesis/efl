@@ -70,6 +70,17 @@ static double _eina_evlog_time_clock_conversion = 1e-9;
 
 static int _evlog_get_opcode = EINA_DEBUG_OPCODE_INVALID;
 
+/**
+ * @internal
+ * @brief Get the current time as a double.
+ *
+ * This function retrieves the current time using the most precise clock
+ * available on the system. It prioritizes `clock_gettime` with
+ * `CLOCK_MONOTONIC` or `CLOCK_REALTIME`, then `mach_absolute_time` on macOS,
+ * `evil_time_get` on Windows, and falls back to `gettimeofday` otherwise.
+ *
+ * @return The current time in seconds with microsecond or nanosecond precision.
+ */
 static inline double
 get_time(void)
 {
@@ -96,6 +107,19 @@ get_time(void)
 
 static int no_anon = -1;
 
+/**
+ * @internal
+ * @brief Allocates a buffer for event logging.
+ *
+ * This function allocates a memory buffer of the specified size.
+ * It attempts to use `mmap` with `MAP_ANON` for anonymous memory mapping
+ * if available and not disabled by the "EFL_NO_MMAP_ANON" environment
+ * variable. Otherwise, it falls back to `malloc`.
+ * If Valgrind is running, `malloc` is used instead of `mmap`.
+ *
+ * @param b Pointer to the Eina_Evlog_Buf structure to manage the buffer.
+ * @param size The desired size of the buffer in bytes.
+ */
 static void
 alloc_buf(Eina_Evlog_Buf *b, unsigned int size)
 {
@@ -127,6 +151,16 @@ alloc_buf(Eina_Evlog_Buf *b, unsigned int size)
    b->overflow = 0;
 }
 
+/**
+ * @internal
+ * @brief Frees an event log buffer.
+ *
+ * This function deallocates the memory buffer previously allocated by
+ * `alloc_buf`. It uses `munmap` if the buffer was allocated with `mmap`,
+ * or `free` if it was allocated with `malloc`.
+ *
+ * @param b Pointer to the Eina_Evlog_Buf structure whose buffer needs to be freed.
+ */
 static void
 free_buf(Eina_Evlog_Buf *b)
 {
@@ -148,6 +182,19 @@ free_buf(Eina_Evlog_Buf *b)
    b->top = 0;
 }
 
+/**
+ * @internal
+ * @brief Reserves space in the event log buffer for a new item.
+ *
+ * This function attempts to reserve `size` bytes in the buffer `b`.
+ * If the buffer does not have enough remaining space, it wraps around to the
+ * beginning of the buffer (overflow behavior) and increments the overflow count.
+ * It aborts if the requested size is larger than the total buffer size.
+ *
+ * @param b Pointer to the Eina_Evlog_Buf structure.
+ * @param size The size of the data to push into the buffer.
+ * @return A pointer to the reserved space in the buffer.
+ */
 static inline void *
 push_buf(Eina_Evlog_Buf *b, unsigned int size)
 {
@@ -252,6 +299,20 @@ eina_evlog_stop(void)
 }
 
 // get evlog
+/**
+ * @internal
+ * @brief Debug callback to retrieve the current event log buffer.
+ *
+ * This function is called via the Eina_Debug infrastructure. It steals the
+ * current event log buffer, packages its content (including overflow count
+ * and log data) and sends it back to the debug client.
+ *
+ * @param session The debug session.
+ * @param cid The command ID.
+ * @param buffer The incoming command buffer (unused).
+ * @param size The size of the incoming command buffer (unused).
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _get_cb(Eina_Debug_Session *session EINA_UNUSED, int cid EINA_UNUSED, void *buffer EINA_UNUSED, int size EINA_UNUSED)
 {
@@ -275,6 +336,19 @@ _get_cb(Eina_Debug_Session *session EINA_UNUSED, int cid EINA_UNUSED, void *buff
 }
 
 // enable evlog
+/**
+ * @internal
+ * @brief Debug callback to start event logging.
+ *
+ * This function is called via the Eina_Debug infrastructure.
+ * It calls eina_evlog_start() to enable event logging.
+ *
+ * @param session The debug session (unused).
+ * @param cid The command ID (unused).
+ * @param buffer The incoming command buffer (unused).
+ * @param size The size of the incoming command buffer (unused).
+ * @return EINA_TRUE.
+ */
 static Eina_Bool
 _start_cb(Eina_Debug_Session *session EINA_UNUSED, int cid EINA_UNUSED, void *buffer EINA_UNUSED, int size EINA_UNUSED)
 {
@@ -283,6 +357,19 @@ _start_cb(Eina_Debug_Session *session EINA_UNUSED, int cid EINA_UNUSED, void *bu
 }
 
 // stop evlog
+/**
+ * @internal
+ * @brief Debug callback to stop event logging.
+ *
+ * This function is called via the Eina_Debug infrastructure.
+ * It calls eina_evlog_stop() to disable event logging.
+ *
+ * @param session The debug session (unused).
+ * @param cid The command ID (unused).
+ * @param buffer The incoming command buffer (unused).
+ * @param size The size of the incoming command buffer (unused).
+ * @return EINA_TRUE.
+ */
 static Eina_Bool
 _stop_cb(Eina_Debug_Session *session EINA_UNUSED, int cid EINA_UNUSED, void *buffer EINA_UNUSED, int size EINA_UNUSED)
 {
@@ -297,6 +384,17 @@ EINA_DEBUG_OPCODES_ARRAY_DEFINE(_EINA_DEBUG_EVLOG_OPS,
       {NULL, NULL, NULL}
 );
 
+/**
+ * @internal
+ * @brief Initializes the event logging system.
+ *
+ * This function sets up the spinlock for thread safety, initializes the
+ * primary event log buffer pointer, determines the appropriate clock ID for
+ * `get_time()`, logs an initial "eina_init" event, and registers the
+ * debug opcodes for controlling event logging remotely.
+ *
+ * @return EINA_TRUE on successful initialization.
+ */
 Eina_Bool
 eina_evlog_init(void)
 {
@@ -317,6 +415,16 @@ eina_evlog_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the event logging system.
+ *
+ * This function frees the spinlock used for synchronization.
+ * Note: It intentionally does not free the event log buffers themselves,
+ * as they might still be in use by a debugging thread that has stolen them.
+ *
+ * @return EINA_TRUE on successful shutdown.
+ */
 Eina_Bool
 eina_evlog_shutdown(void)
 {

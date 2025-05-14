@@ -5,11 +5,21 @@
 #ifdef NEWTILER
 #define MAXREG 24
 
+/**
+ * @brief Initializes the tilebuffer system.
+ * @note Currently a no-op in this implementation.
+ */
 EVAS_API void
 evas_common_tilebuf_init(void)
 {
 }
 
+/**
+ * @brief Creates a new tilebuffer.
+ * @param w The width of the output buffer.
+ * @param h The height of the output buffer.
+ * @return A pointer to the newly created Tilebuf, or NULL on failure.
+ */
 EVAS_API Tilebuf *
 evas_common_tilebuf_new(int w, int h)
 {
@@ -20,6 +30,10 @@ evas_common_tilebuf_new(int w, int h)
    return tb;
 }
 
+/**
+ * @brief Frees a tilebuffer.
+ * @param tb The tilebuffer to free.
+ */
 EVAS_API void
 evas_common_tilebuf_free(Tilebuf *tb)
 {
@@ -27,11 +41,25 @@ evas_common_tilebuf_free(Tilebuf *tb)
    free(tb);
 }
 
+/**
+ * @brief Sets the tile size for the tilebuffer.
+ * @note Currently a no-op in this implementation.
+ * @param tb The tilebuffer.
+ * @param tw The tile width.
+ * @param th The tile height.
+ */
 EVAS_API void
 evas_common_tilebuf_set_tile_size(Tilebuf *tb EINA_UNUSED, int tw EINA_UNUSED, int th EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Gets the tile size of the tilebuffer.
+ * @note Currently returns a fixed tile size of 1x1 in this implementation.
+ * @param tb The tilebuffer.
+ * @param tw Pointer to store the tile width.
+ * @param th Pointer to store the tile height.
+ */
 EVAS_API void
 evas_common_tilebuf_get_tile_size(Tilebuf *tb EINA_UNUSED, int *tw, int *th)
 {
@@ -39,11 +67,26 @@ evas_common_tilebuf_get_tile_size(Tilebuf *tb EINA_UNUSED, int *tw, int *th)
    if (th) *th = 1;
 }
 
+/**
+ * @brief Sets the strict tiling mode.
+ * @note Currently a no-op in this implementation.
+ * @param tb The tilebuffer.
+ * @param strict EINA_TRUE for strict tiling, EINA_FALSE otherwise.
+ */
 EVAS_API void
 evas_common_tilebuf_tile_strict_set(Tilebuf *tb EINA_UNUSED, Eina_Bool strict EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Adds a rectangle to the redraw region of the tilebuffer.
+ * @param tb The tilebuffer.
+ * @param x The x-coordinate of the rectangle.
+ * @param y The y-coordinate of the rectangle.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ * @return 1 on success, 0 on failure (though current implementation always returns 1).
+ */
 EVAS_API int
 evas_common_tilebuf_add_redraw(Tilebuf *tb, int x, int y, int w, int h)
 {
@@ -51,6 +94,15 @@ evas_common_tilebuf_add_redraw(Tilebuf *tb, int x, int y, int w, int h)
    return 1;
 }
 
+/**
+ * @brief Deletes a rectangle from the redraw region of the tilebuffer.
+ * @param tb The tilebuffer.
+ * @param x The x-coordinate of the rectangle.
+ * @param y The y-coordinate of the rectangle.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ * @return 1 on success, 0 on failure (though current implementation always returns 1).
+ */
 EVAS_API int
 evas_common_tilebuf_del_redraw(Tilebuf *tb, int x, int y, int w, int h)
 {
@@ -58,12 +110,29 @@ evas_common_tilebuf_del_redraw(Tilebuf *tb, int x, int y, int w, int h)
    return 1;
 }
 
+/**
+ * @brief Adds a motion vector to the tilebuffer.
+ * @note Currently a no-op and always returns 0 in this implementation.
+ * @param tb The tilebuffer.
+ * @param x The x-coordinate of the motion area.
+ * @param y The y-coordinate of the motion area.
+ * @param w The width of the motion area.
+ * @param h The height of the motion area.
+ * @param dx The horizontal displacement.
+ * @param dy The vertical displacement.
+ * @param alpha The alpha value for blending (unused).
+ * @return 0, indicating no motion vector was added.
+ */
 EVAS_API int
 evas_common_tilebuf_add_motion_vector(Tilebuf *tb EINA_UNUSED, int x EINA_UNUSED, int y EINA_UNUSED, int w EINA_UNUSED, int h EINA_UNUSED, int dx EINA_UNUSED, int dy EINA_UNUSED, int alpha EINA_UNUSED)
 {
    return 0;
 }
 
+/**
+ * @brief Clears all redraw regions from the tilebuffer.
+ * @param tb The tilebuffer to clear.
+ */
 EVAS_API void
 evas_common_tilebuf_clear(Tilebuf *tb)
 {
@@ -71,6 +140,18 @@ evas_common_tilebuf_clear(Tilebuf *tb)
    tb->region = region_new(tb->outbuf_w, tb->outbuf_h);
 }
 
+/**
+ * @internal
+ * @brief Rounds the rectangles in a region to align with a given tile size.
+ * This function takes an input region and creates a new region where all
+ * rectangles are expanded or adjusted to be multiples of tsize.
+ * The x1, y1 coordinates are rounded down to the nearest multiple of tsize.
+ * The x2, y2 coordinates are rounded up to the nearest multiple of tsize.
+ * @param region The input region.
+ * @param tsize The tile size to align to.
+ * @return A new Region object with rounded rectangles, or NULL on failure.
+ *         The caller is responsible for freeing the returned region.
+ */
 static Region *
 _region_round(Region *region, int tsize)
 {
@@ -95,6 +176,27 @@ _region_round(Region *region, int tsize)
    return region2;
 }
 
+/**
+ * @brief Retrieves the rectangles that need to be rendered.
+ *
+ * This function processes the current redraw region in the tilebuffer,
+ * rounds the rectangles to a tile size (hardcoded to 16 here),
+ * and prepares a list of Tilebuf_Rect structures for rendering.
+ * If the number of distinct rectangles exceeds MAXREG (24),
+ * a single bounding box encompassing all rectangles is returned instead.
+ *
+ * @param tb The tilebuffer.
+ * @return A pointer to an Eina_Inlist of Tilebuf_Rect structures.
+ *         Each Tilebuf_Rect represents an area to be rendered.
+ *         The format of the list is an Eina_Inlist, where each node
+ *         is a Tilebuf_Rect. Example:
+ *         rects -> Tilebuf_Rect{x,y,w,h, EINA_INLIST}
+ *                  -> Tilebuf_Rect{x,y,w,h, EINA_INLIST}
+ *                  -> ...
+ *         The caller is responsible for freeing this list using
+ *         evas_common_tilebuf_free_render_rects().
+ *         Returns NULL if there are no rectangles to render or on allocation failure.
+ */
 EVAS_API Tilebuf_Rect *
 evas_common_tilebuf_get_render_rects(Tilebuf *tb)
 {
@@ -169,6 +271,13 @@ evas_common_tilebuf_get_render_rects(Tilebuf *tb)
    return rects;
 }
 
+/**
+ * @brief Frees the list of render rectangles.
+ * @param rects The list of Tilebuf_Rect structures to free. This list
+ *              is typically obtained from evas_common_tilebuf_get_render_rects().
+ *              It's a contiguous block of memory allocated for the rectangles,
+ *              even though it's used as an Eina_Inlist.
+ */
 EVAS_API void
 evas_common_tilebuf_free_render_rects(Tilebuf_Rect *rects)
 {
@@ -200,15 +309,22 @@ static inline void rect_list_add_split_fuzzy_and_merge(list_t *rects, list_node_
 static const list_node_t list_node_zeroed = { NULL };
 static const list_t list_zeroed = { NULL, NULL };
 
+/** @internal Structure for managing a pool of list_node_t objects. */
 typedef struct list_node_pool
 {
-   list_node_t *node;
-   int len;
-   int max;
+   list_node_t *node; /**< Pointer to the head of the free list. */
+   int len;           /**< Current number of nodes in the pool. */
+   int max;           /**< Maximum number of nodes to keep in the pool. */
 } list_node_pool_t;
 
+/** @internal Global instance of the list node pool. */
 static list_node_pool_t list_node_pool = { NULL, 0, MAX_NODES };
 
+/**
+ * @internal
+ * @brief Flushes the list node pool, freeing all cached nodes.
+ * This is typically called during cleanup or when memory needs to be reclaimed.
+ */
 static inline void
 rect_list_node_pool_flush(void)
 {
@@ -221,6 +337,13 @@ rect_list_node_pool_flush(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Retrieves a list_node_t from the pool or allocates a new one.
+ * If the pool has available nodes, one is returned. Otherwise, a new node
+ * is allocated using malloc.
+ * @return A pointer to a list_node_t.
+ */
 static inline list_node_t *
 rect_list_node_pool_get(void)
 {
@@ -234,6 +357,13 @@ rect_list_node_pool_get(void)
    else return (list_node_t *)malloc(sizeof(rect_node_t));
 }
 
+/**
+ * @internal
+ * @brief Returns a list_node_t to the pool if space is available, otherwise frees it.
+ * If the pool's current size is less than its maximum capacity, the node is
+ * added to the pool's free list. Otherwise, the node is freed directly.
+ * @param node The list_node_t to return to the pool or free.
+ */
 static inline void
 rect_list_node_pool_put(list_node_t *node)
 {
@@ -246,6 +376,17 @@ rect_list_node_pool_put(list_node_t *node)
    else free(node);
 }
 
+/**
+ * @internal
+ * @brief Initializes a rectangle structure.
+ * Calculates and sets the area, left, top, right, bottom, width, and height
+ * properties of the given rect_t structure.
+ * @param r Pointer to the rect_t structure to initialize.
+ * @param x The x-coordinate of the top-left corner.
+ * @param y The y-coordinate of the top-left corner.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ */
 static inline void
 rect_init(rect_t *r, int x, int y, int w, int h)
 {
@@ -258,6 +399,13 @@ rect_init(rect_t *r, int x, int y, int w, int h)
    r->height = h;
 }
 
+/**
+ * @internal
+ * @brief Appends a pre-allocated node to the end of a rectangle list.
+ * @param rects Pointer to the list_t structure representing the rectangle list.
+ * @param node Pointer to the list_node_t to append. The node should already
+ *             contain the rectangle data.
+ */
 static inline void
 rect_list_append_node(list_t *rects, list_node_t *node)
 {
@@ -273,6 +421,14 @@ rect_list_append_node(list_t *rects, list_node_t *node)
      }
 }
 
+/**
+ * @internal
+ * @brief Appends a new rectangle to the end of a rectangle list.
+ * A new node is obtained from the pool, initialized with the given rectangle data,
+ * and then appended to the list.
+ * @param rects Pointer to the list_t structure.
+ * @param r The rect_t data to append.
+ */
 static inline void
 rect_list_append(list_t *rects, const rect_t r)
 {
@@ -282,6 +438,16 @@ rect_list_append(list_t *rects, const rect_t r)
    rect_list_append_node(rects, (list_node_t *)rect_node);
 }
 
+/**
+ * @internal
+ * @brief Appends a new rectangle, defined by x, y, w, h, to a list.
+ * Convenience function that initializes a rect_t and then appends it.
+ * @param rects Pointer to the list_t structure.
+ * @param x The x-coordinate.
+ * @param y The y-coordinate.
+ * @param w The width.
+ * @param h The height.
+ */
 static inline void
 rect_list_append_xywh(list_t *rects, int x, int y, int w, int h)
 {
@@ -290,6 +456,14 @@ rect_list_append_xywh(list_t *rects, int x, int y, int w, int h)
    rect_list_append(rects, r);
 }
 
+/**
+ * @internal
+ * @brief Concatenates one rectangle list to another.
+ * Appends all nodes from the 'other' list to the end of the 'rects' list.
+ * The 'other' list becomes empty after this operation.
+ * @param rects Pointer to the destination list_t.
+ * @param other Pointer to the source list_t to be concatenated.
+ */
 static inline void
 rect_list_concat(list_t *rects, list_t *other)
 {
@@ -307,6 +481,18 @@ rect_list_concat(list_t *rects, list_t *other)
    *other = list_zeroed;
 }
 
+/**
+ * @internal
+ * @brief Unlinks the node following parent_node from the list.
+ * If parent_node is NULL, unlinks the head of the list.
+ * Adjusts head/tail pointers of the list as necessary.
+ * The unlinked node's next/prev pointers are zeroed.
+ * @param rects Pointer to the list_t structure.
+ * @param parent_node The node preceding the one to be unlinked, or NULL
+ *                    to unlink the head.
+ * @return The unlinked list_node_t. The caller is responsible for
+ *         either reusing or freeing this node (e.g., via rect_list_node_pool_put).
+ */
 static inline list_node_t *
 rect_list_unlink_next(list_t *rects, list_node_t *parent_node)
 {
@@ -327,6 +513,15 @@ rect_list_unlink_next(list_t *rects, list_node_t *parent_node)
    return node;
 }
 
+/**
+ * @internal
+ * @brief Deletes the node following parent_node from the list.
+ * If parent_node is NULL, deletes the head of the list.
+ * The deleted node is returned to the node pool.
+ * @param rects Pointer to the list_t structure.
+ * @param parent_node The node preceding the one to be deleted, or NULL
+ *                    to delete the head.
+ */
 static inline void
 rect_list_del_next(list_t *rects, list_node_t *parent_node)
 {
@@ -334,6 +529,13 @@ rect_list_del_next(list_t *rects, list_node_t *parent_node)
     rect_list_node_pool_put(node);
 }
 
+/**
+ * @internal
+ * @brief Clears all rectangles from a list.
+ * All nodes in the list are returned to the node pool, and the list
+ * is reset to an empty state.
+ * @param rects Pointer to the list_t structure to clear.
+ */
 static inline void
 rect_list_clear(list_t *rects)
 {
@@ -349,6 +551,16 @@ rect_list_clear(list_t *rects)
    *rects = list_zeroed;
 }
 
+/**
+ * @internal
+ * @brief Calculates the dimensions of the intersection of two rectangles.
+ * @param a The first rectangle.
+ * @param b The second rectangle.
+ * @param[out] width Pointer to store the width of the intersection.
+ *                   Set to 0 or negative if no intersection on the x-axis.
+ * @param[out] height Pointer to store the height of the intersection.
+ *                    Set to 0 or negative if no intersection on the y-axis.
+ */
 static inline void
 _calc_intra_rect_area(const rect_t a, const rect_t b, int *width, int *height)
 {
@@ -367,6 +579,42 @@ _calc_intra_rect_area(const rect_t a, const rect_t b, int *width, int *height)
    *height = min_bottom - max_top;
 }
 
+/**
+ * @internal
+ * @brief Splits rectangle 'r' by subtracting 'current' rectangle from it.
+ * This function is used when a rectangle 'current' (which is being deleted or
+ * processed) overlaps with another rectangle 'r'. The parts of 'r' that do
+ * not overlap with 'current' are added to the 'dirty' list as new rectangles.
+ * 'r' itself is effectively consumed or modified in this process conceptually,
+ * though its input value isn't directly changed for w_1, w_2 calculations.
+ *
+ * Example:
+ * If 'r' is a large rectangle and 'current' is a smaller rectangle inside 'r',
+ * _split_strict will add up to four new rectangles to 'dirty' representing
+ * the parts of 'r' surrounding 'current'.
+ *
+ *   Initial state:
+ *   +-----------------+
+ *   | r               |
+ *   |   +---------+   |
+ *   |   | current |   |
+ *   |   +---------+   |
+ *   |                 |
+ *   +-----------------+
+ *
+ *   After _split_strict (conceptual, r is split into r_top, r_bottom, r_left, r_right):
+ *   +-----------------+ dirty gets:
+ *   | r_top           |   r_top
+ *   +-----+-----+-----+   r_left, r_right
+ *   |r_left|current|r_right| r_bottom
+ *   +-----+-----+-----+
+ *   | r_bottom        |
+ *   +-----------------+
+ *
+ * @param dirty List to add the resulting split rectangles to.
+ * @param current The rectangle that is causing the split (e.g., a deletion area).
+ * @param r The rectangle to be split.
+ */
 static inline void
 _split_strict(list_t *dirty, const rect_t current, rect_t r)
 {
@@ -429,6 +677,18 @@ _split_strict(list_t *dirty, const rect_t current, rect_t r)
      }
 }
 
+/**
+ * @internal
+ * @brief Deletes a rectangle 'del_r' from a list of rectangles 'rects'.
+ * This function iterates through the 'rects' list. If 'del_r' completely
+ * contains a rectangle in the list, that rectangle is removed. If 'del_r'
+ * partially overlaps a rectangle, that rectangle is split into smaller pieces
+ * using _split_strict, and the original overlapping rectangle is removed.
+ * Non-overlapping rectangles are untouched.
+ *
+ * @param rects The list of rectangles to modify.
+ * @param del_r The rectangle to delete from the list.
+ */
 static inline void
 rect_list_del_split_strict(list_t *rects, const rect_t del_r)
 {
@@ -479,6 +739,16 @@ rect_list_del_split_strict(list_t *rects, const rect_t del_r)
    rect_list_concat(rects, &modified);
 }
 
+/**
+ * @internal
+ * @brief Calculates both the intersection (intra) and bounding box (outer) of two rectangles.
+ *
+ * @param a The first rectangle.
+ * @param b The second rectangle.
+ * @param[out] intra Pointer to a rect_t structure to store the intersection rectangle.
+ *                   If there's no intersection, intra->area will be 0.
+ * @param[out] outer Pointer to a rect_t structure to store the bounding box rectangle.
+ */
 static inline void
 _calc_intra_outer_rect_area(const rect_t a, const rect_t b,
                             rect_t *intra, rect_t *outer)
@@ -549,9 +819,31 @@ enum
 {
    SPLIT_FUZZY_ACTION_NONE,
    SPLIT_FUZZY_ACTION_SPLIT,
-   SPLIT_FUZZY_ACTION_MERGE
+   SPLIT_FUZZY_ACTION_MERGE /**< Indicates that rectangles a and b can be merged horizontally. */
 };
 
+/**
+ * @internal
+ * @brief Splits rectangle 'b' based on its overlap with rectangle 'a', with fuzzy logic.
+ * This is similar to _split_strict but allows for slight imperfections or specific
+ * merge conditions. It's used in a context where rectangles might be merged if
+ * they are "close enough" or align in a particular way.
+ *
+ * - If 'b' is partially outside 'a', the non-overlapping parts of 'b' are added to 'dirty'.
+ * - 'b' is modified to represent the overlapping part or a part that might be merged.
+ * - Returns an action code:
+ *   - SPLIT_FUZZY_ACTION_NONE: No split or specific merge action taken for 'b' relative to 'a'.
+ *   - SPLIT_FUZZY_ACTION_SPLIT: 'b' was split, and parts were added to 'dirty'.
+ *   - SPLIT_FUZZY_ACTION_MERGE: 'b' and 'a' are candidates for a horizontal merge
+ *     (same height, adjacent or overlapping horizontally).
+ *
+ * @param dirty List to add newly created rectangle fragments to.
+ * @param a The reference rectangle.
+ * @param b Pointer to the rectangle to be split or modified. This rectangle's
+ *          properties (top, height) might be changed by this function.
+ * @return An integer indicating the action taken (SPLIT_FUZZY_ACTION_NONE,
+ *         SPLIT_FUZZY_ACTION_SPLIT, or SPLIT_FUZZY_ACTION_MERGE).
+ */
 static inline int
 _split_fuzzy(list_t *dirty, const rect_t a, rect_t *b)
 {
@@ -623,6 +915,36 @@ _split_fuzzy(list_t *dirty, const rect_t a, rect_t *b)
    return action;
 }
 
+/**
+ * @internal
+ * @brief Adds a new rectangle node to a list, performing fuzzy splitting and merging.
+ * This function attempts to integrate the new rectangle ('node') into the existing
+ * 'rects' list. It processes the 'node' and potentially other rectangles from
+ * 'rects' by:
+ * 1. Checking for containment: If 'node' is already contained, it's discarded.
+ *    If 'node' contains an existing rect, that rect is removed.
+ * 2. Merging: If 'node' and an existing rect can form a new bounding box whose
+ *    area is not much larger than their combined areas (within 'accepted_error'),
+ *    they are merged.
+ * 3. Splitting: If 'node' partially overlaps an existing rect and merging isn't
+ *    optimal, the existing rect might be split using _split_fuzzy.
+ *
+ * The function maintains a 'dirty' list of rectangles that need further processing.
+ * The goal is to keep the 'rects' list optimized by merging and splitting
+ * rectangles to reduce redundancy and fragmentation, within the fuzzy tolerance.
+ *
+ * @param rects The main list of rectangles to which 'node' is being added.
+ * @param node The new rectangle node to add. This node will be consumed (either
+ *             added to 'rects', or its data used for merging/splitting and then pooled).
+ * @param accepted_error The tolerance for merging. If (bounding_box_area - (area1 + area2 - intersection_area))
+ *                       is less than or equal to this, rectangles may be merged.
+ *                       Also used for intersection_area - combined_area_without_overlap.
+ * @return Returns the 'old_last' node of the 'rects' list before any modifications
+ *         due to processing 'node' and subsequent items from the 'dirty' list that
+ *         were originally from 'rects'. This is used by the caller
+ *         (rect_list_add_split_fuzzy_and_merge) to determine which part of the
+ *         list needs further merging.
+ */
 static inline list_node_t *
 rect_list_add_split_fuzzy(list_t *rects, list_node_t *node, int accepted_error)
 {
@@ -753,6 +1075,14 @@ rect_list_add_split_fuzzy(list_t *rects, list_node_t *node, int accepted_error)
     return old_last;
 }
 
+/**
+ * @internal
+ * @brief Calculates the bounding box (outer rectangle) of two rectangles.
+ * @param a The first rectangle.
+ * @param b The second rectangle.
+ * @param[out] outer Pointer to a rect_t structure to store the resulting
+ *                   bounding box.
+ */
 static inline void
 _calc_outer_rect_area(const rect_t a, const rect_t b, rect_t *outer)
 {
@@ -776,6 +1106,23 @@ _calc_outer_rect_area(const rect_t a, const rect_t b, rect_t *outer)
    outer->area = outer->width * outer->height;
 }
 
+/**
+ * @internal
+ * @brief Merges rectangles from the 'to_merge' list into the 'rects' list.
+ * This function iterates through each rectangle in 'to_merge'. For each such
+ * rectangle (r1), it searches 'rects' for a rectangle (r2) that can be merged
+ * with r1. Merging occurs if their combined bounding box area is not significantly
+ * larger (within 'accepted_error') than the sum of their individual areas.
+ * If a merge occurs, r1 and r2 are replaced by their merged version, which is
+ * then added back to 'to_merge' for further processing. If r1 cannot be merged
+ * with any rectangle in 'rects', it's moved from 'to_merge' to 'rects'.
+ *
+ * @param rects The target list where merged rectangles are accumulated.
+ * @param to_merge List of rectangles to be merged into 'rects'. This list
+ *                 will be empty after the function completes.
+ * @param accepted_error Tolerance for merging, similar to its use in
+ *                       rect_list_add_split_fuzzy. (outer.area - (r1.area + r2.area)) <= accepted_error
+ */
 static inline void
 rect_list_merge_rects(list_t *rects, list_t *to_merge, int accepted_error)
 {
@@ -831,7 +1178,28 @@ rect_list_add_split_fuzzy_and_merge(list_t *rects,
 {
    list_node_t *n;
 
+   /**
+    * First, add the new 'node' to the 'rects' list. This process might
+    * split existing rectangles in 'rects' or merge 'node' with some of them.
+    * 'rect_list_add_split_fuzzy' returns a pointer to the node in 'rects'
+    * that was the tail of the list *before* any new nodes (resulting from
+    * splits of existing rects or the addition of 'node' itself if it wasn't merged)
+    * were added *after* it during its processing.
+    *
+    * Essentially, 'n' marks a boundary: nodes up to 'n' (inclusive) are
+    * considered relatively stable or already processed against each other
+    * to some extent. Nodes after 'n' are newer additions or results of
+    * recent splits/merges triggered by 'node'.
+    */
    n = rect_list_add_split_fuzzy(rects, node, split_accepted_error);
+
+   /**
+    * If 'n' exists and has a 'next' node, it means that rect_list_add_split_fuzzy
+    * potentially added new rectangles after 'n' (or 'n' itself was placed such
+    * that there are subsequent nodes). These "newer" rectangles (from n->next
+    * to the current tail of 'rects') might be candidates for further merging
+    * amongst themselves or with the "older" part of the list (up to 'n').
+    */
    if (n && n->next)
      {
         list_t to_merge;
@@ -840,10 +1208,30 @@ rect_list_add_split_fuzzy_and_merge(list_t *rects,
         to_merge.tail = rects->tail;
         rects->tail = n;
         n->next = NULL;
+        // Now, merge the 'to_merge' list (which contains all nodes originally after 'n')
+        // back into the 'rects' list (which now ends at 'n').
+        // This allows further consolidation.
         rect_list_merge_rects(rects, &to_merge, merge_accepted_error);
      }
 }
 
+/**
+ * @internal
+ * @brief Adds a redraw rectangle to the list, performing fuzzy splitting and merging.
+ * This is a convenience wrapper around rect_list_add_split_fuzzy_and_merge.
+ * It allocates a new rectangle node, initializes it, and then calls the
+ * main fuzzy add/merge logic.
+ *
+ * @param rects The list of rectangles.
+ * @param x The x-coordinate of the redraw rectangle.
+ * @param y The y-coordinate of the redraw rectangle.
+ * @param w The width of the redraw rectangle.
+ * @param h The height of the redraw rectangle.
+ * @param fuzz The accepted error/tolerance for fuzzy splitting and merging.
+ *             This value is passed as both split_accepted_error and
+ *             merge_accepted_error to rect_list_add_split_fuzzy_and_merge.
+ * @return Always returns 1 (historically, perhaps to indicate success).
+ */
 static inline int
 _add_redraw(list_t *rects, int x, int y, int w, int h, int fuzz)
 {
@@ -857,11 +1245,23 @@ _add_redraw(list_t *rects, int x, int y, int w, int h, int fuzz)
 
 /////////////////////////////////////////////////////////////////
 
+/**
+ * @brief Initializes the tilebuffer system.
+ * @note Currently a no-op in this implementation.
+ */
 EVAS_API void
 evas_common_tilebuf_init(void)
 {
 }
 
+/**
+ * @brief Creates a new tilebuffer.
+ * @param w The width of the output buffer associated with this tilebuffer.
+ * @param h The height of the output buffer.
+ * @return A pointer to the newly created Tilebuf, or NULL on allocation failure.
+ *         The tilebuffer is initialized with a default tile size (e.g., 8x8)
+ *         and dimensions for the output buffer.
+ */
 EVAS_API Tilebuf *
 evas_common_tilebuf_new(int w, int h)
 {
@@ -876,6 +1276,11 @@ evas_common_tilebuf_new(int w, int h)
    return tb;
 }
 
+/**
+ * @brief Frees a tilebuffer and its associated resources.
+ * This includes clearing any stored rectangle lists and flushing the node pool.
+ * @param tb The tilebuffer to free.
+ */
 EVAS_API void
 evas_common_tilebuf_free(Tilebuf *tb)
 {
@@ -884,6 +1289,13 @@ evas_common_tilebuf_free(Tilebuf *tb)
    free(tb);
 }
 
+/**
+ * @brief Sets the tile size for the tilebuffer.
+ * This size is used when generating render rectangles, to align them to tile boundaries.
+ * @param tb The tilebuffer.
+ * @param tw The desired tile width.
+ * @param th The desired tile height.
+ */
 EVAS_API void
 evas_common_tilebuf_set_tile_size(Tilebuf *tb, int tw, int th)
 {
@@ -891,6 +1303,12 @@ evas_common_tilebuf_set_tile_size(Tilebuf *tb, int tw, int th)
    tb->tile_size.h = th;
 }
 
+/**
+ * @brief Gets the current tile size of the tilebuffer.
+ * @param tb The tilebuffer.
+ * @param[out] tw Pointer to store the tile width. Can be NULL.
+ * @param[out] th Pointer to store the tile height. Can be NULL.
+ */
 EVAS_API void
 evas_common_tilebuf_get_tile_size(Tilebuf *tb, int *tw, int *th)
 {
@@ -898,12 +1316,33 @@ evas_common_tilebuf_get_tile_size(Tilebuf *tb, int *tw, int *th)
    if (th) *th = tb->tile_size.h;
 }
 
+/**
+ * @brief Sets whether strict tile alignment is used.
+ * @param tb The tilebuffer.
+ * @param strict If EINA_TRUE, strict tile alignment is enforced.
+ *               If EINA_FALSE, fuzzy merging might be used.
+ *               (Note: current get_render_rects seems to always use fuzzy merging logic).
+ */
 EVAS_API void
 evas_common_tilebuf_tile_strict_set(Tilebuf *tb, Eina_Bool strict)
 {
    tb->strict_tiles = strict;
 }
 
+/**
+ * @brief Adds a rectangle to the set of redraw areas for the tilebuffer.
+ * The rectangle is clipped to the tilebuffer's output dimensions.
+ * An optimization prevents re-adding the exact same rectangle consecutively.
+ * The actual addition uses a fuzzy logic (_add_redraw) to merge or split
+ * rectangles to maintain an optimized list.
+ * @param tb The tilebuffer.
+ * @param x The x-coordinate of the rectangle.
+ * @param y The y-coordinate of the rectangle.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ * @return 1 if the rectangle was added (or considered, even if optimized out),
+ *         0 if the input rectangle had non-positive width or height before or after clipping.
+ */
 EVAS_API int
 evas_common_tilebuf_add_redraw(Tilebuf *tb, int x, int y, int w, int h)
 {
@@ -919,6 +1358,21 @@ evas_common_tilebuf_add_redraw(Tilebuf *tb, int x, int y, int w, int h)
    return _add_redraw(&tb->rects, x, y, w, h, FUZZ * FUZZ);
 }
 
+/**
+ * @brief Deletes a rectangle from the set of redraw areas.
+ * The specified rectangle is subtracted from the existing redraw regions.
+ * This may involve splitting existing rectangles.
+ * An optimization prevents re-deleting the exact same rectangle consecutively.
+ * Sets a flag indicating that the rectangle list might need merging.
+ * @param tb The tilebuffer.
+ * @param x The x-coordinate of the rectangle to delete.
+ * @param y The y-coordinate of the rectangle to delete.
+ * @param w The width of the rectangle to delete.
+ * @param h The height of the rectangle to delete.
+ * @return 0 if the operation was processed. (Note: The return value might not
+ *         clearly indicate success/failure in all cases, e.g. if list was empty).
+ *         Returns 1 if the exact same rectangle was just deleted (optimization).
+ */
 EVAS_API int
 evas_common_tilebuf_del_redraw(Tilebuf *tb, int x, int y, int w, int h)
 {
@@ -940,12 +1394,32 @@ evas_common_tilebuf_del_redraw(Tilebuf *tb, int x, int y, int w, int h)
    return 0;
 }
 
+/**
+ * @brief Adds a motion vector to the tilebuffer.
+ * @note Currently a no-op and always returns 0 in this implementation.
+ * This function is intended for hinting areas that have moved, potentially
+ * for optimized rendering (e.g., blitting).
+ * @param tb The tilebuffer.
+ * @param x The x-coordinate of the source area.
+ * @param y The y-coordinate of the source area.
+ * @param w The width of the area.
+ * @param h The height of the area.
+ * @param dx The horizontal displacement (motion).
+ * @param dy The vertical displacement (motion).
+ * @param alpha Alpha value for blending (likely unused or for future use).
+ * @return Always returns 0 in this implementation.
+ */
 EVAS_API int
 evas_common_tilebuf_add_motion_vector(Tilebuf *tb EINA_UNUSED, int x EINA_UNUSED, int y EINA_UNUSED, int w EINA_UNUSED, int h EINA_UNUSED, int dx EINA_UNUSED, int dy EINA_UNUSED, int alpha EINA_UNUSED)
 {
    return 0;
 }
 
+/**
+ * @brief Clears all redraw rectangles from the tilebuffer.
+ * Resets the list of redraw areas and clears previous add/delete caches.
+ * @param tb The tilebuffer to clear.
+ */
 EVAS_API void
 evas_common_tilebuf_clear(Tilebuf *tb)
 {
@@ -955,6 +1429,45 @@ evas_common_tilebuf_clear(Tilebuf *tb)
    tb->need_merge = 0;
 }
 
+/**
+ * @brief Retrieves the list of rectangles that need to be rendered.
+ *
+ * This function performs several steps:
+ * 1. Alignment: It iterates through the current redraw rectangles in `tb->rects`,
+ *    aligns each to the tile boundaries defined by `tb->tile_size`.
+ *    These aligned rectangles are added to a temporary `to_merge` list using
+ *    `_add_redraw` with zero fuzz, which implies strict merging of adjacent/overlapping
+ *    tile-aligned blocks.
+ * 2. Consolidation: The original `tb->rects` is cleared, and the content of
+ *    `to_merge` (now tile-aligned and somewhat merged) is merged back into
+ *    `tb->rects` (again with zero fuzz for strict merging).
+ * 3. Clipping and Bounding Box: The function then iterates through the consolidated
+ *    `tb->rects`, clips each rectangle to the output buffer dimensions, and
+ *    calculates the overall bounding box of all valid rectangles.
+ * 4. Output Generation:
+ *    - If the number of resulting rectangles (`num`) is greater than `MAXREG` (24),
+ *      a single `Tilebuf_Rect` representing the calculated bounding box is returned.
+ *    - Otherwise, an array of `Tilebuf_Rect` is allocated, and each valid, clipped
+ *      rectangle from `tb->rects` is converted into a `Tilebuf_Rect` and added
+ *      to an Eina_Inlist (using the allocated array as backing storage).
+ *
+ * The returned `Tilebuf_Rect*` is the head of an Eina_Inlist. Each element in the
+ * list is a `Tilebuf_Rect`.
+ * Example of returned structure (if num <= MAXREG):
+ *   rects -> Tilebuf_Rect[0] {x, y, w, h, EINA_INLIST links to Tilebuf_Rect[1]}
+ *            Tilebuf_Rect[1] {x, y, w, h, EINA_INLIST links to Tilebuf_Rect[2]}
+ *            ...
+ *            Tilebuf_Rect[num-1] {x, y, w, h, EINA_INLIST links to NULL}
+ * The actual memory is a single block `rbuf = malloc(sizeof(Tilebuf_Rect) * num)`.
+ * If num > MAXREG, then:
+ *   rects -> dynamically allocated Tilebuf_Rect {bx1, by1, bx2-bx1, by2-by1, EINA_INLIST links to NULL}
+ *
+ * @param tb The tilebuffer.
+ * @return A pointer to the head of an Eina_Inlist of Tilebuf_Rects to be rendered.
+ *         The caller is responsible for freeing this list using
+ *         evas_common_tilebuf_free_render_rects().
+ *         Returns NULL if there are no rectangles to render after processing.
+ */
 EVAS_API Tilebuf_Rect *
 evas_common_tilebuf_get_render_rects(Tilebuf *tb)
 {
@@ -1080,6 +1593,11 @@ evas_common_tilebuf_get_render_rects(Tilebuf *tb)
    return rects;
 }
 
+/**
+ * @brief Frees the render rectangles list obtained from evas_common_tilebuf_get_render_rects().
+ * @param rects The pointer to the Tilebuf_Rect list (which is the head of an Eina_Inlist,
+ *              but the memory itself is a contiguous block or a single allocation).
+ */
 EVAS_API void
 evas_common_tilebuf_free_render_rects(Tilebuf_Rect *rects)
 {

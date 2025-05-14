@@ -3,7 +3,10 @@
 
 #ifndef _ELM_PAN_EO_CLASS_TYPE
 #define _ELM_PAN_EO_CLASS_TYPE
-
+/**
+ * @brief The Efl object representing an Elementary Pan.
+ * @ingroup Elm_Pan
+ */
 typedef Eo Elm_Pan;
 
 #endif
@@ -19,6 +22,12 @@ typedef Eo Elm_Pan;
  */
 #define ELM_PAN_CLASS elm_pan_class_get()
 
+/**
+ * @brief Get the Efl_Class for the Elm_Pan type.
+ *
+ * @return The Efl_Class for Elm_Pan.
+ * @ingroup Elm_Pan
+ */
 EWAPI const Efl_Class *elm_pan_class_get(void) EINA_CONST;
 
 /**
@@ -76,6 +85,12 @@ EOAPI void elm_obj_pan_pos_min_get(const Eo *obj, int *x, int *y);
  */
 EOAPI void elm_obj_pan_pos_max_get(const Eo *obj, int *x, int *y);
 
+/**
+ * @brief Event descriptor for the "changed" event of an Elm_Pan object.
+ *
+ * This event is emitted when the pan object's state or properties change.
+ * @ingroup Elm_Pan
+ */
 EWAPI extern const Efl_Event_Description _ELM_PAN_EVENT_CHANGED;
 
 /** Called when pan object changed

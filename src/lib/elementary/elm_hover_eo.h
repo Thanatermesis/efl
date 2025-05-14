@@ -4,6 +4,10 @@
 #ifndef _ELM_HOVER_EO_CLASS_TYPE
 #define _ELM_HOVER_EO_CLASS_TYPE
 
+/**
+ * @brief Elementary Hover object.
+ * @ingroup Elm_Hover
+ */
 typedef Eo Elm_Hover;
 
 #endif

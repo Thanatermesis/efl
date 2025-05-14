@@ -11,11 +11,28 @@
 
 static int evas_image_save_file_png(RGBA_Image *im, const char *file, const char *key, int quality, int compress, const char *encoding);
 
+/**
+ * @brief Structure defining the PNG image saving function.
+ * This structure is used by Evas to register the PNG saver.
+ */
 static Evas_Image_Save_Func evas_image_save_png_func =
 {
    evas_image_save_file_png
 };
 
+/**
+ * @brief Saves an RGBA_Image to a PNG file.
+ *
+ * This function handles the actual PNG encoding and file writing.
+ * It supports different Evas image colorspaces (ARGB8888, AGRY88, GRY8)
+ * and options like compression and interlacing.
+ *
+ * @param im The RGBA_Image to save.
+ * @param file The path to the output PNG file.
+ * @param do_compress The compression level (0-9).
+ * @param interlace Whether to use Adam7 interlacing (1 for yes, 0 for no).
+ * @return 1 on success, 0 on failure.
+ */
 static int
 save_image_png(RGBA_Image *im, const char *file, int do_compress, int interlace)
 {
@@ -184,6 +201,20 @@ save_image_png(RGBA_Image *im, const char *file, int do_compress, int interlace)
    return 0;
 }
 
+/**
+ * @brief Evas image save function for PNG format.
+ *
+ * This is the callback function registered with Evas for saving images
+ * in PNG format. It's a wrapper around save_image_png.
+ *
+ * @param im The RGBA_Image to save.
+ * @param file The path to the output PNG file.
+ * @param key Optional key (unused for PNG).
+ * @param quality Optional quality setting (unused for PNG, lossless).
+ * @param do_compress Compression level for PNG.
+ * @param encoding Optional encoding string (unused for PNG).
+ * @return 1 on success, 0 on failure.
+ */
 static int
 evas_image_save_file_png(RGBA_Image *im, const char *file, const char *key EINA_UNUSED,
                          int quality EINA_UNUSED, int do_compress, const char *encoding EINA_UNUSED)
@@ -191,6 +222,15 @@ evas_image_save_file_png(RGBA_Image *im, const char *file, const char *key EINA_
    return save_image_png(im, file, do_compress, 0);
 }
 
+/**
+ * @brief Opens the PNG image saver module.
+ *
+ * This function is called by Evas when loading the module.
+ * It registers the PNG save function.
+ *
+ * @param em The Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -199,11 +239,24 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Closes the PNG image saver module.
+ *
+ * This function is called by Evas when unloading the module.
+ *
+ * @param em The Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Module API structure for the PNG image saver.
+ *
+ * This structure provides Evas with information about the module,
+ * including its version, name, and open/close functions.
+ */
 static Evas_Module_Api evas_modapi =
 {
    EVAS_MODULE_API_VERSION,

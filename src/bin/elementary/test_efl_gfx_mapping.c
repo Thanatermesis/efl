@@ -4,6 +4,24 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Sets up a complex graphical mapping on an Evas_Object.
+ *
+ * This function defines a non-trivial mapping by specifying 8 points,
+ * which create two separate rectangular regions on the canvas. These regions
+ * are then textured using corresponding parts of the source image, as
+ * defined by the UV coordinates.
+ *
+ * The mapping is structured as follows:
+ * - Point 0-3: Define the first rectangle.
+ *   - (100,0) -> (200,0) -> (200,100) -> (100,100)
+ *   - Mapped from UV [0,0] to [0.5,1] of the source image.
+ * - Point 4-7: Define the second rectangle.
+ *   - (200,0) -> (100,200) -> (100,300) -> (200,100)
+ *   - Mapped from UV [0.5,0] to [1,1] of the source image.
+ *
+ * @param obj The Evas_Object to apply the mapping to.
+ */
 static void
 _map_set(Evas_Object *obj)
 {
@@ -32,12 +50,35 @@ _map_set(Evas_Object *obj)
    efl_gfx_mapping_uv_set(obj, 7, 0.5, 1);
 }
 
+/**
+ * @brief Callback function invoked when the image object is resized.
+ *
+ * This function ensures that the custom graphical mapping is reapplied
+ * whenever the image's size changes, maintaining the intended visual effect.
+ *
+ * @param data Custom data pointer (unused).
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object that was resized.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _image_resize_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    _map_set(obj);
 }
 
+/**
+ * @brief Test case for Efl_Gfx_Mapping.
+ *
+ * This test creates a window and displays an image with a complex graphical
+ * mapping applied. The mapping splits the image into two rectangular regions
+ * and positions them non-contiguously on the canvas. It demonstrates how to
+ * use efl_gfx_mapping API to achieve custom transformations.
+ *
+ * @param data Custom data pointer (unused).
+ * @param obj The parent object (unused).
+ * @param event_info Event-specific information (unused).
+ */
 void
 test_efl_gfx_mapping(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
               void *event_info EINA_UNUSED)

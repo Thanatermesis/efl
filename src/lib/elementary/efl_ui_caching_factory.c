@@ -11,40 +11,69 @@ typedef struct _Efl_Ui_Caching_Factory_Data Efl_Ui_Caching_Factory_Data;
 typedef struct _Efl_Ui_Caching_Factory_Request Efl_Ui_Caching_Factory_Request;
 typedef struct _Efl_Ui_Caching_Factory_Group_Request Efl_Ui_Caching_Factory_Group_Request;
 
+/**
+ * @brief Internal data structure for Efl_Ui_Caching_Factory.
+ *
+ * This structure holds all the necessary data for managing cached UI elements,
+ * including the cache itself, lookup tables, limits, and current usage statistics.
+ */
 struct _Efl_Ui_Caching_Factory_Data
 {
-   const Efl_Class *klass;
+   const Efl_Class *klass; /**< The class of items to create if no style is used or if items are not widgets. */
 
-   Eina_Stringshare *style;
+   Eina_Stringshare *style; /**< The style property to use for item differentiation if lookup is enabled. */
 
    // Simple list of ready-to-use objects. They are all equal so it does not matter from which
    // end of the list objects are added and removed.
-   Eina_List *cache;
-   Eina_Hash *lookup;
-   Eina_Future *flush;
+   Eina_List *cache;       /**< List of cached UI elements ready for reuse. */
+   Eina_Hash *lookup;      /**< Hash table for quick lookup of cached items by style, if pd->style is set. */
+   Eina_Future *flush;     /**< Future for scheduling cache flush operations. */
 
    struct {
-      unsigned int memory;
-      unsigned int items;
-   } limit, current;
+      unsigned int memory; /**< Maximum memory usage allowed for the cache. */
+      unsigned int items;  /**< Maximum number of items allowed in the cache. */
+   } limit;                /**< Cache limits. */
 
-   Eina_Bool invalidated : 1;
+   struct {
+      unsigned int memory; /**< Current memory usage of the cache. */
+      unsigned int items;  /**< Current number of items in the cache. */
+   } current;              /**< Current cache usage. */
+
+   Eina_Bool invalidated : 1; /**< Flag indicating if the factory has been invalidated. */
 };
 
+/**
+ * @brief Represents a request to create a single UI element.
+ *
+ * This structure holds data related to a pending creation request for one item,
+ * including references to the factory data, the factory itself, and the parent object.
+ */
 struct _Efl_Ui_Caching_Factory_Request
 {
-   Efl_Ui_Caching_Factory_Data *pd;
+   Efl_Ui_Caching_Factory_Data *pd; /**< Pointer to the factory's private data. */
 
-   Efl_Ui_Caching_Factory *factory;
-   Eo *parent;
+   Efl_Ui_Caching_Factory *factory; /**< Reference to the caching factory. */
+   Eo *parent;                      /**< Parent Eo object for the created item (unused in current logic, but kept for potential future use or consistency). */
 };
 
+/**
+ * @brief Represents a request to create a group of UI elements.
+ *
+ * This structure is used when multiple items are requested at once, primarily
+ * to aggregate the results.
+ */
 struct _Efl_Ui_Caching_Factory_Group_Request
 {
-   Eina_Value done;
+   Eina_Value done; /**< An Eina_Value array (EINA_VALUE_TYPE_OBJECT) to store the created/retrieved Eo objects. */
 };
 
-// Clear the cache until it meet the constraint
+/**
+ * @brief Removes an entity from the cache and updates current counts.
+ *
+ * @param pd The private data of the caching factory.
+ * @param l The list node in pd->cache pointing to the entity to remove.
+ * @param entity The entity to remove from the cache.
+ */
 static void
 _efl_ui_caching_factory_remove(Efl_Ui_Caching_Factory_Data *pd, Eina_List *l, Efl_Gfx_Entity *entity)
 {
@@ -56,6 +85,17 @@ _efl_ui_caching_factory_remove(Efl_Ui_Caching_Factory_Data *pd, Eina_List *l, Ef
      pd->current.memory -= efl_cached_item_memory_size_get(entity);
 }
 
+/**
+ * @brief Deletes or releases a collection of UI entities.
+ *
+ * If `pd->klass` is not set (meaning items are created by a parent factory),
+ * it releases the items using `efl_ui_factory_release`. Otherwise, it directly
+ * deletes the items using `efl_del`.
+ *
+ * @param obj The caching factory object.
+ * @param pd The private data of the caching factory.
+ * @param entities An iterator over the entities to be deleted or released.
+ */
 static void
 _efl_ui_caching_factory_item_del(Eo *obj, Efl_Ui_Caching_Factory_Data *pd,
                                  Eina_Iterator *entities)
@@ -74,6 +114,16 @@ _efl_ui_caching_factory_item_del(Eo *obj, Efl_Ui_Caching_Factory_Data *pd,
      }
 }
 
+/**
+ * @brief Flushes the cache to meet defined memory and item limits.
+ *
+ * Items are removed from the end of the cache (least recently added back)
+ * until both memory and item count limits are satisfied.
+ * Removed items are scheduled for deletion.
+ *
+ * @param obj The caching factory object.
+ * @param pd The private data of the caching factory.
+ */
 static void
 _efl_ui_caching_factory_flush(Eo *obj, Efl_Ui_Caching_Factory_Data *pd)
 {
@@ -126,6 +176,22 @@ _efl_ui_caching_factory_uncap_then(Eo *model EINA_UNUSED,
    return eina_value_object_init(widget);
 }
 
+/**
+ * @brief Future callback for style-based item creation.
+ *
+ * This function is called when the style property of a model is ready.
+ * It attempts to find an item with the resolved style in the cache.
+ * If not found, it triggers the creation of a new item via the parent factory.
+ *
+ * @param model The model for which the item is being created.
+ * @param data A pointer to Efl_Ui_Caching_Factory_Request.
+ * @param v An Eina_Value containing the style string.
+ * @return An Eina_Value containing the created/retrieved widget as an Eo object,
+ *         or an Eina_Value future if a new item needs to be created asynchronously,
+ *         or an error Eina_Value.
+ *         Example of successful Eina_Value (object): `{ EINA_VALUE_TYPE_OBJECT, { .object = (Eo*)widget } }`
+ *         Example of successful Eina_Value (future): `{ EINA_VALUE_TYPE_OBJECT, { .object = (Eo*)future } }` (where future is an Eina_Future)
+ */
 static Eina_Value
 _efl_ui_caching_factory_create_then(Eo *model, void *data, const Eina_Value v)
 {
@@ -162,6 +228,15 @@ _efl_ui_caching_factory_create_then(Eo *model, void *data, const Eina_Value v)
    return eina_value_object_init(w);
 }
 
+/**
+ * @brief Cleans up resources associated with an Efl_Ui_Caching_Factory_Request.
+ *
+ * This is typically used as a 'free' callback for futures.
+ *
+ * @param o The object associated with the future (unused).
+ * @param data A pointer to Efl_Ui_Caching_Factory_Request to be freed.
+ * @param dead_future The future that has completed (unused).
+ */
 static void
 _efl_ui_caching_factory_cleanup(Eo *o EINA_UNUSED, void *data, const Eina_Future *dead_future EINA_UNUSED)
 {
@@ -172,6 +247,18 @@ _efl_ui_caching_factory_cleanup(Eo *o EINA_UNUSED, void *data, const Eina_Future
    free(r);
 }
 
+/**
+ * @brief Future callback for group item creation.
+ *
+ * This function is called when a batch of items has been created by the parent factory.
+ * It appends the newly created widgets to the `done` array in the group request.
+ *
+ * @param obj The caching factory object (unused).
+ * @param data A pointer to Efl_Ui_Caching_Factory_Group_Request.
+ * @param v An Eina_Value of type EINA_VALUE_TYPE_ARRAY, where each element is an Eo* widget.
+ *          Example: `{ EINA_VALUE_TYPE_ARRAY, { .array = { .subtype = EINA_VALUE_TYPE_OBJECT, .count = N, .value = (Eina_Value_Array_Value[]) { { .object = widget1 }, ..., { .object = widgetN } } } } }`
+ * @return A reference copy of the `gr->done` Eina_Value array.
+ */
 static Eina_Value
 _efl_ui_caching_factory_group_create_then(Eo *obj EINA_UNUSED,
                                           void *data,
@@ -187,6 +274,15 @@ _efl_ui_caching_factory_group_create_then(Eo *obj EINA_UNUSED,
    return eina_value_reference_copy(&gr->done);
 }
 
+/**
+ * @brief Cleans up resources associated with an Efl_Ui_Caching_Factory_Group_Request.
+ *
+ * This is typically used as a 'free' callback for futures.
+ *
+ * @param o The object associated with the future (unused).
+ * @param data A pointer to Efl_Ui_Caching_Factory_Group_Request to be freed.
+ * @param dead_future The future that has completed (unused).
+ */
 static void
 _efl_ui_caching_factory_group_cleanup(Eo *o EINA_UNUSED, void *data, const Eina_Future *dead_future EINA_UNUSED)
 {
@@ -196,6 +292,27 @@ _efl_ui_caching_factory_group_cleanup(Eo *o EINA_UNUSED, void *data, const Eina_
    free(gr);
 }
 
+/**
+ * @brief Implements Efl_Ui_Factory.create.
+ *
+ * Creates UI elements based on the provided models.
+ *
+ * If `pd->cache` is available, `pd->style` is set, and `pd->klass` is not set (style-based caching):
+ *   - It attempts to retrieve items from the cache based on their style (resolved from model property `pd->style`).
+ *   - If an item of a specific style is not in cache, it requests creation from the parent factory.
+ *   - This path involves asynchronous operations using futures to get model properties.
+ *
+ * Otherwise (class-based caching or no caching if `pd->cache` is NULL):
+ *   - It first tries to fulfill requests from `pd->cache` (if available, without style matching).
+ *   - If `pd->klass` is set, it creates new items of that class directly.
+ *   - If `pd->klass` is not set and cache is exhausted, it delegates creation to the parent factory.
+ *
+ * @param obj The caching factory object.
+ * @param pd The private data of the caching factory.
+ * @param models An iterator over Efl_Model objects for which to create UI elements.
+ * @return A future that resolves to an Eina_Value array of created Eo* objects.
+ *         The Eina_Value array structure: `{ EINA_VALUE_TYPE_ARRAY, { .subtype = EINA_VALUE_TYPE_OBJECT, .count = N, .value = (Eina_Value_Array_Value[]) { { .object = item1 }, ..., { .object = itemN } } } }`
+ */
 static Eina_Future *
 _efl_ui_caching_factory_efl_ui_factory_create(Eo *obj,
                                               Efl_Ui_Caching_Factory_Data *pd,
@@ -306,6 +423,10 @@ _efl_ui_caching_factory_efl_ui_widget_factory_item_class_set(Eo *obj,
                                                              Efl_Ui_Caching_Factory_Data *pd,
                                                              const Efl_Object *klass)
 {
+   // If a class is provided that is a view but not a widget,
+   // we store it in pd->klass. This allows caching non-widget items
+   // that still implement Gfx_Entity and Ui_View.
+   // Otherwise, the class is passed to the parent factory.
    if (efl_isa(klass, EFL_UI_VIEW_INTERFACE) &&
        !efl_isa(klass, EFL_UI_WIDGET_CLASS))
      {
@@ -380,6 +501,15 @@ _schedule_cache_flush(Eo *obj, void *data, const Eina_Value v)
    return v;
 }
 
+/**
+ * @brief Future 'free' callback for the scheduled cache flush.
+ *
+ * Clears the `pd->flush` future pointer.
+ *
+ * @param o The object associated with the future (unused).
+ * @param data A pointer to Efl_Ui_Caching_Factory_Data.
+ * @param dead_future The future that has completed (unused).
+ */
 static void
 _schedule_done(Eo *o EINA_UNUSED, void *data, const Eina_Future *dead_future EINA_UNUSED)
 {
@@ -388,6 +518,18 @@ _schedule_done(Eo *o EINA_UNUSED, void *data, const Eina_Future *dead_future EIN
    pd->flush = NULL;
 }
 
+/**
+ * @brief Implements Efl_Ui_Factory.release.
+ *
+ * Releases UI views back into the cache for potential reuse.
+ * If the factory is invalidated, items are deleted instead of cached.
+ * Released items are made invisible and disconnected from their models.
+ * A cache flush is scheduled if items are added to the cache.
+ *
+ * @param obj The caching factory object.
+ * @param pd The private data of the caching factory.
+ * @param ui_views An iterator over Efl_Gfx_Entity objects (UI views) to be released.
+ */
 static void
 _efl_ui_caching_factory_efl_ui_factory_release(Eo *obj,
                                                Efl_Ui_Caching_Factory_Data *pd,
@@ -447,18 +589,42 @@ _efl_ui_caching_factory_pause(void *data, const Efl_Event *event EINA_UNUSED)
    pd->current.memory = 0;
 }
 
+/**
+ * @brief Event callback for EFL_EVENT_INVALIDATE on the factory's widget.
+ *
+ * When the factory's associated widget is invalidated, the cache is cleared,
+ * the lookup table is freed, and the factory is marked as invalidated.
+ * This ensures that no stale items are reused.
+ *
+ * @param data A pointer to Efl_Ui_Caching_Factory_Data.
+ * @param event The Efl_Event details (unused).
+ */
 static void
 _invalidate(void *data, const Efl_Event *event EINA_UNUSED)
 {
    Efl_Ui_Caching_Factory_Data *pd = data;
 
    // As all the objects in the cache have the factory as parent, there's no need to unparent them
+   // because they will be deleted when the factory is deleted.
+   // However, we free the list structure itself.
    pd->cache = eina_list_free(pd->cache);
    eina_hash_free(pd->lookup);
    pd->lookup = NULL;
    pd->invalidated = EINA_TRUE;
 }
 
+/**
+ * @brief Implements Efl_Object.finalize.
+ *
+ * Performs final setup for the caching factory. This includes:
+ * - Finalizing the superclass.
+ * - Registering for the EFL_APP_EVENT_PAUSE event to clear the cache when the app pauses.
+ * - Registering for the EFL_EVENT_INVALIDATE event on the factory's widget to handle invalidation.
+ *
+ * @param obj The caching factory object.
+ * @param pd The private data of the caching factory.
+ * @return The finalized object, or NULL on failure.
+ */
 static Efl_Object *
 _efl_ui_caching_factory_efl_object_finalize(Eo *obj, Efl_Ui_Caching_Factory_Data *pd)
 {
@@ -481,11 +647,25 @@ static void
 _efl_ui_caching_factory_efl_object_invalidate(Eo *obj,
                                               Efl_Ui_Caching_Factory_Data *pd)
 {
+   // Unregister the invalidate event callback before invalidating the superclass.
    efl_event_callback_del(efl_ui_widget_factory_widget_get(obj), EFL_EVENT_INVALIDATE, _invalidate, pd);
 
    efl_invalidate(efl_super(obj, EFL_UI_CACHING_FACTORY_CLASS));
 }
 
+/**
+ * @brief Implements Efl_Ui_Property_Bind.property_bind.
+ *
+ * Binds a property key to a model property name.
+ * Specifically handles the "style" key to store the model property name
+ * that will provide the style for cached items.
+ *
+ * @param obj The caching factory object.
+ * @param pd The private data of the caching factory.
+ * @param key The key to bind (e.g., "style").
+ * @param property The name of the model property to bind to the key.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 static Eina_Error
 _efl_ui_caching_factory_efl_ui_property_bind_property_bind(Eo *obj, Efl_Ui_Caching_Factory_Data *pd,
                                                            const char *key, const char *property)

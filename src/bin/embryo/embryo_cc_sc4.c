@@ -41,6 +41,15 @@
  * Today, the compiler simply generates a HALT instruction at address 0. So
  * a subroutine can savely return to 0, and then encounter a HALT.
  */
+
+/**
+ * @brief Writes the initial instructions to the output file.
+ *
+ * This function is called at the beginning of code generation. It ensures
+ * that the program has a defined exit point by writing a HALT instruction
+ * at address 0. If a subroutine returns to address 0, this HALT instruction
+ * will be executed, stopping the AMX.
+ */
 void
 writeleader(void)
 {
@@ -58,6 +67,18 @@ writeleader(void)
  *                     sc_dataalign     (referred to only)
  *                     code_idx         (altered)
  *                     glb_declared     (altered)
+ */
+
+/**
+ * @brief Writes the concluding information to the output file.
+ *
+ * This function is called at the end of code generation. It performs several tasks:
+ * - Pads the code segment to ensure the data segment is aligned according to `sc_dataalign`.
+ * - Pads the data segment to ensure the stack and heap are aligned.
+ * - Writes the required stack size (`STKSIZE`) to the output, ensuring it's also aligned.
+ *
+ * Global variables like `sc_stksize`, `sc_dataalign`, `code_idx`, and `glb_declared`
+ * are used to determine padding and output values.
  */
 void
 writetrailer(void)
@@ -102,6 +123,17 @@ writetrailer(void)
  *
  *  Global references: curseg
  */
+
+/**
+ * @brief Starts or restarts the CODE segment in the output file.
+ *
+ * This function ensures that subsequent assembly instructions are written
+ * to the code segment. If the current segment is not already the code
+ * segment (`sIN_CSEG`), it writes a "CODE" directive followed by the
+ * current code index (address).
+ *
+ * The `curseg` global variable tracks the current segment being written to.
+ */
 void
 begcseg(void)
 {
@@ -119,6 +151,18 @@ begcseg(void)
  *
  *  Global references: curseg
  */
+
+/**
+ * @brief Starts or restarts the DATA segment in the output file.
+ *
+ * This function ensures that subsequent data definitions are written
+ * to the data segment. If the current segment is not already the data
+ * segment (`sIN_DSEG`), it writes a "DATA" directive followed by the
+ * current count of global variables (address in the data segment).
+ *
+ * The `curseg` global variable tracks the current segment being written to.
+ * `litidx` is used to adjust the address for any pending literals.
+ */
 void
 begdseg(void)
 {
@@ -131,6 +175,15 @@ begdseg(void)
      }				/* if */
 }
 
+/**
+ * @brief Sets the currently active file number for debugging purposes.
+ *
+ * This function emits a "curfile" directive followed by the file number.
+ * This information can be used by a debugger to associate code with its
+ * source file.
+ *
+ * @param fnum The file number to set as active.
+ */
 void
 setactivefile(int fnum)
 {
@@ -138,6 +191,17 @@ setactivefile(int fnum)
    outval(fnum, TRUE);
 }
 
+/**
+ * @brief Calculates the size of a name string in terms of memory cells.
+ *
+ * The size is determined by the length of the string plus the size of a cell,
+ * rounded up to the nearest multiple of `sizeof(cell)`. This is used to
+ * determine how much space the name will occupy in the compiled output
+ * when symbolic debug information is enabled.
+ *
+ * @param name The name string.
+ * @return The size of the name in cells.
+ */
 cell
 nameincells(char *name)
 {
@@ -146,6 +210,17 @@ nameincells(char *name)
    return clen;
 }
 
+/**
+ * @brief Emits debugging information for a source file.
+ *
+ * If symbolic debugging (`sSYMBOLIC`) is enabled, this function writes a "file"
+ * directive to the output. This directive includes the file number and the
+ * file name. This allows a debugger to map compiled code back to the
+ * original source file.
+ *
+ * @param name   The name of the source file.
+ * @param fileno The unique number assigned to this file.
+ */
 void
 setfile(char *name, int fileno)
 {
@@ -162,6 +237,18 @@ setfile(char *name, int fileno)
      }				/* if */
 }
 
+/**
+ * @brief Emits debugging information for a source line number.
+ *
+ * If symbolic debugging (`sSYMBOLIC`) or bounds checking (`sCHKBOUNDS`)
+ * is enabled, this function writes a "line" directive to the output.
+ * This directive includes the line number and the file number it belongs to.
+ * It also includes the current code index (address) as a comment, aiding
+ * in debugging.
+ *
+ * @param line   The line number in the source file.
+ * @param fileno The file number this line belongs to.
+ */
 void
 setline(int line, int fileno)
 {
@@ -180,6 +267,18 @@ setline(int line, int fileno)
 /*  setlabel
  *
  *  Post a code label (specified as a number), on a new line.
+ */
+
+/**
+ * @brief Defines a code label in the output.
+ *
+ * Labels are used as targets for jump and call instructions. This function
+ * writes a label in the format "l.<number>". If not in staging mode (i.e.,
+ * the address is considered accurate), it also writes the current code index
+ * (address of the label) as a comment for verification.
+ *
+ * @param number The numeric identifier for the label. Must be non-negative.
+ *               Example: `setlabel(1)` might output `l.1`.
  */
 void
 setlabel(int number)
@@ -203,6 +302,18 @@ setlabel(int number)
 /* Write a token that signifies the end of an expression, or the end of a
  * function parameter. This allows several simple optimizations by the peephole
  * optimizer.
+ */
+
+/**
+ * @brief Marks the end of an expression or function parameter for the peephole optimizer.
+ *
+ * This function outputs a special comment token (`;$exp` or `;$par`) that the
+ * peephole optimizer can use to identify optimization opportunities.
+ * - `;$exp` indicates the end of a full expression.
+ * - `;$par` indicates the end of a function parameter.
+ *
+ * @param fullexpr If non-zero, marks the end of a full expression.
+ *                 If zero, marks the end of a function parameter.
  */
 void
 endexpr(int fullexpr)

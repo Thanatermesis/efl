@@ -13,6 +13,18 @@ typedef struct _Testitem
 
 static Elm_Gengrid_Item_Class gic;
 
+/**
+ * @brief Get the label for a gengrid item.
+ *
+ * This function provides the label for a gengrid item, which is constructed
+ * using the image path stored in the item's data.
+ *
+ * @param data The item data (a Testitem struct).
+ * @param obj The gengrid object.
+ * @param part The part name for which to get the text.
+ * @return A newly allocated string with the item's label. The caller must
+ *         free this string.
+ */
 char *
 grdt_lbl_get(void            *data,
              Evas_Object *obj EINA_UNUSED,
@@ -24,6 +36,18 @@ grdt_lbl_get(void            *data,
    return strdup(buf);
 }
 
+/**
+ * @brief Get the content for a gengrid item.
+ *
+ * This function provides the icon content for a gengrid item. It handles
+ * the "elm.swallow.icon" part by creating a background object and setting
+ * its file to the path from the item's data.
+ *
+ * @param data The item data (a Testitem struct).
+ * @param obj The gengrid object.
+ * @param part The part name to get content for.
+ * @return An Evas_Object to be used as content, or NULL if the part is not handled.
+ */
 Evas_Object *
 grdt_content_get(void        *data,
               Evas_Object *obj,
@@ -45,6 +69,17 @@ grdt_content_get(void        *data,
 
 static Elm_Genlist_Item_Class itct;
 
+/**
+ * @brief Callback for the "expanded" smart event of a genlist.
+ *
+ * This function is called when a genlist item is expanded. It dynamically
+ * populates the item with three new sub-items, each with its own tooltip.
+ * The data for the new items is derived from the parent item's data.
+ *
+ * @param data User data passed to the smart callback.
+ * @param obj The genlist object.
+ * @param event_info The genlist item that was expanded.
+ */
 static void
 gltt_exp(void *data       EINA_UNUSED,
          Evas_Object *obj EINA_UNUSED,
@@ -68,6 +103,16 @@ gltt_exp(void *data       EINA_UNUSED,
    elm_genlist_item_tooltip_text_set(glit3, "Testing C");
 }
 
+/**
+ * @brief Callback for the "contracted" smart event of a genlist.
+ *
+ * This function is called when a genlist item is contracted. It clears all
+ * sub-items from the contracted item to free up resources.
+ *
+ * @param data User data passed to the smart callback.
+ * @param obj The genlist object.
+ * @param event_info The genlist item that was contracted.
+ */
 static void
 gltt_con(void *data       EINA_UNUSED,
          Evas_Object *obj EINA_UNUSED,
@@ -77,6 +122,18 @@ gltt_con(void *data       EINA_UNUSED,
    elm_genlist_item_subitems_clear(glit);
 }
 
+/**
+ * @brief Callback for the "expand,request" smart event of a genlist.
+ *
+ * This function is called when expansion of a genlist item is requested by
+ * the user (e.g., by clicking the expand button). It marks the item as
+ * expanded, which will trigger the "expanded" event and the gltt_exp()
+ * callback to populate sub-items.
+ *
+ * @param data User data passed to the smart callback.
+ * @param obj The genlist object.
+ * @param event_info The genlist item for which expansion is requested.
+ */
 static void
 gltt_exp_req(void *data       EINA_UNUSED,
              Evas_Object *obj EINA_UNUSED,
@@ -86,6 +143,17 @@ gltt_exp_req(void *data       EINA_UNUSED,
    elm_genlist_item_expanded_set(glit, EINA_TRUE);
 }
 
+/**
+ * @brief Callback for the "contract,request" smart event of a genlist.
+ *
+ * This function is called when contraction of a genlist item is requested
+ * by the user. It marks the item as not expanded, which will trigger the
+ * "contracted" event and the gltt_con() callback.
+ *
+ * @param data User data passed to the smart callback.
+ * @param obj The genlist object.
+ * @param event_info The genlist item for which contraction is requested.
+ */
 static void
 gltt_con_req(void *data       EINA_UNUSED,
              Evas_Object *obj EINA_UNUSED,
@@ -95,6 +163,18 @@ gltt_con_req(void *data       EINA_UNUSED,
    elm_genlist_item_expanded_set(glit, EINA_FALSE);
 }
 
+/**
+ * @brief Get the text for a genlist item.
+ *
+ * This function provides the label for a genlist item. The label is
+ * constructed based on the integer value passed in the data parameter.
+ *
+ * @param data The item data, an integer cast to a void pointer.
+ * @param obj The genlist object.
+ * @param part The part name for which to get the text.
+ * @return A newly allocated string with the item's label. The caller must
+ *         free this string.
+ */
 char *
 gltt_text_get(void            *data,
                Evas_Object *obj EINA_UNUSED,
@@ -105,6 +185,18 @@ gltt_text_get(void            *data,
    return strdup(buf);
 }
 
+/**
+ * @brief Tooltip content callback to create a small icon for an item.
+ *
+ * This callback is for elm_object_item_tooltip_content_cb_set(). It creates
+ * a small icon to be used as the tooltip content for a list or grid item.
+ *
+ * @param data User data associated with the content callback.
+ * @param obj The parent widget of the item.
+ * @param tt The tooltip object itself.
+ * @param item The item this tooltip is for.
+ * @return An icon object to be used as tooltip content.
+ */
 static Evas_Object *
 _tt_item_icon(void *data   EINA_UNUSED,
               Evas_Object *obj EINA_UNUSED,
@@ -121,6 +213,18 @@ _tt_item_icon(void *data   EINA_UNUSED,
    return ic;
 }
 
+/**
+ * @brief Tooltip content callback to create a different icon for an item.
+ *
+ * Similar to _tt_item_icon(), but uses a different image file. This is
+ * used to show tooltips with different content on different items.
+ *
+ * @param data User data associated with the content callback.
+ * @param obj The parent widget of the item.
+ * @param tt The tooltip object itself.
+ * @param item The item this tooltip is for.
+ * @return An icon object to be used as tooltip content.
+ */
 static Evas_Object *
 _tt_item_icon2(void *data   EINA_UNUSED,
               Evas_Object *obj EINA_UNUSED,
@@ -135,6 +239,20 @@ _tt_item_icon2(void *data   EINA_UNUSED,
    return ic;
 }
 
+/**
+ * @brief Tooltip content callback to create a large icon that may be scaled.
+ *
+ * This function creates an icon from a very large image. It checks if the
+ * image dimensions exceed a threshold (80% of screen size) and scales it
+ * down proportionally if necessary to ensure it fits reasonably on screen.
+ * This demonstrates handling of large tooltip content.
+ *
+ * @param data User data associated with the content callback.
+ * @param obj The parent widget of the item.
+ * @param tt The tooltip object itself.
+ * @param item The item this tooltip is for.
+ * @return An icon object to be used as tooltip content.
+ */
 static Evas_Object *
 _tt_item_icon3(void *data   EINA_UNUSED,
               Evas_Object *obj EINA_UNUSED,
@@ -162,6 +280,18 @@ _tt_item_icon3(void *data   EINA_UNUSED,
    return ic;
 }
 
+/**
+ * @brief Tooltip content callback to create a long, wrapped label for an item.
+ *
+ * This demonstrates using a text label with line wrapping as tooltip content,
+ * suitable for displaying longer descriptive texts.
+ *
+ * @param data User data associated with the content callback.
+ * @param obj The parent widget of the item.
+ * @param tt The tooltip object itself.
+ * @param item The item this tooltip is for.
+ * @return A label object to be used as tooltip content.
+ */
 static Evas_Object *
 _tt_item_label(void *data   EINA_UNUSED,
               Evas_Object *obj EINA_UNUSED,
@@ -177,6 +307,17 @@ _tt_item_label(void *data   EINA_UNUSED,
    return l;
 }
 
+/**
+ * @brief Deletion callback for an item's tooltip content.
+ *
+ * This function is registered as a deletion callback for tooltip content
+ * (e.g., created by _tt_item_icon()). It's used for testing to verify that the
+ * callback is invoked correctly by printing the data it receives.
+ *
+ * @param data User data passed when setting the content callback (e.g., 456L).
+ * @param obj The object the tooltip was attached to.
+ * @param event_info The tooltip content object being deleted.
+ */
 static void
 _tt_item_icon_del(void            *data,
                   Evas_Object *obj EINA_UNUSED,
@@ -187,6 +328,17 @@ _tt_item_icon_del(void            *data,
           (long)(uintptr_t)data, event_info);
 }
 
+/**
+ * @brief Replaces the tooltip text with a counter on click.
+ *
+ * This function is a "clicked" callback for a button. Each time it's called,
+ * it increments a static counter and updates the tooltip text of the button
+ * to show the new count. This demonstrates dynamic tooltip text updates.
+ *
+ * @param data User data.
+ * @param obj The button object whose tooltip text is to be replaced.
+ * @param event_info Event-specific information.
+ */
 static void
 _tt_text_replace(void *data       EINA_UNUSED,
                  Evas_Object     *obj,
@@ -199,6 +351,17 @@ _tt_text_replace(void *data       EINA_UNUSED,
    elm_object_tooltip_text_set(obj, buf);
 }
 
+/**
+ * @brief Toggles the move freeze state of a tooltip on click.
+ *
+ * This is a "clicked" callback for a button. It pushes/pops the tooltip's
+ * move freeze stack, effectively freezing or unfreezing the tooltip's
+ * position updates. The tooltip text is updated to reflect the current state.
+ *
+ * @param data User data.
+ * @param obj The object whose tooltip move freeze state is toggled.
+ * @param event_info Event-specific information.
+ */
 static void
 _tt_move_freeze(void *data       EINA_UNUSED,
               Evas_Object     *obj,
@@ -216,6 +379,17 @@ _tt_move_freeze(void *data       EINA_UNUSED,
      }
 }
 
+/**
+ * @brief Cycles through tooltip orientations on click and updates its text.
+ *
+ * This is a "clicked" callback for a button. Each click cycles to the next
+ * tooltip orientation in the Elm_Tooltip_Orient enum. The tooltip text is
+ * updated to display the name of the current orientation.
+ *
+ * @param data User data.
+ * @param obj The object whose tooltip orientation is to be changed.
+ * @param event_info Event-specific information.
+ */
 static void
 _tt_orient_text_replace(void *data       EINA_UNUSED,
                         Evas_Object     *obj,
@@ -301,6 +475,19 @@ _tt_orient_text_replace(void *data       EINA_UNUSED,
      };
 }
 
+/**
+ * @brief Deletes the timer associated with a test object upon its deletion.
+ *
+ * This is an EVAS_CALLBACK_DEL event callback. It retrieves a timer from
+ * the object's data ("test-timer") and deletes it. This ensures timers are
+ * cleaned up properly when the object is destroyed, preventing dangling
+ * pointers and memory leaks.
+ *
+ * @param data User data.
+ * @param e The Evas canvas.
+ * @param obj The object being deleted.
+ * @param event_info Event-specific information.
+ */
 static void
 _tt_timer_del(void *data       EINA_UNUSED,
               Evas *e          EINA_UNUSED,
@@ -312,6 +499,15 @@ _tt_timer_del(void *data       EINA_UNUSED,
    ecore_timer_del(timer);
 }
 
+/**
+ * @brief Timer callback to replace tooltip text.
+ *
+ * This function is called periodically by a timer. It calls
+ * _tt_text_replace() to update the tooltip text of the given object.
+ *
+ * @param data The object whose tooltip text should be replaced.
+ * @return EINA_TRUE to keep the timer running, EINA_FALSE to stop.
+ */
 static Eina_Bool
 _tt_text_replace_timer_cb(void *data)
 {
@@ -319,6 +515,18 @@ _tt_text_replace_timer_cb(void *data)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Starts or stops a timer that periodically replaces tooltip text.
+ *
+ * This is a "clicked" callback for a button. If no timer is running, it
+ * starts one that calls _tt_text_replace_timer_cb() every 1.5 seconds.
+ * If a timer is already running, it stops and deletes it. The button text
+ * is updated to reflect the action (start/stop).
+ *
+ * @param data User data.
+ * @param obj The button object that triggers the timer.
+ * @param event_info Event-specific information.
+ */
 static void
 _tt_text_replace_timed(void *data       EINA_UNUSED,
                        Evas_Object     *obj,
@@ -340,6 +548,18 @@ _tt_text_replace_timed(void *data       EINA_UNUSED,
                              " timed");
 }
 
+/**
+ * @brief Tooltip content callback that creates content without a minimum size.
+ *
+ * This function creates a box as tooltip content, which expands to fill the
+ * available space. It's used with a custom "nomin" style tooltip to demonstrate
+ * tooltips that don't enforce a minimum size.
+ *
+ * @param data User data.
+ * @param obj The object the tooltip is attached to.
+ * @param tt The tooltip object.
+ * @return An Evas_Object to be used as tooltip content.
+ */
 static Evas_Object *
 _no_min_tt_icon(void *data   EINA_UNUSED,
                 Evas_Object *obj EINA_UNUSED,
@@ -352,6 +572,17 @@ _no_min_tt_icon(void *data   EINA_UNUSED,
    return box;
 }
 
+/**
+ * @brief Tooltip content callback to create an icon.
+ *
+ * This callback is for elm_object_tooltip_content_cb_set(). It creates an
+ * icon to be used as the tooltip content for a widget.
+ *
+ * @param data User data associated with the content callback.
+ * @param obj The object the tooltip is attached to.
+ * @param tt The tooltip object itself.
+ * @return An icon object to be used as tooltip content.
+ */
 static Evas_Object *
 _tt_icon(void *data   EINA_UNUSED,
          Evas_Object *obj EINA_UNUSED,
@@ -367,6 +598,17 @@ _tt_icon(void *data   EINA_UNUSED,
    return ic;
 }
 
+/**
+ * @brief Tooltip content callback to create a different icon.
+ *
+ * This callback is used to demonstrate timed replacement of tooltip content.
+ * It provides an alternative icon to the one created by _tt_icon().
+ *
+ * @param data User data associated with the content callback.
+ * @param obj The object the tooltip is attached to.
+ * @param tt The tooltip object itself.
+ * @return An icon object to be used as tooltip content.
+ */
 static Evas_Object *
 _tt_icon2(void *data   EINA_UNUSED,
           Evas_Object *obj EINA_UNUSED,
@@ -381,6 +623,17 @@ _tt_icon2(void *data   EINA_UNUSED,
    return ic;
 }
 
+/**
+ * @brief Deletion callback for a tooltip's content.
+ *
+ * This function is registered as a deletion callback for tooltip content
+ * created by _tt_icon(). It's used for testing to verify that the
+ * callback is invoked correctly by printing the data it receives.
+ *
+ * @param data User data passed when setting the content cb (e.g., 123L).
+ * @param obj The object the tooltip was attached to.
+ * @param event_info The tooltip content object being deleted.
+ */
 static void
 _tt_icon_del(void            *data,
              Evas_Object *obj EINA_UNUSED,
@@ -391,6 +644,16 @@ _tt_icon_del(void            *data,
           (long)(uintptr_t)data, event_info);
 }
 
+/**
+ * @brief Timer callback to replace tooltip icon content.
+ *
+ * This function is called periodically by a timer. It toggles between two
+ * different icon creation callbacks (_tt_icon and _tt_icon2) for the
+ * tooltip content, demonstrating dynamic content updates.
+ *
+ * @param data The object whose tooltip content is to be replaced.
+ * @return EINA_TRUE to keep the timer running.
+ */
 static Eina_Bool
 _tt_icon_replace_timer_cb(void *data)
 {
@@ -403,6 +666,17 @@ _tt_icon_replace_timer_cb(void *data)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Starts or stops a timer that periodically replaces the tooltip icon.
+ *
+ * This is a "clicked" callback. If no timer is running, it starts one that
+ * calls _tt_icon_replace_timer_cb() every 1.5 seconds. If a timer is running,
+ * it's stopped. The button text is updated to reflect the state.
+ *
+ * @param data User data.
+ * @param obj The button object that triggers the timer.
+ * @param event_info Event-specific information.
+ */
 static void
 _tt_icon_replace_timed(void *data       EINA_UNUSED,
                        Evas_Object     *obj,
@@ -423,6 +697,16 @@ _tt_icon_replace_timed(void *data       EINA_UNUSED,
    elm_object_text_set(obj, "Icon tooltip, click to stop changed timed");
 }
 
+/**
+ * @brief Timer callback to replace tooltip style.
+ *
+ * This function is called periodically by a timer. It toggles the tooltip
+ * style between the default (NULL) and "transparent", demonstrating dynamic
+ * style changes.
+ *
+ * @param data The object whose tooltip style is to be replaced.
+ * @return EINA_TRUE to keep the timer running.
+ */
 static Eina_Bool
 _tt_style_replace_timer_cb(void *data)
 {
@@ -432,6 +716,17 @@ _tt_style_replace_timer_cb(void *data)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Starts or stops a timer that periodically replaces the tooltip style.
+ *
+ * This is a "clicked" callback. If no timer is running, it starts one that
+ * calls _tt_style_replace_timer_cb() every 1.5 seconds to alternate the
+ * tooltip's style. If a timer is running, it's stopped.
+ *
+ * @param data User data.
+ * @param obj The button object that triggers the timer.
+ * @param event_info Event-specific information.
+ */
 static void
 _tt_style_replace_timed(void *data       EINA_UNUSED,
                         Evas_Object     *obj,
@@ -453,6 +748,18 @@ _tt_style_replace_timed(void *data       EINA_UNUSED,
                              " timed");
 }
 
+/**
+ * @brief Toggles the visibility lock of a tooltip.
+ *
+ * This is a "clicked" callback for a button. It alternates between locking
+ * the tooltip to be permanently visible (using elm_object_tooltip_show())
+ * and unlocking it (using elm_object_tooltip_hide()). The button and tooltip
+ * texts are updated to reflect the current state (locked/unlocked).
+ *
+ * @param data User data.
+ * @param obj The button object.
+ * @param event_info Event-specific information.
+ */
 static void
 _tt_visible_lock_toggle(void *data       EINA_UNUSED,
                         Evas_Object     *obj,
@@ -479,6 +786,25 @@ _tt_visible_lock_toggle(void *data       EINA_UNUSED,
      }
 }
 
+/**
+ * @brief Main test function for various tooltip features.
+ *
+ * This function creates a window with several widgets to demonstrate:
+ * - Simple text tooltips on buttons and toolbar items.
+ * - Icon and label content in tooltips.
+ * - Dynamically changing tooltip text, content, and style.
+ * - Freezing tooltip movement.
+ * - Changing tooltip orientation.
+ * - Timed updates of tooltips.
+ * - Custom tooltip styles ("transparent", "nomin").
+ * - Locking tooltip visibility.
+ * - Tooltips on entry widgets.
+ * - Tooltips on list items with various content and window mode.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_tooltip(void *data       EINA_UNUSED,
              Evas_Object *obj EINA_UNUSED,
@@ -636,6 +962,26 @@ test_tooltip(void *data       EINA_UNUSED,
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for tooltips on complex collection widgets.
+ *
+ * This function creates a window with a gengrid and a genlist to demonstrate
+ * tooltips on their items.
+ * - The gengrid displays a grid of photos, each with a text tooltip. The item
+ *   data is stored in an array of Testitem structs.
+ *   `static Testitem ti[144];`
+ *   Each element contains:
+ *   - `item`: The Elm_Object_Item itself.
+ *   - `path`: `const char*` to an image file.
+ *   - `mode`, `onoff`: integers for state.
+ * - The genlist has expandable items. Tooltips are set on parent items,
+ *   and also on the sub-items that are created dynamically when a parent
+ *   is expanded.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_tooltip2(void *data       EINA_UNUSED,
               Evas_Object *obj EINA_UNUSED,
@@ -733,6 +1079,18 @@ test_tooltip2(void *data       EINA_UNUSED,
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for tooltip behavior with object layers.
+ *
+ * This function creates a window with a button and a rectangle object. The
+ * button is placed on a higher Evas layer than the rectangle. The test is to
+ * ensure the button's tooltip is displayed correctly above other objects,
+ * respecting the layering.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_tooltip3(void *data       EINA_UNUSED,
               Evas_Object *obj EINA_UNUSED,
@@ -762,6 +1120,19 @@ test_tooltip3(void *data       EINA_UNUSED,
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for tooltip orientation at window edges.
+ *
+ * This function creates a window and places several buttons near the edges
+ * and corners. Each button has a tooltip with a specific orientation set.
+ * This test verifies that tooltips are correctly positioned and constrained
+ * within the window boundaries, even when their preferred orientation would
+ * place them outside.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_tooltip4(void *data       EINA_UNUSED,
               Evas_Object *obj EINA_UNUSED,

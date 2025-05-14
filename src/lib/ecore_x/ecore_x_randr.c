@@ -1,3 +1,12 @@
+/**
+ * @file
+ * @brief Ecore X RandR extension functions.
+ *
+ * This file contains the Ecore X RandR (Resize and Rotate) extension
+ * functions. These functions allow interaction with the X RandR extension
+ * for managing screen configurations, outputs, CRTCs, modes, and more.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -14,10 +23,10 @@
  * round-trip to the X server */
 
 /* local variables */
-static Eina_Bool _randr_avail = EINA_FALSE;
+static Eina_Bool _randr_avail = EINA_FALSE; /**< Flag indicating if RandR is available. */
 
-static Ecore_X_Atom connector_type = 0;
-static Ecore_X_Atom connector_number = 0;
+static Ecore_X_Atom connector_type = 0; /**< Atom for RR_PROPERTY_CONNECTOR_TYPE. */
+static Ecore_X_Atom connector_number = 0; /**< Atom for RR_PROPERTY_CONNECTOR_NUMBER. */
 
 #ifdef ECORE_XRANDR
 
@@ -42,20 +51,34 @@ typedef enum _Ecore_X_Randr_Edid_Aspect_Ratio_Preferred
      RANDR_EDID_ASPECT_RATIO_PREFERRED_15_9 = 0x04
 } Ecore_X_Randr_Edid_Aspect_Ratio_Preferred;
 
-static int _randr_major, _randr_minor, _randr_version;
+static int _randr_major, _randr_minor, _randr_version; /**< RandR version components and combined version. */
 
+/**
+ * @internal
+ * @brief Dummy function for getting screen resources when RandR is not available or version is too low.
+ * @param disp The X display.
+ * @param win The window.
+ * @return Always NULL.
+ */
 static XRRScreenResources *
 _ecore_x_randr_screen_resources_get_dummy(Display *disp EINA_UNUSED, Window win EINA_UNUSED)
 {
    return NULL;
 }
 
-XRRScreenResources *(*_ecore_x_randr_screen_resources_get)(Display *disp, Window win) = _ecore_x_randr_screen_resources_get_dummy;
-XRRScreenResources *(*_ecore_x_randr_screen_resources_get_slow)(Display *disp, Window win) = _ecore_x_randr_screen_resources_get_dummy;
+XRRScreenResources *(*_ecore_x_randr_screen_resources_get)(Display *disp, Window win) = _ecore_x_randr_screen_resources_get_dummy; /**< Function pointer for getting current screen resources. */
+XRRScreenResources *(*_ecore_x_randr_screen_resources_get_slow)(Display *disp, Window win) = _ecore_x_randr_screen_resources_get_dummy; /**< Function pointer for getting screen resources (potentially slow). */
 
 #endif
 
 /* local functions */
+/**
+ * @internal
+ * @brief Initializes the RandR extension.
+ *
+ * Queries the RandR extension version and sets up function pointers
+ * based on the available version.
+ */
 void
 _ecore_x_randr_init(void)
 {
@@ -89,6 +112,11 @@ _ecore_x_randr_init(void)
 }
 
 /* public functions */
+/**
+ * @brief Gets the version of the X RandR extension.
+ *
+ * @return The RandR version as an integer (e.g., 0x0104 for 1.4), or -1 if RandR is not available.
+ */
 EAPI int
 ecore_x_randr_version_get(void)
 {
@@ -98,6 +126,11 @@ ecore_x_randr_version_get(void)
    return -1;
 }
 
+/**
+ * @brief Queries if the X RandR extension is available.
+ *
+ * @return @c EINA_TRUE if RandR is available, @c EINA_FALSE otherwise.
+ */
 EAPI Eina_Bool
 ecore_x_randr_query(void)
 {
@@ -144,7 +177,11 @@ ecore_x_randr_config_timestamp_get(Ecore_X_Window root)
  ***************************************/
 
 /*
- * @param root window whose primary output will be queried
+ * @param root Window whose primary output will be queried.
+ * @return A bitmask of supported orientations for the primary output of the screen
+ *         associated with the root window.
+ *         Example: (ECORE_X_RANDR_ORIENTATION_ROT_0 | ECORE_X_RANDR_ORIENTATION_ROT_90)
+ *         Returns 0 if RandR is not available or the query fails.
  */
 EAPI Ecore_X_Randr_Orientation
 ecore_x_randr_screen_primary_output_orientations_get(Ecore_X_Window root)
@@ -163,8 +200,11 @@ ecore_x_randr_screen_primary_output_orientations_get(Ecore_X_Window root)
 }
 
 /*
- * @param root window whose primary output will be queried
- * @return the current orientation of the root window's screen primary output
+ * @param root Window whose primary output will be queried.
+ * @return The current orientation of the primary output of the screen
+ *         associated with the root window.
+ *         Example: ECORE_X_RANDR_ORIENTATION_ROT_0
+ *         Returns 0 if RandR is not available or the query fails.
  */
 EAPI Ecore_X_Randr_Orientation
 ecore_x_randr_screen_primary_output_orientation_get(Ecore_X_Window root)

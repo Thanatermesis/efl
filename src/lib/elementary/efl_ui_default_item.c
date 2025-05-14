@@ -21,6 +21,28 @@ ELM_PART_MARKUP_DEFAULT_IMPLEMENT(efl_ui_default_item, void)
 ELM_PART_CONTENT_DEFAULT_GET(efl_ui_default_item, "efl.icon")
 ELM_PART_CONTENT_DEFAULT_IMPLEMENT(efl_ui_default_item, void)
 
+/**
+ * @internal
+ * @brief Get a specific part of the Efl.Ui.Default_Item.
+ *
+ * This function is an Eolian implementation for efl_part_part_get.
+ * It allows retrieving specific named parts of the default item, such as
+ * "text", "icon", or "extra". These parts can then be manipulated
+ * (e.g., setting text or content).
+ *
+ * @param[in] obj The Eolian object instance.
+ * @param[in] pd Private data for the Eolian object (unused in this function).
+ * @param[in] part The name of the part to retrieve.
+ *                 Supported part names are:
+ *                 - "text": The main text part of the item.
+ *                 - "icon": The main icon part of the item.
+ *                 - "extra": An additional content part of the item.
+ *                 If an unsupported part name is provided, it falls back to the
+ *                 superclass implementation.
+ *
+ * @return The Efl_Object representing the requested part, or @c NULL if the
+ *         part name is invalid or not found.
+ */
 EOLIAN static Efl_Object *
 _efl_ui_default_item_efl_part_part_get(const Eo *obj, void *pd EINA_UNUSED, const char *part)
 {

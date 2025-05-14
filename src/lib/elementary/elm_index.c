@@ -40,6 +40,16 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {NULL, NULL}
 };
 
+/**
+ * @internal
+ * @brief Frees the resources associated with an Elm_Index_Item_Data.
+ *
+ * This function removes the item from the widget's internal list of items,
+ * frees any list of omitted items associated with it, and decrements the
+ * reference count of its letter string.
+ *
+ * @param it The Elm_Index_Item_Data to free.
+ */
 static void
 _item_free(Elm_Index_Item_Data *it)
 {
@@ -53,6 +63,18 @@ _item_free(Elm_Index_Item_Data *it)
    ELM_SAFE_FREE(it->letter, eina_stringshare_del);
 }
 
+/**
+ * @internal
+ * @brief Custom layout function for the Evas_Object_Box used by the index.
+ *
+ * This function is called by the Evas box to arrange its children. It determines
+ * the orientation (horizontal or vertical) based on the widget's settings and
+ * applies the appropriate box layout.
+ *
+ * @param o The Evas_Object_Box being laid out.
+ * @param priv The private data of the Evas_Object_Box.
+ * @param data The Elm_Index widget data (passed as user data).
+ */
 static void
 _box_custom_layout(Evas_Object *o, Evas_Object_Box_Data *priv, void *data)
 {
@@ -63,6 +85,17 @@ _box_custom_layout(Evas_Object *o, Evas_Object_Box_Data *priv, void *data)
    _els_box_layout(o, priv, horizontal, EINA_TRUE, efl_ui_mirrored_get(data));
 }
 
+/**
+ * @internal
+ * @brief Clears all items from a specified level of the index display.
+ *
+ * This function iterates through all items in the index. If an item belongs
+ * to the given @p level, it is removed from the corresponding Evas_Object_Box
+ * and hidden. The level is then marked as inactive.
+ *
+ * @param obj The Elm_Index widget.
+ * @param level The level (0 or 1) to clear.
+ */
 static void
 _index_box_clear(Evas_Object *obj, int level)
 {
@@ -84,6 +117,16 @@ _index_box_clear(Evas_Object *obj, int level)
    sd->level_active[level] = EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Registers the index widget for accessibility.
+ *
+ * This function makes the index widget focusable and registers its "access"
+ * part (typically an Edje object part) with the accessibility system.
+ * It sets the accessibility type to "Index".
+ *
+ * @param obj The Elm_Index widget.
+ */
 static void
 _access_index_register(Evas_Object *obj)
 {
@@ -95,6 +138,19 @@ _access_index_register(Evas_Object *obj)
      (_elm_access_info_get(ao), ELM_ACCESS_TYPE, E_("Index"));
 }
 
+/**
+ * @internal
+ * @brief Callback function to provide accessibility information for an index item.
+ *
+ * This function is called by the accessibility system to get a textual
+ * description of an index item. It prioritizes the custom access info string
+ * set on the widget, falling back to the item's letter.
+ *
+ * @param data Pointer to the Elm_Index_Item_Data of the item.
+ * @param obj The Evas_Object associated with the item (unused).
+ * @return A newly allocated string containing the access information, or NULL.
+ *         The caller is responsible for freeing this string.
+ */
 static char *
 _access_info_cb(void *data, Evas_Object *obj EINA_UNUSED)
 {
@@ -110,6 +166,18 @@ _access_info_cb(void *data, Evas_Object *obj EINA_UNUSED)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Registers an individual index item for accessibility.
+ *
+ * This Eolian function is called to make an index item accessible.
+ * It sets the accessibility type to "Index Item" and registers a callback
+ * (_access_info_cb) to provide specific information about the item.
+ *
+ * @param eo_item The Eolian object representing the index item.
+ * @param it The private data of the Elm_Index_Item.
+ * @return The Evas_Object used for accessibility registration, or NULL on failure.
+ */
 EOLIAN static Evas_Object*
 _elm_index_item_elm_widget_item_access_register(Eo *eo_item, Elm_Index_Item_Data *it)
 {
@@ -126,6 +194,32 @@ _elm_index_item_elm_widget_item_access_register(Eo *eo_item, Elm_Index_Item_Data
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Calculates which items to omit when the index doesn't have enough space.
+ *
+ * This function determines how to group items if the number of items
+ * (@p num_of_items) exceeds the maximum displayable items (@p max_num_of_items).
+ * It creates Elm_Index_Omit structures that define ranges of items to be
+ * represented by a single placeholder (e.g., "*").
+ *
+ * The logic aims to distribute the omitted items somewhat evenly.
+ * For example, if num_of_items = 10 and max_num_of_items = 5:
+ * - num_of_extra_items = 5
+ * - It might create omit groups like:
+ *   - Item 0
+ *   - Omit Item 1, Item 2 (represented by *)
+ *   - Item 3
+ *   - Omit Item 4, Item 5 (represented by *)
+ *   - Item 6
+ *   - Omit Item 7, Item 8 (represented by *)
+ *   - Item 9
+ * (The exact distribution depends on internal calculations.)
+ *
+ * @param data Pointer to the Elm_Index_Data of the widget.
+ * @param num_of_items The total number of items in the current group/level.
+ * @param max_num_of_items The maximum number of items that can be displayed without omitting.
+ */
 static void
 _omit_calc(void *data, int num_of_items, int max_num_of_items)
 {
@@ -203,6 +297,23 @@ _omit_calc(void *data, int num_of_items, int max_num_of_items)
 }
 
 // FIXME: always have index filled
+/**
+ * @internal
+ * @brief Automatically populates the index display for a given level.
+ *
+ * This function is responsible for rendering the index items in the
+ * Evas_Object_Box associated with the specified @p level. It handles:
+ * - Calculating the maximum number of items that can be displayed if omit_enabled.
+ * - Calling _omit_calc to determine which items to group/omit.
+ * - Iterating through items and adding them to the box.
+ * - Applying appropriate themes ("item/vertical", "item_odd/vertical", etc.).
+ * - Setting the text for each item (letter or "*" for omitted groups).
+ * - Handling item stacking ("above", "below").
+ * - Registering items for accessibility if on level 0.
+ *
+ * @param obj The Elm_Index widget.
+ * @param level The level (0 or 1) to fill.
+ */
 static void
 _index_box_auto_fill(Evas_Object *obj,
                      int level)
@@ -390,6 +501,16 @@ _index_box_auto_fill(Evas_Object *obj,
    sd->level_active[level] = EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Ecore job that handles the actual change of the displayed item group.
+ *
+ * This function is scheduled as a job to update the index display when the
+ * active group (priority) changes. It clears and refills the index box
+ * for level 0 and deselects any currently selected item.
+ *
+ * @param data The Elm_Index widget.
+ */
 static void
 _priority_change_job(void *data)
 {
@@ -405,18 +526,39 @@ _priority_change_job(void *data)
      elm_index_item_selected_set(selected_it, EINA_FALSE);
 }
 
+/**
+ * @internal
+ * @brief Callback wrapper for priority increase, triggering a group change.
+ * @param data The Elm_Index widget.
+ */
 static void
 _priority_up_cb(void *data)
 {
    _priority_change_job(data);
 }
 
+/**
+ * @internal
+ * @brief Callback wrapper for priority decrease, triggering a group change.
+ * @param data The Elm_Index widget.
+ */
 static void
 _priority_down_cb(void *data)
 {
    _priority_change_job(data);
 }
 
+/**
+ * @internal
+ * @brief Handles a change in item priority, potentially switching the displayed group.
+ *
+ * If the selected item @p it belongs to a different priority group than the
+ * currently displayed one (sd->show_group), this function initiates a change
+ * to display the new group.
+ *
+ * @param data The Elm_Index widget.
+ * @param it The Elm_Index_Item_Data of the item whose priority might trigger a group change.
+ */
 static void
 _index_priority_change(void *data, Elm_Index_Item_Data *it)
 {
@@ -609,6 +751,29 @@ _delay_change_cb(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @internal
+ * @brief Evaluates which index item is selected based on mouse/touch coordinates.
+ *
+ * This function iterates through all visible items in the current and active levels.
+ * It calculates the distance from the event coordinates (@p evx, @p evy) to the
+ * center of each item. The closest item is considered selected.
+ *
+ * It handles:
+ * - Deselecting the previously selected item.
+ * - Selecting the new closest item.
+ * - Emitting "elm,state,active/inactive" signals to items for visual feedback.
+ * - Handling items that are part of an omitted group (selecting the specific
+ *   item within the group if applicable).
+ * - Updating drag values for visual feedback (e.g., "elm.dragable.index.1").
+ * - Emitting "changed" and "delay,changed" events.
+ * - Updating accessibility information and emitting AT-SPI signals.
+ * - Updating the indicator text ("elm.text.body", "elm.text").
+ *
+ * @param obj The Elm_Index widget.
+ * @param evx The x-coordinate of the event (e.g., mouse click).
+ * @param evy The y-coordinate of the event.
+ */
 static void
 _sel_eval(Evas_Object *obj,
           Evas_Coord evx,
@@ -814,6 +979,23 @@ _sel_eval(Evas_Object *obj,
    free(last);
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_MOUSE_DOWN events on the index's event rectangle.
+ *
+ * Handles the initial press on the index.
+ * - Sets mouse_down flag.
+ * - Calculates relative coordinates (dx, dy).
+ * - If autohide is not disabled, activates the index display.
+ * - Calls _sel_eval to determine the selected item.
+ * - Updates drag pointer position for visual feedback.
+ * - Activates the indicator if items exist and indicator is not disabled.
+ *
+ * @param data The Elm_Index widget.
+ * @param e The Evas canvas (unused).
+ * @param o The Evas object that received the event (unused).
+ * @param event_info Pointer to Evas_Event_Mouse_Down structure.
+ */
 static void
 _on_mouse_down(void *data,
                Evas *e EINA_UNUSED,
@@ -844,6 +1026,23 @@ _on_mouse_down(void *data,
      elm_layout_signal_emit(data, "elm,indicator,state,active", "elm");
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_MOUSE_UP events on the index's event rectangle.
+ *
+ * Handles the release of a mouse button over the index.
+ * - Clears mouse_down flag.
+ * - If an item is selected, calls its smart callback ("clicked", "selected") and
+ *   its legacy function callback if set.
+ * - If autohide is not disabled, deactivates the index display.
+ * - Resets the level display to 0.
+ * - Deactivates the indicator.
+ *
+ * @param data The Elm_Index widget.
+ * @param e The Evas canvas (unused).
+ * @param o The Evas object that received the event (unused).
+ * @param event_info Pointer to Evas_Event_Mouse_Up structure.
+ */
 static void
 _on_mouse_up(void *data,
              Evas *e EINA_UNUSED,
@@ -877,6 +1076,23 @@ _on_mouse_up(void *data,
      elm_layout_signal_emit(data, "elm,indicator,state,inactive", "elm");
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_MOUSE_MOVE events on the index's event rectangle.
+ *
+ * Handles mouse movement while a button is pressed over the index.
+ * - If mouse_down is not set, returns.
+ * - Updates drag pointer position for visual feedback.
+ * - If not horizontal and a second level event rectangle exists, checks for
+ *   level changes (moving finger horizontally to switch between level 0 and 1).
+ *   Emits "elm,state,level,N" and "level,up"/"level,down" signals/events.
+ * - Calls _sel_eval to update the selected item based on current coordinates.
+ *
+ * @param data The Elm_Index widget.
+ * @param e The Evas canvas (unused).
+ * @param o The Evas object that received the event (unused).
+ * @param event_info Pointer to Evas_Event_Mouse_Move structure.
+ */
 static void
 _on_mouse_move(void *data,
                Evas *e EINA_UNUSED,
@@ -930,6 +1146,18 @@ _on_mouse_move(void *data,
    _sel_eval(data, ev->cur.canvas.x, ev->cur.canvas.y);
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_MOUSE_IN events when accessibility is active.
+ *
+ * If autohide is not disabled, this activates the index display when the mouse
+ * enters its area, specifically for accessibility purposes (e.g., screen reader focus).
+ *
+ * @param data The Elm_Index widget.
+ * @param e The Evas canvas (unused).
+ * @param o The Evas object that received the event (unused).
+ * @param event_info Event specific information (unused).
+ */
 static void
 _on_mouse_in_access(void *data,
                     Evas *e EINA_UNUSED,
@@ -947,6 +1175,18 @@ _on_mouse_in_access(void *data,
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_MOUSE_MOVE events when accessibility is active.
+ *
+ * This function identifies the index item closest to the mouse cursor and
+ * highlights it for accessibility (e.g., for screen readers to announce).
+ *
+ * @param data The Elm_Index widget.
+ * @param e The Evas canvas (unused).
+ * @param o The Evas object that received the event (unused).
+ * @param event_info Pointer to Evas_Event_Mouse_Down structure (used for coordinates).
+ */
 static void
 _on_mouse_move_access(void *data,
                       Evas *e EINA_UNUSED,
@@ -986,6 +1226,18 @@ _on_mouse_move_access(void *data,
      _elm_access_highlight_set(it_closest->base->access_obj);
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_MOUSE_OUT events when accessibility is active.
+ *
+ * If autohide is not disabled, this deactivates the index display when the mouse
+ * leaves its area, specifically for accessibility purposes.
+ *
+ * @param data The Elm_Index widget.
+ * @param e The Evas canvas (unused).
+ * @param o The Evas object that received the event (unused).
+ * @param event_info Event specific information (unused).
+ */
 static void
 _on_mouse_out_access(void *data,
                       Evas *e EINA_UNUSED,
@@ -998,6 +1250,20 @@ _on_mouse_out_access(void *data,
      elm_layout_signal_emit(data, "elm,state,inactive", "elm");
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_RESIZE events on the index widget.
+ *
+ * This function is called when the index widget is resized. If item omission
+ * is enabled (sd->omit_enabled), it triggers a recalculation and refill of
+ * the index items to adapt to the new size. It also ensures the currently
+ * selected item (if any) remains visually active.
+ *
+ * @param data User data, unused in this callback.
+ * @param e The Evas canvas (unused).
+ * @param obj The Elm_Index widget that was resized.
+ * @param event_info Event specific information (unused).
+ */
 static void
 _index_resize_cb(void *data EINA_UNUSED,
                  Evas *e EINA_UNUSED,
@@ -1024,6 +1290,17 @@ _index_resize_cb(void *data EINA_UNUSED,
      }
 }
 
+/**
+ * @internal
+ * @brief Comparison function for sorting Elm_Index_Item_Data instances by priority.
+ *
+ * Used with eina_list_sort to order items based on their `priority` field.
+ * Items with lower priority values come first.
+ *
+ * @param d1 Pointer to the first Elm_Object_Item (cast from Elm_Index_Item_Data).
+ * @param d2 Pointer to the second Elm_Object_Item (cast from Elm_Index_Item_Data).
+ * @return -1 if d1 < d2, 1 if d1 > d2, 0 if equal (though logic implies -1 for <=).
+ */
 static int
 _sort_cb(const void *d1, const void *d2)
 {
@@ -1035,7 +1312,24 @@ _sort_cb(const void *d1, const void *d2)
    else return 1;
 }
 
-
+/**
+ * @internal
+ * @brief Efl_Canvas_Group group_add override for Elm_Index.
+ *
+ * This function is called when the Elm_Index widget is added to a canvas group.
+ * It performs essential initialization:
+ * - Sets up the base layout theme ("index", "base/vertical").
+ * - Creates and configures event rectangles for mouse/touch interaction.
+ * - Sets up Evas_Object_Box(es) (priv->bx[0], priv->bx[1]) to hold index items.
+ * - Initializes default values (delay_change_time, orientation).
+ * - Registers mouse event callbacks (_on_mouse_down, _on_mouse_up, _on_mouse_move).
+ * - Registers accessibility-specific mouse event callbacks if access_mode is on.
+ * - Sets up resize callback.
+ * - Initializes accessibility if configured.
+ *
+ * @param obj The Elm_Index Eolian object.
+ * @param priv The private data (Elm_Index_Data) for the widget.
+ */
 EOLIAN static void
 _elm_index_efl_canvas_group_group_add(Eo *obj, Elm_Index_Data *priv)
 {
@@ -1114,6 +1408,20 @@ _elm_index_efl_canvas_group_group_add(Eo *obj, Elm_Index_Data *priv)
      _access_index_register(obj);
 }
 
+/**
+ * @internal
+ * @brief Efl_Canvas_Group group_del override for Elm_Index.
+ *
+ * This function is called when the Elm_Index widget is being deleted.
+ * It cleans up resources:
+ * - Deletes all Elm_Object_Items (index items) associated with the widget.
+ * - Frees the list of Elm_Index_Omit structures.
+ * - Deletes any active Ecore_Timer (sd->delay).
+ * - Calls the superclass's group_del function.
+ *
+ * @param obj The Elm_Index Eolian object.
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ */
 EOLIAN static void
 _elm_index_efl_canvas_group_group_del(Eo *obj, Elm_Index_Data *sd)
 {
@@ -1130,8 +1438,20 @@ _elm_index_efl_canvas_group_group_del(Eo *obj, Elm_Index_Data *sd)
    efl_canvas_group_del(efl_super(obj, MY_CLASS));
 }
 
-static Eina_Bool _elm_index_smart_focus_next_enable = EINA_FALSE;
+static Eina_Bool _elm_index_smart_focus_next_enable = EINA_FALSE; /**< Global flag related to accessibility focus handling. */
 
+/**
+ * @internal
+ * @brief Processes accessibility registration or unregistration for the index and its items.
+ *
+ * Depending on the @p is_access flag, this function either:
+ * - Registers level 0 items for accessibility and sets up access-specific event
+ *   callbacks on the main event rectangle.
+ * - Unregisters items and removes the access-specific event callbacks.
+ *
+ * @param obj The Elm_Index widget.
+ * @param is_access EINA_TRUE to enable/register accessibility features, EINA_FALSE to disable/unregister.
+ */
 static void
 _access_obj_process(Evas_Object *obj, Eina_Bool is_access)
 {
@@ -1214,6 +1534,18 @@ _elm_index_efl_object_constructor(Eo *obj, Elm_Index_Data *_pd EINA_UNUSED)
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Sets whether the auto-hiding feature of the index is disabled.
+ *
+ * If @p disabled is EINA_TRUE, the index will always be visible.
+ * If EINA_FALSE (default), it hides and shows on interaction.
+ * This also resets the current display level to 0 and updates the visual state.
+ *
+ * @param obj The Elm_Index Eolian object.
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @param disabled EINA_TRUE to disable autohide, EINA_FALSE to enable.
+ */
 EOLIAN static void
 _elm_index_autohide_disabled_set(Eo *obj, Elm_Index_Data *sd, Eina_Bool disabled)
 {
@@ -1232,12 +1564,30 @@ _elm_index_autohide_disabled_set(Eo *obj, Elm_Index_Data *sd, Eina_Bool disabled
    //FIXME: Should be update indicator based on the indicator visibility
 }
 
+/**
+ * @internal
+ * @brief Gets whether the auto-hiding feature of the index is disabled.
+ * @param obj The Elm_Index Eolian object (unused).
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @return EINA_TRUE if autohide is disabled, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _elm_index_autohide_disabled_get(const Eo *obj EINA_UNUSED, Elm_Index_Data *sd)
 {
    return sd->autohide_disabled;
 }
 
+/**
+ * @internal
+ * @brief Sets the current active display level of the index.
+ *
+ * The index can have multiple levels (typically 0 and 1). This function
+ * changes the internally stored active level.
+ *
+ * @param obj The Elm_Index Eolian object (unused).
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @param level The new active level (e.g., 0 or 1).
+ */
 EOLIAN static void
 _elm_index_item_level_set(Eo *obj EINA_UNUSED, Elm_Index_Data *sd, int level)
 {
@@ -1245,6 +1595,13 @@ _elm_index_item_level_set(Eo *obj EINA_UNUSED, Elm_Index_Data *sd, int level)
    sd->level = level;
 }
 
+/**
+ * @internal
+ * @brief Gets the current active display level of the index.
+ * @param obj The Elm_Index Eolian object (unused).
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @return The current active level.
+ */
 EOLIAN static int
 _elm_index_item_level_get(const Eo *obj EINA_UNUSED, Elm_Index_Data *sd)
 {
@@ -1252,6 +1609,19 @@ _elm_index_item_level_get(const Eo *obj EINA_UNUSED, Elm_Index_Data *sd)
 }
 
 //FIXME: Should update indicator based on the autohidden status & indicator visibility
+/**
+ * @internal
+ * @brief Sets the selected state of an index item.
+ *
+ * This function updates the visual state of the item and potentially other
+ * items (deselecting the previous one). It also emits "changed", "selected"
+ * signals/events and schedules a "delay,changed" event.
+ * If AT-SPI mode is active, it emits an accessibility state change signal.
+ *
+ * @param eo_it The Eolian object of the Elm_Index_Item to select/deselect.
+ * @param it The private data (Elm_Index_Item_Data) of the item.
+ * @param selected EINA_TRUE to select the item, EINA_FALSE to deselect.
+ */
 EOLIAN static void
 _elm_index_item_selected_set(Eo *eo_it,
                              Elm_Index_Item_Data *it,
@@ -1319,6 +1689,18 @@ _elm_index_item_selected_set(Eo *eo_it,
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the currently selected item at a specific level.
+ *
+ * Iterates through all items and returns the first one found that is
+ * marked as selected and belongs to the given @p level.
+ *
+ * @param obj The Elm_Index Eolian object (unused).
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @param level The level to check for a selected item.
+ * @return The selected Elm_Object_Item, or NULL if no item is selected at that level.
+ */
 EOLIAN static Elm_Object_Item*
 _elm_index_selected_item_get(const Eo *obj EINA_UNUSED, Elm_Index_Data *sd, int level)
 {
@@ -1337,6 +1719,22 @@ _elm_index_selected_item_get(const Eo *obj EINA_UNUSED, Elm_Index_Data *sd, int 
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Appends a new item to the index.
+ *
+ * Creates a new index item with the given @p letter, callback @p func, and
+ * user @p data, and adds it to the end of the internal item list.
+ * An Evas_Object (Edje) is created for the item's view.
+ * If AT-SPI mode is active, accessibility signals are emitted.
+ *
+ * @param obj The Elm_Index Eolian object.
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @param letter The character/string for the index item (e.g., "A").
+ * @param func A callback function to be invoked when the item is selected.
+ * @param data User data to be associated with the item and passed to @p func.
+ * @return The newly created Elm_Object_Item, or NULL on failure.
+ */
 EOLIAN static Elm_Object_Item*
 _elm_index_item_append(Eo *obj, Elm_Index_Data *sd, const char *letter, Evas_Smart_Cb func, const void *data)
 {
@@ -1359,6 +1757,20 @@ _elm_index_item_append(Eo *obj, Elm_Index_Data *sd, const char *letter, Evas_Sma
    return eo_item;
 }
 
+/**
+ * @internal
+ * @brief Prepends a new item to the index.
+ *
+ * Creates a new index item and adds it to the beginning of the internal item list.
+ * Similar to _elm_index_item_append but adds to the front.
+ *
+ * @param obj The Elm_Index Eolian object.
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @param letter The character/string for the index item.
+ * @param func A callback function for item selection.
+ * @param data User data for the item.
+ * @return The newly created Elm_Object_Item, or NULL on failure.
+ */
 EOLIAN static Elm_Object_Item*
 _elm_index_item_prepend(Eo *obj, Elm_Index_Data *sd, const char *letter, Evas_Smart_Cb func, const void *data)
 {
@@ -1391,6 +1803,21 @@ elm_index_item_prepend_relative(Evas_Object *obj,
             (obj, (Elm_Object_Item *)relative, letter, NULL, item);
 }
 
+/**
+ * @internal
+ * @brief Inserts a new item into the index after a specified existing item.
+ *
+ * If @p after is NULL, this behaves like _elm_index_item_append.
+ * Otherwise, creates a new item and inserts it immediately after the @p after item.
+ *
+ * @param obj The Elm_Index Eolian object.
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @param after The Elm_Object_Item after which to insert the new item.
+ * @param letter The character/string for the new index item.
+ * @param func A callback function for item selection.
+ * @param data User data for the new item.
+ * @return The newly created Elm_Object_Item, or NULL on failure.
+ */
 EOLIAN static Elm_Object_Item*
 _elm_index_item_insert_after(Eo *obj, Elm_Index_Data *sd, Elm_Object_Item *after, const char *letter, Evas_Smart_Cb func, const void *data)
 {
@@ -1416,6 +1843,21 @@ _elm_index_item_insert_after(Eo *obj, Elm_Index_Data *sd, Elm_Object_Item *after
    return eo_item;
 }
 
+/**
+ * @internal
+ * @brief Inserts a new item into the index before a specified existing item.
+ *
+ * If @p before is NULL, this behaves like _elm_index_item_prepend.
+ * Otherwise, creates a new item and inserts it immediately before the @p before item.
+ *
+ * @param obj The Elm_Index Eolian object.
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @param before The Elm_Object_Item before which to insert the new item.
+ * @param letter The character/string for the new index item.
+ * @param func A callback function for item selection.
+ * @param data User data for the new item.
+ * @return The newly created Elm_Object_Item, or NULL on failure.
+ */
 EOLIAN static Elm_Object_Item*
 _elm_index_item_insert_before(Eo *obj, Elm_Index_Data *sd, Elm_Object_Item *before, const char *letter, Evas_Smart_Cb func, const void *data)
 {
@@ -1440,6 +1882,27 @@ _elm_index_item_insert_before(Eo *obj, Elm_Index_Data *sd, Elm_Object_Item *befo
    return eo_item;
 }
 
+/**
+ * @internal
+ * @brief Inserts a new item into the index in a sorted order.
+ *
+ * The item is inserted based on the comparison function @p cmp_func.
+ * If @p cmp_data_func is provided and an item with the same sort key already
+ * exists, @p cmp_data_func is used to compare their user data. If the new
+ * item's data is considered "smaller or equal", the existing item's data might be
+ * updated, and the new item is not added (returning NULL).
+ *
+ * @param obj The Elm_Index Eolian object.
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @param letter The character/string for the new index item.
+ * @param func A callback function for item selection.
+ * @param data User data for the new item.
+ * @param cmp_func The Eina_Compare_Cb function used to determine the sort order of items.
+ *                 It compares two Elm_Object_Item instances.
+ * @param cmp_data_func Optional Eina_Compare_Cb function to compare user data if @p cmp_func
+ *                      returns 0 (items are equivalent by primary sort key).
+ * @return The newly created Elm_Object_Item, or NULL if not inserted (e.g., duplicate data).
+ */
 EOLIAN static Elm_Object_Item*
 _elm_index_item_sorted_insert(Eo *obj, Elm_Index_Data *sd, const char *letter, Evas_Smart_Cb func, const void *data, Eina_Compare_Cb cmp_func, Eina_Compare_Cb cmp_data_func)
 {
@@ -1484,6 +1947,18 @@ _elm_index_item_sorted_insert(Eo *obj, Elm_Index_Data *sd, const char *letter, E
    return eo_item;
 }
 
+/**
+ * @internal
+ * @brief Finds an index item associated with the given user data.
+ *
+ * Iterates through the items and returns the first one whose user data
+ * matches @p data.
+ *
+ * @param obj The Elm_Index Eolian object.
+ * @param _pd The private data (Elm_Index_Data) for the widget (unused).
+ * @param data The user data to search for.
+ * @return The Elm_Object_Item associated with @p data, or NULL if not found.
+ */
 EOLIAN static Elm_Object_Item*
 _elm_index_item_find(Eo *obj, Elm_Index_Data *_pd EINA_UNUSED, const void *data)
 {
@@ -1491,6 +1966,16 @@ _elm_index_item_find(Eo *obj, Elm_Index_Data *_pd EINA_UNUSED, const void *data)
    return EO_OBJ(it);
 }
 
+/**
+ * @internal
+ * @brief Clears all items from the current display level of the index.
+ *
+ * This function removes and deletes all items that belong to the currently
+ * active level (sd->level).
+ *
+ * @param obj The Elm_Index Eolian object.
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ */
 EOLIAN static void
 _elm_index_item_clear(Eo *obj, Elm_Index_Data *sd)
 {
@@ -1508,6 +1993,25 @@ _elm_index_item_clear(Eo *obj, Elm_Index_Data *sd)
      efl_del(eo_item);
 }
 
+/**
+ * @internal
+ * @brief Changes the active display level or group of the index.
+ *
+ * This function is responsible for updating the index display when navigating
+ * between levels or groups.
+ * - Sorts items by priority.
+ * - If @p level is 0:
+ *   - Recalculates default_num (items with priority -1).
+ *   - Recalculates group_num (number of distinct priority groups).
+ *   - Sets show_group to the first encountered priority.
+ * - Clears and refills the index box for level 0.
+ * - If the current level (sd->level) is 1, also clears and refills level 1.
+ *
+ * @param obj The Elm_Index Eolian object.
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @param level The target level to go to. Typically 0 to show the main index,
+ *              or can be used to trigger group recalculation.
+ */
 EOLIAN static void
 _elm_index_level_go(Eo *obj, Elm_Index_Data *sd, int level)
 {
@@ -1545,6 +2049,17 @@ _elm_index_level_go(Eo *obj, Elm_Index_Data *sd, int level)
      }
 }
 
+/**
+ * @internal
+ * @brief Sets whether the selection indicator is disabled.
+ *
+ * The indicator is a visual element (often text) that shows the currently
+ * selected index item/group. Disabling it hides this element.
+ *
+ * @param obj The Elm_Index Eolian object.
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @param disabled EINA_TRUE to disable the indicator, EINA_FALSE to enable.
+ */
 EOLIAN static void
 _elm_index_indicator_disabled_set(Eo *obj, Elm_Index_Data *sd, Eina_Bool disabled)
 {
@@ -1558,18 +2073,44 @@ _elm_index_indicator_disabled_set(Eo *obj, Elm_Index_Data *sd, Eina_Bool disable
      elm_layout_signal_emit(obj, "elm,indicator,state,active", "elm");
 }
 
+/**
+ * @internal
+ * @brief Gets whether the selection indicator is disabled.
+ * @param obj The Elm_Index Eolian object (unused).
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @return EINA_TRUE if the indicator is disabled, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _elm_index_indicator_disabled_get(const Eo *obj EINA_UNUSED, Elm_Index_Data *sd)
 {
    return sd->indicator_disabled;
 }
 
+/**
+ * @internal
+ * @brief Gets the letter (text) of an index item.
+ * @param item The Elm_Index_Item Eolian object (unused).
+ * @param it The private data (Elm_Index_Item_Data) of the item.
+ * @return The string representing the item's letter.
+ */
 EOLIAN static const char *
 _elm_index_item_letter_get(const Eo *item EINA_UNUSED, Elm_Index_Item_Data *it)
 {
    return it->letter;
 }
 
+/**
+ * @internal
+ * @brief Sets the orientation of the index widget (horizontal or vertical).
+ *
+ * This function updates the internal orientation state and triggers a theme apply
+ * to reflect the change visually. The direction is normalized to either
+ * EFL_UI_LAYOUT_ORIENTATION_HORIZONTAL or EFL_UI_LAYOUT_ORIENTATION_VERTICAL.
+ *
+ * @param obj The Elm_Index Eolian object.
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @param dir The desired orientation.
+ */
 EOLIAN static void
 _elm_index_efl_ui_layout_orientable_orientation_set(Eo *obj, Elm_Index_Data *sd, Efl_Ui_Layout_Orientation dir)
 {
@@ -1584,24 +2125,62 @@ _elm_index_efl_ui_layout_orientable_orientation_set(Eo *obj, Elm_Index_Data *sd,
    efl_ui_widget_theme_apply(obj);
 }
 
+/**
+ * @internal
+ * @brief Gets the orientation of the index widget.
+ * @param obj The Elm_Index Eolian object (unused).
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @return The current Efl_Ui_Layout_Orientation.
+ */
 EOLIAN static Efl_Ui_Layout_Orientation
 _elm_index_efl_ui_layout_orientable_orientation_get(const Eo *obj EINA_UNUSED, Elm_Index_Data *sd)
 {
    return sd->dir;
 }
 
+/**
+ * @internal
+ * @brief Sets the time delay for the "delay,changed" event.
+ *
+ * This event is emitted after a period of inactivity following item selections,
+ * consolidating multiple rapid changes into a single event.
+ *
+ * @param obj The Elm_Index Eolian object (unused).
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @param dtime The delay time in seconds.
+ */
 EOLIAN static void
 _elm_index_delay_change_time_set(Eo *obj EINA_UNUSED, Elm_Index_Data *sd, double dtime)
 {
    sd->delay_change_time = dtime;
 }
 
+/**
+ * @internal
+ * @brief Gets the time delay for the "delay,changed" event.
+ * @param obj The Elm_Index Eolian object (unused).
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @return The delay time in seconds.
+ */
 EOLIAN static double
 _elm_index_delay_change_time_get(const Eo *obj EINA_UNUSED, Elm_Index_Data *sd)
 {
    return sd->delay_change_time;
 }
 
+/**
+ * @internal
+ * @brief Sets whether item omission is enabled.
+ *
+ * If enabled, the index will try to fit all items by omitting some and
+ * representing them with a placeholder (e.g., "*") if there isn't enough space.
+ * If disabled, all items are shown, potentially overflowing.
+ * This triggers a recalculation and refill of the index display.
+ *
+ * @param obj The Elm_Index Eolian object.
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @param enabled EINA_TRUE to enable omission, EINA_FALSE to disable.
+ */
 EOLIAN static void
 _elm_index_omit_enabled_set(Eo *obj, Elm_Index_Data *sd, Eina_Bool enabled)
 {
@@ -1618,12 +2197,30 @@ _elm_index_omit_enabled_set(Eo *obj, Elm_Index_Data *sd, Eina_Bool enabled)
      }
 }
 
+/**
+ * @internal
+ * @brief Gets whether item omission is enabled.
+ * @param obj The Elm_Index Eolian object (unused).
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @return EINA_TRUE if omission is enabled, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _elm_index_omit_enabled_get(const Eo *obj EINA_UNUSED, Elm_Index_Data *sd)
 {
    return sd->omit_enabled;
 }
 
+/**
+ * @internal
+ * @brief Sets the priority of an individual index item.
+ *
+ * Items can be grouped by priority. A priority of -1 is the default.
+ * Lower priority values are generally displayed first or given precedence.
+ *
+ * @param eo_it The Elm_Index_Item Eolian object (unused).
+ * @param it The private data (Elm_Index_Item_Data) of the item.
+ * @param priority The priority value (>= -1).
+ */
 EOLIAN static void
 _elm_index_item_priority_set(Eo *eo_it EINA_UNUSED, Elm_Index_Item_Data *it, int priority)
 {
@@ -1636,6 +2233,19 @@ _elm_index_item_priority_set(Eo *eo_it EINA_UNUSED, Elm_Index_Item_Data *it, int
    it->priority = priority;
 }
 
+/**
+ * @internal
+ * @brief Sets the "standard" or currently displayed priority group for the index.
+ *
+ * This function changes which group of items (based on their priority) is
+ * primarily displayed by the index. If the new @p priority is different from
+ * the current `sd->show_group`, it triggers an update (_priority_up_cb or
+ * _priority_down_cb) to refresh the index view.
+ *
+ * @param obj The Elm_Index Eolian object.
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @param priority The priority group to make standard (>= -1).
+ */
 EOLIAN static void
 _elm_index_standard_priority_set(Eo *obj, Elm_Index_Data *sd, int priority)
 {
@@ -1654,18 +2264,43 @@ _elm_index_standard_priority_set(Eo *obj, Elm_Index_Data *sd, int priority)
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the "standard" or currently displayed priority group of the index.
+ * @param obj The Elm_Index Eolian object (unused).
+ * @param sd The private data (Elm_Index_Data) for the widget.
+ * @return The current standard priority group.
+ */
 EOLIAN static int
 _elm_index_standard_priority_get(const Eo *obj EINA_UNUSED, Elm_Index_Data *sd)
 {
    return sd->show_group;
 }
 
+/**
+ * @internal
+ * @brief Class constructor for Elm_Index.
+ *
+ * Registers the legacy type name for the widget.
+ * @param klass The Efl_Class being constructed.
+ */
 static void
 _elm_index_class_constructor(Efl_Class *klass)
 {
    evas_smart_legacy_type_register(MY_CLASS_NAME_LEGACY, klass);
 }
 
+/**
+ * @internal
+ * @brief Accessibility action: activate an item.
+ *
+ * This function is called by the accessibility framework when an "activate"
+ * action is performed on an index item. It effectively selects the item.
+ *
+ * @param obj The Elm_Index_Item Eolian object.
+ * @param params Action parameters (unused).
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _item_action_activate(Eo *obj, const char *params EINA_UNUSED EINA_UNUSED)
 {
@@ -1673,6 +2308,19 @@ _item_action_activate(Eo *obj, const char *params EINA_UNUSED EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Gets the accessibility children of the index widget.
+ *
+ * This Eolian override merges the superclass's accessibility children with
+ * the list of index items (data->items).
+ *
+ * @param obj The Elm_Index Eolian object.
+ * @param data The private data (Elm_Index_Data) for the widget.
+ * @return A new Eina_List containing all accessibility children. The caller
+ *         is responsible for freeing this list (but not its contents if they
+ *         are also managed elsewhere, which is typical for access children).
+ */
 EOLIAN static Eina_List*
 _elm_index_efl_access_object_access_children_get(const Eo *obj, Elm_Index_Data *data)
 {
@@ -1681,6 +2329,18 @@ _elm_index_efl_access_object_access_children_get(const Eo *obj, Elm_Index_Data *
    return eina_list_merge(eina_list_clone(data->items), ret);
 }
 
+/**
+ * @internal
+ * @brief Gets the internationalized accessibility name for an index item.
+ *
+ * This Eolian override first tries to get a name from the superclass.
+ * If that fails, it falls back to a plain name derived from the item's letter,
+ * using _elm_widget_item_accessible_plain_name_get.
+ *
+ * @param eo_it The Elm_Index_Item Eolian object.
+ * @param data The private data (Elm_Index_Item_Data) of the item.
+ * @return The i18n accessibility name string, or NULL.
+ */
 EOLIAN static const char*
 _elm_index_item_efl_access_object_i18n_name_get(const Eo *eo_it, Elm_Index_Item_Data *data)
 {
@@ -1691,6 +2351,18 @@ _elm_index_item_efl_access_object_i18n_name_get(const Eo *eo_it, Elm_Index_Item_
    return _elm_widget_item_accessible_plain_name_get(eo_it, data->letter);
 }
 
+/**
+ * @internal
+ * @brief Gets the accessibility actions available for an index item.
+ *
+ * This Eolian override provides the "activate" action for index items,
+ * which maps to the _item_action_activate function.
+ *
+ * @param eo_it The Elm_Index_Item Eolian object (unused).
+ * @param data The private data (Elm_Index_Item_Data) of the item (unused).
+ * @return A pointer to a static array of Efl_Access_Action_Data, terminated
+ *         by an entry with NULL fields.
+ */
 EOLIAN static const Efl_Access_Action_Data*
 _elm_index_item_efl_access_widget_action_elm_actions_get(const Eo *eo_it EINA_UNUSED, Elm_Index_Item_Data *data EINA_UNUSED)
 {

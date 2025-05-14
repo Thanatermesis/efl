@@ -4,6 +4,11 @@
 
 #include "codegen.h"
 
+/**
+ * @brief Frees a DBus_Property structure and removes it from its interface's list.
+ *
+ * @param property The property to free.
+ */
 void
 property_free(DBus_Property *property)
 {
@@ -16,6 +21,12 @@ property_free(DBus_Property *property)
    free(property);
 }
 
+/**
+ * @brief Creates a new DBus_Property and adds it to the given interface.
+ *
+ * @param iface The interface to which the new property will belong.
+ * @return A pointer to the newly created DBus_Property, or NULL on failure.
+ */
 DBus_Property *
 property_new(DBus_Interface *iface)
 {
@@ -27,6 +38,12 @@ property_new(DBus_Interface *iface)
    return prop;
 }
 
+/**
+ * @brief Creates a new DBus_Method and adds it to the given interface.
+ *
+ * @param iface The interface to which the new method will belong.
+ * @return A pointer to the newly created DBus_Method, or NULL on failure.
+ */
 DBus_Method *
 method_new(DBus_Interface *iface)
 {
@@ -37,6 +54,11 @@ method_new(DBus_Interface *iface)
    return method;
 }
 
+/**
+ * @brief Frees a DBus_Method structure, its arguments, and removes it from its interface's list.
+ *
+ * @param method The method to free.
+ */
 void
 method_free(DBus_Method *method)
 {
@@ -54,6 +76,11 @@ method_free(DBus_Method *method)
    free(method);
 }
 
+/**
+ * @brief Frees a DBus_Arg structure.
+ *
+ * @param arg The argument to free.
+ */
 void
 arg_free(DBus_Arg *arg)
 {
@@ -63,6 +90,12 @@ arg_free(DBus_Arg *arg)
    free(arg);
 }
 
+/**
+ * @brief Creates a new DBus_Signal and adds it to the given interface.
+ *
+ * @param iface The interface to which the new signal will belong.
+ * @return A pointer to the newly created DBus_Signal, or NULL on failure.
+ */
 DBus_Signal *
 signal_new(DBus_Interface *iface)
 {
@@ -73,6 +106,11 @@ signal_new(DBus_Interface *iface)
    return sig;
 }
 
+/**
+ * @brief Frees a DBus_Signal structure, its arguments, and removes it from its interface's list.
+ *
+ * @param sig The signal to free.
+ */
 void
 signal_free(DBus_Signal *sig)
 {
@@ -92,6 +130,12 @@ signal_free(DBus_Signal *sig)
    free(sig);
 }
 
+/**
+ * @brief Creates a new DBus_Interface and adds it to the given D-Bus object.
+ *
+ * @param obj The D-Bus object to which the new interface will belong.
+ * @return A pointer to the newly created DBus_Interface, or NULL on failure.
+ */
 DBus_Interface *
 interface_new(DBus_Object *obj)
 {
@@ -102,6 +146,12 @@ interface_new(DBus_Object *obj)
    return iface;
 }
 
+/**
+ * @brief Frees a DBus_Interface structure, all its signals, methods, and properties,
+ * and removes it from its object's list.
+ *
+ * @param iface The interface to free.
+ */
 void
 interface_free(DBus_Interface *iface)
 {
@@ -130,6 +180,11 @@ interface_free(DBus_Interface *iface)
    free(iface);
 }
 
+/**
+ * @brief Frees a DBus_Object structure and all its interfaces.
+ *
+ * @param obj The D-Bus object to free.
+ */
 void
 object_free(DBus_Object *obj)
 {

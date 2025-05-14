@@ -1148,6 +1148,19 @@ static const Escape_Value html_escapes[] = {
    ESCAPE_VALUE("&zwnj;", "\xe2\x80\x8c"),
 };
 
+/**
+ * @internal
+ * @brief Comparison function for sorting Escape_Value structs by their escape key.
+ *
+ * This function is used with qsort to sort an array of pointers to
+ * Escape_Value structs based on the alphabetical order of their 'escape' string field.
+ *
+ * @param a A pointer to the first Escape_Value pointer.
+ * @param b A pointer to the second Escape_Value pointer.
+ * @return An integer less than, equal to, or greater than zero if the
+ * 'escape' string of a is found, respectively, to be less than, to match,
+ * or be greater than the 'escape' string of b.
+ */
 static int
 _escape_key_sort(const void *a, const void *b)
 {
@@ -1156,6 +1169,19 @@ _escape_key_sort(const void *a, const void *b)
    return strcmp(k_a, k_b);
 }
 
+/**
+ * @internal
+ * @brief Comparison function for sorting Escape_Value structs by their value.
+ *
+ * This function is used with qsort to sort an array of pointers to
+ * Escape_Value structs based on the alphabetical order of their 'value' string field.
+ *
+ * @param a A pointer to the first Escape_Value pointer.
+ * @param b A pointer to the second Escape_Value pointer.
+ * @return An integer less than, equal to, or greater than zero if the
+ * 'value' string of a is found, respectively, to be less than, to match,
+ * or be greater than the 'value' string of b.
+ */
 static int
 _escape_value_sort(const void *a, const void *b)
 {
@@ -1164,6 +1190,18 @@ _escape_value_sort(const void *a, const void *b)
    return strcmp(v_a, v_b);
 }
 
+/**
+ * @internal
+ * @brief Creates a sorted copy of the common HTML escapes array, sorted by escape key.
+ *
+ * This function allocates a new array of pointers to Escape_Value structs,
+ * initializes it with pointers to the elements of the global `html_common_escapes`
+ * array, and then sorts this new array based on the escape keys using `qsort`.
+ * The caller is responsible for freeing the returned array.
+ *
+ * @return A newly allocated array of pointers to Escape_Value, sorted by key.
+ *         NULL on allocation failure.
+ */
 static Escape_Value **
 escape_sorted_common_key_copy()
 {
@@ -1187,6 +1225,18 @@ escape_sorted_common_key_copy()
    return ret_list;
 }
 
+/**
+ * @internal
+ * @brief Creates a sorted copy of the common HTML escapes array, sorted by value.
+ *
+ * This function allocates a new array of pointers to Escape_Value structs,
+ * initializes it with pointers to the elements of the global `html_common_escapes`
+ * array, and then sorts this new array based on the values using `qsort`.
+ * The caller is responsible for freeing the returned array.
+ *
+ * @return A newly allocated array of pointers to Escape_Value, sorted by value.
+ *         NULL on allocation failure.
+ */
 static Escape_Value **
 escape_sorted_common_value_copy()
 {
@@ -1210,6 +1260,18 @@ escape_sorted_common_value_copy()
    return ret_list;
 }
 
+/**
+ * @internal
+ * @brief Creates a sorted copy of the extended HTML escapes array, sorted by escape key.
+ *
+ * This function allocates a new array of pointers to Escape_Value structs,
+ * initializes it with pointers to the elements of the global `html_escapes`
+ * array, and then sorts this new array based on the escape keys using `qsort`.
+ * The caller is responsible for freeing the returned array.
+ *
+ * @return A newly allocated array of pointers to Escape_Value, sorted by key.
+ *         NULL on allocation failure.
+ */
 static Escape_Value **
 escape_sorted_rest_key_copy()
 {
@@ -1233,6 +1295,18 @@ escape_sorted_rest_key_copy()
    return ret_list;
 }
 
+/**
+ * @internal
+ * @brief Creates a sorted copy of the extended HTML escapes array, sorted by value.
+ *
+ * This function allocates a new array of pointers to Escape_Value structs,
+ * initializes it with pointers to the elements of the global `html_escapes`
+ * array, and then sorts this new array based on the values using `qsort`.
+ * The caller is responsible for freeing the returned array.
+ *
+ * @return A newly allocated array of pointers to Escape_Value, sorted by value.
+ *         NULL on allocation failure.
+ */
 static Escape_Value **
 escape_sorted_rest_value_copy()
 {
@@ -1255,6 +1329,17 @@ escape_sorted_rest_value_copy()
    return ret_list;
 }
 
+/**
+ * @internal
+ * @brief Retrieves a statically cached, key-sorted array of common HTML escapes.
+ *
+ * This function provides access to a key-sorted version of the `html_common_escapes`
+ * array. It creates and caches the sorted array on the first call.
+ * This avoids repeated sorting for performance.
+ *
+ * @param[out] p_len If not NULL, it is set to the number of elements in the returned array.
+ * @return A pointer to the statically cached, key-sorted array of pointers to Escape_Value.
+ */
 static Escape_Value **
 get_html_escape_array_common_key_sorted(size_t *p_len)
 {
@@ -1273,6 +1358,17 @@ get_html_escape_array_common_key_sorted(size_t *p_len)
    return ret_list;
 }
 
+/**
+ * @internal
+ * @brief Retrieves a statically cached, value-sorted array of common HTML escapes.
+ *
+ * This function provides access to a value-sorted version of the `html_common_escapes`
+ * array. It creates and caches the sorted array on the first call.
+ * This avoids repeated sorting for performance.
+ *
+ * @param[out] p_len If not NULL, it is set to the number of elements in the returned array.
+ * @return A pointer to the statically cached, value-sorted array of pointers to Escape_Value.
+ */
 static Escape_Value **
 get_html_escape_array_common_value_sorted(size_t *p_len)
 {
@@ -1291,6 +1387,17 @@ get_html_escape_array_common_value_sorted(size_t *p_len)
    return ret_list;
 }
 
+/**
+ * @internal
+ * @brief Retrieves a statically cached, key-sorted array of extended HTML escapes.
+ *
+ * This function provides access to a key-sorted version of the `html_escapes`
+ * array. It creates and caches the sorted array on the first call.
+ * This avoids repeated sorting for performance.
+ *
+ * @param[out] p_len If not NULL, it is set to the number of elements in the returned array.
+ * @return A pointer to the statically cached, key-sorted array of pointers to Escape_Value.
+ */
 static Escape_Value **
 get_html_escape_array_rest_key_sorted(size_t *p_len)
 {
@@ -1308,6 +1415,17 @@ get_html_escape_array_rest_key_sorted(size_t *p_len)
    return ret_list;
 }
 
+/**
+ * @internal
+ * @brief Retrieves a statically cached, value-sorted array of extended HTML escapes.
+ *
+ * This function provides access to a value-sorted version of the `html_escapes`
+ * array. It creates and caches the sorted array on the first call.
+ * This avoids repeated sorting for performance.
+ *
+ * @param[out] p_len If not NULL, it is set to the number of elements in the returned array.
+ * @return A pointer to the statically cached, value-sorted array of pointers to Escape_Value.
+ */
 static Escape_Value **
 get_html_escape_array_rest_value_sorted(size_t *p_len)
 {
@@ -1327,10 +1445,24 @@ get_html_escape_array_rest_value_sorted(size_t *p_len)
 
 /**
  * @internal
- * Checks if a char is a whitespace.
- * @param c the unicode codepoint.
- * @return @c EINA_TRUE if the unicode codepoint is a whitespace, @c EINA_FALSE
- * otherwise.
+ * @brief Checks if a unicode codepoint is a whitespace character.
+ *
+ * The list of unicode whitespace chars is:
+ * - `0x0009` to `0x000D` (Control characters)
+ * - `0x0020` (SPACE)
+ * - `0x0085` (Control character)
+ * - `0x00A0` (NO-BREAK SPACE)
+ * - `0x1680` (OGHAM SPACE MARK)
+ * - `0x180E` (MONGOLIAN VOWEL SEPARATOR)
+ * - `0x2000` to `0x200A` (EN QUAD to HAIR SPACE)
+ * - `0x2028` (LINE SEPARATOR)
+ * - `0x2029` (PARAGRAPH SEPARATOR)
+ * - `0x202F` (NARROW NO-BREAK SPACE)
+ * - `0x205F` (MEDIUM MATHEMATICAL SPACE)
+ * - `0x3000` (IDEOGRAPHIC SPACE)
+ *
+ * @param c The unicode codepoint to check.
+ * @return @c EINA_TRUE if the codepoint is a whitespace, @c EINA_FALSE otherwise.
  */
 static Eina_Bool
 _is_white(Eina_Unicode c)
@@ -1371,11 +1503,15 @@ _is_white(Eina_Unicode c)
 
 /**
  * @internal
- * Prepends the text between s and p to the main cursor of the object.
+ * @brief Prepends a run of text to a cursor.
  *
- * @param cur the cursor to prepend to.
- * @param[in] s start of the string
- * @param[in] p end of the string
+ * Extracts a substring from `s` to `p` and prepends it to the textblock at
+ * the given cursor position. This is a convenience wrapper around
+ * `evas_textblock_cursor_text_prepend`.
+ *
+ * @param cur The cursor to prepend the text to.
+ * @param s Start of the string.
+ * @param p End of the string (exclusive).
  */
 static void
 _prepend_text_run(Efl_Text_Cursor_Handle *cur, const char *s, const char *p)
@@ -1461,15 +1597,23 @@ static const char *gfx_filterstr = NULL;
  */
 
 /**
- * Internal
- * Split str using commas as separators. All characters from the beginning of the string up until
- * the first comma (excluded) are copied into part1.
- * All characters after the last comma (excluded) up until the end of str are copied into part2.
- * Any character in between part1 and part2 is ignored (as right now it's only valid to have 1 comma and 2 strings).
- * For example, if str="str1,str2,str3,str4",
- * part1 will contain "str1" and part2 will contain "str4".
- * part1 and part2 must be already allocated and contain enough space for any possible outcome
- * of the parsing. The safest bet is that they should be as big as str.
+ * @internal
+ * @brief Splits a string by commas, extracting the first and last parts.
+ *
+ * This function parses a string `str` and splits it by commas. It copies
+ * the substring before the first comma into `part1` and the substring after
+ * the last comma into `part2`. Any content between the first and last commas is
+ * ignored.
+ *
+ * For example, if `str` is "str1,str2,str3,str4", `part1` will be "str1" and
+ * `part2` will be "str4".
+ *
+ * @note `part1` and `part2` must be pre-allocated with enough space to hold
+ * the resulting substrings. A safe size is `strlen(str) + 1`.
+ *
+ * @param str The input string to split.
+ * @param[out] part1 Buffer to store the first part of the string.
+ * @param[out] part2 Buffer to store the last part of the string.
  */
 void
 _style_string_split(const char *str, char* part1, char* part2)
@@ -1493,6 +1637,20 @@ _style_string_split(const char *str, char* part1, char* part2)
    if (fmt->style != evas) { fmt->style = evas; changed = EINA_TRUE; } \
    if (set_default && (_FMT_INFO(effect) != efl)) {_FMT_INFO(effect) = efl; changed = EINA_TRUE;}}
 
+/**
+ * @internal
+ * @brief Sets the shadow/effect style for a format.
+ *
+ * Parses the given string `str` to determine the shadow effect and applies it
+ * to the `fmt` structure. It also updates the default format information if
+ * `set_default` is true.
+ *
+ * @param fmt The textblock format to modify.
+ * @param str The string representing the shadow style (e.g., "shadow", "outline").
+ * @param set_default If EINA_TRUE, also updates the default style info in `o`.
+ * @param o The textblock private data, needed if `set_default` is true.
+ * @return EINA_TRUE if the format was changed, EINA_FALSE otherwise.
+ */
 Eina_Bool
 _format_shadow_set(Evas_Object_Textblock_Format *fmt, char *str, Eina_Bool set_default, Efl_Canvas_Textblock_Data *o)
 {
@@ -1529,6 +1687,20 @@ _format_shadow_set(Evas_Object_Textblock_Format *fmt, char *str, Eina_Bool set_d
   if (set_default && (_FMT_INFO(shadow_direction) != EFL_TEXT_STYLE_SHADOW_DIRECTION_##direction)) \
      {_FMT_INFO(shadow_direction) = EFL_TEXT_STYLE_SHADOW_DIRECTION_##direction; changed = EINA_TRUE;}}
 
+/**
+ * @internal
+ * @brief Sets the shadow direction for a format.
+ *
+ * Parses the given string `str` to determine the shadow direction and applies it
+ * to the `fmt` structure. It also updates the default format information if
+ * `set_default` is true.
+ *
+ * @param fmt The textblock format to modify.
+ * @param str The string representing the shadow direction (e.g., "bottom_right", "top").
+ * @param set_default If EINA_TRUE, also updates the default style info in `o`.
+ * @param o The textblock private data, needed if `set_default` is true.
+ * @return EINA_TRUE if the format was changed, EINA_FALSE otherwise.
+ */
 Eina_Bool
 _format_shadow_direction_set(Evas_Object_Textblock_Format *fmt, char *str, Eina_Bool set_default, Efl_Canvas_Textblock_Data *o)
 {
@@ -1558,7 +1730,11 @@ _format_shadow_direction_set(Evas_Object_Textblock_Format *fmt, char *str, Eina_
 
 /**
  * @internal
- * Init the format strings.
+ * @brief Initializes stringshares for format command parsing.
+ *
+ * This function initializes all the stringshared strings used for parsing
+ * textblock style and format tags. It uses a refcount to ensure it's only
+ * initialized once and shutdown correctly.
  */
 static void
 _format_command_init(void)
@@ -1678,7 +1854,10 @@ _format_command_init(void)
 
 /**
  * @internal
- * Shutdown the format strings.
+ * @brief Shuts down and frees the stringshares for format command parsing.
+ *
+ * This function decrements the refcount for format command stringshares and
+ * frees them when the refcount reaches zero.
  */
 static void
 _format_command_shutdown(void)
@@ -1748,10 +1927,13 @@ _format_command_shutdown(void)
 
 /**
  * @internal
- * Copies str to dst while removing the \\ char, i.e unescape the escape sequences.
+ * @brief Unescapes backslash sequences in a format parameter string.
  *
- * @param[out] dst the destination string - Should not be NULL.
- * @param[in] src the source string - Should not be NULL.
+ * This function modifies the string `s` in-place to remove backslash escape
+ * characters. For example, "\\'" becomes "'".
+ *
+ * @param s The string to clean. It will be modified.
+ * @return The new length of the cleaned string.
  */
 static int
 _format_clean_param(char *s)
@@ -1771,6 +1953,19 @@ _format_clean_param(char *s)
    return len;
 }
 
+/**
+ * @internal
+ * @brief Parses and applies legacy-only formatting commands.
+ *
+ * This function handles format commands that are specific to the legacy
+ * textblock API and do not have a direct equivalent in the newer unified API.
+ * The parsed format is applied to the `fmt` structure.
+ *
+ * @param fmt The format structure to populate.
+ * @param cmd The command to process (stringshared).
+ * @param param The parameter for the command.
+ * @param len The length of the parameter string.
+ */
 static void
 _format_command_legacy_only(Evas_Object_Textblock_Format *fmt, const char *cmd, char *param, int len)
 {
@@ -2161,6 +2356,19 @@ _format_command_legacy_only(Evas_Object_Textblock_Format *fmt, const char *cmd, 
      }
 }
 
+/**
+ * @internal
+ * @brief Parses and applies unified-API-only formatting commands.
+ *
+ * This function handles format commands that are specific to the newer unified
+ * textblock API. The parsed format is applied to the `fmt` structure.
+ *
+ * @param o The textblock private data.
+ * @param fmt The format structure to populate.
+ * @param cmd The command to process (stringshared).
+ * @param param The parameter for the command.
+ * @param len The length of the parameter string.
+ */
 static void
 _format_command_unified_only( Efl_Canvas_Textblock_Data *o, Evas_Object_Textblock_Format *fmt, const char *cmd, char *param, int len)
 {

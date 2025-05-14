@@ -71,6 +71,7 @@ EAPI Eina_Bool
 elm_animation_view_play(Efl_Ui_Vg_Animation *obj)
 {
    double speed = efl_player_playback_speed_get(obj);
+   // Ensure playback speed is positive for forward play.
    efl_player_playback_speed_set(obj, speed < 0 ? speed * -1 : speed);
    return efl_player_playing_set(obj, EINA_TRUE);
 }
@@ -79,6 +80,7 @@ EAPI Eina_Bool
 elm_animation_view_play_back(Efl_Ui_Vg_Animation *obj)
 {
    double speed = efl_player_playback_speed_get(obj);
+   // Ensure playback speed is negative for backward play.
    efl_player_playback_speed_set(obj, speed > 0 ? speed * -1 : speed);
    return efl_player_playing_set(obj, EINA_TRUE);
 }
@@ -167,6 +169,18 @@ elm_animation_view_max_frame_get(const Efl_Ui_Vg_Animation *obj)
    return efl_ui_vg_animation_max_frame_get(obj);
 }
 
+/**
+ * @internal
+ * @brief Initializes the Efl.Ui.VG_Animation_Legacy class.
+ *
+ * This function is called once by the EO system when the class is first used.
+ * It sets up the operations (methods) for the class, primarily mapping
+ * legacy API functions to their EO counterparts or providing specific
+ * implementations for legacy behavior. This includes setting the constructor.
+ *
+ * @param klass The Efl_Class to initialize.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _efl_ui_vg_animation_legacy_class_initializer(Efl_Class *klass)
 {

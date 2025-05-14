@@ -3,18 +3,51 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback function to enable/disable global focus highlight.
+ *
+ * This function is called when the state of the "Focus Highlight Enabled (Config)"
+ * checkbox is changed. It sets the global Elementary configuration for focus
+ * highlighting based on the checkbox's state.
+ *
+ * @param data Unused.
+ * @param obj The checkbox object that triggered the event.
+ * @param event_info Unused.
+ */
 static void
 highlight_enabled_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    elm_config_focus_highlight_enabled_set(elm_check_state_get(obj));
 }
 
+/**
+ * @brief Callback function to enable/disable global focus highlight animation.
+ *
+ * This function is called when the state of the "Focus Highlight Animate (Config)"
+ * checkbox is changed. It sets the global Elementary configuration for focus
+ * highlight animation based on the checkbox's state.
+ *
+ * @param data Unused.
+ * @param obj The checkbox object that triggered the event.
+ * @param event_info Unused.
+ */
 static void
 highlight_animate_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    elm_config_focus_highlight_animate_set(elm_check_state_get(obj));
 }
 
+/**
+ * @brief Callback function to enable/disable focus highlight for a specific window.
+ *
+ * This function is called when the state of the "Focus Highlight Enabled (Win)"
+ * checkbox is changed. It sets the focus highlighting for the specific window
+ * passed in the @p data parameter.
+ *
+ * @param data The window object to apply the setting to.
+ * @param obj The checkbox object that triggered the event.
+ * @param event_info Unused.
+ */
 static void
 win_highlight_enabled_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -22,6 +55,17 @@ win_highlight_enabled_cb(void *data, Evas_Object *obj, void *event_info EINA_UNU
                                        elm_check_state_get(obj));
 }
 
+/**
+ * @brief Callback function to enable/disable focus highlight animation for a specific window.
+ *
+ * This function is called when the state of the "Focus Highlight Animate (Win)"
+ * checkbox is changed. It sets the focus highlight animation for the specific window
+ * passed in the @p data parameter.
+ *
+ * @param data The window object to apply the setting to.
+ * @param obj The checkbox object that triggered the event.
+ * @param event_info Unused.
+ */
 static void
 win_highlight_animate_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -29,6 +73,22 @@ win_highlight_animate_cb(void *data, Evas_Object *obj, void *event_info EINA_UNU
                                        elm_check_state_get(obj));
 }
 
+/**
+ * @brief Callback to set or unset a custom focus chain on a box of widgets.
+ *
+ * When the associated checkbox is checked, this function creates a non-default
+ * focus order for the children of the box container passed in @p data.
+ * The focus order is intentionally manipulated to demonstrate custom chain creation.
+ * For a box with four buttons added in order [btn1, btn2, btn3, btn4], the resulting focus
+ * chain will be: btn2 -> btn1 -> btn4 -> btn3.
+ *
+ * If the checkbox is unchecked, it removes the custom focus chain, restoring
+ * the default geometric focus order.
+ *
+ * @param data The box container (Evas_Object *) whose focus chain is being modified.
+ * @param obj The checkbox that triggered this callback.
+ * @param event_info Unused.
+ */
 static void
 custom_chain_unset_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -65,6 +125,18 @@ custom_chain_unset_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED
      }
 }
 
+/**
+ * @brief Callback function to create a new window for focus testing.
+ *
+ * This function is called when the "Create Window" button is clicked. It creates
+ * a new, simple window containing four buttons arranged in a grid. This allows
+ * for testing focus behavior, such as tabbing between widgets, in a separate
+ * top-level window. The window is set to be automatically deleted when closed.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 create_win_bt_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -104,6 +176,24 @@ create_win_bt_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void
    evas_object_show(win);
 }
 
+/**
+ * @brief Main function for the focus custom chain test.
+ *
+ * This function sets up the main window for the test case. It demonstrates:
+ * 1. How to control focus highlight settings both globally (application-wide)
+ *    and per-window.
+ * 2. How to create a custom focus chain on a container, overriding the default
+ *    geometric focus order.
+ *
+ * The test creates a series of checkboxes to toggle focus options, and a set
+ * of buttons with a custom focus chain. The initial custom focus order for the
+ * buttons is: Button 2 -> Button 1 -> Button 4 -> Button 3. A checkbox is
+ * provided to enable/disable this custom chain.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_focus_custom_chain(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

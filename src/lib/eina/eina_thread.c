@@ -30,6 +30,17 @@
 #include "eina_config.h"
 #include "eina_thread.h"
 
+/**
+ * @internal
+ * @brief Implements the eina_thread_cancellable_run function.
+ *
+ * For detailed API documentation, see @ref eina_thread_cancellable_run in eina_thread.h.
+ * This function provides a robust mechanism to execute a potentially cancellable
+ * operation (@p cb) while ensuring that a specified cleanup routine (@p cleanup_cb)
+ * is executed regardless of whether the operation completes normally or is cancelled.
+ * It manages the thread's cancellability state and cleanup handlers around the
+ * execution of @p cb.
+ */
 EINA_API void *
 eina_thread_cancellable_run(Eina_Thread_Cancellable_Run_Cb cb, Eina_Free_Cb cleanup_cb, void *data)
 {

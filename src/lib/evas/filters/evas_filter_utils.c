@@ -2,6 +2,16 @@
 
 #include "evas_filter_private.h"
 
+/**
+ * @brief Scales a source buffer to a new width and height.
+ * @param ctx The filter context.
+ * @param src The source buffer to scale.
+ * @param w The target width.
+ * @param h The target height.
+ * @return A new Evas_Filter_Buffer containing the scaled image, or NULL on failure.
+ *         The returned buffer is a temporary buffer obtained from the context.
+ * @note This is a potentially slow operation.
+ */
 Evas_Filter_Buffer *
 evas_filter_buffer_scaled_get(Evas_Filter_Context *ctx,
                               Evas_Filter_Buffer *src,
@@ -68,6 +78,21 @@ end:
    return dst;
 }
 
+/**
+ * @brief Fills an output array based on input points using no interpolation.
+ * @param output The output array of 256 DATA8 values to be filled.
+ * @param points An array of 256 integers. A value of -1 indicates that the point
+ *               is not set and should be filled with the previous set value.
+ *               Otherwise, the value is directly used.
+ *               Example: `points[0] = 0, points[10] = 50, points[255] = 255`.
+ *                        All other `points[i]` could be -1.
+ * @return EINA_TRUE on success.
+ *
+ * This function implements a "step" or "none" interpolation. For each entry in
+ * `output`, if `points[j]` is not -1, `output[j]` takes that value, and this
+ * value is remembered. If `points[j]` is -1, `output[j]` takes the last
+ * remembered value.
+ */
 static Eina_Bool
 _interpolate_none(DATA8 *output, int *points)
 {
@@ -83,6 +108,22 @@ _interpolate_none(DATA8 *output, int *points)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Fills an output array based on input points using linear interpolation.
+ * @param output The output array of 256 DATA8 values to be filled.
+ * @param points An array of 256 integers. A value of -1 indicates that the point
+ *               is not set and should be interpolated. At least `points[0]`
+ *               must be set (not -1).
+ *               Example: `points[0] = 0, points[128] = 100, points[255] = 255`.
+ *                        Values between 0-128 and 128-255 will be linearly interpolated.
+ * @return EINA_TRUE on success.
+ *
+ * This function implements linear interpolation between defined points.
+ * If `points[j]` is set (not -1), `output[j]` takes that value.
+ * For indices `k` between the last set point `last_idx` and current set point `j`,
+ * `output[k]` is linearly interpolated between `points[last_idx]` and `points[j]`.
+ * Values after the last defined point are set to the value of the last defined point.
+ */
 static Eina_Bool
 _interpolate_linear(DATA8 *output, int *points)
 {
@@ -113,6 +154,16 @@ _interpolate_linear(DATA8 *output, int *points)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Interpolates values in an array based on specified points and mode.
+ * @param output The output array of 256 DATA8 values to be filled.
+ *               Example structure: `output[0...255]` will contain the interpolated values.
+ * @param points An array of 256 integers representing control points for interpolation.
+ *               A value of -1 means the point is not explicitly set.
+ *               Example structure: `points[0...255]`, e.g., `points[0]=0, points[127]=128, points[255]=255`.
+ * @param mode The interpolation mode to use (NONE or LINEAR).
+ * @return EINA_TRUE if interpolation was successful, EINA_FALSE otherwise (though current implementations always return EINA_TRUE).
+ */
 Eina_Bool
 evas_filter_interpolate(DATA8 *output, int *points,
                         Evas_Filter_Interpolation_Mode mode)
@@ -127,6 +178,13 @@ evas_filter_interpolate(DATA8 *output, int *points,
      }
 }
 
+/**
+ * @brief Finds the smallest power of 2 that is greater than or equal to the given value.
+ * @param val The input integer value.
+ * @return The exponent `n` such that 2^n >= val. For example, if val is 7, returns 3 (2^3=8).
+ *         If val is 8, returns 3 (2^3=8).
+ *         Returns 32 if the value is too large (greater than 2^31).
+ */
 int
 evas_filter_smallest_pow2_larger_than(int val)
 {

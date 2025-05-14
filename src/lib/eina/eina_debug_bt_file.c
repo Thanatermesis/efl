@@ -29,8 +29,15 @@
 
 extern Eina_Spinlock _eina_debug_lock;
 
+/** @internal Number of entries currently in the _table (fname, path pairs count as 2). */
 static unsigned int _table_num = 0;
+/** @internal Allocated size of the _table (number of char* pointers). */
 static unsigned int _table_size = 0;
+/** @internal Table storing filename to full path mappings.
+ * It's an array of strings where even indices are filenames (keys)
+ * and odd indices are their corresponding full paths (values).
+ * Example: ["fname1", "/path/to/fname1", "fname2", "/path/to/fname2", NULL, NULL, ...]
+ */
 static const char **_table = NULL;
 
 // a very simple "fast lookup" of a filename to a path. we expect this table

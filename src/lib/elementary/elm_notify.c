@@ -20,6 +20,17 @@
 #define MY_CLASS_NAME "Elm_Notify"
 #define MY_CLASS_NAME_LEGACY "elm_notify"
 
+/**
+ * @internal
+ * @brief Applies the current theme to the notify object.
+ *
+ * This function determines the appropriate theme group and style for the
+ * notify based on its alignment (e.g., "top", "center", "bottom_right")
+ * and then applies it to the underlying Edje object.
+ *
+ * @param obj The notify Evas_Object.
+ * @return Eina_Error EFL_UI_THEME_APPLY_ERROR_NONE on success, or an error code on failure.
+ */
 static Eina_Error
 _notify_theme_apply(Evas_Object *obj)
 {
@@ -64,7 +75,13 @@ _notify_theme_apply(Evas_Object *obj)
 }
 
 /**
- * Moves notification to orientation.
+ * @internal
+ * @brief Moves and resizes the notification based on its content size, alignment, and parent geometry.
+ *
+ * This function calculates the final position and size of the notification
+ * within its parent. It considers the minimum size required by the content,
+ * the alignment settings (horizontal_align, vertical_align), and whether
+ * the UI is mirrored (RTL).
  *
  * This function moves notification to orientation
  * according to object RTL orientation.
@@ -99,6 +116,15 @@ _notify_move_to_orientation(Evas_Object *obj, Evas_Coord x, Evas_Coord y, Evas_C
    evas_object_geometry_set(sd->notify, x, y, minw, minh);
 }
 
+/**
+ * @internal
+ * @brief Applies the theme to the block_events object of the notify.
+ *
+ * The block_events object is a layout used to intercept pointer events
+ * outside the notification when `allow_events` is false.
+ *
+ * @param obj The notify Evas_Object.
+ */
 static void
 _block_events_theme_apply(Evas_Object *obj)
 {
@@ -111,6 +137,16 @@ _block_events_theme_apply(Evas_Object *obj)
      CRI("Failed to set layout!");
 }
 
+/**
+ * @internal
+ * @brief Sets the mirrored (RTL/LTR) mode for the notify widget.
+ *
+ * This updates the underlying Edje object's mirrored state and then
+ * re-calculates the notification's position to reflect the change.
+ *
+ * @param obj The notify Evas_Object.
+ * @param rtl EINA_TRUE for RTL, EINA_FALSE for LTR.
+ */
 static void
 _mirrored_set(Evas_Object *obj, Eina_Bool rtl)
 {
@@ -122,6 +158,17 @@ _mirrored_set(Evas_Object *obj, Eina_Bool rtl)
    _notify_move_to_orientation(obj, x, y, w, h);
 }
 
+/**
+ * @internal
+ * @brief Evaluates and applies the size of the notify widget based on its parent.
+ *
+ * If the notify has a parent, this function sets the notify's geometry
+ * to match the parent's geometry. If the parent is a window,
+ * the position is adjusted to (0,0) relative to the window.
+ * This ensures the notify covers the intended area for positioning its content.
+ *
+ * @param obj The notify Evas_Object.
+ */
 static void
 _sizing_eval(Evas_Object *obj)
 {
@@ -168,6 +215,15 @@ _elm_notify_efl_ui_widget_theme_apply(Eo *obj, Elm_Notify_Data *sd)
 }
 
 /* Legacy compat. Note that notify has no text parts in the default theme... */
+/**
+ * @internal
+ * @brief Legacy compatibility function to set text on a part of the notify.
+ * @warning The default notify theme does not have text parts.
+ * @param obj The notify Eo object (unused).
+ * @param sd The notify widget data.
+ * @param part The name of the Edje part to set text on.
+ * @param label The text to set.
+ */
 static void
 _elm_notify_text_set(Eo *obj EINA_UNUSED, Elm_Notify_Data *sd, const char *part, const char *label)
 {
@@ -175,12 +231,32 @@ _elm_notify_text_set(Eo *obj EINA_UNUSED, Elm_Notify_Data *sd, const char *part,
 }
 
 /* Legacy compat. Note that notify has no text parts in the default theme... */
+/**
+ * @internal
+ * @brief Legacy compatibility function to get text from a part of the notify.
+ * @warning The default notify theme does not have text parts.
+ * @param obj The notify Eo object (unused).
+ * @param sd The notify widget data.
+ * @param part The name of the Edje part to get text from.
+ * @return The text from the part, or NULL if not found.
+ */
 static const char*
 _elm_notify_text_get(Eo *obj EINA_UNUSED, Elm_Notify_Data *sd, const char *part)
 {
    return edje_object_part_text_get(sd->notify, part);
 }
 
+/**
+ * @internal
+ * @brief Recalculates the size and position of the notify.
+ *
+ * This function first calls _sizing_eval() to update the base geometry
+ * based on the parent, and then, if content exists, it calls
+ * _notify_move_to_orientation() to position the actual notification
+ * element (sd->notify) within that geometry.
+ *
+ * @param obj The notify Evas_Object.
+ */
 static void
 _calc(Evas_Object *obj)
 {
@@ -198,6 +274,17 @@ _calc(Evas_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when the size hints of the notify's content change.
+ *
+ * This triggers a recalculation of the notify's layout via _calc().
+ *
+ * @param data The notify Evas_Object (passed as user data).
+ * @param e The Evas canvas (unused).
+ * @param obj The content object whose size hints changed (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _changed_size_hints_cb(void *data,
                        Evas *e EINA_UNUSED,
@@ -225,6 +312,18 @@ _elm_notify_efl_ui_widget_widget_sub_object_del(Eo *obj, Elm_Notify_Data *sd, Ev
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when the area outside the notification is clicked.
+ *
+ * This callback is active when `allow_events` is EINA_FALSE. It emits
+ * the "block,clicked" signal on the notify object.
+ *
+ * @param data The notify Evas_Object (passed as user data).
+ * @param obj The block_events Edje object that received the click (unused).
+ * @param emission The Edje signal emitted (unused).
+ * @param source The source of the Edje signal (unused).
+ */
 static void
 _block_area_clicked_cb(void *data,
                        Evas_Object *obj EINA_UNUSED,
@@ -268,6 +367,17 @@ _elm_notify_efl_gfx_entity_position_set(Eo *obj, Elm_Notify_Data *sd, Eina_Posit
      }
 }
 
+/**
+ * @internal
+ * @brief Callback function for the notify timeout timer.
+ *
+ * When the timer expires, this function hides the notify widget and
+ * emits the "timeout" signal. It ensures the notify is visible before
+ * attempting to hide and emit the signal.
+ *
+ * @param data The notify Evas_Object (passed as user data).
+ * @return ECORE_CALLBACK_CANCEL to automatically delete the timer.
+ */
 static Eina_Bool
 _timer_cb(void *data)
 {
@@ -286,6 +396,16 @@ end:
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @internal
+ * @brief Initializes or re-initializes the timeout timer for the notify.
+ *
+ * If a timer already exists, it's deleted. If the timeout value
+ * (sd->timeout) is greater than 0, a new timer is added.
+ *
+ * @param obj The notify Evas_Object.
+ * @param sd The notify widget data.
+ */
 static void
 _timer_init(Evas_Object *obj,
             Elm_Notify_Data *sd)
@@ -297,6 +417,17 @@ _timer_init(Evas_Object *obj,
      sd->timer = NULL;
 }
 
+/**
+ * @internal
+ * @brief Internal logic to show the notify widget.
+ *
+ * This function makes the notify and its associated elements (like the
+ * block_events object if `allow_events` is false) visible. It also
+ * resets timeout-related flags and starts the timeout timer.
+ *
+ * @param obj The notify Eo object.
+ * @param sd The notify widget data.
+ */
 static void
 _elm_notify_show(Eo *obj, Elm_Notify_Data *sd)
 {
@@ -310,6 +441,18 @@ _elm_notify_show(Eo *obj, Elm_Notify_Data *sd)
    elm_object_focus_set(obj, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Internal logic to hide the notify widget.
+ *
+ * This function handles the process of hiding the notify. It checks if a
+ * specific "hide_finished_signal" is defined in the theme. If so, it emits
+ * signals to trigger animations. Otherwise, it directly hides the Evas objects.
+ * It also stops the timeout timer.
+ *
+ * @param obj The notify Eo object (unused, but kept for consistency with show).
+ * @param sd The notify widget data.
+ */
 static void
 _elm_notify_hide(Eo *obj EINA_UNUSED, Elm_Notify_Data *sd)
 {
@@ -346,6 +489,17 @@ _elm_notify_efl_gfx_entity_visible_set(Eo *obj, Elm_Notify_Data *sd, Eina_Bool v
    else _elm_notify_hide(obj, sd);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when the notify's parent object is deleted.
+ *
+ * This function unsets the parent of the notify and hides the notify.
+ *
+ * @param data The notify Evas_Object (passed as user data).
+ * @param e The Evas canvas (unused).
+ * @param obj The parent object that was deleted (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _parent_del_cb(void *data,
                Evas *e EINA_UNUSED,
@@ -356,6 +510,17 @@ _parent_del_cb(void *data,
    evas_object_hide(data);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when the notify's parent object is hidden.
+ *
+ * This function hides the notify widget.
+ *
+ * @param data The notify Evas_Object (passed as user data).
+ * @param e The Evas canvas (unused).
+ * @param obj The parent object that was hidden (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _parent_hide_cb(void *data,
                 Evas *e EINA_UNUSED,
@@ -365,6 +530,21 @@ _parent_hide_cb(void *data,
    evas_object_hide(data);
 }
 
+/**
+ * @internal
+ * @brief Sets the content of the notify widget for a given part.
+ *
+ * For notify, only the "default" part is typically supported.
+ * If new content is provided, the old content is deleted. The new content
+ * is added as a sub-object and swallowed into the "elm.swallow.content"
+ * part of the notify's Edje theme. Callbacks for size hint changes are set up.
+ *
+ * @param obj The notify Eo object.
+ * @param sd The notify widget data.
+ * @param part The name of the part to set content to (should be "default" or NULL).
+ * @param content The Evas_Object to set as content.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., invalid part).
+ */
 static Eina_Bool
 _elm_notify_content_set(Eo *obj, Elm_Notify_Data *sd, const char *part, Evas_Object *content)
 {
@@ -389,6 +569,17 @@ _elm_notify_content_set(Eo *obj, Elm_Notify_Data *sd, const char *part, Evas_Obj
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Gets the content of the notify widget for a given part.
+ *
+ * For notify, only the "default" part is typically supported.
+ *
+ * @param obj The notify Eo object (unused).
+ * @param sd The notify widget data.
+ * @param part The name of the part to get content from (should be "default" or NULL).
+ * @return The content Evas_Object, or NULL if not set or part is invalid.
+ */
 static Evas_Object*
 _elm_notify_content_get(const Eo *obj EINA_UNUSED, Elm_Notify_Data *sd, const char *part)
 {
@@ -397,6 +588,19 @@ _elm_notify_content_get(const Eo *obj EINA_UNUSED, Elm_Notify_Data *sd, const ch
    return sd->content;
 }
 
+/**
+ * @internal
+ * @brief Unsets (removes) the content from the notify widget for a given part.
+ *
+ * For notify, only the "default" part is typically supported.
+ * The content object is unswallowed from the Edje theme and its sub-object
+ * relationship is handled. The caller is responsible for deleting the returned object if needed.
+ *
+ * @param obj The notify Eo object.
+ * @param sd The notify widget data.
+ * @param part The name of the part to unset content from (should be "default" or NULL).
+ * @return The previously set content Evas_Object, or NULL if no content or invalid part.
+ */
 static Evas_Object*
 _elm_notify_content_unset(Eo *obj, Elm_Notify_Data *sd, const char *part)
 {
@@ -431,6 +635,18 @@ _elm_notify_efl_content_content_unset(Eo *obj, Elm_Notify_Data *sd)
    return _elm_notify_content_unset(obj, sd, "default");
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when the "elm,action,hide,finished" signal is emitted by the notify's Edje object.
+ *
+ * This typically signifies the end of a hide animation. It finalizes the hiding
+ * process by hiding the Evas objects and emitting the ELM_NOTIFY_EVENT_DISMISSED legacy event.
+ *
+ * @param data The notify Evas_Object (passed as user data).
+ * @param obj The Edje object that emitted the signal (unused).
+ * @param emission The Edje signal name (unused).
+ * @param source The Edje signal source (unused).
+ */
 static void
 _hide_finished_cb(void *data,
                   Evas_Object *obj EINA_UNUSED,
@@ -481,7 +697,19 @@ elm_notify_add(Evas_Object *parent)
    return elm_legacy_add(MY_CLASS, parent);
 }
 
-
+/**
+ * @internal
+ * @brief Sets up or tears down event callbacks related to the notify's parent.
+ *
+ * When a parent is set, this function adds callbacks to the parent for events
+ * like deletion, hiding, resizing, and moving. These callbacks allow the notify
+ * to react appropriately (e.g., hide itself, recalculate its position).
+ * When the parent is unset (NULL), existing callbacks are removed.
+ *
+ * @param obj The notify Eo object.
+ * @param sd The notify widget data.
+ * @param parent The new parent Evas_Object, or NULL to unset.
+ */
 static void
 _parent_setup(Eo *obj, Elm_Notify_Data *sd, Evas_Object *parent)
 {
@@ -633,6 +861,17 @@ elm_notify_orient_get(const Evas_Object *obj)
    return orient;
 }
 
+/**
+ * @internal
+ * @brief Sets the timeout value for the notification.
+ *
+ * The notification will automatically hide after this duration (in seconds).
+ * A value of 0.0 or less disables the timeout.
+ *
+ * @param obj The notify Eo object.
+ * @param sd The notify widget data.
+ * @param timeout The timeout duration in seconds.
+ */
 EOLIAN static void
 _elm_notify_timeout_set(Eo *obj, Elm_Notify_Data *sd, double timeout)
 {
@@ -640,12 +879,32 @@ _elm_notify_timeout_set(Eo *obj, Elm_Notify_Data *sd, double timeout)
    _timer_init(obj, sd);
 }
 
+/**
+ * @internal
+ * @brief Gets the timeout value for the notification.
+ *
+ * @param obj The notify Eo object (unused).
+ * @param sd The notify widget data.
+ * @return The timeout duration in seconds.
+ */
 EOLIAN static double
 _elm_notify_timeout_get(const Eo *obj EINA_UNUSED, Elm_Notify_Data *sd)
 {
    return sd->timeout;
 }
 
+/**
+ * @internal
+ * @brief Sets whether events are allowed to pass through to objects below the notification.
+ *
+ * If `allow` is EINA_FALSE (default), a blocking area is created behind the
+ * notification that intercepts mouse events. Clicking this area emits a
+ * "block,clicked" signal. If `allow` is EINA_TRUE, events pass through.
+ *
+ * @param obj The notify Eo object.
+ * @param sd The notify widget data.
+ * @param allow EINA_TRUE to allow events, EINA_FALSE to block them.
+ */
 EOLIAN static void
 _elm_notify_allow_events_set(Eo *obj, Elm_Notify_Data *sd, Eina_Bool allow)
 {
@@ -668,12 +927,41 @@ _elm_notify_allow_events_set(Eo *obj, Elm_Notify_Data *sd, Eina_Bool allow)
      }
 }
 
+/**
+ * @internal
+ * @brief Gets whether events are allowed to pass through to objects below the notification.
+ *
+ * @param obj The notify Eo object (unused).
+ * @param sd The notify widget data.
+ * @return EINA_TRUE if events are allowed, EINA_FALSE if they are blocked.
+ */
 EOLIAN static Eina_Bool
 _elm_notify_allow_events_get(const Eo *obj EINA_UNUSED, Elm_Notify_Data *sd)
 {
    return sd->allow_events;
 }
 
+/**
+ * @internal
+ * @brief Sets the alignment of the notification within its parent.
+ *
+ * Alignment values range from 0.0 to 1.0.
+ * For horizontal alignment:
+ *   - 0.0 means left aligned.
+ *   - 0.5 means center aligned.
+ *   - 1.0 means right aligned.
+ * For vertical alignment:
+ *   - 0.0 means top aligned.
+ *   - 0.5 means center aligned.
+ *   - 1.0 means bottom aligned.
+ * Special value ELM_NOTIFY_ALIGN_FILL can be used to make the notification
+ * fill the entire width/height of its parent.
+ *
+ * @param obj The notify Eo object.
+ * @param sd The notify widget data.
+ * @param horizontal The horizontal alignment value.
+ * @param vertical The vertical alignment value.
+ */
 EOLIAN static void
 _elm_notify_align_set(Eo *obj, Elm_Notify_Data *sd, double horizontal, double vertical)
 {
@@ -684,6 +972,16 @@ _elm_notify_align_set(Eo *obj, Elm_Notify_Data *sd, double horizontal, double ve
    _calc(obj);
 }
 
+/**
+ * @internal
+ * @brief Dismisses the notification.
+ *
+ * This function triggers the hide animation/process for the notification
+ * by emitting "elm,state,hide" signals to its underlying Edje objects.
+ *
+ * @param obj The notify Eo object (unused).
+ * @param sd The notify widget data.
+ */
 EOLIAN static void
 _elm_notify_dismiss(Eo *obj EINA_UNUSED, Elm_Notify_Data *sd)
 {
@@ -691,7 +989,15 @@ _elm_notify_dismiss(Eo *obj EINA_UNUSED, Elm_Notify_Data *sd)
    edje_object_signal_emit(sd->notify, "elm,state,hide", "elm");
 }
 
-
+/**
+ * @internal
+ * @brief Gets the alignment of the notification.
+ *
+ * @param obj The notify Eo object (unused).
+ * @param sd The notify widget data.
+ * @param horizontal Pointer to store the horizontal alignment value.
+ * @param vertical Pointer to store the vertical alignment value.
+ */
 EOLIAN static void
 _elm_notify_align_get(const Eo *obj EINA_UNUSED, Elm_Notify_Data *sd, double *horizontal, double *vertical)
 {
@@ -701,6 +1007,15 @@ _elm_notify_align_get(const Eo *obj EINA_UNUSED, Elm_Notify_Data *sd, double *ho
      *vertical = sd->vertical_align;
 }
 
+/**
+ * @internal
+ * @brief Class constructor for the Elm_Notify widget.
+ *
+ * This function is called once when the Elm_Notify class is being set up.
+ * It registers the legacy type name for the widget.
+ *
+ * @param klass The Efl_Class for Elm_Notify.
+ */
 static void
 _elm_notify_class_constructor(Efl_Class *klass)
 {

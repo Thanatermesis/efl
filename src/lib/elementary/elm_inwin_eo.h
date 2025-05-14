@@ -4,6 +4,10 @@
 #ifndef _ELM_INWIN_EO_CLASS_TYPE
 #define _ELM_INWIN_EO_CLASS_TYPE
 
+/**
+ * @brief Elementary Inwin object.
+ * @ingroup Elm_Inwin
+ */
 typedef Eo Elm_Inwin;
 
 #endif

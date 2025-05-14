@@ -49,11 +49,17 @@ EINA_API Eina_Error EINA_ERROR_VALUE_FAILED = 0;
  * @cond LOCAL
  */
 
+/** @internal @brief Mempool for Eina_Value structures themselves. */
 static Eina_Mempool *_eina_value_mp = NULL;
+/** @internal @brief Hash table storing mempools for inner value data (small allocations). Key: size, Value: Eina_Value_Inner_Mp*. */
 static Eina_Hash *_eina_value_inner_mps = NULL;
+/** @internal @brief Lock protecting access to _eina_value_inner_mps. */
 static Eina_Lock _eina_value_inner_mps_lock;
+/** @internal @brief String choice for the mempool type (e.g., "chained_mempool"). */
 static char *_eina_value_mp_choice = NULL;
+/** @internal @brief Log domain for Eina_Value. */
 static int _eina_value_log_dom = -1;
+/** @internal @brief A pre-initialized empty Eina_Value, used for quick copies. */
 static Eina_Value _eina_value_empty;
 
 #ifdef ERR
@@ -3353,6 +3359,15 @@ _eina_value_type_timeval_copy(const Eina_Value_Type *type EINA_UNUSED, const voi
    return EINA_TRUE;
 }
 
+/**
+* @internal
+* @brief Normalizes a struct timeval.
+* Ensures that tv_usec is within the range [0, 999999].
+* This is necessary because arithmetic operations (like subtraction) on timevals
+* can result in tv_usec being negative or exceeding its valid range.
+* @param input The timeval to normalize.
+* @return A normalized timeval.
+*/
 static inline struct timeval _eina_value_type_timeval_fix(const struct timeval *input)
 {
    struct timeval ret = *input;
@@ -4382,6 +4397,19 @@ _eina_value_type_struct_convert_to(const Eina_Value_Type *type EINA_UNUSED, cons
      }
 }
 
+/**
+* @internal
+* @brief Checks the validity of an Eina_Value_Struct_Desc.
+* Verifies:
+* - desc is not NULL.
+* - desc->version matches EINA_VALUE_STRUCT_DESC_VERSION.
+* - For each member:
+*   - member->type is a valid Eina_Value_Type.
+*   - member->type->value_size is greater than 0.
+* - The declared desc->size is sufficient to hold all members based on their offsets and sizes.
+* @param desc The descriptor to check.
+* @return EINA_TRUE if valid, EINA_FALSE otherwise.
+*/
 static Eina_Bool
 _eina_value_type_struct_desc_check(const Eina_Value_Struct_Desc *desc)
 {
@@ -4550,6 +4578,10 @@ _eina_value_type_optional_setup(const Eina_Value_Type *type EINA_UNUSED, void *m
 static Eina_Bool
 _eina_value_type_optional_flush(const Eina_Value_Type *type EINA_UNUSED, void *mem EINA_UNUSED)
 {
+   // Depending on the size of Eina_Value_Optional_Outer relative to Eina_Value_Union,
+   // the optional value's metadata (subtype and pointer to actual value) is either
+   // stored directly within the Eina_Value's union (if it fits) or a pointer to
+   // an Eina_Value_Optional_Inner structure is stored.
    if(sizeof(Eina_Value_Optional_Outer) <= sizeof(Eina_Value_Union))
      {
         Eina_Value_Optional_Outer* opt = mem;
@@ -4563,7 +4595,7 @@ _eina_value_type_optional_flush(const Eina_Value_Type *type EINA_UNUSED, void *m
      }
    else
      {
-        Eina_Value_Optional_Inner* opt = *(void**)mem;
+        Eina_Value_Optional_Inner* opt = *(void**)mem; // Indirect storage via pointer
         if(opt)
           {
              if(!eina_value_type_flush(opt->subtype, opt->value))
@@ -4612,6 +4644,9 @@ eina_value_optional_pset(Eina_Value *value,
                          Eina_Value_Type const* subtype,
                          const void *subvalue) EINA_ARG_NONNULL(1, 2, 3)
 {
+   // Resets the optional value first to clear any existing content.
+   // Storage strategy depends on whether Eina_Value_Optional_Outer fits directly
+   // into Eina_Value_Union.
    eina_value_optional_reset(value);
 
    if (sizeof(Eina_Value_Optional_Outer) <= sizeof(Eina_Value_Union))
@@ -4627,6 +4662,8 @@ eina_value_optional_pset(Eina_Value *value,
      }
    else
      {
+        // Indirect storage: A pointer to Eina_Value_Optional_Inner is stored.
+        // Eina_Value_Optional_Inner itself contains the subtype and the actual value data.
         Eina_Value_Optional_Inner *inner =
           malloc(sizeof(Eina_Value_Optional_Inner) + subtype->value_size);
         inner->subtype = subtype;
@@ -4643,6 +4680,7 @@ eina_value_optional_pset(Eina_Value *value,
 EINA_API Eina_Bool
 eina_value_optional_pget(Eina_Value *value, void *subvalue) EINA_ARG_NONNULL(1, 2, 3)
 {
+   // Retrieves the stored value, handling the two possible storage strategies.
    if(sizeof(Eina_Value_Optional_Outer) <= sizeof(Eina_Value_Union))
      {
        Eina_Value_Optional_Outer outer;
@@ -4657,15 +4695,16 @@ eina_value_optional_pget(Eina_Value *value, void *subvalue) EINA_ARG_NONNULL(1, 
      }
    else
      {
+       // Indirect storage case
        Eina_Value_Optional_Inner *inner;
 
        if (!eina_value_pget(value, &inner))
            return EINA_FALSE;
 
-       if(inner)
+       if(inner) // Check if the optional holds a value
            eina_value_type_copy(inner->subtype, inner->value, subvalue);
        else
-         return EINA_FALSE;
+         return EINA_FALSE; // Optional is empty
      }
 
    return EINA_TRUE;
@@ -4674,6 +4713,7 @@ eina_value_optional_pget(Eina_Value *value, void *subvalue) EINA_ARG_NONNULL(1, 
 static Eina_Bool
 _eina_value_type_optional_copy(const Eina_Value_Type *type EINA_UNUSED, const void *src_raw, void *dst_raw)
 {
+   // Handles copying for both direct and indirect storage of optional metadata.
    if(sizeof(Eina_Value_Optional_Outer) <= sizeof(Eina_Value_Union))
      {
         Eina_Value_Optional_Outer const* src = src_raw;
@@ -4687,16 +4727,18 @@ _eina_value_type_optional_copy(const Eina_Value_Type *type EINA_UNUSED, const vo
         else
           memset(dst_raw, 0, sizeof(Eina_Value_Optional_Outer));
      }
-   else if(src_raw)
+   else if(src_raw) // Check if src_raw (which is a pointer to Eina_Value_Optional_Inner*) is not NULL
      {
-        Eina_Value_Optional_Inner* src = *(void**)src_raw;
-        Eina_Value_Optional_Inner* dst = *(void**)dst_raw
-          = malloc(sizeof(Eina_Value_Optional_Inner) + src->subtype->value_size);
-        dst->subtype = src->subtype;
+        // Indirect storage: copy Eina_Value_Optional_Inner.
+        Eina_Value_Optional_Inner* src = *(void**)src_raw; // Dereference to get Eina_Value_Optional_Inner*
+        Eina_Value_Optional_Inner* dst_inner_ptr = malloc(sizeof(Eina_Value_Optional_Inner) + src->subtype->value_size);
+        if (!dst_inner_ptr) return EINA_FALSE;
 
-        eina_value_type_copy(src->subtype, src->value, dst->value);
+        dst_inner_ptr->subtype = src->subtype;
+        eina_value_type_copy(src->subtype, src->value, dst_inner_ptr->value);
+        *(void**)dst_raw = dst_inner_ptr; // Store the pointer to the new inner struct
      }
-   else
+   else // Source (indirect storage) is empty (NULL pointer)
      *(void**)dst_raw = NULL;
    return EINA_TRUE;
 }
@@ -4704,6 +4746,7 @@ _eina_value_type_optional_copy(const Eina_Value_Type *type EINA_UNUSED, const vo
 static int
 _eina_value_type_optional_compare(const Eina_Value_Type *type EINA_UNUSED, const void *lhs_raw, const void *rhs_raw)
 {
+   // Compares two optional values, considering their storage strategy.
    if(sizeof(Eina_Value_Optional_Outer) <= sizeof(Eina_Value_Union))
      {
        Eina_Value_Optional_Outer const *lhs = lhs_raw
@@ -4719,16 +4762,17 @@ _eina_value_type_optional_compare(const Eina_Value_Type *type EINA_UNUSED, const
      }
    else
      {
-       Eina_Value_Optional_Inner const * const* lhs_p = lhs_raw;
-       Eina_Value_Optional_Inner const * const* rhs_p = rhs_raw;
+       // Indirect storage comparison.
+       Eina_Value_Optional_Inner const * const* lhs_p = lhs_raw; // lhs_p is Eina_Value_Optional_Inner**
+       Eina_Value_Optional_Inner const * const* rhs_p = rhs_raw; // rhs_p is Eina_Value_Optional_Inner**
 
-       if(!*lhs_p)
-         return *rhs_p ? -1 : 0;
-       else if(!*rhs_p)
-         return 1;
-       else if((*lhs_p)->subtype != (*rhs_p)->subtype)
+       if(!*lhs_p) // LHS is empty (outer pointer is NULL)
+         return *rhs_p ? -1 : 0; // If RHS also empty, 0, else LHS < RHS
+       else if(!*rhs_p) // LHS has value, RHS is empty
+         return 1; // LHS > RHS
+       else if((*lhs_p)->subtype != (*rhs_p)->subtype) // Both have values, compare subtypes
          return (*lhs_p)->subtype < (*rhs_p)->subtype ? -1 : 1;
-       else
+       else // Same subtype, compare actual values
          return eina_value_type_compare((*lhs_p)->subtype, (*lhs_p)->value, (*rhs_p)->value);
      }
 }
@@ -5028,6 +5072,14 @@ EINA_API const Eina_Value_Type _EINA_VALUE_TYPE_RECTANGLE = {
  * NOTE-1: JUST BASIC TYPES, DO NOT ADD MORE TYPES HERE!!!
  * NOTE-2: KEEP ORDER, see eina_value_init()
  */
+/**
+* @internal
+* @brief Array of Eina_Value_Type descriptors for basic built-in types.
+* This array allows for efficient checking if a type is a basic type via
+* pointer arithmetic (_EINA_VALUE_TYPE_BASICS_START and _EINA_VALUE_TYPE_BASICS_END).
+* The order of types in this array is significant and corresponds to the
+* initialization order in eina_value_init().
+*/
 static const Eina_Value_Type _EINA_VALUE_TYPE_BASICS[] = {
   {
     EINA_VALUE_TYPE_VERSION,
@@ -5285,16 +5337,23 @@ struct _Eina_Value_Inner_Mp
 #ifdef DEBUG
    int size;
 #endif
-   int references;
+   int references; /**< Number of active allocations from this mempool. */
 };
-
+ 
 /**
  * @endcond
  */
-
+ 
+// Documentation for eina_value_inner_alloc and eina_value_inner_free
+// is provided below with their public API definitions.
+ 
 /**
+ * @internal
+ * @brief Disposes of an inner mempool if it has no active references.
+ * Removes the mempool from the global hash and deallocates it.
+ * @param size The size of elements this mempool managed.
+ * @param imp Pointer to the Eina_Value_Inner_Mp structure.
  */
-
 static inline void
 _eina_value_inner_mp_dispose(int size, Eina_Value_Inner_Mp *imp)
 {
@@ -5337,7 +5396,15 @@ _eina_value_inner_mp_get(int size)
 
    return imp;
 }
-
+ 
+/**
+* @internal
+* @brief Allocates memory from an inner mempool of the specified size.
+* Retrieves or creates the appropriate mempool and allocates from it.
+* Manages reference counting for the mempool.
+* @param size The size of memory to allocate.
+* @return Pointer to the allocated memory, or NULL on failure.
+*/
 static inline void *
 _eina_value_inner_alloc_internal(int size)
 {
@@ -5353,7 +5420,15 @@ _eina_value_inner_alloc_internal(int size)
 
    return mem;
 }
-
+ 
+/**
+* @internal
+* @brief Frees memory previously allocated by _eina_value_inner_alloc_internal.
+* Returns the memory to the appropriate inner mempool and decrements its
+* reference count, disposing of the mempool if no references remain.
+* @param size The original size of the memory block being freed.
+* @param mem Pointer to the memory to free.
+*/
 static inline void
 _eina_value_inner_free_internal(int size, void *mem)
 {
@@ -5366,7 +5441,24 @@ _eina_value_inner_free_internal(int size, void *mem)
    if (imp->references > 0) return;
    _eina_value_inner_mp_dispose(size, imp);
 }
-
+ 
+/**
+* @brief Allocates a small block of memory, potentially using an internal mempool.
+* @param size The number of bytes to allocate.
+* @return A pointer to the allocated memory, or @c NULL on failure.
+*
+* For allocations up to 256 bytes, this function attempts to use a specialized
+* internal mempool for efficiency. For larger allocations, it falls back to `malloc()`.
+* Memory allocated with this function (especially sizes <= 256 bytes) should be
+* freed with eina_value_inner_free() to ensure proper mempool management.
+*
+* This function is typically used by Eina_Value itself for managing the
+* memory of small, frequently allocated/deallocated value types if they
+* don't fit directly into the Eina_Value_Union.
+*
+* @see eina_value_inner_free()
+* @since 1.8
+*/
 EINA_API void *
 eina_value_inner_alloc(size_t size)
 {
@@ -5380,7 +5472,19 @@ eina_value_inner_alloc(size_t size)
 
    return mem;
 }
-
+ 
+/**
+* @brief Frees a block of memory previously allocated by eina_value_inner_alloc().
+* @param size The original size of the memory block that was allocated.
+* @param mem Pointer to the memory to free.
+*
+* If the original `size` was > 256 bytes, this function calls `free()`.
+* Otherwise, it returns the memory to the appropriate internal mempool.
+* It is crucial to pass the same `size` that was used for allocation.
+*
+* @see eina_value_inner_alloc()
+* @since 1.8
+*/
 EINA_API void
 eina_value_inner_free(size_t size, void *mem)
 {

@@ -24,80 +24,100 @@
 
 #define _TRANSIT_FOCAL 2000
 
+/**
+ * @internal
+ * @brief Structure defining a transit instance.
+ * This structure holds all the state and properties of an ongoing or configured transit.
+ */
 struct _Elm_Transit
 {
 #define ELM_TRANSIT_MAGIC 0xd27f190a
-   EINA_MAGIC;
+   EINA_MAGIC; /**< Magic number for type checking. */
 
-   Ecore_Animator *animator;
-   Ecore_Timer *go_in_timer; /**< Timer used by elm_transit_go_in() */
-   Eina_Inlist *effect_list;
-   Eina_List *objs;
-   Elm_Transit *prev_chain_transit;
-   Eina_List *next_chain_transits;
-   Elm_Transit_Tween_Mode tween_mode;
+   Ecore_Animator *animator; /**< The animator driving the transit. */
+   Ecore_Timer *go_in_timer; /**< Timer used by elm_transit_go_in() for delayed start. */
+   Eina_Inlist *effect_list; /**< List of effects applied in this transit. @see _Elm_Transit_Effect_Module */
+   Eina_List *objs; /**< List of Evas_Object instances affected by this transit. */
+   Elm_Transit *prev_chain_transit; /**< The preceding transit in a chain. */
+   Eina_List *next_chain_transits; /**< List of transits to be run after this one. */
+   Elm_Transit_Tween_Mode tween_mode; /**< The acceleration/deceleration mode of the transit. */
    struct
      {
-        Elm_Transit_Del_Cb func;
-        void *arg;
+        Elm_Transit_Del_Cb func; /**< User callback function on transit deletion. */
+        void *arg; /**< User data for the deletion callback. */
      } del_data;
    struct
      {
-        double delayed;
-        double paused;
-        double duration;
-        double begin;
-        double current;
-        double revert_start;
-        double revert_elapsed;
-        double revert_paused;
-        double revert_delayed;
-     } time;
+        double delayed; /**< Accumulated delay time due to pausing. */
+        double paused; /**< Timestamp when transit was last paused. 0 if not paused. */
+        double duration; /**< Total duration of one cycle of the transit. */
+        double begin; /**< Timestamp when the current cycle of the transit started. */
+        double current; /**< Timestamp of the current animation frame. */
+        double revert_start; /**< Timestamp when revert mode started. */
+        double revert_elapsed; /**< Elapsed time in revert mode for the current segment. */
+        double revert_paused; /**< Timestamp when revert mode was paused. */
+        double revert_delayed; /**< Accumulated delay time during revert mode pausing. */
+     } time; /**< Timing information for the transit. */
    struct
      {
-        int count;
-        int current;
-        Eina_Bool reverse;
-     } repeat;
-   double progress;
-   double inter_progress;
-   double base_progress;
-   double revert_begin_progress;
-   double revert_duration;
-   double total_revert_time;
-   unsigned int effects_pending_del;
-   int walking;
-   double v[4];
-   Eina_Bool auto_reverse : 1;
-   Eina_Bool event_enabled : 1;
-   Eina_Bool deleted : 1;
-   Eina_Bool state_keep : 1;
-   Eina_Bool finished : 1;
-   Eina_Bool smooth : 1;
-   Eina_Bool revert_mode : 1;
+        int count; /**< Total number of times to repeat the transit (-1 for infinite). */
+        int current; /**< Current repetition count. */
+        Eina_Bool reverse; /**< Flag indicating if the current repetition is in reverse (due to auto_reverse). */
+     } repeat; /**< Repetition state of the transit. */
+   double progress; /**< Current progress of the transit (0.0 to 1.0), after tweening and reverse. */
+   double inter_progress; /**< Intervention progress, used by elm_transit_progress_value_set(). */
+   double base_progress; /**< Raw progress before tweening or intervention. */
+   double revert_begin_progress; /**< Progress value when revert mode was initiated. */
+   double revert_duration; /**< Not actively used, potentially for future revert features. */
+   double total_revert_time; /**< Total time spent in revert mode, used to adjust elapsed_time. */
+   unsigned int effects_pending_del; /**< Count of effects marked for deletion during animation loop. */
+   int walking; /**< Counter to prevent re-entrancy issues when iterating effects. */
+   double v[4]; /**< Tween mode factors (e.g., for BEZIER_CURVE, BOUNCE, SPRING).
+                 * v[0], v[1] are used by most tween modes.
+                 * v[0..3] are used by ECORE_POS_MAP_CUBIC_BEZIER.
+                 * Example for ECORE_POS_MAP_CUBIC_BEZIER: {x1, y1, x2, y2}
+                 * Example for ECORE_POS_MAP_BOUNCE: {decay_factor, bounces}
+                 */
+   Eina_Bool auto_reverse : 1; /**< If EINA_TRUE, transit plays forwards then backwards. */
+   Eina_Bool event_enabled : 1; /**< If EINA_TRUE, objects receive events during transit. */
+   Eina_Bool deleted : 1; /**< If EINA_TRUE, transit is marked for deletion. */
+   Eina_Bool state_keep : 1; /**< If EINA_TRUE, object's final state is kept after transit. */
+   Eina_Bool finished : 1; /**< If EINA_TRUE, transit has completed all its cycles. */
+   Eina_Bool smooth : 1; /**< If EINA_TRUE, smooth map rendering is used. */
+   Eina_Bool revert_mode : 1; /**< If EINA_TRUE, transit is currently playing in reverse due to elm_transit_revert(). */
 };
 
+/**
+ * @internal
+ * @brief Structure representing a single effect module within a transit.
+ * This acts as a node in the transit's effect_list.
+ */
 struct _Elm_Transit_Effect_Module
 {
-   EINA_INLIST;
-   Elm_Transit_Effect_Transition_Cb transition_cb;
-   Elm_Transit_Effect_End_Cb end_cb;
-   Elm_Transit_Effect *effect;
-   Eina_Bool deleted : 1;
+   EINA_INLIST; /**< Macro for intrusive list node. */
+   Elm_Transit_Effect_Transition_Cb transition_cb; /**< Callback function that applies the effect based on progress. */
+   Elm_Transit_Effect_End_Cb end_cb; /**< Callback function to clean up the effect's context data. */
+   Elm_Transit_Effect *effect; /**< Pointer to the effect's context data. */
+   Eina_Bool deleted : 1; /**< Flag indicating if the effect module is marked for deletion. */
 };
 
+/**
+ * @internal
+ * @brief Structure to store the original state of an Evas_Object before a transit.
+ * This data is used to restore the object's state if `state_keep` is false.
+ */
 struct _Elm_Transit_Obj_Data
 {
    struct {
-      Evas_Coord x, y, w, h;
-      int r,g,b,a;
-      Evas_Map *map;
-      Eina_Bool map_enabled : 1;
-      Eina_Bool visible : 1;
-      Eina_Bool freeze_events : 1;
-      Eina_Bool anti_alias : 1;
-   } state;
-   int ref;
+      Evas_Coord x, y, w, h; /**< Original geometry. */
+      int r,g,b,a; /**< Original color. */
+      Evas_Map *map; /**< Original Evas_Map. */
+      Eina_Bool map_enabled : 1; /**< Original map_enable state. */
+      Eina_Bool visible : 1; /**< Original visibility state. */
+      Eina_Bool freeze_events : 1; /**< Original freeze_events state. */
+      Eina_Bool anti_alias : 1; /**< Original anti_alias state. */
+   } state; /**< The saved state of the object. */
+   int ref; /**< Reference count for this data, as multiple transits might (though not typical) affect the same object sequentially. */
 };
 
 typedef struct _Elm_Transit_Effect_Module Elm_Transit_Effect_Module;
@@ -114,8 +134,17 @@ static void _transit_del(Elm_Transit *transit);
 static Eina_Bool _transit_animate_op(Elm_Transit *transit, double progress);
 static Eina_Bool _transit_animate_cb(void *data);
 
-static char *_transit_key= "_elm_transit_key";
+static char *_transit_key= "_elm_transit_key"; /**< Key for storing _Elm_Transit_Obj_Data on an Evas_Object. */
 
+/**
+ * @internal
+ * @brief Saves the current state of an Evas_Object.
+ * If the object already has saved data, its reference count is incremented.
+ * Otherwise, new data is allocated and populated with the object's current
+ * geometry, color, visibility, map, and event freeze state.
+ * This data is stored on the object using `evas_object_data_set` with `_transit_key`.
+ * @param obj The Evas_Object whose state is to be saved.
+ */
 static void
 _transit_obj_data_save(Evas_Object *obj)
 {
@@ -188,6 +217,16 @@ _transit_obj_remove_cb(void *data, const Efl_Event *ev)
    if (!transit->objs && !transit->deleted) elm_transit_del(transit);
 }
 
+/**
+ * @internal
+ * @brief Recovers the saved state of an Evas_Object.
+ * Decrements the reference count of the saved data. If `state_keep` is false
+ * for the transit, the object's geometry, color, visibility, map, and
+ * event freeze state are restored to their saved values.
+ * If the reference count reaches zero, the saved data is freed.
+ * @param transit The transit instance.
+ * @param obj The Evas_Object whose state is to be recovered.
+ */
 static void
 _transit_obj_data_recover(Elm_Transit *transit, Evas_Object *obj)
 {
@@ -228,6 +267,14 @@ _transit_obj_remove(Elm_Transit *transit, Evas_Object *obj)
    _transit_obj_data_recover(transit, obj);
 }
 
+/**
+ * @internal
+ * @brief Deletes an effect module from a transit.
+ * Calls the effect's end callback if one is registered, then frees the
+ * effect module structure.
+ * @param transit The transit instance the effect belongs to.
+ * @param effect_module The effect module to delete.
+ */
 static void
 _transit_effect_del(Elm_Transit *transit, Elm_Transit_Effect_Module *effect_module)
 {
@@ -236,6 +283,14 @@ _transit_effect_del(Elm_Transit *transit, Elm_Transit_Effect_Module *effect_modu
    free(effect_module);
 }
 
+/**
+ * @internal
+ * @brief Removes effect modules that have been marked as deleted.
+ * Iterates through the transit's effect list and deletes any module
+ * whose `deleted` flag is true. This is typically called when the
+ * animation loop is not currently iterating through the effects (`transit->walking` is 0).
+ * @param transit The transit instance.
+ */
 static void
 _transit_remove_dead_effects(Elm_Transit *transit)
 {
@@ -309,7 +364,17 @@ _transit_del(Elm_Transit *transit)
    free(transit);
 }
 
-//If the transit is deleted then EINA_FALSE is returned.
+/**
+ * @internal
+ * @brief Applies all active effects in the transit for a given progress.
+ * Iterates through the transit's effect list and calls the `transition_cb`
+ * for each non-deleted effect, passing the current progress.
+ * Handles potential deletion of the transit or effects during the iteration.
+ * @param transit The transit instance.
+ * @param progress The current animation progress (0.0 to 1.0).
+ * @return EINA_TRUE if the transit is still valid and operation continued,
+ *         EINA_FALSE if the transit was deleted during the operation.
+ */
 static Eina_Bool
 _transit_animate_op(Elm_Transit *transit, double progress)
 {
@@ -337,6 +402,17 @@ _transit_animate_op(Elm_Transit *transit, double progress)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief The main animator callback for a transit.
+ * This function is called by the ecore animator on each frame.
+ * It calculates the elapsed time, determines the current progress based on
+ * duration, tween mode, repetition, auto-reverse, and revert mode.
+ * It then calls `_transit_animate_op` to apply the effects.
+ * Manages the lifecycle of the animation (renewing or cancelling the animator callback).
+ * @param data Pointer to the Elm_Transit instance.
+ * @return ECORE_CALLBACK_RENEW to continue animation, ECORE_CALLBACK_CANCEL to stop.
+ */
 static Eina_Bool
 _transit_animate_cb(void *data)
 {
@@ -472,6 +548,15 @@ _transit_animate_cb(void *data)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @internal
+ * @brief Recovers image UV coordinates for a map, typically when flipping along Y-axis.
+ * Sets the UV coordinates of a 4-point Evas_Map to map an image texture
+ * as if it's mirrored or oriented for a Y-axis flip.
+ * @param map The Evas_Map to modify.
+ * @param iw The width of the image.
+ * @param ih The height of the image.
+ */
 static void
 _recover_image_uv_by_y(Evas_Map *map, int iw, int ih)
 {
@@ -481,6 +566,15 @@ _recover_image_uv_by_y(Evas_Map *map, int iw, int ih)
    evas_map_point_image_uv_set(map, 3, iw, ih);
 }
 
+/**
+ * @internal
+ * @brief Recovers image UV coordinates for a map, typically when flipping along X-axis.
+ * Sets the UV coordinates of a 4-point Evas_Map to map an image texture
+ * as if it's mirrored or oriented for an X-axis flip.
+ * @param map The Evas_Map to modify.
+ * @param iw The width of the image.
+ * @param ih The height of the image.
+ */
 static void
 _recover_image_uv_by_x(Evas_Map *map, int iw, int ih)
 {
@@ -490,6 +584,20 @@ _recover_image_uv_by_x(Evas_Map *map, int iw, int ih)
    evas_map_point_image_uv_set(map, 3, 0, 0);
 }
 
+/**
+ * @internal
+ * @brief Sets or recovers image UV coordinates for an Evas_Map based on object properties.
+ * This function is used by effects like Flip to correctly map the texture of an image
+ * object onto a transformed Evas_Map. It handles normal UV mapping (considering
+ * image fill properties) and reverted UV mapping (for flipped states).
+ * @param obj The Evas_Object (expected to be an image).
+ * @param map The Evas_Map whose UV coordinates are to be set.
+ * @param revert If EINA_TRUE, sets UVs for a reverted/flipped state.
+ * @param by_x If EINA_TRUE and `revert` is true, uses X-axis specific UV recovery.
+ *             If EINA_FALSE and `revert` is true, uses Y-axis specific UV recovery.
+ * @return EINA_TRUE if UVs were set (object is a valid image type without a source),
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _recover_image_uv(Evas_Object *obj, Evas_Map *map, Eina_Bool revert, Eina_Bool by_x)
 {
@@ -551,6 +659,14 @@ _recover_image_uv(Evas_Object *obj, Evas_Map *map, Eina_Bool revert, Eina_Bool b
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Timer callback for elm_transit_go_in().
+ * This function is called when the delay timer for `elm_transit_go_in()` expires.
+ * It starts the transit by calling `elm_transit_go()`.
+ * @param data Pointer to the Elm_Transit instance.
+ * @return ECORE_CALLBACK_CANCEL to stop the timer.
+ */
 static Eina_Bool
 _go_in_timer_cb(void *data)
 {
@@ -1048,15 +1164,28 @@ elm_transit_chain_transits_get(const Elm_Transit * transit)
 ///////////////////////////////////////////////////////////////////////////
 //Resizing Effect
 ///////////////////////////////////////////////////////////////////////////
+
+/**
+ * @internal
+ * @brief Context data for the Resizing effect.
+ * Stores the starting dimensions and the change in dimensions for the resize.
+ */
 typedef struct _Elm_Transit_Effect_Resizing Elm_Transit_Effect_Resizing;
 
 struct _Elm_Transit_Effect_Resizing
 {
    struct _size {
-      Evas_Coord w, h;
-   } from, to;
+      Evas_Coord w, h; /**< Width and height. */
+   } from, /**< Initial width and height. */
+     to;   /**< Delta width and height (target - initial). */
 };
 
+/**
+ * @internal
+ * @brief Frees the context data for the Resizing effect.
+ * @param effect Pointer to the Elm_Transit_Effect_Resizing context.
+ * @param transit The transit instance (unused).
+ */
 static void
 _transit_effect_resizing_context_free(Elm_Transit_Effect *effect, Elm_Transit *transit EINA_UNUSED)
 {
@@ -1064,6 +1193,17 @@ _transit_effect_resizing_context_free(Elm_Transit_Effect *effect, Elm_Transit *t
    free(resizing);
 }
 
+/**
+ * @internal
+ * @brief Operation function for the Resizing effect.
+ * Calculates the new width and height based on the progress and applies it
+ * to all objects in the transit.
+ * new_w = from.w + (to.w * progress)
+ * new_h = from.h + (to.h * progress)
+ * @param effect Pointer to the Elm_Transit_Effect_Resizing context.
+ * @param transit The transit instance.
+ * @param progress The current animation progress (0.0 to 1.0).
+ */
 static void
 _transit_effect_resizing_op(Elm_Transit_Effect *effect, Elm_Transit *transit, double progress)
 {
@@ -1081,6 +1221,16 @@ _transit_effect_resizing_op(Elm_Transit_Effect *effect, Elm_Transit *transit, do
      evas_object_resize(obj, w, h);
 }
 
+/**
+ * @internal
+ * @brief Creates and initializes the context data for the Resizing effect.
+ * @param from_w Initial width.
+ * @param from_h Initial height.
+ * @param to_w Target width.
+ * @param to_h Target height.
+ * @return A pointer to the newly allocated Elm_Transit_Effect_Resizing context,
+ *         or NULL on failure.
+ */
 static Elm_Transit_Effect *
 _transit_effect_resizing_context_new(Evas_Coord from_w, Evas_Coord from_h, Evas_Coord to_w, Evas_Coord to_h)
 {
@@ -1117,23 +1267,43 @@ elm_transit_effect_resizing_add(Elm_Transit *transit, Evas_Coord from_w, Evas_Co
 ///////////////////////////////////////////////////////////////////////////
 //Translation Effect
 ///////////////////////////////////////////////////////////////////////////
-typedef struct _Elm_Transit_Effect_Translation Elm_Transit_Effect_Translation;
+
+/**
+ * @internal
+ * @brief Node data for the Translation effect, storing initial position per object.
+ */
 typedef struct _Elm_Transit_Effect_Translation_Node Elm_Transit_Effect_Translation_Node;
+
+/**
+ * @internal
+ * @brief Context data for the Translation effect.
+ * Stores the starting and delta translation values, and a list of nodes
+ * containing initial positions for each object.
+ */
+typedef struct _Elm_Transit_Effect_Translation Elm_Transit_Effect_Translation;
 
 struct _Elm_Transit_Effect_Translation_Node
 {
-   Evas_Object *obj;
-   Evas_Coord x, y;
+   Evas_Object *obj; /**< The object being translated. */
+   Evas_Coord x, y;  /**< Initial X and Y coordinates of the object. */
 };
 
 struct _Elm_Transit_Effect_Translation
 {
    struct _position_variation {
-      Evas_Coord dx, dy;
-   } from, to;
-   Eina_List *nodes;
+      Evas_Coord dx, dy; /**< Delta X and Y. */
+   } from, /**< Initial delta X and Y (offset from original position). */
+     to;   /**< Target delta X and Y (target_offset - initial_offset). */
+   Eina_List *nodes; /**< List of Elm_Transit_Effect_Translation_Node, one per object. */
 };
 
+/**
+ * @internal
+ * @brief Callback for when an object in a translation effect is deleted.
+ * Removes the corresponding node from the translation effect's internal list.
+ * @param data Pointer to the Elm_Transit_Effect_Translation context.
+ * @param ev The EFL_EVENT_DEL event structure.
+ */
 static void
 _translation_object_del_cb(void *data, const Efl_Event *ev)
 {
@@ -1151,6 +1321,16 @@ _translation_object_del_cb(void *data, const Efl_Event *ev)
      }
 }
 
+/**
+ * @internal
+ * @brief Builds the list of translation nodes for each object in the transit.
+ * For each object, its initial geometry is fetched and stored in a new
+ * Elm_Transit_Effect_Translation_Node. An EFL_EVENT_DEL callback is added
+ * to each object to handle its deletion during the transit.
+ * @param transit The transit instance.
+ * @param translation The Elm_Transit_Effect_Translation context.
+ * @return A list of Elm_Transit_Effect_Translation_Node, or NULL on failure.
+ */
 static Eina_List *
 _translation_nodes_build(Elm_Transit *transit, Elm_Transit_Effect_Translation *translation)
 {
@@ -1178,6 +1358,15 @@ _translation_nodes_build(Elm_Transit *transit, Elm_Transit_Effect_Translation *t
    return data_list;
 }
 
+/**
+ * @internal
+ * @brief Frees the context data for the Translation effect.
+ * Iterates through the list of translation nodes, removes the EFL_EVENT_DEL
+ * callback from each object, and frees the nodes. Then frees the main
+ * translation context structure.
+ * @param effect Pointer to the Elm_Transit_Effect_Translation context.
+ * @param transit The transit instance (unused).
+ */
 static void
 _transit_effect_translation_context_free(Elm_Transit_Effect *effect, Elm_Transit *transit EINA_UNUSED)
 {
@@ -1197,6 +1386,18 @@ _transit_effect_translation_context_free(Elm_Transit_Effect *effect, Elm_Transit
    free(translation);
 }
 
+/**
+ * @internal
+ * @brief Operation function for the Translation effect.
+ * If not already done, builds the list of translation nodes.
+ * Then, for each object, calculates its new position based on its initial
+ * position, the 'from' and 'to' deltas, and the current progress.
+ * new_x = node.x + from.dx + (to.dx * progress)
+ * new_y = node.y + from.dy + (to.dy * progress)
+ * @param effect Pointer to the Elm_Transit_Effect_Translation context.
+ * @param transit The transit instance.
+ * @param progress The current animation progress (0.0 to 1.0).
+ */
 static void
 _transit_effect_translation_op(Elm_Transit_Effect *effect, Elm_Transit *transit, double progress EINA_UNUSED)
 {
@@ -1220,6 +1421,16 @@ _transit_effect_translation_op(Elm_Transit_Effect *effect, Elm_Transit *transit,
      }
 }
 
+/**
+ * @internal
+ * @brief Creates and initializes the context data for the Translation effect.
+ * @param from_dx Initial X displacement.
+ * @param from_dy Initial Y displacement.
+ * @param to_dx Target X displacement.
+ * @param to_dy Target Y displacement.
+ * @return A pointer to the newly allocated Elm_Transit_Effect_Translation context,
+ *         or NULL on failure.
+ */
 static Elm_Transit_Effect *
 _transit_effect_translation_context_new(Evas_Coord from_dx, Evas_Coord from_dy, Evas_Coord to_dx, Evas_Coord to_dy)
 {
@@ -1256,13 +1467,26 @@ elm_transit_effect_translation_add(Elm_Transit *transit, Evas_Coord from_dx, Eva
 ///////////////////////////////////////////////////////////////////////////
 //Zoom Effect
 ///////////////////////////////////////////////////////////////////////////
+
+/**
+ * @internal
+ * @brief Context data for the Zoom effect.
+ * Stores the starting and target zoom rates.
+ */
 typedef struct _Elm_Transit_Effect_Zoom Elm_Transit_Effect_Zoom;
 
 struct _Elm_Transit_Effect_Zoom
 {
-   float from, to;
+   float from; /**< Initial zoom rate (e.g., 1.0 for no zoom). */
+   float to;   /**< Target zoom rate. */
 };
 
+/**
+ * @internal
+ * @brief Frees the context data for the Zoom effect.
+ * @param effect Pointer to the Elm_Transit_Effect_Zoom context.
+ * @param transit The transit instance (unused).
+ */
 static void
 _transit_effect_zoom_context_free(Elm_Transit_Effect *effect, Elm_Transit *transit EINA_UNUSED)
 {
@@ -1270,6 +1494,18 @@ _transit_effect_zoom_context_free(Elm_Transit_Effect *effect, Elm_Transit *trans
    free(zoom);
 }
 
+/**
+ * @internal
+ * @brief Operation function for the Zoom effect.
+ * Calculates the current zoom rate based on progress. For each object,
+ * it creates or duplicates an Evas_Map, populates it from the object,
+ * applies the zoom transformation around the object's center, and then
+ * sets this map back to the object.
+ * current_zoom_rate = (from * (1.0 - progress)) + (to * progress)
+ * @param effect Pointer to the Elm_Transit_Effect_Zoom context.
+ * @param transit The transit instance.
+ * @param progress The current animation progress (0.0 to 1.0).
+ */
 static void
 _transit_effect_zoom_op(Elm_Transit_Effect *effect, Elm_Transit *transit , double progress)
 {
@@ -1315,6 +1551,14 @@ _transit_effect_zoom_op(Elm_Transit_Effect *effect, Elm_Transit *transit , doubl
      }
 }
 
+/**
+ * @internal
+ * @brief Creates and initializes the context data for the Zoom effect.
+ * @param from_rate Initial zoom rate.
+ * @param to_rate Target zoom rate.
+ * @return A pointer to the newly allocated Elm_Transit_Effect_Zoom context,
+ *         or NULL on failure.
+ */
 static Elm_Transit_Effect *
 _transit_effect_zoom_context_new(float from_rate, float to_rate)
 {

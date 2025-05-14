@@ -4,6 +4,11 @@
 #ifndef _ELM_LIST_EO_CLASS_TYPE
 #define _ELM_LIST_EO_CLASS_TYPE
 
+/**
+ * @brief Represents an Elementary List object.
+ * This type is an alias for an Eo object that implements the Elm_List interface.
+ * @ingroup Elm_List
+ */
 typedef Eo Elm_List;
 
 #endif

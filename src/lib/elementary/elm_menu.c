@@ -33,6 +33,16 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
 };
 #undef ELM_PRIV_MENU_SIGNALS
 
+/**
+ * @internal
+ * @brief Updates the translation for all items in the menu.
+ *
+ * This function is called when the language changes. It iterates through
+ * all top-level menu items and triggers their translation update.
+ *
+ * @param obj The Evas object (menu). Not used directly.
+ * @param sd The menu's private data.
+ */
 EOLIAN static void
 _elm_menu_efl_ui_l10n_translation_update(Eo *obj EINA_UNUSED, Elm_Menu_Data *sd)
 {
@@ -45,6 +55,16 @@ _elm_menu_efl_ui_l10n_translation_update(Eo *obj EINA_UNUSED, Elm_Menu_Data *sd)
 
 static void _item_del(Elm_Object_Item *eo_item);
 
+/**
+ * @internal
+ * @brief Clears all sub-items of a given menu item.
+ *
+ * This function iterates through the sub-items of the provided menu item,
+ * sets their parent to NULL, and then deletes them using _item_del.
+ *
+ * @param it The menu item data whose sub-items are to be cleared.
+ *           The it->submenu.items list will be freed.
+ */
 static void
 _elm_menu_subitems_clear(Elm_Menu_Item_Data *it)
 {
@@ -62,6 +82,15 @@ _elm_menu_subitems_clear(Elm_Menu_Item_Data *it)
      }
 }
 
+/**
+ * @internal
+ * @brief Deletes a menu item and its sub-items.
+ *
+ * This function first clears all sub-items of the given menu item
+ * (which recursively deletes them) and then deletes the item itself.
+ *
+ * @param eo_item The Efl_Object_Item (Elm_Widget_Item) to be deleted.
+ */
 static void
 _item_del(Elm_Object_Item *eo_item)
 {
@@ -71,6 +100,16 @@ _item_del(Elm_Object_Item *eo_item)
    efl_del(eo_item);
 }
 
+/**
+ * @internal
+ * @brief Hides a submenu and recursively hides its open submenus.
+ *
+ * This function hides the hover object associated with the item's submenu
+ * and sets its open status to EINA_FALSE. It then iterates through its
+ * sub-items and recursively calls _submenu_hide if they are open.
+ *
+ * @param item The menu item data whose submenu is to be hidden.
+ */
 static void
 _submenu_hide(Elm_Menu_Item_Data *item)
 {
@@ -87,6 +126,17 @@ _submenu_hide(Elm_Menu_Item_Data *item)
      }
 }
 
+/**
+ * @internal
+ * @brief Handles the disabling or enabling of a menu item.
+ *
+ * Emits "elm,state,disabled" or "elm,state,enabled" signals on the item's
+ * layout. If the item is being disabled and its submenu is open, the
+ * submenu is hidden. Also triggers D-Bus menu updates if applicable.
+ *
+ * @param eo_item The Efl_Object_Item (Elm_Widget_Item) being disabled/enabled.
+ * @param item The menu item's private data.
+ */
 static void
 _elm_menu_item_elm_widget_item_disable(Eo *eo_item, Elm_Menu_Item_Data *item)
 {
@@ -102,6 +152,17 @@ _elm_menu_item_elm_widget_item_disable(Eo *eo_item, Elm_Menu_Item_Data *item)
    edje_object_message_signal_process(elm_layout_edje_get(VIEW(item)));
 }
 
+/**
+ * @internal
+ * @brief Emits a signal on the layout of a menu item.
+ *
+ * This is a wrapper around elm_layout_signal_emit for menu items.
+ *
+ * @param eo_item The Efl_Object_Item (Elm_Widget_Item). Not used directly.
+ * @param item The menu item's private data, used to get its view.
+ * @param emission The signal name to emit.
+ * @param source The source of the signal.
+ */
 static void
 _elm_menu_item_elm_widget_item_signal_emit(Eo *eo_item EINA_UNUSED, Elm_Menu_Item_Data *item,
                        const char *emission,
@@ -110,6 +171,21 @@ _elm_menu_item_elm_widget_item_signal_emit(Eo *eo_item EINA_UNUSED, Elm_Menu_Ite
    elm_layout_signal_emit(VIEW(item), emission, source);
 }
 
+/**
+ * @internal
+ * @brief Gets the geometry of the menu's parent object.
+ *
+ * This function retrieves the geometry (x, y, width, height) of the
+ * menu's parent. It has special handling if the parent is an EFL_UI_WIN_CLASS
+ * to adjust the position based on whether the menu is a menu_bar and if the
+ * menu object itself is a frame object.
+ *
+ * @param sd The menu's private data, used to access the parent and menu_bar status.
+ * @param[out] x Pointer to store the x-coordinate of the parent. Can be NULL.
+ * @param[out] y Pointer to store the y-coordinate of the parent. Can be NULL.
+ * @param[out] w Pointer to store the width of the parent. Can be NULL.
+ * @param[out] h Pointer to store the height of the parent. Can be NULL.
+ */
 static inline void
 _parent_geometry_get(Elm_Menu_Data *sd, int *x, int *y, int *w, int *h)
 {

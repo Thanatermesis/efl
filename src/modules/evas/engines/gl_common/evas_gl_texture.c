@@ -118,6 +118,21 @@ static const struct {
   { GL_LUMINANCE_ALPHA, matching_luminance_alpha }
 };
 
+/**
+ * @internal
+ * @brief Checks if a returned internal texture format is compatible with the requested one.
+ *
+ * This function compares the requested internal format (`intfmt`) with the format
+ * returned by the driver (`intfmtret`). It returns true if they are identical or
+ * if `intfmtret` is found in the list of compatible formats for `intfmt`
+ * defined in `matching_fmt`. This is useful because OpenGL drivers might
+ * return a more specific format (e.g., GL_RGB8) when a generic one was
+ * requested (e.g., GL_RGB).
+ *
+ * @param intfmt The requested internal format (e.g., GL_RGB).
+ * @param intfmtret The internal format returned by the driver (e.g., GL_RGB8).
+ * @return EINA_TRUE if the formats are compatible, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _evas_gl_texture_match(GLenum intfmt, GLenum intfmtret)
 {
@@ -143,6 +158,20 @@ _evas_gl_texture_match(GLenum intfmt, GLenum intfmtret)
 
 #define MATCH(_r, _v) ((_r == MATCH_ANY) || (_v == MATCH_ANY) || (_r == _v))
 
+/**
+ * @internal
+ * @brief Finds a suitable OpenGL texture format based on image properties.
+ *
+ * This function searches the `matching_format` table for an entry that matches
+ * the given alpha requirement, BGRA preference, and colorspace. It is used to
+ * determine the correct `internalformat` and `format` enum values for
+ * texture creation.
+ *
+ * @param alpha EINA_TRUE if an alpha channel is required.
+ * @param bgra EINA_TRUE if BGRA format is preferred/supported.
+ * @param cspace The colorspace of the image data (e.g., EVAS_COLORSPACE_ARGB8888).
+ * @return The index into the `matching_format` table on success, or -1 on failure.
+ */
 static int
 _evas_gl_texture_search_format(Eina_Bool alpha, Eina_Bool bgra, Evas_Colorspace cspace)
 {
@@ -162,6 +191,17 @@ _evas_gl_texture_search_format(Eina_Bool alpha, Eina_Bool bgra, Evas_Colorspace 
    return -1;
 }
 
+/**
+ * @internal
+ * @brief Converts an OpenGL texture format enum to an Evas_Colorspace.
+ *
+ * This is the reverse of `_evas_gl_texture_search_format`. It iterates through
+ * the `matching_format` table to find the Evas colorspace that corresponds to
+ * a given OpenGL texture format.
+ *
+ * @param f The OpenGL texture format (e.g., GL_RGBA, GL_BGRA).
+ * @return The corresponding Evas_Colorspace, or EVAS_COLORSPACE_ARGB8888 if not found.
+ */
 Evas_Colorspace
 evas_gl_common_gl_format_to_colorspace(GLuint f)
 {
@@ -177,6 +217,21 @@ evas_gl_common_gl_format_to_colorspace(GLuint f)
    return EVAS_COLORSPACE_ARGB8888;
 }
 
+/**
+ * @internal
+ * @brief Prints texture memory usage statistics for debugging.
+ *
+ * This function prints the number and total size of various types of textures
+ * currently allocated. The output is controlled by the `EVAS_GL_MEMINFO`
+ * environment variable. If the variable is set, it will print to stderr.
+ * The categories are:
+ * - c: Color textures (RGBA/BGRA)
+ * - a: Alpha-only textures
+ * - v: Luminance textures (YUV)
+ * - r: Render target textures
+ * - n: Native textures
+ * - d: Dynamic textures
+ */
 static void
 _print_tex_count(void)
 {
@@ -201,6 +256,18 @@ _print_tex_count(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Calculates the nearest power of two greater than or equal to the input.
+ *
+ * This function uses a bit-twiddling algorithm to efficiently find the next
+ * power of two. This is required for older OpenGL implementations that do not
+ * support non-power-of-two (NPOT) textures.
+ *
+ * @param num The input integer.
+ * @return The smallest power of two that is greater than or equal to `num`.
+ *         Example: _nearest_pow2(100) returns 128.
+ */
 static int
 _nearest_pow2(int num)
 {
@@ -213,6 +280,18 @@ _nearest_pow2(int num)
    return n + 1;
 }
 
+/**
+ * @internal
+ * @brief Adjusts texture dimensions to the nearest power of two if required.
+ *
+ * This function checks if the GL context supports non-power-of-two (NPOT)
+ * textures. If not, it modifies the given width and height to be the next
+ * power of two, using `_nearest_pow2`.
+ *
+ * @param gc The Evas GL context.
+ * @param w A pointer to the texture width, which will be modified in-place.
+ * @param h A pointer to the texture height, which will be modified in-place.
+ */
 static void
 _tex_adjust(Evas_Engine_GL_Context *gc, int *w, int *h)
 {
@@ -223,6 +302,18 @@ _tex_adjust(Evas_Engine_GL_Context *gc, int *w, int *h)
 }
 
 
+/**
+ * @internal
+ * @brief Maps a GL texture format enum to an atlas-grouping index.
+ *
+ * This function takes a GL internal format enum and returns an integer index.
+ * This index is used to group textures of similar formats together into
+ * separate texture atlases. For example, all RGBA-like formats might map to
+ * index 0, all RGB-like to 1, etc.
+ *
+ * @param format The GL internal texture format enum (e.g., GL_RGBA, GL_ETC1_RGB8_OES).
+ * @return An index for the texture atlas array, or -1 for unknown formats.
+ */
 static int
 _tex_format_index(GLuint format)
 {
@@ -283,6 +374,21 @@ _tex_format_index(GLuint format)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Calculates the byte size of texture data for given dimensions and format.
+ *
+ * This function determines the memory required for a texture based on its
+ * width, height, and internal format. It handles both uncompressed and
+ * compressed formats (like ETC and S3TC).
+ *
+ * @param w The width of the texture.
+ * @param h The height of the texture.
+ * @param intfmt The internal GL format of the texture (e.g., GL_RGBA, GL_COMPRESSED_RGB_S3TC_DXT1_EXT).
+ * @param[out] comp If not NULL, this will be set to EINA_TRUE if the format
+ *                  is compressed, EINA_FALSE otherwise.
+ * @return The size of the texture data in bytes.
+ */
 static inline int
 _evas_gl_texture_size_get(int w, int h, int intfmt, Eina_Bool *comp)
 {
@@ -317,6 +423,24 @@ _evas_gl_texture_size_get(int w, int h, int intfmt, Eina_Bool *comp)
      }
 }
 
+/**
+ * @internal
+ * @brief Allocates an empty 2D texture on the GPU.
+ *
+ * This function is a wrapper for `glTexImage2D` or `glCompressedTexImage2D`
+ * (for compressed formats). It allocates storage for a texture on the GPU
+ * without uploading any pixel data (the data pointer is NULL). It also
+ * performs size checks and, on non-GLES platforms, verifies that the driver
+ * allocated a compatible texture format.
+ *
+ * @param gc The Evas GL context.
+ * @param intfmt The requested internal format of the texture.
+ * @param w The width of the texture.
+ * @param h The height of the texture.
+ * @param fmt The format of the pixel data (for `glTexImage2D`).
+ * @param type The data type of the pixel data (for `glTexImage2D`).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _tex_2d(Evas_Engine_GL_Context *gc, int intfmt, int w, int h, int fmt, int type)
 {
@@ -360,6 +484,20 @@ _tex_2d(Evas_Engine_GL_Context *gc, int intfmt, int w, int h, int fmt, int type)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Allocates and initializes a new Evas_GL_Texture struct.
+ *
+ * This function performs the host-side allocation of an Evas_GL_Texture object.
+ * It does not allocate any GPU resources. It simply initializes the structure
+ * with basic information like dimensions and alpha presence.
+ *
+ * @param gc The Evas GL context.
+ * @param w The width of the texture.
+ * @param h The height of the texture.
+ * @param alpha EINA_TRUE if the texture has an alpha channel.
+ * @return A newly allocated Evas_GL_Texture, or NULL on failure.
+ */
 static Evas_GL_Texture *
 evas_gl_common_texture_alloc(Evas_Engine_GL_Context *gc,
                              Evas_Coord w, Evas_Coord h,
@@ -379,12 +517,39 @@ evas_gl_common_texture_alloc(Evas_Engine_GL_Context *gc,
    return tex;
 }
 
+/**
+ * @internal
+ * @brief Frees the host-side memory of an Evas_GL_Texture struct.
+ *
+ * This is the counterpart to `evas_gl_common_texture_alloc`. It only frees
+ * the memory for the struct itself and does not deallocate any associated
+* GPU resources.
+ *
+ * @param tex The texture to free.
+ */
 static void
 evas_gl_common_texture_light_free(Evas_GL_Texture *tex)
 {
    free(tex);
 }
 
+/**
+ * @internal
+ * @brief Creates a new texture pool (texture atlas).
+ *
+ * This function allocates a new `Evas_GL_Texture_Pool` object, which represents
+ * a texture atlas. It generates a single large GL texture on the GPU and
+ * initializes a rectangle pool manager (`eina_rectangle_pool`) to manage
+ * sub-regions within this large texture. This allows many small logical
+ * textures to be packed into one physical GPU texture, which is more efficient.
+ *
+ * @param gc The Evas GL context.
+ * @param w The width of the atlas texture.
+ * @param h The height of the atlas texture.
+ * @param intformat The internal format for the atlas texture.
+ * @param format The format for the atlas texture.
+ * @return A newly created Evas_GL_Texture_Pool, or NULL on failure.
+ */
 static Evas_GL_Texture_Pool *
 _pool_tex_new(Evas_Engine_GL_Context *gc, int w, int h, GLenum intformat, GLenum format)
 {
@@ -452,6 +617,22 @@ _pool_tex_new(Evas_Engine_GL_Context *gc, int w, int h, GLenum intformat, GLenum
    return pt;
 }
 
+/**
+ * @internal
+ * @brief Allocates a rectangular region within a texture pool.
+ *
+ * This function requests a free rectangle of size `w`x`h` from the given
+ * texture pool (`pt`). If a suitable space is found, it returns the rectangle's
+ * coordinates and updates the pool's allocation list.
+ *
+ * @param pt The texture pool to allocate from.
+ * @param w The requested width of the region.
+ * @param h The requested height of the region.
+ * @param[out] u The x-coordinate of the allocated region.
+ * @param[out] v The y-coordinate of the allocated region.
+ * @return An Eina_Rectangle pointer representing the allocation, or NULL if
+ *         no space is available.
+ */
 static Eina_Rectangle *
 _pool_tex_alloc(Evas_GL_Texture_Pool *pt, int w, int h, int *u, int *v)
 {
@@ -467,6 +648,31 @@ _pool_tex_alloc(Evas_GL_Texture_Pool *pt, int w, int h, int *u, int *v)
    return r;
 }
 
+/**
+ * @internal
+ * @brief Finds or creates a texture pool to accommodate a new texture.
+ *
+ * This is a central function for texture allocation. It attempts to find space
+ * for a `w`x`h` texture within an existing texture atlas of a compatible format.
+ * - If space is found in an existing atlas, it's used.
+ * - If no space is available, a new atlas is created.
+ * - If the requested texture is too large for atlasing (based on configuration)
+ *   or if `disable_atlas` is true, a new "whole" texture pool is created,
+ *   which contains just this single texture.
+ *
+ * @param gc The Evas GL context.
+ * @param w The required width.
+ * @param h The required height.
+ * @param intformat The internal texture format.
+ * @param format The texture format.
+ * @param[out] u The x-coordinate of the allocated region in the pool.
+ * @param[out] v The y-coordinate of the allocated region in the pool.
+ * @param[out] apt A pointer to store the Eina_Rectangle allocation info.
+ * @param atlas_w The desired width for a new atlas if one needs to be created.
+ * @param disable_atlas If EINA_TRUE, forces creation of a "whole" texture,
+ *                      bypassing the atlas system.
+ * @return The Evas_GL_Texture_Pool where the texture was placed, or NULL on failure.
+ */
 static Evas_GL_Texture_Pool *
 _pool_tex_find(Evas_Engine_GL_Context *gc, int w, int h,
                GLenum intformat, GLenum format, int *u, int *v,
@@ -526,6 +732,26 @@ _pool_tex_find(Evas_Engine_GL_Context *gc, int w, int h,
    return pt;
 }
 
+/**
+ * @internal
+ * @brief Creates and uploads a new GL texture from an RGBA_Image.
+ *
+ * This is the main function for creating a standard texture from an image object.
+ * It performs the following steps:
+ * 1. Determines the required GL format for the image.
+ * 2. Calculates the required dimensions, adding padding for borders. Borders are
+ *    used to prevent artifacts when using linear filtering near texture edges
+ *    by duplicating edge pixels.
+ * 3. Allocates an `Evas_GL_Texture` struct.
+ * 4. Calls `_pool_tex_find` to get a suitable texture pool (atlas or whole).
+ * 5. If successful, calls `evas_gl_common_texture_update` to upload the pixel data.
+ *
+ * @param gc The Evas GL context.
+ * @param im The source image data.
+ * @param disable_atlas If EINA_TRUE, forces the texture to be created standalone,
+ *                      not in a texture atlas.
+ * @return A new, fully allocated and uploaded Evas_GL_Texture, or NULL on failure.
+ */
 Evas_GL_Texture *
 evas_gl_common_texture_new(Evas_Engine_GL_Context *gc, RGBA_Image *im, Eina_Bool disable_atlas)
 {
@@ -598,6 +824,23 @@ evas_gl_common_texture_new(Evas_Engine_GL_Context *gc, RGBA_Image *im, Eina_Bool
    return tex;
 }
 
+/**
+ * @internal
+ * @brief Creates a new texture pool that can be used as a render target.
+ *
+ * Similar to `_pool_tex_new`, this function creates a texture pool. However,
+ * it also creates a Framebuffer Object (FBO) and attaches the pool's texture
+ * to the FBO's color attachment point. This allows rendering directly into
+ * the texture. It can optionally create and attach a stencil buffer as well.
+ *
+ * @param gc The Evas GL context.
+ * @param w The width of the render target texture.
+ * @param h The height of the render target texture.
+ * @param intformat The internal format of the texture.
+ * @param format The format of the texture.
+ * @param stencil EINA_TRUE to create and attach an 8-bit stencil buffer.
+ * @return A new Evas_GL_Texture_Pool configured as a render target, or NULL on failure.
+ */
 static Evas_GL_Texture_Pool *
 _pool_tex_render_new(Evas_Engine_GL_Context *gc, int w, int h, int intformat, int format, int stencil)
 {
@@ -682,6 +925,28 @@ _pool_tex_render_new(Evas_Engine_GL_Context *gc, int w, int h, int intformat, in
    return pt;
 }
 
+/**
+ * @internal
+ * @brief Finds or creates a render-target texture pool for a given size.
+ *
+ * This function is the render-target equivalent of `_pool_tex_find`. It looks
+ * for available space in existing render-target atlases. If none is found, it
+ * creates a new one using `_pool_tex_render_new`. This allows multiple smaller
+ * render-to-texture operations to be batched into a single larger render target.
+ *
+ * @param gc The Evas GL context.
+ * @param w The required width.
+ * @param h The required height.
+ * @param intformat The internal texture format.
+ * @param format The texture format.
+ * @param[out] u The x-coordinate of the allocated region in the pool.
+ * @param[out] v The y-coordinate of the allocated region in the pool.
+ * @param[out] apt A pointer to store the Eina_Rectangle allocation info.
+ * @param atlas_w The desired width for a new atlas if one needs to be created.
+ * @param disable_atlas If EINA_TRUE, forces creation of a "whole" texture,
+ *                      bypassing the atlas system.
+ * @return The Evas_GL_Texture_Pool where the texture was placed, or NULL on failure.
+ */
 static Evas_GL_Texture_Pool *
 _pool_tex_render_find(Evas_Engine_GL_Context *gc, int w, int h,
                       GLenum intformat, GLenum format, int *u, int *v,
@@ -741,6 +1006,24 @@ _pool_tex_render_find(Evas_Engine_GL_Context *gc, int w, int h,
    return pt;
 }
 
+/**
+ * @internal
+ * @brief Creates a texture pool wrapper for a native GL texture.
+ *
+ * This function is used to integrate externally-created textures (e.g., from a
+ * video decoder or another EGL context) into Evas's texture management. It
+ * creates an `Evas_GL_Texture_Pool` but instead of allocating a new GL texture,
+ * it wraps the native texture provided by the `Evas_GL_Image`. It sets up
+ * texture parameters but does not manage the texture's lifetime or pixel data.
+ *
+ * @param gc The Evas GL context.
+ * @param w The width of the native texture.
+ * @param h The height of the native texture.
+ * @param intformat The internal format of the texture.
+ * @param format The format of the texture.
+ * @param im The Evas_GL_Image containing the native texture information.
+ * @return A new Evas_GL_Texture_Pool wrapping the native texture, or NULL on failure.
+ */
 static Evas_GL_Texture_Pool *
 _pool_tex_native_new(Evas_Engine_GL_Context *gc, int w, int h, int intformat, int format, Evas_GL_Image *im)
 {
@@ -800,6 +1083,25 @@ _pool_tex_native_new(Evas_Engine_GL_Context *gc, int w, int h, int intformat, in
    return pt;
 }
 
+/**
+ * @internal
+ * @brief Creates a "dynamic" texture pool for efficient CPU updates.
+ *
+ * This function creates a texture pool that is backed by a special type of
+ * memory that can be mapped for direct CPU access. This is highly platform-
+ * and driver-dependent, typically using EGL extensions like Tizen's native
+ * surface or Samsung's `EGL_MAP_GL_TEXTURE_2D_SEC`. This avoids the overhead of
+ * `glTexSubImage2D` for frequent updates, as the CPU can write directly into
+ * the GPU's memory.
+ *
+ * @param gc The Evas GL context.
+ * @param w The width of the texture.
+ * @param h The height of the texture.
+ * @param intformat The internal format.
+ * @param format The format.
+ * @return A new dynamic Evas_GL_Texture_Pool, or NULL if the required
+ *         extensions are not supported or allocation fails.
+ */
 static Evas_GL_Texture_Pool *
 _pool_tex_dynamic_new(Evas_Engine_GL_Context *gc, int w, int h, int intformat, int format)
 {
@@ -958,6 +1260,17 @@ error:
 #endif
 }
 
+/**
+ * @internal
+ * @brief Releases all resources associated with a texture pool.
+ *
+ * This function deallocates all GPU and CPU resources for a given texture pool.
+ * It deletes the GL texture, any associated FBOs or renderbuffers, and frees
+ * all the `Eina_Rectangle` allocations within the pool. It also updates the
+ * global memory usage statistics.
+ *
+ * @param pt The texture pool to be emptied.
+ */
 void
 evas_gl_texture_pool_empty(Evas_GL_Texture_Pool *pt)
 {
@@ -1042,6 +1355,18 @@ evas_gl_texture_pool_empty(Evas_GL_Texture_Pool *pt)
    pt->h = 0;
 }
 
+/**
+ * @internal
+ * @brief Decrements the reference count of a texture pool and frees it if zero.
+ *
+ * Each `Evas_GL_Texture` that uses a pool holds a reference to it. This
+ * function decrements the pool's reference count. When the count reaches
+ * zero, it means no textures are using this pool anymore. The pool is then
+ * removed from the context's list of active pools and all its resources are
+ * freed via `evas_gl_texture_pool_empty`.
+ *
+ * @param pt The texture pool to unreference.
+ */
 void
 pt_unref(Evas_GL_Texture_Pool *pt)
 {
@@ -1064,6 +1389,18 @@ pt_unref(Evas_GL_Texture_Pool *pt)
    free(pt);
 }
 
+/**
+ * @internal
+ * @brief Links a "whole" texture pool into the context's management list.
+ *
+ * "Whole" textures (those not part of a standard atlas) are managed in a
+ * separate list. This function adds a pool to that list, marks it as a
+ * "whole" texture, and increments its reference count. This is typically used
+ * for native, YUV, or other special-case textures.
+ *
+ * @param gc The Evas GL context.
+ * @param pt The texture pool to link.
+ */
 static void
 pt_link(Evas_Engine_GL_Context *gc, Evas_GL_Texture_Pool *pt)
 {
@@ -1073,6 +1410,22 @@ pt_link(Evas_Engine_GL_Context *gc, Evas_GL_Texture_Pool *pt)
    pt->references++;
 }
 
+/**
+ * @internal
+ * @brief Creates an Evas_GL_Texture that wraps a native GL texture.
+ *
+ * This is the public-facing function for creating a texture from a native
+ * source (e.g., Tizen buffer, EGLImage). It allocates an `Evas_GL_Texture`
+ * and then calls `_pool_tex_native_new` to create the special-purpose
+ * texture pool that wraps the native handle from the `Evas_GL_Image`.
+ *
+ * @param gc The Evas GL context.
+ * @param w The width of the native texture.
+ * @param h The height of the native texture.
+ * @param alpha EINA_TRUE if the native texture has alpha.
+ * @param im The Evas_GL_Image containing the native texture handle and info.
+ * @return A new Evas_GL_Texture wrapping the native surface, or NULL on failure.
+ */
 Evas_GL_Texture *
 evas_gl_common_texture_native_new(Evas_Engine_GL_Context *gc, unsigned int w, unsigned int h, int alpha, Evas_GL_Image *im)
 {
@@ -1097,6 +1450,21 @@ evas_gl_common_texture_native_new(Evas_Engine_GL_Context *gc, unsigned int w, un
    return tex;
 }
 
+/**
+ * @internal
+ * @brief Creates a new, standalone texture for use as a render target.
+ *
+ * This function creates a texture that is intended to be rendered into. It
+ * creates a "whole" texture pool (not part of an atlas) using
+ * `_pool_tex_render_new`, which also sets up an FBO for rendering.
+ *
+ * @param gc The Evas GL context.
+ * @param w The width of the texture.
+ * @param h The height of the texture.
+ * @param alpha EINA_TRUE if the texture should have an alpha channel.
+ * @param stencil EINA_TRUE to create an associated stencil buffer.
+ * @return A new Evas_GL_Texture configured as a render target, or NULL on failure.
+ */
 Evas_GL_Texture *
 evas_gl_common_texture_render_new(Evas_Engine_GL_Context *gc, unsigned int w, unsigned int h, int alpha, int stencil)
 {
@@ -1120,6 +1488,21 @@ evas_gl_common_texture_render_new(Evas_Engine_GL_Context *gc, unsigned int w, un
    return tex;
 }
 
+/**
+ * @internal
+ * @brief Creates a new texture for rendering, potentially from a render atlas.
+ *
+ * This function allocates a texture suitable for use as a render target. Unlike
+ * `evas_gl_common_texture_render_new`, it uses `_pool_tex_render_find` to
+ * potentially place the render surface within a larger render atlas, which
+ * can improve performance by reducing FBO switches.
+ *
+ * @param gc The Evas GL context.
+ * @param w The width of the texture.
+ * @param h The height of the texture.
+ * @param alpha EINA_TRUE if the texture needs an alpha channel.
+ * @return A new Evas_GL_Texture configured as a render target, or NULL on failure.
+ */
 Evas_GL_Texture *
 evas_gl_common_texture_render_noscale_new(Evas_Engine_GL_Context *gc, unsigned int w, unsigned int h, int alpha)
 {
@@ -1151,6 +1534,18 @@ evas_gl_common_texture_render_noscale_new(Evas_Engine_GL_Context *gc, unsigned i
    return tex;
 }
 
+/**
+ * @internal
+ * @brief Creates a new dynamic texture that can be mapped for direct CPU access.
+ *
+ * This function creates a texture that uses platform-specific extensions to
+ * allow its backing memory to be mapped into the application's address space.
+ * It calls `_pool_tex_dynamic_new` to perform the platform-specific allocation.
+ *
+ * @param gc The Evas GL context.
+ * @param im The image providing the parameters (size, alpha) for the texture.
+ * @return A new dynamic Evas_GL_Texture, or NULL on failure.
+ */
 Evas_GL_Texture *
 evas_gl_common_texture_dynamic_new(Evas_Engine_GL_Context *gc, Evas_GL_Image *im)
 {
@@ -1174,6 +1569,24 @@ evas_gl_common_texture_dynamic_new(Evas_Engine_GL_Context *gc, Evas_GL_Image *im
    return tex;
 }
 
+/**
+ * @internal
+ * @brief Uploads image data and its duplicated border into a texture atlas sub-region.
+ *
+ * This function handles the upload of pixel data into an allocated slot in a
+ * texture atlas. A key part of this function is creating a 1-pixel border
+ * around the image by duplicating the edge pixels. This is a common technique
+ * to prevent texture filtering artifacts (like bleeding from adjacent textures
+ * in the atlas) when GL_LINEAR filtering is used.
+ *
+ * It uses `GL_UNPACK_ROW_LENGTH` if available for an efficient way to upload
+ * texture borders; otherwise, it falls back to a slower, manual, line-by-line
+ * and pixel-by-pixel border upload.
+ *
+ * @param tex The destination Evas_GL_Texture.
+ * @param im The source RGBA_Image containing the pixel data.
+ * @param bytes_count The number of bytes per pixel.
+ */
 void
 evas_gl_common_texture_upload(Evas_GL_Texture *tex, RGBA_Image *im, unsigned int bytes_count)
 {
@@ -1299,6 +1712,30 @@ evas_gl_common_texture_upload(Evas_GL_Texture *tex, RGBA_Image *im, unsigned int
      glBindTexture(tex->gc->state.current.tex_target, tex->gc->state.current.cur_tex);
 }
 
+/**
+ * @internal
+ * @brief Uploads or updates the pixel data of a texture from an RGBA_Image.
+ *
+ * This function is the main entry point for getting pixel data onto the GPU for
+ * a given texture. It handles multiple colorspaces and data types.
+ *
+ * For compressed formats (ETC, S3TC), it uses `glCompressedTexSubImage2D`.
+ *
+ * A key feature is the asynchronous preload system for large images. If enabled,
+ * this function will:
+ * 1. Create and upload a small, low-resolution "thumbnail" of the image for
+ *    immediate rendering. This prevents UI stalls.
+ * 2. Schedule an asynchronous job to upload the full-resolution texture data
+ *    in a background thread.
+ * 3. When the async upload is complete, the full-resolution texture replaces
+ *    the thumbnail.
+ *
+ * If preloading is disabled or not applicable, it calls
+ * `evas_gl_common_texture_upload` to perform a synchronous upload.
+ *
+ * @param tex The destination texture.
+ * @param im The source image.
+ */
 void
 evas_gl_common_texture_update(Evas_GL_Texture *tex, RGBA_Image *im)
 {

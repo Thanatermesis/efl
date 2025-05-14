@@ -27,19 +27,111 @@ static int _efreet_xml_log_dom = -1;
 static void efreet_xml_dump(Efreet_Xml *xml, int level);
 #endif
 
+/**
+ * @internal
+ * @brief Parses a chunk of XML data to build an Efreet_Xml tree.
+ * @param data Pointer to the pointer of the XML data string. This will be advanced as data is consumed.
+ * @param size Pointer to the remaining size of the XML data. This will be decremented as data is consumed.
+ * @param error Pointer to an integer that will be set to 1 if an error occurs.
+ * @return A pointer to the newly created Efreet_Xml node, or NULL on failure or if no more tags are found.
+ *
+ * This function recursively parses XML data. It first tries to parse a tag,
+ * then its attributes. It checks if the tag is empty (e.g., <tag/>).
+ * If not empty, it parses any text content and then recursively calls itself
+ * to parse child nodes until a closing tag is found.
+ */
 static Efreet_Xml *efreet_xml_parse(char **data, int *size, int *error);
+
+/**
+ * @internal
+ * @brief Parses the name of an XML tag from the data.
+ * @param data Pointer to the pointer of the XML data string.
+ * @param size Pointer to the remaining size of the XML data.
+ * @param tag Pointer to a const char* that will store the parsed tag name (as a stringshare).
+ * @param error Pointer to an integer that will be set to 1 if an error occurs.
+ * @return 1 on success, 0 on failure (e.g., end tag found, no start tag, or parse error).
+ *
+ * This function searches for the start of a tag '<', skips comments and XML directives,
+ * and then extracts the tag name until a non-alphabetic character is encountered.
+ */
 static int efreet_xml_tag_parse(char **data, int *size,
                                 const char **tag, int *error);
+/**
+ * @internal
+ * @brief Parses attributes of an XML tag.
+ * @param data Pointer to the pointer of the XML data string.
+ * @param size Pointer to the remaining size of the XML data.
+ * @param attributes Pointer to a `Efreet_Xml_Attribute**` that will be allocated and filled
+ *                   with parsed attributes. The array is NULL-terminated.
+ *                   Example: `attributes` will point to an array like:
+ *                   `[Efreet_Xml_Attribute*, Efreet_Xml_Attribute*, ..., NULL]`
+ *                   where each `Efreet_Xml_Attribute` has `key` and `value` strings.
+ * @param error Pointer to an integer that will be set to 1 if an error occurs.
+ *
+ * This function iterates through the data, identifying attribute key-value pairs
+ * (e.g., key="value"). It stops when it encounters '>' or runs out of data.
+ * A fixed-size buffer `attr[11]` is used to temporarily store attributes before
+ * allocating the final `attributes` array.
+ */
 static void efreet_xml_attributes_parse(char **data, int *size,
                                         Efreet_Xml_Attribute ***attributes,
                                         int *error);
+/**
+ * @internal
+ * @brief Parses the text content within an XML tag.
+ * @param data Pointer to the pointer of the XML data string.
+ * @param size Pointer to the remaining size of the XML data.
+ * @param text Pointer to a const char* that will store the parsed text content (as a stringshare).
+ *
+ * This function skips leading whitespace, then reads characters until it encounters
+ * a '<' (start of a new tag). Trailing whitespace from the collected text is then removed.
+ * The resulting text is stored in `*text`.
+ */
 static void efreet_xml_text_parse(char **data, int *size, const char **text);
 
+/**
+ * @internal
+ * @brief Checks if the current XML tag is an empty (self-closing) tag.
+ * @param data Pointer to the pointer of the XML data string.
+ * @param size Pointer to the remaining size of the XML data.
+ * @param error Pointer to an integer that will be set to 1 if an error occurs (e.g., malformed tag).
+ * @return 1 if the tag is empty (e.g., <tag/>), 0 if it's an opening tag (e.g., <tag>).
+ *
+ * This function looks for '/>' to indicate an empty tag or '>' to indicate an opening tag.
+ */
 static int efreet_xml_tag_empty(char **data, int *size, int *error);
+/**
+ * @internal
+ * @brief Checks for and consumes a closing XML tag.
+ * @param data Pointer to the pointer of the XML data string.
+ * @param size Pointer to the remaining size of the XML data.
+ * @param tag The expected closing tag name.
+ * @param error Pointer to an integer that will be set to 1 if an error occurs (e.g., mismatched tag).
+ * @return 1 if the correct closing tag is found and consumed, 0 otherwise (e.g., it's not a closing tag, or it's a different tag).
+ *
+ * This function looks for '</' followed by the provided `tag` name.
+ */
 static int efreet_xml_tag_close(char **data, int *size,
                                 const char *tag, int *error);
 
+/**
+ * @internal
+ * @brief Callback function used by Eina_List to free Efreet_Xml nodes.
+ * @param data A pointer to an Efreet_Xml node.
+ *
+ * This function simply calls efreet_xml_del() on the provided data.
+ */
 static void efreet_xml_cb_attribute_free(void *data);
+
+/**
+ * @internal
+ * @brief Skips an XML comment block.
+ * @param data Pointer to the pointer of the XML data string.
+ * @param size Pointer to the remaining size of the XML data.
+ *
+ * This function advances the `data` pointer past an XML comment,
+ * which starts with `<!--` (already consumed by caller) and ends with `-->`.
+ */
 static void efreet_xml_comment_skip(char **data, int *size);
 
 static int _efreet_xml_init_count = 0;

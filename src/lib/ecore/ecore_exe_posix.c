@@ -45,20 +45,100 @@
  * appended with a preceding space.  The first is the command off course.
  */
 
+/**
+ * @internal
+ * @brief Executes the command.
+ * This function is called in the child process after fork().
+ * It attempts to execute the command directly if possible, otherwise uses a shell.
+ * This function does not return on success, as it replaces the child process image.
+ *
+ * @param exe_cmd The command string to execute.
+ * @param flags Flags to control execution behavior.
+ */
 static inline void _ecore_exe_exec_it(const char     *exe_cmd,
                                       Ecore_Exe_Flags flags);
+
+/**
+ * @internal
+ * @brief Generic handler for data from the child process's stdout or stderr.
+ *
+ * @param data Pointer to the Ecore_Exe object.
+ * @param fd_handler The Ecore_Fd_Handler that triggered this callback.
+ * @param flags Specifies whether this is for ECORE_EXE_PIPE_READ or ECORE_EXE_PIPE_ERROR.
+ * @return ECORE_CALLBACK_RENEW to keep the handler, ECORE_CALLBACK_CANCEL to remove.
+ */
 static Eina_Bool   _ecore_exe_data_generic_handler(void             *data,
                                                    Ecore_Fd_Handler *fd_handler,
                                                    Ecore_Exe_Flags   flags);
+
+/**
+ * @internal
+ * @brief Handler for data from the child process's stderr.
+ *
+ * @param data Pointer to the Ecore_Exe object.
+ * @param fd_handler The Ecore_Fd_Handler that triggered this callback.
+ * @return ECORE_CALLBACK_RENEW to keep the handler, ECORE_CALLBACK_CANCEL to remove.
+ */
 static Eina_Bool            _ecore_exe_data_error_handler(void             *data,
                                                           Ecore_Fd_Handler *fd_handler);
+
+/**
+ * @internal
+ * @brief Handler for data from the child process's stdout.
+ *
+ * @param data Pointer to the Ecore_Exe object.
+ * @param fd_handler The Ecore_Fd_Handler that triggered this callback.
+ * @return ECORE_CALLBACK_RENEW to keep the handler, ECORE_CALLBACK_CANCEL to remove.
+ */
 static Eina_Bool            _ecore_exe_data_read_handler(void             *data,
                                                          Ecore_Fd_Handler *fd_handler);
+
+/**
+ * @internal
+ * @brief Handler for writing data to the child process's stdin.
+ *
+ * @param data Pointer to the Ecore_Exe object.
+ * @param fd_handler The Ecore_Fd_Handler that triggered this callback.
+ * @return ECORE_CALLBACK_RENEW to keep the handler, ECORE_CALLBACK_CANCEL to remove.
+ */
 static Eina_Bool            _ecore_exe_data_write_handler(void             *data,
                                                           Ecore_Fd_Handler *fd_handler);
+
+/**
+ * @internal
+ * @brief Flushes any pending data to the child process's stdin.
+ *
+ * @param obj Pointer to the Ecore_Exe object.
+ */
 static void                 _ecore_exe_flush(Ecore_Exe *obj);
+
+/**
+ * @internal
+ * @brief Callback for a timer to ensure a terminated process is killed if it doesn't exit.
+ * This is the first attempt, sending SIGKILL.
+ *
+ * @param data Pointer to the Ecore_Exe object.
+ * @param event The EFL timer event.
+ */
 static void                 _ecore_exe_make_sure_its_dead(void *data, const Efl_Event *event);
+
+/**
+ * @internal
+ * @brief Callback for a timer to log an error if a process is still alive after a SIGKILL.
+ * This is the second stage, indicating a zombie or unkillable process.
+ *
+ * @param data Pointer to the Ecore_Exe object.
+ * @param event The EFL timer event.
+ */
 static void                 _ecore_exe_make_sure_its_really_dead(void *data, const Efl_Event *event);
+
+/**
+ * @internal
+ * @brief Attaches a "doomsday clock" timer to an Ecore_Exe.
+ * This timer will eventually SIGKILL the process if it doesn't terminate normally.
+ *
+ * @param obj Pointer to the Ecore_Exe object.
+ */
 static void                 _ecore_exe_dead_attach(Ecore_Exe *obj);
 
 static const char *shell = NULL;
@@ -80,6 +160,22 @@ static int _ecore_exe_check_errno(int         result,
 #define E_IF_NO_ERRNO_NOLOOP(result, foo, ok) \
   if (((ok) = _ecore_exe_check_errno((result) = (foo), __FILE__, __LINE__)))
 
+/**
+ * @internal
+ * @brief Checks errno after a system call and handles recoverable errors.
+ * This function is primarily used by the E_IF_NO_ERRNO and E_NO_ERRNO macros.
+ * It categorizes errors and prints messages. Some errors (like EINTR, EAGAIN)
+ * indicate the operation should be retried, in which case it returns -1.
+ * Other critical errors or unsupported errno codes lead to a return of 0.
+ * Success is indicated by a return of 1.
+ *
+ * @param result The result of the system call to check.
+ * @param file The source file where the check occurs (used for error reporting).
+ * @param line The line number where the check occurs (used for error reporting).
+ * @return 1 if the system call was successful (result != -1).
+ * @return -1 if the error is recoverable (e.g., EINTR, EAGAIN) and the call should be retried.
+ * @return 0 if the error is critical or unhandled, and the operation should not be retried.
+ */
 static int
 _ecore_exe_check_errno(int         result,
                        const char *file EINA_UNUSED,
@@ -204,14 +300,26 @@ _ecore_exe_check_errno(int         result,
    return result;
 }
 
-static int run_pri = ECORE_EXE_PRIORITY_INHERIT;
+static int run_pri = ECORE_EXE_PRIORITY_INHERIT; /**< Global default priority for new processes. */
 
+/**
+ * @internal
+ * @brief Sets the default priority for subsequently run processes.
+ *
+ * @param pri The priority to set. Should be ECORE_EXE_PRIORITY_INHERIT or a value between -20 and 19.
+ */
 void
 _impl_ecore_exe_run_priority_set(int pri)
 {
    run_pri = pri;
 }
 
+/**
+ * @internal
+ * @brief Gets the default priority for subsequently run processes.
+ *
+ * @return The current default priority.
+ */
 int
 _impl_ecore_exe_run_priority_get(void)
 {
@@ -225,6 +333,18 @@ static char ***_dl_environ;
 extern char **environ;
 #endif
 
+/**
+ * @internal
+ * @brief Finalizes the Ecore_Exe object, forking and executing the command.
+ * This function sets up pipes for stdin, stdout, stderr, and a status pipe
+ * to detect successful exec() in the child. It then forks the process.
+ * The child process sets up its file descriptors and executes the command.
+ * The parent process sets up fd handlers for the pipes.
+ *
+ * @param obj The Ecore_Exe Eo object.
+ * @param exe The Ecore_Exe_Data private data for the object.
+ * @return The Ecore_Exe Eo object on success, or NULL on failure.
+ */
 Eo *
 _impl_ecore_exe_efl_object_finalize(Eo *obj, Ecore_Exe_Data *exe)
 {
@@ -626,6 +746,17 @@ _impl_ecore_exe_efl_object_finalize(Eo *obj, Ecore_Exe_Data *exe)
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Sends data to the stdin of the running process.
+ * The data is buffered and written asynchronously.
+ *
+ * @param obj The Ecore_Exe Eo object (unused).
+ * @param exe The Ecore_Exe_Data private data for the object.
+ * @param data Pointer to the data to send.
+ * @param size The size of the data in bytes.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., pipe not open, out of memory).
+ */
 Eina_Bool
 _impl_ecore_exe_send(Ecore_Exe  *obj EINA_UNUSED,
                Ecore_Exe_Data *exe,
@@ -655,6 +786,20 @@ _impl_ecore_exe_send(Ecore_Exe  *obj EINA_UNUSED,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Sets automatic data buffering limits for stdout/stderr of the process.
+ * This feature is currently not fully implemented (marked with FIXME).
+ * The intention is to allow capturing a certain amount of initial and/or trailing
+ * output from a command, especially for debugging or logging failed commands.
+ *
+ * @param obj The Ecore_Exe Eo object (unused).
+ * @param exe The Ecore_Exe_Data private data for the object.
+ * @param start_bytes Number of bytes to buffer from the start of the output. -1 for unlimited.
+ * @param end_bytes Number of bytes to buffer from the end of the output (like a circular buffer). -1 for unlimited.
+ * @param start_lines Number of lines to buffer from the start. -1 for unlimited.
+ * @param end_lines Number of lines to buffer from the end. -1 for unlimited.
+ */
 void
 _impl_ecore_exe_auto_limits_set(Ecore_Exe *obj EINA_UNUSED,
                           Ecore_Exe_Data *exe,
@@ -709,6 +854,33 @@ _impl_ecore_exe_auto_limits_set(Ecore_Exe *obj EINA_UNUSED,
     */
 }
 
+/**
+ * @internal
+ * @brief Retrieves buffered data from an Ecore_Exe instance and packages it into an Ecore_Exe_Event_Data structure.
+ * This function is typically called when ECORE_EXE_PIPE_AUTO is not set, and the user wants to manually
+ * retrieve data that has been read from the child process's stdout or stderr pipes.
+ * If line buffering is enabled for the specified pipe, this function will process the raw byte buffer
+ * into an array of lines. Any partial line at the end of the buffer is saved for the next call.
+ *
+ * @param obj The Ecore_Exe object associated with the event.
+ * @param exe The private data structure for the Ecore_Exe object.
+ * @param flags Indicates which pipe's data to retrieve (ECORE_EXE_PIPE_READ for stdout, ECORE_EXE_PIPE_ERROR for stderr).
+ * @return A pointer to a newly allocated Ecore_Exe_Event_Data structure containing the data,
+ *         or NULL if no complete lines are available (for line-buffered pipes) or if an error occurs.
+ *         The caller is responsible for freeing this structure if ECORE_EXE_PIPE_AUTO is not used,
+ *         typically via _ecore_exe_event_exe_data_free when an event is generated.
+ *
+ * @note Example Ecore_Exe_Event_Data_Line structure within Ecore_Exe_Event_Data->lines (if line buffered):
+ * \code
+ * e->lines = [
+ *   { .line = "First line data\0", .size = 15 },
+ *   { .line = "Second line data\0", .size = 16 },
+ *   ...
+ *   { .line = NULL, .size = 0 } // Null terminator for the array
+ * ]
+ * e->data would point to the beginning of the contiguous block of memory holding all line strings.
+ * \endcode
+ */
 Ecore_Exe_Event_Data *
 _impl_ecore_exe_event_data_get(Ecore_Exe      *obj,
                          Ecore_Exe_Data *exe,
@@ -849,6 +1021,16 @@ _impl_ecore_exe_event_data_get(Ecore_Exe      *obj,
    return e;
 }
 
+/**
+ * @internal
+ * @brief Destructor for the Ecore_Exe object.
+ * Cleans up resources associated with the executed process, including
+ * closing pipes, freeing buffers, and removing fd handlers.
+ * It also calls a pre_free_cb if one was set.
+ *
+ * @param obj The Ecore_Exe Eo object being destructed.
+ * @param exe The Ecore_Exe_Data private data for the object.
+ */
 void
 _impl_ecore_exe_efl_object_destructor(Eo *obj, Ecore_Exe_Data *exe)
 {
@@ -889,18 +1071,40 @@ _impl_ecore_exe_efl_object_destructor(Eo *obj, Ecore_Exe_Data *exe)
    IF_FREE(exe->tag);
 }
 
+/**
+ * @internal
+ * @brief Pauses the executed process by sending SIGSTOP.
+ *
+ * @param obj The Ecore_Exe Eo object (unused).
+ * @param exe The Ecore_Exe_Data private data for the object.
+ */
 void
 _impl_ecore_exe_pause(Eo *obj EINA_UNUSED, Ecore_Exe_Data *exe)
 {
    kill(exe->pid, SIGSTOP);
 }
 
+/**
+ * @internal
+ * @brief Resumes a paused process by sending SIGCONT.
+ *
+ * @param obj The Ecore_Exe Eo object (unused).
+ * @param exe The Ecore_Exe_Data private data for the object.
+ */
 void
 _impl_ecore_exe_continue(Eo *obj EINA_UNUSED, Ecore_Exe_Data *exe)
 {
    kill(exe->pid, SIGCONT);
 }
 
+/**
+ * @internal
+ * @brief Sends SIGINT (interrupt) to the executed process.
+ * Attaches a doomsday clock to ensure eventual termination if SIGINT is ignored.
+ *
+ * @param obj The Ecore_Exe Eo object.
+ * @param exe The Ecore_Exe_Data private data for the object.
+ */
 void
 _impl_ecore_exe_interrupt(Ecore_Exe *obj, Ecore_Exe_Data *exe)
 {
@@ -908,6 +1112,14 @@ _impl_ecore_exe_interrupt(Ecore_Exe *obj, Ecore_Exe_Data *exe)
    kill(exe->pid, SIGINT);
 }
 
+/**
+ * @internal
+ * @brief Sends SIGQUIT to the executed process.
+ * Attaches a doomsday clock to ensure eventual termination if SIGQUIT is ignored.
+ *
+ * @param obj The Ecore_Exe Eo object.
+ * @param exe The Ecore_Exe_Data private data for the object.
+ */
 void
 _impl_ecore_exe_quit(Ecore_Exe *obj, Ecore_Exe_Data *exe)
 {
@@ -915,6 +1127,14 @@ _impl_ecore_exe_quit(Ecore_Exe *obj, Ecore_Exe_Data *exe)
    kill(exe->pid, SIGQUIT);
 }
 
+/**
+ * @internal
+ * @brief Sends SIGTERM (terminate) to the executed process.
+ * Attaches a doomsday clock to ensure eventual termination if SIGTERM is ignored.
+ *
+ * @param obj The Ecore_Exe Eo object.
+ * @param exe The Ecore_Exe_Data private data for the object.
+ */
 void
 _impl_ecore_exe_terminate(Ecore_Exe *obj, Ecore_Exe_Data *exe)
 {
@@ -923,6 +1143,14 @@ _impl_ecore_exe_terminate(Ecore_Exe *obj, Ecore_Exe_Data *exe)
    kill(exe->pid, SIGTERM);
 }
 
+/**
+ * @internal
+ * @brief Sends SIGKILL to the executed process.
+ * This also sets up a secondary doomsday clock to check if the process really died.
+ *
+ * @param obj The Ecore_Exe Eo object (unused but passed to timer).
+ * @param exe The Ecore_Exe_Data private data for the object.
+ */
 void
 _impl_ecore_exe_kill(Ecore_Exe *obj EINA_UNUSED, Ecore_Exe_Data *exe)
 {
@@ -937,6 +1165,14 @@ _impl_ecore_exe_kill(Ecore_Exe *obj EINA_UNUSED, Ecore_Exe_Data *exe)
    kill(exe->pid, SIGKILL);
 }
 
+/**
+ * @internal
+ * @brief Sends a user-defined signal (SIGUSR1 or SIGUSR2) to the executed process.
+ *
+ * @param obj The Ecore_Exe Eo object (unused).
+ * @param exe The Ecore_Exe_Data private data for the object.
+ * @param num The signal number (1 for SIGUSR1, 2 for SIGUSR2).
+ */
 void
 _impl_ecore_exe_signal(Ecore_Exe *obj EINA_UNUSED,
                  Ecore_Exe_Data *exe,
@@ -948,6 +1184,13 @@ _impl_ecore_exe_signal(Ecore_Exe *obj EINA_UNUSED,
      kill(exe->pid, SIGUSR2);
 }
 
+/**
+ * @internal
+ * @brief Sends SIGHUP to the executed process.
+ *
+ * @param obj The Ecore_Exe Eo object (unused).
+ * @param exe The Ecore_Exe_Data private data for the object.
+ */
 void
 _impl_ecore_exe_hup(Ecore_Exe *obj EINA_UNUSED, Ecore_Exe_Data *exe)
 {
@@ -993,6 +1236,15 @@ _ecore_exe_make_sure_its_really_dead(void *data, const Efl_Event *event)
    efl_del(event->object);
 }
 
+/**
+ * @internal
+ * @brief Gets the doomsday clock timer associated with an Ecore_Exe.
+ * The doomsday clock is a timer that, when fired, will forcibly terminate
+ * the associated process.
+ *
+ * @param obj The Ecore_Exe object.
+ * @return The Efl_Loop_Timer object representing the doomsday clock, or NULL if none.
+ */
 Efl_Loop_Timer *
 _ecore_exe_doomsday_clock_get(Ecore_Exe *obj)
 {
@@ -1001,6 +1253,13 @@ _ecore_exe_doomsday_clock_get(Ecore_Exe *obj)
    return exe->doomsday_clock;
 }
 
+/**
+ * @internal
+ * @brief Sets or replaces the doomsday clock timer for an Ecore_Exe.
+ *
+ * @param obj The Ecore_Exe object.
+ * @param dc The Efl_Loop_Timer to set as the doomsday clock.
+ */
 void
 _ecore_exe_doomsday_clock_set(Ecore_Exe *obj, Efl_Loop_Timer *dc)
 {

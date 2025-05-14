@@ -79,7 +79,25 @@ static const Elm_Action key_actions[] = {
    {NULL, NULL}
 };
 
-
+/**
+ * @internal
+ * @brief Safely processes a list of items, allowing modification during iteration.
+ *
+ * This function iterates over a copy of the provided @p items list, calling the
+ * @p process function for each valid item. This approach allows the @p process
+ * function to safely modify the original list (e.g., delete items) without
+ * causing iteration issues.
+ *
+ * The `walk` array stores `Elm_Object_Item *` elements.
+ *
+ * @param items The list of items to process.
+ * @param process The function to call for each item.
+ *        The callback signature is: `void (*process)(void* data, Elm_Object_Item *sel, Elm_List_Item_Data *it)`
+ *        - @c data: User-provided data.
+ *        - @c sel: The current `Elm_Object_Item` being processed.
+ *        - @c it: The `Elm_List_Item_Data` associated with @c sel.
+ * @param data Custom data to be passed to the @p process function.
+ */
 static void
 _items_safe_process(Eina_List *items, void (*process)(void* data, Elm_Object_Item *sel, Elm_List_Item_Data *it), void *data)
 {
@@ -106,6 +124,14 @@ _items_safe_process(Eina_List *items, void (*process)(void* data, Elm_Object_Ite
    eina_array_flush(&walk);
 }
 
+/**
+ * @internal
+ * @brief Checks if the list item's selection mode prohibits selection.
+ *
+ * @param it The list item data.
+ * @return @c EINA_TRUE if selection is disabled for this item's list,
+ *         @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _is_no_select(Elm_List_Item_Data *it)
 {
@@ -117,6 +143,17 @@ _is_no_select(Elm_List_Item_Data *it)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Invalidates a list item, cleaning up its resources and callbacks.
+ *
+ * This function is called before an item is destroyed. It removes event
+ * callbacks associated with the item's view and content objects (icon, end)
+ * and updates internal list state if the item was focused or last selected.
+ *
+ * @param eo_it The Eolian object for the list item.
+ * @param it The list item's private data.
+ */
 static void
 _elm_list_item_efl_object_invalidate(Elm_Object_Item *eo_it, Elm_List_Item_Data *it)
 {
@@ -151,6 +188,16 @@ _elm_list_item_efl_object_invalidate(Elm_Object_Item *eo_it, Elm_List_Item_Data 
    efl_invalidate(efl_super(eo_it, ELM_LIST_ITEM_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Destroys a list item, freeing all its allocated resources.
+ *
+ * This function is called when a list item is being destroyed. It frees
+ * stringshares, timers, and Evas objects associated with the item.
+ *
+ * @param eo_it The Eolian object for the list item.
+ * @param it The list item's private data.
+ */
 static void
 _elm_list_item_efl_object_destructor(Elm_Object_Item *eo_it, Elm_List_Item_Data *it)
 {
@@ -163,6 +210,18 @@ _elm_list_item_efl_object_destructor(Elm_Object_Item *eo_it, Elm_List_Item_Data 
    efl_destructor(efl_super(eo_it, ELM_LIST_ITEM_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Handles multi-selection logic when navigating upwards.
+ *
+ * If multi-selection is active and there's a selected item, this function
+ * attempts to select the previous enabled item or unselect the current
+ * last selected item if the previous one is already selected.
+ *
+ * @param sd The list's private data.
+ * @return @c EINA_TRUE if a selection change occurred or boundary reached,
+ *         @c EINA_FALSE otherwise (e.g., no items selected, not in multi-mode).
+ */
 static Eina_Bool
 _item_multi_select_up(Elm_List_Data *sd)
 {
@@ -191,6 +250,18 @@ _item_multi_select_up(Elm_List_Data *sd)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Handles multi-selection logic when navigating downwards.
+ *
+ * If multi-selection is active and there's a selected item, this function
+ * attempts to select the next enabled item or unselect the current
+ * last selected item if the next one is already selected.
+ *
+ * @param sd The list's private data.
+ * @return @c EINA_TRUE if a selection change occurred or boundary reached,
+ *         @c EINA_FALSE otherwise (e.g., no items selected, not in multi-mode).
+ */
 static Eina_Bool
 _item_multi_select_down(Elm_List_Data *sd)
 {
@@ -219,6 +290,14 @@ _item_multi_select_down(Elm_List_Data *sd)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Unselects all currently selected items in the list.
+ *
+ * @param sd The list's private data.
+ * @return @c EINA_TRUE if any items were unselected, @c EINA_FALSE if no
+ *         items were selected initially.
+ */
 static Eina_Bool
 _all_items_unselect(Elm_List_Data *sd)
 {
@@ -231,6 +310,17 @@ _all_items_unselect(Elm_List_Data *sd)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Handles single-selection logic when navigating upwards.
+ *
+ * Unselects all currently selected items and selects the previous enabled item.
+ * If no item is currently selected, it selects the last item in the list.
+ *
+ * @param sd The list's private data.
+ * @return @c EINA_TRUE if an item was selected, @c EINA_FALSE if no
+ *         suitable previous item was found.
+ */
 static Eina_Bool
 _item_single_select_up(Elm_List_Data *sd)
 {
@@ -256,6 +346,17 @@ _item_single_select_up(Elm_List_Data *sd)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Handles single-selection logic when navigating downwards.
+ *
+ * Unselects all currently selected items and selects the next enabled item.
+ * If no item is currently selected, it selects the first item in the list.
+ *
+ * @param sd The list's private data.
+ * @return @c EINA_TRUE if an item was selected, @c EINA_FALSE if no
+ *         suitable next item was found.
+ */
 static Eina_Bool
 _item_single_select_down(Elm_List_Data *sd)
 {
@@ -281,6 +382,21 @@ _item_single_select_down(Elm_List_Data *sd)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Attempts to set focus to focusable content within a list item.
+ *
+ * This function checks if the list item @p it has focusable content (icon or end widget)
+ * and tries to move focus to/between them based on the direction @p dir.
+ * The `focus_chain` array stores `Evas_Object *` elements, which are
+ * the focusable icon and end objects.
+ *
+ * @param it The list item data.
+ * @param dir The direction of focus movement.
+ * @param h_mode EINA_TRUE if the list is in horizontal mode, EINA_FALSE otherwise.
+ * @return @c EINA_TRUE if focus was successfully set to a content object,
+ *         @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_list_item_content_focus_set(Elm_List_Item_Data *it, Elm_Focus_Direction dir,
                                  Eina_Bool h_mode)
@@ -345,6 +461,17 @@ _elm_list_item_content_focus_set(Elm_List_Item_Data *it, Elm_Focus_Direction dir
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Gets the next or previous item relative to a given item.
+ *
+ * @param sd The list's private data.
+ * @param eo_cur The current list item.
+ * @param dir The direction to look for the next item (ELM_FOCUS_UP/LEFT for previous,
+ *            ELM_FOCUS_DOWN/RIGHT for next, considering h_mode).
+ * @return The next/previous `Elm_Object_Item *` or @c NULL if at the boundary or
+ *         @p eo_cur is not found.
+ */
 static Elm_Object_Item *
 _next_item_get(Elm_List_Data *sd, Elm_Object_Item *eo_cur, Elm_Focus_Direction dir)
 {
@@ -363,6 +490,14 @@ _next_item_get(Elm_List_Data *sd, Elm_Object_Item *eo_cur, Elm_Focus_Direction d
    return eo_it;
 }
 
+/**
+ * @internal
+ * @brief Moves focus to the next available (not disabled) item in the specified direction.
+ *
+ * @param obj The list widget object.
+ * @param dir The direction to move focus.
+ * @return @c EINA_TRUE if focus was moved to another item, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _item_focused_next(Evas_Object *obj, Elm_Focus_Direction dir)
 {
@@ -387,6 +522,24 @@ _item_focused_next(Evas_Object *obj, Elm_Focus_Direction dir)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Handles directional navigation events for the list.
+ *
+ * This function processes directional input (up, down, left, right) to
+ * navigate focus or selection within the list. It considers:
+ * - Focusing content within an item.
+ * - Single vs. multi-selection mode.
+ * - Item looping behavior.
+ * - Configuration for item selection on focus.
+ *
+ * @param obj The list widget object.
+ * @param dir The direction of navigation.
+ * @param multi @c EINA_TRUE if multi-selection modification is intended (e.g., shift + arrow),
+ *              @c EINA_FALSE for single item navigation/selection.
+ * @return @c EINA_TRUE if the event was handled (e.g., focus/selection changed,
+ *         looping initiated), @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_list_efl_ui_widget_event_direction(Evas_Object *obj, Elm_Focus_Direction dir, Eina_Bool multi)
 {
@@ -505,6 +658,25 @@ _elm_list_efl_ui_widget_event_direction(Evas_Object *obj, Elm_Focus_Direction di
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Handles "move" key actions for the list.
+ *
+ * This function is an action callback triggered by key events mapped to "move".
+ * It interprets the @p params string to determine the type of move (e.g., "left",
+ * "right", "up", "down", "first", "last", "prior", "next") and performs the
+ * corresponding navigation or scrolling action.
+ *
+ * Example @p params values:
+ * - "left", "right", "up", "down"
+ * - "left_multi", "right_multi", "up_multi", "down_multi"
+ * - "first", "last"
+ * - "prior" (page up), "next" (page down)
+ *
+ * @param obj The list widget object.
+ * @param params A string specifying the direction or type of move.
+ * @return @c EINA_TRUE if the action was handled, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool _key_action_move(Evas_Object *obj, const char *params)
 {
    ELM_LIST_DATA_GET(obj, sd);
@@ -647,6 +819,20 @@ static Eina_Bool _key_action_move(Evas_Object *obj, const char *params)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Handles the "select" key action for the list.
+ *
+ * This function is an action callback triggered by key events mapped to "select"
+ * (e.g., Enter, Space). It selects the currently focused item (or the selected
+ * item if in single-select mode and an item is already selected) and emits
+ * an "activated" signal for that item.
+ *
+ * @param obj The list widget object.
+ * @param params Unused.
+ * @return @c EINA_TRUE if an item was selected/activated, @c EINA_FALSE if no
+ *         items exist or no item could be targeted.
+ */
 static Eina_Bool _key_action_select(Evas_Object *obj, const char *params EINA_UNUSED)
 {
    ELM_LIST_DATA_GET(obj, sd);
@@ -669,6 +855,18 @@ static Eina_Bool _key_action_select(Evas_Object *obj, const char *params EINA_UN
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Handles the "escape" key action for the list.
+ *
+ * This function is an action callback triggered by key events mapped to "escape".
+ * It attempts to unselect all items in the list.
+ *
+ * @param obj The list widget object.
+ * @param params Unused.
+ * @return @c EINA_TRUE if items were unselected, @c EINA_FALSE if no items
+ *         were selected or no items exist.
+ */
 static Eina_Bool _key_action_escape(Evas_Object *obj, const char *params EINA_UNUSED)
 {
    ELM_LIST_DATA_GET(obj, sd);

@@ -14,12 +14,23 @@
 #include "elm_segment_control_item_eo.h"
 #include "elm_widget_segment_control.h"
 
+/**
+ * @internal
+ * @brief The Elementary Segment Control widget.
+ *
+ * See @ref Elm_Segment_Control for more details on this widget.
+ * This file contains the C implementation of the Segment Control widget.
+ */
+
 #define MY_CLASS ELM_SEGMENT_CONTROL_CLASS
 
 #define MY_CLASS_NAME "Elm_Segment_Control"
 #define MY_CLASS_NAME_LEGACY "elm_segment_control"
 
+// "changed" signal name
 static const char SIG_CHANGED[] = "changed";
+
+// Smart callback descriptions
 static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {SIG_CHANGED, ""},
    {SIG_WIDGET_LANG_CHANGED, ""}, /**< handled by elm_widget */
@@ -27,6 +38,16 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {NULL, NULL}
 };
 
+/**
+ * @internal
+ * @brief Updates translations for all items in the segment control.
+ *
+ * This function is called when the application's language changes.
+ * It iterates over all segment items and triggers their translation update.
+ *
+ * @param obj The Evas object (segment control).
+ * @param sd The segment control's private data.
+ */
 EOLIAN static void
 _elm_segment_control_efl_ui_l10n_translation_update(Eo *obj EINA_UNUSED, Elm_Segment_Control_Data *sd)
 {
@@ -39,6 +60,15 @@ _elm_segment_control_efl_ui_l10n_translation_update(Eo *obj EINA_UNUSED, Elm_Seg
    efl_ui_l10n_translation_update(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Frees resources associated with a segment control item.
+ *
+ * This includes removing the item from the segment control's list of items,
+ * deleting its icon, and freeing its label string.
+ *
+ * @param it The segment control item data to free.
+ */
 static void
 _item_free(Elm_Segment_Control_Item_Data *it)
 {
@@ -51,6 +81,15 @@ _item_free(Elm_Segment_Control_Item_Data *it)
    eina_stringshare_del(it->label);
 }
 
+/**
+ * @internal
+ * @brief Calculates and sets the position and size of each segment item.
+ *
+ * Items are distributed equally within the widget's bounds.
+ * Considers Right-To-Left (RTL) mode for positioning.
+ *
+ * @param sd The segment control's private data.
+ */
 static void
 _position_items(Elm_Segment_Control_Data *sd)
 {
@@ -83,6 +122,15 @@ _position_items(Elm_Segment_Control_Data *sd)
    elm_layout_sizing_eval(sd->obj);
 }
 
+/**
+ * @internal
+ * @brief Swallows the icon and sets the text for a segment item in its Edje layout.
+ *
+ * Emits signals to the Edje theme to show or hide icon and text parts
+ * based on their presence.
+ *
+ * @param it The segment control item data.
+ */
 static void
 _swallow_item_objects(Elm_Segment_Control_Item_Data *it)
 {
@@ -106,6 +154,17 @@ _swallow_item_objects(Elm_Segment_Control_Item_Data *it)
    edje_object_message_signal_process(VIEW(it));
 }
 
+/**
+ * @internal
+ * @brief Updates the visual state of all segment items.
+ *
+ * This function repositions items, sets their focus composition,
+ * adjusts finger size multiplier, and updates the Edje theme signals
+ * for type (single, left, middle, right), state (selected, normal, disabled),
+ * and content visibility.
+ *
+ * @param sd The segment control's private data.
+ */
 static void
 _update_list(Elm_Segment_Control_Data *sd)
 {
@@ -193,6 +252,18 @@ _update_list(Elm_Segment_Control_Data *sd)
      }
 }
 
+/**
+ * @internal
+ * @brief Applies the theme to the segment control and its items.
+ *
+ * This function is called when the widget's theme needs to be updated.
+ * It applies the theme to the base widget and then iterates through
+ * each item, setting its theme, scale, and mirrored mode.
+ *
+ * @param obj The Evas object (segment control).
+ * @param sd The segment control's private data.
+ * @return Eina_Error EFL_UI_THEME_APPLY_ERROR_GENERIC on failure, or success from super.
+ */
 EOLIAN static Eina_Error
 _elm_segment_control_efl_ui_widget_theme_apply(Eo *obj, Elm_Segment_Control_Data *sd)
 {
@@ -222,7 +293,17 @@ _elm_segment_control_efl_ui_widget_theme_apply(Eo *obj, Elm_Segment_Control_Data
    return int_ret;
 }
 
-
+/**
+ * @internal
+ * @brief Sets the disabled state of the segment control.
+ *
+ * Propagates the disabled state to the superclass and then updates
+ * the visual state of all items to reflect the change.
+ *
+ * @param obj The Evas object (segment control).
+ * @param sd The segment control's private data.
+ * @param disabled EINA_TRUE to disable, EINA_FALSE to enable.
+ */
 EOLIAN static void
 _elm_segment_control_efl_ui_widget_disabled_set(Eo *obj, Elm_Segment_Control_Data *sd, Eina_Bool disabled)
 {
@@ -269,6 +350,15 @@ _elm_segment_control_elm_widget_focus_next(Eo *obj, Elm_Segment_Control_Data *sd
 
 #endif
 
+/**
+ * @internal
+ * @brief Sets a segment item to the 'off' (unselected) state.
+ *
+ * Emits a signal to the Edje theme to reflect the normal state.
+ * If this item was the currently selected one, it clears the selection.
+ *
+ * @param it The segment control item data.
+ */
 static void
 _segment_off(Elm_Segment_Control_Item_Data *it)
 {
@@ -279,6 +369,17 @@ _segment_off(Elm_Segment_Control_Item_Data *it)
    if (sd->selected_item == it) sd->selected_item = NULL;
 }
 
+/**
+ * @internal
+ * @brief Sets a segment item to the 'on' (selected) state.
+ *
+ * If the item is already selected or disabled, no action is taken.
+ * Otherwise, it deselects any previously selected item, emits a signal
+ * to the Edje theme for the selected state, updates the selected item,
+ * and triggers the "changed" callback.
+ *
+ * @param it The segment control item data.
+ */
 static void
 _segment_on(Elm_Segment_Control_Item_Data *it)
 {
@@ -296,6 +397,17 @@ _segment_on(Elm_Segment_Control_Item_Data *it)
    efl_event_callback_legacy_call(sd->obj, ELM_SEGMENT_CONTROL_EVENT_CHANGED, EO_OBJ(it));
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_RESIZE and EVAS_CALLBACK_MOVE events on the segment control.
+ *
+ * Triggers repositioning of the items when the widget is moved or resized.
+ *
+ * @param data The segment control widget (passed as user data).
+ * @param e The Evas canvas.
+ * @param obj The Evas object that triggered the event.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _on_move_resize(void *data, Evas *e EINA_UNUSED,
                 Evas_Object *obj EINA_UNUSED,
@@ -312,6 +424,7 @@ _on_mouse_up(void *data,
              Evas_Object *obj EINA_UNUSED,
              void *event_info)
 {
+   // it: The specific segment item that received the mouse up event.
    Elm_Segment_Control_Item_Data *it = data;
    Evas_Event_Mouse_Up *ev = event_info;
    Evas_Coord x, y, w, h;
@@ -340,6 +453,7 @@ _on_mouse_down(void *data,
                Evas_Object *obj EINA_UNUSED,
                void *event_info EINA_UNUSED)
 {
+   // it: The specific segment item that received the mouse down event.
    Elm_Segment_Control_Item_Data *it = data;
    Evas_Event_Mouse_Down *ev = event_info;
 
@@ -353,6 +467,15 @@ _on_mouse_down(void *data,
    edje_object_signal_emit(VIEW(it), "elm,state,segment,pressed", "elm");
 }
 
+/**
+ * @internal
+ * @brief Finds a segment control item by its index.
+ *
+ * @param obj The segment control widget.
+ * @param idx The index of the item to find.
+ * @return The Elm_Segment_Control_Item_Data for the item at the given index,
+ *         or NULL if not found.
+ */
 static Elm_Segment_Control_Item_Data *
 _item_find(const Evas_Object *obj,
            int idx)
@@ -372,6 +495,7 @@ _elm_segment_control_item_elm_widget_item_part_text_set(Eo *eo_item EINA_UNUSED,
                                 const char *part,
                                 const char *label)
 {
+   // Buffer for constructing signal strings
    char buf[1024];
 
    if ((!part) || (!strcmp(part, "default")) ||
@@ -407,6 +531,7 @@ _elm_segment_control_item_elm_widget_item_part_text_get(const Eo *eo_item EINA_U
                                                 Elm_Segment_Control_Item_Data *it,
                                                 const char *part)
 {
+   // Buffer for constructing part name string
    char buf[1024];
 
    if (!part || !strcmp(part, "default"))
@@ -423,6 +548,7 @@ _elm_segment_control_item_elm_widget_item_part_content_set(Eo *eo_item EINA_UNUS
                                                    const char *part,
                                                    Evas_Object *content)
 {
+   // Buffer for constructing signal strings
    char buf[1024];
 
    if (!part || !strcmp("icon", part))
@@ -472,12 +598,25 @@ _elm_segment_control_item_efl_object_destructor(Eo *eo_item, Elm_Segment_Control
 {
    ELM_SEGMENT_CONTROL_DATA_GET(WIDGET(item), sd);
 
+   // Free item's internal data
    _item_free(item);
+   // Refresh the layout and state of remaining items
    _update_list(sd);
 
    efl_destructor(efl_super(eo_item, ELM_SEGMENT_CONTROL_ITEM_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Accessibility callback to get information about a segment item.
+ *
+ * Provides the item's label as its accessibility information.
+ *
+ * @param data The segment item data (Elm_Segment_Control_Item_Data *).
+ * @param obj The Evas object (unused).
+ * @return A newly allocated string containing the item's label, or NULL.
+ *         The caller is responsible for freeing the returned string.
+ */
 static char *
 _access_info_cb(void *data, Evas_Object *obj EINA_UNUSED)
 {
@@ -485,12 +624,24 @@ _access_info_cb(void *data, Evas_Object *obj EINA_UNUSED)
    Elm_Segment_Control_Item_Data *it = (Elm_Segment_Control_Item_Data *)data;
    ELM_SEGMENT_CONTROL_ITEM_CHECK_OR_RETURN(it, NULL);
 
-   if (!txt) txt = it->label;
+   if (!txt) txt = it->label; // Prioritize item's label
    if (txt) return strdup(txt);
 
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Accessibility callback to get the state of a segment item.
+ *
+ * Provides a string describing the item's state (e.g., "State: Disabled",
+ * "State: Selected", "State: Unselected").
+ *
+ * @param data The segment item data (Elm_Segment_Control_Item_Data *).
+ * @param obj The Evas object (unused).
+ * @return A newly allocated string describing the item's state, or NULL.
+ *         The caller is responsible for freeing the returned string.
+ */
 static char *
 _access_state_cb(void *data, Evas_Object *obj EINA_UNUSED)
 {
@@ -508,6 +659,16 @@ _access_state_cb(void *data, Evas_Object *obj EINA_UNUSED)
      return strdup(E_("State: Unselected"));
 }
 
+/**
+ * @internal
+ * @brief Registers accessibility features for a segment control item.
+ *
+ * Sets up accessibility callbacks for type, information, and state.
+ *
+ * @param eo_it The Evas object for the item.
+ * @param it The segment control item data.
+ * @return The Evas_Object used for accessibility, typically the item's view.
+ */
 static Evas_Object*
 _elm_segment_control_item_elm_widget_item_access_register(Eo *eo_it EINA_UNUSED,
                                                   Elm_Segment_Control_Item_Data *it)
@@ -526,6 +687,18 @@ _elm_segment_control_item_elm_widget_item_access_register(Eo *eo_it EINA_UNUSED,
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Creates a new segment control item.
+ *
+ * Initializes the item, sets its label and icon, and sets up mouse event
+ * callbacks. Also registers accessibility if enabled.
+ *
+ * @param obj The parent segment control widget.
+ * @param icon Optional icon for the item. Can be NULL.
+ * @param label Optional label for the item. Can be NULL.
+ * @return The newly created Elm_Object_Item, or NULL on failure.
+ */
 static Elm_Object_Item *
 _item_new(Evas_Object *obj,
           Evas_Object *icon,
@@ -561,6 +734,17 @@ _item_new(Evas_Object *obj,
    return eo_item;
 }
 
+/**
+ * @internal
+ * @brief Constructor for an Elm_Segment_Control_Item.
+ *
+ * Initializes the item's Edje view, sets up focus redirection,
+ * scaling, and theming.
+ *
+ * @param obj The Evas object (segment control item).
+ * @param it The segment control item's private data.
+ * @return The constructed Evas object.
+ */
 EOLIAN static Eo *
 _elm_segment_control_item_efl_object_constructor(Eo *obj, Elm_Segment_Control_Item_Data *it)
 {
@@ -584,10 +768,20 @@ _elm_segment_control_item_efl_object_constructor(Eo *obj, Elm_Segment_Control_It
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Handles the addition of the segment control to a canvas group.
+ *
+ * Sets the theme for the segment control base and registers event callbacks
+ * for resize and move to handle item repositioning.
+ *
+ * @param obj The Evas object (segment control).
+ * @param sd The segment control's private data.
+ */
 EOLIAN static void
 _elm_segment_control_efl_canvas_group_group_add(Eo *obj, Elm_Segment_Control_Data *sd)
 {
-   sd->obj = obj;
+   sd->obj = obj; // Store the Evas object in private data
    efl_canvas_group_add(efl_super(obj, MY_CLASS));
 
    if (!elm_layout_theme_set
@@ -602,6 +796,15 @@ _elm_segment_control_efl_canvas_group_group_add(Eo *obj, Elm_Segment_Control_Dat
    elm_layout_sizing_eval(obj);
 }
 
+/**
+ * @internal
+ * @brief Handles the deletion of the segment control from a canvas group.
+ *
+ * Unregisters event callbacks and frees all associated segment items.
+ *
+ * @param obj The Evas object (segment control).
+ * @param sd The segment control's private data.
+ */
 EOLIAN static void
 _elm_segment_control_efl_canvas_group_group_del(Eo *obj, Elm_Segment_Control_Data *sd)
 {
@@ -619,8 +822,19 @@ _elm_segment_control_efl_canvas_group_group_del(Eo *obj, Elm_Segment_Control_Dat
    efl_canvas_group_del(efl_super(obj, MY_CLASS));
 }
 
+// Flag to enable/disable smart focus for accessibility.
 static Eina_Bool _elm_segment_control_smart_focus_next_enable = EINA_FALSE;
 
+/**
+ * @internal
+ * @brief Registers or unregisters accessibility for all items in the segment control.
+ *
+ * Iterates through all items and calls the appropriate accessibility
+ * registration function based on the `is_access` flag.
+ *
+ * @param sd The segment control's private data.
+ * @param is_access EINA_TRUE to register accessibility, EINA_FALSE to unregister.
+ */
 static void
 _access_obj_process(Elm_Segment_Control_Data *sd, Eina_Bool is_access)
 {
@@ -635,6 +849,17 @@ _access_obj_process(Elm_Segment_Control_Data *sd, Eina_Bool is_access)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for when accessibility features are updated/changed for the widget.
+ *
+ * Updates the internal flag for smart focus and processes accessibility
+ * registration for all items accordingly.
+ *
+ * @param obj The Evas object (segment control, unused).
+ * @param sd The segment control's private data.
+ * @param acs EINA_TRUE if accessibility is now active, EINA_FALSE otherwise.
+ */
 EOLIAN static void
 _elm_segment_control_efl_ui_widget_on_access_update(Eo *obj EINA_UNUSED, Elm_Segment_Control_Data *sd, Eina_Bool acs)
 {
@@ -646,9 +871,21 @@ EAPI Evas_Object *
 elm_segment_control_add(Evas_Object *parent)
 {
    EINA_SAFETY_ON_NULL_RETURN_VAL(parent, NULL);
+   // Legacy way to create a new Segment Control widget.
    return elm_legacy_add(MY_CLASS, parent);
 }
 
+/**
+ * @internal
+ * @brief Constructor for the Elm_Segment_Control widget.
+ *
+ * Initializes the widget, sets its legacy type name, smart callbacks,
+ * and accessibility role.
+ *
+ * @param obj The Evas object (segment control).
+ * @param sd The segment control's private data (unused in this function).
+ * @return The constructed Evas object.
+ */
 EOLIAN static Eo *
 _elm_segment_control_efl_object_constructor(Eo *obj, Elm_Segment_Control_Data *sd EINA_UNUSED)
 {
@@ -661,6 +898,19 @@ _elm_segment_control_efl_object_constructor(Eo *obj, Elm_Segment_Control_Data *s
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Adds a new item to the segment control.
+ *
+ * Creates a new item with the given icon and label, appends it to the
+ * end of the item list, and updates the widget's layout.
+ *
+ * @param obj The segment control widget.
+ * @param sd The segment control's private data.
+ * @param icon Optional icon for the new item.
+ * @param label Optional label for the new item.
+ * @return The newly added Elm_Object_Item, or NULL on failure.
+ */
 EOLIAN static Elm_Object_Item*
 _elm_segment_control_item_add(Eo *obj, Elm_Segment_Control_Data *sd, Evas_Object *icon, const char *label)
 {
@@ -675,11 +925,25 @@ _elm_segment_control_item_add(Eo *obj, Elm_Segment_Control_Data *sd, Evas_Object
    return eo_item;
 }
 
+/**
+ * @internal
+ * @brief Inserts a new item into the segment control at a specific index.
+ *
+ * Creates a new item and inserts it before the item currently at `idx`.
+ * If `idx` is out of bounds, it behaves like append or prepend.
+ *
+ * @param obj The segment control widget.
+ * @param sd The segment control's private data.
+ * @param icon Optional icon for the new item.
+ * @param label Optional label for the new item.
+ * @param idx The index at which to insert the item.
+ * @return The newly inserted Elm_Object_Item, or NULL on failure.
+ */
 EOLIAN static Elm_Object_Item*
 _elm_segment_control_item_insert_at(Eo *obj, Elm_Segment_Control_Data *sd, Evas_Object *icon, const char *label, int idx)
 {
    Elm_Object_Item *eo_item;
-   Elm_Segment_Control_Item_Data *it_rel;
+   Elm_Segment_Control_Item_Data *it_rel; // Item relative to which new item is inserted
 
 
    if (idx < 0) idx = 0;
@@ -696,6 +960,14 @@ _elm_segment_control_item_insert_at(Eo *obj, Elm_Segment_Control_Data *sd, Evas_
    return eo_item;
 }
 
+/**
+ * @internal
+ * @brief Deletes an item from the segment control at a specific index.
+ *
+ * @param obj The segment control widget.
+ * @param _pd The segment control's private data (unused).
+ * @param idx The index of the item to delete.
+ */
 EOLIAN static void
 _elm_segment_control_item_del_at(Eo *obj, Elm_Segment_Control_Data *_pd EINA_UNUSED, int idx)
 {
@@ -707,6 +979,15 @@ _elm_segment_control_item_del_at(Eo *obj, Elm_Segment_Control_Data *_pd EINA_UNU
    efl_del(EO_OBJ(it));
 }
 
+/**
+ * @internal
+ * @brief Gets the label of an item at a specific index.
+ *
+ * @param obj The segment control widget.
+ * @param _pd The segment control's private data (unused).
+ * @param idx The index of the item.
+ * @return The label of the item, or NULL if not found or item has no label.
+ */
 EOLIAN static const char*
 _elm_segment_control_item_label_get(const Eo *obj, Elm_Segment_Control_Data *_pd EINA_UNUSED, int idx)
 {
@@ -718,32 +999,73 @@ _elm_segment_control_item_label_get(const Eo *obj, Elm_Segment_Control_Data *_pd
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Gets the icon of an item at a specific index.
+ *
+ * @param obj The segment control widget.
+ * @param _pd The segment control's private data (unused).
+ * @param idx The index of the item.
+ * @return The icon Evas_Object of the item, or NULL if not found or item has no icon.
+ */
 EOLIAN static Evas_Object*
 _elm_segment_control_item_icon_get(const Eo *obj, Elm_Segment_Control_Data *_pd EINA_UNUSED, int idx)
 {
    Elm_Segment_Control_Item_Data *it = _item_find(obj, idx);
-   if (it) return it->icon;
+   if (it) return it->icon; // Return the icon object if item is found
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Gets the total number of items in the segment control.
+ *
+ * @param obj The segment control widget (unused).
+ * @param sd The segment control's private data.
+ * @return The count of items.
+ */
 EOLIAN static int
 _elm_segment_control_item_count_get(const Eo *obj EINA_UNUSED, Elm_Segment_Control_Data *sd)
 {
    return eina_list_count(sd->items);
 }
 
+/**
+ * @internal
+ * @brief Gets the Evas_Object (view) associated with a segment control item.
+ *
+ * @param eo_it The segment control item (unused).
+ * @param it The segment control item's private data.
+ * @return The Evas_Object representing the item's view.
+ */
 EOLIAN static Evas_Object *
 _elm_segment_control_item_object_get(const Eo *eo_it EINA_UNUSED, Elm_Segment_Control_Item_Data *it)
 {
    return VIEW(it);
 }
 
+/**
+ * @internal
+ * @brief Gets the currently selected item in the segment control.
+ *
+ * @param obj The segment control widget (unused).
+ * @param sd The segment control's private data.
+ * @return The selected Elm_Object_Item, or NULL if no item is selected.
+ */
 EOLIAN static Elm_Object_Item*
 _elm_segment_control_item_selected_get(const Eo *obj EINA_UNUSED, Elm_Segment_Control_Data *sd)
 {
    return EO_OBJ(sd->selected_item);
 }
 
+/**
+ * @internal
+ * @brief Sets the selected state of a specific segment control item.
+ *
+ * @param eo_item The segment control item (unused).
+ * @param item The segment control item's private data.
+ * @param selected EINA_TRUE to select the item, EINA_FALSE to unselect.
+ */
 EOLIAN static void
 _elm_segment_control_item_selected_set(Eo *eo_item EINA_UNUSED,
                                Elm_Segment_Control_Item_Data *item,
@@ -764,6 +1086,15 @@ _elm_segment_control_item_selected_set(Eo *eo_item EINA_UNUSED,
      _segment_on(item);
 }
 
+/**
+ * @internal
+ * @brief Gets the segment control item at a specific index.
+ *
+ * @param obj The segment control widget.
+ * @param _pd The segment control's private data (unused).
+ * @param idx The index of the item.
+ * @return The Elm_Object_Item at the given index, or NULL if not found.
+ */
 EOLIAN static Elm_Object_Item*
 _elm_segment_control_item_get(const Eo *obj, Elm_Segment_Control_Data *_pd EINA_UNUSED, int idx)
 {
@@ -771,6 +1102,14 @@ _elm_segment_control_item_get(const Eo *obj, Elm_Segment_Control_Data *_pd EINA_
    return EO_OBJ(it);
 }
 
+/**
+ * @internal
+ * @brief Gets the index of a specific segment control item.
+ *
+ * @param eo_it The segment control item (unused).
+ * @param it The segment control item's private data.
+ * @return The index of the item, or -1 if the item is invalid.
+ */
 EOLIAN static int
 _elm_segment_control_item_index_get(const Eo *eo_it EINA_UNUSED, Elm_Segment_Control_Item_Data *it)
 {
@@ -779,21 +1118,51 @@ _elm_segment_control_item_index_get(const Eo *eo_it EINA_UNUSED, Elm_Segment_Con
    return it->seg_index;
 }
 
+/**
+ * @internal
+ * @brief Class constructor for Elm_Segment_Control.
+ *
+ * Registers the legacy smart type and enables smart focus for accessibility
+ * if access mode is on in the configuration.
+ *
+ * @param klass The Efl_Class for Elm_Segment_Control.
+ */
 EOLIAN static void
 _elm_segment_control_class_constructor(Efl_Class *klass)
 {
    evas_smart_legacy_type_register(MY_CLASS_NAME_LEGACY, klass);
 
+   // Enable smart focus if accessibility is globally enabled
    if (_elm_config->access_mode == ELM_ACCESS_MODE_ON)
       _elm_segment_control_smart_focus_next_enable = EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Gets the focus geometry for a segment control item.
+ *
+ * This is typically the geometry of the item's view.
+ *
+ * @param obj The segment control item (unused).
+ * @param pd The segment control item's private data.
+ * @return The Eina_Rect representing the focus geometry.
+ */
 EOLIAN static Eina_Rect
 _elm_segment_control_item_efl_ui_focus_object_focus_geometry_get(const Eo *obj EINA_UNUSED, Elm_Segment_Control_Item_Data *pd)
 {
    return efl_gfx_entity_geometry_get(VIEW(pd));
 }
 
+/**
+ * @internal
+ * @brief Gets the focus parent for a segment control item.
+ *
+ * The focus parent is the main segment control widget.
+ *
+ * @param obj The segment control item (unused).
+ * @param pd The segment control item's private data.
+ * @return The Efl_Ui_Focus_Object that is the focus parent (the segment control widget).
+ */
 EOLIAN static Efl_Ui_Focus_Object*
 _elm_segment_control_item_efl_ui_focus_object_focus_parent_get(const Eo *obj EINA_UNUSED, Elm_Segment_Control_Item_Data *pd)
 {
@@ -801,6 +1170,10 @@ _elm_segment_control_item_efl_ui_focus_object_focus_parent_get(const Eo *obj EIN
 }
 
 /* Internal EO APIs and hidden overrides */
+// These macros and includes are part of the Eolian generation process
+// and typically do not require manual Doxygen comments unless there's
+// specific, non-obvious logic within them that isn't covered by the
+// .eo file documentation.
 
 #define ELM_SEGMENT_CONTROL_EXTRA_OPS \
    EFL_CANVAS_GROUP_ADD_DEL_OPS(elm_segment_control)

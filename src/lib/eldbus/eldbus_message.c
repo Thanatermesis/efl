@@ -68,6 +68,18 @@ eldbus_message_shutdown(void)
 {
 }
 
+/**
+ * @internal
+ * @brief Create a new message iterator.
+ *
+ * This function allocates and initializes a new Eldbus_Message_Iter object.
+ * The iterator's 'writable' property is set based on the parameter.
+ * A writable iterator is used for building a message to be sent, while
+ * a non-writable one is used for reading a received message.
+ *
+ * @param writable EINA_TRUE if the iterator is for appending data, EINA_FALSE for reading.
+ * @return A new Eldbus_Message_Iter object on success, otherwise NULL.
+ */
 static Eldbus_Message_Iter *
 _message_iterator_new(Eina_Bool writable)
 {
@@ -81,6 +93,18 @@ _message_iterator_new(Eina_Bool writable)
    return iter;
 }
 
+/**
+ * @internal
+ * @brief Create a new message.
+ *
+ * This function is an internal constructor for an Eldbus_Message.
+ * It allocates and initializes the message structure and creates a root
+ * iterator for it. The 'writable' flag is passed to the iterator,
+ * determining if it can be used for appending data.
+ *
+ * @param writable EINA_TRUE to create a writable message for appending data.
+ * @return A new Eldbus_Message object on success, otherwise NULL.
+ */
 Eldbus_Message *eldbus_message_new(Eina_Bool writable)
 {
    Eldbus_Message *msg = calloc(1, sizeof(Eldbus_Message));
@@ -150,6 +174,16 @@ eldbus_message_ref(Eldbus_Message *msg)
    return msg;
 }
 
+/**
+ * @internal
+ * @brief Free a message iterator and its children.
+ *
+ * This function recursively frees an iterator and all of its sub-iterators.
+ * It iterates through the list of sub-iterators and frees them before
+ * freeing the parent iterator itself.
+ *
+ * @param iter The iterator to free.
+ */
 static void
 _message_iterator_free(Eldbus_Message_Iter *iter)
 {
@@ -250,6 +284,18 @@ eldbus_message_error_get(const Eldbus_Message *msg, const char **name, const cha
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Get arguments from a message using a va_list.
+ *
+ * This is a helper function that retrieves the main iterator from the message
+ * and then calls eldbus_message_iter_arguments_vget to read the arguments.
+ *
+ * @param msg The message to get arguments from.
+ * @param signature The D-Bus signature of the expected arguments.
+ * @param ap A va_list containing pointers to store the argument values.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _eldbus_message_arguments_vget(Eldbus_Message *msg, const char *signature, va_list ap)
 {
@@ -293,6 +339,31 @@ eldbus_message_arguments_vget(const Eldbus_Message *msg, const char *signature, 
    return _eldbus_message_arguments_vget((Eldbus_Message *)msg, signature, ap);
 }
 
+/**
+ * @internal
+ * @brief Append arguments to a message iterator using a va_list.
+ *
+ * This function iterates through a D-Bus signature and appends corresponding
+ * arguments from a va_list to a message iterator. It handles basic types by
+ * calling append_basic(). For container types (array, struct, dict-entry),
+ * it opens a new sub-container and returns a new iterator for the user to fill.
+ *
+ * For example, if called with signature "s(ii)", the `va_list` should contain:
+ * - `const char *` for the string 's'
+ * - `Eldbus_Message_Iter **` for the struct '(ii)'.
+ * The function will append the string and open a container for the struct,
+ * returning the new iterator for the struct in the provided pointer. The caller
+ * is then responsible for appending the two integers into the struct iterator
+ * and closing it.
+ *
+ * @note This function does not support appending variants directly.
+ *       eldbus_message_iter_container_new() should be used for variants.
+ *
+ * @param iter The iterator to append arguments to.
+ * @param signature The D-Bus signature of the arguments to append.
+ * @param aq A pointer to a va_list containing the argument values.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _eldbus_message_iter_arguments_vappend(Eldbus_Message_Iter *iter, const char *signature, va_list *aq)
 {
@@ -389,6 +460,19 @@ eldbus_message_iter_arguments_append(Eldbus_Message_Iter *iter, const char *sign
    return r;
 }
 
+/**
+ * @internal
+ * @brief Append a single basic-typed value to a message iterator.
+ *
+ * This function reads a value of a specified basic D-Bus type from a va_list
+ * and appends it to a DBusMessageIter. It handles various basic types like
+ * integers, booleans, doubles, and strings.
+ *
+ * @param type The DBus basic type character (e.g., 'i', 's', 'b').
+ * @param vl A pointer to a va_list from which to read the value.
+ * @param iter The DBusMessageIter to append the value to.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 append_basic(char type, va_list *vl, DBusMessageIter *iter)
 {
@@ -454,6 +538,20 @@ append_basic(char type, va_list *vl, DBusMessageIter *iter)
      }
 }
 
+/**
+ * @internal
+ * @brief Append basic-typed arguments to a message from a va_list.
+ *
+ * This function is a simplified appender that only handles basic D-Bus types.
+ * It iterates through the signature and appends each basic-typed argument from
+ * the va_list to the message's main iterator. It will fail if a complex type
+ * (like array or struct) is present in the signature.
+ *
+ * @param msg The message to append arguments to.
+ * @param signature The D-Bus signature of the arguments (basic types only).
+ * @param aq A pointer to a va_list containing the argument values.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _eldbus_message_arguments_vappend(Eldbus_Message *msg, const char *signature, va_list *aq)
 {
@@ -587,6 +685,18 @@ eldbus_message_iter_basic_get(Eldbus_Message_Iter *iter, void *value)
    dbus_message_iter_get_basic(&iter->dbus_iterator, value);
 }
 
+/**
+ * @internal
+ * @brief Get a sub-iterator for reading a container type.
+ *
+ * This function is used to descend into a container type (like an array,
+ * struct, or variant) in a read-only message iterator. It creates a new
+ * sub-iterator that is positioned at the start of the container's contents.
+ * This new iterator is then used to read the elements within the container.
+ *
+ * @param iter The parent iterator, positioned at a container type. Must be read-only.
+ * @return A new read-only Eldbus_Message_Iter for the container's contents, or NULL on failure.
+ */
 Eldbus_Message_Iter *
 eldbus_message_iter_sub_iter_get(Eldbus_Message_Iter *iter)
 {
@@ -616,6 +726,18 @@ eldbus_message_iter_next(Eldbus_Message_Iter *iter)
    return dbus_message_iter_next(&iter->dbus_iterator);
 }
 
+/**
+ * @internal
+ * @brief Get a single basic-typed value from a message iterator.
+ *
+ * This function reads a value of a specified basic D-Bus type from a
+ * DBusMessageIter and stores it in the location pointed to by the next
+ * argument in the va_list. It is the counterpart to append_basic().
+ *
+ * @param type The DBus basic type character (e.g., 'i', 's', 'b').
+ * @param iter The DBusMessageIter to read the value from.
+ * @param vl A pointer to a va_list containing a pointer to store the value.
+ */
 static void
 get_basic(char type, DBusMessageIter *iter, va_list *vl)
 {
@@ -785,6 +907,28 @@ eldbus_message_iter_get_and_next(Eldbus_Message_Iter *iter, char signature, ...)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Get arguments from a message iterator using a va_list.
+ *
+ * This function iterates through a D-Bus signature and reads corresponding
+ * arguments from a message iterator into a va_list. It handles basic types
+ * by calling get_basic(). For container types, it creates a new sub-iterator
+ * and returns it to the caller to read the container's contents.
+ *
+ * For example, if called with signature "s(ii)", the `va_list` should contain:
+ * - `const char **` to store the pointer to the string 's'.
+ * - `Eldbus_Message_Iter **` to store the new iterator for the struct '(ii)'.
+ * The function will read the string and create a sub-iterator for the struct.
+ * The caller is then responsible for reading the two integers from the struct
+ * iterator.
+ *
+ * @param iter The iterator to read arguments from. Must be read-only.
+ * @param signature The D-Bus signature of the arguments to read.
+ * @param aq A pointer to a va_list containing pointers to store the argument values.
+ * @return EINA_TRUE if all arguments in the signature were read successfully,
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _eldbus_message_iter_arguments_vget(Eldbus_Message_Iter *iter, const char *signature, va_list *aq)
 {

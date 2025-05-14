@@ -8,18 +8,41 @@
 #include "evas_font_ot.h"
 #include "draw.h"
 
+/**
+ * @brief Structure representing a single glyph to be rendered.
+ *
+ * This structure holds information about a font glyph, its position,
+ * and its FreeType index. It is typically part of an Evas_Glyph_Array.
+ */
 struct _Evas_Glyph
 {
-   RGBA_Font_Glyph *fg;
-   int x, y;
-   FT_UInt idx;
+   RGBA_Font_Glyph *fg; /**< Pointer to the RGBA_Font_Glyph data for this glyph. */
+   int x;               /**< The x-coordinate of the glyph's origin (top-left). */
+   int y;               /**< The y-coordinate of the glyph's origin (top-left). */
+   FT_UInt idx;         /**< The FreeType index of the glyph. */
 };
 
+/**
+ * @brief Initializes common font drawing functionalities.
+ * @internal
+ * Currently, this function is a placeholder and does not perform any operations.
+ */
 EVAS_API void
 evas_common_font_draw_init(void)
 {
 }
 
+/**
+ * @brief Creates a new image cache entry for a given font glyph.
+ * @internal
+ * This function takes a rendered font glyph and creates an Evas image cache
+ * entry from its bitmap data. This is used for color fonts.
+ *
+ * @param fg The font glyph to create an image from.
+ * @param alpha Boolean indicating if the image should have an alpha channel.
+ * @param cspace The colorspace of the image to be created.
+ * @return A handle to the cached image data, or NULL on failure.
+ */
 static void *
 _evas_font_image_new(RGBA_Font_Glyph *fg, int alpha, Evas_Colorspace cspace)
 {
@@ -35,6 +58,22 @@ _evas_font_image_new(RGBA_Font_Glyph *fg, int alpha, Evas_Colorspace cspace)
    return evas_cache_image_data(evas_common_image_cache_get(), src_w, src_h, image_data, alpha, cspace);
 }
 
+/**
+ * @brief Draws a cached font glyph image onto a surface.
+ * @internal
+ * This function draws a pre-cached image (created by _evas_font_image_new)
+ * onto a target surface. It handles scaling and rendering pipelines.
+ *
+ * @param context The drawing context.
+ * @param surface The target surface to draw on.
+ * @param image The cached image handle (from _evas_font_image_new).
+ * @param fg The font glyph associated with the image.
+ * @param x The destination x-coordinate.
+ * @param y The destination y-coordinate.
+ * @param w The destination width (for scaling).
+ * @param h The destination height (for scaling).
+ * @param smooth Boolean indicating if smooth scaling should be used.
+ */
 static void
 _evas_font_image_draw(void *context, void *surface, void *image, RGBA_Font_Glyph *fg, int x, int y, int w, int h, int smooth)
 {
@@ -79,6 +118,34 @@ _evas_font_image_draw(void *context, void *surface, void *image, RGBA_Font_Glyph
  * we need to reorder it so we'll have the visual string (the way we draw)
  * and then for kerning we have to switch the order of the kerning query (as the prev
  * is on the right, and not on the left).
+ */
+/**
+ * @brief Draws an array of RGBA font glyphs onto an RGBA image.
+ * @internal
+ * This function iterates through an Evas_Glyph_Array and draws each glyph
+ * onto the destination image. It handles color fonts, extension drawing,
+ * and clipping.
+ *
+ * @param dst The destination RGBA_Image to draw onto.
+ * @param dc The RGBA_Draw_Context containing drawing parameters (color, render_op, etc.).
+ * @param x The base x-coordinate for drawing the glyphs.
+ * @param y The base y-coordinate for drawing the glyphs.
+ * @param glyphs An Evas_Glyph_Array containing the glyphs to draw.
+ *               Each element is an Evas_Glyph struct:
+ *               struct _Evas_Glyph {
+ *                  RGBA_Font_Glyph *fg; // Pointer to the RGBA_Font_Glyph data.
+ *                  int x;               // The x-coordinate offset for this glyph.
+ *                  int y;               // The y-coordinate offset for this glyph.
+ *                  FT_UInt idx;         // The FreeType index of the glyph.
+ *               };
+ * @param func Unused graphics function.
+ * @param ext_x The x-coordinate of the clipping/extension region.
+ * @param ext_y The y-coordinate of the clipping/extension region.
+ * @param ext_w The width of the clipping/extension region.
+ * @param ext_h The height of the clipping/extension region.
+ * @param im_w The width of the destination image (unused in current logic for this param).
+ * @param im_h The height of the destination image (unused).
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
  */
 EVAS_API Eina_Bool
 evas_common_font_rgba_draw(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y,
@@ -178,12 +245,24 @@ evas_common_font_rgba_draw(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Increments the reference count of an Evas_Glyph_Array.
+ * @internal
+ * @param array The Evas_Glyph_Array to reference.
+ */
 void
 evas_common_font_glyphs_ref(Evas_Glyph_Array *array)
 {
    array->refcount++;
 }
 
+/**
+ * @brief Decrements the reference count of an Evas_Glyph_Array.
+ * @internal
+ * If the reference count reaches zero, the array and its associated
+ * font instance are freed/unreferenced.
+ * @param array The Evas_Glyph_Array to unreference.
+ */
 void
 evas_common_font_glyphs_unref(Evas_Glyph_Array *array)
 {
@@ -194,12 +273,23 @@ evas_common_font_glyphs_unref(Evas_Glyph_Array *array)
    free(array);
 }
 
+/**
+ * @brief Increments the reference count of an Evas_Font_Array.
+ * @internal
+ * @param array The Evas_Font_Array to reference.
+ */
 void
 evas_common_font_fonts_ref(Evas_Font_Array *array)
 {
    array->refcount++;
 }
 
+/**
+ * @brief Decrements the reference count of an Evas_Font_Array.
+ * @internal
+ * If the reference count reaches zero, the array is freed.
+ * @param array The Evas_Font_Array to unreference.
+ */
 void
 evas_common_font_fonts_unref(Evas_Font_Array *array)
 {
@@ -209,6 +299,17 @@ evas_common_font_fonts_unref(Evas_Font_Array *array)
    free(array);
 }
 
+/**
+ * @brief Prepares an array of glyphs for drawing based on text properties.
+ * @internal
+ * This function takes text properties (string, font, size, etc.) and
+ * generates or updates an Evas_Glyph_Array. This array contains all
+ * necessary information (glyph data, positions) to render the text.
+ * It handles caching, font loading, and glyph rendering.
+ *
+ * @param text_props The Evas_Text_Props structure containing text information.
+ *                   The `glyphs` member of this struct will be populated or updated.
+ */
 EVAS_API void
 evas_common_font_draw_prepare(Evas_Text_Props *text_props)
 {
@@ -301,6 +402,21 @@ error:
    eina_inarray_free(glyphs);
 }
 
+/**
+ * @brief Draws an array of glyphs using a callback function, handling cutouts and clipping.
+ * @internal
+ * This function manages the drawing process, applying clipping and cutouts
+ * from the draw context, and then calls the provided callback `cb` for each
+ * relevant drawing region.
+ *
+ * @param dst The destination RGBA_Image.
+ * @param dc The RGBA_Draw_Context.
+ * @param x The base x-coordinate for drawing.
+ * @param y The base y-coordinate for drawing.
+ * @param glyphs The Evas_Glyph_Array to draw.
+ * @param cb The callback function (e.g., evas_common_font_rgba_draw) that performs the actual drawing for a region.
+ * @return EINA_TRUE if drawing occurred, EINA_FALSE otherwise or if fully clipped.
+ */
 EVAS_API Eina_Bool
 evas_common_font_draw_cb(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y, Evas_Glyph_Array *glyphs, Evas_Common_Font_Draw_Cb cb)
 {
@@ -375,6 +491,18 @@ evas_common_font_draw_cb(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y, E
      }
 }
 
+/**
+ * @brief Draws an array of glyphs onto an RGBA image.
+ * @internal
+ * This is a convenience wrapper around evas_common_font_draw_cb, using
+ * evas_common_font_rgba_draw as the drawing callback.
+ *
+ * @param dst The destination RGBA_Image.
+ * @param dc The RGBA_Draw_Context.
+ * @param x The base x-coordinate for drawing.
+ * @param y The base y-coordinate for drawing.
+ * @param glyphs The Evas_Glyph_Array to draw.
+ */
 EVAS_API void
 evas_common_font_draw(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y, Evas_Glyph_Array *glyphs)
 {
@@ -382,6 +510,22 @@ evas_common_font_draw(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y, Evas
                             evas_common_font_rgba_draw);
 }
 
+/**
+ * @brief Draws text applying specified cutouts and clipping.
+ * @internal
+ * This function draws text (provided via Evas_Text_Props, which includes
+ * pre-prepared glyphs) onto a destination image. It iterates through
+ * a list of cutout rectangles (`reuse`) and applies an overall clip region.
+ *
+ * @param reuse A Cutout_Rects structure defining areas to draw within (or NULL if none).
+ * @param clip An Eina_Rectangle defining the overall clipping region.
+ * @param func The graphics function to use for drawing (e.g., compositing function).
+ * @param dst The destination RGBA_Image.
+ * @param dc The RGBA_Draw_Context.
+ * @param x The base x-coordinate for drawing the text.
+ * @param y The base y-coordinate for drawing the text.
+ * @param text_props The Evas_Text_Props containing the glyphs and other text info.
+ */
 EVAS_API void
 evas_common_font_draw_do(const Cutout_Rects *reuse, const Eina_Rectangle *clip, RGBA_Gfx_Func func,
                          RGBA_Image *dst, RGBA_Draw_Context *dc,
@@ -421,6 +565,21 @@ evas_common_font_draw_do(const Cutout_Rects *reuse, const Eina_Rectangle *clip, 
      }
 }
 
+/**
+ * @brief Prepares drawing context and cutouts for font rendering.
+ * @internal
+ * This function sets up the graphics function based on the draw context's color
+ * and render operation. It also applies cutouts from the draw context if they exist.
+ * The primary purpose is to prepare for a series of drawing operations,
+ * potentially within multiple clipped regions (cutouts).
+ *
+ * @param reuse Pointer to a Cutout_Rects pointer. If dc->cutout.rects is set,
+ *              this will be updated to point to the applied cutouts.
+ * @param dst The destination RGBA_Image.
+ * @param dc The RGBA_Draw_Context.
+ * @param func Pointer to an RGBA_Gfx_Func that will be set by this function.
+ * @return EINA_TRUE if drawing is possible (clip area is valid), EINA_FALSE otherwise.
+ */
 EVAS_API Eina_Bool
 evas_common_font_draw_prepare_cutout(Cutout_Rects **reuse, RGBA_Image *dst, RGBA_Draw_Context *dc, RGBA_Gfx_Func *func)
 {
@@ -445,6 +604,29 @@ evas_common_font_draw_prepare_cutout(Cutout_Rects **reuse, RGBA_Image *dst, RGBA
 
 // this draws a compressed font glyph and decompresses on the fly as it
 // draws, saving memory bandwidth and providing speedups
+/**
+ * @brief Draws a single (potentially compressed) font glyph.
+ * @internal
+ * This function is responsible for rendering a single font glyph onto a
+ * destination image. It handles decompression of glyph data if necessary,
+ * clipping to a specified rectangle (cx, cy, cw, ch), and applying
+ * the drawing context's color and mask. It includes optimized paths
+ * for different CPU features (MMX, NEON) and drawing scenarios (e.g., drawing
+ * to an alpha-only surface, or drawing with a mask).
+ *
+ * @param fg The RGBA_Font_Glyph to draw.
+ * @param dc The RGBA_Draw_Context containing color, render_op, and mask info.
+ * @param dst_image The destination RGBA_Image.
+ * @param dst_pitch The pitch (stride in bytes) of the destination image.
+ * @param dx The destination x-coordinate for the glyph's top-left corner.
+ * @param dy The destination y-coordinate for the glyph's top-left corner.
+ * @param dw The destination width for the glyph (for scaling, currently unused).
+ * @param dh The destination height for the glyph (for scaling, currently unused).
+ * @param cx The x-coordinate of the clipping rectangle.
+ * @param cy The y-coordinate of the clipping rectangle.
+ * @param cw The width of the clipping rectangle.
+ * @param ch The height of the clipping rectangle.
+ */
 EVAS_API void
 evas_common_font_glyph_draw(RGBA_Font_Glyph *fg,
                             RGBA_Draw_Context *dc,

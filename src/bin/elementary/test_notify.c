@@ -3,6 +3,12 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback function to show a notification.
+ * @param data The notification widget to show.
+ * @param obj The object that triggered the event.
+ * @param event_info The event information.
+ */
 static void
 _bt(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -11,6 +17,12 @@ _bt(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_object_focus_set(notify, EINA_TRUE);
 }
 
+/**
+ * @brief Callback function to hide a notification.
+ * @param data The notification widget to hide.
+ * @param obj The object that triggered the event.
+ * @param event_info The event information.
+ */
 static void
 _bt_close(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -18,6 +30,13 @@ _bt_close(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED
    evas_object_hide(notify);
 }
 
+/**
+ * @brief Callback function to set a timeout for closing a notification.
+ * This function sets a 2-second timeout on the notification, after which it will be hidden.
+ * @param data The notification widget.
+ * @param obj The object that triggered the event.
+ * @param event_info The event information.
+ */
 static void
 _bt_timer_close(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -25,18 +44,41 @@ _bt_timer_close(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_
    elm_notify_timeout_set(notify, 2.0);
 }
 
+/**
+ * @brief Callback function for when a notification times out.
+ * This is called when the timeout set on a notification expires.
+ * @param data User data.
+ * @param obj The notification object.
+ * @param event_info The event information.
+ */
 static void
 _notify_timeout(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("Notify timed out!\n");
 }
 
+/**
+ * @brief Callback function for clicks on the blocked event area of a notification.
+ * This is triggered when events are disallowed outside the notification and the user clicks
+ * in that blocked area.
+ * @param data User data.
+ * @param obj The notification object.
+ * @param event_info The event information.
+ */
 static void
 _notify_block(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("Notify block area clicked!!\n");
 }
 
+/**
+ * @brief Callback function for key down events on the notification.
+ * This is useful for making notifications interactive or dismissible with the keyboard.
+ * @param data User data.
+ * @param e The Evas canvas.
+ * @param obj The notification object that received the event.
+ * @param event_info The key down event details.
+ */
 static void
 _notify_key_down_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED,
                     Evas_Object *obj EINA_UNUSED, void *event_info)
@@ -46,6 +88,15 @@ _notify_key_down_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED,
    printf("Key down: %s\n", ev->keyname);
 }
 
+/**
+ * @brief Test function for the Elementary notify widget.
+ * This function creates a window with a grid of buttons. Each button demonstrates a
+ * notification with different alignment, timeout, and interaction settings. It serves as
+ * a visual test case for the various features of the elm_notify widget.
+ * @param data User data for the test function.
+ * @param obj The parent object.
+ * @param event_info The event information.
+ */
 void
 test_notify(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

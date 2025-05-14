@@ -10,21 +10,30 @@
 #define CTRL_W 15
 #define CTRL_H 15
 
+/**
+ * @brief Structure to hold all the application data for the transit bezier test.
+ */
 typedef struct
 {
-   Evas *e;
-   Evas_Object *win;
-   Evas_Object *rev_btn;
-   Evas_Object *ctrl_pt1;
-   Evas_Object *ctrl_pt2;
-   Evas_Object *ctrl_pt1_line;
-   Evas_Object *ctrl_pt2_line;
-   Evas_Object *label;
-   Evas_Object *line[SEGMENT_MAX];
-   Eina_Bool ctrl_pt1_down;
-   Eina_Bool ctrl_pt2_down;
+   Evas *e; /**< The Evas canvas of the window */
+   Evas_Object *win; /**< The main window object */
+   Evas_Object *rev_btn; /**< The revert button for the transit animation */
+   Evas_Object *ctrl_pt1; /**< The first control point object */
+   Evas_Object *ctrl_pt2; /**< The second control point object */
+   Evas_Object *ctrl_pt1_line; /**< Line connecting start of curve to control point 1 */
+   Evas_Object *ctrl_pt2_line; /**< Line connecting end of curve to control point 2 */
+   Evas_Object *label; /**< Label to display control point coordinates */
+   Evas_Object *line[SEGMENT_MAX]; /**< Array of Evas_Object lines to draw the bezier curve */
+   Eina_Bool ctrl_pt1_down; /**< Flag to indicate if mouse is down on control point 1 */
+   Eina_Bool ctrl_pt2_down; /**< Flag to indicate if mouse is down on control point 2 */
 } transit_data;
 
+/**
+ * @brief Callback function to revert the transit animation.
+ * @param data The Elm_Transit object to be reverted.
+ * @param obj The Evas_Object that triggered the callback (unused).
+ * @param event_info Additional event information (unused).
+ */
 static void
 _transit_revert(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -32,6 +41,20 @@ _transit_revert(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_
    elm_transit_revert(trans);
 }
 
+/**
+ * @brief Get the normalized coordinates of the control points.
+ *
+ * The coordinates are normalized to be within the range [0.0, 1.0] as required
+ * by elm_transit_tween_mode_factor_n_set for BEZIER_CURVE tween mode.
+ * The y-coordinate is inverted (1 - y) because the Evas canvas origin (0,0)
+ * is top-left, while for the curve calculation a bottom-left origin is assumed.
+ *
+ * @param td The transit_data structure.
+ * @param v1 Pointer to store the x-coordinate of the first control point.
+ * @param v2 Pointer to store the y-coordinate of the first control point.
+ * @param v3 Pointer to store the x-coordinate of the second control point.
+ * @param v4 Pointer to store the y-coordinate of the second control point.
+ */
 static void
 v_get(transit_data *td, double *v1, double *v2, double *v3, double *v4)
 {
@@ -47,6 +70,20 @@ v_get(transit_data *td, double *v1, double *v2, double *v3, double *v4)
    *v4 = 1 - (double) (y - (h/2)) / (WIN_H - BTN_SIZE);
 }
 
+/**
+ * @brief Redraws the Bezier curve on the canvas based on control point positions.
+ *
+ * This function calculates points along a cubic Bezier curve and draws lines
+ * between them to approximate the curve's shape. It also updates a label with
+ * the current normalized coordinates of the control points.
+ *
+ * The cubic Bezier formula is:
+ * B(t) = (1-t)^3 * P0 + 3t(1-t)^2 * P1 + 3t^2(1-t) * P2 + t^3 * P3
+ * where P0 is (0,0) and P3 is (1,1) in normalized coordinates. P1 and P2
+ * are the control points.
+ *
+ * @param td The transit_data structure.
+ */
 static void
 update_curve(transit_data *td)
 {
@@ -89,6 +126,17 @@ update_curve(transit_data *td)
    elm_object_text_set(td->label, buf);
 }
 
+/**
+ * @brief Callback for mouse move event on control point 1.
+ *
+ * Moves the control point with the mouse cursor when the left mouse button is held down.
+ * It also redraws the control line and the Bezier curve.
+ *
+ * @param data The transit_data structure.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object that triggered the event (control point 1).
+ * @param event_info The mouse move event information.
+ */
 static void
 ctrl_pt1_mouse_move_cb(void *data, Evas *e EINA_UNUSED,
                        Evas_Object *obj, void *event_info)
@@ -113,6 +161,17 @@ ctrl_pt1_mouse_move_cb(void *data, Evas *e EINA_UNUSED,
    update_curve(td);
 }
 
+/**
+ * @brief Callback for mouse move event on control point 2.
+ *
+ * Moves the control point with the mouse cursor when the left mouse button is held down.
+ * It also redraws the control line and the Bezier curve.
+ *
+ * @param data The transit_data structure.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object that triggered the event (control point 2).
+ * @param event_info The mouse move event information.
+ */
 static void
 ctrl_pt2_mouse_move_cb(void *data, Evas *e EINA_UNUSED,
                        Evas_Object *obj, void *event_info)
@@ -137,6 +196,13 @@ ctrl_pt2_mouse_move_cb(void *data, Evas *e EINA_UNUSED,
    update_curve(td);
 }
 
+/**
+ * @brief Callback for mouse down event on control point 1.
+ * @param data The transit_data structure.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object that triggered the event (unused).
+ * @param event_info The mouse down event information (unused).
+ */
 static void
 ctrl_pt1_mouse_down_cb(void *data, Evas *e EINA_UNUSED,
                        Evas_Object *obj EINA_UNUSED,
@@ -146,6 +212,13 @@ ctrl_pt1_mouse_down_cb(void *data, Evas *e EINA_UNUSED,
    td->ctrl_pt1_down = EINA_TRUE;
 }
 
+/**
+ * @brief Callback for mouse up event on control point 1.
+ * @param data The transit_data structure.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object that triggered the event (unused).
+ * @param event_info The mouse up event information (unused).
+ */
 static void
 ctrl_pt1_mouse_up_cb(void *data, Evas *e EINA_UNUSED,
                      Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
@@ -154,6 +227,13 @@ ctrl_pt1_mouse_up_cb(void *data, Evas *e EINA_UNUSED,
    td->ctrl_pt1_down = EINA_FALSE;
 }
 
+/**
+ * @brief Callback for mouse down event on control point 2.
+ * @param data The transit_data structure.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object that triggered the event (unused).
+ * @param event_info The mouse down event information (unused).
+ */
 static void
 ctrl_pt2_mouse_down_cb(void *data, Evas *e EINA_UNUSED,
                        Evas_Object *obj EINA_UNUSED,
@@ -163,6 +243,13 @@ ctrl_pt2_mouse_down_cb(void *data, Evas *e EINA_UNUSED,
    td->ctrl_pt2_down = EINA_TRUE;
 }
 
+/**
+ * @brief Callback for mouse up event on control point 2.
+ * @param data The transit_data structure.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object that triggered the event (unused).
+ * @param event_info The mouse up event information (unused).
+ */
 static void
 ctrl_pt2_mouse_up_cb(void *data, Evas *e EINA_UNUSED,
                      Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
@@ -171,6 +258,15 @@ ctrl_pt2_mouse_up_cb(void *data, Evas *e EINA_UNUSED,
    td->ctrl_pt2_down = EINA_FALSE;
 }
 
+/**
+ * @brief Callback executed when the transit animation is finished or stopped.
+ *
+ * This function makes the control points and their lines visible again, and
+ * cleans up the "revert" button's callback.
+ *
+ * @param data The transit_data structure.
+ * @param transit The Elm_Transit object that was deleted (unused).
+ */
 static void
 transit_del_cb(void *data, Elm_Transit *transit EINA_UNUSED)
 {
@@ -183,6 +279,17 @@ transit_del_cb(void *data, Elm_Transit *transit EINA_UNUSED)
    elm_object_disabled_set(td->rev_btn, EINA_TRUE);
 }
 
+/**
+ * @brief Callback for the "Go" button click event.
+ *
+ * This function initiates the transit animation. It creates an Elm_Transit object,
+ * configures it to follow the Bezier curve defined by the control points,
+ * and starts the animation. It also hides the control points during the animation.
+ *
+ * @param data The transit_data structure.
+ * @param obj The button object that was clicked.
+ * @param event_info Additional event information (unused).
+ */
 static void
 btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -208,6 +315,17 @@ btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    evas_object_hide(td->ctrl_pt2_line);
 }
 
+/**
+ * @brief Main function for the transit Bezier test.
+ *
+ * This function sets up the Elementary window, canvas, and all the UI elements
+ * for the interactive Bezier curve demonstration. This includes the control
+ * points, the curve display, labels, and buttons.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_transit_bezier(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

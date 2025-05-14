@@ -9,7 +9,18 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_dayselector_week_start_get, Elm_Dayselector_Da
 
 void _elm_dayselector_weekend_length_set(Eo *obj, Elm_Dayselector_Data *pd, unsigned int length);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function for the elm_obj_dayselector_weekend_length_set property.
+ *
+ * This function is part of the Eolian reflection system and allows setting the
+ * 'weekend_length' property using an Eina_Value. It converts the Eina_Value
+ * to an unsigned integer and calls the concrete implementation.
+ *
+ * @param obj The EFL object.
+ * @param val An Eina_Value containing the new weekend length (expected to be convertible to uint).
+ * @return EINA_ERROR_NO_ERROR on success, or an Eina_Error code if conversion or setting fails.
+ */
 static Eina_Error
 __eolian_elm_dayselector_weekend_length_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -29,7 +40,19 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_dayselector_weekend_length_set, EFL_FUNC_CALL(
 
 unsigned int _elm_dayselector_weekend_length_get(const Eo *obj, Elm_Dayselector_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function for the elm_obj_dayselector_weekend_length_get property.
+ *
+ * This function is part of the Eolian reflection system and allows getting the
+ * 'weekend_length' property as an Eina_Value. It calls the concrete
+ * implementation and wraps the returned unsigned int in an Eina_Value.
+ *
+ * @param obj The EFL object.
+ * @return An Eina_Value initialized with the current weekend length (unsigned int).
+ *         Returns an Eina_Value of error type if the underlying get fails,
+ *         though current implementation always returns a uint.
+ */
 static Eina_Value
 __eolian_elm_dayselector_weekend_length_get_reflect(const Eo *obj)
 {
@@ -74,7 +97,19 @@ void _elm_dayselector_efl_ui_l10n_translation_update(Eo *obj, Elm_Dayselector_Da
 
 Efl_Object *_elm_dayselector_efl_part_part_get(const Eo *obj, Elm_Dayselector_Data *pd, const char *name);
 
-
+/**
+ * @internal
+ * @brief Initializes the Elm_Dayselector Efl class.
+ *
+ * This function is called once by the Efl object system when the
+ * Elm_Dayselector class is first used (e.g., when the first instance is
+ * created or a static method is called). It is responsible for setting up
+ * the class's operations (virtual function table), properties, and other
+ * class-level metadata.
+ *
+ * @param klass The Efl_Class pointer representing the Elm_Dayselector class.
+ * @return @c EINA_TRUE on successful initialization, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_dayselector_class_initializer(Efl_Class *klass)
 {

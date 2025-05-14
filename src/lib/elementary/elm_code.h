@@ -72,7 +72,19 @@ EAPI void elm_code_free(Elm_Code *code);
  * Managing the callbacks and other behaviours that cross the backend - frontend divide.
  */
 
-
+/**
+ * @brief Fires a specific event on all widgets associated with an Elm_Code instance.
+ *
+ * This function iterates through all Evas_Object widgets managed by the given
+ * Elm_Code instance and triggers the specified EFL event on each of them.
+ * It is used to propagate events from the Elm_Code backend to its frontend widgets.
+ *
+ * @param code The Elm_Code instance whose widgets will receive the event.
+ * @param signal The Efl_Event_Description for the event to be fired.
+ *               For example, ELM_CODE_EVENT_LINE_LOAD_DONE.
+ * @param data The data to be passed with the event. The type and meaning of
+ *             this data depend on the specific event being fired.
+ */
 EAPI void elm_code_callback_fire(Elm_Code *code, const Efl_Event_Description *signal, void *data);
 
 

@@ -172,6 +172,18 @@ static const Region_Data _region_brokendata = {0, 0};
 
 static Eina_Bool _region_break(Region *region);
 
+/**
+ * @brief Marks a region as "broken" to indicate an error state.
+ *
+ * This function is called when an unrecoverable error occurs, such as memory
+ * allocation failure. It frees any existing rectangle data, resets the
+ * bounding box to be empty, and sets the region's data pointer to a special
+ * static "broken" data structure. This ensures that subsequent operations
+ * on the region will fail safely.
+ *
+ * @param region The region to mark as broken.
+ * @return Always returns EINA_FALSE to propagate the error condition.
+ */
 static Eina_Bool
 _region_break(Region *region)
 {
@@ -181,6 +193,20 @@ _region_break(Region *region)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Allocates or reallocates memory for a region's rectangles.
+ *
+ * This function handles memory management for the array of rectangles within a
+ * region. If the region has no data, it allocates an initial block. If it has
+ * data but needs more space, it reallocates the existing block to a larger
+ * size. The growth strategy is to double the current number of rectangles
+ * (with a cap) to avoid frequent reallocations.
+ *
+ * @param region The region for which to allocate memory.
+ * @param n The number of *additional* rectangles needed.
+ * @return EINA_TRUE on success, EINA_FALSE on memory allocation failure (which
+ *         also breaks the region).
+ */
 static Eina_Bool
 _region_rect_alloc(Region *region, int n)
 {
@@ -216,6 +242,24 @@ _region_rect_alloc(Region *region, int n)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Merges two vertically adjacent and identical bands of rectangles.
+ *
+ * This is an optimization function. If two bands of rectangles are right next
+ * to each other vertically (the y2 of the top band is the y1 of the bottom
+ * one) and they are identical horizontally (same number of rectangles, with
+ * the same x1 and x2 for each corresponding rectangle), this function merges
+ * them into a single band. It does this by extending the y2 of the rectangles
+ * in the top band and removing the bottom band's rectangles. This reduces the
+ * total number of rectangles needed to represent the region.
+ *
+ * @param region The region being modified.
+ * @param prev_start The starting index of the previous (top) band in the
+ *                   region's rectangle array.
+ * @param cur_start The starting index of the current (bottom) band.
+ * @return The starting index of the next band to be processed. If coalescing
+ *         happened, this will be `prev_start`. Otherwise, it's `cur_start`.
+ */
 static int
 _region_coalesce(Region *region, int prev_start, int cur_start)
 {
@@ -266,6 +310,20 @@ _region_coalesce(Region *region, int prev_start, int cur_start)
    return prev_start;
 }
 
+/**
+ * @brief Appends a band of rectangles to a region.
+ *
+ * This is a helper for _region_op. It takes a horizontal band of rectangles
+ * from a source region (all with the same y1, y2 in the source) and appends
+ * them to the destination region, but with new y1 and y2 values.
+ *
+ * @param region The destination region.
+ * @param r The first rectangle in the source band.
+ * @param r_end Pointer to one past the last rectangle in the source band.
+ * @param y1 The new y1 for all appended rectangles.
+ * @param y2 The new y2 for all appended rectangles.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _region_append_non(Region *region, Box *r, Box *r_end, int y1, int y2)
 {
@@ -285,6 +343,30 @@ _region_append_non(Region *region, Box *r, Box *r_end, int y1, int y2)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Core logic for binary region operations (intersection, union, subtract).
+ *
+ * This is a generic function that drives the logic for all binary region
+ * operations. It iterates through the bands of rectangles of two source
+ * regions, calling a specific `overlap_func` for bands that overlap
+ * vertically. It can also optionally append bands from either source region
+ * that don't overlap with the other. This sweep-line algorithm is efficient
+ * because it processes rectangles in sorted order.
+ *
+ * @param dest The destination region for the result.
+ * @param reg1 The first source region.
+ * @param reg2 The second source region.
+ * @param overlap_func A function pointer that handles the logic for horizontally
+ *                     overlapping bands. This defines the specific operation
+ *                     (e.g., _region_intersect, _region_add).
+ * @param append_non1 If EINA_TRUE, append bands from reg1 that do not overlap
+ *                    with any bands in reg2.
+ * @param append_non2 If EINA_TRUE, append bands from reg2 that do not overlap
+ *                    with any bands in reg1.
+ * @param[out] overlap_ret A boolean to indicate if any overlap occurred.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _region_op(Region *dest, // Place to store result
            Region *reg1, // First region in operation
@@ -475,6 +557,16 @@ _region_op(Region *dest, // Place to store result
    return EINA_TRUE;
 }
 
+/**
+ * @brief Recalculates the bounding box of a region from its rectangles.
+ *
+ * This function should be called after an operation that might have changed
+ * the region's rectangles, such as an intersection or subtraction. It iterates
+ * through all the rectangles to find the minimal x1, y1 and maximal x2, y2,
+ * which then become the new bounding box of the region.
+ *
+ * @param region The region whose bounding box needs to be updated.
+ */
 static void
 _region_set_bound(Region *region)
 {
@@ -509,6 +601,25 @@ _region_set_bound(Region *region)
     };
 }
 
+/**
+ * @internal
+ * @brief Overlap function for region intersection.
+ *
+ * This function is passed to _region_op to perform an intersection. It is
+ * called for two vertically-overlapping bands of rectangles. It iterates
+ * through the rectangles of both bands and adds the horizontal intersection
+ * of overlapping pairs to the destination region.
+ *
+ * @param region The destination region.
+ * @param r1 Start of the rectangle band from the first source region.
+ * @param r1_end End of the rectangle band from the first source region.
+ * @param r2 Start of the rectangle band from the second source region.
+ * @param r2_end End of the rectangle band from the second source region.
+ * @param y1 Top coordinate of the output band.
+ * @param y2 Bottom coordinate of the output band.
+ * @param overlap_ret Unused.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _region_intersect(Region *region, Box *r1, Box *r1_end, Box *r2, Box *r2_end,
                   int y1, int y2, Eina_Bool *overlap_ret EINA_UNUSED)
@@ -536,6 +647,25 @@ _region_intersect(Region *region, Box *r1, Box *r1_end, Box *r2, Box *r2_end,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Overlap function for region union (addition).
+ *
+ * This function is passed to _region_op to perform a union. It is called for
+ * two vertically-overlapping bands of rectangles. It merges the rectangles
+ * from both bands into a new band of maximal, non-overlapping rectangles
+ * representing their union, which is then added to the destination region.
+ *
+ * @param region The destination region.
+ * @param r1 Start of the rectangle band from the first source region.
+ * @param r1_end End of the rectangle band from the first source region.
+ * @param r2 Start of the rectangle band from the second source region.
+ * @param r2_end End of the rectangle band from the second source region.
+ * @param y1 Top coordinate of the output band.
+ * @param y2 Bottom coordinate of the output band.
+ * @param[out] overlap_ret Set to EINA_TRUE if rectangles from the two bands overlap.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _region_add(Region *region, Box *r1, Box *r1_end, Box *r2, Box *r2_end,
             int y1, int y2, Eina_Bool *overlap_ret)
@@ -586,6 +716,17 @@ _region_add(Region *region, Box *r1, Box *r1_end, Box *r2, Box *r2_end,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sorts an array of rectangles.
+ *
+ * This function sorts an array of rectangles primarily by their top coordinate
+ * (y1) and secondarily by their left coordinate (x1). It uses a standard
+ * quicksort algorithm. This sorting is crucial for the scanline algorithm
+ * used in region operations.
+ *
+ * @param rects The array of rectangles to sort.
+ * @param num The number of rectangles in the array.
+ */
 static void
 _region_rects_sort(Box *rects, int num)
 {
@@ -641,6 +782,25 @@ _region_rects_sort(Box *rects, int num)
    while (num > 1);
 }
 
+/**
+ * @internal
+ * @brief Overlap function for region subtraction (difference).
+ *
+ * This function is passed to _region_op to perform a subtraction. It is
+ * called for two vertically-overlapping bands of rectangles. It subtracts the
+ * rectangles in the second band (subtrahend) from the rectangles in the first
+ * band (minuend), adding the resulting fragments to the destination region.
+ *
+ * @param region The destination region.
+ * @param r1 Start of the minuend rectangle band.
+ * @param r1end End of the minuend rectangle band.
+ * @param r2 Start of the subtrahend rectangle band.
+ * @param r2end End of the subtrahend rectangle band.
+ * @param y1 Top coordinate of the output band.
+ * @param y2 Bottom coordinate of the output band.
+ * @param overlap_ret Unused.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _region_del(Region *region, Box *r1, Box *r1end, Box *r2, Box *r2end,
             int y1, int y2, Eina_Bool *overlap_ret EINA_UNUSED)

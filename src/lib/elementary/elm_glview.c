@@ -26,6 +26,18 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {NULL, NULL}
 };
 
+/**
+ * @internal
+ * @brief Updates the focus state of the GLView widget.
+ *
+ * This function is called when the focus state of the GLView object needs to be updated.
+ * It propagates the focus to the superclass and then sets the focus on the internal
+ * resize object accordingly.
+ *
+ * @param obj The Evas object.
+ * @param _pd Private data, unused in this function.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _elm_glview_efl_ui_focus_object_on_focus_update(Eo *obj, Elm_Glview_Data *_pd EINA_UNUSED)
 {
@@ -43,6 +55,18 @@ _elm_glview_efl_ui_focus_object_on_focus_update(Eo *obj, Elm_Glview_Data *_pd EI
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Updates or recreates the Evas_GL surface for the GLView.
+ *
+ * This function is responsible for managing the underlying Evas_GL surface.
+ * It handles destroying an old surface, creating a new one based on current
+ * dimensions and configuration, and setting it to the image object used for display.
+ * It also warns if direct rendering is requested with an incompatible render policy
+ * and fakes a resize event to allow clients to reconfigure their viewports.
+ *
+ * @param obj The Evas object (GLView).
+ */
 static void
 _glview_update_surface(Evas_Object *obj)
 {
@@ -86,6 +110,19 @@ _glview_update_surface(Evas_Object *obj)
    sd->resized = EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Sets the size of the GLView widget.
+ *
+ * This function is called when the size of the GLView entity changes.
+ * It propagates the size change to the superclass. If the scale policy is
+ * ELM_GLVIEW_RESIZE_POLICY_RECREATE, it updates the internal dimensions (sd->w, sd->h)
+ * and recreates the GL surface by calling _glview_update_surface().
+ *
+ * @param obj The Evas object.
+ * @param sd The private data of the GLView.
+ * @param sz The new size (width and height).
+ */
 EOLIAN static void
 _elm_glview_efl_gfx_entity_size_set(Eo *obj, Elm_Glview_Data *sd, Eina_Size2D sz)
 {
@@ -108,6 +145,19 @@ _elm_glview_efl_gfx_entity_size_set(Eo *obj, Elm_Glview_Data *sd, Eina_Size2D sz
      }
 }
 
+/**
+ * @internal
+ * @brief Callback function for rendering the GLView content.
+ *
+ * This function is invoked to perform GL rendering. It ensures the GL context
+ * is current, calls the user-defined initialization function (once),
+ * resize function (if the view was resized), and the main rendering function.
+ * It handles different rendering policies (on-demand vs. always) and manages
+ * an idle enterer for continuous rendering if required.
+ *
+ * @param obj The Evas object (GLView).
+ * @param event The Efl_Event data, unused in this function.
+ */
 static void
 _render_cb(void *obj, const Efl_Event *event EINA_UNUSED)
 {
@@ -173,6 +223,19 @@ _render_cb(void *obj, const Efl_Event *event EINA_UNUSED)
    sd->render_idle_enterer = 0;
 }
 
+/**
+ * @internal
+ * @brief Configures callbacks and mechanisms based on the current render policy.
+ *
+ * This function adjusts the GLView's rendering behavior according to the
+ * specified render policy.
+ * For ELM_GLVIEW_RENDER_POLICY_ON_DEMAND, it sets up a pixel get callback
+ * to trigger rendering when Evas needs the pixels.
+ * For ELM_GLVIEW_RENDER_POLICY_ALWAYS, it sets up an idle enterer to
+ * continuously call the _render_cb function.
+ *
+ * @param obj The Evas object (GLView).
+ */
 static void
 _set_render_policy_callback(Evas_Object *obj)
 {
@@ -220,6 +283,18 @@ _set_render_policy_callback(Evas_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Called when the GLView object is added to a canvas group.
+ *
+ * This function initializes the visual representation of the GLView.
+ * It creates an Evas image object that will be used as the target
+ * for rendering the Evas_GL surface. This image object is set as the
+ * widget's resize object.
+ *
+ * @param obj The Evas object.
+ * @param priv Private data, unused in this function.
+ */
 EOLIAN static void
 _elm_glview_efl_canvas_group_group_add(Eo *obj, Elm_Glview_Data *priv EINA_UNUSED)
 {
@@ -233,6 +308,18 @@ _elm_glview_efl_canvas_group_group_add(Eo *obj, Elm_Glview_Data *priv EINA_UNUSE
    efl_canvas_group_add(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Constructor for the Elm_Glview object.
+ *
+ * Initializes the core components of the GLView, including Evas_GL,
+ * a default GL configuration, initial policies (scale and render),
+ * default dimensions, GLES version, and the GL context.
+ * This function is called as part of the object instantiation process.
+ *
+ * @param obj The Evas object being constructed.
+ * @param priv The private data structure for the GLView.
+ */
 static void
 _elm_glview_constructor(Eo *obj, Elm_Glview_Data *priv)
 {
@@ -282,6 +369,17 @@ _elm_glview_constructor(Eo *obj, Elm_Glview_Data *priv)
      }
 }
 
+/**
+ * @internal
+ * @brief Called when the GLView object is being deleted from a canvas group.
+ *
+ * This function handles the cleanup of all resources associated with the GLView.
+ * It calls the user-defined deletion callback, removes any pending render callbacks,
+ * and frees all Evas_GL related resources (surface, context, config, and Evas_GL itself).
+ *
+ * @param obj The Evas object.
+ * @param sd The private data of the GLView.
+ */
 EOLIAN static void
 _elm_glview_efl_canvas_group_group_del(Eo *obj, Elm_Glview_Data *sd)
 {
@@ -314,6 +412,19 @@ _elm_glview_efl_canvas_group_group_del(Eo *obj, Elm_Glview_Data *sd)
    efl_canvas_group_del(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when an Efl_Event_Callback is added to the GLView.
+ *
+ * This function listens for specific event callback additions.
+ * If a callback for ELM_GLVIEW_EVENT_CREATED is added, it resets the
+ * `initialized` flag to ensure the init function is called again.
+ * If a callback for ELM_GLVIEW_EVENT_RENDER is added, it ensures the
+ * render policy callbacks are correctly set up.
+ *
+ * @param data User data associated with the callback, unused here.
+ * @param ev The Efl_Event structure containing event information.
+ */
 static void
 _cb_added(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -331,6 +442,14 @@ _cb_added(void *data EINA_UNUSED, const Efl_Event *ev)
      }
 }
 
+/**
+ * @brief Adds a new GLView widget to the given parent evas object.
+ *
+ * This function creates a new GLView widget with a default GLES 2.X context.
+ *
+ * @param parent The parent object.
+ * @return The new object or NULL if it cannot be created.
+ */
 EAPI Evas_Object *
 elm_glview_add(Evas_Object *parent)
 {
@@ -339,6 +458,14 @@ elm_glview_add(Evas_Object *parent)
                          elm_obj_glview_version_constructor(efl_added, EVAS_GL_GLES_2_X));
 }
 
+/**
+ * @brief Adds a new GLView widget to the given parent evas object with a specific GLES version.
+ *
+ * @param parent The parent object.
+ * @param version The GLES context version to use (e.g., EVAS_GL_GLES_2_X, EVAS_GL_GLES_3_X).
+ *                If an invalid version is provided, it defaults to EVAS_GL_GLES_2_X.
+ * @return The new object or NULL if it cannot be created.
+ */
 EAPI Evas_Object *
 elm_glview_version_add(Evas_Object *parent, Evas_GL_Context_Version version)
 {
@@ -347,6 +474,19 @@ elm_glview_version_add(Evas_Object *parent, Evas_GL_Context_Version version)
                          elm_obj_glview_version_constructor(efl_added, version));
 }
 
+/**
+ * @internal
+ * @brief Internal constructor helper that sets the GLES version.
+ *
+ * This function is called by elm_glview_add and elm_glview_version_add.
+ * It sets the desired GLES version in the private data and then calls
+ * the main _elm_glview_constructor. It also sets up legacy smart callbacks
+ * and the access role.
+ *
+ * @param obj The Evas object.
+ * @param sd The private data of the GLView.
+ * @param version The GLES context version.
+ */
 EOLIAN static void
 _elm_glview_version_constructor(Eo *obj, Elm_Glview_Data *sd,
                                 Evas_GL_Context_Version version)
@@ -361,6 +501,17 @@ _elm_glview_version_constructor(Eo *obj, Elm_Glview_Data *sd,
    efl_event_callback_add(obj, EFL_EVENT_CALLBACK_ADD, _cb_added, NULL);
 }
 
+/**
+ * @internal
+ * @brief Efl_Object constructor for GLView.
+ *
+ * Standard Efl_Object constructor. It handles legacy focus behavior
+ * and calls the superclass constructor.
+ *
+ * @param obj The Evas object.
+ * @param pd Private data, unused in this function.
+ * @return The constructed Efl_Object.
+ */
 EOLIAN static Efl_Object*
 _elm_glview_efl_object_constructor(Eo *obj, Elm_Glview_Data *pd EINA_UNUSED)
 {
@@ -368,6 +519,17 @@ _elm_glview_efl_object_constructor(Eo *obj, Elm_Glview_Data *pd EINA_UNUSED)
    return efl_constructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Efl_Object finalize step for GLView.
+ *
+ * This function is called during the finalization phase of object construction.
+ * It checks if Evas_GL was successfully initialized. If not, it indicates an error.
+ *
+ * @param obj The Evas object.
+ * @param sd The private data of the GLView.
+ * @return The finalized Eo object, or NULL on critical failure (EvasGL not initialized).
+ */
 EOLIAN static Eo *
 _elm_glview_efl_object_finalize(Eo *obj, Elm_Glview_Data *sd)
 {
@@ -380,12 +542,36 @@ _elm_glview_efl_object_finalize(Eo *obj, Elm_Glview_Data *sd)
    return efl_finalize(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Retrieves the Evas_GL_API structure for the GLView.
+ *
+ * This allows access to the GL functions for the current context.
+ *
+ * @param obj The Evas object, unused in this function.
+ * @param sd The private data of the GLView.
+ * @return A pointer to the Evas_GL_API structure.
+ */
 EOLIAN static Evas_GL_API*
 _elm_glview_gl_api_get(const Eo *obj EINA_UNUSED, Elm_Glview_Data *sd)
 {
    return evas_gl_context_api_get(sd->evasgl, sd->context);
 }
 
+/**
+ * @internal
+ * @brief Sets the rendering mode for the GLView.
+ *
+ * Configures various aspects of the GL rendering pipeline, such as alpha channel,
+ * depth buffer, stencil buffer, multisampling, and direct rendering options.
+ * After configuring, it updates the GL surface.
+ *
+ * @param obj The Evas object.
+ * @param sd The private data of the GLView.
+ * @param mode A bitmask of Elm_GLView_Mode flags specifying the desired modes.
+ *             Example: ELM_GLVIEW_ALPHA | ELM_GLVIEW_DEPTH_24 | ELM_GLVIEW_STENCIL_8
+ * @return EINA_TRUE if the mode was set successfully and surface created, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _elm_glview_mode_set(Eo *obj, Elm_Glview_Data *sd, Elm_GLView_Mode mode)
 {
@@ -468,6 +654,21 @@ _elm_glview_mode_set(Eo *obj, Elm_Glview_Data *sd, Elm_GLView_Mode mode)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Sets the resize policy for the GLView.
+ *
+ * Determines how the GLView responds to size changes:
+ * - ELM_GLVIEW_RESIZE_POLICY_RECREATE: The GL surface is destroyed and recreated with the new size.
+ * - ELM_GLVIEW_RESIZE_POLICY_SCALE: The GL surface is scaled (not typically used directly by GLView,
+ *   but the image object it renders to might scale).
+ *
+ * @param obj The Evas object.
+ * @param sd The private data of the GLView.
+ * @param policy The desired resize policy.
+ *               Example: ELM_GLVIEW_RESIZE_POLICY_RECREATE
+ * @return EINA_TRUE on success, EINA_FALSE if the policy is invalid.
+ */
 EOLIAN static Eina_Bool
 _elm_glview_resize_policy_set(Eo *obj, Elm_Glview_Data *sd, Elm_GLView_Resize_Policy policy)
 {
@@ -489,6 +690,21 @@ _elm_glview_resize_policy_set(Eo *obj, Elm_Glview_Data *sd, Elm_GLView_Resize_Po
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Sets the rendering policy for the GLView.
+ *
+ * Determines when the GLView's content is rendered:
+ * - ELM_GLVIEW_RENDER_POLICY_ON_DEMAND: Rendering occurs only when explicitly requested
+ *   (e.g., via elm_obj_glview_draw_request()) or when Evas needs the pixels.
+ * - ELM_GLVIEW_RENDER_POLICY_ALWAYS: Rendering occurs continuously, typically on every idle loop.
+ *
+ * @param obj The Evas object.
+ * @param sd The private data of the GLView.
+ * @param policy The desired render policy.
+ *               Example: ELM_GLVIEW_RENDER_POLICY_ALWAYS
+ * @return EINA_TRUE on success, EINA_FALSE if the policy is invalid.
+ */
 EOLIAN static Eina_Bool
 _elm_glview_render_policy_set(Eo *obj, Elm_Glview_Data *sd, Elm_GLView_Render_Policy policy)
 {
@@ -508,6 +724,18 @@ _elm_glview_render_policy_set(Eo *obj, Elm_Glview_Data *sd, Elm_GLView_Render_Po
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Sets the internal view size of the GLView's surface.
+ *
+ * This directly sets the dimensions (sd->w, sd->h) for the GL surface,
+ * updates the surface, and requests a redraw. This is different from
+ * _elm_glview_efl_gfx_entity_size_set which handles widget sizing and policies.
+ *
+ * @param obj The Evas object.
+ * @param sd The private data of the GLView.
+ * @param sz The new view size (width and height).
+ */
 EOLIAN static void
 _elm_glview_efl_gfx_view_view_size_set(Eo *obj, Elm_Glview_Data *sd, Eina_Size2D sz)
 {
@@ -520,12 +748,33 @@ _elm_glview_efl_gfx_view_view_size_set(Eo *obj, Elm_Glview_Data *sd, Eina_Size2D
    elm_obj_glview_draw_request(obj);
 }
 
+/**
+ * @internal
+ * @brief Gets the internal view size of the GLView's surface.
+ *
+ * @param obj The Evas object, unused in this function.
+ * @param sd The private data of the GLView.
+ * @return The current view size (Eina_Size2D) of the GL surface.
+ */
 EOLIAN static Eina_Size2D
 _elm_glview_efl_gfx_view_view_size_get(const Eo *obj EINA_UNUSED, Elm_Glview_Data *sd)
 {
    return EINA_SIZE2D(sd->w, sd->h);
 }
 
+/**
+ * @internal
+ * @brief Requests a redraw of the GLView content.
+ *
+ * Marks the underlying image object's pixels as dirty, which will trigger
+ * a call to the rendering callback (_render_cb) when Evas processes updates
+ * or when the pixel get callback is invoked (for on-demand rendering).
+ * If the render policy is ELM_GLVIEW_RENDER_POLICY_ALWAYS and an idle enterer
+ * is not already active, it adds one to ensure continuous rendering.
+ *
+ * @param obj The Evas object.
+ * @param sd The private data of the GLView.
+ */
 EOLIAN static void
 _elm_glview_draw_request(Eo *obj, Elm_Glview_Data *sd)
 {
@@ -541,18 +790,42 @@ _elm_glview_draw_request(Eo *obj, Elm_Glview_Data *sd)
                                                               _render_cb, obj);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the Evas_GL context associated with the GLView.
+ *
+ * @param obj The Evas object, unused in this function.
+ * @param sd The private data of the GLView.
+ * @return The Evas_GL context.
+ */
 EOLIAN static Evas_GL *
 _elm_glview_evas_gl_get(const Eo *obj EINA_UNUSED, Elm_Glview_Data *sd)
 {
    return sd->evasgl;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the current rotation of the Evas_GL surface.
+ *
+ * @param obj The Evas object, unused in this function.
+ * @param sd The private data of the GLView.
+ * @return The rotation angle (0, 90, 180, or 270).
+ */
 EOLIAN static int
 _elm_glview_rotation_get(const Eo *obj EINA_UNUSED, Elm_Glview_Data *sd)
 {
    return evas_gl_rotation_get(sd->evasgl);
 }
 
+/**
+ * @internal
+ * @brief Class constructor for Elm_Glview.
+ *
+ * Registers the legacy smart type name for the GLView class.
+ *
+ * @param klass The Efl_Class being constructed.
+ */
 static void
 _elm_glview_class_constructor(Efl_Class *klass)
 {
@@ -560,6 +833,12 @@ _elm_glview_class_constructor(Efl_Class *klass)
 }
 
 /* Legacy deprecated functions */
+
+/**
+ * @brief Notify that the GLView content has changed and needs a redraw.
+ * @deprecated Use elm_obj_glview_draw_request() instead.
+ * @param obj The GLView object.
+ */
 EAPI void
 elm_glview_changed_set(Evas_Object *obj)
 {
@@ -568,6 +847,13 @@ elm_glview_changed_set(Evas_Object *obj)
    elm_obj_glview_draw_request(obj);
 }
 
+/**
+ * @brief Get the size of the GLView's rendering surface.
+ * @deprecated Use efl_gfx_view_size_get() instead.
+ * @param obj The GLView object.
+ * @param[out] w Pointer to store the width.
+ * @param[out] h Pointer to store the height.
+ */
 EAPI void
 elm_glview_size_get(const Elm_Glview *obj, int *w, int *h)
 {
@@ -577,12 +863,25 @@ elm_glview_size_get(const Elm_Glview *obj, int *w, int *h)
    if (h) *h = sz.h;
 }
 
+/**
+ * @brief Set the size of the GLView's rendering surface.
+ * @deprecated Use efl_gfx_view_size_set() instead.
+ * @param obj The GLView object.
+ * @param w The width to set.
+ * @param h The height to set.
+ */
 EAPI void
 elm_glview_size_set(Elm_Glview *obj, int w, int h)
 {
    efl_gfx_view_size_set(obj, EINA_SIZE2D(w, h));
 }
 
+/**
+ * @brief Set the initialization callback for the GLView.
+ * @deprecated Use efl_event_callback_add with ELM_GLVIEW_EVENT_CREATED instead.
+ * @param obj The GLView object.
+ * @param func The callback function for GL initialization.
+ */
 EAPI void
 elm_glview_init_func_set(Elm_Glview *obj, Elm_GLView_Func_Cb func)
 {
@@ -593,6 +892,12 @@ elm_glview_init_func_set(Elm_Glview *obj, Elm_GLView_Func_Cb func)
    sd->init_func = func;
 }
 
+/**
+ * @brief Set the deletion callback for the GLView.
+ * @deprecated Use efl_event_callback_add with ELM_GLVIEW_EVENT_DESTROYED instead.
+ * @param obj The GLView object.
+ * @param func The callback function for GL resource cleanup.
+ */
 EAPI void
 elm_glview_del_func_set(Elm_Glview *obj, Elm_GLView_Func_Cb func)
 {
@@ -602,6 +907,12 @@ elm_glview_del_func_set(Elm_Glview *obj, Elm_GLView_Func_Cb func)
    sd->del_func = func;
 }
 
+/**
+ * @brief Set the resize callback for the GLView.
+ * @deprecated Use efl_event_callback_add with ELM_GLVIEW_EVENT_RESIZED instead.
+ * @param obj The GLView object.
+ * @param func The callback function for handling GL viewport resizing.
+ */
 EAPI void
 elm_glview_resize_func_set(Elm_Glview *obj, Elm_GLView_Func_Cb func)
 {
@@ -611,6 +922,12 @@ elm_glview_resize_func_set(Elm_Glview *obj, Elm_GLView_Func_Cb func)
    sd->resize_func = func;
 }
 
+/**
+ * @brief Set the rendering callback for the GLView.
+ * @deprecated Use efl_event_callback_add with ELM_GLVIEW_EVENT_RENDER instead.
+ * @param obj The GLView object.
+ * @param func The callback function for GL rendering.
+ */
 EAPI void
 elm_glview_render_func_set(Elm_Glview *obj, Elm_GLView_Func_Cb func)
 {

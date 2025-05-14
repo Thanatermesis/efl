@@ -1,5 +1,6 @@
-/*
- * A small binary utility for packing basic data and images into eet files.
+/**
+ * @file
+ * @brief A small binary utility for packing basic data and images into eet files.
  * Can be used in combination with the "eet" utility and can even be used
  * to stuff more data into edj files (which are eet). Run tool for help.
  */
@@ -8,12 +9,20 @@
 #include <Evas.h>
 #include <Ecore_Evas.h>
 
-static const char *output = NULL;
-static Eet_File *ef = NULL;
-static Ecore_Evas *ee = NULL;
-static Evas *evas = NULL;
-static Evas_Object *im_obj = NULL;
+static const char *output = NULL; /**< Path to the output Eet file. */
+static Eet_File *ef = NULL; /**< Pointer to the opened Eet file. */
+static Ecore_Evas *ee = NULL; /**< Ecore_Evas instance for offscreen rendering. */
+static Evas *evas = NULL; /**< Evas canvas associated with ee. */
+static Evas_Object *im_obj = NULL; /**< Evas image object for loading and manipulating images. */
 
+/**
+ * @brief Opens the Eet file for read/write or write mode.
+ *
+ * If the Eet file specified by the global `output` variable does not exist,
+ * it is created. If it exists, it's opened in read/write mode.
+ * The opened file handle is stored in the global `ef` variable.
+ * Exits on failure.
+ */
 static void
 file_add(void)
 {
@@ -27,6 +36,14 @@ file_add(void)
      }
 }
 
+/**
+ * @brief Opens the Eet file for read/write mode, specifically for deletion operations.
+ *
+ * This function ensures the Eet file (specified by `output`) is open
+ * so that entries can be deleted from it. The opened file handle is stored
+ * in the global `ef` variable.
+ * Exits on failure.
+ */
 static void
 file_del(void)
 {
@@ -39,6 +56,14 @@ file_del(void)
      }
 }
 
+/**
+ * @brief Checks if the current argument index `i` is within the bounds of `argc`.
+ *
+ * If `i` is out of bounds (i.e., `i >= argc`), an error message is printed,
+ * and the program exits.
+ * @param argc Total number of command-line arguments.
+ * @param i Current argument index to check.
+ */
 static void
 check_argc(int argc, int i)
 {
@@ -49,6 +74,26 @@ check_argc(int argc, int i)
      }
 }
 
+/**
+ * @brief Processes the command-line arguments to add or remove data from the Eet file.
+ *
+ * This function iterates through the command-line arguments starting from `start` index.
+ * It expects arguments in a specific format:
+ *  - `+ KEY im IMG-FILE [none|lo|med|hi|fast|super|etc1|etc2|0-100]` : Adds an image.
+ *  - `+ KEY data DATA-FILE [none|lo|med|hi|fast|super]` : Adds raw data.
+ *  - `- KEY` : Deletes an entry by key.
+ *
+ * @param start The index in `argv` from which to start processing commands.
+ * @param argc The total number of command-line arguments.
+ * @param argv Array of command-line argument strings.
+ *
+ * Example `argv` structure for adding an image:
+ * `argv[i] = "+"`
+ * `argv[i+1] = "my_image_key"`
+ * `argv[i+2] = "im"`
+ * `argv[i+3] = "path/to/image.png"`
+ * `argv[i+4] = "fast"` (compression mode)
+ */
 static void
 commands(int start, int argc, char **argv)
 {
@@ -235,6 +280,14 @@ commands(int start, int argc, char **argv)
      }
 }
 
+/**
+ * @brief Initializes a minimal Ecore_Evas buffer canvas and an Evas image object.
+ *
+ * This sets up a 1x1 pixel offscreen canvas (`ee` and `evas`) and an image object (`im_obj`)
+ * within that canvas. This is used as a scratchpad for loading image file data
+ * via Evas, before writing it to the Eet file.
+ * Exits on failure to create the buffer canvas.
+ */
 static void
 scratch_canvas_init(void)
 {
@@ -248,6 +301,17 @@ scratch_canvas_init(void)
    im_obj = evas_object_image_add(evas);
 }
 
+/**
+ * @brief Main entry point for the eetpack utility.
+ *
+ * Parses command-line arguments, initializes Eet, Ecore_Evas,
+ * processes commands to pack or unpack data from an Eet file,
+ * and then cleans up.
+ *
+ * @param argc Number of command-line arguments.
+ * @param argv Array of command-line argument strings.
+ * @return 0 on success, -1 on error or if help is displayed.
+ */
 int
 main(int argc, char **argv)
 {

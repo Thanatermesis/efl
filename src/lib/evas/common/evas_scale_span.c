@@ -2,6 +2,26 @@
 #include "evas_convert_color.h"
 #include "evas_scale_span.h"
 
+/**
+ * @internal
+ * @brief Scales a span of RGBA pixels.
+ *
+ * This function scales a source span of RGBA pixels to a destination span of
+ * a different length. It supports a multiplier color and direction control.
+ *
+ * @param src Pointer to the source RGBA pixel data.
+ *            Each DATA32 element represents a pixel in 0xAARRGGBB format.
+ *            Example: `{0xffff0000, 0xff00ff00, 0xff0000ff}` (Red, Green, Blue pixels)
+ * @param mask Unused in this function.
+ * @param src_len Length of the source pixel span.
+ * @param mul_col Multiplier color in 0xAARRGGBB format. If not 0xffffffff,
+ *                each source pixel is multiplied by this color.
+ * @param dst Pointer to the destination RGBA pixel data array.
+ *            The scaled pixels will be written here.
+ * @param dst_len Length of the destination pixel span.
+ * @param dir Direction of scaling. If < 0, scaling is done in reverse
+ *            (from end to start of the destination buffer).
+ */
 static void
 evas_common_scale_rgba_span_(DATA32 *src, DATA8 *mask EINA_UNUSED, int src_len, DATA32 mul_col, DATA32 *dst, int dst_len, int dir)
 {
@@ -106,6 +126,27 @@ evas_common_scale_rgba_span_(DATA32 *src, DATA8 *mask EINA_UNUSED, int src_len, 
      }
 }
 
+/**
+ * @internal
+ * @brief Scales a span of RGBA pixels with an alpha mask.
+ *
+ * This function scales a source span of RGBA pixels, applying an alpha mask
+ * to each source pixel before scaling. It also supports a multiplier color
+ * and direction control.
+ *
+ * @param src Pointer to the source RGBA pixel data.
+ *            Each DATA32 element represents a pixel in 0xAARRGGBB format.
+ * @param mask Pointer to the alpha mask data (array of DATA8).
+ *             Each DATA8 element is an alpha value (0-255) corresponding
+ *             to a source pixel.
+ *             Example: `{0x80, 0xff, 0x40}` (Semi-transparent, Opaque, Very transparent)
+ * @param src_len Length of the source pixel span and mask.
+ * @param mul_col Multiplier color in 0xAARRGGBB format. If not 0xffffffff,
+ *                each masked source pixel is multiplied by this color.
+ * @param dst Pointer to the destination RGBA pixel data array.
+ * @param dst_len Length of the destination pixel span.
+ * @param dir Direction of scaling. If < 0, scaling is done in reverse.
+ */
 static void
 evas_common_scale_rgba_a8_span_(DATA32 *src, DATA8 *mask, int src_len, DATA32 mul_col, DATA32 *dst, int dst_len, int dir)
 {
@@ -233,6 +274,25 @@ evas_common_scale_rgba_a8_span_(DATA32 *src, DATA8 *mask, int src_len, DATA32 mu
      }
 }
 
+/**
+ * @internal
+ * @brief Scales a span of alpha mask values, applying a multiplier color.
+ *
+ * This function scales a source span of alpha mask values. Each scaled alpha
+ * value is then used to modulate a multiplier color, and the result is
+ * written to the destination. The source pixel data is unused.
+ *
+ * @param src Unused in this function.
+ * @param mask Pointer to the source alpha mask data (array of DATA8).
+ *             Example: `{0xff, 0x80, 0x00}` (Opaque, Semi-transparent, Fully transparent)
+ * @param src_len Length of the source alpha mask span.
+ * @param mul_col Multiplier color in 0xAARRGGBB format. This color is
+ *                modulated by the scaled alpha values.
+ * @param dst Pointer to the destination RGBA pixel data array.
+ *            The result of (scaled_alpha * mul_col) is stored here.
+ * @param dst_len Length of the destination pixel span.
+ * @param dir Direction of scaling. If < 0, scaling is done in reverse.
+ */
 static void
 evas_common_scale_a8_span_(DATA32 *src EINA_UNUSED, DATA8 *mask, int src_len, DATA32 mul_col, DATA32 *dst, int dst_len, int dir)
 {
@@ -308,6 +368,28 @@ evas_common_scale_a8_span_(DATA32 *src EINA_UNUSED, DATA8 *mask, int src_len, DA
      }
 }
 
+/**
+ * @internal
+ * @brief Scales an alpha mask and uses it to modulate existing destination pixels.
+ *
+ * This function scales a source span of alpha mask values. The scaled alpha
+ * is then optionally multiplied by `mul_col` (if `mul_col` is not white).
+ * The resulting alpha is then used to modulate the existing pixels in the
+ * `dst` buffer. This is effectively a "clip" operation where the scaled
+ * alpha mask defines the transparency of the destination pixels.
+ *
+ * @param src Unused in this function.
+ * @param mask Pointer to the source alpha mask data (array of DATA8).
+ * @param src_len Length of the source alpha mask span.
+ * @param mul_col Multiplier color in 0xAARRGGBB format. If not 0xffffffff,
+ *                the scaled alpha mask values are first multiplied by this color's
+ *                alpha component (effectively).
+ * @param dst Pointer to the destination RGBA pixel data array, which is read and modified.
+ *            Each pixel `dst[i]` becomes `dst[i] * scaled_mask_alpha[i]`.
+ *            If `mul` is true, it becomes `dst[i] * (scaled_mask_alpha[i] * mul_col_alpha)`.
+ * @param dst_len Length of the destination pixel span.
+ * @param dir Direction of processing. If < 0, processing is done in reverse.
+ */
 static void
 evas_common_scale_clip_a8_span_(DATA32 *src EINA_UNUSED, DATA8 *mask, int src_len, DATA32 mul_col, DATA32 *dst, int dst_len, int dir)
 {
@@ -447,6 +529,23 @@ evas_common_scale_clip_a8_span_(DATA32 *src EINA_UNUSED, DATA8 *mask, int src_le
      }
 }
 
+/**
+ * @brief Scales a span of RGBA pixels.
+ *
+ * This is a public API wrapper for evas_common_scale_rgba_span_().
+ * It scales a source span of RGBA pixels to a destination span of
+ * a different length. It supports a multiplier color and direction control.
+ * After the operation, it calls evas_common_cpu_end_opt().
+ *
+ * @param src Pointer to the source RGBA pixel data.
+ * @param mask Unused in the underlying function.
+ * @param src_len Length of the source pixel span.
+ * @param mul_col Multiplier color in 0xAARRGGBB format.
+ * @param dst Pointer to the destination RGBA pixel data array.
+ * @param dst_len Length of the destination pixel span.
+ * @param dir Direction of scaling.
+ * @see evas_common_scale_rgba_span_()
+ */
 EVAS_API void
 evas_common_scale_rgba_span(DATA32 *src, DATA8 *mask, int src_len, DATA32 mul_col, DATA32 *dst, int dst_len, int dir)
 {
@@ -454,6 +553,24 @@ evas_common_scale_rgba_span(DATA32 *src, DATA8 *mask, int src_len, DATA32 mul_co
    evas_common_cpu_end_opt();
 }
 
+/**
+ * @brief Scales a span of RGBA pixels with an alpha mask.
+ *
+ * This is a public API wrapper for evas_common_scale_rgba_a8_span_().
+ * It scales a source span of RGBA pixels, applying an alpha mask
+ * to each source pixel before scaling. It also supports a multiplier color
+ * and direction control.
+ * After the operation, it calls evas_common_cpu_end_opt().
+ *
+ * @param src Pointer to the source RGBA pixel data.
+ * @param mask Pointer to the alpha mask data.
+ * @param src_len Length of the source pixel span and mask.
+ * @param mul_col Multiplier color in 0xAARRGGBB format.
+ * @param dst Pointer to the destination RGBA pixel data array.
+ * @param dst_len Length of the destination pixel span.
+ * @param dir Direction of scaling.
+ * @see evas_common_scale_rgba_a8_span_()
+ */
 EVAS_API void
 evas_common_scale_rgba_a8_span(DATA32 *src, DATA8 *mask, int src_len, DATA32 mul_col, DATA32 *dst, int dst_len, int dir)
 {
@@ -461,6 +578,24 @@ evas_common_scale_rgba_a8_span(DATA32 *src, DATA8 *mask, int src_len, DATA32 mul
    evas_common_cpu_end_opt();
 }
 
+/**
+ * @brief Scales a span of alpha mask values, applying a multiplier color.
+ *
+ * This is a public API wrapper for evas_common_scale_a8_span_().
+ * It scales a source span of alpha mask values. Each scaled alpha
+ * value is then used to modulate a multiplier color, and the result is
+ * written to the destination.
+ * After the operation, it calls evas_common_cpu_end_opt().
+ *
+ * @param src Unused in the underlying function.
+ * @param mask Pointer to the source alpha mask data.
+ * @param src_len Length of the source alpha mask span.
+ * @param mul_col Multiplier color in 0xAARRGGBB format.
+ * @param dst Pointer to the destination RGBA pixel data array.
+ * @param dst_len Length of the destination pixel span.
+ * @param dir Direction of scaling.
+ * @see evas_common_scale_a8_span_()
+ */
 EVAS_API void
 evas_common_scale_a8_span(DATA32 *src, DATA8 *mask, int src_len, DATA32 mul_col, DATA32 *dst, int dst_len, int dir)
 {
@@ -468,6 +603,23 @@ evas_common_scale_a8_span(DATA32 *src, DATA8 *mask, int src_len, DATA32 mul_col,
    evas_common_cpu_end_opt();
 }
 
+/**
+ * @brief Scales an alpha mask and uses it to modulate existing destination pixels.
+ *
+ * This is a public API wrapper for evas_common_scale_clip_a8_span_().
+ * It scales a source span of alpha mask values. The scaled alpha
+ * is then used to modulate the existing pixels in the `dst` buffer.
+ * After the operation, it calls evas_common_cpu_end_opt().
+ *
+ * @param src Unused in the underlying function.
+ * @param mask Pointer to the source alpha mask data.
+ * @param src_len Length of the source alpha mask span.
+ * @param mul_col Multiplier color in 0xAARRGGBB format.
+ * @param dst Pointer to the destination RGBA pixel data array (read and modified).
+ * @param dst_len Length of the destination pixel span.
+ * @param dir Direction of processing.
+ * @see evas_common_scale_clip_a8_span_()
+ */
 EVAS_API void
 evas_common_scale_clip_a8_span(DATA32 *src, DATA8 *mask, int src_len, DATA32 mul_col, DATA32 *dst, int dst_len, int dir)
 {
@@ -475,6 +627,25 @@ evas_common_scale_clip_a8_span(DATA32 *src, DATA8 *mask, int src_len, DATA32 mul
    evas_common_cpu_end_opt();
 }
 
+/**
+ * @brief Scales a span of RGBA pixels, performing interpolation in HSV(A) color space.
+ *
+ * This function scales a source span of RGBA pixels to a destination span.
+ * Unlike evas_common_scale_rgba_span(), color interpolation between source
+ * pixels is performed in the HSV (Hue, Saturation, Value) color space.
+ * The Alpha component is interpolated linearly.
+ * It supports a multiplier color applied after HSV->RGB conversion and direction control.
+ *
+ * @param src Pointer to the source RGBA pixel data (0xAARRGGBB).
+ *            These are converted to HSV for interpolation.
+ * @param mask Unused in this function.
+ * @param src_len Length of the source pixel span.
+ * @param mul_col Multiplier color in 0xAARRGGBB format. Applied after HSV interpolation
+ *                and conversion back to RGB.
+ * @param dst Pointer to the destination RGBA pixel data array.
+ * @param dst_len Length of the destination pixel span.
+ * @param dir Direction of scaling. If < 0, scaling is done in reverse.
+ */
 EVAS_API void
 evas_common_scale_hsva_span(DATA32 *src, DATA8 *mask EINA_UNUSED, int src_len, DATA32 mul_col, DATA32 *dst, int dst_len, int dir)
 {
@@ -558,6 +729,28 @@ evas_common_scale_hsva_span(DATA32 *src, DATA8 *mask EINA_UNUSED, int src_len, D
      }
 }
 
+/**
+ * @brief Scales a span of RGBA pixels with an alpha mask, performing interpolation in HSV(A) color space.
+ *
+ * This function scales a source span of RGBA pixels, applying an alpha mask
+ * to each source pixel before scaling. Color interpolation between source
+ * pixels is performed in the HSV (Hue, Saturation, Value) color space.
+ * The Alpha component (original alpha multiplied by mask alpha) is interpolated linearly.
+ * It supports a multiplier color applied after HSV->RGB conversion and direction control.
+ *
+ * @param src Pointer to the source RGBA pixel data (0xAARRGGBB).
+ *            These are converted to HSV for interpolation.
+ * @param mask Pointer to the alpha mask data (array of DATA8).
+ *             Each DATA8 element is an alpha value (0-255) corresponding
+ *             to a source pixel. This mask is applied to the source pixel's
+ *             alpha before interpolation.
+ * @param src_len Length of the source pixel span and mask.
+ * @param mul_col Multiplier color in 0xAARRGGBB format. Applied after HSV interpolation
+ *                and conversion back to RGB.
+ * @param dst Pointer to the destination RGBA pixel data array.
+ * @param dst_len Length of the destination pixel span.
+ * @param dir Direction of scaling. If < 0, scaling is done in reverse.
+ */
 EVAS_API void
 evas_common_scale_hsva_a8_span(DATA32 *src, DATA8 *mask, int src_len, DATA32 mul_col, DATA32 *dst, int dst_len, int dir)
 {

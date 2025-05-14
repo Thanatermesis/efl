@@ -13,18 +13,28 @@
 #define MY_CLASS_NAME "Elm_Access"
 #define MY_CLASS_NAME_LEGACY "elm_access"
 
+/**
+ * @internal
+ * @struct _Func_Data
+ * @brief Structure to hold callback function and user data for an access action.
+ */
 struct _Func_Data
 {
-   void                *user_data; /* Holds user data to CB */
-   Elm_Access_Action_Cb cb;
+   void                *user_data; /**< User data to be passed to the callback. */
+   Elm_Access_Action_Cb cb;        /**< The callback function for the action. */
 };
 
 typedef struct _Func_Data Func_Data;
 
+/**
+ * @internal
+ * @struct _Action_Info
+ * @brief Structure to store action callbacks for an Evas_Object.
+ */
 struct _Action_Info
 {
-   Evas_Object      *obj;
-   Func_Data         fn[ELM_ACCESS_ACTION_LAST + 1]; /* Callback for specific action */
+   Evas_Object      *obj;                               /**< The Evas_Object associated with these actions. */
+   Func_Data         fn[ELM_ACCESS_ACTION_LAST + 1]; /**< Array of function data for each possible access action. Indexed by Elm_Access_Action_Type. */
 };
 
 typedef struct _Action_Info Action_Info;
@@ -37,6 +47,7 @@ static Evas_Object * _elm_access_add(Evas_Object *parent);
 
 static void _access_object_unregister(Evas_Object *obj);
 
+/** @internal Signal emitted when an access object is activated. */
 static const char SIG_ACTIVATED[] = "access,activated";
 static const Evas_Smart_Cb_Description _smart_callbacks[] =
 {
@@ -50,6 +61,20 @@ _elm_access_efl_canvas_group_group_add(Eo *obj, void *_pd EINA_UNUSED)
    efl_canvas_group_add(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Calls the registered callback for a specific access action type.
+ *
+ * This function retrieves the action information associated with the object
+ * and, if a callback is registered for the given action type, invokes it.
+ * If @p action_info is NULL, a new Elm_Access_Action_Info struct is allocated
+ * and populated.
+ *
+ * @param obj The Evas_Object on which the action is performed.
+ * @param type The type of access action to perform.
+ * @param action_info Detailed information about the action, or NULL.
+ * @return @c EINA_TRUE if a callback was successfully called, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _access_action_callback_call(Evas_Object *obj,
                              Elm_Access_Action_Type type,
@@ -151,6 +176,14 @@ _elm_access_efl_ui_focus_object_on_focus_update(Eo *obj, void *_pd EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @struct _Mod_Api
+ * @brief Structure to hold function pointers for an accessibility module's API.
+ *
+ * This allows Elementary to interact with different accessibility backends
+ * (like AT-SPI) through a common interface.
+ */
 typedef struct _Mod_Api Mod_Api;
 
 struct _Mod_Api
@@ -158,12 +191,19 @@ struct _Mod_Api
    void (*out_read) (const char *txt);
    void (*out_read_done) (void);
    void (*out_cancel) (void);
-   void (*out_done_callback_set) (void (*func) (void *data), const void *data);
+   void (*out_done_callback_set) (void (*func) (void *data), const void *data); /**< Sets a callback to be invoked when output is done. */
 };
 
-static int initted = 0;
-static Mod_Api *mapi = NULL;
+static int initted = 0; /**< Counter for access module initialization. */
+static Mod_Api *mapi = NULL; /**< Pointer to the loaded accessibility module API. */
 
+/**
+ * @internal
+ * @brief Initializes the accessibility module.
+ *
+ * Loads the "access/api" module and retrieves its API function pointers.
+ * This function ensures the module is initialized only once.
+ */
 static void
 _access_init(void)
 {
@@ -187,6 +227,13 @@ _access_init(void)
    mapi = m->api;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the accessibility module.
+ *
+ * If the accessibility module was initialized, this function calls its
+ * shutdown routine and frees associated resources.
+ */
 static void
 _access_shutdown(void)
 {
@@ -203,6 +250,18 @@ _access_shutdown(void)
    mapi = NULL;
 }
 
+/**
+ * @internal
+ * @brief Adds or retrieves an Elm_Access_Item for a given type.
+ *
+ * If an item of the specified type already exists in the Elm_Access_Info,
+ * it is returned after clearing its previous data. Otherwise, a new
+ * Elm_Access_Item is created, prepended to the list, and returned.
+ *
+ * @param ac The Elm_Access_Info structure to modify.
+ * @param type The type of access information (e.g., ELM_ACCESS_INFO, ELM_ACCESS_TYPE).
+ * @return A pointer to the Elm_Access_Item, or NULL on failure.
+ */
 static Elm_Access_Item *
 _access_add_set(Elm_Access_Info *ac, int type)
 {
@@ -229,6 +288,16 @@ _access_add_set(Elm_Access_Info *ac, int type)
    return ai;
 }
 
+/**
+ * @internal
+ * @brief Gets the currently highlighted accessible object.
+ *
+ * It searches for a special display object named "_elm_access_disp" and
+ * retrieves the target object associated with it.
+ *
+ * @param obj An Evas_Object (often the canvas or a container).
+ * @return The Evas_Object that is currently highlighted for accessibility, or NULL.
+ */
 static Evas_Object *
 _access_highlight_object_get(Evas_Object *obj)
 {
@@ -242,6 +311,18 @@ _access_highlight_object_get(Evas_Object *obj)
    return ho;
 }
 
+/**
+ * @internal
+ * @brief Reads out the accessibility information for a highlighted object.
+ *
+ * This function gathers text from various info types (label, type, state, context)
+ * associated with the object, concatenates them, and then uses the
+ * accessibility module (e.g., AT-SPI via mapi) to speak the text.
+ * It also triggers an on_highlight callback if set.
+ *
+ * @param ac The Elm_Access_Info for the object.
+ * @param obj The Evas_Object whose information is to be read.
+ */
 static void
 _access_highlight_read(Elm_Access_Info *ac, Evas_Object *obj)
 {
@@ -277,6 +358,17 @@ _access_highlight_read(Elm_Access_Info *ac, Evas_Object *obj)
    free(txt);
 }
 
+/**
+ * @internal
+ * @brief Timeout callback for delayed reading of an object under the mouse.
+ *
+ * When the mouse hovers over an accessible object, this callback is triggered
+ * after a short delay to read out its information. This prevents rapid-fire
+ * reading when moving the mouse quickly.
+ *
+ * @param data The Evas_Object that was hovered over.
+ * @return @c EINA_FALSE to automatically remove the timer.
+ */
 static Eina_Bool
 _access_obj_over_timeout_cb(void *data)
 {
@@ -295,6 +387,19 @@ _access_obj_over_timeout_cb(void *data)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_MOUSE_IN on an accessible object.
+ *
+ * When the mouse enters an accessible object, this function schedules a timer
+ * to read out the object's information after a short delay, if mouse events
+ * for accessibility are enabled.
+ *
+ * @param data The Evas_Object associated with the access info (the access object itself).
+ * @param e The Evas canvas.
+ * @param obj The Evas_Object that triggered the event (the hover object).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _access_hover_mouse_in_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info  EINA_UNUSED)
 {
@@ -310,6 +415,18 @@ _access_hover_mouse_in_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA
       ac->delay_timer = ecore_timer_add(0.2, _access_obj_over_timeout_cb, data);
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_MOUSE_OUT on an accessible object.
+ *
+ * When the mouse leaves an accessible object, this function cancels any pending
+ * read timer and unhighlights the object.
+ *
+ * @param data The Evas_Object associated with the access info (the access object itself).
+ * @param e The Evas canvas.
+ * @param obj The Evas_Object that triggered the event (the hover object).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _access_hover_mouse_out_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -324,6 +441,12 @@ _access_hover_mouse_out_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EIN
    ELM_SAFE_FREE(ac->delay_timer, ecore_timer_del);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when the accessibility backend finishes reading text.
+ * @param data User data (unused).
+ * @todo Produce an event here.
+ */
 static void
 _access_read_done(void *data EINA_UNUSED)
 {
@@ -331,6 +454,18 @@ _access_read_done(void *data EINA_UNUSED)
    // FIXME: produce event here
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_DEL on an object with a pending 2nd click timer.
+ *
+ * This ensures that the 2nd click timer is cancelled if the object is deleted
+ * before the timer expires.
+ *
+ * @param data User data (unused).
+ * @param e The Evas canvas.
+ * @param obj The Evas_Object being deleted.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _access_2nd_click_del_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -346,6 +481,16 @@ _access_2nd_click_del_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Objec
      }
 }
 
+/**
+ * @internal
+ * @brief Timeout callback for detecting a second click (double-click like behavior).
+ *
+ * This is used to distinguish single clicks from potential double clicks for
+ * accessibility actions. If the timer expires, it means a single click occurred.
+ *
+ * @param data The Evas_Object on which the click occurred.
+ * @return @c EINA_FALSE to automatically remove the timer.
+ */
 static Eina_Bool
 _access_2nd_click_timeout_cb(void *data)
 {
@@ -355,18 +500,45 @@ _access_2nd_click_timeout_cb(void *data)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_DEL on a highlighted object.
+ * Disables the highlight display when the object is deleted.
+ * @param data User data (unused).
+ * @param e The Evas canvas.
+ * @param obj The Evas_Object being deleted (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _access_obj_hilight_del_cb(void *data EINA_UNUSED, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    _elm_access_object_highlight_disable(e);
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_HIDE on a highlighted object.
+ * Disables the highlight display when the object is hidden.
+ * @param data User data (unused).
+ * @param e The Evas canvas.
+ * @param obj The Evas_Object being hidden (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _access_obj_hilight_hide_cb(void *data EINA_UNUSED, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    _elm_access_object_highlight_disable(e);
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_MOVE on a highlighted object.
+ * Moves the highlight display to match the object's new position.
+ * @param data User data (unused).
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object that was moved.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _access_obj_hilight_move_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -379,6 +551,15 @@ _access_obj_hilight_move_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Ob
    evas_object_move(o, x, y);
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_RESIZE on a highlighted object.
+ * Resizes the highlight display to match the object's new size.
+ * @param data User data (unused).
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object that was resized.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _access_obj_hilight_resize_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -391,6 +572,15 @@ _access_obj_hilight_resize_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_
    evas_object_resize(o, w, h);
 }
 
+/**
+ * @internal
+ * @brief Enables or disables mouse event processing for accessibility.
+ *
+ * This is used to temporarily ignore mouse events, for example, when
+ * programmatically moving the mouse for accessibility purposes.
+ *
+ * @param enabled @c EINA_TRUE to enable, @c EINA_FALSE to disable.
+ */
 void
 _elm_access_mouse_event_enabled_set(Eina_Bool enabled)
 {
@@ -399,6 +589,15 @@ _elm_access_mouse_event_enabled_set(Eina_Bool enabled)
    mouse_event_enable = enabled;
 }
 
+/**
+ * @internal
+ * @brief Sets the auto highlight mode for accessibility.
+ *
+ * Auto highlight is typically enabled during keyboard navigation or
+ * programmatic highlight changes.
+ *
+ * @param enabled @c EINA_TRUE to enable auto highlight, @c EINA_FALSE otherwise.
+ */
 void
 _elm_access_auto_highlight_set(Eina_Bool enabled)
 {
@@ -407,18 +606,40 @@ _elm_access_auto_highlight_set(Eina_Bool enabled)
    auto_highlight = enabled;
 }
 
+/**
+ * @internal
+ * @brief Gets the current state of auto highlight mode.
+ * @return @c EINA_TRUE if auto highlight is enabled, @c EINA_FALSE otherwise.
+ */
 Eina_Bool
 _elm_access_auto_highlight_get(void)
 {
    return auto_highlight;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the Elementary accessibility system.
+ * Calls the internal _access_shutdown function.
+ */
 void
 _elm_access_shutdown()
 {
    _access_shutdown();
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_DEL on an object in a widget item's access order.
+ *
+ * Removes the object from the widget item's custom access order list when
+ * the object is deleted.
+ *
+ * @param data The Elm_Widget_Item_Data whose access order is being modified.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object being deleted from the access order.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _access_order_del_cb(void *data,
                      Evas *e EINA_UNUSED,
@@ -430,6 +651,23 @@ _access_order_del_cb(void *data,
    item->access_order = eina_list_remove(item->access_order, obj);
 }
 
+/**
+ * @internal
+ * @brief Sets the custom accessibility order for a widget item.
+ *
+ * This allows defining a specific navigation order for accessible elements
+ * within a widget item, overriding the default order.
+ *
+ * @param item The widget item.
+ * @param objs An Eina_List of Evas_Object pointers representing the desired access order.
+ *             The list itself is not copied, so it should not be modified or freed
+ *             by the caller after this call unless it's first unset.
+ *             Example:
+ *             Eina_List *order = NULL;
+ *             order = eina_list_append(order, child_obj1);
+ *             order = eina_list_append(order, child_obj2);
+ *             _elm_access_widget_item_access_order_set(item_data, order);
+ */
 void
 _elm_access_widget_item_access_order_set(Elm_Widget_Item_Data *item,
                                          Eina_List *objs)
@@ -450,6 +688,14 @@ _elm_access_widget_item_access_order_set(Elm_Widget_Item_Data *item,
    item->access_order = objs;
 }
 
+/**
+ * @internal
+ * @brief Gets the custom accessibility order for a widget item.
+ * @param item The widget item.
+ * @return A const Eina_List of Evas_Object pointers representing the access order,
+ *         or NULL if no custom order is set or item is NULL.
+ *         The returned list should not be modified.
+ */
 const Eina_List *
 _elm_access_widget_item_access_order_get(const Elm_Widget_Item_Data *item)
 {
@@ -457,6 +703,15 @@ _elm_access_widget_item_access_order_get(const Elm_Widget_Item_Data *item)
    return item->access_order;
 }
 
+/**
+ * @internal
+ * @brief Unsets the custom accessibility order for a widget item.
+ *
+ * This removes any previously defined custom access order, reverting to the
+ * default navigation behavior. It also cleans up associated callbacks.
+ *
+ * @param item The widget item.
+ */
 void
 _elm_access_widget_item_access_order_unset(Elm_Widget_Item_Data *item)
 {
@@ -473,6 +728,18 @@ _elm_access_widget_item_access_order_unset(Elm_Widget_Item_Data *item)
      }
 }
 
+/**
+ * @internal
+ * @brief Gets and highlights the next/previous accessible object.
+ *
+ * This function determines the next or previous object in the accessibility
+ * chain based on the current highlight, custom highlight links (info->next/prev),
+ * or the focus manager's relations. It then sets the highlight to that object.
+ *
+ * @param obj The current Evas_Object, often the highlight root or an object within it.
+ * @param dir The direction to move the highlight (ELM_FOCUS_NEXT or ELM_FOCUS_PREVIOUS).
+ * @return @c EINA_TRUE if a new object was highlighted, @c EINA_FALSE otherwise (e.g., at the end of the chain).
+ */
 static Eina_Bool
 _access_highlight_next_get(Evas_Object *obj, Elm_Focus_Direction dir)
 {
@@ -559,6 +826,15 @@ _access_highlight_next_get(Evas_Object *obj, Elm_Focus_Direction dir)
 }
 
 //-------------------------------------------------------------------------//
+/**
+ * @internal
+ * @brief Sets the accessibility highlight to a specific object and reads its info.
+ *
+ * If the object is not already highlighted, this function updates the
+ * highlight display and reads out the object's accessibility information.
+ *
+ * @param obj The Evas_Object to highlight.
+ */
 EAPI void
 _elm_access_highlight_set(Evas_Object* obj)
 {
@@ -576,6 +852,16 @@ _elm_access_highlight_set(Evas_Object* obj)
    _access_highlight_read(ac, obj);
 }
 
+/**
+ * @internal
+ * @brief Clears all accessibility information items from an Elm_Access_Info structure.
+ *
+ * This function iterates through the list of Elm_Access_Item in @p ac,
+ * frees their data (stringshared if not a callback), and then frees the items themselves.
+ * It also cancels any pending delay timer.
+ *
+ * @param ac The Elm_Access_Info structure to clear.
+ */
 EAPI void
 _elm_access_clear(Elm_Access_Info *ac)
 {
@@ -593,6 +879,18 @@ _elm_access_clear(Elm_Access_Info *ac)
      }
 }
 
+/**
+ * @internal
+ * @brief Sets a static text string for a specific accessibility information type.
+ *
+ * This function associates a given text string with an access information type
+ * (e.g., ELM_ACCESS_INFO, ELM_ACCESS_TYPE) for an accessible object.
+ * The text is stringshared.
+ *
+ * @param ac The Elm_Access_Info structure for the object.
+ * @param type The type of access information to set.
+ * @param text The text string to set.
+ */
 EAPI void
 _elm_access_text_set(Elm_Access_Info *ac, int type, const char *text)
 {
@@ -602,6 +900,18 @@ _elm_access_text_set(Elm_Access_Info *ac, int type, const char *text)
    ai->data = eina_stringshare_add(text);
 }
 
+/**
+ * @internal
+ * @brief Sets a callback function to provide text for a specific accessibility information type.
+ *
+ * This allows dynamic generation of accessibility text. When the accessibility
+ * system needs this information, the provided callback @p func will be called.
+ *
+ * @param ac The Elm_Access_Info structure for the object.
+ * @param type The type of access information this callback provides.
+ * @param func The callback function.
+ * @param data User data to be passed to the callback function.
+ */
 EAPI void
 _elm_access_callback_set(Elm_Access_Info *ac, int type, Elm_Access_Info_Cb func, const void *data)
 {
@@ -611,6 +921,14 @@ _elm_access_callback_set(Elm_Access_Info *ac, int type, Elm_Access_Info_Cb func,
    ai->data = data;
 }
 
+/**
+ * @internal
+ * @brief Sets a callback function to be invoked when an object is highlighted.
+ *
+ * @param ac The Elm_Access_Info structure for the object.
+ * @param func The callback function to call on highlight.
+ * @param data User data to be passed to the callback function.
+ */
 EAPI void
 _elm_access_on_highlight_hook_set(Elm_Access_Info           *ac,
                                   Elm_Access_On_Highlight_Cb func,
@@ -621,6 +939,14 @@ _elm_access_on_highlight_hook_set(Elm_Access_Info           *ac,
     ac->on_highlight_data = data;
 }
 
+/**
+ * @internal
+ * @brief Sets a callback function to be invoked when an accessible object is activated.
+ *
+ * @param ac The Elm_Access_Info structure for the object.
+ * @param func The callback function to call on activation.
+ * @param data User data to be passed to the callback function.
+ */
 EAPI void
 _elm_access_activate_callback_set(Elm_Access_Info           *ac,
                                   Elm_Access_Activate_Cb     func,
@@ -631,6 +957,17 @@ _elm_access_activate_callback_set(Elm_Access_Info           *ac,
    ac->activate_data = data;
 }
 
+/**
+ * @internal
+ * @brief Activates the currently highlighted accessible object.
+ *
+ * This function retrieves the object that currently has the accessibility
+ * highlight and then attempts to activate it (e.g., simulate a click).
+ * It also ensures the object has focus before activation.
+ *
+ * @param obj An Evas_Object (often the canvas or a container from which to find the highlight).
+ * @param act The type of activation (e.g., default, up, down).
+ */
 EAPI void
 _elm_access_highlight_object_activate(Evas_Object *obj, Efl_Ui_Activate act)
 {
@@ -648,6 +985,18 @@ _elm_access_highlight_object_activate(Evas_Object *obj, Efl_Ui_Activate act)
    return;
 }
 
+/**
+ * @internal
+ * @brief Cycles the accessibility highlight to the next or previous object.
+ *
+ * This function is similar to _access_highlight_next_get but is typically
+ * used for continuous cycling (e.g., Tab/Shift+Tab). It finds the highlight
+ * root and then attempts to move the highlight. If custom next/prev links
+ * exist, they are used; otherwise, it falls back to the focus manager.
+ *
+ * @param obj The current Evas_Object, often the highlight root or an object within it.
+ * @param dir The direction to cycle the highlight (ELM_FOCUS_NEXT or ELM_FOCUS_PREVIOUS).
+ */
 EAPI void
 _elm_access_highlight_cycle(Evas_Object *obj, Elm_Focus_Direction dir)
 {
@@ -712,6 +1061,20 @@ _elm_access_highlight_cycle(Evas_Object *obj, Elm_Focus_Direction dir)
    _elm_access_auto_highlight_set(EINA_FALSE);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the accessibility text for a specific type from an Elm_Access_Info structure.
+ *
+ * This function searches for an Elm_Access_Item of the given @p type.
+ * If found, it either calls the associated callback function or returns a copy
+ * of the static text.
+ *
+ * @param ac The Elm_Access_Info structure.
+ * @param type The type of access information to retrieve.
+ * @param obj The Evas_Object for which the information is requested (passed to callbacks).
+ * @return A newly allocated string containing the accessibility text, or NULL if not found.
+ *         The caller is responsible for freeing the returned string.
+ */
 EAPI char *
 _elm_access_text_get(const Elm_Access_Info *ac, int type, const Evas_Object *obj)
 {
@@ -731,6 +1094,19 @@ _elm_access_text_get(const Elm_Access_Info *ac, int type, const Evas_Object *obj
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Reads out accessibility text of a specific type for an object.
+ *
+ * Retrieves the text for the given type and object using _elm_access_text_get,
+ * then uses the accessibility module (mapi) to speak it. It handles special
+ * types like ELM_ACCESS_DONE (signals end of reading) and ELM_ACCESS_CANCEL
+ * (cancels current speech).
+ *
+ * @param ac The Elm_Access_Info structure for the object.
+ * @param type The type of access information to read (e.g., ELM_ACCESS_INFO, ELM_ACCESS_DONE).
+ * @param obj The Evas_Object whose information is to be read.
+ */
 EAPI void
 _elm_access_read(Elm_Access_Info *ac, int type, const Evas_Object *obj)
 {
@@ -761,6 +1137,16 @@ _elm_access_read(Elm_Access_Info *ac, int type, const Evas_Object *obj)
    free(txt);
 }
 
+/**
+ * @internal
+ * @brief Speaks the given text using the accessibility module.
+ *
+ * This is a direct way to make the accessibility system speak a string.
+ * It initializes the access module if needed, cancels any ongoing speech,
+ * then queues the new text to be read.
+ *
+ * @param txt The text string to be spoken.
+ */
 EAPI void
 _elm_access_say(const char *txt)
 {
@@ -781,18 +1167,40 @@ _elm_access_say(const char *txt)
      }
 }
 
+/**
+ * @internal
+ * @brief Retrieves the Elm_Access_Info structure associated with an Evas_Object.
+ * @param obj The Evas_Object.
+ * @return The Elm_Access_Info pointer, or NULL if not set.
+ */
 EAPI Elm_Access_Info *
 _elm_access_info_get(const Evas_Object *obj)
 {
    return evas_object_data_get(obj, "_elm_access");
 }
 
+/**
+ * @internal
+ * @brief DEPRECATED: Alias for _elm_access_info_get.
+ * @param obj The Evas_Object.
+ * @return The Elm_Access_Info pointer, or NULL if not set.
+ */
 EAPI Elm_Access_Info *
 _elm_access_object_get(const Evas_Object *obj)
 {
    return _elm_access_info_get(obj);
 }
 
+/**
+ * @internal
+ * @brief Traverses up the Evas object hierarchy to find the owning Elementary widget.
+ *
+ * This is used to find the widget responsible for an Evas object, which might be
+ * a part of a complex widget.
+ *
+ * @param obj The Evas_Object to start searching from.
+ * @return The parent Elementary widget Evas_Object, or NULL if not found.
+ */
 static Evas_Object *
 _elm_access_widget_target_get(Evas_Object *obj)
 {
@@ -814,6 +1222,17 @@ _elm_access_widget_target_get(Evas_Object *obj)
    return o;
 }
 
+/**
+ * @internal
+ * @brief Displays a visual highlight around an accessible object.
+ *
+ * This function creates or reuses a special Edje object ("_elm_access_disp")
+ * to draw a highlight rectangle around the given @p obj. It handles theming
+ * for the highlight and sets up callbacks to move/resize/hide the highlight
+ * along with the target object.
+ *
+ * @param obj The Evas_Object to highlight.
+ */
 EAPI void
 _elm_access_object_highlight(Evas_Object *obj)
 {
@@ -890,6 +1309,15 @@ _elm_access_object_highlight(Evas_Object *obj)
      evas_object_hide(o);
 }
 
+/**
+ * @internal
+ * @brief Removes the visual highlight from an accessible object.
+ *
+ * If the given @p obj is the currently highlighted object, this function
+ * deletes the highlight display Edje object and cleans up associated callbacks.
+ *
+ * @param obj The Evas_Object to unhighlight.
+ */
 EAPI void
 _elm_access_object_unhighlight(Evas_Object *obj)
 {
@@ -913,6 +1341,15 @@ _elm_access_object_unhighlight(Evas_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_RESIZE on a content object managed by an access object.
+ * Resizes the associated access object to match the content object's new size.
+ * @param data The access Evas_Object.
+ * @param e The Evas canvas (unused).
+ * @param obj The content Evas_Object that was resized.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _content_resize(void *data, Evas *e EINA_UNUSED, Evas_Object *obj,
                 void *event_info EINA_UNUSED)
@@ -927,6 +1364,15 @@ _content_resize(void *data, Evas *e EINA_UNUSED, Evas_Object *obj,
    evas_object_resize(accessobj, w, h);
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_MOVE on a content object managed by an access object.
+ * Moves the associated access object to match the content object's new position.
+ * @param data The access Evas_Object.
+ * @param e The Evas canvas (unused).
+ * @param obj The content Evas_Object that was moved.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _content_move(void *data, Evas *e EINA_UNUSED, Evas_Object *obj,
               void *event_info EINA_UNUSED)
@@ -941,6 +1387,19 @@ _content_move(void *data, Evas *e EINA_UNUSED, Evas_Object *obj,
    evas_object_move(accessobj, x, y);
 }
 
+/**
+ * @internal
+ * @brief Registers an Evas_Object as an accessible object, creating an access counterpart.
+ *
+ * This function creates a new Elm_Access object (@c ao), associates it with the
+ * given @p obj (often a part of a widget or a simple Evas object), and sets up
+ * callbacks to keep their geometries synchronized. The @p obj becomes the
+ * "content" or "part" object, and @c ao is its accessibility representation.
+ *
+ * @param obj The Evas_Object to make accessible (e.g., an Edje part, an image).
+ * @param parent The Elementary widget that will be the parent of the new access object.
+ * @return The newly created Elm_Access Evas_Object, or NULL on failure.
+ */
 static Evas_Object *
 _access_object_register(Evas_Object *obj, Evas_Object *parent)
 {
@@ -981,6 +1440,18 @@ _access_object_register(Evas_Object *obj, Evas_Object *parent)
    return ao;
 }
 
+/**
+ * @internal
+ * @brief Unregisters an accessible object.
+ *
+ * This function handles the cleanup when an object (or its access counterpart)
+ * is no longer needed. If @p obj has an associated access object (stored in
+ * "_part_access_obj" data), that access object is deleted. Otherwise, if @p obj
+ * is itself an access object, its hover object registration is cleaned up.
+ *
+ * @param obj The Evas_Object whose accessibility registration is to be removed.
+ *            This can be the original content object or the access object itself.
+ */
 static void
 _access_object_unregister(Evas_Object *obj)
 {
@@ -1005,6 +1476,19 @@ _access_object_unregister(Evas_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Registers a part of an Edje object as an accessible object.
+ *
+ * Retrieves the Evas_Object for the specified @p part from the Edje object @p eobj,
+ * and then registers it using _access_object_register. The @p obj is used as the
+ * parent for the new access object.
+ *
+ * @param obj The Elementary widget that will parent the access object.
+ * @param eobj The Edje Evas_Object.
+ * @param part The name of the part within the Edje object to make accessible.
+ * @return The newly created Elm_Access Evas_Object, or NULL on failure.
+ */
 EAPI Evas_Object *
 _elm_access_edje_object_part_object_register(Evas_Object* obj,
                                              const Evas_Object *eobj,
@@ -1027,6 +1511,17 @@ _elm_access_edje_object_part_object_register(Evas_Object* obj,
    return ao;
 }
 
+/**
+ * @internal
+ * @brief Unregisters an accessible Edje object part.
+ *
+ * Retrieves the Evas_Object for the specified @p part from the Edje object @p eobj,
+ * and then unregisters its accessibility features using _access_object_unregister.
+ *
+ * @param obj The Elementary widget (currently unused, marked with FIXME).
+ * @param eobj The Edje Evas_Object.
+ * @param part The name of the part within the Edje object.
+ */
 //FIXME: unused obj should be removed from here and each widget.
 EAPI void
 _elm_access_edje_object_part_object_unregister(Evas_Object* obj EINA_UNUSED,
@@ -1043,6 +1538,15 @@ _elm_access_edje_object_part_object_unregister(Evas_Object* obj EINA_UNUSED,
    _access_object_unregister(po);
 }
 
+/**
+ * @internal
+ * @brief Disables and removes the global accessibility highlight display for a given Evas canvas.
+ *
+ * Finds the highlight display object ("_elm_access_disp") on the canvas,
+ * cleans up its callbacks and associated data from its target, and deletes it.
+ *
+ * @param e The Evas canvas from which to remove the highlight.
+ */
 EAPI void
 _elm_access_object_highlight_disable(Evas *e)
 {
@@ -1066,6 +1570,21 @@ _elm_access_object_highlight_disable(Evas *e)
    elm_widget_parent_highlight_set(ptarget, EINA_FALSE);
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_DEL on an access object or its hover object.
+ *
+ * This function handles the cleanup when either an access object or the
+ * object it's providing access for (hover object) is deleted.
+ * It ensures that associated resources and callbacks are cleaned up.
+ * If @p data is not NULL, it means @p obj is the access object and @p data is the hover object.
+ * Otherwise, @p obj is the hover object and @p data is NULL (or was the access object, now gone).
+ *
+ * @param data The hover Evas_Object if @p obj is an access object, or NULL/access_obj.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object being deleted.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _access_obj_del_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -1093,6 +1612,15 @@ _access_obj_del_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *even
      }
 }
 
+/**
+ * @internal
+ * @brief Ecore_Job callback to defer the deletion of an access object.
+ *
+ * This is used to safely delete an access object, ensuring that it happens
+ * outside of certain event callback flows.
+ *
+ * @param data The Evas_Object (access object) to be deleted.
+ */
 static void
 _access_obj_del_job(void *data)
 {
@@ -1104,6 +1632,19 @@ _access_obj_del_job(void *data)
    evas_object_del(data);
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_DEL on a hover object.
+ *
+ * This function is called when the object for which accessibility is provided
+ * (the "hover object") is deleted. It unregisters the associated access object
+ * and schedules the access object itself for deletion via an Ecore_Job.
+ *
+ * @param data The access Evas_Object associated with the hover object.
+ * @param e The Evas canvas (unused).
+ * @param obj The hover Evas_Object being deleted.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _access_hover_del_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -1131,6 +1672,19 @@ _access_hover_del_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *ev
    evas_object_data_set(data, "_access_obj_del_job", ao_del_job);
 }
 
+/**
+ * @internal
+ * @brief Registers an Evas_Object to provide accessibility information for another (hover) object.
+ *
+ * This sets up the core relationship for accessibility. The @p obj becomes the
+ * "access object," which holds accessibility data (Elm_Access_Info) and handles
+ * accessibility events. The @p hoverobj is the actual UI element that users
+ * interact with visually. Callbacks are set on @p hoverobj (MOUSE_IN, MOUSE_OUT, DEL)
+ * to trigger accessibility behaviors on @p obj.
+ *
+ * @param obj The Evas_Object that will act as the access object.
+ * @param hoverobj The Evas_Object that is being made accessible (e.g., a button, an icon).
+ */
 EAPI void
 _elm_access_object_register(Evas_Object *obj, Evas_Object *hoverobj)
 {
@@ -1152,6 +1706,18 @@ _elm_access_object_register(Evas_Object *obj, Evas_Object *hoverobj)
    ac->hoverobj = hoverobj;
 }
 
+/**
+ * @internal
+ * @brief Unregisters an access object from its hover object.
+ *
+ * This function cleans up the relationship established by
+ * _elm_access_object_register. It removes event callbacks from the @p hoverobj,
+ * deletes any stored "_part_access_obj" data from the @p hoverobj,
+ * and frees the Elm_Access_Info and Action_Info associated with the @p obj (access object).
+ *
+ * @param obj The access Evas_Object.
+ * @param hoverobj The hover Evas_Object from which to unregister.
+ */
 EAPI void
 _elm_access_object_unregister(Evas_Object *obj, Evas_Object *hoverobj)
 {
@@ -1184,6 +1750,17 @@ _elm_access_object_unregister(Evas_Object *obj, Evas_Object *hoverobj)
    free(a);
 }
 
+/**
+ * @internal
+ * @brief Registers accessibility for an Elm_Widget_Item.
+ *
+ * This function creates an Elm_Access object for a given widget item.
+ * The item's view object (@c item->view) becomes the "hover object," and a new
+ * access object is created and associated with it. Geometry synchronization
+ * callbacks are set up. The new access object is stored in @c item->access_obj.
+ *
+ * @param item The Elm_Widget_Item_Data for the item to make accessible.
+ */
 EAPI void
 _elm_access_widget_item_register(Elm_Widget_Item_Data *item)
 {
@@ -1221,6 +1798,16 @@ _elm_access_widget_item_register(Elm_Widget_Item_Data *item)
    ac->widget_item = item;
 }
 
+/**
+ * @internal
+ * @brief Unregisters accessibility for an Elm_Widget_Item.
+ *
+ * If the widget item has an associated access object (@c item->access_obj),
+ * this function deletes that access object, which in turn triggers cleanup
+ * of its resources and callbacks.
+ *
+ * @param item The Elm_Widget_Item_Data for the item whose accessibility is to be unregistered.
+ */
 EAPI void
 _elm_access_widget_item_unregister(Elm_Widget_Item_Data *item)
 {
@@ -1237,6 +1824,20 @@ _elm_access_widget_item_unregister(Elm_Widget_Item_Data *item)
    evas_object_del(ao);
 }
 
+/**
+ * @internal
+ * @brief Manages a timeout for detecting a "second click" (like a double-click).
+ *
+ * This function is used to differentiate between a single click and a rapid
+ * succession of clicks that might be interpreted as a double-click for
+ * accessibility purposes.
+ * If a timer for a 2nd click is already active on @p obj, it's deleted, and
+ * @c EINA_TRUE is returned (indicating a 2nd click was detected within the timeout).
+ * Otherwise, a new timer is started, and @c EINA_FALSE is returned.
+ *
+ * @param obj The Evas_Object on which the click occurred.
+ * @return @c EINA_TRUE if a 2nd click was detected within the timeout, @c EINA_FALSE otherwise.
+ */
 EAPI Eina_Bool
 _elm_access_2nd_click_timeout(Evas_Object *obj)
 {
@@ -1258,6 +1859,13 @@ _elm_access_2nd_click_timeout(Evas_Object *obj)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Creates a new Elm_Access object.
+ * This is a wrapper around elm_legacy_add for the Elm_Access class.
+ * @param parent The parent Evas_Object for the new access object.
+ * @return The newly created Elm_Access Evas_Object, or NULL on failure.
+ */
 static Evas_Object *
 _elm_access_add(Evas_Object *parent)
 {
@@ -1426,6 +2034,18 @@ elm_access_action_cb_set(Evas_Object *obj, const Elm_Access_Action_Type type, co
    a->fn[type].cb = cb;
    a->fn[type].user_data = (void *)data;
 }
+/**
+ * @brief Set contextual information text for an accessible object.
+ * @since 1.8
+ *
+ * This is a convenience function that sets the text for the
+ * ELM_ACCESS_CONTEXT_INFO type.
+ *
+ * @param obj The accessible Evas_Object.
+ * @param text The contextual information string.
+ *
+ * @ingroup Access
+ */
 EAPI void
 elm_access_external_info_set(Evas_Object *obj, const char *text)
 {
@@ -1433,6 +2053,19 @@ elm_access_external_info_set(Evas_Object *obj, const char *text)
      (_elm_access_info_get(obj), ELM_ACCESS_CONTEXT_INFO, text);
 }
 
+/**
+ * @brief Get contextual information text from an accessible object.
+ * @since 1.8
+ *
+ * This is a convenience function that retrieves the text for the
+ * ELM_ACCESS_CONTEXT_INFO type.
+ *
+ * @param obj The accessible Evas_Object.
+ * @return A newly allocated string containing the contextual information,
+ *         or @c NULL if not set. The caller must free this string.
+ *
+ * @ingroup Access
+ */
 EAPI char *
 elm_access_external_info_get(const Evas_Object *obj)
 {
@@ -1477,6 +2110,20 @@ _elm_access_class_constructor(Efl_Class *klass)
    evas_smart_legacy_type_register(MY_CLASS_NAME_LEGACY, klass);
 }
 
+/**
+ * @internal
+ * @brief Executes an accessibility action based on a string command.
+ *
+ * This function is typically used by accessibility backends (like AT-SPI)
+ * to trigger actions on an Elm_Access object. It parses the @p params string
+ * (e.g., "highlight", "activate") and calls the appropriate internal
+ * action callback.
+ *
+ * @param obj The Elm_Access Evas_Object on which to perform the action.
+ * @param params A string describing the action to perform.
+ *               Examples: "highlight", "unhighlight", "activate", "value,up".
+ * @return @c EINA_TRUE if the action was recognized and attempted, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _access_atspi_action_do(Evas_Object *obj, const char *params)
 {

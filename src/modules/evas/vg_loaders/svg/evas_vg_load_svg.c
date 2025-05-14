@@ -1,7 +1,15 @@
-
+/**
+ * @file
+ * @brief Evas Vector Graphics (VG) loader implementation for SVG files.
+ *
+ * This file contains the logic for parsing SVG files and converting them
+ * into an internal representation suitable for rendering with Evas VG engine.
+ * It handles various SVG elements, attributes, styles, transformations,
+ * gradients, and structure.
+ */
 #include "vg_common.h"
 
-static int _evas_vg_loader_svg_log_dom = -1;
+static int _evas_vg_loader_svg_log_dom = -1; /**< Log domain for SVG loader messages. */
 
 #ifdef ERR
 # undef ERR
@@ -13,48 +21,109 @@ static int _evas_vg_loader_svg_log_dom = -1;
 #endif
 #define INF(...) EINA_LOG_DOM_INFO(_evas_vg_loader_svg_log_dom, __VA_ARGS__)
 
-/* Global struct for working global cases during the parse */
+/**
+ * @brief Holds global parsing state and context for SVG elements.
+ *
+ * This structure stores information relevant across the parsing of the entire
+ * SVG document, such as the global viewport dimensions and temporary state
+ * for parsing specific elements like gradients.
+ */
 typedef struct _Evas_SVG_Parser Evas_SVG_Parser;
+/**
+ * @struct _Evas_SVG_Parser
+ * @brief Holds global parsing state and context for SVG elements.
+ *
+ * This structure stores information relevant across the parsing of the entire
+ * SVG document, such as the global viewport dimensions and temporary state
+ * for parsing specific elements like gradients.
+ */
 struct _Evas_SVG_Parser {
+   /** @brief Global viewport dimensions extracted from the <svg> tag. */
    struct {
-      int x, y, width, height;
+      int x;      /**< Viewport x coordinate. */
+      int y;      /**< Viewport y coordinate. */
+      int width;  /**< Viewport width. */
+      int height; /**< Viewport height. */
    } global;
+   /** @brief State specific to parsing gradient elements. */
    struct {
-      Eina_Bool fx_parsed;
-      Eina_Bool fy_parsed;
+      Eina_Bool fx_parsed; /**< Flag indicating if 'fx' attribute was parsed for radial gradient. */
+      Eina_Bool fy_parsed; /**< Flag indicating if 'fy' attribute was parsed for radial gradient. */
    } gradient;
 
-   Svg_Node *node;
-   Svg_Style_Gradient *style_grad;
-   Efl_Gfx_Gradient_Stop *grad_stop;
+   Svg_Node *node;                   /**< Pointer to the currently parsed SVG node being processed. */
+   Svg_Style_Gradient *style_grad; /**< Pointer to the gradient style currently being parsed. */
+   Efl_Gfx_Gradient_Stop *grad_stop; /**< Pointer to the gradient stop currently being parsed. */
 };
 
+/**
+ * @brief Manages the state during the SVG loading process.
+ *
+ * This structure holds the necessary context for parsing an SVG file,
+ * including the node stack, document root, definitions, gradients,
+ * and the global parser state.
+ */
 typedef struct _Evas_SVG_Loader Evas_SVG_Loader;
+/**
+ * @struct _Evas_SVG_Loader
+ * @brief Manages the state during the SVG loading process.
+ */
 struct _Evas_SVG_Loader
 {
-   Eina_Array *stack;
-   Svg_Node *doc;
-   Svg_Node *def;
-   Eina_List *gradients;
-   Svg_Style_Gradient *latest_gradient; //for stops
-   Evas_SVG_Parser *svg_parse;
-   int level;
-   Eina_Bool result:1;
+   Eina_Array *stack;                   /**< Stack to keep track of nested SVG elements during parsing. */
+   Svg_Node *doc;                       /**< Root node of the parsed SVG document structure. */
+   Svg_Node *def;                       /**< Pointer to the <defs> node, holding reusable definitions. */
+   Eina_List *gradients;                /**< List of gradients defined outside the <defs> section. */
+   Svg_Style_Gradient *latest_gradient; /**< Pointer to the most recently parsed gradient, used for associating stops. */
+   Evas_SVG_Parser *svg_parse;          /**< Global parser state and context. */
+   int level;                           /**< Current nesting level in the XML structure. */
+   Eina_Bool result:1;                  /**< Flag indicating the overall success of the parsing process. */
 };
 
-
+/**
+ * @typedef Factory_Method
+ * @brief Function pointer type for creating specific SVG node types.
+ * @param loader The SVG loader context.
+ * @param parent The parent node in the SVG tree.
+ * @param buf The buffer containing the element's attributes.
+ * @param buflen The length of the attribute buffer.
+ * @return A pointer to the newly created Svg_Node, or NULL on failure.
+ */
 typedef Svg_Node *(*Factory_Method)(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf, unsigned buflen);
 
+/**
+ * @typedef Gradient_Factory_Method
+ * @brief Function pointer type for creating specific SVG gradient types.
+ * @param loader The SVG loader context.
+ * @param buf The buffer containing the gradient element's attributes.
+ * @param buflen The length of the attribute buffer.
+ * @return A pointer to the newly created Svg_Style_Gradient, or NULL on failure.
+ */
 typedef Svg_Style_Gradient *(*Gradient_Factory_Method)(Evas_SVG_Loader *loader, const char *buf, unsigned buflen);
 
-/* length type to recalculate %, pt, pc, mm, cm etc*/
+/**
+ * @enum SVG_Parser_Length_Type
+ * @brief Specifies the context for interpreting percentage length values.
+ *
+ * Used by _to_double and _gradient_to_double to correctly calculate
+ * percentage values based on the viewport width, height, or diagonal.
+ */
 typedef enum {
-   SVG_PARSER_LENGTH_VERTICAL,
-   SVG_PARSER_LENGTH_HORIZONTAL,
-   /* in case of, for example, radius of radial gradient */
+   SVG_PARSER_LENGTH_VERTICAL,   /**< Length relates to the height of the viewport or bounding box. */
+   SVG_PARSER_LENGTH_HORIZONTAL, /**< Length relates to the width of the viewport or bounding box. */
+   /**
+    * @brief Length relates to neither width nor height specifically.
+    * Used for values like gradient radii, often calculated based on diagonal length.
+    */
    SVG_PARSER_LENGTH_OTHER
 } SVG_Parser_Length_Type;
 
+/**
+ * @brief Skips leading whitespace characters in a string segment.
+ * @param str The input string.
+ * @param end Pointer to the character after the last valid character in str, or NULL if str is null-terminated.
+ * @return Pointer to the first non-whitespace character, or the end of the string/segment.
+ */
 char *
 _skip_space(const char *str, const char *end)
 {
@@ -63,6 +132,11 @@ _skip_space(const char *str, const char *end)
    return (char *)str;
 }
 
+/**
+ * @brief Creates a shared string instance for an ID attribute.
+ * @param str The ID string to share.
+ * @return A new Eina_Stringshare instance, or NULL if str is NULL.
+ */
 static inline Eina_Stringshare *
 _copy_id(const char* str)
 {
@@ -71,6 +145,12 @@ _copy_id(const char* str)
    return eina_stringshare_add(str);
 }
 
+/**
+ * @brief Skips optional whitespace and a comma in a string.
+ * @param content The input string.
+ * @return Pointer to the character after the skipped comma and whitespace,
+ *         or the original pointer if no comma was found.
+ */
 static const char *
 _skipcomma(const char *content)
 {
@@ -79,6 +159,15 @@ _skipcomma(const char *content)
    return content;
 }
 
+/**
+ * @brief Parses a floating-point number from the beginning of a string.
+ *
+ * Advances the content pointer past the parsed number and any trailing comma/whitespace.
+ *
+ * @param content Pointer to the string pointer to parse from. This will be updated.
+ * @param number Pointer to a double where the parsed number will be stored.
+ * @return EINA_TRUE if a number was successfully parsed, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _parse_number(const char **content, double *number)
 {
@@ -97,7 +186,9 @@ _parse_number(const char **content, double *number)
  *
  * TODO
  * Since this documentation is not obvious, more clean recalculation with dpi
- * is required, but for now default w3 constants would be used
+ * is required, but for now default w3 constants would be used.
+ * Assumes 90 DPI based on CSS Values and Units Module Level 3 recommendation.
+ * (1in = 90px, 1cm = 35.43307px, 1mm = 3.543307px, 1pt = 1.25px, 1pc = 15px)
  */
 static inline double
 _to_double(Evas_SVG_Parser *svg_parse, const char *str, SVG_Parser_Length_Type type)
@@ -134,7 +225,20 @@ _to_double(Evas_SVG_Parser *svg_parse, const char *str, SVG_Parser_Length_Type t
 }
 
 /**
- * Turn gradient variables into percentages
+ * @brief Converts a string representation of a length (potentially with units)
+ *        into a double value, interpreted as a percentage relative to the
+ *        SVG viewport dimensions.
+ *
+ * This is specifically used for gradient attributes like cx, cy, fx, fy, r,
+ * x1, y1, x2, y2 when gradientUnits="objectBoundingBox" (the default).
+ * It handles units like %, cm, mm, pt, pc, in and converts them to a
+ * percentage (0.0 to 1.0) based on the specified length type (horizontal,
+ * vertical, or other).
+ *
+ * @param svg_parse The global SVG parser state containing viewport dimensions.
+ * @param str The string containing the length value (e.g., "50%", "10pt").
+ * @param type The type of length, determining the reference dimension for percentages.
+ * @return The calculated length as a percentage (double).
  */
 static inline double
 _gradient_to_double(Evas_SVG_Parser *svg_parse, const char *str, SVG_Parser_Length_Type type)
@@ -177,6 +281,15 @@ _gradient_to_double(Evas_SVG_Parser *svg_parse, const char *str, SVG_Parser_Leng
    return parsed_value;
 }
 
+/**
+ * @brief Converts a string representation of a gradient stop offset into a double value.
+ *
+ * Handles percentage values (e.g., "50%") and unitless values (interpreted as
+ * fractions, e.g., "0.5"). Ensures the format is valid.
+ *
+ * @param str The string containing the offset value.
+ * @return The offset as a double between 0.0 and 1.0, or 0.0 if invalid.
+ */
 static inline double
 _to_offset(const char *str)
 {
@@ -201,6 +314,11 @@ _to_offset(const char *str)
    return parsed_value;
 }
 
+/**
+ * @brief Converts a string representation of opacity (0.0 to 1.0) into an integer alpha value (0 to 255).
+ * @param str The string containing the opacity value.
+ * @return The alpha value as an integer (0-255). Returns 0 if the string is not a valid number.
+ */
 static inline int
 _to_opacity(const char *str)
 {
@@ -213,6 +331,19 @@ _to_opacity(const char *str)
    return a;
 }
 
+/**
+ * @def _PARSE_TAG
+ * @brief Macro to generate functions for parsing string tags into enum values.
+ *
+ * Creates a static inline function `_to_##Short_Name` that takes a string
+ * and returns the corresponding enum value from `Tags_Array` based on string comparison.
+ *
+ * @param Type The enum type to return.
+ * @param Short_Name The suffix for the generated function name (e.g., `line_cap`).
+ * @param Tags_Array An array of structs, where each struct has a `tag` (const char*)
+ *                   and a `Short_Name` (Type) member.
+ * @param Default The default enum value to return if no tag matches.
+ */
 #define _PARSE_TAG(Type, Short_Name, Tags_Array, Default)               \
   static Type _to_##Short_Name(const char *str)                         \
   {                                                                     \
@@ -275,6 +406,18 @@ _PARSE_TAG(Efl_Gfx_Fill_Rule, fill_rule, fill_rule_tags, EFL_GFX_FILL_RULE_WINDI
  * Initial:    none
  * https://www.w3.org/TR/SVG/painting.html
  */
+/**
+ * @brief Parses an SVG 'stroke-dasharray' string into an array of Efl_Gfx_Dash structures.
+ *
+ * Handles comma/space separated numbers. If an odd number of values is provided,
+ * the list of values is repeated to yield an even number of values.
+ * Allocates memory for the dash array, which must be freed by the caller.
+ *
+ * @param str The 'stroke-dasharray' attribute string (e.g., "5, 5", "10 5 2 5").
+ * @param dash Pointer to store the allocated array of Efl_Gfx_Dash structures.
+ *             Example structure: `[{length=5, gap=5}, {length=2, gap=3}]`
+ * @param length Pointer to store the number of elements in the allocated dash array.
+ */
 static inline void
 _parse_dash_array(const char *str, Efl_Gfx_Dash** dash, int *length)
 {
@@ -319,10 +462,19 @@ _parse_dash_array(const char *str, Efl_Gfx_Dash** dash, int *length)
      }
 }
 
+/**
+ * @brief Extracts an ID reference from a URL string (e.g., "url(#myGradient)", "#elementId").
+ *
+ * Skips "url(", leading/trailing whitespace, and the leading '#'.
+ * Assumes the ID length is less than 50 characters.
+ *
+ * @param url The URL string.
+ * @return A shared string containing the extracted ID, or NULL if parsing fails.
+ */
 static Eina_Stringshare *
  _id_from_url(const char *url)
 {
-   char tmp[50];
+   char tmp[50]; // Assumes ID length < 50
    int i = 0;
 
    url = _skip_space(url, NULL);
@@ -345,6 +497,16 @@ static Eina_Stringshare *
    return eina_stringshare_add(tmp);
 }
 
+/**
+ * @brief Parses a single color component (R, G, or B) from a string.
+ *
+ * Handles numeric values (0-255) and percentages (0%-100%).
+ * Advances the end pointer past the parsed component and any trailing whitespace/comma.
+ *
+ * @param value The string containing the color component value (e.g., "255", "50%").
+ * @param end Pointer to a char pointer that will be updated to point after the parsed value.
+ * @return The parsed color component as an unsigned char (0-255), or 0 on error.
+ */
 static unsigned char
 _color_parser(const char *value, char **end)
 {
@@ -365,9 +527,13 @@ _color_parser(const char *value, char **end)
    return lrint(r);
 }
 
+/**
+ * @brief Lookup table for named SVG colors.
+ * Maps color names (lowercase) to their 32-bit ARGB hex values (alpha is FF).
+ */
 static const struct {
-   const char *name;
-   unsigned int value;
+   const char *name;     /**< Lowercase color name (e.g., "black"). */
+   unsigned int value;  /**< ARGB hex value (e.g., 0xff000000). */
 } colors[] = {
   { "aliceblue", 0xfff0f8ff },
   { "antiquewhite", 0xfffaebd7 },
@@ -518,6 +684,22 @@ static const struct {
   { "yellowgreen", 0xff9acd32 }
 };
 
+/**
+ * @brief Parses an SVG color string into RGB components or a URL reference.
+ *
+ * Handles various SVG color formats:
+ * - Hexadecimal: #RGB, #RRGGBB
+ * - Functional: rgb(r, g, b), rgb(r%, g%, b%)
+ * - Named colors (case-insensitive lookup in the `colors` table).
+ * - URL references: url(#someGradient)
+ *
+ * @param str The color string to parse.
+ * @param r Pointer to store the red component (0-255).
+ * @param g Pointer to store the green component (0-255).
+ * @param b Pointer to store the blue component (0-255).
+ * @param ref Pointer to store a shared string for the ID if the color is a URL reference.
+ *            Set to NULL if the color is not a URL.
+ */
 static inline void
 _to_color(const char *str, int *r, int *g, int *b, Eina_Stringshare** ref)
 {
@@ -591,6 +773,19 @@ _to_color(const char *str, int *r, int *g, int *b, Eina_Stringshare** ref)
      }
 }
 
+/**
+ * @brief Parses a string containing a sequence of numbers (space/comma separated)
+ *        into an array of doubles.
+ *
+ * Used for parsing attributes like 'points' in <polygon>/<polyline> or
+ * parameters within transform functions.
+ *
+ * @param str The input string containing numbers.
+ * @param points Array to store the parsed double values. Assumed to be large enough.
+ * @param pt_count Pointer to store the number of points parsed.
+ * @return Pointer to the character in the string after the last parsed number
+ *         and subsequent delimiter/whitespace.
+ */
 static inline char *
 parse_numbers_array(char *str, double *points, int *pt_count)
 {
@@ -615,24 +810,34 @@ parse_numbers_array(char *str, double *points, int *pt_count)
    return str;
 }
 
+/**
+ * @enum _Matrix_State
+ * @brief Internal state identifier for parsing different transformation functions.
+ */
 typedef enum _Matrix_State
 {
-  SVG_MATRIX_UNKNOWN,
-  SVG_MATRIX_MATRIX,
-  SVG_MATRIX_TRANSLATE,
-  SVG_MATRIX_ROTATE,
-  SVG_MATRIX_SCALE,
-  SVG_MATRIX_SKEWX,
-  SVG_MATRIX_SKEWY
+  SVG_MATRIX_UNKNOWN,   /**< Initial or error state. */
+  SVG_MATRIX_MATRIX,    /**< Parsing a 'matrix(a b c d e f)' function. */
+  SVG_MATRIX_TRANSLATE, /**< Parsing a 'translate(tx [ty])' function. */
+  SVG_MATRIX_ROTATE,    /**< Parsing a 'rotate(angle [cx cy])' function. */
+  SVG_MATRIX_SCALE,     /**< Parsing a 'scale(sx [sy])' function. */
+  SVG_MATRIX_SKEWX,     /**< Parsing a 'skewX(angle)' function. */
+  SVG_MATRIX_SKEWY      /**< Parsing a 'skewY(angle)' function. */
 } Matrix_State;
 
+/** @brief Helper macro for defining entries in the matrix_tags lookup table. */
 #define MATRIX_DEF(Name, Value)                 \
   { #Name, sizeof (#Name), Value}
 
+/**
+ * @brief Lookup table for SVG transform function names.
+ * Maps function names (e.g., "matrix", "translate") to their corresponding
+ * internal parser state (_Matrix_State).
+ */
 static const struct {
-   const char *tag;
-   int sz;
-   Matrix_State state;
+   const char *tag;     /**< The transform function name string. */
+   int sz;              /**< The size of the tag string (including null terminator). */
+   Matrix_State state;  /**< The corresponding parser state enum. */
 } matrix_tags[] = {
   MATRIX_DEF(matrix, SVG_MATRIX_MATRIX),
   MATRIX_DEF(translate, SVG_MATRIX_TRANSLATE),
@@ -644,12 +849,19 @@ static const struct {
 
 /* parse transform attribute
  * https://www.w3.org/TR/SVG/coords.html#TransformAttribute
+ * Handles matrix(), translate(), scale(), rotate(), skewX(), skewY().
+ * Composes multiple transforms in the order they appear.
+ *
+ * @param value The string value of the 'transform' attribute.
+ * @return A newly allocated Eina_Matrix3 representing the combined transformation.
+ *         The caller is responsible for freeing this matrix. Returns an identity
+ *         matrix if parsing fails or the input is empty/invalid.
  */
 static Eina_Matrix3 *
 _parse_transformation_matrix(const char *value)
 {
    unsigned int i;
-   double points[8];
+   double points[8]; // Buffer for transform parameters
    int pt_count = 0;
    double sx, sy;
    Matrix_State state = SVG_MATRIX_UNKNOWN;
@@ -741,13 +953,18 @@ _parse_transformation_matrix(const char *value)
    return matrix;
 }
 
+/** @brief Helper macro for defining entries in the length_tags lookup table. */
 #define LENGTH_DEF(Name, Value)                 \
   { #Name, sizeof (#Name), Value}
 
+/**
+ * @brief Lookup table for SVG length unit identifiers.
+ * Maps unit strings (e.g., "%", "px") to their corresponding Svg_Length_Type enum.
+ */
 static const struct {
-   const char *tag;
-   int sz;
-   Svg_Length_Type type;
+   const char *tag;     /**< The unit identifier string. */
+   int sz;              /**< The size of the tag string (including null terminator). */
+   Svg_Length_Type type;/**< The corresponding length type enum. */
 } length_tags[] = {
   LENGTH_DEF(%, SVG_LT_PERCENT),
   LENGTH_DEF(px, SVG_LT_PX),
@@ -758,6 +975,16 @@ static const struct {
   LENGTH_DEF(in, SVG_LT_IN)
 };
 
+/**
+ * @brief Parses a length string, extracting the numeric value and identifying the unit type.
+ *
+ * This function primarily identifies the unit type based on the suffix.
+ * It does *not* perform unit conversion; that happens in functions like _to_double.
+ *
+ * @param str The length string (e.g., "100px", "50%", "10").
+ * @param type Pointer to store the identified Svg_Length_Type (defaults to SVG_LT_PX if no unit found).
+ * @return The numeric value extracted from the string using eina_convert_strtod_c.
+ */
 static double
 parse_length(const char *str, Svg_Length_Type *type)
 {
@@ -775,9 +1002,22 @@ parse_length(const char *str, Svg_Length_Type *type)
    return value;
 }
 
+// Forward declarations for attribute parsing functions
 static Eina_Bool _parse_style_attr(void *data, const char *key, const char *value);
 static Eina_Bool _attr_style_node(void *data, const char *str);
 
+/**
+ * @brief Parses attributes specific to the <svg> element.
+ *
+ * Handles 'width', 'height', 'viewBox', 'preserveAspectRatio', and 'style'.
+ * Other attributes are delegated to the general style parser `_parse_style_attr`.
+ * Updates the global viewport information in `loader->svg_parse->global`.
+ *
+ * @param data Pointer to the Evas_SVG_Loader context.
+ * @param key The attribute name (e.g., "width").
+ * @param value The attribute value (e.g., "100px").
+ * @return Always returns EINA_TRUE.
+ */
 static Eina_Bool
 _attr_parse_svg_node(void *data, const char *key, const char *value)
 {
@@ -828,7 +1068,17 @@ _attr_parse_svg_node(void *data, const char *key, const char *value)
    return EINA_TRUE;
 }
 
-//https://www.w3.org/TR/SVGTiny12/painting.html#SpecifyingPaint
+/**
+ * @brief Parses a paint attribute value (e.g., for 'fill' or 'stroke').
+ *
+ * Handles "none", "currentColor", color values (parsed by _to_color),
+ * and URL references (parsed by _to_color). Updates the Svg_Paint structure.
+ * Reference: https://www.w3.org/TR/SVGTiny12/painting.html#SpecifyingPaint
+ *
+ * @param loader The SVG loader context (unused).
+ * @param paint Pointer to the Svg_Paint structure to update.
+ * @param value The attribute value string (e.g., "red", "#ff0000", "url(#myGrad)", "none").
+ */
 static void
 _handle_paint_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Paint* paint, const char *value)
 {
@@ -847,6 +1097,13 @@ _handle_paint_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Paint* paint, const 
    _to_color(value, &paint->r, &paint->g, &paint->b, &paint->url);
 }
 
+/**
+ * @brief Handles the 'color' style property.
+ * Parses the color value and sets the r, g, b fields in the node's style.
+ * @param loader The SVG loader context (unused).
+ * @param node The SVG node whose style is being updated.
+ * @param value The 'color' attribute value.
+ */
 static void
 _handle_color_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, const char *value)
 {
@@ -854,6 +1111,13 @@ _handle_color_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, const ch
    _to_color(value, &style->r, &style->g, &style->b, NULL);
 }
 
+/**
+ * @brief Handles the 'fill' style property or attribute.
+ * Sets the SVG_FILL_FLAGS_PAINT flag and delegates parsing to _handle_paint_attr.
+ * @param loader The SVG loader context (unused).
+ * @param node The SVG node whose style is being updated.
+ * @param value The 'fill' attribute value.
+ */
 static void
 _handle_fill_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, const char *value)
 {
@@ -862,6 +1126,13 @@ _handle_fill_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, const cha
    _handle_paint_attr(loader, &style->fill.paint, value);
 }
 
+/**
+ * @brief Handles the 'stroke' style property or attribute.
+ * Sets the SVG_STROKE_FLAGS_PAINT flag and delegates parsing to _handle_paint_attr.
+ * @param loader The SVG loader context (unused).
+ * @param node The SVG node whose style is being updated.
+ * @param value The 'stroke' attribute value.
+ */
 static void
 _handle_stroke_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, const char *value)
 {
@@ -870,6 +1141,13 @@ _handle_stroke_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, const c
    _handle_paint_attr(loader, &style->stroke.paint, value);
 }
 
+/**
+ * @brief Handles the 'stroke-opacity' style property or attribute.
+ * Sets the SVG_STROKE_FLAGS_OPACITY flag and the opacity value (0-255).
+ * @param loader The SVG loader context (unused).
+ * @param node The SVG node whose style is being updated.
+ * @param value The 'stroke-opacity' attribute value (0.0-1.0).
+ */
 static void
 _handle_stroke_opacity_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, const char *value)
 {
@@ -877,6 +1155,13 @@ _handle_stroke_opacity_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node,
    node->style->stroke.opacity = _to_opacity(value);
 }
 
+/**
+ * @brief Handles the 'stroke-dasharray' style property or attribute.
+ * Sets the SVG_STROKE_FLAGS_DASH flag and parses the dash array.
+ * @param loader The SVG loader context (unused).
+ * @param node The SVG node whose style is being updated.
+ * @param value The 'stroke-dasharray' attribute value (e.g., "5 5", "none").
+ */
 static void
 _handle_stroke_dasharray_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, const char *value)
 {
@@ -884,6 +1169,13 @@ _handle_stroke_dasharray_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* nod
    _parse_dash_array(value, &node->style->stroke.dash, &node->style->stroke.dash_count);
 }
 
+/**
+ * @brief Handles the 'stroke-width' style property or attribute.
+ * Sets the SVG_STROKE_FLAGS_WIDTH flag and the width value (converted to pixels).
+ * @param loader The SVG loader context.
+ * @param node The SVG node whose style is being updated.
+ * @param value The 'stroke-width' attribute value (e.g., "2px", "1").
+ */
 static void
 _handle_stroke_width_attr(Evas_SVG_Loader *loader, Svg_Node* node, const char *value)
 {
@@ -891,6 +1183,13 @@ _handle_stroke_width_attr(Evas_SVG_Loader *loader, Svg_Node* node, const char *v
    node->style->stroke.width = _to_double(loader->svg_parse, value, SVG_PARSER_LENGTH_HORIZONTAL);
 }
 
+/**
+ * @brief Handles the 'stroke-linecap' style property or attribute.
+ * Sets the SVG_STROKE_FLAGS_CAP flag and the line cap enum value.
+ * @param loader The SVG loader context (unused).
+ * @param node The SVG node whose style is being updated.
+ * @param value The 'stroke-linecap' attribute value ("butt", "round", "square").
+ */
 static void
 _handle_stroke_linecap_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, const char *value)
 {
@@ -898,6 +1197,13 @@ _handle_stroke_linecap_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node,
    node->style->stroke.cap = _to_line_cap(value);
 }
 
+/**
+ * @brief Handles the 'stroke-linejoin' style property or attribute.
+ * Sets the SVG_STROKE_FLAGS_JOIN flag and the line join enum value.
+ * @param loader The SVG loader context (unused).
+ * @param node The SVG node whose style is being updated.
+ * @param value The 'stroke-linejoin' attribute value ("miter", "round", "bevel").
+ */
 static void
 _handle_stroke_linejoin_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, const char *value)
 {
@@ -905,6 +1211,13 @@ _handle_stroke_linejoin_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node
    node->style->stroke.join = _to_line_join(value);
 }
 
+/**
+ * @brief Handles the 'fill-rule' style property or attribute.
+ * Sets the SVG_FILL_FLAGS_FILL_RULE flag and the fill rule enum value.
+ * @param loader The SVG loader context (unused).
+ * @param node The SVG node whose style is being updated.
+ * @param value The 'fill-rule' attribute value ("nonzero", "evenodd").
+ */
 static void
 _handle_fill_rule_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, const char *value)
 {
@@ -912,12 +1225,26 @@ _handle_fill_rule_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, cons
    node->style->fill.fill_rule = _to_fill_rule(value);
 }
 
+/**
+ * @brief Handles the 'opacity' style property or attribute (overall element opacity).
+ * Sets the node's overall opacity value (0-255).
+ * @param loader The SVG loader context (unused).
+ * @param node The SVG node whose style is being updated.
+ * @param value The 'opacity' attribute value (0.0-1.0).
+ */
 static void
 _handle_opacity_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, const char *value)
 {
    node->style->opacity = _to_opacity(value);
 }
 
+/**
+ * @brief Handles the 'fill-opacity' style property or attribute.
+ * Sets the SVG_FILL_FLAGS_OPACITY flag and the fill opacity value (0-255).
+ * @param loader The SVG loader context (unused).
+ * @param node The SVG node whose style is being updated.
+ * @param value The 'fill-opacity' attribute value (0.0-1.0).
+ */
 static void
 _handle_fill_opacity_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, const char *value)
 {
@@ -925,13 +1252,26 @@ _handle_fill_opacity_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, c
    node->style->fill.opacity = _to_opacity(value);
 }
 
+/**
+ * @brief Handles the 'transform' attribute.
+ * Parses the transformation string and sets the node's transform matrix.
+ * @param loader The SVG loader context (unused).
+ * @param node The SVG node whose transform is being set.
+ * @param value The 'transform' attribute value (e.g., "translate(10, 10) rotate(45)").
+ */
 static void
 _handle_transform_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, const char *value)
 {
    node->transform = _parse_transformation_matrix(value);
 }
 
-
+/**
+ * @brief Handles the 'clip-path' attribute.
+ * Sets the SVG_COMPOSITE_FLAGS_CLIP_PATH flag and stores the URL reference.
+ * @param loader The SVG loader context (unused).
+ * @param node The SVG node whose clip path is being set.
+ * @param value The 'clip-path' attribute value (e.g., "url(#myClip)").
+ */
 static void _handle_clip_path_attr(Evas_SVG_Loader* loader EINA_UNUSED, Svg_Node* node, const char* value)
 {
     Svg_Style_Property* style = node->style;
@@ -941,6 +1281,13 @@ static void _handle_clip_path_attr(Evas_SVG_Loader* loader EINA_UNUSED, Svg_Node
     if (len >= 3 && !strncmp(value, "url", 3)) style->comp.url = _id_from_url((const char*)(value + 3));
 }
 
+/**
+ * @brief Handles the 'display' attribute.
+ * Sets the node's visibility flag based on the value ("none" or other).
+ * @param loader The SVG loader context (unused).
+ * @param node The SVG node whose display property is being set.
+ * @param value The 'display' attribute value.
+ */
 static void
 _handle_display_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, const char *value)
 {
@@ -952,15 +1299,28 @@ _handle_display_attr(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node* node, const 
    else node->display = EINA_TRUE;
 }
 
+/**
+ * @typedef Style_Method
+ * @brief Function pointer type for handling specific style properties/attributes.
+ * @param loader The SVG loader context.
+ * @param node The SVG node being styled.
+ * @param value The attribute/property value string.
+ */
 typedef void (*Style_Method)(Evas_SVG_Loader *loader, Svg_Node *node, const char *value);
 
+/** @brief Helper macro for defining entries in the style_tags lookup table. */
 #define STYLE_DEF(Name, Name1)       \
   { #Name, sizeof (#Name), _handle_##Name1##_attr}
 
+/**
+ * @brief Lookup table for common SVG style properties and attributes.
+ * Maps property/attribute names (e.g., "fill", "stroke-width") to their
+ * corresponding handler functions (_handle_*_attr).
+ */
 static const struct {
-   const char *tag;
-   int sz;
-   Style_Method tag_handler;;
+   const char *tag;     /**< The style property/attribute name. */
+   int sz;              /**< The size of the tag string (including null terminator). */
+   Style_Method tag_handler; /**< The function to handle this property/attribute. */
 } style_tags[] = {
   STYLE_DEF(color, color),
   STYLE_DEF(fill, fill),
@@ -977,6 +1337,18 @@ static const struct {
   STYLE_DEF(display, display)
 };
 
+/**
+ * @brief Parses a single style property (key/value pair) or a direct attribute.
+ *
+ * This function is called either directly for attributes like 'fill', 'stroke', etc.,
+ * or indirectly via `_attr_style_node` when parsing a 'style' attribute string.
+ * It looks up the key in `style_tags` and calls the appropriate handler function.
+ *
+ * @param data Pointer to the Evas_SVG_Loader context.
+ * @param key The style property or attribute name (e.g., "fill", "stroke-width").
+ * @param value The property or attribute value (e.g., "red", "2px").
+ * @return Always returns EINA_TRUE.
+ */
 static Eina_Bool
 _parse_style_attr(void *data, const char *key, const char *value)
 {
@@ -1001,6 +1373,17 @@ _parse_style_attr(void *data, const char *key, const char *value)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Parses the content of a 'style' attribute string.
+ *
+ * Uses `eina_simple_xml_attribute_w3c_parse` to break down the style string
+ * (e.g., "fill: red; stroke: blue;") into individual key/value pairs and
+ * calls `_parse_style_attr` for each one.
+ *
+ * @param data Pointer to the Evas_SVG_Loader context.
+ * @param str The value of the 'style' attribute.
+ * @return Always returns EINA_TRUE.
+ */
 static Eina_Bool
 _attr_style_node(void *data, const char *str)
 {
@@ -1009,8 +1392,17 @@ _attr_style_node(void *data, const char *str)
    return EINA_TRUE;
 }
 
-/* parse g node
- * https://www.w3.org/TR/SVG/struct.html#Groups
+/**
+ * @brief Parses attributes specific to the <g> (group) element.
+ *
+ * Handles 'style', 'transform', 'clip-path', and 'id'.
+ * Other attributes are delegated to the general style parser `_parse_style_attr`.
+ * Reference: https://www.w3.org/TR/SVG/struct.html#Groups
+ *
+ * @param data Pointer to the Evas_SVG_Loader context.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return Always returns EINA_TRUE.
  */
 static Eina_Bool
 _attr_parse_g_node(void *data, const char *key, const char *value)
@@ -1041,9 +1433,17 @@ _attr_parse_g_node(void *data, const char *key, const char *value)
    return EINA_TRUE;
 }
 
-
-/* parse clipPath node
- * https://www.w3.org/TR/SVG/struct.html#Groups
+/**
+ * @brief Parses attributes specific to the <clipPath> element.
+ *
+ * Handles 'style', 'transform', 'clip-path', and 'id'.
+ * Other attributes are delegated to the general style parser `_parse_style_attr`.
+ * Reference: https://www.w3.org/TR/SVG/masking.html#ClipPathElement
+ *
+ * @param data Pointer to the Evas_SVG_Loader context.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return Always returns EINA_TRUE.
  */
 static Eina_Bool _attr_parse_clip_path_node(void* data, const char* key, const char* value)
 {
@@ -1073,6 +1473,18 @@ static Eina_Bool _attr_parse_clip_path_node(void* data, const char* key, const c
    return EINA_TRUE;
 }
 
+/**
+ * @brief Creates a new Svg_Node with default style properties.
+ *
+ * Allocates memory for the node and its style property structure.
+ * Initializes default style values according to SVG specifications
+ * (e.g., fill=black, stroke=none, opacity=1).
+ * Appends the new node to the parent's child list if a parent is provided.
+ *
+ * @param parent The parent node in the SVG tree, or NULL for the root/defs node.
+ * @param type The type of the SVG node to create (e.g., SVG_NODE_RECT).
+ * @return A pointer to the newly allocated and initialized Svg_Node.
+ */
 static Svg_Node *
 _create_node(Svg_Node *parent, Svg_Node_Type type)
 {
@@ -1119,15 +1531,32 @@ _create_node(Svg_Node *parent, Svg_Node_Type type)
    return node;
 }
 
+/**
+ * @brief Factory function for creating an SVG <defs> node.
+ * @param loader The SVG loader context (unused).
+ * @param parent Parent node (unused, defs is usually top-level or under root).
+ * @param buf Buffer with attributes (unused).
+ * @param buflen Length of attribute buffer (unused).
+ * @return A new Svg_Node of type SVG_NODE_DEFS.
+ */
 static Svg_Node *
 _create_defs_node(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node *parent EINA_UNUSED, const char *buf EINA_UNUSED, unsigned buflen EINA_UNUSED)
 {
    Svg_Node *node = _create_node(NULL, SVG_NODE_DEFS);
+   // Attributes are parsed later if needed, or handled by children
    eina_simple_xml_attributes_parse(buf, buflen,
-                                    NULL, node);
+                                    NULL, node); // No specific attribute parser needed here
    return node;
 }
 
+/**
+ * @brief Factory function for creating an SVG <g> node.
+ * @param loader The SVG loader context.
+ * @param parent The parent node.
+ * @param buf Buffer containing the element's attributes.
+ * @param buflen Length of the attribute buffer.
+ * @return A new Svg_Node of type SVG_NODE_G with parsed attributes.
+ */
 static Svg_Node *
 _create_g_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf, unsigned buflen)
 {
@@ -1138,34 +1567,68 @@ _create_g_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf, unsig
    return loader->svg_parse->node;
 }
 
+/**
+ * @brief Factory function for creating the root SVG <svg> node.
+ * @param loader The SVG loader context.
+ * @param parent The parent node (should be NULL for the root).
+ * @param buf Buffer containing the element's attributes.
+ * @param buflen Length of the attribute buffer.
+ * @return A new Svg_Node of type SVG_NODE_DOC with parsed attributes.
+ */
 static Svg_Node *
 _create_svg_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf, unsigned buflen)
 {
    loader->svg_parse->node = _create_node(parent, SVG_NODE_DOC);
    Svg_Doc_Node *doc = &(loader->svg_parse->node->node.doc);
 
-   doc->preserve_aspect = EINA_TRUE;
+   doc->preserve_aspect = EINA_TRUE; // Default preserveAspectRatio
    eina_simple_xml_attributes_parse(buf, buflen,
                                     _attr_parse_svg_node, loader);
 
    return loader->svg_parse->node;
 }
 
+/**
+ * @brief Factory function for creating an SVG <switch> node (currently ignored).
+ * @param loader The SVG loader context (unused).
+ * @param parent The parent node (unused).
+ * @param buf Buffer with attributes (unused).
+ * @param buflen Length of attribute buffer (unused).
+ * @return NULL, as <switch> elements are not currently processed.
+ */
 static Svg_Node *
 _create_switch_node(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node *parent EINA_UNUSED, const char *buf EINA_UNUSED, unsigned buflen EINA_UNUSED)
 {
+   // TODO: Implement <switch> element handling if required.
    return NULL;
 }
 
+/**
+ * @brief Factory function for creating an SVG <mask> node (currently creates a hidden node).
+ * @param loader The SVG loader context (unused).
+ * @param parent The parent node (unused, masks are usually in <defs>).
+ * @param buf Buffer with attributes (unused).
+ * @param buflen Length of attribute buffer (unused).
+ * @return A new Svg_Node of type SVG_NODE_UNKNOWN marked as not displayed.
+ */
 static Svg_Node *
 _create_mask_node(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node *parent EINA_UNUSED, const char *buf EINA_UNUSED, unsigned buflen EINA_UNUSED)
 {
+   // TODO: Implement proper <mask> element handling.
    Svg_Node *node = _create_node(NULL, SVG_NODE_UNKNOWN);
 
-   node->display = EINA_FALSE;
+   node->display = EINA_FALSE; // Masks themselves aren't displayed directly
    return node;
 }
 
+/**
+ * @brief Factory function for creating an SVG <clipPath> node.
+ * @param loader The SVG loader context.
+ * @param parent The parent node (usually NULL or <defs>).
+ * @param buf Buffer containing the element's attributes.
+ * @param buflen Length of the attribute buffer.
+ * @return A new Svg_Node of type SVG_NODE_CLIP_PATH with parsed attributes.
+ */
 static Svg_Node *
 _create_clipPath_node(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node *parent EINA_UNUSED, const char *buf EINA_UNUSED, unsigned buflen EINA_UNUSED)
 {
@@ -1176,6 +1639,17 @@ _create_clipPath_node(Evas_SVG_Loader *loader EINA_UNUSED, Svg_Node *parent EINA
    return loader->svg_parse->node;
 }
 
+/**
+ * @brief Parses attributes specific to the <path> element.
+ *
+ * Handles 'd' (path data), 'style', 'clip-path', and 'id'.
+ * Other attributes are delegated to the general style parser `_parse_style_attr`.
+ *
+ * @param data Pointer to the Evas_SVG_Loader context.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return Always returns EINA_TRUE.
+ */
 static Eina_Bool
 _attr_parse_path_node(void *data, const char *key, const char *value)
 {
@@ -1206,6 +1680,14 @@ _attr_parse_path_node(void *data, const char *key, const char *value)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Factory function for creating an SVG <path> node.
+ * @param loader The SVG loader context.
+ * @param parent The parent node.
+ * @param buf Buffer containing the element's attributes.
+ * @param buflen Length of the attribute buffer.
+ * @return A new Svg_Node of type SVG_NODE_PATH with parsed attributes.
+ */
 static Svg_Node *
 _create_path_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf, unsigned buflen)
 {
@@ -1217,14 +1699,20 @@ _create_path_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf, un
    return loader->svg_parse->node;
 }
 
+/** @brief Helper macro for defining entries in the circle_tags lookup table. */
 #define CIRCLE_DEF(Name, Field, Type)       \
   { #Name, Type, sizeof (#Name), offsetof(Svg_Circle_Node, Field)}
 
+/**
+ * @brief Lookup table for SVG <circle> element attributes.
+ * Maps attribute names ("cx", "cy", "r") to their corresponding field offset
+ * within the Svg_Circle_Node struct and the length type for percentage calculation.
+ */
 static const struct {
-   const char *tag;
-   SVG_Parser_Length_Type type;
-   int sz;
-   size_t offset;
+   const char *tag;             /**< The attribute name string. */
+   SVG_Parser_Length_Type type; /**< The length type for percentage calculation. */
+   int sz;                      /**< The size of the tag string (including null terminator). */
+   size_t offset;               /**< The offset of the corresponding field in Svg_Circle_Node. */
 } circle_tags[] = {
   CIRCLE_DEF(cx, cx, SVG_PARSER_LENGTH_HORIZONTAL),
   CIRCLE_DEF(cy, cy, SVG_PARSER_LENGTH_VERTICAL),
@@ -1233,6 +1721,14 @@ static const struct {
 
 /* parse the attributes for a circle element.
  * https://www.w3.org/TR/SVG/shapes.html#CircleElement
+ * Handles 'cx', 'cy', 'r', 'style', 'clip-path', and 'id'.
+ * Other attributes are delegated to the general style parser `_parse_style_attr`.
+ * Uses the `circle_tags` lookup table to set the appropriate fields in the node.
+ *
+ * @param data Pointer to the Evas_SVG_Loader context.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return Always returns EINA_TRUE.
  */
 static Eina_Bool
 _attr_parse_circle_node(void *data, const char *key, const char *value)
@@ -1272,6 +1768,14 @@ _attr_parse_circle_node(void *data, const char *key, const char *value)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Factory function for creating an SVG <circle> node.
+ * @param loader The SVG loader context.
+ * @param parent The parent node.
+ * @param buf Buffer containing the element's attributes.
+ * @param buflen Length of the attribute buffer.
+ * @return A new Svg_Node of type SVG_NODE_CIRCLE with parsed attributes.
+ */
 static Svg_Node *
 _create_circle_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf, unsigned buflen)
 {
@@ -1282,14 +1786,20 @@ _create_circle_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf, 
    return loader->svg_parse->node;
 }
 
+/** @brief Helper macro for defining entries in the ellipse_tags lookup table. */
 #define ELLIPSE_DEF(Name, Field, Type)       \
   { #Name, Type, sizeof (#Name), offsetof(Svg_Ellipse_Node, Field)}
 
+/**
+ * @brief Lookup table for SVG <ellipse> element attributes.
+ * Maps attribute names ("cx", "cy", "rx", "ry") to their corresponding field offset
+ * within the Svg_Ellipse_Node struct and the length type for percentage calculation.
+ */
 static const struct {
-   const char *tag;
-   SVG_Parser_Length_Type type;
-   int sz;
-   size_t offset;
+   const char *tag;             /**< The attribute name string. */
+   SVG_Parser_Length_Type type; /**< The length type for percentage calculation. */
+   int sz;                      /**< The size of the tag string (including null terminator). */
+   size_t offset;               /**< The offset of the corresponding field in Svg_Ellipse_Node. */
 } ellipse_tags[] = {
   ELLIPSE_DEF(cx,cx, SVG_PARSER_LENGTH_HORIZONTAL),
   ELLIPSE_DEF(cy,cy, SVG_PARSER_LENGTH_VERTICAL),
@@ -1299,6 +1809,14 @@ static const struct {
 
 /* parse the attributes for an ellipse element.
  * https://www.w3.org/TR/SVG/shapes.html#EllipseElement
+ * Handles 'cx', 'cy', 'rx', 'ry', 'style', 'clip-path', and 'id'.
+ * Other attributes are delegated to the general style parser `_parse_style_attr`.
+ * Uses the `ellipse_tags` lookup table to set the appropriate fields in the node.
+ *
+ * @param data Pointer to the Evas_SVG_Loader context.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return Always returns EINA_TRUE.
  */
 static Eina_Bool
 _attr_parse_ellipse_node(void *data, const char *key, const char *value)
@@ -1338,6 +1856,14 @@ _attr_parse_ellipse_node(void *data, const char *key, const char *value)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Factory function for creating an SVG <ellipse> node.
+ * @param loader The SVG loader context.
+ * @param parent The parent node.
+ * @param buf Buffer containing the element's attributes.
+ * @param buflen Length of the attribute buffer.
+ * @return A new Svg_Node of type SVG_NODE_ELLIPSE with parsed attributes.
+ */
 static Svg_Node *
 _create_ellipse_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf, unsigned buflen)
 {
@@ -1348,10 +1874,21 @@ _create_ellipse_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf,
    return loader->svg_parse->node;
 }
 
+/**
+ * @brief Parses the 'points' attribute string for <polygon> and <polyline>.
+ *
+ * Extracts coordinate pairs (x, y) from a space/comma separated string of numbers.
+ * Allocates memory for the points array, which must be freed by the caller.
+ * Uses a temporary buffer and reallocates as needed.
+ *
+ * @param str The 'points' attribute value string (e.g., "100,10 250,150 150,210").
+ * @param points Pointer to store the allocated array of doubles (x1, y1, x2, y2, ...).
+ * @param point_count Pointer to store the total number of double values parsed (twice the number of points).
+ */
 static void
 _attr_parse_polygon_points(const char *str, double **points, int *point_count)
 {
-   double tmp[50];
+   double tmp[50]; // Temporary buffer for points
    int tmp_count=0;
    int count = 0;
    double num;
@@ -1389,7 +1926,16 @@ error_alloc:
 }
 
 /* parse the attributes for a polygon element.
+ * https://www.w3.org/TR/SVG/shapes.html#PolygonElement
  * https://www.w3.org/TR/SVG/shapes.html#PolylineElement
+ * Handles 'points', 'style', 'clip-path', and 'id'.
+ * Other attributes are delegated to the general style parser `_parse_style_attr`.
+ * Calls `_attr_parse_polygon_points` to handle the 'points' attribute.
+ *
+ * @param data Pointer to the Evas_SVG_Loader context.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return Always returns EINA_TRUE.
  */
 static Eina_Bool
 _attr_parse_polygon_node(void *data, const char *key, const char *value)
@@ -1427,6 +1973,14 @@ _attr_parse_polygon_node(void *data, const char *key, const char *value)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Factory function for creating an SVG <polygon> node.
+ * @param loader The SVG loader context.
+ * @param parent The parent node.
+ * @param buf Buffer containing the element's attributes.
+ * @param buflen Length of the attribute buffer.
+ * @return A new Svg_Node of type SVG_NODE_POLYGON with parsed attributes.
+ */
 static Svg_Node *
 _create_polygon_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf, unsigned buflen)
 {
@@ -1437,24 +1991,39 @@ _create_polygon_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf,
    return loader->svg_parse->node;
 }
 
+/**
+ * @brief Factory function for creating an SVG <polyline> node.
+ * @param loader The SVG loader context.
+ * @param parent The parent node.
+ * @param buf Buffer containing the element's attributes.
+ * @param buflen Length of the attribute buffer.
+ * @return A new Svg_Node of type SVG_NODE_POLYLINE with parsed attributes.
+ */
 static Svg_Node *
 _create_polyline_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf, unsigned buflen)
 {
    loader->svg_parse->node = _create_node(parent, SVG_NODE_POLYLINE);
 
    eina_simple_xml_attributes_parse(buf, buflen,
-                                    _attr_parse_polygon_node, loader);
+                                    _attr_parse_polygon_node, loader); // Uses the same attribute parser as polygon
    return loader->svg_parse->node;
 }
 
+/** @brief Helper macro for defining entries in the rect_tags lookup table. */
 #define RECT_DEF(Name, Field, Type)       \
   { #Name, Type, sizeof (#Name), offsetof(Svg_Rect_Node, Field)}
 
+/**
+ * @brief Lookup table for SVG <rect> element attributes.
+ * Maps attribute names ("x", "y", "width", "height", "rx", "ry") to their
+ * corresponding field offset within the Svg_Rect_Node struct and the length
+ * type for percentage calculation.
+ */
 static const struct {
-   const char *tag;
-   SVG_Parser_Length_Type type;
-   int sz;
-   size_t offset;
+   const char *tag;             /**< The attribute name string. */
+   SVG_Parser_Length_Type type; /**< The length type for percentage calculation. */
+   int sz;                      /**< The size of the tag string (including null terminator). */
+   size_t offset;               /**< The offset of the corresponding field in Svg_Rect_Node. */
 } rect_tags[] = {
   RECT_DEF(x,x, SVG_PARSER_LENGTH_HORIZONTAL),
   RECT_DEF(y, y, SVG_PARSER_LENGTH_VERTICAL),
@@ -1466,6 +2035,15 @@ static const struct {
 
 /* parse the attributes for a rect element.
  * https://www.w3.org/TR/SVG/shapes.html#RectElement
+ * Handles 'x', 'y', 'width', 'height', 'rx', 'ry', 'style', 'clip-path', and 'id'.
+ * Other attributes are delegated to the general style parser `_parse_style_attr`.
+ * Uses the `rect_tags` lookup table to set the appropriate fields in the node.
+ * Handles the special case where only 'rx' or 'ry' is specified.
+ *
+ * @param data Pointer to the Evas_SVG_Loader context.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return Always returns EINA_TRUE.
  */
 static Eina_Bool
 _attr_parse_rect_node(void *data, const char *key, const char *value)
@@ -1513,13 +2091,24 @@ _attr_parse_rect_node(void *data, const char *key, const char *value)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Factory function for creating an SVG <rect> node.
+ * Initializes has_rx and has_ry flags before parsing attributes.
+ * @param loader The SVG loader context.
+ * @param parent The parent node.
+ * @param buf Buffer containing the element's attributes.
+ * @param buflen Length of the attribute buffer.
+ * @return A new Svg_Node of type SVG_NODE_RECT with parsed attributes.
+ */
 static Svg_Node *
 _create_rect_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf, unsigned buflen)
 {
    loader->svg_parse->node = _create_node(parent, SVG_NODE_RECT);
 
+   // Initialize flags for rx/ry handling
    if (loader->svg_parse->node) {
-        loader->svg_parse->node->node.rect.has_rx = loader->svg_parse->node->node.rect.has_ry = EINA_FALSE;
+        loader->svg_parse->node->node.rect.has_rx = EINA_FALSE;
+        loader->svg_parse->node->node.rect.has_ry = EINA_FALSE;
    }
 
    eina_simple_xml_attributes_parse(buf, buflen,
@@ -1527,14 +2116,20 @@ _create_rect_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf, un
    return loader->svg_parse->node;
 }
 
+/** @brief Helper macro for defining entries in the line_tags lookup table. */
 #define LINE_DEF(Name, Field, Type)       \
   { #Name, Type, sizeof (#Name), offsetof(Svg_Line_Node, Field)}
 
+/**
+ * @brief Lookup table for SVG <line> element attributes.
+ * Maps attribute names ("x1", "y1", "x2", "y2") to their corresponding field offset
+ * within the Svg_Line_Node struct and the length type for percentage calculation.
+ */
 static const struct {
-   const char *tag;
-   SVG_Parser_Length_Type type;
-   int sz;
-   size_t offset;
+   const char *tag;             /**< The attribute name string. */
+   SVG_Parser_Length_Type type; /**< The length type for percentage calculation. */
+   int sz;                      /**< The size of the tag string (including null terminator). */
+   size_t offset;               /**< The offset of the corresponding field in Svg_Line_Node. */
 } line_tags[] = {
   LINE_DEF(x1, x1, SVG_PARSER_LENGTH_HORIZONTAL),
   LINE_DEF(y1, y1, SVG_PARSER_LENGTH_VERTICAL),
@@ -1544,6 +2139,14 @@ static const struct {
 
 /* parse the attributes for a rect element.
  * https://www.w3.org/TR/SVG/shapes.html#LineElement
+ * Handles 'x1', 'y1', 'x2', 'y2', 'style', 'clip-path', and 'id'.
+ * Other attributes are delegated to the general style parser `_parse_style_attr`.
+ * Uses the `line_tags` lookup table to set the appropriate fields in the node.
+ *
+ * @param data Pointer to the Evas_SVG_Loader context.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return Always returns EINA_TRUE.
  */
 static Eina_Bool
 _attr_parse_line_node(void *data, const char *key, const char *value)
@@ -1582,6 +2185,14 @@ _attr_parse_line_node(void *data, const char *key, const char *value)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Factory function for creating an SVG <line> node.
+ * @param loader The SVG loader context.
+ * @param parent The parent node.
+ * @param buf Buffer containing the element's attributes.
+ * @param buflen Length of the attribute buffer.
+ * @return A new Svg_Node of type SVG_NODE_LINE with parsed attributes.
+ */
 static Svg_Node *
 _create_line_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf, unsigned buflen)
 {
@@ -1592,6 +2203,12 @@ _create_line_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf, un
    return loader->svg_parse->node;
 }
 
+/**
+ * @brief Extracts an ID reference from an 'xlink:href' or 'href' attribute value.
+ * Skips leading whitespace and the leading '#'.
+ * @param href The attribute value string (e.g., "#myElement").
+ * @return A shared string containing the extracted ID.
+ */
 static Eina_Stringshare *
 _id_from_href(const char *href)
 {
@@ -1601,6 +2218,12 @@ _id_from_href(const char *href)
    return eina_stringshare_add(href);
 }
 
+/**
+ * @brief Finds the <defs> node associated with a given node.
+ * Traverses up the parent chain to the root <svg> node and returns its defs pointer.
+ * @param node The node from which to start the search.
+ * @return Pointer to the Svg_Node representing the <defs> element, or NULL if not found.
+ */
 static Svg_Node*
 _get_defs_node(Svg_Node *node)
 {
@@ -1617,6 +2240,13 @@ _get_defs_node(Svg_Node *node)
    return NULL;
 }
 
+/**
+ * @brief Finds a direct child node with a specific ID.
+ * Iterates through the direct children of the given node.
+ * @param node The parent node whose children to search.
+ * @param id The ID string to search for.
+ * @return Pointer to the child Svg_Node with the matching ID, or NULL if not found.
+ */
 static Svg_Node*
 _find_child_by_id(Svg_Node *node, const char *id)
 {
@@ -1633,6 +2263,14 @@ _find_child_by_id(Svg_Node *node, const char *id)
    return NULL;
 }
 
+/**
+ * @brief Recursively finds any node within the subtree (including the node itself)
+ *        with a specific ID.
+ * Performs a depth-first search starting from the given node.
+ * @param node The starting node for the search.
+ * @param id The ID string to search for.
+ * @return Pointer to the Svg_Node with the matching ID, or NULL if not found.
+ */
 static Svg_Node* _find_node_by_id(Svg_Node *node, const char* id)
 {
    Svg_Node *child, *result = NULL;
@@ -1647,6 +2285,13 @@ static Svg_Node* _find_node_by_id(Svg_Node *node, const char* id)
    return result;
 }
 
+/**
+ * @brief Creates a deep copy of a list of gradient stops.
+ * Allocates new memory for each stop and copies the data.
+ * @param from The Eina_List of Efl_Gfx_Gradient_Stop pointers to clone.
+ * @return A new Eina_List containing copies of the original stops. The caller
+ *         is responsible for freeing the list and its contents.
+ */
 static Eina_List *
 _clone_grad_stops(Eina_List *from)
 {
@@ -1666,6 +2311,17 @@ _clone_grad_stops(Eina_List *from)
    return res;
 }
 
+/**
+ * @brief Creates a deep copy of an Svg_Style_Gradient structure.
+ *
+ * Allocates new memory for the gradient structure, its transform matrix (if any),
+ * its linear/radial specific data, and clones its gradient stops using `_clone_grad_stops`.
+ * Copies ID, reference, spread, and other flags.
+ *
+ * @param from Pointer to the Svg_Style_Gradient to clone.
+ * @return A pointer to the newly allocated and copied Svg_Style_Gradient,
+ *         or NULL if `from` is NULL. The caller is responsible for freeing the returned structure.
+ */
 static Svg_Style_Gradient *
 _clone_gradient(Svg_Style_Gradient *from)
 {
@@ -1700,10 +2356,21 @@ _clone_gradient(Svg_Style_Gradient *from)
    return grad;
 }
 
+/**
+ * @brief Copies attributes and style properties from one Svg_Node to another.
+ *
+ * Performs a deep copy of the transform matrix (if present) and the
+ * Svg_Style_Property structure. Also copies node-specific data (like circle radius,
+ * rect dimensions, path data, polygon points) based on the node type.
+ * Assumes `to->style` is already allocated.
+ *
+ * @param to The destination Svg_Node.
+ * @param from The source Svg_Node.
+ */
 static void
 _copy_attribute(Svg_Node *to, Svg_Node *from)
 {
-   // copy matrix attribute
+   // copy matrix attribute (deep copy)
    if (from->transform)
      {
         to->transform = calloc(1, sizeof(Eina_Matrix3));
@@ -1761,6 +2428,15 @@ _copy_attribute(Svg_Node *to, Svg_Node *from)
 
 }
 
+/**
+ * @brief Recursively clones an Svg_Node and its entire subtree.
+ *
+ * Creates a new node of the same type, copies its attributes using `_copy_attribute`,
+ * and then recursively calls itself to clone all children, attaching them to the new node.
+ *
+ * @param from The Svg_Node to clone.
+ * @param parent The parent for the newly created top-level clone.
+ */
 static void
 _clone_node(Svg_Node *from, Svg_Node *parent)
 {
@@ -1780,6 +2456,19 @@ _clone_node(Svg_Node *from, Svg_Node *parent)
 
 }
 
+/**
+ * @brief Parses attributes specific to the <use> element.
+ *
+ * Handles 'xlink:href' (or 'href') to find the referenced element (usually in <defs>)
+ * and clones it using `_clone_node`, adding the clone as a child of the <use> node's
+ * representation (which is created as a <g> node).
+ * Also handles 'style', 'transform', 'clip-path', and 'id' attributes for the <use> element itself.
+ *
+ * @param data Pointer to the Evas_SVG_Loader context.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return Always returns EINA_TRUE.
+ */
 static Eina_Bool
 _attr_parse_use_node(void *data, const char *key, const char *value)
 {
@@ -1806,9 +2495,23 @@ _attr_parse_use_node(void *data, const char *key, const char *value)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Factory function for creating an SVG <use> node.
+ *
+ * Creates an Svg_Node of type SVG_NODE_G to represent the <use> element itself
+ * (as <use> can have transforms and styles). The actual referenced content
+ * is cloned and added as children during attribute parsing (`_attr_parse_use_node`).
+ *
+ * @param loader The SVG loader context.
+ * @param parent The parent node.
+ * @param buf Buffer containing the element's attributes.
+ * @param buflen Length of the attribute buffer.
+ * @return A new Svg_Node of type SVG_NODE_G representing the <use> element.
+ */
 static Svg_Node *
 _create_use_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf, unsigned buflen)
 {
+   // Represent <use> as a group node to hold its own transforms/styles
    loader->svg_parse->node = _create_node(parent, SVG_NODE_G);
 
    eina_simple_xml_attributes_parse(buf, buflen,
@@ -1816,14 +2519,20 @@ _create_use_node(Evas_SVG_Loader *loader, Svg_Node *parent, const char *buf, uns
    return loader->svg_parse->node;
 }
 
+/** @brief Helper macro for defining entries in graphics_tags and group_tags lookup tables. */
 #define TAG_DEF(Name)                                   \
   { #Name, sizeof (#Name), _create_##Name##_node }
 
-//TODO: implement 'text' primitive
+/**
+ * @brief Lookup table for SVG graphics elements.
+ * Maps element tag names (e.g., "circle", "path") to their corresponding
+ * node factory functions (_create_*_node).
+ * TODO: implement 'text' primitive
+ */
 static const struct {
-   const char *tag;
-   int sz;
-   Factory_Method tag_handler;
+   const char *tag;     /**< The element tag name. */
+   int sz;              /**< The size of the tag string (including null terminator). */
+   Factory_Method tag_handler; /**< The factory function to create this node type. */
 } graphics_tags[] = {
   TAG_DEF(use),
   TAG_DEF(circle),
@@ -1835,10 +2544,15 @@ static const struct {
   TAG_DEF(line),
 };
 
+/**
+ * @brief Lookup table for SVG container/structural elements.
+ * Maps element tag names (e.g., "g", "svg", "defs") to their corresponding
+ * node factory functions (_create_*_node).
+ */
 static const struct {
-   const char *tag;
-   int sz;
-   Factory_Method tag_handler;
+   const char *tag;     /**< The element tag name. */
+   int sz;              /**< The size of the tag string (including null terminator). */
+   Factory_Method tag_handler; /**< The factory function to create this node type. */
 } group_tags[] = {
   TAG_DEF(defs),
   TAG_DEF(g),
@@ -1848,6 +2562,17 @@ static const struct {
   TAG_DEF(clipPath)
 };
 
+/**
+ * @def FIND_FACTORY
+ * @brief Macro to generate functions for finding factory methods based on tag names.
+ *
+ * Creates a static inline function `_find_##Short_Name##_factory` that takes a tag name string
+ * and returns the corresponding Factory_Method function pointer from `Tags_Array`.
+ *
+ * @param Short_Name The suffix for the generated function name (e.g., `group`, `graphics`).
+ * @param Tags_Array The lookup table (e.g., `group_tags`, `graphics_tags`) containing
+ *                   tag names and their associated factory functions.
+ */
 #define FIND_FACTORY(Short_Name, Tags_Array)                            \
   static Factory_Method                                                 \
   _find_##Short_Name##_factory(const char  *name)                       \
@@ -1883,51 +2608,65 @@ _parse_spread_value(const char *value)
    return spread;
 }
 
+// --- Radial Gradient Attribute Handlers ---
+
+/** @brief Handles the 'cx' attribute for radial gradients. Sets fx if not explicitly parsed. */
 static void
 _handle_radial_cx_attr(Evas_SVG_Loader *loader, Svg_Radial_Gradient* radial, const char *value)
 {
    radial->cx = _gradient_to_double(loader->svg_parse, value, SVG_PARSER_LENGTH_HORIZONTAL);
+   // Default fx to cx if fx is not specified
    if (!loader->svg_parse->gradient.fx_parsed)
      radial->fx = radial->cx;
 }
 
+/** @brief Handles the 'cy' attribute for radial gradients. Sets fy if not explicitly parsed. */
 static void
 _handle_radial_cy_attr(Evas_SVG_Loader *loader, Svg_Radial_Gradient* radial, const char *value)
 {
    radial->cy = _gradient_to_double(loader->svg_parse, value, SVG_PARSER_LENGTH_VERTICAL);
+   // Default fy to cy if fy is not specified
    if (!loader->svg_parse->gradient.fy_parsed)
      radial->fy = radial->cy;
 }
 
+/** @brief Handles the 'fx' attribute for radial gradients. */
 static void
 _handle_radial_fx_attr(Evas_SVG_Loader *loader, Svg_Radial_Gradient* radial, const char *value)
 {
    radial->fx = _gradient_to_double(loader->svg_parse, value, SVG_PARSER_LENGTH_HORIZONTAL);
-   loader->svg_parse->gradient.fx_parsed = EINA_TRUE;
+   loader->svg_parse->gradient.fx_parsed = EINA_TRUE; // Mark fx as explicitly parsed
 }
 
+/** @brief Handles the 'fy' attribute for radial gradients. */
 static void
 _handle_radial_fy_attr(Evas_SVG_Loader *loader, Svg_Radial_Gradient* radial, const char *value)
 {
    radial->fy = _gradient_to_double(loader->svg_parse, value, SVG_PARSER_LENGTH_VERTICAL);
-   loader->svg_parse->gradient.fy_parsed = EINA_TRUE;
+   loader->svg_parse->gradient.fy_parsed = EINA_TRUE; // Mark fy as explicitly parsed
 }
 
+/** @brief Handles the 'r' attribute for radial gradients. */
 static void
 _handle_radial_r_attr(Evas_SVG_Loader *loader, Svg_Radial_Gradient* radial, const char *value)
 {
    radial->r = _gradient_to_double(loader->svg_parse, value, SVG_PARSER_LENGTH_OTHER);
 }
 
+// --- Radial Gradient Recalculation Handlers (for gradientUnits="objectBoundingBox") ---
+
+/** @brief Recalculates radial 'cx' from percentage to absolute coordinates if needed. */
 static void
 _recalc_radial_cx_attr(Evas_SVG_Loader *loader, Svg_Radial_Gradient* radial, Eina_Bool user_space)
 {
+   // If using objectBoundingBox units (default), convert percentage to absolute coordinate
    if (!user_space)
      {
         radial->cx = radial->cx * loader->svg_parse->global.width;
      }
 }
 
+/** @brief Recalculates radial 'cy' from percentage to absolute coordinates if needed. */
 static void
 _recalc_radial_cy_attr(Evas_SVG_Loader *loader, Svg_Radial_Gradient* radial, Eina_Bool user_space)
 {
@@ -1937,6 +2676,7 @@ _recalc_radial_cy_attr(Evas_SVG_Loader *loader, Svg_Radial_Gradient* radial, Ein
      }
 }
 
+/** @brief Recalculates radial 'fx' from percentage to absolute coordinates if needed. */
 static void
 _recalc_radial_fx_attr(Evas_SVG_Loader *loader, Svg_Radial_Gradient* radial, Eina_Bool user_space)
 {
@@ -1946,6 +2686,7 @@ _recalc_radial_fx_attr(Evas_SVG_Loader *loader, Svg_Radial_Gradient* radial, Ein
      }
 }
 
+/** @brief Recalculates radial 'fy' from percentage to absolute coordinates if needed. */
 static void
 _recalc_radial_fy_attr(Evas_SVG_Loader *loader, Svg_Radial_Gradient* radial, Eina_Bool user_space)
 {
@@ -1955,27 +2696,50 @@ _recalc_radial_fy_attr(Evas_SVG_Loader *loader, Svg_Radial_Gradient* radial, Ein
      }
 }
 
+/** @brief Recalculates radial 'r' from percentage to absolute coordinates if needed. */
 static void
 _recalc_radial_r_attr(Evas_SVG_Loader *loader, Svg_Radial_Gradient* radial, Eina_Bool user_space)
 {
+   // If using objectBoundingBox units (default), convert percentage based on viewport diagonal
    if (!user_space)
      {
+        // Normalize radius based on viewport diagonal (sqrt(w^2 + h^2) / sqrt(2))
         radial->r = radial->r * (sqrt(pow(loader->svg_parse->global.height, 2) + pow(loader->svg_parse->global.width, 2)) / sqrt(2.0));
      }
 }
 
-
+/**
+ * @typedef Radial_Method
+ * @brief Function pointer type for handling specific radial gradient attributes during initial parsing.
+ * @param loader The SVG loader context.
+ * @param radial The radial gradient structure being populated.
+ * @param value The attribute value string.
+ */
 typedef void (*Radial_Method)(Evas_SVG_Loader *loader, Svg_Radial_Gradient *radial, const char *value);
+/**
+ * @typedef Radial_Method_Recalc
+ * @brief Function pointer type for recalculating radial gradient attributes after parsing,
+ *        based on the `gradientUnits` attribute.
+ * @param loader The SVG loader context.
+ * @param radial The radial gradient structure to potentially update.
+ * @param user_space EINA_TRUE if `gradientUnits="userSpaceOnUse"`, EINA_FALSE otherwise.
+ */
 typedef void (*Radial_Method_Recalc)(Evas_SVG_Loader *loader, Svg_Radial_Gradient *radial, Eina_Bool user_space);
 
+/** @brief Helper macro for defining entries in the radial_tags lookup table. */
 #define RADIAL_DEF(Name)       \
   { #Name, sizeof (#Name), _handle_radial_##Name##_attr, _recalc_radial_##Name##_attr}
 
+/**
+ * @brief Lookup table for SVG <radialGradient> element attributes.
+ * Maps attribute names ("cx", "cy", "fx", "fy", "r") to their initial parsing
+ * handler and their final recalculation handler (based on gradientUnits).
+ */
 static const struct {
-   const char *tag;
-   int sz;
-   Radial_Method tag_handler;;
-   Radial_Method_Recalc tag_recalc;
+   const char *tag;             /**< The attribute name string. */
+   int sz;                      /**< The size of the tag string (including null terminator). */
+   Radial_Method tag_handler;   /**< The initial parsing handler function. */
+   Radial_Method_Recalc tag_recalc; /**< The recalculation handler function. */
 } radial_tags[] = {
   RADIAL_DEF(cx),
   RADIAL_DEF(cy),
@@ -1984,6 +2748,17 @@ static const struct {
   RADIAL_DEF(r)
 };
 
+/**
+ * @brief Parses attributes specific to the <radialGradient> element.
+ *
+ * Handles 'id', 'spreadMethod', 'xlink:href', 'gradientUnits', and specific
+ * radial attributes ('cx', 'cy', 'fx', 'fy', 'r') using the `radial_tags` table.
+ *
+ * @param data Pointer to the Evas_SVG_Loader context.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return Always returns EINA_TRUE.
+ */
 static Eina_Bool
 _attr_parse_radial_gradient_node(void *data, const char *key, const char *value)
 {
@@ -2020,6 +2795,18 @@ _attr_parse_radial_gradient_node(void *data, const char *key, const char *value)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Factory function for creating an SVG <radialGradient> style structure.
+ *
+ * Allocates the gradient structure, sets defaults (cx=cy=fx=fy=r=0.5, units=objectBoundingBox),
+ * parses attributes using `_attr_parse_radial_gradient_node`, and then performs
+ * recalculation based on `gradientUnits` using the handlers in `radial_tags`.
+ *
+ * @param loader The SVG loader context.
+ * @param buf Buffer containing the element's attributes.
+ * @param buflen Length of the attribute buffer.
+ * @return A new Svg_Style_Gradient structure populated with radial gradient data.
+ */
 static Svg_Style_Gradient *
 _create_radialGradient(Evas_SVG_Loader *loader, const char *buf, unsigned buflen)
 {
@@ -2052,6 +2839,17 @@ _create_radialGradient(Evas_SVG_Loader *loader, const char *buf, unsigned buflen
    return loader->svg_parse->style_grad;
 }
 
+/**
+ * @brief Parses attributes specific to the <stop> element within a gradient.
+ *
+ * Handles 'offset', 'stop-opacity', 'stop-color', and 'style'.
+ * Updates the Efl_Gfx_Gradient_Stop structure pointed to by `loader->svg_parse->grad_stop`.
+ *
+ * @param data Pointer to the Evas_SVG_Loader context.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return Always returns EINA_TRUE.
+ */
 static Eina_Bool
 _attr_parse_stops(void *data, const char *key, const char *value)
 {
@@ -2079,39 +2877,50 @@ _attr_parse_stops(void *data, const char *key, const char *value)
    return EINA_TRUE;
 }
 
+// --- Linear Gradient Attribute Handlers ---
+
+/** @brief Handles the 'x1' attribute for linear gradients. */
 static void
 _handle_linear_x1_attr(Evas_SVG_Loader *loader, Svg_Linear_Gradient* linear, const char *value)
 {
    linear->x1 = _gradient_to_double(loader->svg_parse, value, SVG_PARSER_LENGTH_HORIZONTAL);
 }
 
+/** @brief Handles the 'y1' attribute for linear gradients. */
 static void
 _handle_linear_y1_attr(Evas_SVG_Loader *loader, Svg_Linear_Gradient* linear, const char *value)
 {
    linear->y1 = _gradient_to_double(loader->svg_parse, value, SVG_PARSER_LENGTH_VERTICAL);
 }
 
+/** @brief Handles the 'x2' attribute for linear gradients. */
 static void
 _handle_linear_x2_attr(Evas_SVG_Loader *loader, Svg_Linear_Gradient* linear, const char *value)
 {
    linear->x2 = _gradient_to_double(loader->svg_parse, value, SVG_PARSER_LENGTH_HORIZONTAL);
 }
 
+/** @brief Handles the 'y2' attribute for linear gradients. */
 static void
 _handle_linear_y2_attr(Evas_SVG_Loader *loader, Svg_Linear_Gradient* linear, const char *value)
 {
    linear->y2 = _gradient_to_double(loader->svg_parse, value, SVG_PARSER_LENGTH_VERTICAL);
 }
 
+// --- Linear Gradient Recalculation Handlers (for gradientUnits="objectBoundingBox") ---
+
+/** @brief Recalculates linear 'x1' from percentage to absolute coordinates if needed. */
 static void
 _recalc_linear_x1_attr(Evas_SVG_Loader *loader, Svg_Linear_Gradient* linear, Eina_Bool user_space)
 {
+   // If using objectBoundingBox units (default), convert percentage to absolute coordinate
    if (!user_space)
      {
         linear->x1 = linear->x1 * loader->svg_parse->global.width;
      }
 }
 
+/** @brief Recalculates linear 'y1' from percentage to absolute coordinates if needed. */
 static void
 _recalc_linear_y1_attr(Evas_SVG_Loader *loader, Svg_Linear_Gradient* linear, Eina_Bool user_space)
 {
@@ -2121,6 +2930,7 @@ _recalc_linear_y1_attr(Evas_SVG_Loader *loader, Svg_Linear_Gradient* linear, Ein
      }
 }
 
+/** @brief Recalculates linear 'x2' from percentage to absolute coordinates if needed. */
 static void
 _recalc_linear_x2_attr(Evas_SVG_Loader *loader, Svg_Linear_Gradient* linear, Eina_Bool user_space)
 {
@@ -2130,6 +2940,7 @@ _recalc_linear_x2_attr(Evas_SVG_Loader *loader, Svg_Linear_Gradient* linear, Ein
      }
 }
 
+/** @brief Recalculates linear 'y2' from percentage to absolute coordinates if needed. */
 static void
 _recalc_linear_y2_attr(Evas_SVG_Loader *loader, Svg_Linear_Gradient* linear, Eina_Bool user_space)
 {
@@ -2139,17 +2950,38 @@ _recalc_linear_y2_attr(Evas_SVG_Loader *loader, Svg_Linear_Gradient* linear, Ein
      }
 }
 
+/**
+ * @typedef Linear_Method
+ * @brief Function pointer type for handling specific linear gradient attributes during initial parsing.
+ * @param loader The SVG loader context.
+ * @param linear The linear gradient structure being populated.
+ * @param value The attribute value string.
+ */
 typedef void (*Linear_Method)(Evas_SVG_Loader *loader, Svg_Linear_Gradient *linear, const char *value);
+/**
+ * @typedef Linear_Method_Recalc
+ * @brief Function pointer type for recalculating linear gradient attributes after parsing,
+ *        based on the `gradientUnits` attribute.
+ * @param loader The SVG loader context.
+ * @param linear The linear gradient structure to potentially update.
+ * @param user_space EINA_TRUE if `gradientUnits="userSpaceOnUse"`, EINA_FALSE otherwise.
+ */
 typedef void (*Linear_Method_Recalc)(Evas_SVG_Loader *loader, Svg_Linear_Gradient *linear, Eina_Bool user_space);
 
+/** @brief Helper macro for defining entries in the linear_tags lookup table. */
 #define LINEAR_DEF(Name)       \
   { #Name, sizeof (#Name), _handle_linear_##Name##_attr, _recalc_linear_##Name##_attr}
 
+/**
+ * @brief Lookup table for SVG <linearGradient> element attributes.
+ * Maps attribute names ("x1", "y1", "x2", "y2") to their initial parsing
+ * handler and their final recalculation handler (based on gradientUnits).
+ */
 static const struct {
-   const char *tag;
-   int sz;
-   Linear_Method tag_handler;
-   Linear_Method_Recalc tag_recalc;
+   const char *tag;             /**< The attribute name string. */
+   int sz;                      /**< The size of the tag string (including null terminator). */
+   Linear_Method tag_handler;   /**< The initial parsing handler function. */
+   Linear_Method_Recalc tag_recalc; /**< The recalculation handler function. */
 } linear_tags[] = {
   LINEAR_DEF(x1),
   LINEAR_DEF(y1),
@@ -2157,6 +2989,17 @@ static const struct {
   LINEAR_DEF(y2)
 };
 
+/**
+ * @brief Parses attributes specific to the <linearGradient> element.
+ *
+ * Handles 'id', 'spreadMethod', 'xlink:href', 'gradientUnits', 'gradientTransform',
+ * and specific linear attributes ('x1', 'y1', 'x2', 'y2') using the `linear_tags` table.
+ *
+ * @param data Pointer to the Evas_SVG_Loader context.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return Always returns EINA_TRUE.
+ */
 static Eina_Bool
 _attr_parse_linear_gradient_node(void *data, const char *key, const char *value)
 {
@@ -2197,6 +3040,18 @@ _attr_parse_linear_gradient_node(void *data, const char *key, const char *value)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Factory function for creating an SVG <linearGradient> style structure.
+ *
+ * Allocates the gradient structure, sets defaults (x1=0, y1=0, x2=100%, y2=0, units=objectBoundingBox),
+ * parses attributes using `_attr_parse_linear_gradient_node`, and then performs
+ * recalculation based on `gradientUnits` using the handlers in `linear_tags`.
+ *
+ * @param loader The SVG loader context.
+ * @param buf Buffer containing the element's attributes.
+ * @param buflen Length of the attribute buffer.
+ * @return A new Svg_Style_Gradient structure populated with linear gradient data.
+ */
 static Svg_Style_Gradient *
 _create_linearGradient(Evas_SVG_Loader *loader, const char *buf, unsigned buflen)
 {
@@ -2222,24 +3077,32 @@ _create_linearGradient(Evas_SVG_Loader *loader, const char *buf, unsigned buflen
    return loader->svg_parse->style_grad;
 }
 
+/** @brief Helper macro for defining entries in the gradient_tags lookup table. */
 #define GRADIENT_DEF(Name)                                   \
   { #Name, sizeof (#Name), _create_##Name }
 
 /**
- * For all Gradients lengths would be calculated into percentages related to
- * canvas width and height.
- *
- * if user then recalculate actual pixels into percentages
+ * @brief Lookup table for SVG gradient elements.
+ * Maps element tag names ("linearGradient", "radialGradient") to their
+ * corresponding gradient factory functions (_create_*Gradient).
+ * Note on units: Initial parsing stores lengths as percentages (0.0-1.0)
+ * relative to the viewport/bbox. Recalculation converts these to absolute
+ * pixel values if gradientUnits="userSpaceOnUse" is *not* set.
  */
 static const struct {
-   const char *tag;
-   int sz;
-   Gradient_Factory_Method tag_handler;
+   const char *tag;     /**< The gradient element tag name. */
+   int sz;              /**< The size of the tag string (including null terminator). */
+   Gradient_Factory_Method tag_handler; /**< The factory function for this gradient type. */
 } gradient_tags[] = {
   GRADIENT_DEF(linearGradient),
   GRADIENT_DEF(radialGradient)
 };
 
+/**
+ * @brief Finds the appropriate gradient factory function based on the element tag name.
+ * @param name The gradient element tag name (e.g., "linearGradient").
+ * @return The corresponding Gradient_Factory_Method function pointer, or NULL if not found.
+ */
 static Gradient_Factory_Method
 _find_gradient_factory(const char  *name)
 {
@@ -2254,21 +3117,44 @@ _find_gradient_factory(const char  *name)
    return NULL;
 }
 
+/**
+ * @brief Retrieves the current parent node from the loader's context.
+ * Gets the node from the top of the stack, or returns the document root if the stack is empty.
+ * @param loader The SVG loader context.
+ * @return Pointer to the current parent Svg_Node.
+ */
 static Svg_Node*
 _get_parent_node_from_loader(Evas_SVG_Loader *loader)
 {
    if (eina_array_count(loader->stack) > 0)
+     // Get the node currently at the top of the stack
      return eina_array_data_get(loader->stack, eina_array_count(loader->stack) - 1);
    else
+     // If stack is empty, the parent is the document root
      return loader->doc;
 }
 
+/**
+ * @brief Callback function for handling opening XML tags during parsing.
+ *
+ * Identifies the tag name (e.g., "svg", "g", "path", "linearGradient", "stop").
+ * Finds the appropriate factory function using `_find_group_factory`,
+ * `_find_graphics_factory`, or `_find_gradient_factory`.
+ * Calls the factory function to create the corresponding Svg_Node or Svg_Style_Gradient.
+ * Pushes container nodes onto the loader's stack.
+ * Handles <stop> elements specifically to associate them with the latest gradient.
+ *
+ * @param loader The SVG loader context.
+ * @param content Pointer to the start of the tag content (e.g., "svg ").
+ * @param length Total length of the tag content including attributes.
+ * @param empty EINA_TRUE if the tag is self-closing (e.g., "<rect .../>").
+ */
 static void
 _evas_svg_loader_xml_open_parser(Evas_SVG_Loader *loader,
                                  const char *content, unsigned int length, Eina_Bool empty)
 {
-   const char *attrs = NULL;
-   int attrs_length = 0;
+   const char *attrs = NULL; // Pointer to the start of attributes within content
+   int attrs_length = 0;     // Length of the attribute string
    int sz = length;
    char tag_name[20] = "";
    Factory_Method method;
@@ -2377,6 +3263,17 @@ static const struct {
   POP_TAG(clipPath)
 };
 
+/**
+ * @brief Callback function for handling closing XML tags during parsing.
+ *
+ * Identifies container tags ("g", "svg", "defs", "mask", "clipPath") using `pop_array`.
+ * If a matching container tag is found, pops the corresponding node from the loader's stack.
+ * Decrements the nesting level counter.
+ *
+ * @param loader The SVG loader context.
+ * @param content Pointer to the start of the closing tag name (e.g., "g").
+ * @param length Length of the closing tag name (unused).
+ */
 static void
 _evas_svg_loader_xml_close_parser(Evas_SVG_Loader *loader,
                                   const char *content,
@@ -2396,6 +3293,20 @@ _evas_svg_loader_xml_close_parser(Evas_SVG_Loader *loader,
    loader->level--;
 }
 
+/**
+ * @brief Main callback function for the eina_simple_xml_parse engine.
+ *
+ * Dispatches parsing events (open tag, close tag, data, etc.) to the
+ * appropriate handler functions (`_evas_svg_loader_xml_open_parser`,
+ * `_evas_svg_loader_xml_close_parser`).
+ *
+ * @param data Pointer to the Evas_SVG_Loader context.
+ * @param type The type of XML event (e.g., EINA_SIMPLE_XML_OPEN).
+ * @param content Pointer to the relevant content for the event.
+ * @param offset Offset of the content within the original buffer (unused).
+ * @param length Length of the content.
+ * @return Always returns EINA_TRUE to continue parsing.
+ */
 static Eina_Bool
 _evas_svg_loader_parser(void *data, Eina_Simple_XML_Type type,
                         const char *content,
@@ -2430,11 +3341,22 @@ _evas_svg_loader_parser(void *data, Eina_Simple_XML_Type type,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Inherits style properties from a parent style to a child style.
+ *
+ * For each style property (fill paint, fill opacity, fill rule, stroke paint, etc.),
+ * if the child does not have the corresponding flag set (meaning it wasn't
+ * explicitly defined on the child), the property's value is copied from the parent.
+ * Handles deep copying for URL references and dash arrays.
+ *
+ * @param child The child's Svg_Style_Property structure to update.
+ * @param parent The parent's Svg_Style_Property structure to inherit from. Can be NULL.
+ */
 static void
 _inherit_style(Svg_Style_Property *child, Svg_Style_Property *parent)
 {
    if (parent == NULL)
-     return;
+     return; // Nothing to inherit from
    // inherit the property of parent if not present in child.
    // fill
    if (!(child->fill.flags & SVG_FILL_FLAGS_PAINT))
@@ -2498,6 +3420,16 @@ _inherit_style(Svg_Style_Property *child, Svg_Style_Property *parent)
      }
 }
 
+/**
+ * @brief Recursively updates the style of a node and its descendants by applying inheritance.
+ *
+ * Calls `_inherit_style` to apply the parent's style to the current node,
+ * then recursively calls itself for all children, passing the current node's
+ * (now updated) style as the new parent style.
+ *
+ * @param node The starting node of the subtree to update.
+ * @param parent_style The style properties inherited from the node's parent. Can be NULL for the root.
+ */
 void
 _update_style(Svg_Node *node, Svg_Style_Property *parent_style)
 {
@@ -2512,6 +3444,19 @@ _update_style(Svg_Node *node, Svg_Style_Property *parent_style)
      }
 }
 
+/**
+ * @brief Finds a gradient by ID in a list and returns a deep copy.
+ *
+ * Searches the provided list for a gradient with a matching ID. If found,
+ * creates a clone using `_clone_gradient`. If the cloned gradient has a
+ * reference (`xlink:href`), it attempts to find the referenced gradient in the
+ * same list and copies its stops if the clone doesn't already have stops.
+ *
+ * @param grad_list The Eina_List of Svg_Style_Gradient pointers to search within.
+ * @param id The ID of the gradient to find and duplicate.
+ * @return A pointer to a newly allocated copy of the found gradient, or NULL if not found.
+ *         The caller is responsible for freeing the returned structure.
+ */
 static Svg_Style_Gradient*
 _dup_gradient(Eina_List *grad_list, const char *id)
 {
@@ -2547,6 +3492,17 @@ _dup_gradient(Eina_List *grad_list, const char *id)
    return result;
 }
 
+/**
+ * @brief Recursively resolves gradient URL references within a node subtree.
+ *
+ * Traverses the node tree. For leaf nodes (nodes without children), checks if
+ * the fill or stroke paint properties have a URL reference. If so, calls
+ * `_dup_gradient` to find and clone the referenced gradient from the provided
+ * list and assigns it to the `gradient` field in the paint structure.
+ *
+ * @param node The starting node of the subtree to update.
+ * @param grad_list The Eina_List containing all defined Svg_Style_Gradient structures (e.g., from <defs>).
+ */
 void
 _update_gradient(Svg_Node *node, Eina_List *grad_list)
 {
@@ -2573,6 +3529,17 @@ _update_gradient(Svg_Node *node, Eina_List *grad_list)
      }
 }
 
+/**
+ * @brief Recursively resolves composite URL references (e.g., clip-path) within a node subtree.
+ *
+ * Traverses the node tree. For each node, checks if its composite style property
+ * has a URL reference (`comp.url`) but the resolved node pointer (`comp.node`) is NULL.
+ * If so, calls `_find_node_by_id` starting from the `root` to find the referenced
+ * node (e.g., the <clipPath> element) and stores a pointer to it in `comp.node`.
+ *
+ * @param node The current node being processed in the traversal.
+ * @param root The root node of the SVG document (or the <defs> node), used as the starting point for ID searches.
+ */
 static void _update_composite(Svg_Node* node, Svg_Node* root)
 {
    Svg_Node *child;
@@ -2601,13 +3568,35 @@ evas_vg_load_file_close_svg(Vg_File_Data *vfd)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Evas VG loader function for opening and parsing an SVG file.
+ *
+ * This is the main entry point for loading an SVG. It performs the following steps:
+ * 1. Initializes the Evas_SVG_Loader context.
+ * 2. Maps the entire SVG file content into memory.
+ * 3. Parses the XML content using `eina_simple_xml_parse` with `_evas_svg_loader_parser` as the callback.
+ * 4. Performs post-processing:
+ *    - Inherits styles using `_update_style`.
+ *    - Resolves gradient references using `_update_gradient`.
+ *    - Resolves composite references (clip-path) using `_update_composite`.
+ * 5. Converts the internal Svg_Node tree into an Efl VG node tree using `vg_common_svg_create_vg_node`.
+ * 6. Frees the intermediate Svg_Node tree.
+ * 7. Returns the final Vg_File_Data containing the Efl VG root node.
+ *
+ * @param file Eina_File handle for the opened SVG file.
+ * @param key Optional key associated with the file (unused).
+ * @param error Pointer to an integer to store the Evas load error code.
+ * @return Pointer to the Vg_File_Data structure containing the loaded VG data,
+ *         or NULL on failure (error code will be set).
+ */
 static Vg_File_Data*
 evas_vg_load_file_open_svg(Eina_File *file,
                            const char *key EINA_UNUSED,
-                           int *error EINA_UNUSED)
+                           int *error)
 {
    Evas_SVG_Loader loader = {
-     NULL, NULL, NULL, NULL, NULL, 0, EINA_FALSE
+     .stack = NULL, .doc = NULL, .def = NULL, .gradients = NULL,
+     .latest_gradient = NULL, .svg_parse = NULL, .level = 0, .result = EINA_FALSE
    };
    const char   *content;
    unsigned int  length;
@@ -2655,13 +3644,23 @@ evas_vg_load_file_open_svg(Eina_File *file,
    return result;
 }
 
+/**
+ * @brief Structure containing the function pointers for the SVG VG loader module.
+ */
 static Evas_Vg_Load_Func evas_vg_load_svg_func =
 {
-   evas_vg_load_file_open_svg,
-   evas_vg_load_file_close_svg,
-   evas_vg_load_file_data_svg,
+   /* .file_open */ evas_vg_load_file_open_svg,
+   /* .file_close */ evas_vg_load_file_close_svg,
+   /* .file_data */ evas_vg_load_file_data_svg,
+   /* .frame_load - not used */ NULL,
 };
 
+/**
+ * @brief Evas module initialization function.
+ * Registers the SVG loader functions and the log domain.
+ * @param em Pointer to the Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -2677,6 +3676,11 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Evas module shutdown function.
+ * Unregisters the log domain.
+ * @param em Pointer to the Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

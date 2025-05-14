@@ -18,6 +18,18 @@ Eina_Inlist *_edje_edjes = NULL;
 
 /************************** API Routines **************************/
 
+/**
+ * @brief Adds a new Edje object to the given Evas canvas.
+ *
+ * This is the traditional way to create an Edje object.
+ * It ensures that the provided Evas is a valid canvas and then
+ * creates an instance of the Edje object (MY_CLASS) on it.
+ *
+ * @param evas The Evas canvas to add the Edje object to.
+ * @return A pointer to the newly created Edje object (Evas_Object *),
+ *         or @c NULL on failure.
+ * @ingroup Edje_Object_Group
+ */
 EAPI Evas_Object *
 edje_object_add(Evas *evas)
 {
@@ -26,6 +38,23 @@ edje_object_add(Evas *evas)
    return efl_add(MY_CLASS, evas, efl_canvas_object_legacy_ctor(efl_added));
 }
 
+/**
+ * @internal
+ * @brief Constructor for the Edje object (Efl_Canvas_Layout).
+ *
+ * Initializes the Edje object instance (@p ed). This involves:
+ * - Setting the object as clipped.
+ * - Calling the superclass constructor.
+ * - Setting the legacy Evas object type.
+ * - Storing references to its Evas canvas and clipper.
+ * - Initializing default properties like @c duration_scale.
+ * - Incrementing the Edje library reference count.
+ * - Determining if canvas animator is available from ecore_evas.
+ *
+ * @param obj The Efl_Canvas_Layout object being constructed.
+ * @param ed The Edje private data structure associated with @p obj.
+ * @return The constructed Edje object (@p obj).
+ */
 EOLIAN static Eo *
 _efl_canvas_layout_efl_object_constructor(Eo *obj, Edje *ed)
 {
@@ -50,7 +79,21 @@ _efl_canvas_layout_efl_object_constructor(Eo *obj, Edje *ed)
    return obj;
 }
 
-
+/**
+ * @internal
+ * @brief Invalidation handler for the Edje object.
+ *
+ * Called when the Edje object is being invalidated (typically before deletion).
+ * This function is responsible for cleaning up resources associated with the Edje object,
+ * such as:
+ * - Removing file callbacks.
+ * - Calling the superclass's invalidate method.
+ * - Clearing swallowed objects from SWALLOW parts.
+ * - Removing all child objects from BOX and TABLE container parts.
+ *
+ * @param obj The Efl_Canvas_Layout object being invalidated.
+ * @param ed The Edje private data structure associated with @p obj.
+ */
 EOLIAN static void
 _efl_canvas_layout_efl_object_invalidate(Eo *obj, Edje *ed)
 {
@@ -78,6 +121,17 @@ _efl_canvas_layout_efl_object_invalidate(Eo *obj, Edje *ed)
      }
 }
 
+/**
+ * @internal
+ * @brief Overrides the debug name for the Edje object.
+ *
+ * Appends the Edje file name and group name to the debug string buffer,
+ * providing more specific information for debugging.
+ *
+ * @param obj The Efl_Canvas_Layout object.
+ * @param ed The Edje private data structure.
+ * @param sb The Eina_Strbuf to append the debug information to.
+ */
 EOLIAN static void
 _efl_canvas_layout_efl_object_debug_name_override(Eo *obj, Edje *ed, Eina_Strbuf *sb)
 {
@@ -87,6 +141,17 @@ _efl_canvas_layout_efl_object_debug_name_override(Eo *obj, Edje *ed, Eina_Strbuf
                              ed->group);
 }
 
+/**
+ * @internal
+ * @brief Provides debugging information for the Edje object.
+ *
+ * Adds Edje-specific information to the Efl_Dbg_Info structure, such as
+ * the file name, group name, and any load errors.
+ *
+ * @param eo_obj The Efl_Canvas_Layout object.
+ * @param _pd The Edje private data (unused in this specific override but part of the EOLIAN signature).
+ * @param root The root Efl_Dbg_Info node to append information to.
+ */
 EOLIAN static void
 _efl_canvas_layout_efl_object_dbg_info_get(Eo *eo_obj, Edje *_pd EINA_UNUSED, Efl_Dbg_Info *root) EINA_ARG_NONNULL(3)
 {
@@ -107,6 +172,15 @@ _efl_canvas_layout_efl_object_dbg_info_get(Eo *eo_obj, Edje *_pd EINA_UNUSED, Ef
      }
 }
 
+/**
+ * @internal
+ * @brief Frees an Edje_Color_Class structure.
+ *
+ * Used as a callback for eina_hash_free_buckets to clean up color class data.
+ * It decrements the stringshare reference for the name and frees the structure itself.
+ *
+ * @param data A pointer to the Edje_Color_Class to be freed.
+ */
 static void
 _edje_color_class_free(void *data)
 {
@@ -116,6 +190,16 @@ _edje_color_class_free(void *data)
    free(cc);
 }
 
+/**
+ * @internal
+ * @brief Frees an Edje_Text_Class structure.
+ *
+ * Used as a callback for eina_hash_free_buckets to clean up text class data.
+ * It decrements the stringshare references for the name and font, and frees
+ * the structure itself.
+ *
+ * @param data A pointer to the Edje_Text_Class to be freed.
+ */
 static void
 _edje_text_class_free(void *data)
 {
@@ -126,6 +210,15 @@ _edje_text_class_free(void *data)
    free(tc);
 }
 
+/**
+ * @internal
+ * @brief Frees an Edje_Size_Class structure.
+ *
+ * Used as a callback for eina_hash_free_buckets to clean up size class data.
+ * It decrements the stringshare reference for the name and frees the structure itself.
+ *
+ * @param data A pointer to the Edje_Size_Class to be freed.
+ */
 static void
 _edje_size_class_free(void *data)
 {

@@ -9,37 +9,55 @@ typedef struct _Slice Slice;
 typedef struct _Vertex2 Vertex2;
 typedef struct _Vertex3 Vertex3;
 
+/**
+ * @brief Holds the overall state of the page flip animation.
+ */
 struct _State
 {
-   Evas_Object *front, *back;
-   Evas_Coord down_x, down_y, x, y;
-   Eina_Bool down : 1;
-   Eina_Bool backflip : 1;
+   Evas_Object *front, *back; /**< The front and back page Evas objects. */
+   Evas_Coord down_x, down_y, x, y; /**< Mouse coordinates for flip calculation. */
+   Eina_Bool down : 1; /**< EINA_TRUE if the mouse is down. */
+   Eina_Bool backflip : 1; /**< EINA_TRUE to flip the back page texture. */
 
-   Ecore_Animator *anim;
-   Ecore_Job *job;
-   Evas_Coord ox, oy, w, h;
-   int slices_w, slices_h;
-   Slice **slices, **slices2;
-   int dir; // 0 == left, 1 == right, 2 == up, 3 == down
-   int finish;
+   Ecore_Animator *anim; /**< Animator for the flip/unflip animation. */
+   Ecore_Job *job; /**< Job to coalesce mouse move events. */
+   Evas_Coord ox, oy, w, h; /**< Geometry of the page. */
+   int slices_w, slices_h; /**< Number of slices in width and height. */
+   Slice **slices, **slices2; /**< 2D arrays of slices for front and back pages. */
+   int dir; /**< Flip direction: 0=left, 1=right, 2=up, 3=down. */
+   int finish; /**< Flag to indicate if the animation should complete the flip. */
 };
 
+/**
+ * @brief Represents a rectangular subdivision of the page for rendering the curl.
+ * Each slice is a small piece of the original image that gets transformed in 3D.
+ */
 struct _Slice
 {
-   Evas_Object *obj;
-   // (0)---(1)
-   //  |     |
-   //  |     |
-   // (3)---(2)
-   double u[4], v[4], x[4], y[4], z[4];
+   Evas_Object *obj; /**< The Evas image object for this slice. */
+   /**
+    * @brief Vertex ordering for coordinates:
+    * @code
+    * (0)---(1)
+    *  |     |
+    *  |     |
+    * (3)---(2)
+    * @endcode
+    */
+   double u[4], v[4], x[4], y[4], z[4]; /**< UV and XYZ coordinates for the 4 vertices. */
 };
 
+/**
+ * @brief A simple 2D vertex.
+ */
 struct _Vertex2
 {
    double x, y;
 };
 
+/**
+ * @brief A simple 3D vertex.
+ */
 struct _Vertex3
 {
    double x, y, z;
@@ -61,6 +79,16 @@ static State state =
    0
 };
 
+/**
+ * @brief Creates and initializes a new slice object.
+ *
+ * A slice is a small rectangular part of the original Evas object that will be
+ * individually transformed to create the page curl effect.
+ *
+ * @param st The application state.
+ * @param obj The source Evas object to create the slice from.
+ * @return A new Slice object, or NULL on failure.
+ */
 static Slice *
 _slice_new(State *st EINA_UNUSED, Evas_Object *obj)
 {
@@ -75,6 +103,10 @@ _slice_new(State *st EINA_UNUSED, Evas_Object *obj)
    return sl;
 }
 
+/**
+ * @brief Frees the resources associated with a slice.
+ * @param sl The slice to free.
+ */
 static void
 _slice_free(Slice *sl)
 {
@@ -82,6 +114,19 @@ _slice_free(Slice *sl)
    free(sl);
 }
 
+/**
+ * @brief Applies the calculated 3D transformation to a slice using an Evas_Map.
+ *
+ * This function takes the transformed vertex coordinates from the slice
+ * structure and applies them to the slice's Evas object via an Evas_Map.
+ * It handles the different orientations of the flip (left, right, up, down)
+ * by re-ordering the vertices appropriately.
+ *
+ * @param st The application state, used to get flip direction.
+ * @param sl The slice to apply the transformation to.
+ * @param w Width of the page (used for right-side flips).
+ * @param ox, oy, ow, oh The geometry of the source image on the canvas.
+ */
 static void
 _slice_apply(State *st, Slice *sl,
              Evas_Coord x EINA_UNUSED, Evas_Coord y EINA_UNUSED, Evas_Coord w, Evas_Coord h EINA_UNUSED,
@@ -127,6 +172,17 @@ _slice_apply(State *st, Slice *sl,
    evas_map_free(m);
 }
 
+/**
+ * @brief Applies a 3D perspective effect to a slice.
+ *
+ * It uses a vanishing point at the center of the page to give the illusion of
+ * depth. It also determines if the slice is facing the camera and hides it
+ * if it's facing away (backface culling).
+ *
+ * @param st The application state.
+ * @param sl The slice to apply perspective to.
+ * @param x, y, w, h The geometry of the page.
+ */
 static void
 _slice_3d(State *st EINA_UNUSED, Slice *sl, Evas_Coord x, Evas_Coord y, Evas_Coord w, Evas_Coord h)
 {
@@ -148,6 +204,17 @@ _slice_3d(State *st EINA_UNUSED, Slice *sl, Evas_Coord x, Evas_Coord y, Evas_Coo
    evas_map_free(m);
 }
 
+/**
+ * @brief Applies a lighting effect to a slice.
+ *
+ * This simulates a light source to create shading on the curled page,
+ * enhancing the 3D effect. The light is positioned above the center of the
+ * page, towards the viewer.
+ *
+ * @param st The application state.
+ * @param sl The slice to light.
+ * @param x, y, w, h The geometry of the page.
+ */
 static void
 _slice_light(State *st EINA_UNUSED, Slice *sl, Evas_Coord x, Evas_Coord y, Evas_Coord w, Evas_Coord h)
 {
@@ -177,6 +244,16 @@ _slice_light(State *st EINA_UNUSED, Slice *sl, Evas_Coord x, Evas_Coord y, Evas_
    evas_map_free(m);
 }
 
+/**
+ * @brief Sets the 3D world coordinates of a slice's four vertices.
+ *
+ * @param st The application state.
+ * @param sl The slice to modify.
+ * @param xx1, yy1, zz1 Coordinates for vertex 0.
+ * @param xx2, yy2, zz2 Coordinates for vertex 1.
+ * @param xx3, yy3, zz3 Coordinates for vertex 2.
+ * @param xx4, yy4, zz4 Coordinates for vertex 3.
+ */
 static void
 _slice_xyz(State *st EINA_UNUSED, Slice *sl,
            double xx1, double yy1, double zz1,
@@ -190,6 +267,18 @@ _slice_xyz(State *st EINA_UNUSED, Slice *sl,
    sl->x[3] = xx4; sl->y[3] = yy4; sl->z[3] = zz4;
 }
 
+/**
+ * @brief Sets the UV texture coordinates of a slice's four vertices.
+ *
+ * These coordinates map a portion of the source image onto the slice.
+ *
+ * @param st The application state.
+ * @param sl The slice to modify.
+ * @param u1, v1 Texture coordinates for vertex 0.
+ * @param u2, v2 Texture coordinates for vertex 1.
+ * @param u3, v3 Texture coordinates for vertex 2.
+ * @param u4, v4 Texture coordinates for vertex 3.
+ */
 static void
 _slice_uv(State *st EINA_UNUSED, Slice *sl,
            double u1, double v1,
@@ -203,6 +292,21 @@ _slice_uv(State *st EINA_UNUSED, Slice *sl,
    sl->u[3] = u4; sl->v[3] = v4;
 }
 
+/**
+ * @brief Deforms a 2D point into a 3D point to simulate a page curl.
+ *
+ * This function is the core of the curling effect. It maps a point from a flat
+ * 2D page onto the surface of a cone, which is then rotated to create the
+ * visual effect of a turning page.
+ *
+ * @param vi The input 2D vertex on the flat page.
+ * @param vo The output 3D vertex on the curled page.
+ * @param rho The rotation angle of the cone around the Y-axis (controls how
+ *            much the page is turned). Range: ...-PI/2 to PI/2...
+ * @param theta The angle of the cone (controls the "curliness" of the page).
+ *              Range: 0 to PI/2.
+ * @param A The distance of the cone's apex from the origin along the Y-axis.
+ */
 static void
 _deform_point(Vertex2 *vi, Vertex3 *vo, double rho, double theta, double A)
 {
@@ -229,6 +333,13 @@ _deform_point(Vertex2 *vi, Vertex3 *vo, double rho, double theta, double A)
    vo->z = (v1.x * sin(rho)) + (v1.z * cos(rho));
 }
 
+/**
+ * @brief Performs linear interpolation between two 3D points.
+ * @param vi1 The first input vertex.
+ * @param vi2 The second input vertex.
+ * @param vo The output interpolated vertex.
+ * @param v The interpolation factor (0.0 gives vi1, 1.0 gives vi2).
+ */
 static void
 _interp_point(Vertex3 *vi1, Vertex3 *vi2, Vertex3 *vo, double v)
 {
@@ -237,6 +348,14 @@ _interp_point(Vertex3 *vi1, Vertex3 *vi2, Vertex3 *vo, double v)
    vo->z = (v * vi2->z) + ((1.0 - v) * vi1->z);
 }
 
+/**
+ * @brief Frees all slices and resets slice-related state.
+ *
+ * This is called when the animation ends or when the number of slices needs
+ * to change.
+ *
+ * @param st The application state.
+ */
 static void
 _state_slices_clear(State *st)
 {
@@ -263,6 +382,16 @@ _state_slices_clear(State *st)
    st->slices_h = 0;
 }
 
+/**
+ * @brief Gets the color of a slice vertex and adds it to accumulator variables.
+ *
+ * This is a helper function for `_slice_obj_vert_color_merge`.
+ *
+ * @param s The slice to get the color from.
+ * @param p The index of the vertex (0-3).
+ * @param r, g, b, a Pointers to accumulate the color components.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 _slice_obj_color_sum(Slice *s, int p, int *r, int *g, int *b, int *a)
 {
@@ -277,6 +406,13 @@ _slice_obj_color_sum(Slice *s, int p, int *r, int *g, int *b, int *a)
    return 1;
 }
 
+/**
+ * @brief Sets the color of a specific vertex on a slice.
+ *
+ * @param s The slice to modify.
+ * @param p The index of the vertex (0-3).
+ * @param r, g, b, a The color to set.
+ */
 static void
 _slice_obj_color_set(Slice *s, int p, int r, int g, int b, int a)
 {
@@ -289,6 +425,16 @@ _slice_obj_color_set(Slice *s, int p, int r, int g, int b, int a)
    evas_object_map_set(s->obj, m);
 }
 
+/**
+ * @brief Merges the colors of adjacent vertices from up to four slices.
+ *
+ * This function averages the colors of vertices that meet at a single point
+ * in the grid of slices. This is crucial for creating smooth shading across
+ * the slice boundaries, avoiding visible seams.
+ *
+ * @param s1, s2, s3, s4 Pointers to the four adjacent slices (can be NULL).
+ * @param p1, p2, p3, p4 The vertex indices within each respective slice.
+ */
 static void
 _slice_obj_vert_color_merge(Slice *s1, int p1, Slice *s2, int p2,
                             Slice *s3, int p3, Slice *s4, int p4)
@@ -309,6 +455,21 @@ _slice_obj_vert_color_merge(Slice *s1, int p1, Slice *s2, int p2,
    _slice_obj_color_set(s4, p4, r, g, b, a);
 }
 
+/**
+ * @brief The main update function for the page flip effect.
+ *
+ * This function is called whenever the flip state needs to be recalculated,
+ * typically in response to mouse movement. It performs the entire process of:
+ * 1. Determining the flip direction and progress based on mouse coordinates.
+ * 2. Calculating the geometric parameters (rho, theta, A) for the curl.
+ * 3. Creating or re-configuring the grid of slices if needed.
+ * 4. Deforming the grid of vertices using `_deform_point`.
+ * 5. Setting up the front and back faces of the page using the deformed grid.
+ * 6. Applying transformations, lighting, and color merging to all slices.
+ *
+ * @param st The application state.
+ * @return 1 if the state was updated and slices are active, 0 otherwise.
+ */
 static int
 _state_update(State *st)
 {
@@ -679,12 +840,28 @@ _state_update(State *st)
    return 1;
 }
 
+/**
+ * @brief Cleans up the state after a flip animation is complete.
+ * @param st The application state.
+ */
 static void
 _state_end(State *st)
 {
    _state_slices_clear(st);
 }
 
+/**
+ * @brief The animator callback for the flip completion/reversion animation.
+ *
+ * This function is called by Ecore_Animator on each frame of the animation
+ * that occurs after the user releases the mouse. It interpolates the
+ * cursor position to either complete the page turn or snap it back to its
+ * original state.
+ *
+ * @param data The application state (State *).
+ * @param pos The animation position, from 0.0 (start) to 1.0 (end).
+ * @return EINA_TRUE to continue animating, EINA_FALSE when done.
+ */
 static Eina_Bool
 _state_anim(void *data, double pos)
 {
@@ -723,6 +900,15 @@ _state_anim(void *data, double pos)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Ecore_Job callback to update the curl state.
+ *
+ * Using a job coalesces multiple rapid mouse move events into a single
+ * update, preventing the expensive `_state_update` function from being
+ * called too frequently and bogging down the application.
+ *
+ * @param data The application state (State *).
+ */
 static void
 _update_curl_job(void *data)
 {
@@ -735,6 +921,17 @@ _update_curl_job(void *data)
      }
 }
 
+/**
+ * @brief Callback for the MOUSE_DOWN event.
+ *
+ * Initializes the page flip state when the user presses the mouse button.
+ * It records the initial position and prepares for the flip interaction.
+ *
+ * @param data The front page Evas_Object.
+ * @param e The Evas canvas.
+ * @param obj The object that received the event.
+ * @param event_info The mouse down event details.
+ */
 static void
 im_down_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -762,6 +959,18 @@ im_down_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *
      }
 }
 
+/**
+ * @brief Callback for the MOUSE_UP event.
+ *
+ * Finalizes the flip interaction when the user releases the mouse button.
+ * It determines whether to complete the page turn or snap back to the
+ * original state, and starts the corresponding animation.
+ *
+ * @param data The front page Evas_Object.
+ * @param e The Evas canvas.
+ * @param obj The object that received the event.
+ * @param event_info The mouse up event details.
+ */
 static void
 im_up_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -814,6 +1023,17 @@ im_up_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUS
    _state_anim(st, 0.0);
 }
 
+/**
+ * @brief Callback for the MOUSE_MOVE event.
+ *
+ * Updates the page curl in real-time as the user drags the mouse. It schedules
+ * an Ecore_Job to perform the update, which helps to throttle the update rate.
+ *
+ * @param data The front page Evas_Object.
+ * @param e The Evas canvas.
+ * @param obj The object that received the event.
+ * @param event_info The mouse move event details.
+ */
 static void
 im_move_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -831,6 +1051,14 @@ im_move_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UN
    st->job = ecore_job_add(_update_curl_job, st);
 }
 
+/**
+ * @brief The main test function that sets up the flip page example.
+ *
+ * This function creates a window, loads the front and back images for the
+ * page, and sets up transparent event-catching rectangles. These rectangles
+ * are used to initiate different flip directions (from corners and edges)
+ * when clicked and dragged.
+ */
 void
 test_flip_page(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

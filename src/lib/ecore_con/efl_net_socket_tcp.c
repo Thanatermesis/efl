@@ -32,13 +32,28 @@
 
 #define MY_CLASS EFL_NET_SOCKET_TCP_CLASS
 
+/**
+ * @brief Private data for the Efl_Net_Socket_Tcp class.
+ */
 typedef struct _Efl_Net_Socket_Tcp_Data
 {
-   Eina_Bool keep_alive;
-   Eina_Bool no_delay;
-   Eina_Bool cork;
+   Eina_Bool keep_alive; /**< Whether SO_KEEPALIVE is enabled. */
+   Eina_Bool no_delay;   /**< Whether TCP_NODELAY is enabled (Nagle's algorithm disabled). */
+   Eina_Bool cork;       /**< Whether TCP_CORK or TCP_NOPUSH is enabled. */
 } Efl_Net_Socket_Tcp_Data;
 
+/**
+ * @brief Sets the file descriptor for the TCP socket and applies pending options.
+ *
+ * This function is called when the underlying file descriptor for the socket
+ * is set. It then proceeds to apply any socket options (like keep_alive,
+ * no_delay, cork) that were configured before the fd was available.
+ * It also retrieves and sets the local and remote socket addresses.
+ *
+ * @param o The Efl_Net_Socket_Tcp object.
+ * @param pd Private data for the Efl_Net_Socket_Tcp object.
+ * @param pfd The new file descriptor.
+ */
 EOLIAN static void
 _efl_net_socket_tcp_efl_loop_fd_fd_set(Eo *o, Efl_Net_Socket_Tcp_Data *pd, int pfd)
 {
@@ -82,6 +97,17 @@ _efl_net_socket_tcp_efl_loop_fd_fd_set(Eo *o, Efl_Net_Socket_Tcp_Data *pd, int p
      }
 }
 
+/**
+ * @brief Sets the SO_KEEPALIVE socket option.
+ *
+ * If the socket fd is not yet set, the value is stored and applied later
+ * when the fd becomes available.
+ *
+ * @param o The Efl_Net_Socket_Tcp object.
+ * @param pd Private data for the Efl_Net_Socket_Tcp object.
+ * @param keep_alive EINA_TRUE to enable keep-alive, EINA_FALSE to disable.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 EOLIAN static Eina_Bool
 _efl_net_socket_tcp_keep_alive_set(Eo *o, Efl_Net_Socket_Tcp_Data *pd, Eina_Bool keep_alive)
 {
@@ -110,6 +136,16 @@ _efl_net_socket_tcp_keep_alive_set(Eo *o, Efl_Net_Socket_Tcp_Data *pd, Eina_Bool
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the SO_KEEPALIVE socket option.
+ *
+ * If the socket fd is not yet set, the stored value is returned. Otherwise,
+ * the current value of the option is queried from the system.
+ *
+ * @param o The Efl_Net_Socket_Tcp object.
+ * @param pd Private data for the Efl_Net_Socket_Tcp object.
+ * @return EINA_TRUE if keep-alive is enabled, EINA_FALSE otherwise or on error.
+ */
 EOLIAN static Eina_Bool
 _efl_net_socket_tcp_keep_alive_get(const Eo *o, Efl_Net_Socket_Tcp_Data *pd)
 {
@@ -140,6 +176,18 @@ _efl_net_socket_tcp_keep_alive_get(const Eo *o, Efl_Net_Socket_Tcp_Data *pd)
    return pd->keep_alive;
 }
 
+/**
+ * @brief Sets the TCP_NODELAY socket option.
+ *
+ * Enabling TCP_NODELAY disables Nagle's algorithm.
+ * If the socket fd is not yet set, the value is stored and applied later
+ * when the fd becomes available.
+ *
+ * @param o The Efl_Net_Socket_Tcp object.
+ * @param pd Private data for the Efl_Net_Socket_Tcp object.
+ * @param no_delay EINA_TRUE to enable TCP_NODELAY (disable Nagle's), EINA_FALSE to disable.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 EOLIAN static Eina_Bool
 _efl_net_socket_tcp_no_delay_set(Eo *o, Efl_Net_Socket_Tcp_Data *pd, Eina_Bool no_delay)
 {
@@ -168,6 +216,16 @@ _efl_net_socket_tcp_no_delay_set(Eo *o, Efl_Net_Socket_Tcp_Data *pd, Eina_Bool n
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the TCP_NODELAY socket option.
+ *
+ * If the socket fd is not yet set, the stored value is returned. Otherwise,
+ * the current value of the option is queried from the system.
+ *
+ * @param o The Efl_Net_Socket_Tcp object.
+ * @param pd Private data for the Efl_Net_Socket_Tcp object.
+ * @return EINA_TRUE if TCP_NODELAY is enabled, EINA_FALSE otherwise or on error.
+ */
 EOLIAN static Eina_Bool
 _efl_net_socket_tcp_no_delay_get(const Eo *o, Efl_Net_Socket_Tcp_Data *pd)
 {
@@ -198,6 +256,15 @@ _efl_net_socket_tcp_no_delay_get(const Eo *o, Efl_Net_Socket_Tcp_Data *pd)
    return pd->no_delay;
 }
 
+/**
+ * @brief Gets the appropriate socket option value for TCP_CORK or TCP_NOPUSH.
+ *
+ * This function checks for the availability of TCP_CORK (Linux) or
+ * TCP_NOPUSH (BSD/macOS) and returns the corresponding integer value
+ * for use with setsockopt/getsockopt.
+ *
+ * @return The socket option value (e.g., TCP_CORK, TCP_NOPUSH) or -1 if neither is available.
+ */
 static inline int
 _cork_option_get(void)
 {
@@ -210,6 +277,19 @@ _cork_option_get(void)
 #endif
 }
 
+/**
+ * @brief Sets the TCP_CORK or TCP_NOPUSH socket option.
+ *
+ * This option prevents partial frames from being sent, gathering small packets
+ * into a single larger packet before transmission.
+ * If the socket fd is not yet set, the value is stored and applied later
+ * when the fd becomes available.
+ *
+ * @param o The Efl_Net_Socket_Tcp object.
+ * @param pd Private data for the Efl_Net_Socket_Tcp object.
+ * @param cork EINA_TRUE to enable corking/nopush, EINA_FALSE to disable.
+ * @return EINA_TRUE on success, EINA_FALSE on failure or if the option is not supported.
+ */
 EOLIAN static Eina_Bool
 _efl_net_socket_tcp_cork_set(Eo *o, Efl_Net_Socket_Tcp_Data *pd, Eina_Bool cork)
 {
@@ -242,6 +322,16 @@ _efl_net_socket_tcp_cork_set(Eo *o, Efl_Net_Socket_Tcp_Data *pd, Eina_Bool cork)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the TCP_CORK or TCP_NOPUSH socket option.
+ *
+ * If the socket fd is not yet set, the stored value is returned. Otherwise,
+ * the current value of the option is queried from the system.
+ *
+ * @param o The Efl_Net_Socket_Tcp object.
+ * @param pd Private data for the Efl_Net_Socket_Tcp object.
+ * @return EINA_TRUE if corking/nopush is enabled, EINA_FALSE otherwise, on error, or if not supported.
+ */
 EOLIAN static Eina_Bool
 _efl_net_socket_tcp_cork_get(const Eo *o, Efl_Net_Socket_Tcp_Data *pd)
 {

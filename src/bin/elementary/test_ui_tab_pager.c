@@ -1,3 +1,11 @@
+/**
+ * @file
+ * @brief Test suite for Efl.Ui.Tab_Pager.
+ *
+ * This test suite provides a user interface to test various functionalities
+ * of the Efl.Ui.Tab_Pager widget, including adding, removing, and managing
+ * tab pages, as well as changing their properties and transitions.
+ */
 #ifdef HAVE_CONFIG_H
 # include "elementary_config.h"
 #endif
@@ -7,20 +15,32 @@
 #define TAB_LABEL_COUNT 15
 #define TAB_ICON_COUNT 9
 
+/**
+ * @brief Application specific data structure.
+ * Holds references to the main navigation frame and the tab pager widget.
+ */
 typedef struct _App_Data {
-   Evas_Object *navi;
-   Eo *tab_pager;
+   Evas_Object *navi; /**< The naviframe widget for navigation. */
+   Eo *tab_pager;     /**< The tab pager widget being tested. */
 } App_Data;
 
+/**
+ * @brief Data structure for tab setting operations.
+ * Holds references to the tab pager and a spinner for selecting tab index.
+ */
 typedef struct _Tab_Set_Data {
-   Eo *tab_pager;
-   Eo *spinner;
+   Eo *tab_pager; /**< The tab pager widget. */
+   Eo *spinner;   /**< The spinner widget for index selection. */
 } Tab_Set_Data;
 
+/**
+ * @brief Data structure for tab changing operations.
+ * Holds references to the tab pager and checkboxes for label/icon changes.
+ */
 typedef struct _Tab_Change_Data {
-   Eo *tab_pager;
-   Eo *label_check;
-   Eo *icon_check;
+   Eo *tab_pager;   /**< The tab pager widget. */
+   Eo *label_check; /**< Checkbox to enable/disable label change. */
+   Eo *icon_check;  /**< Checkbox to enable/disable icon change. */
 } Tab_Change_Data;
 
 static int tab_label_count;
@@ -33,30 +53,55 @@ static void _tab_cb(void *data, Evas_Object *obj, void *event_info);
 static void _transition_cb(void *data, Evas_Object *obj, void *event_info);
 static void _win_del_cb(void *data, const Efl_Event *ev);
 
+/**
+ * @brief Array of predefined labels for tabs.
+ * Used cyclically by tab_label_get().
+ * Example: {"efl", "elementary", ...}
+ */
 static char *tab_labels[] = {
    "efl", "elementary", "ecore", "evas", "eina",
    "eo", "eolian", "embryo", "ethumb", "evil",
    "eet", "edje", "ector", "efreet", "eldbus"
 };
 
+/**
+ * @brief Array of predefined icon names for tabs.
+ * Used cyclically by tab_icon_get().
+ * Example: {"document-print", "folder-new", ...}
+ */
 static char *tab_icons[] = {
    "document-print", "folder-new", "object-rotate-right",
    "mail-send", "edit-cut", "edit-copy",
    "edit-paste", "edit-delete", "clock"
 };
 
+/**
+ * @brief Gets the next tab label from the predefined list in a cyclic manner.
+ * @return A string representing the tab label.
+ */
 static char *tab_label_get()
 {
 	if (tab_label_count == TAB_LABEL_COUNT) tab_label_count = 0;
 	return tab_labels[tab_label_count++];
 }
 
+/**
+ * @brief Gets the next tab icon name from the predefined list in a cyclic manner.
+ * @return A string representing the tab icon name.
+ */
 static char *tab_icon_get()
 {
 	if (tab_icon_count == TAB_ICON_COUNT) tab_icon_count = 0;
 	return tab_icons[tab_icon_count++];
 }
 
+/**
+ * @brief Creates and returns a new content layout for a tab page.
+ * The layout displays the provided text.
+ * @param parent The parent Evas_Object.
+ * @param text The text to display in the content.
+ * @return The newly created content layout object.
+ */
 Eo *
 content_add(Eo *parent, char *text)
 {
@@ -77,6 +122,12 @@ content_add(Eo *parent, char *text)
    return page;
 }
 
+/**
+ * @brief Creates and adds a new tab page to the given parent.
+ * The tab page is populated with a label, icon, and content.
+ * @param parent The parent Evas_Object, typically the tab pager.
+ * @return The newly created tab page object.
+ */
 Eo *
 tab_page_add(Eo *parent)
 {
@@ -94,6 +145,13 @@ tab_page_add(Eo *parent)
    return tab_page;
 }
 
+/**
+ * @brief Main function to set up and run the Efl.Ui.Tab_Pager test.
+ * Creates a window with a tab pager and a menu to interact with its properties.
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_ui_tab_pager(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -158,18 +216,35 @@ test_ui_tab_pager(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *ev
 
 /* Menu Callback */
 
+/**
+ * @brief Callback for window deletion.
+ * Frees the application data.
+ * @param data The application data (App_Data *).
+ * @param ev The Efl_Event data.
+ */
 static void
 _win_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Generic button callback to pop an item from the naviframe.
+ * @param data The naviframe Evas_Object.
+ * @param ev The Efl_Event data.
+ */
 static void
 _btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    elm_naviframe_item_pop(data);
 }
 
+/**
+ * @brief Callback for the 'Set Current Tab' button.
+ * Sets the currently selected tab in the tab pager based on the spinner value.
+ * @param data The Tab_Set_Data structure.
+ * @param ev The Efl_Event data.
+ */
 static void
 _tab_set_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -179,12 +254,25 @@ _tab_set_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_selectable_selected_set(efl_ui_tab_page_tab_bar_item_get(page), EINA_TRUE);
 }
 
+/**
+ * @brief Callback for the deletion of the 'Set Current Tab' button's data.
+ * Frees the Tab_Set_Data structure.
+ * @param data The Tab_Set_Data structure.
+ * @param ev The Efl_Event data.
+ */
 static void
 _tab_set_btn_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Callback for the 'Current' menu item.
+ * Pushes a new view onto the naviframe to control the current tab.
+ * @param data The application data (App_Data *).
+ * @param obj Unused.
+ * @param event_info The selected Elm_List_Item.
+ */
 static void
 _current_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -220,6 +308,12 @@ _current_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
                  efl_pack_end(box, efl_added));
 }
 
+/**
+ * @brief Callback for the 'Pack Begin' button.
+ * Adds a new tab page to the beginning of the tab pager.
+ * @param data The tab pager Eo object.
+ * @param ev The Efl_Event data.
+ */
 static void
 _pack_begin_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -231,6 +325,12 @@ _pack_begin_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_pack_begin(tab_pager, tab_page);
 }
 
+/**
+ * @brief Callback for the 'Pack End' button.
+ * Adds a new tab page to the end of the tab pager.
+ * @param data The tab pager Eo object.
+ * @param ev The Efl_Event data.
+ */
 static void
 _pack_end_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -242,6 +342,12 @@ _pack_end_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_pack_end(tab_pager, tab_page);
 }
 
+/**
+ * @brief Callback for the 'Pack Before' button.
+ * Adds a new tab page before the currently selected tab page.
+ * @param data The tab pager Eo object.
+ * @param ev The Efl_Event data.
+ */
 static void
 _pack_before_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -255,6 +361,12 @@ _pack_before_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_pack_before(tab_pager, tab_page, cur_tab_page);
 }
 
+/**
+ * @brief Callback for the 'Pack After' button.
+ * Adds a new tab page after the currently selected tab page.
+ * @param data The tab pager Eo object.
+ * @param ev The Efl_Event data.
+ */
 static void
 _pack_after_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -268,6 +380,12 @@ _pack_after_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_pack_after(tab_pager, tab_page, cur_tab_page);
 }
 
+/**
+ * @brief Callback for the 'Pack At' button.
+ * Adds a new tab page at the index specified by the spinner.
+ * @param data The Tab_Set_Data structure.
+ * @param ev The Efl_Event data.
+ */
 static void
 _pack_at_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -280,12 +398,25 @@ _pack_at_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_range_limits_set(tsd->spinner, 0, efl_content_count(tsd->tab_pager) - 1);
 }
 
+/**
+ * @brief Callback for the deletion of the 'Pack At' button's data.
+ * Frees the Tab_Set_Data structure.
+ * @param data The Tab_Set_Data structure.
+ * @param ev The Efl_Event data.
+ */
 static void
 _pack_at_btn_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Callback for the 'Pack' menu item.
+ * Pushes a new view onto the naviframe to test various pack operations.
+ * @param data The application data (App_Data *).
+ * @param obj Unused.
+ * @param event_info The selected Elm_List_Item.
+ */
 static void
 _pack_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -351,6 +482,12 @@ _pack_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
                  efl_pack_end(in_box, efl_added));
 }
 
+/**
+ * @brief Callback for the 'Clear' button.
+ * Removes all tab pages from the tab pager.
+ * @param data The tab pager Eo object.
+ * @param ev The Efl_Event data.
+ */
 static void
 _clear_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -358,6 +495,12 @@ _clear_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_pack_clear(tab_pager);
 }
 
+/**
+ * @brief Callback for the 'Unpack' button.
+ * Removes the currently selected tab page from the tab pager.
+ * @param data The tab pager Eo object.
+ * @param ev The Efl_Event data.
+ */
 static void
 _unpack_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -369,6 +512,12 @@ _unpack_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_del(tab_page);
 }
 
+/**
+ * @brief Callback for the 'Unpack All' button.
+ * Removes all tab pages from the tab pager. (Similar to clear, but uses unpack_all)
+ * @param data The tab pager Eo object.
+ * @param ev The Efl_Event data.
+ */
 static void
 _unpack_all_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -376,6 +525,12 @@ _unpack_all_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_pack_unpack_all(tab_pager);
 }
 
+/**
+ * @brief Callback for the 'Unpack At' button.
+ * Removes the tab page at the index specified by the spinner.
+ * @param data The Tab_Set_Data structure.
+ * @param ev The Efl_Event data.
+ */
 static void
 _unpack_at_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -385,12 +540,25 @@ _unpack_at_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_range_limits_set(tsd->spinner, 0, efl_content_count(tsd->tab_pager) - 1);
 }
 
+/**
+ * @brief Callback for the deletion of the 'Unpack At' button's data.
+ * Frees the Tab_Set_Data structure.
+ * @param data The Tab_Set_Data structure.
+ * @param ev The Efl_Event data.
+ */
 static void
 _unpack_at_btn_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Callback for the 'Unpack' menu item.
+ * Pushes a new view onto the naviframe to test various unpack operations.
+ * @param data The application data (App_Data *).
+ * @param obj Unused.
+ * @param event_info The selected Elm_List_Item.
+ */
 static void
 _unpack_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -453,6 +621,13 @@ _unpack_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
                  efl_pack_end(in_box, efl_added));
 }
 
+/**
+ * @brief Callback for the 'Change' button in the Tab properties view.
+ * Changes the label and/or icon of the currently selected tab page
+ * based on the state of the checkboxes.
+ * @param data The Tab_Change_Data structure.
+ * @param ev The Efl_Event data.
+ */
 static void
 _change_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -479,12 +654,25 @@ _change_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    }
 }
 
+/**
+ * @brief Callback for the deletion of the 'Change' button's data.
+ * Frees the Tab_Change_Data structure.
+ * @param data The Tab_Change_Data structure.
+ * @param ev The Efl_Event data.
+ */
 static void
 _change_btn_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Callback for the 'Tab' menu item.
+ * Pushes a new view onto the naviframe to change properties of the current tab.
+ * @param data The application data (App_Data *).
+ * @param obj Unused.
+ * @param event_info The selected Elm_List_Item.
+ */
 static void
 _tab_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -526,6 +714,11 @@ _tab_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
                  efl_pack_end(box, efl_added));
 }
 
+/**
+ * @brief Callback to set the tab pager's transition to Scroll.
+ * @param data The tab pager Eo object.
+ * @param ev The Efl_Event data.
+ */
 static void
 _tran_set_btn_scroll_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -533,6 +726,11 @@ _tran_set_btn_scroll_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_tab_pager_spotlight_manager_set(data, scroll);
 }
 
+/**
+ * @brief Callback to set the tab pager's transition to Stack (Fade).
+ * @param data The tab pager Eo object.
+ * @param ev The Efl_Event data.
+ */
 static void
 _tran_set_btn_stack_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -540,12 +738,24 @@ _tran_set_btn_stack_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_tab_pager_spotlight_manager_set(data, stack);
 }
 
+/**
+ * @brief Callback to unset the tab pager's transition manager.
+ * @param data The tab pager Eo object.
+ * @param ev The Efl_Event data.
+ */
 static void
 _tran_unset_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    efl_ui_tab_pager_spotlight_manager_set(data, NULL);
 }
 
+/**
+ * @brief Callback for the 'Transition' menu item.
+ * Pushes a new view onto the naviframe to control tab pager transitions.
+ * @param data The application data (App_Data *).
+ * @param obj Unused.
+ * @param event_info The selected Elm_List_Item.
+ */
 static void
 _transition_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
 {

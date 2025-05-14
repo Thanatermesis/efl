@@ -6,9 +6,32 @@
 
 #define MAX_NUM_OF_CONTENT 17
 
+/**
+ * @brief Array of Efl_Class pointers for UI widgets.
+ *
+ * This array holds the classes of various UI widgets that will be created
+ * and displayed in the test window. Each class corresponds to a specific
+ * Elementary widget type. The array is populated in the
+ * test_part_background() function.
+ *
+ * The structure of elements is an array of pointers to Efl_Class.
+ * For example:
+ * `content_class[0]` will hold `EFL_UI_CALENDAR_CLASS`.
+ * `content_class[1]` will hold `EFL_UI_SLIDER_CLASS`.
+ */
 const Efl_Class *content_class[MAX_NUM_OF_CONTENT];
 
 
+/**
+ * @brief Callback to reset the background of the selected widget.
+ *
+ * This function is called when the "reset" button is clicked. It finds the
+ * currently selected widget from the radio button group and resets its
+ * "background" part to be transparent and have no image.
+ *
+ * @param data The Efl_Ui_Radio_Group that manages the selectable widgets.
+ * @param ev The event information (unused).
+ */
 static void
 _reset_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -22,6 +45,16 @@ _reset_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_file_simple_load(efl_part(target, "background"), NULL, NULL);
 }
 
+/**
+ * @brief Callback to change the background color of the selected widget.
+ *
+ * This function is invoked on a "color" button click. It toggles the
+ * background color of the currently selected widget's "background" part
+ * between red and green. A static variable is used to alternate the color.
+ *
+ * @param data The Efl_Ui_Radio_Group that manages the selectable widgets.
+ * @param ev The event information (unused).
+ */
 static void
 _color_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -35,6 +68,17 @@ _color_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_gfx_color_set(efl_part(target, "background"), (i) ? 255 : 0, (i) ? 0 : 255, 0, 255);
 }
 
+/**
+ * @brief Callback to cycle through image scaling methods.
+ *
+ * Triggered by the "scale_type" button, this function changes the scaling
+ * method of the background image of the selected widget. It loads an image
+ * if not present and cycles through the available Efl_Gfx_Image_Scale_Method
+ * types on each click.
+ *
+ * @param data The Efl_Ui_Radio_Group that manages the selectable widgets.
+ * @param ev The event information (unused).
+ */
 static void
 _scale_type_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -53,6 +97,16 @@ _scale_type_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_gfx_image_scale_method_set(efl_part(target, "background"), type);
 }
 
+/**
+ * @brief Creates a box with radio buttons and corresponding widgets.
+ *
+ * This function populates a given box with a series of widgets, each
+ * associated with a radio button for selection. It iterates through the
+ * global `content_class` array to create instances of different UI widgets.
+ *
+ * @param box The parent Evas_Object (a box) to add the content to.
+ * @return A new Efl_Ui_Radio_Group that manages all the created radio buttons.
+ */
 static Efl_Ui_Radio_Group *
 _create_box_contents(Evas_Object *box)
 {
@@ -119,6 +173,18 @@ _create_box_contents(Evas_Object *box)
    return radio_group;
 }
 
+/**
+ * @brief Main function for the part background test.
+ *
+ * This function sets up the test window for examining the "background" part
+ * of various Elementary widgets. It creates a window, control buttons
+ * (reset, color, scale), and a scrollable list of widgets. The `content_class`
+ * array is populated here with the widget classes to be tested.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_part_background(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

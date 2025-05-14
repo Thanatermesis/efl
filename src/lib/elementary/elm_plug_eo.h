@@ -1,24 +1,43 @@
 #ifndef _ELM_PLUG_EO_H_
 #define _ELM_PLUG_EO_H_
 
-#ifndef _ELM_PLUG_EO_CLASS_TYPE
-#define _ELM_PLUG_EO_CLASS_TYPE
+/**
+ * @file
+ * @brief These routines are for the Efl_Ui_Plug widget.
+ *
+ * Elm_Plug is a widget that allows embedding an Evas canvas from another
+ * process (typically via a socket image mechanism) into an Elementary application.
+ * It is useful for integrating external graphical content or applications.
+ *
+ * @ingroup Elm_Plug
+ */
 
+/**
+ * @brief Represents an Elementary Plug widget instance.
+ * @ingroup Elm_Plug
+ */
 typedef Eo Elm_Plug;
-
-#endif
 
 #ifndef _ELM_PLUG_EO_TYPES
 #define _ELM_PLUG_EO_TYPES
 
 
 #endif
-/** Elementary plug class
+/** @brief Macro to get the Efl_Class for the Elm_Plug widget.
  *
  * @ingroup Elm_Plug
  */
 #define ELM_PLUG_CLASS elm_plug_class_get()
 
+/**
+ * @brief Retrieves the Efl_Class definition for the Elm_Plug widget type.
+ *
+ * This function provides access to the class structure, which contains
+ * metadata and function pointers for the Elm_Plug widget.
+ *
+ * @return The Efl_Class for Elm_Plug.
+ * @ingroup Elm_Plug
+ */
 EWAPI const Efl_Class *elm_plug_class_get(void) EINA_CONST;
 
 /**

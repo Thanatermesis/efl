@@ -1,3 +1,13 @@
+/**
+ * @file
+ * @brief Evas Wayland EGL engine implementation.
+ *
+ * This file contains the core implementation of the Evas rendering engine
+ * that uses Wayland for window system integration and EGL/OpenGL ES 2.0
+ * for hardware-accelerated rendering. It leverages the Evas GL_Generic
+ * engine for common GL operations.
+ */
+
 #include "evas_common_private.h"
 #include "evas_engine.h"
 #include "../gl_common/evas_gl_define.h"

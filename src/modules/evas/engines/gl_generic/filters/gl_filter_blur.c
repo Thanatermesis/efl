@@ -3,6 +3,15 @@
 // sqrt(2 * M_PI)
 #define SQRT_2_PI 2.506628274631
 
+/**
+ * @brief Converts a blur radius to a sigma value for Gaussian calculation.
+ *
+ * This function determines the sigma value based on the blur radius.
+ * The relationship is empirically derived for a visually pleasing blur.
+ *
+ * @param radius The blur radius in pixels.
+ * @return The calculated sigma value.
+ */
 static inline double
 _radius_to_sigma(double radius)
 {
@@ -13,12 +22,36 @@ _radius_to_sigma(double radius)
    return /*sqrt*/ (radius / 3.0);
 }
 
+/**
+ * @brief Calculates a point on the Gaussian curve.
+ *
+ * This function computes the value of the Gaussian function for a given x,
+ * using parameters b. The 'a' parameter (amplitude) is commented out
+ * as it's handled by normalization later.
+ *
+ * @param a The amplitude of the Gaussian curve (currently unused).
+ * @param b A parameter related to the variance (2 * sigma^2).
+ * @param x The point at which to evaluate the Gaussian function.
+ * @return The Gaussian value at point x.
+ */
 static inline double
 _gaussian_val(double a EINA_UNUSED, double b, double x)
 {
    return /*a * */ exp(-(x*x/b));
 }
 
+/**
+ * @brief Calculates Gaussian distribution values up to a max_index.
+ *
+ * This function populates an array with values from a Gaussian distribution.
+ * These values are later used as weights for the blur filter.
+ *
+ * @param values Output array to store the Gaussian values.
+ *                The array should be pre-allocated with at least (max_index + 1) elements.
+ *                Example: `values[0]` will store the Gaussian value at x=0, `values[1]` at x=1, etc.
+ * @param max_index The maximum index (distance from center) for which to calculate Gaussian values.
+ * @param radius The blur radius, used to determine the sigma for the Gaussian curve.
+ */
 static void
 _gaussian_calc(double *values, int max_index, double radius)
 {
@@ -43,6 +76,25 @@ _gaussian_calc(double *values, int max_index, double radius)
      }
 }
 
+/**
+ * @brief Interpolates Gaussian weights and offsets for shader processing.
+ *
+ * This function takes raw Gaussian values and interpolates them into
+ * a smaller set of weights and offsets suitable for use in a shader.
+ * This is an optimization to reduce the number of texture lookups.
+ * The shader will typically sample between pixels using these offsets.
+ *
+ * @param weights Output pointer to an array of interpolated weights.
+ *                The function allocates memory for this array, which must be freed by the caller.
+ *                Example: `(*weights)[0]` is the weight for the center pixel,
+ *                         `(*weights)[1]` is the combined weight for the next pair of pixels.
+ * @param offsets Output pointer to an array of interpolated offsets.
+ *                The function allocates memory for this array, which must be freed by the caller.
+ *                Example: `(*offsets)[0]` is 0.0 (center pixel),
+ *                         `(*offsets)[1]` is the offset for sampling the second of a pair of pixels.
+ * @param radius The blur radius.
+ * @return The number of elements in the `weights` and `offsets` arrays.
+ */
 static int
 _gaussian_interpolate(double **weights, double **offsets, double radius)
 {
@@ -82,6 +134,21 @@ _gaussian_interpolate(double **weights, double **offsets, double radius)
    return count;
 }
 
+/**
+ * @brief Creates and clamps a rectangle to given maximum dimensions.
+ *
+ * This utility function ensures that the created rectangle stays within
+ * the bounds [0, 0, maxw, maxh]. If the rectangle is outside, its
+ * position and dimensions are adjusted.
+ *
+ * @param x The initial x-coordinate of the rectangle.
+ * @param y The initial y-coordinate of the rectangle.
+ * @param w The initial width of the rectangle.
+ * @param h The initial height of the rectangle.
+ * @param maxw The maximum allowed width (boundary for x + w).
+ * @param maxh The maximum allowed height (boundary for y + h).
+ * @return The clamped Eina_Rectangle.
+ */
 static inline Eina_Rectangle
 _rect(int x, int y, int w, int h, int maxw, int maxh)
 {
@@ -112,6 +179,18 @@ _rect(int x, int y, int w, int h, int maxw, int maxh)
 #define S_RECT(_x, _y, _w, _h) _rect(_x, _y, _w, _h, s_w, s_h)
 #define D_RECT(_x, _y, _w, _h) _rect(_x, _y, _w, _h, d_w, d_h)
 
+/**
+ * @brief Retrieves the scaling factors between the filter's output buffer and the command's output dimensions.
+ *
+ * This function calculates the scaling factors required if the filter's internal output buffer
+ * (often the screen or a render target) has different dimensions than the logical output
+ * dimensions specified in the filter command. This can happen, for example, with display scaling.
+ *
+ * @param ctx The Evas filter context.
+ * @param cmd The Evas filter command.
+ * @param scale_x Pointer to store the calculated horizontal scaling factor.
+ * @param scale_y Pointer to store the calculated vertical scaling factor.
+ */
 static inline void
 _output_scale_get(Evas_Filter_Context *ctx, Evas_Filter_Command *cmd,
                   double *scale_x, double *scale_y)
@@ -127,6 +206,23 @@ _output_scale_get(Evas_Filter_Context *ctx, Evas_Filter_Command *cmd,
        }
 }
 
+/**
+ * @brief Applies a 1D Gaussian blur (horizontal or vertical) to an input image.
+ *
+ * This is the core function for applying the blur filter. It sets up the GL context,
+ * calculates Gaussian weights and offsets, handles obscured regions, and then
+ * invokes the GL blur operation.
+ *
+ * @param re The generic GL rendering engine.
+ * @param cmd The Evas filter command containing blur parameters and buffer information.
+ *            `cmd->input` is the source buffer.
+ *            `cmd->output` is the destination buffer.
+ *            `cmd->blur.dx` or `cmd->blur.dy` specifies the blur radius and direction.
+ *            `cmd->draw` contains draw context information (color multiplier, render op).
+ *            `cmd->ctx->obscured.effective` defines an area that should not be blurred,
+ *            allowing for optimized rendering by blurring regions around it.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _gl_filter_blur(Render_Engine_GL_Generic *re, Evas_Filter_Command *cmd)
 {
@@ -270,6 +366,20 @@ _gl_filter_blur(Render_Engine_GL_Generic *re, Evas_Filter_Command *cmd)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the function pointer for applying the GL blur filter.
+ *
+ * This function checks the validity of the filter command and returns
+ * the `_gl_filter_blur` function if the command is suitable for this filter.
+ * It ensures that the blur is 1D (either horizontal or vertical, but not both)
+ * and that a radius is specified.
+ *
+ * @param re The generic GL rendering engine (unused in this function).
+ * @param cmd The Evas filter command to be validated.
+ * @return A function pointer to `_gl_filter_blur` if the command is valid, otherwise NULL.
+ *         Example: `GL_Filter_Apply_Func func = gl_filter_blur_func_get(re, cmd);`
+ *                  `if (func) func(re, cmd);`
+ */
 GL_Filter_Apply_Func
 gl_filter_blur_func_get(Render_Engine_GL_Generic *re EINA_UNUSED, Evas_Filter_Command *cmd)
 {

@@ -22,21 +22,44 @@ static int _evas_loader_tiff_log_dom = -1;
 #endif
 #define INF(...) EINA_LOG_DOM_INFO(_evas_loader_tiff_log_dom, __VA_ARGS__)
 
+/**
+ * @brief Private structure extending TIFFRGBAImage for Evas-specific needs.
+ * This structure is likely intended for internal use within the TIFF loader,
+ * potentially for tracking progress or additional state during image loading,
+ * although pper and py are currently unused in evas_image_load_file_data_tiff.
+ */
 typedef struct TIFFRGBAImage_Extra TIFFRGBAImage_Extra;
+/**
+ * @brief Private structure to hold memory map information for libtiff callbacks.
+ * Used as the handle passed to TIFFClientOpen when reading from memory.
+ */
 typedef struct TIFFRGBAMap TIFFRGBAMap;
 
+/**
+ * @brief Internal structure extending TIFFRGBAImage.
+ */
 struct TIFFRGBAImage_Extra {
-   TIFFRGBAImage       rgba;
-   char                pper;
-   uint32_t            num_pixels;
-   uint32_t            py;
+   TIFFRGBAImage       rgba; /**< The base libtiff RGBA image structure. */
+   char                pper; /**< Potentially for progress tracking (unused). */
+   uint32_t            num_pixels; /**< Total number of pixels in the image. */
+   uint32_t            py; /**< Potentially Y-coordinate for progress (unused). */
 };
 
+/**
+ * @brief Internal structure holding memory map details for libtiff.
+ */
 struct TIFFRGBAMap {
-   tdata_t mem;
-   toff_t size;
+   tdata_t mem; /**< Pointer to the memory-mapped file data. */
+   toff_t size; /**< Size of the memory-mapped data. */
 };
 
+/**
+ * @brief libtiff callback for reading data from the memory map.
+ * @param handle Pointer to the TIFFRGBAMap structure.
+ * @param data Buffer to read data into.
+ * @param size Number of bytes to read.
+ * @return The number of bytes actually read (always `size` in this implementation).
+ */
 static tsize_t
 _evas_tiff_RWProc(thandle_t handle,
                   tdata_t data,
@@ -49,6 +72,13 @@ _evas_tiff_RWProc(thandle_t handle,
    return size;
 }
 
+/**
+ * @brief libtiff callback for seeking within the data stream (no-op for memory map).
+ * @param handle Ignored.
+ * @param size Ignored.
+ * @param origin Ignored.
+ * @return Always 0, as seeking is not needed for a full memory map.
+ */
 static toff_t
 _evas_tiff_SeekProc(thandle_t handle EINA_UNUSED,
                     toff_t size EINA_UNUSED,
@@ -57,12 +87,22 @@ _evas_tiff_SeekProc(thandle_t handle EINA_UNUSED,
    return 0;
 }
 
+/**
+ * @brief libtiff callback for closing the data stream (no-op for memory map).
+ * @param handle Ignored.
+ * @return Always 0.
+ */
 static int
 _evas_tiff_CloseProc(thandle_t handle EINA_UNUSED)
 {
    return 0;
 }
 
+/**
+ * @brief libtiff callback for getting the total size of the data stream.
+ * @param handle Pointer to the TIFFRGBAMap structure.
+ * @return The total size of the memory-mapped file.
+ */
 static toff_t
 _evas_tiff_SizeProc(thandle_t handle)
 {
@@ -71,6 +111,13 @@ _evas_tiff_SizeProc(thandle_t handle)
    return map->size;
 }
 
+/**
+ * @brief libtiff callback for memory mapping the file (provides the existing map).
+ * @param handle Pointer to the TIFFRGBAMap structure.
+ * @param[out] mem Pointer to store the memory map address.
+ * @param[out] size Pointer to store the memory map size.
+ * @return Always 1 (success).
+ */
 static int
 _evas_tiff_MapProc(thandle_t handle, tdata_t *mem, toff_t *size)
 {
@@ -82,11 +129,27 @@ _evas_tiff_MapProc(thandle_t handle, tdata_t *mem, toff_t *size)
    return 1;
 }
 
+/**
+ * @brief libtiff callback for unmapping the file (no-op).
+ * @param handle Ignored.
+ * @param data Ignored.
+ * @param size Ignored.
+ */
 static void
 _evas_tiff_UnmapProc(thandle_t handle EINA_UNUSED, tdata_t data EINA_UNUSED, toff_t size EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Evas loader function to open the TIFF file.
+ * Simply returns the Eina_File handle as loader data.
+ * @param f The Eina_File handle.
+ * @param key Unused.
+ * @param opts Unused.
+ * @param animated Unused.
+ * @param error Unused.
+ * @return The Eina_File handle cast to void*, or NULL on failure (though never fails here).
+ */
 static void *
 evas_image_load_file_open_tiff(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
 			       Evas_Image_Load_Opts *opts EINA_UNUSED,
@@ -96,11 +159,24 @@ evas_image_load_file_open_tiff(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
    return f;
 }
 
+/**
+ * @brief Evas loader function to close the TIFF file.
+ * This is a no-op because the Eina_File is managed externally.
+ * @param loader_data Unused.
+ */
 static void
 evas_image_load_file_close_tiff(void *loader_data EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Evas loader function to read the header information of a TIFF file.
+ * Reads image dimensions (width, height) and checks for alpha channel presence.
+ * @param loader_data The Eina_File handle cast to void*.
+ * @param prop Structure to store image properties (width, height, alpha).
+ * @param error Pointer to store the Evas load error code.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_head_tiff(void *loader_data,
 			       Emile_Image_Property *prop,
@@ -184,6 +260,15 @@ evas_image_load_file_head_tiff(void *loader_data,
    return r;
 }
 
+/**
+ * @brief Evas loader function to read the pixel data of a TIFF file.
+ * Decodes the TIFF image data into the provided pixel buffer.
+ * @param loader_data The Eina_File handle cast to void*.
+ * @param prop Structure containing image properties (used for dimensions, alpha).
+ * @param pixels The buffer to store the decoded ARGB pixel data.
+ * @param error Pointer to store the Evas load error code.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_data_tiff(void *loader_data,
 			       Emile_Image_Property *prop,
@@ -330,19 +415,30 @@ evas_image_load_file_data_tiff(void *loader_data,
    return res;
 }
 
+/**
+ * @brief Structure defining the Evas image loader functions for TIFF.
+ * Maps the internal functions (open, close, head, data) to the Evas loader API.
+ */
 static Evas_Image_Load_Func evas_image_load_tiff_func =
 {
   EVAS_IMAGE_LOAD_VERSION,
-  evas_image_load_file_open_tiff,
-  evas_image_load_file_close_tiff,
-  (void*) evas_image_load_file_head_tiff,
-  NULL,
-  (void*) evas_image_load_file_data_tiff,
-  NULL,
-  EINA_TRUE,
-  EINA_FALSE
+  evas_image_load_file_open_tiff, /* .file_open */
+  evas_image_load_file_close_tiff, /* .file_close */
+  (void*) evas_image_load_file_head_tiff, /* .file_head */
+  NULL, /* .file_head_async - Not implemented */
+  (void*) evas_image_load_file_data_tiff, /* .file_data */
+  NULL, /* .file_data_async - Not implemented */
+  EINA_TRUE, /* .do_region - Supports region loading (though not explicitly used here) */
+  EINA_FALSE /* .is_animated - TIFF is not animated */
 };
 
+/**
+ * @brief Evas module initialization function.
+ * Called when the TIFF loader module is loaded. Registers the log domain
+ * and sets the loader function pointers.
+ * @param em The Evas module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -358,6 +454,11 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Evas module shutdown function.
+ * Called when the TIFF loader module is unloaded. Unregisters the log domain.
+ * @param em Unused.
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

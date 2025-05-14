@@ -1,3 +1,13 @@
+/**
+ * @file
+ * @brief Edje file inspector utility.
+ *
+ * This program allows inspection of compiled Edje files (.edj),
+ * providing details about groups, parts, programs, and other
+ * elements within the file. It can output information in human-readable
+ * or machine-readable formats.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
@@ -33,18 +43,18 @@ static int _log_dom;
 #define FDIFF(a, b) (fabs((a) - (b)) > FLOAT_PRECISION)
 
 /* context */
-static Eina_List *groups;
-static Ecore_Evas *ee;
+static Eina_List *groups; /**< List of group names in the Edje file. */
+static Ecore_Evas *ee; /**< Ecore_Evas instance for Edje object creation. */
 
 /* options */
-static const char *file;
-static char *group = NULL;
-static char *part = NULL;
-static char *program = NULL;
-static int detail = 1;
-static Eina_Bool api_only = EINA_FALSE;
-static Eina_Bool api_fix = EINA_FALSE;
-static Eina_Bool machine = EINA_FALSE;
+static const char *file; /**< Path to the Edje file being inspected. */
+static char *group = NULL; /**< Glob pattern for filtering group names. */
+static char *part = NULL; /**< Glob pattern for filtering part names. */
+static char *program = NULL; /**< Glob pattern for filtering program names. */
+static int detail = 1; /**< Level of detail for output (0: none, 1: terse, 2: all). */
+static Eina_Bool api_only = EINA_FALSE; /**< If EINA_TRUE, only show API-exposed elements. */
+static Eina_Bool api_fix = EINA_FALSE; /**< If EINA_TRUE, fix API names to be C compliant. */
+static Eina_Bool machine = EINA_FALSE; /**< If EINA_TRUE, produce machine-readable output. */
 
 static const char *mode_choices[] = {
    "groups",
@@ -96,6 +106,16 @@ const Ecore_Getopt optdesc = {
    }
 };
 
+/**
+ * @brief Checks if a name matches a given glob pattern.
+ *
+ * If the pattern is NULL, it's considered a match.
+ *
+ * @param name The string to check.
+ * @param pattern The glob pattern to match against.
+ * @return EINA_TRUE if the name matches the pattern or if the pattern is NULL,
+ *         EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 matches(const char *name, const char *pattern)
 {
@@ -103,6 +123,13 @@ matches(const char *name, const char *pattern)
    return eina_fnmatch(pattern, name, 0);
 }
 
+/**
+ * @brief Prints the beginning of a group section.
+ *
+ * Output format depends on whether machine-readable mode is enabled.
+ *
+ * @param name The name of the group.
+ */
 static void
 group_begin(const char *name)
 {
@@ -110,6 +137,11 @@ group_begin(const char *name)
    else printf("group { name: '%s';\n", name);
 }
 
+/**
+ * @brief Prints the end of a group section.
+ *
+ * Output format depends on whether machine-readable mode is enabled.
+ */
 static void
 group_end(void)
 {
@@ -117,6 +149,15 @@ group_end(void)
    else puts("}");
 }
 
+/**
+ * @brief Prints detailed information about a group.
+ *
+ * This includes min/max dimensions and data items, depending on the
+ * detail level. Output format depends on whether machine-readable mode
+ * is enabled.
+ *
+ * @param ed The Edje object representing the loaded group.
+ */
 static void
 group_details(Evas_Object *ed)
 {
@@ -166,6 +207,11 @@ group_details(Evas_Object *ed)
    if (machine) puts("GROUP-DETAILS-END");
 }
 
+/**
+ * @brief Prints the beginning of a parts section within a group.
+ *
+ * Output format depends on whether machine-readable mode is enabled.
+ */
 static void
 parts_begin(void)
 {
@@ -173,6 +219,11 @@ parts_begin(void)
    else puts(INDENT "parts {");
 }
 
+/**
+ * @brief Prints the end of a parts section within a group.
+ *
+ * Output format depends on whether machine-readable mode is enabled.
+ */
 static void
 parts_end(void)
 {
@@ -180,6 +231,13 @@ parts_end(void)
    else puts(INDENT "}");
 }
 
+/**
+ * @brief Gets the string representation of an Edje part type.
+ *
+ * @param t The Edje part type.
+ * @return A string representing the part type, or "???" for unknown types.
+ *         The returned string should not be freed.
+ */
 static const char *
 part_type_name_get(Edje_Part_Type t)
 {
@@ -235,6 +293,14 @@ part_type_name_get(Edje_Part_Type t)
      }
 }
 
+/**
+ * @brief Prints the beginning of a part state description.
+ *
+ * Output format depends on whether machine-readable mode is enabled.
+ *
+ * @param state The name of the state.
+ * @param value The value of the state (e.g., for transitions).
+ */
 static void
 state_begin(const char *state, double value)
 {
@@ -247,6 +313,13 @@ state_begin(const char *state, double value)
      }
 }
 
+/**
+ * @brief Gets the string representation of an aspect preference.
+ *
+ * @param id The aspect preference ID.
+ * @return A string representing the aspect preference, or "???" for unknown IDs.
+ *         The returned string should not be freed.
+ */
 static const char *
 aspect_pref_name_get(int id)
 {
@@ -266,6 +339,13 @@ aspect_pref_name_get(int id)
      }
 }
 
+/**
+ * @brief Gets the string representation of a border fill mode.
+ *
+ * @param id The border fill mode ID.
+ * @return A string representing the border fill mode, or "???" for unknown IDs.
+ *         The returned string should not be freed.
+ */
 static const char *
 border_fill_name_get(int id)
 {
@@ -283,6 +363,19 @@ border_fill_name_get(int id)
      }
 }
 
+/**
+ * @brief Prints detailed information about a specific part state.
+ *
+ * This includes visibility, colors, alignment, min/max sizes, relative
+ * positioning, and type-specific properties (image, text, proxy, external).
+ * Output format depends on whether machine-readable mode is enabled and
+ * the current detail level.
+ *
+ * @param ed The Edje object.
+ * @param ppart The name of the part.
+ * @param state The name of the state.
+ * @param value The value of the state.
+ */
 static void
 state_details(Evas_Object *ed, const char *ppart, const char *state, double value)
 {
@@ -719,6 +812,11 @@ state_details(Evas_Object *ed, const char *ppart, const char *state, double valu
      }
 }
 
+/**
+ * @brief Prints the end of a part state description.
+ *
+ * Output format depends on whether machine-readable mode is enabled.
+ */
 static void
 state_end(void)
 {
@@ -728,6 +826,15 @@ state_end(void)
    else puts(" }");
 }
 
+/**
+ * @brief Prints the beginning of a part definition.
+ *
+ * Includes the part's name and type. Output format depends on whether
+ * machine-readable mode is enabled.
+ *
+ * @param ed The Edje object.
+ * @param name The name of the part.
+ */
 static void
 part_begin(Evas_Object *ed, const char *name)
 {
@@ -740,6 +847,13 @@ part_begin(Evas_Object *ed, const char *name)
      }
 }
 
+/**
+ * @brief Gets the string representation of an Edje text effect.
+ *
+ * @param effect The Edje text effect.
+ * @return A string representing the text effect, or "???" for unknown effects.
+ *         The returned string should not be freed.
+ */
 static const char *
 text_effect_name_get(Edje_Text_Effect effect)
 {
@@ -788,6 +902,14 @@ text_effect_name_get(Edje_Text_Effect effect)
      }
 }
 
+/**
+ * @brief Checks if a character is allowed in a C identifier.
+ *
+ * Allowed characters are alphanumeric (0-9, a-z, A-Z).
+ *
+ * @param c The character to check.
+ * @return EINA_TRUE if the character is allowed, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _c_id_allowed(char c)
 {
@@ -797,6 +919,17 @@ _c_id_allowed(char c)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Fixes an API name to be C compliant.
+ *
+ * Replaces non-alphanumeric characters with underscores.
+ * If api_fix is not enabled, returns a duplicate of the original string.
+ *
+ * @param orig The original API name.
+ * @return A newly allocated string with the fixed API name, or a duplicate of
+ *         the original if no fixing is needed or api_fix is false.
+ *         Returns NULL if orig is NULL. The caller must free the returned string.
+ */
 static char *
 _api_name_fix(const char *orig)
 {
@@ -817,6 +950,17 @@ _api_name_fix(const char *orig)
    return strdup(buf);
 }
 
+/**
+ * @brief Gets the (potentially fixed) API name for a part.
+ *
+ * Retrieves the API name using edje_edit_part_api_name_get and then
+ * fixes it using _api_name_fix if api_fix is enabled.
+ *
+ * @param ed The Edje object.
+ * @param ppart The name of the part.
+ * @return A newly allocated string with the API name. The caller must free it.
+ *         Returns NULL if the part has no API name.
+ */
 static char *
 _part_api_name_get(Evas_Object *ed, const char *ppart)
 {
@@ -826,6 +970,17 @@ _part_api_name_get(Evas_Object *ed, const char *ppart)
    return fix;
 }
 
+/**
+ * @brief Prints detailed information about a part.
+ *
+ * This includes API name/description, mouse/repeat events, scaling,
+ * clip_to, source, text effects, drag properties, and all its states.
+ * Output format depends on whether machine-readable mode is enabled and
+ * the current detail level.
+ *
+ * @param ed The Edje object.
+ * @param ppart The name of the part.
+ */
 static void
 part_details(Evas_Object *ed, const char *ppart)
 {
@@ -948,6 +1103,11 @@ part_details(Evas_Object *ed, const char *ppart)
    if (machine) puts("PART-DETAILS-END");
 }
 
+/**
+ * @brief Prints the end of a part definition.
+ *
+ * Output format depends on whether machine-readable mode is enabled.
+ */
 static void
 part_end(void)
 {
@@ -957,6 +1117,13 @@ part_end(void)
    else puts(" }");
 }
 
+/**
+ * @brief Lists the names of groups matching the filter.
+ *
+ * Prints each matching group name on a new line.
+ *
+ * @return 0 on success, 1 if no matching groups are found.
+ */
 static int
 _groups_names_list(void)
 {
@@ -979,6 +1146,15 @@ _groups_names_list(void)
    return !found;
 }
 
+/**
+ * @brief Lists the names of parts within groups, matching filters.
+ *
+ * Iterates through groups matching the 'group' filter. For each group,
+ * it lists parts matching the 'part' filter and 'api_only' flag.
+ * Output format depends on whether machine-readable mode is enabled.
+ *
+ * @return 0 if matching groups and parts are found, 1 otherwise.
+ */
 static int
 _parts_names_list(void)
 {
@@ -1040,6 +1216,17 @@ _parts_names_list(void)
    return (!found_group) || (!found_part);
 }
 
+/**
+ * @brief Lists detailed information for parts within a loaded group.
+ *
+ * Iterates through parts of the given Edje object (group), applying
+ * the 'part' filter and 'api_only' flag. For each matching part,
+ * it prints its details.
+ *
+ * @param ed The Edje object representing the loaded group.
+ * @return EINA_TRUE if at least one matching part was found and printed,
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _group_parts_list(Evas_Object *ed)
 {
@@ -1076,6 +1263,11 @@ _group_parts_list(Evas_Object *ed)
    return found;
 }
 
+/**
+ * @brief Prints the beginning of a programs section within a group.
+ *
+ * Output format depends on whether machine-readable mode is enabled.
+ */
 static void
 programs_begin(void)
 {
@@ -1083,6 +1275,11 @@ programs_begin(void)
    else puts(INDENT "programs {");
 }
 
+/**
+ * @brief Prints the end of a programs section within a group.
+ *
+ * Output format depends on whether machine-readable mode is enabled.
+ */
 static void
 programs_end(void)
 {
@@ -1090,6 +1287,14 @@ programs_end(void)
    else puts(INDENT "}");
 }
 
+/**
+ * @brief Prints the beginning of a program definition.
+ *
+ * Includes the program's name. Output format depends on whether
+ * machine-readable mode is enabled.
+ *
+ * @param name The name of the program.
+ */
 static void
 program_begin(const char *name)
 {
@@ -1100,6 +1305,11 @@ program_begin(const char *name)
      }
 }
 
+/**
+ * @brief Prints the end of a program definition.
+ *
+ * Output format depends on whether machine-readable mode is enabled.
+ */
 static void
 program_end(void)
 {
@@ -1107,6 +1317,17 @@ program_end(void)
    else puts(INDENT2 "}");
 }
 
+/**
+ * @brief Gets the (potentially fixed) API name for a program.
+ *
+ * Retrieves the API name using edje_edit_program_api_name_get and then
+ * fixes it using _api_name_fix if api_fix is enabled.
+ *
+ * @param ed The Edje object.
+ * @param pprogram The name of the program.
+ * @return A newly allocated string with the API name. The caller must free it.
+ *         Returns NULL if the program has no API name.
+ */
 static char *
 _program_api_name_get(Evas_Object *ed, const char *pprogram)
 {
@@ -1116,6 +1337,13 @@ _program_api_name_get(Evas_Object *ed, const char *pprogram)
    return fix;
 }
 
+/**
+ * @brief Gets the string representation of an Edje tween mode (transition).
+ *
+ * @param mode The Edje tween mode.
+ * @return A string representing the tween mode, or "???" for unknown modes.
+ *         The returned string should not be freed.
+ */
 static const char *
 _transition_name_get(Edje_Tween_Mode mode)
 {
@@ -1137,6 +1365,17 @@ _transition_name_get(Edje_Tween_Mode mode)
      }
 }
 
+/**
+ * @brief Prints detailed information about a program.
+ *
+ * This includes API name/description, signal, source, action,
+ * transition, in (timing), targets, and afters.
+ * Output format depends on whether machine-readable mode is enabled and
+ * the current detail level.
+ *
+ * @param ed The Edje object.
+ * @param pprogram The name of the program.
+ */
 static void
 program_details(Evas_Object *ed, const char *pprogram)
 {
@@ -1266,6 +1505,18 @@ program_details(Evas_Object *ed, const char *pprogram)
    if (machine) puts("PROGRAM-DETAILS-END");
 }
 
+/**
+ * @brief Lists detailed information for programs within a loaded group.
+ *
+ * Iterates through named programs of the given Edje object (group),
+ * applying the 'program' filter and 'api_only' flag. For each matching
+ * program, it prints its details.
+ * @note Currently, this function only lists programs that have names.
+ *
+ * @param ed The Edje object representing the loaded group.
+ * @return EINA_TRUE if at least one matching program was found and printed,
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _group_programs_list(Evas_Object *ed)
 {
@@ -1306,6 +1557,18 @@ _group_programs_list(Evas_Object *ed)
    return found;
 }
 
+/**
+ * @brief Main listing function based on the selected mode.
+ *
+ * This function handles modes "groups", "parts", and "programs".
+ * It iterates through groups matching the 'group' filter. For each group,
+ * it prints group details and, depending on the mode, lists parts and/or
+ * programs, applying respective filters.
+ *
+ * @param mode The operation mode ("groups", "parts", "programs").
+ * @return 0 on success (matching items found), 1 if no matching items
+ *         (groups, parts, or programs as per mode) are found.
+ */
 static int
 _list(const char *mode)
 {
@@ -1390,6 +1653,17 @@ _list(const char *mode)
    return ret;
 }
 
+/**
+ * @brief Loads the first available group from the Edje file.
+ *
+ * This is a helper function to get an Edje object instance when
+ * information not specific to a particular group is needed (e.g.,
+ * global data, images, fonts).
+ *
+ * @return An Evas_Object with a loaded Edje group, or NULL on failure.
+ *         The caller is responsible for deleting the object using
+ *         evas_object_del() if it's not NULL.
+ */
 static Evas_Object *
 _edje_object_any_get(void)
 {
@@ -1403,6 +1677,15 @@ _edje_object_any_get(void)
    return NULL;
 }
 
+/**
+ * @brief Lists global data items from the Edje file.
+ *
+ * Retrieves and prints all key-value pairs from the global data section.
+ * Output format depends on whether machine-readable mode is enabled.
+ *
+ * @return EINA_TRUE if data was successfully listed, EINA_FALSE if an
+ *         Edje object could not be obtained.
+ */
 static Eina_Bool
 _gdata_list(void)
 {
@@ -1432,6 +1715,15 @@ _gdata_list(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets a string representation of an image's compression settings.
+ *
+ * @param ed The Edje object (used to query image properties).
+ * @param img The name of the image.
+ * @return A string describing the compression type and rate (e.g., "RAW",
+ *         "LOSSY 80"). The returned string is a static buffer and should
+ *         not be freed or stored long-term. Returns "???" for unknown types.
+ */
 static const char *
 _comp_str_get(Evas_Object *ed, const char *img)
 {
@@ -1471,6 +1763,16 @@ _comp_str_get(Evas_Object *ed, const char *img)
      }
 }
 
+/**
+ * @brief Lists images embedded in the Edje file.
+ *
+ * For each image, prints its name and compression information.
+ * The level of detail affects whether the image ID is also printed.
+ * Output format depends on whether machine-readable mode is enabled.
+ *
+ * @return EINA_TRUE if images were successfully listed, EINA_FALSE if an
+ *         Edje object could not be obtained.
+ */
 static Eina_Bool
 _images_list(void)
 {
@@ -1519,6 +1821,17 @@ _images_list(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Lists fonts embedded or referenced in the Edje file.
+ *
+ * For each font, prints its alias and path.
+ * The level of detail affects whether the font ID (alias) is also printed
+ * in a comment or as part of machine-readable output.
+ * Output format depends on whether machine-readable mode is enabled.
+ *
+ * @return EINA_TRUE if fonts were successfully listed, EINA_FALSE if an
+ *         Edje object could not be obtained.
+ */
 static Eina_Bool
 _fonts_list(void)
 {
@@ -1569,6 +1882,15 @@ _fonts_list(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Lists external object types declared in the Edje file.
+ *
+ * For each external type, prints its name.
+ * Output format depends on whether machine-readable mode is enabled.
+ *
+ * @return EINA_TRUE if externals were successfully listed, EINA_FALSE if an
+ *         Edje object could not be obtained.
+ */
 static Eina_Bool
 _externals_list(void)
 {
@@ -1597,6 +1919,16 @@ _externals_list(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Main function for the Edje inspector.
+ *
+ * Parses command-line arguments, initializes Efl libraries,
+ * and dispatches to the appropriate listing function based on the mode.
+ *
+ * @param argc Argument count.
+ * @param argv Argument vector.
+ * @return 0 on success, 1 on error.
+ */
 int
 main(int argc, char **argv)
 {

@@ -23,11 +23,24 @@ struct _Outbuf_Region
    int         h;
 };
 
+/**
+ * @brief Initializes the Xlib swapbuffer system.
+ * Currently, this function is a no-op but is kept for API consistency.
+ */
 void
 evas_software_xlib_swapbuf_init(void)
 {
 }
 
+/**
+ * @brief Frees an Outbuf structure and all associated Xlib resources.
+ *
+ * This includes deallocating colors from the colormap if a palette was used,
+ * freeing the Xlib swapper, flushing any pending regions, and freeing the
+ * Outbuf structure itself.
+ *
+ * @param buf The Outbuf to be freed.
+ */
 void
 evas_software_xlib_swapbuf_free(Outbuf *buf)
 {
@@ -42,6 +55,30 @@ evas_software_xlib_swapbuf_free(Outbuf *buf)
    free(buf);
 }
 
+/**
+ * @brief Sets up an Outbuf for Xlib rendering.
+ *
+ * Initializes an Outbuf structure with X11 display parameters, visual information,
+ * colormap, and other settings required for rendering. It also sets up an
+ * Xlib swapper for managing buffer swaps. Color palettes are allocated if
+ * the visual class requires it (e.g., PseudoColor).
+ *
+ * @param w Width of the output buffer.
+ * @param h Height of the output buffer.
+ * @param rot Rotation of the output (0, 90, 180, 270 degrees).
+ * @param depth Output buffer depth.
+ * @param disp X11 Display connection.
+ * @param draw X11 Drawable (Window or Pixmap).
+ * @param vis X11 Visual.
+ * @param cmap X11 Colormap.
+ * @param x_depth Depth of the X11 drawable.
+ * @param grayscale Hint for grayscale palette generation.
+ * @param max_colors Maximum colors for palette mode.
+ * @param mask Mask Pixmap (currently unused).
+ * @param shape_dither Flag to enable shape dithering.
+ * @param destination_alpha Flag indicating if the destination has an alpha channel.
+ * @return A pointer to the newly created Outbuf, or NULL on failure.
+ */
 Outbuf *
 evas_software_xlib_swapbuf_setup_x(int w, int h, int rot, Outbuf_Depth depth,
                                    Display *disp, Drawable draw, Visual *vis,
@@ -213,6 +250,51 @@ evas_software_xlib_swapbuf_setup_x(int w, int h, int rot, Outbuf_Depth depth,
    return buf;
 }
 
+/**
+ * @brief Prepares a region of the Outbuf for updating.
+ *
+ * This function is called before rendering to a part of the canvas.
+ * It clips the requested update region (x, y, w, h) to the Outbuf dimensions.
+ *
+ * If the Outbuf is configured for direct rendering (0 rotation, 32-bit ARGB,
+ * specific masks), it attempts to map the Xlib swapper's buffer directly and
+ * returns a pointer to an RGBA_Image representing this mapped region.
+ * The coordinates (cx, cy, cw, ch) will be the same as the input (x, y, w, h)
+ * relative to the Outbuf. Regions are stored in `buf->priv.onebuf_regions`.
+ * `buf->priv.onebuf_regions` is an Eina_Array of Eina_Rectangle pointers,
+ * where each rectangle defines a region that has been prepared for direct update.
+ * Example:
+ *   buf->priv.onebuf_regions = [
+ *     Eina_Rectangle{x=10, y=10, w=100, h=50},
+ *     Eina_Rectangle{x=150, y=60, w=80, h=80}
+ *   ]
+ *
+ * Otherwise (if direct rendering is not possible due to rotation, format, etc.),
+ * it allocates a new temporary RGBA_Image for the update. This image is stored
+ * in `buf->priv.pending_writes`. The coordinates (cx, cy, cw, ch) will be (0, 0, w, h)
+ * relative to this new temporary image.
+ * `buf->priv.pending_writes` is an Eina_List of RGBA_Image pointers, where each
+ * RGBA_Image has its `extended_info` field pointing to an Eina_Rectangle
+ * that stores the original (x, y, w, h) of the update region.
+ * Example:
+ *   buf->priv.pending_writes = [
+ *     RGBA_Image1 (extended_info: Eina_Rectangle{x=20, y=20, w=50, h=50}),
+ *     RGBA_Image2 (extended_info: Eina_Rectangle{x=80, y=80, w=30, h=30})
+ *   ]
+ *
+ * @param buf The Outbuf structure.
+ * @param x The x-coordinate of the top-left corner of the region to update.
+ * @param y The y-coordinate of the top-left corner of the region to update.
+ * @param w The width of the region to update.
+ * @param h The height of the region to update.
+ * @param[out] cx Pointer to store the clipped x-coordinate of the usable update area.
+ * @param[out] cy Pointer to store the clipped y-coordinate of the usable update area.
+ * @param[out] cw Pointer to store the clipped width of the usable update area.
+ * @param[out] ch Pointer to store the clipped height of the usable update area.
+ * @return A pointer to an RGBA_Image that can be rendered into, or NULL on failure.
+ *         This image is either a direct view into the X shared memory buffer
+ *         or a temporary buffer that will be blitted later.
+ */
 void *
 evas_software_xlib_swapbuf_new_region_for_update(Outbuf *buf, int x, int y, int w, int h, int *cx, int *cy, int *cw, int *ch)
 {
@@ -291,6 +373,32 @@ evas_software_xlib_swapbuf_new_region_for_update(Outbuf *buf, int x, int y, int 
    return NULL;
 }
 
+/**
+ * @brief Flushes updated regions to the X server.
+ *
+ * This function takes all the regions prepared by
+ * evas_software_xlib_swapbuf_new_region_for_update() and makes them visible.
+ *
+ * If `buf->priv.onebuf_regions` (direct rendering) has entries:
+ *   It unmaps the shared memory buffer and calls the swapper to swap/copy
+ *   the specified rectangular regions to the X drawable.
+ *   The `onebuf_regions` array (Eina_Array of Eina_Rectangle pointers) is cleared.
+ *
+ * If `buf->priv.pending_writes` (indirect rendering) has entries:
+ *   It iterates through the list of RGBA_Images. For each image:
+ *     - The image data has already been pushed by evas_software_xlib_swapbuf_push_updated_region().
+ *     - It calculates the destination rectangle on the X drawable, accounting for rotation.
+ *     - These destination rectangles are collected.
+ *   It then unmaps the shared memory buffer (if it was mapped by push_updated_region)
+ *   and calls the swapper to swap/copy these collected rectangles to the X drawable.
+ *   The `pending_writes` list (Eina_List of RGBA_Image pointers) is cleared, and
+ *   associated image data and rectangles are freed.
+ *
+ * @param buf The Outbuf structure.
+ * @param surface_damage Unused parameter.
+ * @param buffer_damage Unused parameter.
+ * @param render_mode The render mode; if EVAS_RENDER_MODE_ASYNC_INIT, the function returns early.
+ */
 void
 evas_software_xlib_swapbuf_flush(Outbuf *buf, Tilebuf_Rect *surface_damage EINA_UNUSED, Tilebuf_Rect *buffer_damage EINA_UNUSED, Evas_Render_Mode render_mode)
 {
@@ -374,12 +482,36 @@ evas_software_xlib_swapbuf_flush(Outbuf *buf, Tilebuf_Rect *surface_damage EINA_
      }
 }
 
+/**
+ * @brief Flushes idle buffers.
+ * Currently, this function is a no-op.
+ * @param buf The Outbuf (unused).
+ */
 void
 evas_software_xlib_swapbuf_idle_flush(Outbuf *buf EINA_UNUSED)
 {
    return;
 }
 
+/**
+ * @brief Pushes an updated RGBA image region to the Outbuf's backing store.
+ *
+ * This function is typically called after rendering to a temporary buffer obtained
+ * from evas_software_xlib_swapbuf_new_region_for_update() when direct rendering
+ * was not possible. It converts the RGBA data from `update` into the native
+ * format of the X server's drawable and writes it into the Xlib swapper's buffer.
+ * It handles color conversion, palette lookup (if applicable), and rotation.
+ *
+ * The destination coordinates (x, y) and dimensions (w, h) are relative to the
+ * original Outbuf, not the `update` image.
+ *
+ * @param buf The Outbuf structure.
+ * @param update The RGBA_Image containing the pixel data to push.
+ * @param x The target x-coordinate in the Outbuf.
+ * @param y The target y-coordinate in the Outbuf.
+ * @param w The width of the region to push.
+ * @param h The height of the region to push.
+ */
 void
 evas_software_xlib_swapbuf_push_updated_region(Outbuf *buf, RGBA_Image *update, int x, int y, int w, int h)
 {
@@ -521,6 +653,19 @@ evas_software_xlib_swapbuf_push_updated_region(Outbuf *buf, RGBA_Image *update, 
                NULL);
 }
 
+/**
+ * @brief Reconfigures an Outbuf with new dimensions, rotation, or depth.
+ *
+ * If the new parameters are different from the current ones, this function
+ * updates the Outbuf's internal state and recreates the Xlib swapper
+ * with the new configuration.
+ *
+ * @param buf The Outbuf to reconfigure.
+ * @param w The new width.
+ * @param h The new height.
+ * @param rot The new rotation (0, 90, 180, 270).
+ * @param depth The new output depth.
+ */
 void
 evas_software_xlib_swapbuf_reconfigure(Outbuf *buf, int w, int h, int rot,
                                        Outbuf_Depth depth)
@@ -546,18 +691,37 @@ evas_software_xlib_swapbuf_reconfigure(Outbuf *buf, int w, int h, int rot,
                                                buf->h, buf->w);
 }
 
+/**
+ * @brief Retrieves the current rotation of the Outbuf.
+ * @param buf The Outbuf.
+ * @return The current rotation value (0, 90, 180, or 270).
+ */
 int
 evas_software_xlib_swapbuf_get_rot(Outbuf *buf)
 {
    return buf->rot;
 }
 
+/**
+ * @brief Checks if the destination buffer is configured to use an alpha channel.
+ * @param buf The Outbuf.
+ * @return EINA_TRUE if the destination has an alpha channel, EINA_FALSE otherwise.
+ */
 Eina_Bool
 evas_software_xlib_swapbuf_alpha_get(Outbuf *buf)
 {
    return buf->priv.destination_alpha;
 }
 
+/**
+ * @brief Gets the buffer state from the Xlib swapper.
+ *
+ * This indicates how the swapper handles updates (e.g., full repaint, copy).
+ *
+ * @param buf The Outbuf.
+ * @return The current Render_Output_Swap_Mode of the swapper.
+ *         Returns MODE_FULL if the swapper is not initialized.
+ */
 Render_Output_Swap_Mode
 evas_software_xlib_swapbuf_buffer_state_get(Outbuf *buf)
 {

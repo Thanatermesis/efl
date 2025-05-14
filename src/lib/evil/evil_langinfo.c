@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Implementation of nl_langinfo function.
+ */
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif /* HAVE_CONFIG_H */
@@ -7,7 +11,21 @@
 
 #include "evil_private.h"
 
-
+/**
+ * @internal
+ * @brief Replaces a dynamically allocated string with a new one.
+ *
+ * If `prev` is not NULL, it is freed. If `value` is not NULL,
+ * a duplicate of `value` is created and returned.
+ * This function is used to manage the static buffer `result` in `nl_langinfo`.
+ *
+ * @param prev Pointer to the previous string (to be freed).
+ * @param value Pointer to the new string content (to be duplicated).
+ * @return A pointer to the newly allocated string if `value` is not NULL,
+ *         otherwise returns `prev` (which would be NULL if `value` was NULL
+ *         and `prev` was also NULL, or `prev` if `value` was NULL and `prev` was not).
+ *         Returns NULL if strdup fails.
+ */
 static char *
 replace(char *prev, char *value)
 {
@@ -19,6 +37,17 @@ replace(char *prev, char *value)
    return strdup (value);
 }
 
+/**
+ * @brief Retrieve locale-specific information.
+ * @see nl_langinfo in evil_langinfo.h for detailed parameter and return value descriptions.
+ *
+ * This function provides an implementation for nl_langinfo, returning
+ * strings for various locale items. It uses a static buffer for some
+ * results, meaning subsequent calls might invalidate previous results.
+ * For CODESET, it attempts to parse the locale string to extract the
+ * codeset, potentially modifying it to a "cp" prefix if it looks like
+ * a codepage number.
+ */
 EVIL_API char *
 nl_langinfo(nl_item index)
 {

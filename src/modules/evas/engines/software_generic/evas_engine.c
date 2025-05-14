@@ -298,16 +298,52 @@ static int gl_lib_init(void);
 
 // Threaded Render
 
+/**
+ * @brief Structure holding data for a rectangle drawing command in a separate thread.
+ */
 typedef struct _Evas_Thread_Command_Rect Evas_Thread_Command_Rect;
+
+/**
+ * @brief Structure holding data for a line drawing command in a separate thread.
+ */
 typedef struct _Evas_Thread_Command_Line Evas_Thread_Command_Line;
+/**
+ * @brief Structure holding data for a polygon drawing command in a separate thread.
+ */
 typedef struct _Evas_Thread_Command_Polygon Evas_Thread_Command_Polygon;
+
+/**
+ * @brief Structure holding data for an image drawing command in a separate thread.
+ */
 typedef struct _Evas_Thread_Command_Image Evas_Thread_Command_Image;
+
+/**
+ * @brief Structure holding data for a font (glyph array) drawing command in a separate thread.
+ */
 typedef struct _Evas_Thread_Command_Font Evas_Thread_Command_Font;
+/**
+ * @brief Structure holding data for a map drawing command in a separate thread.
+ */
 typedef struct _Evas_Thread_Command_Map Evas_Thread_Command_Map;
+
+/**
+ * @brief Structure holding data for drawing multiple font runs in a separate thread.
+ */
 typedef struct _Evas_Thread_Command_Multi_Font Evas_Thread_Command_Multi_Font;
+
+/**
+ * @brief Structure holding data for an Ector rendering command in a separate thread.
+ */
 typedef struct _Evas_Thread_Command_Ector Evas_Thread_Command_Ector;
+
+/**
+ * @brief Structure holding data for setting up an Ector surface in a separate thread.
+ */
 typedef struct _Evas_Thread_Command_Ector_Surface Evas_Thread_Command_Ector_Surface;
 
+/**
+ * @brief Holds parameters for drawing a rectangle in a rendering thread.
+ */
 struct _Evas_Thread_Command_Rect
 {
    void *surface;
@@ -315,12 +351,16 @@ struct _Evas_Thread_Command_Rect
    int render_op;
    int x, y, w, h;
    void *mask;
-   int mask_x, mask_y;
+   int mask_x; /**< X offset for the mask surface. */
+   int mask_y; /**< Y offset for the mask surface. */
 };
 
+/**
+ * @brief Holds parameters for drawing a line in a rendering thread.
+ */
 struct _Evas_Thread_Command_Line
 {
-   void *surface;
+   void *surface; /**< Target surface (RGBA_Image). */
    Eina_Rectangle clip;
    DATA32 color;
    int render_op;
@@ -328,36 +368,48 @@ struct _Evas_Thread_Command_Line
    int x1, y1;
    int x2, y2;
    void *mask;
-   int mask_x, mask_y;
+   int mask_x; /**< X offset for the mask surface. */
+   int mask_y; /**< Y offset for the mask surface. */
 };
 
+/**
+ * @brief Holds parameters for drawing a polygon in a rendering thread.
+ */
 struct _Evas_Thread_Command_Polygon
 {
-   Eina_Rectangle ext;
+   Eina_Rectangle ext; /**< Clipping extent rectangle. */
    DATA32 col;
    int render_op;
    void *surface;
    RGBA_Polygon_Point *points;
    int x, y;
    void *mask;
-   int mask_x, mask_y;
+   int mask_x; /**< X offset for the mask surface. */
+   int mask_y; /**< Y offset for the mask surface. */
 };
 
+/**
+ * @brief Holds parameters for drawing an image in a rendering thread.
+ */
 struct _Evas_Thread_Command_Image
 {
-   void *surface;
+   void *surface; /**< Target surface (RGBA_Image). */
    void *image;
    Eina_Rectangle src, dst, clip;
    DATA32 mul_col;
    int render_op;
    int smooth;
    void *mask;
-   int mask_x, mask_y;
+   int mask_x; /**< X offset for the mask surface. */
+   int mask_y; /**< Y offset for the mask surface. */
 };
 
+/**
+ * @brief Holds parameters for drawing text (glyphs) in a rendering thread.
+ */
 struct _Evas_Thread_Command_Font
 {
-   RGBA_Image *dst;
+   RGBA_Image *dst; /**< Destination surface. */
    int x;
    int y;
    Evas_Glyph_Array *glyphs;
@@ -371,13 +423,17 @@ struct _Evas_Thread_Command_Font
    Eina_Rectangle clip_rect, ext;
    int im_w, im_h;
    void *mask;
-   int mask_x, mask_y;
-   Eina_Bool clip_use : 1;
+   int mask_x; /**< X offset for the mask surface. */
+   int mask_y; /**< Y offset for the mask surface. */
+   Eina_Bool clip_use : 1; /**< Flag indicating if clipping is used. */
 };
 
+/**
+ * @brief Holds parameters for drawing a mapped image in a rendering thread.
+ */
 struct _Evas_Thread_Command_Map
 {
-   void *image;
+   void *image; /**< Source image (RGBA_Image). */
    RGBA_Draw_Context *image_ctx;
    void *surface;
    Eina_Rectangle clip;
@@ -387,36 +443,60 @@ struct _Evas_Thread_Command_Map
    int smooth, level, offset;
    Eina_Bool anti_alias;
    void *mask;
-   int mask_x, mask_y;
+   int mask_x; /**< X offset for the mask surface. */
+   int mask_y; /**< Y offset for the mask surface. */
 };
 
+/**
+ * @brief Holds parameters for drawing multiple text runs in a rendering thread.
+ */
 struct _Evas_Thread_Command_Multi_Font
 {
-   RGBA_Draw_Context *context;
+   RGBA_Draw_Context *context; /**< Drawing context (duplicated for the thread). */
    void *surface;
    int x, y;
-   Evas_Font_Array *texts;
+   Evas_Font_Array *texts; /**< Array of text properties and glyphs to draw. */
 };
 
+/**
+ * @brief Holds parameters for executing an Ector renderer draw command in a thread.
+ */
 struct _Evas_Thread_Command_Ector
 {
-   Ector_Renderer *r;
+   Ector_Renderer *r; /**< The Ector renderer to use. */
    Eina_Array *clips;
 
    DATA32 mul_col;
    Efl_Gfx_Render_Op render_op;
 
-   Eina_Bool free_it;
+   Eina_Bool free_it; /**< Flag indicating if this command struct should be freed after execution. */
 };
 
+/**
+ * @brief Holds parameters for setting up the target surface for an Ector renderer in a thread.
+ */
 struct _Evas_Thread_Command_Ector_Surface
 {
-   Ector_Surface *ector;
+   Ector_Surface *ector; /**< The Ector surface being configured. */
    void *pixels;
-   int x, y;
+   int x; /**< X reference point for the surface. */
+   int y; /**< Y reference point for the surface. */
 };
 
 // declare here as it is re-used
+/**
+ * @brief Creates a new surface suitable for image map operations.
+ *
+ * This function allocates an RGBA_Image that can be used as a temporary
+ * drawing surface, typically for map rendering operations where an
+ * intermediate buffer is needed.
+ *
+ * @param data Engine-specific data (unused).
+ * @param w Width of the surface.
+ * @param h Height of the surface.
+ * @param alpha Boolean indicating if the surface should support alpha.
+ * @return A pointer to the newly created RGBA_Image surface, or NULL on failure.
+ */
 static void *eng_image_map_surface_new(void *data, int w, int h, int alpha);
 
 Eina_Mempool *_mp_command_rect = NULL;
@@ -435,12 +515,17 @@ Eina_Mempool *_mp_command_ector_surface = NULL;
  **
  *****
  */
-static int cpunum = 0;
-static int _evas_soft_gen_log_dom = -1;
+static int cpunum = 0; /**< Number of available CPU cores, used for potential optimizations. */
+static int _evas_soft_gen_log_dom = -1; /**< Log domain for the software generic engine. */
 
-//#define QCMD evas_thread_cmd_enqueue
-#define QCMD evas_thread_queue_flush
+//#define QCMD evas_thread_cmd_enqueue // Alternative command queuing macro (unused)
+#define QCMD evas_thread_queue_flush /**< Macro used to flush the command queue for threaded rendering. */
 
+/**
+ * @brief Dumps caches (image and font). Called usually before shutdown or on memory pressure.
+ * @param engine The engine instance (unused).
+ * @param data Engine-specific data (unused).
+ */
 static void
 eng_output_dump(void *engine EINA_UNUSED, void *data EINA_UNUSED)
 {
@@ -448,12 +533,24 @@ eng_output_dump(void *engine EINA_UNUSED, void *data EINA_UNUSED)
    evas_common_font_font_all_unload();
 }
 
+/**
+ * @brief Creates a new drawing context.
+ * @param data Engine-specific data (unused).
+ * @return A new RGBA_Draw_Context instance.
+ */
 static void *
 eng_context_new(void *data EINA_UNUSED)
 {
    return evas_common_draw_context_new();
 }
 
+/**
+ * @brief Duplicates an existing drawing context.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to duplicate.
+ * @return A new RGBA_Draw_Context instance, which is a copy of the input context.
+ *         References to mask images are incremented.
+ */
 static void *
 eng_context_dup(void *data EINA_UNUSED, void *context)
 {
@@ -469,12 +566,27 @@ eng_context_dup(void *data EINA_UNUSED, void *context)
    return ctx;
 }
 
+/**
+ * @brief Sets the rectangular clipping region for a drawing context.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to modify.
+ * @param x The x-coordinate of the clip rectangle.
+ * @param y The y-coordinate of the clip rectangle.
+ * @param w The width of the clip rectangle.
+ * @param h The height of the clip rectangle.
+ */
 static void
 eng_context_clip_set(void *data EINA_UNUSED, void *context, int x, int y, int w, int h)
 {
    evas_common_draw_context_set_clip(context, x, y, w, h);
 }
 
+/**
+ * @brief Unsets the image mask clipping for a drawing context.
+ * Decrements the reference count of the mask image if set.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to modify.
+ */
 static void
 eng_context_clip_image_unset(void *data EINA_UNUSED, void *context)
 {
@@ -492,6 +604,18 @@ eng_context_clip_image_unset(void *data EINA_UNUSED, void *context)
      }
 }
 
+/**
+ * @brief Sets an image mask for clipping in a drawing context.
+ * The drawing operations will be masked by the alpha channel of the provided image.
+ * The rectangular clip region is intersected with the mask image bounds.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to modify.
+ * @param surface The mask image (Image_Entry). Reference count is incremented.
+ * @param x The x-coordinate offset for the mask image.
+ * @param y The y-coordinate offset for the mask image.
+ * @param evas The Evas canvas public data (used for async unref).
+ * @param do_async If true, use async unref queue for the mask image.
+ */
 static void
 eng_context_clip_image_set(void *data EINA_UNUSED, void *context, void *surface, int x, int y,
                            Evas_Public_Data *evas, Eina_Bool do_async)
@@ -523,6 +647,14 @@ eng_context_clip_image_set(void *data EINA_UNUSED, void *context, void *surface,
      }
 }
 
+/**
+ * @brief Gets the current image mask used for clipping.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to query.
+ * @param ie Pointer to store the mask image (Image_Entry). Reference count is incremented if not NULL.
+ * @param x Pointer to store the x-coordinate offset of the mask.
+ * @param y Pointer to store the y-coordinate offset of the mask.
+ */
 static void
 eng_context_clip_image_get(void *data EINA_UNUSED, void *context, void **ie, int *x, int *y)
 {
@@ -540,6 +672,12 @@ eng_context_clip_image_get(void *data EINA_UNUSED, void *context, void **ie, int
    if (y) *y = ctx->clip.mask_y;
 }
 
+/**
+ * @brief Frees a drawing context.
+ * Unsets any image mask before freeing.
+ * @param data Engine-specific data (used by eng_context_clip_image_unset).
+ * @param context The RGBA_Draw_Context to free.
+ */
 static void
 eng_context_free(void *data, void *context)
 {
@@ -551,18 +689,42 @@ eng_context_free(void *data, void *context)
    evas_common_draw_context_free(context);
 }
 
+/**
+ * @brief Intersects the current clip rectangle with a new rectangle.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to modify.
+ * @param x The x-coordinate of the new rectangle.
+ * @param y The y-coordinate of the new rectangle.
+ * @param w The width of the new rectangle.
+ * @param h The height of the new rectangle.
+ */
 static void
 eng_context_clip_clip(void *data EINA_UNUSED, void *context, int x, int y, int w, int h)
 {
    evas_common_draw_context_clip_clip(context, x, y, w, h);
 }
 
+/**
+ * @brief Resets the clipping region to the default (no clipping).
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to modify.
+ */
 static void
 eng_context_clip_unset(void *data EINA_UNUSED, void *context)
 {
    evas_common_draw_context_unset_clip(context);
 }
 
+/**
+ * @brief Gets the current rectangular clipping region.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to query.
+ * @param x Pointer to store the x-coordinate of the clip rectangle.
+ * @param y Pointer to store the y-coordinate of the clip rectangle.
+ * @param w Pointer to store the width of the clip rectangle.
+ * @param h Pointer to store the height of the clip rectangle.
+ * @return 1 if clipping is enabled, 0 otherwise.
+ */
 static int
 eng_context_clip_get(void *data EINA_UNUSED, void *context, int *x, int *y, int *w, int *h)
 {
@@ -573,12 +735,31 @@ eng_context_clip_get(void *data EINA_UNUSED, void *context, int *x, int *y, int 
    return ((RGBA_Draw_Context *)context)->clip.use;
 }
 
+/**
+ * @brief Sets the drawing color for a context.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to modify.
+ * @param r Red component (0-255).
+ * @param g Green component (0-255).
+ * @param b Blue component (0-255).
+ * @param a Alpha component (0-255).
+ */
 static void
 eng_context_color_set(void *data EINA_UNUSED, void *context, int r, int g, int b, int a)
 {
    evas_common_draw_context_set_color(context, r, g, b, a);
 }
 
+/**
+ * @brief Gets the current drawing color from a context.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to query.
+ * @param r Pointer to store the red component.
+ * @param g Pointer to store the green component.
+ * @param b Pointer to store the blue component.
+ * @param a Pointer to store the alpha component.
+ * @return Always returns 1 (success).
+ */
 static int
 eng_context_color_get(void *data EINA_UNUSED, void *context, int *r, int *g, int *b, int *a)
 {
@@ -589,18 +770,43 @@ eng_context_color_get(void *data EINA_UNUSED, void *context, int *r, int *g, int
    return 1;
 }
 
+/**
+ * @brief Sets the color multiplier for a context.
+ * The drawing color and source image colors will be multiplied by this color.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to modify.
+ * @param r Red multiplier component (0-255).
+ * @param g Green multiplier component (0-255).
+ * @param b Blue multiplier component (0-255).
+ * @param a Alpha multiplier component (0-255).
+ */
 static void
 eng_context_multiplier_set(void *data EINA_UNUSED, void *context, int r, int g, int b, int a)
 {
    evas_common_draw_context_set_multiplier(context, r, g, b, a);
 }
 
+/**
+ * @brief Unsets the color multiplier (disables multiplication).
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to modify.
+ */
 static void
 eng_context_multiplier_unset(void *data EINA_UNUSED, void *context)
 {
    evas_common_draw_context_unset_multiplier(context);
 }
 
+/**
+ * @brief Gets the current color multiplier from a context.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to query.
+ * @param r Pointer to store the red multiplier component.
+ * @param g Pointer to store the green multiplier component.
+ * @param b Pointer to store the blue multiplier component.
+ * @param a Pointer to store the alpha multiplier component.
+ * @return 1 if a multiplier is set, 0 otherwise.
+ */
 static int
 eng_context_multiplier_get(void *data EINA_UNUSED, void *context, int *r, int *g, int *b, int *a)
 {
@@ -611,12 +817,28 @@ eng_context_multiplier_get(void *data EINA_UNUSED, void *context, int *r, int *g
    return ((RGBA_Draw_Context *)context)->mul.use;
 }
 
+/**
+ * @brief Adds a rectangular cutout region to the context.
+ * Drawing operations will not affect pixels within cutout regions.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to modify.
+ * @param x The x-coordinate of the cutout rectangle.
+ * @param y The y-coordinate of the cutout rectangle.
+ * @param w The width of the cutout rectangle.
+ * @param h The height of the cutout rectangle.
+ */
 static void
 eng_context_cutout_add(void *data EINA_UNUSED, void *context, int x, int y, int w, int h)
 {
    evas_common_draw_context_add_cutout(context, x, y, w, h);
 }
 
+/**
+ * @brief Clears all cutout regions from the context.
+ * Also resets the cutout target rectangle.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to modify.
+ */
 static void
 eng_context_cutout_clear(void *data EINA_UNUSED, void *context)
 {
@@ -624,48 +846,100 @@ eng_context_cutout_clear(void *data EINA_UNUSED, void *context)
    evas_common_draw_context_clear_cutouts(context);
 }
 
+/**
+ * @brief Sets the target area for subsequent cutout additions.
+ * Cutouts added after this call will be relative to and clipped by this target area.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to modify.
+ * @param x The x-coordinate of the target rectangle.
+ * @param y The y-coordinate of the target rectangle.
+ * @param w The width of the target rectangle.
+ * @param h The height of the target rectangle.
+ */
 static void
 eng_context_cutout_target(void *data EINA_UNUSED, void *context, int x, int y, int w, int h)
 {
    evas_common_draw_context_target_set(context, x, y, w, h);
 }
 
+/**
+ * @brief Sets the anti-aliasing mode for the context.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to modify.
+ * @param aa 1 to enable anti-aliasing, 0 to disable.
+ */
 static void
 eng_context_anti_alias_set(void *data EINA_UNUSED, void *context, unsigned char aa)
 {
    evas_common_draw_context_set_anti_alias(context, aa);
 }
 
+/**
+ * @brief Gets the current anti-aliasing mode from the context.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to query.
+ * @return 1 if anti-aliasing is enabled, 0 otherwise.
+ */
 static unsigned char
 eng_context_anti_alias_get(void *data EINA_UNUSED, void *context)
 {
    return ((RGBA_Draw_Context *)context)->anti_alias;
 }
 
+/**
+ * @brief Sets the color interpolation space for the context.
+ * Affects how colors are interpolated, e.g., during gradient rendering (if applicable).
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to modify.
+ * @param color_space The Evas_Colorspace value for interpolation.
+ */
 static void
 eng_context_color_interpolation_set(void *data EINA_UNUSED, void *context, int color_space)
 {
    evas_common_draw_context_set_color_interpolation(context, color_space);
 }
 
+/**
+ * @brief Gets the current color interpolation space from the context.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to query.
+ * @return The Evas_Colorspace value used for interpolation.
+ */
 static int
 eng_context_color_interpolation_get(void *data EINA_UNUSED, void *context)
 {
    return ((RGBA_Draw_Context *)context)->interpolation.color_space;
 }
 
+/**
+ * @brief Sets the rendering operation (blending mode) for the context.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to modify.
+ * @param op The Evas_Render_Op value (e.g., EVAS_RENDER_BLEND, EVAS_RENDER_COPY).
+ */
 static void
 eng_context_render_op_set(void *data EINA_UNUSED, void *context, int op)
 {
    evas_common_draw_context_set_render_op(context, op);
 }
 
+/**
+ * @brief Gets the current rendering operation (blending mode) from the context.
+ * @param data Engine-specific data (unused).
+ * @param context The RGBA_Draw_Context to query.
+ * @return The Evas_Render_Op value.
+ */
 static int
 eng_context_render_op_get(void *data EINA_UNUSED, void *context)
 {
    return ((RGBA_Draw_Context *)context)->render_op;
 }
 
+/**
+ * @brief Executes a rectangle drawing command in a rendering thread.
+ * This function is called by the thread pool.
+ * @param data Pointer to an Evas_Thread_Command_Rect structure containing drawing parameters.
+ */
 static void
 _draw_thread_rectangle_draw(void *data)
 {
@@ -679,6 +953,15 @@ _draw_thread_rectangle_draw(void *data)
     eina_mempool_free(_mp_command_rect, rect);
 }
 
+/**
+ * @brief Creates and enqueues a rectangle drawing command for threaded execution.
+ * @param dst The destination RGBA_Image surface.
+ * @param dc The drawing context.
+ * @param x The x-coordinate of the rectangle.
+ * @param y The y-coordinate of the rectangle.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ */
 static void
 _draw_rectangle_thread_cmd(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y, int w, int h)
 {
@@ -704,6 +987,19 @@ _draw_rectangle_thread_cmd(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y,
    QCMD(_draw_thread_rectangle_draw, cr);
 }
 
+/**
+ * @brief Engine function to draw a rectangle.
+ * Dispatches the drawing to the appropriate implementation (sync, async thread, pipe).
+ * @param engine The engine instance (unused).
+ * @param data Engine-specific data (unused).
+ * @param context The drawing context.
+ * @param surface The target surface.
+ * @param x The x-coordinate of the rectangle.
+ * @param y The y-coordinate of the rectangle.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ * @param do_async If true, attempt asynchronous (threaded) drawing.
+ */
 static void
 eng_rectangle_draw(void *engine EINA_UNUSED, void *data EINA_UNUSED, void *context, void *surface, int x, int y, int w, int h, Eina_Bool do_async)
 {
@@ -721,6 +1017,12 @@ eng_rectangle_draw(void *engine EINA_UNUSED, void *data EINA_UNUSED, void *conte
      }
 }
 
+/**
+ * @brief Executes a line drawing command in a rendering thread.
+ * Handles both single points and lines (aliased or anti-aliased).
+ * This function is called by the thread pool.
+ * @param data Pointer to an Evas_Thread_Command_Line structure containing drawing parameters.
+ */
 static void
 _draw_thread_line_draw(void *data)
 {
@@ -762,6 +1064,16 @@ _draw_thread_line_draw(void *data)
    eina_mempool_free(_mp_command_line, line);
 }
 
+/**
+ * @brief Creates and enqueues a line drawing command for threaded execution.
+ * Performs clipping before creating the command structure.
+ * @param dst The destination RGBA_Image surface.
+ * @param dc The drawing context.
+ * @param x1 The starting x-coordinate of the line.
+ * @param y1 The starting y-coordinate of the line.
+ * @param x2 The ending x-coordinate of the line.
+ * @param y2 The ending y-coordinate of the line.
+ */
 static void
 _line_draw_thread_cmd(RGBA_Image *dst, RGBA_Draw_Context *dc, int x1, int y1, int x2, int y2)
 {
@@ -830,6 +1142,19 @@ _line_draw_thread_cmd(RGBA_Image *dst, RGBA_Draw_Context *dc, int x1, int y1, in
    QCMD(_draw_thread_line_draw, cl);
 }
 
+/**
+ * @brief Engine function to draw a line.
+ * Dispatches the drawing to the appropriate implementation (sync, async thread, pipe).
+ * @param engine The engine instance (unused).
+ * @param data Engine-specific data (unused).
+ * @param context The drawing context.
+ * @param surface The target surface.
+ * @param x1 The starting x-coordinate of the line.
+ * @param y1 The starting y-coordinate of the line.
+ * @param x2 The ending x-coordinate of the line.
+ * @param y2 The ending y-coordinate of the line.
+ * @param do_async If true, attempt asynchronous (threaded) drawing.
+ */
 static void
 eng_line_draw(void *engine EINA_UNUSED, void *data EINA_UNUSED, void *context, void *surface, int x1, int y1, int x2, int y2, Eina_Bool do_async)
 {
@@ -845,18 +1170,38 @@ eng_line_draw(void *engine EINA_UNUSED, void *data EINA_UNUSED, void *context, v
      }
 }
 
+/**
+ * @brief Adds a point to a polygon structure.
+ * @param data Engine-specific data (unused).
+ * @param polygon The polygon structure (RGBA_Polygon_Point list) to modify.
+ * @param x The x-coordinate of the point.
+ * @param y The y-coordinate of the point.
+ * @return The updated polygon structure (potentially the new head of the list).
+ */
 static void *
 eng_polygon_point_add(void *data EINA_UNUSED, void *polygon, int x, int y)
 {
    return evas_common_polygon_point_add(polygon, x, y);
 }
 
+/**
+ * @brief Clears all points from a polygon structure.
+ * Frees the memory associated with the points.
+ * @param data Engine-specific data (unused).
+ * @param polygon The polygon structure (RGBA_Polygon_Point list) to clear.
+ * @return Always returns NULL (representing an empty polygon).
+ */
 static void *
 eng_polygon_points_clear(void *data EINA_UNUSED, void *polygon)
 {
    return evas_common_polygon_points_clear(polygon);
 }
 
+/**
+ * @brief Frees the points list associated with a threaded polygon command.
+ * This is called after the polygon has been drawn in the thread.
+ * @param poly The polygon command structure whose points need freeing.
+ */
 static void
 _draw_thread_polygon_cleanup(Evas_Thread_Command_Polygon *poly)
 {
@@ -876,6 +1221,11 @@ _draw_thread_polygon_cleanup(Evas_Thread_Command_Polygon *poly)
    poly->points = NULL;
 }
 
+/**
+ * @brief Executes a polygon drawing command in a rendering thread.
+ * This function is called by the thread pool. Cleans up points afterwards.
+ * @param data Pointer to an Evas_Thread_Command_Polygon structure containing drawing parameters.
+ */
 static void
 _draw_thread_polygon_draw(void *data)
 {
@@ -892,6 +1242,12 @@ _draw_thread_polygon_draw(void *data)
    eina_mempool_free(_mp_command_polygon, poly);
 }
 
+/**
+ * @brief Duplicates the points list for a threaded polygon command.
+ * The original points list belongs to the main thread, so the rendering thread needs its own copy.
+ * @param cp The threaded polygon command structure to populate.
+ * @param points The original list of polygon points (RGBA_Polygon_Point list).
+ */
 static void
 _polygon_draw_thread_points_populate(Evas_Thread_Command_Polygon *cp, RGBA_Polygon_Point *points)
 {
@@ -915,6 +1271,15 @@ _polygon_draw_thread_points_populate(Evas_Thread_Command_Polygon *cp, RGBA_Polyg
    cp->points = npoints;
 }
 
+/**
+ * @brief Creates and enqueues a polygon drawing command for threaded execution.
+ * Performs clipping and duplicates the points list.
+ * @param dst The destination RGBA_Image surface.
+ * @param dc The drawing context.
+ * @param points The list of polygon points (RGBA_Polygon_Point list).
+ * @param x The x-offset for drawing the polygon.
+ * @param y The y-offset for drawing the polygon.
+ */
 static void
 _polygon_draw_thread_cmd(RGBA_Image *dst, RGBA_Draw_Context *dc, RGBA_Polygon_Point *points, int x, int y)
 {
@@ -967,6 +1332,18 @@ _polygon_draw_thread_cmd(RGBA_Image *dst, RGBA_Draw_Context *dc, RGBA_Polygon_Po
    QCMD(_draw_thread_polygon_draw, cp);
 }
 
+/**
+ * @brief Engine function to draw a polygon.
+ * Dispatches the drawing to the appropriate implementation (sync, async thread, pipe).
+ * @param engine The engine instance (unused).
+ * @param data Engine-specific data (unused).
+ * @param context The drawing context.
+ * @param surface The target surface.
+ * @param polygon The polygon points list (RGBA_Polygon_Point list).
+ * @param x The x-offset for drawing the polygon.
+ * @param y The y-offset for drawing the polygon.
+ * @param do_async If true, attempt asynchronous (threaded) drawing.
+ */
 static void
 eng_polygon_draw(void *engine EINA_UNUSED, void *data EINA_UNUSED, void *context, void *surface, void *polygon, int x, int y, Eina_Bool do_async)
 {
@@ -982,6 +1359,12 @@ eng_polygon_draw(void *engine EINA_UNUSED, void *data EINA_UNUSED, void *context
      }
 }
 
+/**
+ * @brief Gets the alpha channel flag for an image.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry).
+ * @return 1 if the image has an alpha channel, 0 otherwise.
+ */
 static int
 eng_image_alpha_get(void *data EINA_UNUSED, void *image)
 {
@@ -999,6 +1382,12 @@ eng_image_alpha_get(void *data EINA_UNUSED, void *image)
    return 0;
 }
 
+/**
+ * @brief Gets the colorspace of an image.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry).
+ * @return The Evas_Colorspace of the image. Defaults to EVAS_COLORSPACE_ARGB8888 if image is NULL.
+ */
 static Evas_Colorspace
 eng_image_colorspace_get(void *data EINA_UNUSED, void *image)
 {
@@ -1009,6 +1398,12 @@ eng_image_colorspace_get(void *data EINA_UNUSED, void *image)
    return im->space;
 }
 
+/**
+ * @brief Checks if the image loader supports region loading/decoding.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry).
+ * @return EINA_TRUE if region operations are supported by the loader, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 eng_image_can_region_get(void *data EINA_UNUSED, void *image)
 {
@@ -1018,6 +1413,15 @@ eng_image_can_region_get(void *data EINA_UNUSED, void *image)
    return ((Evas_Image_Load_Func*) im->info.loader)->do_region;
 }
 
+/**
+ * @brief Sets the alpha channel flag for an image.
+ * If the image data is loaded, it ensures the image is not shared (copies if necessary)
+ * before modifying the flag. Marks the image colorspace as dirty.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry) to modify.
+ * @param has_alpha 1 to indicate the image has alpha, 0 otherwise.
+ * @return The potentially new image entry if a copy was made, otherwise the original image.
+ */
 static void *
 eng_image_alpha_set(void *data EINA_UNUSED, void *image, int has_alpha)
 {
@@ -1037,6 +1441,13 @@ eng_image_alpha_set(void *data EINA_UNUSED, void *image, int has_alpha)
    return im;
 }
 
+/**
+ * @brief Gets the original colorspace of the image as reported by the loader.
+ * This might differ from the current colorspace if it was converted.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry).
+ * @return The original Evas_Colorspace from the file, or the current space if unavailable.
+ */
 static Evas_Colorspace
 eng_image_file_colorspace_get(void *data EINA_UNUSED, void *image)
 {
@@ -1048,6 +1459,14 @@ eng_image_file_colorspace_get(void *data EINA_UNUSED, void *image)
    return im->cache_entry.space;
 }
 
+/**
+ * @brief Gets the content (non-border) region of an image, if defined by the loader.
+ * Loads image data if necessary.
+ * @param engine The engine instance (unused).
+ * @param image The image entry (Image_Entry).
+ * @param content Pointer to an Eina_Rectangle to store the content region.
+ * @return EINA_TRUE if a content region is available and returned, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 eng_image_content_region_get(void *engine EINA_UNUSED, void *image, Eina_Rectangle *content)
 {
@@ -1069,6 +1488,15 @@ eng_image_content_region_get(void *engine EINA_UNUSED, void *image, Eina_Rectang
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the stretch regions (9-patch data) of an image, if defined by the loader.
+ * Loads image data if necessary.
+ * @param engine The engine instance (unused).
+ * @param image The image entry (Image_Entry).
+ * @param horizontal Pointer to store the horizontal stretch region data.
+ * @param vertical Pointer to store the vertical stretch region data.
+ * @return EINA_TRUE if stretch regions are available and returned, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 eng_image_stretch_region_get(void *engine EINA_UNUSED, void *image,
                              uint8_t **horizontal, uint8_t **vertical)
@@ -1090,6 +1518,21 @@ eng_image_stretch_region_get(void *engine EINA_UNUSED, void *image,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets direct access to image data via an Eina_Slice.
+ * This provides a view into the image's internal buffer without copying, if possible
+ * for the given colorspace and plane.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry).
+ * @param plane The color plane to access (0 for interleaved formats like ARGB,
+ *              0=Y, 1=U, 2=V etc. for planar YUV).
+ * @param slice Pointer to an Eina_Slice to store the data pointer and length.
+ * @param cspace Pointer to store the Evas_Colorspace of the returned data.
+ * @param load If EINA_TRUE, ensures image data is loaded before returning the slice.
+ * @param tofree Pointer to a boolean that will be set to EINA_TRUE if the caller
+ *               needs to free the slice memory (currently always EINA_FALSE).
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., invalid plane, load error).
+ */
 static Eina_Bool
 eng_image_data_direct_get(void *data EINA_UNUSED, void *image, int plane,
                           Eina_Slice *slice, Evas_Colorspace *cspace,
@@ -1110,6 +1553,13 @@ eng_image_data_direct_get(void *data EINA_UNUSED, void *image, int plane,
    return _evas_common_rgba_image_plane_get(im, plane, slice);
 }
 
+/**
+ * @brief Sets the colorspace for an image.
+ * This may trigger a colorspace conversion when the image data is accessed or drawn.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry) to modify.
+ * @param cspace The target Evas_Colorspace.
+ */
 static void
 eng_image_colorspace_set(void *data EINA_UNUSED, void *image, Evas_Colorspace cspace)
 {
@@ -1120,6 +1570,13 @@ eng_image_colorspace_set(void *data EINA_UNUSED, void *image, Evas_Colorspace cs
    evas_cache_image_colorspace(im, cspace);
 }
 
+/**
+ * @brief Initializes native surface support for a specific type.
+ * Currently only supports TBM surfaces.
+ * @param data Engine-specific data (unused).
+ * @param type The Evas_Native_Surface_Type to initialize.
+ * @return 1 on success, 0 on failure or if the type is unsupported.
+ */
 static int
 eng_image_native_init(void *data EINA_UNUSED, Evas_Native_Surface_Type type)
 {
@@ -1130,6 +1587,12 @@ eng_image_native_init(void *data EINA_UNUSED, Evas_Native_Surface_Type type)
    return 0;
 }
 
+/**
+ * @brief Shuts down native surface support for a specific type.
+ * Currently only supports TBM surfaces.
+ * @param data Engine-specific data (unused).
+ * @param type The Evas_Native_Surface_Type to shut down.
+ */
 static void
 eng_image_native_shutdown(void *data EINA_UNUSED, Evas_Native_Surface_Type type)
 {
@@ -1139,6 +1602,18 @@ eng_image_native_shutdown(void *data EINA_UNUSED, Evas_Native_Surface_Type type)
      ERR("Native surface type %d not supported!", type);
 }
 
+/**
+ * @brief Associates a native surface with an Evas image.
+ * This allows Evas to potentially use the native surface directly (e.g., for zero-copy).
+ * The implementation details depend on the native surface type (TBM, WL_DMABUF, EvasGL).
+ * May replace the underlying image data structure.
+ * @param data Engine-specific data (unused).
+ * @param image The Evas image entry (Image_Entry) to associate with the native surface. Can be NULL for probing.
+ * @param native Pointer to the Evas_Native_Surface structure describing the native surface.
+ *               If NULL, disassociates any existing native surface.
+ * @return The potentially new Evas image entry (Image_Entry) representing the native surface,
+ *         or NULL on failure or if disassociating.
+ */
 static void *
 eng_image_native_set(void *data EINA_UNUSED, void *image, void *native)
 {
@@ -1193,6 +1668,12 @@ eng_image_native_set(void *data EINA_UNUSED, void *image, void *native)
    return ie2;
 }
 
+/**
+ * @brief Retrieves the native surface associated with an Evas image.
+ * @param data Engine-specific data (unused).
+ * @param image The Evas image entry (Image_Entry) to query.
+ * @return Pointer to the associated Evas_Native_Surface structure, or NULL if none.
+ */
 static void *
 eng_image_native_get(void *data EINA_UNUSED, void *image)
 {
@@ -1204,6 +1685,16 @@ eng_image_native_get(void *data EINA_UNUSED, void *image)
    return n;
 }
 
+/**
+ * @brief Loads an image from a file.
+ * Uses the common image loading infrastructure.
+ * @param data Engine-specific data (unused).
+ * @param file The path to the image file.
+ * @param key Optional key within the file (e.g., for Eet files).
+ * @param error Pointer to store the Evas_Load_Error code on failure.
+ * @param lo Pointer to image loading options.
+ * @return A new image entry (Image_Entry) on success, NULL on failure.
+ */
 static void *
 eng_image_load(void *data EINA_UNUSED, const char *file, const char *key, int *error, Evas_Image_Load_Opts *lo)
 {
@@ -1212,6 +1703,16 @@ eng_image_load(void *data EINA_UNUSED, const char *file, const char *key, int *e
    return evas_common_load_image_from_file(file, key, lo, error);
 }
 
+/**
+ * @brief Loads an image from a memory-mapped file.
+ * Uses the common image loading infrastructure.
+ * @param data Engine-specific data (unused).
+ * @param f The Eina_File handle representing the memory-mapped file.
+ * @param key Optional key within the file.
+ * @param error Pointer to store the Evas_Load_Error code on failure.
+ * @param lo Pointer to image loading options.
+ * @return A new image entry (Image_Entry) on success, NULL on failure.
+ */
 static void *
 eng_image_mmap(void *data EINA_UNUSED, Eina_File *f, const char *key, int *error, Evas_Image_Load_Opts *lo)
 {
@@ -1220,24 +1721,57 @@ eng_image_mmap(void *data EINA_UNUSED, Eina_File *f, const char *key, int *error
    return evas_common_load_image_from_mmap(f, key, lo, error);
 }
 
+/**
+ * @brief Creates a new image entry wrapping existing pixel data (zero-copy).
+ * The engine does not own the pixel data and will not free it.
+ * @param data Engine-specific data (unused).
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param image_data Pointer to the pixel data.
+ * @param alpha 1 if the data has alpha, 0 otherwise.
+ * @param cspace The Evas_Colorspace of the pixel data.
+ * @return A new image entry (Image_Entry) wrapping the data, or NULL on failure.
+ */
 static void *
 eng_image_new_from_data(void *data EINA_UNUSED, int w, int h, DATA32 *image_data, int alpha, Evas_Colorspace cspace)
 {
    return evas_cache_image_data(evas_common_image_cache_get(), w, h, image_data, alpha, cspace);
 }
 
+/**
+ * @brief Creates a new image entry by copying pixel data.
+ * The engine allocates its own buffer and copies the provided data into it.
+ * @param data Engine-specific data (unused).
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param image_data Pointer to the pixel data to copy. If NULL, allocates an uninitialized buffer.
+ * @param alpha 1 if the data has alpha, 0 otherwise.
+ * @param cspace The Evas_Colorspace of the pixel data.
+ * @return A new image entry (Image_Entry) with copied data, or NULL on failure.
+ */
 static void *
 eng_image_new_from_copied_data(void *data EINA_UNUSED, int w, int h, DATA32 *image_data, int alpha, Evas_Colorspace cspace)
 {
    return evas_cache_image_copied_data(evas_common_image_cache_get(), w, h, image_data, alpha, cspace);
 }
 
+/**
+ * @brief Frees an image entry (decrements reference count).
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry) to free/unref.
+ */
 static void
 eng_image_free(void *data EINA_UNUSED, void *image)
 {
    evas_cache_image_drop(image);
 }
 
+/**
+ * @brief Increments the reference count of an image entry.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry) to reference.
+ * @return The same image entry pointer.
+ */
 static void *
 eng_image_ref(void *data EINA_UNUSED, void *image)
 {
@@ -1246,6 +1780,13 @@ eng_image_ref(void *data EINA_UNUSED, void *image)
    return image;
 }
 
+/**
+ * @brief Gets the dimensions (width and height) of an image.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry).
+ * @param w Pointer to store the width.
+ * @param h Pointer to store the height.
+ */
 static void
 eng_image_size_get(void *data EINA_UNUSED, void *image, int *w, int *h)
 {
@@ -1256,6 +1797,16 @@ eng_image_size_get(void *data EINA_UNUSED, void *image, int *w, int *h)
    if (h) *h = im->h;
 }
 
+/**
+ * @brief Sets the dimensions of an image.
+ * This might involve reallocating the image buffer or creating a new image entry.
+ * Handles potential native surface resource freeing if the image entry changes.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry) to resize.
+ * @param w The new width.
+ * @param h The new height.
+ * @return The potentially new image entry if reallocation occurred, otherwise the original image.
+ */
 static void *
 eng_image_size_set(void *data EINA_UNUSED, void *image, int w, int h)
 {
@@ -1280,6 +1831,18 @@ eng_image_size_set(void *data EINA_UNUSED, void *image, int w, int h)
    return im2;
 }
 
+/**
+ * @brief Marks a region of an image as dirty.
+ * This informs the cache that the specified area of the image data has been modified externally.
+ * Ensures the image is not shared (copies if necessary) before marking dirty.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry) to mark dirty.
+ * @param x The x-coordinate of the dirty region.
+ * @param y The y-coordinate of the dirty region.
+ * @param w The width of the dirty region.
+ * @param h The height of the dirty region.
+ * @return The potentially new image entry if a copy was made, otherwise the original image.
+ */
 static void *
 eng_image_dirty_region(void *data EINA_UNUSED, void *image, int x, int y, int w, int h)
 {
@@ -1288,6 +1851,20 @@ eng_image_dirty_region(void *data EINA_UNUSED, void *image, int x, int y, int w,
    return evas_cache_image_dirty(im, x, y, w, h);
 }
 
+/**
+ * @brief Gets a pointer to the raw pixel data of an image.
+ * Loads the image data if necessary. If `to_write` is set, ensures the image is
+ * not shared (copies if necessary).
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry).
+ * @param to_write 1 if the data will be modified, 0 for read-only access.
+ * @param image_data Pointer to store the address of the pixel data (DATA32* for ARGB/GRY, void* for YUV).
+ * @param err Pointer to store an Evas_Load_Error code if loading fails.
+ * @param tofree Pointer to a boolean that will be set to EINA_TRUE if the caller
+ *               needs to free the returned data (currently always EINA_FALSE).
+ * @return The potentially new image entry if a copy was made for writing, otherwise the original image.
+ *         Returns NULL on failure (e.g., load error, unsupported format for writing).
+ */
 static void *
 eng_image_data_get(void *data EINA_UNUSED, void *image, int to_write, DATA32 **image_data, int *err, Eina_Bool *tofree)
 {
@@ -1351,6 +1928,18 @@ eng_image_data_get(void *data EINA_UNUSED, void *image, int to_write, DATA32 **i
    return im;
 }
 
+/**
+ * @brief Updates the pixel data pointer for an image.
+ * If the provided `image_data` pointer is different from the image's current
+ * data pointer, it might replace the internal buffer (potentially creating a
+ * new image entry for ARGB/GRY formats if the original was zero-copy) or update
+ * the YUV data pointer.
+ * @param data Engine-specific data (used by eng_image_new_from_data).
+ * @param image The image entry (Image_Entry) to update.
+ * @param image_data The new pointer to the pixel data.
+ * @return The potentially new image entry if a replacement occurred, otherwise the original image.
+ *         Returns NULL for unsupported colorspaces.
+ */
 static void *
 eng_image_data_put(void *data, void *image, DATA32 *image_data)
 {
@@ -1408,6 +1997,31 @@ eng_image_data_put(void *data, void *image, DATA32 *image_data)
    return im;
 }
 
+/**
+ * @brief Maps a region of an image's pixel data for direct access.
+ *
+ * Provides access to a portion (or all) of the image data, potentially
+ * performing colorspace conversion or copy-on-write as requested.
+ *
+ * @param engdata Engine-specific data (unused).
+ * @param image Pointer to the image entry (Image_Entry*). This might be updated
+ *              if copy-on-write occurs.
+ * @param slice Pointer to an Eina_Rw_Slice to store the mapped memory region
+ *              (pointer and length).
+ * @param stride Pointer to store the stride (bytes per row) of the mapped data.
+ * @param x The starting x-coordinate of the region to map.
+ * @param y The starting y-coordinate of the region to map.
+ * @param w The width of the region to map.
+ * @param h The height of the region to map.
+ * @param cspace The desired Evas_Colorspace for the mapped data. If different
+ *               from the image's internal colorspace, conversion will be attempted.
+ * @param mode Access mode flags (Efl_Gfx_Buffer_Access_Mode), indicating read/write
+ *             and copy-on-write behavior.
+ * @param plane The color plane to map (0 for interleaved, 0=Y, 1=U/CbCr, 2=V for planar).
+ *              Currently, only plane 0 is fully supported.
+ * @return EINA_TRUE on successful mapping, EINA_FALSE on failure (e.g., invalid
+ *         parameters, unsupported conversion, allocation error).
+ */
 static Eina_Bool
 eng_image_data_map(void *engdata EINA_UNUSED, void **image, Eina_Rw_Slice *slice,
                    int *stride, int x, int y, int w, int h,
@@ -1616,6 +2230,14 @@ eng_image_data_map(void *engdata EINA_UNUSED, void **image, Eina_Rw_Slice *slice
    return EINA_TRUE;
 }
 
+/**
+ * @brief Commits changes made to a mapped region back to the original image buffer.
+ * This is called during unmap if the map was allocated (due to COW or colorspace conversion)
+ * and opened for writing. It handles potential colorspace conversion back to the
+ * image's native format.
+ * @param im The target RGBA_Image.
+ * @param map The RGBA_Image_Data_Map structure containing the modified data and mapping info.
+ */
 static void
 _image_data_commit(RGBA_Image *im, RGBA_Image_Data_Map *map)
 {
@@ -1667,6 +2289,15 @@ _image_data_commit(RGBA_Image *im, RGBA_Image_Data_Map *map)
      }
 }
 
+/**
+ * @brief Unmaps a previously mapped image data region.
+ * Finds the corresponding map entry based on the slice, performs commit if necessary,
+ * frees allocated resources (if any), and removes the map entry.
+ * @param engdata Engine-specific data (unused).
+ * @param image The image entry (Image_Entry) that was mapped.
+ * @param slice The Eina_Rw_Slice representing the region to unmap (must match the one returned by map).
+ * @return EINA_TRUE on success, EINA_FALSE if the slice doesn't correspond to a known map.
+ */
 static Eina_Bool
 eng_image_data_unmap(void *engdata EINA_UNUSED, void *image, const Eina_Rw_Slice *slice)
 {
@@ -1697,6 +2328,15 @@ eng_image_data_unmap(void *engdata EINA_UNUSED, void *image, const Eina_Rw_Slice
    return EINA_FALSE;
 }
 
+/**
+ * @brief Retrieves all currently active data maps for an image.
+ * @param engdata Engine-specific data (unused).
+ * @param image The image entry (Image_Entry) to query.
+ * @param slices If not NULL, an array to be filled with pointers to the Eina_Rw_Slice
+ *               structures representing the active maps. The array must be large enough.
+ *               If NULL, the function only returns the count.
+ * @return The number of active maps, or -1 if image is NULL.
+ */
 static int
 eng_image_data_maps_get(void *engdata EINA_UNUSED, const void *image, const Eina_Rw_Slice **slices)
 {
@@ -1715,6 +2355,11 @@ eng_image_data_maps_get(void *engdata EINA_UNUSED, const void *image, const Eina
    return k;
 }
 
+/**
+ * @brief Helper function to check if a colorspace is a YUV format handled by this engine.
+ * @param cspace The Evas_Colorspace to check.
+ * @return EINA_TRUE if it's a supported YUV format, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _is_yuv(Evas_Colorspace cspace)
 {
@@ -1732,6 +2377,34 @@ _is_yuv(Evas_Colorspace cspace)
      }
 }
 
+/**
+ * @brief Adds or updates image data using an Eina_Slice, typically for a specific plane.
+ *
+ * This function is intended for setting image data plane by plane, especially
+ * for YUV formats or potentially other planar/complex formats in the future.
+ * It can create a new image or update an existing one.
+ *
+ * @note This function is not robust and should NOT be mixed with eng_image_data_get/put.
+ *       It assumes parameters like w, h, cspace, alpha are correct.
+ *       Zero-copy (`copy = EINA_FALSE`) is only supported for specific formats and
+ *       requires the stride to match the expected packed stride. Copying YUV data
+ *       is currently not implemented.
+ *
+ * @param engdata Engine-specific data (used for image creation).
+ * @param image The existing image entry (Image_Entry) to update, or NULL to create a new one.
+ *              If updating, the image might be modified (e.g., made non-shared).
+ * @param slice The Eina_Slice containing the pixel data for the plane.
+ * @param copy If EINA_TRUE, the data from the slice is copied into the image's
+ *             internal buffer. If EINA_FALSE, attempts zero-copy (buffer pointer assignment).
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param stride Stride (bytes per row) of the data in the slice. If 0, calculated based on w and cspace/bpp.
+ * @param cspace The Evas_Colorspace of the data in the slice.
+ * @param plane The plane index this slice represents (0 for interleaved, 0=Y, 1=Cb, 2=Cr, etc.).
+ * @param alpha Boolean indicating if the image should have an alpha channel.
+ * @return The updated or newly created image entry (Image_Entry), or NULL on failure
+ *         (e.g., invalid parameters, unsupported format/operation, allocation error).
+ */
 static void *
 eng_image_data_slice_add(void *engdata, void *image,
                          const Eina_Slice *slice, Eina_Bool copy,
@@ -1904,6 +2577,13 @@ fail:
    return NULL;
 }
 
+/**
+ * @brief Hint to the engine to prepare an image for rendering.
+ * For the software engine, this is currently a no-op, but could potentially
+ * trigger background loading threads.
+ * @param engdata Engine-specific data (unused).
+ * @param image The image entry (Image_Entry) to prepare (unused).
+ */
 static void
 eng_image_prepare(void *engdata EINA_UNUSED, void *image EINA_UNUSED)
 {
@@ -1912,6 +2592,15 @@ eng_image_prepare(void *engdata EINA_UNUSED, void *image EINA_UNUSED)
    // some thread jobs for loading in the bg.
 }
 
+/**
+ * @brief Creates a new image surface intended for direct rendering without scaling.
+ * In the software engine, this is equivalent to creating a standard buffer for map surfaces.
+ * @param engdata Engine-specific data.
+ * @param w Width of the surface.
+ * @param h Height of the surface.
+ * @param alpha Boolean indicating if the surface should support alpha.
+ * @return A pointer to the newly created RGBA_Image surface, or NULL on failure.
+ */
 static void *
 eng_image_surface_noscale_new(void *engdata, int w, int h, int alpha)
 {
@@ -1919,6 +2608,13 @@ eng_image_surface_noscale_new(void *engdata, int w, int h, int alpha)
    return eng_image_map_surface_new(engdata, w, h, alpha);
 }
 
+/**
+ * @brief Flips an ARGB image horizontally. Operates in-place if pixels_out == pixels_in.
+ * @param pixels_out Destination pixel buffer.
+ * @param pixels_in Source pixel buffer.
+ * @param iw Image width.
+ * @param ih Image height.
+ */
 static void
 _image_flip_horizontal(DATA32 *pixels_out, const DATA32 *pixels_in,
                        int iw, int ih)
@@ -1943,6 +2639,13 @@ _image_flip_horizontal(DATA32 *pixels_out, const DATA32 *pixels_in,
      }
 }
 
+/**
+ * @brief Flips an ARGB image vertically. Operates in-place if pixels_out == pixels_in.
+ * @param pixels_out Destination pixel buffer.
+ * @param pixels_in Source pixel buffer.
+ * @param iw Image width.
+ * @param ih Image height.
+ */
 static void
 _image_flip_vertical(DATA32 *pixels_out, const DATA32 *pixels_in,
                      int iw, int ih)
@@ -1967,6 +2670,13 @@ _image_flip_vertical(DATA32 *pixels_out, const DATA32 *pixels_in,
      }
 }
 
+/**
+ * @brief Rotates an ARGB image by 180 degrees. Operates in-place if pixels_out == pixels_in.
+ * @param pixels_out Destination pixel buffer.
+ * @param pixels_in Source pixel buffer.
+ * @param iw Image width.
+ * @param ih Image height.
+ */
 static void
 _image_rotate_180(DATA32 *pixels_out, const DATA32 *pixels_in,
                   int iw, int ih)
@@ -1989,6 +2699,14 @@ _image_rotate_180(DATA32 *pixels_out, const DATA32 *pixels_in,
      }
 }
 
+/**
+ * @brief Rotates an ARGB image by 90 degrees clockwise. Requires separate buffers.
+ * Uses tiling for potentially better cache performance.
+ * @param pixels_out Destination pixel buffer (must be ih x iw).
+ * @param pixels_in Source pixel buffer (iw x ih).
+ * @param iw Source image width.
+ * @param ih Source image height.
+ */
 static void
 _image_rotate_90(DATA32 *pixels_out, const DATA32 *pixels_in, int iw, int ih)
 {
@@ -2020,6 +2738,14 @@ _image_rotate_90(DATA32 *pixels_out, const DATA32 *pixels_in, int iw, int ih)
      }
 }
 
+/**
+ * @brief Rotates an ARGB image by 270 degrees clockwise (90 counter-clockwise). Requires separate buffers.
+ * Uses tiling for potentially better cache performance.
+ * @param pixels_out Destination pixel buffer (must be ih x iw).
+ * @param pixels_in Source pixel buffer (iw x ih).
+ * @param iw Source image width.
+ * @param ih Source image height.
+ */
 static void
 _image_rotate_270(DATA32 *pixels_out, const DATA32 *pixels_in, int iw, int ih)
 {
@@ -2051,6 +2777,13 @@ _image_rotate_270(DATA32 *pixels_out, const DATA32 *pixels_in, int iw, int ih)
      }
 }
 
+/**
+ * @brief Transposes an ARGB image (flips along the top-left to bottom-right diagonal). Requires separate buffers.
+ * @param pixels_out Destination pixel buffer (must be ih x iw).
+ * @param pixels_in Source pixel buffer (iw x ih).
+ * @param iw Source image width.
+ * @param ih Source image height.
+ */
 static void
 _image_flip_transpose(DATA32 *pixels_out, const DATA32 *pixels_in,
                       int iw, int ih)
@@ -2074,6 +2807,13 @@ _image_flip_transpose(DATA32 *pixels_out, const DATA32 *pixels_in,
      }
 }
 
+/**
+ * @brief Transverses an ARGB image (flips along the top-right to bottom-left diagonal). Requires separate buffers.
+ * @param pixels_out Destination pixel buffer (must be ih x iw).
+ * @param pixels_in Source pixel buffer (iw x ih).
+ * @param iw Source image width.
+ * @param ih Source image height.
+ */
 static void
 _image_flip_transverse(DATA32 *pixels_out, const DATA32 *pixels_in,
                        int iw, int ih)
@@ -2096,6 +2836,17 @@ _image_flip_transverse(DATA32 *pixels_out, const DATA32 *pixels_in,
      }
 }
 
+/**
+ * @brief Sets the orientation of an image.
+ * This function physically transforms the pixel data according to the new orientation.
+ * It creates a new image entry with the transformed data and drops the old one.
+ * Handles transitions between different orientations efficiently where possible.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry) to reorient.
+ * @param orient The target Evas_Image_Orient value.
+ * @return The new image entry with the specified orientation, or the original image if
+ *         the orientation is unchanged or an error occurred.
+ */
 static void *
 eng_image_orient_set(void *data EINA_UNUSED, void *image, Evas_Image_Orient orient)
 {
@@ -2277,6 +3028,12 @@ eng_image_orient_set(void *data EINA_UNUSED, void *image, Evas_Image_Orient orie
    return im;
 }
 
+/**
+ * @brief Gets the current orientation of an image.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry).
+ * @return The current Evas_Image_Orient value.
+ */
 static Evas_Image_Orient
 eng_image_orient_get(void *data EINA_UNUSED, void *image)
 {
@@ -2287,6 +3044,13 @@ eng_image_orient_get(void *data EINA_UNUSED, void *image)
    return im->orient;
 }
 
+/**
+ * @brief Requests asynchronous preloading of image data.
+ * The actual loading happens in a separate thread (managed by evas_cache).
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry) to preload.
+ * @param target The target Evas object associated with this preload request (used for cancellation).
+ */
 static void
 eng_image_data_preload_request(void *data EINA_UNUSED, void *image, const Eo *target)
 {
@@ -2296,6 +3060,13 @@ eng_image_data_preload_request(void *data EINA_UNUSED, void *image, const Eo *ta
    evas_cache_image_preload_data(&im->cache_entry, target, NULL, NULL);
 }
 
+/**
+ * @brief Cancels an image data preload request associated with a target object.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry) whose preload should be cancelled.
+ * @param target The target Evas object used in the preload request.
+ * @param force If EINA_TRUE, cancel immediately even if loading is in progress.
+ */
 static void
 eng_image_data_preload_cancel(void *data EINA_UNUSED, void *image, const Eo *target, Eina_Bool force)
 {
@@ -2306,6 +3077,12 @@ eng_image_data_preload_cancel(void *data EINA_UNUSED, void *image, const Eo *tar
    evas_cache_image_preload_cancel(&im->cache_entry, target, force);
 }
 
+/**
+ * @brief Executes an image drawing command in a rendering thread.
+ * Handles smooth (bilinear) or sample (nearest neighbor) scaling.
+ * This function is called by the thread pool.
+ * @param data Pointer to an Evas_Thread_Command_Image structure containing drawing parameters.
+ */
 static void
 _draw_thread_image_draw(void *data)
 {
@@ -2331,6 +3108,23 @@ _draw_thread_image_draw(void *data)
    eina_mempool_free(_mp_command_image, image);
 }
 
+/**
+ * @brief Creates and enqueues an image drawing command for threaded execution.
+ * Performs clipping based on destination bounds and context clip settings.
+ * @param src The source RGBA_Image.
+ * @param dst The destination RGBA_Image.
+ * @param dc The drawing context.
+ * @param src_x Source rectangle x-coordinate.
+ * @param src_y Source rectangle y-coordinate.
+ * @param src_w Source rectangle width.
+ * @param src_h Source rectangle height.
+ * @param dst_x Destination rectangle x-coordinate.
+ * @param dst_y Destination rectangle y-coordinate.
+ * @param dst_w Destination rectangle width.
+ * @param dst_h Destination rectangle height.
+ * @param smooth 1 for smooth (bilinear) scaling, 0 for sample (nearest).
+ * @return EINA_TRUE if the command was successfully enqueued, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _image_draw_thread_cmd(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Context *dc, int src_x, int src_y, int src_w, int src_h, int dst_x, int dst_y, int dst_w, int dst_h, int smooth)
 {
@@ -2387,6 +3181,21 @@ _image_draw_thread_cmd(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Context *dc, 
    return EINA_TRUE;
 }
 
+/**
+ * @brief Helper to enqueue a smooth image drawing command.
+ * @param src Source image.
+ * @param dst Destination image.
+ * @param dc Drawing context.
+ * @param src_x Source X.
+ * @param src_y Source Y.
+ * @param src_w Source W.
+ * @param src_h Source H.
+ * @param dst_x Destination X.
+ * @param dst_y Destination Y.
+ * @param dst_w Destination W.
+ * @param dst_h Destination H.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _image_draw_thread_cmd_smooth(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Context *dc, int src_x, int src_y, int src_w, int src_h, int dst_x, int dst_y, int dst_w, int dst_h)
 {
@@ -2396,6 +3205,21 @@ _image_draw_thread_cmd_smooth(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Contex
                                  1);
 }
 
+/**
+ * @brief Helper to enqueue a sample (non-smooth) image drawing command.
+ * @param src Source image.
+ * @param dst Destination image.
+ * @param dc Drawing context.
+ * @param src_x Source X.
+ * @param src_y Source Y.
+ * @param src_w Source W.
+ * @param src_h Source H.
+ * @param dst_x Destination X.
+ * @param dst_y Destination Y.
+ * @param dst_w Destination W.
+ * @param dst_h Destination H.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _image_draw_thread_cmd_sample(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Context *dc, int src_x, int src_y, int src_w, int src_h, int dst_x, int dst_y, int dst_w, int dst_h)
 {
@@ -2405,6 +3229,23 @@ _image_draw_thread_cmd_sample(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Contex
                                  0);
 }
 
+/**
+ * @brief Callback function used by the scale cache mechanism for smooth threaded drawing.
+ * This function is passed to evas_common_rgba_image_scalecache_do_cbs.
+ * It clips the drawing operation and enqueues the actual drawing command.
+ * @param src Source image.
+ * @param dst Destination image.
+ * @param dc Drawing context.
+ * @param src_x Source X.
+ * @param src_y Source Y.
+ * @param src_w Source W.
+ * @param src_h Source H.
+ * @param dst_x Destination X.
+ * @param dst_y Destination Y.
+ * @param dst_w Destination W.
+ * @param dst_h Destination H.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _image_thr_cb_smooth(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Context *dc, int src_x, int src_y, int src_w, int src_h, int dst_x, int dst_y, int dst_w, int dst_h)
 {
@@ -2414,6 +3255,23 @@ _image_thr_cb_smooth(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Context *dc, in
                                                    _image_draw_thread_cmd_smooth);
 }
 
+/**
+ * @brief Callback function used by the scale cache mechanism for sample (non-smooth) threaded drawing.
+ * This function is passed to evas_common_rgba_image_scalecache_do_cbs.
+ * It clips the drawing operation and enqueues the actual drawing command.
+ * @param src Source image.
+ * @param dst Destination image.
+ * @param dc Drawing context.
+ * @param src_x Source X.
+ * @param src_y Source Y.
+ * @param src_w Source W.
+ * @param src_h Source H.
+ * @param dst_x Destination X.
+ * @param dst_y Destination Y.
+ * @param dst_w Destination W.
+ * @param dst_h Destination H.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _image_thr_cb_sample(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Context *dc, int src_x, int src_y, int src_w, int src_h, int dst_x, int dst_y, int dst_w, int dst_h)
 {
@@ -2423,6 +3281,27 @@ _image_thr_cb_sample(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Context *dc, in
                                                    _image_draw_thread_cmd_sample);
 }
 
+/**
+ * @brief Engine function to draw an image (potentially scaled).
+ * Dispatches the drawing to the appropriate implementation (sync, async thread, pipe),
+ * potentially utilizing the scale cache. Handles native surface binding/unbinding.
+ * @param engine The engine instance (unused).
+ * @param data Engine-specific data (unused).
+ * @param context The drawing context.
+ * @param surface The target surface.
+ * @param image The source image entry (Image_Entry).
+ * @param src_x Source rectangle x-coordinate.
+ * @param src_y Source rectangle y-coordinate.
+ * @param src_w Source rectangle width.
+ * @param src_h Source rectangle height.
+ * @param dst_x Destination rectangle x-coordinate.
+ * @param dst_y Destination rectangle y-coordinate.
+ * @param dst_w Destination rectangle width.
+ * @param dst_h Destination rectangle height.
+ * @param smooth 1 for smooth (bilinear) scaling, 0 for sample (nearest).
+ * @param do_async If true, attempt asynchronous (threaded) drawing.
+ * @return EINA_TRUE if drawing was handled (typically for async), EINA_FALSE otherwise (sync or error).
+ */
 static Eina_Bool
 eng_image_draw(void *engine EINA_UNUSED, void *data EINA_UNUSED, void *context, void *surface, void *image, int src_x, int src_y, int src_w, int src_h, int dst_x, int dst_y, int dst_w, int dst_h, int smooth, Eina_Bool do_async)
 {
@@ -2493,6 +3372,22 @@ eng_image_draw(void *engine EINA_UNUSED, void *data EINA_UNUSED, void *context, 
    return EINA_FALSE;
 }
 
+/**
+ * @brief Internal function to draw a scaled image, used as a callback for map drawing optimization.
+ * This is called when a map operation degenerates into a simple scale/blit.
+ * @param src Source image.
+ * @param dst Destination image.
+ * @param dc Drawing context.
+ * @param src_x Source X.
+ * @param src_y Source Y.
+ * @param src_w Source W.
+ * @param src_h Source H.
+ * @param dst_x Destination X.
+ * @param dst_y Destination Y.
+ * @param dst_w Destination W.
+ * @param dst_h Destination H.
+ * @param smooth Smooth scaling flag.
+ */
 static void
 _map_image_draw(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Context *dc, int src_x, int src_y, int src_w, int src_h, int dst_x, int dst_y, int dst_w, int dst_h, int smooth)
 {
@@ -2535,6 +3430,22 @@ _map_image_draw(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Context *dc, int src
                                         dc->clip.mask, dc->clip.mask_x, dc->clip.mask_y);
 }
 
+/**
+ * @brief Callback wrapper for _map_image_draw with smooth=0.
+ * Used with evas_common_scale_rgba_in_to_out_clip_cb.
+ * @param src Source image.
+ * @param dst Destination image.
+ * @param dc Drawing context.
+ * @param src_x Source X.
+ * @param src_y Source Y.
+ * @param src_w Source W.
+ * @param src_h Source H.
+ * @param dst_x Destination X.
+ * @param dst_y Destination Y.
+ * @param dst_w Destination W.
+ * @param dst_h Destination H.
+ * @return Always EINA_TRUE.
+ */
 static Eina_Bool
 _map_image_sample_draw(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Context *dc, int src_x, int src_y, int src_w, int src_h, int dst_x, int dst_y, int dst_w, int dst_h)
 {
@@ -2544,6 +3455,22 @@ _map_image_sample_draw(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Context *dc, 
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback wrapper for _map_image_draw with smooth=1.
+ * Used with evas_common_scale_rgba_in_to_out_clip_cb.
+ * @param src Source image.
+ * @param dst Destination image.
+ * @param dc Drawing context.
+ * @param src_x Source X.
+ * @param src_y Source Y.
+ * @param src_w Source W.
+ * @param src_h Source H.
+ * @param dst_x Destination X.
+ * @param dst_y Destination Y.
+ * @param dst_w Destination W.
+ * @param dst_h Destination H.
+ * @return Always EINA_TRUE.
+ */
 static Eina_Bool
 _map_image_smooth_draw(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Context *dc, int src_x, int src_y, int src_w, int src_h, int dst_x, int dst_y, int dst_w, int dst_h)
 {
@@ -2553,6 +3480,13 @@ _map_image_smooth_draw(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Context *dc, 
    return EINA_TRUE;
 }
 
+/**
+ * @brief Executes an image map drawing command in a rendering thread.
+ * Handles the optimization where a map operation is equivalent to a simple scale/blit.
+ * Iterates through map points (typically in quads) and calls the appropriate drawing function.
+ * This function is called by the thread pool. Frees associated resources afterwards.
+ * @param data Pointer to an Evas_Thread_Command_Map structure containing drawing parameters.
+ */
 static void
 _draw_thread_map_draw(void *data)
 {
@@ -2645,6 +3579,18 @@ _draw_thread_map_draw(void *data)
    eina_mempool_free(_mp_command_map, map);
 }
 
+/**
+ * @brief Creates and enqueues an image map drawing command for threaded execution.
+ * Duplicates the drawing context and the map data structure for the thread.
+ * @param src The source RGBA_Image.
+ * @param dst The destination RGBA_Image.
+ * @param dc The drawing context.
+ * @param map The RGBA_Map structure defining the transformation.
+ * @param smooth 1 for smooth rendering, 0 otherwise.
+ * @param level Map rendering level (unused in software engine?).
+ * @param offset Starting offset within the map points array (usually 0).
+ * @return EINA_TRUE if the command was successfully enqueued, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _map_draw_thread_cmd(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Context *dc, RGBA_Map *map, int smooth, int level, int offset)
 {
@@ -2703,6 +3649,21 @@ _map_draw_thread_cmd(RGBA_Image *src, RGBA_Image *dst, RGBA_Draw_Context *dc, RG
    return EINA_TRUE;
 }
 
+/**
+ * @brief Synchronous implementation for drawing an image map.
+ * Handles the optimization where a map operation is equivalent to a simple scale/blit
+ * by calling eng_image_draw directly. Otherwise, dispatches to pipe render or
+ * common map drawing function. Recursively calls itself for maps with more than 4 points.
+ * @param engine The engine instance (unused).
+ * @param data Engine-specific data (used for context manipulation).
+ * @param context The drawing context.
+ * @param surface The target surface (RGBA_Image).
+ * @param im The source image (RGBA_Image).
+ * @param m The RGBA_Map structure.
+ * @param smooth Smooth rendering flag.
+ * @param level Map rendering level.
+ * @param offset Starting offset in the map points array.
+ */
 static void
 evas_software_image_map_draw(void *engine EINA_UNUSED, void *data, void *context, RGBA_Image *surface, RGBA_Image *im, RGBA_Map *m, int smooth, int level, int offset)
 {
@@ -2771,6 +3732,21 @@ evas_software_image_map_draw(void *engine EINA_UNUSED, void *data, void *context
      }
 }
 
+/**
+ * @brief Engine function to draw a mapped image.
+ * Dispatches the drawing to the appropriate implementation (sync or async thread).
+ * Ensures source image data is loaded for async operations.
+ * @param engine The engine instance (unused).
+ * @param data Engine-specific data.
+ * @param context The drawing context.
+ * @param surface The target surface.
+ * @param image The source image entry (Image_Entry).
+ * @param m The RGBA_Map structure defining the transformation.
+ * @param smooth 1 for smooth rendering, 0 otherwise.
+ * @param level Map rendering level (unused in software engine?).
+ * @param do_async If true, attempt asynchronous (threaded) drawing.
+ * @return EINA_TRUE if drawing was handled asynchronously, EINA_FALSE otherwise (sync or error).
+ */
 static Eina_Bool
 eng_image_map_draw(void *engine EINA_UNUSED, void *data, void *context, void *surface, void *image, RGBA_Map *m, int smooth, int level, Eina_Bool do_async)
 {
@@ -2803,12 +3779,28 @@ eng_image_map_draw(void *engine EINA_UNUSED, void *data, void *context, void *su
    return EINA_FALSE;
 }
 
+/**
+ * @brief Cleans up resources associated with an RGBA_Map structure.
+ * Currently frees engine-specific data if present.
+ * @param data Engine-specific data (unused).
+ * @param m The RGBA_Map structure to clean.
+ */
 static void
 eng_image_map_clean(void *data EINA_UNUSED, RGBA_Map *m)
 {
    evas_common_map_rgba_clean(m);
 }
 
+/**
+ * @brief Creates a new surface suitable for image map operations.
+ * Allocates an RGBA_Image with copied data (initially NULL data, effectively just allocating).
+ * Ensures the pixel buffer is allocated.
+ * @param data Engine-specific data (unused).
+ * @param w Width of the surface.
+ * @param h Height of the surface.
+ * @param alpha Boolean indicating if the surface should support alpha.
+ * @return A pointer to the newly created RGBA_Image surface, or NULL on failure.
+ */
 static void *
 eng_image_map_surface_new(void *data EINA_UNUSED, int w, int h, int alpha)
 {
@@ -2822,6 +3814,13 @@ eng_image_map_surface_new(void *data EINA_UNUSED, int w, int h, int alpha)
    return surface;
 }
 
+/**
+ * @brief Sets the scaling hint for an image.
+ * Hints like static can allow caching of scaled versions.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry) to modify.
+ * @param hint The Evas_Image_Scale_Hint value.
+ */
 static void
 eng_image_scale_hint_set(void *data EINA_UNUSED, void *image, int hint)
 {
@@ -2832,6 +3831,12 @@ eng_image_scale_hint_set(void *data EINA_UNUSED, void *image, int hint)
    im->scale_hint = hint;
 }
 
+/**
+ * @brief Gets the scaling hint for an image.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry).
+ * @return The Evas_Image_Scale_Hint value.
+ */
 static int
 eng_image_scale_hint_get(void *data EINA_UNUSED, void *image)
 {
@@ -2842,6 +3847,12 @@ eng_image_scale_hint_get(void *data EINA_UNUSED, void *image)
    return im->scale_hint;
 }
 
+/**
+ * @brief Checks if an image is animated.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry).
+ * @return EINA_TRUE if the image is animated, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 eng_image_animated_get(void *data EINA_UNUSED, void *image)
 {
@@ -2852,6 +3863,12 @@ eng_image_animated_get(void *data EINA_UNUSED, void *image)
    return im->animated.animated;
 }
 
+/**
+ * @brief Gets the total number of frames in an animated image.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry).
+ * @return The frame count, or -1 if the image is not animated.
+ */
 static int
 eng_image_animated_frame_count_get(void *data EINA_UNUSED, void *image)
 {
@@ -2863,6 +3880,12 @@ eng_image_animated_frame_count_get(void *data EINA_UNUSED, void *image)
    return im->animated.frame_count;
 }
 
+/**
+ * @brief Gets the loop type hint for an animated image.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry).
+ * @return The Evas_Image_Animated_Loop_Hint value.
+ */
 static Evas_Image_Animated_Loop_Hint
 eng_image_animated_loop_type_get(void *data EINA_UNUSED, void *image)
 {
@@ -2874,6 +3897,12 @@ eng_image_animated_loop_type_get(void *data EINA_UNUSED, void *image)
    return im->animated.loop_hint;
 }
 
+/**
+ * @brief Gets the loop count for an animated image.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry).
+ * @return The number of times the animation should loop, or -1 if not animated.
+ */
 static int
 eng_image_animated_loop_count_get(void *data EINA_UNUSED, void *image)
 {
@@ -2885,6 +3914,15 @@ eng_image_animated_loop_count_get(void *data EINA_UNUSED, void *image)
    return im->animated.loop_count;
 }
 
+/**
+ * @brief Gets the duration of a specific frame in an animated image.
+ * May require loading frame information from the file.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry).
+ * @param start_frame The starting frame index (unused in current implementation?).
+ * @param frame_num The index of the frame whose duration is requested.
+ * @return The duration of the frame in seconds, or -1.0 on error or if not animated.
+ */
 static double
 eng_image_animated_frame_duration_get(void *data EINA_UNUSED, void *image, int start_frame, int frame_num)
 {
@@ -2896,6 +3934,14 @@ eng_image_animated_frame_duration_get(void *data EINA_UNUSED, void *image, int s
    return evas_common_load_rgba_image_frame_duration_from_file(im, start_frame, frame_num);
 }
 
+/**
+ * @brief Sets the current frame to be displayed for an animated image.
+ * Updates the internal current frame index. Does not immediately load the frame data.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry).
+ * @param frame_index The index of the frame to set as current.
+ * @return EINA_TRUE if the frame index was changed, EINA_FALSE otherwise (or if not animated).
+ */
 static Eina_Bool
 eng_image_animated_frame_set(void *data EINA_UNUSED, void *image, int frame_index)
 {
@@ -2909,6 +3955,12 @@ eng_image_animated_frame_set(void *data EINA_UNUSED, void *image, int frame_inde
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the index of the currently set frame for an animated image.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry).
+ * @return The current frame index, or 0 if not animated.
+ */
 static int
 eng_image_animated_frame_get(void *data EINA_UNUSED, void *image)
 {
@@ -2921,6 +3973,12 @@ eng_image_animated_frame_get(void *data EINA_UNUSED, void *image)
    return im->animated.cur_frame;
 }
 
+/**
+ * @brief Executes a multi-font drawing command in a rendering thread.
+ * Iterates through the Evas_Font_Array, sets the color for each run, and draws the glyphs.
+ * This function is called by the thread pool. Frees associated resources afterwards.
+ * @param data Pointer to an Evas_Thread_Command_Multi_Font structure.
+ */
 static void
 _draw_thread_multi_font_draw(void *data)
 {
@@ -2946,6 +4004,16 @@ _draw_thread_multi_font_draw(void *data)
    eina_mempool_free(_mp_command_multi_font, mf);
 }
 
+/**
+ * @brief Creates and enqueues a multi-font drawing command for threaded execution.
+ * Duplicates the drawing context for the thread.
+ * @param dst The destination RGBA_Image surface.
+ * @param dc The drawing context.
+ * @param x The base x-coordinate for drawing.
+ * @param y The base y-coordinate for drawing.
+ * @param texts The Evas_Font_Array containing text runs and glyphs.
+ * @return EINA_TRUE if the command was successfully enqueued, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _multi_font_draw_thread_cmd(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y, Evas_Font_Array *texts)
 {
@@ -2971,6 +4039,24 @@ _multi_font_draw_thread_cmd(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y
    return EINA_TRUE;
 }
 
+/**
+ * @brief Engine function to draw multiple text runs defined by an Evas_Font_Array.
+ * Currently only supports asynchronous (threaded) drawing.
+ * @param engine The engine instance (unused).
+ * @param data Engine-specific data (unused).
+ * @param context The drawing context.
+ * @param surface The target surface.
+ * @param font The font set (unused, information is in texts).
+ * @param x The base x-coordinate.
+ * @param y The base y-coordinate.
+ * @param w Target width (unused).
+ * @param h Target height (unused).
+ * @param ow Output width (unused).
+ * @param oh Output height (unused).
+ * @param texts The Evas_Font_Array containing text runs, colors, and glyphs.
+ * @param do_async If true, attempt asynchronous (threaded) drawing.
+ * @return EINA_TRUE if drawing was handled asynchronously, EINA_FALSE otherwise (sync not implemented or error).
+ */
 static Eina_Bool
 eng_multi_font_draw(void *engine EINA_UNUSED, void *data EINA_UNUSED, void *context, void *surface, Evas_Font_Set *font EINA_UNUSED, int x, int y, int w EINA_UNUSED, int h EINA_UNUSED, int ow EINA_UNUSED, int oh EINA_UNUSED, Evas_Font_Array *texts, Eina_Bool do_async)
 {
@@ -2982,6 +4068,25 @@ eng_multi_font_draw(void *engine EINA_UNUSED, void *data EINA_UNUSED, void *cont
    return EINA_FALSE;
 }
 
+/**
+ * @brief Gets the alpha value of a pixel corresponding to a specific point on a potentially scaled/sub-regioned image.
+ * Calculates the source pixel coordinate based on the destination coordinate and the source/destination regions.
+ * Loads image data if necessary.
+ * @param image The image entry (Image_Entry).
+ * @param x The destination x-coordinate to query.
+ * @param y The destination y-coordinate to query.
+ * @param alpha Pointer to store the resulting alpha value (0-255).
+ * @param src_region_x Source region X used for scaling.
+ * @param src_region_y Source region Y used for scaling.
+ * @param src_region_w Source region W used for scaling.
+ * @param src_region_h Source region H used for scaling.
+ * @param dst_region_x Destination region X where the source region is drawn.
+ * @param dst_region_y Destination region Y where the source region is drawn.
+ * @param dst_region_w Destination region W where the source region is drawn.
+ * @param dst_region_h Destination region H where the source region is drawn.
+ * @return EINA_TRUE if the alpha value was successfully retrieved (even if 0 due to OOB),
+ *         EINA_FALSE if the image is invalid or data couldn't be loaded.
+ */
 static Eina_Bool
 eng_pixel_alpha_get(void *image, int x, int y, DATA8 *alpha, int src_region_x, int src_region_y, int src_region_w, int src_region_h, int dst_region_x, int dst_region_y, int dst_region_w, int dst_region_h)
 {
@@ -3064,6 +4169,11 @@ eng_pixel_alpha_get(void *image, int x, int y, DATA8 *alpha, int src_region_x, i
    return EINA_TRUE;
 }
 
+/**
+ * @brief Flushes the image cache.
+ * Temporarily sets the cache size to 0, flushes common caches, then restores the size.
+ * @param data Engine-specific data (unused).
+ */
 static void
 eng_image_cache_flush(void *data EINA_UNUSED)
 {
@@ -3075,6 +4185,12 @@ eng_image_cache_flush(void *data EINA_UNUSED)
    evas_common_image_set_cache(tmp_size);
 }
 
+/**
+ * @brief Sets the target size for the image cache.
+ * Also updates the size of the RGBA image scale cache.
+ * @param data Engine-specific data (unused).
+ * @param bytes The target cache size in bytes.
+ */
 static void
 eng_image_cache_set(void *data EINA_UNUSED, int bytes)
 {
@@ -3082,12 +4198,27 @@ eng_image_cache_set(void *data EINA_UNUSED, int bytes)
    evas_common_rgba_image_scalecache_size_set(bytes);
 }
 
+/**
+ * @brief Gets the current target size of the image cache.
+ * @param data Engine-specific data (unused).
+ * @return The target cache size in bytes.
+ */
 static int
 eng_image_cache_get(void *data EINA_UNUSED)
 {
    return evas_common_image_get_cache();
 }
 
+/**
+ * @brief Loads a font set (potentially multiple fonts for fallback) by name and size.
+ * Uses the common font loading infrastructure.
+ * @param data Engine-specific data (unused).
+ * @param name The primary font name.
+ * @param size The font size.
+ * @param wanted_rend Rendering flags (e.g., anti-aliasing).
+ * @param bitmap_scalable Scalability hint for bitmap fonts.
+ * @return An Evas_Font_Set handle (actually RGBA_Font*) on success, NULL on failure.
+ */
 static Evas_Font_Set *
 eng_font_load(void *data EINA_UNUSED, const char *name, int size,
       Font_Rend_Flags wanted_rend, Efl_Text_Font_Bitmap_Scalable bitmap_scalable)
@@ -3095,6 +4226,19 @@ eng_font_load(void *data EINA_UNUSED, const char *name, int size,
    return (Evas_Font_Set *) evas_common_font_load(name, size, wanted_rend, bitmap_scalable);
 }
 
+/**
+ * @brief Loads a font set from memory data.
+ * Uses the common font loading infrastructure.
+ * @param data Engine-specific data (unused).
+ * @param source Identifier for the memory source (e.g., "memory").
+ * @param name The font name associated with this memory data.
+ * @param size The font size.
+ * @param fdata Pointer to the font data in memory.
+ * @param fdata_size Size of the font data.
+ * @param wanted_rend Rendering flags.
+ * @param bitmap_scalable Scalability hint for bitmap fonts.
+ * @return An Evas_Font_Set handle (actually RGBA_Font*) on success, NULL on failure.
+ */
 static Evas_Font_Set *
 eng_font_memory_load(void *data EINA_UNUSED, const char *source, const char *name, int size, const void *fdata, int fdata_size,
                      Font_Rend_Flags wanted_rend, Efl_Text_Font_Bitmap_Scalable bitmap_scalable)
@@ -3103,6 +4247,17 @@ eng_font_memory_load(void *data EINA_UNUSED, const char *source, const char *nam
          fdata, fdata_size, wanted_rend, bitmap_scalable);
 }
 
+/**
+ * @brief Adds a font (by name) to an existing font set for fallback purposes.
+ * Uses the common font loading infrastructure.
+ * @param data Engine-specific data (unused).
+ * @param font The existing Evas_Font_Set (RGBA_Font*) to add to.
+ * @param name The name of the font to add.
+ * @param size The size of the font to add.
+ * @param wanted_rend Rendering flags.
+ * @param bitmap_scalable Scalability hint for bitmap fonts.
+ * @return The potentially updated Evas_Font_Set handle.
+ */
 static Evas_Font_Set *
 eng_font_add(void *data EINA_UNUSED, Evas_Font_Set *font, const char *name, int size, Font_Rend_Flags wanted_rend,
              Efl_Text_Font_Bitmap_Scalable bitmap_scalable)
@@ -3111,6 +4266,20 @@ eng_font_add(void *data EINA_UNUSED, Evas_Font_Set *font, const char *name, int 
          size, wanted_rend, bitmap_scalable);
 }
 
+/**
+ * @brief Adds a font (from memory) to an existing font set for fallback purposes.
+ * Uses the common font loading infrastructure.
+ * @param data Engine-specific data (unused).
+ * @param font The existing Evas_Font_Set (RGBA_Font*) to add to.
+ * @param source Identifier for the memory source.
+ * @param name The font name associated with this memory data.
+ * @param size The font size.
+ * @param fdata Pointer to the font data in memory.
+ * @param fdata_size Size of the font data.
+ * @param wanted_rend Rendering flags.
+ * @param bitmap_scalable Scalability hint for bitmap fonts.
+ * @return The potentially updated Evas_Font_Set handle.
+ */
 static Evas_Font_Set *
 eng_font_memory_add(void *data EINA_UNUSED, Evas_Font_Set *font, const char *source, const char *name, int size, const void *fdata, int fdata_size,
                     Font_Rend_Flags wanted_rend, Efl_Text_Font_Bitmap_Scalable bitmap_scalable)
@@ -3119,54 +4288,115 @@ eng_font_memory_add(void *data EINA_UNUSED, Evas_Font_Set *font, const char *sou
          source, name, size, fdata, fdata_size, wanted_rend, bitmap_scalable);
 }
 
+/**
+ * @brief Frees a font set (decrements reference count).
+ * @param data Engine-specific data (unused).
+ * @param font The Evas_Font_Set (RGBA_Font*) to free/unref.
+ */
 static void
 eng_font_free(void *data EINA_UNUSED, Evas_Font_Set *font)
 {
    evas_common_font_free((RGBA_Font *) font);
 }
 
+/**
+ * @brief Gets the ascent of a font set (distance from baseline to top).
+ * @param data Engine-specific data (unused).
+ * @param font The Evas_Font_Set (RGBA_Font*) to query.
+ * @return The font ascent in pixels.
+ */
 static int
 eng_font_ascent_get(void *data EINA_UNUSED, Evas_Font_Set *font)
 {
    return evas_common_font_ascent_get((RGBA_Font *) font);
 }
 
+/**
+ * @brief Gets the descent of a font set (distance from baseline to bottom).
+ * @param data Engine-specific data (unused).
+ * @param font The Evas_Font_Set (RGBA_Font*) to query.
+ * @return The font descent in pixels (usually a non-positive value).
+ */
 static int
 eng_font_descent_get(void *data EINA_UNUSED, Evas_Font_Set *font)
 {
    return evas_common_font_descent_get((RGBA_Font *) font);
 }
 
+/**
+ * @brief Gets the maximum ascent of a font set over all its glyphs.
+ * @param data Engine-specific data (unused).
+ * @param font The Evas_Font_Set (RGBA_Font*) to query.
+ * @return The maximum font ascent in pixels.
+ */
 static int
 eng_font_max_ascent_get(void *data EINA_UNUSED, Evas_Font_Set *font)
 {
    return evas_common_font_max_ascent_get((RGBA_Font *) font);
 }
 
+/**
+ * @brief Gets the maximum descent of a font set over all its glyphs.
+ * @param data Engine-specific data (unused).
+ * @param font The Evas_Font_Set (RGBA_Font*) to query.
+ * @return The maximum font descent in pixels (usually a non-positive value).
+ */
 static int
 eng_font_max_descent_get(void *data EINA_UNUSED, Evas_Font_Set *font)
 {
    return evas_common_font_max_descent_get((RGBA_Font *) font);
 }
 
+/**
+ * @brief Calculates the bounding box size (width and height) for rendering given text properties.
+ * @param data Engine-specific data (unused).
+ * @param font The Evas_Font_Set (RGBA_Font*) to use for measurement.
+ * @param text_props The text properties (including text string and layout info).
+ * @param w Pointer to store the calculated width.
+ * @param h Pointer to store the calculated height.
+ */
 static void
 eng_font_string_size_get(void *data EINA_UNUSED, Evas_Font_Set *font, const Evas_Text_Props *text_props, int *w, int *h)
 {
    evas_common_font_query_size((RGBA_Font *) font, text_props, w, h);
 }
 
+/**
+ * @brief Gets the horizontal inset (bearing) of the first glyph for the given text properties.
+ * This is the horizontal distance from the drawing origin (pen position) to the left edge of the first glyph's bounding box.
+ * @param data Engine-specific data (unused).
+ * @param font The Evas_Font_Set (RGBA_Font*) to use for measurement.
+ * @param text_props The text properties.
+ * @return The horizontal inset in pixels.
+ */
 static int
 eng_font_inset_get(void *data EINA_UNUSED, Evas_Font_Set *font, const Evas_Text_Props *text_props)
 {
    return evas_common_font_query_inset((RGBA_Font *) font, text_props);
 }
 
+/**
+ * @brief Gets the horizontal right inset of the last glyph for the given text properties.
+ * This is the horizontal distance from the right edge of the last glyph's bounding box to the final pen position after drawing the text.
+ * @param data Engine-specific data (unused).
+ * @param font The Evas_Font_Set (RGBA_Font*) to use for measurement.
+ * @param text_props The text properties.
+ * @return The horizontal right inset in pixels.
+ */
 static int
 eng_font_right_inset_get(void *data EINA_UNUSED, Evas_Font_Set *font, const Evas_Text_Props *text_props)
 {
    return evas_common_font_query_right_inset((RGBA_Font *) font, text_props);
 }
 
+/**
+ * @brief Gets the total horizontal advance for rendering the given text properties.
+ * This is the distance the pen position moves horizontally after drawing the text.
+ * @param data Engine-specific data (unused).
+ * @param font The Evas_Font_Set (RGBA_Font*) to use for measurement.
+ * @param text_props The text properties.
+ * @return The horizontal advance in pixels.
+ */
 static int
 eng_font_h_advance_get(void *data EINA_UNUSED, Evas_Font_Set *font, const Evas_Text_Props *text_props)
 {
@@ -3176,6 +4406,14 @@ eng_font_h_advance_get(void *data EINA_UNUSED, Evas_Font_Set *font, const Evas_T
    return h;
 }
 
+/**
+ * @brief Gets the total vertical advance for rendering the given text properties.
+ * This is the distance the pen position moves vertically after drawing the text (usually 0 for horizontal text).
+ * @param data Engine-specific data (unused).
+ * @param font The Evas_Font_Set (RGBA_Font*) to use for measurement.
+ * @param text_props The text properties.
+ * @return The vertical advance in pixels.
+ */
 static int
 eng_font_v_advance_get(void *data EINA_UNUSED, Evas_Font_Set *font, const Evas_Text_Props *text_props)
 {
@@ -3185,12 +4423,38 @@ eng_font_v_advance_get(void *data EINA_UNUSED, Evas_Font_Set *font, const Evas_T
    return v;
 }
 
+/**
+ * @brief Gets the pen coordinates after drawing up to a specific character position.
+ * @param data Engine-specific data (unused).
+ * @param font The Evas_Font_Set (RGBA_Font*) used for layout.
+ * @param text_props The text properties.
+ * @param pos The character position (index) in the text string.
+ * @param cpen_x Pointer to store the horizontal pen position after the character at `pos`.
+ * @param cy Pointer to store the vertical position (baseline) of the character at `pos`.
+ * @param cadv Pointer to store the advance width of the character at `pos`.
+ * @param ch Pointer to store the height of the character at `pos`.
+ * @return The character index corresponding to the input position `pos` (can differ due to bidi).
+ */
 static int
 eng_font_pen_coords_get(void *data EINA_UNUSED, Evas_Font_Set *font, const Evas_Text_Props *text_props, int pos, int *cpen_x, int *cy, int *cadv, int *ch)
 {
    return evas_common_font_query_pen_coords((RGBA_Font *) font, text_props, pos, cpen_x, cy, cadv, ch);
 }
 
+/**
+ * @brief Populates an Evas_Text_Props structure with layout information for a given text string.
+ * Performs BiDi analysis, script detection, and potentially itemization based on the mode.
+ * @param data Engine-specific data (unused).
+ * @param fi The specific font instance (RGBA_Font_Int*) to use (can be NULL).
+ * @param text The Unicode text string.
+ * @param text_props The Evas_Text_Props structure to populate.
+ * @param par_props Pre-calculated BiDi paragraph properties (optional).
+ * @param par_pos Starting position within the paragraph (for BiDi context).
+ * @param len Length of the text segment to process.
+ * @param mode The processing mode (e.g., BIDI_ONLY, FULL).
+ * @param lang Language code (e.g., "en") for language-specific shaping.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 eng_font_text_props_info_create(void *data EINA_UNUSED, Evas_Font_Instance *fi, const Eina_Unicode *text, Evas_Text_Props *text_props, const Evas_BiDi_Paragraph_Props *par_props, size_t par_pos, size_t len, Evas_Text_Props_Mode mode, const char *lang)
 {
@@ -3198,24 +4462,74 @@ eng_font_text_props_info_create(void *data EINA_UNUSED, Evas_Font_Instance *fi, 
          text_props, par_props, par_pos, len, mode, lang);
 }
 
+/**
+ * @brief Gets the geometry (bounding box) of the character at a specific position in the text.
+ * @param data Engine-specific data (unused).
+ * @param font The Evas_Font_Set (RGBA_Font*) used for layout.
+ * @param text_props The text properties.
+ * @param pos The character position (index) in the text string.
+ * @param cx Pointer to store the character's left x-coordinate relative to the text origin.
+ * @param cy Pointer to store the character's top y-coordinate relative to the text origin.
+ * @param cw Pointer to store the character's width.
+ * @param ch Pointer to store the character's height.
+ * @return The character index corresponding to the input position `pos` (can differ due to bidi).
+ */
 static int
 eng_font_char_coords_get(void *data EINA_UNUSED, Evas_Font_Set *font, const Evas_Text_Props *text_props, int pos, int *cx, int *cy, int *cw, int *ch)
 {
    return evas_common_font_query_char_coords((RGBA_Font *) font, text_props, pos, cx, cy, cw, ch);
 }
 
+/**
+ * @brief Finds the character index at given coordinates relative to the text origin.
+ * Also returns the geometry of the found character.
+ * @param data Engine-specific data (unused).
+ * @param font The Evas_Font_Set (RGBA_Font*) used for layout.
+ * @param text_props The text properties.
+ * @param x The x-coordinate relative to the text origin.
+ * @param y The y-coordinate relative to the text origin.
+ * @param cx Pointer to store the found character's left x-coordinate.
+ * @param cy Pointer to store the found character's top y-coordinate.
+ * @param cw Pointer to store the found character's width.
+ * @param ch Pointer to store the found character's height.
+ * @return The index of the character at the given coordinates, or -1 if no character is found there.
+ */
 static int
 eng_font_char_at_coords_get(void *data EINA_UNUSED, Evas_Font_Set *font, const Evas_Text_Props *text_props, int x, int y, int *cx, int *cy, int *cw, int *ch)
 {
    return evas_common_font_query_char_at_coords((RGBA_Font *) font, text_props, x, y, cx, cy, cw, ch);
 }
 
+/**
+ * @brief Finds the last character index that fits within a given horizontal coordinate range.
+ * Useful for text truncation or line breaking calculations.
+ * @param data Engine-specific data (unused).
+ * @param font The Evas_Font_Set (RGBA_Font*) used for layout.
+ * @param text_props The text properties.
+ * @param x The target x-coordinate relative to the text origin (usually the available width).
+ * @param y The target y-coordinate (used to determine the line, often ignored for single line).
+ * @param width_offset An offset added to the calculated width before comparing with x.
+ * @return The index of the last character that fits within the coordinate `x`.
+ */
 static int
 eng_font_last_up_to_pos(void *data EINA_UNUSED, Evas_Font_Set *font, const Evas_Text_Props *text_props, int x, int y, int width_offset)
 {
    return evas_common_font_query_last_up_to_pos((RGBA_Font *) font, text_props, x, y, width_offset);
 }
 
+/**
+ * @brief Determines the end of a text run based on font/script changes.
+ * Finds how many characters starting from `text` can be rendered using the same
+ * font instance (`cur_fi`) within the given script context.
+ * @param data Engine-specific data (unused).
+ * @param font The base Evas_Font_Set (RGBA_Font*).
+ * @param script_fi Pointer to store the font instance appropriate for the `script`.
+ * @param cur_fi Pointer to store the font instance used for the current run (might differ from script_fi due to fallback).
+ * @param script The script type of the text run.
+ * @param text Pointer to the beginning of the Unicode text run.
+ * @param run_len The maximum length of the run to consider.
+ * @return The number of characters from `text` that form a continuous run with the same font instance.
+ */
 static int
 eng_font_run_font_end_get(void *data EINA_UNUSED, Evas_Font_Set *font, Evas_Font_Instance **script_fi, Evas_Font_Instance **cur_fi, Evas_Script_Type script, const Eina_Unicode *text, int run_len)
 {
@@ -3224,6 +4538,13 @@ eng_font_run_font_end_get(void *data EINA_UNUSED, Evas_Font_Set *font, Evas_Font
          script, text, run_len);
 }
 
+/**
+ * @brief Executes a font (glyph array) drawing command in a rendering thread.
+ * Sets up a temporary drawing context with necessary info from the command struct
+ * and calls the common font drawing function.
+ * This function is called by the thread pool. Frees associated resources afterwards.
+ * @param data Pointer to an Evas_Thread_Command_Font structure containing drawing parameters.
+ */
 static void
 _draw_thread_font_draw(void *data)
 {
@@ -3256,6 +4577,23 @@ _draw_thread_font_draw(void *data)
    eina_mempool_free(_mp_command_font, font);
 }
 
+/**
+ * @brief Creates and enqueues a font drawing command for threaded execution.
+ * Populates the command structure with data from the drawing context and glyph array.
+ * @param dst The destination RGBA_Image surface.
+ * @param dc The drawing context.
+ * @param x The x-coordinate for drawing the text.
+ * @param y The y-coordinate for drawing the text (baseline).
+ * @param glyphs The Evas_Glyph_Array containing glyphs and positions.
+ * @param func The low-level glyph drawing function (e.g., evas_common_gfx_font_glyph_draw).
+ * @param ext_x Clipping extent x.
+ * @param ext_y Clipping extent y.
+ * @param ext_w Clipping extent width.
+ * @param ext_h Clipping extent height.
+ * @param im_w Destination image width.
+ * @param im_h Destination image height.
+ * @return EINA_TRUE if the command was successfully enqueued, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _font_draw_thread_cmd(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y, Evas_Glyph_Array *glyphs, RGBA_Gfx_Func func, int ext_x, int ext_y, int ext_w, int ext_h, int im_w, int im_h)
 {
@@ -3290,6 +4628,25 @@ _font_draw_thread_cmd(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y, Evas
    return EINA_TRUE;
 }
 
+/**
+ * @brief Engine function to draw text based on text properties.
+ * Prepares the glyphs if needed, then dispatches the drawing to the appropriate
+ * implementation (sync, async thread, pipe).
+ * @param engine The engine instance (unused).
+ * @param data Engine-specific data (unused).
+ * @param context The drawing context.
+ * @param surface The target surface.
+ * @param font The font set (unused, information is in text_props).
+ * @param x The x-coordinate for drawing the text.
+ * @param y The y-coordinate for drawing the text (baseline).
+ * @param w Target width (unused).
+ * @param h Target height (unused).
+ * @param ow Output width (unused).
+ * @param oh Output height (unused).
+ * @param text_props The Evas_Text_Props containing the text, layout, and glyph information.
+ * @param do_async If true, attempt asynchronous (threaded) drawing.
+ * @return EINA_TRUE if drawing was handled asynchronously, EINA_FALSE otherwise (sync or error).
+ */
 static Eina_Bool
 eng_font_draw(void *engine EINA_UNUSED, void *data EINA_UNUSED, void *context, void *surface, Evas_Font_Set *font EINA_UNUSED, int x, int y, int w EINA_UNUSED, int h EINA_UNUSED, int ow EINA_UNUSED, int oh EINA_UNUSED, Evas_Text_Props *text_props, Eina_Bool do_async)
 {
@@ -3315,6 +4672,11 @@ eng_font_draw(void *engine EINA_UNUSED, void *data EINA_UNUSED, void *context, v
    return EINA_FALSE;
 }
 
+/**
+ * @brief Flushes the font cache.
+ * Temporarily sets the cache size to 0, flushes common font caches, then restores the size.
+ * @param data Engine-specific data (unused).
+ */
 static void
 eng_font_cache_flush(void *data EINA_UNUSED)
 {
@@ -3326,30 +4688,58 @@ eng_font_cache_flush(void *data EINA_UNUSED)
    evas_common_font_cache_set(tmp_size);
 }
 
+/**
+ * @brief Sets the target size for the font cache.
+ * @param data Engine-specific data (unused).
+ * @param bytes The target cache size in bytes.
+ */
 static void
 eng_font_cache_set(void *data EINA_UNUSED, int bytes)
 {
    evas_common_font_cache_set(bytes);
 }
 
+/**
+ * @brief Gets the current target size of the font cache.
+ * @param data Engine-specific data (unused).
+ * @return The target cache size in bytes.
+ */
 static int
 eng_font_cache_get(void *data EINA_UNUSED)
 {
    return evas_common_font_cache_get();
 }
 
+/**
+ * @brief Sets the hinting mode for a font set.
+ * @param data Engine-specific data (unused).
+ * @param font The Evas_Font_Set (RGBA_Font*) to modify.
+ * @param hinting The Evas_Font_Hinting_Flags value.
+ */
 static void
 eng_font_hinting_set(void *data EINA_UNUSED, Evas_Font_Set *font, int hinting)
 {
    evas_common_font_hinting_set((RGBA_Font *) font, hinting);
 }
 
+/**
+ * @brief Checks if a specific hinting mode is available/supported by the underlying font backend (FreeType).
+ * @param data Engine-specific data (unused).
+ * @param hinting The Evas_Font_Hinting_Flags value to check.
+ * @return 1 if the hinting mode is available, 0 otherwise.
+ */
 static int
 eng_font_hinting_can_hint(void *data EINA_UNUSED, int hinting)
 {
    return evas_common_hinting_available(hinting);
 }
 
+/**
+ * @brief Checks if the engine's output supports alpha blending.
+ * The software engine always supports alpha.
+ * @param data Engine-specific data (unused).
+ * @return Always EINA_TRUE.
+ */
 static Eina_Bool
 eng_canvas_alpha_get(void *data EINA_UNUSED)
 {
@@ -3357,6 +4747,12 @@ eng_canvas_alpha_get(void *data EINA_UNUSED)
 }
 
 
+/**
+ * @brief Gets the last load error code associated with an image.
+ * @param data Engine-specific data (unused).
+ * @param image The image entry (Image_Entry).
+ * @return The Evas_Load_Error code from the last load attempt.
+ */
 static int
 eng_image_load_error_get(void *data EINA_UNUSED, void *image)
 {
@@ -3370,6 +4766,11 @@ eng_image_load_error_get(void *data EINA_UNUSED, void *image)
 
 //------------ Evas GL engine code ---------------//
 #ifdef EVAS_GL
+/**
+ * @brief Initializes thread-local storage (TLS) keys for current GL context and surface.
+ * Ensures TLS is initialized only once. Not thread-safe itself, relies on external locking if needed.
+ * @return 1 on success, 0 on failure to create TLS keys.
+ */
 static inline int
 _tls_check(void)
 {
@@ -3386,6 +4787,11 @@ _tls_check(void)
 }
 #endif
 
+/**
+ * @brief Checks if the GL library (OSMesa) is initialized and available.
+ * Calls gl_lib_init() if not already initialized.
+ * @return EINA_TRUE if GL is available, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _check_gl(void)
 {
@@ -3393,12 +4799,26 @@ _check_gl(void)
    return 1;
 }
 
+/**
+ * @brief Checks if the engine supports Evas GL (via OSMesa).
+ * @param data Engine-specific data (unused).
+ * @return EINA_TRUE if OSMesa is available, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 eng_gl_supports_evas_gl(void *data EINA_UNUSED)
 {
    return _check_gl();
 }
 
+/**
+ * @brief Creates an off-screen GL rendering surface (using OSMesa).
+ * Allocates memory for the pixel buffer based on configuration.
+ * @param data Engine-specific data (unused).
+ * @param config Pointer to an Evas_GL_Config structure specifying format, depth, stencil bits.
+ * @param w Width of the surface.
+ * @param h Height of the surface.
+ * @return A pointer to the Render_Engine_GL_Surface structure on success, NULL on failure.
+ */
 static void *
 eng_gl_surface_create(void *data EINA_UNUSED, void *config, int w, int h)
 {
@@ -3502,6 +4922,14 @@ eng_gl_surface_create(void *data EINA_UNUSED, void *config, int w, int h)
 #endif
 }
 
+/**
+ * @brief Destroys an off-screen GL rendering surface.
+ * Frees the associated pixel buffer and the surface structure.
+ * Unsets the current surface in TLS if this surface was current.
+ * @param data Engine-specific data (unused).
+ * @param surface Pointer to the Render_Engine_GL_Surface to destroy.
+ * @return 1 on success, 0 if GL is not available or surface is NULL.
+ */
 static int
 eng_gl_surface_destroy(void *data EINA_UNUSED, void *surface)
 {
@@ -3531,6 +4959,17 @@ eng_gl_surface_destroy(void *data EINA_UNUSED, void *surface)
 #endif
 }
 
+/**
+ * @brief Creates a GL rendering context (using OSMesa).
+ * Currently only supports GLES 2.0 contexts. The actual OSMesa context
+ * is created lazily during the first make_current call.
+ * @param data Engine-specific data (unused).
+ * @param share_context Optional pointer to another Render_Engine_GL_Context to share resources with.
+ * @param version The requested GL version (must be EVAS_GL_GLES_2_X).
+ * @param native_context_get Function pointer (unused in this engine).
+ * @param engine_data_get Function pointer (unused in this engine).
+ * @return A pointer to the Render_Engine_GL_Context structure on success, NULL on failure or unsupported version.
+ */
 static void *
 eng_gl_context_create(void *data EINA_UNUSED, void *share_context, int version,
                       void *(*native_context_get)(void *) EINA_UNUSED,
@@ -3580,6 +5019,14 @@ eng_gl_context_create(void *data EINA_UNUSED, void *share_context, int version,
 #endif
 }
 
+/**
+ * @brief Destroys a GL rendering context.
+ * Destroys the underlying OSMesa context and frees the context structure.
+ * Unsets the current context in TLS if this context was current.
+ * @param data Engine-specific data (unused).
+ * @param context Pointer to the Render_Engine_GL_Context to destroy.
+ * @return 1 on success, 0 if GL is not available or context is NULL.
+ */
 static int
 eng_gl_context_destroy(void *data EINA_UNUSED, void *context)
 {
@@ -3608,6 +5055,17 @@ eng_gl_context_destroy(void *data EINA_UNUSED, void *context)
 #endif
 }
 
+/**
+ * @brief Makes a GL context current with a specific surface.
+ * If the context hasn't been initialized yet, creates the OSMesa context now,
+ * potentially sharing with another context if specified during creation.
+ * Calls OSMesaMakeCurrent and sets the current context/surface in TLS.
+ * Supports unsetting the current context/surface by passing NULL for both.
+ * @param data Engine-specific data (unused).
+ * @param surface Pointer to the Render_Engine_GL_Surface (or NULL).
+ * @param context Pointer to the Render_Engine_GL_Context (or NULL).
+ * @return 1 on success, 0 on failure (GL unavailable, OSMesa error, mismatched NULLs).
+ */
 static int
 eng_gl_make_current(void *data EINA_UNUSED, void *surface, void *context)
 {
@@ -3691,6 +5149,13 @@ eng_gl_make_current(void *data EINA_UNUSED, void *surface, void *context)
 #endif
 }
 
+/**
+ * @brief Queries GL implementation strings (e.g., GL_VERSION, GL_VENDOR).
+ * Currently not implemented for the software engine.
+ * @param data Engine-specific data (unused).
+ * @param name The GLenum specifying the string to query (unused).
+ * @return Always returns NULL.
+ */
 // FIXME!!! Implement later
 static const char *
 eng_gl_string_query(void *data EINA_UNUSED, int name EINA_UNUSED)
@@ -3698,6 +5163,13 @@ eng_gl_string_query(void *data EINA_UNUSED, int name EINA_UNUSED)
    return NULL;
 }
 
+/**
+ * @brief Gets the address of a GL extension function.
+ * Uses OSMesaGetProcAddress if available, otherwise falls back to dlsym.
+ * @param data Engine-specific data (unused).
+ * @param name The name of the GL function.
+ * @return A pointer to the function address, or NULL if not found or GL is unavailable.
+ */
 static void *
 eng_gl_proc_address_get(void *data EINA_UNUSED, const char *name)
 {
@@ -3712,6 +5184,14 @@ eng_gl_proc_address_get(void *data EINA_UNUSED, const char *name)
 #endif
 }
 
+/**
+ * @brief Fills an Evas_Native_Surface structure with information about a GL surface.
+ * Allows retrieving the underlying pixel buffer pointer for use elsewhere.
+ * @param data Engine-specific data (unused).
+ * @param surface Pointer to the Render_Engine_GL_Surface.
+ * @param native_surface Pointer to an Evas_Native_Surface structure to be filled.
+ * @return 1 on success, 0 if GL is unavailable or surface is NULL.
+ */
 static int
 eng_gl_native_surface_get(void *data EINA_UNUSED, void *surface, void *native_surface)
 {
@@ -3738,6 +5218,13 @@ eng_gl_native_surface_get(void *data EINA_UNUSED, void *surface, void *native_su
 #endif
 }
 
+/**
+ * @brief Gets the Evas_GL_API function table for a specific GL version.
+ * Currently only supports GLES 2.0. Initializes GL symbols if necessary.
+ * @param data Engine-specific data (unused).
+ * @param version The requested GL version (must be EVAS_GL_GLES_2_X).
+ * @return A pointer to the Evas_GL_API structure, or NULL if version is unsupported or GL is unavailable.
+ */
 static void *
 eng_gl_api_get(void *data EINA_UNUSED, int version)
 {
@@ -3753,6 +5240,12 @@ eng_gl_api_get(void *data EINA_UNUSED, int version)
 #endif
 }
 
+/**
+ * @brief Gets the last Evas GL error code for the engine.
+ * Currently only checks if the output buffer exists.
+ * @param data Pointer to the Render_Output_Software_Generic structure.
+ * @return An Evas_GL_Error code (e.g., EVAS_GL_SUCCESS, EVAS_GL_BAD_DISPLAY).
+ */
 static int
 eng_gl_error_get(void *data)
 {
@@ -3766,6 +5259,12 @@ eng_gl_error_get(void *data)
    return EVAS_GL_SUCCESS;
 }
 
+/**
+ * @brief Gets the currently active GL context for the calling thread.
+ * Retrieves the context pointer from thread-local storage.
+ * @param data Engine-specific data (unused).
+ * @return Pointer to the current Render_Engine_GL_Context, or NULL if none is current.
+ */
 static void *
 eng_gl_current_context_get(void *data EINA_UNUSED)
 {
@@ -3773,6 +5272,12 @@ eng_gl_current_context_get(void *data EINA_UNUSED)
    return eina_tls_get(gl_current_ctx_key);
 }
 
+/**
+ * @brief Gets the currently active GL surface for the calling thread.
+ * Retrieves the surface pointer from thread-local storage.
+ * @param data Engine-specific data (unused).
+ * @return Pointer to the current Render_Engine_GL_Surface, or NULL if none is current.
+ */
 static void *
 eng_gl_current_surface_get(void *data EINA_UNUSED)
 {
@@ -3780,6 +5285,12 @@ eng_gl_current_surface_get(void *data EINA_UNUSED)
    return eina_tls_get(gl_current_sfc_key);
 }
 
+/**
+ * @brief Gets the rotation angle applied to the GL output.
+ * The software engine does not support rotation at the GL level.
+ * @param data Engine-specific data (unused).
+ * @return Always returns 0.
+ */
 static int
 eng_gl_rotation_angle_get(void *data EINA_UNUSED)
 {
@@ -3795,6 +5306,11 @@ eng_gl_rotation_angle_get(void *data EINA_UNUSED)
    initialized by evas_render_engine_software_generic_init().
  */
 
+/**
+ * @brief Creates a new instance of the software generic rendering engine.
+ * Allocates the main engine structure and initializes the Ector surface cache.
+ * @return Pointer to the new Render_Engine_Software_Generic instance, or NULL on failure.
+ */
 static void *
 eng_engine_new(void)
 {
@@ -3808,6 +5324,11 @@ eng_engine_new(void)
    return engine;
 }
 
+/**
+ * @brief Frees an instance of the software generic rendering engine.
+ * Destroys the Ector surface cache, checks for leaked outputs, and frees the engine structure.
+ * @param engine Pointer to the Render_Engine_Software_Generic instance to free.
+ */
 static void
 eng_engine_free(void *engine)
 {
@@ -3822,6 +5343,13 @@ eng_engine_free(void *engine)
    free(e);
 }
 
+/**
+ * @brief Resizes the output buffer and associated tile buffer for a specific output.
+ * @param engine The engine instance (unused).
+ * @param data Pointer to the Render_Output_Software_Generic structure for the output.
+ * @param w The new width.
+ * @param h The new height.
+ */
 static void
 eng_output_resize(void *engine EINA_UNUSED, void *data, int w, int h)
 {
@@ -3841,6 +5369,14 @@ eng_output_resize(void *engine EINA_UNUSED, void *data, int w, int h)
    re->h = h;
 }
 
+/**
+ * @brief Adds a rectangle to the redraw list for all outputs managed by the engine.
+ * @param engine Pointer to the Render_Engine_Software_Generic instance.
+ * @param x The x-coordinate of the redraw rectangle.
+ * @param y The y-coordinate of the redraw rectangle.
+ * @param w The width of the redraw rectangle.
+ * @param h The height of the redraw rectangle.
+ */
 static void
 eng_output_redraws_rect_add(void *engine, int x, int y, int w, int h)
 {
@@ -3852,6 +5388,14 @@ eng_output_redraws_rect_add(void *engine, int x, int y, int w, int h)
      evas_common_tilebuf_add_redraw(re->tb, x, y, w, h);
 }
 
+/**
+ * @brief Deletes/subtracts a rectangle from the redraw list for all outputs.
+ * @param engine Pointer to the Render_Engine_Software_Generic instance.
+ * @param x The x-coordinate of the rectangle to remove.
+ * @param y The y-coordinate of the rectangle to remove.
+ * @param w The width of the rectangle to remove.
+ * @param h The height of the rectangle to remove.
+ */
 static void
 eng_output_redraws_rect_del(void *engine, int x, int y, int w, int h)
 {
@@ -3863,6 +5407,12 @@ eng_output_redraws_rect_del(void *engine, int x, int y, int w, int h)
      evas_common_tilebuf_del_redraw(re->tb, x, y, w, h);
 }
 
+/**
+ * @brief Clears the redraw list for a specific output.
+ * Also calls the output buffer's clear function if available.
+ * @param engine The engine instance (unused).
+ * @param data Pointer to the Render_Output_Software_Generic structure for the output.
+ */
 static void
 eng_output_redraws_clear(void *engine EINA_UNUSED, void *data)
 {
@@ -3873,6 +5423,17 @@ eng_output_redraws_clear(void *engine EINA_UNUSED, void *data)
    if (re->outbuf_redraws_clear) re->outbuf_redraws_clear(re->ob);
 }
 
+/**
+ * @brief Merges redraw rectangles using a "smart" algorithm.
+ * Tries to combine nearby rectangles into larger bounding boxes if the
+ * resulting area increase is within a certain percentage threshold, aiming
+ * to reduce the number of separate update regions while not excessively
+ * increasing the total pixel area to redraw. Also merges vertically adjacent
+ * rectangles with the same width.
+ * @param tb The Tilebuf (used for width/height).
+ * @param rects The initial list of redraw rectangles (Tilebuf_Rect list). This list is freed by the function.
+ * @return A new list of merged redraw rectangles (Tilebuf_Rect list).
+ */
 static Tilebuf_Rect *
 _smart_merge(Tilebuf *tb, Tilebuf_Rect *rects)
 {
@@ -4029,6 +5590,19 @@ _smart_merge(Tilebuf *tb, Tilebuf_Rect *rects)
    return rects;
 }
 
+/**
+ * @brief Merges multiple lists of redraw rectangles based on the swap mode and merge mode.
+ * Combines rectangles from previous frames (r1-r4) with the current frame's
+ * redraws stored in the tilebuffer `tb`. Applies either bounding box merging
+ * or smart merging based on `merge_mode`.
+ * @param merge_mode The merging strategy (MERGE_BOUNDING, MERGE_SMART).
+ * @param tb The Tilebuf containing the current frame's redraws.
+ * @param r1 Redraw rectangles from frame N.
+ * @param r2 Redraw rectangles from frame N-1.
+ * @param r3 Redraw rectangles from frame N-2.
+ * @param r4 Redraw rectangles from frame N-3.
+ * @return A new list of merged redraw rectangles for the current update cycle.
+ */
 static Tilebuf_Rect *
 _merge_rects(Render_Output_Merge_Mode merge_mode,
              Tilebuf *tb,
@@ -4112,6 +5686,25 @@ _merge_rects(Render_Output_Merge_Mode merge_mode,
 }
 
 
+/**
+ * @brief Gets the next rectangular region that needs to be redrawn and the surface to draw on.
+ * This function manages the update cycle based on the output buffer's swap mode.
+ * It retrieves redraws from the tilebuffer, merges them with previous frame redraws
+ * according to the swap mode (COPY, DOUBLE, TRIPLE, etc.) and merge mode (BOUNDING, SMART),
+ * and returns one update rectangle at a time along with a surface (obtained from the output buffer)
+ * to render into.
+ * @param engine The engine instance (unused).
+ * @param data Pointer to the Render_Output_Software_Generic structure for the output.
+ * @param x Pointer to store the logical x-coordinate of the update rectangle.
+ * @param y Pointer to store the logical y-coordinate of the update rectangle.
+ * @param w Pointer to store the logical width of the update rectangle.
+ * @param h Pointer to store the logical height of the update rectangle.
+ * @param cx Pointer to store the actual x-coordinate within the returned surface buffer.
+ * @param cy Pointer to store the actual y-coordinate within the returned surface buffer.
+ * @param cw Pointer to store the actual width within the returned surface buffer.
+ * @param ch Pointer to store the actual height within the returned surface buffer.
+ * @return A pointer to the surface buffer to draw into for this update region, or NULL if there are no more updates.
+ */
 static void *
 eng_output_redraws_next_update_get(void *engine EINA_UNUSED, void *data, int *x, int *y, int *w, int *h, int *cx, int *cy, int *cw, int *ch)
 {
@@ -4240,6 +5833,19 @@ eng_output_redraws_next_update_get(void *engine EINA_UNUSED, void *data, int *x,
    return NULL;
 }
 
+/**
+ * @brief Pushes a completed update region back to the output buffer.
+ * Called after rendering into the surface obtained from eng_output_redraws_next_update_get.
+ * Signals the output buffer to display/copy the updated region. Frees the update surface if necessary.
+ * @param engine The engine instance (unused).
+ * @param data Pointer to the Render_Output_Software_Generic structure for the output.
+ * @param surface The surface buffer that was rendered into.
+ * @param x The logical x-coordinate of the updated rectangle.
+ * @param y The logical y-coordinate of the updated rectangle.
+ * @param w The logical width of the updated rectangle.
+ * @param h The logical height of the updated rectangle.
+ * @param render_mode Current render mode (used to skip async init).
+ */
 static void
 eng_output_redraws_next_update_push(void *engine EINA_UNUSED, void *data, void *surface, int x, int y, int w, int h, Evas_Render_Mode render_mode)
 {
@@ -4257,6 +5863,14 @@ eng_output_redraws_next_update_push(void *engine EINA_UNUSED, void *data, void *
    evas_common_cpu_end_opt();
 }
 
+/**
+ * @brief Flushes all pending updates for an output.
+ * Called after all update regions for a frame have been pushed. Signals the output buffer
+ * that the frame is complete. Frees the merged rectangle list.
+ * @param engine The engine instance (unused).
+ * @param data Pointer to the Render_Output_Software_Generic structure for the output.
+ * @param render_mode Current render mode (used to skip async init).
+ */
 static void
 eng_output_flush(void *engine EINA_UNUSED, void *data, Evas_Render_Mode render_mode)
 {
@@ -4273,6 +5887,12 @@ eng_output_flush(void *engine EINA_UNUSED, void *data, Evas_Render_Mode render_m
      }
 }
 
+/**
+ * @brief Performs idle-time flushing or cleanup for an output.
+ * Calls the output buffer's idle flush function if available.
+ * @param engine The engine instance (unused).
+ * @param data Pointer to the Render_Output_Software_Generic structure for the output.
+ */
 static void
 eng_output_idle_flush(void *engine EINA_UNUSED, void *data)
 {
@@ -4284,6 +5904,12 @@ eng_output_idle_flush(void *engine EINA_UNUSED, void *data)
 
 // Ector functions
 
+/**
+ * @brief Creates a new Ector surface suitable for the software engine.
+ * Instantiates an ECTOR_SOFTWARE_SURFACE.
+ * @param engine The engine instance (unused).
+ * @return A new Ector_Surface object (refcounted), or NULL on failure.
+ */
 static Ector_Surface *
 eng_ector_create(void *engine EINA_UNUSED)
 {
@@ -4295,6 +5921,15 @@ eng_ector_create(void *engine EINA_UNUSED)
    return ector;
 }
 
+/**
+ * @brief Creates an Evas image surface to be used as a backing store for Ector rendering.
+ * This is typically used for caching intermediate Ector results.
+ * @param engine The engine instance.
+ * @param width Width of the surface.
+ * @param height Height of the surface.
+ * @param error Pointer to store an error flag (EINA_TRUE on failure).
+ * @return A pointer to the new RGBA_Image surface, or NULL on failure.
+ */
 static void*
 eng_ector_surface_create(void *engine, int width, int height, int *error)
 {
@@ -4308,6 +5943,11 @@ eng_ector_surface_create(void *engine, int width, int height, int *error)
    return surface;
 }
 
+/**
+ * @brief Destroys an Evas image surface previously created by eng_ector_surface_create.
+ * @param engine The engine instance.
+ * @param surface Pointer to the RGBA_Image surface to destroy.
+ */
 static void
 eng_ector_surface_destroy(void *engine, void *surface)
 {
@@ -4315,6 +5955,12 @@ eng_ector_surface_destroy(void *engine, void *surface)
    eng_image_free(engine, surface);
 }
 
+/**
+ * @brief Stores an Ector backing surface in the engine's generic cache.
+ * @param engine Pointer to the Render_Engine_Software_Generic instance.
+ * @param key The cache key (typically the Ector_Surface pointer).
+ * @param surface The RGBA_Image surface to store.
+ */
 static void
 eng_ector_surface_cache_set(void *engine, void *key , void *surface)
 {
@@ -4324,6 +5970,12 @@ eng_ector_surface_cache_set(void *engine, void *key , void *surface)
 
 }
 
+/**
+ * @brief Retrieves an Ector backing surface from the engine's generic cache.
+ * @param engine Pointer to the Render_Engine_Software_Generic instance.
+ * @param key The cache key.
+ * @return The cached RGBA_Image surface, or NULL if not found.
+ */
 static void *
 eng_ector_surface_cache_get(void *engine, void *key)
 {
@@ -4332,6 +5984,11 @@ eng_ector_surface_cache_get(void *engine, void *key)
    return generic_cache_data_get(e->surface_cache, key);
 }
 
+/**
+ * @brief Removes an Ector backing surface from the engine's generic cache (and potentially frees it).
+ * @param engine Pointer to the Render_Engine_Software_Generic instance.
+ * @param key The cache key.
+ */
 static void
 eng_ector_surface_cache_drop(void *engine, void *key)
 {
@@ -4340,12 +5997,26 @@ eng_ector_surface_cache_drop(void *engine, void *key)
    generic_cache_data_drop(e->surface_cache, key);
 }
 
+/**
+ * @brief Destroys an Ector surface object.
+ * Decrements the reference count of the Ector_Surface.
+ * @param data Engine-specific data (unused).
+ * @param ector The Ector_Surface to destroy/unref.
+ */
 static void
 eng_ector_destroy(void *data EINA_UNUSED, Ector_Surface *ector)
 {
    if (ector) efl_unref(ector);
 }
 
+/**
+ * @brief Wraps an existing Evas image (Image_Entry) into an Ector_Buffer.
+ * Creates an EVAS_ECTOR_SOFTWARE_BUFFER that references the Evas image data.
+ * @param data Engine-specific data (passed to buffer).
+ * @param e The Evas canvas (unused).
+ * @param engine_image Pointer to the Evas Image_Entry to wrap.
+ * @return A new Ector_Buffer object (refcounted) wrapping the image, or NULL on failure.
+ */
 static Ector_Buffer *
 eng_ector_buffer_wrap(void *data, Evas *e EINA_UNUSED, void *engine_image)
 {
@@ -4365,6 +6036,17 @@ eng_ector_buffer_wrap(void *data, Evas *e EINA_UNUSED, void *engine_image)
    return buf;
 }
 
+/**
+ * @brief Creates a new Ector_Buffer backed by a newly allocated Evas image.
+ * Allocates an Evas image with the specified dimensions and colorspace, then wraps it.
+ * @param data Engine-specific data (passed to buffer).
+ * @param evas The Evas canvas.
+ * @param width Width of the buffer.
+ * @param height Height of the buffer.
+ * @param cspace Colorspace of the buffer (currently supports ARGB8888, GRY8).
+ * @param flags Buffer flags (unused).
+ * @return A new Ector_Buffer object (refcounted), or NULL on failure.
+ */
 static Ector_Buffer *
 eng_ector_buffer_new(void *data, Evas *evas, int width, int height,
                      Efl_Gfx_Colorspace cspace, Ector_Buffer_Flag flags EINA_UNUSED)
@@ -4398,6 +6080,11 @@ eng_ector_buffer_new(void *data, Evas *evas, int width, int height,
    return buf;
 }
 
+/**
+ * @brief Cleans up resources associated with a threaded Ector draw command.
+ * Frees the duplicated clip rectangles and optionally the command structure itself.
+ * @param ector The Evas_Thread_Command_Ector structure to clean up.
+ */
 static void
 _draw_thread_ector_cleanup(Evas_Thread_Command_Ector *ector)
 {
@@ -4411,6 +6098,12 @@ _draw_thread_ector_cleanup(Evas_Thread_Command_Ector *ector)
      eina_mempool_free(_mp_command_ector, ector);
 }
 
+/**
+ * @brief Executes an Ector renderer draw command in a rendering thread.
+ * Calls ector_renderer_draw with the provided parameters.
+ * This function is called by the thread pool. Cleans up resources afterwards.
+ * @param data Pointer to an Evas_Thread_Command_Ector structure.
+ */
 static void
 _draw_thread_ector_draw(void *data)
 {
@@ -4421,6 +6114,17 @@ _draw_thread_ector_draw(void *data)
    _draw_thread_ector_cleanup(ector);
 }
 
+/**
+ * @brief Engine function to execute an Ector renderer's drawing operations onto an Evas surface.
+ * Clips the provided clip rectangles against the Evas drawing context's clip region.
+ * Dispatches the drawing to the appropriate implementation (sync or async thread).
+ * @param engine The engine instance (unused).
+ * @param surface The target Evas surface (RGBA_Image).
+ * @param context The Evas drawing context (used for clipping).
+ * @param renderer The Ector_Renderer containing the drawing commands.
+ * @param clips An Eina_Array of Eina_Rectangle* defining clipping areas for the Ector draw.
+ * @param do_async If true, attempt asynchronous (threaded) drawing.
+ */
 static void
 eng_ector_renderer_draw(void *engine EINA_UNUSED, void *surface,
                         void *context, Ector_Renderer *renderer,
@@ -4508,6 +6212,13 @@ eng_ector_renderer_draw(void *engine EINA_UNUSED, void *surface,
      }
 }
 
+/**
+ * @brief Executes an Ector surface setup command in a rendering thread.
+ * Sets the pixel buffer, dimensions, and reference point for an Ector_Surface.
+ * If setting a buffer, clears it first. If unsetting (pixels=NULL), just updates Ector.
+ * This function is called by the thread pool. Frees the command structure afterwards.
+ * @param data Pointer to an Evas_Thread_Command_Ector_Surface structure.
+ */
 static void
 _draw_thread_ector_surface_set(void *data)
 {
@@ -4542,6 +6253,19 @@ _draw_thread_ector_surface_set(void *data)
    eina_mempool_free(_mp_command_ector_surface, ector_surface);
 }
 
+/**
+ * @brief Prepares an Ector_Surface to render onto an Evas surface (RGBA_Image).
+ * Associates the Evas surface's pixel buffer with the Ector_Surface, sets the
+ * reference point, and clears the buffer. Dispatches to sync or async thread.
+ * @param engine The engine instance (unused).
+ * @param surface The target Evas surface (RGBA_Image).
+ * @param context The Evas drawing context (unused).
+ * @param ector The Ector_Surface to prepare.
+ * @param x The x-coordinate reference point for the Ector surface.
+ * @param y The y-coordinate reference point for the Ector surface.
+ * @param do_async If true, perform setup asynchronously in a thread.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., couldn't get pixels).
+ */
 static Eina_Bool
 eng_ector_begin(void *engine EINA_UNUSED, void *surface,
                 void *context EINA_UNUSED, Ector_Surface *ector,
@@ -4582,6 +6306,16 @@ eng_ector_begin(void *engine EINA_UNUSED, void *surface,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Finalizes rendering to an Ector_Surface associated with an Evas surface.
+ * Detaches the pixel buffer from the Ector_Surface by setting it to NULL.
+ * Dispatches to sync or async thread.
+ * @param engine The engine instance (unused).
+ * @param surface The target Evas surface (unused).
+ * @param context The Evas drawing context (unused).
+ * @param ector The Ector_Surface to finalize.
+ * @param do_async If true, perform finalization asynchronously in a thread.
+ */
 static void
 eng_ector_end(void *engine EINA_UNUSED,
               void *surface EINA_UNUSED,
@@ -4610,6 +6344,11 @@ eng_ector_end(void *engine EINA_UNUSED,
 
 //------------------------------------------------//
 
+/**
+ * @brief Gets the appropriate software filter function based on the filter mode.
+ * @param cmd The Evas_Filter_Command describing the filter operation.
+ * @return A function pointer (Software_Filter_Func) to the implementation, or NULL if unsupported.
+ */
 static Software_Filter_Func
 _gfx_filter_func_get(Evas_Filter_Command *cmd)
 {
@@ -4633,6 +6372,12 @@ _gfx_filter_func_get(Evas_Filter_Command *cmd)
    return func;
 }
 
+/**
+ * @brief Checks if a graphics filter command is supported by the software engine.
+ * @param data Engine-specific data (unused).
+ * @param cmd The Evas_Filter_Command to check.
+ * @return EVAS_FILTER_SUPPORT_CPU if supported, EVAS_FILTER_SUPPORT_NONE otherwise.
+ */
 static Evas_Filter_Support
 eng_gfx_filter_supports(void *data EINA_UNUSED, Evas_Filter_Command *cmd)
 {
@@ -4642,12 +6387,28 @@ eng_gfx_filter_supports(void *data EINA_UNUSED, Evas_Filter_Command *cmd)
    return EVAS_FILTER_SUPPORT_CPU;
 }
 
+/**
+ * @brief Triggers garbage collection for font glyphs/atlases.
+ * This is a no-op in the software engine as it doesn't use texture atlases for fonts.
+ * @param data Engine-specific data (unused).
+ * @param ratio Ratio of glyphs to collect (unused).
+ * @param texture_size Pointer to store texture size (unused).
+ * @param atlas_size Pointer to store atlas size (unused).
+ * @param only_when_requested Flag (unused).
+ */
 static void
 eng_font_glyphs_gc_collect(void *data EINA_UNUSED, float ratio EINA_UNUSED, int *texture_size EINA_UNUSED, int *atlas_size EINA_UNUSED, Eina_Bool only_when_requested EINA_UNUSED)
 {
    return;
 }
 
+/**
+ * @brief Processes a graphics filter command using the software implementation.
+ * Finds the appropriate filter function and executes it.
+ * @param data Engine-specific data (unused).
+ * @param cmd The Evas_Filter_Command to process.
+ * @return EINA_TRUE on success, EINA_FALSE if the filter is unsupported or fails.
+ */
 static Eina_Bool
 eng_gfx_filter_process(void *data EINA_UNUSED, Evas_Filter_Command *cmd)
 {
@@ -4865,12 +6626,20 @@ static Evas_Func func =
 //                                                                //
 //----------------------------------------------------------------//
 #ifdef EVAS_GL
+/**
+ * @brief Placeholder function used when a required GL symbol cannot be found. Logs an error.
+ */
 static void
 sym_missing(void)
 {
    ERR("GL symbols missing!");
 }
 
+/**
+ * @brief Initializes core OSMesa API function pointers required by the engine.
+ * Uses dlsym to find the symbols in the loaded OSMesa library.
+ * @return 1 on success (all required symbols found), 0 on failure.
+ */
 static int
 glue_sym_init(void)
 {
@@ -4908,6 +6677,13 @@ glue_sym_init(void)
    return 1;
 }
 
+/**
+ * @brief Initializes function pointers for OpenGL (ES 2.0) APIs.
+ * Attempts to find symbols using dlsym and falls back to OSMesaGetProcAddress.
+ * Assigns sym_missing as a fallback if a symbol is not found.
+ * Determines if the underlying library is GLES or desktop GL based on symbol availability.
+ * @return EINA_TRUE if all essential symbols were found, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 gl_sym_init(void)
 {
@@ -5379,6 +7155,15 @@ gl_sym_init(void)
 
 // Stripping precision code from GLES shader for desktop compatibility
 // Code adopted from Meego GL code. Temporary Fix.
+/**
+ * @brief Custom strtok-like function that handles C/C++ comments.
+ * Used to parse shader source code while skipping comments.
+ * @param s Input string (or NULL to continue tokenizing).
+ * @param n Pointer to remaining length of the input string.
+ * @param saveptr Pointer to store the internal state for subsequent calls.
+ * @param prevbuf The buffer returned by the previous call (will be freed).
+ * @return A newly allocated string containing the next token, or NULL if no more tokens.
+ */
 static const char *
 opengl_strtok(const char *s, int *n, char **saveptr, char *prevbuf)
 {
@@ -5465,6 +7250,16 @@ opengl_strtok(const char *s, int *n, char **saveptr, char *prevbuf)
    return ret;
 }
 
+/**
+ * @brief Patches GLES shader source code for compatibility with desktop OpenGL.
+ * Removes precision qualifiers (lowp, mediump, highp) and replaces GLES-specific
+ * built-in variables (like gl_MaxVertexUniformVectors) with their desktop GL equivalents.
+ * Uses opengl_strtok to handle comments correctly.
+ * @param source The original GLES shader source code.
+ * @param length The length of the source code.
+ * @param patched_len Pointer to store the length of the patched shader code.
+ * @return A newly allocated string containing the patched shader source, or NULL on failure.
+ */
 static char *
 patch_gles_shader(const char *source, int length, int *patched_len)
 {
@@ -5549,6 +7344,14 @@ patch_gles_shader(const char *source, int length, int *patched_len)
    return patched;
 }
 
+/**
+ * @brief Wrapper for glShaderSource that patches GLES shaders for desktop GL compatibility.
+ * Calls patch_gles_shader before passing the source to the real _sym_glShaderSource.
+ * @param shader The shader object handle.
+ * @param count The number of strings in the source array.
+ * @param string Array of source code strings.
+ * @param length Array of string lengths (or NULL for null-terminated strings).
+ */
 static void
 evgl_glShaderSource(GLuint shader, GLsizei count, const char* const* string, const GLint* length)
 {
@@ -5608,6 +7411,15 @@ err:
 }
 
 
+/**
+ * @brief Wrapper/Emulation for glGetShaderPrecisionFormat for desktop GL.
+ * Provides fixed precision/range values typical for desktop float precision,
+ * as desktop GL prior to 4.1 doesn't have this function.
+ * @param shadertype Shader type (unused).
+ * @param precisiontype Precision type (unused).
+ * @param range Pointer to store the range [min, max].
+ * @param precision Pointer to store the precision bits.
+ */
 static void
 evgl_glGetShaderPrecisionFormat(GLenum shadertype EINA_UNUSED, GLenum precisiontype EINA_UNUSED, GLint* range, GLint* precision)
 {
@@ -5623,6 +7435,10 @@ evgl_glGetShaderPrecisionFormat(GLenum shadertype EINA_UNUSED, GLenum precisiont
    return;
 }
 
+/**
+ * @brief Wrapper/Emulation for glReleaseShaderCompiler for desktop GL.
+ * This is a no-op on desktop GL as shader compilation is typically synchronous.
+ */
 static void
 evgl_glReleaseShaderCompiler(void)
 {
@@ -5630,6 +7446,15 @@ evgl_glReleaseShaderCompiler(void)
    return;
 }
 
+/**
+ * @brief Wrapper/Emulation for glShaderBinary for desktop GL.
+ * This is generally not supported on desktop GL in the same way as GLES. Logs a debug message.
+ * @param n Number of shaders (unused).
+ * @param shaders Array of shader handles (unused).
+ * @param binaryformat Binary format enum (unused).
+ * @param binary Pointer to binary data (unused).
+ * @param length Length of binary data (unused).
+ */
 static void
 evgl_glShaderBinary(GLsizei n EINA_UNUSED, const GLuint* shaders EINA_UNUSED, GLenum binaryformat EINA_UNUSED, const void* binary EINA_UNUSED, GLsizei length EINA_UNUSED)
 {
@@ -5640,6 +7465,14 @@ evgl_glShaderBinary(GLsizei n EINA_UNUSED, const GLuint* shaders EINA_UNUSED, GL
    //shaders = binary = 0;
 }
 
+/**
+ * @brief Wrapper for glGetString to modify version strings for GLES compatibility.
+ * Returns modified strings for GL_VERSION and GL_SHADING_LANGUAGE_VERSION to
+ * report as GLES 2.0 / GLSL ES 1.00, while embedding the original desktop GL version.
+ * Passes through other string queries (VENDOR, RENDERER, EXTENSIONS) directly.
+ * @param name The GLenum specifying the string to query.
+ * @return Pointer to the (potentially modified) GL string.
+ */
 static const GLubyte *
 evgl_glGetString(GLenum name)
 {
@@ -5686,6 +7519,12 @@ evgl_glGetString(GLenum name)
 }
 
 
+/**
+ * @brief Populates the Evas_GL_API structure with function pointers.
+ * Assigns the resolved symbols (_sym_*) to the corresponding fields in the API struct.
+ * Overrides specific functions with wrappers (evgl_*) for desktop GL compatibility if needed.
+ * @param api Pointer to the Evas_GL_API structure to populate.
+ */
 static void
 override_gl_apis(Evas_GL_API *api)
 {
@@ -5856,6 +7695,13 @@ override_gl_apis(Evas_GL_API *api)
 #endif
 
 //-------------------------------------------//
+/**
+ * @brief Initializes the GL library (OSMesa) support for the engine.
+ * Attempts to dlopen libOSMesa, resolves core OSMesa symbols, resolves GL API symbols,
+ * and sets up the Evas_GL_API function table with potential compatibility wrappers.
+ * Ensures thread-local storage is initialized.
+ * @return 1 on successful initialization, 0 on failure (OSMesa not found or symbol resolution failed).
+ */
 static int
 gl_lib_init(void)
 {
@@ -5939,6 +7785,13 @@ init_gl(void)
  *****
  */
 
+/**
+ * @brief Opens and initializes the software_generic engine module.
+ * Registers the log domain, creates mempools for threaded commands, initializes
+ * Ector and pipe rendering subsystems, and registers the engine's function table.
+ * @param em Pointer to the Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -5990,6 +7843,11 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Closes and cleans up the software_generic engine module.
+ * Shuts down Ector, deletes command mempools, and unregisters the log domain.
+ * @param em Pointer to the Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {
@@ -6008,6 +7866,9 @@ module_close(Evas_Module *em EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Module API structure defining the engine module.
+ */
 static Evas_Module_Api evas_modapi =
 {
    EVAS_MODULE_API_VERSION,
@@ -6019,11 +7880,20 @@ static Evas_Module_Api evas_modapi =
    }
 };
 
+/**
+ * @brief Initializes and registers the software_generic engine module with Evas.
+ * Called by Evas during module loading.
+ * @return EINA_TRUE on successful registration, EINA_FALSE otherwise.
+ */
 Eina_Bool evas_engine_software_generic_init(void)
 {
    return evas_module_register(&evas_modapi, EVAS_MODULE_TYPE_ENGINE);
 }
 
+/**
+ * @brief Unregisters the software_generic engine module from Evas.
+ * Called by Evas during module unloading.
+ */
 // Time to destroy the ector context
 void evas_engine_software_generic_shutdown(void)
 {

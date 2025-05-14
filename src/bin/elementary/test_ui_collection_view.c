@@ -7,6 +7,18 @@
 
 #define NUM_ITEMS 50
 
+/**
+ * @brief Creates a new data model for the collection view.
+ *
+ * This function initializes a generic model and populates it with
+ * NUM_ITEMS children. Each child has an "initial" integer property
+ * representing its index. It also sets up "relative" and "title"
+ * string properties that can be used for display, demonstrating
+ * string formatting with child properties.
+ *
+ * @param win The parent window, used as the parent for the model.
+ * @return A new Efl_Model instance populated with data.
+ */
 static Efl_Model*
 _make_model(Efl_Ui_Win *win)
 {
@@ -34,6 +46,16 @@ _make_model(Efl_Ui_Win *win)
    return model;
 }
 
+/**
+ * @brief Callback invoked when an item in the collection view is being constructed.
+ *
+ * This function sets a minimum size for the item if its calculation
+ * is not locked. This is typically used to ensure items have a default
+ * visual dimension.
+ *
+ * @param data User data passed to the callback (unused in this case).
+ * @param ev The event information, containing the item being constructed.
+ */
 static void
 _item_constructing(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -43,6 +65,16 @@ _item_constructing(void *data EINA_UNUSED, const Efl_Event *ev)
      efl_gfx_hint_size_min_set(item, EINA_SIZE2D(100, 50));
 }
 
+/**
+ * @brief Callback invoked when the selection changes in the collection view.
+ *
+ * This function retrieves the model associated with the last selected item
+ * and sets it on the provided data object (which is an Efl_Model_Provider).
+ * This allows another part of the UI to display details of the selected item.
+ *
+ * @param data The Efl_Model_Provider to update with the selected item's model.
+ * @param ev The event information, containing the selectable object.
+ */
 static void
 _item_select(void *data, const Efl_Event *ev)
 {
@@ -52,6 +84,18 @@ _item_select(void *data, const Efl_Event *ev)
    if (m) efl_ui_view_model_set(data, m);
 }
 
+/**
+ * @brief Main test function for Efl.Ui.Collection_View.
+ *
+ * This function sets up a window with a table layout. The table contains
+ * a list view and a grid view, both displaying data from the same model.
+ * It also includes a frame that displays properties of the currently
+ * selected item from the list view.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void test_efl_ui_collection_view(void *data EINA_UNUSED,
                                  Evas_Object *obj EINA_UNUSED,
                                  void *event_info EINA_UNUSED)

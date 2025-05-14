@@ -4,6 +4,10 @@
 #ifndef _ELM_SLIDER_PART_INDICATOR_EO_CLASS_TYPE
 #define _ELM_SLIDER_PART_INDICATOR_EO_CLASS_TYPE
 
+/**
+ * @brief Represents an instance of the Elm_Slider_Part_Indicator class.
+ * @ingroup Elm_Slider_Part_Indicator
+ */
 typedef Eo Elm_Slider_Part_Indicator;
 
 #endif

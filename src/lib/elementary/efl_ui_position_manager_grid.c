@@ -12,40 +12,72 @@
 #define MY_DATA_GET(obj, pd) \
   Efl_Ui_Position_Manager_Grid_Data *pd = efl_data_scope_get(obj, MY_CLASS);
 
+/**
+ * @brief Private data structure for the Efl_Ui_Position_Manager_Grid class.
+ *
+ * This structure holds all the necessary data for managing the grid layout,
+ * including caches for item sizes and group information, viewport details,
+ * scroll position, and callbacks for accessing item data.
+ */
 typedef struct {
-   Api_Callbacks callbacks;
+   Api_Callbacks callbacks; /**< Callbacks for accessing item data (objects and sizes). */
 
-   Eina_Inarray *group_cache;
-   int *size_cache;
-   Eo *last_group;
-   Eina_Future *rebuild_absolut_size;
-   Efl_Ui_Win *window;
-   Evas *canvas;
+   Eina_Inarray *group_cache; /**< Cache for group information. Stores Group_Cache_Line items.
+                               * Example:
+                               * [
+                               *   { group_header_size={w=100,h=20}, items=5, real_group=EINA_TRUE }, // A real group header
+                               *   { group_header_size={w=0,h=0}, items=10, real_group=EINA_FALSE }  // A block of items not part of a real group
+                               * ]
+                               */
+   int *size_cache; /**< Cache for the calculated size (height or width depending on orientation) of each group. */
+   Eo *last_group; /**< The last group header object that was made visible and potentially floated. */
+   Eina_Future *rebuild_absolut_size; /**< Future for debouncing absolute size recalculation. */
+   Efl_Ui_Win *window; /**< The window containing the grid. */
+   Evas *canvas; /**< The Evas canvas. */
 
-   Vis_Segment prev_run;
+   Vis_Segment prev_run; /**< Stores the previously visible segment of items (start_id, end_id). */
 
-   Eina_Rect viewport;
-   Eina_Vector2 scroll_position;
-   Eina_Size2D max_min_size;
-   Eina_Size2D last_viewport_size;
-   Eina_Size2D prev_min_size;
+   Eina_Rect viewport; /**< Current viewport geometry (x, y, w, h). */
+   Eina_Vector2 scroll_position; /**< Normalized scroll position (0.0 to 1.0). */
+   Eina_Size2D max_min_size; /**< Maximum of all minimum item sizes. Used as the base cell size. */
+   Eina_Size2D last_viewport_size; /**< The total content size calculated in the last flush. */
+   Eina_Size2D prev_min_size; /**< The previously reported minimum content size. */
 
-   Efl_Ui_Layout_Orientation dir;
+   Efl_Ui_Layout_Orientation dir; /**< Layout orientation (vertical or horizontal). */
 
-   unsigned int size;
-   unsigned int groups;
-   unsigned int prev_consumed_space;
+   unsigned int size; /**< Total number of items in the grid. */
+   unsigned int groups; /**< (Not actively used) Number of groups. */
+   unsigned int prev_consumed_space; /**< Consumed space for the start of the previous visible range. */
 
-   Eina_Bool group_cache_dirty;
-   Eina_Bool size_cache_dirty;
+   Eina_Bool group_cache_dirty; /**< Flag indicating if the group_cache needs rebuilding. */
+   Eina_Bool size_cache_dirty; /**< Flag indicating if the size_cache needs rebuilding. */
 } Efl_Ui_Position_Manager_Grid_Data;
 
+/**
+ * @brief Structure to store cached information about a group or a block of items.
+ *
+ * A "group" in this context can be a real group with a header, or a contiguous
+ * block of items that are not part of a real group but are treated as a unit
+ * for calculation purposes.
+ */
 typedef struct {
-   Eina_Size2D group_header_size;
-   int items;
-   Eina_Bool real_group;
+   Eina_Size2D group_header_size; /**< Size of the group header if real_group is EINA_TRUE. */
+   int items; /**< Number of items in this group/block, including the header if it's a real group. */
+   Eina_Bool real_group; /**< EINA_TRUE if this represents a real group with a header. */
 } Group_Cache_Line;
 
+/**
+ * @brief Updates the maximum minimum size based on a new item's minimum size.
+ *
+ * This function is called when items are added or their sizes change, to ensure
+ * `pd->max_min_size` reflects the largest width and height required by any single item.
+ * This `max_min_size` is then used as the uniform cell size for all grid items.
+ *
+ * @param obj The Efl_Ui_Position_Manager_Grid object.
+ * @param pd The private data of the grid manager.
+ * @param added_index Index of the item being considered (currently unused in function body).
+ * @param min_size The minimum size of the item.
+ */
 static inline void
 _update_min_size(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd, int added_index EINA_UNUSED, Eina_Size2D min_size)
 {
@@ -53,6 +85,21 @@ _update_min_size(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd, int
    pd->max_min_size.h = MAX(pd->max_min_size.h, min_size.h);
 }
 
+/**
+ * @brief Ensures the group cache (pd->group_cache) is up-to-date.
+ *
+ * If `pd->group_cache_dirty` is true, this function rebuilds the group cache.
+ * It iterates through all items, identifies groups and their headers,
+ * and stores this information in `pd->group_cache`. It also updates
+ * `pd->max_min_size` by calling `_update_min_size` for each item.
+ *
+ * The group cache essentially segments the flat list of items into logical blocks,
+ * where each block is either a real group (header + items) or a sequence of
+ * non-grouped items.
+ *
+ * @param obj The Efl_Ui_Position_Manager_Grid object.
+ * @param pd The private data of the grid manager.
+ */
 static void
 _group_cache_require(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd)
 {
@@ -105,6 +152,14 @@ _group_cache_require(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd)
    eina_inarray_push(pd->group_cache, &line);
 }
 
+/**
+ * @brief Invalidates the group cache and size cache.
+ *
+ * Sets flags to indicate that both caches need to be rebuilt.
+ *
+ * @param obj The Efl_Ui_Position_Manager_Grid object.
+ * @param pd The private data of the grid manager.
+ */
 static inline void
 _group_cache_invalidate(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd)
 {
@@ -112,6 +167,20 @@ _group_cache_invalidate(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *
   pd->size_cache_dirty = EINA_TRUE;
 }
 
+/**
+ * @brief Ensures the size cache (pd->size_cache) is up-to-date.
+ *
+ * If `pd->size_cache_dirty` is true, this function first ensures the group
+ * cache is up-to-date by calling `_group_cache_require`. Then, it calculates
+ * the total size (height for vertical, width for horizontal) for each
+ * group/block in the `pd->group_cache` and stores it in `pd->size_cache`.
+ * This calculation considers the group header size, the number of items,
+ * the `pd->max_min_size` (cell size), and the viewport width/height to
+ * determine how many rows/columns are needed for the items within that group.
+ *
+ * @param obj The Efl_Ui_Position_Manager_Grid object.
+ * @param pd The private data of the grid manager.
+ */
 static void
 _size_cache_require(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd)
 {
@@ -143,17 +212,45 @@ _size_cache_require(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd)
      }
 }
 
+/**
+ * @brief Invalidates the size cache.
+ *
+ * Sets a flag to indicate that the size cache needs to be rebuilt.
+ *
+ * @param obj The Efl_Ui_Position_Manager_Grid object.
+ * @param pd The private data of the grid manager.
+ */
 static inline void
 _size_cache_invalidate(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd)
 {
   pd->size_cache_dirty = EINA_TRUE;
 }
 
+/**
+ * @brief Structure to hold the result of a search for an item ID.
+ */
 typedef struct {
-  int resulting_id;
-  int consumed_space;
+  int resulting_id;     /**< The ID of the item found at or just after the specified space. */
+  int consumed_space;   /**< The amount of space consumed up to the `resulting_id`. */
 } Search_Result;
 
+/**
+ * @brief Searches for the item ID that corresponds to a given scroll offset.
+ *
+ * This function determines which item should be visible at a specific
+ * scroll offset (`relevant_space_size`). It iterates through the cached
+ * group sizes (`pd->size_cache`) to quickly skip over groups that are
+ * entirely before the offset. Then, it performs a more detailed calculation
+ * within the target group to find the exact item ID.
+ *
+ * @param obj The Efl_Ui_Position_Manager_Grid object.
+ * @param pd The private data of the grid manager.
+ * @param relevant_space_size The scroll offset (in pixels) from the beginning
+ *                            of the content. For vertical orientation, this is
+ *                            the Y offset; for horizontal, it's the X offset.
+ * @return Search_Result A structure containing the `resulting_id` of the item
+ *                       at that offset and the `consumed_space` up to that item.
+ */
 static inline Search_Result
 _search_id(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd, int relevant_space_size)
 {
@@ -221,11 +318,27 @@ _search_id(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd, int relev
    return res;
 }
 
+/**
+ * @brief Determines the range of visible item IDs (start and end) based on the viewport.
+ *
+ * This function uses `_search_id` to find the first item visible at the current
+ * scroll position (`relevant_space_size`) and the item that would be just beyond
+ * the end of the viewport plus a buffer (`step*2`).
+ *
+ * @param obj The Efl_Ui_Position_Manager_Grid object.
+ * @param pd The private data of the grid manager.
+ * @param relevant_viewport The size of the viewport in the scrolling direction (height for vertical, width for horizontal).
+ * @param relevant_space_size The current scroll offset from the beginning of the content.
+ * @param step The size of one item in the scrolling direction (e.g., `pd->max_min_size.h` for vertical). Used for buffering.
+ * @param[out] cur Pointer to a Vis_Segment structure to store the calculated start and end IDs.
+ * @param[out] consumed_space Pointer to an integer to store the space consumed up to the start_id.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise (though currently always returns EINA_TRUE).
+ */
 static inline Eina_Bool
 _search_start_end(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd, int relevant_viewport, int relevant_space_size, unsigned int step, Vis_Segment *cur, int *consumed_space)
 {
    Search_Result start = _search_id(obj, pd, MAX(relevant_space_size, 0));
-   Search_Result end = _search_id(obj, pd, MAX(relevant_space_size, 0)+relevant_viewport+step*2);
+   Search_Result end = _search_id(obj, pd, MAX(relevant_space_size, 0)+relevant_viewport+step*2); // step*2 provides a buffer
    cur->start_id = MIN(MAX(start.resulting_id, 0), (int)pd->size);
    cur->end_id = MAX(MIN(end.resulting_id, (int)pd->size), 0);
 
@@ -234,16 +347,35 @@ _search_start_end(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd, in
    return EINA_TRUE;
 }
 
+/**
+ * @brief Context structure for item positioning functions.
+ *
+ * This structure bundles together several pieces of data that are passed
+ * between and modified by the item positioning functions
+ * (`_position_items_vertical`, `_position_items_horizontal`, `_position_group_items`).
+ */
 typedef struct {
-   int relevant_space_size;
-   int consumed_space;
-   Vis_Segment new;
-   Eo *floating_group;
-   Eina_Size2D floating_size;
-   Eo *placed_item;
+   int relevant_space_size; /**< The scroll offset from the beginning of the content. */
+   int consumed_space;      /**< Space consumed up to the first visible item. */
+   Vis_Segment new;         /**< The current segment of items to be made visible. */
+   Eo *floating_group;      /**< The group header object that should be floated. */
+   Eina_Size2D floating_size; /**< The size of the floating_group header. */
+   Eo *placed_item;         /**< The first actual item (not header) that was positioned, used for floating header adjustment. */
 } Item_Position_Context;
 
 
+/**
+ * @brief Calculates and sets the geometry for a single grid item.
+ *
+ * Adjusts the item's geometry based on its column (x) and row (y)
+ * position within its group/block, using `pd->max_min_size` as the cell dimensions.
+ * The initial `geom->pos` is expected to be the top-left of the group/block area.
+ *
+ * @param[in,out] geom Pointer to the Eina_Rect for the item. Its x and y will be updated.
+ * @param pd The private data of the grid manager.
+ * @param x The column index of the item within its current layout block.
+ * @param y The row index of the item within its current layout block.
+ */
 static inline void
 _place_grid_item(Eina_Rect *geom, Efl_Ui_Position_Manager_Grid_Data *pd, int x, int y)
 {
@@ -252,6 +384,23 @@ _place_grid_item(Eina_Rect *geom, Efl_Ui_Position_Manager_Grid_Data *pd, int x, 
    geom->size = pd->max_min_size;
 }
 
+/**
+ * @brief Positions items when the layout orientation is vertical.
+ *
+ * Iterates through the items in the current visible range (`ctx->new.start_id`
+ * to `ctx->new.end_id`). For each item, it calculates its position based on
+ * a grid layout (number of columns determined by viewport width and `pd->max_min_size.w`).
+ * Group headers are positioned to span the viewport width. Regular items are
+ * placed in grid cells.
+ * It fetches item objects and their sizes in batches for efficiency.
+ * It also identifies the `floating_group` (the group header for the first visible group)
+ * and the `placed_item` (the first non-header item encountered).
+ *
+ * @param obj The Efl_Ui_Position_Manager_Grid object.
+ * @param pd The private data of the grid manager.
+ * @param[in,out] ctx The item positioning context. `ctx->floating_group`,
+ *                    `ctx->floating_size`, and `ctx->placed_item` may be updated.
+ */
 static inline void
 _position_items_vertical(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd, Item_Position_Context *ctx)
 {
@@ -319,6 +468,22 @@ _position_items_vertical(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data 
      }
 }
 
+/**
+ * @brief Positions items when the layout orientation is horizontal.
+ *
+ * Similar to `_position_items_vertical`, but lays out items horizontally.
+ * The number of rows is determined by the viewport height and `pd->max_min_size.h`.
+ * Group headers are positioned to span the viewport height (after accounting for their own header height if applicable).
+ * Regular items are placed in grid cells.
+ * It fetches item objects and their sizes in batches.
+ * It identifies the `floating_group` and `placed_item`.
+ *
+ * @param obj The Efl_Ui_Position_Manager_Grid object.
+ * @param pd The private data of the grid manager.
+ * @param[in,out] ctx The item positioning context. `ctx->floating_group`,
+ *                    `ctx->floating_size`, and `ctx->placed_item` may be updated.
+ *                    The `start.y` position within the context is adjusted based on group header sizes.
+ */
 static inline void
 _position_items_horizontal(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd, Item_Position_Context *ctx)
 {
@@ -390,6 +555,25 @@ _position_items_horizontal(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Dat
      }
 }
 
+/**
+ * @brief Positions the "floating" group header.
+ *
+ * If a `ctx->floating_group` is identified by the item positioning functions,
+ * this function ensures it is visible and positioned correctly at the top (for vertical)
+ * or left (for horizontal) of the viewport, potentially overlapping the first
+ * row/column of items if they belong to the same group. This creates the
+ * "sticky" or "floating" header effect.
+ * If there's no current floating group but there was a `pd->last_group`,
+ * the last group is hidden.
+ * If there's no floating group, but there is a `ctx->placed_item` that is a group header
+ * itself (e.g. the very first item is a group header and is at the top of the viewport),
+ * this function ensures it's clipped to the viewport bounds.
+ *
+ * @param obj The Efl_Ui_Position_Manager_Grid object.
+ * @param pd The private data of the grid manager.
+ * @param ctx The item positioning context, providing `floating_group`, `floating_size`,
+ *            and `placed_item`.
+ */
 static inline void
 _position_group_items(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd, Item_Position_Context *ctx)
 {
@@ -441,6 +625,22 @@ _position_group_items(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd
      }
 }
 
+/**
+ * @brief Main function to reposition all visible content.
+ *
+ * This function orchestrates the process of updating the layout when
+ * scrolling, resizing, or when data changes.
+ * 1. Ensures size cache is up-to-date (`_size_cache_require`).
+ * 2. Calculates `relevant_space_size` (scroll offset) and `relevant_viewport` size.
+ * 3. Determines the range of visible items (`_search_start_end`).
+ * 4. Hides items that are no longer visible and shows items that become visible (`vis_segment_swap`).
+ * 5. Calls the appropriate positioning function (`_position_items_vertical` or `_position_items_horizontal`).
+ * 6. Positions the floating group header (`_position_group_items`).
+ * 7. Emits `EFL_UI_POSITION_MANAGER_ENTITY_EVENT_VISIBLE_RANGE_CHANGED` if the visible range changed.
+ *
+ * @param obj The Efl_Ui_Position_Manager_Grid object.
+ * @param pd The private data of the grid manager.
+ */
 static void
 _reposition_content(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd)
 {
@@ -506,6 +706,18 @@ _reposition_content(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd)
      }
 }
 
+/**
+ * @brief Calculates and emits the total content size.
+ *
+ * This function calculates the total scrollable size of the content based on
+ * the `pd->size_cache` (sum of all group sizes).
+ * If this total size changes from the `pd->last_viewport_size`, it updates
+ * `pd->last_viewport_size` and emits the
+ * `EFL_UI_POSITION_MANAGER_ENTITY_EVENT_CONTENT_SIZE_CHANGED` event.
+ *
+ * @param obj The Efl_Ui_Position_Manager_Grid object.
+ * @param pd The private data of the grid manager.
+ */
 static inline void
 _flush_abs_size(Eo *obj, Efl_Ui_Position_Manager_Grid_Data *pd)
 {
@@ -538,6 +750,21 @@ _flush_abs_size(Eo *obj, Efl_Ui_Position_Manager_Grid_Data *pd)
      }
 }
 
+/**
+ * @brief Calculates and emits the minimum content size.
+ *
+ * The minimum content size is primarily determined by `pd->max_min_size`.
+ * For vertical orientation, the minimum height is set to -1 (unrestricted),
+ * and for horizontal, the minimum width is -1. This is because the grid
+ * can expand in the scrolling direction. The other dimension is constrained
+ * by `pd->max_min_size`.
+ * If this minimum size changes from `pd->prev_min_size`, it updates
+ * `pd->prev_min_size` and emits the
+ * `EFL_UI_POSITION_MANAGER_ENTITY_EVENT_CONTENT_MIN_SIZE_CHANGED` event.
+ *
+ * @param obj The Efl_Ui_Position_Manager_Grid object.
+ * @param pd The private data of the grid manager.
+ */
 static inline void
 _flush_min_size(Eo *obj, Efl_Ui_Position_Manager_Grid_Data *pd)
 {
@@ -567,11 +794,23 @@ _efl_ui_position_manager_grid_efl_ui_position_manager_entity_viewport_set(Eo *ob
 EOLIAN static void
 _efl_ui_position_manager_grid_efl_ui_position_manager_entity_scroll_position_set(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_Grid_Data *pd, double x, double y)
 {
+   //DBG("Scroll position set to %f, %f", x, y);
    pd->scroll_position.x = x;
    pd->scroll_position.y = y;
    _reposition_content(obj, pd);
 }
 
+/**
+ * @brief Callback for the debounced recalculation job.
+ *
+ * This function is executed by a job scheduled by `_schedule_recalc_abs_size`.
+ * It flushes the absolute size and repositions content.
+ *
+ * @param data The Efl_Ui_Position_Manager_Grid object.
+ * @param v Unused Eina_Value.
+ * @param f Unused Eina_Future.
+ * @return EINA_VALUE_EMPTY.
+ */
 static Eina_Value
 _rebuild_job_cb(void *data, Eina_Value v EINA_UNUSED, const Eina_Future *f EINA_UNUSED)
 {
@@ -586,6 +825,16 @@ _rebuild_job_cb(void *data, Eina_Value v EINA_UNUSED, const Eina_Future *f EINA_
    return EINA_VALUE_EMPTY;
 }
 
+/**
+ * @brief Schedules a debounced job to recalculate absolute size and reposition content.
+ *
+ * If a recalculation job is not already pending, this function schedules one
+ * using `efl_loop_job`. This is used to coalesce multiple rapid updates
+ * (e.g., from multiple item_added events) into a single recalculation pass.
+ *
+ * @param obj The Efl_Ui_Position_Manager_Grid object.
+ * @param pd The private data of the grid manager.
+ */
 static void
 _schedule_recalc_abs_size(Eo *obj, Efl_Ui_Position_Manager_Grid_Data *pd)
 {

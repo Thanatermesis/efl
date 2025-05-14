@@ -4,6 +4,15 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Callback function for the "time_changed" event of the timepicker.
+ *
+ * This function is called whenever the time on the timepicker is changed by the user.
+ * It retrieves the new hour and minute from the timepicker widget and prints them to the console.
+ *
+ * @param data User data pointer (unused in this case).
+ * @param ev The event information structure.
+ */
 static void
 _time_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -14,6 +23,18 @@ _time_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 }
 
 
+/**
+ * @brief Test function for Efl.Ui.Timepicker.
+ *
+ * This function creates a new window and adds two timepicker widgets to it.
+ * The first timepicker uses the default 12-hour format.
+ * The second timepicker is configured to use the 24-hour format.
+ * Both are initialized to 11:35.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_ui_timepicker(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

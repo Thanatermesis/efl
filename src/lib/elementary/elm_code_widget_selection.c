@@ -6,8 +6,16 @@
 
 #include "elm_code_widget_private.h"
 
+/** @internal
+ * @brief Characters that are considered word breaks for selection purposes.
+ */
 static char _breaking_chars[] = " \t,.?!;:*&()[]{}'\"";
 
+/**
+ * @internal
+ * @brief Allocates and initializes a new Elm_Code_Widget_Selection_Data structure.
+ * @return A pointer to the newly allocated Elm_Code_Widget_Selection_Data, or NULL on failure.
+ */
 static Elm_Code_Widget_Selection_Data *
 _elm_code_widget_selection_new()
 {
@@ -18,6 +26,18 @@ _elm_code_widget_selection_new()
    return data;
 }
 
+/**
+ * @internal
+ * @brief Ensures that the given row and column are within the valid boundaries of the document.
+ *
+ * If the row exceeds the total number of lines, it's set to the last line.
+ * If the column exceeds the width of the specified line, it's set to the end of that line.
+ *
+ * @param widget The Elm_Code_Widget object.
+ * @param pd The private data of the Elm_Code_Widget.
+ * @param row Pointer to the row number to be validated/adjusted.
+ * @param col Pointer to the column number to be validated/adjusted.
+ */
 static void
 _elm_code_widget_selection_limit(Evas_Object *widget EINA_UNUSED, Elm_Code_Widget_Data *pd,
                                  unsigned int *row, unsigned int *col)
@@ -47,9 +67,11 @@ elm_code_widget_selection_start(Evas_Object *widget,
 
    pd = efl_data_scope_get(widget, ELM_CODE_WIDGET_CLASS);
 
+   // Ensure the provided line and column are within valid document bounds.
    _elm_code_widget_selection_limit(widget, pd, &line, &col);
    if (!pd->selection)
      {
+        // If no selection exists, create a new one.
         selection = _elm_code_widget_selection_new();
 
         selection->end_line = line;
@@ -74,12 +96,16 @@ elm_code_widget_selection_end(Evas_Object *widget,
 
    pd = efl_data_scope_get(widget, ELM_CODE_WIDGET_CLASS);
 
+   // Optimization: If the new end position is the same as the current one, do nothing.
    if (pd->selection && (pd->selection->end_line == line) &&
        (pd->selection->end_col == col)) return;
 
+   // Ensure the provided line and column are within valid document bounds.
    _elm_code_widget_selection_limit(widget, pd, &line, &col);
    if (!pd->selection)
      {
+        // If no selection exists, create a new one.
+        // This might happen if selection_end is called without a preceding selection_start.
         selection = _elm_code_widget_selection_new();
 
         selection->start_line = line;
@@ -125,17 +151,22 @@ elm_code_widget_selection_normalized_get(Evas_Object *widget)
 
    if (!pd->selection)
      {
+        // If no active selection, return a new selection object
+        // representing a cursor at the beginning of the document (line 1, col 1).
         selection->start_line = selection->end_line = 1;
         selection->start_col = selection->end_col = 1;
 
         return selection;
      }
 
+   // Determine if the selection was made in reverse order
+   // (e.g., dragging the mouse from bottom-right to top-left).
    if (pd->selection->start_line == pd->selection->end_line)
-     reverse = pd->selection->start_col > pd->selection->end_col;
+     reverse = pd->selection->start_col > pd->selection->end_col; // Same line, compare columns
    else
-     reverse = pd->selection->start_line > pd->selection->end_line;
+     reverse = pd->selection->start_line > pd->selection->end_line; // Different lines, compare lines
 
+   // "Normalize" the selection: ensure start_line/col is before or at end_line/col.
    if (reverse)
      {
         selection->start_line = pd->selection->end_line;
@@ -169,6 +200,12 @@ elm_code_widget_selection_clear(Evas_Object *widget)
    efl_event_callback_legacy_call(widget, EFL_UI_CODE_WIDGET_EVENT_CODE_SELECTION_CLEARED, widget);
 }
 
+/**
+ * @internal
+ * @brief Deletes the selected text when the selection is contained within a single line.
+ * @param widget The Elm_Code_Widget object.
+ * @param pd The private data of the Elm_Code_Widget.
+ */
 static void
 _elm_code_widget_selection_delete_single(Elm_Code_Widget *widget, Elm_Code_Widget_Data *pd)
 {
@@ -205,6 +242,32 @@ _elm_code_widget_selection_delete_single(Elm_Code_Widget *widget, Elm_Code_Widge
    free(selection);
 }
 
+/**
+ * @internal
+ * @brief Copies a string, ensuring null termination even if source is longer than len.
+ *
+ * This function copies up to `len - 1` characters from `src` to `dest` and
+ * null-terminates `dest`. If `src` is shorter than `len`, the copy is
+ * null-terminated at the end of `src`.
+ *
+ * @param dest The destination buffer.
+ * @param src The source string.
+ * @param len The maximum number of characters to copy from src (including space for null terminator if src is shorter).
+ *            Effectively, it's the size of the dest buffer if you want to prevent overflow.
+ *            However, the loop runs `len` times, so if `len` is `sizeof(dest)`, it might write
+ *            `dest[len-1]` and then `*p = 0` would be `dest[len]`, which is an overflow.
+ *            The logic seems to intend to copy `len` bytes and then null terminate if `*src` became `0`
+ *            within those `len` bytes.
+ *
+ * TODO: Review the len parameter usage carefully. If len is sizeof(dest),
+ * the loop `for (p = dest; len > 0; p++, src++, len--)` means `p` can reach `dest + sizeof(dest) -1`.
+ * If `*src` is not `0` at that point, `*p = *src` writes to the last byte.
+ * Then `if (*src == 0) break;` is checked. If it wasn't `0`, the loop continues (len becomes 0),
+ * and the function ends. `dest` might not be null-terminated if `src` filled `len` bytes without a null.
+ * The original `strncpy` has a different behavior (it pads with nulls if src is shorter,
+ * and doesn't guarantee null termination if src is longer).
+ * This function aims to always null-terminate if `*src == 0` is encountered within `len` copies.
+ */
 static void
 my_string_copy_truncate(char *dest, const char *src, size_t len)
 {
@@ -217,6 +280,12 @@ my_string_copy_truncate(char *dest, const char *src, size_t len)
 }
 
 
+/**
+ * @internal
+ * @brief Deletes the selected text when the selection spans multiple lines.
+ * @param widget The Elm_Code_Widget object.
+ * @param pd The private data of the Elm_Code_Widget.
+ */
 static void
 _elm_code_widget_selection_delete_multi(Elm_Code_Widget *widget, Elm_Code_Widget_Data *pd)
 {
@@ -263,6 +332,17 @@ _elm_code_widget_selection_delete_multi(Elm_Code_Widget *widget, Elm_Code_Widget
    free(selection);
 }
 
+/**
+ * @internal
+ * @brief Core implementation for deleting selected text.
+ *
+ * This function handles the actual deletion logic, differentiating between
+ * single-line and multi-line selections. It can optionally register the
+ * change for undo functionality.
+ *
+ * @param widget The Elm_Code_Widget object.
+ * @param undo If EINA_TRUE, the change is registered for undo.
+ */
 void
 _elm_code_widget_selection_delete_do(Evas_Object *widget, Eina_Bool undo)
 {
@@ -302,6 +382,11 @@ elm_code_widget_selection_delete(Evas_Object *widget)
    _elm_code_widget_selection_delete_do(widget, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Deletes the current selection without adding the action to the undo history.
+ * @param widget The Elm_Code_Widget object.
+ */
 void
 _elm_code_widget_selection_delete_no_undo(Evas_Object *widget)
 {
@@ -326,14 +411,26 @@ elm_code_widget_selection_select_line(Evas_Object *widget, unsigned int line)
    elm_code_widget_selection_end(widget, line, col);
 }
 
+/**
+ * @internal
+ * @brief Checks if a given character is a "breaking" character (e.g., space, punctuation).
+ *
+ * Breaking characters are used to determine word boundaries for operations like
+ * "select word".
+ *
+ * @param chr The character to check.
+ * @return EINA_TRUE if the character is a breaking character, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_code_widget_selection_char_breaks(char chr)
 {
    unsigned int i;
 
+   // Null character is considered a break.
    if (chr == 0)
      return EINA_TRUE;
 
+   // Check against the predefined list of breaking characters.
    for (i = 0; i < sizeof(_breaking_chars); i++)
      if (chr == _breaking_chars[i])
        return EINA_TRUE;
@@ -354,9 +451,12 @@ elm_code_widget_selection_select_word(Evas_Object *widget, unsigned int line, un
    lineobj = elm_code_file_line_get(pd->code->file, line);
    content = elm_code_line_text_get(lineobj, &length);
 
+   // Ensure the initial cursor position is valid.
    _elm_code_widget_selection_limit(widget, pd, &line, &col);
    colpos = elm_code_widget_line_text_position_for_column_get(widget, lineobj, col);
 
+   // Find the start of the word:
+   // Move backwards from the cursor position until a breaking character or line start is found.
    pos = colpos;
    while (pos > 0)
      {
@@ -367,8 +467,10 @@ elm_code_widget_selection_select_word(Evas_Object *widget, unsigned int line, un
    elm_code_widget_selection_start(widget, line,
                                    elm_code_widget_line_text_column_width_to_position(widget, lineobj, pos));
 
+   // Find the end of the word:
+   // Move forwards from the cursor position until a breaking character or line end is found.
    pos = colpos;
-   while (pos < length - 1)
+   while (pos < length - 1) // length - 1 because we check content[pos + 1]
      {
         if (_elm_code_widget_selection_char_breaks(content[pos + 1]))
           break;
@@ -400,6 +502,16 @@ elm_code_widget_selection_text_get(Evas_Object *widget)
    return text;
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when the application loses ownership of a selection (e.g., clipboard).
+ *
+ * This is typically used to clear the visual selection in the widget if another
+ * application takes over the clipboard.
+ *
+ * @param data User data, expected to be the Elm_Code_Widget.
+ * @param selection The type of selection that was lost (e.g., ELM_SEL_TYPE_CLIPBOARD).
+ */
 static void
 _selection_loss_cb(void *data EINA_UNUSED, Elm_Sel_Type selection EINA_UNUSED)
 {
@@ -407,7 +519,8 @@ _selection_loss_cb(void *data EINA_UNUSED, Elm_Sel_Type selection EINA_UNUSED)
 
    /* widget = (Elm_Code_Widget *)data; */
 // TODO we need to know whih selection we are clearing!
-//   elm_code_widget_selection_clear(widget);
+// For example, if primary selection is lost, we should not clear clipboard selection.
+// elm_code_widget_selection_clear(widget);
 }
 
 EAPI void
@@ -445,6 +558,18 @@ elm_code_widget_selection_copy(Evas_Object *widget)
    efl_event_callback_legacy_call(widget, EFL_UI_CODE_WIDGET_EVENT_CODE_SELECTION_COPY, widget);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when data is received for a paste operation.
+ *
+ * This function receives the text from the clipboard (or other selection source)
+ * and inserts it into the widget at the current cursor position.
+ *
+ * @param data User data, expected to be the Elm_Code_Widget.
+ * @param obj The Evas_Object that owns the selection (unused here).
+ * @param ev The selection data event, containing the text to paste.
+ * @return EINA_TRUE on successful paste, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _selection_paste_cb(void *data, Evas_Object *obj EINA_UNUSED, Elm_Selection_Data *ev)
 {
@@ -452,6 +577,7 @@ _selection_paste_cb(void *data, Evas_Object *obj EINA_UNUSED, Elm_Selection_Data
 
    widget = (Elm_Code_Widget *)data;
 
+   // Insert the received text data at the current cursor position.
    elm_code_widget_text_at_cursor_insert(widget, ev->data);
 
    efl_event_callback_legacy_call(widget, EFL_UI_CODE_WIDGET_EVENT_CODE_SELECTION_PASTE, widget);
@@ -476,20 +602,39 @@ elm_code_widget_selection_is_empty(Evas_Object *widget)
    pd = efl_data_scope_get(widget, ELM_CODE_WIDGET_CLASS);
 
    if (!pd->selection)
-     return EINA_TRUE;
+     return EINA_TRUE; // No selection object means it's empty.
 
    selection = elm_code_widget_selection_normalized_get(widget);
 
-   // check there is no space between start and end
-   if (selection->start_col == selection->end_col + 1 &&
+   // Check if the normalized selection start and end positions are identical,
+   // or if start_col is one greater than end_col on the same line.
+   // The latter condition (start_col == end_col + 1) might indicate a zero-width
+   // selection or a specific convention for an empty selection marker.
+   // Typically, an empty selection means start_col == end_col and start_line == end_line.
+   // This needs clarification if it's intended for a specific behavior.
+   if (selection->start_col == selection->end_col + 1 && // This condition is unusual for "empty"
        selection->start_line == selection->end_line)
      ret = EINA_TRUE;
+   // A more common check for empty would be:
+   // if (selection->start_line == selection->end_line && selection->start_col == selection->end_col)
+   //   ret = EINA_TRUE;
+
 
    free(selection);
 
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Sets the 'in_progress' state of the current selection.
+ *
+ * The 'in_progress' flag can be used to indicate that a selection operation
+ * (e.g., mouse drag) is currently active.
+ *
+ * @param widget The Elm_Code_Widget object.
+ * @param state The new state for the 'in_progress' flag (EINA_TRUE or EINA_FALSE).
+ */
 void
 _elm_code_widget_selection_in_progress_set(Evas_Object *widget, Eina_Bool state)
 {
@@ -503,6 +648,16 @@ _elm_code_widget_selection_in_progress_set(Evas_Object *widget, Eina_Bool state)
    pd->selection->in_progress = state;
 }
 
+/**
+ * @internal
+ * @brief Sets the type of the current selection.
+ *
+ * The selection type can be used to differentiate between different kinds of
+ * selections, e.g., normal character selection, line selection, word selection.
+ *
+ * @param widget The Elm_Code_Widget object.
+ * @param type The Elm_Code_Widget_Selection_Type to set.
+ */
 void
 _elm_code_widget_selection_type_set(Evas_Object *widget, Elm_Code_Widget_Selection_Type type)
 {

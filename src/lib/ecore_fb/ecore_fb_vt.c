@@ -5,29 +5,29 @@
 #include "Ecore_Fb.h"
 #include "ecore_fb_private.h"
 
-static int _ecore_fb_vt_do_switch = 0;
+static int _ecore_fb_vt_do_switch = 0; /**< Flag indicating if VT switching is enabled (if running as root). */
 
-static int _ecore_fb_vt_tty0_fd = -1;
-static int _ecore_fb_vt_tty_fd = -1;
-static int _ecore_fb_vt_current_vt = 0;
-static int _ecore_fb_vt_prev_vt = 0;
+static int _ecore_fb_vt_tty0_fd = -1; /**< File descriptor for /dev/tty0. */
+static int _ecore_fb_vt_tty_fd = -1; /**< File descriptor for the current TTY. */
+static int _ecore_fb_vt_current_vt = 0; /**< The current virtual terminal number. */
+static int _ecore_fb_vt_prev_vt = 0; /**< The previous virtual terminal number (before switching). */
 
-static struct termios _ecore_fb_tty_prev_tio_mode;
-static struct vt_mode _ecore_fb_vt_prev_mode;
+static struct termios _ecore_fb_tty_prev_tio_mode; /**< Stores the original termios settings of the TTY. */
+static struct vt_mode _ecore_fb_vt_prev_mode; /**< Stores the original VT mode. */
 
 static Eina_Bool _ecore_fb_signal_usr_handler(void *data, int type, void *ev);
-static Ecore_Event_Handler *_ecore_fb_user_handler = NULL;
-static int _ecore_fb_tty_prev_mode = 0;
-static int _ecore_fb_tty_prev_kd_mode = 0;
+static Ecore_Event_Handler *_ecore_fb_user_handler = NULL; /**< Event handler for SIGUSR signals used for VT switching. */
+static int _ecore_fb_tty_prev_mode = 0; /**< Stores the original TTY keyboard mode. */
+static int _ecore_fb_tty_prev_kd_mode = 0; /**< Stores the original TTY kernel keyboard mode. */
 
 /* callbacks for an attach/release of a vt */
-static void (*_ecore_fb_func_fb_lost) (void *data) = NULL;
-static void *_ecore_fb_func_fb_lost_data = NULL;
-static void (*_ecore_fb_func_fb_gain) (void *data) = NULL;
-static void *_ecore_fb_func_fb_gain_data = NULL;
+static void (*_ecore_fb_func_fb_lost) (void *data) = NULL; /**< Callback function for when the VT is lost. */
+static void *_ecore_fb_func_fb_lost_data = NULL; /**< User data for the VT lost callback. */
+static void (*_ecore_fb_func_fb_gain) (void *data) = NULL; /**< Callback function for when the VT is gained. */
+static void *_ecore_fb_func_fb_gain_data = NULL; /**< User data for the VT gain callback. */
 
 /* FIXME what is the filter for? */
-static Ecore_Event_Filter *_ecore_fb_filter_handler = NULL;
+static Ecore_Event_Filter *_ecore_fb_filter_handler = NULL; /**< Event filter handler (currently unused). */
 
 /* prototypes */
 /* XXX: unused
@@ -37,6 +37,17 @@ static Eina_Bool _ecore_fb_event_filter_filter(void *data, void *loop_data, int 
 static void _ecore_fb_event_filter_end(void *data, void *loop_data);
 */
 
+/**
+ * @brief Handles SIGUSR1 and SIGUSR2 signals for VT switching.
+ *
+ * SIGUSR1 indicates that the VT is being released (lost).
+ * SIGUSR2 indicates that the VT is being acquired (gained).
+ *
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param ev The Ecore_Event_Signal_User event.
+ * @return ECORE_CALLBACK_PASS_ON to continue processing.
+ */
 static Eina_Bool
 _ecore_fb_signal_usr_handler(void *data EINA_UNUSED, int type EINA_UNUSED, void *ev)
 {
@@ -77,6 +88,14 @@ _ecore_fb_vt_switch(int vt)
 }
 */
 
+/**
+ * @brief Sets up the specified virtual terminal for graphics mode.
+ *
+ * This function opens the target TTY, saves its current state,
+ * sets it to graphics mode, and configures it for VT switching signals.
+ *
+ * @return 1 on success, 0 on failure.
+ */
 static int
 _ecore_fb_vt_setup(void)
 {
@@ -154,6 +173,16 @@ _ecore_fb_vt_setup(void)
    return 1;
 }
 
+/**
+ * @brief Initializes virtual terminal switching.
+ *
+ * This function determines if VT switching is possible (requires root),
+ * queries the current VT state, and attempts to acquire a new VT or
+ * use the current one. It then calls _ecore_fb_vt_setup() to configure
+ * the chosen VT.
+ *
+ * @return 1 on success, 0 on failure.
+ */
 int
 ecore_fb_vt_init(void)
 {
@@ -202,6 +231,13 @@ ecore_fb_vt_init(void)
    return 1;
 }
 
+/**
+ * @brief Shuts down virtual terminal switching and restores the original TTY state.
+ *
+ * This function restores the TTY's termios settings, keyboard mode,
+ * and VT mode. It also releases the VT if it was switched and closes
+ * the TTY file descriptor. Event handlers related to VT switching are removed.
+ */
 void
 ecore_fb_vt_shutdown(void)
 {

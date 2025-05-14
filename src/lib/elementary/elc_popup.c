@@ -32,6 +32,23 @@ static const char SIG_TIMEOUT[] = "timeout";
 static const char SIG_ITEM_FOCUSED[] = "item,focused";
 static const char SIG_ITEM_UNFOCUSED[] = "item,unfocused";
 
+/**
+ * @brief Smart callback descriptions for the Elm_Popup widget.
+ *
+ * This array defines the smart callbacks available for a popup object.
+ * The callbacks allow the application to react to various events.
+ *
+ * The structure of each element is { "event_name", "params_type_string" }.
+ * For example:
+ * @li {"block,clicked", ""}: Emitted when the user clicks the blocked event area.
+ * @li {"timeout", ""}: Emitted when the popup timeout is reached.
+ * @li {"item,focused", ""}: Emitted when an item in the popup gains focus.
+ * @li {"item,unfocused", ""}: Emitted when an item in the popup loses focus.
+ * @li {"language,changed", ""}: Handled by elm_widget; emitted on language change.
+ * @li {"access,changed", ""}: Handled by elm_widget; emitted on accessibility state change.
+ * @li {"focused", ""}: Handled by elm_layout; emitted when the layout gains focus.
+ * @li {"unfocused", ""}: Handled by elm_layout; emitted when the layout loses focus.
+ */
 static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {SIG_BLOCK_CLICKED, ""},
    {SIG_TIMEOUT, ""},
@@ -51,6 +68,15 @@ static void _timeout_cb(void *data, const Efl_Event *event);
 
 static void _hide_effect_finished_cb(void *data, const Efl_Event *event);
 
+/**
+ * @brief Defines the key actions for the popup widget.
+ *
+ * This array maps key names to handler functions, allowing for keyboard
+ * control of the popup.
+ * The structure of each element is { "key_name", callback_function }.
+ * For example:
+ * @li {"escape", _key_action_escape}: Calls _key_action_escape to dismiss the popup.
+ */
 static const Elm_Action key_actions[] = {
    {"escape", _key_action_escape},
    {NULL, NULL}
@@ -64,6 +90,16 @@ EFL_CALLBACKS_ARRAY_DEFINE(_notify_cb,
 
 static void  _on_content_del(void *data, Evas *e, Evas_Object *obj, void *event_info);
 
+/**
+ * @brief Updates the translations for the popup and its items.
+ *
+ * This function is called when the application's language changes. It iterates
+ * through all items to trigger their translation updates and then calls the
+ * superclass implementation.
+ *
+ * @param obj The popup object (unused).
+ * @param sd The popup's private data.
+ */
 EOLIAN static void
 _elm_popup_efl_ui_l10n_translation_update(Eo *obj EINA_UNUSED, Elm_Popup_Data *sd)
 {
@@ -77,6 +113,16 @@ _elm_popup_efl_ui_l10n_translation_update(Eo *obj EINA_UNUSED, Elm_Popup_Data *s
    efl_ui_l10n_translation_update(sd->main_layout);
 }
 
+/**
+ * @brief Sets the visibility of the title and action areas based on their content.
+ *
+ * This function checks if a title text or icon is set and toggles the
+ * visibility of the title area accordingly by emitting signals to the theme.
+ * It does the same for the action area. This ensures the popup layout
+ * adapts to its content.
+ *
+ * @param obj The popup object.
+ */
 static void
 _visuals_set(Evas_Object *obj)
 {
@@ -98,12 +144,31 @@ _visuals_set(Evas_Object *obj)
    edje_object_message_signal_process(elm_layout_edje_get(sd->main_layout));
 }
 
+/**
+ * @brief Callback for clicks on the block area.
+ *
+ * This function is called when the user clicks the area outside the popup,
+ * which is blocked to prevent interaction with other controls. It emits the
+ * "block,clicked" legacy event.
+ *
+ * @param data The popup object.
+ * @param event The EFL event data (unused).
+ */
 static void
 _block_clicked_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
    efl_event_callback_legacy_call(data, ELM_POPUP_EVENT_BLOCK_CLICKED, NULL);
 }
 
+/**
+ * @brief Callback for popup timeout.
+ *
+ * This function is called when the popup's timeout is reached. It hides the
+ * popup and emits the "timeout" legacy event.
+ *
+ * @param data The popup object.
+ * @param event The EFL event data (unused).
+ */
 static void
 _timeout_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -111,6 +176,15 @@ _timeout_cb(void *data, const Efl_Event *event EINA_UNUSED)
    efl_event_callback_legacy_call(data, ELM_POPUP_EVENT_TIMEOUT, NULL);
 }
 
+/**
+ * @brief Callback for when the hide effect finishes.
+ *
+ * This is called after the popup's hiding animation/effect completes. It sets
+ * the popup to be invisible and emits the "dismissed" legacy event.
+ *
+ * @param data The popup object.
+ * @param event The EFL event data (unused).
+ */
 static void
 _hide_effect_finished_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -119,6 +193,13 @@ _hide_effect_finished_cb(void *data, const Efl_Event *event EINA_UNUSED)
 }
 
 
+/**
+ * @brief Retrieves the accessibility object for a given part.
+ *
+ * @param obj The popup object.
+ * @param part The name of the part to get the access object for.
+ * @return The accessibility object associated with the part, or @c NULL.
+ */
 static Evas_Object *
 _access_object_get(const Evas_Object *obj, const char* part)
 {
@@ -134,6 +215,17 @@ _access_object_get(const Evas_Object *obj, const char* part)
    return ao;
 }
 
+/**
+ * @brief Callback for when the popup is shown.
+ *
+ * This function is called when the popup becomes visible. It sets the focus
+ * to the popup widget.
+ *
+ * @param data Unused.
+ * @param e The Evas canvas (unused).
+ * @param obj The popup object that was shown.
+ * @param event_info Unused.
+ */
 static void
 _on_show(void *data EINA_UNUSED,
          Evas *e EINA_UNUSED,
@@ -143,6 +235,16 @@ _on_show(void *data EINA_UNUSED,
    elm_object_focus_set(obj, EINA_TRUE);
 }
 
+/**
+ * @brief Calculates the maximum height for the popup's scroller.
+ *
+ * The maximum height is determined by the available space within the parent
+ * notify widget, after accounting for the space occupied by the title and
+ * action areas. This prevents the scroller from growing larger than the
+ * popup itself.
+ *
+ * @param obj The popup object.
+ */
 static void
 _scroller_size_calc(Evas_Object *obj)
 {
@@ -175,6 +277,16 @@ _scroller_size_calc(Evas_Object *obj)
    sd->max_sc_h = h - (h_title + h_action_area);
 }
 
+/**
+ * @brief Callback for when size hints of a content object change.
+ *
+ * Triggers a recalculation of the popup's layout.
+ *
+ * @param data The popup object.
+ * @param e The Evas canvas (unused).
+ * @param obj The object whose size hints changed (unused).
+ * @param event_info Unused.
+ */
 static void
 _size_hints_changed_cb(void *data,
                        Evas *e EINA_UNUSED,
@@ -184,6 +296,17 @@ _size_hints_changed_cb(void *data,
    elm_layout_sizing_eval(data);
 }
 
+/**
+ * @brief Callback for when the notify widget is resized.
+ *
+ * Triggers a recalculation of the popup's layout when its container (the
+ * notify widget) changes size.
+ *
+ * @param data The popup object.
+ * @param e The Evas canvas (unused).
+ * @param obj The notify widget that was resized (unused).
+ * @param event_info Unused.
+ */
 static void
 _notify_resize_cb(void *data,
                   Evas *e EINA_UNUSED,
@@ -197,6 +320,11 @@ _notify_resize_cb(void *data,
    elm_layout_sizing_eval(popup);
 }
 
+/**
+ * @brief Deletes the list-related objects (scroller, box, etc.).
+ *
+ * @param sd The popup's private data.
+ */
 static void
 _list_del(Elm_Popup_Data *sd)
 {
@@ -211,6 +339,11 @@ _list_del(Elm_Popup_Data *sd)
    sd->spacer = NULL;
 }
 
+/**
+ * @brief Removes and deletes all items from the popup.
+ *
+ * @param sd The popup's private data.
+ */
 static void
 _items_remove(Elm_Popup_Data *sd)
 {
@@ -224,6 +357,14 @@ _items_remove(Elm_Popup_Data *sd)
    sd->items = NULL;
 }
 
+/**
+ * @brief Callback for focus changes within the composition.
+ *
+ * Mirrors the focus state from the event source to the popup itself.
+ *
+ * @param data The popup object.
+ * @param ev The focus change event.
+ */
 static void
 _focus_changed_popup(void *data, const Efl_Event *ev)
 {
@@ -231,10 +372,31 @@ _focus_changed_popup(void *data, const Efl_Event *ev)
    efl_ui_focus_object_focus_set(data, efl_ui_focus_object_focus_get(ev->object));
 }
 
+/**
+ * @brief Defines callbacks for composition events on the notify widget.
+ *
+ * This array maps EFL events to handler functions for events occurring on the
+ * internal notify widget that contains the popup.
+ *
+ * The structure of each element is { EFL_EVENT, callback_function }.
+ * For example:
+ * @li { EFL_UI_FOCUS_OBJECT_EVENT_FOCUS_CHANGED, _focus_changed_popup }:
+ *     Mirrors focus changes from the notify widget to the popup.
+ */
 EFL_CALLBACKS_ARRAY_DEFINE(composition_cb,
    { EFL_UI_FOCUS_OBJECT_EVENT_FOCUS_CHANGED, _focus_changed_popup },
 )
 static void _on_table_del(void *data, Evas *e, Evas_Object *obj, void *event_info);
+/**
+ * @brief Destructor for the Elm_Popup object.
+ *
+ * This function is called when the popup object is being deleted. It cleans up
+ * all associated resources, including event callbacks, child objects (notify,
+ * layout, buttons, items, etc.), and allocated memory.
+ *
+ * @param obj The popup object being deleted.
+ * @param sd The popup's private data.
+ */
 EOLIAN static void
 _elm_popup_efl_canvas_group_group_del(Eo *obj, Elm_Popup_Data *sd)
 {
@@ -286,6 +448,16 @@ _elm_popup_efl_canvas_group_group_del(Eo *obj, Elm_Popup_Data *sd)
    efl_canvas_group_del(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Sets the mirrored mode for the popup and its sub-objects.
+ *
+ * This function propagates the mirrored mode (right-to-left layout) to all
+ * relevant child widgets of the popup, such as the notify, main layout,
+ * scroller, action area, and all items.
+ *
+ * @param obj The popup object.
+ * @param rtl EINA_TRUE for mirrored mode, EINA_FALSE otherwise.
+ */
 static void
 _mirrored_set(Evas_Object *obj,
               Eina_Bool rtl)
@@ -306,6 +478,18 @@ _mirrored_set(Evas_Object *obj,
      }
 }
 
+/**
+ * @brief Manages accessibility objects for the popup.
+ *
+ * This function is responsible for creating, registering, updating, and
+ * unregistering accessibility objects for the dynamic parts of the popup, such
+ * as the title and body text. It is called when the accessibility state
+ * changes.
+ *
+ * @param obj The popup object.
+ * @param is_access If @c EINA_TRUE, accessibility is enabled and objects should
+ * be registered. If @c EINA_FALSE, they should be unregistered.
+ */
 static void
 _access_obj_process(Eo *obj, Eina_Bool is_access)
 {
@@ -351,6 +535,15 @@ _access_obj_process(Eo *obj, Eina_Bool is_access)
      }
 }
 
+/**
+ * @brief Checks the theme to determine if scrolling should be enabled by default.
+ *
+ * This function reads data from the content area's theme file to see if the
+ * current theme expects the content to be scrollable. The result is stored in
+ * the `theme_scroll` flag of the popup's data.
+ *
+ * @param sd The popup's private data.
+ */
 static void
 _populate_theme_scroll(Elm_Popup_Data *sd)
 {
@@ -368,6 +561,17 @@ _populate_theme_scroll(Elm_Popup_Data *sd)
    sd->theme_scroll = EINA_FALSE;
 }
 
+/**
+ * @brief Applies the current theme to the popup widget.
+ *
+ * This function is called when the widget's theme needs to be updated. It
+ * sets the style for the notify, main layout, action area, content area,
+ * and all items. It also updates text and icons, and re-evaluates the layout.
+ *
+ * @param obj The popup object.
+ * @param sd The popup's private data.
+ * @return An Eina_Error, @c EFL_UI_THEME_APPLY_ERROR_NONE on success.
+ */
 EOLIAN static Eina_Error
 _elm_popup_efl_ui_widget_theme_apply(Eo *obj, Elm_Popup_Data *sd)
 {
@@ -445,6 +649,16 @@ _elm_popup_efl_ui_widget_theme_apply(Eo *obj, Elm_Popup_Data *sd)
    return EFL_UI_THEME_APPLY_ERROR_NONE;
 }
 
+/**
+ * @brief Calculates and applies the size hints for a popup item.
+ *
+ * This function calculates the minimum and maximum size of a single popup item
+ * based on its content and the theme. The calculated size hints are then
+ * applied to the item's layout object. This is crucial for the parent
+ * container to correctly manage the layout of all items.
+ *
+ * @param it The popup item data.
+ */
 static void
 _item_sizing_eval(Elm_Popup_Item_Data *it)
 {
@@ -563,6 +777,18 @@ _on_content_del(void *data,
    elm_layout_sizing_eval(data);
 }
 
+/**
+ * @brief Callback invoked when the text content object of the popup is deleted.
+ *
+ * This function is registered on the label widget used for content text.
+ * When the label is deleted, this callback nullifies the `text_content_obj`
+ * pointer in the popup's data and triggers a layout recalculation.
+ *
+ * @param data The popup object.
+ * @param e The Evas canvas (unused).
+ * @param obj The label object being deleted (unused).
+ * @param event_info The event data (unused).
+ */
 static void
 _on_text_content_del(void *data,
                      Evas *e EINA_UNUSED,
@@ -575,6 +801,19 @@ _on_text_content_del(void *data,
    elm_layout_sizing_eval(data);
 }
 
+/**
+ * @brief Callback invoked when the internal table of the popup is deleted.
+ *
+ * This function is registered on the table object. When the table is
+ * deleted, this callback nullifies pointers to the table and its child
+ * objects (spacer, scroller, box) in the popup's data, and then triggers a
+ * layout recalculation.
+ *
+ * @param data The popup object.
+ * @param e The Evas canvas (unused).
+ * @param obj The table object being deleted (unused).
+ * @param event_info The event data (unused).
+ */
 static void
 _on_table_del(void *data,
               Evas *e EINA_UNUSED,
@@ -590,6 +829,19 @@ _on_table_del(void *data,
    elm_layout_sizing_eval(data);
 }
 
+/**
+ * @brief Callback invoked when an action button is deleted.
+ *
+ * This function is registered on each action button. When a button is
+ * deleted, this callback finds the corresponding button in the popup's data
+ * and calls `_button_remove` to clean up its resources and update the layout.
+ * It only acts if the button was marked for deletion.
+ *
+ * @param data The popup object.
+ * @param e The Evas canvas (unused).
+ * @param obj The button object being deleted.
+ * @param event_info The event data (unused).
+ */
 static void
 _on_button_del(void *data,
                Evas *e EINA_UNUSED,
@@ -611,6 +863,18 @@ _on_button_del(void *data,
      }
 }
 
+/**
+ * @brief Removes a button from the action area of the popup.
+ *
+ * This function handles the removal of a button at a specific position. It can
+ * either just detach the button from the layout or delete it completely. After
+ * removing the button, it updates the state and theme of the action area to
+ * reflect the new number of buttons.
+ *
+ * @param obj The popup object.
+ * @param pos The position of the button to remove (0-based index).
+ * @param delete If @c EINA_TRUE, the button object is deleted.
+ */
 static void
 _button_remove(Evas_Object *obj,
                int pos,
@@ -666,6 +930,18 @@ _button_remove(Evas_Object *obj,
      }
 }
 
+/**
+ * @brief Callback for layout-related signals from the theme.
+ *
+ * This function is called when signals that affect layout (e.g., visibility
+ * changes of title/action areas) are emitted from the edje theme. It
+ * triggers a sizing evaluation to recalculate the popup's layout.
+ *
+ * @param data Unused.
+ * @param obj The popup object whose layout needs recalculation.
+ * @param emission The signal emitted (unused).
+ * @param source The source of the signal (unused).
+ */
 static void
 _layout_change_cb(void *data EINA_UNUSED,
                   Evas_Object *obj,
@@ -675,6 +951,15 @@ _layout_change_cb(void *data EINA_UNUSED,
    elm_layout_sizing_eval(obj);
 }
 
+/**
+ * @brief Creates and configures the scroller components for the popup.
+ *
+ * This function sets up the necessary objects for scrollable content, including
+ * a table, a spacer, and the scroller itself. The scroller is configured with
+ * policies and styles appropriate for the popup.
+ *
+ * @param obj The popup object.
+ */
 static void
 _create_scroller(Evas_Object *obj)
 {
@@ -720,6 +1005,15 @@ _create_scroller(Evas_Object *obj)
    evas_object_show(sd->scr);
 }
 
+/**
+ * @brief Adds a list container (box) to the popup for holding items.
+ *
+ * This function ensures a scroller exists by calling `_create_scroller` if
+ * needed, and then adds an `elm_box` to the scroller. This box will serve as
+ * the container for popup items.
+ *
+ * @param obj The popup object.
+ */
 static void
 _list_add(Evas_Object *obj)
 {
@@ -911,6 +1205,16 @@ _elm_popup_item_elm_widget_item_signal_emit(Eo *eo_it EINA_UNUSED, Elm_Popup_Ite
    elm_layout_signal_emit(VIEW(it), emission, source);
 }
 
+/**
+ * @brief Callback for focus changes on a popup item.
+ *
+ * This function is triggered when an item's focus state changes. It emits the
+ * corresponding legacy "item,focused" or "item,unfocused" signal on the
+ * parent popup widget.
+ *
+ * @param data The popup item data.
+ * @param event The EFL focus changed event.
+ */
 static void
 _item_focus_change(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -935,6 +1239,15 @@ _elm_popup_item_efl_object_constructor(Eo *eo_it, Elm_Popup_Item_Data *it)
    return eo_it;
 }
 
+/**
+ * @brief Initializes a new popup item.
+ *
+ * This function creates the layout for a new popup item, sets its style,
+ * and configures its properties like focus handling and mirroring. It also sets
+ * up the "click" signal callback.
+ *
+ * @param it The popup item data for the new item.
+ */
 static void
 _item_new(Elm_Popup_Item_Data *it)
 {
@@ -959,6 +1272,18 @@ _item_new(Elm_Popup_Item_Data *it)
      }
 }
 
+/**
+ * @brief Sets the text of the popup's title area.
+ *
+ * This function updates the title text, sharing the string to save memory.
+ * It also updates accessibility information and emits signals to the theme
+ * to show or hide the title text part. If the overall visibility of the
+ * title area changes, it triggers a visual update of the whole popup.
+ *
+ * @param obj The popup object.
+ * @param text The text to set as the title.
+ * @return @c EINA_TRUE on success.
+ */
 static Eina_Bool
 _title_text_set(Evas_Object *obj,
                 const char *text)
@@ -1002,6 +1327,18 @@ _title_text_set(Evas_Object *obj,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets the text of the popup's content area.
+ *
+ * This function is used to display a simple text message in the popup. If there
+ * are items, they are removed. If there is other content, it is replaced.
+ * A new label is created for the text, and accessibility information is
+ * updated.
+ *
+ * @param obj The popup object.
+ * @param text The text to set in the content area.
+ * @return @c EINA_TRUE on success.
+ */
 static Eina_Bool
 _content_text_set(Evas_Object *obj,
                   const char *text)
@@ -1072,6 +1409,21 @@ end:
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Sets the text of a part of the popup.
+ *
+ * This function acts as a dispatcher for setting text on various parts of the
+ * popup, such as the main content text ("elm.text") or the title text
+ * ("title,text"). It calls the appropriate internal function based on the
+ * provided part name.
+ *
+ * @param obj The popup object.
+ * @param _pd The popup's private data.
+ * @param part The name of the text part to set.
+ * @param label The text to set.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 _elm_popup_text_set(Eo *obj, Elm_Popup_Data *_pd, const char *part, const char *label)
 {
@@ -1092,12 +1444,29 @@ _elm_popup_text_set(Eo *obj, Elm_Popup_Data *_pd, const char *part, const char *
    return int_ret;
 }
 
+/**
+ * @internal
+ * @brief Gets the text of the popup's title area.
+ *
+ * @param sd The popup's private data.
+ * @return The title text, or @c NULL if not set.
+ */
 static const char *
 _title_text_get(const Elm_Popup_Data *sd)
 {
    return sd->title_text;
 }
 
+/**
+ * @internal
+ * @brief Gets the text from the popup's content area.
+ *
+ * This function retrieves text only if the content is a label set by
+ * `_content_text_set`.
+ *
+ * @param sd The popup's private data.
+ * @return The content text, or @c NULL if not set or if content is not text.
+ */
 static const char *
 _content_text_get(const Elm_Popup_Data *sd)
 {
@@ -1109,6 +1478,20 @@ _content_text_get(const Elm_Popup_Data *sd)
    return str;
 }
 
+/**
+ * @internal
+ * @brief Gets the text of a part of the popup.
+ *
+ * This function acts as a dispatcher for getting text from various parts of
+ * the popup, such as the main content text ("elm.text") or the title text
+ * ("title,text"). It calls the appropriate internal getter based on the
+ * provided part name.
+ *
+ * @param obj The popup object (unused).
+ * @param _pd The popup's private data.
+ * @param part The name of the text part to get.
+ * @return The text of the part, or @c NULL on failure.
+ */
 static const char *
 _elm_popup_text_get(Eo *obj EINA_UNUSED, Elm_Popup_Data *_pd, const char *part)
 {

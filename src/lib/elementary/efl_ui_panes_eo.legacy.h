@@ -4,6 +4,10 @@
 #ifndef _EFL_UI_PANES_EO_CLASS_TYPE
 #define _EFL_UI_PANES_EO_CLASS_TYPE
 
+/**
+ * @brief Represents a UI panes widget.
+ * @ingroup Efl_Ui_Panes_Group
+ */
 typedef Eo Efl_Ui_Panes;
 
 #endif

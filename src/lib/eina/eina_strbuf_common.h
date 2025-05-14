@@ -20,7 +20,9 @@ struct _Eina_Strbuf
 
    EINA_MAGIC
 
-   Eina_Bool ro : 1;
+   Eina_Bool ro : 1; /**< EINA_TRUE if the buffer is read-only, EINA_FALSE otherwise.
+                      * A read-only buffer might use an external, non-owned string.
+                      * Operations that modify it will typically create a writable copy. */
 };
 
 #define EINA_MAGIC_CHECK_STRBUF(d, ...)                         \

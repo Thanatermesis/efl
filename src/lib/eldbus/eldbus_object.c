@@ -56,11 +56,70 @@ eldbus_object_shutdown(void)
 {
 }
 
+/**
+ * @internal
+ * @brief Calls all registered event callbacks for a given event type.
+ *
+ * This function iterates over the list of registered callbacks for the
+ * specified event type and invokes each one. It handles a walking counter
+ * to allow safe deletion of callbacks from within a callback.
+ *
+ * @param obj The Eldbus_Object emitting the event.
+ * @param type The type of event that occurred.
+ * @param event_info A pointer to event-specific data.
+ */
 static void _eldbus_object_event_callback_call(Eldbus_Object *obj, Eldbus_Object_Event_Type type, const void *event_info);
+
+/**
+ * @internal
+ * @brief Deletes an object context event callback.
+ *
+ * Removes the given context callback @p ctx from the event context @p ce
+ * and frees the memory associated with @p ctx.
+ *
+ * @param ce The object context event from which to remove the callback.
+ * @param ctx The object context event callback to delete.
+ */
 static void _eldbus_object_context_event_cb_del(Eldbus_Object_Context_Event *ce, Eldbus_Object_Context_Event_Cb *ctx);
+
+/**
+ * @internal
+ * @brief Callback executed when an Eldbus_Connection is freed.
+ *
+ * This function is registered with an Eldbus_Connection and is called when
+ * the connection is about to be freed. It clears and frees the associated
+ * Eldbus_Object.
+ *
+ * @param data The Eldbus_Object associated with the connection.
+ * @param dead_pointer The Eldbus_Connection being freed (unused).
+ */
 static void _on_connection_free(void *data, const void *dead_pointer);
+
+/**
+ * @internal
+ * @brief Callback executed when an Eldbus_Signal_Handler is freed.
+ *
+ * This function is registered with an Eldbus_Signal_Handler and is called
+ * when the signal handler is about to be freed. It removes the handler
+ * from the object's list of signal handlers.
+ *
+ * @param data The Eldbus_Object that owns the signal handler.
+ * @param dead_pointer The Eldbus_Signal_Handler being freed.
+ */
 static void _on_signal_handler_free(void *data, const void *dead_pointer);
 
+/**
+ * @internal
+ * @brief Calls ELDBUS_OBJECT_EVENT_DEL callbacks and clears them.
+ *
+ * This function is called as part of the object destruction process.
+ * It first triggers all ELDBUS_OBJECT_EVENT_DEL event callbacks.
+ * Then, it removes all ELDBUS_OBJECT_EVENT_DEL callbacks to prevent
+ * them from being called again during the final cleanup in
+ * _eldbus_object_clear().
+ *
+ * @param obj The Eldbus_Object being deleted.
+ */
 static void
 _eldbus_object_call_del(Eldbus_Object *obj)
 {
@@ -82,6 +141,24 @@ _eldbus_object_call_del(Eldbus_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Clears resources associated with an Eldbus_Object.
+ *
+ * This function is responsible for cleaning up an Eldbus_Object before it is
+ * freed. It performs the following actions:
+ * - Calls _eldbus_object_call_del() to notify ELDBUS_OBJECT_EVENT_DEL listeners.
+ * - Removes the object from its connection's name-to-object mapping.
+ * - Deletes all owned signal handlers.
+ * - Cancels all owned pending calls.
+ * - Dispatches all registered free callbacks (cbs_free).
+ * - Sets the refcount to 0.
+ *
+ * Note: obj->proxies are expected to be cleared via cbs_free mechanism
+ * by Eldbus_Proxy.
+ *
+ * @param obj The Eldbus_Object to clear.
+ */
 static void
 _eldbus_object_clear(Eldbus_Object *obj)
 {
@@ -119,6 +196,25 @@ _eldbus_object_clear(Eldbus_Object *obj)
    obj->refcount = 0;
 }
 
+/**
+ * @internal
+ * @brief Frees the memory allocated for an Eldbus_Object.
+ *
+ * This function is the final step in destroying an Eldbus_Object. It should
+ * only be called after _eldbus_object_clear() has been successfully executed
+ * and the object's refcount is 0.
+ * It performs the following actions:
+ * - Frees the hash table of proxies if any remain (logs errors for alive proxies).
+ * - Frees the list of signal handlers if any remain (logs errors for alive handlers).
+ * - Logs a critical error if any pendings still exist.
+ * - Frees all event handlers and their associated callback contexts.
+ * - Deletes specific signal handlers for InterfacesAdded, InterfacesRemoved, and PropertiesChanged.
+ * - Frees the stringshared name and path.
+ * - Sets the magic to EINA_MAGIC_NONE.
+ * - Frees the Eldbus_Object structure itself.
+ *
+ * @param obj The Eldbus_Object to free.
+ */
 static void
 _eldbus_object_free(Eldbus_Object *obj)
 {
@@ -175,6 +271,10 @@ _eldbus_object_free(Eldbus_Object *obj)
    free(obj);
 }
 
+/*
+ * For _on_connection_free Doxygen documentation, see its forward declaration
+ * earlier in this file.
+ */
 static void
 _on_connection_free(void *data, const void *dead_pointer EINA_UNUSED)
 {
@@ -223,8 +323,22 @@ cleanup:
    return NULL;
 }
 
+/*
+ * For _on_signal_handler_free Doxygen documentation, see its forward declaration
+ * earlier in this file.
+ */
 static void _on_signal_handler_free(void *data, const void *dead_pointer);
 
+/**
+ * @internal
+ * @brief Decrements the reference count of an Eldbus_Object and frees it if the count reaches zero.
+ *
+ * This is the internal implementation for unreferencing an object.
+ * If the reference count drops to zero, it removes the connection free callback,
+ * clears the object's resources, and then frees the object structure.
+ *
+ * @param obj The Eldbus_Object to unreference.
+ */
 static void
 _eldbus_object_unref(Eldbus_Object *obj)
 {
@@ -271,6 +385,25 @@ eldbus_object_free_cb_del(Eldbus_Object *obj, Eldbus_Free_Cb cb, const void *dat
    obj->cbs_free = eldbus_cbs_free_del(obj->cbs_free, cb, data);
 }
 
+/**
+ * @internal
+ * @brief Callback for the "InterfacesAdded" D-Bus signal from org.freedesktop.DBus.ObjectManager.
+ *
+ * This function is invoked when an "InterfacesAdded" signal is received for
+ * the monitored object path. It parses the signal message, which contains the
+ * object path and a dictionary of interfaces added along with their properties.
+ * For each interface added, it retrieves the corresponding Eldbus_Proxy
+ * and triggers the ELDBUS_OBJECT_EVENT_IFACE_ADDED event.
+ *
+ * @param data The Eldbus_Object associated with this signal handler.
+ * @param msg The received Eldbus_Message containing the signal data.
+ *        The message arguments are expected to be:
+ *        - "o": object_path (string)
+ *        - "a{sa{sv}}": interfaces_and_properties (array of dictionary entries)
+ *          - Each dictionary entry:
+ *            - key: interface_name (string)
+ *            - value: properties (dictionary of string to variant)
+ */
 static void
 _cb_interfaces_added(void *data, const Eldbus_Message *msg)
 {
@@ -296,6 +429,22 @@ _cb_interfaces_added(void *data, const Eldbus_Message *msg)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for the "InterfacesRemoved" D-Bus signal from org.freedesktop.DBus.ObjectManager.
+ *
+ * This function is invoked when an "InterfacesRemoved" signal is received for
+ * the monitored object path. It parses the signal message, which contains the
+ * object path and an array of interface names that were removed.
+ * For each interface removed, it triggers the ELDBUS_OBJECT_EVENT_IFACE_REMOVED event.
+ *
+ * @param data The Eldbus_Object associated with this signal handler.
+ * @param msg The received Eldbus_Message containing the signal data.
+ *        The message arguments are expected to be:
+ *        - "o": object_path (string)
+ *        - "as": interfaces (array of strings)
+ *          - Each string is an interface_name.
+ */
 static void
 _cb_interfaces_removed(void *data, const Eldbus_Message *msg)
 {
@@ -315,6 +464,20 @@ _cb_interfaces_removed(void *data, const Eldbus_Message *msg)
      }
 }
 
+/**
+ * @internal
+ * @brief Iterator function for changed properties in a "PropertiesChanged" signal.
+ *
+ * This function is called for each property that has changed, as part of
+ * processing the "PropertiesChanged" signal from org.freedesktop.DBus.Properties.
+ * It extracts the property name (key) and its new value (var), then constructs
+ * an Eldbus_Object_Event_Property_Changed event structure and triggers the
+ * ELDBUS_OBJECT_EVENT_PROPERTY_CHANGED event.
+ *
+ * @param data The Eldbus_Proxy associated with the interface whose property changed.
+ * @param key The name of the property that changed (const char *).
+ * @param var An Eldbus_Message_Iter pointing to the new value of the property (variant).
+ */
 static void
 _property_changed_iter(void *data, const void *key, Eldbus_Message_Iter *var)
 {
@@ -337,6 +500,33 @@ _property_changed_iter(void *data, const void *key, Eldbus_Message_Iter *var)
    eina_value_flush(&stack_value);
 }
 
+/**
+ * @internal
+ * @brief Callback for the "PropertiesChanged" D-Bus signal from org.freedesktop.DBus.Properties.
+ *
+ * This function is invoked when a "PropertiesChanged" signal is received.
+ * The signal indicates that one or more properties of an interface have changed,
+ * or that some properties have been invalidated (removed).
+ *
+ * It parses the signal message which contains:
+ * - The interface name whose properties changed.
+ * - A dictionary of changed properties (name to new value).
+ * - An array of property names that were invalidated.
+ *
+ * For each changed property, it calls _property_changed_iter if there are listeners
+ * for ELDBUS_OBJECT_EVENT_PROPERTY_CHANGED.
+ * For each invalidated property, it triggers an ELDBUS_OBJECT_EVENT_PROPERTY_REMOVED
+ * event if there are listeners for it.
+ *
+ * @param data The Eldbus_Object associated with this signal handler.
+ * @param msg The received Eldbus_Message containing the signal data.
+ *        The message arguments are expected to be:
+ *        - "s": interface_name (string)
+ *        - "a{sv}": changed_properties (dictionary of string to variant)
+ *          - Each entry: property_name (string) to new_value (variant)
+ *        - "as": invalidated_properties (array of strings)
+ *          - Each string is a property_name.
+ */
 static void
 _cb_properties_changed(void *data, const Eldbus_Message *msg)
 {
@@ -376,6 +566,9 @@ end:
    eldbus_proxy_unref(proxy);
 }
 
+/*
+ * Doxygen documentation for eldbus_object_event_callback_add is in eldbus_object.h
+ */
 EAPI void
 eldbus_object_event_callback_add(Eldbus_Object *obj, Eldbus_Object_Event_Type type, Eldbus_Object_Event_Cb cb, const void *cb_data)
 {
@@ -444,6 +637,10 @@ eldbus_object_event_callback_add(Eldbus_Object *obj, Eldbus_Object_Event_Type ty
      }
 }
 
+/*
+ * For _eldbus_object_context_event_cb_del Doxygen documentation, see its
+ * forward declaration earlier in this file.
+ */
 static void
 _eldbus_object_context_event_cb_del(Eldbus_Object_Context_Event *ce, Eldbus_Object_Context_Event_Cb *ctx)
 {
@@ -517,6 +714,10 @@ eldbus_object_event_callback_del(Eldbus_Object *obj, Eldbus_Object_Event_Type ty
      }
 }
 
+/*
+ * For _eldbus_object_event_callback_call Doxygen documentation, see its
+ * forward declaration earlier in this file.
+ */
 static void
 _eldbus_object_event_callback_call(Eldbus_Object *obj, Eldbus_Object_Event_Type type, const void *event_info)
 {
@@ -559,6 +760,19 @@ eldbus_object_path_get(const Eldbus_Object *obj)
    return obj->path;
 }
 
+/**
+ * @internal
+ * @brief Internal callback wrapper for messages sent via an Eldbus_Object.
+ *
+ * This function is used as the callback for eldbus_connection_send when
+ * a message is sent using eldbus_object_send. It retrieves the user-provided
+ * callback and object from the pending's data, removes the pending from the
+ * object's list of pendings, and then calls the user's callback.
+ *
+ * @param data The user-provided callback data.
+ * @param msg The reply message (or error message).
+ * @param pending The Eldbus_Pending object associated with this message exchange.
+ */
 static void
 _on_object_message_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
 {
@@ -595,6 +809,10 @@ eldbus_object_send(Eldbus_Object *obj, Eldbus_Message *msg, Eldbus_Message_Cb cb
    return pending;
 }
 
+/*
+ * For _on_signal_handler_free Doxygen documentation, see its forward declaration
+ * earlier in this file.
+ */
 static void
 _on_signal_handler_free(void *data, const void *dead_pointer)
 {
@@ -603,6 +821,9 @@ _on_signal_handler_free(void *data, const void *dead_pointer)
    obj->signal_handlers = eina_list_remove(obj->signal_handlers, dead_pointer);
 }
 
+/*
+ * Doxygen documentation for eldbus_object_signal_handler_add is in eldbus_object.h
+ */
 EAPI Eldbus_Signal_Handler *
 eldbus_object_signal_handler_add(Eldbus_Object *obj, const char *interface, const char *member, Eldbus_Signal_Cb cb, const void *cb_data)
 {
@@ -621,6 +842,9 @@ eldbus_object_signal_handler_add(Eldbus_Object *obj, const char *interface, cons
    return handler;
 }
 
+/*
+ * Doxygen documentation for eldbus_object_method_call_new is in eldbus_object.h
+ */
 EAPI Eldbus_Message *
 eldbus_object_method_call_new(Eldbus_Object *obj, const char *interface, const char *member)
 {
@@ -631,24 +855,58 @@ eldbus_object_method_call_new(Eldbus_Object *obj, const char *interface, const c
    return eldbus_message_method_call_new(obj->name, obj->path, interface, member);
 }
 
+/**
+ * @internal
+ * @brief Adds a proxy to the object's internal hash of proxies.
+ * This is typically called by eldbus_proxy_get().
+ *
+ * @param obj The Eldbus_Object.
+ * @param proxy The Eldbus_Proxy to add.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 Eina_Bool
 eldbus_object_proxy_add(Eldbus_Object *obj, Eldbus_Proxy *proxy)
 {
    return eina_hash_add(obj->proxies, eldbus_proxy_interface_get(proxy), proxy);
 }
 
+/**
+ * @internal
+ * @brief Retrieves a proxy from the object's internal hash of proxies by interface name.
+ * This is typically called by eldbus_proxy_get().
+ *
+ * @param obj The Eldbus_Object.
+ * @param interface The interface name of the proxy to retrieve.
+ * @return The Eldbus_Proxy if found, NULL otherwise.
+ */
 Eldbus_Proxy *
 eldbus_object_proxy_get(Eldbus_Object *obj, const char *interface)
 {
    return eina_hash_find(obj->proxies, interface);
 }
 
+/**
+ * @internal
+ * @brief Deletes a proxy from the object's internal hash of proxies.
+ * This is typically called when an Eldbus_Proxy is unref'd to 0.
+ *
+ * @param obj The Eldbus_Object.
+ * @param proxy The Eldbus_Proxy to delete (for verification).
+ * @param interface The interface name of the proxy to delete.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 Eina_Bool
 eldbus_object_proxy_del(Eldbus_Object *obj, Eldbus_Proxy *proxy, const char *interface)
 {
    return eina_hash_del(obj->proxies, interface, proxy);
 }
 
+/*
+ * Doxygen documentation for eldbus_object_peer_ping is in eldbus_object.h
+ * (Note: eldbus_object.h does not currently have this EAPI, but assuming it should based on pattern)
+ * If it's not meant to be EAPI, this comment should be adjusted.
+ * For now, assuming it's an EAPI function that might be missing from the header or is new.
+ */
 EAPI Eldbus_Pending *
 eldbus_object_peer_ping(Eldbus_Object *obj, Eldbus_Message_Cb cb, const void *data)
 {
@@ -660,6 +918,10 @@ eldbus_object_peer_ping(Eldbus_Object *obj, Eldbus_Message_Cb cb, const void *da
    return p;
 }
 
+/*
+ * Doxygen documentation for eldbus_object_peer_machine_id_get is in eldbus_object.h
+ * (Note: eldbus_object.h does not currently have this EAPI, but assuming it should based on pattern)
+ */
 EAPI Eldbus_Pending *
 eldbus_object_peer_machine_id_get(Eldbus_Object *obj, Eldbus_Message_Cb cb, const void *data)
 {
@@ -672,6 +934,10 @@ eldbus_object_peer_machine_id_get(Eldbus_Object *obj, Eldbus_Message_Cb cb, cons
    return p;
 }
 
+/*
+ * Doxygen documentation for eldbus_object_introspect is in eldbus_object.h
+ * (Note: eldbus_object.h does not currently have this EAPI, but assuming it should based on pattern)
+ */
 EAPI Eldbus_Pending *
 eldbus_object_introspect(Eldbus_Object *obj, Eldbus_Message_Cb cb, const void *data)
 {

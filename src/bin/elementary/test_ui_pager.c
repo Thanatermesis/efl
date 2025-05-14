@@ -23,52 +23,75 @@
   *
   */
 
-
+/**
+ * @brief Enumeration for different types of pages that can be added to the pager.
+ */
 typedef enum _Page_Type {
-   LAYOUT,
-   LIST,
-   BUTTON
+   LAYOUT, /**< A page with a layout defined in an EDJ file. */
+   LIST, /**< A page containing a list of items. */
+   BUTTON /**< A page with a simple button. */
 } Page_Type;
 
+/**
+ * @brief Enumeration for different ways to pack/unpack pages in the pager.
+ */
 typedef enum _Pack_Type {
-   PACK_BEGIN,
-   PACK_END,
-   PACK_BEFORE,
-   PACK_AFTER,
-   PACK_AT,
-   UNPACK_AT,
-   CLEAR
+   PACK_BEGIN, /**< Pack a page at the beginning of the pager. */
+   PACK_END, /**< Pack a page at the end of the pager. */
+   PACK_BEFORE, /**< Pack a page before the current page. */
+   PACK_AFTER, /**< Pack a page after the current page. */
+   PACK_AT, /**< Pack a page at a specific index. */
+   UNPACK_AT, /**< Unpack a page from a specific index. */
+   CLEAR /**< Remove all pages from the pager. */
 } Pack_Type;
 
+/**
+ * @brief Structure to hold common parameters used across various callbacks.
+ */
 typedef struct _Params {
-   Evas_Object *navi;
-   Eo *pager;
-   Eo *indicator;
-   int w, h;
-   Eina_Bool wfill, hfill;
+   Evas_Object *navi; /**< The naviframe widget. */
+   Eo *pager; /**< The pager widget. */
+   Eo *indicator; /**< The pager indicator widget (can be NULL). */
+   int w, h; /**< Current width and height settings for pages. */
+   Eina_Bool wfill, hfill; /**< Flags indicating if width/height should fill available space. */
 } Params;
 
+/**
+ * @brief Structure to hold parameters for setting the current page.
+ */
 typedef struct _Page_Set_Params {
-   Eo *pager;
-   Eo *spinner;
+   Eo *pager; /**< The pager widget. */
+   Eo *spinner; /**< The spin button used to select the page index. */
 } Page_Set_Params;
 
+/**
+ * @brief Structure to hold parameters for packing/unpacking operations.
+ */
 typedef struct _Pack_Params {
-   Pack_Type type;
-   Eo *pager;
-   Eo *pack_sp;
-   Eo *unpack_sp;
-   Eo *unpack_btn;
+   Pack_Type type; /**< The type of pack/unpack operation to perform. */
+   Eo *pager; /**< The pager widget. */
+   Eo *pack_sp; /**< The spin button for selecting pack index. */
+   Eo *unpack_sp; /**< The spin button for selecting unpack index. */
+   Eo *unpack_btn; /**< The button to trigger unpack operation. */
 } Pack_Params;
 
+/**
+ * @brief Structure to hold parameters for page size adjustment.
+ */
 typedef struct _Size_Params {
-   Eo *pager;
-   Eo *slider;
-   Params *params;
+   Eo *pager; /**< The pager widget. */
+   Eo *slider; /**< The slider controlling width or height. */
+   Params *params; /**< Pointer to the common Params structure. */
 } Size_Params;
 
 
-
+/**
+ * @brief Creates and returns a new page widget based on the specified type.
+ *
+ * @param p The type of page to create (LAYOUT, LIST, or BUTTON).
+ * @param parent The parent Evas_Object for the new page.
+ * @return The newly created page widget (Eo *).
+ */
 static Eo *page_add(Page_Type p, Eo *parent)
 {
    Eo *page;
@@ -119,6 +142,12 @@ static Eo *page_add(Page_Type p, Eo *parent)
    return page;
 }
 
+/**
+ * @brief Callback function for the "Previous" button.
+ * Navigates the pager to the previous page.
+ * @param data The pager widget (Eo *).
+ * @param ev The Efl_Event data (unused).
+ */
 static void prev_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    Eo *pager = data;
@@ -127,6 +156,12 @@ static void prev_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_pager_current_page_set(pager, (curr_page - 1));
 }
 
+/**
+ * @brief Callback function for the "Next" button.
+ * Navigates the pager to the next page.
+ * @param data The pager widget (Eo *).
+ * @param ev The Efl_Event data (unused).
+ */
 static void next_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    Eo *pager = data;
@@ -135,16 +170,34 @@ static void next_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_pager_current_page_set(pager, (curr_page + 1));
 }
 
+/**
+ * @brief Callback function for the "Back" button in the naviframe.
+ * Pops the current item from the naviframe.
+ * @param data The naviframe widget (Evas_Object *).
+ * @param ev The Efl_Event data (unused).
+ */
 static void back_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    elm_naviframe_item_pop(data);
 }
 
+/**
+ * @brief Callback function for the EFL_EVENT_DEL of the properties list.
+ * Frees the associated Params data.
+ * @param data The Params structure to free.
+ * @param ev The Efl_Event data (unused).
+ */
 static void list_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Callback function for the width slider.
+ * Adjusts the page width of the pager based on the slider value.
+ * @param data The Params structure.
+ * @param ev The Efl_Event data, where ev->object is the slider.
+ */
 static void width_slider_cb(void *data, const Efl_Event *ev)
 {
    Params *params = data;
@@ -157,6 +210,12 @@ static void width_slider_cb(void *data, const Efl_Event *ev)
    efl_ui_pager_page_size_set(params->pager, EINA_SIZE2D(params->w, h));
 }
 
+/**
+ * @brief Callback function for the height slider.
+ * Adjusts the page height of the pager based on the slider value.
+ * @param data The Params structure.
+ * @param ev The Efl_Event data, where ev->object is the slider.
+ */
 static void height_slider_cb(void *data, const Efl_Event *ev)
 {
    Params *params = data;
@@ -169,6 +228,12 @@ static void height_slider_cb(void *data, const Efl_Event *ev)
    efl_ui_pager_page_size_set(params->pager, EINA_SIZE2D(w, params->h));
 }
 
+/**
+ * @brief Callback function for the width "Fill" checkbox.
+ * Toggles whether the page width should fill available space or use the slider value.
+ * @param data The Size_Params structure.
+ * @param ev The Efl_Event data, where ev->object is the checkbox.
+ */
 static void width_check_cb(void *data, const Efl_Event *ev)
 {
    Size_Params *params = data;
@@ -188,6 +253,12 @@ static void width_check_cb(void *data, const Efl_Event *ev)
    efl_ui_pager_page_size_set(params->pager, EINA_SIZE2D(w, h));
 }
 
+/**
+ * @brief Callback function for the height "Fill" checkbox.
+ * Toggles whether the page height should fill available space or use the slider value.
+ * @param data The Size_Params structure.
+ * @param ev The Efl_Event data, where ev->object is the checkbox.
+ */
 static void height_check_cb(void *data, const Efl_Event *ev)
 {
    Size_Params *params = data;
@@ -207,11 +278,23 @@ static void height_check_cb(void *data, const Efl_Event *ev)
    efl_ui_pager_page_size_set(params->pager, EINA_SIZE2D(w, h));
 }
 
+/**
+ * @brief Callback function for the EFL_EVENT_DEL of a "Fill" checkbox.
+ * Frees the associated Size_Params data.
+ * @param data The Size_Params structure to free.
+ * @param ev The Efl_Event data (unused).
+ */
 static void check_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Callback function for various pack/unpack operation buttons.
+ * Performs the specified pack/unpack operation on the pager.
+ * @param data The Pack_Params structure containing operation details.
+ * @param ev The Efl_Event data (unused).
+ */
 static void pack_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    Pack_Params *param = data;
@@ -294,11 +377,23 @@ static void pack_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback function for the EFL_EVENT_DEL of a pack/unpack button.
+ * Frees the associated Pack_Params data.
+ * @param data The Pack_Params structure to free.
+ * @param ev The Efl_Event data (unused).
+ */
 static void pack_btn_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Callback function for the "Set Current Page As" button.
+ * Sets the current page of the pager based on the spinner value.
+ * @param data The Page_Set_Params structure.
+ * @param ev The Efl_Event data (unused).
+ */
 static void page_set_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    Page_Set_Params *psp = data;
@@ -307,11 +402,23 @@ static void page_set_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
                                  efl_ui_range_value_get(psp->spinner));
 }
 
+/**
+ * @brief Callback function for the EFL_EVENT_DEL of the "Set Current Page As" button.
+ * Frees the associated Page_Set_Params data.
+ * @param data The Page_Set_Params structure to free.
+ * @param ev The Efl_Event data (unused).
+ */
 static void page_set_btn_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Callback function for the "Icon Type" indicator button.
+ * Sets an icon-based indicator for the pager.
+ * @param data The Params structure.
+ * @param ev The Efl_Event data (unused).
+ */
 static void indicator_icon_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    Params *params = data;
@@ -320,12 +427,25 @@ static void indicator_icon_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_pager_indicator_set(params->pager, params->indicator);
 }
 
+/**
+ * @brief Callback function for the "None" indicator button.
+ * Removes any existing indicator from the pager.
+ * @param data The Params structure.
+ * @param ev The Efl_Event data (unused).
+ */
 static void indicator_none_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    Params *params = data;
    efl_ui_pager_indicator_set(params->pager, NULL);
 }
 
+/**
+ * @brief Callback function for the "Page Size" list item.
+ * Pushes a new view onto the naviframe to control page width and height.
+ * @param data The Params structure.
+ * @param obj The list object (unused).
+ * @param event_info The list item data (unused).
+ */
 static void page_size_cb(void *data,
                          Evas_Object *obj EINA_UNUSED,
                          void *event_info EINA_UNUSED)
@@ -427,6 +547,13 @@ static void page_size_cb(void *data,
      }
 }
 
+/**
+ * @brief Callback function for the "Pack / Unpack" list item.
+ * Pushes a new view onto the naviframe to control packing and unpacking of pages.
+ * @param data The Params structure.
+ * @param obj The list object (unused).
+ * @param event_info The list item data (unused).
+ */
 static void pack_cb(void *data,
                     Evas_Object *obj EINA_UNUSED,
                     void *event_info EINA_UNUSED)
@@ -611,6 +738,13 @@ static void pack_cb(void *data,
 
 }
 
+/**
+ * @brief Callback function for the "Current Page" list item.
+ * Pushes a new view onto the naviframe to control the currently displayed page.
+ * @param data The Params structure.
+ * @param obj The list object (unused).
+ * @param event_info The list item data (unused).
+ */
 static void current_page_cb(void *data,
                             Evas_Object *obj EINA_UNUSED,
                             void *event_info EINA_UNUSED)
@@ -660,6 +794,13 @@ static void current_page_cb(void *data,
    efl_event_callback_add(btn, EFL_EVENT_DEL, page_set_btn_del_cb, psp);
 }
 
+/**
+ * @brief Callback function for the "Indicator" list item.
+ * Pushes a new view onto the naviframe to control the pager's indicator type.
+ * @param data The Params structure.
+ * @param obj The list object (unused).
+ * @param event_info The list item data (unused).
+ */
 static void indicator_cb(void *data,
                          Evas_Object *obj EINA_UNUSED,
                          void *event_info EINA_UNUSED)
@@ -691,6 +832,16 @@ static void indicator_cb(void *data,
            efl_pack_end(box, efl_added));
 }
 
+/**
+ * @brief Main function to set up and run the Pager UI test.
+ * Creates a window with a panes widget. The left pane contains a naviframe
+ * with a list of properties to control the pager. The right pane displays
+ * the pager itself and controls for previous/next navigation.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void test_ui_pager(void *data EINA_UNUSED,
                    Evas_Object *obj EINA_UNUSED,
                    void *event_info EINA_UNUSED)

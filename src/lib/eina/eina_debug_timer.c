@@ -43,23 +43,41 @@
 #include "eina_debug.h"
 #include "eina_debug_private.h"
 
-static Eina_Spinlock _lock;
+static Eina_Spinlock _lock; /**< Spinlock to protect access to shared timer data. */
 
+/**
+ * @internal
+ * @struct _Eina_Debug_Timer
+ * @brief Represents a timer for debugging purposes.
+ *
+ * This structure holds information about a single debug timer, including its
+ * relative time, total timeout, callback function, and associated data.
+ */
 struct _Eina_Debug_Timer
 {
-   unsigned int rel_time;
-   unsigned int timeout;
-   Eina_Debug_Timer_Cb cb;
-   void *data;
+   unsigned int rel_time;       /**< Relative time in milliseconds until this timer fires, based on the previous timer in the sorted list. */
+   unsigned int timeout;        /**< Absolute timeout in milliseconds from the start or last firing. */
+   Eina_Debug_Timer_Cb cb;      /**< Callback function to execute when the timer expires. */
+   void *data;                 /**< User data to pass to the callback function. */
 };
 
-static Eina_List *_timers = NULL;
+static Eina_List *_timers = NULL; /**< List of active debug timers, sorted by timeout. */
 
-static Eina_Bool _thread_runs = EINA_FALSE;
-static pthread_t _thread;
+static Eina_Bool _thread_runs = EINA_FALSE; /**< Flag indicating if the monitor thread is currently running. */
+static pthread_t _thread; /**< Identifier for the monitor thread. */
 
-static int pipeToThread[2];
+static int pipeToThread[2]; /**< Pipe used to communicate with the monitor thread, typically to wake it up. pipeToThread[0] is read end, pipeToThread[1] is write end. */
 
+/**
+ * @internal
+ * @brief Appends a new timer to the sorted list of timers.
+ *
+ * The timer is inserted into the `_timers` list based on its `timeout` value,
+ * maintaining a sorted order. After insertion, the monitor thread is signaled
+ * via `pipeToThread` to re-evaluate its wait time.
+ *
+ * @param t The timer to append.
+ */
 static void
 _timer_append(Eina_Debug_Timer *t)
 {
@@ -81,6 +99,18 @@ end:
      e_debug("EINA DEBUG ERROR: Can't wake up thread for debug timer");
 }
 
+/**
+ * @internal
+ * @brief Main function for the timer monitor thread.
+ *
+ * This thread waits for timer events or signals to update the timer list.
+ * It uses `epoll` (if available) to wait on a pipe for notifications
+ * or until the next timer is due. When a timer expires, its callback
+ * is executed. If the callback returns `EINA_TRUE`, the timer is rescheduled.
+ *
+ * @param _data Unused thread data.
+ * @return NULL when the thread exits.
+ */
 static void *
 _monitor(void *_data EINA_UNUSED)
 {
@@ -148,6 +178,39 @@ _monitor(void *_data EINA_UNUSED)
    return NULL;
 }
 
+/**
+ * @brief Adds a new debug timer.
+ *
+ * Creates and adds a new timer that will execute the given callback function
+ * after the specified timeout. If this is the first timer or the monitor thread
+ * is not running, the thread is created.
+ *
+ * @param timeout_ms The timeout in milliseconds. Must be greater than 0.
+ * @param cb The callback function to execute when the timer expires. Must not be NULL.
+ *           The callback should return #EINA_TRUE to reschedule the timer with the
+ *           same timeout, or #EINA_FALSE to remove it.
+ * @param data User data to be passed to the callback function.
+ * @return A pointer to the newly created Eina_Debug_Timer on success, or NULL on failure
+ *         (e.g., if `cb` is NULL or `timeout_ms` is 0).
+ *
+ * @note The timer system uses a dedicated thread to manage timers.
+ *       Signal handling is configured in this thread to avoid interference.
+ *
+ * Example:
+ * @code
+ * Eina_Bool my_timer_callback(void *data)
+ * {
+ *     printf("Timer fired with data: %s\n", (char *)data);
+ *     return EINA_FALSE; // Do not repeat
+ * }
+ *
+ * Eina_Debug_Timer *timer = eina_debug_timer_add(1000, my_timer_callback, "hello world");
+ * if (!timer)
+ * {
+ *     fprintf(stderr, "Failed to add timer\n");
+ * }
+ * @endcode
+ */
 EINA_API Eina_Debug_Timer *
 eina_debug_timer_add(unsigned int timeout_ms, Eina_Debug_Timer_Cb cb, void *data)
 {
@@ -193,6 +256,25 @@ eina_debug_timer_add(unsigned int timeout_ms, Eina_Debug_Timer_Cb cb, void *data
    return t;
 }
 
+/**
+ * @brief Deletes a debug timer.
+ *
+ * Removes the specified timer from the active list and frees its resources.
+ * If the timer is not found in the list, this function does nothing.
+ *
+ * @param t The timer to delete. If NULL, the function does nothing.
+ *
+ * Example:
+ * @code
+ * Eina_Debug_Timer *timer = eina_debug_timer_add(1000, my_callback, NULL);
+ * // ... later ...
+ * if (timer)
+ * {
+ *     eina_debug_timer_del(timer);
+ *     timer = NULL; // Good practice to NULLify dangling pointers
+ * }
+ * @endcode
+ */
 EINA_API void
 eina_debug_timer_del(Eina_Debug_Timer *t)
 {
@@ -206,6 +288,15 @@ eina_debug_timer_del(Eina_Debug_Timer *t)
    eina_spinlock_release(&_lock);
 }
 
+/**
+ * @internal
+ * @brief Initializes the debug timer system.
+ *
+ * Sets up the spinlock and the communication pipe for the monitor thread.
+ * This function is called during Eina library initialization.
+ *
+ * @return #EINA_TRUE on success, #EINA_FALSE on failure (e.g., pipe creation failed).
+ */
 Eina_Bool
 _eina_debug_timer_init(void)
 {
@@ -217,6 +308,16 @@ _eina_debug_timer_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the debug timer system.
+ *
+ * Cleans up all active timers, cancels the monitor thread if it's running,
+ * closes the communication pipe, and frees the spinlock.
+ * This function is called during Eina library shutdown.
+ *
+ * @return #EINA_TRUE always.
+ */
 Eina_Bool
 _eina_debug_timer_shutdown(void)
 {

@@ -1,5 +1,22 @@
 #include "gl_engine_filter.h"
 
+/**
+ * @file
+ * @brief This file implements the curve filter for the GL engine.
+ */
+
+/**
+ * @internal
+ * @brief Applies a curve filter to an image.
+ *
+ * This function takes an input image, applies a color curve transformation
+ * based on the provided points and channel, and writes the result to the
+ * output surface.
+ *
+ * @param re The GL generic render engine.
+ * @param cmd The filter command containing input, output, and curve parameters.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 _gl_filter_curve(Render_Engine_GL_Generic *re, Evas_Filter_Command *cmd)
 {
@@ -54,6 +71,25 @@ _gl_filter_curve(Render_Engine_GL_Generic *re, Evas_Filter_Command *cmd)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the function pointer for applying the curve filter.
+ *
+ * This function validates the filter command and its parameters. If valid,
+ * it returns a pointer to the _gl_filter_curve function.
+ *
+ * @param re The GL generic render engine (unused).
+ * @param cmd The filter command to validate.
+ * @return A function pointer to _gl_filter_curve if the command is valid,
+ *         otherwise @c NULL.
+ *
+ * @note The `cmd->curve.data` is an array of 256 `uint8_t` values representing
+ *       the curve points for the selected channel. For example, if `cmd->curve.channel`
+ *       is `EVAS_FILTER_CHANNEL_R`, then `cmd->curve.data` contains 256 values
+ *       for the red channel curve.
+ *       - `cmd->curve.data[0]` is the output value for input value 0.
+ *       - `cmd->curve.data[128]` is the output value for input value 128.
+ *       - `cmd->curve.data[255]` is the output value for input value 255.
+ */
 GL_Filter_Apply_Func
 gl_filter_curve_func_get(Render_Engine_GL_Generic *re EINA_UNUSED, Evas_Filter_Command *cmd)
 {

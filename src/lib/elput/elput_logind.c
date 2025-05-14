@@ -1,3 +1,13 @@
+/**
+ * @file
+ * @brief Functions for interacting with systemd-logind or elogind.
+ *
+ * This file contains the implementation for managing input devices
+ * and sessions through the logind D-Bus interface. It handles
+ * operations like opening/closing devices, session activation,
+ * and VT switching.
+ */
+
 #include "elput_private.h"
 
 #ifdef HAVE_SYSTEMD
@@ -14,15 +24,24 @@
 #  define MINOR(x) (((x) & 0xff) | (((x) >> 12) & ~0xff))
 # endif
 
-static Eina_Module *_libsystemd = NULL;
-static Eina_Bool _libsystemd_broken = EINA_FALSE;
+static Eina_Module *_libsystemd = NULL; /**< Pointer to the loaded libsystemd/libelogind module. */
+static Eina_Bool _libsystemd_broken = EINA_FALSE; /**< Flag indicating if loading libsystemd/libelogind failed permanently. */
 
-static int (*_elput_sd_session_get_vt) (const char *session, unsigned *vtnr) = NULL;
-static int (*_elput_sd_session_get_tty) (const char *session, char **display) = NULL;
-static int (*_elput_sd_pid_get_session) (pid_t pid, char **session) = NULL;
-static int (*_elput_sd_session_get_seat) (const char *session, char **seat) = NULL;
-static int (*_elput_sd_seat_can_tty) (const char *seat) = NULL;
+static int (*_elput_sd_session_get_vt) (const char *session, unsigned *vtnr) = NULL; /**< Function pointer for sd_session_get_vt. */
+static int (*_elput_sd_session_get_tty) (const char *session, char **display) = NULL; /**< Function pointer for sd_session_get_tty. */
+static int (*_elput_sd_pid_get_session) (pid_t pid, char **session) = NULL; /**< Function pointer for sd_pid_get_session. */
+static int (*_elput_sd_session_get_seat) (const char *session, char **seat) = NULL; /**< Function pointer for sd_session_get_seat. */
+static int (*_elput_sd_seat_can_tty) (const char *seat) = NULL; /**< Function pointer for sd_seat_can_tty. */
 
+/**
+ * @brief Initializes libsystemd/libelogind function pointers.
+ *
+ * This function attempts to load libsystemd.so.0 or libelogind-shared.so.0
+ * (or libelogind.so.0) and resolve necessary symbols. It tries multiple
+ * library names to support both systemd and elogind.
+ * If EFL_ELOGIND_LIB environment variable is set, it will try that path first.
+ * Sets _libsystemd_broken to EINA_TRUE if all attempts fail.
+ */
 void
 _elput_sd_init(void)
 {
@@ -109,7 +128,14 @@ _elput_sd_init(void)
      }
 }
 
-
+/**
+ * @brief Frees an Elput_Event_Session_Active event.
+ *
+ * Callback for ecore_event_add to free the event data.
+ *
+ * @param data Unused.
+ * @param event The event data to free.
+ */
 static void
 _logind_session_active_cb_free(void *data EINA_UNUSED, void *event)
 {
@@ -120,6 +146,15 @@ _logind_session_active_cb_free(void *data EINA_UNUSED, void *event)
    free(ev);
 }
 
+/**
+ * @brief Sends an ELPUT_EVENT_SESSION_ACTIVE event.
+ *
+ * This function enables or disables input based on the active state
+ * and then creates and sends an ELPUT_EVENT_SESSION_ACTIVE event.
+ *
+ * @param em The Elput_Manager instance.
+ * @param active EINA_TRUE if the session is now active, EINA_FALSE otherwise.
+ */
 static void
 _logind_session_active_send(Elput_Manager *em, Eina_Bool active)
 {
@@ -140,6 +175,15 @@ _logind_session_active_send(Elput_Manager *em, Eina_Bool active)
                    _logind_session_active_cb_free, NULL);
 }
 
+/**
+ * @brief Sends a PauseDeviceComplete D-Bus signal.
+ *
+ * This is called after a device has been paused to notify logind.
+ *
+ * @param em The Elput_Manager instance.
+ * @param major The major number of the paused device.
+ * @param minor The minor number of the paused device.
+ */
 static void
 _logind_device_pause_complete(Elput_Manager *em, uint32_t major, uint32_t minor)
 {
@@ -157,6 +201,15 @@ _logind_device_pause_complete(Elput_Manager *em, uint32_t major, uint32_t minor)
    eldbus_proxy_send(em->dbus.session, msg, NULL, NULL, -1);
 }
 
+/**
+ * @brief Callback for the SessionRemoved D-Bus signal.
+ *
+ * Handles the SessionRemoved signal from logind. If the removed session
+ * is the current one, it logs a warning.
+ *
+ * @param data The Elput_Manager instance.
+ * @param msg The D-Bus message.
+ */
 static void
 _cb_session_removed(void *data, const Eldbus_Message *msg)
 {
@@ -182,6 +235,17 @@ _cb_session_removed(void *data, const Eldbus_Message *msg)
      }
 }
 
+/**
+ * @brief Callback for the PauseDevice D-Bus signal.
+ *
+ * Handles the PauseDevice signal from logind. If the device is a DRM device
+ * (major 226), it sends a session active event with active=EINA_FALSE.
+ * It also calls _logind_device_pause_complete if the type is "pause".
+ * Includes a workaround for multiple DRM device opens/closes during probing.
+ *
+ * @param data The Elput_Manager instance.
+ * @param msg The D-Bus message.
+ */
 static void
 _cb_device_paused(void *data, const Eldbus_Message *msg)
 {
@@ -223,6 +287,15 @@ _cb_device_paused(void *data, const Eldbus_Message *msg)
      }
 }
 
+/**
+ * @brief Callback for the ResumeDevice D-Bus signal.
+ *
+ * Handles the ResumeDevice signal from logind. If the device is a DRM device
+ * (major 226), it sends a session active event with active=EINA_TRUE.
+ *
+ * @param data The Elput_Manager instance.
+ * @param msg The D-Bus message.
+ */
 static void
 _cb_device_resumed(void *data, const Eldbus_Message *msg)
 {
@@ -245,6 +318,16 @@ _cb_device_resumed(void *data, const Eldbus_Message *msg)
      }
 }
 
+/**
+ * @brief Gets the VT number for a given session ID.
+ *
+ * Uses either sd_session_get_vt (newer systemd) or sd_session_get_tty
+ * (older systemd/elogind) to retrieve the TTY and parse the VT number.
+ *
+ * @param sid The session ID string.
+ * @param[out] vt Pointer to store the retrieved VT number.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _logind_session_vt_get(const char *sid, unsigned int *vt)
 {
@@ -267,6 +350,15 @@ _logind_session_vt_get(const char *sid, unsigned int *vt)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Opens a connection to the system D-Bus.
+ *
+ * Initializes Eldbus if not already initialized and gets a connection
+ * to the system bus.
+ *
+ * @param[out] conn Pointer to store the Eldbus_Connection.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _logind_dbus_open(Eldbus_Connection **conn)
 {
@@ -278,6 +370,13 @@ _logind_dbus_open(Eldbus_Connection **conn)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Closes the D-Bus connection.
+ *
+ * Unreferences the Eldbus_Connection and shuts down Eldbus.
+ *
+ * @param conn The Eldbus_Connection to close.
+ */
 static void
 _logind_dbus_close(Eldbus_Connection *conn)
 {
@@ -285,6 +384,16 @@ _logind_dbus_close(Eldbus_Connection *conn)
    eldbus_shutdown();
 }
 
+/**
+ * @brief Gets the D-Bus object path for the current session.
+ *
+ * Calls the GetSession method on org.freedesktop.login1.Manager
+ * to retrieve the object path for the session specified by em->sid.
+ * The path is stored in em->dbus.path.
+ *
+ * @param em The Elput_Manager instance.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _logind_session_object_path_get(Elput_Manager *em)
 {
@@ -336,6 +445,17 @@ proxy_fail:
    return ret;
 }
 
+/**
+ * @brief Sets up D-Bus proxies and signal handlers for the session.
+ *
+ * After obtaining the session object path, this function gets D-Bus objects
+ * and proxies for org.freedesktop.login1.Manager and
+ * org.freedesktop.login1.Session. It then registers signal handlers for
+ * SessionRemoved, PauseDevice, and ResumeDevice.
+ *
+ * @param em The Elput_Manager instance.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _logind_dbus_setup(Elput_Manager *em)
 {
@@ -386,6 +506,14 @@ obj_err:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Takes control of the logind session.
+ *
+ * Calls the TakeControl method on the session D-Bus object.
+ *
+ * @param em The Elput_Manager instance.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _logind_control_take(Elput_Manager *em)
 {
@@ -414,6 +542,13 @@ _logind_control_take(Elput_Manager *em)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Releases control of the logind session.
+ *
+ * Calls the ReleaseControl method on the session D-Bus object.
+ *
+ * @param em The Elput_Manager instance.
+ */
 static void
 _logind_control_release(Elput_Manager *em)
 {
@@ -429,6 +564,15 @@ _logind_control_release(Elput_Manager *em)
    eldbus_proxy_send(em->dbus.session, msg, NULL, NULL, -1);
 }
 
+/**
+ * @brief Releases a device previously taken via logind.
+ *
+ * Calls the ReleaseDevice method on the session D-Bus object.
+ *
+ * @param em The Elput_Manager instance.
+ * @param major The major number of the device.
+ * @param minor The minor number of the device.
+ */
 static void
 _logind_device_release(Elput_Manager *em, uint32_t major, uint32_t minor)
 {
@@ -446,6 +590,16 @@ _logind_device_release(Elput_Manager *em, uint32_t major, uint32_t minor)
    eldbus_proxy_send(em->dbus.session, msg, NULL, NULL, -1);
 }
 
+/**
+ * @brief Writes a file descriptor to the input pipe.
+ *
+ * This is used to pass the opened device FD from the D-Bus callback thread
+ * (or synchronous call) back to the main thread waiting on the pipe.
+ * Closes the write end of the pipe after writing.
+ *
+ * @param em The Elput_Manager instance.
+ * @param fd The file descriptor to write (or -1 on error).
+ */
 static void
 _logind_pipe_write_fd(Elput_Manager *em, int fd)
 {
@@ -466,6 +620,18 @@ _logind_pipe_write_fd(Elput_Manager *em, int fd)
    em->input.pipe = -1;
 }
 
+/**
+ * @brief Callback for asynchronous TakeDevice D-Bus method call.
+ *
+ * Handles the reply from the TakeDevice method. Extracts the file descriptor,
+ * sets its flags (e.g., O_NONBLOCK), and writes it to the pipe using
+ * _logind_pipe_write_fd. If an error occurs or fd is invalid, -1 is written.
+ * Releases the device via logind if an error occurs after obtaining the fd.
+ *
+ * @param data The Elput_Manager instance.
+ * @param msg The D-Bus reply message.
+ * @param pending The Eldbus_Pending object for this call.
+ */
 static void
 _logind_device_take_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
 {
@@ -517,6 +683,19 @@ err:
    _logind_pipe_write_fd(em, fd);
 }
 
+/**
+ * @brief Asynchronously takes a device via logind.
+ *
+ * Calls the TakeDevice method on the session D-Bus object asynchronously.
+ * The result (file descriptor or error) is handled by _logind_device_take_cb.
+ * Stores major, minor, and flags in the Eldbus_Pending object to be
+ * retrieved in the callback.
+ *
+ * @param em The Elput_Manager instance.
+ * @param flags Flags for opening the device (e.g., O_NONBLOCK).
+ * @param major The major number of the device.
+ * @param minor The minor number of the device.
+ */
 static void
 _logind_device_take_async(Elput_Manager *em, int flags, uint32_t major, uint32_t minor)
 {
@@ -544,6 +723,17 @@ _logind_device_take_async(Elput_Manager *em, int flags, uint32_t major, uint32_t
                            (intptr_t*)(intptr_t)flags);
 }
 
+/**
+ * @brief Synchronously takes a device via logind.
+ *
+ * Calls the TakeDevice method on the session D-Bus object and blocks
+ * until a reply is received.
+ *
+ * @param em The Elput_Manager instance.
+ * @param major The major number of the device.
+ * @param minor The minor number of the device.
+ * @return The opened file descriptor on success, or -1 on error.
+ */
 static int
 _logind_device_take(Elput_Manager *em, uint32_t major, uint32_t minor)
 {
@@ -576,6 +766,15 @@ _logind_device_take(Elput_Manager *em, uint32_t major, uint32_t minor)
    return fd;
 }
 
+/**
+ * @brief Activates the logind session.
+ *
+ * Calls the Activate method on the session D-Bus object. This is typically
+ * done to bring the session to the foreground.
+ *
+ * @param em The Elput_Manager instance.
+ * @return EINA_TRUE on success or if message sending is initiated, EINA_FALSE on error creating message.
+ */
 static Eina_Bool
 _logind_activate(Elput_Manager *em)
 {
@@ -592,6 +791,24 @@ _logind_activate(Elput_Manager *em)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Connects to logind and sets up an Elput_Manager.
+ *
+ * This is the main entry point for establishing a logind-managed input session.
+ * It performs several steps:
+ * 1. Initializes libsystemd/libelogind symbols.
+ * 2. Gets the current process's session ID and seat.
+ * 3. Validates the provided seat and TTY against the session's values.
+ * 4. Opens a D-Bus connection.
+ * 5. Sets up D-Bus proxies and signal handlers for the session.
+ * 6. Takes control of the session.
+ * 7. Activates the session.
+ *
+ * @param[out] manager Pointer to store the created Elput_Manager instance.
+ * @param seat The requested seat ID (e.g., "seat0"). Can be NULL.
+ * @param tty The requested TTY number. If 0, it's not checked against session TTY.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _logind_connect(Elput_Manager **manager, const char *seat, unsigned int tty)
 {
@@ -694,6 +911,15 @@ session_err:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Disconnects from logind and cleans up resources.
+ *
+ * Releases control of the session, unrefs D-Bus objects and proxies,
+ * closes the D-Bus connection, and frees the Elput_Manager instance
+ * and associated data (seat, session ID, XKB context/keymap).
+ *
+ * @param em The Elput_Manager instance to disconnect and free.
+ */
 static void
 _logind_disconnect(Elput_Manager *em)
 {
@@ -710,6 +936,20 @@ _logind_disconnect(Elput_Manager *em)
    free(em);
 }
 
+/**
+ * @brief Asynchronously opens a device file via logind.
+ *
+ * Stats the given path to get its device major/minor numbers.
+ * If it's a character device, calls _logind_device_take_async.
+ * Otherwise, writes -1 to the pipe to indicate failure.
+ * This function is part of the Elput_Interface and is called when elput
+ * needs to open a device in a non-blocking way. The actual fd is passed
+ * back via a pipe.
+ *
+ * @param em The Elput_Manager instance.
+ * @param path The path to the device file (e.g., "/dev/input/event0").
+ * @param flags Flags for opening the device (e.g., O_RDONLY | O_NONBLOCK).
+ */
 static void
 _logind_open_async(Elput_Manager *em, const char *path, int flags)
 {
@@ -722,6 +962,19 @@ _logind_open_async(Elput_Manager *em, const char *path, int flags)
      _logind_device_take_async(em, flags, MAJOR(st.st_rdev), MINOR(st.st_rdev));
 }
 
+/**
+ * @brief Synchronously opens a device file via logind.
+ *
+ * Stats the given path to get its device major/minor numbers.
+ * If it's a character device, calls _logind_device_take to get an fd.
+ * Sets O_NONBLOCK if requested in flags. Increments drm_opens if it's a DRM device.
+ * This function is part of the Elput_Interface.
+ *
+ * @param em The Elput_Manager instance.
+ * @param path The path to the device file (e.g., "/dev/input/event0").
+ * @param flags Flags for opening the device (e.g., O_RDONLY | O_NONBLOCK).
+ * @return The opened file descriptor on success, or -1 on error.
+ */
 static int
 _logind_open(Elput_Manager *em, const char *path, int flags)
 {
@@ -757,6 +1010,16 @@ err:
    return -1;
 }
 
+/**
+ * @brief Closes a device file previously opened via logind.
+ *
+ * Closes the file descriptor and then calls _logind_device_release
+ * to inform logind that the device is no longer in use.
+ * This function is part of the Elput_Interface.
+ *
+ * @param em The Elput_Manager instance.
+ * @param fd The file descriptor to close.
+ */
 static void
 _logind_close(Elput_Manager *em, int fd)
 {
@@ -772,6 +1035,18 @@ _logind_close(Elput_Manager *em, int fd)
    _logind_device_release(em, MAJOR(st.st_rdev), MINOR(st.st_rdev));
 }
 
+/**
+ * @brief Switches to a different virtual terminal (VT).
+ *
+ * Calls the SwitchTo method on org.freedesktop.login1.Seat D-Bus interface
+ * for the "self" seat (usually the current seat).
+ * This function is part of the Elput_Interface.
+ *
+ * @param em The Elput_Manager instance.
+ * @param vt The VT number to switch to.
+ * @return EINA_TRUE if the D-Bus message was successfully created and sent (or queued),
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _logind_vt_set(Elput_Manager *em, int vt)
 {
@@ -794,6 +1069,12 @@ _logind_vt_set(Elput_Manager *em, int vt)
    return EINA_TRUE;
 }
 
+/**
+ * @brief The Elput_Interface implementation for logind.
+ *
+ * This structure provides the function pointers that elput core uses
+ * to interact with the session management system (logind in this case).
+ */
 Elput_Interface _logind_interface =
 {
    _logind_connect,

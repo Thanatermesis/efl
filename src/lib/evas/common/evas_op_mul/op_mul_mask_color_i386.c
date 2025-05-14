@@ -1,6 +1,20 @@
 /* mul mask x color -> dst */
 
 #ifdef BUILD_MMX
+/**
+ * @brief Multiplies a mask by a color and blends the result with the destination. (MMX optimized)
+ *
+ * This function processes a span of pixels. For each pixel, it takes a mask value,
+ * multiplies it by a given color, and then blends this result with the
+ * corresponding destination pixel.
+ *
+ * @param s Pointer to the source data (unused in this function).
+ * @param m Pointer to the mask data (array of DATA8). Each element represents the alpha/mask value for a pixel.
+ * @param c The color (DATA32) to multiply the mask with.
+ * @param d Pointer to the destination data (array of DATA32). Results are written here.
+ *          Each DATA32 is an ARGB pixel, e.g., 0xAARRGGBB.
+ * @param l The number of pixels to process (length of the span).
+ */
 static void
 _op_mul_mas_c_dp_mmx(DATA32 *s EINA_UNUSED, DATA8 *m, DATA32 c, DATA32 *d, int l) {
    DATA32 *e = d + l;
@@ -42,6 +56,15 @@ _op_mul_mas_c_dp_mmx(DATA32 *s EINA_UNUSED, DATA8 *m, DATA32 c, DATA32 *d, int l
 #define _op_mul_mas_can_dpan_mmx _op_mul_mas_can_dp_mmx
 #define _op_mul_mas_caa_dpan_mmx _op_mul_mas_caa_dp_mmx
 
+/**
+ * @brief Initializes the MMX-specific function pointers for mask multiplication span operations.
+ *
+ * This function assigns the MMX-optimized version of the mask multiplication
+ * span operation to the appropriate entries in the global function pointer table
+ * `op_mul_span_funcs`. This allows the rendering engine to dynamically select
+ * the MMX version when available and appropriate for the current operation
+ * parameters (source, mask, color, destination properties).
+ */
 static void
 init_mul_mask_color_span_funcs_mmx(void)
 {
@@ -56,6 +79,19 @@ init_mul_mask_color_span_funcs_mmx(void)
 #endif
 
 #ifdef BUILD_MMX
+/**
+ * @brief Multiplies a mask by a color for a single point and blends with the destination. (MMX optimized)
+ *
+ * This function processes a single pixel. It takes a mask value,
+ * multiplies it by a given color, and then blends this result with the
+ * destination pixel.
+ *
+ * @param s Source data (unused, but value is modified based on mask `m`).
+ * @param m The mask value (DATA8) for the pixel.
+ * @param c The color (DATA32) to multiply the mask with.
+ * @param d Pointer to the destination pixel (DATA32). Result is written here.
+ *          A DATA32 is an ARGB pixel, e.g., 0xAARRGGBB.
+ */
 static void
 _op_mul_pt_mas_c_dp_mmx(DATA32 s, DATA8 m, DATA32 c, DATA32 *d) {
 	s = m + 1;
@@ -78,6 +114,15 @@ _op_mul_pt_mas_c_dp_mmx(DATA32 s, DATA8 m, DATA32 c, DATA32 *d) {
 #define _op_mul_pt_mas_can_dpan_mmx _op_mul_pt_mas_can_dp_mmx
 #define _op_mul_pt_mas_caa_dpan_mmx _op_mul_pt_mas_caa_dp_mmx
 
+/**
+ * @brief Initializes the MMX-specific function pointers for mask multiplication point operations.
+ *
+ * This function assigns the MMX-optimized version of the mask multiplication
+ * point operation to the appropriate entries in the global function pointer table
+ * `op_mul_pt_funcs`. This allows the rendering engine to dynamically select
+ * the MMX version when available and appropriate for the current operation
+ * parameters.
+ */
 static void
 init_mul_mask_color_pt_funcs_mmx(void)
 {

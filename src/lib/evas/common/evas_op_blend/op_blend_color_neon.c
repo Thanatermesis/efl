@@ -1,9 +1,35 @@
 #ifdef BUILD_NEON
 #include <arm_neon.h>
 #endif
+
+/**
+ * @file op_blend_color_neon.c
+ * @brief NEON optimized color blending operations.
+ *
+ * This file contains implementations of color blending operations
+ * accelerated using NEON intrinsics or inline assembly for ARM processors.
+ * These operations typically blend a source color with a destination buffer.
+ */
+
 /* blend color --> dst */
 
 #ifdef BUILD_NEON
+/**
+ * @brief Blends a solid color onto a destination buffer using NEON.
+ *
+ * This function takes a solid color `c` and blends it over `l` pixels
+ * in the destination buffer `d`. The source pixel `s` and mask `m` are unused
+ * in this specific operation.
+ * The blending formula used is: `*d = c + MUL_256(256 - (c >> 24), *d)`
+ * which simplifies to `*d = c + ((256 - alpha_c) * *d) / 256`.
+ *
+ * @param s Unused source pixel data.
+ * @param m Unused mask data.
+ * @param c The solid color to blend (in 0xAARRGGBB format).
+ * @param d Pointer to the destination buffer (array of DATA32 pixels).
+ *          Each DATA32 pixel is in 0xAARRGGBB format.
+ * @param l The number of pixels to process.
+ */
 static void
 _op_blend_c_dp_neon(DATA32 *s EINA_UNUSED, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, int l) {
 #ifdef BUILD_NEON_INTRINSICS
@@ -236,6 +262,13 @@ _op_blend_c_dp_neon(DATA32 *s EINA_UNUSED, DATA8 *m EINA_UNUSED, DATA32 c, DATA3
 #define _op_blend_c_dpan_neon _op_blend_c_dp_neon
 #define _op_blend_caa_dpan_neon _op_blend_c_dpan_neon
 
+/**
+ * @brief Initializes function pointers for NEON-optimized span blending operations.
+ *
+ * This function assigns the NEON-accelerated blend functions to the
+ * global function pointer table `op_blend_span_funcs`. It covers various
+ * combinations of source, mask, and destination properties.
+ */
 static void
 init_blend_color_span_funcs_neon(void)
 {
@@ -248,9 +281,23 @@ init_blend_color_span_funcs_neon(void)
 #endif
 
 #ifdef BUILD_NEON
+/**
+ * @brief Blends a solid color onto a single destination pixel using NEON (conceptual).
+ *
+ * This function blends a solid color `c` onto a single pixel pointed to by `d`.
+ * The source pixel `s` and mask `m` are unused.
+ * The blending formula is: `*d = c + MUL_256(256 - (c >> 24), *d)`.
+ * Note: While defined under BUILD_NEON, this specific implementation does not
+ * use NEON intrinsics directly but follows the logic for point operations.
+ *
+ * @param s Unused source pixel data.
+ * @param m Unused mask data.
+ * @param c The solid color to blend (in 0xAARRGGBB format).
+ * @param d Pointer to the single destination pixel (DATA32 pixel in 0xAARRGGBB format).
+ */
 static void
 _op_blend_pt_c_dp_neon(DATA32 s EINA_UNUSED, DATA8 m EINA_UNUSED, DATA32 c, DATA32 *d) {
-   s = 256 - (c >> 24);
+   s = 256 - (c >> 24); // s here is effectively the inverse alpha of color c
    *d = c + MUL_256(s, *d);
 }
 
@@ -259,6 +306,12 @@ _op_blend_pt_c_dp_neon(DATA32 s EINA_UNUSED, DATA8 m EINA_UNUSED, DATA32 c, DATA
 #define _op_blend_pt_c_dpan_neon _op_blend_pt_c_dp_neon
 #define _op_blend_pt_caa_dpan_neon _op_blend_pt_c_dpan_neon
 
+/**
+ * @brief Initializes function pointers for NEON-optimized point blending operations.
+ *
+ * This function assigns the NEON-accelerated (or conceptually NEON-related)
+ * point blend functions to the global function pointer table `op_blend_pt_funcs`.
+ */
 static void
 init_blend_color_pt_funcs_neon(void)
 {
@@ -274,6 +327,22 @@ init_blend_color_pt_funcs_neon(void)
 /* blend_rel color -> dst */
 
 #ifdef BUILD_NEON
+/**
+ * @brief Blends a solid color onto a destination buffer using relative alpha (NEON).
+ *
+ * This function blends a solid color `c` over `l` pixels in the destination
+ * buffer `d`, taking into account the destination alpha.
+ * The source pixel `s` and mask `m` are unused.
+ * The blending formula used is: `*d = MUL_SYM(*d >> 24, c) + MUL_256(256 - (c >> 24), *d)`
+ * which means `*d = (alpha_d * c) / 255 + ((256 - alpha_c) * *d) / 256`.
+ *
+ * @param s Unused source pixel data.
+ * @param m Unused mask data.
+ * @param c The solid color to blend (in 0xAARRGGBB format).
+ * @param d Pointer to the destination buffer (array of DATA32 pixels).
+ *          Each DATA32 pixel is in 0xAARRGGBB format.
+ * @param l The number of pixels to process.
+ */
 static void
 _op_blend_rel_c_dp_neon(DATA32 *s EINA_UNUSED, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, int l) {
    uint16x8_t ad0_16x8;
@@ -372,6 +441,12 @@ _op_blend_rel_c_dp_neon(DATA32 *s EINA_UNUSED, DATA8 *m EINA_UNUSED, DATA32 c, D
 #define _op_blend_rel_c_dpan_neon _op_blend_c_dpan_neon
 #define _op_blend_rel_caa_dpan_neon _op_blend_caa_dpan_neon
 
+/**
+ * @brief Initializes function pointers for NEON-optimized relative alpha span blending.
+ *
+ * This function assigns the NEON-accelerated relative alpha blend functions
+ * to the global function pointer table `op_blend_rel_span_funcs`.
+ */
 static void
 init_blend_rel_color_span_funcs_neon(void)
 {
@@ -384,9 +459,22 @@ init_blend_rel_color_span_funcs_neon(void)
 #endif
 
 #ifdef BUILD_NEON
+/**
+ * @brief Blends a solid color onto a single destination pixel using relative alpha (NEON conceptual).
+ *
+ * This function blends a solid color `c` onto a single pixel `d`,
+ * considering the destination alpha.
+ * The source pixel `s` (parameter) is unused and redefined locally. Mask `m` is unused.
+ * The blending formula is: `*d = MUL_SYM(*d >> 24, c) + MUL_256(256 - (c >> 24), *d)`.
+ *
+ * @param s Unused source pixel data (parameter is shadowed by local variable).
+ * @param m Unused mask data.
+ * @param c The solid color to blend (in 0xAARRGGBB format).
+ * @param d Pointer to the single destination pixel (DATA32 pixel in 0xAARRGGBB format).
+ */
 static void
 _op_blend_rel_pt_c_dp_neon(DATA32 s EINA_UNUSED, DATA8 m EINA_UNUSED, DATA32 c, DATA32 *d) {
-   s = *d >> 24;
+   s = *d >> 24; // s here is the alpha of the destination pixel *d
    *d = MUL_SYM(s, c) + MUL_256(256 - (c >> 24), *d);
 }
 
@@ -395,6 +483,13 @@ _op_blend_rel_pt_c_dp_neon(DATA32 s EINA_UNUSED, DATA8 m EINA_UNUSED, DATA32 c, 
 #define _op_blend_rel_pt_c_dpan_neon _op_blend_pt_c_dpan_neon
 #define _op_blend_rel_pt_caa_dpan_neon _op_blend_pt_caa_dpan_neon
 
+/**
+ * @brief Initializes function pointers for NEON-optimized relative alpha point blending.
+ *
+ * This function assigns the NEON-accelerated (or conceptually NEON-related)
+ * relative alpha point blend functions to the global function pointer table
+ * `op_blend_rel_pt_funcs`.
+ */
 static void
 init_blend_rel_color_pt_funcs_neon(void)
 {

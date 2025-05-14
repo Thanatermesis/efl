@@ -93,10 +93,14 @@ ecore_x_pixmap_paste(Ecore_X_Pixmap pmap,
 }
 
 /**
- * Retrieves the size of the given pixmap.
+ * Retrieves the geometry (position, width, and height) of the given pixmap.
+ * For pixmaps, the X and Y coordinates are typically 0, as they are
+ * off-screen resources and not positioned on the screen like windows.
  * @param   pmap The given pixmap.
- * @param   x    Pointer to an integer in which to store the X position.
- * @param   y    Pointer to an integer in which to store the Y position.
+ * @param   x    Pointer to an integer in which to store the X coordinate.
+ *               For pixmaps, this is usually 0.
+ * @param   y    Pointer to an integer in which to store the Y coordinate.
+ *               For pixmaps, this is usually 0.
  * @param   w    Pointer to an integer in which to store the width.
  * @param   h    Pointer to an integer in which to store the height.
  * @ingroup Ecore_X_Pixmap_Group

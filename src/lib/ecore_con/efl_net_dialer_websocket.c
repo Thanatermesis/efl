@@ -49,15 +49,28 @@
 
 #define MY_CLASS EFL_NET_DIALER_WEBSOCKET_CLASS
 
+/**
+ * @brief Defines the WebSocket frame opcodes.
+ * @see https://tools.ietf.org/html/rfc6455#section-5.2
+ */
 typedef enum _Efl_Net_Dialer_Websocket_Opcode {
-  EFL_NET_DIALER_WEBSOCKET_OPCODE_CONTINUATION = 0x0,
-  EFL_NET_DIALER_WEBSOCKET_OPCODE_TEXT = 0x1,
-  EFL_NET_DIALER_WEBSOCKET_OPCODE_BINARY = 0x2,
+  EFL_NET_DIALER_WEBSOCKET_OPCODE_CONTINUATION = 0x0, /**< Denotes a continuation frame */
+  EFL_NET_DIALER_WEBSOCKET_OPCODE_TEXT = 0x1, /**< Denotes a text frame */
+  EFL_NET_DIALER_WEBSOCKET_OPCODE_BINARY = 0x2, /**< Denotes a binary frame */
   EFL_NET_DIALER_WEBSOCKET_OPCODE_CLOSE = 0x8,
-  EFL_NET_DIALER_WEBSOCKET_OPCODE_PING = 0x9,
-  EFL_NET_DIALER_WEBSOCKET_OPCODE_PONG = 0xa,
+  EFL_NET_DIALER_WEBSOCKET_OPCODE_PING = 0x9, /**< Denotes a ping frame */
+  EFL_NET_DIALER_WEBSOCKET_OPCODE_PONG = 0xa, /**< Denotes a pong frame */
 } Efl_Net_Dialer_Websocket_Opcode;
 
+/**
+ * @internal
+ * @brief Checks if a given opcode is a control frame opcode.
+ *
+ * Control frames (CLOSE, PING, PONG) have opcodes with the most significant bit set.
+ *
+ * @param opcode The opcode to check.
+ * @return @c EINA_TRUE if the opcode is for a control frame, @c EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _efl_net_dialer_websocket_opcode_control_check(Efl_Net_Dialer_Websocket_Opcode opcode)
 {
@@ -72,6 +85,16 @@ _efl_net_dialer_websocket_opcode_control_check(Efl_Net_Dialer_Websocket_Opcode o
      }
 }
 
+/**
+ * @internal
+ * @brief Validates if a given close reason code is acceptable according to RFC6455.
+ *
+ * This function checks if the reason code falls within the defined ranges for
+ * standard, IANA registered, or private use.
+ *
+ * @param r The close reason code to check.
+ * @return @c EINA_TRUE if the close reason is valid, @c EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _efl_net_dialer_websocket_close_reason_check(Efl_Net_Dialer_Websocket_Close_Reason r)
 {
@@ -129,80 +152,135 @@ _efl_net_dialer_websocket_close_reason_check(Efl_Net_Dialer_Websocket_Close_Reas
  *
  * See https://tools.ietf.org/html/rfc6455#section-5.2
  */
+/**
+ * @internal
+ * @brief Represents the header of a WebSocket frame.
+ *
+ * This structure directly maps to the first two bytes of a WebSocket frame,
+ * containing critical information like FIN bit, opcode, MASK bit, and initial
+ * payload length.
+ */
 typedef struct _Efl_Net_Dialer_Websocket_Frame_Header {
     /* first byte: fin + opcode */
-    uint8_t opcode : 4;
-    uint8_t _reserved : 3;
-    uint8_t fin : 1;
+    uint8_t opcode : 4; /**< Opcode of the frame (Efl_Net_Dialer_Websocket_Opcode) */
+    uint8_t _reserved : 3; /**< Reserved bits (RSV1, RSV2, RSV3), must be 0 unless an extension is negotiated */
+    uint8_t fin : 1; /**< FIN bit: 1 if this is the final fragment, 0 otherwise */
 
     /* second byte: mask + payload length */
-    uint8_t payload_len : 7; /* if 126, uses extra 2 bytes (uint16_t)
-                              * if 127, uses extra 8 bytes (uint64_t)
-                              * if <=125 is self-contained
+    uint8_t payload_len : 7; /**< Initial payload length.
+                              * If 126, the next 2 bytes are the extended payload length.
+                              * If 127, the next 8 bytes are the extended payload length.
+                              * If <=125, this is the actual payload length.
                               */
-    uint8_t mask : 1; /* if 1, uses 4 extra bytes */
+    uint8_t mask : 1; /**< MASK bit: 1 if the payload is masked, 0 otherwise. Client-to-server frames must be masked. */
 } Efl_Net_Dialer_Websocket_Frame_Header;
 
+/**
+ * @internal
+ * @brief Represents a WebSocket frame to be sent.
+ *
+ * This structure is used to manage outgoing frames in a queue. It includes
+ * the frame header and the total length of the frame data (header + payload + mask key).
+ * The actual payload data is stored contiguously after this struct in memory.
+ */
 typedef struct _Efl_Net_Dialer_Websocket_Frame {
-   EINA_INLIST;
-   size_t len; /* total frame size to send */
-   Efl_Net_Dialer_Websocket_Frame_Header header;
+   EINA_INLIST; /**< Inlist node for queuing frames */
+   size_t len; /**< Total frame size to send (header + extended_len_bytes + mask_key_bytes + payload_bytes) */
+   Efl_Net_Dialer_Websocket_Frame_Header header; /**< The frame header */
+   /* uint8_t data[] follows, containing extended payload length (if any),
+    * mask key (if any), and then the masked payload data. */
 } Efl_Net_Dialer_Websocket_Frame;
 
+/**
+ * @internal
+ * @brief Represents a chunk of received data that has been processed and is pending delivery to the user.
+ *
+ * This is used when streaming_mode is enabled, allowing the user to read
+ * message data piece by piece via the Efl.Io.Reader interface.
+ */
 typedef struct _Efl_Net_Dialer_Websocket_Pending_Read {
-   EINA_INLIST;
-   size_t len;
-   uint8_t *bytes;
+   EINA_INLIST; /**< Inlist node for queuing pending read buffers */
+   size_t len; /**< Length of the data in bytes */
+   uint8_t *bytes; /**< Pointer to the data buffer */
 } Efl_Net_Dialer_Websocket_Pending_Read;
 
+/**
+ * @internal
+ * @brief Internal data structure for the Efl_Net_Dialer_Websocket object.
+ *
+ * This structure holds all the state information for a WebSocket connection,
+ * including the underlying HTTP dialer, connection state, send/receive buffers,
+ * and protocol-specific details.
+ */
 typedef struct _Efl_Net_Dialer_Websocket_Data {
-   Eo *http;
-   Eina_Future *close_timeout;
-   Eina_Future *job;
-   Eina_Stringshare *address_dial; /* must rewrite ws->http, wss->https */
-   Eina_Stringshare *address_remote; /* must rewrite ws->http, wss->https */
+   Eo *http; /**< The underlying Efl_Net_Dialer_Http object used for the initial handshake and data transfer */
+   Eina_Future *close_timeout; /**< Future for timing out a close handshake if the server doesn't respond */
+   Eina_Future *job; /**< Future for scheduling send/receive processing jobs */
+   Eina_Stringshare *address_dial; /**< The original address provided by the user (e.g., "ws://server:port/path") */
+   Eina_Stringshare *address_remote; /**< The actual remote address after handshake (may differ due to redirects, ws->http rewrite) */
    struct {
-      Eina_List *requested;
-      Eina_List *received;
+      Eina_List *requested; /**< List of Eina_Stringshare: protocols requested by the client (Sec-WebSocket-Protocol) */
+      Eina_List *received; /**< List of Eina_Stringshare: protocols confirmed by the server */
    } protocols;
-   char accept_key[29]; /* 28 + \0 */
-   struct {
-      struct {
-         uint64_t total_len;
-         uint64_t used_len;
-         uint8_t *payload;
-         Efl_Net_Dialer_Websocket_Opcode opcode;
-         Eina_Bool fin;
+   char accept_key[29]; /**< The expected Sec-WebSocket-Accept key from the server (28 chars + NUL) */
+   struct { /* Receive state */
+      struct { /* Current frame being processed */
+         uint64_t total_len; /**< Total payload length of the current frame */
+         uint64_t used_len; /**< Amount of payload data received so far for the current frame */
+         uint8_t *payload; /**< Buffer for the current frame's payload */
+         Efl_Net_Dialer_Websocket_Opcode opcode; /**< Opcode of the current frame */
+         Eina_Bool fin; /**< FIN bit of the current frame */
       } current;
 
-      struct {
-         uint64_t total_len;
-         uint64_t used_len;
-         uint8_t *payload;
-         Efl_Net_Dialer_Websocket_Opcode opcode;
+      struct { /* State for fragmented messages */
+         uint64_t total_len; /**< Total accumulated payload length of the fragmented message so far */
+         uint64_t used_len; /**< Amount of payload data accumulated for the fragmented message */
+         uint8_t *payload; /**< Buffer for the reassembled fragmented message payload */
+         Efl_Net_Dialer_Websocket_Opcode opcode; /**< Opcode of the initial frame of the fragmented message */
       } fragmented;
 
-      Efl_Net_Dialer_Websocket_Pending_Read *pending_read;
-      size_t pending_read_offset;
+      Efl_Net_Dialer_Websocket_Pending_Read *pending_read; /**< Queue of fully received messages/data chunks ready for user via Efl.Io.Reader */
+      size_t pending_read_offset; /**< Offset into the current pending_read buffer being consumed by the user */
 
-      /* for current frame */
-      uint8_t tmpbuf[sizeof(Efl_Net_Dialer_Websocket_Frame_Header) + sizeof(uint64_t)];
-      uint8_t done; /* of tmpbuf, for header */
-      uint8_t needed; /* of tmpbuf, for header */
+      /* for current frame header parsing */
+      uint8_t tmpbuf[sizeof(Efl_Net_Dialer_Websocket_Frame_Header) + sizeof(uint64_t)]; /**< Temporary buffer for reading frame header and extended length */
+      uint8_t done; /**< Number of bytes read into tmpbuf for the current header */
+      uint8_t needed; /**< Total number of bytes needed for the current header (including extended length) */
    } recv;
-   struct {
-      Efl_Net_Dialer_Websocket_Frame *pending;
-      size_t offset;
+   struct { /* Send state */
+      Efl_Net_Dialer_Websocket_Frame *pending; /**< Queue (inlist) of frames waiting to be sent */
+      size_t offset; /**< Offset into the current pending frame being sent */
    } send;
-   Efl_Net_Dialer_Websocket_Streaming_Mode streaming_mode;
-   Eina_Bool connected;
-   Eina_Bool close_requested;
-   Eina_Bool can_read;
-   Eina_Bool can_write;
+   Efl_Net_Dialer_Websocket_Streaming_Mode streaming_mode; /**< Current streaming mode for received messages */
+   Eina_Bool connected; /**< EINA_TRUE if the WebSocket handshake was successful and connection is established */
+   Eina_Bool close_requested; /**< EINA_TRUE if a close has been initiated (either locally or by peer) */
+   Eina_Bool can_read; /**< EINA_TRUE if there is data available to be read by the user (via Efl.Io.Reader) */
+   Eina_Bool can_write; /**< EINA_TRUE if the dialer is ready to accept data for sending (via Efl.Io.Writer) */
 } Efl_Net_Dialer_Websocket_Data;
 
+/**
+ * @internal
+ * @brief Schedules a job to process WebSocket send/receive operations.
+ *
+ * This function ensures that WebSocket operations (like reading from the
+ * underlying socket, parsing frames, and writing pending frames) are
+ * performed in the main loop context. It avoids re-scheduling if a job
+ * is already pending.
+ *
+ * @param o The Efl_Net_Dialer_Websocket object.
+ * @param pd The private data of the WebSocket dialer.
+ */
 static void _efl_net_dialer_websocket_job_schedule(Eo *o, Efl_Net_Dialer_Websocket_Data *pd);
 
+/**
+ * @internal
+ * @brief Removes the current head of the pending send queue and frees its resources.
+ *
+ * This is called after a frame has been completely sent. It updates the
+ * send queue to point to the next frame, if any.
+ *
+ * @param pd The private data of the WebSocket dialer.
+ */
 static void
 _efl_net_dialer_websocket_send_pending_remove(Efl_Net_Dialer_Websocket_Data *pd)
 {
@@ -216,32 +294,79 @@ _efl_net_dialer_websocket_send_pending_remove(Efl_Net_Dialer_Websocket_Data *pd)
    pd->send.offset = 0;
 }
 
+/**
+ * @internal
+ * @brief Gets a pointer to the beginning of the frame data (header).
+ *
+ * The frame data (header, extended length, mask, payload) is stored
+ * contiguously in memory allocated with the Efl_Net_Dialer_Websocket_Frame struct.
+ * This function returns a pointer to the start of this data, which is equivalent
+ * to a pointer to the `header` field.
+ *
+ * @param f The WebSocket frame.
+ * @return Pointer to the raw bytes of the frame header.
+ */
 static uint8_t *
 _efl_net_dialer_websocket_frame_bytes_get(Efl_Net_Dialer_Websocket_Frame *f)
 {
    return (uint8_t *)&f->header;
 }
 
+/**
+ * @internal
+ * @brief Gets a pointer to the masking key within a WebSocket frame.
+ *
+ * The masking key is located after the header and any extended payload length fields.
+ * This function calculates its position based on the payload_len field in the header.
+ *
+ * @param f The WebSocket frame.
+ * @return Pointer to the 4-byte masking key.
+ */
 static uint8_t *
 _efl_net_dialer_websocket_frame_mask_get(Efl_Net_Dialer_Websocket_Frame *f)
 {
    uint8_t *bytes = _efl_net_dialer_websocket_frame_bytes_get(f)
      + sizeof(Efl_Net_Dialer_Websocket_Frame_Header);
 
-   if (f->header.payload_len == 127)
+   if (f->header.payload_len == 127) /* 8 bytes extended payload length */
      return bytes + sizeof(uint64_t);
-   else if (f->header.payload_len == 126)
+   else if (f->header.payload_len == 126) /* 2 bytes extended payload length */
      return bytes + sizeof(uint16_t);
-   else
+   else /* No extended payload length */
      return bytes;
 }
 
+/**
+ * @internal
+ * @brief Gets a pointer to the payload data within a WebSocket frame.
+ *
+ * The payload data is located immediately after the 4-byte masking key.
+ *
+ * @param f The WebSocket frame.
+ * @return Pointer to the start of the payload data area.
+ */
 static uint8_t *
 _efl_net_dialer_websocket_frame_payload_get(Efl_Net_Dialer_Websocket_Frame *f)
 {
-   return _efl_net_dialer_websocket_frame_mask_get(f) + 4;
+   return _efl_net_dialer_websocket_frame_mask_get(f) + 4; /* Masking key is 4 bytes */
 }
 
+/**
+ * @internal
+ * @brief Creates and adds a new WebSocket frame to the send queue.
+ *
+ * This function allocates memory for the frame structure and its associated data
+ * (header, extended length, mask key, payload). It initializes the frame header,
+ * generates a random mask key, and appends the frame to the pending send queue.
+ * It also triggers a job schedule if the underlying HTTP connection can write.
+ *
+ * @param o The Efl_Net_Dialer_Websocket object.
+ * @param pd The private data of the WebSocket dialer.
+ * @param opcode The opcode for the new frame.
+ * @param payload_len The length of the payload data for this frame.
+ * @return A pointer to the newly created frame, or @c NULL on failure.
+ *         The payload data itself is not yet copied into the frame by this function.
+ */
 static Efl_Net_Dialer_Websocket_Frame *
 _efl_net_dialer_websocket_send_pending_add(Eo *o, Efl_Net_Dialer_Websocket_Data *pd, Efl_Net_Dialer_Websocket_Opcode opcode, size_t payload_len)
 {
@@ -304,6 +429,19 @@ _efl_net_dialer_websocket_send_pending_add(Eo *o, Efl_Net_Dialer_Websocket_Data 
    return f;
 }
 
+/**
+ * @internal
+ * @brief Writes (and masks) data into the payload section of a WebSocket frame.
+ *
+ * This function copies the provided data into the frame's payload area,
+ * starting at the given offset. Each byte of the input data is XORed with
+ * a byte from the frame's masking key before being written.
+ *
+ * @param f The WebSocket frame to write into.
+ * @param offset The starting offset within the frame's payload section.
+ * @param mem Pointer to the data to write.
+ * @param len Length of the data to write.
+ */
 static void
 _efl_net_dialer_websocket_frame_write(Efl_Net_Dialer_Websocket_Frame *f, size_t offset, const void *mem, size_t len)
 {
@@ -316,6 +454,21 @@ _efl_net_dialer_websocket_frame_write(Efl_Net_Dialer_Websocket_Frame *f, size_t 
      *o = *input ^ mask[(o - payload) & 0x3];
 }
 
+/**
+ * @internal
+ * @brief Creates a complete WebSocket frame with the given payload and adds it to the send queue.
+ *
+ * This is a convenience function that combines
+ * _efl_net_dialer_websocket_send_pending_add() and
+ * _efl_net_dialer_websocket_frame_write() to prepare and queue a
+ * message for sending.
+ *
+ * @param o The Efl_Net_Dialer_Websocket object.
+ * @param pd The private data of the WebSocket dialer.
+ * @param opcode The opcode for the frame (e.g., TEXT, BINARY, PING).
+ * @param mem Pointer to the payload data.
+ * @param len Length of the payload data.
+ */
 static void
 _efl_net_dialer_websocket_send(Eo *o, Efl_Net_Dialer_Websocket_Data *pd, Efl_Net_Dialer_Websocket_Opcode opcode, const void *mem, size_t len)
 {
@@ -327,6 +480,18 @@ _efl_net_dialer_websocket_send(Eo *o, Efl_Net_Dialer_Websocket_Data *pd, Efl_Net
    _efl_net_dialer_websocket_frame_write(f, 0, mem, len);
 }
 
+/**
+ * @internal
+ * @brief Attempts to send data from the current pending frame over the underlying HTTP connection.
+ *
+ * This function is called by the WebSocket job scheduler. It tries to write
+ * the remaining part of the current frame in the send queue. If the frame is
+ * completely sent, it's removed from the queue. If an error occurs (other than EAGAIN),
+ * an error event is emitted.
+ *
+ * @param o The Efl_Net_Dialer_Websocket object.
+ * @param pd The private data of the WebSocket dialer.
+ */
 static void
 _efl_net_dialer_websocket_job_send(Eo *o, Efl_Net_Dialer_Websocket_Data *pd)
 {
@@ -352,6 +517,21 @@ _efl_net_dialer_websocket_job_send(Eo *o, Efl_Net_Dialer_Websocket_Data *pd)
      }
 }
 
+/**
+ * @internal
+ * @brief Takes ownership of a received payload buffer and queues it for reading by the user.
+ *
+ * This function is used when streaming mode is active. It allocates a
+ * Efl_Net_Dialer_Websocket_Pending_Read structure, assigns the payload buffer to it,
+ * and adds it to the `pd->recv.pending_read` queue. The original payload pointer
+ * `*p_payload` is set to NULL to indicate that ownership has been transferred.
+ * It also sets the `can_read` flag to notify the user that data is available.
+ *
+ * @param o The Efl_Net_Dialer_Websocket object.
+ * @param pd The private data of the WebSocket dialer.
+ * @param p_payload Pointer to the payload buffer. On success, this will be set to NULL.
+ * @param len Length of the payload data.
+ */
 static void
 _efl_net_dialer_websocket_recv_frame_steal_and_queue(Eo *o, Efl_Net_Dialer_Websocket_Data *pd, uint8_t **p_payload, size_t len)
 {
@@ -386,6 +566,20 @@ _efl_net_dialer_websocket_recv_frame_steal_and_queue(Eo *o, Efl_Net_Dialer_Webso
     } \
   while (0)
 
+/**
+ * @internal
+ * @brief Validates a received WebSocket frame before dispatching it.
+ *
+ * Checks for several protocol violations:
+ * - Receiving non-CLOSE frames after a close has been requested.
+ * - Receiving fragmented control frames.
+ * - Receiving a continuation frame when no message is being fragmented.
+ * If a violation is detected, it logs a warning and initiates a protocol error close.
+ *
+ * @param o The Efl_Net_Dialer_Websocket object.
+ * @param pd The private data of the WebSocket dialer.
+ * @return @c EINA_TRUE if the frame is valid for dispatch, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _efl_net_dialer_websocket_job_dispatch_frame_validate(Eo *o, Efl_Net_Dialer_Websocket_Data *pd)
 {
@@ -409,6 +603,19 @@ _efl_net_dialer_websocket_job_dispatch_frame_validate(Eo *o, Efl_Net_Dialer_Webs
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Dispatches a received text frame.
+ *
+ * Emits the EFL_NET_DIALER_WEBSOCKET_EVENT_MESSAGE_TEXT event.
+ * If text streaming mode is enabled, the payload buffer is queued for user consumption
+ * via the Efl.Io.Reader interface. Otherwise, the buffer is implicitly freed after the event.
+ *
+ * @param o The Efl_Net_Dialer_Websocket object.
+ * @param pd The private data of the WebSocket dialer.
+ * @param p_payload Pointer to the payload buffer (UTF-8 text).
+ * @param len Length of the text payload.
+ */
 static void
 _efl_net_dialer_websocket_job_dispatch_frame_text(Eo *o, Efl_Net_Dialer_Websocket_Data *pd, uint8_t **p_payload, size_t len)
 {
@@ -422,6 +629,19 @@ _efl_net_dialer_websocket_job_dispatch_frame_text(Eo *o, Efl_Net_Dialer_Websocke
      _efl_net_dialer_websocket_recv_frame_steal_and_queue(o, pd, p_payload, len);
 }
 
+/**
+ * @internal
+ * @brief Dispatches a received binary frame.
+ *
+ * Emits the EFL_NET_DIALER_WEBSOCKET_EVENT_MESSAGE_BINARY event with an Eina_Slice.
+ * If binary streaming mode is enabled, the payload buffer is queued for user consumption
+ * via the Efl.Io.Reader interface. Otherwise, the buffer is implicitly freed after the event.
+ *
+ * @param o The Efl_Net_Dialer_Websocket object.
+ * @param pd The private data of the WebSocket dialer.
+ * @param p_payload Pointer to the payload buffer (binary data).
+ * @param len Length of the binary payload.
+ */
 static void
 _efl_net_dialer_websocket_job_dispatch_frame_binary(Eo *o, Efl_Net_Dialer_Websocket_Data *pd, uint8_t **p_payload, size_t len)
 {
@@ -434,6 +654,23 @@ _efl_net_dialer_websocket_job_dispatch_frame_binary(Eo *o, Efl_Net_Dialer_Websoc
      _efl_net_dialer_websocket_recv_frame_steal_and_queue(o, pd, p_payload, len);
 }
 
+/**
+ * @internal
+ * @brief Dispatches a fully received WebSocket frame based on its opcode.
+ *
+ * This function is called once a complete frame (header and payload) has been
+ * received and parsed. It handles different opcodes:
+ * - CONTINUATION: Appends data to a fragmented message. If FIN is set, dispatches the completed message.
+ * - TEXT: Dispatches a text message. If FIN is not set, starts a fragmented message.
+ * - BINARY: Dispatches a binary message. If FIN is not set, starts a fragmented message.
+ * - CLOSE: Parses close reason and message, emits events, and handles close handshake.
+ * - PING: Sends a PONG frame back with the PING payload.
+ * - PONG: Emits a PONG event.
+ * - Other opcodes: Considered a protocol error.
+ *
+ * @param o The Efl_Net_Dialer_Websocket object.
+ * @param pd The private data of the WebSocket dialer.
+ */
 static void
 _efl_net_dialer_websocket_job_dispatch_frame(Eo *o, Efl_Net_Dialer_Websocket_Data *pd)
 {
@@ -565,6 +802,27 @@ _efl_net_dialer_websocket_job_dispatch_frame(Eo *o, Efl_Net_Dialer_Websocket_Dat
      }
 }
 
+/**
+ * @internal
+ * @brief Processes incoming data from the underlying HTTP connection to parse WebSocket frames.
+ *
+ * This function reads data from `pd->http` in two stages:
+ * 1. Reads and parses the WebSocket frame header (first 2 bytes, plus extended
+ *    length if indicated). It validates header bits (reserved, mask) and
+ *    determines the total payload length.
+ * 2. Reads the payload data according to the length determined in stage 1.
+ *
+ * Once a full frame (header + payload) is received, it calls
+ * `_efl_net_dialer_websocket_job_dispatch_frame()` to handle it.
+ * This function handles fragmented messages by accumulating payload data
+ * across multiple continuation frames.
+ * If any read error occurs or protocol violations are detected (e.g., server
+ * masking frames, invalid frame sizes for control messages), it may trigger
+ * a connection close or error events.
+ *
+ * @param o The Efl_Net_Dialer_Websocket object.
+ * @param pd The private data of the WebSocket dialer.
+ */
 static void
 _efl_net_dialer_websocket_job_receive(Eo *o, Efl_Net_Dialer_Websocket_Data *pd)
 {
@@ -732,6 +990,22 @@ _efl_net_dialer_websocket_job_receive(Eo *o, Efl_Net_Dialer_Websocket_Data *pd)
    efl_unref(o);
 }
 
+/**
+ * @internal
+ * @brief Main processing job for WebSocket communication.
+ *
+ * This function is scheduled on the Ecore loop. It performs the following actions:
+ * 1. If the underlying HTTP connection `can_read`, it calls `_efl_net_dialer_websocket_job_receive()`
+ *    to process incoming data and parse frames.
+ * 2. If the underlying HTTP connection `can_write` and there are pending frames to send,
+ *    it calls `_efl_net_dialer_websocket_job_send()` to write data.
+ * 3. If there's still readable data on the HTTP connection after processing, it re-schedules itself.
+ *
+ * @param o The Efl_Net_Dialer_Websocket object.
+ * @param data Not used.
+ * @param v The Eina_Value passed by the future system, not used here.
+ * @return The input Eina_Value `v`.
+ */
 static Eina_Value
 _efl_net_dialer_websocket_job(Eo *o, void *data EINA_UNUSED, const Eina_Value v)
 {
@@ -767,6 +1041,16 @@ _efl_net_dialer_websocket_job_schedule(Eo *o, Efl_Net_Dialer_Websocket_Data *pd)
                    .storage = &pd->job);
 }
 
+/**
+ * @internal
+ * @brief Callback for EFL_IO_READER_EVENT_CAN_READ_CHANGED on the underlying HTTP dialer.
+ *
+ * If the HTTP dialer becomes readable, this function schedules the WebSocket
+ * processing job to handle incoming data.
+ *
+ * @param data The Efl_Net_Dialer_Websocket object (passed as user data).
+ * @param event The event information (not used).
+ */
 static void
 _efl_net_dialer_websocket_http_can_read_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -776,6 +1060,16 @@ _efl_net_dialer_websocket_http_can_read_changed(void *data, const Efl_Event *eve
      _efl_net_dialer_websocket_job_schedule(o, pd);
 }
 
+/**
+ * @internal
+ * @brief Callback for EFL_IO_WRITER_EVENT_CAN_WRITE_CHANGED on the underlying HTTP dialer.
+ *
+ * If the HTTP dialer becomes writable, this function schedules the WebSocket
+ * processing job to send any pending outgoing frames.
+ *
+ * @param data The Efl_Net_Dialer_Websocket object (passed as user data).
+ * @param event The event information (not used).
+ */
 static void
 _efl_net_dialer_websocket_http_can_write_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -785,6 +1079,17 @@ _efl_net_dialer_websocket_http_can_write_changed(void *data, const Efl_Event *ev
      _efl_net_dialer_websocket_job_schedule(o, pd);
 }
 
+/**
+ * @internal
+ * @brief Callback for EFL_IO_CLOSER_EVENT_CLOSED on the underlying HTTP dialer.
+ *
+ * This indicates that the underlying TCP connection has been closed.
+ * If a WebSocket close handshake wasn't already in progress, it signifies an
+ * abrupt closure. It emits appropriate WebSocket close/EOS events.
+ *
+ * @param data The Efl_Net_Dialer_Websocket object (passed as user data).
+ * @param event The event information (not used).
+ */
 static void
 _efl_net_dialer_websocket_http_closed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -807,6 +1112,17 @@ _efl_net_dialer_websocket_http_closed(void *data, const Efl_Event *event EINA_UN
    efl_unref(o);
 }
 
+/**
+ * @internal
+ * @brief Callback for EFL_NET_DIALER_EVENT_DIALER_ERROR on the underlying HTTP dialer.
+ *
+ * Propagates the error from the HTTP dialer as a WebSocket dialer error,
+ * unless it's a receive error that occurred after a close was already requested
+ * (which can be normal). It also ensures the WebSocket dialer itself is closed.
+ *
+ * @param data The Efl_Net_Dialer_Websocket object (passed as user data).
+ * @param event The event information, containing the Eina_Error code.
+ */
 static void
 _efl_net_dialer_websocket_http_error(void *data, const Efl_Event *event)
 {
@@ -821,6 +1137,22 @@ _efl_net_dialer_websocket_http_error(void *data, const Efl_Event *event)
    efl_unref(o);
 }
 
+/**
+ * @internal
+ * @brief Callback for EFL_NET_DIALER_HTTP_EVENT_HEADERS_DONE on the underlying HTTP dialer.
+ *
+ * This is called after the HTTP server's response headers for the WebSocket
+ * handshake have been received. It validates the handshake:
+ * - Checks for HTTP status 101 (Switching Protocols).
+ * - Verifies "Upgrade: websocket" and "Connection: Upgrade" headers.
+ * - Validates the Sec-WebSocket-Accept key against the expected value.
+ * - Parses Sec-WebSocket-Protocol if present.
+ * If validation succeeds, the WebSocket is marked as connected. Otherwise,
+ * an error is emitted and the connection is closed.
+ *
+ * @param data The Efl_Net_Dialer_Websocket object (passed as user data).
+ * @param event The event information (not used).
+ */
 static void
 _efl_net_dialer_websocket_http_headers_done(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -986,6 +1318,17 @@ _efl_net_dialer_websocket_efl_object_destructor(Eo *o, Efl_Net_Dialer_Websocket_
      _efl_net_dialer_websocket_send_pending_remove(pd);
 }
 
+/**
+ * @internal
+ * @brief Adds the Sec-WebSocket-Protocol header to the HTTP handshake request.
+ *
+ * If the user has specified any subprotocols via
+ * `efl_net_dialer_websocket_request_protocol_add()`, this function
+ * constructs a comma-separated string of these protocols and adds it
+ * as the "Sec-WebSocket-Protocol" header to the outgoing HTTP request.
+ *
+ * @param pd The private data of the WebSocket dialer.
+ */
 static void
 _efl_net_dialer_websocket_protocols_add(Efl_Net_Dialer_Websocket_Data *pd)
 {
@@ -1020,6 +1363,20 @@ _efl_net_dialer_websocket_protocols_add(Efl_Net_Dialer_Websocket_Data *pd)
    free(protocols);
 }
 
+/**
+ * @internal
+ * @brief Generates and adds the Sec-WebSocket-Key header to the HTTP handshake request.
+ *
+ * This function performs the following steps:
+ * 1. Generates a 16-byte random key.
+ * 2. Base64 encodes this random key. This is the value for the "Sec-WebSocket-Key" header.
+ * 3. Appends the WebSocket GUID ("258EAFA5-E914-47DA-95CA-C5AB0DC85B11") to the base64 encoded key.
+ * 4. Calculates the SHA-1 hash of the concatenated string.
+ * 5. Base64 encodes the SHA-1 hash. This result is stored in `pd->accept_key`
+ *    and is the expected value for the "Sec-WebSocket-Accept" header from the server.
+ *
+ * @param pd The private data of the WebSocket dialer.
+ */
 static void
 _efl_net_dialer_websocket_key_add(Efl_Net_Dialer_Websocket_Data *pd)
 {
@@ -1084,6 +1441,20 @@ _efl_net_dialer_websocket_key_add(Efl_Net_Dialer_Websocket_Data *pd)
     eina_strbuf_free(strbuf_key_base64);
 }
 
+/**
+ * @internal
+ * @brief Adds standard WebSocket-specific headers to the HTTP handshake request.
+ *
+ * This includes:
+ * - "Upgrade: websocket"
+ * - "Connection: Upgrade"
+ * - "Expect: 101" (Note: "101" is not a standard value for Expect, usually "100-continue". This might be specific.)
+ * - "Transfer-Encoding: " (Clears any existing Transfer-Encoding from the HTTP dialer)
+ * - "Sec-WebSocket-Version: 13"
+ * It also calls helper functions to add "Sec-WebSocket-Protocol" and "Sec-WebSocket-Key".
+ *
+ * @param pd The private data of the WebSocket dialer.
+ */
 static void
 _efl_net_dialer_websocket_request_headers_websocket_add(Efl_Net_Dialer_Websocket_Data *pd)
 {
@@ -1232,6 +1603,17 @@ _efl_net_dialer_websocket_efl_net_socket_address_remote_get(const Eo *o EINA_UNU
    return pd->address_remote;
 }
 
+/**
+ * @internal
+ * @brief Removes the head of the `pending_read` queue and frees its resources.
+ *
+ * This is typically called after the user has consumed all data from the
+ * current Efl_Net_Dialer_Websocket_Pending_Read buffer via the Efl.Io.Reader interface.
+ * It updates the `can_read` status accordingly.
+ *
+ * @param o The Efl_Net_Dialer_Websocket object.
+ * @param pd The private data of the WebSocket dialer.
+ */
 static void
 _efl_net_dialer_websocket_recv_pending_read_remove(Eo *o, Efl_Net_Dialer_Websocket_Data *pd)
 {
@@ -1489,6 +1871,20 @@ _efl_net_dialer_websocket_binary_send(Eo *o, Efl_Net_Dialer_Websocket_Data *pd, 
                                   blob.mem, blob.len);
 }
 
+/**
+ * @internal
+ * @brief Callback for the close request timeout future.
+ *
+ * If the server doesn't respond to a close request by closing the TCP connection
+ * within a certain time (2 seconds), this function is called. It logs a debug
+ * message and emits the EFL_IO_CLOSER_EVENT_CLOSED event to signal that the
+ * WebSocket considers the connection closed from its perspective.
+ *
+ * @param o The Efl_Net_Dialer_Websocket object.
+ * @param data Not used.
+ * @param v The Eina_Value from the future system (not used).
+ * @return The input Eina_Value `v`.
+ */
 static Eina_Value
 _efl_net_dialer_websocket_close_request_timeout(Eo *o, void *data EINA_UNUSED, const Eina_Value v)
 {
@@ -1561,6 +1957,18 @@ static const Efl_Net_Dialer_Websocket_Blacklist_Header _efl_net_dialer_websocket
   {NULL, 0}
 };
 
+/**
+ * @internal
+ * @brief Checks if a given HTTP header key is blacklisted for user modification.
+ *
+ * Certain HTTP headers are essential for the WebSocket protocol handshake
+ * (e.g., "Upgrade", "Connection", "Sec-WebSocket-Key"). This function checks
+ * if the provided `key` is one of these reserved headers. Users should not
+ * be able to set these directly as it would interfere with the protocol.
+ *
+ * @param key The HTTP header key string to check.
+ * @return @c EINA_TRUE if the header is blacklisted, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _efl_net_dialer_websocket_blacklisted_header_check(const char *key)
 {
@@ -1606,9 +2014,21 @@ _efl_net_dialer_websocket_request_headers_clear(Eo *o EINA_UNUSED, Efl_Net_Diale
 typedef struct _Eina_Iterator_Filtered_Header
 {
    Eina_Iterator iterator;
-   Eina_Iterator *full;
+   Eina_Iterator *full; /**< The original, unfiltered iterator from the HTTP dialer */
 } Eina_Iterator_Filtered_Header;
 
+/**
+ * @internal
+ * @brief Iterator next function for filtering out blacklisted WebSocket headers.
+ *
+ * This function iterates through the underlying HTTP headers and skips
+ * any headers that are managed internally by the WebSocket implementation
+ * (i.e., those identified by `_efl_net_dialer_websocket_blacklisted_header_check`).
+ *
+ * @param it Pointer to the Eina_Iterator_Filtered_Header.
+ * @param data Pointer to store the next non-blacklisted Efl_Net_Http_Header.
+ * @return @c EINA_TRUE if a next item is found, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 eina_iterator_filtered_header_next(Eina_Iterator_Filtered_Header *it, void **data)
 {
@@ -1625,12 +2045,22 @@ eina_iterator_filtered_header_next(Eina_Iterator_Filtered_Header *it, void **dat
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Iterator get_container function for the filtered header iterator.
+ * Delegates to the underlying iterator.
+ */
 static const struct filtered *
 eina_iterator_filtered_header_get_container(Eina_Iterator_Filtered_Header *it)
 {
    return eina_iterator_container_get(it->full);
 }
 
+/**
+ * @internal
+ * @brief Iterator free function for the filtered header iterator.
+ * Frees the underlying iterator and the filtered iterator structure itself.
+ */
 static void
 eina_iterator_filtered_header_free(Eina_Iterator_Filtered_Header *it)
 {

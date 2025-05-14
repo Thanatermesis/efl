@@ -1,9 +1,15 @@
-/*
+/**
+ * @file
+ * @brief Ecore_Con_Url provides helper functions for network connections using URLs.
+ *
+ * This module leverages libcurl for handling URL-based network operations,
+ * providing an abstraction layer over Efl.Net.Dialer.Http for legacy
+ * Ecore_Con applications. It supports features like GET, POST, HEAD requests,
+ * cookie management, proxy settings, SSL verification, and more.
+ *
  * For info on how to use libcurl, see:
  * http://curl.haxx.se/libcurl/c/libcurl-tutorial.html
- */
-
-/*
+ *
  * FIXME: Support more CURL features...
  */
 
@@ -26,14 +32,23 @@
 #include "ecore_con_url_curl.h"
 #include "Emile.h"
 
+/** Event type for URL data reception.
+ * @ingroup Ecore_Con_Url_Group
+ */
 int ECORE_CON_EVENT_URL_DATA = 0;
+/** Event type for URL connection completion.
+ * @ingroup Ecore_Con_Url_Group
+ */
 int ECORE_CON_EVENT_URL_COMPLETE = 0;
+/** Event type for URL connection progress.
+ * @ingroup Ecore_Con_Url_Group
+ */
 int ECORE_CON_EVENT_URL_PROGRESS = 0;
 
-static int _init_count = 0;
-static Eina_Bool pipelining = EINA_FALSE;
+static int _init_count = 0; /**< Counter for ecore_con_url_init() calls. */
+static Eina_Bool pipelining = EINA_FALSE; /**< Flag indicating if HTTP pipelining is enabled. */
 
-static Eina_List *_url_con_url_list = NULL;
+static Eina_List *_url_con_url_list = NULL; /**< List of active Ecore_Con_Url handles. */
 
 /**
  * @addtogroup Ecore_Con_Url_Group Ecore URL Connection Functions
@@ -41,6 +56,17 @@ static Eina_List *_url_con_url_list = NULL;
  * @{
  */
 
+/**
+ * @brief Initializes the Ecore_Con_Url library.
+ *
+ * This function initializes all necessary subsystems for Ecore_Con_Url,
+ * including Ecore, Ecore_Con, and Emile. It also registers new event types
+ * for URL operations. This function increments an internal counter, and only
+ * performs full initialization on the first call.
+ *
+ * @return The new initialization count. Returns 0 on failure.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API int
 ecore_con_url_init(void)
 {
@@ -64,6 +90,16 @@ ecore_con_url_init(void)
    return --_init_count;
 }
 
+/**
+ * @brief Shuts down the Ecore_Con_Url library.
+ *
+ * This function shuts down all subsystems initialized by ecore_con_url_init().
+ * It decrements an internal counter and only performs full shutdown when the
+ * count reaches zero. It also frees any remaining Ecore_Con_Url handles.
+ *
+ * @return The new initialization count. Returns 0 if fully shut down.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API int
 ecore_con_url_shutdown(void)
 {
@@ -84,6 +120,16 @@ ecore_con_url_shutdown(void)
    return 0;
 }
 
+/**
+ * @brief Enables or disables HTTP pipelining.
+ *
+ * Pipelining allows sending multiple HTTP requests on the same persistent
+ * connection without waiting for the corresponding responses.
+ * This function requires the underlying curl library to be initialized.
+ *
+ * @param enable EINA_TRUE to enable pipelining, EINA_FALSE to disable.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_pipeline_set(Eina_Bool enable)
 {
@@ -93,6 +139,12 @@ ecore_con_url_pipeline_set(Eina_Bool enable)
    pipelining = enable;
 }
 
+/**
+ * @brief Gets the current state of HTTP pipelining.
+ *
+ * @return EINA_TRUE if pipelining is enabled, EINA_FALSE otherwise.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API Eina_Bool
 ecore_con_url_pipeline_get(void)
 {
@@ -102,56 +154,64 @@ ecore_con_url_pipeline_get(void)
 
 /* The rest of this file exists solely to provide ABI compatibility */
 
+/**
+ * @brief Structure representing an Ecore_Con_Url connection handle.
+ * @typedef Ecore_Con_Url
+ * @ingroup Ecore_Con_Url_Group
+ *
+ * This structure holds all the state for a single URL connection.
+ * It is an opaque type, and its members should not be accessed directly.
+ */
 struct _Ecore_Con_Url
 {
-   ECORE_MAGIC;
-   Eo *dialer;
-   Eo *send_copier;
-   Eo *input;
-   Ecore_Timer *timer;
+   ECORE_MAGIC; /**< Magic number for type checking. */
+   Eo *dialer; /**< The underlying Efl_Net_Dialer_Http object. */
+   Eo *send_copier; /**< Efl_Io_Copier for POST/PUT data. */
+   Eo *input; /**< Input source for POST/PUT data (e.g., Efl_Io_Buffer or Efl_Io_File). */
+   Ecore_Timer *timer; /**< Timeout timer for the connection. */
    struct {
-      Ecore_Animator *animator;
+      Ecore_Animator *animator; /**< Animator for progress updates. */
       struct {
-         uint64_t total;
-         uint64_t now;
-      } download, upload;
+         uint64_t total; /**< Total bytes expected for download. */
+         uint64_t now;   /**< Current bytes downloaded. */
+      } download, upload; /**< Download and upload progress information. */
    } progress;
-   Eina_Stringshare *url;
-   Eina_Stringshare *custom_request;
-   void *data;
+   Eina_Stringshare *url; /**< The URL for the connection. */
+   Eina_Stringshare *custom_request; /**< Custom HTTP request method (e.g., "PUT", "DELETE"). */
+   void *data; /**< User-specific data associated with this handle. */
    struct {
-      Eina_List *files; /* of Eina_Stringshare - read locations */
-      Eina_List *cmds; /* of static-const strings - COOKIELIST commands */
-      Eina_Stringshare *jar; /* write location */
-      Eina_Bool ignore_old_session;
+      Eina_List *files; /**< List of Eina_Stringshare: file paths to read cookies from. */
+      Eina_List *cmds;  /**< List of static const char*: COOKIELIST commands (e.g., "ALL", "SESS"). */
+      Eina_Stringshare *jar; /**< Eina_Stringshare: file path to write cookies to (cookie jar). */
+      Eina_Bool ignore_old_session; /**< If EINA_TRUE, ignore session cookies from previous sessions. */
    } cookies;
    struct {
-      Eina_Stringshare *url;
-      Eina_Stringshare *username;
-      Eina_Stringshare *password;
+      Eina_Stringshare *url; /**< Proxy server URL. */
+      Eina_Stringshare *username; /**< Username for proxy authentication. */
+      Eina_Stringshare *password; /**< Password for proxy authentication. */
    } proxy;
    struct {
-      Ecore_Con_Url_Time condition;
-      double stamp;
+      Ecore_Con_Url_Time condition; /**< Time condition for the request (e.g., If-Modified-Since). */
+      double stamp; /**< Timestamp for the time condition. */
    } time;
    struct {
-      Eina_Stringshare *username;
-      Eina_Stringshare *password;
-      Efl_Net_Http_Authentication_Method method;
-      Eina_Bool restricted;
+      Eina_Stringshare *username; /**< Username for HTTP authentication. */
+      Eina_Stringshare *password; /**< Password for HTTP authentication. */
+      Efl_Net_Http_Authentication_Method method; /**< HTTP authentication method. */
+      Eina_Bool restricted; /**< If EINA_TRUE, use only "safe" authentication methods. */
    } httpauth;
-   Eina_Stringshare *ca_path;
-   Eina_List *request_headers;
-   Eina_List *response_headers;
-   unsigned event_count;
-   int received_bytes;
-   int status;
-   int write_fd;
-   Efl_Net_Http_Version http_version;
-   Eina_Bool ssl_verify_peer;
-   Eina_Bool verbose;
-   Eina_Bool ftp_use_epsv;
-   Eina_Bool delete_me;
+   Eina_Stringshare *ca_path; /**< Path to CA certificate(s) for SSL verification. */
+   Eina_List *request_headers; /**< List of Efl_Net_Http_Header: custom headers to send with the request. */
+   Eina_List *response_headers; /**< List of char*: headers received from the server. Each string is a full header line. */
+   unsigned event_count; /**< Count of pending events associated with this handle. */
+   int received_bytes; /**< Total bytes received in the current transfer. */
+   int status; /**< HTTP status code of the response. Set when complete. */
+   int write_fd; /**< File descriptor to write received data to. -1 if not used. */
+   Efl_Net_Http_Version http_version; /**< HTTP protocol version to use. */
+   Eina_Bool ssl_verify_peer; /**< If EINA_TRUE, verify the SSL peer certificate. */
+   Eina_Bool verbose; /**< If EINA_TRUE, enable verbose output for debugging. */
+   Eina_Bool ftp_use_epsv; /**< If EINA_TRUE, use EPSV for FTP transfers. */
+   Eina_Bool delete_me; /**< If EINA_TRUE, the handle is marked for deletion. */
 };
 
 #define ECORE_CON_URL_CHECK_RETURN(u, ...) \
@@ -167,6 +227,16 @@ struct _Ecore_Con_Url
   while (0)
 
 
+/**
+ * @internal
+ * @brief Closes and cleans up resources associated with the dialer for a given Ecore_Con_Url.
+ *
+ * This function handles the deletion of the send copier, input source, timer,
+ * progress animator, and the dialer itself. It ensures that the dialer is closed
+ * if it's still open.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ */
 static void
 _ecore_con_url_dialer_close(Ecore_Con_Url *url_con)
 {
@@ -202,6 +272,14 @@ _ecore_con_url_dialer_close(Ecore_Con_Url *url_con)
    url_con->dialer = NULL;
 }
 
+/**
+ * @internal
+ * @brief Frees the memory allocated for storing response headers.
+ *
+ * Iterates through the list of response headers and frees each header string.
+ *
+ * @param url_con The Ecore_Con_Url handle whose response headers are to be freed.
+ */
 static void
 _ecore_con_url_response_headers_free(Ecore_Con_Url *url_con)
 {
@@ -210,6 +288,16 @@ _ecore_con_url_response_headers_free(Ecore_Con_Url *url_con)
      free(str);
 }
 
+/**
+ * @internal
+ * @brief Frees the memory allocated for storing request headers.
+ *
+ * Iterates through the list of request headers (Efl_Net_Http_Header structures)
+ * and frees each one. The key and value strings are assumed to be part of
+ * the same allocation as the header structure itself.
+ *
+ * @param url_con The Ecore_Con_Url handle whose request headers are to be freed.
+ */
 static void
 _ecore_con_url_request_headers_free(Ecore_Con_Url *url_con)
 {
@@ -218,6 +306,16 @@ _ecore_con_url_request_headers_free(Ecore_Con_Url *url_con)
      free(header); /* key and value are inline */
 }
 
+/**
+ * @internal
+ * @brief Internal function to free an Ecore_Con_Url handle and its associated resources.
+ *
+ * This function is called when an Ecore_Con_Url handle is no longer needed and
+ * has no pending events. It cleans up all allocated resources, including stringshares,
+ * lists, and the dialer.
+ *
+ * @param url_con The Ecore_Con_Url handle to free.
+ */
 static void
 _ecore_con_url_free_internal(Ecore_Con_Url *url_con)
 {
@@ -254,6 +352,17 @@ _ecore_con_url_free_internal(Ecore_Con_Url *url_con)
    free(url_con);
 }
 
+/**
+ * @internal
+ * @brief Frees an Ecore_Con_Event_Url_Progress event structure.
+ *
+ * This is a callback function used by the Ecore event system. It decrements
+ * the event count on the associated Ecore_Con_Url handle and, if the handle
+ * is marked for deletion and has no more pending events, frees the handle.
+ *
+ * @param data Unused user data.
+ * @param event The Ecore_Con_Event_Url_Progress event to free.
+ */
 static void
 _ecore_con_event_url_progress_free(void *data EINA_UNUSED, void *event)
 {
@@ -270,6 +379,16 @@ _ecore_con_event_url_progress_free(void *data EINA_UNUSED, void *event)
    free(ev);
 }
 
+/**
+ * @internal
+ * @brief Creates and adds an ECORE_CON_EVENT_URL_PROGRESS event to the event queue.
+ *
+ * This function is called to notify listeners about the progress of a URL transfer.
+ * It populates an Ecore_Con_Event_Url_Progress structure with the current
+ * download and upload progress from the Ecore_Con_Url handle.
+ *
+ * @param url_con The Ecore_Con_Url handle for which to report progress.
+ */
 static void
 _ecore_con_event_url_progress_add(Ecore_Con_Url *url_con)
 {
@@ -289,6 +408,17 @@ _ecore_con_event_url_progress_add(Ecore_Con_Url *url_con)
    ecore_event_add(ECORE_CON_EVENT_URL_PROGRESS, ev, _ecore_con_event_url_progress_free, NULL);
 }
 
+/**
+ * @internal
+ * @brief Frees an Ecore_Con_Event_Url_Complete event structure.
+ *
+ * This is a callback function used by the Ecore event system. It decrements
+ * the event count on the associated Ecore_Con_Url handle and, if the handle
+ * is marked for deletion and has no more pending events, frees the handle.
+ *
+ * @param data Unused user data.
+ * @param event The Ecore_Con_Event_Url_Complete event to free.
+ */
 static void
 _ecore_con_event_url_complete_free(void *data EINA_UNUSED, void *event)
 {
@@ -305,6 +435,18 @@ _ecore_con_event_url_complete_free(void *data EINA_UNUSED, void *event)
    free(ev);
 }
 
+/**
+ * @internal
+ * @brief Creates and adds an ECORE_CON_EVENT_URL_COMPLETE event to the event queue.
+ *
+ * This function is called when a URL transfer is complete (either successfully
+ * or with an error). It cleans up progress reporting, sets the status on the
+ * Ecore_Con_Url handle, and queues the completion event. It also closes
+ * the dialer associated with the handle.
+ *
+ * @param url_con The Ecore_Con_Url handle that has completed.
+ * @param status The completion status code (e.g., HTTP status code or an error code).
+ */
 static void
 _ecore_con_event_url_complete_add(Ecore_Con_Url *url_con, int status)
 {
@@ -316,7 +458,7 @@ _ecore_con_event_url_complete_add(Ecore_Con_Url *url_con, int status)
      {
         ecore_animator_del(url_con->progress.animator);
         url_con->progress.animator = NULL;
-        _ecore_con_event_url_progress_add(url_con);
+        _ecore_con_event_url_progress_add(url_con); /* Send one last progress event */
      }
 
    if (url_con->status)
@@ -339,6 +481,17 @@ _ecore_con_event_url_complete_add(Ecore_Con_Url *url_con, int status)
    _ecore_con_url_dialer_close(url_con);
 }
 
+/**
+ * @internal
+ * @brief Callback for EFL_NET_DIALER_EVENT_DIALER_ERROR events from the HTTP dialer.
+ *
+ * This function is invoked when the underlying Efl_Net_Dialer_Http object
+ * encounters an error. It logs the error and triggers a completion event
+ * with an appropriate status code.
+ *
+ * @param data The Ecore_Con_Url handle associated with the dialer.
+ * @param event The Efl_Event containing error information.
+ */
 static void
 _ecore_con_url_dialer_error(void *data, const Efl_Event *event)
 {
@@ -360,6 +513,17 @@ _ecore_con_url_dialer_error(void *data, const Efl_Event *event)
    _ecore_con_event_url_complete_add(url_con, status);
 }
 
+/**
+ * @internal
+ * @brief Frees an Ecore_Con_Event_Url_Data event structure.
+ *
+ * This is a callback function used by the Ecore event system. It decrements
+ * the event count on the associated Ecore_Con_Url handle and, if the handle
+ * is marked for deletion and has no more pending events, frees the handle.
+ *
+ * @param data Unused user data.
+ * @param event The Ecore_Con_Event_Url_Data event to free.
+ */
 static void
 _ecore_con_event_url_data_free(void *data EINA_UNUSED, void *event)
 {
@@ -376,6 +540,18 @@ _ecore_con_event_url_data_free(void *data EINA_UNUSED, void *event)
    free(ev);
 }
 
+/**
+ * @internal
+ * @brief Callback for EFL_IO_READER_EVENT_CAN_READ_CHANGED events from the HTTP dialer.
+ *
+ * This function is invoked when the underlying Efl_Net_Dialer_Http object
+ * has data available to be read. It reads the data, and either sends an
+ * ECORE_CON_EVENT_URL_DATA event or writes the data to the `write_fd`
+ * if one is set.
+ *
+ * @param data The Ecore_Con_Url handle associated with the dialer.
+ * @param event The Efl_Event (unused in this function).
+ */
 static void
 _ecore_con_url_dialer_can_read_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -432,6 +608,17 @@ _ecore_con_url_dialer_can_read_changed(void *data, const Efl_Event *event EINA_U
    free(ev);
 }
 
+/**
+ * @internal
+ * @brief Callback for EFL_IO_READER_EVENT_EOS (End Of Stream) events from the HTTP dialer.
+ *
+ * This function is invoked when the underlying Efl_Net_Dialer_Http object
+ * signals that all data has been received. If there's no pending send operation,
+ * it triggers a completion event.
+ *
+ * @param data The Ecore_Con_Url handle associated with the dialer.
+ * @param event The Efl_Event (unused in this function).
+ */
 static void
 _ecore_con_url_dialer_eos(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -448,6 +635,18 @@ _ecore_con_url_dialer_eos(void *data, const Efl_Event *event EINA_UNUSED)
    _ecore_con_event_url_complete_add(url_con, efl_net_dialer_http_response_status_get(url_con->dialer));
 }
 
+/**
+ * @internal
+ * @brief Callback for EFL_NET_DIALER_HTTP_EVENT_HEADERS_DONE events from the HTTP dialer.
+ *
+ * This function is invoked when the underlying Efl_Net_Dialer_Http object
+ * has finished receiving all response headers. It retrieves the headers,
+ * formats them as strings, and stores them in the `response_headers` list
+ * of the Ecore_Con_Url handle.
+ *
+ * @param data The Ecore_Con_Url handle associated with the dialer.
+ * @param event The Efl_Event (unused in this function).
+ */
 static void
 _ecore_con_url_dialer_headers_done(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -509,6 +708,18 @@ EFL_CALLBACKS_ARRAY_DEFINE(ecore_con_url_dialer_cbs,
                            { EFL_NET_DIALER_EVENT_DIALER_ERROR, _ecore_con_url_dialer_error },
                            { EFL_NET_DIALER_HTTP_EVENT_HEADERS_DONE, _ecore_con_url_dialer_headers_done });
 
+/**
+ * @internal
+ * @brief Animator callback for periodically checking and reporting transfer progress.
+ *
+ * This function is called by an Ecore_Animator. It retrieves the current
+ * download and upload progress from the dialer. If the progress has changed
+ * since the last check, it updates the Ecore_Con_Url handle's progress
+ * information and triggers an ECORE_CON_EVENT_URL_PROGRESS event.
+ *
+ * @param data The Ecore_Con_Url handle.
+ * @return EINA_TRUE to continue the animator, EINA_FALSE to stop.
+ */
 static Eina_Bool
 _ecore_con_url_progress_animator_cb(void *data)
 {
@@ -541,7 +752,19 @@ _ecore_con_url_progress_animator_cb(void *data)
  *  - username
  *  - password
  *
- * May return NULL (= use envvar http_proxy)
+ * This function constructs a full proxy URL string suitable for
+ * `efl_net_dialer_proxy_set()` by combining the proxy URL, username,
+ * and password fields from the `Ecore_Con_Url` structure. It handles
+ * cases where parts of the proxy information might be embedded in the
+ * proxy URL itself or provided separately.
+ *
+ * If `url_con->proxy.url` is NULL, this function returns NULL, indicating
+ * that the proxy should be determined from environment variables (e.g., http_proxy).
+ *
+ * The returned string is dynamically allocated and must be freed by the caller.
+ *
+ * @param url_con The Ecore_Con_Url handle containing proxy settings.
+ * @return A newly allocated string with the full proxy URL, or NULL.
  */
 static char *
 _ecore_con_url_proxy_url_new(const Ecore_Con_Url *url_con)
@@ -629,6 +852,18 @@ _ecore_con_url_proxy_url_new(const Ecore_Con_Url *url_con)
    return strdup(buf);
 }
 
+/**
+ * @internal
+ * @brief Callback for EFL_IO_COPIER_EVENT_DONE events from the send copier.
+ *
+ * This function is invoked when the Efl_Io_Copier used for sending data
+ * (e.g., in a POST or PUT request) has finished its operation. If the
+ * receiving side (dialer) has also reached EOS (End Of Stream), this
+ * triggers a completion event for the URL transfer.
+ *
+ * @param data The Ecore_Con_Url handle associated with the copier.
+ * @param event The Efl_Event from the copier.
+ */
 static void
 _ecore_con_url_copier_done(void *data, const Efl_Event *event)
 {
@@ -646,6 +881,17 @@ _ecore_con_url_copier_done(void *data, const Efl_Event *event)
    _ecore_con_event_url_complete_add(url_con, status);
 }
 
+/**
+ * @internal
+ * @brief Callback for EFL_IO_COPIER_EVENT_ERROR events from the send copier.
+ *
+ * This function is invoked when the Efl_Io_Copier used for sending data
+ * encounters an error. It logs the error and triggers a completion event
+ * for the URL transfer with an appropriate status code.
+ *
+ * @param data The Ecore_Con_Url handle associated with the copier.
+ * @param event The Efl_Event containing error information from the copier.
+ */
 static void
 _ecore_con_url_copier_error(void *data, const Efl_Event *event)
 {
@@ -676,8 +922,33 @@ EFL_CALLBACKS_ARRAY_DEFINE(_ecore_con_url_copier_cbs,
  * Ecore_Con_Url is documented as 'reusable', while Efl.Net.Dialers
  * are one-shot and must be recreated on every usage.
  *
- * Then _ecore_con_url_request_prepare() will close (cancel) any
- * previous dialer and create a new one with all parameters set.
+ * This function, _ecore_con_url_request_prepare(), handles this by:
+ * 1. Closing any existing dialer associated with `url_con`.
+ * 2. Resetting various state variables in `url_con` (status, received_bytes, progress, response_headers).
+ * 3. Constructing the proxy URL using `_ecore_con_url_proxy_url_new()`.
+ * 4. Creating a new `EFL_NET_DIALER_HTTP_CLASS` instance.
+ * 5. Configuring the new dialer with all relevant settings from `url_con`, such as:
+ *    - HTTP method (GET, POST, custom).
+ *    - Primary mode (upload/download).
+ *    - Proxy settings.
+ *    - HTTP authentication.
+ *    - HTTP version.
+ *    - Redirect policy.
+ *    - SSL verification settings (peer verification, CA path).
+ *    - Event callbacks.
+ * 6. Accessing the underlying CURL easy handle to set CURL-specific options:
+ *    - Verbose mode / debug function.
+ *    - FTP EPSV mode.
+ *    - Default "Accept-Encoding" header.
+ *    - Time conditions (If-Modified-Since, If-Unmodified-Since).
+ *    - Custom request headers.
+ *    - Cookie settings (session behavior, cookie files, cookie jar, cookie commands).
+ * 7. Starting an Ecore_Animator for progress updates if needed.
+ *
+ * @param url_con The Ecore_Con_Url handle to prepare for a new request.
+ * @param method The HTTP method string (e.g., "GET", "POST", "HEAD").
+ * @return EINA_TRUE if the preparation was successful and a new dialer is ready,
+ *         EINA_FALSE on failure (e.g., memory allocation error, failed to create dialer).
  */
 static Eina_Bool
 _ecore_con_url_request_prepare(Ecore_Con_Url *url_con, const char *method)
@@ -778,6 +1049,17 @@ _ecore_con_url_request_prepare(Ecore_Con_Url *url_con, const char *method)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Creates a new Ecore_Con_Url handle.
+ *
+ * Initializes a new Ecore_Con_Url structure for the given URL.
+ * Default settings include HTTP version 1.1 and no write file descriptor.
+ * The new handle is added to a global list of active handles.
+ *
+ * @param url The URL string for this connection. Must not be NULL.
+ * @return A new Ecore_Con_Url handle, or NULL on failure.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API Ecore_Con_Url *
 ecore_con_url_new(const char *url)
 {
@@ -798,6 +1080,17 @@ ecore_con_url_new(const char *url)
    return url_con;
 }
 
+/**
+ * @brief Creates a new Ecore_Con_Url handle with a custom HTTP request method.
+ *
+ * This is similar to ecore_con_url_new(), but allows specifying a custom
+ * HTTP request method (e.g., "DELETE", "OPTIONS").
+ *
+ * @param url The URL string for this connection. Must not be NULL.
+ * @param custom_request The custom HTTP request method string. Must not be NULL.
+ * @return A new Ecore_Con_Url handle, or NULL on failure.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API Ecore_Con_Url *
 ecore_con_url_custom_new(const char *url,
                          const char *custom_request)
@@ -815,6 +1108,16 @@ ecore_con_url_custom_new(const char *url,
    return url_con;
 }
 
+/**
+ * @brief Frees an Ecore_Con_Url handle and its associated resources.
+ *
+ * Removes the handle from the global list and calls the internal free function.
+ * If there are pending events for this handle, the actual freeing might be
+ * deferred until all events are processed.
+ *
+ * @param url_con The Ecore_Con_Url handle to free.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_free(Ecore_Con_Url *url_con)
 {
@@ -826,6 +1129,13 @@ ecore_con_url_free(Ecore_Con_Url *url_con)
    _ecore_con_url_free_internal(url_con);
 }
 
+/**
+ * @brief Gets the user-specific data associated with an Ecore_Con_Url handle.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @return The user data pointer, or NULL if not set or on error.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void *
 ecore_con_url_data_get(Ecore_Con_Url *url_con)
 {
@@ -833,6 +1143,16 @@ ecore_con_url_data_get(Ecore_Con_Url *url_con)
    return url_con->data;
 }
 
+/**
+ * @brief Sets user-specific data for an Ecore_Con_Url handle.
+ *
+ * This allows associating arbitrary data with the connection handle,
+ * which can be retrieved later using ecore_con_url_data_get().
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param data The user data pointer to set.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_data_set(Ecore_Con_Url *url_con,
                        void *data)
@@ -841,6 +1161,14 @@ ecore_con_url_data_set(Ecore_Con_Url *url_con,
    url_con->data = data;
 }
 
+/**
+ * @brief Sets or updates the URL for an Ecore_Con_Url handle.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param url The new URL string. If NULL, the URL is set to an empty string.
+ * @return EINA_TRUE on success, EINA_FALSE on error.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API Eina_Bool
 ecore_con_url_url_set(Ecore_Con_Url *url_con,
                       const char *url)
@@ -850,6 +1178,14 @@ ecore_con_url_url_set(Ecore_Con_Url *url_con,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the URL string from an Ecore_Con_Url handle.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @return The URL string, or NULL if not set or on error. The returned
+ *         string is an Eina_Stringshare and should not be freed by the caller.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API const char *
 ecore_con_url_url_get(Ecore_Con_Url *url_con)
 {
@@ -858,6 +1194,15 @@ ecore_con_url_url_get(Ecore_Con_Url *url_con)
 }
 
 /* LEGACY: HTTP requests */
+/**
+ * @brief Initiates an HTTP GET request.
+ *
+ * Prepares the Ecore_Con_Url handle for a "GET" request and starts the dial operation.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @return EINA_TRUE if the request was successfully initiated, EINA_FALSE on error.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API Eina_Bool
 ecore_con_url_get(Ecore_Con_Url *url_con)
 {
@@ -879,6 +1224,15 @@ ecore_con_url_get(Ecore_Con_Url *url_con)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Initiates an HTTP HEAD request.
+ *
+ * Prepares the Ecore_Con_Url handle for a "HEAD" request and starts the dial operation.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @return EINA_TRUE if the request was successfully initiated, EINA_FALSE on error.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API Eina_Bool
 ecore_con_url_head(Ecore_Con_Url *url_con)
 {
@@ -900,6 +1254,21 @@ ecore_con_url_head(Ecore_Con_Url *url_con)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Initiates an HTTP POST request with the given data.
+ *
+ * Prepares the Ecore_Con_Url handle for a "POST" request. The provided data
+ * is copied into an Efl_Io_Buffer, and an Efl_Io_Copier is set up to send
+ * this data to the server after the connection is established.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param data Pointer to the data to be posted.
+ * @param length The length of the data in bytes.
+ * @param content_type The "Content-Type" header value for the POST data (e.g., "application/x-www-form-urlencoded").
+ *                     If NULL, no Content-Type header is added by this function for the data.
+ * @return EINA_TRUE if the request was successfully initiated, EINA_FALSE on error.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API Eina_Bool
 ecore_con_url_post(Ecore_Con_Url *url_con,
                    const void *data,
@@ -963,6 +1332,18 @@ ecore_con_url_post(Ecore_Con_Url *url_con,
 }
 
 /* LEGACY: headers */
+/**
+ * @brief Adds a custom header to be sent with the HTTP request.
+ *
+ * The header is stored internally and will be applied when the request
+ * is prepared by _ecore_con_url_request_prepare().
+ * Multiple headers can be added by calling this function repeatedly.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param key The header key (e.g., "User-Agent"). Must not be NULL.
+ * @param value The header value. Must not be NULL.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_additional_header_add(Ecore_Con_Url *url_con,
                                     const char *key,
@@ -990,6 +1371,12 @@ ecore_con_url_additional_header_add(Ecore_Con_Url *url_con,
                                                header);
 }
 
+/**
+ * @brief Clears all previously added custom request headers.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_additional_headers_clear(Ecore_Con_Url *url_con)
 {
@@ -997,6 +1384,18 @@ ecore_con_url_additional_headers_clear(Ecore_Con_Url *url_con)
    _ecore_con_url_request_headers_free(url_con);
 }
 
+/**
+ * @brief Sets a time condition for the HTTP request.
+ *
+ * This can be used to send "If-Modified-Since" or "If-Unmodified-Since" headers.
+ * The condition and timestamp are stored and applied when the request is prepared.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param time_condition The type of time condition (ECORE_CON_URL_TIME_IFMODSINCE or ECORE_CON_URL_TIME_IFUNMODSINCE).
+ *                       Use ECORE_CON_URL_TIME_NONE to disable.
+ * @param timestamp The timestamp (seconds since epoch) to use for the condition.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_time(Ecore_Con_Url *url_con,
                    Ecore_Con_Url_Time time_condition,
@@ -1008,6 +1407,18 @@ ecore_con_url_time(Ecore_Con_Url *url_con,
 }
 
 /* LEGACY: cookies */
+/**
+ * @brief Initializes cookie handling for the Ecore_Con_Url handle.
+ *
+ * This function enables the cookie engine by setting an empty string
+ * for the cookie file, which tells libcurl to just enable the engine
+ * but not read from/write to any specific file yet.
+ * The setting is persisted in `url_con->cookies.files` and applied
+ * to the underlying CURL handle if a dialer already exists.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_cookies_init(Ecore_Con_Url *url_con)
 {
@@ -1026,6 +1437,18 @@ ecore_con_url_cookies_init(Ecore_Con_Url *url_con)
    _c->curl_easy_setopt(curl_easy, CURLOPT_COOKIEFILE, "");
 }
 
+/**
+ * @brief Adds a file from which to read cookies.
+ *
+ * The specified file will be read by libcurl to load cookies.
+ * This can be called multiple times to read cookies from several files.
+ * The setting is persisted and applied to the underlying CURL handle
+ * if a dialer already exists.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param file_name Path to the cookie file. Must not be NULL.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_cookies_file_add(Ecore_Con_Url *url_con,
                                const char * const file_name)
@@ -1046,6 +1469,16 @@ ecore_con_url_cookies_file_add(Ecore_Con_Url *url_con,
    _c->curl_easy_setopt(curl_easy, CURLOPT_COOKIEFILE, file_name);
 }
 
+/**
+ * @brief Clears all cookies from the current session's in-memory cookie store.
+ *
+ * If a connection is active, this command is sent to libcurl immediately.
+ * Otherwise, the command "ALL" is queued to be executed when the
+ * connection is prepared.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_cookies_clear(Ecore_Con_Url *url_con)
 {
@@ -1067,6 +1500,17 @@ ecore_con_url_cookies_clear(Ecore_Con_Url *url_con)
    _c->curl_easy_setopt(curl_easy, CURLOPT_COOKIELIST, cookielist_cmd_all);
 }
 
+/**
+ * @brief Clears all session cookies from the current session's in-memory cookie store.
+ *
+ * Session cookies are those that have no expiry date.
+ * If a connection is active, this command is sent to libcurl immediately.
+ * Otherwise, the command "SESS" is queued to be executed when the
+ * connection is prepared.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_cookies_session_clear(Ecore_Con_Url *url_con)
 {
@@ -1088,6 +1532,16 @@ ecore_con_url_cookies_session_clear(Ecore_Con_Url *url_con)
    _c->curl_easy_setopt(curl_easy, CURLOPT_COOKIELIST, cookielist_cmd_sess);
 }
 
+/**
+ * @brief Sets whether to ignore cookies from previous sessions.
+ *
+ * If `ignore` is EINA_TRUE, libcurl will start a new cookie session,
+ * ignoring all cookies that were loaded from files and marked as session cookies.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param ignore EINA_TRUE to ignore old session cookies, EINA_FALSE otherwise.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_cookies_ignore_old_session_set(Ecore_Con_Url *url_con,
                                              Eina_Bool ignore)
@@ -1096,6 +1550,19 @@ ecore_con_url_cookies_ignore_old_session_set(Ecore_Con_Url *url_con,
    url_con->cookies.ignore_old_session = ignore;
 }
 
+/**
+ * @brief Sets the file to be used as a cookie jar.
+ *
+ * Libcurl will write all internally known cookies to this file when the
+ * connection handle is closed (or when ecore_con_url_cookies_jar_write is called).
+ * The setting is persisted and applied to the underlying CURL handle
+ * if a dialer already exists.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param cookiejar_file Path to the cookie jar file. Must not be NULL.
+ * @return EINA_TRUE on success, EINA_FALSE on error.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API Eina_Bool
 ecore_con_url_cookies_jar_file_set(Ecore_Con_Url *url_con,
                                    const char * const cookiejar_file)
@@ -1117,6 +1584,16 @@ ecore_con_url_cookies_jar_file_set(Ecore_Con_Url *url_con,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Forces libcurl to write all known cookies to the cookie jar file.
+ *
+ * This function is only effective if a cookie jar file has been set using
+ * ecore_con_url_cookies_jar_file_set() and a connection is active.
+ * It sends the "FLUSH" command via CURLOPT_COOKIELIST.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_cookies_jar_write(Ecore_Con_Url *url_con)
 {
@@ -1134,6 +1611,18 @@ ecore_con_url_cookies_jar_write(Ecore_Con_Url *url_con)
 }
 
 /* LEGACY: file upload/download */
+/**
+ * @brief Sets a file descriptor to which downloaded data will be written.
+ *
+ * If a valid file descriptor (>= 0) is set, data received from the URL
+ * will be written directly to this fd instead of generating
+ * ECORE_CON_EVENT_URL_DATA events. Set to -1 to disable writing to an fd
+ * and revert to event-based data delivery.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param fd The file descriptor to write to, or -1 to disable.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_fd_set(Ecore_Con_Url *url_con, int fd)
 {
@@ -1145,6 +1634,22 @@ ecore_con_url_fd_set(Ecore_Con_Url *url_con, int fd)
    if (!url_con->dialer) return;
 }
 
+/**
+ * @brief Initiates an FTP upload of a local file.
+ *
+ * Prepares the Ecore_Con_Url handle for a "PUT" request (used for FTP upload).
+ * The target URL is constructed by appending the `upload_dir` (if provided)
+ * and the basename of the `filename` to the base URL set in `url_con`.
+ * An Efl_Io_File is used as the source for an Efl_Io_Copier to send the file data.
+ *
+ * @param url_con The Ecore_Con_Url handle. Its `url` field should be the base FTP path (e.g., "ftp://server.com/").
+ * @param filename Path to the local file to upload. Must not be NULL or empty.
+ * @param user Username for FTP authentication (can be NULL).
+ * @param pass Password for FTP authentication (can be NULL).
+ * @param upload_dir Optional subdirectory on the FTP server where the file should be placed (can be NULL).
+ * @return EINA_TRUE if the upload was successfully initiated, EINA_FALSE on error.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API Eina_Bool
 ecore_con_url_ftp_upload(Ecore_Con_Url *url_con,
                          const char *filename,
@@ -1211,6 +1716,13 @@ ecore_con_url_ftp_upload(Ecore_Con_Url *url_con,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Sets whether to use EPSV (Extended Passive Mode) for FTP transfers.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param use_epsv EINA_TRUE to use EPSV, EINA_FALSE to use PASV.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_ftp_use_epsv_set(Ecore_Con_Url *url_con,
                                Eina_Bool use_epsv)
@@ -1219,6 +1731,16 @@ ecore_con_url_ftp_use_epsv_set(Ecore_Con_Url *url_con,
    url_con->ftp_use_epsv = use_epsv;
 }
 
+/**
+ * @brief Limits the maximum upload speed for the connection.
+ *
+ * This setting is applied directly to the underlying CURL handle if a
+ * connection is active.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param max_speed Maximum send speed in bytes per second. 0 for unlimited.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_limit_upload_speed(Ecore_Con_Url *url_con, off_t max_speed)
 {
@@ -1233,6 +1755,16 @@ ecore_con_url_limit_upload_speed(Ecore_Con_Url *url_con, off_t max_speed)
    _c->curl_easy_setopt(curl_easy, CURLOPT_MAX_SEND_SPEED_LARGE, max_speed);
 }
 
+/**
+ * @brief Limits the maximum download speed for the connection.
+ *
+ * This setting is applied directly to the underlying CURL handle if a
+ * connection is active.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param max_speed Maximum receive speed in bytes per second. 0 for unlimited.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_limit_download_speed(Ecore_Con_Url *url_con, off_t max_speed)
 {
@@ -1248,6 +1780,14 @@ ecore_con_url_limit_download_speed(Ecore_Con_Url *url_con, off_t max_speed)
 }
 
 /* LEGACY: proxy */
+/**
+ * @brief Sets the password for proxy authentication.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param password The proxy password. Must not be NULL.
+ * @return EINA_TRUE on success, EINA_FALSE on error.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API Eina_Bool
 ecore_con_url_proxy_password_set(Ecore_Con_Url *url_con, const char *password)
 {
@@ -1257,6 +1797,14 @@ ecore_con_url_proxy_password_set(Ecore_Con_Url *url_con, const char *password)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets the username for proxy authentication.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param username The proxy username. Must not be NULL.
+ * @return EINA_TRUE on success, EINA_FALSE on error.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API Eina_Bool
 ecore_con_url_proxy_username_set(Ecore_Con_Url *url_con, const char *username)
 {
@@ -1266,6 +1814,19 @@ ecore_con_url_proxy_username_set(Ecore_Con_Url *url_con, const char *username)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets the proxy server URL.
+ *
+ * If `proxy_url` is NULL, proxy usage will be determined by environment
+ * variables (e.g., http_proxy). Otherwise, the specified URL will be used.
+ * The URL can be in the format "protocol://host:port" or just "host:port"
+ * (in which case "http" is assumed as the protocol).
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param proxy_url The proxy server URL, or NULL to use environment settings.
+ * @return EINA_TRUE on success, EINA_FALSE on error.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API Eina_Bool
 ecore_con_url_proxy_set(Ecore_Con_Url *url_con, const char *proxy_url)
 {
@@ -1275,6 +1836,13 @@ ecore_con_url_proxy_set(Ecore_Con_Url *url_con, const char *proxy_url)
 }
 
 /* LEGACY: response */
+/**
+ * @brief Gets the total number of bytes received so far for the current transfer.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @return The number of received bytes, or EINA_FALSE (0) on error.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API int
 ecore_con_url_received_bytes_get(Ecore_Con_Url *url_con)
 {
@@ -1282,6 +1850,16 @@ ecore_con_url_received_bytes_get(Ecore_Con_Url *url_con)
    return url_con->received_bytes;
 }
 
+/**
+ * @brief Gets the HTTP status code of the response.
+ *
+ * This is typically valid after an ECORE_CON_EVENT_URL_COMPLETE event has been received.
+ * If the connection is active, it queries the dialer; otherwise, it returns the stored status.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @return The HTTP status code, or 0 if not yet available or on error.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API int
 ecore_con_url_status_code_get(Ecore_Con_Url *url_con)
 {
@@ -1290,6 +1868,19 @@ ecore_con_url_status_code_get(Ecore_Con_Url *url_con)
    return efl_net_dialer_http_response_status_get(url_con->dialer);
 }
 
+/**
+ * @brief Gets the list of response headers received from the server.
+ *
+ * The list contains strings, where each string is a full header line
+ * (e.g., "Content-Type: text/html\r\n"). The list and its contents
+ * are owned by the Ecore_Con_Url handle and should not be modified or freed.
+ * This is typically valid after an ECORE_CON_EVENT_URL_COMPLETE event or
+ * after headers_done callback.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @return A const Eina_List of response header strings, or NULL on error or if no headers.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API const Eina_List *
 ecore_con_url_response_headers_get(Ecore_Con_Url *url_con)
 {
@@ -1298,6 +1889,19 @@ ecore_con_url_response_headers_get(Ecore_Con_Url *url_con)
 }
 
 /* LEGACY: SSL */
+/**
+ * @brief Sets the path to the Certificate Authority (CA) bundle file or directory.
+ *
+ * This is used for verifying the peer's SSL certificate.
+ * Setting a `ca_path` also implicitly enables peer verification
+ * (`ssl_verify_peer` is set to EINA_TRUE).
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param ca_path Path to the CA file or directory. If NULL, peer verification might be disabled
+ *                depending on `ecore_con_url_ssl_verify_peer_set`.
+ * @return 0 on success, -1 on error.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API int
 ecore_con_url_ssl_ca_set(Ecore_Con_Url *url_con,
                          const char *ca_path)
@@ -1308,6 +1912,13 @@ ecore_con_url_ssl_ca_set(Ecore_Con_Url *url_con,
    return 0;
 }
 
+/**
+ * @brief Enables or disables SSL peer certificate verification.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param verify EINA_TRUE to enable verification, EINA_FALSE to disable.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_ssl_verify_peer_set(Ecore_Con_Url *url_con,
                                   Eina_Bool verify)
@@ -1317,6 +1928,19 @@ ecore_con_url_ssl_verify_peer_set(Ecore_Con_Url *url_con,
 }
 
 /* LEGACY: misc */
+/**
+ * @brief Sets HTTP authentication credentials.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param username The username for authentication. Must not be NULL.
+ * @param password The password for authentication. Must not be NULL.
+ * @param safe If EINA_TRUE, only "safe" authentication methods (like Digest) are considered
+ *             (EFL_NET_HTTP_AUTHENTICATION_METHOD_ANY_SAFE).
+ *             If EINA_FALSE, any method including Basic might be used
+ *             (EFL_NET_HTTP_AUTHENTICATION_METHOD_ANY).
+ * @return EINA_TRUE on success, EINA_FALSE on error.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API Eina_Bool
 ecore_con_url_httpauth_set(Ecore_Con_Url *url_con,
                            const char *username,
@@ -1334,6 +1958,14 @@ ecore_con_url_httpauth_set(Ecore_Con_Url *url_con,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets the HTTP protocol version to use for the connection.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param version The HTTP version (ECORE_CON_URL_HTTP_VERSION_1_0 or ECORE_CON_URL_HTTP_VERSION_1_1).
+ * @return EINA_TRUE on success, EINA_FALSE if an unknown version is provided.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API Eina_Bool
 ecore_con_url_http_version_set(Ecore_Con_Url *url_con, Ecore_Con_Url_Http_Version version)
 {
@@ -1353,6 +1985,17 @@ ecore_con_url_http_version_set(Ecore_Con_Url *url_con, Ecore_Con_Url_Http_Versio
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Callback function for the connection timeout timer.
+ *
+ * This function is invoked when the Ecore_Timer set by `ecore_con_url_timeout_set`
+ * expires. It logs a warning, determines an appropriate error status,
+ * and triggers an ECORE_CON_EVENT_URL_COMPLETE event.
+ *
+ * @param data The Ecore_Con_Url handle associated with the timed-out connection.
+ * @return EINA_FALSE to stop the timer (it's a one-shot timer).
+ */
 static Eina_Bool
 _ecore_con_url_timeout_cb(void *data)
 {
@@ -1375,6 +2018,20 @@ _ecore_con_url_timeout_cb(void *data)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Sets a timeout for the entire connection operation.
+ *
+ * If the timeout is reached before the connection completes, an
+ * ECORE_CON_EVENT_URL_COMPLETE event will be generated with an error status.
+ * A timeout value of 0.0 or less disables the timeout.
+ *
+ * Note: This function starts the timer immediately, which is a behavior
+ * retained for compatibility with the legacy API.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param timeout The timeout duration in seconds.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_timeout_set(Ecore_Con_Url *url_con, double timeout)
 {
@@ -1393,6 +2050,19 @@ ecore_con_url_timeout_set(Ecore_Con_Url *url_con, double timeout)
    url_con->timer = ecore_timer_add(timeout, _ecore_con_url_timeout_cb, url_con);
 }
 
+/**
+ * @brief Enables or disables verbose debugging output for the connection.
+ *
+ * When enabled, libcurl will produce detailed information about the transfer.
+ * This setting is persisted and applied to the underlying CURL handle
+ * if a dialer already exists. If verbose is enabled, it sets the CURL
+ * debug function to NULL, meaning CURL's default verbose output (to stderr)
+ * will be used, not Eina_Log.
+ *
+ * @param url_con The Ecore_Con_Url handle.
+ * @param verbose EINA_TRUE to enable verbose output, EINA_FALSE to disable.
+ * @ingroup Ecore_Con_Url_Group
+ */
 ECORE_CON_API void
 ecore_con_url_verbose_set(Ecore_Con_Url *url_con,
                           Eina_Bool verbose)

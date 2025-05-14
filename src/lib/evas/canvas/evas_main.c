@@ -54,6 +54,15 @@ const char *efl_gfx_image_load_error_msgs[] = {
  "(Edje only) The group/collection set to load from had recursive references on its components"
 };
 
+/**
+ * @internal
+ * @brief Initializes the Efl Gfx image load error messages.
+ *
+ * This function registers the static error messages for image loading
+ * if they haven't been registered yet. It iterates through a predefined
+ * list of error messages and assigns them to their corresponding global
+ * Eina_Error variables.
+ */
 static void
 _efl_gfx_image_load_error_init(void)
 {
@@ -79,6 +88,18 @@ _efl_gfx_image_load_error_init(void)
 #undef TABLE_ENTRY
 }
 
+/**
+ * @internal
+ * @brief Converts an Evas_Load_Error to its corresponding Efl_Gfx_Image_Load_Error.
+ *
+ * This function maps an Evas specific load error enum to the more generic
+ * Eina_Error type used by Efl Gfx.
+ *
+ * @param err The Evas_Load_Error to convert.
+ * @return The corresponding Eina_Error (Efl_Gfx_Image_Load_Error).
+ *         Returns the input error if it's outside the known range of
+ *         EVAS_LOAD_ERROR_CANCELLED.
+ */
 Eina_Error
 _evas_load_error_to_efl_gfx_image_load_error(Evas_Load_Error err)
 {
@@ -101,6 +122,18 @@ _evas_load_error_to_efl_gfx_image_load_error(Evas_Load_Error err)
 #undef TABLE_ENTRY
 }
 
+/**
+ * @internal
+ * @brief Converts an Eina_Error (Efl_Gfx_Image_Load_Error) to an Evas_Load_Error.
+ *
+ * This function maps an Eina_Error, specifically one from the
+ * Efl_Gfx_Image_Load_Error set, back to the Evas specific load error enum.
+ * If the error is not recognized or is a generic Eina_Error outside the
+ * specific image load errors, it defaults to EVAS_LOAD_ERROR_GENERIC.
+ *
+ * @param err The Eina_Error to convert.
+ * @return The corresponding Evas_Load_Error.
+ */
 Evas_Load_Error
 _efl_gfx_image_load_error_to_evas_load_error(Eina_Error err)
 {
@@ -120,6 +153,19 @@ _efl_gfx_image_load_error_to_evas_load_error(Eina_Error err)
    return EVAS_LOAD_ERROR_GENERIC;
 }
 
+/**
+ * @internal
+ * @brief Converts Elementary markup text to UTF-8 plain text.
+ *
+ * This function is a converter used by eina_content_converter. It takes
+ * an Eina_Content object containing Elementary markup and attempts to
+ * convert its content to a new Eina_Content object containing UTF-8 plain text.
+ *
+ * @param from The source Eina_Content object with "application/x-elementary-markup" type.
+ * @param to_type The target content type, expected to be "text/plain;charset=utf-8".
+ * @return A new Eina_Content object with UTF-8 text if conversion is successful,
+ *         otherwise NULL. The caller is responsible for freeing the returned object.
+ */
 static Eina_Content*
 _markup_to_utf8(Eina_Content *from, const char *to_type)
 {
@@ -134,6 +180,19 @@ _markup_to_utf8(Eina_Content *from, const char *to_type)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Converts UTF-8 plain text to Elementary markup text.
+ *
+ * This function is a converter used by eina_content_converter. It takes
+ * an Eina_Content object containing UTF-8 plain text and attempts to
+ * convert its content to a new Eina_Content object containing Elementary markup.
+ *
+ * @param from The source Eina_Content object with "text/plain;charset=utf-8" type.
+ * @param to_type The target content type, expected to be "application/x-elementary-markup".
+ * @return A new Eina_Content object with Elementary markup text if conversion is successful,
+ *         otherwise NULL. The caller is responsible for freeing the returned object.
+ */
 static Eina_Content*
 _utf8_to_markup(Eina_Content *from, const char *to_type)
 {

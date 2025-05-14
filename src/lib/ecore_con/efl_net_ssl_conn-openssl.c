@@ -29,6 +29,17 @@
 #endif
 
 /* OpenSSL's BIO is the abstraction for I/O, provide one for Efl.Io.* */
+
+/**
+ * @internal
+ * @brief Creates and initializes a new BIO for an Efl.Net.Socket.
+ *
+ * This function is used by OpenSSL as a callback to create a new BIO.
+ * It initializes the BIO structure fields.
+ *
+ * @param b The BIO to initialize.
+ * @return 1 on success, 0 on failure (though OpenSSL docs say it should always return 1).
+ */
 static int
 efl_net_socket_bio_create(BIO *b)
 {
@@ -45,6 +56,16 @@ efl_net_socket_bio_create(BIO *b)
    return 1;
 }
 
+/**
+ * @internal
+ * @brief Destroys/frees a BIO previously created with efl_net_socket_bio_create().
+ *
+ * This function is used by OpenSSL as a callback to destroy a BIO.
+ * It resets the BIO structure fields.
+ *
+ * @param b The BIO to destroy.
+ * @return 1 on success, 0 if b is NULL.
+ */
 static int
 efl_net_socket_bio_destroy(BIO *b)
 {
@@ -61,6 +82,22 @@ efl_net_socket_bio_destroy(BIO *b)
    return 1;
 }
 
+/**
+ * @internal
+ * @brief Reads data from the Efl.Net.Socket associated with the BIO.
+ *
+ * This function is used by OpenSSL as a callback to read data.
+ * It attempts to read up to 'len' bytes from the socket into 'buf'.
+ * It handles non-blocking behavior by setting BIO_retry_read if the
+ * socket would block.
+ *
+ * @param b The BIO to read from.
+ * @param buf The buffer to store the read data.
+ * @param len The maximum number of bytes to read.
+ * @return The number of bytes read, or -1 on error or if the operation
+ *         would block (in which case BIO_retry_read is set). Returns 0
+ *         if len or buf is invalid, or if the socket is not set.
+ */
 static int
 efl_net_socket_bio_read(BIO *b, char *buf, int len)
 {
@@ -97,6 +134,22 @@ efl_net_socket_bio_read(BIO *b, char *buf, int len)
    return slice.len;
 }
 
+/**
+ * @internal
+ * @brief Writes data to the Efl.Net.Socket associated with the BIO.
+ *
+ * This function is used by OpenSSL as a callback to write data.
+ * It attempts to write 'len' bytes from 'buf' to the socket.
+ * It handles non-blocking behavior by setting BIO_retry_write if the
+ * socket would block.
+ *
+ * @param b The BIO to write to.
+ * @param buf The buffer containing data to write.
+ * @param len The number of bytes to write.
+ * @return The number of bytes written, or -1 on error or if the operation
+ *         would block (in which case BIO_retry_write is set). Returns 0
+ *         if len or buf is invalid, or if the socket is not set.
+ */
 static int
 efl_net_socket_bio_write(BIO *b, const char *buf, int len)
 {
@@ -133,6 +186,20 @@ efl_net_socket_bio_write(BIO *b, const char *buf, int len)
    return slice.len;
 }
 
+/**
+ * @internal
+ * @brief Handles control commands for the BIO.
+ *
+ * This function is used by OpenSSL as a callback for various control operations.
+ * Currently, it only handles BIO_CTRL_FLUSH, which is a mandatory command
+ * but doesn't have a specific meaning for this Efl.Net.Socket based BIO.
+ *
+ * @param b The BIO. (Unused)
+ * @param cmd The control command.
+ * @param num A numerical argument for the command. (Unused)
+ * @param ptr A pointer argument for the command. (Unused)
+ * @return 1 if the command is BIO_CTRL_FLUSH, 0 otherwise.
+ */
 static long
 efl_net_socket_bio_ctrl(BIO *b EINA_UNUSED, int cmd, long num EINA_UNUSED, void *ptr EINA_UNUSED)
 {
@@ -142,12 +209,35 @@ efl_net_socket_bio_ctrl(BIO *b EINA_UNUSED, int cmd, long num EINA_UNUSED, void 
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Writes a null-terminated string to the BIO.
+ *
+ * This function is used by OpenSSL as a callback to write a string.
+ * It's a convenience wrapper around efl_net_socket_bio_write().
+ *
+ * @param b The BIO to write to.
+ * @param str The null-terminated string to write.
+ * @return The number of bytes written (excluding the null terminator),
+ *         or an error code from efl_net_socket_bio_write().
+ */
 static int
 efl_net_socket_bio_puts(BIO *b, const char *str)
 {
    return efl_net_socket_bio_write(b, str, strlen(str));
 }
 
+/**
+ * @internal
+ * @brief Gets the BIO_METHOD structure for the Efl.Net.Socket BIO.
+ *
+ * This function returns a pointer to a static BIO_METHOD structure
+ * that defines the custom BIO implementation for Efl.Net.Socket.
+ * It handles different OpenSSL/LibreSSL versions for BIO_METHOD creation.
+ *
+ * @return A pointer to the BIO_METHOD structure, or NULL on failure to
+ *         create or initialize the method (for newer OpenSSL versions).
+ */
 static BIO_METHOD *
 __efl_net_socket_bio_get(void)
 {
@@ -188,19 +278,41 @@ __efl_net_socket_bio_get(void)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Structure representing an SSL connection.
+ *
+ * This structure holds all the necessary data for managing an SSL connection
+ * using OpenSSL, including the SSL object, the BIO, and settings related
+ * to hostname verification.
+ */
 struct _Efl_Net_Ssl_Conn
 {
-   SSL *ssl;
-   BIO *bio;
-   const char *hostname;
-   Eina_Bool hostname_verify;
-   Eina_Bool did_certificates;
+   SSL *ssl; /**< The OpenSSL SSL object. */
+   BIO *bio; /**< The OpenSSL BIO object wrapping the Efl.Net.Socket. */
+   const char *hostname; /**< The hostname to verify against the certificate (stringshared). */
+   Eina_Bool hostname_verify; /**< Flag indicating if hostname verification should be performed. */
+   Eina_Bool did_certificates; /**< Flag indicating if certificates have been processed/checked (currently unused). */
 };
 
 #define EFL_NET_SOCKET_SSL_CIPHERS "aRSA+HIGH:+kEDH:+kRSA:!kSRP:!kPSK:+3DES:!MD5"
 
 #define _efl_net_ssl_conn_session_debug(conn) \
   __efl_net_ssl_conn_session_debug(__FILE__, __LINE__, __func__, conn)
+
+/**
+ * @internal
+ * @brief Dumps SSL session information for debugging.
+ *
+ * This function logs detailed information about the SSL session, including
+ * peer certificate chain, ciphers (available, shared, current), and
+ * the SSL_SESSION object itself if the debug level is high enough.
+ *
+ * @param file The source file name where the debug was invoked.
+ * @param line The line number in the source file.
+ * @param fname The function name where the debug was invoked.
+ * @param conn The SSL connection data.
+ */
 static void
 __efl_net_ssl_conn_session_debug(const char *file, int line, const char *fname, Efl_Net_Ssl_Conn *conn)
 {
@@ -300,6 +412,20 @@ __efl_net_ssl_conn_session_debug(const char *file, int line, const char *fname, 
 
 #define _efl_net_ssl_conn_check_errors() \
   __efl_net_ssl_conn_check_errors(__FILE__, __LINE__, __func__)
+
+/**
+ * @internal
+ * @brief Checks and logs OpenSSL errors from the error queue.
+ *
+ * This function iterates through the OpenSSL error queue, logging each
+ * error with its details (file, line, data, reason string).
+ *
+ * @param file The source file name where the error check was invoked.
+ * @param line The line number in the source file.
+ * @param fname The function name where the error check was invoked.
+ * @return The error code of the first error retrieved from the queue,
+ *         or 0 if the queue was empty.
+ */
 static unsigned long
 __efl_net_ssl_conn_check_errors(const char *file, int line, const char *fname)
 {
@@ -322,6 +448,21 @@ __efl_net_ssl_conn_check_errors(const char *file, int line, const char *fname)
    return first;
 }
 
+/**
+ * @internal
+ * @brief Sets up an SSL connection.
+ *
+ * Initializes the SSL structure, creates a BIO for the underlying socket,
+ * associates the BIO with the SSL structure, and sets the SSL connection
+ * state (client/connect or server/accept).
+ *
+ * @param conn The SSL connection data to initialize.
+ * @param is_dialer EINA_TRUE if this is a client (dialer) connection,
+ *                  EINA_FALSE if it's a server (listener/accepted) connection.
+ * @param sock The Efl_Net_Socket to use for the SSL communication.
+ * @param context The Efl_Net_Ssl_Context to use for this connection.
+ * @return 0 on success, or an Eina_Error code on failure (e.g., EALREADY, ENOSYS).
+ */
 static Eina_Error
 efl_net_ssl_conn_setup(Efl_Net_Ssl_Conn *conn, Eina_Bool is_dialer, Efl_Net_Socket *sock, Efl_Net_Ssl_Context *context)
 {
@@ -401,6 +542,16 @@ efl_net_ssl_conn_setup(Efl_Net_Ssl_Conn *conn, Eina_Bool is_dialer, Efl_Net_Sock
    return ENOSYS;
 }
 
+/**
+ * @internal
+ * @brief Tears down an SSL connection.
+ *
+ * Shuts down the SSL connection gracefully if possible, frees the SSL
+ * structure (which also frees the associated BIO), and releases the
+ * stringshared hostname.
+ *
+ * @param conn The SSL connection data to tear down.
+ */
 static void
 efl_net_ssl_conn_teardown(Efl_Net_Ssl_Conn *conn)
 {
@@ -421,6 +572,23 @@ efl_net_ssl_conn_teardown(Efl_Net_Ssl_Conn *conn)
    eina_stringshare_replace(&conn->hostname, NULL);
 }
 
+/**
+ * @internal
+ * @brief Writes data to the SSL connection.
+ *
+ * Attempts to write the data in the provided slice to the SSL connection.
+ * Handles SSL-specific errors like SSL_ERROR_WANT_WRITE (indicating the
+ * operation would block and should be retried).
+ *
+ * @param conn The SSL connection data.
+ * @param slice A pointer to an Eina_Slice containing the data to write.
+ *              On successful partial or full write, slice->len is updated
+ *              to the number of bytes actually written. On error or
+ *              blocking, slice->len is set to 0.
+ * @return 0 on success (data written or operation would block),
+ *         EAGAIN if the operation would block (SSL_ERROR_WANT_WRITE),
+ *         EINVAL on other SSL errors or if conn->ssl is NULL.
+ */
 static Eina_Error
 efl_net_ssl_conn_write(Efl_Net_Ssl_Conn *conn, Eina_Slice *slice)
 {
@@ -443,6 +611,24 @@ efl_net_ssl_conn_write(Efl_Net_Ssl_Conn *conn, Eina_Slice *slice)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Reads data from the SSL connection.
+ *
+ * Attempts to read data from the SSL connection into the buffer provided
+ * by the slice. Handles SSL-specific errors like SSL_ERROR_WANT_READ
+ * (indicating the operation would block and should be retried).
+ *
+ * @param conn The SSL connection data.
+ * @param slice A pointer to an Eina_Rw_Slice where slice->mem is the buffer
+ *              to read into and slice->len is the maximum number of bytes
+ *              to read. On successful read, slice->len is updated to the
+ *              number of bytes actually read. On error or blocking,
+ *              slice->len is set to 0.
+ * @return 0 on success (data read or operation would block),
+ *         EAGAIN if the operation would block (SSL_ERROR_WANT_READ),
+ *         EINVAL on other SSL errors or if conn->ssl is NULL.
+ */
 static Eina_Error
 efl_net_ssl_conn_read(Efl_Net_Ssl_Conn *conn, Eina_Rw_Slice *slice)
 {
@@ -468,6 +654,18 @@ efl_net_ssl_conn_read(Efl_Net_Ssl_Conn *conn, Eina_Rw_Slice *slice)
 /* OpenSSL 1.0.2 introduced X509_check_host() and X509_check_ip_asc()
  * and with them the X509_CHECK_FLAG_ALWAYS_CHECK_SUBJECT define.
  */
+
+/**
+ * @internal
+ * @brief Placeholder for X509_check_host if not available.
+ * Logs an error and returns 0, indicating verification failure.
+ * @param x Unused.
+ * @param chk Unused.
+ * @param chklen Unused.
+ * @param flags Unused.
+ * @param peername Unused.
+ * @return 0 (failure).
+ */
 static int
 _replace_X509_check_host(X509 *x EINA_UNUSED,
                          const char *chk EINA_UNUSED,
@@ -475,10 +673,19 @@ _replace_X509_check_host(X509 *x EINA_UNUSED,
                          unsigned int flags EINA_UNUSED,
                          char **peername EINA_UNUSED)
 {
-   ERR("your OpenSSL do not support X509_check_ip_asc() - no verification can be done");
+   ERR("your OpenSSL do not support X509_check_host() - no verification can be done");
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Placeholder for X509_check_ip_asc if not available.
+ * Logs an error and returns 0, indicating verification failure.
+ * @param x Unused.
+ * @param ipasc Unused.
+ * @param flags Unused.
+ * @return 0 (failure).
+ */
 static int
 _replace_X509_check_ip_asc(X509 *x EINA_UNUSED,
                            const char *ipasc EINA_UNUSED,
@@ -491,6 +698,15 @@ _replace_X509_check_ip_asc(X509 *x EINA_UNUSED,
 static int (*_sym_X509_check_host)   (X509 *x, const char *chk, size_t chklen, unsigned int flags, char **peername) = NULL;
 static int (*_sym_X509_check_ip_asc) (X509 *x, const char *ipasc, unsigned int flags) = NULL;
 
+/**
+ * @internal
+ * @brief Initializes function pointers for X509 hostname/IP checking.
+ *
+ * Attempts to dynamically load X509_check_host and X509_check_ip_asc
+ * symbols. If they are not available (e.g., on older OpenSSL versions),
+ * it assigns placeholder functions that log an error and report failure.
+ * This is done only once.
+ */
 static inline void
 _X509_check_init(void)
 {
@@ -504,6 +720,21 @@ _X509_check_init(void)
    _sym_X509_check_ip_asc = _replace_X509_check_ip_asc;
 }
 
+/**
+ * @internal
+ * @brief Verifies the peer's certificate against the configured hostname.
+ *
+ * Retrieves the peer certificate and checks if the hostname (or IP address)
+ * stored in `conn->hostname` matches the subject/SANs in the certificate.
+ * Uses dynamically loaded X509_check_host or X509_check_ip_asc.
+ *
+ * @param conn The SSL connection data, containing the hostname to verify.
+ * @return 0 on successful verification.
+ *         EFL_NET_SOCKET_SSL_ERROR_CERTIFICATE_VERIFY_FAILED if verification fails
+ *         or if the hostname is not set.
+ *         EFL_NET_SOCKET_SSL_ERROR_HANDSHAKE if no peer certificate is available.
+ *         EINVAL if conn->ssl is NULL.
+ */
 static Eina_Error
 _efl_net_ssl_conn_hostname_verify(Efl_Net_Ssl_Conn *conn)
 {
@@ -554,6 +785,24 @@ _efl_net_ssl_conn_hostname_verify(Efl_Net_Ssl_Conn *conn)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Performs the SSL handshake.
+ *
+ * Calls SSL_do_handshake() to perform a step in the SSL handshake process.
+ * If the handshake completes successfully (r == 1), it performs hostname
+ * verification if enabled.
+ * Handles cases where more data is needed (SSL_ERROR_WANT_READ/WRITE).
+ * Logs detailed error information if the handshake fails.
+ *
+ * @param conn The SSL connection data.
+ * @param[out] done Set to EINA_TRUE if the handshake is complete, EINA_FALSE otherwise.
+ * @return 0 on success (handshake complete or in progress).
+ *         An Eina_Error code (e.g., EFL_NET_SOCKET_SSL_ERROR_CERTIFICATE_VERIFY_FAILED,
+ *         EFL_NET_SOCKET_SSL_ERROR_HANDSHAKE) if the handshake fails or hostname
+ *         verification fails.
+ *         EINVAL if conn->ssl is NULL.
+ */
 static Eina_Error
 efl_net_ssl_conn_handshake(Efl_Net_Ssl_Conn *conn, Eina_Bool *done)
 {
@@ -619,6 +868,18 @@ efl_net_ssl_conn_handshake(Efl_Net_Ssl_Conn *conn, Eina_Bool *done)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Sets the SSL verification mode for the connection.
+ *
+ * Configures how peer certificate verification is handled (none, optional, required).
+ * This translates Efl_Net_Ssl_Verify_Mode to OpenSSL's SSL_VERIFY_* flags.
+ *
+ * @param conn The SSL connection data.
+ * @param verify_mode The desired verification mode.
+ *        Example: EFL_NET_SSL_VERIFY_MODE_REQUIRED
+ * @return 0 on success, EINVAL if conn->ssl is NULL or verify_mode is unknown.
+ */
 static Eina_Error
 efl_net_ssl_conn_verify_mode_set(Efl_Net_Ssl_Conn *conn, Efl_Net_Ssl_Verify_Mode verify_mode)
 {
@@ -646,6 +907,18 @@ efl_net_ssl_conn_verify_mode_set(Efl_Net_Ssl_Conn *conn, Efl_Net_Ssl_Verify_Mode
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Enables or disables hostname verification for the SSL connection.
+ *
+ * If enabled, the hostname provided (usually via efl_net_ssl_conn_hostname_override_set
+ * or implicitly from the dial address) will be checked against the peer's
+ * certificate during/after the handshake.
+ *
+ * @param conn The SSL connection data.
+ * @param hostname_verify EINA_TRUE to enable hostname verification, EINA_FALSE to disable.
+ * @return 0 (always succeeds).
+ */
 static Eina_Error
 efl_net_ssl_conn_hostname_verify_set(Efl_Net_Ssl_Conn *conn, Eina_Bool hostname_verify)
 {
@@ -653,6 +926,19 @@ efl_net_ssl_conn_hostname_verify_set(Efl_Net_Ssl_Conn *conn, Eina_Bool hostname_
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Sets or overrides the hostname to be used for certificate verification.
+ *
+ * This hostname will be used to check against the Subject Alternative Name (SAN)
+ * or Common Name (CN) in the peer's SSL certificate if hostname verification is enabled.
+ * The provided hostname string is stringshared.
+ *
+ * @param conn The SSL connection data.
+ * @param hostname The hostname to verify against (e.g., "example.com").
+ *                 If NULL, the existing hostname override is cleared.
+ * @return 0 on success, ENOMEM if stringsharing fails.
+ */
 static Eina_Error
 efl_net_ssl_conn_hostname_override_set(Efl_Net_Ssl_Conn *conn, const char *hostname)
 {

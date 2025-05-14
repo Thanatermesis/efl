@@ -7,6 +7,15 @@
 #define HEIGHT (1000)
 #define MSG_ID_VEL (1)
 
+/**
+ * @brief Toggles an animation in the layout based on a preference setting.
+ *
+ * Reads the "main:animation" boolean preference. If true, it emits a "start"
+ * signal to the layout's theme, otherwise it emits a "stop" signal.
+ *
+ * @param prefs The preferences object.
+ * @param layout The layout object to control.
+ */
 static void
 _update_animation(Evas_Object *prefs, Evas_Object *layout)
 {
@@ -21,6 +30,16 @@ _update_animation(Evas_Object *prefs, Evas_Object *layout)
      elm_layout_signal_emit(layout, "stop", "animation");
 }
 
+/**
+ * @brief Updates the animation time/velocity in the layout.
+ *
+ * Reads the "main:animation_time" float preference and sends it as a message
+ * to the Edje object of the layout. This is used to control properties like
+ * animation speed.
+ *
+ * @param prefs The preferences object.
+ * @param layout The layout object containing the Edje object to message.
+ */
 static void
 _update_animation_time(Evas_Object *prefs, Evas_Object *layout)
 {
@@ -35,6 +54,15 @@ _update_animation_time(Evas_Object *prefs, Evas_Object *layout)
                             MSG_ID_VEL, &msg);
 }
 
+/**
+ * @brief Updates all animation-related settings in the layout.
+ *
+ * This is a convenience function that calls all individual update functions
+ * to synchronize the layout's state with the current preferences.
+ *
+ * @param prefs The preferences object.
+ * @param layout The layout object to update.
+ */
 static void
 _update(Evas_Object *prefs, Evas_Object *layout)
 {
@@ -42,6 +70,17 @@ _update(Evas_Object *prefs, Evas_Object *layout)
    _update_animation_time(prefs, layout);
 }
 
+/**
+ * @brief Callback for the "page,loaded" event of the prefs object.
+ *
+ * This function is called when a preferences page is fully loaded. It
+ * triggers an initial update of the layout to reflect the loaded
+ * preference values.
+ *
+ * @param data The layout object, passed as user data.
+ * @param obj The prefs object that emitted the signal.
+ * @param event_info Extra event information (unused).
+ */
 static void
 _page_loaded_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -50,6 +89,18 @@ _page_loaded_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    _update(obj, layout);
 }
 
+/**
+ * @brief Callback for the "item,changed" event of the prefs object.
+ *
+ * Called whenever a preference item's value is changed by the user. It
+ * identifies which item changed and calls the specific update function
+ * for that item.
+ *
+ * @param data The layout object, passed as user data.
+ * @param obj The prefs object that emitted the signal.
+ * @param event_info A const char* containing the name of the changed item,
+ *        e.g., "main:animation".
+ */
 static void
 _item_changed_cb(void *data, Evas_Object *obj, void *event_info)
 {
@@ -62,6 +113,19 @@ _item_changed_cb(void *data, Evas_Object *obj, void *event_info)
       _update_animation(obj, layout);
 }
 
+/**
+ * @brief Main function for the Elementary Prefs test.
+ *
+ * This function sets up a window with an elm_prefs widget. The prefs widget
+ * is configured to load its structure and values from external files
+ * (`.epb` and `.cfg`). It demonstrates how to interact with preference
+ * items, listen for changes, and dynamically update another UI component
+ * (a layout with an Edje animation) based on the preference values.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_prefs(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
            void *event_info EINA_UNUSED)

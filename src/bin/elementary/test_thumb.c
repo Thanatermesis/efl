@@ -3,6 +3,31 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Test function for thumb widget.
+ *
+ * This function creates a new window containing a scrollable grid of
+ * thumbnail widgets. It demonstrates the basic usage of the elm_thumb
+ * widget by creating a square grid where each row contains thumbnails
+ * for a predefined list of images.
+ *
+ * The created thumbnails are also set to be editable, allowing for
+ * actions like reordering or deleting.
+ *
+ * The image list is a static array of C-strings, for example:
+ * @code
+ * const char *img[] =
+ *   {
+ *      "panel_01.jpg",
+ *      "plant_01.jpg",
+ *      ...
+ *   };
+ * @endcode
+ *
+ * @param data Unused data pointer.
+ * @param obj Unused object pointer.
+ * @param event_info Unused event information pointer.
+ */
 void
 test_thumb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

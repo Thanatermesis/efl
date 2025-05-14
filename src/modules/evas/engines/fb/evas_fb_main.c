@@ -1,8 +1,13 @@
-/* -------------------------------------------------------------------- */
-/* LINUX FBCON FRAMEBUFFER UTILITY CODE                                 */
-/* makes setting up the framebuffer easy. Also makes it eays to port to */
-/* some other system if needed.                                         */
-/* Copyright (c) 1999 - Carsten Haitzler (The Rasterman)                */
+/**
+ * @file
+ * @brief Linux fbcon framebuffer utility code.
+ *
+ * This file provides functions to simplify framebuffer setup and management
+ * on Linux systems using fbcon. It aims to make porting to other systems
+ * easier if needed.
+ *
+ * Copyright (c) 1999 - Carsten Haitzler (The Rasterman)
+ */
 /* -------------------------------------------------------------------- */
 #include "evas_common_private.h"
 #include "evas_fb.h"
@@ -51,26 +56,47 @@ extern int _evas_engine_fb_log_dom;
 /* -------------------------------------------------------------------- */
 /* internal variables                                                   */
 
-static struct fb_fix_screeninfo  fb_fix;
-static int                       fb = -1, tty = -1;
-static int                       bpp, depth;
-//static int                       orig_vt_no = 0;
-static int                       kd_mode;
-static struct vt_mode            vt_omode;
-static struct fb_var_screeninfo  fb_ovar;
-static unsigned short            ored[256], ogreen[256], oblue[256];
-static unsigned short            red[256],  green[256],  blue[256];
-static struct fb_cmap            ocmap = { 0, 256, ored, ogreen, oblue, NULL };
-static struct fb_cmap            cmap  = { 0, 256, red,  green,  blue, NULL };
+static struct fb_fix_screeninfo  fb_fix; /**< Fixed screen information for the framebuffer. */
+static int                       fb = -1, tty = -1; /**< File descriptors for framebuffer and TTY. */
+static int                       bpp, depth; /**< Bytes per pixel and color depth. */
+//static int                       orig_vt_no = 0; /**< Original virtual terminal number (unused). */
+static int                       kd_mode; /**< Original keyboard mode. */
+static struct vt_mode            vt_omode; /**< Original virtual terminal mode. */
+static struct fb_var_screeninfo  fb_ovar; /**< Original variable screen information. */
+static unsigned short            ored[256], ogreen[256], oblue[256]; /**< Original red, green, and blue palette values. */
+static unsigned short            red[256],  green[256],  blue[256]; /**< Current red, green, and blue palette values. */
+static struct fb_cmap            ocmap = { 0, 256, ored, ogreen, oblue, NULL }; /**< Original colormap. */
+static struct fb_cmap            cmap  = { 0, 256, red,  green,  blue, NULL }; /**< Current colormap. */
 
 /* -------------------------------------------------------------------- */
 /* internal function prototypes                                         */
 
 //static void fb_cleanup_fork(void);
 //static void fb_setvt(int vtno);
+
+/**
+ * @brief Initializes the color palette for 8-bit 3:3:2 RGB mode.
+ * @param mode Pointer to the FB_Mode structure containing framebuffer info.
+ */
 static void fb_init_palette_332(FB_Mode *mode);
+
+/**
+ * @brief Initializes a linear color palette for 8-bit modes.
+ * @param mode Pointer to the FB_Mode structure containing framebuffer info.
+ */
 static void fb_init_palette_linear(FB_Mode *mode);
 
+/**
+ * @internal
+ * @brief Converts a struct fb_cmap to a string representation.
+ *
+ * This is primarily used for debugging purposes to log colormap details.
+ * The returned string must be freed by the caller.
+ *
+ * @param fb_cmap Pointer to the colormap structure.
+ * @return A newly allocated string representing the colormap, or NULL on failure.
+ *         Example: "start=0, len=256, red={0,8,16,...}, green={0,8,16,...}, blue={0,16,32,...}, transp={}"
+ */
 static char *
 fb_cmap_str_convert(const struct fb_cmap *fb_cmap)
 {
@@ -124,6 +150,18 @@ fb_cmap_str_convert(const struct fb_cmap *fb_cmap)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Calculates the bitmask from a fb_bitfield structure.
+ *
+ * A bitfield defines a component of a pixel (e.g., red, green, blue, alpha)
+ * by its offset and length within the pixel's bits. This function generates
+ * the corresponding mask.
+ *
+ * @param fbb Pointer to the fb_bitfield structure.
+ * @return The calculated bitmask.
+ *         Example: if fbb->offset = 8 and fbb->length = 8, returns 0x0000FF00.
+ */
 static unsigned int
 fb_bitfield_mask_get(const struct fb_bitfield *fbb)
 {
@@ -133,6 +171,16 @@ fb_bitfield_mask_get(const struct fb_bitfield *fbb)
    return mask;
 }
 
+/**
+ * @internal
+ * @brief Converts a struct fb_var_screeninfo to a string representation.
+ *
+ * This is primarily used for debugging purposes to log screen information.
+ * The returned string must be freed by the caller.
+ *
+ * @param fbv Pointer to the variable screen info structure.
+ * @return A newly allocated string representing the screen info, or NULL on failure.
+ */
 static char *
 fb_var_str_convert(const struct fb_var_screeninfo *fbv)
 {
@@ -264,6 +312,15 @@ fb_var_str_convert(const struct fb_var_screeninfo *fbv)
 /* -------------------------------------------------------------------- */
 /* palette setting                                                      */
 
+/**
+ * @internal
+ * @brief Initializes the color palette for 8-bit 3:3:2 RGB mode.
+ *
+ * This function sets up a colormap where red has 3 bits, green has 3 bits,
+ * and blue has 2 bits of precision. It's used for 8bpp displays.
+ *
+ * @param mode Pointer to the FB_Mode structure. Assumes mode->fb_var.bits_per_pixel is 8.
+ */
 static void
 fb_init_palette_332(FB_Mode *mode)
 {
@@ -308,6 +365,17 @@ fb_init_palette_332(FB_Mode *mode)
      }
 }
 
+/**
+ * @internal
+ * @brief Initializes a linear grayscale or pseudo-color palette for 8-bit modes.
+ *
+ * This function sets up a colormap where each entry (0-255) maps to an
+ * intensity level for red, green, and blue equally, effectively creating
+ * a grayscale palette if the hardware interprets it that way, or a direct
+ * mapping for pseudo-color.
+ *
+ * @param mode Pointer to the FB_Mode structure. Assumes mode->fb_var.bits_per_pixel is 8.
+ */
 static void
 fb_init_palette_linear(FB_Mode *mode)
 {
@@ -336,6 +404,25 @@ fb_init_palette_linear(FB_Mode *mode)
 /* -------------------------------------------------------------------- */
 /* initialisation & cleanup                                             */
 
+/**
+ * @brief Lists available framebuffer modes from /etc/fb.modes.
+ *
+ * Parses the /etc/fb.modes file to find defined video modes.
+ * The caller is responsible for freeing the returned array of FB_Mode structures.
+ *
+ * @param[out] num_return Pointer to an unsigned int where the number of modes found will be stored.
+ * @return An array of FB_Mode structures representing the available modes.
+ *         Returns NULL if /etc/fb.modes cannot be opened or if no modes are found.
+ *         Each element in the array would be like:
+ *         {
+ *           width = 640, height = 480, refresh = 60,
+ *           fb_var = {
+ *             xres = 640, yres = 480, xres_virtual = 640, yres_virtual = 480,
+ *             bits_per_pixel = 16, ... // other fb_var_screeninfo fields
+ *           },
+ *           // other FB_Mode fields like depth, bpp might not be fully populated here
+ *         }
+ */
 FB_Mode *
 fb_list_modes(unsigned int *num_return)
 {
@@ -443,6 +530,16 @@ fb_list_modes(unsigned int *num_return)
    return modes;
 }
 
+/**
+ * @internal
+ * @brief Sets the variable screen information for the framebuffer.
+ *
+ * This function calls the FBIOPUT_VSCREENINFO ioctl to apply the
+ * provided screen settings.
+ *
+ * @param fb_var Pointer to the fb_var_screeninfo structure with the desired settings.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _fb_vscreeninfo_put(const struct fb_var_screeninfo *fb_var)
 {
@@ -463,6 +560,28 @@ _fb_vscreeninfo_put(const struct fb_var_screeninfo *fb_var)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets the framebuffer video mode.
+ *
+ * Searches for a matching mode in /etc/fb.modes based on width, height,
+ * pixel depth (pdepth), and refresh rate. If a match is found, it attempts
+ * to set this mode.
+ *
+ * @param width Desired width in pixels.
+ * @param height Desired height in pixels.
+ * @param pdepth Desired pixel depth (bits per pixel). If 0, any depth matching
+ *               width, height, and refresh is considered.
+ * @param refresh Desired refresh rate in Hz.
+ * @return A pointer to an FB_Mode structure representing the successfully set mode.
+ *         The caller is responsible for freeing this structure using fb_freemode().
+ *         Returns NULL if no matching mode is found or if setting the mode fails.
+ *         Example of a returned FB_Mode (if successful):
+ *         {
+ *           width = 1024, height = 768, refresh = 75, depth = 16, bpp = 2,
+ *           fb_var = { // populated fb_var_screeninfo for 1024x768x16bpp@75Hz ... },
+ *           mem = (pointer to mmaped memory), mem_offset = ..., stride = ..., fb_fd = ...
+ *         }
+ */
 FB_Mode *
 fb_setmode(unsigned int width, unsigned int height, unsigned int pdepth, unsigned int refresh)
 {
@@ -505,6 +624,18 @@ fb_setmode(unsigned int width, unsigned int height, unsigned int pdepth, unsigne
    return NULL;
 }
 
+/**
+ * @brief Changes the pixel depth of the current framebuffer mode.
+ *
+ * Modifies the bits_per_pixel field of the current mode's fb_var_screeninfo
+ * and attempts to apply it. The original cur_mode is freed.
+ *
+ * @param cur_mode Pointer to the current FB_Mode structure. This structure will be freed.
+ * @param pdepth New desired pixel depth (bits per pixel).
+ * @return A pointer to a new FB_Mode structure representing the mode with the changed depth.
+ *         The caller is responsible for freeing this new structure using fb_freemode().
+ *         Returns NULL if setting the new depth fails.
+ */
 FB_Mode *
 fb_changedepth(FB_Mode *cur_mode, unsigned int pdepth)
 {
@@ -516,6 +647,23 @@ fb_changedepth(FB_Mode *cur_mode, unsigned int pdepth)
    return fb_getmode();
 }
 
+/**
+ * @brief Changes the resolution and refresh rate of the current framebuffer mode.
+ *
+ * Searches /etc/fb.modes for a mode matching the new width, height, and refresh rate,
+ * while keeping the current pixel depth. If found, applies the new mode.
+ * The original cur_mode is freed if a new mode is successfully set.
+ *
+ * @param cur_mode Pointer to the current FB_Mode structure. This structure will be
+ *                 freed if a new mode is successfully set.
+ * @param width New desired width in pixels.
+ * @param height New desired height in pixels.
+ * @param refresh New desired refresh rate in Hz.
+ * @return A pointer to an FB_Mode structure representing the new mode. If a new mode
+ *         is set, this is a new structure that must be freed. If no matching mode is
+ *         found or setting fails, returns the original cur_mode.
+ *         The caller is responsible for freeing the returned structure using fb_freemode().
+ */
 FB_Mode *
 fb_changeres(FB_Mode *cur_mode, unsigned int width, unsigned int height, unsigned int refresh)
 {
@@ -562,6 +710,25 @@ fb_changeres(FB_Mode *cur_mode, unsigned int width, unsigned int height, unsigne
    return cur_mode;
 }
 
+/**
+ * @brief Changes the framebuffer video mode (resolution, depth, and refresh rate).
+ *
+ * Searches /etc/fb.modes for a mode matching the new width, height, pixel depth (pdepth),
+ * and refresh rate. If found, applies the new mode.
+ * The original cur_mode is freed if a new mode is successfully set.
+ *
+ * @param cur_mode Pointer to the current FB_Mode structure. This structure will be
+ *                 freed if a new mode is successfully set.
+ * @param width New desired width in pixels.
+ * @param height New desired height in pixels.
+ * @param pdepth New desired pixel depth (bits per pixel). If 0, the depth from a
+ *               matching mode in /etc/fb.modes is used.
+ * @param refresh New desired refresh rate in Hz.
+ * @return A pointer to an FB_Mode structure representing the new mode. If a new mode
+ *         is set, this is a new structure that must be freed. If no matching mode is
+ *         found or setting fails, returns the original cur_mode.
+ *         The caller is responsible for freeing the returned structure using fb_freemode().
+ */
 FB_Mode *
 fb_changemode(FB_Mode *cur_mode, unsigned int width, unsigned int height, unsigned int pdepth, unsigned int refresh)
 {
@@ -609,6 +776,24 @@ fb_changemode(FB_Mode *cur_mode, unsigned int width, unsigned int height, unsign
    return cur_mode;
 }
 
+/**
+ * @brief Gets the current framebuffer mode information.
+ *
+ * Retrieves the current variable screen information (FBIOGET_VSCREENINFO)
+ * and populates an FB_Mode structure. It also calculates refresh rate,
+ * depth, and bpp based on the retrieved information.
+ * For 8-bit modes, it initializes a 3:3:2 palette; otherwise, a linear palette.
+ *
+ * @return A pointer to a newly allocated FB_Mode structure representing the current mode.
+ *         The caller is responsible for freeing this structure using fb_freemode().
+ *         Returns NULL on failure (e.g., if ioctl fails).
+ *         Example of a returned FB_Mode:
+ *         {
+ *           width = 1920, height = 1080, refresh = 60, depth = 24, bpp = 4,
+ *           fb_var = { // current fb_var_screeninfo ... },
+ *           // other FB_Mode fields like mem, mem_offset, stride, fb_fd are NOT populated by this function.
+ *         }
+ */
 FB_Mode *
 fb_getmode(void)
 {
@@ -698,6 +883,11 @@ fb_getmode(void)
    return mode;
 }
 
+/**
+ * @brief Frees an FB_Mode structure.
+ *
+ * @param mode Pointer to the FB_Mode structure to be freed.
+ */
 void
 fb_freemode(FB_Mode *mode)
 {
@@ -762,6 +952,20 @@ fb_setvt(int vtno)
 }
 */
 
+/**
+ * @brief Initializes the framebuffer device.
+ *
+ * Opens the specified framebuffer device (e.g., /dev/fb0).
+ * It retrieves and stores the original screen information and colormap.
+ * It also attempts to get original TTY and keyboard modes, though this
+ * part is largely disabled with #if 0.
+ *
+ * The environment variable EVAS_FB_DEV can override the device path if it
+ * points to a valid framebuffer device (e.g., "/dev/fb1").
+ *
+ * @param vt Virtual terminal number (currently unused).
+ * @param device Framebuffer device number (e.g., 0 for /dev/fb0 or /dev/fb/0).
+ */
 void
 fb_init(int vt EINA_UNUSED, int device)
 {
@@ -856,6 +1060,25 @@ fb_init(int vt EINA_UNUSED, int device)
      }
 }
 
+/**
+ * @brief Performs post-initialization steps for the framebuffer.
+ *
+ * This function should be called after fb_init() and after a mode has been
+ * selected (e.g., via fb_setmode() or fb_getmode() followed by modifications).
+ * It retrieves fixed screen information, checks framebuffer type, maps the
+ * framebuffer memory, calculates stride, and pans the display to (0,0).
+ * It also sets the TTY to graphics mode (currently disabled with #if 0).
+ *
+ * The FB_Mode structure passed in is populated with:
+ * - mem: Pointer to the mmap'd framebuffer memory.
+ * - mem_offset: Offset for mmap.
+ * - stride: Line length in pixels.
+ * - fb_fd: The framebuffer file descriptor.
+ *
+ * @param mode Pointer to the FB_Mode structure for the desired mode.
+ *             This structure will be updated with mmap info and stride.
+ * @return The framebuffer file descriptor (fb) on success, -1 on failure.
+ */
 int
 fb_postinit(FB_Mode *mode)
 {
@@ -956,6 +1179,14 @@ fb_postinit(FB_Mode *mode)
   return fb;
 }
 
+/**
+ * @brief Cleans up framebuffer resources and restores console state.
+ *
+ * This function restores the original screen information and colormap.
+ * It also attempts to restore original TTY, keyboard, and VT modes
+ * (though some parts are disabled with #if 0).
+ * Finally, it closes the framebuffer and TTY file descriptors.
+ */
 void
 fb_cleanup(void)
 {

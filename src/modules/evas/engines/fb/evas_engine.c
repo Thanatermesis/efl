@@ -6,17 +6,38 @@
 #include <Ecore.h>
 #include <Eina.h>
 
+/** @internal Log domain for the Evas FB engine. */
 int _evas_engine_fb_log_dom = -1;
 
+/** @internal List of active output buffers. */
 static Eina_List *_outbufs = NULL;
 
 /* function tables - filled in later (func and parent func) */
 static Evas_Func func, pfunc;
 
 /* engine struct data */
+/**
+ * @internal
+ * @brief Typedef for the rendering engine data.
+ * This engine uses the software_generic rendering capabilities.
+ */
 typedef Render_Output_Software_Generic Render_Engine;
 
 /* engine api this module provides */
+/**
+ * @internal
+ * @brief Sets up the output for the Evas FB engine.
+ *
+ * This function initializes the rendering engine, sets up the output buffer
+ * using framebuffer-specific functions, and configures the software_generic
+ * rendering engine with appropriate callbacks.
+ *
+ * @param engine The Evas generic engine pointer.
+ * @param in Pointer to Evas_Engine_Info_FB containing setup information.
+ * @param w The width of the output.
+ * @param h The height of the output.
+ * @return A pointer to the configured Render_Engine, or NULL on failure.
+ */
 static void *
 eng_output_setup(void *engine, void *in, unsigned int w, unsigned int h)
 {
@@ -65,6 +86,15 @@ eng_output_setup(void *engine, void *in, unsigned int w, unsigned int h)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Sets up engine-specific information.
+ *
+ * This function is called to allow the engine to populate the
+ * Evas_Engine_Info_FB structure. It sets the rendering mode to blocking.
+ *
+ * @param info Pointer to Evas_Engine_Info_FB to be filled.
+ */
 static void
 eng_output_info_setup(void *info)
 {
@@ -73,6 +103,16 @@ eng_output_info_setup(void *info)
    einfo->render_mode = EVAS_RENDER_MODE_BLOCKING;
 }
 
+/**
+ * @internal
+ * @brief Frees the output data associated with the engine.
+ *
+ * Cleans up and frees the Render_Engine structure, including removing the
+ * output buffer from the list and cleaning the software_generic engine.
+ *
+ * @param engine The Evas generic engine pointer (unused in this function).
+ * @param data Pointer to the Render_Engine data to be freed.
+ */
 static void
 eng_output_free(void *engine, void *data)
 {
@@ -87,6 +127,15 @@ eng_output_free(void *engine, void *data)
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the alpha channel support status for the canvas.
+ *
+ * Checks if the underlying framebuffer device supports transparency.
+ *
+ * @param data Pointer to the Render_Engine data.
+ * @return EINA_TRUE if alpha is supported, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 eng_canvas_alpha_get(void *data)
 {
@@ -97,6 +146,17 @@ eng_canvas_alpha_get(void *data)
 }
 
 /* module advertising code */
+/**
+ * @internal
+ * @brief Opens the Evas FB engine module.
+ *
+ * This function is called when the module is loaded. It inherits functions
+ * from the "software_generic" engine, registers a log domain, and overrides
+ * specific engine functions with FB-specific implementations.
+ *
+ * @param em Pointer to the Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -125,6 +185,15 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @internal
+ * @brief Closes the Evas FB engine module.
+ *
+ * This function is called when the module is unloaded. It unregisters the
+ * log domain used by the engine.
+ *
+ * @param em Pointer to the Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {
@@ -135,14 +204,20 @@ module_close(Evas_Module *em EINA_UNUSED)
      }
 }
 
+/**
+ * @internal
+ * @brief Module API structure for the Evas FB engine.
+ *
+ * Defines the module API version, name, and entry points (module_open, module_close).
+ */
 static Evas_Module_Api evas_modapi =
 {
-  EVAS_MODULE_API_VERSION,
-  "fb",
-  "none",
+  EVAS_MODULE_API_VERSION, /**< Evas module API version. */
+  "fb",                    /**< Module name. */
+  "none",                  /**< Module author/licence (not strictly enforced). */
   {
-    module_open,
-    module_close
+    module_open,           /**< Function to open the module. */
+    module_close           /**< Function to close the module. */
   }
 };
 

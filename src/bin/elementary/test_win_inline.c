@@ -4,6 +4,15 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Fills a window with a set of widgets to test inlined windows.
+ *
+ * This function adds a scroller with a box containing entries, bubbles,
+ * and icons. It's a helper to populate the content of a window.
+ *
+ * @param win The window object to fill.
+ * @param do_bg If EINA_TRUE, a background is added to the window.
+ */
 static void
 fill(Evas_Object *win, Eina_Bool do_bg)
 {
@@ -134,6 +143,17 @@ fill(Evas_Object *win, Eina_Bool do_bg)
    evas_object_show(sc);
 }
 
+/**
+ * @brief Callback for mouse down events on the inlined window's image object.
+ *
+ * When the left mouse button is pressed on the image representation of an
+ * inlined window, this function sets the focus to that window object.
+ *
+ * @param data User data, unused.
+ * @param evas The evas canvas, unused.
+ * @param obj The object that received the event.
+ * @param event_info The mouse down event information.
+ */
 static void
 cb_mouse_down(void *data EINA_UNUSED, Evas *evas EINA_UNUSED, Evas_Object *obj, void *event_info)
 {
@@ -142,6 +162,18 @@ cb_mouse_down(void *data EINA_UNUSED, Evas *evas EINA_UNUSED, Evas_Object *obj, 
    if (ev->button == 1) elm_object_focus_set(obj, EINA_TRUE);
 }
 
+/**
+ * @brief Callback for mouse move events on the handles.
+ *
+ * This function is called when a handle is dragged. It moves the handle
+ * and updates the map of the original object ('orig') to create a perspective
+ * distortion effect based on the handle positions.
+ *
+ * @param data The original object to be transformed with a map.
+ * @param evas The evas canvas, unused.
+ * @param obj The handle object being moved.
+ * @param event_info The mouse move event information.
+ */
 static void
 cb_mouse_move(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj, void *event_info)
 {
@@ -181,6 +213,16 @@ cb_mouse_move(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj, void *event_
    evas_map_free(p);
 }
 
+/**
+ * @brief Creates four corner handles for an object.
+ *
+ * The handles are small image objects placed at the corners of the given
+ * object. These handles can be dragged to manipulate the object, for
+ * example to apply a map transformation. The handles are stored as
+ * data on the original object with keys "h-0", "h-1", "h-2", "h-3".
+ *
+ * @param obj The object for which to create handles.
+ */
 static void
 create_handles(Evas_Object *obj)
 {
@@ -209,6 +251,23 @@ create_handles(Evas_Object *obj)
      }
 }
 
+/**
+ * @brief Test case for inlined windows.
+ *
+ * This test creates a main window with a background image. Inside this
+ * window, it demonstrates two inlined windows.
+ *
+ * The first inlined window is packed into a box and resizes with the main
+ * window.
+ *
+ * The second inlined window is placed at a fixed position and size, and
+ * has handles that allow for perspective transformation via evas map.
+ * This demonstrates manual control over the inlined window's image object.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_win_inline(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

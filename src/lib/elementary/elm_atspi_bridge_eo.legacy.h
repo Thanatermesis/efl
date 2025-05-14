@@ -4,6 +4,10 @@
 #ifndef _ELM_ATSPI_BRIDGE_EO_CLASS_TYPE
 #define _ELM_ATSPI_BRIDGE_EO_CLASS_TYPE
 
+/**
+ * @brief Represents the Elm AT-SPI Bridge object.
+ * This object manages the connection and communication with the AT-SPI2 bus.
+ */
 typedef Eo Elm_Atspi_Bridge;
 
 #endif

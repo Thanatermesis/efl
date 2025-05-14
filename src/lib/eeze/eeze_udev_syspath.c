@@ -5,6 +5,21 @@
 #include <Eeze.h>
 #include "eeze_udev_private.h"
 
+/**
+ * @brief Get the syspath of the parent device matching a subsystem and devtype.
+ *
+ * This function walks up the device chain from the given @p syspath and
+ * returns the syspath of the first parent device that matches the specified
+ * @p subsystem and @p devtype.
+ *
+ * @param syspath The syspath of the child device.
+ * @param subsystem The subsystem to filter by (e.g., "usb"). Can be NULL.
+ * @param devtype The devtype to filter by (e.g., "usb_device"). Can be NULL.
+ * @return The syspath of the matching parent device as an Eina_Stringshare,
+ *         or @c NULL if no matching parent is found or on error.
+ *         The returned stringshare must be freed by the caller using
+ *         eina_stringshare_del().
+ */
 EAPI Eina_Stringshare *
 eeze_udev_syspath_get_parent_filtered(const char *syspath, const char *subsystem, const char *devtype)
 {
@@ -22,6 +37,15 @@ eeze_udev_syspath_get_parent_filtered(const char *syspath, const char *subsystem
    return ret;
 }
 
+/**
+ * @brief Get the syspath of the immediate parent device.
+ *
+ * @param syspath The syspath of the child device.
+ * @return The syspath of the parent device as an Eina_Stringshare,
+ *         or @c NULL if no parent is found or on error.
+ *         The returned stringshare must be freed by the caller using
+ *         eina_stringshare_del().
+ */
 EAPI const char *
 eeze_udev_syspath_get_parent(const char *syspath)
 {
@@ -39,6 +63,19 @@ eeze_udev_syspath_get_parent(const char *syspath)
    return ret;
 }
 
+/**
+ * @brief Get a list of syspaths for all parent devices.
+ *
+ * This function walks up the device chain from the given @p syspath
+ * and returns a list of syspaths for all ancestor devices. The list
+ * is ordered from the closest parent to the furthest ancestor.
+ *
+ * @param syspath The syspath of the child device.
+ * @return An Eina_List containing Eina_Stringshare elements for each parent's
+ *         syspath, or @c NULL if no parents are found or on error.
+ *         The list and its stringshare elements must be freed by the caller.
+ *         Example: eina_list_free() after eina_stringshare_del() on each item.
+ */
 EAPI Eina_List *
 eeze_udev_syspath_get_parents(const char *syspath)
 {
@@ -68,6 +105,17 @@ eeze_udev_syspath_get_parents(const char *syspath)
    return devlist;
 }
 
+/**
+ * @brief Get the device node path (devpath) for a given syspath.
+ *
+ * The devpath is the path to the device file in the /dev directory
+ * (e.g., "/dev/sda1").
+ *
+ * @param syspath The syspath of the device.
+ * @return The devpath as an Eina_Stringshare, or @c NULL if not found or on error.
+ *         The returned stringshare must be freed by the caller using
+ *         eina_stringshare_del().
+ */
 EAPI const char *
 eeze_udev_syspath_get_devpath(const char *syspath)
 {
@@ -91,6 +139,16 @@ eeze_udev_syspath_get_devpath(const char *syspath)
    return name;
 }
 
+/**
+ * @brief Get the system name (sysname) for a given syspath.
+ *
+ * The sysname is the kernel's internal name for the device (e.g., "sda1").
+ *
+ * @param syspath The syspath of the device.
+ * @return The sysname as an Eina_Stringshare, or @c NULL if not found or on error.
+ *         The returned stringshare must be freed by the caller using
+ *         eina_stringshare_del().
+ */
 EAPI const char *
 eeze_udev_syspath_get_devname(const char *syspath)
 {
@@ -114,6 +172,16 @@ eeze_udev_syspath_get_devname(const char *syspath)
    return name;
 }
 
+/**
+ * @brief Get the subsystem of a device for a given syspath.
+ *
+ * Example subsystems include "block", "input", "pci", etc.
+ *
+ * @param syspath The syspath of the device.
+ * @return The subsystem name as an Eina_Stringshare, or @c NULL if not found or on error.
+ *         The returned stringshare must be freed by the caller using
+ *         eina_stringshare_del().
+ */
 EAPI const char *
 eeze_udev_syspath_get_subsystem(const char *syspath)
 {
@@ -130,6 +198,15 @@ eeze_udev_syspath_get_subsystem(const char *syspath)
    return subsystem;
 }
 
+/**
+ * @brief Check if a device property matches a given value.
+ *
+ * @param syspath The syspath of the device.
+ * @param property The name of the property to check (e.g., "ID_VENDOR_ID").
+ * @param value The value to compare against.
+ * @return @c EINA_TRUE if the property exists and its value matches @p value,
+ *         @c EINA_FALSE otherwise or on error.
+ */
 EAPI Eina_Bool
 eeze_udev_syspath_check_property(const char *syspath, const char *property, const char *value)
 {
@@ -149,6 +226,16 @@ eeze_udev_syspath_check_property(const char *syspath, const char *property, cons
    return ret;
 }
 
+/**
+ * @brief Get the value of a device property.
+ *
+ * @param syspath The syspath of the device.
+ * @param property The name of the property to retrieve (e.g., "ID_MODEL_ID").
+ * @return The property value as an Eina_Stringshare, or @c NULL if the property
+ *         is not found or on error.
+ *         The returned stringshare must be freed by the caller using
+ *         eina_stringshare_del().
+ */
 EAPI const char *
 eeze_udev_syspath_get_property(const char *syspath,
                                const char *property)
@@ -169,6 +256,17 @@ eeze_udev_syspath_get_property(const char *syspath,
    return value;
 }
 
+/**
+ * @brief Check if a device sysattr matches a given value.
+ *
+ * Sysattrs are kernel attributes of a device, found in sysfs.
+ *
+ * @param syspath The syspath of the device.
+ * @param sysattr The name of the sysattr to check (e.g., "power/control").
+ * @param value The value to compare against.
+ * @return @c EINA_TRUE if the sysattr exists and its value matches @p value,
+ *         @c EINA_FALSE otherwise or on error.
+ */
 EAPI Eina_Bool
 eeze_udev_syspath_check_sysattr(const char *syspath, const char *sysattr, const char *value)
 {
@@ -189,6 +287,16 @@ eeze_udev_syspath_check_sysattr(const char *syspath, const char *sysattr, const 
    return ret;
 }
 
+/**
+ * @brief Get the value of a device sysattr.
+ *
+ * @param syspath The syspath of the device.
+ * @param sysattr The name of the sysattr to retrieve (e.g., "manufacturer").
+ * @return The sysattr value as an Eina_Stringshare, or @c NULL if the sysattr
+ *         is not found or on error.
+ *         The returned stringshare must be freed by the caller using
+ *         eina_stringshare_del().
+ */
 EAPI const char *
 eeze_udev_syspath_get_sysattr(const char *syspath,
                               const char *sysattr)
@@ -209,6 +317,19 @@ eeze_udev_syspath_get_sysattr(const char *syspath,
    return value;
 }
 
+/**
+ * @brief Set the value of a device sysattr.
+ *
+ * Note: This function attempts to write a double value as a string to the sysattr.
+ * This operation might not be supported for all sysattrs or may require
+ * specific privileges.
+ * The functionality depends on the version of libudev being used (OLD_LIBUDEV macro).
+ *
+ * @param syspath The syspath of the device.
+ * @param sysattr The name of the sysattr to set (e.g., "brightness").
+ * @param value The double value to set.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure or if not supported.
+ */
 EAPI Eina_Bool
 eeze_udev_syspath_set_sysattr(const char *syspath,
                               const char *sysattr,
@@ -239,6 +360,14 @@ eeze_udev_syspath_set_sysattr(const char *syspath,
   return ret;
 }
 
+/**
+ * @brief Get a list of all sysattr names for a device.
+ *
+ * @param syspath The syspath of the device.
+ * @return An Eina_List containing Eina_Stringshare elements for each sysattr name,
+ *         or @c NULL if no sysattrs are found or on error.
+ *         The list and its stringshare elements must be freed by the caller.
+ */
 EAPI Eina_List *
 eeze_udev_syspath_get_sysattr_list(const char *syspath)
 {
@@ -263,6 +392,15 @@ eeze_udev_syspath_get_sysattr_list(const char *syspath)
    return syslist;
 }
 
+/**
+ * @brief Check if a device is a mouse.
+ *
+ * This function checks the "ID_INPUT_MOUSE" property of the device.
+ *
+ * @param syspath The syspath of the device.
+ * @return @c EINA_TRUE if the device is identified as a mouse,
+ *         @c EINA_FALSE otherwise or on error.
+ */
 EAPI Eina_Bool
 eeze_udev_syspath_is_mouse(const char *syspath)
 {
@@ -285,6 +423,15 @@ eeze_udev_syspath_is_mouse(const char *syspath)
    return mouse;
 }
 
+/**
+ * @brief Check if a device is a keyboard.
+ *
+ * This function checks the "ID_INPUT_KEYBOARD" property of the device.
+ *
+ * @param syspath The syspath of the device.
+ * @return @c EINA_TRUE if the device is identified as a keyboard,
+ *         @c EINA_FALSE otherwise or on error.
+ */
 EAPI Eina_Bool
 eeze_udev_syspath_is_kbd(const char *syspath)
 {
@@ -307,6 +454,15 @@ eeze_udev_syspath_is_kbd(const char *syspath)
    return kbd;
 }
 
+/**
+ * @brief Check if a device is a touchpad.
+ *
+ * This function checks the "ID_INPUT_TOUCHPAD" property of the device.
+ *
+ * @param syspath The syspath of the device.
+ * @return @c EINA_TRUE if the device is identified as a touchpad,
+ *         @c EINA_FALSE otherwise or on error.
+ */
 EAPI Eina_Bool
 eeze_udev_syspath_is_touchpad(const char *syspath)
 {
@@ -329,6 +485,15 @@ eeze_udev_syspath_is_touchpad(const char *syspath)
    return touchpad;
 }
 
+/**
+ * @brief Check if a device is a joystick.
+ *
+ * This function checks the "ID_INPUT_JOYSTICK" property of the device.
+ *
+ * @param syspath The syspath of the device.
+ * @return @c EINA_TRUE if the device is identified as a joystick,
+ *         @c EINA_FALSE otherwise or on error.
+ */
 EAPI Eina_Bool
 eeze_udev_syspath_is_joystick(const char *syspath)
 {
@@ -351,6 +516,17 @@ eeze_udev_syspath_is_joystick(const char *syspath)
    return joystick;
 }
 
+/**
+ * @brief Get the syspath for a given device node path (devpath).
+ *
+ * This function queries udev to find a device matching the given @p devpath
+ * (e.g., "/dev/input/event0") and returns its corresponding syspath.
+ *
+ * @param devpath The device node path (e.g., "/dev/ttyS0").
+ * @return The syspath as an Eina_Stringshare, or @c NULL if not found or on error.
+ *         The returned stringshare must be freed by the caller using
+ *         eina_stringshare_del().
+ */
 EAPI const char *
 eeze_udev_devpath_get_syspath(const char *devpath)
 {
@@ -378,6 +554,15 @@ eeze_udev_devpath_get_syspath(const char *devpath)
    return ret;
 }
 
+/**
+ * @brief Get the sysnum (kernel number) of a device.
+ *
+ * The sysnum is a string representation of the kernel number for the device.
+ * This function converts it to an integer.
+ *
+ * @param syspath The syspath of the device.
+ * @return The sysnum as an integer, or -1 if not found or on error.
+ */
 EAPI int
 eeze_udev_syspath_get_sysnum(const char *syspath)
 {

@@ -84,56 +84,92 @@
 
 #ifdef EINA_ENABLE_LOG
 
-// Structure for storing domain level settings passed from the command line
-// that will be matched with application-defined domains.
+/**
+ * @internal
+ * @struct _Eina_Log_Domain_Level_Pending
+ * @brief Structure for storing domain level settings that are pending.
+ *
+ * This structure holds log level settings for domains that might be
+ * registered later. These settings are typically parsed from environment
+ * variables like EINA_LOG_LEVELS.
+ */
 typedef struct _Eina_Log_Domain_Level_Pending Eina_Log_Domain_Level_Pending;
 struct _Eina_Log_Domain_Level_Pending
 {
-   EINA_INLIST;
-   unsigned int level;
-   size_t namelen;
-   char name[];
+   EINA_INLIST; /**< Macro for inlist node integration. */
+   unsigned int level; /**< The pending log level for the domain. */
+   size_t namelen; /**< The length of the domain name. */
+   char name[]; /**< The domain name (flexible array member). */
 };
 
+/**
+ * @internal
+ * @struct _Eina_Log_Timing
+ * @brief Structure for storing timing information for log phases.
+ *
+ * Used by eina_log_timing() to track the start time and state of a named phase
+ * for a specific log domain.
+ */
 typedef struct _Eina_Log_Timing Eina_Log_Timing;
 struct _Eina_Log_Timing
 {
-   const char *phase;
-   Eina_Nano_Time start;
-   Eina_Log_State state;
+   const char *phase; /**< Name of the current timing phase. */
+   Eina_Nano_Time start; /**< Start time of the phase. */
+   Eina_Log_State state; /**< Current state of the phase (start/stop). */
 };
 
 EINA_API const char *_eina_log_state_init = "init";
 EINA_API const char *_eina_log_state_shutdown = "shutdown";
 
-/*
- * List of levels for domains set by the user before the domains are registered,
- * updates the domain levels on the first log and clears itself.
+/**
+ * @internal
+ * @brief List of pending log levels for specific domains.
+ * @see EINA_LOG_ENV_LEVELS
  */
 static Eina_Inlist *_pending_list = NULL;
+/**
+ * @internal
+ * @brief List of pending log levels for domains matching a glob pattern.
+ * @see EINA_LOG_ENV_LEVELS_GLOB
+ */
 static Eina_Inlist *_glob_list = NULL;
 
-// Disable color flag (can be changed through the env var
-// EINA_LOG_ENV_COLOR_DISABLE).
+/**< @internal @brief Flag to disable colored log output. Controlled by EINA_LOG_ENV_COLOR_DISABLE. */
 static Eina_Bool _disable_color = EINA_FALSE;
+/**< @internal @brief Flag to disable file name in log output. Controlled by EINA_LOG_ENV_FILE_DISABLE. */
 static Eina_Bool _disable_file = EINA_FALSE;
+/**< @internal @brief Flag to disable function name in log output. Controlled by EINA_LOG_ENV_FUNCTION_DISABLE. */
 static Eina_Bool _disable_function = EINA_FALSE;
+/**< @internal @brief Flag to abort on critical log messages. Controlled by EINA_LOG_ENV_ABORT. */
 static Eina_Bool _abort_on_critical = EINA_FALSE;
+/**< @internal @brief Flag to disable log timing. Controlled by EINA_LOG_TIMING. */
 static Eina_Bool _disable_timing = EINA_TRUE;
+/**< @internal @brief Log level at which to abort if _abort_on_critical is true. Controlled by EINA_LOG_ENV_ABORT_LEVEL. */
 static int _abort_level_on_critical = EINA_LOG_LEVEL_CRITICAL;
 
 #ifdef EINA_LOG_BACKTRACE
-// CRI & ERR by default in release mode, nothing in dev mode
+/**
+ * @internal
+ * @brief Log level at or below which a backtrace should be printed.
+ * Defaults to -1 (disabled) in development mode (EINA_LOG_BACKTRACE_ENABLE not defined),
+ * or EINA_LOG_LEVEL_ERR in release mode. Controlled by EINA_LOG_ENV_BACKTRACE.
+ * A value of -1 means backtraces are disabled unless overridden by the environment variable.
+ * EINA_LOG_LEVEL_CRITICAL (0) would enable for critical messages.
+ * EINA_LOG_LEVEL_ERR (1) would enable for error and critical messages.
+ */
 # ifndef EINA_LOG_BACKTRACE_ENABLE
-static int _backtrace_level = -1;
+static int _backtrace_level = -1; // Disabled by default in dev builds unless EINA_LOG_ENV_BACKTRACE is set
 # else
-static int _backtrace_level = EINA_LOG_LEVEL_ERR;
+static int _backtrace_level = EINA_LOG_LEVEL_ERR; // ERR and CRI by default in release builds
 # endif
 #endif
 
+/**< @internal @brief Flag indicating if logging thread-safety features are enabled. */
 static Eina_Bool _threads_enabled = EINA_FALSE;
+/**< @internal @brief Flag indicating if thread-related resources for logging have been initialized. */
 static Eina_Bool _threads_inited = EINA_FALSE;
 
+/**< @internal @brief Stores the thread ID of the main thread (the one that calls eina_init() first). */
 static Eina_Thread _main_thread;
 
 #  define SELF() eina_thread_self()
@@ -156,16 +192,21 @@ static Eina_Spinlock _log_mutex;
 #   define INIT() eina_spinlock_new(&_log_mutex)
 #   define SHUTDOWN() eina_spinlock_free(&_log_mutex)
 
-// List of domains registered
+/**< @internal @brief Array storing all registered log domains. */
 static Eina_Log_Domain *_log_domains = NULL;
+/**< @internal @brief Array storing timing information for each domain. Parallels _log_domains. */
 static Eina_Log_Timing *_log_timing = NULL;
+/**< @internal @brief Number of currently registered (active or deleted-slot) log domains. */
 static unsigned int _log_domains_count = 0;
+/**< @internal @brief Number of allocated slots in _log_domains and _log_timing. */
 static size_t _log_domains_allocated = 0;
 
-// Default function for printing on domains
+/**< @internal @brief The current log printing callback function. Defaults to eina_log_print_cb_stderr. */
 static Eina_Log_Print_Cb _print_cb = eina_log_print_cb_stderr;
+/**< @internal @brief User data to be passed to the _print_cb. */
 static void *_print_cb_data = NULL;
 
+/**< @internal @brief Global/default log level. Initialized based on build type (DEBUG, DEBUG_CRITICAL, or release). */
 #ifdef DEBUG
 static Eina_Log_Level _log_level = EINA_LOG_LEVEL_DBG;
 #elif DEBUG_CRITICAL
@@ -174,25 +215,37 @@ static Eina_Log_Level _log_level = EINA_LOG_LEVEL_CRITICAL;
 static Eina_Log_Level _log_level = EINA_LOG_LEVEL_ERR;
 #endif
 
-/* NOTE: if you change this, also change:
+/**
+ * @internal
+ * @brief Array of short string representations for standard log levels.
+ * Used by eina_log_print_level_name_get().
+ * NOTE: if you change this, also change:
  *   eina_log_print_level_name_get()
  *   eina_log_print_level_name_color_get()
  */
 static const char *_names[] = {
-   "CRI",
-   "ERR",
-   "WRN",
-   "INF",
-   "DBG",
+   "CRI", /**< EINA_LOG_LEVEL_CRITICAL */
+   "ERR", /**< EINA_LOG_LEVEL_ERR */
+   "WRN", /**< EINA_LOG_LEVEL_WARN */
+   "INF", /**< EINA_LOG_LEVEL_INFO */
+   "DBG", /**< EINA_LOG_LEVEL_DBG */
 };
 
 #ifdef _WIN32
 
+/**< @internal @brief Flag indicating if the current Win32 output is a console (supports color attributes). */
 static Eina_Bool _eina_log_win32_is_console = EINA_FALSE;
-/* TODO: query win32_def_attr on eina_log_init() */
+/**< @internal @brief Default Win32 console text attributes (white text). TODO: query win32_def_attr on eina_log_init() */
 static int win32_def_attr = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
 
-/* NOTE: can't use eina_log from inside this function */
+/**
+ * @internal
+ * @brief Converts an ANSI-like color string to Windows console attributes.
+ * @param color The ANSI-like color string (e.g., "\033[31;1m").
+ * @param[out] endptr If not NULL, set to point after the parsed color code in @p color.
+ * @return The corresponding Windows console attribute flags, or 0 if conversion fails.
+ * @note Can't use eina_log from inside this function.
+ */
 static int
 eina_log_win32_color_convert(const char *color, const char **endptr)
 {
@@ -289,6 +342,13 @@ eina_log_win32_color_convert(const char *color, const char **endptr)
    return attr;
 }
 
+/**
+ * @internal
+ * @brief Converts an ANSI-like color string to Windows console attributes.
+ * This is a convenience wrapper around eina_log_win32_color_convert.
+ * @param color The ANSI-like color string.
+ * @return The corresponding Windows console attribute flags.
+ */
 static int
 eina_log_win32_color_get(const char *color)
 {
@@ -296,12 +356,25 @@ eina_log_win32_color_get(const char *color)
 }
 #endif
 
+/**
+ * @internal
+ * @brief Gets the current process ID.
+ * @return The process ID as an unsigned integer.
+ */
 static inline unsigned int
 eina_log_pid_get(void)
 {
    return (unsigned int)getpid();
 }
 
+/**
+ * @internal
+ * @brief Gets the string representation for a given log level.
+ * For standard levels, it uses the _names array. For others, it formats the integer.
+ * @param level The log level.
+ * @param[out] p_name Pointer to a const char* which will be set to the level's name string.
+ *                    The string is valid until the next call if a temporary buffer is used.
+ */
 static inline void
 eina_log_print_level_name_get(int level, const char **p_name)
 {
@@ -325,6 +398,14 @@ eina_log_print_level_name_get(int level, const char **p_name)
 }
 
 #ifdef _WIN32
+/**
+ * @internal
+ * @brief Gets the string name and Win32 console color attribute for a given log level.
+ * This is for Win32 console specific output.
+ * @param level The log level.
+ * @param[out] p_name Pointer to a const char* which will be set to the level's name string.
+ * @param[out] p_color Pointer to an int which will be set to the Win32 console color attribute.
+ */
 static inline void
 eina_log_print_level_name_color_get_win32_console(int level,
                                                   const char **p_name,
@@ -350,6 +431,14 @@ eina_log_print_level_name_color_get_win32_console(int level,
    *p_color = eina_log_win32_color_get(eina_log_level_color_get(level));
 }
 #endif
+/**
+ * @internal
+ * @brief Gets the string name and POSIX terminal color code for a given log level.
+ * This is for POSIX terminals supporting ANSI escape codes.
+ * @param level The log level.
+ * @param[out] p_name Pointer to a const char* which will be set to the level's name string.
+ * @param[out] p_color Pointer to a const char* which will be set to the ANSI color code string.
+ */
 static inline void
 eina_log_print_level_name_color_get_posix(int level,
                                           const char **p_name,
@@ -976,8 +1065,15 @@ static void (*_eina_log_print_prefix)(FILE *fp, const Eina_Log_Domain *d,
                                       Eina_Log_Level level, const char *file,
                                       const char *fnc,
                                       int line) =
-   eina_log_print_prefix_NOthreads_color_file_func;
+   eina_log_print_prefix_NOthreads_color_file_func; /**< @internal @brief Function pointer to the current log prefix printing function. Selected by eina_log_print_prefix_update(). */
 
+/**
+ * @internal
+ * @brief Updates the _eina_log_print_prefix function pointer based on current settings.
+ * This function selects the appropriate prefix formatting routine (e.g., with/without color,
+ * thread ID, file/line info) based on global flags like _threads_enabled, _disable_color,
+ * _disable_file, and _disable_function.
+ */
 static inline void
 eina_log_print_prefix_update(void)
 {
@@ -1041,8 +1137,14 @@ eina_log_print_prefix_update(void)
 #undef S
 }
 
-/*
- * Creates a colored domain name string.
+/**
+ * @internal
+ * @brief Creates a formatted domain string, potentially with ANSI color codes.
+ * If color is enabled and provided, the domain name is wrapped in color codes.
+ * The returned string is dynamically allocated and must be freed by the caller.
+ * @param name The domain name.
+ * @param color The ANSI color string (e.g., EINA_COLOR_RED) or NULL for no color.
+ * @return A newly allocated string containing the formatted domain name.
  */
 static const char *
 eina_log_domain_str_get(const char *name, const char *color)
@@ -1074,9 +1176,17 @@ eina_log_domain_str_get(const char *name, const char *color)
    return d;
 }
 
-/*
- * Setups a new logging domain to the name and color specified. Note that this
- * constructor acts upon an pre-allocated object.
+/**
+ * @internal
+ * @brief Initializes an Eina_Log_Domain structure.
+ * This function sets up a new logging domain with the given name and color.
+ * It populates the fields of a pre-allocated Eina_Log_Domain structure.
+ * The domain_str and name fields are dynamically allocated.
+ * @param d Pointer to the Eina_Log_Domain structure to initialize.
+ * @param t Pointer to the Eina_Log_Timing structure to initialize for this domain.
+ * @param name The name of the log domain.
+ * @param color The ANSI color string for the domain, or NULL.
+ * @return Pointer to the initialized Eina_Log_Domain structure @p d, or NULL on failure.
  */
 static Eina_Log_Domain *
 eina_log_domain_new(Eina_Log_Domain *d, Eina_Log_Timing *t,
@@ -1102,9 +1212,13 @@ eina_log_domain_new(Eina_Log_Domain *d, Eina_Log_Timing *t,
    return d;
 }
 
-/*
- * Frees internal strings of a log domain, keeping the log domain itself as a
- * slot for next domain registers.
+/**
+ * @internal
+ * @brief Frees internally allocated strings within an Eina_Log_Domain structure.
+ * This function is called when a domain is unregistered or when Eina Log is shut down.
+ * It frees the `domain_str` and `name` members. The Eina_Log_Domain structure itself
+ * is not freed here, as it might be part of an array.
+ * @param d Pointer to the Eina_Log_Domain structure whose members are to be freed.
  */
 static void
 eina_log_domain_free(Eina_Log_Domain *d)
@@ -1115,8 +1229,12 @@ eina_log_domain_free(Eina_Log_Domain *d)
    free((char *)d->name);
 }
 
-/*
- * Parses domain levels passed through the env var.
+/**
+ * @internal
+ * @brief Parses domain-specific log levels from the EINA_LOG_LEVELS environment variable.
+ * The format is "name1:level1,name2:level2,...".
+ * Parsed levels are stored in the _pending_list to be applied when domains are registered
+ * or to override levels of already registered domains.
  */
 static void
 eina_log_domain_parse_pendings(void)
@@ -1126,7 +1244,7 @@ eina_log_domain_parse_pendings(void)
    if (!(start = getenv(EINA_LOG_ENV_LEVELS)))
       return;
 
-   // name1:level1,name2:level2,name3:level3,...
+   // Format: name1:level1,name2:level2,name3:level3,...
    while (1)
      {
         Eina_Log_Domain_Level_Pending *p;
@@ -1165,6 +1283,13 @@ parse_end:
      }
 }
 
+/**
+ * @internal
+ * @brief Parses domain-specific log levels from the EINA_LOG_LEVELS_GLOB environment variable.
+ * The format is "glob_pattern1:level1,glob_pattern2:level2,...".
+ * Parsed levels are stored in the _glob_list to be applied to domains whose names match
+ * the glob patterns.
+ */
 static void
 eina_log_domain_parse_pending_globs(void)
 {
@@ -1173,7 +1298,7 @@ eina_log_domain_parse_pending_globs(void)
    if (!(start = getenv(EINA_LOG_ENV_LEVELS_GLOB)))
       return;
 
-   // name1:level1,name2:level2,name3:level3,...
+   // Format: name1:level1,name2:level2,name3:level3,...
    while (1)
      {
         Eina_Log_Domain_Level_Pending *p;
@@ -1212,6 +1337,16 @@ parse_end:
      }
 }
 
+/**
+ * @internal
+ * @brief Registers a new log domain or reuses a deleted slot. (Unlocked version)
+ * This is the core logic for eina_log_domain_register(). It handles allocation of
+ * domain structures, applies pending level settings, and initializes the domain.
+ * This function assumes necessary locks are already held.
+ * @param name The name for the new domain.
+ * @param color The ANSI color string for the domain, or NULL.
+ * @return The domain ID (index) on success, or -1 on failure.
+ */
 static inline int
 eina_log_domain_register_unlocked(const char *name, const char *color)
 {
@@ -1297,6 +1432,12 @@ finish_register:
    return i;
 }
 
+/**
+ * @internal
+ * @brief Checks if the terminal specified by the TERM environment variable likely supports ANSI colors.
+ * @param term The value of the TERM environment variable.
+ * @return #EINA_TRUE if the terminal is known to support colors, #EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 eina_log_term_color_supported(const char *term)
 {
@@ -1345,6 +1486,14 @@ eina_log_term_color_supported(const char *term)
      }
 }
 
+/**
+ * @internal
+ * @brief Unregisters a log domain. (Unlocked version)
+ * This is the core logic for eina_log_domain_unregister(). It marks the domain
+ * slot as deleted and frees associated resources.
+ * This function assumes necessary locks are already held.
+ * @param domain The ID of the domain to unregister.
+ */
 static inline void
 eina_log_domain_unregister_unlocked(int domain)
 {
@@ -1374,6 +1523,21 @@ eina_log_domain_unregister_unlocked(int domain)
 # define DISPLAY_BACKTRACE(File, Level)
 #endif
 
+/**
+ * @internal
+ * @brief Core log printing function. (Unlocked version)
+ * This function handles the actual formatting and output of a log message
+ * via the currently set print callback (_print_cb). It checks domain validity,
+ * log levels, and handles critical aborts.
+ * This function assumes necessary locks are already held.
+ * @param domain The log domain ID.
+ * @param level The log level of the message.
+ * @param file The source file name where the log was generated.
+ * @param fnc The function name where the log was generated.
+ * @param line The line number in the source file.
+ * @param fmt The printf-style format string for the message.
+ * @param args The va_list of arguments for the format string.
+ */
 static inline void
 eina_log_print_unlocked(int domain,
                         Eina_Log_Level level,
@@ -2100,11 +2264,19 @@ eina_log_print_cb_stdout(const Eina_Log_Domain *d,
 }
 
 #ifdef HAVE_SYSTEMD
-static Eina_Module *_libsystemd = NULL;
-static Eina_Bool _libsystemd_broken = EINA_FALSE;
+static Eina_Module *_libsystemd = NULL; /**< @internal @brief Module handle for libsystemd, if loaded. */
+static Eina_Bool _libsystemd_broken = EINA_FALSE; /**< @internal @brief Flag to prevent repeated attempts to load a broken/missing libsystemd. */
 
+/**< @internal @brief Function pointer to sd_journal_send_with_location from libsystemd. */
 static int (*_eina_sd_journal_send_with_location) (const char *file, const char *line, const char *func, const char *format, ...) = NULL;
 
+/**
+ * @internal
+ * @brief Initializes the connection to systemd-journald.
+ * This function attempts to load libsystemd.so.0 and get the address of
+ * sd_journal_send_with_location. It sets _libsystemd_broken to EINA_TRUE
+ * on failure to prevent repeated attempts.
+ */
 static void
 _eina_sd_init(void)
 {

@@ -12,8 +12,25 @@
 #include "eo_lexer.h"
 #include "eolian_priv.h"
 
+/**
+ * @internal
+ * @brief Stores the number of remaining bytes for a multi-byte UTF-8 character.
+ * This is used by next_char() to correctly advance over UTF-8 sequences.
+ */
 static int lastbytes = 0;
 
+/**
+ * @internal
+ * @brief Advances the lexer to the next character in the input stream.
+ *
+ * This function handles moving past single-byte ASCII characters as well as
+ * multi-byte UTF-8 characters. It updates the current character in `ls->current`,
+ * and adjusts the character-aware column number `ls->icolumn`. For single-byte
+ * characters, it also updates the token-aware `ls->column`. The `lastbytes`
+ * static variable is used to track progress through a multi-byte sequence.
+ *
+ * @param ls The lexer instance.
+ */
 static void
 next_char(Eo_Lexer *ls)
 {
@@ -92,8 +109,26 @@ static const char * const ctypes[] =
 
 #define is_newline(c) ((c) == '\n' || (c) == '\r')
 
+/**
+ * @internal
+ * @brief Global hash map for fast keyword lookup. Maps string keywords to their enum values.
+ */
 static Eina_Hash *keyword_map = NULL;
 
+/**
+ * @internal
+ * @brief Reports a fatal parsing error and aborts the process.
+ *
+ * This function constructs a detailed error message, including the line of
+ * code where the error occurred and a caret pointing to the specific column.
+ * The formatted error is logged to the Eolian state, and then `longjmp` is
+ * used to unwind the stack and return control to the error handler set up
+ * in `eo_lexer_new`.
+ *
+ * @param ls The lexer instance.
+ * @param fmt The printf-style format string for the error message.
+ * @param ... Arguments for the format string.
+ */
 static void
 throw(Eo_Lexer *ls, const char *fmt, ...)
 {
@@ -142,6 +177,18 @@ eo_lexer_shutdown(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the string representation of a given token.
+ *
+ * For most tokens, this function defers to eo_lexer_token_to_str(). However,
+ * for a `TOK_VALUE` token (an identifier or keyword), it copies the actual
+ * string value from the token itself into the provided buffer.
+ *
+ * @param ls The lexer instance.
+ * @param token The token identifier.
+ * @param[out] buf The buffer to store the string representation.
+ */
 static void
 txt_token(Eo_Lexer *ls, int token, char *buf)
 {
@@ -154,6 +201,17 @@ txt_token(Eo_Lexer *ls, int token, char *buf)
 void eo_lexer_lex_error   (Eo_Lexer *ls, const char *msg, int token);
 void eo_lexer_syntax_error(Eo_Lexer *ls, const char *msg);
 
+/**
+ * @internal
+ * @brief Processes a newline character and updates the lexer's line and column state.
+ *
+ * This function handles both LF (`\n`) and CRLF (`\r\n`) line endings. It
+ * increments the internal and token-aware line numbers and resets the column
+ * counters. It also updates `ls->stream_line` to point to the beginning of the
+ * new line for error reporting.
+ *
+ * @param ls The lexer instance.
+ */
 static void next_line(Eo_Lexer *ls)
 {
    int old = ls->current;
@@ -171,19 +229,49 @@ static void next_line(Eo_Lexer *ls)
    ls->icolumn = ls->column = 0;
 }
 
+/**
+ * @internal
+ * @brief Skips whitespace characters (excluding newlines) on the current line.
+ * @param ls The lexer instance.
+ */
 static void skip_ws(Eo_Lexer *ls)
 {
    while (isspace(ls->current) && !is_newline(ls->current))
      next_char(ls);
 }
 
-/* go to next line and strip leading whitespace */
+/**
+ * @internal
+ * @brief Advances to the next line and skips any leading whitespace.
+ * A convenience function combining next_line() and skip_ws().
+ * @param ls The lexer instance.
+ */
 static void next_line_ws(Eo_Lexer *ls)
 {
    next_line(ls);
    skip_ws(ls);
 }
 
+/**
+ * @internal
+ * @brief Helper for parsing aligned multi-line comments.
+ *
+ * In documentation blocks, it's common to align stars on each line, like:
+ * @code
+ * /*
+ *  * Some text.
+ *  * More text.
+ *  *\/
+ * @endcode
+ * This function checks if the current character is a `*` at the expected
+ * indentation level (`ccol`). If so, it consumes the star and any subsequent
+ * whitespace. It also detects the end of a comment (`*` followed by `/`).
+ *
+ * @param ls The lexer instance.
+ * @param ccol The column where a leading `*` is expected.
+ * @param[out] term Set to EINA_TRUE if the comment termination sequence `*`\/ is found.
+ * @return EINA_TRUE if a star was found and skipped, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 should_skip_star(Eo_Lexer *ls, int ccol, Eina_Bool *term)
 {
@@ -203,6 +291,18 @@ should_skip_star(Eo_Lexer *ls, int ccol, Eina_Bool *term)
    return had_star;
 }
 
+/**
+ * @internal
+ * @brief Reads a multi-line C-style comment (`/* ... *` /`).
+ *
+ * This function parses the content of a long comment, handling newlines and
+ * optionally stripping leading aligned asterisks on each line (using
+ * should_skip_star()). The comment content is stored in the lexer's
+ * shared buffer `ls->buff`. It stops upon reaching the `*` / terminator.
+ *
+ * @param ls The lexer instance.
+ * @param ccol The starting column of the comment, used for aligning asterisks.
+ */
 static void
 read_long_comment(Eo_Lexer *ls, int ccol)
 {
@@ -268,6 +368,19 @@ enum Doc_Tokens {
     DOC_MANGLED = -2, DOC_UNFINISHED = -1, DOC_TEXT = 0, DOC_SINCE = 1
 };
 
+/**
+ * @internal
+ * @brief Processes a class name referenced within a documentation comment.
+ *
+ * When a documentation comment refers to a class (e.g., `My.Foo`), this
+ * function is called. It normalizes the class name to its corresponding
+ * filename (e.g., `my_foo.eo`) and, if that file exists, it queues it for
+ * deferred parsing. This ensures that all referenced types are available
+ * later without creating circular dependencies during the initial parse.
+ *
+ * @param ls The lexer instance.
+ * @param cname The class name as it appears in the documentation.
+ */
 static void
 doc_ref_class(Eo_Lexer *ls, const char *cname)
 {
@@ -289,6 +402,20 @@ doc_ref_class(Eo_Lexer *ls, const char *cname)
    database_defer(ls->state, buf, EINA_FALSE);
 }
 
+/**
+ * @internal
+ * @brief Parses a reference tag (like `@ref`) within a documentation block.
+ *
+ * This function is triggered when an `@` is encountered. It parses what
+ * follows as a potential reference to another declaration (e.g., a class,
+ * method, or property). It calls doc_ref_class() on parts of the name to
+ * ensure dependencies are registered. It also stores debug information about
+ * the location of the reference.
+ *
+ * @param ls The lexer instance.
+ * @param doc The documentation object being built, to which reference debug
+ *            info will be added.
+ */
 static void
 doc_ref(Eo_Lexer *ls, Eolian_Documentation *doc)
 {
@@ -336,6 +463,26 @@ doc_ref(Eo_Lexer *ls, Eolian_Documentation *doc)
    doc_ref_class(ls, buf);
 }
 
+/**
+ * @internal
+ * @brief The core lexer for the content inside a documentation block (`[[...]]`).
+ *
+ * This function processes the text within a doc comment. It handles:
+ * - Paragraph breaks (two or more newlines).
+ * - Escaped terminators (`\\]]`).
+ * - `@since` tags.
+ * - `@ref`-style references to other code elements.
+ * - The final `]]` terminator.
+ *
+ * It returns special tokens from the `Doc_Tokens` enum to guide the calling
+ * function (`read_doc`).
+ *
+ * @param ls The lexer instance.
+ * @param doc The documentation object being built.
+ * @param[out] term Set to EINA_TRUE when the `]]` terminator is found.
+ * @param[out] since Set to EINA_TRUE when an `@since` tag is found.
+ * @return A `Doc_Tokens` value indicating what was parsed (e.g., DOC_TEXT).
+ */
 static int
 doc_lex(Eo_Lexer *ls, Eolian_Documentation *doc, Eina_Bool *term, Eina_Bool *since)
 {
@@ -433,6 +580,17 @@ exit_with_token:
    return tokret;
 }
 
+/**
+ * @internal
+ * @brief Parses the version string following an `@since` tag in documentation.
+ *
+ * After `doc_lex` identifies an `@since` tag, this function is called to read
+ * the version identifier that follows (e.g., "1.2.0"). It performs basic
+ * validation and expects the documentation block to terminate immediately after.
+ *
+ * @param ls The lexer instance.
+ * @return `DOC_SINCE` on success, or `DOC_MANGLED`/`DOC_UNFINISHED` on error.
+ */
 static int
 read_since(Eo_Lexer *ls)
 {
@@ -458,6 +616,19 @@ read_since(Eo_Lexer *ls)
    return DOC_SINCE;
 }
 
+/**
+ * @internal
+ * @brief Handles a fatal error during documentation parsing.
+ *
+ * This function is a specialized error handler. It cleans up any partially
+ * allocated documentation structures (`doc`, `buf`) before calling the
+ * main lexer error function (`eo_lexer_lex_error`), which will then `longjmp`.
+ *
+ * @param ls The lexer instance.
+ * @param msg The error message.
+ * @param doc The partially built documentation object to free.
+ * @param buf An auxiliary string buffer to free.
+ */
 void doc_error(Eo_Lexer *ls, const char *msg, Eolian_Documentation *doc, Eina_Strbuf *buf)
 {
    eina_stringshare_del(doc->summary);
@@ -468,6 +639,21 @@ void doc_error(Eo_Lexer *ls, const char *msg, Eolian_Documentation *doc, Eina_St
    eo_lexer_lex_error(ls, msg, -1);
 }
 
+/**
+ * @internal
+ * @brief Parses an entire documentation block (`[[...]]`) into an Eolian_Documentation object.
+ *
+ * This function is called when the `[[` token is encountered. It orchestrates
+ * the documentation parsing process by repeatedly calling `doc_lex` and
+ * `read_since`. It distinguishes between the summary (the first paragraph) and
+ * the full description (subsequent paragraphs) and populates the
+ * `Eolian_Documentation` structure, which is then attached to the `TOK_DOC` token.
+ *
+ * @param ls The lexer instance.
+ * @param[out] tok The token to which the parsed documentation object will be attached.
+ * @param line The starting line number of the documentation block.
+ * @param column The starting column number of the documentation block.
+ */
 static void
 read_doc(Eo_Lexer *ls, Eo_Token *tok, int line, int column)
 {
@@ -528,6 +714,19 @@ read_doc(Eo_Lexer *ls, Eo_Token *tok, int line, int column)
    tok->value.doc = doc;
 }
 
+/**
+ * @internal
+ * @brief Reports an error related to an invalid escape sequence.
+ *
+ * This is a helper function to format and report errors encountered while
+ * parsing escape sequences in strings or character literals. It constructs a
+ * message showing the invalid sequence before calling `eo_lexer_lex_error`.
+ *
+ * @param ls The lexer instance.
+ * @param c An array of characters forming the invalid sequence.
+ * @param n The number of characters in `c`.
+ * @param msg The error description (e.g., "hexadecimal digit expected").
+ */
 static void
 esc_error(Eo_Lexer *ls, int *c, int n, const char *msg)
 {
@@ -539,6 +738,12 @@ esc_error(Eo_Lexer *ls, int *c, int n, const char *msg)
    eo_lexer_lex_error(ls, msg, TOK_STRING);
 }
 
+/**
+ * @internal
+ * @brief Converts a hexadecimal character to its integer value.
+ * @param c The character to convert (e.g., 'a', 'F', '7').
+ * @return The integer value (0-15).
+ */
 static int
 hex_val(int c)
 {
@@ -547,6 +752,12 @@ hex_val(int c)
    return c - '0';
 }
 
+/**
+ * @internal
+ * @brief Reads a two-digit hexadecimal escape sequence (e.g., `\xAB`).
+ * @param ls The lexer instance.
+ * @return The integer value of the escaped character.
+ */
 static int
 read_hex_esc(Eo_Lexer *ls)
 {
@@ -563,6 +774,12 @@ read_hex_esc(Eo_Lexer *ls)
    return r;
 }
 
+/**
+ * @internal
+ * @brief Reads a one to three-digit decimal/octal escape sequence (e.g., `\123`).
+ * @param ls The lexer instance.
+ * @return The integer value of the escaped character.
+ */
 static int
 read_dec_esc(Eo_Lexer *ls)
 {
@@ -579,6 +796,17 @@ read_dec_esc(Eo_Lexer *ls)
    return r;
 }
 
+/**
+ * @internal
+ * @brief Parses an escape sequence and appends the resulting character to the lexer buffer.
+ *
+ * This function is called after a `\` is found inside a string or character
+ * literal. It handles standard escapes (`\n`, `\t`, etc.), hexadecimal escapes
+ * (`\xHH`), and decimal/octal escapes (`\123`). The interpreted character is
+ * appended to `ls->buff`.
+ *
+ * @param ls The lexer instance.
+ */
 static void
 read_escape(Eo_Lexer *ls)
 {
@@ -612,6 +840,18 @@ read_escape(Eo_Lexer *ls)
      }
 }
 
+/**
+ * @internal
+ * @brief Reads a double-quoted string literal.
+ *
+ * This function parses a string literal from the input stream, starting after
+ * the opening `"`. It processes characters and escape sequences (using
+ * `read_escape`) until it finds the closing `"`. The resulting string is
+ * stored as a shared string in the token's value.
+ *
+ * @param ls The lexer instance.
+ * @param[out] tok The token to store the parsed string value.
+ */
 static void
 read_string(Eo_Lexer *ls, Eo_Token *tok)
 {
@@ -642,6 +882,17 @@ read_string(Eo_Lexer *ls, Eo_Token *tok)
                                 (unsigned int)eina_strbuf_length_get(ls->buff) - 2);
 }
 
+/**
+ * @internal
+ * @brief Determines the specific numerical type based on suffixes.
+ *
+ * After a number has been read as a string, this function inspects the
+ * following characters for type suffixes (like `f`, `u`, `l`, `ll`, `ull`).
+ *
+ * @param ls The lexer instance.
+ * @param is_float EINA_TRUE if the number is known to be a float, EINA_FALSE otherwise.
+ * @return A `NUM_*` enum value from `eo_lexer.h` indicating the type.
+ */
 static int
 get_type(Eo_Lexer *ls, Eina_Bool is_float)
 {
@@ -682,6 +933,18 @@ get_type(Eo_Lexer *ls, Eina_Bool is_float)
    return NUM_INT;
 }
 
+/**
+ * @internal
+ * @brief Replaces the decimal point character in the lexer's number buffer.
+ *
+ * This is a locale-handling helper. C requires '.', but some locales use ','.
+ * If a float parse fails, this function is used to swap the decimal point
+ * character in the buffered number string to try parsing again with the
+ * locale-specific character.
+ *
+ * @param ls The lexer instance.
+ * @param prevdecp The decimal point character to be replaced.
+ */
 static void
 replace_decpoint(Eo_Lexer *ls, char prevdecp)
 {
@@ -693,6 +956,18 @@ replace_decpoint(Eo_Lexer *ls, char prevdecp)
    free(bufs);
 }
 
+/**
+ * @internal
+ * @brief Attempts to parse a floating-point number using the locale-specific decimal point.
+ *
+ * This function is a fallback for when `write_val` fails to parse a float.
+ * It replaces the `.` with the system's locale-defined decimal point (e.g., `,`)
+ * and retries the conversion using `strtof` or `strtod`.
+ *
+ * @param ls The lexer instance.
+ * @param[out] tok The token to store the parsed value.
+ * @param type The numerical type (`NUM_FLOAT` or `NUM_DOUBLE`).
+ */
 static void
 write_val_with_decpoint(Eo_Lexer *ls, Eo_Token *tok, int type)
 {
@@ -715,6 +990,21 @@ write_val_with_decpoint(Eo_Lexer *ls, Eo_Token *tok, int type)
    tok->kw = type;
 }
 
+/**
+ * @internal
+ * @brief Converts a number string from the buffer into a numeric value in the token.
+ *
+ * This is the main number-parsing function. It first calls `get_type` to
+ * determine the exact numerical type from suffixes. Then, it uses the
+ * appropriate `strto*` function (e.g., `strtoul`, `strtod`) to convert the
+ * string in `ls->buff` into a binary representation, which is stored in the
+ * `tok->value` union. For floating-point numbers, it has a fallback to
+ * `write_val_with_decpoint` to handle different locales.
+ *
+ * @param ls The lexer instance.
+ * @param[out] tok The token to store the parsed value.
+ * @param is_float EINA_TRUE if the number involves a `.` or exponent.
+ */
 static void
 write_val(Eo_Lexer *ls, Eo_Token *tok, Eina_Bool is_float)
 {
@@ -751,6 +1041,15 @@ write_val(Eo_Lexer *ls, Eo_Token *tok, Eina_Bool is_float)
    tok->kw = type;
 }
 
+/**
+ * @internal
+ * @brief Parses the exponent part of a floating-point number (e.g., `e+10`, `P-2`).
+ *
+ * Appends the exponent character (`e`, `E`, `p`, `P`), an optional sign, and
+ * the exponent digits to the lexer's buffer.
+ *
+ * @param ls The lexer instance.
+ */
 static void
 write_exp(Eo_Lexer *ls)
 {
@@ -768,6 +1067,18 @@ write_exp(Eo_Lexer *ls)
      }
 }
 
+/**
+ * @internal
+ * @brief Reads a hexadecimal number literal (integer or float).
+ *
+ * This function is called after a `0x` prefix is seen. It reads a sequence of
+ * hexadecimal digits. If a `.` is encountered, it's treated as a hexadecimal
+ * float, which must have a binary exponent (e.g., `0x1.Ap2`). The final
+ * string is then converted by `write_val`.
+ *
+ * @param ls The lexer instance.
+ * @param[out] tok The token to store the parsed number.
+ */
 static void
 read_hex_number(Eo_Lexer *ls, Eo_Token *tok)
 {
@@ -791,6 +1102,19 @@ read_hex_number(Eo_Lexer *ls, Eo_Token *tok)
    write_val(ls, tok, is_float);
 }
 
+/**
+ * @internal
+ * @brief Reads a decimal, octal, or hexadecimal number literal.
+ *
+ * This is the entry point for number parsing. It reads a sequence of digits,
+ * possibly including a decimal point. If the number starts with `0`, it could
+ * be octal or, if followed by `x` or `X`, it dispatches to `read_hex_number`.
+ * It also handles floating-point exponents (`e` or `E`). The collected string
+ * is then converted by `write_val`.
+ *
+ * @param ls The lexer instance.
+ * @param[out] tok The token to store the parsed number.
+ */
 static void
 read_number(Eo_Lexer *ls, Eo_Token *tok)
 {
@@ -821,6 +1145,25 @@ read_number(Eo_Lexer *ls, Eo_Token *tok)
    write_val(ls, tok, is_float);
 }
 
+/**
+ * @internal
+ * @brief The main lexer function; reads the next token from the input stream.
+ *
+ * This function is the heart of the lexer. It's a state machine implemented
+ * as a `switch` on the current input character. It's responsible for:
+ * - Skipping whitespace and comments.
+ * - Recognizing and parsing multi-character operators (e.g., `==`, `<<`).
+ * - Dispatching to specialized functions for complex tokens like strings
+ *   (`read_string`), numbers (`read_number`), and documentation blocks
+ *   (`read_doc`).
+ * - Parsing identifiers and checking if they are keywords.
+ * - Returning single-character tokens for all other symbols.
+ *
+ * @param ls The lexer instance.
+ * @param[out] tok The token structure to be filled with information about the
+ *                 next token found.
+ * @return The token identifier (from `enum Tokens` or an ASCII value), or -1 on EOF.
+ */
 static int
 lex(Eo_Lexer *ls, Eo_Token *tok)
 {
@@ -1021,6 +1364,15 @@ lex(Eo_Lexer *ls, Eo_Token *tok)
      }
 }
 
+/**
+ * @internal
+ * @brief Extracts the basename of a file from its full path.
+ *
+ * This function handles both `/` and `\` path separators.
+ *
+ * @param ls The lexer instance, containing the source path.
+ * @return A stringshared representation of the filename.
+ */
 static const char *
 get_filename(Eo_Lexer *ls)
 {
@@ -1031,6 +1383,17 @@ get_filename(Eo_Lexer *ls)
    return eina_stringshare_ref(ls->source);
 }
 
+/**
+ * @internal
+ * @brief Callback function to free an `Eolian_Object` node.
+ *
+ * This function is used by the `eina_hash` that tracks nodes allocated during
+ * parsing. If parsing is aborted, this function is called for each node in
+ * the hash to ensure proper cleanup. It delegates to the appropriate
+ * `database_*_del` function based on the object's type.
+ *
+ * @param obj The Eolian object to free.
+ */
 static void
 _node_free(Eolian_Object *obj)
 {
@@ -1067,6 +1430,19 @@ _node_free(Eolian_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Initializes the lexer for a given input source file.
+ *
+ * This function is called by `eo_lexer_new`. It opens and memory-maps the
+ * specified source file, initializes the lexer's internal state (stream
+ * pointers, line/column counters, etc.), and prepares it for parsing. It also
+ * handles the UTF-8 BOM if present at the beginning of the file.
+ *
+ * @param ls The lexer instance to initialize.
+ * @param state The global Eolian state.
+ * @param source The path to the source file.
+ */
 static void
 eo_lexer_set_input(Eo_Lexer *ls, Eolian_State *state, const char *source)
 {
@@ -1133,6 +1509,18 @@ eo_lexer_node_release(Eo_Lexer *ls, Eolian_Object *obj)
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Frees any dynamically allocated memory associated with a token.
+ *
+ * Most tokens don't own memory, but some do:
+ * - `TOK_VALUE` and `TOK_STRING` hold a `Eina_Stringshare`.
+ * - `TOK_DOC` holds a pointer to an `Eolian_Documentation` struct.
+ * This function checks the token type and frees the associated resources
+ * accordingly.
+ *
+ * @param tok The token to clean up.
+ */
 static void
 _free_tok(Eo_Token *tok)
 {
@@ -1311,6 +1699,16 @@ eo_lexer_get_c_type(int kw)
    return ctypes[kw - KW_byte];
 }
 
+/**
+ * @internal
+ * @brief Checks if a token type is one that holds a stringshare value.
+ *
+ * This is a helper for context management to know when to ref/unref the
+ * stringshare pointer in the token's value union.
+ *
+ * @param t The token type identifier.
+ * @return EINA_TRUE if the token type is `TOK_STRING` or `TOK_VALUE`.
+ */
 static Eina_Bool
 _eo_is_tokstr(int t) {
     return (t == TOK_STRING) || (t == TOK_VALUE);

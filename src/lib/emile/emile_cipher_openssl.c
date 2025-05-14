@@ -1,3 +1,12 @@
+/**
+ * @file
+ * @brief Emile cipher functions implementation using OpenSSL.
+ *
+ * This file provides the implementation for various cryptographic operations
+ * such as hashing, HMAC, encryption, decryption, and SSL/TLS functionalities
+ * using the OpenSSL library.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -39,9 +48,18 @@ struct _Emile_SSL
    Eina_Bool upgrade : 1;
    Eina_Bool crl_flag : 1;
    Eina_Bool verify : 1;
-   Eina_Bool verify_basic : 1;
+   Eina_Bool verify_basic : 1; /**< EINA_TRUE if basic certificate verification is enabled. */
 };
 
+/**
+ * @brief Initializes the OpenSSL library.
+ *
+ * This function loads error strings and initializes algorithms for OpenSSL.
+ * It's typically called before any other OpenSSL operations.
+ * This is conditionally compiled for older OpenSSL/LibreSSL versions.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE otherwise (though currently always returns EINA_TRUE).
+ */
 Eina_Bool
 _emile_cipher_init(void)
 {
@@ -55,6 +73,16 @@ _emile_cipher_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Computes the HMAC-SHA1 of a binary buffer.
+ *
+ * @param key The secret key for HMAC.
+ * @param key_len The length of the key.
+ * @param data The binary buffer to hash.
+ * @param digest Output buffer for the 20-byte SHA1 HMAC digest.
+ *               Example: unsigned char digest_output[20];
+ * @return EINA_TRUE on success (always returns EINA_TRUE in current implementation).
+ */
 EAPI Eina_Bool
 emile_binbuf_hmac_sha1(const char *key,
                        unsigned int key_len,
@@ -68,6 +96,14 @@ emile_binbuf_hmac_sha1(const char *key,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Computes the SHA1 hash of a binary buffer.
+ *
+ * @param data The binary buffer to hash.
+ * @param digest Output buffer for the 20-byte SHA1 digest.
+ *               Example: unsigned char digest_output[20];
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., context creation failure).
+ */
 EAPI Eina_Bool
 emile_binbuf_sha1(const Eina_Binbuf * data, unsigned char digest[20])
 {
@@ -102,6 +138,30 @@ emile_binbuf_sha1(const Eina_Binbuf * data, unsigned char digest[20])
    return EINA_TRUE;
 }
 
+/**
+ * @brief Encrypts a binary buffer using a specified algorithm (currently only AES256-CBC).
+ *
+ * The encryption process involves:
+ * 1. Generating a random salt.
+ * 2. Deriving a key and IV from the provided key and salt using PBKDF2-SHA1.
+ * 3. Prepending the salt and the original data length to the output buffer.
+ * 4. Encrypting the data along with its original length.
+ *
+ * The output format is: [salt (4 bytes)][encrypted_original_length (4 bytes)][encrypted_data]
+ *
+ * @param algo The encryption algorithm to use. Currently, only EMILE_AES256_CBC is supported.
+ * @param data The binary buffer to encrypt.
+ * @param key The encryption key.
+ * @param length The length of the encryption key.
+ * @return A new Eina_Binbuf containing the encrypted data (including salt and original length),
+ *         or NULL on failure. The caller is responsible for freeing the returned buffer.
+ *         Example of returned structure (conceptual):
+ *         Eina_Binbuf {
+ *           unsigned char salt[4];
+ *           unsigned int encrypted_original_data_length; // network byte order
+ *           unsigned char encrypted_data_payload[];
+ *         }
+ */
 EAPI Eina_Binbuf *
 emile_binbuf_cipher(Emile_Cipher_Algorithm algo,
                     const Eina_Binbuf *data,
@@ -215,7 +275,30 @@ on_error:
    return NULL;
 }
 
-
+/**
+ * @brief Decrypts a binary buffer encrypted with emile_binbuf_cipher.
+ *
+ * The decryption process assumes the input data was encrypted by `emile_binbuf_cipher`
+ * and thus expects the format: [salt (4 bytes)][encrypted_original_length (4 bytes)][encrypted_data].
+ * It will:
+ * 1. Extract the salt from the beginning of the data.
+ * 2. Derive the key and IV using the provided key and the extracted salt via PBKDF2-SHA1.
+ * 3. Decrypt the payload.
+ * 4. Extract the original data length from the decrypted payload.
+ * 5. Return the original plaintext data.
+ *
+ * @param algo The decryption algorithm to use. Currently, only EMILE_AES256_CBC is supported.
+ * @param data The binary buffer to decrypt. Expected format:
+ *         Eina_Binbuf {
+ *           unsigned char salt[4];
+ *           unsigned int encrypted_original_data_length; // network byte order
+ *           unsigned char encrypted_data_payload[];
+ *         }
+ * @param key The decryption key.
+ * @param length The length of the decryption key.
+ * @return A new Eina_Binbuf containing the decrypted data, or NULL on failure.
+ *         The caller is responsible for freeing the returned buffer.
+ */
 EAPI Eina_Binbuf *
 emile_binbuf_decipher(Emile_Cipher_Algorithm algo,
                       const Eina_Binbuf *data,
@@ -309,6 +392,18 @@ on_error:
    return NULL;
 }
 
+/**
+ * @brief Creates and configures an Emile_SSL context for a listening server.
+ *
+ * This function initializes an SSL_CTX for server-side operations,
+ * sets up appropriate SSL/TLS versions (SSLv23 or TLSv1), configures options
+ * like disabling SSLv2 and enabling single DH use, generates temporary DH parameters,
+ * and sets a default cipher list.
+ *
+ * @param t The type of SSL/TLS protocol to use (e.g., EMILE_SSLv23, EMILE_TLSv1).
+ * @return A pointer to an initialized Emile_SSL structure, or NULL on failure.
+ *         The caller is responsible for freeing this structure using emile_cipher_free().
+ */
 EAPI Emile_SSL *
 emile_cipher_server_listen(Emile_Cipher_Type t)
 {
@@ -406,6 +501,15 @@ on_error2:
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Prints a human-readable string for an X509 verification error code.
+ *
+ * This function maps OpenSSL's X509_V_ERR_* constants to their string
+ * representations and logs them as errors.
+ *
+ * @param error The X509 verification error code (e.g., X509_V_OK, X509_V_ERR_CERT_HAS_EXPIRED).
+ */
 static void
 _emile_cipher_print_verify_error(int error)
 {
@@ -585,6 +689,15 @@ case (X):        \
 #undef ERROR_OPENSSL
 }
 
+/**
+ * @internal
+ * @brief Prints detailed information about an SSL session for debugging.
+ *
+ * This function logs the peer certificate chain and SSL session details
+ * if the Emile log domain level is set to EINA_LOG_LEVEL_DBG or higher.
+ *
+ * @param ssl The SSL connection object.
+ */
 static void
 _emile_cipher_session_print(SSL *ssl)
 {
@@ -637,6 +750,22 @@ _emile_cipher_session_print(SSL *ssl)
    BIO_free(b);
 }
 
+/**
+ * @internal
+ * @brief Manages the SSL/TLS handshake process for a client connection on the server side.
+ *
+ * This function performs the SSL handshake steps. If verification is enabled
+ * (client->parent->verify or client->parent->verify_basic), it also
+ * verifies the peer's certificate against configured CAs and optionally
+ * checks the certificate's common name or subject alternative name against
+ * client->parent->verify_name.
+ *
+ * It handles SSL_ERROR_WANT_READ/WRITE by setting the appropriate
+ * client->ssl_want state for non-blocking operations.
+ *
+ * @param client The Emile_SSL structure representing the client connection.
+ *               Its ssl_state will be updated based on the handshake progress.
+ */
 static void
 _emile_cipher_client_handshake(Emile_SSL *client)
 {
@@ -753,6 +882,20 @@ _emile_cipher_client_handshake(Emile_SSL *client)
    return ;
 }
 
+/**
+ * @brief Accepts a new client connection on a listening server.
+ *
+ * This function creates a new Emile_SSL structure for an incoming client connection,
+ * associates it with the server's SSL context, sets the file descriptor for the
+ * connection, and initiates the SSL handshake using _emile_cipher_client_handshake().
+ * This is typically used by a server after an accept() call.
+ *
+ * @param server The Emile_SSL structure of the listening server, obtained from
+ *               emile_cipher_server_listen().
+ * @param fd The file descriptor for the accepted client socket.
+ * @return A new Emile_SSL structure for the client connection, or NULL on failure.
+ *         The caller is responsible for freeing this structure using emile_cipher_free().
+ */
 EAPI Emile_SSL *
 emile_cipher_client_connect(Emile_SSL *server, int fd)
 {
@@ -783,6 +926,18 @@ emile_cipher_client_connect(Emile_SSL *server, int fd)
    return NULL;
 }
 
+/**
+ * @brief Creates and configures an Emile_SSL context for an outgoing client connection.
+ *
+ * This function initializes an SSL_CTX for client-side operations,
+ * sets up appropriate SSL/TLS versions (SSLv23 or TLSv1), configures options
+ * like disabling SSLv2, and sets a default cipher list.
+ * This is used when this application intends to connect to a remote SSL/TLS server.
+ *
+ * @param t The type of SSL/TLS protocol to use (e.g., EMILE_SSLv23, EMILE_TLSv1).
+ * @return A pointer to an initialized Emile_SSL structure, or NULL on failure.
+ *         The caller is responsible for freeing this structure using emile_cipher_free().
+ */
 EAPI Emile_SSL *
 emile_cipher_server_connect(Emile_Cipher_Type t)
 {
@@ -827,6 +982,16 @@ emile_cipher_server_connect(Emile_Cipher_Type t)
    return NULL;
 }
 
+/**
+ * @brief Frees an Emile_SSL structure and its associated resources.
+ *
+ * This function releases all resources associated with an Emile_SSL object,
+ * including shutting down the SSL connection, freeing the SSL and SSL_CTX objects,
+ * and deallocating the Emile_SSL structure itself.
+ *
+ * @param emile The Emile_SSL structure to free.
+ * @return EINA_TRUE on success, EINA_FALSE if emile is NULL.
+ */
 EAPI Eina_Bool
 emile_cipher_free(Emile_SSL *emile)
 {
@@ -855,6 +1020,22 @@ emile_cipher_free(Emile_SSL *emile)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Adds a CA certificate file or directory for peer verification.
+ *
+ * This function loads CA certificates from the specified file or all
+ * certificates from the specified directory into the SSL context's trust store.
+ * These CAs are used to verify the peer's certificate during the SSL handshake.
+ *
+ * @param emile The Emile_SSL context to which the CA(s) will be added.
+ *              This should be a context created by emile_cipher_server_listen()
+ *              or emile_cipher_server_connect().
+ * @param file Path to a PEM-encoded CA certificate file or a directory
+ *             containing PEM-encoded CA certificate files (hashed with c_rehash).
+ *             Example: "/etc/ssl/certs/ca-certificates.crt" or "/etc/ssl/certs/"
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., file not found, OpenSSL error).
+ *         On failure, emile->last_error may be set.
+ */
 EAPI Eina_Bool
 emile_cipher_cafile_add(Emile_SSL *emile, const char *file)
 {
@@ -884,6 +1065,19 @@ emile_cipher_cafile_add(Emile_SSL *emile, const char *file)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Adds a certificate to the Emile_SSL context.
+ *
+ * This function loads a PEM-encoded certificate from the specified file and
+ * associates it with the SSL context. This is typically the server's own
+ * certificate.
+ *
+ * @param emile The Emile_SSL context to which the certificate will be added.
+ * @param file Path to the PEM-encoded certificate file.
+ *             Example: "/path/to/server.crt"
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., file not found, invalid format, OpenSSL error).
+ *         On failure, emile->last_error may be set.
+ */
 EAPI Eina_Bool
 emile_cipher_cert_add(Emile_SSL *emile, const char *file)
 {
@@ -928,6 +1122,20 @@ emile_cipher_cert_add(Emile_SSL *emile, const char *file)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Adds a private key to the Emile_SSL context.
+ *
+ * This function loads a PEM-encoded private key from the specified file and
+ * associates it with the SSL context. This key should correspond to the
+ * certificate added via emile_cipher_cert_add().
+ * After loading, it also checks if the private key matches the certificate.
+ *
+ * @param emile The Emile_SSL context to which the private key will be added.
+ * @param file Path to the PEM-encoded private key file.
+ *             Example: "/path/to/server.key"
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., file not found, key mismatch, OpenSSL error).
+ *         On failure, emile->last_error may be set.
+ */
 EAPI Eina_Bool
 emile_cipher_privkey_add(Emile_SSL *emile, const char *file)
 {
@@ -979,6 +1187,19 @@ emile_cipher_privkey_add(Emile_SSL *emile, const char *file)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Adds a Certificate Revocation List (CRL) to the Emile_SSL context.
+ *
+ * This function loads a PEM-encoded CRL from the specified file into the
+ * SSL context's certificate store. If this is the first CRL added, it also
+ * enables CRL checking flags (X509_V_FLAG_CRL_CHECK and X509_V_FLAG_CRL_CHECK_ALL).
+ *
+ * @param emile The Emile_SSL context to which the CRL will be added.
+ * @param file Path to the PEM-encoded CRL file.
+ *             Example: "/path/to/crl.pem"
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., file not found, OpenSSL error).
+ *         On failure, emile->last_error may be set.
+ */
 EAPI Eina_Bool
 emile_cipher_crl_add(Emile_SSL *emile, const char *file)
 {
@@ -1014,6 +1235,27 @@ emile_cipher_crl_add(Emile_SSL *emile, const char *file)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Reads data from an SSL/TLS connection.
+ *
+ * Attempts to read up to `eina_binbuf_length_get(buffer)` bytes from the SSL connection
+ * into the provided buffer.
+ * If the SSL handshake is not yet complete (emile->ssl_state == EMILE_SSL_STATE_HANDSHAKING),
+ * it will first attempt to continue the handshake via _emile_cipher_client_handshake().
+ *
+ * Handles non-blocking I/O by setting emile->ssl_want if SSL_read returns
+ * SSL_ERROR_WANT_READ or SSL_ERROR_WANT_WRITE.
+ *
+ * @param emile The Emile_SSL connection object.
+ * @param buffer The Eina_Binbuf to store the read data. The length of the binbuf
+ *               determines the maximum number of bytes to read. The actual data
+ *               will be written into `eina_binbuf_string_get(buffer)`.
+ * @return The number of bytes read on success.
+ *         0 if the connection was cleanly closed by the peer (SSL_ERROR_ZERO_RETURN),
+ *         or if SSL_ERROR_WANT_READ/WRITE occurred (indicating to try again later).
+ *         -1 on error (e.g., handshake error, SSL error, system call error).
+ *         On error or SSL_ERROR_ZERO_RETURN, emile->last_error may be set.
+ */
 EAPI int
 emile_cipher_read(Emile_SSL *emile, Eina_Binbuf *buffer)
 {
@@ -1057,6 +1299,25 @@ emile_cipher_read(Emile_SSL *emile, Eina_Binbuf *buffer)
    return num < 0 ? 0 : num;
 }
 
+/**
+ * @brief Writes data to an SSL/TLS connection.
+ *
+ * Attempts to write `eina_binbuf_length_get(buffer)` bytes from the provided buffer
+ * to the SSL connection.
+ * If the SSL handshake is not yet complete (emile->ssl_state == EMILE_SSL_STATE_HANDSHAKING),
+ * it will first attempt to continue the handshake via _emile_cipher_client_handshake().
+ *
+ * Handles non-blocking I/O by setting emile->ssl_want if SSL_write returns
+ * SSL_ERROR_WANT_READ or SSL_ERROR_WANT_WRITE.
+ *
+ * @param emile The Emile_SSL connection object.
+ * @param buffer The Eina_Binbuf containing the data to write.
+ * @return The number of bytes written on success.
+ *         0 if no data was provided or if SSL_ERROR_WANT_READ/WRITE occurred
+ *         (indicating to try again later).
+ *         -1 on error (e.g., handshake error, SSL error, system call error).
+ *         On error or SSL_ERROR_ZERO_RETURN, emile->last_error may be set.
+ */
 EAPI int
 emile_cipher_write(Emile_SSL *emile, const Eina_Binbuf *buffer)
 {
@@ -1100,42 +1361,105 @@ emile_cipher_write(Emile_SSL *emile, const Eina_Binbuf *buffer)
    return num < 0 ? 0 : num;
 }
 
+/**
+ * @brief Gets the last error message string for an Emile_SSL context.
+ *
+ * @param emile The Emile_SSL context.
+ * @return A pointer to a stringshared C-string containing the last error message,
+ *         or NULL if no error message is set. The string is owned by the Emile_SSL
+ *         context and should not be freed by the caller.
+ */
 EAPI const char *
 emile_cipher_error_get(const Emile_SSL *emile)
 {
    return emile->last_error;
 }
 
+/**
+ * @brief Sets the hostname to verify against in the peer's certificate.
+ *
+ * This name is used during certificate verification if `emile->verify` is true.
+ * It's typically compared against the certificate's Common Name (CN) or
+ * Subject Alternative Name (SAN). Wildcards like "*.example.com" are supported
+ * with specific validation rules (see _emile_cipher_client_handshake).
+ *
+ * @param emile The Emile_SSL context.
+ * @param name The hostname to verify (e.g., "example.com", "*.example.com").
+ *             The string is stringshared.
+ * @return EINA_TRUE on success, EINA_FALSE on memory allocation failure for stringshare.
+ */
 EAPI Eina_Bool
 emile_cipher_verify_name_set(Emile_SSL *emile, const char *name)
 {
    return eina_stringshare_replace(&emile->verify_name, name);
 }
 
+/**
+ * @brief Gets the hostname used for certificate verification.
+ *
+ * @param emile The Emile_SSL context.
+ * @return A pointer to the stringshared hostname, or NULL if not set.
+ *         The string is owned by the Emile_SSL context.
+ */
 EAPI const char *
 emile_cipher_verify_name_get(const Emile_SSL *emile)
 {
    return emile->verify_name;
 }
 
+/**
+ * @brief Enables or disables full peer certificate verification.
+ *
+ * If enabled, this implies:
+ * 1. The peer's certificate chain is validated against the trusted CAs.
+ * 2. CRLs are checked if loaded.
+ * 3. The certificate's hostname (CN/SAN) is matched against the name set by
+ *    emile_cipher_verify_name_set().
+ *
+ * @param emile The Emile_SSL context.
+ * @param verify EINA_TRUE to enable full verification, EINA_FALSE to disable.
+ */
 EAPI void
 emile_cipher_verify_set(Emile_SSL *emile, Eina_Bool verify)
 {
    emile->verify = verify;
 }
 
+/**
+ * @brief Enables or disables basic peer certificate verification.
+ *
+ * If enabled, this implies that the peer's certificate chain is validated
+ * against the trusted CAs and CRLs are checked if loaded.
+ * It does *not* perform hostname verification.
+ * This is typically less strict than full verification set by emile_cipher_verify_set().
+ *
+ * @param emile The Emile_SSL context.
+ * @param verify_basic EINA_TRUE to enable basic verification, EINA_FALSE to disable.
+ */
 EAPI void
 emile_cipher_verify_basic_set(Emile_SSL *emile, Eina_Bool verify_basic)
 {
    emile->verify_basic = verify_basic;
 }
 
+/**
+ * @brief Gets the status of full peer certificate verification.
+ *
+ * @param emile The Emile_SSL context.
+ * @return EINA_TRUE if full verification is enabled, EINA_FALSE otherwise.
+ */
 EAPI Eina_Bool
 emile_cipher_verify_get(const Emile_SSL *emile)
 {
    return emile->verify;
 }
 
+/**
+ * @brief Gets the status of basic peer certificate verification.
+ *
+ * @param emile The Emile_SSL context.
+ * @return EINA_TRUE if basic verification is enabled, EINA_FALSE otherwise.
+ */
 EAPI Eina_Bool
 emile_cipher_verify_basic_get(const Emile_SSL *emile)
 {

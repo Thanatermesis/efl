@@ -1,3 +1,18 @@
+/**
+ * @file
+ * @brief System Notification Manager
+ *
+ * This file implements the Elm_Sys_Notify module, which provides a
+ * unified interface for sending system notifications. It acts as a
+ * singleton manager that can interact with various notification
+ * server backends, primarily D-Bus based notification services.
+ *
+ * The manager handles the creation and lifecycle of notification
+ * server instances and dispatches notification requests (send, close)
+ * to all registered servers. It also defines Ecore events for
+ * notification closure and action invocation.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include "elementary_config.h"
 #endif
@@ -16,11 +31,29 @@
 #define MY_CLASS_NAME        "Elm_Sys_Notify"
 #define MY_CLASS_NAME_LEGACY "elm_sys_notify"
 
+/**
+ * @brief Event type for notification closed.
+ * @details This event is triggered when a notification is closed.
+ * The event info will be the notification ID (unsigned int).
+ */
 EAPI int ELM_EVENT_SYS_NOTIFY_NOTIFICATION_CLOSED = 0;
+
+/**
+ * @brief Event type for action invoked on a notification.
+ * @details This event is triggered when an action is invoked on a notification.
+ * The event info will be an Elm_Sys_Notify_Action_Invocation struct.
+ */
 EAPI int ELM_EVENT_SYS_NOTIFY_ACTION_INVOKED      = 0;
 
+/**
+ * @brief Function pointer type for getting an Efl_Class.
+ * @return A pointer to the Efl_Class, or NULL if not available.
+ */
 typedef const Efl_Class *(*Class_Get_Func)(void);
 
+/**
+ * @brief Singleton instance of the Elm_Sys_Notify manager.
+ */
 static Elm_Sys_Notify *_singleton = NULL;
 
 /*
@@ -34,12 +67,24 @@ static Elm_Sys_Notify *_singleton = NULL;
  * to register/unregister notification servers.
  */
 
+/**
+ * @brief Enumeration of supported notification server types.
+ * @details This enum is used to identify and manage different
+ *          notification server backends.
+ */
 typedef enum
 {
-   SRV_DBUS = 0,
-   __SRV_LAST /* Sentinel */
+   SRV_DBUS = 0, /**< D-Bus based notification server. This is the primary and often only type. */
+   __SRV_LAST    /**< Sentinel value to mark the end of the enum. Should not be used directly. */
 } Srv;
 
+/**
+ * @brief Array of function pointers to get the Efl_Class for each server type.
+ * @details This array maps Srv enum values to functions that return the
+ *          Efl_Class for the corresponding notification server implementation.
+ *          If a server type is not compiled in, its entry will be NULL.
+ *          Example: _class_getters[SRV_DBUS] would point to elm_sys_notify_dbus_class_get.
+ */
 static Class_Get_Func _class_getters[__SRV_LAST] =
 {
 #ifdef ELM_SYS_NOTIFY_DBUS_CLASS
@@ -50,16 +95,30 @@ static Class_Get_Func _class_getters[__SRV_LAST] =
 };
 
 
-
+/**
+ * @brief Internal data structure for the Elm_Sys_Notify object.
+ * @details This structure holds the instances of the notification servers
+ *          managed by Elm_Sys_Notify. The `servers` array stores Eo pointers
+ *          to the server objects, indexed by the Srv enum.
+ *          For example, `sd->servers[SRV_DBUS]` would hold the D-Bus server object.
+ */
 typedef struct
 {
-   Eo *servers[__SRV_LAST];
+   Eo *servers[__SRV_LAST]; /**< Array of active notification server instances. */
 } Elm_Sys_Notify_Data;
 
 /*============================================================================*
  *                  Constructor/Destructor - Singleton setup                  *
  *============================================================================*/
 
+/**
+ * @brief Constructor for the Elm_Sys_Notify object.
+ * @details This function is called when a new Elm_Sys_Notify object is created.
+ *          It ensures that only one instance (singleton) of the manager exists.
+ * @param obj The Eolian object being constructed.
+ * @param sd The private data for the Elm_Sys_Notify object.
+ * @return The constructed Eolian object, or NULL if another instance already exists.
+ */
 EOLIAN static Efl_Object *
 _elm_sys_notify_efl_object_constructor(Eo                  *obj,
                                     Elm_Sys_Notify_Data *sd  EINA_UNUSED)
@@ -76,6 +135,13 @@ _elm_sys_notify_efl_object_constructor(Eo                  *obj,
    return obj;
 }
 
+/**
+ * @brief Destructor for the Elm_Sys_Notify object.
+ * @details This function is called when the Elm_Sys_Notify object is destroyed.
+ *          It resets the singleton instance pointer.
+ * @param obj The Eolian object being destructed.
+ * @param sd The private data for the Elm_Sys_Notify object.
+ */
 EOLIAN static void
 _elm_sys_notify_efl_object_destructor(Eo                  *obj,
                                    Elm_Sys_Notify_Data *sd  EINA_UNUSED)
@@ -89,6 +155,24 @@ _elm_sys_notify_efl_object_destructor(Eo                  *obj,
  *                           Notification Interface                           *
  *============================================================================*/
 
+/**
+ * @brief Sends a notification through all registered servers.
+ * @details Implements the Elm_Sys_Notify_Interface send method. This function
+ *          iterates through all active server instances (e.g., D-Bus) and
+ *          forwards the send request to each of them.
+ *
+ * @param obj The Elm_Sys_Notify object (unused, as it's a singleton context).
+ * @param sd The private data of the Elm_Sys_Notify object, containing server instances.
+ * @param replaces_id ID of the notification to replace, or 0 for a new one.
+ * @param icon Path to an icon file or a stock icon name.
+ * @param summary A brief summary of the notification.
+ * @param body The detailed body text of the notification.
+ * @param urgency The urgency level of the notification (e.g., ELM_SYS_NOTIFY_URGENCY_NORMAL).
+ * @param timeout The timeout in milliseconds for the notification to be displayed.
+ *                A value of -1 means server default, 0 means persist.
+ * @param cb Callback function to be invoked with the notification ID once sent.
+ * @param cb_data User data to be passed to the callback function.
+ */
 EOLIAN static void
 _elm_sys_notify_elm_sys_notify_interface_send(const Eo *obj EINA_UNUSED,
                                               Elm_Sys_Notify_Data *sd,
@@ -109,6 +193,19 @@ _elm_sys_notify_elm_sys_notify_interface_send(const Eo *obj EINA_UNUSED,
        elm_obj_sys_notify_interface_send(sd->servers[i], replaces_id, icon, summary, body, urgency, timeout, cb, cb_data);
 }
 
+/**
+ * @brief Sends a simple notification (icon, summary, body) through all registered servers.
+ * @details Implements the Elm_Sys_Notify_Interface simple_send method. This is a
+ *          convenience function that sends a notification with default urgency
+ *          and timeout. It iterates through all active server instances and
+ *          forwards the request.
+ *
+ * @param obj The Elm_Sys_Notify object (unused).
+ * @param sd The private data of the Elm_Sys_Notify object.
+ * @param icon Path to an icon file or a stock icon name.
+ * @param summary A brief summary of the notification.
+ * @param body The detailed body text of the notification.
+ */
 EOLIAN static void
 _elm_sys_notify_elm_sys_notify_interface_simple_send(const Eo *obj EINA_UNUSED,
                                                      Elm_Sys_Notify_Data *sd,
@@ -124,6 +221,16 @@ _elm_sys_notify_elm_sys_notify_interface_simple_send(const Eo *obj EINA_UNUSED,
        elm_obj_sys_notify_interface_simple_send(sd->servers[i], icon, summary, body);
 }
 
+/**
+ * @brief Closes a notification on all registered servers.
+ * @details Implements the Elm_Sys_Notify_Interface close method. This function
+ *          iterates through all active server instances and requests each
+ *          to close the notification with the given ID.
+ *
+ * @param obj The Elm_Sys_Notify object (unused).
+ * @param sd The private data of the Elm_Sys_Notify object.
+ * @param id The ID of the notification to close.
+ */
 EOLIAN static void
 _elm_sys_notify_elm_sys_notify_interface_close(const Eo *obj EINA_UNUSED,
                                                Elm_Sys_Notify_Data *sd,
@@ -142,6 +249,22 @@ _elm_sys_notify_elm_sys_notify_interface_close(const Eo *obj EINA_UNUSED,
  *                                   Methods                                  *
  *============================================================================*/
 
+/**
+ * @brief Sets the active notification servers.
+ * @details This function configures which notification server backends are active.
+ *          It iterates through all known server types (defined in Srv enum).
+ *          If a server type is specified in the `servers` bitmask and not
+ *          currently active, it attempts to create an instance of it.
+ *          If a server type is not in the `servers` bitmask but is currently
+ *          active, its instance is deleted.
+ *
+ * @param obj The Elm_Sys_Notify object (unused).
+ * @param sd The private data of the Elm_Sys_Notify object.
+ * @param servers A bitmask of Elm_Sys_Notify_Server flags indicating which
+ *                servers to enable. For example, `ELM_SYS_NOTIFY_SERVER_DBUS`.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., unsupported server,
+ *         failed to create server instance).
+ */
 EOLIAN static Eina_Bool
 _elm_sys_notify_servers_set(Eo                     *obj  EINA_UNUSED,
                             Elm_Sys_Notify_Data    *sd,
@@ -184,6 +307,16 @@ _elm_sys_notify_servers_set(Eo                     *obj  EINA_UNUSED,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the currently active notification servers.
+ * @details This function returns a bitmask representing all currently
+ *          initialized and active notification server backends.
+ *
+ * @param obj The Elm_Sys_Notify object (unused).
+ * @param sd The private data of the Elm_Sys_Notify object.
+ * @return A bitmask of Elm_Sys_Notify_Server flags indicating active servers.
+ *         For example, if D-Bus server is active, it returns `ELM_SYS_NOTIFY_SERVER_DBUS`.
+ */
 EOLIAN static Elm_Sys_Notify_Server
 _elm_sys_notify_servers_get(const Eo            *obj EINA_UNUSED,
                             Elm_Sys_Notify_Data *sd)
@@ -198,6 +331,12 @@ _elm_sys_notify_servers_get(const Eo            *obj EINA_UNUSED,
    return servers;
 }
 
+/**
+ * @brief Gets the singleton instance of the Elm_Sys_Notify manager.
+ * @details If the singleton instance does not exist, it is created.
+ *          This ensures that there is only one system notification manager.
+ * @return A pointer to the Elm_Sys_Notify singleton instance.
+ */
 EOLIAN static Elm_Sys_Notify *
 _elm_sys_notify_singleton_get(void)
 {
@@ -206,6 +345,12 @@ _elm_sys_notify_singleton_get(void)
    return _singleton;
 }
 
+/**
+ * @brief Class constructor for Elm_Sys_Notify.
+ * @details This function is called once when the Elm_Sys_Notify class is constructed.
+ *          It initializes the Ecore event types for notification closed and action invoked.
+ * @param klass The Efl_Class being constructed (unused).
+ */
 EOLIAN static void
 _elm_sys_notify_class_constructor(Efl_Class *klass EINA_UNUSED)
 {
@@ -217,6 +362,13 @@ _elm_sys_notify_class_constructor(Efl_Class *klass EINA_UNUSED)
  *                                 Legacy API                                 *
  *============================================================================*/
 
+/**
+ * @brief Deinitializes the system notification manager (legacy).
+ * @details This function is part of the legacy API. It retrieves the
+ *          singleton manager, sets its active servers to NONE (which
+ *          effectively deinitializes them), and then deletes the manager.
+ *          This is typically called when system notifications are no longer needed.
+ */
 void
 _elm_unneed_sys_notify(void)
 {
@@ -228,6 +380,19 @@ _elm_unneed_sys_notify(void)
      }
 }
 
+/**
+ * @brief Initializes the system notification framework (legacy).
+ * @details This function is part of the legacy API. It initializes the
+ *          system notification manager singleton and attempts to set up
+ *          all available notification servers (e.g., D-Bus).
+ *          It should be called before sending any notifications if using
+ *          the legacy API. If servers are already configured, this function
+ *          will report an error.
+ *
+ * @return EINA_TRUE if initialization was successful and at least one
+ *         notification server was set up, EINA_FALSE otherwise.
+ * @see elm_sys_notify_servers_set() for more flexible server configuration.
+ */
 EAPI Eina_Bool
 elm_need_sys_notify(void)
 {

@@ -1,3 +1,11 @@
+/**
+ * @file
+ * @brief Ecore_Evas cocoa engine implementation.
+ *
+ * This file contains the Ecore_Evas engine implementation for the Cocoa
+ * backend, providing integration with macOS native windows.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -32,23 +40,46 @@
 # define EMODAPI
 #endif
 
-static int                      _ecore_evas_init_count = 0;
-static Ecore_Event_Handler      *ecore_evas_event_handlers[4];
+static int                      _ecore_evas_init_count = 0; /**< Reference count for ecore_evas_cocoa initialization. */
+static Ecore_Event_Handler      *ecore_evas_event_handlers[4]; /**< Array of Ecore event handlers. */
 
-static const char *_iface_name = "opengl_cocoa";
-static const int _iface_version = 1;
+static const char *_iface_name = "opengl_cocoa"; /**< Name of the Ecore_Evas interface. */
+static const int _iface_version = 1; /**< Version of the Ecore_Evas interface. */
 
+/**
+ * @brief Structure to hold engine-specific data for an Ecore_Evas Cocoa instance.
+ */
 typedef struct {
-   Ecore_Evas_Selection_Callbacks clipboard;
-   Eina_Future *delivery;
+   Ecore_Evas_Selection_Callbacks clipboard; /**< Callbacks for clipboard operations. */
+   Eina_Future *delivery; /**< Future for asynchronous clipboard data delivery. */
 } Ecore_Evas_Cocoa_Engine_Data;
 
+/**
+ * @brief Matches a Cocoa window object to an Ecore_Evas instance.
+ *
+ * This function is used to find the Ecore_Evas instance associated with a
+ * given Ecore_Cocoa_Object (which represents a native Cocoa window).
+ *
+ * @param cocoa_win The Cocoa window object.
+ * @return The matching Ecore_Evas instance, or NULL if no match is found.
+ */
 static inline Ecore_Evas *
 _ecore_evas_cocoa_match(Ecore_Cocoa_Object *cocoa_win)
 {
    return ecore_event_window_match((Ecore_Window)cocoa_win);
 }
 
+/**
+ * @brief Event handler for Cocoa window focus gain events.
+ *
+ * This function is called when a Cocoa window associated with an Ecore_Evas
+ * instance gains focus. It updates the focus state of the Ecore_Evas.
+ *
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param event The Ecore_Cocoa_Event_Window_Focused event data.
+ * @return ECORE_CALLBACK_PASS_ON to continue processing.
+ */
 static Eina_Bool
 _ecore_evas_cocoa_event_got_focus(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -62,6 +93,17 @@ _ecore_evas_cocoa_event_got_focus(void *data EINA_UNUSED, int type EINA_UNUSED, 
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Event handler for Cocoa window focus loss events.
+ *
+ * This function is called when a Cocoa window associated with an Ecore_Evas
+ * instance loses focus. It updates the focus state of the Ecore_Evas.
+ *
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param event The Ecore_Cocoa_Event_Window_Unfocused event data.
+ * @return ECORE_CALLBACK_PASS_ON to continue processing.
+ */
 static Eina_Bool
 _ecore_evas_cocoa_event_lost_focus(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -75,6 +117,18 @@ _ecore_evas_cocoa_event_lost_focus(void *data EINA_UNUSED, int type EINA_UNUSED,
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Common logic for resizing an Ecore_Evas window.
+ *
+ * This function handles the core logic for resizing an Ecore_Evas instance,
+ * including updating its internal dimensions, resizing the native Cocoa window
+ * if requested, and notifying the Evas canvas and application callbacks.
+ *
+ * @param ee The Ecore_Evas instance to resize.
+ * @param w The new width.
+ * @param h The new height.
+ * @param resize_cocoa If EINA_TRUE, the underlying Cocoa window will also be resized.
+ */
 static void
 _ecore_evas_resize_common(Ecore_Evas *ee,
                           int         w,
@@ -109,6 +163,17 @@ _ecore_evas_resize_common(Ecore_Evas *ee,
      }
 }
 
+/**
+ * @brief Event handler for Cocoa window resize request events.
+ *
+ * This function is called when a resize request is received for a Cocoa window
+ * associated with an Ecore_Evas instance. It triggers the common resize logic.
+ *
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param event The Ecore_Cocoa_Event_Window_Resize_Request event data.
+ * @return ECORE_CALLBACK_PASS_ON to continue processing.
+ */
 static Eina_Bool
 _ecore_evas_cocoa_event_window_resize(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -129,6 +194,18 @@ _ecore_evas_cocoa_event_window_resize(void *data EINA_UNUSED, int type EINA_UNUS
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Event handler for Cocoa window destroy events.
+ *
+ * This function is called when a Cocoa window associated with an Ecore_Evas
+ * instance is about to be destroyed. It typically triggers the delete request
+ * callback on the Ecore_Evas.
+ *
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param event The Ecore_Cocoa_Event_Window_Destroy event data.
+ * @return ECORE_CALLBACK_PASS_ON to continue processing.
+ */
 static Eina_Bool
 _ecore_evas_cocoa_event_window_destroy(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -148,6 +225,14 @@ _ecore_evas_cocoa_event_window_destroy(void *data EINA_UNUSED, int type EINA_UNU
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Initializes the Ecore_Evas Cocoa module.
+ *
+ * This function sets up the necessary Ecore event handlers for Cocoa window
+ * events. It uses a reference counter to manage multiple initializations.
+ *
+ * @return The current initialization count.
+ */
 static int
 _ecore_evas_cocoa_init(void)
 {
@@ -175,6 +260,14 @@ _ecore_evas_cocoa_init(void)
    return _ecore_evas_init_count;
 }
 
+/**
+ * @brief Shuts down the Ecore_Evas Cocoa module.
+ *
+ * This function removes the Ecore event handlers added during initialization.
+ * It uses a reference counter to manage multiple shutdowns.
+ *
+ * @return The current initialization count after decrementing.
+ */
 static int
 _ecore_evas_cocoa_shutdown(void)
 {
@@ -192,6 +285,15 @@ _ecore_evas_cocoa_shutdown(void)
    return _ecore_evas_init_count;
 }
 
+/**
+ * @brief Frees resources associated with an Ecore_Evas Cocoa instance.
+ *
+ * This function is called when an Ecore_Evas instance using the Cocoa engine
+ * is destroyed. It frees the native Cocoa window, unregisters event handlers,
+ * and shuts down the Cocoa Ecore module if necessary.
+ *
+ * @param ee The Ecore_Evas instance to free.
+ */
 static void
 _ecore_evas_cocoa_free(Ecore_Evas *ee)
 {
@@ -203,30 +305,59 @@ _ecore_evas_cocoa_free(Ecore_Evas *ee)
    ecore_cocoa_shutdown();
 }
 
+/**
+ * @brief Sets the resize callback for an Ecore_Evas instance.
+ * @param ee The Ecore_Evas instance.
+ * @param func The callback function to be called on resize.
+ */
 static void
 _ecore_evas_callback_resize_set(Ecore_Evas *ee, Ecore_Evas_Event_Cb func)
 {
    if (ee) ee->func.fn_resize = func;
 }
 
+/**
+ * @brief Sets the minimum size for the Ecore_Evas window.
+ * @param ee The Ecore_Evas instance.
+ * @param w The minimum width.
+ * @param h The minimum height.
+ */
 static void
 _ecore_evas_size_min_set(Ecore_Evas *ee, int w, int h)
 {
    ecore_cocoa_window_size_min_set((Ecore_Cocoa_Window *)ee->prop.window, w, h);
 }
 
+/**
+ * @brief Sets the maximum size for the Ecore_Evas window.
+ * @param ee The Ecore_Evas instance.
+ * @param w The maximum width.
+ * @param h The maximum height.
+ */
 static void
 _ecore_evas_size_max_set(Ecore_Evas *ee, int w, int h)
 {
    ecore_cocoa_window_size_max_set((Ecore_Cocoa_Window *)ee->prop.window, w, h);
 }
 
+/**
+ * @brief Sets the size step for the Ecore_Evas window.
+ * @param ee The Ecore_Evas instance.
+ * @param w The width step.
+ * @param h The height step.
+ */
 static void
 _ecore_evas_size_step_set(Ecore_Evas *ee, int w, int h)
 {
    ecore_cocoa_window_size_step_set((Ecore_Cocoa_Window *)ee->prop.window, w, h);
 }
 
+/**
+ * @brief Moves the Ecore_Evas window to the specified coordinates.
+ * @param ee The Ecore_Evas instance.
+ * @param x The new x-coordinate.
+ * @param y The new y-coordinate.
+ */
 static void
 _ecore_evas_move(Ecore_Evas *ee, int x, int y)
 {
@@ -234,6 +365,12 @@ _ecore_evas_move(Ecore_Evas *ee, int x, int y)
    ecore_cocoa_window_move((Ecore_Cocoa_Window *)ee->prop.window, x, y);
 }
 
+/**
+ * @brief Resizes the Ecore_Evas window to the specified dimensions.
+ * @param ee The Ecore_Evas instance.
+ * @param w The new width.
+ * @param h The new height.
+ */
 static void
 _ecore_evas_resize(Ecore_Evas *ee, int w, int h)
 {
@@ -241,6 +378,14 @@ _ecore_evas_resize(Ecore_Evas *ee, int w, int h)
    _ecore_evas_resize_common(ee, w, h, EINA_TRUE);
 }
 
+/**
+ * @brief Moves and resizes the Ecore_Evas window.
+ * @param ee The Ecore_Evas instance.
+ * @param x The new x-coordinate.
+ * @param y The new y-coordinate.
+ * @param w The new width.
+ * @param h The new height.
+ */
 static void
 _ecore_evas_move_resize(Ecore_Evas *ee, int x, int y, int w, int h)
 {
@@ -266,7 +411,13 @@ _ecore_evas_move_resize(Ecore_Evas *ee, int x, int y, int w, int h)
    if (ee->func.fn_resize) ee->func.fn_resize(ee);
 }
 
-
+/**
+ * @brief Shows the Ecore_Evas window.
+ *
+ * Makes the Ecore_Evas window visible and triggers relevant callbacks.
+ *
+ * @param ee The Ecore_Evas instance.
+ */
 static void
 _ecore_evas_show(Ecore_Evas *ee)
 {
@@ -284,7 +435,13 @@ _ecore_evas_show(Ecore_Evas *ee)
    if (ee->func.fn_show) ee->func.fn_show(ee);
 }
 
-
+/**
+ * @brief Hides the Ecore_Evas window.
+ *
+ * Makes the Ecore_Evas window invisible and triggers relevant callbacks.
+ *
+ * @param ee The Ecore_Evas instance.
+ */
 static void
 _ecore_evas_hide(Ecore_Evas *ee)
 {
@@ -305,6 +462,10 @@ _ecore_evas_hide(Ecore_Evas *ee)
    if (ee->func.fn_hide) ee->func.fn_hide(ee);
 }
 
+/**
+ * @brief Raises the Ecore_Evas window above other windows.
+ * @param ee The Ecore_Evas instance.
+ */
 static void
 _ecore_evas_raise(Ecore_Evas *ee)
 {
@@ -313,6 +474,10 @@ _ecore_evas_raise(Ecore_Evas *ee)
    ecore_cocoa_window_raise((Ecore_Cocoa_Window *)ee->prop.window);
 }
 
+/**
+ * @brief Lowers the Ecore_Evas window below other windows.
+ * @param ee The Ecore_Evas instance.
+ */
 static void
 _ecore_evas_lower(Ecore_Evas *ee)
 {
@@ -321,6 +486,12 @@ _ecore_evas_lower(Ecore_Evas *ee)
    ecore_cocoa_window_lower((Ecore_Cocoa_Window *)ee->prop.window);
 }
 
+/**
+ * @brief Activates the Ecore_Evas window.
+ *
+ * This typically brings the window to the foreground and gives it input focus.
+ * @param ee The Ecore_Evas instance.
+ */
 static void
 _ecore_evas_activate(Ecore_Evas *ee)
 {
@@ -329,6 +500,11 @@ _ecore_evas_activate(Ecore_Evas *ee)
    ecore_cocoa_window_activate((Ecore_Cocoa_Window *)ee->prop.window);
 }
 
+/**
+ * @brief Sets the iconified state of the Ecore_Evas window.
+ * @param ee The Ecore_Evas instance.
+ * @param on EINA_TRUE to iconify, EINA_FALSE to de-iconify.
+ */
 static void
 _ecore_evas_iconified_set(Ecore_Evas *ee, Eina_Bool on)
 {
@@ -337,6 +513,11 @@ _ecore_evas_iconified_set(Ecore_Evas *ee, Eina_Bool on)
    ecore_cocoa_window_iconified_set((Ecore_Cocoa_Window *)ee->prop.window, on);
 }
 
+/**
+ * @brief Sets the title of the Ecore_Evas window.
+ * @param ee The Ecore_Evas instance.
+ * @param title The new title string.
+ */
 static void
 _ecore_evas_title_set(Ecore_Evas *ee, const char *title)
 {
@@ -350,6 +531,17 @@ _ecore_evas_title_set(Ecore_Evas *ee, const char *title)
                                 ee->prop.title);
 }
 
+/**
+ * @brief Sets a custom cursor for an Evas object within the Ecore_Evas window.
+ *
+ * If the object is not the default cursor image, the native window cursor is hidden.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param obj The Evas object to use as a cursor.
+ * @param layer Unused.
+ * @param hot_x Unused.
+ * @param hot_y Unused.
+ */
 static void
 _ecore_evas_object_cursor_set(Ecore_Evas *ee, Evas_Object *obj,
                               int layer EINA_UNUSED, int hot_x EINA_UNUSED,
@@ -361,6 +553,13 @@ _ecore_evas_object_cursor_set(Ecore_Evas *ee, Evas_Object *obj,
      ecore_cocoa_window_cursor_show(win, EINA_FALSE);
 }
 
+/**
+ * @brief Unsets a custom cursor, reverting to the default window cursor.
+ *
+ * Shows the native window cursor.
+ *
+ * @param ee The Ecore_Evas instance.
+ */
 static void
 _ecore_evas_object_cursor_unset(Ecore_Evas *ee)
 {
@@ -368,6 +567,14 @@ _ecore_evas_object_cursor_unset(Ecore_Evas *ee)
    ecore_cocoa_window_cursor_show(win, EINA_TRUE);
 }
 
+/**
+ * @brief Sets the withdrawn state of the Ecore_Evas window.
+ *
+ * A withdrawn window is hidden and does not participate in window management.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param on EINA_TRUE to withdraw, EINA_FALSE to un-withdraw (show).
+ */
 static void
 _ecore_evas_withdrawn_set(Ecore_Evas *ee, Eina_Bool on)
 {
@@ -377,6 +584,15 @@ _ecore_evas_withdrawn_set(Ecore_Evas *ee, Eina_Bool on)
      _ecore_evas_show(ee);
 }
 
+/**
+ * @brief Initializes the Evas engine for Cocoa GL.
+ *
+ * Sets up the Evas rendering method and engine info for OpenGL rendering
+ * within a Cocoa window.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 _ecore_evas_engine_cocoa_init(Ecore_Evas *ee)
 {
@@ -415,6 +631,17 @@ _ecore_evas_engine_cocoa_init(Ecore_Evas *ee)
    return 1;
 }
 
+/**
+ * @brief Gets the geometry of the screen containing the Ecore_Evas window.
+ *
+ * For Cocoa, this typically returns the main screen's geometry.
+ *
+ * @param ee The Ecore_Evas instance (unused).
+ * @param x Pointer to store the x-coordinate of the screen (set to 0).
+ * @param y Pointer to store the y-coordinate of the screen (set to 0).
+ * @param w Pointer to store the width of the screen.
+ * @param h Pointer to store the height of the screen.
+ */
 static void
 _ecore_evas_screen_geometry_get(const Ecore_Evas *ee EINA_UNUSED, int *x, int *y, int *w, int *h)
 {
@@ -424,13 +651,29 @@ _ecore_evas_screen_geometry_get(const Ecore_Evas *ee EINA_UNUSED, int *x, int *y
    DBG("screen geometry_get  %dx%d", *w, *h);
 }
 
-
+/**
+ * @brief Sets the delete request callback for an Ecore_Evas instance.
+ * @param ee The Ecore_Evas instance.
+ * @param func The callback function to be called on a delete request.
+ */
 static void
 _ecore_evas_callback_delete_request_set(Ecore_Evas *ee, Ecore_Evas_Event_Cb func)
 {
    ee->func.fn_delete_request = func;
 }
 
+/**
+ * @brief Callback function for asynchronous clipboard data delivery.
+ *
+ * This function is executed when a future associated with a clipboard claim
+ * is resolved. It calls the application-provided delivery callback to get
+ * the actual data and then sets it to the Cocoa clipboard.
+ *
+ * @param data The Ecore_Evas instance.
+ * @param value Unused.
+ * @param dead_future Unused.
+ * @return EINA_VALUE_EMPTY.
+ */
 static Eina_Value
 _delivery(void *data, const Eina_Value value EINA_UNUSED, const Eina_Future *dead_future EINA_UNUSED)
 {
@@ -461,6 +704,22 @@ end:
    return EINA_VALUE_EMPTY;
 }
 
+/**
+ * @brief Claims ownership of a selection (clipboard).
+ *
+ * This function handles requests to claim the clipboard. If `delivery` and
+ * `cancel` are NULL, it clears the clipboard. Otherwise, it sets up
+ * callbacks for delivering data to the clipboard when requested.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param seat The seat (unused in Cocoa, typically 0).
+ * @param selection The selection buffer to claim (only COPY_AND_PASTE is supported).
+ * @param available_types An array of MIME types the application can provide for this selection.
+ *                        Example: `eina_array_new(2); eina_array_push(arr, "text/plain;charset=utf-8");`
+ * @param delivery Callback to provide the selection data.
+ * @param cancel Callback if the claim is cancelled.
+ * @return EINA_TRUE if the claim was successful or initiated, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _ecore_evas_cocoa_selection_claim(Ecore_Evas *ee, unsigned int seat, Ecore_Evas_Selection_Buffer selection, Eina_Array *available_types, Ecore_Evas_Selection_Internal_Delivery delivery, Ecore_Evas_Selection_Internal_Cancel cancel)
 {
@@ -491,6 +750,22 @@ _ecore_evas_cocoa_selection_claim(Ecore_Evas *ee, unsigned int seat, Ecore_Evas_
      }
 }
 
+/**
+ * @brief Requests data from a selection (clipboard).
+ *
+ * This function requests data from the clipboard in one of the specified
+ * acceptable MIME types.
+ *
+ * @param ee The Ecore_Evas instance (unused).
+ * @param seat The seat (unused in Cocoa, typically 0).
+ * @param selection The selection buffer to request from (only COPY_AND_PASTE is supported).
+ * @param acceptable_type An array of MIME types the application can accept.
+ *                        Example: `eina_array_new(1); eina_array_push(arr, "text/plain");`
+ * @return A future that will resolve with an Eina_Value containing an Eina_Content
+ *         object on success, or be rejected on failure. The Eina_Content will hold
+ *         the data as an Eina_Rw_Slice.
+ *         Example of resolved value: `eina_value_content_init(eina_content_new(eina_rw_slice_copy(slice), "text/plain"))`
+ */
 Eina_Future*
 _ecore_evas_cocoa_selection_request(Ecore_Evas *ee EINA_UNUSED, unsigned int seat EINA_UNUSED, Ecore_Evas_Selection_Buffer selection, Eina_Array *acceptable_type)
 {
@@ -547,6 +822,14 @@ _ecore_evas_cocoa_selection_request(Ecore_Evas *ee EINA_UNUSED, unsigned int sea
    return future;
 }
 
+/**
+ * @brief Checks if a selection (clipboard) has an owner.
+ *
+ * @param ee The Ecore_Evas instance (unused).
+ * @param seat The seat (unused in Cocoa, typically 0).
+ * @param selection The selection buffer to check (only COPY_AND_PASTE is supported).
+ * @return EINA_TRUE if the clipboard has content, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _ecore_evas_cocoa_selection_has_owner(Ecore_Evas *ee EINA_UNUSED, unsigned int seat EINA_UNUSED, Ecore_Evas_Selection_Buffer selection EINA_UNUSED)
 {
@@ -555,6 +838,12 @@ _ecore_evas_cocoa_selection_has_owner(Ecore_Evas *ee EINA_UNUSED, unsigned int s
    return EINA_FALSE;
 }
 
+/**
+ * @brief Structure defining the Ecore_Evas engine functions for the Cocoa backend.
+ *
+ * This structure maps generic Ecore_Evas operations to their specific
+ * implementations for the Cocoa environment.
+ */
 static Ecore_Evas_Engine_Func _ecore_cocoa_engine_func =
   {
     _ecore_evas_cocoa_free,
@@ -648,6 +937,12 @@ static Ecore_Evas_Engine_Func _ecore_cocoa_engine_func =
    NULL, //fn_dnd_stop
   };
 
+/**
+ * @brief Gets the native Ecore_Cocoa_Window associated with an Ecore_Evas.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @return The Ecore_Cocoa_Window pointer.
+ */
 static Ecore_Cocoa_Window *
 _ecore_evas_cocoa_window_get(const Ecore_Evas *ee)
 {
@@ -655,6 +950,19 @@ _ecore_evas_cocoa_window_get(const Ecore_Evas *ee)
    return (Ecore_Cocoa_Window *)(ee->prop.window);
 }
 
+/**
+ * @brief Creates a new Ecore_Evas instance using the Cocoa engine.
+ *
+ * This is the internal function for creating a new Ecore_Evas window
+ * backed by a native Cocoa window.
+ *
+ * @param parent Parent Cocoa window (unused in current implementation).
+ * @param x The initial x-coordinate of the window.
+ * @param y The initial y-coordinate of the window.
+ * @param w The initial width of the window.
+ * @param h The initial height of the window.
+ * @return A new Ecore_Evas instance, or NULL on failure.
+ */
 EMODAPI Ecore_Evas *
 ecore_evas_cocoa_new_internal(Ecore_Cocoa_Window *parent EINA_UNUSED, int x, int y, int w, int h)
 {

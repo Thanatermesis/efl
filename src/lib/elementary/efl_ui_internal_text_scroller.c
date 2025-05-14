@@ -34,16 +34,22 @@
 
 #define MY_CLASS_NAME "Efl.Ui.Internal_Text_Scroller"
 
+/**
+ * @brief Internal data structure for the Efl.Ui.Internal_Text_Scroller widget.
+ *
+ * This structure holds all the private data members needed for the
+ * internal text scroller's operation.
+ */
 typedef struct _Efl_Ui_Internal_Text_Scroller_Data
 {
-   Efl_Canvas_Textblock *text_obj;
-   Efl_Ui_Table *text_table;
-   Eo *smanager;
+   Efl_Canvas_Textblock *text_obj; /**< The textblock object displaying the text. */
+   Efl_Ui_Table *text_table;       /**< The table used to layout the textblock. */
+   Eo *smanager;                   /**< The scroll manager associated with this scroller. */
 
-   Efl_Ui_Text_Scroller_Mode mode;
+   Efl_Ui_Text_Scroller_Mode mode; /**< The current scrolling mode (single line or multiline). */
 
-   Eina_Bool  match_content_w: 1;
-   Eina_Bool  match_content_h: 1;
+   Eina_Bool  match_content_w: 1;  /**< Flag to indicate if width should match content. (Currently unused) */
+   Eina_Bool  match_content_h: 1;  /**< Flag to indicate if height should match content. (Currently unused) */
 } Efl_Ui_Internal_Text_Scroller_Data;
 
 #define EFL_UI_INTERNAL_TEXT_SCROLLER_DATA_GET(o, sd) \
@@ -58,6 +64,15 @@ typedef struct _Efl_Ui_Internal_Text_Scroller_Data
        return __VA_ARGS__;                                    \
     }
 
+/**
+ * @brief Constructor for the Efl.Ui.Internal_Text_Scroller object.
+ *
+ * Initializes the internal text scroller, sets default scrollbar modes.
+ *
+ * @param obj The Efl.Ui.Internal_Text_Scroller object.
+ * @param sd Private data for the Efl.Ui.Internal_Text_Scroller object.
+ * @return The constructed Efl.Ui.Internal_Text_Scroller object.
+ */
 EOLIAN static Eo *
 _efl_ui_internal_text_scroller_efl_object_constructor(Eo *obj,
                                         Efl_Ui_Internal_Text_Scroller_Data *sd EINA_UNUSED)
@@ -69,6 +84,17 @@ _efl_ui_internal_text_scroller_efl_object_constructor(Eo *obj,
    return obj;
 }
 
+/**
+ * @brief Calculates the size of the internal text scroller content.
+ *
+ * This function is called when the group needs to recalculate its layout.
+ * It determines the formatted size of the textblock and adjusts the
+ * scroller's content size accordingly, based on the current scroller mode
+ * (single-line or multi-line) and viewport dimensions.
+ *
+ * @param obj The Efl.Ui.Internal_Text_Scroller object.
+ * @param sd Private data for the Efl.Ui.Internal_Text_Scroller object.
+ */
 EOLIAN static void
 _efl_ui_internal_text_scroller_efl_canvas_group_group_calculate(Eo *obj,
       Efl_Ui_Internal_Text_Scroller_Data *sd)
@@ -129,9 +155,20 @@ _efl_ui_internal_text_scroller_efl_canvas_group_group_calculate(Eo *obj,
      }
 }
 
+/**
+ * @brief Finalizer for the Efl.Ui.Internal_Text_Scroller object.
+ *
+ * Completes the initialization of the internal text scroller.
+ * Sets the text table as the content of the scroller and ensures
+ * scrollbars are initially off (mode_set will adjust them later).
+ *
+ * @param obj The Efl.Ui.Internal_Text_Scroller object.
+ * @param sd Private data for the Efl.Ui.Internal_Text_Scroller object.
+ * @return The finalized Efl.Ui.Internal_Text_Scroller object.
+ */
 EOLIAN static Eo *
 _efl_ui_internal_text_scroller_efl_object_finalize(Eo *obj,
-                                     Efl_Ui_Internal_Text_Scroller_Data *sd EINA_UNUSED)
+                                     Efl_Ui_Internal_Text_Scroller_Data *sd)
 {
    obj = efl_finalize(efl_super(obj, MY_CLASS));
    efl_ui_scrollbar_bar_mode_set(obj,
@@ -140,6 +177,14 @@ _efl_ui_internal_text_scroller_efl_object_finalize(Eo *obj,
    return obj;
 }
 
+/**
+ * @brief Destructor for the Efl.Ui.Internal_Text_Scroller object.
+ *
+ * Cleans up resources used by the internal text scroller.
+ *
+ * @param obj The Efl.Ui.Internal_Text_Scroller object.
+ * @param sd Private data for the Efl.Ui.Internal_Text_Scroller object.
+ */
 EOLIAN static void
 _efl_ui_internal_text_scroller_efl_object_destructor(Eo *obj,
                                        Efl_Ui_Internal_Text_Scroller_Data *sd EINA_UNUSED)
@@ -147,6 +192,17 @@ _efl_ui_internal_text_scroller_efl_object_destructor(Eo *obj,
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Initializes the internal text scroller with textblock and table.
+ *
+ * This function sets up the core components (textblock and table) for the scroller.
+ * It should only be called during the construction phase of the object.
+ *
+ * @param obj The Efl.Ui.Internal_Text_Scroller object.
+ * @param sd Private data for the Efl.Ui.Internal_Text_Scroller object.
+ * @param text_obj The Efl_Canvas_Textblock object to be scrolled.
+ * @param text_table The Efl_Ui_Table object used for laying out the textblock.
+ */
 EOLIAN static void
 _efl_ui_internal_text_scroller_initialize(Eo *obj,
                                        Efl_Ui_Internal_Text_Scroller_Data *sd,
@@ -163,6 +219,16 @@ _efl_ui_internal_text_scroller_initialize(Eo *obj,
    sd->text_table = text_table;
 }
 
+/**
+ * @brief Sets the scrolling mode for the internal text scroller.
+ *
+ * This function configures the scroller to operate in either single-line
+ * or multi-line mode, adjusting scrollbar visibility accordingly.
+ *
+ * @param obj The Efl.Ui.Internal_Text_Scroller object.
+ * @param sd Private data for the Efl.Ui.Internal_Text_Scroller object.
+ * @param mode The desired Efl_Ui_Text_Scroller_Mode (EFL_UI_TEXT_SCROLLER_MODE_SINGLELINE or EFL_UI_TEXT_SCROLLER_MODE_MULTILINE).
+ */
 EOLIAN static void
 _efl_ui_internal_text_scroller_scroller_mode_set(Eo *obj,
                                        Efl_Ui_Internal_Text_Scroller_Data *sd,
@@ -181,6 +247,16 @@ _efl_ui_internal_text_scroller_scroller_mode_set(Eo *obj,
      }
 }
 
+/**
+ * @brief Gets the clip object for the scroller's viewport.
+ *
+ * Retrieves the Evas_Object that is used as the clipper for the scrollable
+ * content area (pan_obj) of the scroller.
+ *
+ * @param obj The Efl.Ui.Internal_Text_Scroller object.
+ * @param sd Private data for the Efl.Ui.Internal_Text_Scroller object. (Unused in this function)
+ * @return The Evas_Object used as the viewport clip, or NULL on failure.
+ */
 EOLIAN static Eo *
 _efl_ui_internal_text_scroller_viewport_clip_get(const Eo *obj,
       Efl_Ui_Internal_Text_Scroller_Data *sd EINA_UNUSED)

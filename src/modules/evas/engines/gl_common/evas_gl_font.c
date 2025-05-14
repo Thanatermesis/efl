@@ -1,5 +1,20 @@
 #include "evas_gl_private.h"
 
+/**
+ * @internal
+ * @brief Creates a new GL texture for a font glyph.
+ *
+ * This function takes a font glyph, uncompresses its bitmap data,
+ * and uploads it to a new alpha-only GL texture. The texture data is
+ * aligned to 4-byte row boundaries for efficient upload. The created
+ * texture is stored in a texture atlas managed by the GL engine.
+ *
+ * @param[in] context The Evas GL engine context.
+ * @param[in] fg The font glyph to create a texture for. The glyph's
+ *               bitmap data is expected to be RLE compressed.
+ * @return A pointer to the newly created Evas_GL_Texture, or NULL on failure.
+ *         The returned texture is owned by the Evas GL engine.
+ */
 void *
 evas_gl_font_texture_new(void *context, RGBA_Font_Glyph *fg)
 {
@@ -49,6 +64,16 @@ done:
    return tex;
 }
 
+/**
+ * @internal
+ * @brief Frees a font glyph texture.
+ *
+ * This function releases the resources associated with a font glyph
+ * texture. It should be called when the glyph is no longer needed.
+ *
+ * @param[in] tex The texture to free, previously created by
+ *                evas_gl_font_texture_new().
+ */
 void
 evas_gl_font_texture_free(void *tex)
 {
@@ -56,6 +81,26 @@ evas_gl_font_texture_free(void *tex)
    evas_gl_common_texture_free(tex, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Draws a font glyph texture.
+ *
+ * This function renders a pre-rendered font glyph texture to the specified
+ * coordinates. It handles complex rendering scenarios, including clipping
+ * to a rectangular area and applying cutouts (rendering with holes).
+ * The drawing operation is batched for performance by pushing it to the
+ * GL common context.
+ *
+ * @param[in] context The Evas GL engine context.
+ * @param[in] surface The destination surface (unused).
+ * @param[in] draw_context The drawing context, containing color and clipping information.
+ * @param[in] fg The font glyph to draw. Its `ext_dat` field should contain a valid
+ *               Evas_GL_Texture.
+ * @param[in] x The destination X coordinate.
+ * @param[in] y The destination Y coordinate.
+ * @param[in] w The destination width.
+ * @param[in] h The destination height.
+ */
 void
 evas_gl_font_texture_draw(void *context, void *surface EINA_UNUSED, void *draw_context, RGBA_Font_Glyph *fg, int x, int y, int w, int h)
 {
@@ -188,6 +233,21 @@ evas_gl_font_texture_draw(void *context, void *surface EINA_UNUSED, void *draw_c
    gc->dc->clip.use = c; gc->dc->clip.x = cx; gc->dc->clip.y = cy; gc->dc->clip.w = cw; gc->dc->clip.h = ch;
 }
 
+/**
+ * @internal
+ * @brief Creates a new Evas_GL_Image from glyph data.
+ *
+ * This function is used for glyphs that are represented as full-color images
+ * (e.g., color fonts, emojis) rather than single-color alpha masks. It
+ * creates an Evas_GL_Image from the raw bitmap data of the glyph.
+ * The created image is tracked for caching purposes.
+ *
+ * @param[in] gc The Evas GL engine context.
+ * @param[in] fg The font glyph containing the image data.
+ * @param[in] alpha EINA_TRUE if the image has an alpha channel.
+ * @param[in] cspace The colorspace of the image data.
+ * @return A new Evas_GL_Image as a void pointer, or NULL on failure.
+ */
 void *
 evas_gl_font_image_new(void *gc, RGBA_Font_Glyph *fg, int alpha, Evas_Colorspace cspace)
 {
@@ -208,12 +268,37 @@ evas_gl_font_image_new(void *gc, RGBA_Font_Glyph *fg, int alpha, Evas_Colorspace
    return (void *)im;
 }
 
+/**
+ * @internal
+ * @brief Frees a font glyph image.
+ *
+ * @param[in] im The image to free, previously created by
+ *               evas_gl_font_image_new().
+ */
 void
 evas_gl_font_image_free(void *im)
 {
    evas_gl_common_image_free((Evas_GL_Image *)im);
 }
 
+/**
+ * @internal
+ * @brief Draws a font glyph that is an image.
+ *
+ * This function draws a glyph image (e.g., for color fonts) at the
+ * specified location. It also performs cache management by moving the
+ * drawn glyph to the end of a list, implementing an LRU-like policy.
+ * If creating a new texture atlas for the glyph causes the total atlas
+ * size to exceed a cache limit, it requests a garbage collection cycle.
+ *
+ * @param[in] gc The Evas GL engine context.
+ * @param[in] gl_image The Evas_GL_Image to draw.
+ * @param[in] dx The destination X coordinate.
+ * @param[in] dy The destination Y coordinate.
+ * @param[in] dw The destination width.
+ * @param[in] dh The destination height.
+ * @param[in] smooth EINA_TRUE to enable smooth scaling.
+ */
 void
 evas_gl_font_image_draw(void *gc, void *gl_image, int dx, int dy, int dw, int dh, int smooth)
 {

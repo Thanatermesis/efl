@@ -1,3 +1,12 @@
+/**
+ * @file evas_engine.c
+ * @brief Evas GL SDL engine implementation.
+ *
+ * This file contains the Evas engine implementation for rendering using OpenGL
+ * via SDL. It handles window creation, context management, and drawing
+ * operations.
+ */
+
 #include "evas_common_private.h" /* Also includes international specific stuff */
 #include "evas_private.h"
 #include "evas_engine.h"
@@ -8,32 +17,80 @@
 
 #include <SDL2/SDL_opengl.h>
 
+/** @brief Pointer to the Evas GL common context creation function. */
 Evas_GL_Common_Context_New glsym_evas_gl_common_context_new = NULL;
+/** @brief Pointer to the Evas GL common context free function. */
 Evas_GL_Common_Context_Call glsym_evas_gl_common_context_free = NULL;
+/** @brief Pointer to the Evas GL common context use function. */
 Evas_GL_Common_Context_Call glsym_evas_gl_common_context_use = NULL;
+/** @brief Pointer to the Evas GL common context flush function. */
 Evas_GL_Common_Context_Call glsym_evas_gl_common_context_flush = NULL;
+/** @brief Pointer to the Evas GL common image unload function. */
 Evas_GL_Common_Context_Call glsym_evas_gl_common_image_all_unload = NULL;
+/** @brief Pointer to the Evas GL common context resize function. */
 Evas_GL_Common_Context_Resize_Call glsym_evas_gl_common_context_resize = NULL;
+/** @brief Pointer to the Evas GL preload render lock function. */
 Evas_GL_Preload_Render_Call glsym_evas_gl_preload_render_lock = NULL;
+/** @brief Pointer to the Evas GL symbols function. */
 Evas_Gl_Symbols glsym_evas_gl_symbols = NULL;
 
+/**
+ * @brief Sets up the SDL output buffer.
+ * @param w The width of the output buffer.
+ * @param h The height of the output buffer.
+ * @param fullscreen Non-zero if fullscreen, 0 otherwise.
+ * @param noframe Non-zero if no frame, 0 otherwise.
+ * @param info Pointer to Evas_Engine_Info_GL_SDL structure.
+ * @return A pointer to the initialized Outbuf structure, or NULL on failure.
+ */
 static Outbuf *_sdl_output_setup(int w, int h, int fullscreen, int noframe, Evas_Engine_Info_GL_SDL *info);
 
+/** @brief Log domain for the Evas GL SDL engine. */
 int _evas_engine_GL_SDL_log_dom = -1;
 /* function tables - filled in later (func and parent func) */
-static Evas_Func func, pfunc;
+/** @brief Current engine functions. */
+static Evas_Func func;
+/** @brief Parent engine functions (gl_generic). */
+static Evas_Func pfunc;
 
+/**
+ * @brief Reconfigures the output buffer.
+ * @param ob The output buffer.
+ * @param w The new width.
+ * @param h The new height.
+ * @param rot The new rotation.
+ * @param depth The new depth.
+ * @note This function is currently a no-op for this engine.
+ */
 static void
 _outbuf_reconfigure(Outbuf *ob EINA_UNUSED, int w EINA_UNUSED, int h EINA_UNUSED, int rot EINA_UNUSED, Outbuf_Depth depth EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Checks if there's a first rectangle in the output buffer's region.
+ * @param ob The output buffer.
+ * @return EINA_FALSE as this engine does not support this.
+ */
 static Eina_Bool
 _outbuf_region_first_rect(Outbuf *ob EINA_UNUSED)
 {
    return EINA_FALSE;
 }
 
+/**
+ * @brief Creates a new region for update.
+ * @param ob The output buffer.
+ * @param x X-coordinate of the region.
+ * @param y Y-coordinate of the region.
+ * @param w Width of the region.
+ * @param h Height of the region.
+ * @param cx Pointer to store the context X-coordinate (unused).
+ * @param cy Pointer to store the context Y-coordinate (unused).
+ * @param cw Pointer to store the context width (unused).
+ * @param ch Pointer to store the context height (unused).
+ * @return A pointer to the default surface of the GL context.
+ */
 static void *
 _outbuf_new_region_for_update(Outbuf *ob,
                               int x EINA_UNUSED, int y EINA_UNUSED, int w EINA_UNUSED, int h EINA_UNUSED,
@@ -42,6 +99,16 @@ _outbuf_new_region_for_update(Outbuf *ob,
    return ob->gl_context->def_surface;
 }
 
+/**
+ * @brief Pushes an updated region to the output buffer.
+ * @param ob The output buffer.
+ * @param update The RGBA image data for the update.
+ * @param x X-coordinate of the update.
+ * @param y Y-coordinate of the update.
+ * @param w Width of the update.
+ * @param h Height of the update.
+ * @note This function is currently a no-op for this engine.
+ */
 static void
 _outbuf_push_updated_region(Outbuf *ob EINA_UNUSED,
                             RGBA_Image *update EINA_UNUSED,
@@ -49,6 +116,10 @@ _outbuf_push_updated_region(Outbuf *ob EINA_UNUSED,
 {
 }
 
+/**
+ * @brief Frees the output buffer.
+ * @param ob The output buffer to free.
+ */
 static void
 _outbuf_free(Outbuf *ob)
 {
@@ -56,18 +127,37 @@ _outbuf_free(Outbuf *ob)
    glsym_evas_gl_common_context_free(ob->gl_context);
 }
 
+/**
+ * @brief Gets the rotation of the output buffer.
+ * @param ob The output buffer.
+ * @return Always returns 0 as rotation is not supported.
+ */
 static int
 _outbuf_get_rot(Outbuf *ob EINA_UNUSED)
 {
    return 0;
 }
 
+/**
+ * @brief Flushes the output buffer.
+ * @param ob The output buffer.
+ * @param surface_damage Regions of the surface that were damaged (unused).
+ * @param buffer_damage Regions of the buffer that were damaged (unused).
+ * @param render_mode The render mode (unused).
+ * @note This swaps the SDL GL window buffers.
+ */
 static void
 _outbuf_flush(Outbuf *ob, Tilebuf_Rect *surface_damage EINA_UNUSED, Tilebuf_Rect *buffer_damage EINA_UNUSED, Evas_Render_Mode render_mode EINA_UNUSED)
 {
    SDL_GL_SwapWindow(ob->window);
 }
 
+/**
+ * @brief Makes the engine's window current for GL operations.
+ * @param data Pointer to the Outbuf structure.
+ * @param doit Unused parameter.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise (though always TRUE here).
+ */
 static Eina_Bool
 eng_window_make_current(void *data, void *doit EINA_UNUSED)
 {
@@ -77,6 +167,10 @@ eng_window_make_current(void *data, void *doit EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Prepares the window for use by locking and flushing the GL context.
+ * @param ob The output buffer associated with the window.
+ */
 static void
 _window_use(Outbuf *ob)
 {
@@ -90,12 +184,22 @@ _window_use(Outbuf *ob)
      }
 }
 
+/**
+ * @brief Gets the Evas GL context associated with the window.
+ * @param ob The output buffer.
+ * @return A pointer to the Evas_Engine_GL_Context.
+ */
 static Evas_Engine_GL_Context *
 _window_gl_context_get(Outbuf *ob)
 {
    return ob->gl_context;
 }
 
+/**
+ * @brief Gets the EGL display associated with the window.
+ * @param ob The output buffer.
+ * @return A pointer to the EGLDisplay if using GLES, otherwise NULL.
+ */
 static void *
 _window_egl_display_get(Outbuf *ob)
 {
@@ -107,12 +211,21 @@ _window_egl_display_get(Outbuf *ob)
 #endif
 }
 
+/**
+ * @brief Structure for a 3D context.
+ * Holds the output buffer and the SDL GL context.
+ */
 struct _Context_3D
 {
-   Outbuf *ob;
-   SDL_GLContext sdl_context;
+   Outbuf *ob; /**< Pointer to the output buffer. */
+   SDL_GLContext sdl_context; /**< The SDL GL context. */
 };
 
+/**
+ * @brief Creates a new 3D GL context.
+ * @param ob The output buffer for which to create the context.
+ * @return A pointer to the new Context_3D, or NULL on failure.
+ */
 static Context_3D *
 _window_gl_context_new(Outbuf *ob)
 {
@@ -127,6 +240,10 @@ _window_gl_context_new(Outbuf *ob)
    return ctx;
 }
 
+/**
+ * @brief Makes the specified 3D GL context current.
+ * @param ctx The 3D context to make current.
+ */
 static void
 _window_gl_context_use(Context_3D *ctx)
 {
@@ -135,6 +252,11 @@ _window_gl_context_use(Context_3D *ctx)
 
 /* FIXME: noway to destroy Context_3D */
 
+/**
+ * @brief Gets the EGL display for the EvasGL engine.
+ * @param data Pointer to the Render_Engine structure.
+ * @return A pointer to the EGLDisplay if using GLES and output buffer exists, otherwise NULL.
+ */
 static void *
 evgl_eng_display_get(void *data)
 {
@@ -148,6 +270,11 @@ evgl_eng_display_get(void *data)
 #endif
 }
 
+/**
+ * @brief Gets the Evas surface (SDL window) for the EvasGL engine.
+ * @param data Pointer to the Render_Engine structure.
+ * @return A pointer to the SDL_Window.
+ */
 static void *
 evgl_eng_evas_surface_get(void *data)
 {
@@ -156,6 +283,14 @@ evgl_eng_evas_surface_get(void *data)
    return re->generic.software.ob->window;
 }
 
+/**
+ * @brief Makes the given surface and context current for EvasGL.
+ * @param data Unused.
+ * @param surface The surface (SDL_Window) to make current.
+ * @param context The GL context to make current.
+ * @param flush If non-zero, flushes the window context.
+ * @return EINA_TRUE on success.
+ */
 static int
 evgl_eng_make_current(void *data EINA_UNUSED,
                       void *surface, void *context,
@@ -166,6 +301,12 @@ evgl_eng_make_current(void *data EINA_UNUSED,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Creates a native window for EvasGL.
+ * @param data Unused.
+ * @return NULL, as this is not fully implemented for SDL.
+ * @note FIXME: Needs proper implementation for SDL.
+ */
 static void *
 evgl_eng_native_window_create(void *data EINA_UNUSED)
 {
@@ -175,6 +316,13 @@ evgl_eng_native_window_create(void *data EINA_UNUSED)
    /*                         2, 2, SDL_WINDOW_OPENGL); */
 }
 
+/**
+ * @brief Destroys a native window for EvasGL.
+ * @param data Unused.
+ * @param native_window The native window to destroy (unused).
+ * @return Always returns 1 (success).
+ * @note FIXME: Needs proper implementation if native_window_create is implemented.
+ */
 static int
 evgl_eng_native_window_destroy(void *data EINA_UNUSED, void *native_window EINA_UNUSED)
 {
@@ -182,12 +330,24 @@ evgl_eng_native_window_destroy(void *data EINA_UNUSED, void *native_window EINA_
    return 1;
 }
 
+/**
+ * @brief Creates a window surface for EvasGL from a native window.
+ * @param data Unused.
+ * @param native_window The native window.
+ * @return The native_window itself, as SDL_Window acts as the surface.
+ */
 static void *
 evgl_eng_window_surface_create(void *data EINA_UNUSED, void *native_window)
 {
    return native_window;
 }
 
+/**
+ * @brief Destroys a window surface for EvasGL.
+ * @param data Unused.
+ * @param surface The surface to destroy (unused).
+ * @return Always returns 1 (success).
+ */
 static int
 evgl_eng_window_surface_destroy(void *data EINA_UNUSED,
                                 void *surface EINA_UNUSED)
@@ -195,6 +355,13 @@ evgl_eng_window_surface_destroy(void *data EINA_UNUSED,
    return 1;
 }
 
+/**
+ * @brief Creates a GL context for EvasGL.
+ * @param data Pointer to the Render_Engine structure.
+ * @param share_ctx Context to share resources with (unused).
+ * @param version The GLES version requested. Currently only GLES 2.0 is supported.
+ * @return A pointer to the created SDL_GLContext, or NULL on failure or unsupported version.
+ */
 static void *
 evgl_eng_context_create(void *data, void *share_ctx EINA_UNUSED, Evas_GL_Context_Version version)
 {
@@ -210,6 +377,12 @@ evgl_eng_context_create(void *data, void *share_ctx EINA_UNUSED, Evas_GL_Context
    return SDL_GL_CreateContext(re->generic.software.ob->window);
 }
 
+/**
+ * @brief Destroys a GL context for EvasGL.
+ * @param data Unused.
+ * @param context The GL context to destroy.
+ * @return Always returns 1 (success).
+ */
 static int
 evgl_eng_context_destroy(void *data EINA_UNUSED, void *context)
 {
@@ -217,6 +390,11 @@ evgl_eng_context_destroy(void *data EINA_UNUSED, void *context)
    return 1;
 }
 
+/**
+ * @brief Gets the GL extension string.
+ * @param data Unused.
+ * @return The GL_EXTENSIONS string, or NULL if glGetString is not found.
+ */
 static const char *
 evgl_eng_string_get(void *data EINA_UNUSED)
 {
@@ -227,18 +405,33 @@ evgl_eng_string_get(void *data EINA_UNUSED)
    return NULL;
 }
 
+/**
+ * @brief Gets the address of a GL/EGL extension function.
+ * @param name The name of the function.
+ * @return A pointer to the function, or NULL if not found.
+ */
 static void *
 evgl_eng_proc_address_get(const char *name)
 {
    return SDL_GL_GetProcAddress(name);
 }
 
+/**
+ * @brief Gets the rotation angle of the EvasGL surface.
+ * @param data Unused.
+ * @return Always returns 0, as rotation is not supported by this backend.
+ */
 static int
 evgl_eng_rotation_angle_get(void *data EINA_UNUSED)
 {
    return 0;
 }
 
+/**
+ * @brief Interface functions for EvasGL.
+ * This structure provides callbacks for EvasGL to interact with the
+ * underlying GL implementation (SDL in this case).
+ */
 static const EVGL_Interface evgl_funcs =
 {
    evgl_eng_display_get,
@@ -253,14 +446,22 @@ static const EVGL_Interface evgl_funcs =
    evgl_eng_proc_address_get,
    evgl_eng_string_get,
    evgl_eng_rotation_angle_get,
-   NULL, // PBuffer
-   NULL, // PBuffer
-   NULL, // OpenGL-ES 1
-   NULL, // OpenGL-ES 1
-   NULL, // OpenGL-ES 1
+   NULL, // PBuffer create
+   NULL, // PBuffer destroy
+   NULL, // OpenGL-ES 1 (pixmap_surface_create)
+   NULL, // OpenGL-ES 1 (pixmap_surface_destroy)
+   NULL, // OpenGL-ES 1 (image_target_render_surface_set)
    NULL, // native_win_surface_config_get
 };
 
+/**
+ * @brief Sets up the output for the Evas engine.
+ * @param engine Pointer to the Evas engine (Render_Engine_GL_Generic).
+ * @param in Pointer to Evas_Engine_Info_GL_SDL structure.
+ * @param w The width of the output.
+ * @param h The height of the output.
+ * @return A pointer to the initialized Render_Engine structure, or NULL on failure.
+ */
 static void *
 eng_output_setup(void *engine, void *in, unsigned int w, unsigned int h)
 {
@@ -281,13 +482,13 @@ eng_output_setup(void *engine, void *in, unsigned int w, unsigned int h)
                                            _outbuf_get_rot,
                                            _outbuf_reconfigure,
                                            _outbuf_region_first_rect,
-                                           NULL,
+                                           NULL, // outbuf_damage_region_set - not used by gl_generic
                                            _outbuf_new_region_for_update,
                                            _outbuf_push_updated_region,
-                                           NULL,
-                                           NULL,
+                                           NULL, // outbuf_idle_flush - not used by gl_generic
+                                           NULL, // outbuf_free_region_for_update - not used by gl_generic
                                            _outbuf_flush,
-                                           NULL,
+                                           NULL, // outbuf_drawable_add - not used by gl_generic
                                            _outbuf_free,
                                            _window_use,
                                            _window_gl_context_get,
@@ -307,6 +508,11 @@ eng_output_setup(void *engine, void *in, unsigned int w, unsigned int h)
    return NULL;
 }
 
+/**
+ * @brief Frees the output data for the Evas engine.
+ * @param engine Pointer to the Evas engine (Render_Engine_GL_Generic).
+ * @param data Pointer to the Render_Engine structure to free.
+ */
 static void
 eng_output_free(void *engine, void *data)
 {
@@ -315,6 +521,12 @@ eng_output_free(void *engine, void *data)
    evas_render_engine_software_generic_clean(engine, &re->generic.software);
 }
 
+/**
+ * @brief Dumps information about the engine's current state.
+ * This includes cache dumps and unloading of images and fonts.
+ * @param engine Pointer to the Evas engine (Render_Engine_GL_Generic).
+ * @param data Pointer to the Render_Engine structure.
+ */
 static void
 eng_output_dump(void *engine, void *data)
 {
@@ -328,12 +540,22 @@ eng_output_dump(void *engine, void *data)
    glsym_evas_gl_common_image_all_unload(re->generic.software.ob->gl_context);
 }
 
+/**
+ * @brief Gets the alpha channel state of the canvas.
+ * @param data Unused.
+ * @return EINA_FALSE, as this engine does not support canvas alpha.
+ */
 static Eina_Bool
 eng_canvas_alpha_get(void *data EINA_UNUSED)
 {
    return 0;
 }
 
+/**
+ * @brief Loads GL symbols required by the engine.
+ * Uses dlsym to dynamically link to GL common functions.
+ * Also initializes Evas GL symbols.
+ */
 static void
 gl_symbols(void)
 {
@@ -359,6 +581,11 @@ gl_symbols(void)
    glsym_evas_gl_symbols((void*)SDL_GL_GetProcAddress, exts);
 }
 
+/**
+ * @brief Opens/initializes the Evas GL SDL engine module.
+ * @param em Pointer to the Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -389,6 +616,10 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Closes/deinitializes the Evas GL SDL engine module.
+ * @param em Pointer to the Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {
@@ -399,6 +630,9 @@ module_close(Evas_Module *em EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Evas module API structure for the GL SDL engine.
+ */
 static Evas_Module_Api evas_modapi =
 {
    EVAS_MODULE_API_VERSION,
@@ -416,6 +650,18 @@ EVAS_MODULE_DEFINE(EVAS_MODULE_TYPE_ENGINE, engine, gl_sdl);
 EVAS_EINA_MODULE_DEFINE(engine, gl_sdl);
 #endif
 
+/**
+ * @brief Sets up the SDL output buffer and GL context.
+ * @param w The width of the output buffer.
+ * @param h The height of the output buffer.
+ * @param fullscreen EINA_UNUSED: Non-zero if fullscreen, 0 otherwise.
+ * @param noframe EINA_UNUSED: Non-zero if no frame, 0 otherwise.
+ * @param info Pointer to Evas_Engine_Info_GL_SDL structure containing window and other info.
+ * @return A pointer to the initialized Outbuf structure, or NULL on failure.
+ *
+ * This function initializes SDL GL attributes for a GLES 2.0 context,
+ * creates an SDL GL context, and initializes the Evas common GL context.
+ */
 static Outbuf *
 _sdl_output_setup(int w, int h, int fullscreen EINA_UNUSED, int noframe EINA_UNUSED, Evas_Engine_Info_GL_SDL *info)
 {

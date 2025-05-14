@@ -23,6 +23,17 @@
 
 /* The URI standard is at http://tools.ietf.org/html/std66 */
 
+/**
+ * @brief Decodes a URI string into an Efreet_Uri structure.
+ * @param full_uri The URI string to decode (e.g., "file:///home/user/file.txt").
+ * @return A newly allocated Efreet_Uri structure, or NULL on error.
+ *         The caller is responsible for freeing the returned structure using efreet_uri_free().
+ *
+ * This function parses a URI string according to RFC 3986.
+ * It handles scheme, authority (hostname), and path components.
+ * Special handling is included for Windows "file://" URIs to correctly parse local paths.
+ * Percent-encoded characters in the path are decoded.
+ */
 EAPI Efreet_Uri *
 efreet_uri_decode(const char *full_uri)
 {
@@ -157,6 +168,18 @@ efreet_uri_decode(const char *full_uri)
     return uri;
 }
 
+/**
+ * @brief Encodes an Efreet_Uri structure into a URI string.
+ * @param uri The Efreet_Uri structure to encode.
+ * @return A newly allocated, stringshared URI string (e.g., "file:///home/user/file%20name.txt").
+ *         Returns NULL if the input uri or its essential components (path, protocol) are NULL.
+ *         The caller is responsible for freeing the returned string using eina_stringshare_del().
+ *
+ * This function constructs a URI string from an Efreet_Uri structure.
+ * It typically formats the URI as "<protocol>://<path>".
+ * The hostname component is usually omitted as many applications do not handle it.
+ * Characters in the path that are not alphanumeric or one of "/$-_.+!*'()" are percent-encoded.
+ */
 EAPI const char *
 efreet_uri_encode(Efreet_Uri *uri)
 {
@@ -186,6 +209,14 @@ efreet_uri_encode(Efreet_Uri *uri)
     return eina_stringshare_add(dest);
 }
 
+/**
+ * @brief Frees an Efreet_Uri structure.
+ * @param uri The Efreet_Uri structure to free.
+ *
+ * This function releases the memory allocated for an Efreet_Uri structure,
+ * including its stringshared protocol, hostname, and path components.
+ * If uri is NULL, the function does nothing.
+ */
 EAPI void
 efreet_uri_free(Efreet_Uri *uri)
 {

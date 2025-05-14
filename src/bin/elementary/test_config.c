@@ -25,25 +25,43 @@
 typedef struct _Prof_Data Prof_Data;
 typedef struct _App_Data  App_Data;
 
+/**
+ * @brief Holds data for a profile configuration UI section.
+ *
+ * This struct contains widgets and data related to selecting a profile and
+ * a set of available profiles, either for the current window or for a new
+ * window to be created.
+ */
 struct _Prof_Data
 {
-   Evas_Object *rdg;
-   Eina_List   *cks;
-   const char  *profile;
-   const char  *available_profiles[MAX_PROFILES];
-   int          count;
+   Evas_Object *rdg;  /**< Radio group for selecting a single profile. */
+   Eina_List   *cks;  /**< List of checkboxes for selecting available profiles. */
+   const char  *profile; /**< The name of the currently selected profile. */
+   const char  *available_profiles[MAX_PROFILES]; /**< Array of available profile names. */
+   int          count; /**< Number of profiles in available_profiles. */
 };
 
+/**
+ * @brief Application data for the configuration test.
+ *
+ * This struct holds all the relevant data for a single test window instance,
+ * including its window object, the list of all system profiles, and profile
+ * data for both the current window and for creating a new one.
+ */
 struct _App_Data
 {
-   Evas_Object *win;
-   Eina_List   *profiles;
-   Prof_Data    curr;
-   Prof_Data    new;
+   Evas_Object *win; /**< The main window of the test application. */
+   Eina_List   *profiles; /**< List of all profiles available in the system. */
+   Prof_Data    curr; /**< Profile data for the current window. */
+   Prof_Data    new; /**< Profile data for creating a new window. */
 };
 
 void test_config(void *data, Evas_Object *obj, void *event_info);
 
+/**
+ * @brief Clears the selected profile string in a Prof_Data structure.
+ * @param pd The profile data structure to modify.
+ */
 static void
 _profile_clear(Prof_Data *pd)
 {
@@ -52,6 +70,13 @@ _profile_clear(Prof_Data *pd)
    pd->profile = NULL;
 }
 
+/**
+ * @brief Clears the list of available profiles in a Prof_Data structure.
+ *
+ * This function iterates through the available_profiles array and frees
+ * each stringshare instance.
+ * @param pd The profile data structure to modify.
+ */
 static void
 _profiles_clear(Prof_Data *pd)
 {
@@ -64,6 +89,13 @@ _profiles_clear(Prof_Data *pd)
      }
 }
 
+/**
+ * @brief Updates the UI label to show the window's current and available profiles.
+ *
+ * It retrieves the current profile and the list of available profiles from the
+ * window and formats them into a string to be displayed in a label.
+ * @param win The window object whose profile information is to be displayed.
+ */
 static void
 _profile_update(Evas_Object *win)
 {
@@ -94,6 +126,16 @@ _profile_update(Evas_Object *win)
    elm_object_text_set(lb, buf);
 }
 
+/**
+ * @brief Callback to set the profile of the current window.
+ *
+ * This function is called when the "Set" button for the current window's
+ * profile is clicked. It gets the selected profile from the radio group
+ * and applies it to the window.
+ * @param data The window object.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _bt_profile_set(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -107,6 +149,16 @@ _bt_profile_set(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_
    _profile_update(ad->win);
 }
 
+/**
+ * @brief Callback to set the list of available profiles for the current window.
+ *
+ * This is triggered by the "Set" button for available profiles. It collects
+ * the names of the profiles from the checked boxes and sets them as the
+ * available profiles for the window.
+ * @param data The window object.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _bt_available_profiles_set(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -138,6 +190,16 @@ _bt_available_profiles_set(void *data, Evas_Object *obj EINA_UNUSED, void *event
    _profile_update(ad->win);
 }
 
+/**
+ * @brief Callback to create a new window with a specified profile configuration.
+ *
+ * This function is triggered by the "Create" button. It gathers the profile
+ * and available profiles settings from the "new window" UI section and
+ * calls test_config() to create a new window with these settings.
+ * @param data The main window object containing the App_Data.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _bt_win_add(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -172,12 +234,30 @@ _bt_win_add(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    test_config(&(ad->new), NULL, NULL);
 }
 
+/**
+ * @brief Callback for the "profile,changed" smart event on a window.
+ *
+ * This function is called when a window's profile has been changed.
+ * It calls _profile_update() to refresh the displayed information.
+ * @param data Unused.
+ * @param obj The window object whose profile changed.
+ * @param event Unused.
+ */
 static void
 _win_profile_changed_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event EINA_UNUSED)
 {
    _profile_update(obj);
 }
 
+/**
+ * @brief Callback for the "delete,request" smart event to clean up resources.
+ *
+ * This function is called when the window is being closed. It frees all
+ * the memory allocated for the App_Data struct and its members.
+ * @param data Unused.
+ * @param obj The window object that is being deleted.
+ * @param event_info Unused.
+ */
 static void
 _win_del_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -208,6 +288,15 @@ _win_del_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUS
    free(ad);
 }
 
+/**
+ * @brief Creates and returns a radio group for profile selection.
+ *
+ * This function creates a horizontal box with a radio button for each
+ * available system profile, plus one for "Nothing".
+ * @param win The parent window.
+ * @param bx The box to pack the radio group into.
+ * @return The created radio group object.
+ */
 static Evas_Object *
 _radio_add(Evas_Object *win, Evas_Object *bx)
 {
@@ -249,6 +338,14 @@ _radio_add(Evas_Object *win, Evas_Object *bx)
    return rdg;
 }
 
+/**
+ * @brief Creates and returns a list of checkboxes for available profile selection.
+ *
+ * This function creates a checkbox for each available system profile.
+ * @param win The parent window.
+ * @param bx The box to pack the checkboxes into.
+ * @return A list of the created checkbox objects.
+ */
 static Eina_List *
 _check_add(Evas_Object *win, Evas_Object *bx)
 {
@@ -280,6 +377,15 @@ _check_add(Evas_Object *win, Evas_Object *bx)
    return ll;
 }
 
+/**
+ * @brief Creates an inlined window.
+ *
+ * An inlined window is a window that is rendered into an image object in a
+ * parent window, rather than being a separate top-level window. This function
+ * demonstrates this feature.
+ * @param parent The parent window.
+ * @return The newly created inlined window object, or NULL on failure.
+ */
 static Evas_Object *
 _inlined_add(Evas_Object *parent)
 {
@@ -320,6 +426,15 @@ _inlined_add(Evas_Object *parent)
    return win;
 }
 
+/**
+ * @brief Creates a socket window for another process to plug into.
+ *
+ * This demonstrates inter-process window embedding by creating a window that
+ * listens on a socket for a client (a plug) to connect. It also creates an
+ * inlined window inside itself.
+ * @param name The service name for the socket.
+ * @return The socket window object, or NULL on failure.
+ */
 static Evas_Object *
 _socket_add(const char *name)
 {
@@ -368,6 +483,16 @@ _socket_add(const char *name)
    return win;
 }
 
+/**
+ * @brief Creates a plug widget to connect to a socket window.
+ *
+ * This widget will render the contents of the socket window it connects to.
+ * This demonstrates the client side of inter-process window embedding.
+ * @param win The parent window.
+ * @param bx The box to pack the plug into.
+ * @param name The service name of the socket to connect to.
+ * @return The plug object if connection is successful, otherwise NULL.
+ */
 static Evas_Object *
 _plug_add(Evas_Object *win, Evas_Object *bx, const char *name)
 {
@@ -421,6 +546,24 @@ _plug_add(Evas_Object *win, Evas_Object *bx, const char *name)
         evas_object_show(bx2);                                                    \
    } while(0)
 
+/**
+ * @brief Main function for the Elementary configuration test.
+ *
+ * This function creates the main window and UI for testing profile and other
+ * configuration options. It can be called recursively to create new windows
+ * with specific profile settings.
+ *
+ * @param data If not NULL, it is a pointer to a Prof_Data struct which
+ *        contains the profile settings for the new window. This is used
+ *        when creating a new window from an existing test window.
+ *        The Prof_Data passed would have its members set, for example:
+ *        - `.profile` = "my_profile"
+ *        - `.available_profiles` = {"p1", "p2", NULL, ...}
+ *        - `.count` = 2
+ * @param obj Unused when creating a new window via button click. It is the
+ *        object that triggered the test (e.g., from a test launcher).
+ * @param event_info Unused.
+ */
 void
 test_config(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -540,6 +683,17 @@ test_config(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback to push the next page in the font overlay test.
+ *
+ * This function is called when the "Next" button is clicked. It pushes a new
+ * page onto the naviframe which contains a textblock to demonstrate the
+ * font overlay effect.
+ *
+ * @param data The naviframe object.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _font_overlay_page_next(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -556,6 +710,17 @@ _font_overlay_page_next(void *data, Evas_Object *obj EINA_UNUSED, void *event_in
    elm_naviframe_item_push(nf, "Font Overlay", NULL, NULL, layout, NULL);
 }
 
+/**
+ * @brief Callback to apply the font overlay settings.
+ *
+ * Triggered by the "Apply Font Overlay" button. It retrieves the font name
+ * and size from the entry fields, sets them as a font overlay configuration,
+ * and applies the changes globally.
+ *
+ * @param data The naviframe object, used to access the entry fields.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _apply_font_overlay_btn_clicked_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -576,6 +741,17 @@ _apply_font_overlay_btn_clicked_cb(void *data, Evas_Object *obj EINA_UNUSED, voi
    elm_config_font_overlay_apply();
 }
 
+/**
+ * @brief Main function for the font overlay configuration test.
+ *
+ * This function sets up a window with UI elements to test the font overlay
+ * feature of Elementary. Users can input a font name and size, apply it,
+ * and navigate to another page to see its effect.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_config_font_overlay(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

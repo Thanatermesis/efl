@@ -44,6 +44,12 @@ static const Elm_Action key_actions[] = {
    {NULL, NULL}
 };
 
+/**
+ * @internal
+ * @brief Sets the mirrored mode on the panel and its content.
+ * @param obj The panel object.
+ * @param rtl EINA_TRUE for right-to-left mode, EINA_FALSE otherwise.
+ */
 static void
 _mirrored_set(Evas_Object *obj,
               Eina_Bool rtl)
@@ -55,6 +61,17 @@ _mirrored_set(Evas_Object *obj,
    elm_panel_orient_set(obj, elm_panel_orient_get(obj));
 }
 
+/**
+ * @internal
+ * @brief Recalculates the panel layout.
+ *
+ * For scrollable panels, this function ensures the drawer is correctly
+ * positioned (opened or closed) without animation when the layout is
+ * recalculated.
+ *
+ * @param obj The panel object.
+ * @param sd The panel's private data.
+ */
 EOLIAN static void
 _elm_panel_efl_canvas_group_group_calculate(Eo *obj, Elm_Panel_Data *sd)
 {
@@ -70,6 +87,14 @@ _elm_panel_efl_canvas_group_group_calculate(Eo *obj, Elm_Panel_Data *sd)
    efl_canvas_group_calculate(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Returns the state of the panel for accessibility.
+ * @param data The panel object.
+ * @param obj The accessibility object.
+ * @return A string describing the panel state ("opened" or "closed"). The
+ *         caller is responsible for freeing the returned string.
+ */
 static char *
 _access_state_cb(void *data, Evas_Object *obj EINA_UNUSED)
 {
@@ -81,6 +106,17 @@ _access_state_cb(void *data, Evas_Object *obj EINA_UNUSED)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Gets the accessibility object for a given part of the panel's layout.
+ *
+ * This is used to retrieve the accessibility object associated with parts
+ * like the outline, which is only visible when the panel is open.
+ *
+ * @param obj The panel object.
+ * @param part The name of the part to get the accessibility object for.
+ * @return The accessibility object, or NULL if not found.
+ */
 static Evas_Object *
 _access_object_get(const Evas_Object *obj, const char *part)
 {
@@ -96,6 +132,17 @@ _access_object_get(const Evas_Object *obj, const char *part)
    return ao;
 }
 
+/**
+ * @internal
+ * @brief Accessibility action callback to close the panel.
+ *
+ * This function is triggered when an accessibility user activates the
+ * "close" action, for example, by double-tapping a specific element.
+ *
+ * @param data The panel object.
+ * @param part_obj The part object that was activated.
+ * @param item The item that was activated.
+ */
 static void
 _access_activate_cb(void *data,
                     Evas_Object *part_obj EINA_UNUSED,
@@ -104,6 +151,18 @@ _access_activate_cb(void *data,
    elm_panel_hidden_set(data, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Manages the registration of accessibility objects for the panel.
+ *
+ * When accessibility is enabled, this function registers an accessibility
+ * object for the panel's outline part, allowing users to interact with it
+ * (e.g., to close the panel). When accessibility is disabled, it
+ * unregisters the object.
+ *
+ * @param obj The panel object.
+ * @param is_access EINA_TRUE if accessibility is being enabled, EINA_FALSE otherwise.
+ */
 static void
 _access_obj_process(Evas_Object *obj, Eina_Bool is_access)
 {
@@ -132,6 +191,17 @@ _access_obj_process(Evas_Object *obj, Eina_Bool is_access)
      }
 }
 
+/**
+ * @internal
+ * @brief Applies the theme and accessibility settings based on the panel's orientation.
+ *
+ * This function is responsible for setting the correct layout theme file for
+ * the panel's current orientation (top, bottom, left, or right). It also
+ * sets up accessibility for the panel's toggle button. This is for
+ * non-scrollable panels.
+ *
+ * @param obj The panel object.
+ */
 static void
 _orient_set_do(Evas_Object *obj)
 {
@@ -178,6 +248,16 @@ _orient_set_do(Evas_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Sets the theme for the scrollable layout of the panel.
+ *
+ * Based on the panel's orientation, this function applies the corresponding
+ * scroller theme. It also initializes accessibility for the scrollable panel.
+ *
+ * @param obj The panel object.
+ * @param sd The panel's private data.
+ */
 static void
 _scrollable_layout_theme_set(Eo *obj, Elm_Panel_Data *sd)
 {
@@ -210,6 +290,18 @@ _scrollable_layout_theme_set(Eo *obj, Elm_Panel_Data *sd)
      _access_obj_process(obj, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Applies the theme to the panel widget.
+ *
+ * This function is called when the theme of the panel is changed. It re-applies
+ * the style, orientation, and other theme-dependent properties. It handles
+ * both scrollable and non-scrollable panels.
+ *
+ * @param obj The panel object.
+ * @param sd The panel's private data.
+ * @return An Eina_Error, EFL_UI_THEME_APPLY_ERROR_GENERIC on failure.
+ */
 EOLIAN static Eina_Error
 _elm_panel_efl_ui_widget_theme_apply(Eo *obj, Elm_Panel_Data *sd)
 {
@@ -261,6 +353,13 @@ _elm_panel_efl_ui_widget_theme_apply(Eo *obj, Elm_Panel_Data *sd)
    return int_ret;
 }
 
+/**
+ * @internal
+ * @brief Layout callback for the internal box holding the panel content.
+ * @param o The box object.
+ * @param priv The box private data.
+ * @param data User data (unused).
+ */
 static void
 _box_layout_cb(Evas_Object *o,
                Evas_Object_Box_Data *priv,
@@ -269,6 +368,18 @@ _box_layout_cb(Evas_Object *o,
    _els_box_layout(o, priv, EINA_TRUE, EINA_FALSE, EINA_FALSE);
 }
 
+/**
+ * @internal
+ * @brief Opens the panel's handler area.
+ *
+ * In a scrollable panel, the handler is a small area that can be dragged
+ * to open the panel. This function brings the handler into view.
+ * This is used for un-freezing the panel on mouse down.
+ *
+ * @param obj The panel object.
+ * @param w The width of the panel.
+ * @param h The height of the panel.
+ */
 static void
 _handler_open(Evas_Object *obj, Evas_Coord w, Evas_Coord h)
 {
@@ -297,6 +408,18 @@ _handler_open(Evas_Object *obj, Evas_Coord w, Evas_Coord h)
      }
 }
 
+/**
+ * @internal
+ * @brief Opens the scrollable panel (drawer).
+ *
+ * This function scrolls the panel into the fully open position. It can
+ * optionally animate the transition. If the panel was frozen, it unfreezes it.
+ *
+ * @param obj The panel object.
+ * @param w The width of the panel.
+ * @param h The height of the panel.
+ * @param anim EINA_TRUE to animate the opening, EINA_FALSE otherwise.
+ */
 static void
 _drawer_open(Evas_Object *obj, Evas_Coord w, Evas_Coord h, Eina_Bool anim)
 {
@@ -338,6 +461,19 @@ _drawer_open(Evas_Object *obj, Evas_Coord w, Evas_Coord h, Eina_Bool anim)
            (obj, x, y, w, h);
 }
 
+/**
+ * @internal
+ * @brief Closes the scrollable panel (drawer).
+ *
+ * This function scrolls the panel to the fully closed position. It can
+ * optionally animate the transition. When closed, it freezes scrolling in
+ * the direction of opening/closing to prevent accidental opening.
+ *
+ * @param obj The panel object.
+ * @param w The width of the panel.
+ * @param h The height of the panel.
+ * @param anim EINA_TRUE to animate the closing, EINA_FALSE otherwise.
+ */
 static void
 _drawer_close(Evas_Object *obj, Evas_Coord w, Evas_Coord h, Eina_Bool anim)
 {
@@ -414,6 +550,20 @@ _drawer_close(Evas_Object *obj, Evas_Coord w, Evas_Coord h, Eina_Bool anim)
      }
 }
 
+/**
+ * @internal
+ * @brief Toggles the visibility of the panel.
+ *
+ * This is the core logic for showing and hiding the panel. It handles both
+ * scrollable and non-scrollable panels. For scrollable panels, it calls
+ * _drawer_open/_drawer_close. For non-scrollable panels, it emits edje signals
+ * to animate the transition. It also emits the "toggled" signal.
+ *
+ * @param data User data (unused).
+ * @param obj The panel object.
+ * @param emission The edje signal emission string (unused).
+ * @param source The edje signal source string (unused).
+ */
 static void
 _panel_toggle(void *data EINA_UNUSED,
               Evas_Object *obj,
@@ -463,6 +613,17 @@ _panel_toggle(void *data EINA_UNUSED,
    efl_event_callback_legacy_call(obj, ELM_PANEL_EVENT_TOGGLED, NULL);
 }
 
+/**
+ * @internal
+ * @brief Synchronizes the hidden state of a scrollable panel.
+ *
+ * After a user finishes scrolling a scrollable panel, this function determines
+ * whether the panel should be considered opened or closed based on its final
+ * scroll position. It compares the position to a threshold (1/4 of the panel size).
+ *
+ * @param obj The panel object.
+ * @return EINA_TRUE if there's nothing to do, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _state_sync(Evas_Object *obj)
 {
@@ -520,6 +681,17 @@ _state_sync(Evas_Object *obj)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Timer callback to unfreeze a scrollable panel.
+ *
+ * When a user presses down on the edge of a frozen scrollable panel, a timer
+ * is started. If the user holds the press long enough, this callback fires,
+ * unfreezing the panel and allowing it to be opened by dragging.
+ *
+ * @param data The panel object.
+ * @return ECORE_CALLBACK_CANCEL to automatically delete the timer.
+ */
 static Eina_Bool
 _timer_cb(void *data)
 {
@@ -542,6 +714,20 @@ _timer_cb(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @internal
+ * @brief Mouse up event handler for the event area of a non-scrollable panel.
+ *
+ * This handles clicks on the area outside the panel when it's open, which
+ * should close it. This is specifically for when the panel is not scrollable.
+ * It ensures that only a click (mouse down and up at the same position)
+ * triggers the close.
+ *
+ * @param data The panel object.
+ * @param e The Evas canvas.
+ * @param obj The object that received the event.
+ * @param event_info The mouse up event details.
+ */
 static void
 _event_mouse_up(void *data,
                 Evas *e EINA_UNUSED,
@@ -562,6 +748,19 @@ _event_mouse_up(void *data,
      elm_panel_hidden_set(data, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Mouse down event handler for scrollable panels.
+ *
+ * When the user presses down on a frozen scrollable panel near its edge, this
+ * function starts a timer. If the timer is allowed to complete (i.e., the user
+ * holds the press), the panel will unfreeze, allowing it to be dragged open.
+ *
+ * @param data The panel's private data.
+ * @param e The Evas canvas.
+ * @param obj The panel object.
+ * @param event_info The mouse down event details.
+ */
 static void
 _on_mouse_down(void *data,
                Evas *e EINA_UNUSED,
@@ -615,6 +814,21 @@ _on_mouse_down(void *data,
      }
 }
 
+/**
+ * @internal
+ * @brief Mouse move event handler for scrollable panels.
+ *
+ * If a timer was started on mouse down (meaning the user is trying to open a
+ * frozen panel), and the user moves the mouse more than a finger-size distance,
+ * this function unfreezes the panel immediately, allowing it to be scrolled.
+ * It also puts a hold on the mouse move event if the panel is hidden and not
+ * frozen to prevent other widgets from receiving it.
+ *
+ * @param data The panel's private data.
+ * @param e The Evas canvas.
+ * @param obj The panel object.
+ * @param event_info The mouse move event details.
+ */
 static void
 _on_mouse_move(void *data,
                Evas *e EINA_UNUSED,
@@ -680,6 +894,20 @@ _on_mouse_move(void *data,
      ev->event_flags |= EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @internal
+ * @brief Mouse up event handler for scrollable panels.
+ *
+ * When the user releases the mouse button after scrolling, this function
+ * determines the final state (opened or closed) of the panel using _state_sync
+ * and animates it to its final position. It also stops the timer for
+ * un-freezing if it was running.
+ *
+ * @param data The panel's private data.
+ * @param e The Evas canvas.
+ * @param obj The panel object.
+ * @param event_info The mouse up event details.
+ */
 static void
 _on_mouse_up(void *data,
              Evas *e EINA_UNUSED,
@@ -708,6 +936,17 @@ _on_mouse_up(void *data,
      ev->event_flags |= EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @internal
+ * @brief Action to toggle the panel's state.
+ *
+ * This function can be bound to a key press to allow toggling the panel
+ * with the keyboard.
+ *
+ * @param obj The panel object.
+ * @param params Action parameters (unused).
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _key_action_toggle(Evas_Object *obj, const char *params EINA_UNUSED)
 {
@@ -899,6 +1138,19 @@ _elm_panel_efl_gfx_entity_position_set(Eo *obj, Elm_Panel_Data *sd, Eina_Positio
    efl_gfx_entity_position_set(sd->hit_rect, pos);
 }
 
+/**
+ * @internal
+ * @brief Resizes the internal components of a scrollable panel.
+ *
+ * This function is called when the panel's size changes. It adjusts the size
+ * of the scrollable layout and its child components based on the panel's
+ * orientation and content size ratio.
+ *
+ * @param obj The panel object.
+ * @param sd The panel's private data.
+ * @param w The new width.
+ * @param h The new height.
+ */
 static void
 _scrollable_layout_resize(Eo *obj, Elm_Panel_Data *sd, Evas_Coord w, Evas_Coord h)
 {
@@ -1088,6 +1340,18 @@ _elm_panel_efl_ui_widget_interest_region_get(const Eo *obj, Elm_Panel_Data *sd)
    return r;
 }
 
+/**
+ * @internal
+ * @brief Callback for when the scroll animation of the panel stops.
+ *
+ * This function is called when the panel's open/close animation finishes.
+ * It finalizes the state of the panel, setting focus, enabling/disabling
+ * tree focus, and managing accessibility states. If the panel is now closed,
+ * it freezes scrolling in the appropriate direction.
+ *
+ * @param obj The panel object.
+ * @param data User data (unused).
+ */
 static void
 _anim_stop_cb(Evas_Object *obj, void *data EINA_UNUSED)
 {
@@ -1174,6 +1438,17 @@ _anim_stop_cb(Evas_Object *obj, void *data EINA_UNUSED)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for when the panel's content is scrolled.
+ *
+ * This function is triggered during scrolling of a scrollable panel. It
+ * unfreezes the panel if it was frozen and emits the "scroll" smart callback
+ * with information about the relative scroll position.
+ *
+ * @param obj The panel object.
+ * @param data User data (unused).
+ */
 static void
 _scroll_cb(Evas_Object *obj, void *data EINA_UNUSED)
 {
@@ -1489,6 +1764,15 @@ _elm_panel_efl_ui_i18n_mirrored_set(Eo *obj, Elm_Panel_Data *sd, Eina_Bool mirro
      efl_ui_mirrored_set(efl_cast(obj, EFL_UI_WIDGET_CLASS), mirrored);
 }
 
+/**
+ * @internal
+ * @brief Class constructor for the Elm_Panel widget.
+ *
+ * This function is called once when the class is constructed. It registers
+ * the legacy type name for the widget.
+ *
+ * @param klass The Efl_Class to construct.
+ */
 static void
 _elm_panel_class_constructor(Efl_Class *klass)
 {

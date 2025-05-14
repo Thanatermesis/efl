@@ -11,6 +11,10 @@ typedef Eo Elm_Spinner;
 #ifndef _ELM_SPINNER_EO_TYPES
 #define _ELM_SPINNER_EO_TYPES
 
+/**
+ * @brief Specific types defined for Elm_Spinner.
+ * @ingroup Elm_Spinner
+ */
 
 #endif
 /** Elementary spinner class

@@ -19,16 +19,30 @@
 #include "efreetd_cache.h"
 #include "efreetd_ipc.h"
 
-int efreetd_log_dom = -1;
-Eina_Mempool *efreetd_mp_stat = NULL;
-FILE *efreetd_log_file = NULL;
+int efreetd_log_dom = -1; /**< Log domain for efreetd */
+Eina_Mempool *efreetd_mp_stat = NULL; /**< Mempool for struct stat allocations */
+FILE *efreetd_log_file = NULL; /**< File pointer for the efreetd log file */
 
+/**
+ * @brief Signals the main loop to terminate.
+ *
+ * This function is typically called to gracefully shut down the daemon.
+ */
 void
 quit(void)
 {
    ecore_main_loop_quit();
 }
 
+/**
+ * @brief Main entry point for the Efreet daemon.
+ *
+ * Initializes logging, IPC, caching, and then enters the Ecore main loop.
+ * Handles cleanup on exit.
+ * @param argc Argument count.
+ * @param argv Argument vector.
+ * @return 0 on success, 1 on failure.
+ */
 int
 main(int argc, char *argv[])
 {

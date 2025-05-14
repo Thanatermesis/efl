@@ -3,17 +3,35 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Application data structure for the EFL animation start delay test.
+ *
+ * This structure holds all the necessary Evas objects and state
+ * for managing the animation test, including animations, widgets,
+ * and visibility status.
+ */
 typedef struct _App_Data
 {
-   Efl_Canvas_Animation        *show_anim;
-   Efl_Canvas_Animation        *hide_anim;
-   Elm_Button                  *button;
+   Efl_Canvas_Animation        *show_anim; /**< The animation to show the button (fade in). */
+   Efl_Canvas_Animation        *hide_anim; /**< The animation to hide the button (fade out). */
+   Elm_Button                  *button; /**< The button that will be animated. */
 
-   Evas_Object          *start_delay_spin;
+   Evas_Object          *start_delay_spin; /**< Spinner to set the animation start delay. */
 
-   Eina_Bool             is_btn_visible;
+   Eina_Bool             is_btn_visible; /**< Flag to track the visibility state of the button. */
 } App_Data;
 
+/**
+ * @brief Callback function for animation state changes (started/ended).
+ *
+ * This function is triggered when an animation begins or concludes. It prints a
+ * status message and manages the interactivity of the start delay spinner,
+ * disabling it during animation playback to prevent conflicts.
+ *
+ * @param data The application data (App_Data instance).
+ * @param event The EFL event description. The event's info will be the
+ *              animation object on start, and NULL on end.
+ */
 static void
 _anim_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -32,6 +50,16 @@ _anim_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback for animation progress updates.
+ *
+ * Called repeatedly while an animation is running. It prints the current
+ * progress of the animation.
+ *
+ * @param data Application data (unused).
+ * @param event The EFL event description. The event's info is a pointer to a
+ *              double representing the animation progress (from 0.0 to 1.0).
+ */
 static void
 _anim_running_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -39,11 +67,31 @@ _anim_running_cb(void *data EINA_UNUSED, const Efl_Event *event)
    printf("Animation is running! Current progress(%lf)\n", *progress);
 }
 
+/**
+ * @brief Array of callbacks for monitoring animation status.
+ *
+ * This array maps animation events to their respective handler functions.
+ * It's used to attach multiple callbacks to the animated button at once.
+ * @li EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_CHANGED: Handled by _anim_changed_cb.
+ * @li EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_PROGRESS_UPDATED: Handled by _anim_running_cb.
+ */
 EFL_CALLBACKS_ARRAY_DEFINE(animation_stats_cb,
   {EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_CHANGED, _anim_changed_cb },
   {EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_PROGRESS_UPDATED, _anim_running_cb },
 )
 
+/**
+ * @brief Callback for the "Start Animation" button click.
+ *
+ * This function is called when the user clicks the button to start an animation.
+ * It toggles between the show and hide animations based on the button's current
+ * visibility state. It retrieves the start delay value from the spinner, applies
+ * it to the appropriate animation, and then starts the animation on the target button.
+ *
+ * @param data The application data (App_Data instance).
+ * @param obj The button that was clicked to start the animation.
+ * @param event_info Evas event info (unused).
+ */
 static void
 _start_btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -74,6 +122,16 @@ _start_btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED
      }
 }
 
+/**
+ * @brief Callback for window deletion request.
+ *
+ * This function is called when the window is about to be closed.
+ * It frees the application data structure to prevent memory leaks.
+ *
+ * @param data The application data (App_Data instance) to be freed.
+ * @param obj The window object (unused).
+ * @param event_info Evas event info (unused).
+ */
 static void
 _win_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -81,6 +139,19 @@ _win_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    free(ad);
 }
 
+/**
+ * @brief Main function for the EFL animation start delay test.
+ *
+ * This function sets up the Elementary test window, creates all necessary UI
+ * components (buttons, spinner), and initializes the alpha animations. It also
+ * allocates and initializes the application data structure and connects all
+ * callbacks to their respective events. This test demonstrates how to use
+ * efl_animation_start_delay_set() to postpone the start of an animation.
+ *
+ * @param data Test data (unused).
+ * @param obj Parent object (unused).
+ * @param event_info Event info (unused).
+ */
 void
 test_efl_anim_start_delay(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

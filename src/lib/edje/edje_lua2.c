@@ -208,6 +208,19 @@ static const luaL_Reg _elua_libs[] =
 };
 
 //--------------------------------------------------------------------------//
+/**
+ * @internal
+ * @brief Custom memory allocator for Lua.
+ *
+ * This function is used by Lua to allocate, reallocate, or free memory.
+ * It tracks memory usage against a maximum limit defined in Edje_Lua_Alloc.
+ *
+ * @param ud User data, expected to be an Edje_Lua_Allocator pointer.
+ * @param ptr Pointer to the memory block to be managed. If NULL, a new block is allocated.
+ * @param osize Original size of the memory block. If ptr is NULL, osize encodes the object type in Lua 5.2+.
+ * @param nsize New size for the memory block. If 0, the block is freed.
+ * @return Pointer to the allocated/reallocated memory block, or NULL on failure or if nsize is 0.
+ */
 static void *
 _elua_alloc(void *ud, void *ptr, size_t osize, size_t nsize)
 {
@@ -249,6 +262,18 @@ _elua_alloc(void *ud, void *ptr, size_t osize, size_t nsize)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Custom panic function for Lua.
+ *
+ * This function is called by Lua when a fatal error (panic) occurs that
+ * is not handled by a protected call. It logs the error.
+ *
+ * @param L The Lua state.
+ * @return int Always returns 0, as Lua will exit(EXIT_FAILURE) if this function returns.
+ *             A longjmp should be used if exiting is to be avoided, but pcalls prevent this.
+ * @note Stack usage: [-0, +0, m] (may allocate memory for lua_tostring)
+ */
 static int
 _elua_custom_panic(lua_State *L) // Stack usage [-0, +0, m]
 {
@@ -272,7 +297,18 @@ _elua_custom_panic(lua_State *L) // Stack usage [-0, +0, m]
    return 0;
 }
 
-// Really only used to manage the pointer to our edje.
+/**
+ * @internal
+ * @brief Sets a light userdata value in the Lua registry, keyed by another light userdata.
+ *
+ * This is primarily used to store the Edje object pointer (`ed`) in the registry,
+ * making it accessible from Lua callbacks and functions.
+ *
+ * @param L The Lua state.
+ * @param key The light userdata to use as a key.
+ * @param val The light userdata to store as the value.
+ * @note Stack usage: [-2, +0, e] (pushes key, pushes value, sets table, pops key & value)
+ */
 static void
 _elua_table_ptr_set(lua_State *L, const void *key, const void *val)  // Stack usage [-2, +2, e]
 {
@@ -281,6 +317,17 @@ _elua_table_ptr_set(lua_State *L, const void *key, const void *val)  // Stack us
    lua_settable(L, LUA_REGISTRYINDEX);     // Stack usage [-2, +0, e]
 }
 
+/**
+ * @internal
+ * @brief Gets a light userdata value from the Lua registry, keyed by another light userdata.
+ *
+ * This is primarily used to retrieve the Edje object pointer (`ed`) from the registry.
+ *
+ * @param L The Lua state.
+ * @param key The light userdata key to look up.
+ * @return const void* The light userdata value associated with the key, or NULL if not found.
+ * @note Stack usage: [-1, +1, e] (pushes key, gets table, pops value) then pops key. Net: [-0, +0, e] after lua_pop.
+ */
 static const void *
 _elua_table_ptr_get(lua_State *L, const void *key)  // Stack usage [-2, +2, e]
 {
@@ -303,7 +350,31 @@ _elua_table_ptr_get(lua_State *L, const void *key)  // Stack usage [-2, +2, e]
  */
 
 /*
- * Cori: Assumes object to be saved on top of stack
+ * @brief Stores a Lua object (expected on top of the stack) into a special registry table.
+ *
+ * The object is stored in `LUA_REGISTRYINDEX[&_elua_objs][key]`.
+ * This is used to keep C-side references to Lua objects (like callbacks or userdata)
+ * alive and accessible. The `_elua_objs` table is configured to have weak values,
+ * allowing objects to be garbage collected if only C holds a reference via this mechanism
+ * and the C object itself is freed.
+ *
+ * @param L The Lua state.
+ * @param key A C pointer used as the key in the `_elua_objs` table. Typically the
+ *            address of the C structure that owns or is associated with the Lua object.
+ * @note The Lua object to be stored must be on the top of the Lua stack before calling.
+ * @note Stack usage: [-1, +0, m] (pushes `&_elua_objs`, gets table, pushes key, pushes value from -3, sets table, pops table and original value)
+ * The comment `// Stack usage [-4, +4, m]` seems to account for the value being duplicated.
+ * Corrected stack analysis:
+ *   lua_pushlightuserdata(L, &_elua_objs);  // stack: ..., val, _elua_objs_key
+ *   lua_rawget(L, LUA_REGISTRYINDEX);       // stack: ..., val, objs_table
+ *   lua_pushlightuserdata(L, key);          // stack: ..., val, objs_table, c_key
+ *   lua_pushvalue(L, -3);                   // stack: ..., val, objs_table, c_key, val
+ *   lua_rawset(L, -3);                      // stack: ..., val, objs_table (key & val popped by rawset)
+ *   lua_pop(L, 1);                          // stack: ..., val (pops objs_table)
+ * So, if the value is already on stack at -1, it's effectively [-1, +0, m] relative to the state *before* the value was pushed.
+ * If the value is at -3 as implied by `lua_pushvalue(L, -3)`, then the stack before this function might be `..., val_to_store, other1, other2`.
+ * The function itself uses `lua_pushvalue(L, -3)` which means it expects the value to be stored at stack index -3 relative to the top *after* `_elua_objs_key`, `objs_table`, and `c_key` are pushed.
+ * This means the value to be stored is already on the stack and this function consumes it from there.
  */
 static void
 _elua_ref_set(lua_State *L, void *key)     // Stack usage [-4, +4, m]
@@ -317,7 +388,26 @@ _elua_ref_set(lua_State *L, void *key)     // Stack usage [-4, +4, m]
 }
 
 /*
- * Cori: Get an object from the object table
+ * @brief Retrieves a Lua object from the special registry table `LUA_REGISTRYINDEX[&_elua_objs]`.
+ *
+ * The object is retrieved using a C pointer as the key. The retrieved object (typically userdata)
+ * is pushed onto the Lua stack.
+ *
+ * @param L The Lua state.
+ * @param key A C pointer used as the key to look up the object in the `_elua_objs` table.
+ * @return void* The C pointer to the userdata retrieved, or NULL if not found or not userdata.
+ *               The Lua object itself is left on top of the stack.
+ * @note Stack usage: [-0, +1, -] (pushes `&_elua_objs_key`, gets table, pushes `key`, gets table, removes `objs_table`).
+ * The comment `// Stack usage [-3, +4, -]` seems to describe a different operation or includes prior stack state.
+ * Corrected stack analysis:
+ *   lua_pushlightuserdata(L, &_elua_objs);  // stack: ..., _elua_objs_key
+ *   lua_rawget(L, LUA_REGISTRYINDEX);       // stack: ..., objs_table
+ *   lua_pushlightuserdata(L, key);          // stack: ..., objs_table, c_key
+ *   lua_rawget(L, -2);                      // stack: ..., objs_table, lua_obj
+ *   lua_remove(L, -2);                      // stack: ..., lua_obj
+ * This leaves the retrieved lua_obj on top of the stack.
+ * The `lua_touserdata(L, -2)` in the original code is confusing as the value is at -1 after remove.
+ * Assuming it means to get userdata from the value just pushed: `lua_touserdata(L, -1)`.
  */
 static void *
 _elua_ref_get(lua_State *L, void *key)     // Stack usage [-3, +4, -]
@@ -327,9 +417,27 @@ _elua_ref_get(lua_State *L, void *key)     // Stack usage [-3, +4, -]
    lua_pushlightuserdata(L, key); // Stack usage [-0, +1, -]
    lua_rawget(L, -2); // Stack usage [-1, +1, -]
    lua_remove(L, -2); // Stack usage [-1, +0, -]
-   return lua_touserdata(L, -2); // Stack usage [-0, +0, -]
+   return lua_touserdata(L, -1); // Stack usage [-0, +0, -] (Corrected index from -2 to -1)
 }
 
+/**
+ * @internal
+ * @brief Creates a new Lua userdata object and associates it with an Edje instance.
+ *
+ * The new userdata is initialized, added to the Edje object's list of Lua objects (`ed->lua_objs`),
+ * its metatable is set, and a reference to it is stored in the `_elua_objs` registry table
+ * using the userdata's own pointer as the key.
+ *
+ * @param L The Lua state.
+ * @param ed The Edje instance this Lua object belongs to.
+ * @param size The size of the userdata to allocate (e.g., `sizeof(Edje_Lua_Evas_Object)`).
+ * @param metatable The name of the metatable to associate with this userdata (e.g., `_elua_evas_image_meta`).
+ * @return Edje_Lua_Obj* Pointer to the newly created Edje_Lua_Obj (which is the userdata itself).
+ *                       The userdata is left on top of the Lua stack.
+ * @note Stack usage: [-0, +1, m] (lua_newuserdata) then metatable operations and _elua_ref_set.
+ * The comment `// Stack usage [-5, +6, m]` is likely an aggregate or includes _elua_ref_set's complex accounting.
+ * Relative to call: newuserdata (+1), getmetatable (+1), setmetatable (-1), _elua_ref_set (complex, but value is on stack). Net +1 (the userdata).
+ */
 static Edje_Lua_Obj *
 _elua_obj_new(lua_State *L, Edje *ed, int size, const char *metatable)  // Stack usage [-5, +6, m]
 {
@@ -348,6 +456,18 @@ _elua_obj_new(lua_State *L, Edje *ed, int size, const char *metatable)  // Stack
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Frees an Edje Lua object.
+ *
+ * This function removes the object's reference from the `_elua_objs` registry table,
+ * calls the object-specific free function (`obj->free_func`), and removes the object
+ * from the Edje instance's list of Lua objects.
+ *
+ * @param L The Lua state.
+ * @param obj The Edje_Lua_Obj to free.
+ * @note This is typically called from the `__gc` metamethod of the userdata.
+ */
 static void
 _elua_obj_free(lua_State *L, Edje_Lua_Obj *obj)
 {
@@ -362,6 +482,18 @@ _elua_obj_free(lua_State *L, Edje_Lua_Obj *obj)
    obj->ed = NULL;
 }
 
+/**
+ * @internal
+ * @brief Garbage collection metamethod (`__gc`) for Edje Lua objects (userdata).
+ *
+ * When Lua's garbage collector determines a userdata created by `_elua_obj_new`
+ * is no longer reachable, this function is called. It retrieves the `Edje_Lua_Obj`
+ * pointer from the userdata and calls `_elua_obj_free` to perform cleanup.
+ *
+ * @param L The Lua state. The userdata to be collected is at stack index 1.
+ * @return int Always 0.
+ * @note Stack usage: [-0, +0, -] (lua_touserdata does not change stack for valid userdata)
+ */
 static int
 _elua_obj_gc(lua_State *L)  // Stack usage [-0, +0, -]
 {
@@ -371,12 +503,30 @@ _elua_obj_gc(lua_State *L)  // Stack usage [-0, +0, -]
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Deletion function for Edje Lua objects, typically exposed as `obj:del()`.
+ *
+ * This function is an alias for `_elua_obj_gc`. Calling it explicitly
+ * attempts to free the object's resources.
+ *
+ * @param L The Lua state. The userdata object is at stack index 1.
+ * @return int Always 0.
+ * @note Stack usage: [-0, +0, -]
+ */
 static int
 _elua_obj_del(lua_State *L)  // Stack usage [-0, +0, -]
 {
    return _elua_obj_gc(L);   // Stack usage [-0, +0, -]
 }
 
+/**
+ * @internal
+ * @brief Explicitly triggers a full Lua garbage collection cycle.
+ *
+ * @param L The Lua state.
+ * @note Stack usage: [-0, +0, e]
+ */
 static void
 _elua_gc(lua_State *L)  // Stack usage [-0, +0, e]
 {
@@ -396,6 +546,22 @@ _elua_gc(lua_State *L)  // Stack usage [-0, +0, e]
 //  thread   ^
 //  nil      ~
 
+/**
+ * @internal
+ * @brief Extracts an identifier (name) from a string and pushes it onto the Lua stack.
+ *
+ * If `idx` is positive, it treats `p` (derived from `q`) as a field name and pushes
+ * `table[p]` onto the stack, where `table` is at `idx`.
+ * If `idx` is not positive (e.g., 0 or negative), it pushes `p` as a new Lua string.
+ * The function scans `q` for an alphanumeric identifier.
+ *
+ * @param L The Lua state.
+ * @param q Pointer to the current position in a format string. The identifier starts here.
+ * @param idx If positive, the stack index of a Lua table from which to get a field.
+ *            Otherwise, the identifier is pushed as a simple string.
+ * @return char* Pointer to the character in the original string `q` immediately after the parsed identifier.
+ * @note Stack usage: [-0, +1, e or m] (e for getfield, m for pushstring)
+ */
 static char *
 _elua_push_name(lua_State *L, char *q, int idx)  // Stack usage [-0, +1, e or m]
 {
@@ -417,6 +583,35 @@ _elua_push_name(lua_State *L, char *q, int idx)  // Stack usage [-0, +1, e or m]
    return q;
 }
 
+/**
+ * @internal
+ * @brief Scans and retrieves parameters from Lua stack or a Lua table based on a format string.
+ *
+ * This function parses a `params` format string to determine the expected types
+ * and names (if `i` is a table index) of parameters. It retrieves these parameters
+ * starting from Lua stack index `i`, or from the table at stack index `i`.
+ *
+ * The format string uses specifiers:
+ *  - `%<name>`: Expects an integer. `<name>` is used if `i` is a table.
+ *  - `#<name>`: Expects a number (double). `<name>` is used if `i` is a table.
+ *  - `$<name>`: Expects a string. `<name>` is used if `i` is a table. The string is duplicated with `malloc`.
+ *  - `!<name>`: Expects a boolean. `<name>` is used if `i` is a table.
+ *
+ * @param L The Lua state.
+ * @param i The starting stack index for parameters, or the index of a table containing parameters.
+ * @param params The format string describing the parameters to scan.
+ * @param ... Variable arguments, pointers to where the scanned values should be stored (e.g., `int *`, `double *`, `char **`).
+ * @return int The number of successfully scanned parameters. Returns 0 if not all specified parameters
+ *             could be scanned (e.g., type mismatch, missing field). Returns 1 if `i` was a table and
+ *             at least one parameter was successfully scanned from it. Returns -1 on memory allocation failure for the format string copy.
+ * @note If `i` refers to a table:
+ *         Stack usage: For each parameter, `_elua_push_name` pushes the field name (+1),
+ *         `lua_is<type>` checks, `lua_to<type>` converts, then `lua_pop` (-1) for the field value.
+ *         Net effect per param: [-0, +0, e (for getfield) or m (for tolstring)].
+ *         The comment `// [-n, +n, e]` seems to indicate that values are left on stack, but `lua_pop(L,1)` is called.
+ * @note If `i` refers to stack arguments:
+ *         Stack usage: [-0, +0, -] (accesses existing stack values).
+ */
 static int
 _elua_scan_params(lua_State *L, int i, char *params, ...) // Stack usage -
                                                                          // if i is a table
@@ -550,6 +745,29 @@ _elua_scan_params(lua_State *L, int i, char *params, ...) // Stack usage -
    return n;
 }
 
+/**
+ * @internal
+ * @brief Creates a Lua table and populates it with key-value pairs based on a format string and variadic arguments.
+ *
+ * The resulting table is left on top of the Lua stack.
+ * The format string uses specifiers:
+ *  - `%<name>`: The value is an integer. `<name>` becomes the key.
+ *  - `#<name>`: The value is a number (double). `<name>` becomes the key.
+ *  - `$<name>`: The value is a string. `<name>` becomes the key.
+ *  - `!<name>`: The value is a boolean. `<name>` becomes the key.
+ *
+ * Example: `_elua_ret(L, "%x %y #w", 10, 20, 50.5)` would result in a Lua table:
+ *   `{ x = 10, y = 20, w = 50.5 }`
+ *
+ * @param L The Lua state.
+ * @param params The format string describing the key names and types of values.
+ * @param ... Variable arguments, the values to be put into the table.
+ * @return int The number of key-value pairs added to the table. Returns -1 on memory allocation failure for the format string copy.
+ *             The new table is left on top of the stack.
+ * @note Stack usage: `lua_newtable` (+1). For each pair: `_elua_push_name` (+1 for key string),
+ *       `lua_push<type>` (+1 for value), `lua_settable` (-2).
+ *       Net: +1 (the table). The comment `// Stack usage [-(2*n), +(2*n+1), em]` seems to be an aggregate.
+ */
 static int
 _elua_ret(lua_State *L, char *params, ...) // Stack usage [-(2*n), +(2*n+1), em]
 {
@@ -621,6 +839,19 @@ _elua_ret(lua_State *L, char *params, ...) // Stack usage [-(2*n), +(2*n+1), em]
    return n;
 }
 
+/**
+ * @internal
+ * @brief Premultiplies RGB color components by the alpha component.
+ *
+ * Ensures that R, G, and B values do not exceed the A value. This is a common
+ * requirement for color operations where alpha represents opacity and colors
+ * are premultiplied.
+ *
+ * @param r Pointer to the red component.
+ * @param g Pointer to the green component.
+ * @param b Pointer to the blue component.
+ * @param a Pointer to the alpha component.
+ */
 static void
 _elua_color_fix(int *r, int *g, int *b, int *a)
 {

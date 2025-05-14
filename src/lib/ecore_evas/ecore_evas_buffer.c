@@ -15,6 +15,16 @@
 #include "ecore_evas_buffer.h"
 #include "ecore_evas_private.h"
 
+/**
+ * @internal
+ * @brief Frees resources associated with an Ecore_Evas buffer instance.
+ *
+ * This function cleans up the Ecore_Evas buffer engine data, including
+ * unregistering input events, freeing pixel data (or an associated Evas image),
+ * and shutting down Ecore_Event_Evas if necessary.
+ *
+ * @param ee The Ecore_Evas instance to free.
+ */
 static void
 _ecore_evas_buffer_free(Ecore_Evas *ee)
 {
@@ -43,6 +53,18 @@ _ecore_evas_buffer_free(Ecore_Evas *ee)
    ecore_event_evas_shutdown();
 }
 
+/**
+ * @internal
+ * @brief Moves the Ecore_Evas buffer instance.
+ *
+ * This function updates the position of the Ecore_Evas buffer.
+ * If the buffer is associated with an Evas image object, this function does nothing
+ * as the image object's position is managed separately.
+ *
+ * @param ee The Ecore_Evas instance to move.
+ * @param x The new x-coordinate.
+ * @param y The new y-coordinate.
+ */
 static void
 _ecore_evas_move(Ecore_Evas *ee, int x, int y)
 {
@@ -53,6 +75,19 @@ _ecore_evas_move(Ecore_Evas *ee, int x, int y)
    ee->y = ee->req.y = y;
 }
 
+/**
+ * @internal
+ * @brief Resizes the Ecore_Evas buffer instance.
+ *
+ * This function handles resizing of the Ecore_Evas buffer. It updates
+ * the Evas canvas size, reallocates pixel data if necessary (for non-image
+ * backed buffers), and updates the Evas engine information with the new
+ * buffer parameters.
+ *
+ * @param ee The Ecore_Evas instance to resize.
+ * @param w The new width.
+ * @param h The new height.
+ */
 static void
 _ecore_evas_resize(Ecore_Evas *ee, int w, int h)
 {
@@ -109,12 +144,36 @@ _ecore_evas_resize(Ecore_Evas *ee, int w, int h)
      bdata->resized = 1;
 }
 
+/**
+ * @internal
+ * @brief Moves and resizes the Ecore_Evas buffer instance.
+ *
+ * Currently, this function only calls the resize function, as the move
+ * operation for buffer Ecore_Evas instances (not backed by an image object)
+ * is handled by _ecore_evas_move. The x and y parameters are unused.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param x The new x-coordinate (unused).
+ * @param y The new y-coordinate (unused).
+ * @param w The new width.
+ * @param h The new height.
+ */
 static void
 _ecore_evas_move_resize(Ecore_Evas *ee, int x EINA_UNUSED, int y EINA_UNUSED, int w, int h)
 {
    _ecore_evas_resize(ee, w, h);
 }
 
+/**
+ * @internal
+ * @brief Sets whether the Ecore_Evas buffer instance ignores events.
+ *
+ * If the buffer is associated with an Evas image object, this function
+ * will also set the pass_events property on the image object.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param val 1 to ignore events, 0 to process them.
+ */
 static void
 _ecore_evas_buffer_ignore_events_set(Ecore_Evas *ee, int val)
 {
@@ -126,6 +185,16 @@ _ecore_evas_buffer_ignore_events_set(Ecore_Evas *ee, int val)
      evas_object_pass_events_set(bdata->image, val);
 }
 
+/**
+ * @internal
+ * @brief Shows the Ecore_Evas buffer instance.
+ *
+ * This function marks the Ecore_Evas as not withdrawn and triggers state change
+ * and focus callbacks. It does nothing if the buffer is associated with an
+ * Evas image object, as visibility is handled by the image object itself.
+ *
+ * @param ee The Ecore_Evas instance to show.
+ */
 static void
 _ecore_evas_show(Ecore_Evas *ee)
 {
@@ -138,6 +207,17 @@ _ecore_evas_show(Ecore_Evas *ee)
    _ecore_evas_focus_device_set(ee, NULL, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Sets the title for the Ecore_Evas buffer instance.
+ *
+ * This function updates the title property of the Ecore_Evas.
+ * The title is typically used for window titles, but in a buffer context,
+ * it's stored for informational purposes or potential use by parent systems.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param t The new title string.
+ */
 static void
 _ecore_evas_buffer_title_set(Ecore_Evas *ee, const char *t)
 {
@@ -148,6 +228,17 @@ _ecore_evas_buffer_title_set(Ecore_Evas *ee, const char *t)
    ee->prop.title = strdup(t);
 }
 
+/**
+ * @internal
+ * @brief Sets the name and class for the Ecore_Evas buffer instance.
+ *
+ * These properties are typically used for window management hints. In a
+ * buffer context, they are stored for informational purposes.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param n The new name string.
+ * @param c The new class string.
+ */
 static void
 _ecore_evas_buffer_name_class_set(Ecore_Evas *ee, const char *n, const char *c)
 {
@@ -165,6 +256,19 @@ _ecore_evas_buffer_name_class_set(Ecore_Evas *ee, const char *n, const char *c)
      }
 }
 
+/**
+ * @internal
+ * @brief Prepares the Ecore_Evas buffer for rendering.
+ *
+ * This function is called before rendering. It checks if the associated
+ * Evas image object (if any) has been resized and updates the Ecore_Evas
+ * accordingly. It also locks the image data if changes are detected and
+ * data is not already locked. For non-image backed buffers, it calls the
+ * resize callback if the buffer was marked as resized.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @return EINA_TRUE always.
+ */
 static Eina_Bool
 _ecore_evas_buffer_prepare(Ecore_Evas *ee)
 {
@@ -192,6 +296,19 @@ _ecore_evas_buffer_prepare(Ecore_Evas *ee)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Callback function called after an Evas render cycle for image-backed buffers.
+ *
+ * This function is registered as an EVAS_CALLBACK_RENDER_POST callback.
+ * It updates the associated Evas image object with the new pixel data from the
+ * Ecore_Evas buffer and marks the updated regions on the image. It then unlocks
+ * the pixel data.
+ *
+ * @param data The Ecore_Evas instance (passed as user data).
+ * @param e The Evas canvas (unused).
+ * @param event_info Pointer to Evas_Event_Render_Post structure containing update regions.
+ */
 static void
 _ecore_evas_buffer_update_image(void *data, Evas *e EINA_UNUSED, void *event_info)
 {
@@ -209,6 +326,16 @@ _ecore_evas_buffer_update_image(void *data, Evas *e EINA_UNUSED, void *event_inf
    bdata->lock_data = EINA_FALSE;
 }
 
+/**
+ * @brief Renders the Ecore_Evas buffer and waits for completion.
+ *
+ * This function performs a synchronous render of the Ecore_Evas buffer.
+ * It calls ecore_evas_render() to trigger rendering and then
+ * ecore_evas_render_wait() to ensure rendering is finished before returning.
+ *
+ * @param ee The Ecore_Evas instance to render.
+ * @return The number of updates rendered.
+ */
 EAPI int
 ecore_evas_buffer_render(Ecore_Evas *ee)
 {
@@ -219,6 +346,19 @@ ecore_evas_buffer_render(Ecore_Evas *ee)
    return r;
 }
 
+/**
+ * @internal
+ * @brief Translates coordinates from the parent Evas canvas to the buffer's Evas canvas.
+ *
+ * This function is used when the Ecore_Evas buffer is rendered onto an
+ * Evas image object in a parent Evas. It adjusts mouse coordinates based on the
+ * image object's geometry, fill properties, and mapping state to correctly
+ * propagate events to the buffer's Evas instance.
+ *
+ * @param ee The Ecore_Evas instance (the buffer).
+ * @param[in,out] x Pointer to the x-coordinate to translate.
+ * @param[in,out] y Pointer to the y-coordinate to translate.
+ */
 static void
 _ecore_evas_buffer_coord_translate(Ecore_Evas *ee, Evas_Coord *x, Evas_Coord *y)
 {
@@ -258,6 +398,17 @@ _ecore_evas_buffer_coord_translate(Ecore_Evas *ee, Evas_Coord *x, Evas_Coord *y)
      }
 }
 
+/**
+ * @internal
+ * @brief Transfers key modifiers and lock states from one Evas canvas to another.
+ *
+ * This is used to ensure that the Ecore_Evas buffer's internal Evas canvas
+ * has the same modifier (Shift, Ctrl, Alt, etc.) and lock (Caps_Lock, Num_Lock, etc.)
+ * states as the parent Evas canvas when events are being propagated.
+ *
+ * @param e The source Evas canvas (typically the parent/outer Evas).
+ * @param e2 The destination Evas canvas (typically the buffer's internal Evas).
+ */
 static void
 _ecore_evas_buffer_transfer_modifiers_locks(Evas *e, Evas *e2)
 {
@@ -283,6 +434,19 @@ _ecore_evas_buffer_transfer_modifiers_locks(Evas *e, Evas *e2)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse_in events on the associated Evas image object.
+ *
+ * This function is called when the mouse enters the Evas image object that
+ * represents the Ecore_Evas buffer. It transfers modifier/lock states and
+ * feeds a mouse_in event to the buffer's internal Evas canvas.
+ *
+ * @param data The Ecore_Evas instance (user data).
+ * @param e The Evas canvas of the image object.
+ * @param obj The Evas image object (unused).
+ * @param event_info The Evas_Event_Mouse_In event data (unused here, but cast internally).
+ */
 static void
 _ecore_evas_buffer_cb_mouse_in(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -297,6 +461,19 @@ _ecore_evas_buffer_cb_mouse_in(void *data, Evas *e, Evas_Object *obj EINA_UNUSED
    evas_event_feed_mouse_in(ee->evas, ev->timestamp, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse_out events on the associated Evas image object.
+ *
+ * This function is called when the mouse leaves the Evas image object that
+ * represents the Ecore_Evas buffer. It transfers modifier/lock states and
+ * feeds a mouse_out event to the buffer's internal Evas canvas.
+ *
+ * @param data The Ecore_Evas instance (user data).
+ * @param e The Evas canvas of the image object.
+ * @param obj The Evas image object (unused).
+ * @param event_info The Evas_Event_Mouse_Out event data (unused here, but cast internally).
+ */
 static void
 _ecore_evas_buffer_cb_mouse_out(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -311,6 +488,19 @@ _ecore_evas_buffer_cb_mouse_out(void *data, Evas *e, Evas_Object *obj EINA_UNUSE
    evas_event_feed_mouse_out(ee->evas, ev->timestamp, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse_down events on the associated Evas image object.
+ *
+ * This function is called when a mouse button is pressed on the Evas image
+ * object. It transfers modifier/lock states and feeds a mouse_down event
+ * to the buffer's internal Evas canvas.
+ *
+ * @param data The Ecore_Evas instance (user data).
+ * @param e The Evas canvas of the image object.
+ * @param obj The Evas image object (unused).
+ * @param event_info The Evas_Event_Mouse_Down event data.
+ */
 static void
 _ecore_evas_buffer_cb_mouse_down(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -325,6 +515,19 @@ _ecore_evas_buffer_cb_mouse_down(void *data, Evas *e, Evas_Object *obj EINA_UNUS
    evas_event_feed_mouse_down(ee->evas, ev->button, ev->flags, ev->timestamp, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse_up events on the associated Evas image object.
+ *
+ * This function is called when a mouse button is released on the Evas image
+ * object. It transfers modifier/lock states and feeds a mouse_up event
+ * to the buffer's internal Evas canvas.
+ *
+ * @param data The Ecore_Evas instance (user data).
+ * @param e The Evas canvas of the image object.
+ * @param obj The Evas image object (unused).
+ * @param event_info The Evas_Event_Mouse_Up event data.
+ */
 static void
 _ecore_evas_buffer_cb_mouse_up(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -339,6 +542,19 @@ _ecore_evas_buffer_cb_mouse_up(void *data, Evas *e, Evas_Object *obj EINA_UNUSED
    evas_event_feed_mouse_up(ee->evas, ev->button, ev->flags, ev->timestamp, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse_move events on the associated Evas image object.
+ *
+ * This function is called when the mouse moves over the Evas image object.
+ * It translates the coordinates, transfers modifier/lock states, and processes
+ * the mouse move event for the buffer's internal Evas canvas.
+ *
+ * @param data The Ecore_Evas instance (user data).
+ * @param e The Evas canvas of the image object.
+ * @param obj The Evas image object (unused).
+ * @param event_info The Evas_Event_Mouse_Move event data.
+ */
 static void
 _ecore_evas_buffer_cb_mouse_move(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -356,6 +572,19 @@ _ecore_evas_buffer_cb_mouse_move(void *data, Evas *e, Evas_Object *obj EINA_UNUS
    _ecore_evas_mouse_move_process(ee, x, y, ev->timestamp);
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse_wheel events on the associated Evas image object.
+ *
+ * This function is called when the mouse wheel is scrolled over the Evas image
+ * object. It transfers modifier/lock states and feeds a mouse_wheel event
+ * to the buffer's internal Evas canvas.
+ *
+ * @param data The Ecore_Evas instance (user data).
+ * @param e The Evas canvas of the image object.
+ * @param obj The Evas image object (unused).
+ * @param event_info The Evas_Event_Mouse_Wheel event data.
+ */
 static void
 _ecore_evas_buffer_cb_mouse_wheel(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -370,6 +599,19 @@ _ecore_evas_buffer_cb_mouse_wheel(void *data, Evas *e, Evas_Object *obj EINA_UNU
    evas_event_feed_mouse_wheel(ee->evas, ev->direction, ev->z, ev->timestamp, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for multi_down events (multi-touch) on the associated Evas image object.
+ *
+ * This function is called when a multi-touch down event occurs on the Evas
+ * image object. It translates coordinates, transfers modifier/lock states,
+ * and feeds a multi_down event to the buffer's internal Evas canvas.
+ *
+ * @param data The Ecore_Evas instance (user data).
+ * @param e The Evas canvas of the image object.
+ * @param obj The Evas image object (unused).
+ * @param event_info The Evas_Event_Multi_Down event data.
+ */
 static void
 _ecore_evas_buffer_cb_multi_down(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -393,6 +635,19 @@ _ecore_evas_buffer_cb_multi_down(void *data, Evas *e, Evas_Object *obj EINA_UNUS
    evas_event_feed_multi_down(ee->evas, ev->device, x, y, ev->radius, ev->radius_x, ev->radius_y, ev->pressure, ev->angle, xf, yf, ev->flags, ev->timestamp, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for multi_up events (multi-touch) on the associated Evas image object.
+ *
+ * This function is called when a multi-touch up event occurs on the Evas
+ * image object. It translates coordinates, transfers modifier/lock states,
+ * and feeds a multi_up event to the buffer's internal Evas canvas.
+ *
+ * @param data The Ecore_Evas instance (user data).
+ * @param e The Evas canvas of the image object.
+ * @param obj The Evas image object (unused).
+ * @param event_info The Evas_Event_Multi_Up event data.
+ */
 static void
 _ecore_evas_buffer_cb_multi_up(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -416,6 +671,19 @@ _ecore_evas_buffer_cb_multi_up(void *data, Evas *e, Evas_Object *obj EINA_UNUSED
    evas_event_feed_multi_up(ee->evas, ev->device, x, y, ev->radius, ev->radius_x, ev->radius_y, ev->pressure, ev->angle, xf, yf, ev->flags, ev->timestamp, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for multi_move events (multi-touch) on the associated Evas image object.
+ *
+ * This function is called when a multi-touch move event occurs on the Evas
+ * image object. It translates coordinates, transfers modifier/lock states,
+ * and feeds a multi_move event to the buffer's internal Evas canvas.
+ *
+ * @param data The Ecore_Evas instance (user data).
+ * @param e The Evas canvas of the image object.
+ * @param obj The Evas image object (unused).
+ * @param event_info The Evas_Event_Multi_Move event data.
+ */
 static void
 _ecore_evas_buffer_cb_multi_move(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -439,6 +707,20 @@ _ecore_evas_buffer_cb_multi_move(void *data, Evas *e, Evas_Object *obj EINA_UNUS
    evas_event_feed_multi_move(ee->evas, ev->device, x, y, ev->radius, ev->radius_x, ev->radius_y, ev->pressure, ev->angle, xf, yf, ev->timestamp, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_FREE on the associated Evas image object.
+ *
+ * This function is called when the Evas image object representing the
+ * Ecore_Evas buffer is freed. It triggers the freeing of the
+ * Ecore_Evas instance itself if its driver is still set (meaning it
+ * hasn't been freed by other means).
+ *
+ * @param data The Ecore_Evas instance (user data).
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas image object being freed (unused).
+ * @param event_info Event specific information (unused).
+ */
 static void
 _ecore_evas_buffer_cb_free(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -448,6 +730,19 @@ _ecore_evas_buffer_cb_free(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EIN
    if (ee->driver) _ecore_evas_free(ee);
 }
 
+/**
+ * @internal
+ * @brief Callback for key_down events on the associated Evas image object.
+ *
+ * This function is called when a key is pressed while the Evas image object
+ * has focus. It transfers modifier/lock states and feeds a key_down event
+ * to the buffer's internal Evas canvas.
+ *
+ * @param data The Ecore_Evas instance (user data).
+ * @param e The Evas canvas of the image object.
+ * @param obj The Evas image object (unused).
+ * @param event_info The Evas_Event_Key_Down event data.
+ */
 static void
 _ecore_evas_buffer_cb_key_down(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -462,6 +757,19 @@ _ecore_evas_buffer_cb_key_down(void *data, Evas *e, Evas_Object *obj EINA_UNUSED
    evas_event_feed_key_down(ee->evas, ev->keyname, ev->key, ev->string, ev->compose, ev->timestamp, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for key_up events on the associated Evas image object.
+ *
+ * This function is called when a key is released while the Evas image object
+ * has focus. It transfers modifier/lock states and feeds a key_up event
+ * to the buffer's internal Evas canvas.
+ *
+ * @param data The Ecore_Evas instance (user data).
+ * @param e The Evas canvas of the image object.
+ * @param obj The Evas image object (unused).
+ * @param event_info The Evas_Event_Key_Up event data.
+ */
 static void
 _ecore_evas_buffer_cb_key_up(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -476,6 +784,18 @@ _ecore_evas_buffer_cb_key_up(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, 
    evas_event_feed_key_up(ee->evas, ev->keyname, ev->key, ev->string, ev->compose, ev->timestamp, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for focus_in events on the associated Evas image object.
+ *
+ * This function is called when the Evas image object gains focus.
+ * It sets the focus state on the Ecore_Evas buffer instance.
+ *
+ * @param data The Ecore_Evas instance (user data).
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas image object (unused).
+ * @param event_info Event specific information (unused).
+ */
 static void
 _ecore_evas_buffer_cb_focus_in(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -486,6 +806,18 @@ _ecore_evas_buffer_cb_focus_in(void *data, Evas *e EINA_UNUSED, Evas_Object *obj
    _ecore_evas_focus_device_set(ee, NULL, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Callback for focus_out events on the associated Evas image object.
+ *
+ * This function is called when the Evas image object loses focus.
+ * It unsets the focus state on the Ecore_Evas buffer instance.
+ *
+ * @param data The Ecore_Evas instance (user data).
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas image object (unused).
+ * @param event_info Event specific information (unused).
+ */
 static void
 _ecore_evas_buffer_cb_focus_out(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -496,6 +828,20 @@ _ecore_evas_buffer_cb_focus_out(void *data, Evas *e EINA_UNUSED, Evas_Object *ob
    _ecore_evas_focus_device_set(ee, NULL, EINA_FALSE);
 }
 
+/**
+ * @internal
+ * @brief Callback for show events on the associated Evas image object.
+ *
+ * This function is called when the Evas image object representing the
+ * Ecore_Evas buffer is shown. It updates the withdrawn and visible
+ * properties of the Ecore_Evas instance and calls relevant state change
+ * and show callbacks.
+ *
+ * @param data The Ecore_Evas instance (user data).
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas image object (unused).
+ * @param event_info Event specific information (unused).
+ */
 static void
 _ecore_evas_buffer_cb_show(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -508,6 +854,20 @@ _ecore_evas_buffer_cb_show(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EIN
    if (ee->func.fn_show) ee->func.fn_show(ee);
 }
 
+/**
+ * @internal
+ * @brief Callback for hide events on the associated Evas image object.
+ *
+ * This function is called when the Evas image object representing the
+ * Ecore_Evas buffer is hidden. It updates the withdrawn and visible
+ * properties of the Ecore_Evas instance and calls relevant state change
+ * and hide callbacks.
+ *
+ * @param data The Ecore_Evas instance (user data).
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas image object (unused).
+ * @param event_info Event specific information (unused).
+ */
 static void
 _ecore_evas_buffer_cb_hide(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -520,6 +880,18 @@ _ecore_evas_buffer_cb_hide(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EIN
    if (ee->func.fn_hide) ee->func.fn_hide(ee);
 }
 
+/**
+ * @internal
+ * @brief Sets the alpha channel state for the Ecore_Evas buffer.
+ *
+ * If the buffer is associated with an Evas image object, its alpha flag
+ * is updated. Otherwise, the Evas engine info for the buffer's Evas
+ * canvas is updated to reflect whether an alpha channel is used
+ * (ARGB32) or not (RGB32).
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param alpha 1 to enable alpha channel, 0 to disable.
+ */
 static void
 _ecore_evas_buffer_alpha_set(Ecore_Evas *ee, int alpha)
 {
@@ -545,6 +917,17 @@ _ecore_evas_buffer_alpha_set(Ecore_Evas *ee, int alpha)
      }
 }
 
+/**
+ * @internal
+ * @brief Sets the profile for the Ecore_Evas buffer instance.
+ *
+ * This function updates the profile name associated with the Ecore_Evas.
+ * Profiles can be used to hint at preferred window behaviors or appearances.
+ * It also triggers a state change callback if one is set.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param profile The new profile name string. Can be NULL to clear the profile.
+ */
 static void
 _ecore_evas_buffer_profile_set(Ecore_Evas *ee, const char *profile)
 {
@@ -561,6 +944,21 @@ _ecore_evas_buffer_profile_set(Ecore_Evas *ee, const char *profile)
      }
 }
 
+/**
+ * @internal
+ * @brief Sends a message from the Ecore_Evas buffer to its parent.
+ *
+ * This function facilitates communication between a child Ecore_Evas (the buffer)
+ * and its parent Ecore_Evas. If a parent exists and has a message handler,
+ * the message is passed to it. Otherwise, if the buffer itself has a parent
+ * message handler, it's called (e.g., for top-level buffers).
+ *
+ * @param ee The Ecore_Evas instance sending the message.
+ * @param msg_domain The domain of the message.
+ * @param msg_id The ID of the message within the domain.
+ * @param data A pointer to the message data.
+ * @param size The size of the message data.
+ */
 static void
 _ecore_evas_buffer_msg_parent_send(Ecore_Evas *ee, int msg_domain, int msg_id, void *data, int size)
 {
@@ -579,6 +977,21 @@ _ecore_evas_buffer_msg_parent_send(Ecore_Evas *ee, int msg_domain, int msg_id, v
      }
 }
 
+/**
+ * @internal
+ * @brief Sends a message from the Ecore_Evas buffer to its child.
+ *
+ * This function facilitates communication from a parent Ecore_Evas (the buffer)
+ * to its child Ecore_Evas. If a child exists and has a message handler,
+ * the message is passed to it. Otherwise, if the buffer itself has a
+ * message handler, it's called.
+ *
+ * @param ee The Ecore_Evas instance sending the message.
+ * @param msg_domain The domain of the message.
+ * @param msg_id The ID of the message within the domain.
+ * @param data A pointer to the message data.
+ * @param size The size of the message data.
+ */
 static void
 _ecore_evas_buffer_msg_send(Ecore_Evas *ee, int msg_domain, int msg_id, void *data, int size)
 {
@@ -597,6 +1010,19 @@ _ecore_evas_buffer_msg_send(Ecore_Evas *ee, int msg_domain, int msg_id, void *da
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the screen geometry of the Ecore_Evas buffer.
+ *
+ * For a buffer Ecore_Evas, the "screen" geometry is simply its own
+ * position (x, y) and dimensions (w, h).
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param[out] x Pointer to store the x-coordinate.
+ * @param[out] y Pointer to store the y-coordinate.
+ * @param[out] w Pointer to store the width.
+ * @param[out] h Pointer to store the height.
+ */
 static void
 _ecore_evas_buffer_screen_geometry_get(const Ecore_Evas *ee, int *x, int *y, int *w, int *h)
 {
@@ -606,12 +1032,33 @@ _ecore_evas_buffer_screen_geometry_get(const Ecore_Evas *ee, int *x, int *y, int
    if (h) *h = ee->h;
 }
 
+/**
+ * @internal
+ * @brief Gets the current pointer (mouse) coordinates relative to the Ecore_Evas buffer's canvas.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param[out] x Pointer to store the x-coordinate of the mouse.
+ * @param[out] y Pointer to store the y-coordinate of the mouse.
+ */
 static void
 _ecore_evas_buffer_pointer_xy_get(const Ecore_Evas *ee, Evas_Coord *x, Evas_Coord *y)
 {
    evas_pointer_canvas_xy_get(ee->evas, x, y);
 }
 
+/**
+ * @internal
+ * @brief Warps (moves) the mouse pointer to a specific coordinate within the Ecore_Evas buffer.
+ *
+ * If the buffer is associated with an Evas image object, this simulates a mouse move
+ * event. If it's a standalone buffer and not ignoring events, it creates and adds
+ * an ECORE_EVENT_MOUSE_MOVE to the event queue.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param x The target x-coordinate for the pointer.
+ * @param y The target y-coordinate for the pointer.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise (though currently always returns EINA_TRUE).
+ */
 static Eina_Bool
 _ecore_evas_buffer_pointer_warp(const Ecore_Evas *ee, Evas_Coord x, Evas_Coord y)
 {
@@ -667,6 +1114,13 @@ _ecore_evas_buffer_pointer_warp(const Ecore_Evas *ee, Evas_Coord x, Evas_Coord y
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Table of engine functions for the Ecore_Evas buffer engine.
+ *
+ * This structure maps generic Ecore_Evas operations to their specific
+ * implementations for the buffer engine.
+ */
 static Ecore_Evas_Engine_Func _ecore_buffer_engine_func =
 {
    _ecore_evas_buffer_free,
@@ -756,18 +1210,57 @@ static Ecore_Evas_Engine_Func _ecore_buffer_engine_func =
    NULL // fn_last_tick_get
 };
 
+/**
+ * @internal
+ * @brief Default pixel allocation function for Ecore_Evas buffer.
+ *
+ * This function is used if no custom allocation function is provided
+ * to ecore_evas_buffer_allocfunc_new(). It simply uses malloc.
+ *
+ * @param data User data (unused in this default implementation).
+ * @param size The number of bytes to allocate.
+ * @return A pointer to the allocated memory, or NULL on failure.
+ */
 static void *
 _ecore_evas_buffer_pix_alloc(void *data EINA_UNUSED, int size)
 {
    return malloc(size);
 }
 
+/**
+ * @internal
+ * @brief Default pixel freeing function for Ecore_Evas buffer.
+ *
+ * This function is used if no custom freeing function is provided
+ * to ecore_evas_buffer_allocfunc_new(). It simply uses free.
+ *
+ * @param data User data (unused in this default implementation).
+ * @param pix A pointer to the memory to free.
+ */
 static void
 _ecore_evas_buffer_pix_free(void *data EINA_UNUSED, void *pix)
 {
    free(pix);
 }
 
+/**
+ * @brief Creates a new Ecore_Evas backed by a pixel buffer with custom memory allocators.
+ *
+ * This function allows creation of an Ecore_Evas instance that renders to an
+ * in-memory pixel buffer. It provides flexibility by allowing custom functions
+ * for allocating and freeing the pixel buffer memory.
+ *
+ * @param w The initial width of the buffer.
+ * @param h The initial height of the buffer.
+ * @param alloc_func A function pointer to allocate memory for the pixel buffer.
+ *                   It takes user data and size as parameters and returns a void pointer.
+ *                   Example: `void *my_alloc(void *data, int size);`
+ * @param free_func A function pointer to free memory used by the pixel buffer.
+ *                  It takes user data and a pointer to the pixels as parameters.
+ *                  Example: `void my_free(void *data, void *pixels);`
+ * @param data A pointer to user-defined data that will be passed to alloc_func and free_func.
+ * @return A new Ecore_Evas handle on success, NULL on failure.
+ */
 EAPI Ecore_Evas *
 ecore_evas_buffer_allocfunc_new(int w, int h,
                                 void *(*alloc_func) (void *data, int size),
@@ -891,6 +1384,18 @@ ecore_evas_buffer_allocfunc_new(int w, int h,
    return ee;
 }
 
+/**
+ * @brief Creates a new Ecore_Evas backed by a pixel buffer using default memory allocators.
+ *
+ * This function creates an Ecore_Evas instance that renders to an in-memory
+ * pixel buffer. It uses standard `malloc` and `free` for memory management
+ * of the pixel data.
+ *
+ * @param w The initial width of the buffer.
+ * @param h The initial height of the buffer.
+ * @return A new Ecore_Evas handle on success, NULL on failure.
+ * @see ecore_evas_buffer_allocfunc_new() for using custom allocators.
+ */
 EAPI Ecore_Evas *
 ecore_evas_buffer_new(int w, int h)
 {
@@ -913,6 +1418,23 @@ ecore_evas_buffer_new(int w, int h)
    return ee;
 }
 
+/**
+ * @brief Retrieves a direct pointer to the pixel data of an Ecore_Evas buffer.
+ *
+ * This function first ensures that the Ecore_Evas buffer is fully rendered
+ * and up-to-date by calling ecore_evas_render() and ecore_evas_render_wait().
+ * It then returns a constant pointer to the raw pixel data.
+ * The format of the pixel data depends on whether the Ecore_Evas buffer
+ * has an alpha channel (ARGB32) or not (RGB32, though typically still 4 bytes per pixel
+ * with the alpha byte unused or set to opaque).
+ *
+ * @warning The returned pointer is valid only until the next resize or
+ *          rendering operation that might reallocate the buffer. Do not store
+ *          this pointer for long-term use.
+ *
+ * @param ee The Ecore_Evas buffer instance.
+ * @return A constant void pointer to the pixel data, or NULL if `ee` is NULL.
+ */
 EAPI const void *
 ecore_evas_buffer_pixels_get(Ecore_Evas *ee)
 {
@@ -926,6 +1448,18 @@ ecore_evas_buffer_pixels_get(Ecore_Evas *ee)
    return bdata->pixels;
 }
 
+/**
+ * @brief Retrieves the parent Ecore_Evas of an Ecore_Evas buffer that is used as an Evas image source.
+ *
+ * If the given Ecore_Evas buffer (`ee`) was created via
+ * `ecore_evas_object_image_new()`, it is associated with an Evas_Object image
+ * that belongs to a target (parent) Ecore_Evas. This function returns
+ * that parent Ecore_Evas.
+ *
+ * @param ee The Ecore_Evas buffer instance (presumably created from an Evas_Object image).
+ * @return The parent Ecore_Evas instance if `ee` is an image-backed buffer and
+ *         has a parent, otherwise NULL. Returns NULL if `ee` is NULL.
+ */
 EAPI Ecore_Evas *
 ecore_evas_buffer_ecore_evas_parent_get(Ecore_Evas *ee)
 {
@@ -937,6 +1471,26 @@ ecore_evas_buffer_ecore_evas_parent_get(Ecore_Evas *ee)
    return evas_object_data_get(bdata->image, "Ecore_Evas_Parent");
 }
 
+/**
+ * @brief Creates a new Evas image object that is rendered by an Ecore_Evas buffer.
+ *
+ * This function sets up a special Ecore_Evas instance that renders its content
+ * into an Evas image object. This image object can then be added to another
+ * Evas canvas (managed by `ee_target`). This allows embedding one Evas scene
+ * (from the new Ecore_Evas buffer) as an image within another.
+ *
+ * The returned Evas_Object is an image. The Ecore_Evas that renders to this
+ * image can be retrieved using `evas_object_data_get(o, "Ecore_Evas")`.
+ *
+ * Event propagation (mouse, key, focus, etc.) from the `ee_target`'s canvas
+ * to the embedded Ecore_Evas buffer is handled automatically.
+ *
+ * @param ee_target The target Ecore_Evas whose Evas canvas will contain the new image object.
+ * @return A new Evas_Object (image type) on success, NULL on failure.
+ *         The Evas_Object's data "Ecore_Evas" will point to the Ecore_Evas
+ *         instance that draws into this image.
+ *         The Evas_Object's data "Ecore_Evas_Parent" will point to `ee_target`.
+ */
 EAPI Evas_Object *
 ecore_evas_object_image_new(Ecore_Evas *ee_target)
 {

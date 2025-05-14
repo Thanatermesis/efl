@@ -16,31 +16,38 @@
 // For now only vertical logic is implemented. Horizontal list and grid are not supported.
 
 typedef struct _Efl_Ui_Exact_Model_Data Efl_Ui_Exact_Model_Data;
+/**
+ * @brief Private data structure for the Efl_Ui_Exact_Model.
+ *
+ * This structure holds all the data necessary for the exact model to function,
+ * including compressed size information, total size, and cached slots for
+ * uncompressed data.
+ */
 struct _Efl_Ui_Exact_Model_Data
 {
-   Efl_Ui_Exact_Model_Data *parent;
+   Efl_Ui_Exact_Model_Data *parent; /**< Pointer to the parent model's data if this is a child model. */
 
    struct {
-      Eina_List *width;
-      Eina_List *height;
-   } compressed;
+      Eina_List *width;  /**< List of Eina_Binbuf containing compressed width data for segments. */
+      Eina_List *height; /**< List of Eina_Binbuf containing compressed height data for segments. */
+   } compressed; /**< Holds lists of compressed data segments. */
 
    struct {
-      unsigned int width;
-      unsigned int height;
-   } total_size;
+      unsigned int width;  /**< Total width accumulated from all items (max width in vertical list). */
+      unsigned int height; /**< Total height accumulated from all items. */
+   } total_size; /**< Stores the overall dimensions calculated from item sizes. */
 
    struct {
-      unsigned int *width;
-      unsigned int *height;
-      unsigned int start_offset;
-      unsigned short usage;
-      Eina_Bool defined : 1;
+      unsigned int *width;        /**< Buffer for uncompressed width data of the current slot. */
+      unsigned int *height;       /**< Buffer for uncompressed height data of the current slot. */
+      unsigned int start_offset;  /**< The starting index of the items covered by this slot, divided by EFL_UI_EXACT_MODEL_CONTENT. */
+      unsigned short usage;       /**< Usage counter for LRU cache replacement strategy. */
+      Eina_Bool defined : 1;      /**< Flag indicating if this slot contains valid data. */
       struct {
-         Eina_Bool width : 1;
-         Eina_Bool height : 1;
-      } decompressed;
-   } slot[3];
+         Eina_Bool width : 1;     /**< Flag indicating if the width data in this slot is currently decompressed. */
+         Eina_Bool height : 1;    /**< Flag indicating if the height data in this slot is currently decompressed. */
+      } decompressed; /**< Flags to track decompression status of width and height data. */
+   } slot[3]; /**< Cache slots for uncompressed data. Each slot can hold EFL_UI_EXACT_MODEL_CONTENT items. */
 };
 
 static Efl_Object *
@@ -54,6 +61,22 @@ _efl_ui_exact_model_efl_object_constructor(Eo *obj, Efl_Ui_Exact_Model_Data *pd)
    return efl_constructor(efl_super(obj, EFL_UI_EXACT_MODEL_CLASS));
 }
 
+/**
+ * @brief Compresses a buffer of size data and stores it in the compressed list.
+ *
+ * This function takes a buffer of uncompressed size data (either width or height),
+ * compresses it using Emile (LZ4), and then stores or updates the corresponding
+ * compressed Eina_Binbuf in the provided Eina_List. The list is indexed by
+ * `index / EFL_UI_EXACT_MODEL_CONTENT`.
+ *
+ * @param index The starting item index for which the buffer data is relevant.
+ *              This determines the position in the `compressed` list.
+ * @param compressed The Eina_List holding Eina_Binbuf(s) of compressed data.
+ *                   This list will be modified.
+ * @param buffer Pointer to the uncompressed data (array of unsigned int) to be compressed.
+ *               The buffer is assumed to be of size EFL_UI_EXACT_MODEL_CONTENT_LENGTH.
+ * @return The (potentially modified) `compressed` Eina_List.
+ */
 static Eina_List *
 _efl_ui_exact_model_slot_compress(unsigned int index, Eina_List *compressed, unsigned int *buffer)
 {
@@ -119,6 +142,24 @@ _efl_ui_exact_model_slot_compress(unsigned int index, Eina_List *compressed, uns
    return compressed;
 }
 
+/**
+ * @brief Expands a compressed data segment from the list into a buffer.
+ *
+ * Retrieves a compressed Eina_Binbuf from the given `list` at `list_index`,
+ * decompresses it using Emile (LZ4), and stores the result in `buffer`.
+ * If `buffer` is NULL, it will be allocated. If the `list_index` is out of
+ * bounds for `list`, the `buffer` is zeroed out.
+ *
+ * @param list_index The index in the `list` from which to retrieve the compressed data.
+ * @param buffer The buffer to store the decompressed data. If NULL, it's allocated.
+ *               Must be large enough for EFL_UI_EXACT_MODEL_CONTENT_LENGTH bytes.
+ * @param list The Eina_List containing Eina_Binbuf(s) of compressed data.
+ * @return Pointer to the `buffer` containing the decompressed data. The caller
+ *         is responsible for freeing this buffer if it was allocated by this function
+ *         (i.e., if the input `buffer` was NULL and a new one was created).
+ *         However, in the context of its usage within this file, the buffer management
+ *         is typically handled by the slot structure.
+ */
 static unsigned int *
 _efl_ui_exact_model_buffer_expand(unsigned int list_index, unsigned int *buffer, Eina_List *list)
 {
@@ -145,6 +186,23 @@ _efl_ui_exact_model_buffer_expand(unsigned int list_index, unsigned int *buffer,
    return buffer;
 }
 
+/**
+ * @brief Finds or allocates a cache slot for a given item index.
+ *
+ * This function implements an LRU (Least Recently Used) cache policy for the
+ * uncompressed data slots. It tries to find an existing slot that covers the
+ * `index`. If not found, it selects a slot for replacement (either an unused
+ * one or the LRU one). If a slot is replaced, its modified data (if any) is
+ * compressed back into storage. The selected slot is then prepared for the
+ * new `index`. If `width_get` or `height_get` are true, the corresponding
+ * data for the new slot is decompressed.
+ *
+ * @param pd Pointer to the Efl_Ui_Exact_Model_Data instance.
+ * @param index The item index for which a slot is needed.
+ * @param width_get If EINA_TRUE, ensure the width data for the slot is decompressed.
+ * @param height_get If EINA_TRUE, ensure the height data for the slot is decompressed.
+ * @return The index of the cache slot (0 to 2) that now covers the requested `index`.
+ */
 static unsigned char
 _efl_ui_exact_model_slot_find(Efl_Ui_Exact_Model_Data *pd, unsigned int index,
                               Eina_Bool width_get, Eina_Bool height_get)
@@ -226,6 +284,23 @@ _efl_ui_exact_model_slot_find(Efl_Ui_Exact_Model_Data *pd, unsigned int index,
    return found;
 }
 
+/**
+ * @brief Sets a property value for the model or a specific item.
+ *
+ * Handles setting properties like "self.w" (item width) and "self.h" (item height).
+ * For item-specific properties, it finds the appropriate cache slot, updates the
+ * size in the uncompressed buffer, and updates total size calculations.
+ * Read-only properties like "total.w", "total.h", "item.w", "item.h" will
+ * result in a rejected future.
+ *
+ * @param obj The Efl_Ui_Exact_Model object.
+ * @param pd Pointer to the Efl_Ui_Exact_Model_Data instance.
+ * @param property The name of the property to set (e.g., "self.w", "self.h").
+ * @param value The Eina_Value containing the new value for the property.
+ * @return An Eina_Future that resolves with the set value on success, or is
+ *         rejected with an error code (e.g., EFL_MODEL_ERROR_INCORRECT_VALUE,
+ *         EFL_MODEL_ERROR_READ_ONLY) on failure.
+ */
 static Eina_Future *
 _efl_ui_exact_model_efl_model_property_set(Eo *obj, Efl_Ui_Exact_Model_Data *pd,
                                            const char *property, Eina_Value *value)
@@ -288,6 +363,23 @@ _efl_ui_exact_model_efl_model_property_set(Eo *obj, Efl_Ui_Exact_Model_Data *pd,
    return efl_model_property_set(efl_super(obj, EFL_UI_EXACT_MODEL_CLASS), property, value);
 }
 
+/**
+ * @brief Gets a property value from the model or a specific item.
+ *
+ * Handles getting properties like "self.w" (item width), "self.h" (item height),
+ * "total.w" (total width of all items), and "total.h" (total height of all items).
+ * For item-specific properties, it finds the appropriate cache slot and retrieves
+ * the size from the uncompressed buffer.
+ * For "item.w" and "item.h" (generic item size), it returns an error as the
+ * exact model does not assume a uniform item size.
+ *
+ * @param obj The Efl_Ui_Exact_Model object.
+ * @param pd Pointer to the Efl_Ui_Exact_Model_Data instance.
+ * @param property The name of the property to get (e.g., "self.w", "total.h").
+ * @return An Eina_Value containing the property value. For "item.w" and "item.h",
+ *         it returns an Eina_Value of type error with EAGAIN. For other properties,
+ *         it returns the corresponding unsigned integer value.
+ */
 static Eina_Value *
 _efl_ui_exact_model_efl_model_property_get(const Eo *obj, Efl_Ui_Exact_Model_Data *pd,
                                            const char *property)

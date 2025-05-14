@@ -12,10 +12,10 @@ static int _efreet_icon_log_dom = -1;
 #include "Efreet.h"
 #include "efreet_private.h"
 
-static const char *efreet_icon_deprecated_user_dir = NULL;
-static const char *efreet_icon_user_dir = NULL;
-static Eina_List *efreet_icon_extensions = NULL;
-static Eina_List *efreet_extra_icon_dirs = NULL;
+static const char *efreet_icon_deprecated_user_dir = NULL; /**< Cached path for ~/.icons */
+static const char *efreet_icon_user_dir = NULL; /**< Cached path for XDG_DATA_HOME/icons */
+static Eina_List *efreet_icon_extensions = NULL; /**< List of recognized icon file extensions (e.g., ".png", ".svg") */
+static Eina_List *efreet_extra_icon_dirs = NULL; /**< List of additional directories to search for icons */
 
 typedef struct Efreet_Icon_Cache Efreet_Icon_Cache;
 struct Efreet_Icon_Cache
@@ -32,15 +32,92 @@ static char *efreet_icon_remove_extension(const char *icon);
 static Efreet_Icon *efreet_icon_new(const char *path);
 static void efreet_icon_populate(Efreet_Icon *icon, const char *file);
 
+/**
+ * @internal
+ * @brief Finds the best matching icon path from a cached icon based on size.
+ * @param icon The cached icon data.
+ * @param size The desired icon size.
+ * @return The path to the best matching icon, or NULL if not found.
+ * This function first looks for an exact size match. If not found, it searches
+ * for the icon with the smallest "distance" (preferring larger icons that can be scaled down).
+ */
 static const char *efreet_icon_lookup_icon(Efreet_Cache_Icon *icon, unsigned int size);
+
+/**
+ * @internal
+ * @brief Looks up an icon from a list of cached icons within a theme and its inherits.
+ * @param theme The current theme to search in.
+ * @param icons A list of Efreet_Cache_Icon structures to search through.
+ * @param size The desired icon size.
+ * @return The path to the best matching icon, or NULL if not found.
+ * It recursively searches parent themes and Hicolor as a final fallback.
+ */
 static const char *efreet_icon_list_lookup_icon(Efreet_Icon_Theme *theme, Eina_List *icons, unsigned int size);
+
+/**
+ * @internal
+ * @brief Checks if a cached icon element's size properties match the desired size.
+ * @param elem The cached icon element.
+ * @param size The desired icon size.
+ * @return 1 if it's a match, 0 otherwise.
+ * For fixed size icons, it checks for equality. For scalable/threshold icons,
+ * it checks if the size is within the min/max range.
+ */
 static int efreet_icon_size_match(Efreet_Cache_Icon_Element *elem, unsigned int size);
+
+/**
+ * @internal
+ * @brief Calculates a distance metric indicating how well an icon element's size matches a desired size.
+ * @param elem The cached icon element.
+ * @param size The desired icon size.
+ * @return A double representing the distance. Lower is better.
+ * For fixed size, it's the absolute difference. For scalable/threshold, it's a ratio
+ * if outside min/max (behavior differs slightly based on STRICT_SPEC).
+ */
 static double efreet_icon_size_distance(Efreet_Cache_Icon_Element *elem, unsigned int size);
+
+/**
+ * @internal
+ * @brief Looks up the full path for an icon element by checking standard icon directories.
+ * @param elem The cached icon element containing relative paths.
+ * @return The absolute path to the icon if found and valid, otherwise NULL.
+ * It checks user directories, extra directories, and XDG data directories.
+ */
 static const char *efreet_icon_lookup_path(Efreet_Cache_Icon_Element *elem);
+
+/**
+ * @internal
+ * @brief Helper function to find an icon element's path within a specific base directory.
+ * @param elem The cached icon element.
+ * @param path The base directory path to check.
+ * @return The full path to the icon if found under the base path and has a recognized extension, otherwise NULL.
+ */
 static const char *efreet_icon_lookup_path_path(Efreet_Cache_Icon_Element *elem, const char *path);
+
+/**
+ * @internal
+ * @brief Looks up the full path for a fallback icon by checking standard icon directories.
+ * @param icon The cached fallback icon data.
+ * @return The absolute path to the icon if found and valid, otherwise NULL.
+ * Similar to efreet_icon_lookup_path but for fallback icons. Also checks /usr/share/pixmaps.
+ */
 static const char *efreet_icon_fallback_lookup_path(Efreet_Cache_Fallback_Icon *icon);
+
+/**
+ * @internal
+ * @brief Helper function to find a fallback icon's path within a specific base directory.
+ * @param icon The cached fallback icon data.
+ * @param path The base directory path to check.
+ * @return The full path to the icon if found under the base path and has a recognized extension, otherwise NULL.
+ */
 static const char *efreet_icon_fallback_lookup_path_path(Efreet_Cache_Fallback_Icon *icon,
                                                                const char *path);
+/**
+ * @internal
+ * @brief Callback function scheduled as a job to add extra icon directories to the cache.
+ * @param data Unused user data.
+ * This ensures that modifications to `efreet_extra_icon_dirs` are processed by the caching mechanism.
+ */
 static void efreet_cache_icon_dirs_add_cb(void *data);
 
 /**

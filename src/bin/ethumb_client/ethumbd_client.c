@@ -59,6 +59,20 @@ struct options
    int page;
 };
 
+/**
+ * @brief Parses the theme string for the --theme option.
+ *
+ * This function is a callback for Ecore_Getopt to handle the custom
+ * theme string format "file:group:swallow_part". It parses the string
+ * and populates a struct frame with the components.
+ *
+ * @param parser The Ecore_Getopt parser instance (unused).
+ * @param desc The Ecore_Getopt descriptor for this option (unused).
+ * @param str The string value of the argument to parse.
+ * @param data The user data pointer (unused).
+ * @param storage The Ecore_Getopt_Value to store the parsed data in.
+ * @return 1 on success, 0 on failure.
+ */
 static unsigned char
 _ethumb_getopt_callback_frame_parse(const Ecore_Getopt *parser EINA_UNUSED, const Ecore_Getopt_Desc *desc EINA_UNUSED, const char *str, void *data EINA_UNUSED, Ecore_Getopt_Value *storage)
 {
@@ -141,6 +155,18 @@ const Ecore_Getopt optdesc = {
   }
 };
 
+/**
+ * @brief Reports the result of a thumbnail operation.
+ *
+ * This function prints a line to standard output detailing the outcome of a
+ * thumbnail request.
+ *
+ * @param mode The status of the operation (e.g., "GENERATED", "FAILED", "EXISTS").
+ * @param src_path The path to the source file.
+ * @param src_key The key within the source file (for container formats like .eet).
+ * @param thumb_path The path to the generated thumbnail.
+ * @param thumb_key The key within the thumbnail file (if applicable).
+ */
 static void
 _thumb_report(const char *mode, const char *src_path, const char *src_key, const char *thumb_path, const char *thumb_key)
 {
@@ -150,6 +176,22 @@ _thumb_report(const char *mode, const char *src_path, const char *src_key, const
 	  thumb_path, thumb_key ? thumb_key : "");
 }
 
+/**
+ * @brief Callback for when thumbnail generation is complete.
+ *
+ * This function is invoked by the Ethumb_Client when a thumbnail generation
+ * request has finished. It reports the success or failure and quits the
+ * main loop.
+ *
+ * @param data User data passed to the request (unused).
+ * @param client The Ethumb_Client instance (unused).
+ * @param id The request ID (unused).
+ * @param src_path The path to the source file.
+ * @param src_key The key within the source file.
+ * @param thumb_path The path to the generated thumbnail.
+ * @param thumb_key The key within the thumbnail file.
+ * @param success EINA_TRUE if generation was successful, EINA_FALSE otherwise.
+ */
 static void
 _finished_thumb(void *data EINA_UNUSED, Ethumb_Client *client EINA_UNUSED, int id EINA_UNUSED, const char *src_path, const char *src_key, const char *thumb_path, const char *thumb_key, Eina_Bool success)
 {
@@ -158,6 +200,18 @@ _finished_thumb(void *data EINA_UNUSED, Ethumb_Client *client EINA_UNUSED, int i
    ecore_main_loop_quit();
 }
 
+/**
+ * @brief Callback for the thumbnail existence check.
+ *
+ * This function is called after checking if a thumbnail already exists.
+ * If it does, it reports it and quits. If not, it initiates a new
+ * thumbnail generation request.
+ *
+ * @param data The `struct options` pointer containing command-line arguments.
+ * @param c The Ethumb_Client instance.
+ * @param thread The existence check thread (unused).
+ * @param exists EINA_TRUE if the thumbnail exists, EINA_FALSE otherwise.
+ */
 static void
 _exists(void *data, Ethumb_Client *c, EINA_UNUSED Ethumb_Exists *thread, Eina_Bool exists)
 {
@@ -186,6 +240,18 @@ _exists(void *data, Ethumb_Client *c, EINA_UNUSED Ethumb_Exists *thread, Eina_Bo
 
 }
 
+/**
+ * @brief Callback for when the client connects to the ethumbd server.
+ *
+ * This function is called once the DBus connection to the ethumbd server is
+ * established. It sets all the thumbnail generation parameters based on
+ * the command-line options and then starts the process by checking if the
+ * thumbnail already exists.
+ *
+ * @param data The `struct options` pointer containing command-line arguments.
+ * @param c The Ethumb_Client instance.
+ * @param success EINA_TRUE if connection was successful, EINA_FALSE otherwise.
+ */
 static void
 _connected(void *data, Ethumb_Client *c, Eina_Bool success)
 {
@@ -227,6 +293,17 @@ _connected(void *data, Ethumb_Client *c, Eina_Bool success)
    ethumb_client_thumb_exists(c, _exists, opts);
 }
 
+/**
+ * @brief The main entry point for the ethumbd client application.
+ *
+ * Parses command-line arguments, initializes the Ethumb client library,
+ * connects to the ethumbd server, and runs the main loop to process
+ * thumbnail requests.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv An array of command-line argument strings.
+ * @return 0 on success, non-zero on failure.
+ */
 int
 main(int argc, char *argv[])
 {

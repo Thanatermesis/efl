@@ -10,14 +10,29 @@
 
 #define MY_CLASS EFL_UI_FOCUS_LAYER_MIXIN
 
+/**
+ * @brief Private data structure for the Efl_Ui_Focus_Layer_Mixin.
+ */
 typedef struct {
-   Efl_Ui_Focus_Object *old_focus;
-   Efl_Ui_Focus_Manager *registered_manager;
-   Efl_Ui_Focus_Manager *manager;
-   Eina_Bool cycle;
-   Eina_Bool enable_on_visible;
+   Efl_Ui_Focus_Object *old_focus; /**< Stores the focus object that was focused before this layer became active. Used to restore focus when the layer is disabled. */
+   Efl_Ui_Focus_Manager *registered_manager; /**< The manager this layer is registered with. Typically the top-level widget (e.g., window). */
+   Efl_Ui_Focus_Manager *manager; /**< The internal focus manager for this layer. Manages focus within the layer's own hierarchy. */
+   Eina_Bool cycle; /**< If EINA_TRUE, focus movement will cycle within this layer. */
+   Eina_Bool enable_on_visible; /**< If EINA_TRUE, the layer will automatically enable/disable itself based on its visibility. */
 } Efl_Ui_Focus_Layer_Data;
 
+/**
+ * @brief Creates a new focus manager for this layer.
+ *
+ * This function is called when a focus manager is requested for this layer.
+ * It creates an instance of EFL_UI_FOCUS_MANAGER_ROOT_FOCUS_CLASS,
+ * which is a specialized focus manager that roots its focus within the provided `root` object.
+ *
+ * @param obj The Efl_Ui_Focus_Layer object.
+ * @param pd Private data for the Efl_Ui_Focus_Layer.
+ * @param root The root object for the new focus manager.
+ * @return The newly created focus manager.
+ */
 EOLIAN static Efl_Ui_Focus_Manager*
 _efl_ui_focus_layer_efl_ui_widget_focus_manager_focus_manager_create(Eo *obj, Efl_Ui_Focus_Layer_Data *pd EINA_UNUSED, Efl_Ui_Focus_Object *root)
 {
@@ -25,6 +40,16 @@ _efl_ui_focus_layer_efl_ui_widget_focus_manager_focus_manager_create(Eo *obj, Ef
    return pd->manager;
 }
 
+/**
+ * @brief Sets the visibility of the focus layer.
+ *
+ * If `enable_on_visible` is true, this function will also enable or disable
+ * the focus layer accordingly.
+ *
+ * @param obj The Efl_Ui_Focus_Layer object.
+ * @param pd Private data for the Efl_Ui_Focus_Layer.
+ * @param v EINA_TRUE if visible, EINA_FALSE otherwise.
+ */
 EOLIAN static void
 _efl_ui_focus_layer_efl_gfx_entity_visible_set(Eo *obj, Efl_Ui_Focus_Layer_Data *pd, Eina_Bool v)
 {
@@ -36,6 +61,19 @@ _efl_ui_focus_layer_efl_gfx_entity_visible_set(Eo *obj, Efl_Ui_Focus_Layer_Data 
      }
 }
 
+/**
+ * @brief Moves the focus within the layer based on the given direction.
+ *
+ * This function handles focus movement within the layer. If the movement
+ * results in no newly focused object (e.g., reaching the end of the focus chain)
+ * and cycling is disabled, it returns NULL. If cycling is enabled, it may
+ * reset focus to the layer itself and then return the current focus.
+ *
+ * @param obj The Efl_Ui_Focus_Layer object.
+ * @param pd Private data for the Efl_Ui_Focus_Layer.
+ * @param direction The direction to move the focus.
+ * @return The newly focused object, or NULL if no object could be focused in that direction.
+ */
 EOLIAN static Efl_Ui_Focus_Object*
 _efl_ui_focus_layer_efl_ui_focus_manager_move(Eo *obj, Efl_Ui_Focus_Layer_Data *pd, Efl_Ui_Focus_Direction direction)
 {
@@ -54,6 +92,15 @@ _efl_ui_focus_layer_efl_ui_focus_manager_move(Eo *obj, Efl_Ui_Focus_Layer_Data *
    return efl_ui_focus_manager_focus_get(obj);
 }
 
+/**
+ * @brief Invalidates the focus layer object.
+ *
+ * This function ensures that the layer is disabled before the object
+ * is fully invalidated.
+ *
+ * @param obj The Efl_Ui_Focus_Layer object.
+ * @param pd Private data for the Efl_Ui_Focus_Layer.
+ */
 EOLIAN static void
 _efl_ui_focus_layer_efl_object_invalidate(Eo *obj, Efl_Ui_Focus_Layer_Data *pd EINA_UNUSED)
 {
@@ -61,6 +108,13 @@ _efl_ui_focus_layer_efl_object_invalidate(Eo *obj, Efl_Ui_Focus_Layer_Data *pd E
    efl_invalidate(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Gets the focus manager this layer is registered with.
+ *
+ * @param obj The Efl_Ui_Focus_Layer object.
+ * @param pd Private data for the Efl_Ui_Focus_Layer.
+ * @return The registered focus manager, or NULL if not registered.
+ */
 EOLIAN static Efl_Ui_Focus_Manager*
 _efl_ui_focus_layer_efl_ui_focus_object_focus_manager_get(const Eo *obj EINA_UNUSED, Efl_Ui_Focus_Layer_Data *pd EINA_UNUSED)
 {
@@ -70,6 +124,15 @@ _efl_ui_focus_layer_efl_ui_focus_object_focus_manager_get(const Eo *obj EINA_UNU
      return NULL;
 }
 
+/**
+ * @brief Gets the focus parent of this layer.
+ *
+ * The focus parent is typically the root of the manager this layer is registered with.
+ *
+ * @param obj The Efl_Ui_Focus_Layer object.
+ * @param pd Private data for the Efl_Ui_Focus_Layer.
+ * @return The focus parent object, or NULL if not registered.
+ */
 EOLIAN static Efl_Ui_Focus_Object*
 _efl_ui_focus_layer_efl_ui_focus_object_focus_parent_get(const Eo *obj EINA_UNUSED, Efl_Ui_Focus_Layer_Data *pd)
 {
@@ -79,12 +142,34 @@ _efl_ui_focus_layer_efl_ui_focus_object_focus_parent_get(const Eo *obj EINA_UNUS
      return NULL;
 }
 
+/**
+ * @brief Applies focus state for the widget.
+ *
+ * This function is part of the Efl.Ui.Widget.Focus_State interface.
+ * For a focus layer, it currently does not apply any specific state and returns EINA_FALSE.
+ *
+ * @param obj The Efl_Ui_Focus_Layer object.
+ * @param pd Private data for the Efl_Ui_Focus_Layer.
+ * @param current_state The current focus state of the widget.
+ * @param configured_state Pointer to store the configured focus state.
+ * @param redirect Pointer to store a widget to redirect focus to.
+ * @return EINA_FALSE, indicating no state was applied or changed.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_focus_layer_efl_ui_widget_focus_state_apply(Eo *obj EINA_UNUSED, Efl_Ui_Focus_Layer_Data *pd EINA_UNUSED, Efl_Ui_Widget_Focus_State current_state EINA_UNUSED, Efl_Ui_Widget_Focus_State *configured_state EINA_UNUSED, Efl_Ui_Widget *redirect EINA_UNUSED)
 {
    return EINA_FALSE;
 }
 
+/**
+ * @brief Constructor for the Efl_Ui_Focus_Layer.
+ *
+ * Initializes default values for `enable_on_visible` and `cycle`.
+ *
+ * @param obj The Efl_Ui_Focus_Layer object being constructed.
+ * @param pd Private data for the Efl_Ui_Focus_Layer.
+ * @return The constructed object.
+ */
 EOLIAN static Efl_Object*
 _efl_ui_focus_layer_efl_object_constructor(Eo *obj, Efl_Ui_Focus_Layer_Data *pd)
 {
@@ -94,6 +179,16 @@ _efl_ui_focus_layer_efl_object_constructor(Eo *obj, Efl_Ui_Focus_Layer_Data *pd)
    return obj;
 }
 
+/**
+ * @brief Publishes focus manager and parent changed events.
+ *
+ * This helper function is used to emit events indicating that the
+ * focus manager or focus parent of this layer has changed.
+ *
+ * @param obj The Efl_Ui_Focus_Layer object.
+ * @param omanager The old focus manager.
+ * @param oobj The old focus parent object.
+ */
 static void
 _publish_state_change(Eo *obj, Efl_Ui_Focus_Manager *omanager, Efl_Ui_Focus_Object *oobj)
 {
@@ -101,6 +196,19 @@ _publish_state_change(Eo *obj, Efl_Ui_Focus_Manager *omanager, Efl_Ui_Focus_Obje
    efl_event_callback_call(obj, EFL_UI_FOCUS_OBJECT_EVENT_FOCUS_PARENT_CHANGED, oobj);
 }
 
+/**
+ * @brief Enables or disables the focus layer.
+ *
+ * When enabled, the layer registers itself with its parent focus manager (typically a window)
+ * and redirects focus to its internal manager. It also attempts to store the previously
+ * focused element to restore it upon disabling.
+ * When disabled, it unregisters itself and attempts to restore focus to the previously
+ * focused element or clears the redirection.
+ *
+ * @param obj The Efl_Ui_Focus_Layer object.
+ * @param pd Private data for the Efl_Ui_Focus_Layer.
+ * @param v EINA_TRUE to enable, EINA_FALSE to disable.
+ */
 EOLIAN static void
 _efl_ui_focus_layer_enable_set(Eo *obj, Efl_Ui_Focus_Layer_Data *pd, Eina_Bool v)
 {
@@ -165,13 +273,34 @@ _efl_ui_focus_layer_enable_set(Eo *obj, Efl_Ui_Focus_Layer_Data *pd, Eina_Bool v
      }
 }
 
+/**
+ * @brief Gets the enabled state of the focus layer.
+ *
+ * The layer is considered enabled if it has a registered manager and
+ * that manager is currently redirecting focus to this layer.
+ *
+ * @param obj The Efl_Ui_Focus_Layer object.
+ * @param pd Private data for the Efl_Ui_Focus_Layer.
+ * @return EINA_TRUE if enabled, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
-_efl_ui_focus_layer_enable_get(const Eo *obj, Efl_Ui_Focus_Layer_Data *pd)
+_efl_ui_focus_layer_enable_get(const Eo *obj EINA_UNUSED, Efl_Ui_Focus_Layer_Data *pd)
 {
    if (!pd->registered_manager) return EINA_FALSE;
    return (efl_ui_focus_manager_redirect_get(pd->registered_manager) == obj);
 }
 
+/**
+ * @brief Sets the behaviour of the focus layer.
+ *
+ * This configures whether the layer should automatically enable/disable
+ * based on its visibility, and whether focus movement should cycle within the layer.
+ *
+ * @param obj The Efl_Ui_Focus_Layer object.
+ * @param pd Private data for the Efl_Ui_Focus_Layer.
+ * @param enable_on_visible If EINA_TRUE, layer enables/disables with visibility.
+ * @param cycle If EINA_TRUE, focus cycles within the layer.
+ */
 EOLIAN static void
 _efl_ui_focus_layer_behaviour_set(Eo *obj EINA_UNUSED, Efl_Ui_Focus_Layer_Data *pd, Eina_Bool enable_on_visible, Eina_Bool cycle)
 {
@@ -179,6 +308,16 @@ _efl_ui_focus_layer_behaviour_set(Eo *obj EINA_UNUSED, Efl_Ui_Focus_Layer_Data *
    pd->cycle = cycle;
 }
 
+/**
+ * @brief Gets the behaviour of the focus layer.
+ *
+ * Retrieves the current settings for `enable_on_visible` and `cycle`.
+ *
+ * @param obj The Efl_Ui_Focus_Layer object.
+ * @param pd Private data for the Efl_Ui_Focus_Layer.
+ * @param enable_on_visible Pointer to store the enable_on_visible flag.
+ * @param cycle Pointer to store the cycle flag.
+ */
 EOLIAN static void
 _efl_ui_focus_layer_behaviour_get(const Eo *obj EINA_UNUSED, Efl_Ui_Focus_Layer_Data *pd, Eina_Bool *enable_on_visible, Eina_Bool *cycle)
 {

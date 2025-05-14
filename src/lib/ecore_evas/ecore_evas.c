@@ -68,16 +68,77 @@ static Ecore_Idle_Enterer *ecore_evas_idle_enterer = NULL;
 static Ecore_Evas *ecore_evases = NULL;
 static int _ecore_evas_fps_debug = 0;
 
+/**
+ * @internal
+ * @brief Get the Efl_Event_Description for a given Efl_Pointer_Action.
+ *
+ * This function maps a pointer action (like move, down, up) to its
+ * corresponding EFL event description.
+ *
+ * @param action The pointer action.
+ * @return The corresponding Efl_Event_Description, or NULL if not found.
+ */
 static const Efl_Event_Description *_event_description_get(Efl_Pointer_Action action);
 
 //RENDER_SYNC
 static int _ecore_evas_render_sync = 1;
 
+/**
+ * @internal
+ * @brief Flushes (frees) animators marked for deletion within an Ecore_Evas instance.
+ *
+ * This is typically called after processing animators to clean up those
+ * that have completed or been explicitly deleted.
+ *
+ * @param ee The Ecore_Evas instance whose deleted animators are to be flushed.
+ */
 static void _ecore_evas_animator_flush(Ecore_Evas *ee);
 
+/**
+ * @internal
+ * @brief Adds a timeline-based animator to an Ecore_Evas instance.
+ *
+ * Timeline animators run for a specific duration, with their callback
+ * receiving a position value from 0.0 to 1.0.
+ *
+ * @param evo The Evas object associated with this animator (used to find Ecore_Evas).
+ * @param runtime The total duration of the animation in seconds.
+ * @param func The callback function to execute at each animation step.
+ * @param data User data to be passed to the callback function.
+ * @return A new Ecore_Animator instance, or NULL on failure.
+ */
 static Ecore_Animator *_ecore_evas_animator_timeline_add(void *evo, double runtime, Ecore_Timeline_Cb func, const void *data);
+
+/**
+ * @internal
+ * @brief Adds a task-based animator to an Ecore_Evas instance.
+ *
+ * Task animators run indefinitely until their callback returns EINA_FALSE
+ * or they are explicitly deleted.
+ *
+ * @param evo The Evas object associated with this animator (used to find Ecore_Evas).
+ * @param func The callback function to execute at each animation step.
+ * @param data User data to be passed to the callback function.
+ * @return A new Ecore_Animator instance, or NULL on failure.
+ */
 static Ecore_Animator *_ecore_evas_animator_add(void *evo, Ecore_Task_Cb func, const void *data);
+
+/**
+ * @internal
+ * @brief Freezes (suspends) an Ecore_Animator.
+ *
+ * A frozen animator will not be processed until it is thawed.
+ *
+ * @param animator The animator to freeze.
+ */
 static void _ecore_evas_animator_freeze(Ecore_Animator *animator);
+
+/**
+ * @internal
+ * @brief Thaws (resumes) a frozen Ecore_Animator.
+ *
+ * @param animator The animator to thaw.
+ */
 static void _ecore_evas_animator_thaw(Ecore_Animator *animator);
 static void *_ecore_evas_animator_del(Ecore_Animator *animator);
 
@@ -91,6 +152,16 @@ _ecore_evas_focus_out_dispatch(Ecore_Evas *ee, Efl_Input_Device *seat)
    if (ee->func.fn_focus_device_out) ee->func.fn_focus_device_out(ee, seat);
 }
 
+/**
+ * @internal
+ * @brief Callback for when an Efl_Input_Device that had focus is deleted.
+ *
+ * This function removes the device from the list of focusing devices for
+ * the Ecore_Evas instance and dispatches a focus out event.
+ *
+ * @param data The Ecore_Evas instance.
+ * @param ev The Efl_Event containing the deleted device object.
+ */
 static void
 _ecore_evas_device_del_cb(void *data, const Efl_Event *ev)
 {
@@ -100,6 +171,15 @@ _ecore_evas_device_del_cb(void *data, const Efl_Event *ev)
    _ecore_evas_focus_out_dispatch(ee, ev->object);
 }
 
+/**
+ * @internal
+ * @brief Dispatches mouse out events for an Ecore_Evas instance.
+ *
+ * This function calls any registered Ecore_Evas mouse out callbacks.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param mouse The input device (mouse) that moved out.
+ */
 static void
 _ecore_evas_mouse_out_dispatch(Ecore_Evas *ee, Efl_Input_Device *mouse)
 {
@@ -107,6 +187,16 @@ _ecore_evas_mouse_out_dispatch(Ecore_Evas *ee, Efl_Input_Device *mouse)
    if (ee->func.fn_device_mouse_out) ee->func.fn_device_mouse_out(ee, mouse);
 }
 
+/**
+ * @internal
+ * @brief Callback for when an Efl_Input_Device (mouse) that was inside the Ecore_Evas is deleted.
+ *
+ * This function removes the mouse device from the list of mice currently inside
+ * the Ecore_Evas and dispatches a mouse out event.
+ *
+ * @param data The Ecore_Evas instance.
+ * @param ev The Efl_Event containing the deleted mouse device object.
+ */
 static void
 _ecore_evas_mouse_del_cb(void *data, const Efl_Event *ev)
 {
@@ -116,6 +206,16 @@ _ecore_evas_mouse_del_cb(void *data, const Efl_Event *ev)
    _ecore_evas_mouse_out_dispatch(ee, ev->object);
 }
 
+/**
+ * @internal
+ * @brief Callback for EFL_CANVAS_OBJECT_EVENT_ANIMATOR_TICK on an Evas canvas.
+ *
+ * This function is called when an animator tick event occurs on the Evas canvas.
+ * It marks that an animator has ticked for the associated Ecore_Evas instance.
+ *
+ * @param data The Ecore_Evas instance.
+ * @param ev The Efl_Event (unused).
+ */
 static void
 _ecore_evas_animator(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -124,6 +224,13 @@ _ecore_evas_animator(void *data, const Efl_Event *ev EINA_UNUSED)
    ee->animator_ticked = EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Checks if an Ecore_Evas instance or any of its sub-Ecore_Evas instances have rendering changes.
+ *
+ * @param ee The Ecore_Evas instance to check.
+ * @return EINA_TRUE if there are changes, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _ecore_evas_changes_get(Ecore_Evas *ee)
 {
@@ -137,6 +244,16 @@ _ecore_evas_changes_get(Ecore_Evas *ee)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Ecore idle exiter callback for Ecore_Evas.
+ *
+ * This function is called when the main loop is about to exit an idle state.
+ * It resets the `animator_ran` flag for all Ecore_Evas instances.
+ *
+ * @param data Unused.
+ * @return ECORE_CALLBACK_RENEW to keep the exiter active.
+ */
 static Eina_Bool
 _ecore_evas_idle_exiter(void *data EINA_UNUSED)
 {
@@ -148,6 +265,18 @@ _ecore_evas_idle_exiter(void *data EINA_UNUSED)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Wait for the current asynchronous rendering operation to complete.
+ *
+ * If the Ecore_Evas instance @p ee is currently performing an asynchronous
+ * rendering operation (i.e., `ee->in_async_render` is true), this function
+ * will block until that rendering operation is synchronized and finished.
+ * This is useful to ensure that the canvas is in a consistent state before
+ * performing operations that depend on the rendered output.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @since 1.2
+ */
 EAPI void
 ecore_evas_render_wait(Ecore_Evas *ee)
 {

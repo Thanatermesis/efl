@@ -40,66 +40,86 @@ composed of all theme1.edj components.\n\
 Replacing the button and check with widgets taken from default theme.\n\
 (Given that theme1.edj button, check group-name are as in default.edj)\n"
 
+/**
+ * @brief Structure to map old resource IDs to new resource IDs.
+ * This is used when merging multiple edj files to ensure uniqueness
+ * of IDs in the output file.
+ */
 struct _Edje_Pick_Id
 {
-   int       old_id;
-   int       new_id;
-   Eina_Bool used;
+   int       old_id; /**< The original ID of the resource in its source file. */
+   int       new_id; /**< The new ID assigned to the resource in the output file. */
+   Eina_Bool used;   /**< Flag indicating whether this resource (and thus its ID mapping) is used in the final output. */
 };
 typedef struct _Edje_Pick_Id Edje_Pick_Id;
 
+/**
+ * @brief Parameters and data associated with each input edj file.
+ */
 struct _Edje_Pick_File_Params
 {
-   const char *name;
-   Eina_List  *groups;
-   Edje_File  *edf;    /* Keeps all file data after reading  */
-   Eina_Bool   append; /* Take everything from this file */
+   const char *name;   /**< The filename of the input edj file. */
+   Eina_List  *groups; /**< A list of Eina_Stringshare representing the names of groups to be included from this file. */
+   Edje_File  *edf;    /**< Pointer to the parsed Edje_File structure, holding all data read from this edj file. */
+   Eina_Bool   append; /**< If EINA_TRUE, all groups from this file are taken, unless overridden by specific group selections from other files. */
 
    /* We hold list of IDs for each file */
-   Eina_List  *scriptlist;
-   Eina_List  *luascriptlist;
-   Eina_List  *imagelist;
-   Eina_List  *imagesetlist; /* List of IDs (Edje_Pick_Data) for image sets */
-   Eina_List  *vectorlist;
-   Eina_List  *samplelist;
-   Eina_List  *tonelist;
-   Eina_List  *vibrationlist;
-   Eina_List  *fontlist;
+   Eina_List  *scriptlist;    /**< List of Edje_Pick_Data for Embryo scripts. */
+   Eina_List  *luascriptlist; /**< List of Edje_Pick_Data for Lua scripts. */
+   Eina_List  *imagelist;     /**< List of Edje_Pick_Data for images. */
+   Eina_List  *imagesetlist;  /**< List of Edje_Pick_Data for image sets. */
+   Eina_List  *vectorlist;    /**< List of Edje_Pick_Data for vector graphics. */
+   Eina_List  *samplelist;    /**< List of Edje_Pick_Data for sound samples. */
+   Eina_List  *tonelist;      /**< List of Edje_Pick_Tone for sound tones. */
+   Eina_List  *vibrationlist; /**< List of Edje_Pick_Data for vibration samples. */
+   Eina_List  *fontlist;      /**< List of Edje_Pick_Font for fonts. */
 };
 typedef struct _Edje_Pick_File_Params Edje_Pick_File_Params;
 
+/**
+ * @brief Generic structure to hold data for various resources like images, samples, scripts.
+ */
 struct _Edje_Pick_Data
 {
-   const char  *filename; /* Image, Sample File Name       */
-   void        *entry; /* used to build output file dir FIXME: REMOVE THIS */
-   void        *data; /* Data as taken from input file */
+   const char  *filename; /**< The original filename or entry name of the resource (e.g., image path, script name). */
+   void        *entry;    /**< Pointer to the original directory entry structure (e.g., Edje_Image_Directory_Entry). Used to build the output file directory. FIXME: REMOVE THIS comment if entry is used more broadly. */
+   void        *data;     /**< Pointer to the raw binary data of the resource as read from the input file. */
 
-   int          size;
-   Edje_Pick_Id id;
+   int          size;     /**< The size of the data in bytes. */
+   Edje_Pick_Id id;       /**< ID mapping for this resource. */
 };
 typedef struct _Edje_Pick_Data Edje_Pick_Data;
 
+/**
+ * @brief Structure to manage sound tones during the picking process.
+ */
 struct _Edje_Pick_Tone
 {
-   Edje_Sound_Tone *tone;
-   Eina_Bool        used;
+   Edje_Sound_Tone *tone; /**< Pointer to the Edje_Sound_Tone structure from the input file. */
+   Eina_Bool        used; /**< Flag indicating whether this tone is used in the final output. */
 };
 typedef struct _Edje_Pick_Tone Edje_Pick_Tone;
 
+/**
+ * @brief Structure to manage fonts and their data during the picking process.
+ */
 struct _Edje_Pick_Font
 {
-   Edje_Font *f;
+   Edje_Font *f; /**< Pointer to the Edje_Font structure (metadata like name, file). */
 
-   void      *data; /* Font data as take from source edj file */
-   int        size; /* data size */
-   Eina_Bool  used;
+   void      *data; /**< Pointer to the raw font data as read from the source edj file. */
+   int        size; /**< The size of the font data in bytes. */
+   Eina_Bool  used; /**< Flag indicating whether this font is used in the final output. */
 };
 typedef struct _Edje_Pick_Font Edje_Pick_Font;
 
+/**
+ * @brief Global context for the edje_pick tool.
+ */
 struct _Edje_Pick
 {
-   Eina_Bool              v; /* Verbose */
-   Edje_Pick_File_Params *current_file;
+   Eina_Bool              v; /**< Verbose mode flag. If EINA_TRUE, detailed logging is enabled. */
+   Edje_Pick_File_Params *current_file; /**< Pointer to the Edje_Pick_File_Params of the input file currently being processed. */
 };
 typedef struct _Edje_Pick Edje_Pick;
 
@@ -124,6 +144,13 @@ enum _Edje_Pick_Status
 };
 typedef enum _Edje_Pick_Status Edje_Pick_Status;
 
+/**
+ * @brief Prints the parsed command-line arguments.
+ * This function is typically used for debugging or verbose output to show
+ * how the command-line arguments were interpreted.
+ * @param ifs A list of Edje_Pick_File_Params structures, representing the input files and their selected groups.
+ * @param out The name of the output file.
+ */
 static void
 _edje_pick_args_show(Eina_List *ifs, char *out)
 {  /* Print command-line arguments after parsing phase */
@@ -150,6 +177,13 @@ _edje_pick_args_show(Eina_List *ifs, char *out)
   EINA_LOG_INFO("\nOutput file name was <%s>\n", out);
 }
 
+/**
+ * @brief Frees a list of Edje_Pick_Data structures.
+ * Iterates through the list, freeing the filename stringshare,
+ * the data buffer, and the structure itself for each element.
+ * @param l The Eina_List of Edje_Pick_Data pointers to be freed.
+ *          The list itself is also freed.
+ */
 static void
 _edje_pick_data_free(Eina_List *l)
 {
@@ -163,6 +197,12 @@ _edje_pick_data_free(Eina_List *l)
      }
 }
 
+/**
+ * @brief Frees the memory allocated for an Edje_File structure, specifically for the output file.
+ * This includes closing the Eet_File, and freeing directories (external, image, sound, vibration),
+ * color classes, collection hash, and the compiler string.
+ * @param out_file Pointer to the Edje_File structure to be freed.
+ */
 static void
 _edje_pick_out_file_free(Edje_File *out_file)
 {
@@ -215,6 +255,17 @@ _edje_pick_out_file_free(Edje_File *out_file)
      }
 }
 
+/**
+ * @brief Performs cleanup of all allocated resources.
+ * This function frees the output Edje_File structure, all input file parameters
+ * (including their associated lists of groups, scripts, images, etc.),
+ * and shuts down Edje and Eet libraries. It also prints an error message
+ * based on the provided status code.
+ * @param ifs A list of Edje_Pick_File_Params structures (input files data).
+ * @param out_file The Edje_File structure for the output file.
+ * @param s The Edje_Pick_Status code indicating the outcome or error.
+ * @return The status code s.
+ */
 static int
 _edje_pick_cleanup(Eina_List *ifs, Edje_File *out_file, Edje_Pick_Status s)
 {
@@ -305,7 +356,16 @@ _edje_pick_cleanup(Eina_List *ifs, Edje_File *out_file, Edje_Pick_Status s)
    return s;
 }
 
-/* Look for group name in all input files that are not d1 */
+/**
+ * @brief Checks if a group name is selected in any input file other than the specified one.
+ * This is used to prevent duplicate group names being explicitly selected from different
+ * input files, which could lead to ambiguity.
+ * @param inp_files The list of all Edje_Pick_File_Params (all input files).
+ * @param d1 A pointer to an Edje_Pick_File_Params representing the current input file,
+ *           which is excluded from the search.
+ * @param d2 A pointer to a char (string) representing the group name to search for.
+ * @return 1 if the group name is found in another file's selected groups, 0 otherwise.
+ */
 static int
 _group_name_in_other_file(Eina_List *inp_files, void *d1, void *d2)
 {
@@ -324,6 +384,25 @@ _group_name_in_other_file(Eina_List *inp_files, void *d1, void *d2)
    return 0;  /* Not found */
 }
 
+/**
+ * @brief Parses the command-line arguments for edje_pick.
+ * It uses Ecore_Getopt to interpret arguments like input files, groups,
+ * output file, append mode, and verbose mode. It populates the list of
+ * input file parameters and the output filename.
+ * @param argc The argument count.
+ * @param argv The argument vector.
+ * @param[out] ifs Pointer to an Eina_List* that will be populated with
+ *                 Edje_Pick_File_Params structures for each input file.
+ *                 Example:
+ *                 ifs will point to a list like:
+ *                 [ (Edje_Pick_File_Params for file1), (Edje_Pick_File_Params for file2), ... ]
+ *                 Each Edje_Pick_File_Params contains:
+ *                   ->name = "file1.edj"
+ *                   ->groups = [ "group/a", "group/b" ] (if -g used) or empty (if -a used)
+ *                   ->append = EINA_TRUE or EINA_FALSE
+ * @param[out] ofn Pointer to a char* that will be set to the output filename.
+ * @return An Edje_Pick_Status code indicating success (EDJE_PICK_NO_ERROR) or failure.
+ */
 static int
 _edje_pick_command_line_parse(int argc, char **argv,
                               Eina_List **ifs, char **ofn)
@@ -493,6 +572,15 @@ _edje_pick_command_line_parse(int argc, char **argv,
   return EDJE_PICK_NO_ERROR;
 }
 
+/**
+ * @brief Updates the external directory of the output Edje_File by appending entries
+ * from an input Edje_File.
+ * If the output file doesn't have an external directory, it's created.
+ * Entries from the input file's external directory are then copied to the end
+ * of the output file's external directory entries.
+ * @param o Pointer to the output Edje_File structure. Its external_dir will be modified.
+ * @param edf Pointer to the input Edje_File structure from which to copy external directory entries.
+ */
 static void
 _edje_pick_external_dir_update(Edje_File *o, Edje_File *edf)
 {
@@ -527,6 +615,20 @@ _edje_pick_external_dir_update(Edje_File *o, Edje_File *edf)
      }
 }
 
+/**
+ * @brief Prepares the output Edje_File structure.
+ * If 'o' is NULL, a new Edje_File structure is allocated and initialized
+ * (e.g., compiler name, version, opening the Eet_File for writing).
+ * If 'o' is not NULL, it checks for compatibility (version, minor, feature_ver, base_scale)
+ * with the current input file 'edf'. It updates version numbers if the input file's
+ * version is higher.
+ * It also calls _edje_pick_external_dir_update to merge external directory entries.
+ * @param o Pointer to the existing output Edje_File structure, or NULL if it's the first file being processed.
+ * @param edf Pointer to the input Edje_File structure (from the current input edj file).
+ * @param name The desired filename for the output edj file.
+ * @return Pointer to the (newly created or updated) output Edje_File structure,
+ *         or NULL on critical error (e.g., base scale mismatch).
+ */
 static Edje_File *
 _edje_pick_output_prepare(Edje_File *o, Edje_File *edf, char *name)
 {
@@ -580,6 +682,20 @@ _edje_pick_output_prepare(Edje_File *o, Edje_File *edf, char *name)
    return o;
 }
 
+/**
+ * @brief Handles the addition of a parent group when an alias group is processed.
+ * If the given collection entry 'ce' is an alias (ce->group_alias is true),
+ * this function finds its actual parent group within the input file 'edf'.
+ * It then ensures this parent group is added to the 'out_file's collection.
+ * If the parent is already in 'out_file', the alias 'ce_out' gets the parent's ID.
+ * If the parent is not yet in 'out_file', it's added with the same ID as 'ce_out'.
+ * This ensures that aliases correctly point to their parent groups in the merged file.
+ * @param out_file The output Edje_File structure.
+ * @param edf The input Edje_File structure.
+ * @param ce The Edje_Part_Collection_Directory_Entry of the alias group from the input file.
+ * @param ce_out The Edje_Part_Collection_Directory_Entry for the alias group being added to the output file.
+ *               Its 'id' field might be updated by this function.
+ */
 static void
 _edje_pick_header_alias_parent_add(Edje_File *out_file, Edje_File *edf, Edje_Part_Collection_Directory_Entry *ce, Edje_Part_Collection_Directory_Entry *ce_out)
 {
@@ -611,6 +727,23 @@ _edje_pick_header_alias_parent_add(Edje_File *out_file, Edje_File *edf, Edje_Par
    eina_iterator_free(i);
 }
 
+/**
+ * @brief Recursively checks and adds dependencies for a given group.
+ * When a group is selected, it might depend on other groups (e.g., via part sources).
+ * This function reads the specified group 'ce' from 'edf', iterates through its parts
+ * and their items, and identifies any 'source' groups. If these source groups are not
+ * already selected (in 'groups' list) or present in 'out_file', they are recursively
+ * processed and added to 'out_file'.
+ * @param out_file The output Edje_File structure where dependent groups are added.
+ * @param edf The input Edje_File structure from which groups are read.
+ * @param groups A list of group names (Eina_Stringshare) already explicitly selected for the current input file.
+ *               Used to avoid re-processing explicitly selected groups as dependencies.
+ * @param ce The Edje_Part_Collection_Directory_Entry of the group whose dependencies are being checked.
+ * @param current_id Pointer to an integer that holds the next available group ID for the output file.
+ *                   This ID is incremented as new dependent groups are added.
+ * @return An Eina_List of Eina_Stringshare, containing the names of all newly added dependent groups.
+ *         The caller is responsible for freeing this list and its contents.
+ */
 static Eina_List *
 _edje_pick_header_dependencies_check(Edje_File *out_file, Edje_File *edf, Eina_List *groups, Edje_Part_Collection_Directory_Entry *ce, int *current_id)
 {
@@ -679,6 +812,15 @@ exit:
 #undef GROUP_CHECK_AND_ADD
 }
 
+/**
+ * @brief Merges data entries from an input Edje_File's data hash into the output Edje_File's data hash.
+ * It iterates over all key-value pairs in `edf->data`. If a key is not already present
+ * in `out_file->data`, the key-value pair is added to `out_file->data`.
+ * This is used to merge the "data" blocks from multiple edj files.
+ * @param out_file The output Edje_File structure. Its `data` hash will be updated.
+ * @param edf The input Edje_File structure from which to copy data entries.
+ * @return Always returns EDJE_PICK_NO_ERROR.
+ */
 static int
 _edje_pick_data_update(Edje_File *out_file, Edje_File *edf)
 {

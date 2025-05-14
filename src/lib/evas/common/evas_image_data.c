@@ -8,6 +8,27 @@
 #include "evas_private.h"
 #include "evas_image.h"
 
+/**
+ * @brief Populates an RGBA_Image from existing image data.
+ *
+ * This function sets up an RGBA_Image (Image_Entry) to use the provided
+ * image_data directly without copying it. The ownership of image_data is
+ * not transferred; it's marked as not to be freed by Evas.
+ *
+ * @param ie_dst The destination Image_Entry to populate.
+ * @param w The width of the image.
+ * @param h The height of the image.
+ * @param image_data Pointer to the raw image data. The format depends on cspace.
+ *                   For EVAS_COLORSPACE_ARGB8888, this is an array of DATA32 (unsigned int).
+ *                   Example: `DATA32 arr[] = {0xFFRRGGBB, 0xFFRRGGBB, ...};`
+ *                   For EVAS_COLORSPACE_AGRY88 or EVAS_COLORSPACE_GRY8, this is an array of DATA8 (unsigned char).
+ *                   Example: `DATA8 arr[] = {0xAA, 0xGG, ...};` or `DATA8 arr[] = {0xGG, ...};`
+ *                   For YCbCr planar formats, this points to the planar data.
+ * @param alpha Flag indicating if the image data has an alpha channel (1 for alpha, 0 for no alpha).
+ *              This is primarily used for ARGB8888 and ETC formats.
+ * @param cspace The colorspace of the image_data.
+ * @return 0 on success, though the function currently always returns 0 or aborts.
+ */
 int
 evas_common_rgba_image_from_data(Image_Entry* ie_dst, unsigned int w, unsigned int h, DATA32 *image_data, int alpha, Evas_Colorspace cspace)
 {
@@ -66,6 +87,29 @@ evas_common_rgba_image_from_data(Image_Entry* ie_dst, unsigned int w, unsigned i
    return 0;
 }
 
+/**
+ * @brief Populates an RGBA_Image by copying data from an existing buffer.
+ *
+ * This function allocates memory (if needed, depending on the colorspace)
+ * and copies the provided image_data into the RGBA_Image (Image_Entry).
+ *
+ * @param ie_dst The destination Image_Entry to populate.
+ * @param w The width of the image.
+ * @param h The height of the image.
+ * @param image_data Pointer to the source image data to be copied. The format depends on cspace.
+ *                   If NULL, no data is copied, but alpha flags might be set.
+ *                   For EVAS_COLORSPACE_ARGB8888, this is an array of DATA32.
+ *                   Example: `DATA32 arr[] = {0xFFRRGGBB, 0xFFRRGGBB, ...};`
+ *                   For EVAS_COLORSPACE_AGRY88, this is an array of DATA16.
+ *                   Example: `DATA16 arr[] = {0xAAGG, 0xAAGG, ...};`
+ *                   For EVAS_COLORSPACE_GRY8, this is an array of DATA8.
+ *                   Example: `DATA8 arr[] = {0xGG, 0xGG, ...};`
+ *                   For YCbCr planar formats, this points to the planar data to be copied.
+ * @param alpha Flag indicating if the image data has an alpha channel (1 for alpha, 0 for no alpha).
+ *              This is used for ARGB8888, AGRY88, and GRY8 colorspaces.
+ * @param cspace The colorspace of the image_data.
+ * @return 0 on success, though the function currently always returns 0 or aborts.
+ */
 int
 evas_common_rgba_image_from_copied_data(Image_Entry* ie_dst, unsigned int w, unsigned int h, DATA32 *image_data, int alpha, Evas_Colorspace cspace)
 {
@@ -109,6 +153,20 @@ evas_common_rgba_image_from_copied_data(Image_Entry* ie_dst, unsigned int w, uns
    return 0;
 }
 
+/**
+ * @brief Sets the size of a destination image based on a source image and potentially allocates memory.
+ *
+ * This function primarily handles allocation for YCbCr colorspaces when setting
+ * the size of an image. It also copies flags from the source image.
+ * The w and h parameters are currently unused. The size is taken from ie_dst->cache_entry.
+ *
+ * @param ie_dst The destination Image_Entry whose size and properties are being set.
+ *               Its cache_entry.w and cache_entry.h should be pre-set.
+ * @param ie_im The source Image_Entry from which to copy flags and determine colorspace-specific actions.
+ * @param w The new width (currently unused).
+ * @param h The new height (currently unused).
+ * @return 0 on success.
+ */
 int
 evas_common_rgba_image_size_set(Image_Entry *ie_dst, const Image_Entry *ie_im, unsigned int w EINA_UNUSED, unsigned int h EINA_UNUSED)
 {
@@ -132,6 +190,21 @@ evas_common_rgba_image_size_set(Image_Entry *ie_dst, const Image_Entry *ie_im, u
    return 0;
 }
 
+/**
+ * @brief Changes the colorspace of an RGBA_Image.
+ *
+ * This function attempts to change the colorspace of an image.
+ * It may free existing image data and allocate new buffers if necessary
+ * (e.g., for YCbCr conversions).
+ *
+ * @warning This function has several FIXMEs regarding memory management
+ *          (potential to free mmap'd data with free()) and handling of
+ *          images with multiple references.
+ *
+ * @param ie The Image_Entry whose colorspace is to be changed.
+ * @param cspace The new Evas_Colorspace to set.
+ * @return 1 on success, 0 on failure (e.g., unsupported colorspace). Aborts on critical errors.
+ */
 int
 evas_common_rgba_image_colorspace_set(Image_Entry* ie, Evas_Colorspace cspace)
 {

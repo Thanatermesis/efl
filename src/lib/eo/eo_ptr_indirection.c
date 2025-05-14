@@ -4,16 +4,32 @@
 
 #include "eo_ptr_indirection.h"
 
-extern Eina_Thread _efl_object_main_thread;
+extern Eina_Thread _efl_object_main_thread; /**< Stores the main thread ID for EFL objects. */
 
 //////////////////////////////////////////////////////////////////////////
 
-Eina_TLS          _eo_table_data;
-Eo_Id_Data       *_eo_table_data_shared = NULL;
-Eo_Id_Table_Data *_eo_table_data_shared_data = NULL;
+Eina_TLS          _eo_table_data; /**< Thread-local storage key for Eo_Id_Data. Each thread gets its own instance. */
+Eo_Id_Data       *_eo_table_data_shared = NULL; /**< Global pointer to the Eo_Id_Data structure for shared objects. Access is synchronized. */
+Eo_Id_Table_Data *_eo_table_data_shared_data = NULL; /**< Global pointer to the Eo_Id_Table_Data for shared objects. Contains the actual tables and lock. */
 
 //////////////////////////////////////////////////////////////////////////
 
+/**
+ * @internal
+ * @brief Logs an error when an Eo pointer operation fails.
+ *
+ * This function is primarily a central point for logging pointer-related errors.
+ * It uses eina_log for output and also calls _eo_log_obj_report for
+ * more detailed object-specific logging if available.
+ * Its existence facilitates setting a single breakpoint to catch all such errors.
+ *
+ * @param obj_id The Eo object ID that was being processed when the error occurred.
+ * @param func_name The name of the function where the error was detected.
+ * @param file The source file where the error was detected.
+ * @param line The line number in the source file.
+ * @param fmt A printf-style format string for the error message.
+ * @param ... Variable arguments for the format string.
+ */
 void
 _eo_pointer_error(const Eo *obj_id, const char *func_name, const char *file, int line, const char *fmt, ...)
 {
@@ -25,6 +41,23 @@ _eo_pointer_error(const Eo *obj_id, const char *func_name, const char *file, int
    _eo_log_obj_report((Eo_Id)obj_id, EINA_LOG_LEVEL_ERR, func_name, file, line);
 }
 
+/**
+ * @internal
+ * @brief Logs detailed information when an Eo ID is found to be invalid.
+ *
+ * This function is called by _eo_obj_pointer_get when an Eo ID cannot be
+ * resolved to a valid object pointer. It provides comprehensive diagnostic
+ * information, including the ID itself, whether it's an object or class,
+ * the current thread, suspected reasons for invalidity (e.g., deleted,
+ * wrong thread), domain information, generation count, and raw ID components.
+ *
+ * @param obj_id The invalid Eo ID.
+ * @param data The Eo_Id_Data associated with the current context (thread-local or shared).
+ * @param domain The domain extracted from the obj_id.
+ * @param func_name The name of the function that attempted to resolve the pointer.
+ * @param file The source file where the resolution was attempted.
+ * @param line The line number in the source file.
+ */
 static void
 _eo_obj_pointer_invalid(const Eo_Id obj_id,
                         Eo_Id_Data *data,
@@ -76,6 +109,31 @@ _eo_obj_pointer_invalid(const Eo_Id obj_id,
    _eo_log_obj_report(obj_id, EINA_LOG_LEVEL_ERR, func_name, file, line);
 }
 
+/**
+ * @internal
+ * @brief Resolves an Eo_Id to an _Eo_Object pointer.
+ *
+ * This is the core function for converting an Eo object ID into a usable
+ * memory pointer. It handles:
+ * - NULL ID checks.
+ * - Distinguishing between thread-local and shared domains.
+ * - Cache lookups for frequently accessed objects.
+ * - Navigating the multi-level ID tables to find the object entry.
+ * - Generation counter checks to ensure the ID refers to the current instance
+ *   of the object and not a stale one.
+ * - Storing successfully resolved pointers in the cache.
+ * - Locking for shared domain access (lock is taken here and expected to be
+ *   released by _eo_obj_pointer_done() via EO_OBJ_DONE()).
+ * - Error reporting via _eo_obj_pointer_invalid() for failed resolutions.
+ *
+ * @param obj_id The Eo ID to resolve.
+ * @param func_name Name of the calling function (for error reporting).
+ * @param file Source file of the calling function (for error reporting).
+ * @param line Line number in the source file (for error reporting).
+ * @return A pointer to the _Eo_Object if resolution is successful and the ID
+ *         is valid; NULL otherwise. For shared objects, if successful,
+ *         _eo_table_data_shared_data->obj_lock is held upon return.
+ */
 _Eo_Object *
 _eo_obj_pointer_get(const Eo_Id obj_id, const char *func_name, const char *file, int line)
 {

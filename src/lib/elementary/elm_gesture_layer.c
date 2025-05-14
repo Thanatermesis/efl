@@ -29,6 +29,15 @@
 #define RAD2DEG(x) ((x) * 57.295779513)
 #define DEG2RAD(x) ((x) / 57.295779513)
 
+/**
+ * @internal
+ * Duplicates a buffer of a given size.
+ *
+ * @param buf The buffer to duplicate.
+ * @param size The size of the buffer.
+ * @return A new buffer with the duplicated content, must be freed by the caller.
+ * @ingroup Elm_Gesture_Layer
+ */
 static void *
 _glayer_buf_dup(void *buf, size_t size)
 {
@@ -216,6 +225,34 @@ static void _event_process(void *data,
 
 static void _callbacks_unregister(Evas_Object *obj);
 
+/**
+ * @internal
+ * @brief Array of function pointers for handling different gesture types.
+ *
+ * This array maps each gesture type from the _Elm_Gesture_Type enum to a set
+ * of functions that implement the gesture detection logic. The order of
+ * elements in this array must match the order of gestures in
+ * _Elm_Gesture_Type.
+ *
+ * Each element is a Tests_Array_Funcs struct containing:
+ * - test: A function pointer to the gesture's main detection logic.
+ *         It is called for each relevant input event.
+ * - reset: A function pointer to reset the gesture's internal state.
+ *          This is called when a gesture is completed, aborted, or when
+ *          the gesture detection is reset.
+ * - cont_reset: An optional function pointer to reset a continuous gesture's
+ *               state. This allows gestures like lines or zoom to be
+ *               restarted without lifting the fingers from the surface.
+ *               If NULL, the gesture is not continuous.
+ *
+ * Example for ELM_GESTURE_N_TAPS:
+ *   { _tap_gesture_test, _tap_gestures_test_reset, NULL }
+ *   - _tap_gesture_test: Handles the logic for detecting single taps.
+ *   - _tap_gestures_test_reset: Resets the tap gesture state.
+ *   - NULL: Tap is not a continuous gesture.
+ *
+ * @ingroup Elm_Gesture_Layer
+ */
 /* Should be the same order as _Elm_Gesture_Type */
 static Tests_Array_Funcs _glayer_tests_array[] = {
    { NULL, NULL, NULL },     /** Because someone made an awful mistake. */
@@ -395,8 +432,14 @@ struct _Elm_Gesture_Layer_Data
 /* START - Functions to manage touched-device list */
 /**
  * @internal
- * This function is used to find if device is touched
+ * @brief Comparison function to find a Pointer_Event by device ID.
  *
+ * This function is used with eina_list_search_unsorted to find a
+ * Pointer_Event in a list that matches a given device ID.
+ *
+ * @param data1 A Pointer_Event from the list.
+ * @param data2 A Pointer_Event to compare against, containing the target device ID.
+ * @return 0 if device IDs match, non-zero otherwise.
  * @ingroup Elm_Gesture_Layer
  */
 static int
@@ -409,11 +452,14 @@ _device_compare(const void *data1,
 
 /**
  * @internal
+ * @brief Removes a Pointer_Event from the list of touched devices.
  *
- * Remove Pointer Event from touched device list
- * @param list Pointer to touched device list.
- * @param Pointer_Event Pointer to PE.
+ * Finds and removes the Pointer_Event corresponding to the device specified in
+ * @p pe from the @p list. The memory for the removed Pointer_Event is freed.
  *
+ * @param list The list of touched devices.
+ * @param pe A Pointer_Event containing the device ID to remove.
+ * @return The updated list.
  * @ingroup Elm_Gesture_Layer
  */
 static Eina_List *
@@ -434,13 +480,21 @@ _touched_device_remove(Eina_List *list,
 
 /**
  * @internal
+ * @brief Adds or updates a Pointer_Event in the list of touched devices.
  *
- * Recoed Pointer Event in touched device list
- * Note: This fuction allocates memory for PE event
- * This memory is released in _touched_device_remove()
- * @param list Pointer to touched device list.
- * @param Pointer_Event Pointer to PE.
+ * If a device with the same ID as in @p pe already exists in the @p list,
+ * its event data is updated with the new information from @p pe.
  *
+ * If the device is not in the list and the event type is a DOWN event
+ * (EVAS_CALLBACK_MOUSE_DOWN or EVAS_CALLBACK_MULTI_DOWN), a new Pointer_Event
+ * is allocated, copied from @p pe, and appended to the list.
+ *
+ * Note: This function allocates memory for new Pointer_Events, which is
+ * expected to be freed by _touched_device_remove().
+ *
+ * @param list The list of touched devices.
+ * @param pe The Pointer_Event to add or use for updating.
+ * @return The updated list.
  * @ingroup Elm_Gesture_Layer
  */
 static Eina_List *

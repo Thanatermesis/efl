@@ -4,6 +4,10 @@
 #ifndef _EVAS_TEXT_EO_CLASS_TYPE
 #define _EVAS_TEXT_EO_CLASS_TYPE
 
+/**
+ * @brief Opaque handle to an Evas_Text object.
+ * @ingroup Evas_Text
+ */
 typedef Eo Evas_Text;
 
 #endif
@@ -13,7 +17,12 @@ typedef Eo Evas_Text;
 
 
 #endif
-/** Evas text class
+/**
+ * @brief Get the Efl_Class for Evas_Text.
+ *
+ * @details This macro provides a convenient way to get the Evas Text class.
+ * It is used internally and by applications to perform type checking
+ * (e.g., with efl_isa()) or to operate on the class itself.
  *
  * @ingroup Evas_Text
  */

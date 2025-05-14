@@ -21,23 +21,53 @@
   efl_event_callback_del(Obj, EFL_CANVAS_OBJECT_EVENT_ANIMATOR_TICK, Callback, Data); \
   Bool = 0;
 
-
+/**
+ * @brief Linear interpolation function.
+ *
+ * @param data Unused.
+ * @param progress The progress of the animation (0.0 to 1.0).
+ * @return The interpolated value, which is the same as progress for linear.
+ */
 static double
 _scroll_manager_linear_interp(void *data EINA_UNUSED, double progress)
 {
    return progress;
 }
+
+/**
+ * @brief Acceleration interpolation function.
+ * Progress is squared.
+ *
+ * @param data Unused.
+ * @param progress The progress of the animation (0.0 to 1.0).
+ * @return The interpolated value, accelerated.
+ */
 static double
 _scroll_manager_accel_interp(void *data EINA_UNUSED, double progress)
 {
    return progress * progress;
 }
+
+/**
+ * @brief Deceleration interpolation function.
+ *
+ * @param data Unused.
+ * @param progress The progress of the animation (0.0 to 1.0).
+ * @return The interpolated value, decelerated.
+ */
 static double
 _scroll_manager_decel_interp(void *data EINA_UNUSED, double progress)
 {
    return (1.0 - (1.0 - progress) * (1.0 - progress));
 }
 
+/**
+ * @brief Gets the interpolator function based on the type.
+ *
+ * @param interp The type of interpolator requested.
+ * @return A function pointer to the corresponding interpolator.
+ *         Returns _scroll_manager_linear_interp if type is not recognized.
+ */
 static Interpolator
 _scroll_manager_interp_get(InterpType interp)
 {
@@ -51,45 +81,76 @@ _scroll_manager_interp_get(InterpType interp)
 // Prototypes --- //
 
 // ANIMATORS - tick function
+/** @brief Animator tick function for holding scroll position. */
 static void _efl_ui_scroll_manager_hold_animator(void *data, const Efl_Event *event);
+/** @brief Animator tick function for scrolling when mouse is held down near edges. */
 static void _efl_ui_scroll_manager_on_hold_animator(void *data, const Efl_Event *event);
+/** @brief Animator tick function for scrolling to a specific Y coordinate. */
 static void _efl_ui_scroll_manager_scroll_to_y_animator(void *data, const Efl_Event *event);
+/** @brief Animator tick function for scrolling to a specific X coordinate. */
 static void _efl_ui_scroll_manager_scroll_to_x_animator(void *data, const Efl_Event *event);
+/** @brief Animator tick function for Y-axis bounce animation. */
 static void _efl_ui_scroll_manager_bounce_y_animator(void *data, const Efl_Event *event);
+/** @brief Animator tick function for X-axis bounce animation. */
 static void _efl_ui_scroll_manager_bounce_x_animator(void *data, const Efl_Event *event);
 
 // ANIMATORS - manipulate function
+/** @brief Adds/starts the hold animator. */
 static void _scroll_manager_hold_animator_add(Efl_Ui_Scroll_Manager_Data *sd, Evas_Coord x, Evas_Coord y);
+/** @brief Deletes/stops the hold animator. */
 static Eina_Bool _scroll_manager_hold_animator_del(Efl_Ui_Scroll_Manager_Data *sd);
 
+/** @brief Adds/starts the on-hold (edge scroll) animator. */
 static void _scroll_manager_on_hold_animator_add(Efl_Ui_Scroll_Manager_Data *sd, double vx, double vy);
+/** @brief Deletes/stops the on-hold (edge scroll) animator. */
 static Eina_Bool _scroll_manager_on_hold_animator_del(Efl_Ui_Scroll_Manager_Data *sd);
 
 /// Constant scrolling
+/** @brief Adds/starts a scroll-to animation for both X and Y axes. */
 static void _scroll_manager_scrollto_animator_add(Efl_Ui_Scroll_Manager_Data *sd,  Evas_Coord cx, Evas_Coord cy, Evas_Coord x, Evas_Coord y, double tx, double ty, InterpType interp);
+/** @brief Deletes/stops the scroll-to animation for both X and Y axes. */
 static Eina_Bool _scroll_manager_scrollto_animator_del(Efl_Ui_Scroll_Manager_Data *sd);
+/** @brief Adds/starts a scroll-to animation for the X axis. */
 static void _scroll_manager_scrollto_x_animator_add(Efl_Ui_Scroll_Manager_Data *sd, Evas_Coord cx, Evas_Coord x, double t, InterpType interp);
+/** @brief Deletes/stops the scroll-to animation for the X axis. */
 static Eina_Bool _scroll_manager_scrollto_x_animator_del(Efl_Ui_Scroll_Manager_Data *sd);
+/** @brief Adds/starts a scroll-to animation for the Y axis. */
 static void _scroll_manager_scrollto_y_animator_add(Efl_Ui_Scroll_Manager_Data *sd, Evas_Coord cy, Evas_Coord y, double t, InterpType interp);
+/** @brief Deletes/stops the scroll-to animation for the Y axis. */
 static Eina_Bool _scroll_manager_scrollto_y_animator_del(Efl_Ui_Scroll_Manager_Data *sd);
 
 /// Flicking
+/** @brief Adds/starts a momentum (flick) animation. */
 static void _scroll_manager_momentum_animator_add(Efl_Ui_Scroll_Manager_Data *sd, double vx, double vy);
 
 // Bounce
+/** @brief Adds/starts a bounce animation for the X axis. */
 static void _scroll_manager_bounce_x_animator_add(Efl_Ui_Scroll_Manager_Data *sd, double vx);
+/** @brief Deletes/stops the bounce animation for the X axis. */
 static Eina_Bool _scroll_manager_bounce_x_animator_del(Efl_Ui_Scroll_Manager_Data *sd);
+/** @brief Adds/starts a bounce animation for the Y axis. */
 static void _scroll_manager_bounce_y_animator_add(Efl_Ui_Scroll_Manager_Data *sd, double vy);
+/** @brief Deletes/stops the bounce animation for the Y axis. */
 static Eina_Bool _scroll_manager_bounce_y_animator_del(Efl_Ui_Scroll_Manager_Data *sd);
 
 // Util
+/** @brief Scrolls content to a specific position (x, y) with animation. */
 static void _scroll_manager_scrollto(Efl_Ui_Scroll_Manager_Data *sd, Evas_Coord x, Evas_Coord y);
+/** @brief Stops all active scroll-related animators. */
 static void _scroll_manager_animators_drop(Evas_Object *obj);
 
 // ETC
+/** @brief Updates the wanted scroll coordinates (wx, wy) based on input and constraints. */
 static void _efl_ui_scroll_manager_wanted_coordinates_update(Efl_Ui_Scroll_Manager_Data *sd, Evas_Coord x,Evas_Coord y);
 // --- Prototypes //
 
+/**
+ * @brief Rounds a double value to a specified number of decimal places.
+ *
+ * @param value The double value to round.
+ * @param pos The number of decimal places to round to.
+ * @return The rounded double value.
+ */
 static inline double
 _round(double value, int pos)
 {
@@ -124,6 +185,13 @@ _round(double value, int pos)
        return val;                                           \
     }
 
+/**
+ * @brief Sets the content region based on the previously stored wanted region (wx, wy, ww, wh).
+ * This is often called after a resize or when scrolling needs to adjust to content/viewport changes.
+ * It handles mirroring and ensures the content is positioned correctly.
+ *
+ * @param obj The scroll manager object.
+ */
 static void _efl_ui_scroll_manager_wanted_region_set(Evas_Object *obj);
 
 #define LEFT               0
@@ -133,6 +201,14 @@ static void _efl_ui_scroll_manager_wanted_region_set(Evas_Object *obj);
 //#define SCROLLDBG 1
 /* smoothness debug calls - for debugging how much smooth your app is */
 
+/**
+ * @brief Checks if thumb scrolling is currently enabled and possible.
+ *
+ * This considers global configuration and scroll blocking flags.
+ *
+ * @param sd The scroll manager private data.
+ * @return EINA_TRUE if thumb scrolling is allowed, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _scroll_manager_thumb_scrollable_get(Efl_Ui_Scroll_Manager_Data *sd)
 {
@@ -146,6 +222,12 @@ _scroll_manager_thumb_scrollable_get(Efl_Ui_Scroll_Manager_Data *sd)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Checks if any scroll animation (bounce or scrollto) is currently active.
+ *
+ * @param sd The scroll manager private data.
+ * @return EINA_TRUE if an animation is active, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _scroll_manager_animating_get(Efl_Ui_Scroll_Manager_Data *sd)
 {
@@ -154,6 +236,11 @@ _scroll_manager_animating_get(Efl_Ui_Scroll_Manager_Data *sd)
            (sd->scrollto.x.animator) || (sd->scrollto.y.animator));
 }
 
+/**
+ * @brief Emits the EFL_UI_EVENT_SCROLL_STARTED event and sets the scrolling flag.
+ *
+ * @param sd The scroll manager private data.
+ */
 static void
 _efl_ui_scroll_manager_scroll_start(Efl_Ui_Scroll_Manager_Data *sd)
 {
@@ -161,6 +248,11 @@ _efl_ui_scroll_manager_scroll_start(Efl_Ui_Scroll_Manager_Data *sd)
    efl_event_callback_call(sd->parent, EFL_UI_EVENT_SCROLL_STARTED, NULL);
 }
 
+/**
+ * @brief Emits the EFL_UI_EVENT_SCROLL_FINISHED event and clears the scrolling flag.
+ *
+ * @param sd The scroll manager private data.
+ */
 static void
 _efl_ui_scroll_manager_scroll_stop(Efl_Ui_Scroll_Manager_Data *sd)
 {
@@ -168,6 +260,12 @@ _efl_ui_scroll_manager_scroll_stop(Efl_Ui_Scroll_Manager_Data *sd)
    efl_event_callback_call(sd->parent, EFL_UI_EVENT_SCROLL_FINISHED, NULL);
 }
 
+/**
+ * @brief Emits the EFL_UI_EVENT_SCROLL_DRAG_STARTED event.
+ * If not already scrolling, it also calls _efl_ui_scroll_manager_scroll_start().
+ *
+ * @param sd The scroll manager private data.
+ */
 static void
 _efl_ui_scroll_manager_drag_start(Efl_Ui_Scroll_Manager_Data *sd)
 {
@@ -176,12 +274,23 @@ _efl_ui_scroll_manager_drag_start(Efl_Ui_Scroll_Manager_Data *sd)
      _efl_ui_scroll_manager_scroll_start(sd);
 }
 
+/**
+ * @brief Emits the EFL_UI_EVENT_SCROLL_DRAG_FINISHED event.
+ *
+ * @param sd The scroll manager private data.
+ */
 static void
 _efl_ui_scroll_manager_drag_stop(Efl_Ui_Scroll_Manager_Data *sd)
 {
    efl_event_callback_call(sd->parent, EFL_UI_EVENT_SCROLL_DRAG_FINISHED, NULL);
 }
 
+/**
+ * @brief Emits the EFL_UI_EVENT_SCROLL_ANIM_STARTED event.
+ * If not already scrolling, it also calls _efl_ui_scroll_manager_scroll_start().
+ *
+ * @param sd The scroll manager private data.
+ */
 static void
 _efl_ui_scroll_manager_anim_start(Efl_Ui_Scroll_Manager_Data *sd)
 {
@@ -190,6 +299,12 @@ _efl_ui_scroll_manager_anim_start(Efl_Ui_Scroll_Manager_Data *sd)
      _efl_ui_scroll_manager_scroll_start(sd);
 }
 
+/**
+ * @brief Emits the EFL_UI_EVENT_SCROLL_ANIM_FINISHED event.
+ * If scrolling was active, it also calls _efl_ui_scroll_manager_scroll_stop().
+ *
+ * @param sd The scroll manager private data.
+ */
 static void
 _efl_ui_scroll_manager_anim_stop(Efl_Ui_Scroll_Manager_Data *sd)
 {
@@ -198,54 +313,99 @@ _efl_ui_scroll_manager_anim_stop(Efl_Ui_Scroll_Manager_Data *sd)
      _efl_ui_scroll_manager_scroll_stop(sd);
 }
 
+/**
+ * @brief Emits the EFL_UI_EVENT_SCROLL_CHANGED event.
+ *
+ * @param sd The scroll manager private data.
+ */
 static void
 _efl_ui_scroll_manager_scroll(Efl_Ui_Scroll_Manager_Data *sd)
 {
    efl_event_callback_call(sd->parent, EFL_UI_EVENT_SCROLL_CHANGED, NULL);
 }
 
+/**
+ * @brief Emits the EFL_UI_EVENT_SCROLL_UP event.
+ *
+ * @param sd The scroll manager private data.
+ */
 static void
 _efl_ui_scroll_manager_scroll_up(Efl_Ui_Scroll_Manager_Data *sd)
 {
    efl_event_callback_call(sd->parent, EFL_UI_EVENT_SCROLL_UP, NULL);
 }
 
+/**
+ * @brief Emits the EFL_UI_EVENT_SCROLL_DOWN event.
+ *
+ * @param sd The scroll manager private data.
+ */
 static void
 _efl_ui_scroll_manager_scroll_down(Efl_Ui_Scroll_Manager_Data *sd)
 {
    efl_event_callback_call(sd->parent, EFL_UI_EVENT_SCROLL_DOWN, NULL);
 }
 
+/**
+ * @brief Emits the EFL_UI_EVENT_SCROLL_LEFT event.
+ *
+ * @param sd The scroll manager private data.
+ */
 static void
 _efl_ui_scroll_manager_scroll_left(Efl_Ui_Scroll_Manager_Data *sd)
 {
    efl_event_callback_call(sd->parent, EFL_UI_EVENT_SCROLL_LEFT, NULL);
 }
 
+/**
+ * @brief Emits the EFL_UI_EVENT_SCROLL_RIGHT event.
+ *
+ * @param sd The scroll manager private data.
+ */
 static void
 _efl_ui_scroll_manager_scroll_right(Efl_Ui_Scroll_Manager_Data *sd)
 {
    efl_event_callback_call(sd->parent, EFL_UI_EVENT_SCROLL_RIGHT, NULL);
 }
 
+/**
+ * @brief Emits the EFL_UI_EVENT_EDGE_UP event.
+ *
+ * @param sd The scroll manager private data.
+ */
 static void
 _efl_ui_scroll_manager_edge_up(Efl_Ui_Scroll_Manager_Data *sd)
 {
    efl_event_callback_call(sd->parent, EFL_UI_EVENT_EDGE_UP, NULL);
 }
 
+/**
+ * @brief Emits the EFL_UI_EVENT_EDGE_DOWN event.
+ *
+ * @param sd The scroll manager private data.
+ */
 static void
 _efl_ui_scroll_manager_edge_down(Efl_Ui_Scroll_Manager_Data *sd)
 {
    efl_event_callback_call(sd->parent, EFL_UI_EVENT_EDGE_DOWN, NULL);
 }
 
+/**
+ * @brief Emits the EFL_UI_EVENT_EDGE_LEFT event.
+ *
+ * @param sd The scroll manager private data.
+ */
 static void
 _efl_ui_scroll_manager_edge_left(Efl_Ui_Scroll_Manager_Data *sd)
 {
    efl_event_callback_call(sd->parent, EFL_UI_EVENT_EDGE_LEFT, NULL);
 }
 
+/**
+ * @brief Emits the EFL_UI_EVENT_EDGE_RIGHT event.
+ *
+ * @param sd The scroll manager private data.
+ */
 static void
 _efl_ui_scroll_manager_edge_right(Efl_Ui_Scroll_Manager_Data *sd)
 {
@@ -287,6 +447,18 @@ _efl_ui_scroll_manager_efl_ui_scrollable_step_size_get(const Eo *obj EINA_UNUSED
    return EINA_POSITION2D(sd->step.x, sd->step.y);
 }
 
+/**
+ * @brief Calculates the mirrored X-coordinate for RTL (Right-To-Left) layouts.
+ *
+ * Given an X-coordinate in LTR (Left-To-Right) space, this function
+ * converts it to its equivalent in RTL space, considering the content's
+ * scrollable range (min/max positions).
+ *
+ * @param obj The scroll manager object.
+ * @param x The X-coordinate in LTR space.
+ * @return The corresponding X-coordinate in RTL space. If the pan object
+ *         is not set or an error occurs, it might return the input `x` or 0.
+ */
 static Evas_Coord
 _efl_ui_scroll_manager_x_mirrored_get(const Evas_Object *obj,
                            Evas_Coord x)
@@ -346,6 +518,17 @@ _efl_ui_scroll_manager_wanted_coordinates_update(Efl_Ui_Scroll_Manager_Data *sd,
    else sd->wy = y;
 }
 
+/**
+ * @brief Calculates the current velocity of an ongoing scrollto animation.
+ *
+ * This function estimates the velocity based on the remaining distance and time
+ * for the `scrollto.x` and `scrollto.y` animators. It considers the
+ * interpolator if one is set for the animation.
+ *
+ * @param sd The scroll manager private data.
+ * @param[out] velx Pointer to store the calculated velocity in the X direction.
+ * @param[out] vely Pointer to store the calculated velocity in the Y direction.
+ */
 static void
 _scroll_manager_animator_velocity_get(Efl_Ui_Scroll_Manager_Data *sd, double *velx, double *vely)
 {
@@ -375,6 +558,18 @@ _scroll_manager_animator_velocity_get(Efl_Ui_Scroll_Manager_Data *sd, double *ve
    if (vely) *vely = vy;
 }
 
+/**
+ * @brief Evaluates and initiates bounce animations if necessary.
+ *
+ * This function is called when the scroll position might have exceeded
+ * its valid range and a bounce-back animation is required. It checks
+ * if bouncing is enabled and if the conditions for bouncing (bouncemex, bouncemey)
+ * are met. It also considers if the content is currently held down by the user.
+ * If a bounce is needed, it stops any ongoing scrollto animators for the
+ * respective axis and starts a bounce animator.
+ *
+ * @param sd The scroll manager private data.
+ */
 static void
 _efl_ui_scroll_manager_bounce_eval(Efl_Ui_Scroll_Manager_Data *sd)
 {

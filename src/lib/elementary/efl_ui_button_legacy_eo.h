@@ -1,9 +1,21 @@
+/**
+ * @file
+ * @brief These routines are legacy routines for the Efl Ui Button class.
+ *
+ * Users should use the new APIs whenever possible.
+ *
+ * @ingroup Efl_Ui_Button_Legacy
+ */
 #ifndef _EFL_UI_BUTTON_LEGACY_EO_H_
 #define _EFL_UI_BUTTON_LEGACY_EO_H_
 
 #ifndef _EFL_UI_BUTTON_LEGACY_EO_CLASS_TYPE
 #define _EFL_UI_BUTTON_LEGACY_EO_CLASS_TYPE
 
+/**
+ * @brief Opaque handle to the Efl Ui Button Legacy instance.
+ * @ingroup Efl_Ui_Button_Legacy
+ */
 typedef Eo Efl_Ui_Button_Legacy;
 
 #endif

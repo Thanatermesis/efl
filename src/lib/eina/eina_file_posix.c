@@ -102,6 +102,17 @@ int _eina_file_log_dom = -1;
  * http://womble.decadent.org.uk/readdir_r-advisory.html
  */
 #ifdef HAVE_DIRENT_H
+/**
+ * @internal
+ * @brief Get the maximum length of a filename in a directory.
+ *
+ * This function attempts to determine the maximum filename length
+ * for the directory associated with @p dirp. It uses fpathconf if
+ * available, otherwise falls back to NAME_MAX or PATH_MAX.
+ *
+ * @param dirp Pointer to the DIR structure of the directory.
+ * @return The maximum filename length, or a fallback value.
+ */
 static long
 _eina_name_max(DIR *dirp EINA_UNUSED)
 {
@@ -134,6 +145,18 @@ _eina_name_max(DIR *dirp EINA_UNUSED)
    return name_max;
 }
 
+/**
+ * @internal
+ * @brief Get the next entry for the simple directory listing iterator.
+ *
+ * Reads the next directory entry from the iterator @p it, skipping "." and "..".
+ * The full path of the entry is constructed and returned as a shared string
+ * in @p data.
+ *
+ * @param it The file iterator.
+ * @param data Pointer to store the Eina_Stringshare (char *) of the full path.
+ * @return EINA_TRUE if a new entry is found, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _eina_file_ls_iterator_next(Eina_File_Iterator *it, void **data)
 {
@@ -166,12 +189,27 @@ _eina_file_ls_iterator_next(Eina_File_Iterator *it, void **data)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Get the container (DIR stream) of the simple ls iterator.
+ *
+ * @param it The file iterator.
+ * @return The DIR stream pointer.
+ */
 static DIR *
 _eina_file_ls_iterator_container(Eina_File_Iterator *it)
 {
    return it->dirp;
 }
 
+/**
+ * @internal
+ * @brief Free the simple directory listing iterator.
+ *
+ * Closes the directory stream and frees the iterator structure.
+ *
+ * @param it The file iterator to free.
+ */
 static void
 _eina_file_ls_iterator_free(Eina_File_Iterator *it)
 {
@@ -191,9 +229,21 @@ struct _Eina_File_Direct_Iterator
 
    Eina_File_Direct_Info info;
 
-   char dir[1];
+   char dir[1]; /**< Flexible array member for the directory path. */
 };
 
+/**
+ * @internal
+ * @brief Get the next entry for the direct directory listing iterator.
+ *
+ * Reads the next directory entry from the iterator @p it, skipping "." and "..".
+ * It populates an Eina_File_Direct_Info structure with path, name, and type
+ * (if available from dirent). This info structure is returned via @p data.
+ *
+ * @param it The direct file iterator.
+ * @param data Pointer to store the Eina_File_Direct_Info pointer.
+ * @return EINA_TRUE if a new entry is found, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _eina_file_direct_ls_iterator_next(Eina_File_Direct_Iterator *it, void **data)
 {
@@ -262,12 +312,27 @@ _eina_file_direct_ls_iterator_next(Eina_File_Direct_Iterator *it, void **data)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Get the container (DIR stream) of the direct ls iterator.
+ *
+ * @param it The direct file iterator.
+ * @return The DIR stream pointer.
+ */
 static DIR *
 _eina_file_direct_ls_iterator_container(Eina_File_Direct_Iterator *it)
 {
    return it->dirp;
 }
 
+/**
+ * @internal
+ * @brief Free the direct directory listing iterator.
+ *
+ * Closes the directory stream and frees the iterator structure.
+ *
+ * @param it The direct file iterator to free.
+ */
 static void
 _eina_file_direct_ls_iterator_free(Eina_File_Direct_Iterator *it)
 {
@@ -277,6 +342,18 @@ _eina_file_direct_ls_iterator_free(Eina_File_Direct_Iterator *it)
    free(it);
 }
 
+/**
+ * @internal
+ * @brief Get the next entry for the stat directory listing iterator.
+ *
+ * This function behaves like _eina_file_direct_ls_iterator_next, but if
+ * the file type is EINA_FILE_UNKNOWN (e.g., d_type is not available or DT_UNKNOWN),
+ * it attempts to determine the file type using eina_file_statat().
+ *
+ * @param it The direct file iterator (reused for stat ls).
+ * @param data Pointer to store the Eina_File_Direct_Info pointer.
+ * @return EINA_TRUE if a new entry is found, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _eina_file_stat_ls_iterator_next(Eina_File_Direct_Iterator *it, void **data)
 {
@@ -295,6 +372,16 @@ _eina_file_stat_ls_iterator_next(Eina_File_Direct_Iterator *it, void **data)
 }
 #endif
 
+/**
+ * @internal
+ * @brief Actually closes an Eina_File and cleans up its resources.
+ *
+ * This function is responsible for unmapping any dead memory maps,
+ * unmapping the global map if it exists and is not copied, and
+ * closing the file descriptor.
+ *
+ * @param file The Eina_File to close.
+ */
 void
 eina_file_real_close(Eina_File *file)
 {
@@ -314,6 +401,14 @@ eina_file_real_close(Eina_File *file)
      }
 }
 
+/**
+ * @internal
+ * @brief Unmaps a memory region and frees the Eina_File_Map structure.
+ *
+ * This is typically used as a callback for hash table freeing.
+ *
+ * @param map The Eina_File_Map to close and free.
+ */
 static void
 _eina_file_map_close(Eina_File_Map *map)
 {
@@ -322,6 +417,21 @@ _eina_file_map_close(Eina_File_Map *map)
 }
 
 #ifndef MAP_POPULATE
+/**
+ * @internal
+ * @brief Manually populates a memory-mapped region by touching pages.
+ *
+ * This function is a fallback for systems that do not define MAP_POPULATE.
+ * It iterates through the memory region, accessing bytes at page intervals
+ * to hint the kernel to load these pages into memory.
+ *
+ * @param map The memory-mapped region.
+ * @param size The size of the region to populate.
+ * @param hugetlb EINA_TRUE if HugeTLB pages are used, EINA_FALSE otherwise.
+ *                This determines the step size (EINA_HUGE_PAGE or EINA_SMALL_PAGE).
+ * @return An unsigned integer derived from XORing accessed bytes, mostly to
+ *         prevent the compiler from optimizing out the memory accesses.
+ */
 static unsigned int
 _eina_file_map_populate(char *map, unsigned long int size, Eina_Bool hugetlb)
 {
@@ -342,6 +452,20 @@ _eina_file_map_populate(char *map, unsigned long int size, Eina_Bool hugetlb)
 }
 #endif
 
+/**
+ * @internal
+ * @brief Calculates a page-aligned address within a given memory map.
+ *
+ * Given a base @p map address and an @p offset, this function returns
+ * the address of the start of the page containing `map + offset`.
+ * The page size used for alignment depends on @p hugetlb.
+ *
+ * @param map The base address of the memory map.
+ * @param offset The offset within the map.
+ * @param hugetlb EINA_TRUE if HugeTLB page alignment is required,
+ *                EINA_FALSE for regular page alignment.
+ * @return The page-aligned address.
+ */
 static char *
 _page_aligned_address(const char *map, unsigned long int offset, Eina_Bool hugetlb)
 {
@@ -353,6 +477,25 @@ _page_aligned_address(const char *map, unsigned long int offset, Eina_Bool huget
    return (char *) pmap;
 }
 
+/**
+ * @internal
+ * @brief Applies a memory advice rule to a specified region of a memory map.
+ *
+ * This function uses madvise() to apply hints like MADV_RANDOM, MADV_SEQUENTIAL,
+ * MADV_WILLNEED, etc. For EINA_FILE_POPULATE, it may also call
+ * _eina_file_map_populate if MAP_POPULATE is not defined.
+ * The address and size are adjusted to be page-aligned.
+ *
+ * @param rule The Eina_File_Populate rule to apply.
+ * @param map The base address of the memory map.
+ * @param offset The starting offset within the map for the rule.
+ * @param size The length of the region to apply the rule to. If 0, it might imply
+ *             the entire map from the aligned offset.
+ * @param maplen The total length of the original memory map.
+ * @param hugetlb EINA_TRUE if HugeTLB pages are involved, EINA_FALSE otherwise.
+ * @return An integer, typically 42 or 42 XORed with a value from
+ *         _eina_file_map_populate. Its specific value is not critical.
+ */
 static int
 _eina_file_map_rule_apply(Eina_File_Populate rule, const void *map, unsigned long int offset,
                           unsigned long int size, unsigned long long maplen, Eina_Bool hugetlb)
@@ -405,6 +548,18 @@ _eina_file_map_rule_apply(Eina_File_Populate rule, const void *map, unsigned lon
    return tmp;
 }
 
+/**
+ * @internal
+ * @brief Compares cached file metadata with fresh stat information.
+ *
+ * Checks if the modification time, size, inode number, and nanosecond
+ * modification time (if available) of a cached Eina_File @p f match
+ * the values in a new `struct stat` @p st.
+ *
+ * @param f The cached Eina_File structure.
+ * @param st The `struct stat` containing fresh file metadata.
+ * @return EINA_TRUE if all compared fields match, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _eina_file_timestamp_compare(Eina_File *f, struct stat *st)
 {
@@ -423,6 +578,19 @@ _eina_file_timestamp_compare(Eina_File *f, struct stat *st)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Safe snprintf wrapper ensuring null-termination.
+ *
+ * This function calls vsnprintf and then explicitly null-terminates
+ * the buffer at `str[size - 1]` to guarantee null-termination
+ * even if vsnprintf truncates.
+ *
+ * @param str The buffer to write to.
+ * @param size The size of the buffer @p str.
+ * @param format The format string.
+ * @param ... Variable arguments for the format string.
+ */
 static void
 slprintf(char *str, size_t size, const char *format, ...)
 {
@@ -444,6 +612,20 @@ slprintf(char *str, size_t size, const char *format, ...)
  *                                 Global                                     *
  *============================================================================*/
 
+/**
+ * @internal
+ * @brief Checks if a given memory page range overlaps with a specific Eina_File_Map.
+ *
+ * If an overlap is detected, the Eina_File_Map @p m is marked as faulty.
+ * This is used to detect if a SIGBUS/SIGSEGV on a mapped address might be
+ * due to issues with this specific file mapping (e.g., file truncated).
+ *
+ * @param addr The starting address of the memory page that faulted.
+ * @param page_size The size of the memory page.
+ * @param m The Eina_File_Map to check against.
+ * @return EINA_TRUE if the address range overlaps with the map and it was marked faulty,
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _eina_file_mmap_faulty_one(void *addr, long page_size,
                            Eina_File_Map *m)
@@ -457,6 +639,21 @@ _eina_file_mmap_faulty_one(void *addr, long page_size,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Marks file maps as faulty if a given memory address falls within them.
+ *
+ * This function is typically called from a signal handler (e.g., for SIGBUS or
+ * SIGSEGV) to determine if the faulting @p addr is within any known memory-mapped
+ * file regions managed by Eina_File. If a map contains the @p addr, it's
+ * marked as faulty.
+ *
+ * @param addr The faulting memory address.
+ * @param page_size The system's page size, relevant for the fault range.
+ * @return EINA_TRUE if any Eina_File_Map (global or specific) was found to
+ *         contain the address and was marked faulty, EINA_FALSE otherwise.
+ * @note This function iterates through a global cache of Eina_File objects
+ *       and their associated maps. It involves taking locks.
+ */
 Eina_Bool
 eina_file_mmap_faulty(void *addr, long page_size)
 {
@@ -521,6 +718,21 @@ eina_file_mmap_faulty(void *addr, long page_size)
  *   Simplified logic for portability layer with eina_file_common   *
  * ================================================================ */
 
+/**
+ * @internal
+ * @brief Prepends the current working directory to a relative path.
+ *
+ * This function is part of the eina_file_common.h abstraction.
+ * It gets the current working directory, concatenates it with the
+ * provided @p path, and returns the result as an Eina_Tmpstr.
+ * The @p len parameter seems to be an initial length for @p path,
+ * which is then augmented by the CWD's length.
+ *
+ * @param path The relative path component.
+ * @param len The initial length of @p path (before CWD concatenation).
+ * @return An Eina_Tmpstr containing the absolute path, or NULL on error.
+ * @note The memory for the path is allocated on the stack using alloca.
+ */
 Eina_Tmpstr *
 eina_file_current_directory_get(const char *path, size_t len)
 {
@@ -530,7 +742,7 @@ eina_file_current_directory_get(const char *path, size_t len)
   tmp = getcwd(cwd, PATH_MAX);
   if (!tmp) return NULL;
 
-  len += strlen(cwd) + 2;
+  len += strlen(cwd) + 2; // +1 for '/', +1 for '\0'
   tmp = alloca(sizeof (char) * len);
 
   slprintf(tmp, len, "%s/%s", cwd, path);
@@ -538,6 +750,18 @@ eina_file_current_directory_get(const char *path, size_t len)
   return eina_tmpstr_add_length(tmp, len);
 }
 
+/**
+ * @internal
+ * @brief Converts an Eina_Tmpstr to a duplicated string and frees the Tmpstr.
+ *
+ * This function is part of the eina_file_common.h abstraction.
+ * It duplicates the content of @p path (if not NULL) into a new
+ * heap-allocated string and then deletes the @p path.
+ *
+ * @param path The Eina_Tmpstr to convert and delete.
+ * @return A newly allocated string with the contents of @p path,
+ *         or an empty string if @p path was NULL. The caller must free this.
+ */
 char *
 eina_file_cleanup(Eina_Tmpstr *path)
 {
@@ -555,6 +779,15 @@ eina_file_cleanup(Eina_Tmpstr *path)
 
 
 
+/**
+ * @brief Checks if a given file path is relative.
+ *
+ * A path is considered relative if it does not start with the
+ * directory separator character ('/').
+ *
+ * @param path The file path to check.
+ * @return EINA_TRUE if the path is relative, EINA_FALSE otherwise (e.g., if absolute, NULL, or empty).
+ */
 EINA_API Eina_Bool
 eina_file_path_relative(const char *path)
 {
@@ -564,6 +797,24 @@ eina_file_path_relative(const char *path)
    return *path != '/';
 }
 
+/**
+ * @brief Lists files and directories within a given directory.
+ *
+ * Iterates over the entries in the directory @p dir. For each entry,
+ * the callback function @p cb is invoked. If @p recursive is EINA_TRUE,
+ * the function will recurse into subdirectories.
+ *
+ * @param dir The path to the directory to list.
+ * @param recursive If EINA_TRUE, list recursively. Otherwise, list only
+ *        the immediate contents of @p dir.
+ * @param cb The callback function to call for each entry.
+ *           The first argument to the callback is the entry name (char *).
+ *           The second argument is the base directory path (const char *dir).
+ *           The third argument is the user-provided @p data.
+ * @param data User data to be passed to the callback function @p cb.
+ * @return EINA_TRUE on success or if the directory is empty/could be opened,
+ *         EINA_FALSE if @p dir is NULL, empty, or cannot be opened, or if @p cb is NULL.
+ */
 EINA_API Eina_Bool
 eina_file_dir_list(const char *dir,
                    Eina_Bool recursive,
@@ -596,6 +847,25 @@ eina_file_dir_list(const char *dir,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Splits a file path into its components.
+ *
+ * The path is tokenized by the PATH_DELIM character (usually '/').
+ * The original @p path string is modified in place (null bytes are inserted
+ * to terminate components). The components are added as (char *) to the
+ * returned Eina_Array.
+ *
+ * @param path The file path string to split. This string will be modified.
+ * @return A new Eina_Array containing (char *) pointers to the components
+ *         of the path. Returns NULL if @p path is NULL or if array allocation fails.
+ *         The strings in the array point into the modified @p path string.
+ *         Example: For path "/usr/local/bin", the array would contain
+ *         pointers to "usr", "local", "bin". (Initial empty component from "/"
+ *         is skipped).
+ *
+ * @note The Eina_Array should be freed using eina_array_free() when no longer needed.
+ *       The string data itself is part of the original @p path.
+ */
 EINA_API Eina_Array *
 eina_file_split(char *path)
 {
@@ -629,6 +899,19 @@ eina_file_split(char *path)
    return ea;
 }
 
+/**
+ * @brief Creates an iterator to list entries in a directory.
+ *
+ * This function provides a simple way to iterate over the names of files
+ * and directories within @p dir. It skips "." and ".." entries.
+ * The iterator returns full paths as shared strings (Eina_Stringshare).
+ *
+ * @param dir The path to the directory.
+ * @return A new Eina_Iterator on success, or NULL on failure (e.g., @p dir
+ *         is NULL, empty, or cannot be opened).
+ *         The iterator should be freed using eina_iterator_free().
+ *         Data from iterator: (char *) eina_stringshare_add("full/path/to/entry")
+ */
 EINA_API Eina_Iterator *
 eina_file_ls(const char *dir)
 {
@@ -677,6 +960,22 @@ eina_file_ls(const char *dir)
 #endif
 }
 
+/**
+ * @brief Creates an iterator for direct listing of directory entries with more info.
+ *
+ * This iterator provides Eina_File_Direct_Info structures for each entry.
+ * This structure includes the full path, the name of the entry, and potentially
+ * the file type (Eina_File_Type) if available directly from the `dirent`
+ * structure (e.g., `d_type` field). It skips "." and ".." entries.
+ *
+ * @param dir The path to the directory.
+ * @return A new Eina_Iterator on success, or NULL on failure (e.g., @p dir
+ *         is NULL, empty, cannot be opened, or path length exceeds limits).
+ *         The iterator should be freed using eina_iterator_free().
+ *         Data from iterator: (Eina_File_Direct_Info *)
+ *         The Eina_File_Direct_Info structure is valid only until the next
+ *         iterator call or iterator free.
+ */
 EINA_API Eina_Iterator *
 eina_file_direct_ls(const char *dir)
 {
@@ -737,6 +1036,23 @@ eina_file_direct_ls(const char *dir)
 #endif
 }
 
+/**
+ * @brief Creates an iterator for listing directory entries with stat-resolved types.
+ *
+ * This iterator is similar to eina_file_direct_ls(), providing
+ * Eina_File_Direct_Info structures. However, if the file type cannot be
+ * determined from the `dirent` structure (i.e., it's EINA_FILE_UNKNOWN),
+ * this function will attempt to use `stat` (or `fstatat`) to determine the
+ * file type. It skips "." and ".." entries.
+ *
+ * @param dir The path to the directory.
+ * @return A new Eina_Iterator on success, or NULL on failure (e.g., @p dir
+ *         is NULL, empty, cannot be opened, or path length exceeds limits).
+ *         The iterator should be freed using eina_iterator_free().
+ *         Data from iterator: (Eina_File_Direct_Info *)
+ *         The Eina_File_Direct_Info structure is valid only until the next
+ *         iterator call or iterator free.
+ */
 EINA_API Eina_Iterator *
 eina_file_stat_ls(const char *dir)
 {
@@ -797,6 +1113,30 @@ eina_file_stat_ls(const char *dir)
 #endif
 }
 
+/**
+ * @brief Opens a file and returns an Eina_File handle.
+ *
+ * This function opens the file specified by @p path. It uses a caching
+ * mechanism: if the same file (identified by its sanitized path) is already
+ * open and its metadata (timestamp, size, inode) hasn't changed, the existing
+ * Eina_File handle is returned with an incremented reference count.
+ * Otherwise, a new Eina_File structure is created.
+ *
+ * If @p shared is EINA_TRUE, it attempts to open the file using `shm_open`
+ * for shared memory access (if available and applicable). Otherwise, a
+ * regular `open` is used.
+ *
+ * @param path The path to the file.
+ * @param shared If EINA_TRUE, try to open for shared access (e.g. shm_open).
+ * @return A pointer to an Eina_File structure on success, or NULL on failure.
+ *         The returned Eina_File should be closed with eina_file_close()
+ *         when no longer needed.
+ *
+ * @note The path is sanitized using eina_file_sanitize() before use.
+ * @see eina_file_close()
+ * @see eina_file_sanitize()
+ * @see eina_file_refresh()
+ */
 EINA_API Eina_File *
 eina_file_open(const char *path, Eina_Bool shared)
 {
@@ -902,6 +1242,19 @@ eina_file_open(const char *path, Eina_Bool shared)
    return NULL;
 }
 
+/**
+ * @brief Refreshes the cached metadata of an opened file.
+ *
+ * This function performs an `fstat` on the file descriptor associated with
+ * @p file to get the latest metadata (size, modification time, inode).
+ * If the size has changed, it calls eina_file_flush() to handle potential
+ * changes in mappings. The cached metadata in @p file is then updated.
+ *
+ * @param file The Eina_File handle to refresh.
+ * @return EINA_TRUE if the file size changed (and thus flush was called),
+ *         EINA_FALSE otherwise or on error (e.g., fstat fails, file is virtual).
+ * @note This function is not applicable to virtual files.
+ */
 EINA_API Eina_Bool
 eina_file_refresh(Eina_File *file)
 {
@@ -931,6 +1284,17 @@ eina_file_refresh(Eina_File *file)
    return r;
 }
 
+/**
+ * @brief Deletes a name from the filesystem.
+ *
+ * This function is a wrapper around the `unlink` system call.
+ * If @p pathname is the last link to a file and no processes have the file open,
+ * the file is deleted and the space it was using is made available for reuse.
+ *
+ * @param pathname The path to the file or symbolic link to delete.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., file does not exist,
+ *         permission denied).
+ */
 EINA_API Eina_Bool
 eina_file_unlink(const char *pathname)
 {
@@ -941,6 +1305,28 @@ eina_file_unlink(const char *pathname)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Maps an entire file into memory.
+ *
+ * This function memory-maps the whole file associated with the @p file handle.
+ * The mapping is read-only and shared (MAP_SHARED).
+ * It may attempt to use `MAP_POPULATE` if @p rule is EINA_FILE_POPULATE and
+ * the system supports it. It may also attempt to use `MAP_HUGETLB` if the
+ * file size is large enough (>= EINA_HUGE_PAGE_MIN).
+ *
+ * If the file is already globally mapped, this function increments a reference
+ * count for the global mapping and returns the existing map address.
+ *
+ * @param file The Eina_File handle of the opened file.
+ * @param rule A population hint (e.g., EINA_FILE_POPULATE, EINA_FILE_SEQUENTIAL).
+ *             See Eina_File_Populate enum.
+ * @return A pointer to the memory-mapped region on success, or NULL on failure.
+ *         The memory should be unmapped using eina_file_map_free() when no
+ *         longer needed.
+ * @note For virtual files, eina_file_virtual_map_all() is called.
+ * @see eina_file_map_free()
+ * @see Eina_File_Populate
+ */
 EINA_API void *
 eina_file_map_all(Eina_File *file, Eina_File_Populate rule)
 {
@@ -992,6 +1378,38 @@ eina_file_map_all(Eina_File *file, Eina_File_Populate rule)
    return ret;
 }
 
+/**
+ * @brief Maps a specific region of a file into memory.
+ *
+ * This function memory-maps a portion of the file associated with @p file,
+ * starting at @p offset and extending for @p length bytes.
+ * The mapping is read-only and shared (MAP_SHARED).
+ *
+ * If @p offset is 0 and @p length equals the file length, this function
+ * behaves like eina_file_map_all().
+ *
+ * Mappings are cached. If an identical mapping (same offset and length)
+ * already exists, its reference count is incremented and the existing
+ * map address is returned.
+ *
+ * It may attempt to use `MAP_POPULATE` if @p rule is EINA_FILE_POPULATE and
+ * the system supports it. It may also attempt to use `MAP_HUGETLB` if the
+ * mapping length is large enough (>= EINA_HUGE_PAGE_MIN).
+ *
+ * @param file The Eina_File handle of the opened file.
+ * @param rule A population hint (e.g., EINA_FILE_POPULATE, EINA_FILE_SEQUENTIAL).
+ *             See Eina_File_Populate enum.
+ * @param offset The starting offset within the file to map.
+ * @param length The number of bytes to map.
+ * @return A pointer to the memory-mapped region on success, or NULL on failure
+ *         (e.g., offset/length out of bounds, mmap fails).
+ *         The memory should be unmapped using eina_file_map_free() when no
+ *         longer needed.
+ * @note For virtual files, eina_file_virtual_map_new() is called.
+ * @see eina_file_map_free()
+ * @see eina_file_map_all()
+ * @see Eina_File_Populate
+ */
 EINA_API void *
 eina_file_map_new(Eina_File *file, Eina_File_Populate rule,
                   unsigned long int offset, unsigned long int length)
@@ -1071,6 +1489,19 @@ eina_file_map_new(Eina_File *file, Eina_File_Populate rule,
    return NULL;
 }
 
+/**
+ * @brief Unmaps a memory-mapped region of a file.
+ *
+ * This function decrements the reference count of the given @p map. If the
+ * reference count drops to zero, the memory region is unmapped using `munmap`.
+ * This applies to both globally mapped regions (from eina_file_map_all())
+ * and specific regions (from eina_file_map_new()).
+ *
+ * @param file The Eina_File handle associated with the map.
+ * @param map The pointer to the memory-mapped region to free (returned by
+ *            eina_file_map_all() or eina_file_map_new()).
+ * @note For virtual files, eina_file_virtual_map_free() is called.
+ */
 EINA_API void
 eina_file_map_free(Eina_File *file, void *map)
 {
@@ -1102,6 +1533,23 @@ eina_file_map_free(Eina_File *file, void *map)
    eina_lock_release(&file->lock);
 }
 
+/**
+ * @brief Applies a population rule to an already mapped region of a file.
+ *
+ * This function allows applying or changing memory advice (like pre-faulting
+ * pages or hinting access patterns) for a sub-region (@p offset, @p length)
+ * of an existing memory map @p map.
+ *
+ * @param file The Eina_File handle associated with the map.
+ * @param rule The Eina_File_Populate rule to apply (e.g., EINA_FILE_POPULATE,
+ *             EINA_FILE_SEQUENTIAL, EINA_FILE_DONTNEED).
+ * @param map The pointer to the existing memory-mapped region.
+ * @param offset The starting offset *within the given map* (not file offset)
+ *               to apply the rule.
+ * @param length The number of bytes from @p offset within @p map to apply the rule to.
+ * @see Eina_File_Populate
+ * @see _eina_file_map_rule_apply()
+ */
 EINA_API void
 eina_file_map_populate(Eina_File *file, Eina_File_Populate rule, const void *map,
                        unsigned long int offset, unsigned long int length)
@@ -1117,6 +1565,20 @@ eina_file_map_populate(Eina_File *file, Eina_File_Populate rule, const void *map
    eina_lock_release(&file->lock);
 }
 
+/**
+ * @brief Checks if a given memory-mapped region has been marked as faulty.
+ *
+ * A map can be marked faulty, for example, by eina_file_mmap_faulty() if a
+ * memory access violation occurs within its range, potentially indicating
+ * that the underlying file has changed (e.g., truncated).
+ *
+ * @param file The Eina_File handle associated with the map.
+ * @param map The pointer to the memory-mapped region to check.
+ * @return EINA_TRUE if the map is marked as faulty, EINA_FALSE otherwise or
+ *         if the map is not found or @p file is NULL.
+ * @note This function is not applicable to virtual files (always returns EINA_FALSE).
+ * @see eina_file_mmap_faulty()
+ */
 EINA_API Eina_Bool
 eina_file_map_faulted(Eina_File *file, void *map)
 {
@@ -1159,6 +1621,22 @@ eina_file_map_faulted(Eina_File *file, void *map)
    return r;
 }
 
+/**
+ * @brief Gets an iterator for the extended attribute names of a file.
+ *
+ * This function creates an iterator that yields the names of all extended
+ * attributes associated with the opened file @p file.
+ *
+ * @param file The Eina_File handle.
+ * @return A new Eina_Iterator that yields (char *) Eina_Stringshare names of
+ *         extended attributes, or NULL if @p file is NULL, virtual, or an
+ *         error occurs.
+ *         The iterator should be freed using eina_iterator_free().
+ *         The stringshare names should be deleted with eina_stringshare_del()
+ *         when no longer needed if taken from the iterator.
+ * @note Not applicable to virtual files.
+ * @see eina_xattr_fd_ls()
+ */
 EINA_API Eina_Iterator *
 eina_file_xattr_get(Eina_File *file)
 {
@@ -1169,6 +1647,29 @@ eina_file_xattr_get(Eina_File *file)
    return eina_xattr_fd_ls(file->fd);
 }
 
+/**
+ * @brief Gets an iterator for the extended attribute names and values of a file.
+ *
+ * This function creates an iterator that yields Eina_Xattr_Actual_Value
+ * structures, each containing an extended attribute's name and its value.
+ *
+ * @param file The Eina_File handle.
+ * @return A new Eina_Iterator that yields (Eina_Xattr_Actual_Value *)
+ *         structures, or NULL if @p file is NULL, virtual, or an error occurs.
+ *         The iterator should be freed using eina_iterator_free().
+ *         The Eina_Xattr_Actual_Value structure and its contents (name, value)
+ *         are valid until the next iterator call or iterator free.
+ * @note Not applicable to virtual files.
+ * @see eina_xattr_value_fd_ls()
+ * @struct Eina_Xattr_Actual_Value
+ * @brief Structure holding an extended attribute name and its value.
+ * @var Eina_Xattr_Actual_Value::name
+ * Member 'name' contains the stringshared name of the attribute.
+ * @var Eina_Xattr_Actual_Value::value
+ * Member 'value' contains the attribute's value as a void pointer.
+ * @var Eina_Xattr_Actual_Value::value_len
+ * Member 'value_len' contains the length of the value.
+ */
 EINA_API Eina_Iterator *
 eina_file_xattr_value_get(Eina_File *file)
 {
@@ -1179,6 +1680,61 @@ eina_file_xattr_value_get(Eina_File *file)
    return eina_xattr_value_fd_ls(file->fd);
 }
 
+/**
+ * @brief Retrieves file status information, similar to fstatat or lstat.
+ *
+ * This function populates the Eina_Stat structure @p st with metadata for
+ * the file described by @p info. If `HAVE_ATFILE_SOURCE` is defined and
+ * @p container is a valid DIR*, `fstatat` is used with the directory file
+ * descriptor and the relative name from `info->path + info->name_start`.
+ * Otherwise, `stat` (which follows symlinks) is called on `info->path`.
+ *
+ * If `info->type` is EINA_FILE_UNKNOWN, this function attempts to determine
+ * the file type based on the `st_mode` field from the stat buffer and updates
+ * `info->type`.
+ *
+ * @param container A pointer to a DIR stream (used for `dirfd` if `fstatat` is available)
+ *                  or NULL/ignored if `fstatat` is not used.
+ * @param info Pointer to an Eina_File_Direct_Info structure describing the file.
+ *             Its `type` field may be updated.
+ * @param st Pointer to an Eina_Stat structure to be filled with file metadata.
+ * @return 0 on success, -1 on failure (e.g., stat call fails).
+ *
+ * @struct Eina_Stat
+ * @brief Structure to hold file status information (portable version of struct stat).
+ * @var Eina_Stat::dev
+ * ID of device containing file.
+ * @var Eina_Stat::ino
+ * Inode number.
+ * @var Eina_Stat::mode
+ * File type and mode.
+ * @var Eina_Stat::nlink
+ * Number of hard links.
+ * @var Eina_Stat::uid
+ * User ID of owner.
+ * @var Eina_Stat::gid
+ * Group ID of owner.
+ * @var Eina_Stat::rdev
+ * Device ID (if special file).
+ * @var Eina_Stat::size
+ * Total size, in bytes.
+ * @var Eina_Stat::blksize
+ * Block size for filesystem I/O.
+ * @var Eina_Stat::blocks
+ * Number of 512B blocks allocated.
+ * @var Eina_Stat::atime
+ * Time of last access (seconds).
+ * @var Eina_Stat::mtime
+ * Time of last modification (seconds).
+ * @var Eina_Stat::ctime
+ * Time of last status change (seconds).
+ * @var Eina_Stat::atimensec
+ * Time of last access (nanoseconds part).
+ * @var Eina_Stat::mtimensec
+ * Time of last modification (nanoseconds part).
+ * @var Eina_Stat::ctimensec
+ * Time of last status change (nanoseconds part).
+ */
 EINA_API int
 eina_file_statat(void *container, Eina_File_Direct_Info *info, Eina_Stat *st)
 {
@@ -1296,10 +1852,38 @@ typedef struct
    off64_t        d_off;
    unsigned short d_reclen;
    unsigned char  d_type;
-   char           d_name[4096];
+   char           d_name[4096]; /**< Null-terminated filename. */
 } Dirent;
 #endif
 
+/**
+ * @brief Closes all open file descriptors from a given fd upwards.
+ *
+ * This function is intended to be called in critical sections, typically
+ * between a `fork()` and `exec()` sequence, where memory allocation
+ * (like `malloc` for `opendir`) should be avoided.
+ *
+ * It attempts to iterate over `/proc/self/fd` or `/dev/fd` to find open
+ * file descriptors. For each descriptor found that is numerically greater
+ * than or equal to @p fd, it calls `close()`.
+ *
+ * If @p except_fd is not NULL, it points to a NULL-terminated array of
+ * integers representing file descriptors that should *not* be closed.
+ *
+ * If directory iteration fails (e.g. `/proc/self/fd` not available or
+ * `getdents` fails), it falls back to a loop closing FDs from @p fd up to
+ * a system-defined maximum (or 1024).
+ *
+ * @param fd The lowest file descriptor number to start closing from (inclusive).
+ * @param except_fd A NULL-terminated array of file descriptor numbers to
+ *                  exclude from closing. Can be NULL if no exceptions.
+ *                  Example: `int exceptions[] = {stdout_fileno, stderr_fileno, -1};`
+ *
+ * @note This function tries to avoid heap allocations. On Linux, it uses
+ *       the `getdents64` syscall directly. On FreeBSD/OpenBSD, it uses `getdents`.
+ *       If these mechanisms are unavailable or fail, it uses a less precise
+ *       iterative close up to RLIMIT_NOFILE or a default max.
+ */
 EINA_API void
 eina_file_close_from(int fd, int *except_fd)
 {
@@ -1498,6 +2082,33 @@ skip3:
 #endif
 }
 
+/**
+ * @brief Creates and opens a unique temporary file.
+ *
+ * This function generates a unique temporary filename from @p templatename
+ * and opens it. The @p templatename string must end with "XXXXXX" (or "XXXXXX."
+ * followed by a suffix for mkstemps). These 'X's are replaced to form a unique name.
+ *
+ * If @p templatename does not contain a '/', it's prefixed with the system's
+ * temporary directory path (from eina_environment_tmp_get()).
+ *
+ * The file is created with permissions 0600 (read/write for owner only) by
+ * temporarily setting umask to S_IRWXG | S_IRWXO.
+ *
+ * @param templatename A template for the temporary filename. Must end in "XXXXXX"
+ *                     or "XXXXXX.suffix".
+ *                     Example: "myapp_temp_XXXXXX" or "myapp_temp_XXXXXX.log".
+ * @param path If not NULL, this will be set to an Eina_Tmpstr containing the
+ *             actual path of the created temporary file on success. The caller
+ *             should free this with eina_tmpstr_del() when no longer needed.
+ *             Set to NULL on failure.
+ * @return The file descriptor of the opened temporary file on success, or -1 on failure.
+ *         The file descriptor should be closed by the caller.
+ *
+ * @see eina_environment_tmp_get()
+ * @see mkstemp(3)
+ * @see mkstemps(3)
+ */
 EINA_API int
 eina_file_mkstemp(const char *templatename, Eina_Tmpstr **path)
 {
@@ -1544,6 +2155,29 @@ eina_file_mkstemp(const char *templatename, Eina_Tmpstr **path)
    return fd;
 }
 
+/**
+ * @brief Creates a unique temporary directory.
+ *
+ * This function generates a unique temporary directory name from @p templatename.
+ * The @p templatename string must end with "XXXXXX". These 'X's are replaced
+ * to form a unique directory name.
+ *
+ * If @p templatename does not contain a '/', it's prefixed with the system's
+ * temporary directory path (from eina_environment_tmp_get()).
+ *
+ * The directory is created with default permissions (influenced by umask).
+ *
+ * @param templatename A template for the temporary directory name. Must end in "XXXXXX".
+ *                     Example: "myapp_session_XXXXXX".
+ * @param path If not NULL, this will be set to an Eina_Tmpstr containing the
+ *             actual path of the created temporary directory on success. The caller
+ *             should free this with eina_tmpstr_del() when no longer needed.
+ *             Set to NULL on failure.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ *
+ * @see eina_environment_tmp_get()
+ * @see mkdtemp(3)
+ */
 EINA_API Eina_Bool
 eina_file_mkdtemp(const char *templatename, Eina_Tmpstr **path)
 {
@@ -1575,6 +2209,27 @@ eina_file_mkdtemp(const char *templatename, Eina_Tmpstr **path)
 }
 
 
+/**
+ * @brief Checks user's permissions for a file.
+ *
+ * This function is a wrapper around the `access(2)` system call. It checks
+ * whether the calling process can access the file @p path with the specified
+ * @p mode.
+ *
+ * @param path The path to the file or directory to check.
+ * @param mode The access mode(s) to check for. This is a bitmask that can be
+ *             a combination of:
+ *             - EINA_FILE_ACCESS_R_OK: Test for read permission.
+ *             - EINA_FILE_ACCESS_W_OK: Test for write permission.
+ *             - EINA_FILE_ACCESS_X_OK: Test for execute (search) permission.
+ *             - EINA_FILE_ACCESS_F_OK: Test for existence of file.
+ *             These correspond to R_OK, W_OK, X_OK, F_OK for `access()`.
+ * @return EINA_TRUE if the requested access is permitted, EINA_FALSE otherwise
+ *         (e.g., permission denied, file does not exist, path is NULL/empty).
+ *
+ * @see access(2)
+ * @see Eina_File_Access_Mode
+ */
 EINA_API Eina_Bool
 eina_file_access(const char *path, Eina_File_Access_Mode mode)
 {

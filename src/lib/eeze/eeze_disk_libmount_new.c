@@ -26,6 +26,10 @@
  *
  */
 
+/**
+ * @brief Mapping of mount option strings to Eeze_Disk_Mountopt flags.
+ * Used by mnt_optstr_get_flags() to parse mount options.
+ */
 static struct libmnt_optmap eeze_optmap[] =
 {
    { "loop[=]", EEZE_DISK_MOUNTOPT_LOOP, 0 },
@@ -37,24 +41,35 @@ static struct libmnt_optmap eeze_optmap[] =
    { "nodev", EEZE_DISK_MOUNTOPT_NODEV, 0 },
    { NULL, 0, 0 }
 };
-typedef struct libmnt_table libmnt_table;
-typedef struct libmnt_fs libmnt_fs;
-typedef struct libmnt_cache libmnt_cache;
-static Ecore_File_Monitor *_fstab_mon = NULL;
-static Eina_Bool _watching = EINA_FALSE;
-static Eina_Bool _fstab_scan_active = EINA_FALSE;
-static libmnt_cache *_eeze_mount_mtab_cache = NULL;
-static libmnt_cache *_eeze_mount_fstab_cache = NULL;
-static libmnt_table *_eeze_mount_mtab = NULL;
-static libmnt_table *_eeze_mount_fstab = NULL;
-extern Eina_List *_eeze_disks;
+typedef struct libmnt_table libmnt_table; /**< Typedef for libmount table structure. */
+typedef struct libmnt_fs libmnt_fs; /**< Typedef for libmount filesystem structure. */
+typedef struct libmnt_cache libmnt_cache; /**< Typedef for libmount cache structure. */
+static Ecore_File_Monitor *_fstab_mon = NULL; /**< File monitor for /etc/fstab. */
+static Eina_Bool _watching = EINA_FALSE; /**< Flag indicating if mount tabs are being watched. */
+static Eina_Bool _fstab_scan_active = EINA_FALSE; /**< Flag to prevent recursive scans of fstab. */
+static libmnt_cache *_eeze_mount_mtab_cache = NULL; /**< Cache for mtab data. */
+static libmnt_cache *_eeze_mount_fstab_cache = NULL; /**< Cache for fstab data. */
+static libmnt_table *_eeze_mount_mtab = NULL; /**< Parsed mtab data. */
+static libmnt_table *_eeze_mount_fstab = NULL; /**< Parsed fstab data. */
+extern Eina_List *_eeze_disks; /**< External list of known Eeze_Disk objects. */
 
-static Ecore_Fd_Handler *_mountinfo_fdh = NULL;
-static int _mountinfo = -1;
+static Ecore_Fd_Handler *_mountinfo_fdh = NULL; /**< FD handler for /proc/self/mountinfo. */
+static int _mountinfo = -1; /**< File descriptor for /proc/self/mountinfo. */
 
 static libmnt_table *_eeze_mount_tab_parse(const char *filename);
 static void _eeze_mount_tab_watcher(void *data, Ecore_File_Monitor *mon EINA_UNUSED, Ecore_File_Event event EINA_UNUSED, const char *path);
 
+/**
+ * @brief Callback function for libmount table parsing errors.
+ *
+ * This function is invoked by libmount when an error occurs while parsing
+ * a mount table file (e.g., /etc/fstab or /proc/self/mountinfo).
+ *
+ * @param tab The libmount table being parsed (unused).
+ * @param filename The name of the file where the parsing error occurred.
+ * @param line The line number in the file where the error occurred.
+ * @return Always returns -1 to indicate an error to libmount.
+ */
 static int
 _eeze_mount_tab_parse_errcb(libmnt_table *tab EINA_UNUSED, const char *filename, int line)
 {
@@ -65,6 +80,18 @@ _eeze_mount_tab_parse_errcb(libmnt_table *tab EINA_UNUSED, const char *filename,
 /*
  * I could use mnt_new_table_from_file() but this way gives much more detailed output
  * on failure so why not
+ */
+/**
+ * @brief Parses a mount table file (e.g., fstab, mtab) into a libmnt_table.
+ *
+ * This function initializes a new libmount table and attempts to parse the
+ * specified file. It sets a custom error callback for more detailed error
+ * reporting.
+ *
+ * @param filename The path to the mount table file to parse.
+ *                 Example: "/etc/fstab", "/proc/self/mountinfo".
+ * @return A pointer to the newly created and parsed libmnt_table on success,
+ *         or NULL on failure (e.g., allocation error, parse error).
  */
 static libmnt_table *
 _eeze_mount_tab_parse(const char *filename)
@@ -86,6 +113,22 @@ _eeze_mount_tab_parse(const char *filename)
    return NULL;
 }
 
+/**
+ * @brief Callback function for Ecore_File_Monitor watching /etc/fstab.
+ *
+ * This function is triggered when /etc/fstab changes. It re-parses the
+ * file and updates the internal cache. The `data` parameter is used to
+ * distinguish between mtab and fstab updates, though in this specific
+ * callback, it's implicitly for fstab.
+ *
+ * @param data User data passed to ecore_file_monitor_add. If non-NULL,
+ *             it implies an update related to mtab cache (though this
+ *             function is registered for fstab). If NULL, it implies
+ *             an update related to fstab cache.
+ * @param mon The Ecore_File_Monitor that triggered the event (unused).
+ * @param event The type of file event that occurred (unused).
+ * @param path The path to the file that changed (expected to be /etc/fstab).
+ */
 static void
 _eeze_mount_tab_watcher(void *data, Ecore_File_Monitor *mon EINA_UNUSED, Ecore_File_Event event EINA_UNUSED, const char *path)
 {
@@ -125,6 +168,19 @@ error:
 
 /* on tab change, check differences
  * based on code from findmnt
+ */
+/**
+ * @brief Ecore_Fd_Handler callback for monitoring /proc/self/mountinfo changes.
+ *
+ * This function is called when there's activity on the file descriptor for
+ * /proc/self/mountinfo, typically indicating a change in the system's mount points.
+ * It re-parses mountinfo, compares it with the previous state, and emits
+ * EEZE_EVENT_DISK_MOUNT or EEZE_EVENT_DISK_UNMOUNT events for affected Eeze_Disk
+ * objects.
+ *
+ * @param d User data associated with the Fd_Handler (unused).
+ * @param fdh The Ecore_Fd_Handler that triggered the callback (unused).
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
  */
 static Eina_Bool
 _eeze_mount_fdh(void *d EINA_UNUSED, Ecore_Fd_Handler *fdh EINA_UNUSED)
@@ -241,6 +297,13 @@ err:
  *
  */
 
+/**
+ * @brief Initializes the eeze libmount integration.
+ *
+ * Currently a placeholder.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 Eina_Bool
 eeze_libmount_init(void)
 {
@@ -248,6 +311,12 @@ eeze_libmount_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Shuts down the eeze libmount integration.
+ *
+ * Frees allocated libmount tables and caches, and stops watching
+ * mount tabs if currently active.
+ */
 void
 eeze_libmount_shutdown(void)
 {
@@ -264,6 +333,19 @@ eeze_libmount_shutdown(void)
    eeze_mount_tabs_unwatch();
 }
 
+/**
+ * @brief Retrieves the mount options for a given disk.
+ *
+ * Scans mtab and fstab (if not already cached) and looks up the disk
+ * by its UUID. It then parses the mount options string associated with
+ * the disk.
+ *
+ * @param disk The Eeze_Disk object to get mount options for.
+ * @return A bitmask of Eeze_Disk_Mountopt flags representing the active
+ *         mount options for the disk. Returns 0 if the disk is not found,
+ *         has no options, or an error occurs.
+ *         Example: (EEZE_DISK_MOUNTOPT_NOEXEC | EEZE_DISK_MOUNTOPT_NOSUID)
+ */
 unsigned long
 eeze_disk_libmount_opts_get(Eeze_Disk *disk)
 {
@@ -288,6 +370,17 @@ eeze_disk_libmount_opts_get(Eeze_Disk *disk)
 
 /*
  * helper function to return whether a disk is mounted
+ */
+/**
+ * @brief Checks if a disk is currently mounted and updates its mount point.
+ *
+ * Scans mtab (if not already cached) to determine if the given disk's
+ * device path is listed as mounted. If it is, the disk's `mounted` status
+ * and `mount_point` are updated.
+ *
+ * @param disk The Eeze_Disk object to check.
+ * @return EINA_TRUE if the disk is mounted, EINA_FALSE otherwise or if an
+ *         error occurs.
  */
 Eina_Bool
 eeze_disk_libmount_mounted_get(Eeze_Disk *disk)
@@ -316,6 +409,16 @@ eeze_disk_libmount_mounted_get(Eeze_Disk *disk)
 /*
  * helper function to return the device that is mounted at a mount point
  */
+/**
+ * @brief Finds the source device path for a given mount point.
+ *
+ * Scans mtab and fstab (if not already cached) to find an entry
+ * whose target matches the given mount_point.
+ *
+ * @param mount_point The mount point to search for. Example: "/mnt/data".
+ * @return The source device path (e.g., "/dev/sda1") if found,
+ *         NULL otherwise or if an error occurs.
+ */
 const char *
 eeze_disk_libmount_mp_find_source(const char *mount_point)
 {
@@ -340,6 +443,15 @@ eeze_disk_libmount_mp_find_source(const char *mount_point)
 /*
  * helper function to return a mount point from a uuid
  */
+/**
+ * @brief Looks up a mount point in fstab by its UUID.
+ *
+ * Scans fstab (if not already cached) for an entry with a matching UUID tag.
+ *
+ * @param uuid The UUID string to search for. Example: "a1b2c3d4-e5f6-7890-1234-567890abcdef".
+ * @return The target mount point (e.g., "/media/usb_drive") if found,
+ *         NULL otherwise or if an error occurs.
+ */
 const char *
 eeze_disk_libmount_mp_lookup_by_uuid(const char *uuid)
 {
@@ -362,6 +474,15 @@ eeze_disk_libmount_mp_lookup_by_uuid(const char *uuid)
 /*
  * helper function to return a mount point from a label
  */
+/**
+ * @brief Looks up a mount point in fstab by its filesystem label.
+ *
+ * Scans fstab (if not already cached) for an entry with a matching LABEL tag.
+ *
+ * @param label The filesystem label to search for. Example: "MyUSB".
+ * @return The target mount point (e.g., "/media/MyUSB") if found,
+ *         NULL otherwise or if an error occurs.
+ */
 const char *
 eeze_disk_libmount_mp_lookup_by_label(const char *label)
 {
@@ -383,6 +504,16 @@ eeze_disk_libmount_mp_lookup_by_label(const char *label)
 
 /*
  * helper function to return a mount point from a /dev/ path
+ */
+/**
+ * @brief Looks up a mount point in mtab or fstab by its device path.
+ *
+ * Scans mtab and then fstab (if not already cached) for an entry
+ * whose source path matches the given devpath.
+ *
+ * @param devpath The device path to search for. Example: "/dev/sdb1".
+ * @return The target mount point (e.g., "/var/log") if found,
+ *         NULL otherwise or if an error occurs.
  */
 const char *
 eeze_disk_libmount_mp_lookup_by_devpath(const char *devpath)
@@ -411,6 +542,20 @@ eeze_disk_libmount_mp_lookup_by_devpath(const char *devpath)
  *
  */
 
+/**
+ * @brief Starts watching /proc/self/mountinfo and /etc/fstab for changes.
+ *
+ * This function parses the current mountinfo and fstab, caches them,
+ * and sets up monitoring mechanisms:
+ * - An Ecore_Fd_Handler for /proc/self/mountinfo to detect mount/unmount events.
+ * - An Ecore_File_Monitor for /etc/fstab to detect changes to static mount configurations.
+ *
+ * If already watching, this function does nothing and returns EINA_TRUE.
+ *
+ * @return EINA_TRUE if watching was successfully started or was already active.
+ *         EINA_FALSE if an error occurred during setup (e.g., parsing failed,
+ *         could not open files, could not set up monitors).
+ */
 EAPI Eina_Bool
 eeze_mount_tabs_watch(void)
 {
@@ -461,6 +606,13 @@ error:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Stops watching /proc/self/mountinfo and /etc/fstab for changes.
+ *
+ * Removes the Ecore_Fd_Handler for mountinfo and the Ecore_File_Monitor
+ * for fstab. Closes the file descriptor for mountinfo.
+ * If not currently watching, this function does nothing.
+ */
 EAPI void
 eeze_mount_tabs_unwatch(void)
 {
@@ -475,6 +627,17 @@ eeze_mount_tabs_unwatch(void)
    _watching = EINA_FALSE;
 }
 
+/**
+ * @brief Scans and caches /proc/self/mountinfo (mtab).
+ *
+ * This function parses /proc/self/mountinfo and updates the internal mtab cache.
+ * If watching is active (via eeze_mount_tabs_watch()), this function assumes
+ * the cache is up-to-date and does nothing, returning EINA_TRUE.
+ * This is useful for a one-time scan if continuous monitoring is not required.
+ *
+ * @return EINA_TRUE if the scan was successful or if watching is active.
+ *         EINA_FALSE if parsing /proc/self/mountinfo failed.
+ */
 EAPI Eina_Bool
 eeze_mount_mtab_scan(void)
 {
@@ -501,6 +664,17 @@ error:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Scans and caches /etc/fstab.
+ *
+ * This function parses /etc/fstab and updates the internal fstab cache.
+ * If watching is active (via eeze_mount_tabs_watch()), this function assumes
+ * the cache is up-to-date and does nothing, returning EINA_TRUE.
+ * This is useful for a one-time scan if continuous monitoring is not required.
+ *
+ * @return EINA_TRUE if the scan was successful or if watching is active.
+ *         EINA_FALSE if parsing /etc/fstab failed.
+ */
 EAPI Eina_Bool
 eeze_mount_fstab_scan(void)
 {

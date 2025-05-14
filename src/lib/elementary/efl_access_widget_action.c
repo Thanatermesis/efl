@@ -9,6 +9,17 @@
 
 extern Eina_Hash *_elm_key_bindings;
 
+/**
+ * @brief Executes the action corresponding to the given ID.
+ *
+ * This function retrieves the list of available actions for the widget
+ * and executes the action at the specified index (id).
+ *
+ * @param[in] obj The Efl_Access_Widget_Action object.
+ * @param[in] pd Private data, unused.
+ * @param[in] id The zero-based index of the action to perform.
+ * @return @c EINA_TRUE if the action was successfully performed, @c EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_access_widget_action_efl_access_action_action_do(Eo *obj, void *pd EINA_UNUSED, int id)
 {
@@ -37,6 +48,20 @@ _efl_access_widget_action_efl_access_action_action_do(Eo *obj, void *pd EINA_UNU
    return func(obj, param);
 }
 
+/**
+ * @brief Gets the keybinding associated with the action of the given ID.
+ *
+ * This function retrieves the action details for the specified ID and
+ * then searches the global keybindings for a match based on the widget type,
+ * action name, and parameters.
+ *
+ * @param[in] obj The Efl_Access_Widget_Action object.
+ * @param[in] pd Private data, unused.
+ * @param[in] id The zero-based index of the action.
+ * @return A string representing the keybinding (e.g., "Control+A", "F1")
+ *         if found, otherwise @c NULL. The caller is responsible for freeing
+ *         the returned string.
+ */
 EOLIAN static char*
 _efl_access_widget_action_efl_access_action_action_keybinding_get(Eo *obj, void *pd EINA_UNUSED, int id)
 {
@@ -90,6 +115,16 @@ _efl_access_widget_action_efl_access_action_action_keybinding_get(Eo *obj, void 
    return NULL;
 }
 
+/**
+ * @brief Gets the name of the action corresponding to the given ID.
+ *
+ * @param[in] obj The Efl_Access_Widget_Action object.
+ * @param[in] pd Private data, unused.
+ * @param[in] id The zero-based index of the action.
+ * @return The name of the action (e.g., "click") if found, otherwise @c NULL.
+ *         The returned string is owned by the Efl_Access_Action_Data array and
+ *         must not be modified or freed.
+ */
 EOLIAN static const char *
 _efl_access_widget_action_efl_access_action_action_name_get(const Eo *obj, void *pd EINA_UNUSED, int id)
 {
@@ -107,18 +142,59 @@ _efl_access_widget_action_efl_access_action_action_name_get(const Eo *obj, void 
    return NULL;
 }
 
+/**
+ * @brief Sets the description of the action corresponding to the given ID.
+ * @warning This function is a stub and currently does nothing.
+ *
+ * @param[in] obj The Efl_Access_Widget_Action object, unused.
+ * @param[in] pd Private data, unused.
+ * @param[in] id The zero-based index of the action, unused.
+ * @param[in] description The description to set, unused.
+ * @return Always @c EINA_FALSE.
+ */
 EOLIAN static Eina_Bool
 _efl_access_widget_action_efl_access_action_action_description_set(Eo *obj EINA_UNUSED, void *pd EINA_UNUSED, int id EINA_UNUSED, const char *description EINA_UNUSED)
 {
    return EINA_FALSE;
 }
 
+/**
+ * @brief Gets the description of the action corresponding to the given ID.
+ * @warning This function is a stub and currently always returns @c NULL.
+ *
+ * @param[in] obj The Efl_Access_Widget_Action object, unused.
+ * @param[in] pd Private data, unused.
+ * @param[in] id The zero-based index of the action, unused.
+ * @return Always @c NULL.
+ */
 EOLIAN static const char *
 _efl_access_widget_action_efl_access_action_action_description_get(const Eo *obj EINA_UNUSED, void *pd EINA_UNUSED, int id EINA_UNUSED)
 {
    return NULL;
 }
 
+/**
+ * @brief Gets a list of all available action names for the widget.
+ *
+ * The returned list contains strings which are the names of the actions.
+ * For example:
+ * @code
+ * Eina_List *actions_list;
+ * const char *action_name;
+ * EINA_LIST_FREE(actions_list, action_name) {
+ *    // process action_name, e.g., printf("%s\n", action_name);
+ *    // Note: action_name itself should not be freed as it points to
+ *    // internal data.
+ * }
+ * @endcode
+ *
+ * @param[in] obj The Efl_Access_Widget_Action object.
+ * @param[in] pd Private data, unused.
+ * @return An Eina_List of strings, where each string is an action name.
+ *         Returns @c NULL if no actions are available or an error occurs.
+ *         The caller is responsible for freeing the returned Eina_List
+ *         using eina_list_free(). The strings within the list must not be freed.
+ */
 EOLIAN static Eina_List*
 _efl_access_widget_action_efl_access_action_actions_get(const Eo *obj, void *pd EINA_UNUSED)
 {

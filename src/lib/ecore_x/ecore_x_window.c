@@ -21,6 +21,23 @@ static Ecore_X_Window *ignore_list = NULL;
  * Functions that can be used to create an X window.
  */
 
+/**
+ * Creates a new X window with specified visual, colormap, depth, and override_redirect.
+ *
+ * This function provides more control over window creation than ecore_x_window_new().
+ *
+ * @param   parent   The parent window. If 0, the default root window is used.
+ * @param   x        The X coordinate of the new window.
+ * @param   y        The Y coordinate of the new window.
+ * @param   w        The width of the new window.
+ * @param   h        The height of the new window.
+ * @param   visual   The visual to use for the window.
+ * @param   colormap The colormap to use for the window.
+ * @param   depth    The depth of the window.
+ * @param   override If EINA_TRUE, the window manager will not manage this window (override_redirect).
+ * @return  The ID of the newly created window, or 0 on failure.
+ * @ingroup Ecore_X_Window_Create_Group
+ */
 EAPI Ecore_X_Window
 ecore_x_window_full_new(Ecore_X_Window parent,
                         int x,
@@ -332,6 +349,26 @@ ecore_x_window_defaults_set(Ecore_X_Window win)
    ecore_x_icccm_command_set(win, argc, argv);
 }
 
+/**
+ * Configures an X window's geometry and stacking order.
+ *
+ * This function allows changing various attributes of a window, such as its
+ * position, size, border width, and stacking relative to sibling windows.
+ * The @p mask parameter specifies which attributes to change.
+ *
+ * @param win          The window to configure.
+ * @param mask         A bitmask indicating which fields in the XWindowChanges
+ *                     structure are to be modified. For example, (CWX | CWY)
+ *                     to change x and y coordinates.
+ * @param x            The new X coordinate of the window.
+ * @param y            The new Y coordinate of the window.
+ * @param w            The new width of the window.
+ * @param h            The new height of the window.
+ * @param border_width The new border width of the window.
+ * @param sibling      A sibling window for stacking operations.
+ * @param stack_mode   Specifies how the window is stacked relative to the sibling.
+ *                     Possible values include: Above, Below, TopIf, BottomIf, Opposite.
+ */
 EAPI void
 ecore_x_window_configure(Ecore_X_Window win,
                          Ecore_X_Window_Configure_Mask mask,
@@ -387,9 +424,15 @@ ecore_x_window_free(Ecore_X_Window win)
 }
 
 /**
- * Set if a window should be ignored.
- * @param   win The given window.
- * @param   ignore if to ignore
+ * Adds or removes a window from the internal list of windows to be ignored by certain operations.
+ *
+ * This is typically used to prevent Ecore_X from processing events for specific
+ * windows, often utility windows or windows managed by other parts of an
+ * application.
+ *
+ * @param win    The window to add to or remove from the ignore list.
+ * @param ignore If non-zero, the window is added to the ignore list.
+ *               If zero, the window is removed from the ignore list.
  */
 EAPI void
 ecore_x_window_ignore_set(Ecore_X_Window win,
@@ -446,9 +489,20 @@ ecore_x_window_ignore_set(Ecore_X_Window win,
 }
 
 /**
- * Get the ignore list
- * @param   num number of windows in the list
- * @return  list of windows to ignore
+ * Retrieves the list of windows currently marked as ignored.
+ *
+ * The returned list is a direct pointer to the internal storage and should not
+ * be modified or freed by the caller. The number of windows in the list is
+ * returned via the @p num parameter.
+ *
+ * @param num Pointer to an integer where the number of ignored windows will be stored.
+ *            Can be NULL if the count is not needed.
+ * @return    A pointer to an array of Ecore_X_Window IDs.
+ *            The array contains the windows that are currently ignored.
+ *            Returns NULL if the ignore list is empty or not initialized.
+ *            Example of returned array structure:
+ *            If `ignore_list` contains `[win1, win2, win3]`, then `*num` will be 3,
+ *            and the return value will point to this array.
  */
 EAPI Ecore_X_Window *
 ecore_x_window_ignore_list(int *num)
@@ -907,6 +961,18 @@ ecore_x_window_cursor_show(Ecore_X_Window win,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * Sets the cursor for a given window.
+ *
+ * This function changes the mouse pointer's appearance when it is over the
+ * specified window.
+ *
+ * @param win The window for which to set the cursor.
+ * @param c   The cursor to set. If 0 (None), the cursor is undefined
+ *            (usually inheriting from the parent or root window).
+ *            This can be a standard X cursor or a custom cursor created
+ *            with ecore_x_cursor_new().
+ */
 EAPI void
 ecore_x_window_cursor_set(Ecore_X_Window win,
                           Ecore_X_Cursor c)
@@ -964,6 +1030,19 @@ struct _Shadow
 static Shadow **shadow_base = NULL;
 static int shadow_num = 0;
 
+/**
+ * @internal
+ * Recursively walks the X window tree starting from @p win and builds a
+ * shadow tree representation.
+ *
+ * This function queries the X server for window attributes and children,
+ * creating a tree of Shadow structures. It only includes mapped (visible)
+ * windows in the shadow tree.
+ *
+ * @param  win The window to start walking from.
+ * @return A pointer to the Shadow structure representing @p win and its
+ *         descendants, or NULL if @p win is not mapped or an error occurs.
+ */
 static Shadow *
 _ecore_x_window_tree_walk(Window win)
 {
@@ -1034,6 +1113,15 @@ _ecore_x_window_tree_walk(Window win)
    return s;
 }
 
+/**
+ * @internal
+ * Recursively frees a Shadow structure and all its children.
+ *
+ * This is a helper function for _ecore_x_window_tree_shadow_free to deallocate
+ * the memory used by the shadow window tree.
+ *
+ * @param s The Shadow node to free.
+ */
 static void
 _ecore_x_window_tree_shadow_free1(Shadow *s)
 {
@@ -1055,6 +1143,14 @@ _ecore_x_window_tree_shadow_free1(Shadow *s)
    free(s);
 }
 
+/**
+ * @internal
+ * Frees the entire shadow window tree.
+ *
+ * This function iterates through the base of the shadow tree (typically roots
+ * of screens) and calls _ecore_x_window_tree_shadow_free1 to deallocate
+ * all Shadow structures.
+ */
 static void
 _ecore_x_window_tree_shadow_free(void)
 {
@@ -1075,6 +1171,14 @@ _ecore_x_window_tree_shadow_free(void)
    shadow_num = 0;
 }
 
+/**
+ * @internal
+ * Populates the shadow window tree by walking the actual X window tree.
+ *
+ * This function gets the list of root windows for all screens and then
+ * calls _ecore_x_window_tree_walk for each root to build the shadow
+ * representation.
+ */
 static void
 _ecore_x_window_tree_shadow_populate(void)
 {
@@ -1116,6 +1220,15 @@ _ecore_x_window_tree_shadow_populate(void)
    }
  */
 
+/**
+ * @internal
+ * Recursively searches for a Shadow node corresponding to a given X Window ID
+ * within a subtree of the shadow window tree.
+ *
+ * @param s   The root of the Shadow subtree to search.
+ * @param win The X Window ID to find.
+ * @return A pointer to the Shadow structure if found, otherwise NULL.
+ */
 static Shadow *
 _ecore_x_window_shadow_tree_find_shadow(Shadow *s,
                                         Window win)
@@ -1140,6 +1253,18 @@ _ecore_x_window_shadow_tree_find_shadow(Shadow *s,
    return NULL;
 }
 
+/**
+ * @internal
+ * Finds a Shadow node corresponding to a given X Window ID in the global
+ * shadow window tree.
+ *
+ * This function iterates through all root nodes of the shadow tree (one for
+ * each screen) and calls _ecore_x_window_shadow_tree_find_shadow to search
+ * within each screen's subtree.
+ *
+ * @param base The X Window ID to find.
+ * @return A pointer to the Shadow structure if found, otherwise NULL.
+ */
 static Shadow *
 _ecore_x_window_shadow_tree_find(Window base)
 {
@@ -1157,6 +1282,23 @@ _ecore_x_window_shadow_tree_find(Window base)
    return NULL;
 }
 
+/**
+ * @internal
+ * Checks if a given point (x, y) is inside any of the provided rectangles.
+ *
+ * The point (x, y) is in global coordinates. The rectangles are relative to
+ * the shadow window `s` whose top-left corner is at (`s->x + bx`, `s->y + by`).
+ *
+ * @param s     The Shadow window structure, used for its position.
+ * @param x     The global X coordinate of the point to check.
+ * @param y     The global Y coordinate of the point to check.
+ * @param bx    The X offset of the parent window's coordinate system relative to global.
+ * @param by    The Y offset of the parent window's coordinate system relative to global.
+ * @param rects An array of Ecore_X_Rectangle structures.
+ *              Example: `rects[0] = { .x=10, .y=10, .width=20, .height=20 }`
+ * @param num   The number of rectangles in the @p rects array.
+ * @return 1 if the point is inside any rectangle, 0 otherwise. The @p rects array is freed by this function.
+ */
 static int
 _inside_rects(Shadow *s,
               int x,
@@ -1185,6 +1327,26 @@ _inside_rects(Shadow *s,
    return inside;
 }
 
+/**
+ * @internal
+ * Recursively finds the topmost visible window in the shadow tree at global
+ * coordinates (x, y), considering window shapes and a skip list.
+ *
+ * This function traverses the shadow tree. For each window, it checks if the
+ * point (x, y) is within its bounds and shape. If so, it recursively checks
+ * its children. If no child contains the point, the current window is returned.
+ *
+ * @param s        The current Shadow node being checked.
+ * @param bx       The X offset of the parent of @p s relative to global coordinates.
+ * @param by       The Y offset of the parent of @p s relative to global coordinates.
+ * @param x        The global X coordinate.
+ * @param y        The global Y coordinate.
+ * @param skip     An array of Ecore_X_Window IDs to ignore during the search.
+ *                 Example: `skip[0] = some_window_id_to_ignore`
+ * @param skip_num The number of windows in the @p skip array.
+ * @return The Ecore_X_Window ID of the topmost window at (x, y), or 0 if no
+ *         window is found (or if the found window is shaped out).
+ */
 static Window
 _ecore_x_window_shadow_tree_at_xy_get_shadow(Shadow *s,
                                              int bx,
@@ -1251,6 +1413,24 @@ onward:
    return s->win;
 }
 
+/**
+ * @internal
+ * Finds the topmost visible window in the shadow tree starting from a @p base
+ * window at global coordinates (x,y), considering a skip list.
+ *
+ * This function first ensures the shadow tree is populated. It then finds the
+ * Shadow node for @p base and calls
+ * _ecore_x_window_shadow_tree_at_xy_get_shadow to perform the search.
+ *
+ * @param base     The Ecore_X_Window ID from which to start the search (usually a root window).
+ * @param bx       Initial X offset (usually 0 for root window searches).
+ * @param by       Initial Y offset (usually 0 for root window searches).
+ * @param x        The global X coordinate.
+ * @param y        The global Y coordinate.
+ * @param skip     An array of Ecore_X_Window IDs to ignore.
+ * @param skip_num The number of windows in the @p skip array.
+ * @return The Ecore_X_Window ID of the topmost window, or 0 if not found.
+ */
 static Window
 _ecore_x_window_shadow_tree_at_xy_get(Window base,
                                       int bx,
@@ -1382,6 +1562,28 @@ ecore_x_window_root_get(Ecore_X_Window win)
    return att.root;
 }
 
+/**
+ * @internal
+ * Recursively finds the topmost visible window by querying the X server directly
+ * (not using the shadow tree) at global coordinates (x, y).
+ *
+ * This function checks if the current @p base window is visible and contains
+ * the point (x, y). If so, it queries its children and recursively calls
+ * itself for each child. If no child contains the point, @p base is returned.
+ * This version can be slower than the shadow tree version due to multiple
+ * X server requests.
+ *
+ * @param base     The current window being checked.
+ * @param bx       The X offset of the parent of @p base relative to global coordinates.
+ * @param by       The Y offset of the parent of @p base relative to global coordinates.
+ * @param x        The global X coordinate.
+ * @param y        The global Y coordinate.
+ * @param skip     An array of Ecore_X_Window IDs to ignore.
+ *                 Example: `skip[0] = some_window_id_to_ignore`
+ * @param skip_num The number of windows in the @p skip array.
+ * @return The Ecore_X_Window ID of the topmost window at (x, y), or 0 if no
+ *         window is found.
+ */
 static Window
 _ecore_x_window_at_xy_get(Window base,
                           int bx,
@@ -1501,6 +1703,21 @@ ecore_x_window_at_xy_with_skip_get(int x,
    return win ? win : root;
 }
 
+/**
+ * Retrieves the top, visible window at the given location, starting the search from a specific window.
+ *
+ * This function performs a "live" query of the X server, similar to
+ * ecore_x_window_at_xy_get(), but starts its traversal from the @p begin
+ * window instead of the root window.
+ *
+ * @param   begin The window from which to start the search. The search will
+ *                consider @p begin and its children.
+ * @param   x     The global X coordinate.
+ * @param   y     The global Y coordinate.
+ * @return  The Ecore_X_Window ID of the topmost window at (x, y) within the
+ *          subtree of @p begin, or @p begin itself if no child is found at
+ *          that location but @p begin is. Returns 0 if @p begin is not at (x,y).
+ */
 EAPI Ecore_X_Window
 ecore_x_window_at_xy_begin_get(Ecore_X_Window begin,
                                int x,
@@ -1570,6 +1787,17 @@ ecore_x_window_background_color_set(Ecore_X_Window win,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * Sets the window gravity for a given window.
+ *
+ * Window gravity determines how a window's position is affected when its
+ * parent is resized. For example, NorthWestGravity means the window will
+ * maintain its position relative to the top-left corner of its parent.
+ *
+ * @param win  The window for which to set the gravity.
+ * @param grav The Ecore_X_Gravity value to set (e.g., ECORE_X_GRAVITY_NORTH_WEST).
+ *             See X.h for Gravity constants (e.g., NorthWestGravity).
+ */
 EAPI void
 ecore_x_window_gravity_set(Ecore_X_Window win,
                            Ecore_X_Gravity grav)
@@ -1582,6 +1810,17 @@ ecore_x_window_gravity_set(Ecore_X_Window win,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * Sets the bit gravity for a given window.
+ *
+ * Bit gravity determines how the contents of a window are preserved or
+ * repositioned when the window is resized. For example, NorthWestGravity
+ * means the top-left portion of the window's contents will be preserved.
+ *
+ * @param win  The window for which to set the bit gravity.
+ * @param grav The Ecore_X_Gravity value to set (e.g., ECORE_X_GRAVITY_NORTH_WEST).
+ *             See X.h for Gravity constants (e.g., NorthWestGravity).
+ */
 EAPI void
 ecore_x_window_pixel_gravity_set(Ecore_X_Window win,
                                  Ecore_X_Gravity grav)
@@ -1594,6 +1833,18 @@ ecore_x_window_pixel_gravity_set(Ecore_X_Window win,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * Sets the background pixmap for a given window.
+ *
+ * This will tile the specified pixmap as the window's background.
+ * If the pixmap is None, the window's background is not changed in this way,
+ * and it might be inherited or use a solid color.
+ *
+ * @param win  The window for which to set the background pixmap.
+ * @param pmap The Ecore_X_Pixmap to use as the background.
+ *             Set to 0 (None) to remove a previously set background pixmap
+ *             and revert to default background behavior.
+ */
 EAPI void
 ecore_x_window_pixmap_set(Ecore_X_Window win,
                           Ecore_X_Pixmap pmap)
@@ -1603,6 +1854,21 @@ ecore_x_window_pixmap_set(Ecore_X_Window win,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * Clears a rectangular area within a window.
+ *
+ * This function fills the specified rectangle with the window's current
+ * background color or pixmap. It does not generate Expose events.
+ *
+ * @param win The window in which to clear the area.
+ * @param x   The X coordinate of the top-left corner of the area to clear,
+ *            relative to the window's origin.
+ * @param y   The Y coordinate of the top-left corner of the area to clear.
+ * @param w   The width of the area to clear. If 0, it extends to the
+ *            window's right edge from x.
+ * @param h   The height of the area to clear. If 0, it extends to the
+ *            window's bottom edge from y.
+ */
 EAPI void
 ecore_x_window_area_clear(Ecore_X_Window win,
                           int x,
@@ -1615,6 +1881,22 @@ ecore_x_window_area_clear(Ecore_X_Window win,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * Clears a rectangular area within a window and generates Expose events.
+ *
+ * This function fills the specified rectangle with the window's current
+ * background and then generates Expose events for that area. This signals
+ * to the application that the area needs to be redrawn.
+ *
+ * @param win The window in which to expose the area.
+ * @param x   The X coordinate of the top-left corner of the area,
+ *            relative to the window's origin.
+ * @param y   The Y coordinate of the top-left corner of the area.
+ * @param w   The width of the area. If 0, it extends to the
+ *            window's right edge from x.
+ * @param h   The height of the area. If 0, it extends to the
+ *            window's bottom edge from y.
+ */
 EAPI void
 ecore_x_window_area_expose(Ecore_X_Window win,
                            int x,
@@ -1627,6 +1909,16 @@ ecore_x_window_area_expose(Ecore_X_Window win,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * Sets or clears the override-redirect attribute of a window.
+ *
+ * If @p override is EINA_TRUE, the window manager will typically not manage
+ * (e.g., decorate, move, resize) this window. This is often used for menus,
+ * tooltips, and other transient pop-up windows.
+ *
+ * @param win      The window for which to set the override-redirect attribute.
+ * @param override EINA_TRUE to set override-redirect, EINA_FALSE to clear it.
+ */
 EAPI void
 ecore_x_window_override_set(Ecore_X_Window win,
                             Eina_Bool override)
@@ -1640,6 +1932,23 @@ ecore_x_window_override_set(Ecore_X_Window win,
 }
 
 #ifdef ECORE_XRENDER
+/**
+ * @internal
+ * Creates a new window with an ARGB visual (if available).
+ *
+ * This is an internal helper function used by other ARGB window creation
+ * functions. It attempts to find a 32-bit visual with an alpha channel.
+ *
+ * @param parent    The parent window. If 0, the default root window is used.
+ * @param x         The X coordinate of the new window.
+ * @param y         The Y coordinate of the new window.
+ * @param w         The width of the new window.
+ * @param h         The height of the new window.
+ * @param override  If EINA_TRUE, set override-redirect for the window.
+ * @param saveunder If EINA_TRUE, set save-under for the window (hint for server).
+ * @return The ID of the newly created ARGB window, or 0 on failure (e.g.,
+ *         if no suitable ARGB visual is found or XRender is not available).
+ */
 static Ecore_X_Window
 _ecore_x_window_argb_internal_new(Ecore_X_Window parent,
                                   int x,
@@ -1755,6 +2064,15 @@ _ecore_x_window_argb_internal_new(Ecore_X_Window parent,
 
 #endif /* ifdef ECORE_XRENDER */
 
+/**
+ * Checks if a window is an ARGB window (i.e., uses a visual with an alpha channel).
+ *
+ * This function requires the XRender extension.
+ *
+ * @param  win The window to check.
+ * @return 1 if the window is an ARGB window, 0 otherwise or if XRender is
+ *         not available.
+ */
 EAPI int
 ecore_x_window_argb_get(Ecore_X_Window win)
 {
@@ -1860,6 +2178,32 @@ ecore_x_window_override_argb_new(Ecore_X_Window parent,
 #endif /* ifdef ECORE_XRENDER */
 }
 
+/**
+ * Creates or retrieves a "permanent" window associated with a unique atom on a parent window.
+ *
+ * This function is used to create a helper window that can persist across
+ * application restarts or client disconnections, provided the X server
+ * supports it and the window is set to RetainPermanent.
+ *
+ * The function first tries to find an existing window by checking for a
+ * property named @p unique_atom on the @p parent window. If this property
+ * exists and points to a valid window, and that window also has the
+ * @p unique_atom property pointing back to itself, that window is returned.
+ *
+ * If no such window is found, a new simple window is created as a child of
+ * @p parent. The @p unique_atom property is then set on both the new window
+ * (pointing to itself) and on the @p parent window (pointing to the new window).
+ * The close-down mode for the new window is set to RetainPermanent.
+ *
+ * This mechanism is often used for tasks like selection ownership or other
+ * roles where a persistent, uniquely identifiable window is needed.
+ *
+ * @param parent      The parent window under which to find or create the permanent window.
+ * @param unique_atom An X atom that uniquely identifies this permanent window's role
+ *                    or purpose. For example, `ECORE_X_ATOM_E_PERMANENT_WINDOW`.
+ * @return The Ecore_X_Window ID of the existing or newly created permanent window.
+ *         Returns 0 on failure (e.g., if unable to open a new display connection).
+ */
 EAPI Ecore_X_Window
 ecore_x_window_permanent_new(Ecore_X_Window parent, Ecore_X_Atom unique_atom)
 {

@@ -1,3 +1,14 @@
+/**
+ * @file
+ * @brief This file implements the AT-SPI bridge for Elementary, enabling
+ * accessibility features by exposing UI elements to assistive technologies.
+ *
+ * It handles the communication between EFL applications and the AT-SPI D-Bus
+ * services, translating EFL's accessibility information into AT-SPI compatible
+ * formats and vice-versa. This includes managing object lifecycles,
+ * properties, states, actions, and events.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include "elementary_config.h"
 #endif

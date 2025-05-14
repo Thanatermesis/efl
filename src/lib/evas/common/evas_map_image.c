@@ -19,21 +19,52 @@
 typedef struct _Line Line;
 typedef struct _Span Span;
 
+/**
+ * @brief Represents a horizontal span of pixels to be rendered for a map.
+ *
+ * A span defines a horizontal line segment with start and end X coordinates,
+ * associated texture (U,V) coordinates, and color values at its endpoints.
+ * These values are interpolated across the span during rendering.
+ */
 struct _Span
 {
-   int x[2];
-   FPc o1, o2, z1, z2;
-   FPc  u[2], v[2];
-   DATA32 col[2];
+   int x[2];      /**< Start (x[0]) and end (x[1]) X-coordinates of the span. */
+   FPc o1, o2;    /**< Original start (o1) and end (o2) X-coordinates in fixed-point, before integer conversion for x[]. */
+   FPc z1, z2;    /**< Z-coordinates at the start and end of the span (currently FIXME). */
+   FPc  u[2];     /**< Texture U-coordinates at the start (u[0]) and end (u[1]) of the span. */
+   FPc  v[2];     /**< Texture V-coordinates at the start (v[0]) and end (v[1]) of the span. */
+   DATA32 col[2]; /**< Color values at the start (col[0]) and end (col[1]) of the span. */
 };
 
+/**
+ * @brief Represents a scanline in the mapped image, potentially containing multiple spans.
+ *
+ * A scanline can be composed of up to two `Span` structures, allowing for
+ * complex shapes where a single horizontal line might intersect the mapped
+ * polygon in two separate segments (e.g., concave shapes or after clipping).
+ * It also stores anti-aliasing coverage information.
+ */
 struct _Line
 {
-   Span span[2];
-   int aa_cov[2];
-   int aa_len[2];
+   Span span[2];   /**< Array of up to two spans for this scanline. If span[i].x[0] is -1, the span is not active. */
+   int aa_cov[2]; /**< Anti-aliasing coverage data for each potential span. */
+   int aa_len[2]; /**< Anti-aliasing length data for each potential span. */
 };
 
+/**
+ * @internal
+ * @brief Interpolates a fixed-point value.
+ *
+ * Linearly interpolates a value (u) between u1 and u2, based on the
+ * position p relative to x1 and x2.
+ *
+ * @param x1 Start X-coordinate of the interpolation range.
+ * @param x2 End X-coordinate of the interpolation range.
+ * @param p Current X-coordinate for which to interpolate.
+ * @param u1 Value at x1.
+ * @param u2 Value at x2.
+ * @return The interpolated fixed-point value at p.
+ */
 static inline FPc
 _interp(int x1, int x2, int p, FPc u1, FPc u2)
 {
@@ -45,9 +76,24 @@ _interp(int x1, int x2, int p, FPc u1, FPc u2)
    u = u2 - u1;
    u = ((u * p) / x2);
    // FIXME: do z persp
+   // FIXME: do z persp
    return u1 + u;
 }
 
+/**
+ * @internal
+ * @brief Interpolates a color value.
+ *
+ * Linearly interpolates a color between col1 and col2, based on the
+ * position p relative to x1 and x2.
+ *
+ * @param x1 Start X-coordinate of the interpolation range.
+ * @param x2 End X-coordinate of the interpolation range.
+ * @param p Current X-coordinate for which to interpolate.
+ * @param col1 Color at x1.
+ * @param col2 Color at x2.
+ * @return The interpolated DATA32 color value at p.
+ */
 static inline DATA32
 _interp_col(int x1, int x2, int p, DATA32 col1, DATA32 col2)
 {
@@ -56,9 +102,23 @@ _interp_col(int x1, int x2, int p, DATA32 col1, DATA32 col2)
    p -= x1;
    p = ((p << 8) / x2);
    // FIXME: do z persp
+   // FIXME: do z persp
    return INTERP_256(p, col2, col1);
 }
 
+/**
+ * @internal
+ * @brief Clips a span to a given horizontal range [c1, c2) and interpolates its properties.
+ *
+ * If the span `s` extends beyond the clipping boundaries `c1` (left) or `c2` (right),
+ * its endpoints (x, u, v, and optionally color) are adjusted to fit within the
+ * clipping range by interpolating their values at the new clipped boundaries.
+ *
+ * @param s Pointer to the Span structure to be clipped.
+ * @param c1 The left clipping boundary (inclusive).
+ * @param c2 The right clipping boundary (exclusive).
+ * @param interp_col If EINA_TRUE, the color `s->col` will also be interpolated.
+ */
 static inline void
 _interpolated_clip_span(Span *s, int c1, int c2, Eina_Bool interp_col)
 {
@@ -85,6 +145,35 @@ _interpolated_clip_span(Span *s, int c1, int c2, Eina_Bool interp_col)
 }
 
 // 12.63 % of time - this can improve
+/**
+ * @internal
+ * @brief Calculates all horizontal spans for a given polygon and Y-range.
+ *
+ * This function iterates through scanlines from `ystart` to `yend`. For each
+ * scanline, it determines the intersection points of the polygon edges (`p`)
+ * with that scanline. These intersection points define horizontal spans,
+ * for which texture coordinates (u,v) and colors are interpolated.
+ * The resulting spans are stored in the `spans` array.
+ * The function handles simple horizontal line cases and general polygons
+ * (quadrilaterals expected, as `p` has 4 points).
+ * Spans are also clipped horizontally against `cx` and `cx + cw`.
+ *
+ * @param p Array of 4 RGBA_Map_Point defining the polygon vertices.
+ *          Example: p[0] is top-left, p[1] top-right, p[2] bottom-right, p[3] bottom-left.
+ *          Each point contains:
+ *          - x, y: Destination coordinates (fixed-point).
+ *          - u, v: Source texture coordinates (fixed-point).
+ *          - z: Z-coordinate (fixed-point, for perspective, largely FIXME).
+ *          - col: Vertex color (DATA32).
+ * @param spans Output array of Line structures, one for each scanline from `ystart` to `yend`.
+ *              `spans[y - ystart]` will store the span(s) for scanline `y`.
+ * @param ystart The starting Y-coordinate (inclusive) of the scanline range to process.
+ * @param yend The ending Y-coordinate (inclusive) of the scanline range to process.
+ * @param cx The X-coordinate of the left edge of the clipping rectangle.
+ * @param cy The Y-coordinate of the top edge of the clipping rectangle (unused in current logic but passed).
+ * @param cw The width of the clipping rectangle.
+ * @param ch The height of the clipping rectangle (unused in current logic but passed).
+ */
 static void
 _calc_spans(RGBA_Map_Point *p, Line *spans, int ystart, int yend, int cx, int cy EINA_UNUSED, int cw, int ch EINA_UNUSED)
 {
@@ -357,6 +446,24 @@ _calc_spans(RGBA_Map_Point *p, Line *spans, int ystart, int yend, int cx, int cy
 /* FIXME: Account for 10% during pipe rendering, should be improved
  * Could be computing the interpolation once somehow.
  */
+/**
+ * @internal
+ * @brief Clips already calculated spans to a new horizontal clipping region.
+ *
+ * This function iterates through a list of pre-calculated spans (organized by scanline)
+ * and applies horizontal clipping. If a span falls completely outside the new clip region
+ * [cx, cx + cw), it's marked as inactive. If it partially overlaps, its endpoints
+ * are adjusted using `_interpolated_clip_span`.
+ * This seems to be a secondary clipping pass, potentially for cutouts or refined clipping,
+ * as `_calc_spans` already performs initial clipping.
+ *
+ * @param spans Array of Line structures containing the spans to be clipped.
+ * @param ystart The starting Y-coordinate corresponding to the first Line in `spans`.
+ * @param yend The ending Y-coordinate corresponding to the last Line in `spans`.
+ * @param cx The X-coordinate of the left edge of the new clipping rectangle.
+ * @param cw The width of the new clipping rectangle.
+ * @param interp_col If EINA_TRUE, color values will be interpolated during clipping.
+ */
 static void
 _clip_spans(Line *spans, int ystart, int yend,
             int cx, int cw, Eina_Bool interp_col)
@@ -435,6 +542,18 @@ evas_common_map_rgba_clean(RGBA_Map *m)
    m->engine_data = NULL;
 }
 
+/**
+ * @internal
+ * @brief Resizes the internal storage for map cutouts and their associated spans.
+ *
+ * Manages the `m->engine_data` which is a `RGBA_Map_Cutout` structure.
+ * This structure holds an array of `RGBA_Map_Spans`. This function
+ * reallocates this data if the required `count` of cutouts changes.
+ * If `count` is 0, it cleans up the existing data.
+ *
+ * @param m The RGBA_Map whose `engine_data` needs resizing.
+ * @param count The new number of `RGBA_Map_Spans` required.
+ */
 static void
 _rgba_map_cutout_resize(RGBA_Map *m, int count)
 {
@@ -476,6 +595,34 @@ _rgba_map_cutout_resize(RGBA_Map *m, int count)
    return;
 }
 
+/**
+ * @internal
+ * @brief Prepares a single set of spans for a given map and clipping region.
+ *
+ * This function takes a set of 4 map points `p` defining a quadrilateral,
+ * determines its vertical extent, clips it to the provided `cy`, `ch` clipping region,
+ * normalizes texture coordinates, allocates memory for the `span->spans` array,
+ * and then calls `_calc_spans` to compute the actual scanline data.
+ * It also determines if the source image has alpha or if vertex colors imply alpha,
+ * and sets `span->direct` if a direct solid blit might be possible.
+ *
+ * @param span Pointer to an `RGBA_Map_Spans` structure to be populated.
+ *             This structure will store the calculated `Line` array and metadata.
+ *             - `span->spans`: Array of `Line` structures.
+ *             - `span->size`: Allocated size of `span->spans`.
+ *             - `span->ystart`, `span->yend`: Vertical range of calculated spans.
+ *             - `span->havecol`: Number of vertices with non-default color.
+ *             - `span->havea`: Flag indicating if alpha is present.
+ *             - `span->direct`: Flag indicating if direct blit is possible.
+ * @param src The source RGBA_Image.
+ * @param dst The destination RGBA_Image (used for initial clip bounds if no DC clip).
+ * @param dc The draw context (used for checking multiplier and alpha flags).
+ * @param p Array of 4 RGBA_Map_Point defining the polygon vertices.
+ * @param cx The X-coordinate of the left edge of the clipping rectangle for `_calc_spans`.
+ * @param cy The Y-coordinate of the top edge of the clipping rectangle for this span set.
+ * @param cw The width of the clipping rectangle for `_calc_spans`.
+ * @param ch The height of the clipping rectangle for this span set.
+ */
 static void
 _evas_common_map_rgba_span(RGBA_Map_Spans *span,
                            RGBA_Image *src, RGBA_Image *dst,

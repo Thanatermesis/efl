@@ -49,9 +49,46 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {NULL, NULL}
 };
 
+/**
+ * @brief Callback function invoked when a naviframe item's back button is clicked.
+ *
+ * This function is typically associated with the "clicked" smart callback of a
+ * back button. It triggers the naviframe_item_pop() action for the item
+ * passed in @p data. To prevent multiple pop actions due to event queueing
+ * in Edje, it also removes itself as a callback for the "clicked" event
+ * on the button @p obj.
+ *
+ * @param data Pointer to the Elm_Object_Item (naviframe item) to be popped.
+ * @param obj The Evas_Object (button) that triggered the event.
+ * @param event_info Additional event information (unused).
+ */
 static void _on_item_back_btn_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED);
 
+/**
+ * @brief Key action to activate the back button of the top naviframe item.
+ *
+ * This function retrieves the top item of the naviframe and simulates a click
+ * on its back button, effectively trying to pop the current view.
+ *
+ * @param obj The naviframe Evas_Object.
+ * @param params Additional parameters for the action (unused).
+ * @return EINA_TRUE if the action was attempted (i.e., a top item with a back button exists),
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool _key_action_top_item_get(Evas_Object *obj, const char *params);
+
+/**
+ * @brief Key action to pop the top naviframe item.
+ *
+ * This function retrieves the top item of the naviframe and calls
+ * elm_naviframe_item_pop() to remove it from the stack.
+ * It will not pop if the item is currently in a push or pop transition.
+ *
+ * @param obj The naviframe Evas_Object.
+ * @param params Additional parameters for the action (unused).
+ * @return EINA_TRUE if the pop action was successfully initiated, EINA_FALSE otherwise
+ *         (e.g., no top item, or item is in transition).
+ */
 static Eina_Bool _key_action_item_pop(Evas_Object *obj, const char *params);
 
 static const Elm_Action key_actions[] = {
@@ -78,6 +115,16 @@ super:
    efl_ui_widget_resize_object_set(efl_super(obj, MY_CLASS), sobj);
 }
 
+/**
+ * @brief Resets the resize object of the naviframe to the view of the given item.
+ *
+ * This is typically called when an item becomes the top-most visible item,
+ * ensuring that the naviframe's layout calculations are based on this item.
+ * It also raises the item's view to the top of its layer.
+ *
+ * @param obj The naviframe Evas_Object.
+ * @param it The naviframe item whose view should become the resize object.
+ */
 static void
 _resize_object_reset(Evas_Object *obj, Elm_Naviframe_Item_Data *it)
 {
@@ -88,6 +135,17 @@ _resize_object_reset(Evas_Object *obj, Elm_Naviframe_Item_Data *it)
      }
 }
 
+/**
+ * @brief Recovers focus to the naviframe widget itself.
+ *
+ * This function is called when a page transition occurs, ensuring that
+ * the naviframe widget (rather than a potentially hidden or new page element)
+ * initially receives focus. This helps in managing focus flow during
+ * transitions.
+ *
+ * @param it The naviframe item that has just become active or relevant.
+ *           Used to get a reference to the parent naviframe widget.
+ */
 static void
 _prev_page_focus_recover(Elm_Naviframe_Item_Data *it)
 {
@@ -107,6 +165,17 @@ _elm_naviframe_efl_ui_l10n_translation_update(Eo *obj EINA_UNUSED, Elm_Naviframe
    efl_ui_l10n_translation_update(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Callback for when an item's main content object is deleted.
+ *
+ * Sets the item's content pointer to NULL and emits a signal
+ * to hide the content part in the item's layout.
+ *
+ * @param data Pointer to the Elm_Naviframe_Item_Data of the item.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object being deleted (content object, unused).
+ * @param event_info Additional event information (unused).
+ */
 static void
 _item_content_del_cb(void *data,
                      Evas *e EINA_UNUSED,
@@ -119,6 +188,18 @@ _item_content_del_cb(void *data,
    elm_object_signal_emit(VIEW(it), "elm,state,content,hide", "elm");
 }
 
+/**
+ * @brief Callback for when an item's title previous button object is deleted.
+ *
+ * Sets the item's title_prev_btn pointer to NULL. If this button was
+ * an auto-pushed button, that reference is also cleared. Emits a signal
+ * to hide the previous button part in the item's layout.
+ *
+ * @param data Pointer to the Elm_Naviframe_Item_Data of the item.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object being deleted (button object, unused).
+ * @param event_info Additional event information (unused).
+ */
 static void
 _item_title_prev_btn_del_cb(void *data,
                             Evas *e EINA_UNUSED,
@@ -132,6 +213,17 @@ _item_title_prev_btn_del_cb(void *data,
    elm_object_signal_emit(VIEW(it), "elm,state,prev_btn,hide", "elm");
 }
 
+/**
+ * @brief Callback for when an item's title next button object is deleted.
+ *
+ * Sets the item's title_next_btn pointer to NULL and emits a signal
+ * to hide the next button part in the item's layout.
+ *
+ * @param data Pointer to the Elm_Naviframe_Item_Data of the item.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object being deleted (button object, unused).
+ * @param event_info Additional event information (unused).
+ */
 static void
 _item_title_next_btn_del_cb(void *data,
                             Evas *e EINA_UNUSED,
@@ -144,6 +236,17 @@ _item_title_next_btn_del_cb(void *data,
    elm_object_signal_emit(VIEW(it), "elm,state,next_btn,hide", "elm");
 }
 
+/**
+ * @brief Callback for when an item's title icon object is deleted.
+ *
+ * Sets the item's title_icon pointer to NULL and emits a signal
+ * to hide the icon part in the item's layout.
+ *
+ * @param data Pointer to the Elm_Naviframe_Item_Data of the item.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object being deleted (icon object, unused).
+ * @param event_info Additional event information (unused).
+ */
 static void
 _item_title_icon_del_cb(void *data,
                         Evas *e EINA_UNUSED,
@@ -156,6 +259,20 @@ _item_title_icon_del_cb(void *data,
    elm_object_signal_emit(VIEW(it), "elm,state,icon,hide", "elm");
 }
 
+/**
+ * @brief Callback for when a generic title content part (not main content, prev/next/icon) is deleted.
+ *
+ * This function handles the deletion of custom content objects swallowed into
+ * arbitrary parts of the naviframe item's title area. It emits a signal
+ * to hide the specific part, removes the content pair from the item's list,
+ * and frees associated resources.
+ *
+ * @param data Pointer to Elm_Naviframe_Content_Item_Pair, which links the item,
+ *             the part name, and the content object.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object being deleted (content object, unused).
+ * @param event_info Additional event information (unused).
+ */
 static void
 _title_content_del(void *data,
                    Evas *e EINA_UNUSED,
@@ -173,6 +290,14 @@ _title_content_del(void *data,
    free(pair);
 }
 
+/**
+ * @brief Frees resources associated with a naviframe item's text parts.
+ *
+ * This function releases the stringshare instances for the item's title label,
+ * subtitle label, and any custom text parts stored in its text_list.
+ *
+ * @param it Pointer to the Elm_Naviframe_Item_Data whose text resources are to be freed.
+ */
 static void
 _item_free(Elm_Naviframe_Item_Data *it)
 {
@@ -190,6 +315,16 @@ _item_free(Elm_Naviframe_Item_Data *it)
      }
 }
 
+/**
+ * @brief Emits Edje signals to show or hide content parts of a naviframe item.
+ *
+ * Based on whether content objects are set for various predefined parts
+ * (main content, previous button, next button, icon) and custom content parts,
+ * this function emits "elm,state,<part>,show" or "elm,state,<part>,hide" signals
+ * to the item's layout. This allows the theme to visually update the item.
+ *
+ * @param it Pointer to the Elm_Naviframe_Item_Data for which to emit signals.
+ */
 static void
 _item_content_signals_emit(Elm_Naviframe_Item_Data *it)
 {
@@ -228,6 +363,16 @@ _item_content_signals_emit(Elm_Naviframe_Item_Data *it)
      }
 }
 
+/**
+ * @brief Emits Edje signals to show or hide text parts of a naviframe item.
+ *
+ * Based on whether text is set for the title label, subtitle label, and any
+ * custom text parts, this function emits "elm,state,<part>,show" or
+ * "elm,state,<part>,hide" signals to the item's layout. This allows the
+ * theme to visually update the item's text display.
+ *
+ * @param it Pointer to the Elm_Naviframe_Item_Data for which to emit signals.
+ */
 static void
 _item_text_signals_emit(Elm_Naviframe_Item_Data *it)
 {
@@ -254,6 +399,16 @@ _item_text_signals_emit(Elm_Naviframe_Item_Data *it)
      }
 }
 
+/**
+ * @brief Retrieves the accessibility object associated with a specific part of an item's layout.
+ *
+ * This function first gets the Edje part object and then retrieves the
+ * accessibility object stored in its data field under the key "_part_access_obj".
+ *
+ * @param it The naviframe item.
+ * @param part The name of the Edje part (e.g., TITLE_ACCESS_PART).
+ * @return The accessibility Evas_Object associated with the part, or NULL if not found.
+ */
 static Evas_Object *
 _access_object_get(Elm_Naviframe_Item_Data *it, const char* part)
 {
@@ -268,6 +423,18 @@ _access_object_get(Elm_Naviframe_Item_Data *it, const char* part)
    return ao;
 }
 
+/**
+ * @brief Checks if an Evas_Object has accessibility information of a specific type.
+ *
+ * Iterates through the accessibility items (Elm_Access_Item) associated with
+ * the object and checks if any item matches the given type and has either a
+ * callback function or data set.
+ *
+ * @param obj The Evas_Object to check.
+ * @param type The accessibility information type (e.g., ELM_ACCESS_INFO, ELM_ACCESS_TYPE).
+ * @return EINA_TRUE if accessibility information of the specified type exists and is populated,
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _access_info_has(Evas_Object *obj, int type)
 {
@@ -289,6 +456,14 @@ _access_info_has(Evas_Object *obj, int type)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Emits all relevant signals for an item, covering both text and content parts.
+ *
+ * This is a convenience function that calls _item_text_signals_emit() and
+ * _item_content_signals_emit() for the given item.
+ *
+ * @param it The naviframe item for which to emit signals.
+ */
 static void
 _item_signals_emit(Elm_Naviframe_Item_Data *it)
 {
@@ -296,8 +471,21 @@ _item_signals_emit(Elm_Naviframe_Item_Data *it)
    _item_content_signals_emit(it);
 }
 
-/* FIXME: we need to handle the case when this function is called
- * during a transition */
+/**
+ * @brief Sets the style for a naviframe item.
+ *
+ * This function applies a new style to the item's layout. The style name is
+ * combined with "item/" prefix and the widget's current style to form the
+ * theme group. If the specified style is not found, it falls back to "item/basic".
+ * It also handles potential freezing of events on the item's view.
+ *
+ * @note FIXME: The function mentions a need to handle cases where it's called
+ * during a transition, which is not currently implemented.
+ *
+ * @param it The naviframe item to style.
+ * @param item_style The desired style name (e.g., "basic", "overlap"). If NULL,
+ *                   "basic" is used.
+ */
 static void
 _item_style_set(Elm_Naviframe_Item_Data *it,
                 const char *item_style)

@@ -21,9 +21,19 @@ typedef struct _Efl_Net_Dialer_Windows_Data
 {
    Eina_Stringshare *address_dial;
    double timeout_dial;
-   Eina_Bool connected;
+   Eina_Bool connected; /**< Tracks the connection state. EINA_TRUE if connected, EINA_FALSE otherwise. */
 } Efl_Net_Dialer_Windows_Data;
 
+/**
+ * @internal
+ * @brief Destructor for the Efl_Net_Dialer_Windows object.
+ *
+ * This function is called when the Efl_Net_Dialer_Windows object is being destroyed.
+ * It cleans up resources allocated by the object, such as the dial address string.
+ *
+ * @param o The Efl_Net_Dialer_Windows object.
+ * @param pd The private data of the Efl_Net_Dialer_Windows object.
+ */
 EOLIAN static void
 _efl_net_dialer_windows_efl_object_destructor(Eo *o, Efl_Net_Dialer_Windows_Data *pd)
 {

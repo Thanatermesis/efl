@@ -153,6 +153,18 @@ static Eet_Data_Descriptor *_values_edd;
 static Eet_Data_Descriptor *_item_edd;
 static Eet_Data_Descriptor *_item_unified_edd;
 
+/**
+ * @internal
+ * @brief Get the string representation of an Elm_Prefs_Item_Type for Eet.
+ *
+ * This function is used by Eet to determine the type of a union member
+ * when serializing/deserializing data.
+ *
+ * @param data Pointer to an Elm_Prefs_Item_Type.
+ * @param unknow Pointer to a boolean that will be set to EINA_TRUE if the
+ *        type is unknown, EINA_FALSE otherwise.
+ * @return The string representation of the type, or NULL if unknown.
+ */
 static const char *
 _union_type_get(const void *data,
                 Eina_Bool *unknow)
@@ -173,6 +185,18 @@ _union_type_get(const void *data,
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Set an Elm_Prefs_Item_Type from its string representation for Eet.
+ *
+ * This function is used by Eet to set the type of a union member
+ * when deserializing data.
+ *
+ * @param type The string representation of the type.
+ * @param data Pointer to an Elm_Prefs_Item_Type to be set.
+ * @param unknow EINA_TRUE if the type string is unknown, EINA_FALSE otherwise.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _union_type_set(const char *type,
                 void *data,
@@ -194,6 +218,15 @@ _union_type_set(const char *type,
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Callback function to free a hash of values.
+ *
+ * This function is used as a callback when freeing the main keys hash
+ * in Elm_Prefs_Data, where each value is another hash.
+ *
+ * @param data Pointer to the Eina_Hash (of values) to be freed.
+ */
 static void
 _data_keys_hash_free_cb(void *data)
 {
@@ -201,6 +234,16 @@ _data_keys_hash_free_cb(void *data)
    eina_hash_free(values);
 }
 
+/**
+ * @internal
+ * @brief Callback function to free an Elm_Prefs_Data_Item.
+ *
+ * This function is used as a callback when freeing a hash of
+ * Elm_Prefs_Data_Item structures. It flushes the Eina_Value
+ * and frees the item itself.
+ *
+ * @param data Pointer to the Elm_Prefs_Data_Item to be freed.
+ */
 static void
 _data_values_hash_free_cb(void *data)
 {
@@ -210,6 +253,19 @@ _data_values_hash_free_cb(void *data)
    free(it);
 }
 
+/**
+ * @internal
+ * @brief Load preference data from an Eet file for a specific key.
+ *
+ * This function reads data associated with a given key from an Eet file
+ * and populates the Elm_Prefs_Data structure. It handles different
+ * data types and converts them from their Eet representation to
+ * Eina_Value.
+ *
+ * @param prefs_data The Elm_Prefs_Data handle to populate.
+ * @param eet_file The opened Eet_File to read from.
+ * @param key The key (group name) for which to load data.
+ */
 static void
 _eet_data_load(Elm_Prefs_Data *prefs_data,
                Eet_File *eet_file,
@@ -395,6 +451,18 @@ elm_prefs_data_version_get(const Elm_Prefs_Data *prefs_data)
    return prefs_data->version;
 }
 
+/**
+ * @internal
+ * @brief Save preference data to an Eet file for a specific key.
+ *
+ * This function serializes the data associated with a given key from
+ * the Elm_Prefs_Data structure and writes it to an Eet file.
+ * It converts Eina_Value data to its Eet representation.
+ *
+ * @param prefs_data The Elm_Prefs_Data handle containing the data to save.
+ * @param eet_file The opened Eet_File to write to.
+ * @param key The key (group name) under which to save the data.
+ */
 static void
 _eet_data_save(const Elm_Prefs_Data *prefs_data,
                Eet_File *eet_file,
@@ -504,6 +572,18 @@ _eet_data_save(const Elm_Prefs_Data *prefs_data,
       free(it);
 }
 
+/**
+ * @internal
+ * @brief Perform the actual file saving operation with backup.
+ *
+ * This function handles the process of saving data to a file.
+ * It first renames the existing file to a backup, then attempts to
+ * write the new data. If writing fails, it restores the backup.
+ *
+ * @param prefs_data The Elm_Prefs_Data handle.
+ * @param file The path to the file to save to.
+ * @param key The key (group name) under which to save the data.
+ */
 static void
 _elm_prefs_data_save_do(const Elm_Prefs_Data *prefs_data,
                         const char *file,
@@ -529,6 +609,17 @@ _elm_prefs_data_save_do(const Elm_Prefs_Data *prefs_data,
      }
 }
 
+/**
+ * @internal
+ * @brief Clear event callbacks marked for deletion.
+ *
+ * Iterates through the list of event callbacks marked as 'deleted'
+ * and removes them from the main event callback list, then frees them.
+ * This is typically called when it's safe to modify the callback list
+ * (i.e., not during an event dispatch).
+ *
+ * @param prefs_data The Elm_Prefs_Data handle.
+ */
 static void
 _event_cbs_clear(Elm_Prefs_Data *prefs_data)
 {
@@ -542,6 +633,19 @@ _event_cbs_clear(Elm_Prefs_Data *prefs_data)
      }
 }
 
+/**
+ * @internal
+ * @brief Call all registered event callbacks for a specific event type.
+ *
+ * Iterates through the list of registered event callbacks and invokes
+ * those that match the given event type and are not marked for deletion.
+ * It manages a 'walking' counter to prevent modification of the callback
+ * list during dispatch.
+ *
+ * @param prefs_data The Elm_Prefs_Data handle.
+ * @param type The type of event that occurred.
+ * @param event_info Additional information about the event.
+ */
 static void
 _elm_prefs_data_event_callback_call(Elm_Prefs_Data *prefs_data,
                                     Elm_Prefs_Data_Event_Type type,
@@ -561,6 +665,17 @@ _elm_prefs_data_event_callback_call(Elm_Prefs_Data *prefs_data,
      _event_cbs_clear(prefs_data);
 }
 
+/**
+ * @internal
+ * @brief Ecore_Poller callback function to save prefs data.
+ *
+ * This function is called by an Ecore_Poller when autosave is enabled
+ * and data is dirty. It triggers the actual save operation and
+ * emits an autosave event.
+ *
+ * @param d The Elm_Prefs_Data handle (passed as void*).
+ * @return ECORE_CALLBACK_CANCEL to remove the poller after execution.
+ */
 static Eina_Bool
 _elm_prefs_data_save(void *d)
 {
@@ -582,6 +697,15 @@ end:
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @internal
+ * @brief Mark the prefs data as dirty and schedule a save if autosave is on.
+ *
+ * Sets the 'dirty' flag for the prefs data. If autosave is enabled and
+ * the data is writable, it adds an Ecore_Poller to save the data soon.
+ *
+ * @param prefs_data The Elm_Prefs_Data handle.
+ */
 static void
 _elm_prefs_data_mark_as_dirty(Elm_Prefs_Data *prefs_data)
 {
@@ -619,6 +743,17 @@ elm_prefs_data_ref(Elm_Prefs_Data *prefs_data)
    return prefs_data;
 }
 
+/**
+ * @internal
+ * @brief Clean up and free an Elm_Prefs_Data handle.
+ *
+ * This function is called when the reference count of an Elm_Prefs_Data
+ * handle reaches zero. It ensures any pending saves are performed,
+ * frees all allocated resources including event callbacks, hash tables,
+ * and stringshares, and finally frees the Elm_Prefs_Data structure itself.
+ *
+ * @param prefs_data The Elm_Prefs_Data handle to delete.
+ */
 static void
 _elm_prefs_data_del(Elm_Prefs_Data *prefs_data)
 {
@@ -930,6 +1065,11 @@ elm_prefs_data_save(const Elm_Prefs_Data *prefs_data,
   EET_EINA_STREAM_DATA_DESCRIPTOR_CLASS_SET(&eddc, _type); \
   _desc = eet_data_descriptor_stream_new(&eddc)
 
+/**
+ * @internal
+ * @brief Create an Eet_Data_Descriptor for Eet_Boolean_Item.
+ * @return A new Eet_Data_Descriptor for boolean items.
+ */
 static Eet_Data_Descriptor *
 _bool_desc_new(void)
 {
@@ -942,6 +1082,11 @@ _bool_desc_new(void)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Create an Eet_Data_Descriptor for Eet_Integer_Item.
+ * @return A new Eet_Data_Descriptor for integer items.
+ */
 static Eet_Data_Descriptor *
 _int_desc_new(void)
 {
@@ -954,6 +1099,11 @@ _int_desc_new(void)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Create an Eet_Data_Descriptor for Eet_Float_Item.
+ * @return A new Eet_Data_Descriptor for float items.
+ */
 static Eet_Data_Descriptor *
 _float_desc_new(void)
 {
@@ -966,6 +1116,11 @@ _float_desc_new(void)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Create an Eet_Data_Descriptor for Eet_String_Item.
+ * @return A new Eet_Data_Descriptor for string items.
+ */
 static Eet_Data_Descriptor *
 _str_desc_new(void)
 {
@@ -978,6 +1133,11 @@ _str_desc_new(void)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Create an Eet_Data_Descriptor for Eet_Date_Item.
+ * @return A new Eet_Data_Descriptor for date items.
+ */
 static Eet_Data_Descriptor *
 _date_desc_new(void)
 {
@@ -992,6 +1152,15 @@ _date_desc_new(void)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Initialize all Eet_Data_Descriptors required for prefs data.
+ *
+ * This function creates and configures the Eet data descriptors
+ * for various data types (boolean, integer, float, string, date)
+ * and the overall structure of preference items and values. These
+ * descriptors are used by Eet for serialization and deserialization.
+ */
 static void
 _elm_prefs_data_descriptors_init(void)
 {
@@ -1039,6 +1208,13 @@ _elm_prefs_data_descriptors_init(void)
 
 #undef DESC_NEW
 
+/**
+ * @internal
+ * @brief Free all initialized Eet_Data_Descriptors.
+ *
+ * This function is called during shutdown to release the memory
+ * allocated for the Eet data descriptors.
+ */
 static void
 _elm_prefs_data_descriptors_shutdown(void)
 {
@@ -1051,6 +1227,15 @@ _elm_prefs_data_descriptors_shutdown(void)
    eet_data_descriptor_free(_item_unified_edd);
 }
 
+/**
+ * @internal
+ * @brief Initialize the Elm Prefs Data subsystem.
+ *
+ * Increments an initialization counter. If this is the first
+ * initialization, it sets up the EINA_MAGIC string for Elm_Prefs_Data
+ * and initializes the Eet data descriptors.
+ * This function should be called before any elm_prefs_data_* functions are used.
+ */
 void
 _elm_prefs_data_init(void)
 {
@@ -1062,6 +1247,14 @@ _elm_prefs_data_init(void)
    _elm_prefs_data_descriptors_init();
 }
 
+/**
+ * @internal
+ * @brief Shutdown the Elm Prefs Data subsystem.
+ *
+ * Decrements the initialization counter. If the counter reaches zero,
+ * it shuts down the Eet data descriptors.
+ * This function should be called when the elm_prefs_data_* functions are no longer needed.
+ */
 void
 _elm_prefs_data_shutdown(void)
 {

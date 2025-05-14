@@ -186,7 +186,37 @@ EINA_API int                 eina_ustringshare_strlen(const Eina_Unicode *str) E
  */
 EINA_API void                eina_ustringshare_dump(void);
 
+/**
+ * @brief Replaces a shared unicode string with another.
+ * @param[in,out] p_str Pointer to the shared unicode string to be replaced.
+ *                      On success, this will point to the new shared unicode string.
+ *                      The pointer must be valid (not @c NULL).
+ * @param[in] news The new unicode string to use. This string will be added to the
+ *                 ustringshare, and the old string will be deleted.
+ *                 If @c NULL, @p p_str will be set to @c NULL after deleting the old string.
+ * @return #EINA_TRUE on success, #EINA_FALSE on failure (e.g., memory allocation).
+ *
+ * This function replaces the shared unicode string pointed to by @p p_str with @p news.
+ * It effectively calls eina_ustringshare_del() on the old string (if @p *p_str is not @c NULL) and
+ * eina_ustringshare_add() on @p news (if @p news is not @c NULL), then updates @p p_str.
+ */
 static inline Eina_Bool  eina_ustringshare_replace(const Eina_Unicode **p_str, const Eina_Unicode *news) EINA_ARG_NONNULL(1);
+
+/**
+ * @brief Replaces a shared unicode string with another, specifying length.
+ * @param[in,out] p_str Pointer to the shared unicode string to be replaced.
+ *                      On success, this will point to the new shared unicode string.
+ *                      The pointer must be valid (not @c NULL).
+ * @param[in] news The new unicode string to use.
+ * @param[in] slen The length of @p news to use (in Eina_Unicode characters).
+ * @return #EINA_TRUE on success, #EINA_FALSE on failure (e.g., memory allocation).
+ *
+ * This function replaces the shared unicode string pointed to by @p p_str with
+ * the first @p slen Eina_Unicode characters of @p news.
+ * It effectively calls eina_ustringshare_del() on the old string (if @p *p_str is not @c NULL) and
+ * eina_ustringshare_add_length() on @p news with @p slen (if @p news is not @c NULL and @p slen > 0),
+ * then updates @p p_str. If @p news is @c NULL or @p slen is 0, @p p_str will be set to @c NULL.
+ */
 static inline Eina_Bool  eina_ustringshare_replace_length(const Eina_Unicode **p_str, const Eina_Unicode *news, unsigned int slen) EINA_ARG_NONNULL(1);
 
 #include "eina_inline_ustringshare.x"

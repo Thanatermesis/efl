@@ -9,30 +9,67 @@
 
 #define PSIZE 318
 
+/**
+ * @brief Callback to scroll the scroller to the region at (300, 300).
+ *
+ * This function is called when the "to 300 300" button is clicked. It brings
+ * a specific region of the scroller into view.
+ * @param data The scroller object.
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info The event information (unused).
+ */
 static void
 _my_bt_go_300_300(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_scroller_region_bring_in((Evas_Object *)data, 300, 300, PSIZE, PSIZE);
 }
 
+/**
+ * @brief Callback to scroll the scroller to the region at (900, 300).
+ *
+ * @param data The scroller object.
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info The event information (unused).
+ */
 static void
 _my_bt_go_900_300(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_scroller_region_bring_in((Evas_Object *)data, 900, 300, PSIZE, PSIZE);
 }
 
+/**
+ * @brief Callback to scroll the scroller to the region at (300, 900).
+ *
+ * @param data The scroller object.
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info The event information (unused).
+ */
 static void
 _my_bt_go_300_900(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_scroller_region_bring_in((Evas_Object *)data, 300, 900, PSIZE, PSIZE);
 }
 
+/**
+ * @brief Callback to scroll the scroller to the region at (900, 900).
+ *
+ * @param data The scroller object.
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info The event information (unused).
+ */
 static void
 _my_bt_go_900_900(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_scroller_region_bring_in((Evas_Object *)data, 900, 900, PSIZE, PSIZE);
 }
 
+/**
+ * @brief Callback to scroll the scroller content up by one pixel.
+ *
+ * @param data The scroller object.
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info The event information (unused).
+ */
 static void
 _my_bt_y_minus_one(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -42,6 +79,13 @@ _my_bt_y_minus_one(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EI
    elm_scroller_region_show((Evas_Object *)data, x, y - 1, w, h);
 }
 
+/**
+ * @brief Callback to scroll the scroller content down by one pixel.
+ *
+ * @param data The scroller object.
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info The event information (unused).
+ */
 static void
 _my_bt_y_plus_one(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -51,6 +95,14 @@ _my_bt_y_plus_one(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EIN
    elm_scroller_region_show((Evas_Object *)data, x, y + 1, w, h);
 }
 
+/**
+ * @brief Callback to scroll to the previous page.
+ *
+ * This function gets the current page and brings in the previous horizontal page.
+ * @param data The scroller object.
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info The event information (unused).
+ */
 static void
 _my_bt_prev_page(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -60,6 +112,14 @@ _my_bt_prev_page(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA
 	elm_scroller_page_bring_in(sc, --page_x, page_y);
 }
 
+/**
+ * @brief Callback to scroll to the next page.
+ *
+ * This function gets the current page and brings in the next horizontal page.
+ * @param data The scroller object.
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info The event information (unused).
+ */
 static void
 _my_bt_next_page(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -69,6 +129,14 @@ _my_bt_next_page(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA
 	elm_scroller_page_bring_in(sc, ++page_x, page_y);
 }
 
+/**
+ * @brief Callback to toggle the scroller's freeze state.
+ *
+ * When frozen, the scroller will not scroll.
+ * @param data The scroller's content object.
+ * @param obj The checkbox object that triggered the callback.
+ * @param event_info The event information (unused).
+ */
 static void
 _my_bt_freeze_toggle(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -78,6 +146,14 @@ _my_bt_freeze_toggle(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      elm_object_scroll_freeze_pop((Evas_Object *)data);
 }
 
+/**
+ * @brief Callback to toggle the scroller's hold state.
+ *
+ * When held, user interaction will not scroll the scroller.
+ * @param data The scroller's content object.
+ * @param obj The checkbox object that triggered the callback.
+ * @param event_info The event information (unused).
+ */
 static void
 _my_bt_hold_toggle(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -87,6 +163,15 @@ _my_bt_hold_toggle(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      elm_object_scroll_hold_pop((Evas_Object *)data);
 }
 
+/**
+ * @brief Callback to toggle blocking of horizontal movements.
+ *
+ * This function preserves the vertical blocking state while toggling
+ * the horizontal blocking.
+ * @param data The scroller object.
+ * @param obj The checkbox object that triggered the callback.
+ * @param event_info The event information (unused).
+ */
 static void
 _my_bt_block_movements_x_axis(void *data, Evas_Object *obj,
                              void *event_info EINA_UNUSED)
@@ -113,6 +198,15 @@ _my_bt_block_movements_x_axis(void *data, Evas_Object *obj,
      }
 }
 
+/**
+ * @brief Callback to toggle snapping to pages.
+ *
+ * When enabled, the scroller will snap to the nearest page boundary
+ * after a scroll.
+ * @param data The scroller object.
+ * @param obj The checkbox object that triggered the callback.
+ * @param event_info The event information (unused).
+ */
 static void
 _my_bt_snap_to_pages(void *data,
                     Evas_Object *obj,
@@ -128,6 +222,15 @@ _my_bt_snap_to_pages(void *data,
      }
 }
 
+/**
+ * @brief Callback to toggle blocking of vertical movements.
+ *
+ * This function preserves the horizontal blocking state while toggling
+ * the vertical blocking.
+ * @param data The scroller object.
+ * @param obj The checkbox object that triggered the callback.
+ * @param event_info The event information (unused).
+ */
 static void
 _my_bt_block_movements_y_axis(void *data, Evas_Object *obj,
                              void *event_info EINA_UNUSED)
@@ -154,6 +257,13 @@ _my_bt_block_movements_y_axis(void *data, Evas_Object *obj,
      }
 }
 
+/**
+ * @brief Callback to toggle horizontal looping of the scroller content.
+ *
+ * @param data The scroller object.
+ * @param obj The checkbox object that triggered the callback (unused).
+ * @param event_info The event information (unused).
+ */
 static void
 _my_bt_loop_x_axis(void *data, Evas_Object *obj EINA_UNUSED,
                   void *event_info EINA_UNUSED)
@@ -165,6 +275,13 @@ _my_bt_loop_x_axis(void *data, Evas_Object *obj EINA_UNUSED,
    elm_scroller_loop_set(scroller, !loop_h, loop_v);
 }
 
+/**
+ * @brief Callback to toggle vertical looping of the scroller content.
+ *
+ * @param data The scroller object.
+ * @param obj The checkbox object that triggered the callback (unused).
+ * @param event_info The event information (unused).
+ */
 static void
 _my_bt_loop_y_axis(void *data, Evas_Object *obj EINA_UNUSED,
                   void *event_info EINA_UNUSED)
@@ -176,8 +293,15 @@ _my_bt_loop_y_axis(void *data, Evas_Object *obj EINA_UNUSED,
    elm_scroller_loop_set(scroller, loop_h, !loop_v);
 }
 
+/**
+ * @brief Callback to toggle disabling of mouse wheel scrolling.
+ *
+ * @param data The scroller object.
+ * @param obj The checkbox object that triggered the callback.
+ * @param event_info The event information (unused).
+ */
 static void
-_my_bt_wheel_disable_cb(void *data, Evas_Object *obj EINA_UNUSED,
+_my_bt_wheel_disable_cb(void *data, Evas_Object *obj,
                   void *event_info EINA_UNUSED)
 {
    Evas_Object *scroller = (Evas_Object *)data;
@@ -185,6 +309,14 @@ _my_bt_wheel_disable_cb(void *data, Evas_Object *obj EINA_UNUSED,
    elm_scroller_wheel_disabled_set(scroller, elm_check_state_get(obj));
 }
 
+/**
+ * @brief Callback for when the scroller's page changes.
+ *
+ * Prints the new page number to the console.
+ * @param data The user data (unused).
+ * @param obj The scroller object.
+ * @param event_info The event information (unused).
+ */
 static void
 _page_change_cb(void *data EINA_UNUSED,
                Evas_Object *obj,
@@ -197,6 +329,16 @@ _page_change_cb(void *data EINA_UNUSED,
    printf("Page changed to %d, %d\n", page_x, page_y);
 }
 
+/**
+ * @brief Callback for scroller move events.
+ *
+ * Moves another object to match the scroller's position. Used to overlay
+ * controls on top of the scroller.
+ * @param data The object to move.
+ * @param e The Evas canvas (unused).
+ * @param obj The scroller object that moved.
+ * @param event_info The event information (unused).
+ */
 static void
 _sc_move_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -205,6 +347,16 @@ _sc_move_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info 
    evas_object_move(data, x, y);
 }
 
+/**
+ * @brief Callback for scroller resize events.
+ *
+ * Resizes another object to match the scroller's size. Used to overlay
+ * controls on top of the scroller.
+ * @param data The object to resize.
+ * @param e The Evas canvas (unused).
+ * @param obj The scroller object that was resized.
+ * @param event_info The event information (unused).
+ */
 static void
 _sc_resize_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -213,6 +365,14 @@ _sc_resize_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_inf
    evas_object_resize(data, w, h);
 }
 
+/**
+ * @brief Callback for when the step size spinner value changes.
+ *
+ * Updates the scroller's step size for keyboard-based scrolling.
+ * @param data The scroller object.
+ * @param obj The spinner object.
+ * @param event_info The event information (unused).
+ */
 static void
 _step_size_changed(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -221,6 +381,14 @@ _step_size_changed(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_scroller_step_size_set(sc, ELM_SCALE_SIZE(size), ELM_SCALE_SIZE(size));
 }
 
+/**
+ * @brief Callback for when the page size spinner value changes.
+ *
+ * Updates the scroller's page size.
+ * @param data The scroller object.
+ * @param obj The spinner object.
+ * @param event_info The event information (unused).
+ */
 static void
 _page_size_changed(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -229,6 +397,19 @@ _page_size_changed(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_scroller_page_size_set(sc, size, size);
 }
 
+/**
+ * @brief Test case for the scroller widget.
+ *
+ * This test creates a window with a large scroller containing a grid of
+ * images. It also provides various UI controls (checkboxes, buttons, spinners)
+ * to manipulate the scroller's behavior and properties in real-time, such as
+ * freezing, holding, blocking movement, snapping, looping, and changing step
+ * and page sizes. An overlay table with navigation buttons is also included.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_scroller(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -460,25 +641,50 @@ test_scroller(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_
    evas_object_show(win);
 }
 
+/**
+ * @brief A simple callback to confirm a click event was received.
+ *
+ * This is used on buttons inside scrollers to verify that clicks are
+ * being processed correctly.
+ *
+ * @param data Unused.
+ * @param obj The object that was clicked.
+ * @param event_info Unused.
+ */
 static void
 _click_through(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    printf("click went through on %p\n", obj);
 }
 
+/**
+ * @struct Bounce
+ * @brief Holds state information for the scroller bounce test.
+ */
 typedef struct
 {
-   Evas_Object *scroller;
-   Evas_Object *it1, *it2;
-   Ecore_Timer *timer;
-   int autobounce;
-   int frames;
-   int bounce_max;
-   int y1, y2;
-   int state;
+   Evas_Object *scroller; /**< The scroller widget being tested. */
+   Evas_Object *it1, *it2; /**< Two items in the scroller to bounce between. */
+   Ecore_Timer *timer;    /**< Timer to trigger the bounce animation steps. */
+   int autobounce;        /**< Flag to enable automatic bouncing for testing. */
+   int frames;            /**< Frame counter for performance measurement. */
+   int bounce_max;        /**< Maximum number of bounces to perform in auto mode. */
+   int y1, y2;            /**< Y coordinates of it1 and it2. */
+   int state;             /**< Current state of the bounce animation. */
 } Bounce;
 
 #ifdef CLOCK_PROCESS_CPUTIME_ID
+/**
+ * @brief Frame callback for the bounce test.
+ *
+ * This function is called on every frame render to count frames, used for
+ * performance measurement of the bounce animation. It is compiled only when
+ * CLOCK_PROCESS_CPUTIME_ID is available.
+ *
+ * @param data The Bounce struct.
+ * @param e Unused.
+ * @param event_info Unused.
+ */
 static void
 _bounce_cb_frame(void *data, Evas *e EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -487,6 +693,17 @@ _bounce_cb_frame(void *data, Evas *e EINA_UNUSED, void *event_info EINA_UNUSED)
 }
 #endif
 
+/**
+ * @brief Timer callback to animate the scroller bouncing.
+ *
+ * This function is called periodically by a timer. On each call, it
+ * scrolls the scroller to one of two target items, creating a bouncing
+ * effect. It also handles performance measurement and stops the test
+ * after a certain number of bounces.
+ *
+ * @param data The Bounce struct.
+ * @return ECORE_CALLBACK_RENEW to continue the timer, or ECORE_CALLBACK_CANCEL to stop.
+ */
 static Eina_Bool
 _bounce_cb(void *data)
 {
@@ -535,6 +752,17 @@ _bounce_cb(void *data)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Deletion callback for the scroller2 test.
+ *
+ * Cleans up resources used by the bounce test, such as the timer and the
+ * Bounce struct, when the test window is closed.
+ *
+ * @param data The Bounce struct.
+ * @param e Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _scroll2_del_cb(void *data, Evas *e EINA_UNUSED,
                 Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
@@ -551,6 +779,22 @@ _scroll2_del_cb(void *data, Evas *e EINA_UNUSED,
    free(bounce);
 }
 
+/**
+ * @brief A second test case for the scroller.
+ *
+ * This test demonstrates various scroller configurations within a single
+ * window. It includes:
+ * - A vertical box layout inside a main scroller.
+ * - Sections with vertical-only scrolling.
+ * - A horizontal scroller nested within the main vertical scroller.
+ * - A 2D-scrolling table of buttons.
+ * - An automated bounce test (if ELM_TEST_AUTOBOUNCE is set) that
+ *   scrolls programmatically between two items.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_scroller2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -693,6 +937,15 @@ test_scroller2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event
      }
 }
 
+/**
+ * @brief Callback for the 'scroll,anim,start' event.
+ *
+ * Prints a message indicating that a scroll animation has started, along with
+ * the scroller's current position.
+ * @param data Unused.
+ * @param obj The scroller object.
+ * @param event_info Unused.
+ */
 static void
 _scroll_anim_start(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -701,6 +954,15 @@ _scroll_anim_start(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EI
    printf("scroll start: %p x: %d y: %d\n", obj, x, y);
 }
 
+/**
+ * @brief Callback for the 'scroll,anim,stop' event.
+ *
+ * Prints a message indicating that a scroll animation has stopped, along with
+ * the scroller's final position.
+ * @param data Unused.
+ * @param obj The scroller object.
+ * @param event_info Unused.
+ */
 static void
 _scroll_anim_stop(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -709,6 +971,18 @@ _scroll_anim_stop(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EIN
    printf("scroll stop: %p x: %d y: %d\n", obj, x, y);
 }
 
+/**
+ * @brief A simple scroller test case.
+ *
+ * This test creates a window with a scroller containing a very long vertical
+ * list of buttons (2000 of them). It is used to test basic scrolling
+ * functionality and performance with a large number of child objects. It also
+ * hooks into scroll animation start/stop events to print debug messages.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_scroller_simple(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -756,12 +1030,26 @@ static Ecore_Timer *_timer = NULL;
 static int _append = 0;
 static int _count = 0;
 
+/**
+ * @brief Callback to delete a clicked item from the scroller content.
+ *
+ * @param data Unused.
+ * @param obj The item (button) to be deleted.
+ * @param event_info Unused.
+ */
 static void
 _del_item(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    evas_object_del(obj);
 }
 
+/**
+ * @brief Callback to append a new item to the end of a box.
+ *
+ * @param data The box object to append to.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _append_item(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -776,6 +1064,13 @@ _append_item(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNU
    evas_object_show(bt);
 }
 
+/**
+ * @brief Callback to prepend a new item to the start of a box.
+ *
+ * @param data The box object to prepend to.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _prepend_item(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -790,6 +1085,15 @@ _prepend_item(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UN
    evas_object_show(bt);
 }
 
+/**
+ * @brief Timer callback to append an item periodically.
+ *
+ * This function is called by a timer to append a new item to the box.
+ * It decrements a counter and cancels the timer when the count reaches zero.
+ *
+ * @param data The box object to append to.
+ * @return ECORE_CALLBACK_RENEW to continue, ECORE_CALLBACK_CANCEL to stop.
+ */
 static Eina_Bool
 _append_cb(void *data)
 {
@@ -814,6 +1118,16 @@ _append_cb(void *data)
      return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Callback to start appending 10 items over time.
+ *
+ * Sets up a timer to call _append_cb every 0.3 seconds to add items
+ * to the box.
+ *
+ * @param data The box object to append items to.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _append_items(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -821,6 +1135,13 @@ _append_items(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UN
    _timer = ecore_timer_add(0.3, _append_cb, data);
 }
 
+/**
+ * @brief Callback for slider value changes to adjust scroller gravity.
+ *
+ * @param data The scroller object.
+ * @param obj The slider object that changed.
+ * @param event_info Unused.
+ */
 static void
 _changed_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -830,6 +1151,17 @@ _changed_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
 	printf("Gravity change to %lf\n",val);
 }
 
+/**
+ * @brief Window deletion callback for test_scroller3.
+ *
+ * Cleans up the timer used for appending items when the window is closed
+ * to prevent it from firing after the UI is gone.
+ *
+ * @param data Unused.
+ * @param e Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _win_del_cb(void *data EINA_UNUSED,
 		Evas *e EINA_UNUSED,
@@ -840,6 +1172,18 @@ _win_del_cb(void *data EINA_UNUSED,
    _timer = NULL;
 }
 
+/**
+ * @brief A third test case for the scroller.
+ *
+ * This test focuses on dynamic content manipulation. It provides buttons to
+ * append or prepend items to the scroller's content individually, or to
+ * start a timer that adds multiple items over a few seconds. It also
+ * includes a slider to adjust the scroller's vertical gravity.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_scroller3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -916,6 +1260,18 @@ test_scroller3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event
    evas_object_show(win);
 }
 
+/**
+ * @brief A fourth test case for the scroller.
+ *
+ * This test demonstrates a horizontal page scroller where each page is a
+ * layout. One of the pages contains another, vertical scroller (nested
+ * scroller). It tests page-based scrolling, looping, and interaction with
+ * complex content within pages.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_scroller4(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -981,18 +1337,46 @@ test_scroller4(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback for the button inside the popup.
+ *
+ * Deletes the popup window when the button is clicked.
+ * @param data The popup object to delete.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _popup_btn_clicked_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    evas_object_del(data);
 }
 
+/**
+ * @brief Callback for the 'block,clicked' event on a popup.
+ *
+ * This is triggered when the user clicks outside the popup content. It
+ * deletes the popup.
+ *
+ * @param data Unused.
+ * @param obj The popup object to be deleted.
+ * @param event_info Unused.
+ */
 static void
 _block_clicked_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    evas_object_del(obj);
 }
 
+/**
+ * @brief Callback to create and show a popup with a scroller.
+ *
+ * This function is triggered by buttons in the main window. It creates a
+ * new popup containing a scroller with some text content and a cancel button.
+ *
+ * @param data The parent window object.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _btn_clicked_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -1041,12 +1425,30 @@ _btn_clicked_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_
    elm_object_focus_set(btn, EINA_TRUE);
 }
 
+/**
+ * @brief Callback for when an object receives focus.
+ *
+ * Prints a confirmation message to the console.
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _focused_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("focused");
 }
 
+/**
+ * @brief A fifth test case for the scroller.
+ *
+ * This test demonstrates using a scroller inside a popup widget. It checks
+ * focus handling between the main window buttons and the popup's content.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_scroller5(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -1082,6 +1484,18 @@ test_scroller5(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event
    evas_object_show(win);
 }
 
+/**
+ * @brief A sixth test case for the scroller.
+ *
+ * This test focuses on focus management with a scroller containing
+ * non-focusable content (a label) alongside other focusable widgets
+ * (buttons) outside the scroller. This is to ensure that focus navigation
+ * skips the scroller's content and moves between the other buttons correctly.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_scroller6(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -1127,6 +1541,19 @@ test_scroller6(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event
    evas_object_show(win);
 }
 
+/**
+ * @brief A seventh test case for the scroller.
+ *
+ * This test explores a more complex layout for focus management. It features
+ * a scroller containing a table with both focusable (a button) and
+ * non-focusable (labels) content. The goal is to verify that focus can move
+ * into the scroller to the focusable item, and then correctly move out to
+ * other focusable items in the main layout.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_scroller7(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

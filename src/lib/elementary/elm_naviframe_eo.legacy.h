@@ -4,6 +4,10 @@
 #ifndef _ELM_NAVIFRAME_EO_CLASS_TYPE
 #define _ELM_NAVIFRAME_EO_CLASS_TYPE
 
+/**
+ * @brief Represents a naviframe widget.
+ * @ingroup Elm_Naviframe_Group
+ */
 typedef Eo Elm_Naviframe;
 
 #endif

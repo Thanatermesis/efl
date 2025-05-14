@@ -1,3 +1,12 @@
+/**
+ * @file
+ * @brief Ecore memory pool allocation functions.
+ *
+ * This file provides functions for managing memory pools for various Ecore
+ * data structures. It aims to improve performance by reducing the overhead
+ * of frequent allocations and deallocations.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
@@ -9,14 +18,30 @@
 #include "Ecore.h"
 #include "ecore_private.h"
 
+/**
+ * @brief Structure to hold information about a specific Ecore mempool.
+ */
 typedef struct _Ecore_Mempool Ecore_Mempool;
 struct _Ecore_Mempool
 {
-   const char *name;
-   Eina_Mempool *mp;
-   size_t size;
+   const char *name; /**< The name of the mempool type (e.g., "Ecore_Pipe") */
+   Eina_Mempool *mp; /**< Pointer to the Eina mempool instance */
+   size_t size;      /**< Size of a single element in this mempool */
 };
 
+/**
+ * @def GENERIC_ALLOC_FREE(TYPE, Type)
+ * @brief Macro to generate mempool allocation and free functions for a given Ecore type.
+ *
+ * This macro defines:
+ * - An external declaration for the size of the TYPE (`_ecore_sizeof_##TYPE`).
+ * - An `Ecore_Mempool` static instance (`Type##_mp`) initialized with the type name.
+ * - A `Type##_calloc()` function that allocates memory from the mempool.
+ * - A `Type##_mp_free()` function that frees memory back to the mempool.
+ *
+ * @param TYPE The Ecore structure type (e.g., Ecore_Pipe).
+ * @param Type The prefix for the generated functions and mempool variable (e.g., ecore_pipe).
+ */
 #define GENERIC_ALLOC_FREE(TYPE, Type)                                  \
   extern size_t _ecore_sizeof_##TYPE;                                   \
   Ecore_Mempool Type##_mp = { #TYPE,  NULL, 0 };                        \
@@ -49,6 +74,20 @@ GENERIC_ALLOC_FREE(Efl_Loop_Promise_Simple_Data, efl_loop_promise_simple_data);
 GENERIC_ALLOC_FREE(Ecore_Win32_Handler, ecore_win32_handler);
 #endif
 
+/**
+ * @brief Array of pointers to all managed Ecore_Mempool instances.
+ *
+ * This array is used to iterate over all mempools during initialization
+ * and shutdown.
+ * Example:
+ * @code
+ * static Ecore_Mempool *mempool_array[] = {
+ *   &ecore_pipe_mp, // Mempool for Ecore_Pipe structures
+ *   &ecore_fd_handler_mp, // Mempool for Ecore_Fd_Handler structures
+ *   // ... other mempools
+ * };
+ * @endcode
+ */
 static Ecore_Mempool *mempool_array[] = {
 //  &ecore_animator_mp,
 //  &ecore_event_handler_mp,
@@ -68,6 +107,20 @@ static Ecore_Mempool *mempool_array[] = {
 #endif
 };
 
+/**
+ * @brief Initializes all registered Ecore mempools.
+ *
+ * This function iterates through the `mempool_array` and initializes
+ * each mempool using `eina_mempool_add()`. The type of mempool (e.g.,
+ * "chained_mempool", "pass_through") can be influenced by the
+ * `EINA_MEMPOOL` environment variable.
+ *
+ * It also sets the `size` member of each `Ecore_Mempool` structure
+ * based on the `_ecore_sizeof_##TYPE` variables.
+ *
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure to initialize
+ *         any mempool.
+ */
 Eina_Bool
 ecore_mempool_init(void)
 {
@@ -121,6 +174,12 @@ ecore_mempool_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Shuts down all registered Ecore mempools.
+ *
+ * This function iterates through the `mempool_array` and deinitializes
+ * each mempool using `eina_mempool_del()`, freeing associated resources.
+ */
 void
 ecore_mempool_shutdown(void)
 {

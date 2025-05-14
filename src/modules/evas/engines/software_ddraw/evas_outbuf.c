@@ -1,11 +1,25 @@
 #include "evas_common_private.h"
 #include "evas_engine.h"
 
+/**
+ * @brief Initializes the DirectDraw output buffer system.
+ *
+ * This function is called once to set up any necessary global state for
+ * DirectDraw output buffers. Currently, it does nothing.
+ */
 void
 evas_software_ddraw_outbuf_init(void)
 {
 }
 
+/**
+ * @brief Frees the resources associated with an output buffer.
+ *
+ * @param buf The output buffer to free.
+ *
+ * Shuts down the DirectDraw components associated with the buffer and
+ * frees the memory allocated for the Outbuf structure.
+ */
 void
 evas_software_ddraw_outbuf_free(Outbuf *buf)
 {
@@ -16,6 +30,21 @@ evas_software_ddraw_outbuf_free(Outbuf *buf)
    free(buf);
 }
 
+/**
+ * @brief Sets up a new DirectDraw output buffer.
+ *
+ * @param width The desired width of the buffer.
+ * @param height The desired height of the buffer.
+ * @param rotation The rotation angle (0, 90, 180, 270).
+ * @param window The handle to the window (HWND) where the buffer will be displayed.
+ * @param fullscreen Non-zero if fullscreen mode is requested, 0 otherwise.
+ * @return A pointer to the newly created Outbuf structure, or NULL on failure.
+ *
+ * This function allocates and initializes an Outbuf structure, sets up the
+ * DirectDraw environment for the specified window and dimensions, and checks
+ * if a suitable color conversion function is available for the detected
+ * screen format.
+ */
 Outbuf *
 evas_software_ddraw_outbuf_setup(int          width,
                                  int          height,
@@ -92,6 +121,19 @@ evas_software_ddraw_outbuf_setup(int          width,
    return buf;
 }
 
+/**
+ * @brief Reconfigures an existing output buffer.
+ *
+ * @param buf The output buffer to reconfigure.
+ * @param width The new width.
+ * @param height The new height.
+ * @param rotation The new rotation angle (0, 90, 180, 270).
+ * @param depth The new color depth (currently unused).
+ *
+ * Updates the dimensions and rotation of the output buffer. If the dimensions
+ * or rotation have changed, it triggers a resize of the underlying DirectDraw
+ * surface.
+ */
 void
 evas_software_ddraw_outbuf_reconfigure(Outbuf      *buf,
                                        int          width,
@@ -99,6 +141,7 @@ evas_software_ddraw_outbuf_reconfigure(Outbuf      *buf,
                                        int          rotation,
                                        Outbuf_Depth depth EINA_UNUSED)
 {
+   /* Avoid unnecessary resizing if configuration hasn't changed */
    if ((width == buf->width) && (height == buf->height) &&
        (rotation == buf->rot))
      return;
@@ -108,6 +151,27 @@ evas_software_ddraw_outbuf_reconfigure(Outbuf      *buf,
    evas_software_ddraw_surface_resize(buf);
 }
 
+/**
+ * @brief Creates a new image buffer for updating a region of the output buffer.
+ *
+ * @param buf The output buffer.
+ * @param x The x-coordinate of the region to update.
+ * @param y The y-coordinate of the region to update.
+ * @param w The width of the region to update.
+ * @param h The height of the region to update.
+ * @param[out] cx Pointer to store the relative x-coordinate within the returned image (always 0).
+ * @param[out] cy Pointer to store the relative y-coordinate within the returned image (always 0).
+ * @param[out] cw Pointer to store the width of the returned image (same as w).
+ * @param[out] ch Pointer to store the height of the returned image (same as h).
+ * @return A pointer to an RGBA_Image structure representing the update region, or NULL on failure.
+ *
+ * This function allocates an RGBA_Image buffer that Evas can render into.
+ * It might reuse DirectDraw buffers directly if the format and rotation allow,
+ * otherwise, it allocates a separate buffer. The returned image is added to
+ * the list of pending writes for the output buffer.
+ * The `obr` (Outbuf_Region) structure stored in `im->extended_info` holds
+ * metadata about the update region, including the associated DirectDraw buffer (`ddob`).
+ */
 void *
 evas_software_ddraw_outbuf_new_region_for_update(Outbuf *buf,
                                                  int     x,
@@ -159,9 +223,30 @@ evas_software_ddraw_outbuf_new_region_for_update(Outbuf *buf,
      }
 
    buf->priv.pending_writes = eina_list_append(buf->priv.pending_writes, im);
+   buf->priv.pending_writes = eina_list_append(buf->priv.pending_writes, im);
    return im;
 }
 
+/**
+ * @brief Processes an updated region before flushing.
+ *
+ * @param buf The output buffer.
+ * @param update The RGBA_Image containing the updated pixel data.
+ * @param x The x-coordinate of the updated region.
+ * @param y The y-coordinate of the updated region.
+ * @param w The width of the updated region.
+ * @param h The height of the updated region.
+ *
+ * This function takes the pixel data from the `update` image (which was
+ * previously obtained from evas_software_ddraw_outbuf_new_region_for_update)
+ * and prepares it for drawing onto the DirectDraw surface. This involves:
+ * 1. Finding the appropriate color conversion function based on buffer properties.
+ * 2. Calculating the target coordinates (`obr->x`, `obr->y`) on the DirectDraw
+ *    surface based on the buffer's rotation.
+ * 3. If necessary (i.e., if the update image data is not already in the
+ *    DirectDraw buffer), performing the color conversion from the source
+ *    RGBA data to the DirectDraw buffer associated with the Outbuf_Region (`obr->ddob`).
+ */
 void
 evas_software_ddraw_outbuf_push_updated_region(Outbuf     *buf,
                                                RGBA_Image *update,
@@ -238,8 +323,24 @@ evas_software_ddraw_outbuf_push_updated_region(Outbuf     *buf,
                x,
                y,
                NULL);
+               NULL);
 }
 
+/**
+ * @brief Flushes all pending updates to the screen.
+ *
+ * @param buf The output buffer.
+ * @param surface_damage Regions damaged on the surface (unused).
+ * @param buffer_damage Regions damaged in the buffer (unused).
+ * @param render_mode The rendering mode (sync/async).
+ *
+ * This function takes all the processed update regions (stored in
+ * `buf->priv.pending_writes`), copies them to the DirectDraw back buffer,
+ * and then flips the back buffer to the primary surface, making the updates
+ * visible. It also manages the lifecycle of the update images and associated
+ * DirectDraw buffers.
+ * If render_mode is EVAS_RENDER_MODE_ASYNC_INIT, it returns immediately.
+ */
 void
 evas_software_ddraw_outbuf_flush(Outbuf *buf, Tilebuf_Rect *surface_damage EINA_UNUSED, Tilebuf_Rect *buffer_damage EINA_UNUSED, Evas_Render_Mode render_mode)
 {
@@ -296,11 +397,22 @@ evas_software_ddraw_outbuf_flush(Outbuf *buf, Tilebuf_Rect *surface_damage EINA_
    buf->priv.pending_writes = NULL;
 
    evas_common_cpu_end_opt();
+   evas_common_cpu_end_opt();
 }
 
+/**
+ * @brief Frees resources associated with previously flushed updates during idle time.
+ *
+ * @param buf The output buffer.
+ *
+ * This function cleans up the image buffers and DirectDraw buffers that were
+ * used in the *previous* flush operation (`buf->priv.prev_pending_writes`).
+ * It's typically called when the application is idle to release memory.
+ */
 void
 evas_software_ddraw_outbuf_idle_flush(Outbuf *buf)
 {
+   /* Free images and buffers from the previous flush cycle */
    while (buf->priv.prev_pending_writes)
      {
         RGBA_Image *im;
@@ -318,20 +430,37 @@ evas_software_ddraw_outbuf_idle_flush(Outbuf *buf)
      }
 }
 
+/**
+ * @brief Gets the width of the output buffer.
+ * @param buf The output buffer.
+ * @return The width in pixels.
+ */
 int
 evas_software_ddraw_outbuf_width_get(Outbuf *buf)
 {
    return buf->width;
 }
 
+/**
+ * @brief Gets the height of the output buffer.
+ * @param buf The output buffer.
+ * @return The height in pixels.
+ */
 int
 evas_software_ddraw_outbuf_height_get(Outbuf *buf)
 {
    return buf->height;
 }
 
+/**
+ * @brief Gets the rotation angle of the output buffer.
+ * @param buf The output buffer.
+ * @return The rotation angle (0, 90, 180, or 270).
+ */
 int
 evas_software_ddraw_outbuf_rot_get(Outbuf *buf)
 {
    return buf->rot;
 }
+
+/* vim:ts=8 sw=3 expandtab cindent */

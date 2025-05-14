@@ -23,19 +23,25 @@
 #ifdef HAVE_GLIB
 # include <glib.h>
 
-static Eina_Bool _ecore_glib_active = EINA_FALSE;
-static Ecore_Select_Function _ecore_glib_select_original;
-static GPollFD *_ecore_glib_fds = NULL;
-static size_t _ecore_glib_fds_size = 0;
-static const size_t ECORE_GLIB_FDS_INITIAL = 128;
-static const size_t ECORE_GLIB_FDS_STEP = 8;
-static const size_t ECORE_GLIB_FDS_MAX_FREE = 256;
+static Eina_Bool _ecore_glib_active = EINA_FALSE; /**< Tracks if GLib integration is active */
+static Ecore_Select_Function _ecore_glib_select_original; /**< Stores the original Ecore select function */
+static GPollFD *_ecore_glib_fds = NULL; /**< Array of GLib poll file descriptors */
+static size_t _ecore_glib_fds_size = 0; /**< Current allocated size of _ecore_glib_fds array */
+static const size_t ECORE_GLIB_FDS_INITIAL = 128; /**< Initial size for _ecore_glib_fds */
+static const size_t ECORE_GLIB_FDS_STEP = 8; /**< Step size for increasing _ecore_glib_fds */
+static const size_t ECORE_GLIB_FDS_MAX_FREE = 256; /**< Maximum free slots before shrinking _ecore_glib_fds */
 #if GLIB_CHECK_VERSION(2,32,0)
-static GRecMutex *_ecore_glib_select_lock;
+static GRecMutex *_ecore_glib_select_lock; /**< Mutex to protect select operations in GLib >= 2.32 */
 #else
-static GStaticRecMutex *_ecore_glib_select_lock;
+static GStaticRecMutex *_ecore_glib_select_lock; /**< Mutex to protect select operations in GLib < 2.32 */
 #endif
 
+/**
+ * @brief Resizes the internal array of GLib poll file descriptors.
+ *
+ * @param size The new desired size of the array.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., realloc failed).
+ */
 static Eina_Bool
 _ecore_glib_fds_resize(size_t size)
 {
@@ -53,6 +59,20 @@ _ecore_glib_fds_resize(size_t size)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Queries the GLib main context for file descriptors and timeout.
+ *
+ * This function wraps g_main_context_query, handling resizing of the
+ * internal _ecore_glib_fds array as needed. It also implements a strategy
+ * to shrink the array if it becomes too large compared to the required
+ * number of file descriptors.
+ *
+ * @param ctx The GLib main context to query.
+ * @param priority The maximum priority of sources to check.
+ * @param p_timer Pointer to an integer where the timeout value (in milliseconds)
+ *                will be stored.
+ * @return The number of file descriptors ready, or -1 on error (e.g., resize failed).
+ */
 static int
 _ecore_glib_context_query(GMainContext *ctx,
                           int           priority,
@@ -88,6 +108,21 @@ _ecore_glib_context_query(GMainContext *ctx,
    return reqfds;
 }
 
+/**
+ * @brief Populates Ecore's fd_sets based on GLib's GPollFD array.
+ *
+ * This function iterates through the GPollFD array (populated by
+ * g_main_context_query) and sets the corresponding file descriptors
+ * in Ecore's read, write, and error fd_sets.
+ *
+ * @param pfds Array of GPollFD structures from GLib.
+ * @param count The number of elements in the pfds array.
+ * @param rfds Pointer to Ecore's read file descriptor set.
+ * @param wfds Pointer to Ecore's write file descriptor set.
+ * @param efds Pointer to Ecore's error file descriptor set.
+ * @return The highest file descriptor number encountered plus one,
+ *         suitable for use as the first argument to select().
+ */
 static int
 _ecore_glib_context_poll_from(const GPollFD *pfds,
                               int            count,
@@ -114,6 +149,23 @@ _ecore_glib_context_poll_from(const GPollFD *pfds,
    return glib_fds + 1;
 }
 
+/**
+ * @brief Updates GLib's GPollFD array based on the results from select().
+ *
+ * This function iterates through the GPollFD array and sets the `revents`
+ * field for each descriptor based on whether it's present in Ecore's
+ * read, write, or error fd_sets after the select() call.
+ * It also performs a check for sockets that might have been closed by the
+ * peer, marking them with G_IO_ERR if getpeername fails.
+ *
+ * @param pfds Array of GPollFD structures to update.
+ * @param count The number of elements in the pfds array.
+ * @param rfds Pointer to Ecore's read file descriptor set (after select).
+ * @param wfds Pointer to Ecore's write file descriptor set (after select).
+ * @param efds Pointer to Ecore's error file descriptor set (after select).
+ * @param ready The number of file descriptors reported ready by select().
+ * @return The number of remaining ready file descriptors not consumed by GLib.
+ */
 static int
 _ecore_glib_context_poll_to(GPollFD      *pfds,
                             int           count,
@@ -160,6 +212,23 @@ _ecore_glib_context_poll_to(GPollFD      *pfds,
    return ready;
 }
 
+/**
+ * @brief Core select logic, integrating Ecore and GLib event sources.
+ *
+ * This function is called with the _ecore_glib_select_lock held.
+ * It prepares the GLib main context, queries it for FDs and timeout,
+ * merges GLib FDs into Ecore's fd_sets, determines the overall timeout,
+ * calls the original Ecore select function, updates GLib's GPollFDs
+ * with the results, and dispatches any pending GLib events.
+ *
+ * @param ctx The GLib main context.
+ * @param ecore_fds The highest file descriptor number from Ecore sources.
+ * @param rfds Pointer to Ecore's read file descriptor set.
+ * @param wfds Pointer to Ecore's write file descriptor set.
+ * @param efds Pointer to Ecore's error file descriptor set.
+ * @param ecore_timeout The timeout requested by Ecore.
+ * @return The number of file descriptors ready, or -1 on error.
+ */
 static int
 _ecore_glib_select__locked(GMainContext   *ctx,
                            int             ecore_fds,
@@ -217,7 +286,7 @@ _ecore_glib_select(int             ecore_fds,
    GMainContext *ctx;
    int ret;
 
-   ctx = g_main_context_default();
+   ctx = g_main_context_default(); // Get the default GLib main context.
 
    while (!g_main_context_acquire(ctx))
      g_thread_yield();
@@ -243,6 +312,15 @@ _ecore_glib_select(int             ecore_fds,
 
 #endif
 
+/**
+ * @internal
+ * @brief Initializes GLib integration specific resources.
+ *
+ * This function initializes the mutex used for synchronizing access to
+ * GLib's main context operations. It handles different GLib versions
+ * for mutex initialization. This is typically called when GLib integration
+ * is first activated.
+ */
 void
 _ecore_glib_init(void)
 {
@@ -258,6 +336,14 @@ _ecore_glib_init(void)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Shuts down GLib integration and cleans up resources.
+ *
+ * This function deactivates GLib integration, restores the original Ecore
+ * select function, frees allocated memory for GLib poll file descriptors,
+ * and cleans up the synchronization mutex.
+ */
 void
 _ecore_glib_shutdown(void)
 {
@@ -286,20 +372,34 @@ _ecore_glib_shutdown(void)
 #endif
 }
 
+/**
+ * @brief Integrates the GLib main loop with the Ecore main loop.
+ *
+ * After calling this function, Ecore's main loop will also process
+ * GLib events. This is achieved by replacing Ecore's default select
+ * function with a wrapper (`_ecore_glib_select`) that polls both
+ * Ecore and GLib event sources.
+ *
+ * @return EINA_TRUE if integration was successful or already active.
+ *         EINA_FALSE if GLib support is not compiled in.
+ * @see ecore_main_loop_select_func_set()
+ * @see _ecore_glib_select()
+ */
 EAPI Eina_Bool
 ecore_main_loop_glib_integrate(void)
 {
 #ifdef HAVE_GLIB
    void *func;
 
-   if (_ecore_glib_active) return EINA_TRUE;
+   if (_ecore_glib_active) return EINA_TRUE; // Already active
    func = ecore_main_loop_select_func_get();
-   if (func == _ecore_glib_select) return EINA_TRUE;
-   _ecore_glib_select_original = func;
-   ecore_main_loop_select_func_set(_ecore_glib_select);
+   if (func == _ecore_glib_select) return EINA_TRUE; // Already integrated (e.g. by another call)
+
+   _ecore_glib_select_original = func; // Store the original select function
+   ecore_main_loop_select_func_set(_ecore_glib_select); // Set our wrapper
    _ecore_glib_active = EINA_TRUE;
 
-   /* Init only when requested */
+   /* Init GLib specific parts only when integration is explicitly requested */
    _ecore_glib_init();
    return EINA_TRUE;
 #else
@@ -308,8 +408,29 @@ ecore_main_loop_glib_integrate(void)
 #endif
 }
 
+/**
+ * @brief Flag to control automatic GLib integration at Ecore initialization.
+ * @since 1.2
+ *
+ * If true (default), Ecore will attempt to integrate with GLib automatically
+ * during its initialization if GLib is present and Ecore was compiled with
+ * GLib support. Setting this to false via
+ * ecore_main_loop_glib_always_integrate_disable() prevents this automatic
+ * integration, requiring an explicit call to ecore_main_loop_glib_integrate().
+ */
 Eina_Bool _ecore_glib_always_integrate = 1;
 
+/**
+ * @brief Disables the automatic integration of the GLib main loop at Ecore initialization.
+ * @since 1.2
+ *
+ * By default, Ecore attempts to integrate with GLib automatically if available.
+ * Calling this function prevents that automatic integration, allowing for manual
+ * control via ecore_main_loop_glib_integrate().
+ *
+ * @see ecore_main_loop_glib_integrate()
+ * @see _ecore_glib_always_integrate
+ */
 EAPI void
 ecore_main_loop_glib_always_integrate_disable(void)
 {

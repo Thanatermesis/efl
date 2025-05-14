@@ -1,19 +1,37 @@
 #include <assert.h>
 #include "private.h"
 
+/**
+ * @brief Structure to hold the parameters for the photocam widget.
+ * This structure is used for state saving and restoration.
+ */
 typedef struct _Elm_Params_Photocam
 {
-   Elm_Params base;
-   const char *file;
-   double zoom;
-   const char *zoom_mode;
-   Eina_Bool paused:1;
-   Eina_Bool paused_exists:1;
-   Eina_Bool zoom_exists:1;
+   Elm_Params base; /**< Base parameters */
+   const char *file; /**< The path to the image file to be displayed */
+   double zoom; /**< The zoom level of the photocam */
+   const char *zoom_mode; /**< The zoom mode as a string (e.g., "manual", "auto fit") */
+   Eina_Bool paused:1; /**< Boolean indicating if the photocam animations are paused */
+   Eina_Bool paused_exists:1; /**< Flag indicating if the paused parameter is set */
+   Eina_Bool zoom_exists:1; /**< Flag indicating if the zoom parameter is set */
 } Elm_Params_Photocam;
 
+/**
+ * @brief Array of strings representing the available zoom modes.
+ * The order of strings corresponds to the Elm_Photocam_Zoom_Mode enum.
+ * The array is NULL-terminated.
+ * Example: `choices[0]` is "manual", `choices[1]` is "auto fit".
+ */
 static const char* choices[] = { "manual", "auto fit", "auto fill", NULL };
 
+/**
+ * @brief Converts a zoom mode string to an Elm_Photocam_Zoom_Mode enum value.
+ *
+ * @param zoom_mode_str The string representation of the zoom mode.
+ *                      Example: "manual", "auto fit", "auto fill".
+ * @return The corresponding Elm_Photocam_Zoom_Mode enum value,
+ *         or ELM_PHOTOCAM_ZOOM_MODE_LAST if the string is not recognized.
+ */
 static Elm_Photocam_Zoom_Mode
 _zoom_mode_setting_get(const char *zoom_mode_str)
 {
@@ -29,6 +47,16 @@ _zoom_mode_setting_get(const char *zoom_mode_str)
    return ELM_PHOTOCAM_ZOOM_MODE_LAST;
 }
 
+/**
+ * @brief Sets the state of the photocam widget from parameters.
+ * This function is typically called during widget state restoration.
+ *
+ * @param data Unused.
+ * @param obj The photocam Evas_Object.
+ * @param from_params The previous state parameters (can be NULL).
+ * @param to_params The new state parameters to apply (can be NULL).
+ * @param pos Unused.
+ */
 static void
 external_photocam_state_set(void *data EINA_UNUSED, Evas_Object *obj,
                             const void *from_params, const void *to_params,
@@ -54,6 +82,17 @@ external_photocam_state_set(void *data EINA_UNUSED, Evas_Object *obj,
      elm_photocam_paused_set(obj, p->paused);
 }
 
+/**
+ * @brief Sets a specific external parameter for the photocam widget.
+ * This function is called by Edje to set individual properties.
+ *
+ * @param data Unused.
+ * @param obj The photocam Evas_Object.
+ * @param param The Edje_External_Param to set.
+ *              Example for param->name: "file", "zoom", "zoom mode", "paused".
+ *              Example for param->type: EDJE_EXTERNAL_PARAM_TYPE_STRING for "file".
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., unknown parameter or wrong type).
+ */
 static Eina_Bool
 external_photocam_param_set(void *data EINA_UNUSED, Evas_Object *obj,
                             const Edje_External_Param *param)
@@ -99,6 +138,18 @@ external_photocam_param_set(void *data EINA_UNUSED, Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Gets a specific external parameter from the photocam widget.
+ * This function is called by Edje to retrieve individual properties.
+ *
+ * @param data Unused.
+ * @param obj The photocam Evas_Object.
+ * @param param The Edje_External_Param to fill with the retrieved value.
+ *              The `param->name` field indicates which parameter to get.
+ *              Example for param->name: "file", "zoom".
+ *              The `param->type` field indicates the expected type.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., unknown parameter or wrong type).
+ */
 static Eina_Bool
 external_photocam_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
                             Edje_External_Param *param)
@@ -148,6 +199,19 @@ external_photocam_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Parses a list of Edje_External_Param and stores them in an Elm_Params_Photocam structure.
+ * This is used to convert a list of parameters (e.g., from an EDC file) into a structured format.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param params A list of Edje_External_Param structures.
+ *               Each element in the list is an Edje_External_Param*.
+ *               Example: A list might contain params for "file", "zoom", etc.
+ * @return A newly allocated Elm_Params_Photocam structure filled with the parsed parameters,
+ *         or NULL on allocation failure. The caller is responsible for freeing this memory
+ *         using external_photocam_params_free().
+ */
 static void *
 external_photocam_params_parse(void *data EINA_UNUSED,
                                Evas_Object *obj EINA_UNUSED,
@@ -182,6 +246,15 @@ external_photocam_params_parse(void *data EINA_UNUSED,
    return mem;
 }
 
+/**
+ * @brief Retrieves a content part from the photocam widget.
+ * Photocam does not expose named content parts through this mechanism.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param content Unused.
+ * @return Always NULL for photocam, as it does not support this.
+ */
 static Evas_Object *external_photocam_content_get(void *data EINA_UNUSED,
                                                   const Evas_Object *obj EINA_UNUSED,
                                                   const char *content EINA_UNUSED)
@@ -190,6 +263,13 @@ static Evas_Object *external_photocam_content_get(void *data EINA_UNUSED,
    return NULL;
 }
 
+/**
+ * @brief Frees the memory allocated for Elm_Params_Photocam.
+ * This function is used to clean up the structure returned by
+ * external_photocam_params_parse().
+ *
+ * @param params A pointer to an Elm_Params_Photocam structure.
+ */
 static void
 external_photocam_params_free(void *params)
 {
@@ -202,6 +282,15 @@ external_photocam_params_free(void *params)
    free(mem);
 }
 
+/**
+ * @brief Describes the external parameters supported by the photocam widget.
+ * This array is used by Edje to understand how to interact with the photocam's properties.
+ * Each entry defines a parameter's name, type, and other relevant information (like choices for enums).
+ * - "file": string, path to the image.
+ * - "zoom": double, zoom level.
+ * - "zoom mode": choice, one of "manual", "auto fit", "auto fill".
+ * - "paused": bool, true if animations are paused.
+ */
 static Edje_External_Param_Info external_photocam_params[] = {
      DEFINE_EXTERNAL_COMMON_PARAMS,
      EDJE_EXTERNAL_PARAM_INFO_STRING("file"),

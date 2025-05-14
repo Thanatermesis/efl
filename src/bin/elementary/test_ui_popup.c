@@ -9,20 +9,38 @@
 
 #define POPUP_POINT_MAX 8
 
+/**
+ * @brief Structure to hold private data for the efl_ui_popup test.
+ */
 typedef struct
 {
-   Eo *win;
-   Eo *panel_win;
-   Eo *efl_ui_popup;
-   Eo *button;
+   Eo *win;           /**< The main window */
+   Eo *panel_win;     /**< The window for control panel */
+   Eo *efl_ui_popup;  /**< The popup object */
+   Eo *button;        /**< A button, usage varies by context */
 } efl_ui_popup_data;
 
+/**
+ * @brief Callback for the popup backwall clicked event.
+ *
+ * This function is called when the semi-transparent background of the popup
+ * is clicked. It simply prints a message to stdout.
+ */
 static void
 _backwall_clicked(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
    printf("Popup's background is clicked.\n");
 }
 
+/**
+ * @brief Callback for the popup timeout event.
+ *
+ * This function is called when the popup times out. It sets the popup
+ * reference in the private data to NULL and prints a message.
+ * The popup object itself is deleted by the EFL framework upon timeout.
+ * @param data The private data for the popup test, cast to #efl_ui_popup_data.
+ * @param ev The event information.
+ */
 static void
 _timeout_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
@@ -31,6 +49,14 @@ _timeout_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
    printf("Popup times out and it is deleted.\n");
 }
 
+/**
+ * @brief Callback for the delete button click event.
+ *
+ * Deletes the popup object if it exists and sets its reference in the
+ * private data to NULL. If the popup does not exist, it prints a message.
+ * @param data The private data for the popup test, cast to #efl_ui_popup_data.
+ * @param ev The event information.
+ */
 static void
 _delete_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
@@ -44,6 +70,15 @@ _delete_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
    printf("Efl.Ui.Popup does not exist.\n");
 }
 
+/**
+ * @brief Creates a new popup object.
+ *
+ * If a popup already exists, it is shown. Otherwise, a new popup is created,
+ * configured with a button as content, and event callbacks are added.
+ *
+ * @param p_data The private data for the popup test.
+ * @return The created or existing popup object, or NULL on failure.
+ */
 static Eo*
 _create_popup(efl_ui_popup_data *p_data)
 {
@@ -69,6 +104,13 @@ _create_popup(efl_ui_popup_data *p_data)
    return efl_ui_popup;
 }
 
+/**
+ * @brief Callback for the create button click event.
+ *
+ * Creates a new popup by calling _create_popup().
+ * @param data The private data for the popup test.
+ * @param ev The event information.
+ */
 static void
 _create_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -76,6 +118,15 @@ _create_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    p_data->efl_ui_popup = _create_popup(p_data);
 }
 
+/**
+ * @brief Callback to toggle the backwall image of the popup.
+ *
+ * On the first click, it sets an image as the popup's backwall. On the
+ * second click, it removes the image, reverting to the default backwall.
+ * It also toggles the text of the button that triggered the event.
+ * @param data The private data for the popup test.
+ * @param ev The event information, used to get the source object (button).
+ */
 static void
 _backwall_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -97,6 +148,14 @@ _backwall_cb(void *data EINA_UNUSED, const Efl_Event *ev)
    k = !k;
 }
 
+/**
+ * @brief Callback to toggle repeat events for the popup's backwall.
+ *
+ * When repeat events are enabled, click events on the popup's backwall are
+ * propagated to objects behind it. This function toggles this behavior.
+ * @param data The private data for the popup test.
+ * @param ev The event information, used to get the source object (button).
+ */
 static void
 _repeat_event_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -114,12 +173,27 @@ _repeat_event_cb(void *data EINA_UNUSED, const Efl_Event *ev)
      }
 }
 
+/**
+ * @brief Callback for the repeat event test button.
+ *
+ * This function is used to test if click events are repeated to widgets
+ * behind the popup when backwall event repeating is enabled. It prints
+ * a message when clicked.
+ */
 static void
 _repeat_test_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
    printf("Repeat Test Button is Clicked.\n");
 }
 
+/**
+ * @brief Callback to show or hide a dummy button.
+ *
+ * This function toggles the visibility of a "dummy" button in the main
+ * window, which is used for testing event propagation.
+ * @param data The private data for the popup test.
+ * @param ev The event information, used to get the source object (button).
+ */
 static void
 _dummy_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -137,6 +211,11 @@ _dummy_cb(void *data EINA_UNUSED, const Efl_Event *ev)
      }
 }
 
+/**
+ * @brief Callback to set the popup alignment to center.
+ * @param data The private data for the popup test.
+ * @param ev The event information.
+ */
 static void
 _center_align_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
@@ -145,6 +224,11 @@ _center_align_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
    efl_ui_popup_align_set(p_data->efl_ui_popup, EFL_UI_POPUP_ALIGN_CENTER);
 }
 
+/**
+ * @brief Callback to set the popup alignment to left.
+ * @param data The private data for the popup test.
+ * @param ev The event information.
+ */
 static void
 _left_align_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
@@ -153,6 +237,11 @@ _left_align_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
    efl_ui_popup_align_set(p_data->efl_ui_popup, EFL_UI_POPUP_ALIGN_LEFT);
 }
 
+/**
+ * @brief Callback to set the popup alignment to right.
+ * @param data The private data for the popup test.
+ * @param ev The event information.
+ */
 static void
 _right_align_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
@@ -161,6 +250,11 @@ _right_align_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
    efl_ui_popup_align_set(p_data->efl_ui_popup, EFL_UI_POPUP_ALIGN_RIGHT);
 }
 
+/**
+ * @brief Callback to set the popup alignment to top.
+ * @param data The private data for the popup test.
+ * @param ev The event information.
+ */
 static void
 _top_align_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
@@ -169,6 +263,11 @@ _top_align_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
    efl_ui_popup_align_set(p_data->efl_ui_popup, EFL_UI_POPUP_ALIGN_TOP);
 }
 
+/**
+ * @brief Callback to set the popup alignment to bottom.
+ * @param data The private data for the popup test.
+ * @param ev The event information.
+ */
 static void
 _bottom_align_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
@@ -177,6 +276,13 @@ _bottom_align_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
    efl_ui_popup_align_set(p_data->efl_ui_popup, EFL_UI_POPUP_ALIGN_BOTTOM);
 }
 
+/**
+ * @brief Callback to set the popup position to (0, 0).
+ *
+ * This function moves the popup to the top-left corner of its parent window.
+ * @param data The private data for the popup test.
+ * @param ev The event information.
+ */
 static void
 _position_set_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
@@ -185,6 +291,13 @@ _position_set_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
    efl_gfx_entity_position_set(p_data->efl_ui_popup, EINA_POSITION2D(0, 0));
 }
 
+/**
+ * @brief Callback to resize the popup.
+ *
+ * Toggles the minimum size of the popup between two predefined sizes.
+ * @param data The private data for the popup test.
+ * @param ev The event information.
+ */
 static void
 _popup_resize_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
@@ -201,6 +314,13 @@ _popup_resize_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
    size_changed = !size_changed;
 }
 
+/**
+ * @brief Callback to set a closing timeout for the popup.
+ *
+ * Sets a 3-second timeout after which the popup will automatically close.
+ * @param data The private data for the popup test.
+ * @param ev The event information.
+ */
 static void
 _timeout_set_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
@@ -210,6 +330,15 @@ _timeout_set_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
    printf("timemout is set to 3 seconds\n");
 }
 
+/**
+ * @brief Callback for the main window delete request event.
+ *
+ * This function handles the deletion of the main window by also deleting
+ * the associated panel window. It coordinates with `_panel_win_del` to
+ * free the shared private data once both windows are destroyed.
+ * @param data The private data for the popup test.
+ * @param ev The event information.
+ */
 static void
 _win_del(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -223,6 +352,15 @@ _win_del(void *data, const Efl_Event *ev EINA_UNUSED)
    printf("window is deleted\n");
 }
 
+/**
+ * @brief Callback for the panel window delete request event.
+ *
+ * This function handles the deletion of the panel window by also deleting
+ * the associated main window. It coordinates with `_win_del` to
+ * free the shared private data once both windows are destroyed.
+ * @param data The private data for the popup test.
+ * @param ev The event information.
+ */
 static void
 _panel_win_del(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -236,6 +374,13 @@ _panel_win_del(void *data, const Efl_Event *ev EINA_UNUSED)
    printf("window is deleted\n");
 }
 
+/**
+ * @brief Test case for the Efl.Ui.Popup widget.
+ *
+ * This test creates two windows: a main window for displaying the popup and a
+ * panel window with controls to manipulate the popup (create, delete, change
+ * alignment, etc.). It demonstrates basic popup functionalities.
+ */
 void
 test_ui_popup(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -340,6 +485,15 @@ test_ui_popup(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_
    efl_event_callback_add(position_btn, EFL_INPUT_EVENT_CLICKED, _position_set_cb, p_data);
 }
 
+/**
+ * @brief Callback for button clicks on an alert popup.
+ *
+ * Prints a message indicating which button (positive, negative, or user) was
+ * clicked and then deletes the popup.
+ *
+ * @param data User data, unused.
+ * @param ev The event information, containing details about the clicked button.
+ */
 static void
 efl_ui_alert_popup_clicked_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -355,6 +509,13 @@ efl_ui_alert_popup_clicked_cb(void *data EINA_UNUSED, const Efl_Event *ev)
    efl_del(ev->object);
 }
 
+/**
+ * @brief Test case for the Efl.Ui.Alert.Popup widget.
+ *
+ * This test creates a window and displays a standard alert popup with a title,
+ * content loaded from an Edje file, and three buttons ("Yes", "No", "Cancel").
+ * It demonstrates the basic setup of an alert popup.
+ */
 void
 test_ui_alert_popup(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -384,6 +545,15 @@ test_ui_alert_popup(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *
    efl_event_callback_add(efl_ui_popup, EFL_UI_ALERT_POPUP_EVENT_BUTTON_CLICKED, efl_ui_alert_popup_clicked_cb, NULL);
 }
 
+/**
+ * @brief Test case 1 for scrollable alert popup.
+ *
+ * Creates an alert popup with scrollable content and default sizing.
+ * The content is larger than the popup's minimum size, demonstrating
+ * the default scrolling behavior.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_scroll_case1_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -408,6 +578,14 @@ _alert_scroll_case1_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_event_callback_add(efl_ui_popup, EFL_UI_ALERT_POPUP_EVENT_BUTTON_CLICKED, efl_ui_alert_popup_clicked_cb, NULL);
 }
 
+/**
+ * @brief Test case 2 for scrollable alert popup.
+ *
+ * Creates an alert popup and sets a maximum width, allowing it to expand
+ * horizontally but not vertically.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_scroll_case2_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -434,6 +612,14 @@ _alert_scroll_case2_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_event_callback_add(efl_ui_popup, EFL_UI_ALERT_POPUP_EVENT_BUTTON_CLICKED, efl_ui_alert_popup_clicked_cb, NULL);
 }
 
+/**
+ * @brief Test case 3 for scrollable alert popup.
+ *
+ * Creates an alert popup and sets a maximum height, allowing it to expand
+ * vertically but not horizontally.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_scroll_case3_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -460,6 +646,14 @@ _alert_scroll_case3_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_event_callback_add(efl_ui_popup, EFL_UI_ALERT_POPUP_EVENT_BUTTON_CLICKED, efl_ui_alert_popup_clicked_cb, NULL);
 }
 
+/**
+ * @brief Test case 4 for scrollable alert popup.
+ *
+ * Creates an alert popup and sets both maximum width and height, constraining
+ * its expansion in both directions.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_scroll_case4_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -486,6 +680,15 @@ _alert_scroll_case4_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_event_callback_add(efl_ui_popup, EFL_UI_ALERT_POPUP_EVENT_BUTTON_CLICKED, efl_ui_alert_popup_clicked_cb, NULL);
 }
 
+/**
+ * @brief Test case 5 for scrollable alert popup.
+ *
+ * Creates an alert popup with a maximum size smaller than its minimum size.
+ * This tests how the popup respects the minimum size constraint over the
+ * maximum size hint.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_scroll_case5_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -512,6 +715,14 @@ _alert_scroll_case5_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_event_callback_add(efl_ui_popup, EFL_UI_ALERT_POPUP_EVENT_BUTTON_CLICKED, efl_ui_alert_popup_clicked_cb, NULL);
 }
 
+/**
+ * @brief Test suite for scrollable Efl.Ui.Alert.Popup.
+ *
+ * This test creates a window with several buttons. Each button triggers a
+ * different test case for an alert popup with scrollable content, focusing on
+ * how minimum and maximum size hints affect the popup's final size and
+ * scrollability.
+ */
 void
 test_ui_scroll_alert_popup(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -552,6 +763,15 @@ test_ui_scroll_alert_popup(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    efl_event_callback_add(create_btn, EFL_INPUT_EVENT_CLICKED, _alert_scroll_case5_cb, win);
 }
 
+/**
+ * @brief Callback for button clicks on a text alert popup.
+ *
+ * If the positive button is clicked, it changes the text of the popup.
+ * Otherwise (negative or user button), it deletes the popup.
+ *
+ * @param data User data, unused.
+ * @param ev The event information.
+ */
 static void
 efl_ui_text_alert_popup_clicked_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -563,6 +783,16 @@ efl_ui_text_alert_popup_clicked_cb(void *data EINA_UNUSED, const Efl_Event *ev)
      efl_del(ev->object);
 }
 
+/**
+ * @brief Helper function to create a long string by repetition.
+ *
+ * Appends the given message to the string buffer a specified number of times.
+ * Used to generate long text for testing scrollable popups.
+ *
+ * @param message_buf The string buffer to append to.
+ * @param message The string to repeat.
+ * @param iterate_cnt The number of times to repeat the message.
+ */
 static void
 create_message(Eina_Strbuf *message_buf, const char *message, int iterate_cnt)
 {
@@ -571,6 +801,13 @@ create_message(Eina_Strbuf *message_buf, const char *message, int iterate_cnt)
       eina_strbuf_append(message_buf, message);
 }
 
+/**
+ * @brief Test case 1 for text alert popup.
+ *
+ * Creates a text alert popup with a short message and default sizing.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_text_case1_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -589,6 +826,14 @@ _alert_text_case1_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_event_callback_add(efl_ui_popup, EFL_UI_ALERT_POPUP_EVENT_BUTTON_CLICKED, efl_ui_text_alert_popup_clicked_cb, NULL);
 }
 
+/**
+ * @brief Test case 2 for text alert popup.
+ *
+ * Creates a text alert popup with a long message to test scrolling, using
+ * default sizing.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_text_case2_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -612,6 +857,13 @@ _alert_text_case2_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    eina_strbuf_free(message_buf);
 }
 
+/**
+ * @brief Test case 3 for text alert popup.
+ *
+ * Creates a text alert popup with a short message and both min/max size hints.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_text_case3_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -631,6 +883,13 @@ _alert_text_case3_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_event_callback_add(efl_ui_popup, EFL_UI_ALERT_POPUP_EVENT_BUTTON_CLICKED, efl_ui_text_alert_popup_clicked_cb, NULL);
 }
 
+/**
+ * @brief Test case 4 for text alert popup.
+ *
+ * Creates a text alert popup with a short message and a max width hint.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_text_case4_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -651,6 +910,13 @@ _alert_text_case4_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_event_callback_add(efl_ui_popup, EFL_UI_ALERT_POPUP_EVENT_BUTTON_CLICKED, efl_ui_text_alert_popup_clicked_cb, NULL);
 }
 
+/**
+ * @brief Test case 5 for text alert popup.
+ *
+ * Creates a text alert popup with a short message and a max height hint.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_text_case5_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -670,6 +936,13 @@ _alert_text_case5_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_event_callback_add(efl_ui_popup, EFL_UI_ALERT_POPUP_EVENT_BUTTON_CLICKED, efl_ui_text_alert_popup_clicked_cb, NULL);
 }
 
+/**
+ * @brief Test case 6 for text alert popup.
+ *
+ * Creates a text alert popup with a long message and both min/max size hints.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_text_case6_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -695,6 +968,13 @@ _alert_text_case6_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    eina_strbuf_free(message_buf);
 }
 
+/**
+ * @brief Test case 7 for text alert popup.
+ *
+ * Creates a text alert popup with a long message and a max width hint.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_text_case7_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -720,6 +1000,13 @@ _alert_text_case7_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    eina_strbuf_free(message_buf);
 }
 
+/**
+ * @brief Test case 8 for text alert popup.
+ *
+ * Creates a text alert popup with a long message and a max height hint.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_text_case8_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -745,6 +1032,14 @@ _alert_text_case8_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    eina_strbuf_free(message_buf);
 }
 
+/**
+ * @brief Test case 9 for text alert popup.
+ *
+ * Creates a text alert popup with a long message and max size hints smaller
+ * than the min size hints, testing size constraint priorities.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_text_case9_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -770,6 +1065,14 @@ _alert_text_case9_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    eina_strbuf_free(message_buf);
 }
 
+/**
+ * @brief Test case 10 for text alert popup.
+ *
+ * Creates a text alert popup with a long message and max size hints smaller
+ * than the min size hints.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_text_case10_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -795,6 +1098,14 @@ _alert_text_case10_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    eina_strbuf_free(message_buf);
 }
 
+/**
+ * @brief Test case 11 for text alert popup.
+ *
+ * Creates a text alert popup with a long message, a min size, and a max
+ * width hint that is smaller than the min width.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_text_case11_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -820,6 +1131,14 @@ _alert_text_case11_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    eina_strbuf_free(message_buf);
 }
 
+/**
+ * @brief Test case 12 for text alert popup.
+ *
+ * Creates a text alert popup with a long message, a min size, and a max
+ * width hint that is larger than the min width.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_text_case12_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -845,6 +1164,14 @@ _alert_text_case12_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    eina_strbuf_free(message_buf);
 }
 
+/**
+ * @brief Test case 13 for text alert popup.
+ *
+ * Creates a text alert popup with a long message, a min size, and a max
+ * height hint that is smaller than the min height.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_text_case13_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -870,6 +1197,14 @@ _alert_text_case13_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    eina_strbuf_free(message_buf);
 }
 
+/**
+ * @brief Test case 14 for text alert popup.
+ *
+ * Creates a text alert popup with a long message, a min size, and a max
+ * height hint that is larger than the min height.
+ * @param data The parent window.
+ * @param ev The event information.
+ */
 static void
 _alert_text_case14_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -895,6 +1230,14 @@ _alert_text_case14_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    eina_strbuf_free(message_buf);
 }
 
+/**
+ * @brief Test suite for text-based Efl.Ui.Alert.Popup.
+ *
+ * This test creates a window with numerous buttons. Each button triggers a
+ * different scenario for an alert popup with text content. The scenarios cover
+ * combinations of short and long text with various minimum and maximum size
+ * constraints to test layouting and scrolling behavior.
+ */
 void
 test_ui_text_alert_popup(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -989,18 +1332,44 @@ test_ui_text_alert_popup(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, v
    efl_event_callback_add(create_btn, EFL_INPUT_EVENT_CLICKED, _alert_text_case14_cb, win);
 }
 
+/**
+ * @brief Callback to set the popup's anchor.
+ *
+ * Sets the anchor of the popup to the object that triggered the event (a button).
+ * The popup will be positioned relative to this anchor object.
+ *
+ * @param data The popup object.
+ * @param ev The event information, containing the anchor object.
+ */
 static void
 _anchor_set_cb(void *data, const Efl_Event *ev)
 {
    efl_ui_popup_anchor_set(data, ev->object);
 }
 
+/**
+ * @brief Callback to unset the popup's anchor.
+ *
+ * Removes the anchor from the popup, causing it to revert to its default
+ * positioning behavior.
+ *
+ * @param data The popup object.
+ * @param ev The event information.
+ */
 static void
 _anchor_unset_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    efl_ui_popup_anchor_set(data, NULL);
 }
 
+/**
+ * @brief Test case for anchored Efl.Ui.Popup.
+ *
+ * This test demonstrates how a popup can be anchored to another widget.
+ * It creates a layout with several buttons that can serve as anchors.
+ * Clicking a button sets it as the popup's anchor. The popup itself contains
+ * controls to change its alignment relative to the anchor.
+ */
 void
 test_ui_anchor_popup(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

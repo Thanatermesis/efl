@@ -3,30 +3,94 @@ EVAS_API EVAS_API_WEAK const Efl_Event_Description _EVAS_BOX_EVENT_CHILD_ADDED =
 EVAS_API EVAS_API_WEAK const Efl_Event_Description _EVAS_BOX_EVENT_CHILD_REMOVED =
    EFL_EVENT_DESCRIPTION("child,removed");
 
+/**
+ * @internal
+ * @brief Internal implementation for evas_obj_box_align_set().
+ * This function contains the actual logic for setting the box alignment.
+ * @param obj The Evas_Box object.
+ * @param pd Private data for the Evas_Box object.
+ * @param horizontal The horizontal alignment (0.0 to 1.0).
+ * @param vertical The vertical alignment (0.0 to 1.0).
+ */
 void _evas_box_align_set(Eo *obj, Evas_Object_Box_Data *pd, double horizontal, double vertical);
 
 EVAS_API EVAS_API_WEAK EFL_VOID_FUNC_BODYV(evas_obj_box_align_set, EFL_FUNC_CALL(horizontal, vertical), double horizontal, double vertical);
 
+/**
+ * @internal
+ * @brief Internal implementation for evas_obj_box_align_get().
+ * This function contains the actual logic for getting the box alignment.
+ * @param obj The Evas_Box object.
+ * @param pd Private data for the Evas_Box object.
+ * @param[out] horizontal Pointer to store the horizontal alignment.
+ * @param[out] vertical Pointer to store the vertical alignment.
+ */
 void _evas_box_align_get(const Eo *obj, Evas_Object_Box_Data *pd, double *horizontal, double *vertical);
 
 EVAS_API EVAS_API_WEAK EFL_VOID_FUNC_BODYV_CONST(evas_obj_box_align_get, EFL_FUNC_CALL(horizontal, vertical), double *horizontal, double *vertical);
 
+/**
+ * @internal
+ * @brief Internal implementation for evas_obj_box_padding_set().
+ * This function contains the actual logic for setting the box padding.
+ * @param obj The Evas_Box object.
+ * @param pd Private data for the Evas_Box object.
+ * @param horizontal The horizontal padding in pixels.
+ * @param vertical The vertical padding in pixels.
+ */
 void _evas_box_padding_set(Eo *obj, Evas_Object_Box_Data *pd, int horizontal, int vertical);
 
 EVAS_API EVAS_API_WEAK EFL_VOID_FUNC_BODYV(evas_obj_box_padding_set, EFL_FUNC_CALL(horizontal, vertical), int horizontal, int vertical);
 
+/**
+ * @internal
+ * @brief Internal implementation for evas_obj_box_padding_get().
+ * This function contains the actual logic for getting the box padding.
+ * @param obj The Evas_Box object.
+ * @param pd Private data for the Evas_Box object.
+ * @param[out] horizontal Pointer to store the horizontal padding.
+ * @param[out] vertical Pointer to store the vertical padding.
+ */
 void _evas_box_padding_get(const Eo *obj, Evas_Object_Box_Data *pd, int *horizontal, int *vertical);
 
 EVAS_API EVAS_API_WEAK EFL_VOID_FUNC_BODYV_CONST(evas_obj_box_padding_get, EFL_FUNC_CALL(horizontal, vertical), int *horizontal, int *vertical);
 
+/**
+ * @internal
+ * @brief Internal implementation for evas_obj_box_layout_set().
+ * This function contains the actual logic for setting the box layout function.
+ * @param obj The Evas_Box object.
+ * @param pd Private data for the Evas_Box object.
+ * @param cb The layout callback function.
+ * @param data User data for the callback.
+ * @param free_data Callback to free the user data.
+ */
 void _evas_box_layout_set(Eo *obj, Evas_Object_Box_Data *pd, Evas_Object_Box_Layout cb, const void *data, Eina_Free_Cb free_data);
 
 EVAS_API EVAS_API_WEAK EFL_VOID_FUNC_BODYV(evas_obj_box_layout_set, EFL_FUNC_CALL(cb, data, free_data), Evas_Object_Box_Layout cb, const void *data, Eina_Free_Cb free_data);
 
+/**
+ * @internal
+ * @brief Internal implementation for evas_obj_box_layout_horizontal().
+ * This function performs the horizontal layout logic.
+ * @param obj The Evas_Box object.
+ * @param pd Private data for the Evas_Box object. (Note: API shows priv, pd is likely the Eo private data)
+ * @param priv The Evas_Object_Box_Data specific to the layout operation.
+ * @param data User data associated with the layout.
+ */
 void _evas_box_layout_horizontal(Eo *obj, Evas_Object_Box_Data *pd, Evas_Object_Box_Data *priv, void *data);
 
 EVAS_API EVAS_API_WEAK EFL_VOID_FUNC_BODYV(evas_obj_box_layout_horizontal, EFL_FUNC_CALL(priv, data), Evas_Object_Box_Data *priv, void *data);
 
+/**
+ * @internal
+ * @brief Internal implementation for evas_obj_box_layout_vertical().
+ * This function performs the vertical layout logic.
+ * @param obj The Evas_Box object.
+ * @param pd Private data for the Evas_Box object.
+ * @param priv The Evas_Object_Box_Data specific to the layout operation.
+ * @param data User data associated with the layout.
+ */
 void _evas_box_layout_vertical(Eo *obj, Evas_Object_Box_Data *pd, Evas_Object_Box_Data *priv, void *data);
 
 EVAS_API EVAS_API_WEAK EFL_VOID_FUNC_BODYV(evas_obj_box_layout_vertical, EFL_FUNC_CALL(priv, data), Evas_Object_Box_Data *priv, void *data);
@@ -170,7 +234,18 @@ void _evas_box_efl_gfx_entity_position_set(Eo *obj, Evas_Object_Box_Data *pd, Ei
 
 void _evas_box_efl_canvas_group_group_calculate(Eo *obj, Evas_Object_Box_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Initializes the Evas_Box Efl_Class.
+ *
+ * This function is called by the EO system when the Evas_Box class is
+ * first loaded. It registers the operations (methods) that Evas_Box implements,
+ * mapping the public C API function names (e.g., evas_obj_box_align_set)
+ * to their corresponding internal implementation functions (e.g., _evas_box_align_set).
+ *
+ * @param klass The Evas_Box Efl_Class structure to initialize.
+ * @return @c EINA_TRUE on successful initialization, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _evas_box_class_initializer(Efl_Class *klass)
 {
@@ -233,6 +308,20 @@ _evas_box_class_initializer(Efl_Class *klass)
    return efl_class_functions_set(klass, opsp, ropsp);
 }
 
+/**
+ * @internal
+ * @brief Constant descriptor for the Evas_Box Efl_Class.
+ *
+ * This structure provides metadata about the Evas_Box class to the EO system.
+ * It includes:
+ * - EO_VERSION: The EO API version this class complies with.
+ * - "Evas.Box": The unique name of the class.
+ * - EFL_CLASS_TYPE_REGULAR: Specifies that this is a regular, instantiable class.
+ * - sizeof(Evas_Object_Box_Data): The size of the private data structure for instances of this class.
+ * - _evas_box_class_initializer: Pointer to the class initializer function.
+ * - _evas_box_class_constructor: Pointer to the class constructor function (called for new instances).
+ * - NULL: Pointer to the class destructor function (unused here).
+ */
 static const Efl_Class_Description _evas_box_class_desc = {
    EO_VERSION,
    "Evas.Box",

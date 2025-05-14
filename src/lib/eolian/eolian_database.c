@@ -18,6 +18,14 @@ database_object_add(Eolian_Unit *unit, const Eolian_Object *obj)
                  ((Eina_List *)eina_hash_find(unit->state->staging.objects_f, obj->file), obj));
 }
 
+/**
+ * @brief Gets the type of an Eolian object.
+ *
+ * @param[in] obj The Eolian object.
+ * @return The type of the object, or #EOLIAN_OBJECT_UNKNOWN if obj is NULL.
+ *
+ * @ingroup Eolian_Object
+ */
 EOLIAN_API Eolian_Object_Type
 eolian_object_type_get(const Eolian_Object *obj)
 {
@@ -25,6 +33,14 @@ eolian_object_type_get(const Eolian_Object *obj)
    return obj->type;
 }
 
+/**
+ * @brief Gets the compilation unit where an Eolian object is defined.
+ *
+ * @param[in] obj The Eolian object.
+ * @return The Eolian unit, or NULL if obj is NULL.
+ *
+ * @ingroup Eolian_Object
+ */
 EOLIAN_API const Eolian_Unit *
 eolian_object_unit_get(const Eolian_Object *obj)
 {
@@ -32,6 +48,14 @@ eolian_object_unit_get(const Eolian_Object *obj)
    return obj->unit;
 }
 
+/**
+ * @brief Gets the (short) file name where an Eolian object is defined.
+ *
+ * @param[in] obj The Eolian object.
+ * @return The file name (e.g., "my_class.eo"), or NULL if obj is NULL.
+ *
+ * @ingroup Eolian_Object
+ */
 EOLIAN_API const char *
 eolian_object_file_get(const Eolian_Object *obj)
 {
@@ -39,6 +63,14 @@ eolian_object_file_get(const Eolian_Object *obj)
    return obj->file;
 }
 
+/**
+ * @brief Gets the line number where an Eolian object is defined in its source file.
+ *
+ * @param[in] obj The Eolian object.
+ * @return The line number, or 0 if obj is NULL.
+ *
+ * @ingroup Eolian_Object
+ */
 EOLIAN_API int
 eolian_object_line_get(const Eolian_Object *obj)
 {
@@ -46,6 +78,14 @@ eolian_object_line_get(const Eolian_Object *obj)
    return obj->line;
 }
 
+/**
+ * @brief Gets the column number where an Eolian object is defined in its source file.
+ *
+ * @param[in] obj The Eolian object.
+ * @return The column number, or 0 if obj is NULL.
+ *
+ * @ingroup Eolian_Object
+ */
 EOLIAN_API int
 eolian_object_column_get(const Eolian_Object *obj)
 {
@@ -53,6 +93,16 @@ eolian_object_column_get(const Eolian_Object *obj)
    return obj->column;
 }
 
+/**
+ * @brief Gets the fully qualified Eolian name of an object.
+ *
+ * For example, "My.Namespace.MyClass".
+ *
+ * @param[in] obj The Eolian object.
+ * @return The full name of the object, or NULL if obj is NULL.
+ *
+ * @ingroup Eolian_Object
+ */
 EOLIAN_API const char *
 eolian_object_name_get(const Eolian_Object *obj)
 {
@@ -60,6 +110,17 @@ eolian_object_name_get(const Eolian_Object *obj)
    return obj->name;
 }
 
+/**
+ * @brief Gets the C-language-equivalent name for an Eolian object.
+ *
+ * This is the name used for generating C code, for example,
+ * "my_namespace_myclass_get".
+ *
+ * @param[in] obj The Eolian object.
+ * @return The C name of the object, or NULL if obj is NULL.
+ *
+ * @ingroup Eolian_Object
+ */
 EOLIAN_API const char *
 eolian_object_c_name_get(const Eolian_Object *obj)
 {
@@ -73,6 +134,18 @@ typedef struct _Eolian_Namespace_List
    char *curp;
 } Eolian_Namespace_List;
 
+/**
+ * @internal
+ * @brief Iterator 'next' function for traversing namespaces.
+ *
+ * This function is part of the Eina_Iterator implementation for
+ * eolian_object_namespaces_get(). It finds the next namespace component
+ * in the object's full name by splitting the string at each dot.
+ *
+ * @param it The iterator instance.
+ * @param data Pointer to store the next namespace component.
+ * @return EINA_TRUE if a namespace was found, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _nmsp_iterator_next(Eolian_Namespace_List *it, void **data)
 {
@@ -89,12 +162,33 @@ _nmsp_iterator_next(Eolian_Namespace_List *it, void **data)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Iterator 'get_container' function for namespace iterator.
+ *
+ * Always returns NULL as there is no container.
+ *
+ * @param it The iterator instance.
+ * @return NULL.
+ */
 static void *
 _nmsp_container_get(Eina_Iterator *it EINA_UNUSED)
 {
    return NULL;
 }
 
+/**
+ * @brief Gets the short name of an Eolian object.
+ *
+ * This returns the part of the name after the last dot. For an object with
+ * full name "My.Namespace.MyClass", the short name is "MyClass". If there are
+ * no dots, the full name is returned.
+ *
+ * @param[in] obj The Eolian object.
+ * @return The short name of the object, or NULL if obj or its name is NULL.
+ *
+ * @ingroup Eolian_Object
+ */
 EOLIAN_API const char *
 eolian_object_short_name_get(const Eolian_Object *obj)
 {
@@ -105,6 +199,19 @@ eolian_object_short_name_get(const Eolian_Object *obj)
    return obj->name;
 }
 
+/**
+ * @brief Gets an iterator over the namespaces of an Eolian object.
+ *
+ * For an object with full name "My.Namespace.MyClass", this iterator will
+ * yield "My" and then "Namespace". The iterator and its string data must be freed
+ * after use by calling eina_iterator_free(). The strings are part of the iterator's memory block.
+ *
+ * @param[in] obj The Eolian object.
+ * @return A new Eina_Iterator over the namespaces, or NULL if there are no
+ *         namespaces or on error. The caller is responsible for freeing it.
+ *
+ * @ingroup Eolian_Object
+ */
 EOLIAN_API Eina_Iterator *
 eolian_object_namespaces_get(const Eolian_Object *obj)
 {
@@ -126,6 +233,16 @@ eolian_object_namespaces_get(const Eolian_Object *obj)
    return &it->itr;
 }
 
+/**
+ * @brief Checks if an Eolian object is marked as beta.
+ *
+ * Beta objects are part of an unstable API and may change in future versions.
+ *
+ * @param[in] obj The Eolian object.
+ * @return #EINA_TRUE if the object is beta, #EINA_FALSE otherwise (or if obj is NULL).
+ *
+ * @ingroup Eolian_Object
+ */
 EOLIAN_API Eina_Bool
 eolian_object_is_beta(const Eolian_Object *obj)
 {
@@ -143,6 +260,16 @@ void database_doc_del(Eolian_Documentation *doc)
    free(doc);
 }
 
+/**
+ * @brief Gets the summary from a documentation block.
+ *
+ * The summary is typically the first paragraph of a documentation comment.
+ *
+ * @param[in] doc The documentation object.
+ * @return The summary string, or NULL if not available.
+ *
+ * @ingroup Eolian_Documentation
+ */
 EOLIAN_API const char *
 eolian_documentation_summary_get(const Eolian_Documentation *doc)
 {
@@ -150,6 +277,16 @@ eolian_documentation_summary_get(const Eolian_Documentation *doc)
    return doc->summary;
 }
 
+/**
+ * @brief Gets the detailed description from a documentation block.
+ *
+ * The description is the part of the documentation that follows the summary.
+ *
+ * @param[in] doc The documentation object.
+ * @return The description string, or NULL if not available.
+ *
+ * @ingroup Eolian_Documentation
+ */
 EOLIAN_API const char *
 eolian_documentation_description_get(const Eolian_Documentation *doc)
 {
@@ -157,6 +294,17 @@ eolian_documentation_description_get(const Eolian_Documentation *doc)
    return doc->description;
 }
 
+/**
+ * @brief Gets the 'since' version string from a documentation block.
+ *
+ * This string indicates when the documented element was added or last
+ * significantly changed.
+ *
+ * @param[in] doc The documentation object.
+ * @return The 'since' version string, or NULL if not available.
+ *
+ * @ingroup Eolian_Documentation
+ */
 EOLIAN_API const char *
 eolian_documentation_since_get(const Eolian_Documentation *doc)
 {
@@ -164,6 +312,19 @@ eolian_documentation_since_get(const Eolian_Documentation *doc)
    return doc->since;
 }
 
+/**
+ * @brief Splits a documentation string into paragraphs.
+ *
+ * This function splits a raw documentation string by double newlines ("\n\n")
+ * into a list of strings. Each string in the list corresponds to a paragraph.
+ * Empty paragraphs are omitted. The caller is responsible for freeing the
+ * returned list and its string elements.
+ *
+ * @param[in] doc The raw documentation string to split.
+ * @return A new Eina_List of strings (char *), or NULL if the input is NULL or empty.
+ *
+ * @ingroup Eolian_Documentation
+ */
 EOLIAN_API Eina_List *
 eolian_documentation_string_split(const char *doc)
 {
@@ -191,6 +352,18 @@ eolian_documentation_string_split(const char *doc)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Skips over a valid reference word in a documentation string.
+ *
+ * A reference word starts with an underscore or a letter, and is followed
+ * by any number of alphanumeric characters or underscores. This is a helper
+ * for parsing documentation references like '@Some.Thing.func'.
+ *
+ * @param doc Pointer to a pointer to the current position in the string.
+ *            On success, this is advanced past the word.
+ * @return EINA_TRUE if a valid word was skipped, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _skip_ref_word(const char **doc)
 {
@@ -203,10 +376,20 @@ _skip_ref_word(const char **doc)
    return EINA_TRUE;
 }
 
-/* this make sure the format is correct at least, it cannot verify the
- * correctness of the reference itself (but Eolian will do it in its
- * lexer, so there is nothing to worry about; all references are guaranteed
- * to be right
+/**
+ * @internal
+ * @brief Attempts to parse a documentation reference token from a string.
+ *
+ * This function checks if the given string `doc` starts with a valid
+ * documentation reference (e.g., "@Some.Class.method", "@[Some.Class,event]").
+ * It performs basic syntax validation but does not resolve the reference.
+ * The lexer is expected to guarantee correctness of the reference itself.
+ *
+ * @param doc The string to parse.
+ * @param doc_end If not NULL, this will be set to point to the character
+ *                after the parsed reference token on success.
+ * @return #EOLIAN_DOC_TOKEN_REF if a valid reference is found,
+ *         #EOLIAN_DOC_TOKEN_UNKNOWN otherwise.
  */
 static Eolian_Doc_Token_Type
 _get_ref_token(const char *doc, const char **doc_end)
@@ -259,6 +442,37 @@ _get_ref_token(const char *doc, const char **doc_end)
    return EOLIAN_DOC_TOKEN_REF;
 }
 
+/**
+ * @brief Tokenizes a documentation string, one token at a time.
+ *
+ * This function processes a documentation string and extracts the next token.
+ * A token can be plain text, a special marker (like "Note:"), a monospace
+ * markup, or a reference to another Eolian object.
+ *
+ * To use it, initialize an Eolian_Doc_Token with eolian_doc_token_init()
+ * and call this function in a loop.
+ *
+ * Example:
+ * @code
+ * Eolian_Doc_Token tok;
+ * const char *doc_ptr = "This is a note. Note: and a ref @Foo.Bar.";
+ *
+ * eolian_doc_token_init(&tok);
+ * while ((doc_ptr = eolian_documentation_tokenize(doc_ptr, &tok)))
+ * {
+ *    // process token 'tok'
+ * }
+ * @endcode
+ *
+ * @param[in] doc The documentation string to tokenize. For subsequent calls,
+ *                pass the return value of the previous call.
+ * @param[out] ret A pointer to an Eolian_Doc_Token structure to be filled with
+ *                 token information. It is also used to maintain state between calls.
+ * @return A pointer to the position in the string after the parsed token, or
+ *         NULL when the end of the string is reached.
+ *
+ * @ingroup Eolian_Documentation
+ */
 EOLIAN_API const char *
 eolian_documentation_tokenize(const char *doc, Eolian_Doc_Token *ret)
 {
@@ -393,6 +607,16 @@ mloop:
    return ret->text_end;
 }
 
+/**
+ * @brief Initializes an Eolian_Doc_Token structure.
+ *
+ * This must be called on a token before it is first used with
+ * eolian_documentation_tokenize(). It sets the token to a clean, unknown state.
+ *
+ * @param[in] tok The token to initialize.
+ *
+ * @ingroup Eolian_Documentation
+ */
 EOLIAN_API void
 eolian_doc_token_init(Eolian_Doc_Token *tok)
 {
@@ -402,6 +626,14 @@ eolian_doc_token_init(Eolian_Doc_Token *tok)
    tok->text = tok->text_end = NULL;
 }
 
+/**
+ * @brief Gets the type of a documentation token.
+ *
+ * @param[in] tok The documentation token.
+ * @return The type of the token, or #EOLIAN_DOC_TOKEN_UNKNOWN on error.
+ *
+ * @ingroup Eolian_Documentation
+ */
 EOLIAN_API Eolian_Doc_Token_Type
 eolian_doc_token_type_get(const Eolian_Doc_Token *tok)
 {
@@ -409,6 +641,19 @@ eolian_doc_token_type_get(const Eolian_Doc_Token *tok)
    return tok->type;
 }
 
+/**
+ * @brief Gets the text content of a documentation token.
+ *
+ * This function extracts the text associated with a token, stripping any
+ * markup characters (like $, [, ], @) and handling escape sequences. For a
+ * monospace token like "$[hello \]]", it returns "hello ]".
+ *
+ * @param[in] tok The documentation token.
+ * @return A newly allocated string containing the token's text. The caller
+ *         must free this string. Returns NULL on error or for unknown token types.
+ *
+ * @ingroup Eolian_Documentation
+ */
 EOLIAN_API char *
 eolian_doc_token_text_get(const Eolian_Doc_Token *tok)
 {
@@ -427,6 +672,22 @@ eolian_doc_token_text_get(const Eolian_Doc_Token *tok)
    return ptr;
 }
 
+/**
+ * @internal
+ * @brief Resolves a reference to an event in documentation.
+ *
+ * Event references in documentation are of the form `@[Full.Class.Name.event_name]`.
+ * This function parses this string, finds the corresponding class and event,
+ * and returns pointers to their Eolian_Object representations. The string is
+ * split at the last dot to separate the class name from the event name.
+ *
+ * @param name The string containing the class and event name. This string will be modified.
+ * @param unit1 The primary unit to search in.
+ * @param unit2 An optional secondary unit to search in.
+ * @param data1 On success, will point to the Eolian_Object of the class.
+ * @param data2 On success, will point to the Eolian_Object of the event.
+ * @return #EOLIAN_OBJECT_EVENT on success, #EOLIAN_OBJECT_UNKNOWN on failure.
+ */
 static Eolian_Object_Type
 _resolve_event(char *name, const Eolian_Unit *unit1, const Eolian_Unit *unit2,
                const Eolian_Object **data1, const Eolian_Object **data2)
@@ -574,6 +835,34 @@ database_doc_token_ref_resolve(const Eolian_Doc_Token *tok,
    return EOLIAN_OBJECT_FUNCTION;
 }
 
+/**
+ * @brief Resolves a documentation reference token to an Eolian object.
+ *
+ * This function is a wrapper around the internal resolver. It takes a token of
+ * type #EOLIAN_DOC_TOKEN_REF and tries to find the Eolian object it refers to within
+ * the main database of a given Eolian_State.
+ *
+ * It can resolve references to:
+ * - Classes: `@My.Class`
+ * - Structs/Enums/Aliases: `@My.Typedecl`
+ * - Constants: `@My.Constant`
+ * - Errors: `@My.Error`
+ * - Functions/Methods/Properties: `@My.Class.my_func`, `@My.Class.prop.get`
+ * - Struct fields: `@My.Struct.my_field`
+ * - Enum fields: `@My.Enum.my_field`
+ * - Events: `@[My.Class.my_event]`
+ *
+ * @param[in] tok The reference token to resolve.
+ * @param[in] state The Eolian state to search in.
+ * @param[out] data On success, this will point to the resolved Eolian_Object. For
+ *             members (functions, fields, events), this is the containing object.
+ * @param[out] data2 For members (functions, fields, events), this points to the
+ *             specific member object. For other types, it is unused.
+ * @return The Eolian_Object_Type of the resolved object, or #EOLIAN_OBJECT_UNKNOWN
+ *         if the reference could not be resolved.
+ *
+ * @ingroup Eolian_Documentation
+ */
 EOLIAN_API Eolian_Object_Type
 eolian_doc_token_ref_resolve(const Eolian_Doc_Token *tok, const Eolian_State *state,
                              const Eolian_Object **data, const Eolian_Object **data2)

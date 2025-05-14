@@ -25,17 +25,33 @@ extern pa_mainloop_api functable;
 #define MY_CLASS ECORE_AUDIO_OUT_PULSE_CLASS
 #define MY_CLASS_NAME "Ecore_Audio_Out_Pulse"
 
+/**
+ * @brief Private data for the Ecore_Audio_Out_Pulse object.
+ *
+ * This structure holds all the private data necessary for the pulseaudio output,
+ * including the PulseAudio mainloop API, context, state, and a list of associated outputs.
+ */
 struct _Ecore_Audio_Out_Pulse_Data
 {
-   pa_mainloop_api *api;
-   pa_context *context;
-   pa_context_state_t state;
-   Ecore_Job *state_job;
-   Eina_List *outputs;
+   pa_mainloop_api *api;        /**< Pointer to the PulseAudio mainloop API. */
+   pa_context *context;         /**< PulseAudio context. */
+   pa_context_state_t state;    /**< Current state of the PulseAudio context. */
+   Ecore_Job *state_job;        /**< Ecore_Job for handling state changes. */
+   Eina_List *outputs;          /**< List of Ecore_Audio_Out_Pulse objects sharing this context. */
 };
 
 typedef struct _Ecore_Audio_Out_Pulse_Data Ecore_Audio_Out_Pulse_Data;
 
+/**
+ * @brief Sets the volume for the pulseaudio output and all its connected inputs.
+ *
+ * This function sets the overall volume for the output and propagates this
+ * volume setting to each connected input stream in PulseAudio.
+ *
+ * @param eo_obj The Ecore_Audio_Out_Pulse object.
+ * @param pd The private data for the Ecore_Audio_Out_Pulse object.
+ * @param volume The desired volume level (0.0 to 1.0+).
+ */
 EOLIAN static void
 _ecore_audio_out_pulse_ecore_audio_volume_set(Eo *eo_obj, Ecore_Audio_Out_Pulse_Data *pd, double volume)
 {

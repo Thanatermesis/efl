@@ -12,6 +12,15 @@
 static void evas_object_intercept_init(Evas_Object_Protected_Data *obj);
 static void evas_object_intercept_deinit(Evas_Object_Protected_Data *obj);
 
+/**
+ * @internal
+ * @brief Initializes the interceptor structure for an Evas object.
+ *
+ * If the interceptor structure doesn't exist, this function allocates and
+ * initializes it.
+ *
+ * @param obj The protected data of the Evas object.
+ */
 static void
 evas_object_intercept_init(Evas_Object_Protected_Data *obj)
 {
@@ -20,6 +29,15 @@ evas_object_intercept_init(Evas_Object_Protected_Data *obj)
      obj->interceptors = calloc(1, sizeof(Evas_Intercept_Func));
 }
 
+/**
+ * @internal
+ * @brief Deinitializes the interceptor structure for an Evas object.
+ *
+ * If the interceptor structure exists and no interceptor functions are set,
+ * this function frees the interceptor structure.
+ *
+ * @param obj The protected data of the Evas object.
+ */
 static void
 evas_object_intercept_deinit(Evas_Object_Protected_Data *obj)
 {
@@ -43,6 +61,15 @@ evas_object_intercept_deinit(Evas_Object_Protected_Data *obj)
 
 /* private calls */
 
+/**
+ * @internal
+ * @brief Cleans up interceptors for an Evas object.
+ *
+ * This function is called when an Evas object is being deleted. It frees
+ * the interceptor structure if it exists.
+ *
+ * @param eo_obj The Evas object.
+ */
 void
 evas_object_intercept_cleanup(Evas_Object *eo_obj)
 {
@@ -56,6 +83,19 @@ evas_object_intercept_cleanup(Evas_Object *eo_obj)
 #define UNPACK_ARG2(a, b) , a, b
 #define UNPACK_ARG4(a, b, c, d) , a, b, c, d
 
+/**
+ * @internal
+ * @brief Macro to define an interceptor call function.
+ *
+ * This macro generates a static inline function for a specific interceptor type.
+ * The generated function checks if an interceptor is set and, if so, calls it.
+ * It also handles a flag to prevent re-entrant calls to the same interceptor.
+ *
+ * @param Type The type of the interceptor (e.g., show, hide, move).
+ * @param Args The arguments for the interceptor function, including COMMON_ARGS.
+ * @param ... Additional arguments to be unpacked and passed to the interceptor function.
+ * @return 1 if the interceptor was called, 0 otherwise.
+ */
 #define EVAS_OBJECT_INTERCEPT_CALL(Type, Args, ...) \
   static inline int evas_object_intercept_call_##Type Args \
   { \
@@ -83,6 +123,22 @@ EVAS_OBJECT_INTERCEPT_CALL(device_focus_set,   (COMMON_ARGS, int focus, Eo *seat
 EVAS_OBJECT_INTERCEPT_CALL(color_set,   (COMMON_ARGS, int r, int g, int b, int a), UNPACK_ARG4(r, g, b, a))
 EVAS_OBJECT_INTERCEPT_CALL(clip_set,    (COMMON_ARGS, Evas_Object *clip), UNPACK_ARG1(clip))
 
+/**
+ * @internal
+ * @brief Internal function to handle interceptor calls.
+ *
+ * This function dispatches the call to the appropriate interceptor based on
+ * the callback type. It unpacks arguments from the va_list and calls the
+ * generated interceptor functions (e.g., evas_object_intercept_call_show).
+ *
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @param cb_type The type of the interceptor callback.
+ * @param internal An internal flag, possibly to differentiate calls originating
+ *                 from within Evas itself versus external API calls.
+ * @param args A va_list containing the arguments for the interceptor.
+ * @return EINA_TRUE if the call was blocked/handled by an interceptor, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _evas_object_intercept_call_internal(Evas_Object *eo_obj,
                                      Evas_Object_Protected_Data *obj,
@@ -219,6 +275,20 @@ _evas_object_intercept_call_internal(Evas_Object *eo_obj,
 /* This is a legacy-only compatibility function.
  * Made public for other parts of EFL (elm, ecore_evas).
  */
+/**
+ * @brief Calls an interceptor function for an Evas object.
+ * @deprecated This is a legacy-only compatibility function.
+ *
+ * This function is a wrapper around _evas_object_intercept_call_internal.
+ * It is exposed for use by other parts of EFL like Elm and Ecore_Evas.
+ *
+ * @param eo_obj The Evas object.
+ * @param cb_type The type of the interceptor callback.
+ * @param internal An internal flag.
+ * @param ... Variable arguments for the interceptor function.
+ * @return EINA_TRUE if the call was blocked/handled by an interceptor, EINA_FALSE otherwise.
+ *         Returns 1 if the object data is invalid.
+ */
 EVAS_API EVAS_API_WEAK Eina_Bool
 _evas_object_intercept_call(Evas_Object *eo_obj, Evas_Object_Intercept_Cb_Type cb_type,
                             int internal, ...)
@@ -236,6 +306,21 @@ _evas_object_intercept_call(Evas_Object *eo_obj, Evas_Object_Intercept_Cb_Type c
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Calls an interceptor function using protected data.
+ *
+ * Similar to _evas_object_intercept_call, but takes Evas_Object_Protected_Data
+ * directly. This is likely used internally within Evas where the protected data
+ * is already available.
+ *
+ * @param obj The protected data of the Evas object.
+ * @param cb_type The type of the interceptor callback.
+ * @param internal An internal flag.
+ * @param ... Variable arguments for the interceptor function.
+ * @return EINA_TRUE if the call was blocked/handled by an interceptor, EINA_FALSE otherwise.
+ *         Returns 1 if the object data is invalid.
+ */
 Eina_Bool
 _evas_object_intercept_call_evas(Evas_Object_Protected_Data *obj,
                                  Evas_Object_Intercept_Cb_Type cb_type,
@@ -255,6 +340,20 @@ _evas_object_intercept_call_evas(Evas_Object_Protected_Data *obj,
 
 /* public calls */
 
+/**
+ * @internal
+ * @brief Macro to define interceptor callback add and delete functions.
+ *
+ * This macro generates a pair of functions for adding and deleting interceptor
+ * callbacks for a specific Evas object event (e.g., show, hide, move).
+ * - `evas_object_intercept_Lower_Type_callback_add()`: Adds an interceptor callback.
+ * - `evas_object_intercept_Lower_Type_callback_del()`: Deletes an interceptor callback.
+ *
+ * @param Up_Type The type of the interceptor in UpperCamelCase (e.g., Show, Move).
+ *                This is used to form the Evas_Object_Intercept_##Up_Type##_Cb type.
+ * @param Lower_Type The type of the interceptor in lowercase_snake_case (e.g., show, move).
+ *                   This is used in function names and accessing interceptor struct members.
+ */
 #define EVAS_OBJECT_INTERCEPT_CALLBACK_DEFINE(Up_Type, Lower_Type)      \
   EVAS_API void                                                             \
   evas_object_intercept_##Lower_Type##_callback_add(Evas_Object *eo_obj,\

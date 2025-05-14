@@ -9,6 +9,13 @@
 #include "eolian_priv.h"
 #include "eo_lexer.h"
 
+/**
+ * @brief Logs an error message associated with an Eolian object.
+ *
+ * @param obj The Eolian object related to the error.
+ * @param msg The error message string.
+ * @return EINA_FALSE always, to indicate an error.
+ */
 static Eina_Bool
 node_error(const Eolian_Object *obj, const char *msg)
 {
@@ -16,6 +23,17 @@ node_error(const Eolian_Object *obj, const char *msg)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Converts an Eolian type mask to a human-readable string.
+ *
+ * The string represents the types included in the mask, separated by '|'.
+ * For example, if mask includes EOLIAN_MASK_SINT and EOLIAN_MASK_FLOAT,
+ * the output might be "signed integer|float".
+ *
+ * @param mask The type mask to convert.
+ * @param buf The character buffer to store the resulting string.
+ *            The buffer should be large enough to hold the string.
+ */
 static void
 mask_to_str(int mask, char *buf)
 {
@@ -51,6 +69,17 @@ mask_to_str(int mask, char *buf)
 #undef APPEND_TP
 }
 
+/**
+ * @brief Logs an error for an invalid type in an expression.
+ *
+ * This function formats an error message indicating the given type and
+ * the expected type(s) based on the mask.
+ *
+ * @param expr The expression where the type error occurred.
+ * @param type The actual type mask found.
+ * @param mask The expected type mask.
+ * @return EINA_FALSE always, to indicate an error.
+ */
 static Eina_Bool
 expr_type_error(const Eolian_Expression *expr, int type, int mask)
 {
@@ -64,6 +93,16 @@ expr_type_error(const Eolian_Expression *expr, int type, int mask)
    return node_error((const Eolian_Object*)expr, buf);
 }
 
+/**
+ * @brief Logs a general error for an expression.
+ *
+ * This function formats an error message including a custom message and
+ * the string value of the expression.
+ *
+ * @param expr The expression related to the error.
+ * @param msg The custom error message.
+ * @return EINA_FALSE always, to indicate an error.
+ */
 static Eina_Bool
 expr_error(const Eolian_Expression *expr, const char *msg)
 {
@@ -72,6 +111,14 @@ expr_error(const Eolian_Expression *expr, const char *msg)
    return node_error((const Eolian_Object*)expr, buf);
 }
 
+/**
+ * @brief Converts an Eolian expression type to its corresponding type mask.
+ *
+ * @param expr The expression whose type is to be converted.
+ * @return The type mask (e.g., EOLIAN_MASK_SINT, EOLIAN_MASK_FLOAT)
+ *         corresponding to the expression's type. Returns 0 for unknown
+ *         or unhandled types.
+ */
 static int
 expr_type_to_mask(const Eolian_Expression *expr)
 {
@@ -103,6 +150,16 @@ expr_type_to_mask(const Eolian_Expression *expr)
    return 0;
 }
 
+/**
+ * @brief Logs an error for mismatched types between two expressions.
+ *
+ * This is typically used in binary operations where operands are expected
+ * to be compatible.
+ *
+ * @param lhs The left-hand side expression.
+ * @param rhs The right-hand side expression.
+ * @return EINA_FALSE always, to indicate an error.
+ */
 static Eina_Bool
 expr_type_mismatch_error(const Eolian_Expression *lhs,
                          const Eolian_Expression *rhs)
@@ -116,6 +173,19 @@ expr_type_mismatch_error(const Eolian_Expression *lhs,
    return node_error((const Eolian_Object*)rhs, buf);
 }
 
+/**
+ * @brief Promotes the types of two numerical expressions to a common type.
+ *
+ * This function implements C-like type promotion rules for arithmetic
+ * operations. For example, if one operand is a double and the other is an int,
+ * the int will be promoted to a double.
+ * The expressions `a` and `b` are modified in place.
+ *
+ * @param a Pointer to the first expression (will be modified).
+ * @param b Pointer to the second expression (will be modified).
+ * @return EINA_TRUE on successful promotion, EINA_FALSE if a type error occurs
+ *         (e.g., one of the expressions is not a number).
+ */
 static Eina_Bool
 promote(Eolian_Expression *a, Eolian_Expression *b)
 {
@@ -190,6 +260,20 @@ static Eina_Bool eval_exp(const Eolian_Unit *unit,
                           Eolian_Expression_Mask mask, Eolian_Expression *out,
                           Expr_Obj_Cb cb, void *data);
 
+/**
+ * @brief Evaluates a unary operation expression.
+ *
+ * Handles operations like unary plus, unary minus, logical NOT, and bitwise NOT.
+ * It performs type checking based on the `mask` and the operation.
+ *
+ * @param unit The Eolian unit context for resolving names (if any).
+ * @param expr The unary expression to evaluate.
+ * @param mask The expected type mask for the result of the operation.
+ * @param out Pointer to an Eolian_Expression to store the result.
+ * @param cb Callback function to be invoked for resolved objects (e.g., constants).
+ * @param data User data for the callback function.
+ * @return EINA_TRUE on successful evaluation, EINA_FALSE on error.
+ */
 static Eina_Bool
 eval_unary(const Eolian_Unit *unit, Eolian_Expression *expr,
            Eolian_Expression_Mask mask, Eolian_Expression *out,
@@ -277,6 +361,24 @@ eval_unary(const Eolian_Unit *unit, Eolian_Expression *expr,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Helper function to evaluate and promote operands of a binary numerical expression.
+ *
+ * This function first ensures the target `mask` allows for a numerical result.
+ * Then, it evaluates the left-hand side (lhs) and right-hand side (rhs)
+ * expressions, expecting them to conform to `emask` (evaluation mask).
+ * Finally, it promotes `lhs` and `rhs` to a common numerical type.
+ *
+ * @param unit The Eolian unit context.
+ * @param expr The parent binary expression (used for error reporting).
+ * @param lhs Pointer to store the evaluated and promoted left-hand side.
+ * @param rhs Pointer to store the evaluated and promoted right-hand side.
+ * @param mask The expected type mask for the result of the binary operation.
+ * @param emask The type mask expected for the individual operands before promotion.
+ * @param cb Callback for resolved objects.
+ * @param data User data for the callback.
+ * @return EINA_TRUE on success, EINA_FALSE on error.
+ */
 static Eina_Bool
 eval_promote_num(const Eolian_Unit *unit, Eolian_Expression *expr,
                  Eolian_Expression *lhs, Eolian_Expression *rhs, int mask,
@@ -300,6 +402,21 @@ eval_promote_num(const Eolian_Unit *unit, Eolian_Expression *expr,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Evaluates a binary operation expression.
+ *
+ * Handles arithmetic (+, -, *, /), modulo (%), comparison (==, !=, >, <, >=, <=),
+ * logical (&&, ||), and bitwise (&, |, ^, <<, >>) operations.
+ * It performs type checking and promotion of operands as necessary.
+ *
+ * @param unit The Eolian unit context for resolving names.
+ * @param expr The binary expression to evaluate.
+ * @param mask The expected type mask for the result of the operation.
+ * @param out Pointer to an Eolian_Expression to store the result.
+ * @param cb Callback function for resolved objects.
+ * @param data User data for the callback function.
+ * @return EINA_TRUE on successful evaluation, EINA_FALSE on error.
+ */
 static Eina_Bool
 eval_binary(const Eolian_Unit *unit, Eolian_Expression *expr,
             Eolian_Expression_Mask mask, Eolian_Expression *out,
@@ -426,6 +543,21 @@ eval_binary(const Eolian_Unit *unit, Eolian_Expression *expr,
 #undef APPLY_CASE
 }
 
+/**
+ * @brief Splits a fully qualified enum member name into enum name and member name.
+ *
+ * A fully qualified enum member name is expected to be in the format "EnumName.MemberName".
+ *
+ * @param str The input string (e.g., "MyEnum.MyValue").
+ * @param[out] ename Pointer to store the allocated string for the enum name (e.g., "MyEnum").
+ *                   The caller is responsible for freeing this string.
+ * @param[out] memb Pointer to store a pointer to the member name part within the duplicated string
+ *                  (e.g., "MyValue"). This points inside the string allocated for `ename`'s original full string.
+ * @return EINA_TRUE if splitting was successful ('.' was found), EINA_FALSE otherwise.
+ *         If EINA_TRUE, `*ename` will contain the duplicated string up to (but not including)
+ *         the last '.', and `*memb` will point to the character after the last '.'.
+ *         `*ename` must be freed by the caller.
+ */
 static Eina_Bool
 split_enum_name(const char *str, char **ename, char **memb)
 {
@@ -442,6 +574,32 @@ split_enum_name(const char *str, char **ename, char **memb)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Recursively evaluates an Eolian expression.
+ *
+ * This is the core evaluation function. It handles different expression types:
+ * literals (int, float, string, etc.), named constants/enum fields,
+ * unary operations, and binary operations. It performs type checking against
+ * the provided `mask`.
+ *
+ * @param unit The Eolian unit context, used for resolving named constants or enum fields.
+ *             Can be NULL if the expression is guaranteed not to contain names
+ *             that need resolution (e.g., already resolved or purely literal).
+ * @param expr The expression to evaluate.
+ * @param mask The expected type mask for the result of this expression.
+ *             This is used to ensure the expression's value is compatible with
+ *             what the caller expects. For example, if an integer is expected,
+ *             EOLIAN_MASK_INT would be part of the mask.
+ * @param out Pointer to an Eolian_Expression structure where the evaluated
+ *            result (type and value) will be stored.
+ * @param cb An optional callback function that is invoked when a named object
+ *           (like a constant or an enum type) is successfully resolved during
+ *           evaluation. This can be used for dependency tracking or other purposes.
+ * @param data User-provided data that will be passed to the callback function `cb`.
+ * @return EINA_TRUE if the expression is successfully evaluated and its type
+ *         matches the `mask`, EINA_FALSE otherwise (e.g., type mismatch,
+ *         undefined variable, or error in sub-expression).
+ */
 static Eina_Bool
 eval_exp(const Eolian_Unit *unit, Eolian_Expression *expr,
          Eolian_Expression_Mask mask, Eolian_Expression *out,
@@ -586,6 +744,23 @@ eval_exp(const Eolian_Unit *unit, Eolian_Expression *expr,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Evaluates an Eolian expression against a specific type mask.
+ *
+ * This function serves as a public entry point for expression evaluation.
+ * It initializes an Eolian_Value to an unknown type and then calls
+ * eval_exp to perform the actual evaluation.
+ *
+ * @param unit The Eolian unit context for resolving names.
+ * @param expr The expression to evaluate.
+ * @param mask The expected type mask for the result.
+ *             Example: EOLIAN_MASK_SINT | EOLIAN_MASK_UINT for any integer.
+ * @param cb Callback function for resolved objects.
+ * @param data User data for the callback.
+ * @return An Eolian_Value structure containing the type and value of the
+ *         evaluated expression. If an error occurs or the mask is 0,
+ *         the type in the returned Eolian_Value will be EOLIAN_EXPR_UNKNOWN.
+ */
 Eolian_Value
 database_expr_eval(const Eolian_Unit *unit, Eolian_Expression *expr,
                    Eolian_Expression_Mask mask, Expr_Obj_Cb cb, void *data)
@@ -602,6 +777,26 @@ database_expr_eval(const Eolian_Unit *unit, Eolian_Expression *expr,
    return ret;
 }
 
+/**
+ * @brief Evaluates an Eolian expression expecting its result to match a given Eolian_Type.
+ *
+ * This function determines the appropriate Eolian_Expression_Mask based on the
+ * provided Eolian_Type and then calls database_expr_eval.
+ * It handles basic types, enums, aliases, and ownable types (which are expected to be NULL).
+ *
+ * @param unit The Eolian unit context for resolving names.
+ * @param expr The expression to evaluate.
+ * @param type The Eolian_Type that the expression's result should conform to.
+ * @param cb Callback function for resolved objects.
+ * @param data User data for the callback.
+ * @return An Eolian_Value structure. If the type is unsupported, or an error
+ *         occurs during evaluation, the type in the returned Eolian_Value
+ *         will be EOLIAN_EXPR_UNKNOWN.
+ *         For example, if `type` is an integer type, it will evaluate `expr`
+ *         expecting an EOLIAN_MASK_SINT or EOLIAN_MASK_UINT.
+ *         If `type` is an enum, it expects EOLIAN_MASK_INT.
+ *         If `type` is a class or an ownable type, it expects EOLIAN_MASK_NULL.
+ */
 Eolian_Value
 database_expr_eval_type(const Eolian_Unit *unit, Eolian_Expression *expr,
                         const Eolian_Type *type, Expr_Obj_Cb cb, void *data)
@@ -676,6 +871,16 @@ database_expr_eval_type(const Eolian_Unit *unit, Eolian_Expression *expr,
       }
 }
 
+/**
+ * @brief Frees an Eolian_Expression and its associated data.
+ *
+ * This function recursively frees an expression tree. It handles different
+ * expression types, releasing stringshare references for string literals
+ * and recursively deleting sub-expressions for binary and unary operations
+ * (unless they are weak references).
+ *
+ * @param expr The expression to delete. If NULL, the function does nothing.
+ */
 void
 database_expr_del(Eolian_Expression *expr)
 {

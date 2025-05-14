@@ -15,6 +15,20 @@ typedef struct Efl_Ui_Widget_Scrollable_Content_Data
    Eina_Bool did_group_calc : 1;
 } Efl_Ui_Widget_Scrollable_Content_Data;
 
+/**
+ * @brief Finalizes the sizing calculation of the widget and its scroller.
+ *
+ * This function takes the minimum size of the widget (obj_min) and the
+ * minimum size of the scroller content (scr_min) and determines the
+ * optimal size for the widget. It configures the scroller to either match
+ * its content size or become scrollable, based on the widget's maximum
+ * size hints.
+ *
+ * @param obj The widget object.
+ * @param pd The private data of the widget.
+ * @param obj_min The minimum size of the widget's chrome/theming, without content.
+ * @param scr_min The minimum size of the content inside the scroller.
+ */
 static void
 _scroller_sizing_eval(Eo *obj, Efl_Ui_Widget_Scrollable_Content_Data *pd,
                       Eina_Size2D obj_min, Eina_Size2D scr_min)
@@ -108,6 +122,19 @@ _scroller_sizing_eval(Eo *obj, Efl_Ui_Widget_Scrollable_Content_Data *pd,
    efl_gfx_hint_size_restricted_min_set(obj, new_min);
 }
 
+/**
+ * @brief Performs the main sizing calculation for the widget.
+ *
+ * This function is the entry point for calculating the widget's minimum size.
+ * It calculates the minimum size of the widget's theme elements and the
+ * minimum size of the content within the scroller. It handles special logic
+ * for text content, calculating its size with and without wrapping to
+ * determine the natural minimum width. It then calls _scroller_sizing_eval
+ * to finalize the sizing logic.
+ *
+ * @param obj The widget object.
+ * @param pd The private data of the widget.
+ */
 static void
 _sizing_eval(Eo *obj, Efl_Ui_Widget_Scrollable_Content_Data *pd)
 {
@@ -149,6 +176,15 @@ _sizing_eval(Eo *obj, Efl_Ui_Widget_Scrollable_Content_Data *pd)
    _scroller_sizing_eval(obj, pd, EINA_SIZE2D(obj_minw, obj_minh), EINA_SIZE2D(scr_minw, scr_minh));
 }
 
+/**
+ * @brief Implements the canvas group calculation for the widget.
+ *
+ * This function is called when the widget's geometry needs to be recalculated.
+ * It triggers the sizing evaluation and ensures that further recalculations
+ * for the widget and its internal scroller are suppressed to avoid redundant
+ * calculations. The did_group_calc flag is used to signal if this logic
+ * was executed.
+ */
 EOLIAN static void
 _efl_ui_widget_scrollable_content_efl_canvas_group_group_calculate(Eo *obj, Efl_Ui_Widget_Scrollable_Content_Data *pd)
 {
@@ -164,6 +200,13 @@ _efl_ui_widget_scrollable_content_efl_canvas_group_group_calculate(Eo *obj, Efl_
    efl_canvas_group_need_recalculate_set(obj, EINA_FALSE);
 }
 
+/**
+ * @brief Sets up the internal scroller widget.
+ *
+ * This is called on-demand when content is first set. It creates the
+ * scroller, sets a specific style on it, and sets it as the widget's
+ * content.
+ */
 static void
 _scroller_setup(Eo *obj, Efl_Ui_Widget_Scrollable_Content_Data *pd)
 {
@@ -174,6 +217,13 @@ _scroller_setup(Eo *obj, Efl_Ui_Widget_Scrollable_Content_Data *pd)
    efl_content_set(obj, pd->scroller);
 }
 
+/**
+ * @brief Sets up the internal label widget.
+ *
+ * This is called on-demand when text content is first set. It creates the
+ * label, configures its expansion hints, and sets it as the content of the
+ * internal scroller.
+ */
 static void
 _label_setup(Eo *obj EINA_UNUSED, Efl_Ui_Widget_Scrollable_Content_Data *pd)
 {
@@ -185,12 +235,30 @@ _label_setup(Eo *obj EINA_UNUSED, Efl_Ui_Widget_Scrollable_Content_Data *pd)
    efl_content_set(pd->scroller, pd->label);
 }
 
+/**
+ * @brief Implements Efl.Ui.Widget.Scrollable.Content.scrollable_content_did_group_calc_get.
+ *
+ * This is used by consuming widgets to check if the sizing logic has run
+ * during a specific calculation cycle.
+ *
+ * @return EINA_TRUE if the group calculation was performed, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_widget_scrollable_content_scrollable_content_did_group_calc_get(const Eo *obj EINA_UNUSED, Efl_Ui_Widget_Scrollable_Content_Data *pd)
 {
    return pd->did_group_calc;
 }
 
+/**
+ * @brief Implements Efl.Ui.Widget.Scrollable.Content.scrollable_content_set.
+ *
+ * Sets a custom widget as the content. This is mutually exclusive
+ * with setting text content.
+ *
+ * @param[in] content The content to set.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_widget_scrollable_content_scrollable_content_set(Eo *obj, Efl_Ui_Widget_Scrollable_Content_Data *pd, Eo *content)
 {
@@ -203,6 +271,12 @@ _efl_ui_widget_scrollable_content_scrollable_content_set(Eo *obj, Efl_Ui_Widget_
    return ret;
 }
 
+/**
+ * @brief Implements Efl.Ui.Widget.Scrollable.Content.scrollable_content_get.
+ *
+ * @return The content widget, or NULL if no custom content is set or if
+ * text content is being used.
+ */
 EOLIAN static Eo *
 _efl_ui_widget_scrollable_content_scrollable_content_get(const Eo *obj EINA_UNUSED, Efl_Ui_Widget_Scrollable_Content_Data *pd)
 {
@@ -211,6 +285,14 @@ _efl_ui_widget_scrollable_content_scrollable_content_get(const Eo *obj EINA_UNUS
    return efl_content_get(pd->scroller);
 }
 
+/**
+ * @brief Implements Efl.Ui.Widget.Scrollable.Content.scrollable_text_set.
+ *
+ * This creates an internal label to display the text. This is mutually
+ * exclusive with setting custom content.
+ *
+ * @param[in] text The text to set.
+ */
 EOLIAN static void
 _efl_ui_widget_scrollable_content_scrollable_text_set(Eo *obj, Efl_Ui_Widget_Scrollable_Content_Data *pd, const char *text)
 {
@@ -223,6 +305,11 @@ _efl_ui_widget_scrollable_content_scrollable_text_set(Eo *obj, Efl_Ui_Widget_Scr
    efl_canvas_group_change(obj);
 }
 
+/**
+ * @brief Implements Efl.Ui.Widget.Scrollable.Content.scrollable_text_get.
+ *
+ * @return The text content, or NULL if no text is set.
+ */
 EOLIAN static const char *
 _efl_ui_widget_scrollable_content_scrollable_text_get(const Eo *obj EINA_UNUSED, Efl_Ui_Widget_Scrollable_Content_Data *pd)
 {
@@ -231,6 +318,11 @@ _efl_ui_widget_scrollable_content_scrollable_text_get(const Eo *obj EINA_UNUSED,
    //return efl_text_get(pd->label);
 }
 
+/**
+ * @brief Destructor for the scrollable content mixin.
+ *
+ * Cleans up resources, specifically the wref to the scroller.
+ */
 EOLIAN static void
 _efl_ui_widget_scrollable_content_efl_object_destructor(Eo *obj, Efl_Ui_Widget_Scrollable_Content_Data *pd)
 {

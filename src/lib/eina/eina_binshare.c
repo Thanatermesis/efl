@@ -58,10 +58,27 @@
 #endif
 #define DBG(...) EINA_LOG_DOM_DBG(_eina_share_binshare_log_dom, __VA_ARGS__)
 
+/**
+ * @internal
+ * @brief Log domain for Eina Binshare operations.
+ * Initialized to -1, it's assigned a proper log domain ID by
+ * eina_log_domain_register() during eina_binshare_init().
+ */
 static int _eina_share_binshare_log_dom = -1;
 
-/* The actual share */
+/**
+ * @internal
+ * @brief The global Eina_Share instance used for managing shared binary objects.
+ * This structure holds the shared data and is initialized by eina_share_common_init().
+ */
 static Eina_Share *binshare_share;
+/**
+ * @internal
+ * @brief Magic string identifier for Eina_Binshare nodes.
+ * This string is used in conjunction with EINA_MAGIC_BINSHARE_NODE
+ * to identify nodes managed by this binshare module within the Eina_Share structure,
+ * aiding in debugging and type safety.
+ */
 static const char EINA_MAGIC_BINSHARE_NODE_STR[] = "Eina Binshare Node";
 
 /**

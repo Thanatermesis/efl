@@ -251,6 +251,7 @@ EOAPI double elm_obj_calendar_interval_get(const Eo *obj);
  *
  * @param[in] obj The object.
  * @param[in] weekdays Array of seven strings to be used as weekday names.
+ * For example: `const char *my_weekdays[7] = {"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"};`.
  * Warning: It must have 7 elements, or it will access invalid memory. Warning:
  * The strings must be @c null terminated ('@\0').
  *
@@ -272,9 +273,11 @@ EOAPI void elm_obj_calendar_weekdays_names_set(Eo *obj, const char **weekdays);
  *
  * @param[in] obj The object.
  *
- * @return Array of seven strings to be used as weekday names. Warning: It must
- * have 7 elements, or it will access invalid memory. Warning: The strings must
- * be @c null terminated ('@\0').
+ * @return Array of seven C strings (const char *) representing the weekday names.
+ * The structure is an array of 7 pointers to NULL-terminated strings (e.g.,
+ * `{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}`).
+ * The caller must not modify or free the returned array or its contents.
+ * Warning: It must have 7 elements.
  *
  * @ingroup Elm_Calendar
  */

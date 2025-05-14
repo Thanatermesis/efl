@@ -1,3 +1,8 @@
+/** @file
+ * @brief This file provides a mapping from X11 keysyms to Linux framebuffer key codes.
+ * It is used by the Ecore_Evas VNC server to translate key events.
+ */
+
 #if defined(__linux__)
  #include <linux/input-event-codes.h>
 #elif defined(__FreeBSD__)
@@ -8,6 +13,23 @@
 #include <limits.h>
 #include <Ecore_Input.h>
 
+/**
+ * @brief Array mapping framebuffer key codes to key names, strings, and compose sequences.
+ *
+ * This array is generated from `ecore_fb_keytable.h`.
+ * Each key code `id` maps to 7 entries in this array:
+ * - `_ecore_fb_li_kbd_syms[id * 7]`       : Key name (e.g., "a", "Control_L")
+ * - `_ecore_fb_li_kbd_syms[(id * 7) + 0]` : Unshifted key string (e.g., "a", "Control_L")
+ * - `_ecore_fb_li_kbd_syms[(id * 7) + 1]` : Shifted key string (e.g., "A")
+ * - `_ecore_fb_li_kbd_syms[(id * 7) + 2]` : AltGr key string (e.g., "æ")
+ * - `_ecore_fb_li_kbd_syms[(id * 7) + 3]` : Unshifted compose string (e.g., "a")
+ * - `_ecore_fb_li_kbd_syms[(id * 7) + 4]` : Shifted compose string (e.g., "A")
+ * - `_ecore_fb_li_kbd_syms[(id * 7) + 5]` : AltGr compose string (e.g., "æ")
+ * - `_ecore_fb_li_kbd_syms[(id * 7) + 6]` : Ctrl key string (e.g., "^A")
+ *
+ * For keys without a shifted, AltGr, or Ctrl variant, the corresponding string might be NULL
+ * or the same as the unshifted string.
+ */
 static const char *_ecore_fb_li_kbd_syms[144 * 7] =
 {
 #include "ecore_fb_keytable.h"
@@ -15,6 +37,21 @@ static const char *_ecore_fb_li_kbd_syms[144 * 7] =
 
 #include "ecore_evas_vnc_server_fb_keymap.h"
 
+/**
+ * @brief Converts an X11 keysym to a Linux framebuffer key code.
+ *
+ * This function handles common X11 keysyms and maps them to their
+ * corresponding `KEY_*` defines from `<linux/input-event-codes.h>`.
+ * It also determines if the key is a shifted variant and updates the
+ * `offset` parameter accordingly.
+ *
+ * @param key The X11 keysym (e.g., XK_a, XK_A, XK_Shift_L).
+ * @param[out] offset Pointer to an unsigned integer that will be set to 1
+ *                    if the key is a shifted variant (e.g., XK_A, XK_plus),
+ *                    otherwise it's set to 0.
+ * @return The Linux framebuffer key code (e.g., KEY_A, KEY_LEFTSHIFT),
+ *         or `UINT_MAX` if no mapping is found.
+ */
 static unsigned int
 _x11_to_fb(rfbKeySym key, unsigned int *offset)
 {
@@ -402,6 +439,26 @@ _x11_to_fb(rfbKeySym key, unsigned int *offset)
      }
 }
 
+/**
+ * @brief Translates an RFB (VNC) keysym to framebuffer key information.
+ *
+ * This function takes an RFB keysym, converts it to a Linux framebuffer key code,
+ * and then looks up the corresponding key name, key string, and compose string
+ * from the `_ecore_fb_li_kbd_syms` table.
+ *
+ * @param key The RFB keysym (typically an X11 keysym like XK_a, XK_Return).
+ * @param[out] key_name Pointer to a char pointer that will be set to the
+ *                      canonical name of the key (e.g., "a", "Return").
+ *                      The lifetime of this string is tied to `_ecore_fb_li_kbd_syms`.
+ * @param[out] key_str Pointer to a char pointer that will be set to the
+ *                     string representation of the key, considering shift state
+ *                     (e.g., "a", "A", "+").
+ *                     The lifetime of this string is tied to `_ecore_fb_li_kbd_syms`.
+ * @param[out] compose Pointer to a char pointer that will be set to the
+ *                     compose string for the key (e.g., for dead keys or multi-key sequences).
+ *                     The lifetime of this string is tied to `_ecore_fb_li_kbd_syms`.
+ * @return `EINA_TRUE` if the translation was successful, `EINA_FALSE` otherwise.
+ */
 Eina_Bool
 ecore_evas_vnc_server_keysym_to_fb_translate(rfbKeySym key,
                                              const char **key_name,

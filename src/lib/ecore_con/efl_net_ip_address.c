@@ -1,3 +1,11 @@
+/**
+ * @file
+ * @brief This file implements the Efl.Net.Ip_Address interface, providing
+ *        functionality for handling IP addresses (both IPv4 and IPv6).
+ *        It includes operations such as creating, parsing, formatting,
+ *        and resolving IP addresses.
+ */
+
 #define EFL_NET_IP_ADDRESS_PROTECTED 1
 
 #ifdef HAVE_CONFIG_H
@@ -12,29 +20,58 @@
 #include "Ecore_Con.h"
 #include "ecore_con_private.h"
 
+/**
+ * @brief Private data structure for Efl_Net_Ip_Address objects.
+ *
+ * This structure holds the internal representation of an IP address,
+ * including its string form, the sockaddr union for IPv4/IPv6,
+ * and a slice pointing to the raw address bytes.
+ */
 typedef struct _Efl_Net_Ip_Address_Data {
-   char string[INET6_ADDRSTRLEN + sizeof("[]:65536")];
+   char string[INET6_ADDRSTRLEN + sizeof("[]:65536")]; /**< String representation of the IP address (e.g., "192.168.1.1:80", "[::1]:8080"). */
    union {
-      struct sockaddr addr;
-      struct sockaddr_in ipv4;
-      struct sockaddr_in6 ipv6;
+      struct sockaddr addr; /**< Generic socket address structure. */
+      struct sockaddr_in ipv4;  /**< IPv4 socket address structure. */
+      struct sockaddr_in6 ipv6; /**< IPv6 socket address structure. */
    };
-   Eina_Slice addr_slice;
+   Eina_Slice addr_slice; /**< Slice pointing to the raw IP address bytes (either ipv4.sin_addr or ipv6.sin6_addr). */
 } Efl_Net_Ip_Address_Data;
 
+/**
+ * @brief Structure holding the result of an IP address resolution operation.
+ *
+ * This structure is used to return the results from Efl.Net.Ip_Address.resolve.
+ * It contains the original requested address, the canonical name (if requested),
+ * and an array of resolved Efl_Net_Ip_Address objects.
+ */
 typedef struct _Efl_Net_Ip_Address_Resolve_Value
 {
-   Eina_Stringshare *request_address; /**< The 'address' argument given to
-                                 * Efl.Net.Ip_Address.resolve */
-   Eina_Stringshare *canonical_name; /**< The canonical name, if it was requested in
-                                * flags */
-   const Eina_Value_Array results;  /**< The resolved objects. Do not modify this array but
-                                     * you can keep reference to elements using efl_ref()
-                                     * and efl_unref() */
+   Eina_Stringshare *request_address; /**< The 'address' argument given to Efl.Net.Ip_Address.resolve (e.g., "example.com:80"). */
+   Eina_Stringshare *canonical_name; /**< The canonical name, if it was requested in flags (e.g., "server.example.com"). */
+   const Eina_Value_Array results;  /**< An Eina_Value_Array of Efl_Net_Ip_Address objects.
+                                     * Example structure:
+                                     * [
+                                     *   (Efl_Net_Ip_Address *) "192.0.2.1:80",
+                                     *   (Efl_Net_Ip_Address *) "[2001:db8::1]:80"
+                                     * ]
+                                     * Do not modify this array but you can keep reference
+                                     * to elements using efl_ref() and efl_unref(). */
 } Efl_Net_Ip_Address_Resolve_Value;
 
 #define MY_CLASS EFL_NET_IP_ADDRESS_CLASS
 
+/**
+ * @internal
+ * @brief Finalizes the Efl_Net_Ip_Address object.
+ *
+ * This function is called when the object is being finalized. It formats
+ * the IP address into its string representation and performs safety checks.
+ * If the port is 0, it removes the ":0" suffix from the string.
+ *
+ * @param o The Efl_Net_Ip_Address object.
+ * @param pd The private data of the object.
+ * @return The finalized object, or NULL on failure.
+ */
 EOLIAN static Eo *
 _efl_net_ip_address_efl_object_finalize(Eo *o, Efl_Net_Ip_Address_Data *pd)
 {
@@ -66,12 +103,31 @@ _efl_net_ip_address_efl_object_finalize(Eo *o, Efl_Net_Ip_Address_Data *pd)
    return o;
 }
 
+/**
+ * @internal
+ * @brief Gets the string representation of the IP address.
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @return A pointer to the string representation (e.g., "192.168.1.1:80").
+ */
 EOLIAN static const char *
 _efl_net_ip_address_string_get(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd)
 {
    return pd->string;
 }
 
+/**
+ * @internal
+ * @brief Sets the address family (AF_INET or AF_INET6).
+ *
+ * This function initializes the address family and sets up the addr_slice
+ * to point to the correct address part of the sockaddr union.
+ * It can only be called once when the family is not yet set.
+ *
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @param family The address family to set (AF_INET or AF_INET6).
+ */
 EOLIAN static void
 _efl_net_ip_address_family_set(Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd, int family)
 {
@@ -91,12 +147,31 @@ _efl_net_ip_address_family_set(Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd, i
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the address family.
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @return The address family (AF_INET or AF_INET6), or 0 if not set.
+ */
 EOLIAN static int
 _efl_net_ip_address_family_get(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd)
 {
    return pd->addr.sa_family;
 }
 
+/**
+ * @internal
+ * @brief Sets the port number for the IP address.
+ *
+ * The port is converted to network byte order. This function ensures
+ * that the address family is already set and that the port is not
+ * set multiple times.
+ *
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @param port The port number to set (e.g., 80, 443).
+ */
 EOLIAN static void
 _efl_net_ip_address_port_set(Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd, uint16_t port)
 {
@@ -118,6 +193,16 @@ _efl_net_ip_address_port_set(Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd, uin
    *pport = nport;
 }
 
+/**
+ * @internal
+ * @brief Gets the port number of the IP address.
+ *
+ * The port is converted from network byte order to host byte order.
+ *
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @return The port number (e.g., 80, 443), or 0 if not set or family is invalid.
+ */
 EOLIAN static uint16_t
 _efl_net_ip_address_port_get(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd)
 {
@@ -132,6 +217,21 @@ _efl_net_ip_address_port_get(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *p
    return eina_ntohs(*pport);
 }
 
+/**
+ * @internal
+ * @brief Sets the raw IP address bytes.
+ *
+ * This function copies the provided address bytes into the internal
+ * sockaddr structure. It ensures that the address family is set,
+ * the length of the provided slice matches the family, and that the
+ * address is not set multiple times to a different value.
+ *
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @param address An Eina_Slice containing the raw IP address bytes.
+ *                For IPv4, this should be 4 bytes (e.g., `{ 0xC0, 0xA8, 0x01, 0x01 }` for 192.168.1.1).
+ *                For IPv6, this should be 16 bytes.
+ */
 EOLIAN static void
 _efl_net_ip_address_address_set(Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd, Eina_Slice address)
 {
@@ -173,12 +273,33 @@ _efl_net_ip_address_address_set(Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd, 
    eina_rw_slice_copy(rw_slice, address);
 }
 
+/**
+ * @internal
+ * @brief Gets the raw IP address bytes as an Eina_Slice.
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @return An Eina_Slice pointing to the raw IP address bytes.
+ *         The slice will have a length of 4 for IPv4 or 16 for IPv6.
+ */
 EOLIAN static Eina_Slice
 _efl_net_ip_address_address_get(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd)
 {
    return pd->addr_slice;
 }
 
+/**
+ * @internal
+ * @brief Sets the IP address from a sockaddr structure.
+ *
+ * This function copies the data from the provided sockaddr structure
+ * into the internal representation. It also sets the address family
+ * and the addr_slice accordingly. It can only be called once when
+ * the family is not yet set.
+ *
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @param ptr A pointer to a `struct sockaddr` (either `struct sockaddr_in` or `struct sockaddr_in6`).
+ */
 EOLIAN static void
 _efl_net_ip_address_sockaddr_set(Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd, const void *ptr)
 {
@@ -203,38 +324,83 @@ _efl_net_ip_address_sockaddr_set(Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd,
      }
 }
 
+/**
+ * @internal
+ * @brief Gets a pointer to the internal sockaddr structure.
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @return A const pointer to the `struct sockaddr` representing the IP address.
+ *         This can be cast to `struct sockaddr_in` or `struct sockaddr_in6`
+ *         depending on the address family.
+ */
 EOLIAN static const void *
 _efl_net_ip_address_sockaddr_get(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd)
 {
    return &pd->addr;
 }
 
+/** Helper macro to get IPv4 address in host byte order. */
 #define IPV4_ADDR_GET(pd) eina_ntohl(pd->ipv4.sin_addr.s_addr)
 
+/**
+ * @internal
+ * @brief Checks if the IPv4 address is Class A.
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @return EINA_TRUE if it's an IPv4 Class A address, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_net_ip_address_ipv4_class_a_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd)
 {
    return (pd->addr.sa_family == AF_INET) && IN_CLASSA(IPV4_ADDR_GET(pd));
 }
 
+/**
+ * @internal
+ * @brief Checks if the IPv4 address is Class B.
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @return EINA_TRUE if it's an IPv4 Class B address, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_net_ip_address_ipv4_class_b_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd)
 {
    return (pd->addr.sa_family == AF_INET) && IN_CLASSB(IPV4_ADDR_GET(pd));
 }
 
+/**
+ * @internal
+ * @brief Checks if the IPv4 address is Class C.
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @return EINA_TRUE if it's an IPv4 Class C address, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_net_ip_address_ipv4_class_c_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd)
 {
    return (pd->addr.sa_family == AF_INET) && IN_CLASSC(IPV4_ADDR_GET(pd));
 }
 
+/**
+ * @internal
+ * @brief Checks if the IPv4 address is Class D (multicast).
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @return EINA_TRUE if it's an IPv4 Class D address, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_net_ip_address_ipv4_class_d_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd)
 {
    return (pd->addr.sa_family == AF_INET) && IN_CLASSD(IPV4_ADDR_GET(pd));
 }
 
+/**
+ * @internal
+ * @brief Checks if the IPv6 address is an IPv4-mapped address.
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @return EINA_TRUE if it's an IPv4-mapped IPv6 address, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_net_ip_address_ipv6_v4mapped_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd)
 {
@@ -242,6 +408,13 @@ _efl_net_ip_address_ipv6_v4mapped_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Addr
      IN6_IS_ADDR_V4MAPPED(&pd->ipv6.sin6_addr);
 }
 
+/**
+ * @internal
+ * @brief Checks if the IPv6 address is an IPv4-compatible address.
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @return EINA_TRUE if it's an IPv4-compatible IPv6 address, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_net_ip_address_ipv6_v4compat_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd)
 {
@@ -249,6 +422,13 @@ _efl_net_ip_address_ipv6_v4compat_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Addr
      IN6_IS_ADDR_V4COMPAT(&pd->ipv6.sin6_addr);
 }
 
+/**
+ * @internal
+ * @brief Checks if the IPv6 address is a link-local address.
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @return EINA_TRUE if it's a link-local IPv6 address, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_net_ip_address_ipv6_local_link_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd)
 {
@@ -256,6 +436,13 @@ _efl_net_ip_address_ipv6_local_link_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Ad
      IN6_IS_ADDR_LINKLOCAL(&pd->ipv6.sin6_addr);
 }
 
+/**
+ * @internal
+ * @brief Checks if the IPv6 address is a site-local address.
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @return EINA_TRUE if it's a site-local IPv6 address, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_net_ip_address_ipv6_local_site_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd)
 {
@@ -263,6 +450,13 @@ _efl_net_ip_address_ipv6_local_site_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Ad
      IN6_IS_ADDR_SITELOCAL(&pd->ipv6.sin6_addr);
 }
 
+/**
+ * @internal
+ * @brief Checks if the IP address is a multicast address.
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @return EINA_TRUE if it's a multicast address (IPv4 or IPv6), EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_net_ip_address_multicast_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd)
 {
@@ -272,6 +466,13 @@ _efl_net_ip_address_multicast_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_
      return IN_MULTICAST(IPV4_ADDR_GET(pd));
 }
 
+/**
+ * @internal
+ * @brief Checks if the IP address is a loopback address.
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @return EINA_TRUE if it's a loopback address (e.g., 127.0.0.1 or ::1), EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_net_ip_address_loopback_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd)
 {
@@ -281,6 +482,16 @@ _efl_net_ip_address_loopback_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_D
      return IPV4_ADDR_GET(pd) == INADDR_LOOPBACK;
 }
 
+/**
+ * @internal
+ * @brief Checks if the IP address is an "any" address (0.0.0.0 or ::).
+ *
+ * This means all bytes of the address are zero.
+ *
+ * @param o The Efl_Net_Ip_Address object (unused).
+ * @param pd The private data of the object.
+ * @return EINA_TRUE if it's an "any" address, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_net_ip_address_any_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *pd)
 {
@@ -295,6 +506,16 @@ _efl_net_ip_address_any_check(const Eo *o EINA_UNUSED, Efl_Net_Ip_Address_Data *
    return i > 0;
 }
 
+/**
+ * @internal
+ * @brief Creates an Efl_Net_Ip_Address object from raw address bytes and port.
+ *
+ * @param port The port number (e.g., 80).
+ * @param address An Eina_Slice containing the raw IP address bytes.
+ *                Must be 4 bytes for IPv4 or 16 bytes for IPv6.
+ *                Example IPv4: `{ 0xC0, 0xA8, 0x01, 0x01 }` for 192.168.1.1.
+ * @return A new, referenced Efl_Net_Ip_Address object, or NULL on failure.
+ */
 EOLIAN static Efl_Net_Ip_Address *
 _efl_net_ip_address_create(uint16_t port, const Eina_Slice address)
 {
@@ -313,6 +534,13 @@ _efl_net_ip_address_create(uint16_t port, const Eina_Slice address)
                   efl_net_ip_address_set(efl_added, address));
 }
 
+/**
+ * @internal
+ * @brief Creates an Efl_Net_Ip_Address object from a sockaddr structure.
+ *
+ * @param ptr A pointer to a `struct sockaddr` (either `struct sockaddr_in` or `struct sockaddr_in6`).
+ * @return A new, referenced Efl_Net_Ip_Address object, or NULL on failure.
+ */
 EOLIAN static Efl_Net_Ip_Address *
 _efl_net_ip_address_create_sockaddr(const void *ptr)
 {
@@ -368,12 +596,27 @@ _efl_net_ip_address_parse(const char *numeric_address)
                   efl_net_ip_address_sockaddr_set(efl_added, &ss));
 }
 
+/**
+ * @brief Context structure for asynchronous IP address resolution.
+ *
+ * Holds the state required for an ongoing resolution operation, including
+ * the requested address string, the worker thread, and the promise for the result.
+ */
 typedef struct _Efl_Net_Ip_Address_Resolve_Context {
-   Eina_Stringshare *request_address;
-   Ecore_Thread *thread;
-   Eina_Promise *promise;
+   Eina_Stringshare *request_address; /**< The original address string being resolved (e.g., "example.com:80"). */
+   Ecore_Thread *thread;             /**< The worker thread performing the resolution. */
+   Eina_Promise *promise;            /**< The promise to be fulfilled with the resolution result or error. */
 } Efl_Net_Ip_Address_Resolve_Context;
 
+/**
+ * @internal
+ * @brief Gets the Eina_Value structure descriptor for Efl_Net_Ip_Address_Resolve_Value.
+ *
+ * This is used for handling Efl_Net_Ip_Address_Resolve_Value with Eina_Value.
+ * It defines the members and their types.
+ *
+ * @return A pointer to the static Eina_Value_Struct_Desc.
+ */
 static Eina_Value_Struct_Desc *
 _efl_net_ip_address_resolve_value_desc_get(void)
 {
@@ -390,6 +633,7 @@ _efl_net_ip_address_resolve_value_desc_get(void)
       EINA_C_ARRAY_LENGTH(struct_members),
       sizeof (Efl_Net_Ip_Address_Resolve_Value)
    };
+   // Types are set here because EINA_VALUE_TYPE_* are not constant initializers.
    struct_members[0].type = EINA_VALUE_TYPE_STRINGSHARE;
    struct_members[1].type = EINA_VALUE_TYPE_STRINGSHARE;
    struct_members[2].type = EINA_VALUE_TYPE_ARRAY;
@@ -398,6 +642,18 @@ _efl_net_ip_address_resolve_value_desc_get(void)
    return &struct_desc;
 }
 
+/**
+ * @internal
+ * @brief Cleans up the resolution context when a promise is cancelled or finished.
+ *
+ * This function is called when the promise associated with a resolution
+ * operation is deleted (e.g., due to cancellation or completion).
+ * It ensures that resources like the stringshare, thread, and context
+ * itself are properly freed.
+ *
+ * @param data The Efl_Net_Ip_Address_Resolve_Context to clean up.
+ * @param dead_promise The promise that is being deleted (unused).
+ */
 static void
 _efl_net_ip_address_resolve_del(void *data,
                                 const Eina_Promise *dead_promise EINA_UNUSED)
@@ -418,6 +674,19 @@ _efl_net_ip_address_resolve_del(void *data,
    free(ctx);
 }
 
+/**
+ * @internal
+ * @brief Searches for an IP address (sockaddr) within an Eina_Value array of Efl_Net_Ip_Address objects.
+ *
+ * This function iterates through the array and compares the sockaddr
+ * of each Efl_Net_Ip_Address object with the provided sockaddr.
+ * It is used to avoid adding duplicate addresses to the resolution results.
+ *
+ * @param array An Eina_Value of type EINA_VALUE_TYPE_ARRAY, where each element
+ *              is an Efl_Net_Ip_Address object.
+ * @param addr The `struct sockaddr` to search for.
+ * @return The index of the found address in the array, or -1 if not found.
+ */
 static inline int
 _efl_net_ip_address_find(const Eina_Value *array, const struct sockaddr *addr)
 {
@@ -448,6 +717,21 @@ _efl_net_ip_address_find(const Eina_Value *array, const struct sockaddr *addr)
    return -1;
 }
 
+/**
+ * @internal
+ * @brief Callback function invoked when asynchronous IP address resolution is complete.
+ *
+ * This function is called by the ecore_con dns lookup mechanism once the
+ * getaddrinfo call in the worker thread finishes. It processes the results,
+ * creates Efl_Net_Ip_Address objects, and resolves or rejects the associated promise.
+ *
+ * @param data The Efl_Net_Ip_Address_Resolve_Context.
+ * @param host The hostname that was resolved (unused by this function directly, but part of ecore_con_dns_lookup_done_cb signature).
+ * @param port The port string that was used (unused by this function directly).
+ * @param hints The addrinfo hints used for resolution (unused).
+ * @param result A linked list of `struct addrinfo` containing the resolved addresses.
+ * @param gai_error An error code from getaddrinfo (0 on success).
+ */
 static void
 _efl_net_ip_address_resolve_done(void *data,
                                  const char *host, const char *port,
@@ -531,6 +815,29 @@ _efl_net_ip_address_resolve_done(void *data,
    free(ctx);
 }
 
+/**
+ * @internal
+ * @brief Initiates asynchronous resolution of a host address string.
+ *
+ * This function resolves a given address string (which can be a hostname,
+ * an IP literal, and an optional port) into one or more Efl_Net_Ip_Address objects.
+ * The resolution is performed asynchronously in a separate thread.
+ *
+ * @param address The address string to resolve (e.g., "example.com", "192.168.1.1:80", "[::1]:http").
+ * @param family The desired address family (AF_INET, AF_INET6, or AF_UNSPEC).
+ *               If 0, AF_UNSPEC is used.
+ * @param flags Flags for getaddrinfo (e.g., AI_CANONNAME).
+ *              If 0, `AI_ADDRCONFIG | AI_V4MAPPED | AI_CANONNAME` is used.
+ * @return An Eina_Future that will be fulfilled with an Eina_Value of type
+ *         Efl_Net_Ip_Address_Resolve_Value on success, or rejected with an
+ *         Eina_Error on failure. Returns NULL if immediate setup fails.
+ *         The Efl_Net_Ip_Address_Resolve_Value contains:
+ *         - `request_address`: The original input address string.
+ *         - `canonical_name`: The canonical name if AI_CANONNAME was used and a CNAME record exists.
+ *         - `results`: An Eina_Value_Array of Efl_Net_Ip_Address objects.
+ *           Example `results` array:
+ *           `[ (Efl_Net_Ip_Address*)"198.51.100.1:80", (Efl_Net_Ip_Address*)"[2001:db8::a]:80" ]`
+ */
 EOLIAN static Eina_Future *
 _efl_net_ip_address_resolve(const char *address, int family, int flags)
 {

@@ -14,6 +14,12 @@
 #include "eina_internal.h"
 #include "eina_private.h"
 
+/**
+ * @internal
+ * @brief Hash table to store vpath key-value pairs.
+ * Keys are vpath identifiers like "home", "tmp", "app.dir", etc.
+ * Values are the corresponding real paths (Eina_Stringshare *).
+ */
 static Eina_Hash *vpath_data = NULL;
 
 #ifdef CRI
@@ -31,21 +37,48 @@ static Eina_Hash *vpath_data = NULL;
 #endif
 #define DBG(...) EINA_LOG_DOM_DBG(_eina_vpath_log_dom, __VA_ARGS__)
 
+/**
+ * @internal
+ * @brief Log domain for eina_vpath.
+ * Used for logging messages related to vpath operations.
+ */
 static int _eina_vpath_log_dom = -1;
 
+/**
+ * @internal
+ * @brief Adds a key-value pair to the vpath_data hash.
+ * The value is added as an Eina_Stringshare.
+ * @param key The vpath key (e.g., "home", "tmp").
+ * @param value The real path corresponding to the key.
+ */
 static inline void
 _eina_vpath_data_add(const char *key, const char *value)
 {
    eina_hash_add(vpath_data, key, eina_stringshare_add(value));
 }
 
+/**
+ * @internal
+ * @brief Retrieves a value (real path) from the vpath_data hash.
+ * @param key The vpath key to look up.
+ * @return The Eina_Stringshare* for the real path if found, otherwise NULL.
+ */
 static inline Eina_Stringshare*
 _eina_vpath_data_get(const char *key)
 {
    return eina_hash_find(vpath_data, key);
 }
 
-
+/**
+ * @internal
+ * @brief Creates a fallback runtime directory if XDG_RUNTIME_DIR is not set.
+ * This typically creates a directory like "$HOME/.run".
+ * It performs several checks for existence, type (must be a directory),
+ * and ownership. If any check fails or creation fails, it aborts.
+ * @param home The user's home directory path.
+ * @return A newly allocated string containing the path to the runtime directory.
+ *         The caller is responsible for freeing this string.
+ */
 static char *
 _fallback_runtime_dir(const char *home)
 {
@@ -121,6 +154,14 @@ _fallback_runtime_dir(const char *home)
    return strdup(buf);
 }
 
+/**
+ * @internal
+ * @brief Provides a fallback home directory path if the standard one cannot be determined.
+ * On systems with geteuid(), it tries to create/use "/tmp/<uid>".
+ * If that fails or geteuid() is not available, it falls back to "/tmp" or ultimately "/".
+ * @return A newly allocated string containing the fallback home directory path.
+ *         The caller is responsible for freeing this string.
+ */
 static char *
 _fallback_home_dir()
 {
@@ -154,6 +195,12 @@ _fallback_home_dir()
    return strdup(buf);
 }
 
+/**
+ * @internal
+ * @brief Initializes system-level vpath entries like "home" and "tmp".
+ * It retrieves these paths from the environment or uses fallbacks if necessary,
+ * then adds them to the vpath_data hash.
+ */
 static void
 _eina_vpath_interface_sys_init(void)
 {
@@ -175,6 +222,14 @@ _eina_vpath_interface_sys_init(void)
    _eina_vpath_data_add("tmp", tmp);
 }
 
+/**
+ * @internal
+ * @brief Initializes the Eina vpath system.
+ * This function sets up the internal hash table for vpath storage,
+ * initializes system-specific vpath entries (like home, tmp),
+ * initializes XDG environment variables, and registers a log domain.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (though currently always returns EINA_TRUE).
+ */
 Eina_Bool
 eina_vpath_init(void)
 {
@@ -187,6 +242,13 @@ eina_vpath_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the Eina vpath system.
+ * This function frees the internal hash table used for vpath storage
+ * and unregisters the log domain.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (though currently always returns EINA_TRUE).
+ */
 Eina_Bool
 eina_vpath_shutdown(void)
 {
@@ -198,6 +260,17 @@ eina_vpath_shutdown(void)
 }
 
 #ifdef HAVE_GETPWENT
+/**
+ * @internal
+ * @brief Fetches the home directory of a specified user.
+ * This function is only available if HAVE_GETPWENT is defined.
+ * It uses getpwnam() to look up the user.
+ * @param[out] str Pointer to a char* that will be set to the user's home directory (pw_dir).
+ *                 This pointer is not allocated by this function but points into the passwd struct.
+ * @param name The username to look up.
+ * @param error A string to include in error messages if the user is not found.
+ * @return EINA_TRUE if the user is found and home directory is retrieved, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _fetch_user_homedir(char **str, const char *name, const char *error)
 {
@@ -216,6 +289,21 @@ _fetch_user_homedir(char **str, const char *name, const char *error)
 }
 #endif
 
+/**
+ * @internal
+ * @brief Core logic for resolving a vpath string into a real path.
+ * This function handles different vpath syntaxes:
+ * - `~/...`: Current user's home directory.
+ * - `~username/...`: Specified user's home directory (if HAVE_GETPWENT).
+ * - `(:key:)/...` or `${key}/...`: Vpath key lookup (e.g., "(:tmp:)/file").
+ * - Absolute or relative paths: Passed through as is.
+ *
+ * @param path The vpath string to resolve.
+ * @param[out] str Buffer to store the resolved path.
+ * @param size Size of the output buffer `str`.
+ * @return The number of characters written to `str` (excluding null terminator)
+ *         on success, or 0 on failure or if the path is invalid.
+ */
 static int
 _eina_vpath_resolve(const char *path, char *str, size_t size)
 {
@@ -321,6 +409,17 @@ _eina_vpath_resolve(const char *path, char *str, size_t size)
    return 0;
 }
 
+/**
+ * @brief Resolves a virtual path to a real, absolute path.
+ *
+ * This function takes a vpath string (e.g., "(:home:)/file.txt", "~/docs")
+ * and converts it into a canonical file system path. The returned string
+ * is dynamically allocated and must be freed by the caller using free().
+ *
+ * @param path The virtual path string to resolve.
+ * @return A newly allocated string containing the resolved path,
+ *         or NULL if the path is NULL or resolution fails.
+ */
 EINA_API char *
 eina_vpath_resolve(const char* path)
 {
@@ -332,6 +431,21 @@ eina_vpath_resolve(const char* path)
    return NULL;
 }
 
+/**
+ * @brief Resolves a virtual path formatted string into a real path, storing it in a provided buffer.
+ *
+ * This function works like snprintf, but first resolves any vpath components
+ * within the formatted string. For example, if format is "(:tmp:)/%s" and an argument is "myfile",
+ * it will resolve "(:tmp:)/myfile" into something like "/tmp/myfile".
+ *
+ * @param str Output buffer to store the resolved path.
+ * @param size Size of the output buffer `str`.
+ * @param format A printf-style format string that may contain vpath specifiers.
+ * @param ... Variable arguments for the format string.
+ * @return The number of characters that would have been written if `size` were
+ *         sufficiently large (excluding the null terminator), similar to snprintf.
+ *         Returns 0 or a negative value on error (e.g., invalid vpath syntax).
+ */
 EINA_API int
 eina_vpath_resolve_snprintf(char *str, size_t size, const char *format, ...)
 {
@@ -362,6 +476,24 @@ eina_vpath_resolve_snprintf(char *str, size_t size, const char *format, ...)
    return 0;
 }
 
+/**
+ * @brief Sets application-specific vpath entries.
+ *
+ * This function registers several vpath keys related to application directories,
+ * based on the application's domain and prefix. These keys include:
+ * - "app.dir": Application installation directory (from eina_prefix_get()).
+ * - "app.bin": Application binaries directory.
+ * - "app.lib": Application libraries directory.
+ * - "app.data": Application shared data directory.
+ * - "app.locale": Application locale data directory.
+ * - "app.config": Application-specific user configuration directory (e.g., ~/.config/app_domain).
+ * - "app.cache": Application-specific user cache directory (e.g., ~/.cache/app_domain).
+ * - "app.local": Application-specific user local data directory (e.g., ~/.local/share/app_domain).
+ * - "app.tmp": Application-specific user temporary directory (e.g., ~/.local/tmp/app_domain).
+ *
+ * @param app_domain The application's domain name (e.g., "my_app"). Used to construct user-specific paths.
+ * @param app_pfx An Eina_Prefix object representing the application's installation paths.
+ */
 EINA_API void
 eina_vpath_interface_app_set(const char *app_domain, Eina_Prefix *app_pfx)
 {
@@ -389,6 +521,35 @@ eina_vpath_interface_app_set(const char *app_domain, Eina_Prefix *app_pfx)
    _eina_vpath_data_add("app.tmp", buf);
 }
 
+/**
+ * @brief Sets user-specific vpath entries based on XDG user directories or fallbacks.
+ *
+ * This function registers vpath keys for standard user directories like "desktop",
+ * "documents", "downloads", "music", "pictures", "public", "templates", "videos",
+ * as well as XDG base directories like "data", "config", "cache", "run", and "tmp".
+ *
+ * If `user->run` is NULL, it attempts to determine a fallback runtime directory.
+ *
+ * The paths are taken from the `user` struct, which should be populated with
+ * paths to these standard user directories (e.g., from XDG lookups).
+ *
+ * Registered keys (prefixed with "usr."):
+ * - "usr.desktop"
+ * - "usr.documents"
+ * - "usr.downloads"
+ * - "usr.music"
+ * - "usr.pictures"
+ * - "usr.public" (from user->pub)
+ * - "usr.templates"
+ * - "usr.videos"
+ * - "usr.data"
+ * - "usr.config"
+ * - "usr.cache"
+ * - "usr.run"
+ * - "usr.tmp"
+ *
+ * @param user Pointer to an Eina_Vpath_Interface_User struct containing paths to user directories.
+ */
 EINA_API void
 eina_vpath_interface_user_set(Eina_Vpath_Interface_User *user)
 {

@@ -29,6 +29,19 @@
 #define ELM_CALENDAR_CIT_TEXT_PART_STR "elm.cit_%d.text"
 #define ELM_CALENDAR_CIT_ACCESS_PART_STR "elm.cit_%d.access"
 
+/**
+ * @brief Generates a part name for an Edje object, with a fallback for older themes.
+ * @param buffer The character buffer to write the part name to.
+ * @param buffer_size The size of the buffer.
+ * @param obj The Edje object to check for part existence.
+ * @param template The format string for the part name (e.g., "elm.cit_%d.text").
+ * @param n The integer value to substitute into the template.
+ *
+ * This function first tries the full template. If the part doesn't exist
+ * (e.g., "elm.cit_0.text"), it tries again by skipping the "elm." prefix
+ * (e.g., "cit_0.text") for compatibility with older themes that did not
+ * use this namespace.
+ */
 static void _part_name_snprintf(char *buffer, int buffer_size,
    const Evas_Object *obj, const char *template, int n)
 {
@@ -44,9 +57,15 @@ static void _part_name_snprintf(char *buffer, int buffer_size,
 static const char SIG_CHANGED[] = "changed";
 static const char SIG_DISPLAY_CHANGED[] = "display,changed";
 
+/**
+ * @brief Descriptions for the smart callbacks of the Elm_Calendar widget.
+ *
+ * These are used by evas_object_smart_callbacks_descriptions_set() to
+ * provide introspection capabilities for the widget's signals.
+ */
 static const Evas_Smart_Cb_Description _smart_callbacks[] = {
-   {SIG_CHANGED, ""},
-   {SIG_DISPLAY_CHANGED, ""},
+   {SIG_CHANGED, ""}, /**< Emitted when the selected date changes. */
+   {SIG_DISPLAY_CHANGED, ""}, /**< Emitted when the displayed month/year changes. */
    {SIG_WIDGET_LANG_CHANGED, ""}, /**< handled by elm_widget */
    {SIG_WIDGET_ACCESS_CHANGED, ""}, /**< handled by elm_widget */
    {SIG_LAYOUT_FOCUSED, ""}, /**< handled by elm_layout */
@@ -68,10 +87,30 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
  * callback functions are also newly added for button objects.
  * We still keep the old signal callback functions for backward compatibility. */
 
+/**
+ * @brief Callback for the 'clicked' event on increment/decrement buttons.
+ * @param data The calendar widget object.
+ * @param event The Efl_Event details (unused).
+ * Triggers a single step change in month/year.
+ */
 static void
 _inc_dec_button_clicked_cb(void *data, const Efl_Event *event EINA_UNUSED);
+
+/**
+ * @brief Callback for the 'pressed' event on increment/decrement buttons.
+ * @param data The calendar widget object.
+ * @param event The Efl_Event details, used to identify the source button.
+ * Starts a timer for continuous month/year change (spinning).
+ */
 static void
 _inc_dec_button_pressed_cb(void *data, const Efl_Event *event);
+
+/**
+ * @brief Callback for the 'unpressed' event on increment/decrement buttons.
+ * @param data The calendar widget object.
+ * @param event The Efl_Event details (unused).
+ * Stops the continuous month/year change timer.
+ */
 static void
 _inc_dec_button_unpressed_cb(void *data, const Efl_Event *event EINA_UNUSED);
 
@@ -81,8 +120,19 @@ EFL_CALLBACKS_ARRAY_DEFINE( _inc_dec_button_cb,
    { EFL_INPUT_EVENT_UNPRESSED, _inc_dec_button_unpressed_cb}
 );
 
+/**
+ * @brief Callback for the "activate" key action.
+ * @param obj The calendar widget object.
+ * @param params Action parameters (unused).
+ * @return EINA_TRUE if the action was handled, EINA_FALSE otherwise.
+ * This function typically selects the currently focused day.
+ */
 static Eina_Bool _key_action_activate(Evas_Object *obj, const char *params);
 
+/**
+ * @brief Defines the key actions supported by the calendar widget.
+ * Currently, only "activate" is supported.
+ */
 static const Elm_Action key_actions[] = {
    {"activate", _key_action_activate},
    {NULL, NULL}
@@ -90,18 +140,40 @@ static const Elm_Action key_actions[] = {
 
 /* Should not be translated, it's used if we failed
  * getting from locale. */
+/**
+ * @brief Default abbreviated day names.
+ * Used as a fallback if locale-specific names cannot be retrieved.
+ * Index 0 = Sunday, ..., 6 = Saturday.
+ */
 static const char *_days_abbrev[] =
 {
-   "Sun", "Mon", "Tue", "Wed",
-   "Thu", "Fri", "Sat"
+   "Sun", "Mon", "Tue", "Wed", /* Sunday, Monday, Tuesday, Wednesday */
+   "Thu", "Fri", "Sat"        /* Thursday, Friday, Saturday */
 };
 
+/**
+ * @brief Array storing the number of days in each month.
+ * _days_in_month[0] is for common years.
+ * _days_in_month[1] is for leap years.
+ * Index 0 = January, ..., 11 = December.
+ * Example: _days_in_month[0][1] is 28 (February in a common year).
+ *          _days_in_month[1][1] is 29 (February in a leap year).
+ */
 static int _days_in_month[2][12] =
 {
-   {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
-   {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+   {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}, /* Common year */
+   {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31} /* Leap year */
 };
 
+/**
+ * @brief Allocates and initializes a new calendar mark.
+ * @param obj The calendar widget this mark belongs to.
+ * @param mark_type A string identifying the type of mark (e.g., "holiday", "event").
+ *                  This string is used by the theme to style the mark.
+ * @param mark_time A struct tm representing the date of the mark.
+ * @param repeat The repeat type for the mark (e.g., daily, weekly, unique).
+ * @return A pointer to the newly created Elm_Calendar_Mark, or NULL on failure.
+ */
 static Elm_Calendar_Mark *
 _mark_new(Evas_Object *obj,
           const char *mark_type,
@@ -120,6 +192,10 @@ _mark_new(Evas_Object *obj,
    return mark;
 }
 
+/**
+ * @brief Frees the resources associated with a calendar mark.
+ * @param mark The Elm_Calendar_Mark to free.
+ */
 static inline void
 _mark_free(Elm_Calendar_Mark *mark)
 {
@@ -127,6 +203,13 @@ _mark_free(Elm_Calendar_Mark *mark)
    free(mark);
 }
 
+/**
+ * @brief Calculates the number of days in a given month, potentially offset from a reference time.
+ * @param selected_time A struct tm representing the reference date.
+ * @param month_offset An offset in months from selected_time->tm_mon.
+ *                     For example, 0 for the current month, -1 for the previous, 1 for the next.
+ * @return The number of days in the calculated month and year.
+ */
 static inline int
 _maxdays_get(struct tm *selected_time, int month_offset)
 {
@@ -141,6 +224,11 @@ _maxdays_get(struct tm *selected_time, int month_offset)
           [((!(year % 4)) && ((!(year % 400)) || (year % 100)))][month];
 }
 
+/**
+ * @brief Emits an Edje signal to visually unselect a calendar item (day cell).
+ * @param obj The calendar widget.
+ * @param selected The index of the calendar item (0-41) to unselect.
+ */
 static inline void
 _unselect(Evas_Object *obj,
           int selected)
@@ -151,6 +239,12 @@ _unselect(Evas_Object *obj,
    elm_layout_signal_emit(obj, emission, "elm");
 }
 
+/**
+ * @brief Emits an Edje signal to visually select a calendar item (day cell).
+ * @param obj The calendar widget.
+ * @param selected The index of the calendar item (0-41) to select.
+ * Also updates the internal focused and selected item index.
+ */
 static inline void
 _select(Evas_Object *obj,
         int selected)
@@ -164,6 +258,11 @@ _select(Evas_Object *obj,
    elm_layout_signal_emit(obj, emission, "elm");
 }
 
+/**
+ * @brief Emits an Edje signal to remove the "today" styling from a calendar item.
+ * @param sd The calendar widget's private data.
+ * The item index is taken from sd->today_it.
+ */
 static inline void
 _not_today(Elm_Calendar_Data *sd)
 {
@@ -174,6 +273,11 @@ _not_today(Elm_Calendar_Data *sd)
    sd->today_it = -1;
 }
 
+/**
+ * @brief Emits an Edje signal to apply "today" styling to a calendar item.
+ * @param sd The calendar widget's private data.
+ * @param it The index of the calendar item (0-41) to mark as today.
+ */
 static inline void
 _today(Elm_Calendar_Data *sd,
        int it)
@@ -185,6 +289,12 @@ _today(Elm_Calendar_Data *sd,
    sd->today_it = it;
 }
 
+/**
+ * @brief Emits an Edje signal to enable a calendar item (day cell).
+ * @param sd The calendar widget's private data.
+ * @param it The index of the calendar item (0-41) to enable.
+ * Enabled items are typically interactive.
+ */
 static inline void
 _enable(Elm_Calendar_Data *sd,
         int it)
@@ -195,6 +305,12 @@ _enable(Elm_Calendar_Data *sd,
    elm_layout_signal_emit(sd->obj, emission, "elm");
 }
 
+/**
+ * @brief Emits an Edje signal to disable a calendar item (day cell).
+ * @param sd The calendar widget's private data.
+ * @param it The index of the calendar item (0-41) to disable.
+ * Disabled items are typically non-interactive and visually distinct.
+ */
 static inline void
 _disable(Elm_Calendar_Data *sd,
          int it)
@@ -205,24 +321,52 @@ _disable(Elm_Calendar_Data *sd,
    elm_layout_signal_emit(sd->obj, emission, "elm");
 }
 
+/**
+ * @brief Formats a time struct into "Month Year" string (e.g., "May 2025").
+ * @param selected_time The time to format.
+ * @return A newly allocated string with the formatted date. Must be freed by the caller.
+ * Uses E_("%B %Y") for localization.
+ */
 static char *
 _format_month_year(struct tm *selected_time)
 {
    return eina_strftime(E_("%B %Y"), selected_time);
 }
 
+/**
+ * @brief Formats a time struct into "Month" string (e.g., "May").
+ * @param selected_time The time to format.
+ * @return A newly allocated string with the formatted month. Must be freed by the caller.
+ * Uses E_("%B") for localization.
+ */
 static char *
 _format_month(struct tm *selected_time)
 {
    return eina_strftime(E_("%B"), selected_time);
 }
 
+/**
+ * @brief Formats a time struct into "Year" string (e.g., "2025").
+ * @param selected_time The time to format.
+ * @return A newly allocated string with the formatted year. Must be freed by the caller.
+ * Uses E_("%Y") for localization.
+ */
 static char *
 _format_year(struct tm *selected_time)
 {
    return eina_strftime(E_("%Y"), selected_time);
 }
 
+/**
+ * @brief Applies a mark to a specific calendar item (day cell) by emitting an Edje signal.
+ * @param cal The calendar widget.
+ * @param cit The index of the calendar item (0-41).
+ * @param mtype The type of mark (e.g., "holiday", "event", or "clear" to remove marks).
+ *
+ * This function checks if the day corresponding to `cit` is within the
+ * calendar's min/max date range before applying the mark (unless `mtype` is "clear").
+ * The Edje signal emitted is of the form "cit_<i>,<mtype>", e.g., "cit_15,holiday".
+ */
 static inline void
 _cit_mark(Evas_Object *cal,
           int cit,
@@ -245,6 +389,13 @@ _cit_mark(Evas_Object *cal,
    elm_layout_signal_emit(cal, sign, "elm");
 }
 
+/**
+ * @brief Calculates the day of the week for a given day number in the month.
+ * @param first_week_day The starting day of the week for the calendar (0=Sunday, ..., 6=Saturday).
+ * @param day The day of the month (1-31).
+ * @return The calculated day of the week (0=Sunday, ..., 6=Saturday).
+ * This is used to determine if a day is a weekday or weekend for styling marks.
+ */
 static inline int
 _weekday_get(int first_week_day,
              int day)
@@ -252,6 +403,15 @@ _weekday_get(int first_week_day,
    return (day + first_week_day - 1) % ELM_DAY_LAST;
 }
 
+/**
+ * @brief (Deprecated) Updates the text color of a day cell based on its type (weekday, Saturday, Sunday).
+ * @param sd The calendar widget's private data.
+ * @param pos The index of the calendar item (0-41).
+ *
+ * This function emits Edje signals like "cit_<i>,weekday", "cit_<i>,saturday",
+ * or "cit_<i>,sunday" to allow theming of day colors.
+ * This functionality is likely superseded by more modern theming approaches.
+ */
 // EINA_DEPRECATED
 static void
 _text_day_color_update(Elm_Calendar_Data *sd,
@@ -280,6 +440,16 @@ _text_day_color_update(Elm_Calendar_Data *sd,
    elm_layout_signal_emit(sd->obj, emission, "elm");
 }
 
+/**
+ * @brief Sets the displayed month and year text in the calendar's header.
+ * @param sd The calendar widget's private data.
+ *
+ * If `sd->double_spinners` is true (theme supports separate year spinner),
+ * it formats and sets "year_text" and "month_text" separately.
+ * Otherwise, it uses `sd->format_func` (which defaults to "Month Year")
+ * to set "month_text".
+ * The `sd->filling` flag is used to prevent recursive updates during this process.
+ */
 static void
 _set_month_year(Elm_Calendar_Data *sd)
 {

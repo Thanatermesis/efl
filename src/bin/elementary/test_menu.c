@@ -3,6 +3,13 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback function called when a menu is dismissed.
+ *
+ * This function is registered with the "dismissed" smart callback of a menu
+ * object. It simply prints a message to standard output indicating that it has
+ * been called.
+ */
 static void
 _menu_dismissed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                    void *event_info EINA_UNUSED)
@@ -10,6 +17,17 @@ _menu_dismissed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    printf("menu dismissed callback is called!\n");
 }
 
+/**
+ * @brief Callback function to show a menu on a mouse down event.
+ *
+ * This function is registered as an event callback for EVAS_CALLBACK_MOUSE_DOWN
+ * on a clickable area. It retrieves the mouse coordinates from the event and
+ * moves the menu to that position, then shows it.
+ *
+ * @param data The menu Evas_Object to be shown.
+ * @param event_info The Evas_Event_Mouse_Down event structure containing
+ *        cursor coordinates.
+ */
 static void
 _menu_show_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
               void *event_info)
@@ -21,6 +39,16 @@ _menu_show_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    evas_object_show(data);
 }
 
+/**
+ * @brief Populates a menu item with a set of sub-items, including disabled ones.
+ *
+ * This is a helper function to add a specific set of items and separators
+ * to a given parent menu item. It demonstrates adding standard items and
+ * items that are explicitly disabled.
+ *
+ * @param menu The menu widget.
+ * @param menu_it The parent menu item to which new items will be added.
+ */
 static void
 _populate_4(Evas_Object *menu, Elm_Object_Item *menu_it)
 {
@@ -40,6 +68,15 @@ _populate_4(Evas_Object *menu, Elm_Object_Item *menu_it)
    elm_object_item_disabled_set(menu_it2, EINA_TRUE);
 }
 
+/**
+ * @brief Populates a menu item with media-related sub-items.
+ *
+ * This helper function adds media control-themed items to a parent menu item.
+ * It includes a separator and a disabled item.
+ *
+ * @param menu The menu widget.
+ * @param menu_it The parent menu item.
+ */
 static void
 _populate_3(Evas_Object *menu, Elm_Object_Item *menu_it)
 {
@@ -54,6 +91,16 @@ _populate_3(Evas_Object *menu, Elm_Object_Item *menu_it)
    elm_object_item_disabled_set(menu_it2, EINA_TRUE);
 }
 
+/**
+ * @brief Recursively populates a menu item with sub-items and sub-menus.
+ *
+ * This function builds a more complex menu structure. It adds items directly,
+ * then creates sub-menus by calling _populate_3() and _populate_4() on newly
+ * added items. It also demonstrates adding multiple separators.
+ *
+ * @param menu The menu widget.
+ * @param menu_it The parent menu item to populate.
+ */
 static void
 _populate_2(Evas_Object *menu, Elm_Object_Item *menu_it)
 {
@@ -83,6 +130,16 @@ _populate_2(Evas_Object *menu, Elm_Object_Item *menu_it)
    _populate_4(menu, menu_it2);
 }
 
+/**
+ * @brief Populates a top-level menu item, including a custom widget.
+ *
+ * This function demonstrates more advanced menu item creation. It adds a
+ * standard item, then adds an item containing an elm_radio widget as its
+ * content. It then calls _populate_2() to create a sub-menu.
+ *
+ * @param menu The menu widget.
+ * @param menu_it The parent menu item to populate.
+ */
 static void
 _populate_1(Evas_Object *menu, Elm_Object_Item *menu_it)
 {
@@ -101,6 +158,15 @@ _populate_1(Evas_Object *menu, Elm_Object_Item *menu_it)
    _populate_2(menu, menu_it2);
 }
 
+/**
+ * @brief Test function for a complex, nested menu.
+ *
+ * This test creates a window with a label and an invisible rectangle.
+ * Clicking the rectangle area triggers a menu to appear. The menu is
+ * populated with a deep hierarchy of items and sub-menus using the
+ * _populate_* helper functions. This demonstrates how to create and show
+ * a menu in response to a user event.
+ */
 void
 test_menu(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
           void *event_info EINA_UNUSED)
@@ -142,6 +208,16 @@ test_menu(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback to toggle the parent of a menu object.
+ *
+ * This function is triggered by a button click. It retrieves two potential
+ * parent objects stored in the menu's data. It checks the current parent of
+ * the menu and switches it to the other one, demonstrating dynamic
+ * reparenting of a menu.
+ *
+ * @param data The menu Evas_Object whose parent will be changed.
+ */
 static void
 _parent_set_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
                        void *event_info EINA_UNUSED)
@@ -158,6 +234,15 @@ _parent_set_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
    elm_menu_parent_set(mn, parent);
 }
 
+/**
+ * @brief Callback to toggle the icon of a menu item.
+ *
+ * Triggered by a button click, this function gets the icon name of a specific
+ * menu item. It toggles the icon between "home" and "file", demonstrating
+ * how to dynamically change a menu item's icon.
+ *
+ * @param data The Elm_Object_Item whose icon will be changed.
+ */
 static void
 _icon_set_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
                      void *event_info EINA_UNUSED)
@@ -175,6 +260,14 @@ _icon_set_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
    elm_menu_item_icon_name_set(menu_it, "home");
 }
 
+/**
+ * @brief Callback to toggle the selected state of a menu item.
+ *
+ * Triggered by a button click, this function inverts the 'selected' state
+ * of the given menu item.
+ *
+ * @param data The Elm_Object_Item to be selected/deselected.
+ */
 static void
 _item_select_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
                         void *event_info EINA_UNUSED)
@@ -185,6 +278,15 @@ _item_select_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
    elm_menu_item_selected_set(menu_it, !elm_menu_item_selected_get(menu_it));
 }
 
+/**
+ * @brief Callback to count and print the number of separators in a menu item's sub-menu.
+ *
+ * This function retrieves the list of sub-items for a given menu item,
+ * iterates through them, and counts how many are separators. The result is
+ * printed to standard output.
+ *
+ * @param data The Elm_Object_Item whose sub-items will be inspected.
+ */
 static void
 _separators_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
                        void *event_info EINA_UNUSED)
@@ -205,6 +307,11 @@ _separators_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
    printf("The number of separators: %d\n", separators);
 }
 
+/**
+ * @brief Callback to programmatically open a menu.
+ *
+ * @param data The menu Evas_Object to be opened.
+ */
 static void
 _open_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
                  void *event_info EINA_UNUSED)
@@ -215,6 +322,11 @@ _open_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED,
    elm_menu_open(mn);
 }
 
+/**
+ * @brief Callback to programmatically close a menu.
+ *
+ * @param data The menu Evas_Object to be closed.
+ */
 static void
 _close_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -224,6 +336,18 @@ _close_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EIN
    elm_menu_close(mn);
 }
 
+/**
+ * @brief Test function for menu manipulation.
+ *
+ * This test creates a window with a background image and a vertical box of
+ * buttons. These buttons demonstrate various menu API functions:
+ * - Opening and closing the menu programmatically.
+ * - Changing a menu item's icon.
+ * - Changing the menu's parent object.
+ * - Selecting an item.
+ * - Counting separators.
+ * This provides a comprehensive test case for dynamic menu control.
+ */
 void
 test_menu2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

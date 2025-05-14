@@ -12,29 +12,38 @@ typedef struct _Frame_Info Frame_Info;
 typedef struct _Loader_Info Loader_Info;
 typedef struct _File_Info File_Info;
 
+/**
+ * @brief Holds information about the memory-mapped GIF file being read.
+ */
 struct _File_Info
 {
-   unsigned char *map;
-   int pos, len; // yes - gif uses ints for file sizes.
+   unsigned char *map; /**< Pointer to the memory-mapped file data. */
+   int pos, len; /**< Current read position and total length of the mapped data. */ // yes - gif uses ints for file sizes.
 };
 
+/**
+ * @brief Holds context information for the GIF loader instance.
+ */
 struct _Loader_Info
 {
-   Eina_File *f;
-   Evas_Image_Load_Opts *opts;
-   Evas_Image_Animated *animated;
-   GifFileType *gif;
-   int imgnum;
-   File_Info fi;
+   Eina_File *f; /**< Eina file handle. */
+   Evas_Image_Load_Opts *opts; /**< Image loading options. */
+   Evas_Image_Animated *animated; /**< Structure holding animation details. */
+   GifFileType *gif; /**< libgif file handle. */
+   int imgnum; /**< Current image number being processed (for animation). */
+   File_Info fi; /**< Information about the memory-mapped file. */
 };
 
+/**
+ * @brief Holds information specific to a single frame in a GIF animation.
+ */
 struct _Frame_Info
 {
-   int x, y, w, h;
-   unsigned short delay; // delay time in 1/100ths of a sec
-   short transparent : 10; // -1 == not, anything else == index
-   short dispose : 6; // 0, 1, 2, 3 (others invalid)
-   Eina_Bool interlace : 1; // interlaced or not
+   int x, y, w, h; /**< Frame offset (x, y) and dimensions (w, h). */
+   unsigned short delay; /**< Delay time in 1/100ths of a second before displaying the next frame. */
+   short transparent : 10; /**< Transparent color index (-1 == not transparent, otherwise the index). */
+   short dispose : 6; /**< Disposal method (0-3) indicating how to treat the frame area before rendering the next frame. */
+   Eina_Bool interlace : 1; /**< Flag indicating if the frame is interlaced. */
 };
 
 #define LOADERR(x) \
@@ -49,6 +58,13 @@ do { \
 // utility funcs...
 
 // brute force find frame index - gifs are normally saml so ok for now
+/**
+ * @brief Finds a frame entry in the animated structure by its index.
+ * @param animated The animated image structure containing the frame list.
+ * @param index The index of the frame to find.
+ * @return The found Image_Entry_Frame or NULL if not found.
+ * @note This performs a linear search.
+ */
 static Image_Entry_Frame *
 _find_frame(Evas_Image_Animated *animated, int index)
 {
@@ -64,6 +80,16 @@ _find_frame(Evas_Image_Animated *animated, int index)
 }
 
 // fill in am image with a specific rgba color value
+/**
+ * @brief Fills a rectangular area of an image buffer with a solid color.
+ * @param data Pointer to the image pixel data (DATA32 format).
+ * @param rowpix Width of the image in pixels (stride).
+ * @param val The 32-bit ARGB color value to fill with.
+ * @param x The starting X coordinate of the rectangle.
+ * @param y The starting Y coordinate of the rectangle.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ */
 static void
 _fill_image(DATA32 *data, int rowpix, DATA32 val, int x, int y, int w, int h)
 {
@@ -82,6 +108,21 @@ _fill_image(DATA32 *data, int rowpix, DATA32 val, int x, int y, int w, int h)
 }
 
 // fix coords and work out an x and y inset in orig data if out of image bounds
+/**
+ * @brief Clips coordinates to fit within image bounds and calculates insets.
+ * @param imw The width of the main image buffer.
+ * @param imh The height of the main image buffer.
+ * @param[out] xin Pointer to store the horizontal inset within the source data (if clipped left).
+ * @param[out] yin Pointer to store the vertical inset within the source data (if clipped top).
+ * @param x0 The original starting X coordinate.
+ * @param y0 The original starting Y coordinate.
+ * @param w0 The original width.
+ * @param h0 The original height.
+ * @param[out] x Pointer to store the clipped starting X coordinate.
+ * @param[out] y Pointer to store the clipped starting Y coordinate.
+ * @param[out] w Pointer to store the clipped width.
+ * @param[out] h Pointer to store the clipped height.
+ */
 static void
 _clip_coords(int imw, int imh, int *xin, int *yin,
              int x0, int y0, int w0, int h0,
@@ -108,6 +149,20 @@ _clip_coords(int imw, int imh, int *xin, int *yin,
 }
 
 // file a rgba data pixle blob with a frame color (bg or trans) depending...
+/**
+ * @brief Fills a frame area with either the background color or transparency.
+ * @param data Pointer to the image pixel data (DATA32 format).
+ * @param rowpix Width of the image in pixels (stride).
+ * @param gif The libgif file handle.
+ * @param finfo Frame information containing transparency details.
+ * @param x The starting X coordinate of the area to fill.
+ * @param y The starting Y coordinate of the area to fill.
+ * @param w The width of the area to fill.
+ * @param h The height of the area to fill.
+ * @details If the frame is not transparent (finfo->transparent < 0), it fills
+ *          with the background color defined in the GIF. Otherwise, it fills
+ *          with fully transparent pixels (0).
+ */
 static void
 _fill_frame(DATA32 *data, int rowpix, GifFileType *gif, Frame_Info *finfo,
             int x, int y, int w, int h)
@@ -147,6 +202,11 @@ _fill_frame(DATA32 *data, int rowpix, GifFileType *gif, Frame_Info *finfo,
 }
 
 // store common fields from gif file info into frame info
+/**
+ * @brief Copies common image descriptor fields from the libgif structure to our frame info structure.
+ * @param gif The libgif file handle, positioned at the image descriptor.
+ * @param finfo The destination Frame_Info structure to populate.
+ */
 static void
 _store_frame_info(GifFileType *gif, Frame_Info *finfo)
 {
@@ -161,6 +221,15 @@ _store_frame_info(GifFileType *gif, Frame_Info *finfo)
 // at all then the image could be transparent - OR if image doesnt fill,
 // then it could be trasnparent (full coverage of screen). some gifs will
 // be recognized as solid here for faster rendering, but not all.
+/**
+ * @brief Checks if a frame fully covers the screen and if it uses transparency.
+ * @param[in,out] full Pointer to a boolean flag, set to EINA_FALSE if the frame
+ *                     does not fully cover the screen or uses transparency.
+ * @param finfo Frame information containing position, dimensions, and transparency.
+ * @param w The width of the logical screen (GIF canvas).
+ * @param h The height of the logical screen (GIF canvas).
+ * @details This helps determine if the final image might have alpha.
+ */
 static void
 _check_transparency(Eina_Bool *full, Frame_Info *finfo, int w, int h)
 {
@@ -173,6 +242,17 @@ _check_transparency(Eina_Bool *full, Frame_Info *finfo, int w, int h)
 }
 
 // allocate frame and frame info and append to list and store fields
+/**
+ * @brief Allocates and initializes a new frame entry and its associated info.
+ * @param animated The animated image structure to add the frame to.
+ * @param transparent The transparency index for this frame (-1 if none).
+ * @param dispose The disposal method for this frame.
+ * @param delay The delay for this frame (in 1/100ths of a second).
+ * @param index The index number for this frame.
+ * @return Pointer to the newly allocated Frame_Info structure, or NULL on failure.
+ * @details Allocates both Image_Entry_Frame and Frame_Info, links them,
+ *          populates the fields, and appends the frame to the animated list.
+ */
 static Frame_Info *
 _new_frame(Evas_Image_Animated *animated,
            int transparent, int dispose, int delay,
@@ -207,6 +287,27 @@ _new_frame(Evas_Image_Animated *animated,
 
 // decode a gif image into rows then expand to 32bit into the destination
 // data pointer
+/**
+ * @brief Decodes a single GIF image frame into a 32-bit RGBA buffer.
+ * @param gif The libgif file handle, positioned at the image data.
+ * @param data The destination 32-bit RGBA buffer.
+ * @param rowpix The width (stride) of the destination buffer in pixels.
+ * @param xin Horizontal inset within the source GIF frame data (due to clipping).
+ * @param yin Vertical inset within the source GIF frame data (due to clipping).
+ * @param transparent The transparency index for this frame (-1 if none).
+ * @param fw The full width of the source GIF frame.
+ * @param fh The full height of the source GIF frame.
+ * @param x The target X coordinate in the destination buffer.
+ * @param y The target Y coordinate in the destination buffer.
+ * @param w The width of the area to decode/copy.
+ * @param h The height of the area to decode/copy.
+ * @param fill If EINA_TRUE, transparent pixels in the source overwrite destination
+ *             pixels with 0 (fully transparent). If EINA_FALSE, destination pixels
+ *             corresponding to transparent source pixels are left unchanged.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., decoding error).
+ * @details Handles interlaced and non-interlaced images, color map expansion,
+ *          and transparency application based on the 'fill' flag.
+ */
 static Eina_Bool
 _decode_image(GifFileType *gif, DATA32 *data, int rowpix, int xin, int yin,
               int transparent, int fw, int fh,
@@ -334,6 +435,18 @@ on_error:
 
 // flush out older rgba frame images to save memory but skip current frame
 // and previous frame (prev needed for dispose mode 3)
+/**
+ * @brief Frees decoded pixel data for older frames to conserve memory.
+ * @param animated The animated image structure containing the frames.
+ * @param w Width of the image (used for memory calculation).
+ * @param h Height of the image (used for memory calculation).
+ * @param thisframe The current frame being processed (will not be flushed).
+ * @param prevframe The previous frame (needed for disposal mode 3, will not be flushed).
+ * @details Iterates through frames older than `prevframe` and frees their
+ *          `data` buffer if memory usage exceeds a target threshold (512 KB).
+ *          Stops flushing once memory usage is below the target or all eligible
+ *          frames have been checked.
+ */
 static void
 _flush_older_frames(Evas_Image_Animated *animated,
                     int w, int h,
@@ -386,6 +499,13 @@ _flush_older_frames(Evas_Image_Animated *animated,
      }
 }
 
+/**
+ * @brief libgif callback function to read data from a memory buffer.
+ * @param gft The GifFileType structure (contains user data).
+ * @param buf The buffer to read data into.
+ * @param len The maximum number of bytes to read.
+ * @return The number of bytes actually read, or 0 on EOF or error.
+ */
 static int
 _file_read(GifFileType *gft, GifByteType *buf, int len)
 {
@@ -398,6 +518,17 @@ _file_read(GifFileType *gft, GifByteType *buf, int len)
    return len;
 }
 
+/**
+* @brief Reads the header information of a GIF file.
+* @param loader_data Pointer to the Loader_Info context.
+* @param[out] prop Pointer to the Emile_Image_Property structure to fill.
+* @param[out] error Pointer to store the error code on failure.
+* @return EINA_TRUE on success, EINA_FALSE on failure.
+* @details Opens the GIF file using libgif, reads the screen descriptor,
+*          parses through image descriptors and extensions to determine
+*          image dimensions, frame count, loop count, and potential alpha usage.
+*          Populates the `prop` and `animated` structures.
+*/
 static Eina_Bool
 evas_image_load_file_head_gif2(void *loader_data,
                                Emile_Image_Property *prop,
@@ -568,6 +699,20 @@ on_error: // jump here on any errors to clean up
    return ret;
 }
 
+/**
+* @brief Loads the pixel data for a specific frame of a GIF file.
+* @param loader_data Pointer to the Loader_Info context.
+* @param prop Pointer to the image properties (mostly read-only here).
+* @param[out] pixels Pointer to the destination buffer for the pixel data (DATA32 format).
+* @param[out] error Pointer to store the error code on failure.
+* @return EINA_TRUE on success, EINA_FALSE on failure.
+* @details Locates the requested frame data. If the frame is already decoded and
+*          cached, it copies the cached data. Otherwise, it opens/re-opens the
+*          GIF file, seeks to the correct frame, handles frame disposal methods
+*          from the previous frame, decodes the current frame using _decode_image,
+*          caches the result (if animated), and copies the final pixel data to
+*          the `pixels` buffer. It also manages flushing older cached frames.
+*/
 static Eina_Bool
 evas_image_load_file_data_gif2(void *loader_data,
                                Emile_Image_Property *prop,
@@ -834,6 +979,15 @@ on_error: // jump here on any errors to clean up
 }
 
 // get the time between 2 frames in the timeline
+/**
+* @brief Calculates the total duration for a sequence of frames.
+* @param loader_data Pointer to the Loader_Info context.
+* @param start_frame The index of the first frame in the sequence.
+* @param frame_num The number of frames in the sequence.
+* @return The total duration in seconds, or -1.0 on error (e.g., invalid frame index).
+* @details Sums the delays (stored in 1/100ths of a second) for the specified
+*          range of frames. Uses a default delay of 10/100s if a frame's delay is 0.
+*/
 static double
 evas_image_load_frame_duration_gif2(void *loader_data,
                                     int start_frame,
@@ -870,6 +1024,17 @@ evas_image_load_frame_duration_gif2(void *loader_data,
 }
 
 // called on opening of a file load
+/**
+* @brief Opens a GIF file for loading.
+* @param f The Eina_File handle to the file.
+* @param key Optional key (unused here).
+* @param opts Load options (unused here).
+* @param animated Pointer to the animated structure to be populated/used.
+* @param[out] error Pointer to store the error code on failure.
+* @return A pointer to the allocated Loader_Info context, or NULL on failure.
+* @details Allocates the loader context, duplicates the file handle, and stores
+*          pointers to the options and animated structure.
+*/
 static void *
 evas_image_load_file_open_gif2(Eina_File *f,
                                Eina_Stringshare *key EINA_UNUSED, // XXX: we need to use key for frame #
@@ -890,6 +1055,12 @@ evas_image_load_file_open_gif2(Eina_File *f,
 }
 
 // called on closing of an image file load (end of load)
+/**
+* @brief Closes the GIF file and cleans up loader resources.
+* @param loader_data Pointer to the Loader_Info context created by evas_image_load_file_open_gif2.
+* @details Closes the libgif file handle (if open), unmaps the memory-mapped file
+*          (if mapped), closes the Eina_File handle, and frees the loader context.
+*/
 static void
 evas_image_load_file_close_gif2(void *loader_data)
 {
@@ -920,6 +1091,13 @@ static Evas_Image_Load_Func evas_image_load_gif_func =
 };
 
 // raw module api that the rest of the world sees
+/**
+* @brief Evas module initialization function.
+* @param em The Evas_Module structure to initialize.
+* @return 1 on success, 0 on failure.
+* @details Assigns the loader function table (`evas_image_load_gif_func`)
+*          to the module structure.
+*/
 static int
 module_open(Evas_Module *em)
 {
@@ -928,6 +1106,11 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+* @brief Evas module shutdown function.
+* @param em The Evas_Module structure (unused).
+* @details Currently does nothing.
+*/
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

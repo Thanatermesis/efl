@@ -1,3 +1,15 @@
+/**
+ * @file
+ * @brief These routines are for Evas smart objects.
+ *
+ * Evas smart objects are a kind of meta objects that can encapsulate
+ * other Evas objects (members) and present a custom API. They are
+ * the basis for more complex UI elements.
+ *
+ * This file implements the Efl_Canvas_Group interface and provides
+ * the legacy Evas_Object_Smart API.
+ */
+
 #define EFL_CANVAS_GROUP_PROTECTED
 
 #include "eo_internal.h"
@@ -17,66 +29,86 @@ extern Eina_Hash* signals_hash_table;
 
 static Eina_Hash *_evas_smart_class_names_hash_table = NULL;
 
+/**
+ * @brief Internal data structure for Evas smart objects.
+ *
+ * This structure holds all the private data associated with an Evas_Object
+ * when it's a smart object (implementing EFL_CANVAS_GROUP_CLASS).
+ */
 struct _Evas_Smart_Data
 {
    struct {
-      Eina_Rectangle bounding_box;
+      Eina_Rectangle bounding_box; /**< Current and previous bounding box of the smart object, encompassing all its members. */
    } cur, prev;
-   Evas_Object      *object;
-   Evas_Object      *filter_img;
-   void             *engine_data;
-   void             *data;
-   Eina_Inlist      *callbacks;
-   Eina_Inlist      *contained; /** list of smart member objects */
+   Evas_Object      *object; /**< Pointer to the Evas_Object itself. */
+   Evas_Object      *filter_img; /**< Internal image object used for filters. */
+   void             *engine_data; /**< Engine-specific data for this smart object. */
+   void             *data; /**< User-provided data associated with the smart object. */
+   Eina_Inlist      *callbacks; /**< List of legacy smart callbacks registered. @see _eo_evas_smart_cb_info */
+   Eina_Inlist      *contained; /**< Inlist of Evas_Object_Protected_Data for member objects. */
 
-   void             *render_cache;
+   void             *render_cache; /**< Cache for rendering operations. */
   /* ptr array + data blob holding all interfaces private data for
    * this object */
-   void            **interface_privates;
-   Eina_Clist        calc_entry;
+   void            **interface_privates; /**< Array of private data for each interface implemented. */
+   Eina_Clist        calc_entry; /**< Entry in the canvas's calculation list. */
 
-   Evas_Smart_Cb_Description_Array callbacks_descriptions;
+   Evas_Smart_Cb_Description_Array callbacks_descriptions; /**< Descriptions for instance-specific smart callbacks. */
 
-   int               x, y;
-   int               walking_list;
-   int               member_count; /** number of smart member objects */
+   int               x, y; /**< Coordinates, primarily used by clipped smart objects. */
+   int               walking_list; /**< Flag to indicate if a list (e.g., members) is being iterated, to prevent modification issues. */
+   int               member_count; /**< Number of smart member objects. */
 
-   unsigned short    recalculate_cycle;
+   unsigned short    recalculate_cycle; /**< Counter to detect unstable recalculate loops. */
 
-   Evas_BiDi_Direction paragraph_direction : 2;
-   Eina_Bool         inherit_paragraph_direction : 1;
-   Eina_Bool         deletions_waiting : 1;
-   Eina_Bool         need_recalculate : 1;
-   Eina_Bool         update_boundingbox_needed : 1;
-   Eina_Bool         group_del_called : 1;
-   Eina_Bool         clipped : 1; /* If true, smart clipped */
-   Eina_Bool         data_nofree : 1; /* If true, do NOT free the data */
-   Eina_Bool         constructed : 1; /* constructor finished */
-   Eina_Bool         cb_move : 1; /* has "move" cb added */
-   Eina_Bool         cb_resize : 1; /* has "resize" cb added */
-   Eina_Bool         cb_restack : 1; /* has "restack" cb added */
-   Eina_Bool         cb_member_added : 1; /* has "member,added" cb added */
-   Eina_Bool         cb_member_removed : 1; /* has "member,removed" cb added */
+   Evas_BiDi_Direction paragraph_direction : 2; /**< Bidirectional paragraph direction. */
+   Eina_Bool         inherit_paragraph_direction : 1; /**< Whether to inherit paragraph direction from parent. */
+   Eina_Bool         deletions_waiting : 1; /**< Flag indicating if there are pending deletions. */
+   Eina_Bool         need_recalculate : 1; /**< Flag indicating if the smart object needs its calculate() method called. */
+   Eina_Bool         update_boundingbox_needed : 1; /**< Flag indicating if the bounding box needs to be updated. */
+   Eina_Bool         group_del_called : 1; /**< Flag to ensure efl_canvas_group_del is called. */
+   Eina_Bool         clipped : 1; /**< If true, this smart object manages a clipper for its members. */
+   Eina_Bool         data_nofree : 1; /**< If true, do NOT free the `data` pointer on destruction. */
+   Eina_Bool         constructed : 1; /**< True after the efl_constructor has finished. */
+   Eina_Bool         cb_move : 1; /**< True if a "move" legacy callback is registered. */
+   Eina_Bool         cb_resize : 1; /**< True if a "resize" legacy callback is registered. */
+   Eina_Bool         cb_restack : 1; /**< True if a "restack" legacy callback is registered. */
+   Eina_Bool         cb_member_added : 1; /**< True if a "member,added" legacy callback is registered. */
+   Eina_Bool         cb_member_removed : 1; /**< True if a "member,removed" legacy callback is registered. */
 };
 
+/**
+ * @brief Internal structure to store information for legacy Evas_Smart_Cb callbacks.
+ *
+ * This is used to bridge legacy smart callbacks with the Efl_Event system.
+ */
 typedef struct
 {
-   EINA_INLIST;
-   Evas_Smart_Cb func;
-   void *data;
-   const Efl_Event_Description *event;
+   EINA_INLIST; /**< Macro for Eina_Inlist node. */
+   Evas_Smart_Cb func; /**< The legacy smart callback function pointer. */
+   void *data; /**< User data for the callback. */
+   const Efl_Event_Description *event; /**< The corresponding Efl_Event_Description. */
 } _eo_evas_smart_cb_info;
 
 
+/**
+ * @brief Iterator structure for iterating over smart object members.
+ */
 typedef struct _Evas_Object_Smart_Iterator Evas_Object_Smart_Iterator;
 struct _Evas_Object_Smart_Iterator
 {
-   Eina_Iterator iterator;
+   Eina_Iterator iterator; /**< The Eina_Iterator interface. */
 
-   const Eina_Inlist *current;
-   Evas_Object *parent;
+   const Eina_Inlist *current; /**< Current member in the iteration. */
+   Evas_Object *parent; /**< The parent smart object being iterated. */
 };
 
+/**
+ * @internal
+ * @brief Trampoline function to call legacy Evas_Smart_Cb from an Efl_Event.
+ * @param data Pointer to _eo_evas_smart_cb_info.
+ * @param event The Efl_Event payload.
+ */
 static void
 _eo_evas_smart_cb(void *data, const Efl_Event *event)
 {
@@ -85,19 +117,51 @@ _eo_evas_smart_cb(void *data, const Efl_Event *event)
 }
 
 /* private methods for smart objects */
+/**
+ * @internal
+ * @brief Main rendering function for smart objects (largely a no-op).
+ * Smart objects typically don't render themselves but manage members that do.
+ */
 static void evas_object_smart_render(Evas_Object *eo_obj,
                                      Evas_Object_Protected_Data *obj,
                                      void *type_private_data,
                                      void *engine, void *output, void *context, void *surface,
                                      int x, int y, Eina_Bool do_async);
+/**
+ * @internal
+ * @brief Pre-render operations for smart objects.
+ * Handles tasks like adding to clip_changes list if map or source visibility changed.
+ */
 static void evas_object_smart_render_pre(Evas_Object *eo_obj,
 					 Evas_Object_Protected_Data *obj,
 					 void *type_private_data);
+/**
+ * @internal
+ * @brief Post-render operations for smart objects.
+ * Updates previous state to current state (geometry, visibility, etc.).
+ */
 static void evas_object_smart_render_post(Evas_Object *eo_obj,
 					  Evas_Object_Protected_Data *obj,
 					  void *type_private_data);
 
+/**
+ * @internal
+ * @brief Retrieves engine-specific data for a smart object.
+ * @param eo_obj The smart object.
+ * @return Pointer to engine data, or NULL if not a smart object or no engine data.
+ */
 static void *evas_object_smart_engine_data_get(Evas_Object *eo_obj);
+
+/**
+ * @internal
+ * @brief Internal function to recursively set paragraph direction for smart object members.
+ *
+ * This is called when a smart object's paragraph direction changes, and it
+ * propagates this change to its children if they inherit the direction.
+ *
+ * @param eo_obj The smart object whose members' paragraph direction is to be set.
+ * @param dir The new paragraph direction.
+ */
 static void _efl_canvas_group_group_paragraph_direction_set_internal(Eo *eo_obj,
                                                                 Evas_BiDi_Direction dir);
 
@@ -124,6 +188,12 @@ static const Evas_Object_Func object_func =
 };
 
 /* helpers */
+/**
+ * @internal
+ * @brief Helper to get the internal clipper object of a clipped smart object.
+ * @param o The smart data of the smart object.
+ * @return The clipper Evas_Object, or NULL if not a clipped smart or no clipper.
+ */
 static inline Evas_Object *
 _smart_clipper_get(Evas_Smart_Data *o)
 {
@@ -132,6 +202,19 @@ _smart_clipper_get(Evas_Smart_Data *o)
 }
 
 /* public funcs */
+/**
+ * @brief Sets the smart data of a smart Evas object.
+ *
+ * This function associates a custom data pointer with a smart object.
+ * If the object previously had data set (and not marked as nofree),
+ * the old data will be freed. The new data is marked as 'nofree',
+ * meaning evas will not free it automatically when the object is deleted
+ * or when new data is set. The user is responsible for managing its lifecycle.
+ *
+ * @param eo_obj The smart object.
+ * @param data The data to set.
+ * @see evas_object_smart_data_get()
+ */
 EVAS_API void
 evas_object_smart_data_set(Evas_Object *eo_obj, void *data)
 {
@@ -145,6 +228,17 @@ evas_object_smart_data_set(Evas_Object *eo_obj, void *data)
      }
 }
 
+/**
+ * @brief Gets the smart data of a smart Evas object.
+ *
+ * This function retrieves the custom data pointer associated with a
+ * smart object, previously set by evas_object_smart_data_set().
+ *
+ * @param eo_obj The smart object.
+ * @return The data associated with @p eo_obj, or @c NULL on errors or if no
+ *         data was set.
+ * @see evas_object_smart_data_set()
+ */
 EVAS_API void *
 evas_object_smart_data_get(const Evas_Object *eo_obj)
 {
@@ -152,6 +246,19 @@ evas_object_smart_data_get(const Evas_Object *eo_obj)
    return o->data;
 }
 
+/**
+ * @brief Retrieves a smart interface for a given smart object by name.
+ *
+ * Smart interfaces allow smart objects to expose additional, standardized APIs.
+ * This function looks up an interface by its string name.
+ *
+ * @param eo_obj The smart object.
+ * @param name The name of the interface to retrieve.
+ * @return A pointer to the Evas_Smart_Interface structure if found,
+ *         otherwise @c NULL. The returned pointer is valid as long as the
+ *         smart object's class exists.
+ * @see evas_object_smart_interface_data_get()
+ */
 EVAS_API const void *
 evas_object_smart_interface_get(const Evas_Object *eo_obj,
                                 const char *name)
@@ -176,6 +283,19 @@ evas_object_smart_interface_get(const Evas_Object *eo_obj,
    return NULL;
 }
 
+/**
+ * @brief Retrieves the private data associated with a specific smart interface instance on an object.
+ *
+ * Each smart object that implements an interface can have its own private data
+ * for that interface. This function retrieves that data.
+ *
+ * @param eo_obj The smart object.
+ * @param iface A pointer to the Evas_Smart_Interface structure (e.g., obtained
+ *              from evas_object_smart_interface_get()).
+ * @return A pointer to the private data for the specified interface on this object,
+ *         or @c NULL if the interface is not found or has no private data.
+ * @see evas_object_smart_interface_get()
+ */
 EVAS_API void *
 evas_object_smart_interface_data_get(const Evas_Object *eo_obj,
                                      const Evas_Smart_Interface *iface)
@@ -199,6 +319,16 @@ evas_object_smart_interface_data_get(const Evas_Object *eo_obj,
    return NULL;
 }
 
+/**
+ * @brief Retrieves the Evas_Smart structure associated with a smart object.
+ *
+ * The Evas_Smart structure contains information about the smart object's class,
+ * its interfaces, and callbacks.
+ *
+ * @param eo_obj The smart object (must be an Efl_Canvas_Group).
+ * @return A pointer to the Evas_Smart structure, or @c NULL if the object
+ *         is not a valid smart object.
+ */
 EVAS_API Evas_Smart*
 evas_object_smart_smart_get(const Efl_Canvas_Group *eo_obj)
 {
@@ -206,12 +336,34 @@ evas_object_smart_smart_get(const Efl_Canvas_Group *eo_obj)
    return obj->smart.smart;
 }
 
+/**
+ * @brief Adds an object as a member of a smart object.
+ *
+ * This is a convenience wrapper around efl_canvas_group_member_add().
+ * The order of parameters is (member_object, smart_parent_object).
+ *
+ * @param eo_obj The object to be added as a member.
+ * @param smart_obj The smart object to which @p eo_obj will be added.
+ * @see efl_canvas_group_member_add()
+ * @see evas_object_smart_member_del()
+ */
 EVAS_API void
 evas_object_smart_member_add(Evas_Object *eo_obj, Evas_Object *smart_obj)
 {
    efl_canvas_group_member_add(smart_obj, eo_obj);
 }
 
+/**
+ * @internal
+ * @brief Invalidates parent-related caches for a smart object and its members recursively.
+ *
+ * When properties like pass_events, freeze_events, or src_invisible change on a parent,
+ * cached values in its children (and their children, etc.) related to these properties
+ * become invalid and need to be re-evaluated. This function marks them as invalid.
+ *
+ * @param obj The protected data of the object whose cache (and its members' caches) needs invalidation.
+ * @param sd The smart data of @p obj, if it's a smart object. Can be NULL if @p obj is not smart.
+ */
 static void
 _evas_object_smart_member_cache_invalidate(Evas_Object_Protected_Data *obj, Evas_Smart_Data *sd)
 {

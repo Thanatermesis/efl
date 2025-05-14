@@ -7,6 +7,21 @@ Evas_Object * _focus_autoscroll_mode_frame_create(Evas_Object *parent);
 
 /**** focus 1 ****/
 
+/**
+ * @brief Callback for key events on the main window.
+ *
+ * This function handles key down and key up events. It prints the name
+ * of the key pressed or released to standard output. It also sets the
+ * EVAS_EVENT_FLAG_ON_HOLD flag on the event to indicate that it has been
+ * handled and should not be processed further by other handlers.
+ *
+ * @param data User data, unused.
+ * @param obj The object the event is on, unused.
+ * @param src The source of the event, unused.
+ * @param type The type of the event (e.g., EVAS_CALLBACK_KEY_DOWN).
+ * @param event_info The specific event information, like Evas_Event_Key_Down.
+ * @return EINA_TRUE if the event was handled, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _event(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, Evas_Object *src EINA_UNUSED, Evas_Callback_Type type, void *event_info)
 {
@@ -23,6 +38,18 @@ _event(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, Evas_Object *src EI
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for key down events on an object.
+ *
+ * This function is registered as a key down event callback but its
+ * implementation is commented out. It was likely used for debugging
+ * to print information about the object receiving the key event.
+ *
+ * @param data User data, unused.
+ * @param e The Evas canvas, unused.
+ * @param obj The object that received the event, unused.
+ * @param einfo Event-specific information, unused.
+ */
 static void
 _on_key_down(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *einfo EINA_UNUSED)
 {
@@ -31,6 +58,16 @@ _on_key_down(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj EINA_
    //       obj, event->key, evas_object_smart_parent_get(obj));
 }
 
+/**
+ * @brief Disables a given widget.
+ *
+ * This function is used as a callback, typically for a "clicked" event
+ * on a button. It disables the widget passed in the @p data parameter.
+ *
+ * @param data A pointer to the Evas_Object to be disabled.
+ * @param obj The object that emitted the signal, unused.
+ * @param event_info The event information, unused.
+ */
 static void
 my_disable(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -38,6 +75,16 @@ my_disable(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSE
    elm_object_disabled_set(bt, EINA_TRUE);
 }
 
+/**
+ * @brief Enables a given widget.
+ *
+ * This function is used as a callback, typically for a "clicked" event
+ * on a button. It enables the widget passed in the @p data parameter.
+ *
+ * @param data A pointer to the Evas_Object to be enabled.
+ * @param obj The object that emitted the signal, unused.
+ * @param event_info The event information, unused.
+ */
 static void
 my_enable(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -45,6 +92,14 @@ my_enable(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED
    elm_object_disabled_set(bt, EINA_FALSE);
 }
 
+/**
+ * @brief A helper function to show an object and add a key down callback.
+ *
+ * This function adds the _on_key_down callback for the EVAS_CALLBACK_KEY_DOWN
+ * event and then shows the object. It's a convenience wrapper.
+ *
+ * @param obj The object to show and attach the event callback to.
+ */
 static inline void
 my_show(Evas_Object *obj)
 {
@@ -53,12 +108,32 @@ my_show(Evas_Object *obj)
    evas_object_show(obj);
 }
 
+/**
+ * @brief Callback for toolbar item selection.
+ *
+ * This function is called when a toolbar item is selected. It simply
+ * prints the memory address of the selected item's object for debugging.
+ *
+ * @param data User data, unused.
+ * @param obj The toolbar object.
+ * @param event_info The selected item, unused here.
+ */
 static void
 _tb_sel(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    printf("tb sel %p\n", obj);
 }
 
+/**
+ * @brief Callback for when the focus highlight checkbox changes state.
+ *
+ * Toggles the focus highlight feature on the window based on the
+ * state of a checkbox.
+ *
+ * @param data The window object (Evas_Object *).
+ * @param obj The checkbox object that changed.
+ * @param event_info Event information, unused.
+ */
 static void
 _focus_highlight_changed(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -68,6 +143,16 @@ _focus_highlight_changed(void *data, Evas_Object *obj, void *event_info EINA_UNU
      elm_win_focus_highlight_enabled_set(data, EINA_FALSE);
 }
 
+/**
+ * @brief Callback for when the focus animation checkbox changes state.
+ *
+ * Toggles the focus highlight animation on the window based on the
+ * state of a checkbox.
+ *
+ * @param data The window object (Evas_Object *).
+ * @param obj The checkbox object that changed.
+ * @param event_info Event information, unused.
+ */
 static void
 _focus_anim_changed(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -77,6 +162,16 @@ _focus_anim_changed(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      elm_win_focus_highlight_animate_set(data, EINA_FALSE);
 }
 
+/**
+ * @brief Callback for when a radio button's state changes.
+ *
+ * Sets the global focus movement policy based on which radio button
+ * in a group is selected.
+ *
+ * @param data User data, unused.
+ * @param obj The radio button object that changed.
+ * @param event_info Event information, unused.
+ */
 static void
 _rd_changed_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -90,6 +185,18 @@ _rd_changed_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_U
      elm_config_focus_move_policy_set(ELM_FOCUS_MOVE_POLICY_KEY_ONLY);
 }
 
+/**
+ * @brief Test for general focus behavior.
+ *
+ * Creates a window with a complex arrangement of various widgets
+ * (toolbar, buttons, entries, scrollers, etc.) to test focus
+ * movement using keyboard navigation (Tab, Shift+Tab, arrows).
+ * It also includes controls to change focus highlight and movement policies.
+ *
+ * @param data User data, unused.
+ * @param obj The object that triggered this test, unused.
+ * @param event_info Event information, unused.
+ */
 void
 test_focus(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -530,6 +637,16 @@ test_focus(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_inf
 
 /**** focus 2 ****/
 
+/**
+ * @brief Callback for canvas object focus in events.
+ *
+ * This function is called when any object on the canvas receives focus.
+ * It prints the type and memory address of the object that gained focus.
+ *
+ * @param data User data, unused.
+ * @param e The Evas canvas, unused.
+ * @param event_info The object that gained focus (Evas_Object *).
+ */
 static void
 _focus_in(void *data EINA_UNUSED, Evas *e EINA_UNUSED, void *event_info)
 {
@@ -539,6 +656,16 @@ _focus_in(void *data EINA_UNUSED, Evas *e EINA_UNUSED, void *event_info)
    printf("Evas_Object focus in: %p %s\n", event_info, type);
 }
 
+/**
+ * @brief Callback for canvas object focus out events.
+ *
+ * This function is called when any object on the canvas loses focus.
+ * It prints the type and memory address of the object that lost focus.
+ *
+ * @param data User data, unused.
+ * @param e The Evas canvas, unused.
+ * @param event_info The object that lost focus (Evas_Object *).
+ */
 static void
 _focus_out(void *data EINA_UNUSED, Evas *e EINA_UNUSED, void *event_info)
 {
@@ -548,6 +675,16 @@ _focus_out(void *data EINA_UNUSED, Evas *e EINA_UNUSED, void *event_info)
    printf("Evas_Object focus out: %p %s\n", event_info, type);
 }
 
+/**
+ * @brief Sets focus programmatically on a given object.
+ *
+ * This function is a callback, typically for a "clicked" event. It sets
+ * the focus to the object passed in the @p data parameter.
+ *
+ * @param data The object to focus (Evas_Object *).
+ * @param o The object that emitted the signal, unused.
+ * @param event_info Event information, unused.
+ */
 static void
 _focus_obj(void *data, Evas_Object *o EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -559,6 +696,17 @@ _focus_obj(void *data, Evas_Object *o EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_object_focus_set(newfocus, EINA_TRUE);
 }
 
+/**
+ * @brief Sets focus programmatically on a specific part of a layout.
+ *
+ * This callback focuses a predefined part named "sky" within a given
+ * layout widget. This demonstrates focusing child objects that are
+ * part of a layout's internal structure.
+ *
+ * @param data The layout object (Evas_Object *).
+ * @param o The object that emitted the signal, unused.
+ * @param event_info Event information, unused.
+ */
 static void
 _focus_layout_part(void *data, Evas_Object *o EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -572,6 +720,19 @@ _focus_layout_part(void *data, Evas_Object *o EINA_UNUSED, void *event_info EINA
    evas_object_focus_set(newfocus, EINA_TRUE);;
 }
 
+/**
+ * @brief Test for programmatic focus setting.
+ *
+ * This test creates a window with several widgets, including a layout with
+ * child objects. Buttons are provided to programmatically set focus on
+ * different widgets (an entry, the layout itself, parts of the layout,
+ * and children of the layout) to verify that elm_object_focus_set() and
+ * evas_object_focus_set() work as expected.
+ *
+ * @param data User data, unused.
+ * @param obj The object that triggered this test, unused.
+ * @param event_info Event information, unused.
+ */
 void
 test_focus2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -681,6 +842,15 @@ test_focus2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
 
 static Evas_Object *foc = NULL;
 
+/**
+ * @brief Callback for when an object is focused.
+ *
+ * Stores the focused object in the global `foc` variable.
+ *
+ * @param data User data, unused.
+ * @param obj The object that gained focus.
+ * @param event_info Event information, unused.
+ */
 static void
 _foc(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -688,6 +858,15 @@ _foc(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
    printf("foc -> %p\n", foc);
 }
 
+/**
+ * @brief Callback for when an object is unfocused.
+ *
+ * Clears the global `foc` variable by setting it to NULL.
+ *
+ * @param data User data, unused.
+ * @param obj The object that lost focus, unused.
+ * @param event_info Event information, unused.
+ */
 static void
 _unfoc(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -695,6 +874,17 @@ _unfoc(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EI
    printf("foc -> %p\n", foc);
 }
 
+/**
+ * @brief Adds a new entry widget to a box.
+ *
+ * This callback creates a new entry, sets its properties, and adds it to
+ * the box container specified by @p data. It also hooks up focus and
+ * unfocus callbacks to track the focus state.
+ *
+ * @param data The parent box (Evas_Object *) to which the new entry will be added.
+ * @param obj The object that emitted the signal, unused.
+ * @param event_info Event information, unused.
+ */
 static void
 _add(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -712,18 +902,50 @@ _add(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    evas_object_show(en);
 }
 
+/**
+ * @brief Deletes the currently focused widget.
+ *
+ * This callback checks if the global `foc` variable points to a valid
+ * object and, if so, deletes that object.
+ *
+ * @param data User data, unused.
+ * @param obj The object that emitted the signal, unused.
+ * @param event_info Event information, unused.
+ */
 static void
 _del(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    if (foc) evas_object_del(foc);
 }
 
+/**
+ * @brief Hides the currently focused widget.
+ *
+ * This callback checks if the global `foc` variable points to a valid
+ * object and, if so, hides that object.
+ *
+ * @param data User data, unused.
+ * @param obj The object that emitted the signal, unused.
+ * @param event_info Event information, unused.
+ */
 static void
 _hide(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    if (foc) evas_object_hide(foc);
 }
 
+/**
+ * @brief Test for focus behavior when widgets are hidden or deleted.
+ *
+ * This test creates a window where entry widgets can be dynamically added.
+ * Buttons are provided to hide or delete the currently focused entry.
+ * The purpose is to ensure that focus is correctly transferred to another
+ * widget when the focused one disappears.
+ *
+ * @param data User data, unused.
+ * @param obj The object that triggered this test, unused.
+ * @param event_info Event information, unused.
+ */
 void
 test_focus_hide_del(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -783,6 +1005,16 @@ test_focus_hide_del(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *
 
 /**** focus 3 ****/
 
+/**
+ * @brief Helper function to create a button.
+ *
+ * Creates a button with the given text and adds it to the parent.
+ *
+ * @param parent The parent widget.
+ * @param text The text for the button label.
+ * @param expand If EINA_TRUE, the button will expand to fill available space.
+ * @return The newly created button object.
+ */
 static Evas_Object *
 create_button(Evas_Object *parent, const char *text, Eina_Bool expand)
 {
@@ -799,6 +1031,16 @@ create_button(Evas_Object *parent, const char *text, Eina_Bool expand)
    return btn;
 }
 
+/**
+ * @brief Callback to change the focus highlight clip disable setting.
+ *
+ * Reads the state of a checkbox and updates the global configuration
+ * for disabling focus highlight clipping.
+ *
+ * @param data User data, unused.
+ * @param obj The checkbox whose state changed.
+ * @param event_info Event information, unused.
+ */
 static void
 _focus_highlight_clip_disable_changed_cb(void *data EINA_UNUSED,
                                          Evas_Object *obj,
@@ -808,6 +1050,16 @@ _focus_highlight_clip_disable_changed_cb(void *data EINA_UNUSED,
    elm_config_focus_highlight_clip_disabled_set(disable);
 }
 
+/**
+ * @brief Toggles the orientation of a box layout.
+ *
+ * This callback reads the state of a checkbox and sets the orientation
+ * of the box passed in @p data to horizontal or vertical accordingly.
+ *
+ * @param data The box object (Evas_Object *) to modify.
+ * @param obj The checkbox whose state changed.
+ * @param event_info Event information, unused.
+ */
 static void
 _horizontal_btn(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -815,6 +1067,19 @@ _horizontal_btn(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_box_horizontal_set(box_btn, elm_check_state_get(obj));
 }
 
+/**
+ * @brief Test for focus behavior in scrollers and with custom themes.
+ *
+ * This test sets up a scene with a scroller containing many items to
+ * specifically check for focus-related bugs that occur with scrolling,
+ * such as focus being clipped or not moving correctly when items are
+ * scrolled out of view. It also loads a custom theme to test custom
+ * focus highlight styles.
+ *
+ * @param data User data, unused.
+ * @param obj The object that triggered this test, unused.
+ * @param event_info Event information, unused.
+ */
 void
 test_focus3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -908,6 +1173,17 @@ test_focus3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
 
 /**** focus 4 ****/
 
+/**
+ * @brief Re-applies focus to a button.
+ *
+ * This callback is used to test how focus highlighting behaves when focus
+ * is explicitly set to an object that might already have it. It unfocuses
+ * and then immediately refocuses the button.
+ *
+ * @param data The button object (Evas_Object *) to refocus.
+ * @param obj The object that emitted the signal, unused.
+ * @param event_info Event information, unused.
+ */
 static void
 btn_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -917,6 +1193,16 @@ btn_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
 }
 
 static Eina_Bool toggle = EINA_FALSE;
+/**
+ * @brief Toggles the size of a button.
+ *
+ * This callback resizes a button when clicked, to test how the focus
+ * highlight adjusts to a widget's size change.
+ *
+ * @param data The button object (Evas_Object *) to resize.
+ * @param obj The object that emitted the signal, unused.
+ * @param event_info Event information, unused.
+ */
 static void
 btn_clicked2(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -928,6 +1214,18 @@ btn_clicked2(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNU
      evas_object_size_hint_min_set(bt, 100, 100);
 }
 
+/**
+ * @brief Test for focus on a resized widget within a layout.
+ *
+ * This test places a button inside a layout, which is inside a scroller.
+ * The button's size can be changed dynamically. The purpose is to check
+ * if the focus highlight is correctly updated and redrawn when the
+ * focused widget is resized.
+ *
+ * @param data User data, unused.
+ * @param obj The object that triggered this test, unused.
+ * @param event_info Event information, unused.
+ */
 void
 test_focus4(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -976,11 +1274,40 @@ test_focus4(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
 
 /**** focus 5 ****/
 
+/**
+ * @struct _focus5_obj
+ * @brief Describes a widget to be placed in a grid for test_focus5.
+ *
+ * @var _focus5_obj::name
+ * The name and text of the button.
+ * @var _focus5_obj::x
+ * The x-coordinate in the grid.
+ * @var _focus5_obj::y
+ * The y-coordinate in the grid.
+ * @var _focus5_obj::w
+ * The width (colspan) in the grid.
+ * @var _focus5_obj::h
+ * The height (rowspan) in the grid.
+ */
 struct _focus5_obj {
    const char *name;
    Evas_Coord x, y, w, h;
 };
 
+/**
+ * @brief Layout data for test_focus5.
+ *
+ * An array of `_focus5_obj` structs defining a layout for the grid.
+ * Each entry specifies a button's name/text and its position and size
+ * within the grid. The array is terminated by an entry with a NULL name.
+ *
+ * Example:
+ * @code
+ * {"top", 40, 0, 20, 10}
+ * // Creates a button with text "top", placed at grid cell (40, 0),
+ * // spanning 20 columns and 10 rows.
+ * @endcode
+ */
 struct _focus5_obj _focus5_layout_data1[] = {
    {"top",    40,  0, 20, 10},
    {"bottom", 40, 90, 20, 10},
@@ -1011,6 +1338,15 @@ struct _focus5_obj _focus5_layout_data3[] = {
    {NULL, 0, 0, 0, 0} /* sentinel */
 };
 
+/**
+ * @brief Populates a grid with buttons based on a layout definition.
+ *
+ * Clears the given grid and then fills it with new buttons according to
+ * the positions and sizes specified in the layout array.
+ *
+ * @param grid The grid widget to populate.
+ * @param layout An array of `_focus5_obj` structs defining the layout.
+ */
 void
 _focus5_layout(Evas_Object *grid, struct _focus5_obj *layout)
 {
@@ -1030,6 +1366,17 @@ _focus5_layout(Evas_Object *grid, struct _focus5_obj *layout)
    }
 }
 
+/**
+ * @brief Cycles through different grid layouts.
+ *
+ * This callback is triggered by a button click. It changes the layout of
+ * the grid to the next one in a predefined sequence, testing how focus
+ * behaves when the positions of all widgets change dramatically.
+ *
+ * @param data The grid object (Evas_Object *).
+ * @param obj The object that emitted the signal, unused.
+ * @param event_info Event information, unused.
+ */
 static void
 _focus5_btn_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -1048,6 +1395,18 @@ _focus5_btn_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info E
 
 }
 
+/**
+ * @brief Test for focus navigation in a dynamically changing grid.
+ *
+ * This test creates a grid of buttons. A separate button allows cycling
+ * through several different layouts for the grid. This is designed to
+ * test the robustness of the focus movement algorithm when widget
+ * geometries change completely.
+ *
+ * @param data User data, unused.
+ * @param obj The object that triggered this test, unused.
+ * @param event_info Event information, unused.
+ */
 void
 test_focus5(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -1087,6 +1446,17 @@ test_focus5(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
 }
 
 /**** focus 6 ****/
+/**
+ * @brief Genlist text get function for test_focus6.
+ *
+ * Provides the text for each item in the genlist.
+ *
+ * @param data The item data (an integer cast to void*).
+ * @param obj The genlist object, unused.
+ * @param part The theme part name, unused.
+ * @return A newly allocated string with the item's text. The caller is
+ *         responsible for freeing it.
+ */
 static char *
 _focus6_gl_text_get(void *data, Evas_Object *obj EINA_UNUSED,
                     const char *part EINA_UNUSED)
@@ -1096,6 +1466,17 @@ _focus6_gl_text_get(void *data, Evas_Object *obj EINA_UNUSED,
    return strdup(buf);
 }
 
+/**
+ * @brief Moves focus programmatically on the main layout.
+ *
+ * This callback is triggered by one of the direction buttons (UP, DOWN, etc.).
+ * It calls elm_object_focus_next() to move the focus on the main layout
+ * in the specified direction.
+ *
+ * @param data The layout object (Evas_Object *) on which to move focus.
+ * @param obj The button that was clicked.
+ * @param event_info Event information, unused.
+ */
 static void
 _focus6_btn_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -1105,6 +1486,19 @@ _focus6_btn_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_focus_next(ly, dir);
 }
 
+/**
+ * @brief Test for focus navigation in a complex layout.
+ *
+ * This test uses a custom Edje layout that contains multiple swallows,
+ * which are populated with widgets like a genlist and buttons. It's
+ * designed to test focus movement between different containers within
+ * a single complex widget. It also includes buttons to test the
+ * `elm_object_focus_next()` API.
+ *
+ * @param data User data, unused.
+ * @param obj The object that triggered this test, unused.
+ * @param event_info Event information, unused.
+ */
 void
 test_focus6(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -1232,6 +1626,19 @@ test_focus6(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
    evas_object_show(win);
 }
 
+/**
+ * @brief Test for setting an explicit focus next item.
+ *
+ * This test demonstrates the use of `elm_object_focus_next_item_set()`
+ * to create a manual link in the focus chain. A button is configured so
+ * that pressing right arrow when it is focused will move focus directly
+ * to a specific item in a genlist, overriding the default spatial
+ * navigation logic.
+ *
+ * @param data User data, unused.
+ * @param obj The object that triggered this test, unused.
+ * @param event_info Event information, unused.
+ */
 void
 test_focus7(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

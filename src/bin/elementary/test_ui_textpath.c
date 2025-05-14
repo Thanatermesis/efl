@@ -14,6 +14,15 @@
 static Evas_Object *angle_sld, *slice_sld, *dir_chk;
 static int path_type;
 
+/**
+ * @brief Callback function to handle the change of ellipsis property.
+ *
+ * This function is called when the ellipsis checkbox's state is changed.
+ * It sets the ellipsis property of the textpath object based on the checkbox state.
+ *
+ * @param data The textpath object.
+ * @param event The event information.
+ */
 static void
 _ellipsis_changed_cb(void *data, const Efl_Event *event)
 {
@@ -21,6 +30,15 @@ _ellipsis_changed_cb(void *data, const Efl_Event *event)
    efl_ui_textpath_ellipsis_set(txtpath, elm_check_state_get(event->object));
 }
 
+/**
+ * @brief Callback function to handle the change of text direction.
+ *
+ * This function is called when the direction checkbox's state is changed.
+ * It sets the text direction (Clockwise or Counter-clockwise) for the circular path.
+ *
+ * @param data The textpath object.
+ * @param event The event information.
+ */
 static void
 _direction_changed_cb(void *data, const Efl_Event *event)
 {
@@ -32,6 +50,15 @@ _direction_changed_cb(void *data, const Efl_Event *event)
    efl_ui_textpath_circular_set(txtpath, CR, angle, dir);
 }
 
+/**
+ * @brief Callback function to handle the change of start angle.
+ *
+ * This function is called when the angle slider's value is changed.
+ * It updates the start angle of the circular textpath.
+ *
+ * @param data The textpath object.
+ * @param event The event information.
+ */
 static void
 _angle_changed_cb(void *data, const Efl_Event *event)
 {
@@ -44,6 +71,15 @@ _angle_changed_cb(void *data, const Efl_Event *event)
    efl_ui_textpath_circular_set(txtpath, CR, angle, dir);
 }
 
+/**
+ * @brief Callback function to toggle between short and long text.
+ *
+ * This function is called when the "Short text" checkbox's state is changed.
+ * It sets either a short or a long text on the textpath widget.
+ *
+ * @param data The textpath object.
+ * @param event The event information.
+ */
 static void
 _short_text_changed_cb(void *data, const Efl_Event *event)
 {
@@ -58,6 +94,15 @@ _short_text_changed_cb(void *data, const Efl_Event *event)
 
 static char *user_style = "DEFAULT='font_size=16 color=#F00 underline=on underline_color=#00ffff'";
 
+/**
+ * @brief Callback function to toggle user-defined text style.
+ *
+ * This function is called when the "User style" checkbox's state is changed.
+ * It applies or removes a custom style string to the textpath's text.
+ *
+ * @param data The textpath object.
+ * @param event The event information.
+ */
 static void
 _user_style_changed_cb(void *data, const Efl_Event *event)
 {
@@ -70,6 +115,17 @@ _user_style_changed_cb(void *data, const Efl_Event *event)
      elm_textpath_text_user_style_set(txtpath, NULL);
 }
 
+/**
+ * @brief Callback function to change the path shape.
+ *
+ * This function is called when the "Change Path" button is clicked.
+ * It toggles the path of the textpath widget between a circular path and a
+ * cubic Bezier curve.
+ *
+ * @param data The textpath object.
+ * @param obj The button object that triggered the callback.
+ * @param event_info The event-specific data (unused).
+ */
 static void
 _change_shape_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -92,6 +148,16 @@ _change_shape_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA
      }
 }
 
+/**
+ * @brief Callback function to handle the change of slice number.
+ *
+ * This function is called when the slice number slider's value is changed.
+ * The slice number controls how many segments are used to approximate the curve,
+ * affecting rendering quality and performance.
+ *
+ * @param data The textpath object.
+ * @param event The event information.
+ */
 static void
 _slice_no_changed_cb(void *data, const Efl_Event *event)
 {
@@ -101,6 +167,17 @@ _slice_no_changed_cb(void *data, const Efl_Event *event)
    efl_ui_textpath_slice_number_set(txtpath, slice_no);
 }
 
+/**
+ * @brief The main function for the textpath UI test.
+ *
+ * This function sets up the test window, creates an Efl_Ui_Textpath widget,
+ * and adds various controls (checkboxes, sliders, button) to manipulate
+ * the textpath's properties, such as text, path shape, direction, etc.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_ui_textpath(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

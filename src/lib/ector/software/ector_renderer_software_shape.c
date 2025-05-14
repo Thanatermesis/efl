@@ -17,43 +17,66 @@
 typedef struct _Ector_Renderer_Software_Shape_Data Ector_Renderer_Software_Shape_Data;
 typedef struct _Ector_Software_Shape_Task Ector_Software_Shape_Task;
 
+/**
+ * @brief Represents a task for updating Run-Length Encoded (RLE) data for a shape.
+ * This structure holds the necessary information for an asynchronous task
+ * that generates or updates the RLE representation of a shape's geometry.
+ */
 struct _Ector_Software_Shape_Task
 {
-   Ector_Renderer_Software_Shape_Data *pd;
+   Ector_Renderer_Software_Shape_Data *pd; /**< Pointer to the parent renderer data. */
 
-   const Efl_Gfx_Path_Command *cmds;
-   const double *pts;
+   const Efl_Gfx_Path_Command *cmds; /**< Array of path commands defining the shape's geometry. */
+   const double *pts; /**< Array of points corresponding to the path commands. */
 
-   Efl_Gfx_Fill_Rule fill_rule;
+   Efl_Gfx_Fill_Rule fill_rule; /**< The fill rule (e.g., odd-even, non-zero) to be applied. */
 };
 
+/**
+ * @brief Main data structure for the Ector Software Shape Renderer.
+ * This structure holds all data related to rendering a shape using the
+ * software rendering backend. It includes references to the public shape properties,
+ * the rendering surface, shape-specific data, base renderer data, RLE data for
+ * fill and stroke, compositing information, and the asynchronous RLE update task.
+ */
 struct _Ector_Renderer_Software_Shape_Data
 {
-   Efl_Gfx_Shape_Public        *public_shape;
+   Efl_Gfx_Shape_Public        *public_shape; /**< Public shape properties. */
 
-   Ector_Software_Surface_Data *surface;
-   Ector_Renderer_Shape_Data   *shape;
-   Ector_Renderer_Data         *base;
+   Ector_Software_Surface_Data *surface; /**< Software surface data where rendering occurs. */
+   Ector_Renderer_Shape_Data   *shape; /**< Renderer-specific shape data. */
+   Ector_Renderer_Data         *base; /**< Base renderer data. */
 
-   Shape_Rle_Data              *shape_data;
-   Shape_Rle_Data              *outline_data;
+   Shape_Rle_Data              *shape_data; /**< RLE data for the shape's fill. */
+   Shape_Rle_Data              *outline_data; /**< RLE data for the shape's stroke. */
 
-   Ector_Buffer                *comp;
-   Efl_Gfx_Vg_Composite_Method comp_method;
+   Ector_Buffer                *comp; /**< Compositing buffer, if any. */
+   Efl_Gfx_Vg_Composite_Method comp_method; /**< Compositing method. */
 
-   Ector_Software_Shape_Task   *task;
+   Ector_Software_Shape_Task   *task; /**< Task for asynchronous RLE data generation. */
 };
 
+/**
+ * @brief Wrapper around FreeType's SW_FT_Outline to manage memory allocation.
+ * This structure facilitates dynamic resizing of the points and contours arrays
+ * used by FreeType for representing vector outlines.
+ */
 typedef struct _Outline
 {
-   SW_FT_Outline ft_outline;
-   int points_alloc;
-   int contours_alloc;
+   SW_FT_Outline ft_outline; /**< The FreeType outline structure. */
+   int points_alloc; /**< Number of allocated points. */
+   int contours_alloc; /**< Number of allocated contours. */
 } Outline;
 
 
 #define TO_FT_COORD(x) ((x) * 64) // to freetype 26.6 coordinate.
 
+/**
+ * @brief Ensures that the outline's contour array has enough space for additional contours.
+ * If the current capacity is insufficient, it reallocates the contour array.
+ * @param outline The outline structure to modify.
+ * @param num The number of additional contours needed.
+ */
 static inline void
 _grow_outline_contour(Outline *outline, int num)
 {
@@ -65,6 +88,12 @@ _grow_outline_contour(Outline *outline, int num)
      }
 }
 
+/**
+ * @brief Ensures that the outline's points and tags arrays have enough space for additional points.
+ * If the current capacity is insufficient, it reallocates the points and tags arrays.
+ * @param outline The outline structure to modify.
+ * @param num The number of additional points needed.
+ */
 static inline void
 _grow_outline_points(Outline *outline, int num)
 {

@@ -65,30 +65,44 @@
 // How of then we should retry to write to the pipe
 #define ECORE_PIPE_WRITE_RETRY 6
 
+/**
+ * @brief Structure representing an Ecore_Pipe.
+ * @internal
+ */
 struct _Ecore_Pipe
 {
-   ECORE_MAGIC;
-   int               fd_read;
-   int               fd_write;
-   Ecore_Fd_Handler *fd_handler;
-   const void       *data;
-   Ecore_Pipe_Cb     handler;
-   unsigned int      len;
-   int               handling;
-   unsigned int      already_read;
-   void             *passed_data;
-   int               message;
+   ECORE_MAGIC; /**< Magic number for type checking. */
+   int               fd_read; /**< File descriptor for reading from the pipe. */
+   int               fd_write; /**< File descriptor for writing to the pipe. */
+   Ecore_Fd_Handler *fd_handler; /**< Fd handler for the read end of the pipe. */
+   const void       *data; /**< User data associated with the pipe. */
+   Ecore_Pipe_Cb     handler; /**< Callback function to be called when data is read. */
+   unsigned int      len; /**< Length of the current message being read. */
+   int               handling; /**< Counter to track if the pipe is currently being handled (e.g., in a callback). */
+   unsigned int      already_read; /**< Number of bytes already read for the current message. */
+   void             *passed_data; /**< Buffer to store incoming data. */
+   int               message; /**< Counter for messages processed by _ecore_pipe_wait. */
 #ifndef _WIN32
-   int               pollfd;
-   int               timerfd;
+   int               pollfd; /**< epoll instance for _ecore_pipe_wait (Linux specific). */
+   int               timerfd; /**< timerfd for _ecore_pipe_wait (Linux specific). */
 #endif
-   Eina_Bool         delete_me : 1;
+   Eina_Bool         delete_me : 1; /**< Flag indicating if the pipe is marked for deletion. */
 };
 GENERIC_ALLOC_SIZE_DECLARE(Ecore_Pipe);
 
 static Eina_Bool _ecore_pipe_read(void             *data,
                                   Ecore_Fd_Handler *fd_handler);
 
+/**
+ * @brief Creates a new pipe.
+ *
+ * This function creates a new pipe and sets up a handler for the readable
+ * end of the pipe.
+ *
+ * @param handler The function to call when data is available on the pipe.
+ * @param data User data to pass to the handler function.
+ * @return A new Ecore_Pipe object on success, @c NULL on failure.
+ */
 EAPI Ecore_Pipe *
 ecore_pipe_add(Ecore_Pipe_Cb handler,
                const void   *data)
@@ -96,6 +110,17 @@ ecore_pipe_add(Ecore_Pipe_Cb handler,
    return _ecore_pipe_add(handler, data);
 }
 
+/**
+ * @brief Deletes an Ecore_Pipe.
+ *
+ * This function closes and frees an Ecore_Pipe. If the pipe is currently
+ * being handled (e.g., its callback is running), it will be marked for
+ * deletion and freed later.
+ *
+ * @param p The Ecore_Pipe to delete.
+ * @return The data pointer originally passed to ecore_pipe_add() or
+ *         ecore_pipe_full_add(). @c NULL if p is @c NULL.
+ */
 EAPI void *
 ecore_pipe_del(Ecore_Pipe *p)
 {
@@ -104,6 +129,14 @@ ecore_pipe_del(Ecore_Pipe *p)
    return _ecore_pipe_del(p);
 }
 
+/**
+ * @brief Closes the read end of an Ecore_Pipe.
+ *
+ * This function closes the file descriptor used for reading from the pipe
+ * and removes the associated fd handler.
+ *
+ * @param p The Ecore_Pipe whose read end should be closed.
+ */
 EAPI void
 ecore_pipe_read_close(Ecore_Pipe *p)
 {
@@ -125,6 +158,12 @@ ecore_pipe_read_close(Ecore_Pipe *p)
      }
 }
 
+/**
+ * @brief Gets the read file descriptor of an Ecore_Pipe.
+ *
+ * @param p The Ecore_Pipe.
+ * @return The file descriptor for reading, or @c PIPE_FD_INVALID on error or if p is @c NULL.
+ */
 EAPI int
 ecore_pipe_read_fd(Ecore_Pipe *p)
 {
@@ -133,6 +172,14 @@ ecore_pipe_read_fd(Ecore_Pipe *p)
    return p->fd_read;
 }
 
+/**
+ * @brief Freezes an Ecore_Pipe.
+ *
+ * This function temporarily stops the Ecore_Pipe from listening for read events
+ * by deleting its fd handler.
+ *
+ * @param p The Ecore_Pipe to freeze.
+ */
 EAPI void
 ecore_pipe_freeze(Ecore_Pipe *p)
 {
@@ -149,6 +196,14 @@ ecore_pipe_freeze(Ecore_Pipe *p)
      }
 }
 
+/**
+ * @brief Thaws an Ecore_Pipe.
+ *
+ * This function resumes listening for read events on an Ecore_Pipe that was
+ * previously frozen by ecore_pipe_freeze(). It re-adds the fd handler.
+ *
+ * @param p The Ecore_Pipe to thaw.
+ */
 EAPI void
 ecore_pipe_thaw(Ecore_Pipe *p)
 {
@@ -164,6 +219,17 @@ ecore_pipe_thaw(Ecore_Pipe *p)
                                                NULL, NULL);
 }
 
+/**
+ * @brief Waits for data on an Ecore_Pipe.
+ *
+ * This function blocks until a specified number of messages are read from
+ * the pipe or a timeout occurs.
+ *
+ * @param p The Ecore_Pipe to wait on.
+ * @param message_count The number of messages to wait for.
+ * @param wait The maximum time in seconds to wait. A negative value means wait indefinitely.
+ * @return The number of messages read, or -1 on error.
+ */
 EAPI int
 ecore_pipe_wait(Ecore_Pipe *p,
                 int         message_count,
@@ -172,6 +238,11 @@ ecore_pipe_wait(Ecore_Pipe *p,
    return _ecore_pipe_wait(p, message_count, wait);
 }
 
+/**
+ * @brief Closes the write end of an Ecore_Pipe.
+ *
+ * @param p The Ecore_Pipe whose write end should be closed.
+ */
 EAPI void
 ecore_pipe_write_close(Ecore_Pipe *p)
 {
@@ -187,6 +258,12 @@ ecore_pipe_write_close(Ecore_Pipe *p)
      }
 }
 
+/**
+ * @brief Gets the write file descriptor of an Ecore_Pipe.
+ *
+ * @param p The Ecore_Pipe.
+ * @return The file descriptor for writing, or @c PIPE_FD_INVALID on error or if p is @c NULL.
+ */
 EAPI int
 ecore_pipe_write_fd(Ecore_Pipe *p)
 {
@@ -195,6 +272,18 @@ ecore_pipe_write_fd(Ecore_Pipe *p)
    return p->fd_write;
 }
 
+/**
+ * @brief Writes data to an Ecore_Pipe.
+ *
+ * This function writes a specified number of bytes from a buffer to the pipe.
+ * It first writes the size of the data, then the data itself.
+ * It retries writing a few times in case of transient errors.
+ *
+ * @param p The Ecore_Pipe to write to.
+ * @param buffer The buffer containing the data to write.
+ * @param nbytes The number of bytes to write from the buffer.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 EAPI Eina_Bool
 ecore_pipe_write(Ecore_Pipe  *p,
                  const void  *buffer,
@@ -289,6 +378,21 @@ out:
    return ok;
 }
 
+/**
+ * @brief Creates a new pipe with more control over file descriptors.
+ *
+ * This function creates a new Ecore_Pipe, allowing the use of existing
+ * file descriptors or creating new ones. It also allows specifying whether
+ * the read and write ends of the pipe should remain open after a fork().
+ *
+ * @param handler The function to call when data is available on the pipe.
+ * @param data User data to pass to the handler function.
+ * @param fd_read The file descriptor to use for reading. If -1, a new one is created.
+ * @param fd_write The file descriptor to use for writing. If -1, a new one is created.
+ * @param read_survive_fork If @c EINA_TRUE, the read fd will not be closed on exec.
+ * @param write_survive_fork If @c EINA_TRUE, the write fd will not be closed on exec.
+ * @return A new Ecore_Pipe object on success, @c NULL on failure.
+ */
 EAPI Ecore_Pipe *
 ecore_pipe_full_add(Ecore_Pipe_Cb handler,
                     const void   *data,
@@ -354,6 +458,18 @@ ecore_pipe_full_add(Ecore_Pipe_Cb handler,
 }
 
 // Private functions
+
+/**
+ * @internal
+ * @brief Internal implementation for ecore_pipe_add.
+ *
+ * Calls ecore_pipe_full_add with default parameters (new pipe fds,
+ * close on fork).
+ *
+ * @param handler The callback function.
+ * @param data User data for the callback.
+ * @return A new Ecore_Pipe or @c NULL on error.
+ */
 Ecore_Pipe *
 _ecore_pipe_add(Ecore_Pipe_Cb handler,
                 const void   *data)
@@ -361,6 +477,17 @@ _ecore_pipe_add(Ecore_Pipe_Cb handler,
    return ecore_pipe_full_add(handler, data, -1, -1, EINA_FALSE, EINA_FALSE);
 }
 
+/**
+ * @internal
+ * @brief Internal implementation for ecore_pipe_del.
+ *
+ * Handles the actual deletion of the pipe, including cleaning up
+ * fd handlers and closing file descriptors. If the pipe is marked
+ * as being handled, deletion is deferred.
+ *
+ * @param p The Ecore_Pipe to delete.
+ * @return The user data associated with the pipe.
+ */
 void *
 _ecore_pipe_del(Ecore_Pipe *p)
 {
@@ -393,6 +520,17 @@ _ecore_pipe_del(Ecore_Pipe *p)
    return data;
 }
 
+/**
+ * @internal
+ * @brief Decrements the handling counter and deletes the pipe if marked.
+ *
+ * This function is called after a pipe operation (like a read callback)
+ * is finished. It decrements the `handling` counter. If the pipe was
+ * marked for deletion (`delete_me` is true) and `handling` drops to 0,
+ * it calls `_ecore_pipe_del` to perform the actual deletion.
+ *
+ * @param p The Ecore_Pipe.
+ */
 static void
 _ecore_pipe_unhandle(Ecore_Pipe *p)
 {
@@ -401,6 +539,19 @@ _ecore_pipe_unhandle(Ecore_Pipe *p)
 }
 
 #if ! defined(HAVE_SYS_EPOLL_H) || ! defined(HAVE_SYS_TIMERFD_H)
+/**
+ * @internal
+ * @brief Waits for messages on a pipe using select().
+ *
+ * This is the implementation of ecore_pipe_wait for systems that
+ * do not have epoll and timerfd. It uses select() to monitor the
+ * pipe's read file descriptor.
+ *
+ * @param p The Ecore_Pipe to wait on.
+ * @param message_count The number of messages to wait for.
+ * @param wait The maximum time in seconds to wait.
+ * @return The number of messages read, or -1 on error.
+ */
 int
 _ecore_pipe_wait(Ecore_Pipe *p,
                  int         message_count,
@@ -482,6 +633,19 @@ _ecore_pipe_wait(Ecore_Pipe *p,
 }
 
 #else
+/**
+ * @internal
+ * @brief Waits for messages on a pipe using epoll() and timerfd().
+ *
+ * This is the implementation of ecore_pipe_wait for systems that
+ * support epoll and timerfd (typically Linux). It uses epoll to
+ * monitor both the pipe's read file descriptor and a timerfd for timeouts.
+ *
+ * @param p The Ecore_Pipe to wait on.
+ * @param message_count The number of messages to wait for.
+ * @param wait The maximum time in seconds to wait.
+ * @return The number of messages read, or -1 on error or if epoll_wait fails.
+ */
 int
 _ecore_pipe_wait(Ecore_Pipe *p,
                  int         message_count,
@@ -580,6 +744,19 @@ _ecore_pipe_wait(Ecore_Pipe *p,
 }
 
 #endif
+/**
+ * @internal
+ * @brief Calls the user-provided handler for a received pipe message.
+ *
+ * This function is responsible for invoking the callback function
+ * associated with the Ecore_Pipe when a complete message has been read.
+ * It resets pipe state related to the current message before calling
+ * the handler and frees the buffer after the handler returns.
+ *
+ * @param p The Ecore_Pipe.
+ * @param buf The buffer containing the received message data. Can be @c NULL if len is 0.
+ * @param len The length of the received message in bytes.
+ */
 static void
 _ecore_pipe_handler_call(Ecore_Pipe *p,
                          unsigned char *buf,
@@ -599,6 +776,20 @@ _ecore_pipe_handler_call(Ecore_Pipe *p,
    free(buf);
 }
 
+/**
+ * @internal
+ * @brief Reads data from the pipe and calls the handler.
+ *
+ * This function is called by the fd handler when the read end of the pipe
+ * is readable. It attempts to read the message length, then the message
+ * data. Once a complete message is read, it calls _ecore_pipe_handler_call.
+ * It handles partial reads and various error conditions.
+ *
+ * @param data The Ecore_Pipe structure.
+ * @param fd_handler The Ecore_Fd_Handler that triggered this call (unused).
+ * @return ECORE_CALLBACK_RENEW to keep the fd handler active,
+ *         ECORE_CALLBACK_CANCEL to remove it (e.g., on error or pipe close).
+ */
 static Eina_Bool
 _ecore_pipe_read(void             *data,
                  Ecore_Fd_Handler *fd_handler EINA_UNUSED)

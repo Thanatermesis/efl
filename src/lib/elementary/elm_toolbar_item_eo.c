@@ -9,7 +9,18 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_toolbar_item_next_get, Elm_Widget_Item *, NULL
 
 void _elm_toolbar_item_selected_set(Eo *obj, Elm_Toolbar_Item_Data *pd, Eina_Bool selected);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_obj_toolbar_item_selected_set Eolian property.
+ *
+ * This function is called by the Eolian reflection system when the "selected"
+ * property is set. It converts the Eina_Value to a Eina_Bool and calls the
+ * concrete implementation _elm_toolbar_item_selected_set.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the boolean value to set.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 static Eina_Error
 __eolian_elm_toolbar_item_selected_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -29,7 +40,17 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_toolbar_item_selected_set, EFL_FUNC_CALL(selec
 
 Eina_Bool _elm_toolbar_item_selected_get(const Eo *obj, Elm_Toolbar_Item_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_obj_toolbar_item_selected_get Eolian property.
+ *
+ * This function is called by the Eolian reflection system when the "selected"
+ * property is read. It calls the concrete implementation _elm_toolbar_item_selected_get
+ * and converts the returned Eina_Bool to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the boolean state of the property.
+ */
 static Eina_Value
 __eolian_elm_toolbar_item_selected_get_reflect(const Eo *obj)
 {
@@ -41,7 +62,18 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_toolbar_item_selected_get, Eina_Bool, 0);
 
 void _elm_toolbar_item_priority_set(Eo *obj, Elm_Toolbar_Item_Data *pd, int priority);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_obj_toolbar_item_priority_set Eolian property.
+ *
+ * This function is called by the Eolian reflection system when the "priority"
+ * property is set. It converts the Eina_Value to an int and calls the
+ * concrete implementation _elm_toolbar_item_priority_set.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the integer value to set.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 static Eina_Error
 __eolian_elm_toolbar_item_priority_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -61,7 +93,17 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_toolbar_item_priority_set, EFL_FUNC_CALL(prior
 
 int _elm_toolbar_item_priority_get(const Eo *obj, Elm_Toolbar_Item_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_obj_toolbar_item_priority_get Eolian property.
+ *
+ * This function is called by the Eolian reflection system when the "priority"
+ * property is read. It calls the concrete implementation _elm_toolbar_item_priority_get
+ * and converts the returned int to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the integer value of the property.
+ */
 static Eina_Value
 __eolian_elm_toolbar_item_priority_get_reflect(const Eo *obj)
 {
@@ -73,7 +115,18 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_toolbar_item_priority_get, int, 0);
 
 void _elm_toolbar_item_icon_set(Eo *obj, Elm_Toolbar_Item_Data *pd, const char *icon);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_obj_toolbar_item_icon_set Eolian property.
+ *
+ * This function is called by the Eolian reflection system when the "icon"
+ * property is set. It converts the Eina_Value to a const char* and calls the
+ * concrete implementation _elm_toolbar_item_icon_set.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the string value to set.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 static Eina_Error
 __eolian_elm_toolbar_item_icon_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -93,7 +146,17 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_toolbar_item_icon_set, EFL_FUNC_CALL(icon), co
 
 const char *_elm_toolbar_item_icon_get(const Eo *obj, Elm_Toolbar_Item_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_obj_toolbar_item_icon_get Eolian property.
+ *
+ * This function is called by the Eolian reflection system when the "icon"
+ * property is read. It calls the concrete implementation _elm_toolbar_item_icon_get
+ * and converts the returned const char* to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the string value of the property.
+ */
 static Eina_Value
 __eolian_elm_toolbar_item_icon_get_reflect(const Eo *obj)
 {
@@ -113,7 +176,18 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_toolbar_item_icon_object_get, Efl_Canvas_Objec
 
 void _elm_toolbar_item_separator_set(Eo *obj, Elm_Toolbar_Item_Data *pd, Eina_Bool separator);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_obj_toolbar_item_separator_set Eolian property.
+ *
+ * This function is called by the Eolian reflection system when the "separator"
+ * property is set. It converts the Eina_Value to a Eina_Bool and calls the
+ * concrete implementation _elm_toolbar_item_separator_set.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the boolean value to set.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 static Eina_Error
 __eolian_elm_toolbar_item_separator_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -133,7 +207,17 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_toolbar_item_separator_set, EFL_FUNC_CALL(sepa
 
 Eina_Bool _elm_toolbar_item_separator_get(const Eo *obj, Elm_Toolbar_Item_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_obj_toolbar_item_separator_get Eolian property.
+ *
+ * This function is called by the Eolian reflection system when the "separator"
+ * property is read. It calls the concrete implementation _elm_toolbar_item_separator_get
+ * and converts the returned Eina_Bool to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the boolean state of the property.
+ */
 static Eina_Value
 __eolian_elm_toolbar_item_separator_get_reflect(const Eo *obj)
 {
@@ -241,7 +325,17 @@ const char *_elm_toolbar_item_efl_access_object_i18n_name_get(const Eo *obj, Elm
 
 Efl_Access_State_Set _elm_toolbar_item_efl_access_object_state_set_get(const Eo *obj, Elm_Toolbar_Item_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Initializes the Elm_Toolbar_Item Eolian class.
+ *
+ * This function is called once when the Eolian class is being constructed.
+ * It sets up the Efl_Object operations (methods) and Eolian properties
+ * for the Elm_Toolbar_Item class.
+ *
+ * @param klass The Eolian class to initialize.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_toolbar_item_class_initializer(Efl_Class *klass)
 {
@@ -299,6 +393,10 @@ _elm_toolbar_item_class_initializer(Efl_Class *klass)
    );
    opsp = &ops;
 
+   // Defines the Eolian properties and their reflection functions.
+   // Each entry maps a property name (string) to its setter and getter
+   // reflection functions. These functions handle the conversion between
+   // Eina_Value and the C types used by the actual property implementations.
    static const Efl_Object_Property_Reflection refl_table[] = {
       {"selected", __eolian_elm_toolbar_item_selected_set_reflect, __eolian_elm_toolbar_item_selected_get_reflect},
       {"priority", __eolian_elm_toolbar_item_priority_set_reflect, __eolian_elm_toolbar_item_priority_get_reflect},

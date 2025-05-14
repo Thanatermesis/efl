@@ -3,6 +3,17 @@
 #endif
 #include <Efl_Ui.h>
 
+/**
+ * @brief Test function for Efl.Ui.Separator.
+ *
+ * This function creates a new window and adds two separators to it.
+ * One separator is horizontal (default) and the other is vertical.
+ * Both separators are packed into an Efl.Ui.Table.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_ui_separator(void *data EINA_UNUSED, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

@@ -56,10 +56,45 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] =
   {                                                                         \
      efl_event_callback_legacy_call(data, event, ev->info);          \
   }
+
+/**
+ * @internal
+ * @brief Forwards the CHANGED event from the internal entry to the fileselector entry.
+ * @param data The fileselector entry object.
+ * @param ev The Efl_Event.
+ */
 SIG_FWD(CHANGED, ELM_FILESELECTOR_ENTRY_EVENT_CHANGED)
+
+/**
+ * @internal
+ * @brief Forwards the PRESS event from the internal entry to the fileselector entry.
+ * @param data The fileselector entry object.
+ * @param ev The Efl_Event.
+ */
 SIG_FWD(PRESS, ELM_FILESELECTOR_ENTRY_EVENT_PRESS)
+
+/**
+ * @internal
+ * @brief Forwards the SELECTION_PASTE event from the internal entry to the fileselector entry.
+ * @param data The fileselector entry object.
+ * @param ev The Efl_Event.
+ */
 SIG_FWD(SELECTION_PASTE, EFL_UI_TEXTBOX_EVENT_SELECTION_PASTE)
+
+/**
+ * @internal
+ * @brief Forwards the SELECTION_COPY event from the internal entry to the fileselector entry.
+ * @param data The fileselector entry object.
+ * @param ev The Efl_Event.
+ */
 SIG_FWD(SELECTION_COPY, EFL_UI_TEXTBOX_EVENT_SELECTION_COPY)
+
+/**
+ * @internal
+ * @brief Forwards the SELECTION_CUT event from the internal entry to the fileselector entry.
+ * @param data The fileselector entry object.
+ * @param ev The Efl_Event.
+ */
 SIG_FWD(SELECTION_CUT, EFL_UI_TEXTBOX_EVENT_SELECTION_CUT)
 #undef SIG_FWD
 
@@ -69,13 +104,56 @@ SIG_FWD(SELECTION_CUT, EFL_UI_TEXTBOX_EVENT_SELECTION_CUT)
   {                                                                         \
      evas_object_smart_callback_call(data, event, event_info);              \
   }
+
+/**
+ * @internal
+ * @brief Forwards the "clicked" smart callback from the internal entry or button to the fileselector entry.
+ * @param data The fileselector entry object.
+ * @param obj The Evas_Object that triggered the event (unused).
+ * @param event_info Event-specific data.
+ */
 SIG_FWD(CLICKED, "clicked")
+
+/**
+ * @internal
+ * @brief Forwards the "clicked,double" smart callback from the internal entry to the fileselector entry.
+ * @param data The fileselector entry object.
+ * @param obj The Evas_Object that triggered the event (unused).
+ * @param event_info Event-specific data.
+ */
 SIG_FWD(CLICKED_DOUBLE, "clicked,double")
+
+/**
+ * @internal
+ * @brief Forwards the "unpressed" smart callback from the internal button to the fileselector entry.
+ * @param data The fileselector entry object.
+ * @param obj The Evas_Object that triggered the event (unused).
+ * @param event_info Event-specific data.
+ */
 SIG_FWD(UNPRESSED, "unpressed")
+
+/**
+ * @internal
+ * @brief Forwards the "longpressed" smart callback from the internal entry to the fileselector entry.
+ * @param data The fileselector entry object.
+ * @param obj The Evas_Object that triggered the event (unused).
+ * @param event_info Event-specific data.
+ */
 SIG_FWD(LONGPRESSED, "longpressed")
 #undef SIG_FWD
 
-
+/**
+ * @internal
+ * @brief Callback function for the "file,chosen" event from the internal fileselector button.
+ *
+ * This function is triggered when a file is selected in the fileselector.
+ * It updates the entry's text with the chosen file path and emits the
+ * ELM_FILESELECTOR_ENTRY_EVENT_FILE_CHOSEN event.
+ *
+ * @param data The fileselector entry object (Eo *fs).
+ * @param event The Efl_Event structure containing the event information.
+ *              The event->info is an Efl_Model representing the chosen file.
+ */
 static void
 _FILE_CHOSEN_fwd(void *data, const Efl_Event *event)
 {
@@ -98,6 +176,17 @@ _FILE_CHOSEN_fwd(void *data, const Efl_Event *event)
    free(file);
 }
 
+/**
+ * @internal
+ * @brief Callback function for the "activated" event from the internal entry widget.
+ *
+ * This function is triggered when the entry is activated (e.g., by pressing Enter).
+ * It retrieves the text from the entry, updates the model of the internal button
+ * if it exists, and then forwards the ELM_FILESELECTOR_ENTRY_EVENT_ACTIVATED event.
+ *
+ * @param data The fileselector entry object.
+ * @param event The Efl_Event structure containing the event information.
+ */
 static void
 _ACTIVATED_fwd(void *data, const Efl_Event *event)
 {
@@ -120,6 +209,17 @@ _ACTIVATED_fwd(void *data, const Efl_Event *event)
      (data, ELM_FILESELECTOR_ENTRY_EVENT_ACTIVATED, event->info);
 }
 
+/**
+ * @internal
+ * @brief Applies the theme to the fileselector entry widget.
+ *
+ * This function is called when the theme of the widget needs to be updated.
+ * It applies the style to the base widget and its internal components (button and entry).
+ *
+ * @param obj The fileselector entry object.
+ * @param sd The private data of the fileselector entry.
+ * @return Eina_Error EFL_UI_THEME_APPLY_ERROR_NONE on success, or an error code otherwise.
+ */
 EOLIAN static Eina_Error
 _elm_fileselector_entry_efl_ui_widget_theme_apply(Eo *obj, Elm_Fileselector_Entry_Data *sd)
 {
@@ -151,6 +251,19 @@ _elm_fileselector_entry_efl_ui_widget_theme_apply(Eo *obj, Elm_Fileselector_Entr
    return int_ret;
 }
 
+/**
+ * @internal
+ * @brief Sets the text for a specific part of the fileselector entry.
+ *
+ * If @p part is "elm.text" or NULL, it sets the text of the internal button.
+ * Otherwise, it attempts to set the text of the specified part in the superclass.
+ *
+ * @param obj The fileselector entry object.
+ * @param sd The private data of the fileselector entry.
+ * @param part The name of the part to set the text for (e.g., "elm.text").
+ * @param label The text to set.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_fileselector_entry_text_set(Eo *obj, Elm_Fileselector_Entry_Data *sd, const char *part, const char *label)
 {
@@ -163,6 +276,18 @@ _elm_fileselector_entry_text_set(Eo *obj, Elm_Fileselector_Entry_Data *sd, const
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Gets the text from a specific part of the fileselector entry.
+ *
+ * If @p part is "elm.text" or NULL, it gets the text of the internal button.
+ * Otherwise, it attempts to get the text of the specified part from the superclass.
+ *
+ * @param obj The fileselector entry object.
+ * @param sd The private data of the fileselector entry.
+ * @param part The name of the part to get the text from (e.g., "elm.text").
+ * @return The text of the specified part, or NULL on failure.
+ */
 static const char *
 _elm_fileselector_entry_text_get(Eo *obj, Elm_Fileselector_Entry_Data *sd, const char *part)
 {
@@ -176,6 +301,19 @@ _elm_fileselector_entry_text_get(Eo *obj, Elm_Fileselector_Entry_Data *sd, const
    return elm_object_text_get(sd->button);
 }
 
+/**
+ * @internal
+ * @brief Sets the content for a specific part of the fileselector entry.
+ *
+ * If @p part is "button icon" or NULL, it sets the content of the internal button's icon.
+ * Otherwise, it attempts to set the content of the specified part in the superclass.
+ *
+ * @param obj The fileselector entry object.
+ * @param sd The private data of the fileselector entry.
+ * @param part The name of the part to set the content for (e.g., "button icon").
+ * @param content The Evas_Object to set as content.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_fileselector_entry_content_set(Eo *obj, Elm_Fileselector_Entry_Data *sd, const char *part, Evas_Object *content)
 {
@@ -189,6 +327,18 @@ _elm_fileselector_entry_content_set(Eo *obj, Elm_Fileselector_Entry_Data *sd, co
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Gets the content from a specific part of the fileselector entry.
+ *
+ * If @p part is "button icon" or NULL, it gets the content of the internal button's icon.
+ * Otherwise, it attempts to get the content of the specified part from the superclass.
+ *
+ * @param obj The fileselector entry object.
+ * @param sd The private data of the fileselector entry.
+ * @param part The name of the part to get the content from (e.g., "button icon").
+ * @return The Evas_Object content of the specified part, or NULL on failure or if not set.
+ */
 static Evas_Object *
 _elm_fileselector_entry_content_get(Eo *obj, Elm_Fileselector_Entry_Data *sd, const char *part)
 {
@@ -200,6 +350,18 @@ _elm_fileselector_entry_content_get(Eo *obj, Elm_Fileselector_Entry_Data *sd, co
    return elm_layout_content_get(sd->button, NULL);
 }
 
+/**
+ * @internal
+ * @brief Unsets (removes) the content from a specific part of the fileselector entry.
+ *
+ * If @p part is "button icon" or NULL, it unsets the content of the internal button's icon.
+ * Otherwise, it attempts to unset the content of the specified part in the superclass.
+ *
+ * @param obj The fileselector entry object.
+ * @param sd The private data of the fileselector entry.
+ * @param part The name of the part to unset the content from (e.g., "button icon").
+ * @return The previously set Evas_Object content, or NULL if none was set or on failure.
+ */
 static Evas_Object *
 _elm_fileselector_entry_content_unset(Eo *obj, Elm_Fileselector_Entry_Data *sd, const char *part)
 {
@@ -211,6 +373,17 @@ _elm_fileselector_entry_content_unset(Eo *obj, Elm_Fileselector_Entry_Data *sd, 
    return elm_layout_content_unset(sd->button, NULL);
 }
 
+/**
+ * @internal
+ * @brief Adds the internal Evas objects (button and entry) to the fileselector entry.
+ *
+ * This function is called during the widget's construction. It creates and
+ * configures the internal fileselector button and entry widgets, sets up
+ * signal forwarding, and themes them.
+ *
+ * @param obj The fileselector entry object.
+ * @param priv The private data of the fileselector entry.
+ */
 EOLIAN static void
 _elm_fileselector_entry_efl_canvas_group_group_add(Eo *obj, Elm_Fileselector_Entry_Data *priv)
 {
@@ -273,6 +446,16 @@ _elm_fileselector_entry_efl_canvas_group_group_add(Eo *obj, Elm_Fileselector_Ent
    elm_layout_sizing_eval(obj);
 }
 
+/**
+ * @internal
+ * @brief Handles the deletion of the fileselector entry's canvas group.
+ *
+ * This function is called when the widget is being deleted. It frees
+ * any allocated resources, specifically the cached path string.
+ *
+ * @param obj The fileselector entry object.
+ * @param sd The private data of the fileselector entry.
+ */
 EOLIAN static void
 _elm_fileselector_entry_efl_canvas_group_group_del(Eo *obj, Elm_Fileselector_Entry_Data *sd)
 {
@@ -288,6 +471,18 @@ elm_fileselector_entry_add(Evas_Object *parent)
    return elm_legacy_add(MY_CLASS, parent);
 }
 
+/**
+ * @internal
+ * @brief Constructor for the Elm_Fileselector_Entry object.
+ *
+ * This function is called when a new fileselector entry object is created.
+ * It initializes the object, sets its legacy type name, registers smart callbacks,
+ * and sets its accessibility role.
+ *
+ * @param obj The fileselector entry object being constructed.
+ * @param sd The private data of the fileselector entry (unused in this function).
+ * @return The constructed fileselector entry object.
+ */
 EOLIAN static Eo *
 _elm_fileselector_entry_efl_object_constructor(Eo *obj, Elm_Fileselector_Entry_Data *sd EINA_UNUSED)
 {
@@ -307,6 +502,13 @@ elm_fileselector_entry_selected_set(Evas_Object *obj, const char *path)
    elm_fileselector_selected_set(obj, path);
 }
 
+/**
+ * @internal
+ * @brief Internal implementation for setting the selected path.
+ * @param obj The fileselector entry object.
+ * @param path The file path to set.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 Eina_Bool
 _elm_fileselector_entry_selected_set_internal(Evas_Object *obj, const char *path)
 {
@@ -315,6 +517,15 @@ _elm_fileselector_entry_selected_set_internal(Evas_Object *obj, const char *path
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Sets the selected file model for the fileselector entry.
+ * This function directly sets the model on the internal fileselector button.
+ * @param obj The fileselector entry object (unused).
+ * @param sd The private data of the fileselector entry.
+ * @param model The Efl_Model representing the file to be selected.
+ * @return EINA_TRUE on success.
+ */
 EOLIAN static Eina_Bool
 _elm_fileselector_entry_elm_interface_fileselector_selected_model_set(Eo *obj EINA_UNUSED,
                                                                       Elm_Fileselector_Entry_Data *sd,
@@ -332,6 +543,12 @@ elm_fileselector_entry_selected_get(const Evas_Object *obj)
    return elm_fileselector_selected_get((Eo *) obj);
 }
 
+/**
+ * @internal
+ * @brief Internal implementation for getting the selected path.
+ * @param obj The fileselector entry object.
+ * @return The currently selected file path, or NULL.
+ */
 const char *
 _elm_fileselector_entry_selected_get_internal(const Evas_Object *obj)
 {
@@ -339,6 +556,14 @@ _elm_fileselector_entry_selected_get_internal(const Evas_Object *obj)
    return elm_fileselector_path_get(sd->button);
 }
 
+/**
+ * @internal
+ * @brief Gets the selected file model from the fileselector entry.
+ * This function retrieves the model directly from the internal fileselector button.
+ * @param obj The fileselector entry object (unused).
+ * @param sd The private data of the fileselector entry.
+ * @return The Efl_Model representing the currently selected file, or NULL.
+ */
 EOLIAN static Efl_Model *
 _elm_fileselector_entry_elm_interface_fileselector_selected_model_get(const Eo *obj EINA_UNUSED, Elm_Fileselector_Entry_Data *sd)
 {
@@ -387,6 +612,16 @@ elm_fileselector_entry_path_set(Evas_Object *obj,
    elm_fileselector_path_set(obj, path);
 }
 
+/**
+ * @internal
+ * @brief Internal implementation for setting the path displayed in the entry and button.
+ *
+ * This function sets the path for the internal fileselector button and updates
+ * the text of the internal entry widget with a markup version of the path.
+ *
+ * @param obj The fileselector entry object.
+ * @param path The file system path to set.
+ */
 void
 _elm_fileselector_entry_path_set_internal(Evas_Object *obj, const char *path)
 {
@@ -403,6 +638,19 @@ _elm_fileselector_entry_path_set_internal(Evas_Object *obj, const char *path)
      }
 }
 
+/**
+ * @internal
+ * @brief Sets the Efl_Model for the fileselector entry.
+ *
+ * This function sets the provided model to both the internal fileselector button
+ * and the internal entry. It also binds the "path" property of the model
+ * to the "default" text property of the entry.
+ * It expects the model to be an Efl_Io_Model.
+ *
+ * @param obj The fileselector entry object (unused).
+ * @param sd The private data of the fileselector entry.
+ * @param model The Efl_Model to set. Must be an Efl_Io_Model.
+ */
 EOLIAN static void
 _elm_fileselector_entry_efl_ui_view_model_set(Eo *obj EINA_UNUSED, Elm_Fileselector_Entry_Data *sd, Efl_Model *model)
 {
@@ -420,6 +668,18 @@ elm_fileselector_entry_path_get(const Evas_Object *obj)
    return elm_fileselector_path_get(obj);
 }
 
+/**
+ * @internal
+ * @brief Internal implementation for getting the path currently displayed in the entry.
+ *
+ * This function retrieves the text from the internal entry widget, converts it
+ * from markup to UTF-8, and returns it. The returned string is stored in sd->path
+ * and should not be freed by the caller; it will be freed on the next call or
+ * when the widget is destroyed.
+ *
+ * @param obj The fileselector entry object.
+ * @return The file system path currently in the entry, or NULL on failure.
+ */
 const char *
 _elm_fileselector_entry_path_get_internal(const Evas_Object *obj)
 {
@@ -429,6 +689,20 @@ _elm_fileselector_entry_path_get_internal(const Evas_Object *obj)
    return sd->path;
 }
 
+/**
+ * @internal
+ * @brief Gets the Efl_Model representing the current path in the fileselector entry.
+ *
+ * This function retrieves the model from the internal fileselector button.
+ * If the path in the entry widget differs from the path in the button's model,
+ * a new volatile model is created with the entry's path.
+ *
+ * @param obj The fileselector entry object.
+ * @param sd The private data of the fileselector entry.
+ * @return An Efl_Model representing the current path. This model might be
+ *         the button's model or a new volatile model. The new model is
+ *         managed by a postponed free queue. Returns NULL if no base model exists.
+ */
 EOLIAN static Efl_Model *
 _elm_fileselector_entry_efl_ui_view_model_get(const Eo *obj, Elm_Fileselector_Entry_Data *sd)
 {
@@ -463,6 +737,13 @@ elm_fileselector_entry_expandable_set(Evas_Object *obj,
    elm_interface_fileselector_expandable_set(obj, value);
 }
 
+/**
+ * @internal
+ * @brief Sets whether the internal fileselector is expandable (shows a tree view).
+ * @param obj The fileselector entry object (unused).
+ * @param sd The private data of the fileselector entry.
+ * @param value EINA_TRUE to make it expandable, EINA_FALSE otherwise.
+ */
 EOLIAN static void
 _elm_fileselector_entry_elm_interface_fileselector_expandable_set(Eo *obj EINA_UNUSED, Elm_Fileselector_Entry_Data *sd, Eina_Bool value)
 {
@@ -476,6 +757,13 @@ elm_fileselector_entry_expandable_get(const Evas_Object *obj)
    return elm_interface_fileselector_expandable_get((Eo *) obj);
 }
 
+/**
+ * @internal
+ * @brief Gets whether the internal fileselector is expandable.
+ * @param obj The fileselector entry object (unused).
+ * @param sd The private data of the fileselector entry.
+ * @return EINA_TRUE if expandable, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _elm_fileselector_entry_elm_interface_fileselector_expandable_get(const Eo *obj EINA_UNUSED, Elm_Fileselector_Entry_Data *sd)
 {
@@ -490,6 +778,13 @@ elm_fileselector_entry_folder_only_set(Evas_Object *obj,
    elm_interface_fileselector_folder_only_set(obj, value);
 }
 
+/**
+ * @internal
+ * @brief Sets whether the internal fileselector shows only folders.
+ * @param obj The fileselector entry object (unused).
+ * @param sd The private data of the fileselector entry.
+ * @param value EINA_TRUE to show only folders, EINA_FALSE otherwise.
+ */
 EOLIAN static void
 _elm_fileselector_entry_elm_interface_fileselector_folder_only_set(Eo *obj EINA_UNUSED, Elm_Fileselector_Entry_Data *sd, Eina_Bool value)
 {
@@ -503,6 +798,13 @@ elm_fileselector_entry_folder_only_get(const Evas_Object *obj)
    return elm_interface_fileselector_folder_only_get((Eo *) obj);
 }
 
+/**
+ * @internal
+ * @brief Gets whether the internal fileselector shows only folders.
+ * @param obj The fileselector entry object (unused).
+ * @param sd The private data of the fileselector entry.
+ * @return EINA_TRUE if showing only folders, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _elm_fileselector_entry_elm_interface_fileselector_folder_only_get(const Eo *obj EINA_UNUSED, Elm_Fileselector_Entry_Data *sd)
 {
@@ -517,6 +819,14 @@ elm_fileselector_entry_is_save_set(Evas_Object *obj,
    elm_interface_fileselector_is_save_set(obj, value);
 }
 
+/**
+ * @internal
+ * @brief Sets whether the internal fileselector is in "save" mode.
+ * In "save" mode, the fileselector allows entering new filenames.
+ * @param obj The fileselector entry object (unused).
+ * @param sd The private data of the fileselector entry.
+ * @param value EINA_TRUE for "save" mode, EINA_FALSE otherwise.
+ */
 EOLIAN static void
 _elm_fileselector_entry_elm_interface_fileselector_is_save_set(Eo *obj EINA_UNUSED, Elm_Fileselector_Entry_Data *sd, Eina_Bool value)
 {
@@ -530,6 +840,13 @@ elm_fileselector_entry_is_save_get(const Evas_Object *obj)
    return elm_interface_fileselector_is_save_get((Eo *) obj);
 }
 
+/**
+ * @internal
+ * @brief Gets whether the internal fileselector is in "save" mode.
+ * @param obj The fileselector entry object (unused).
+ * @param sd The private data of the fileselector entry.
+ * @return EINA_TRUE if in "save" mode, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _elm_fileselector_entry_elm_interface_fileselector_is_save_get(const Eo *obj EINA_UNUSED, Elm_Fileselector_Entry_Data *sd)
 {
@@ -552,6 +869,15 @@ elm_fileselector_entry_inwin_mode_get(const Eo *obj)
    return elm_fileselector_button_inwin_mode_get(sd->button);
 }
 
+/**
+ * @internal
+ * @brief Class constructor for Elm_Fileselector_Entry.
+ *
+ * This function is called when the Elm_Fileselector_Entry class is being set up.
+ * It registers the legacy type name for the class.
+ *
+ * @param klass The Efl_Class for Elm_Fileselector_Entry.
+ */
 EOLIAN static void
 _elm_fileselector_entry_class_constructor(Efl_Class *klass)
 {

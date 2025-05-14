@@ -44,8 +44,24 @@
  * @cond LOCAL
  */
 
+/**
+ * @internal
+ * @brief Hash table storing registered mempool backends.
+ * The key is the backend name (const char *) and the value is a pointer
+ * to Eina_Mempool_Backend.
+ */
 static Eina_Hash *_backends;
+/**
+ * @internal
+ * @brief Array storing loaded mempool modules.
+ * This array holds Eina_Module instances for dynamically loaded backends.
+ */
 static Eina_Array *_modules;
+/**
+ * @internal
+ * @brief Log domain for eina_mempool.
+ * Used for logging messages specific to the mempool subsystem.
+ */
 static int _eina_mempool_log_dom = -1;
 
 #ifdef ERR
@@ -58,7 +74,23 @@ static int _eina_mempool_log_dom = -1;
 #endif
 #define DBG(...) EINA_LOG_DOM_DBG(_eina_mempool_log_dom, __VA_ARGS__)
 
-
+/**
+ * @internal
+ * @brief Creates a new mempool instance using a specific backend.
+ *
+ * This function is a variadic arguments version for mempool creation.
+ * It looks up the requested backend by @p name, initializes it with
+ * the given @p context, @p options, and variadic @p args, and
+ * sets up the Eina_Mempool structure.
+ * It also handles the EINA_MEMPOOL_PASS environment variable to optionally
+ * force the "pass_through" backend for debugging or performance comparison.
+ *
+ * @param name The name of the mempool backend to use (e.g., "chained_pool").
+ * @param context A string identifier for this mempool instance, used for debugging.
+ * @param options A string containing options for the backend (specific to each backend).
+ * @param args Variadic arguments list passed to the backend's init function.
+ * @return A pointer to the newly created Eina_Mempool, or NULL on failure.
+ */
 static Eina_Mempool *
 _new_va(const char *name,
         const char *context,
@@ -148,7 +180,7 @@ void      pass_through_shutdown(void);
  * @cond LOCAL
  */
 
-EINA_API Eina_Error EINA_ERROR_NOT_MEMPOOL_MODULE = 0;
+EINA_API Eina_Error EINA_ERROR_NOT_MEMPOOL_MODULE = 0; /**< Error code for when a mempool module cannot be found or loaded. */
 
 /**
  * @endcond
@@ -170,6 +202,17 @@ eina_mempool_unregister(Eina_Mempool_Backend *be)
    eina_hash_del(_backends, be->name, be);
 }
 
+/**
+ * @internal
+ * @brief Initializes the mempool subsystem.
+ *
+ * Sets up the logging domain for mempools, initializes the hash table
+ * for storing backends, and loads available mempool modules (both dynamic
+ * and static/built-in).
+ * Dynamic modules are searched in standard EFL module paths.
+ *
+ * @return #EINA_TRUE on success, #EINA_FALSE on failure.
+ */
 Eina_Bool
 eina_mempool_init(void)
 {
@@ -228,6 +271,15 @@ mempool_init_error:
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the mempool subsystem.
+ *
+ * Unloads any loaded mempool modules (both dynamic and static/built-in),
+ * frees the hash table of backends, and unregisters the logging domain.
+ *
+ * @return #EINA_TRUE on success (currently always returns true).
+ */
 Eina_Bool
 eina_mempool_shutdown(void)
 {

@@ -15,9 +15,25 @@
  * @cond LOCAL
  */
 
-
+/**
+ * @brief Counter for DND initialization calls.
+ * This variable tracks the number of times ecore_win32_dnd_init() has been
+ * called, ensuring OleInitialize is called only once and OleUninitialize is
+ * called when the count drops to zero.
+ */
 static int _ecore_win32_dnd_init_count = 0;
 
+/**
+ * @brief Allocates global memory and copies data into it.
+ *
+ * This helper function is used to prepare data for OLE drag and drop
+ * operations, specifically for creating an HGLOBAL from a data buffer.
+ *
+ * @param data Pointer to the data to be copied.
+ * @param size The size of the data in bytes.
+ * @return A HANDLE to the allocated global memory containing the copied data,
+ *         or NULL if allocation fails. The memory is allocated with GMEM_FIXED.
+ */
 static HANDLE DataToHandle(const char *data, int size)
 {
    char *ptr;
@@ -133,26 +149,36 @@ ecore_win32_dnd_begin(const char *data,
       size = strlen(data) + 1;
 
    stgmed.hGlobal = DataToHandle(data, size);
+   if (!stgmed.hGlobal) // Check if DataToHandle failed
+     return EINA_FALSE; // Or handle error appropriately
 
-   // create the data object
+   // Create the IDataObject COM object. This object will hold the data
+   // being dragged. fmtetc describes the format (CF_TEXT) and stgmed
+   // contains the actual data.
    pDataObject = (IDataObject *)_ecore_win32_dnd_data_object_new((void *)&fmtetc,
                                                                  (void *)&stgmed,
                                                                  1);
+   // Create the IDropSource COM object. This object is responsible for
+   // providing feedback during the drag operation (e.g., changing the cursor).
    pDropSource = (IDropSource *)_ecore_win32_dnd_drop_source_new();
 
    if (pDataObject && pDropSource)
    {
       DWORD dwResult;
-      DWORD dwEffect = DROPEFFECT_COPY;
+      DWORD dwEffect = DROPEFFECT_COPY; // Specifies that the data will be copied.
 
-      // do the drag-drop!
+      // Initiate the OLE drag and drop operation.
+      // pDataObject: The data to be dragged.
+      // pDropSource: The source of the drag.
+      // DROPEFFECT_COPY: The allowed effect (e.g., copy, move, link).
+      // &dwEffect: Receives the actual effect of the drop operation.
       dwResult = DoDragDrop(pDataObject, pDropSource, DROPEFFECT_COPY, &dwEffect);
 
-      // finished. Check the return values to see if we need to do anything else
-      if (dwResult == DRAGDROP_S_DROP)
+      // After DoDragDrop returns, check the result.
+      if (dwResult == DRAGDROP_S_DROP) // Indicates the drop was successful.
       {
          //printf(">>> \"%s\" Dropped <<<\n", str);
-         if(dwEffect == DROPEFFECT_MOVE)
+         if(dwEffect == DROPEFFECT_MOVE) // If the operation was a move.
          {
             // remove the data we just dropped from active document
          }

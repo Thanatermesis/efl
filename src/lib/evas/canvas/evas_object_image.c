@@ -10,17 +10,95 @@ static const char o_type[] = "image";
 const char *o_image_type = o_type;
 
 /* private methods for image objects */
+
+/**
+ * @internal
+ * @brief Calculates the starting X coordinate and width for a filled image region based on viewport and output dimensions.
+ *
+ * This function adjusts the fill region's X coordinate and width according to the
+ * Evas canvas's viewport and output resolution. It handles tiling by ensuring
+ * the start coordinate is within the first repetition of the fill pattern.
+ *
+ * @param eo_obj The Evas object (image). Unused in this function.
+ * @param obj The protected data of the Evas object.
+ * @param start The initial starting X coordinate of the fill region.
+ * @param size The initial width of the fill region.
+ * @param[out] size_ret Pointer to store the calculated width of the fill region.
+ * @return The calculated starting X coordinate for the fill.
+ */
 static Evas_Coord   evas_object_image_figure_x_fill(Evas_Object *eo_obj, Evas_Object_Protected_Data *obj, Evas_Coord start, Evas_Coord size, Evas_Coord *size_ret);
+
+/**
+ * @internal
+ * @brief Calculates the starting Y coordinate and height for a filled image region based on viewport and output dimensions.
+ *
+ * This function adjusts the fill region's Y coordinate and height according to the
+ * Evas canvas's viewport and output resolution. It handles tiling by ensuring
+ * the start coordinate is within the first repetition of the fill pattern.
+ *
+ * @param eo_obj The Evas object (image). Unused in this function.
+ * @param obj The protected data of the Evas object.
+ * @param start The initial starting Y coordinate of the fill region.
+ * @param size The initial height of the fill region.
+ * @param[out] size_ret Pointer to store the calculated height of the fill region.
+ * @return The calculated starting Y coordinate for the fill.
+ */
 static Evas_Coord   evas_object_image_figure_y_fill(Evas_Object *eo_obj, Evas_Object_Protected_Data *obj, Evas_Coord start, Evas_Coord size, Evas_Coord *size_ret);
 
 static void         evas_object_image_init(Evas_Object *eo_obj);
 
+/**
+ * @internal
+ * @brief Accumulates the lengths of stretch region segments matching a given mask.
+ *
+ * Iterates through a stretch_region array, summing the lengths (lower 7 bits)
+ * of segments where the type (highest bit) matches the provided mask.
+ * The stretch_region array is a series of bytes where:
+ * - The lower 7 bits define the length of a segment.
+ * - The highest bit (0x80) indicates if the segment is stretchable (1) or fixed (0).
+ * The array is terminated by a zero byte.
+ *
+ * @param stretch_region The array defining stretchable and non-stretchable segments.
+ *                       Example: { 0x0A, 0x85, 0x03, 0x00 } represents:
+ *                       - Fixed segment of length 10
+ *                       - Stretchable segment of length 5
+ *                       - Fixed segment of length 3
+ * @param mask The mask to match against the highest bit (0x80 for stretchable, 0x00 for fixed).
+ * @param i Pointer to the current index in the stretch_region array. This is advanced
+ *          past the processed segments.
+ * @return The total accumulated length of the matching segments.
+ */
 static inline uint32_t _stretch_region_accumulate(uint8_t *stretch_region, Eina_Bool mask, uint32_t *i);
 
 static void         evas_object_image_render(Evas_Object *eo_obj, Evas_Object_Protected_Data *obj,
                                              void *type_private_data,
                                              void *engine, void *output, void *context, void *surface,
                                              int x, int y, Eina_Bool do_async);
+
+/**
+ * @internal
+ * @brief Renders the image, handling borders, fill, and stretching.
+ *
+ * This is the core rendering function for image objects. It takes into account
+ * the image's fill properties, border settings (9-patch scaling), and stretch
+ * regions to draw the image onto the target surface. It also handles mapping if
+ * the object has a map applied.
+ *
+ * @param eo_obj The Evas image object.
+ * @param obj The protected data of the Evas object.
+ * @param engine The rendering engine.
+ * @param output The rendering output.
+ * @param context The rendering context.
+ * @param surface The target surface to render on.
+ * @param x The X offset for rendering.
+ * @param y The Y offset for rendering.
+ * @param l Left border/padding for filter rendering.
+ * @param t Top border/padding for filter rendering.
+ * @param r Right border/padding for filter rendering.
+ * @param b Bottom border/padding for filter rendering.
+ * @param skip_map If EINA_TRUE, skip map transformation even if one is set.
+ * @param do_async If EINA_TRUE, perform asynchronous rendering if supported.
+ */
 static void         _evas_image_render(Eo *eo_obj, Evas_Object_Protected_Data *obj,
                                        void *engine, void *output, void *context, void *surface,
                                        int x, int y, int l, int t, int r, int b, Eina_Bool skip_map, Eina_Bool do_async);
@@ -128,6 +206,19 @@ evas_object_image_render_prepare(Evas_Object *eo_obj EINA_UNUSED, Evas_Object_Pr
    // XXX: if image is a proxy, PREPEND to prerender list in evas canvas
 }
 
+/**
+ * @internal
+ * @brief Finds the Evas output that intersects with the object's geometry.
+ *
+ * Iterates through the Evas canvas's outputs and returns the first one
+ * whose geometry intersects with the object's current geometry. If no
+ * intersection is found, it returns the first output in the list as a fallback,
+ * as Evas relies on having an output even if the object is off-screen.
+ *
+ * @param obj The protected data of the Evas object.
+ * @return A pointer to the engine-specific output data (e.g., EGL_Surface).
+ *         Returns NULL if no outputs are available (should not happen in a typical setup).
+ */
 static void *
 _evas_object_image_output_find(Evas_Object_Protected_Data *obj)
 {
@@ -151,6 +242,18 @@ _evas_object_image_output_find(Evas_Object_Protected_Data *obj)
    return output->output;
 }
 
+/**
+ * @internal
+ * @brief Cleans up image-specific data, cancelling preloads and unsetting proxies.
+ *
+ * This function is called to perform cleanup operations on an image object,
+ * such as invalidating the opaque state if it was valid, cancelling any
+ * ongoing preloading operations, and unsetting any proxy source.
+ *
+ * @param eo_obj The Evas image object.
+ * @param obj The protected data of the Evas object.
+ * @param o The image-specific data (Evas_Image_Data).
+ */
 void
 _evas_image_cleanup(Evas_Object *eo_obj, Evas_Object_Protected_Data *obj, Evas_Image_Data *o)
 {
@@ -173,6 +276,16 @@ _evas_image_cleanup(Evas_Object *eo_obj, Evas_Object_Protected_Data *obj, Evas_I
    if (o->cur->source) _evas_image_proxy_unset(eo_obj, obj, o);
 }
 
+/**
+ * @internal
+ * @brief Initializes the Eina_Cow instances for image object properties.
+ *
+ * This function ensures that the Copy-On-Write (COW) managers for image
+ * load options, pixel data, and state are created. If they already exist,
+ * it does nothing.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE if COW initialization fails.
+ */
 static Eina_Bool
 _init_cow(void)
 {

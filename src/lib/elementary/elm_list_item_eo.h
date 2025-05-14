@@ -4,6 +4,7 @@
 #ifndef _ELM_LIST_ITEM_EO_CLASS_TYPE
 #define _ELM_LIST_ITEM_EO_CLASS_TYPE
 
+/** @brief The Evas Object (Eo) type for an Elementary List Item. */
 typedef Eo Elm_List_Item;
 
 #endif

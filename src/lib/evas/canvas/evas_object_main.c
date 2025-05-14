@@ -5,50 +5,71 @@
 #include "evas_private.h"
 #include <Ecore.h>
 
-EVAS_MEMPOOL(_mp_sh);
+EVAS_MEMPOOL(_mp_sh); /**< Memory pool for Evas_Size_Hints structures. */
 
 #define MY_CLASS EFL_CANVAS_OBJECT_CLASS
 
 #define MY_CLASS_NAME "Evas_Object"
 
 /* evas internal stuff */
+/** @brief Default proxy data for Evas objects. Used for COW initialization. */
 static const Evas_Object_Proxy_Data default_proxy = {
   NULL, NULL, 0, 0, NULL, 0, 0, 0, 0
 };
+/** @brief Default map data for Evas objects. Used for COW initialization. */
 static const Evas_Object_Map_Data default_map = {
   { NULL, NULL, 0, 0 }, { NULL, NULL, 0, 0 }, NULL, 0, 0, NULL, NULL
 };
+/** @brief Default protected state data for Evas objects. Used for COW initialization. */
 static const Evas_Object_Protected_State default_state = {
   NULL, { 0, 0, 0, 0 },
   { { 0, 0, 0, 0, 0, 0, 0, 0, EINA_FALSE, EINA_FALSE } },
   { 255, 255, 255, 255 },
   1.0, 0, EVAS_RENDER_BLEND, EINA_FALSE, EINA_FALSE, EINA_FALSE, EINA_FALSE, EINA_FALSE
 };
+/** @brief Default mask data for Evas objects. Used for COW initialization. */
 static const Evas_Object_Mask_Data default_mask = {
   NULL, 0, 0, EINA_FALSE, EINA_FALSE, EINA_FALSE, EINA_FALSE
 };
+/** @brief Default events data for Evas objects. Used for COW initialization. */
 static const Evas_Object_Events_Data default_events = {
   NULL, NULL, NULL, NULL
 };
 
-Eina_Cow *evas_object_proxy_cow = NULL;
-Eina_Cow *evas_object_map_cow = NULL;
-Eina_Cow *evas_object_state_cow = NULL;
-Eina_Cow *evas_object_mask_cow = NULL;
-Eina_Cow *evas_object_events_cow = NULL;
+Eina_Cow *evas_object_proxy_cow = NULL; /**< COW for Evas_Object_Proxy_Data. */
+Eina_Cow *evas_object_map_cow = NULL; /**< COW for Evas_Object_Map_Data. */
+Eina_Cow *evas_object_state_cow = NULL; /**< COW for Evas_Object_Protected_State. */
+Eina_Cow *evas_object_mask_cow = NULL; /**< COW for Evas_Object_Mask_Data. */
+Eina_Cow *evas_object_events_cow = NULL; /**< COW for Evas_Object_Events_Data. */
 
+/**
+ * @brief Structure to hold an animation associated with an event description.
+ * This is used to manage event-triggered animations on an object.
+ */
 typedef struct _Event_Animation
 {
    EINA_INLIST;
 
    const Efl_Event_Description *desc;
-   Efl_Canvas_Animation        *anim;
+   Efl_Canvas_Animation        *anim; /**< The animation object. */
 } Event_Animation;
 
+/**
+ * @brief Initializes the Copy-On-Write (COW) structures for Evas objects.
+ *
+ * This function sets up global COW instances for various Evas object data types
+ * (proxy, map, state, mask, events). It ensures that these COWs are initialized
+ * only once.
+ *
+ * @return EINA_TRUE if initialization is successful or already done,
+ *         EINA_FALSE on failure to allocate COW instances.
+ */
 static Eina_Bool
 _init_cow(void)
 {
-   if (evas_object_map_cow && evas_object_proxy_cow && evas_object_state_cow) return EINA_TRUE;
+   // Check if already initialized to prevent redundant work.
+   if (evas_object_map_cow && evas_object_proxy_cow && evas_object_state_cow &&
+       evas_object_mask_cow && evas_object_events_cow) return EINA_TRUE;
 
    evas_object_proxy_cow = eina_cow_add("Evas Object Proxy", sizeof (Evas_Object_Proxy_Data), 8, &default_proxy, EINA_TRUE);
    evas_object_map_cow = eina_cow_add("Evas Object Map", sizeof (Evas_Object_Map_Data), 8, &default_map, EINA_TRUE);
@@ -77,11 +98,23 @@ _init_cow(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Finds Evas_Object_Pointer_Data associated with a specific input device.
+ *
+ * Iterates through the list of pointer grabs for the given object and
+ * returns the data structure that matches the specified input device (pointer).
+ *
+ * @param obj The protected data of the Evas object.
+ * @param pointer The input device (e.g., a mouse, touch point) to search for.
+ * @return A pointer to the Evas_Object_Pointer_Data if found, otherwise NULL.
+ */
 Evas_Object_Pointer_Data *
 evas_object_pointer_data_find(Evas_Object_Protected_Data *obj,
                               Efl_Input_Device *pointer)
 {
    Evas_Object_Pointer_Data *pdata;
+
+   if (!obj || !obj->events || !obj->events->pointer_grabs) return NULL;
 
    EINA_INLIST_FOREACH(obj->events->pointer_grabs, pdata)
      {
@@ -91,11 +124,23 @@ evas_object_pointer_data_find(Evas_Object_Protected_Data *obj,
    return NULL;
 }
 
+/**
+ * @brief Deletes pointer grabs related to a proxy object's source.
+ *
+ * When a proxy object loses a grab, this function ensures that any
+ * corresponding grabs held by its source object (if it's an image source)
+ * for child objects are also released. This is important for maintaining
+ * consistent event handling state across proxy chains.
+ *
+ * @param obj The protected data of the proxy Evas object.
+ * @param pdata Pointer data associated with the grab being deleted on the proxy.
+ */
 static void
 _evas_object_proxy_grab_del(Evas_Object_Protected_Data *obj,
                             Evas_Object_Pointer_Data *pdata)
 {
    Evas_Object *eo_src = _evas_object_image_source_get(obj->object);
+   if (!eo_src) return;
    Evas_Object_Protected_Data *src = efl_data_scope_get(eo_src, EFL_CANVAS_OBJECT_CLASS);
    Eina_List *copy = eina_list_clone(src->proxy->src_event_in);
    Eina_List *l;
@@ -118,20 +163,41 @@ _evas_object_proxy_grab_del(Evas_Object_Protected_Data *obj,
      }
 }
 
+/**
+ * @brief Deletes a pointer grab data structure associated with an object.
+ *
+ * This function handles the cleanup of a pointer grab. It updates the
+ * global mouse grab count on the seat, removes the object from the seat's
+ * "in" list if necessary, and if the object is a proxy, it calls
+ * _evas_object_proxy_grab_del to handle proxy-specific cleanup.
+ * Finally, it removes the pointer data from the object's list of grabs
+ * and frees the memory.
+ *
+ * @param obj The protected data of the Evas object.
+ * @param pdata The pointer data structure to delete.
+ */
 void
 evas_object_pointer_grab_del(Evas_Object_Protected_Data *obj,
                              Evas_Object_Pointer_Data *pdata)
 {
-   if ((pdata->mouse_grabbed > 0) && (obj->layer) && (obj->layer->evas))
+   if (!pdata) return;
+   if (!obj || !obj->layer || !obj->layer->evas || !obj->events)
+     {
+        free(pdata);
+        return;
+     }
+
+   if (pdata->mouse_grabbed > 0)
      pdata->evas_pdata->seat->mouse_grabbed -= pdata->mouse_grabbed;
-   if (((pdata->mouse_in) || (pdata->mouse_grabbed > 0)) &&
-       (obj->layer) && (obj->layer->evas))
+
+   if ((pdata->mouse_in) || (pdata->mouse_grabbed > 0))
      {
         pdata->evas_pdata->seat->object.in = eina_list_remove(pdata->evas_pdata->seat->object.in, obj->object);
         if (obj->proxy->is_proxy && obj->proxy->src_events)
           _evas_object_proxy_grab_del(obj, pdata);
      }
-   if ((obj->events) && (obj->events->pointer_grabs))
+
+   if (obj->events->pointer_grabs)
      {
         EINA_COW_WRITE_BEGIN(evas_object_events_cow, obj->events, Evas_Object_Events_Data, events)
           events->pointer_grabs = eina_inlist_remove(events->pointer_grabs, EINA_INLIST_GET(pdata));
@@ -141,6 +207,19 @@ evas_object_pointer_grab_del(Evas_Object_Protected_Data *obj,
    free(pdata);
 }
 
+/**
+ * @brief Adds a new pointer data structure for an object and a given pointer device.
+ *
+ * This function allocates and initializes an Evas_Object_Pointer_Data structure,
+ * associating it with the Evas object and the specific Evas_Pointer_Data (which
+ * represents a pointer device like a mouse or touch). It sets the default
+ * pointer mode to AUTOGRAB and appends the new structure to the object's
+ * list of pointer grabs. It also registers the grab with the input device.
+ *
+ * @param evas_pdata The Evas_Pointer_Data for the specific pointer device.
+ * @param obj The protected data of the Evas object.
+ * @return A pointer to the newly created Evas_Object_Pointer_Data, or NULL on failure.
+ */
 static Evas_Object_Pointer_Data *
 _evas_object_pointer_data_add(Evas_Pointer_Data *evas_pdata,
                               Evas_Object_Protected_Data *obj)
@@ -149,9 +228,22 @@ _evas_object_pointer_data_add(Evas_Pointer_Data *evas_pdata,
 
    pdata = calloc(1, sizeof(Evas_Object_Pointer_Data));
    EINA_SAFETY_ON_NULL_RETURN_VAL(pdata, NULL);
-   pdata->pointer_mode = EVAS_OBJECT_POINTER_MODE_AUTOGRAB;
+   pdata->pointer_mode = EVAS_OBJECT_POINTER_MODE_AUTOGRAB; // Default mode
    pdata->evas_pdata = evas_pdata;
    pdata->obj = obj;
+
+   // Ensure obj->events is initialized (should be by constructor)
+   if (EINA_UNLIKELY(!obj->events))
+     {
+        ERR("obj->events is NULL for object %p. This should not happen.", obj->object);
+        obj->events = eina_cow_alloc(evas_object_events_cow);
+        if (!obj->events)
+          {
+             free(pdata);
+             return NULL;
+          }
+     }
+
    EINA_COW_WRITE_BEGIN(evas_object_events_cow, obj->events, Evas_Object_Events_Data, events)
      events->pointer_grabs = eina_inlist_append(events->pointer_grabs,
                                                 EINA_INLIST_GET(pdata));
@@ -161,6 +253,19 @@ _evas_object_pointer_data_add(Evas_Pointer_Data *evas_pdata,
    return pdata;
 }
 
+/**
+ * @brief Retrieves or creates Evas_Object_Pointer_Data for an object and pointer device.
+ *
+ * This function first attempts to find existing pointer data for the given
+ * object and pointer device using evas_object_pointer_data_find().
+ * If no existing data is found, it calls _evas_object_pointer_data_add()
+ * to create and add new pointer data.
+ *
+ * @param evas_pdata The Evas_Pointer_Data for the specific pointer device.
+ * @param obj The protected data of the Evas object.
+ * @return A pointer to the Evas_Object_Pointer_Data (either existing or newly created),
+ *         or NULL if obj is NULL or creation fails.
+ */
 Evas_Object_Pointer_Data *
 _evas_object_pointer_data_get(Evas_Pointer_Data *evas_pdata,
                               Evas_Object_Protected_Data *obj)
@@ -168,15 +273,34 @@ _evas_object_pointer_data_get(Evas_Pointer_Data *evas_pdata,
    Evas_Object_Pointer_Data *pdata;
 
    if (!obj) return NULL;
+   if (!evas_pdata) return NULL; // Added safety check
 
    pdata = evas_object_pointer_data_find(obj, evas_pdata->pointer);
 
-   //The pointer does not exist yet - create one.
+   // The pointer does not exist yet - create one.
    if (!pdata)
      return _evas_object_pointer_data_add(evas_pdata, obj);
    return pdata;
 }
 
+/**
+ * @brief Efl_Object constructor for Evas_Object.
+ *
+ * This is the EOLIAN constructor for the base Evas_Object. It performs
+ * essential initialization steps:
+ * - Calls the superclass constructor.
+ * - Sets the object type name.
+ * - Enables manual freeing.
+ * - Initializes Copy-On-Write (COW) data structures for proxy, map, state, mask, and events.
+ * - Injects the object into the Evas canvas internal structures.
+ *
+ * @param eo_obj The Evas_Object being constructed.
+ * @param obj The protected data structure for the Evas_Object.
+ * @return The constructed Evas_Object (eo_obj), or NULL on failure.
+ *
+ * @note This function relies on _init_cow() to have successfully initialized
+ *       the global COW managers.
+ */
 EOLIAN static Eo *
 _efl_canvas_object_efl_object_constructor(Eo *eo_obj, Evas_Object_Protected_Data *obj)
 {

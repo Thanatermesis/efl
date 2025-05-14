@@ -44,17 +44,45 @@ static Eina_Bool _gl_state_get(void *data, Evas_Object *obj, const char *part);
 static void _gl_del(void *data, Evas_Object *obj);
 static void _test_eio_clear(void *data, Evas_Object *obj, void *event);
 
+/**
+ * @brief Callback for when a file is selected in the genlist.
+ *
+ * This function is currently a no-op.
+ * @param data User data, unused.
+ * @param obj The Evas object, unused.
+ * @param event_info Event-specific info, unused.
+ */
 static void
 _sel_file(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Filter callback for eio_file_ls.
+ *
+ * This function is called for each file found by eio_file_ls and decides
+ * whether to include it in the results. This implementation includes all files.
+ * @param data User data, unused.
+ * @param handler The Eio_File handler.
+ * @param file The file name.
+ * @return EINA_TRUE to include the file, EINA_FALSE to exclude.
+ */
 static Eina_Bool
 _ls_filter_cb(void *data EINA_UNUSED, Eio_File *handler EINA_UNUSED, const char *file EINA_UNUSED)
 {
   return EINA_TRUE;
 }
 
+/**
+ * @brief Comparison function for sorting genlist items.
+ *
+ * This function is used by elm_genlist_item_sorted_insert to sort items
+ * alphabetically based on their string data.
+ * @param data1 First item to compare (an Elm_Object_Item*).
+ * @param data2 Second item to compare (an Elm_Object_Item*).
+ * @return An integer less than, equal to, or greater than zero if data1 is
+ * found, respectively, to be less than, to match, or be greater than data2.
+ */
 static int
 _compare_cb(const void *data1, const void *data2)
 {
@@ -64,6 +92,15 @@ _compare_cb(const void *data1, const void *data2)
                   elm_object_item_data_get(it2));
 }
 
+/**
+ * @brief Main callback for eio_file_ls, called for each file.
+ *
+ * This function is called for each file that passes the filter. It inserts
+ * the file as a new item into the genlist, sorted alphabetically.
+ * @param data The genlist widget.
+ * @param handler The Eio_File handler.
+ * @param file The file name.
+ */
 static void
 _ls_main_cb(void *data, Eio_File *handler EINA_UNUSED, const char *file)
 {
@@ -77,6 +114,14 @@ _ls_main_cb(void *data, Eio_File *handler EINA_UNUSED, const char *file)
                                   NULL);
 }
 
+/**
+ * @brief Callback for when eio_file_ls has finished listing files.
+ *
+ * This function is called when the directory listing operation is complete.
+ * It calculates and prints the time taken for the operation.
+ * @param data User data, unused.
+ * @param handler The Eio_File handler.
+ */
 static void
 _ls_done_cb(void *data EINA_UNUSED, Eio_File *handler EINA_UNUSED)
 {
@@ -114,12 +159,31 @@ _ls_done_cb(void *data EINA_UNUSED, Eio_File *handler EINA_UNUSED)
 #endif
 }
 
+/**
+ * @brief Callback for when an error occurs in eio_file_ls.
+ *
+ * This function is called if an error happens during the file listing.
+ * It prints the error message to stderr.
+ * @param data User data, unused.
+ * @param handler The Eio_File handler.
+ * @param error The error code (errno).
+ */
 static void
 _ls_error_cb(void *data EINA_UNUSED, Eio_File *handler EINA_UNUSED, int error)
 {
    fprintf(stderr, "error: [%s]\n", strerror(error));
 }
 
+/**
+ * @brief Callback for when a file/directory is chosen in the fileselector.
+ *
+ * This function is triggered by the "file,chosen" smart callback of the
+ * fileselector button. It starts the asynchronous directory listing with Eio.
+ * It also records the start time for performance measurement.
+ * @param data The genlist widget, passed as user data.
+ * @param obj The fileselector button, unused.
+ * @param event_info The chosen file path (a const char*).
+ */
 static void
 _file_chosen(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -157,6 +221,17 @@ _file_chosen(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
      }
 }
 
+/**
+ * @brief Get the text for a genlist item.
+ *
+ * This is a callback function for the genlist item class. It provides the
+ * text to be displayed for each item.
+ * @param data The item's data (the file path as a string).
+ * @param obj The genlist widget, unused.
+ * @param part The theme part name, unused.
+ * @return A newly allocated string for the item's label. The caller is
+ * responsible for freeing it. E.g., "Item # /path/to/file".
+ */
 static char *
 _gl_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
@@ -165,29 +240,77 @@ _gl_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNU
    return strdup(buf);
 }
 
+/**
+ * @brief Get the content for a genlist item.
+ *
+ * This is a callback function for the genlist item class. It provides a
+ * content object (like an icon) for the item. This implementation returns NULL.
+ * @param data The item's data, unused.
+ * @param obj The genlist widget, unused.
+ * @param part The theme part name, unused.
+ * @return An Evas_Object to be used as content, or NULL.
+ */
 static Evas_Object *
 _gl_content_get(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
    return NULL;
 }
 
+/**
+ * @brief Get the state for a genlist item.
+ *
+ * This is a callback function for the genlist item class. It's used for
+ * parts like check boxes or radio buttons to get their state. This
+ * implementation always returns false (unchecked).
+ * @param data The item's data, unused.
+ * @param obj The genlist widget, unused.
+ * @param part The theme part name, unused.
+ * @return EINA_TRUE for "on" state, EINA_FALSE for "off".
+ */
 static Eina_Bool
 _gl_state_get(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
    return EINA_FALSE;
 }
 
+/**
+ * @brief Callback for genlist item deletion.
+ *
+ * This is a callback function for the genlist item class, called when an
+ * item is deleted. It can be used to free item-specific data.
+ * @param data The item's data, unused.
+ * @param obj The genlist widget, unused.
+ */
 static void
 _gl_del(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Callback to clear the genlist.
+ *
+ * This function is connected to the "clicked" signal of the "clear" button.
+ * It removes all items from the genlist.
+ * @param data The genlist widget to be cleared.
+ * @param obj The button that was clicked, unused.
+ * @param event Event-specific information, unused.
+ */
 static void
 _test_eio_clear(void *data, Evas_Object *obj EINA_UNUSED, void *event EINA_UNUSED)
 {
    elm_genlist_clear(data);
 }
 
+/**
+ * @brief Main function for the Eio test.
+ *
+ * This function sets up the window and all the UI components for the Eio
+ * test application. This includes a genlist to display files, a fileselector
+ * button to choose a directory, and a clear button.
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_eio(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

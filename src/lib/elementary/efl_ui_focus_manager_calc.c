@@ -31,71 +31,127 @@ static int _focus_log_domain = -1;
 
 #define DIRECTION_ACCESS(V, ID) ((V)->graph.directions[(ID) - 2])
 
+/**
+ * @brief Represents a dimension in 2D space.
+ */
 typedef enum {
-    DIMENSION_X = 0,
-    DIMENSION_Y = 1,
+    DIMENSION_X = 0, /**< The X-axis dimension. */
+    DIMENSION_Y = 1, /**< The Y-axis dimension. */
 } Dimension;
 
 typedef struct _Border Border;
 typedef struct _Node Node;
 
+/**
+ * @brief Represents the border connections of a Node in the focus graph.
+ *
+ * Each Node has an array of Border structures, one for each 2D direction
+ * (UP, DOWN, LEFT, RIGHT).
+ */
 struct _Border {
-  Eina_List *one_direction; //partners that are linked in one direction
-  Eina_List *cleanup_nodes; //a list of nodes that needs to be cleaned up when this node is deleted
+  Eina_List *one_direction; /**< List of Node pointers. Partners that are linked in this specific direction.
+                                 Example: If this Border is for the RIGHT direction of Node A,
+                                 one_direction might contain [Node B, Node C] if B and C are to the right of A. */
+  Eina_List *cleanup_nodes; /**< List of Node pointers. Nodes that have this Node in their 'one_direction' list
+                                 for the complementary direction. This list is used to efficiently update
+                                 relationships when a node is deleted or its links change.
+                                 Example: If Node B has Node A in its LEFT.one_direction, then Node A's
+                                 RIGHT.cleanup_nodes would contain Node B. */
 };
 
+/**
+ * @brief Defines the type of a Node in the focus manager.
+ */
 typedef enum {
-  NODE_TYPE_NORMAL = 0,
-  NODE_TYPE_ONLY_LOGICAL = 2,
+  NODE_TYPE_NORMAL = 0,       /**< A regular focusable object that participates in 2D (spatial) and logical navigation. */
+  NODE_TYPE_ONLY_LOGICAL = 2, /**< A node that only participates in logical (sequential) navigation, not 2D.
+                                   It might act as a container or a logical grouping. */
 } Node_Type;
 
+/**
+ * @brief Represents an element within the focus manager's internal graph and tree structure.
+ *
+ * Each Node corresponds to an Efl_Ui_Focus_Object and stores its relationships
+ * for both logical (tree-based) and 2D (graph-based) focus navigation.
+ */
 struct _Node{
-  Node_Type type; //type of the node
+  Node_Type type; /**< The type of the node (normal or logical-only). */
 
-  Efl_Ui_Focus_Object *focusable;
-  Efl_Ui_Focus_Manager *manager;
-  Efl_Ui_Focus_Manager *redirect_manager;
+  Efl_Ui_Focus_Object *focusable; /**< The actual Efl_Ui_Focus_Object this node represents. */
+  Efl_Ui_Focus_Manager *manager; /**< The focus manager this node belongs to. */
+  Efl_Ui_Focus_Manager *redirect_manager; /**< If not NULL, focus requests on this node might be redirected to this manager. */
 
+  /**
+   * @brief Tree-related information for logical navigation (parent/child relationships).
+   */
   struct _Tree_Node{
-    Node *parent; //the parent of the tree
-    Eina_List *children; //this saves the original set of elements
-    Eina_List *saved_order;
-    Eina_Bool clean_apply; //set if there was no new registration after a "update_order" call
+    Node *parent;           /**< The parent Node in the logical focus tree. */
+    Eina_List *children;    /**< List of child Node pointers, representing the logical children of this node.
+                                 Example: A container widget's Node would have its child widgets' Nodes in this list. */
+    Eina_List *saved_order; /**< A user-defined explicit order for the children. List of Efl_Ui_Focus_Object pointers. */
+    Eina_Bool clean_apply;  /**< Flag indicating if 'saved_order' has been applied without subsequent registrations. */
   }tree;
 
+  /**
+   * @brief Graph-related information for 2D spatial navigation.
+   */
   struct _Graph_Node {
-    Border directions[NODE_DIRECTIONS_COUNT];
+    Border directions[NODE_DIRECTIONS_COUNT]; /**< Array of Border structures, indexed by (Efl_Ui_Focus_Direction - 2).
+                                                   directions[0] is for UP (EFL_UI_FOCUS_DIRECTION_UP - 2)
+                                                   directions[1] is for DOWN (EFL_UI_FOCUS_DIRECTION_DOWN - 2)
+                                                   directions[2] is for LEFT (EFL_UI_FOCUS_DIRECTION_LEFT - 2)
+                                                   directions[3] is for RIGHT (EFL_UI_FOCUS_DIRECTION_RIGHT - 2) */
   } graph;
 
-  Eina_Bool on_list : 1;
-  Eina_Bool unused : 1;
-  Eina_Bool this_is_root : 1;
+  Eina_Bool on_list : 1;      /**< True if this node is currently in the 'dirty' list of the manager. */
+  Eina_Bool unused : 1;       /**< True if this node is currently marked as unused. This flag is typically set to EINA_TRUE
+                                   when a node is first registered or when its geometry might be stale.
+                                   Graph calculation routines (like dirty_flush_node) will set this to EINA_FALSE
+                                   for nodes that are processed and found to be part of the active graph. */
+  Eina_Bool this_is_root : 1; /**< True if this node represents the root object of the focus manager. */
 };
 
 #define T(n) (n->tree)
 #define G(n) (n->graph)
 
+/**
+ * @brief Private data structure for the Efl_Ui_Focus_Manager_Calc class.
+ *
+ * This structure holds all the internal state required for the focus manager
+ * to calculate focus movements, manage registered objects, and handle focus history.
+ */
 typedef struct {
-    Eina_List *focus_stack;
-    Eina_Hash *node_hash;
-    Efl_Ui_Focus_Manager *redirect;
-    Efl_Ui_Focus_Object *redirect_entry;
-    Eina_List *dirty;
-    Efl_Ui_Focus_Graph_Context graph_ctx;
-    int freeze;
+    Eina_List *focus_stack; /**< List of Node pointers. Represents the history of focused elements.
+                                 The last element is the currently focused one.
+                                 Example: [Node_Oldest_Focus, ..., Node_Recent_Focus, Node_Current_Focus] */
+    Eina_Hash *node_hash;   /**< Hash table mapping Efl_Ui_Focus_Object pointers to their corresponding Node pointers.
+                                 Key: Efl_Ui_Focus_Object*, Value: Node* */
+    Efl_Ui_Focus_Manager *redirect; /**< If not NULL, this manager redirects its focus control to another manager. */
+    Efl_Ui_Focus_Object *redirect_entry; /**< The Efl_Ui_Focus_Object that caused the current redirection to 'redirect' manager. */
+    Eina_List *dirty;       /**< List of Node pointers. Nodes whose 2D spatial relationships might need recalculation. */
+    Efl_Ui_Focus_Graph_Context graph_ctx; /**< Context for the focus graph calculation algorithm. */
+    int freeze;             /**< Counter for freezing dirty logic updates. If > 0, dirty list processing is paused. */
 
-    Node *root;
-    Eina_Bool border_elements_changed;
+    Node *root;             /**< The root Node of the logical focus tree for this manager. */
+    Eina_Bool border_elements_changed; /**< Flag indicating if any border elements (nodes with incomplete graph links) have changed. */
 } Efl_Ui_Focus_Manager_Calc_Data;
 
 static Eina_Mempool *_node_mempool;
 
+/**
+ * @brief Allocates a new Node from the mempool.
+ * @return A pointer to the newly allocated and zeroed Node, or NULL on failure.
+ */
 static Node*
 node_mem_get(void)
 {
    return eina_mempool_calloc(_node_mempool, sizeof(Node));
 }
 
+/**
+ * @brief Frees a Node back to the mempool.
+ * @param n The Node to free.
+ */
 static void
 node_mem_free(Node *n)
 {
@@ -107,6 +163,15 @@ static void dirty_add(Eo *obj, Efl_Ui_Focus_Manager_Calc_Data *pd, Node *dirty);
 static Node* _next(Node *node);
 static void _prepare_node(Node *root);
 
+/**
+ * @brief Checks if the given focus manager is currently active in the focus chain.
+ *
+ * A manager is active if it's the root window's manager or if it's the
+ * target of a redirect from an active manager.
+ *
+ * @param obj The focus manager object.
+ * @return EINA_TRUE if the manager is active, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _focus_manager_active_get(Eo *obj)
 {
@@ -137,6 +202,16 @@ _focus_manager_active_get(Eo *obj)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Ensures that this manager is part of the active focus chain.
+ *
+ * If this manager's root element is focused by an outer manager, this function
+ * effectively "activates" this manager by setting focus on its root within
+ * the context of that outer manager. This is crucial for nested managers.
+ *
+ * @param obj The focus manager object.
+ * @param pd The private data of the focus manager.
+ */
 static void
 _manager_in_chain_set(Eo *obj, Efl_Ui_Focus_Manager_Calc_Data *pd)
 {
@@ -972,11 +1047,11 @@ _efl_ui_focus_manager_calc_efl_object_destructor(Eo *obj, Efl_Ui_Focus_Manager_C
 
 typedef struct {
    Eina_Iterator iterator;
-   Eina_Iterator *real_iterator;
-   Efl_Ui_Focus_Manager *object;
-   Eina_Each_Cb filter_cb;
-   Eina_Rect viewport;
-   Eina_Bool use_viewport;
+   Eina_Iterator *real_iterator; /**< The underlying iterator, typically over all nodes in the manager. */
+   Efl_Ui_Focus_Manager *object; /**< The focus manager instance this iterator is associated with. */
+   Eina_Each_Cb filter_cb;    /**< (Unused) A callback function for filtering elements. */
+   Eina_Rect viewport;         /**< The viewport rectangle, if 'use_viewport' is true. */
+   Eina_Bool use_viewport;     /**< If true, the iterator filters elements based on the 'viewport'. */
 } Border_Elements_Iterator;
 
 static Eina_Bool

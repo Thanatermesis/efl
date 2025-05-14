@@ -4,6 +4,12 @@
 #ifndef _EVAS_CANVAS_EO_CLASS_TYPE
 #define _EVAS_CANVAS_EO_CLASS_TYPE
 
+/**
+ * @brief Evas_Canvas type.
+ * @ingroup Evas_Canvas
+ *
+ * This is the base type for Evas Canvas objects. It is an alias for Eo.
+ */
 typedef Eo Evas_Canvas;
 
 #endif

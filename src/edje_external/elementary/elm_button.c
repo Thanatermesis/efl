@@ -1,18 +1,37 @@
 #include "private.h"
 
+/**
+ * @brief Structure defining the parameters for an Elm_Button widget.
+ *
+ * This structure holds all configurable parameters for a button,
+ * including its label, icon, and autorepeat behavior.
+ */
 typedef struct _Elm_Params_Button
 {
-   Elm_Params base;
-   const char *label;
-   Evas_Object *icon;
-   double autorepeat_initial;
-   double autorepeat_gap;
-   Eina_Bool autorepeat:1;
-   Eina_Bool autorepeat_exists:1;
-   Eina_Bool autorepeat_gap_exists:1;
-   Eina_Bool autorepeat_initial_exists:1;
+   Elm_Params base; /**< Base parameters, common to all Elm widgets. */
+   const char *label; /**< The text label to display on the button. */
+   Evas_Object *icon; /**< The icon object to display on the button. */
+   double autorepeat_initial; /**< The initial timeout before autorepeat starts (in seconds). */
+   double autorepeat_gap; /**< The gap timeout between autorepeat events (in seconds). */
+   Eina_Bool autorepeat:1; /**< Flag indicating if autorepeat is enabled. */
+   Eina_Bool autorepeat_exists:1; /**< Flag indicating if the autorepeat parameter was provided. */
+   Eina_Bool autorepeat_gap_exists:1; /**< Flag indicating if the autorepeat_gap parameter was provided. */
+   Eina_Bool autorepeat_initial_exists:1; /**< Flag indicating if the autorepeat_initial parameter was provided. */
 } Elm_Params_Button;
 
+/**
+ * @brief Sets the state of an external button widget.
+ *
+ * This function is called to apply a set of parameters (either `to_params`
+ * or `from_params`) to the given Evas_Object, which is expected to be an
+ * Elm_Button. It updates the button's label, icon, and autorepeat properties.
+ *
+ * @param data Unused user data.
+ * @param obj The Evas_Object (Elm_Button) to modify.
+ * @param from_params The previous state parameters (can be NULL).
+ * @param to_params The new state parameters to apply (can be NULL).
+ * @param pos Unused position value for animations/transitions.
+ */
 static void
 external_button_state_set(void *data EINA_UNUSED, Evas_Object *obj,
                           const void *from_params, const void *to_params,
@@ -36,6 +55,18 @@ external_button_state_set(void *data EINA_UNUSED, Evas_Object *obj,
      elm_button_autorepeat_set(obj, p->autorepeat);
 }
 
+/**
+ * @brief Sets a single external parameter for a button widget.
+ *
+ * This function is called by Edje to set a specific parameter on the
+ * Elm_Button widget. It handles parameters like "label", "icon",
+ * "autorepeat_initial", "autorepeat_gap", and "autorepeat".
+ *
+ * @param data Unused user data.
+ * @param obj The Evas_Object (Elm_Button) to modify.
+ * @param param The Edje_External_Param to apply.
+ * @return EINA_TRUE if the parameter was successfully set, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 external_button_param_set(void *data EINA_UNUSED, Evas_Object *obj,
                           const Edje_External_Param *param)
@@ -89,6 +120,22 @@ external_button_param_set(void *data EINA_UNUSED, Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Gets a single external parameter from a button widget.
+ *
+ * This function is called by Edje to retrieve the value of a specific
+ * parameter from the Elm_Button widget. It handles parameters like "label",
+ * "autorepeat_initial", "autorepeat_gap", and "autorepeat".
+ * Note: Retrieving the "icon" parameter is not supported directly.
+ *
+ * @param data Unused user data.
+ * @param obj The Evas_Object (Elm_Button) to query.
+ * @param param The Edje_External_Param to fill with the retrieved value.
+ *              The `name` field indicates which parameter to get, and `type`
+ *              indicates the expected type. The value is stored in the
+ *              appropriate union member (e.g., `param->s`, `param->d`, `param->i`).
+ * @return EINA_TRUE if the parameter was successfully retrieved, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 external_button_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
                           Edje_External_Param *param)
@@ -137,6 +184,27 @@ external_button_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Parses a list of Edje_External_Param objects and creates an Elm_Params_Button structure.
+ *
+ * This function iterates through a list of external parameters (typically from an
+ * Edje theme file) and populates an Elm_Params_Button structure. This structure
+ * can then be used to set the initial state of an Elm_Button.
+ *
+ * @param data Unused user data.
+ * @param obj The Evas_Object (Elm_Button) this parse is associated with (used for icon parsing).
+ * @param params A list of Edje_External_Param objects to parse.
+ *               Example of `params` structure:
+ *               Eina_List containing Edje_External_Param elements.
+ *               Each Edje_External_Param might look like:
+ *               - { .name = "label", .type = EDJE_EXTERNAL_PARAM_TYPE_STRING, .s = "Click Me" }
+ *               - { .name = "icon", .type = EDJE_EXTERNAL_PARAM_TYPE_STRING, .s = "home" }
+ *               - { .name = "autorepeat", .type = EDJE_EXTERNAL_PARAM_TYPE_BOOL, .i = 1 }
+ *               - { .name = "autorepeat_initial", .type = EDJE_EXTERNAL_PARAM_TYPE_DOUBLE, .d = 0.5 }
+ *               - { .name = "autorepeat_gap", .type = EDJE_EXTERNAL_PARAM_TYPE_DOUBLE, .d = 0.2 }
+ * @return A pointer to a newly allocated Elm_Params_Button structure, or NULL on failure.
+ *         The caller is responsible for freeing this memory using external_button_params_free().
+ */
 static void *
 external_button_params_parse(void *data EINA_UNUSED, Evas_Object *obj,
                              const Eina_List *params)
@@ -175,6 +243,18 @@ external_button_params_parse(void *data EINA_UNUSED, Evas_Object *obj,
    return mem;
 }
 
+/**
+ * @brief Retrieves content from an external button widget.
+ *
+ * This function is intended to get a named content part from the button.
+ * However, for Elm_Button, it currently does not support retrieving content
+ * this way and will always log an error and return NULL.
+ *
+ * @param data Unused user data.
+ * @param obj Unused Evas_Object.
+ * @param content Unused name of the content part to retrieve.
+ * @return Always NULL for Elm_Button.
+ */
 static Evas_Object *external_button_content_get(void *data EINA_UNUSED,
                                                 const Evas_Object *obj EINA_UNUSED,
                                                 const char *content EINA_UNUSED)
@@ -183,6 +263,14 @@ static Evas_Object *external_button_content_get(void *data EINA_UNUSED,
    return NULL;
 }
 
+/**
+ * @brief Frees the memory allocated for Elm_Params_Button.
+ *
+ * This function releases the resources held by an Elm_Params_Button
+ * structure, including any stringshared label.
+ *
+ * @param params A pointer to the Elm_Params_Button structure to free.
+ */
 static void
 external_button_params_free(void *params)
 {
@@ -192,9 +280,16 @@ external_button_params_free(void *params)
    free(params);
 }
 
+/**
+ * @brief Array defining the external parameters supported by Elm_Button.
+ *
+ * This array provides metadata about the parameters that can be set on an
+ * Elm_Button from an Edje theme or externally. It includes the parameter
+ * name and its type.
+ */
 static Edje_External_Param_Info external_button_params[] =
 {
-   DEFINE_EXTERNAL_COMMON_PARAMS,
+   DEFINE_EXTERNAL_COMMON_PARAMS, /**< Common parameters like "swallow" */
    EDJE_EXTERNAL_PARAM_INFO_STRING("label"),
    EDJE_EXTERNAL_PARAM_INFO_STRING("icon"),
    EDJE_EXTERNAL_PARAM_INFO_DOUBLE("autorepeat_initial"),

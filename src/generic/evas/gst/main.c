@@ -36,7 +36,21 @@ int   width = 0;
 int   height = 0;
 void *data = NULL;
 
-
+/**
+ * @brief Initializes the GStreamer pipeline for video decoding.
+ *
+ * This function sets up a GStreamer pipeline to decode a video file specified
+ * by @p filename. It configures the pipeline to output raw video frames in
+ * either ARGB or BGRA format, depending on the system's endianness.
+ * The pipeline uses `uridecodebin` to handle various URI types and media
+ * formats, `typefind` to determine the stream type, `videoconvert` for
+ * color space conversion, and `appsink` to make the raw video frames
+ * accessible to the application.
+ *
+ * @param filename The path or URI of the video file to load.
+ *                 Example: "/path/to/video.mp4" or "file:///path/to/video.mp4"
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _gst_init(const char *filename)
 {
@@ -159,6 +173,12 @@ _gst_init(const char *filename)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Shuts down the GStreamer pipeline and deinitializes GStreamer.
+ *
+ * This function sets the pipeline state to NULL, unreferences the pipeline
+ * object, and deinitializes GStreamer to free associated resources.
+ */
 static void
 _gst_shutdown()
 {
@@ -167,6 +187,20 @@ _gst_shutdown()
    gst_deinit();
 }
 
+/**
+ * @brief Loads a video frame at a specific position into shared memory.
+ *
+ * This function seeks the GStreamer pipeline to a given position (or the
+ * middle of the video if @p pos is negative) and pulls a prerolled sample
+ * (video frame). The frame data is then copied into a shared memory segment
+ * allocated by `shm_alloc`.
+ *
+ * @param size_w The desired width for scaling (currently unused).
+ * @param size_h The desired height for scaling (currently unused).
+ * @param pos The time position in nanoseconds to seek to in the video.
+ *            If negative, seeks to the middle of the video.
+ *            Example: 1.5 * GST_SECOND (for 1.5 seconds)
+ */
 static void
 _gst_load_image(int size_w EINA_UNUSED, int size_h EINA_UNUSED, double pos)
 {
@@ -196,6 +230,27 @@ _gst_load_image(int size_w EINA_UNUSED, int size_h EINA_UNUSED, double pos)
    gst_buffer_unmap(buffer, &info);
 }
 
+/**
+ * @brief Main entry point for the GStreamer video frame extractor.
+ *
+ * This program takes a video file as input and extracts a video frame,
+ * outputting its metadata (width, height, alpha) and pixel data.
+ * The pixel data can be written to a shared memory file or directly to stdout.
+ *
+ * Command-line arguments:
+ *   argv[1]: Path to the video file. (Required)
+ *   -head: If present, only loads header information (dimensions) and not
+ *          the pixel data.
+ *   -key <pos_ns>: Specifies the time position in nanoseconds to extract
+ *                  the frame from. Example: -key 1500000000 (for 1.5s)
+ *   -opt-scale-down-by <factor>: (Not currently used by this loader)
+ *   -opt-dpi <dpi>: (Not currently used by this loader)
+ *   -opt-size <width> <height>: (Not currently used by this loader)
+ *
+ * @param argc Number of command-line arguments.
+ * @param argv Array of command-line argument strings.
+ * @return 0 on success, -1 on failure.
+ */
 int
 main(int argc, char **argv)
 {

@@ -17,6 +17,12 @@ struct _My_Item
   char *from, *subject, *date, *head_content;
 };
 
+/**
+ * @brief Callback for the "selected" event on the genlist.
+ * @param data User data pointer (unused).
+ * @param obj The Evas_Object that emitted the signal (unused).
+ * @param event_info The event-specific information. For "selected", this is a pointer to the selected Elm_Object_Item.
+ */
 // callbacks just to see user interacting with genlist
 static void
 _st_selected(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
@@ -24,12 +30,24 @@ _st_selected(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_i
    printf("selected: %p\n", event_info);
 }
 
+/**
+ * @brief Callback for the "clicked,double" event on the genlist.
+ * @param data User data pointer (unused).
+ * @param obj The Evas_Object that emitted the signal (unused).
+ * @param event_info The event-specific information. For "clicked,double", this is a pointer to the double-clicked Elm_Object_Item.
+ */
 static void
 _st_double_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
    printf("double clicked: %p\n", event_info);
 }
 
+/**
+ * @brief Callback for the "longpressed" event on the genlist.
+ * @param data User data pointer (unused).
+ * @param obj The Evas_Object that emitted the signal (unused).
+ * @param event_info The event-specific information. For "longpressed", this is a pointer to the long-pressed Elm_Object_Item.
+ */
 static void
 _st_longpress(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -78,6 +96,23 @@ static const Elm_Store_Item_Mapping it1_mapping[] =
   ELM_STORE_ITEM_MAPPING_END
 };
 
+/**
+ * @brief Lists items from the filesystem for the store.
+ *
+ * This function is called by the store for each file found in the target
+ * directory. It runs in a worker thread.
+ * Its purpose is to quickly decide if a file should be included in the store,
+ * and to provide basic information like a sorting key and the item class
+ * without parsing the whole file.
+ * The sorting key is a string generated from the file's numeric ID, allowing
+ * for lexicographical sorting that is equivalent to numerical sorting.
+ *
+ * @param data User data passed to elm_store_list_func_set() (unused).
+ * @param item_info Information about the file item. This function populates
+ *        the base fields of this struct.
+ * @return @c EINA_TRUE to include the item in the store, @c EINA_FALSE to
+ *         ignore it.
+ */
 ////// **** WARNING ***********************************************************
 ////   * This function runs inside a thread outside efl mainloop. Be careful! *
 //     ************************************************************************
@@ -115,6 +150,20 @@ _st_store_list(void *data EINA_UNUSED, Elm_Store_Item_Info *item_info)
 ////   * End of separate thread function.                                     *
 ////// ************************************************************************
 
+/**
+ * @brief Fetches the detailed data for a specific store item.
+ *
+ * This function is called by the store when an item's full data is needed
+ * (e.g., when it is about to become visible in a list). It runs in a worker
+ * thread to avoid blocking the main loop.
+ * It reads an email file, parses out the From, Subject, and Date headers,
+ * and a short preview of the body content. This data is then attached to the
+ * store item.
+ *
+ * @param data User data passed to elm_store_fetch_func_set() (unused).
+ * @param sti The store item to fetch data for. The parsed data should be
+ *        attached to it using elm_store_item_data_set().
+ */
 ////// **** WARNING ***********************************************************
 ////   * This function runs inside a thread outside efl mainloop. Be careful! *
 //     ************************************************************************
@@ -210,6 +259,16 @@ _st_store_fetch(void *data EINA_UNUSED, Elm_Store_Item *sti)
 ////   * End of separate thread function.                                     *
 ////// ************************************************************************
 
+/**
+ * @brief Frees the data associated with a store item.
+ *
+ * This function is called by the store when an item's data is no longer
+ * needed (e.g., when it has been scrolled far off-screen). Its purpose is to
+ * free up memory.
+ *
+ * @param data User data passed to elm_store_unfetch_func_set() (unused).
+ * @param sti The store item whose data should be freed.
+ */
 static void
 _st_store_unfetch(void *data EINA_UNUSED, Elm_Store_Item *sti)
 {
@@ -222,6 +281,18 @@ _st_store_unfetch(void *data EINA_UNUSED, Elm_Store_Item *sti)
    free(myit);
 }
 
+/**
+ * @brief Sets up and runs the elm_store test.
+ *
+ * This function creates a window with a genlist widget that is populated
+ * from a filesystem store. It configures the store to read files from the
+ * "./store" directory, sets up the callbacks for listing, fetching, and
+ * un-fetching item data, and displays the window.
+ *
+ * @param data Test data (unused).
+ * @param obj The parent object (unused).
+ * @param event_info Event info (unused).
+ */
 void
 test_store(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

@@ -13,6 +13,23 @@ static Elm_Theme *theme_default = NULL;
 
 static Eina_List *themes = NULL;
 
+/**
+ * @internal
+ * @brief Tries to find an Edje group in a theme file and cache it.
+ *
+ * This function checks if a given Edje group exists in the provided theme
+ * file handle. If it exists, it may perform additional checks for overlays
+ * and extensions to ensure they match the base theme. If successful, the
+ * file handle is cached for the given group name to speed up future lookups.
+ *
+ * @param th The theme context.
+ * @param etf The theme file to search in.
+ * @param group The name of the Edje group to find.
+ * @param force If @c EINA_TRUE, bypasses the theme matching check for
+ *              overlays and extensions. This is used as a fallback mechanism.
+ * @return The file handle (@c Eina_File *) if the group is found and conditions
+ *         are met, otherwise @c NULL. The returned handle is not a new reference.
+ */
 static Eina_File *
 _elm_theme_find_try(Elm_Theme *th, Elm_Theme_File *etf, const char *group, Eina_Bool force)
 {
@@ -37,6 +54,24 @@ _elm_theme_find_try(Elm_Theme *th, Elm_Theme_File *etf, const char *group, Eina_
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Finalizes the addition of a theme file to a theme list.
+ *
+ * This function performs the final steps of adding a theme file to a list of
+ * theme files. It checks the theme's version for compatibility, creates an
+ * Elm_Theme_File structure, populates it with theme information, and adds it
+ * to the given list of files (either at the beginning or end).
+ *
+ * @param files A pointer to the list of theme files (Eina_Inlist).
+ * @param item The name of the theme item.
+ * @param f The file handle (@c Eina_File *) for the theme file. This function
+ *          takes ownership of the handle.
+ * @param prepend If @c EINA_TRUE, the item is added to the beginning of the list.
+ *                Otherwise, it's appended to the end.
+ * @param istheme If @c EINA_TRUE, the file is treated as a base theme file.
+ *                Otherwise, it's treated as an extension or overlay.
+ */
 static inline void
 _elm_theme_item_finalize(Eina_Inlist **files,
                          const char *item,
@@ -97,6 +132,21 @@ _elm_theme_item_finalize(Eina_Inlist **files,
      }
 }
 
+/**
+ * @internal
+ * @brief Adds a theme file item to a list of theme files.
+ *
+ * This function locates a theme file by its name, opens it, and adds it to the
+ * specified list of theme files. It can handle absolute paths, paths relative
+ * to the home directory, and theme names that need to be looked up in the
+ * standard theme search paths.
+ *
+ * @param files A pointer to the list of theme files.
+ * @param item The theme item name or path. This could be a simple name like
+ *             "default", or a path like "/path/to/my/theme.edj".
+ * @param prepend If @c EINA_TRUE, add to the beginning of the list (for overlays).
+ * @param istheme If @c EINA_TRUE, this is a base theme, not an extension/overlay.
+ */
 static void
 _elm_theme_file_item_add(Eina_Inlist **files, const char *item, Eina_Bool prepend, Eina_Bool istheme)
 {
@@ -144,6 +194,16 @@ _elm_theme_file_item_add(Eina_Inlist **files, const char *item, Eina_Bool prepen
    if (buf) eina_strbuf_free(buf);
 }
 
+/**
+ * @internal
+ * @brief Deletes a theme file item from a list of theme files.
+ *
+ * This function searches for a theme file by its name within the given list and
+ * removes it. It also closes the associated file handle and frees allocated memory.
+ *
+ * @param files A pointer to the list of theme files.
+ * @param str The name of the theme item to delete.
+ */
 static void
 _elm_theme_file_item_del(Eina_Inlist **files, const char *str)
 {
@@ -164,6 +224,16 @@ _elm_theme_file_item_del(Eina_Inlist **files, const char *str)
    eina_stringshare_del(str);
 }
 
+/**
+ * @internal
+ * @brief Deletes a theme file item from a list using its file handle.
+ *
+ * This function is similar to _elm_theme_file_item_del(), but it identifies
+ * the theme file to be removed by its @c Eina_File handle instead of its name.
+ *
+ * @param files A pointer to the list of theme files.
+ * @param file The file handle of the theme to delete.
+ */
 static void
 _elm_theme_file_mmap_del(Eina_Inlist **files, const Eina_File *file)
 {
@@ -180,6 +250,16 @@ _elm_theme_file_mmap_del(Eina_Inlist **files, const Eina_File *file)
      }
 }
 
+/**
+ * @internal
+ * @brief Cleans up a list of theme files.
+ *
+ * This function iterates through a list of theme files, closing each file
+ * handle, freeing associated stringshares, and deallocating the list items.
+ * The list will be empty after this call.
+ *
+ * @param files A pointer to the list of theme files to clean.
+ */
 static void
 _elm_theme_file_clean(Eina_Inlist **files)
 {
@@ -195,6 +275,16 @@ _elm_theme_file_clean(Eina_Inlist **files)
      }
 }
 
+/**
+ * @internal
+ * @brief Clears all data associated with a theme object.
+ *
+ * This function resets a theme object to a clean state. It clears the lists of
+ * themes, overlays, and extensions. It also frees all associated caches
+ * (for groups, data, and failed lookups) and releases any referenced theme.
+ *
+ * @param th The theme object to clear.
+ */
 static void
 _elm_theme_clear(Elm_Theme *th)
 {
@@ -225,6 +315,19 @@ _elm_theme_clear(Elm_Theme *th)
    th->eo_theme = NULL;
 }
 
+/**
+ * @internal
+ * @brief Internal implementation for finding the file containing an Edje group.
+ *
+ * This function searches for an Edje group within the theme hierarchy, which
+ * includes overlays, base themes, and extensions. It also recursively searches
+ * in the referenced theme if one is set. It uses a cache to speed up lookups.
+ *
+ * @param th The theme to search in.
+ * @param group The name of the Edje group to find.
+ * @param force If @c EINA_TRUE, bypasses theme matching logic, used as a fallback.
+ * @return The file handle (@c Eina_File *) containing the group, or @c NULL if not found.
+ */
 static Eina_File *
 _elm_theme_group_file_find_internal(Elm_Theme *th, const char *group, Eina_Bool force)
 {
@@ -252,6 +355,20 @@ _elm_theme_group_file_find_internal(Elm_Theme *th, const char *group, Eina_Bool 
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Finds the theme file that contains a specific Edje group.
+ *
+ * This is a public-within-Elementary function to find which theme file (.edj)
+ * provides a given Edje group. It first attempts a standard search, and if
+ * that fails, it performs a "forced" search that may bypass some theme
+ * matching rules as a fallback.
+ *
+ * @param th The theme context to search within. If NULL, the default theme is used.
+ * @param group The name of the Edje group to locate.
+ * @return An @c Eina_File handle to the theme file containing the group, or
+ *         @c NULL if the group cannot be found.
+ */
 Eina_File *
 _elm_theme_group_file_find(Elm_Theme *th, const char *group)
 {
@@ -261,6 +378,19 @@ _elm_theme_group_file_find(Elm_Theme *th, const char *group)
    return file;
 }
 
+/**
+ * @internal
+ * @brief Tries to read and cache a data item from a single theme file.
+ *
+ * This function attempts to retrieve a data value associated with a key from
+ * a given Edje file. If the data is found, it is added to the theme's data
+ * cache for faster subsequent access.
+ *
+ * @param th The theme context for caching.
+ * @param f The Edje file handle to read from.
+ * @param key The key of the data item to retrieve.
+ * @return A stringshared pointer to the data value if found, otherwise @c NULL.
+ */
 static const char *
 _elm_theme_find_data_try(Elm_Theme *th, const Eina_File *f, const char *key)
 {
@@ -278,6 +408,19 @@ _elm_theme_find_data_try(Elm_Theme *th, const Eina_File *f, const char *key)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Finds a data item by key within the entire theme hierarchy.
+ *
+ * This function searches for a data item across all parts of a theme, including
+ * overlays, base themes, and extensions. It checks the cache first, and if not
+ * found, it iterates through the theme files. It also searches in the
+ * referenced theme if one exists.
+ *
+ * @param th The theme context to search within.
+ * @param key The key of the data item to find.
+ * @return A stringshared pointer to the data value if found, otherwise @c NULL.
+ */
 static const char *
 _elm_theme_data_find(Elm_Theme *th, const char *key)
 {
@@ -305,6 +448,22 @@ _elm_theme_data_find(Elm_Theme *th, const char *key)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Sets the theme for a widget object, deriving theme from a parent.
+ *
+ * This function is an internal helper used to apply a theme style to a widget.
+ * It determines the correct theme to use by looking at the widget's parent.
+ * This is the common path for setting a widget's theme when it's part of a
+ * widget hierarchy.
+ *
+ * @param parent The parent widget, used to inherit the theme context.
+ * @param o The Evas_Object (widget) to apply the theme to.
+ * @param clas The class of the widget (e.g., "button").
+ * @param group The group within the theme file (e.g., "base").
+ * @param style The style to apply (e.g., "default", "custom").
+ * @return An @c Efl_Ui_Theme_Apply_Error code indicating success or failure.
+ */
 Eina_Error
 _elm_theme_object_set(Evas_Object *parent, Evas_Object *o, const char *clas, const char *group, const char *style)
 {
@@ -315,6 +474,19 @@ _elm_theme_object_set(Evas_Object *parent, Evas_Object *o, const char *clas, con
    return _elm_theme_set(th, o, clas, group, style, elm_widget_is_legacy(parent));
 }
 
+/**
+ * @internal
+ * @brief Sets the theme for an icon object.
+ *
+ * This is a specialized theme-setting function used exclusively by the icon
+ * widget. It handles the logic for applying a theme to an icon, including
+ * checking for standard system icons if the configuration dictates.
+ *
+ * @param o The icon object.
+ * @param group The icon group (e.g., "home", "close").
+ * @param style The style of the icon (e.g., "default").
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 /* only issued by elm_icon.c */
 Eina_Bool
 _elm_theme_object_icon_set(Evas_Object *o,
@@ -326,6 +498,28 @@ _elm_theme_object_icon_set(Evas_Object *o,
    return _elm_theme_icon_set(th, o, group, style);
 }
 
+/**
+ * @internal
+ * @brief Core function for applying a theme style to an Evas object.
+ *
+ * This function is the heart of theme application. It constructs the full
+ * Edje group name based on class, group, and style, then finds the appropriate
+ * theme file and applies the group to the object. It supports both modern
+ * ("efl/...") and legacy ("elm/...") naming schemes. If a specific style is
+ * not found, it attempts to fall back to the "default" style for that group.
+ * It also caches failed lookups to avoid repeated file system searches.
+ *
+ * @param th The theme context to use.
+ * @param o The Evas_Object to apply the theme to.
+ * @param clas The widget's class.
+ * @param group The widget's part/group name.
+ * @param style The desired style.
+ * @param is_legacy If @c EINA_TRUE, use the old "elm/" naming scheme.
+ * @return An @c Efl_Ui_Theme_Apply_Error code.
+ *         - @c EFL_UI_THEME_APPLY_ERROR_NONE: Success.
+ *         - @c EFL_UI_THEME_APPLY_ERROR_DEFAULT: The requested style failed, but the default fallback was successful.
+ *         - @c EFL_UI_THEME_APPLY_ERROR_GENERIC: A general failure occurred.
+ */
 Eina_Error
 _elm_theme_set(Elm_Theme *th, Evas_Object *o, const char *clas, const char *group, const char *style, Eina_Bool is_legacy)
 {
@@ -373,6 +567,23 @@ _elm_theme_set(Elm_Theme *th, Evas_Object *o, const char *clas, const char *grou
    return EFL_UI_THEME_APPLY_ERROR_GENERIC;
 }
 
+/**
+ * @internal
+ * @brief Core function to apply a theme to an icon object.
+ *
+ * This function handles the logic for setting an icon. It first checks if a
+ * standard Freedesktop icon theme should be used. If not, or if the icon is
+ * not a standard one, it proceeds to look for the icon in the Elementary
+ * theme files. It constructs the group name (e.g., "elm/icon/home/default")
+ * and applies it. It includes a fallback to the "default" style if the
+ * requested style is not found.
+ *
+ * @param th The theme context.
+ * @param o The Evas_Object (icon) to set.
+ * @param group The icon's name/group (e.g., "home").
+ * @param style The icon's style.
+ * @return @c EINA_TRUE if the icon was successfully set, @c EINA_FALSE otherwise.
+ */
 Eina_Bool
 _elm_theme_icon_set(Elm_Theme *th,
                     Evas_Object *o,
@@ -412,6 +623,19 @@ _elm_theme_icon_set(Elm_Theme *th,
    return w > 0;
 }
 
+/**
+ * @internal
+ * @brief Parses a theme search string and configures the theme.
+ *
+ * This function takes a colon-separated string of theme names, parses it,
+ * and sets up the theme search order. It clears any existing theme
+ * configuration and caches before applying the new one. It ensures that
+ * "default" is always present in the theme list as a final fallback.
+ *
+ * @param th The theme to configure.
+ * @param theme The theme search string, e.g., "mytheme:shiny:/path/to/other.edj".
+ *              Colons can be escaped with a backslash.
+ */
 void
 _elm_theme_parse(Elm_Theme *th, const char *theme)
 {
@@ -490,6 +714,14 @@ _elm_theme_parse(Elm_Theme *th, const char *theme)
    elm_theme_get(th);
 }
 
+/**
+ * @internal
+ * @brief Initializes the default theme system for Elementary.
+ *
+ * This function must be called during Elementary initialization. It creates
+ * the singleton default theme object that will be used by all widgets unless
+ * a specific theme is set on them. It's safe to call this multiple times.
+ */
 void
 _elm_theme_init(void)
 {
@@ -503,6 +735,14 @@ _elm_theme_init(void)
    theme_default = td->th;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the Elementary theme system.
+ *
+ * This function is called during Elementary shutdown. It cleans up all
+ * created theme objects, including the default theme, freeing all associated
+ * resources.
+ */
 void
 _elm_theme_shutdown(void)
 {
@@ -524,6 +764,19 @@ _elm_theme_shutdown(void)
 
 
 
+/**
+ * @internal
+ * @brief Gathers all used color classes from a list of theme files.
+ *
+ * This helper function iterates through a given list of theme file handles,
+ * extracts the list of used color classes from each, and appends them to
+ * the provided list.
+ *
+ * @param list The list to append color class names to. Can be @c NULL to start a new list.
+ * @param handles An inlist of @c Elm_Theme_File handles to process.
+ * @return An updated Eina_List containing the stringshared names of all found
+ *         color classes.
+ */
 static Eina_List *
 _elm_theme_file_color_class_list(Eina_List *list,
                                  Eina_Inlist *handles)
@@ -545,6 +798,19 @@ _elm_theme_file_color_class_list(Eina_List *list,
    return list;
 }
 
+/**
+ * @internal
+ * @brief Hash foreach callback to build a list of unique strings.
+ *
+ * This callback is used with eina_hash_foreach to iterate over a hash of
+ * unique color class names and append each name to an Eina_List.
+ *
+ * @param hash The hash being iterated.
+ * @param key The hash key (the color class name).
+ * @param data The data associated with the key (unused).
+ * @param fdata A pointer to the Eina_List to append the key to.
+ * @return @c EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 _elm_theme_color_class_list_hash_cb(const Eina_Hash *hash EINA_UNUSED,
                                     const void *key,
@@ -616,6 +882,16 @@ elm_theme_free(Elm_Theme *th)
      efl_del(th->eo_theme);
 }
 
+/**
+ * @internal
+ * @brief Copies a list of theme files.
+ *
+ * This function performs a deep copy of an Eina_Inlist of @c Elm_Theme_File
+ * structures. It duplicates the file handles and stringshares for each item.
+ *
+ * @param dst A pointer to the destination list.
+ * @param src A pointer to the source list.
+ */
 static void
 elm_theme_files_copy(Eina_Inlist **dst, Eina_Inlist **src)
 {
@@ -1070,6 +1346,21 @@ elm_theme_group_path_find(Elm_Theme *th, const char *group)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Gathers all Edje groups starting with a base string from a list of theme files.
+ *
+ * This helper function iterates through a list of theme files and finds all
+ * Edje group (collection) names that start with the given base string. It
+ * ensures that each unique group name is added to the output list only once.
+ *
+ * @param list The list to append group names to. Can be @c NULL to start a new list.
+ * @param handles An inlist of @c Elm_Theme_File handles to process.
+ * @param base The base string to match at the beginning of group names.
+ * @param len The length of the base string, passed for efficiency.
+ * @return An updated Eina_List containing the stringshared names of all matching
+ *         groups.
+ */
 static Eina_List *
 _elm_theme_file_group_base_list(Eina_List *list,
                                 Eina_Inlist *handles,
@@ -1160,7 +1451,17 @@ elm_theme_user_dir_get(void)
    return path;
 }
 
-/* Allocates memory for theme and appends the theme to themes list. */
+/**
+ * @internal
+ * @brief Internal constructor for a new Elm_Theme.
+ *
+ * This function allocates and initializes a new @c Elm_Theme structure. It adds
+ * the "default" theme to its search path and registers it in the global list
+ * of active themes. This is called by the Efl_Object constructor.
+ *
+ * @param obj The parent Eo object for this theme.
+ * @return A newly allocated and initialized @c Elm_Theme, or @c NULL on failure.
+ */
 static Elm_Theme *
 _elm_theme_new_internal(Eo *obj)
 {
@@ -1182,7 +1483,16 @@ _efl_ui_theme_efl_object_constructor(Eo *obj, Efl_Ui_Theme_Data *pd)
    return obj;
 }
 
-/* Removes the given theme from themes list and deallocates the given theme. */
+/**
+ * @internal
+ * @brief Internal destructor for an Elm_Theme.
+ *
+ * This function cleans up all resources used by an @c Elm_Theme, removes it
+ * from the global list of active themes, and frees the structure itself.
+ * This is called by the Efl_Object destructor.
+ *
+ * @param th The theme to free.
+ */
 static void
 _elm_theme_free_internal(Elm_Theme *th)
 {

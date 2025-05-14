@@ -45,8 +45,19 @@ static const char *conn_types[] =
    "DSI",
 };
 
-EAPI int ECORE_DRM_EVENT_OUTPUT = 0;
+EAPI int ECORE_DRM_EVENT_OUTPUT = 0; /**< Event type for output plug/unplug events */
 
+/**
+ * @internal
+ * @brief Frees an Ecore_Drm_Event_Output structure.
+ *
+ * This function is called by Ecore when an ECORE_DRM_EVENT_OUTPUT event
+ * is no longer needed. It frees the memory allocated for the event structure
+ * and its stringshare members.
+ *
+ * @param data User data associated with the event (unused).
+ * @param event Pointer to the Ecore_Drm_Event_Output structure to free.
+ */
 static void
 _ecore_drm_output_event_free(void *data EINA_UNUSED, void *event)
 {
@@ -58,6 +69,17 @@ _ecore_drm_output_event_free(void *data EINA_UNUSED, void *event)
    free(event);
 }
 
+/**
+ * @internal
+ * @brief Creates and sends an ECORE_DRM_EVENT_OUTPUT event.
+ *
+ * This function is called when an output is plugged or unplugged. It
+ * populates an Ecore_Drm_Event_Output structure with information from the
+ * given Ecore_Drm_Output and adds it to the Ecore event queue.
+ *
+ * @param output The output that triggered the event.
+ * @param plug EINA_TRUE if the output was plugged in, EINA_FALSE if unplugged.
+ */
 static void
 _ecore_drm_output_event_send(const Ecore_Drm_Output *output, Eina_Bool plug)
 {
@@ -92,6 +114,20 @@ _ecore_drm_output_event_send(const Ecore_Drm_Output *output, Eina_Bool plug)
                    _ecore_drm_output_event_free, NULL);
 }
 
+/**
+ * @internal
+ * @brief Retrieves a DRM property by name for a given connector.
+ *
+ * Iterates through the properties of a connector and returns the one
+ * matching the specified name.
+ *
+ * @param fd The DRM device file descriptor.
+ * @param conn The DRM connector.
+ * @param name The name of the property to retrieve.
+ * @return A pointer to the drmModePropertyPtr if found, otherwise NULL.
+ *         The caller is responsible for freeing the returned property using
+ *         drmModeFreeProperty().
+ */
 static drmModePropertyPtr
 _ecore_drm_output_property_get(int fd, drmModeConnectorPtr conn, const char *name)
 {
@@ -111,6 +147,18 @@ _ecore_drm_output_property_get(int fd, drmModeConnectorPtr conn, const char *nam
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Parses a string from EDID data.
+ *
+ * Copies up to 12 bytes from the EDID data into the text buffer.
+ * It replaces non-printable characters with '-' and ensures the string
+ * is null-terminated. If more than 4 characters are replaced, the
+ * resulting string is considered invalid and set to empty.
+ *
+ * @param data Pointer to the EDID data block containing the string.
+ * @param text Output buffer (should be at least 13 bytes) to store the parsed string.
+ */
 static void
 _ecore_drm_output_edid_parse_string(const uint8_t *data, char text[])
 {
@@ -139,6 +187,18 @@ _ecore_drm_output_edid_parse_string(const uint8_t *data, char text[])
    if (rep > 4) text[0] = '\0';
 }
 
+/**
+ * @internal
+ * @brief Parses EDID data to extract monitor information.
+ *
+ * Extracts PNP ID, serial number, monitor name, and EISA ID from the
+ * raw EDID data.
+ *
+ * @param output The Ecore_Drm_Output to populate with EDID information.
+ * @param data Raw EDID data buffer.
+ * @param len Length of the EDID data buffer.
+ * @return 0 on success, -1 on failure (e.g., invalid EDID header).
+ */
 static int
 _ecore_drm_output_edid_parse(Ecore_Drm_Output *output, const uint8_t *data, size_t len)
 {
@@ -178,6 +238,17 @@ _ecore_drm_output_edid_parse(Ecore_Drm_Output *output, const uint8_t *data, size
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Finds and parses the EDID information for an output.
+ *
+ * Retrieves the EDID blob property from the DRM connector, duplicates it,
+ * and then parses it to populate the make and model fields of the
+ * Ecore_Drm_Output structure.
+ *
+ * @param output The Ecore_Drm_Output to populate.
+ * @param conn The DRM connector to get EDID from.
+ */
 static void
 _ecore_drm_output_edid_find(Ecore_Drm_Output *output, drmModeConnector *conn)
 {
@@ -217,6 +288,15 @@ _ecore_drm_output_edid_find(Ecore_Drm_Output *output, drmModeConnector *conn)
    drmModeFreePropertyBlob(blob);
 }
 
+/**
+ * @internal
+ * @brief Placeholder for software rendering logic.
+ *
+ * This function is intended to handle rendering when hardware acceleration
+ * is not available or not used. Currently, it's a stub.
+ *
+ * @param output The output to render on.
+ */
 static void
 _ecore_drm_output_software_render(Ecore_Drm_Output *output)
 {
@@ -224,6 +304,18 @@ _ecore_drm_output_software_render(Ecore_Drm_Output *output)
    if (!output->current_mode) return;
 }
 
+/**
+ * @internal
+ * @brief Finds an available CRTC for a given connector.
+ *
+ * Iterates through encoders associated with the connector and their
+ * possible CRTCs to find one that is not already allocated.
+ *
+ * @param dev The Ecore_Drm_Device.
+ * @param res The DRM resources.
+ * @param conn The DRM connector.
+ * @return The index of a suitable CRTC in res->crtcs, or -1 if none is found.
+ */
 static int
 _ecore_drm_output_crtc_find(Ecore_Drm_Device *dev, drmModeRes *res, drmModeConnector *conn)
 {
@@ -260,6 +352,18 @@ _ecore_drm_output_crtc_find(Ecore_Drm_Device *dev, drmModeRes *res, drmModeConne
    return -1;
 }
 
+/**
+ * @internal
+ * @brief Creates an Ecore_Drm_Output_Mode from drmModeModeInfo and adds it to the output.
+ *
+ * Calculates the refresh rate and populates an Ecore_Drm_Output_Mode structure.
+ * The new mode is then appended to the output's list of modes.
+ *
+ * @param output The Ecore_Drm_Output to add the mode to.
+ * @param info The drmModeModeInfo structure describing the mode.
+ * @return A pointer to the newly created Ecore_Drm_Output_Mode, or NULL on allocation failure.
+ *         The returned mode is owned by the output's modes list.
+ */
 static Ecore_Drm_Output_Mode *
 _ecore_drm_output_mode_add(Ecore_Drm_Output *output, drmModeModeInfo *info)
 {
@@ -365,6 +469,21 @@ _ecore_drm_output_brightness_set(Ecore_Drm_Backlight *backlight, double brightne
 }
 */
 
+/**
+ * @internal
+ * @brief Initializes backlight control for an output.
+ *
+ * Searches for backlight devices (either "backlight" or "leds" subsystem)
+ * associated with the DRM device path. It prioritizes "raw", "platform",
+ * or "firmware" types, especially for LVDS or eDP connectors.
+ *
+ * @param output The Ecore_Drm_Output for which to initialize backlight.
+ * @param conn_type The connector type (e.g., DRM_MODE_CONNECTOR_LVDS).
+ * @return A pointer to an allocated Ecore_Drm_Backlight structure if a
+ *         suitable backlight device is found, otherwise NULL. The caller is
+ *         responsible for freeing this structure using
+ *         _ecore_drm_output_backlight_shutdown().
+ */
 static Ecore_Drm_Backlight *
 _ecore_drm_output_backlight_init(Ecore_Drm_Output *output, uint32_t conn_type)
 {
@@ -415,6 +534,12 @@ _ecore_drm_output_backlight_init(Ecore_Drm_Output *output, uint32_t conn_type)
    return backlight;
 }
 
+/**
+ * @internal
+ * @brief Shuts down backlight control and frees associated resources.
+ *
+ * @param backlight The Ecore_Drm_Backlight structure to free.
+ */
 static void
 _ecore_drm_output_backlight_shutdown(Ecore_Drm_Backlight *backlight)
 {
@@ -426,6 +551,15 @@ _ecore_drm_output_backlight_shutdown(Ecore_Drm_Backlight *backlight)
    free(backlight);
 }
 
+/**
+ * @internal
+ * @brief Converts a DRM subpixel order value to an Ecore/Wayland equivalent.
+ *
+ * @param subpixel The DRM_MODE_SUBPIXEL_* value.
+ * @return An integer representing the subpixel order (intended to map to
+ *         Wayland's wl_output_subpixel enum, though comments indicate
+ *         direct mapping, e.g., 0 for UNKNOWN, 1 for NONE, etc.).
+ */
 static int
 _ecore_drm_output_subpixel_get(int subpixel)
 {
@@ -448,6 +582,16 @@ _ecore_drm_output_subpixel_get(int subpixel)
      }
 }
 
+/**
+ * @internal
+ * @brief Retrieves and stores information about planes available for an output.
+ *
+ * Iterates through all planes reported by DRM, filters those usable with
+ * the output's CRTC, and extracts properties like plane type and supported
+ * rotations.
+ *
+ * @param output The Ecore_Drm_Output to populate with plane information.
+ */
 static void
 _ecore_drm_output_planes_get(Ecore_Drm_Output *output)
 {
@@ -539,6 +683,23 @@ free_plane:
      }
 }
 
+/**
+ * @internal
+ * @brief Creates and initializes an Ecore_Drm_Output structure.
+ *
+ * This function is responsible for allocating an Ecore_Drm_Output, finding a
+ * suitable CRTC for it, populating its properties (name, make, model, modes,
+ * physical size, subpixel order, etc.), initializing backlight if applicable,
+ * and parsing EDID information.
+ *
+ * @param dev The Ecore_Drm_Device this output belongs to.
+ * @param res DRM resources.
+ * @param conn The DRM connector for this output.
+ * @param x The initial x-coordinate for this output on the desktop.
+ * @param y The initial y-coordinate for this output on the desktop.
+ * @param cloned EINA_TRUE if this output is a clone of another, EINA_FALSE otherwise.
+ * @return A pointer to the newly created Ecore_Drm_Output, or NULL on failure.
+ */
 static Ecore_Drm_Output *
 _ecore_drm_output_create(Ecore_Drm_Device *dev, drmModeRes *res, drmModeConnector *conn, int x, int y, Eina_Bool cloned)
 {
@@ -692,6 +853,17 @@ err:
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Frees an Ecore_Drm_Output structure and its associated resources.
+ *
+ * This includes shutting down backlight, turning off the hardware cursor,
+ * attempting to restore the original CRTC state, and freeing mode lists,
+ * stringshares, and DRM properties. If a page flip is pending, destruction
+ * is deferred.
+ *
+ * @param output The Ecore_Drm_Output to free.
+ */
 static void
 _ecore_drm_output_free(Ecore_Drm_Output *output)
 {
@@ -925,6 +1097,17 @@ _ecore_drm_output_render_disable(Ecore_Drm_Output *output)
  *
  */
 
+/**
+ * @brief Creates and initializes all outputs for a DRM device.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * Iterates through all connectors reported by the DRM device, and for each
+ * connected one, it attempts to create an Ecore_Drm_Output.
+ * Outputs are laid out horizontally by default.
+ *
+ * @param dev The Ecore_Drm_Device to create outputs for.
+ * @return EINA_TRUE on success (at least one output created), EINA_FALSE otherwise.
+ */
 EAPI Eina_Bool
 ecore_drm_outputs_create(Ecore_Drm_Device *dev)
 {
@@ -998,12 +1181,29 @@ next:
    return ret;
 }
 
+/**
+ * @brief Frees an Ecore_Drm_Output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * This is a public wrapper around _ecore_drm_output_free().
+ *
+ * @param output The Ecore_Drm_Output to free.
+ */
 EAPI void
 ecore_drm_output_free(Ecore_Drm_Output *output)
 {
    _ecore_drm_output_free(output);
 }
 
+/**
+ * @brief Sets the hardware cursor for an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * @param output The Ecore_Drm_Output.
+ * @param handle The buffer handle for the cursor image (0 to hide).
+ * @param w The width of the cursor.
+ * @param h The height of the cursor.
+ */
 EAPI void
 ecore_drm_output_cursor_size_set(Ecore_Drm_Output *output, int handle, int w, int h)
 {
@@ -1012,6 +1212,15 @@ ecore_drm_output_cursor_size_set(Ecore_Drm_Output *output, int handle, int w, in
    drmModeSetCursor(output->dev->drm.fd, output->crtc_id, handle, w, h);
 }
 
+/**
+ * @brief Enables an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * Marks the output as enabled, sets DPMS to ON, and sends a plug event.
+ *
+ * @param output The Ecore_Drm_Output to enable.
+ * @return EINA_TRUE on success.
+ */
 EAPI Eina_Bool
 ecore_drm_output_enable(Ecore_Drm_Output *output)
 {
@@ -1025,6 +1234,14 @@ ecore_drm_output_enable(Ecore_Drm_Output *output)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Disables an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * Marks the output as disabled, sets DPMS to OFF, and sends an unplug event.
+ *
+ * @param output The Ecore_Drm_Output to disable.
+ */
 EAPI void
 ecore_drm_output_disable(Ecore_Drm_Output *output)
 {
@@ -1036,6 +1253,16 @@ ecore_drm_output_disable(Ecore_Drm_Output *output)
    _ecore_drm_output_event_send(output, EINA_FALSE);
 }
 
+/**
+ * @brief Releases a framebuffer associated with an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * If the framebuffer is mmapped and not one of the device's dumb buffers,
+ * it is destroyed.
+ *
+ * @param output The Ecore_Drm_Output.
+ * @param fb The Ecore_Drm_Fb to release.
+ */
 EAPI void
 ecore_drm_output_fb_release(Ecore_Drm_Output *output, Ecore_Drm_Fb *fb)
 {
@@ -1044,6 +1271,18 @@ ecore_drm_output_fb_release(Ecore_Drm_Output *output, Ecore_Drm_Fb *fb)
    _ecore_drm_output_fb_release(output, fb);
 }
 
+/**
+ * @brief Repaints an output, scheduling a page flip.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * This function handles the core repaint logic. If there's no "next"
+ * framebuffer prepared, it might fall back to software rendering (currently a stub).
+ * Otherwise, it sets the CRTC if the current buffer is different or uninitialized,
+ * then schedules a page flip to the "next" framebuffer. It also handles
+ * sprite updates and vblank events.
+ *
+ * @param output The Ecore_Drm_Output to repaint.
+ */
 EAPI void
 ecore_drm_output_repaint(Ecore_Drm_Output *output)
 {
@@ -1132,6 +1371,15 @@ err:
      }
 }
 
+/**
+ * @brief Gets the size of a framebuffer by its ID.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * @param dev The Ecore_Drm_Device.
+ * @param output The ID of the framebuffer.
+ * @param[out] w Pointer to store the width.
+ * @param[out] h Pointer to store the height.
+ */
 EAPI void
 ecore_drm_output_size_get(Ecore_Drm_Device *dev, int output, int *w, int *h)
 {
@@ -1147,6 +1395,20 @@ ecore_drm_output_size_get(Ecore_Drm_Device *dev, int output, int *w, int *h)
    drmModeFreeFB(fb);
 }
 
+/**
+ * @brief Gets the total geometry of all connected and enabled non-cloned outputs.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * Calculates the bounding box that encompasses all active, non-cloned outputs.
+ * Currently, it seems to sum widths and take max height, which might be
+ * specific to a horizontal layout assumption.
+ *
+ * @param dev The Ecore_Drm_Device.
+ * @param[out] x Pointer to store the starting x-coordinate (currently always 0).
+ * @param[out] y Pointer to store the starting y-coordinate (currently always 0).
+ * @param[out] w Pointer to store the total width.
+ * @param[out] h Pointer to store the maximum height.
+ */
 EAPI void
 ecore_drm_outputs_geometry_get(Ecore_Drm_Device *dev, int *x, int *y, int *w, int *h)
 {
@@ -1174,6 +1436,14 @@ ecore_drm_outputs_geometry_get(Ecore_Drm_Device *dev, int *x, int *y, int *w, in
    if (h) *h = oh;
 }
 
+/**
+ * @brief Gets the position of an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * @param output The Ecore_Drm_Output.
+ * @param[out] x Pointer to store the x-coordinate.
+ * @param[out] y Pointer to store the y-coordinate.
+ */
 EAPI void
 ecore_drm_output_position_get(Ecore_Drm_Output *output, int *x, int *y)
 {
@@ -1183,6 +1453,15 @@ ecore_drm_output_position_get(Ecore_Drm_Output *output, int *x, int *y)
    if (y) *y = output->y;
 }
 
+/**
+ * @brief Gets the current resolution and refresh rate of an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * @param output The Ecore_Drm_Output.
+ * @param[out] w Pointer to store the width.
+ * @param[out] h Pointer to store the height.
+ * @param[out] refresh Pointer to store the refresh rate in mHz (e.g., 60000 for 60Hz).
+ */
 EAPI void
 ecore_drm_output_current_resolution_get(Ecore_Drm_Output *output, int *w, int *h, unsigned int *refresh)
 {
@@ -1199,6 +1478,14 @@ ecore_drm_output_current_resolution_get(Ecore_Drm_Output *output, int *w, int *h
    if (refresh) *refresh = output->current_mode->refresh;
 }
 
+/**
+ * @brief Gets the physical size of an output in millimeters.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * @param output The Ecore_Drm_Output.
+ * @param[out] w Pointer to store the physical width in mm.
+ * @param[out] h Pointer to store the physical height in mm.
+ */
 EAPI void
 ecore_drm_output_physical_size_get(Ecore_Drm_Output *output, int *w, int *h)
 {
@@ -1208,6 +1495,14 @@ ecore_drm_output_physical_size_get(Ecore_Drm_Output *output, int *w, int *h)
    if (h) *h = output->phys_height;
 }
 
+/**
+ * @brief Gets the subpixel order of an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * @param output The Ecore_Drm_Output.
+ * @return The subpixel order (maps to Wayland's wl_output_subpixel enum values).
+ *         Example: 2 for WL_OUTPUT_SUBPIXEL_HORIZONTAL_RGB.
+ */
 EAPI unsigned int
 ecore_drm_output_subpixel_order_get(Ecore_Drm_Output *output)
 {
@@ -1216,6 +1511,17 @@ ecore_drm_output_subpixel_order_get(Ecore_Drm_Output *output)
    return output->subpixel;
 }
 
+/**
+ * @brief Gets the model name of an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * This is typically derived from EDID information.
+ *
+ * @param output The Ecore_Drm_Output.
+ * @return A stringshared pointer to the model name. The caller should not free this.
+ *         Returns NULL if output is NULL.
+ *         Example: "DELL U2412M"
+ */
 EAPI Eina_Stringshare *
 ecore_drm_output_model_get(Ecore_Drm_Output *output)
 {
@@ -1224,6 +1530,17 @@ ecore_drm_output_model_get(Ecore_Drm_Output *output)
    return output->model;
 }
 
+/**
+ * @brief Gets the make (manufacturer) of an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * This is typically derived from EDID (PNP ID).
+ *
+ * @param output The Ecore_Drm_Output.
+ * @return A stringshared pointer to the make. The caller should not free this.
+ *         Returns NULL if output is NULL.
+ *         Example: "DEL"
+ */
 EAPI Eina_Stringshare *
 ecore_drm_output_make_get(Ecore_Drm_Output *output)
 {
@@ -1232,6 +1549,13 @@ ecore_drm_output_make_get(Ecore_Drm_Output *output)
    return output->make;
 }
 
+/**
+ * @brief Sets the DPMS (Display Power Management Signaling) level for an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * @param output The Ecore_Drm_Output.
+ * @param level The DPMS level to set (e.g., DRM_MODE_DPMS_ON, DRM_MODE_DPMS_OFF).
+ */
 EAPI void
 ecore_drm_output_dpms_set(Ecore_Drm_Output *output, int level)
 {
@@ -1243,6 +1567,22 @@ ecore_drm_output_dpms_set(Ecore_Drm_Output *output, int level)
                                output->dpms->prop_id, level);
 }
 
+/**
+ * @brief Sets the gamma ramps for an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * @param output The Ecore_Drm_Output.
+ * @param size The size of each gamma ramp array. This must match the
+ *             output's gamma_size property.
+ * @param r Array of red gamma values.
+ * @param g Array of green gamma values.
+ * @param b Array of blue gamma values.
+ *          Each array should contain 'size' elements.
+ *          Example for r, g, b arrays (conceptual, values depend on desired correction):
+ *          uint16_t r[256], g[256], b[256];
+ *          for (int i=0; i<256; ++i) { r[i] = g[i] = b[i] = (i << 8) | i; } // Linear ramp
+ *          ecore_drm_output_gamma_set(output, 256, r, g, b);
+ */
 EAPI void
 ecore_drm_output_gamma_set(Ecore_Drm_Output *output, uint16_t size, uint16_t *r, uint16_t *g, uint16_t *b)
 {
@@ -1256,6 +1596,13 @@ ecore_drm_output_gamma_set(Ecore_Drm_Output *output, uint16_t size, uint16_t *r,
      ERR("Failed to set output gamma: %m");
 }
 
+/**
+ * @brief Gets the CRTC ID associated with an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * @param output The Ecore_Drm_Output.
+ * @return The CRTC ID, or 0 if output is NULL.
+ */
 EAPI unsigned int
 ecore_drm_output_crtc_id_get(Ecore_Drm_Output *output)
 {
@@ -1264,6 +1611,15 @@ ecore_drm_output_crtc_id_get(Ecore_Drm_Output *output)
    return output->crtc_id;
 }
 
+/**
+ * @brief Gets the current buffer ID associated with an output's CRTC.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * Retrieves the ID of the framebuffer currently being scanned out by the CRTC.
+ *
+ * @param output The Ecore_Drm_Output.
+ * @return The buffer ID, or 0 on failure or if output/dev/crtc is NULL.
+ */
 EAPI unsigned int
 ecore_drm_output_crtc_buffer_get(Ecore_Drm_Output *output)
 {
@@ -1283,6 +1639,13 @@ ecore_drm_output_crtc_buffer_get(Ecore_Drm_Output *output)
    return id;
 }
 
+/**
+ * @brief Gets the connector ID associated with an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * @param output The Ecore_Drm_Output.
+ * @return The connector ID, or 0 if output is NULL.
+ */
 EAPI unsigned int
 ecore_drm_output_connector_id_get(Ecore_Drm_Output *output)
 {
@@ -1291,6 +1654,17 @@ ecore_drm_output_connector_id_get(Ecore_Drm_Output *output)
    return output->conn_id;
 }
 
+/**
+ * @brief Gets the name of an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * The name is typically formatted as "CONNECTOR_TYPE-ID" (e.g., "HDMI-A-1").
+ *
+ * @param output The Ecore_Drm_Output.
+ * @return A newly allocated string containing the output name. The caller
+ *         must free this string. Returns NULL if output is NULL.
+ *         Example: "DP-1"
+ */
 EAPI char *
 ecore_drm_output_name_get(Ecore_Drm_Output *output)
 {
@@ -1299,6 +1673,13 @@ ecore_drm_output_name_get(Ecore_Drm_Output *output)
    return strdup(output->name);
 }
 
+/**
+ * @brief Checks if an output is currently connected.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * @param output The Ecore_Drm_Output.
+ * @return EINA_TRUE if connected, EINA_FALSE otherwise or if output is NULL.
+ */
 EAPI Eina_Bool
 ecore_drm_output_connected_get(Ecore_Drm_Output *output)
 {
@@ -1307,6 +1688,14 @@ ecore_drm_output_connected_get(Ecore_Drm_Output *output)
    return output->connected;
 }
 
+/**
+ * @brief Gets the connector type of an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * @param output The Ecore_Drm_Output.
+ * @return The connector type (e.g., DRM_MODE_CONNECTOR_DisplayPort,
+ *         DRM_MODE_CONNECTOR_HDMIA). Returns 0 if output is NULL.
+ */
 EAPI unsigned int
 ecore_drm_output_connector_type_get(Ecore_Drm_Output *output)
 {
@@ -1315,6 +1704,14 @@ ecore_drm_output_connector_type_get(Ecore_Drm_Output *output)
    return output->conn_type;
 }
 
+/**
+ * @brief Checks if an output has backlight control.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * @param output The Ecore_Drm_Output.
+ * @return EINA_TRUE if backlight control is available, EINA_FALSE otherwise
+ *         or if output is NULL.
+ */
 EAPI Eina_Bool
 ecore_drm_output_backlight_get(Ecore_Drm_Output *output)
 {
@@ -1322,6 +1719,19 @@ ecore_drm_output_backlight_get(Ecore_Drm_Output *output)
    return (output->backlight != NULL);
 }
 
+/**
+ * @brief Gets the raw EDID data of an output as a hex string.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * Retrieves the stored EDID blob (first 128 bytes) and converts it
+ * into a hexadecimal string representation.
+ *
+ * @param output The Ecore_Drm_Output.
+ * @return A newly allocated string containing the hex representation of EDID.
+ *         The caller must free this string. Returns NULL if output, its
+ *         edid_blob is NULL, or on allocation failure.
+ *         Example: "00ffffffffffff00..." (256 characters)
+ */
 EAPI char *
 ecore_drm_output_edid_get(Ecore_Drm_Output *output)
 {
@@ -1348,6 +1758,22 @@ ecore_drm_output_edid_get(Ecore_Drm_Output *output)
    return edid_str;
 }
 
+/**
+ * @brief Gets the list of available modes for an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * Each element in the list is an Ecore_Drm_Output_Mode.
+ *
+ * @param output The Ecore_Drm_Output.
+ * @return A pointer to the Eina_List of modes. The caller should not modify
+ *         or free this list or its contents. Returns NULL if output or its
+ *         modes list is NULL.
+ *         Example list structure:
+ *         [
+ *           Ecore_Drm_Output_Mode { width=1920, height=1080, refresh=60000, ... },
+ *           Ecore_Drm_Output_Mode { width=1280, height=720, refresh=60000, ... }
+ *         ]
+ */
 EAPI Eina_List *
 ecore_drm_output_modes_get(Ecore_Drm_Output *output)
 {
@@ -1357,6 +1783,15 @@ ecore_drm_output_modes_get(Ecore_Drm_Output *output)
    return output->modes;
 }
 
+/**
+ * @brief Gets the primary output for a DRM device.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * Iterates through the device's outputs and returns the one marked as primary.
+ *
+ * @param dev The Ecore_Drm_Device.
+ * @return The primary Ecore_Drm_Output, or NULL if none is set or dev is NULL.
+ */
 EAPI Ecore_Drm_Output *
 ecore_drm_output_primary_get(Ecore_Drm_Device *dev)
 {
@@ -1371,6 +1806,14 @@ ecore_drm_output_primary_get(Ecore_Drm_Device *dev)
    return NULL;
 }
 
+/**
+ * @brief Sets an output as the primary output for its device.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * Unmarks all other outputs on the same device as non-primary.
+ *
+ * @param output The Ecore_Drm_Output to set as primary.
+ */
 EAPI void
 ecore_drm_output_primary_set(Ecore_Drm_Output *output)
 {
@@ -1387,6 +1830,17 @@ ecore_drm_output_primary_set(Ecore_Drm_Output *output)
    output->primary = EINA_TRUE;
 }
 
+/**
+ * @brief Gets the configured size of the CRTC associated with an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * This reflects the dimensions of the CRTC's current mode, not necessarily
+ * the display's native resolution.
+ *
+ * @param output The Ecore_Drm_Output.
+ * @param[out] width Pointer to store the CRTC width.
+ * @param[out] height Pointer to store the CRTC height.
+ */
 EAPI void
 ecore_drm_output_crtc_size_get(Ecore_Drm_Output *output, int *width, int *height)
 {
@@ -1399,6 +1853,17 @@ ecore_drm_output_crtc_size_get(Ecore_Drm_Output *output, int *width, int *height
    if (height) *height = output->crtc->height;
 }
 
+/**
+ * @brief Checks if a given CRTC ID can be used by an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * This function determines if the specified CRTC is among the possible CRTCs
+ * for any encoder connected to the output.
+ *
+ * @param output The Ecore_Drm_Output.
+ * @param crtc The CRTC ID to check.
+ * @return EINA_TRUE if the CRTC can be used by the output, EINA_FALSE otherwise.
+ */
 EAPI Eina_Bool
 ecore_drm_output_possible_crtc_get(Ecore_Drm_Output *output, unsigned int crtc)
 {
@@ -1469,6 +1934,20 @@ next:
    return ret;
 }
 
+/**
+ * @brief Sets the mode and position for an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * Configures the CRTC associated with the output to use the specified mode
+ * and framebuffer position. If `mode` is NULL, it attempts to turn off the output
+ * by setting a NULL mode on the CRTC.
+ *
+ * @param output The Ecore_Drm_Output to configure.
+ * @param mode The Ecore_Drm_Output_Mode to set. If NULL, the output is turned off.
+ * @param x The x-coordinate for the framebuffer on the CRTC.
+ * @param y The y-coordinate for the framebuffer on the CRTC.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 EAPI Eina_Bool
 ecore_drm_output_mode_set(Ecore_Drm_Output *output, Ecore_Drm_Output_Mode *mode, int x, int y)
 {
@@ -1516,6 +1995,16 @@ ecore_drm_output_mode_set(Ecore_Drm_Output *output, Ecore_Drm_Output_Mode *mode,
    return ret;
 }
 
+/**
+ * @brief Gets the supported rotations for a specific plane type on an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * @param output The Ecore_Drm_Output.
+ * @param type The type of plane (e.g., ECORE_DRM_PLANE_TYPE_PRIMARY).
+ * @return A bitmask of supported ECORE_DRM_PLANE_ROTATION_* flags, or -1 (all bits set)
+ *         if output is NULL or the plane type is not found.
+ *         Example: (ECORE_DRM_PLANE_ROTATION_NORMAL | ECORE_DRM_PLANE_ROTATION_90)
+ */
 EAPI unsigned int
 ecore_drm_output_supported_rotations_get(Ecore_Drm_Output *output, Ecore_Drm_Plane_Type type)
 {
@@ -1535,6 +2024,17 @@ ecore_drm_output_supported_rotations_get(Ecore_Drm_Output *output, Ecore_Drm_Pla
    return rot;
 }
 
+/**
+ * @brief Sets the rotation for a specific plane type on an output.
+ * @ingroup Ecore_Drm_Output_Group
+ *
+ * @param output The Ecore_Drm_Output.
+ * @param type The type of plane (e.g., ECORE_DRM_PLANE_TYPE_PRIMARY).
+ * @param rotation The rotation to set (one of ECORE_DRM_PLANE_ROTATION_* flags).
+ *                 Must be a single, supported rotation value.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., unsupported rotation,
+ *         plane not found, or DRM error).
+ */
 EAPI Eina_Bool
 ecore_drm_output_rotation_set(Ecore_Drm_Output *output, Ecore_Drm_Plane_Type type, unsigned int rotation)
 {

@@ -1,5 +1,28 @@
 #include "gl_engine_filter.h"
 
+/**
+ * @internal
+ * @brief Applies the inverse color filter to a buffer.
+ *
+ * This function performs the actual rendering of the inverse color effect.
+ * It sets up the OpenGL context, binds the input texture and the output
+ * framebuffer, and then executes a drawing operation that applies the
+ * color inversion logic, likely through a shader.
+ *
+ * A temporary draw context is created to apply the filter-specific
+ * color multiplier and render operation, without affecting the global
+ * draw context. This is crucial for correct rendering when filters are
+ * chained or used alongside other drawing operations.
+ *
+ * The function handles both in-place (input buffer is the same as output
+ * buffer) and out-of-place filtering. For in-place operations, it uses
+ * EVAS_RENDER_COPY to ensure the source is not blended with itself.
+ *
+ * @param[in] re The render engine data.
+ * @param[in] cmd The filter command containing input/output buffers and
+ *                drawing parameters.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _gl_filter_inverse_color(Render_Engine_GL_Generic *re, Evas_Filter_Command *cmd)
 {
@@ -42,6 +65,18 @@ _gl_filter_inverse_color(Render_Engine_GL_Generic *re, Evas_Filter_Command *cmd)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Get the inverse color filter function.
+ *
+ * @param re The render engine data (unused).
+ * @param cmd The filter command.
+ * @return The function pointer to apply the filter, or NULL on failure.
+ *
+ * This function acts as a factory for the inverse color filter.
+ * It validates the provided filter command and, if valid, returns
+ * a pointer to the internal function _gl_filter_inverse_color(),
+ * which performs the actual filtering operation.
+ */
 GL_Filter_Apply_Func
 gl_filter_inverse_color_func_get(Render_Engine_GL_Generic *re EINA_UNUSED, Evas_Filter_Command *cmd)
 {

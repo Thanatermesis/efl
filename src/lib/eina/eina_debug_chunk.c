@@ -44,19 +44,27 @@
 // need and then some via either a static 8k+4k buffer pair or via a growable
 // mmaped mem chunk pair
 // implement using mmap so we can grow if needed - unlikelt though
-static unsigned char *chunk1 = NULL;
-static unsigned char *chunk2 = NULL;
-static unsigned char *chunk3 = NULL;
-static int chunk1_size = 0;
-static int chunk1_num = 0;
-static int chunk2_size = 0;
-static int chunk2_num = 0;
-static int chunk3_size = 0;
-static int chunk3_num = 0;
+static unsigned char *chunk1 = NULL; /**< Primary chunk for general allocations. */
+static unsigned char *chunk2 = NULL; /**< Secondary chunk, typically used for realloc operations like path lookups. */
+static unsigned char *chunk3 = NULL; /**< Tertiary chunk for temporary allocations that can be reset. */
+static int chunk1_size = 0; /**< Current allocated size of chunk1. */
+static int chunk1_num = 0; /**< Currently used bytes in chunk1. */
+static int chunk2_size = 0; /**< Current allocated size of chunk2. */
+static int chunk2_num = 0; /**< Currently used bytes in chunk2. */
+static int chunk3_size = 0; /**< Current allocated size of chunk3. */
+static int chunk3_num = 0; /**< Currently used bytes in chunk3. */
 
-static int no_anon = -1;
+static int no_anon = -1; /**< Flag to indicate if anonymous mmap is disabled (-1: unset, 0: enabled, 1: disabled). */
 
-// get a new chunk of "anonymous mmaped memory"
+/**
+ * @brief Allocates a new chunk of memory, preferably using anonymous mmap.
+ *
+ * If Valgrind is running or anonymous mmap is disabled (via EFL_NO_MMAP_ANON
+ * environment variable or mmap failure), it falls back to malloc.
+ *
+ * @param size The number of bytes to allocate.
+ * @return A pointer to the allocated memory, or NULL on failure.
+ */
 static void *
 _eina_debug_chunk_need(int size)
 {
@@ -83,7 +91,15 @@ _eina_debug_chunk_need(int size)
    return ptr;
 }
 
-// release a chunk of this mmaped anon mem if we don't need it anymore
+/**
+ * @brief Releases a chunk of memory previously allocated by _eina_debug_chunk_need.
+ *
+ * If Valgrind is running or anonymous mmap was disabled during allocation,
+ * it uses free. Otherwise, it uses munmap.
+ *
+ * @param ptr Pointer to the memory chunk to release.
+ * @param size The size of the memory chunk to release (must match allocation size).
+ */
 static void
 _eina_debug_chunk_noneed(void *ptr, int size)
 {
@@ -97,8 +113,18 @@ _eina_debug_chunk_noneed(void *ptr, int size)
      }
 }
 
-// push a new bit of mem on our growing stack of mem - given our workload,
-// we never free anything here, only ever grow new things on this stack
+/**
+ * @brief Allocates memory from a growable stack-like chunk (chunk1).
+ *
+ * This function provides memory from a pre-allocated or dynamically grown
+ * chunk (chunk1). Allocations are pointer-aligned. If the chunk is too small,
+ * it's reallocated to twice its size. Memory allocated this way is not
+ * intended to be individually freed; the entire chunk system is reset or
+ * managed as a whole.
+ *
+ * @param size The number of bytes to allocate.
+ * @return A pointer to the allocated memory within chunk1, or NULL on failure.
+ */
 void *
 _eina_debug_chunk_push(int size)
 {
@@ -133,7 +159,19 @@ _eina_debug_chunk_push(int size)
    return ptr;
 }
 
-// grow a single existing chunk (we use this for the filename -> path lookup)
+/**
+ * @brief Reallocates or allocates a dedicated chunk (chunk2) to a specific size.
+ *
+ * This function manages chunk2, typically used for a single, resizable buffer
+ * (e.g., for filename to path lookups). If chunk2 doesn't exist, it's
+ * allocated. If it exists but is smaller than the requested size, it's
+ * reallocated (doubling its size until sufficient). The content of chunk2
+ * is preserved up to chunk2_num bytes during reallocation.
+ *
+ * @param size The desired new size for chunk2.
+ * @return A pointer to chunk2, or NULL on failure. The content of chunk2
+ *         up to the old chunk2_num is preserved.
+ */
 void *
 _eina_debug_chunk_realloc(int size)
 {
@@ -163,7 +201,17 @@ _eina_debug_chunk_realloc(int size)
    return chunk2;
 }
 
-// grow a single existing chunk (we use this for the filename -> path lookup)
+/**
+ * @brief Allocates memory from a temporary, resettable chunk (chunk3).
+ *
+ * This function provides memory from a pre-allocated or dynamically grown
+ * chunk (chunk3). Allocations are pointer-aligned. If the chunk is too small,
+ * it's reallocated to twice its size. Memory allocated from this chunk can be
+ * effectively "freed" all at once by calling _eina_debug_chunk_tmp_reset().
+ *
+ * @param size The number of bytes to allocate.
+ * @return A pointer to the allocated memory within chunk3, or NULL on failure.
+ */
 void *
 _eina_debug_chunk_tmp_push(int size)
 {
@@ -198,6 +246,13 @@ _eina_debug_chunk_tmp_push(int size)
    return ptr;
 }
 
+/**
+ * @brief Resets the temporary chunk (chunk3), effectively clearing all allocations made from it.
+ *
+ * This function sets the used count (chunk3_num) of chunk3 back to zero,
+ * allowing its memory to be reused for new temporary allocations without
+ * actually freeing and reallocating the underlying memory block.
+ */
 void
 _eina_debug_chunk_tmp_reset(void)
 {
@@ -208,18 +263,27 @@ _eina_debug_chunk_tmp_reset(void)
 // maybe one day find another solution, but these buffers should be enough
 // for now for thos eplatforms (like windows) where we can't do the mmap
 // tricks above.
-static unsigned char chunk1[8 * 1024];
-static unsigned char chunk2[4 * 1024];
-static unsigned char chunk3[128 * 1024];
-static int chunk1_size = sizeof(chunk1);
-static int chunk1_num = 0;
-static int chunk2_size = sizeof(chunk2);
-static int chunk2_num = 0;
-static int chunk3_size = sizeof(chunk3);
-static int chunk3_num = 0;
+static unsigned char chunk1[8 * 1024]; /**< Static primary chunk for general allocations. */
+static unsigned char chunk2[4 * 1024]; /**< Static secondary chunk, typically used for realloc operations. */
+static unsigned char chunk3[128 * 1024]; /**< Static tertiary chunk for temporary allocations. */
+static int chunk1_size = sizeof(chunk1); /**< Size of static chunk1. */
+static int chunk1_num = 0; /**< Currently used bytes in static chunk1. */
+static int chunk2_size = sizeof(chunk2); /**< Size of static chunk2. */
+static int chunk2_num = 0; /**< Currently used bytes in static chunk2. */
+static int chunk3_size = sizeof(chunk3); /**< Size of static chunk3. */
+static int chunk3_num = 0; /**< Currently used bytes in static chunk3. */
 
-// push a new bit of mem on our growing stack of mem - given our workload,
-// we never free anything here, only ever grow new things on this stack
+/**
+ * @brief Allocates memory from a static stack-like chunk (chunk1). (No HAVE_MMAP version)
+ *
+ * This function provides memory from a fixed-size static buffer (chunk1).
+ * Allocations are pointer-aligned. If the buffer runs out of space,
+ * allocation fails. Memory allocated this way is not intended to be
+ * individually freed.
+ *
+ * @param size The number of bytes to allocate.
+ * @return A pointer to the allocated memory within chunk1, or NULL if out of space.
+ */
 void *
 _eina_debug_chunk_push(int size)
 {
@@ -235,7 +299,17 @@ _eina_debug_chunk_push(int size)
    return ptr;
 }
 
-// grow a single existing chunk (we use this for the filename -> path lookup)
+/**
+ * @brief "Reallocates" a static dedicated chunk (chunk2) by setting its used size. (No HAVE_MMAP version)
+ *
+ * This function manages chunk2, a fixed-size static buffer. It doesn't actually
+ * reallocate memory but sets the `chunk2_num` to the requested size if it fits
+ * within `chunk2_size`. This is used for a single buffer that might be reused
+ * with different content sizes.
+ *
+ * @param size The desired "used" size for chunk2.
+ * @return A pointer to chunk2 if `size` is within `chunk2_size`, otherwise NULL.
+ */
 void *
 _eina_debug_chunk_realloc(int size)
 {
@@ -246,7 +320,17 @@ _eina_debug_chunk_realloc(int size)
    return chunk2;
 }
 
-// grow a single existing chunk (we use this for the filename -> path lookup)
+/**
+ * @brief Allocates memory from a static temporary, resettable chunk (chunk3). (No HAVE_MMAP version)
+ *
+ * This function provides memory from a fixed-size static buffer (chunk3).
+ * Allocations are pointer-aligned. If the buffer runs out of space,
+ * allocation fails. Memory allocated from this chunk can be effectively
+ * "freed" all at once by calling _eina_debug_chunk_tmp_reset().
+ *
+ * @param size The number of bytes to allocate.
+ * @return A pointer to the allocated memory within chunk3, or NULL if out of space.
+ */
 void *
 _eina_debug_chunk_tmp_push(int size)
 {
@@ -262,6 +346,12 @@ _eina_debug_chunk_tmp_push(int size)
    return ptr;
 }
 
+/**
+ * @brief Resets the static temporary chunk (chunk3). (No HAVE_MMAP version)
+ *
+ * This function sets the used count (chunk3_num) of the static chunk3
+ * back to zero, allowing its memory to be reused.
+ */
 void
 _eina_debug_chunk_tmp_reset(void)
 {
@@ -269,7 +359,17 @@ _eina_debug_chunk_tmp_reset(void)
 }
 # endif
 
-// handy - duplicate a string on our growing stack - never expect to free it
+/**
+ * @brief Duplicates a string using memory from the primary chunk (_eina_debug_chunk_push).
+ *
+ * Allocates memory for a copy of the input string `str` using
+ * `_eina_debug_chunk_push` and then copies the string content. The duplicated
+ * string is not meant to be individually freed.
+ *
+ * @param str The null-terminated string to duplicate.
+ * @return A pointer to the newly allocated and copied string, or NULL on failure
+ *         (e.g., if `str` is NULL or memory allocation fails).
+ */
 char *
 _eina_debug_chunk_strdup(const char *str)
 {

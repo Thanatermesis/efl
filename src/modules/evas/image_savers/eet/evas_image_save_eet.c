@@ -14,6 +14,23 @@ static Evas_Image_Save_Func evas_image_save_eet_func =
    evas_image_save_file_eet
 };
 
+/**
+ * @brief Saves an RGBA image to an EET file.
+ *
+ * This function takes an RGBA_Image structure and saves its pixel data
+ * into an EET (Eina Data Archive) file. It handles opening/creating the
+ * EET file, writing the image data with specified compression and quality
+ * settings, and closing the file.
+ *
+ * @param im Pointer to the RGBA_Image structure containing the image data.
+ *           Example: A valid RGBA_Image pointer obtained from Evas.
+ * @param file The path to the EET file to save to. Example: "/path/to/output.eet"
+ * @param key The key under which to store the image data within the EET file. Example: "images/my_background"
+ * @param quality The quality setting for lossy compression (0-100). Ignored if lossy is 0. Example: 85
+ * @param compress The compression level (0-9). 0 means no compression. Example: 6
+ * @param encoding The desired encoding (currently unused).
+ * @return 1 on success, 0 on failure.
+ */
 static int
 evas_image_save_file_eet(RGBA_Image *im, const char *file, const char *key,
                          int quality, int compress, const char *encoding EINA_UNUSED)
@@ -52,6 +69,15 @@ evas_image_save_file_eet(RGBA_Image *im, const char *file, const char *key,
    return ok;
 }
 
+/**
+ * @brief Opens the Evas image saver module.
+ *
+ * This function is called when the Evas module system loads this
+ * image saver module. It registers the module's save function.
+ *
+ * @param em Pointer to the Evas_Module structure to initialize.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -60,14 +86,28 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Closes the Evas image saver module.
+ *
+ * This function is called when the Evas module system unloads this
+ * image saver module. Currently, it performs no specific cleanup for this module.
+ *
+ * @param em Pointer to the Evas_Module structure (unused in this function).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Module API structure for the EET image saver.
+ *
+ * Defines the API version and the open/close function pointers
+ * for interaction with the Evas module system.
+ */
 static Evas_Module_Api evas_modapi =
 {
-   EVAS_MODULE_API_VERSION,
+   EVAS_MODULE_API_VERSION, /*< The Evas module API version */
    "eet",
    "none",
    {

@@ -224,14 +224,19 @@ EVAS_API EVAS_API_WEAK void evas_obj_box_layout_vertical(Eo *obj, Evas_Object_Bo
 EVAS_API EVAS_API_WEAK void evas_obj_box_layout_homogeneous_max_size_horizontal(Eo *obj, Evas_Object_Box_Data *priv, void *data);
 
 /**
- * @brief No description supplied by the EVAS_API.
+ * @brief Internal function to remove a child object from the box.
  *
- * @param[in] obj The object.
- * @param[in] child Child object to be removed
+ * This function is used by Evas internally to remove a child object from
+ * a box. It is not intended for direct use by application developers.
+ * It handles the core logic of detaching the child.
  *
- * @return New object with child removed
+ * @param[in] obj The box object.
+ * @param[in] child The child object to remove.
+ *
+ * @return The removed child object if successful, otherwise @c NULL.
  *
  * @ingroup Evas_Box
+ * @internal
  */
 EVAS_API EVAS_API_WEAK Efl_Canvas_Object *evas_obj_box_internal_remove(Eo *obj, Efl_Canvas_Object *child);
 
@@ -251,12 +256,17 @@ EVAS_API EVAS_API_WEAK Efl_Canvas_Object *evas_obj_box_internal_remove(Eo *obj, 
 EVAS_API EVAS_API_WEAK void evas_obj_box_layout_flow_vertical(Eo *obj, Evas_Object_Box_Data *priv, void *data);
 
 /**
- * @brief No description supplied by the EVAS_API.
+ * @brief Internal function to free an Evas_Object_Box_Option.
  *
- * @param[in] obj The object.
- * @param[in] opt Box option to be freed
+ * This function is used by Evas internally to release resources
+ * associated with a specific box option (metadata for a child within a box).
+ * It is not intended for direct use by application developers.
+ *
+ * @param[in] obj The box object.
+ * @param[in] opt The box option to be freed.
  *
  * @ingroup Evas_Box
+ * @internal
  */
 EVAS_API EVAS_API_WEAK void evas_obj_box_internal_option_free(Eo *obj, Evas_Object_Box_Option *opt);
 
@@ -409,14 +419,19 @@ EVAS_API EVAS_API_WEAK Evas_Object_Box_Option *evas_obj_box_prepend(Eo *obj, Efl
 EVAS_API EVAS_API_WEAK Eina_Accessor *evas_obj_box_accessor_new(const Eo *obj) EINA_WARN_UNUSED_RESULT;
 
 /**
- * @brief No description supplied by the EVAS_API.
+ * @brief Internal function to append a child object to the box.
  *
- * @param[in] obj The object.
- * @param[in] child Child object to be appended
+ * This function is used by Evas internally to append a child object
+ * to a box. It is not intended for direct use by application developers.
+ * It handles the core logic of adding the child to the end of the box's list.
  *
- * @return Box option
+ * @param[in] obj The box object.
+ * @param[in] child The child object to append.
+ *
+ * @return A new Evas_Object_Box_Option for the appended child, or @c NULL on failure.
  *
  * @ingroup Evas_Box
+ * @internal
  */
 EVAS_API EVAS_API_WEAK Evas_Object_Box_Option *evas_obj_box_internal_append(Eo *obj, Efl_Canvas_Object *child);
 
@@ -441,14 +456,19 @@ EVAS_API EVAS_API_WEAK Evas_Object_Box_Option *evas_obj_box_internal_append(Eo *
 EVAS_API EVAS_API_WEAK Eina_Bool evas_obj_box_option_property_vset(Eo *obj, Evas_Object_Box_Option *opt, int property, va_list *args) EINA_ARG_NONNULL(2);
 
 /**
- * @brief No description supplied by the EVAS_API.
+ * @brief Internal function to remove a child object from a specific position in the box.
  *
- * @param[in] obj The object.
- * @param[in] pos Position of object to be removed
+ * This function is used by Evas internally to remove a child object
+ * from a given position within a box. It is not intended for direct use
+ * by application developers.
  *
- * @return Canvas object
+ * @param[in] obj The box object.
+ * @param[in] pos The position (index) of the child object to remove.
+ *
+ * @return The removed child object if successful, otherwise @c NULL.
  *
  * @ingroup Evas_Box
+ * @internal
  */
 EVAS_API EVAS_API_WEAK Efl_Canvas_Object *evas_obj_box_internal_remove_at(Eo *obj, unsigned int pos);
 
@@ -499,15 +519,20 @@ EVAS_API EVAS_API_WEAK Eina_Bool evas_obj_box_remove_at(Eo *obj, unsigned int po
 EVAS_API EVAS_API_WEAK Eina_Bool evas_obj_box_option_property_vget(const Eo *obj, Evas_Object_Box_Option *opt, int property, va_list *args) EINA_ARG_NONNULL(2);
 
 /**
- * @brief No description supplied by the EVAS_API.
+ * @brief Internal function to insert a child object at a specific position in the box.
  *
- * @param[in] obj The object.
- * @param[in] child Child object to be inserted
- * @param[in] pos Position where the object will be inserted
+ * This function is used by Evas internally to insert a child object
+ * at a given position within a box. It is not intended for direct use
+ * by application developers.
  *
- * @return Box option
+ * @param[in] obj The box object.
+ * @param[in] child The child object to insert.
+ * @param[in] pos The position (index) at which to insert the child.
+ *
+ * @return A new Evas_Object_Box_Option for the inserted child, or @c NULL on failure.
  *
  * @ingroup Evas_Box
+ * @internal
  */
 EVAS_API EVAS_API_WEAK Evas_Object_Box_Option *evas_obj_box_internal_insert_at(Eo *obj, Efl_Canvas_Object *child, unsigned int pos);
 
@@ -558,15 +583,20 @@ EVAS_API EVAS_API_WEAK Evas_Object_Box_Option *evas_obj_box_insert_before(Eo *ob
 EVAS_API EVAS_API_WEAK const char *evas_obj_box_option_property_name_get(const Eo *obj, int property) EINA_WARN_UNUSED_RESULT;
 
 /**
- * @brief No description supplied by the EVAS_API.
+ * @brief Internal function to insert a child object before a reference object in the box.
  *
- * @param[in] obj The object.
- * @param[in] child Object to be inserted
- * @param[in] reference Reference where the object will be inserted
+ * This function is used by Evas internally to insert a child object
+ * before a specified reference object within a box. It is not intended
+ * for direct use by application developers.
  *
- * @return Box option
+ * @param[in] obj The box object.
+ * @param[in] child The child object to insert.
+ * @param[in] reference The existing child object before which to insert the new child.
+ *
+ * @return A new Evas_Object_Box_Option for the inserted child, or @c NULL on failure.
  *
  * @ingroup Evas_Box
+ * @internal
  */
 EVAS_API EVAS_API_WEAK Evas_Object_Box_Option *evas_obj_box_internal_insert_before(Eo *obj, Efl_Canvas_Object *child, const Efl_Canvas_Object *reference);
 
@@ -608,14 +638,19 @@ EVAS_API EVAS_API_WEAK Evas_Object_Box_Option *evas_obj_box_internal_insert_befo
 EVAS_API EVAS_API_WEAK void evas_obj_box_layout_homogeneous_horizontal(Eo *obj, Evas_Object_Box_Data *priv, void *data);
 
 /**
- * @brief No description supplied by the EVAS_API.
+ * @brief Internal function to create a new Evas_Object_Box_Option for a child.
  *
- * @param[in] obj The object.
- * @param[in] child New box object
+ * This function is used by Evas internally to allocate and initialize
+ * a new box option structure, which holds metadata for a child object
+ * within the box. It is not intended for direct use by application developers.
  *
- * @return Box option
+ * @param[in] obj The box object.
+ * @param[in] child The child object for which to create the option.
+ *
+ * @return A new Evas_Object_Box_Option, or @c NULL on failure.
  *
  * @ingroup Evas_Box
+ * @internal
  */
 EVAS_API EVAS_API_WEAK Evas_Object_Box_Option *evas_obj_box_internal_option_new(Eo *obj, Efl_Canvas_Object *child);
 
@@ -636,15 +671,20 @@ EVAS_API EVAS_API_WEAK Evas_Object_Box_Option *evas_obj_box_internal_option_new(
 EVAS_API EVAS_API_WEAK void evas_obj_box_layout_homogeneous_max_size_vertical(Eo *obj, Evas_Object_Box_Data *priv, void *data);
 
 /**
- * @brief No description supplied by the EVAS_API.
+ * @brief Internal function to insert a child object after a reference object in the box.
  *
- * @param[in] obj The object.
- * @param[in] child Object to be inserted
- * @param[in] reference Reference where the object will be inserted
+ * This function is used by Evas internally to insert a child object
+ * after a specified reference object within a box. It is not intended
+ * for direct use by application developers.
  *
- * @return Box option
+ * @param[in] obj The box object.
+ * @param[in] child The child object to insert.
+ * @param[in] reference The existing child object after which to insert the new child.
+ *
+ * @return A new Evas_Object_Box_Option for the inserted child, or @c NULL on failure.
  *
  * @ingroup Evas_Box
+ * @internal
  */
 EVAS_API EVAS_API_WEAK Evas_Object_Box_Option *evas_obj_box_internal_insert_after(Eo *obj, Efl_Canvas_Object *child, const Efl_Canvas_Object *reference);
 
@@ -676,14 +716,19 @@ EVAS_API EVAS_API_WEAK Evas_Object_Box_Option *evas_obj_box_internal_insert_afte
 EVAS_API EVAS_API_WEAK Evas_Object_Box_Option *evas_obj_box_insert_at(Eo *obj, Efl_Canvas_Object *child, unsigned int pos) EINA_ARG_NONNULL(2);
 
 /**
- * @brief No description supplied by the EVAS_API.
+ * @brief Internal function to prepend a child object to the box.
  *
- * @param[in] obj The object.
- * @param[in] child Object to be prepended
+ * This function is used by Evas internally to prepend a child object
+ * to a box. It is not intended for direct use by application developers.
+ * It handles the core logic of adding the child to the beginning of the box's list.
  *
- * @return Box option
+ * @param[in] obj The box object.
+ * @param[in] child The child object to prepend.
+ *
+ * @return A new Evas_Object_Box_Option for the prepended child, or @c NULL on failure.
  *
  * @ingroup Evas_Box
+ * @internal
  */
 EVAS_API EVAS_API_WEAK Evas_Object_Box_Option *evas_obj_box_internal_prepend(Eo *obj, Efl_Canvas_Object *child);
 

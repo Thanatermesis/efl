@@ -5,23 +5,42 @@
 #include "perf.h"
 ///////////////////////////////////////////////////////////////////////////////
 
+/** @file perf.c
+ * @brief Main application logic for the Elementary performance test suite.
+ * This file contains the core framework for running and managing individual
+ * performance tests.
+ */
+
 ///////////////////////////////////////////////////////////////////////////////
-static Evas *evas;
-static Evas_Object *win, *bg;
-static double total_time = 0.0;
-static int total_frames = 0;
+static Evas *evas; /**< The main Evas canvas. */
+static Evas_Object *win, *bg; /**< The main window and background Evas objects. */
+static double total_time = 0.0; /**< Accumulated time spent in rendering frames for the current test. */
+static int total_frames = 0; /**< Total number of frames rendered for the current test. */
 ///////////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief Structure defining a single performance test.
+ */
 typedef struct
 {
-   void        (*init) (Evas *e);
-   void        (*tick) (Evas *e, double pos, Evas_Coord win_w, Evas_Coord win_h);
-   const char   *desc;
-   double        weight;
+   void        (*init) (Evas *e); /**< Function pointer to initialize the test.
+                                   *   @param e The Evas canvas. */
+   void        (*tick) (Evas *e, double pos, Evas_Coord win_w, Evas_Coord win_h); /**< Function pointer for each animation tick of the test.
+                                                                                  *   @param e The Evas canvas.
+                                                                                  *   @param pos The normalized position in the animation (0.0 to 1.0).
+                                                                                  *   @param win_w The current width of the window.
+                                                                                  *   @param win_h The current height of the window. */
+   const char   *desc; /**< A human-readable description of the test. */
+   double        weight; /**< The weight of this test in the overall average FPS calculation. */
 } Test;
 
-static Eina_List *cleanup_list = NULL;
+static Eina_List *cleanup_list = NULL; /**< List of Evas_Objects to be cleaned up after each test. */
 
+/**
+ * @brief Adds an Evas_Object to the cleanup list.
+ * Objects in this list are deleted after the current test completes.
+ * @param o The Evas_Object to add.
+ */
 void
 cleanup_add(Evas_Object *o)
 {
@@ -33,25 +52,48 @@ cleanup_add(Evas_Object *o)
 #undef T2
 
 #define T1
+/**
+ * @brief Array of all available performance tests.
+ * This array is populated by including `perf_list.c` which uses the `TFUN` macro.
+ * Each element is a `Test` struct.
+ * Example structure:
+ * @code
+ * static Test tests[] = {
+ *    { test_foo_init, test_foo_tick, "Description of foo test", 1.0 },
+ *    { test_bar_init, test_bar_tick, "Description of bar test", 0.5 },
+ *    { NULL, NULL, NULL, 0.0 } // Terminator
+ * };
+ * @endcode
+ */
 static Test tests[] = {
 #define TFUN(x) test_ ## x ## _init, test_ ## x ## _tick
 #include "perf_list.c"
-   { NULL, NULL, NULL, 0.0 }
+   { NULL, NULL, NULL, 0.0 } /* Terminator for the tests array. */
 };
 #undef T1
 
-static unsigned int test_pos = 0;
-static double time_start = 0.0;
-static double anim_tick_delta_total = 0.0;
-static int anim_tick_total = 0;
-static Eina_Array *tests_to_do = NULL;
-static double tests_fps = 0.0;
-static double tests_weights = 0.0;
-static double run_time = 5.0;
-static double spin_up_delay = 2.0;
+static unsigned int test_pos = 0; /**< Index of the current test being run in the `tests_to_do` array. */
+static double time_start = 0.0; /**< Timestamp when the current test's animation phase started. */
+static double anim_tick_delta_total = 0.0; /**< Sum of time deltas between animation ticks for the current test. */
+static int anim_tick_total = 0; /**< Total number of animation ticks for the current test. */
+static Eina_Array *tests_to_do = NULL; /**< Array of test indices (1-based) to be executed. If NULL, all tests are run. */
+static double tests_fps = 0.0; /**< Accumulated weighted FPS across all completed tests. */
+static double tests_weights = 0.0; /**< Sum of weights of all completed tests. */
+static double run_time = 5.0; /**< Duration in seconds for each test to run. Default is 5.0s. */
+static double spin_up_delay = 2.0; /**< Initial delay in seconds before starting the first test, to allow system to settle. Default is 2.0s. */
 
+/**
+ * @brief Runs the next test in the sequence or finishes if all tests are done.
+ * @param e The Evas canvas.
+ */
 static void all_tests(Evas *e);
 
+/**
+ * @brief Timer callback to introduce a delay before starting the next test.
+ * This calls all_tests() to proceed.
+ * @param data The Evas canvas (passed as user data).
+ * @return EINA_FALSE to stop the timer.
+ */
 static Eina_Bool
 next_test_delay(void *data EINA_UNUSED)
 {
@@ -62,11 +104,25 @@ next_test_delay(void *data EINA_UNUSED)
 #define ANIMATOR 1
 
 #ifdef ANIMATOR
-static Ecore_Animator *animator = NULL;
+static Ecore_Animator *animator = NULL; /**< Ecore_Animator used for driving test animations. */
 
+/**
+ * @brief Animation tick callback (Ecore_Animator version).
+ * This function is called repeatedly by the ecore animator to drive the
+ * current test's animation and measure performance.
+ * @param data The Evas canvas (passed as user data).
+ * @return EINA_TRUE to continue the animator, EINA_FALSE to stop.
+ */
 static Eina_Bool
 anim_tick(void *data)
 #else
+/**
+ * @brief Animation tick callback (EFL event version).
+ * This function is called repeatedly via EFL_CANVAS_OBJECT_EVENT_ANIMATOR_TICK
+ * to drive the current test's animation and measure performance.
+ * @param data The Evas canvas (passed as user data).
+ * @param event The EFL event details (unused).
+ */
 static void
 anim_tick(void *data, const Efl_Event *event EINA_UNUSED)
 #endif
@@ -137,6 +193,12 @@ anim_tick(void *data, const Efl_Event *event EINA_UNUSED)
 #endif
 }
 
+/**
+ * @brief Timer callback to delay exiting the application.
+ * Allows final messages to be seen before the application closes.
+ * @param data Unused.
+ * @return EINA_FALSE to stop the timer.
+ */
 static Eina_Bool
 exit_delay(void *data EINA_UNUSED)
 {
@@ -144,6 +206,12 @@ exit_delay(void *data EINA_UNUSED)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Manages the execution of performance tests.
+ * Initializes and starts the current test based on `test_pos`.
+ * If all specified tests are completed, it prints the summary and schedules an exit.
+ * @param e The Evas canvas.
+ */
 static void
 all_tests(Evas *e)
 {
@@ -172,6 +240,12 @@ all_tests(Evas *e)
 #endif
 }
 
+/**
+ * @brief Timer callback to start the test sequence after an initial delay.
+ * This calls all_tests() to begin the first test.
+ * @param data The Evas canvas (passed as user data).
+ * @return EINA_FALSE to stop the timer.
+ */
 static Eina_Bool
 all_tests_delay(void *data)
 {
@@ -179,23 +253,44 @@ all_tests_delay(void *data)
    return EINA_FALSE;
 }
 
-static double rtime = 0.0;
+static double rtime = 0.0; /**< Timestamp captured just before rendering starts. */
 
+/**
+ * @brief Evas event callback executed before rendering a frame.
+ * Captures the start time of the render operation.
+ * @param data Unused.
+ * @param e Unused.
+ * @param info Unused.
+ */
 static void
 render_pre(void *data EINA_UNUSED, Evas *e EINA_UNUSED, void *info EINA_UNUSED)
 {
    rtime = ecore_time_get();
 }
 
+/**
+ * @brief Evas event callback executed after rendering a frame (post flush).
+ * Calculates the time spent on rendering the frame and updates totals.
+ * @param data Unused.
+ * @param e Unused.
+ * @param info Unused.
+ */
 static void
 render_post(void *data EINA_UNUSED, Evas *e EINA_UNUSED, void *info EINA_UNUSED)
 {
    double spent = ecore_time_get() - rtime;
-   if (total_frames == 2) total_time = 0.0;
+   if (total_frames == 2) total_time = 0.0; // Reset total_time after the first couple of frames to ignore setup.
    total_time += spent;
    total_frames++;
 }
 
+/**
+ * @brief Idler function to keep the CPU busy during the spin-up delay.
+ * This helps in achieving a more consistent state before tests start,
+ * potentially by encouraging the CPU to ramp up to its performance state.
+ * @param data Unused.
+ * @return EINA_TRUE to keep the idler running.
+ */
 static Eina_Bool
 _spincpu_up_idler(void *data EINA_UNUSED)
 {
@@ -203,6 +298,25 @@ _spincpu_up_idler(void *data EINA_UNUSED)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/**
+ * @brief Main entry point for the Elementary application.
+ * Parses command-line arguments, sets up the Evas canvas and window,
+ * and starts the performance test sequence.
+ *
+ * Command-line arguments:
+ * - `-h` or `--help`: Display help message.
+ * - `-l`: List all available tests with their numbers and descriptions.
+ * - `-t N`: Run only test number N. Can be used multiple times to select multiple tests.
+ *           Example: `-t 1 -t 5` runs test 1 and test 5.
+ * - `-r N`: Set the duration for each test to N seconds.
+ *           Example: `-r 10.0` runs each test for 10 seconds.
+ * - `-d N`: Set the initial spin-up delay to N seconds before tests start.
+ *           Example: `-d 3.0` waits 3 seconds before the first test.
+ *
+ * @param argc Number of command-line arguments.
+ * @param argv Array of command-line argument strings.
+ * @return Exit status of the application.
+ */
 EAPI int
 elm_main(int argc, char **argv)
 {

@@ -1,3 +1,20 @@
+/**
+ * @file
+ * Ecore Evas Extension Engine.
+ *
+ * This engine provides a way to create Ecore_Evas instances that can be
+ * rendered in two different modes: "plug" and "socket". This allows for
+ * embedding an Evas canvas from one process into another.
+ *
+ * The "socket" Ecore_Evas acts as a server, managing shared memory buffers
+ * for rendering. The "plug" Ecore_Evas acts as a client, connecting to the
+ * socket and displaying the rendered content as an Evas image object.
+ *
+ * Communication between the plug and socket is handled via Ecore_Ipc.
+ * Events (mouse, keyboard, etc.) from the plug are forwarded to the socket,
+ * and rendering updates from the socket are propagated to the plug.
+ */
+
 #include "ecore_evas_extn_engine.h"
 
 #ifdef _WIN32
@@ -26,35 +43,46 @@ static const int   interface_extn_version = 1;
 static Ecore_Evas_Interface_Extn *_ecore_evas_extn_interface_new(void);
 static void *_ecore_evas_socket_switch(void *data, void *dest_buf);
 
+/**
+ * @brief Private data structure for the extension engine.
+ *
+ * This structure holds all the state for an Ecore_Evas extension instance,
+ * whether it's a "plug" or a "socket".
+ */
 typedef struct _Extn Extn;
 
 struct _Extn
 {
+   /** IPC-related data */
    struct {
-      Ecore_Ipc_Server *server;
-      Eina_List *clients;
-      Eina_List *visible_clients;
-      Eina_List *handlers;
+      Ecore_Ipc_Server *server;      /**< The IPC server (for sockets) or connection to server (for plugs) */
+      Eina_List *clients;            /**< List of connected IPC clients (for sockets) */
+      Eina_List *visible_clients;    /**< List of clients that have requested to be shown */
+      Eina_List *handlers;           /**< Ecore event handlers for IPC events */
    } ipc;
+   /** Service information for IPC */
    struct {
-      const char *name;
-      int         num;
-      Eina_Bool   sys : 1;
+      const char *name;              /**< Service name for IPC connection */
+      int         num;               /**< Service number for IPC connection */
+      Eina_Bool   sys : 1;           /**< Whether this is a system-wide service */
    } svc;
+   /** File-related data (used for updates) */
    struct {
-      Eina_List  *updates;
+      Eina_List  *updates;           /**< List of pending update rectangles of type Ipc_Data_Update */
    } file;
+   /** Double-buffering data using shared memory */
    struct {
-      Extnbuf *buf, *obuf; // current buffer and if needed an "old" buffer
-      const char *base, *lock;
-      int id, num, w, h;
-      Eina_Bool sys : 1;
-      Eina_Bool alpha : 1;
+      Extnbuf *buf, *obuf;           /**< Current buffer and if needed an "old" buffer for swapping */
+      const char *base, *lock;       /**< Base name and lock file for shared memory */
+      int id, num, w, h;             /**< SHM ID, number, width, and height */
+      Eina_Bool sys : 1;             /**< Is system SHM */
+      Eina_Bool alpha : 1;           /**< Does the buffer have an alpha channel */
    } b[NBUF];
-   int cur_b; // current buffer (b) being displayed or rendered to
-   int prev_b; // the last buffer (b) that was rendered
+   int cur_b;                         /**< Index of the current buffer being displayed or rendered to */
+   int prev_b;                        /**< Index of the last buffer that was rendered */
+   /** Profile-related data */
    struct {
-      Eina_Bool   done : 1; /* need to send change done event to the client(plug) */
+      Eina_Bool   done : 1;          /**< Flag to indicate a profile change is complete */
    } profile;
 };
 
@@ -85,6 +113,18 @@ _ecore_evas_extn_event(Ecore_Evas *ee, int event)
    ecore_event_add(event, ee, _ecore_evas_extn_event_free, ee);
 }
 
+/**
+ * @brief Pre-render callback for the plug.
+ * @param data The Ecore_Evas instance.
+ * @param e The Evas canvas.
+ * @param event_info Evas event info.
+ *
+ * This function is called before rendering begins for the canvas containing
+ * the plug's image object. It locks the shared memory buffer to get a pointer
+ * to the pixel data, which is then set as the image data for the Evas object.
+ * This ensures that the latest rendered frame from the socket is available
+ * for the plug to display.
+ */
 static void
 _ecore_evas_extn_plug_render_pre(void *data, Evas *e EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -100,6 +140,15 @@ _ecore_evas_extn_plug_render_pre(void *data, Evas *e EINA_UNUSED, void *event_in
    bdata->pixels = _extnbuf_lock(extn->b[extn->cur_b].buf, NULL, NULL, NULL);
 }
 
+/**
+ * @brief Post-render callback for the plug.
+ * @param data The Ecore_Evas instance.
+ * @param e The Evas canvas.
+ * @param event_info Evas event info.
+ *
+ * This function is called after rendering has completed. It unlocks the
+ * shared memory buffer that was locked in the pre-render callback.
+ */
 static void
 _ecore_evas_extn_plug_render_post(void *data, Evas *e EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -121,6 +170,16 @@ _ecore_evas_extn_plug_render_post(void *data, Evas *e EINA_UNUSED, void *event_i
      }
 }
 
+/**
+ * @brief Callback for the deletion of the plug's image object.
+ * @param data The Ecore_Evas instance.
+ * @param e The Evas canvas.
+ * @param obj The Evas object being deleted.
+ * @param event_info Evas event info.
+ *
+ * When the image object representing the plug is deleted from the parent Evas,
+ * this function is called to clean up and free the associated plug Ecore_Evas.
+ */
 static void
 _ecore_evas_extn_plug_image_obj_del(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -128,6 +187,18 @@ _ecore_evas_extn_plug_image_obj_del(void *data, Evas *e EINA_UNUSED, Evas_Object
    ecore_evas_free(ee);
 }
 
+/**
+ * @brief Translates coordinates from the parent Evas to the plug's Evas space.
+ * @param ee The plug's Ecore_Evas instance.
+ * @param x Pointer to the X coordinate to be translated.
+ * @param y Pointer to the Y coordinate to be translated.
+ *
+ * This function handles the complex mapping of coordinates from the container
+ * Evas (where the plug's image object lives) to the coordinate space of the
+ * plug's own canvas. It takes into account the image object's position,
+ * size, and fill properties, as well as any Evas map transformations applied
+ * to the image. This is crucial for correctly forwarding mouse events.
+ */
 static void
 _ecore_evas_extn_coord_translate(Ecore_Evas *ee, Evas_Coord *x, Evas_Coord *y)
 {
@@ -167,6 +238,15 @@ _ecore_evas_extn_coord_translate(Ecore_Evas *ee, Evas_Coord *x, Evas_Coord *y)
      }
 }
 
+/**
+ * @brief Frees an Ecore_Evas and its extension data.
+ * @param ee The Ecore_Evas to free.
+ *
+ * This function handles the complete cleanup of an extension Ecore_Evas,
+ * regardless of whether it is a plug or a socket. It frees all associated
+ * resources, including IPC connections, shared memory buffers, event handlers,
+ * and the Evas image object for plugs.
+ */
 static void
 _ecore_evas_extn_free(Ecore_Evas *ee)
 {
@@ -245,6 +325,16 @@ _ecore_evas_extn_free(Ecore_Evas *ee)
    extn_ee_list = eina_list_remove(extn_ee_list, ee);
 }
 
+/**
+ * @brief Handles resizing of a plug Ecore_Evas.
+ * @param ee The Ecore_Evas to resize.
+ * @param w The new width.
+ * @param h The new height.
+ *
+ * This function updates the size of the plug's Ecore_Evas and the
+ * associated image object in the parent canvas. It does not propagate the
+ * resize to the socket, as a socket can have multiple plugs of different sizes.
+ */
 static void
 _ecore_evas_resize(Ecore_Evas *ee, int w, int h)
 {
@@ -278,12 +368,32 @@ _ecore_evas_resize(Ecore_Evas *ee, int w, int h)
    if (ee->func.fn_resize) ee->func.fn_resize(ee);
 }
 
+/**
+ * @brief Handles move and resize for a plug Ecore_Evas.
+ * @param ee The Ecore_Evas.
+ * @param x The new X position (unused).
+ * @param y The new Y position (unused).
+ * @param w The new width.
+ * @param h The new height.
+ *
+ * This is the move/resize callback for the plug. The move part is ignored,
+ * and it simply calls the resize function.
+ */
 static void
 _ecore_evas_move_resize(Ecore_Evas *ee, int x EINA_UNUSED, int y EINA_UNUSED, int w, int h)
 {
    _ecore_evas_resize(ee, w, h);
 }
 
+/**
+ * @brief Gets a bitmask representing the current state of keyboard modifiers and locks.
+ * @param e The Evas canvas.
+ * @return An integer bitmask.
+ *
+ * This function queries Evas for the state of modifiers (Shift, Ctrl, Alt, etc.)
+ * and locks (Caps, Num, Scroll) and packs them into a single integer bitmask.
+ * This is used for sending keyboard state over IPC.
+ */
 static int
 _ecore_evas_modifiers_locks_mask_get(Evas *e)
 {
@@ -310,6 +420,15 @@ _ecore_evas_modifiers_locks_mask_get(Evas *e)
    return mask;
 }
 
+/**
+ * @brief Sets the state of keyboard modifiers and locks from a bitmask.
+ * @param e The Evas canvas to apply the state to.
+ * @param mask The integer bitmask representing the desired state.
+ *
+ * This function takes a bitmask (likely received over IPC) and sets the
+ * modifier and lock states on the target Evas canvas. This is used to
+ * synchronize keyboard state between the plug and socket.
+ */
 static void
 _ecore_evas_modifiers_locks_mask_set(Evas *e, int mask)
 {
@@ -333,6 +452,17 @@ _ecore_evas_modifiers_locks_mask_set(Evas *e, int mask)
    else                   evas_key_lock_off(e, "Caps_Lock");
 }
 
+/**
+ * @brief Callback for mouse_in events on the plug image.
+ * @param data The Ecore_Evas instance.
+ * @param e The parent Evas canvas.
+ * @param obj The plug's image object.
+ * @param event_info The Evas_Event_Mouse_In data.
+ *
+ * This function is triggered when the mouse enters the plug's image object.
+ * It packages the event information, including timestamp and keyboard modifiers,
+ * into an IPC message and sends it to the socket Ecore_Evas.
+ */
 static void
 _ecore_evas_extn_cb_mouse_in(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -355,6 +485,12 @@ _ecore_evas_extn_cb_mouse_in(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, 
      }
 }
 
+/**
+ * @brief Callback for mouse_out events on the plug image.
+ *
+ * Forwards the mouse out event to the socket via IPC.
+ * @see _ecore_evas_extn_cb_mouse_in
+ */
 static void
 _ecore_evas_extn_cb_mouse_out(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -377,6 +513,14 @@ _ecore_evas_extn_cb_mouse_out(void *data, Evas *e, Evas_Object *obj EINA_UNUSED,
      }
 }
 
+/**
+ * @brief Callback for mouse_down events on the plug image.
+ *
+ * Translates the event coordinates and forwards the mouse down event to the
+ * socket via IPC. It also sends a mouse move event just before the down
+ * event to ensure the remote canvas has the correct pointer position.
+ * @see _ecore_evas_extn_cb_mouse_in
+ */
 static void
 _ecore_evas_extn_cb_mouse_down(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -418,6 +562,12 @@ _ecore_evas_extn_cb_mouse_down(void *data, Evas *e, Evas_Object *obj EINA_UNUSED
      }
 }
 
+/**
+ * @brief Callback for mouse_up events on the plug image.
+ *
+ * Forwards the mouse up event to the socket via IPC.
+ * @see _ecore_evas_extn_cb_mouse_in
+ */
 static void
 _ecore_evas_extn_cb_mouse_up(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -442,6 +592,13 @@ _ecore_evas_extn_cb_mouse_up(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, 
      }
 }
 
+/**
+ * @brief Callback for mouse_move events on the plug image.
+ *
+ * Translates event coordinates and forwards the mouse move event to the
+ * socket via IPC.
+ * @see _ecore_evas_extn_cb_mouse_in
+ */
 static void
 _ecore_evas_extn_cb_mouse_move(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -470,6 +627,12 @@ _ecore_evas_extn_cb_mouse_move(void *data, Evas *e, Evas_Object *obj EINA_UNUSED
      }
 }
 
+/**
+ * @brief Callback for mouse_wheel events on the plug image.
+ *
+ * Forwards the mouse wheel event to the socket via IPC.
+ * @see _ecore_evas_extn_cb_mouse_in
+ */
 static void
 _ecore_evas_extn_cb_mouse_wheel(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -494,6 +657,13 @@ _ecore_evas_extn_cb_mouse_wheel(void *data, Evas *e, Evas_Object *obj EINA_UNUSE
      }
 }
 
+/**
+ * @brief Callback for multi_down events (multi-touch) on the plug image.
+ *
+ * Translates event coordinates and forwards the multi-touch down event
+ * to the socket via IPC.
+ * @see _ecore_evas_extn_cb_mouse_in
+ */
 static void
 _ecore_evas_extn_cb_multi_down(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -532,6 +702,13 @@ _ecore_evas_extn_cb_multi_down(void *data, Evas *e, Evas_Object *obj EINA_UNUSED
 }
 
 
+/**
+ * @brief Callback for multi_up events (multi-touch) on the plug image.
+ *
+ * Translates event coordinates and forwards the multi-touch up event
+ * to the socket via IPC.
+ * @see _ecore_evas_extn_cb_mouse_in
+ */
 static void
 _ecore_evas_extn_cb_multi_up(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -569,6 +746,13 @@ _ecore_evas_extn_cb_multi_up(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, 
      }
 }
 
+/**
+ * @brief Callback for multi_move events (multi-touch) on the plug image.
+ *
+ * Translates event coordinates and forwards the multi-touch move event
+ * to the socket via IPC.
+ * @see _ecore_evas_extn_cb_mouse_in
+ */
 static void
 _ecore_evas_extn_cb_multi_move(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -605,6 +789,15 @@ _ecore_evas_extn_cb_multi_move(void *data, Evas *e, Evas_Object *obj EINA_UNUSED
      }
 }
 
+/**
+ * @brief Callback for key_down events on the plug image.
+ *
+ * This function is triggered by a key press. It serializes all key-related
+ * strings (key, keyname, string, compose) into a single buffer allocated
+ * on the stack with `alloca`, and sends this buffer over IPC to the socket.
+ * This is an efficient way to send variable-length data without heap allocation.
+ * @see _ecore_evas_extn_cb_mouse_in
+ */
 static void
 _ecore_evas_extn_cb_key_down(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -662,6 +855,13 @@ _ecore_evas_extn_cb_key_down(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, 
      }
 }
 
+/**
+ * @brief Callback for key_up events on the plug image.
+ *
+ * Serializes and forwards the key up event to the socket via IPC, in the
+ * same manner as `_ecore_evas_extn_cb_key_down`.
+ * @see _ecore_evas_extn_cb_key_down
+ */
 static void
 _ecore_evas_extn_cb_key_up(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -719,6 +919,12 @@ _ecore_evas_extn_cb_key_up(void *data, Evas *e, Evas_Object *obj EINA_UNUSED, vo
      }
 }
 
+/**
+ * @brief Callback for hold events on the plug image.
+ *
+ * Forwards the hold event to the socket via IPC.
+ * @see _ecore_evas_extn_cb_mouse_in
+ */
 static void
 _ecore_evas_extn_cb_hold(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -741,6 +947,13 @@ _ecore_evas_extn_cb_hold(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_
      }
 }
 
+/**
+ * @brief Callback for focus_in events on the plug image.
+ *
+ * This function is called when the plug's image object receives focus.
+ * It updates the focus state of the plug's Ecore_Evas and sends a
+ * `OP_FOCUS` message to the socket to synchronize the focus state.
+ */
 static void
 _ecore_evas_extn_cb_focus_in(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -758,6 +971,12 @@ _ecore_evas_extn_cb_focus_in(void *data, Evas *e EINA_UNUSED, Evas_Object *obj E
    ecore_ipc_server_send(extn->ipc.server, MAJOR, OP_FOCUS, 0, 0, 0, NULL, 0);
 }
 
+/**
+ * @brief Callback for focus_out events on the plug image.
+ *
+ * This function is called when the plug's image object loses focus.
+ * It updates the focus state and sends an `OP_UNFOCUS` message to the socket.
+ */
 static void
 _ecore_evas_extn_cb_focus_out(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -773,6 +992,13 @@ _ecore_evas_extn_cb_focus_out(void *data, Evas *e EINA_UNUSED, Evas_Object *obj 
    ecore_ipc_server_send(extn->ipc.server, MAJOR, OP_UNFOCUS, 0, 0, 0, NULL, 0);
 }
 
+/**
+ * @brief Callback for show events on the plug image.
+ *
+ * This function is called when the plug's image object becomes visible.
+ * It updates the visibility state of the plug's Ecore_Evas and sends an
+ * `OP_SHOW` message to the socket.
+ */
 static void
 _ecore_evas_extn_cb_show(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -787,6 +1013,12 @@ _ecore_evas_extn_cb_show(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_
    ecore_ipc_server_send(extn->ipc.server, MAJOR, OP_SHOW, 0, 0, 0, NULL, 0);
 }
 
+/**
+ * @brief Callback for hide events on the plug image.
+ *
+ * This function is called when the plug's image object is hidden.
+ * It updates the visibility state and sends an `OP_HIDE` message to the socket.
+ */
 static void
 _ecore_evas_extn_cb_hide(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -801,6 +1033,15 @@ _ecore_evas_extn_cb_hide(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_
    ecore_ipc_server_send(extn->ipc.server, MAJOR, OP_HIDE, 0, 0, 0, NULL, 0);
 }
 
+/**
+ * @brief Sets the window profile for the plug.
+ * @param ee The plug's Ecore_Evas.
+ * @param profile The name of the profile to set.
+ *
+ * This function is part of the Ecore_Evas engine interface. When called on a
+ * plug Ecore_Evas, it sends an IPC message to the socket to request a
+ * profile change.
+ */
 static void
 _ecore_evas_extn_plug_profile_set(Ecore_Evas *ee, const char *profile)
 {
@@ -823,6 +1064,17 @@ _ecore_evas_extn_plug_profile_set(Ecore_Evas *ee, const char *profile)
      }
 }
 
+/**
+ * @brief Sends a generic message from a plug to its parent socket.
+ * @param ee The plug's Ecore_Evas.
+ * @param msg_domain The message domain.
+ * @param msg_id The message ID.
+ * @param data The message data payload.
+ * @param size The size of the payload.
+ *
+ * This function provides a generic messaging channel from the plug to the
+ * socket, sending the data encapsulated in an `OP_MSG` IPC call.
+ */
 static void
 _ecore_evas_extn_plug_msg_parent_send(Ecore_Evas *ee, int msg_domain, int msg_id, void *data, int size)
 {
@@ -932,6 +1184,17 @@ static const Ecore_Evas_Engine_Func _ecore_extn_plug_engine_func =
    NULL  // fn_last_tick_get
 };
 
+/**
+ * @brief IPC event handler for when a server connection is established (plug side).
+ * @param data The plug's Ecore_Evas.
+ * @param type The event type.
+ * @param event The Ecore_Ipc_Event_Server_Add event data.
+ * @return ECORE_CALLBACK_PASS_ON.
+ *
+ * This handler is called on the plug side when a connection to the socket
+ * server is successfully made. It handles cases where the server might have
+ * been relaunched, ensuring the visibility state is synchronized.
+ */
 static Eina_Bool
 _ipc_server_add(void *data, int type EINA_UNUSED, void *event)
 {
@@ -954,6 +1217,18 @@ _ipc_server_add(void *data, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief IPC event handler for when a server connection is lost (plug side).
+ * @param data The plug's Ecore_Evas.
+ * @param type The event type.
+ * @param event The Ecore_Ipc_Event_Server_Del event data.
+ * @return ECORE_CALLBACK_PASS_ON.
+ *
+ * This handler is called on the plug side when the connection to the socket
+ * server is lost. It cleans up resources, frees buffers, and effectively
+ * disconnects the plug, often triggering a delete request for the plug's
+ * Ecore_Evas.
+ */
 static Eina_Bool
 _ipc_server_del(void *data, int type EINA_UNUSED, void *event)
 {
@@ -986,6 +1261,27 @@ _ipc_server_del(void *data, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief IPC event handler for data received from the server (plug side).
+ * @param data The plug's Ecore_Evas.
+ * @param type The event type.
+ * @param event The Ecore_Ipc_Event_Server_Data event data.
+ * @return ECORE_CALLBACK_PASS_ON.
+ *
+ * This is the main data processing function for the plug. It receives
+ * messages from the socket server and acts on them. The `e->minor` value
+ * determines the operation (opcode).
+ *
+ * Notable opcodes:
+ * - OP_UPDATE: A rectangle that needs to be redrawn.
+ * - OP_UPDATE_DONE: All update rectangles for a frame have been sent. The
+ *   plug can now switch to the newly rendered buffer and redraw.
+ * - OP_SHM_REF*: A series of messages that convey shared memory information
+ *   (name, size, alpha, etc.) for a buffer.
+ * - OP_RESIZE: A request to resize the plug's canvas.
+ * - OP_PROFILE_CHANGE_DONE: Confirmation that a profile change is complete.
+ * - OP_MSG_PARENT: A generic message from the socket.
+ */
 static Eina_Bool
 _ipc_server_data(void *data, int type EINA_UNUSED, void *event)
 {
@@ -1180,6 +1476,20 @@ _ipc_server_data(void *data, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Creates a new Ecore_Evas "plug".
+ * @param ee_target The parent Ecore_Evas in which to create the plug.
+ * @return An Evas_Object that represents the plug, or NULL on failure.
+ *
+ * This function creates a special Ecore_Evas that acts as a "plug".
+ * It doesn't have its own window; instead, it's represented by an
+ * Evas_Object (an image) within the `ee_target` Ecore_Evas. This image
+ * will display the content rendered by a remote "socket" Ecore_Evas.
+ *
+ * The returned object should be treated like any other Evas object. The
+ * associated Ecore_Evas for the plug can be retrieved from the object's
+ * data ("Ecore_Evas").
+ */
 EMODAPI Evas_Object *
 ecore_evas_extn_plug_new_internal(Ecore_Evas *ee_target)
 {
@@ -1304,6 +1614,18 @@ ecore_evas_extn_plug_new_internal(Ecore_Evas *ee_target)
    return o;
 }
 
+/**
+ * @brief Connects a plug Ecore_Evas to a socket server.
+ * @param ee The plug's Ecore_Evas.
+ * @param svcname The service name to connect to.
+ * @param svcnum The service number.
+ * @param svcsys Whether the service is system-wide.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ *
+ * This function initiates the IPC connection from the plug to the socket
+ * server, identified by the service name, number, and type. Once connected,
+ * the plug can receive rendering updates from the socket.
+ */
 static Eina_Bool
 _ecore_evas_extn_plug_connect(Ecore_Evas *ee, const char *svcname, int svcnum, Eina_Bool svcsys)
 {
@@ -1358,6 +1680,18 @@ _ecore_evas_extn_plug_connect(Ecore_Evas *ee, const char *svcname, int svcnum, E
    return EINA_TRUE;
 }
 
+/**
+ * @brief Handles resizing of a socket Ecore_Evas.
+ * @param ee The socket's Ecore_Evas.
+ * @param w The new width.
+ * @param h The new height.
+ *
+ * This function resizes the socket's Evas canvas. A key part of this
+ * process is re-creating the shared memory buffers (`Extnbuf`) to match the
+ * new size. It then sends messages to all connected plugs to inform them of
+ * the new buffers and the new size, so they can re-connect to the SHM
+ * segments and resize their display image.
+ */
 static void
 _ecore_evas_socket_resize(Ecore_Evas *ee, int w, int h)
 {
@@ -1466,12 +1800,25 @@ _ecore_evas_socket_resize(Ecore_Evas *ee, int w, int h)
    if (ee->func.fn_resize) ee->func.fn_resize(ee);
 }
 
+/**
+ * @brief Handles move and resize for a socket Ecore_Evas.
+ *
+ * The move part is ignored, and it simply calls the socket resize function.
+ * @see _ecore_evas_socket_resize
+ */
 static void
 _ecore_evas_socket_move_resize(Ecore_Evas *ee, int x EINA_UNUSED, int y EINA_UNUSED, int w, int h)
 {
    _ecore_evas_socket_resize(ee, w, h);
 }
 
+/**
+ * @brief Sends a "profile change done" message to all clients.
+ * @param ee The socket's Ecore_Evas.
+ *
+ * After the socket has finished processing a profile change, this function
+ * notifies all connected plugs that the change is complete.
+ */
 static void
 _ecore_evas_extn_socket_window_profile_change_done_send(Ecore_Evas *ee)
 {
@@ -1494,6 +1841,17 @@ _ecore_evas_extn_socket_window_profile_change_done_send(Ecore_Evas *ee)
      }
 }
 
+/**
+ * @brief Buffer switching callback for the Evas buffer engine.
+ * @param data The socket's Ecore_Evas.
+ * @param dest_buf Unused.
+ * @return A pointer to the pixel data of the next buffer to be rendered to.
+ *
+ * This function implements double-buffering. It's called by the Evas render
+ * engine when it's ready to switch to the next buffer. It cycles through the
+ * available shared memory buffers and returns the data pointer for the new
+ * "back" buffer.
+ */
 static void *
 _ecore_evas_socket_switch(void *data, void *dest_buf EINA_UNUSED)
 {
@@ -1509,6 +1867,15 @@ _ecore_evas_socket_switch(void *data, void *dest_buf EINA_UNUSED)
    return bdata->pixels;
 }
 
+/**
+ * @brief Pre-render preparation for the socket.
+ * @param ee The socket's Ecore_Evas.
+ * @return EINA_TRUE if the buffer was successfully locked, EINA_FALSE otherwise.
+ *
+ * This function is called before the socket's Evas begins rendering a frame.
+ * It locks the current shared memory buffer to get a writable pointer to its
+ * pixel data.
+ */
 static Eina_Bool
 _ecore_evas_extn_socket_prepare(Ecore_Evas *ee)
 {
@@ -1531,6 +1898,17 @@ _ecore_evas_extn_socket_prepare(Ecore_Evas *ee)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Post-render callback for the socket Evas.
+ * @param data The socket's Ecore_Evas.
+ * @param e The Evas canvas.
+ * @param event_info The Evas_Event_Render_Post event data.
+ *
+ * This function is called after the socket's Evas has finished rendering a
+ * frame. It unlocks the previously rendered buffer and sends the updated
+ * regions (damage rectangles) to all connected plugs via IPC. This tells the
+ * plugs which parts of their image object need to be redrawn.
+ */
 static void
 _ecore_evas_ews_update_image(void *data, Evas *e EINA_UNUSED, void *event_info)
 {
@@ -1573,6 +1951,19 @@ _ecore_evas_ews_update_image(void *data, Evas *e EINA_UNUSED, void *event_info)
      }
 }
 
+/**
+ * @brief IPC event handler for a new client connecting (socket side).
+ * @param data The socket's Ecore_Evas.
+ * @param type The event type.
+ * @param event The Ecore_Ipc_Event_Client_Add event data.
+ * @return ECORE_CALLBACK_PASS_ON.
+ *
+ * This handler is called on the socket side when a new plug client connects.
+ * It sends the client all the necessary information to get started:
+ * - Shared memory buffer details (OP_SHM_REF* messages).
+ * - The current size of the canvas (OP_RESIZE).
+ * - An initial full update so the plug displays the current content.
+ */
 static Eina_Bool
 _ipc_client_add(void *data, int type EINA_UNUSED, void *event)
 {
@@ -1622,6 +2013,16 @@ _ipc_client_add(void *data, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief IPC event handler for a client disconnecting (socket side).
+ * @param data The socket's Ecore_Evas.
+ * @param type The event type.
+ * @param event The Ecore_Ipc_Event_Client_Del event data.
+ * @return ECORE_CALLBACK_PASS_ON.
+ *
+ * This handler is called on the socket side when a plug client disconnects.
+ * It removes the client from the lists of connected and visible clients.
+ */
 static Eina_Bool
 _ipc_client_del(void *data, int type EINA_UNUSED, void *event)
 {
@@ -1640,6 +2041,26 @@ _ipc_client_del(void *data, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief IPC event handler for data received from a client (socket side).
+ * @param data The socket's Ecore_Evas.
+ * @param type The event type.
+ * @param event The Ecore_Ipc_Event_Client_Data event data.
+ * @return ECORE_CALLBACK_PASS_ON.
+ *
+ * This is the main data processing function for the socket. It receives
+ * messages from a plug client and acts on them by feeding events into the
+ * socket's Evas canvas. This is how user input from a plug is simulated
+ * in the socket.
+ *
+ * Notable opcodes:
+ * - OP_SHOW/OP_HIDE: Manages the visibility state based on requests from plugs.
+ * - OP_FOCUS/OP_UNFOCUS: Sets the focus state of the socket Evas.
+ * - OP_EV_*: Forwards various events (mouse, key, multi-touch) to the
+ *   socket's Evas using the `evas_event_feed_*` functions.
+ * - OP_PROFILE_CHANGE_REQUEST: A plug is requesting a profile change.
+ * - OP_MSG: A generic message from a plug.
+ */
 static Eina_Bool
 _ipc_client_data(void *data, int type EINA_UNUSED, void *event)
 {
@@ -1917,6 +2338,15 @@ _ipc_client_data(void *data, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Sets the alpha channel state for a socket Ecore_Evas.
+ * @param ee The socket's Ecore_Evas.
+ * @param alpha EINA_TRUE for alpha, EINA_FALSE for opaque.
+ *
+ * This function enables or disables the alpha channel for the socket's Evas
+ * and its rendering buffers. It also notifies all connected plugs about the
+ * change so they can update their image object properties accordingly.
+ */
 static void
 _ecore_evas_extn_socket_alpha_set(Ecore_Evas *ee, int alpha)
 {
@@ -1968,6 +2398,15 @@ _ecore_evas_extn_socket_alpha_set(Ecore_Evas *ee, int alpha)
      }
 }
 
+/**
+ * @brief Sets the window profile for the socket.
+ * @param ee The socket's Ecore_Evas.
+ * @param profile The name of the profile to set.
+ *
+ * This function is part of the Ecore_Evas engine interface. When called on a
+ * socket Ecore_Evas, it sets the profile and triggers a state change, which
+ * might be handled by the application using the socket.
+ */
 static void
 _ecore_evas_extn_socket_profile_set(Ecore_Evas *ee, const char *profile)
 {
@@ -1983,6 +2422,15 @@ _ecore_evas_extn_socket_profile_set(Ecore_Evas *ee, const char *profile)
      }
 }
 
+/**
+ * @brief Sets the list of available profiles for the socket.
+ * @param ee The socket's Ecore_Evas.
+ * @param plist An array of profile name strings.
+ * @param n The number of profiles in the list.
+ *
+ * The application using the socket can call this to define which window
+ * profiles are available. This information can then be queried by clients.
+ */
 static void
 _ecore_evas_extn_socket_available_profiles_set(Ecore_Evas *ee, const char **plist, int n)
 {
@@ -2005,6 +2453,17 @@ _ecore_evas_extn_socket_available_profiles_set(Ecore_Evas *ee, const char **plis
      }
 }
 
+/**
+ * @brief Sends a generic message from a socket to all connected plugs.
+ * @param ee The socket's Ecore_Evas.
+ * @param msg_domain The message domain.
+ * @param msg_id The message ID.
+ * @param data The message data payload.
+ * @param size The size of the payload.
+ *
+ * This function provides a generic messaging channel from the socket to all
+ * plugs, broadcasting the data encapsulated in an `OP_MSG_PARENT` IPC call.
+ */
 static void
 _ecore_evas_extn_socket_msg_send(Ecore_Evas *ee, int msg_domain, int msg_id, void *data, int size)
 {
@@ -2114,6 +2573,17 @@ static const Ecore_Evas_Engine_Func _ecore_extn_socket_engine_func =
    NULL //fn_last_tick_get
 };
 
+/**
+ * @brief Creates a new Ecore_Evas "socket".
+ * @param w The initial width.
+ * @param h The initial height.
+ * @return A new Ecore_Evas instance, or NULL on failure.
+ *
+ * This function creates a special Ecore_Evas that acts as a "socket" server.
+ * It is a backend for rendering, using an Evas "buffer" engine. It does not
+ * create a visible window itself. Its content is meant to be displayed by
+ * one or more "plug" clients connecting to it.
+ */
 EMODAPI Ecore_Evas *
 ecore_evas_extn_socket_new_internal(int w, int h)
 {
@@ -2217,6 +2687,18 @@ ecore_evas_extn_socket_new_internal(int w, int h)
    return ee;
 }
 
+/**
+ * @brief Starts listening for connections on a socket Ecore_Evas.
+ * @param ee The socket's Ecore_Evas.
+ * @param svcname The service name to listen on.
+ * @param svcnum The service number.
+ * @param svcsys Whether to create a system-wide service.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ *
+ * This function sets up the socket Ecore_Evas to act as an IPC server,
+ * allowing plug clients to connect. It also creates the initial shared
+ * memory buffers for rendering.
+ */
 Eina_Bool
 _ecore_evas_extn_socket_listen(Ecore_Evas *ee, const char *svcname, int svcnum, Eina_Bool svcsys)
 {
@@ -2304,6 +2786,14 @@ _ecore_evas_extn_socket_listen(Ecore_Evas *ee, const char *svcname, int svcnum, 
    return EINA_TRUE;
 }
 
+/**
+ * @brief Creates and initializes the extension interface structure.
+ * @return A pointer to the newly allocated interface.
+ *
+ * This function allocates and sets up the `Ecore_Evas_Interface_Extn`
+ * structure, populating it with function pointers for the `connect` and
+ * `listen` operations, which are the entry points for using this extension.
+ */
 static Ecore_Evas_Interface_Extn *
 _ecore_evas_extn_interface_new(void)
 {
@@ -2321,12 +2811,24 @@ _ecore_evas_extn_interface_new(void)
    return iface;
 }
 
+/**
+ * @brief Blocks or unblocks event processing for a socket.
+ * @param ee The socket's Ecore_Evas.
+ * @param events_block EINA_TRUE to block events, EINA_FALSE to unblock.
+ *
+ * When events are blocked, any events received from plugs via IPC will be ignored.
+ */
 EMODAPI void
 ecore_evas_extn_socket_events_block_set_internal(Ecore_Evas *ee, Eina_Bool events_block)
 {
    ee->events_block = events_block;
 }
 
+/**
+ * @brief Gets the event blocking state for a socket.
+ * @param ee The socket's Ecore_Evas.
+ * @return The current event blocking state.
+ */
 EMODAPI Eina_Bool
 ecore_evas_extn_socket_events_block_get_internal(Ecore_Evas *ee)
 {

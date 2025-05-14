@@ -21,13 +21,28 @@
 
 typedef struct _Ecore_Buffer_Shm_Data Ecore_Buffer_Shm_Data;
 
+/**
+ * @brief Structure to hold shared memory buffer data.
+ */
 struct _Ecore_Buffer_Shm_Data {
-     const char *file;
-     void *addr;
-     int w, h, stride, size;
-     Eina_Bool am_owner : 1;
+     const char *file; /**< Path to the shared memory file. */
+     void *addr;       /**< Mapped memory address. */
+     int w;            /**< Width of the buffer in pixels. */
+     int h;            /**< Height of the buffer in pixels. */
+     int stride;       /**< Stride of the buffer in bytes. */
+     int size;         /**< Total size of the mapped memory in bytes. */
+     Eina_Bool am_owner : 1; /**< EINA_TRUE if this instance created the shared memory, EINA_FALSE otherwise. */
 };
 
+/**
+ * @brief Frees a shared memory buffer.
+ *
+ * This function unmaps the shared memory and, if this instance is the owner,
+ * unlinks the associated file.
+ *
+ * @param bmdata Unused module data.
+ * @param bdata Pointer to the Ecore_Buffer_Shm_Data structure to free.
+ */
 static void
 _ecore_buffer_shm_buffer_free(Ecore_Buffer_Module_Data bmdata EINA_UNUSED, Ecore_Buffer_Data bdata)
 {
@@ -48,7 +63,20 @@ _ecore_buffer_shm_buffer_free(Ecore_Buffer_Module_Data bmdata EINA_UNUSED, Ecore
    free(b);
 }
 
-
+/**
+ * @brief Allocates a new shared memory buffer.
+ *
+ * Creates a new shared memory segment, maps it, and returns a handle to it.
+ * The shared memory file is created in a temporary location.
+ *
+ * @param bmdata Module data (unused in this implementation).
+ * @param width The desired width of the buffer in pixels.
+ * @param height The desired height of the buffer in pixels.
+ * @param format The pixel format of the buffer (unused in this implementation, assumes 32bpp).
+ * @param flags Allocation flags (unused in this implementation).
+ * @return A pointer to Ecore_Buffer_Data (specifically Ecore_Buffer_Shm_Data) on success,
+ *         NULL on failure.
+ */
 static Ecore_Buffer_Data
 _ecore_buffer_shm_buffer_alloc(Ecore_Buffer_Module_Data bmdata, int width, int height, Ecore_Buffer_Format format EINA_UNUSED, unsigned int flags EINA_UNUSED)
 {
@@ -89,6 +117,17 @@ err_fd:
    return NULL;
 }
 
+/**
+ * @brief Exports a shared memory buffer.
+ *
+ * Opens the shared memory file associated with the buffer and returns its
+ * file descriptor.
+ *
+ * @param bmdata Unused module data.
+ * @param bdata Pointer to the Ecore_Buffer_Shm_Data structure.
+ * @param id Pointer to an integer where the file descriptor will be stored.
+ * @return EXPORT_TYPE_FD on success.
+ */
 static Ecore_Export_Type
 _ecore_buffer_shm_buffer_export(Ecore_Buffer_Module_Data bmdata EINA_UNUSED, Ecore_Buffer_Data bdata, int *id)
 {
@@ -101,6 +140,22 @@ _ecore_buffer_shm_buffer_export(Ecore_Buffer_Module_Data bmdata EINA_UNUSED, Eco
    return EXPORT_TYPE_FD;
 }
 
+/**
+ * @brief Imports a shared memory buffer from a file descriptor.
+ *
+ * Maps an existing shared memory segment, identified by a file descriptor,
+ * into the process's address space.
+ *
+ * @param bmdata Unused module data.
+ * @param w The width of the buffer in pixels.
+ * @param h The height of the buffer in pixels.
+ * @param format The pixel format of the buffer (unused, assumes 32bpp).
+ * @param type The type of export identifier; must be EXPORT_TYPE_FD.
+ * @param export_id The file descriptor of the shared memory segment.
+ * @param flags Import flags (unused in this implementation).
+ * @return A pointer to Ecore_Buffer_Data (specifically Ecore_Buffer_Shm_Data) on success,
+ *         NULL on failure.
+ */
 static void *
 _ecore_buffer_shm_buffer_import(Ecore_Buffer_Module_Data bmdata EINA_UNUSED, int w, int h, Ecore_Buffer_Format format EINA_UNUSED, Ecore_Export_Type type, int export_id, unsigned int flags EINA_UNUSED)
 {
@@ -130,6 +185,13 @@ err:
    return NULL;
 }
 
+/**
+ * @brief Gets the direct pointer to the shared memory data.
+ *
+ * @param bmdata Unused module data.
+ * @param bdata Pointer to the Ecore_Buffer_Shm_Data structure.
+ * @return A void pointer to the mapped shared memory address.
+ */
 static void *
 _ecore_buffer_shm_data_get(Ecore_Buffer_Module_Data bmdata EINA_UNUSED, Ecore_Buffer_Data bdata)
 {
@@ -151,11 +213,23 @@ static Ecore_Buffer_Backend _ecore_buffer_shm_backend = {
      NULL,
 };
 
+/**
+ * @brief Initializes the shared memory buffer module.
+ *
+ * Registers the SHM backend with Ecore_Buffer.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 Eina_Bool shm_init(void)
 {
    return ecore_buffer_register(&_ecore_buffer_shm_backend);
 }
 
+/**
+ * @brief Shuts down the shared memory buffer module.
+ *
+ * Unregisters the SHM backend from Ecore_Buffer.
+ */
 void shm_shutdown(void)
 {
    ecore_buffer_unregister(&_ecore_buffer_shm_backend);

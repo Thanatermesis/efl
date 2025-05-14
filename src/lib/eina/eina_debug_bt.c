@@ -99,22 +99,47 @@
 # endif
 #endif
 
+/** @internal
+ * @brief Semaphore used to synchronize backtrace collection from threads.
+ * The main thread waits on this semaphore after signaling other threads
+ * to collect their backtraces. Each thread releases the semaphore once
+ * its backtrace is collected.
+ */
 static Eina_Semaphore _wait_for_bts_sem;
 
 // _bt_buf[0] is always for mainloop, 1 + is for extra threads
+/** @internal @brief Array of backtrace buffers for each active thread. */
 static void             ***_bt_buf;
+/** @internal @brief Array of backtrace lengths for each active thread. */
 static int                *_bt_buf_len;
+/** @internal @brief Array of timestamps for when backtraces were collected for each thread. */
 static struct timespec    *_bt_ts;
+/** @internal @brief Array of CPU IDs where each thread was running when backtrace was collected. */
 static int                *_bt_cpu;
 
 /* Used by trace timer */
+/** @internal @brief Timestamp of the start of the current tracing interval. */
 static double _trace_t0 = 0.0;
+/** @internal @brief Timer used for periodic backtrace collection. */
 static Eina_Debug_Timer *_timer = NULL;
 
 #ifndef _WIN32
+/** @internal @brief Stores the original sigaction for SIGPROF before it's overridden. */
 static struct sigaction old_sigprof_action;
 #endif
 
+/**
+ * @internal
+ * @brief Dumps a backtrace to the given file handle.
+ *
+ * This function iterates through the backtrace frames, resolves symbol
+ * information using dladdr (if available), and prints it to the file.
+ *
+ * @param f The file handle to write the backtrace to (e.g., stderr).
+ * @param bt An array of void pointers representing the backtrace frames.
+ *           Example: `bt[0] = (void*)0x12345678;`
+ * @param btlen The number of frames in the backtrace array.
+ */
 void
 _eina_debug_dump_fhandle_bt(FILE *f, void **bt, int btlen)
 {
@@ -148,6 +173,18 @@ _eina_debug_dump_fhandle_bt(FILE *f, void **bt, int btlen)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Generates a backtrace using libunwind.
+ *
+ * This function walks the call stack of the current thread and stores
+ * the instruction pointer for each frame in the provided buffer.
+ *
+ * @param bt An array of void pointers to store the backtrace frames.
+ *           Example: `void *frames[EINA_MAX_BT]; _eina_debug_unwind_bt(frames, EINA_MAX_BT);`
+ * @param max The maximum number of frames to capture.
+ * @return The total number of frames captured in the backtrace.
+ */
 // a backtracer that uses libunwind to do the job
 static inline int
 _eina_debug_unwind_bt(void **bt, int max)
@@ -177,6 +214,16 @@ _eina_debug_unwind_bt(void **bt, int max)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Gets the current time as a double-precision floating-point number.
+ *
+ * This function uses `clock_gettime` with `CLOCK_MONOTONIC` if available,
+ * otherwise falls back to `gettimeofday`. The time is returned in seconds.
+ *
+ * @return The current time in seconds.
+ *         Example: `1678886400.123456`
+ */
 // a quick and dirty local time point getter func - not portable
 static inline double
 get_time(void)
@@ -193,6 +240,18 @@ get_time(void)
 }
 
 #ifndef _WIN32
+/**
+ * @internal
+ * @brief Signal handler for collecting backtrace information from a thread.
+ *
+ * This handler is invoked when a specific signal (SIG) is received by a thread.
+ * It identifies the thread, collects its current CPU, CPU time, and backtrace,
+ * then releases a semaphore to notify the main thread that collection is complete.
+ *
+ * @param sig The signal number (unused).
+ * @param si Signal information (unused).
+ * @param foo Unused context pointer.
+ */
 static void
 _signal_handler(int sig EINA_UNUSED,
       siginfo_t *si EINA_UNUSED, void *foo EINA_UNUSED)
@@ -253,6 +312,14 @@ found:
 }
 #endif
 
+/**
+ * @internal
+ * @brief Initializes signal handlers for backtrace collection.
+ *
+ * This function sets up a custom signal handler for a specific signal (SIG)
+ * used to trigger backtrace collection in threads. It also saves the
+ * original signal handler for SIGPROF and sets SIGPIPE to be ignored.
+ */
 static void
 _signal_init(void)
 {
@@ -284,6 +351,13 @@ _signal_init(void)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Shuts down signal handlers related to backtrace collection.
+ *
+ * This function restores the original signal handler for SIG that was
+ * saved during initialization.
+ */
 static void
 _signal_shutdown(void)
 {
@@ -292,6 +366,15 @@ _signal_shutdown(void)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Sends a signal to a specific thread to trigger backtrace collection.
+ *
+ * This function uses `pthread_kill` to send the predefined signal (SIG)
+ * to the target thread, which will then execute `_signal_handler`.
+ *
+ * @param th The Eina_Thread handle of the target thread.
+ */
 static void
 _collect_bt(Eina_Thread th)
 {
@@ -304,6 +387,18 @@ _collect_bt(Eina_Thread th)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Timer callback function for periodic backtrace collection.
+ *
+ * This function is called periodically by a timer. It iterates through all
+ * active registered threads, signals each to collect its backtrace,
+ * waits for all threads to complete, and then dumps the collected backtraces.
+ * It also includes some performance metrics for debugging.
+ *
+ * @param data User data passed to the callback (unused in this case, typically the session).
+ * @return EINA_TRUE to continue the timer, EINA_FALSE to stop.
+ */
 static Eina_Bool
 _trace_cb(void *data EINA_UNUSED)
 {
@@ -368,6 +463,21 @@ err:
 }
 
 // profiling on with poll time gap as uint payload
+/**
+ * @internal
+ * @brief Callback function to enable profiling and start backtrace collection.
+ *
+ * This function is invoked when a "Profiler/on" debug command is received.
+ * It initializes signal handling and starts a timer for periodic backtrace
+ * collection. The polling interval for the timer is read from the buffer.
+ *
+ * @param session The debug session.
+ * @param cid Command ID (unused).
+ * @param buffer A buffer containing the polling time interval (unsigned int, 4 bytes).
+ *               Example: `unsigned int interval_ms = 100;` (passed as buffer)
+ * @param size The size of the buffer. Must be at least 4.
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _prof_on_cb(Eina_Debug_Session *session, int cid EINA_UNUSED, void *buffer, int size)
 {
@@ -384,6 +494,19 @@ _prof_on_cb(Eina_Debug_Session *session, int cid EINA_UNUSED, void *buffer, int 
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Callback function to disable profiling and stop backtrace collection.
+ *
+ * This function is invoked when a "Profiler/off" debug command is received.
+ * It stops the backtrace collection timer and shuts down signal handling.
+ *
+ * @param session The debug session (unused).
+ * @param cid Command ID (unused).
+ * @param buffer Command buffer (unused).
+ * @param size Size of the command buffer (unused).
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _prof_off_cb(Eina_Debug_Session *session EINA_UNUSED, int cid EINA_UNUSED, void *buffer EINA_UNUSED, int size EINA_UNUSED)
 {
@@ -399,6 +522,15 @@ EINA_DEBUG_OPCODES_ARRAY_DEFINE(_OPS,
       {NULL, NULL, NULL}
 );
 
+/**
+ * @internal
+ * @brief Initializes the eina debug backtrace functionality.
+ *
+ * This function creates the synchronization semaphore and registers
+ * the debug opcodes for controlling the profiler.
+ *
+ * @return EINA_TRUE on successful initialization, EINA_FALSE otherwise.
+ */
 Eina_Bool
 _eina_debug_bt_init(void)
 {
@@ -407,6 +539,15 @@ _eina_debug_bt_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the eina debug backtrace functionality.
+ *
+ * This function frees the synchronization semaphore.
+ * Note: It does not unregister opcodes, as that's handled by a higher level.
+ *
+ * @return EINA_TRUE on successful shutdown.
+ */
 Eina_Bool
 _eina_debug_bt_shutdown(void)
 {

@@ -3,6 +3,16 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback for the "changed" event on the segment control.
+ *
+ * This is triggered when the selected segment item changes. It prints the
+ * memory address and text of the newly selected item.
+ *
+ * @param data Custom data pointer (unused).
+ * @param o The Evas_Object that triggered the event (unused).
+ * @param event A pointer to the selected Elm_Object_Item.
+ */
 static void
 changed_cb(void *data EINA_UNUSED, Evas_Object *o EINA_UNUSED, void *event)
 {
@@ -10,6 +20,18 @@ changed_cb(void *data EINA_UNUSED, Evas_Object *o EINA_UNUSED, void *event)
    printf("Segment Item (%p) %s\n", it, elm_object_item_text_get(it));
 }
 
+/**
+ * @brief Creates a test window for the Elementary Segment Control widget.
+ *
+ * This function sets up a window containing various configurations of
+ * the Elm_Segment_Control widget to test its functionality. It demonstrates
+ * items with text, icons, both, and in disabled states. It also tests
+ * different layout behaviors by iterating over `exp_modes`.
+ *
+ * @param data Unused user data.
+ * @param obj Unused parent object.
+ * @param event_info Unused event information.
+ */
 void
 test_segment_control(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -18,6 +40,12 @@ test_segment_control(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void 
    unsigned int i;
    char buf[PATH_MAX];
 
+   /**
+    * @struct exp_mode
+    * @brief A structure to hold widget expansion and alignment hints.
+    *
+    * This is used to test segment controls with different layout behaviors.
+    */
    struct exp_mode {
       struct {
          double w, h;
@@ -26,6 +54,9 @@ test_segment_control(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void 
          double x, y;
       } align;
    } exp_modes[2] = {
+     /* This array defines two layout modes to be tested:
+      * 1. Expand horizontally and fill the available space.
+      * 2. Do not expand, but center within the available space. */
      {{EVAS_HINT_EXPAND, 0.0}, {EVAS_HINT_FILL, EVAS_HINT_FILL}},
      {{0.0, 0.0}, {0.5, 0.5}}
    };

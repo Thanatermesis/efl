@@ -47,19 +47,29 @@ static const char EINA_MAGIC_INARRAY_ACCESSOR_STR[] = "Eina Inline Array Accesso
 typedef struct _Eina_Iterator_Inarray Eina_Iterator_Inarray;
 typedef struct _Eina_Accessor_Inarray Eina_Accessor_Inarray;
 
+/**
+ * @internal
+ * @brief Internal structure for an Eina_Inarray iterator.
+ * Holds the iterator state, including the array being iterated and current position.
+ */
 struct _Eina_Iterator_Inarray
 {
-   Eina_Iterator iterator;
-   const Eina_Inarray *array;
-   unsigned int pos;
-   EINA_MAGIC
+   Eina_Iterator iterator; /**< The base Eina_Iterator structure. Must be the first member. */
+   const Eina_Inarray *array; /**< The inarray being iterated. */
+   unsigned int pos; /**< Current position within the inarray. */
+   EINA_MAGIC /**< Magic number for type checking. */
 };
 
+/**
+ * @internal
+ * @brief Internal structure for an Eina_Inarray accessor.
+ * Holds the accessor state, including the array being accessed.
+ */
 struct _Eina_Accessor_Inarray
 {
-   Eina_Accessor accessor;
-   const Eina_Inarray *array;
-   EINA_MAGIC
+   Eina_Accessor accessor; /**< The base Eina_Accessor structure. Must be the first member. */
+   const Eina_Inarray *array; /**< The inarray being accessed. */
+   EINA_MAGIC /**< Magic number for type checking. */
 };
 
 static int _eina_inarray_log_dom = -1;
@@ -107,6 +117,17 @@ static int _eina_inarray_log_dom = -1;
     }                                                           \
   while(0)
 
+/**
+ * @internal
+ * @brief Initializes the basic fields of an Eina_Inarray structure.
+ * Sets the magic number, version, member size, initial length and capacity,
+ * step size, and initializes members pointer to NULL.
+ *
+ * @param array The Eina_Inarray to setup.
+ * @param member_size The size in bytes of each element in the array.
+ * @param step The number of elements to grow the array by when needed.
+ *             If 0, a default step (32) is used.
+ */
 static void
 _eina_inarray_setup(Eina_Inarray *array, unsigned int member_size, unsigned int step)
 {
@@ -119,6 +140,21 @@ _eina_inarray_setup(Eina_Inarray *array, unsigned int member_size, unsigned int 
    array->members = NULL;
 }
 
+/**
+ * @internal
+ * @brief Resizes the internal memory buffer of the inarray.
+ * This function handles allocation and reallocation of the 'members' buffer.
+ * It will only grow the buffer; if new_size is smaller than the current
+ * capacity (max), it does nothing and returns EINA_TRUE. This behavior
+ * is relied upon by eina_inarray_pop().
+ *
+ * @param array The Eina_Inarray to resize.
+ * @param new_size The desired minimum number of elements the array should be
+ *                 able to hold. The actual new capacity might be larger due
+ *                 to the step calculation.
+ * @return EINA_TRUE on success or if no resize was needed, EINA_FALSE on
+ *         memory allocation failure.
+ */
 static Eina_Bool
 _eina_inarray_resize(Eina_Inarray *array, unsigned int new_size)
 {
@@ -141,6 +177,16 @@ _eina_inarray_resize(Eina_Inarray *array, unsigned int new_size)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Retrieves a pointer to the element at a given position.
+ * This function performs no bounds checking.
+ *
+ * @param array The Eina_Inarray to access.
+ * @param position The index of the element.
+ * @return A void pointer to the element at the specified position.
+ *         The caller is responsible for casting this to the correct type.
+ */
 static inline void *
 _eina_inarray_get(const Eina_Inarray *array, unsigned int position)
 {
@@ -148,6 +194,16 @@ _eina_inarray_get(const Eina_Inarray *array, unsigned int position)
    return (unsigned char *)array->members + offset;
 }
 
+/**
+ * @internal
+ * @brief Performs a linear search for an element in the array.
+ *
+ * @param array The Eina_Inarray to search within.
+ * @param data A pointer to the data to search for. This data is compared
+ *             against elements in the array.
+ * @param compare The comparison function. It should return 0 if the elements match.
+ * @return The index of the first matching element, or -1 if not found or if the array is empty.
+ */
 static int
 _eina_inarray_search(const Eina_Inarray *array, const void *data, Eina_Compare_Cb compare)
 {
@@ -170,6 +226,27 @@ _eina_inarray_search(const Eina_Inarray *array, const void *data, Eina_Compare_C
      return -1;
 }
 
+/**
+ * @internal
+ * @brief Performs a binary search to find an element or its insertion point in a sorted array.
+ * This function is used for sorted arrays to efficiently find an element or
+ * determine where a new element should be inserted to maintain sort order.
+ *
+ * @param array The Eina_Inarray to search (assumed to be sorted).
+ * @param data A pointer to the data to search for.
+ * @param compare The comparison function.
+ * @param[out] cmp A pointer to an integer that will store the result of the
+ *                 last comparison (compare(data, p)). This indicates the
+ *                 relationship of 'data' to the element at the returned 'middle'
+ *                 index.
+ *                 - 0 if 'data' matches the element at 'middle'.
+ *                 - >0 if 'data' is greater than the element at 'middle'.
+ *                 - <0 if 'data' is less than the element at 'middle'.
+ * @return The index 'middle' where the element was found or where it should be
+ *         inserted. If the array is empty, returns 0 and sets *cmp to -1.
+ *         If the array has one element, returns 0 and sets *cmp to the comparison result.
+ *         Otherwise, it's the index from the binary search process.
+ */
 static unsigned int
 _eina_inarray_search_sorted_near(const Eina_Inarray *array, const void *data, Eina_Compare_Cb compare, int *cmp)
 {
@@ -207,7 +284,16 @@ _eina_inarray_search_sorted_near(const Eina_Inarray *array, const void *data, Ei
    return middle;
 }
 
-
+/**
+ * @internal
+ * @brief Advances the iterator to the next element in the inarray.
+ * Implements the 'next' function for the Eina_Iterator interface.
+ *
+ * @param it The Eina_Iterator_Inarray instance.
+ * @param[out] data Pointer to store the data of the next element.
+ * @return EINA_TRUE if an element was retrieved, EINA_FALSE if the end of
+ *         the inarray was reached.
+ */
 static Eina_Bool
 _eina_inarray_iterator_next(Eina_Iterator_Inarray *it, void **data)
 {
@@ -222,6 +308,16 @@ _eina_inarray_iterator_next(Eina_Iterator_Inarray *it, void **data)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Moves the iterator to the previous element in the inarray.
+ * This is used for reversed iterators.
+ *
+ * @param it The Eina_Iterator_Inarray instance.
+ * @param[out] data Pointer to store the data of the previous element.
+ * @return EINA_TRUE if an element was retrieved, EINA_FALSE if the beginning
+ *         of the inarray was reached.
+ */
 static Eina_Bool
 _eina_inarray_iterator_prev(Eina_Iterator_Inarray *it, void **data)
 {
@@ -236,6 +332,14 @@ _eina_inarray_iterator_prev(Eina_Iterator_Inarray *it, void **data)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the container (Eina_Inarray) associated with the iterator.
+ * Implements the 'get_container' function for the Eina_Iterator interface.
+ *
+ * @param it The Eina_Iterator_Inarray instance.
+ * @return A pointer to the Eina_Inarray being iterated.
+ */
 static Eina_Inarray *
 _eina_inarray_iterator_get_container(Eina_Iterator_Inarray *it)
 {
@@ -243,6 +347,13 @@ _eina_inarray_iterator_get_container(Eina_Iterator_Inarray *it)
    return (Eina_Inarray *)it->array;
 }
 
+/**
+ * @internal
+ * @brief Frees the resources associated with an Eina_Inarray iterator.
+ * Implements the 'free' function for the Eina_Iterator interface.
+ *
+ * @param it The Eina_Iterator_Inarray instance to free.
+ */
 static void
 _eina_inarray_iterator_free(Eina_Iterator_Inarray *it)
 {
@@ -250,6 +361,17 @@ _eina_inarray_iterator_free(Eina_Iterator_Inarray *it)
    MAGIC_FREE(it);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the element at a specific position using the accessor.
+ * Implements the 'get_at' function for the Eina_Accessor interface.
+ *
+ * @param it The Eina_Accessor_Inarray instance.
+ * @param pos The index of the element to retrieve.
+ * @param[out] data Pointer to store the data of the element.
+ * @return EINA_TRUE if the element was retrieved successfully, EINA_FALSE
+ *         if the position is out of bounds.
+ */
 static Eina_Bool
 _eina_inarray_accessor_get_at(Eina_Accessor_Inarray *it, unsigned int pos, void **data)
 {
@@ -262,6 +384,14 @@ _eina_inarray_accessor_get_at(Eina_Accessor_Inarray *it, unsigned int pos, void 
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the container (Eina_Inarray) associated with the accessor.
+ * Implements the 'get_container' function for the Eina_Accessor interface.
+ *
+ * @param it The Eina_Accessor_Inarray instance.
+ * @return A pointer to the Eina_Inarray being accessed.
+ */
 static Eina_Inarray *
 _eina_inarray_accessor_get_container(Eina_Accessor_Inarray *it)
 {
@@ -269,6 +399,13 @@ _eina_inarray_accessor_get_container(Eina_Accessor_Inarray *it)
    return (Eina_Inarray *)it->array;
 }
 
+/**
+ * @internal
+ * @brief Frees the resources associated with an Eina_Inarray accessor.
+ * Implements the 'free' function for the Eina_Accessor interface.
+ *
+ * @param it The Eina_Accessor_Inarray instance to free.
+ */
 static void
 _eina_inarray_accessor_free(Eina_Accessor_Inarray *it)
 {

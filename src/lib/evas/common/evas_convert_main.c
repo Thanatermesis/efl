@@ -8,6 +8,13 @@
 #include "evas_convert_yuv.h"
 
 #ifdef USE_DITHER_44
+/**
+ * @brief 4x4 Bayer dither matrix.
+ *
+ * Used for dithering when converting to lower bit-depth color formats.
+ * Each element represents a threshold value in a 4x4 pixel block.
+ * Example: _evas_dither_44[y % 4][x % 4]
+ */
 const DATA8 _evas_dither_44[4][4] =
 {
      { 0,  8,  2, 10},
@@ -18,6 +25,14 @@ const DATA8 _evas_dither_44[4][4] =
 #endif
 
 #ifdef USE_DITHER_128128
+/**
+ * @brief 128x128 Bayer dither matrix.
+ *
+ * A larger dither matrix for potentially higher quality dithering,
+ * especially for larger images or when finer control over dithering patterns is desired.
+ * Each element represents a threshold value in a 128x128 pixel block.
+ * Example: _evas_dither_128128[y % 128][x % 128]
+ */
 const DATA8 _evas_dither_128128[128][128] =
 {
      { 0, 41, 23, 5, 17, 39, 7, 15, 62, 23, 40, 51, 31, 47, 9, 32, 52, 27, 57, 25, 6, 61, 27, 52, 37, 7, 40, 63, 18, 36, 10, 42, 25, 62, 45, 34, 20, 42, 37, 14, 35, 29, 50, 10, 61, 2, 40, 8, 37, 12, 58, 22, 5, 41, 10, 39, 0, 60, 11, 46, 2, 55, 38, 17, 36, 59, 13, 54, 37, 56, 8, 29, 16, 13, 63, 22, 41, 55, 7, 20, 49, 14, 23, 55, 37, 23, 19, 36, 15, 49, 23, 63, 30, 14, 38, 27, 53, 13, 22, 41, 19, 31, 7, 19, 50, 30, 49, 16, 3, 32, 56, 40, 29, 34, 8, 48, 19, 45, 4, 51, 12, 46, 35, 49, 16, 42, 12, 62 },
@@ -151,11 +166,44 @@ const DATA8 _evas_dither_128128[128][128] =
 };
 #endif /* USE_DITHER_128128 */
 
+/**
+ * @brief Initializes the Evas common conversion module.
+ * @see evas_common_convert_init() in evas_convert_main.h
+ *
+ * Currently, this function is a no-op but is kept for API consistency
+ * and potential future initialization needs.
+ */
 EVAS_API void
 evas_common_convert_init(void)
 {
 }
 
+/**
+ * @brief Retrieves a specific RGBA to destination format conversion function.
+ * @see evas_common_convert_func_get() in evas_convert_main.h
+ *
+ * This function inspects the destination buffer's properties (depth, color masks,
+ * palette mode, and rotation) to select an optimized conversion routine.
+ * It handles various color depths (8-bit, 16-bit, 24-bit, 32-bit) and color
+ * orderings (RGB, BGR), as well as different palette modes and image rotations.
+ *
+ * @param dest Pointer to the destination image data buffer.
+ *             Example: `DATA8 *my_buffer = malloc(width * height * (depth / 8));`
+ * @param w Width of the image in pixels.
+ * @param h Height of the image in pixels (marked EINA_UNUSED as it's not directly used in this function's logic for selecting a converter, but is part of the Gfx_Func_Convert signature).
+ * @param depth Destination image color depth in bits (e.g., 8, 16, 24, 32).
+ * @param rmask Red color channel mask. Example for RGB565: `0xf800`.
+ * @param gmask Green color channel mask. Example for RGB565: `0x07e0`.
+ * @param bmask Blue color channel mask. Example for RGB565: `0x001f`.
+ * @param pal_mode Palette mode if the destination is palettized.
+ *                 Example: `PAL_MODE_RGB332`, `PAL_MODE_GRAY64`.
+ *                 Set to `PAL_MODE_NONE` if not palettized or for default grayscale.
+ * @param rotation Image rotation in degrees (0, 90, 180, 270).
+ * @return A function pointer to the selected conversion function, or NULL if no
+ *         suitable converter is found for the given parameters.
+ *         The returned function will have the signature:
+ *         `void (*Gfx_Func_Convert)(DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA32 *pal);`
+ */
 EVAS_API Gfx_Func_Convert
 evas_common_convert_func_get(DATA8 *dest, int w, int h EINA_UNUSED, int depth, DATA32 rmask, DATA32 gmask, DATA32 bmask, Convert_Pal_Mode pal_mode, int rotation)
 {

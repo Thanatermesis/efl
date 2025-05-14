@@ -1,70 +1,105 @@
-
+/**
+ * @brief Legacy wrapper for efl_canvas_object_pointer_mode_set.
+ */
 EVAS_API Eina_Bool
 evas_object_pointer_mode_set(Efl_Canvas_Object *obj, Evas_Object_Pointer_Mode pointer_mode)
 {
    return efl_canvas_object_pointer_mode_set(obj, (Efl_Input_Object_Pointer_Mode)pointer_mode);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_pointer_mode_get.
+ */
 EVAS_API Evas_Object_Pointer_Mode
 evas_object_pointer_mode_get(const Efl_Canvas_Object *obj)
 {
    return (Evas_Object_Pointer_Mode)efl_canvas_object_pointer_mode_get(obj);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_clipper_set.
+ */
 EVAS_API void
 evas_object_clip_set(Efl_Canvas_Object *obj, Efl_Canvas_Object *clipper)
 {
    efl_canvas_object_clipper_set(obj, clipper);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_clipper_get.
+ */
 EVAS_API Efl_Canvas_Object *
 evas_object_clip_get(const Efl_Canvas_Object *obj)
 {
    return efl_canvas_object_clipper_get(obj);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_repeat_events_set.
+ */
 EVAS_API void
 evas_object_repeat_events_set(Efl_Canvas_Object *obj, Eina_Bool repeat)
 {
    efl_canvas_object_repeat_events_set(obj, repeat);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_repeat_events_get.
+ */
 EVAS_API Eina_Bool
 evas_object_repeat_events_get(const Efl_Canvas_Object *obj)
 {
    return efl_canvas_object_repeat_events_get(obj);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_key_focus_set.
+ */
 EVAS_API void
 evas_object_focus_set(Efl_Canvas_Object *obj, Eina_Bool focus)
 {
    efl_canvas_object_key_focus_set(obj, focus);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_key_focus_get.
+ */
 EVAS_API Eina_Bool
 evas_object_focus_get(const Efl_Canvas_Object *obj)
 {
    return efl_canvas_object_key_focus_get(obj);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_precise_is_inside_set.
+ */
 EVAS_API void
 evas_object_precise_is_inside_set(Efl_Canvas_Object *obj, Eina_Bool precise)
 {
    efl_canvas_object_precise_is_inside_set(obj, precise);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_precise_is_inside_get.
+ */
 EVAS_API Eina_Bool
 evas_object_precise_is_inside_get(const Efl_Canvas_Object *obj)
 {
    return efl_canvas_object_precise_is_inside_get(obj);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_propagate_events_set.
+ */
 EVAS_API void
 evas_object_propagate_events_set(Efl_Canvas_Object *obj, Eina_Bool propagate)
 {
    efl_canvas_object_propagate_events_set(obj, propagate);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_propagate_events_get.
+ */
 EVAS_API Eina_Bool
 evas_object_propagate_events_get(const Efl_Canvas_Object *obj)
 {
@@ -72,48 +107,81 @@ evas_object_propagate_events_get(const Efl_Canvas_Object *obj)
    return efl_canvas_object_propagate_events_get(obj);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_pass_events_set.
+ */
 EVAS_API void
 evas_object_pass_events_set(Efl_Canvas_Object *obj, Eina_Bool pass)
 {
    efl_canvas_object_pass_events_set(obj, pass);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_pass_events_get.
+ */
 EVAS_API Eina_Bool
 evas_object_pass_events_get(const Efl_Canvas_Object *obj)
 {
    return efl_canvas_object_pass_events_get(obj);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_event_rects_set.
+ */
 EVAS_API void
 evas_object_event_rects_set(Efl_Canvas_Object *obj, const Eina_Rect *region)
 {
   efl_canvas_object_event_rects_set(obj, region);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_event_rects_get.
+ */
 EVAS_API const Eina_Rect *
 evas_object_event_rects_get(const Efl_Canvas_Object *obj)
 {
   return efl_canvas_object_event_rects_get(obj);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_anti_alias_set.
+ */
 EVAS_API void
 evas_object_anti_alias_set(Efl_Canvas_Object *obj, Eina_Bool anti_alias)
 {
    efl_canvas_object_anti_alias_set(obj, anti_alias);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_anti_alias_get.
+ */
 EVAS_API Eina_Bool
 evas_object_anti_alias_get(const Efl_Canvas_Object *obj)
 {
    return efl_canvas_object_anti_alias_get(obj);
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_render_parent_get.
+ */
 EVAS_API Efl_Canvas_Object *
 evas_object_smart_parent_get(const Efl_Canvas_Object *obj)
 {
    return efl_canvas_object_render_parent_get(obj);
 }
 
+/**
+ * @internal
+ * @brief Converts Evas_BiDi_Direction to Efl_Text_Bidirectional_Type.
+ *
+ * This static inline function maps the legacy Evas_BiDi_Direction enum values
+ * to their corresponding Efl_Text_Bidirectional_Type enum values.
+ * If an unhandled Evas_BiDi_Direction value is provided, it defaults to
+ * EFL_TEXT_BIDIRECTIONAL_TYPE_NATURAL.
+ *
+ * @param type The Evas_BiDi_Direction value to convert.
+ * @return The corresponding Efl_Text_Bidirectional_Type value.
+ */
 static inline Efl_Text_Bidirectional_Type
 _evas_bidi_direction_type_to_efl_text_bidirectional_type(Evas_BiDi_Direction type)
 {
@@ -130,6 +198,18 @@ _evas_bidi_direction_type_to_efl_text_bidirectional_type(Evas_BiDi_Direction typ
 #undef CONVERT_TYPE
 }
 
+/**
+ * @internal
+ * @brief Converts Efl_Text_Bidirectional_Type to Evas_BiDi_Direction.
+ *
+ * This static inline function maps Efl_Text_Bidirectional_Type enum values
+ * back to their corresponding legacy Evas_BiDi_Direction enum values.
+ * If an unhandled Efl_Text_Bidirectional_Type value is provided, it defaults to
+ * EVAS_BIDI_DIRECTION_NATURAL.
+ *
+ * @param type The Efl_Text_Bidirectional_Type value to convert.
+ * @return The corresponding Evas_BiDi_Direction value.
+ */
 static inline Evas_BiDi_Direction
 _efl_text_bidirectional_type_to_evas_bidi_direction_type(Efl_Text_Bidirectional_Type type)
 {
@@ -146,12 +226,18 @@ _efl_text_bidirectional_type_to_evas_bidi_direction_type(Efl_Text_Bidirectional_
 #undef CONVERT_TYPE
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_paragraph_direction_set.
+ */
 EVAS_API void
 evas_object_paragraph_direction_set(Efl_Canvas_Object *obj, Evas_BiDi_Direction dir)
 {
    efl_canvas_object_paragraph_direction_set(obj, _evas_bidi_direction_type_to_efl_text_bidirectional_type(dir));
 }
 
+/**
+ * @brief Legacy wrapper for efl_canvas_object_paragraph_direction_get.
+ */
 EVAS_API Evas_BiDi_Direction
 evas_object_paragraph_direction_get(const Efl_Canvas_Object *obj)
 {

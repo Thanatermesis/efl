@@ -7,18 +7,31 @@
 
 #include "elm_code_private.h"
 
+/**
+ * @brief Defines the syntax for a programming language to be used for highlighting.
+ */
 typedef struct _Elm_Code_Syntax
 {
-   const char *symbols;
-   const char *numparts;
-   const char *preprocessor;
-   const char *comment_single;
-   const char *comment_start;
-   const char *comment_end;
-   int (*scope_change)(Elm_Code_Line *line);
-   const char *keywords[];
+   const char *symbols;        /**< Characters that act as symbols or operators. */
+   const char *numparts;       /**< Characters that can be part of a number, besides digits. e.g. ".". */
+   const char *preprocessor;   /**< The string that starts a preprocessor directive. e.g. "#". */
+   const char *comment_single; /**< The string that starts a single-line comment. e.g. "//". */
+   const char *comment_start;  /**< The string that starts a multi-line comment. e.g. "/*". */
+   const char *comment_end;    /**< The string that ends a multi-line comment. e.g. "asterisk + /". */
+   int (*scope_change)(Elm_Code_Line *line); /**< Function to calculate scope change (e.g., due to braces). */
+   const char *keywords[];     /**< A NULL-terminated array of keyword strings. */
 } Elm_Code_Syntax;
 
+/**
+ * @brief Calculate the change in scope for a line based on braces.
+ *
+ * This function counts the number of opening and closing braces ('{' and '}')
+ * in a line to determine the change in scope. Each '{' increments the scope
+ * and each '}' decrements it.
+ *
+ * @param line The line to analyze.
+ * @return The change in scope (positive for increase, negative for decrease).
+ */
 static int
 _elm_code_syntax_scope_change_braces(Elm_Code_Line *line)
 {
@@ -169,6 +182,13 @@ static Elm_Code_Syntax _elm_code_syntax_shell =
      "done", "in", "function", "time", "coproc", NULL }
 };
 
+/**
+ * @brief Lookup a syntax definition from a mime type.
+ *
+ * @param mime The mime type to be looked up for a matching syntax definition,
+ *             e.g. "text/x-csrc".
+ * @return A syntax definition, if one is found, or NULL.
+ */
 EAPI Elm_Code_Syntax *
 elm_code_syntax_for_mime_get(const char *mime)
 {
@@ -194,6 +214,17 @@ elm_code_syntax_for_mime_get(const char *mime)
    return NULL;
 }
 
+/**
+ * @brief Checks if a character can be part of a number.
+ *
+ * This includes standard digits '0'-'9' and any additional characters
+ * defined in the syntax's `numparts` field (e.g., '.').
+ *
+ * @param c The character to check.
+ * @param syntax The syntax definition to use.
+ * @return @c EINA_TRUE if the character is a digit or a number part,
+ *         @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _char_is_number(char c, Elm_Code_Syntax *syntax)
 {
@@ -209,6 +240,19 @@ _char_is_number(char c, Elm_Code_Syntax *syntax)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Parses a token and adds a syntax token to the line if it matches a known type.
+ *
+ * It checks if the token is a keyword or a number based on the provided syntax.
+ * If a match is found, an `Elm_Code_Token` of the appropriate type (KEYWORD or NUMBER)
+ * is added to the line.
+ *
+ * @param syntax The syntax definition.
+ * @param line The line to which the token belongs.
+ * @param pos The starting position of the token in the line.
+ * @param token A pointer to the start of the token string.
+ * @param length The length of the token string.
+ */
 static void
 _elm_code_syntax_parse_token(Elm_Code_Syntax *syntax, Elm_Code_Line *line, unsigned int pos, const char *token, unsigned int length)
 {
@@ -231,6 +275,15 @@ _elm_code_syntax_parse_token(Elm_Code_Syntax *syntax, Elm_Code_Line *line, unsig
      }
 }
 
+/**
+ * @brief Checks if a given string starts with a specific prefix.
+ *
+ * @param content The string to check.
+ * @param prefix The prefix to look for.
+ * @param length The length of the @p content string.
+ * @return @c EINA_TRUE if @p content starts with @p prefix, @c EINA_FALSE otherwise.
+ *         Returns @c EINA_FALSE if prefix is NULL or longer than content.
+ */
 static Eina_Bool
 _content_starts_with(const char *content, const char *prefix, unsigned int length)
 {
@@ -250,24 +303,43 @@ _content_starts_with(const char *content, const char *prefix, unsigned int lengt
    return EINA_TRUE;
 }
 
+/**
+ * @brief Checks if the content starts with a single-line comment marker.
+ */
 static Eina_Bool
 _starts_single_comment(Elm_Code_Syntax *syntax, const char *content, unsigned int length)
 {
    return _content_starts_with(content, syntax->comment_single, length);
 }
 
+/**
+ * @brief Checks if the content starts with a multi-line comment start marker.
+ */
 static Eina_Bool
 _starts_comment(Elm_Code_Syntax *syntax, const char *content, unsigned int length)
 {
    return _content_starts_with(content, syntax->comment_start, length);
 }
 
+/**
+ * @brief Checks if the content starts with a multi-line comment end marker.
+ */
 static Eina_Bool
 _ends_comment(Elm_Code_Syntax *syntax, const char *content, unsigned int length)
 {
    return _content_starts_with(content, syntax->comment_end, length);
 }
 
+/**
+ * @brief Determines if the previous line contains a token that continues to the current line.
+ *
+ * This is used for multi-line constructs like comments or preprocessor directives.
+ * It inspects the tokens of the previous line for one with the 'continues' flag set.
+ *
+ * @param line The current line.
+ * @return The `Elm_Code_Token_Type` of the continuing token from the previous line,
+ *         or `ELM_CODE_TOKEN_TYPE_DEFAULT` if no token continues.
+ */
 static Elm_Code_Token_Type
 _previous_line_continue_type(Elm_Code_Line *line)
 {
@@ -289,6 +361,15 @@ _previous_line_continue_type(Elm_Code_Line *line)
    return ELM_CODE_TOKEN_TYPE_DEFAULT;
 }
 
+/**
+ * @brief Gets the scope value from the end of the previous line.
+ *
+ * The scope of the current line is calculated based on the scope of the
+ * previous line. This function retrieves that base value.
+ *
+ * @param line The current line.
+ * @return The scope value of the previous line, or 0 if it's the first line.
+ */
 unsigned int
 _previous_line_scope(Elm_Code_Line *line)
 {
@@ -304,6 +385,25 @@ _previous_line_scope(Elm_Code_Line *line)
    return prev->scope;
 }
 
+/**
+ * @brief Parses a single line of code, identifying and adding tokens based on the given syntax.
+ *
+ * This is the core syntax highlighting function. It performs a lexical analysis of the
+ * line's content. It handles:
+ * - Continuing multi-line comments or preprocessor directives from the previous line.
+ * - Preprocessor directives.
+ * - Single-line comments.
+ * - Multi-line comments.
+ * - String literals (double and single quoted).
+ * - Symbols (operators, braces, etc.).
+ * - Other words, which are then identified as keywords or numbers.
+ *
+ * It also calculates the line's scope based on the previous line's scope and
+ * any scope-changing characters on the current line.
+ *
+ * @param syntax The syntax definition to use.
+ * @param line The line that contains the content to parse and will receive the tokens.
+ */
 EAPI void
 elm_code_syntax_parse_line(Elm_Code_Syntax *syntax, Elm_Code_Line *line)
 {
@@ -439,6 +539,16 @@ elm_code_syntax_parse_line(Elm_Code_Syntax *syntax, Elm_Code_Line *line)
      _elm_code_syntax_parse_token(syntax, line, ptr-content, ptr, count);
 }
 
+/**
+ * @brief Parses an entire file, applying syntax highlighting to each line.
+ *
+ * @note This function is currently a stub and does not perform any action.
+ * The parsing is expected to be done line-by-line via
+ * elm_code_syntax_parse_line().
+ *
+ * @param syntax The syntax definition to use.
+ * @param file The file to parse.
+ */
 EAPI void
 elm_code_syntax_parse_file(Elm_Code_Syntax *syntax, Elm_Code_File *file EINA_UNUSED)
 {

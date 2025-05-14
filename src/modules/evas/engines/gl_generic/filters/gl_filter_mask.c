@@ -1,5 +1,24 @@
 #include "gl_engine_filter.h"
 
+/**
+ * @internal
+ * @brief Applies a mask to an input buffer and produces an output buffer.
+ *
+ * This function implements the mask filter operation for the OpenGL engine.
+ * It takes an input image and a mask image. The output is the input image,
+ * where the mask has been applied. The mask can be tiled or stretched to
+ * match the input image's dimensions, depending on the fill mode specified
+ * in the filter command.
+ *
+ * The masking is performed by setting a clip mask on the GL draw context
+ * and then drawing the input image. When the mask is smaller than the
+ * input, it's tiled.
+ *
+ * @param[in] re The render engine data.
+ * @param[in] cmd The filter command containing input, output, mask buffers,
+ *            and drawing parameters.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 _gl_filter_mask(Render_Engine_GL_Generic *re, Evas_Filter_Command *cmd)
 {
@@ -67,6 +86,19 @@ _gl_filter_mask(Render_Engine_GL_Generic *re, Evas_Filter_Command *cmd)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Get the filter function for a mask operation.
+ *
+ * This function validates the provided filter command @p cmd and returns
+ * the function pointer to the actual mask filter implementation if the
+ * command is valid. The command is considered valid if the input, mask,
+ * and output buffers are present and have valid dimensions.
+ *
+ * @param[in] re The render engine data (unused).
+ * @param[in] cmd The filter command to be validated.
+ * @return A function pointer to _gl_filter_mask on success, @c NULL on failure.
+ *         For example, if cmd->mask is NULL, this function will return NULL.
+ */
 GL_Filter_Apply_Func
 gl_filter_mask_func_get(Render_Engine_GL_Generic *re EINA_UNUSED, Evas_Filter_Command *cmd)
 {

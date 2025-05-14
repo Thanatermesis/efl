@@ -35,23 +35,45 @@
 
 #define KEVENT_NUM_EVENTS 5
 
+/**
+ * @brief Backend-specific data for kqueue-based Eio_Monitor.
+ *
+ * This structure holds all the necessary information for the kqueue backend
+ * to monitor a specific path. It includes a reference to the parent Eio_Monitor,
+ * a list of previously seen files (for detecting changes), and the file
+ * descriptor associated with the kqueue watch.
+ */
 struct _Eio_Monitor_Backend
 {
-   Eio_Monitor *parent;
-   Eina_List *prev_list;
-   int fd;
+   Eio_Monitor *parent; /**< Pointer to the parent Eio_Monitor instance. */
+   Eina_List *prev_list; /**< List of Eio_File_Info for the previously scanned directory state. Used to detect created/deleted files. */
+   int fd; /**< File descriptor for the kqueue event source (the monitored file or directory). */
 };
 
+/**
+ * @brief Structure to hold information about a file.
+ *
+ * This is used to store the path and stat information for files within
+ * a monitored directory, primarily to detect changes between scans.
+ */
 typedef struct _Eio_File_Info Eio_File_Info;
 struct _Eio_File_Info
 {
-   const char *path;
-   Eina_Stat st;
+   const char *path; /**< The full path to the file, stringshared. */
+   Eina_Stat st;     /**< Stat information for the file. */
 };
 
-static Ecore_Fd_Handler *_kqueue_fd = NULL;
-static Eina_Hash *_kevent_monitors = NULL;
+static Ecore_Fd_Handler *_kqueue_fd = NULL; /**< Global Ecore_Fd_Handler for the kqueue instance. All kqueue events are processed through this. */
+static Eina_Hash *_kevent_monitors = NULL; /**< Hash table mapping kqueue file descriptors (ident) to their corresponding Eio_Monitor_Backend. Key: (int *)fd, Value: (Eio_Monitor_Backend *)backend. */
 
+/**
+ * @brief Frees a list of Eio_File_Info structures.
+ *
+ * Iterates through the list, unreferences the stringshared path,
+ * and frees the Eio_File_Info structure itself.
+ *
+ * @param list The Eina_List of Eio_File_Info to free.
+ */
 static void
 _eio_kevent_ls_free(Eina_List *list)
 {
@@ -64,6 +86,16 @@ _eio_kevent_ls_free(Eina_List *list)
      }
 }
 
+/**
+ * @brief Cleans up an Eio_Monitor_Backend structure.
+ *
+ * This function is typically used as a callback when an Eio_Monitor_Backend
+ * is removed from the _kevent_monitors hash. It frees the list of
+ * previous file states, closes the associated file descriptor, and frees
+ * the backend structure itself.
+ *
+ * @param data Pointer to the Eio_Monitor_Backend to be deleted.
+ */
 static void
 _eio_kevent_del(void *data)
 {
@@ -77,7 +109,22 @@ _eio_kevent_del(void *data)
    free(emb);
 }
 
-
+/**
+ * @brief Lists the contents of a directory and stores their stat info.
+ *
+ * Creates a list of Eio_File_Info structures, each representing a file or
+ * subdirectory within the given directory. This list is used to compare
+ * against a previous state to detect changes.
+ *
+ * @param directory The path to the directory to list.
+ * @return An Eina_List of Eio_File_Info structures, or NULL on failure.
+ *         The caller is responsible for freeing this list using _eio_kevent_ls_free().
+ *         Example of Eina_List structure:
+ *         [
+ *           { path: "/path/to/dir/file1.txt", st: { ino: 123, mtime: ..., ... } },
+ *           { path: "/path/to/dir/subdir", st: { ino: 456, mtime: ..., ... } }
+ *         ]
+ */
 static Eina_List *
 _eio_kevent_ls(const char *directory)
 {
@@ -105,6 +152,17 @@ _eio_kevent_ls(const char *directory)
    return files;
 }
 
+/**
+ * @brief Compares the current state of a directory with its previous state to find changes.
+ *
+ * This function is called when a directory modification event (NOTE_WRITE or NOTE_ATTRIB
+ * on the directory itself) is detected by kqueue. It lists the current directory
+ * contents and compares it with the `prev_list` stored in the backend.
+ * It then sends appropriate EIO_MONITOR events (CREATED, DELETED, MODIFIED)
+ * for files and directories.
+ *
+ * @param backend The Eio_Monitor_Backend associated with the monitored directory.
+ */
 static void
 _eio_kevent_event_find(Eio_Monitor_Backend *backend)
 {
@@ -168,6 +226,17 @@ _eio_kevent_event_find(Eio_Monitor_Backend *backend)
    backend->prev_list = next_list;
 }
 
+/**
+ * @brief Ecore_Fd_Handler callback for kqueue events.
+ *
+ * This function is called by the Ecore main loop when there is activity
+ * on the global kqueue file descriptor. It retrieves events from kqueue,
+ * finds the corresponding Eio_Monitor_Backend, and processes the events.
+ *
+ * @param data User data, unused in this handler.
+ * @param fdh The Ecore_Fd_Handler that triggered this callback.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
+ */
 static Eina_Bool
 _eio_kevent_handler(void *data EINA_UNUSED, Ecore_Fd_Handler *fdh)
 {
@@ -219,6 +288,15 @@ _eio_kevent_handler(void *data EINA_UNUSED, Ecore_Fd_Handler *fdh)
  * @endcond
  */
 
+/**
+ * @brief Initializes the kqueue backend for Eio_Monitor.
+ *
+ * This function sets up the global kqueue file descriptor and the
+ * Ecore_Fd_Handler to process kqueue events. It also initializes the hash
+ * table used to store active monitors. This must be called before any
+ * kqueue-based monitors can be added.
+ * It is called from eio_monitor_init().
+ */
 void eio_monitor_backend_init(void)
 {
    int fd;
@@ -238,6 +316,14 @@ void eio_monitor_backend_init(void)
    _kevent_monitors = eina_hash_int32_new(_eio_kevent_del);
 }
 
+/**
+ * @brief Shuts down the kqueue backend for Eio_Monitor.
+ *
+ * Cleans up resources used by the kqueue backend, including freeing the
+ * hash table of monitors, deleting the Ecore_Fd_Handler, and closing
+ * the global kqueue file descriptor.
+ * It is called from eio_monitor_shutdown().
+ */
 void eio_monitor_backend_shutdown(void)
 {
    int fd;
@@ -256,6 +342,16 @@ void eio_monitor_backend_shutdown(void)
    close(fd);
 }
 
+/**
+ * @brief Adds a new path to be monitored using the kqueue backend.
+ *
+ * Creates an Eio_Monitor_Backend for the given Eio_Monitor, opens the
+ * specified path, and registers it with the kqueue system for event
+ * notification. If the path is a directory, its initial contents are listed.
+ *
+ * @param monitor The Eio_Monitor instance representing the path to monitor.
+ *                The `monitor->backend` will be populated by this function.
+ */
 void eio_monitor_backend_add(Eio_Monitor *monitor)
 {
    struct kevent e;
@@ -301,6 +397,17 @@ error:
    free(backend);
 }
 
+/**
+ * @brief Stops monitoring a path with the kqueue backend.
+ *
+ * Removes the Eio_Monitor_Backend associated with the given Eio_Monitor
+ * from the internal hash table. This implicitly triggers the cleanup
+ * of the backend resources (closing fd, freeing lists) via the
+ * _eio_kevent_del hash free callback.
+ *
+ * @param monitor The Eio_Monitor instance to stop monitoring.
+ *                `monitor->backend` will be set to NULL.
+ */
 void eio_monitor_backend_del(Eio_Monitor *monitor)
 {
    Eio_Monitor_Backend *backend;
@@ -311,6 +418,18 @@ void eio_monitor_backend_del(Eio_Monitor *monitor)
    eina_hash_del(_kevent_monitors, &backend->fd, backend);
 }
 
+/**
+ * @brief Checks if a given path was part of the last known state of a monitored directory.
+ *
+ * This function is used to determine if a path reported in an event (e.g., a deleted file)
+ * was actually known to be part of the monitored directory's contents before the event.
+ * It iterates through the `prev_list` of the monitor's backend.
+ *
+ * @param monitor The Eio_Monitor instance.
+ * @param path The path to check.
+ * @return EINA_TRUE if the path was found in the previous list of directory contents,
+ *         EINA_FALSE otherwise.
+ */
 Eina_Bool eio_monitor_context_check(const Eio_Monitor *monitor, const char *path)
 {
    Eio_Monitor_Backend *backend = monitor->backend;

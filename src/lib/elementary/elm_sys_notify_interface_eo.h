@@ -4,6 +4,11 @@
 #ifndef _ELM_SYS_NOTIFY_INTERFACE_EO_CLASS_TYPE
 #define _ELM_SYS_NOTIFY_INTERFACE_EO_CLASS_TYPE
 
+/**
+ * @brief Represents the Elementary System Notify Interface.
+ * This type is used for objects that implement the system notification capabilities.
+ * @ingroup Elm_Sys_Notify_Interface
+ */
 typedef Eo Elm_Sys_Notify_Interface;
 
 #endif

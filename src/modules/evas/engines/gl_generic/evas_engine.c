@@ -54,6 +54,22 @@ static Eina_Bool eng_gl_surface_read_pixels(void *data, void *surface, int x, in
 
 Eina_Bool _need_context_restore = EINA_FALSE;
 
+/**
+ * @internal
+ * @brief Finds a suitable GL render output to use.
+ *
+ * This function determines which render output to use for a GL operation.
+ * The selection logic is as follows:
+ * 1. If a 'current' output is explicitly set on the engine, it is used.
+ * 2. If not, it checks thread-local storage (TLS) for a stored output,
+ *    which is useful in multi-threaded applications to keep rendering
+ *    contexts separate.
+ * 3. As a last resort, it iterates through all available outputs and picks
+ *    the first one that is attached to an underlying output buffer.
+ *
+ * @param[in] engine The generic GL render engine.
+ * @return A pointer to the selected render output, or NULL if none is found.
+ */
 static Render_Output_GL_Generic *
 _evgl_output_find(Render_Engine_GL_Generic *engine)
 {
@@ -87,6 +103,16 @@ _evgl_output_find(Render_Engine_GL_Generic *engine)
 
 static Evas_Func func, pfunc;
 
+/**
+ * @internal
+ * @brief Restores the Evas GL context if it was changed externally.
+ *
+ * This function is called to ensure that the correct Evas GL context is active.
+ * It checks a thread-local flag (_need_context_restore) and, if set,
+ * re-activates the context that was stored in thread-local storage. This is
+ * crucial when Evas GL rendering is interleaved with application-specific
+ * OpenGL calls that might use a different context.
+ */
 void
 _context_restore(void)
 {
@@ -102,6 +128,18 @@ _context_restore(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Stores the current GL context information in thread-local storage.
+ *
+ * This allows Evas to remember which context was active for a given thread,
+ * so it can be restored later by _context_restore(). This mechanism is only
+ * active for the main thread where Evas was initialized.
+ *
+ * @param[in] data The GL implementation-specific data (e.g., window).
+ * @param[in] surface The GL surface.
+ * @param[in] context The GL context.
+ */
 static inline void
 _context_store(void *data, void *surface, void *context)
 {
@@ -118,6 +156,16 @@ _context_store(void *data, void *surface, void *context)
      }
 }
 
+/**
+ * @internal
+ * @brief Resets the stored context information in thread-local storage.
+ *
+ * This should be called when a surface is destroyed to prevent attempts
+ * to restore a context associated with an invalid surface.
+ *
+ * @param[in] data Unused.
+ * @param[in] surface The surface being destroyed.
+ */
 static inline void
 _context_stored_reset(void *data EINA_UNUSED, void *surface)
 {
@@ -135,6 +183,17 @@ _context_stored_reset(void *data EINA_UNUSED, void *surface)
 #define CONTEXT_STORED_RESET(data, surface) _context_stored_reset(data, surface)
 
 #ifdef GL_GLES
+/**
+ * @internal
+ * @brief Gets the EGL display associated with the engine.
+ *
+ * Iterates through the engine's outputs to find one with an associated
+ * output buffer and queries its EGL display handle. This is specific to
+ * OpenGL ES environments.
+ *
+ * @param[in] engine The generic GL render engine.
+ * @return The EGLDisplay handle or NULL on failure.
+ */
 static void *
 egl_display_get(Render_Engine_GL_Generic *engine)
 {
@@ -151,6 +210,11 @@ egl_display_get(Render_Engine_GL_Generic *engine)
 
 void eng_image_free(void *engine, void *image);
 
+/**
+ * @internal
+ * @brief Allocates and initializes a new generic GL render engine instance.
+ * @return A pointer to the new engine instance, or NULL on allocation failure.
+ */
 static void *
 eng_engine_new(void)
 {
@@ -163,6 +227,11 @@ eng_engine_new(void)
    return engine;
 }
 
+/**
+ * @internal
+ * @brief Frees all resources associated with a generic GL render engine instance.
+ * @param[in] engine The engine instance to free.
+ */
 static void
 eng_engine_free(void *engine)
 {
@@ -176,6 +245,19 @@ eng_engine_free(void *engine)
    free(e);
 }
 
+/**
+ * @internal
+ * @brief Draw a rectangle.
+ * @param engine The engine.
+ * @param data The render output data.
+ * @param context The draw context.
+ * @param surface The target surface.
+ * @param x The x coordinate of the rectangle.
+ * @param y The y coordinate of the rectangle.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ * @param do_async Unused.
+ */
 static void
 eng_rectangle_draw(void *engine EINA_UNUSED, void *data, void *context, void *surface, int x, int y, int w, int h, Eina_Bool do_async EINA_UNUSED)
 {
@@ -188,6 +270,19 @@ eng_rectangle_draw(void *engine EINA_UNUSED, void *data, void *context, void *su
    evas_gl_common_rect_draw(gl_context, x, y, w, h);
 }
 
+/**
+ * @internal
+ * @brief Draw a line.
+ * @param engine The engine.
+ * @param data The render output data.
+ * @param context The draw context.
+ * @param surface The target surface.
+ * @param p1x X coordinate of the start point.
+ * @param p1y Y coordinate of the start point.
+ * @param p2x X coordinate of the end point.
+ * @param p2y Y coordinate of the end point.
+ * @param do_async Unused.
+ */
 static void
 eng_line_draw(void *engine EINA_UNUSED, void *data, void *context, void *surface, int p1x, int p1y, int p2x, int p2y, Eina_Bool do_async EINA_UNUSED)
 {
@@ -200,18 +295,46 @@ eng_line_draw(void *engine EINA_UNUSED, void *data, void *context, void *surface
    evas_gl_common_line_draw(gl_context, p1x, p1y, p2x, p2y);
 }
 
+/**
+ * @internal
+ * @brief Add a point to a polygon object.
+ * @param engine Unused.
+ * @param polygon The polygon object.
+ * @param x The x coordinate of the point.
+ * @param y The y coordinate of the point.
+ * @return The polygon object.
+ */
 static void *
 eng_polygon_point_add(void *engine EINA_UNUSED, void *polygon, int x, int y)
 {
    return evas_gl_common_poly_point_add(polygon, x, y);
 }
 
+/**
+ * @internal
+ * @brief Clear all points from a polygon object.
+ * @param engine Unused.
+ * @param polygon The polygon object.
+ * @return The polygon object, now empty.
+ */
 static void *
 eng_polygon_points_clear(void *engine EINA_UNUSED, void *polygon)
 {
    return evas_gl_common_poly_points_clear(polygon);
 }
 
+/**
+ * @internal
+ * @brief Draw a polygon.
+ * @param engine Unused.
+ * @param data The render output data.
+ * @param context The draw context.
+ * @param surface The target surface.
+ * @param polygon The polygon to draw.
+ * @param x The x offset for the polygon.
+ * @param y The y offset for the polygon.
+ * @param do_async Unused.
+ */
 static void
 eng_polygon_draw(void *engine EINA_UNUSED, void *data, void *context, void *surface EINA_UNUSED, void *polygon, int x, int y, Eina_Bool do_async EINA_UNUSED)
 {
@@ -224,6 +347,13 @@ eng_polygon_draw(void *engine EINA_UNUSED, void *data, void *context, void *surf
    evas_gl_common_poly_draw(gl_context, polygon, x, y);
 }
 
+/**
+ * @internal
+ * @brief Check if an image has an alpha channel.
+ * @param engine Unused.
+ * @param image The image object.
+ * @return 1 if the image has alpha, 0 otherwise.
+ */
 static int
 eng_image_alpha_get(void *engine EINA_UNUSED, void *image)
 {
@@ -233,6 +363,13 @@ eng_image_alpha_get(void *engine EINA_UNUSED, void *image)
    return im->alpha;
 }
 
+/**
+ * @internal
+ * @brief Get the colorspace of an image.
+ * @param engine Unused.
+ * @param image The image object.
+ * @return The Evas_Colorspace of the image.
+ */
 static Evas_Colorspace
 eng_image_colorspace_get(void *engine EINA_UNUSED, void *image)
 {
@@ -242,6 +379,19 @@ eng_image_colorspace_get(void *engine EINA_UNUSED, void *image)
    return im->cs.space;
 }
 
+/**
+ * @internal
+ * @brief Set or unset the alpha channel flag on an image.
+ *
+ * This function can be complex. If the image is referenced multiple times,
+ * it may need to be duplicated to change the alpha flag, as this can affect
+ * its data representation. For other cases, it may just modify the flag.
+ *
+ * @param engine The engine instance.
+ * @param image The image to modify.
+ * @param has_alpha 1 to enable alpha, 0 to disable.
+ * @return The modified image object, which may be a new instance.
+ */
 static void *
 eng_image_alpha_set(void *engine, void *image, int has_alpha)
 {
@@ -287,6 +437,18 @@ eng_image_alpha_set(void *engine, void *image, int has_alpha)
    return evas_gl_common_image_alpha_set(im, has_alpha ? 1 : 0);
 }
 
+/**
+ * @internal
+ * @brief Get the original colorspace of an image from its file.
+ *
+ * This returns the colorspace as stored in the image file's metadata,
+ * which might be different from its current in-memory colorspace if it
+ * has been converted.
+ *
+ * @param engine Unused.
+ * @param image The image object.
+ * @return The original Evas_Colorspace from the file.
+ */
 static Evas_Colorspace
 eng_image_file_colorspace_get(void *engine EINA_UNUSED, void *image)
 {
@@ -298,6 +460,27 @@ eng_image_file_colorspace_get(void *engine EINA_UNUSED, void *image)
    return im->im->cache_entry.space;
 }
 
+/**
+ * @internal
+ * @brief Get a direct slice of pixel data from an image.
+ *
+ * This function provides access to an image's pixel data planes. A key aspect
+ * is its handling of images with a DYNAMIC content hint, which may only have
+ * data in a GPU texture. In such cases, this function can temporarily copy
+ * the texture data back to a CPU-side buffer to satisfy the request.
+ *
+ * @param[in] engine Unused.
+ * @param[in] image The image object.
+ * @param[in] plane The data plane to retrieve (usually 0 for RGBA).
+ * @param[out] slice The slice pointing to the image data.
+ * @param[out] cspace The colorspace of the returned data.
+ * @param[in] load If true, force loading of image data if not present.
+ * @param[out] tofree If the function needs to allocate a temporary buffer
+ *             (e.g., for dynamic images), this will be set to EINA_TRUE.
+ *             The caller becomes responsible for the temporary buffer,
+ *             which is managed through the returned image handle.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 eng_image_data_direct_get(void *engine EINA_UNUSED, void *image, int plane,
                           Eina_Slice *slice, Evas_Colorspace *cspace,
@@ -383,6 +566,18 @@ eng_image_data_direct_get(void *engine EINA_UNUSED, void *image, int plane,
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Set the colorspace of an image.
+ *
+ * Changing the colorspace may require reallocating the image's data buffers
+ * to match the new format. For example, converting from ARGB8888 to a YUV
+ * format will change the data layout completely.
+ *
+ * @param engine The engine instance.
+ * @param image The image to modify.
+ * @param cspace The new colorspace to set.
+ */
 static void
 eng_image_colorspace_set(void *engine, void *image, Evas_Colorspace cspace)
 {

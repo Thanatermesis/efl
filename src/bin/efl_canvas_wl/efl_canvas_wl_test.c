@@ -4,22 +4,51 @@
 #include "Efl_Canvas_Wl.h"
 #include "Elementary.h"
 
-static Evas_Object *win;
-static Eina_Strbuf *buf;
-static Eo *exe;
+static Evas_Object *win; ///< The main window object.
+static Eina_Strbuf *buf; ///< Buffer to store command line arguments.
+static Eo *exe; ///< The executable object run by efl_canvas_wl_run.
 
+/**
+ * @brief Handles the EFL_TASK_EVENT_EXIT event.
+ *
+ * This function is called when the executed task (exe) exits.
+ * It quits the main loop if the event object is the executed task.
+ *
+ * @param d User data, unused.
+ * @param ev The Efl_Event structure containing event information.
+ */
 static void
 del_handler(void *d EINA_UNUSED, const Efl_Event *ev)
 {
    if (ev->object == exe) ecore_main_loop_quit();
 }
 
+/**
+ * @brief Handles the EVAS_CALLBACK_FOCUS_IN event for the main window.
+ *
+ * Sets focus to the Efl_Canvas_Wl object when the main window gains focus.
+ *
+ * @param data The Efl_Canvas_Wl object to focus.
+ * @param e The Evas canvas, unused.
+ * @param obj The Evas object that triggered the event (the window), unused.
+ * @param event_info Event specific information, unused.
+ */
 static void
 focus_in(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    evas_object_focus_set(data, 1);
 }
 
+/**
+ * @brief Executes a command using efl_canvas_wl_run.
+ *
+ * This function is called by an ecore_timer. It runs the command
+ * specified in the global buffer `buf` using the provided `data`
+ * (Efl_Canvas_Wl object) as the Wayland surface.
+ *
+ * @param data The Efl_Canvas_Wl object to be used as the Wayland surface.
+ * @return EINA_FALSE to stop the timer from recurring.
+ */
 static Eina_Bool
 dostuff(void *data)
 {
@@ -29,6 +58,18 @@ dostuff(void *data)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Handles the EVAS_CALLBACK_CHANGED_SIZE_HINTS event.
+ *
+ * Propagates size hints (aspect, min, max) from the Efl_Canvas_Wl object
+ * to the main window. This is used when efl_canvas_wl_aspect_propagate_set
+ * and efl_canvas_wl_minmax_propagate_set are enabled.
+ *
+ * @param data The main window object (win).
+ * @param e The Evas canvas, unused.
+ * @param obj The Efl_Canvas_Wl object whose hints changed.
+ * @param event_info Event specific information, unused.
+ */
 static void
 hints_changed(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -43,6 +84,22 @@ hints_changed(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_inf
    evas_object_size_hint_max_set(data, w, h);
 }
 
+/**
+ * @brief Main function for the efl_canvas_wl_test application.
+ *
+ * Initializes Elementary, creates a window, and sets up an Efl_Canvas_Wl
+ * object to run a client application specified by command line arguments.
+ * The client application's output will be displayed within this Efl_Canvas_Wl object.
+ *
+ * @param argc Number of command line arguments.
+ * @param argv Array of command line argument strings.
+ *             The first argument (argv[0]) is the program name.
+ *             Subsequent arguments (argv[1] onwards) specify the
+ *             command and its arguments to be executed by efl_canvas_wl_run.
+ *             Example: ./efl_canvas_wl_test evas_test evas_object_textblock
+ *
+ * @return 0 on successful execution, non-zero otherwise.
+ */
 int
 main(int argc, char *argv[])
 {

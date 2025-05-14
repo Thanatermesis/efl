@@ -42,6 +42,23 @@ struct frame
    const char *swallow;
 };
 
+/**
+ * @brief Parses the theme argument for thumbnail generation.
+ *
+ * @param parser The Ecore_Getopt parser instance (unused).
+ * @param desc The Ecore_Getopt_Desc for this option (unused).
+ * @param str The string value of the argument to parse.
+ *        Expected format: "file:group:swallow_part".
+ * @param data Custom data associated with the callback (unused).
+ * @param storage The Ecore_Getopt_Value to store the parsed data.
+ *
+ * This callback is used by Ecore_Getopt to handle the --theme argument.
+ * It parses the argument string, which specifies a theme file, a group within
+ * that file, and a swallow part. The parsed values are stored in the
+ * 'frame' struct pointed to by 'storage'.
+ *
+ * @return 1 on success, 0 on failure.
+ */
 static unsigned char
 _ethumb_getopt_callback_frame_parse(const Ecore_Getopt *parser EINA_UNUSED, const Ecore_Getopt_Desc *desc EINA_UNUSED, const char *str, void *data EINA_UNUSED, Ecore_Getopt_Value *storage)
 {
@@ -124,6 +141,16 @@ const Ecore_Getopt optdesc = {
   }
 };
 
+/**
+ * @brief Reports the result of a thumbnail operation.
+ *
+ * @param mode A string indicating the status of the operation (e.g., "GENERATED", "FAILED", "EXISTS").
+ * @param e The Ethumb handle containing information about the file and thumbnail.
+ *
+ * This function retrieves the source file path/key and the generated
+ * thumbnail path/key from the Ethumb handle and prints them to stdout,
+ * prefixed with the operation status.
+ */
 static void
 _thumb_report(const char *mode, Ethumb *e)
 {
@@ -134,6 +161,16 @@ _thumb_report(const char *mode, Ethumb *e)
 	  mode, ap, ak ? ak : "", gp, gk ? gk : "");
 }
 
+/**
+ * @brief Callback function for when thumbnail generation is finished.
+ *
+ * @param data Custom data passed to the generation function (unused).
+ * @param e The Ethumb handle.
+ * @param success A boolean indicating if the thumbnail was generated successfully.
+ *
+ * This function is called by ethumb when an asynchronous thumbnail
+ * generation completes. It reports the result and quits the main loop.
+ */
 static void
 _finished_thumb( void *data EINA_UNUSED, Ethumb *e, Eina_Bool success)
 {
@@ -142,6 +179,18 @@ _finished_thumb( void *data EINA_UNUSED, Ethumb *e, Eina_Bool success)
    ecore_main_loop_quit();
 }
 
+/**
+ * @brief Main function for the ethumb command-line tool.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv An array of command-line argument strings.
+ *
+ * This program serves as a command-line interface for the ethumb library.
+ * It parses options to configure thumbnail generation (size, format, etc.),
+ * and then generates a thumbnail for a given input file.
+ *
+ * @return 0 on success, non-zero on failure.
+ */
 int
 main(int argc, char *argv[])
 {

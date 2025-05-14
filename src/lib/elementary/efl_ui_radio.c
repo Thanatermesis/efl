@@ -25,7 +25,20 @@ static const Elm_Layout_Part_Alias_Description _text_aliases[] =
    {NULL, NULL}
 };
 
+/** @internal
+ * @brief Signal name for the "changed" event.
+ */
 static const char SIG_CHANGED[] = "changed";
+
+/** @internal
+ * @brief Descriptions for smart callbacks supported by Efl.Ui.Radio.
+ *
+ * Each element is an Evas_Smart_Cb_Description:
+ * - First field: const char *name (signal name)
+ * - Second field: const char *type (type signature of callback parameters, "" means void *event_info)
+ *
+ * Example: {SIG_CHANGED, ""} means a signal "changed" with no specific event_info structure.
+ */
 static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {SIG_CHANGED, ""}, /**< handled by efl_ui_check */
    {SIG_WIDGET_LANG_CHANGED, ""}, /**< handled by elm_widget */
@@ -37,11 +50,33 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
 
 static Eina_Bool _key_action_activate(Evas_Object *obj, const char *params);
 
+/** @internal
+ * @brief Defines keyboard actions for the radio widget.
+ *
+ * Each element is an Elm_Action:
+ * - First field: const char *name (action name, e.g., "activate")
+ * - Second field: Eina_Bool (*func)(Evas_Object *obj, const char *params) (callback function)
+ *
+ * Example: {"activate", _key_action_activate} maps the "activate" action to the
+ * _key_action_activate function.
+ */
 static const Elm_Action key_actions[] = {
    {"activate", _key_action_activate},
    {NULL, NULL}
 };
 
+/**
+ * @internal
+ * @brief Emits a standardized Edje signal for the radio widget.
+ *
+ * The signal format is "<source>,<middle_term>,<state>", where:
+ * - <source> is "elm" for legacy widgets or "efl" for newer widgets.
+ * - <middle_term> is a string provided by the caller (e.g., "state,radio", "activate,radio").
+ * - <state> is "on" if the radio is selected, "off" otherwise.
+ *
+ * @param obj The radio widget object.
+ * @param middle_term The middle part of the signal string.
+ */
 static void
 _radio_widget_signal_emit(Evas_Object *obj, const char *middle_term)
 {
@@ -62,6 +97,17 @@ _radio_widget_signal_emit(Evas_Object *obj, const char *middle_term)
    elm_layout_signal_emit(obj, path, source);
 }
 
+/**
+ * @internal
+ * @brief Sets the selected state of the radio button and emits appropriate signals.
+ * This function overrides the efl_ui_selectable_selected_set method.
+ * It also emits an accessibility state change signal if AT-SPI mode is enabled
+ * and the radio button becomes checked.
+ *
+ * @param obj The radio widget object.
+ * @param pd Private data of the radio widget (unused in this function).
+ * @param value The new selected state (EINA_TRUE for selected, EINA_FALSE for unselected).
+ */
 static void
 _efl_ui_radio_efl_ui_selectable_selected_set(Eo *obj, Efl_Ui_Radio_Data *pd EINA_UNUSED, Eina_Bool value)
 {
@@ -79,13 +125,36 @@ _efl_ui_radio_efl_ui_selectable_selected_set(Eo *obj, Efl_Ui_Radio_Data *pd EINA
      }
 }
 
-
+/**
+ * @internal
+ * @brief Emits an activation signal for the radio widget.
+ * This is a helper function that calls _radio_widget_signal_emit with "activate,radio".
+ *
+ * @param obj The radio widget object.
+ */
 static void
 _activate_state_emit(Evas_Object *obj)
 {
    _radio_widget_signal_emit(obj, "activate,radio");
 }
 
+/**
+ * @internal
+ * @brief Updates the selection state of all radio buttons within the same group.
+ *
+ * Iterates through all radio buttons in the group associated with `sd`.
+ * It sets their selection state based on the group's current value (`sd->group->value`).
+ * If `activate` is EINA_TRUE, it also emits activation signals for each radio button
+ * during the state change.
+ *
+ * A special case handles scenarios where the intended selected radio button might be
+ * disabled. If this occurs, and there was a previously selected radio button,
+ * this function attempts to re-select that previous one.
+ *
+ * @param sd The private data of a radio widget in the group. This provides access
+ *           to the group's information (list of radios, current group value).
+ * @param activate If EINA_TRUE, emits activation signals for affected radio buttons.
+ */
 static void
 _state_set_all(Efl_Ui_Radio_Data *sd, Eina_Bool activate)
 {
@@ -118,6 +187,26 @@ _state_set_all(Efl_Ui_Radio_Data *sd, Eina_Bool activate)
      }
 }
 
+/**
+ * @internal
+ * @brief Handles the activation logic for a radio button.
+ *
+ * This function is called when a radio button is activated (e.g., by a click or key press).
+ *
+ * For legacy widgets:
+ * - If the radio's value already matches the group's value, it does nothing.
+ * - Otherwise, it updates the group's value (`sd->group->value`) to this radio's value.
+ * - If a value pointer (`sd->group->valuep`) is set, it's also updated.
+ * - It then calls `_state_set_all` to update the visual state of all radios in the group.
+ * - If access mode is enabled, it announces "State: On".
+ * - Finally, it triggers the "changed" smart callback.
+ *
+ * For non-legacy (EFL UI) widgets:
+ * - It simply toggles the selected state of the current radio button. The group logic
+ *   is expected to be handled by a manager or container widget, or through bindings.
+ *
+ * @param obj The radio widget object that was activated.
+ */
 static void
 _activate(Evas_Object *obj)
 {
@@ -148,6 +237,18 @@ _activate(Evas_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback function for the "activate" key action.
+ *
+ * This function is invoked when the "activate" action (e.g., pressing Space or Enter
+ * when the radio button has focus) is triggered. It calls the `_activate` function
+ * to perform the radio button activation.
+ *
+ * @param obj The radio widget object.
+ * @param params Action parameters (currently unused).
+ * @return EINA_TRUE to indicate the action was handled.
+ */
 static Eina_Bool
 _key_action_activate(Evas_Object *obj, const char *params EINA_UNUSED)
 {
@@ -155,6 +256,21 @@ _key_action_activate(Evas_Object *obj, const char *params EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Applies the theme to the radio widget and updates its visual state.
+ *
+ * This function overrides the `efl_ui_widget_theme_apply` EOLIAN method.
+ * After calling the superclass's theme apply, it emits specific signals
+ * based on whether the widget is legacy or not, and its current selected state.
+ * For legacy widgets, it emits "elm,state,radio,on" or "elm,state,radio,off".
+ * For non-legacy widgets, it emits "efl,state,selected" or "efl,state,unselected".
+ * It also ensures that any pending Edje messages are processed.
+ *
+ * @param obj The radio widget object.
+ * @param sd Private data of the radio widget (unused in this function).
+ * @return EFL_UI_THEME_APPLY_ERROR_GENERIC on failure from super, or the result of super's apply.
+ */
 EOLIAN static Eina_Error
 _efl_ui_radio_efl_ui_widget_theme_apply(Eo *obj, Efl_Ui_Radio_Data *sd EINA_UNUSED)
 {
@@ -179,6 +295,19 @@ _efl_ui_radio_efl_ui_widget_theme_apply(Eo *obj, Efl_Ui_Radio_Data *sd EINA_UNUS
    return int_ret;
 }
 
+/**
+ * @internal
+ * @brief Callback function for the "elm,action,radio,toggle" signal.
+ *
+ * This callback is used in legacy mode. When the "elm,action,radio,toggle" signal
+ * is emitted (typically by the theme when the radio is clicked), this function
+ * calls `_activate` to handle the radio button's activation.
+ *
+ * @param data User data, expected to be the radio widget object (`Evas_Object *`).
+ * @param obj The Evas object that emitted the signal (unused).
+ * @param emission The emitted signal string (e.g., "elm,action,radio,toggle") (unused).
+ * @param source The source of the signal (e.g., "elm") (unused).
+ */
 static void
 _radio_on_cb(void *data,
              Evas_Object *obj EINA_UNUSED,
@@ -188,6 +317,21 @@ _radio_on_cb(void *data,
    _activate(data);
 }
 
+/**
+ * @internal
+ * @brief Provides accessibility information for the radio widget.
+ *
+ * This function is used as a callback for `ELM_ACCESS_INFO`.
+ * It retrieves the accessibility information string, prioritizing
+ * `elm_widget_access_info_get(obj)`. If that is NULL, it falls back to
+ * `elm_layout_text_get(obj, NULL)` (the visible text of the radio).
+ *
+ * @param data User data, passed from _elm_access_callback_set (unused).
+ * @param obj The radio widget object.
+ * @return A newly allocated string containing the accessibility information,
+ *         or NULL if no information is available. The caller is responsible
+ *         for freeing the returned string.
+ */
 static char *
 _access_info_cb(void *data EINA_UNUSED, Evas_Object *obj)
 {
@@ -199,6 +343,19 @@ _access_info_cb(void *data EINA_UNUSED, Evas_Object *obj)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Provides the accessibility state description for the radio widget.
+ *
+ * This function is used as a callback for `ELM_ACCESS_STATE`.
+ * It returns a string describing the current state of the radio button,
+ * such as "State: Disabled", "State: On", or "State: Off".
+ *
+ * @param data User data, passed from _elm_access_callback_set (unused).
+ * @param obj The radio widget object.
+ * @return A newly allocated string containing the accessibility state description.
+ *         The caller is responsible for freeing the returned string.
+ */
 static char *
 _access_state_cb(void *data EINA_UNUSED, Evas_Object *obj)
 {
@@ -208,6 +365,25 @@ _access_state_cb(void *data EINA_UNUSED, Evas_Object *obj)
    return strdup(E_("State: Off"));
 }
 
+/**
+ * @internal
+ * @brief Constructor for the Efl.Ui.Radio object.
+ *
+ * Initializes the radio widget. This includes:
+ * - Setting the default theme class to "radio" if not already set.
+ * - Calling the superclass constructor.
+ * - Setting up smart callbacks.
+ * - For legacy widgets:
+ *   - Adding a signal callback for "elm,action,radio,toggle" to handle activation.
+ *   - Initializing the radio group structure (`pd->group`) and adding the new
+ *     radio object to this group.
+ * - Setting the accessibility role to `EFL_ACCESS_ROLE_RADIO_BUTTON`.
+ * - Setting up accessibility information and state callbacks.
+ *
+ * @param obj The Efl.Ui.Radio object being constructed.
+ * @param pd The private data structure for the radio widget.
+ * @return The constructed Eo object, or NULL on failure.
+ */
 EOLIAN static Eo *
 _efl_ui_radio_efl_object_constructor(Eo *obj, Efl_Ui_Radio_Data *pd)
 {
@@ -241,6 +417,19 @@ _efl_ui_radio_efl_object_constructor(Eo *obj, Efl_Ui_Radio_Data *pd)
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Destructor for the Efl.Ui.Radio object.
+ *
+ * Performs cleanup for the radio widget. This includes:
+ * - For legacy widgets:
+ *   - Removing the radio object from its group (`pd->group->radios`).
+ *   - If the group becomes empty after removal, freeing the group structure.
+ * - Calling the superclass destructor.
+ *
+ * @param obj The Efl.Ui.Radio object being destructed (unused directly, superclass uses it).
+ * @param pd The private data structure for the radio widget.
+ */
 EOLIAN static void
 _efl_ui_radio_efl_object_destructor(Eo *obj EINA_UNUSED, Efl_Ui_Radio_Data *pd)
 {
@@ -253,6 +442,19 @@ _efl_ui_radio_efl_object_destructor(Eo *obj EINA_UNUSED, Efl_Ui_Radio_Data *pd)
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Sets an integer value associated with this specific radio button.
+ *
+ * This value is used in legacy mode to determine which radio button in a group
+ * should be selected based on the group's current value.
+ * If the widget is legacy and its new `value` matches the `group->value`,
+ * this radio button is selected; otherwise, it's deselected.
+ *
+ * @param obj The radio widget object.
+ * @param sd The private data for the radio widget.
+ * @param value The integer value to associate with this radio button.
+ */
 EOLIAN static void
 _efl_ui_radio_state_value_set(Eo *obj, Efl_Ui_Radio_Data *sd, int value)
 {
@@ -264,12 +466,34 @@ _efl_ui_radio_state_value_set(Eo *obj, Efl_Ui_Radio_Data *sd, int value)
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the integer value associated with this specific radio button.
+ *
+ * @param obj The radio widget object (unused).
+ * @param sd The private data for the radio widget.
+ * @return The integer value of this radio button.
+ */
 EOLIAN static int
 _efl_ui_radio_state_value_get(const Eo *obj EINA_UNUSED, Efl_Ui_Radio_Data *sd)
 {
    return sd->value;
 }
 
+/**
+ * @internal
+ * @brief Handles accessibility activation requests for the radio widget.
+ *
+ * This overrides the `efl_ui_widget_on_access_activate` EOLIAN method.
+ * If the widget is not disabled and the activation type is `EFL_UI_ACTIVATE_DEFAULT`,
+ * it calls the internal `_activate(obj)` function to perform the activation logic.
+ *
+ * @param obj The radio widget object.
+ * @param _pd Private data of the radio widget (unused).
+ * @param act The type of activation requested (e.g., `EFL_UI_ACTIVATE_DEFAULT`).
+ * @return EINA_TRUE if the activation was handled (widget not disabled and default action),
+ *         EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_radio_efl_ui_widget_on_access_activate(Eo *obj, Efl_Ui_Radio_Data *_pd EINA_UNUSED, Efl_Ui_Activate act)
 {
@@ -281,6 +505,26 @@ _efl_ui_radio_efl_ui_widget_on_access_activate(Eo *obj, Efl_Ui_Radio_Data *_pd E
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Provides a list of Elementary accessibility actions supported by the radio widget.
+ *
+ * This overrides the `efl_access_widget_action_elm_actions_get` EOLIAN method.
+ * Currently, it returns a static array containing only the "activate" action,
+ * which is mapped to the `_key_action_activate` function.
+ *
+ * The structure of `Efl_Access_Action_Data` is:
+ * - `name`: Programmatic name of the action.
+ * - `action`: Localized name of the action.
+ * - `keybinding`: Associated keybinding (if any, NULL here).
+ * - `f`: Callback function `Eina_Bool (*f)(Evas_Object *obj, const char *params)`.
+ *
+ * @param obj The radio widget object (unused).
+ * @param pd Private data of the radio widget (unused).
+ * @return A pointer to a static array of `Efl_Access_Action_Data`. The array is
+ *         terminated by an element with all NULL members.
+ *         Example: `{{ "activate", "activate", NULL, _key_action_activate}, {NULL,NULL,NULL,NULL}}`
+ */
 EOLIAN const Efl_Access_Action_Data *
 _efl_ui_radio_efl_access_widget_action_elm_actions_get(const Eo *obj EINA_UNUSED, Efl_Ui_Radio_Data *pd EINA_UNUSED)
 {
@@ -291,6 +535,21 @@ _efl_ui_radio_efl_access_widget_action_elm_actions_get(const Eo *obj EINA_UNUSED
    return &atspi_actions[0];
 }
 
+/**
+ * @internal
+ * @brief Gets the accessibility state set for the radio object.
+ *
+ * This overrides the `efl_access_object_state_set_get` EOLIAN method.
+ * It retrieves the state set from the superclass and then adds the
+ * `EFL_ACCESS_STATE_TYPE_CHECKED` state if this radio button is currently
+ * the selected one in its group (determined by `elm_radio_selected_object_get(obj)`).
+ * This is particularly relevant for AT-SPI (Accessibility Toolkit Service Provider Interface).
+ *
+ * @param obj The radio widget object.
+ * @param pd Private data of the radio widget (unused).
+ * @return The `Efl_Access_State_Set` for the object, indicating its current states
+ *         (e.g., focusable, checked, etc.).
+ */
 EOLIAN Efl_Access_State_Set
 _efl_ui_radio_efl_access_object_state_set_get(const Eo *obj, Efl_Ui_Radio_Data *pd EINA_UNUSED)
 {
@@ -321,12 +580,34 @@ EFL_UI_LAYOUT_TEXT_ALIASES_IMPLEMENT(MY_CLASS_PFX)
 #define MY_CLASS_NAME_LEGACY "elm_radio"
 /* Legacy APIs */
 
+/**
+ * @internal
+ * @brief Legacy class constructor for elm_radio.
+ *
+ * Registers the legacy type name "elm_radio" with the Evas smart system.
+ * This allows old code using `elm_radio_add` to work with the new Eo-based widget.
+ *
+ * @param klass The Efl_Class being constructed for the legacy radio type.
+ */
 static void
 _efl_ui_radio_legacy_class_constructor(Efl_Class *klass)
 {
    evas_smart_legacy_type_register(MY_CLASS_NAME_LEGACY, klass);
 }
 
+/**
+ * @internal
+ * @brief Legacy object constructor for elm_radio.
+ *
+ * This function is called when an `elm_radio` is created using legacy APIs.
+ * It calls the superclass constructor for `EFL_UI_RADIO_LEGACY_CLASS`,
+ * sets the Evas object type to "elm_radio" for compatibility, and
+ * initializes legacy focus handling.
+ *
+ * @param obj The legacy radio widget object being constructed.
+ * @param _pd Private data for the legacy radio widget (unused).
+ * @return The constructed Eo object.
+ */
 EOLIAN static Eo *
 _efl_ui_radio_legacy_efl_object_constructor(Eo *obj, void *_pd EINA_UNUSED)
 {
@@ -336,6 +617,22 @@ _efl_ui_radio_legacy_efl_object_constructor(Eo *obj, void *_pd EINA_UNUSED)
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Legacy theme application for elm_radio.
+ *
+ * Overrides `efl_ui_widget_theme_apply` for the legacy radio.
+ * After the superclass applies the theme, this function calls
+ * `_elm_layout_legacy_icon_signal_emit(obj)` if the object is finalized.
+ * This is a FIXME related to how icons/content are handled in legacy layouts,
+ * specifically because the radio uses "elm.swallow.content" instead of a
+ * standard "elm.swallow.icon".
+ *
+ * @param obj The legacy radio widget object.
+ * @param _pd Private data for the legacy radio widget (unused).
+ * @return The result of the superclass's theme_apply operation, or
+ *         EFL_UI_THEME_APPLY_ERROR_GENERIC on early failure.
+ */
 EOLIAN static Eina_Error
 _efl_ui_radio_legacy_efl_ui_widget_theme_apply(Eo *obj, void *_pd EINA_UNUSED)
 {
@@ -354,6 +651,22 @@ _efl_ui_radio_legacy_efl_ui_widget_theme_apply(Eo *obj, void *_pd EINA_UNUSED)
 /* FIXME: replicated from elm_layout just because radio's icon spot
  * is elm.swallow.content, not elm.swallow.icon. Fix that whenever we
  * can changed the theme API */
+/**
+ * @internal
+ * @brief Legacy sub-object deletion for elm_radio.
+ *
+ * Overrides `efl_ui_widget_sub_object_del` for the legacy radio.
+ * After the superclass handles sub-object deletion, this function calls
+ * `_elm_layout_legacy_icon_signal_emit(obj)`.
+ * This is part of the FIXME related to legacy icon/content handling,
+ * ensuring UI updates correctly when content changes.
+ *
+ * @param obj The legacy radio widget object.
+ * @param _pd Private data for the legacy radio widget (unused).
+ * @param sobj The sub-object being deleted.
+ * @return EINA_TRUE if the sub-object was successfully deleted by the superclass,
+ *         EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_radio_legacy_efl_ui_widget_widget_sub_object_del(Eo *obj, void *_pd EINA_UNUSED, Evas_Object *sobj)
 {
@@ -370,6 +683,22 @@ _efl_ui_radio_legacy_efl_ui_widget_widget_sub_object_del(Eo *obj, void *_pd EINA
 /* FIXME: replicated from elm_layout just because radio's icon spot
  * is elm.swallow.content, not elm.swallow.icon. Fix that whenever we
  * can changed the theme API */
+/**
+ * @internal
+ * @brief Legacy content setting for elm_radio.
+ *
+ * Implements `efl_content_set` for the legacy radio, typically for the
+ * "elm.swallow.content" part. After the superclass sets the content,
+ * this function calls `_elm_layout_legacy_icon_signal_emit(obj)`.
+ * This is part of the FIXME related to legacy icon/content handling.
+ *
+ * @param obj The legacy radio widget object.
+ * @param _pd Private data for the legacy radio widget (unused).
+ * @param part The name of the part to set content into (e.g., "elm.swallow.content").
+ * @param content The Evas_Object to set as content.
+ * @return EINA_TRUE if the content was successfully set by the superclass,
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _efl_ui_radio_legacy_content_set(Eo *obj, void *_pd EINA_UNUSED, const char *part, Evas_Object *content)
 {
@@ -385,6 +714,18 @@ _efl_ui_radio_legacy_content_set(Eo *obj, void *_pd EINA_UNUSED, const char *par
 
 /* Efl.Part begin */
 
+/**
+ * @internal
+ * @brief Checks if a given part name is the specific content part for legacy radio.
+ *
+ * This function is used by the Efl.Part interface implementation to identify
+ * if a part name refers to the main content swallow part of the legacy radio,
+ * which is "elm.swallow.content".
+ *
+ * @param obj The legacy radio widget object (unused).
+ * @param part The part name string to check.
+ * @return EINA_TRUE if the part name is "elm.swallow.content", EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _part_is_efl_ui_radio_legacy_part(const Eo *obj EINA_UNUSED, const char *part)
 {

@@ -13,6 +13,21 @@ static Elm_Prefs_Item_Type supported_types[] =
    ELM_PREFS_TYPE_UNKNOWN
 };
 
+/**
+ * @internal
+ * @brief Ecore timer callback to animate entry color on validation mismatch.
+ *
+ * This function is called periodically to create a blinking effect. It cycles
+ * the entry's background color between red and white to signal a validation
+ * error to the user.
+ *
+ * The color cycle state is stored in the object's data under the key
+ * "current_color".
+ *
+ * @param data The Evas_Object (the entry widget) to animate.
+ * @return ECORE_CALLBACK_RENEW to continue the timer, or
+ *         ECORE_CALLBACK_CANCEL to stop it.
+ */
 static Eina_Bool
 _color_change_do(void *data)
 {
@@ -52,6 +67,21 @@ end:
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @internal
+ * @brief Validates the current value of the entry widget.
+ *
+ * This function checks the entry's text against several validation rules:
+ * - A regular expression that the value must match ("accept_regex").
+ * - A regular expression that the value must not match ("deny_regex").
+ * - A minimum required length ("min_size").
+ *
+ * If validation fails, it triggers a blinking animation to give visual
+ * feedback to the user.
+ *
+ * @param obj The entry widget object to validate.
+ * @return @c EINA_TRUE if the value is valid, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 elm_prefs_entry_value_validate(Evas_Object *obj)
 {
@@ -96,6 +126,20 @@ mismatch:
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Callback for when the entry's content or focus state changes.
+ *
+ * This function is triggered on ELM_ENTRY_EVENT_ACTIVATED (e.g., user presses
+ * Enter) and EFL_UI_FOCUS_OBJECT_EVENT_FOCUS_CHANGED. It forwards the
+ * notification to the main prefs item changed callback, but only if the
+ * entry currently has focus. This prevents redundant notifications when
+ * focus is lost.
+ *
+ * @param data The user-provided callback function
+ *             (Elm_Prefs_Item_Changed_Cb).
+ * @param event The event that triggered the callback.
+ */
 static void
 _item_changed_cb(void *data, const Efl_Event *event)
 {
@@ -105,6 +149,19 @@ _item_changed_cb(void *data, const Efl_Event *event)
      prefs_it_changed_cb(event->object);
 }
 
+/**
+ * @internal
+ * @brief Cleans up resources when the entry widget is deleted.
+ *
+ * This is an EVAS_CALLBACK_DEL handler. It is responsible for freeing any
+ * dynamically allocated resources associated with the entry, such as
+ * compiled regular expressions and the validation feedback timer.
+ *
+ * @param data User data (unused).
+ * @param evas The Evas canvas (unused).
+ * @param obj The object being deleted.
+ * @param event_info Event-specific data (unused).
+ */
 static void
 _entry_del_cb(void *data EINA_UNUSED,
               Evas *evas EINA_UNUSED,
@@ -134,6 +191,24 @@ _entry_del_cb(void *data EINA_UNUSED,
    evas_object_data_del(obj, "min_size");
 }
 
+/**
+ * @internal
+ * @brief Creates a new entry widget for a prefs item.
+ *
+ * This is the factory function for the entry widget used in the prefs system.
+ * It creates and configures an elm_entry based on the provided specification.
+ * This includes setting up single-line or multi-line (textarea) mode,
+ * character limits, placeholder text, and validation rules (regex, length).
+ *
+ * @param iface The prefs item interface (unused).
+ * @param prefs The parent prefs widget.
+ * @param type The type of entry, e.g., ELM_PREFS_TYPE_TEXT or
+ *             ELM_PREFS_TYPE_TEXTAREA.
+ * @param spec The specification for the item, containing details like
+ *             validation patterns, length limits, and placeholder text.
+ * @param cb A callback function to be invoked when the item's value changes.
+ * @return A new Evas_Object for the configured entry widget.
+ */
 static Evas_Object *
 elm_prefs_entry_add(const Elm_Prefs_Item_Iface *iface EINA_UNUSED,
                     Evas_Object *prefs,
@@ -222,7 +297,16 @@ elm_prefs_entry_add(const Elm_Prefs_Item_Iface *iface EINA_UNUSED,
    return obj;
 }
 
-/* already expects an EINA_VALUE_TYPE_STRINGSHARE one */
+/**
+ * @internal
+ * @brief Sets the text content of the entry widget from an Eina_Value.
+ *
+ * The provided Eina_Value must be of type EINA_VALUE_TYPE_STRINGSHARE.
+ *
+ * @param obj The entry widget object.
+ * @param value A pointer to an Eina_Value holding the string to set.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 elm_prefs_entry_value_set(Evas_Object *obj,
                           Eina_Value *value)
@@ -234,6 +318,18 @@ elm_prefs_entry_value_set(Evas_Object *obj,
    return elm_layout_text_set(obj, NULL, val);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the text content of the entry widget into an Eina_Value.
+ *
+ * The value is returned as a shared string (@c EINA_VALUE_TYPE_STRINGSHARE),
+ * which is an efficient way to handle strings that avoids unnecessary copies.
+ *
+ * @param obj The entry widget object.
+ * @param[out] value A pointer to an Eina_Value to store the retrieved string.
+ *                   It will be set up as EINA_VALUE_TYPE_STRINGSHARE.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 elm_prefs_entry_value_get(Evas_Object *obj,
                           Eina_Value *value)
@@ -249,6 +345,14 @@ elm_prefs_entry_value_get(Evas_Object *obj,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Sets an icon on the entry widget.
+ *
+ * @param obj The entry widget object.
+ * @param icon The name of a standard icon to display (e.g., "home").
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 elm_prefs_entry_icon_set(Evas_Object *obj,
                          const char *icon)
@@ -260,6 +364,15 @@ elm_prefs_entry_icon_set(Evas_Object *obj,
    return elm_layout_content_set(obj, "icon", ic);
 }
 
+/**
+ * @internal
+ * @brief Sets the editable state of the entry widget.
+ *
+ * @param obj The entry widget object.
+ * @param editable @c EINA_TRUE to make the entry editable, @c EINA_FALSE
+ *                 to make it read-only.
+ * @return Always returns @c EINA_TRUE.
+ */
 static Eina_Bool
 elm_prefs_entry_editable_set(Evas_Object *obj,
                              Eina_Bool editable)
@@ -269,12 +382,30 @@ elm_prefs_entry_editable_set(Evas_Object *obj,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Gets the editable state of the entry widget.
+ *
+ * @param obj The entry widget object.
+ * @return @c EINA_TRUE if the entry is editable, @c EINA_FALSE if it is
+ *         read-only.
+ */
 static Eina_Bool
 elm_prefs_entry_editable_get(Evas_Object *obj)
 {
    return elm_entry_editable_get(obj);
 }
 
+/**
+ * @internal
+ * @brief Indicates whether the widget wants to expand horizontally.
+ *
+ * Entry widgets in the prefs system always want to expand to fill available
+ * horizontal space.
+ *
+ * @param obj The entry widget object (unused).
+ * @return Always returns @c EINA_TRUE.
+ */
 static Eina_Bool
 elm_prefs_entry_expand_want(Evas_Object *obj EINA_UNUSED)
 {

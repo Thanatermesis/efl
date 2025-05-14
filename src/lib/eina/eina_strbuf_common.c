@@ -115,13 +115,29 @@ _eina_strbuf_common_manage_init(size_t csize EINA_UNUSED,
 
 /**
  * @internal
+ * @brief Resizes the internal buffer of an Eina_Strbuf.
  *
- * resize the buffer
- * @param csize the character size
- * @param buf the buffer to resize
- * @param size the minimum size of the buffer
+ * This function adjusts the allocated size of the buffer. It attempts
+ * to grow or shrink the buffer efficiently. The new size will be
+ * at least @p size + 1 (for the null terminator) and will be a
+ * multiple of the calculated step.
  *
- * @return #EINA_TRUE on success, #EINA_FALSE on failure.
+ * If the buffer is read-only (@c buf->ro is #EINA_TRUE), a new writable
+ * buffer is allocated, and the existing content is copied if the realloc
+ * operation requires a new memory block (which it usually does when
+ * realloc is called on a potentially different pointer). The buffer
+ * then becomes writable.
+ *
+ * The growth step (@c buf->step) is adjusted based on the delta between
+ * the current size and the requested size, capped by
+ * #EINA_STRBUF_MAX_STEP.
+ *
+ * @param csize The size of a single character (e.g., `sizeof(char)` or `sizeof(wchar_t)`).
+ * @param buf The string buffer to resize. Must be a valid pointer.
+ * @param size The minimum required capacity for characters (excluding null terminator).
+ *
+ * @return #EINA_TRUE on success (buffer resized or already sufficient),
+ *         #EINA_FALSE on failure (e.g., memory allocation error).
  */
 static inline Eina_Bool
 _eina_strbuf_common_resize(size_t csize, Eina_Strbuf *buf, size_t size)
@@ -194,17 +210,24 @@ _eina_strbuf_common_grow(size_t csize, Eina_Strbuf *buf, size_t size)
 
 /**
  * @internal
+ * @brief Inserts a string of a known length into the buffer at a specified position.
  *
- * insert string of known length at random within existing strbuf limits.
+ * This function first ensures the buffer is large enough to hold the
+ * existing content plus the new string. If not, it grows the buffer.
+ * Then, it moves the content from @p pos to the end of the buffer to
+ * make space for the new string. Finally, it copies the new string
+ * into the created space. The buffer's length is updated, and a null
+ * terminator is ensured.
  *
- * @param csize the character size
- * @param buf the buffer to resize, must be valid.
- * @param str the string to copy, must be valid (!NULL and smaller than @a len)
- * @param len the amount of bytes in @a str to copy, must be valid.
- * @param pos the position inside buffer to insert, must be valid (smaller
- *        than eina_strbuf_common_length_get())
+ * @param csize The size of a single character.
+ * @param buf The string buffer to modify. Must be valid.
+ * @param str The string to insert. Must be valid and non-NULL.
+ * @param len The number of characters from @p str to insert.
+ * @param pos The character position in @p buf where @p str should be inserted.
+ *        Must be less than or equal to the current length of @p buf.
+ *        If @p pos is equal to the current length, this is equivalent to an append.
  *
- * @return #EINA_TRUE on success, #EINA_FALSE on failure.
+ * @return #EINA_TRUE on success, #EINA_FALSE on failure (e.g., memory allocation error).
  */
 static inline Eina_Bool
 _eina_strbuf_common_insert_length(size_t csize,
@@ -723,19 +746,26 @@ eina_strbuf_common_insert_char(size_t csize,
 
 /**
  * @internal
- * @brief Remove a slice of the given string buffer.
+ * @brief Removes a slice of characters from the string buffer.
  *
- * @param csize the character size
- * @param buf The string buffer to remove a slice.
- * @param start The initial (inclusive) slice position to start
- *        removing, in bytes.
- * @param end The final (non-inclusive) slice position to finish
- *        removing, in bytes.
- * @return #EINA_TRUE on success, #EINA_FALSE on failure.
+ * This function removes characters from the buffer starting at index @p start
+ * up to (but not including) index @p end.
+ * If @p end is beyond the current length of the buffer, it's clamped to the length.
+ * If @p start is greater than or equal to @p end, no action is taken.
  *
- * This function removes a slice of @p buf, starting at @p start
- * (inclusive) and ending at @p end (non-inclusive). Both values are
- * in bytes. It returns #EINA_FALSE on failure, #EINA_TRUE otherwise.
+ * If the buffer is read-only, it's first converted to a writable one by
+ * allocating new memory and copying the content.
+ * If the entire content of the buffer is removed, the buffer is re-initialized.
+ * Otherwise, the content after the removed slice is moved to fill the gap,
+ * the length is updated, and the buffer might be shrunk.
+ *
+ * @param csize The size of a single character.
+ * @param buf The string buffer to modify.
+ * @param start The starting character index (inclusive) of the slice to remove.
+ * @param end The ending character index (exclusive) of the slice to remove.
+ * @return #EINA_TRUE on success or if no removal was needed.
+ *         #EINA_FALSE on failure (e.g., memory allocation error if buffer was read-only
+ *         and conversion to writable failed, or if re-initialization failed).
  */
 Eina_Bool
 eina_strbuf_common_remove(size_t csize,
@@ -797,18 +827,30 @@ eina_strbuf_common_string_get(const Eina_Strbuf *buf)
 
 /**
  * @internal
- * @brief Steal the contents of a string buffer.
+ * @brief Transfers ownership of the internal string from the buffer to the caller.
  *
- * @param csize the character size
- * @param buf The string buffer to steal.
- * @return The current string in the string buffer.
+ * After this call, the Eina_Strbuf @p buf is reset to an empty state,
+ * as if newly initialized. The caller is responsible for freeing the returned
+ * string using `free()`.
  *
- * This function returns the string contained in @p buf. @p buf is
- * then initialized and does not own the returned string anymore. The
- * caller must release the memory of the returned string by calling
- * free().
+ * If the buffer @p buf was read-only (`buf->ro == EINA_TRUE`), a new memory
+ * block is allocated, the content is copied into it, and this new block
+ * is returned. This ensures the caller always receives a modifiable string
+ * that they own, regardless of the buffer's original state. The original
+ * read-only string managed by the buffer (if any) is not affected directly,
+ * but the buffer itself is reset.
+ *
+ * @param csize The size of a single character.
+ * @param buf The string buffer from which to steal the string.
+ * @return A pointer to the (char *) string. The caller owns this memory
+ *         and must free it. Returns @c NULL (or 0, as it's `void*` which might be
+ *         implicitly cast from int 0 in C, though `NULL` is preferred) if memory
+ *         allocation fails during the copy of a read-only buffer.
+ *         Note: The original code returns `0` on malloc failure for RO buffer,
+ *         which is equivalent to `NULL` for pointers.
  *
  * @see eina_strbuf_common_string_get()
+ * @see eina_strbuf_common_free()
  */
 void *
 eina_strbuf_common_string_steal(size_t csize, Eina_Strbuf *buf)
@@ -924,6 +966,31 @@ eina_strbuf_common_rw_slice_get(const Eina_Strbuf *buf)
  */
 
 
+/**
+ * @brief Replaces the Nth occurrence of a substring within the string buffer.
+ *
+ * This function searches for the Nth occurrence of the substring @p str
+ * within the string buffer @p buf and replaces it with the string @p with.
+ * The search is 1-indexed, so @p n = 1 means the first occurrence.
+ *
+ * If the buffer is read-only, it is first converted to a writable one.
+ * If the lengths of @p str and @p with differ, the buffer is resized
+ * accordingly. The content after the replaced part is shifted as needed.
+ *
+ * @param buf The string buffer to modify. Must be a valid Eina_Strbuf.
+ * @param str The substring to search for. Must not be NULL.
+ * @param with The string to replace @p str with. Must not be NULL.
+ * @param n The 1-based index of the occurrence of @p str to replace.
+ *          If @p n is 0 or if the Nth occurrence is not found, the function
+ *          returns #EINA_FALSE without modifying the buffer (unless it was
+ *          made writable).
+ * @return #EINA_TRUE on successful replacement.
+ *         #EINA_FALSE if @p str or @p with is NULL, @p buf is invalid,
+ *         @p n is 0, the Nth occurrence is not found, or if a memory
+ *         allocation error occurs (e.g., when making buffer writable or resizing).
+ *         Note: The original code returns `0` (integer) on some error paths,
+ *         which implicitly converts to #EINA_FALSE.
+ */
 EINA_API Eina_Bool
 eina_strbuf_replace(Eina_Strbuf *buf,
                     const char *str,
@@ -980,6 +1047,26 @@ eina_strbuf_replace(Eina_Strbuf *buf,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Replaces the last occurrence of a substring within the string buffer.
+ *
+ * This function searches for the last occurrence of the substring @p str
+ * within the string buffer @p buf and replaces it with the string @p with.
+ *
+ * If the buffer is read-only, it is first converted to a writable one.
+ * If the lengths of @p str and @p with differ, the buffer is resized
+ * accordingly. The content after the replaced part is shifted as needed.
+ *
+ * @param buf The string buffer to modify. Must be a valid Eina_Strbuf.
+ * @param str The substring to search for. Must not be NULL.
+ * @param with The string to replace @p str with. Must not be NULL.
+ * @return #EINA_TRUE on successful replacement.
+ *         #EINA_FALSE if @p str or @p with is NULL, @p buf is invalid,
+ *         @p str is not found, or if a memory allocation error occurs
+ *         (e.g., when making buffer writable or resizing).
+ *         Note: The original code returns `0` (integer) on some error paths,
+ *         which implicitly converts to #EINA_FALSE.
+ */
 EINA_API Eina_Bool
 eina_strbuf_replace_last(Eina_Strbuf *buf,
                     const char *str,
@@ -1035,6 +1122,34 @@ eina_strbuf_replace_last(Eina_Strbuf *buf,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Replaces all occurrences of a substring within the string buffer.
+ *
+ * This function finds all occurrences of the substring @p str in @p buf
+ * and replaces them with the string @p with.
+ *
+ * If the buffer @p buf is read-only, it is first converted to a writable one.
+ *
+ * The replacement strategy depends on whether the length of @p str (@c len1)
+ * is equal to the length of @p with (@c len2):
+ * - If @c len1 == @c len2: The replacement is done in-place, which is efficient.
+ * - If @c len1 != @c len2: This is more complex. A temporary copy of the
+ *   original buffer's content is made. The function then iterates through
+ *   occurrences, copying segments from the temporary buffer and the @p with
+ *   string into the (potentially resized) @p buf->buf. The @p buf->buf is
+ *   grown as needed. If a growth operation fails, replacement stops, and
+ *   the number of replacements made up to that point is returned.
+ *
+ * @param buf The string buffer to modify. Must be a valid Eina_Strbuf.
+ * @param str The substring to search for. Must not be NULL.
+ * @param with The string to replace occurrences of @p str with. Must not be NULL.
+ * @return The number of replacements made. Returns 0 if @p str or @p with is NULL,
+ *         @p buf is invalid, @p str is not found, or if a memory allocation
+ *         error occurs early (e.g., making buffer writable or initial allocation
+ *         for temporary buffer). If memory allocation fails during resizing
+ *         in the len1 != len2 case, it returns the count of replacements
+ *         performed before the failure.
+ */
 EINA_API int
 eina_strbuf_replace_all(Eina_Strbuf *buf, const char *str, const char *with)
 {

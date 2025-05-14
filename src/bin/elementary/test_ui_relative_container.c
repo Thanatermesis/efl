@@ -6,15 +6,32 @@
 #include <Elementary.h>
 #include "test.h"
 
-static Eo *layout, *btn1, *btn2, *btn3;
+/** @brief The main layout container for the test. */
+static Eo *layout;
+/** @brief First button in the relative container. */
+static Eo *btn1;
+/** @brief Second button in the relative container. */
+static Eo *btn2;
+/** @brief Third button in the relative container. */
+static Eo *btn3;
 
+/** @brief Options to specify the side for relative positioning or alignment. */
 typedef enum {
-   LEFT,
-   RIGHT,
-   TOP,
-   BOTTOM
+   LEFT,   /**< Left side. */
+   RIGHT,  /**< Right side. */
+   TOP,    /**< Top side. */
+   BOTTOM  /**< Bottom side. */
 } Options;
 
+/**
+ * @brief Callback function for button click to change layout color.
+ *
+ * Toggles the background color of the provided layout object between
+ * a blueish color and white.
+ *
+ * @param data The layout object (Eo *) whose color will be changed.
+ * @param event Information about the event (unused).
+ */
 static void
 _btn_color_clicked_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -30,6 +47,15 @@ _btn_color_clicked_cb(void *data, const Efl_Event *event EINA_UNUSED)
    changed = !changed;
 }
 
+/**
+ * @brief Callback function for button click to change the relative target.
+ *
+ * Cycles the target object for a relative positioning rule. The target
+ * can be the main layout or one of the other buttons.
+ *
+ * @param data The side (Options enum) for which the relation is being changed.
+ * @param event Information about the event, including the source object.
+ */
 static void
 _btn_clicked_to_cb(void *data, const Efl_Event *event)
 {
@@ -76,6 +102,14 @@ _btn_clicked_to_cb(void *data, const Efl_Event *event)
    efl_text_set(obj, ((to == layout) ? "parent" : (char *)efl_text_get(to)));
 }
 
+/**
+ * @brief Callback function for slider value change to update relative positioning.
+ *
+ * Sets the relative offset for a specific side of a button based on the slider's value.
+ *
+ * @param data The side (Options enum) for which the relative offset is being changed.
+ * @param event Information about the event, including the source slider object.
+ */
 static void
 _slider_changed_relative_cb(void *data, const Efl_Event *event)
 {
@@ -103,6 +137,14 @@ _slider_changed_relative_cb(void *data, const Efl_Event *event)
      }
 }
 
+/**
+ * @brief Callback function for slider value change to update alignment.
+ *
+ * Sets the horizontal or vertical alignment hint for a button based on the slider's value.
+ *
+ * @param data Character 'x' for horizontal alignment, 'y' for vertical alignment.
+ * @param event Information about the event, including the source slider object.
+ */
 static void
 _slider_changed_align_cb(void *data, const Efl_Event *event)
 {
@@ -120,6 +162,17 @@ _slider_changed_align_cb(void *data, const Efl_Event *event)
      efl_gfx_hint_align_set(btn, x, val);
 }
 
+/**
+ * @brief Adds UI elements (label, button, slider) to control a specific relative positioning property.
+ *
+ * Creates a horizontal box containing a label for the property (e.g., "left"),
+ * a button to select the target object for the relation, and a slider to adjust
+ * the relative offset.
+ *
+ * @param vbox The parent vertical box container.
+ * @param btn The button whose relative property is being configured.
+ * @param option The specific side (Options enum: LEFT, RIGHT, TOP, BOTTOM) to configure.
+ */
 static void
 _setter_add(Eo *vbox, Eo *btn, Options option)
 {
@@ -179,6 +232,16 @@ _setter_add(Eo *vbox, Eo *btn, Options option)
            efl_pack(hbox, efl_added));
 }
 
+/**
+ * @brief Adds a frame containing controls for a button's relative layout and alignment.
+ *
+ * This function creates a UI frame titled with the button's text. Inside the frame,
+ * it sets up controls for the button's left, right, top, and bottom relative
+ * positions, as well as its horizontal and vertical alignment.
+ *
+ * @param box The parent box container where the frame will be added.
+ * @param btn The button for which the control frame is being created.
+ */
 static void
 _button_frame_add(Eo *box, Eo *btn)
 {
@@ -270,6 +333,18 @@ _button_frame_add(Eo *box, Eo *btn)
            efl_pack(hbox, efl_added));
 }
 
+/**
+ * @brief Main function to set up and run the Efl.Ui.Relative_Container test.
+ *
+ * Creates a window with a vertical box. The box contains a frame for controls
+ * and a frame for the content (the relative container itself).
+ * Three buttons are added to the relative container, and control panels
+ * for each button are added to the controls frame.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_ui_relative_container(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

@@ -16,7 +16,15 @@
  *                                  Local                                     *
  *============================================================================*/
 
-
+/**
+ * @brief Creates a new cursor from a pre-defined X11 cursor shape.
+ * @param shape The X11 cursor shape to create.
+ * @return A new Ecore_Win32_Cursor handle, or @c NULL on failure.
+ *
+ * This function is used internally to create cursors that mimic
+ * standard X11 cursors. The actual cursor data (masks, hotspots)
+ * is assumed to be defined in _ecore_win32_cursors_x11.
+ */
 Ecore_Win32_Cursor *
 _ecore_win32_cursor_x11_shaped_new(Ecore_Win32_Cursor_X11_Shape shape)
 {
@@ -352,9 +360,20 @@ ecore_win32_cursor_size_get(int *width, int *height)
    INF("geting size cursor");
 
    if (*width) *width = GetSystemMetrics(SM_CXCURSOR);
+   if (*width) *width = GetSystemMetrics(SM_CXCURSOR);
    if (*height) *height = GetSystemMetrics(SM_CYCURSOR);
 }
 
+/**
+ * @brief Shows or hides the cursor.
+ *
+ * @param show If @c EINA_TRUE, the cursor is shown. If @c EINA_FALSE,
+ *             the cursor is hidden.
+ *
+ * This function increments or decrements an internal display counter
+ * for the cursor. The cursor is displayed if the counter is greater
+ * than or equal to 0.
+ */
 EAPI void
 ecore_win32_cursor_show(Eina_Bool show)
 {

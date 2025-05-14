@@ -32,7 +32,14 @@ static const char *efreet_trash_dir = NULL;
 # define getuid() GetCurrentProcessId()
 #endif
 
-
+/**
+ * @internal
+ * @brief Initializes the Efreet trash module.
+ * This function initializes the Efreet trash module, setting up logging
+ * and incrementing an initialization counter. It's intended for internal
+ * use by Efreet.
+ * @return The current initialization count, or 0 on failure.
+ */
 int
 efreet_internal_trash_init(void)
 {
@@ -49,6 +56,14 @@ efreet_internal_trash_init(void)
     return _efreet_trash_init_count;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the Efreet trash module.
+ * This function shuts down the Efreet trash module, releasing resources,
+ * unregistering the log domain, and decrementing the initialization counter.
+ * It's intended for internal use by Efreet.
+ * @return The current initialization count.
+ */
 int
 efreet_internal_trash_shutdown(void)
 {
@@ -62,18 +77,49 @@ efreet_internal_trash_shutdown(void)
     return _efreet_trash_init_count;
 }
 
+/**
+ * @brief Initializes the Efreet library, including the trash module.
+ * This is a convenience wrapper around efreet_init().
+ * @return The Efreet initialization count.
+ * @see efreet_init()
+ */
 EAPI int
 efreet_trash_init(void)
 {
    return efreet_init();
 }
 
+/**
+ * @brief Shuts down the Efreet library, including the trash module.
+ * This is a convenience wrapper around efreet_shutdown().
+ * @return The Efreet initialization count.
+ * @see efreet_shutdown()
+ */
 EAPI int
 efreet_trash_shutdown(void)
 {
    return efreet_shutdown();
 }
 
+/**
+ * @brief Gets the appropriate trash directory for a given file.
+ * This function determines the correct trash directory based on the
+ * location of the input file. It handles cases where the file is on the
+ * same device as the user's home directory, and cases where it's on a
+ * different device (creating a .Trash-UID directory on that device).
+ *
+ * If @p file is NULL, it returns the primary trash directory
+ * ($XDG_DATA_HOME/Trash).
+ *
+ * The returned string is an Eina_Stringshare, so it should be released
+ * with eina_stringshare_del() when no longer needed.
+ *
+ * @param file The full path to the file for which to find the trash directory.
+ *             Can be NULL to get the default trash directory.
+ * @return The path to the trash directory as an Eina_Stringshare, or NULL on error.
+ *         The caller owns a reference to the returned stringshare.
+ *         Example: "/home/user/.local/share/Trash" or "/media/usb/.Trash-1000"
+ */
 EAPI const char*
 efreet_trash_dir_get(const char *file)
 {
@@ -169,6 +215,27 @@ efreet_trash_dir_get(const char *file)
     return trash_dir;
 }
 
+/**
+ * @brief Moves a file (specified by URI) to the trash.
+ * This function moves the file pointed to by @p uri to the appropriate
+ * trash directory. It creates a corresponding .trashinfo file with
+ * metadata about the original path and deletion date.
+ *
+ * If the file is on a different device and @p force_delete is not set,
+ * the function will return -1. If @p force_delete is set, it will
+ * attempt to recursively remove the file from the other device instead
+ * of moving it (this is a fallback, not a true "trash" operation for
+ * that file).
+ *
+ * @param uri The Efreet_Uri of the file to delete. Must not be NULL.
+ *            The uri->path must not be NULL.
+ * @param force_delete If 1, and the file is on a different device,
+ *                     the function will attempt to delete it directly
+ *                     instead of failing. If 0, it will fail with -1
+ *                     in such a cross-device scenario.
+ * @return 1 on success, 0 on failure, or -1 if the file is on a
+ *         different device and force_delete is 0.
+ */
 EAPI int
 efreet_trash_delete_uri(Efreet_Uri *uri, int force_delete)
 {
@@ -256,6 +323,14 @@ efreet_trash_delete_uri(Efreet_Uri *uri, int force_delete)
     return 1;
 }
 
+/**
+ * @brief Checks if the primary trash directory is empty.
+ * This function checks if the "$XDG_DATA_HOME/Trash/files" directory
+ * is empty.
+ * @note This function currently only checks the primary trash directory
+ *       and does not check for .Trash-UID directories on other filesystems.
+ * @return 1 if the primary trash directory is empty, 0 otherwise.
+ */
 EAPI int
 efreet_trash_is_empty(void)
 {
@@ -267,6 +342,15 @@ efreet_trash_is_empty(void)
     return ecore_file_dir_is_empty(buf);
 }
 
+/**
+ * @brief Empties the primary trash directory.
+ * This function removes all files and info files from the
+ * "$XDG_DATA_HOME/Trash/files" and "$XDG_DATA_HOME/Trash/info"
+ * directories respectively.
+ * @note This function currently only empties the primary trash directory
+ *       and does not empty .Trash-UID directories on other filesystems.
+ * @return 1 on success, 0 on failure.
+ */
 EAPI int
 efreet_trash_empty_trash(void)
 {
@@ -284,6 +368,20 @@ efreet_trash_empty_trash(void)
     return 1;
 }
 
+/**
+ * @brief Lists the files currently in the primary trash directory.
+ * This function returns a list of filenames (not full paths) of items
+ * in the "$XDG_DATA_HOME/Trash/files" directory.
+ *
+ * @note This function is currently incomplete as indicated by the TODO.
+ *       It should ideally read names from .trashinfo files.
+ *       It also only lists files from the primary trash directory.
+ *
+ * @return An Eina_List of (char *) filenames. The caller is responsible
+ *         for freeing the list and its contents (e.g., using
+ *         EINA_LIST_FREE and free()).
+ *         Example list elements: "document.txt", "image.png$1"
+ */
 EAPI Eina_List*
 efreet_trash_ls(void)
 {

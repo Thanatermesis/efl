@@ -27,6 +27,23 @@
 #include "elput_private.h"
 #include <libudev.h>
 
+/**
+ * @brief Callback to open a device file descriptor.
+ *
+ * This function is part of the libinput_interface. It handles opening a device
+ * specified by @p path.
+ * If an Ecore input thread is active in @p em, this function attempts to
+ * perform the open operation asynchronously. It creates a pipe to communicate
+ * the resulting file descriptor (or an error) back from the thread that
+ * performs the actual open via em->interface->open_async.
+ * If no thread is active or open_async is not supported, it falls back to a
+ * synchronous open via em->interface->open.
+ *
+ * @param path The file system path to the device node.
+ * @param flags The flags to use when opening the device (e.g., O_RDWR, O_NONBLOCK).
+ * @param data User data, expected to be an Elput_Manager instance.
+ * @return The opened file descriptor on success, or -1 on failure.
+ */
 static int
 _cb_open_restricted(const char *path, int flags, void *data)
 {
@@ -79,6 +96,15 @@ _cb_open_restricted(const char *path, int flags, void *data)
    return ret;
 }
 
+/**
+ * @brief Callback to close a device file descriptor.
+ *
+ * This function is part of the libinput_interface. It handles closing a
+ * device file descriptor previously opened by _cb_open_restricted.
+ *
+ * @param fd The file descriptor to close.
+ * @param data User data, expected to be an Elput_Manager instance.
+ */
 static void
 _cb_close_restricted(int fd, void *data)
 {
@@ -88,12 +114,29 @@ _cb_close_restricted(int fd, void *data)
    elput_manager_close(em, fd);
 }
 
+/**
+ * @brief libinput interface implementation for elput.
+ *
+ * This structure provides libinput with functions to open and close
+ * file descriptors for input devices.
+ */
 const struct libinput_interface _input_interface =
 {
    _cb_open_restricted,
    _cb_close_restricted,
 };
 
+/**
+ * @brief Creates and initializes a new Elput_Seat.
+ *
+ * A seat represents a collection of input devices that logically belong
+ * together (e.g., a keyboard, mouse, and touchscreen for a single user).
+ * The newly created seat is added to the manager's list of seats.
+ *
+ * @param em The Elput_Manager instance.
+ * @param name The name for the new seat (e.g., "seat0").
+ * @return A pointer to the newly created Elput_Seat, or NULL on failure.
+ */
 static Elput_Seat *
 _udev_seat_create(Elput_Manager *em, const char *name)
 {
@@ -111,6 +154,16 @@ _udev_seat_create(Elput_Manager *em, const char *name)
    return eseat;
 }
 
+/**
+ * @brief Destroys an Elput_Seat and frees its associated resources.
+ *
+ * This function decrements the reference count of the seat. If the reference
+ * count reaches zero, it proceeds to destroy all associated devices,
+ * keyboard, pointer, and touch handlers, removes the seat from its manager,
+ * and frees the seat structure itself.
+ *
+ * @param eseat The Elput_Seat to destroy.
+ */
 void
 _udev_seat_destroy(Elput_Seat *eseat)
 {
@@ -136,6 +189,15 @@ _udev_seat_destroy(Elput_Seat *eseat)
    free(eseat);
 }
 
+/**
+ * @brief Retrieves an Elput_Seat by its name, creating it if it doesn't exist.
+ *
+ * If @p name is NULL, it defaults to "seat0".
+ *
+ * @param em The Elput_Manager instance.
+ * @param name The name of the seat to retrieve. Defaults to "seat0" if NULL.
+ * @return A pointer to the Elput_Seat, or NULL on failure to create.
+ */
 static Elput_Seat *
 _udev_seat_named_get(Elput_Manager *em, const char *name)
 {
@@ -153,6 +215,16 @@ _udev_seat_named_get(Elput_Manager *em, const char *name)
    return eseat;
 }
 
+/**
+ * @brief Retrieves or creates the Elput_Seat associated with a libinput_device.
+ *
+ * This function uses the physical name of the libinput seat associated with
+ * the given libinput device to find or create a corresponding Elput_Seat.
+ *
+ * @param em The Elput_Manager instance.
+ * @param device The libinput_device for which to get the seat.
+ * @return A pointer to the Elput_Seat, or NULL on failure.
+ */
 static Elput_Seat *
 _udev_seat_get(Elput_Manager *em, struct libinput_device *device)
 {
@@ -165,6 +237,19 @@ _udev_seat_get(Elput_Manager *em, struct libinput_device *device)
    return _udev_seat_named_get(em, name);
 }
 
+/**
+ * @brief Callback function to free an Elput_Event_Device_Change event.
+ *
+ * This function is called by Ecore when an ELPUT_EVENT_DEVICE_CHANGE event
+ * is no longer needed. It decrements the reference count of the associated
+ * Elput_Device. If the event type is ELPUT_DEVICE_REMOVED and the device's
+ * reference count drops to a point where it can be destroyed (implicitly,
+ * though not explicitly checked here beyond the ref count), it removes the
+ * device from its seat and destroys it.
+ *
+ * @param data User data associated with the event (unused).
+ * @param event The Elput_Event_Device_Change event to free.
+ */
 static void
 _device_event_cb_free(void *data EINA_UNUSED, void *event)
 {
@@ -187,6 +272,16 @@ _device_event_cb_free(void *data EINA_UNUSED, void *event)
    free(ev);
 }
 
+/**
+ * @brief Allocates and sends an ELPUT_EVENT_DEVICE_CHANGE Ecore event.
+ *
+ * This function creates a new device change event, populates it with the
+ * given device and type, increments the device's reference count, and
+ * adds the event to the Ecore event queue.
+ *
+ * @param edev The Elput_Device that changed.
+ * @param type The type of change (ELPUT_DEVICE_ADDED or ELPUT_DEVICE_REMOVED).
+ */
 static void
 _device_event_send(Elput_Device *edev, Elput_Device_Change_Type type)
 {
@@ -202,6 +297,18 @@ _device_event_send(Elput_Device *edev, Elput_Device_Change_Type type)
    ecore_event_add(ELPUT_EVENT_DEVICE_CHANGE, ev, _device_event_cb_free, NULL);
 }
 
+/**
+ * @brief Handles the addition of a new input device.
+ *
+ * This function is called when a LIBINPUT_EVENT_DEVICE_ADDED event occurs.
+ * It retrieves or creates the appropriate Elput_Seat for the device,
+ * creates an Elput_Device wrapper for the libinput_device, configures
+ * properties like pointer rotation based on the manager's settings,
+ * and sends an ELPUT_DEVICE_ADDED event.
+ *
+ * @param em The Elput_Manager instance.
+ * @param dev The libinput_device that was added.
+ */
 static void
 _device_add(Elput_Manager *em, struct libinput_device *dev)
 {
@@ -259,6 +366,17 @@ _device_add(Elput_Manager *em, struct libinput_device *dev)
    _device_event_send(edev, ELPUT_DEVICE_ADDED);
 }
 
+/**
+ * @brief Handles the removal of an input device.
+ *
+ * This function is called when a LIBINPUT_EVENT_DEVICE_REMOVED event occurs.
+ * It retrieves the Elput_Device associated with the libinput_device
+ * (stored as user data) and sends an ELPUT_DEVICE_REMOVED event. The actual
+ * cleanup of the device happens in _device_event_cb_free.
+ *
+ * @param em The Elput_Manager instance (unused).
+ * @param device The libinput_device that was removed.
+ */
 static void
 _device_remove(Elput_Manager *em EINA_UNUSED, struct libinput_device *device)
 {
@@ -272,6 +390,17 @@ _device_remove(Elput_Manager *em EINA_UNUSED, struct libinput_device *device)
    _device_event_send(edev, ELPUT_DEVICE_REMOVED);
 }
 
+/**
+ * @brief Processes device addition or removal events from libinput.
+ *
+ * This function checks the type of the libinput_event. If it's a
+ * LIBINPUT_EVENT_DEVICE_ADDED or LIBINPUT_EVENT_DEVICE_REMOVED event,
+ * it calls the appropriate handler (_device_add or _device_remove).
+ *
+ * @param event The libinput_event to process.
+ * @return 1 if the event was a device added/removed event and was handled,
+ *         0 otherwise.
+ */
 static int
 _udev_process_event(struct libinput_event *event)
 {
@@ -300,6 +429,17 @@ _udev_process_event(struct libinput_event *event)
    return ret;
 }
 
+/**
+ * @brief Processes a single libinput event.
+ *
+ * This function acts as a dispatcher for various types of libinput events.
+ * It first attempts to process udev-related events (device added/removed).
+ * If not handled, and if `only_gesture_events` is false, it tries to process
+ * it as an evdev event. Finally, it attempts to process it as a gesture event.
+ *
+ * @param em The Elput_Manager instance.
+ * @param event The libinput_event to process.
+ */
 static void
 _process_event(Elput_Manager *em, struct libinput_event *event)
 {
@@ -311,6 +451,15 @@ _process_event(Elput_Manager *em, struct libinput_event *event)
    if (_gesture_event_process(event)) return;
 }
 
+/**
+ * @brief Processes all pending events from libinput.
+ *
+ * This function retrieves and processes events from the libinput context
+ * in a loop until no more events are available. Each event is passed to
+ * _process_event for further handling, and then destroyed.
+ *
+ * @param em The Elput_Manager instance.
+ */
 static void
 _process_events(Elput_Manager *em)
 {
@@ -325,6 +474,18 @@ _process_events(Elput_Manager *em)
      }
 }
 
+/**
+ * @brief Ecore Fd Handler callback for libinput dispatching.
+ *
+ * This function is called by the Ecore main loop when there is data
+ * available to read on the libinput file descriptor. It calls
+ * libinput_dispatch() to allow libinput to read and queue events,
+ * and then calls _process_events() to handle these queued events.
+ *
+ * @param data User data, expected to be an Elput_Manager instance.
+ * @param hdlr The Ecore_Fd_Handler that triggered this callback (unused).
+ * @return EINA_TRUE to keep the handler active, EINA_FALSE to remove it.
+ */
 static Eina_Bool
 _cb_input_dispatch(void *data, Ecore_Fd_Handler *hdlr EINA_UNUSED)
 {
@@ -340,6 +501,17 @@ _cb_input_dispatch(void *data, Ecore_Fd_Handler *hdlr EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Cancellation handler for the input initialization thread.
+ *
+ * This function is called if the Ecore thread responsible for initializing
+ * libinput is cancelled. It cleans up resources such as pending DBus calls
+ * and the communication pipe. If the manager is marked for deletion,
+ * it triggers a disconnect.
+ *
+ * @param data User data, expected to be an Elput_Manager instance.
+ * @param eth The Ecore_Thread that was cancelled (unused).
+ */
 static void
 _elput_input_init_cancel(void *data, Ecore_Thread *eth EINA_UNUSED)
 {
@@ -357,6 +529,19 @@ _elput_input_init_cancel(void *data, Ecore_Thread *eth EINA_UNUSED)
      elput_manager_disconnect(manager);
 }
 
+/**
+ * @brief End handler for the input initialization thread.
+ *
+ * This function is called when the Ecore thread responsible for initializing
+ * libinput finishes execution successfully. It sets up an Ecore_Fd_Handler
+ * to monitor the libinput file descriptor for new events. If setup is
+ * successful, it processes any initially available events. It also handles
+ * any pending pointer position settings that were queued before initialization
+ * completed.
+ *
+ * @param data User data, expected to be an Elput_Manager instance.
+ * @param eth The Ecore_Thread that finished (unused).
+ */
 static void
 _elput_input_init_end(void *data, Ecore_Thread *eth EINA_UNUSED)
 {
@@ -389,6 +574,19 @@ _elput_input_init_end(void *data, Ecore_Thread *eth EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Notification handler for the input initialization thread.
+ *
+ * This function is called by the Ecore thread feedback mechanism when the
+ * input initialization thread sends a message. It's used to handle
+ * asynchronous open operations requested by _cb_open_restricted.
+ * The message data @p msg_data is expected to be an Elput_Async_Open
+ * structure containing details for the asynchronous open.
+ *
+ * @param data User data (unused).
+ * @param eth The Ecore_Thread that sent the notification (unused).
+ * @param msg_data The message data, an Elput_Async_Open pointer.
+ */
 static void
 _elput_input_init_notify(void *data EINA_UNUSED, Ecore_Thread *eth EINA_UNUSED, void *msg_data)
 {
@@ -400,6 +598,16 @@ _elput_input_init_notify(void *data EINA_UNUSED, Ecore_Thread *eth EINA_UNUSED, 
    free(ao);
 }
 
+/**
+ * @brief Main function for the input initialization Ecore thread.
+ *
+ * This function runs in a separate thread to initialize the libinput
+ * udev context and assign the seat. This is done in a thread to avoid
+ * blocking the main loop during potentially lengthy udev operations.
+ *
+ * @param data User data, expected to be an Elput_Manager instance.
+ * @param eth The Ecore_Thread executing this function (unused).
+ */
 static void
 _elput_input_init_thread(void *data, Ecore_Thread *eth EINA_UNUSED)
 {
@@ -426,6 +634,15 @@ _elput_input_init_thread(void *data, Ecore_Thread *eth EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Enables input event processing for the given manager.
+ *
+ * If not already active, this function sets up an Ecore_Fd_Handler to listen
+ * for input events from libinput. If input processing was previously suspended,
+ * it resumes libinput and processes any queued events.
+ *
+ * @param manager The Elput_Manager instance for which to enable input.
+ */
 void
 _elput_input_enable(Elput_Manager *manager)
 {
@@ -445,6 +662,16 @@ _elput_input_enable(Elput_Manager *manager)
      }
 }
 
+/**
+ * @brief Disables input event processing for the given manager.
+ *
+ * This function suspends libinput, effectively stopping new input events
+ * from being processed. It also marks all seats as having pending motion,
+ * which might be relevant for state updates when input is re-enabled.
+ * Any currently queued events are processed before suspension.
+ *
+ * @param manager The Elput_Manager instance for which to disable input.
+ */
 void
 _elput_input_disable(Elput_Manager *manager)
 {
@@ -458,6 +685,19 @@ _elput_input_disable(Elput_Manager *manager)
    manager->input.suspended = EINA_TRUE;
 }
 
+/**
+ * @brief Initializes the elput input system for a given manager.
+ *
+ * This function sets up the necessary structures for input handling and
+ * starts an Ecore thread to initialize the libinput context.
+ * Initialization is asynchronous.
+ *
+ * @param manager The Elput_Manager instance to initialize.
+ * @return EINA_TRUE if the initialization thread was successfully started,
+ *         EINA_FALSE otherwise.
+ * @see _elput_input_init_thread()
+ * @see _elput_input_init_end()
+ */
 EAPI Eina_Bool
 elput_input_init(Elput_Manager *manager)
 {
@@ -473,6 +713,15 @@ elput_input_init(Elput_Manager *manager)
    return !!manager->input.thread;
 }
 
+/**
+ * @brief Shuts down the elput input system for a given manager.
+ *
+ * This function cleans up all resources associated with input handling for
+ * the specified manager. It deletes the Ecore fd handler, destroys all seats,
+ * cancels any running input thread, and unreferences the libinput context.
+ *
+ * @param manager The Elput_Manager instance to shut down.
+ */
 EAPI void
 elput_input_shutdown(Elput_Manager *manager)
 {
@@ -495,6 +744,18 @@ elput_input_shutdown(Elput_Manager *manager)
      }
 }
 
+/**
+ * @brief Retrieves the current pointer coordinates for a specific seat.
+ *
+ * If @p seat is NULL, the default seat "seat0" is used.
+ * The coordinates are written to the locations pointed to by @p x and @p y.
+ * If @p x or @p y are NULL, the respective coordinate is not written.
+ *
+ * @param manager The Elput_Manager instance.
+ * @param seat The name of the seat (e.g., "seat0"). Can be NULL for default.
+ * @param[out] x Pointer to an integer to store the X coordinate.
+ * @param[out] y Pointer to an integer to store the Y coordinate.
+ */
 EAPI void
 elput_input_pointer_xy_get(Elput_Manager *manager, const char *seat, int *x, int *y)
 {
@@ -518,6 +779,21 @@ elput_input_pointer_xy_get(Elput_Manager *manager, const char *seat, int *x, int
      }
 }
 
+/**
+ * @brief Sets the current pointer coordinates for a specific seat.
+ *
+ * This function attempts to update the logical pointer position for the
+ * specified seat. If @p seat is NULL, the default seat "seat0" is used.
+ * If input initialization is not yet complete or no seats exist, the
+ * coordinates are stored as pending and applied later.
+ * For existing seats, it updates the seat's pointer coordinates and
+ * triggers a motion event on the first pointer device found for that seat.
+ *
+ * @param manager The Elput_Manager instance.
+ * @param seat The name of the seat (e.g., "seat0"). Can be NULL for default.
+ * @param x The new X coordinate.
+ * @param y The new Y coordinate.
+ */
 EAPI void
 elput_input_pointer_xy_set(Elput_Manager *manager, const char *seat, int x, int y)
 {
@@ -559,6 +835,20 @@ elput_input_pointer_xy_set(Elput_Manager *manager, const char *seat, int x, int 
      }
 }
 
+/**
+ * @brief Sets the left-handed mode for pointer devices on a specific seat.
+ *
+ * If @p seat is NULL, the default seat "seat0" is used.
+ * This function iterates through all pointer devices on the specified seat
+ * and attempts to configure their left-handed mode via libinput.
+ *
+ * @param manager The Elput_Manager instance.
+ * @param seat The name of the seat (e.g., "seat0"). Can be NULL for default.
+ * @param left EINA_TRUE to enable left-handed mode, EINA_FALSE for right-handed.
+ * @return EINA_TRUE if the operation was attempted for all relevant devices
+ *         (individual device configuration may still fail, check logs for WRN).
+ *         EINA_FALSE if @p manager is NULL.
+ */
 EAPI Eina_Bool
 elput_input_pointer_left_handed_set(Elput_Manager *manager, const char *seat, Eina_Bool left)
 {
@@ -600,6 +890,16 @@ elput_input_pointer_left_handed_set(Elput_Manager *manager, const char *seat, Ei
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets the maximum dimensions for pointer movement.
+ *
+ * This typically corresponds to the screen or output resolution. These values
+ * might be used for scaling or constraining pointer coordinates.
+ *
+ * @param manager The Elput_Manager instance.
+ * @param maxw The maximum width for pointer coordinates.
+ * @param maxh The maximum height for pointer coordinates.
+ */
 EAPI void
 elput_input_pointer_max_set(Elput_Manager *manager, int maxw, int maxh)
 {
@@ -608,6 +908,18 @@ elput_input_pointer_max_set(Elput_Manager *manager, int maxw, int maxh)
    manager->input.pointer_h = maxh;
 }
 
+/**
+ * @brief Sets the rotation for pointer input devices.
+ *
+ * This affects how pointer movements are interpreted (e.g., swapping axes,
+ * inverting axes) to match screen rotation.
+ * The rotation value must be a multiple of 90 degrees (0, 90, 180, 270).
+ *
+ * @param manager The Elput_Manager instance.
+ * @param rotation The rotation angle in degrees. Valid values are 0, 90, 180, 270.
+ * @return EINA_TRUE if the rotation value is valid and applied,
+ *         EINA_FALSE otherwise (e.g., invalid rotation value, NULL manager).
+ */
 EAPI Eina_Bool
 elput_input_pointer_rotation_set(Elput_Manager *manager, int rotation)
 {
@@ -659,6 +971,18 @@ elput_input_pointer_rotation_set(Elput_Manager *manager, int rotation)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Calibrates all input devices based on output dimensions.
+ *
+ * This function sets the output dimensions (width @p w, height @p h) for the
+ * manager and then iterates through all devices on all seats, triggering
+ * their individual calibration logic (_evdev_device_calibrate). This is
+ * typically used for touch devices to map their input area to the screen area.
+ *
+ * @param manager The Elput_Manager instance.
+ * @param w The width of the output/screen.
+ * @param h The height of the output/screen.
+ */
 EAPI void
 elput_input_devices_calibrate(Elput_Manager *manager, int w, int h)
 {
@@ -682,6 +1006,16 @@ elput_input_devices_calibrate(Elput_Manager *manager, int w, int h)
      }
 }
 
+/**
+ * @brief Enables or disables key remapping for keyboard devices.
+ *
+ * When enabled, keyboard devices can use a hash table for remapping keys.
+ * When disabled, if a remapping hash table exists for a device, it is freed.
+ *
+ * @param manager The Elput_Manager instance.
+ * @param enable EINA_TRUE to enable key remapping, EINA_FALSE to disable.
+ * @return EINA_TRUE on success, EINA_FALSE if @p manager is NULL.
+ */
 EAPI Eina_Bool
 elput_input_key_remap_enable(Elput_Manager *manager, Eina_Bool enable)
 {
@@ -709,6 +1043,25 @@ elput_input_key_remap_enable(Elput_Manager *manager, Eina_Bool enable)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets key remappings for keyboard devices.
+ *
+ * This function applies a set of key remappings. For each keyboard device
+ * that has key remapping enabled, it adds entries to its remapping hash table.
+ * The `from_keys` and `to_keys` arrays define the mapping: `from_keys[i]`
+ * will be remapped to `to_keys[i]`.
+ *
+ * @param manager The Elput_Manager instance.
+ * @param from_keys An array of key codes to be remapped.
+ *                  Example: `int from_keys[] = {KEY_A, KEY_B};`
+ * @param to_keys An array of key codes that `from_keys` will be mapped to.
+ *                Must be the same size as `from_keys`.
+ *                Example: `int to_keys[] = {KEY_X, KEY_Y};` (A becomes X, B becomes Y)
+ * @param num The number of elements in `from_keys` and `to_keys` arrays.
+ * @return EINA_TRUE on success or if no applicable devices found.
+ *         EINA_FALSE if @p manager, @p from_keys, or @p to_keys are NULL,
+ *         or if @p num is not positive.
+ */
 EAPI Eina_Bool
 elput_input_key_remap_set(Elput_Manager *manager, int *from_keys, int *to_keys, int num)
 {
@@ -748,6 +1101,20 @@ elput_input_key_remap_set(Elput_Manager *manager, int *from_keys, int *to_keys, 
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets the XKB context, keymap, and initial group for keyboard handling.
+ *
+ * This function updates the cached XKB information within the manager.
+ * If the provided context or keymap differs from the cached ones,
+ * the old ones are unreferenced, and the new ones are referenced.
+ * After updating the cache, it triggers a keymap update for all seats.
+ *
+ * @param manager The Elput_Manager instance.
+ * @param context The XKB context (e.g., `struct xkb_context *`).
+ *                Both @p context and @p keymap must be either both NULL or both non-NULL.
+ * @param keymap The XKB keymap (e.g., `struct xkb_keymap *`).
+ * @param group The initial keyboard layout group index.
+ */
 EAPI void
 elput_input_keyboard_info_set(Elput_Manager *manager, void *context, void *keymap, int group)
 {
@@ -771,6 +1138,17 @@ elput_input_keyboard_info_set(Elput_Manager *manager, void *context, void *keyma
      _keyboard_keymap_update(seat);
 }
 
+/**
+ * @brief Sets the active keyboard layout group.
+ *
+ * If the new @p group is different from the currently cached group,
+ * this function updates the cached group in the manager and then
+ * triggers a group update for all seats, causing them to switch
+ * to the new layout group.
+ *
+ * @param manager The Elput_Manager instance.
+ * @param group The new keyboard layout group index.
+ */
 EAPI void
 elput_input_keyboard_group_set(Elput_Manager *manager, int group)
 {
@@ -784,6 +1162,19 @@ elput_input_keyboard_group_set(Elput_Manager *manager, int group)
      _keyboard_group_update(seat);
 }
 
+/**
+ * @brief Sets the pointer acceleration profile for devices on a specific seat.
+ *
+ * If @p seat is NULL, the default seat "seat0" is used.
+ * This function iterates through all pointer devices on the specified seat
+ * and attempts to set their acceleration profile using libinput.
+ *
+ * @param manager The Elput_Manager instance.
+ * @param seat The name of the seat (e.g., "seat0"). Can be NULL for default.
+ * @param profile The acceleration profile to set (e.g.,
+ *                LIBINPUT_CONFIG_ACCEL_PROFILE_FLAT,
+ *                LIBINPUT_CONFIG_ACCEL_PROFILE_ADAPTIVE).
+ */
 EAPI void
 elput_input_pointer_accel_profile_set(Elput_Manager *manager, const char *seat, uint32_t profile)
 {
@@ -819,6 +1210,18 @@ elput_input_pointer_accel_profile_set(Elput_Manager *manager, const char *seat, 
      }
 }
 
+/**
+ * @brief Sets the pointer acceleration speed for devices on a specific seat.
+ *
+ * If @p seat is NULL, the default seat "seat0" is used.
+ * This function iterates through all pointer devices on the specified seat
+ * that support acceleration speed configuration and attempts to set their speed.
+ * The @p speed value typically ranges from -1.0 to 1.0.
+ *
+ * @param manager The Elput_Manager instance.
+ * @param seat The name of the seat (e.g., "seat0"). Can be NULL for default.
+ * @param speed The acceleration speed to set.
+ */
 EAPI void
 elput_input_pointer_accel_speed_set(Elput_Manager *manager, const char *seat, double speed)
 {
@@ -857,6 +1260,18 @@ elput_input_pointer_accel_speed_set(Elput_Manager *manager, const char *seat, do
      }
 }
 
+/**
+ * @brief Enables or disables tap-to-click for touch devices on a specific seat.
+ *
+ * If @p seat is NULL, the default seat "seat0" is used.
+ * This function iterates through all pointer-capable devices (which often
+ * include touchpads that handle tap-to-click) on the specified seat and
+ * attempts to enable or disable their tap-to-click feature via libinput.
+ *
+ * @param manager The Elput_Manager instance.
+ * @param seat The name of the seat (e.g., "seat0"). Can be NULL for default.
+ * @param enabled EINA_TRUE to enable tap-to-click, EINA_FALSE to disable.
+ */
 EAPI void
 elput_input_touch_tap_to_click_enabled_set(Elput_Manager *manager, const char *seat, Eina_Bool enabled)
 {
@@ -895,6 +1310,13 @@ elput_input_touch_tap_to_click_enabled_set(Elput_Manager *manager, const char *s
      }
 }
 
+/**
+ * @brief Retrieves the Elput_Seat associated with an Elput_Device.
+ *
+ * @param dev The Elput_Device.
+ * @return A pointer to the Elput_Seat the device belongs to, or NULL if
+ *         @p dev is NULL.
+ */
 EAPI Elput_Seat *
 elput_device_seat_get(const Elput_Device *dev)
 {
@@ -902,6 +1324,17 @@ elput_device_seat_get(const Elput_Device *dev)
    return dev->seat;
 }
 
+/**
+ * @brief Retrieves the capabilities of an Elput_Device.
+ *
+ * Capabilities indicate what kind of input the device can produce (e.g.,
+ * keyboard, pointer, touch).
+ *
+ * @param dev The Elput_Device.
+ * @return A bitmask of Elput_Device_Caps representing the device's
+ *         capabilities, or 0 if @p dev is NULL.
+ *         Example: `ELPUT_DEVICE_CAPS_KEYBOARD | ELPUT_DEVICE_CAPS_POINTER`
+ */
 EAPI Elput_Device_Caps
 elput_device_caps_get(const Elput_Device *dev)
 {
@@ -909,6 +1342,17 @@ elput_device_caps_get(const Elput_Device *dev)
    return dev->caps;
 }
 
+/**
+ * @brief Retrieves the output name associated with an Elput_Device.
+ *
+ * The output name typically refers to the display or screen that the
+ * input device is mapped to. This is often used for multi-monitor setups.
+ *
+ * @param device The Elput_Device.
+ * @return An Eina_Stringshare containing the output name, or NULL if
+ *         @p device is NULL or no output name is set. The caller should not
+ *         free the returned stringshare; its lifetime is managed by elput.
+ */
 EAPI Eina_Stringshare *
 elput_device_output_name_get(Elput_Device *device)
 {
@@ -917,6 +1361,14 @@ elput_device_output_name_get(Elput_Device *device)
    return device->output_name;
 }
 
+/**
+ * @brief Retrieves the list of Elput_Devices associated with an Elput_Seat.
+ *
+ * @param seat The Elput_Seat.
+ * @return A pointer to an Eina_List containing Elput_Device pointers.
+ *         The list is owned by elput and should not be modified or freed
+ *         by the caller. Returns NULL if @p seat is NULL.
+ */
 EAPI const Eina_List *
 elput_seat_devices_get(const Elput_Seat *seat)
 {
@@ -924,6 +1376,14 @@ elput_seat_devices_get(const Elput_Seat *seat)
    return seat->devices;
 }
 
+/**
+ * @brief Retrieves the name of an Elput_Seat.
+ *
+ * @param seat The Elput_Seat.
+ * @return An Eina_Stringshare containing the seat's name (e.g., "seat0").
+ *         The stringshare is owned by elput and should not be freed by
+ *         the caller. Returns NULL if @p seat is NULL.
+ */
 EAPI Eina_Stringshare *
 elput_seat_name_get(const Elput_Seat *seat)
 {
@@ -931,6 +1391,13 @@ elput_seat_name_get(const Elput_Seat *seat)
    return seat->name;
 }
 
+/**
+ * @brief Retrieves the Elput_Manager associated with an Elput_Seat.
+ *
+ * @param seat The Elput_Seat.
+ * @return A pointer to the Elput_Manager that owns this seat, or NULL if
+ *         @p seat is NULL.
+ */
 EAPI Elput_Manager *
 elput_seat_manager_get(const Elput_Seat *seat)
 {

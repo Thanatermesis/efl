@@ -3,6 +3,16 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback function for the "clicked" event on the icon.
+ *
+ * This function is called when the icon is clicked. It toggles the
+ * animation of the icon between playing and paused states.
+ *
+ * @param data The icon Evas_Object passed as user data.
+ * @param obj The Evas_Object on which the event occurred (the icon).
+ * @param event_info The event-specific information (unused).
+ */
 static void
 _icon_clicked_cb(void *data , Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -14,6 +24,18 @@ _icon_clicked_cb(void *data , Evas_Object *obj EINA_UNUSED, void *event_info EIN
    elm_image_animated_play_set(ic, play);
 }
 
+/**
+ * @brief Creates and runs the icon animated test.
+ *
+ * This function sets up a window containing an animated icon.
+ * The icon displays an animated GIF. A label explains that clicking the icon
+ * will toggle the animation. The animation starts playing by default if
+ * available.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_icon_animated(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

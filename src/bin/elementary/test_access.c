@@ -3,19 +3,33 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback to disable accessibility when the test window is closed.
+ * This is important to not affect other tests.
+ */
 static void
 _cleanup_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_config_access_set(EINA_FALSE);
 }
 
+/**
+ * @brief A struct to hold data for genlist and gengrid items.
+ */
 typedef struct _Item_Data
 {
-   Elm_Object_Item *item;
-   int index;
+   Elm_Object_Item *item; /**< The genlist or gengrid item */
+   int index; /**< A unique index for the item */
 } Item_Data;
 
 static Elm_Genlist_Item_Class *itc1, *itc2;
+/**
+ * @brief Get the text for a genlist item, to be read by a screen reader.
+ * @param data The item data (Item_Data).
+ * @param obj The genlist object.
+ * @param part The theme part name.
+ * @return The allocated string with the item's text.
+ */
 char *gl_access_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
    char buf[256];
@@ -24,6 +38,14 @@ char *gl_access_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *p
    return strdup(buf);
 }
 
+/**
+ * @brief Get the content for a genlist item.
+ * @param data The item data.
+ * @param obj The genlist object.
+ * @param part The theme part name to swallow content into.
+ * @return An object to be swallowed. For "elm.swallow.end", it returns
+ * a button. Otherwise, it returns an icon.
+ */
 Evas_Object *gl_access_content_get(void *data EINA_UNUSED, Evas_Object *obj, const char *part)
 {
    char buf[PATH_MAX];
@@ -47,6 +69,13 @@ Evas_Object *gl_access_content_get(void *data EINA_UNUSED, Evas_Object *obj, con
    return bt;
 }
 
+/**
+ * @brief Deletion function for genlist/gengrid items.
+ *
+ * It frees the item data.
+ * @param data The item data (Item_Data) to free.
+ * @param obj The Evas object (genlist/gengrid).
+ */
 static void
 gl_del(void *data, Evas_Object *obj EINA_UNUSED)
 {
@@ -55,6 +84,13 @@ gl_del(void *data, Evas_Object *obj EINA_UNUSED)
 
 static Elm_Gengrid_Item_Class *gic;
 
+/**
+ * @brief Get the content for a gengrid item.
+ * @param data The item data (Item_Data).
+ * @param obj The gengrid object.
+ * @param part The theme part name to swallow content into.
+ * @return An icon object for the "elm.swallow.icon" part, otherwise NULL.
+ */
 Evas_Object *
 grid_access_content_get(void *data, Evas_Object *obj, const char *part)
 {
@@ -77,6 +113,18 @@ grid_access_content_get(void *data, Evas_Object *obj, const char *part)
    return NULL;
 }
 
+/**
+ * @brief Get content for a "full" style genlist item.
+ *
+ * This function creates a whole gengrid widget, populates it with items,
+ * and returns it as the content for the "elm.swallow.content" part of a
+ * genlist item. This demonstrates nesting of complex widgets.
+ *
+ * @param data The item data.
+ * @param obj The genlist object.
+ * @param part The theme part name.
+ * @return A new gengrid widget if part is "elm.swallow.content", otherwise NULL.
+ */
 Evas_Object *gl_access_content_full_get(void *data EINA_UNUSED, Evas_Object *obj, const char *part)
 {
    int i;
@@ -112,6 +160,19 @@ Evas_Object *gl_access_content_full_get(void *data EINA_UNUSED, Evas_Object *obj
    return grid;
 }
 
+/**
+ * @brief "realized" smart callback for genlist items.
+ *
+ * This function is called when a genlist item is created and shown.
+ * It customizes the accessibility behavior.
+ * For "full" items, it makes the inner gengrid the focusable element instead of
+ * the item itself.
+ * For other items, it makes the "OK" button the focusable element.
+ *
+ * @param data User data.
+ * @param obj The genlist object.
+ * @param ei Event info, which is the Elm_Object_Item that was realized.
+ */
 static void _realized(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *ei)
 {
    Evas_Object *content, *bt;
@@ -145,6 +206,17 @@ static void _realized(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void
    elm_object_item_access_order_set(item, items);
 }
 
+/**
+ * @brief Test for genlist accessibility.
+ *
+ * Creates a window with a genlist. The genlist contains two types of items:
+ * - A default item with a label, an icon and a button.
+ * - A "full" item which contains a gengrid of icons.
+ *
+ * This test demonstrates basic accessibility on genlist, and how to
+ * customize focus order for items with complex content using the "realized"
+ * smart callback.
+ */
 void
 test_access(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -224,6 +296,16 @@ test_access(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
    evas_object_show(win);
 }
 
+/**
+ * @brief Test for advanced accessibility features.
+ *
+ * Creates a window with a scroller containing several layouts. Each layout
+ * contains a grid of icons.
+ * This test demonstrates:
+ * - How to manually register an access object for a part of a layout.
+ * - How to create a custom focus chain using elm_object_focus_custom_chain_append().
+ * This allows defining a non-trivial navigation order for accessibility.
+ */
 void
 test_access2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -303,6 +385,17 @@ test_access2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_i
    evas_object_show(win);
 }
 
+/**
+ * @brief Key down event handler to trigger a custom access action.
+ *
+ * When F1 is pressed, it calls elm_access_action() to move the highlight
+ * to the next object in the custom highlight chain.
+ *
+ * @param data The window object.
+ * @param type The event type.
+ * @param ei The key event info.
+ * @return ECORE_CALLBACK_PASS_ON to continue event propagation.
+ */
 static Eina_Bool
 _key_down_cb(void *data, int type EINA_UNUSED, void *ei)
 {
@@ -325,6 +418,12 @@ _key_down_cb(void *data, int type EINA_UNUSED, void *ei)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Callback to provide a textual description for an access object.
+ * @param data Custom data, in this case a string with the description.
+ * @param obj The object for which info is requested.
+ * @return A newly allocated string with the accessibility information.
+ */
 static char *
 _access_info_cb(void *data, Evas_Object *obj EINA_UNUSED)
 {
@@ -332,6 +431,18 @@ _access_info_cb(void *data, Evas_Object *obj EINA_UNUSED)
    return NULL;
 }
 
+/**
+ * @brief Test for custom accessibility highlight order and actions.
+ *
+ * Creates a window with a layout containing several colored regions and a
+ * central button.
+ * This test demonstrates:
+ * - Registering access objects for parts of a layout.
+ * - Providing custom textual descriptions for access objects with
+ *   elm_access_info_cb_set().
+ * - Defining a custom highlight order with elm_access_highlight_next_set().
+ * - Triggering access actions from a key event to navigate the custom order.
+ */
 void
 test_access3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

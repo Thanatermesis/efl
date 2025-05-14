@@ -13,6 +13,15 @@
 
 static int _evas_vg_loader_json_log_dom = -1;
 
+/**
+ * @brief Closes a Vg_File_Data object and frees associated resources.
+ *
+ * This function releases the Lottie animation data, animation metadata (including markers),
+ * the root EFL object, and the Vg_File_Data structure itself.
+ *
+ * @param vfd Pointer to the Vg_File_Data to close.
+ * @return EINA_TRUE on success, EINA_FALSE if vfd is NULL.
+ */
 static Eina_Bool
 evas_vg_load_file_close_json(Vg_File_Data *vfd)
 {
@@ -37,12 +46,48 @@ evas_vg_load_file_close_json(Vg_File_Data *vfd)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Creates the Efl_Vg_Node structure from the loaded Lottie animation data.
+ *
+ * This function delegates to vg_common_json_create_vg_node to parse the
+ * JSON data (already loaded into vfd->loader_data by evas_vg_load_file_open_json)
+ * and construct the vector graphics scene graph.
+ *
+ * @param vfd Pointer to the Vg_File_Data containing the loaded Lottie animation.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_vg_load_file_data_json(Vg_File_Data *vfd)
 {
    return vg_common_json_create_vg_node(vfd);
 }
 
+/**
+ * @brief Opens a Lottie JSON file and prepares it for rendering.
+ *
+ * This function loads a Lottie animation from the given Eina_File.
+ * It handles both regular files and files mapped into virtual memory.
+ * It extracts animation properties like duration, frame count, and markers.
+ * The actual parsing of JSON into a scene graph is deferred to
+ * evas_vg_load_file_data_json.
+ *
+ * @param file Pointer to the Eina_File object representing the Lottie JSON file.
+ * @param key Optional key, often the filename, used by lottie_animation_from_data.
+ * @param error Pointer to an integer to store error codes (currently unused).
+ * @return A pointer to a Vg_File_Data structure on success, or NULL on failure.
+ *         The Vg_File_Data structure contains:
+ *         - loader_data: Pointer to the Lottie_Animation object.
+ *         - anim_data: Pointer to Vg_File_Anim_Data if the Lottie file is animated.
+ *           - duration: Total duration of the animation in seconds.
+ *           - frame_cnt: Total number of frames in the animation.
+ *           - markers: An Eina_Inarray of Vg_File_Anim_Data_Marker.
+ *             Each marker has:
+ *             - name: eina_stringshare_add'ed name of the marker.
+ *             - startframe: Starting frame number of the marker.
+ *             - endframe: Ending frame number of the marker.
+ *         - w: Default width of the animation.
+ *         - h: Default height of the animation.
+ */
 static Vg_File_Data*
 evas_vg_load_file_open_json(Eina_File *file,
                             const char *key,
@@ -127,6 +172,15 @@ static Evas_Vg_Load_Func evas_vg_load_json_func =
    evas_vg_load_file_data_json
 };
 
+/**
+ * @brief Initializes the Evas VG loader module for JSON (Lottie) files.
+ *
+ * This function is called when the module is loaded. It sets up the
+ * loader functions and registers a log domain for the module.
+ *
+ * @param em Pointer to the Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -142,6 +196,14 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Shuts down the Evas VG loader module for JSON (Lottie) files.
+ *
+ * This function is called when the module is unloaded. It unregisters
+ * the log domain.
+ *
+ * @param em Pointer to the Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

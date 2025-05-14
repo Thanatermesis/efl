@@ -1,23 +1,109 @@
 
+/**
+ * @internal
+ * @brief Implementation for getting the previous item in the genlist.
+ *
+ * Retrieves the Elm_Widget_Item that precedes the given item (@p obj)
+ * in the genlist's internal item sequence. This function serves as the
+ * concrete implementation for the @ref elm_obj_genlist_item_prev_get EO API method.
+ *
+ * @param obj The Elm_Genlist_Item object.
+ * @param pd Pointer to the private data (Elm_Gen_Item) of the item.
+ * @return The previous Elm_Widget_Item, or @c NULL if it's the first item or on error.
+ * @see elm_obj_genlist_item_prev_get
+ */
 Elm_Widget_Item *_elm_genlist_item_prev_get(const Eo *obj, Elm_Gen_Item *pd);
 
 EOAPI EFL_FUNC_BODY_CONST(elm_obj_genlist_item_prev_get, Elm_Widget_Item *, NULL);
 
+/**
+ * @internal
+ * @brief Implementation for getting the next item in the genlist.
+ *
+ * Retrieves the Elm_Widget_Item that follows the given item (@p obj)
+ * in the genlist's internal item sequence. This function is the
+ * concrete implementation for the @ref elm_obj_genlist_item_next_get EO API method.
+ *
+ * @param obj The Elm_Genlist_Item object.
+ * @param pd Pointer to the private data (Elm_Gen_Item) of the item.
+ * @return The next Elm_Widget_Item, or @c NULL if it's the last item or on error.
+ * @see elm_obj_genlist_item_next_get
+ */
 Elm_Widget_Item *_elm_genlist_item_next_get(const Eo *obj, Elm_Gen_Item *pd);
 
 EOAPI EFL_FUNC_BODY_CONST(elm_obj_genlist_item_next_get, Elm_Widget_Item *, NULL);
 
+/**
+ * @internal
+ * @brief Implementation for getting the parent item of a genlist item.
+ *
+ * Retrieves the parent Elm_Widget_Item of the specified item (@p obj).
+ * This is relevant for tree-like structures within the genlist.
+ * This function is the concrete implementation for the
+ * @ref elm_obj_genlist_item_parent_item_get EO API method.
+ *
+ * @param obj The Elm_Genlist_Item object.
+ * @param pd Pointer to the private data (Elm_Gen_Item) of the item.
+ * @return The parent Elm_Widget_Item, or @c NULL if the item has no parent or on error.
+ * @see elm_obj_genlist_item_parent_item_get
+ */
 Elm_Widget_Item *_elm_genlist_item_parent_item_get(const Eo *obj, Elm_Gen_Item *pd);
 
 EOAPI EFL_FUNC_BODY_CONST(elm_obj_genlist_item_parent_item_get, Elm_Widget_Item *, NULL);
 
+/**
+ * @internal
+ * @brief Implementation for getting the list of subitems of a genlist item.
+ *
+ * Retrieves a list of all subitems (children) of the specified genlist item (@p obj).
+ * The returned list contains pointers to Elm_Widget_Item objects. This list is
+ * owned by the item and should not be modified or freed by the caller.
+ * This function is the concrete implementation for the
+ * @ref elm_obj_genlist_item_subitems_get EO API method.
+ *
+ * @param obj The Elm_Genlist_Item object.
+ * @param pd Pointer to the private data (Elm_Gen_Item) of the item.
+ * @return A const Eina_List of Elm_Widget_Item pointers, or @c NULL on error or if no subitems.
+ *         The list contains Elm_Widget_Item* elements. For example:
+ *         Eina_List* subitems = elm_obj_genlist_item_subitems_get(item);
+ *         Elm_Widget_Item* first_child;
+ *         EINA_LIST_FOREACH(subitems, l, first_child) break; // Get first child
+ * @see elm_obj_genlist_item_subitems_get
+ */
 const Eina_List *_elm_genlist_item_subitems_get(const Eo *obj, Elm_Gen_Item *pd);
 
 EOAPI EFL_FUNC_BODY_CONST(elm_obj_genlist_item_subitems_get, const Eina_List *, NULL);
 
+/**
+ * @internal
+ * @brief Implementation for setting the selected state of a genlist item.
+ *
+ * Sets whether the specified genlist item (@p obj) is selected.
+ * This function is the concrete implementation for the
+ * @ref elm_obj_genlist_item_selected_set EO API method.
+ *
+ * @param obj The Elm_Genlist_Item object.
+ * @param pd Pointer to the private data (Elm_Gen_Item) of the item.
+ * @param selected @c EINA_TRUE to select the item, @c EINA_FALSE to unselect.
+ * @see elm_obj_genlist_item_selected_set
+ */
 void _elm_genlist_item_selected_set(Eo *obj, Elm_Gen_Item *pd, Eina_Bool selected);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function to set the 'selected' property from an Eina_Value.
+ *
+ * This function is utilized by the Eolian reflection system to update the item's
+ * 'selected' state. It converts an Eina_Value (expected to hold a boolean)
+ * into a C boolean type and then calls the concrete @ref elm_obj_genlist_item_selected_set
+ * function to apply the change.
+ *
+ * @param obj The Elm_Genlist_Item object whose 'selected' property is to be set.
+ * @param val An Eina_Value containing the new selected state (must be convertible to boolean).
+ * @return @c EINA_ERROR_NO_ERROR on successful conversion and setting of the property,
+ *         or an Eina_Error code (e.g., @c EINA_ERROR_VALUE_FAILED) if the
+ *         Eina_Value cannot be converted to a boolean.
+ */
 static Eina_Error
 __eolian_elm_genlist_item_selected_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -35,9 +121,33 @@ __eolian_elm_genlist_item_selected_set_reflect(Eo *obj, Eina_Value val)
 
 EOAPI EFL_VOID_FUNC_BODYV(elm_obj_genlist_item_selected_set, EFL_FUNC_CALL(selected), Eina_Bool selected);
 
+/**
+ * @internal
+ * @brief Implementation for getting the selected state of a genlist item.
+ *
+ * Retrieves the current selected state of the specified genlist item (@p obj).
+ * This function is the concrete implementation for the
+ * @ref elm_obj_genlist_item_selected_get EO API method.
+ *
+ * @param obj The Elm_Genlist_Item object.
+ * @param pd Pointer to the private data (Elm_Gen_Item) of the item.
+ * @return @c EINA_TRUE if the item is selected, @c EINA_FALSE otherwise.
+ * @see elm_obj_genlist_item_selected_get
+ */
 Eina_Bool _elm_genlist_item_selected_get(const Eo *obj, Elm_Gen_Item *pd);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function to get the 'selected' property as an Eina_Value.
+ *
+ * This function is utilized by the Eolian reflection system to retrieve the item's
+ * current 'selected' state. It calls the concrete @ref elm_obj_genlist_item_selected_get
+ * function and then wraps the resulting boolean value into an Eina_Value.
+ *
+ * @param obj The Elm_Genlist_Item object whose 'selected' property is to be retrieved.
+ * @return An Eina_Value initialized with the boolean selected state of the item.
+ *         The caller is responsible for flushing this Eina_Value if it's not @c NULL.
+ */
 static Eina_Value
 __eolian_elm_genlist_item_selected_get_reflect(const Eo *obj)
 {
@@ -47,9 +157,33 @@ __eolian_elm_genlist_item_selected_get_reflect(const Eo *obj)
 
 EOAPI EFL_FUNC_BODY_CONST(elm_obj_genlist_item_selected_get, Eina_Bool, 0);
 
+/**
+ * @internal
+ * @brief Implementation for setting the expanded state of a genlist item.
+ *
+ * Sets whether the specified genlist item (@p obj) is expanded (if it's a tree item).
+ * This function is the concrete implementation for the
+ * @ref elm_obj_genlist_item_expanded_set EO API method.
+ *
+ * @param obj The Elm_Genlist_Item object.
+ * @param pd Pointer to the private data (Elm_Gen_Item) of the item.
+ * @param expanded @c EINA_TRUE to expand the item, @c EINA_FALSE to collapse.
+ * @see elm_obj_genlist_item_expanded_set
+ */
 void _elm_genlist_item_expanded_set(Eo *obj, Elm_Gen_Item *pd, Eina_Bool expanded);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function to set the 'expanded' property from an Eina_Value.
+ *
+ * Used by the Eolian reflection system to update the item's 'expanded' state.
+ * It converts an Eina_Value (expected boolean) and calls
+ * @ref elm_obj_genlist_item_expanded_set.
+ *
+ * @param obj The Elm_Genlist_Item object.
+ * @param val An Eina_Value containing the new expanded state (boolean).
+ * @return @c EINA_ERROR_NO_ERROR on success, or an error code if conversion fails.
+ */
 static Eina_Error
 __eolian_elm_genlist_item_expanded_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -67,9 +201,31 @@ __eolian_elm_genlist_item_expanded_set_reflect(Eo *obj, Eina_Value val)
 
 EOAPI EFL_VOID_FUNC_BODYV(elm_obj_genlist_item_expanded_set, EFL_FUNC_CALL(expanded), Eina_Bool expanded);
 
+/**
+ * @internal
+ * @brief Implementation for getting the expanded state of a genlist item.
+ *
+ * Retrieves the current expanded state of the specified genlist item (@p obj).
+ * This function is the concrete implementation for the
+ * @ref elm_obj_genlist_item_expanded_get EO API method.
+ *
+ * @param obj The Elm_Genlist_Item object.
+ * @param pd Pointer to the private data (Elm_Gen_Item) of the item.
+ * @return @c EINA_TRUE if the item is expanded, @c EINA_FALSE otherwise.
+ * @see elm_obj_genlist_item_expanded_get
+ */
 Eina_Bool _elm_genlist_item_expanded_get(const Eo *obj, Elm_Gen_Item *pd);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function to get the 'expanded' property as an Eina_Value.
+ *
+ * Used by the Eolian reflection system to retrieve the item's 'expanded' state.
+ * It calls @ref elm_obj_genlist_item_expanded_get and wraps the result in an Eina_Value.
+ *
+ * @param obj The Elm_Genlist_Item object.
+ * @return An Eina_Value initialized with the boolean expanded state.
+ */
 static Eina_Value
 __eolian_elm_genlist_item_expanded_get_reflect(const Eo *obj)
 {
@@ -79,9 +235,34 @@ __eolian_elm_genlist_item_expanded_get_reflect(const Eo *obj)
 
 EOAPI EFL_FUNC_BODY_CONST(elm_obj_genlist_item_expanded_get, Eina_Bool, 0);
 
+/**
+ * @internal
+ * @brief Implementation for getting the expanded depth of a genlist item.
+ *
+ * Retrieves the depth of an expanded item in a tree structure within the genlist.
+ * This function is the concrete implementation for the
+ * @ref elm_obj_genlist_item_expanded_depth_get EO API method.
+ *
+ * @param obj The Elm_Genlist_Item object.
+ * @param pd Pointer to the private data (Elm_Gen_Item) of the item.
+ * @return The depth of the expanded item (e.g., 0 for root level items that are expanded,
+ *         1 for their children if expanded, etc.). Returns a negative value or 0
+ *         if not applicable or on error, depending on specific internal logic.
+ * @see elm_obj_genlist_item_expanded_depth_get
+ */
 int _elm_genlist_item_expanded_depth_get(const Eo *obj, Elm_Gen_Item *pd);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function to get the 'expanded_depth' property as an Eina_Value.
+ *
+ * Used by the Eolian reflection system to retrieve the item's 'expanded_depth'.
+ * It calls @ref elm_obj_genlist_item_expanded_depth_get and wraps the integer result
+ * in an Eina_Value.
+ *
+ * @param obj The Elm_Genlist_Item object.
+ * @return An Eina_Value initialized with the integer expanded depth.
+ */
 static Eina_Value
 __eolian_elm_genlist_item_expanded_depth_get_reflect(const Eo *obj)
 {
@@ -91,10 +272,39 @@ __eolian_elm_genlist_item_expanded_depth_get_reflect(const Eo *obj)
 
 EOAPI EFL_FUNC_BODY_CONST(elm_obj_genlist_item_expanded_depth_get, int, 0);
 
+/**
+ * @internal
+ * @brief Implementation for getting the item class of a genlist item.
+ *
+ * Retrieves the Elm_Genlist_Item_Class associated with the specified genlist item (@p obj).
+ * The item class defines how the item is rendered and behaves.
+ * This function is the concrete implementation for the
+ * @ref elm_obj_genlist_item_class_get EO API method.
+ * (Note: This refers to the EOAPI, not the EWAPI `elm_genlist_item_class_get`.)
+ *
+ * @param obj The Elm_Genlist_Item object.
+ * @param pd Pointer to the private data (Elm_Gen_Item) of the item.
+ * @return A pointer to the const Elm_Genlist_Item_Class for this item, or @c NULL on error.
+ * @see elm_obj_genlist_item_class_get
+ */
 const Elm_Genlist_Item_Class *_elm_genlist_item_item_class_get(const Eo *obj, Elm_Gen_Item *pd);
 
 EOAPI EFL_FUNC_BODY_CONST(elm_obj_genlist_item_class_get, const Elm_Genlist_Item_Class *, NULL);
 
+/**
+ * @internal
+ * @brief Implementation for getting the index of a genlist item.
+ *
+ * Retrieves the numerical index of the item within the genlist. The index is 1-based.
+ * This function is the concrete implementation for the
+ * @ref elm_obj_genlist_item_index_get EO API method.
+ *
+ * @param obj The Elm_Genlist_Item object.
+ * @param pd Pointer to the private data (Elm_Gen_Item) of the item.
+ * @return The 1-based index of the item, or -1 (or other error indicator like 0)
+ *         if the item is not yet realized or on error.
+ * @see elm_obj_genlist_item_index_get
+ */
 int _elm_genlist_item_index_get(const Eo *obj, Elm_Gen_Item *pd);
 
 
@@ -315,6 +525,27 @@ _elm_genlist_item_class_initializer(Efl_Class *klass)
 
    const Efl_Object_Property_Reflection_Ops *ropsp = NULL;
 
+/**
+ * @internal
+ * @brief Initializes the Elm_Genlist_Item Efl_Class.
+ *
+ * This function is called once during the Efl class construction phase.
+ * It is responsible for setting up the operations (methods) that instances
+ * of Elm_Genlist_Item will support, as well as defining how properties
+ * are reflected for introspection and scripting purposes.
+ *
+ * The EFL_OPS_DEFINE macro is used to associate EO API function names
+ * (e.g., elm_obj_genlist_item_prev_get) with their corresponding internal
+ * implementation functions (e.g., _elm_genlist_item_prev_get).
+ *
+ * Similarly, it sets up a table for property reflection, mapping property
+ * names (e.g., "selected") to their getter and setter reflection functions
+ * (e.g., __eolian_elm_genlist_item_selected_get_reflect,
+ * __eolian_elm_genlist_item_selected_set_reflect).
+ *
+ * @param klass The Efl_Class (Elm_Genlist_Item's class) to initialize.
+ * @return @c EINA_TRUE on successful initialization, @c EINA_FALSE otherwise.
+ */
 #ifndef ELM_GENLIST_ITEM_EXTRA_OPS
 #define ELM_GENLIST_ITEM_EXTRA_OPS
 #endif

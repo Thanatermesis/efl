@@ -5,6 +5,21 @@
 
 /* Note: Optimisation is based on keeping _dest_ aligned: else it's a pair of
  * reads, then two writes, a miss on read is 'just' two reads */
+/**
+ * @brief Blend source pixels with a color, then blend with destination.
+ *
+ * Operation: `d_out = s_processed + d_orig * (1 - alpha_of_s_processed)`
+ * where `s_processed = MUL4_SYM(c, s_orig)`.
+ * `s_orig` is the source pixel, `c` is the input color, `d_orig` is the destination pixel.
+ * Alpha of `s_processed` is used for blending with `d_orig`.
+ * Processes `l` pixels. Optimized for NEON.
+ *
+ * @param s Pointer to the source pixel data array. Each DATA32 is a pixel (e.g., 0xAARRGGBB).
+ * @param m Pointer to mask data (unused in this NEON implementation).
+ * @param c The DATA32 color to blend with the source pixels.
+ * @param d Pointer to the destination pixel data array, where results are stored.
+ * @param l The number of pixels to process.
+ */
 static void
 _op_blend_p_c_dp_neon(DATA32 * __restrict s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 * __restrict d, int l) {
 #ifdef BUILD_NEON_INTRINSICS
@@ -197,7 +212,22 @@ _op_blend_p_c_dp_neon(DATA32 * __restrict s, DATA8 *m EINA_UNUSED, DATA32 c, DAT
 #endif
 }
 
-
+/**
+ * @brief Blend source pixels (non-premultiplied alpha) with a color, then blend with destination.
+ *
+ * Operation: `D_out = S' + D_orig * (1 - C.alpha)`
+ * where `S'.rgb = S_orig.rgb * C.rgb` (component-wise, scaled) and `S'.alpha = C.alpha`.
+ * `S_orig` is the source pixel, `C` is the input color, `D_orig` is the destination pixel.
+ * The color `c`'s alpha component determines the transparency for blending with `d`.
+ * If color `c` is fully transparent (alpha 0), the function returns early.
+ * Processes `l` pixels. Optimized for NEON.
+ *
+ * @param s Pointer to the source pixel data array (non-premultiplied alpha). Each DATA32 is a pixel.
+ * @param m Pointer to mask data (unused).
+ * @param c The DATA32 color to blend with. Its alpha component is used for the final blend with destination.
+ * @param d Pointer to the destination pixel data array.
+ * @param l The number of pixels to process.
+ */
 static void
 _op_blend_pan_c_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, int l) {
    uint16x8_t ad0_16x8;
@@ -302,6 +332,21 @@ _op_blend_pan_c_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, in
 
 }
 
+/**
+ * @brief Blend source pixels with a color (non-premultiplied alpha), then blend with destination using source alpha.
+ *
+ * Operation: `D_out = S' + D_orig * (1 - S_orig.alpha)`
+ * where `S'.rgb = S_orig.rgb * C.rgb` (component-wise, scaled) and `S'.alpha = S_orig.alpha`.
+ * `S_orig` is the source pixel, `C` is the input color, `D_orig` is the destination pixel.
+ * The source pixel `s`'s alpha component determines the transparency for blending with `d`.
+ * Processes `l` pixels. Optimized for NEON.
+ *
+ * @param s Pointer to the source pixel data array. Each DATA32 is a pixel. Its alpha is used for blending.
+ * @param m Pointer to mask data (unused).
+ * @param c The DATA32 color (non-premultiplied alpha) whose RGB components are multiplied with source's RGB.
+ * @param d Pointer to the destination pixel data array.
+ * @param l The number of pixels to process.
+ */
 static void
 _op_blend_p_can_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, int l) {
    uint16x8_t ad0_16x8;
@@ -418,6 +463,19 @@ _op_blend_p_can_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, in
    }
 }
 
+/**
+ * @brief Multiply source (non-premultiplied alpha) with color (non-premultiplied alpha), output is opaque.
+ *
+ * Operation: `D_out.rgb = S_orig.rgb * C.rgb` (component-wise, scaled), `D_out.alpha = 0xFF` (fully opaque).
+ * `S_orig` is the source pixel, `C` is the input color. Destination `d` is overwritten.
+ * Processes `l` pixels. Optimized for NEON, processes 8 pixels per iteration in the main loop.
+ *
+ * @param s Pointer to the source pixel data array (non-premultiplied alpha).
+ * @param m Pointer to mask data (unused).
+ * @param c The DATA32 color (non-premultiplied alpha) whose RGB components are multiplied with source's RGB.
+ * @param d Pointer to the destination pixel data array (overwritten).
+ * @param l The number of pixels to process.
+ */
 static void
 _op_blend_pan_can_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, int l) {
    uint16x8_t sc00_16x8;
@@ -503,6 +561,21 @@ _op_blend_pan_can_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, 
    }
 }
 
+/**
+ * @brief Scale source pixels by a color alpha value, then blend with destination.
+ *
+ * Operation: `D_out = SC + D_orig * (1 - SC.alpha)`
+ * where `SC = S_orig * C_alpha_param_scaled`.
+ * `C_alpha_param_scaled = (1 + (c & 0xff)) / 256.0`. The input `c` is treated as an alpha value.
+ * `S_orig` is the source pixel, `D_orig` is the destination pixel.
+ * Processes `l` pixels. Optimized for NEON.
+ *
+ * @param s Pointer to the source pixel data array.
+ * @param m Pointer to mask data (unused).
+ * @param c A DATA32 value, where the lower 8 bits are used as an alpha value for scaling.
+ * @param d Pointer to the destination pixel data array.
+ * @param l The number of pixels to process.
+ */
 static void
 _op_blend_p_caa_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, int l) {
    uint16x8_t ad0_16x8;
@@ -621,6 +694,20 @@ _op_blend_p_caa_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, in
 
 }
 
+/**
+ * @brief Interpolate between source (non-premultiplied alpha) and destination pixels using a color alpha value.
+ *
+ * Operation: `D_out = D_orig + (S_orig - D_orig) * C_alpha_param_scaled` (component-wise linear interpolation).
+ * `C_alpha_param_scaled = (1 + (c & 0xff)) / 256.0`. The input `c` is treated as an alpha value.
+ * `S_orig` is the source pixel, `D_orig` is the destination pixel.
+ * Processes `l` pixels. Optimized for NEON.
+ *
+ * @param s Pointer to the source pixel data array (non-premultiplied alpha).
+ * @param m Pointer to mask data (unused).
+ * @param c A DATA32 value, where the lower 8 bits are used as an alpha value for interpolation.
+ * @param d Pointer to the destination pixel data array.
+ * @param l The number of pixels to process.
+ */
 static void
 _op_blend_pan_caa_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, int l) {
    int16x8_t c_i16x8;
@@ -724,7 +811,13 @@ _op_blend_pan_caa_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, 
 #define _op_blend_pas_caa_dpan_neon _op_blend_pas_caa_dp_neon
 #define _op_blend_pan_caa_dpan_neon _op_blend_pan_caa_dp_neon
 
-
+/**
+ * @brief Initializes NEON-optimized span blending functions for pixel-color operations.
+ *
+ * This function populates the `op_blend_span_funcs` table with pointers to
+ * the NEON implementations of various pixel-color blending operations.
+ * These functions operate on spans (arrays) of pixels.
+ */
 static void
 init_blend_pixel_color_span_funcs_neon(void)
 {
@@ -751,10 +844,23 @@ init_blend_pixel_color_span_funcs_neon(void)
 #endif
 
 #ifdef BUILD_NEON
+/**
+ * @brief Blend a single source pixel with a color, then blend with a destination pixel. (Point operation)
+ *
+ * Operation: `d_out = s_processed + d_orig * (1 - alpha_of_s_processed)`
+ * where `s_processed = MUL4_SYM(c_param, s_param)`.
+ * `s_param` is the source pixel value, `c_param` is the input color, `d_orig` is the destination pixel.
+ * This is the single-pixel (point) equivalent of `_op_blend_p_c_dp_neon`.
+ *
+ * @param s The source DATA32 pixel value.
+ * @param m Mask value (unused).
+ * @param c The DATA32 color to blend with the source pixel.
+ * @param d Pointer to the destination DATA32 pixel.
+ */
 static void
 _op_blend_pt_p_c_dp_neon(DATA32 s, DATA8 m EINA_UNUSED, DATA32 c, DATA32 *d) {
    s = MUL4_SYM(c, s);
-   c = 256 - (s >> 24);
+   c = 256 - (s >> 24); // Note: `c` is reused here to store alpha
    *d = s + MUL_256(c, *d);
 }
 
@@ -777,6 +883,12 @@ _op_blend_pt_p_c_dp_neon(DATA32 s, DATA8 m EINA_UNUSED, DATA32 c, DATA32 *d) {
 #define _op_blend_pt_pas_caa_dpan_neon _op_blend_pt_p_c_dp_neon
 #define _op_blend_pt_pan_caa_dpan_neon _op_blend_pt_p_c_dp_neon
 
+/**
+ * @brief Initializes NEON-optimized point blending functions for pixel-color operations.
+ *
+ * This function populates the `op_blend_pt_funcs` table with pointers to
+ * the NEON implementations of various single-pixel (point) color blending operations.
+ */
 static void
 init_blend_pixel_color_pt_funcs_neon(void)
 {
@@ -808,6 +920,22 @@ init_blend_pixel_color_pt_funcs_neon(void)
 
 #ifdef BUILD_NEON
 
+/**
+ * @brief Relative blend of source pixels with a color, modulated by destination alpha, then blended with destination.
+ *
+ * Operation: `D_out = (SC * D_orig.alpha) + (D_orig * (1 - SC.alpha))`
+ * where `SC = MUL4_SYM(C_param, S_orig)`.
+ * `S_orig` is the source pixel, `C_param` is the input color, `D_orig` is the destination pixel.
+ * This blend mode considers the destination alpha (`D_orig.alpha`) when applying the
+ * source-color product (`SC`).
+ * Processes `l` pixels. Optimized for NEON.
+ *
+ * @param s Pointer to the source pixel data array.
+ * @param m Pointer to mask data (unused).
+ * @param c The DATA32 color to blend with the source pixels.
+ * @param d Pointer to the destination pixel data array.
+ * @param l The number of pixels to process.
+ */
 static void
 _op_blend_rel_p_c_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, int l) {
    uint16x8_t ad0_16x8;
@@ -960,6 +1088,13 @@ _op_blend_rel_p_c_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, 
 #define _op_blend_rel_pas_caa_dpan_neon _op_blend_pas_caa_dpan_neon
 #define _op_blend_rel_pan_caa_dpan_neon _op_blend_pan_caa_dpan_neon
 
+/**
+ * @brief Initializes NEON-optimized relative span blending functions for pixel-color operations.
+ *
+ * This function populates the `op_blend_rel_span_funcs` table with pointers to
+ * the NEON implementations of various "relative" pixel-color blending operations
+ * that operate on spans (arrays) of pixels.
+ */
 static void
 init_blend_rel_pixel_color_span_funcs_neon(void)
 {
@@ -997,6 +1132,13 @@ init_blend_rel_pixel_color_span_funcs_neon(void)
 #define _op_blend_rel_pt_pas_caa_dpan_neon _op_blend_pt_pas_caa_dpan_neon
 #define _op_blend_rel_pt_pan_caa_dpan_neon _op_blend_pt_pan_caa_dpan_neon
 
+/**
+ * @brief Initializes NEON-optimized relative point blending functions for pixel-color operations.
+ *
+ * This function populates the `op_blend_rel_pt_funcs` table with pointers to
+ * the NEON implementations of various "relative" single-pixel (point) color blending operations.
+ * Note that many of these point functions are aliased to other existing point functions.
+ */
 static void
 init_blend_rel_pixel_color_pt_funcs_neon(void)
 {

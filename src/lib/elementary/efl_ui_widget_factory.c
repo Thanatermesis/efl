@@ -10,43 +10,84 @@
 #include "elm_priv.h"
 #include "efl_ui_property_bind_part.eo.h"
 
+/**
+ * @brief Internal data structure for Efl_Ui_Widget_Factory.
+ */
 typedef struct _Efl_Ui_Widget_Factory_Data Efl_Ui_Widget_Factory_Data;
+
+/**
+ * @brief Internal data structure for handling widget creation requests.
+ */
 typedef struct _Efl_Ui_Widget_Factory_Request Efl_Ui_Widget_Factory_Request;
+
+/**
+ * @brief Internal data structure for managing bindings to a specific part.
+ */
 typedef struct _Efl_Ui_Bind_Part_Data Efl_Ui_Bind_Part_Data;
+
+/**
+ * @brief Internal data structure for a single property binding.
+ */
 typedef struct _Efl_Ui_Property_Bind_Data Efl_Ui_Property_Bind_Data;
 
+/**
+ * @internal
+ * @brief Stores information about a single property binding between a part's property and a model's property.
+ */
 struct _Efl_Ui_Property_Bind_Data
 {
    Eina_Stringshare *part_property;
-   Eina_Stringshare *model_property;
+   Eina_Stringshare *model_property; /**< The name of the property in the model. */
 };
 
+/**
+ * @internal
+ * @brief Stores information about all property bindings for a specific UI part.
+ */
 struct _Efl_Ui_Bind_Part_Data
 {
-   Eina_Stringshare *part;
+   Eina_Stringshare *part; /**< The name of the part to bind. */
 
-   Eina_List *properties;
+   Eina_List *properties; /**< A list of Efl_Ui_Property_Bind_Data, defining individual property bindings for this part. */
 };
 
+/**
+ * @internal
+ * @brief Private data for the Efl_Ui_Widget_Factory class.
+ */
 struct _Efl_Ui_Widget_Factory_Data
 {
-   const Efl_Class *klass;
+   const Efl_Class *klass; /**< The Efl_Class to instantiate for each item. Must implement Efl_Ui_View and Efl_Ui_Widget. */
 
-   Efl_Ui_Widget *parenting_widget;
+   Efl_Ui_Widget *parenting_widget; /**< The parent widget where new widgets will be added. */
 
-   Eina_Hash *parts;
+   Eina_Hash *parts; /**< A hash table mapping part names (Eina_Stringshare) to Efl_Ui_Bind_Part_Data. Stores part-specific property bindings. */
 
-   Eina_Stringshare *default_property;
+   Eina_Stringshare *default_property; /**< The default model property to bind to the widget itself (not a part). */
 
-   Eina_Stringshare *style;
+   Eina_Stringshare *style; /**< The model property name that dictates the widget's style. */
 };
 
+/**
+ * @internal
+ * @brief Represents a request to create widgets, holding necessary context.
+ * This structure is used to pass data through asynchronous operations like Eina_Future.
+ */
 struct _Efl_Ui_Widget_Factory_Request
 {
-   Efl_Ui_Widget_Factory_Data *pd;
-   Efl_Ui_Factory *factory;
+   Efl_Ui_Widget_Factory_Data *pd; /**< Pointer to the factory's private data. */
+   Efl_Ui_Factory *factory; /**< Reference to the factory initiating the request. */
 };
 
+/**
+ * @internal
+ * @brief Finalization step for the widget factory.
+ * Ensures that a parenting widget is available.
+ *
+ * @param obj The Efl_Ui_Widget_Factory object.
+ * @param pd The private data of the Efl_Ui_Widget_Factory.
+ * @return The finalized Efl_Object, or NULL on error.
+ */
 static Efl_Object *
 _efl_ui_widget_factory_efl_object_finalize(Eo *obj, Efl_Ui_Widget_Factory_Data *pd)
 {
@@ -60,6 +101,15 @@ _efl_ui_widget_factory_efl_object_finalize(Eo *obj, Efl_Ui_Widget_Factory_Data *
    return efl_finalize(efl_super(obj, EFL_UI_WIDGET_FACTORY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Retrieves the parenting widget associated with this factory.
+ * This is an internal accessor and not part of the public API,
+ * typically used by Efl.Ui.Widget_Factory_Helper.
+ *
+ * @param factory The Efl_Ui_Widget_Factory object.
+ * @return The parenting Efl_Ui_Widget.
+ */
 Efl_Ui_Win *
 efl_ui_widget_factory_widget_get(Efl_Ui_Widget_Factory *factory)
 {
@@ -68,6 +118,15 @@ efl_ui_widget_factory_widget_get(Efl_Ui_Widget_Factory *factory)
    return pd->parenting_widget;
 }
 
+/**
+ * @internal
+ * @brief Sets the class to be instantiated by this factory.
+ * The class must implement Efl.Ui.View and Efl.Ui.Widget.
+ *
+ * @param obj The Efl_Ui_Widget_Factory object.
+ * @param pd The private data of the Efl_Ui_Widget_Factory.
+ * @param klass The Efl_Class to use for creating new widgets.
+ */
 static void
 _efl_ui_widget_factory_item_class_set(Eo *obj, Efl_Ui_Widget_Factory_Data *pd,
                                       const Efl_Class *klass)
@@ -85,6 +144,14 @@ _efl_ui_widget_factory_item_class_set(Eo *obj, Efl_Ui_Widget_Factory_Data *pd,
    pd->klass = klass;
 }
 
+/**
+ * @internal
+ * @brief Gets the class currently set to be instantiated by this factory.
+ *
+ * @param obj The Efl_Ui_Widget_Factory object (unused).
+ * @param pd The private data of the Efl_Ui_Widget_Factory.
+ * @return The Efl_Class used for creating new widgets.
+ */
 static const Efl_Class *
 _efl_ui_widget_factory_item_class_get(const Eo *obj EINA_UNUSED,
                                       Efl_Ui_Widget_Factory_Data *pd)
@@ -92,6 +159,16 @@ _efl_ui_widget_factory_item_class_get(const Eo *obj EINA_UNUSED,
    return pd->klass;
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a new item (widget) is being constructed by the factory.
+ * This function attempts to set the minimum size of the widget based on "self.width"
+ * and "self.height" properties from its model, if available. This can optimize
+ * rendering by avoiding an initial recalculation pass if the size is known.
+ *
+ * @param data User data, not used in this function.
+ * @param ev The event information, where ev->info is the Efl_Gfx_Entity (ui_view) being constructed.
+ */
 static void
 _efl_ui_widget_factory_constructing(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -125,7 +202,16 @@ _efl_ui_widget_factory_constructing(void *data EINA_UNUSED, const Efl_Event *ev)
    efl_key_data_set(ui_view, "efl.ui.widget.factory.size_check", (void*)EINA_TRUE);
 }
 
-
+/**
+ * @internal
+ * @brief Callback invoked when a new item (widget) is being built by the factory,
+ * after construction but before it's fully finalized and ready for use.
+ * This function applies property bindings and sets the widget's style based on
+ * model properties.
+ *
+ * @param data The Efl_Ui_Widget_Factory_Data associated with the factory.
+ * @param ev The event information, where ev->info is the Efl_Gfx_Entity (ui_view) being built.
+ */
 static void
 _efl_ui_widget_factory_building(void *data, const Efl_Event *ev)
 {
@@ -172,6 +258,15 @@ _efl_ui_widget_factory_building(void *data, const Efl_Event *ev)
    efl_key_data_set(ui_view, "efl.ui.widget.factory.cached", NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when an item (widget) previously created by the factory is being released.
+ * This function unbinds properties, clears the model, and resets certain states
+ * to prepare the widget for potential reuse or deletion.
+ *
+ * @param data The Efl_Ui_Widget_Factory_Data associated with the factory.
+ * @param ev The event information, where ev->info is the Efl_Gfx_Entity (ui_view) being released.
+ */
 static void
 _efl_ui_widget_factory_releasing(void *data, const Efl_Event *ev)
 {
@@ -211,6 +306,15 @@ EFL_CALLBACKS_ARRAY_DEFINE(item_callbacks,
                            { EFL_UI_FACTORY_EVENT_ITEM_BUILDING, _efl_ui_widget_factory_building },
                            { EFL_UI_FACTORY_EVENT_ITEM_RELEASING, _efl_ui_widget_factory_releasing })
 
+/**
+ * @internal
+ * @brief Constructor for Efl_Ui_Widget_Factory.
+ * Initializes the object and registers callbacks for item lifecycle events.
+ *
+ * @param obj The Efl_Ui_Widget_Factory object being constructed.
+ * @param pd The private data for the Efl_Ui_Widget_Factory.
+ * @return The constructed Efl_Object.
+ */
 static Eo *
 _efl_ui_widget_factory_efl_object_constructor(Efl_Ui_Widget_Factory *obj,
                                               Efl_Ui_Widget_Factory_Data *pd)
@@ -222,6 +326,18 @@ _efl_ui_widget_factory_efl_object_constructor(Efl_Ui_Widget_Factory *obj,
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Core widget creation logic.
+ * Instantiates a widget of the given class, sets its model, and triggers
+ * construction and building events.
+ *
+ * @param factory The factory invoking the creation.
+ * @param klass The class of the widget to create.
+ * @param parent The parent widget for the new widget.
+ * @param model The model to associate with the new widget.
+ * @return The newly created Efl_Ui_Widget, or NULL on failure.
+ */
 static Efl_Ui_Widget *
 _efl_ui_widget_create(const Efl_Ui_Factory *factory,
                       const Efl_Class *klass,
@@ -237,6 +353,18 @@ _efl_ui_widget_create(const Efl_Ui_Factory *factory,
    return w;
 }
 
+/**
+ * @internal
+ * @brief Success callback for a future that creates a single widget.
+ * This is called when the model's style property (if specified) is ready.
+ * It then proceeds to create the widget.
+ *
+ * @param model The Efl_Model for the widget.
+ * @param data The Efl_Ui_Widget_Factory_Request containing factory context.
+ * @param v The resolved value of the future (unused).
+ * @return An Eina_Value containing the created widget (as Efl_Object) on success,
+ *         or an Eina_Value error on failure.
+ */
 static Eina_Value
 _efl_ui_widget_factory_create_then(Eo *model, void *data, const Eina_Value v EINA_UNUSED)
 {
@@ -248,12 +376,30 @@ _efl_ui_widget_factory_create_then(Eo *model, void *data, const Eina_Value v EIN
    return eina_value_object_init(w);
 }
 
+/**
+ * @internal
+ * @brief Cleanup callback for a future associated with a single model property check.
+ * Unreferences the model.
+ *
+ * @param model The Efl_Model associated with the future.
+ * @param data User data (unused).
+ * @param dead_future The future that has completed (unused).
+ */
 static void
 _efl_ui_widget_factory_single_cleanup(Eo *model, void *data EINA_UNUSED, const Eina_Future *dead_future EINA_UNUSED)
 {
    efl_unref(model);
 }
 
+/**
+ * @internal
+ * @brief Cleanup callback for the main future returned by `_efl_ui_widget_factory_efl_ui_factory_create`.
+ * Frees the Efl_Ui_Widget_Factory_Request data and unreferences the factory.
+ *
+ * @param o The object associated with the future (unused).
+ * @param data The Efl_Ui_Widget_Factory_Request to clean up.
+ * @param dead_future The future that has completed (unused).
+ */
 static void
 _efl_ui_widget_factory_create_cleanup(Eo *o EINA_UNUSED, void *data, const Eina_Future *dead_future EINA_UNUSED)
 {
@@ -263,6 +409,25 @@ _efl_ui_widget_factory_create_cleanup(Eo *o EINA_UNUSED, void *data, const Eina_
    free(r);
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Ui.Factory.create.
+ * Creates widgets for each model provided in the iterator.
+ * If a style property is set on the factory, it waits for this property to be ready
+ * on each model before creating the corresponding widget. Otherwise, widgets are
+ * created synchronously.
+ *
+ * @param obj The Efl_Ui_Widget_Factory object.
+ * @param pd The private data of the Efl_Ui_Widget_Factory.
+ * @param models An iterator providing Efl_Model instances for which to create widgets.
+ * @return An Eina_Future that resolves to an Eina_Value array of created Efl_Object (widgets),
+ *         or rejects with an error code.
+ *         The Eina_Value array will contain Efl_Object instances. For example:
+ *         `EINA_VALUE_TYPE_ARRAY` of `EINA_VALUE_TYPE_OBJECT`.
+ *         Element 0: (Efl_Object*) widget1
+ *         Element 1: (Efl_Object*) widget2
+ *         ...
+ */
 static Eina_Future *
 _efl_ui_widget_factory_efl_ui_factory_create(Eo *obj, Efl_Ui_Widget_Factory_Data *pd,
                                              Eina_Iterator *models)
@@ -362,8 +527,23 @@ _efl_ui_widget_factory_efl_ui_factory_release(Eo *obj,
    eina_iterator_free(ui_views);
 }
 
+/**
+ * @internal
+ * @brief Stringshare for the "style" property key. Used for optimized comparisons.
+ */
 Eina_Stringshare *_property_style_ss = NULL;
 
+/**
+ * @internal
+ * @brief Implements Efl.Ui.Property_Bind.property_bind for the factory itself.
+ * Currently, only supports binding the "style" property.
+ *
+ * @param obj The Efl_Ui_Widget_Factory object.
+ * @param pd The private data of the Efl_Ui_Widget_Factory.
+ * @param target The target property name to bind. Expected to be "style".
+ * @param property The model property name to bind to the target.
+ * @return 0 on success, EINVAL if the target is not "style".
+ */
 static Eina_Error
 _efl_ui_widget_factory_efl_ui_property_bind_property_bind(Eo *obj, Efl_Ui_Widget_Factory_Data *pd,
                                                           const char *target, const char *property)
@@ -378,14 +558,37 @@ _efl_ui_widget_factory_efl_ui_property_bind_property_bind(Eo *obj, Efl_Ui_Widget
    return EINVAL;
 }
 
-
+/**
+ * @internal
+ * @brief Private data for the Efl_Ui_Property_Bind_Part helper class.
+ * This structure is associated with temporary objects created via `efl_part_part_get`
+ * on the factory, allowing chained property binding calls like
+ * `efl_part_property_bind(efl_part(factory, "part_name"), "part_prop", "model_prop")`.
+ */
 typedef struct _Efl_Ui_Property_Bind_Part_Data Efl_Ui_Property_Bind_Part_Data;
+/**
+ * @internal
+ * @brief Private data structure for an Efl_Ui_Property_Bind_Part object.
+ * This object acts as a temporary context for binding properties to a specific part of widgets
+ * created by the factory.
+ */
 struct _Efl_Ui_Property_Bind_Part_Data
 {
-   Efl_Ui_Widget_Factory_Data *pd;
-   Eina_Stringshare *name;
+   Efl_Ui_Widget_Factory_Data *pd; /**< Pointer to the parent factory's private data. */
+   Eina_Stringshare *name; /**< The name of the part this binding context refers to. */
 };
 
+/**
+ * @internal
+ * @brief Implements Efl.Part.part_get for the factory.
+ * Returns a temporary Efl_Ui_Property_Bind_Part object that allows binding properties
+ * to the specified part name.
+ *
+ * @param obj The Efl_Ui_Widget_Factory object.
+ * @param pd The private data of the Efl_Ui_Widget_Factory.
+ * @param name The name of the part to get a binder for.
+ * @return A new Efl_Object (Efl_Ui_Property_Bind_Part) for binding to the part, or NULL on failure.
+ */
 static Efl_Object *
 _efl_ui_widget_factory_efl_part_part_get(const Eo *obj,
                                          Efl_Ui_Widget_Factory_Data *pd,
@@ -404,6 +607,14 @@ _efl_ui_widget_factory_efl_part_part_get(const Eo *obj,
    return part;
 }
 
+/**
+ * @internal
+ * @brief Destructor for the Efl_Ui_Property_Bind_Part helper object.
+ * Releases the stringshared part name.
+ *
+ * @param obj The Efl_Ui_Property_Bind_Part object.
+ * @param pd The private data of the Efl_Ui_Property_Bind_Part.
+ */
 static void
 _efl_ui_property_bind_part_efl_object_destructor(Eo *obj, Efl_Ui_Property_Bind_Part_Data *pd)
 {
@@ -412,6 +623,20 @@ _efl_ui_property_bind_part_efl_object_destructor(Eo *obj, Efl_Ui_Property_Bind_P
    efl_destructor(efl_super(obj, EFL_UI_PROPERTY_BIND_PART_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Ui.Property_Bind.property_bind for an Efl_Ui_Property_Bind_Part object.
+ * This function records a binding between a property of a specific part (`key`) and a
+ * model property (`property`). If `key` is NULL, it sets the default property binding
+ * for the widget itself (not a specific part, though this seems to be handled by `pd->pd->default_property`).
+ *
+ * @param obj The Efl_Ui_Property_Bind_Part object (unused).
+ * @param pd The private data of the Efl_Ui_Property_Bind_Part, linking back to the factory.
+ * @param key The name of the property on the part to bind (e.g., "text", "value").
+ *            If NULL, it refers to a default property of the main widget.
+ * @param property The name of the property in the model to bind from.
+ * @return 0 on success, or an error code (ENOENT, ENOMEM) on failure.
+ */
 static Eina_Error
 _efl_ui_property_bind_part_efl_ui_property_bind_property_bind(Eo *obj EINA_UNUSED,
                                                               Efl_Ui_Property_Bind_Part_Data *pd,
@@ -460,6 +685,17 @@ _efl_ui_property_bind_part_efl_ui_property_bind_property_bind(Eo *obj EINA_UNUSE
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Ui.Factory_Bind.factory_bind.
+ * This operation is not supported by Efl_Ui_Widget_Factory.
+ *
+ * @param obj Unused.
+ * @param pd Unused.
+ * @param key Unused.
+ * @param factory Unused.
+ * @return Always EINA_ERROR_NOT_IMPLEMENTED.
+ */
 static Eina_Error
 _efl_ui_widget_factory_efl_ui_factory_bind_factory_bind(Eo *obj EINA_UNUSED,
                                                         Efl_Ui_Widget_Factory_Data *pd EINA_UNUSED,

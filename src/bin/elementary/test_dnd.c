@@ -46,6 +46,15 @@ typedef struct _drag_anim_st drag_anim_st;
 static Eina_Bool _5s_cancel = EINA_FALSE;
 static Ecore_Timer *_5s_timeout = NULL;
 
+/**
+ * @brief Compare two item pointers.
+ *
+ * This is used for searching in an Eina_List.
+ *
+ * @param d1 First pointer.
+ * @param d2 Second pointer.
+ * @return The difference between the two pointers.
+ */
 static int
 _item_ptr_cmp(const void *d1, const void *d2)
 {
@@ -55,6 +64,16 @@ _item_ptr_cmp(const void *d1, const void *d2)
 static Elm_Genlist_Item_Class *itc1;
 static Elm_Gengrid_Item_Class *gic;
 
+/**
+ * @brief Build a drag data string from a list of items.
+ *
+ * The format of the returned string is a newline-separated list of file URIs.
+ * e.g., "file:///path/to/image1.jpg\nfile:///path/to/image2.jpg"
+ *
+ * @param items Pointer to a list of Elm_Object_Item pointers.
+ * @return A newly allocated string with the drag data, or NULL on failure.
+ *         The caller is responsible for freeing the returned string.
+ */
 static const char *
 _drag_data_build(Eina_List **items)
 {
@@ -89,6 +108,19 @@ _drag_data_build(Eina_List **items)
    return drag_data;
 }
 
+/**
+ * @brief Extract a single file URI from a drag data string.
+ *
+ * This function parses a string of newline-separated URIs (as created by
+ * _drag_data_build) and returns one URI at a time. It modifies the input
+ * string by replacing newlines with null terminators.
+ *
+ * @param drag_data A pointer to a character pointer. On each call, this
+ *                  pointer is advanced to the next URI in the string.
+ * @return A pointer to the current URI within the original string, or NULL
+ *         if no more URIs are found. The returned pointer is not a new
+ *         allocation and should not be freed.
+ */
 static char *
 _drag_data_extract(char **drag_data)
 {
@@ -134,12 +166,30 @@ _drag_data_extract(char **drag_data)
    return uri;
 }
 
+/**
+ * @brief Get the text for a genlist or gengrid item.
+ *
+ * @param data The item data (a string with the file path).
+ * @param obj The genlist/gengrid object.
+ * @param part The part name.
+ * @return A duplicated string of the item data. The caller (Elementary) will
+ *         free it.
+ */
 static char *
 gl_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
    return strdup(data);
 }
 
+/**
+ * @brief Get the content (icon) for a genlist or gengrid item.
+ *
+ * @param data The item data (a string with the file path for the icon).
+ * @param obj The genlist/gengrid object.
+ * @param part The part name to get content for. Expected to be
+ *             "elm.swallow.icon".
+ * @return A new icon object, or NULL if the part is not "elm.swallow.icon".
+ */
 static Evas_Object *
 gl_content_get(void *data, Evas_Object *obj, const char *part)
 {
@@ -154,12 +204,31 @@ gl_content_get(void *data, Evas_Object *obj, const char *part)
    return NULL;
 }
 
+/**
+ * @brief Callback for item deletion in gengrid.
+ *
+ * This is called when an item is deleted from the gengrid, and it frees the
+ * associated stringshared data.
+ *
+ * @param data The item data (a stringshared file path).
+ * @param obj The gengrid object.
+ */
 static void
 gl_del_cb(void *data, Evas_Object *obj EINA_UNUSED)
 {
    eina_stringshare_del(data);
 }
 
+/**
+ * @brief Callback for window deletion request.
+ *
+ * Cleans up drag-and-drop containers and item classes associated with the
+ * widget passed in @p data.
+ *
+ * @param data The widget (genlist or gengrid) to clean up.
+ * @param obj The window object.
+ * @param event_info Event-specific information.
+ */
 static void
 _win_del(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -173,6 +242,17 @@ _win_del(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    itc1 = NULL;
 }
 
+/**
+ * @brief Get the genlist item at specific coordinates.
+ *
+ * @param obj The genlist object.
+ * @param x The x-coordinate.
+ * @param y The y-coordinate.
+ * @param xposret Unused for vertical genlist.
+ * @param yposret A pointer to store the relative position within the item
+ *                (-1 for top, 0 for middle, 1 for bottom).
+ * @return The Elm_Object_Item at the given coordinates, or NULL.
+ */
 static Elm_Object_Item *
 _gl_item_getcb(Evas_Object *obj, Evas_Coord x, Evas_Coord y, int *xposret EINA_UNUSED, int *yposret)
 {  /* This function returns pointer to item under (x,y) coords */
@@ -187,6 +267,18 @@ _gl_item_getcb(Evas_Object *obj, Evas_Coord x, Evas_Coord y, int *xposret EINA_U
    return gli;
 }
 
+/**
+ * @brief Get the gengrid item at specific coordinates.
+ *
+ * @param obj The gengrid object.
+ * @param x The x-coordinate.
+ * @param y The y-coordinate.
+ * @param xposret A pointer to store the relative horizontal position within
+ *                the item (-1 for left, 0 for center, 1 for right).
+ * @param yposret A pointer to store the relative vertical position within
+ *                the item (-1 for top, 0 for center, 1 for bottom).
+ * @return The Elm_Object_Item at the given coordinates, or NULL.
+ */
 static Elm_Object_Item *
 _grid_item_getcb(Evas_Object *obj, Evas_Coord x, Evas_Coord y, int *xposret, int *yposret)
 {  /* This function returns pointer to item under (x,y) coords */
@@ -201,6 +293,21 @@ _grid_item_getcb(Evas_Object *obj, Evas_Coord x, Evas_Coord y, int *xposret, int
    return item;
 }
 
+/**
+ * @brief Callback for drag position updates over a genlist.
+ *
+ * This function is called when the drag cursor moves over a droppable item.
+ * It's mainly used for debugging purposes here.
+ *
+ * @param data User data.
+ * @param obj The genlist object.
+ * @param it The item under the cursor.
+ * @param x The current x-coordinate of the cursor.
+ * @param y The current y-coordinate of the cursor.
+ * @param xposret The relative horizontal position within the item.
+ * @param yposret The relative vertical position within the item.
+ * @param action The current drag and drop action.
+ */
 static void
 _gl_poscb(void *data EINA_UNUSED, Evas_Object *obj, Elm_Object_Item *it, Evas_Coord x, Evas_Coord y, int xposret, int yposret, Elm_Xdnd_Action action EINA_UNUSED)
 {
@@ -209,6 +316,22 @@ _gl_poscb(void *data EINA_UNUSED, Evas_Object *obj, Elm_Object_Item *it, Evas_Co
           x, y, xposret, yposret);
 }
 
+/**
+ * @brief Callback for drop events on a genlist.
+ *
+ * This function is called when data is dropped onto the genlist. It extracts
+ * the file URIs from the drop data and inserts new items into the genlist.
+ * The insertion position depends on where the drop occurred on an existing
+ * item (before, or after).
+ *
+ * @param data User data.
+ * @param obj The genlist object.
+ * @param it The item that was dropped on.
+ * @param ev The selection data containing the dropped content.
+ * @param xposret The relative horizontal position of the drop.
+ * @param yposret The relative vertical position of the drop.
+ * @return EINA_TRUE on successful handling of the drop, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _gl_dropcb(void *data EINA_UNUSED, Evas_Object *obj, Elm_Object_Item *it, Elm_Selection_Data *ev, int xposret EINA_UNUSED, int yposret)
 {  /* This function is called when data is dropped on the genlist */
@@ -264,6 +387,20 @@ _gl_dropcb(void *data EINA_UNUSED, Evas_Object *obj, Elm_Object_Item *it, Elm_Se
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for drop events on a gengrid.
+ *
+ * Handles data dropped onto the gengrid. It parses the drop data and inserts
+ * new items into the grid.
+ *
+ * @param data User data.
+ * @param obj The gengrid object.
+ * @param it The item that was dropped on.
+ * @param ev The selection data.
+ * @param xposret Relative horizontal drop position.
+ * @param yposret Relative vertical drop position.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _grid_dropcb(void *data EINA_UNUSED, Evas_Object *obj, Elm_Object_Item *it, Elm_Selection_Data *ev, int xposret EINA_UNUSED, int yposret EINA_UNUSED)
 {  /* This function is called when data is dropped on the genlist */
@@ -293,6 +430,14 @@ _grid_dropcb(void *data EINA_UNUSED, Evas_Object *obj, Elm_Object_Item *it, Elm_
 static void _gl_obj_mouse_move( void *data, Evas *e, Evas_Object *obj, void *event_info);
 static void _gl_obj_mouse_up( void *data, Evas *e, Evas_Object *obj, void *event_info);
 
+/**
+ * @brief Free resources associated with a drag animation state.
+ *
+ * Stops any ongoing timers or animators and frees the memory used by the
+ * drag_anim_st structure and its associated icons.
+ *
+ * @param anim_st The drag animation state to free.
+ */
 static void
 anim_st_free(drag_anim_st *anim_st)
 {  /* Stops and free mem of ongoing animation */
@@ -328,6 +473,17 @@ anim_st_free(drag_anim_st *anim_st)
      }
 }
 
+/**
+ * @brief Ecore animator callback to play the drag animation.
+ *
+ * This function is called for each frame of the drag start animation.
+ * It moves the animated icons towards the mouse cursor. The animation is
+ * cancelled and resources are freed when it completes or is interrupted.
+ *
+ * @param data The drag_anim_st data structure.
+ * @param pos The position in the animation timeline (0.0 to 1.0).
+ * @return ECORE_CALLBACK_RENEW to continue animation, ECORE_CALLBACK_CANCEL to stop.
+ */
 static Eina_Bool
 _drag_anim_play(void *data, double pos)
 {  /* Impl of the animation of icons, called on frame time */
@@ -365,6 +521,16 @@ _drag_anim_play(void *data, double pos)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Timer callback to start the drag animation.
+ *
+ * This is called after a short delay (DRAG_TIMEOUT) when the user holds
+ * the mouse button down on an item. It creates icons for the selected items
+ * and starts the ecore animator to move them.
+ *
+ * @param data The drag_anim_st data structure.
+ * @return ECORE_CALLBACK_CANCEL to stop the timer.
+ */
 static Eina_Bool
 _gl_anim_start(void *data)
 {  /* Start icons animation before actually drag-starts */
@@ -421,6 +587,17 @@ _gl_anim_start(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Mouse up event callback on the genlist.
+ *
+ * If the user releases the mouse button before the drag operation officially
+ * starts, this callback cancels the pending drag animation.
+ *
+ * @param data The drag_anim_st data structure.
+ * @param e The Evas canvas.
+ * @param obj The genlist object.
+ * @param event_info The mouse up event info.
+ */
 static void
 _gl_obj_mouse_up(
    void *data,
@@ -432,6 +609,18 @@ _gl_obj_mouse_up(
    anim_st_free(anim_st);
 }
 
+/**
+ * @brief Mouse move event callback on the genlist.
+ *
+ * If the mouse moves while the event is on hold (i.e., before the drag
+ * timeout), this cancels the drag animation. This prevents the animation
+ * from starting if the user clicks and drags immediately.
+ *
+ * @param data The drag_anim_st data structure.
+ * @param e The Evas canvas.
+ * @param obj The genlist object.
+ * @param event_info The mouse move event info.
+ */
 static void
 _gl_obj_mouse_move(
    void *data,
@@ -447,6 +636,18 @@ _gl_obj_mouse_move(
      }
 }
 
+/**
+ * @brief Mouse down event callback on the genlist for custom animation.
+ *
+ * This function initiates the custom drag animation. It sets a timer that,
+ * after a short delay, will start the animation of icons moving from their
+ * original positions.
+ *
+ * @param data The genlist object.
+ * @param e The Evas canvas.
+ * @param obj The object that received the event.
+ * @param event_info The mouse down event info.
+ */
 static void
 _gl_obj_mouse_down(
    void *data,
@@ -468,6 +669,19 @@ _gl_obj_mouse_down(
 }
 /* END   - Handling drag start animation */
 
+/**
+ * @brief Callback for when a drag operation has finished.
+ *
+ * This function is called after a drop has occurred (or was cancelled).
+ * If the drop was accepted by the target (@p doaccept is EINA_TRUE),
+ * it deletes the dragged items from the source genlist/gengrid.
+ * It also handles cleanup of the 5-second cancel timer and frees the list
+ * of dragged items.
+ *
+ * @param data The list of dragged items (Eina_List of Elm_Object_Item*).
+ * @param obj The source object.
+ * @param doaccept EINA_TRUE if the drop was accepted, EINA_FALSE otherwise.
+ */
 static void
 _gl_dragdone(void *data, Evas_Object *obj EINA_UNUSED, Eina_Bool doaccept)
 {
@@ -493,6 +707,15 @@ _gl_dragdone(void *data, Evas_Object *obj EINA_UNUSED, Eina_Bool doaccept)
    return;
 }
 
+/**
+ * @brief Timer callback to cancel a drag operation after a timeout.
+ *
+ * This function is part of a feature to test drag cancellation. If a drag
+ * operation is ongoing for 5 seconds, this timer fires and cancels it.
+ *
+ * @param data The object on which drag is active.
+ * @return ECORE_CALLBACK_CANCEL to stop the timer.
+ */
 static Eina_Bool
 _5s_timeout_gone(void *data)
 {
@@ -502,6 +725,19 @@ _5s_timeout_gone(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Create an icon for the drag operation.
+ *
+ * This callback creates the visual representation (an icon) that is dragged
+ * around by the user. It also provides offsets to position the icon relative
+ * to the cursor.
+ *
+ * @param data The item being dragged (Elm_Object_Item*).
+ * @param win The window where the icon should be created.
+ * @param xoff Pointer to store the horizontal offset of the icon from the cursor.
+ * @param yoff Pointer to store the vertical offset of the icon from the cursor.
+ * @return The newly created icon object.
+ */
 static Evas_Object *
 _gl_createicon(void *data, Evas_Object *win, Evas_Coord *xoff, Evas_Coord *yoff)
 {
@@ -531,6 +767,16 @@ _gl_createicon(void *data, Evas_Object *win, Evas_Coord *xoff, Evas_Coord *yoff)
    return icon;
 }
 
+/**
+ * @brief Get a list of icons for the default drag animation.
+ *
+ * This function collects icons from all selected items in the genlist, plus the
+ * item currently under the mouse pointer. These icons are then used by the
+ * default Elementary drag animation.
+ *
+ * @param data The genlist object.
+ * @return A list (Eina_List) of newly created Evas_Object icons.
+ */
 static Eina_List *
 _gl_icons_get(void *data)
 {  /* Start icons animation before actually drag-starts */
@@ -583,6 +829,19 @@ _gl_icons_get(void *data)
    return icons;
 }
 
+/**
+ * @brief Get the drag data from a genlist.
+ *
+ * This function collects all selected items (plus the one under the cursor)
+ * and builds a drag data string from them using _drag_data_build().
+ *
+ * @param obj The genlist object.
+ * @param it The item under the cursor when the drag started.
+ * @param[out] items A pointer to an Eina_List* which will be populated with
+ *                   the list of dragged items. This list is later used in
+ *                   _gl_dragdone to delete items if the drop is accepted.
+ * @return A string containing the drag data, which should be freed by the caller.
+ */
 static const char *
 _gl_get_drag_data(Evas_Object *obj, Elm_Object_Item *it, Eina_List **items)
 {  /* Construct a string of dragged info, user frees returned string */
@@ -602,6 +861,16 @@ _gl_get_drag_data(Evas_Object *obj, Elm_Object_Item *it, Eina_List **items)
    return drag_data;
 }
 
+/**
+ * @brief Get the drag data from a gengrid.
+ *
+ * Similar to _gl_get_drag_data(), but for a gengrid widget.
+ *
+ * @param obj The gengrid object.
+ * @param it The item under the cursor.
+ * @param[out] items A pointer to an Eina_List* to be populated with dragged items.
+ * @return A string with drag data, to be freed by the caller.
+ */
 static const char *
 _grid_get_drag_data(Evas_Object *obj, Elm_Object_Item *it, Eina_List **items)
 {  /* Construct a string of dragged info, user frees returned string */
@@ -621,6 +890,19 @@ _grid_get_drag_data(Evas_Object *obj, Elm_Object_Item *it, Eina_List **items)
    return drag_data;
 }
 
+/**
+ * @brief Callback to get drag data for a genlist with default animation.
+ *
+ * This function is called when a drag is initiated. It populates the
+ * Elm_Drag_User_Info structure with all the necessary information for the
+ * drag-and-drop operation to proceed, including data, callbacks, and a list of
+ * icons for the default animation.
+ *
+ * @param obj The genlist object.
+ * @param it The item under the cursor.
+ * @param[out] info The structure to fill with drag information.
+ * @return EINA_TRUE if drag should start, EINA_FALSE to abort.
+ */
 static Eina_Bool
 _gl_dnd_default_anim_data_getcb(Evas_Object *obj,  /* The genlist object */
       Elm_Object_Item *it,
@@ -644,6 +926,18 @@ _gl_dnd_default_anim_data_getcb(Evas_Object *obj,  /* The genlist object */
      return EINA_FALSE;
 }
 
+/**
+ * @brief Callback to get drag data for a genlist with custom user animation.
+ *
+ * This is similar to _gl_dnd_default_anim_data_getcb(), but it does not
+ * provide a list of icons. The animation is handled separately by custom
+ * mouse event callbacks.
+ *
+ * @param obj The genlist object.
+ * @param it The item under the cursor.
+ * @param[out] info The structure to fill with drag information.
+ * @return EINA_TRUE if drag should start, EINA_FALSE to abort.
+ */
 static Eina_Bool
 _gl_data_getcb(Evas_Object *obj,  /* The genlist object */
       Elm_Object_Item *it,
@@ -665,6 +959,15 @@ _gl_data_getcb(Evas_Object *obj,  /* The genlist object */
      return EINA_FALSE;
 }
 
+/**
+ * @brief Get a list of icons for the default drag animation from a gengrid.
+ *
+ * This function is analogous to _gl_icons_get(), but operates on a gengrid.
+ * It collects icons from selected items and the item under the cursor.
+ *
+ * @param data The gengrid object.
+ * @return A list (Eina_List) of newly created Evas_Object icons.
+ */
 static Eina_List *
 _grid_icons_get(void *data)
 {  /* Start icons animation before actually drag-starts */
@@ -716,6 +1019,16 @@ _grid_icons_get(void *data)
    return icons;
 }
 
+/**
+ * @brief Callback for when the drag operation officially starts.
+ *
+ * This is called after the initial timeout and when the user has moved the
+ * cursor enough to start a drag. It is used here to start a 5-second timer
+ * to test drag cancellation.
+ *
+ * @param data User data provided in Elm_Drag_User_Info.
+ * @param obj The object being dragged from.
+ */
 static void
 _gl_dragstart(void *data EINA_UNUSED, Evas_Object *obj)
 {
@@ -724,6 +1037,18 @@ _gl_dragstart(void *data EINA_UNUSED, Evas_Object *obj)
      _5s_timeout = ecore_timer_add(5.0, _5s_timeout_gone, obj);
 }
 
+/**
+ * @brief Callback to get drag data for a gengrid.
+ *
+ * Populates the Elm_Drag_User_Info structure for a drag operation
+ * originating from a gengrid. It sets up callbacks for creating the drag icon,
+ * handling drag start and completion, and provides the data to be dragged.
+ *
+ * @param obj The gengrid object.
+ * @param it The item under the cursor.
+ * @param[out] info The structure to fill with drag information.
+ * @return EINA_TRUE if drag should start, EINA_FALSE to abort.
+ */
 static Eina_Bool
 _grid_data_getcb(Evas_Object *obj,  /* The genlist object */
                  Elm_Object_Item *it,
@@ -749,6 +1074,13 @@ _grid_data_getcb(Evas_Object *obj,  /* The genlist object */
      return EINA_FALSE;
 }
 
+/**
+ * @brief Test for drag and drop between two genlists with default animation.
+ *
+ * This test creates a window with two genlists. Users can drag items from one
+ * list and drop them onto the other. The drag animation is handled by
+ * Elementary's default mechanism.
+ */
 void
 test_dnd_genlist_default_anim(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -824,6 +1156,13 @@ test_dnd_genlist_default_anim(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUS
    evas_object_show(win);
 }
 
+/**
+ * @brief Test for drag and drop between two genlists with custom animation.
+ *
+ * This test is similar to test_dnd_genlist_default_anim(), but it demonstrates
+ * how to implement a custom animation for the start of a drag operation instead
+ * of using the default one.
+ */
 void
 test_dnd_genlist_user_anim(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -890,6 +1229,12 @@ test_dnd_genlist_user_anim(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    evas_object_show(win);
 }
 
+/**
+ * @brief Test for drag and drop between a genlist and a gengrid.
+ *
+ * This test sets up a window containing a genlist and a gengrid to demonstrate
+ * drag and drop interoperability between different container widgets.
+ */
 void
 test_dnd_genlist_gengrid(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -978,6 +1323,18 @@ test_dnd_genlist_gengrid(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, v
    evas_object_show(win);
 }
 
+/**
+ * @brief Drop callback that creates a new button in a box.
+ *
+ * When an item is dropped onto the target box, this callback is invoked.
+ * It extracts the image path from the drop data and creates a new button
+ * with that image as its icon, then adds the button to the box.
+ *
+ * @param data The parent window object.
+ * @param obj The box object that is the drop target.
+ * @param ev The selection data from the drop.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool _drop_box_button_new_cb(void *data, Evas_Object *obj, Elm_Selection_Data *ev)
 {
    Evas_Object *win = data;
@@ -1006,11 +1363,30 @@ static Eina_Bool _drop_box_button_new_cb(void *data, Evas_Object *obj, Elm_Selec
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for when the drag cursor enters a button's area.
+ *
+ * This is used for demonstrating multiple drop callbacks on a single widget.
+ *
+ * @param data User data.
+ * @param obj The button object.
+ */
 void _enter_but_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED)
 {
    printf("Entered %s - drop it here and I will never print this line anymore.\n", __func__);
 }
 
+/**
+ * @brief Drop callback to change the icon of a button.
+ *
+ * When an item is dropped on the button, this function takes the image path
+ * from the drop data and sets it as the new icon for the button.
+ *
+ * @param data The parent window object.
+ * @param obj The button object.
+ * @param ev The selection data.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool _drop_but_icon_change_cb(void *data, Evas_Object *obj, Elm_Selection_Data *ev)
 {
    Evas_Object *win = data;
@@ -1034,6 +1410,18 @@ static Eina_Bool _drop_but_icon_change_cb(void *data, Evas_Object *obj, Elm_Sele
 }
 
 /* Callback used to test multi-callbacks feature */
+/**
+ * @brief Drop callback that removes itself.
+ *
+ * This function demonstrates how drop callbacks can be managed dynamically.
+ * When called, it removes itself and another associated callback (_enter_but_cb)
+ * from the button's drop targets, so they won't be triggered on subsequent drops.
+ *
+ * @param data User data.
+ * @param obj The button object.
+ * @param ev The selection data.
+ * @return EINA_TRUE.
+ */
 static Eina_Bool _drop_but_cb_remove_cb(void *data EINA_UNUSED, Evas_Object *obj, Elm_Selection_Data *ev EINA_UNUSED)
 {
    printf("Second callback called - removing it\n");
@@ -1041,6 +1429,17 @@ static Eina_Bool _drop_but_cb_remove_cb(void *data EINA_UNUSED, Evas_Object *obj
    return EINA_TRUE;
 }
 
+/**
+ * @brief Drop callback to change the background image.
+ *
+ * Handles a drop on the window background, changing the background image
+ * to the one specified in the drop data.
+ *
+ * @param data User data.
+ * @param obj The background object.
+ * @param ev The selection data.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool _drop_bg_change_cb(void *data EINA_UNUSED, Evas_Object *obj, Elm_Selection_Data *ev)
 {
    if (ev->len <= 0)
@@ -1056,12 +1455,32 @@ static Eina_Bool _drop_bg_change_cb(void *data EINA_UNUSED, Evas_Object *obj, El
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for the 'cancel after 5s' check button.
+ *
+ * Updates the global flag `_5s_cancel` based on the state of the check button.
+ *
+ * @param data User data.
+ * @param obj The check button object.
+ * @param event_info Event information.
+ */
 static void
 _5s_cancel_ck_changed(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    _5s_cancel = elm_check_state_get(obj);
 }
 
+/**
+ * @brief Test demonstrating multiple drag-and-drop features.
+ *
+ * This test sets up a window with a gengrid as a source of draggable items
+ * and various drop targets (a box, buttons, the window background). It showcases:
+ * - Dropping to create new widgets.
+ * - Dropping to modify existing widgets (changing an icon).
+ * - Having multiple drop callbacks on a single widget.
+ * - Dynamically adding/removing drop callbacks.
+ * - Timed cancellation of a drag operation.
+ */
 void
 test_dnd_multi_features(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -1171,6 +1590,14 @@ test_dnd_multi_features(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, vo
    evas_object_show(win);
 }
 
+/**
+ * @brief Generic callback for when a drag enters a drop target area.
+ *
+ * Used for logging/debugging purposes.
+ *
+ * @param data User data.
+ * @param obj The object that was entered.
+ */
 static void
 _enter_cb(void *data EINA_UNUSED, Evas_Object *obj)
 {
@@ -1178,6 +1605,14 @@ _enter_cb(void *data EINA_UNUSED, Evas_Object *obj)
           evas_object_type_get(obj), obj);
 }
 
+/**
+ * @brief Generic callback for when a drag leaves a drop target area.
+ *
+ * Used for logging/debugging purposes.
+ *
+ * @param data User data.
+ * @param obj The object that was left.
+ */
 static void
 _leave_cb(void *data EINA_UNUSED, Evas_Object *obj)
 {
@@ -1185,6 +1620,17 @@ _leave_cb(void *data EINA_UNUSED, Evas_Object *obj)
           evas_object_type_get(obj), obj);
 }
 
+/**
+ * @brief Generic callback for drag position updates over a drop target.
+ *
+ * Used for logging/debugging purposes.
+ *
+ * @param data User data.
+ * @param obj The object under the cursor.
+ * @param x The x-coordinate of the drag.
+ * @param y The y-coordinate of the drag.
+ * @param action The current drag action.
+ */
 static void
 _pos_cb(void *data EINA_UNUSED, Evas_Object *obj, Evas_Coord x, Evas_Coord y, Elm_Xdnd_Action action)
 {
@@ -1192,6 +1638,16 @@ _pos_cb(void *data EINA_UNUSED, Evas_Object *obj, Evas_Coord x, Evas_Coord y, El
           evas_object_type_get(obj), obj, x, y, action);
 }
 
+/**
+ * @brief Drop callback for a label widget.
+ *
+ * Sets the text of the label to the text content from the drop data.
+ *
+ * @param data User data.
+ * @param obj The label object.
+ * @param ev The selection data containing text.
+ * @return EINA_TRUE.
+ */
 static Eina_Bool
 _label_drop_cb(void *data EINA_UNUSED, Evas_Object *obj, Elm_Selection_Data *ev)
 {
@@ -1202,6 +1658,16 @@ _label_drop_cb(void *data EINA_UNUSED, Evas_Object *obj, Elm_Selection_Data *ev)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Drop callback for an image widget.
+ *
+ * Sets the file of the image widget to the path provided in the drop data.
+ *
+ * @param data User data.
+ * @param obj The image object.
+ * @param ev The selection data containing a file path.
+ * @return EINA_TRUE.
+ */
 static Eina_Bool
 _image_drop_cb(void *data EINA_UNUSED, Evas_Object *obj, Elm_Selection_Data *ev)
 {
@@ -1214,6 +1680,18 @@ _image_drop_cb(void *data EINA_UNUSED, Evas_Object *obj, Elm_Selection_Data *ev)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Create an icon for dragging a label.
+ *
+ * Creates a new label to be used as the drag icon, copying the text from
+ * the original label.
+ *
+ * @param data The original label object.
+ * @param parent The parent window for the new icon.
+ * @param[out] xoff Horizontal offset for the icon.
+ * @param[out] yoff Vertical offset for the icon.
+ * @return The new label icon object.
+ */
 static Evas_Object *
 _label_create_icon(void *data, Evas_Object *parent, Evas_Coord *xoff, Evas_Coord *yoff)
 {
@@ -1239,12 +1717,31 @@ _label_create_icon(void *data, Evas_Object *parent, Evas_Coord *xoff, Evas_Coord
    return icon;
 }
 
+/**
+ * @brief Drag done callback for a label drag operation.
+ *
+ * Frees the text data that was allocated for the drag operation.
+ *
+ * @param data The text data to free.
+ * @param obj The source object (unused).
+ */
 static void
 _label_drag_done_cb(void *data, Evas_Object *obj EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Mouse down callback to start dragging from a label.
+ *
+ * When the mouse is pressed on a label, this function initiates a drag
+ * operation with the label's text as the data.
+ *
+ * @param data The label object.
+ * @param e The Evas canvas.
+ * @param obj The object that received the event.
+ * @param event_info The mouse down event info.
+ */
 static void
 _label_mouse_down_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -1262,6 +1759,18 @@ _label_mouse_down_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUS
                   _label_drag_done_cb, text);
 }
 
+/**
+ * @brief Create an icon for dragging an image.
+ *
+ * Creates a new image object to be used as the drag icon, copying the file
+ * from the original image.
+ *
+ * @param data The original image object.
+ * @param parent The parent window for the new icon.
+ * @param[out] xoff Horizontal offset for the icon.
+ * @param[out] yoff Vertical offset for the icon.
+ * @return The new image icon object.
+ */
 static Evas_Object *
 _image_create_icon(void *data, Evas_Object *parent, Evas_Coord *xoff, Evas_Coord *yoff)
 {
@@ -1285,6 +1794,16 @@ _image_create_icon(void *data, Evas_Object *parent, Evas_Coord *xoff, Evas_Coord
    return ic;
 }
 
+/**
+ * @brief Mouse down callback to start dragging from an image.
+ *
+ * Initiates a drag operation with the image's file path as the data.
+ *
+ * @param data The image object.
+ * @param e The Evas canvas.
+ * @param obj The object that received the event.
+ * @param event_info The mouse down event info.
+ */
 static void
 _image_mouse_down_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -1300,6 +1819,14 @@ _image_mouse_down_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUS
                   NULL, NULL, NULL, NULL, NULL, NULL);
 }
 
+/**
+ * @brief Test drag and drop with different data types.
+ *
+ * This test demonstrates dragging and dropping different types of content
+ * (text and images) between various widgets like labels, entries, and image
+ * objects. It shows how to handle different data formats in both drag source
+ * and drop target.
+ */
 void
 test_dnd_types(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

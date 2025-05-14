@@ -10,6 +10,18 @@
 #include "ector_software_private.h"
 #include "ector_software_gradient.h"
 
+/**
+ * @internal
+ * @brief Prepares the radial gradient renderer.
+ *
+ * This function initializes the radial gradient parameters based on the
+ * gradient data. It sets up the center, focal point, radii, and
+ * pre-calculates values used in the gradient rendering process.
+ *
+ * @param obj The Evas_Object_Smart_Clipped object.
+ * @param pd The gradient data.
+ * @return EINA_FALSE on success, EINA_TRUE on failure.
+ */
 static Eina_Bool
 _ector_renderer_software_gradient_radial_ector_renderer_prepare(Eo *obj, Ector_Renderer_Software_Gradient_Data *pd)
 {
@@ -56,6 +68,19 @@ _ector_renderer_software_gradient_radial_ector_renderer_prepare(Eo *obj, Ector_R
 }
 
 // Clearly duplicated and should be in a common place...
+/**
+ * @internal
+ * @brief Draws the radial gradient.
+ *
+ * @note This function is currently a stub and returns EINA_TRUE.
+ *
+ * @param obj The Evas_Object_Smart_Clipped object.
+ * @param pd The gradient data.
+ * @param op The rendering operation.
+ * @param clips An array of clipping regions.
+ * @param mul_col The multiplication color.
+ * @return EINA_TRUE.
+ */
 static Eina_Bool
 _ector_renderer_software_gradient_radial_ector_renderer_draw(Eo *obj EINA_UNUSED,
                                                              Ector_Renderer_Software_Gradient_Data *pd EINA_UNUSED,
@@ -66,6 +91,17 @@ _ector_renderer_software_gradient_radial_ector_renderer_draw(Eo *obj EINA_UNUSED
 }
 
 // Clearly duplicated and should be in a common place...
+/**
+ * @internal
+ * @brief Fills with the radial gradient.
+ *
+ * This function sets the radial gradient in the software rasterizer and
+ * updates the gradient colors.
+ *
+ * @param obj The Evas_Object_Smart_Clipped object.
+ * @param pd The gradient data.
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _ector_renderer_software_gradient_radial_ector_renderer_software_op_fill(Eo *obj EINA_UNUSED, Ector_Renderer_Software_Gradient_Data *pd)
 {
@@ -75,6 +111,16 @@ _ector_renderer_software_gradient_radial_ector_renderer_software_op_fill(Eo *obj
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Constructor for the radial gradient renderer.
+ *
+ * Initializes the renderer object and its associated data.
+ *
+ * @param obj The Evas_Object_Smart_Clipped object being constructed.
+ * @param pd The private data for the gradient renderer.
+ * @return The constructed Evas_Object_Smart_Clipped object.
+ */
 Eo *
 _ector_renderer_software_gradient_radial_efl_object_constructor(Eo *obj,
                                                                 Ector_Renderer_Software_Gradient_Data *pd)
@@ -87,6 +133,16 @@ _ector_renderer_software_gradient_radial_efl_object_constructor(Eo *obj,
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Destructor for the radial gradient renderer.
+ *
+ * Cleans up resources used by the renderer, including the color table
+ * and referenced data.
+ *
+ * @param obj The Evas_Object_Smart_Clipped object being destructed.
+ * @param pd The private data for the gradient renderer.
+ */
 void
 _ector_renderer_software_gradient_radial_efl_object_destructor(Eo *obj,
                                                             Ector_Renderer_Software_Gradient_Data *pd)
@@ -104,6 +160,26 @@ _ector_renderer_software_gradient_radial_efl_object_destructor(Eo *obj,
    efl_destructor(efl_super(obj, ECTOR_RENDERER_SOFTWARE_GRADIENT_RADIAL_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Sets the gradient stops for the radial gradient.
+ *
+ * This function forwards the call to the parent class to set the gradient stops.
+ * The `colors` array should contain `length` elements of `Efl_Gfx_Gradient_Stop`.
+ * Example of `colors` array structure:
+ * @code
+ * Efl_Gfx_Gradient_Stop stops[] = {
+ *   { { 255, 0, 0, 255 }, 0.0 },  // Red at the start
+ *   { { 0, 0, 255, 255 }, 1.0 }   // Blue at the end
+ * };
+ * unsigned int length = sizeof(stops) / sizeof(stops[0]);
+ * @endcode
+ *
+ * @param obj The Evas_Object_Smart_Clipped object.
+ * @param pd The private data for the gradient renderer (unused).
+ * @param colors Array of gradient stops.
+ * @param length Number of elements in the colors array.
+ */
 void
 _ector_renderer_software_gradient_radial_efl_gfx_gradient_stop_set(Eo *obj, Ector_Renderer_Software_Gradient_Data *pd EINA_UNUSED,
                                                                    const Efl_Gfx_Gradient_Stop *colors, unsigned int length)
@@ -111,6 +187,18 @@ _ector_renderer_software_gradient_radial_efl_gfx_gradient_stop_set(Eo *obj, Ecto
    efl_gfx_gradient_stop_set(efl_super(obj, ECTOR_RENDERER_SOFTWARE_GRADIENT_RADIAL_CLASS), colors, length);
 }
 
+/**
+ * @internal
+ * @brief Calculates the CRC for the radial gradient renderer.
+ *
+ * This function computes a CRC value based on the renderer's current state,
+ * including gradient spread, colors, and radial gradient specific data.
+ * This CRC can be used to detect changes in the renderer's configuration.
+ *
+ * @param obj The Evas_Object_Smart_Clipped object.
+ * @param pd The private data for the gradient renderer.
+ * @return The calculated CRC value.
+ */
 static unsigned int
 _ector_renderer_software_gradient_radial_ector_renderer_crc_get(const Eo *obj, Ector_Renderer_Software_Gradient_Data *pd)
 {

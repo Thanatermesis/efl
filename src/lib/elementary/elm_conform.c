@@ -20,20 +20,37 @@
 #define MY_CLASS_NAME "Elm_Conformant"
 #define MY_CLASS_NAME_LEGACY "elm_conformant"
 
+/** @internal
+ * @brief Key used to store data associated with the conformant widget.
+ */
 static char CONFORMANT_KEY[] = "_elm_conform_key";
 
+/** @internal
+ * @brief Time in seconds for the indicator connection retry timer.
+ */
 #define ELM_CONFORM_INDICATOR_TIME 1.0
 
+/** @internal @brief Edje part name for the indicator swallow. */
 static const char INDICATOR_PART[] = "elm.swallow.indicator";
+/** @internal @brief Edje part name for the virtual keypad swallow. */
 static const char VIRTUALKEYPAD_PART[] = "elm.swallow.virtualkeypad";
+/** @internal @brief Edje part name for the clipboard swallow. */
 static const char CLIPBOARD_PART[] = "elm.swallow.clipboard";
+/** @internal @brief Edje part name for the softkey swallow. */
 static const char SOFTKEY_PART[] = "elm.swallow.softkey";
 
+/** @internal @brief Signal emitted when virtual keypad is shown. */
 static const char SIG_VIRTUALKEYPAD_STATE_ON[] = "virtualkeypad,state,on";
+/** @internal @brief Signal emitted when virtual keypad is hidden. */
 static const char SIG_VIRTUALKEYPAD_STATE_OFF[] = "virtualkeypad,state,off";
+/** @internal @brief Signal emitted when clipboard is shown. */
 static const char SIG_CLIPBOARD_STATE_ON[] = "clipboard,state,on";
+/** @internal @brief Signal emitted when clipboard is hidden. */
 static const char SIG_CLIPBOARD_STATE_OFF[] = "clipboard,state,off";
 
+/** @internal
+ * @brief Smart callback descriptions for the conformant widget.
+ */
 static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {SIG_VIRTUALKEYPAD_STATE_ON, ""},
    {SIG_VIRTUALKEYPAD_STATE_OFF, ""},
@@ -42,6 +59,10 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {NULL, NULL}
 };
 
+/** @internal
+ * @brief Content part aliases for the conformant widget.
+ * Allows using "default" or "icon" to refer to "elm.swallow.content".
+ */
 static const Elm_Layout_Part_Alias_Description _content_aliases[] =
 {
    {"default", "elm.swallow.content"},
@@ -55,6 +76,21 @@ static const Elm_Layout_Part_Alias_Description _content_aliases[] =
  * ILLUME_STK="0, 568, 800, 32"
  */
 #ifdef HAVE_ELEMENTARY_X
+/**
+ * @internal
+ * @brief Retrieves geometry for a conformant part from environment variables.
+ *
+ * This function parses environment variables (e.g., ILLUME_IND, ILLUME_KBD)
+ * that define the geometry (x, y, width, height) of UI components like
+ * the indicator or keyboard.
+ *
+ * @param part The environment variable name (e.g., "ILLUME_IND").
+ * @param[out] sx Pointer to store the x-coordinate.
+ * @param[out] sy Pointer to store the y-coordinate.
+ * @param[out] sw Pointer to store the width.
+ * @param[out] sh Pointer to store the height.
+ * @return @c EINA_TRUE if geometry was successfully parsed, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _conformant_part_geometry_get_from_env(const char *part,
                                        int *sx,
@@ -97,6 +133,23 @@ _conformant_part_geometry_get_from_env(const char *part,
 }
 #endif
 
+/**
+ * @internal
+ * @brief Sets size hints for a conformant part based on its geometry and overlap.
+ *
+ * This function calculates the overlapping area between the conformant widget
+ * and a given part (e.g., indicator, keyboard) and sets the minimum and
+ * maximum size hints of a sub-object (@p sobj) to match this overlap.
+ * This ensures the sub-object (typically a rectangle used as a spacer)
+ * correctly occupies the space of the external UI component.
+ *
+ * @param obj The conformant widget object.
+ * @param sobj The sub-object whose size hints are to be set.
+ * @param sx X-coordinate of the external part.
+ * @param sy Y-coordinate of the external part.
+ * @param sw Width of the external part.
+ * @param sh Height of the external part.
+ */
 static void
 _conformant_part_size_hints_set(Evas_Object *obj,
                                 Evas_Object *sobj,
@@ -122,6 +175,20 @@ _conformant_part_size_hints_set(Evas_Object *obj,
    evas_object_size_hint_max_set(sobj, part_width, part_height);
 }
 
+/**
+ * @internal
+ * @brief Evaluates and applies sizing for specified conformant parts.
+ *
+ * This function retrieves the geometry for different parts of the conformant
+ * (indicator, virtual keypad, softkey, clipboard) primarily from X window
+ * properties or environment variables. It then calls
+ * _conformant_part_size_hints_set to adjust the size of the respective
+ * placeholder objects within the conformant widget.
+ *
+ * @param obj The conformant widget object.
+ * @param part_type A bitmask of ::Conformant_Part_Type indicating which parts
+ *        to evaluate. For example, `ELM_CONFORMANT_INDICATOR_PART | ELM_CONFORMANT_VIRTUAL_KEYPAD_PART`.
+ */
 static void
 _conformant_part_sizing_eval(Evas_Object *obj,
                              Conformant_Part_Type part_type)
@@ -219,6 +286,18 @@ _conformant_part_sizing_eval(Evas_Object *obj,
      }
 }
 
+/**
+ * @internal
+ * @brief Creates and swallows placeholder objects for conformant parts.
+ *
+ * This function checks for the existence of standard Edje parts (virtual
+ * keypad, clipboard, softkey) in the conformant widget's theme. If a part
+ * exists, it ensures a corresponding placeholder rectangle is created,
+ * configured (transparent, initial size hints), and swallowed into that
+ * Edje part. This is done to reserve space for these UI elements.
+ *
+ * @param obj The conformant widget object.
+ */
 static void
 _conformant_parts_swallow(Evas_Object *obj)
 {
@@ -284,6 +363,20 @@ _conformant_parts_swallow(Evas_Object *obj)
      ELM_SAFE_FREE(sd->softkey, evas_object_del);
 }
 
+/**
+ * @internal
+ * @brief Timer callback to attempt connection to the portrait indicator service.
+ *
+ * This function is called by a timer if the initial connection to the
+ * portrait indicator service (via elm_plug) fails. It retries the connection.
+ * It also checks if the indicator mode is still 'show'; if not, it cancels
+ * the timer.
+ *
+ * @param data The conformant widget object.
+ * @return @c ECORE_CALLBACK_RENEW to keep the timer active for retries,
+ *         or @c ECORE_CALLBACK_CANCEL to stop the timer (e.g., on success
+ *         or if indicator is no longer shown).
+ */
 static Eina_Bool
 _port_indicator_connect_cb(void *data)
 {
@@ -319,6 +412,18 @@ _port_indicator_connect_cb(void *data)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @internal
+ * @brief Timer callback to attempt connection to the landscape indicator service.
+ *
+ * Similar to _port_indicator_connect_cb(), but for the landscape indicator.
+ * This function is called by a timer if the initial connection to the
+ * landscape indicator service fails, and it retries the connection.
+ *
+ * @param data The conformant widget object.
+ * @return @c ECORE_CALLBACK_RENEW to keep the timer active for retries,
+ *         or @c ECORE_CALLBACK_CANCEL to stop the timer.
+ */
 static Eina_Bool
 _land_indicator_connect_cb(void *data)
 {
@@ -354,6 +459,18 @@ _land_indicator_connect_cb(void *data)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @internal
+ * @brief Callback for when the landscape indicator plug is disconnected.
+ *
+ * This function is invoked when the elm_plug object representing the
+ * landscape indicator loses its connection to the server (e.g., the
+ * indicator service crashes or exits). It schedules a timer to attempt
+ * reconnection using _land_indicator_connect_cb().
+ *
+ * @param data The conformant widget object.
+ * @param event The Efl_Event details (unused).
+ */
 static void
 _land_indicator_disconnected(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -365,6 +482,18 @@ _land_indicator_disconnected(void *data, const Efl_Event *event EINA_UNUSED)
                                          _land_indicator_connect_cb, conform);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the portrait indicator plug is disconnected.
+ *
+ * Similar to _land_indicator_disconnected(), but for the portrait indicator.
+ * This function is invoked when the elm_plug object for the portrait
+ * indicator is disconnected. It schedules a timer to attempt reconnection
+ * using _port_indicator_connect_cb().
+ *
+ * @param data The conformant widget object.
+ * @param event The Efl_Event details (unused).
+ */
 static void
 _port_indicator_disconnected(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -376,6 +505,19 @@ _port_indicator_disconnected(void *data, const Efl_Event *event EINA_UNUSED)
                                          _port_indicator_connect_cb, conform);
 }
 
+/**
+ * @internal
+ * @brief Creates and configures the portrait indicator plug object.
+ *
+ * This function creates an elm_plug widget, attempts to connect it to the
+ * portrait indicator service (obtained from configuration based on rotation),
+ * and sets up callbacks for disconnection. If the initial connection fails,
+ * a timer is started to retry.
+ *
+ * @param obj The conformant widget object.
+ * @return The created Evas_Object for the portrait indicator plug, or @c NULL
+ *         on failure.
+ */
 static Evas_Object *
 _create_portrait_indicator(Evas_Object *obj)
 {
@@ -418,6 +560,18 @@ _create_portrait_indicator(Evas_Object *obj)
    return port_indicator;
 }
 
+/**
+ * @internal
+ * @brief Creates and configures the landscape indicator plug object.
+ *
+ * Similar to _create_portrait_indicator(), but for the landscape orientation.
+ * It creates an elm_plug widget, connects to the landscape indicator service,
+ * and handles connection retries and disconnections.
+ *
+ * @param obj The conformant widget object.
+ * @return The created Evas_Object for the landscape indicator plug, or @c NULL
+ *         on failure.
+ */
 static Evas_Object *
 _create_landscape_indicator(Evas_Object *obj)
 {
@@ -459,6 +613,20 @@ _create_landscape_indicator(Evas_Object *obj)
    return land_indicator;
 }
 
+/**
+ * @internal
+ * @brief Sets the indicator visibility mode for the conformant widget.
+ *
+ * This function handles showing or hiding the indicator based on @p indmode.
+ * If mode is ELM_WIN_INDICATOR_SHOW, it ensures the correct indicator
+ * (portrait or landscape, based on current rotation) is created if it
+ * doesn't exist, and then swallows it into the INDICATOR_PART.
+ * It also emits Edje signals to animate the indicator's appearance/disappearance.
+ *
+ * @param conformant The conformant widget object.
+ * @param indmode The desired indicator mode (ELM_WIN_INDICATOR_SHOW or
+ *                ELM_WIN_INDICATOR_HIDE).
+ */
 static void
 _indicator_mode_set(Evas_Object *conformant, Elm_Win_Indicator_Mode indmode)
 {
@@ -502,6 +670,16 @@ _indicator_mode_set(Evas_Object *conformant, Elm_Win_Indicator_Mode indmode)
      elm_object_signal_emit(conformant, "elm,state,indicator,hide", "elm");
 }
 
+/**
+ * @internal
+ * @brief Sets the indicator opacity mode for the conformant widget.
+ *
+ * This function updates the internal state for indicator opacity.
+ * Currently, the actual visual change for opacity is marked as a TODO.
+ *
+ * @param conformant The conformant widget object.
+ * @param ind_o_mode The desired indicator opacity mode.
+ */
 static void
 _indicator_opacity_set(Evas_Object *conformant, Elm_Win_Indicator_Opacity_Mode ind_o_mode)
 {
@@ -510,6 +688,17 @@ _indicator_opacity_set(Evas_Object *conformant, Elm_Win_Indicator_Opacity_Mode i
    //TODO: opacity change
 }
 
+/**
+ * @internal
+ * @brief Callback for window indicator property changes.
+ *
+ * This function is called when the parent window's indicator mode or
+ * opacity changes. It updates the conformant widget's indicator display
+ * accordingly by calling _indicator_mode_set() or _indicator_opacity_set().
+ *
+ * @param data The conformant widget object.
+ * @param event The Efl_Event containing the window object whose properties changed.
+ */
 static void
 _on_indicator_mode_changed(void *data, const Efl_Event *event)
 {
@@ -529,6 +718,22 @@ _on_indicator_mode_changed(void *data, const Efl_Event *event)
      _indicator_opacity_set(conformant, ind_o_mode);
 }
 
+/**
+ * @internal
+ * @brief Callback for window rotation changes.
+ *
+ * This function is called when the parent window's rotation changes.
+ * It updates the conformant widget's indicator by:
+ * 1. Unsetting the current indicator from its Edje part.
+ * 2. Hiding the old indicator.
+ * 3. Ensuring the correct indicator (portrait or landscape) for the new
+ *    rotation is created if it doesn't exist.
+ * 4. Showing the new/correct indicator.
+ * 5. Swallowing the new/correct indicator into the INDICATOR_PART.
+ *
+ * @param data The conformant widget object.
+ * @param event The Efl_Event containing the window object whose rotation changed.
+ */
 static void
 _on_rotation_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -640,6 +845,21 @@ _elm_conformant_efl_ui_widget_theme_apply(Eo *obj, Elm_Conformant_Data *_pd EINA
    }
  */
 
+/**
+ * @internal
+ * @brief Callback for conformant widget's move or resize events.
+ *
+ * This function is invoked when the conformant widget itself is moved or resized.
+ * It triggers a re-evaluation of the sizing for all relevant conformant parts
+ * (indicator, softkey, virtual keypad, clipboard) by calling
+ * _conformant_part_sizing_eval(). This ensures that the placeholders for these
+ * parts are correctly adjusted based on the new geometry of the conformant.
+ *
+ * @param data Unused.
+ * @param e Unused.
+ * @param obj The conformant widget object that was moved/resized.
+ * @param event_info Unused.
+ */
 static void
 _move_resize_cb(void *data EINA_UNUSED,
                 Evas *e EINA_UNUSED,
@@ -657,6 +877,18 @@ _move_resize_cb(void *data EINA_UNUSED,
 }
 
 #ifdef HAVE_ELEMENTARY_X
+/**
+ * @internal
+ * @brief Ecore_Job callback to ensure the focused widget's region is visible.
+ *
+ * This job is scheduled when the virtual keyboard or clipboard appears.
+ * It gets the currently focused elementary widget and calls
+ * elm_widget_show_region_set() to ensure that the widget (or a region
+ * around it, adjusted for finger size) is scrolled into view if necessary.
+ * This is part of the auto-scroll mechanism.
+ *
+ * @param data The conformant widget object.
+ */
 static void
 _show_region_job(void *data)
 {
@@ -679,6 +911,20 @@ _show_region_job(void *data)
 }
 
 // showing the focused/important region.
+/**
+ * @internal
+ * @brief Callback for when the content (typically a scroller) inside conformant is resized.
+ *
+ * This function is triggered when a scroller (or genlist) that is being
+ * tracked for auto-scrolling purposes is resized. If the virtual keyboard
+ * or clipboard is active, it schedules the _show_region_job to potentially
+ * adjust the scroll position to keep the focused element visible.
+ *
+ * @param data The conformant widget object.
+ * @param e Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _on_content_resize(void *data,
                    Evas *e EINA_UNUSED,
@@ -695,6 +941,17 @@ _on_content_resize(void *data,
    sd->show_region_job = ecore_job_add(_show_region_job, data);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the tracked top-most scroller is deleted.
+ *
+ * If the scroller widget that conformant is monitoring for auto-scroll
+ * purposes is deleted, this callback ensures that the conformant widget
+ * clears its reference to it (sd->scroller = NULL).
+ *
+ * @param data The conformant widget object.
+ * @param event The Efl_Event containing the deleted scroller object.
+ */
 static void
 _on_top_scroller_del(void *data, const Efl_Event *event)
 {
@@ -707,6 +964,19 @@ _on_top_scroller_del(void *data, const Efl_Event *event)
 #endif
 
 #ifdef HAVE_ELEMENTARY_X
+/**
+ * @internal
+ * @brief Updates the tracked scroller object for auto-scrolling.
+ *
+ * This function identifies the top-most scroller widget in the hierarchy
+ * of the currently focused object within the conformant. If this scroller
+ * is different from the one currently tracked (sd->scroller), it updates
+ * the event callbacks: removes them from the old scroller and adds them
+ * to the new one. These callbacks (_on_content_resize, _on_top_scroller_del)
+ * are used to manage the auto-scrolling behavior when the keyboard/clipboard appears.
+ *
+ * @param data The conformant widget object.
+ */
 static void
 _autoscroll_objects_update(void *data)
 {
@@ -749,6 +1019,20 @@ _autoscroll_objects_update(void *data)
      }
 }
 
+/**
+ * @internal
+ * @brief Handles changes in the virtual keypad's state.
+ *
+ * This function is called when an X property event indicates a change in the
+ * virtual keypad's state (e.g., ECORE_X_ATOM_E_VIRTUAL_KEYBOARD_STATE).
+ * It updates the size hints of the virtual keypad placeholder in the conformant
+ * widget, sets the display mode (e.g., to compress content), triggers
+ * auto-scroll updates if the keypad is shown, and emits the appropriate
+ * "virtualkeypad,state,on/off" signal.
+ *
+ * @param obj The conformant widget object.
+ * @param ev The X window property event data.
+ */
 static void
 _virtualkeypad_state_change(Evas_Object *obj, Ecore_X_Event_Window_Property *ev)
 {
@@ -788,6 +1072,19 @@ _virtualkeypad_state_change(Evas_Object *obj, Ecore_X_Event_Window_Property *ev)
      }
 }
 
+/**
+ * @internal
+ * @brief Handles changes in the clipboard's state.
+ *
+ * Similar to _virtualkeypad_state_change(), this function responds to X
+ * property events related to the clipboard's state (e.g.,
+ * ECORE_X_ATOM_E_ILLUME_CLIPBOARD_STATE). It adjusts the clipboard
+ * placeholder, sets display mode, updates auto-scroll logic, and emits
+ * "clipboard,state,on/off" signals.
+ *
+ * @param obj The conformant widget object.
+ * @param ev The X window property event data.
+ */
 static void
 _clipboard_state_change(Evas_Object *obj, Ecore_X_Event_Window_Property *ev)
 {
@@ -824,6 +1121,24 @@ _clipboard_state_change(Evas_Object *obj, Ecore_X_Event_Window_Property *ev)
      }
 }
 
+/**
+ * @internal
+ * @brief Ecore event handler for X window property changes.
+ *
+ * This function is the central handler for various X window property changes
+ * that affect the conformant widget. It listens for changes related to:
+ * - Window state (hidden/shown): Manages indicator creation/deletion.
+ * - Illume zone changes: Triggers a full re-evaluation of part sizing.
+ * - Geometry of indicator, softkey, keyboard, clipboard: Triggers sizing
+ *   evaluation for the specific part.
+ * - State of virtual keyboard or clipboard: Calls specific state change handlers.
+ *
+ * @param data The conformant widget object.
+ * @param type Unused (ECORE_X_EVENT_WINDOW_PROPERTY).
+ * @param event The Ecore_X_Event_Window_Property data.
+ * @return @c ECORE_CALLBACK_PASS_ON to allow other handlers to process the event,
+ *         or @c ECORE_CALLBACK_DONE if the event is fully handled (e.g., window hidden).
+ */
 static Eina_Bool
 _on_prop_change(void *data,
                 int type EINA_UNUSED,

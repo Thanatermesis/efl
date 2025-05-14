@@ -9,8 +9,30 @@
 
 #define CLICK_THRESHOLD_DEFAULT 0.25
 
+/**
+ * @internal
+ * @brief List of currently opened input devices.
+ */
 static Eina_List *_ecore_fb_li_devices = NULL;
 
+/**
+ * @internal
+ * @brief Keyboard symbols mapping table.
+ * This array maps key codes to their string representations.
+ * Each key code has 7 entries:
+ * - [0]: Default key symbol (e.g., "a", "Control_L")
+ * - [1]: Shift-modified key symbol (e.g., "A")
+ * - [2]: Lock-modified key symbol (e.g., "A" for Caps_Lock)
+ * - [3]: Default compose sequence (e.g., for dead keys)
+ * - [4]: Shift-modified compose sequence
+ * - [5]: Lock-modified compose sequence
+ * - [6]: Ctrl-modified compose sequence (used if non-NULL)
+ *
+ * Example for a key code `X`:
+ * _ecore_fb_li_kbd_syms[X * 7 + 0] // Default symbol
+ * _ecore_fb_li_kbd_syms[X * 7 + 1] // Shifted symbol
+ * ...and so on.
+ */
 static const char *_ecore_fb_li_kbd_syms[144 * 7] =
 {
 #include "ecore_fb_keytable.h"
@@ -27,6 +49,16 @@ static const char *_ecore_fb_li_kbd_syms[144 * 7] =
  *                                                - bigeasy
  */
 extern int long_has_neither_32_nor_64_bits(void);
+
+/**
+ * @internal
+ * @brief Tests if a specific bit is set in an array of unsigned longs.
+ * This function is used to check capabilities of input devices.
+ * @param bit The bit number to test (0-indexed).
+ * @param array Pointer to the array of unsigned longs.
+ * @return 1 if the bit is set, 0 otherwise.
+ * @note This function handles both 32-bit and 64-bit longs.
+ */
 static inline int
 test_bit(int bit, unsigned long *array)
 {
@@ -37,6 +69,14 @@ test_bit(int bit, unsigned long *array)
    else long_has_neither_32_nor_64_bits();
 }
 
+/**
+ * @internal
+ * @brief Handles key events from an input device.
+ * This function processes EV_KEY events, updates modifier states (Ctrl, Alt, Shift, Lock),
+ * and generates Ecore_Event_Key events.
+ * @param dev The input device that generated the event.
+ * @param iev The raw input event from the kernel.
+ */
 static void
 _ecore_fb_li_device_event_key(Ecore_Fb_Input_Device *dev, struct input_event *iev)
 {
@@ -212,6 +252,15 @@ _ecore_fb_li_device_event_key(Ecore_Fb_Input_Device *dev, struct input_event *ie
      }
 }
 
+/**
+ * @internal
+ * @brief Handles relative axis events from an input device.
+ * This function processes EV_REL events, such as mouse movement (REL_X, REL_Y)
+ * or mouse wheel (REL_WHEEL, REL_HWHEEL), and generates Ecore_Event_Mouse_Move
+ * or Ecore_Event_Mouse_Wheel events.
+ * @param dev The input device that generated the event.
+ * @param iev The raw input event from the kernel.
+ */
 static void
 _ecore_fb_li_device_event_rel(Ecore_Fb_Input_Device *dev, struct input_event *iev)
 {
@@ -304,6 +353,15 @@ _ecore_fb_li_device_event_rel(Ecore_Fb_Input_Device *dev, struct input_event *ie
      }
 }
 
+/**
+ * @internal
+ * @brief Handles absolute axis events from an input device.
+ * This function processes EV_ABS events, typically from touchscreens or tablets.
+ * It updates mouse coordinates (ABS_X, ABS_Y) and handles pressure events (ABS_PRESSURE)
+ * to generate mouse move or button events.
+ * @param dev The input device that generated the event.
+ * @param iev The raw input event from the kernel.
+ */
 static void
 _ecore_fb_li_device_event_abs(Ecore_Fb_Input_Device *dev, struct input_event *iev)
 {
@@ -356,6 +414,15 @@ _ecore_fb_li_device_event_abs(Ecore_Fb_Input_Device *dev, struct input_event *ie
      }
 }
 
+/**
+ * @internal
+ * @brief Handles synchronization events from an input device.
+ * This function processes EV_SYN events. For absolute devices, it triggers
+ * the dispatch of queued mouse move or button events that were updated by
+ * preceding EV_ABS events.
+ * @param dev The input device that generated the event.
+ * @param iev The raw input event from the kernel (unused in this function).
+ */
 static void
 _ecore_fb_li_device_event_syn(Ecore_Fb_Input_Device *dev, struct input_event *iev EINA_UNUSED)
 {
@@ -404,6 +471,16 @@ _ecore_fb_li_device_event_syn(Ecore_Fb_Input_Device *dev, struct input_event *ie
      }
 }
 
+/**
+ * @internal
+ * @brief Callback function for handling input device file descriptor activity.
+ * This function is called by the Ecore main loop when there is data to be read
+ * from an input device's file descriptor. It reads the input events and dispatches
+ * them to the appropriate event-specific handler functions.
+ * @param data User data, expected to be an Ecore_Fb_Input_Device pointer.
+ * @param fdh The Ecore_Fd_Handler that triggered this callback (unused).
+ * @return EINA_TRUE to keep the handler active, EINA_FALSE to remove it (e.g., on read error).
+ */
 static Eina_Bool
 _ecore_fb_li_device_fd_callback(void *data, Ecore_Fd_Handler *fdh EINA_UNUSED)
 {

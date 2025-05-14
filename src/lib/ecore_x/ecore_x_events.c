@@ -45,6 +45,14 @@ static Eina_Inlist            *_ecore_x_mouse_down_info_list          = NULL;
 static Eina_Hash *emitted_events = NULL;
 #endif
 
+/**
+ * @internal
+ * @brief Clears all stored mouse down information.
+ *
+ * This function iterates through the global list of mouse down information
+ * structures, freeing each one and resetting the list to NULL. This is
+ * typically called during shutdown to clean up resources.
+ */
 static void
 _ecore_x_mouse_down_info_clear(void)
 {
@@ -59,6 +67,14 @@ _ecore_x_mouse_down_info_clear(void)
    _ecore_x_mouse_down_info_list = NULL;
 }
 
+/**
+ * @internal
+ * @brief Initializes the Ecore_X event handling system.
+ *
+ * This function sets up any necessary resources for event processing.
+ * Currently, it initializes a hash table for tracking emitted XKB events
+ * to avoid duplicates, if XKB support is enabled.
+ */
 void
 _ecore_x_events_init(void)
 {
@@ -68,6 +84,14 @@ _ecore_x_events_init(void)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Shuts down the Ecore_X event handling system.
+ *
+ * This function cleans up resources used by the event handling system,
+ * such as clearing the mouse down information list and freeing the XKB
+ * event hash table if XKB support is enabled.
+ */
 void
 _ecore_x_events_shutdown(void)
 {
@@ -77,6 +101,19 @@ _ecore_x_events_shutdown(void)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Retrieves or creates mouse down information for a specific device.
+ *
+ * This function is used to track multi-click events (double, triple clicks)
+ * on a per-device basis. It searches for an existing `Ecore_X_Mouse_Down_Info`
+ * structure for the given device ID. If one is not found, it allocates a new
+ * one, initializes it, and adds it to the global list.
+ *
+ * @param dev The device ID to get information for.
+ * @return A pointer to the `Ecore_X_Mouse_Down_Info` for the device, or
+ *         @c NULL on allocation failure.
+ */
 static Ecore_X_Mouse_Down_Info *
 _ecore_x_mouse_down_info_get(int dev)
 {
@@ -97,6 +134,18 @@ _ecore_x_mouse_down_info_get(int dev)
    return info;
 }
 
+/**
+ * @internal
+ * @brief Frees a mouse move event and resets the last mouse move event cache.
+ *
+ * This function is registered as a free callback for mouse move events. It
+ * frees the memory allocated for the `Ecore_Event_Mouse_Move` structure. It
+ * also resets global pointers tracking the last mouse move event, which is
+ * part of the logic to compress multiple mouse move events into a single one.
+ *
+ * @param data Unused user data.
+ * @param ev The `Ecore_Event_Mouse_Move` event to free.
+ */
 static void
 _ecore_x_event_free_mouse_move(void *data EINA_UNUSED,
                                void *ev)
@@ -114,6 +163,15 @@ _ecore_x_event_free_mouse_move(void *data EINA_UNUSED,
    free(e);
 }
 
+/**
+ * @brief Add an event mask to a window's existing event mask.
+ * @param w The window to change the event mask of.
+ * @param mask The mask of events to add to the window's mask.
+ *
+ * This function will add the given event mask to the window's event mask. It
+ * gets the current event mask, OR's it with the given one, and then sets the
+ * new mask.
+ */
 EAPI void
 ecore_x_event_mask_set(Ecore_X_Window w,
                        Ecore_X_Event_Mask mask)
@@ -136,6 +194,15 @@ ecore_x_event_mask_set(Ecore_X_Window w,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * @brief Remove an event mask from a window's existing event mask.
+ * @param w The window to change the event mask of.
+ * @param mask The mask of events to remove from the window's mask.
+ *
+ * This function will remove the given event mask from the window's event mask.
+ * It gets the current event mask, AND's it with the inverse of the given one,
+ * and then sets the new mask.
+ */
 EAPI void
 ecore_x_event_mask_unset(Ecore_X_Window w,
                          Ecore_X_Event_Mask mask)
@@ -158,6 +225,18 @@ ecore_x_event_mask_unset(Ecore_X_Window w,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * @internal
+ * @brief Frees an Xdnd Enter event.
+ *
+ * This function is registered as a free callback for `ECORE_X_EVENT_XDND_ENTER`
+ * events. It frees the memory allocated for the `Ecore_X_Event_Xdnd_Enter`
+ * structure, including the array of type names which were allocated by
+ * `XGetAtomName`.
+ *
+ * @param data Unused user data.
+ * @param ev The `Ecore_X_Event_Xdnd_Enter` event to free.
+ */
 static void
 _ecore_x_event_free_xdnd_enter(void *data EINA_UNUSED,
                                void *ev)
@@ -172,6 +251,19 @@ _ecore_x_event_free_xdnd_enter(void *data EINA_UNUSED,
    free(e);
 }
 
+/**
+ * @internal
+ * @brief Frees a Selection Notify event.
+ *
+ * This function is registered as a free callback for
+ * `ECORE_X_EVENT_SELECTION_NOTIFY` events. It frees the memory allocated for
+ * the `Ecore_X_Event_Selection_Notify` structure. It also calls a free
+ * function for the selection data if one is provided, allowing for custom
+ * data structures to be cleaned up correctly.
+ *
+ * @param data Unused user data.
+ * @param ev The `Ecore_X_Event_Selection_Notify` event to free.
+ */
 static void
 _ecore_x_event_free_selection_notify(void *data EINA_UNUSED,
                                      void *ev)
@@ -188,6 +280,17 @@ _ecore_x_event_free_selection_notify(void *data EINA_UNUSED,
    free(e);
 }
 
+/**
+ * @internal
+ * @brief Translates an X modifier mask to an Ecore modifier mask.
+ *
+ * @param state The X modifier mask (from an XEvent's state field).
+ * @return The equivalent Ecore modifier mask.
+ *
+ * This function maps X11 modifier flags (like ShiftMask, ControlMask) to their
+ * corresponding platform-independent Ecore counterparts (like
+ * `ECORE_EVENT_MODIFIER_SHIFT`, `ECORE_EVENT_MODIFIER_CTRL`).
+ */
 static unsigned int
 _ecore_x_event_modifiers(unsigned int state)
 {
@@ -223,6 +326,35 @@ _ecore_x_event_modifiers(unsigned int state)
    return modifiers;
 }
 
+/**
+ * @internal
+ * @brief Creates and adds a mouse move event to the event queue.
+ *
+ * This is a helper function that constructs an `Ecore_Event_Mouse_Move`
+ * event from raw data and adds it to the Ecore event queue. It handles
+ * both standard mouse motion and multi-touch data. It also updates
+ * global state about the last event time and window.
+ *
+ * @param timestamp Event timestamp.
+ * @param xmodifiers X modifier mask.
+ * @param x X coordinate relative to the window.
+ * @param y Y coordinate relative to the window.
+ * @param x_root X coordinate relative to the root window.
+ * @param y_root Y coordinate relative to the root window.
+ * @param event_window The window that received the event.
+ * @param window The window the cursor is in (can be a sub-window).
+ * @param root_win The root window.
+ * @param same_screen Non-zero if the cursor is on the same screen.
+ * @param dev The device ID.
+ * @param radx The radius of the touch on the X-axis (for multi-touch).
+ * @param rady The radius of the touch on the Y-axis (for multi-touch).
+ * @param pressure The pressure of the touch (for multi-touch).
+ * @param angle The angle of the touch (for multi-touch).
+ * @param mx The precise X coordinate (for multi-touch).
+ * @param my The precise Y coordinate (for multi-touch).
+ * @param mrx The precise X coordinate relative to root (for multi-touch).
+ * @param mry The precise Y coordinate relative to root (for multi-touch).
+ */
 void
 _ecore_mouse_move(unsigned int timestamp,
                   unsigned int xmodifiers,
@@ -289,6 +421,17 @@ _ecore_mouse_move(unsigned int timestamp,
    _ecore_x_last_event_mouse_move = EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Frees an Axis Update event.
+ *
+ * This function is registered as a free callback for `ECORE_EVENT_AXIS_UPDATE`
+ * events. It frees the `Ecore_Event_Axis_Update` structure and the `axis`
+ * array within it.
+ *
+ * @param data Unused user data.
+ * @param ev The `Ecore_Event_Axis_Update` event to free.
+ */
 static void
 _ecore_x_event_free_axis_update_event(void *data EINA_UNUSED, void *ev)
 {
@@ -297,6 +440,31 @@ _ecore_x_event_free_axis_update_event(void *data EINA_UNUSED, void *ev)
    free(e);
 }
 
+/**
+ * @internal
+ * @brief Creates and adds an axis update event to the event queue.
+ *
+ * This function is used for XI2 valuator events (e.g., from tablets,
+ * touchscreens). It constructs an `Ecore_Event_Axis_Update` event with data
+ * for one or more axes and adds it to the Ecore event queue.
+ *
+ * @param window The window the event is for.
+ * @param event_window The window that received the event.
+ * @param root_window The root window.
+ * @param timestamp Event timestamp.
+ * @param devid The device ID.
+ * @param toolid The tool ID (for devices with multiple tools).
+ * @param naxis The number of axes in the `axis` array.
+ * @param axis An array of `Ecore_Axis` structs describing the axis updates.
+ *        The array contains `naxis` elements. Each element is a struct like:
+ *        @code
+ *        {
+ *          .label = ECORE_AXIS_LABEL_X, // The axis identifier
+ *          .value = 123.45              // The new value for the axis
+ *        }
+ *        @endcode
+ *        This function takes ownership of the `axis` pointer and will free it.
+ */
 void
 _ecore_x_axis_update(Ecore_Window window,
                      Ecore_Window event_window,
@@ -340,6 +508,26 @@ _ecore_x_axis_update(Ecore_Window window,
    _ecore_x_event_last_time = timestamp;
 }
 
+/**
+ * @internal
+ * @brief Handles key press and key release events from X.
+ *
+ * This function is called for both `KeyPress` and `KeyRelease` X events. It
+ * translates the X-specific key event information into a generic
+ * `Ecore_Event_Key` and adds it to the Ecore event queue.
+ *
+ * This involves:
+ * - Looking up the `KeySym` for the keycode.
+ * - Getting the string representation of the key (`keyname`).
+ * - Performing a string lookup to get the composed string (`compose`), and
+ *   converting it to UTF-8.
+ * - Allocating a single block of memory for the `Ecore_Event_Key` struct and
+ *   all its associated strings (`keyname`, `key`, `compose`, `string`).
+ *
+ * @param event The Ecore event type (`ECORE_EVENT_KEY_DOWN` or
+ *              `ECORE_EVENT_KEY_UP`).
+ * @param xevent A pointer to the X `XKeyEvent` structure.
+ */
 static void
 _ecore_key_press(int event,
                  XKeyEvent *xevent)
@@ -430,6 +618,40 @@ on_error:
      free(tmp);
 }
 
+/**
+ * @internal
+ * @brief Creates and adds a mouse button event to the event queue.
+ *
+ * This function constructs an `Ecore_Event_Mouse_Button` event and adds it to
+ * the Ecore event queue. It is used for button down, up, and cancel events.
+ * A significant part of its logic is dedicated to detecting double and triple
+ * clicks by comparing timestamps and windows with previous clicks from the
+ * same device.
+ *
+ * @param event The Ecore event type (e.g., `ECORE_EVENT_MOUSE_BUTTON_DOWN`).
+ * @param timestamp Event timestamp.
+ * @param xmodifiers X modifier mask.
+ * @param buttons The button number that triggered the event.
+ * @param x X coordinate relative to the window.
+ * @param y Y coordinate relative to the window.
+ * @param x_root X coordinate relative to the root window.
+ * @param y_root Y coordinate relative to the root window.
+ * @param event_window The window that received the event.
+ * @param window The window the cursor is in (can be a sub-window).
+ * @param root_win The root window.
+ * @param same_screen Non-zero if the cursor is on the same screen.
+ * @param dev The device ID.
+ * @param radx Radius on X-axis (for multi-touch).
+ * @param rady Radius on Y-axis (for multi-touch).
+ * @param pressure Pressure (for multi-touch).
+ * @param angle Angle (for multi-touch).
+ * @param mx Precise X coordinate (for multi-touch).
+ * @param my Precise Y coordinate (for multi-touch).
+ * @param mrx Precise root X coordinate (for multi-touch).
+ * @param mry Precise root Y coordinate (for multi-touch).
+ * @return A pointer to the created `Ecore_Event_Mouse_Button` event, or
+ *         @c NULL on allocation failure. The caller does not own this pointer.
+ */
 Ecore_Event_Mouse_Button *
 _ecore_mouse_button(int event,
                     unsigned int timestamp,
@@ -590,6 +812,18 @@ _ecore_mouse_button(int event,
    return e;
 }
 
+/**
+ * @internal
+ * @brief Handles any X event by creating a generic Ecore X event.
+ *
+ * This function is called to create an `ECORE_X_EVENT_ANY` event. This is
+ * useful for debugging or for applications that need to inspect all raw
+ * X events.
+ * The function allocates memory for a copy of the `XEvent` and adds it to
+ * the event queue.
+ *
+ * @param xevent The raw XEvent.
+ */
 void
 _ecore_x_event_handle_any_event(XEvent *xevent)
 {
@@ -599,18 +833,53 @@ _ecore_x_event_handle_any_event(XEvent *xevent)
    ecore_event_add(ECORE_X_EVENT_ANY, ev, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles an X `KeyPress` event.
+ *
+ * This is a wrapper around `_ecore_key_press()` that passes the appropriate
+ * Ecore event type `ECORE_EVENT_KEY_DOWN`.
+ *
+ * @param xevent The X `KeyPress` event.
+ */
 void
 _ecore_x_event_handle_key_press(XEvent *xevent)
 {
    _ecore_key_press(ECORE_EVENT_KEY_DOWN, (XKeyEvent *)xevent);
 }
 
+/**
+ * @internal
+ * @brief Handles an X `KeyRelease` event.
+ *
+ * This is a wrapper around `_ecore_key_press()` that passes the appropriate
+ * Ecore event type `ECORE_EVENT_KEY_UP`.
+ *
+ * @param xevent The X `KeyRelease` event.
+ */
 void
 _ecore_x_event_handle_key_release(XEvent *xevent)
 {
    _ecore_key_press(ECORE_EVENT_KEY_UP, (XKeyEvent *)xevent);
 }
 
+/**
+ * @internal
+ * @brief Handles an X `ButtonPress` event.
+ *
+ * This function processes mouse button press events from X. It distinguishes
+ * between regular button clicks and mouse wheel events (typically buttons 4-7).
+ *
+ * For mouse wheel events, it creates an `Ecore_Event_Mouse_Wheel`.
+ *
+ * For regular button presses, it first synthesizes a mouse move event to ensure
+ * coordinates are up-to-date, and then calls `_ecore_mouse_button()` to create
+ * an `ECORE_EVENT_MOUSE_BUTTON_DOWN` event.
+ *
+ * It also handles pointer grabbing logic, replaying events if necessary.
+ *
+ * @param xevent The X `ButtonPress` event.
+ */
 void
 _ecore_x_event_handle_button_press(XEvent *xevent)
 {
@@ -764,6 +1033,18 @@ _ecore_x_event_handle_button_press(XEvent *xevent)
      }
 }
 
+/**
+ * @internal
+ * @brief Handles an X `ButtonRelease` event.
+ *
+ * This function processes mouse button release events from X. It filters out
+ * mouse wheel events (buttons 4-7) since they are handled on press.
+ * For regular button releases, it first synthesizes a mouse move event to
+ * ensure coordinates are up-to-date, and then calls `_ecore_mouse_button()`
+ * to create an `ECORE_EVENT_MOUSE_BUTTON_UP` event.
+ *
+ * @param xevent The X `ButtonRelease` event.
+ */
 void
 _ecore_x_event_handle_button_release(XEvent *xevent)
 {

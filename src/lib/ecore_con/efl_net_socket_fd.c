@@ -23,13 +23,28 @@
 
 #define MY_CLASS EFL_NET_SOCKET_FD_CLASS
 
+/**
+ * @brief Private data for the Efl_Net_Socket_Fd class.
+ *
+ * This structure holds the local and remote addresses as stringshares
+ * and the socket family (e.g., AF_INET, AF_INET6).
+ */
 typedef struct _Efl_Net_Socket_Fd_Data
 {
-   Eina_Stringshare *address_local;
-   Eina_Stringshare *address_remote;
-   int family;
+   Eina_Stringshare *address_local; /**< The local socket address string. */
+   Eina_Stringshare *address_remote; /**< The remote socket address string. */
+   int family; /**< The socket address family. */
 } Efl_Net_Socket_Fd_Data;
 
+/**
+ * @brief Event callback for readable file descriptor.
+ *
+ * This function is called when the underlying file descriptor becomes readable.
+ * It sets the can_read property to EINA_TRUE if the socket is not closed.
+ *
+ * @param data User data (unused).
+ * @param event The Efl_Event structure.
+ */
 static void
 _efl_net_socket_fd_event_read(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -38,6 +53,15 @@ _efl_net_socket_fd_event_read(void *data EINA_UNUSED, const Efl_Event *event)
    efl_io_reader_can_read_set(event->object, EINA_TRUE);
 }
 
+/**
+ * @brief Event callback for writable file descriptor.
+ *
+ * This function is called when the underlying file descriptor becomes writable.
+ * It sets the can_write property to EINA_TRUE if the socket is not closed.
+ *
+ * @param data User data (unused).
+ * @param event The Efl_Event structure.
+ */
 static void
 _efl_net_socket_fd_event_write(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -46,6 +70,15 @@ _efl_net_socket_fd_event_write(void *data EINA_UNUSED, const Efl_Event *event)
    efl_io_writer_can_write_set(event->object, EINA_TRUE);
 }
 
+/**
+ * @brief Event callback for file descriptor error.
+ *
+ * This function is called when an error occurs on the underlying file descriptor.
+ * It sets can_write and can_read to EINA_FALSE and eos to EINA_TRUE if the socket is not closed.
+ *
+ * @param data User data (unused).
+ * @param event The Efl_Event structure.
+ */
 static void
 _efl_net_socket_fd_event_error(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -56,6 +89,16 @@ _efl_net_socket_fd_event_error(void *data EINA_UNUSED, const Efl_Event *event)
    efl_io_reader_eos_set(event->object, EINA_TRUE);
 }
 
+/**
+ * @brief Finalizes the Efl_Net_Socket_Fd object.
+ *
+ * This function is called during the finalization phase of object construction.
+ * It registers event callbacks for read, write, and error events on the file descriptor.
+ *
+ * @param o The Efl_Net_Socket_Fd object.
+ * @param pd Private data (unused).
+ * @return The finalized Efl_Object.
+ */
 EOLIAN static Efl_Object *
 _efl_net_socket_fd_efl_object_finalize(Eo *o, Efl_Net_Socket_Fd_Data *pd EINA_UNUSED)
 {
@@ -68,6 +111,17 @@ _efl_net_socket_fd_efl_object_finalize(Eo *o, Efl_Net_Socket_Fd_Data *pd EINA_UN
    return o;
 }
 
+/**
+ * @brief Constructs the Efl_Net_Socket_Fd object.
+ *
+ * This function is called during the construction phase of the object.
+ * It initializes the socket family to AF_UNSPEC and sets default
+ * properties for closing behavior and file descriptors.
+ *
+ * @param o The Efl_Net_Socket_Fd object.
+ * @param pd Private data for the object.
+ * @return The constructed Efl_Object.
+ */
 EOLIAN static Efl_Object *
 _efl_net_socket_fd_efl_object_constructor(Eo *o, Efl_Net_Socket_Fd_Data *pd)
 {
@@ -83,6 +137,16 @@ _efl_net_socket_fd_efl_object_constructor(Eo *o, Efl_Net_Socket_Fd_Data *pd)
    return o;
 }
 
+/**
+ * @brief Invalidates the Efl_Net_Socket_Fd object.
+ *
+ * This function is called when the object is being invalidated.
+ * If close_on_invalidate is set and the socket is not already closed,
+ * it closes the socket.
+ *
+ * @param o The Efl_Net_Socket_Fd object.
+ * @param pd Private data (unused).
+ */
 EOLIAN static void
 _efl_net_socket_fd_efl_object_invalidate(Eo *o, Efl_Net_Socket_Fd_Data *pd EINA_UNUSED)
 {
@@ -97,6 +161,15 @@ _efl_net_socket_fd_efl_object_invalidate(Eo *o, Efl_Net_Socket_Fd_Data *pd EINA_
    efl_invalidate(efl_super(o, MY_CLASS));
 }
 
+/**
+ * @brief Destroys the Efl_Net_Socket_Fd object.
+ *
+ * This function is called when the object is being destroyed.
+ * It releases the stringshare for local and remote addresses.
+ *
+ * @param o The Efl_Net_Socket_Fd object.
+ * @param pd Private data for the object.
+ */
 EOLIAN static void
 _efl_net_socket_fd_efl_object_destructor(Eo *o, Efl_Net_Socket_Fd_Data *pd)
 {
@@ -106,6 +179,18 @@ _efl_net_socket_fd_efl_object_destructor(Eo *o, Efl_Net_Socket_Fd_Data *pd)
    eina_stringshare_replace(&pd->address_remote, NULL);
 }
 
+/**
+ * @brief Configures the socket with a new file descriptor.
+ *
+ * This internal helper function sets the given file descriptor for reading,
+ * writing, and closing operations on the socket object. It also applies
+ * any postponed settings like close_on_exec. It ensures that the socket
+ * family is set before proceeding.
+ *
+ * @param o The Efl_Net_Socket_Fd object.
+ * @param pd Private data for the object.
+ * @param fd The socket file descriptor to set.
+ */
 static void
 _efl_net_socket_fd_set(Eo *o, Efl_Net_Socket_Fd_Data *pd, SOCKET fd)
 {
@@ -123,6 +208,15 @@ _efl_net_socket_fd_set(Eo *o, Efl_Net_Socket_Fd_Data *pd, SOCKET fd)
      }
 }
 
+/**
+ * @brief Resets the socket's file descriptor and addresses.
+ *
+ * This internal helper function sets the file descriptor for reading, writing,
+ * and closing to INVALID_SOCKET. It also clears the local and remote
+ * socket addresses.
+ *
+ * @param o The Efl_Net_Socket_Fd object.
+ */
 static void
 _efl_net_socket_fd_unset(Eo *o)
 {
@@ -134,6 +228,19 @@ _efl_net_socket_fd_unset(Eo *o)
    efl_net_socket_address_remote_set(o, NULL);
 }
 
+/**
+ * @brief Sets the file descriptor for the Efl_Loop_Fd interface.
+ *
+ * This function handles setting the underlying file descriptor for the socket.
+ * If the socket family is not yet determined and a valid fd is provided,
+ * it attempts to determine the family using getsockname().
+ * It then calls the superclass's fd_set method and either configures
+ * or unsets the socket based on whether the fd is valid.
+ *
+ * @param o The Efl_Net_Socket_Fd object.
+ * @param pd Private data for the object.
+ * @param pfd The platform-specific file descriptor.
+ */
 EOLIAN static void
 _efl_net_socket_fd_efl_loop_fd_fd_set(Eo *o, Efl_Net_Socket_Fd_Data *pd, int pfd)
 {
@@ -155,6 +262,18 @@ _efl_net_socket_fd_efl_loop_fd_fd_set(Eo *o, Efl_Net_Socket_Fd_Data *pd, int pfd
    else _efl_net_socket_fd_unset(o);
 }
 
+/**
+ * @brief Closes the socket.
+ *
+ * Implements the Efl.Io.Closer.close interface.
+ * It sets can_write and can_read to false, and eos to true.
+ * It then closes the underlying socket file descriptor and emits the "closed" event.
+ * Finally, it cleans up by unsetting the socket's fd and addresses.
+ *
+ * @param o The Efl_Net_Socket_Fd object.
+ * @param pd Private data (unused).
+ * @return 0 on success, or an error code on failure.
+ */
 EOLIAN static Eina_Error
 _efl_net_socket_fd_efl_io_closer_close(Eo *o, Efl_Net_Socket_Fd_Data *pd EINA_UNUSED)
 {
@@ -184,6 +303,17 @@ _efl_net_socket_fd_efl_io_closer_close(Eo *o, Efl_Net_Socket_Fd_Data *pd EINA_UN
    return ret;
 }
 
+/**
+ * @brief Checks if the socket is closed.
+ *
+ * Implements the Efl.Io.Closer.closed_get interface.
+ * The socket is considered closed if its family is specified and
+ * the underlying file descriptor is INVALID_SOCKET.
+ *
+ * @param o The Efl_Net_Socket_Fd object.
+ * @param pd Private data for the object.
+ * @return EINA_TRUE if closed, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_net_socket_fd_efl_io_closer_closed_get(const Eo *o, Efl_Net_Socket_Fd_Data *pd)
 {
@@ -191,6 +321,22 @@ _efl_net_socket_fd_efl_io_closer_closed_get(const Eo *o, Efl_Net_Socket_Fd_Data 
    return (SOCKET)efl_io_closer_fd_get(o) == INVALID_SOCKET;
 }
 
+/**
+ * @brief Reads data from the socket.
+ *
+ * Implements the Efl.Io.Reader.read interface.
+ * It attempts to receive data into the provided Eina_Rw_Slice.
+ * Handles EINTR errors by retrying the recv call.
+ * Sets can_read to false after a successful read or error,
+ * and sets eos to true if recv returns 0 (connection closed by peer).
+ *
+ * @param o The Efl_Net_Socket_Fd object.
+ * @param pd Private data (unused).
+ * @param rw_slice The read-write slice to store the received data.
+ *                 On success, rw_slice->len is updated with the number of bytes read.
+ *                 On error or EOF, rw_slice->len is 0 and rw_slice->mem is NULL.
+ * @return 0 on success, or an error code on failure.
+ */
 EOLIAN static Eina_Error
 _efl_net_socket_fd_efl_io_reader_read(Eo *o, Efl_Net_Socket_Fd_Data *pd EINA_UNUSED, Eina_Rw_Slice *rw_slice)
 {
@@ -231,6 +377,20 @@ _efl_net_socket_fd_efl_io_reader_read(Eo *o, Efl_Net_Socket_Fd_Data *pd EINA_UNU
    return EINVAL;
 }
 
+/**
+ * @brief Sets the can_read property and manages read event monitoring.
+ *
+ * Implements the Efl.Io.Reader.can_read_set interface.
+ * When can_read is set to true (meaning data is available or an event occurred),
+ * it stops monitoring the EFL_LOOP_FD_EVENT_READ event, as the user is expected
+ * to call efl_io_reader_read().
+ * When can_read is set to false (either after a read or if no data is available),
+ * it resumes monitoring the EFL_LOOP_FD_EVENT_READ event.
+ *
+ * @param o The Efl_Net_Socket_Fd object.
+ * @param pd Private data (unused).
+ * @param value The new value for the can_read property.
+ */
 EOLIAN static void
 _efl_net_socket_fd_efl_io_reader_can_read_set(Eo *o, Efl_Net_Socket_Fd_Data *pd EINA_UNUSED, Eina_Bool value)
 {
@@ -261,11 +421,30 @@ _efl_net_socket_fd_efl_io_reader_eos_set(Eo *o, Efl_Net_Socket_Fd_Data *pd EINA_
 
    if (!value) return;
 
-   /* stop monitoring the FD, it's closed */
+   /* stop monitoring the FD, it's closed or an error occurred */
    efl_event_callback_del(o, EFL_LOOP_FD_EVENT_READ, _efl_net_socket_fd_event_read, NULL);
    efl_event_callback_del(o, EFL_LOOP_FD_EVENT_WRITE, _efl_net_socket_fd_event_write, NULL);
 }
 
+/**
+ * @brief Writes data to the socket.
+ *
+ * Implements the Efl.Io.Writer.write interface.
+ * It attempts to send data from the provided Eina_Slice.
+ * Handles EINTR errors by retrying the send call.
+ * Sets can_write to false after a successful write or error.
+ * If `remaining` is provided, it will be updated with any data that was not sent.
+ *
+ * @param o The Efl_Net_Socket_Fd object.
+ * @param pd Private data (unused).
+ * @param ro_slice The slice containing data to write. On success, ro_slice->len
+ *                 is updated with the number of bytes written.
+ * @param remaining Optional slice to store any unsent data.
+ *                  Example: If ro_slice has 100 bytes and only 60 are sent,
+ *                           remaining will point to the last 40 bytes of the original
+ *                           buffer and its len will be 40.
+ * @return 0 on success, or an error code on failure.
+ */
 EOLIAN static Eina_Error
 _efl_net_socket_fd_efl_io_writer_write(Eo *o, Efl_Net_Socket_Fd_Data *pd EINA_UNUSED, Eina_Slice *ro_slice, Eina_Slice *remaining)
 {
@@ -311,6 +490,20 @@ _efl_net_socket_fd_efl_io_writer_write(Eo *o, Efl_Net_Socket_Fd_Data *pd EINA_UN
    return EINVAL;
 }
 
+/**
+ * @brief Sets the can_write property and manages write event monitoring.
+ *
+ * Implements the Efl.Io.Writer.can_write_set interface.
+ * When can_write is set to true (meaning the socket is ready for writing or an event occurred),
+ * it stops monitoring the EFL_LOOP_FD_EVENT_WRITE event, as the user is expected
+ * to call efl_io_writer_write().
+ * When can_write is set to false (either after a write or if the socket is not ready),
+ * it resumes monitoring the EFL_LOOP_FD_EVENT_WRITE event.
+ *
+ * @param o The Efl_Net_Socket_Fd object.
+ * @param pd Private data (unused).
+ * @param value The new value for the can_write property.
+ */
 EOLIAN static void
 _efl_net_socket_fd_efl_io_writer_can_write_set(Eo *o, Efl_Net_Socket_Fd_Data *pd EINA_UNUSED, Eina_Bool value)
 {

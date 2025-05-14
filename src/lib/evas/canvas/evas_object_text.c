@@ -22,94 +22,189 @@ static const char o_type[] = "text";
 typedef struct _Evas_Text_Data Evas_Text_Data;
 typedef struct _Evas_Object_Text_Item Evas_Object_Text_Item;
 
+/**
+ * @brief Internal data structure for Evas_Object_Text.
+ *
+ * This structure holds all the private data for a text object, including its
+ * current and previous states for properties like font, text content, colors,
+ * style, and layout information.
+ */
 struct _Evas_Text_Data
 {
-   DATA32               magic;
+   DATA32               magic; /**< Magic number for type checking. */
 
+   /**
+    * @brief Current and previous states of text properties.
+    * Used to detect changes and optimize rendering.
+    */
    struct {
       // WARNING - you cannot change the below outline/shadow etc. members
       // and their content without also updating _color_same() in this
       // file
+      /** @brief Color for outline effect. */
       struct {
          unsigned char  r, g, b, a;
-      } outline, shadow, glow, glow2;
+      } outline, /** @brief Color for shadow effect. */ shadow, /** @brief Color for glow effect. */ glow, /** @brief Color for secondary glow effect. */ glow2;
 
-      const char          *utf8_text; /* The text exposed to the API */
-      const char          *font;
-      Evas_Font_Description *fdesc;
-      const char          *source;
-      Eina_Unicode        *text;
+      const char          *utf8_text; /**< The text string in UTF-8 format, as set by the user. */
+      const char          *font; /**< The font name string (e.g., "Sans", "DejaVu Sans:style=Bold"). */
+      Evas_Font_Description *fdesc; /**< Parsed font description from the font name. */
+      const char          *source; /**< Path to a font file, if specified. */
+      Eina_Unicode        *text; /**< The text string converted to Eina_Unicode for internal processing. */
 
-      double               ellipsis;
+      double               ellipsis; /**< Ellipsis value: -1.0 for no ellipsis, 0.0 for start, 0.5 for middle, 1.0 for end. */
 
-      Evas_Font_Size       size;
-      Evas_Text_Style_Type style;
-      Efl_Text_Font_Bitmap_Scalable bitmap_scalable;
-   } cur, prev;
+      Evas_Font_Size       size; /**< Font size in points or pixels, depending on Evas configuration. */
+      Evas_Text_Style_Type style; /**< Text style (e.g., plain, shadow, outline). */
+      Efl_Text_Font_Bitmap_Scalable bitmap_scalable; /**< Bitmap scalable font rendering mode. */
+   } cur, /**< Current state of text properties. */ prev; /**< Previous state of text properties, for change detection. */
 
+   /**
+    * @brief Cached results from the last text layout computation.
+    */
    struct {
-      Evas_Object_Text_Item    *ellipsis_start;
-      Evas_Object_Text_Item    *ellipsis_end;
-      Evas_Coord                w, h;
-      int                       advance;
-      int                       width_without_ellipsis;
-      Eina_Bool                 ellipsis;
+      Evas_Object_Text_Item    *ellipsis_start; /**< Pointer to the text item representing the start ellipsis (...), if any. */
+      Evas_Object_Text_Item    *ellipsis_end; /**< Pointer to the text item representing the end ellipsis (...), if any. */
+      Evas_Coord                w, h; /**< Computed width and height of the text layout, possibly affected by ellipsis. */
+      int                       advance; /**< Total horizontal advance of the laid-out text. */
+      int                       width_without_ellipsis; /**< Computed width of the text before applying ellipsis. */
+      Eina_Bool                 ellipsis; /**< Flag indicating if ellipsis is currently active in the layout. */
    } last_computed;
 
-   Evas_BiDi_Paragraph_Props  *bidi_par_props;
-   const char                 *bidi_delimiters;
-   Evas_Object_Text_Item      *items;
+   Evas_BiDi_Paragraph_Props  *bidi_par_props; /**< Bidirectional paragraph properties for complex script layout. */
+   const char                 *bidi_delimiters; /**< Custom delimiters for BiDi processing, if any. */
+   Evas_Object_Text_Item      *items; /**< An EINA_INLIST of Evas_Object_Text_Item, representing individual laid-out segments of the text. */
 
-   Evas_Font_Set              *font;
+   Evas_Font_Set              *font; /**< The loaded font set (collection of actual font files/data) used for rendering. */
 
-   float                       ascent, descent;
-   float                       max_ascent, max_descent;
+   float                       ascent, descent; /**< Typographical ascent and descent for the current font and text. */
+   float                       max_ascent, max_descent; /**< Maximum typographical ascent and descent for the current font. */
 
-   Evas_BiDi_Direction         bidi_dir : 2;
-   Evas_BiDi_Direction         paragraph_direction : 2;
-   Eina_Bool                   inherit_paragraph_direction : 1;
-   Eina_Bool                   changed_paragraph_direction : 1;
-   Eina_Bool                   changed : 1;
-   Eina_Bool                   has_filter : 1;
+   Evas_BiDi_Direction         bidi_dir : 2; /**< Resolved base bidirectional direction of the text (LTR, RTL, Neutral). */
+   Evas_BiDi_Direction         paragraph_direction : 2; /**< User-set or inherited paragraph direction. */
+   Eina_Bool                   inherit_paragraph_direction : 1; /**< Flag: EINA_TRUE if paragraph direction is inherited from parent. */
+   Eina_Bool                   changed_paragraph_direction : 1; /**< Flag: EINA_TRUE if paragraph direction changed and requires recalculation. */
+   Eina_Bool                   changed : 1; /**< General flag: EINA_TRUE if any text property changed and requires recalculation/redraw. */
+   Eina_Bool                   has_filter : 1; /**< Flag: EINA_TRUE if a graphical filter is applied to the text. */
 };
 
+/**
+ * @brief Represents a segment of laid-out text.
+ *
+ * An Evas_Object_Text is broken down into one or more items for layout and
+ * rendering, especially when dealing with BiDi text or font fallbacks.
+ */
 struct _Evas_Object_Text_Item
 {
-   EINA_INLIST;
+   EINA_INLIST; /**< Macro to make this struct usable in an Eina_Inlist. */
 
-   size_t               text_pos;
-   size_t               visual_pos;
-   Evas_Text_Props      text_props;
-   Evas_Coord           x, w, h, adv;
+   size_t               text_pos; /**< Logical start position of this item in the original Eina_Unicode text. */
+   size_t               visual_pos; /**< Visual start position of this item after BiDi reordering. */
+   Evas_Text_Props      text_props; /**< Properties for this text segment (font instance, BiDi info, script type, length). */
+   Evas_Coord           x, /**< X-coordinate of this item relative to the start of the text line. */
+                        w, /**< Width of this item. */
+                        h, /**< Height of this item. */
+                        adv; /**< Horizontal advance of this item. */
 };
 
 /* private methods for text objects */
+/**
+ * @brief Initializes a new text object.
+ * @param eo_obj The Evas_Object to initialize.
+ */
 static void evas_object_text_init(Evas_Object *eo_obj);
+/**
+ * @brief Renders the text object.
+ * @param eo_obj The Evas_Object to render.
+ * @param obj The protected data of the Evas_Object.
+ * @param type_private_data The private data of the text object (Evas_Text_Data).
+ * @param engine The rendering engine.
+ * @param output The rendering output.
+ * @param context The rendering context.
+ * @param surface The surface to render on.
+ * @param x The x-offset for rendering.
+ * @param y The y-offset for rendering.
+ * @param do_async EINA_TRUE if asynchronous rendering is allowed.
+ */
 static void evas_object_text_render(Evas_Object *eo_obj,
                                     Evas_Object_Protected_Data *obj,
                                     void *type_private_data,
                                     void *engine, void *output, void *context, void *surface,
                                     int x, int y, Eina_Bool do_async);
+/**
+ * @brief Frees a text object.
+ * @param eo_obj The Evas_Object to free.
+ * @param obj The protected data of the Evas_Object.
+ */
 static void evas_object_text_free(Evas_Object *eo_obj,
 				  Evas_Object_Protected_Data *obj);
+/**
+ * @brief Pre-rendering operations for the text object.
+ *
+ * This function is called before rendering to update states, calculate
+ * necessary changes, and add redraw rectangles.
+ * @param eo_obj The Evas_Object.
+ * @param obj The protected data of the Evas_Object.
+ * @param type_private_data The private data of the text object.
+ */
 static void evas_object_text_render_pre(Evas_Object *eo_obj,
 					Evas_Object_Protected_Data *obj,
 					void *type_private_data);
+/**
+ * @brief Post-rendering operations for the text object.
+ *
+ * This function is called after rendering to clean up states and move
+ * current data to previous state for the next rendering cycle.
+ * @param eo_obj The Evas_Object.
+ * @param obj The protected data of the Evas_Object.
+ * @param type_private_data The private data of the text object.
+ */
 static void evas_object_text_render_post(Evas_Object *eo_obj,
 					 Evas_Object_Protected_Data *obj,
 					 void *type_private_data);
 
+/**
+ * @brief Gets engine-specific data for the text object.
+ * @param eo_obj The Evas_Object.
+ * @return A pointer to engine-specific data (typically the Evas_Font_Set).
+ */
 static void *evas_object_text_engine_data_get(Evas_Object *eo_obj);
 
+/**
+ * @brief Checks if the text object is currently opaque.
+ * @param eo_obj The Evas_Object.
+ * @param obj The protected data of the Evas_Object.
+ * @param type_private_data The private data of the text object.
+ * @return 1 if opaque, 0 otherwise. Text objects are generally not opaque.
+ */
 static int evas_object_text_is_opaque(Evas_Object *eo_obj,
 				      Evas_Object_Protected_Data *obj,
 				      void *type_private_data);
+/**
+ * @brief Checks if the text object was opaque in the previous state.
+ * @param eo_obj The Evas_Object.
+ * @param obj The protected data of the Evas_Object.
+ * @param type_private_data The private data of the text object.
+ * @return 1 if it was opaque, 0 otherwise.
+ */
 static int evas_object_text_was_opaque(Evas_Object *eo_obj,
 				       Evas_Object_Protected_Data *obj,
 				       void *type_private_data);
 
+/**
+ * @brief Recalculates the layout and properties of the text.
+ *
+ * This function is called when text content, font, size, or other
+ * layout-affecting properties change. It updates the internal text items,
+ * ascent/descent, and object geometry.
+ * @param eo_obj The Evas_Object.
+ * @param text The Eina_Unicode text to layout. If NULL, an empty string is assumed.
+ */
 static void _evas_object_text_recalc(Evas_Object *eo_obj, Eina_Unicode *text);
 
+/**
+ * @brief The Evas_Object_Func structure providing function pointers for text objects.
+ */
 static const Evas_Object_Func object_func =
 {
    /* methods (compulsory) */
@@ -135,6 +230,23 @@ static const Evas_Object_Func object_func =
 /* the actual api call to add a rect */
 /* it has no other api calls as all properties are standard */
 
+/**
+ * @brief Retrieves the coordinates and dimensions of a character at a given logical position.
+ *
+ * This function iterates through the laid-out text items to find the one
+ * containing the character at `pos`. It then calls the engine's
+ * `font_char_coords_get` to get the character's geometry relative to that item,
+ * and adjusts it by the item's own x-offset.
+ *
+ * @param eo_obj The Evas_Object (text object).
+ * @param o The private data of the text object.
+ * @param pos The logical position (index) of the character in the original text string.
+ * @param[out] x Pointer to store the x-coordinate of the character. Can be NULL.
+ * @param[out] y Pointer to store the y-coordinate of the character (relative to baseline). Can be NULL.
+ * @param[out] w Pointer to store the width of the character. Can be NULL.
+ * @param[out] h Pointer to store the height of the character. Can be NULL.
+ * @return 1 on success, 0 if the character at `pos` is not found or not rendered.
+ */
 static int
 _evas_object_text_char_coords_get(const Evas_Object *eo_obj,
       const Evas_Text_Data *o,
@@ -158,12 +270,27 @@ _evas_object_text_char_coords_get(const Evas_Object *eo_obj,
    return 0;
 }
 
+/**
+ * @brief Cleans up resources held by an Evas_Object_Text_Item.
+ * Specifically, it unreferences the content of its text properties.
+ * @param it The text item to clean.
+ */
 static void
 _evas_object_text_item_clean(Evas_Object_Text_Item *it)
 {
    evas_common_text_props_content_unref(&it->text_props);
 }
 
+/**
+ * @brief Deletes an Evas_Object_Text_Item.
+ *
+ * Removes the item from the list of items in Evas_Text_Data,
+ * cleans its resources, and frees its memory. It also updates
+ * ellipsis pointers if the deleted item was an ellipsis item.
+ *
+ * @param o The private data of the text object.
+ * @param it The text item to delete.
+ */
 static void
 _evas_object_text_item_del(Evas_Text_Data *o, Evas_Object_Text_Item *it)
 {
@@ -181,6 +308,12 @@ _evas_object_text_item_del(Evas_Text_Data *o, Evas_Object_Text_Item *it)
    free(it);
 }
 
+/**
+ * @brief Compares two color structs for equality.
+ * @param col1 Pointer to the first color struct (e.g., o->cur.outline).
+ * @param col2 Pointer to the second color struct (e.g., o->prev.outline).
+ * @return EINA_TRUE if colors are identical, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _color_same(const void *col1, const void *col2)
 {
@@ -188,6 +321,17 @@ _color_same(const void *col1, const void *col2)
    return (*icol1 == *icol2);
 }
 
+/**
+ * @brief Cleans all text items, potentially preserving ellipsis items if properties haven't changed significantly.
+ *
+ * This function is called when text properties might have changed.
+ * If core properties (font, size, colors, style, scale) are the same as previous,
+ * it tries to preserve existing ellipsis items. Otherwise, it forcefully removes
+ * all items, including any existing ellipsis items.
+ *
+ * @param obj The protected data of the Evas_Object.
+ * @param o The private data of the text object.
+ */
 static void
 _evas_object_text_items_clean(Evas_Object_Protected_Data *obj, Evas_Text_Data *o)
 {
@@ -228,6 +372,14 @@ _evas_object_text_items_clean(Evas_Object_Protected_Data *obj, Evas_Text_Data *o
      }
 }
 
+/**
+ * @brief Clears all text items, including any ellipsis items.
+ *
+ * This function is a more forceful clear than _evas_object_text_items_clean.
+ * It unconditionally removes all items from the text object's item list.
+ *
+ * @param o The private data of the text object.
+ */
 static void
 _evas_object_text_items_clear(Evas_Text_Data *o)
 {
@@ -250,6 +402,13 @@ _evas_object_text_items_clear(Evas_Text_Data *o)
 }
 
 #ifdef BIDI_SUPPORT
+/**
+ * @brief Comparison function for sorting text items by their logical position.
+ * Used for BiDi text processing to reorder items from visual to logical order.
+ * @param _it1 Pointer to the first Evas_Object_Text_Item.
+ * @param _it2 Pointer to the second Evas_Object_Text_Item.
+ * @return -1 if it1 < it2, 0 if it1 == it2, 1 if it1 > it2, based on text_pos.
+ */
 static int
 _evas_object_text_it_compare_logical(const void *_it1, const void *_it2)
 {
@@ -264,6 +423,19 @@ _evas_object_text_it_compare_logical(const void *_it1, const void *_it2)
 }
 #endif
 
+/**
+ * @brief Finds the logical character position that is closest to the given coordinates, up to the x-coordinate.
+ *
+ * This function determines which character in the text is visually located at or
+ * before the given `cx` coordinate on the line defined by `cy`.
+ * For BiDi text, it first reorders items logically before performing the check.
+ *
+ * @param eo_obj The Evas_Object (text object).
+ * @param o The private data of the text object.
+ * @param cx The target x-coordinate.
+ * @param cy The target y-coordinate (used by the font engine, relative to baseline).
+ * @return The logical character position (index) or -1 if not found.
+ */
 static int
 _evas_object_text_last_up_to_pos(const Evas_Object *eo_obj,
       const Evas_Text_Data *o, Evas_Coord cx, Evas_Coord cy)
@@ -319,6 +491,23 @@ _evas_object_text_last_up_to_pos(const Evas_Object *eo_obj,
    return pos;
 }
 
+/**
+ * @brief Finds the logical character position at the given coordinates and its geometry.
+ *
+ * This function determines which character in the text is visually located at
+ * the coordinates (`cx`, `cy`). It then returns the logical position of that
+ * character and, optionally, its relative coordinates and dimensions.
+ *
+ * @param eo_obj The Evas_Object (text object).
+ * @param o The private data of the text object.
+ * @param cx The target x-coordinate.
+ * @param cy The target y-coordinate (relative to baseline).
+ * @param[out] rx Pointer to store the relative x-coordinate of the character. Can be NULL.
+ * @param[out] ry Pointer to store the relative y-coordinate of the character. Can be NULL.
+ * @param[out] rw Pointer to store the width of the character. Can be NULL.
+ * @param[out] rh Pointer to store the height of the character. Can be NULL.
+ * @return The logical character position (index) or -1 if no character is at the given coordinates.
+ */
 static int
 _evas_object_text_char_at_coords(const Evas_Object *eo_obj,
       const Evas_Text_Data *o, Evas_Coord cx, Evas_Coord cy,
@@ -343,18 +532,36 @@ _evas_object_text_char_at_coords(const Evas_Object *eo_obj,
    return -1;
 }
 
+/**
+ * @brief Gets the computed horizontal width of the text before ellipsis is applied.
+ * @param o The private data of the text object.
+ * @return The horizontal width.
+ */
 static Evas_Coord
 _evas_object_text_horiz_width_without_ellipsis_get(const Evas_Text_Data *o)
 {
    return o->last_computed.width_without_ellipsis;
 }
 
+/**
+ * @brief Gets the computed horizontal advance of the text.
+ * This includes the advance of all characters and inter-character spacing.
+ * @param o The private data of the text object.
+ * @return The horizontal advance.
+ */
 static Evas_Coord
 _evas_object_text_horiz_advance_get(const Evas_Text_Data *o)
 {
    return o->last_computed.advance;
 }
 
+/**
+ * @brief Gets the computed vertical advance (height) of the text.
+ * This is typically the sum of maximum ascent and maximum descent of the font.
+ * @param obj The Evas_Object (unused).
+ * @param o The private data of the text object.
+ * @return The vertical advance.
+ */
 static Evas_Coord
 _evas_object_text_vert_advance_get(const Evas_Object *obj EINA_UNUSED,
       const Evas_Text_Data *o)
@@ -362,6 +569,12 @@ _evas_object_text_vert_advance_get(const Evas_Object *obj EINA_UNUSED,
    return o->max_ascent + o->max_descent;
 }
 
+/**
+ * @brief Adds a new text object to the canvas.
+ * @param e The Evas canvas.
+ * @return A new Evas_Object of type text, or NULL on failure.
+ * @ingroup Evas_Object_Text_Group
+ */
 EVAS_API Evas_Object *
 evas_object_text_add(Evas *e)
 {

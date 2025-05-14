@@ -19,6 +19,17 @@
 #include "Ecore_X_Atoms.h"
 #include "ecore_x_atoms_decl.h"
 
+/**
+ * @internal
+ * @brief Initializes pre-defined X atoms.
+ *
+ * This function is called internally to initialize a set of commonly used
+ * X atoms. It iterates over the `atom_items` array (defined in
+ * `ecore_x_atoms_decl.h`), calls `XInternAtoms` to get the actual
+ * X atom identifiers from the X server, and stores these identifiers
+ * back into the `atom_items` array. This pre-initialization helps
+ * to avoid repeated calls to `XInternAtom` for these common atoms.
+ */
 void
 _ecore_x_atoms_init(void)
 {
@@ -53,6 +64,19 @@ ecore_x_atom_get(const char *name)
    return atom;
 }
 
+/**
+ * @brief Retrieves multiple X atoms by their names.
+ *
+ * This function sends a request to the X server to get the atom
+ * identifiers for an array of atom names.
+ *
+ * @param names An array of C-strings, where each string is an atom name.
+ *              Example: `const char *atom_names[] = {"UTF8_STRING", "WM_NAME"};`
+ * @param num The number of atom names in the `names` array.
+ * @param atoms A pre-allocated array where the retrieved Ecore_X_Atom
+ *              values will be stored. The size of this array must be at least `num`.
+ *              Example: `Ecore_X_Atom retrieved_atoms[2];`
+ */
 EAPI void
 ecore_x_atoms_get(const char **names,
                   int num,
@@ -70,6 +94,18 @@ ecore_x_atoms_get(const char **names,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * @brief Retrieves the name of an X atom.
+ *
+ * This function queries the X server for the string name associated
+ * with a given atom identifier.
+ *
+ * @param atom The Ecore_X_Atom identifier whose name is to be retrieved.
+ * @return A newly allocated string containing the atom's name,
+ *         or @c NULL if the atom does not exist or an error occurs.
+ *         The caller is responsible for freeing this string using `free()`.
+ *         Example: `char *name = ecore_x_atom_name_get(ECORE_X_ATOM_WM_NAME); if (name) free(name);`
+ */
 EAPI char *
 ecore_x_atom_name_get(Ecore_X_Atom atom)
 {

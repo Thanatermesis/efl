@@ -14,6 +14,16 @@
 static void _eldbus_model_object_introspect_cb(void *, const Eldbus_Message *, Eldbus_Pending *);
 static void _eldbus_model_object_create_children(Eldbus_Model_Object_Data *, Eldbus_Object *, Eina_List *);
 
+/**
+ * @internal
+ * @brief EFL object constructor for Eldbus_Model_Object.
+ *
+ * Initializes the Eldbus_Model_Object instance.
+ *
+ * @param obj The Eo object.
+ * @param pd The private data for the Eldbus_Model_Object.
+ * @return The constructed Eo object.
+ */
 static Efl_Object*
 _eldbus_model_object_efl_object_constructor(Eo *obj, Eldbus_Model_Object_Data *pd)
 {
@@ -24,6 +34,14 @@ _eldbus_model_object_efl_object_constructor(Eo *obj, Eldbus_Model_Object_Data *p
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Sets the D-Bus bus name for the Eldbus_Model_Object.
+ *
+ * @param obj The Eo object (unused).
+ * @param pd The private data for the Eldbus_Model_Object.
+ * @param bus The D-Bus bus name (e.g., "org.freedesktop.DBus").
+ */
 static void
 _eldbus_model_object_bus_set(Eo *obj EINA_UNUSED,
                              Eldbus_Model_Object_Data *pd,
@@ -32,6 +50,14 @@ _eldbus_model_object_bus_set(Eo *obj EINA_UNUSED,
    pd->bus = eina_stringshare_add(bus);
 }
 
+/**
+ * @internal
+ * @brief Sets the D-Bus object path for the Eldbus_Model_Object.
+ *
+ * @param obj The Eo object (unused).
+ * @param pd The private data for the Eldbus_Model_Object.
+ * @param path The D-Bus object path (e.g., "/org/freedesktop/DBus").
+ */
 static void
 _eldbus_model_object_path_set(Eo *obj EINA_UNUSED,
                               Eldbus_Model_Object_Data *pd,
@@ -40,6 +66,16 @@ _eldbus_model_object_path_set(Eo *obj EINA_UNUSED,
    pd->path = eina_stringshare_add(path);
 }
 
+/**
+ * @internal
+ * @brief EFL object finalization for Eldbus_Model_Object.
+ *
+ * Ensures that the bus and path are set before finalizing the object.
+ *
+ * @param obj The Eo object.
+ * @param pd The private data for the Eldbus_Model_Object.
+ * @return The finalized Eo object, or NULL if bus or path is not set.
+ */
 static Efl_Object*
 _eldbus_model_object_efl_object_finalize(Eo *obj, Eldbus_Model_Object_Data *pd)
 {
@@ -49,6 +85,16 @@ _eldbus_model_object_efl_object_finalize(Eo *obj, Eldbus_Model_Object_Data *pd)
    return efl_finalize(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief EFL object invalidation for Eldbus_Model_Object.
+ *
+ * Cleans up resources associated with the Eldbus_Model_Object,
+ * such as children, pending D-Bus calls, and D-Bus objects.
+ *
+ * @param obj The Eo object.
+ * @param pd The private data for the Eldbus_Model_Object.
+ */
 static void
 _eldbus_model_object_efl_object_invalidate(Eo *obj, Eldbus_Model_Object_Data *pd)
 {
@@ -74,6 +120,15 @@ _eldbus_model_object_efl_object_invalidate(Eo *obj, Eldbus_Model_Object_Data *pd
    efl_invalidate(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief EFL object destructor for Eldbus_Model_Object.
+ *
+ * Frees stringshared bus and path.
+ *
+ * @param obj The Eo object.
+ * @param pd The private data for the Eldbus_Model_Object.
+ */
 static void
 _eldbus_model_object_efl_object_destructor(Eo *obj, Eldbus_Model_Object_Data *pd)
 {
@@ -83,6 +138,19 @@ _eldbus_model_object_efl_object_destructor(Eo *obj, Eldbus_Model_Object_Data *pd
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Initiates D-Bus introspection for a given bus and path.
+ *
+ * This function retrieves the D-Bus object and sends an introspection request.
+ * The result of the introspection is handled by _eldbus_model_object_introspect_cb.
+ *
+ * @param obj The Eo object.
+ * @param pd The private data for the Eldbus_Model_Object.
+ * @param bus The D-Bus bus name.
+ * @param path The D-Bus object path.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _eldbus_model_object_introspect(const Eo *obj,
                                 Eldbus_Model_Object_Data *pd,
@@ -110,6 +178,26 @@ _eldbus_model_object_introspect(const Eo *obj,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Implements Efl_Model_Children_Slice_Get.
+ *
+ * Retrieves a slice of child objects. If introspection is not yet complete,
+ * it queues the request and initiates introspection if not already pending.
+ *
+ * @param obj The Eo object (unused).
+ * @param pd The private data for the Eldbus_Model_Object.
+ * @param start The starting index of the slice.
+ * @param count The number of children to retrieve.
+ * @return An Eina_Future that will resolve to an Eina_Value array of children.
+ *         The Eina_Value array contains Eo pointers to the child objects.
+ *         Example of resolved Eina_Value (type EINA_VALUE_TYPE_ARRAY):
+ *         {
+ *           type: EINA_VALUE_TYPE_OBJECT (Efl_Object *), value: child1_ptr
+ *           type: EINA_VALUE_TYPE_OBJECT (Efl_Object *), value: child2_ptr
+ *           ...
+ *         }
+ */
 static Eina_Future *
 _eldbus_model_object_efl_model_children_slice_get(Eo *obj EINA_UNUSED,
                                                   Eldbus_Model_Object_Data *pd,
@@ -141,6 +229,17 @@ _eldbus_model_object_efl_model_children_slice_get(Eo *obj EINA_UNUSED,
    return efl_future_then(obj, eina_future_new(p));;
 }
 
+/**
+ * @internal
+ * @brief Implements Efl_Model_Children_Count_Get.
+ *
+ * Returns the number of child objects. If introspection is not yet complete,
+ * it initiates introspection if not already pending.
+ *
+ * @param obj The Eo object (unused).
+ * @param pd The private data for the Eldbus_Model_Object.
+ * @return The number of child objects.
+ */
 static unsigned int
 _eldbus_model_object_efl_model_children_count_get(const Eo *obj EINA_UNUSED,
                                                   Eldbus_Model_Object_Data *pd)
@@ -150,18 +249,48 @@ _eldbus_model_object_efl_model_children_count_get(const Eo *obj EINA_UNUSED,
    return eina_list_count(pd->childrens);
 }
 
+/**
+ * @internal
+ * @brief Gets the D-Bus bus name of the Eldbus_Model_Object.
+ *
+ * @param obj The Eo object (unused).
+ * @param pd The private data for the Eldbus_Model_Object.
+ * @return The D-Bus bus name.
+ */
 static const char *
 _eldbus_model_object_bus_get(const Eo *obj EINA_UNUSED, Eldbus_Model_Object_Data *pd)
 {
    return pd->bus;
 }
 
+/**
+ * @internal
+ * @brief Gets the D-Bus object path of the Eldbus_Model_Object.
+ *
+ * @param obj The Eo object (unused).
+ * @param pd The private data for the Eldbus_Model_Object.
+ * @return The D-Bus object path.
+ */
 static const char *
 _eldbus_model_object_path_get(const Eo *obj EINA_UNUSED, Eldbus_Model_Object_Data *pd)
 {
    return pd->path;
 }
 
+/**
+ * @internal
+ * @brief Concatenates a root path and a relative path to form an absolute D-Bus path.
+ *
+ * Handles the special case where the root path is "/".
+ * Example:
+ *   _eldbus_model_object_concatenate_path("/org/example", "Node") -> "/org/example/Node"
+ *   _eldbus_model_object_concatenate_path("/", "Node") -> "/Node"
+ *
+ * @param root_path The root D-Bus path.
+ * @param relative_path The relative D-Bus path.
+ * @return A newly allocated string containing the absolute path. The caller must free this string.
+ *         Returns NULL on allocation failure.
+ */
 static char *
 _eldbus_model_object_concatenate_path(const char *root_path,
                                       const char *relative_path)
@@ -178,6 +307,17 @@ _eldbus_model_object_concatenate_path(const char *root_path,
    return absolute_path;
 }
 
+/**
+ * @internal
+ * @brief Recursively introspects child nodes found in D-Bus introspection data.
+ *
+ * For each node in the provided list, it constructs the absolute path and
+ * initiates a new introspection request for that path.
+ *
+ * @param pd The private data for the Eldbus_Model_Object.
+ * @param current_path The D-Bus path of the parent object currently being introspected.
+ * @param nodes A list of Eldbus_Introspection_Node representing child nodes.
+ */
 static void
 _eldbus_model_object_introspect_nodes(Eldbus_Model_Object_Data *pd,
                                       const char *current_path,
@@ -203,6 +343,17 @@ _eldbus_model_object_introspect_nodes(Eldbus_Model_Object_Data *pd,
      }
 }
 
+/**
+ * @internal
+ * @brief Creates child proxy objects based on the interfaces found during introspection.
+ *
+ * For each interface, a new ELDBUS_MODEL_PROXY_CLASS instance is created and
+ * added to the list of children.
+ *
+ * @param pd The private data for the Eldbus_Model_Object.
+ * @param object The Eldbus_Object corresponding to the introspected D-Bus object.
+ * @param interfaces A list of Eldbus_Introspection_Interface found for the object.
+ */
 static void
 _eldbus_model_object_create_children(Eldbus_Model_Object_Data *pd, Eldbus_Object *object, Eina_List *interfaces)
 {
@@ -229,6 +380,18 @@ _eldbus_model_object_create_children(Eldbus_Model_Object_Data *pd, Eldbus_Object
      }
 }
 
+/**
+ * @internal
+ * @brief Callback function for D-Bus introspection results.
+ *
+ * This function is called when an introspection request completes. It parses
+ * the introspection XML, creates child objects for interfaces, introspects
+ * child nodes, and resolves any pending children slice requests.
+ *
+ * @param data User data, expected to be Eldbus_Model_Object_Data*.
+ * @param msg The D-Bus message containing the introspection result or error.
+ * @param pending The Eldbus_Pending object associated with the introspection request.
+ */
 static void
 _eldbus_model_object_introspect_cb(void *data,
                                    const Eldbus_Message *msg,

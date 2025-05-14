@@ -26,6 +26,16 @@ static const char *filter =
       "print ('Evaluating filter: ' .. input.width .. 'x' .. input.height)"
       ;
 
+/**
+ * @brief Creates and configures a new UI image object.
+ *
+ * This helper function simplifies the creation of an Efl_Ui_Image, setting its
+ * file path, triggering the load, and defining a minimum size.
+ *
+ * @param win The parent object, typically the main window.
+ * @param path The filesystem path to the image file to be loaded.
+ * @return A new Efl_Ui_Image object, or NULL on failure.
+ */
 static inline Eo *
 _image_create(Eo *win, const char *path)
 {
@@ -35,6 +45,16 @@ _image_create(Eo *win, const char *path)
                   efl_gfx_hint_size_min_set(efl_added, EINA_SIZE2D(20, 20)));
 }
 
+/**
+ * @brief Toggles the animation (play/pause) of all playable objects in the table.
+ *
+ * Iterates through all children of the main table. If an object implements
+ * the EFL_PLAYER_INTERFACE and is playable (e.g., a GIF), this function
+ * will either start its animation or toggle its paused state.
+ *
+ * @param data The application's main window (Eo *).
+ * @param ev The Efl_Event structure for this event (unused).
+ */
 static void
 _anim_toggle(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -56,6 +76,17 @@ _anim_toggle(void *data, const Efl_Event *ev EINA_UNUSED)
    eina_iterator_free(it);
 }
 
+/**
+ * @brief Saves the snapshot content to a file after rendering.
+ *
+ * This function is registered as a one-time callback for the
+ * EFL_CANVAS_SCENE_EVENT_RENDER_POST event. It saves the snapshot's buffer
+ * to a PNG file in the system's temporary directory and then removes itself
+ * to prevent being called on subsequent frames.
+ *
+ * @param data The snapshot object (Eo *snap) to save.
+ * @param ev The Efl_Event structure for this event.
+ */
 static void
 _render_post(void *data, const Efl_Event *ev)
 {
@@ -65,6 +96,18 @@ _render_post(void *data, const Efl_Event *ev)
    efl_file_save(snap, eina_slstr_printf("%s/snap-efl.png", eina_environment_tmp_get()), NULL, NULL);
 }
 
+/**
+ * @brief Initiates the process of saving the snapshot to a file.
+ *
+ * This function is called on a button click. It prepares for the snapshot
+ * by registering the _render_post() callback. To ensure _render_post() is
+ * called, it forces a redraw by adding damage to the snapshot object. This
+ * is a specific mechanism for triggering a render when the scene might
+ * otherwise be static.
+ *
+ * @param data The application's main window (Eo *).
+ * @param ev The Efl_Event structure for this event (unused).
+ */
 static void
 _save_image(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -83,6 +126,16 @@ _save_image(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_gfx_buffer_update_add(snap, NULL);
 }
 
+/**
+ * @brief Updates the blur radius in the snapshot's filter.
+ *
+ * This callback responds to changes from the blur radius slider. It takes
+ * the slider's new value and updates the 'radius' variable within the
+ * snapshot's EFL graphics filter program.
+ *
+ * @param data The application's main window (Eo *).
+ * @param ev The Efl_Event structure containing the slider object.
+ */
 static void
 _radius_set(void *data, const Efl_Event *ev)
 {
@@ -95,6 +148,12 @@ _radius_set(void *data, const Efl_Event *ev)
    efl_gfx_filter_data_set(snap, "radius", buf, EINA_TRUE);
 }
 
+/**
+ * @brief Closes and deletes the main window.
+ *
+ * @param data The main window object to be deleted.
+ * @param ev The Efl_Event structure for this event (unused).
+ */
 static void
 _close_do(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -103,6 +162,16 @@ _close_do(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_del(win);
 }
 
+/**
+ * @brief Toggles a graphical transformation (map) on the snapshot object.
+ *
+ * If no map is currently applied, this function applies a combination of
+ * zoom (0.8x) and rotation (20 degrees). If a map is already active, it
+ * removes it, resetting the snapshot to its default appearance.
+ *
+ * @param data The application's main window (Eo *).
+ * @param ev The Efl_Event structure for this event (unused).
+ */
 static void
 _toggle_map(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -118,6 +187,20 @@ _toggle_map(void *data, const Efl_Event *ev EINA_UNUSED)
    else efl_gfx_mapping_reset(snap);
 }
 
+/**
+ * @brief Test case for Evas Snapshot functionality.
+ *
+ * This test demonstrates the use of Efl.Canvas.Snapshot to capture a region
+ * of the canvas, apply live effects (filters), and interact with it.
+ *
+ * It sets up a scene with:
+ * - A background grid of static and animated images.
+ * - A snapshot object layered over the center of the grid.
+ * - A blur filter applied to the snapshot.
+ * - Objects layered on top of the snapshot to test visibility and interaction.
+ * - UI controls to manipulate the snapshot's filter, save its content,
+ *   apply transformations, and toggle animations in the background.
+ */
 void
 test_evas_snapshot(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

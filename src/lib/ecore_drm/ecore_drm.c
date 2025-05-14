@@ -29,19 +29,60 @@
 #include "ecore_drm_private.h"
 
 /* local variables */
+/** @internal
+ * @brief Counter for ecore_drm_init() calls.
+ *
+ * This variable tracks the number of times ecore_drm_init() has been called
+ * without a corresponding ecore_drm_shutdown(). It ensures that the library
+ * is initialized only once and shut down only when the count reaches zero.
+ */
 static int _ecore_drm_init_count = 0;
 
 /* external variables */
+/** @internal
+ * @brief Log domain for Ecore_Drm.
+ *
+ * This variable stores the Eina log domain identifier used by the Ecore_Drm
+ * library for logging messages. It is registered during ecore_drm_init()
+ * and unregistered during ecore_drm_shutdown().
+ */
 int _ecore_drm_log_dom = -1;
 
+/**
+ * @brief Event type for DRM activation/deactivation.
+ *
+ * This event is triggered when the DRM master status changes, indicating
+ * whether the application has control of the DRM resources.
+ * The event data is a pointer to an Ecore_Drm_Event_Activate structure.
+ */
 EAPI int ECORE_DRM_EVENT_ACTIVATE = 0;
 
+/**
+ * @internal
+ * @brief Frees the Ecore_Drm_Event_Activate event data.
+ *
+ * This function is registered as a callback with ecore_event_add()
+ * to handle the cleanup of the Ecore_Drm_Event_Activate event structure
+ * after it has been processed by all handlers.
+ *
+ * @param data User data associated with the event (unused).
+ * @param event Pointer to the Ecore_Drm_Event_Activate structure to be freed.
+ */
 static void
 _ecore_drm_event_activate_free(void *data EINA_UNUSED, void *event)
 {
    free(event);
 }
 
+/**
+ * @internal
+ * @brief Sends an ECORE_DRM_EVENT_ACTIVATE event.
+ *
+ * This function creates and sends an ECORE_DRM_EVENT_ACTIVATE event
+ * to notify listeners about a change in DRM activation status.
+ *
+ * @param active EINA_TRUE if DRM is now active, EINA_FALSE otherwise.
+ */
 void
 _ecore_drm_event_activate_send(Eina_Bool active)
 {

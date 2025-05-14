@@ -42,18 +42,37 @@
 
 #define MY_CLASS EFL_NET_SERVER_UNIX_CLASS
 
+/**
+ * @brief Private data for the Efl_Net_Server_Unix class.
+ */
 typedef struct _Efl_Net_Server_Unix_Data
 {
-   unsigned int leading_directories_create_mode;
+   unsigned int leading_directories_create_mode; /**< Permissions mode for creating leading directories. Example: 0700 */
 #ifdef BIND_HANG_WORKAROUND
-   int lock_fd;
-   Eina_Bool have_lock_fd : 1;
+   int lock_fd; /**< File descriptor for the bind hang workaround lock file. */
+   Eina_Bool have_lock_fd : 1; /**< Flag indicating if the lock_fd is valid. */
 #endif
-   Eina_Bool leading_directories_create : 1;
-   Eina_Bool unlink_before_bind : 1;
+   Eina_Bool leading_directories_create : 1; /**< If EINA_TRUE, create leading directories for the socket path. */
+   Eina_Bool unlink_before_bind : 1; /**< If EINA_TRUE, unlink the socket path before binding. */
 } Efl_Net_Server_Unix_Data;
 
 #ifdef BIND_HANG_WORKAROUND
+/**
+ * @brief Workaround for a potential bind hang issue on FreeBSD.
+ *
+ * This function attempts to acquire or release a lock file associated with the
+ * given socket address. This is used to prevent multiple processes from
+ * attempting to bind to the same socket simultaneously, which can cause a hang
+ * on some systems.
+ *
+ * @param address The socket address (path) for which to manage the lock.
+ *                Example: "/tmp/my_server.sock"
+ * @param lock If EINA_TRUE, acquire the lock. If EINA_FALSE, release the lock.
+ * @param lockfile_fd The file descriptor of an existing lock file if releasing.
+ *                    If acquiring, this is ignored and a new fd is created.
+ * @return The file descriptor of the lock file if acquired successfully,
+ *         -1 otherwise. When releasing, it also returns -1.
+ */
 static int
 _efl_net_server_unix_bind_hang_lock_workaround(const char *address, Eina_Bool lock, int lockfile_fd)
 {
@@ -103,6 +122,15 @@ _efl_net_server_unix_bind_hang_lock_workaround(const char *address, Eina_Bool lo
 }
 #endif
 
+/**
+ * @brief Destructor for the Efl_Net_Server_Unix object.
+ *
+ * Cleans up resources, including unlinking the socket file if it's not
+ * an abstract socket and releasing any bind hang workaround locks.
+ *
+ * @param o The Efl_Net_Server_Unix object.
+ * @param pd The private data for the object.
+ */
 EOLIAN static void
 _efl_net_server_unix_efl_object_destructor(Eo *o, Efl_Net_Server_Unix_Data *pd EINA_UNUSED)
 {
@@ -128,6 +156,19 @@ _efl_net_server_unix_efl_object_destructor(Eo *o, Efl_Net_Server_Unix_Data *pd E
    efl_destructor(efl_super(o, MY_CLASS));
 }
 
+/**
+ * @brief Binds the server to the specified Unix domain socket address.
+ *
+ * This function handles the creation of the socket, setting up the address
+ * structure (including abstract namespace sockets), optionally creating
+ * leading directories, and unlinking an existing socket file before binding.
+ * It also incorporates a workaround for potential bind hangs on FreeBSD.
+ *
+ * @param o The Efl_Net_Server_Unix object.
+ * @param pd The private data for the object.
+ * @return 0 on success, or a standard errno value on failure.
+ *         Example return values: 0 (success), EADDRINUSE, ENOENT.
+ */
 static Eina_Error
 _efl_net_server_unix_bind(Eo *o, Efl_Net_Server_Unix_Data *pd)
 {
@@ -278,6 +319,19 @@ _efl_net_server_unix_bind(Eo *o, Efl_Net_Server_Unix_Data *pd)
    return err;
 }
 
+/**
+ * @brief Activates the server using a pre-existing socket (e.g., from systemd socket activation).
+ *
+ * This function checks if a socket matching the given address is already
+ * available (typically via systemd). If so, it uses that socket.
+ * Otherwise, it falls back to the standard server activation.
+ * It ensures the socket is listening and updates the server's address.
+ *
+ * @param o The Efl_Net_Server_Unix object.
+ * @param pd The private data for the object.
+ * @param address The address to serve on. Example: "/tmp/my_server.sock" or "abstract:my_abstract_socket"
+ * @return 0 on success, or a standard errno value on failure.
+ */
 EOLIAN static Eina_Error
 _efl_net_server_unix_efl_net_server_fd_socket_activate(Eo *o, Efl_Net_Server_Unix_Data *pd EINA_UNUSED, const char *address)
 {
@@ -336,6 +390,16 @@ _efl_net_server_unix_efl_net_server_fd_socket_activate(Eo *o, Efl_Net_Server_Uni
 #endif
 }
 
+/**
+ * @brief Starts serving on the given Unix domain socket address.
+ *
+ * Sets the server's address and then calls the internal bind function.
+ *
+ * @param o The Efl_Net_Server_Unix object.
+ * @param pd The private data for the object.
+ * @param address The address to serve on. Example: "/tmp/my_server.sock" or "abstract:my_abstract_socket"
+ * @return 0 on success, or a standard errno value on failure from _efl_net_server_unix_bind().
+ */
 EOLIAN static Eina_Error
 _efl_net_server_unix_efl_net_server_serve(Eo *o, Efl_Net_Server_Unix_Data *pd, const char *address)
 {
@@ -347,6 +411,17 @@ _efl_net_server_unix_efl_net_server_serve(Eo *o, Efl_Net_Server_Unix_Data *pd, c
    return _efl_net_server_unix_bind(o, pd);
 }
 
+/**
+ * @brief Handles a new accepted client connection.
+ *
+ * Creates an Efl_Net_Socket_Unix object for the new client, sets its properties
+ * (close_on_exec, close_on_invalidate, fd), and announces the new client
+ * to the server.
+ *
+ * @param o The Efl_Net_Server_Unix object (server).
+ * @param pd The private data for the server object.
+ * @param client_fd The file descriptor of the accepted client socket.
+ */
 static void
 _efl_net_server_unix_efl_net_server_fd_client_add(Eo *o, Efl_Net_Server_Unix_Data *pd EINA_UNUSED, int client_fd)
 {
@@ -364,6 +439,18 @@ _efl_net_server_unix_efl_net_server_fd_client_add(Eo *o, Efl_Net_Server_Unix_Dat
    efl_net_server_client_announce(o, client);
 }
 
+/**
+ * @brief Handles a client connection that is rejected.
+ *
+ * This function is called when a client connection is accepted by the underlying
+ * system but is then rejected by the server logic (e.g., due to connection limits).
+ * It attempts to get the peer name of the rejected client for logging/event purposes,
+ * then closes the client socket and emits a CLIENT_REJECTED event.
+ *
+ * @param o The Efl_Net_Server_Unix object (server).
+ * @param pd The private data for the server object.
+ * @param client_fd The file descriptor of the rejected client socket.
+ */
 static void
 _efl_net_server_unix_efl_net_server_fd_client_reject(Eo *o, Efl_Net_Server_Unix_Data *pd EINA_UNUSED, int client_fd)
 {
@@ -384,19 +471,40 @@ _efl_net_server_unix_efl_net_server_fd_client_reject(Eo *o, Efl_Net_Server_Unix_
    efl_event_callback_call(o, EFL_NET_SERVER_EVENT_CLIENT_REJECTED, str);
 }
 
+/**
+ * @brief Sets whether to unlink the socket file before binding.
+ *
+ * @param o The Efl_Net_Server_Unix object.
+ * @param pd The private data for the object.
+ * @param unlink_before_bind If EINA_TRUE, unlink before binding.
+ */
 static void
 _efl_net_server_unix_unlink_before_bind_set(Eo *o EINA_UNUSED, Efl_Net_Server_Unix_Data *pd, Eina_Bool unlink_before_bind)
 {
    pd->unlink_before_bind = unlink_before_bind;
 }
 
+/**
+ * @brief Gets whether to unlink the socket file before binding.
+ *
+ * @param o The Efl_Net_Server_Unix object.
+ * @param pd The private data for the object.
+ * @return EINA_TRUE if unlinking before binding is enabled, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _efl_net_server_unix_unlink_before_bind_get(const Eo *o EINA_UNUSED, Efl_Net_Server_Unix_Data *pd)
 {
    return pd->unlink_before_bind;
 }
 
-
+/**
+ * @brief Sets whether to create leading directories for the socket path and the mode for creation.
+ *
+ * @param o The Efl_Net_Server_Unix object.
+ * @param pd The private data for the object.
+ * @param do_it If EINA_TRUE, create leading directories.
+ * @param mode The file system mode (permissions) to use when creating directories. Example: 0755
+ */
 static void
 _efl_net_server_unix_leading_directories_create_set(Eo *o EINA_UNUSED, Efl_Net_Server_Unix_Data *pd, Eina_Bool do_it, unsigned int mode)
 {
@@ -404,6 +512,14 @@ _efl_net_server_unix_leading_directories_create_set(Eo *o EINA_UNUSED, Efl_Net_S
    pd->leading_directories_create_mode = mode;
 }
 
+/**
+ * @brief Gets whether leading directories will be created and the mode for creation.
+ *
+ * @param o The Efl_Net_Server_Unix object.
+ * @param pd The private data for the object.
+ * @param do_it Pointer to store Eina_Bool indicating if creation is enabled. Can be NULL.
+ * @param mode Pointer to store the unsigned int mode for directory creation. Can be NULL.
+ */
 static void
 _efl_net_server_unix_leading_directories_create_get(const Eo *o EINA_UNUSED, Efl_Net_Server_Unix_Data *pd, Eina_Bool *do_it, unsigned int *mode)
 {

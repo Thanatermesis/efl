@@ -17,6 +17,12 @@
 #define SLIDER_DELAY_CHANGED_INTERVAL 0.2
 #define SLIDER_STEP 0.05
 
+/**
+ * @brief Handles key-based dragging actions for accessibility.
+ * @param obj The slider object.
+ * @param params A string indicating the direction of drag (e.g., "left", "right").
+ * @return EINA_TRUE if the action was handled, EINA_FALSE otherwise.
+ */
 static Eina_Bool _key_action_drag(Evas_Object *obj, const char *params);
 
 static const Elm_Action key_actions[] = {
@@ -24,6 +30,14 @@ static const Elm_Action key_actions[] = {
    {NULL, NULL}
 };
 
+/**
+ * @brief Callback function to finalize a value change after a delay.
+ *
+ * This is used to emit EFL_UI_RANGE_EVENT_STEADY and accessibility events
+ * after the user has stopped interacting with the slider for a short period.
+ * @param data The slider object.
+ * @return ECORE_CALLBACK_CANCEL to automatically remove the timer.
+ */
 static Eina_Bool
 _delay_change(void *data)
 {
@@ -38,12 +52,22 @@ _delay_change(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Helper function to check if the slider orientation is horizontal.
+ * @param dir The orientation to check.
+ * @return EINA_TRUE if horizontal, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _is_horizontal(Efl_Ui_Layout_Orientation dir)
 {
    return efl_ui_layout_orientation_is_horizontal(dir, EINA_TRUE);
 }
 
+/**
+ * @brief Emits standard range events (changed, min_reached, max_reached).
+ * @param obj The slider object.
+ * @param sd The private data of the slider.
+ */
 static void
 _emit_events(Eo *obj, Efl_Ui_Slider_Interval_Data *sd)
 {
@@ -54,6 +78,11 @@ _emit_events(Eo *obj, Efl_Ui_Slider_Interval_Data *sd)
      efl_event_callback_call(obj, EFL_UI_RANGE_EVENT_MAX_REACHED, NULL);
 }
 
+/**
+ * @brief Sets the visual position of the slider's two draggable parts (knobs)
+ * based on the current interval values (intvl_from, intvl_to) and range (val_min, val_max).
+ * @param obj The slider object.
+ */
 static void
 _val_set(Evas_Object *obj)
 {
@@ -93,6 +122,13 @@ _val_set(Evas_Object *obj)
    evas_object_smart_changed(obj);
 }
 
+/**
+ * @brief Fetches the current values from the draggable parts (knobs) of the slider
+ * and updates the internal interval values (intvl_from, intvl_to).
+ * It also handles emitting change events and managing a delay timer for steady events.
+ * @param obj The slider object.
+ * @param user_event EINA_TRUE if the change was initiated by user interaction, EINA_FALSE otherwise.
+ */
 static void
 _val_fetch(Evas_Object *obj, Eina_Bool user_event)
 {
@@ -152,6 +188,14 @@ _val_fetch(Evas_Object *obj, Eina_Bool user_event)
      }
 }
 
+/**
+ * @brief Handles a mouse down event on the slider, determining which knob
+ * is closer to the click and should be activated for dragging.
+ * The positions button_x and button_y are relative (0.0 to 1.0).
+ * @param obj The slider object.
+ * @param button_x The relative horizontal position of the mouse click.
+ * @param button_y The relative vertical position of the mouse click.
+ */
 static void
 _down_knob(Evas_Object *obj, double button_x, double button_y)
 {
@@ -209,6 +253,13 @@ _down_knob(Evas_Object *obj, double button_x, double button_y)
      }
 }
 
+/**
+ * @brief Moves the currently active knob based on mouse movement.
+ * The positions button_x and button_y are relative (0.0 to 1.0).
+ * @param obj The slider object.
+ * @param button_x The new relative horizontal position.
+ * @param button_y The new relative vertical position.
+ */
 static void
 _move_knob(Evas_Object *obj, double button_x, double button_y)
 {
@@ -227,6 +278,15 @@ _move_knob(Evas_Object *obj, double button_x, double button_y)
      }
 }
 
+/**
+ * @brief EOLIAN function to set the 'from' and 'to' values of the interval.
+ * The 'from' value also sets the primary range value of the slider.
+ * Values are clamped to the min/max range.
+ * @param obj The slider object.
+ * @param pd Private data for the slider.
+ * @param from The desired 'from' value of the interval.
+ * @param to The desired 'to' value of the interval.
+ */
 EOLIAN static void
 _efl_ui_slider_interval_interval_value_set(Eo *obj, Efl_Ui_Slider_Interval_Data *pd, double from, double to)
 {
@@ -244,6 +304,14 @@ _efl_ui_slider_interval_interval_value_set(Eo *obj, Efl_Ui_Slider_Interval_Data 
    _val_set(obj);
 }
 
+/**
+ * @brief EOLIAN function to get the 'from' and 'to' values of the interval.
+ * Ensures 'from' is always less than or equal to 'to' in the returned values.
+ * @param obj The slider object (unused).
+ * @param pd Private data for the slider.
+ * @param from Pointer to store the 'from' value. Can be NULL.
+ * @param to Pointer to store the 'to' value. Can be NULL.
+ */
 EOLIAN static void
 _efl_ui_slider_interval_interval_value_get(const Eo *obj EINA_UNUSED, Efl_Ui_Slider_Interval_Data *pd, double *from, double *to)
 {
@@ -251,6 +319,14 @@ _efl_ui_slider_interval_interval_value_get(const Eo *obj EINA_UNUSED, Efl_Ui_Sli
    if (to) *to = fmax(pd->intvl_from, pd->intvl_to);
 }
 
+/**
+ * @brief Helper function to find the position of a search string (e.g., "horizontal" or "vertical")
+ * at the end of the current theme group string.
+ * @param cur_group The current theme group string.
+ * @param search The string to search for at the end of cur_group.
+ * @param len The length of cur_group.
+ * @return A pointer to the start of 'search' within 'cur_group' if found at the end, otherwise NULL.
+ */
 static const char *
 _theme_group_modify_pos_get(const char *cur_group, const char *search, size_t len)
 {
@@ -267,6 +343,14 @@ _theme_group_modify_pos_get(const char *cur_group, const char *search, size_t le
    return pos;
 }
 
+/**
+ * @brief Constructs the appropriate theme group string for the slider based on its
+ * current orientation (horizontal/vertical).
+ * It modifies the existing theme group by replacing or appending the orientation part.
+ * @param obj The slider object.
+ * @param sd Private data for the slider, containing orientation information.
+ * @return A newly allocated string with the theme group. The caller must free this string.
+ */
 static char *
 _efl_ui_slider_interval_theme_group_get(Evas_Object *obj, Efl_Ui_Slider_Interval_Data *sd)
 {
@@ -303,6 +387,12 @@ _efl_ui_slider_interval_theme_group_get(Evas_Object *obj, Efl_Ui_Slider_Interval
    return eina_strbuf_release(new_group);
 }
 
+/**
+ * @brief Central update function for the slider.
+ * Fetches values from UI, updates internal state, and marks the object as changed.
+ * @param obj The slider object.
+ * @param user_event EINA_TRUE if the update is due to direct user interaction.
+ */
 static void
 _slider_update(Evas_Object *obj, Eina_Bool user_event)
 {
@@ -310,6 +400,13 @@ _slider_update(Evas_Object *obj, Eina_Bool user_event)
    evas_object_smart_changed(obj);
 }
 
+/**
+ * @brief Callback for "drag" signal from the layout. Updates slider value.
+ * @param data The slider object.
+ * @param obj Unused.
+ * @param emission Unused.
+ * @param source Unused.
+ */
 static void
 _drag(void *data,
       Evas_Object *obj EINA_UNUSED,
@@ -319,6 +416,14 @@ _drag(void *data,
    _slider_update(data, EINA_TRUE);
 }
 
+/**
+ * @brief Callback for "drag,start" signal. Sets focus, updates slider,
+ * emits drag start event, and freezes scrolling on parent widgets.
+ * @param data The slider object.
+ * @param obj Unused.
+ * @param emission Unused.
+ * @param source Unused.
+ */
 static void
 _drag_start(void *data,
             Evas_Object *obj EINA_UNUSED,
@@ -332,6 +437,14 @@ _drag_start(void *data,
    efl_ui_widget_scroll_freeze_push(data);
 }
 
+/**
+ * @brief Callback for "drag,stop" signal. Updates slider, emits drag stop event,
+ * and unfreezes scrolling on parent widgets.
+ * @param data The slider object.
+ * @param obj Unused.
+ * @param emission Unused.
+ * @param source Unused.
+ */
 static void
 _drag_stop(void *data,
            Evas_Object *obj EINA_UNUSED,
@@ -343,6 +456,13 @@ _drag_stop(void *data,
    efl_ui_widget_scroll_freeze_pop(data);
 }
 
+/**
+ * @brief Callback for "drag,step" signal. Updates slider value.
+ * @param data The slider object.
+ * @param obj Unused.
+ * @param emission Unused.
+ * @param source Unused.
+ */
 static void
 _drag_step(void *data,
            Evas_Object *obj EINA_UNUSED,
@@ -352,6 +472,14 @@ _drag_step(void *data,
    _slider_update(data, EINA_TRUE);
 }
 
+/**
+ * @brief Callback for mouse down events on the spacer object (the track of the slider).
+ * This initiates a drag operation by moving the closest knob to the click position.
+ * @param data The slider object.
+ * @param e Unused.
+ * @param obj Unused.
+ * @param event_info Mouse down event details.
+ */
 static void
 _spacer_down_cb(void *data,
                 Evas *e EINA_UNUSED,
@@ -389,6 +517,15 @@ _spacer_down_cb(void *data,
    efl_event_callback_call(data, EFL_UI_SLIDER_INTERVAL_EVENT_SLIDER_DRAG_START, NULL);
 }
 
+/**
+ * @brief Callback for mouse move events on the spacer object.
+ * Handles dragging of a knob if a drag operation was initiated by _spacer_down_cb.
+ * It also manages scroll freezing and on-hold event flags.
+ * @param data The slider object.
+ * @param e Unused.
+ * @param obj Unused.
+ * @param event_info Mouse move event details.
+ */
 static void
 _spacer_move_cb(void *data,
                 Evas *e EINA_UNUSED,
@@ -450,6 +587,14 @@ _spacer_move_cb(void *data,
      }
 }
 
+/**
+ * @brief Callback for mouse up events on the spacer object.
+ * Finalizes a drag operation, emits drag stop event, and unfreezes scrolling.
+ * @param data The slider object.
+ * @param e Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _spacer_up_cb(void *data,
               Evas *e EINA_UNUSED,
@@ -471,6 +616,14 @@ _spacer_up_cb(void *data,
      }
 }
 
+/**
+ * @brief Callback for mouse in events on the slider widget.
+ * Pushes a scroll hold to prevent parent scrolling while interacting with the slider.
+ * @param data Unused.
+ * @param e Unused.
+ * @param obj The slider object.
+ * @param event_info Unused.
+ */
 static void
 _mouse_in_cb(void *data EINA_UNUSED,
               Evas *e EINA_UNUSED,
@@ -480,6 +633,14 @@ _mouse_in_cb(void *data EINA_UNUSED,
    efl_ui_widget_scroll_hold_push(obj);
 }
 
+/**
+ * @brief Callback for mouse out events on the slider widget.
+ * Pops the scroll hold.
+ * @param data Unused.
+ * @param e Unused.
+ * @param obj The slider object.
+ * @param event_info Unused.
+ */
 static void
 _mouse_out_cb(void *data EINA_UNUSED,
               Evas *e EINA_UNUSED,
@@ -489,6 +650,12 @@ _mouse_out_cb(void *data EINA_UNUSED,
    efl_ui_widget_scroll_hold_pop(obj);
 }
 
+/**
+ * @brief Provides accessibility information for the slider.
+ * @param data Unused.
+ * @param obj The slider object.
+ * @return A string with accessibility information, or NULL. Caller owns the string.
+ */
 static char *
 _access_info_cb(void *data EINA_UNUSED, Evas_Object *obj)
 {
@@ -500,6 +667,12 @@ _access_info_cb(void *data EINA_UNUSED, Evas_Object *obj)
    return NULL;
 }
 
+/**
+ * @brief Provides the accessibility state for the slider.
+ * @param data Unused.
+ * @param obj The slider object.
+ * @return A string describing the state (e.g., " state: disabled"), or NULL. Caller owns the string.
+ */
 static char *
 _access_state_cb(void *data EINA_UNUSED, Evas_Object *obj)
 {
@@ -520,6 +693,13 @@ _access_state_cb(void *data EINA_UNUSED, Evas_Object *obj)
    return NULL;
 }
 
+/**
+ * @brief EOLIAN constructor for the Efl.Ui.Slider_Interval object.
+ * Initializes the slider, sets up its theme, default values, and event callbacks.
+ * @param obj The Efl.Ui.Slider_Interval object being constructed.
+ * @param priv The private data structure for this slider instance.
+ * @return The constructed Efl_Object.
+ */
 EOLIAN static Efl_Object *
 _efl_ui_slider_interval_efl_object_constructor(Eo *obj, Efl_Ui_Slider_Interval_Data *priv)
 {
@@ -586,6 +766,12 @@ _efl_ui_slider_interval_efl_object_constructor(Eo *obj, Efl_Ui_Slider_Interval_D
    return obj;
 }
 
+/**
+ * @brief EOLIAN destructor for the Efl.Ui.Slider_Interval object.
+ * Cleans up resources, such as timers.
+ * @param obj The Efl.Ui.Slider_Interval object being destructed.
+ * @param pd The private data structure for this slider instance.
+ */
 EOLIAN static void
 _efl_ui_slider_interval_efl_object_destructor(Eo *obj,
                                       Efl_Ui_Slider_Interval_Data *pd)
@@ -595,6 +781,14 @@ _efl_ui_slider_interval_efl_object_destructor(Eo *obj,
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief EOLIAN function to apply the theme to the slider.
+ * This function updates the theme group based on orientation and inversion state,
+ * then calls the parent's theme apply function and updates the slider's visual state.
+ * @param obj The slider object.
+ * @param sd The private data for the slider.
+ * @return Eina_Error indicating success or failure of theme application.
+ */
 EOLIAN static Eina_Error
 _efl_ui_slider_interval_efl_ui_widget_theme_apply(Eo *obj, Efl_Ui_Slider_Interval_Data *sd)
 {
@@ -625,6 +819,11 @@ _efl_ui_slider_interval_efl_ui_widget_theme_apply(Eo *obj, Efl_Ui_Slider_Interva
    return int_ret;
 }
 
+/**
+ * @brief Moves the slider's primary knob up (or right, depending on orientation and inversion) by one step.
+ * This is typically used for keyboard navigation or programmatic control.
+ * @param obj The slider object.
+ */
 static void
 _drag_up(Evas_Object *obj)
 {
@@ -644,6 +843,11 @@ _drag_up(Evas_Object *obj)
    _slider_update(obj, EINA_TRUE);
 }
 
+/**
+ * @brief Moves the slider's primary knob down (or left, depending on orientation and inversion) by one step.
+ * This is typically used for keyboard navigation or programmatic control.
+ * @param obj The slider object.
+ */
 static void
 _drag_down(Evas_Object *obj)
 {
@@ -663,6 +867,7 @@ _drag_down(Evas_Object *obj)
    _slider_update(obj, EINA_TRUE);
 }
 
+// Documentation for _key_action_drag is at its declaration.
 static Eina_Bool
 _key_action_drag(Evas_Object *obj, const char *params)
 {
@@ -710,6 +915,14 @@ _key_action_drag(Evas_Object *obj, const char *params)
    return !EINA_DBL_EQ(new_value, old_value);
 }
 
+/**
+ * @brief EOLIAN function to handle accessibility activation requests.
+ * Translates activation types (UP, DOWN, LEFT, RIGHT) into slider drag actions.
+ * @param obj The slider object.
+ * @param sd Private data for the slider.
+ * @param act The type of activation requested (e.g., EFL_UI_ACTIVATE_UP).
+ * @return EINA_TRUE if the activation was handled, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_slider_interval_efl_ui_widget_on_access_activate(Eo *obj, Efl_Ui_Slider_Interval_Data *sd, Efl_Ui_Activate act)
 {
@@ -739,6 +952,16 @@ _efl_ui_slider_interval_efl_ui_widget_on_access_activate(Eo *obj, Efl_Ui_Slider_
 // _slider_efl_ui_widget_widget_input_event_handler
 ELM_WIDGET_KEY_DOWN_DEFAULT_IMPLEMENT(slider, Efl_Ui_Slider_Interval_Data)
 
+/**
+ * @brief EOLIAN function to handle input events for the slider widget.
+ * This processes key down events (using the default Elm_Widget handler),
+ * key up events (ignored), and pointer wheel events to adjust the slider value.
+ * @param obj The slider object.
+ * @param sd Private data for the slider.
+ * @param eo_event The Efl_Event containing details about the input event.
+ * @param src The source object of the event.
+ * @return EINA_TRUE if the event was handled, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_slider_interval_efl_ui_widget_widget_input_event_handler(Eo *obj, Efl_Ui_Slider_Interval_Data *sd, const Efl_Event *eo_event, Evas_Object *src)
 {
@@ -779,6 +1002,13 @@ _efl_ui_slider_interval_efl_ui_widget_widget_input_event_handler(Eo *obj, Efl_Ui
    return EINA_TRUE;
 }
 
+/**
+ * @brief EOLIAN function to set the minimum and maximum displayable range of the slider.
+ * @param obj The slider object.
+ * @param sd Private data for the slider.
+ * @param min The minimum value of the range.
+ * @param max The maximum value of the range.
+ */
 EOLIAN static void
 _efl_ui_slider_interval_efl_ui_range_display_range_limits_set(Eo *obj, Efl_Ui_Slider_Interval_Data *sd, double min, double max)
 {
@@ -801,6 +1031,13 @@ _efl_ui_slider_interval_efl_ui_range_display_range_limits_set(Eo *obj, Efl_Ui_Sl
    _val_set(obj);
 }
 
+/**
+ * @brief EOLIAN function to get the minimum and maximum displayable range of the slider.
+ * @param obj The slider object (unused).
+ * @param sd Private data for the slider.
+ * @param min Pointer to store the minimum value. Can be NULL.
+ * @param max Pointer to store the maximum value. Can be NULL.
+ */
 EOLIAN static void
 _efl_ui_slider_interval_efl_ui_range_display_range_limits_get(const Eo *obj EINA_UNUSED, Efl_Ui_Slider_Interval_Data *sd, double *min, double *max)
 {
@@ -808,6 +1045,13 @@ _efl_ui_slider_interval_efl_ui_range_display_range_limits_get(const Eo *obj EINA
    if (max) *max = sd->val_max;
 }
 
+/**
+ * @brief EOLIAN function to set the primary value of the slider.
+ * This corresponds to the 'from' value of the interval.
+ * @param obj The slider object.
+ * @param sd Private data for the slider.
+ * @param val The value to set.
+ */
 EOLIAN static void
 _efl_ui_slider_interval_efl_ui_range_display_range_value_set(Eo *obj, Efl_Ui_Slider_Interval_Data *sd, double val)
 {
@@ -829,18 +1073,38 @@ _efl_ui_slider_interval_efl_ui_range_display_range_value_set(Eo *obj, Efl_Ui_Sli
    _val_set(obj);
 }
 
+/**
+ * @brief EOLIAN function to get the primary value of the slider.
+ * This corresponds to the 'from' value of the interval.
+ * @param obj The slider object (unused).
+ * @param sd Private data for the slider.
+ * @return The primary value of the slider.
+ */
 EOLIAN static double
 _efl_ui_slider_interval_efl_ui_range_display_range_value_get(const Eo *obj EINA_UNUSED, Efl_Ui_Slider_Interval_Data *sd)
 {
    return sd->val;
 }
 
+/**
+ * @brief EOLIAN function to get the step value for interactive changes.
+ * @param obj The slider object (unused).
+ * @param sd Private data for the slider.
+ * @return The step value.
+ */
 EOLIAN static double
 _efl_ui_slider_interval_efl_ui_range_interactive_range_step_get(const Eo *obj EINA_UNUSED, Efl_Ui_Slider_Interval_Data *sd)
 {
    return sd->step;
 }
 
+/**
+ * @brief EOLIAN function to set the step value for interactive changes.
+ * The step value must be greater than 0.
+ * @param obj The slider object (unused).
+ * @param sd Private data for the slider.
+ * @param step The step value to set.
+ */
 EOLIAN static void
 _efl_ui_slider_interval_efl_ui_range_interactive_range_step_set(Eo *obj EINA_UNUSED, Efl_Ui_Slider_Interval_Data *sd, double step)
 {
@@ -855,6 +1119,12 @@ _efl_ui_slider_interval_efl_ui_range_interactive_range_step_set(Eo *obj EINA_UNU
    sd->step = step;
 }
 
+/**
+ * @brief EOLIAN function to set the orientation of the slider.
+ * @param obj The slider object.
+ * @param sd Private data for the slider.
+ * @param dir The desired orientation (horizontal or vertical).
+ */
 EOLIAN static void
 _efl_ui_slider_interval_efl_ui_layout_orientable_orientation_set(Eo *obj, Efl_Ui_Slider_Interval_Data *sd, Efl_Ui_Layout_Orientation dir)
 {
@@ -863,6 +1133,12 @@ _efl_ui_slider_interval_efl_ui_layout_orientable_orientation_set(Eo *obj, Efl_Ui
    efl_ui_widget_theme_apply(obj);
 }
 
+/**
+ * @brief EOLIAN function to get the orientation of the slider.
+ * @param obj The slider object (unused).
+ * @param sd Private data for the slider.
+ * @return The current orientation of the slider.
+ */
 EOLIAN static Efl_Ui_Layout_Orientation
 _efl_ui_slider_interval_efl_ui_layout_orientable_orientation_get(const Eo *obj EINA_UNUSED, Efl_Ui_Slider_Interval_Data *sd)
 {
@@ -871,6 +1147,16 @@ _efl_ui_slider_interval_efl_ui_layout_orientable_orientation_get(const Eo *obj E
 
 // A11Y Accessibility
 
+/**
+ * @brief EOLIAN function to get the accessibility actions for the slider.
+ * Provides actions for dragging the slider knobs via accessibility interfaces.
+ * @param obj The slider object (unused).
+ * @param pd Private data for the slider (unused).
+ * @return A static array of Efl_Access_Action_Data describing the available actions.
+ *         Example: { "drag,left", "drag", "left", _key_action_drag}
+ *                  This defines an action named "drag,left", of type "drag",
+ *                  with parameter "left", handled by _key_action_drag function.
+ */
 EOLIAN const Efl_Access_Action_Data *
 _efl_ui_slider_interval_efl_access_widget_action_elm_actions_get(const Eo *obj EINA_UNUSED, Efl_Ui_Slider_Interval_Data *pd EINA_UNUSED)
 {

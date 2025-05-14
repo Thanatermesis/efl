@@ -21,16 +21,35 @@
  * @cond LOCAL
  */
 
-
+/**
+ * @brief Defines the Z-order for a window.
+ * Used internally to specify how a window should be placed relative to others.
+ */
 typedef enum _Ecore_Win32_Window_Z_Order Ecore_Win32_Window_Z_Order;
 enum _Ecore_Win32_Window_Z_Order
 {
   ECORE_WIN32_WINDOW_Z_ORDER_BOTTOM,
   ECORE_WIN32_WINDOW_Z_ORDER_NOTOPMOST,
   ECORE_WIN32_WINDOW_Z_ORDER_TOP,
-  ECORE_WIN32_WINDOW_Z_ORDER_TOPMOST
+  ECORE_WIN32_WINDOW_Z_ORDER_TOPMOST /**< Places the window above all non-topmost windows. The window maintains its topmost position even when it is deactivated. */
 };
 
+/**
+ * @internal
+ * @brief Internal function to create a new Ecore_Win32_Window.
+ *
+ * This function is the core implementation for creating a window. It handles
+ * memory allocation, window class registration (implicitly via ECORE_WIN32_WINDOW_CLASS),
+ * window creation with specified style, and initialization of the Ecore_Win32_Window structure.
+ *
+ * @param parent Optional parent window. If NULL, the window is a top-level window.
+ * @param x The initial x-coordinate of the window's top-left corner.
+ * @param y The initial y-coordinate of the window's top-left corner.
+ * @param width The initial width of the window's client area.
+ * @param height The initial height of the window's client area.
+ * @param style The window style flags (e.g., WS_OVERLAPPEDWINDOW, WS_POPUP).
+ * @return A pointer to the newly created Ecore_Win32_Window, or NULL on failure.
+ */
 static Ecore_Win32_Window *
 _ecore_win32_window_internal_new(Ecore_Win32_Window *parent,
                                 int                 x,
@@ -170,6 +189,23 @@ _ecore_win32_window_internal_new(Ecore_Win32_Window *parent,
  *                                 Global                                     *
  *============================================================================*/
 
+/**
+ * @brief Handles window dragging (moving or resizing) based on mouse input.
+ *
+ * This function is typically called in response to mouse move events when a
+ * drag operation has been initiated (e.g., by a mouse button press on the
+ * title bar or border). It interprets the `w->drag.type` (e.g., HTCAPTION,
+ * HTLEFT) to determine whether to move the window or resize it from one of
+ * its edges or corners. It also considers window size hints (min/max size,
+ * step size, base size) during resize operations.
+ *
+ * @param w The Ecore_Win32_Window being dragged.
+ * @param ptx The current x-coordinate of the mouse pointer in screen coordinates.
+ * @param pty The current y-coordinate of the mouse pointer in screen coordinates.
+ * @return EINA_TRUE if the drag event was handled (i.e., the window was moved
+ *         or resized), EINA_FALSE otherwise (e.g., if `w->drag.type` is not
+ *         a recognized drag type).
+ */
 Eina_Bool
 ecore_win32_window_drag(Ecore_Win32_Window *w, int ptx, int pty)
 {

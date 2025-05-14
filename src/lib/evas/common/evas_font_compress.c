@@ -7,6 +7,20 @@
 //--------------------------------------------------------------------------
 //- UTILS ------------------------------------------------------------------
 //--------------------------------------------------------------------------
+
+/**
+ * @brief Expands a 1-bit per pixel bitmap to an 8-bit per pixel bitmap.
+ *
+ * This function is used to convert glyphs from fonts that are in a 1-bit
+ * format into an 8-bit format, which is easier to process for compression.
+ *
+ * @param src Pointer to the source 1-bit bitmap data.
+ * @param pitch The pitch (stride in bytes) of the source bitmap.
+ * @param w The width of the bitmap in pixels.
+ * @param h The height of the bitmap in pixels.
+ * @param dst Pointer to the destination 8-bit bitmap buffer. This buffer
+ *            must be pre-allocated with sufficient size (w * h bytes).
+ */
 static void
 expand_bitmap(DATA8 *src, int pitch, int w, int h, DATA8 *dst)
 {
@@ -37,6 +51,18 @@ expand_bitmap(DATA8 *src, int pitch, int w, int h, DATA8 *dst)
      }
 }
 
+/**
+ * @brief Converts an 8-bit alpha value to a 4-bit alpha value.
+ *
+ * The 4-bit alpha values are quantized to steps of 0x11 (17),
+ * e.g., 0x00, 0x11, 0x22, ..., 0xFF. This function rounds the 8-bit
+ * alpha value to the nearest 4-bit equivalent.
+ *
+ * @param a8 The 8-bit alpha value (0-255).
+ * @return The corresponding 4-bit alpha value (0-15), which when
+ *         expanded back (e.g., `(a4 << 4) | a4`) gives the quantized
+ *         8-bit representation.
+ */
 static inline DATA8
 alpha8to4(int a8)
 {
@@ -111,6 +137,34 @@ alpha8to4(int a8)
 // ...
 // [char] last byte of RLE data
 //
+
+/**
+ * @brief Compresses 8-bit per pixel image data into a 4-bit RLE format.
+ *
+ * This function takes an 8-bit grayscale image and compresses it using
+ * Run-Length Encoding where each run stores a 4-bit alpha value.
+ * The output format includes a header indicating the jump table size,
+ * the jump table itself (offsets to the start of RLE data for each row),
+ * and the RLE data.
+ *
+ * @param src Pointer to the source 8-bit image data.
+ * @param pitch The pitch (stride in bytes) of the source image.
+ * @param w The width of the image in pixels.
+ * @param h The height of the image in pixels.
+ * @param[out] size_ret Pointer to an integer where the total size of the
+ *                      compressed data will be stored.
+ * @return A pointer to the allocated buffer containing the compressed RLE data,
+ *         or NULL on allocation failure. The caller is responsible for freeing
+ *         this buffer.
+ *         The compressed data structure is:
+ *         - `[int] header`: Type of jump table (1: 8-bit, 2: 16-bit, 3: 32-bit).
+ *         - `[xx * h] jumptab`: Jump table, where `xx` is 1, 2, or 4 bytes.
+ *           Each entry `jumptab[i]` stores the offset to the RLE data for row `i+1`.
+ *           The RLE data for row 0 starts immediately after the jump table.
+ *         - `[char array] rle_data`: The actual RLE encoded pixel data.
+ *           Each byte encodes a run: `(length-1) << 4 | value`.
+ *           Length is 1-16 pixels. Value is a 4-bit alpha.
+ */
 static DATA8 *
 compress_rle4(DATA8 *src, int pitch, int w, int h, int *size_ret)
 {
@@ -225,6 +279,20 @@ compress_rle4(DATA8 *src, int pitch, int w, int h, int *size_ret)
 // and finishes reading RLE data before the "end" byte and starts AT the
 // "start" byte within the array pointed to by src. this ASSUMES the dest
 // buffer has already been zeroed out so we can skip runs that are "0"
+
+/**
+ * @brief Decompresses a single row of 4-bit RLE data into an 8-bit pixel row.
+ *
+ * This function processes a segment of RLE data (for one row) and expands it
+ * into an 8-bit grayscale pixel row. It assumes the destination buffer `dst`
+ * has been zeroed out, allowing it to skip writing runs of zero-value pixels.
+ *
+ * @param src Pointer to the start of the RLE data blob (not just the row's data).
+ * @param start The byte offset within `src` where the RLE data for this row begins.
+ * @param end The byte offset within `src` where the RLE data for this row ends.
+ * @param dst Pointer to the destination buffer for the decompressed 8-bit pixel row.
+ *            This buffer must be large enough to hold the row's width in pixels.
+ */
 static void
 decompress_full_row(DATA8 *src, int start, int end, DATA8 *dst)
 {
@@ -258,6 +326,19 @@ decompress_full_row(DATA8 *src, int start, int end, DATA8 *dst)
 
 // to save copy & paste repeating code, this macro acts as a code generator
 // to create a specific decompress function per jumptable size (8, 16 or 32bit)
+
+/**
+ * @def DECOMPRESS_ROW_FUNC
+ * @brief Macro to generate row decompression functions for different jump table types.
+ *
+ * This macro creates specialized functions (`decompress_jumptab8_rle4`,
+ * `decompress_jumptab16_rle4`, `decompress_jumptab32_rle4`) that iterate
+ * through image rows, determine the RLE data segment for each row using the
+ * provided jump table, and call `decompress_full_row` to decompress it.
+ *
+ * @param _name The name of the function to generate.
+ * @param _type The data type of the jump table entries (e.g., DATA8, unsigned short, int).
+ */
 #define DECOMPRESS_ROW_FUNC(_name, _type) \
 static void \
 _name(_type *jumptab, DATA8 *src, DATA8 *dst, int pitch, int h) \
@@ -278,6 +359,23 @@ DECOMPRESS_ROW_FUNC(decompress_jumptab32_rle4, int)
 
 // decompress a full RLE blob with header into the dst pointer. pitch is
 // the number of bytes between each destination row
+
+/**
+ * @brief Decompresses a full 4-bit RLE data blob into an 8-bit image.
+ *
+ * This function reads the header from the RLE data to determine the jump
+ * table format (8-bit, 16-bit, or 32-bit offsets) and then calls the
+ * appropriate specialized decompression function generated by
+ * `DECOMPRESS_ROW_FUNC`.
+ *
+ * @param src Pointer to the compressed 4-bit RLE data blob (including header).
+ * @param dst Pointer to the destination buffer for the decompressed 8-bit image.
+ *            This buffer must be pre-allocated and zeroed.
+ * @param pitch The pitch (stride in bytes) of the destination image buffer.
+ * @param w The width of the image in pixels (unused in this function but
+ *          part of a common signature).
+ * @param h The height of the image in pixels.
+ */
 static void
 decompress_rle4(DATA8 *src, DATA8 *dst, int pitch, int w EINA_UNUSED, int h)
 {
@@ -312,6 +410,31 @@ decompress_rle4(DATA8 *src, DATA8 *dst, int pitch, int w EINA_UNUSED, int h)
 // 4bit packed data. this is so we can share the same generic "rle" pointer
 // between 4bit rle and 4bit packed and easily switch between these 2 encodings
 // based on which one is likely more compact and/or faster at runtime.
+
+/**
+ * @brief Compresses 8-bit per pixel image data to raw 4-bit per pixel.
+ *
+ * This function converts an 8-bit grayscale image to a 4-bit grayscale image.
+ * Each byte in the output stores two 4-bit pixels: the most significant 4 bits
+ * for the first pixel and the least significant 4 bits for the second.
+ * Rows with an odd number of pixels will have the last byte's lower 4 bits unused.
+ * The output data is prepended with an integer header (value 0) to distinguish
+ * it from RLE compressed data.
+ *
+ * @param src Pointer to the source 8-bit image data.
+ * @param pitch The pitch (stride in bytes) of the source image.
+ * @param w The width of the image in pixels.
+ * @param h The height of the image in pixels.
+ * @param[out] size_ret Pointer to an integer where the total size of the
+ *                      compressed data (header + pixel data) will be stored.
+ * @return A pointer to the allocated buffer containing the 4bpp compressed data,
+ *         or NULL on allocation failure. The caller is responsible for freeing
+ *         this buffer.
+ *         The compressed data structure is:
+ *         - `[int] header`: Type identifier, 0 for 4bpp packed.
+ *         - `[char array] pixel_data`: Packed 4-bit pixel data.
+ *           Each byte `(px1 << 4) | px2`.
+ */
 static DATA8 *
 compress_bpp4(DATA8 *src, int pitch, int w, int h, int *size_ret)
 {
@@ -354,6 +477,21 @@ compress_bpp4(DATA8 *src, int pitch, int w, int h, int *size_ret)
 // destination 8bit buffer assumed to be allocated and the right size with
 // the given destination pitch in bytes per line and a row length of w
 // pixels and height of h rows
+
+/**
+ * @brief Decompresses raw 4-bit per pixel data to an 8-bit per pixel image.
+ *
+ * This function converts a 4-bit grayscale image (where each byte packs two pixels)
+ * back into an 8-bit grayscale image. It skips the integer header at the
+ * beginning of the source data.
+ *
+ * @param src Pointer to the compressed 4-bit per pixel data (including header).
+ * @param dst Pointer to the destination buffer for the decompressed 8-bit image.
+ *            This buffer must be pre-allocated.
+ * @param pitch The pitch (stride in bytes) of the destination image buffer.
+ * @param w The width of the image in pixels.
+ * @param h The height of the image in pixels.
+ */
 static void
 decompress_bpp4(DATA8 *src, DATA8 *dst, int pitch, int w, int h)
 {
@@ -402,6 +540,30 @@ decompress_bpp4(DATA8 *src, DATA8 *dst, int pitch, int w, int h)
 //--------------------------------------------------------------------------
 //- GENERAL ----------------------------------------------------------------
 //--------------------------------------------------------------------------
+
+/**
+ * @brief Compresses font glyph data.
+ *
+ * This function takes raw glyph data (either 8-bit grayscale or 1-bit monochrome)
+ * and compresses it. If the input is 1-bit, it's first expanded to 8-bit.
+ * Based on the glyph dimensions, it chooses either raw 4-bit per pixel (4bpp)
+ * compression or 4-bit Run-Length Encoding (RLE). Smaller glyphs typically use
+ * 4bpp, while larger ones use RLE.
+ *
+ * @param data Pointer to the raw glyph data.
+ * @param num_grays Number of gray levels in the source data (e.g., 256 for FT_PIXEL_MODE_GRAY).
+ * @param pixel_mode The pixel mode of the source data (e.g., FT_PIXEL_MODE_GRAY, FT_PIXEL_MODE_MONO).
+ * @param pitch_data The pitch (stride in bytes) of the source glyph data.
+ * @param w The width of the glyph in pixels.
+ * @param h The height of the glyph in pixels.
+ * @param[out] size_ret Pointer to an integer where the size of the compressed
+ *                      data will be stored.
+ * @return A pointer to the allocated buffer containing the compressed glyph data,
+ *         or NULL if the glyph dimensions are invalid or compression fails.
+ *         The caller is responsible for freeing this buffer. The format of this
+ *         data will be either 4bpp packed or 4-bit RLE, identifiable by an
+ *         integer header at the beginning of the data.
+ */
 EVAS_API void *
 evas_common_font_glyph_compress(void *data, int num_grays, int pixel_mode,
                                 int pitch_data, int w, int h, int *size_ret)
@@ -438,6 +600,29 @@ evas_common_font_glyph_compress(void *data, int num_grays, int pixel_mode,
 
 // this decompresses a whole block of compressed font data back to 8bit
 // per pixels and deals with both 4bit RLE and 4bit packed encoding modes
+
+/**
+ * @brief Decompresses font glyph data.
+ *
+ * This function takes a compressed font glyph (which can be either 4-bit RLE
+ * or raw 4-bit packed) and decompresses it into an 8-bit grayscale bitmap.
+ * It reads an integer header from the compressed data to determine the
+ * encoding type and calls the appropriate decompression routine.
+ *
+ * @param fg Pointer to the RGBA_Font_Glyph structure containing the
+ *           compressed glyph data and metadata.
+ *           - `fg->glyph_out->rle`: Pointer to the compressed data.
+ *           - `fg->glyph_out->bitmap.width`: Width of the glyph.
+ *           - `fg->glyph_out->bitmap.rows`: Height of the glyph.
+ * @param[out] wret Optional pointer to an integer where the width of the
+ *                  decompressed glyph will be stored.
+ * @param[out] hret Optional pointer to an integer where the height of the
+ *                  decompressed glyph will be stored.
+ * @return A pointer to a newly allocated buffer containing the decompressed
+ *         8-bit grayscale glyph data, or NULL on allocation failure.
+ *         The caller is responsible for freeing this buffer. The buffer will
+ *         be `width * height` bytes in size.
+ */
 EVAS_API DATA8 *
 evas_common_font_glyph_uncompress(RGBA_Font_Glyph *fg, int *wret, int *hret)
 {

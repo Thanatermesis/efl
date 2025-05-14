@@ -3,19 +3,35 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Application data structure.
+ *
+ * This struct holds all the data needed for the application's main loop,
+ * including widgets and animation state.
+ */
 typedef struct _App_Data
 {
-   Efl_Canvas_Animation        *show_anim;
-   Efl_Canvas_Animation        *hide_anim;
-   Elm_Button                  *button;
+   Efl_Canvas_Animation        *show_anim; /**< The animation to show the button (alpha 0 to 1). */
+   Efl_Canvas_Animation        *hide_anim; /**< The animation to hide the button (alpha 1 to 0). */
+   Elm_Button                  *button;    /**< The button to be animated. */
 
-   Evas_Object          *start_btn;
-   Evas_Object          *play_count_spin;
-   Evas_Object          *repeat_mode_spin;
+   Evas_Object          *start_btn;        /**< The button to start the animation. */
+   Evas_Object          *play_count_spin;  /**< The spinner to set animation play count. */
+   Evas_Object          *repeat_mode_spin; /**< The spinner to set animation repeat mode. */
 
-   Eina_Bool             is_btn_visible;
+   Eina_Bool             is_btn_visible;    /**< Flag to track button visibility state. */
 } App_Data;
 
+/**
+ * @brief Gets the animation repeat mode from the spinner widget.
+ *
+ * The spinner uses integer values to represent repeat modes:
+ * - 0: EFL_CANVAS_ANIMATION_REPEAT_MODE_RESTART
+ * - 1: EFL_CANVAS_ANIMATION_REPEAT_MODE_REVERSE
+ *
+ * @param spinner The spinner widget.
+ * @return The corresponding animation repeat mode.
+ */
 Efl_Canvas_Animation_Repeat_Mode
 _anim_repeat_mode_get(Evas_Object *spinner)
 {
@@ -28,6 +44,22 @@ _anim_repeat_mode_get(Evas_Object *spinner)
 }
 
 
+/**
+ * @brief Callback for animation start and end events.
+ *
+ * This function is called when an animation starts or ends. When an animation
+ * ends, it re-enables the control spinners.
+ *
+ * A non-obvious case is handled for `EFL_CANVAS_ANIMATION_REPEAT_MODE_REVERSE`
+ * with an even play count. In this scenario, the animation ends in its
+ * original state. The application's visibility flag `is_btn_visible` was
+ * toggled when starting the animation, so it must be toggled back to reflect
+ * the true final state.
+ *
+ * @param data The application data (App_Data).
+ * @param event The Efl event information. `event->info` is the animation object on start,
+ *              NULL on end.
+ */
 static void
 _anim_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -59,6 +91,16 @@ _anim_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback for animation progress updates.
+ *
+ * This function is called repeatedly as the animation runs. It prints the
+ * current progress of the animation to standard output.
+ *
+ * @param data Not used.
+ * @param event The Efl event information. `event->info` is a pointer to a
+ *              double representing the progress (0.0 to 1.0).
+ */
 static void
 _anim_running_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -66,11 +108,34 @@ _anim_running_cb(void *data EINA_UNUSED, const Efl_Event *event)
    printf("Animation is running! Current progress(%lf)\n", *progress);
 }
 
+/**
+ * @brief An array of callbacks for animation events.
+ *
+ * This array maps animation events to their respective handler functions.
+ * The structure of elements is `{ Efl_Event_Description, callback_function }`.
+ * - `EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_CHANGED`: Triggered on
+ *   animation start and end. Handled by `_anim_changed_cb`.
+ * - `EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_PROGRESS_UPDATED`: Triggered
+ *   during animation playback. Handled by `_anim_running_cb`.
+ */
 EFL_CALLBACKS_ARRAY_DEFINE(animation_stats_cb,
   {EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_CHANGED, _anim_changed_cb },
   {EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_PROGRESS_UPDATED, _anim_running_cb },
 )
 
+/**
+ * @brief Callback for the start button's "clicked" event.
+ *
+ * This function is called when the start button is clicked. It reads the
+ * animation settings (play count, repeat mode) from the spinners, disables them
+ * during animation, and starts the appropriate animation (show or hide) on the
+ * target button. The `is_btn_visible` flag is toggled to alternate between
+ * show and hide animations.
+ *
+ * @param data The application data (App_Data).
+ * @param obj The Evas_Object that was clicked (the start button).
+ * @param event_info Not used.
+ */
 static void
 _start_btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -110,6 +175,15 @@ _start_btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED
      }
 }
 
+/**
+ * @brief Callback for the window's "delete,request" event.
+ *
+ * Frees the application data structure when the window is closed.
+ *
+ * @param data The application data (App_Data) to free.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _win_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -117,6 +191,18 @@ _win_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    free(ad);
 }
 
+/**
+ * @brief Main function for the Efl Animation Repeat test.
+ *
+ * This test demonstrates the `play_count` and `repeat_mode` properties of
+ * Efl_Canvas_Animation. It creates a window with a button that can be animated
+ * (alpha fade-in/fade-out). The user can control the animation's play count
+ * (where 0 means infinite) and repeat mode (`RESTART` or `REVERSE`) via spinners.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_efl_anim_repeat(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

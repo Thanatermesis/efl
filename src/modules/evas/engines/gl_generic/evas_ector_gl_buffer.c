@@ -1,3 +1,12 @@
+/**
+ * @file
+ * @brief Evas Ector GL Buffer implementation
+ *
+ * This file provides the Evas Ector GL Buffer, which allows for the creation
+ * and manipulation of graphical buffers using OpenGL. It integrates with
+ * Ector for rendering operations.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
@@ -18,29 +27,47 @@
 typedef struct _Ector_GL_Buffer_Map Ector_GL_Buffer_Map;
 typedef struct _Evas_Ector_GL_Buffer_Data Evas_Ector_GL_Buffer_Data;
 
-static int _map_id = 0;
+static int _map_id = 0; /**< Counter for unique map identifiers. */
 
+/**
+ * @brief Structure representing a mapped region of a GL buffer.
+ *
+ * This structure holds information about a memory-mapped region of an
+ * Evas_GL_Image, allowing direct CPU access to pixel data.
+ */
 struct _Ector_GL_Buffer_Map
 {
-   EINA_INLIST;
-   void *ptr;
-   unsigned int base_size; // in bytes
-   unsigned int x, y, w, h;
-   void *image_data, *base_data;
-   int map_id;
-   size_t length;
-   Efl_Gfx_Colorspace cspace;
-   Evas_GL_Image *im;
-   Eina_Bool allocated;
-   Ector_Buffer_Access_Flag mode;
+   EINA_INLIST; /**< Macro for Eina_Inlist node integration. */
+   void *ptr; /**< Pointer to the mapped pixel data, adjusted for sub-region. */
+   unsigned int base_size; /**< Total size of the base_data in bytes. */
+   unsigned int x, y, w, h; /**< Coordinates and dimensions of the mapped sub-region. */
+   void *image_data; /**< Pointer to the raw image data from eng_image_data_get(). */
+   void *base_data; /**< Pointer to the base of the (potentially converted) pixel data.
+                       * If cspace is GRY8, this points to a converted buffer.
+                       * Otherwise, it's the same as image_data. */
+   int map_id; /**< Unique identifier for this map operation. */
+   size_t length; /**< Length of the mapped region in bytes (w * h * pixel_size). */
+   Efl_Gfx_Colorspace cspace; /**< Colorspace of the mapped data (ptr). */
+   Evas_GL_Image *im; /**< Evas_GL_Image associated with this map, if it needs to be freed separately.
+                          * This is typically the case when a new image is created for the map
+                          * (e.g., when detaching from an FBO for writing). */
+   Eina_Bool allocated; /**< True if base_data was allocated for colorspace conversion (e.g., to GRY8). */
+   Ector_Buffer_Access_Flag mode; /**< Access mode for the map (read, write, etc.). */
 };
 
+/**
+ * @brief Private data for the Evas_Ector_GL_Buffer object.
+ *
+ * This structure holds all the internal state for an Evas Ector GL buffer,
+ * including the GL image, rendering engine context, and active memory maps.
+ */
 struct _Evas_Ector_GL_Buffer_Data
 {
-   Render_Engine_GL_Generic *re;
-   Evas_GL_Image *glim;
-   Eina_Bool alpha_only, was_render;
-   Ector_GL_Buffer_Map *maps;
+   Render_Engine_GL_Generic *re; /**< Pointer to the generic GL rendering engine. */
+   Evas_GL_Image *glim; /**< The core Evas_GL_Image used by this buffer. */
+   Eina_Bool alpha_only; /**< True if the buffer is for alpha-only (GRY8) data. */
+   Eina_Bool was_render; /**< True if the buffer was last used for rendering (FBO). */
+   Ector_GL_Buffer_Map *maps; /**< Inlist of active Ector_GL_Buffer_Map structures. */
 };
 
 void *eng_image_data_put(void *data, void *image, DATA32 *image_data);
@@ -75,6 +102,12 @@ _mapped_image_dump(Eo *buf, Evas_GL_Image *im, const char *fmt, int id)
 #endif
 
 /* FIXME: Conversion routines don't belong here */
+/**
+ * @brief Converts ARGB8888 pixel data to GRY8 (alpha channel).
+ * @param dst Pointer to the destination buffer (GRY8).
+ * @param src Pointer to the source buffer (ARGB8888).
+ * @param len Number of pixels to convert.
+ */
 static inline void
 _pixels_argb_to_gry8_convert(uint8_t *dst, const uint32_t *src, int len)
 {
@@ -86,6 +119,13 @@ _pixels_argb_to_gry8_convert(uint8_t *dst, const uint32_t *src, int len)
      }
 }
 
+/**
+ * @brief Converts GRY8 (alpha channel) pixel data to ARGB8888.
+ * @param dst Pointer to the destination buffer (ARGB8888).
+ * @param src Pointer to the source buffer (GRY8).
+ * @param len Number of pixels to convert.
+ * @note The R, G, B components are filled with the alpha value.
+ */
 static inline void
 _pixels_gry8_to_argb_convert(uint32_t *dst, const uint8_t *src, int len)
 {
@@ -97,12 +137,30 @@ _pixels_gry8_to_argb_convert(uint32_t *dst, const uint8_t *src, int len)
      }
 }
 
+/**
+ * @brief Checks if an Evas_GL_Image is backed by an FBO.
+ * @param glim The Evas_GL_Image to check.
+ * @return EINA_TRUE if the image is FBO-backed, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _evas_gl_image_is_fbo(Evas_GL_Image *glim)
 {
    return glim && glim->tex && glim->tex->pt && glim->tex->pt->fb;
 }
 
+/**
+ * @brief Prepares the GL buffer for use.
+ * @param obj The Evas_Ector_GL_Buffer object.
+ * @param pd Private data of the Evas_Ector_GL_Buffer.
+ * @param engine Pointer to the Render_Engine_GL_Generic.
+ * @param w Width of the buffer.
+ * @param h Height of the buffer.
+ * @param cspace Colorspace of the buffer.
+ * @param flags Buffer flags (currently unused).
+ *
+ * This function initializes the internal Evas_GL_Image based on the provided
+ * dimensions and colorspace. It is intended to be called once during setup.
+ */
 EOLIAN static void
 _evas_ector_gl_buffer_gl_buffer_prepare(Eo *obj, Evas_Ector_GL_Buffer_Data *pd,
                                         void *engine,
@@ -137,6 +195,17 @@ on_fail:
    pd->glim = NULL;
 }
 
+/**
+ * @brief Retrieves the internal Evas_GL_Image.
+ * @param pd Private data of the Evas_Ector_GL_Buffer.
+ * @param render EINA_TRUE if the image is being retrieved for rendering (FBO usage),
+ *               EINA_FALSE otherwise.
+ * @return Pointer to the Evas_GL_Image on success, NULL on failure.
+ *
+ * This helper function ensures the image is not currently mapped and handles
+ * FBO-specific logic if @p render is true. It also increments the reference
+ * count of the returned image.
+ */
 static inline void *
 _image_get(Evas_Ector_GL_Buffer_Data *pd, Eina_Bool render)
 {
@@ -159,6 +228,13 @@ on_fail:
    return NULL;
 }
 
+/**
+ * @brief Gets the Evas_GL_Image for drawing operations (not necessarily FBO).
+ * @param obj The Evas_Ector_GL_Buffer object (unused).
+ * @param pd Private data of the Evas_Ector_GL_Buffer.
+ * @return Pointer to the Evas_GL_Image.
+ * @see _image_get
+ */
 EOLIAN static void *
 _evas_ector_gl_buffer_evas_ector_buffer_drawable_image_get(Eo *obj EINA_UNUSED,
                                                            Evas_Ector_GL_Buffer_Data *pd)
@@ -166,6 +242,13 @@ _evas_ector_gl_buffer_evas_ector_buffer_drawable_image_get(Eo *obj EINA_UNUSED,
    return _image_get(pd, EINA_FALSE);
 }
 
+/**
+ * @brief Gets the Evas_GL_Image for rendering operations (FBO).
+ * @param obj The Evas_Ector_GL_Buffer object (unused).
+ * @param pd Private data of the Evas_Ector_GL_Buffer.
+ * @return Pointer to the Evas_GL_Image (FBO).
+ * @see _image_get
+ */
 EOLIAN static void *
 _evas_ector_gl_buffer_evas_ector_buffer_render_image_get(Eo *obj EINA_UNUSED,
                                                          Evas_Ector_GL_Buffer_Data *pd)
@@ -173,6 +256,16 @@ _evas_ector_gl_buffer_evas_ector_buffer_render_image_get(Eo *obj EINA_UNUSED,
    return _image_get(pd, EINA_TRUE);
 }
 
+/**
+ * @brief Releases an Evas_GL_Image previously obtained via _drawable_image_get or _render_image_get.
+ * @param obj The Evas_Ector_GL_Buffer object (unused).
+ * @param pd Private data of the Evas_Ector_GL_Buffer.
+ * @param image The Evas_GL_Image to release.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ *
+ * This function decrements the reference count of the image. If the image was
+ * used for rendering (FBO), it might detach the surface.
+ */
 EOLIAN static Eina_Bool
 _evas_ector_gl_buffer_evas_ector_buffer_engine_image_release(Eo *obj EINA_UNUSED,
                                                              Evas_Ector_GL_Buffer_Data *pd,
@@ -189,6 +282,13 @@ _evas_ector_gl_buffer_evas_ector_buffer_engine_image_release(Eo *obj EINA_UNUSED
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the dimensions of the buffer.
+ * @param obj The Evas_Ector_GL_Buffer object (unused).
+ * @param pd Private data of the Evas_Ector_GL_Buffer.
+ * @param[out] w Pointer to store the width.
+ * @param[out] h Pointer to store the height.
+ */
 EOLIAN static void
 _evas_ector_gl_buffer_ector_buffer_size_get(const Eo *obj EINA_UNUSED,
                                             Evas_Ector_GL_Buffer_Data *pd,
@@ -198,6 +298,12 @@ _evas_ector_gl_buffer_ector_buffer_size_get(const Eo *obj EINA_UNUSED,
    if (h) *h = pd->glim->h;
 }
 
+/**
+ * @brief Gets the native colorspace of the buffer.
+ * @param obj The Evas_Ector_GL_Buffer object (unused).
+ * @param pd Private data of the Evas_Ector_GL_Buffer.
+ * @return The native Efl_Gfx_Colorspace of the buffer (EFL_GFX_COLORSPACE_GRY8 or EFL_GFX_COLORSPACE_ARGB8888).
+ */
 EOLIAN static Efl_Gfx_Colorspace
 _evas_ector_gl_buffer_ector_buffer_cspace_get(const Eo *obj EINA_UNUSED,
                                               Evas_Ector_GL_Buffer_Data *pd)
@@ -208,6 +314,12 @@ _evas_ector_gl_buffer_ector_buffer_cspace_get(const Eo *obj EINA_UNUSED,
      return EFL_GFX_COLORSPACE_ARGB8888;
 }
 
+/**
+ * @brief Gets the flags of the buffer.
+ * @param obj The Evas_Ector_GL_Buffer object (unused).
+ * @param pd Private data of the Evas_Ector_GL_Buffer (unused).
+ * @return A combination of Ector_Buffer_Flag values indicating buffer capabilities.
+ */
 EOLIAN static Ector_Buffer_Flag
 _evas_ector_gl_buffer_ector_buffer_flags_get(const Eo *obj EINA_UNUSED,
                                              Evas_Ector_GL_Buffer_Data *pd EINA_UNUSED)
@@ -216,6 +328,26 @@ _evas_ector_gl_buffer_ector_buffer_flags_get(const Eo *obj EINA_UNUSED,
          ECTOR_BUFFER_FLAG_CPU_WRITABLE | ECTOR_BUFFER_FLAG_RENDERABLE;
 }
 
+/**
+ * @brief Maps a region of the buffer for direct CPU access.
+ * @param obj The Evas_Ector_GL_Buffer object (unused).
+ * @param pd Private data of the Evas_Ector_GL_Buffer.
+ * @param[out] length Pointer to store the length of the mapped region in bytes.
+ * @param mode Access mode flags (e.g., ECTOR_BUFFER_ACCESS_FLAG_READ, ECTOR_BUFFER_ACCESS_FLAG_WRITE).
+ * @param x X-coordinate of the region to map.
+ * @param y Y-coordinate of the region to map.
+ * @param w Width of the region to map (0 for full width from x).
+ * @param h Height of the region to map (0 for full height from y).
+ * @param cspace Requested colorspace for the mapped data. If different from the buffer's
+ *               native colorspace, conversion will occur.
+ * @param[out] stride Pointer to store the stride (bytes per row) of the mapped region.
+ * @return Pointer to the mapped memory region on success, NULL on failure.
+ *
+ * This function allows direct access to the buffer's pixel data. If the requested
+ * colorspace (@p cspace) is EFL_GFX_COLORSPACE_GRY8 and the buffer is ARGB8888,
+ * the data will be converted. If writing to an FBO-backed image, the image data
+ * might be detached and copied.
+ */
 EOLIAN static void *
 _evas_ector_gl_buffer_ector_buffer_map(Eo *obj EINA_UNUSED, Evas_Ector_GL_Buffer_Data *pd,
                                        unsigned int *length,
@@ -296,6 +428,18 @@ on_fail:
    return NULL;
 }
 
+/**
+ * @brief Unmaps a previously mapped region of the buffer.
+ * @param obj The Evas_Ector_GL_Buffer object (unused).
+ * @param pd Private data of the Evas_Ector_GL_Buffer.
+ * @param data Pointer to the mapped memory region (returned by _ector_buffer_map).
+ * @param length Length of the mapped region in bytes (returned by _ector_buffer_map).
+ *
+ * This function releases the mapped memory region. If the region was mapped for
+ * writing, the changes are applied to the underlying Evas_GL_Image. This might
+ * involve colorspace conversion (e.g., from GRY8 back to ARGB8888) and updating
+ * the GL texture.
+ */
 EOLIAN static void
 _evas_ector_gl_buffer_ector_buffer_unmap(Eo *obj EINA_UNUSED, Evas_Ector_GL_Buffer_Data *pd,
                                          void *data, unsigned int length)
@@ -354,6 +498,15 @@ _evas_ector_gl_buffer_ector_buffer_unmap(Eo *obj EINA_UNUSED, Evas_Ector_GL_Buff
    ERR("Tried to unmap a non-mapped region!");
 }
 
+/**
+ * @brief Finalizes the Evas_Ector_GL_Buffer object.
+ * @param obj The Evas_Ector_GL_Buffer object.
+ * @param pd Private data of the Evas_Ector_GL_Buffer.
+ * @return The finalized Efl_Object.
+ *
+ * Ensures that the buffer was properly initialized (i.e., pd->glim is not NULL)
+ * before calling the superclass finalize method.
+ */
 EOLIAN static Efl_Object *
 _evas_ector_gl_buffer_efl_object_finalize(Eo *obj, Evas_Ector_GL_Buffer_Data *pd)
 {
@@ -365,6 +518,15 @@ _evas_ector_gl_buffer_efl_object_finalize(Eo *obj, Evas_Ector_GL_Buffer_Data *pd
    return efl_finalize(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Destructor for the Evas_Ector_GL_Buffer object.
+ * @param obj The Evas_Ector_GL_Buffer object.
+ * @param pd Private data of the Evas_Ector_GL_Buffer.
+ *
+ * Frees the internal Evas_GL_Image and calls the superclass destructor.
+ * Any active maps should ideally be unmapped before destruction, though
+ * this function does not explicitly handle unmapping.
+ */
 EOLIAN static void
 _evas_ector_gl_buffer_efl_object_destructor(Eo *obj, Evas_Ector_GL_Buffer_Data *pd)
 {

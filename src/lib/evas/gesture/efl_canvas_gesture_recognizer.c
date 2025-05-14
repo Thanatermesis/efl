@@ -5,6 +5,18 @@
 #define MY_CLASS                                    EFL_CANVAS_GESTURE_RECOGNIZER_CLASS
 #include "efl_canvas_gesture_recognizer.eo.h"
 
+/**
+ * @internal
+ * @brief Retrieves a configuration value for the gesture recognizer.
+ *
+ * This function finds the EFL_CONFIG_INTERFACE provider for the given Evas object
+ * and retrieves the configuration value associated with the specified name.
+ *
+ * @param[in] obj The Evas object (gesture recognizer).
+ * @param[in] name The name of the configuration property to retrieve.
+ * @return A pointer to an Eina_Value containing the configuration value,
+ *         or @c NULL if the provider or configuration is not found.
+ */
 Eina_Value *
 _recognizer_config_get(const Eo *obj, const char *name)
 {
@@ -25,6 +37,19 @@ _efl_canvas_gesture_recognizer_continues_set(Eo *obj EINA_UNUSED, Efl_Canvas_Ges
    pd->continues = !!value;
 }
 
+/**
+ * @internal
+ * @brief Determines the direction of movement along one axis.
+ *
+ * Compares two coordinate values (e.g., x-coordinates) to determine
+ * if the movement is negative, positive, or none.
+ *
+ * @param[in] xx1 The starting coordinate.
+ * @param[in] xx2 The ending coordinate.
+ * @return -1 if xx2 < xx1 (movement in negative direction).
+ * @return  1 if xx2 > xx1 (movement in positive direction).
+ * @return  0 if xx2 == xx1 (no movement).
+ */
 int
 _direction_get(Evas_Coord xx1, Evas_Coord xx2)
 {
@@ -34,13 +59,40 @@ _direction_get(Evas_Coord xx1, Evas_Coord xx2)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Checks if a touch event involves multiple touch points.
+ *
+ * @param[in] event The gesture touch event.
+ * @return @c EINA_TRUE if the event has more than one touch point,
+ *         @c EINA_FALSE otherwise.
+ */
 Eina_Bool
 _event_multi_touch_get(const Efl_Canvas_Gesture_Touch *event)
 {
    return efl_gesture_touch_points_count_get(event) > 1;
 }
 
-
+/**
+ * @internal
+ * @brief Calculates the angle in degrees between two points (xx1,yy1) and (xx2,yy2).
+ *
+ * The angle is calculated with respect to a coordinate system where 0 degrees
+ * is to the right (positive x-axis), and angles increase counter-clockwise.
+ * The function then transforms this angle to a system where 0 degrees is upwards
+ * (negative y-axis), and angles increase clockwise.
+ *
+ * Example:
+ * - (0,0) to (10,0)  -> result is 0 in atan, transformed to 90.
+ * - (0,0) to (0,-10) -> result is 90 in atan, transformed to 0.
+ *
+ * @param[in] xx1 X-coordinate of the first point.
+ * @param[in] yy1 Y-coordinate of the first point.
+ * @param[in] xx2 X-coordinate of the second point.
+ * @param[in] yy2 Y-coordinate of the second point.
+ * @return The calculated angle in degrees, ranging from 0 to 359.9...
+ *         Returns -1 if calculation is not possible (e.g. points are identical and not on axis lines).
+ */
 double
 _angle_get(Evas_Coord xx1, Evas_Coord yy1, Evas_Coord xx2, Evas_Coord yy2)
 {
@@ -89,6 +141,21 @@ _angle_get(Evas_Coord xx1, Evas_Coord yy1, Evas_Coord xx2, Evas_Coord yy2)
    return rt;
 }
 
+/**
+ * @internal
+ * @brief Calculates the distance (gap) between two touch points and their midpoint.
+ *
+ * This function computes the Euclidean distance between (xx1, yy1) and (xx2, yy2).
+ * It also calculates the coordinates of the midpoint between these two points.
+ *
+ * @param[in] xx1 X-coordinate of the first touch point.
+ * @param[in] yy1 Y-coordinate of the first touch point.
+ * @param[in] xx2 X-coordinate of the second touch point.
+ * @param[in] yy2 Y-coordinate of the second touch point.
+ * @param[out] x Pointer to store the X-coordinate of the midpoint.
+ * @param[out] y Pointer to store the Y-coordinate of the midpoint.
+ * @return The distance (gap) between the two touch points as an Evas_Coord.
+ */
 Evas_Coord
 _finger_gap_length_get(Evas_Coord xx1,
                        Evas_Coord yy1,

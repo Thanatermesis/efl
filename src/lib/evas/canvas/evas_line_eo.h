@@ -4,6 +4,15 @@
 #ifndef _EVAS_LINE_EO_CLASS_TYPE
 #define _EVAS_LINE_EO_CLASS_TYPE
 
+/**
+ * @typedef Evas_Line
+ * @brief Represents an Evas Line object.
+ *
+ * This is an alias for the Eo type, specific to Evas Line objects.
+ * It is used throughout the Evas API when dealing with line objects.
+ *
+ * @ingroup Evas_Line
+ */
 typedef Eo Evas_Line;
 
 #endif

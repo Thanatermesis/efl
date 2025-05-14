@@ -13,16 +13,35 @@
 #include "elm_priv.h"
 #include "efl_ui_collection_focus_manager.eo.h"
 
+/**
+ * @brief Private data for the Efl_Ui_Collection_Focus_Manager class.
+ */
 typedef struct {
-   Eo *collection;
+   Eo *collection; /**< The collection object this focus manager belongs to. */
 } Efl_Ui_Collection_Focus_Manager_Data;
 
+/**
+ * @brief Structure to optimize access to items in an Eina_List.
+ *
+ * This structure caches the last accessed item and its index to speed up
+ * subsequent accesses, especially for sequential or nearby elements.
+ */
 typedef struct {
-   unsigned int last_index;
-   const Eina_List *current;
-   Eina_List **items;
+   unsigned int last_index; /**< Index of the last accessed item. */
+   const Eina_List *current; /**< Pointer to the last accessed Eina_List node. */
+   Eina_List **items; /**< Pointer to the Eina_List itself. */
 } Fast_Accessor;
 
+/**
+ * @brief Retrieves an Eina_List node at a specific index using the fast accessor.
+ *
+ * This function optimizes list traversal by starting from the last accessed
+ * position, or by choosing the shortest path from the beginning or end of the list.
+ *
+ * @param accessor The fast accessor instance.
+ * @param idx The index of the item to retrieve.
+ * @return The Eina_List node at the given index, or NULL if out of bounds or not found.
+ */
 static const Eina_List*
 _fast_accessor_get_at(Fast_Accessor *accessor, unsigned int idx)
 {
@@ -82,6 +101,16 @@ _fast_accessor_get_at(Fast_Accessor *accessor, unsigned int idx)
    return over;
 }
 
+/**
+ * @brief Initializes a fast accessor.
+ *
+ * Sets up the accessor to work with the provided Eina_List.
+ * This is a workaround for cases where an accessor might be needed
+ * before the list is fully populated.
+ *
+ * @param accessor The fast accessor instance to initialize.
+ * @param items A pointer to the Eina_List that will be accessed.
+ */
 static void
 _fast_accessor_init(Fast_Accessor *accessor, Eina_List **items)
 {
@@ -91,6 +120,16 @@ _fast_accessor_init(Fast_Accessor *accessor, Eina_List **items)
    accessor->items = items;
 }
 
+/**
+ * @brief Updates the fast accessor when an element is removed from the list.
+ *
+ * If the removed element was the currently cached element, this function
+ * adjusts the cache to point to a nearby element (next, previous, or NULL
+ * if the list becomes empty or the removed element was the only one).
+ *
+ * @param accessor The fast accessor instance.
+ * @param removed_elem The Eina_List node that was removed.
+ */
 static void
 _fast_accessor_remove(Fast_Accessor *accessor, const Eina_List *removed_elem)
 {
@@ -127,32 +166,46 @@ _fast_accessor_remove(Fast_Accessor *accessor, const Eina_List *removed_elem)
 #define MY_DATA_GET(obj, pd) \
   Efl_Ui_Collection_Data *pd = efl_data_scope_get(obj, MY_CLASS);
 
+/**
+ * @brief Private data for the Efl_Ui_Collection class.
+ */
 typedef struct {
-   Efl_Ui_Scroll_Manager *smanager;
-   Efl_Ui_Pan *pan;
-   Eina_List *selected;
-   Eina_List *items;
-   Efl_Ui_Selection *fallback;
-   Efl_Ui_Select_Mode mode;
-   Efl_Ui_Layout_Orientation dir;
-   Eina_Size2D content_min_size;
-   Efl_Ui_Position_Manager_Entity *pos_man;
-   Eina_Future *selection_changed_job;
+   Efl_Ui_Scroll_Manager *smanager; /**< Scroll manager for the collection. */
+   Efl_Ui_Pan *pan; /**< Pan object used for scrolling content. */
+   Eina_List *selected; /**< List of currently selected items. */
+   Eina_List *items; /**< List of all items in the collection. */
+   Efl_Ui_Selection *fallback; /**< Fallback item to select when selection is empty. */
+   Efl_Ui_Select_Mode mode; /**< Current selection mode (single, multi, none). */
+   Efl_Ui_Layout_Orientation dir; /**< Layout orientation (vertical, horizontal). */
+   Eina_Size2D content_min_size; /**< Minimum size of the content. */
+   Efl_Ui_Position_Manager_Entity *pos_man; /**< Position manager for item layout. */
+   Eina_Future *selection_changed_job; /**< Future for debouncing selection changed events. */
    struct {
-      Eina_Bool w;
-      Eina_Bool h;
-   } match_content;
-   Fast_Accessor obj_accessor;
-   Fast_Accessor size_accessor;
-   Efl_Gfx_Entity *sizer;
-   unsigned int start_id, end_id;
-   Eina_Bool allow_manual_deselection : 1;
-   Eina_Bool api_selection_change : 1;
+      Eina_Bool w; /**< Match content width. */
+      Eina_Bool h; /**< Match content height. */
+   } match_content; /**< Flags for matching content size. */
+   Fast_Accessor obj_accessor; /**< Fast accessor for item objects. */
+   Fast_Accessor size_accessor; /**< Fast accessor for item sizes. */
+   Efl_Gfx_Entity *sizer; /**< Sizer object for the pan content. */
+   unsigned int start_id, end_id; /**< Range of currently visible item IDs. */
+   Eina_Bool allow_manual_deselection : 1; /**< Whether manual deselection is allowed. */
+   Eina_Bool api_selection_change : 1; /**< Flag to indicate if selection change is API-driven. */
 } Efl_Ui_Collection_Data;
 
 static Eina_Bool register_item(Eo *obj, Efl_Ui_Collection_Data *pd, Efl_Ui_Item *item);
 static Eina_Bool unregister_item(Eo *obj, Efl_Ui_Collection_Data *pd, Efl_Ui_Item *item);
 
+/**
+ * @brief Flushes the minimum size of the collection to its graphics hint.
+ *
+ * This function updates the restricted minimum size hint of the collection object
+ * based on the current content_min_size and match_content flags.
+ * If match_content.w is false, width is set to -1 (unrestricted).
+ * If match_content.h is false, height is set to -1 (unrestricted).
+ *
+ * @param obj The collection object.
+ * @param pd The private data of the collection.
+ */
 static void
 flush_min_size(Eo *obj, Efl_Ui_Collection_Data *pd)
 {
@@ -167,6 +220,20 @@ flush_min_size(Eo *obj, Efl_Ui_Collection_Data *pd)
    efl_gfx_hint_size_restricted_min_set(obj, tmp);
 }
 
+/**
+ * @brief Clamps an index to indicate its position relative to list bounds.
+ *
+ * @param pd The private data of the collection.
+ * @param index The index to clamp.
+ * @return -1 if index is before the start, 1 if after the end, 0 if within bounds (inclusive of negative indexing).
+ * For example, if list count is 5:
+ *   index -10 -> returns -1
+ *   index  -5 -> returns 0 (valid negative index)
+ *   index   0 -> returns 0
+ *   index   4 -> returns 0
+ *   index   5 -> returns 1
+ *   index  10 -> returns 1
+ */
 static int
 clamp_index(Efl_Ui_Collection_Data *pd, int index)
 {
@@ -177,6 +244,24 @@ clamp_index(Efl_Ui_Collection_Data *pd, int index)
    return 0;
 }
 
+/**
+ * @brief Adjusts a potentially negative or out-of-bounds index to a valid list index.
+ *
+ * Negative indices are counted from the end of the list.
+ * Indices beyond the list bounds are clamped to the first or last valid index.
+ *
+ * @param pd The private data of the collection.
+ * @param index The index to adjust.
+ * @return A valid index within the range [0, count-1]. If the list is empty, behavior might be unexpected for positive indices.
+ * For example, if list count is 5:
+ *   index -10 -> returns 0
+ *   index  -5 -> returns 0
+ *   index  -1 -> returns 4
+ *   index   0 -> returns 0
+ *   index   4 -> returns 4
+ *   index   5 -> returns 4
+ *   index  10 -> returns 4
+ */
 static int
 index_adjust(Efl_Ui_Collection_Data *pd, int index)
 {
@@ -190,6 +275,14 @@ index_adjust(Efl_Ui_Collection_Data *pd, int index)
    return index;
 }
 
+/**
+ * @brief Callback for when the pan viewport geometry changes.
+ *
+ * Updates the position manager with the new viewport.
+ *
+ * @param data The collection object.
+ * @param ev The event information (unused).
+ */
 static void
 _pan_viewport_changed_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -199,6 +292,14 @@ _pan_viewport_changed_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_position_manager_entity_viewport_set(pd->pos_man, rect);
 }
 
+/**
+ * @brief Callback for when the pan content position changes.
+ *
+ * Updates the position manager with the new relative scroll position.
+ *
+ * @param data The collection object.
+ * @param ev The event information, containing the new Eina_Position2D.
+ */
 static void
 _pan_position_changed_cb(void *data, const Efl_Event *ev)
 {
@@ -221,6 +322,18 @@ EFL_CALLBACKS_ARRAY_DEFINE(pan_events_cb,
   {EFL_GFX_ENTITY_EVENT_POSITION_CHANGED, _pan_viewport_changed_cb},
 )
 
+/**
+ * @brief Internal function to scroll an item into view.
+ *
+ * Calculates the item's position relative to the viewport and scrolls
+ * the scroll manager to make the item visible.
+ *
+ * @param obj The collection object (unused).
+ * @param pd The private data of the collection.
+ * @param item The item to scroll into view.
+ * @param align Alignment parameter (currently unused, FIXME).
+ * @param anim Whether to animate the scroll.
+ */
 static void
 _item_scroll_internal(Eo *obj EINA_UNUSED,
                       Efl_Ui_Collection_Data *pd,
@@ -237,6 +350,7 @@ _item_scroll_internal(Eo *obj EINA_UNUSED,
    view = efl_ui_scrollable_viewport_geometry_get(pd->smanager);
    vpos = efl_ui_scrollable_content_pos_get(pd->smanager);
 
+   // Adjust item position to be relative to the scrollable content origin
    ipos.x = ipos.x + vpos.x - view.x;
    ipos.y = ipos.y + vpos.y - view.y;
 
@@ -268,26 +382,58 @@ _efl_ui_collection_efl_ui_multi_selectable_object_range_selected_iterator_new(Eo
    return eina_list_iterator_new(pd->selected);
 }
 
+/**
+ * @brief Fills depth information for an item.
+ *
+ * Determines if an item is a group leader, a child of a group, or a standalone item,
+ * and sets the depth accordingly.
+ * Depth 0: Standalone item.
+ * Depth 1: Group leader or child of a group.
+ *
+ * @param item The item to check.
+ * @param depth Pointer to store the calculated depth.
+ * @param leader Pointer to store whether the item is a depth leader (group header).
+ */
 static inline void
 _fill_depth(Eo *item, unsigned char *depth, Eina_Bool *leader)
 {
    if (efl_isa(item, EFL_UI_GROUP_ITEM_CLASS))
      {
-        *depth = 1;
+        *depth = 1; // Group item itself is a leader at depth 1
         *leader = EINA_TRUE;
      }
    else if (efl_ui_item_parent_get(item))
      {
-        *depth = 1;
+        *depth = 1; // Child of a group item is at depth 1, but not a leader
         *leader = EINA_FALSE;
      }
    else
      {
-        *leader = EINA_FALSE;
+        *leader = EINA_FALSE; // Standalone item
         *depth = 0;
      }
 }
 
+/**
+ * @brief Accessor function for the position manager to get sizes of a batch of items.
+ *
+ * This function is called by the position manager to retrieve the minimum combined
+ * size and depth information for a range of items.
+ *
+ * @param data The Fast_Accessor for sizes.
+ * @param conf Configuration for the size call, including the range of items.
+ *             `conf.range.start_id` is the starting index.
+ *             `conf.range.end_id` is the ending index (exclusive).
+ * @param memory A writable slice of memory to store the Efl_Ui_Position_Manager_Size_Batch_Entity results.
+ *               Each Efl_Ui_Position_Manager_Size_Batch_Entity should be filled with:
+ *               - `size`: The Eina_Size2D of the item.
+ *               - `element_depth`: The depth of the item (0 for root, 1 for child/group).
+ *               - `depth_leader`: EINA_TRUE if this item is a group leader.
+ * @return Efl_Ui_Position_Manager_Size_Batch_Result containing:
+ *         - `filled_items`: The number of items for which size info was written.
+ *         - `parent_size`: If the first item in the batch is part of a group and not a leader,
+ *                          this is the size of its parent group item.
+ */
 static Efl_Ui_Position_Manager_Size_Batch_Result
 _size_accessor_get_at(void *data, Efl_Ui_Position_Manager_Size_Call_Config conf, Eina_Rw_Slice memory)
 {
@@ -323,6 +469,26 @@ _size_accessor_get_at(void *data, Efl_Ui_Position_Manager_Size_Call_Config conf,
    return result;
 }
 
+/**
+ * @brief Accessor function for the position manager to get a batch of item objects.
+ *
+ * This function is called by the position manager to retrieve the Efl_Gfx_Entity
+ * objects and depth information for a range of items.
+ *
+ * @param data The Fast_Accessor for objects.
+ * @param range The range of items to retrieve.
+ *              `range.start_id` is the starting index.
+ *              `range.end_id` is the ending index (exclusive).
+ * @param memory A writable slice of memory to store the Efl_Ui_Position_Manager_Object_Batch_Entity results.
+ *               Each Efl_Ui_Position_Manager_Object_Batch_Entity should be filled with:
+ *               - `entity`: The Efl_Gfx_Entity of the item.
+ *               - `element_depth`: The depth of the item.
+ *               - `depth_leader`: EINA_TRUE if this item is a group leader.
+ * @return Efl_Ui_Position_Manager_Object_Batch_Result containing:
+ *         - `filled_items`: The number of items for which object info was written.
+ *         - `group`: If the first item in the batch is part of a group and not a leader,
+ *                    this is the Efl_Gfx_Entity of its parent group item.
+ */
 static Efl_Ui_Position_Manager_Object_Batch_Result
 _obj_accessor_get_at(void *data, Efl_Ui_Position_Manager_Request_Range range, Eina_Rw_Slice memory)
 {
@@ -419,14 +585,26 @@ _efl_ui_collection_efl_object_destructor(Eo *obj, Efl_Ui_Collection_Data *pd EIN
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Deselects all currently selected items in the collection.
+ *
+ * Iterates through the list of selected items and sets their selected state to EINA_FALSE.
+ * This function directly modifies the selection state of items, which might trigger
+ * individual item selection changed events.
+ *
+ * @param pd The private data of the collection.
+ */
 static void
 deselect_all(Efl_Ui_Collection_Data *pd)
 {
    while(pd->selected)
      {
         Eo *item = eina_list_data_get(pd->selected);
+        // Setting selected to FALSE will trigger _selection_changed,
+        // which removes the item from pd->selected.
         efl_ui_selectable_selected_set(item, EINA_FALSE);
-        EINA_SAFETY_ON_TRUE_RETURN(eina_list_data_get(pd->selected) == item);
+        // Safety check: ensure the item was indeed removed or list became NULL.
+        EINA_SAFETY_ON_TRUE_RETURN(pd->selected && eina_list_data_get(pd->selected) == item);
      }
 }
 
@@ -514,6 +692,17 @@ _efl_ui_collection_efl_ui_multi_selectable_select_mode_get(const Eo *obj EINA_UN
    return pd->mode;
 }
 
+/**
+ * @brief Callback for the scheduled selection changed job.
+ *
+ * This function is executed after a short delay (via efl_loop_job)
+ * to coalesce multiple selection changes into a single SELECTION_CHANGED event.
+ *
+ * @param o The collection object.
+ * @param data User data (unused).
+ * @param value Future value (unused).
+ * @return EINA_VALUE_EMPTY.
+ */
 static Eina_Value
 _schedule_selection_job_cb(Eo *o, void *data EINA_UNUSED, const Eina_Value value EINA_UNUSED)
 {
@@ -526,18 +715,37 @@ _schedule_selection_job_cb(Eo *o, void *data EINA_UNUSED, const Eina_Value value
    return EINA_VALUE_EMPTY;
 }
 
+/**
+ * @brief Schedules a job to emit the SELECTION_CHANGED event.
+ *
+ * This is used to debounce selection changes, ensuring that the
+ * SELECTION_CHANGED event is emitted only once after a series of
+ * rapid selection updates.
+ *
+ * @param obj The collection object.
+ * @param pd The private data of the collection.
+ */
 static void
 _schedule_selection_changed(Eo *obj, Efl_Ui_Collection_Data *pd)
 {
    Eina_Future *f;
 
-   if (pd->selection_changed_job) return;
+   if (pd->selection_changed_job) return; // Job already scheduled
 
    f = efl_loop_job(efl_main_loop_get());
    pd->selection_changed_job = efl_future_then(obj, f, _schedule_selection_job_cb);
 
 }
 
+/**
+ * @brief Applies the fallback selection if no items are currently selected.
+ *
+ * If a fallback item is set and the `pd->selected` list is empty,
+ * this function selects the fallback item.
+ *
+ * @param obj The collection object (unused).
+ * @param pd The private data of the collection.
+ */
 static void
 _apply_fallback(Eo *obj EINA_UNUSED, Efl_Ui_Collection_Data *pd)
 {
@@ -547,20 +755,53 @@ _apply_fallback(Eo *obj EINA_UNUSED, Efl_Ui_Collection_Data *pd)
      }
 }
 
+/**
+ * @brief Handles selection logic for single selection mode.
+ *
+ * If the `new_selection` is already selected, it deselects it (if manual deselection is allowed,
+ * though that check is typically done by the item itself before emitting SELECTED_CHANGED).
+ * Otherwise, it deselects all currently selected items. The `new_selection` will be
+ * added to `pd->selected` by the caller (`_selection_changed`).
+ *
+ * @param obj The collection object (unused).
+ * @param pd The private data of the collection.
+ * @param new_selection The item whose selection state is changing.
+ */
 static inline void
 _single_selection_behaviour(Eo *obj EINA_UNUSED, Efl_Ui_Collection_Data *pd, Efl_Ui_Selectable *new_selection)
 {
-   //we might get the situation that the item is already in the list and selected again, so just free the list, it will be rebuild below
+   // If the item being selected is already the sole selected item.
    if (eina_list_data_get(pd->selected) == new_selection)
      {
+       // This path is typically taken when an item is deselected.
+       // `deselect_all` (called by item's selected_set(FALSE)) would clear pd->selected.
+       // Here, we ensure pd->selected is cleared if it somehow still points to new_selection.
+       // This effectively means if the item is clicked again to deselect it (and it's the only one selected),
+       // pd->selected will be cleared.
        pd->selected = eina_list_free(pd->selected);
      }
    else
      {
+        // A new item is being selected, or an additional item in a mode that became single.
+        // Deselect all other items.
         deselect_all(pd);
      }
 }
 
+/**
+ * @brief Handles changes in an item's selection state.
+ *
+ * This function is called when an item within the collection emits the
+ * EFL_UI_EVENT_SELECTED_CHANGED event. It updates the collection's
+ * internal list of selected items (`pd->selected`) based on the selection mode
+ * and the item's new state. It also handles fallback selection and schedules
+ * the emission of the collection's own SELECTION_CHANGED event.
+ *
+ * @param data The collection object.
+ * @param ev The event information, where `ev->object` is the item whose
+ *           selection changed, and `ev->info` is a pointer to an Eina_Bool
+ *           indicating the new selection state (EINA_TRUE for selected).
+ */
 static void
 _selection_changed(void *data, const Efl_Event *ev)
 {
@@ -604,6 +845,14 @@ _selection_changed(void *data, const Efl_Event *ev)
    _schedule_selection_changed(obj, pd);
 }
 
+/**
+ * @brief Callback for when an item in the collection is invalidated.
+ *
+ * This function unregisters the invalidated item from the collection.
+ *
+ * @param data The collection object.
+ * @param ev The event information, where `ev->object` is the item being invalidated.
+ */
 static void
 _invalidate_cb(void *data, const Efl_Event *ev)
 {
@@ -613,6 +862,15 @@ _invalidate_cb(void *data, const Efl_Event *ev)
    unregister_item(obj, pd, ev->object);
 }
 
+/**
+ * @brief Callback for when an item's hints (size, etc.) change.
+ *
+ * Notifies the position manager that the item's size has changed,
+ * so the layout can be updated.
+ *
+ * @param data The collection object.
+ * @param ev The event information, where `ev->object` is the item whose hints changed.
+ */
 static void
 _hints_changed_cb(void *data, const Efl_Event *ev)
 {
@@ -620,9 +878,21 @@ _hints_changed_cb(void *data, const Efl_Event *ev)
    MY_DATA_GET(obj, pd);
    int idx = eina_list_data_idx(pd->items, ev->object);
 
-   efl_ui_position_manager_entity_item_size_changed(pd->pos_man, idx, idx);
+   if (idx != -1 && pd->pos_man) // Ensure item is found and pos_man exists
+     efl_ui_position_manager_entity_item_size_changed(pd->pos_man, idx, idx);
 }
 
+/**
+ * @brief Redirects input events from items to collection-level item events.
+ *
+ * This function listens to input events (pressed, unpressed, longpressed, clicked)
+ * on individual items and re-emits them as corresponding EFL_UI_EVENT_ITEM_*
+ * events from the collection itself. The event info is augmented to include
+ * the item that originated the event.
+ *
+ * @param data The collection object.
+ * @param ev The input event from an item. `ev->object` is the item.
+ */
 static void
 _redirect_cb(void *data, const Efl_Event *ev)
 {
@@ -688,6 +958,18 @@ register_item(Eo *obj, Efl_Ui_Collection_Data *pd, Efl_Ui_Item *item)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Unregisters an item from the collection.
+ *
+ * This involves removing it as a sub-object, removing it from internal lists,
+ * detaching event callbacks, notifying the position manager, and cleaning up
+ * its relationship with the collection.
+ *
+ * @param obj The collection object.
+ * @param pd The private data of the collection.
+ * @param item The item to unregister.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., item not found).
+ */
 static Eina_Bool
 unregister_item(Eo *obj, Efl_Ui_Collection_Data *pd, Efl_Ui_Item *item)
 {
@@ -706,16 +988,27 @@ unregister_item(Eo *obj, Efl_Ui_Collection_Data *pd, Efl_Ui_Item *item)
    _fast_accessor_remove(&pd->obj_accessor, elem);
    _fast_accessor_remove(&pd->size_accessor, elem);
 
-   pd->items = eina_list_remove(pd->items, item);
-   pd->selected = eina_list_remove(pd->selected, item);
+   pd->items = eina_list_remove_list(pd->items, elem); // Use remove_list with the found elem
+   pd->selected = eina_list_remove(pd->selected, item); // item might not be in selected list, this is fine
    efl_event_callback_array_del(item, active_item(), obj);
-   efl_ui_position_manager_entity_item_removed(pd->pos_man, id, item);
+   if (pd->pos_man)
+     efl_ui_position_manager_entity_item_removed(pd->pos_man, id, item);
    efl_ui_item_container_set(item, NULL);
    efl_canvas_group_member_remove(pd->pan, item);
 
    return EINA_TRUE;
 }
 
+/**
+ * @brief Updates the position manager after an item is added.
+ *
+ * Notifies the position manager about the newly added item and its index.
+ * Also, resets fast accessors if the item is added at the beginning.
+ *
+ * @param obj The collection object (unused).
+ * @param pd The private data of the collection.
+ * @param subobj The item that was added.
+ */
 static void
 update_pos_man(Eo *obj EINA_UNUSED, Efl_Ui_Collection_Data *pd, Efl_Gfx_Entity *subobj)
 {
@@ -727,9 +1020,17 @@ update_pos_man(Eo *obj EINA_UNUSED, Efl_Ui_Collection_Data *pd, Efl_Gfx_Entity *
         pd->size_accessor.last_index = id;
         pd->size_accessor.current = pd->items;
      }
-   efl_ui_position_manager_entity_item_added(pd->pos_man, id, subobj);
+   if (pd->pos_man)
+     efl_ui_position_manager_entity_item_added(pd->pos_man, id, subobj);
 }
 
+/**
+ * @brief Fetches the representative parent (group item) of an item in a list node.
+ *
+ * @param lst The Eina_List node containing the item.
+ * @return The parent Efl_Ui_Item if it's a group, otherwise NULL.
+ *         Returns NULL if `lst` is NULL.
+ */
 static inline Efl_Ui_Item*
 fetch_rep_parent(Eina_List *lst)
 {
@@ -738,38 +1039,71 @@ fetch_rep_parent(Eina_List *lst)
 
    Efl_Ui_Item *it = eina_list_data_get(lst);
 
-   return efl_ui_item_parent_get(it);
+   return efl_ui_item_parent_get(it); // This returns the group item if 'it' is a child
 }
 
+/**
+ * @brief Checks the integrity of item grouping when an item is inserted.
+ *
+ * This function verifies that an item being inserted maintains consistent
+ * grouping. For example, an item should not be inserted into the middle of
+ * another group if it doesn't belong to that group, or between a group header
+ * and its children if it's not part of that group.
+ * If an integrity violation is detected, an error is logged, and the
+ * offending item is unregistered.
+ *
+ * @param obj The collection object.
+ * @param pd The private data of the collection.
+ * @param subobj The item that was just inserted and needs its group integrity checked.
+ * @return EINA_TRUE if integrity is maintained, EINA_FALSE if a violation occurred
+ *         and the item was unregistered.
+ */
 static Eina_Bool
 check_group_integrity(Eo *obj EINA_UNUSED, Efl_Ui_Collection_Data *pd, Efl_Gfx_Entity *subobj)
 {
    Eina_List *carrier_list = eina_list_data_find_list(pd->items, subobj), *prev_lst;
-   Efl_Ui_Item *next, *prev, *carrier;
+   Efl_Ui_Item *next_parent, *prev_parent, *carrier_parent;
 
    prev_lst = eina_list_prev(carrier_list);
-   next = fetch_rep_parent(eina_list_next(carrier_list));
-   prev = fetch_rep_parent(prev_lst);
-   carrier = fetch_rep_parent(carrier_list);
+   next_parent = fetch_rep_parent(eina_list_next(carrier_list));
+   prev_parent = fetch_rep_parent(prev_lst);
+   carrier_parent = fetch_rep_parent(carrier_list);
 
-   if (next && next == prev && carrier != prev)
+   // Case 1: Item inserted into the middle of an existing group, but doesn't belong to it.
+   // Example: [GroupA_Child1, NewItem_NoGroup, GroupA_Child2]
+   // Here, prev_parent is GroupA, next_parent is GroupA, carrier_parent is NULL.
+   if (next_parent && next_parent == prev_parent && carrier_parent != prev_parent)
      {
         //a item got inserted into the middle of one group, but does not have the correct group header, that is a bug
-        ERR("Inserting a item with the wrong group into another group(%p,%p,%p)", prev, carrier, next);
+        ERR("Inserting a item with the wrong group into another group (prev_parent:%p, carrier_parent:%p, next_parent:%p)", prev_parent, carrier_parent, next_parent);
         unregister_item(obj, pd, subobj);
         return EINA_FALSE;
      }
 
-   if (prev_lst && eina_list_data_get(prev_lst) == next && carrier != next)
+   // Case 2: Item inserted between a group header and its children, but doesn't belong to that group.
+   // This check seems complex. `eina_list_data_get(prev_lst) == next_parent` implies prev_lst item is the group header for next_parent's group.
+   // If carrier_parent is not this group header, it's an error.
+   // Example: [GroupA_Header, NewItem_NoGroup, GroupA_Child1]
+   // Here, prev_lst contains GroupA_Header. next_parent is GroupA. carrier_parent is NULL.
+   // `eina_list_data_get(prev_lst)` would be GroupA_Header. `next_parent` would be GroupA.
+   // This condition might be `efl_isa(eina_list_data_get(prev_lst), EFL_UI_GROUP_ITEM_CLASS) && eina_list_data_get(prev_lst) == next_parent`
+   // and `carrier_parent != next_parent`.
+   if (prev_lst && efl_isa(eina_list_data_get(prev_lst), EFL_UI_GROUP_ITEM_CLASS) && eina_list_data_get(prev_lst) == next_parent && carrier_parent != next_parent)
      {
         //a item got inserted between group header and group children, also a error
-        ERR("Inserting a item between group header, and group elements(%p,%p,%p)", prev_lst, eina_list_data_get(prev_lst), next);
+        ERR("Inserting a item between group header and group elements (prev_item_header:%p, carrier_parent:%p, next_item_parent:%p)", eina_list_data_get(prev_lst), carrier_parent, next_parent);
         unregister_item(obj, pd, subobj);
         return EINA_FALSE;
      }
-   if (!next && !prev && carrier && prev_lst && eina_list_data_get(prev_lst) != carrier)
+   // Case 3: Item with a group parent inserted, but its neighbors don't match its group, or it's at an edge incorrectly.
+   // Example: [OtherItem, GroupB_Child1_With_ParentB] where OtherItem is not ParentB.
+   // `!next_parent && !prev_parent` means item is at an edge or standalone regarding neighbors' parents.
+   // `carrier_parent` means the item itself has a parent.
+   // `prev_lst && eina_list_data_get(prev_lst) != carrier_parent` means previous item is not its parent.
+   // This implies it's the first child of its group, but the item before it is not its group header.
+   if (!next_parent && !prev_parent && carrier_parent && prev_lst && eina_list_data_get(prev_lst) != carrier_parent)
      {
-        ERR("Tried to insert a item with group, outside its group(%p,%p,%p)", next, prev, carrier);
+        ERR("Tried to insert a item with group, outside its group (next_parent:%p, prev_parent:%p, carrier_parent:%p, prev_item:%p)", next_parent, prev_parent, carrier_parent, eina_list_data_get(prev_lst));
         unregister_item(obj, pd, subobj);
         return EINA_FALSE;
      }
@@ -922,6 +1256,15 @@ _pos_content_size_changed_cb(void *data, const Efl_Event *ev)
    efl_gfx_entity_size_set(pd->sizer, *size);
 }
 
+/**
+ * @brief Callback for when the position manager reports a change in content minimum size.
+ *
+ * Updates the collection's internal `content_min_size` and then calls
+ * `flush_min_size` to apply this to the collection's hints.
+ *
+ * @param data The collection object.
+ * @param ev The event information, where `ev->info` is a pointer to Eina_Size2D.
+ */
 static void
 _pos_content_min_size_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -933,6 +1276,18 @@ _pos_content_min_size_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
    flush_min_size(data, pd);
 }
 
+/**
+ * @brief Callback for when the position manager reports a change in the visible range of items.
+ *
+ * Updates the collection's internal `start_id` and `end_id` which track the
+ * indices of the first and last (exclusive end) visible items.
+ *
+ * @param data The collection object.
+ * @param ev The event information, where `ev->info` is a pointer to
+ *           Efl_Ui_Position_Manager_Range_Update.
+ *           `info->start_id` is the first visible item index.
+ *           `info->end_id` is one past the last visible item index.
+ */
 static void
 _visible_range_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -1004,11 +1359,27 @@ _efl_ui_collection_efl_ui_widget_focus_state_apply(Eo *obj, Efl_Ui_Collection_Da
    return efl_ui_widget_focus_state_apply(efl_super(obj, MY_CLASS), current_state, configured_state, obj);
 }
 
+/**
+ * @brief Finds the Efl_Ui_Item that contains or is the given focused_element.
+ *
+ * Traverses up the widget hierarchy from `focused_element` until an
+ * Efl_Ui_Item is found, or until the top of the hierarchy is reached.
+ * This is used to map a focused sub-element back to its containing item
+ * in the collection.
+ *
+ * @param obj The collection object (unused).
+ * @param pd The private data of the collection (unused).
+ * @param focused_element The element that currently has focus, or is a candidate.
+ * @return The Efl_Ui_Item containing `focused_element`, or `focused_element` itself
+ *         if it is an Efl_Ui_Item. Returns NULL if no Efl_Ui_Item is found in the
+ *         ancestry or if `focused_element` is NULL.
+ */
 static Efl_Ui_Item *
 _find_item(Eo *obj EINA_UNUSED, Efl_Ui_Collection_Data *pd EINA_UNUSED, Eo *focused_element)
 {
    if (!focused_element) return NULL;
 
+   // Traverse up until an Efl_Ui_Item is found or no parent.
    while (focused_element && !efl_isa(focused_element, EFL_UI_ITEM_CLASS))
      {
         focused_element = efl_ui_widget_parent_get(focused_element);
@@ -1097,6 +1468,16 @@ _efl_ui_collection_efl_ui_focus_manager_move(Eo *obj, Efl_Ui_Collection_Data *pd
    return new_obj;
 }
 
+/**
+ * @brief Applies a selection state to a range of items starting from a given list node.
+ *
+ * Iterates through the Eina_List starting from `start` and sets the selected
+ * state of each Efl_Ui_Selectable item to `flag`.
+ *
+ * @param start The Eina_List node to start applying the selection state from.
+ *              The iteration proceeds through `eina_list_next()`.
+ * @param flag The selection state to apply (EINA_TRUE for select, EINA_FALSE for unselect).
+ */
 static void
 _selectable_range_apply(Eina_List *start, Eina_Bool flag)
 {
@@ -1125,38 +1506,78 @@ _efl_ui_collection_efl_ui_multi_selectable_all_unselect(Eo *obj EINA_UNUSED, Efl
    pd->api_selection_change = EINA_FALSE;
 }
 
+/**
+ * @brief Selects or unselects a range of items between two specified items (inclusive).
+ *
+ * Iterates through all items in the collection. Once the first item (`a` or `b`)
+ * is found, it starts applying the selection `flag` to it and all subsequent items
+ * until the second item (`b` or `a`) is found and processed.
+ * The order of `a` and `b` in the list determines the range.
+ *
+ * @param obj The collection object.
+ * @param pd The private data of the collection.
+ * @param a One boundary of the range.
+ * @param b The other boundary of the range.
+ * @param flag EINA_TRUE to select the range, EINA_FALSE to unselect.
+ */
 static void
 _range_selection_find(Eo *obj, Efl_Ui_Collection_Data *pd, Efl_Ui_Selectable *a, Efl_Ui_Selectable *b, Eina_Bool flag)
 {
    Eina_List *n;
    Efl_Ui_Selectable *c;
-   Eina_List *start = NULL, *end = NULL;
+   Eina_List *first_node = NULL, *second_node = NULL;
+   Eina_Bool in_range = EINA_FALSE;
 
    EINA_SAFETY_ON_FALSE_RETURN(efl_ui_widget_parent_get(a) == obj);
    EINA_SAFETY_ON_FALSE_RETURN(efl_ui_widget_parent_get(b) == obj);
 
+   // Find the list nodes for a and b to determine order
    EINA_LIST_FOREACH(pd->items, n, c)
      {
-        if (!start)
-          {
-             if (c == a)
-               start = n;
-             else if (c == b)
-               start = n;
-          }
-        else if (!end)
-          {
-             if (c == a)
-               end = n;
-             else if (c == b)
-               end = n;
-          }
-        /* if we have found the first element, start applying the flag */
-        if (start)
-          efl_ui_selectable_selected_set(c, flag);
-        if (end)
-          break;
+        if (c == a) first_node = n;
+        if (c == b) second_node = n;
+        if (first_node && second_node) break; // Found both
      }
+
+   // If one or both items are not in the list, do nothing.
+   if (!first_node || !second_node) return;
+
+   // Determine which one comes first.
+   // This requires iterating again or knowing indices. For simplicity, iterate again.
+   // A more efficient way would be to get indices of a and b.
+   Efl_Ui_Selectable *start_item = NULL, *end_item = NULL;
+   int idx_a = eina_list_data_idx(pd->items, a);
+   int idx_b = eina_list_data_idx(pd->items, b);
+
+   if (idx_a <= idx_b)
+     {
+        start_item = a;
+        end_item = b;
+     }
+   else
+     {
+        start_item = b;
+        end_item = a;
+     }
+
+   pd->api_selection_change = EINA_TRUE;
+   EINA_LIST_FOREACH(pd->items, n, c)
+     {
+        if (c == start_item)
+          in_range = EINA_TRUE;
+
+        if (in_range)
+          efl_ui_selectable_selected_set(c, flag);
+
+        if (c == end_item)
+          {
+             // If we started with end_item because it came first, ensure start_item (which is later) is also processed.
+             // This logic ensures the item itself is processed before breaking.
+             if (in_range) break;
+          }
+     }
+   pd->api_selection_change = EINA_FALSE;
+   _schedule_selection_changed(obj, pd); // Schedule a single update
 }
 
 EOLIAN static void
@@ -1199,12 +1620,27 @@ _efl_ui_collection_efl_ui_single_selectable_allow_manual_deselection_get(const E
 
 #include "efl_ui_collection.eo.c"
 
-#define ITEM_IS_OUTSIDE_VISIBLE(id) id < collection_pd->start_id || id > collection_pd->end_id
+#define ITEM_IS_OUTSIDE_VISIBLE(id) (id < collection_pd->start_id || id >= collection_pd->end_id) // end_id is exclusive
 
+/**
+ * @brief Ensures an item is available (visible and positioned) for focus.
+ *
+ * If an item is requested for focus but is currently outside the visible
+ * range managed by the position manager (e.g., virtualized), this function
+ * makes it visible and sets its geometry based on the position manager's layout.
+ *
+ * @param item The Efl_Ui_Item to make available.
+ * @param new_id The index of the item in the collection.
+ * @param pd The private data of the Efl_Ui_Collection.
+ */
 static inline void
 _assert_item_available(Eo *item, unsigned int new_id, Efl_Ui_Collection_Data *pd)
 {
-   EINA_SAFETY_ON_FALSE_RETURN(new_id < eina_list_count(pd->items));
+   EINA_SAFETY_ON_FALSE_RETURN(new_id < eina_list_count(pd->items)); // Ensure ID is valid
+   EINA_SAFETY_ON_NULL_RETURN(pd->pos_man); // Position manager must exist
+
+   // Make the item visible and set its geometry as determined by the position manager.
+   // This is crucial for items that might be virtualized (not currently realized UI elements).
    efl_gfx_entity_visible_set(item, EINA_TRUE);
    efl_gfx_entity_geometry_set(item, efl_ui_position_manager_entity_position_single_item(pd->pos_man, new_id));
 }

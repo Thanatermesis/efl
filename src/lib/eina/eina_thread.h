@@ -48,12 +48,17 @@ typedef uintptr_t Eina_Thread;
 /**
  * @typedef Eina_Thread_Cb
  * Type for the definition of a thread callback function
+ * @param data User-provided context for the thread function, passed from eina_thread_create().
+ * @param t The Eina_Thread identifier of the thread executing this callback.
+ * @return Pointer to data to be returned by eina_thread_join(), or @c NULL.
  */
 typedef void *(*Eina_Thread_Cb)(void *data, Eina_Thread t);
 
 /**
  * @typedef Eina_Thread_Cleanup_Cb
  * Type for the definition of a thread cleanup function
+ * @param data User-provided context for the cleanup function, typically the same data
+ *             passed to EINA_THREAD_CLEANUP_PUSH() or eina_thread_cancellable_run().
  */
 typedef void (*Eina_Thread_Cleanup_Cb) (void *data);
 
@@ -89,8 +94,10 @@ EINA_API Eina_Bool eina_thread_equal(Eina_Thread t1, Eina_Thread t2) EINA_WARN_U
  * @brief Creates a new thread, setting its priority and affinity.
  *
  * @param[out] t where to return the thread identifier. Must @b not be @c NULL.
- * @param[in] prio thread priority to use, usually EINA_THREAD_BACKGROUND
- * @param[in] affinity thread affinity to use. To not set affinity use @c -1.
+ * @param[in] prio Thread priority to use (e.g., #EINA_THREAD_NORMAL for general tasks,
+ *                 #EINA_THREAD_BACKGROUND for less critical tasks, or #EINA_THREAD_IDLE).
+ * @param[in] affinity CPU affinity for the thread (e.g., 0 for the first CPU core, 1 for the second).
+ *                     Use @c -1 to indicate no specific affinity (OS default).
  * @param[in] func function to run in the thread. Must @b not be @c NULL.
  * @param[in] data context data to provide to @a func as first argument.
  * @return #EINA_TRUE if thread was created, #EINA_FALSE on errors.
@@ -118,9 +125,10 @@ EINA_API extern const void *EINA_THREAD_JOIN_CANCELED;
  * @brief Joins a currently running thread, waiting until it finishes.
  *
  * This function will block the current thread until @a t
- * finishes. The returned value is the one returned by @a t @c func()
- * and may be @c NULL on errors. See @ref Eina_Error_Group to identify
- * problems.
+ * finishes. The returned value is the one returned by @a t's callback function @c func()
+ * (e.g., if @c func returns an @c int*, @c eina_thread_join() will return that @c int*).
+ * This value may be @c NULL on errors or if @c func() itself returns @c NULL.
+ * See @ref Eina_Error_Group to identify problems.
  *
  * @param[in] t thread identifier to wait.
  * @return value returned by @a t creation function @c func() or
@@ -141,7 +149,9 @@ EINA_API void *eina_thread_join(Eina_Thread t);
  * meaningful name attached to the thread.
  *
  * @param[in] t thread to set the name of
- * @param[in] name a string to name the thread - this cannot be NULL
+ * @param[in] name A string to name the thread (e.g., "MyWorkerThread"). This cannot be @c NULL.
+ *                 The name might be truncated by the operating system (e.g., to 15 characters
+ *                 plus the null terminator on some Linux systems).
  * @return EINA_TRUE if it succeeds in setting the name or EINA_FALSE
  *         otherwise.
  * @since 1.16
@@ -193,8 +203,9 @@ EINA_API Eina_Bool eina_thread_cancel(Eina_Thread t);
  * @param[in] cancellable If EINA_TRUE, this thread will be accept
  *        cancellation requests. If EINA_FALSE -- the default, it will
  *        ignore cancellation requests.
- * @param[in] was_cancellable If non-NULL, will return the previous state,
- *        shall you want to restore.
+ * @param[out] was_cancellable If non-NULL, the previous cancellable state of the thread
+ *        is stored here. This is useful, for example, to temporarily enable cancellation
+ *        within a critical code block and then restore the original state afterwards.
  *
  * @return EINA_TRUE if it succeeds in setting the cancellable state
  *        or EINA_FALSE otherwise.
@@ -255,6 +266,18 @@ EINA_API void eina_thread_cancel_checkpoint(void);
  * @since 1.19
  */
 #ifdef _WIN32
+/**
+ * @internal
+ * @brief Windows-specific implementation for EINA_THREAD_CLEANUP_PUSH.
+ *
+ * This function is called by the EINA_THREAD_CLEANUP_PUSH macro on Windows
+ * systems to register a cleanup handler. It is not typically called directly.
+ *
+ * @param[in] fn The cleanup function to register.
+ * @param[in] data The data to pass to the cleanup function.
+ * @return #EINA_TRUE on success, #EINA_FALSE on failure.
+ * @since 1.19
+ */
 EINA_API Eina_Bool
 eina_thread_cleanup_push(Eina_Thread_Cleanup_Cb fn, void *data);
 
@@ -293,6 +316,18 @@ eina_thread_cleanup_push(Eina_Thread_Cleanup_Cb fn, void *data);
  * @since 1.19
  */
 #ifdef _WIN32
+/**
+ * @internal
+ * @brief Windows-specific implementation for EINA_THREAD_CLEANUP_POP.
+ *
+ * This function is called by the EINA_THREAD_CLEANUP_POP macro on Windows
+ * systems to unregister a cleanup handler, optionally executing it.
+ * It is not typically called directly.
+ *
+ * @param[in] execute If non-zero (typically #EINA_TRUE), the cleanup handler is executed.
+ *                    If zero (typically #EINA_FALSE), it is just removed.
+ * @since 1.19
+ */
 EINA_API void
 eina_thread_cleanup_pop(int execute);
 
@@ -306,6 +341,9 @@ eina_thread_cleanup_pop(int execute);
 /**
  * @typedef Eina_Thread_Cancellable_Run_Cb
  * Type for the definition of a cancellable callback to run.
+ * @param data User-provided context for the callback, passed from eina_thread_cancellable_run().
+ * @return Pointer to data returned by the callback, or @c NULL. This value will be
+ *         the return value of eina_thread_cancellable_run().
  *
  * @since 1.19
  */

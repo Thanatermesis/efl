@@ -7,11 +7,27 @@
 
 #define MY_CLASS EFL_UI_FOCUS_MANAGER_SUB_MIXIN
 #define MY_DATA(o, p) Efl_Ui_Focus_Manager_Sub_Data *p = efl_data_scope_get(o, MY_CLASS);
+
+/**
+ * @brief Private data for the Efl_Ui_Focus_Manager_Sub mixin.
+ */
 typedef struct {
-    Efl_Ui_Focus_Manager *manager;//the manager where current_border is currently registered
-    Eina_List *current_border; //the current set of widgets which is registered as borders
+    Efl_Ui_Focus_Manager *manager; /**< The manager where current_border is currently registered. */
+    Eina_List *current_border;     /**< The current set of widgets registered as borders.
+                                     * This list contains Efl_Ui_Focus_Object instances.
+                                     * Example: (obj1, obj2, obj3) */
 } Efl_Ui_Focus_Manager_Sub_Data;
 
+/**
+ * @brief Computes the set difference of two lists (a - b).
+ *
+ * Returns a new list containing elements that are in list 'a' but not in list 'b'.
+ * The caller is responsible for freeing the returned list.
+ *
+ * @param a The first list.
+ * @param b The second list.
+ * @return A new list representing a - b, or NULL on failure.
+ */
 static Eina_List*
 _set_a_without_b(Eina_List *a, Eina_List *b)
 {
@@ -28,6 +44,14 @@ _set_a_without_b(Eina_List *a, Eina_List *b)
    return a_out;
 }
 
+/**
+ * @brief Callback for when a border object is invalidated.
+ *
+ * Removes the invalidated object from the current_border list.
+ *
+ * @param data The Efl_Ui_Focus_Manager_Sub instance.
+ * @param ev The event information, where ev->object is the invalidated Efl_Ui_Focus_Object.
+ */
 static void
 _invalidate_cb(void *data, const Efl_Event *ev)
 {
@@ -38,6 +62,14 @@ _invalidate_cb(void *data, const Efl_Event *ev)
    pd->current_border = eina_list_remove(pd->current_border, ev->object);
 }
 
+/**
+ * @brief Registers a focus node with the parent manager and sets up an invalidate callback.
+ *
+ * @param obj The Efl_Ui_Focus_Manager_Sub instance (acting as the sub-manager).
+ * @param par_m The parent Efl_Ui_Focus_Manager.
+ * @param node The Efl_Ui_Focus_Object to register.
+ * @param logical The logical parent for focus calculation purposes.
+ */
 static void
 _register(Efl_Ui_Focus_Manager *obj, Efl_Ui_Focus_Manager *par_m, Efl_Ui_Focus_Object *node, Efl_Ui_Focus_Object *logical)
 {
@@ -46,6 +78,13 @@ _register(Efl_Ui_Focus_Manager *obj, Efl_Ui_Focus_Manager *par_m, Efl_Ui_Focus_O
    efl_event_callback_add(node, EFL_EVENT_INVALIDATE, _invalidate_cb, obj);
 }
 
+/**
+ * @brief Unregisters a focus node from the parent manager and removes the invalidate callback.
+ *
+ * @param obj The Efl_Ui_Focus_Manager_Sub instance.
+ * @param par_m The parent Efl_Ui_Focus_Manager.
+ * @param node The Efl_Ui_Focus_Object to unregister.
+ */
 static void
 _unregister(Efl_Ui_Focus_Manager *obj EINA_UNUSED, Efl_Ui_Focus_Manager *par_m, Efl_Ui_Focus_Object *node)
 {
@@ -54,6 +93,15 @@ _unregister(Efl_Ui_Focus_Manager *obj EINA_UNUSED, Efl_Ui_Focus_Manager *par_m, 
    efl_event_callback_del(node, EFL_EVENT_INVALIDATE, _invalidate_cb, obj);
 }
 
+/**
+ * @brief Updates the registered border elements based on the current viewport.
+ *
+ * This function identifies new elements in the viewport to register them
+ * and old elements no longer in the viewport to unregister them.
+ *
+ * @param obj The Efl_Ui_Focus_Manager_Sub instance.
+ * @param pd The private data for the instance.
+ */
 static void
 _border_flush(Eo *obj, Efl_Ui_Focus_Manager_Sub_Data *pd)
 {
@@ -95,6 +143,14 @@ _border_flush(Eo *obj, Efl_Ui_Focus_Manager_Sub_Data *pd)
    pd->current_border = selection;
 }
 
+/**
+ * @brief Unregisters all currently registered border elements.
+ *
+ * This is typically called during destruction or when the manager itself is changing.
+ *
+ * @param obj The Efl_Ui_Focus_Manager_Sub instance.
+ * @param pd The private data for the instance.
+ */
 static void
 _border_unregister(Eo *obj, Efl_Ui_Focus_Manager_Sub_Data *pd)
 {
@@ -109,6 +165,14 @@ _border_unregister(Eo *obj, Efl_Ui_Focus_Manager_Sub_Data *pd)
      }
 }
 
+/**
+ * @brief Callback for the parent manager's EFL_UI_FOCUS_MANAGER_EVENT_FLUSH_PRE event.
+ *
+ * If border elements have changed, flushes the borders.
+ *
+ * @param data The Efl_Ui_Focus_Manager_Sub instance.
+ * @param ev The event information (unused).
+ */
 static void
 _parent_manager_pre_flush(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -119,6 +183,14 @@ _parent_manager_pre_flush(void *data, const Efl_Event *ev EINA_UNUSED)
     _border_flush(data, pd);
 }
 
+/**
+ * @brief Callback for the parent manager's EFL_UI_FOCUS_MANAGER_EVENT_REDIRECT_CHANGED event.
+ *
+ * Flushes the borders if the redirect target changes.
+ *
+ * @param data The Efl_Ui_Focus_Manager_Sub instance.
+ * @param ev The event information (unused).
+ */
 static void
 _redirect_changed_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -129,6 +201,14 @@ _redirect_changed_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    _border_flush(data, pd);
 }
 
+/**
+ * @brief Callback for the parent manager's EFL_UI_FOCUS_MANAGER_EVENT_DIRTY_LOGIC_FREEZE_CHANGED event.
+ *
+ * Freezes or unfreezes the dirty logic of this sub-manager based on the parent's state.
+ *
+ * @param data The Efl_Ui_Focus_Manager_Sub instance.
+ * @param ev The event information, where ev->info is a pointer to Eina_Bool indicating freeze state.
+ */
 static void
 _freeze_changed_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -149,6 +229,15 @@ EFL_CALLBACKS_ARRAY_DEFINE(parent_manager,
     {EFL_UI_FOCUS_MANAGER_EVENT_DIRTY_LOGIC_FREEZE_CHANGED, _freeze_changed_cb}
 );
 
+/**
+ * @brief Callback for EFL_UI_FOCUS_OBJECT_EVENT_FOCUS_PARENT_CHANGED event on self.
+ *
+ * Updates the parent for calculation purposes for all border elements when the
+ * logical parent of this sub-manager changes.
+ *
+ * @param data The Efl_Ui_Focus_Manager_Sub instance.
+ * @param ev The event information, where ev->info is the new logical parent (Efl_Ui_Focus_Object*).
+ */
 static void
 _logical_manager_change(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -169,6 +258,15 @@ _logical_manager_change(void *data EINA_UNUSED, const Efl_Event *ev)
      }
 }
 
+/**
+ * @brief Handles changes in the actual focus manager this sub-manager is part of.
+ *
+ * Unregisters border elements from the old manager and registers them with the new manager.
+ * Also updates event callbacks on the manager itself.
+ *
+ * @param obj The Efl_Ui_Focus_Manager_Sub instance.
+ * @param pd The private data for the instance.
+ */
 static void
 _flush_manager(Eo *obj, Efl_Ui_Focus_Manager_Sub_Data *pd)
 {
@@ -198,6 +296,15 @@ _flush_manager(Eo *obj, Efl_Ui_Focus_Manager_Sub_Data *pd)
    pd->manager = manager;
 }
 
+/**
+ * @brief Callback for EFL_UI_FOCUS_OBJECT_EVENT_FOCUS_MANAGER_CHANGED event on self.
+ *
+ * Triggers a flush of manager-related settings when the focus manager of this
+ * sub-manager object changes.
+ *
+ * @param data The Efl_Ui_Focus_Manager_Sub instance.
+ * @param ev The event information (unused).
+ */
 static void
 _manager_change(void *data, const Efl_Event *ev EINA_UNUSED)
 {

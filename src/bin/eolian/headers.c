@@ -1,8 +1,25 @@
 #include "main.h"
 #include "docs.h"
 
+/**
+ * @file
+ * @brief Functions for generating C header file content from Eolian data.
+ *
+ * This file contains the logic to translate Eolian class, method, property,
+ * and event definitions into their C header file representations.
+ */
+
 extern char* _eolian_api_symbol;
 
+/**
+ * @brief Determines if a star '*' should be added to a C type based on function type and parameter direction.
+ *
+ * This is used to correctly represent pointers for out/inout parameters or property getters.
+ *
+ * @param ftype The Eolian function type (e.g., EOLIAN_PROP_GET).
+ * @param pdir The Eolian parameter direction (e.g., EOLIAN_PARAMETER_OUT).
+ * @return "*" if a star is needed, "" otherwise.
+ */
 static const char *
 _get_add_star(Eolian_Function_Type ftype, Eolian_Parameter_Direction pdir)
 {
@@ -13,6 +30,22 @@ _get_add_star(Eolian_Function_Type ftype, Eolian_Parameter_Direction pdir)
    return "";
 }
 
+/**
+ * @brief Generates the C code for a single function parameter.
+ *
+ * This function handles regular parameters as well as special cases like
+ * function pointers (which are expanded to a data pointer, function pointer,
+ * and free callback). It also appends EFL_TRANSFER_OWNERSHIP if the parameter
+ * is marked as 'move'.
+ *
+ * @param buf The string buffer to append the generated C code to.
+ * @param pr The Eolian function parameter to generate code for.
+ * @param ftype The Eolian function type (property get/set, method).
+ * @param[out] rpid Pointer to an integer that will be set to 1 if the parameter
+ *                  was a function pointer (indicating it expanded to multiple C parameters),
+ *                  0 otherwise. This is used for NONNULL argument indexing.
+ * @return The number of C parameters generated (1 for regular, 3 for function pointers).
+ */
 static int
 _gen_param(Eina_Strbuf *buf, Eolian_Function_Parameter *pr,
            Eolian_Function_Type ftype, int *rpid)
@@ -43,6 +76,21 @@ _gen_param(Eina_Strbuf *buf, Eolian_Function_Parameter *pr,
    return 1;
 }
 
+/**
+ * @brief Generates C code for a list of function parameters.
+ *
+ * Iterates over Eolian function parameters and calls _gen_param for each one,
+ * appending the results to the provided string buffer. It also handles
+ * comma separation between parameters.
+ * The flagbuf logic for EINA_ARG_NONNULL is currently disabled.
+ *
+ * @param itr An iterator over Eolian_Function_Parameter objects.
+ * @param buf The string buffer to append the generated C parameter list to.
+ * @param flagbuf A pointer to a string buffer for EINA_ARG_NONNULL (currently unused).
+ * @param nidx A pointer to an integer representing the current parameter index,
+ *             which is incremented by this function.
+ * @param ftype The Eolian function type, passed to _gen_param.
+ */
 void
 eo_gen_params(Eina_Iterator *itr, Eina_Strbuf *buf,
               Eina_Strbuf **flagbuf, int *nidx, Eolian_Function_Type ftype)
@@ -74,6 +122,25 @@ eo_gen_params(Eina_Iterator *itr, Eina_Strbuf *buf,
    eina_iterator_free(itr);
 }
 
+/**
+ * @brief Generates the C header declaration for a single Eolian function (method or property).
+ *
+ * This function constructs the complete C function signature, including:
+ * - Beta API guards (#ifdef EFL_BETA_API_SUPPORT)
+ * - Protected scope guards (#ifdef CLASSNAME_PROTECTED)
+ * - Documentation (via eo_gen_docs_func_gen)
+ * - API visibility symbols (_eolian_api_symbol_WEAK)
+ * - Return type (handling void, regular types, and 'move' semantics)
+ * - Function name
+ * - Parameters (including the 'Eo *obj' for instance methods/properties)
+ * - EINA_WARN_UNUSED_RESULT and EFL_TRANSFER_OWNERSHIP annotations.
+ *
+ * @param state The Eolian state.
+ * @param fid The Eolian function (method or property) identifier.
+ * @param ftype The specific type of function (EOLIAN_PROP_GET, EOLIAN_PROP_SET, EOLIAN_METHOD).
+ * @param buf The string buffer to append the generated C function declaration to.
+ * @param cnameu The uppercase C name of the class, used for protected guards.
+ */
 static void
 _gen_func(const Eolian_State *state, const Eolian_Function *fid,
           Eolian_Function_Type ftype, Eina_Strbuf *buf, char *cnameu)
@@ -191,6 +258,21 @@ _gen_func(const Eolian_State *state, const Eolian_Function *fid,
      eina_strbuf_append_printf(buf, "#endif /* EFL_BETA_API_SUPPORT */\n");
 }
 
+/**
+ * @brief Generates the complete C header content for an Eolian class.
+ *
+ * This function orchestrates the generation of:
+ * - Beta API guards for the entire class.
+ * - Class documentation.
+ * - The class macro definition (e.g., #define MY_CLASS_CLASS my_class_class_get()).
+ * - The declaration for the class_get function (e.g., const Efl_Class *my_class_class_get(void)).
+ * - Declarations for all methods and properties of the class (via _gen_func).
+ * - Declarations and macro definitions for all events of the class.
+ *
+ * @param state The Eolian state.
+ * @param cl The Eolian class for which to generate the header.
+ * @param buf The string buffer to append the generated C header content to.
+ */
 void
 eo_gen_header_gen(const Eolian_State *state, const Eolian_Class *cl,
                   Eina_Strbuf *buf)

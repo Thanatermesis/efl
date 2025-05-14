@@ -6,6 +6,12 @@
 
 static mode_t default_mode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
 
+/**
+ * @internal
+ * @brief Checks if the given file path corresponds to a directory.
+ * @param file The path to check.
+ * @return EINA_TRUE if it is a directory, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 evas_gl_common_file_cache_is_dir(const char *file)
 {
@@ -16,6 +22,12 @@ evas_gl_common_file_cache_is_dir(const char *file)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Checks if a file or directory exists at the given path.
+ *
+ * @param file The path to the file or directory.
+ * @return EINA_TRUE if the file exists, EINA_FALSE otherwise.
+ */
 Eina_Bool
 evas_gl_common_file_cache_file_exists(const char *file)
 {
@@ -25,6 +37,16 @@ evas_gl_common_file_cache_file_exists(const char *file)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Creates a directory at the given path if it does not already exist.
+ *
+ * This function will not create parent directories.
+ *
+ * @param path The directory path to create.
+ * @return EINA_TRUE on success or if the directory already exists,
+ *         EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_gl_common_file_cache_mkpath_if_not_exists(const char *path)
 {
@@ -36,6 +58,17 @@ evas_gl_common_file_cache_mkpath_if_not_exists(const char *path)
      return S_ISDIR(st.st_mode);
 }
 
+/**
+ * @brief Creates a directory and all its parent directories if they do not exist.
+ *
+ * This function is similar to `mkdir -p`. It will not do anything if the
+ * effective user ID is different from the real user ID, as a security
+ * precaution.
+ *
+ * @param path The full directory path to create.
+ * @return EINA_TRUE on success or if the path already exists and is a directory,
+ *         EINA_FALSE on failure.
+ */
 Eina_Bool
 evas_gl_common_file_cache_mkpath(const char *path)
 {
@@ -70,6 +103,17 @@ evas_gl_common_file_cache_mkpath(const char *path)
    return evas_gl_common_file_cache_mkpath_if_not_exists(ss);
 }
 
+/**
+ * @brief Constructs the Evas GL cache directory path and checks for its existence.
+ *
+ * The path is typically constructed in `~/.cache/evas_gl_common_caches`.
+ * This function also performs a security check to ensure the real and
+ * effective user IDs are the same.
+ *
+ * @param[out] cache_dir Buffer to store the resulting cache directory path.
+ * @param[in]  num       Size of the cache_dir buffer.
+ * @return 1 if the directory exists, 0 otherwise.
+ */
 int
 evas_gl_common_file_cache_dir_check(char *cache_dir, int num)
 {
@@ -86,6 +130,27 @@ evas_gl_common_file_cache_dir_check(char *cache_dir, int num)
    return evas_gl_common_file_cache_file_exists(cache_dir);
 }
 
+/**
+ * @brief Constructs a cache file path and checks if it exists.
+ *
+ * The file name is generated based on a combination of OpenGL context
+ * information (vendor, renderer, version), module architecture, Evas version,
+ * and a given cache name. This ensures that caches are specific to the
+ * hardware and software configuration.
+ *
+ * The generated filename will have forward slashes ('/') removed to ensure
+ * it is a valid filename. On Windows, a double underscore ("__") is used as
+ * a separator, otherwise a double colon ("::") is used.
+ *
+ * Example of a generated file path on Linux:
+ * `cache_dir/NVIDIA_Corporation::NVIDIA_GeForce_GTX_1080::4.6.0_NVIDIA_410.78::x86_64.123__my_cache.eet`
+ *
+ * @param[in]  cache_dir   The base directory for the cache file.
+ * @param[in]  cache_name  A unique name for this specific cache (e.g., "shaders").
+ * @param[out] cache_file  Buffer to store the full path to the cache file.
+ * @param[in]  dir_num     Size of the cache_file buffer.
+ * @return 1 if the file exists, 0 otherwise.
+ */
 int
 evas_gl_common_file_cache_file_check(const char *cache_dir, const char *cache_name, char *cache_file, int dir_num)
 {

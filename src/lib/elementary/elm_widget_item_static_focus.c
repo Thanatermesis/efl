@@ -1,3 +1,12 @@
+/**
+ * @file
+ * @brief This file implements the static focus handling for Elm_Widget_Item.
+ *
+ * It provides an adapter for focus management, particularly for items
+ * within Genlist and Gengrid widgets, ensuring that focus behaves
+ * correctly even when items are realized or unrealized.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include "elementary_config.h"
 #endif
@@ -12,12 +21,19 @@
 #include "elm_priv.h"
 #include "efl_ui_focus_composition_adapter.eo.h"
 
+/**
+ * @brief Private data structure for Elm_Widget_Item_Static_Focus.
+ */
 typedef struct {
-   Eo *adapter;
-   Eina_Bool realized;
-   Eina_Bool in_unrealize;
+   Eo *adapter; /**< The focus composition adapter object. This is created when the item needs to represent focus. */
+   Eina_Bool realized; /**< Flag indicating if the item is currently realized (visible/active). */
+   Eina_Bool in_unrealize; /**< Flag to prevent adapter deletion during the unrealize process if it's currently focused. */
 } Elm_Widget_Item_Static_Focus_Data;
 
+/**
+ * @brief Sets the realized state of the widget item.
+ * @param f The Elm_Widget_Item_Static_Focus object.
+ */
 static void
 _realized_set(Elm_Widget_Item_Static_Focus *f)
 {
@@ -26,6 +42,13 @@ _realized_set(Elm_Widget_Item_Static_Focus *f)
    pd->realized = EINA_TRUE;
 }
 
+/**
+ * @brief Callback invoked when a genlist item is realized.
+ *
+ * This function marks the item as realized and, if it's not disabled
+ * and not a group item, sets up its focus order.
+ * @param obj The Efl_Object representing the genlist item.
+ */
 static void
 _list_realized_cb(Eo *obj)
 {
@@ -36,6 +59,14 @@ _list_realized_cb(Eo *obj)
      efl_ui_focus_object_setup_order(obj);
 }
 
+/**
+ * @brief Callback invoked when a gengrid item is realized.
+ *
+ * This function marks the item as realized. If the item is not disabled
+ * and not a group item (identified by its item style "group_index"),
+ * it sets up its focus order.
+ * @param obj The Efl_Object representing the gengrid item.
+ */
 static void
 _grid_realized_cb(Eo *obj)
 {
@@ -52,6 +83,14 @@ _grid_realized_cb(Eo *obj)
      efl_ui_focus_object_setup_order(obj);
 }
 
+/**
+ * @brief Callback invoked when an item is unrealized.
+ *
+ * This function marks the item as unrealized. It also handles the deletion
+ * of the focus adapter, but only if the adapter exists and is not currently focused.
+ * This prevents focus artifacts when items are scrolled out of view.
+ * @param obj The Efl_Object representing the item.
+ */
 static void
 _unrealized_cb(Eo *obj)
 {
@@ -70,6 +109,32 @@ _unrealized_cb(Eo *obj)
      }
 }
 
+/**
+ * @brief Sets up the focus order for the widget item non-recursively.
+ *
+ * This function is crucial for managing focus when items are part of a larger
+ * navigable structure (like Genlist or Gengrid). It ensures that a focus
+ * adapter (EFL_UI_FOCUS_COMPOSITION_ADAPTER_CLASS) is created if needed,
+ * or reconfigured if the logical focus child changes.
+ *
+ * The adapter acts as a proxy for the item in the focus chain of the parent widget.
+ * This is necessary because widget items themselves are not direct children
+ * in the focus manager's view.
+ *
+ * If the item is not realized, this function will log a warning and return,
+ * as focus setup on an unrealized item can lead to issues.
+ *
+ * The logic handles cases where:
+ * - No logical child exists for focus: an adapter is created.
+ * - A logical child exists but is not the current adapter: the old adapter is deleted
+ *   (if not in unrealize phase) and a new one might be implicitly created or the existing one reused.
+ * - The logical child is the current adapter: it checks the next focusable widget to ensure
+ *   the adapter is correctly positioned or if it should be skipped (e.g., if the next item is also
+ *   a static focus item or another adapter for the same parent).
+ *
+ * @param obj The Elm_Widget_Item_Static_Focus object.
+ * @param pd Private data for the object.
+ */
 EOLIAN static void
 _elm_widget_item_static_focus_efl_ui_focus_object_setup_order_non_recursive(Eo *obj, Elm_Widget_Item_Static_Focus_Data *pd)
 {
@@ -130,6 +195,16 @@ _elm_widget_item_static_focus_efl_ui_focus_object_setup_order_non_recursive(Eo *
      efl_ui_focus_composition_adapter_canvas_object_set(pd->adapter,  wpd->view);
 }
 
+/**
+ * @brief Constructor for Elm_Widget_Item_Static_Focus.
+ *
+ * Initializes the widget item and sets up the appropriate realized/unrealized
+ * callbacks based on whether the parent widget is a Genlist or Gengrid.
+ *
+ * @param obj The Efl_Object being constructed.
+ * @param pd Private data for the object (unused in this function).
+ * @return The constructed Efl_Object.
+ */
 EOLIAN static Efl_Object*
 _elm_widget_item_static_focus_efl_object_constructor(Eo *obj, Elm_Widget_Item_Static_Focus_Data *pd EINA_UNUSED)
 {
@@ -144,6 +219,15 @@ _elm_widget_item_static_focus_efl_object_constructor(Eo *obj, Elm_Widget_Item_St
    return ret;
 }
 
+/**
+ * @brief Destructor for Elm_Widget_Item_Static_Focus.
+ *
+ * Cleans up resources used by the widget item, including nullifying
+ * the realized/unrealized callbacks and deleting the focus adapter if it exists.
+ *
+ * @param obj The Efl_Object being destructed.
+ * @param pd Private data for the object.
+ */
 EOLIAN static void
 _elm_widget_item_static_focus_efl_object_destructor(Eo *obj, Elm_Widget_Item_Static_Focus_Data *pd EINA_UNUSED)
 {

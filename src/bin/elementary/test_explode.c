@@ -8,6 +8,18 @@ static Ecore_Animator *anim = NULL;
 
 static Eina_List *mirrors = NULL;
 
+/**
+ * @brief Animator callback for the explode effect.
+ *
+ * This function is called repeatedly by the Ecore_Animator to update
+ * the frames of the explosion animation. It applies a 3D rotation and
+ * perspective transformation to each mirror object. The rotation angle for each
+ * mirror is calculated based on its "stack" data, which is set in explode_obj().
+ *
+ * @param data The user data passed to ecore_animator_timeline_add(), unused here.
+ * @param pos The position in the animation timeline, from 0.0 to 1.0.
+ * @return EINA_TRUE to continue the animation, EINA_FALSE to stop.
+ */
 static Eina_Bool
 _cb_anim(void *data EINA_UNUSED, double pos)
 {
@@ -38,6 +50,22 @@ _cb_anim(void *data EINA_UNUSED, double pos)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Recursively creates mirror objects for an object and its children.
+ *
+ * This function traverses the smart object tree of `obj`. For each non-container
+ * child, it creates two semi-transparent mirror Evas_Objects. These mirrors
+ * are image objects that use the original child object as their source.
+ * The mirrors are what will be animated in the explosion effect.
+ *
+ * Each mirror is stored in the static `mirrors` list and has an integer
+ * attached via `evas_object_data_set(mirror, "stack", n)` which is used
+ * during animation to calculate its trajectory.
+ *
+ * @param obj The Evas_Object to process.
+ * @param n The current count of mirrors created, used for stacking and animation.
+ * @return The updated count of mirrors after processing `obj` and its children.
+ */
 static int
 explode_obj(Evas_Object *obj, int n)
 {
@@ -96,6 +124,15 @@ explode_obj(Evas_Object *obj, int n)
    return n;
 }
 
+/**
+ * @brief Initiates the explode animation on a target object.
+ *
+ * Clears any existing explosion effect, then creates new mirror objects
+ * from the target `obj` and starts the animation timeline. If `obj` is NULL,
+ * it only cleans up the previous effect.
+ *
+ * @param obj The Evas_Object to "explode". If NULL, just cleans up.
+ */
 static void
 explode(Evas_Object *obj)
 {
@@ -108,6 +145,18 @@ explode(Evas_Object *obj)
    if (!anim) anim = ecore_animator_timeline_add(1.0, _cb_anim, NULL);
 }
 
+/**
+ * @brief Callback for when the target object is deleted.
+ *
+ * If the object being deleted is the one currently being animated (`target`),
+ * this function cleans up the animation and all associated mirror objects
+ * to prevent artifacts and crashes.
+ *
+ * @param data Unused.
+ * @param e Unused.
+ * @param obj The object that was deleted.
+ * @param info Unused.
+ */
 static void
 _cb_target_del(void *data EINA_UNUSED, Evas *e EINA_UNUSED,
                Evas_Object *obj, void *info EINA_UNUSED)
@@ -124,6 +173,19 @@ _cb_target_del(void *data EINA_UNUSED, Evas *e EINA_UNUSED,
      }
 }
 
+/**
+ * @brief Mouse down event callback on the catcher object.
+ *
+ * Listens for Ctrl + Middle Mouse Button clicks. When this combination is
+ * detected, it finds the topmost Elementary widget under the cursor, sets it
+ * as the target, and triggers the explode() function on it.
+ * It also handles cleanup of any previously active explosion.
+ *
+ * @param data The window object.
+ * @param e The Evas canvas.
+ * @param obj The catcher object.
+ * @param info The Evas_Event_Mouse_Down event information.
+ */
 static void
 _cb_catcher_down(void *data, Evas *e,
                  Evas_Object *obj EINA_UNUSED, void *info)

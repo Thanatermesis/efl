@@ -70,23 +70,34 @@
 static Ethumb_Version _version = { VMAJ, VMIN, VMIC, VREV };
 EAPI Ethumb_Version *ethumb_version = &_version;
 
+/** @internal Log domain for Ethumb library messages. */
 static int _log_dom = -1;
 #define DBG(...) EINA_LOG_DOM_DBG(_log_dom, __VA_ARGS__)
 #define INF(...) EINA_LOG_DOM_INFO(_log_dom, __VA_ARGS__)
 #define WRN(...) EINA_LOG_DOM_WARN(_log_dom, __VA_ARGS__)
 #define ERR(...) EINA_LOG_DOM_ERR(_log_dom, __VA_ARGS__)
 
+/** @internal Initialization counter for the Ethumb library. Incremented on ethumb_init(), decremented on ethumb_shutdown(). */
 static int initcount = 0;
+/** @internal Flag to track if Ethumb plugins have been loaded. Prevents redundant loading. */
 static Eina_Bool _plugins_loaded = EINA_FALSE;
+/** @internal Stringshared path to the user's home thumbnail directory (e.g., "$HOME/.thumbnails"). */
 static const char *_home_thumb_dir = NULL;
+/** @internal Stringshared name for the "normal" FDO thumbnail category. */
 static const char *_thumb_category_normal = NULL;
+/** @internal Stringshared name for the "large" FDO thumbnail category. */
 static const char *_thumb_category_large = NULL;
 
+/** @internal Default size (width and height) in pixels for "normal" FDO thumbnails. */
 static const int THUMB_SIZE_NORMAL = 128;
+/** @internal Default size (width and height) in pixels for "large" FDO thumbnails. */
 static const int THUMB_SIZE_LARGE = 256;
 
+/** @internal Hash table mapping file extensions (e.g., "png", "jpg") to their corresponding Ethumb_Plugin. */
 static Eina_Hash *_plugins_ext = NULL;
+/** @internal Array holding loaded Eina_Module instances for Ethumb plugins. */
 static Eina_Array *_plugins = NULL;
+/** @internal Eina_Prefix for Ethumb, used to locate library resources and modules. */
 static Eina_Prefix *_pfx = NULL;
 
 EAPI Eina_Bool
@@ -143,7 +154,15 @@ ethumb_plugin_unregister(const Ethumb_Plugin *plugin)
    return EINA_TRUE;
 }
 
-
+/**
+ * @internal
+ * @brief Loads Ethumb plugins.
+ *
+ * This function scans predefined directories for Ethumb plugin modules,
+ * loads them, and registers them. It ensures plugins are loaded only once.
+ * It checks for plugins in the build directory if running in tree and
+ * also in the system library directory.
+ */
 static void
 _ethumb_plugins_load(void)
 {
@@ -206,6 +225,13 @@ _ethumb_plugins_load(void)
      ERR("Couldn't find any ethumb plugin.");
 }
 
+/**
+ * @internal
+ * @brief Unloads all loaded Ethumb plugins.
+ *
+ * This function frees the list of loaded modules and the hash table
+ * mapping extensions to plugins. It resets the _plugins_loaded flag.
+ */
 static void
 _ethumb_plugins_unload(void)
 {
@@ -398,6 +424,16 @@ ethumb_new(void)
    return ethumb;
 }
 
+/**
+ * @internal
+ * @brief Frees an Ethumb_Frame structure and its associated resources.
+ *
+ * If the frame has an Edje object and a swallowed image, it unswallows
+ * the image. It then deletes the Edje object and frees the stringshared
+ * members and the frame structure itself.
+ *
+ * @param frame The Ethumb_Frame to free.
+ */
 static void
 _ethumb_frame_free(Ethumb_Frame *frame)
 {
@@ -875,6 +911,30 @@ ethumb_file_get(const Ethumb *e, const char **path, const char **key)
    if (key) *key = e->src_key;
 }
 
+/**
+ * @internal
+ * @brief Lookup table for characters acceptable in a URI without percent-encoding.
+ *
+ * This table is used by _ethumb_generate_hash to determine which characters
+ * in a file path need to be percent-encoded when constructing a file URI
+ * for MD5 hashing, as per RFC 3986. Each byte corresponds to an ASCII
+ * character from 32 (space) to 127 (DEL). The bits in the byte indicate
+ * properties; specifically, the 0x08 bit (checked by _check_uri_char macro)
+ * marks characters that are "unreserved" or otherwise safe to include directly.
+ *
+ * The characters are:
+ * - Unreserved: A-Z a-z 0-9 - . _ ~
+ * - gen-delims: : / ? # [ ] @
+ * - sub-delims: ! $ & ' ( ) * + , ; =
+ *
+ * The table seems to allow unreserved, plus some sub-delims and gen-delims.
+ * The macro `_check_uri_char(c)` checks `(ACCEPTABLE_URI_CHARS[(c) - 32] & 0x08)`.
+ * A value of 0x3F (e.g. for '0'-'9', 'A'-'Z') means all relevant bits are set.
+ * A value of 0x20 (e.g. for '"', '#', ';', '<', '=', '>', '?', '[', '\', ']', '^', '`', '{', '|', '}') means the 0x08 bit is not set, so these will be encoded.
+ *
+ * Example: 'A' (ASCII 65). Index is 65 - 32 = 33. `ACCEPTABLE_URI_CHARS[33]` is 0x3F. `0x3F & 0x08` is `0x08`, so 'A' is acceptable.
+ * Example: ' ' (ASCII 32). Index is 32 - 32 = 0. `ACCEPTABLE_URI_CHARS[0]` is 0x00. `0x00 & 0x08` is `0x00`, so ' ' is not acceptable (will be encoded).
+ */
 static const char ACCEPTABLE_URI_CHARS[96] = {
      /*      !    "    #    $    %    &    '    (    )    *    +    ,    -    .    / */
      0x00,0x3F,0x20,0x20,0x28,0x00,0x2C,0x3F,0x3F,0x3F,0x3F,0x2A,0x28,0x3F,0x3F,0x1C,
@@ -890,6 +950,22 @@ static const char ACCEPTABLE_URI_CHARS[96] = {
      0x3F,0x3F,0x3F,0x3F,0x3F,0x3F,0x3F,0x3F,0x3F,0x3F,0x3F,0x20,0x20,0x20,0x3F,0x20
 };
 
+/**
+ * @internal
+ * @brief Generates an MD5 hash for a given file path, used for thumbnail naming.
+ *
+ * This function first attempts to retrieve a pre-calculated MD5 hash from
+ * the file's extended attribute "user.e.md5". If not found or invalid,
+ * it constructs a URI from the file path (e.g., "file:///path/to/image.png"),
+ * percent-encoding characters as necessary according to ACCEPTABLE_URI_CHARS.
+ * It then calculates the MD5 hash of this URI. The resulting hexadecimal
+ * MD5 string is stored in the "user.e.md5" extended attribute for future use
+ * and returned as a stringshared string.
+ *
+ * @param file The absolute path to the file.
+ * @return A stringshared MD5 hash string, or NULL on failure.
+ *         Example: "d41d8cd98f00b204e9800998ecf8427e"
+ */
 static const char *
 _ethumb_generate_hash(const char *file)
 {
@@ -967,6 +1043,16 @@ _ethumb_generate_hash(const char *file)
    return eina_stringshare_add(md5out);
 }
 
+/**
+ * @internal
+ * @brief Checks if the current Ethumb settings conform to FDO thumbnail standards.
+ *
+ * FDO (Freedesktop.org) thumbnail standards specify particular sizes (normal, large),
+ * format (PNG), aspect ratio handling (keep aspect), and no frame.
+ *
+ * @param e The Ethumb instance to check.
+ * @return 1 if settings conform to FDO standards, 0 otherwise.
+ */
 static int
 _ethumb_file_check_fdo(Ethumb *e)
 {
@@ -986,6 +1072,19 @@ _ethumb_file_check_fdo(Ethumb *e)
    return 1;
 }
 
+/**
+ * @internal
+ * @brief Generates a category string for custom (non-FDO) thumbnail settings.
+ *
+ * The category string encodes thumbnail dimensions, aspect handling,
+ * frame presence, and format. This allows different thumbnail versions
+ * for the same original file but with different processing parameters
+ * to be stored in separate subdirectories.
+ *
+ * @param e The Ethumb instance with custom settings.
+ * @return A stringshared category string.
+ *         Example: "100x100-crop-framed-jpg"
+ */
 static const char *
 _ethumb_file_generate_custom_category(Ethumb *e)
 {
@@ -1018,6 +1117,24 @@ _ethumb_file_generate_custom_category(Ethumb *e)
    return eina_stringshare_add(buf);
 }
 
+/**
+ * @internal
+ * @brief Generates and stores the full thumbnail file path in the Ethumb instance.
+ *
+ * This function determines the thumbnail directory, category, and filename.
+ * - Directory: User-specified via ethumb_thumb_dir_path_set(), or default $HOME/.thumbnails.
+ * - Category: User-specified via ethumb_thumb_category_set(), FDO standard ("normal", "large"),
+ *   or custom generated by _ethumb_file_generate_custom_category().
+ * - Filename: MD5 hash of the source file's URI (from _ethumb_generate_hash())
+ *   plus an extension based on the thumbnail format (e.g., ".png", ".jpg", ".eet").
+ *
+ * The generated path is stored in e->thumb_path. If the format is EET,
+ * e->thumb_key is set to "thumbnail".
+ *
+ * @param e The Ethumb instance.
+ *          e->src_path must be set.
+ *          e->thumb_path and e->thumb_key will be updated.
+ */
 static void
 _ethumb_file_generate_path(Ethumb *e)
 {
@@ -1239,6 +1356,22 @@ ethumb_calculate_fill(Ethumb *e, int iw, int ih, int *fx, int *fy, int *fw, int 
    ethumb_calculate_fill_from_ratio(e, ia, fx, fy, fw, fh);
 }
 
+/**
+ * @internal
+ * @brief Attempts to generate a thumbnail using a suitable plugin.
+ *
+ * It extracts the file extension from e->src_path, loads plugins if not
+ * already loaded (_ethumb_plugins_load()), and finds a plugin registered
+ * for that extension. If a plugin is found, its thumb_generate() method
+ * is called.
+ *
+ * @param e The Ethumb instance. e->src_path must be set.
+ * @return EINA_TRUE if a plugin was found and its generate function was called,
+ *         EINA_FALSE otherwise (e.g., no plugin for the extension).
+ *         Note: This return value does not indicate successful thumbnail generation,
+ *         only that a plugin was invoked. The plugin itself will call
+ *         ethumb_finished_callback_call() with the actual result.
+ */
 static Eina_Bool
 _ethumb_plugin_generate(Ethumb *e)
 {
@@ -1358,6 +1491,21 @@ ethumb_image_save(Ethumb *e)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Applies image orientation transformations directly to pixel data.
+ *
+ * This function handles rotations (90, 180, 270 degrees) and flips
+ * (horizontal, vertical, transpose, transverse) by manipulating the
+ * pixel data of the Evas_Object image (e->img).
+ * For 90-degree rotations and transpose/transverse, a temporary image
+ * is used to correctly re-arrange pixels.
+ *
+ * @param e The Ethumb instance containing the image (e->img).
+ * @param orientation The desired Ethumb_Thumb_Orientation to apply.
+ *                    ETHUMB_THUMB_ORIENT_NONE and ETHUMB_THUMB_ORIENT_ORIGINAL
+ *                    are handled by Evas itself and not processed here.
+ */
 static void
 _ethumb_image_orient(Ethumb *e, int orientation)
 {
@@ -1480,6 +1628,25 @@ _ethumb_image_orient(Ethumb *e, int orientation)
    evas_object_image_data_update_add(img, 0, 0, iw, ih);
 }
 
+/**
+ * @internal
+ * @brief Loads an image into the Ethumb Evas objects and applies settings.
+ *
+ * This function performs the core image loading and setup when no plugin
+ * is used or a plugin falls back to generic image handling.
+ * It checks if the source path is a regular file.
+ * It sets the source file on e->img, an Evas_Object of type image.
+ * If e->orientation is ETHUMB_THUMB_ORIENT_ORIGINAL, it lets Evas handle EXIF orientation.
+ * Otherwise, if a specific orientation is set (not NONE), it calls _ethumb_image_orient().
+ * It then calculates the final thumbnail dimensions (ww, hh) based on aspect settings
+ * using ethumb_calculate_aspect() and resizes the Evas objects (e->o, e->sub_ee, e->img or e->frame->edje).
+ * It calculates fill parameters using ethumb_calculate_fill() and applies them.
+ *
+ * @param e The Ethumb instance. e->src_path, e->tw, e->th, and other relevant
+ *          settings must be configured.
+ * @return 1 on successful load and setup, 0 on failure (e.g., file not found,
+ *         load error, invalid image dimensions).
+ */
 static int
 _ethumb_image_load(Ethumb *e)
 {
@@ -1552,6 +1719,18 @@ _ethumb_image_load(Ethumb *e)
    return 1;
 }
 
+/**
+ * @internal
+ * @brief Ecore_Idler callback to invoke the user's thumbnail generation finished callback.
+ *
+ * This idler ensures that the user's callback (e->finished_cb) is called
+ * from the main loop, after the current event processing is complete.
+ * It passes the Ethumb instance and the result of the generation (e->cb_result).
+ * It also calls the user's data free callback (e->cb_data_free) if provided.
+ *
+ * @param data Pointer to the Ethumb instance.
+ * @return EINA_FALSE to automatically remove the idler after execution.
+ */
 static Eina_Bool
 _ethumb_finished_idler_cb(void *data)
 {

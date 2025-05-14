@@ -633,8 +633,11 @@ EOAPI void elm_obj_gengrid_reorder_mode_stop(Eo *obj);
 
 EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_REALIZED;
 
-/** Called when gengrid realized
- * @return Efl_Object *
+/**
+ * @brief Called when the gengrid's items are first rendered (realized).
+ *
+ * The event information passed to the callback is the gengrid widget itself.
+ * @return Efl_Object* The #Elm_Gengrid widget that was realized, cast to Efl_Object*.
  *
  * @ingroup Elm_Gengrid_Group
  */
@@ -642,8 +645,11 @@ EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_REALIZED;
 
 EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_UNREALIZED;
 
-/** Called when gengrid unrealized
- * @return Efl_Object *
+/**
+ * @brief Called when the gengrid's items are no longer rendered (unrealized).
+ *
+ * The event information passed to the callback is the gengrid widget itself.
+ * @return Efl_Object* The #Elm_Gengrid widget that was unrealized, cast to Efl_Object*.
  *
  * @ingroup Elm_Gengrid_Group
  */
@@ -651,8 +657,12 @@ EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_UNREALIZED;
 
 EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_INDEX_UPDATE;
 
-/** Called on gengrid index update
- * @return Efl_Object *
+/**
+ * @brief Called when the internal index of gengrid items is updated.
+ *
+ * This can happen after item sorting or other structural changes.
+ * The event information passed to the callback is the gengrid widget itself.
+ * @return Efl_Object* The #Elm_Gengrid widget whose index was updated, cast to Efl_Object*.
  *
  * @ingroup Elm_Gengrid_Group
  */
@@ -700,8 +710,11 @@ EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_EDGE_LEFT;
 
 EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_ITEM_FOCUSED;
 
-/** Called when item got focus
- * @return Efl_Object *
+/**
+ * @brief Called when an item in the gengrid receives focus.
+ *
+ * The event information passed to the callback is the focused #Elm_Widget_Item.
+ * @return Efl_Object* The #Elm_Widget_Item that received focus, cast to Efl_Object*.
  *
  * @ingroup Elm_Gengrid_Group
  */
@@ -709,8 +722,11 @@ EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_ITEM_FOCUSED;
 
 EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_ITEM_UNFOCUSED;
 
-/** Called when item no longer has focus
- * @return Efl_Object *
+/**
+ * @brief Called when an item in the gengrid loses focus.
+ *
+ * The event information passed to the callback is the unfocused #Elm_Widget_Item.
+ * @return Efl_Object* The #Elm_Widget_Item that lost focus, cast to Efl_Object*.
  *
  * @ingroup Elm_Gengrid_Group
  */
@@ -718,8 +734,11 @@ EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_ITEM_UNFOCUSED;
 
 EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_ITEM_REORDER_ANIM_START;
 
-/** Called when item reorder animation started
- * @return Efl_Object *
+/**
+ * @brief Called when the animation for an item reorder operation starts.
+ *
+ * The event information passed to the callback is the #Elm_Widget_Item being reordered.
+ * @return Efl_Object* The #Elm_Widget_Item whose reorder animation started, cast to Efl_Object*.
  *
  * @ingroup Elm_Gengrid_Group
  */
@@ -727,8 +746,11 @@ EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_ITEM_REORDER_ANIM_ST
 
 EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_ITEM_REORDER_ANIM_STOP;
 
-/** Called when item reorder animation stopped
- * @return Efl_Object *
+/**
+ * @brief Called when the animation for an item reorder operation stops.
+ *
+ * The event information passed to the callback is the #Elm_Widget_Item that was reordered.
+ * @return Efl_Object* The #Elm_Widget_Item whose reorder animation stopped, cast to Efl_Object*.
  *
  * @ingroup Elm_Gengrid_Group
  */
@@ -736,8 +758,11 @@ EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_ITEM_REORDER_ANIM_ST
 
 EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_ACTIVATED;
 
-/** Called when gengrid got activated
- * @return Efl_Object *
+/**
+ * @brief Called when a gengrid item is activated (e.g., by pressing Enter or clicking).
+ *
+ * The event information passed to the callback is the activated #Elm_Widget_Item.
+ * @return Efl_Object* The #Elm_Widget_Item that was activated, cast to Efl_Object*.
  *
  * @ingroup Elm_Gengrid_Group
  */
@@ -745,8 +770,11 @@ EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_ACTIVATED;
 
 EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_HIGHLIGHTED;
 
-/** Called when gengrid is highlighted
- * @return Efl_Object *
+/**
+ * @brief Called when a gengrid item is highlighted (e.g., on mouse over).
+ *
+ * The event information passed to the callback is the highlighted #Elm_Widget_Item.
+ * @return Efl_Object* The #Elm_Widget_Item that was highlighted, cast to Efl_Object*.
  *
  * @ingroup Elm_Gengrid_Group
  */
@@ -754,8 +782,11 @@ EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_HIGHLIGHTED;
 
 EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_UNHIGHLIGHTED;
 
-/** Called when gengrid is no longer highlighted
- * @return Efl_Object *
+/**
+ * @brief Called when a gengrid item is no longer highlighted.
+ *
+ * The event information passed to the callback is the unhighlighted #Elm_Widget_Item.
+ * @return Efl_Object* The #Elm_Widget_Item that was unhighlighted, cast to Efl_Object*.
  *
  * @ingroup Elm_Gengrid_Group
  */
@@ -763,8 +794,11 @@ EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_UNHIGHLIGHTED;
 
 EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_RELEASED;
 
-/** Called when gengrid is released
- * @return Efl_Object *
+/**
+ * @brief Called when a gengrid item is released (e.g., after a mouse click).
+ *
+ * The event information passed to the callback is the released #Elm_Widget_Item.
+ * @return Efl_Object* The #Elm_Widget_Item that was released, cast to Efl_Object*.
  *
  * @ingroup Elm_Gengrid_Group
  */
@@ -772,8 +806,11 @@ EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_RELEASED;
 
 EWAPI extern const Efl_Event_Description _ELM_GENGRID_EVENT_MOVED;
 
-/** Called when gengrid item moved
- * @return Efl_Object *
+/**
+ * @brief Called when a gengrid item is moved (e.g., during a reorder operation).
+ *
+ * The event information passed to the callback is the moved #Elm_Widget_Item.
+ * @return Efl_Object* The #Elm_Widget_Item that was moved, cast to Efl_Object*.
  *
  * @ingroup Elm_Gengrid_Group
  */

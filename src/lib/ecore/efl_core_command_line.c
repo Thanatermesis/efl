@@ -11,9 +11,23 @@
 typedef struct {
    Eina_Bool filled;
    char *string_command;
-   Eina_Array *command;
+   Eina_Array *command; /**< Array of command arguments after parsing */
 } Efl_Core_Command_Line_Data;
 
+/**
+ * @internal
+ * @brief Unescapes a command string into an array of arguments.
+ *
+ * This function parses a command string, handling single and double quotes,
+ * and escape characters. It splits the string into individual arguments.
+ * For example, the string "command "arg1 with spaces" 'arg2\'s content'"
+ * would be parsed into ["command", "arg1 with spaces", "arg2's content"].
+ *
+ * @param s The command string to unescape.
+ * @return A new Eina_Array containing eina_stringshare instances for each argument,
+ *         or NULL on failure or if s is NULL. The caller is responsible for freeing
+ *         the returned array and its contents.
+ */
 static Eina_Array *
 _unescape(const char *s)
 {
@@ -111,6 +125,21 @@ _unescape(const char *s)
    return args;
 }
 
+/**
+ * @internal
+ * @brief Escapes a string to be safely used as a single command line argument.
+ *
+ * This function takes a string and escapes special characters (', ", $, #, ;,
+ * &, `, |, (, ), [, ], {, }, >, <, newline, carriage return, tab, space).
+ * If any of these characters are present, the entire string is enclosed in
+ * double quotes. Within the string, backslashes, single quotes, and double
+ * quotes are escaped with a backslash.
+ * For example, "arg with 'quotes' and spaces" becomes "\"arg with \\'quotes\\' and spaces\"".
+ *
+ * @param s The string to escape.
+ * @return A new character string that has been escaped. The caller is responsible
+ *         for freeing this string. Returns NULL on allocation failure.
+ */
 static char *
 _escape(const char *s)
 {
@@ -192,6 +221,17 @@ _efl_core_command_line_command_access(Eo *obj EINA_UNUSED, Efl_Core_Command_Line
    return pd->command ? eina_array_accessor_new(pd->command) : NULL;
 }
 
+/**
+ * @internal
+ * @brief Replaces invalid characters in a command string.
+ *
+ * This function iterates through the command string and replaces any
+ * characters outside the printable ASCII range (0x20-0x7E) or the DEL
+ * character (0x7F) with a placeholder character (0x12 - Device Control Two).
+ * This is done to prevent issues with non-standard characters in commands.
+ *
+ * @param command The command string to modify in-place.
+ */
 static void
 _remove_invalid_chars(char *command)
 {
@@ -203,6 +243,16 @@ _remove_invalid_chars(char *command)
      }
 }
 
+/**
+ * @internal
+ * @brief Clears the internal command array.
+ *
+ * This function frees all the stringshared arguments stored in the
+ * `pd->command` array and then frees the array itself. It sets
+ * `pd->command` to NULL.
+ *
+ * @param pd Pointer to the Efl_Core_Command_Line_Data structure.
+ */
 static void
 _clear_command(Efl_Core_Command_Line_Data *pd)
 {
@@ -213,6 +263,29 @@ _clear_command(Efl_Core_Command_Line_Data *pd)
    pd->command = NULL;
 }
 
+/**
+ * @brief Sets the command and its arguments from an Eina_Array.
+ *
+ * Each element in the input array should be a C string (char *).
+ * These strings are then stringshared and stored internally.
+ * The function also constructs a single string representation of the command
+ * by escaping and joining the arguments.
+ *
+ * Example of array structure:
+ * Eina_Array *my_array = eina_array_new(3);
+ * eina_array_push(my_array, eina_stringshare_add("command"));
+ * eina_array_push(my_array, eina_stringshare_add("arg1"));
+ * eina_array_push(my_array, eina_stringshare_add("arg with space"));
+ * // This would result in pd->string_command being "command arg1 \"arg with space\""
+ * // and pd->command containing ["command", "arg1", "arg with space"].
+ *
+ * @param[in] obj The Efl_Core_Command_Line object.
+ * @param[in,out] pd The private data for the Efl_Core_Command_Line object.
+ * @param[in] array An Eina_Array of C strings representing the command and its arguments.
+ *                  The function takes ownership of the strings within the array (by stringsharing)
+ *                  and frees the array itself.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_core_command_line_command_array_set(Eo *obj EINA_UNUSED, Efl_Core_Command_Line_Data *pd, Eina_Array *array)
 {
@@ -264,6 +337,17 @@ _efl_core_command_line_command_array_set(Eo *obj EINA_UNUSED, Efl_Core_Command_L
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets the command and its arguments from a single string.
+ *
+ * The input string is parsed to separate the command and its arguments,
+ * handling quotes and escapes. Invalid characters in the string are replaced.
+ *
+ * @param[in] obj The Efl_Core_Command_Line object.
+ * @param[in,out] pd The private data for the Efl_Core_Command_Line object.
+ * @param[in] str The command string to set. For example, "my_command -o \"output file.txt\" --enable-feature".
+ * @return EINA_TRUE on success, EINA_FALSE otherwise (e.g., if parsing fails).
+ */
 EOLIAN static Eina_Bool
 _efl_core_command_line_command_string_set(Eo *obj EINA_UNUSED, Efl_Core_Command_Line_Data *pd, const char *str)
 {

@@ -7,14 +7,29 @@
 
 #define MY_CLASS EFL_CANVAS_VG_GRADIENT_LINEAR_CLASS
 
+/**
+ * @brief Private data structure for Efl_Canvas_Vg_Gradient_Linear objects.
+ *
+ * This structure holds the specific data for a linear gradient,
+ * primarily its start and end points.
+ */
 typedef struct _Efl_Canvas_Vg_Gradient_Linear_Data Efl_Canvas_Vg_Gradient_Linear_Data;
 struct _Efl_Canvas_Vg_Gradient_Linear_Data
 {
    struct {
-      double x, y;
-   } start, end;
+      double x, y; /**< Coordinates of the point. */
+   } start, /**< The start point (x, y) of the linear gradient. */
+     end;   /**< The end point (x, y) of the linear gradient. */
 };
 
+/**
+ * @brief Sets the start point of the linear gradient.
+ *
+ * @param[in] obj The Efl_Canvas_Vg_Gradient_Linear object.
+ * @param[in,out] pd The private data of the object.
+ * @param[in] x The x-coordinate of the start point.
+ * @param[in] y The y-coordinate of the start point.
+ */
 static void
 _efl_canvas_vg_gradient_linear_efl_gfx_gradient_linear_start_set(Eo *obj EINA_UNUSED,
                                                           Efl_Canvas_Vg_Gradient_Linear_Data *pd,
@@ -26,6 +41,14 @@ _efl_canvas_vg_gradient_linear_efl_gfx_gradient_linear_start_set(Eo *obj EINA_UN
    efl_canvas_vg_node_change(obj);
 }
 
+/**
+ * @brief Gets the start point of the linear gradient.
+ *
+ * @param[in] obj The Efl_Canvas_Vg_Gradient_Linear object.
+ * @param[in] pd The private data of the object.
+ * @param[out] x Pointer to store the x-coordinate of the start point. Can be NULL.
+ * @param[out] y Pointer to store the y-coordinate of the start point. Can be NULL.
+ */
 static void
 _efl_canvas_vg_gradient_linear_efl_gfx_gradient_linear_start_get(const Eo *obj EINA_UNUSED,
                                                           Efl_Canvas_Vg_Gradient_Linear_Data *pd,
@@ -35,6 +58,14 @@ _efl_canvas_vg_gradient_linear_efl_gfx_gradient_linear_start_get(const Eo *obj E
    if (y) *y = pd->start.y;
 }
 
+/**
+ * @brief Sets the end point of the linear gradient.
+ *
+ * @param[in] obj The Efl_Canvas_Vg_Gradient_Linear object.
+ * @param[in,out] pd The private data of the object.
+ * @param[in] x The x-coordinate of the end point.
+ * @param[in] y The y-coordinate of the end point.
+ */
 static void
 _efl_canvas_vg_gradient_linear_efl_gfx_gradient_linear_end_set(Eo *obj EINA_UNUSED,
                                                         Efl_Canvas_Vg_Gradient_Linear_Data *pd,
@@ -46,6 +77,14 @@ _efl_canvas_vg_gradient_linear_efl_gfx_gradient_linear_end_set(Eo *obj EINA_UNUS
    efl_canvas_vg_node_change(obj);
 }
 
+/**
+ * @brief Gets the end point of the linear gradient.
+ *
+ * @param[in] obj The Efl_Canvas_Vg_Gradient_Linear object.
+ * @param[in] pd The private data of the object.
+ * @param[out] x Pointer to store the x-coordinate of the end point. Can be NULL.
+ * @param[out] y Pointer to store the y-coordinate of the end point. Can be NULL.
+ */
 static void
 _efl_canvas_vg_gradient_linear_efl_gfx_gradient_linear_end_get(const Eo *obj EINA_UNUSED,
                                                         Efl_Canvas_Vg_Gradient_Linear_Data *pd,
@@ -55,6 +94,27 @@ _efl_canvas_vg_gradient_linear_efl_gfx_gradient_linear_end_get(const Eo *obj EIN
    if (y) *y = pd->end.y;
 }
 
+/**
+ * @brief Pre-render setup for the linear gradient.
+ *
+ * This function is called before rendering the VG node. It sets up the
+ * Ector renderer with the gradient's properties, including its
+ * transformation, colors, spread method, and linear gradient specific
+ * start and end points.
+ *
+ * @param[in] vg_pd Evas object protected data (unused).
+ * @param[in] obj The Efl_VG object being rendered.
+ * @param[in,out] nd The node data for the VG object.
+ * @param[in] engine Rendering engine (unused).
+ * @param[in] output Output target (unused).
+ * @param[in] context Rendering context (unused).
+ * @param[in] surface The Ector surface to render on.
+ * @param[in] ptransform The parent's transformation matrix.
+ * @param[in] p_opacity Parent's opacity (unused).
+ * @param[in] comp Composition buffer for Ector.
+ * @param[in] comp_method Composition method.
+ * @param[in] data Custom data, which is Efl_Canvas_Vg_Gradient_Linear_Data.
+ */
 static void
 _efl_canvas_vg_gradient_linear_render_pre(Evas_Object_Protected_Data *vg_pd EINA_UNUSED,
                                           Efl_VG *obj,
@@ -97,6 +157,16 @@ _efl_canvas_vg_gradient_linear_render_pre(Evas_Object_Protected_Data *vg_pd EINA
    ector_renderer_comp_method_set(nd->renderer, comp, comp_method);
 }
 
+/**
+ * @brief Constructor for Efl_Canvas_Vg_Gradient_Linear objects.
+ *
+ * Initializes the object, sets up its private data, and assigns the
+ * pre-render function.
+ *
+ * @param[in] obj The Efl_Canvas_Vg_Gradient_Linear object being constructed.
+ * @param[in] pd The private data for the object.
+ * @return The constructed Eo object.
+ */
 static Eo *
 _efl_canvas_vg_gradient_linear_efl_object_constructor(Eo *obj,
                                             Efl_Canvas_Vg_Gradient_Linear_Data *pd)
@@ -112,12 +182,33 @@ _efl_canvas_vg_gradient_linear_efl_object_constructor(Eo *obj,
    return obj;
 }
 
+/**
+ * @brief Destructor for Efl_Canvas_Vg_Gradient_Linear objects.
+ *
+ * Cleans up resources used by the object.
+ *
+ * @param[in] obj The Efl_Canvas_Vg_Gradient_Linear object being destructed.
+ * @param[in] pd The private data of the object (unused).
+ */
 static void
 _efl_canvas_vg_gradient_linear_efl_object_destructor(Eo *obj, Efl_Canvas_Vg_Gradient_Linear_Data *pd EINA_UNUSED)
 {
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Gets the bounding box of the linear gradient.
+ *
+ * The bounds are defined by the start and end points of the gradient.
+ * Note: This calculates a rectangle where the width and height are
+ * (end.x - start.x) and (end.y - start.y) respectively. This might not
+ * represent the visual extent if the gradient line is not axis-aligned
+ * or if spread methods extend the gradient.
+ *
+ * @param[in] obj The Efl_Canvas_Vg_Gradient_Linear object.
+ * @param[in] pd The private data of the object.
+ * @param[out] r The Eina_Rect structure to store the bounds.
+ */
 static void
 _efl_canvas_vg_gradient_linear_efl_gfx_path_bounds_get(const Eo *obj, Efl_Canvas_Vg_Gradient_Linear_Data *pd, Eina_Rect *r)
 {
@@ -129,6 +220,21 @@ _efl_canvas_vg_gradient_linear_efl_gfx_path_bounds_get(const Eo *obj, Efl_Canvas
                       pd->end.x - pd->start.x, pd->end.y - pd->start.x);
 }
 
+/**
+ * @brief Interpolates between two linear gradients.
+ *
+ * This function linearly interpolates the start and end points of the gradient
+ * based on the `pos_map` value. It also calls the superclass's interpolate
+ * function to handle common gradient properties (like colors).
+ *
+ * @param[in] obj The Efl_Canvas_Vg_Gradient_Linear object to store the interpolated result.
+ * @param[in,out] pd The private data of the target object.
+ * @param[in] from The source Efl_VG gradient to interpolate from.
+ * @param[in] to The destination Efl_VG gradient to interpolate to.
+ * @param[in] pos_map The interpolation factor (0.0 to 1.0).
+ *                    0.0 means `from` gradient, 1.0 means `to` gradient.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _efl_canvas_vg_gradient_linear_efl_gfx_path_interpolate(Eo *obj,
                                                 Efl_Canvas_Vg_Gradient_Linear_Data *pd,
@@ -160,6 +266,16 @@ _efl_canvas_vg_gradient_linear_efl_gfx_path_interpolate(Eo *obj,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Duplicates an Efl_Canvas_Vg_Gradient_Linear object.
+ *
+ * Creates a new linear gradient object that is a copy of the original,
+ * including its start and end points.
+ *
+ * @param[in] obj The Efl_Canvas_Vg_Gradient_Linear object to duplicate.
+ * @param[in] pd The private data of the object being duplicated.
+ * @return A new Efl_VG object that is a duplicate of @p obj, or NULL on failure.
+ */
 EOLIAN static Efl_VG *
 _efl_canvas_vg_gradient_linear_efl_duplicate_duplicate(const Eo *obj, Efl_Canvas_Vg_Gradient_Linear_Data *pd)
 {
@@ -171,30 +287,64 @@ _efl_canvas_vg_gradient_linear_efl_duplicate_duplicate(const Eo *obj, Efl_Canvas
    return cn;
 }
 
+/**
+ * @brief Sets the start point of a linear gradient (legacy Evas API).
+ * @param obj The gradient object.
+ * @param x The x-coordinate of the start point.
+ * @param y The y-coordinate of the start point.
+ * @ingroup Evas_Vg_Gradient_Linear_Group
+ */
 EVAS_API void
 evas_vg_gradient_linear_start_set(Evas_Vg_Gradient_Linear *obj, double x, double y)
 {
    efl_gfx_gradient_linear_start_set(obj, x, y);
 }
 
+/**
+ * @brief Gets the start point of a linear gradient (legacy Evas API).
+ * @param obj The gradient object.
+ * @param x Pointer to store the x-coordinate.
+ * @param y Pointer to store the y-coordinate.
+ * @ingroup Evas_Vg_Gradient_Linear_Group
+ */
 EVAS_API void
 evas_vg_gradient_linear_start_get(Evas_Vg_Gradient_Linear *obj, double *x, double *y)
 {
    efl_gfx_gradient_linear_start_get(obj, x, y);
 }
 
+/**
+ * @brief Sets the end point of a linear gradient (legacy Evas API).
+ * @param obj The gradient object.
+ * @param x The x-coordinate of the end point.
+ * @param y The y-coordinate of the end point.
+ * @ingroup Evas_Vg_Gradient_Linear_Group
+ */
 EVAS_API void
 evas_vg_gradient_linear_end_set(Evas_Vg_Gradient_Linear *obj, double x, double y)
 {
    efl_gfx_gradient_linear_end_set(obj, x, y);
 }
 
+/**
+ * @brief Gets the end point of a linear gradient (legacy Evas API).
+ * @param obj The gradient object.
+ * @param x Pointer to store the x-coordinate.
+ * @param y Pointer to store the y-coordinate.
+ * @ingroup Evas_Vg_Gradient_Linear_Group
+ */
 EVAS_API void
 evas_vg_gradient_linear_end_get(Evas_Vg_Gradient_Linear *obj, double *x, double *y)
 {
    efl_gfx_gradient_linear_end_get(obj, x, y);
 }
 
+/**
+ * @brief Adds a new linear gradient object as a child of a VG container (legacy Evas API).
+ * @param parent The parent VG container.
+ * @return The new linear gradient object, or NULL on failure.
+ * @ingroup Evas_Vg_Gradient_Linear_Group
+ */
 EVAS_API Evas_Vg_Gradient_Linear *
 evas_vg_gradient_linear_add(Evas_Vg_Container *parent)
 {

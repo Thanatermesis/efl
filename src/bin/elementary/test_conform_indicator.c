@@ -8,6 +8,17 @@ static int rotate_with_resize = 0;
 static Evas_Object *win_port = NULL;
 static Evas_Object *win_land = NULL;
 
+/**
+ * @brief Rotates the window to 0 degrees.
+ *
+ * This function is a callback for a button click. It rotates the window passed
+ * in the `data` parameter to 0 degrees. The rotation behavior (with or
+ * without resize) is controlled by the global `rotate_with_resize` flag.
+ *
+ * @param data The window (Evas_Object *) to be rotated.
+ * @param obj The object that triggered the event (unused).
+ * @param event_info The event information (unused).
+ */
 static void
 _rot_0(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -18,6 +29,17 @@ _rot_0(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
      elm_win_rotation_set(win, 0);
 }
 
+/**
+ * @brief Rotates the window to 90 degrees.
+ *
+ * This function is a callback for a button click. It rotates the window passed
+ * in the `data` parameter to 90 degrees. The rotation behavior (with or
+ * without resize) is controlled by the global `rotate_with_resize` flag.
+ *
+ * @param data The window (Evas_Object *) to be rotated.
+ * @param obj The object that triggered the event (unused).
+ * @param event_info The event information (unused).
+ */
 static void
 _rot_90(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -28,6 +50,17 @@ _rot_90(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
      elm_win_rotation_set(win, 90);
 }
 
+/**
+ * @brief Rotates the window to 180 degrees.
+ *
+ * This function is a callback for a button click. It rotates the window passed
+ * in the `data` parameter to 180 degrees. The rotation behavior (with or
+ * without resize) is controlled by the global `rotate_with_resize` flag.
+ *
+ * @param data The window (Evas_Object *) to be rotated.
+ * @param obj The object that triggered the event (unused).
+ * @param event_info The event information (unused).
+ */
 static void
 _rot_180(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -38,6 +71,17 @@ _rot_180(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
      elm_win_rotation_set(win, 180);
 }
 
+/**
+ * @brief Rotates the window to 270 degrees.
+ *
+ * This function is a callback for a button click. It rotates the window passed
+ * in the `data` parameter to 270 degrees. The rotation behavior (with or
+ * without resize) is controlled by the global `rotate_with_resize` flag.
+ *
+ * @param data The window (Evas_Object *) to be rotated.
+ * @param obj The object that triggered the event (unused).
+ * @param event_info The event information (unused).
+ */
 static void
 _rot_270(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -48,6 +92,18 @@ _rot_270(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
      elm_win_rotation_set(win, 270);
 }
 
+/**
+ * @brief Toggles the visibility of the window indicator.
+ *
+ * This callback function is triggered by a button click. It alternates
+ * between showing and hiding the window indicator using
+ * elm_win_indicator_mode_set(). The current visibility state is tracked by
+ * the global `vis` variable.
+ *
+ * @param data The window (Evas_Object *) whose indicator mode is to be changed.
+ * @param obj The object that triggered the event (unused).
+ * @param event_info The event information (unused).
+ */
 static void
 _visible_change_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -69,6 +125,21 @@ _visible_change_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EI
    printf("visible change after = %d\n", vis);
 }
 
+/**
+ * @brief Launches a window that uses the conformant indicator.
+ *
+ * This function, called on a button click, creates a new "conformant" window.
+ * This window is designed to demonstrate how an application can interact with
+ * an external indicator service. It includes buttons for rotation control and
+ * two `elm_plug` widgets. These plugs connect to the portrait and landscape
+ * indicator services (which are socket windows) and display their content.
+ * This setup allows testing of the conformant mechanism, where the window's
+ * content area is adjusted based on the indicator's presence.
+ *
+ * @param data Unused.
+ * @param obj The object that triggered the event (unused).
+ * @param event_info The event information (unused).
+ */
 static void
 _launch_conformant_indicator_window_btn_cb(void *data EINA_UNUSED,
                                            Evas_Object *obj EINA_UNUSED,
@@ -176,6 +247,18 @@ _launch_conformant_indicator_window_btn_cb(void *data EINA_UNUSED,
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback for mouse down events on the indicator background.
+ *
+ * This function is used to test if mouse events are correctly forwarded from
+ * the indicator socket window to the application. It moves a button widget
+ * (`sub_obj`) to the coordinates of the mouse down event.
+ *
+ * @param data A pointer to the Evas_Object to be moved (the button).
+ * @param evas Unused.
+ * @param obj Unused.
+ * @param event_info The mouse down event details.
+ */
 static void
 _mouse_down_cb(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -187,6 +270,18 @@ _mouse_down_cb(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    evas_object_move(sub_obj, ev->canvas.x, ev->canvas.y);
 }
 
+/**
+ * @brief Callback for mouse move events on the indicator background.
+ *
+ * Similar to _mouse_down_cb, this handles mouse move events, allowing
+ * dragging of the button widget within the indicator area if a mouse button
+ * is held down. This further tests event propagation.
+ *
+ * @param data A pointer to the Evas_Object to be moved (the button).
+ * @param evas Unused.
+ * @param obj Unused.
+ * @param event_info The mouse move event details.
+ */
 static void
 _mouse_move_cb(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -198,6 +293,15 @@ _mouse_move_cb(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    evas_object_move(sub_obj, ev->cur.canvas.x, ev->cur.canvas.y);
 }
 
+/**
+ * @brief Fills the content of the portrait indicator window.
+ *
+ * This function populates the portrait indicator window with a colored
+ * background and a button labeled "portrait". It also sets up mouse event
+ * callbacks on the background to test event forwarding through the socket.
+ *
+ * @param win The portrait indicator window to fill.
+ */
 static void
 _fill_portrait(Evas_Object *win)
 {
@@ -226,6 +330,15 @@ _fill_portrait(Evas_Object *win)
    evas_object_event_callback_add(bg, EVAS_CALLBACK_MOUSE_MOVE, _mouse_move_cb, btn);
 }
 
+/**
+ * @brief Fills the content of the landscape indicator window.
+ *
+ * This function populates the landscape indicator window with a colored
+ * background and a button labeled "landscape". It also sets up mouse event
+ * callbacks on the background to test event forwarding through the socket.
+ *
+ * @param win The landscape indicator window to fill.
+ */
 static void
 _fill_landscape(Evas_Object *win)
 {
@@ -254,6 +367,17 @@ _fill_landscape(Evas_Object *win)
    evas_object_event_callback_add(bg, EVAS_CALLBACK_MOUSE_MOVE, _mouse_move_cb, btn);
 }
 
+/**
+ * @brief Creates the portrait indicator service window.
+ *
+ * This function creates a window of type ELM_WIN_SOCKET_IMAGE, which acts as
+ * a service provider for an indicator. It listens on a socket connection
+ * with a service name retrieved from `elm_config_indicator_service_get(0)`,
+ * or a default name "elm_indicator_portrait". Applications can connect to
+ * this socket using `elm_plug` to display this window's content.
+ *
+ * @return The created portrait window object, or NULL on failure.
+ */
 static Evas_Object *
 _create_portrait(void)
 {
@@ -293,6 +417,16 @@ _create_portrait(void)
    return win_port;
 }
 
+/**
+ * @brief Creates the landscape indicator service window.
+ *
+ * This function creates a window of type ELM_WIN_SOCKET_IMAGE for the
+ * landscape orientation indicator. It listens on a socket with a service name
+ * from `elm_config_indicator_service_get(90)` or a default name
+ * "elm_indicator_landscape".
+ *
+ * @return The created landscape window object, or NULL on failure.
+ */
 static Evas_Object *
 _create_landscape(void)
 {
@@ -332,6 +466,17 @@ _create_landscape(void)
    return win_land;
 }
 
+/**
+ * @brief Callback to start the indicator services.
+ *
+ * This function is triggered by a button click. It creates and shows both the
+ * portrait and landscape indicator service windows. It also disables the
+ * button that triggered it to prevent multiple service instances.
+ *
+ * @param data The button object to be disabled.
+ * @param obj Unused.
+ * @param event Unused.
+ */
 static void
 _indicator_service_start_btn_cb(void *data, Evas_Object *obj EINA_UNUSED,
                                 void *event EINA_UNUSED)
@@ -349,6 +494,24 @@ _indicator_service_start_btn_cb(void *data, Evas_Object *obj EINA_UNUSED,
 
 }
 
+/**
+ * @brief Main function for the conformant indicator test.
+ *
+ * This function is the entry point for the test. It creates a main window
+ * with two buttons:
+ * 1. "Start Indicator Service": This button, when clicked, will launch the
+ *    portrait and landscape indicator service windows (_indicator_service_start_btn_cb).
+ * 2. "Launch Conformant Indicator Window": This button launches a client
+ *    application window that uses the indicator services
+ *    (_launch_conformant_indicator_window_btn_cb).
+ *
+ * This setup allows testing the entire indicator mechanism, from service
+ * creation to client interaction.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event Unused.
+ */
 void
 test_conformant_indicator(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                           void *event EINA_UNUSED)

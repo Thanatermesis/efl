@@ -1,3 +1,9 @@
+/**
+ * @file
+ * @brief This file implements the base Efl_Object class, providing core object-oriented functionalities
+ * like lifecycle management, event handling, parent-child relationships, and data storage.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -12,71 +18,120 @@
 #include "eo_private.h"
 #include "eina_promise_private.h"
 
+/**
+ * @brief Event triggered when a new callback is added to an object.
+ * The event_info for this event is an Efl_Callback_Array_Item_Full array.
+ */
 EO_API const Efl_Event_Description _EFL_EVENT_CALLBACK_ADD =
     EFL_EVENT_DESCRIPTION_HOT("callback,add");
 
+/**
+ * @brief Event triggered when a callback is deleted from an object.
+ * The event_info for this event is an Efl_Callback_Array_Item_Full array.
+ */
 EO_API const Efl_Event_Description _EFL_EVENT_CALLBACK_DEL =
     EFL_EVENT_DESCRIPTION_HOT("callback,del");
 
+/** Global counter for event freezing. When > 0, most events are not processed. */
 static int event_freeze_count = 0;
 
+/**
+ * @brief Describes a registered callback, either a single function or an array of functions.
+ */
 typedef struct _Eo_Callback_Description  Eo_Callback_Description;
+/**
+ * @brief Represents a frame in the event callback stack during event emission.
+ * This helps manage nested event calls and callback modifications during emission.
+ */
 typedef struct _Efl_Event_Callback_Frame Efl_Event_Callback_Frame;
+
+/**
+ * @brief Structure to manage event forwarding from one object to another.
+ */
 typedef struct _Efl_Event_Forwarder Efl_Event_Forwarder;
 
 struct _Efl_Event_Forwarder
 {
-   const Efl_Event_Description *desc;
-   Eo *source;
-   Eo *new_obj;
+   const Efl_Event_Description *desc; /**< The event description being forwarded. */
+   Eo *source;                          /**< The source object of the event (wref). */
+   Eo *new_obj;                         /**< The target object to forward the event to. */
 
-   short priority;
+   short priority;                      /**< Priority of the forwarding callback. */
 
-   Eina_Bool inserted : 1;
+   Eina_Bool inserted : 1;              /**< Flag indicating if the forwarder callback is currently inserted. */
 };
 
+/**
+ * @struct _Efl_Event_Callback_Frame
+ * @brief Represents a frame in the event callback stack during event emission.
+ *
+ * This structure is used to keep track of the state of event processing,
+ * especially when callbacks are added or removed during an event emission,
+ * or when events trigger other events (nested calls).
+ */
 struct _Efl_Event_Callback_Frame
 {
-   const Efl_Event_Description    *desc;
-   Efl_Event_Callback_Frame *next;
-   unsigned int              idx;
-   unsigned int              inserted_before;
-   unsigned short            generation;
+   const Efl_Event_Description    *desc;            /**< The event description for this frame. */
+   Efl_Event_Callback_Frame *next;            /**< Pointer to the next frame in the stack (outer call). */
+   unsigned int              idx;               /**< Current index in the callback list being processed. */
+   unsigned int              inserted_before;   /**< Count of callbacks inserted before the current idx during this frame's processing. */
+   unsigned short            generation;        /**< Generation number to handle callbacks added during emission. */
 };
 
+/**
+ * @brief Extension data for an Efl_Object.
+ * This structure holds optional, less frequently used data associated with an object
+ * to save memory for objects that don't use these features.
+ */
 typedef struct
 {
-   const char                *name;
-   const char                *comment;
-   Eo                        *composite_parent;
-   Eina_Inlist               *generic_data;
-   Eo                      ***wrefs;
-   Eina_Hash                 *providers;
-   Eina_Hash                 *schedulers;
-   Eina_Hash                 *forwarders;
+   const char                *name;             /**< User-provided name for the object (stringshared). */
+   const char                *comment;          /**< User-provided comment for the object (stringshared). */
+   Eo                        *composite_parent; /**< Parent object in a composite relationship. */
+   Eina_Inlist               *generic_data;     /**< List of generic key-value data associated with the object. */
+   Eo                      ***wrefs;            /**< Array of weak references pointing to this object. */
+   Eina_Hash                 *providers;        /**< Hash table of provided interfaces/classes by this object or its children. Keys are Efl_Class*, values are Eo* providers. */
+   Eina_Hash                 *schedulers;       /**< Hash table of future schedulers associated with specific event callback arrays. Keys are Efl_Callback_Array_Item*, values are Efl_Future_Scheduler*. */
+   Eina_Hash                 *forwarders;       /**< Hash table of event forwarders. Keys are Efl_Event_Description*, values are Eina_List* of Efl_Event_Forwarder*. */
 } Efl_Object_Extension;
 
+/**
+ * @def EFL_OBJECT_EVENT_CALLBACK(Event)
+ * @brief Macro to define a boolean flag for specific, frequently checked event callbacks.
+ * This is an optimization to quickly check if any callbacks for certain critical events
+ * (like EFL_EVENT_DEL, EFL_EVENT_NOREF) are registered, avoiding a full scan of the callback list.
+ * The flag is named `event_cb_EventName`.
+ */
 #define EFL_OBJECT_EVENT_CALLBACK(Event) Eina_Bool event_cb_##Event : 1;
 
+/**
+ * @brief Core private data for an Efl_Object.
+ * This structure holds essential data for object functionality.
+ */
 struct _Efl_Object_Data
 {
-   Eina_Inlist               *children;
-   Eo                        *parent;
+   Eina_Inlist               *children;         /**< Inlist of child objects. */
+   Eo                        *parent;           /**< Parent object. */
 
-   Efl_Object_Extension      *ext;
+   Efl_Object_Extension      *ext;              /**< Pointer to extended data, allocated on demand. */
 
-   Efl_Event_Callback_Frame  *event_frame;
-   Eo_Callback_Description  **callbacks;
+   Efl_Event_Callback_Frame  *event_frame;      /**< Current event callback processing frame, if any. */
+   Eo_Callback_Description  **callbacks;       /**< Array of registered event callbacks, sorted by priority. */
 #ifdef EFL64
-   uint64_t                   callbacks_mask;
+   uint64_t                   callbacks_mask;   /**< Bitmask for quick check if any callback for a hashed event group exists. */
 #else
-   uint32_t                   callbacks_mask;
+   uint32_t                   callbacks_mask;   /**< Bitmask for quick check if any callback for a hashed event group exists. */
 #endif
-   Eina_Inlist               *pending_futures;
-   unsigned int               callbacks_count;
+   Eina_Inlist               *pending_futures;  /**< List of pending Eina_Future objects associated with this object. */
+   unsigned int               callbacks_count;   /**< Number of registered callback descriptions. */
 
-   unsigned short             event_freeze_count;
+   unsigned short             event_freeze_count;/**< Per-object event freeze counter. */
 
+   /** @name Optimized event callback presence flags
+    *  These flags are set to EINA_TRUE if there is at least one callback
+    *  registered for the corresponding event. This is an optimization.
+    *  @{
+    */
    EFL_OBJECT_EVENT_CALLBACK(EFL_EVENT_CALLBACK_ADD);
    EFL_OBJECT_EVENT_CALLBACK(EFL_EVENT_CALLBACK_DEL);
    EFL_OBJECT_EVENT_CALLBACK(EFL_EVENT_DEL);
@@ -84,61 +139,110 @@ struct _Efl_Object_Data
 
    EFL_OBJECT_EVENT_CALLBACK(EFL_EVENT_INVALIDATE);
    EFL_OBJECT_EVENT_CALLBACK(EFL_EVENT_DESTRUCT); // No proper count: minor optimization triggered at destruction only
-   Eina_Bool                  callback_stopped : 1;
-   Eina_Bool                  need_cleaning : 1;
+   /** @} */
+   Eina_Bool                  callback_stopped : 1; /**< Flag indicating if efl_event_callback_stop() was called. */
+   Eina_Bool                  need_cleaning : 1;    /**< Flag indicating if there are callbacks marked for deletion that need to be cleaned up. */
 
-   Eina_Bool                  allow_parent_unref : 1; // Allows unref to zero even with a parent
+   Eina_Bool                  allow_parent_unref : 1; /**< Allows unref to zero (and thus potential destruction) even with a parent. Used for specific scenarios like parts. */
 };
 
+/**
+ * @brief Enumerates the types of generic data that can be stored with an object.
+ */
 typedef enum
 {
-   DATA_PTR,
-   DATA_OBJ,
-   DATA_OBJ_WEAK,
-   DATA_VAL
+   DATA_PTR,      /**< Arbitrary pointer data. */
+   DATA_OBJ,      /**< A strong reference to another Eo object. */
+   DATA_OBJ_WEAK, /**< A weak reference to another Eo object. */
+   DATA_VAL       /**< An Eina_Value. */
 } Eo_Generic_Data_Node_Type;
 
+/**
+ * @brief Node for storing generic key-value data associated with an Eo object.
+ */
 typedef struct
 {
    EINA_INLIST;
-   const Eo                  *obj;
-   Eina_Stringshare          *key;
+   const Eo                  *obj;    /**< The Eo object this data is attached to. */
+   Eina_Stringshare          *key;    /**< The string key for this data. */
    union {
-        Eina_Value           *val;
-        Eo                   *obj;
-        void                 *ptr;
+        Eina_Value           *val;    /**< Eina_Value data if d_type is DATA_VAL. */
+        Eo                   *obj;    /**< Eo object data if d_type is DATA_OBJ or DATA_OBJ_WEAK. */
+        void                 *ptr;    /**< Pointer data if d_type is DATA_PTR. */
    } d;
-   Eo_Generic_Data_Node_Type  d_type;
+   Eo_Generic_Data_Node_Type  d_type; /**< The type of data stored. */
 } Eo_Generic_Data_Node;
 
+/**
+ * @brief Structure to track a pending Eina_Future associated with an Eo object.
+ * This is used by efl_future_cb_from_desc to manage the lifecycle of futures
+ * tied to an object's existence.
+ */
 typedef struct _Efl_Future_Pending
 {
    EINA_INLIST;
-   const Eo *o;
-   Eina_Future *future;
-   Efl_Future_Cb_Desc desc;
+   const Eo *o;                 /**< The Eo object this future is associated with. */
+   Eina_Future *future;         /**< The Eina_Future itself (can be self-referential if desc.storage is NULL). */
+   Efl_Future_Cb_Desc desc;     /**< The description of callbacks for the future. */
 } Efl_Future_Pending;
 
 
+/**
+ * @brief Describes the current state of a callback being processed, primarily for internal use.
+ * @deprecated This structure seems unused or its purpose is unclear in the current context.
+ */
 typedef struct
 {
    EINA_INLIST;
-   const Efl_Event_Description *desc;
-   unsigned int current;
+   const Efl_Event_Description *desc; /**< The event description. */
+   unsigned int current;              /**< Current index or counter related to the callback. */
 } Eo_Current_Callback_Description;
 
+/**
+ * @def EVENT_STACK_PUSH(pd, fr)
+ * @brief Pushes a new event callback frame onto the object's event frame stack.
+ * @param pd Pointer to the Efl_Object_Data.
+ * @param fr Pointer to the Efl_Event_Callback_Frame to push.
+ */
 #define EVENT_STACK_PUSH(pd, fr) do { \
    (fr)->next = (pd)->event_frame; \
    (pd)->event_frame = (fr); \
 } while (0)
+
+/**
+ * @def EVENT_STACK_POP(pd)
+ * @brief Pops the top event callback frame from the object's event frame stack.
+ * @param pd Pointer to the Efl_Object_Data.
+ */
 #define EVENT_STACK_POP(pd) do { \
    if ((pd)->event_frame) (pd)->event_frame = (pd)->event_frame->next; \
 } while (0)
 
+/**
+ * @brief Callback function used for event forwarding.
+ * This function is registered on the source object and, when triggered,
+ * calls efl_event_callback_call on the new_obj with the original event details.
+ * @param data The target Eo object (new_obj) to which the event should be forwarded.
+ * @param event The event details from the source object.
+ */
 static void _efl_event_forwarder_callback(void *data, const Efl_Event *event);
 
+/**
+ * @brief Flag to control callback array allocation strategy.
+ * If set (via "EO_NOSTEP_ALLOC" environment variable), callback arrays are reallocated
+ * for each new callback. Otherwise, they grow in steps (e.g., 16 entries at a time).
+ * -1 indicates not yet initialized. 0 for step allocation, 1 for no-step.
+ */
 static int _eo_nostep_alloc = -1;
 
+/**
+ * @internal
+ * @brief Clears all pending futures associated with an object.
+ * This function iterates through the list of pending futures for the given
+ * object data and cancels each one. It's typically called during object
+ * invalidation or destruction.
+ * @param pd Pointer to the Efl_Object_Data whose pending futures are to be cleared.
+ */
 static void
 _efl_pending_futures_clear(Efl_Object_Data *pd)
 {
@@ -151,12 +255,25 @@ _efl_pending_futures_clear(Efl_Object_Data *pd)
      }
 }
 
+/**
+ * @internal
+ * @brief Frees an Efl_Object_Extension structure.
+ * Uses eina_freeq_ptr_main_add for safe freeing from the main loop.
+ * @param ext Pointer to the Efl_Object_Extension to free.
+ */
 static inline void
 _efl_object_extension_free(Efl_Object_Extension *ext)
 {
    eina_freeq_ptr_main_add(ext, free, sizeof(*ext));
 }
 
+/**
+ * @internal
+ * @brief Ensures that the Efl_Object_Extension structure is allocated for an object.
+ * If pd->ext is NULL, this function allocates and zero-initializes it.
+ * @param pd Pointer to the Efl_Object_Data.
+ * @return Pointer to the (possibly newly allocated) Efl_Object_Extension.
+ */
 static inline Efl_Object_Extension *
 _efl_object_extension_need(Efl_Object_Data *pd)
 {
@@ -164,6 +281,12 @@ _efl_object_extension_need(Efl_Object_Data *pd)
    return pd->ext;
 }
 
+/**
+ * @internal
+ * @brief Checks if the Efl_Object_Extension is still needed and frees it if not.
+ * An extension is considered not needed if all its fields are NULL or empty.
+ * @param pd Pointer to the Efl_Object_Data.
+ */
 static inline void
 _efl_object_extension_noneed(Efl_Object_Data *pd)
 {
@@ -181,6 +304,16 @@ _efl_object_extension_noneed(Efl_Object_Data *pd)
    pd->ext = NULL;
 }
 
+/**
+ * @internal
+ * @brief Performs internal cleanup when an object is being invalidated.
+ * This includes clearing pending futures, freeing forwarders, providers, and schedulers.
+ * It may also trigger `efl_parent_set(obj_id, NULL)` if the object is not already
+ * in the process of being invalidated via a parent change.
+ *
+ * @param obj_id The Eo object ID being invalidated.
+ * @param pd Pointer to the Efl_Object_Data of the object.
+ */
 static void
 _efl_object_invalidate(Eo *obj_id, Efl_Object_Data *pd)
 {
@@ -222,6 +355,18 @@ _efl_object_invalidate(Eo *obj_id, Efl_Object_Data *pd)
 // before any user code can change the children invalidate state. This
 // make sure that the entire tree of object is valid at the time of
 // the invalidate event.
+/**
+ * @internal
+ * @brief Initiates the invalidation process for an object and its children.
+ *
+ * This function ensures that an object is marked as invalidating, calls the
+ * `efl_invalidate` operation (which might be overridden), and then recursively
+ * invalidates all its children by setting their parent to NULL.
+ * The `EFL_EVENT_INVALIDATE` event is emitted on the object before its own
+ * `efl_invalidate` op is called.
+ *
+ * @param obj Pointer to the internal _Eo_Object structure.
+ */
 void
 _efl_invalidate(_Eo_Object *obj)
 {
@@ -261,8 +406,23 @@ _efl_invalidate(_Eo_Object *obj)
    obj->invalidate = EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Callback for EFL_EVENT_DEL on an object stored via efl_key_ref_set or efl_key_wref_set.
+ * When the referenced object is deleted, this callback removes the corresponding
+ * generic data node from the owner object.
+ * @param data Pointer to the Eo_Generic_Data_Node.
+ * @param event The EFL_EVENT_DEL event (unused).
+ */
 static void _key_generic_cb_del(void *data, const Efl_Event *event);
 
+/**
+ * @internal
+ * @brief Frees an Eo_Generic_Data_Node and its associated resources.
+ * Depending on the node's d_type, this may involve unreferencing Eo objects,
+ * removing event callbacks, or freeing Eina_Value instances.
+ * @param node The Eo_Generic_Data_Node to free.
+ */
 static void
 _eo_generic_data_node_free(Eo_Generic_Data_Node *node)
 {
@@ -287,6 +447,13 @@ _eo_generic_data_node_free(Eo_Generic_Data_Node *node)
    eina_freeq_ptr_main_add(node, free, sizeof(*node));
 }
 
+/**
+ * @internal
+ * @brief Deletes all generic data associated with an object.
+ * Iterates through all Eo_Generic_Data_Node in pd->ext->generic_data and frees them.
+ * @param obj The Eo object (unused).
+ * @param pd Pointer to the Efl_Object_Data.
+ */
 static void
 _eo_generic_data_del_all(Eo *obj EINA_UNUSED, Efl_Object_Data *pd)
 {
@@ -305,6 +472,13 @@ _eo_generic_data_del_all(Eo *obj EINA_UNUSED, Efl_Object_Data *pd)
      }
 }
 
+/**
+ * @internal
+ * @brief Directly removes a given Eo_Generic_Data_Node from the object's generic data list.
+ * @param pd Pointer to the Efl_Object_Data.
+ * @param node The Eo_Generic_Data_Node to remove.
+ * @param call_free If EINA_TRUE, calls _eo_generic_data_node_free on the node.
+ */
 static void
 _eo_key_generic_direct_del(Efl_Object_Data *pd, Eo_Generic_Data_Node *node, Eina_Bool call_free)
 {
@@ -315,6 +489,14 @@ _eo_key_generic_direct_del(Efl_Object_Data *pd, Eo_Generic_Data_Node *node, Eina
    if (call_free) _eo_generic_data_node_free(node);
 }
 
+/**
+ * @internal
+ * @brief Deletes generic data associated with a specific key from an object.
+ * @param obj The Eo object (unused).
+ * @param pd Pointer to the Efl_Object_Data.
+ * @param key The key of the data to delete.
+ * @param call_free If EINA_TRUE, calls _eo_generic_data_node_free on the found node.
+ */
 static void
 _eo_key_generic_del(const Eo *obj EINA_UNUSED, Efl_Object_Data *pd, const char *key, Eina_Bool call_free)
 {
@@ -333,7 +515,22 @@ _eo_key_generic_del(const Eo *obj EINA_UNUSED, Efl_Object_Data *pd, const char *
      }
 }
 
-/* Return TRUE if the object was newly added. */
+/**
+ * @internal
+ * @brief Sets or replaces generic data for a given key.
+ * If data is NULL, the existing data for the key is removed.
+ * If a node with the same key already exists, it's replaced.
+ *
+ * @param obj The Eo object to associate data with.
+ * @param pd Pointer to the Efl_Object_Data.
+ * @param key The string key for the data.
+ * @param data Pointer to the data to store.
+ * @param d_type The type of the data being stored (DATA_PTR, DATA_OBJ, etc.).
+ * @param call_free If EINA_TRUE and an existing node is replaced or data is NULL,
+ *                  _eo_generic_data_node_free is called on the old/removed node.
+ * @return The newly created or updated Eo_Generic_Data_Node, or NULL if data was NULL (deletion)
+ *         or if allocation failed. Returns NULL also if the data and type are identical to an existing entry.
+ */
 static Eo_Generic_Data_Node *
 _key_generic_set(const Eo *obj, Efl_Object_Data *pd, const char *key, const void *data, Eo_Generic_Data_Node_Type d_type, Eina_Bool call_free)
 {
@@ -381,6 +578,18 @@ _key_generic_set(const Eo *obj, Efl_Object_Data *pd, const char *key, const void
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Retrieves generic data associated with a key and a specific type.
+ * If found, the node is promoted to the front of the generic_data list for faster access next time.
+ *
+ * @param obj The Eo object.
+ * @param pd Pointer to the Efl_Object_Data.
+ * @param key The string key for the data.
+ * @param d_type The expected type of the data.
+ * @return Pointer to the data if found and type matches, otherwise NULL.
+ *         Logs an error if a key is found but the type mismatches.
+ */
 static void *
 _key_generic_get(const Eo *obj, Efl_Object_Data *pd, const char *key, Eo_Generic_Data_Node_Type d_type)
 {

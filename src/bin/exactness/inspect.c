@@ -49,6 +49,11 @@ static Eina_List *_comp_vvs = NULL;
 
 static Eina_List *_modified_units = NULL;
 
+/**
+ * @brief Get the string name of an action type.
+ * @param act The action.
+ * @return A string representing the action type, or NULL on error.
+ */
 static const char *
 _action_name_get(Exactness_Action *act)
 {
@@ -71,6 +76,14 @@ _action_name_get(Exactness_Action *act)
      }
 }
 
+/**
+ * @brief Get the size of the data structure for a specific action type.
+ *
+ * This is used to know how much data to compare for checking duplicates.
+ *
+ * @param type The action type.
+ * @return The size of the action's data structure, or 0 if it has no specific data.
+ */
 static int
 _event_struct_len_get(Exactness_Action_Type type)
 {
@@ -94,6 +107,12 @@ _event_struct_len_get(Exactness_Action_Type type)
      }
 }
 
+/**
+ * @brief Get a string with human-readable details about an action.
+ * @param act The action to get info from.
+ * @param output The output buffer to write the formatted string into.
+ *               Must be at least 1024 bytes.
+ */
 static void
 _action_specific_info_get(const Exactness_Action *act, char output[1024])
 {
@@ -154,6 +173,16 @@ _action_specific_info_get(const Exactness_Action *act, char output[1024])
      }
 }
 
+/**
+ * @brief Check if an action is a duplicate of the previous one.
+ *
+ * This is used to clean up recordings by merging consecutive identical events
+ * (e.g., multiple mouse move events when nothing else happens).
+ *
+ * @param cur_act The current action.
+ * @param prev_act The previous action.
+ * @return EINA_TRUE if the actions are duplicates, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _is_hook_duplicate(const Exactness_Action *cur_act, const Exactness_Action *prev_act)
 {
@@ -166,6 +195,15 @@ _is_hook_duplicate(const Exactness_Action *cur_act, const Exactness_Action *prev
    return EINA_FALSE;
 }
 
+/**
+ * @brief Compare two scenario actions to see if they are different.
+ *
+ * Used in compare mode to highlight differences.
+ *
+ * @param act1 The first action.
+ * @param act2 The second action.
+ * @return EINA_TRUE if they are different, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _are_scenario_entries_different(Exactness_Action *act1, Exactness_Action *act2)
 {
@@ -202,6 +240,12 @@ _are_scenario_entries_different(Exactness_Action *act1, Exactness_Action *act2)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Compare two images pixel by pixel to check for differences.
+ * @param e_img1 The first image.
+ * @param e_img2 The second image.
+ * @return EINA_TRUE if images are different, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _are_images_different(Exactness_Image *e_img1, Exactness_Image *e_img2)
 {
@@ -224,6 +268,17 @@ _are_images_different(Exactness_Image *e_img1, Exactness_Image *e_img2)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Recursively compare two object trees for differences.
+ *
+ * @param e_obj1 The root of the first object tree.
+ * @param e_obj2 The root of the second object tree.
+ * @param check_objs If EINA_TRUE, compare the properties of the objects themselves.
+ *                   If EINA_FALSE, only recurse and compare children. This is used
+ *                   to check for differences inside an object's children list without
+ *                   considering the parent object's properties again.
+ * @return EINA_TRUE if the object trees are different, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _are_objs_different(Exactness_Object *e_obj1, Exactness_Object *e_obj2, Eina_Bool check_objs)
 {
@@ -248,6 +303,16 @@ _are_objs_different(Exactness_Object *e_obj1, Exactness_Object *e_obj2, Eina_Boo
    return EINA_FALSE;
 }
 
+/**
+ * @brief Compare two lists of root objects.
+ *
+ * This function iterates over the main objects in two `Exactness_Objects`
+ * structures and compares them.
+ *
+ * @param e_objs1 The first list of object trees.
+ * @param e_objs2 The second list of object trees.
+ * @return EINA_TRUE if the lists of object trees are different, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _are_objs_trees_different(Exactness_Objects *e_objs1, Exactness_Objects *e_objs2)
 {
@@ -269,12 +334,18 @@ _are_objs_trees_different(Exactness_Objects *e_objs1, Exactness_Objects *e_objs2
    return EINA_FALSE;
 }
 
+/**
+ * @brief Callback for window deletion request. Exits the main loop.
+ */
 static void
 _win_del(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    efl_exit(0); /* exit the program's main loop that runs in elm_run() */
 }
 
+/**
+ * @brief Create the main GUI window and layout.
+ */
 static void
 _gui_win_create()
 {
@@ -303,6 +374,17 @@ _gui_win_create()
    efl_gfx_entity_visible_set(win, EINA_TRUE);
 }
 
+/**
+ * @brief Genlist callback to get the text for a group item.
+ *
+ * Handles both single view and compare view, and displays different text
+ * based on the data type (fonts, scenario, etc.).
+ *
+ * @param data The data type (_Data_Type).
+ * @param gl The genlist object.
+ * @param part The part name (unused).
+ * @return A newly allocated string for the group item label.
+ */
 static char *
 _grp_text_get(void *data, Evas_Object *gl, const char *part EINA_UNUSED)
 {
@@ -340,6 +422,18 @@ _grp_text_get(void *data, Evas_Object *gl, const char *part EINA_UNUSED)
    return strdup(buf);
 }
 
+/**
+ * @brief Genlist callback to get the text for a scenario item.
+ *
+ * Formats a string describing the scenario action. In compare mode, it
+ * highlights differences between the two actions.
+ *
+ * @param data For single view, an `Exactness_Action`. For compare view,
+ *             a `_Compare_Item_Data` containing two actions.
+ * @param gl The genlist object.
+ * @param part The part name (unused).
+ * @return A newly allocated string for the scenario item label.
+ */
 static char *
 _scn_text_get(void *data, Evas_Object *gl, const char *part EINA_UNUSED)
 {
@@ -400,6 +494,16 @@ _scn_text_get(void *data, Evas_Object *gl, const char *part EINA_UNUSED)
    return ret;
 }
 
+/**
+ * @brief Find the index of a "take shot" action within a unit's action list.
+ *
+ * The index is 0-based and counts only `EXACTNESS_ACTION_TAKE_SHOT` actions.
+ * This corresponds to the index in the unit's image list.
+ *
+ * @param unit The exactness unit.
+ * @param act_ref The "take shot" action to find.
+ * @return The index of the shot, or -1 if not found.
+ */
 static int
 _unit_shot_no_get(Exactness_Unit *unit, Exactness_Action *act_ref)
 {
@@ -418,6 +522,16 @@ _unit_shot_no_get(Exactness_Unit *unit, Exactness_Action *act_ref)
    return -1;
 }
 
+/**
+ * @brief Callback for a "goto shot" button.
+ *
+ * When a thumbnail in the scenario list is clicked, this scrolls the image
+ * list to show the corresponding full-size image or diff.
+ *
+ * @param data Unused.
+ * @param bt The button that was clicked.
+ * @param event_info Unused.
+ */
 static void
 _goto_shot(void *data EINA_UNUSED, Evas_Object *bt, void *event_info EINA_UNUSED)
 {
@@ -456,6 +570,19 @@ _goto_shot(void *data EINA_UNUSED, Evas_Object *bt, void *event_info EINA_UNUSED
      }
 }
 
+/**
+ * @brief Genlist callback to get content for a scenario item.
+ *
+ * For `EXACTNESS_ACTION_TAKE_SHOT` actions, it creates a button with a
+ * thumbnail of the shot (or a diff thumbnail in compare mode). Clicking
+ * this button will scroll the image list to the corresponding image.
+ *
+ * @param data For single view, an `Exactness_Action`. For compare view,
+ *             a `_Compare_Item_Data`.
+ * @param gl The genlist object.
+ * @param part The part name (e.g., "elm.swallow.end").
+ * @return A widget to be displayed, or NULL.
+ */
 static Evas_Object *
 _scn_content_get(void *data, Evas_Object *gl, const char *part)
 {
@@ -541,6 +668,18 @@ _scn_content_get(void *data, Evas_Object *gl, const char *part)
    return NULL;
 }
 
+/**
+ * @brief Genlist callback to get content for an image item.
+ *
+ * Creates an image widget to display a captured screenshot. In compare
+ * mode, it displays a diff of the two images.
+ *
+ * @param data For single view, an `Exactness_Image`. For compare view,
+ *             a `_Compare_Item_Data`.
+ * @param gl The genlist object.
+ * @param part The part name (e.g., "elm.swallow.content").
+ * @return An image widget, or NULL.
+ */
 static Evas_Object *
 _img_content_get(void *data, Evas_Object *gl, const char *part)
 {
@@ -576,6 +715,16 @@ _img_content_get(void *data, Evas_Object *gl, const char *part)
    return img;
 }
 
+/**
+ * @brief Genlist callback to get the text for an objects group item.
+ *
+ * This represents a single "shot" of the object tree.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param part Unused.
+ * @return A newly allocated string "Shot".
+ */
 static char *
 _objs_text_get(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
@@ -588,6 +737,18 @@ _objs_text_get(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, const char 
                  e_obj2 ? e_obj2->field : fallback); \
 
 
+/**
+ * @brief Genlist callback to get the text for an object tree item.
+ *
+ * Displays the object's class name and geometry. In compare mode, it
+ * highlights differences.
+ *
+ * @param data For single view, an `Exactness_Object`. For compare view,
+ *             a `_Compare_Item_Data`.
+ * @param gl The genlist object.
+ * @param part Unused.
+ * @return A newly allocated string with the object's description.
+ */
 static char *
 _obj_text_get(void *data, Evas_Object *gl, const char *part EINA_UNUSED)
 {
@@ -632,6 +793,12 @@ _obj_text_get(void *data, Evas_Object *gl, const char *part EINA_UNUSED)
    return ret;
 }
 
+/**
+ * @brief Initialize the genlist item classes.
+ *
+ * This function sets up the different styles and callbacks for each type
+ * of item that can appear in the genlists.
+ */
 static void
 _itc_init()
 {
@@ -672,6 +839,14 @@ _itc_init()
      }
 }
 
+/**
+ * @brief Callback for scrolling in compare mode.
+ *
+ * Synchronizes the scroll position of all genlists so they scroll together.
+ *
+ * @param obj The genlist that was scrolled.
+ * @param data Unused.
+ */
 static void
 _comp_gl_dragged_cb(Evas_Object *obj, void *data EINA_UNUSED)
 {
@@ -686,6 +861,15 @@ _comp_gl_dragged_cb(Evas_Object *obj, void *data EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Ensure a genlist item for a given object is realized.
+ *
+ * This function recursively expands parent items in the genlist until the
+ * item corresponding to `ex_obj` is created and visible. This is used to
+ * programmatically show an item that may be inside a collapsed parent.
+ *
+ * @param ex_obj The object whose genlist item needs to be realized.
+ */
 static void
 _obj_item_realize(Exactness_Object *ex_obj)
 {
@@ -697,6 +881,16 @@ _obj_item_realize(Exactness_Object *ex_obj)
    if (iip->gl_item) elm_genlist_item_expanded_set(iip->gl_item, EINA_TRUE);
 }
 
+/**
+ * @brief Callback for a genlist item expand request.
+ *
+ * When an item in one genlist is expanded, this ensures the corresponding
+ * items in the other genlists (in compare mode) are also expanded.
+ *
+ * @param data Unused.
+ * @param gl The genlist where the event occurred.
+ * @param event_info The genlist item being expanded.
+ */
 static void
 _gl_expand_request_cb(void *data EINA_UNUSED, Evas_Object *gl, void *event_info)
 {
@@ -730,6 +924,16 @@ _gl_expand_request_cb(void *data EINA_UNUSED, Evas_Object *gl, void *event_info)
    elm_genlist_item_expanded_set(glit, EINA_TRUE);
 }
 
+/**
+ * @brief Callback for a genlist item contract request.
+ *
+ * When an item in one genlist is contracted, this ensures the corresponding
+ * items in the other genlists (in compare mode) are also contracted.
+ *
+ * @param data Unused.
+ * @param gl The genlist where the event occurred.
+ * @param event_info The genlist item being contracted.
+ */
 static void
 _gl_contract_request_cb(void *data EINA_UNUSED, Evas_Object *gl EINA_UNUSED, void *event_info)
 {
@@ -759,6 +963,16 @@ _gl_contract_request_cb(void *data EINA_UNUSED, Evas_Object *gl EINA_UNUSED, voi
    elm_genlist_item_expanded_set(glit, EINA_FALSE);
 }
 
+/**
+ * @brief Callback for after a genlist item has been expanded.
+ *
+ * This function populates the sub-items of the expanded item. For example,
+ * expanding an object item will add its children as sub-items.
+ *
+ * @param _data Unused.
+ * @param gl The genlist where the event occurred.
+ * @param event_info The genlist item that was expanded.
+ */
 static void
 _gl_expanded_cb(void *_data EINA_UNUSED, Evas_Object *gl EINA_UNUSED, void *event_info)
 {
@@ -858,6 +1072,15 @@ _gl_expanded_cb(void *_data EINA_UNUSED, Evas_Object *gl EINA_UNUSED, void *even
      }
 }
 
+/**
+ * @brief Callback for after a genlist item has been contracted.
+ *
+ * This function clears all sub-items of the contracted item to free resources.
+ *
+ * @param data Unused.
+ * @param gl Unused.
+ * @param event_info The genlist item that was contracted.
+ */
 static void
 _gl_contracted_cb(void *data EINA_UNUSED, Evas_Object *gl EINA_UNUSED, void *event_info)
 {
@@ -865,6 +1088,16 @@ _gl_contracted_cb(void *data EINA_UNUSED, Evas_Object *gl EINA_UNUSED, void *eve
    elm_genlist_item_subitems_clear(glit);
 }
 
+/**
+ * @brief Callback for item selection in the center (comparison) genlist.
+ *
+ * When an item in the comparison list is selected, this function finds and
+ * selects the corresponding items in the left and right genlists.
+ *
+ * @param data Unused.
+ * @param gl Unused.
+ * @param event_info The selected genlist item from the comparison list.
+ */
 static void
 _comp_gl_selected_cb(void *data EINA_UNUSED, Evas_Object *gl EINA_UNUSED, void *event_info)
 {
@@ -889,6 +1122,17 @@ _comp_gl_selected_cb(void *data EINA_UNUSED, Evas_Object *gl EINA_UNUSED, void *
      }
 }
 
+/**
+ * @brief Callback to remove a scenario action item.
+ *
+ * This is called from the context menu. It removes the action from the
+ * unit's data and deletes the genlist item. It also marks the unit as
+ * modified so it can be saved on exit.
+ *
+ * @param data The genlist item to remove.
+ * @param menu Unused.
+ * @param item Unused.
+ */
 static void
 _scn_item_remove(void *data, Evas_Object *menu EINA_UNUSED, void *item EINA_UNUSED)
 {
@@ -901,6 +1145,15 @@ _scn_item_remove(void *data, Evas_Object *menu EINA_UNUSED, void *item EINA_UNUS
    efl_del(glit);
 }
 
+/**
+ * @brief Callback for right-clicks on the genlist.
+ *
+ * Shows a context menu for applicable items (e.g., scenario actions).
+ *
+ * @param data The main window.
+ * @param gl The genlist that was clicked.
+ * @param event_info The clicked genlist item.
+ */
 static void
 _gl_clicked_right_cb(void *data, Evas_Object *gl, void *event_info)
 {
@@ -920,6 +1173,15 @@ _gl_clicked_right_cb(void *data, Evas_Object *gl, void *event_info)
      }
 }
 
+/**
+ * @brief Show an image in a new dialog window.
+ *
+ * This is used to display a larger view of an image from the image list.
+ *
+ * @param data The `Exactness_Image` to show.
+ * @param obj The parent object for the new window.
+ * @param event_info Unused.
+ */
 static void
 _gl_img_show(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -940,6 +1202,16 @@ _gl_img_show(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    efl_gfx_entity_size_set(_img_win, EINA_SIZE2D(550, 500));
 }
 
+/**
+ * @brief Create and populate genlists to display one or two exactness units.
+ *
+ * If only `unit1` is provided, a single genlist is created to inspect it.
+ * If `unit2` is also provided, three genlists are created: one for each unit,
+ * and a center one that shows a comparison view highlighting differences.
+ *
+ * @param unit1 The first (or only) unit to display.
+ * @param unit2 The second unit for comparison (can be NULL).
+ */
 static void
 _gui_unit_display(Exactness_Unit *unit1, Exactness_Unit *unit2)
 {
@@ -1119,6 +1391,15 @@ _gui_unit_display(Exactness_Unit *unit1, Exactness_Unit *unit2)
      }
 }
 
+/**
+ * @brief Compare two units and print a summary of differences to stdout.
+ *
+ * This is for non-GUI mode. It counts the number of differences in the
+ * scenario, images, and object trees and prints a summary report.
+ *
+ * @param unit1 The first unit.
+ * @param unit2 The second unit.
+ */
 static void
 _diff_result_print(Exactness_Unit *unit1, Exactness_Unit *unit2)
 {
@@ -1184,6 +1465,14 @@ _diff_result_print(Exactness_Unit *unit1, Exactness_Unit *unit2)
           nb_objtree - nb_diff_objtree, nb_objtree);
 }
 
+/**
+ * @brief Read an image file from disk.
+ *
+ * Uses Evas to load an image file and returns it as an `Exactness_Image` struct.
+ *
+ * @param filename Path to the image file.
+ * @return A newly allocated `Exactness_Image`, or NULL on failure.
+ */
 static Exactness_Image *
 _image_read(const char *filename)
 {
@@ -1247,6 +1536,17 @@ static const Ecore_Getopt optdesc = {
   }
 };
 
+/**
+ * @brief Main function of the exactness_inspect tool.
+ *
+ * Parses command-line arguments and either enters a command-line mode
+ * for processing files (e.g., comparing, cleaning, modifying) or launches
+ * the GUI inspector.
+ *
+ * @param argc Argument count.
+ * @param argv Argument vector.
+ * @return 0 on success, 1 on failure.
+ */
 int
 main(int argc, char *argv[])
 {

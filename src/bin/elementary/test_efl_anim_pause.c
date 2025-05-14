@@ -3,6 +3,9 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Application data structure to hold widgets and state.
+ */
 typedef struct _App_Data
 {
    Efl_Canvas_Animation        *show_anim;
@@ -15,6 +18,16 @@ typedef struct _App_Data
    Eina_Bool             is_anim_paused;
 } App_Data;
 
+/**
+ * @brief Callback invoked when an animation starts or stops.
+ *
+ * This function enables the pause button when an animation begins and disables
+ * it when the animation ends.
+ *
+ * @param data The application data (_App_Data).
+ * @param event The EFL event information. The event->info will contain the
+ * animation object if it's starting, or NULL if it's ending.
+ */
 static void
 _anim_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -33,6 +46,15 @@ _anim_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback invoked periodically as an animation progresses.
+ *
+ * This function prints the current progress of the animation to the console.
+ *
+ * @param data Not used.
+ * @param event The EFL event information, where event->info is a pointer to a
+ * double representing the animation's progress (from 0.0 to 1.0).
+ */
 static void
 _anim_running_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -40,11 +62,29 @@ _anim_running_cb(void *data EINA_UNUSED, const Efl_Event *event)
    printf("Animation is running! Current progress(%lf)\n", *progress);
 }
 
+/**
+ * @brief Defines a set of callbacks for animation events.
+ *
+ * This array maps animation events to their respective handler functions.
+ * - EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_CHANGED: triggered when an animation starts or ends.
+ * - EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_PROGRESS_UPDATED: triggered during animation playback.
+ */
 EFL_CALLBACKS_ARRAY_DEFINE(animation_stats_cb,
   {EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_CHANGED, _anim_changed_cb },
   {EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_PROGRESS_UPDATED, _anim_running_cb },
 )
 
+/**
+ * @brief Callback for the "Start Animation" button click.
+ *
+ * Toggles between a "show" (fade-in) and "hide" (fade-out) animation
+ * on a target button. It also updates its own label to reflect the next
+ * action.
+ *
+ * @param data The application data (_App_Data).
+ * @param obj The button that was clicked.
+ * @param event_info Not used.
+ */
 static void
 _start_btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -66,6 +106,17 @@ _start_btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED
      }
 }
 
+/**
+ * @brief Callback for the "Pause Animation" button click.
+ *
+ * Toggles the pause state of the currently running animation on the target
+ * button. Updates its own label to "Resume Animation" when paused and
+ * "Pause Animation" when resumed.
+ *
+ * @param data The application data (_App_Data).
+ * @param obj The button that was clicked.
+ * @param event_info Not used.
+ */
 static void
 _pause_btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -87,6 +138,16 @@ _pause_btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED
      }
 }
 
+/**
+ * @brief Callback for the window delete request event.
+ *
+ * This function is called when the window is closed, and it is responsible
+ * for freeing the application data.
+ *
+ * @param data The application data (_App_Data) to be freed.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _win_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -94,6 +155,18 @@ _win_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    free(ad);
 }
 
+/**
+ * @brief Test case for pausing and resuming EFL canvas object animations.
+ *
+ * This function sets up a window with a button that can be animated (alpha fade-in/out).
+ * Two other buttons control the animation: one to start/toggle the animations,
+ * and another to pause/resume them. This demonstrates how to use
+ * efl_canvas_object_animation_start() and efl_canvas_object_animation_pause_set().
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_efl_anim_pause(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

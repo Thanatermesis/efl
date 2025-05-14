@@ -11,13 +11,28 @@
 #define MY_CLASS EFL_UI_TAB_BAR_CLASS
 #define MY_CLASS_NAME "Efl.Ui.Tab_Bar"
 
-
+/**
+ * @brief Gets the last selected item in the tab bar.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @return The last selected item, or NULL if no item is selected.
+ */
 EOLIAN static Efl_Ui_Selectable*
 _efl_ui_tab_bar_efl_ui_single_selectable_last_selected_get(const Eo *obj EINA_UNUSED, Efl_Ui_Tab_Bar_Data *pd)
 {
    return pd->selected;
 }
 
+/**
+ * @brief Sets the fallback item to be selected if the current selection is removed or deselected.
+ *
+ * If no item is currently selected, the fallback item will be selected immediately.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @param fallback The item to set as fallback.
+ */
 EOLIAN static void
 _efl_ui_tab_bar_efl_ui_single_selectable_fallback_selection_set(Eo *obj EINA_UNUSED, Efl_Ui_Tab_Bar_Data *pd, Efl_Ui_Selectable *fallback)
 {
@@ -29,19 +44,39 @@ _efl_ui_tab_bar_efl_ui_single_selectable_fallback_selection_set(Eo *obj EINA_UNU
      }
 }
 
+/**
+ * @brief Sets whether manual deselection of items is allowed.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @param allow_manual_deselection EINA_TRUE to allow manual deselection, EINA_FALSE otherwise.
+ */
 EOLIAN static void
 _efl_ui_tab_bar_efl_ui_single_selectable_allow_manual_deselection_set(Eo *obj EINA_UNUSED, Efl_Ui_Tab_Bar_Data *pd, Eina_Bool allow_manual_deselection)
 {
    pd->allow_manual_deselection = !!allow_manual_deselection;
 }
 
+/**
+ * @brief Gets whether manual deselection of items is allowed.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @return EINA_TRUE if manual deselection is allowed, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_tab_bar_efl_ui_single_selectable_allow_manual_deselection_get(const Eo *obj EINA_UNUSED, Efl_Ui_Tab_Bar_Data *pd)
 {
    return pd->allow_manual_deselection;
 }
 
-
+/**
+ * @brief Gets the fallback item.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @return The fallback item.
+ */
 EOLIAN static Efl_Ui_Selectable*
 _efl_ui_tab_bar_efl_ui_single_selectable_fallback_selection_get(const Eo *obj EINA_UNUSED, Efl_Ui_Tab_Bar_Data *pd)
 {
@@ -50,6 +85,15 @@ _efl_ui_tab_bar_efl_ui_single_selectable_fallback_selection_get(const Eo *obj EI
 
 static void _remove_item(Eo *obj, Efl_Ui_Tab_Bar_Data *pd, Efl_Ui_Item *item);
 
+/**
+ * @brief Callback function for handling selection changes of items in the tab bar.
+ *
+ * This function updates the selected item in the tab bar and handles fallback selection logic.
+ * It also emits the EFL_UI_EVENT_ITEM_SELECTED and EFL_UI_SELECTABLE_EVENT_SELECTION_CHANGED events.
+ *
+ * @param data The Efl_Ui_Tab_Bar object.
+ * @param ev The Efl_Event data.
+ */
 static void
 _selelction_change_cb(void *data, const Efl_Event *ev)
 {
@@ -90,6 +134,15 @@ _selelction_change_cb(void *data, const Efl_Event *ev)
      }
 }
 
+/**
+ * @brief Callback function for handling item invalidation.
+ *
+ * This function is called when an item in the tab bar is invalidated (e.g., deleted).
+ * It removes the item from the tab bar's internal state.
+ *
+ * @param data The Efl_Ui_Tab_Bar object.
+ * @param ev The Efl_Event data, where ev->object is the invalidated item.
+ */
 static void
 _invalidate_cb(void *data, const Efl_Event *ev)
 {
@@ -99,11 +152,25 @@ _invalidate_cb(void *data, const Efl_Event *ev)
    _remove_item(data, pd, ev->object);
 }
 
+/**
+ * @brief Array of event listeners for items in the tab bar.
+ *
+ * This array defines the callbacks for item selection changes and invalidation.
+ */
 EFL_CALLBACKS_ARRAY_DEFINE(item_listeners,
   {EFL_UI_EVENT_SELECTED_CHANGED, _selelction_change_cb},
   {EFL_EVENT_INVALIDATE, _invalidate_cb},
 )
 
+/**
+ * @brief Internal function to clean up an item being removed from the tab bar.
+ *
+ * This function deselects the item if it was selected and removes event listeners.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @param item The item to remove.
+ */
 static void
 _remove_item(Eo *obj, Efl_Ui_Tab_Bar_Data *pd, Efl_Ui_Item *item)
 {
@@ -115,6 +182,17 @@ _remove_item(Eo *obj, Efl_Ui_Tab_Bar_Data *pd, Efl_Ui_Item *item)
      _elm_widget_sub_object_redirect_to_top(obj, item);
 }
 
+/**
+ * @brief Internal function to register a new item with the tab bar.
+ *
+ * This function sets up the item as a sub-object, sets its container,
+ * adds event listeners, and sets default alignment.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @param subitem The item to register.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _register_item(Eo *obj, Efl_Ui_Tab_Bar_Data *pd EINA_UNUSED, Eo *subitem)
 {
@@ -126,12 +204,28 @@ _register_item(Eo *obj, Efl_Ui_Tab_Bar_Data *pd EINA_UNUSED, Eo *subitem)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Destructor for the Efl_Ui_Tab_Bar object.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param sd The private data of the Efl_Ui_Tab_Bar object.
+ */
 EOLIAN static void
 _efl_ui_tab_bar_efl_object_destructor(Eo *obj, Efl_Ui_Tab_Bar_Data *sd EINA_UNUSED)
 {
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Constructor for the Efl_Ui_Tab_Bar object.
+ *
+ * Initializes the tab bar, sets its theme, and creates an internal box layout
+ * to hold the tab items.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object being constructed.
+ * @param sd The private data of the Efl_Ui_Tab_Bar object.
+ * @return The constructed Efl_Ui_Tab_Bar object.
+ */
 EOLIAN static Efl_Object *
 _efl_ui_tab_bar_efl_object_constructor(Eo *obj, Efl_Ui_Tab_Bar_Data *sd)
 {
@@ -152,6 +246,15 @@ _efl_ui_tab_bar_efl_object_constructor(Eo *obj, Efl_Ui_Tab_Bar_Data *sd)
    return obj;
 }
 
+/**
+ * @brief Finalizes the Efl_Ui_Tab_Bar object.
+ *
+ * Sets the internal box layout as the content of the "efl.content" part.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @return The finalized Efl_Ui_Tab_Bar object.
+ */
 EOLIAN static Efl_Object*
 _efl_ui_tab_bar_efl_object_finalize(Eo *obj, Efl_Ui_Tab_Bar_Data *pd)
 {
@@ -164,6 +267,15 @@ _efl_ui_tab_bar_efl_object_finalize(Eo *obj, Efl_Ui_Tab_Bar_Data *pd)
    return o;
 }
 
+/**
+ * @brief Clears all items from the tab bar.
+ *
+ * Removes each item and then clears the internal box layout.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_tab_bar_efl_pack_pack_clear(Eo *obj, Efl_Ui_Tab_Bar_Data *pd)
 {
@@ -174,6 +286,15 @@ _efl_ui_tab_bar_efl_pack_pack_clear(Eo *obj, Efl_Ui_Tab_Bar_Data *pd)
    return efl_pack_clear(pd->bx);
 }
 
+/**
+ * @brief Unpacks all items from the tab bar.
+ *
+ * Removes each item and then unpacks all items from the internal box layout.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_tab_bar_efl_pack_unpack_all(Eo *obj, Efl_Ui_Tab_Bar_Data *pd)
 {
@@ -184,6 +305,16 @@ _efl_ui_tab_bar_efl_pack_unpack_all(Eo *obj, Efl_Ui_Tab_Bar_Data *pd)
    return efl_pack_unpack_all(pd->bx);
 }
 
+/**
+ * @brief Unpacks a specific item from the tab bar.
+ *
+ * Removes the item and then unpacks it from the internal box layout.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @param subobj The item to unpack.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_tab_bar_efl_pack_unpack(Eo *obj, Efl_Ui_Tab_Bar_Data *pd, Efl_Gfx_Entity *subobj)
 {
@@ -191,6 +322,17 @@ _efl_ui_tab_bar_efl_pack_unpack(Eo *obj, Efl_Ui_Tab_Bar_Data *pd, Efl_Gfx_Entity
    return efl_pack_unpack(pd->bx, subobj);
 }
 
+/**
+ * @brief Packs an item at the beginning of the tab bar.
+ *
+ * Registers the item and then packs it into the internal box layout.
+ * Ensures the selected item remains raised.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @param subobj The item to pack.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_tab_bar_efl_pack_linear_pack_begin(Eo *obj, Efl_Ui_Tab_Bar_Data *pd, Efl_Gfx_Entity *subobj)
 {
@@ -202,6 +344,17 @@ _efl_ui_tab_bar_efl_pack_linear_pack_begin(Eo *obj, Efl_Ui_Tab_Bar_Data *pd, Efl
    return val;
 }
 
+/**
+ * @brief Packs an item at the end of the tab bar.
+ *
+ * Registers the item and then packs it into the internal box layout.
+ * Ensures the selected item remains raised.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @param subobj The item to pack.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_tab_bar_efl_pack_linear_pack_end(Eo *obj, Efl_Ui_Tab_Bar_Data *pd, Efl_Gfx_Entity *subobj)
 {
@@ -213,6 +366,18 @@ _efl_ui_tab_bar_efl_pack_linear_pack_end(Eo *obj, Efl_Ui_Tab_Bar_Data *pd, Efl_G
    return val;
 }
 
+/**
+ * @brief Packs an item before an existing item in the tab bar.
+ *
+ * Registers the item and then packs it into the internal box layout.
+ * Ensures the selected item remains raised.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @param subobj The item to pack.
+ * @param existing The item before which to pack the new item.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_tab_bar_efl_pack_linear_pack_before(Eo *obj, Efl_Ui_Tab_Bar_Data *pd, Efl_Gfx_Entity *subobj, const Efl_Gfx_Entity *existing)
 {
@@ -226,6 +391,18 @@ _efl_ui_tab_bar_efl_pack_linear_pack_before(Eo *obj, Efl_Ui_Tab_Bar_Data *pd, Ef
    return val;
 }
 
+/**
+ * @brief Packs an item after an existing item in the tab bar.
+ *
+ * Registers the item and then packs it into the internal box layout.
+ * Ensures the selected item remains raised.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @param subobj The item to pack.
+ * @param existing The item after which to pack the new item.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_tab_bar_efl_pack_linear_pack_after(Eo *obj, Efl_Ui_Tab_Bar_Data *pd, Efl_Gfx_Entity *subobj, const Efl_Gfx_Entity *existing)
 {
@@ -239,6 +416,18 @@ _efl_ui_tab_bar_efl_pack_linear_pack_after(Eo *obj, Efl_Ui_Tab_Bar_Data *pd, Efl
    return val;
 }
 
+/**
+ * @brief Packs an item at a specific index in the tab bar.
+ *
+ * Registers the item and then packs it into the internal box layout at the given index.
+ * Ensures the selected item remains raised.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @param subobj The item to pack.
+ * @param index The index at which to pack the item.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_tab_bar_efl_pack_linear_pack_at(Eo *obj, Efl_Ui_Tab_Bar_Data *pd, Efl_Gfx_Entity *subobj, int index)
 {
@@ -250,18 +439,42 @@ _efl_ui_tab_bar_efl_pack_linear_pack_at(Eo *obj, Efl_Ui_Tab_Bar_Data *pd, Efl_Gf
    return val;
 }
 
+/**
+ * @brief Gets the number of items in the tab bar.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @return The number of items.
+ */
 EOLIAN static int
 _efl_ui_tab_bar_efl_container_content_count(Eo *obj EINA_UNUSED, Efl_Ui_Tab_Bar_Data *pd)
 {
    return efl_content_count(pd->bx);
 }
 
+/**
+ * @brief Gets an iterator for the items in the tab bar.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @return An Eina_Iterator for the items.
+ */
 EOLIAN static Eina_Iterator*
 _efl_ui_tab_bar_efl_container_content_iterate(Eo *obj EINA_UNUSED, Efl_Ui_Tab_Bar_Data *pd)
 {
    return efl_content_iterate(pd->bx);
 }
 
+/**
+ * @brief Unpacks an item from a specific index in the tab bar.
+ *
+ * Removes the item and then unpacks it from the internal box layout.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @param index The index of the item to unpack.
+ * @return The unpacked item, or NULL on failure.
+ */
 EOLIAN static Efl_Gfx_Entity*
 _efl_ui_tab_bar_efl_pack_linear_pack_unpack_at(Eo *obj, Efl_Ui_Tab_Bar_Data *pd, int index)
 {
@@ -269,6 +482,17 @@ _efl_ui_tab_bar_efl_pack_linear_pack_unpack_at(Eo *obj, Efl_Ui_Tab_Bar_Data *pd,
    return efl_pack_unpack_at(pd->bx, index);
 }
 
+/**
+ * @brief Packs an item into the tab bar (equivalent to pack_end).
+ *
+ * Registers the item and then packs it into the internal box layout.
+ * Ensures the selected item remains raised.
+ *
+ * @param obj The Efl_Ui_Tab_Bar object.
+ * @param pd The private data of the Efl_Ui_Tab_Bar object.
+ * @param subobj The item to pack.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_tab_bar_efl_pack_pack(Eo *obj, Efl_Ui_Tab_Bar_Data *pd, Efl_Gfx_Entity *subobj)
 {

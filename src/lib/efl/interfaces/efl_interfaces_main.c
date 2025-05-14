@@ -78,6 +78,20 @@
 
 #include "interfaces/efl_cached_item.eo.c"
 
+/**
+ * @internal
+ * @brief Event callback triggered when an object's reference count drops to zero.
+ *
+ * This function is responsible for cleaning up the object by first removing
+ * itself as an event callback for the EFL_EVENT_NOREF event, and then
+ * deleting the object. This prevents potential issues if the object were
+ * to be resurrected and then later no-ref'd again without this callback
+ * being re-added.
+ *
+ * @param data User data passed to the event callback (unused in this function).
+ * @param event Information about the event that occurred. The event->object
+ *              is the object whose reference count reached zero.
+ */
 static void
 _noref_death(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -85,6 +99,22 @@ _noref_death(void *data EINA_UNUSED, const Efl_Event *event)
    efl_del(event->object);
 }
 
+/**
+ * @brief Retrieves a part object from a given Eo object and manages its lifecycle.
+ *
+ * This function fetches a part named @p name from the object @p obj.
+ * If the part is found, it sets up an event callback (_noref_death)
+ * to automatically delete the part when its reference count drops to zero.
+ * It also performs safety checks to ensure the part has a parent and its
+ * reference count is 1 before enabling auto-unreffing and returning a
+ * new reference to the part.
+ *
+ * @param obj The parent object from which to get the part.
+ * @param name The name of the part to retrieve.
+ * @return A new reference to the retrieved part object, or @c NULL if the part
+ *         is not found or if safety checks fail. The caller is responsible
+ *         for unreferencing this object when it's no longer needed.
+ */
 EAPI Efl_Object *
 efl_part(const Eo *obj, const char *name)
 {
@@ -105,12 +135,41 @@ efl_part(const Eo *obj, const char *name)
    return efl_ref(r);
 }
 
+/**
+ * @internal
+ * @brief Initializes internal EFL components.
+ *
+ * This function is called to set up necessary internal systems within EFL.
+ * Currently, it initializes the EFL model system.
+ */
 EAPI void
 __efl_internal_init(void)
 {
    efl_model_init();
 }
 
+/**
+ * @internal
+ * @brief Callback function invoked after items are created by an Efl_Ui_View_Factory.
+ *
+ * This function iterates through an Eina_Value array, which contains
+ * Efl_Gfx_Entity items created by the factory. For each item, it triggers the
+ * EFL_UI_FACTORY_EVENT_ITEM_CREATED event on the factory object.
+ *
+ * @param factory The factory object that created the items.
+ * @param data User data passed to the callback (unused in this function).
+ * @param v An Eina_Value of type EINA_VALUE_TYPE_ARRAY. Each element in the
+ *          array is an Efl_Gfx_Entity* representing a newly created UI item.
+ *          Example:
+ *          v (Eina_Value array)
+ *          |
+ *          +-- [0] (Efl_Gfx_Entity *) item1
+ *          +-- [1] (Efl_Gfx_Entity *) item2
+ *          ...
+ *          +-- [n-1] (Efl_Gfx_Entity *) itemN
+ *
+ * @return The original Eina_Value @p v, passed through.
+ */
 static Eina_Value
 _efl_ui_view_factory_item_created(Eo *factory, void *data EINA_UNUSED, const Eina_Value v)
 {
@@ -123,6 +182,24 @@ _efl_ui_view_factory_item_created(Eo *factory, void *data EINA_UNUSED, const Ein
    return v;
 }
 
+/**
+ * @internal
+ * @brief Creates UI items using a factory and emits an event upon completion.
+ *
+ * This Eolian-exposed static function initiates the creation of UI items
+ * based on the provided models using the `efl_ui_factory_create` method.
+ * Once the creation process (which is asynchronous and returns a future)
+ * completes successfully, it then calls the `_efl_ui_view_factory_item_created`
+ * callback. This callback is responsible for emitting the
+ * `EFL_UI_FACTORY_EVENT_ITEM_CREATED` event for each created item.
+ *
+ * @param factory The Efl_Ui_Factory instance to use for creating items.
+ * @param models An iterator providing the models for which UI items should be created.
+ * @return An Eina_Future that resolves with an Eina_Value array containing the
+ *         created Efl_Gfx_Entity items. Returns @c NULL if the factory is @c NULL.
+ *         The structure of the resolved Eina_Value array is the same as described
+ *         for the @p v parameter in `_efl_ui_view_factory_item_created`.
+ */
 EOLIAN static Eina_Future *
 _efl_ui_view_factory_create_with_event(Efl_Ui_Factory *factory, Eina_Iterator *models)
 {

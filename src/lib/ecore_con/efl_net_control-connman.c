@@ -7,6 +7,13 @@
 #include "ecore_con_private.h"
 #include "efl_net-connman.h"
 
+/**
+ * @brief Private data structure for the Efl_Net_Control_Manager_Connman class.
+ *
+ * This structure holds all the internal state for managing network connections
+ * via ConnMan, including lists of pending D-Bus calls, signal handlers,
+ * known technologies and access points, and the state of the ConnMan agent.
+ */
 typedef struct
 {
    /* Eldbus_Proxy/Eldbus_Object keeps a list of pending calls, but
@@ -26,18 +33,25 @@ typedef struct
    } agent_request_input;
    Efl_Net_Control_State state;
    Eina_Bool radios_offline;
-   Eina_Bool operating; /* connman exists */
-   Eina_Bool agent_enabled;
+   Eina_Bool operating; /**< EINA_TRUE if ConnMan service is detected and operating. */
+   Eina_Bool agent_enabled; /**< EINA_TRUE if the ConnMan agent is registered and enabled. */
    struct {
-      unsigned char radios_offline; /* 0xff = not requested */
-      Eldbus_Pending *radios_offline_pending;
-   } request;
+      unsigned char radios_offline; /**< Requested state for radios offline mode (0xff if not requested). */
+      Eldbus_Pending *radios_offline_pending; /**< Pending D-Bus call for setting radios_offline. */
+   } request; /**< Holds requested states that are pending or to be applied. */
 } Efl_Net_Control_Manager_Data;
 
 #define MY_CLASS EFL_NET_CONTROL_MANAGER_CLASS
 
 static void _efl_net_control_manager_agent_enabled_set(Eo *o, Efl_Net_Control_Manager_Data *pd, Eina_Bool agent_enabled);
 
+/**
+ * @brief Finds a technology object by its D-Bus path.
+ *
+ * @param pd The private data of the control manager.
+ * @param path The D-Bus object path of the technology.
+ * @return The Eo technology object if found, otherwise NULL.
+ */
 static Eo *
 _efl_net_control_technology_find(const Efl_Net_Control_Manager_Data *pd, const char *path)
 {
@@ -55,6 +69,13 @@ _efl_net_control_technology_find(const Efl_Net_Control_Manager_Data *pd, const c
    return NULL;
 }
 
+/**
+ * @brief Finds an access point object by its D-Bus path.
+ *
+ * @param pd The private data of the control manager.
+ * @param path The D-Bus object path of the access point.
+ * @return The Eo access point object if found, otherwise NULL.
+ */
 static Eo *
 _efl_net_control_access_point_find(const Efl_Net_Control_Manager_Data *pd, const char *path)
 {
@@ -72,6 +93,16 @@ _efl_net_control_access_point_find(const Efl_Net_Control_Manager_Data *pd, const
    return NULL;
 }
 
+/**
+ * @brief Handles the "Release" D-Bus method call for the ConnMan agent.
+ *
+ * This function is called when ConnMan releases the agent. It updates the
+ * agent's state and emits an EFL_NET_CONTROL_MANAGER_EVENT_AGENT_RELEASED event.
+ *
+ * @param service The Eldbus service interface.
+ * @param msg The incoming D-Bus message.
+ * @return A new D-Bus method return message.
+ */
 static Eldbus_Message *
 _efl_net_control_agent_release(const Eldbus_Service_Interface *service, const Eldbus_Message *msg)
 {
@@ -89,6 +120,17 @@ _efl_net_control_agent_release(const Eldbus_Service_Interface *service, const El
    return eldbus_message_method_return_new(msg);
 }
 
+/**
+ * @brief Handles the "Cancel" D-Bus method call for the ConnMan agent.
+ *
+ * This function is called when a pending agent request (like RequestInput)
+ * is canceled by ConnMan. It sends an error reply for the original request
+ * if one is pending.
+ *
+ * @param service The Eldbus service interface.
+ * @param msg The incoming D-Bus message.
+ * @return A new D-Bus method return message.
+ */
 static Eldbus_Message *
 _efl_net_control_agent_cancel(const Eldbus_Service_Interface *service, const Eldbus_Message *msg)
 {

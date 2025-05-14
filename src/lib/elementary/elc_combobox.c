@@ -58,10 +58,43 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {NULL, NULL}
 };
 
+/**
+ * @brief Resizes the combobox's internal table layout based on item count and available space.
+ * @param data The combobox object.
+ */
 static void _table_resize(void *data);
+
+/**
+ * @brief Handles key actions for moving the selection within the combobox list.
+ * @param obj The combobox object.
+ * @param params The direction of movement (e.g., "up", "down").
+ * @return EINA_TRUE if the action was handled, EINA_FALSE otherwise.
+ */
 static Eina_Bool _key_action_move(Evas_Object *obj, const char *params);
+
+/**
+ * @brief Handles key actions for activating an item or expanding/collapsing the combobox.
+ * @param obj The combobox object.
+ * @param params Action parameters (unused).
+ * @return EINA_TRUE if the action was handled, EINA_FALSE otherwise.
+ */
 static Eina_Bool _key_action_activate(Evas_Object *obj, const char *params);
 
+/**
+ * @brief Defines the key actions for the combobox widget.
+ *
+ * Each Elm_Action structure maps an action name (string) to a callback function.
+ * - "activate": Triggers the _key_action_activate function.
+ * - "move": Triggers the _key_action_move function.
+ *
+ * Example structure:
+ * @code
+ *   {
+ *     "action_name_string", // Name of the action
+ *     callback_function_pointer // Function to call for this action
+ *   }
+ * @endcode
+ */
 static const Elm_Action key_actions[] = {
    {"activate", _key_action_activate},
    {"move", _key_action_move},
@@ -79,6 +112,17 @@ _elm_combobox_efl_ui_l10n_translation_update(Eo *obj EINA_UNUSED, Elm_Combobox_D
      efl_ui_l10n_translation_update(sd->hover);
 }
 
+/**
+ * @brief Applies the theme to the combobox widget and its sub-objects.
+ *
+ * This function handles applying the style to the combobox itself,
+ * the hover popup, the genlist, and the entry. It also manages
+ * mirrored mode settings.
+ *
+ * @param obj The combobox object.
+ * @param sd The private data of the combobox.
+ * @return Eina_Error EFL_UI_THEME_APPLY_ERROR_GENERIC on failure, or the result of the superclass theme_apply.
+ */
 EOLIAN static Eina_Error
 _elm_combobox_efl_ui_widget_theme_apply(Eo *obj, Elm_Combobox_Data *sd)
 {
@@ -120,6 +164,16 @@ _elm_combobox_efl_ui_widget_theme_apply(Eo *obj, Elm_Combobox_Data *sd)
    return int_ret;
 }
 
+/**
+ * @brief Callback invoked when the hover object is clicked.
+ *
+ * This function handles dismissing the hover if the "dismiss" layout data
+ * is not set to "on". This provides backward compatibility.
+ *
+ * @param data The combobox object (passed as user data).
+ * @param obj The hover Evas_Object that was clicked.
+ * @param event_info Click event information (unused).
+ */
 static void
 _on_hover_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -131,6 +185,18 @@ _on_hover_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      elm_combobox_hover_end(data); // for backward compatibility
 }
 
+/**
+ * @brief Callback invoked when the hover's "hide,finished" signal is emitted.
+ *
+ * This function checks if the hover was dismissed via a layout signal
+ * (e.g., "elm,action,hide,no_animate"). If so, it updates the expanded state
+ * and emits the "dismissed" event.
+ *
+ * @param data The combobox object (passed as user data).
+ * @param obj The hover Evas_Object (unused).
+ * @param emission The emitted signal name (unused).
+ * @param source The source of the signal (unused).
+ */
 static void
 _hover_end_finished(void *data,
                     Evas_Object *obj EINA_UNUSED,
@@ -148,6 +214,13 @@ _hover_end_finished(void *data,
      }
 }
 
+/**
+ * @brief Counts the number of items currently visible in the genlist after filtering.
+ *
+ * Updates the `count` field in the combobox's private data.
+ *
+ * @param data The combobox object.
+ */
 static void
 count_items_genlist(void *data)
 {
@@ -164,12 +237,31 @@ count_items_genlist(void *data)
    eina_iterator_free(filter_iter);
 }
 
+/**
+ * @brief Callback invoked when a genlist item is realized.
+ *
+ * Triggers a resize of the combobox's internal table to accommodate the item.
+ *
+ * @param data The combobox object (passed as user data).
+ * @param obj The genlist Evas_Object (unused).
+ * @param event_info Realization event information (unused).
+ */
 static void
 _item_realized(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    _table_resize(data);
 }
 
+/**
+ * @brief Resizes the combobox's internal table layout.
+ *
+ * Calculates the appropriate height for the hover popup based on the number of items,
+ * individual item height, and available space within the hover parent.
+ * It sets the minimum size of a spacer object within the table to control the
+ * genlist's visible area.
+ *
+ * @param data The combobox object.
+ */
 static void
 _table_resize(void *data)
 {
@@ -214,6 +306,15 @@ _table_resize(void *data)
      }
 }
 
+/**
+ * @brief Activates or expands the combobox.
+ *
+ * If the combobox is already expanded, it calls `elm_combobox_hover_end` to dismiss it.
+ * Otherwise, it sets the expanded state, counts items, resizes the table,
+ * sets up the hover content, shows the genlist and hover, and emits the "expanded" event.
+ *
+ * @param obj The combobox object.
+ */
 static void
 _activate(Evas_Object *obj)
 {
@@ -240,6 +341,15 @@ _activate(Evas_Object *obj)
    efl_event_callback_legacy_call(obj, ELM_COMBOBOX_EVENT_EXPANDED, NULL);
 }
 
+/**
+ * @brief Callback invoked when an item in the genlist is selected.
+ *
+ * Sets focus to the entry part of the combobox and emits the "item,selected" event.
+ *
+ * @param data The combobox object (passed as user data).
+ * @param obj The genlist Evas_Object (unused).
+ * @param event The selected Elm_Object_Item.
+ */
 static void
 _on_item_selected(void *data , Evas_Object *obj EINA_UNUSED, void *event)
 {
@@ -249,12 +359,31 @@ _on_item_selected(void *data , Evas_Object *obj EINA_UNUSED, void *event)
    efl_event_callback_legacy_call(data, ELM_COMBOBOX_EVENT_ITEM_SELECTED, event);
 }
 
+/**
+ * @brief Callback invoked when an item in the genlist is pressed.
+ *
+ * Emits the "item,pressed" event.
+ *
+ * @param data The combobox object (passed as user data).
+ * @param obj The genlist Evas_Object (unused).
+ * @param event The pressed Elm_Object_Item.
+ */
 static void
 _on_item_pressed(void *data , Evas_Object *obj EINA_UNUSED, void *event)
 {
    efl_event_callback_legacy_call(data, ELM_COMBOBOX_EVENT_ITEM_PRESSED, event);
 }
 
+/**
+ * @brief Callback invoked when the genlist filtering process is finished.
+ *
+ * Updates the item count. If it's not the first filter operation, it emits
+ * the "filter,done" event. If items remain, it activates or resizes the
+ * combobox and selects the first item. If no items remain, it hides the hover.
+ *
+ * @param data The combobox object (passed as user data).
+ * @param event The Efl_Event data associated with the filter finishing.
+ */
 static void
 _gl_filter_finished_cb(void *data, const Efl_Event *event)
 {
@@ -287,6 +416,14 @@ _gl_filter_finished_cb(void *data, const Efl_Event *event)
      }
 }
 
+/**
+ * @brief Callback invoked when the entry's "aborted" event occurs (e.g., Escape key pressed).
+ *
+ * If the combobox is expanded, it dismisses the hover.
+ *
+ * @param data The combobox object (passed as user data).
+ * @param event The Efl_Event data (unused).
+ */
 static void
 _on_aborted(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -294,18 +431,47 @@ _on_aborted(void *data, const Efl_Event *event EINA_UNUSED)
    if (sd->expanded) elm_combobox_hover_end(data);
 }
 
+/**
+ * @brief Callback invoked when the entry's content has changed by user interaction.
+ *
+ * Emits the ELM_ENTRY_EVENT_CHANGED event (legacy).
+ *
+ * @param data The combobox object (passed as user data).
+ * @param event The Efl_Event data (unused).
+ */
 static void
 _on_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
    efl_event_callback_legacy_call(data, ELM_ENTRY_EVENT_CHANGED, NULL);
 }
 
+/**
+ * @brief Callback invoked when the combobox button itself is clicked.
+ *
+ * Begins the hover process to show the list of items.
+ *
+ * @param data The combobox object (passed as user data).
+ * @param obj The combobox Evas_Object that was clicked (unused).
+ * @param event_info Click event information (unused).
+ */
 static void
 _on_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_combobox_hover_begin(data);
 }
 
+/**
+ * @brief Helper function to create and add a sub-component for the combobox.
+ *
+ * This function abstracts the creation of legacy or EFL-style widgets
+ * based on whether the main combobox object is legacy.
+ *
+ * @param obj The main combobox object (used to check if it's legacy).
+ * @param parent The parent Evas_Object for the new component.
+ * @param klass The Efl_Class of the component to create.
+ * @param style The style to apply to the new component.
+ * @return The newly created component Eo object, or NULL on failure.
+ */
 static Eo *
 _elm_combobox_component_add(Eo *obj, Eo *parent, const Efl_Class *klass, char *style)
 {
@@ -334,10 +500,18 @@ _elm_combobox_efl_canvas_group_group_add(Eo *obj, Elm_Combobox_Data *sd EINA_UNU
 
    evas_object_smart_callback_add(obj, "clicked", _on_clicked, obj);
 
-   //What are you doing here?
+   // Apply the theme during the add operation to ensure the widget is styled correctly.
    efl_ui_widget_theme_apply(obj);
 }
 
+/**
+ * @brief Handles the deletion of the combobox canvas group.
+ *
+ * Cleans up resources, specifically nullifying the hover_parent reference.
+ *
+ * @param obj The combobox object.
+ * @param sd The private data of the combobox.
+ */
 EOLIAN static void
 _elm_combobox_efl_canvas_group_group_del(Eo *obj, Elm_Combobox_Data *sd)
 {
@@ -345,6 +519,15 @@ _elm_combobox_efl_canvas_group_group_del(Eo *obj, Elm_Combobox_Data *sd)
    efl_canvas_group_del(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Sets the visibility of the combobox.
+ *
+ * Also manages the visibility of the hover popup if the combobox is expanded.
+ *
+ * @param obj The combobox object.
+ * @param sd The private data of the combobox.
+ * @param vis EINA_TRUE to show, EINA_FALSE to hide.
+ */
 EOLIAN static void
 _elm_combobox_efl_gfx_entity_visible_set(Eo *obj, Elm_Combobox_Data *sd, Eina_Bool vis)
 {
@@ -372,6 +555,14 @@ _elm_combobox_efl_ui_autorepeat_autorepeat_enabled_set(const Eo *obj EINA_UNUSED
    efl_ui_autorepeat_enabled_set(efl_super(obj, MY_CLASS), EINA_FALSE);
 }
 
+/**
+ * @brief Adds a new combobox widget to the given parent Evas_Object.
+ *
+ * @param parent The parent object.
+ * @return The new object or NULL on error.
+ *
+ * @ingroup Elm_Combobox
+ */
 EAPI Evas_Object *
 elm_combobox_add(Evas_Object *parent)
 {
@@ -458,6 +649,14 @@ _elm_combobox_efl_object_constructor(Eo *obj, Elm_Combobox_Data *sd)
    return obj;
 }
 
+/**
+ * @brief Initiates the display of the combobox's item list (hover).
+ *
+ * Sets focus to the entry part and calls _activate to show the hover.
+ *
+ * @param obj The combobox object.
+ * @param sd The private data of the combobox.
+ */
 EOLIAN static void
 _elm_combobox_hover_begin(Eo *obj, Elm_Combobox_Data *sd)
 {
@@ -467,6 +666,16 @@ _elm_combobox_hover_begin(Eo *obj, Elm_Combobox_Data *sd)
    _activate(obj);
 }
 
+/**
+ * @brief Ends the display of the combobox's item list (hover).
+ *
+ * If the hover has "dismiss" set to "on" in its layout data, it calls
+ * elm_hover_dismiss(). Otherwise, it directly hides the hover and emits
+ * the "dismissed" event (for backward compatibility).
+ *
+ * @param obj The combobox object.
+ * @param sd The private data of the combobox.
+ */
 EOLIAN static void
 _elm_combobox_hover_end(Eo *obj, Elm_Combobox_Data *sd)
 {
@@ -484,12 +693,28 @@ _elm_combobox_hover_end(Eo *obj, Elm_Combobox_Data *sd)
      } // for backward compatibility
 }
 
+/**
+ * @brief Gets whether the combobox is currently expanded (hover is visible).
+ *
+ * @param obj The combobox object (unused).
+ * @param sd The private data of the combobox.
+ * @return EINA_TRUE if expanded, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _elm_combobox_expanded_get(const Eo *obj EINA_UNUSED, Elm_Combobox_Data *sd)
 {
    return sd->expanded;
 }
 
+/**
+ * @brief Handles key-based navigation within the combobox list.
+ *
+ * Moves the selection up or down in the genlist based on the `params` string.
+ *
+ * @param obj The combobox object.
+ * @param params Direction of movement: "up" or "down".
+ * @return EINA_TRUE if the action was handled, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _key_action_move(Evas_Object *obj, const char *params)
 {
@@ -518,6 +743,17 @@ _key_action_move(Evas_Object *obj, const char *params)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Handles key-based activation of the combobox or its items.
+ *
+ * If the combobox is not expanded, it calls `elm_combobox_hover_begin()` to expand it.
+ * If already expanded, it simulates a "pressed" event on the currently selected item
+ * in the genlist and moves the cursor to the end of the entry.
+ *
+ * @param obj The combobox object.
+ * @param params Action parameters (unused).
+ * @return EINA_TRUE if the action was handled, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _key_action_activate(Evas_Object *obj, const char *params EINA_UNUSED)
 {
@@ -533,12 +769,37 @@ _key_action_activate(Evas_Object *obj, const char *params EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Class constructor for Elm_Combobox.
+ *
+ * Registers the legacy smart type for the combobox.
+ *
+ * @param klass The Efl_Class being constructed.
+ */
 static void
 _elm_combobox_class_constructor(Efl_Class *klass)
 {
    evas_smart_legacy_type_register(MY_CLASS_NAME_LEGACY, klass);
 }
 
+/**
+ * @brief Provides accessibility actions for the combobox widget.
+ *
+ * @param obj The combobox object (unused).
+ * @param pd The private data of the combobox (unused).
+ * @return A static array of Efl_Access_Action_Data describing available actions.
+ *         The array defines actions like "activate", "move,up", and "move,down",
+ *         mapping them to their respective handler functions and parameters.
+ *         Example Efl_Access_Action_Data element:
+ *         @code
+ *         {
+ *           "action_name_and_params", // e.g., "move,up"
+ *           "action_name",            // e.g., "move"
+ *           "param_string",           // e.g., "up"
+ *           callback_function_pointer // e.g., _key_action_move
+ *         }
+ *         @endcode
+ */
 EOLIAN const Efl_Access_Action_Data *
 _elm_combobox_efl_access_widget_action_elm_actions_get(const Eo *obj EINA_UNUSED,
                                                                 Elm_Combobox_Data *pd
@@ -553,6 +814,13 @@ _elm_combobox_efl_access_widget_action_elm_actions_get(const Eo *obj EINA_UNUSED
    return &atspi_actions[0];
 }
 
+/**
+ * @brief Sets the filter key for the internal genlist.
+ *
+ * @param obj The combobox object (unused).
+ * @param pd The private data of the combobox.
+ * @param key The filter key to be used by the genlist.
+ */
 EOLIAN void
 _elm_combobox_elm_genlist_filter_set(Eo *obj EINA_UNUSED, Elm_Combobox_Data *pd, void *key)
 {
@@ -563,6 +831,16 @@ _elm_combobox_elm_genlist_filter_set(Eo *obj EINA_UNUSED, Elm_Combobox_Data *pd,
 
 // FIXME: Combobox part API is badly defined. Efl.Part should be reimplemented
 // properly, but this will be tricky: how to set "guide" on the "entry" part?
+/**
+ * @brief Sets the text for a specific part of the combobox's entry.
+ * @deprecated This is a legacy function. Use EFL Part API where possible.
+ *
+ * This function acts as a proxy to `elm_object_part_text_set` on the internal entry widget.
+ *
+ * @param obj The combobox object.
+ * @param part The name of the part to set text on (e.g., "guide").
+ * @param label The text to set.
+ */
 void
 _elm_combobox_part_text_set(Eo *obj, const char * part, const char *label)
 {
@@ -571,6 +849,16 @@ _elm_combobox_part_text_set(Eo *obj, const char * part, const char *label)
    elm_object_part_text_set(pd->entry, part, label);
 }
 
+/**
+ * @brief Gets the text from a specific part of the combobox's entry.
+ * @deprecated This is a legacy function. Use EFL Part API where possible.
+ *
+ * This function acts as a proxy to `elm_object_part_text_get` on the internal entry widget.
+ *
+ * @param obj The combobox object.
+ * @param part The name of the part to get text from.
+ * @return The text of the part, or NULL if the part does not exist or an error occurs.
+ */
 const char *
 _elm_combobox_part_text_get(const Eo *obj, const char *part)
 {
@@ -579,6 +867,15 @@ _elm_combobox_part_text_get(const Eo *obj, const char *part)
    return elm_object_part_text_get(pd->entry, part);
 }
 
+/**
+ * @brief Sets the size of the combobox.
+ *
+ * If the combobox has items, it triggers a resize of the internal table.
+ *
+ * @param obj The combobox object.
+ * @param pd The private data of the combobox.
+ * @param sz The new size (width and height).
+ */
 EOLIAN static void
 _elm_combobox_efl_gfx_entity_size_set(Eo *obj, Elm_Combobox_Data *pd, Eina_Size2D sz)
 {
@@ -597,6 +894,14 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_combobox_expanded_get, Eina_Bool, 0);
 EOAPI EFL_VOID_FUNC_BODY(elm_obj_combobox_hover_begin);
 EOAPI EFL_VOID_FUNC_BODY(elm_obj_combobox_hover_end);
 
+/**
+ * @brief Class initializer for Elm_Combobox.
+ *
+ * Sets up the Eolian operations for the combobox class.
+ *
+ * @param klass The Efl_Class being initialized.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_combobox_class_initializer(Efl_Class *klass)
 {
@@ -631,18 +936,41 @@ static const Efl_Class_Description _elm_combobox_class_desc = {
 
 EFL_DEFINE_CLASS(elm_combobox_class_get, &_elm_combobox_class_desc, EFL_UI_BUTTON_CLASS, EFL_ACCESS_WIDGET_ACTION_MIXIN, ELM_ENTRY_CLASS, ELM_GENLIST_CLASS, ELM_HOVER_CLASS, EFL_UI_LEGACY_INTERFACE, NULL);
 
+/**
+ * @brief Get whether the combobox is currently expanded (hover is visible).
+ *
+ * @param obj The combobox object.
+ * @return @c EINA_TRUE if expanded, @c EINA_FALSE otherwise.
+ * @ingroup Elm_Combobox
+ */
 EAPI Eina_Bool
 elm_combobox_expanded_get(const Elm_Combobox *obj)
 {
    return elm_obj_combobox_expanded_get(obj);
 }
 
+/**
+ * @brief Programmatically begin the combobox hover.
+ *
+ * This will show the hover and list of items.
+ *
+ * @param obj The combobox object.
+ * @ingroup Elm_Combobox
+ */
 EAPI void
 elm_combobox_hover_begin(Elm_Combobox *obj)
 {
    elm_obj_combobox_hover_begin(obj);
 }
 
+/**
+ * @brief Programmatically end the combobox hover.
+ *
+ * This will hide the hover and list of items.
+ *
+ * @param obj The combobox object.
+ * @ingroup Elm_Combobox
+ */
 EAPI void
 elm_combobox_hover_end(Elm_Combobox *obj)
 {

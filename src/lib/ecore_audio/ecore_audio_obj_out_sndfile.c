@@ -19,15 +19,33 @@
 
 extern SF_VIRTUAL_IO vio_wrapper;
 
+/**
+ * @brief Private data for the Ecore_Audio_Out_Sndfile object.
+ *
+ * This structure holds all the private data members for an Ecore_Audio_Out_Sndfile object.
+ * It includes the sndfile library handle, information about the sound file,
+ * and a virtual I/O structure if used.
+ */
 struct _Ecore_Audio_Out_Sndfile_Data
 {
-  SNDFILE *handle;
-  SF_INFO sfinfo;
-  Ecore_Audio_Vio *vio;
+  SNDFILE *handle; /**< The sndfile library handle for the output file. */
+  SF_INFO sfinfo; /**< Structure containing information about the sound file (samplerate, channels, format). */
+  Ecore_Audio_Vio *vio; /**< Pointer to the Ecore_Audio_Vio structure for virtual I/O operations (currently unused). */
 };
 
 typedef struct _Ecore_Audio_Out_Sndfile_Data Ecore_Audio_Out_Sndfile_Data;
 
+/**
+ * @brief Callback function to write audio data to the sndfile.
+ *
+ * This function is registered as an idler callback and is responsible for
+ * reading data from the attached input(s) and writing it to the output
+ * sndfile. It stops when no more data is available from the input or
+ * when the output is paused.
+ *
+ * @param data Pointer to the Ecore_Audio_Out_Sndfile Eo object.
+ * @return EINA_TRUE if writing should continue, EINA_FALSE otherwise.
+ */
 static Eina_Bool _write_cb(void *data)
 {
   Eo *eo_obj = data;
@@ -60,6 +78,19 @@ static Eina_Bool _write_cb(void *data)
   return EINA_TRUE;
 }
 
+/**
+ * @brief Attaches an audio input to the sndfile output.
+ *
+ * This function attaches an Ecore_Audio_In object as an input to this
+ * sndfile output. It configures the sndfile handle based on the input's
+ * samplerate and channels, and opens the output file for writing.
+ * If not paused, it starts the writing process via an idler.
+ *
+ * @param eo_obj The Ecore_Audio_Out_Sndfile Eo object.
+ * @param obj The private data of the Ecore_Audio_Out_Sndfile object.
+ * @param in The Ecore_Audio_In Eo object to attach.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 EOLIAN static Eina_Bool
 _ecore_audio_out_sndfile_ecore_audio_out_input_attach(Eo *eo_obj, Ecore_Audio_Out_Sndfile_Data *obj, Eo *in)
 {
@@ -94,6 +125,19 @@ _ecore_audio_out_sndfile_ecore_audio_out_input_attach(Eo *eo_obj, Ecore_Audio_Ou
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets the source (output filename) for the sndfile output.
+ *
+ * This function sets the filename for the output audio file. If a file
+ * is already open, it will be closed first. The new filename is stored,
+ * but the file is not opened until an input is attached or properties
+ * like format are set.
+ *
+ * @param eo_obj The Ecore_Audio_Out_Sndfile Eo object.
+ * @param obj The private data of the Ecore_Audio_Out_Sndfile object.
+ * @param source The path to the output audio file.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., if source is NULL).
+ */
 EOLIAN static Eina_Bool
 _ecore_audio_out_sndfile_ecore_audio_source_set(Eo *eo_obj, Ecore_Audio_Out_Sndfile_Data *obj, const char *source)
 {
@@ -115,6 +159,13 @@ _ecore_audio_out_sndfile_ecore_audio_source_set(Eo *eo_obj, Ecore_Audio_Out_Sndf
   return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the source (output filename) of the sndfile output.
+ *
+ * @param eo_obj The Ecore_Audio_Out_Sndfile Eo object.
+ * @param _pd The private data of the Ecore_Audio_Out_Sndfile object (unused).
+ * @return The current output filename, or NULL if not set.
+ */
 EOLIAN static const char*
 _ecore_audio_out_sndfile_ecore_audio_source_get(const Eo *eo_obj, Ecore_Audio_Out_Sndfile_Data *_pd EINA_UNUSED)
 {
@@ -122,6 +173,20 @@ _ecore_audio_out_sndfile_ecore_audio_source_get(const Eo *eo_obj, Ecore_Audio_Ou
   return obj->source;
 }
 
+/**
+ * @brief Sets the audio format for the output sndfile.
+ *
+ * This function configures the desired audio format (e.g., WAV, OGG, FLAC)
+ * for the output file. It can only be called before the output file is opened
+ * (i.e., before an input is attached and writing starts).
+ *
+ * @param eo_obj The Ecore_Audio_Out_Sndfile Eo object.
+ * @param obj The private data of the Ecore_Audio_Out_Sndfile object.
+ * @param format The desired Ecore_Audio_Format.
+ *               Example: ECORE_AUDIO_FORMAT_WAV, ECORE_AUDIO_FORMAT_OGG.
+ * @return EINA_TRUE on success, EINA_FALSE if the format is unsupported or
+ *         if the file is already open.
+ */
 EOLIAN static Eina_Bool
 _ecore_audio_out_sndfile_ecore_audio_format_set(Eo *eo_obj, Ecore_Audio_Out_Sndfile_Data *obj, Ecore_Audio_Format format)
 {
@@ -154,6 +219,13 @@ _ecore_audio_out_sndfile_ecore_audio_format_set(Eo *eo_obj, Ecore_Audio_Out_Sndf
   return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the audio format of the sndfile output.
+ *
+ * @param eo_obj The Ecore_Audio_Out_Sndfile Eo object.
+ * @param _pd The private data of the Ecore_Audio_Out_Sndfile object (unused).
+ * @return The current Ecore_Audio_Format.
+ */
 EOLIAN static Ecore_Audio_Format
 _ecore_audio_out_sndfile_ecore_audio_format_get(const Eo *eo_obj, Ecore_Audio_Out_Sndfile_Data *_pd EINA_UNUSED)
 {
@@ -161,6 +233,17 @@ _ecore_audio_out_sndfile_ecore_audio_format_get(const Eo *eo_obj, Ecore_Audio_Ou
   return obj->format;
 }
 
+/**
+ * @brief Constructor for the Ecore_Audio_Out_Sndfile object.
+ *
+ * Initializes the Ecore_Audio_Out_Sndfile object. It calls the parent
+ * constructor, sets a default audio format (OGG), and indicates that
+ * this output type does not require an external writer.
+ *
+ * @param eo_obj The Ecore_Audio_Out_Sndfile Eo object being constructed.
+ * @param _pd The private data of the Ecore_Audio_Out_Sndfile object (unused).
+ * @return The constructed Eo object.
+ */
 EOLIAN static Eo *
 _ecore_audio_out_sndfile_efl_object_constructor(Eo *eo_obj, Ecore_Audio_Out_Sndfile_Data *_pd EINA_UNUSED)
 {
@@ -175,6 +258,16 @@ _ecore_audio_out_sndfile_efl_object_constructor(Eo *eo_obj, Ecore_Audio_Out_Sndf
   return eo_obj;
 }
 
+/**
+ * @brief Destructor for the Ecore_Audio_Out_Sndfile object.
+ *
+ * Cleans up resources used by the Ecore_Audio_Out_Sndfile object.
+ * This includes closing the sndfile handle if it's open and deleting
+ * the write idler if it exists. Finally, it calls the parent destructor.
+ *
+ * @param eo_obj The Ecore_Audio_Out_Sndfile Eo object being destructed.
+ * @param obj The private data of the Ecore_Audio_Out_Sndfile object.
+ */
 EOLIAN static void
 _ecore_audio_out_sndfile_efl_object_destructor(Eo *eo_obj, Ecore_Audio_Out_Sndfile_Data *obj)
 {

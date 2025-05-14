@@ -21,18 +21,50 @@
 # define O_BINARY 0
 #endif
 
+/**
+ * @internal
+ * @brief Holds the compiled version of the Eet library.
+ */
 static Eet_Version _version = { VMAJ, VMIN, VMIC, VREV };
+
+/**
+ * @brief Public pointer to the compiled version of the Eet library.
+ * This can be used by applications to check the version of Eet they are
+ * linked against.
+ * @since 1.0
+ */
 EAPI Eet_Version *eet_version = &_version;
 
 #ifdef HAVE_REALPATH
 # undef HAVE_REALPATH
 #endif /* ifdef HAVE_REALPATH */
 
+/**
+ * @internal
+ * @def EET_MAGIC_FILE
+ * @brief Magic number identifying an old Eet file format.
+ */
 #define EET_MAGIC_FILE        0x1ee7ff00
+/**
+ * @internal
+ * @def EET_MAGIC_FILE_HEADER
+ * @brief Magic number identifying an Eet file header in memory.
+ */
 #define EET_MAGIC_FILE_HEADER 0x1ee7ff01
 
+/**
+ * @internal
+ * @def EET_MAGIC_FILE2
+ * @brief Magic number identifying the current Eet file format (version 2).
+ */
 #define EET_MAGIC_FILE2       0x1ee70f42
 
+/**
+ * @internal
+ * @def EET_FILE2_HEADER_COUNT
+ * @brief Number of integer fields in the header of an Eet file (version 2).
+ * The header contains: magic number, number of directory entries, number of dictionary entries.
+ */
 #define EET_FILE2_HEADER_COUNT           3
 #define EET_FILE2_DIRECTORY_ENTRY_COUNT  6
 #define EET_FILE2_DICTIONARY_ENTRY_COUNT 5
@@ -46,23 +78,74 @@ EAPI Eet_Version *eet_version = &_version;
 
 // force data alignmenmt in the eet file so direct mmap can work without
 // copies and we can work with alignment
+/**
+ * @internal
+ * @def ALIGN
+ * @brief Defines the alignment boundary (in bytes) for data within an Eet file.
+ * This is used to ensure that data sections are aligned to allow for efficient
+ * memory mapping and direct access, potentially avoiding unaligned access issues
+ * on certain architectures.
+ */
 #define ALIGN 8
 
 /* prototypes of internal calls */
+
+/**
+ * @internal
+ * @brief Finds an Eet_File structure in a given cache.
+ *
+ * @param path The file path to search for.
+ * @param cache The cache (array of Eet_File pointers) to search in.
+ * @param cache_num The number of items currently in the cache.
+ * @return A pointer to the Eet_File if found and not marked for deletion, otherwise NULL.
+ */
 static Eet_File *
 eet_cache_find(const char *path,
                Eet_File  **cache,
                int         cache_num);
+
+/**
+ * @internal
+ * @brief Adds an Eet_File structure to a given cache.
+ * Manages cache resizing and evicts the oldest, unreferenced entry if the cache is full.
+ *
+ * @param ef The Eet_File to add.
+ * @param cache A pointer to the cache (array of Eet_File pointers). This may be reallocated.
+ * @param cache_num A pointer to the number of items currently in the cache. This will be incremented.
+ * @param cache_alloc A pointer to the allocated size of the cache. This may be increased.
+ */
 static void
 eet_cache_add(Eet_File   *ef,
               Eet_File ***cache,
               int        *cache_num,
               int        *cache_alloc);
+
+/**
+ * @internal
+ * @brief Deletes an Eet_File structure from a given cache.
+ * Manages cache resizing if necessary.
+ *
+ * @param ef The Eet_File to delete.
+ * @param cache A pointer to the cache (array of Eet_File pointers). This may be reallocated.
+ * @param cache_num A pointer to the number of items currently in the cache. This will be decremented.
+ * @param cache_alloc A pointer to the allocated size of the cache. This may be decreased.
+ */
 static void
 eet_cache_del(Eet_File   *ef,
               Eet_File ***cache,
               int        *cache_num,
               int        *cache_alloc);
+
+/**
+ * @internal
+ * @brief Compares two strings for equality.
+ * Handles NULL pointers safely.
+ *
+ * @param s1 The first string.
+ * @param s2 The second string.
+ * @return 1 if the strings are identical (or both are the same pointer), 0 otherwise.
+ *         Returns 0 if either string is NULL but not both.
+ */
 static int
 eet_string_match(const char *s1,
                  const char *s2);
@@ -70,41 +153,128 @@ eet_string_match(const char *s1,
 static Eet_Error
 eet_flush(Eet_File *ef);
 #endif /* if 0 */
+
+/**
+ * @internal
+ * @brief Flushes pending writes for an Eet file (version 2 format) to disk.
+ * This function handles the complete serialization of the Eet file structure,
+ * including the header, directory entries, dictionary entries, strings, and data.
+ *
+ * @param ef The Eet_File to flush.
+ * @param sync If EINA_TRUE, performs a data sync to disk (e.g., fdatasync).
+ * @return EET_ERROR_NONE on success, or an Eet_Error code on failure.
+ */
 static Eet_Error
  eet_flush2(Eet_File *ef, Eina_Bool sync);
+
+/**
+ * @internal
+ * @brief Finds a specific node (data entry) within an Eet file by its name.
+ *
+ * @param ef The Eet_File to search within.
+ * @param name The name of the node to find.
+ * @return A pointer to the Eet_File_Node if found, otherwise NULL.
+ */
 static Eet_File_Node *
  find_node_by_name(Eet_File  *ef,
                   const char *name);
+
+/**
+ * @internal
+ * @brief Reads the data associated with an Eet_File_Node from disk or in-memory cache into an Eina_Binbuf.
+ * This function handles data that might be stored directly in the Eet_File_Node structure
+ * or needs to be read from the memory-mapped file data.
+ *
+ * @param ef The Eet_File containing the node.
+ * @param efn The Eet_File_Node whose data is to be read.
+ * @return An Eina_Binbuf containing the node's raw data, or NULL on error.
+ *         The returned binbuf is managed (EINA_TRUE) and should be freed by the caller
+ *         or its content stolen.
+ */
 static Eina_Binbuf *
 read_binbuf_from_disk(Eet_File      *ef,
                       Eet_File_Node *efn);
 
+/**
+ * @internal
+ * @brief Internal function to close an Eet_File.
+ * This handles dereferencing, flushing writes, removing from cache, and freeing resources.
+ *
+ * @param ef The Eet_File to close.
+ * @param locked EINA_TRUE if the cache lock is already held by the caller, EINA_FALSE otherwise.
+ * @param shutdown EINA_TRUE if Eet is shutting down, EINA_FALSE for a regular close.
+ *                 This affects how aggressively resources are freed.
+ * @return EET_ERROR_NONE on success, or an Eet_Error code on failure (e.g., bad object).
+ */
 static Eet_Error
 eet_internal_close(Eet_File *ef, Eina_Bool locked, Eina_Bool shutdown);
 
+/**
+ * @internal
+ * @brief Global lock for protecting access to the Eet file caches (eet_readers and eet_writers).
+ */
 static Eina_Lock eet_cache_lock;
 
 #define LOCK_CACHE   eina_lock_take(&eet_cache_lock)
 #define UNLOCK_CACHE eina_lock_release(&eet_cache_lock)
 
+/**
+ * @internal
+ * @def INIT_FILE(File)
+ * @brief Initializes the per-file lock for an Eet_File structure.
+ */
 #define INIT_FILE(File)    eina_lock_new(&File->file_lock)
+/**
+ * @internal
+ * @def LOCK_FILE(File)
+ * @brief Acquires the per-file lock for an Eet_File structure.
+ */
 #define LOCK_FILE(File)    eina_lock_take(&File->file_lock)
+/**
+ * @internal
+ * @def UNLOCK_FILE(File)
+ * @brief Releases the per-file lock for an Eet_File structure.
+ */
 #define UNLOCK_FILE(File)  eina_lock_release(&File->file_lock)
+/**
+ * @internal
+ * @def DESTROY_FILE(File)
+ * @brief Frees the per-file lock for an Eet_File structure.
+ */
 #define DESTROY_FILE(File) eina_lock_free(&File->file_lock)
 
 /* cache. i don't expect this to ever be large, so arrays will do */
+/** @internal @brief Number of Eet_File entries currently in the writers cache. */
 static int eet_writers_num = 0;
+/** @internal @brief Allocated size of the writers cache array. */
 static int eet_writers_alloc = 0;
+/** @internal @brief Cache for Eet_File structures opened in write or read-write mode. */
 static Eet_File **eet_writers = NULL;
+/** @internal @brief Number of Eet_File entries currently in the readers cache. */
 static int eet_readers_num = 0;
+/** @internal @brief Allocated size of the readers cache array. */
 static int eet_readers_alloc = 0;
+/** @internal @brief Cache for Eet_File structures opened in read-only mode. */
 static Eet_File **eet_readers = NULL;
+/** @internal @brief Initialization counter for the Eet library. */
 static int eet_init_count = 0;
 
 /* log domain variable */
+/**
+ * @internal
+ * @brief Global log domain identifier for Eet library messages.
+ * Initialized by eet_init().
+ */
 int _eet_log_dom_global = -1;
 
-/* Check to see its' an eet file pointer */
+/**
+ * @internal
+ * @brief Checks if the provided pointer is a valid Eet_File handle.
+ * A valid handle is non-NULL and has the correct magic number.
+ *
+ * @param ef The Eet_File pointer to check.
+ * @return 1 if the pointer is invalid, 0 if it is valid.
+ */
 static inline int
 eet_check_pointer(const Eet_File *ef)
 {
@@ -114,6 +284,13 @@ eet_check_pointer(const Eet_File *ef)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Checks if the Eet_File has a valid header and directory structure.
+ *
+ * @param ef The Eet_File pointer to check.
+ * @return 1 if the header or directory is invalid/missing, 0 otherwise.
+ */
 static inline int
 eet_check_header(const Eet_File *ef)
 {
@@ -126,6 +303,17 @@ eet_check_header(const Eet_File *ef)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Helper function to conditionally mark an Eet_File for closure and close it.
+ * If the `test` condition is true, the Eet_File is marked for immediate deletion
+ * and `eet_internal_close` is called. This is typically used for error handling
+ * during file opening or reading, where a failure means the file handle is invalid.
+ *
+ * @param test The condition to check. If true, the file is closed.
+ * @param ef The Eet_File to potentially close.
+ * @return The value of `test`.
+ */
 static inline int
 eet_test_close(int       test,
                Eet_File *ef)

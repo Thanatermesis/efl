@@ -3,6 +3,12 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback for when a photo is clicked.
+ * @param data User data pointer (unused).
+ * @param obj The Evas object that was clicked (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _clicked_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
             void *event_info EINA_UNUSED)
@@ -10,18 +16,59 @@ _clicked_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    printf("photo clicked\n");
 }
 
+/**
+ * @brief Callback for when a drag operation starts on a photo.
+ * @param mydata User data pointer (unused).
+ * @param obj The Evas object being dragged (unused).
+ * @param evdata Event-specific data (unused).
+ */
 static void
 drag_start_cb(void *mydata EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *evdata EINA_UNUSED)
 {
    printf("Drag start.\n");
 }
 
+/**
+ * @brief Callback for when a drag operation ends on a photo.
+ * @param mydata User data pointer (unused).
+ * @param obj The Evas object that was dragged (unused).
+ * @param evdata Event-specific data (unused).
+ */
 static void
 drag_end_cb(void *mydata EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *evdata EINA_UNUSED)
 {
    printf("Drag end.\n");
 }
 
+/**
+ * @brief Creates a test window with a grid of photo widgets.
+ *
+ * This function sets up a window containing a scroller, which in turn
+ * contains a table. The table is populated with a 12x12 grid of
+ * elm_photo widgets, cycling through a predefined list of 9 images.
+ * Some photos are configured with special properties like shadows,
+ * fill modes, or thumbnail generation.
+ *
+ * The `img` array holds the filenames of the images to be displayed.
+ * @code
+ * const char *img[9] =
+ *   {
+ *      "panel_01.jpg",
+ *      "mystrale.jpg",
+ *      "mystrale_2.jpg",
+ *      "rock_02.jpg",
+ *      "sky_01.jpg",
+ *      "sky_02.jpg",
+ *      "sky_03.jpg",
+ *      "sky_04.jpg",
+ *      "wood_01.jpg"
+ *   };
+ * @endcode
+ *
+ * @param data User data pointer (unused).
+ * @param obj The Evas object that initiated the test (unused).
+ * @param event_info Event-specific information (unused).
+ */
 void
 test_photo(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

@@ -13,26 +13,29 @@
 #define MY_DATA_GET(obj, pd) \
   Efl_Ui_Position_Manager_List_Data *pd = efl_data_scope_get(obj, MY_CLASS);
 
+/**
+ * @brief Private data structure for Efl_Ui_Position_Manager_List.
+ */
 typedef struct {
-   Api_Callbacks callbacks;
+   Api_Callbacks callbacks; /**< Callbacks for accessing item data. */
 
-   Eina_Future *rebuild_absolut_size;
-   int *size_cache;
-   Efl_Gfx_Entity *last_group;
-   Efl_Ui_Win *window;
-   Evas *canvas;
+   Eina_Future *rebuild_absolut_size; /**< Future for deferred absolute size recalculation. */
+   int *size_cache; /**< Cache storing the cumulative sum of item sizes. `size_cache[i]` stores the sum of sizes of items 0 to i-1. */
+   Efl_Gfx_Entity *last_group; /**< The last group item that was made visible and positioned. */
+   Efl_Ui_Win *window; /**< The window containing the managed items. */
+   Evas *canvas; /**< The Evas canvas associated with the window. */
 
-   Vis_Segment prev_run;
+   Vis_Segment prev_run; /**< Stores the previously visible segment of items (start_id, end_id). */
 
-   Eina_Rect viewport;
-   Eina_Size2D abs_size;
-   Eina_Vector2 scroll_position;
+   Eina_Rect viewport; /**< The current viewport rectangle. */
+   Eina_Size2D abs_size; /**< The total absolute size of all content. */
+   Eina_Vector2 scroll_position; /**< The current scroll position (0.0 to 1.0). */
 
-   Efl_Ui_Layout_Orientation dir;
+   Efl_Ui_Layout_Orientation dir; /**< The layout orientation (vertical or horizontal). */
 
-   unsigned int size;
-   int average_item_size;
-   int maximum_min_size;
+   unsigned int size; /**< The total number of items. */
+   int average_item_size; /**< The average size of items (height for vertical, width for horizontal). */
+   int maximum_min_size; /**< The maximum of the minimum sizes of items (width for vertical, height for horizontal). */
 } Efl_Ui_Position_Manager_List_Data;
 
 /*
@@ -43,6 +46,15 @@ typedef struct {
  * Every other walk of the items is at max the maximum number of items you get into the maximum distance between the average item size and a actaul item size.
  */
 
+/**
+ * @brief Invalidates and frees the size cache.
+ *
+ * This function is called when the item sizes or count change, requiring
+ * the cache to be rebuilt.
+ *
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ */
 static void
 cache_invalidate(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_List_Data *pd)
 {
@@ -51,6 +63,18 @@ cache_invalidate(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_List_Data *pd)
    pd->size_cache = NULL;
 }
 
+/**
+ * @brief Ensures the size cache is populated.
+ *
+ * If the cache is not already built (pd->size_cache is NULL), this function
+ * iterates through all items, queries their sizes using the provided callbacks,
+ * and populates the `pd->size_cache`. The cache stores the cumulative sum
+ * of item sizes along the layout direction. It also calculates the
+ * `average_item_size` and `maximum_min_size`.
+ *
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ */
 static void
 cache_require(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_List_Data *pd)
 {
@@ -106,6 +130,15 @@ cache_require(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_List_Data *pd)
      cache_invalidate(obj, pd);
 }
 
+/**
+ * @brief Accesses the cumulative size from the cache for a given item index.
+ *
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ * @param idx The index of the item. `cache_access(pd, 0)` is always 0.
+ *            `cache_access(pd, i)` returns the sum of sizes of items 0 to i-1.
+ * @return The cumulative size up to the item at `idx-1`, or 0 if `idx` is out of bounds.
+ */
 static int
 cache_access(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_List_Data *pd, unsigned int idx)
 {
@@ -113,6 +146,18 @@ cache_access(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_List_Data *pd, unsigne
    return pd->size_cache[idx];
 }
 
+/**
+ * @brief Recalculates the absolute content size and minimum size.
+ *
+ * This function ensures the cache is up-to-date, then calculates the
+ * total size of all items (`pd->abs_size`) and the maximum of their
+ * minimum cross-axis sizes (`pd->maximum_min_size`).
+ * It emits events if these sizes change.
+ * This function might return early if the cache is not yet available (deferred calculation).
+ *
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ */
 static void
 recalc_absolut_size(Eo *obj, Efl_Ui_Position_Manager_List_Data *pd)
 {
@@ -148,6 +193,25 @@ recalc_absolut_size(Eo *obj, Efl_Ui_Position_Manager_List_Data *pd)
      efl_event_callback_call(obj, EFL_UI_POSITION_MANAGER_ENTITY_EVENT_CONTENT_MIN_SIZE_CHANGED, &min_size);
 }
 
+/**
+ * @brief Searches for the segment of items that should be currently visible.
+ *
+ * This function determines the range of item indices (`start_id` to `end_id`)
+ * that fall within or intersect the current viewport, based on the scroll position
+ * and item sizes (obtained from the cache).
+ *
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ * @param relevant_space_size The amount of content scrolled out of view before the viewport.
+ *                            For vertical lists, this is `space_size.h`.
+ *                            For horizontal lists, this is `space_size.w`.
+ * @param relevant_viewport The size of the viewport along the layout direction.
+ *                          For vertical lists, this is `pd->viewport.h`.
+ *                          For horizontal lists, this is `pd->viewport.w`.
+ * @return A Vis_Segment struct containing the start and end indices of the visible items.
+ *         If an error occurs, start_id and end_id will be 0.
+ *         Example: If items 5, 6, 7 are visible, returns {start_id=5, end_id=8} (end_id is exclusive).
+ */
 static inline Vis_Segment
 _search_visual_segment(Eo *obj, Efl_Ui_Position_Manager_List_Data *pd, int relevant_space_size, int relevant_viewport)
 {
@@ -180,6 +244,23 @@ err:
    return cur;
 }
 
+/**
+ * @brief Positions the items within the given visual segment.
+ *
+ * This function iterates through the items in the `new` segment,
+ * retrieves their actual Efl_Gfx_Entity objects and sizes using callbacks,
+ * and sets their geometry (position and size) on the canvas.
+ * It also handles the positioning and visibility of group items, ensuring
+ * the correct group header is displayed at the top of the viewport.
+ *
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ * @param new The segment of items to position.
+ *            Example: {start_id=5, end_id=8} means items 5, 6, 7.
+ * @param relevant_space_size The amount of content scrolled out of view before the viewport.
+ *                            This is used to calculate the starting y (for vertical) or x (for horizontal)
+ *                            coordinate for the first item in the `new` segment.
+ */
 static inline void
 _position_items(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_List_Data *pd, Vis_Segment new, int relevant_space_size)
 {
@@ -306,7 +387,17 @@ _position_items(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_List_Data *pd, Vis_
    evas_event_thaw_eval(pd->canvas);
 }
 
-
+/**
+ * @brief Main function to calculate and position the content within the viewport.
+ *
+ * This function is called when the viewport, scroll position, or content changes.
+ * It determines the currently visible segment of items, updates their visibility
+ * (hiding items outside the viewport, showing items inside), and positions them.
+ * It also emits an event if the visible range of items changes.
+ *
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ */
 static void
 position_content(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_List_Data *pd)
 {
@@ -351,6 +442,18 @@ position_content(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_List_Data *pd)
 
 }
 
+/**
+ * @brief Callback for the deferred rebuild job.
+ *
+ * This function is executed as a job in the main loop. It ensures the cache
+ * is populated, recalculates the absolute content size, and then positions
+ * the content. This is used to defer heavy calculations.
+ *
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param data The private data (Efl_Ui_Position_Manager_List_Data *).
+ * @param v The Eina_Value passed by the future (unused here).
+ * @return The input Eina_Value `v`.
+ */
 static Eina_Value
 _rebuild_job_cb(Eo *obj, void *data, const Eina_Value v)
 {
@@ -363,6 +466,16 @@ _rebuild_job_cb(Eo *obj, void *data, const Eina_Value v)
    return v;
 }
 
+/**
+ * @brief Frees data associated with the rebuild job future.
+ *
+ * Specifically, it nullifies the `rebuild_absolut_size` future pointer in the
+ * private data when the future is cleaned up.
+ *
+ * @param o The Efl_Ui_Position_Manager_List object.
+ * @param data The private data (Efl_Ui_Position_Manager_List_Data *).
+ * @param dead_future The future that has completed or been cancelled.
+ */
 static void
 _rebuild_job_free(Eo *o EINA_UNUSED, void *data, const Eina_Future *dead_future EINA_UNUSED)
 {
@@ -371,6 +484,16 @@ _rebuild_job_free(Eo *o EINA_UNUSED, void *data, const Eina_Future *dead_future 
    pd->rebuild_absolut_size = NULL;
 }
 
+/**
+ * @brief Schedules a deferred recalculation of the absolute size and content positioning.
+ *
+ * If a rebuild job is not already pending, this function schedules one
+ * using `efl_loop_job`. This is typically called when items are added/removed
+ * or their sizes change, to avoid immediate, potentially expensive, recalculations.
+ *
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ */
 static void
 schedule_recalc_absolut_size(Eo *obj, Efl_Ui_Position_Manager_List_Data *pd)
 {
@@ -382,6 +505,12 @@ schedule_recalc_absolut_size(Eo *obj, Efl_Ui_Position_Manager_List_Data *pd)
                                               .free = _rebuild_job_free);
 }
 
+/**
+ * @brief Sets the viewport rectangle for the position manager.
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ * @param size The new viewport rectangle. Example: {x=0, y=0, w=300, h=500}.
+ */
 EOLIAN static void
 _efl_ui_position_manager_list_efl_ui_position_manager_entity_viewport_set(Eo *obj, Efl_Ui_Position_Manager_List_Data *pd, Eina_Rect size)
 {
@@ -397,6 +526,13 @@ _efl_ui_position_manager_list_efl_ui_position_manager_entity_viewport_set(Eo *ob
    position_content(obj, pd);
 }
 
+/**
+ * @brief Sets the current scroll position.
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ * @param x The horizontal scroll position (0.0 to 1.0).
+ * @param y The vertical scroll position (0.0 to 1.0).
+ */
 EOLIAN static void
 _efl_ui_position_manager_list_efl_ui_position_manager_entity_scroll_position_set(Eo *obj, Efl_Ui_Position_Manager_List_Data *pd, double x, double y)
 {
@@ -405,6 +541,13 @@ _efl_ui_position_manager_list_efl_ui_position_manager_entity_scroll_position_set
    position_content(obj, pd);
 }
 
+/**
+ * @brief Notifies the manager that an item has been added.
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ * @param added_index The index where the item was added (currently unused).
+ * @param subobj The Efl_Gfx_Entity of the added item (can be NULL).
+ */
 EOLIAN static void
 _efl_ui_position_manager_list_efl_ui_position_manager_entity_item_added(Eo *obj, Efl_Ui_Position_Manager_List_Data *pd, int added_index EINA_UNUSED, Efl_Gfx_Entity *subobj)
 {
@@ -422,6 +565,13 @@ _efl_ui_position_manager_list_efl_ui_position_manager_entity_item_added(Eo *obj,
    schedule_recalc_absolut_size(obj, pd);
 }
 
+/**
+ * @brief Notifies the manager that an item has been removed.
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ * @param removed_index The index from where the item was removed (currently unused).
+ * @param subobj The Efl_Gfx_Entity of the removed item (can be NULL).
+ */
 EOLIAN static void
 _efl_ui_position_manager_list_efl_ui_position_manager_entity_item_removed(Eo *obj, Efl_Ui_Position_Manager_List_Data *pd, int removed_index EINA_UNUSED, Efl_Gfx_Entity *subobj)
 {
@@ -434,6 +584,19 @@ _efl_ui_position_manager_list_efl_ui_position_manager_entity_item_removed(Eo *ob
    schedule_recalc_absolut_size(obj, pd);
 }
 
+/**
+ * @brief Calculates the expected geometry of a single item.
+ *
+ * This function determines where an item at a given index `idx` would be
+ * positioned based on the current scroll position and the sizes of preceding items.
+ * It does not actually move or show the item.
+ *
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ * @param idx The index of the item to calculate position for.
+ * @return The calculated Eina_Rect for the item. Returns an empty rect if item count is zero or an error occurs.
+ *         Example: {x=10, y=100, w=280, h=50}.
+ */
 EOLIAN static Eina_Rect
 _efl_ui_position_manager_list_efl_ui_position_manager_entity_position_single_item(Eo *obj, Efl_Ui_Position_Manager_List_Data *pd, int idx)
 {
@@ -481,6 +644,13 @@ _efl_ui_position_manager_list_efl_ui_position_manager_entity_position_single_ite
    return geom;
 }
 
+/**
+ * @brief Notifies the manager that the size of one or more items has changed.
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ * @param start_id The starting index of the range of items whose size changed (currently unused).
+ * @param end_id The ending index of the range of items whose size changed (currently unused).
+ */
 EOLIAN static void
 _efl_ui_position_manager_list_efl_ui_position_manager_entity_item_size_changed(Eo *obj, Efl_Ui_Position_Manager_List_Data *pd, int start_id EINA_UNUSED, int end_id EINA_UNUSED)
 {
@@ -488,6 +658,13 @@ _efl_ui_position_manager_list_efl_ui_position_manager_entity_item_size_changed(E
    schedule_recalc_absolut_size(obj, pd);
 }
 
+/**
+ * @brief Sets the layout orientation (vertical or horizontal).
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ * @param dir The new layout orientation.
+ *            Example: EFL_UI_LAYOUT_ORIENTATION_VERTICAL.
+ */
 EOLIAN static void
 _efl_ui_position_manager_list_efl_ui_layout_orientable_orientation_set(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_List_Data *pd, Efl_Ui_Layout_Orientation dir)
 {
@@ -504,12 +681,27 @@ _efl_ui_position_manager_list_efl_ui_layout_orientable_orientation_set(Eo *obj E
    position_content(obj, pd);
 }
 
+/**
+ * @brief Gets the current layout orientation.
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ * @return The current Efl_Ui_Layout_Orientation.
+ */
 EOLIAN static Efl_Ui_Layout_Orientation
 _efl_ui_position_manager_list_efl_ui_layout_orientable_orientation_get(const Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_List_Data *pd)
 {
    return pd->dir;
 }
 
+/**
+ * @brief Invalidates the position manager object.
+ *
+ * This function is called when the object is being invalidated (e.g., during destruction).
+ * It cancels any pending rebuild job and cleans up data access callbacks.
+ *
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ */
 EOLIAN static void
 _efl_ui_position_manager_list_efl_object_invalidate(Eo *obj, Efl_Ui_Position_Manager_List_Data *pd)
 {
@@ -521,6 +713,20 @@ _efl_ui_position_manager_list_efl_object_invalidate(Eo *obj, Efl_Ui_Position_Man
    efl_invalidate(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Finds a relative item for focus movement.
+ *
+ * Given a current item ID and a focus direction, this function determines
+ * the ID of the next item in that direction.
+ *
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ * @param current_id The ID of the currently focused item.
+ * @param direction The direction of focus movement.
+ *                  Example: EFL_UI_FOCUS_DIRECTION_NEXT.
+ * @param[out] index Pointer to store the ID of the relative item.
+ * @return EINA_TRUE if a relative item is found, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_position_manager_list_efl_ui_position_manager_entity_relative_item(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_List_Data *pd, unsigned int current_id, Efl_Ui_Focus_Direction direction, unsigned int *index)
 {
@@ -547,12 +753,44 @@ _efl_ui_position_manager_list_efl_ui_position_manager_entity_relative_item(Eo *o
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the version of the position manager entity API.
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ * @param max Unused.
+ * @return The API version (currently 1).
+ */
 EOLIAN static int
 _efl_ui_position_manager_list_efl_ui_position_manager_entity_version(Eo *obj EINA_UNUSED, Efl_Ui_Position_Manager_List_Data *pd EINA_UNUSED, int max EINA_UNUSED)
 {
    return 1;
 }
 
+/**
+ * @brief Sets the data access callbacks and initial item count.
+ *
+ * This function provides the position manager with the means to access
+ * item objects and their sizes. It also sets the total number of items.
+ *
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ * @param canvas The Efl_Ui_Win containing the items.
+ * @param obj_access_data User data for the object access callback.
+ * @param obj_access Callback function to get a batch of item Efl_Gfx_Entity objects.
+ *                   Example: `void obj_cb(void *data, unsigned int first, unsigned int count, Efl_Ui_Position_Manager_Object_Batch_Entity buffer[])`
+ *                   `buffer` should be filled with item entities.
+ *                   `buffer[i].entity` is the Efl_Gfx_Entity for item `first + i`.
+ *                   `buffer[i].depth_leader` is EINA_TRUE if this item is a group leader.
+ * @param obj_access_free_cb Callback to free `obj_access_data`.
+ * @param size_access_data User data for the size access callback.
+ * @param size_access Callback function to get a batch of item sizes.
+ *                    Example: `void size_cb(void *data, unsigned int first, unsigned int count, Eina_Bool estimate, Efl_Ui_Position_Manager_Size_Batch_Entity buffer[])`
+ *                    `buffer` should be filled with item sizes.
+ *                    `buffer[i].size` is the Eina_Size2D for item `first + i`.
+ *                    `buffer[i].parent_size` is the size of the group if item `first + i` is a group leader.
+ * @param size_access_free_cb Callback to free `size_access_data`.
+ * @param size The total number of items.
+ */
 EOLIAN static void
 _efl_ui_position_manager_list_efl_ui_position_manager_data_access_v1_data_access_set(Eo *obj, Efl_Ui_Position_Manager_List_Data *pd, Efl_Ui_Win *canvas, void *obj_access_data, Efl_Ui_Position_Manager_Object_Batch_Callback obj_access, Eina_Free_Cb obj_access_free_cb, void *size_access_data, Efl_Ui_Position_Manager_Size_Batch_Callback size_access, Eina_Free_Cb size_access_free_cb, int size)
 {
@@ -578,7 +816,18 @@ _efl_ui_position_manager_list_efl_ui_position_manager_data_access_v1_data_access
    pd->size = size;
 }
 
-
+/**
+ * @brief Notifies the manager that a range of entities (items) is ready to be processed.
+ *
+ * This is typically called after item data (like objects or sizes) has been loaded
+ * asynchronously. If the specified range intersects with the currently visible
+ * segment, this function re-positions the items in the visible segment.
+ *
+ * @param obj The Efl_Ui_Position_Manager_List object.
+ * @param pd The private data of the object.
+ * @param start_id The starting index of the range of ready entities.
+ * @param end_id The ending index (exclusive) of the range of ready entities.
+ */
 EOLIAN static void
 _efl_ui_position_manager_list_efl_ui_position_manager_entity_entities_ready(Eo *obj, Efl_Ui_Position_Manager_List_Data *pd, unsigned int start_id, unsigned int end_id)
 {

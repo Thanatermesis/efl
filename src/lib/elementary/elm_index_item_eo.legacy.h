@@ -1,3 +1,11 @@
+/**
+ * @file
+ * @brief These routines are legacy routines used for Elm_Index_Item objects.
+ *
+ * See @ref Elm_Index_Item_Group for more details.
+ *
+ * @deprecated Use the new EO API directly.
+ */
 #ifndef _ELM_INDEX_ITEM_EO_LEGACY_H_
 #define _ELM_INDEX_ITEM_EO_LEGACY_H_
 
@@ -11,6 +19,7 @@ typedef Eo Elm_Index_Item;
 #ifndef _ELM_INDEX_ITEM_EO_TYPES
 #define _ELM_INDEX_ITEM_EO_TYPES
 
+/** @brief Placeholder for future type definitions related to Elm_Index_Item. */
 
 #endif
 

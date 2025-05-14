@@ -65,16 +65,58 @@ struct _Eina_Accessor_Inlist
    unsigned int index;
 };
 
+/**
+ * @struct _Eina_Inlist_Sorted_State
+ * @brief Represents the state for optimized sorted insertion into an Eina_Inlist.
+ *
+ * This structure maintains a "jump table" which is an array of pointers to
+ * nodes within the inlist. This table acts as an index, allowing for a
+ * dichotomous search (binary search) to quickly find the approximate
+ * location for a new item, significantly reducing the number of list nodes
+ * that must be traversed compared to a linear scan.
+ *
+ * The jump table is dynamically managed to balance memory usage and
+ * performance.
+ *
+ * `jump_table` example structure:
+ * If `jump_div` is 4, then the `jump_table` will store pointers to every
+ * 4th element in the list.
+ * list: [0]->[1]->[2]->[3]->[4]->[5]->[6]->[7]->[8]->...
+ * jump_table[0] -> &list[0]
+ * jump_table[1] -> &list[4]
+ * jump_table[2] -> &list[8]
+ * ...
+ */
 struct _Eina_Inlist_Sorted_State
 {
+   /**
+    * An array of pointers to nodes in the inlist, used for fast seeking.
+    * This table allows for a binary search-like approach on a linked list.
+    */
    Eina_Inlist *jump_table[EINA_INLIST_JUMP_SIZE];
 
+   /** The number of valid entries currently in `jump_table`. */
    unsigned short jump_limit;
+   /**
+    * The interval between nodes pointed to by `jump_table`.
+    * For example, if `jump_div` is 4, every 4th node is in the table.
+    */
    int jump_div;
 
+   /** The total number of items in the list. */
    int inserted;
 };
 
+/**
+ * @brief Advances the iterator to the next item in the inlist.
+ * @param it The inlist iterator.
+ * @param data A pointer to store the data of the current item.
+ * @return EINA_TRUE if the iterator was advanced, EINA_FALSE if it reached the end.
+ *
+ * This function is the `next` implementation for an Eina_Iterator on an
+ * Eina_Inlist. It retrieves the current item's data and moves the iterator
+ * to the next node.
+ */
 static Eina_Bool
 eina_inlist_iterator_next(Eina_Iterator_Inlist *it, void **data)
 {
@@ -89,18 +131,47 @@ eina_inlist_iterator_next(Eina_Iterator_Inlist *it, void **data)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Retrieves the container (the inlist head) from the iterator.
+ * @param it The inlist iterator.
+ * @return The head of the inlist being iterated.
+ *
+ * This function is the `get_container` implementation for an Eina_Iterator
+ * on an Eina_Inlist.
+ */
 static Eina_Inlist *
 eina_inlist_iterator_get_container(Eina_Iterator_Inlist *it)
 {
    return (Eina_Inlist *)it->head;
 }
 
+/**
+ * @brief Frees the resources used by an inlist iterator.
+ * @param it The inlist iterator to free.
+ *
+ * This function is the `free` implementation for an Eina_Iterator on an
+ * Eina_Inlist.
+ */
 static void
 eina_inlist_iterator_free(Eina_Iterator_Inlist *it)
 {
    free(it);
 }
 
+/**
+ * @brief Retrieves the item at a specific index in the inlist.
+ * @param it The inlist accessor.
+ * @param idx The index of the item to retrieve.
+ * @param data A pointer to store the data of the item at the specified index.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., index out of bounds).
+ *
+ * This function implements the `get_at` functionality for an Eina_Accessor.
+ * It contains logic to optimize traversal:
+ * - If `idx` is after the current position, it traverses forward.
+ * - If `idx` is before the current position, it decides whether to traverse
+ *   backward from the current node or forward from the beginning of the list,
+ *   based on which path is likely shorter.
+ */
 static Eina_Bool
 eina_inlist_accessor_get_at(Eina_Accessor_Inlist *it,
                             unsigned int idx,
@@ -148,18 +219,45 @@ eina_inlist_accessor_get_at(Eina_Accessor_Inlist *it,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Retrieves the container (the inlist head) from the accessor.
+ * @param it The inlist accessor.
+ * @return The head of the inlist being accessed.
+ *
+ * This function is the `get_container` implementation for an Eina_Accessor
+ * on an Eina_Inlist.
+ */
 static Eina_Inlist *
 eina_inlist_accessor_get_container(Eina_Accessor_Inlist *it)
 {
    return (Eina_Inlist *)it->head;
 }
 
+/**
+ * @brief Frees the resources used by an inlist accessor.
+ * @param it The inlist accessor to free.
+ *
+ * This function is the `free` implementation for an Eina_Accessor on an
+ * Eina_Inlist.
+ */
 static void
 eina_inlist_accessor_free(Eina_Accessor_Inlist *it)
 {
    free(it);
 }
 
+/**
+ * @brief Merges two sorted inlists into a single sorted inlist.
+ * @param a The first sorted inlist.
+ * @param b The second sorted inlist.
+ * @param func The comparison function.
+ * @return The head of the newly merged, sorted inlist.
+ *
+ * This function is a helper for the merge sort algorithm. It takes two
+ * sorted lists (`a` and `b`) and merges them into a single sorted list.
+ * Note that this function only sets the `next` pointers; `prev` pointers
+ * must be rebuilt separately after the sort is complete.
+ */
 static Eina_Inlist *
 eina_inlist_sort_merge(Eina_Inlist *a, Eina_Inlist *b, Eina_Compare_Cb func)
 {
@@ -181,6 +279,15 @@ eina_inlist_sort_merge(Eina_Inlist *a, Eina_Inlist *b, Eina_Compare_Cb func)
    return first;
 }
 
+/**
+ * @brief Reconstructs the `prev` pointers for an inlist.
+ * @param list The head of the inlist.
+ * @return The last element of the list (the new tail).
+ *
+ * After an in-place sort operation like merge sort, the `prev` pointers of
+ * the nodes are incorrect. This function iterates through the list (using the
+ * correct `next` pointers) and rebuilds all the `prev` pointers.
+ */
 static Eina_Inlist *
 eina_inlist_sort_rebuild_prev(Eina_Inlist *list)
 {
@@ -195,6 +302,20 @@ eina_inlist_sort_rebuild_prev(Eina_Inlist *list)
    return prev;
 }
 
+/**
+ * @brief Compacts the jump table to reduce its size while increasing its step.
+ * @param state The sorted state containing the jump table to compact.
+ *
+ * When the jump table becomes full, this function is called to "compress" it.
+ * It does so by doubling the jump interval (`jump_div`) and halving the number
+ * of entries (`jump_limit`), effectively discarding every other entry. This
+ * keeps the memory usage of the jump table constant while allowing it to
+ * index a growing list.
+ *
+ * For example, if `jump_div` was 2, it becomes 4. The table that pointed to
+ * elements at indices 0, 2, 4, 6, 8... will now point to elements at
+ * 0, 4, 8...
+ */
 static void
 _eina_inlist_sorted_state_compact(Eina_Inlist_Sorted_State *state)
 {
@@ -505,6 +626,21 @@ eina_inlist_sorted_state_free(Eina_Inlist_Sorted_State *state)
    free(state);
 }
 
+/**
+ * @brief Updates the sorted state after an item has been inserted into the list.
+ * @param state The sorted state to update.
+ * @param idx The index in the jump table at or after which the insertion occurred.
+ * @param offset An offset indicating if the insertion was exactly at a jump
+ *               point or after it.
+ *
+ * This function is crucial for maintaining the integrity of the jump table
+ * after a new node is inserted into the inlist. It performs two main tasks:
+ * 1. It shifts the existing jump pointers after the insertion point, as they
+ *    now correspond to the previous node in the list.
+ * 2. It rebuilds the tail part of the jump table to account for the new node
+ *    and any changes in list structure, potentially compacting the table if
+ *    it becomes full.
+ */
 static void
 _eina_inlist_sorted_state_insert(Eina_Inlist_Sorted_State *state,
                                  unsigned short idx,

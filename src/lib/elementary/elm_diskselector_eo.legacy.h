@@ -119,7 +119,7 @@ EAPI int elm_diskselector_display_item_num_get(const Elm_Diskselector *obj);
  *
  * @param[in] obj The object.
  *
- * @return The first item, or @c null if none.
+ * @return The first item, or @c NULL if none.
  *
  * @ingroup Elm_Diskselector_Group
  */
@@ -133,7 +133,7 @@ EAPI Elm_Widget_Item *elm_diskselector_first_item_get(const Elm_Diskselector *ob
  *
  * @param[in] obj The object.
  *
- * @return A @c list of diskselector items, or @c ull on failure.
+ * @return A @c Eina_List of @c Elm_Widget_Item pointers, or @c NULL on failure.
  *
  * @ingroup Elm_Diskselector_Group
  */
@@ -149,7 +149,7 @@ EAPI const Eina_List *elm_diskselector_items_get(const Elm_Diskselector *obj);
  *
  * @param[in] obj The object.
  *
- * @return The last item, or @c null if none.
+ * @return The last item, or @c NULL if none.
  *
  * @ingroup Elm_Diskselector_Group
  */
@@ -168,7 +168,7 @@ EAPI Elm_Widget_Item *elm_diskselector_last_item_get(const Elm_Diskselector *obj
  *
  * @param[in] obj The object.
  *
- * @return The selected diskselector item.
+ * @return The selected diskselector item, or @c NULL if none is selected.
  *
  * @ingroup Elm_Diskselector_Group
  */
@@ -204,7 +204,7 @@ EAPI Elm_Widget_Item *elm_diskselector_selected_item_get(const Elm_Diskselector 
  * @param[in] func The function to call when the item is selected.
  * @param[in] data The data to associate with the item for related callbacks.
  *
- * @return New item
+ * @return The new item, or @c NULL on failure.
  *
  * @ingroup Elm_Diskselector_Group
  */

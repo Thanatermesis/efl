@@ -40,9 +40,13 @@
    ((_elm_access_auto_highlight_get()) ? (elm_widget_highlight_get(obj)) : \
                                          (efl_ui_focus_object_focus_get(obj))))
 
+/** @brief Signal emitted when a widget receives focus. */
 const char SIG_WIDGET_FOCUSED[] = "focused";
+/** @brief Signal emitted when a widget loses focus. */
 const char SIG_WIDGET_UNFOCUSED[] = "unfocused";
+/** @brief Signal emitted when the language of a widget changes. */
 const char SIG_WIDGET_LANG_CHANGED[] = "language,changed";
+/** @brief Signal emitted when the accessibility state of a widget changes. */
 const char SIG_WIDGET_ACCESS_CHANGED[] = "access,changed";
 
 typedef struct _Elm_Event_Cb_Data         Elm_Event_Cb_Data;
@@ -53,27 +57,49 @@ static Eina_Error _efl_ui_property_bind(Eo *widget, Eo *target, Efl_Ui_Widget_Da
                                         const char *part,
                                         const char *key, const char *property);
 
+/**
+ * @brief Structure to hold event callback function and its associated data.
+ * This is used to manage custom event callbacks registered on a widget.
+ */
 struct _Elm_Event_Cb_Data
 {
-   Elm_Event_Cb func;
-   const void  *data;
+   Elm_Event_Cb func; /**< The callback function pointer. */
+   const void  *data; /**< User data to be passed to the callback function. */
 };
 
+/**
+ * @brief Structure to hold label data for a widget part.
+ * This is used internally for managing text parts that might be set directly
+ * or through custom mechanisms.
+ */
 struct _Elm_Label_Data
 {
-   const char *part;
-   const char *text;
+   const char *part; /**< The name of the part. */
+   const char *text; /**< The text associated with the part. */
 };
 
+/**
+ * @brief Structure to hold translatable string data.
+ * This is used to manage strings that need to be translated when the language changes.
+ * It forms an inlist to allow efficient addition and removal.
+ */
 struct _Elm_Translate_String_Data
 {
-   EINA_INLIST;
-   Eina_Stringshare *id;
-   Eina_Stringshare *domain;
-   Eina_Stringshare *string;
-   Eina_Bool   preset : 1;
+   EINA_INLIST; /**< Macro to make this struct usable in an Eina_Inlist. */
+   Eina_Stringshare *id;     /**< Identifier for the translatable string (often the part name). */
+   Eina_Stringshare *domain; /**< The translation domain (gettext domain). */
+   Eina_Stringshare *string; /**< The original, untranslated string. */
+   Eina_Bool   preset : 1; /**< Flag indicating if this translation was preset (e.g., by legacy API). */
 };
 
+/**
+ * @brief Table mapping newer Efl class names to legacy Elm class names.
+ * This is used for maintaining backward compatibility, particularly for applications
+ * or themes that might still use the older Elm_* type names.
+ * Each entry is an array of two strings: { "New.Efl.Class.Name", "Legacy_Elm_Type_Name" }.
+ * The list is terminated by a { NULL, NULL } entry.
+ * Example: { "Efl.Ui.Button_Legacy", "Elm_Button" }
+ */
 /* For keeping backward compatibility (EFL 1.18 or older versions).
  * Since EFL 1.19 which starts to use eolian_gen2, it does not convert
  * "." to "_" among the class name. */
@@ -149,12 +175,26 @@ static const char *legacy_type_table[][2] =
 };
 
 /* local subsystem globals */
+/**
+ * @internal
+ * @brief Checks if the given Evas_Object is an Efl_Ui_Widget.
+ * @param obj The Evas_Object to check.
+ * @return EINA_TRUE if the object is an Efl_Ui_Widget, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _elm_widget_is(const Evas_Object *obj)
 {
    return efl_isa(obj, MY_CLASS);
 }
 
+/**
+ * @internal
+ * @brief Determines if a widget can be focused.
+ * A widget is focusable if its 'can_focus' property is true or
+ * if it has focusable children (logical.child_count > 0).
+ * @param obj The widget to check.
+ * @return EINA_TRUE if the widget can be focused, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _is_focusable(Evas_Object *obj)
 {
@@ -162,6 +202,12 @@ _is_focusable(Evas_Object *obj)
    return sd->can_focus || (sd->logical.child_count > 0);
 }
 
+/**
+ * @internal
+ * @brief Checks if a widget is currently focused.
+ * @param obj The widget to check.
+ * @return EINA_TRUE if the widget is focused, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _is_focused(Evas_Object *obj)
 {
@@ -169,6 +215,14 @@ _is_focused(Evas_Object *obj)
    return sd->focused;
 }
 
+/**
+ * @internal
+ * @brief Checks if an object implements a scrollable interface.
+ * This function handles both legacy Elm_Interface_Scrollable and the newer
+ * Efl_Ui_Scrollable_Interface.
+ * @param obj The object to check.
+ * @return EINA_TRUE if the object is scrollable, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _elm_scrollable_is(const Evas_Object *obj)
 {
@@ -181,30 +235,77 @@ _elm_scrollable_is(const Evas_Object *obj)
         efl_isa(obj, EFL_UI_SCROLLABLE_INTERFACE);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a sub-object of a widget is deleted.
+ * This function handles cleanup related to the deleted sub-object,
+ * such as updating focus states or removing it from internal lists.
+ * @param data The parent widget.
+ * @param event The EFL_EVENT_DEL event information.
+ */
 static void
 _on_sub_obj_del(void *data, const Efl_Event *event);
+
+/**
+ * @internal
+ * @brief Propagates input events (key down, key up, pointer wheel) up the widget hierarchy.
+ * This allows parent widgets to handle events not consumed by their children.
+ * @param data User data (typically NULL for these callbacks).
+ * @param eo_event The Efl_Event containing event details.
+ */
 static void _propagate_event(void *data, const Efl_Event *eo_event);
+
+/**
+ * @internal
+ * @brief Updates the shadow effect for a widget if it has one.
+ * This is called when the widget's geometry or visibility changes.
+ * @param obj The widget whose shadow needs updating.
+ */
 static void _elm_widget_shadow_update(Efl_Ui_Widget *obj);
 
+/** @brief Callbacks array for handling sub-item deletion. */
 EFL_CALLBACKS_ARRAY_DEFINE(efl_subitems_callbacks,
                           { EFL_EVENT_DEL, _on_sub_obj_del });
+/** @brief Callbacks array for handling focus-related input events. */
 EFL_CALLBACKS_ARRAY_DEFINE(focus_callbacks,
                           { EFL_EVENT_KEY_DOWN, _propagate_event },
                           { EFL_EVENT_KEY_UP, _propagate_event },
                           { EFL_EVENT_POINTER_WHEEL, _propagate_event });
 
+/**
+ * @internal
+ * @brief Adds the efl_subitems_callbacks to a widget.
+ * This is typically used when a sub-object is added to a widget.
+ * @param widget The widget to add callbacks to.
+ * @param data The data to pass to the callbacks (usually the parent widget).
+ */
 static inline void
 _callbacks_add(Eo *widget, void *data)
 {
     efl_event_callback_array_add(widget, efl_subitems_callbacks(), data);
 }
 
+/**
+ * @internal
+ * @brief Removes the efl_subitems_callbacks from a widget.
+ * This is typically used when a sub-object is removed from a widget.
+ * @param widget The widget to remove callbacks from.
+ * @param data The data that was passed when adding the callbacks.
+ */
 static inline void
 _callbacks_del(Eo *widget, void *data)
 {
     efl_event_callback_array_del(widget, efl_subitems_callbacks(), data);
 }
 
+/**
+ * @internal
+ * @brief Sets the 'highlight_in_theme' property of a widget based on its item's view.
+ * It checks if the item's view (or its Edje object) has the "focus_highlight" data
+ * field set to "on".
+ * @param obj The parent widget.
+ * @param eo_it The widget item whose view is to be checked.
+ */
 void
 _elm_widget_item_highlight_in_theme(Evas_Object *obj, Elm_Object_Item *eo_it)
 {
@@ -228,6 +329,13 @@ _elm_widget_item_highlight_in_theme(Evas_Object *obj, Elm_Object_Item *eo_it)
      elm_widget_highlight_in_theme_set(obj, EINA_FALSE);
 }
 
+/**
+ * @internal
+ * @brief Initiates the focus highlight animation for the window containing the widget.
+ * This function finds the top-level window associated with the given widget and
+ * calls the window-specific function to start the focus highlight.
+ * @param obj The widget for which to start the focus highlight.
+ */
 void
 _elm_widget_focus_highlight_start(const Evas_Object *obj)
 {
@@ -238,6 +346,14 @@ _elm_widget_focus_highlight_start(const Evas_Object *obj)
    _elm_win_focus_highlight_start(top);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the actual Evas_Object used for displaying the focus highlight in the window.
+ * This function finds the top-level window associated with the given widget and
+ * then queries that window for its focus highlight object.
+ * @param obj The widget whose window's focus highlight object is desired.
+ * @return The Evas_Object used for focus highlighting, or NULL if not found.
+ */
 Evas_Object *
 _efl_ui_widget_focus_highlight_object_get(const Evas_Object *obj)
 {
@@ -248,6 +364,18 @@ _efl_ui_widget_focus_highlight_object_get(const Evas_Object *obj)
    return _elm_win_focus_highlight_object_get(top);
 }
 
+/**
+ * @internal
+ * @brief Evaluates if a widget is focusable in the legacy focus system.
+ * This function checks the widget's ancestors for custom focus chains. If a widget
+ * is part of a custom focus chain of an ancestor, and it's not explicitly listed
+ * in that chain, it's considered disabled for focus purposes by that chain.
+ * The evaluation stops at the window level.
+ * @param obj The widget to evaluate.
+ * @return EINA_TRUE if the widget is disabled by a legacy custom focus chain or
+ *         if the top-most ancestor evaluated is not a window (indicating it's not part of a valid UI tree for this check).
+ *         EINA_FALSE if the widget is not disabled by any legacy custom focus chain it's part of.
+ */
 static Eina_Bool
 _legacy_focus_eval(Eo *obj)
 {
@@ -279,8 +407,26 @@ _legacy_focus_eval(Eo *obj)
    return !efl_isa(top, EFL_UI_WIN_CLASS);
 }
 
+/**
+ * @internal
+ * @brief Performs a full focus evaluation for a widget and its private data.
+ * This function is a forward declaration. The actual implementation will handle
+ * the complete focus state recalculation for the widget.
+ * @param obj The widget to evaluate.
+ * @param pd The smart data of the widget.
+ */
 static void _full_eval(Eo *obj, Elm_Widget_Smart_Data *pd);
 
+/**
+ * @internal
+ * @brief Evaluates and updates the focus manager for a given widget.
+ * It determines the correct focus manager based on the widget's parent.
+ * If the parent is a focus manager, it's used directly. Otherwise, the parent's
+ * focus manager is queried.
+ * @param obj The widget whose focus manager is to be evaluated.
+ * @param pd The smart data of the widget, where manager information is stored.
+ * @return The old focus manager if it changed, otherwise NULL.
+ */
 static Efl_Ui_Focus_Object*
 _focus_manager_eval(Eo *obj, Elm_Widget_Smart_Data *pd)
 {
@@ -310,6 +456,22 @@ _focus_manager_eval(Eo *obj, Elm_Widget_Smart_Data *pd)
    return old;
 }
 
+/**
+ * @internal
+ * @brief Applies a new focus state to a widget, registering or unregistering it with focus managers as needed.
+ * This function compares the widget's `current_state` with the `configured_state`
+ * and performs the necessary operations (register, unregister, update parent)
+ * with the appropriate focus manager.
+ *
+ * @param obj The widget object.
+ * @param pd The widget's smart data (unused in this specific EOLIAN implementation, but common in helpers).
+ * @param current_state The widget's current focus registration state (manager, parent, logical).
+ * @param configured_state Pointer to the desired focus registration state. The function will update this
+ *                         to reflect the actual state after applying changes if successful.
+ * @param redirect The widget to redirect focus to, if applicable.
+ * @return EINA_TRUE if the widget is successfully registered or its state updated with a manager,
+ *         EINA_FALSE if it's unregistered or an error occurred.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_widget_focus_state_apply(Eo *obj, Elm_Widget_Smart_Data *pd EINA_UNUSED, Efl_Ui_Widget_Focus_State current_state, Efl_Ui_Widget_Focus_State *configured_state, Efl_Ui_Widget *redirect)
 {
@@ -364,6 +526,19 @@ _efl_ui_widget_focus_state_apply(Eo *obj, Elm_Widget_Smart_Data *pd EINA_UNUSED,
    );
    return EINA_FALSE;
 }
+
+/**
+ * @internal
+ * @brief Evaluates if a widget should be a candidate for focus registration.
+ * A widget is a candidate if it's visible, not disabled, not part of an unfocusable tree,
+ * and either `can_focus` is true or it has logical children.
+ * The legacy focus system is also checked if applicable.
+ *
+ * @param obj The widget object.
+ * @param pd The widget's smart data.
+ * @param[out] should EINA_TRUE if the widget should be registered (either fully or logically), EINA_FALSE otherwise.
+ * @param[out] want_full EINA_TRUE if the widget wants full focus registration (can_focus is true), EINA_FALSE if only logical registration is needed (has children but can_focus is false).
+ */
 static void
 _eval_registration_candidate(Eo *obj, Elm_Widget_Smart_Data *pd, Eina_Bool *should, Eina_Bool *want_full)
 {
@@ -392,6 +567,19 @@ _eval_registration_candidate(Eo *obj, Elm_Widget_Smart_Data *pd, Eina_Bool *shou
       }
 }
 
+/**
+ * @internal
+ * @brief Evaluates and applies the focus registration state for a widget.
+ * Based on the `should` and `want_full` parameters (determined by `_eval_registration_candidate`),
+ * this function configures the widget's focus state (parent, manager, logical) and
+ * calls `_efl_ui_widget_focus_state_apply` to enact the changes.
+ * It updates the widget's internal focus state (`pd->focus`) based on the outcome.
+ *
+ * @param obj The widget object.
+ * @param pd The widget's smart data.
+ * @param should EINA_TRUE if the widget should be registered with a focus manager.
+ * @param want_full EINA_TRUE if the widget requires full focus capabilities, EINA_FALSE for logical only.
+ */
 static void
 _focus_state_eval(Eo *obj, Elm_Widget_Smart_Data *pd, Eina_Bool should, Eina_Bool want_full)
 {
@@ -430,6 +618,23 @@ _focus_state_eval(Eo *obj, Elm_Widget_Smart_Data *pd, Eina_Bool should, Eina_Boo
 
 }
 
+/**
+ * @internal
+ * @brief Evaluates and updates the logical focus parent of a widget.
+ * The logical parent is determined by querying `EFL_UI_FOCUS_PARENT_PROVIDER_INTERFACE`
+ * if the widget `should` be registered and custom parent providers are active.
+ * Otherwise, the widget's direct UI parent is used.
+ * This function updates child counts on old and new logical parents and
+ * sets `state_change_to_parent` if a parent's logical child count transitions
+ * to/from zero, potentially triggering a re-evaluation of that parent.
+ *
+ * @param obj The widget object.
+ * @param pd The widget's smart data.
+ * @param should EINA_TRUE if the widget is a candidate for focus registration.
+ * @param[out] state_change_to_parent Set to EINA_TRUE if the old or new logical parent's
+ *                                    state (regarding having logical children) changed.
+ * @return The old logical parent if it changed, otherwise NULL.
+ */
 static Efl_Ui_Focus_Object*
 _logical_parent_eval(Eo *obj EINA_UNUSED, Elm_Widget_Smart_Data *pd, Eina_Bool should, Eina_Bool *state_change_to_parent)
 {
@@ -492,6 +697,22 @@ _logical_parent_eval(Eo *obj EINA_UNUSED, Elm_Widget_Smart_Data *pd, Eina_Bool s
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Performs a comprehensive focus evaluation for a widget.
+ * This function orchestrates several steps:
+ * 1. Determines if the widget should be a registration candidate (`_eval_registration_candidate`).
+ * 2. Evaluates and updates its logical parent (`_logical_parent_eval`). If the logical parent
+ *    changes in a way that affects its own focus state (e.g., gains/loses its last logical child),
+ *    a full evaluation is recursively triggered for the affected old/new logical parents.
+ * 3. Evaluates and updates its focus manager (`_focus_manager_eval`).
+ * 4. Evaluates and applies its focus registration state (`_focus_state_eval`).
+ * 5. Emits signals if the focus parent or focus manager has changed. If the manager changed,
+ *    it also triggers a full evaluation for all children of the current widget.
+ *
+ * @param obj The widget object.
+ * @param pd The widget's smart data.
+ */
 static void
 _full_eval(Eo *obj, Elm_Widget_Smart_Data *pd)
 {

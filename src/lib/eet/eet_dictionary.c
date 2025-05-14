@@ -11,6 +11,14 @@
 #include "Eet.h"
 #include "Eet_private.h"
 
+/**
+ * @brief Creates and initializes a new Eet_Dictionary.
+ *
+ * This function allocates memory for a new Eet_Dictionary structure,
+ * initializes its hash table, and sets up a read-write lock for thread safety.
+ *
+ * @return A pointer to the newly created Eet_Dictionary, or NULL on failure.
+ */
 Eet_Dictionary *
 eet_dictionary_add(void)
 {
@@ -23,6 +31,14 @@ eet_dictionary_add(void)
    return ed;
 }
 
+/**
+ * @brief Frees an Eet_Dictionary and its associated resources.
+ *
+ * This function releases all memory allocated for the Eet_Dictionary,
+ * including shared strings, hash tables, and the read-write lock.
+ *
+ * @param ed The Eet_Dictionary to free. If NULL, the function does nothing.
+ */
 void
 eet_dictionary_free(Eet_Dictionary *ed)
 {
@@ -50,24 +66,62 @@ eet_dictionary_free(Eet_Dictionary *ed)
    eet_dictionary_mp_free(ed);
 }
 
+/**
+ * @brief Acquires a read lock on the Eet_Dictionary.
+ *
+ * This function is used to protect the dictionary for read operations
+ * in a multi-threaded environment. Multiple readers can acquire the lock
+ * simultaneously.
+ *
+ * @param ed The Eet_Dictionary to lock for reading.
+ */
 void
 eet_dictionary_lock_read(const Eet_Dictionary *ed)
 {
    eina_rwlock_take_read((Eina_RWLock *)&ed->rwlock);
 }
 
+/**
+ * @brief Acquires a write lock on the Eet_Dictionary.
+ *
+ * This function is used to protect the dictionary for write operations
+ * in a multi-threaded environment. Only one writer can acquire the lock,
+ * and it blocks all readers.
+ *
+ * @param ed The Eet_Dictionary to lock for writing.
+ */
 void
 eet_dictionary_lock_write(Eet_Dictionary *ed)
 {
    eina_rwlock_take_write((Eina_RWLock *)&ed->rwlock);
 }
 
+/**
+ * @brief Releases a previously acquired read or write lock on the Eet_Dictionary.
+ *
+ * @param ed The Eet_Dictionary whose lock is to be released.
+ */
 void
 eet_dictionary_unlock(const Eet_Dictionary *ed)
 {
    eina_rwlock_release((Eina_RWLock *)&ed->rwlock);
 }
 
+/**
+ * @internal
+ * @brief Callback function used by eina_hash_foreach to prepare strings for writing.
+ *
+ * This function is called for each string in the `add_hash` (a temporary hash
+ * table used during initial dictionary population). It adds the string to the
+ * main dictionary's string array (`ed->all`), calculates its hash, and updates
+ * relevant structures.
+ *
+ * @param hashtab The hash table being iterated (unused).
+ * @param key The string key from the hash table.
+ * @param value The value associated with the key (used to derive an index).
+ * @param data A pointer to the Eet_Dictionary.
+ * @return EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 _eet_dictionary_write_prepare_hash_cb(const Eina_Hash *hashtab EINA_UNUSED, const void *key, void *value, void *data)
 {
@@ -97,6 +151,20 @@ on_error:
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Prepares the dictionary for writing by processing strings from `add_hash`.
+ *
+ * This function is called when the dictionary, initially populated using a
+ * temporary `add_hash` for performance, needs to be finalized for writing
+ * or further operations. It allocates the main string storage arrays
+ * (`ed->all`, `ed->all_hash`, `ed->all_allocated`) and populates them
+ * by iterating over `ed->add_hash` using `_eet_dictionary_write_prepare_hash_cb`.
+ * The `add_hash` is then freed.
+ * This function assumes the dictionary's write lock is already held.
+ *
+ * @param ed The Eet_Dictionary to prepare.
+ */
 void
 eet_dictionary_write_prepare_unlocked(Eet_Dictionary *ed)
 {
@@ -113,6 +181,17 @@ eet_dictionary_write_prepare_unlocked(Eet_Dictionary *ed)
    ed->add_hash = NULL;
 }
 
+/**
+ * @brief Prepares the dictionary for writing, ensuring thread safety.
+ *
+ * This function acquires a write lock on the dictionary and then calls
+ * `eet_dictionary_write_prepare_unlocked` to perform the actual preparation.
+ * The write lock is released before the function returns. This is typically
+ * called before saving the dictionary or when switching from the initial
+ * fast-add mode to normal operation.
+ *
+ * @param ed The Eet_Dictionary to prepare.
+ */
 void
 eet_dictionary_write_prepare(Eet_Dictionary *ed)
 {
@@ -121,6 +200,23 @@ eet_dictionary_write_prepare(Eet_Dictionary *ed)
    eina_rwlock_release(&ed->rwlock);
 }
 
+/**
+ * @internal
+ * @brief Looks up a string in the dictionary.
+ *
+ * This function searches for a given string within the dictionary. It first
+ * checks a small cache for frequently accessed strings. If not found in the
+ * cache, it traverses the hash chain corresponding to the string's hash.
+ *
+ * @param ed The Eet_Dictionary to search in.
+ * @param string The string to look up.
+ * @param len The length of the string (including null terminator).
+ * @param hash The precomputed hash of the string.
+ * @param previous Pointer to an integer where the index of the previous string
+ *                 in the hash chain will be stored, if found. This is useful
+ *                 for linking new entries.
+ * @return The index of the string in the dictionary if found, otherwise -1.
+ */
 static int
 _eet_dictionary_lookup(Eet_Dictionary *ed,
                        const char     *string,

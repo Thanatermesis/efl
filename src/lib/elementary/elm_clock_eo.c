@@ -1,9 +1,32 @@
+/**
+ * @internal
+ * @brief Event descriptor for the "changed" event.
+ * @details This event is emitted when the clock's time is changed by the user
+ *          interacting with the clock widget in edit mode. This global variable
+ *          is used to register and emit this specific event.
+ */
 EWAPI const Efl_Event_Description _ELM_CLOCK_EVENT_CHANGED =
    EFL_EVENT_DESCRIPTION("changed");
 
 void _elm_clock_show_am_pm_set(Eo *obj, Elm_Clock_Data *pd, Eina_Bool am_pm);
 
 
+/**
+ * @internal
+ * @brief Eolian reflection function for setting the 'show_am_pm' property.
+ *
+ * This function is part of the Eolian reflection system. It is called when
+ * the 'show_am_pm' property is set via efl_property_reflection_set() or
+ * equivalent Eolian mechanisms. It converts an Eina_Value (which is a generic
+ * value container) to the specific type required by the property (Eina_Bool in this case)
+ * and then calls the underlying C implementation (elm_obj_clock_show_am_pm_set).
+ *
+ * @param obj The Efl object instance on which the property is being set.
+ * @param val An Eina_Value holding the new boolean state for the 'show_am_pm' property.
+ *            For example, to set it to true, val might be initialized with `eina_value_bool_init(EINA_TRUE)`.
+ * @return #EINA_ERROR_NO_ERROR on success, or an Eina_Error code if the
+ *         Eina_Value conversion to Eina_Bool fails.
+ */
 static Eina_Error
 __eolian_elm_clock_show_am_pm_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -24,6 +47,22 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_clock_show_am_pm_set, EFL_FUNC_CALL(am_pm), Ei
 Eina_Bool _elm_clock_show_am_pm_get(const Eo *obj, Elm_Clock_Data *pd);
 
 
+/**
+ * @internal
+ * @brief Eolian reflection function for getting the 'show_am_pm' property.
+ *
+ * This function is part of the Eolian reflection system. It is called when
+ * the 'show_am_pm' property is read via efl_property_reflection_get() or
+ * equivalent Eolian mechanisms. It calls the underlying C implementation
+ * (elm_obj_clock_show_am_pm_get) and wraps the returned Eina_Bool value
+ * into an Eina_Value container for generic handling by the Eolian system.
+ *
+ * @param obj The Efl object instance from which the property is being read.
+ * @return An Eina_Value holding the boolean value of the 'show_am_pm' property.
+ *         For example, if 'show_am_pm' is true, this returns an Eina_Value
+ *         equivalent to one from `eina_value_bool_init(EINA_TRUE)`.
+ *         The caller is responsible for flushing the returned Eina_Value using eina_value_flush().
+ */
 static Eina_Value
 __eolian_elm_clock_show_am_pm_get_reflect(const Eo *obj)
 {
@@ -186,6 +225,20 @@ void _elm_clock_efl_ui_widget_on_access_update(Eo *obj, Elm_Clock_Data *pd, Eina
 Eina_Error _elm_clock_efl_ui_widget_theme_apply(Eo *obj, Elm_Clock_Data *pd);
 
 
+/**
+ * @internal
+ * @brief Initializes the Elm_Clock Efl class.
+ *
+ * This function is automatically called by the Efl class system when the
+ * Elm_Clock class is first loaded or used. Its primary role is to register
+ * the C functions that implement the Eolian methods (operations) and
+ * properties (including their reflection handlers) for the Elm_Clock class.
+ * This connects the Eolian definitions to their C implementations.
+ *
+ * @param klass The Efl_Class (specifically Elm_Clock_Class) to initialize.
+ * @return @c EINA_TRUE on successful initialization of the class functions,
+ *         @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_clock_class_initializer(Efl_Class *klass)
 {
@@ -234,6 +287,21 @@ _elm_clock_class_initializer(Efl_Class *klass)
    return efl_class_functions_set(klass, opsp, ropsp);
 }
 
+/**
+ * @internal
+ * @brief Describes the Elm_Clock Efl class structure.
+ *
+ * This static constant structure provides the Efl class system with
+ * essential metadata about the Elm_Clock class. This metadata includes:
+ * - EO_VERSION: The Eolian object system version this class complies with.
+ * - "Elm.Clock": The unique name of the class in the Eolian system.
+ * - EFL_CLASS_TYPE_REGULAR: Specifies that this is a standard Efl class.
+ * - sizeof(Elm_Clock_Data): The size of the private instance data structure for Elm_Clock objects.
+ * - _elm_clock_class_initializer: A pointer to the class initializer function (defined above).
+ * - _elm_clock_class_constructor: A pointer to the class constructor function (called when a new instance is created).
+ * - NULL: Placeholder for a class destructor, if one were defined.
+ * This structure is used by EFL_DEFINE_CLASS to register the class.
+ */
 static const Efl_Class_Description _elm_clock_class_desc = {
    EO_VERSION,
    "Elm.Clock",

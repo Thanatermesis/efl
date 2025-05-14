@@ -4,6 +4,10 @@
 #ifndef _EFL_UI_FRAME_LEGACY_EO_CLASS_TYPE
 #define _EFL_UI_FRAME_LEGACY_EO_CLASS_TYPE
 
+/**
+ * @brief Represents a legacy frame widget.
+ * @ingroup Efl_Ui_Frame_Legacy
+ */
 typedef Eo Efl_Ui_Frame_Legacy;
 
 #endif

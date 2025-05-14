@@ -1116,32 +1116,128 @@ EAPI const char *elm_config_icon_theme_get(void);
  */
 EAPI void elm_config_icon_theme_set(const char *theme);
 
-/** new palette code - nbot sure if this should be final yet **/
+/**
+ * @defgroup Elm_Palette_Group Palette
+ * @ingroup Elementary
+ *
+ * @brief Functions to manage color palettes.
+ *
+ * A palette is a named set of colors that can be applied to an application.
+ *
+ * @{
+ */
+
+/**
+ * @brief Structure for a single color within a palette.
+ * @ingroup Elm_Palette_Group
+ */
 typedef struct _Elm_Palette_Color
 {
-   const char    *name;
-   unsigned char  r, g, b, a;
+   const char    *name; /**< The name of the color. */
+   unsigned char  r, g, b, a; /**< The color components (Red, Green, Blue, Alpha). */
 } Elm_Palette_Color;
 
+/**
+ * @brief Structure for a color palette.
+ * @ingroup Elm_Palette_Group
+ */
 typedef struct _Elm_Palette
 {
-   int        version;
-   Eina_List *colors;
+   int        version; /**< The version of the palette structure. */
+   Eina_List *colors; /**< A list of #Elm_Palette_Color structs. */
 } Elm_Palette;
 
+/**
+ * @brief Get the currently configured palette name.
+ * @return The name of the current palette.
+ * @ingroup Elm_Palette_Group
+ */
 EAPI const char *elm_config_palette_get(void);
+/**
+ * @brief Set the palette to be used.
+ * @param palette The name of the palette to set.
+ * @ingroup Elm_Palette_Group
+ */
 EAPI void        elm_config_palette_set(const char *palette);
 
+/**
+ * @brief Load a palette by name.
+ *
+ * This function loads a palette from the user's or system's configuration directories.
+ * If the palette is not found, a new empty palette is created.
+ *
+ * @param palette The name of the palette to load.
+ * @return A new #Elm_Palette object. It must be freed with elm_config_palette_free().
+ * @ingroup Elm_Palette_Group
+ */
 EAPI Elm_Palette *elm_config_palette_load(const char *palette);
+/**
+ * @brief Set a color in a palette.
+ *
+ * If a color with the same name already exists in the palette, it is updated.
+ * Otherwise, a new color is added to the palette.
+ *
+ * @param pal The palette to modify.
+ * @param name The name of the color.
+ * @param r The red component of the color (0-255).
+ * @param g The green component of the color (0-255).
+ * @param b The blue component of the color (0-255).
+ * @param a The alpha component of the color (0-255).
+ * @ingroup Elm_Palette_Group
+ */
 EAPI void         elm_config_palette_color_set(Elm_Palette *pal, const char *name, int r, int g, int b, int a);
+/**
+ * @brief Unset (remove) a color from a palette.
+ * @param pal The palette to modify.
+ * @param name The name of the color to remove.
+ * @ingroup Elm_Palette_Group
+ */
 EAPI void         elm_config_palette_color_unset(Elm_Palette *pal, const char *name);
+/**
+ * @brief Save a palette to the user's configuration.
+ * @param pal The palette to save.
+ * @param palette The name to save the palette as.
+ * @ingroup Elm_Palette_Group
+ */
 EAPI void         elm_config_palette_save(Elm_Palette *pal, const char *palette);
+/**
+ * @brief Free a palette object.
+ * @param pal The palette to free.
+ * @ingroup Elm_Palette_Group
+ */
 EAPI void         elm_config_palette_free(Elm_Palette *pal);
+/**
+ * @brief Delete a palette from the user's configuration.
+ * @param palette The name of the palette to delete.
+ * @ingroup Elm_Palette_Group
+ */
 EAPI void         elm_config_palette_delete(const char *palette);
+/**
+ * @brief Check if a palette exists in the system configuration.
+ * @param palette The name of the palette to check.
+ * @return @c EINA_TRUE if the palette exists in the system configuration, @c EINA_FALSE otherwise.
+ * @ingroup Elm_Palette_Group
+ */
 EAPI Eina_Bool    elm_config_palette_system_has(const char *palette);
+/**
+ * @brief Get a list of available palette names.
+ *
+ * The list contains names from both system and user configurations.
+ *
+ * @return A list of palette name strings. The list must be freed with elm_config_palette_list_free().
+ *         The strings in the list are stringshared and should not be modified.
+ * @ingroup Elm_Palette_Group
+ */
 EAPI Eina_List   *elm_config_palette_list(void);
+/**
+ * @brief Free a list of palette names.
+ * @param list The list to free, as returned by elm_config_palette_list().
+ * @ingroup Elm_Palette_Group
+ */
 EAPI void         elm_config_palette_list_free(Eina_List *list);
-/** end new palette code **/
+/**
+ * @}
+ */
 
 /**
  * @defgroup Elm_Password_last_show Password show last

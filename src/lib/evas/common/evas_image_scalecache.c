@@ -1,3 +1,23 @@
+/**
+ * @file
+ * @brief This file implements a cache for scaled RGBA images.
+ *
+ * The scale cache is designed to store and retrieve pre-scaled versions of
+ * images to improve performance by avoiding repeated scaling operations.
+ * It manages cache size, item eviction, and usage tracking.
+ *
+ * The cache can be configured through environment variables:
+ * - EVAS_SCALECACHE_SIZE: Sets the maximum cache size in kilobytes.
+ * - EVAS_SCALECACHE_MAX_DIMENSION: Sets the maximum dimension (width or height)
+ *   for an image to be cached.
+ * - EVAS_SCALECACHE_MAX_FLOP_COUNT: Sets the maximum "flop" count for an item
+ *   before it's considered for re-population. A flop occurs when an item is
+ *   evicted and then requested again.
+ * - EVAS_SCALECACHE_MAX_ITEMS: Sets the maximum number of scaled items per
+ *   original image.
+ * - EVAS_SCALECACHE_MIN_USES: Sets the minimum number of times a scaled image
+ *   must be used before it's considered for caching.
+ */
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
@@ -27,45 +47,64 @@
 typedef struct _ScaleitemKey ScaleitemKey;
 typedef struct _Scaleitem Scaleitem;
 
+/**
+ * @brief Defines the key for a cached scaled image.
+ * This structure holds all the parameters that uniquely identify a scaled version
+ * of an image, including source region, destination size, and smoothing flag.
+ */
 struct _ScaleitemKey
 {
-   int src_x, src_y;
-   unsigned int src_w, src_h;
-   unsigned int dst_w, dst_h;
-   Eina_Bool smooth : 1;
+   int src_x, src_y; /**< Source rectangle X and Y coordinates. */
+   unsigned int src_w, src_h; /**< Source rectangle width and height. */
+   unsigned int dst_w, dst_h; /**< Destination image width and height. */
+   Eina_Bool smooth : 1; /**< Boolean flag indicating if smoothing was used for scaling. */
 };
 
+/**
+ * @brief Represents a cached scaled image item.
+ * This structure holds the scaled image data, its usage statistics,
+ * and links for managing it within the cache lists.
+ */
 struct _Scaleitem
 {
-   EINA_INLIST;
-   unsigned long long usage;
-   unsigned long long usage_count;
-   RGBA_Image *im, *parent_im;
-   Eina_List *item;
-   unsigned int flop;
-   unsigned int size_adjust;
+   EINA_INLIST; /**< Macro for Eina_Inlist node, used for global cache list. */
+   unsigned long long usage; /**< Number of times this specific scaled item has been used. */
+   unsigned long long usage_count; /**< Global usage counter value when this item was last used. */
+   RGBA_Image *im; /**< Pointer to the actual scaled RGBA_Image data. NULL if not populated. */
+   RGBA_Image *parent_im; /**< Pointer to the original (parent) RGBA_Image. */
+   Eina_List *item; /**< Pointer to this item's node in the parent image's cache list (im->cache.list). */
+   unsigned int flop; /**< "Flop" counter: incremented when an item is unloaded due to cache pressure and then requested again. Helps decide if an item is worth re-caching. */
+   unsigned int size_adjust; /**< Adjusted size for accounting when `forced_unload` is true. This is used for large images that might be unloaded from the main image cache but kept in scale cache. */
 
-   ScaleitemKey key;
+   ScaleitemKey key; /**< The key defining this scaled version. */
 
-   Eina_Bool forced_unload : 1;
-   Eina_Bool populate_me : 1;
+   Eina_Bool forced_unload : 1; /**< Flag indicating if the original image data was unloaded while this scaled version is kept. */
+   Eina_Bool populate_me : 1; /**< Flag indicating that this item should be populated with scaled image data on its next use. */
 };
 
 #ifdef SCALECACHE
-static unsigned long long use_counter = 0;
+static unsigned long long use_counter = 0; /**< Global counter incremented on each image use, helps in LRU-like decisions. */
 
-static SLK(cache_lock);
-static Eina_Inlist *cache_list = NULL;
-static unsigned int cache_size = 0;
-static int init = 0;
+static SLK(cache_lock); /**< Global lock for the scale cache (cache_list, cache_size). */
+static Eina_Inlist *cache_list = NULL; /**< Global list of all active Scaleitem entries, ordered by usage (approximating LRU). */
+static unsigned int cache_size = 0; /**< Current total size of all scaled images in the cache, in bytes. */
+static int init = 0; /**< Initialization counter for the scale cache module. */
 
-static unsigned int max_cache_size = SCALE_CACHE_SIZE;
-static unsigned int max_dimension = MAX_SCALECACHE_DIM;
-static unsigned int max_flop_count = MAX_FLOP_COUNT;
-static unsigned int max_scale_items = MAX_SCALEITEMS;
-static unsigned int min_scale_uses = MIN_SCALE_USES;
+// Configurable cache parameters
+static unsigned int max_cache_size = SCALE_CACHE_SIZE; /**< Maximum allowed size of the scale cache in bytes. */
+static unsigned int max_dimension = MAX_SCALECACHE_DIM; /**< Maximum dimension (width or height) for a scaled image to be cached. */
+static unsigned int max_flop_count = MAX_FLOP_COUNT; /**< Maximum flop count. If an item's flop count exceeds this, it might not be repopulated. */
+static unsigned int max_scale_items = MAX_SCALEITEMS; /**< Maximum number of scaled versions to keep per original image. */
+static unsigned int min_scale_uses = MIN_SCALE_USES; /**< Minimum number of times a scaled version must be used before it's considered for caching. */
 #endif
 
+/**
+ * @brief Computes a hash for a ScaleitemKey.
+ * Used by Eina_Hash to store and retrieve scale items.
+ * @param key Pointer to the ScaleitemKey.
+ * @param key_length Length of the key (unused).
+ * @return The computed hash value.
+ */
 static int
 _evas_common_scalecache_key_hash(const void *key, int key_length EINA_UNUSED)
 {
@@ -81,12 +120,28 @@ _evas_common_scalecache_key_hash(const void *key, int key_length EINA_UNUSED)
    return r;
 }
 
+/**
+ * @brief Returns the length of a ScaleitemKey.
+ * Used by Eina_Hash.
+ * @param key Pointer to the ScaleitemKey (unused).
+ * @return The size of ScaleitemKey in bytes.
+ */
 static unsigned int
 _evas_common_scalecache_key_length(const void *key EINA_UNUSED)
 {
    return sizeof (ScaleitemKey);
 }
 
+/**
+ * @brief Compares two ScaleitemKey instances.
+ * Used by Eina_Hash to find matching keys.
+ * @param key1 Pointer to the first ScaleitemKey.
+ * @param key1_length Length of the first key (unused).
+ * @param key2 Pointer to the second ScaleitemKey.
+ * @param key2_length Length of the second key (unused).
+ * @return 0 if keys are equal, a negative value if key1 < key2,
+ *         or a positive value if key1 > key2.
+ */
 static int
 _evas_common_scalecache_key_cmp(const void *key1, int key1_length EINA_UNUSED,
                                 const void *key2, int key2_length EINA_UNUSED)
@@ -109,6 +164,12 @@ _evas_common_scalecache_key_cmp(const void *key1, int key1_length EINA_UNUSED,
    return 0;
 }
 
+/**
+ * @brief Initializes the global scale cache system.
+ * This function sets up the global lock and reads environment variables
+ * to configure cache parameters. It uses a reference counter (`init`)
+ * to allow multiple initializations without re-executing the setup.
+ */
 void
 evas_common_scalecache_init(void)
 {
@@ -132,6 +193,14 @@ evas_common_scalecache_init(void)
 #endif
 }
 
+/**
+ * @brief Shuts down the global scale cache system.
+ * Decrements the initialization counter and, if it reaches zero,
+ * destroys the global cache lock.
+ * Note: This does not free cached items; that's typically handled
+ * by `evas_common_rgba_image_scalecache_shutdown` for each image
+ * or by `evas_common_rgba_image_scalecache_flush/dump`.
+ */
 void
 evas_common_scalecache_shutdown(void)
 {
@@ -142,6 +211,11 @@ evas_common_scalecache_shutdown(void)
 #endif
 }
 
+/**
+ * @brief Initializes the scale cache for a specific image entry.
+ * Sets up the per-image lock.
+ * @param ie The image entry (cast to RGBA_Image) for which to initialize the scale cache.
+ */
 void
 evas_common_rgba_image_scalecache_init(Image_Entry *ie)
 {
@@ -152,6 +226,12 @@ evas_common_rgba_image_scalecache_init(Image_Entry *ie)
 #endif
 }
 
+/**
+ * @brief Shuts down and cleans up the scale cache for a specific image entry.
+ * This function clears all cached scaled versions associated with the given
+ * image entry and destroys its per-image lock.
+ * @param ie The image entry (cast to RGBA_Image) whose scale cache is to be shut down.
+ */
 void
 evas_common_rgba_image_scalecache_shutdown(Image_Entry *ie)
 {
@@ -163,6 +243,12 @@ evas_common_rgba_image_scalecache_shutdown(Image_Entry *ie)
 #endif
 }
 
+/**
+ * @brief Marks the scale cache for a specific image entry as dirty.
+ * This typically means the original image content has changed, so all its
+ * cached scaled versions are invalidated and freed.
+ * @param ie The image entry (cast to RGBA_Image) whose scaled versions are to be cleared.
+ */
 void
 evas_common_rgba_image_scalecache_dirty(Image_Entry *ie)
 {
@@ -210,6 +296,13 @@ evas_common_rgba_image_scalecache_dirty(Image_Entry *ie)
 #endif
 }
 
+/**
+ * @brief Records a use of the original (unscaled) image.
+ * This updates usage statistics for the original image, which can influence
+ * decisions about whether to keep its scaled versions or the original itself
+ * in memory.
+ * @param ie The image entry (cast to RGBA_Image) representing the original image.
+ */
 void
 evas_common_rgba_image_scalecache_orig_use(Image_Entry *ie)
 {
@@ -225,6 +318,12 @@ evas_common_rgba_image_scalecache_orig_use(Image_Entry *ie)
 #endif
 }
 
+/**
+ * @brief Gets the total memory usage of scaled versions for a specific image.
+ * @param ie The image entry (cast to RGBA_Image).
+ * @return The total size in bytes of all cached scaled versions for this image.
+ *         Returns 0 if scale cache is disabled.
+ */
 int
 evas_common_rgba_image_scalecache_usage_get(Image_Entry *ie)
 {
@@ -245,7 +344,19 @@ evas_common_rgba_image_scalecache_usage_get(Image_Entry *ie)
 #endif
 }
 
-/* receives original Image_Entry */
+/**
+ * @brief Retrieves and increments reference counts for all cached scaled items of an image.
+ * This function is used to get a list of all scaled versions (as Image_Entry*)
+ * associated with a given original image. The reference count of each returned
+ * scaled image is incremented. The caller is responsible for decrementing these
+ * references later using `evas_common_rgba_image_scalecache_item_unref`.
+ *
+ * @param ie The original image entry (cast to RGBA_Image).
+ * @param ret An Eina_Array to which pointers to the scaled Image_Entry items will be added.
+ *            Example of `ret` structure after population:
+ *            `ret` might contain `[Image_Entry_scaled1, Image_Entry_scaled2, ...]`,
+ *            where each element is an `Image_Entry*` for a cached scaled version.
+ */
 void
 evas_common_rgba_image_scalecache_items_ref(Image_Entry *ie, Eina_Array *ret)
 {
@@ -269,7 +380,13 @@ evas_common_rgba_image_scalecache_items_ref(Image_Entry *ie, Eina_Array *ret)
 #endif
 }
 
-/* receives scaled Image_Entry */
+/**
+ * @brief Decrements the reference count of a cached scaled image item.
+ * This should be called when a previously referenced scaled item (obtained via
+ * `evas_common_rgba_image_scalecache_items_ref`) is no longer needed by the caller.
+ *
+ * @param scie The scaled image entry (Image_Entry*) whose reference count is to be decremented.
+ */
 void
 evas_common_rgba_image_scalecache_item_unref(Image_Entry *scie)
 {
@@ -280,6 +397,15 @@ evas_common_rgba_image_scalecache_item_unref(Image_Entry *scie)
 }
 
 #ifdef SCALECACHE
+/**
+ * @brief Recalculates the newest usage timestamp and count for an image's scale cache.
+ * This function iterates through all scaled items of a given image and updates
+ * `im->cache.newest_usage` and `im->cache.newest_usage_count` to reflect the
+ * most recently used item among them. This is typically called after a scaled
+ * item is removed from the cache.
+ *
+ * @param im The RGBA_Image whose newest usage stats need to be updated.
+ */
 static void
 _sci_fix_newest(RGBA_Image *im)
 {
@@ -298,6 +424,26 @@ _sci_fix_newest(RGBA_Image *im)
 //   INF("_sci_fix_newest! -> %i", im->cache.newest_usage);
 }
 
+/**
+ * @brief Finds or creates a Scaleitem for a given set of scaling parameters.
+ * This function attempts to find an existing cached scaled image matching the
+ * provided source/destination dimensions and smoothing. If not found, and if
+ * the cache limits (max_scale_items) allow, it may create a new (empty) Scaleitem
+ * structure. It also handles eviction of the least recently used item from the
+ * image's specific cache list if `max_scale_items` is exceeded.
+ *
+ * @param im The parent RGBA_Image.
+ * @param dc The draw context (unused in this function but kept for API consistency or future use).
+ * @param smooth Boolean, true if smooth scaling is requested.
+ * @param src_x Source X coordinate.
+ * @param src_y Source Y coordinate.
+ * @param src_w Source width.
+ * @param src_h Source height.
+ * @param dst_w Destination width.
+ * @param dst_h Destination height.
+ * @return Pointer to the found or newly allocated Scaleitem, or NULL if an item
+ *         could not be found or allocated (e.g., cache limits reached).
+ */
 static Scaleitem *
 _sci_find(RGBA_Image *im,
           RGBA_Draw_Context *dc EINA_UNUSED, int smooth,
@@ -396,6 +542,18 @@ try_alloc:
    return sci;
 }
 
+/**
+ * @brief Prunes the global scale cache to reduce its size.
+ * This function iterates through the global list of cached items (LRU order)
+ * and frees scaled image data until the `cache_size` is below `max_cache_size`.
+ * It prioritizes freeing items that are not currently referenced.
+ *
+ * @param notsci A Scaleitem that should NOT be pruned by this call. Can be NULL.
+ * @param copies_only If EINA_TRUE, only prune items whose parent image data is
+ *                    currently loaded (i.e., the cached item is a "copy"). This
+ *                    is a heuristic to avoid freeing cached items that might be
+ *                    the only available version of an image if the original was unloaded.
+ */
 static void
 _cache_prune(Scaleitem *notsci, Eina_Bool copies_only)
 {
@@ -444,6 +602,12 @@ _cache_prune(Scaleitem *notsci, Eina_Bool copies_only)
 }
 #endif
 
+/**
+ * @brief Sets the maximum size of the global RGBA image scale cache.
+ * If the new size is smaller than the current cache usage, the cache will be pruned.
+ * @param size The new maximum cache size in bytes.
+ *             Example: `1024 * 1024` for 1MB.
+ */
 EVAS_API void
 evas_common_rgba_image_scalecache_size_set(unsigned int size)
 {
@@ -458,6 +622,11 @@ evas_common_rgba_image_scalecache_size_set(unsigned int size)
 #endif
 }
 
+/**
+ * @brief Gets the current maximum size of the global RGBA image scale cache.
+ * @return The maximum cache size in bytes.
+ *         Returns 0 if scale cache is disabled.
+ */
 EVAS_API unsigned int
 evas_common_rgba_image_scalecache_size_get(void)
 {
@@ -472,6 +641,12 @@ evas_common_rgba_image_scalecache_size_get(void)
 #endif
 }
 
+/**
+ * @brief Manually triggers a prune operation on the global scale cache.
+ * This function attempts to reduce the cache size according to the configured
+ * maximum size, by evicting least recently used items. It prunes all types of
+ * items, not just 'copies_only'.
+ */
 EVAS_API void
 evas_common_rgba_image_scalecache_prune(void)
 {
@@ -482,6 +657,12 @@ evas_common_rgba_image_scalecache_prune(void)
 #endif
 }
 
+/**
+ * @brief Completely empties the global scale cache.
+ * This function sets the `max_cache_size` to 0, prunes everything,
+ * and then restores the original `max_cache_size`. It effectively clears
+ * all scaled images from the cache.
+ */
 EVAS_API void
 evas_common_rgba_image_scalecache_dump(void)
 {
@@ -496,6 +677,13 @@ evas_common_rgba_image_scalecache_dump(void)
 #endif
 }
 
+/**
+ * @brief Flushes the global scale cache, removing only "copies".
+ * This function is similar to `evas_common_rgba_image_scalecache_dump`, but it
+ * calls `_cache_prune` with `copies_only = 1`. This means it will try to
+ * remove cached items for which the original image data is still loaded,
+ * potentially keeping cached items if the original was unloaded.
+ */
 EVAS_API void
 evas_common_rgba_image_scalecache_flush(void)
 {
@@ -510,6 +698,36 @@ evas_common_rgba_image_scalecache_flush(void)
 #endif
 }
 
+/**
+ * @brief Prepares an image for scaled drawing by checking the scale cache.
+ * This function is called before a scale operation. It checks if a suitable
+ * scaled version of the image already exists or if it should be created.
+ * It updates usage statistics and marks items for population if they meet
+ * caching criteria (e.g., `min_scale_uses`, `max_dimension`, `max_flop_count`).
+ *
+ * The primary purpose is to decide if a cached version can be used or if a new
+ * one should be generated (and potentially cached). It sets the `populate_me`
+ * flag on a `Scaleitem` if a new scaled version should be generated and cached.
+ *
+ * @param ie The original image entry.
+ * @param dst The destination image (unused in this function, but part of a common API signature).
+ * @param dc The draw context.
+ * @param smooth EINA_TRUE for smooth scaling, EINA_FALSE for nearest-neighbor.
+ * @param src_region_x X-coordinate of the source region.
+ * @param src_region_y Y-coordinate of the source region.
+ * @param src_region_w Width of the source region.
+ * @param src_region_h Height of the source region.
+ * @param dst_region_x X-coordinate of the destination region (unused).
+ * @param dst_region_y Y-coordinate of the destination region (unused).
+ * @param dst_region_w Width of the destination region (scaled width).
+ * @param dst_region_h Height of the destination region (scaled height).
+ * @return EINA_TRUE if the operation might use the cache (either hit or will populate),
+ *         EINA_FALSE if the cache will not be involved (e.g., 1:1 scale, solid nearest, or item not eligible).
+ *         Note: A return of EINA_TRUE does not guarantee a cache hit, but indicates that
+ *         `evas_common_rgba_image_scalecache_do_cbs` should be called.
+ *         If the original image data (`im->image.data`) is NULL and `sci->populate_me` is true,
+ *         it returns EINA_FALSE to signal that the original image needs to be loaded first.
+ */
 EVAS_API Eina_Bool
 evas_common_rgba_image_scalecache_prepare(Image_Entry *ie, RGBA_Image *dst EINA_UNUSED,
                                           RGBA_Draw_Context *dc, int smooth,
@@ -644,6 +862,43 @@ evas_common_rgba_image_scalecache_prepare(Image_Entry *ie, RGBA_Image *dst EINA_
 //static int noscales = 0;
 #endif
 
+/**
+ * @brief Performs the scaled drawing operation, utilizing the scale cache.
+ * This function is the core of the cached scaling. It attempts to:
+ * 1. Find a matching `Scaleitem` for the requested scale operation.
+ * 2. If a `Scaleitem` is found and marked with `populate_me` (by `..._prepare`),
+ *    it generates the scaled image data, stores it in `Scaleitem->im`, and adds
+ *    it to the global cache list. It may also decide to unload the original
+ *    image data (`forced_unload`) if the scaled version is large.
+ * 3. If a `Scaleitem` with valid image data (`sci->im`) is found (cache hit),
+ *    it uses this pre-scaled image as the source for drawing to `dst` via `cb_sample`.
+ * 4. If no suitable cached item is found or if population fails, it falls back
+ *    to scaling directly from the original image (`im`) to `dst` using either
+ *    `cb_smooth` or `cb_sample` based on the `smooth` flag.
+ *
+ * It manages cache coherency (moving used items to the end of LRU list) and
+ * potentially unloads the original image data if a cached version is used and
+ * certain heuristics are met (e.g., original used less frequently than newest scaled item).
+ *
+ * @param ie The original image entry.
+ * @param dst The destination RGBA_Image to draw onto.
+ * @param dc The draw context for the operation.
+ * @param smooth EINA_TRUE for smooth scaling, EINA_FALSE for nearest-neighbor.
+ * @param src_region_x X-coordinate of the source region from the original image.
+ * @param src_region_y Y-coordinate of the source region.
+ * @param src_region_w Width of the source region.
+ * @param src_region_h Height of the source region.
+ * @param dst_region_x X-coordinate in the `dst` image where the scaled result will be placed.
+ * @param dst_region_y Y-coordinate in the `dst` image.
+ * @param dst_region_w Width of the scaled result (and the region in `dst`).
+ * @param dst_region_h Height of the scaled result.
+ * @param cb_sample Callback function for nearest-neighbor scaling.
+ *                  Example: `evas_common_scale_rgba_in_to_out_clip_sample`
+ * @param cb_smooth Callback function for smooth (e.g., bilinear) scaling.
+ *                  Example: `evas_common_scale_rgba_in_to_out_clip_smooth`
+ * @return EINA_TRUE if the drawing operation was performed (either from cache or by direct scaling),
+ *         EINA_FALSE if drawing could not be performed (e.g., source image data unavailable).
+ */
 EVAS_API Eina_Bool
 evas_common_rgba_image_scalecache_do_cbs(Image_Entry *ie, RGBA_Image *dst,
                                          RGBA_Draw_Context *dc, int smooth,
@@ -953,6 +1208,27 @@ evas_common_rgba_image_scalecache_do_cbs(Image_Entry *ie, RGBA_Image *dst,
 }
 
 
+/**
+ * @brief Performs a scaled drawing operation using default scaling callbacks and prunes the cache.
+ * This is a convenience wrapper around `evas_common_rgba_image_scalecache_do_cbs`.
+ * It uses standard Evas scaling functions (`evas_common_scale_rgba_in_to_out_clip_sample`
+ * and `evas_common_scale_rgba_in_to_out_clip_smooth`) as callbacks.
+ * After the scaling operation, it calls `evas_common_rgba_image_scalecache_prune()`
+ * to potentially clean up the cache.
+ *
+ * @param ie The original image entry.
+ * @param dst The destination RGBA_Image to draw onto.
+ * @param dc The draw context for the operation.
+ * @param smooth EINA_TRUE for smooth scaling, EINA_FALSE for nearest-neighbor.
+ * @param src_region_x X-coordinate of the source region from the original image.
+ * @param src_region_y Y-coordinate of the source region.
+ * @param src_region_w Width of the source region.
+ * @param src_region_h Height of the source region.
+ * @param dst_region_x X-coordinate in the `dst` image where the scaled result will be placed.
+ * @param dst_region_y Y-coordinate in the `dst` image.
+ * @param dst_region_w Width of the scaled result (and the region in `dst`).
+ * @param dst_region_h Height of the scaled result.
+ */
 EVAS_API void
 evas_common_rgba_image_scalecache_do(Image_Entry *ie, RGBA_Image *dst,
                                      RGBA_Draw_Context *dc, int smooth,

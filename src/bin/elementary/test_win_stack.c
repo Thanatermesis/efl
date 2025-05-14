@@ -7,12 +7,40 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
-static int level = 0;
-static Evas_Object *popto_win = NULL;
+static int level = 0; /**< Current window stack level. */
+static Evas_Object *popto_win = NULL; /**< Window to pop to when "Pop to level 3" is clicked. */
 
+/**
+ * @brief Callback function for the "Pop to level 3" button.
+ *
+ * This function pops the window stack to the window stored in popto_win.
+ *
+ * @param data User data, not used.
+ * @param obj The button object that was clicked.
+ * @param event_info Event specific information, not used.
+ */
 static void _bt_popto(void *data, Evas_Object *obj, void *event_info);
+/**
+ * @brief Callback function for the "Push" button.
+ *
+ * This function creates and pushes a new window onto the stack.
+ *
+ * @param data The parent window object.
+ * @param obj The button object that was clicked.
+ * @param event_info Event specific information, not used.
+ */
 static void _bt_pressed(void *data, Evas_Object *obj, void *event_info);
 
+/**
+ * @brief Creates a new window.
+ *
+ * This function creates a new window with a title, a label, and buttons.
+ * The window type (NAVIFRAME_BASIC or DIALOG_BASIC) depends on the current stack level.
+ *
+ * @param parent The parent Evas_Object for the new window.
+ * @param title The title for the new window.
+ * @return The newly created window object.
+ */
 static Evas_Object *
 _win_new(Evas_Object* parent, const char *title)
 {
@@ -91,6 +119,16 @@ _bt_pressed(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    efl_ui_win_stack_master_id_set(win, efl_ui_win_stack_id_get(data));
 }
 
+/**
+ * @brief Callback function for window deletion.
+ *
+ * Resets the global level and popto_win variables when the base window is deleted.
+ *
+ * @param data User data, not used.
+ * @param e The Evas canvas, not used.
+ * @param o The Evas_Object being deleted, not used.
+ * @param info Event specific information, not used.
+ */
 static void
 _del(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *o EINA_UNUSED, void *info EINA_UNUSED)
 {
@@ -98,6 +136,16 @@ _del(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *o EINA_UNUSED, vo
    popto_win = NULL;
 }
 
+/**
+ * @brief Main function for the window stack test.
+ *
+ * This function creates the initial window and sets up the UI for testing
+ * the window stacking functionality.
+ *
+ * @param data User data, not used.
+ * @param obj The object that triggered this test, not used.
+ * @param event_info Event specific information, not used.
+ */
 void
 test_win_stack(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

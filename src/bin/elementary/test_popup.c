@@ -6,15 +6,37 @@
 
 #define POPUP_POINT_MAX 8
 
+/**
+ * @brief Represents a point using relative coordinates.
+ *
+ * Used for positioning objects within a container, where coordinates are
+ * fractions of the container's dimensions (e.g., 0.5 is the center).
+ */
 typedef struct
 {
-   double x;
-   double y;
+   double x; /**< The relative horizontal coordinate (0.0 to 1.0). */
+   double y; /**< The relative vertical coordinate (0.0 to 1.0). */
 } Evas_Rel_Coord_Point;
 
 static Evas_Object *g_popup = NULL;
 static int times = 0;
 static Eina_Bool is_popup_scroll;
+/**
+ * @brief An array of predefined points used to cycle through different
+ * alignments for a popup.
+ *
+ * The points cover corners, center, and even an off-screen position
+ * to test alignment behavior.
+ * The points are:
+ * - { 0.01, 0.01 }: Top-left corner
+ * - { 0.2, 0.2 }:   Near top-left
+ * - { 0.5, 0.5 }:   Center
+ * - { 0.99, 0.01 }: Top-right corner
+ * - { 0.01, 0.99 }: Bottom-left corner
+ * - { 0.99, 0.99 }: Bottom-right corner
+ * - { 0.0, 0.0 }:   Absolute top-left
+ * - { 1.5, 1.5 }:   Outside the container, to test clamping
+ */
 static Evas_Rel_Coord_Point _popup_point[POPUP_POINT_MAX] =
 {
    { 0.01, 0.01 },
@@ -27,6 +49,12 @@ static Evas_Rel_Coord_Point _popup_point[POPUP_POINT_MAX] =
    { 1.5, 1.5 }
 };
 
+/**
+ * @brief Callback function to delete the object when a popup is dismissed.
+ * @param data Not used.
+ * @param obj The popup object to be deleted.
+ * @param event_info Not used.
+ */
 static void
 _response_cb(void *data EINA_UNUSED, Evas_Object *obj,
              void *event_info EINA_UNUSED)
@@ -34,6 +62,12 @@ _response_cb(void *data EINA_UNUSED, Evas_Object *obj,
    evas_object_del(obj);
 }
 
+/**
+ * @brief Callback function to delete a popup object when its close button is clicked.
+ * @param data The popup object to be deleted.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_close_cb(void *data, Evas_Object *obj EINA_UNUSED,
                 void *event_info EINA_UNUSED)
@@ -41,6 +75,15 @@ _popup_close_cb(void *data, Evas_Object *obj EINA_UNUSED,
    evas_object_del(data);
 }
 
+/**
+ * @brief Callback function to programmatically dismiss a popup.
+ *
+ * This is used when a button's action should be to dismiss the popup,
+ * which might trigger a "dismissed" animation/signal.
+ * @param data The popup object to be dismissed.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_dismiss_btn_cb(void *data, Evas_Object *obj EINA_UNUSED,
                       void *event_info EINA_UNUSED)
@@ -48,6 +91,16 @@ _popup_dismiss_btn_cb(void *data, Evas_Object *obj EINA_UNUSED,
    elm_popup_dismiss(data);
 }
 
+/**
+ * @brief Cycles through predefined alignment points for a popup.
+ *
+ * Each time this function is called, it sets the popup's alignment to the
+ * next point in the `_popup_point` array. This is used to test the
+ * `elm_popup_align_set()` function.
+ * @param data The popup object to be realigned.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_align_cb(void *data, Evas_Object *obj EINA_UNUSED,
                void *event_info EINA_UNUSED)
@@ -65,6 +118,14 @@ _popup_align_cb(void *data, Evas_Object *obj EINA_UNUSED,
      k = 0;
 }
 
+/**
+ * @brief Callback to hide the global popup `g_popup` instead of deleting it.
+ *
+ * This is used to test showing and hiding a persistent popup.
+ * @param data The global popup object to be hidden.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _g_popup_response_cb(void *data, Evas_Object *obj EINA_UNUSED,
              void *event_info EINA_UNUSED)
@@ -72,6 +133,15 @@ _g_popup_response_cb(void *data, Evas_Object *obj EINA_UNUSED,
    evas_object_hide(data);
 }
 
+/**
+ * @brief Callback for when the area outside a restacked popup is clicked.
+ *
+ * Deletes an associated image (if any) and the popup itself. This demonstrates
+ * cleanup of associated resources when a popup is dismissed this way.
+ * @param data Not used.
+ * @param obj The popup object that was clicked outside of.
+ * @param event_info Not used.
+ */
 static void
 _restack_block_clicked_cb(void *data EINA_UNUSED, Evas_Object *obj,
                           void *event_info EINA_UNUSED)
@@ -82,6 +152,14 @@ _restack_block_clicked_cb(void *data EINA_UNUSED, Evas_Object *obj,
    evas_object_del(obj);
 }
 
+/**
+ * @brief Callback for closing a popup that is part of the restacking test.
+ *
+ * Ensures that both the popup and its associated image are deleted.
+ * @param data The popup object to be closed.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _restack_popup_close_cb(void *data, Evas_Object *obj EINA_UNUSED,
                         void *event_info EINA_UNUSED)
@@ -91,6 +169,14 @@ _restack_popup_close_cb(void *data, Evas_Object *obj EINA_UNUSED,
    evas_object_del(data);
 }
 
+/**
+ * @brief Generic callback for handling clicks on the "block" area (outside the popup).
+ *
+ * Deletes the popup and optionally another related object.
+ * @param data An optional object to delete in addition to the popup.
+ * @param obj The popup object itself.
+ * @param event_info Not used.
+ */
 static void
 _block_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -99,6 +185,14 @@ _block_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    evas_object_del(obj);
 }
 
+/**
+ * @brief Callback for when an item within a popup's item list is selected.
+ *
+ * Prints the text of the selected item.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info The selected Elm_Object_Item.
+ */
 static void
 _item_selected_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                   void *event_info)
@@ -106,6 +200,14 @@ _item_selected_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    printf("popup item selected: %s\n", elm_object_item_text_get(event_info));
 }
 
+/**
+ * @brief Callback for clicks on the main list of tests.
+ *
+ * Deselects the clicked item to prevent it from remaining highlighted.
+ * @param data Not used.
+ * @param obj The list object.
+ * @param event_info Not used.
+ */
 static void
 _list_click(void *data EINA_UNUSED, Evas_Object *obj,
             void *event_info EINA_UNUSED)
@@ -115,6 +217,16 @@ _list_click(void *data EINA_UNUSED, Evas_Object *obj,
    elm_list_item_selected_set(it, EINA_FALSE);
 }
 
+/**
+ * @brief Callback for key down events on a popup.
+ *
+ * Prints the name of the key that was pressed. This is for testing
+ * keyboard interaction with popups.
+ * @param data Not used.
+ * @param e The Evas canvas. Not used.
+ * @param obj The object that received the event. Not used.
+ * @param event_info The Evas_Event_Key_Down struct with key information.
+ */
 static void
 _popup_key_down_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED,
                    Evas_Object *obj EINA_UNUSED, void *event_info)
@@ -124,6 +236,15 @@ _popup_key_down_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED,
    printf("Key: %s\n", ev->keyname);
 }
 
+/**
+ * @brief Creates a simple popup with centered text and a 3-second timeout.
+ *
+ * This function demonstrates the most basic usage of a popup, with text
+ * content and automatic dismissal.
+ * @param data The parent object for the popup (the window).
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_center_text_cb(void *data, Evas_Object *obj EINA_UNUSED,
                       void *event_info EINA_UNUSED)
@@ -144,6 +265,14 @@ _popup_center_text_cb(void *data, Evas_Object *obj EINA_UNUSED,
    evas_object_show(popup);
 }
 
+/**
+ * @brief Creates a popup with centered text and a single "Close" button.
+ *
+ * This demonstrates adding a button to the action area of a popup.
+ * @param data The parent object for the popup (the window).
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_center_text_1button_cb(void *data, Evas_Object *obj EINA_UNUSED,
                               void *event_info EINA_UNUSED)
@@ -167,6 +296,14 @@ _popup_center_text_1button_cb(void *data, Evas_Object *obj EINA_UNUSED,
    evas_object_show(popup);
 }
 
+/**
+ * @brief Creates a popup with a title, text content, and a "Close" button.
+ *
+ * Demonstrates the use of the title area in a popup.
+ * @param data The parent object for the popup (the window).
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_center_title_text_1button_cb(void *data, Evas_Object *obj EINA_UNUSED,
                                     void *event_info EINA_UNUSED)
@@ -194,6 +331,15 @@ _popup_center_title_text_1button_cb(void *data, Evas_Object *obj EINA_UNUSED,
    evas_object_show(popup);
 }
 
+/**
+ * @brief Creates a popup that can be dismissed by clicking the area outside it.
+ *
+ * This tests the "block,clicked" smart callback, which is a common UI
+ * pattern for closing popups.
+ * @param data The parent object for the popup (the window).
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_center_title_text_block_clicked_event_cb(void *data,
                                                 Evas_Object *obj EINA_UNUSED,
@@ -218,6 +364,16 @@ _popup_center_title_text_block_clicked_event_cb(void *data,
    evas_object_show(popup);
 }
 
+/**
+ * @brief Creates a popup with a specific parent object.
+ *
+ * The popup's blocked event region is confined to the parent's area.
+ * This demonstrates how a popup's interaction area can be controlled by
+ * parenting it to a smaller container instead of the whole window.
+ * @param data The parent object for the popup.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_center_title_text_block_clicked_event_with_parent_cb(void *data,
                                                             Evas_Object *obj EINA_UNUSED,
@@ -249,6 +405,16 @@ _popup_center_title_text_block_clicked_event_with_parent_cb(void *data,
    evas_object_show(popup);
 }
 
+/**
+ * @brief Creates a popup oriented at the bottom of the window.
+ *
+ * This popup includes a title, an icon in the title, wrapped text, and three
+ * buttons in the action area. It demonstrates a more complex layout and
+ * orientation.
+ * @param data The parent object for the popup (the window).
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_bottom_title_text_3button_cb(void *data, Evas_Object *obj EINA_UNUSED,
                                     void *event_info EINA_UNUSED)
@@ -298,6 +464,15 @@ _popup_bottom_title_text_3button_cb(void *data, Evas_Object *obj EINA_UNUSED,
    evas_object_show(popup);
 }
 
+/**
+ * @brief Creates a popup with custom content (a button with an icon).
+ *
+ * Instead of simple text, this popup's content area is filled with a complex
+ * widget. It also has a title and three action buttons.
+ * @param data The parent object for the popup (the window).
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_center_title_content_3button_cb(void *data, Evas_Object *obj EINA_UNUSED,
                                        void *event_info EINA_UNUSED)
@@ -343,6 +518,12 @@ _popup_center_title_content_3button_cb(void *data, Evas_Object *obj EINA_UNUSED,
    evas_object_show(popup);
 }
 
+/**
+ * @brief Callback for when a popup item gains focus.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info The focused Elm_Object_Item.
+ */
 static void
 _item_focused_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -351,6 +532,12 @@ _item_focused_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *eve
    printf("item,focused:%p\n", it);
 }
 
+/**
+ * @brief Callback for when a popup item loses focus.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info The unfocused Elm_Object_Item.
+ */
 static void
 _item_unfocused_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -359,6 +546,15 @@ _item_unfocused_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *e
    printf("item,unfocused:%p\n", it);
 }
 
+/**
+ * @brief Creates a popup containing a list of selectable items.
+ *
+ * This demonstrates using `elm_popup_item_append()` to create a menu-like
+ * popup. It includes a title and three action buttons.
+ * @param data The parent object for the popup (the window).
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_center_title_item_3button_cb(void *data, Evas_Object *obj EINA_UNUSED,
                                     void *event_info EINA_UNUSED)
@@ -410,6 +606,16 @@ _popup_center_title_item_3button_cb(void *data, Evas_Object *obj EINA_UNUSED,
    evas_object_smart_callback_add(popup, "item,unfocused", _item_unfocused_cb, NULL);
 }
 
+/**
+ * @brief Callback for the "Restack" button.
+ *
+ * Creates an image and places it at the same level as the popup, then
+ * raises the popup above it. This is to test that the popup can be
+ * correctly layered above other UI elements.
+ * @param data The popup object.
+ * @param obj The button that was clicked.
+ * @param event_info Not used.
+ */
 static void
 _restack_btn_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -432,6 +638,15 @@ _restack_btn_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    evas_object_raise((Evas_Object *)data);
 }
 
+/**
+ * @brief Creates a popup to test z-ordering (restacking).
+ *
+ * Contains a "Restack" button that, when clicked, adds an image underneath
+ * the popup to verify the popup remains on top.
+ * @param data The parent object for the popup (the window).
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_center_title_text_2button_restack_cb(void *data, Evas_Object *obj EINA_UNUSED,
                                     void *event_info EINA_UNUSED)
@@ -467,6 +682,16 @@ _popup_center_title_text_2button_restack_cb(void *data, Evas_Object *obj EINA_UN
    evas_object_show(popup);
 }
 
+/**
+ * @brief Creates or shows a persistent global popup.
+ *
+ * If the global popup `g_popup` does not exist, it is created. If it does
+ * exist, it is simply shown again. The popup's text is updated to count
+ * how many times it has been viewed. This tests object reuse.
+ * @param data The parent object for the popup (the window).
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_center_text_1button_hide_show_cb(void *data, Evas_Object *obj EINA_UNUSED,
                               void *event_info EINA_UNUSED)
@@ -499,6 +724,15 @@ _popup_center_text_1button_hide_show_cb(void *data, Evas_Object *obj EINA_UNUSED
    evas_object_show(g_popup);
 }
 
+/**
+ * @brief Toggles the visibility of a button in the popup's action area.
+ *
+ * This function is used as a callback for items in the popup. When an item is
+ * selected, it hides or shows the corresponding button in the action area.
+ * @param data The button object to be toggled.
+ * @param obj The popup object.
+ * @param event_info Not used.
+ */
 static void
 _toggle_button_cb(void *data,
                   Evas_Object *obj,
@@ -520,6 +754,16 @@ _toggle_button_cb(void *data,
      elm_object_part_content_set(obj, buf, btn);
 }
 
+/**
+ * @brief Creates a popup where action buttons can be dynamically added/removed.
+ *
+ * The popup has items that, when clicked, toggle the visibility of the action
+ * buttons. This demonstrates modifying a popup's content after it has been
+ * created.
+ * @param data The parent object for the popup (the window).
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_center_text_3button_add_remove_button_cb(void *data,
                                                 Evas_Object *obj EINA_UNUSED,
@@ -559,6 +803,14 @@ _popup_center_text_3button_add_remove_button_cb(void *data,
    evas_object_show(popup);
 }
 
+/**
+ * @brief Creates a popup with a transparent background.
+ *
+ * This demonstrates using a different style for the popup widget.
+ * @param data The parent object for the popup (the window).
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_transparent_cb(void *data, Evas_Object *obj EINA_UNUSED,
                       void *event_info EINA_UNUSED)
@@ -582,6 +834,15 @@ _popup_transparent_cb(void *data, Evas_Object *obj EINA_UNUSED,
    evas_object_show(popup);
 }
 
+/**
+ * @brief Creates a transparent popup that can be moved.
+ *
+ * Combines the transparent style with the alignment cycling functionality
+ * to test moving a styled popup.
+ * @param data The parent object for the popup (the window).
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_transparent_align_cb(void *data, Evas_Object *obj EINA_UNUSED,
                             void *event_info EINA_UNUSED)
@@ -610,12 +871,28 @@ _popup_transparent_align_cb(void *data, Evas_Object *obj EINA_UNUSED,
    evas_object_show(popup);
 }
 
+/**
+ * @brief Callback to delete the parent popup when a list item is selected.
+ * @param data The popup object to be deleted.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _list_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    evas_object_del(data);
 }
 
+/**
+ * @brief A `text_get` function for a genlist item.
+ *
+ * Provides the text for a genlist item based on its data.
+ * @param data The item data (an integer cast to a pointer).
+ * @param obj The genlist object. Not used.
+ * @param part The theme part name. Not used.
+ * @return A newly allocated string with the item's text. The caller is
+ * responsible for freeing it. Example: "Item # 5".
+ */
 char *
 gl_popup_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
@@ -624,12 +901,27 @@ gl_popup_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EIN
    return strdup(buf);
 }
 
+/**
+ * @brief Callback to clear the content of a popup.
+ * @param data The popup object whose content will be cleared.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _delete_btn_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_object_content_set(data, NULL);
 }
 
+/**
+ * @brief Creates a popup with a list widget as its main content.
+ *
+ * Also demonstrates a "Delete" button that clears the popup's content area
+ * by removing the list.
+ * @param data The parent object for the popup (the window).
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_center_title_list_content_2button_cb(void *data, Evas_Object *obj EINA_UNUSED,
                                             void *event_info EINA_UNUSED)
@@ -665,6 +957,14 @@ _popup_center_title_list_content_2button_cb(void *data, Evas_Object *obj EINA_UN
    evas_object_show(popup);
 }
 
+/**
+ * @brief Creates a popup with a genlist widget as its main content.
+ *
+ * This demonstrates using a more complex, efficient list view inside a popup.
+ * @param data The parent object for the popup (the window).
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_center_title_genlist_content_1button_cb(void *data, Evas_Object *obj EINA_UNUSED,
                                             void *event_info EINA_UNUSED)
@@ -713,6 +1013,16 @@ _popup_center_title_genlist_content_1button_cb(void *data, Evas_Object *obj EINA
    evas_object_show(popup);
 }
 
+/**
+ * @brief Creates a popup with the "subpopup" style.
+ *
+ * This style is typically smaller and may have a different appearance,
+ * suitable for secondary popups. It also includes a custom 'x' close button
+ * in the top corner.
+ * @param data The parent object for the popup (the window).
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _subpopup_cb(void *data, Evas_Object *obj EINA_UNUSED,
              void *event_info EINA_UNUSED)
@@ -748,6 +1058,16 @@ _subpopup_cb(void *data, Evas_Object *obj EINA_UNUSED,
    evas_object_show(popup);
 }
 
+/**
+ * @brief Creates a popup that uses only a content area.
+ *
+ * The buttons are placed inside the content area rather than a separate
+ * action area. This allows for more flexible layouts where buttons and other
+ * content are mixed.
+ * @param data The parent window object.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_content_only_cb(void *data, Evas_Object *obj EINA_UNUSED,
                        void *event_info EINA_UNUSED)
@@ -803,6 +1123,15 @@ _popup_content_only_cb(void *data, Evas_Object *obj EINA_UNUSED,
    elm_object_focus_set(btn, EINA_TRUE);
 }
 
+/**
+ * @brief Creates a popup that uses the dismiss API for closing.
+ *
+ * The `elm_popup_dismiss()` function is called, which can trigger a visual
+ * effect on hide, and emits the "dismissed" signal.
+ * @param data The parent object for the popup (the window).
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _popup_center_title_text_1button_hide_effect_cb(void *data, Evas_Object *obj EINA_UNUSED,
                                                 void *event_info EINA_UNUSED)
@@ -831,6 +1160,12 @@ _popup_center_title_text_1button_hide_effect_cb(void *data, Evas_Object *obj EIN
    evas_object_show(popup);
 }
 
+/**
+ * @brief Toggles the window's focus highlight feature.
+ * @param data The window object.
+ * @param obj The checkbox that was toggled.
+ * @param event_info Not used.
+ */
 static void
 _focus_changed_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -839,12 +1174,28 @@ _focus_changed_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_win_focus_highlight_animate_set(data, check);
 }
 
+/**
+ * @brief Toggles whether newly created popups will be scrollable.
+ * @param data Not used.
+ * @param obj The checkbox that was toggled.
+ * @param event_info Not used.
+ */
 static void
 _popup_scroll_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    is_popup_scroll = elm_check_state_get(obj);
 }
 
+/**
+ * @brief Main function for the popup test.
+ *
+ * Creates a window with a list of different popup types to be tested.
+ * Also includes checkboxes to toggle global settings like focus highlighting
+ * and popup scrollability.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_popup(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
            void *event_info EINA_UNUSED)

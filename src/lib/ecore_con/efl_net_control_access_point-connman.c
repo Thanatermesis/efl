@@ -7,6 +7,14 @@
 #include "ecore_con_private.h"
 #include "efl_net-connman.h"
 
+/**
+ * @brief Private data structure for Efl_Net_Control_Access_Point instances.
+ *
+ * This structure holds all the internal state and properties of a network
+ * access point as managed by ConnMan. It includes DBus proxy information,
+ * pending operations, signal handlers, and cached properties like SSID,
+ * security settings, IP configurations, etc.
+ */
 typedef struct
 {
    /* Eldbus_Proxy/Eldbus_Object keeps a list of pending calls, but
@@ -58,7 +66,17 @@ typedef struct
 
 #define MY_CLASS EFL_NET_CONTROL_ACCESS_POINT_CLASS
 
-
+/**
+ * @brief Callback for DBus SetProperty method calls.
+ *
+ * This function is invoked when a DBus SetProperty call, initiated to change
+ * an access point's property, completes. It removes the pending operation
+ * from the list and logs any errors.
+ *
+ * @param data The Eo object associated with the access point.
+ * @param msg The Eldbus_Message reply.
+ * @param pending The Eldbus_Pending object for the call.
+ */
 static void
 _efl_net_control_access_point_property_set_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
 {
@@ -74,6 +92,18 @@ _efl_net_control_access_point_property_set_cb(void *data, const Eldbus_Message *
      }
 }
 
+/**
+ * @brief Sets a ConnMan property that is an array of strings.
+ *
+ * This helper function constructs and sends a DBus message to ConnMan's
+ * SetProperty method for properties that are string arrays (e.g., Nameservers).
+ *
+ * @param o The Eo object for the access point.
+ * @param pd The private data of the access point.
+ * @param name The name of the property to set (e.g., "Nameservers.Configuration").
+ * @param it An Eina_Iterator yielding const char * strings for the array.
+ *           The iterator will be freed by this function.
+ */
 static void
 _efl_net_control_access_point_property_set_string_array(const Eo *o, Efl_Net_Control_Access_Point_Data *pd, const char *name, Eina_Iterator *it)
 {
@@ -111,6 +141,20 @@ _efl_net_control_access_point_property_set_string_array(const Eo *o, Efl_Net_Con
    eina_iterator_free(it);
 }
 
+/**
+ * @brief Sets a ConnMan property with a variant value.
+ *
+ * This is a generic helper function to set a ConnMan property using DBus.
+ * It constructs a SetProperty call with the property name and a variant
+ * value whose type and content are specified by @p signature and variadic
+ * arguments.
+ *
+ * @param o The Eo object for the access point.
+ * @param pd The private data of the access point.
+ * @param name The name of the property to set (e.g., "AutoConnect").
+ * @param signature The DBus signature of the variant's content (e.g., "b" for boolean).
+ * @param ... The value(s) for the property, matching the @p signature.
+ */
 static void
 _efl_net_control_access_point_property_set(const Eo *o, Efl_Net_Control_Access_Point_Data *pd, const char *name, const char *signature, ...)
 {
@@ -222,6 +266,17 @@ _efl_net_control_access_point_ssid_get(const Eo *o EINA_UNUSED, Efl_Net_Control_
    return pd->name;
 }
 
+/**
+ * @brief Callback for DBus MoveBefore/MoveAfter method calls (priority change).
+ *
+ * This function is invoked when a DBus call to reorder services (change priority)
+ * completes. It removes the pending operation and reloads access points as ConnMan
+ * might not emit ServicesChanged signal reliably.
+ *
+ * @param data The Eo object associated with the access point.
+ * @param msg The Eldbus_Message reply.
+ * @param pending The Eldbus_Pending object for the call.
+ */
 static void
 _efl_net_control_access_point_priority_set_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
 {
@@ -447,6 +502,17 @@ _efl_net_control_access_point_configuration_domains_get(const Eo *o EINA_UNUSED,
    return eina_list_iterator_new(pd->configured.domains);
 }
 
+/**
+ * @brief Appends a dictionary entry (string to variant) to a DBus message iterator.
+ *
+ * This helper is used to construct `a{sv}` (array of dictionary entries)
+ * type messages for ConnMan properties like IPv4.Configuration.
+ *
+ * @param array The DBus message iterator for the array `a{sv}`.
+ * @param name The string key of the dictionary entry.
+ * @param signature The DBus signature of the variant value (e.g., "s" for string).
+ * @param ... The value for the variant, matching the @p signature.
+ */
 static void
 _append_dict_entry(Eldbus_Message_Iter *array, const char *name, const char *signature, ...)
 {
@@ -469,6 +535,18 @@ _append_dict_entry(Eldbus_Message_Iter *array, const char *name, const char *sig
    eldbus_message_iter_container_close(array, entry);
 }
 
+/**
+ * @brief Appends a dictionary entry (string to array of strings) to a DBus message iterator.
+ *
+ * This helper is used for `a{sv}` dictionary entries where the variant `v`
+ * itself contains an array of strings `as`. Example: Proxy.Configuration's "Servers"
+ * or "Excludes".
+ *
+ * @param array The DBus message iterator for the array `a{sv}`.
+ * @param name The string key of the dictionary entry.
+ * @param it An Eina_Iterator yielding const char * strings for the `as` value.
+ *           The iterator will be freed by this function if not NULL.
+ */
 static void
 _append_dict_entry_string_array(Eldbus_Message_Iter *array, const char *name, Eina_Iterator *it)
 {
@@ -722,6 +800,17 @@ _efl_net_control_access_point_configuration_proxy_get(const Eo *o EINA_UNUSED, E
    if (excludes) *excludes = eina_list_iterator_new(pd->configured.proxy.excludes);
 }
 
+/**
+ * @brief Callback for the DBus Connect method call.
+ *
+ * This function is invoked when ConnMan's Connect method call completes.
+ * It resolves or rejects the associated Eina_Promise based on the outcome
+ * of the connection attempt.
+ *
+ * @param data The Eina_Promise to be resolved or rejected.
+ * @param msg The Eldbus_Message reply.
+ * @param pending The Eldbus_Pending object for the call, used to retrieve private data.
+ */
 static void
 _efl_net_control_access_point_connect_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
 {
@@ -748,6 +837,18 @@ _efl_net_control_access_point_connect_cb(void *data, const Eldbus_Message *msg, 
    eina_promise_resolve(promise, EINA_VALUE_EMPTY);
 }
 
+/**
+ * @brief Error callback for the connect future, handling cancellation.
+ *
+ * If the future associated with a connect operation is cancelled (e.g., object
+ * destroyed before connection completes), this function is called. It cancels
+ * the pending DBus "Connect" call.
+ *
+ * @param consumer The Efl_Loop_Consumer (unused).
+ * @param data The Eldbus_Pending object for the "Connect" call.
+ * @param error The error code, ECANCELED if the future was cancelled.
+ * @return An Eina_Value containing the error.
+ */
 static Eina_Value
 _efl_net_control_access_point_connect_promise_del(Efl_Loop_Consumer *consumer EINA_UNUSED, void *data, Eina_Error error)
 {
@@ -762,6 +863,17 @@ _efl_net_control_access_point_connect_promise_del(Efl_Loop_Consumer *consumer EI
    return eina_value_error_init(error);
 }
 
+/**
+ * @brief Cleanup callback for the connect future.
+ *
+ * This function is called when the future associated with a connect operation
+ * is cleaned up (e.g., after resolution, rejection, or cancellation). It removes
+ * the pending DBus operation from the access point's list of pending operations.
+ *
+ * @param o The Eo object (unused).
+ * @param data The Eldbus_Pending object for the "Connect" call.
+ * @param dead_future The Eina_Future that has completed (unused).
+ */
 static void
 _efl_net_control_access_point_connect_promise_clean(Eo *o EINA_UNUSED, void *data, const Eina_Future *dead_future EINA_UNUSED)
 {
@@ -802,6 +914,16 @@ _efl_net_control_access_point_connect(Eo *o, Efl_Net_Control_Access_Point_Data *
    return efl_future_then(o, f);
 }
 
+/**
+ * @brief Callback for the DBus Disconnect method call.
+ *
+ * This function is invoked when ConnMan's Disconnect method call completes.
+ * It removes the pending operation from the list and logs any errors.
+ *
+ * @param data The Eo object associated with the access point.
+ * @param msg The Eldbus_Message reply.
+ * @param pending The Eldbus_Pending object for the call.
+ */
 static void
 _efl_net_control_access_point_disconnect_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
 {
@@ -827,6 +949,16 @@ _efl_net_control_access_point_disconnect(Eo *o, Efl_Net_Control_Access_Point_Dat
    pd->pending = eina_list_append(pd->pending, p);
 }
 
+/**
+ * @brief Callback for the DBus Remove (Forget) method call.
+ *
+ * This function is invoked when ConnMan's Remove method call (to forget a service)
+ * completes. It removes the pending operation from the list and logs any errors.
+ *
+ * @param data The Eo object associated with the access point.
+ * @param msg The Eldbus_Message reply.
+ * @param pending The Eldbus_Pending object for the call.
+ */
 static void
 _efl_net_control_access_point_forget_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
 {
@@ -1108,24 +1240,54 @@ _efl_net_control_access_point_list_updated(const char *name, Eina_List **p_list,
 
 /* Actual Values */
 
+/**
+ * @brief Handles changes to the "Nameservers" (actual) property.
+ * @param o The Eo object (unused).
+ * @param pd The private data of the access point.
+ * @param value The Eldbus_Message_Iter containing the new property value.
+ */
 static void
 _efl_net_control_access_point_property_actual_name_servers_changed(Eo *o EINA_UNUSED, Efl_Net_Control_Access_Point_Data *pd, Eldbus_Message_Iter *value)
 {
    _efl_net_control_access_point_list_updated("name_servers", &pd->actual.name_servers, value);
 }
 
+/**
+ * @brief Handles changes to the "Timeservers" (actual) property.
+ * @param o The Eo object (unused).
+ * @param pd The private data of the access point.
+ * @param value The Eldbus_Message_Iter containing the new property value.
+ */
 static void
 _efl_net_control_access_point_property_actual_time_servers_changed(Eo *o EINA_UNUSED, Efl_Net_Control_Access_Point_Data *pd, Eldbus_Message_Iter *value)
 {
    _efl_net_control_access_point_list_updated("time_servers", &pd->actual.time_servers, value);
 }
 
+/**
+ * @brief Handles changes to the "Domains" (actual) property.
+ * @param o The Eo object (unused).
+ * @param pd The private data of the access point.
+ * @param value The Eldbus_Message_Iter containing the new property value.
+ */
 static void
 _efl_net_control_access_point_property_actual_domains_changed(Eo *o EINA_UNUSED, Efl_Net_Control_Access_Point_Data *pd, Eldbus_Message_Iter *value)
 {
    _efl_net_control_access_point_list_updated("domains", &pd->actual.domains, value);
 }
 
+/**
+ * @brief Handles changes to the "IPv4" (actual) property.
+ *
+ * Parses a DBus dictionary `a{sv}` representing the IPv4 settings
+ * (Method, Address, Netmask, Gateway) and updates the `pd->actual.ipv4` struct.
+ * Example `a{sv}` structure:
+ *   { "Method": Variant("dhcp"), "Address": Variant("192.168.1.100"), ... }
+ *
+ * @param o The Eo object (unused).
+ * @param pd The private data of the access point.
+ * @param value The Eldbus_Message_Iter containing the new property value (a dictionary).
+ */
 static void
 _efl_net_control_access_point_property_actual_ipv4_changed(Eo *o EINA_UNUSED, Efl_Net_Control_Access_Point_Data *pd, Eldbus_Message_Iter *value)
 {
@@ -1181,6 +1343,19 @@ _efl_net_control_access_point_property_actual_ipv4_changed(Eo *o EINA_UNUSED, Ef
      }
 }
 
+/**
+ * @brief Handles changes to the "IPv6" (actual) property.
+ *
+ * Parses a DBus dictionary `a{sv}` representing the IPv6 settings
+ * (Method, Address, PrefixLength, Netmask, Gateway, Privacy) and updates
+ * the `pd->actual.ipv6` struct.
+ * Example `a{sv}` structure:
+ *   { "Method": Variant("auto"), "Address": Variant("fe80::1"), "PrefixLength": Variant(byte 64), ... }
+ *
+ * @param o The Eo object (unused).
+ * @param pd The private data of the access point.
+ * @param value The Eldbus_Message_Iter containing the new property value (a dictionary).
+ */
 static void
 _efl_net_control_access_point_property_actual_ipv6_changed(Eo *o EINA_UNUSED, Efl_Net_Control_Access_Point_Data *pd, Eldbus_Message_Iter *value)
 {
@@ -1265,6 +1440,20 @@ _efl_net_control_access_point_property_actual_ipv6_changed(Eo *o EINA_UNUSED, Ef
      }
 }
 
+/**
+ * @brief Handles changes to the "Proxy" (actual) property.
+ *
+ * Parses a DBus dictionary `a{sv}` representing the proxy settings
+ * (Method, URL, Servers, Excludes) and updates the `pd->actual.proxy` struct.
+ * "Servers" and "Excludes" are arrays of strings.
+ * Example `a{sv}` structure:
+ *   { "Method": Variant("manual"), "URL": Variant("http://proxy.example.com/pac.js"),
+ *     "Servers": Variant(["http://server1:8080", "socks://server2:1080"]), ... }
+ *
+ * @param o The Eo object (unused).
+ * @param pd The private data of the access point.
+ * @param value The Eldbus_Message_Iter containing the new property value (a dictionary).
+ */
 static void
 _efl_net_control_access_point_property_actual_proxy_changed(Eo *o EINA_UNUSED, Efl_Net_Control_Access_Point_Data *pd, Eldbus_Message_Iter *value)
 {
@@ -1330,24 +1519,53 @@ _efl_net_control_access_point_property_actual_proxy_changed(Eo *o EINA_UNUSED, E
 
 /* Configured Values */
 
+/**
+ * @brief Handles changes to the "Nameservers.Configuration" property.
+ * @param o The Eo object (unused).
+ * @param pd The private data of the access point.
+ * @param value The Eldbus_Message_Iter containing the new property value.
+ */
 static void
 _efl_net_control_access_point_property_configured_name_servers_changed(Eo *o EINA_UNUSED, Efl_Net_Control_Access_Point_Data *pd, Eldbus_Message_Iter *value)
 {
    _efl_net_control_access_point_list_updated("name_servers", &pd->configured.name_servers, value);
 }
 
+/**
+ * @brief Handles changes to the "Timeservers.Configuration" property.
+ * @param o The Eo object (unused).
+ * @param pd The private data of the access point.
+ * @param value The Eldbus_Message_Iter containing the new property value.
+ */
 static void
 _efl_net_control_access_point_property_configured_time_servers_changed(Eo *o EINA_UNUSED, Efl_Net_Control_Access_Point_Data *pd, Eldbus_Message_Iter *value)
 {
    _efl_net_control_access_point_list_updated("time_servers", &pd->configured.time_servers, value);
 }
 
+/**
+ * @brief Handles changes to the "Domains.Configuration" property.
+ * @param o The Eo object (unused).
+ * @param pd The private data of the access point.
+ * @param value The Eldbus_Message_Iter containing the new property value.
+ */
 static void
 _efl_net_control_access_point_property_configured_domains_changed(Eo *o EINA_UNUSED, Efl_Net_Control_Access_Point_Data *pd, Eldbus_Message_Iter *value)
 {
    _efl_net_control_access_point_list_updated("domains", &pd->configured.domains, value);
 }
 
+/**
+ * @brief Handles changes to the "IPv4.Configuration" property.
+ *
+ * Parses a DBus dictionary `a{sv}` representing the configured IPv4 settings
+ * and updates the `pd->configured.ipv4` struct.
+ * See _efl_net_control_access_point_property_actual_ipv4_changed() for structure.
+ *
+ * @param o The Eo object (unused).
+ * @param pd The private data of the access point.
+ * @param value The Eldbus_Message_Iter containing the new property value (a dictionary).
+ */
 static void
 _efl_net_control_access_point_property_configured_ipv4_changed(Eo *o EINA_UNUSED, Efl_Net_Control_Access_Point_Data *pd, Eldbus_Message_Iter *value)
 {
@@ -1403,6 +1621,17 @@ _efl_net_control_access_point_property_configured_ipv4_changed(Eo *o EINA_UNUSED
      }
 }
 
+/**
+ * @brief Handles changes to the "IPv6.Configuration" property.
+ *
+ * Parses a DBus dictionary `a{sv}` representing the configured IPv6 settings
+ * and updates the `pd->configured.ipv6` struct.
+ * See _efl_net_control_access_point_property_actual_ipv6_changed() for structure.
+ *
+ * @param o The Eo object (unused).
+ * @param pd The private data of the access point.
+ * @param value The Eldbus_Message_Iter containing the new property value (a dictionary).
+ */
 static void
 _efl_net_control_access_point_property_configured_ipv6_changed(Eo *o EINA_UNUSED, Efl_Net_Control_Access_Point_Data *pd, Eldbus_Message_Iter *value)
 {
@@ -1487,6 +1716,17 @@ _efl_net_control_access_point_property_configured_ipv6_changed(Eo *o EINA_UNUSED
      }
 }
 
+/**
+ * @brief Handles changes to the "Proxy.Configuration" property.
+ *
+ * Parses a DBus dictionary `a{sv}` representing the configured proxy settings
+ * and updates the `pd->configured.proxy` struct.
+ * See _efl_net_control_access_point_property_actual_proxy_changed() for structure.
+ *
+ * @param o The Eo object (unused).
+ * @param pd The private data of the access point.
+ * @param value The Eldbus_Message_Iter containing the new property value (a dictionary).
+ */
 static void
 _efl_net_control_access_point_property_configured_proxy_changed(Eo *o EINA_UNUSED, Efl_Net_Control_Access_Point_Data *pd, Eldbus_Message_Iter *value)
 {
@@ -1550,7 +1790,18 @@ _efl_net_control_access_point_property_configured_proxy_changed(Eo *o EINA_UNUSE
      }
 }
 
-
+/**
+ * @brief Internal dispatcher for property changes.
+ *
+ * This function takes a DBus message iterator pointing to a property name
+ * and its new value (as a variant), and calls the appropriate specific
+ * handler function based on the property name.
+ *
+ * @param o The Eo object for the access point.
+ * @param pd The private data of the access point.
+ * @param itr The Eldbus_Message_Iter positioned at the start of a "sv" pair
+ *            (property name string, property value variant).
+ */
 static void
 _efl_net_control_access_point_property_changed_internal(Eo *o, Efl_Net_Control_Access_Point_Data *pd, Eldbus_Message_Iter *itr)
 {
@@ -1614,6 +1865,18 @@ _efl_net_control_access_point_property_changed_internal(Eo *o, Efl_Net_Control_A
      WRN("Unknown property name: %s", name);
 }
 
+/**
+ * @brief Callback for ConnMan's "PropertyChanged" DBus signal.
+ *
+ * This function is invoked when a property of the ConnMan service (access point)
+ * changes. It extracts the property name and new value from the signal message
+ * and calls the internal dispatcher to update the cached state. Finally, it
+ * emits the EFL_NET_CONTROL_ACCESS_POINT_EVENT_CHANGED event.
+ *
+ * @param data The Eo object associated with the access point.
+ * @param msg The Eldbus_Message for the PropertyChanged signal.
+ *            The message iterator contains a string (property name) and a variant (new value).
+ */
 static void
 _efl_net_control_access_point_property_changed(void *data, const Eldbus_Message *msg)
 {
@@ -1626,6 +1889,23 @@ _efl_net_control_access_point_property_changed(void *data, const Eldbus_Message 
    efl_event_callback_call(o, EFL_NET_CONTROL_ACCESS_POINT_EVENT_CHANGED, NULL);
 }
 
+/**
+ * @brief Creates a new Efl_Net_Control_Access_Point instance from ConnMan data.
+ *
+ * This function is called by the Efl_Net_Control_Manager (ConnMan backend)
+ * when a new service (access point) is discovered or when existing services
+ * are enumerated. It initializes the object, sets up DBus proxy and signal
+ * handlers, and populates its initial properties.
+ *
+ * @param ctl The parent Efl_Net_Control_Manager object.
+ * @param path The DBus object path of the ConnMan service.
+ * @param properties An Eldbus_Message_Iter containing the initial properties
+ *                   of the service, typically from GetServices or a PropertiesChanged signal.
+ *                   This iterator is expected to be an array of dictionary entries 'a{sv}'.
+ *                   Example: [ {"Name": Variant("MyWiFi"), "State": Variant("idle"), ...}, ... ]
+ * @param priority The initial priority of this access point among others.
+ * @return A new Efl_Net_Control_Access_Point object, or NULL on failure.
+ */
 Efl_Net_Control_Access_Point *
 efl_net_connman_access_point_new(Efl_Net_Control_Manager *ctl, const char *path, Eldbus_Message_Iter *properties, unsigned int priority)
 {
@@ -1676,6 +1956,12 @@ efl_net_connman_access_point_new(Efl_Net_Control_Manager *ctl, const char *path,
    return NULL;
 }
 
+/**
+ * @brief Gets the DBus object path for a ConnMan access point.
+ *
+ * @param o The Efl_Net_Control_Access_Point object.
+ * @return The DBus object path as a stringshare, or NULL on error.
+ */
 const char *
 efl_net_connman_access_point_path_get(Efl_Net_Control_Access_Point *o)
 {
@@ -1684,6 +1970,19 @@ efl_net_connman_access_point_path_get(Efl_Net_Control_Access_Point *o)
    return pd->path;
 }
 
+/**
+ * @brief Updates an existing Efl_Net_Control_Access_Point instance with new properties.
+ *
+ * This function is typically called when ConnMan signals that properties of an
+ * existing service have changed, or during an initial bulk update of services.
+ *
+ * @param o The Efl_Net_Control_Access_Point object to update. (Note: parameter type seems to be Efl_Net_Control_Manager in signature, but used as AccessPoint)
+ * @param properties An Eldbus_Message_Iter containing the properties
+ *                   of the service. This iterator is expected to be an array
+ *                   of dictionary entries 'a{sv}'.
+ *                   Example: [ {"State": Variant("online"), "Strength": Variant(byte 80), ...}, ... ]
+ * @param priority The new priority of this access point.
+ */
 void
 efl_net_connman_access_point_update(Efl_Net_Control_Manager *o, Eldbus_Message_Iter *properties, unsigned int priority)
 {

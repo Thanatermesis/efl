@@ -20,13 +20,46 @@
 /*
  * Needs EAPI because of helper binaries
  */
+/**
+ * @brief Global flag to enable/disable cache updates.
+ * Set to 0 to disable automatic cache updates, 1 (default) to enable.
+ * This is primarily used by helper binaries that should not trigger cache
+ * regeneration.
+ */
 EAPI int efreet_cache_update = 1;
 
+/**
+ * @internal
+ * @brief Counter for efreet_init() calls.
+ * Ensures that Efreet is initialized only once and shut down when the count
+ * reaches zero.
+ */
 static int _efreet_init_count = 0;
+/**
+ * @internal
+ * @brief Flag indicating if the locale has been parsed.
+ * Used to avoid redundant parsing of locale settings.
+ */
 static int efreet_parsed_locale = 0;
+/**
+ * @internal
+ * @brief Stores the language part of the locale (e.g., "en").
+ */
 static const char *efreet_lang = NULL;
+/**
+ * @internal
+ * @brief Stores the country part of the locale (e.g., "US").
+ */
 static const char *efreet_lang_country = NULL;
+/**
+ * @internal
+ * @brief Stores the modifier part of the locale (e.g., "UTF-8").
+ */
 static const char *efreet_lang_modifier = NULL;
+/**
+ * @internal
+ * @brief Stores the full language string (e.g., "en_US.UTF-8@modifier").
+ */
 static const char *efreet_language = NULL;
 static void efreet_parse_locale(void);
 static int efreet_parse_locale_setting(const char *env);
@@ -36,6 +69,14 @@ static uid_t ruid;
 static uid_t rgid;
 #endif
 
+/**
+ * @brief Initializes the Efreet library.
+ * @return The new init count, or 0 on failure.
+ * This function initializes all necessary Efreet subsystems. It should be
+ * called before any other Efreet function. It handles multiple calls by
+ * incrementing an internal counter and only performing initialization on the
+ * first call.
+ */
 EAPI int
 efreet_init(void)
 {
@@ -137,6 +178,12 @@ shutdown_eina:
    return --_efreet_init_count;
 }
 
+/**
+ * @brief Shuts down the Efreet library.
+ * @return The new init count.
+ * This function shuts down all Efreet subsystems. It decrements an internal
+ * counter and only performs shutdown when the counter reaches zero.
+ */
 EAPI int
 efreet_shutdown(void)
 {
@@ -173,6 +220,12 @@ efreet_shutdown(void)
    return _efreet_init_count;
 }
 
+/**
+ * @brief Resets the current language settings and reparses them.
+ * This function is useful if the system locale changes while the application
+ * is running. It clears any cached locale information, re-parses the
+ * environment, and rebuilds relevant caches like the desktop file cache.
+ */
 EAPI void
 efreet_lang_reset(void)
 {
@@ -190,7 +243,7 @@ efreet_lang_reset(void)
 
 /**
  * @internal
- * @return Returns the current users language setting or NULL if none set
+ * @return Returns the current user's language setting (e.g., "en") or @c NULL if not set.
  * @brief Retrieves the current language setting
  */
 const char *
@@ -204,8 +257,8 @@ efreet_lang_get(void)
 
 /**
  * @internal
- * @return Returns the current language country setting or NULL if none set
- * @brief Retrieves the current country setting for the current language or
+ * @return Returns the current language country setting (e.g., "US") or @c NULL if not set.
+ * @brief Retrieves the current country setting for the current language.
  */
 const char *
 efreet_lang_country_get(void)
@@ -218,9 +271,8 @@ efreet_lang_country_get(void)
 
 /**
  * @internal
- * @return Returns the current language modifier setting or NULL if none
- * set.
- * @brief Retrieves the modifier setting for the language.
+ * @return Returns the current language modifier setting (e.g., "latin") or @c NULL if not set.
+ * @brief Retrieves the modifier setting for the language (e.g., from LANG=en_US@latin).
  */
 const char *
 efreet_lang_modifier_get(void)
@@ -231,6 +283,16 @@ efreet_lang_modifier_get(void)
    return efreet_lang_modifier;
 }
 
+/**
+ * @brief Retrieves the full current language string.
+ * @return The full language string (e.g., "en_US.UTF-8", "de_DE@euro") as
+ *         obtained from the environment or system settings. Returns "C" if
+ *         no language setting can be determined. The returned string is
+ *         an Eina_Stringshare, so it should not be freed by the caller.
+ *
+ * This function parses the locale on its first call if not already parsed.
+ * Subsequent calls return the cached value.
+ */
 EAPI const char *
 efreet_language_get(void)
 {
@@ -245,7 +307,8 @@ efreet_language_get(void)
  * @return Returns no value
  * @brief Parses out the language, country and modifer setting from the
  * LC_MESSAGES environment variable on UNIX. On Windows, retrieve them from
- * the system.
+ * the system. It tries "LANG", then "LC_ALL", then "LC_MESSAGES". If none
+ * are found or parseable, it defaults to "C".
  */
 static void
 efreet_parse_locale(void)
@@ -268,10 +331,17 @@ efreet_parse_locale(void)
  * @internal
  * @param env The environment variable to grab
  * @return Returns 1 if we parsed something of @a env, 0 otherwise
- * @brief Tries to parse the lang settings out of the given environment
- * variable
+ * @brief Tries to parse the language, country, and modifier from the given environment variable.
  *
- * @note @a env is not used on Windows.
+ * On POSIX systems, it parses @p env (e.g., "LANG", "LC_MESSAGES").
+ * The format expected is lang[_COUNTRY][.CODESET][@MODIFIER].
+ * Examples: "en_US.UTF-8@valencia", "de_DE", "fr@paris".
+ *
+ * On Windows, @p env is ignored, and locale information is retrieved using
+ * GetLocaleInfo with LOCALE_SYSTEM_DEFAULT.
+ *
+ * @param env The environment variable name (e.g., "LANG") to read from (POSIX only).
+ * @return Returns 1 if locale information was successfully parsed and set, 0 otherwise.
  */
 static int
 efreet_parse_locale_setting(const char *env)
@@ -354,10 +424,17 @@ efreet_parse_locale_setting(const char *env)
  * @internal
  * @param buffer The destination buffer
  * @param size The destination buffer size
- * @param strs The strings to concatenate together
- * @return Returns the size of the string in @a buffer
- * @brief Concatenates the strings in @a strs into the given @a buffer not
- * exceeding the given @a size.
+ * @param buffer The destination buffer.
+ * @param size The destination buffer size.
+ * @param strs A NULL-terminated array of C-strings to concatenate.
+ *             Example: `const char *my_strs[] = {"Hello", " ", "World", NULL};`
+ * @return Returns the total number of bytes written to @a buffer, excluding the
+ *         null terminator if the buffer was large enough, or the number of bytes
+ *         that would have been written if the buffer was truncated. This is
+ *         consistent with eina_strlcpy behavior.
+ * @brief Concatenates the strings in the @a strs array into the given @a buffer,
+ * ensuring not to exceed @a size. This function uses eina_strlcpy for safe
+ * string copying.
  */
 size_t
 efreet_array_cat(char *buffer, size_t size, const char *strs[])
@@ -372,6 +449,18 @@ efreet_array_cat(char *buffer, size_t size, const char *strs[])
 }
 
 #ifndef _WIN32
+/**
+ * @brief Changes the owner and group of an open file descriptor to the
+ *        real user ID and group ID.
+ * @param fd The file descriptor of the file whose ownership is to be changed.
+ *
+ * This function is a no-op if the file descriptor is invalid, if fstat fails,
+ * if the file is already owned by the real user, or if fchown fails.
+ * It is intended to be used in scenarios where a program running with elevated
+ * privileges (e.g., via sudo) creates files that should be owned by the
+ * original user.
+ * This function is not available on Windows.
+ */
 EAPI void
 efreet_fsetowner(int fd)
 {
@@ -384,6 +473,11 @@ efreet_fsetowner(int fd)
    if (fchown(fd, ruid, rgid) != 0) return;
 }
 #else
+/**
+ * @brief Placeholder for efreet_fsetowner on Windows.
+ * @param fd Unused.
+ * This function is a no-op on Windows.
+ */
 EAPI void
 efreet_fsetowner(int fd EINA_UNUSED)
 {
@@ -391,6 +485,15 @@ efreet_fsetowner(int fd EINA_UNUSED)
 #endif
 
 #ifndef _WIN32
+/**
+ * @brief Changes the owner and group of a file to the real user ID and group ID.
+ * @param path The path to the file whose ownership is to be changed.
+ *
+ * This function opens the file, calls efreet_fsetowner() on the file
+ * descriptor, and then closes it. It handles errors during open silently.
+ * It is intended for the same use cases as efreet_fsetowner().
+ * This function is not available on Windows.
+ */
 EAPI void
 efreet_setowner(const char *path)
 {
@@ -404,6 +507,11 @@ efreet_setowner(const char *path)
    close(fd);
 }
 #else
+/**
+ * @brief Placeholder for efreet_setowner on Windows.
+ * @param path Unused.
+ * This function is a no-op on Windows.
+ */
 EAPI void
 efreet_setowner(const char *path EINA_UNUSED)
 {

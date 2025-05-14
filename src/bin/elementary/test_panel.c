@@ -21,6 +21,16 @@ static Eina_Bool _dir_has_subs(const char *path);
 
 static Eina_List *dirs = NULL;
 
+/**
+ * @brief Callback function to report the status of the top panel.
+ * @param data The panel object whose status is to be checked.
+ * @param obj The toolbar object that triggered the callback.
+ * @param event_info Unused event information.
+ *
+ * This function is called when the "Hello" item in the top toolbar is
+ * clicked. It prints whether the top panel is "hidden" or "shown" to
+ * standard output and deselects the toolbar item.
+ */
 static void
 _tstatus(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -36,6 +46,16 @@ _tstatus(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_toolbar_item_selected_set(tb_it, EINA_FALSE);
 }
 
+/**
+ * @brief Callback function to report the status of the bottom panel.
+ * @param data The panel object whose status is to be checked.
+ * @param obj The toolbar object that triggered the callback.
+ * @param event_info Unused event information.
+ *
+ * This function is called when the "Hello" item in the bottom toolbar is
+ * clicked. It prints whether the bottom panel is "hidden" or "shown" to
+ * standard output and deselects the toolbar item.
+ */
 static void
 _bstatus(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -51,12 +71,35 @@ _bstatus(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_toolbar_item_selected_set(tb_it, EINA_FALSE);
 }
 
+/**
+ * @brief Genlist callback to get the text for an item.
+ * @param data The full path to a file or directory.
+ * @param obj The genlist object.
+ * @param source The part name of the item.
+ * @return A newly allocated string containing the filename. The caller is
+ *         responsible for freeing this string.
+ *
+ * This function extracts and returns just the filename from the full path
+ * provided in @p data. For example, for "/tmp/test_panel/a_file.txt",
+ * it returns "a_file.txt".
+ */
 static char *
 _text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *source EINA_UNUSED)
 {
    return strdup(ecore_file_file_get(data));
 }
 
+/**
+ * @brief Genlist callback to get content (an icon) for an item.
+ * @param data The full path to a file or directory.
+ * @param obj The genlist object.
+ * @param source The part name of the content to get, expected to be
+ *        "elm.swallow.icon".
+ * @return A new icon object, or NULL if the source is not "elm.swallow.icon".
+ *
+ * This function creates and returns an icon. It shows a "folder" icon if @p data
+ * points to a directory, and a "file" icon otherwise.
+ */
 static Evas_Object *
 _content_get(void *data, Evas_Object *obj, const char *source)
 {
@@ -76,18 +119,44 @@ _content_get(void *data, Evas_Object *obj, const char *source)
    return NULL;
 }
 
+/**
+ * @brief Genlist callback to get the state of an item.
+ * @param data Item data (unused).
+ * @param obj The genlist object (unused).
+ * @param source The part name of the state to get (unused).
+ * @return Always returns EINA_FALSE.
+ *
+ * This function is a placeholder and always indicates that items are not in
+ * a "selected" or special state.
+ */
 static Eina_Bool
 _state_get(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, const char *source EINA_UNUSED)
 {
    return EINA_FALSE;
 }
 
+/**
+ * @brief Genlist callback for item deletion.
+ * @param data The item data (an Eina_Stringshare) to be freed.
+ * @param obj The genlist object (unused).
+ *
+ * This function is called when a genlist item is deleted. It frees the
+ * stringshared path associated with the item.
+ */
 static void
 _item_del(void *data, Evas_Object *obj EINA_UNUSED)
 {
    eina_stringshare_del(data);
 }
 
+/**
+ * @brief Creates a temporary directory structure for the test.
+ *
+ * This function creates a directory "/tmp/test_panel" with a few files
+ * and one subdirectory, which also contains files. This structure is
+ * used to populate the genlist in the panel. If the directories or
+ * files already exist, it may print errors but will not fail.
+ */
 static void
 _create_dir_struct(void)
 {
@@ -109,6 +178,18 @@ _create_dir_struct(void)
    if (fp) fclose(fp);
 }
 
+/**
+ * @brief Populates a genlist with files and directories.
+ * @param obj The genlist object to fill.
+ * @param itc The item class to use for genlist items.
+ *
+ * This function populates the given genlist with the contents of the
+ * "/tmp/test_panel" directory. On the first call, it creates the
+ * directory structure via _create_dir_struct(), scans it, and caches
+ * the directory paths in the static `dirs` list. Subsequent calls
+ * reuse the cached list. It adds items as expandable (tree) if they
+ * are directories that contain subdirectories.
+ */
 static void
 _fill_list(Evas_Object *obj, Elm_Genlist_Item_Class *itc)
 {
@@ -155,6 +236,15 @@ _fill_list(Evas_Object *obj, Elm_Genlist_Item_Class *itc)
      }
 }
 
+/**
+ * @brief Checks if a directory contains any subdirectories.
+ * @param path The path to the directory to check.
+ * @return EINA_TRUE if the directory contains at least one subdirectory,
+ *         EINA_FALSE otherwise.
+ *
+ * This is used to determine if a genlist item representing a directory
+ * should be expandable.
+ */
 static Eina_Bool
 _dir_has_subs(const char *path)
 {
@@ -179,6 +269,13 @@ _dir_has_subs(const char *path)
    return result;
 }
 
+/**
+ * @brief Frees the global list of directories.
+ *
+ * This function iterates through the static `dirs` list, freeing each
+ * directory path string and then the list itself. It's called for cleanup
+ * at the end of the test_panel function.
+ */
 static void
 _free_dirs(void)
 {
@@ -187,6 +284,20 @@ _free_dirs(void)
      free(dir);
 }
 
+/**
+ * @brief The main test function for demonstrating Elementary panels.
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ *
+ * This function creates a window with four panels (top, bottom, left, right).
+ * The left and right panels contain a genlist populated with a file system
+ * hierarchy from "/tmp/test_panel". The top and bottom panels contain toolbars
+ * with buttons to report the panel's visibility status. A central area
+ * displays a photo.
+ * This test showcases panel creation, orientation, content setting, and
+ * basic interaction.
+ */
 void
 test_panel(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -300,6 +411,12 @@ test_panel(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_inf
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback for button click to toggle a panel's visibility.
+ * @param data The panel object to toggle.
+ * @param obj The button that was clicked (unused).
+ * @param event_info Unused event information.
+ */
 static void
 _clicked_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -307,6 +424,19 @@ _clicked_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    elm_panel_toggle(panel);
 }
 
+/**
+ * @brief Callback for when a panel's toggled state changes.
+ * @param data A check widget. If this check is enabled, the panel content
+ *             will be reset.
+ * @param obj The panel object that was toggled.
+ * @param event_info Unused event information.
+ *
+ * This function is called whenever the panel's visibility is changed. It
+ * prints the new state ("hidden" or "visible"). If the 'Reset content on
+ * toggle' checkbox (@p data) is checked, it replaces the panel's content
+ * with a new list. This demonstrates dynamic content manipulation in
+ * response to panel events.
+ */
 static void
 _toggled_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -328,12 +458,35 @@ _toggled_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    printf("Panel toggled:%s\n", elm_panel_hidden_get(obj) ? "hidden" : "visible");
 }
 
+/**
+ * @brief Callback for when the 'Enable thumb scroll' checkbox changes.
+ * @param data Unused.
+ * @param obj The checkbox object that changed state.
+ * @param event_info Unused.
+ *
+ * Updates the global Elementary configuration for thumbscrolling to match
+ * the state of the checkbox. This allows testing the scrollable panel
+ * feature even if it's disabled globally.
+ */
 static void
 _changed_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    elm_config_scroll_thumbscroll_enabled_set(elm_check_state_get(obj));
 }
 
+/**
+ * @brief A second test function for panels, focusing on a scrollable panel.
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ *
+ * Creates a window with a single left-oriented scrollable panel. The main
+ * content is a list, and the panel slides over it. This test demonstrates:
+ * - A scrollable panel (`elm_panel_scrollable_set`).
+ * - Setting the content size revealed by the panel.
+ * - Dynamically enabling/disabling thumbscrolling for the test.
+ * - Resetting panel content upon toggling, controlled by a checkbox.
+ */
 void
 test_panel2(void *data EINA_UNUSED,
            Evas_Object *obj EINA_UNUSED,

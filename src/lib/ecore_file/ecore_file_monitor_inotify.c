@@ -24,20 +24,30 @@
 
 #include <sys/inotify.h>
 
+/**
+ * @file ecore_file_monitor_inotify.c
+ * @brief Ecore file monitor backend implementation using inotify.
+ *
+ * This file provides the inotify-specific logic for monitoring file
+ * system events.
+ */
 
 typedef struct _Ecore_File_Monitor_Inotify Ecore_File_Monitor_Inotify;
 
 #define ECORE_FILE_MONITOR_INOTIFY(x) ((Ecore_File_Monitor_Inotify *)(x))
 
+/**
+ * @brief Structure extending Ecore_File_Monitor for inotify-specific data.
+ */
 struct _Ecore_File_Monitor_Inotify
 {
-   Ecore_File_Monitor  monitor;
-   int                 wd;
+   Ecore_File_Monitor  monitor; /**< Base Ecore_File_Monitor structure. */
+   int                 wd;      /**< Inotify watch descriptor. */
 };
 
-static Ecore_Fd_Handler *_fdh = NULL;
-static Ecore_File_Monitor    *_monitors = NULL;
-static pid_t             _inotify_fd_pid = -1;
+static Ecore_Fd_Handler *_fdh = NULL; /**< FD handler for the inotify file descriptor. */
+static Ecore_File_Monitor    *_monitors = NULL; /**< Inlist of active monitors. */
+static pid_t             _inotify_fd_pid = -1; /**< PID of the process that initialized inotify, used for fork detection. */
 
 static Eina_Bool           _ecore_file_monitor_inotify_handler(void *data, Ecore_Fd_Handler *fdh);
 static Eina_List *_ecore_file_monitor_inotify_monitor_find(int wd);
@@ -47,9 +57,18 @@ static int                 _ecore_file_monitor_inotify_monitor(Ecore_File_Monito
 static void                _ecore_file_monitor_inotify_print(char *file, int mask);
 #endif
 
-static Eina_Bool reseting;
-static Eina_Hash *monitor_hash;
+static Eina_Bool reseting; /**< Flag to indicate if the monitor system is currently being reset (e.g., after a fork). */
+static Eina_Hash *monitor_hash; /**< Hash table mapping watch descriptors (wd) to a list of Ecore_File_Monitor instances. */
 
+/**
+ * @brief Resets the inotify monitoring system.
+ *
+ * This function is typically called after a fork to re-initialize inotify
+ * watches in the new process. It shuts down and re-initializes the backend,
+ * then re-adds all existing monitors.
+ *
+ * @param data Unused.
+ */
 static void
 _ecore_file_monitor_inotify_reset(void *data EINA_UNUSED)
 {
@@ -68,6 +87,15 @@ _ecore_file_monitor_inotify_reset(void *data EINA_UNUSED)
    reseting = 0;
 }
 
+/**
+ * @brief Initializes the inotify backend for file monitoring.
+ *
+ * Sets up the inotify file descriptor and registers an FD handler
+ * to process inotify events. Also registers a callback to handle
+ * resetting the monitor after a fork.
+ *
+ * @return 1 on success, 0 on failure.
+ */
 int
 ecore_file_monitor_backend_init(void)
 {
@@ -94,6 +122,14 @@ ecore_file_monitor_backend_init(void)
    return 1;
 }
 
+/**
+ * @brief Shuts down the inotify backend for file monitoring.
+ *
+ * Removes all active monitors, closes the inotify file descriptor,
+ * and unregisters the FD handler and fork callback.
+ *
+ * @return 1 on success.
+ */
 int
 ecore_file_monitor_backend_shutdown(void)
 {
@@ -118,6 +154,18 @@ ecore_file_monitor_backend_shutdown(void)
    return 1;
 }
 
+/**
+ * @brief Adds a new file or directory to monitor using the inotify backend.
+ *
+ * Creates a new monitor for the given path and registers it with the
+ * inotify system. If the inotify system was initialized by a different
+ * process (e.g., after a fork), it will be reset.
+ *
+ * @param path The file or directory path to monitor.
+ * @param func The callback function to execute when an event occurs.
+ * @param data User data to pass to the callback function.
+ * @return A pointer to the new Ecore_File_Monitor on success, or NULL on failure.
+ */
 Ecore_File_Monitor *
 ecore_file_monitor_backend_add(const char *path,
                                void (*func) (void *data, Ecore_File_Monitor *em,
@@ -154,6 +202,14 @@ ecore_file_monitor_backend_add(const char *path,
    return em;
 }
 
+/**
+ * @brief Deletes a file monitor from the inotify backend.
+ *
+ * Removes the specified monitor from the list of active monitors and
+ * tells inotify to stop watching the associated path.
+ *
+ * @param em The Ecore_File_Monitor to delete.
+ */
 void
 ecore_file_monitor_backend_del(Ecore_File_Monitor *em)
 {
@@ -171,6 +227,16 @@ ecore_file_monitor_backend_del(Ecore_File_Monitor *em)
    free(em);
 }
 
+/**
+ * @brief Handles incoming inotify events from the file descriptor.
+ *
+ * Reads events from the inotify file descriptor, finds the corresponding
+ * monitor(s), and dispatches the events.
+ *
+ * @param data Unused.
+ * @param fdh The Ecore_Fd_Handler that triggered this callback.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
+ */
 static Eina_Bool
 _ecore_file_monitor_inotify_handler(void *data EINA_UNUSED, Ecore_Fd_Handler *fdh)
 {
@@ -201,12 +267,30 @@ _ecore_file_monitor_inotify_handler(void *data EINA_UNUSED, Ecore_Fd_Handler *fd
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Finds the list of monitors associated with a watch descriptor.
+ *
+ * @param wd The inotify watch descriptor.
+ * @return An Eina_List of Ecore_File_Monitor instances associated with the wd,
+ *         or NULL if not found.
+ */
 static Eina_List *
 _ecore_file_monitor_inotify_monitor_find(int wd)
 {
    return eina_hash_find(monitor_hash, &wd);
 }
 
+/**
+ * @brief Processes inotify events and triggers corresponding Ecore_File_Event callbacks.
+ *
+ * Translates inotify event masks into Ecore_File_Event types and calls the
+ * monitor's callback function.
+ *
+ * @param em The Ecore_File_Monitor that received the event.
+ * @param file The name of the file or directory within the monitored path,
+ *             or NULL if the event pertains to the monitored path itself.
+ * @param mask The inotify event mask.
+ */
 static void
 _ecore_file_monitor_inotify_events(Ecore_File_Monitor *em, char *file, int mask)
 {
@@ -288,6 +372,17 @@ _ecore_file_monitor_inotify_events(Ecore_File_Monitor *em, char *file, int mask)
      _ecore_file_monitor_inotify_monitor(em, em->path);
 }
 
+/**
+ * @brief Adds or re-adds an inotify watch for a given monitor and path.
+ *
+ * This function is called to initially set up a watch or to re-establish
+ * a watch (e.g., after an IN_IGNORED event).
+ *
+ * @param em The Ecore_File_Monitor to associate with the watch.
+ * @param path The file system path to monitor.
+ * @return 1 on success, 0 on failure (e.g., if inotify_add_watch fails).
+ *         If it fails, the monitor `em` is deleted.
+ */
 static int
 _ecore_file_monitor_inotify_monitor(Ecore_File_Monitor *em, const char *path)
 {

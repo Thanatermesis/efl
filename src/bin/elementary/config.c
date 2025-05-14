@@ -112,6 +112,18 @@ _font_styles_list_sel(void *data   EINA_UNUSED,
                       Evas_Object *obj,
                       void        *event_info);
 
+/**
+ * @brief Callback function invoked when the application is requested to exit.
+ *
+ * This function is responsible for cleaning up all allocated resources before
+ * the application terminates. It frees memory associated with font data,
+ * saves the current configuration, and then requests the application's main
+ * loop to exit.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 config_exit(void *data       EINA_UNUSED,
             Evas_Object *obj EINA_UNUSED,
@@ -1046,6 +1058,15 @@ _status_config(Evas_Object *win,
    evas_object_show(bx);
 }
 
+/**
+ * @brief Switches the view in the main naviframe widget.
+ *
+ * This function finds a widget by its name in the window's data and promotes
+ * it in the naviframe, making it the visible view.
+ *
+ * @param win The main application window.
+ * @param name The string key for the widget to flip to.
+ */
 static void
 _flip_to(Evas_Object *win,
          const char  *name)
@@ -1153,6 +1174,16 @@ _cf_etc(void *data,
    _flip_to(data,"etc");
 }
 
+/**
+ * @brief Extracts the primary theme from the theme search order string.
+ *
+ * The theme search order is a colon-separated list of theme names. This
+ * function parses this string and returns the first theme in the list.
+ *
+ * @param theme_search_order A colon-separated string of theme names,
+ *        e.g., "my-theme:default".
+ * @return A stringshare'd reference to the current theme name, or NULL on failure.
+ */
 const char *
 _elm_theme_current_get(const char *theme_search_order)
 {
@@ -1184,6 +1215,18 @@ _elm_theme_current_get(const char *theme_search_order)
    return ret;
 }
 
+/**
+ * @brief Applies the font settings of the selected text class to all other text classes.
+ *
+ * This function is a callback for the "Set to All" button in the fonts tab.
+ * It takes the font, style, and size from the currently selected text class
+ * in the UI and applies these settings to every text class defined in
+ * `fndata.text_classes`.
+ *
+ * @param data The application window object.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _font_overlay_set_all(void            *data,
                       Evas_Object *obj EINA_UNUSED,
@@ -1212,6 +1255,18 @@ _font_overlay_set_all(void            *data,
    elm_config_all_flush();
 }
 
+/**
+ * @brief Resets the font overlay for the currently selected text class.
+ *
+ * This function is a callback for the "Reset" button in the fonts tab. It
+ * removes any custom font overlay for the selected text class, reverting it
+ * to the theme's default. It also updates the UI to disable font selection
+ * lists.
+ *
+ * @param data The application window object.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _font_overlay_reset(void            *data,
                     Evas_Object *obj EINA_UNUSED,
@@ -1249,6 +1304,18 @@ _font_overlay_reset(void            *data,
    elm_config_all_flush();
 }
 
+/**
+ * @brief Resets all font overlays for all text classes.
+ *
+ * This function is a callback for the "Reset All" button in the fonts tab.
+ * It iterates through all text classes and removes their font overlays,
+ * restoring default font settings for the entire application. The UI is updated
+ * to reflect this by clearing selections and disabling font lists.
+ *
+ * @param data The application window object.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _font_overlay_reset_all(void            *data,
                         Evas_Object *obj EINA_UNUSED,
@@ -1288,6 +1355,19 @@ _font_overlay_reset_all(void            *data,
    elm_config_all_flush();
 }
 
+/**
+ * @brief Applies all pending font overlay changes to the configuration.
+ *
+ * This function is the callback for the "Apply" button in the fonts tab.
+ * It iterates through all text classes stored in `fndata.text_classes`. For each
+ * class that has a custom font set, it generates a fontconfig-style name
+ * and sets it as a font overlay in the elementary configuration. It then
+ * applies all overlays and flushes the configuration to make changes visible.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _font_overlay_change(void *data       EINA_UNUSED,
                      Evas_Object *obj EINA_UNUSED,
@@ -1318,6 +1398,17 @@ _font_overlay_change(void *data       EINA_UNUSED,
    /* TODO: apply hinting */
 }
 
+/**
+ * @brief Updates all UI widgets to reflect the current configuration values.
+ *
+ * This function reads all relevant settings from `elm_config` and updates
+ * the state of the corresponding UI widgets (sliders, checkboxes, lists, etc.)
+ * across all configuration pages. This is called when the configuration
+ * changes to keep the UI in sync.
+ *
+ * @param win The main application window, used to access UI widgets via
+ *        `evas_object_data_get`.
+ */
 static void
 _config_display_update(Evas_Object *win)
 {
@@ -1450,6 +1541,18 @@ _config_display_update(Evas_Object *win)
    eina_stringshare_del(curr_theme);
 }
 
+/**
+ * @brief Ecore event handler for ELM_EVENT_CONFIG_ALL_CHANGED.
+ *
+ * This callback is triggered whenever the elementary configuration has changed.
+ * It calls `_config_display_update` to ensure the UI reflects the new
+ * configuration state.
+ *
+ * @param data The main application window.
+ * @param ev_type The type of the event, should be ELM_EVENT_CONFIG_ALL_CHANGED.
+ * @param ev The event information, not used.
+ * @return ECORE_CALLBACK_PASS_ON to continue event propagation.
+ */
 static Eina_Bool
 _config_all_changed(void *data,
                     int ev_type EINA_UNUSED,
@@ -1460,6 +1563,18 @@ _config_all_changed(void *data,
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Applies the selected user profile.
+ *
+ * This is the callback for the "Use" button on the profiles page. It gets the
+ * selected profile from the list, sets it as the active profile in elm_config,
+ * and then updates the entire UI display to reflect the new settings from
+ * that profile.
+ *
+ * @param data The list widget containing the profiles.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _profile_use(void            *data,
              Evas_Object *obj EINA_UNUSED,
@@ -1497,6 +1612,18 @@ _btn_todo(void *data       EINA_UNUSED,
    printf("To be done!\n");
 }
 
+/**
+ * @brief Resets the selected profile to its default state.
+ *
+ * This is the callback for the "Reset" button on the profiles page. It
+ * deletes the user's local directory for the selected profile, causing
+ * it to revert to the system-wide default settings upon next load.
+ * After deletion, it reloads the configuration and updates the UI.
+ *
+ * @param data The list widget containing the profiles.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _profile_reset(void            *data,
                Evas_Object *obj EINA_UNUSED,
@@ -1525,6 +1652,17 @@ _profile_reset(void            *data,
    _config_display_update(elm_object_top_widget_get(li));
 }
 
+/**
+ * @brief Applies the theme currently shown in the preview.
+ *
+ * This is the callback for the "Use Theme" button. It retrieves the theme
+ * definition from the preview widget and sets it as the system-wide
+ * theme using `elm_theme_set`.
+ *
+ * @param data Not used.
+ * @param obj The button widget that was clicked.
+ * @param event_info Not used.
+ */
 static void
 _theme_use(void *data       EINA_UNUSED,
            Evas_Object *obj EINA_UNUSED,
@@ -1541,6 +1679,18 @@ _theme_use(void *data       EINA_UNUSED,
    elm_config_all_flush();
 }
 
+/**
+ * @brief Updates the theme preview when the theme selection changes.
+ *
+ * This callback is triggered when items in the theme list are selected or
+ * unselected. It constructs a new colon-separated theme search string from
+ * the list of selected themes and applies it to the theme preview widget.
+ * It ensures 'default' is always a fallback.
+ *
+ * @param data Not used.
+ * @param obj The theme list widget.
+ * @param event_info Not used.
+ */
 static void
 _theme_sel(void            *data EINA_UNUSED,
            Evas_Object     *obj,
@@ -1585,6 +1735,14 @@ _theme_sel(void            *data EINA_UNUSED,
    printf("not implemented\n");
    }*/
 
+/**
+ * @brief Adds a single icon to the icon preview frame.
+ *
+ * @param icon The name of the icon to add (e.g., "folder").
+ * @param theme The name of the icon theme to look up the icon in. If it is
+ *        the special theme "elementary", `elm_icon_standard_set` is used.
+ *        Otherwise, the icon path is resolved using `efreet_icon_path_find`.
+ */
 static void
 _icon_preview_icon_add(const char *icon, const char *theme)
 {
@@ -1606,6 +1764,15 @@ _icon_preview_icon_add(const char *icon, const char *theme)
 }
 
 
+/**
+ * @brief Updates the icon preview area with a set of example icons.
+ *
+ * This function clears the existing preview and adds a standard set of
+ * example icons using the currently selected icon theme.
+ *
+ * @param win The main application window, used to get the current icon theme
+ *        from its data store.
+ */
 static void
 _icon_preview_update(Evas_Object *win)
 {
@@ -1679,6 +1846,15 @@ _icon_theme_sel(void *data, Evas_Object *obj,
    _icon_preview_update(win);
 }
 
+/**
+ * @brief Checks if a given icon theme is valid and can be used.
+ *
+ * A theme is considered valid if it can resolve the path to a common icon,
+ * in this case, "folder".
+ *
+ * @param theme The name of the icon theme to validate.
+ * @return EINA_TRUE if the theme is valid, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _icon_theme_valid(const char *theme)
 {
@@ -1688,6 +1864,17 @@ _icon_theme_valid(const char *theme)
    return !!icon_path;
 }
 
+/**
+ * @brief Sorting function for the icon theme list.
+ *
+ * This function is used with `eina_list_sort` to sort `Efreet_Icon_Theme`
+ * structures alphabetically by name.
+ *
+ * @param data1 Pointer to the first `Efreet_Icon_Theme`.
+ * @param data2 Pointer to the second `Efreet_Icon_Theme`.
+ * @return A negative, zero, or positive value if `t1` is less than, equal to,
+ *         or greater than `t2`, respectively.
+ */
 static int
 _icon_theme_list_sort(const void *data1, const void *data2)
 {
@@ -1702,6 +1889,16 @@ _icon_theme_list_sort(const void *data1, const void *data2)
    return strcmp(t1->name.name, t2->name.name);
 }
 
+/**
+ * @brief Creates the "Sizing" configuration page.
+ *
+ * This function builds the UI for configuring scaling and finger size.
+ * It consists of two sliders for these settings. The created box is
+ * then pushed onto the naviframe.
+ *
+ * @param win The main application window.
+ * @param naviframe The naviframe widget to add this page to.
+ */
 static void
 _status_config_sizing(Evas_Object *win,
                       Evas_Object *naviframe)
@@ -1758,6 +1955,18 @@ _status_config_sizing(Evas_Object *win,
    elm_naviframe_item_simple_push(naviframe, bx);
 }
 
+/**
+ * @def MUTE_CB(_cb, _chan)
+ * @brief A macro to generate a callback function for a mute checkbox.
+ *
+ * This macro creates a static function with the name `_cb` that handles the
+ * "changed" event for a checkbox. The function reads the checkbox state and
+ * updates the mute status for the specified audio channel `_chan` in the
+ * elementary configuration.
+ *
+ * @param _cb The name of the callback function to generate.
+ * @param _chan The `Edje_Channel` to control.
+ */
 #define MUTE_CB(_cb, _chan) \
 static void \
 _cb(void *data       EINA_UNUSED, \
@@ -1780,6 +1989,16 @@ MUTE_CB(mute_input_change, EDJE_CHANNEL_INPUT)
 MUTE_CB(mute_alert_change, EDJE_CHANNEL_ALERT)
 MUTE_CB(mute_all_change, EDJE_CHANNEL_ALL)
 
+/**
+ * @brief Creates the "Audio" configuration page.
+ *
+ * This function builds the UI for managing audio mute settings. It creates a
+ * series of checkboxes, one for each audio channel, using the `MUTE_CHECK`
+ * macro. The page is then pushed onto the naviframe.
+ *
+ * @param win The main application window.
+ * @param naviframe The naviframe widget to add this page to.
+ */
 static void
 _status_config_audio(Evas_Object *win,
                      Evas_Object *naviframe)
@@ -1889,6 +2108,16 @@ _config_focus_auto_animate_cb(void *data EINA_UNUSED, Evas_Object *obj,
    elm_config_all_flush();
 }
 
+/**
+ * @brief Creates the "Focus" configuration page.
+ *
+ * This function builds the UI for configuring various focus-related behaviors,
+ * such as focus highlighting, autoscroll mode, and automatic focus display.
+ * The created page is then pushed onto the naviframe.
+ *
+ * @param win The main application window.
+ * @param naviframe The naviframe widget to add this page to.
+ */
 static void
 _status_config_focus(Evas_Object *win,
                      Evas_Object *naviframe)
@@ -1995,6 +2224,19 @@ _status_config_focus(Evas_Object *win,
    elm_naviframe_item_simple_push(naviframe, bx);
 }
 
+/**
+ * @brief Callback invoked when the web backend entry widget is deleted.
+ *
+ * This function is registered with EVAS_CALLBACK_DEL. It is a failsafe to
+ * ensure that the web backend setting is saved if the user edited the entry
+ * but did not trigger another action that would save it. It reads the text
+ * from the entry and applies it to the configuration if it has changed.
+ *
+ * @param data Not used.
+ * @param e Not used.
+ * @param obj The entry widget being deleted.
+ * @param info Not used.
+ */
 static void
 _web_entry_del(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *info EINA_UNUSED)
 {
@@ -2129,6 +2371,17 @@ _status_config_etc(Evas_Object *win,
    elm_naviframe_item_simple_push(naviframe, bx);
 }
 
+/**
+ * @brief Creates a sample layout with various widgets for theme previewing.
+ *
+ * This function constructs a table containing a variety of standard Elementary
+ * widgets (button, check, radio, slider, etc.). This composite object is used
+ * in the "Theme" tab to provide a live preview of how the selected theme
+ * affects different widgets.
+ *
+ * @param win The parent window for the new widgets.
+ * @return A table widget containing the sample UI components.
+ */
 static Evas_Object *
 _sample_theme_new(Evas_Object *win)
 {
@@ -2778,6 +3031,19 @@ _font_classes_list_load(Evas_Object *li)
    evas_event_thaw(evas);
 }
 
+/**
+ * @brief Initializes and populates the global font data structure (`fndata`).
+ *
+ * This function performs the one-time setup for the fonts configuration tab.
+ * It populates `fndata` with:
+ * - A hash of all available system fonts.
+ * - A list of all Elementary text classes.
+ * - Any existing font overlays from the current configuration.
+ * - Predefined lists of font sizes, both scalable (Tiny, Small, etc.) and
+ *   in pixels.
+ *
+ * @param evas The evas canvas, needed to get the list of available fonts.
+ */
 static void
 _fonts_data_fill(Evas *evas)
 {
@@ -2880,6 +3146,16 @@ _fonts_data_fill(Evas *evas)
      }
 }
 
+/**
+ * @brief Sorting function for font names.
+ *
+ * A simple string comparison function to be used with `eina_list_sort` for
+ * sorting font names alphabetically.
+ *
+ * @param data1 First font name string.
+ * @param data2 Second font name string.
+ * @return strcmp result of the two strings.
+ */
 static int
 _font_sort_cb(const void *data1,
               const void *data2)
@@ -2931,6 +3207,19 @@ _fnames_list_unselect_cb(void *data       EINA_UNUSED,
    ELM_LIST_DISABLE(sizes_list);
 }
 
+/**
+ * @brief Hash foreach callback to populate a list with font names.
+ *
+ * This function is called for each font in the `fndata.font_hash`. It extracts
+ * the font name from the `Elm_Font_Properties` and appends it to the Eina_List
+ * provided in `fdata`.
+ *
+ * @param hash The hash being iterated.
+ * @param key The hash key (font name).
+ * @param data The hash value (`Elm_Font_Properties *`).
+ * @param fdata A pointer to an `Eina_List **` to which font names are appended.
+ * @return EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 _font_list_fill(const Eina_Hash *hash EINA_UNUSED,
                 const void *key       EINA_UNUSED,
@@ -4355,6 +4644,18 @@ _status_config_caches(Evas_Object *win,
    elm_naviframe_item_simple_push(naviframe, bx);
 }
 
+/**
+ * @brief Creates the full configuration UI for interactive mode.
+ *
+ * This function sets up the main layout for the application window in
+ * interactive mode. It creates a toolbar at the top for navigating between
+ * different configuration categories and a naviframe below it to display the
+ * corresponding pages. It then calls the various `_status_config_*` functions
+ * to create and populate each page of the naviframe.
+ *
+ * @param win The main application window.
+ * @param bx0 The main box widget of the window to which the UI is added.
+ */
 static void
 _status_config_full(Evas_Object *win,
                     Evas_Object *bx0)
@@ -4465,6 +4766,28 @@ efl_terminate(void *data EINA_UNUSED,
 /* this is your elementary main function - it MUST be called IMMEDIATELY
  * after elm_init() and MUST be passed argc and argv, and MUST be called
  * elm_main and not be static - must be a visible symbol with EAPI infront */
+/**
+ * @brief The main function of the Elementary configuration application.
+ *
+ * This function is the entry point for the application. It handles command-line
+ * arguments for non-interactive configuration changes, initializes the
+ * application's metadata, and creates the main window if running in
+ * interactive mode.
+ *
+ * Command-line arguments handle:
+ * - `-h`: Show help.
+ * - `-q`: Quiet mode, no window is shown. Implies non-interactive.
+ * - `-t THEME`: Set the theme.
+ * - `-f SIZE`: Set the finger size.
+ * - `-s SCALE`: Set the global scaling factor.
+ * - `-w WEB_BACKEND`: Set the web backend engine.
+ *
+ * If any of the configuration arguments are used, the application runs
+ * non-interactively, applies the settings, and exits.
+ *
+ * @param data Not used.
+ * @param ev The Efl_Loop_App event, contains argc/argv.
+ */
 EAPI_MAIN void
 efl_main(void *data EINA_UNUSED, const Efl_Event *ev)
 {

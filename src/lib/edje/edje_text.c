@@ -33,6 +33,21 @@ part_get_geometry(Edje_Real_Part *rp, Evas_Coord *w, Evas_Coord *h)
      }
 }
 
+/**
+ * @brief Retrieves a translated string for a given Edje part, if NLS is enabled.
+ *
+ * This function looks up the text defined in the part's description,
+ * considering its specified text domain. If NLS (Native Language Support)
+ * is enabled and a translation is found for the current locale (or a
+ * language explicitly set on the Edje object), the translated string is returned.
+ * Otherwise, the original string is returned.
+ *
+ * @param ed The Edje object.
+ * @param ep The Edje real part whose text is to be translated.
+ * @return The translated string if found and NLS is active, otherwise the original string.
+ *         The caller should not free the returned string as it's managed internally
+ *         or by gettext.
+ */
 const char *
 _set_translated_string(Edje *ed, Edje_Real_Part *ep)
 {
@@ -69,11 +84,28 @@ _set_translated_string(Edje *ed, Edje_Real_Part *ep)
    return text;
 }
 
+/**
+ * @brief Initializes the Edje text subsystem.
+ *
+ * Currently, this function is a placeholder and does not perform any
+ * specific initialization tasks.
+ */
 void
 _edje_text_init(void)
 {
 }
 
+/**
+ * @brief Handles operations required when a text part is added to an Edje object.
+ *
+ * This function checks if the added part is of type TEXT. If so, and if the
+ * part's descriptions (default or others) specify a text_class, it registers
+ * the Edje object as an observer for that text_class. This allows the text part
+ * to react to changes in the text_class properties (e.g., font, size).
+ *
+ * @param ed The Edje object to which the part is being added.
+ * @param ep The Edje real part that is being added.
+ */
 void
 _edje_text_part_on_add(Edje *ed, Edje_Real_Part *ep)
 {
@@ -97,6 +129,16 @@ _edje_text_part_on_add(Edje *ed, Edje_Real_Part *ep)
      }
 }
 
+/**
+ * @brief Handles operations required when a text part is being deleted from an Edje object.
+ *
+ * This function checks if the part being deleted is of type TEXT. If so, and if
+ * the part's descriptions (default or others) were associated with a text_class,
+ * it unregisters the Edje object as an observer from that text_class.
+ *
+ * @param ed The Edje object from which the part is being deleted.
+ * @param pt The Edje part that is being deleted.
+ */
 void
 _edje_text_part_on_del(Edje *ed, Edje_Part *pt)
 {
@@ -119,6 +161,32 @@ _edje_text_part_on_del(Edje *ed, Edje_Part *pt)
      }
 }
 
+/**
+ * @brief Fits text horizontally within specified dimensions.
+ *
+ * If the text, when rendered with the given font and size, exceeds the
+ * available width (sw), this function may apply an ellipsis character
+ * based on the ellipsis value in params. It updates the Evas text object
+ * (ep->object) with the font, size, text, and dimensions.
+ *
+ * This function is typically called when `chosen_desc->text.min_x` is false,
+ * indicating that text should be truncated or ellipsized if it doesn't fit.
+ *
+ * @param ed The Edje object.
+ * @param ep The Edje real part representing the text object.
+ * @param params Calculation parameters, containing ellipsis settings and target dimensions.
+ * @param chosen_desc The chosen text description for the part.
+ * @param text The original text string to fit.
+ * @param font The font family name.
+ * @param size The font size.
+ * @param sw The target width for the text.
+ * @param sh The target height for the text (used for setting object size).
+ * @param[out] free_text Pointer to an integer flag; currently unused in this function
+ *                       but part of the signature for potential future use where
+ *                       the returned text might need freeing. It's set to 0.
+ * @return The original text string. The actual fitting (e.g., ellipsis) is
+ *         applied directly to the Evas text object.
+ */
 static const char *
 _edje_text_fit_x(Edje *ed, Edje_Real_Part *ep,
                  Edje_Calc_Params *params,
@@ -149,6 +217,26 @@ _edje_text_fit_x(Edje *ed, Edje_Real_Part *ep,
    return text;
 }
 
+/**
+ * @brief Merges a base font string with a new font string, preserving style from base if not in new.
+ *
+ * This function is used to combine font definitions. If the `new` font string
+ * does not contain a ":style=" component, but the `base` font string does,
+ * the style component from `base` is appended to `new`.
+ *
+ * Example:
+ * - base: "Sans:style=Bold", new: "DejaVu Sans" -> "DejaVu Sans:style=Bold"
+ * - base: "Sans:style=Bold", new: "DejaVu Sans:style=Italic" -> "DejaVu Sans:style=Italic" (new style takes precedence)
+ * - base: "Sans", new: "DejaVu Sans" -> "DejaVu Sans"
+ *
+ * @param base The base font string, potentially containing a style. Can be NULL.
+ * @param new The new font string. Can be NULL.
+ * @param[out] free_later If memory is allocated for the merged string, this
+ *                        pointer will be set to the allocated memory. The caller
+ *                        is responsible for freeing this memory. Otherwise, it's set to NULL.
+ * @return The merged font string. This might be `base`, `new`, or a newly
+ *         allocated string (if `*free_later` is not NULL).
+ */
 const char *
 _edje_text_font_get(const char *base, const char *new, char **free_later)
 {
@@ -179,6 +267,25 @@ _edje_text_font_get(const char *base, const char *new, char **free_later)
    return *free_later;
 }
 
+/**
+ * @brief Retrieves the effective font name and size for a text part, considering text classes.
+ *
+ * This function determines the font name and size to be used for a text part.
+ * It starts with the font and size defined directly in `chosen_desc`.
+ * If `chosen_desc` specifies a `text_class`, it finds that class and potentially
+ * overrides the font and size. The font merging logic from `_edje_text_font_get`
+ * is used if the text class provides a font. The size is calculated by
+ * `_edje_text_size_calc`.
+ *
+ * @param ed The Edje object.
+ * @param chosen_desc The chosen text description for the part.
+ * @param[out] size Pointer to an integer where the calculated font size will be stored.
+ * @param[out] free_later If a new font string is allocated (due to merging with
+ *                        text class font), this pointer will be set to the
+ *                        allocated memory. The caller is responsible for freeing it.
+ * @return The effective font name. This can be from `chosen_desc`, the text class,
+ *         or a newly allocated merged string.
+ */
 const char *
 _edje_text_class_font_get(Edje *ed, Edje_Part_Description_Text *chosen_desc, int *size, char **free_later)
 {
@@ -202,6 +309,29 @@ _edje_text_class_font_get(Edje *ed, Edje_Part_Description_Text *chosen_desc, int
    return font;
 }
 
+/**
+ * @brief Recalculates and applies text properties to a text part.
+ *
+ * This is a core function for updating the visual representation of a text part.
+ * It determines the text content (handling translations, text sources),
+ * font (handling text classes, embedded fonts, font appends), and size (handling
+ * fitting, size ranges, text classes). It then applies these properties, along
+ * with alignment, ellipsis, color, and text effects, to the Evas text object
+ * associated with the real part.
+ *
+ * The function employs a caching mechanism (`ep->typedata.text->cache`) to avoid
+ * redundant calculations if input parameters (text, size, dimensions, alignment, etc.)
+ * haven't changed.
+ *
+ * @param ed The Edje object.
+ * @param ep The Edje real part (must be a text part).
+ * @param params Calculated parameters for the part, including target dimensions,
+ *               colors, and text-specific attributes like alignment and ellipsis.
+ * @param chosen_desc The chosen text description for this state of the part.
+ * @param calc_only If EINA_TRUE, perform calculations but do not apply them
+ *                  (e.g., don't move or show the Evas object). This is typically
+ *                  used for size calculation passes.
+ */
 void
 _edje_text_recalc_apply(Edje *ed, Edje_Real_Part *ep,
                         Edje_Calc_Params *params,
@@ -686,6 +816,19 @@ arrange_text:
    if (sfont) free(sfont);
 }
 
+/**
+ * @brief Calculates the effective font size based on a base size and a text class.
+ *
+ * The text class (`tc`) can modify the base `size` in three ways:
+ * 1. If `tc->size` is 0, the base `size` is used.
+ * 2. If `tc->size` is positive, it directly specifies the new size, overriding `size`.
+ * 3. If `tc->size` is negative, it's treated as a percentage of `size`.
+ *    For example, if `size` is 20 and `tc->size` is -50, the result is (20 * 50) / 100 = 10.
+ *
+ * @param size The base font size.
+ * @param tc Pointer to the Edje_Text_Class.
+ * @return The calculated Evas_Font_Size.
+ */
 Evas_Font_Size
 _edje_text_size_calc(Evas_Font_Size size, Edje_Text_Class * tc)
 {

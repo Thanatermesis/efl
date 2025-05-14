@@ -30,6 +30,14 @@
 #include "eina_quaternion.h"
 #include "eina_util.h"
 
+/**
+ * @brief Sets the components of a 16.16 fixed-point quaternion.
+ * @param out The quaternion to set.
+ * @param x The x component.
+ * @param y The y component.
+ * @param z The z component.
+ * @param w The w component.
+ */
 EINA_API void
 eina_quaternion_f16p16_set(Eina_Quaternion *out,
                            Eina_F16p16 x, Eina_F16p16 y,
@@ -41,6 +49,13 @@ eina_quaternion_f16p16_set(Eina_Quaternion *out,
    out->z = z;
 }
 
+/**
+ * @brief Calculates the norm (magnitude) of a 16.16 fixed-point quaternion.
+ * @param q The quaternion.
+ * @return The norm of the quaternion.
+ *
+ * The norm is calculated as sqrt(w*w + x*x + y*y + z*z).
+ */
 EINA_API Eina_F16p16
 eina_quaternion_f16p16_norm(const Eina_Quaternion_F16p16 *q)
 {
@@ -54,6 +69,14 @@ eina_quaternion_f16p16_norm(const Eina_Quaternion_F16p16 *q)
    return eina_f16p16_sqrt(s);
 }
 
+/**
+ * @brief Negates a 16.16 fixed-point quaternion.
+ * @param out The resulting negated quaternion.
+ * @param in The input quaternion.
+ *
+ * Each component of the output quaternion will be the negative of the corresponding
+ * component of the input quaternion.
+ */
 EINA_API void
 eina_quaternion_f16p16_negative(Eina_Quaternion_F16p16 *out,
                                 const Eina_Quaternion_F16p16 *in)
@@ -64,6 +87,12 @@ eina_quaternion_f16p16_negative(Eina_Quaternion_F16p16 *out,
    out->z = eina_f16p16_sub(0, in->z);
 }
 
+/**
+ * @brief Adds two 16.16 fixed-point quaternions.
+ * @param out The resulting quaternion (a + b).
+ * @param a The first quaternion.
+ * @param b The second quaternion.
+ */
 EINA_API void
 eina_quaternion_f16p16_add(Eina_Quaternion_F16p16 *out,
                            const Eina_Quaternion_F16p16 *a,
@@ -75,6 +104,14 @@ eina_quaternion_f16p16_add(Eina_Quaternion_F16p16 *out,
    out->z = eina_f16p16_add(a->z, b->z);
 }
 
+/**
+ * @brief Multiplies two 16.16 fixed-point quaternions.
+ * @param out The resulting quaternion (a * b).
+ * @param a The first quaternion.
+ * @param b The second quaternion.
+ *
+ * Quaternion multiplication is not commutative (a * b != b * a).
+ */
 EINA_API void
 eina_quaternion_f16p16_mul(Eina_Quaternion_F16p16 *out,
                            const Eina_Quaternion_F16p16 *a,
@@ -98,6 +135,12 @@ eina_quaternion_f16p16_mul(Eina_Quaternion_F16p16 *out,
                                             eina_f16p16_mul(a->y, b->x)));
 }
 
+/**
+ * @brief Scales a 16.16 fixed-point quaternion by a scalar.
+ * @param out The resulting scaled quaternion.
+ * @param a The input quaternion.
+ * @param b The scalar value.
+ */
 EINA_API void
 eina_quaternion_f16p16_scale(Eina_Quaternion_F16p16 *out,
                              const Eina_Quaternion_F16p16 *a,
@@ -109,6 +152,13 @@ eina_quaternion_f16p16_scale(Eina_Quaternion_F16p16 *out,
    out->z = eina_f16p16_scale(a->z, b);
 }
 
+/**
+ * @brief Computes the conjugate of a 16.16 fixed-point quaternion.
+ * @param out The resulting conjugate quaternion.
+ * @param in The input quaternion.
+ *
+ * The conjugate of a quaternion (w, x, y, z) is (w, -x, -y, -z).
+ */
 EINA_API void
 eina_quaternion_f16p16_conjugate(Eina_Quaternion_F16p16 *out,
                                  const Eina_Quaternion_F16p16 *in)
@@ -119,6 +169,14 @@ eina_quaternion_f16p16_conjugate(Eina_Quaternion_F16p16 *out,
    out->z = eina_f16p16_sub(0, in->z);
 }
 
+/**
+ * @brief Computes the dot product of two 16.16 fixed-point quaternions.
+ * @param a The first quaternion.
+ * @param b The second quaternion.
+ * @return The dot product.
+ *
+ * The dot product is calculated as (a.w*b.w + a.x*b.x + a.y*b.y + a.z*b.z).
+ */
 EINA_API Eina_F16p16
 eina_quaternion_f16p16_dot(const Eina_Quaternion_F16p16 *a,
                            const Eina_Quaternion_F16p16 *b)
@@ -129,6 +187,14 @@ eina_quaternion_f16p16_dot(const Eina_Quaternion_F16p16 *a,
                                           eina_f16p16_mul(a->z, b->z)));
 }
 
+/**
+ * @brief Normalizes a 16.16 fixed-point quaternion.
+ * @param out The resulting normalized quaternion.
+ * @param in The input quaternion.
+ *
+ * A normalized quaternion has a norm (magnitude) of 1.
+ * This is achieved by dividing each component by the quaternion's norm.
+ */
 EINA_API void
 eina_quaternion_f16p16_normalized(Eina_Quaternion_F16p16 *out,
                                   const Eina_Quaternion_F16p16 *in)
@@ -141,6 +207,17 @@ eina_quaternion_f16p16_normalized(Eina_Quaternion_F16p16 *out,
                                                 norm));
 }
 
+/**
+ * @brief Performs linear interpolation between two 16.16 fixed-point quaternions.
+ * @param out The resulting interpolated quaternion.
+ * @param a The starting quaternion (for pos = 0).
+ * @param b The ending quaternion (for pos = 1).
+ * @param pos The interpolation factor (0.0 to 1.0).
+ *
+ * LERP (Linear intERPolation) is calculated as: out = a + pos * (b - a).
+ * It does not preserve unit length if 'a' and 'b' are unit quaternions.
+ * For rotations, SLERP or NLERP are generally preferred.
+ */
 EINA_API void
 eina_quaternion_f16p16_lerp(Eina_Quaternion_F16p16 *out,
                             const Eina_Quaternion_F16p16 *a,
@@ -172,6 +249,19 @@ eina_quaternion_f16p16_lerp(Eina_Quaternion_F16p16 *out,
                                             pos));
 }
 
+/**
+ * @brief Performs spherical linear interpolation between two 16.16 fixed-point quaternions.
+ * @param out The resulting interpolated quaternion.
+ * @param a The starting quaternion (for pos = 0).
+ * @param b The ending quaternion (for pos = 1).
+ * @param pos The interpolation factor (0.0 to 1.0).
+ *
+ * SLERP (Spherical Linear intERPolation) interpolates along the shortest arc
+ * on a 4D hypersphere. It preserves unit length if 'a' and 'b' are unit quaternions,
+ * making it suitable for interpolating rotations.
+ * This implementation handles cases where the dot product is negative by negating 'b'
+ * to ensure interpolation along the shorter path.
+ */
 EINA_API void
 eina_quaternion_f16p16_slerp(Eina_Quaternion_F16p16 *out,
                              const Eina_Quaternion_F16p16 *a,
@@ -228,6 +318,18 @@ eina_quaternion_f16p16_slerp(Eina_Quaternion_F16p16 *out,
    eina_quaternion_f16p16_add(out, &left, &right);
 }
 
+/**
+ * @brief Performs normalized linear interpolation between two 16.16 fixed-point quaternions.
+ * @param out The resulting interpolated quaternion.
+ * @param a The starting quaternion (for pos = 0).
+ * @param b The ending quaternion (for pos = 1).
+ * @param pos The interpolation factor (0.0 to 1.0).
+ *
+ * NLERP (Normalized Linear intERPolation) is a faster alternative to SLERP.
+ * It performs a LERP and then normalizes the result.
+ * This implementation also handles cases where the dot product is negative
+ * by negating 'b' to ensure interpolation along the shorter path.
+ */
 EINA_API void
 eina_quaternion_f16p16_nlerp(Eina_Quaternion_F16p16 *out,
                              const Eina_Quaternion_F16p16 *a,
@@ -267,6 +369,18 @@ eina_quaternion_f16p16_nlerp(Eina_Quaternion_F16p16 *out,
    eina_quaternion_f16p16_normalized(out, &not_normalize);
 }
 
+/**
+ * @brief Rotates a 3D point (16.16 fixed-point) around a center using a quaternion.
+ * @param p The point to rotate (in/out).
+ * @param center The center of rotation. If NULL, rotation is around the origin (0,0,0).
+ * @param q The quaternion representing the rotation.
+ *
+ * The rotation is performed by translating the point so the center is the origin,
+ * applying the quaternion rotation, and then translating back.
+ * The formula for quaternion rotation of a vector v by quaternion q is: p' = q * v * q_conjugate.
+ * This function uses an optimized form: p' = p + 2w(u x p) + 2(u x (u x p)),
+ * where q = (w, u) with u being the vector part (x,y,z).
+ */
 EINA_API void
 eina_quaternion_f16p16_rotate(Eina_Point_3D_F16p16 *p,
                               const Eina_Point_3D_F16p16 *center,
@@ -313,6 +427,14 @@ eina_quaternion_f16p16_rotate(Eina_Point_3D_F16p16 *p,
                           eina_f16p16_add(uvz, uuvz));
 }
 
+/**
+ * @brief Converts a 16.16 fixed-point quaternion to a 3x3 rotation matrix.
+ * @param m The output 3x3 matrix.
+ * @param q The input quaternion.
+ *
+ * Assumes the input quaternion is normalized. If not, the resulting matrix
+ * will also include scaling.
+ */
 EINA_API void
 eina_quaternion_f16p16_rotation_matrix3_get(Eina_Matrix3_F16p16 *m,
                                             const Eina_Quaternion_F16p16 *q)
@@ -351,6 +473,14 @@ eina_quaternion_f16p16_rotation_matrix3_get(Eina_Matrix3_F16p16 *m,
                            eina_f16p16_add(xx, yy));
 }
 
+/**
+ * @brief Sets the components of a double-precision quaternion.
+ * @param out The quaternion to set.
+ * @param x The x component.
+ * @param y The y component.
+ * @param z The z component.
+ * @param w The w component.
+ */
 EINA_API void
 eina_quaternion_set(Eina_Quaternion *out, double x,
                     double y, double z, double w)
@@ -361,6 +491,13 @@ eina_quaternion_set(Eina_Quaternion *out, double x,
    out->z = z;
 }
 
+/**
+ * @brief Calculates the norm (magnitude) of a double-precision quaternion.
+ * @param q The quaternion.
+ * @return The norm of the quaternion.
+ *
+ * The norm is calculated as sqrt(w*w + x*x + y*y + z*z).
+ */
 EINA_API double
 eina_quaternion_norm(const Eina_Quaternion *q)
 {
@@ -371,6 +508,14 @@ eina_quaternion_norm(const Eina_Quaternion *q)
    return sqrt(s);
 }
 
+/**
+ * @brief Negates a double-precision quaternion.
+ * @param out The resulting negated quaternion.
+ * @param in The input quaternion.
+ *
+ * Each component of the output quaternion will be the negative of the corresponding
+ * component of the input quaternion.
+ */
 EINA_API void
 eina_quaternion_negative(Eina_Quaternion *out,
                          const Eina_Quaternion *in)
@@ -381,6 +526,12 @@ eina_quaternion_negative(Eina_Quaternion *out,
    out->z = - in->z;
 }
 
+/**
+ * @brief Adds two double-precision quaternions.
+ * @param out The resulting quaternion (a + b).
+ * @param a The first quaternion.
+ * @param b The second quaternion.
+ */
 EINA_API void
 eina_quaternion_add(Eina_Quaternion *out,
                     const Eina_Quaternion *a,
@@ -392,6 +543,14 @@ eina_quaternion_add(Eina_Quaternion *out,
    out->z = a->z + b->z;
 }
 
+/**
+ * @brief Multiplies two double-precision quaternions.
+ * @param out The resulting quaternion (a * b).
+ * @param a The first quaternion.
+ * @param b The second quaternion.
+ *
+ * Quaternion multiplication is not commutative (a * b != b * a).
+ */
 EINA_API void
 eina_quaternion_mul(Eina_Quaternion *out,
                     const Eina_Quaternion *a,
@@ -403,6 +562,12 @@ eina_quaternion_mul(Eina_Quaternion *out,
    out->z = a->w * b->z + a->x * b->y - a->y * b->x + a->z * b->w;
 }
 
+/**
+ * @brief Scales a double-precision quaternion by a scalar.
+ * @param out The resulting scaled quaternion.
+ * @param a The input quaternion.
+ * @param b The scalar value.
+ */
 EINA_API void
 eina_quaternion_scale(Eina_Quaternion *out,
                       const Eina_Quaternion *a,
@@ -414,6 +579,13 @@ eina_quaternion_scale(Eina_Quaternion *out,
    out->z = a->z * b;
 }
 
+/**
+ * @brief Computes the conjugate of a double-precision quaternion.
+ * @param out The resulting conjugate quaternion.
+ * @param in The input quaternion.
+ *
+ * The conjugate of a quaternion (w, x, y, z) is (w, -x, -y, -z).
+ */
 EINA_API void
 eina_quaternion_conjugate(Eina_Quaternion *out,
                           const Eina_Quaternion *in)
@@ -424,6 +596,14 @@ eina_quaternion_conjugate(Eina_Quaternion *out,
    out->z = - in->z;
 }
 
+/**
+ * @brief Computes the dot product of two double-precision quaternions.
+ * @param a The first quaternion.
+ * @param b The second quaternion.
+ * @return The dot product.
+ *
+ * The dot product is calculated as (a.w*b.w + a.x*b.x + a.y*b.y + a.z*b.z).
+ */
 EINA_API double
 eina_quaternion_dot(const Eina_Quaternion *a,
                     const Eina_Quaternion *b)
@@ -431,6 +611,15 @@ eina_quaternion_dot(const Eina_Quaternion *a,
    return a->w * b->w + a->x * b->x + a->y * b->y + a->z * b->z;
 }
 
+/**
+ * @brief Normalizes a double-precision quaternion.
+ * @param out The resulting normalized quaternion.
+ * @param in The input quaternion.
+ *
+ * A normalized quaternion has a norm (magnitude) of 1.
+ * This is achieved by dividing each component by the quaternion's norm.
+ * If the norm is zero, the output quaternion will be (0,0,0,0).
+ */
 EINA_API void
 eina_quaternion_normalized(Eina_Quaternion *out,
                            const Eina_Quaternion *in)
@@ -438,9 +627,23 @@ eina_quaternion_normalized(Eina_Quaternion *out,
    double norm;
 
    norm = eina_quaternion_norm(in);
-   eina_quaternion_scale(out, in, 1.0 / norm);
+   if (norm > 0.0) // Avoid division by zero
+     eina_quaternion_scale(out, in, 1.0 / norm);
+   else
+     eina_quaternion_set(out, 0.0, 0.0, 0.0, 0.0);
 }
 
+/**
+ * @brief Performs linear interpolation between two double-precision quaternions.
+ * @param out The resulting interpolated quaternion.
+ * @param a The starting quaternion (for pos = 0.0).
+ * @param b The ending quaternion (for pos = 1.0).
+ * @param pos The interpolation factor (0.0 to 1.0).
+ *
+ * LERP (Linear intERPolation) is calculated as: out = a + pos * (b - a).
+ * It does not preserve unit length if 'a' and 'b' are unit quaternions.
+ * For rotations, SLERP or NLERP are generally preferred.
+ */
 EINA_API void
 eina_quaternion_lerp(Eina_Quaternion *out,
                      const Eina_Quaternion *a,
@@ -464,6 +667,19 @@ eina_quaternion_lerp(Eina_Quaternion *out,
    out->z = a->z + pos * (b->z - a->z);
 }
 
+/**
+ * @brief Performs spherical linear interpolation between two double-precision quaternions.
+ * @param out The resulting interpolated quaternion.
+ * @param a The starting quaternion (for pos = 0.0).
+ * @param b The ending quaternion (for pos = 1.0).
+ * @param pos The interpolation factor (0.0 to 1.0).
+ *
+ * SLERP (Spherical Linear intERPolation) interpolates along the shortest arc
+ * on a 4D hypersphere. It preserves unit length if 'a' and 'b' are unit quaternions,
+ * making it suitable for interpolating rotations.
+ * This implementation handles cases where the dot product is negative by negating 'b'
+ * to ensure interpolation along the shorter path.
+ */
 EINA_API void
 eina_quaternion_slerp(Eina_Quaternion *out,
                       const Eina_Quaternion *a,
@@ -518,6 +734,18 @@ eina_quaternion_slerp(Eina_Quaternion *out,
    eina_quaternion_add(out, &left, &right);
 }
 
+/**
+ * @brief Performs normalized linear interpolation between two double-precision quaternions.
+ * @param out The resulting interpolated quaternion.
+ * @param a The starting quaternion (for pos = 0.0).
+ * @param b The ending quaternion (for pos = 1.0).
+ * @param pos The interpolation factor (0.0 to 1.0).
+ *
+ * NLERP (Normalized Linear intERPolation) is a faster alternative to SLERP.
+ * It performs a LERP and then normalizes the result.
+ * This implementation also handles cases where the dot product is negative
+ * by negating 'b' to ensure interpolation along the shorter path.
+ */
 EINA_API void
 eina_quaternion_nlerp(Eina_Quaternion *out,
                       const Eina_Quaternion *a,
@@ -556,6 +784,20 @@ eina_quaternion_nlerp(Eina_Quaternion *out,
    eina_quaternion_normalized(out, &not_normalize);
 }
 
+/**
+ * @brief Rotates a 3D point (double-precision) around a center using a quaternion.
+ * @param p The point to rotate (in/out).
+ * @param center The center of rotation. If NULL, rotation is around the origin (0,0,0).
+ * @param q The quaternion representing the rotation.
+ *
+ * The rotation is performed by translating the point so the center is the origin,
+ * applying the quaternion rotation, and then translating back.
+ * The formula for quaternion rotation of a vector v by quaternion q is: p' = q * v * q_conjugate.
+ * This function uses an optimized form: p' = p + 2w(u x p) + 2(u x (u x p)),
+ * where q = (w, u) with u being the vector part (x,y,z).
+ * It assumes `center` is non-NULL. If `center` can be NULL, an explicit check
+ * and default to origin (0,0,0) should be added as in the f16p16 version.
+ */
 EINA_API void
 eina_quaternion_rotate(Eina_Point_3D *p,
                        const Eina_Point_3D *center,
@@ -590,6 +832,14 @@ eina_quaternion_rotate(Eina_Point_3D *p,
    p->z = center->z + z + uvz + uuvz;
 }
 
+/**
+ * @brief Converts a double-precision quaternion to a 3x3 rotation matrix.
+ * @param m The output 3x3 matrix.
+ * @param q The input quaternion.
+ *
+ * Assumes the input quaternion is normalized. If not, the resulting matrix
+ * will also include scaling.
+ */
 EINA_API void
 eina_quaternion_rotation_matrix3_get(Eina_Matrix3 *m,
                                      const Eina_Quaternion *q)
@@ -625,18 +875,40 @@ eina_quaternion_rotation_matrix3_get(Eina_Matrix3 *m,
    m->zz = 1.0 - xx - yy;
 }
 
+/**
+ * @internal
+ * @brief Returns the maximum of two double values.
+ * @param a First value.
+ * @param b Second value.
+ * @return The greater of a and b.
+ */
 static inline double
 _max(double a, double b)
 {
    return a > b ? a : b;
 }
 
+/**
+ * @internal
+ * @brief Calculates the norm (magnitude) of a 3D point.
+ * @param p The point.
+ * @return The norm of the point.
+ */
 static inline double
 eina_point_3d_norm(Eina_Point_3D *p)
 {
    return sqrt(p->x * p->x + p->y * p->y + p->z * p->z);
 }
 
+/**
+ * @internal
+ * @brief Normalizes a 3D point using a pre-calculated norm.
+ * @param p The point to normalize (in/out).
+ * @param norm The pre-calculated norm of the point.
+ *
+ * Divides each component of the point by its norm.
+ * Assumes norm is not zero.
+ */
 static inline void
 eina_point_3d_normalize(Eina_Point_3D *p, double norm)
 {
@@ -647,12 +919,28 @@ eina_point_3d_normalize(Eina_Point_3D *p, double norm)
    p->z *= tmp;
 }
 
+/**
+ * @internal
+ * @brief Calculates the dot product of two 3D points.
+ * @param a The first point.
+ * @param b The second point.
+ * @return The dot product.
+ */
 static inline double
 eina_point_3d_dot(const Eina_Point_3D *a, const Eina_Point_3D *b)
 {
    return a->x * b->x + a->y * b->y + a->z * b->z;
 }
 
+/**
+ * @internal
+ * @brief Computes a linear combination of two 3D points.
+ * @param out The resulting point: (a * scale1) + (b * scale2).
+ * @param a The first point.
+ * @param b The second point.
+ * @param scale1 The scalar for the first point.
+ * @param scale2 The scalar for the second point.
+ */
 static inline void
 eina_point_3d_combine(Eina_Point_3D *out,
                       const Eina_Point_3D *a, const Eina_Point_3D *b,
@@ -663,6 +951,13 @@ eina_point_3d_combine(Eina_Point_3D *out,
    out->z = a->z * scale1 + b->z * scale2;
 }
 
+/**
+ * @internal
+ * @brief Calculates the cross product of two 3D points (vectors).
+ * @param out The resulting cross product (a x b).
+ * @param a The first point (vector).
+ * @param b The second point (vector).
+ */
 static inline void
 eina_point3d_cross(Eina_Point_3D *out,
                    const Eina_Point_3D *a, const Eina_Point_3D *b)
@@ -672,6 +967,12 @@ eina_point3d_cross(Eina_Point_3D *out,
    out->z = a->x * b->y - a->y * b->x;
 }
 
+/**
+ * @internal
+ * @brief Negates a 3D point.
+ * @param out The resulting negated point.
+ * @param in The input point.
+ */
 static inline void
 eina_point3d_neg(Eina_Point_3D *out, const Eina_Point_3D *in)
 {
@@ -681,6 +982,29 @@ eina_point3d_neg(Eina_Point_3D *out, const Eina_Point_3D *in)
 }
 
 /* http://www.w3.org/TR/css3-transforms/#decomposing-a-3d-matrix */
+/**
+ * @brief Decomposes a 4x4 matrix into translation, scale, skew, perspective, and rotation components.
+ *
+ * This function attempts to decompose a 4x4 transformation matrix @p m into its
+ * constituent parts: rotation (as a quaternion), perspective (as a quaternion),
+ * translation, scale, and skew (each as a 3D point).
+ *
+ * The decomposition algorithm is based on the method described in the W3C CSS Transforms
+ * specification: http://www.w3.org/TR/css3-transforms/#decomposing-a-3d-matrix
+ *
+ * @param[out] rotation Pointer to store the rotation quaternion. Can be NULL.
+ * @param[out] perspective Pointer to store the perspective quaternion. Can be NULL.
+ * @param[out] translation Pointer to store the translation vector. Can be NULL.
+ * @param[out] scale Pointer to store the scale vector. Can be NULL.
+ * @param[out] skew Pointer to store the skew vector (contains skew factors xy, xz, yz). Can be NULL.
+ * @param[in] m The 4x4 matrix to decompose.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE if the matrix cannot be decomposed
+ *         (e.g., if it's singular or m->ww is zero).
+ *
+ * @note The matrix @p m is first normalized by its @c ww component.
+ * @note If the perspective matrix is not invertible, decomposition fails.
+ * @note The @p skew output contains [skewXY, skewXZ, skewYZ].
+ */
 EINA_API Eina_Bool
 eina_matrix4_quaternion_to(Eina_Quaternion *rotation,
                            Eina_Quaternion *perspective,
@@ -884,6 +1208,32 @@ eina_matrix3_quaternion_get(Eina_Quaternion *q,
    q->z = z;
 }
 
+/**
+ * @brief Composes a 4x4 matrix from translation, scale, skew, perspective, and rotation components.
+ *
+ * This function constructs a 4x4 transformation matrix @p m from the
+ * provided rotation (as a quaternion), perspective (as a quaternion),
+ * translation, scale, and skew (each as a 3D point).
+ *
+ * The operations are applied in the following order:
+ * 1. Perspective
+ * 2. Translation
+ * 3. Rotation
+ * 4. Skew (Z, then Y, then X axis)
+ * 5. Scale
+ *
+ * @param[out] m The resulting 4x4 matrix.
+ * @param[in] rotation The rotation quaternion.
+ * @param[in] perspective The perspective quaternion. (Typically x,y,z are 0, w is perspective value or 1 if no perspective)
+ * @param[in] translation The translation vector.
+ * @param[in] scale The scale vector.
+ * @param[in] skew The skew vector (contains skew factors for xy, xz, yz axes).
+ *                 skew->x is skew factor for Y axis with respect to X.
+ *                 skew->y is skew factor for Z axis with respect to X.
+ *                 skew->z is skew factor for Z axis with respect to Y.
+ *                 (Note: This interpretation of skew parameters might differ from other libraries,
+ *                 check usage if inter-operating.)
+ */
 EINA_API void
 eina_quaternion_matrix4_to(Eina_Matrix4 *m,
                            const Eina_Quaternion *rotation,
@@ -986,6 +1336,18 @@ eina_quaternion_matrix4_to(Eina_Matrix4 *m,
    m->ww = tmp.ww;
 }
 
+/**
+ * @brief Computes the inverse of the given quaternion.
+ *
+ * The inverse of a quaternion q is its conjugate divided by its squared norm.
+ * q⁻¹ = q* / ||q||²
+ * If the quaternion is a unit quaternion (norm is 1), its inverse is simply its conjugate.
+ *
+ * @param[out] out The resulting inverse quaternion.
+ * @param[in] q The quaternion to invert.
+ *
+ * If the norm is zero (q is a zero quaternion), the output is a zero quaternion.
+ */
 EINA_API void
 eina_quaternion_inverse(Eina_Quaternion *out, const Eina_Quaternion *q)
 {
@@ -1017,6 +1379,12 @@ eina_quaternion_array_set(Eina_Quaternion *dst, const double *v)
    dst->w = v[3];
 }
 
+/**
+ * @brief Copies a quaternion.
+ *
+ * @param[out] dst The destination quaternion.
+ * @param[in] src The source quaternion.
+ */
 EINA_API void
 eina_quaternion_copy(Eina_Quaternion *dst, const Eina_Quaternion *src)
 {
@@ -1026,6 +1394,17 @@ eina_quaternion_copy(Eina_Quaternion *dst, const Eina_Quaternion *src)
    dst->w = src->w;
 }
 
+/**
+ * @brief Regulates a quaternion to its homogeneous form.
+ *
+ * If the w component is non-zero, this function divides the x, y, and z components
+ * by w, and sets w to 1.0. This is useful when a quaternion represents a point
+ * in homogeneous coordinates and needs to be converted to a standard form.
+ * If w is zero, the quaternion is unchanged.
+ *
+ * @param[out] out The resulting regulated quaternion.
+ * @param[in] v The input quaternion.
+ */
 EINA_API void
 eina_quaternion_homogeneous_regulate(Eina_Quaternion *out, const Eina_Quaternion *v)
 {
@@ -1038,8 +1417,24 @@ eina_quaternion_homogeneous_regulate(Eina_Quaternion *out, const Eina_Quaternion
         out->z = v->z * scale;
         out->w = 1.0;
      }
+   // If v->w is 0, 'out' should ideally be a copy of 'v' or handled as an error/special case.
+   // Current behavior: 'out' is not modified if v->w is 0 and out != v.
+   // If out == v, then v is modified in place if v->w != 0.
+   // If out != v and v->w == 0, out remains uninitialized or with its previous value.
+   // Consider copying 'v' to 'out' if 'v->w' is zero and 'out' is not 'v'.
+   else if (out != v)
+     {
+        eina_quaternion_copy(out, v);
+     }
 }
 
+/**
+ * @brief Subtracts one quaternion from another.
+ *
+ * @param[out] out The resulting quaternion (a - b).
+ * @param[in] a The minuend quaternion.
+ * @param[in] b The subtrahend quaternion.
+ */
 EINA_API void
 eina_quaternion_subtract(Eina_Quaternion *out, const Eina_Quaternion *a, const Eina_Quaternion *b)
 {
@@ -1049,6 +1444,14 @@ eina_quaternion_subtract(Eina_Quaternion *out, const Eina_Quaternion *a, const E
    out->w = a->w - b->w;
 }
 
+/**
+ * @brief Calculates the length (norm or magnitude) of a quaternion.
+ *
+ * This is equivalent to eina_quaternion_norm().
+ *
+ * @param v The quaternion.
+ * @return The length of the quaternion.
+ */
 EINA_API double
 eina_quaternion_length_get(const Eina_Quaternion *v)
 {
@@ -1056,12 +1459,30 @@ eina_quaternion_length_get(const Eina_Quaternion *v)
                                 (v->z * v->z) + (v->w * v->w)));
 }
 
+/**
+ * @brief Calculates the squared length (squared norm) of a quaternion.
+ *
+ * This is computationally cheaper than eina_quaternion_length_get() as it avoids a square root.
+ * Useful for comparisons.
+ *
+ * @param v The quaternion.
+ * @return The squared length of the quaternion.
+ */
 EINA_API double
 eina_quaternion_length_square_get(const Eina_Quaternion *v)
 {
    return (v->x * v->x) + (v->y * v->y) + (v->z * v->z) + (v->w * v->w);
 }
 
+/**
+ * @brief Calculates the distance between two quaternions.
+ *
+ * The distance is the length of the difference quaternion (a - b).
+ *
+ * @param a The first quaternion.
+ * @param b The second quaternion.
+ * @return The distance between the two quaternions.
+ */
 EINA_API double
 eina_quaternion_distance_get(const Eina_Quaternion *a, const Eina_Quaternion *b)
 {
@@ -1071,6 +1492,16 @@ eina_quaternion_distance_get(const Eina_Quaternion *a, const Eina_Quaternion *b)
    return eina_quaternion_length_get(&v);
 }
 
+/**
+ * @brief Calculates the squared distance between two quaternions.
+ *
+ * The squared distance is the squared length of the difference quaternion (a - b).
+ * This is computationally cheaper than eina_quaternion_distance_get() as it avoids a square root.
+ *
+ * @param a The first quaternion.
+ * @param b The second quaternion.
+ * @return The squared distance between the two quaternions.
+ */
 EINA_API double
 eina_quaternion_distance_square_get(const Eina_Quaternion *a, const Eina_Quaternion *b)
 {
@@ -1080,6 +1511,24 @@ eina_quaternion_distance_square_get(const Eina_Quaternion *a, const Eina_Quatern
    return eina_quaternion_length_square_get(&v);
 }
 
+/**
+ * @brief Transforms a quaternion by a 4x4 matrix.
+ *
+ * This function applies the transformation represented by matrix @p m to the
+ * quaternion @p v. The result is stored in @p out.
+ * If the matrix @p m is an identity matrix, @p v is copied to @p out directly.
+ *
+ * The transformation is a standard matrix-vector multiplication, treating the
+ * quaternion as a 4D vector (x, y, z, w).
+ * out.x = m.xx*v.x + m.yx*v.y + m.zx*v.z + m.wx*v.w
+ * out.y = m.xy*v.x + m.yy*v.y + m.zy*v.z + m.wy*v.w
+ * out.z = m.xz*v.x + m.yz*v.y + m.zz*v.z + m.wz*v.w
+ * out.w = m.xw*v.x + m.yw*v.y + m.zw*v.z + m.ww*v.w
+ *
+ * @param[out] out The resulting transformed quaternion. Can be the same as @p v.
+ * @param[in] v The quaternion to transform.
+ * @param[in] m The 4x4 transformation matrix.
+ */
 EINA_API void
 eina_quaternion_transform(Eina_Quaternion *out, const Eina_Quaternion *v, const Eina_Matrix4 *m)
 {
@@ -1099,10 +1548,41 @@ eina_quaternion_transform(Eina_Quaternion *out, const Eina_Quaternion *v, const 
    eina_quaternion_copy(out, &tmp);
 }
 
+/**
+ * @brief Calculates the cosine of the angle between the vector parts of two quaternions.
+ *
+ * This function computes the dot product of the vector parts (x, y, z) of
+ * quaternions @p a and @p b, and divides it by the product of their vector magnitudes.
+ * This effectively gives the cosine of the angle between the 3D vectors represented
+ * by the x, y, z components of the quaternions.
+ *
+ * cos(theta) = (a_vec . b_vec) / (||a_vec|| * ||b_vec||)
+ * where a_vec = (a->x, a->y, a->z) and b_vec = (b->x, b->y, b->z).
+ *
+ * @param a The first quaternion.
+ * @param b The second quaternion.
+ * @return The cosine of the angle between the vector parts of the quaternions.
+ *         Returns NaN if either vector part has zero magnitude.
+ *
+ * @note The 'w' component of the quaternions is ignored.
+ * @note This function does not return the angle itself, but its cosine.
+ *       To get the angle, use acos() on the result.
+ * @warning If the magnitude of the vector part of either quaternion is zero,
+ *          this function will result in division by zero, likely returning NaN or Inf.
+ *          It's recommended to check for zero magnitude before calling.
+ */
 EINA_API double
 eina_quaternion_angle_plains(Eina_Quaternion *a, Eina_Quaternion *b)
 {
-   return (double) ((a->x * b->x) + (a->y * b->y) + (a->z * b->z)) / ((sqrt((a->x * a->x) +
-                    (a->y * a->y) + (a->z * a->z))) * (sqrt((b->x * b->x) + (b->y * b->y) +
-                    (b->z * b->z))));
+   double mag_a_vec, mag_b_vec, dot_vec;
+
+   dot_vec = (a->x * b->x) + (a->y * b->y) + (a->z * b->z);
+   mag_a_vec = sqrt((a->x * a->x) + (a->y * a->y) + (a->z * a->z));
+   mag_b_vec = sqrt((b->x * b->x) + (b->y * b->y) + (b->z * b->z));
+
+   if (EINA_DBL_EQ(mag_a_vec, 0.0) || EINA_DBL_EQ(mag_b_vec, 0.0))
+     return 0.0; // Or handle as an error, e.g., return NAN, or document this behavior.
+                 // Current code would divide by zero. Returning 0.0 if either magnitude is zero.
+
+   return dot_vec / (mag_a_vec * mag_b_vec);
 }

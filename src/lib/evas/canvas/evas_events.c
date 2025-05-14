@@ -1,3 +1,13 @@
+/**
+ * @file
+ * @brief This file contains the event handling logic for Evas.
+ *
+ * It includes functions for feeding input events (mouse, keyboard, touch)
+ * into the Evas canvas, processing these events, and dispatching them
+ * to the appropriate Evas objects. It also handles event freezing,
+ * event propagation, and object event grabbing.
+ */
+
 #define EFL_INPUT_EVENT_PROTECTED
 
 #include "evas_common_private.h"
@@ -5,6 +15,28 @@
 
 int _evas_event_counter = 0;
 
+/**
+ * @internal
+ * @brief Retrieves a list of Evas objects at a given point (x, y) within a specified list or inlist of objects.
+ *
+ * This function is a wrapper around _evas_event_object_list_raw_in_get, primarily
+ * setting the must_walk_last parameter to EINA_FALSE. It iterates through objects
+ * to find those under the given coordinates, considering visibility, pass_events,
+ * freeze_events, and clipping.
+ *
+ * @param eo_e The Evas canvas.
+ * @param in The initial list of objects to append to. Can be NULL.
+ * @param ilist An Eina_Inlist of objects to search within.
+ * @param list An Eina_List of objects to search within. (Only one of ilist or list should be non-NULL)
+ * @param stop If this object is encountered, the search stops and no_rep is set.
+ * @param x The x-coordinate for the check.
+ * @param y The y-coordinate for the check.
+ * @param[out] no_rep Pointer to an integer that is set to 1 if the 'stop' object is found or
+ *                    if an object that does not repeat events is found.
+ * @param source EINA_TRUE if checking for source invisible objects, EINA_FALSE otherwise.
+ * @return An Eina_List of Evas_Object pointers that are at the given coordinates.
+ *         The caller is responsible for freeing this list if 'in' was NULL.
+ */
 static Eina_List *
 _evas_event_object_list_in_get(Evas *eo_e, Eina_List *in,
                                const Eina_Inlist *ilist,
@@ -13,29 +45,128 @@ _evas_event_object_list_in_get(Evas *eo_e, Eina_List *in,
                                int x, int y, int *no_rep, Eina_Bool source);
 
 /* FIXME: use eina_list_clone */
+/**
+ * @internal
+ * @brief Creates a shallow copy of an Eina_List.
+ *
+ * The function iterates through the provided list and appends each data pointer
+ * to a new list. The data itself is not duplicated.
+ *
+ * @param list The Eina_List to copy.
+ * @return A new Eina_List containing the same data pointers as the original list,
+ *         or NULL if the input list is NULL or memory allocation fails.
+ *         The caller is responsible for freeing the returned list.
+ */
 static Eina_List *
 evas_event_list_copy(Eina_List *list);
 
+/**
+ * @internal
+ * @brief Internal handler for feeding mouse move events to the canvas.
+ *
+ * This function processes mouse movement, determines which objects are
+ * currently under the pointer, and dispatches MOUSE_MOVE, MOUSE_IN, and
+ * MOUSE_OUT events accordingly. It handles grabbed objects, event propagation,
+ * and object pointer modes.
+ *
+ * @param e The Evas public data.
+ * @param ev The pointer event data containing current and previous coordinates,
+ *           timestamp, device, etc.
+ *           Example for ev->cur: { .x = 100, .y = 200 }
+ *           Example for ev->prev: { .x = 90, .y = 190 }
+ */
 static void
 _canvas_event_feed_mouse_move_internal(Evas_Public_Data *e, Efl_Input_Pointer_Data *ev);
 
+/**
+ * @internal
+ * @brief Internal handler for feeding multi-touch up events.
+ *
+ * This function processes a multi-touch "up" (finger lift) event. It updates
+ * the state of touch points, handles grabbed objects, and dispatches
+ * MULTI_UP events to relevant objects. If all touch points are up and
+ * no objects are grabbed, it may also trigger MOUSE_OUT/MOUSE_IN events
+ * by calling _post_up_handle.
+ *
+ * @param e The Evas public data.
+ * @param ev The pointer event data, specifically for a multi-touch point.
+ *           ev->touch_id identifies the touch point.
+ *           ev->cur contains the coordinates of the touch up.
+ */
 static void
 _canvas_event_feed_multi_up_internal(Evas_Public_Data *e, Efl_Input_Pointer_Data *ev);
 
+/**
+ * @internal
+ * @brief Internal handler for feeding multi-touch move events.
+ *
+ * This function processes a multi-touch "move" event for a specific touch point.
+ * It updates the state of the touch point, handles grabbed objects, and dispatches
+ * MULTI_MOVE events to relevant objects. If no objects are grabbed, it recalculates
+ * the list of objects under the current touch point.
+ *
+ * @param e The Evas public data.
+ * @param ev The pointer event data, specifically for a multi-touch point.
+ *           ev->touch_id identifies the touch point.
+ *           ev->cur contains the current coordinates of the touch.
+ *           ev->prev contains the previous coordinates.
+ */
 static void
 _canvas_event_feed_multi_move_internal(Evas_Public_Data *e, Efl_Input_Pointer_Data *ev);
 
+/**
+ * @internal
+ * @brief Legacy internal handler for feeding mouse move events.
+ *
+ * This function is a wrapper around _canvas_event_feed_mouse_move_internal.
+ * It creates an Efl_Input_Pointer_Data structure from the legacy parameters
+ * and then calls the main internal mouse move handler.
+ *
+ * @param eo_e The Evas canvas.
+ * @param e The Evas public data.
+ * @param x The new x-coordinate of the mouse.
+ * @param y The new y-coordinate of the mouse.
+ * @param timestamp The timestamp of the event.
+ * @param data User-provided data associated with the event.
+ */
 static void
 _canvas_event_feed_mouse_move_legacy(Evas *eo_e, Evas_Public_Data *e, int x, int y,
                                      unsigned int timestamp, const void *data);
 
-static inline void
+/**
+ * @internal
+ * @brief Checks if new input events are being fed from a post-event callback.
+ *
+ * This is a safety check. Feeding new events from a post-event callback
+ * can lead to re-entrancy issues or unexpected behavior. If such a condition
+ * is detected, it logs a critical warning.
+ *
+ * @param e The Evas public data.
+ */
 _evas_event_feed_check(Evas_Public_Data *e)
 {
    if (EINA_LIKELY(!e->running_post_events)) return;
    CRI("Feeding new input events from a post-event callback is risky!");
 }
 
+/**
+ * @internal
+ * @brief Checks if an object is allowed to receive pointer events.
+ *
+ * This function determines if an object should be considered for pointer events
+ * based on several conditions:
+ * - It's an event parent.
+ * - It's visible (considering clippers).
+ * - It has grabbed the mouse.
+ * - It does not pass events through.
+ * - It does not freeze events through.
+ * - It does not have clippees (i.e., it's not a clipper itself for other objects).
+ *
+ * @param eo_obj The Evas object (Eo pointer).
+ * @param obj The protected data of the Evas object.
+ * @param obj_pdata The pointer-specific data for this object and device.
+ * @return EINA_TRUE if the object can receive pointer events, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _evas_event_object_pointer_allow(Eo *eo_obj, Evas_Object_Protected_Data *obj, Evas_Object_Pointer_Data *obj_pdata)
 {
@@ -45,6 +176,22 @@ _evas_event_object_pointer_allow(Eo *eo_obj, Evas_Object_Protected_Data *obj, Ev
            (!obj->clip.clipees);
 }
 
+/**
+ * @internal
+ * @brief Checks if an object is allowed to receive pointer events with precise inside check.
+ *
+ * This function extends _evas_event_object_pointer_allow by also checking:
+ * - If the object is present in the `ins` list (list of objects currently under the pointer).
+ * - If precise_is_inside is not set OR if the object has event_rects OR
+ *   if the point (x,y) is actually inside the object's geometry (precise check).
+ *
+ * @param eo_obj The Evas object (Eo pointer).
+ * @param obj The protected data of the Evas object.
+ * @param x The x-coordinate to check.
+ * @param y The y-coordinate to check.
+ * @param ins A list of Evas_Object pointers that are currently considered "in" (under the pointer).
+ * @return EINA_TRUE if the object can receive pointer events based on precise checks, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _evas_event_object_pointer_allow_precise(Eo *eo_obj, Evas_Object_Protected_Data *obj, int x, int y, const Eina_List *ins)
 {
@@ -55,6 +202,24 @@ _evas_event_object_pointer_allow_precise(Eo *eo_obj, Evas_Object_Protected_Data 
 
 #define EVAS_EVENT_FEED_SAFETY_CHECK(evas) _evas_event_feed_check(evas)
 
+/**
+ * @internal
+ * @brief Recursively adjusts a point's coordinates based on object maps.
+ *
+ * If an object or its smart parents have a map, this function transforms
+ * the given point from canvas coordinates to the object's local (mapped)
+ * coordinates. It traverses up the smart parent hierarchy, applying maps
+ * at each level.
+ *
+ * @param obj The protected data of the Evas object whose map (and its parents' maps)
+ *            should be considered.
+ * @param[in,out] point The point to be transformed. Input is canvas/parent-mapped coordinates,
+ *                      output is local mapped coordinates relative to the object's origin.
+ *                      Example: Input { .x = 100, .y = 100 }, Output { .x = 5, .y = 10 } (after map and offset)
+ * @param mouse_grabbed EINA_TRUE if the mouse is currently grabbed by this object or one of its children.
+ *                      This can affect how map_coords_get behaves (e.g., extrapolating coordinates).
+ * @return EINA_TRUE if any map was applied, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _evas_event_havemap_adjust_f_inline(Evas_Object_Protected_Data *obj, Eina_Vector2 *point, Eina_Bool mouse_grabbed)
 {
@@ -81,6 +246,25 @@ _evas_event_havemap_adjust_f_inline(Evas_Object_Protected_Data *obj, Eina_Vector
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Adjusts current and previous points based on an object's map.
+ *
+ * This function uses _evas_event_havemap_adjust_f_inline to transform the
+ * `cur_pt` according to the object's map (and its smart parents' maps).
+ * It then adjusts `prev_pt` by the same delta that `cur_pt` was transformed by,
+ * effectively transforming `prev_pt` into the same mapped space relative to `cur_pt`.
+ *
+ * This is used to ensure that mouse move deltas are correct in the context of
+ * mapped objects.
+ *
+ * @param obj The protected data of the Evas object.
+ * @param[in,out] cur_pt The current pointer coordinates. Will be transformed.
+ *                       Example: Input { .x = 100, .y = 100 }, Output { .x = 5, .y = 10 }
+ * @param[in,out] prev_pt The previous pointer coordinates. Will be adjusted relative to cur_pt's transformation.
+ *                        Example: Input { .x = 90, .y = 90 }, Output might be { .x = -5, .y = 0 } if cur_pt moved by (10,10) in canvas space but (0,0) in mapped space.
+ * @param mouse_grabbed EINA_TRUE if the mouse is grabbed, affecting map coordinate calculation.
+ */
 static void
 _evas_event_havemap_adjust_f(Evas_Object_Protected_Data *obj, Eina_Vector2 *cur_pt, Eina_Vector2 *prev_pt, Eina_Bool mouse_grabbed)
 {
@@ -104,6 +288,13 @@ _evas_event_havemap_adjust_f(Evas_Object_Protected_Data *obj, Eina_Vector2 *cur_
 #endif
 
 #ifdef DDD_DO
+/**
+ * @internal
+ * @brief Debugging function to print the clipper hierarchy of an object.
+ * Only compiled if DDD_DO is defined.
+ * @param spaces Indentation level for printing.
+ * @param obj The object whose clippers to walk and print.
+ */
 static void
 walk_clippers_print(int spaces, Evas_Object_Protected_Data *obj)
 {
@@ -118,6 +309,20 @@ walk_clippers_print(int spaces, Evas_Object_Protected_Data *obj)
 }
 #endif
 
+/**
+ * @internal
+ * @brief Recursively calculates the effective clip rectangle for an object.
+ *
+ * This function walks up the clipper chain of an object (`obj->cur->clipper`).
+ * At each step, it clips the rectangle `c` to the current clipper's geometry.
+ * The result in `c` is the intersection of all clipper geometries with the
+ * initial `c`.
+ *
+ * @param obj The object whose clipper chain is to be processed. If NULL, the function returns.
+ * @param[in,out] c The rectangle to be clipped. It's modified in place.
+ *                  Example: Input c = {0, 0, 100, 100}, obj clips to {10, 10, 50, 50}
+ *                           Output c = {10, 10, 50, 50}
+ */
 static void
 clip_calc(Evas_Object_Protected_Data *obj, Eina_Rectangle *c)
 {
@@ -128,6 +333,28 @@ clip_calc(Evas_Object_Protected_Data *obj, Eina_Rectangle *c)
    clip_calc(obj->cur->clipper, c);
 }
 
+/**
+ * @internal
+ * @brief Gets a single object at (x,y) and its children if it's a smart object or event parent.
+ *
+ * This function checks if a single object `obj` is under the point (x,y) and should be
+ * part of the event target list. It considers visibility, clipping (dynamically calculated),
+ * maps, pass_events, source_invisible, and repeat_events flags.
+ * If `obj` is a smart object, it recursively calls _evas_event_object_list_in_get for its children.
+ * If `obj` is an event parent, it recursively calls _evas_event_object_list_in_get for its event grabbers.
+ * Otherwise, if the point is inside `obj` and other conditions are met, `obj` is added to the `in` list.
+ *
+ * @param eo_e The Evas canvas.
+ * @param obj The protected data of the Evas object to check.
+ * @param in The list of objects found so far, to which `obj` or its children might be appended.
+ * @param stop If this object is encountered, the search stops for this branch.
+ * @param x The x-coordinate.
+ * @param y The y-coordinate.
+ * @param[out] no_rep Set to 1 if `stop` is found or an object with no_repeat_events is hit.
+ * @param source EINA_TRUE if checking for source_invisible objects.
+ * @param spaces Debugging parameter for indentation (used with DDD macros).
+ * @return Updated list `in` with found objects.
+ */
 static Eina_List *
 _evas_event_object_list_raw_in_get_single(Evas *eo_e, Evas_Object_Protected_Data *obj, Eina_List *in, Evas_Object *stop,
                                           int x, int y, int *no_rep, Eina_Bool source, int spaces EINA_UNUSED)
@@ -379,6 +606,37 @@ _evas_event_object_list_raw_in_get_single(Evas *eo_e, Evas_Object_Protected_Data
    return in;
 }
 
+/**
+ * @internal
+ * @brief Retrieves a list of Evas objects at a given point (x, y) by iterating through a provided list or inlist.
+ *
+ * This function iterates (in reverse order for visual stacking) through either an `Eina_Inlist` (`ilist`)
+ * or an `Eina_List` (`list`) of Evas objects. For each object, it calls
+ * `_evas_event_object_list_raw_in_get_single` to determine if the object or its children
+ * are at the given coordinates and should be added to the event target list.
+ *
+ * The `must_walk_last` parameter is a subtle optimization: if EINA_FALSE, it uses `ilist->last`
+ * which is O(1). If EINA_TRUE, it uses `eina_inlist_last(ilist)` which is O(N) but ensures
+ * it starts from the true last element even if `ilist` is not the head of the inlist.
+ *
+ * @param eo_e The Evas canvas.
+ * @param in The initial list of objects to append to. Can be NULL.
+ * @param ilist An Eina_Inlist of Evas_Object_Protected_Data to search within.
+ *              Objects are processed from last to first.
+ * @param list An Eina_List of Evas_Object_Protected_Data to search within.
+ *             Objects are processed from last to first. (Only one of ilist or list should be non-NULL)
+ * @param stop If this Evas_Object is encountered, the search stops and no_rep is set.
+ * @param x The x-coordinate for the check.
+ * @param y The y-coordinate for the check.
+ * @param[out] no_rep Pointer to an integer that is set to 1 if the 'stop' object is found or
+ *                    if an object that does not repeat events is found during the single object check.
+ *                    It's reset to 0 if the loop completes without `*no_rep` being set.
+ * @param source EINA_TRUE if checking for source invisible objects, EINA_FALSE otherwise.
+ * @param must_walk_last If EINA_TRUE and `ilist` is provided, `eina_inlist_last()` is used to find the
+ *                       starting object. Otherwise, `EINA_INLIST_GET(ilist)->last` is used.
+ * @return An Eina_List of Evas_Object pointers that are at the given coordinates.
+ *         The caller is responsible for freeing this list if 'in' was NULL.
+ */
 static Eina_List *
 _evas_event_object_list_raw_in_get(Evas *eo_e, Eina_List *in,
                                    const Eina_Inlist *ilist,
@@ -403,7 +661,7 @@ _evas_event_object_list_raw_in_get(Evas *eo_e, Eina_List *in,
              obj;
              obj = _EINA_INLIST_CONTAINER(obj, EINA_INLIST_GET(obj)->prev))
           {
-             if (obj->events->parent) continue;
+             if (obj->events->parent) continue; // Skip objects that are part of another event parent's handling
              in = _evas_event_object_list_raw_in_get_single(eo_e, obj, in, stop, x, y, no_rep, source, spaces);
              if (*no_rep) goto end;
           }
@@ -425,6 +683,25 @@ end:
    return in;
 }
 
+/**
+ * @internal
+ * @brief Transforms points from one object's coordinate space to another (source) object's space.
+ *
+ * This is typically used when an object (`obj`) acts as a proxy or source for another
+ * object (`src`). Events occurring over `obj` need their coordinates translated
+ * to be relative to `src`. The transformation accounts for differences in position
+ * and scaling (size) between `obj` and `src`.
+ *
+ * @param obj The protected data of the object in whose coordinate space the points currently are.
+ * @param src The protected data of the target "source" object to whose coordinate space the points will be transformed.
+ * @param[in,out] cur_pt The current point to transform.
+ *                       Example: obj is at (10,10) size 100x100, src is at (50,50) size 200x200.
+ *                                Input cur_pt = {60, 60} (relative to canvas, but conceptually "on" obj)
+ *                                Becomes {50,50} relative to obj's origin.
+ *                                Scaled: {50*(200/100), 50*(200/100)} = {100,100}
+ *                                Translated to src: {100+50, 100+50} = {150,150} (final output for cur_pt)
+ * @param[in,out] prev_pt The previous point to transform, handled identically to `cur_pt`.
+ */
 static void
 _transform_to_src_space_f(Evas_Object_Protected_Data *obj, Evas_Object_Protected_Data *src,
                           Eina_Vector2 *cur_pt, Eina_Vector2 *prev_pt)
@@ -453,6 +730,19 @@ _transform_to_src_space_f(Evas_Object_Protected_Data *obj, Evas_Object_Protected
    prev_pt->y += src->cur->geometry.y;
 }
 
+/**
+ * @internal
+ * @brief Gets the appropriate legacy input device (mouse or keyboard).
+ *
+ * If a device has been pushed onto the Evas device stack (_evas_device_top_get),
+ * that device is returned. Otherwise, it returns the default mouse or keyboard
+ * device associated with the Evas canvas.
+ *
+ * @param evas The Evas canvas instance.
+ * @param mouse EINA_TRUE to get the default mouse device if no device is pushed,
+ *              EINA_FALSE to get the default keyboard device.
+ * @return The Efl_Input_Device to use. This is an unowned reference.
+ */
 static Efl_Input_Device *
 _evas_event_legacy_device_get(Eo *evas, Eina_Bool mouse)
 {
@@ -468,6 +758,23 @@ _evas_event_legacy_device_get(Eo *evas, Eina_Bool mouse)
    return dev;
 }
 
+/**
+ * @internal
+ * @brief Propagates mouse down events from a proxy object to its source's children.
+ *
+ * When a mouse down event occurs on an object `eo_obj` that is a proxy
+ * (i.e., `obj->proxy->is_proxy` is true and `obj->proxy->src_events` is true),
+ * this function forwards the event to the children of `eo_obj`'s source object.
+ * The event coordinates are transformed into the source object's space.
+ * It handles grabbing logic for the source's children.
+ *
+ * @param eo_obj The proxy Evas object that received the original event.
+ * @param eo_e The Evas canvas.
+ * @param parent_ev The original pointer down event that occurred on `eo_obj`.
+ *                  This event is duplicated and modified for propagation.
+ * @param pdata Pointer data associated with the device that generated the event.
+ * @param event_id The event ID for this mouse down sequence.
+ */
 static void
 _evas_event_source_mouse_down_events(Evas_Object *eo_obj, Evas *eo_e,
                                      Efl_Input_Pointer *parent_ev,
@@ -606,6 +913,22 @@ _evas_event_source_mouse_down_events(Evas_Object *eo_obj, Evas *eo_e,
    efl_unref(evt);
 }
 
+/**
+ * @internal
+ * @brief Sets the mouse_in status for an object across all pointers associated with a seat.
+ *
+ * This function iterates through all `Evas_Pointer_Data` (representing individual
+ * physical pointers or touch points) associated with a given `Evas_Pointer_Seat`.
+ * For each pointer, it retrieves the object-specific pointer data (`Evas_Object_Pointer_Data`)
+ * and updates its `mouse_in` flag.
+ *
+ * This is used to track whether the logical pointer (represented by the seat)
+ * is considered "in" a particular object, affecting MOUSE_IN/MOUSE_OUT event generation.
+ *
+ * @param pseat The pointer seat whose associated pointers' `mouse_in` status for `obj` will be set.
+ * @param obj The protected data of the Evas object for which to set the `mouse_in` status.
+ * @param mouse_in EINA_TRUE if the mouse is considered in the object, EINA_FALSE otherwise.
+ */
 static void
 _evas_event_mouse_in_set(Evas_Pointer_Seat *pseat,
                          Evas_Object_Protected_Data *obj, Eina_Bool mouse_in)
@@ -623,6 +946,22 @@ _evas_event_mouse_in_set(Evas_Pointer_Seat *pseat,
      }
 }
 
+/**
+ * @internal
+ * @brief Propagates mouse move events from a proxy object to its source's children.
+ *
+ * When a mouse move event occurs on an object `eo_obj` that is a proxy
+ * with `src_events` enabled, this function forwards the event to the children
+ * of `eo_obj`'s source object. Coordinates are transformed.
+ * It handles MOUSE_MOVE, MOUSE_IN, and MOUSE_OUT events for the source's children
+ * based on whether they are grabbed or if the pointer moves into/out of them.
+ *
+ * @param eo_obj The proxy Evas object that received the original event.
+ * @param eo_e The Evas canvas.
+ * @param parent_ev The original pointer move event. This is duplicated and modified.
+ * @param pdata Pointer data for the device.
+ * @param event_id The event ID for this mouse move sequence.
+ */
 static void
 _evas_event_source_mouse_move_events(Evas_Object *eo_obj, Evas *eo_e,
                                      Efl_Input_Pointer *parent_ev,

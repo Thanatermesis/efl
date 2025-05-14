@@ -5,6 +5,7 @@
 #include "evas_common_private.h"
 #include "evas_private.h"
 
+/** @brief Logging domain for the XPM loader module. */
 static int _evas_loader_xpm_log_dom = -1;
 
 #ifdef ERR
@@ -12,12 +13,28 @@ static int _evas_loader_xpm_log_dom = -1;
 #endif
 #define ERR(...) EINA_LOG_DOM_ERR(_evas_loader_xpm_log_dom, __VA_ARGS__)
 
+/**
+ * @struct Color_Index
+ * @brief Structure to hold RGB color values and their corresponding name offset.
+ * Used in the `color_name_index` lookup table.
+ */
 typedef struct
 {
-   unsigned short offset;
-   unsigned char r, g, b;
+   unsigned short offset; /**< Offset into the color_name_string table. */
+   unsigned char r, g, b; /**< RGB color components. */
 } Color_Index;
 
+/**
+ * @brief Lookup table mapping color name string offsets to RGB values.
+ *
+ * This array stores precomputed RGB values for standard X11 color names.
+ * Each entry contains:
+ * - offset: The starting index in the `color_name_string` array for the color name.
+ * - r, g, b: The 8-bit red, green, and blue components of the color.
+ *
+ * Example:
+ * {   0,  240, 248, 255} corresponds to "alice blue" at offset 0 in color_name_string.
+ */
 static const Color_Index color_name_index[] =
 {
 {   0,  240, 248, 255},

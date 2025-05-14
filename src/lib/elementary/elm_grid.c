@@ -14,6 +14,17 @@
 #define MY_CLASS_NAME "Elm_Grid"
 #define MY_CLASS_NAME_LEGACY "elm_grid"
 
+/**
+ * @internal
+ * @brief Prepares the focus composition for the grid.
+ *
+ * This function retrieves the children of the grid, filters out non-widget
+ * elements, and sets the remaining widgets as the focus composition elements.
+ * This is necessary for managing focus order within the grid.
+ *
+ * @param obj The Evas object (grid).
+ * @param pd Private data (unused).
+ */
 static void
 _elm_grid_efl_ui_focus_composition_prepare(Eo *obj, void *pd EINA_UNUSED)
 {
@@ -32,6 +43,16 @@ _elm_grid_efl_ui_focus_composition_prepare(Eo *obj, void *pd EINA_UNUSED)
    efl_ui_focus_composition_elements_set(obj, order);
 }
 
+/**
+ * @internal
+ * @brief Sets the mirrored mode of the grid.
+ *
+ * This function is a helper to apply the mirrored (right-to-left)
+ * setting to the underlying Evas grid object.
+ *
+ * @param obj The Evas object (grid).
+ * @param rtl EINA_TRUE if right-to-left mode is enabled, EINA_FALSE otherwise.
+ */
 static void
 _mirrored_set(Evas_Object *obj, Eina_Bool rtl)
 {
@@ -40,6 +61,17 @@ _mirrored_set(Evas_Object *obj, Eina_Bool rtl)
    evas_object_grid_mirrored_set(wd->resize_obj, rtl);
 }
 
+/**
+ * @internal
+ * @brief Applies the theme to the grid widget.
+ *
+ * This function calls the superclass's theme apply function and then
+ * applies mirroring settings based on the current theme and widget state.
+ *
+ * @param obj The Evas object (grid).
+ * @param sd Private data (unused).
+ * @return Eina_Error Standard Efl_Ui_Theme_Apply error codes.
+ */
 EOLIAN static Eina_Error
 _elm_grid_efl_ui_widget_theme_apply(Eo *obj, void *sd EINA_UNUSED)
 {
@@ -53,6 +85,16 @@ _elm_grid_efl_ui_widget_theme_apply(Eo *obj, void *sd EINA_UNUSED)
    return int_ret;
 }
 
+/**
+ * @internal
+ * @brief Handles the addition of the grid to a canvas.
+ *
+ * This function initializes the internal Evas grid object, sets its default
+ * virtual size (100x100), and configures initial widget properties like focus.
+ *
+ * @param obj The Evas object (grid).
+ * @param _pd Private data (unused).
+ */
 EOLIAN static void
 _elm_grid_efl_canvas_group_group_add(Eo *obj, void *_pd EINA_UNUSED)
 {
@@ -70,6 +112,20 @@ _elm_grid_efl_canvas_group_group_add(Eo *obj, void *_pd EINA_UNUSED)
    efl_ui_widget_theme_apply(obj);
 }
 
+/**
+ * @internal
+ * @brief Handles the deletion of the grid from a canvas.
+ *
+ * This function ensures that the internal Evas grid object (resize_obj)
+ * is processed last during deletion. This is important because the grid
+ * might be the smart parent of other sub-objects, and destroying it
+ * prematurely could lead to issues. It achieves this by moving the
+ * resize_obj to the end of the children list before calling the superclass's
+ * group_del.
+ *
+ * @param obj The Evas object (grid).
+ * @param _pd Private data (unused).
+ */
 EOLIAN static void
 _elm_grid_efl_canvas_group_group_del(Eo *obj, void *_pd EINA_UNUSED)
 {
@@ -97,6 +153,17 @@ elm_grid_add(Evas_Object *parent)
    return elm_legacy_add(MY_CLASS, parent);
 }
 
+/**
+ * @internal
+ * @brief Constructor for the Elm_Grid object.
+ *
+ * Initializes the grid object, sets its legacy type name, and
+ * assigns its accessibility role.
+ *
+ * @param obj The Evas object (grid).
+ * @param _pd Private data (unused).
+ * @return The constructed Evas object.
+ */
 EOLIAN static Eo *
 _elm_grid_efl_object_constructor(Eo *obj, void *_pd EINA_UNUSED)
 {
@@ -107,6 +174,19 @@ _elm_grid_efl_object_constructor(Eo *obj, void *_pd EINA_UNUSED)
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Sets the virtual size of the grid.
+ *
+ * The children of the grid are placed and sized relative to this
+ * virtual resolution. For example, if the virtual size is 100x100,
+ * a child packed at x=50, y=50 will be centered.
+ *
+ * @param obj The Evas object (grid).
+ * @param _pd Private data (unused).
+ * @param w The virtual width.
+ * @param h The virtual height.
+ */
 EOLIAN static void
 _elm_grid_grid_size_set(Eo *obj, void *_pd EINA_UNUSED, Evas_Coord w, Evas_Coord h)
 {
@@ -115,6 +195,15 @@ _elm_grid_grid_size_set(Eo *obj, void *_pd EINA_UNUSED, Evas_Coord w, Evas_Coord
    evas_object_grid_size_set(wd->resize_obj, w, h);
 }
 
+/**
+ * @internal
+ * @brief Gets the virtual size of the grid.
+ *
+ * @param obj The Evas object (grid).
+ * @param _pd Private data (unused).
+ * @param w Pointer to store the virtual width.
+ * @param h Pointer to store the virtual height.
+ */
 EOLIAN static void
 _elm_grid_grid_size_get(const Eo *obj, void *_pd EINA_UNUSED, Evas_Coord *w, Evas_Coord *h)
 {
@@ -123,6 +212,22 @@ _elm_grid_grid_size_get(const Eo *obj, void *_pd EINA_UNUSED, Evas_Coord *w, Eva
    evas_object_grid_size_get(wd->resize_obj, w, h);
 }
 
+/**
+ * @internal
+ * @brief Packs a sub-object into the grid.
+ *
+ * Adds the sub-object as a child of the grid and positions/sizes it
+ * according to the provided virtual coordinates and dimensions.
+ * Also marks the focus composition as dirty.
+ *
+ * @param obj The Evas object (grid).
+ * @param _pd Private data (unused).
+ * @param subobj The sub-object to pack.
+ * @param x The virtual x-coordinate.
+ * @param y The virtual y-coordinate.
+ * @param w The virtual width.
+ * @param h The virtual height.
+ */
 EOLIAN static void
 _elm_grid_pack(Eo *obj, void *_pd EINA_UNUSED, Evas_Object *subobj, Evas_Coord x, Evas_Coord y, Evas_Coord w, Evas_Coord h)
 {
@@ -133,6 +238,19 @@ _elm_grid_pack(Eo *obj, void *_pd EINA_UNUSED, Evas_Object *subobj, Evas_Coord x
    efl_ui_focus_composition_dirty(obj);
 }
 
+/**
+ * @internal
+ * @brief Unpacks a sub-object from the grid.
+ *
+ * Removes the sub-object from the grid's layout management.
+ * Before unpacking from the Evas grid, it redirects the sub-object's
+ * parentage to ensure proper cleanup if it was an Elm widget.
+ * Also marks the focus composition as dirty.
+ *
+ * @param obj The Evas object (grid).
+ * @param _pd Private data (unused).
+ * @param subobj The sub-object to unpack.
+ */
 EOLIAN static void
 _elm_grid_unpack(Eo *obj, void *_pd EINA_UNUSED, Evas_Object *subobj)
 {
@@ -143,6 +261,20 @@ _elm_grid_unpack(Eo *obj, void *_pd EINA_UNUSED, Evas_Object *subobj)
    efl_ui_focus_composition_dirty(obj);
 }
 
+/**
+ * @internal
+ * @brief Clears the grid, removing all packed sub-objects.
+ *
+ * If `clear` is EINA_FALSE, it first redirects the parentage of Elm widget
+ * children to ensure they are properly unparented before being removed
+ * from the Evas grid. If `clear` is EINA_TRUE, the Evas grid directly
+ * deletes the children. Marks focus composition as dirty.
+ *
+ * @param obj The Evas object (grid).
+ * @param _pd Private data (unused).
+ * @param clear If EINA_TRUE, sub-objects are deleted. If EINA_FALSE,
+ *              they are just unpacked (and potentially reparented if Elm widgets).
+ */
 EOLIAN static void
 _elm_grid_clear(Eo *obj, void *_pd EINA_UNUSED, Eina_Bool clear)
 {
@@ -194,6 +326,24 @@ elm_grid_pack_get(Evas_Object *subobj,
      (wd->resize_obj, subobj, x, y, w, h);
 }
 
+/**
+ * @internal
+ * @brief Gets the list of children packed into the grid.
+ *
+ * @param obj The Evas object (grid).
+ * @param _pd Private data (unused).
+ * @return A list of Evas_Object children. The list itself should not be modified
+ *         by the caller and is valid as long as the grid children are not changed.
+ *         It may be an EINA_LIST_EMPTY if there are no children.
+ *         Example of iterating:
+ *         Eina_List *children, *l;
+ *         Evas_Object *child_obj;
+ *         children = _elm_grid_children_get(grid_obj, NULL);
+ *         EINA_LIST_FOREACH(children, l, child_obj) {
+ *            // process child_obj
+ *         }
+ *         // Do not eina_list_free(children) if it's from evas_object_grid_children_get
+ */
 EOLIAN static Eina_List*
 _elm_grid_children_get(const Eo *obj, void *_pd EINA_UNUSED)
 {
@@ -201,6 +351,16 @@ _elm_grid_children_get(const Eo *obj, void *_pd EINA_UNUSED)
    return evas_object_grid_children_get(wd->resize_obj);
 }
 
+/**
+ * @internal
+ * @brief Class constructor for Elm_Grid.
+ *
+ * Registers the legacy type name for the Elm_Grid class. This is
+ * important for backward compatibility and for Evas smart object
+ * handling.
+ *
+ * @param klass The Efl_Class for Elm_Grid.
+ */
 static void
 _elm_grid_class_constructor(Efl_Class *klass)
 {

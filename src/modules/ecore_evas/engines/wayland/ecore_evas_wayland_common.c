@@ -14,21 +14,35 @@ EMODAPI extern void _evas_canvas_image_data_regenerate(Eina_List *list);
 static const char *interface_wl_name = "wayland";
 static const int interface_wl_version = 1;
 
+/** @brief List of all Ecore_Evas Wayland instances. */
 Eina_List *ee_list;
 
-/* local structure for evas devices with IDs */
+/**
+ * @brief Internal structure to manage Evas devices associated with a Wayland seat.
+ *
+ * This structure holds references to Evas_Device objects for a seat and its
+ * capabilities like pointer, keyboard, and touch, along with the seat ID.
+ */
 typedef struct _EE_Wl_Device EE_Wl_Device;
 struct _EE_Wl_Device
 {
-   Evas_Device *seat;
-   Evas_Device *pointer;
-   Evas_Device *keyboard;
-   Evas_Device *touch;
-   unsigned int id;
+   Evas_Device *seat; /**< The Evas_Device representing the seat itself. */
+   Evas_Device *pointer; /**< The Evas_Device for pointer input, if available. */
+   Evas_Device *keyboard; /**< The Evas_Device for keyboard input, if available. */
+   Evas_Device *touch; /**< The Evas_Device for touch input, if available. */
+   unsigned int id; /**< The Wayland seat ID. */
 };
 
 /* local variables */
+/** @brief Initialization counter for the Ecore_Evas Wayland common module.
+ * Incremented on init, decremented on shutdown. Ensures proper initialization
+ * and shutdown of shared resources.
+ */
 static int _ecore_evas_wl_init_count = 0;
+
+/** @brief Array holding Ecore_Event_Handler pointers for Wayland events.
+ * Used to manage the lifecycle of event handlers registered by this module.
+ */
 static Eina_Array *_ecore_evas_wl_event_hdls;
 
 static void _ecore_evas_wayland_resize(Ecore_Evas *ee, int location);
@@ -36,6 +50,18 @@ static void _ecore_evas_wl_common_rotation_set(Ecore_Evas *ee, int rotation, int
 static void _ecore_evas_wl_selection_init(Ecore_Evas *ee);
 
 /* local functions */
+
+/**
+ * @brief Frame callback for Evas animations.
+ *
+ * This function is registered as a Wayland frame callback. It is invoked by the
+ * compositor when it's a good time to draw a new frame. It then ticks the
+ * Ecore_Evas animator.
+ *
+ * @param win The Ecore_Wl2_Window associated with this callback (unused).
+ * @param timestamp The timestamp provided by the compositor for this frame (unused, ecore_loop_time_get() is used instead).
+ * @param data User data, expected to be an Ecore_Evas instance.
+ */
 static void
 _anim_cb_tick(Ecore_Wl2_Window *win EINA_UNUSED, uint32_t timestamp EINA_UNUSED, void *data)
 {
@@ -65,6 +91,16 @@ _anim_cb_tick(Ecore_Wl2_Window *win EINA_UNUSED, uint32_t timestamp EINA_UNUSED,
    /* prt = rt; */
 }
 
+/**
+ * @brief Registers the animator frame callback for an Ecore_Evas instance.
+ *
+ * If not already ticking and a frame callback is not set, this function
+ * adds a Wayland frame callback (_anim_cb_tick) to drive Evas animations.
+ * It also requests a commit if no drawing operations are pending to ensure
+ * the frame callback loop starts.
+ *
+ * @param ee The Ecore_Evas instance for which to register the animator.
+ */
 static void
 _ecore_evas_wl_common_animator_register(Ecore_Evas *ee)
 {
@@ -83,6 +119,14 @@ _ecore_evas_wl_common_animator_register(Ecore_Evas *ee)
    edata->ticking = EINA_TRUE;
 }
 
+/**
+ * @brief Unregisters the animator frame callback for an Ecore_Evas instance.
+ *
+ * This function stops the animator ticking and removes the Wayland frame
+ * callback if one was previously registered.
+ *
+ * @param ee The Ecore_Evas instance for which to unregister the animator.
+ */
 static void
 _ecore_evas_wl_common_animator_unregister(Ecore_Evas *ee)
 {
@@ -95,6 +139,20 @@ _ecore_evas_wl_common_animator_unregister(Ecore_Evas *ee)
    edata->frame = NULL;
 }
 
+/**
+ * @brief Handles notifications of changes in the Evas canvas.
+ *
+ * If the animator is ticking and there are no pending Wayland window updates,
+ * this function requests a "false commit". This is typically used to ensure
+ * that the compositor processes any pending events or acknowledges the current
+ * state, which can be important for keeping animations smooth or ensuring
+ * timely updates when only Evas internal state has changed without a buffer swap.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param changed If EINA_TRUE, indicates a change that might lead to a render.
+ *                This function specifically acts when `changed` is EINA_FALSE,
+ *                implying other types of canvas state updates.
+ */
 static void
 _ecore_evas_wl_common_evas_changed(Ecore_Evas *ee, Eina_Bool changed)
 {
@@ -107,12 +165,30 @@ _ecore_evas_wl_common_evas_changed(Ecore_Evas *ee, Eina_Bool changed)
      ecore_wl2_window_false_commit(edata->win);
 }
 
+/**
+ * @brief Triggers the state change callback for an Ecore_Evas instance.
+ *
+ * This function calls the `fn_state_change` callback if it is set for the
+ * given Ecore_Evas. This is used to notify the application of changes in
+ * window states like maximization, fullscreen, iconification, etc.
+ *
+ * @param ee The Ecore_Evas instance whose state has changed.
+ */
 static void
 _ecore_evas_wl_common_state_update(Ecore_Evas *ee)
 {
    if (ee->func.fn_state_change) ee->func.fn_state_change(ee);
 }
 
+/**
+ * @brief Updates the Ecore_Evas properties related to WM rotation support.
+ *
+ * Queries the underlying Ecore_Wl2_Window to determine if the window manager
+ * (compositor) supports the screen rotation protocol and updates the
+ * `ee->prop.wm_rot.supported` flag accordingly.
+ *
+ * @param ee The Ecore_Evas instance.
+ */
 static void
 _ecore_evas_wl_common_wm_rotation_protocol_set(Ecore_Evas *ee)
 {

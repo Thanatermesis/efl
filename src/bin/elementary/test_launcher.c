@@ -3,6 +3,17 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback to toggle map-buffering on/off for all map-buffers.
+ *
+ * This function is called when the "Map" checkbox is toggled. It iterates
+ * through all map-buffer objects associated with the window and flips their
+ * enabled state.
+ *
+ * @param data The window Evas_Object.
+ * @param obj The checkbox object that triggered the callback (unused).
+ * @param event_info Extra event information (unused).
+ */
 static void
 mode_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -20,6 +31,13 @@ mode_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback to toggle fullscreen mode for the window.
+ *
+ * @param data The window Evas_Object.
+ * @param obj The checkbox object that triggered the callback (unused).
+ * @param event_info Extra event information (unused).
+ */
 static void
 full_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -27,6 +45,16 @@ full_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_win_fullscreen_set(win, !elm_win_fullscreen_get(win));
 }
 
+/**
+ * @brief Callback to toggle alpha on/off for all map-buffers.
+ *
+ * Based on the state of a checkbox, this enables or disables the alpha
+ * channel for all map-buffer objects associated with the window.
+ *
+ * @param data The window Evas_Object.
+ * @param obj The checkbox object.
+ * @param event_info Extra event information (unused).
+ */
 static void
 alpha_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -41,6 +69,16 @@ alpha_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback to toggle smooth rendering on/off for all map-buffers.
+ *
+ * Based on the state of a checkbox, this enables or disables smooth
+ * scaling for all map-buffer objects associated with the window.
+ *
+ * @param data The window Evas_Object.
+ * @param obj The checkbox object.
+ * @param event_info Extra event information (unused).
+ */
 static void
 smooth_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -55,12 +93,30 @@ smooth_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback to close and delete the main window.
+ * @param data The window Evas_Object to be deleted.
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Extra event information (unused).
+ */
 static void
 close_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    evas_object_del(data);
 }
 
+/**
+ * @brief Timer callback to initiate icon dragging.
+ *
+ * This function is triggered after a short delay when the user presses and
+ * holds on an icon. It transitions the icon to a "dragging" state.
+ * It freezes the parent scroller, detaches the icon from its table layout,
+ * and changes the background colors of the map buffers to indicate a drag
+ * operation is in progress.
+ *
+ * @param data The icon Evas_Object being dragged.
+ * @return ECORE_CALLBACK_CANCEL (EINA_FALSE) to stop the timer from recurring.
+ */
 static Eina_Bool
 tim_cb(void *data)
 {
@@ -81,6 +137,17 @@ tim_cb(void *data)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Callback invoked when an icon is deleted.
+ *
+ * Ensures that any pending timer for a drag operation is cancelled and
+ * freed to prevent memory leaks or use-after-free errors.
+ *
+ * @param data Custom data associated with the callback (unused).
+ * @param e The Evas canvas (unused).
+ * @param obj The icon Evas_Object that is being deleted.
+ * @param event_info Extra event information (unused).
+ */
 static void
 ic_del_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -94,6 +161,19 @@ ic_del_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *e
      }
 }
 
+/**
+ * @brief Callback for mouse-down events on an icon.
+ *
+ * This function initiates a timer for a potential drag-and-drop operation.
+ * If the user holds the mouse button down, the timer will fire and start the
+ * drag. It also stores initial mouse and icon coordinates for calculating
+ * movement.
+ *
+ * @param data The icon Evas_Object.
+ * @param e The Evas canvas (unused).
+ * @param obj The icon Evas_Object that received the event.
+ * @param event_info Pointer to Evas_Event_Mouse_Down structure.
+ */
 static void
 ic_down_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info)
 {
@@ -120,6 +200,20 @@ ic_down_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info)
      }
 }
 
+/**
+ * @brief Callback for mouse-up events on an icon.
+ *
+ * This function completes a click or a drag-and-drop operation.
+ * If no drag was initiated, it simply cancels the drag timer.
+ * If the icon was being dragged, it places the icon back into the table
+ * layout at the nearest cell, restores map-buffer colors, and unfreezes the
+ * scroller. It ignores events that are on hold.
+ *
+ * @param data The icon Evas_Object.
+ * @param e The Evas canvas (unused).
+ * @param obj The icon Evas_Object that received the event.
+ * @param event_info Pointer to Evas_Event_Mouse_Up structure.
+ */
 static void
 ic_up_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info)
 {
@@ -154,6 +248,19 @@ ic_up_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info)
      }
 }
 
+/**
+ * @brief Callback for mouse-move events on an icon.
+ *
+ * If a drag operation is in progress (indicated by the "dragging" data flag),
+ * this function updates the icon's position to follow the mouse cursor.
+ * If the event is put on hold (e.g. by a scroller), it cancels the drag
+ * timer to prevent the drag from starting.
+ *
+ * @param data The icon Evas_Object.
+ * @param e The Evas canvas (unused).
+ * @param obj The icon Evas_Object that received the event.
+ * @param event_info Pointer to Evas_Event_Mouse_Move structure.
+ */
 static void
 ic_move_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info)
 {
@@ -185,6 +292,33 @@ ic_move_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info)
      }
 }
 
+/**
+ * @brief Creates the main test window for a launcher-like icon grid.
+ *
+ * This function sets up a window containing multiple "pages" of icons.
+ * Each page is a table within a map-buffer, and all pages are hosted in a
+ * horizontal box inside a scroller.
+ *
+ * It demonstrates:
+ * - A paged scroller interface.
+ * - Icon drag-and-drop within a table layout.
+ * - Use of map-buffers for visual effects (alpha, smoothing).
+ *
+ * The array of names[] provides labels for icons:
+ * @code
+ * const char *names[] =
+ *   {
+ *      "Hello",    "World",    "Spam",  "Egg",
+ *      "Ham",      "Good",     "Bad",   "Milk",
+ *      "Smell",    "Of",       "Sky",   "Gold",
+ *      "Hole",     "Pig",      "And",   "Calm"
+ *   };
+ * @endcode
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_launcher(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -376,6 +510,22 @@ test_launcher(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_
    evas_object_show(win);
 }
 
+/**
+ * @brief Creates a second test window using layouts for pages.
+ *
+ * This function sets up a window similar to test_launcher(), but each page
+ * is an `Elm_Layout` object loaded from an EDJE file ("test.edj").
+ * Buttons are placed into specific parts of the layout.
+ *
+ * It demonstrates:
+ * - Using `Elm_Layout` for complex page structure.
+ * - Paging with `elm_scroller_page_size_set()`.
+ * - Use of map-buffers on layouts.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_launcher2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -502,6 +652,13 @@ test_launcher2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback to toggle map-buffering for test_launcher3.
+ * @see mode_cb
+ * @param data The window Evas_Object.
+ * @param obj The checkbox object (unused).
+ * @param event_info Extra event information (unused).
+ */
 static void
 l3_mode_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -519,6 +676,13 @@ l3_mode_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSE
      }
 }
 
+/**
+ * @brief Callback to toggle fullscreen for test_launcher3.
+ * @see full_cb
+ * @param data The window Evas_Object.
+ * @param obj The checkbox object (unused).
+ * @param event_info Extra event information (unused).
+ */
 static void
 l3_full_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -526,6 +690,13 @@ l3_full_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSE
    elm_win_fullscreen_set(win, !elm_win_fullscreen_get(win));
 }
 
+/**
+ * @brief Callback to toggle alpha for test_launcher3 map-buffers.
+ * @see alpha_cb
+ * @param data The window Evas_Object.
+ * @param obj The checkbox object.
+ * @param event_info Extra event information (unused).
+ */
 static void
 l3_alpha_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -540,6 +711,13 @@ l3_alpha_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback to toggle smooth rendering for test_launcher3 map-buffers.
+ * @see smooth_cb
+ * @param data The window Evas_Object.
+ * @param obj The checkbox object.
+ * @param event_info Extra event information (unused).
+ */
 static void
 l3_smooth_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -554,6 +732,15 @@ l3_smooth_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback to toggle visibility of all map-buffers.
+ *
+ * This is connected to the "Hid" checkbox in test_launcher3.
+ *
+ * @param data The window Evas_Object.
+ * @param obj The checkbox object (unused).
+ * @param event_info Extra event information (unused).
+ */
 static void
 l3_hidden_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -569,12 +756,30 @@ l3_hidden_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNU
      }
 }
 
+/**
+ * @brief Callback to close the window for test_launcher3.
+ * @see close_cb
+ * @param data The window Evas_Object to be deleted.
+ * @param obj The button object (unused).
+ * @param event_info Extra event information (unused).
+ */
 static void
 l3_close_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    evas_object_del(data);
 }
 
+/**
+ * @brief Timer callback to initiate icon dragging in test_launcher3.
+ *
+ * Similar to tim_cb(), this function is triggered on a long press. It
+ * prepares an icon for dragging by unsetting its content from the parent
+ * layout's slot (e.g., "slot.0.1") and emitting a "drag" signal to the
+ * icon's own layout to trigger a visual change.
+ *
+ * @param data The icon Evas_Object being dragged.
+ * @return ECORE_CALLBACK_CANCEL (EINA_FALSE) to stop the timer from recurring.
+ */
 static Eina_Bool
 l3_tim_cb(void *data)
 {
@@ -602,6 +807,14 @@ l3_tim_cb(void *data)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Callback for icon deletion in test_launcher3.
+ * @see ic_del_cb
+ * @param data Unused.
+ * @param e Unused.
+ * @param obj The icon Evas_Object being deleted.
+ * @param event_info Unused.
+ */
 static void
 l3_ic_del_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -615,6 +828,18 @@ l3_ic_del_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void
      }
 }
 
+/**
+ * @brief Callback for mouse-down events on an icon in test_launcher3.
+ *
+ * Similar to ic_down_cb(), this starts a timer for a drag operation and
+ * stores initial coordinates. It also emits a "click" signal to the icon's
+ * layout to change its visual state (e.g., show a glow).
+ *
+ * @param data Unused.
+ * @param e Unused.
+ * @param obj The icon Evas_Object that received the event.
+ * @param event_info Pointer to Evas_Event_Mouse_Down structure.
+ */
 static void
 l3_ic_down_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info)
 {
@@ -643,6 +868,20 @@ l3_ic_down_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, voi
      }
 }
 
+/**
+ * @brief Callback for mouse-up events on an icon in test_launcher3.
+ *
+ * Completes a click or drag operation.
+ * If dragging, it re-parents the icon's layout into the main page layout slot
+ * and emits a "drop" signal.
+ * If not dragging, it cancels the drag timer and emits an "unclick" signal
+ * to revert the icon's visual state from "clicked".
+ *
+ * @param data Unused.
+ * @param e Unused.
+ * @param obj The icon Evas_Object that received the event.
+ * @param event_info Pointer to Evas_Event_Mouse_Up structure.
+ */
 static void
 l3_ic_up_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info)
 {
@@ -684,6 +923,18 @@ l3_ic_up_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void 
       elm_layout_signal_emit(ly2, "unclick", "app");
 }
 
+/**
+ * @brief Callback for mouse-move events on an icon in test_launcher3.
+ *
+ * Updates the position of the icon's layout (`ly2`) during a drag.
+ * If the event is put on hold, it cancels the drag timer and emits a "cancel"
+ * signal to the layout to abort the click/drag visual state.
+ *
+ * @param data Unused.
+ * @param e Unused.
+ * @param obj The icon Evas_Object that received the event.
+ * @param event_info Pointer to Evas_Event_Mouse_Move structure.
+ */
 static void
 l3_ic_move_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info)
 {
@@ -719,6 +970,34 @@ l3_ic_move_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, voi
      }
 }
 
+/**
+ * @brief Creates a third, more advanced launcher test window.
+ *
+ * This function builds on test_launcher() but uses `Elm_Layout` for both
+ * the pages and the individual icons, allowing for more complex visuals and
+ * state changes via EDJE signals.
+ *
+ * It demonstrates:
+ * - A fully layout-based icon grid.
+ * - Drag-and-drop implemented by re-parenting layout objects.
+ * - Using EDJE signals ("click", "drag", "drop", "cancel") to coordinate
+ *   visual feedback between C code and the theme file.
+ *
+ * The array of names[] provides labels for icons:
+ * @code
+ * const char *names[] =
+ *   {
+ *      "Hello",    "World",    "Spam",  "Egg",
+ *      "Ham",      "Good",     "Bad",   "Milk",
+ *      "Smell",    "Of",       "Sky",   "Gold",
+ *      "Hole",     "Pig",      "And",   "Calm"
+ *   };
+ * @endcode
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_launcher3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

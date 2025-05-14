@@ -142,3 +142,14 @@ elm_toolbar_item_menu_set(Elm_Toolbar_Item *obj, Eina_Bool menu)
 {
    elm_obj_toolbar_item_menu_set(obj, menu);
 }
+/**
+ * @file
+ * @brief These functions are legacy C implementations for the Elm_Toolbar_Item Eo API.
+ *
+ * They serve as wrappers around the `elm_obj_toolbar_item_*` functions,
+ * providing a C-style interface for applications that do not directly
+ * use the Eo object system for this widget item.
+ *
+ * The primary API documentation for these functions can be found in
+ * the corresponding header file, elm_toolbar_item_eo.legacy.h.
+ */

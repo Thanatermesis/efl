@@ -4,20 +4,34 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Represents a vertex in 3D space with texture coordinates.
+ *
+ * Contains 3D coordinates (x, y, z) and 2D texture coordinates (u, v) for a point.
+ */
 typedef struct _Point
 {
    Evas_Coord x, y, z, u, v;
 } Point;
 
+/**
+ * @brief Represents a single face of a 3D shape (e.g., a cube side).
+ *
+ * It consists of an Evas_Object to render the face and an array of 4 points
+ * that define its vertices.
+ */
 typedef struct _Side
 {
-   Evas_Object *o;
-   Point pt[4];
+   Evas_Object *o; /**< The Evas object used to draw the side. */
+   Point pt[4];    /**< An array of 4 vertices defining the corners of the side. */
 } Side;
 
+/**
+ * @brief Represents a cube composed of 6 sides.
+ */
 typedef struct _Cube
 {
-   Side side[6];
+   Side side[6]; /**< An array of 6 sides, one for each face of the cube. */
 } Cube;
 
 static Cube *cube;
@@ -30,6 +44,19 @@ static double cxo = 0.0, cyo = 0.0, focv = 256.0, z0v = 0.0;
    c->side[n].pt[p].u = uu; \
    c->side[n].pt[p].v = vv
 
+/**
+ * @brief Creates and initializes a new Cube object.
+ *
+ * This function allocates memory for a Cube, creates six Evas_Object images
+ * for the cube faces, and sets their initial properties and vertex coordinates.
+ * Each side is a square plane defined by four vertices.
+ *
+ * @param evas The Evas canvas on which to create the cube's objects.
+ * @param w The width of the cube.
+ * @param h The height of the cube.
+ * @param d The depth of the cube.
+ * @return A pointer to the newly created Cube object.
+ */
 static Cube *
 _cube_new(Evas *evas, Evas_Coord w, Evas_Coord h, Evas_Coord d)
 {
@@ -54,6 +81,19 @@ _cube_new(Evas *evas, Evas_Coord w, Evas_Coord h, Evas_Coord d)
         evas_object_color_set(o, 235, 235, 235, 235);
         evas_object_show(o);
      }
+   /*
+    * Define the 6 faces of the cube. Each face has 4 vertices.
+    * The vertices are defined in what should be a counter-clockwise order when
+    * viewed from outside the cube for back-face culling to work correctly.
+    * The texture coordinates (u,v) map a 256x256 image to each face.
+    *
+    * Face 0: Front face
+    * Face 1: Right face
+    * Face 2: Back face
+    * Face 3: Left face
+    * Face 4: Bottom face
+    * Face 5: Top face
+    */
    POINT(0, 0, -w, -h, -d,   0,   0);
    POINT(0, 1,  w, -h, -d, 256,   0);
    POINT(0, 2,  w,  h, -d, 256, 256);
@@ -87,6 +127,26 @@ _cube_new(Evas *evas, Evas_Coord w, Evas_Coord h, Evas_Coord d)
    return c;
 }
 
+/**
+ * @brief Positions and transforms the cube in 3D space.
+ *
+ * This function applies 3D rotation, lighting, and perspective projection
+ * to each side of the cube. It uses Evas_Map to perform these transformations.
+ * It also handles back-face culling by hiding sides that are not facing
+ * the camera and sorts the visible sides by depth to ensure correct rendering order.
+ *
+ * @param c The cube to position.
+ * @param x The x-coordinate of the cube's center in canvas coordinates.
+ * @param y The y-coordinate of the cube's center in canvas coordinates.
+ * @param z The z-coordinate of the cube's center in canvas coordinates.
+ * @param dx Rotation angle around the x-axis, in degrees.
+ * @param dy Rotation angle around the y-axis, in degrees.
+ * @param dz Rotation angle around the z-axis, in degrees.
+ * @param cx The x-coordinate of the perspective vanishing point on the screen.
+ * @param cy The y-coordinate of the perspective vanishing point on the screen.
+ * @param z0 The z-coordinate of the "eye" or camera position relative to the screen plane.
+ * @param foc The focal length, affecting the strength of the perspective effect.
+ */
 static void
 _cube_pos(Cube *c,
           Evas_Coord x, Evas_Coord y, Evas_Coord z,
@@ -155,6 +215,16 @@ _cube_pos(Cube *c,
    evas_map_free(m);
 }
 
+/**
+ * @brief Updates the cube's position and transformation.
+ *
+ * This function retrieves the window dimensions and calls _cube_pos()
+ * with the current global rotation and perspective settings. It is a convenience
+ * wrapper to redraw the cube when any parameter changes.
+ *
+ * @param win The window object containing the cube.
+ * @param c The cube to update.
+ */
 static void
 _cube_update(Evas_Object *win, Cube *c)
 {
@@ -167,6 +237,15 @@ _cube_update(Evas_Object *win, Cube *c)
              (w / 2) + cxo, (h / 2) + cyo, z0v, focv);
 }
 
+/**
+ * @brief Callback for changes to the X rotation slider.
+ *
+ * Updates the global X rotation angle and triggers a cube redraw.
+ *
+ * @param data The user data (the window object).
+ * @param obj The slider object that triggered the callback.
+ * @param event_info Unused event information.
+ */
 void
 _ch_rot_x(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -175,6 +254,15 @@ _ch_rot_x(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    _cube_update(win, cube);
 }
 
+/**
+ * @brief Callback for changes to the Y rotation slider.
+ *
+ * Updates the global Y rotation angle and triggers a cube redraw.
+ *
+ * @param data The user data (the window object).
+ * @param obj The slider object that triggered the callback.
+ * @param event_info Unused event information.
+ */
 void
 _ch_rot_y(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -183,6 +271,15 @@ _ch_rot_y(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    _cube_update(win, cube);
 }
 
+/**
+ * @brief Callback for changes to the Z rotation slider.
+ *
+ * Updates the global Z rotation angle and triggers a cube redraw.
+ *
+ * @param data The user data (the window object).
+ * @param obj The slider object that triggered the callback.
+ * @param event_info Unused event information.
+ */
 void
 _ch_rot_z(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -191,6 +288,15 @@ _ch_rot_z(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    _cube_update(win, cube);
 }
 
+/**
+ * @brief Callback for changes to the perspective center X offset slider.
+ *
+ * Updates the global perspective center X offset and triggers a cube redraw.
+ *
+ * @param data The user data (the window object).
+ * @param obj The slider object that triggered the callback.
+ * @param event_info Unused event information.
+ */
 void
 _ch_cx(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -199,6 +305,15 @@ _ch_cx(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    _cube_update(win, cube);
 }
 
+/**
+ * @brief Callback for changes to the perspective center Y offset slider.
+ *
+ * Updates the global perspective center Y offset and triggers a cube redraw.
+ *
+ * @param data The user data (the window object).
+ * @param obj The slider object that triggered the callback.
+ * @param event_info Unused event information.
+ */
 void
 _ch_cy(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -207,6 +322,15 @@ _ch_cy(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    _cube_update(win, cube);
 }
 
+/**
+ * @brief Callback for changes to the focal length slider.
+ *
+ * Updates the global focal length value and triggers a cube redraw.
+ *
+ * @param data The user data (the window object).
+ * @param obj The slider object that triggered the callback.
+ * @param event_info Unused event information.
+ */
 void
 _ch_foc(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -215,6 +339,15 @@ _ch_foc(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    _cube_update(win, cube);
 }
 
+/**
+ * @brief Callback for changes to the Z0 (camera Z position) slider.
+ *
+ * Updates the global Z0 value and triggers a cube redraw.
+ *
+ * @param data The user data (the window object).
+ * @param obj The slider object that triggered the callback.
+ * @param event_info Unused event information.
+ */
 void
 _ch_z0(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -223,6 +356,17 @@ _ch_z0(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    _cube_update(win, cube);
 }
 
+/**
+ * @brief Main function for the 3D cube test.
+ *
+ * This function sets up the main window, creates the cube, and adds
+ * sliders to control the cube's rotation and perspective. It initializes
+ * the UI and shows the window.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_3d(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

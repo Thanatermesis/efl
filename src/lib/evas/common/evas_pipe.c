@@ -3,15 +3,20 @@
 
 #ifdef BUILD_PIPE_RENDER
 
+/**
+ * @brief Structure to hold thread-specific information for pipe rendering.
+ */
 typedef struct _Thinfo
 {
-   RGBA_Image            *im;
-   int                    thread_num;
-   Eina_Thread            thread_id;
-   Eina_Barrier          *barrier;
-   const Eina_Inlist     *tasks;
-   Eina_Array             cutout_trash;
-   Eina_Array             rects_task;
+   RGBA_Image            *im; /**< The image being processed by this thread. */
+   int                    thread_num; /**< Identifier for this thread. */
+   Eina_Thread            thread_id; /**< The Eina thread identifier. */
+   Eina_Barrier          *barrier; /**< Barrier for synchronization with other threads. */
+   const Eina_Inlist     *tasks; /**< List of rendering tasks assigned to this thread.
+                                   *   Each element is a RGBA_Pipe_Thread_Info. */
+   Eina_Array             cutout_trash; /**< Array for recycling Cutout_Rects structures.
+                                         *   Elements are (Cutout_Rects *). */
+   Eina_Array             rects_task; /**< Array of pipe operations (RGBA_Pipe_Op *) that need preparation. */
 } Thinfo;
 
 static RGBA_Pipe *evas_common_pipe_add(RGBA_Pipe *pipe, RGBA_Pipe_Op **op);
@@ -19,6 +24,17 @@ static void evas_common_pipe_draw_context_copy(RGBA_Draw_Context *dc, RGBA_Pipe_
 static void evas_common_pipe_op_free(RGBA_Pipe_Op *op);
 
 /* utils */
+
+/**
+ * @brief Adds a new operation to the rendering pipe.
+ *
+ * If rpipe is NULL, a new pipe is created. If the current pipe segment
+ * is full, a new segment is allocated and appended.
+ *
+ * @param rpipe The existing rendering pipe, or NULL to create a new one.
+ * @param op Pointer to store the newly added pipe operation.
+ * @return The (potentially new) head of the rendering pipe list.
+ */
 static RGBA_Pipe *
 evas_common_pipe_add(RGBA_Pipe *rpipe, RGBA_Pipe_Op **op)
 {
@@ -48,6 +64,15 @@ evas_common_pipe_add(RGBA_Pipe *rpipe, RGBA_Pipe_Op **op)
    return rpipe;
 }
 
+/**
+ * @brief Copies the draw context into a pipe operation.
+ *
+ * This function performs a deep copy of the draw context, including
+ * allocating and copying cutout rectangles if they are active.
+ *
+ * @param dc The source RGBA_Draw_Context to copy.
+ * @param op The destination RGBA_Pipe_Op where the context will be stored.
+ */
 static void
 evas_common_pipe_draw_context_copy(RGBA_Draw_Context *dc, RGBA_Pipe_Op *op)
 {
@@ -63,6 +88,13 @@ evas_common_pipe_draw_context_copy(RGBA_Draw_Context *dc, RGBA_Pipe_Op *op)
      }
 }
 
+/**
+ * @brief Frees resources associated with a pipe operation's context.
+ *
+ * Specifically, this cleans up cutout rectangles within the operation's context.
+ *
+ * @param op The RGBA_Pipe_Op whose context resources are to be freed.
+ */
 static void
 evas_common_pipe_op_free(RGBA_Pipe_Op *op)
 {
@@ -70,6 +102,17 @@ evas_common_pipe_op_free(RGBA_Pipe_Op *op)
 }
 
 /* main api calls */
+
+/**
+ * @brief Main function for a rendering worker thread.
+ *
+ * This thread waits for tasks, processes them by iterating through pipe operations,
+ * and then waits for the next set of tasks.
+ *
+ * @param data Pointer to Thinfo structure for this thread.
+ * @param t The Eina_Thread handle (unused).
+ * @return NULL always.
+ */
 static void *
 evas_common_pipe_thread(void *data, Eina_Thread t EINA_UNUSED)
 {
@@ -119,9 +162,18 @@ static int               thread_num = 0;
 static Thinfo            thinfo[TH_MAX];
 static Eina_Barrier      thbarrier[2];
 
-static RGBA_Pipe_Thread_Info *buf = NULL;
-static unsigned int           buf_size = 0;
+static RGBA_Pipe_Thread_Info *buf = NULL; /**< Buffer for RGBA_Pipe_Thread_Info structures. */
+static unsigned int           buf_size = 0; /**< Current allocated size of buf, in number of elements. */
 
+/**
+ * @brief Pops a Cutout_Rects structure from the thread's trash array.
+ *
+ * If the trash is empty, a new Cutout_Rects structure is allocated.
+ * This is used for recycling Cutout_Rects to reduce allocations.
+ *
+ * @param info The thread information structure containing the cutout_trash.
+ * @return A pointer to a Cutout_Rects structure.
+ */
 static Cutout_Rects *
 evas_pipe_cutout_rects_pop(Thinfo *info)
 {
@@ -132,6 +184,14 @@ evas_pipe_cutout_rects_pop(Thinfo *info)
    return r;
 }
 
+/**
+ * @brief Pushes a Cutout_Rects structure back into the thread's trash array.
+ *
+ * The Cutout_Rects structure is freed before being pushed for recycling.
+ *
+ * @param info The thread information structure containing the cutout_trash.
+ * @param r The Cutout_Rects structure to recycle.
+ */
 static void
 evas_pipe_cutout_rects_push(Thinfo *info, Cutout_Rects *r)
 {
@@ -140,6 +200,13 @@ evas_pipe_cutout_rects_push(Thinfo *info, Cutout_Rects *r)
    eina_array_push(&info->cutout_trash, r);
 }
 
+/**
+ * @brief Rotates a Cutout_Rects structure to a worker thread's trash for recycling.
+ *
+ * This distributes the responsibility of recycling cutouts among worker threads.
+ *
+ * @param r The Cutout_Rects structure to recycle.
+ */
 static void
 evas_pipe_cutout_rects_rotate(Cutout_Rects *r)
 {
@@ -150,6 +217,13 @@ evas_pipe_cutout_rects_rotate(Cutout_Rects *r)
    current++;
 }
 
+/**
+ * @brief Pushes a pipe operation to a worker thread's task list for preparation.
+ *
+ * This distributes pipe operation preparation tasks among worker threads.
+ *
+ * @param op The RGBA_Pipe_Op to be prepared.
+ */
 static void
 evas_pipe_prepare_push(RGBA_Pipe_Op *op)
 {
@@ -160,6 +234,14 @@ evas_pipe_prepare_push(RGBA_Pipe_Op *op)
    current++;
 }
 
+/**
+ * @brief Prepares an image for threaded pipe rendering.
+ *
+ * Divides the image into smaller rectangular tasks and assigns them to worker threads.
+ * If only one thread is configured, this function does nothing.
+ *
+ * @param im The RGBA_Image to prepare for rendering.
+ */
 static void
 evas_common_pipe_begin(RGBA_Image *im)
 {
@@ -283,6 +365,16 @@ evas_common_pipe_free(RGBA_Image *im)
 
 /* draw ops */
 /**************** RECT ******************/
+
+/**
+ * @brief Executes the rectangle drawing operation for a specific thread and area.
+ *
+ * This function is called by a worker thread to draw a part of a rectangle.
+ *
+ * @param dst The destination image.
+ * @param op The pipe operation containing rectangle parameters and context.
+ * @param info Thread-specific information, including the area to render.
+ */
 static void
 evas_common_pipe_rectangle_draw_do(RGBA_Image *dst, const RGBA_Pipe_Op *op, const RGBA_Pipe_Thread_Info *info)
 {
@@ -294,6 +386,16 @@ evas_common_pipe_rectangle_draw_do(RGBA_Image *dst, const RGBA_Pipe_Op *op, cons
 				 op->op.rect.w, op->op.rect.h);
 }
 
+/**
+ * @brief Prepares a rectangle drawing operation.
+ *
+ * This involves calculating cutout rectangles for the operation.
+ *
+ * @param data Pointer to Thinfo for the current thread (used for recycling cutouts).
+ * @param dst The destination image.
+ * @param op The pipe operation for the rectangle.
+ * @return EINA_TRUE if rendering is needed, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 evas_common_pipe_rectangle_prepare(void *data, RGBA_Image *dst, RGBA_Pipe_Op *op)
 {
@@ -331,6 +433,17 @@ evas_common_pipe_rectangle_draw(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, i
 }
 
 /**************** LINE ******************/
+
+/**
+ * @brief Executes the line drawing operation for a specific thread and area.
+ *
+ * This function is called by a worker thread to draw a part of a line.
+ * The context is clipped to the thread's assigned area.
+ *
+ * @param dst The destination image.
+ * @param op The pipe operation containing line parameters and context.
+ * @param info Thread-specific information, including the area to render and clip.
+ */
 static void
 evas_common_pipe_line_draw_do(RGBA_Image *dst, const RGBA_Pipe_Op *op, const RGBA_Pipe_Thread_Info *info)
 {
@@ -363,10 +476,20 @@ evas_common_pipe_line_draw(RGBA_Image *dst, RGBA_Draw_Context *dc,
 }
 
 /**************** POLY ******************/
+
+/**
+ * @brief Frees resources specific to a polygon pipe operation.
+ *
+ * Currently, this function is a no-op for polygon points as they are not
+ * deep-copied into the pipe operation but might be in the future.
+ * It calls the generic pipe operation free function.
+ *
+ * @param op The polygon pipe operation.
+ */
 static void
 evas_common_pipe_op_poly_free(RGBA_Pipe_Op *op)
 {
-#if 0
+#if 0 // FIXME: Points are not copied currently, so no need to free them here.
    RGBA_Polygon_Point *p;
 
    while (op->op.poly.points)
@@ -380,6 +503,16 @@ evas_common_pipe_op_poly_free(RGBA_Pipe_Op *op)
    evas_common_pipe_op_free(op);
 }
 
+/**
+ * @brief Executes the polygon drawing operation for a specific thread and area.
+ *
+ * This function is called by a worker thread to draw a part of a polygon.
+ * The context is clipped to the thread's assigned area.
+ *
+ * @param dst The destination image.
+ * @param op The pipe operation containing polygon parameters and context.
+ * @param info Thread-specific information, including the area to render and clip.
+ */
 static void
 evas_common_pipe_poly_draw_do(RGBA_Image *dst, const RGBA_Pipe_Op *op, const RGBA_Pipe_Thread_Info *info)
 {
@@ -425,6 +558,15 @@ evas_common_pipe_poly_draw(RGBA_Image *dst, RGBA_Draw_Context *dc,
 }
 
 /**************** TEXT ******************/
+
+/**
+ * @brief Frees resources specific to a text pipe operation.
+ *
+ * This unreferences the international text properties and calls the generic
+ * pipe operation free function.
+ *
+ * @param op The text pipe operation.
+ */
 static void
 evas_common_pipe_op_text_free(RGBA_Pipe_Op *op)
 {
@@ -432,6 +574,15 @@ evas_common_pipe_op_text_free(RGBA_Pipe_Op *op)
    evas_common_pipe_op_free(op);
 }
 
+/**
+ * @brief Executes the text drawing operation for a specific thread and area.
+ *
+ * This function is called by a worker thread to draw a part of a text string.
+ *
+ * @param dst The destination image.
+ * @param op The pipe operation containing text parameters, properties, and context.
+ * @param info Thread-specific information, including the area to render.
+ */
 static void
 evas_common_pipe_text_draw_do(RGBA_Image *dst, const RGBA_Pipe_Op *op, const RGBA_Pipe_Thread_Info *info)
 {
@@ -441,6 +592,16 @@ evas_common_pipe_text_draw_do(RGBA_Image *dst, const RGBA_Pipe_Op *op, const RGB
    evas_common_font_draw_do(op->rects, &info->area, op->op.text.func, dst, &(context), op->op.text.x, op->op.text.y, op->op.text.intl_props);
 }
 
+/**
+ * @brief Prepares a text drawing operation.
+ *
+ * This involves calculating cutout rectangles for the text rendering.
+ *
+ * @param data Pointer to Thinfo for the current thread (used for recycling cutouts).
+ * @param dst The destination image.
+ * @param op The pipe operation for the text.
+ * @return EINA_TRUE if rendering is needed, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 evas_common_pipe_text_draw_prepare(void *data, RGBA_Image *dst, RGBA_Pipe_Op *op)
 {
@@ -478,6 +639,16 @@ evas_common_pipe_text_draw(RGBA_Image *dst, RGBA_Draw_Context *dc,
 }
 
 /**************** IMAGE *****************/
+
+/**
+ * @brief Frees resources specific to an image pipe operation.
+ *
+ * This decrements the reference count of the source image and drops it
+ * from the cache if the reference count reaches zero. It then calls the
+ * generic pipe operation free function.
+ *
+ * @param op The image pipe operation.
+ */
 static void
 evas_common_pipe_op_image_free(RGBA_Pipe_Op *op)
 {
@@ -489,6 +660,16 @@ evas_common_pipe_op_image_free(RGBA_Pipe_Op *op)
    evas_common_pipe_op_free(op);
 }
 
+/**
+ * @brief Prepares an image drawing (scaling) operation.
+ *
+ * This involves calculating cutout rectangles for the scaled image rendering.
+ *
+ * @param data Pointer to Thinfo for the current thread (used for recycling cutouts).
+ * @param dst The destination image.
+ * @param op The pipe operation for the image.
+ * @return EINA_TRUE if rendering is needed, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 evas_common_pipe_op_image_prepare(void *data, RGBA_Image *dst, RGBA_Pipe_Op *op)
 {
@@ -508,6 +689,16 @@ evas_common_pipe_op_image_prepare(void *data, RGBA_Image *dst, RGBA_Pipe_Op *op)
    return r;
 }
 
+/**
+ * @brief Executes the image drawing (scaling) operation for a specific thread and area.
+ *
+ * This function is called by a worker thread to draw a part of a scaled image.
+ * It handles both smooth and sampled scaling.
+ *
+ * @param dst The destination image.
+ * @param op The pipe operation containing image scaling parameters and context.
+ * @param info Thread-specific information, including the area to render.
+ */
 static void
 evas_common_pipe_image_draw_do(RGBA_Image *dst, const RGBA_Pipe_Op *op, const RGBA_Pipe_Thread_Info *info)
 {
@@ -595,6 +786,15 @@ evas_common_pipe_image_draw(RGBA_Image *src, RGBA_Image *dst,
    evas_common_pipe_image_load(src);
 }
 
+/**
+ * @brief Frees resources specific to a map pipe operation.
+ *
+ * This decrements the reference count of the source image and drops it
+ * from the cache if the reference count reaches zero. It then calls the
+ * generic pipe operation free function.
+ *
+ * @param op The map pipe operation.
+ */
 static void
 evas_common_pipe_op_map_free(RGBA_Pipe_Op *op)
 {
@@ -605,6 +805,15 @@ evas_common_pipe_op_map_free(RGBA_Pipe_Op *op)
    evas_common_pipe_op_free(op);
 }
 
+/**
+ * @brief Executes the map rendering operation for a specific thread and area.
+ *
+ * This function is called by a worker thread to render a part of a mapped image.
+ *
+ * @param dst The destination image.
+ * @param op The pipe operation containing map parameters and context.
+ * @param info Thread-specific information, including the area to render.
+ */
 static void
 evas_common_pipe_map_draw_do(RGBA_Image *dst, const RGBA_Pipe_Op *op, const RGBA_Pipe_Thread_Info *info)
 {
@@ -617,6 +826,16 @@ evas_common_pipe_map_draw_do(RGBA_Image *dst, const RGBA_Pipe_Op *op, const RGBA
                            op->op.map.level);
 }
 
+/**
+ * @brief Prepares a map rendering operation.
+ *
+ * This function checks if the map operation is valid and can be rendered.
+ *
+ * @param data Unused.
+ * @param dst The destination image.
+ * @param op The pipe operation for the map.
+ * @return EINA_TRUE if rendering is needed, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 evas_common_pipe_map_draw_prepare(void *data EINA_UNUSED, RGBA_Image *dst, RGBA_Pipe_Op *op)
 {
@@ -665,6 +884,17 @@ evas_common_pipe_map_draw(RGBA_Image *src, RGBA_Image *dst,
    evas_common_pipe_image_load(src);
 }
 
+/**
+ * @brief Recursively renders map operations.
+ *
+ * Map operations can be nested (an image used in a map can itself be
+ * the result of other pipe operations, including other maps). This function
+ * ensures that source images for maps are rendered before the map itself.
+ * After recursively processing dependencies, it begins and flushes the pipe
+ * for the current root image.
+ *
+ * @param root The root image whose map operations (and their dependencies) are to be rendered.
+ */
 static void
 evas_common_pipe_map_render(RGBA_Image *root)
 {
@@ -693,6 +923,17 @@ evas_common_pipe_map_render(RGBA_Image *root)
   evas_common_pipe_flush(root);
 }
 
+/**
+ * @brief Main function for a loading/preparation worker thread.
+ *
+ * This thread waits for tasks related to loading image data, normalizing
+ * colorspaces, preparing text glyphs, and preparing other drawing operations
+ * (like calculating cutouts).
+ *
+ * @param data Pointer to Thinfo structure for this thread.
+ * @param t The Eina_Thread handle (unused).
+ * @return NULL always.
+ */
 static void*
 evas_common_pipe_load(void *data, Eina_Thread t EINA_UNUSED)
 {
@@ -760,8 +1001,17 @@ evas_common_pipe_load(void *data, Eina_Thread t EINA_UNUSED)
   return NULL;
 }
 
-static volatile int bval = 0;
+static volatile int bval = 0; /**< Unused variable. */
 
+/**
+ * @brief Triggers the loading and preparation phase for an image.
+ *
+ * Assigns the image to all loading worker threads and signals them
+ * to start processing their respective tasks (image loading, text prep, op prep).
+ * It then waits for all loading threads to complete.
+ *
+ * @param im The image for which loading/preparation tasks should be performed.
+ */
 static void
 evas_common_pipe_load_do(RGBA_Image *im)
 {

@@ -66,6 +66,13 @@ static int _eina_convert_log_dom = -1;
 
 #define HEXA_TO_INT(Hexa) (Hexa >= 'a') ? Hexa - 'a' + 10 : Hexa - '0'
 
+/**
+ * @internal
+ * @brief Reverses a string in place.
+ *
+ * @param s The string to be reversed.
+ * @param length The length of the string.
+ */
 static inline void reverse(char s[], int length)
 {
    int i, j;
@@ -283,6 +290,9 @@ eina_convert_atod(const char *src, int length, long long *m, long *e)
    return EINA_TRUE;
 
 on_length_error:
+   /* Handles cases where the input string length is insufficient
+    * for the required "0x..." or "p..." parts of the hexadecimal float format.
+    */
    return EINA_FALSE;
 }
 
@@ -651,11 +661,20 @@ eina_convert_strtod_c(const char *nptr, char **endptr)
      }
 
  on_success:
+   /* Successfully parsed a valid number or reached a point
+    * where a valid number was formed, even if subsequent characters
+    * are not part of the number (e.g., "123abc").
+    * Sets endptr to the character after the parsed number.
+    */
    if (endptr)
      *endptr = (char *)a;
    return minus * val;
 
  on_error:
+   /* Encountered an invalid sequence that cannot form a number
+    * (e.g., "infinit", "nanana", or an unexpected character).
+    * Sets endptr to the beginning of the input string as per strtod behavior.
+    */
    if (endptr)
      *endptr = (char *)nptr;
    return 0.0;

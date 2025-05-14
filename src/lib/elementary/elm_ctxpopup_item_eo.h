@@ -4,6 +4,7 @@
 #ifndef _ELM_CTXPOPUP_ITEM_EO_CLASS_TYPE
 #define _ELM_CTXPOPUP_ITEM_EO_CLASS_TYPE
 
+/** @brief The Efl object type for Elementary Ctxpopup Items. */
 typedef Eo Elm_Ctxpopup_Item;
 
 #endif

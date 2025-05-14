@@ -109,22 +109,44 @@ extern Eina_Bool eina_mempool_init(void);
 extern Eina_Bool eina_list_init(void);
 
 extern Eina_Spinlock _eina_debug_thread_lock;
+/** @internal List of all active debug sessions (_Eina_Debug_Session). */
 static Eina_List *sessions;
 
+/** @internal Global flag to indicate if eina_debug is disabled.
+ * Set by eina_debug_disable() typically before eina_init().
+ */
 static Eina_Bool _debug_disabled = EINA_FALSE;
 
 /* Local session */
 /* __thread here to allow debuggers to be master and slave by using two different threads */
 static Eina_Debug_Session *_last_local_session = NULL;
 
+/**
+ * @internal
+ * @struct _opcode_reply_info
+ * @brief Holds information related to an opcode registration request.
+ *
+ * This structure is used to track the status of opcode registration requests
+ * sent to the debug daemon and to invoke the appropriate status callback
+ * upon receiving a response or when a session is terminated.
+ */
 typedef struct
 {
-   const Eina_Debug_Opcode *ops;
-   Eina_Debug_Opcode_Status_Cb status_cb;
-   void *status_data;
-   Eina_Bool sent : 1;
+   const Eina_Debug_Opcode *ops; /**< Pointer to the array of opcodes to be registered. */
+   Eina_Debug_Opcode_Status_Cb status_cb; /**< Callback to invoke when registration status is known. */
+   void *status_data; /**< User data for the status_cb. */
+   Eina_Bool sent : 1; /**< Flag indicating if the registration request has been sent. */
 } _opcode_reply_info;
 
+/**
+ * @internal
+ * @struct _Eina_Debug_Session
+ * @brief Represents an active debugging session with the daemon.
+ *
+ * This structure encapsulates all state associated with a connection
+ * to the efl_debugd daemon, including registered opcodes, callbacks,
+ * and connection details.
+ */
 struct _Eina_Debug_Session
 {
    Eina_List **cbs; /* Table of callbacks lists indexed by opcode id */
@@ -178,6 +200,20 @@ err:
 }
 
 #ifndef _WIN32
+/**
+ * @internal
+ * @brief Sends a greeting message to the debug daemon.
+ *
+ * This message includes the client's PID, the protocol version it speaks,
+ * and the application name. This is typically the first message sent
+ * after a connection is established.
+ * The payload format is:
+ * - int32: protocol version (currently 1)
+ * - int32: client PID
+ * - string: application name (null-terminated)
+ *
+ * @param session The debug session used to send the greeting.
+ */
 static void
 _daemon_greet(Eina_Debug_Session *session)
 {
@@ -203,6 +239,21 @@ _daemon_greet(Eina_Debug_Session *session)
    eina_debug_session_send(session, 0, EINA_DEBUG_OPCODE_HELLO, buf, size);
 }
 
+/**
+ * @internal
+ * @brief Receives a complete packet from the debug session's file descriptor.
+ *
+ * This function first reads the packet size (4 bytes), then allocates memory
+ * and reads the rest of the packet. The received packet includes its header.
+ *
+ * @param session The debug session from which to receive the packet.
+ * @param[out] buffer Pointer to a buffer that will be allocated and filled
+ *                    with the received packet data. The caller is responsible
+ *                    for freeing this buffer.
+ * @return The total number of bytes received (including the size field itself),
+ *         or a negative value on error or if the connection is closed.
+ *         Returns 0 if read indicates EOF before reading size.
+ */
 static int
 _packet_receive(Eina_Debug_Session *session, unsigned char **buffer)
 {
@@ -303,6 +354,19 @@ eina_debug_session_dispatch_get(Eina_Debug_Session *session)
 }
 
 #ifndef _WIN32
+/**
+ * @internal
+ * @brief Registers a callback for a specific opcode ID within a session.
+ *
+ * This function associates a callback `cb` with a given `op_id`. If the
+ * internal callback table `session->cbs` is not large enough, it will be
+ * reallocated. Multiple callbacks can be registered for the same opcode ID;
+ * they will be stored in a list.
+ *
+ * @param session The debug session.
+ * @param op_id The opcode ID for which to register the callback.
+ * @param cb The callback function to be invoked when a packet with `op_id` is received.
+ */
 static void
 _static_opcode_register(Eina_Debug_Session *session,
       int op_id, Eina_Debug_Cb cb)
@@ -322,7 +386,10 @@ _static_opcode_register(Eina_Debug_Session *session,
 
 /*
  * Response of the daemon containing the ids of the requested opcodes.
- * PTR64 + (opcode id)*
+ * The buffer format is:
+ * - uint64_t: Pointer to the original _opcode_reply_info structure (client-side address).
+ * - int32_t[]: Array of opcode IDs assigned by the daemon, corresponding to the
+ *              opcode names sent in the registration request.
  */
 static Eina_Bool
 _callbacks_register_cb(Eina_Debug_Session *session, int src_id EINA_UNUSED, void *buffer, int size)
@@ -362,6 +429,22 @@ _callbacks_register_cb(Eina_Debug_Session *session, int src_id EINA_UNUSED, void
 }
 #endif
 
+/**
+ * @internal
+ * @brief Sends an opcode registration request to the debug daemon.
+ *
+ * This function constructs and sends a packet to the daemon requesting
+ * numerical IDs for a list of opcode names. The packet payload contains:
+ * - uint64_t: The address of the `_opcode_reply_info` structure associated
+ *             with this request (used by the client to correlate the response).
+ * - char[]: A sequence of null-terminated strings, where each string is an
+ *           opcode name to be registered.
+ *
+ * @param session The debug session to use for sending the request.
+ * @param info An `_opcode_reply_info` structure containing the opcodes to register
+ *             and associated callback information. This function marks `info->sent`
+ *             as EINA_TRUE to prevent duplicate sends.
+ */
 static void
 _opcodes_registration_send(Eina_Debug_Session *session,
       _opcode_reply_info *info)
@@ -406,6 +489,18 @@ _opcodes_registration_send(Eina_Debug_Session *session,
 }
 
 #ifndef _WIN32
+/**
+ * @internal
+ * @brief Registers all pending opcode requests for a given session.
+ *
+ * This function is typically called when a session is established or
+ * re-established. It iterates through all `_opcode_reply_info` structures
+ * associated with the session and sends registration requests for those
+ * that haven't been sent yet. It also registers the internal callback
+ * `_callbacks_register_cb` for handling responses to these requests.
+ *
+ * @param session The debug session for which to register opcodes.
+ */
 static void
 _opcodes_register_all(Eina_Debug_Session *session)
 {
@@ -418,6 +513,18 @@ _opcodes_register_all(Eina_Debug_Session *session)
         _opcodes_registration_send(session, info);;
 }
 
+/**
+ * @internal
+ * @brief Cleans up opcode registrations when a session is terminated or lost.
+ *
+ * This function iterates through all registered opcodes for the session,
+ * invalidates their IDs (sets them to `EINA_DEBUG_OPCODE_INVALID`),
+ * and invokes their status callbacks with `EINA_FALSE` to notify the
+ * user code that the opcodes are no longer valid. It also frees resources
+ * associated with opcode callback lists.
+ *
+ * @param session The debug session whose opcodes are to be unregistered.
+ */
 static void
 _opcodes_unregister_all(Eina_Debug_Session *session)
 {
@@ -448,6 +555,19 @@ _opcodes_unregister_all(Eina_Debug_Session *session)
    (strlen((s)->sun_path) + (size_t)(((struct sockaddr_un *)NULL)->sun_path))
 #endif
 
+/**
+ * @internal
+ * @brief Creates and initializes a new debug session.
+ *
+ * Allocates an `_Eina_Debug_Session` structure, initializes its members
+ * (including setting the default dispatcher and file descriptor),
+ * adds it to the global list of sessions, and starts the monitor thread
+ * for this session.
+ *
+ * @param fd The file descriptor for the connection to the debug daemon.
+ * @return A pointer to the newly created `Eina_Debug_Session` on success,
+ *         or `NULL` on allocation failure.
+ */
 static Eina_Debug_Session *
 _session_create(int fd)
 {
@@ -546,6 +666,19 @@ err:
 // users or developers to get useful information about an app at all times
 
 #ifndef _WIN32
+/**
+ * @internal
+ * @brief The main function for the dedicated debug monitor thread.
+ *
+ * This thread is responsible for handling communication with the efl_debugd
+ * daemon for a specific session. It performs the initial greeting, registers
+ * opcodes, and then enters a loop to receive and dispatch packets.
+ * If the connection is lost or an error occurs, it unregisters opcodes
+ * and terminates the session.
+ *
+ * @param _data A pointer to the `Eina_Debug_Session` this thread manages.
+ * @return Always `NULL`. The thread exits when the session is terminated.
+ */
 static void *
 _monitor(void *_data)
 {
@@ -600,6 +733,17 @@ _monitor(void *_data)
 #endif
 
 // start up the debug monitor if we haven't already
+/**
+ * @internal
+ * @brief Starts the dedicated monitor thread for a debug session.
+ *
+ * This function creates a new POSIX thread that will execute the `_monitor`
+ * function. It configures signal masking for the new thread to ensure
+ * robustness. If thread creation fails, it logs an error and aborts.
+ * This function is not implemented on Windows.
+ *
+ * @param session The debug session for which to start the monitor thread.
+ */
 static void
 _thread_start(Eina_Debug_Session *session)
 {
@@ -701,6 +845,19 @@ eina_debug_session_data_get(Eina_Debug_Session *session)
    else return NULL;
 }
 
+/**
+ * @internal
+ * @brief Initializes the Eina debug system.
+ *
+ * This function sets up necessary threading components, spinlocks,
+ * initializes CPU and backtrace debugging features, and timers.
+ * It also attempts to connect to the local debug daemon unless
+ * debugging is disabled (e.g., by `EFL_NODEBUG` environment variable,
+ * `eina_debug_disable()`, or if running as setuid).
+ * This function is part of Eina's internal initialization sequence.
+ *
+ * @return EINA_TRUE on successful initialization.
+ */
 Eina_Bool
 eina_debug_init(void)
 {
@@ -731,6 +888,16 @@ eina_debug_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the Eina debug system.
+ *
+ * Terminates all active debug sessions, shuts down timer, backtrace,
+ * and CPU debugging features, and cleans up threading resources and spinlocks.
+ * This function is part of Eina's internal shutdown sequence.
+ *
+ * @return EINA_TRUE on successful shutdown.
+ */
 Eina_Bool
 eina_debug_shutdown(void)
 {

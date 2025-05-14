@@ -1,42 +1,86 @@
 #include "edje_private.h"
 
+/**
+ * @brief Structure to hold information about items in an Edje table part.
+ *
+ * This structure is used to define the properties of a child object
+ * within a TABLE part, such as its position and span.
+ */
 typedef struct _Edje_Table_Items Edje_Table_Items;
 struct _Edje_Table_Items
 {
-   Evas_Object   *child;
-   const char    *part;
-   unsigned short col;
-   unsigned short row;
-   unsigned short colspan;
-   unsigned short rowspan;
+   Evas_Object   *child;    /**< The child Evas_Object packed into the table. */
+   const char    *part;     /**< The name of the part this item belongs to. */
+   unsigned short col;       /**< The column in the table where the child is placed. */
+   unsigned short row;       /**< The row in the table where the child is placed. */
+   unsigned short colspan;   /**< The number of columns the child spans. */
+   unsigned short rowspan;   /**< The number of rows the child spans. */
 };
 
+/**
+ * @brief Structure to hold information about draggable items in an Edje part.
+ *
+ * This structure defines the properties of a draggable element, including its
+ * current position, dimensions, and step/page values for dragging.
+ */
 typedef struct _Edje_Drag_Items Edje_Drag_Items;
 struct _Edje_Drag_Items
 {
-   const char *part;
-   FLOAT_T     x, y, w, h;
+   const char *part; /**< The name of the draggable part. */
+   FLOAT_T     x;    /**< The current X-coordinate of the draggable item (relative to its container). */
+   FLOAT_T     y;    /**< The current Y-coordinate of the draggable item (relative to its container). */
+   FLOAT_T     w;    /**< The current width of the draggable item. */
+   FLOAT_T     h;    /**< The current height of the draggable item. */
    struct
    {
-      FLOAT_T x, y;
+      FLOAT_T x; /**< The step value for dragging in the X-axis. */
+      FLOAT_T y; /**< The step value for dragging in the Y-axis. */
    } step;
    struct
    {
-      FLOAT_T x, y;
+      FLOAT_T x; /**< The page step value for dragging in the X-axis. */
+      FLOAT_T y; /**< The page step value for dragging in the Y-axis. */
    } page;
 };
 
+/**
+ * @brief Adds an Edje file to the Edje object and loads its collection.
+ *
+ * This internal function is responsible for opening and processing an Edje file (.edj),
+ * associating it with the given Edje object, and loading the specified group/collection.
+ * It handles error reporting if the file cannot be loaded or the group is not found.
+ *
+ * @param ed The Edje object to associate the file with.
+ * @param f The Eina_File handle of the Edje file to load.
+ */
 void _edje_file_add(Edje *ed, const Eina_File *f);
 
 /* START - Nested part support */
-#define _edje_smart_nested_type "Evas_Smart_Nested"
+#define _edje_smart_nested_type "Evas_Smart_Nested" /**< String identifier for the nested smart object type. */
+
+/**
+ * @brief Structure to manage nested Edje parts.
+ *
+ * This structure is used internally to keep track of smart objects
+ * that contain nested children parts within an Edje layout.
+ */
 typedef struct _Edje_Nested_Support Edje_Nested_Support;
 struct _Edje_Nested_Support /* We builed nested-parts list using this struct */
 {
-   Evas_Object  *o; /* Smart object containing nested children */
-   unsigned char nested_children_count; /* Number of nested children */
+   Evas_Object  *o; /**< The smart Evas_Object that acts as a container for nested children. */
+   unsigned char nested_children_count; /**< The number of direct nested children this smart object manages. */
 };
 
+/**
+ * @brief Creates or retrieves the Evas_Smart_Class for nested Edje objects.
+ *
+ * This function initializes and returns a singleton Evas_Smart_Class instance
+ * specifically designed for handling nested Edje parts. This class defines
+ * the behavior of smart objects used to group nested children.
+ *
+ * @return A pointer to the Evas_Smart_Class for nested Edje objects.
+ *         Returns the existing smart class if already created.
+ */
 Evas_Smart *
 _edje_smart_nested_smart_class_new(void)
 {
@@ -52,6 +96,16 @@ _edje_smart_nested_smart_class_new(void)
    return smart;
 }
 
+/**
+ * @brief Adds a new smart object for handling nested Edje parts.
+ *
+ * This function creates an instance of the Edje nested smart object
+ * using the Evas_Smart_Class obtained from _edje_smart_nested_smart_class_new().
+ * This object will serve as a container for nested children.
+ *
+ * @param evas The Evas canvas on which to create the smart object.
+ * @return A new Evas_Object instance of the nested smart type.
+ */
 Evas_Object *
 edje_smart_nested_add(Evas *evas)
 {
@@ -63,47 +117,159 @@ edje_smart_nested_add(Evas *evas)
 #ifdef EDJE_PROGRAM_CACHE
 static Eina_Bool  _edje_collection_free_prog_cache_matches_free_cb(const Eina_Hash *hash, const void *key, void *data, void *fdata);
 #endif
+
+/**
+ * @brief Sets the size hints for an object packed into an Edje container (Box or Table).
+ *
+ * This function applies various size hints (min, max, preferred, padding, alignment,
+ * weight, aspect control) from an Edje_Pack_Element structure to a given Evas_Object.
+ * It also handles initial sizing based on min hints or calculated min size.
+ *
+ * @param obj The Evas_Object whose hints are to be set.
+ * @param it Pointer to the Edje_Pack_Element containing the hint information.
+ *           Example Edje_Pack_Element structure:
+ *           Edje_Pack_Element {
+ *              min.w = 10, min.h = 10, // Minimum width and height
+ *              prefer.w = 50, prefer.h = 50, // Preferred width and height
+ *              max.w = 100, max.h = 100, // Maximum width and height
+ *              padding.l = 2, padding.r = 2, padding.t = 2, padding.b = 2, // Padding
+ *              align.x = 0.5, align.y = 0.5, // Alignment (0.0 to 1.0)
+ *              weight.x = 1.0, weight.y = 1.0, // Weight (for expansion)
+ *              aspect.mode = EDJE_ASPECT_CONTROL_BOTH, // Aspect control mode
+ *              aspect.w = 1, aspect.h = 1 // Aspect ratio (width:height)
+ *           }
+ */
 static void       _edje_object_pack_item_hints_set(Evas_Object *obj, Edje_Pack_Element *it);
+
+/**
+ * @brief Callback function to repeat/propagate signals from child Edje objects to their parent.
+ *
+ * When a signal is emitted by a child Edje object (e.g., one nested within a GROUP or
+ * packed into a BOX/TABLE), this callback is invoked. It constructs a new source string
+ * that includes the parent's context (part name, index) and re-emits the signal on the
+ * parent Edje object. This allows signals to bubble up the Edje object hierarchy.
+ * It also handles alias resolution for part names.
+ *
+ * @param data The parent Edje Evas_Object (passed as user data).
+ * @param obj The child Evas_Object that emitted the original signal.
+ * @param signal The signal string (e.g., "mouse,clicked,1").
+ * @param source The source string from the original signal (e.g., "my_button").
+ */
 static void       _cb_signal_repeat(void *data, Evas_Object *obj, const char *signal, const char *source);
 
+/**
+ * @brief Collects user-defined state from an Edje object before a file/group change.
+ *
+ * This function iterates through the `user_defined` hash table in the Edje object.
+ * This table stores information about objects swallowed by the user, items packed
+ * into boxes/tables by the user, and other user-set properties (like text, drag values).
+ *
+ * For swallows, it unswallows the child. For box/table items, it prepares them for
+ * re-packing by determining their index if not already set and removing them from the
+ * container. For strings, it increments their reference count.
+ * The collected information is returned in a new hash table, and the original
+ * `ed->user_defined` is cleared. This allows the user-defined state to be reapplied
+ * after the Edje object's content is reloaded.
+ *
+ * @param ed The Edje object.
+ * @return A new Eina_Hash containing the collected user-defined states.
+ *         The keys are part names (const char *), and values are Eina_List *
+ *         of Edje_User_Defined structures.
+ *         Example of collected data structure:
+ *         Eina_Hash {
+ *           "part_name1": Eina_List [ Edje_User_Defined_Swallow1, Edje_User_Defined_Text1 ],
+ *           "part_name2": Eina_List [ Edje_User_Defined_Box_Pack1 ]
+ *         }
+ */
 static Eina_Hash *_edje_object_collect(Edje *ed);
 
+/**
+ * @brief Comparator function for sorting Edje_User_Defined box items.
+ *
+ * Used with qsort or eina_list_sort to sort a list of Edje_User_Defined
+ * structures that represent items packed into a box. The primary sort key
+ * is the part name (stringshare comparison, effectively by pointer), and the
+ * secondary sort key is the `index` within the box.
+ *
+ * @param a Pointer to the first Edje_User_Defined item.
+ * @param b Pointer to the second Edje_User_Defined item.
+ * @return An integer less than, equal to, or greater than zero if the first
+ *         argument is considered to be respectively less than, equal to, or
+ *         greater than the second.
+ */
 static int        _sort_defined_boxes(const void *a, const void *b);
 
 /************************** API Routines **************************/
 
+/**
+ * @internal
+ * @brief Gets the file path of the Edje object.
+ * Efl.File.file Eo API proxy.
+ *
+ * @param obj The Edje Evas_Object (unused).
+ * @param ed The Edje data structure.
+ * @return The file path stringshare, or NULL if not set.
+ */
 EOLIAN const char *
 _efl_canvas_layout_efl_file_file_get(Eo *obj EINA_UNUSED, Edje *ed)
 {
    return ed->path;
 }
 
+/**
+ * @internal
+ * @brief Gets the group name of the Edje object.
+ * Efl.File.key Eo API proxy.
+ *
+ * @param obj The Edje Evas_Object (unused).
+ * @param ed The Edje data structure.
+ * @return The group name stringshare, or NULL if not set.
+ */
 EOLIAN const char *
 _efl_canvas_layout_efl_file_group_get(Eo *obj EINA_UNUSED, Edje *ed)
 {
    return ed->group;
 }
 
+/**
+ * @internal
+ * @brief Gets the last load error for the Edje object.
+ * Efl.Layout.Layout.load_error Eo API proxy.
+ *
+ * This function translates the internal Edje_Load_Error enum to the
+ * Efl_Gfx_Image_Load_Error enum.
+ *
+ * @param obj The Edje Evas_Object (unused).
+ * @param ed The Edje data structure.
+ * @return The Efl_Gfx_Image_Load_Error representing the last load error.
+ */
 EOLIAN Eina_Error
 _efl_canvas_layout_layout_load_error_get(const Eo *obj EINA_UNUSED, Edje *ed)
 {
    switch (ed->load_error)
      {
-      case EDJE_LOAD_ERROR_NONE: return EFL_GFX_IMAGE_LOAD_ERROR_NONE;
-      case EDJE_LOAD_ERROR_GENERIC: return EFL_GFX_IMAGE_LOAD_ERROR_GENERIC;
-      case EDJE_LOAD_ERROR_DOES_NOT_EXIST: return EFL_GFX_IMAGE_LOAD_ERROR_DOES_NOT_EXIST;
-      case EDJE_LOAD_ERROR_PERMISSION_DENIED: return EFL_GFX_IMAGE_LOAD_ERROR_PERMISSION_DENIED;
-      case EDJE_LOAD_ERROR_RESOURCE_ALLOCATION_FAILED: return EFL_GFX_IMAGE_LOAD_ERROR_RESOURCE_ALLOCATION_FAILED;
-      case EDJE_LOAD_ERROR_CORRUPT_FILE: return EFL_GFX_IMAGE_LOAD_ERROR_CORRUPT_FILE;
-      case EDJE_LOAD_ERROR_UNKNOWN_FORMAT: return EFL_GFX_IMAGE_LOAD_ERROR_UNKNOWN_FORMAT;
-      case EDJE_LOAD_ERROR_INCOMPATIBLE_FILE: return EFL_GFX_IMAGE_LOAD_ERROR_INCOMPATIBLE_FILE;
-      case EDJE_LOAD_ERROR_UNKNOWN_COLLECTION: return EFL_GFX_IMAGE_LOAD_ERROR_UNKNOWN_COLLECTION;
-      case EDJE_LOAD_ERROR_RECURSIVE_REFERENCE: return EFL_GFX_IMAGE_LOAD_ERROR_RECURSIVE_REFERENCE;
+      case EDJE_LOAD_ERROR_NONE: return EFL_GFX_IMAGE_LOAD_ERROR_NONE; /**< No error occurred. */
+      case EDJE_LOAD_ERROR_GENERIC: return EFL_GFX_IMAGE_LOAD_ERROR_GENERIC; /**< A generic error occurred. */
+      case EDJE_LOAD_ERROR_DOES_NOT_EXIST: return EFL_GFX_IMAGE_LOAD_ERROR_DOES_NOT_EXIST; /**< The file does not exist. */
+      case EDJE_LOAD_ERROR_PERMISSION_DENIED: return EFL_GFX_IMAGE_LOAD_ERROR_PERMISSION_DENIED; /**< Permission denied to access the file. */
+      case EDJE_LOAD_ERROR_RESOURCE_ALLOCATION_FAILED: return EFL_GFX_IMAGE_LOAD_ERROR_RESOURCE_ALLOCATION_FAILED; /**< Resource allocation failed during loading. */
+      case EDJE_LOAD_ERROR_CORRUPT_FILE: return EFL_GFX_IMAGE_LOAD_ERROR_CORRUPT_FILE; /**< The Edje file is corrupt. */
+      case EDJE_LOAD_ERROR_UNKNOWN_FORMAT: return EFL_GFX_IMAGE_LOAD_ERROR_UNKNOWN_FORMAT; /**< The file format is unknown or not an Edje file. */
+      case EDJE_LOAD_ERROR_INCOMPATIBLE_FILE: return EFL_GFX_IMAGE_LOAD_ERROR_INCOMPATIBLE_FILE; /**< The Edje file version is incompatible. */
+      case EDJE_LOAD_ERROR_UNKNOWN_COLLECTION: return EFL_GFX_IMAGE_LOAD_ERROR_UNKNOWN_COLLECTION; /**< The specified group/collection was not found in the file. */
+      case EDJE_LOAD_ERROR_RECURSIVE_REFERENCE: return EFL_GFX_IMAGE_LOAD_ERROR_RECURSIVE_REFERENCE; /**< A recursive reference was detected in the Edje file. */
       default: break;
      }
    return EFL_GFX_IMAGE_LOAD_ERROR_GENERIC;
 }
 
+/**
+ * @brief Converts an Edje_Load_Error enum to a human-readable string.
+ *
+ * @param error The Edje_Load_Error code.
+ * @return A static string describing the error.
+ *         Example: For EDJE_LOAD_ERROR_DOES_NOT_EXIST, returns "File Does Not Exist".
+ */
 EAPI const char *
 edje_load_error_str(Edje_Load_Error error)
 {
@@ -144,19 +310,33 @@ edje_load_error_str(Edje_Load_Error error)
      }
 }
 
+/**
+ * @brief Retrieves a list of all group/collection names from a memory-mapped Edje file.
+ *
+ * This function opens an Edje file (via its Eina_File handle, which might be memory-mapped)
+ * and iterates through its collection directory to extract the names of all defined groups.
+ *
+ * @param f The Eina_File handle of the Edje file.
+ * @return An Eina_List of eina_stringshare'd collection names.
+ *         The caller is responsible for freeing this list using
+ *         edje_mmap_collection_list_free() or edje_file_collection_list_free().
+ *         Returns NULL on failure (e.g., if f is NULL or file cannot be processed).
+ *         Example list structure:
+ *         Eina_List [ "group/main", "group/button", "group/another_ui" ]
+ */
 EAPI Eina_List *
 edje_mmap_collection_list(Eina_File *f)
 {
-   Eina_List *lst = NULL;
-   Edje_File *edf;
+   Eina_List *lst = NULL; /**< List to store collection names. */
+   Edje_File *edf;        /**< Pointer to the cached Edje file data. */
    int error_ret = 0;
 
    if (!f) return NULL;
    edf = _edje_cache_file_coll_open(f, NULL, &error_ret, NULL, NULL);
    if (edf)
      {
-        Eina_Iterator *i;
-        const char *key;
+        Eina_Iterator *i; /**< Iterator for the collection hash. */
+        const char *key;  /**< Key from the hash (collection name). */
 
         i = eina_hash_iterator_key_new(edf->collection);
 
@@ -171,12 +351,26 @@ edje_mmap_collection_list(Eina_File *f)
    return lst;
 }
 
+/**
+ * @brief Retrieves a list of all group/collection names from an Edje file specified by path.
+ *
+ * This function opens an Edje file from the given path, then calls
+ * edje_mmap_collection_list() to get the collection names.
+ *
+ * @param file The path to the Edje file.
+ * @return An Eina_List of eina_stringshare'd collection names.
+ *         The caller is responsible for freeing this list using
+ *         edje_file_collection_list_free().
+ *         Returns NULL on failure (e.g., if file is NULL, empty, or cannot be opened).
+ *         Example list structure:
+ *         Eina_List [ "group/main", "group/button", "group/another_ui" ]
+ */
 EAPI Eina_List *
 edje_file_collection_list(const char *file)
 {
-   Eina_File *f;
-   Eina_List *lst = NULL;
-   char *tmp;
+   Eina_File *f;          /**< Eina_File handle for the opened file. */
+   Eina_List *lst = NULL; /**< List to store collection names. */
+   char *tmp;             /**< Temporary storage for resolved vpath. */
 
    if ((!file) || (!*file)) return NULL;
    tmp = eina_vpath_resolve(file);
@@ -191,6 +385,15 @@ err:
    return lst;
 }
 
+/**
+ * @brief Frees a list of collection names obtained from edje_file_collection_list()
+ *        or edje_mmap_collection_list().
+ *
+ * This function iterates through the list, deleting the eina_stringshare for each
+ * collection name and then removing the list node.
+ *
+ * @param lst The Eina_List of collection names to free.
+ */
 EAPI void
 edje_file_collection_list_free(Eina_List *lst)
 {
@@ -201,25 +404,48 @@ edje_file_collection_list_free(Eina_List *lst)
      }
 }
 
+/**
+ * @brief Frees a list of collection names obtained from edje_mmap_collection_list().
+ *
+ * This is an alias for edje_file_collection_list_free().
+ *
+ * @param lst The Eina_List of collection names to free.
+ */
 EAPI void
 edje_mmap_collection_list_free(Eina_List *lst)
 {
    edje_file_collection_list_free(lst);
 }
 
+/**
+ * @brief Retrieves a list of all color class names used in a memory-mapped Edje file.
+ *
+ * This function opens an Edje file (via its Eina_File handle) and reads the
+ * "edje/color_class_info" EET entry to get a list of all defined color classes.
+ *
+ * @param f The Eina_File handle of the Edje file.
+ * @return An Eina_List of eina_stringshare'd color class names.
+ *         The caller is responsible for freeing this list using
+ *         eina_list_free() (as stringshares are directly appended, not the list itself).
+ *         Consider using edje_file_color_class_used_free() for consistency if it were
+ *         to handle stringshare deletion.
+ *         Returns NULL on failure or if no color classes are defined.
+ *         Example list structure:
+ *         Eina_List [ "bg_color", "text_color", "highlight_color" ]
+ */
 EAPI Eina_List *
 edje_mmap_color_class_used_list(Eina_File *f)
 {
-   Eina_List *lst = NULL, *l;
-   Edje_File *edf;
-   int error_ret = 0;
-   const char *s;
+   Eina_List *lst = NULL, *l; /**< List to store color class names and loop iterator. */
+   Edje_File *edf;            /**< Pointer to the cached Edje file data. */
+   int error_ret = 0;         /**< Error code from cache open. */
+   const char *s;             /**< Temporary string for color class name. */
 
    if (!f) return NULL;
    edf = _edje_cache_file_coll_open(f, NULL, &error_ret, NULL, NULL);
    if (edf)
      {
-        Edje_Color_Class_Info *cc_info;
+        Edje_Color_Class_Info *cc_info; /**< Structure holding color class information from EET. */
 
         cc_info = eet_data_read(edf->ef, _edje_edd_edje_color_class_info,
                                 "edje/color_class_info");
@@ -236,18 +462,34 @@ edje_mmap_color_class_used_list(Eina_File *f)
    return lst;
 }
 
+/**
+ * @brief Retrieves a list of all color class names used in an Edje file specified by path.
+ *
+ * This function opens an Edje file from the given path and then calls
+ * edje_mmap_color_class_used_list() to get the color class names.
+ * @note There seems to be a copy-paste error here, it calls edje_mmap_collection_list()
+ * instead of edje_mmap_color_class_used_list(). This should be corrected.
+ *
+ * @param file The path to the Edje file.
+ * @return An Eina_List of eina_stringshare'd color class names (if the called function was correct).
+ *         The caller is responsible for freeing this list.
+ *         Returns NULL on failure.
+ *         Example list structure (intended):
+ *         Eina_List [ "bg_color", "text_color", "highlight_color" ]
+ */
 EAPI Eina_List *
 edje_file_color_class_used_list(const char *file)
 {
-   Eina_File *f;
-   Eina_List *lst = NULL;
-   char *tmp;
+   Eina_File *f;          /**< Eina_File handle for the opened file. */
+   Eina_List *lst = NULL; /**< List to store color class names. */
+   char *tmp;             /**< Temporary storage for resolved vpath. */
 
    if ((!file) || (!*file)) return NULL;
    tmp = eina_vpath_resolve(file);
    f = eina_file_open(tmp, EINA_FALSE);
    if (!f) goto err;
 
+   // FIXME: This should call edje_mmap_color_class_used_list(f)
    lst = edje_mmap_collection_list(f);
 
    eina_file_close(f); // close matching open OK
@@ -256,13 +498,34 @@ err:
    return lst;
 }
 
+/**
+ * @brief Frees a list of color class names.
+ *
+ * This function simply calls eina_list_free(). It assumes that the
+ * stringshare'd names within the list do not need individual freeing
+ * if they were added as direct data (which edje_mmap_color_class_used_list does).
+ * If stringshares were duplicated or separately managed, they would leak.
+ *
+ * @param lst The Eina_List of color class names to free.
+ */
 EAPI void
 edje_file_color_class_used_free(Eina_List *lst)
 {
    eina_list_free(lst);
 }
 
-
+/**
+ * @brief Checks if a group/collection matching a glob pattern exists in a memory-mapped Edje file.
+ *
+ * This function opens an Edje file (via its Eina_File handle) and checks if any
+ * collection name matches the provided glob pattern. If the pattern does not
+ * contain glob characters (*, ?, [), it performs an exact match.
+ *
+ * @param f The Eina_File handle of the Edje file.
+ * @param glob The glob pattern or exact name of the group to search for.
+ *             Example: "group/buttons/*", "main_interface"
+ * @return EINA_TRUE if a matching group exists, EINA_FALSE otherwise or on error.
+ */
 EAPI Eina_Bool
 edje_mmap_group_exists(Eina_File *f, const char *glob)
 {

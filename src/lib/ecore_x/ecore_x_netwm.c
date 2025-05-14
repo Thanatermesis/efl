@@ -16,33 +16,54 @@
 
 typedef struct _Ecore_X_Startup_Info Ecore_X_Startup_Info;
 
+/**
+ * @brief Structure to hold startup notification information.
+ * This structure is used internally to manage data related to the
+ * _NET_STARTUP_INFO protocol, which applications use to inform the
+ * window manager about their startup process.
+ */
 struct _Ecore_X_Startup_Info
 {
-   Ecore_X_Window win;
+   Ecore_X_Window win; /**< The window associated with the startup sequence. */
 
-   int            init;
+   int            init; /**< Flag indicating if the startup info has been initialized. */
 
-   int            buffer_size;
-   char          *buffer;
+   int            buffer_size; /**< Current allocated size of the buffer. */
+   char          *buffer; /**< Buffer to accumulate startup data messages. */
 
-   int            length;
+   int            length; /**< Current length of data in the buffer. */
 
    /* These are the sequence info fields */
-   char          *id;
-   char          *name;
-   int            screen;
-   char          *bin;
-   char          *icon;
-   int            desktop;
-   int            timestamp;
-   char          *description;
-   char          *wmclass;
-   int            silent;
+   char          *id; /**< The startup ID string (e.g., "myclient_TIME291991"). */
+   char          *name; /**< Application name (e.g., "My Application"). */
+   int            screen; /**< Screen number where the application started. */
+   char          *bin; /**< The binary name of the application (e.g., "myapplication"). */
+   char          *icon; /**< The icon name for the application. */
+   int            desktop; /**< The desktop number where the application intends to appear. */
+   int            timestamp; /**< Timestamp associated with the startup ID. */
+   char          *description; /**< A more detailed description of the application. */
+   char          *wmclass; /**< The window class (WM_CLASS). */
+   int            silent; /**< Hint for silent startup (e.g., 0 for normal, 1 for silent). */
 };
 
+/**
+ * @internal
+ * @brief Sets a UTF-8 string property on a window.
+ * @param win The window.
+ * @param atom The atom for the property.
+ * @param str The UTF-8 string to set.
+ */
 static void  _ecore_x_window_prop_string_utf8_set(Ecore_X_Window win,
                                                   Ecore_X_Atom atom,
                                                   const char *str);
+/**
+ * @internal
+ * @brief Gets a UTF-8 string property from a window.
+ * @param win The window.
+ * @param atom The atom for the property.
+ * @return A newly allocated string containing the property value, or NULL.
+ *         The caller is responsible for freeing the returned string.
+ */
 static char *_ecore_x_window_prop_string_utf8_get(Ecore_X_Window win,
                                                   Ecore_X_Atom atom);
 #if 0 /* Unused */
@@ -50,6 +71,12 @@ static int   _ecore_x_netwm_startup_info_process(Ecore_X_Startup_Info *info);
 static int   _ecore_x_netwm_startup_info_parse(Ecore_X_Startup_Info *info,
                                                char *data);
 #endif /* if 0 */
+/**
+ * @internal
+ * @brief Frees an Ecore_X_Startup_Info structure.
+ * This function is suitable for use as a callback for eina_hash_free_cb.
+ * @param data Pointer to the Ecore_X_Startup_Info structure to free.
+ */
 static void  _ecore_x_netwm_startup_info_free(void *data);
 
 /*
@@ -69,8 +96,16 @@ static void  _ecore_x_netwm_startup_info_free(void *data);
  * Local variables
  */
 
-static Eina_Hash *startup_info = NULL;
+static Eina_Hash *startup_info = NULL; /**< Hash table for storing startup info, keyed by window ID. */
 
+/**
+ * @brief Initializes the Ecore_X NetWM module.
+ *
+ * This function sets up internal structures needed for NetWM support,
+ * primarily for handling startup notifications. It should be called
+ * once during application or window manager initialization if NetWM
+ * features related to startup sequences are to be used.
+ */
 EAPI void
 ecore_x_netwm_init(void)
 {
@@ -79,6 +114,14 @@ ecore_x_netwm_init(void)
        _ecore_x_netwm_startup_info_free);
 }
 
+/**
+ * @brief Shuts down the Ecore_X NetWM module.
+ *
+ * This function cleans up resources allocated by ecore_x_netwm_init(),
+ * such as the hash table used for startup notification sequences.
+ * It should be called when NetWM support is no longer needed, typically
+ * during application or window manager shutdown.
+ */
 EAPI void
 ecore_x_netwm_shutdown(void)
 {
@@ -91,6 +134,20 @@ ecore_x_netwm_shutdown(void)
 
 /*
  * WM identification
+ */
+/**
+ * @brief Identifies a window manager to the X server according to EWMH.
+ *
+ * This function is called by a window manager to announce its presence.
+ * It sets the _NET_SUPPORTING_WM_CHECK property on both the root window
+ * and a child window (check window), and _NET_WM_NAME on the check window
+ * and optionally on the root window.
+ *
+ * @param root The root window of the screen the WM is managing.
+ * @param check A child window created by the WM for identification purposes.
+ *              This window should have the _NET_SUPPORTING_WM_CHECK property
+ *              pointing to itself and _NET_WM_NAME set.
+ * @param wm_name The UTF-8 encoded name of the window manager (e.g., "Enlightenment").
  */
 EAPI void
 ecore_x_netwm_wm_identify(Ecore_X_Window root,
@@ -118,6 +175,17 @@ ecore_x_netwm_wm_identify(Ecore_X_Window root,
 /*
  * Set supported atoms
  */
+/**
+ * @brief Sets the list of EWMH hints supported by the window manager.
+ *
+ * The window manager calls this to advertise which EWMH features it supports
+ * by setting the _NET_SUPPORTED property on the root window.
+ *
+ * @param root The root window.
+ * @param supported An array of Ecore_X_Atom representing the supported hints
+ *                  (e.g., ECORE_X_ATOM_NET_WM_STATE, ECORE_X_ATOM_NET_ACTIVE_WINDOW).
+ * @param num The number of atoms in the @p supported array.
+ */
 EAPI void
 ecore_x_netwm_supported_set(Ecore_X_Window root,
                             Ecore_X_Atom *supported,
@@ -130,6 +198,21 @@ ecore_x_netwm_supported_set(Ecore_X_Window root,
                                 num);
 }
 
+/**
+ * @brief Gets the list of EWMH hints supported by the window manager.
+ *
+ * This function retrieves the _NET_SUPPORTED property from the root window.
+ * The caller is responsible for freeing the @p supported array using free().
+ *
+ * @param root The root window.
+ * @param[out] supported Pointer to an array of Ecore_X_Atom that will be
+ *                       allocated and filled with the supported hints.
+ *                       The caller must free this array.
+ * @param[out] num Pointer to an integer that will be filled with the
+ *                 number of atoms in the @p supported array.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure (e.g., property
+ *         not set or empty).
+ */
 EAPI Eina_Bool
 ecore_x_netwm_supported_get(Ecore_X_Window root,
                             Ecore_X_Atom **supported,
@@ -157,6 +240,14 @@ ecore_x_netwm_supported_get(Ecore_X_Window root,
 /*
  * Desktop configuration and status
  */
+/**
+ * @brief Sets the total number of virtual desktops.
+ *
+ * This function sets the _NET_NUMBER_OF_DESKTOPS property on the root window.
+ *
+ * @param root The root window.
+ * @param n_desks The total number of desktops. For example, 4.
+ */
 EAPI void
 ecore_x_netwm_desk_count_set(Ecore_X_Window root,
                              unsigned int n_desks)
@@ -166,6 +257,18 @@ ecore_x_netwm_desk_count_set(Ecore_X_Window root,
                                   &n_desks, 1);
 }
 
+/**
+ * @brief Sets the virtual root windows for each desktop.
+ *
+ * This function sets the _NET_VIRTUAL_ROOTS property on the root window.
+ * This is used when each desktop is managed by a separate virtual root window.
+ *
+ * @param root The actual root window.
+ * @param vroots An array of Ecore_X_Window IDs, one for each virtual desktop's
+ *               root window. The size of the array must be @p n_desks.
+ *               Example: `Ecore_X_Window vroots[] = {vroot1, vroot2};`
+ * @param n_desks The number of virtual desktops (and virtual root windows).
+ */
 EAPI void
 ecore_x_netwm_desk_roots_set(Ecore_X_Window root,
                              Ecore_X_Window *vroots,
@@ -178,6 +281,19 @@ ecore_x_netwm_desk_roots_set(Ecore_X_Window root,
                                   n_desks);
 }
 
+/**
+ * @brief Sets the names for each virtual desktop.
+ *
+ * This function sets the _NET_DESKTOP_NAMES property on the root window.
+ * The names are provided as an array of UTF-8 strings. If a name is NULL,
+ * a default name "Desk-N" will be generated.
+ *
+ * @param root The root window.
+ * @param names An array of C-strings, where each string is the UTF-8 encoded
+ *              name for a desktop. Can be NULL to use default names.
+ *              Example: `const char *names[] = {"Web", "Work", "Mail"};`
+ * @param n_desks The number of desktops (and names in the @p names array if not NULL).
+ */
 EAPI void
 ecore_x_netwm_desk_names_set(Ecore_X_Window root,
                              const char **names,

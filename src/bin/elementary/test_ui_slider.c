@@ -4,6 +4,16 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Callback for the 'changed' event of a slider.
+ *
+ * This function is called whenever the slider's value is changed. It checks
+ * if the value exceeds 100 and, if so, resets it to 100, effectively
+ * capping the slider's value from this callback.
+ *
+ * @param data User data pointer (unused).
+ * @param ev The event information.
+ */
 static void
 _slider_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -17,6 +27,15 @@ _slider_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
      efl_ui_range_value_set(ev->object, 100);
 }
 
+/**
+ * @brief Callback for the 'steady' event of a slider.
+ *
+ * This function is called when the slider has come to a rest after user
+ * interaction. It prints the current value of the slider.
+ *
+ * @param data User data pointer (unused).
+ * @param ev The event information.
+ */
 static void
 _slider_steady_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -27,6 +46,15 @@ _slider_steady_cb(void *data EINA_UNUSED, const Efl_Event *ev)
    printf("steady callbck : val = %f\n", val);
 }
 
+/**
+ * @brief Callback for the 'slider,drag,start' event.
+ *
+ * This function is invoked when the user begins to drag the slider's handle.
+ * It prints the value of the slider at the start of the drag operation.
+ *
+ * @param data User data pointer (unused).
+ * @param ev The event information.
+ */
 static void
 _slider_drag_start_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -37,6 +65,15 @@ _slider_drag_start_cb(void *data EINA_UNUSED, const Efl_Event *ev)
    printf("drag start callbck : val = %f\n", val);
 }
 
+/**
+ * @brief Callback for the 'slider,drag,stop' event.
+ *
+ * This function is invoked when the user stops dragging the slider's handle.
+ * It prints the final value of the slider at the end of the drag operation.
+ *
+ * @param data User data pointer (unused).
+ * @param ev The event information.
+ */
 static void
 _slider_drag_stop_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -47,6 +84,22 @@ _slider_drag_stop_cb(void *data EINA_UNUSED, const Efl_Event *ev)
    printf("drag stop callbck : val = %f\n", val);
 }
 
+/**
+ * @brief Creates the test window and UI components for the slider test.
+ *
+ * This function sets up a window with a variety of Efl_Ui_Slider widgets
+ * to demonstrate different configurations and features, such as:
+ * - Horizontal and vertical orientations.
+ * - Inverted display.
+ * - Manual step values.
+ * - Disabled state.
+ * - Range limits.
+ * - Event callbacks for value changes and drag events.
+ *
+ * @param data User data pointer (unused).
+ * @param obj Parent object (unused).
+ * @param event_info Event information (unused).
+ */
 void
 test_ui_slider(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

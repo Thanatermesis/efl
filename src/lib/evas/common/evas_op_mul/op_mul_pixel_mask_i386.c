@@ -1,6 +1,23 @@
 /* mul pixel x mask --> dst */
 
 #ifdef BUILD_MMX
+/**
+ * @brief Multiplies source pixels by a mask and blends with destination pixels using MMX.
+ *
+ * This function processes a span of pixels. For each pixel, it applies a mask
+ * value. If the mask is 0, the destination pixel is unchanged. If the mask is
+ * 255, the source pixel is blended with the destination. For intermediate mask
+ * values, a more complex blending operation is performed.
+ *
+ * @param s Pointer to the source pixel data array. Each DATA32 is a pixel (e.g., ARGB).
+ *          Example: s[0] = 0xAARRGGBB
+ * @param m Pointer to the mask data array. Each DATA8 is a mask value (0-255).
+ *          Example: m[0] = 0 (transparent), m[0] = 255 (opaque)
+ * @param c This parameter is unused as its value is immediately overwritten by `*m`.
+ * @param d Pointer to the destination pixel data array, which is read and overwritten.
+ *          Example: d[0] = 0xAARRGGBB
+ * @param l The number of pixels to process.
+ */
 static void
 _op_mul_p_mas_dp_mmx(DATA32 *s, DATA8 *m, DATA32 c, DATA32 *d, int l) {
    DATA32 *e = d + l;
@@ -42,6 +59,14 @@ _op_mul_p_mas_dp_mmx(DATA32 *s, DATA8 *m, DATA32 c, DATA32 *d, int l) {
 #define _op_mul_pas_mas_dpan_mmx _op_mul_pas_mas_dp_mmx
 #define _op_mul_pan_mas_dpan_mmx _op_mul_pan_mas_dp_mmx
 
+/**
+ * @brief Initializes function pointers for MMX-optimized span multiplication operations.
+ *
+ * This function populates the `op_mul_span_funcs` dispatch table with pointers
+ * to MMX-specific implementations for various combinations of source, mask,
+ * and destination properties. These define how pixel spans are multiplied
+ * when a mask is involved.
+ */
 static void
 init_mul_pixel_mask_span_funcs_mmx(void)
 {
@@ -56,6 +81,14 @@ init_mul_pixel_mask_span_funcs_mmx(void)
 #endif
 
 #ifdef BUILD_MMX
+/**
+ * @brief Initializes function pointers for MMX-optimized point multiplication operations.
+ *
+ * This function is intended to populate a dispatch table (similar to
+ * `init_mul_pixel_mask_span_funcs_mmx`) for point-based (single pixel)
+ * multiplication operations.
+ * @note This function is currently a stub and does not initialize any operations.
+ */
 static void
 init_mul_pixel_mask_pt_funcs_mmx(void)
 {

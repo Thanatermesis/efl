@@ -6,29 +6,58 @@
 
 #include "test_explode.h"
 
+/**
+ * @brief Callback function for the "clicked" event on a bubble.
+ *
+ * This function is called when a bubble widget is clicked. It simply prints
+ * a message to standard output.
+ * @param data User data, unused in this case.
+ * @param obj The Evas_Object that emitted the event, unused.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _print_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("bubble clicked\n");
 }
 
+/**
+ * @brief Structure to hold data for the API test.
+ *
+ * This structure contains the necessary data to manage the state of the
+ * bubble API test, including the current test state, the parent window,
+ * and the container for the bubble widgets.
+ */
 struct _api_data
 {
-   unsigned int state;  /* What state we are testing       */
-   Evas_Object *win;    /* Parent Window of widgets        */
-   void *box;           /* Use this to get box content     */
+   unsigned int state;  /**< The current state of the API test, from api_state enum. */
+   Evas_Object *win;    /**< The parent window containing the widgets. */
+   void *box;           /**< The box container for the bubble widgets. */
 };
 typedef struct _api_data api_data;
 
+/**
+ * @brief Defines the different states for the bubble API test.
+ *
+ * Each state corresponds to a specific API function or property being tested.
+ */
 enum _api_state
 {
-   BUBBLE_SET_CORNER_1,
-   BUBBLE_SET_CORNER_2,
-   BUBBLE_SET_ICON_CONTENT,
-   API_STATE_LAST
+   BUBBLE_SET_CORNER_1,       /**< Test setting bubble corners to bottom-left and top-right. */
+   BUBBLE_SET_CORNER_2,       /**< Test setting bubble corners to top-right and bottom-left. */
+   BUBBLE_SET_ICON_CONTENT,   /**< Test setting an icon and a label as content. */
+   API_STATE_LAST             /**< Marker for the last state. */
 };
 typedef enum _api_state api_state;
 
+/**
+ * @brief Apply changes to the bubble widgets based on the current API test state.
+ *
+ * This function modifies the properties of the bubble widgets being tested
+ * according to the current state in the api_data structure. It's called
+ * to progress through the various API tests.
+ * @param api The API test data structure.
+ */
 static void
 set_api_state(api_data *api)
 {
@@ -81,10 +110,20 @@ set_api_state(api_data *api)
      }
 }
 
+/**
+ * @brief Callback for the "Next API function" button.
+ *
+ * This function is triggered when the user clicks the button to advance to
+ * the next API test. It increments the test state, calls set_api_state()
+ * to apply the changes for the new state, and updates the button's text.
+ * When the final state is reached, the button is disabled.
+ * @param data The api_data structure for the test.
+ * @param obj The button object that was clicked.
+ * @param event_info Evas event info, unused.
+ */
 static void
 _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
-{  /* Will add here a SWITCH command containing code to modify test-object */
-   /* in accordance a->state value. */
+{
    api_data *a = data;
    char str[128];
 
@@ -96,12 +135,39 @@ _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_disabled_set(obj, a->state == API_STATE_LAST);
 }
 
+/**
+ * @brief Callback to free allocated resources on window close.
+ *
+ * This function is registered with the EVAS_CALLBACK_FREE event on the
+ * main window. It is responsible for freeing the api_data structure
+ * when the window is destroyed.
+ * @param data The api_data structure to be freed.
+ * @param e The Evas canvas, unused.
+ * @param obj The Evas_Object that is being freed, unused.
+ * @param event_info Event-specific information, unused.
+ */
 static void
 _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Main function to set up and run the bubble widget test.
+ *
+ * This function creates a window and populates it with two elm_bubble widgets
+ * to demonstrate and test their functionality. It also sets up a button to
+ * cycle through different API tests that modify the bubbles' properties,
+ * such as their corner position and content.
+ *
+ * The test initializes two bubbles:
+ * - The first bubble has an icon and text content.
+ * - The second bubble has only text content.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_bubble(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

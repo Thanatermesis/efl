@@ -6,6 +6,12 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Test data structure for the part shadow test.
+ *
+ * This structure holds all the necessary widgets and state for the test,
+ * allowing them to be accessed within callbacks.
+ */
 typedef struct Test_Data
 {
    Evas_Object *pb1;
@@ -19,6 +25,16 @@ typedef struct Test_Data
    int loop;
 } Test_Data;
 
+/**
+ * @brief Animates the shadow of an icon on every animator tick.
+ *
+ * This function is called repeatedly to create a pulsing shadow effect for an icon.
+ * It calculates a new blur radius for the shadow in a ping-pong manner (grows and
+ * then shrinks) over 120 frames.
+ *
+ * @param data The user data, a pointer to Test_Data.
+ * @param ev The event information, unused.
+ */
 static void
 animate(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -32,6 +48,16 @@ animate(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_gfx_blur_radius_set(efl_part(td->ico, "shadow"), radius, radius);
 }
 
+/**
+ * @brief Starts the pulsing animation of progress bars and icon shadow.
+ *
+ * This function sets all progress bars to their infinite animation mode,
+ * disables the "Start" button, enables the "Stop" button, and adds the
+ * animation callback to the icon.
+ *
+ * @param data The user data, a pointer to Test_Data.
+ * @param ev The event information, unused.
+ */
 static void
 pulse_start(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -49,6 +75,16 @@ pulse_start(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_event_callback_add(td->ico, EFL_CANVAS_OBJECT_EVENT_ANIMATOR_TICK, animate, td);
 }
 
+/**
+ * @brief Stops the pulsing animation.
+ *
+ * This function stops the infinite animation of all progress bars,
+ * enables the "Start" button, disables the "Stop" button, and removes
+ * the animation callback from the icon.
+ *
+ * @param data The user data, a pointer to Test_Data.
+ * @param ev The event information, unused.
+ */
 static void
 pulse_stop(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -66,6 +102,15 @@ pulse_stop(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_event_callback_del(td->ico, EFL_CANVAS_OBJECT_EVENT_ANIMATOR_TICK, animate, td);
 }
 
+/**
+ * @brief Callback for the window delete request event.
+ *
+ * Ensures that the animation is stopped and resources are freed when the
+ * window is closed.
+ *
+ * @param data The user data, a pointer to Test_Data.
+ * @param ev The event information, containing the object being deleted.
+ */
 static void
 _delete_cb(void *data, const Efl_Event *ev)
 {
@@ -76,6 +121,18 @@ _delete_cb(void *data, const Efl_Event *ev)
    free(td);
 }
 
+/**
+ * @brief The main function for the part shadow test.
+ *
+ * This function sets up a window with various widgets to demonstrate different
+ * shadow effects on widget parts. This includes standard drop shadows, glows,
+ * and custom filter-based shadow effects. It also sets up buttons to
+ * start/stop a pulsing shadow animation on an icon.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_part_shadow(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

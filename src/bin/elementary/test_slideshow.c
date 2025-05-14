@@ -4,24 +4,53 @@
 static Evas_Object *slideshow, *bt_start, *bt_stop;
 static Elm_Slideshow_Item_Class itc;
 
+/**
+ * @brief Callback to show a notification widget.
+ * @param data The notification widget to show.
+ * @param e Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _notify_show(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    evas_object_show(data);
 }
 
+/**
+ * @brief Callback to advance to the next slide.
+ * @param data The slideshow widget.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _next(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_slideshow_next(data);
 }
 
+/**
+ * @brief Callback to go to the previous slide.
+ * @param data The slideshow widget.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _previous(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_slideshow_previous(data);
 }
 
+/**
+ * @brief Callback for mouse entering the controls area.
+ *
+ * This function makes the notification containing the controls visible and
+ * sets its timeout to 0, so it remains visible as long as the mouse is over it.
+ * @param data The notification widget.
+ * @param e Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _mouse_in(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -29,12 +58,31 @@ _mouse_in(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *e
    evas_object_show(data);
 }
 
+/**
+ * @brief Callback for mouse leaving the controls area.
+ *
+ * This function sets the timeout for the notification containing the controls,
+ * so it will hide after the specified time.
+ * @param data The notification widget.
+ * @param e Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _mouse_out(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_notify_timeout_set(data, 3.0);
 }
 
+/**
+ * @brief Callback for selecting a transition effect.
+ *
+ * This is called when an item from the transition hoversel is selected. It applies
+ * the selected transition to the slideshow.
+ * @param data The name of the selected transition (e.g., "fade").
+ * @param obj The hoversel widget.
+ * @param event_info The selected hoversel item.
+ */
 static void
 _hv_select(void *data, Evas_Object *obj, void *event_info)
 {
@@ -42,6 +90,15 @@ _hv_select(void *data, Evas_Object *obj, void *event_info)
    elm_object_text_set(obj, elm_object_item_text_get(event_info));
 }
 
+/**
+ * @brief Callback for selecting a slide layout.
+ *
+ * This is called when an item from the layout hoversel is selected. It applies
+ * the selected layout to the slideshow.
+ * @param data The name of the selected layout (e.g., "fullscreen").
+ * @param obj The hoversel widget.
+ * @param event_info Not used.
+ */
 static void
 _layout_select(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -49,6 +106,16 @@ _layout_select(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_text_set(obj, data);
 }
 
+/**
+ * @brief Callback to start the automatic slideshow.
+ *
+ * It retrieves the timeout value from the spinner and sets it on the slideshow,
+ * starting the automatic transitions. It also disables the start button and
+ * enables the stop button.
+ * @param data The spinner widget from which to get the timeout value.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _start(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -58,6 +125,15 @@ _start(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_object_disabled_set(bt_stop, EINA_FALSE);
 }
 
+/**
+ * @brief Callback to stop the automatic slideshow.
+ *
+ * It sets the slideshow timeout to 0.0 to stop automatic transitions. It also
+ * enables the start button and disables the stop button.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _stop(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -66,6 +142,15 @@ _stop(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EIN
    elm_object_disabled_set(bt_stop, EINA_TRUE);
 }
 
+/**
+ * @brief Callback for when the spinner value changes.
+ *
+ * If the slideshow is currently running (timeout > 0), this function updates
+ * the slideshow's transition timeout with the new value from the spinner.
+ * @param data The spinner widget.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _spin(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -73,6 +158,18 @@ _spin(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
      elm_slideshow_timeout_set(slideshow, elm_spinner_value_get(data));
 }
 
+/**
+ * @brief Item provider function to get a slide's content object.
+ *
+ * This function is part of the Elm_Slideshow_Item_Class interface. It's called
+ * by the slideshow widget to create the actual Evas_Object for a slide.
+ * In this implementation, it creates an elm_image widget and loads the image
+ * from the file path provided in `data`.
+ *
+ * @param data The data associated with the item (here, a path to an image file).
+ * @param obj The parent slideshow widget.
+ * @return The created Evas_Object for the slide.
+ */
 static Evas_Object *
 _get(void *data, Evas_Object *obj)
 {
@@ -88,6 +185,16 @@ _get(void *data, Evas_Object *obj)
    return photo;
 }
 
+/**
+ * @brief Item provider function to delete a slide's content object.
+ *
+ * This function is part of the Elm_Slideshow_Item_Class interface. It's called
+ * by the slideshow widget when an item is being deleted. This is where an
+ * application would free resources associated with the slide's content object.
+ *
+ * @param data The data associated with the item.
+ * @param obj The slide's content Evas_Object that is being deleted. Not used here.
+ */
 static void
 _del(void *data, Evas_Object *obj EINA_UNUSED)
 {
@@ -95,6 +202,16 @@ _del(void *data, Evas_Object *obj EINA_UNUSED)
 }
 
 
+/**
+ * @brief Callback for the "changed" smart event of the slideshow.
+ *
+ * This function is executed whenever the currently displayed slide changes.
+ * It prints the data of the new slide item.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info The `Elm_Object_Item` for the new current slide.
+ */
 static void
 _changed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -103,6 +220,17 @@ _changed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
           (char*)elm_object_item_data_get(slide_it));
 }
 
+/**
+ * @brief Callback for the "transition,end" smart event of the slideshow.
+ *
+ * This function is executed when a slide transition animation has finished. It
+ * checks if the slideshow has reached its last slide by comparing the item
+ * whose transition just ended (`event_info`) with the last item (`data`).
+ *
+ * @param data The last slide item, passed during callback registration.
+ * @param obj Not used.
+ * @param event_info The `Elm_Object_Item` of the slide whose transition ended.
+ */
 static void
 _transition_end_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -113,6 +241,18 @@ _transition_end_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
      printf("Reaches to End of slides\n");
 }
 
+/**
+ * @brief Main function to set up and run the slideshow test.
+ *
+ * This function creates the main window and all the UI components for the
+ * slideshow test application, including the slideshow widget itself, navigation
+ * buttons, and controls for transitions, layouts, and timing. It populates
+ * the slideshow with a list of images.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_slideshow(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -122,6 +262,11 @@ test_slideshow(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event
    Elm_Object_Item *slide_last_it = NULL;
    unsigned long i;
 
+   /*
+    * A NULL-terminated array of image file names. These are relative to
+    * the application's data directory. For example:
+    * { "image1.png", "image2.jpg", NULL }
+    */
    const char *imgs[] = {
      "logo.png",
      "rock_01.jpg",

@@ -7,48 +7,162 @@
 /* private magic number for polygon objects */
 static const char o_type[] = "polygon";
 
-/* private struct for line object internal data */
+/**
+ * @internal
+ * @brief Private structure for storing a point of a polygon object.
+ *
+ * This structure holds the x and y coordinates of a single vertex
+ * in a polygon.
+ */
 typedef struct _Efl_Canvas_Polygon_Point       Efl_Canvas_Polygon_Point;
 
+/**
+ * @internal
+ * @brief Defines the coordinates of a polygon point.
+ */
 struct _Efl_Canvas_Polygon_Point
 {
-   Evas_Coord x, y;
+   Evas_Coord x, y; /**< The x-coordinate of the point. */
 };
 
 /* private methods for polygon objects */
+
+/**
+ * @internal
+ * @brief Initializes a new polygon object.
+ * @param eo_obj The Evas_Object (polygon) to initialize.
+ */
 static void evas_object_polygon_init(Evas_Object *eo_obj);
+
+/**
+ * @internal
+ * @brief Renders the polygon object.
+ * @param eo_obj The Evas_Object (polygon) to render.
+ * @param obj The protected data of the Evas_Object.
+ * @param type_private_data The private data of the polygon object.
+ * @param engine The rendering engine.
+ * @param output The rendering output context.
+ * @param context The rendering context.
+ * @param surface The surface to render on.
+ * @param x The x-offset for rendering.
+ * @param y The y-offset for rendering.
+ * @param do_async Flag for asynchronous rendering.
+ */
 static void evas_object_polygon_render(Evas_Object *eo_obj,
                                        Evas_Object_Protected_Data *obj,
                                        void *type_private_data,
                                        void *engine, void *output, void *context, void *surface,
                                        int x, int y, Eina_Bool do_async);
+
+/**
+ * @internal
+ * @brief Frees the resources used by a polygon object.
+ * @param eo_obj The Evas_Object (polygon) to free.
+ * @param obj The protected data of the Evas_Object.
+ * @param type_private_data The private data of the polygon object.
+ */
 static void evas_object_polygon_free(Evas_Object *eo_obj,
                                      Evas_Object_Protected_Data *obj,
                                      void *type_private_data);
+
+/**
+ * @internal
+ * @brief Performs pre-render operations for the polygon object.
+ *
+ * This function is called before the actual rendering of the object. It
+ * handles tasks like recalculating clipping and determining if the object
+ * needs to be redrawn.
+ * @param eo_obj The Evas_Object (polygon).
+ * @param obj The protected data of the Evas_Object.
+ * @param type_private_data The private data of the polygon object.
+ */
 static void evas_object_polygon_render_pre(Evas_Object *eo_obj,
                                            Evas_Object_Protected_Data *obj,
                                            void *type_private_data);
+
+/**
+ * @internal
+ * @brief Performs post-render operations for the polygon object.
+ *
+ * This function is called after the object has been rendered. It updates
+ * the object's state from current to previous.
+ * @param eo_obj The Evas_Object (polygon).
+ * @param obj The protected data of the Evas_Object.
+ * @param type_private_data The private data of the polygon object.
+ */
 static void evas_object_polygon_render_post(Evas_Object *eo_obj,
                                             Evas_Object_Protected_Data *obj,
                                             void *type_private_data);
 
+/**
+ * @internal
+ * @brief Retrieves the engine-specific data for the polygon object.
+ * @param eo_obj The Evas_Object (polygon).
+ * @return A pointer to the engine-specific data.
+ */
 static void *evas_object_polygon_engine_data_get(Evas_Object *eo_obj);
 
+/**
+ * @internal
+ * @brief Checks if the polygon object is currently opaque.
+ * @param eo_obj The Evas_Object (polygon).
+ * @param obj The protected data of the Evas_Object.
+ * @param type_private_data The private data of the polygon object.
+ * @return 1 if opaque, 0 otherwise. Polygons are generally not opaque.
+ */
 static int evas_object_polygon_is_opaque(Evas_Object *eo_obj,
                                          Evas_Object_Protected_Data *obj,
                                          void *type_private_data);
+/**
+ * @internal
+ * @brief Checks if the polygon object was previously opaque.
+ * @param eo_obj The Evas_Object (polygon).
+ * @param obj The protected data of the Evas_Object.
+ * @param type_private_data The private data of the polygon object.
+ * @return 1 if it was opaque, 0 otherwise. Polygons are generally not opaque.
+ */
 static int evas_object_polygon_was_opaque(Evas_Object *eo_obj,
                                           Evas_Object_Protected_Data *obj,
                                           void *type_private_data);
+/**
+ * @internal
+ * @brief Checks if a given point is inside the polygon.
+ *
+ * Implements the ray casting algorithm (even-odd rule) to determine
+ * if a point is inside the polygon.
+ * @param eo_obj The Evas_Object (polygon).
+ * @param obj The protected data of the Evas_Object.
+ * @param type_private_data The private data of the polygon object.
+ * @param x The x-coordinate of the point to check.
+ * @param y The y-coordinate of the point to check.
+ * @return 1 if the point is inside, 0 otherwise.
+ */
 static int evas_object_polygon_is_inside(Evas_Object *eo_obj,
                                          Evas_Object_Protected_Data *obj,
                                          void *type_private_data,
                                          Evas_Coord x, Evas_Coord y);
+/**
+ * @internal
+ * @brief Checks if a given point was inside the polygon in its previous state.
+ * @param eo_obj The Evas_Object (polygon).
+ * @param obj The protected data of the Evas_Object.
+ * @param type_private_data The private data of the polygon object.
+ * @param x The x-coordinate of the point to check.
+ * @param y The y-coordinate of the point to check.
+ * @return 1 if the point was inside, 0 otherwise. (Currently always returns 1)
+ */
 static int evas_object_polygon_was_inside(Evas_Object *eo_obj,
                                           Evas_Object_Protected_Data *obj,
                                           void *type_private_data,
                                           Evas_Coord x, Evas_Coord y);
 
+/**
+ * @internal
+ * @brief Structure defining the Evas_Object_Func interface for polygon objects.
+ *
+ * This structure maps internal Evas object operations to the specific
+ * implementations for polygon objects.
+ */
 static const Evas_Object_Func object_func =
 {
    /* methods (compulsory) */
@@ -74,6 +188,14 @@ static const Evas_Object_Func object_func =
 /* the actual api call to add a rect */
 /* it has no other api calls as all properties are standard */
 
+/**
+ * @brief Adds a new polygon object to the given Evas canvas.
+ *
+ * @param e The Evas canvas to add the polygon to.
+ * @return A handle to the new polygon object, or @c NULL on failure.
+ *
+ * @ingroup Evas_Object_Polygon
+ */
 EVAS_API Evas_Object *
 evas_object_polygon_add(Evas *e)
 {
@@ -82,6 +204,17 @@ evas_object_polygon_add(Evas *e)
    return efl_add(MY_CLASS, e, efl_canvas_object_legacy_ctor(efl_added));
 }
 
+/**
+ * @internal
+ * @brief Constructor for Efl_Canvas_Polygon objects.
+ *
+ * This function is called when a new polygon object is created using
+ * efl_add. It initializes the Evas-specific parts of the polygon.
+ *
+ * @param eo_obj The Efl_Canvas_Polygon object being constructed.
+ * @param class_data The private data for the Efl_Canvas_Polygon class (unused).
+ * @return The constructed Efl_Canvas_Polygon object.
+ */
 EOLIAN static Eo *
 _efl_canvas_polygon_efl_object_constructor(Eo *eo_obj, Efl_Canvas_Polygon_Data *class_data EINA_UNUSED)
 {
@@ -92,6 +225,18 @@ _efl_canvas_polygon_efl_object_constructor(Eo *eo_obj, Efl_Canvas_Polygon_Data *
    return eo_obj;
 }
 
+/**
+ * @internal
+ * @brief Adds a point to the polygon object.
+ *
+ * Points are added relative to the polygon's current position. The polygon's
+ * geometry is updated to encompass all added points.
+ *
+ * @param eo_obj The Efl_Canvas_Polygon object.
+ * @param _pd The private data for the Efl_Canvas_Polygon.
+ * @param pos The 2D position (Eina_Position2D) of the point to add.
+ *            Example: EINA_POSITION2D(10, 20)
+ */
 EOLIAN static void
 _efl_canvas_polygon_point_add(Eo *eo_obj, Efl_Canvas_Polygon_Data *_pd, Eina_Position2D pos)
 {
@@ -187,6 +332,16 @@ _efl_canvas_polygon_point_add(Eo *eo_obj, Efl_Canvas_Polygon_Data *_pd, Eina_Pos
    evas_object_inform_call_resize(eo_obj, obj);
 }
 
+/**
+ * @internal
+ * @brief Clears all points from the polygon object.
+ *
+ * This function removes all vertices from the polygon, effectively making it
+ * an empty polygon. Its geometry is reset to (0,0,0,0).
+ *
+ * @param eo_obj The Efl_Canvas_Polygon object.
+ * @param _pd The private data for the Efl_Canvas_Polygon.
+ */
 EOLIAN static void
 _efl_canvas_polygon_points_clear(Eo *eo_obj, Efl_Canvas_Polygon_Data *_pd)
 {
@@ -235,6 +390,16 @@ evas_object_polygon_init(Evas_Object *eo_obj)
    obj->type = o_type;
 }
 
+/**
+ * @internal
+ * @brief Destructor for Efl_Canvas_Polygon objects.
+ *
+ * This function is called when a polygon object is being destroyed.
+ * It frees resources associated with the Evas-specific parts of the polygon.
+ *
+ * @param eo_obj The Efl_Canvas_Polygon object being destroyed.
+ * @param _pd The private data for the Efl_Canvas_Polygon (unused).
+ */
 EOLIAN static void
 _efl_canvas_polygon_efl_object_destructor(Eo *eo_obj, Efl_Canvas_Polygon_Data *_pd EINA_UNUSED)
 {
@@ -438,7 +603,9 @@ evas_object_polygon_was_opaque(Evas_Object *eo_obj EINA_UNUSED,
 
 /* We count the number of edges a "ray" 90 degs upwards from our point
  * intersects with. If it's even, we are outside of the polygon, if it's odd,
- * we are inside of it. */
+ * we are inside of it. This is known as the Ray Casting algorithm or the
+ * even-odd rule algorithm.
+ */
 static int
 evas_object_polygon_is_inside(Evas_Object *eo_obj EINA_UNUSED,
 			      Evas_Object_Protected_Data *obj EINA_UNUSED,
@@ -507,12 +674,30 @@ evas_object_polygon_was_inside(Evas_Object *eo_obj EINA_UNUSED,
    return 1;
 }
 
+/**
+ * @brief Adds a point to the given polygon object.
+ *
+ * @param obj The polygon object.
+ * @param x The x-coordinate of the point to add.
+ * @param y The y-coordinate of the point to add.
+ *
+ * @ingroup Evas_Object_Polygon
+ * @see efl_canvas_polygon_point_add()
+ */
 EVAS_API void
 evas_object_polygon_point_add(Evas_Object *obj, Evas_Coord x, Evas_Coord y)
 {
    efl_canvas_polygon_point_add(obj, EINA_POSITION2D(x, y));
 }
 
+/**
+ * @brief Clears all points from the given polygon object.
+ *
+ * @param obj The polygon object.
+ *
+ * @ingroup Evas_Object_Polygon
+ * @see efl_canvas_polygon_points_clear()
+ */
 EVAS_API void
 evas_object_polygon_points_clear(Evas_Object *obj)
 {

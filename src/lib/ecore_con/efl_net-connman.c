@@ -4,10 +4,25 @@
 
 #include "efl_net-connman.h"
 
+/** @internal Singleton proxy for net.connman.Manager */
 static Eldbus_Proxy *_efl_net_connman_manager;
+/** @internal Singleton DBus connection for ConnMan */
 static Eldbus_Connection *_efl_net_connman_conn;
+/** @internal Reference counter for efl_net_connman_init() and efl_net_connman_shutdown() */
 static int _efl_net_connman_init_count;
 
+/**
+ * @internal
+ * @brief Callback invoked when the _efl_net_connman_manager proxy is freed.
+ *
+ * This function is registered with eldbus_proxy_free_cb_add() to ensure
+ * that the global _efl_net_connman_manager pointer is set to NULL when
+ * the proxy object is destroyed. This helps prevent use-after-free errors,
+ * especially in scenarios involving multiple unreferences.
+ *
+ * @param data User data passed to eldbus_proxy_free_cb_add (unused here).
+ * @param dead_ptr The proxy object that was freed.
+ */
 static void
 _efl_net_connman_manager_free(void *data EINA_UNUSED, const void *dead_ptr)
 {
@@ -23,6 +38,12 @@ efl_net_connman_init(void)
 {
    Eldbus_Object *obj;
 
+   /*
+    * Increment the initialization counter. If this is not the first call,
+    * it means ConnMan support has already been initialized, so return success.
+    * This allows multiple parts of the application to initialize ConnMan
+    * support without issues.
+    */
    _efl_net_connman_init_count++;
    if (_efl_net_connman_init_count > 1) return EINA_TRUE;
 
@@ -74,6 +95,11 @@ efl_net_connman_init(void)
 void
 efl_net_connman_shutdown(void)
 {
+   /*
+    * Decrement the initialization counter. If the counter is still greater
+    * than zero, it means other parts of the application are still using
+    * ConnMan support, so do not shut down yet.
+    */
    _efl_net_connman_init_count--;
    if (_efl_net_connman_init_count > 0) return;
 

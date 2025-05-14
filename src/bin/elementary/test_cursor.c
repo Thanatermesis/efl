@@ -6,17 +6,30 @@
 
 // XXX: show all type of cursors in the elementary_test. this needs to be the first test
 
+/**
+ * @brief Structure to hold data for a gengrid item in the cursor test.
+ */
 typedef struct _Testitem
 {
-   Elm_Object_Item *item;
-   const char *path;
-   int mode;
-   int onoff;
+   Elm_Object_Item *item; /**< The gengrid item itself. */
+   const char *path;      /**< Path to the image file for the item. */
+   int mode;              /**< An integer to identify the item's mode or type. */
+   int onoff;             /**< A state variable, possibly for toggling. */
 } Testitem;
 
 static Elm_Gengrid_Item_Class gic;
 static Eina_Bool cursor_setted = EINA_FALSE;
 
+/**
+ * @brief Gengrid item label get callback.
+ * @param data The item data, expected to be a Testitem pointer.
+ * @param obj The gengrid object.
+ * @param part The theme part name.
+ * @return The label for the gengrid item. Must be freed by the caller.
+ *
+ * This function is called by gengrid to get the text label for an item.
+ * It formats a string "Photo %s" with the path from the Testitem data.
+ */
 char *
 grd_lbl_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
@@ -26,6 +39,17 @@ grd_lbl_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUS
    return strdup(buf);
 }
 
+/**
+ * @brief Gengrid item content get callback.
+ * @param data The item data, expected to be a Testitem pointer.
+ * @param obj The gengrid object.
+ * @param part The theme part name for which to get content.
+ * @return A new Evas_Object for the content, or NULL if the part is not handled.
+ *
+ * This function is called by gengrid to get the content for an item.
+ * It creates a background object, sets an image file on it, and returns it
+ * to be displayed in the "elm.swallow.icon" part of the item.
+ */
 Evas_Object *
 grd_content_get(void *data, Evas_Object *obj, const char *part)
 {
@@ -44,6 +68,16 @@ grd_content_get(void *data, Evas_Object *obj, const char *part)
 
 static Elm_Genlist_Item_Class itct;
 
+/**
+ * @brief Genlist "expanded" smart callback.
+ * @param data User data, not used here.
+ * @param obj The genlist object, not used here.
+ * @param event_info The expanded genlist item.
+ *
+ * This function is called when a genlist item is expanded. It adds three
+ * new sub-items to the expanded item, demonstrating dynamic list modification
+ * and cursor setting on the new items.
+ */
 static void
 glt_exp(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -66,6 +100,15 @@ glt_exp(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 
 }
 
+/**
+ * @brief Genlist "contracted" smart callback.
+ * @param data User data, not used here.
+ * @param obj The genlist object, not used here.
+ * @param event_info The contracted genlist item.
+ *
+ * This function is called when a genlist item is contracted. It clears all
+ * sub-items from the contracted item.
+ */
 static void
 glt_con(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -73,6 +116,15 @@ glt_con(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
    elm_genlist_item_subitems_clear(glit);
 }
 
+/**
+ * @brief Genlist "expand,request" smart callback.
+ * @param data User data, not used here.
+ * @param obj The genlist object, not used here.
+ * @param event_info The genlist item requesting expansion.
+ *
+ * This function is called when an expansion of a genlist item is requested.
+ * It programmatically expands the item.
+ */
 static void
 glt_exp_req(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -80,6 +132,15 @@ glt_exp_req(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
    elm_genlist_item_expanded_set(glit, EINA_TRUE);
 }
 
+/**
+ * @brief Genlist "contract,request" smart callback.
+ * @param data User data, not used here.
+ * @param obj The genlist object, not used here.
+ * @param event_info The genlist item requesting contraction.
+ *
+ * This function is called when a contraction of a genlist item is requested.
+ * It programmatically contracts the item.
+ */
 static void
 glt_con_req(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -87,6 +148,16 @@ glt_con_req(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
    elm_genlist_item_expanded_set(glit, EINA_FALSE);
 }
 
+/**
+ * @brief Genlist item text get callback.
+ * @param data The item data (an integer cast to a pointer).
+ * @param obj The genlist object.
+ * @param part The theme part name.
+ * @return The text for the genlist item. Must be freed by the caller.
+ *
+ * This function is called by genlist to get the text label for an item.
+ * It formats a string "Item mode %i" with the integer data of the item.
+ */
 char *
 glt_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
@@ -95,6 +166,16 @@ glt_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNU
    return strdup(buf);
 }
 
+/**
+ * @brief "clicked" smart callback for a button.
+ * @param data User data, not used here.
+ * @param obj The button object that was clicked.
+ * @param event_info Event-specific information, not used here.
+ *
+ * Toggles a cursor on the button. If no cursor is set, it sets
+ * ELM_CURSOR_HAND1. If a cursor is already set, it unsets it. The button's
+ * text is updated to reflect the current state.
+ */
 static void
 bt_clicked(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -112,6 +193,17 @@ bt_clicked(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSE
      }
 }
 
+/**
+ * @brief Test function for basic cursor functionality on various widgets.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * Creates a window with several widgets (background, clock, buttons, list,
+ * entry) and sets different cursors on them to test basic cursor functionality.
+ * It also demonstrates unsetting a cursor and setting a cursor dynamically on
+ * a button click.
+ */
 void
 test_cursor(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -186,6 +278,17 @@ test_cursor(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for cursors on more complex widgets and item parts.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * Creates a window with a toolbar, list, genlist, and gengrid to test
+ * setting cursors on their items. Demonstrates cursor setting on toolbar items,
+ * list items, genlist items (including dynamically added ones), and gengrid
+ * items.
+ */
 void
 test_cursor2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -305,6 +408,22 @@ test_cursor2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_i
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for theme-based cursors and engine settings.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This test demonstrates using custom cursors from a theme file (`cursors.edj`).
+ * It covers:
+ * - Adding a theme extension.
+ * - Setting cursors by name (e.g., "hand3").
+ * - Enabling/disabling theme search for cursors.
+ * - Setting cursor style (e.g., "transparent").
+ * - Testing behavior with non-existent cursors.
+ * - Toggling the `elm_config_cursor_engine_only_set()` setting to see its effect.
+ * - Setting cursors on list items with different engine settings.
+ */
 void
 test_cursor3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -413,6 +532,20 @@ test_cursor3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_i
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for cursors on layout parts.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * Creates a window to test cursor interactions with elm_layout objects.
+ * It demonstrates:
+ * - Setting a cursor on an entire layout.
+ * - Setting cursors on specific parts of a layout using
+ *   `elm_layout_part_cursor_set()`.
+ * - How cursors on child objects (swallowed into a layout) interact with
+ *   cursors set on the layout parts.
+ */
 void
 test_cursor4(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

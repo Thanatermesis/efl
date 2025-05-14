@@ -1,3 +1,13 @@
+/**
+ * @file
+ * @brief Implementation of Efreetd caching mechanisms.
+ *
+ * This file contains the core logic for managing caches of desktop files,
+ * icons, and MIME types. It handles file system monitoring, cache generation
+ * via external helper programs, and inter-process communication for cache
+ * update notifications. It also implements a persistent cache for subdirectory
+ * listings to speed up recursive monitoring.
+ */
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -21,72 +31,113 @@
 
 extern FILE *efreetd_log_file;
 
+/* Hash table mapping directory paths to Eio_Monitor objects for icon directories. */
 static Eina_Hash *icon_change_monitors = NULL;
+/* Hash table mapping Eio_Monitor pointers to themselves, for quick lookup from events. */
 static Eina_Hash *icon_change_monitors_mon = NULL;
+/* Hash table mapping directory paths to Eio_Monitor objects for desktop directories. */
 static Eina_Hash *desktop_change_monitors = NULL;
+/* Hash table mapping Eio_Monitor pointers to themselves, for quick lookup from events. */
 static Eina_Hash *desktop_change_monitors_mon = NULL;
 
+/* Event handler for Ecore_Exe deletion events. */
 static Ecore_Event_Handler *cache_exe_del_handler = NULL;
+/* Event handler for Ecore_Exe data events. */
 static Ecore_Event_Handler *cache_exe_data_handler = NULL;
+/* Ecore_Exe process for icon cache generation. */
 static Ecore_Exe           *icon_cache_exe = NULL;
+/* Ecore_Exe process for desktop cache generation. */
 static Ecore_Exe           *desktop_cache_exe = NULL;
+/* Timer for debouncing icon cache updates. */
 static Ecore_Timer         *icon_cache_timer = NULL;
+/* Timer for debouncing desktop cache updates. */
 static Ecore_Timer         *desktop_cache_timer = NULL;
+/* Efreet prefix utility for finding helper executables. */
 static Eina_Prefix         *pfx = NULL;
 
+/* Flag indicating if the desktop cache has been successfully built at least once. */
 static Eina_Bool  desktop_exists = EINA_FALSE;
 
+/* List of system-defined desktop directories. (e.g., XDG_DATA_DIRS/applications) */
 static Eina_List *desktop_system_dirs = NULL;
+/* List of user-added or dynamically discovered desktop directories. */
 static Eina_List *desktop_extra_dirs = NULL;
+/* List of user-added or dynamically discovered icon directories. */
 static Eina_List *icon_extra_dirs = NULL;
+/* List of icon extensions to monitor (e.g., "png", "svg"). */
 static Eina_List *icon_exts = NULL;
+/* Flag to indicate if the icon cache needs a full flush. */
 static Eina_Bool  icon_flush = EINA_FALSE;
 
+/* Flag to indicate if a desktop cache update is queued due to an ongoing update. */
 static Eina_Bool desktop_queue = EINA_FALSE;
+/* Flag to indicate if an icon cache update is queued due to an ongoing update. */
 static Eina_Bool icon_queue = EINA_FALSE;
 
+/* List of Ecore_Event_Handler pointers for file system monitor events. */
 static Eina_List *_handlers = NULL;
 
 static void icon_changes_listen(void);
 static void desktop_changes_listen(void);
 
 /* internal */
+/**
+ * @brief Represents the cache of subdirectory listings.
+ * This is used to avoid repeated readdir/stat calls when monitoring
+ * directory trees.
+ */
 typedef struct _Subdir_Cache Subdir_Cache;
+/**
+ * @brief Represents a cached directory's metadata and its subdirectories.
+ */
 typedef struct _Subdir_Cache_Dir Subdir_Cache_Dir;
 
 struct _Subdir_Cache
 {
-   Eina_Hash *dirs;
+   Eina_Hash *dirs; /**< Hash table mapping directory paths (const char *) to Subdir_Cache_Dir objects. */
 };
 
 struct _Subdir_Cache_Dir
 {
-   unsigned long long dev;
-   unsigned long long ino;
-   unsigned long long mode;
-   unsigned long long uid;
-   unsigned long long gid;
-   unsigned long long size;
-   unsigned long long mtim;
-   unsigned long long ctim;
-   const char **dirs;
-   unsigned int dirs_count;
+   unsigned long long dev;    /**< Device ID of the directory. */
+   unsigned long long ino;    /**< Inode number of the directory. */
+   unsigned long long mode;   /**< File mode (type and permissions). */
+   unsigned long long uid;    /**< User ID of owner. */
+   unsigned long long gid;    /**< Group ID of owner. */
+   unsigned long long size;   /**< Total size, in bytes. */
+   unsigned long long mtim;   /**< Time of last modification. */
+   unsigned long long ctim;   /**< Time of last status change. */
+   const char **dirs;         /**< Array of stringshared subdirectory names. Example: {"subdir1", "subdir2", NULL} */
+   unsigned int dirs_count;   /**< Number of entries in the dirs array. */
 };
 
+/* Eet data descriptor for Subdir_Cache. */
 static Eet_Data_Descriptor *subdir_edd = NULL;
+/* Eet data descriptor for Subdir_Cache_Dir. */
 static Eet_Data_Descriptor *subdir_dir_edd = NULL;
+/* The global instance of the subdirectory cache. */
 static Subdir_Cache        *subdir_cache = NULL;
+/* Flag indicating if the subdir_cache needs to be saved to disk. */
 static Eina_Bool            subdir_need_save = EINA_FALSE;
 
+/* Hash table mapping directory paths to Eio_Monitor objects for MIME directories. */
 static Eina_Hash *mime_monitors = NULL;
+/* Hash table mapping Eio_Monitor pointers to themselves, for quick MIME lookup from events. */
 static Eina_Hash *mime_monitors_mon = NULL;
+/* Timer for debouncing MIME cache updates. */
 static Ecore_Timer *mime_update_timer = NULL;
+/* Ecore_Exe process for MIME cache generation. */
 static Ecore_Exe *mime_cache_exe = NULL;
 
 static void mime_cache_init(void);
 static void mime_cache_shutdown(void);
 static Eina_Bool mime_update_cache_cb(void *data EINA_UNUSED);
 
+/**
+ * @brief Frees a Subdir_Cache_Dir structure.
+ * This function is suitable for use as an Eina_Free_Cb.
+ * @param cd The Subdir_Cache_Dir to free.
+ */
 static void
 subdir_cache_dir_free(Subdir_Cache_Dir *cd)
 {
@@ -101,6 +152,14 @@ subdir_cache_dir_free(Subdir_Cache_Dir *cd)
    free(cd);
 }
 
+/**
+ * @brief Adds an entry to a hash table, creating the hash if it doesn't exist.
+ * This is a helper function for Eet to populate the Subdir_Cache's hash table.
+ * @param hash The hash table (may be NULL).
+ * @param key The key for the new entry.
+ * @param data The data for the new entry.
+ * @return The hash table, or NULL on failure.
+ */
 static void *
 subdir_cache_hash_add(void *hash, const char *key, void *data)
 {
@@ -110,6 +169,12 @@ subdir_cache_hash_add(void *hash, const char *key, void *data)
    return hash;
 }
 
+/**
+ * @brief Initializes the subdirectory cache.
+ * Sets up Eet data descriptors for Subdir_Cache and Subdir_Cache_Dir,
+ * and loads the cache from a file (e.g., ~/.cache/efreet/subdirs_$(hostname).eet).
+ * If the cache file doesn't exist or is invalid, an empty cache is created.
+ */
 static void
 subdir_cache_init(void)
 {
@@ -161,6 +226,12 @@ subdir_cache_init(void)
      subdir_cache->dirs = eina_hash_string_superfast_new(EINA_FREE_CB(subdir_cache_dir_free));
 }
 
+/**
+ * @brief Shuts down the subdirectory cache.
+ * Frees the in-memory cache data and Eet data descriptors.
+ * Note: This does not save the cache; subdir_cache_save() should be called
+ * if changes need to be persisted.
+ */
 static void
 subdir_cache_shutdown(void)
 {
@@ -177,6 +248,12 @@ subdir_cache_shutdown(void)
    subdir_edd = NULL;
 }
 
+/**
+ * @brief Saves the subdirectory cache to a persistent file.
+ * The cache is saved to a temporary file first, then atomically renamed
+ * to the final cache file (e.g., ~/.cache/efreet/subdirs_$(hostname).eet).
+ * This function only saves if `subdir_need_save` is EINA_TRUE.
+ */
 static void
 subdir_cache_save(void)
 {
@@ -235,6 +312,16 @@ subdir_cache_save(void)
    eina_strbuf_free(buf);
 }
 
+/**
+ * @brief Retrieves or creates a cache entry for a given directory path.
+ * If a valid cache entry exists for the path and its stat information matches,
+ * it is returned. Otherwise, the directory is scanned, a new cache entry is
+ * created and stored, and `subdir_need_save` is set to EINA_TRUE.
+ * @param st The stat structure of the directory.
+ * @param path The full path to the directory.
+ * @return A pointer to the Subdir_Cache_Dir entry, or NULL on failure.
+ *         The returned pointer is valid until the cache is modified or shut down.
+ */
 static const Subdir_Cache_Dir *
 subdir_cache_get(const struct stat *st, const char *path)
 {
@@ -319,6 +406,15 @@ subdir_cache_get(const struct stat *st, const char *path)
    return cd;
 }
 
+/**
+ * @brief Ecore_Timer callback to trigger an icon cache update.
+ * This function is called after a short delay to debounce multiple
+ * rapid requests for icon cache updates. It constructs and executes
+ * the `efreet_icon_cache_create` helper program.
+ * If an update is already in progress, it queues the request.
+ * @param data Unused.
+ * @return ECORE_CALLBACK_CANCEL to remove the timer.
+ */
 static Eina_Bool
 icon_cache_update_cache_cb(void *data EINA_UNUSED)
 {
@@ -391,6 +487,15 @@ icon_cache_update_cache_cb(void *data EINA_UNUSED)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Ecore_Timer callback to trigger a desktop cache update.
+ * This function is called after a short delay to debounce multiple
+ * rapid requests for desktop cache updates. It constructs and executes
+ * the `efreet_desktop_cache_create` helper program.
+ * If an update is already in progress, it queues the request.
+ * @param data Unused.
+ * @return ECORE_CALLBACK_CANCEL to remove the timer.
+ */
 static Eina_Bool
 desktop_cache_update_cache_cb(void *data EINA_UNUSED)
 {
@@ -442,6 +547,11 @@ desktop_cache_update_cache_cb(void *data EINA_UNUSED)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Schedules an update for the icon cache.
+ * This function will trigger a rebuild of the icon cache after a short delay.
+ * @param flush If EINA_TRUE, the cache generator will be instructed to perform a full flush.
+ */
 static void
 cache_icon_update(Eina_Bool flush)
 {
@@ -457,6 +567,16 @@ cache_desktop_update(void)
    desktop_cache_timer = ecore_timer_add(0.2, desktop_cache_update_cache_cb, NULL);
 }
 
+/**
+ * @brief Ecore_Event_Handler callback for EIO_MONITOR events.
+ * This function is triggered by file system changes in monitored directories.
+ * It determines if the change affects icons, desktops, or MIME types and
+ * schedules the appropriate cache update.
+ * @param data Unused.
+ * @param type The type of the event (unused).
+ * @param event The Eio_Monitor_Event structure.
+ * @return ECORE_CALLBACK_PASS_ON to allow other handlers to process the event.
+ */
 static Eina_Bool
 _cb_monitor_event(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -487,6 +607,13 @@ _cb_monitor_event(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Adds a directory to the icon monitoring system.
+ * If the path is a directory and not already monitored, an Eio_Monitor
+ * is created for it. Handles symbolic links by monitoring their real path.
+ * @param st The stat structure of the path.
+ * @param path The directory path to monitor.
+ */
 static void
 icon_changes_monitor_add(const struct stat *st, const char *path)
 {
@@ -515,6 +642,13 @@ icon_changes_monitor_add(const struct stat *st, const char *path)
    free(realp);
 }
 
+/**
+ * @brief Adds a directory to the desktop monitoring system.
+ * If the path is a directory and not already monitored, an Eio_Monitor
+ * is created for it. Handles symbolic links by monitoring their real path.
+ * @param st The stat structure of the path.
+ * @param path The directory path to monitor.
+ */
 static void
 desktop_changes_monitor_add(const struct stat *st, const char *path)
 {
@@ -543,6 +677,14 @@ desktop_changes_monitor_add(const struct stat *st, const char *path)
    free(realp);
 }
 
+/**
+ * @brief Comparison function for struct stat, used for Eina_Inarray searches.
+ * Compares two stat structures based on their device ID (st_dev) and
+ * inode number (st_ino).
+ * @param a Pointer to the first struct stat.
+ * @param b Pointer to the second struct stat.
+ * @return 0 if they refer to the same file system object, 1 otherwise.
+ */
 static int
 stat_cmp(const void *a, const void *b)
 {
@@ -554,6 +696,15 @@ stat_cmp(const void *a, const void *b)
    return 1;
 }
 
+/**
+ * @brief Performs sanity checks before recursing into a directory for monitoring.
+ * Prevents excessive recursion depth and monitoring of the user's home directory,
+ * which could be a sign of a misconfiguration or symlink loop.
+ * @param stack An Eina_Inarray used to track the recursion path (dev/inode pairs).
+ * @param path The path being considered for recursion.
+ * @param stack_limit The maximum allowed recursion depth.
+ * @return EINA_TRUE if it's safe to recurse, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _check_recurse_monitor_sanity(Eina_Inarray *stack, const char *path, unsigned int stack_limit)
 {
@@ -574,6 +725,18 @@ _check_recurse_monitor_sanity(Eina_Inarray *stack, const char *path, unsigned in
    return EINA_TRUE;
 }
 
+/**
+ * @brief Recursively sets up Eio_Monitors for icon directories.
+ * Traverses a directory tree, adding monitors for each directory found.
+ * Uses the `subdir_cache` to quickly get subdirectory listings and avoid
+ * redundant `stat` calls. It also uses an `Eina_Inarray` (stack) to detect
+ * and prevent recursion loops (e.g. symlink loops).
+ * @param stack An Eina_Inarray to track visited (dev_t, ino_t) pairs to prevent loops.
+ *              The caller is responsible for initializing and flushing it for base paths.
+ * @param path The current directory path to process.
+ * @param base EINA_TRUE if this is a base directory (e.g., from XDG_DATA_DIRS),
+ *             EINA_FALSE for subdirectories found during recursion.
+ */
 static void
 icon_changes_listen_recursive(Eina_Inarray *stack, const char *path, Eina_Bool base)
 {
@@ -618,6 +781,16 @@ icon_changes_listen_recursive(Eina_Inarray *stack, const char *path, Eina_Bool b
    eina_mempool_free(efreetd_mp_stat, st);
 }
 
+/**
+ * @brief Recursively sets up Eio_Monitors for desktop directories.
+ * Similar to `icon_changes_listen_recursive`, but for desktop file directories.
+ * Traverses a directory tree, adding monitors for each directory found.
+ * Uses the `subdir_cache` and an `Eina_Inarray` (stack) for efficiency and loop prevention.
+ * @param stack An Eina_Inarray to track visited (dev_t, ino_t) pairs to prevent loops.
+ *              The caller is responsible for initializing and flushing it for base paths.
+ * @param path The current directory path to process.
+ * @param base EINA_TRUE if this is a base directory, EINA_FALSE for subdirectories.
+ */
 static void
 desktop_changes_listen_recursive(Eina_Inarray *stack, const char *path, Eina_Bool base)
 {
@@ -661,6 +834,12 @@ desktop_changes_listen_recursive(Eina_Inarray *stack, const char *path, Eina_Boo
    eina_mempool_free(efreetd_mp_stat, st);
 }
 
+/**
+ * @brief Sets up monitoring for all relevant icon directories.
+ * This includes user-specific icon directories, XDG data directories (e.g., /usr/share/icons),
+ * and legacy pixmap directories. It uses `icon_changes_listen_recursive` to
+ * traverse each base directory.
+ */
 static void
 icon_changes_listen(void)
 {
@@ -712,6 +891,12 @@ icon_changes_listen(void)
    eina_strbuf_free(buf);
 }
 
+/**
+ * @brief Sets up monitoring for all relevant desktop file directories.
+ * This includes system-defined desktop directories and any extra directories
+ * added by the user or applications. It uses `desktop_changes_listen_recursive`
+ * to traverse each base directory.
+ */
 static void
 desktop_changes_listen(void)
 {
@@ -734,6 +919,13 @@ desktop_changes_listen(void)
    eina_inarray_free(stack);
 }
 
+/**
+ * @brief Reads a list of strings from a cache file into an Eina_List.
+ * Each line in the file becomes a stringshared item in the list.
+ * The file is expected to be in `efreet_cache_home_get()/efreet/`.
+ * @param file The name of the file (e.g., "extra_icons.dirs").
+ * @param l A pointer to an Eina_List* to populate. The list will be appended to.
+ */
 static void
 fill_list(const char *file, Eina_List **l)
 {
@@ -763,6 +955,10 @@ error_buf:
    eina_strbuf_free(buf);
 }
 
+/**
+ * @brief Reads persisted lists of extra icon directories and icon extensions.
+ * Loads data from `extra_icons.dirs` and `icons.exts` in the Efreet cache directory.
+ */
 static void
 read_lists(void)
 {
@@ -773,6 +969,13 @@ read_lists(void)
    fill_list("icons.exts", &icon_exts);
 }
 
+/**
+ * @brief Saves an Eina_List of strings to a cache file.
+ * Each stringshared item in the list is written as a line in the file.
+ * The file is created in `efreet_cache_home_get()/efreet/`.
+ * @param file The name of the file (e.g., "extra_icons.dirs").
+ * @param l The Eina_List of (const char *) strings to save.
+ */
 static void
 save_list(const char *file, Eina_List *l)
 {
@@ -795,12 +998,34 @@ save_list(const char *file, Eina_List *l)
    eina_strbuf_free(buf);
 }
 
+/**
+ * @brief Comparison function for eina_list_search_unsorted_list.
+ * Compares two C strings using strncmp, where the length of the comparison
+ * is determined by the length of the first string (data1).
+ * This is specifically used for checking if a path from `desktop_system_dirs`
+ * is already present, potentially as a prefix, in another list.
+ * @param data1 The first string (typically from `desktop_system_dirs`).
+ * @param data2 The second string to compare against.
+ * @return An integer less than, equal to, or greater than zero if data1 is found
+ *         to be, respectively, less than, to match, or be greater than data2.
+ */
 static int
 strcmplen(const void *data1, const void *data2)
 {
    return strncmp(data1, data2, eina_stringshare_strlen(data1));
 }
 
+/**
+ * @brief Ecore_Event_Handler callback for ECORE_EXE_EVENT_DATA.
+ * Handles data (stdout) received from cache generation helper programs
+ * (`efreet_icon_cache_create`, `efreet_desktop_cache_create`, `efreet_mime_cache_create`).
+ * For desktop and icon caches, it checks if the output indicates a change ('c')
+ * and sends appropriate signals to clients.
+ * @param data Unused.
+ * @param type The type of the event (unused).
+ * @param event The Ecore_Exe_Event_Data structure.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
+ */
 static Eina_Bool
 cache_exe_data_cb(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -836,6 +1061,17 @@ cache_exe_data_cb(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Ecore_Event_Handler callback for ECORE_EXE_EVENT_DEL.
+ * Handles the termination of cache generation helper programs.
+ * It updates the status of the respective cache process (e.g., `desktop_cache_exe = NULL`).
+ * If a cache update was queued while the previous one was running, it triggers the queued update.
+ * For MIME cache, it sends a signal indicating the build is complete.
+ * @param data Unused.
+ * @param type The type of the event (unused).
+ * @param event The Ecore_Exe_Event_Del structure.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
+ */
 static Eina_Bool
 cache_exe_del_cb(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -926,6 +1162,10 @@ cache_desktop_exists(void)
    return desktop_exists;
 }
 
+/**
+ * @brief Launches the `efreet_mime_cache_create` helper program.
+ * This function constructs the command and executes it using `ecore_exe_pipe_run`.
+ */
 static void
 mime_update_launch(void)
 {
@@ -942,6 +1182,14 @@ mime_update_launch(void)
    eina_strbuf_free(file);
 }
 
+/**
+ * @brief Ecore_Timer callback to trigger a MIME cache update.
+ * This function is called after a short delay to debounce multiple
+ * rapid requests for MIME cache updates. It ensures any existing
+ * MIME cache process is killed before launching a new one.
+ * @param data Unused.
+ * @return EINA_FALSE to remove the timer.
+ */
 static Eina_Bool
 mime_update_cache_cb(void *data EINA_UNUSED)
 {
@@ -955,6 +1203,12 @@ mime_update_cache_cb(void *data EINA_UNUSED)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Initializes monitoring for MIME type related files and directories.
+ * Sets up Eio_Monitors for standard MIME locations like `/etc/mime.types`,
+ * `/usr/share/mime/globs`, and `XDG_DATA_DIRS/mime/globs`.
+ * Changes in these locations will trigger `mime_update_cache_cb`.
+ */
 static void
 mime_cache_init(void)
 {
@@ -1007,6 +1261,11 @@ mime_cache_init(void)
    eina_strbuf_free(buf);
 }
 
+/**
+ * @brief Shuts down the MIME cache monitoring system.
+ * Deletes the MIME update timer and frees the hash tables used for
+ * storing Eio_Monitor objects.
+ */
 static void
 mime_cache_shutdown(void)
 {
@@ -1027,6 +1286,30 @@ mime_cache_shutdown(void)
      }
 }
 
+/**
+ * @brief Initializes the Efreetd caching system.
+ *
+ * This function performs the following steps:
+ * 1. Initializes Eina_Prefix to locate helper executables.
+ * 2. Sets up Ecore event handlers for process completion (ECORE_EXE_EVENT_DEL)
+ *    and data output (ECORE_EXE_EVENT_DATA) from cache helper programs.
+ * 3. Initializes hash tables for icon and desktop directory monitors.
+ * 4. Initializes the Efreet library itself.
+ * 5. Initializes EIO for file system monitoring.
+ * 6. Registers Ecore event handlers for various EIO_MONITOR events, all
+ *    pointing to `_cb_monitor_event`.
+ * 7. Initializes the subdirectory cache (`subdir_cache_init`).
+ * 8. Initializes MIME cache monitoring (`mime_cache_init`) and launches an
+ *    initial MIME cache update (`mime_update_launch`).
+ * 9. Reads persisted lists of extra icon directories and extensions (`read_lists`).
+ * 10. Populates the list of system desktop directories.
+ * 11. Sets up recursive listeners for icon and desktop directory changes
+ *     (`icon_changes_listen`, `desktop_changes_listen`).
+ * 12. Triggers initial updates for icon and desktop caches.
+ * 13. Saves the subdirectory cache if it was modified.
+ *
+ * @return EINA_TRUE on successful initialization, EINA_FALSE on failure.
+ */
 Eina_Bool
 cache_init(void)
 {
@@ -1104,6 +1387,25 @@ error:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Shuts down the Efreetd caching system.
+ *
+ * This function performs the following cleanup steps:
+ * 1. Frees the Eina_Prefix object.
+ * 2. Shuts down MIME cache monitoring (`mime_cache_shutdown`).
+ * 3. Shuts down the subdirectory cache (`subdir_cache_shutdown`). Note: This does
+ *    not save any pending changes; `subdir_cache_save()` should be called before
+ *    shutdown if persistence is needed.
+ * 4. Shuts down the Efreet library itself (`efreet_shutdown`).
+ * 5. Deletes Ecore event handlers for ECORE_EXE_EVENT_DEL and ECORE_EXE_EVENT_DATA.
+ * 6. Frees hash tables used for icon and desktop directory monitors.
+ * 7. Frees lists of desktop system directories, extra desktop directories,
+ *    extra icon directories, and icon extensions.
+ * 8. Deletes Ecore event handlers for EIO_MONITOR events.
+ * 9. Shuts down EIO.
+ *
+ * @return EINA_TRUE always.
+ */
 Eina_Bool
 cache_shutdown(void)
 {

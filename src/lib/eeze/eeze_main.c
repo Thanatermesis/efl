@@ -11,16 +11,71 @@
 #include "eeze_disk_private.h"
 #include "eeze_sensor_private.h"
 
+/**
+ * @internal
+ * @brief Global udev context.
+ * This variable holds the global udev context, initialized by udev_new()
+ * during eeze_init() and released by udev_unref() during eeze_shutdown().
+ * It is used by various Eeze functions to interact with the udev system.
+ */
 _udev *udev;
 
+/**
+ * @internal
+ * @brief Log domain for Eeze udev operations.
+ */
 int _eeze_udev_log_dom = -1;
+/**
+ * @internal
+ * @brief Log domain for Eeze net operations.
+ */
 int _eeze_net_log_dom = -1;
+/**
+ * @internal
+ * @brief Log domain for Eeze sensor operations.
+ */
 int _eeze_sensor_log_dom = -1;
+/**
+ * @internal
+ * @brief Initialization counter for the Eeze library.
+ * This counter tracks the number of times eeze_init() has been called.
+ * The library is initialized on the first call and shut down when the
+ * counter reaches zero after corresponding eeze_shutdown() calls.
+ */
 int _eeze_init_count = 0;
 
+/**
+ * @internal
+ * @brief Internal static Eeze library version information.
+ */
 static Eeze_Version _version = { VMAJ, VMIN, VMIC, VREV };
+/**
+ * @brief Eeze library version information.
+ *
+ * Use this to check the version of Eeze your application is linked against.
+ * Example:
+ * @code
+ * const Eeze_Version *version = eeze_version;
+ * printf("Eeze version: %d.%d.%d.%d\n",
+ *        version->major, version->minor,
+ *        version->micro, version->revision);
+ * @endcode
+ */
 EAPI Eeze_Version *eeze_version = &_version;
 
+/**
+ * @brief Initialize the Eeze library.
+ *
+ * This function initializes all the necessary Eeze subsystems. It increments
+ * an internal counter, and if the counter is 1, it proceeds with full
+ * initialization. This includes initializing Eina, Ecore, registering log
+ * domains, initializing udev, and Eeze-specific modules like disk, net,
+ * and sensor.
+ *
+ * @return The new init count, or 0 on failure.
+ *
+ * @see eeze_shutdown()
+ */
 EAPI int
 eeze_init(void)
 {
@@ -98,6 +153,20 @@ eina_fail:
    return --_eeze_init_count;
 }
 
+/**
+ * @brief Shut down the Eeze library.
+ *
+ * This function shuts down all Eeze subsystems. It decrements an internal
+ * counter, and if the counter reaches 0, it proceeds with full shutdown.
+ * This includes unreferencing the udev context, shutting down Eeze-specific
+ * modules, Ecore, and unregistering log domains, and finally shutting down Eina.
+ *
+ * @return The new init count. If the count reaches 0, it means a full
+ *         shutdown was performed. Returns 0 if called when init count
+ *         is already zero or less.
+ *
+ * @see eeze_init()
+ */
 EAPI int
 eeze_shutdown(void)
 {
@@ -126,6 +195,28 @@ eeze_shutdown(void)
    return _eeze_init_count;
 }
 
+/**
+ * @brief Get the global udev context.
+ *
+ * This function returns a pointer to the global udev context that Eeze uses.
+ * This can be useful for applications that need to perform custom udev
+ * operations alongside Eeze. The udev context is managed by Eeze and should
+ * not be unreferenced by the caller.
+ *
+ * @return A pointer to the global _udev context, or NULL if Eeze is not
+ *         initialized or udev initialization failed.
+ *
+ * @warning Do not call udev_unref() on the returned pointer.
+ *
+ * Example:
+ * @code
+ * struct udev *ctx = eeze_udev_get();
+ * if (ctx)
+ *   {
+ *      // Use ctx for udev operations
+ *   }
+ * @endcode
+ */
 EAPI void *
 eeze_udev_get(void)
 {

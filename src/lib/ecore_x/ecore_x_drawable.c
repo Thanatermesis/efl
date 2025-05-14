@@ -18,6 +18,8 @@
  * @param y Pointer to an integer into which the Y position is to be stored.
  * @param w Pointer to an integer into which the width is to be stored.
  * @param h Pointer to an integer into which the height is to be stored.
+ * @note If the underlying XGetGeometry call fails, the output parameters
+ *       @p x, @p y, @p w, and @p h will be set to 0.
  * @ingroup Ecore_X_Drawable_Group
  */
 EAPI void
@@ -59,7 +61,7 @@ ecore_x_drawable_geometry_get(Ecore_X_Drawable d,
 /**
  * Retrieves the width of the border of the given drawable.
  * @param  d The given drawable.
- * @return The border width of the given drawable.
+ * @return The border width of the given drawable, or 0 if the query fails.
  * @ingroup Ecore_X_Drawable_Group
  */
 EAPI int
@@ -81,7 +83,7 @@ ecore_x_drawable_border_width_get(Ecore_X_Drawable d)
 /**
  * Retrieves the depth of the given drawable.
  * @param  d The given drawable.
- * @return The depth of the given drawable.
+ * @return The depth of the given drawable, or 0 if the query fails.
  * @ingroup Ecore_X_Drawable_Group
  */
 EAPI int

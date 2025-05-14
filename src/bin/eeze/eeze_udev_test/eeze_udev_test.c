@@ -12,13 +12,33 @@
  * a demo.
  */
 
+/**
+ * @brief Structure to hold lists of keyboards and mice, and a hash table.
+ *
+ * This structure is used to pass around data related to detected keyboards
+ * and mice, primarily for the event callback.
+ */
 typedef struct kbdmouse
 {
-   Eina_List *kbds;
-   Eina_List *mice;
-   Eina_Hash *hash;
+   Eina_List *kbds; /**< A list of syspaths for detected keyboards. Example: "/sys/devices/platform/i8042/serio0/input/input3" */
+   Eina_List *mice; /**< A list of syspaths for detected mice. Example: "/sys/devices/pci0000:00/0000:00:14.0/usb1/1-1/1-1:1.0/0003:1234:5678.0001/input/input10" */
+   Eina_Hash *hash; /**< A hash table mapping syspaths to devpaths. Key: syspath (e.g., "/sys/devices/platform/i8042/serio0/input/input3"), Value: devpath (e.g., "/dev/input/event3") */
 } kbdmouse;
 
+/**
+ * @brief Callback function for udev events.
+ *
+ * This function is called when a udev event (add/remove) occurs for a device
+ * being watched. It checks if the event is for a known keyboard or mouse
+ * and prints a message. It also handles cleanup of resources on the first
+ * relevant event.
+ *
+ * @param device The syspath of the device that triggered the event.
+ *               Example: "/sys/devices/pci0000:00/0000:00:14.0/usb1/1-1/1-1:1.0/0003:1234:5678.0001/input/input10"
+ * @param event The type of udev event (EEZE_UDEV_EVENT_ADD or EEZE_UDEV_EVENT_REMOVE).
+ * @param data User data passed to eeze_udev_watch_add(), in this case a kbdmouse struct.
+ * @param watch The Eeze_Udev_Watch object associated with this event.
+ */
 static void
 /* event will always be a syspath starting with /sys */
 catch_events(const char      *device,
@@ -80,12 +100,32 @@ end:
    ecore_main_loop_quit();
 }
 
+/**
+ * @brief Frees data stored in the eina_hash.
+ *
+ * This function is used as a callback by eina_hash_stringshared_new to free
+ * the stringshared devpaths when the hash is destroyed or items are removed.
+ *
+ * @param data The data to free (a stringshared devpath).
+ */
 static void
 hash_free(void *data)
 {
    eina_stringshare_del(data);
 }
 
+/**
+ * @brief Main function for the eeze_udev_test demo.
+ *
+ * This program demonstrates various functionalities of the Eeze_Udev library:
+ * - Finding devices by type (keyboard, mouse, mountable drives, network, internal drives, removable media, V4L).
+ * - Retrieving device properties (devpath, manufacturer, filesystem type, interface, serial number, model, subsystem).
+ * - Setting up a udev watch to monitor device plug/unplug events.
+ * It initializes Ecore and Eeze, performs device discovery, prints information,
+ * sets up an event watch, and then enters the Ecore main loop to wait for events.
+ *
+ * @return 0 on successful execution.
+ */
 int
 main()
 {

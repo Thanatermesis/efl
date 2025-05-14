@@ -2,6 +2,17 @@
 
 #ifdef BUILD_SSE3
 
+/**
+ * @brief Blend source pixels (s) onto destination pixels (d) using SSE3.
+ * dst = s + ( (256 - s_alpha) * d ) / 256
+ * This function assumes source pixels are opaque or their alpha is pre-multiplied.
+ *
+ * @param s Pointer to the source pixel data (array of DATA32). Each DATA32 is an ARGB pixel.
+ * @param m Pointer to the mask data (array of DATA8). Not used in this function.
+ * @param c Color value (DATA32). Not used in this function.
+ * @param d Pointer to the destination pixel data (array of DATA32). Pixels are overwritten.
+ * @param l Number of pixels to process.
+ */
 static void
 _op_blend_p_dp_sse3(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c EINA_UNUSED, DATA32 *d, int l) {
 
@@ -49,6 +60,18 @@ _op_blend_p_dp_sse3(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c EINA_UNUSED, DATA3
       })
 }
 
+/**
+ * @brief Blend source pixels (s) onto destination pixels (d) considering source alpha, using SSE3.
+ * If s_alpha is 0, d is unchanged.
+ * If s_alpha is 255, d = s.
+ * Otherwise, dst = s + ( (256 - s_alpha) * d ) / 256
+ *
+ * @param s Pointer to the source pixel data (array of DATA32). Each DATA32 is an ARGB pixel.
+ * @param m Pointer to the mask data (array of DATA8). Not used in this function.
+ * @param c Color value (DATA32). Not used in this function.
+ * @param d Pointer to the destination pixel data (array of DATA32). Pixels are overwritten.
+ * @param l Number of pixels to process.
+ */
 static void
 _op_blend_pas_dp_sse3(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c EINA_UNUSED, DATA32 *d, int l) {
 
@@ -139,6 +162,12 @@ _op_blend_pas_dp_sse3(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c EINA_UNUSED, DAT
 #define _op_blend_pas_dpan_sse3 _op_blend_pas_dp_sse3
 #define _op_blend_pan_dpan_sse3 _op_blend_pan_dp_sse3
 
+/**
+ * @brief Initializes the span blending function pointers for SSE3 optimized versions.
+ * This function assigns the appropriate SSE3-optimized blending functions
+ * to the global function pointer table `op_blend_span_funcs`.
+ * These functions are used for blending horizontal spans of pixels.
+ */
 static void
 init_blend_pixel_span_funcs_sse3(void)
 {
@@ -161,6 +190,14 @@ init_blend_pixel_span_funcs_sse3(void)
 #define _op_blend_pt_pan_dpan_sse3 _op_blend_pt_pan_dp_sse3
 #define _op_blend_pt_pas_dpan_sse3 _op_blend_pt_pas_dp_sse3
 
+/**
+ * @brief Initializes the point blending function pointers for SSE3 optimized versions.
+ * This function assigns the appropriate SSE3-optimized blending functions
+ * to the global function pointer table `op_blend_pt_funcs`.
+ * These functions are used for blending single pixels (points).
+ * Note: Some functions are NULL, indicating no specific SSE3 optimization for that case,
+ * or they alias other existing functions.
+ */
 static void
 init_blend_pixel_pt_funcs_sse3(void)
 {
@@ -177,6 +214,17 @@ init_blend_pixel_pt_funcs_sse3(void)
 
 /* blend_rel pixel -> dst */
 
+/**
+ * @brief Blend source pixels (s) onto destination pixels (d) relative to destination alpha, using SSE3.
+ * dst = ( (1 + d_alpha) * s ) / 256 + ( (256 - s_alpha) * d ) / 256
+ * This is a "blend relative" operation.
+ *
+ * @param s Pointer to the source pixel data (array of DATA32). Each DATA32 is an ARGB pixel.
+ * @param m Pointer to the mask data (array of DATA8). Not used in this function.
+ * @param c Color value (DATA32). Used in the UOP (unaligned operation) path, but seems unused in A4OP/A8OP.
+ * @param d Pointer to the destination pixel data (array of DATA32). Pixels are overwritten.
+ * @param l Number of pixels to process.
+ */
 static void
 _op_blend_rel_p_dp_sse3(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, int l) {
 
@@ -228,6 +276,18 @@ _op_blend_rel_p_dp_sse3(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, in
       })
 }
 
+/**
+ * @brief Blend source pixels (s) onto destination pixels (d) relative to destination alpha,
+ *        assuming source alpha is fully opaque (alpha=255), using SSE3.
+ * dst = ( (1 + d_alpha) * s ) / 256
+ * This is a "blend relative" operation where the source fully overwrites based on destination alpha.
+ *
+ * @param s Pointer to the source pixel data (array of DATA32). Each DATA32 is an ARGB pixel. Source alpha is ignored (treated as 255).
+ * @param m Pointer to the mask data (array of DATA8). Not used in this function.
+ * @param c Color value (DATA32). Used in the UOP (unaligned operation) path, but seems unused in A4OP/A8OP.
+ * @param d Pointer to the destination pixel data (array of DATA32). Pixels are overwritten.
+ * @param l Number of pixels to process.
+ */
 static void
 _op_blend_rel_pan_dp_sse3(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, int l) {
 
@@ -279,6 +339,12 @@ _op_blend_rel_pan_dp_sse3(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, 
 #define _op_blend_rel_pan_dpan_sse3 _op_blend_pan_dpan_sse3
 #define _op_blend_rel_pas_dpan_sse3 _op_blend_pas_dpan_sse3
 
+/**
+ * @brief Initializes the relative span blending function pointers for SSE3 optimized versions.
+ * This function assigns the appropriate SSE3-optimized "blend relative" functions
+ * to the global function pointer table `op_blend_rel_span_funcs`.
+ * These functions are used for blending horizontal spans of pixels with relative alpha compositing.
+ */
 static void
 init_blend_rel_pixel_span_funcs_sse3(void)
 {
@@ -300,6 +366,14 @@ init_blend_rel_pixel_span_funcs_sse3(void)
 #define _op_blend_rel_pt_pan_dpan_sse3 _op_blend_pt_pan_dpan_sse3
 #define _op_blend_rel_pt_pas_dpan_sse3 _op_blend_pt_pas_dpan_sse3
 
+/**
+ * @brief Initializes the relative point blending function pointers for SSE3 optimized versions.
+ * This function assigns the appropriate SSE3-optimized "blend relative" functions
+ * to the global function pointer table `op_blend_rel_pt_funcs`.
+ * These functions are used for blending single pixels (points) with relative alpha compositing.
+ * Note: Some functions are NULL, indicating no specific SSE3 optimization for that case,
+ * or they alias other existing functions.
+ */
 static void
 init_blend_rel_pixel_pt_funcs_sse3(void)
 {

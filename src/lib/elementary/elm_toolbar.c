@@ -67,6 +67,22 @@ static const Elm_Action key_actions[] = {
 
 static void _item_select(Elm_Toolbar_Item_Data *it);
 
+/**
+ * @brief Compares two toolbar items based on their priority.
+ *
+ * Used for sorting items to determine visibility and order in the "more" menu.
+ * Higher priority items are considered "greater".
+ * If priorities are equal, the first item is considered "lesser" to maintain
+ * a stable sort for items with the same priority (though the current logic
+ * returns -1, effectively making eti1 appear before eti2 if priorities are equal).
+ *
+ * @param i1 Pointer to the first Elm_Toolbar_Item_Data.
+ * @param i2 Pointer to the second Elm_Toolbar_Item_Data.
+ * @return Positive if eti2 has higher priority, negative if eti1 has higher
+ *         or equal priority, or if eti1 is valid and eti2 is not.
+ *         Returns 1 if eti2 is NULL.
+ *         Returns -1 if eti1 is NULL.
+ */
 static int
 _toolbar_item_prio_compare_cb(const void *i1,
                               const void *i2)
@@ -83,6 +99,25 @@ _toolbar_item_prio_compare_cb(const void *i1,
    return eti2->prio.priority - eti1->prio.priority;
 }
 
+/**
+ * @brief Adjusts the visibility of toolbar items based on available space and priority.
+ *
+ * This function iterates through toolbar items, sorted by priority,
+ * and determines if each item should be visible in the main toolbar box (sd->bx)
+ * or moved to one of the "more" boxes (sd->bx_more, sd->bx_more2) if space is limited.
+ * It updates the `prio.visible` and `in_box` fields for each item.
+ *
+ * @param obj The toolbar Evas_Object.
+ * @param sd The toolbar's private data.
+ * @param iw Pointer to the current accumulated width (horizontal) or height (vertical)
+ *           of visible items. This value is updated by the function.
+ * @param vw The available width (horizontal) or height (vertical) of the viewport.
+ * @param usage_bx_more If EINA_TRUE, indicates that the `bx_more` and `bx_more2`
+ *                      boxes are actively being used (typically in ELM_TOOLBAR_SHRINK_EXPAND mode).
+ *                      If EINA_FALSE, visibility is strictly determined by `vw` and item priority.
+ * @param more Pointer to a boolean that is set to EINA_TRUE if any item
+ *             is not visible in the main box, indicating the "more" button might be needed.
+ */
 static void
 _items_visibility_fix(Elm_Toolbar *obj,
                       Elm_Toolbar_Data *sd,
@@ -159,6 +194,14 @@ _items_visibility_fix(Elm_Toolbar *obj,
    efl_ui_focus_object_setup_order(obj);
 }
 
+/**
+ * @brief Destroys the menu associated with a toolbar item.
+ *
+ * If the item has a menu object (item->o_menu), it is deleted.
+ * The item's menu flag (item->menu) is set to EINA_FALSE.
+ *
+ * @param item The toolbar item whose menu is to be destroyed.
+ */
 static void
 _item_menu_destroy(Elm_Toolbar_Item_Data *item)
 {
@@ -166,6 +209,18 @@ _item_menu_destroy(Elm_Toolbar_Item_Data *item)
    item->menu = EINA_FALSE;
 }
 
+/**
+ * @brief Unselects a toolbar item.
+ *
+ * If the item is currently selected, this function:
+ * - Sets its `selected` flag to EINA_FALSE.
+ * - Updates the toolbar's `selected_item` to NULL.
+ * - Emits "elm,state,unselected" signals to the item's layout and icon.
+ * - Calls the "unselected" smart callback for the item.
+ * - Emits an accessibility state changed signal if AT-SPI is enabled.
+ *
+ * @param item The toolbar item to unselect.
+ */
 static void
 _item_unselect(Elm_Toolbar_Item_Data *item)
 {
@@ -183,6 +238,17 @@ _item_unselect(Elm_Toolbar_Item_Data *item)
     efl_access_state_changed_signal_emit(EO_OBJ(item), EFL_ACCESS_STATE_TYPE_SELECTED, EINA_FALSE);
 }
 
+/**
+ * @brief Callback invoked when an item's menu is hidden.
+ *
+ * This function ensures that the associated toolbar item is unselected
+ * when its menu is hidden.
+ *
+ * @param data The Elm_Toolbar_Item_Data whose menu was hidden.
+ * @param e Evas canvas (unused).
+ * @param obj The menu Evas_Object that was hidden (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _menu_hide(void *data,
            Evas *e EINA_UNUSED,
@@ -197,6 +263,19 @@ _menu_hide(void *data,
    _item_unselect(selected);
 }
 
+/**
+ * @brief Callback invoked when an item's menu is deleted.
+ *
+ * This function removes the _menu_hide callback to prevent it from
+ * being called during the menu's deletion process, which could lead to
+ * issues if the item it tries to unselect is already being processed
+ * or is invalid.
+ *
+ * @param data The Elm_Toolbar_Item_Data whose menu is being deleted.
+ * @param e Evas canvas (unused).
+ * @param obj The menu Evas_Object being deleted.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _menu_del(void *data,
           Evas *e EINA_UNUSED,
@@ -208,6 +287,16 @@ _menu_del(void *data,
      (obj, EVAS_CALLBACK_HIDE, _menu_hide, data);
 }
 
+/**
+ * @brief Creates a menu for a toolbar item.
+ *
+ * Initializes and configures a new elm_menu object for the given toolbar item.
+ * Sets the menu's parent if specified in the toolbar data.
+ * Adds EVAS_CALLBACK_HIDE and EVAS_CALLBACK_DEL event callbacks to the menu.
+ *
+ * @param sd The toolbar's private data.
+ * @param item The toolbar item for which to create the menu.
+ */
 static void
 _item_menu_create(Elm_Toolbar_Data *sd,
                   Elm_Toolbar_Item_Data *item)
@@ -224,6 +313,17 @@ _item_menu_create(Elm_Toolbar_Data *sd,
      (item->o_menu, EVAS_CALLBACK_DEL, _menu_del, item);
 }
 
+/**
+ * @brief Callback for when a menu item (representing a toolbar item in a "more" menu) is selected.
+ *
+ * This function is invoked when an item within a dynamically created menu
+ * (typically the "more" menu) is clicked. It calls the original toolbar item's
+ * callback function (`it->func`).
+ *
+ * @param data The Elm_Toolbar_Item_Data corresponding to the menu item.
+ * @param obj The Evas_Object of the menu (unused).
+ * @param event_info The Elm_Object_Item of the menu item that was clicked (unused).
+ */
 static void
 _elm_toolbar_item_menu_cb(void *data,
                           Evas_Object *obj EINA_UNUSED,
@@ -234,6 +334,15 @@ _elm_toolbar_item_menu_cb(void *data,
    if (it->func) it->func((void *)(WIDGET_ITEM_DATA_GET(EO_OBJ(it))), WIDGET(it), EO_OBJ(it));
 }
 
+/**
+ * @brief Ensures a toolbar item is visible within the scrollable area.
+ *
+ * Calculates the item's position relative to its parent box (sd->bx)
+ * and calls elm_interface_scrollable_content_region_show() to scroll
+ * the toolbar if necessary to make the item visible.
+ *
+ * @param it The toolbar item to show.
+ */
 static void
 _item_show(Elm_Toolbar_Item_Data *it)
 {
@@ -247,6 +356,13 @@ _item_show(Elm_Toolbar_Item_Data *it)
          (WIDGET(it), x - bx, y - by, w, h);
 }
 
+/**
+ * @brief Sets the mirrored mode for a single toolbar item and its associated menu.
+ *
+ * @param obj The toolbar Evas_Object (unused).
+ * @param it The toolbar item.
+ * @param mirrored EINA_TRUE if mirrored mode should be enabled, EINA_FALSE otherwise.
+ */
 static void
 _item_mirrored_set(Evas_Object *obj EINA_UNUSED,
                    Elm_Toolbar_Item_Data *it,
@@ -256,6 +372,15 @@ _item_mirrored_set(Evas_Object *obj EINA_UNUSED,
    if (it->o_menu) efl_ui_mirrored_set(it->o_menu, mirrored);
 }
 
+/**
+ * @brief Sets the mirrored mode for all items in the toolbar.
+ *
+ * Iterates through all standard items and the "more" item (if it exists)
+ * and applies the specified mirrored mode to each.
+ *
+ * @param obj The toolbar Evas_Object.
+ * @param mirrored EINA_TRUE to enable mirrored mode, EINA_FALSE to disable.
+ */
 static void
 _mirrored_set(Evas_Object *obj,
               Eina_Bool mirrored)
@@ -270,6 +395,30 @@ _mirrored_set(Evas_Object *obj,
      _item_mirrored_set(obj, sd->more_item, mirrored);
 }
 
+/**
+ * @brief Adjusts the total size of items when they don't fit the view.
+ *
+ * This function is typically used in ELM_TOOLBAR_SHRINK_EXPAND mode when
+ * the sum of minimum item sizes exceeds the available view space. It calculates
+ * a new total size (`*bl`) that attempts to proportionally scale down items
+ * or determine a suitable scrollable size.
+ *
+ * The logic distinguishes between items that fit initially (`sumf`) and those
+ * that overflow (`sumb`). If all items fit (`sumf` > 0 and `sumb` == 0),
+ * `*bl` is not modified (or rather, it implies the current total size is fine).
+ * If there's an overflow, it calculates a new total size based on the ratio
+ * of (total minimum size of all items) to (minimum size of items that fit initially),
+ * scaled by the `view` size.
+ *
+ * A special case handles separators: if an item overflows and the preceding
+ * item was a separator, that separator's size is moved from `sumf` to `sumb`
+ * to avoid shrinking based on a separator that might become hidden or less relevant.
+ *
+ * @param obj The toolbar Evas_Object.
+ * @param bl Pointer to the calculated total breadth (width or height) of the items.
+ *           This is an output parameter.
+ * @param view The available breadth (width or height) of the viewport.
+ */
 static void
 _items_size_fit(Evas_Object *obj, Evas_Coord *bl, Evas_Coord view)
 {
@@ -320,6 +469,23 @@ _items_size_fit(Evas_Object *obj, Evas_Coord *bl, Evas_Coord view)
    if (sumf != 0) *bl = (Evas_Coord)(((sumf + sumb) * view) / sumf);
 }
 
+/**
+ * @brief Calculates the target coordinates for scrolling to an item.
+ *
+ * Based on the specified scroll-to type (e.g., in, first, middle, last),
+ * this function determines the x, y, width, and height of the region
+ * to be made visible by the scroller.
+ *
+ * @param item The toolbar item to scroll to.
+ * @param type The type of scrolling (how the item should be positioned in the viewport).
+ *             Example: ELM_TOOLBAR_ITEM_SCROLLTO_IN makes the entire item visible.
+ *                      ELM_TOOLBAR_ITEM_SCROLLTO_MIDDLE centers the item.
+ * @param x Output for the target x-coordinate.
+ * @param y Output for the target y-coordinate.
+ * @param w Output for the target width (usually viewport width).
+ * @param h Output for the target height (usually viewport height).
+ * @return EINA_TRUE if coordinates were successfully calculated, EINA_FALSE otherwise (e.g., invalid type).
+ */
 static Eina_Bool
 _elm_toolbar_item_coordinates_calc(Elm_Toolbar_Item_Data *item,
                                    Elm_Toolbar_Item_Scrollto_Type type,

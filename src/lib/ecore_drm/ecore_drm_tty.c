@@ -32,8 +32,24 @@
 # define KDSKBMUTE 0x4B51
 #endif
 
+/** @internal
+ * @brief Stores the original keyboard mode to restore it later.
+ */
 static int kbd_mode = 0;
 
+/**
+ * @internal
+ * @brief Callback function for VT (Virtual Terminal) switch signals.
+ *
+ * This function is triggered when a VT switch signal (SIGUSR1 or SIGUSR2)
+ * is received. It handles disabling/enabling DRM inputs and dropping/setting
+ * the DRM master status based on the signal.
+ *
+ * @param data The Ecore_Drm_Device associated with this TTY.
+ * @param type The type of the event (unused).
+ * @param event The Ecore_Event_Signal_User event data.
+ * @return ECORE_CALLBACK_PASS_ON always.
+ */
 static Eina_Bool
 _ecore_drm_tty_cb_vt_signal(void *data, int type EINA_UNUSED, void *event)
 {
@@ -71,12 +87,38 @@ _ecore_drm_tty_cb_vt_signal(void *data, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @internal
+ * @brief Activates a specific virtual terminal.
+ *
+ * This function uses the VT_ACTIVATE ioctl to switch to the
+ * virtual terminal specified by activate_vt.
+ *
+ * @param dev The Ecore_Drm_Device associated with this TTY.
+ * @param activate_vt The number of the virtual terminal to activate.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 Eina_Bool
 _ecore_drm_tty_switch(Ecore_Drm_Device *dev, int activate_vt)
 {
    return ioctl(dev->tty.fd, VT_ACTIVATE, activate_vt) >= 0;
 }
 
+/**
+ * @internal
+ * @brief Sets up the TTY for graphics mode.
+ *
+ * This function performs several setup steps:
+ * - Verifies the TTY device.
+ * - Gets the current TTY mode and keyboard mode.
+ * - Mutes the keyboard and sets it to K_OFF.
+ * - Sets the TTY to KD_GRAPHICS mode.
+ * - Sets the VT mode to VT_PROCESS for signal handling.
+ * If any step fails, it attempts to revert changes and returns EINA_FALSE.
+ *
+ * @param dev The Ecore_Drm_Device to set up the TTY for.
+ * @return EINA_TRUE on successful setup, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _ecore_drm_tty_setup(Ecore_Drm_Device *dev)
 {
@@ -160,6 +202,22 @@ err_kmode:
  * Functions that deal with opening, closing, and otherwise using a tty
  */
 
+/**
+ * @brief Opens and initializes a TTY for use with Ecore_Drm.
+ * @ingroup Ecore_Drm_Tty_Group
+ *
+ * This function opens the specified TTY device (or uses stdin if name is NULL
+ * or ECORE_DRM_TTY environment variable is set). It then sets up the TTY
+ * for graphics mode and registers a signal handler for VT switches.
+ *
+ * @param dev The Ecore_Drm_Device to associate with this TTY.
+ * @param name The path to the TTY device (e.g., "/dev/tty1"). If NULL,
+ *             it tries ECORE_DRM_TTY environment variable or defaults to stdin.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ *
+ * @see ecore_drm_tty_close()
+ * @see _ecore_drm_tty_setup()
+ */
 EAPI Eina_Bool
 ecore_drm_tty_open(Ecore_Drm_Device *dev, const char *name)
 {
@@ -229,6 +287,19 @@ ecore_drm_tty_open(Ecore_Drm_Device *dev, const char *name)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Restores the TTY to its original state.
+ *
+ * This function is called when closing the TTY or when Ecore_Drm is
+ * shutting down. It performs the following actions:
+ * - Sets the TTY mode back to KD_TEXT.
+ * - Restores the original keyboard mode.
+ * - Drops DRM master status.
+ * - Resets VT handling to VT_AUTO.
+ *
+ * @param dev The Ecore_Drm_Device associated with the TTY.
+ */
 void
 _ecore_drm_tty_restore(Ecore_Drm_Device *dev)
 {
@@ -253,6 +324,21 @@ _ecore_drm_tty_restore(Ecore_Drm_Device *dev)
      ERR("Could not reset VT handling\n");
 }
 
+/**
+ * @brief Closes an opened TTY and restores its original state.
+ * @ingroup Ecore_Drm_Tty_Group
+ *
+ * This function restores the TTY settings (text mode, keyboard mode),
+ * closes the TTY file descriptor, unregisters the VT switch signal handler,
+ * and clears the TTY name from the Ecore_Drm_Device. It also unsets the
+ * ECORE_DRM_TTY environment variable.
+ *
+ * @param dev The Ecore_Drm_Device whose TTY should be closed.
+ * @return EINA_TRUE on success, EINA_FALSE if the device is invalid.
+ *
+ * @see ecore_drm_tty_open()
+ * @see _ecore_drm_tty_restore()
+ */
 EAPI Eina_Bool
 ecore_drm_tty_close(Ecore_Drm_Device *dev)
 {
@@ -276,6 +362,20 @@ ecore_drm_tty_close(Ecore_Drm_Device *dev)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Releases the active VT.
+ * @ingroup Ecore_Drm_Tty_Group
+ *
+ * This function sends a VT_RELDISP ioctl with argument 1 to the TTY
+ * file descriptor, signaling that the current application is releasing
+ * control of the virtual terminal. This allows another process (like the
+ * getty or display manager) to take over.
+ *
+ * @param dev The Ecore_Drm_Device associated with the TTY.
+ * @return EINA_TRUE on success, EINA_FALSE on failure or if the device is invalid.
+ *
+ * @see ecore_drm_tty_acquire()
+ */
 EAPI Eina_Bool
 ecore_drm_tty_release(Ecore_Drm_Device *dev)
 {
@@ -293,6 +393,20 @@ ecore_drm_tty_release(Ecore_Drm_Device *dev)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Acquires the VT.
+ * @ingroup Ecore_Drm_Tty_Group
+ *
+ * This function sends a VT_RELDISP ioctl with argument VT_ACKACQ to the TTY
+ * file descriptor. This is typically done in response to a VT switch signal
+ * (e.g., SIGUSR2) indicating that the application should reacquire control
+ * of the virtual terminal.
+ *
+ * @param dev The Ecore_Drm_Device associated with the TTY.
+ * @return EINA_TRUE on success, EINA_FALSE on failure or if the device is invalid.
+ *
+ * @see ecore_drm_tty_release()
+ */
 EAPI Eina_Bool
 ecore_drm_tty_acquire(Ecore_Drm_Device *dev)
 {
@@ -310,6 +424,14 @@ ecore_drm_tty_acquire(Ecore_Drm_Device *dev)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the file descriptor of the opened TTY.
+ * @ingroup Ecore_Drm_Tty_Group
+ *
+ * @param dev The Ecore_Drm_Device associated with the TTY.
+ * @return The TTY file descriptor on success, or -1 if the device is invalid
+ *         or the TTY is not open.
+ */
 EAPI int
 ecore_drm_tty_get(Ecore_Drm_Device *dev)
 {

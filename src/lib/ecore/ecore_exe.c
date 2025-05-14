@@ -41,11 +41,34 @@ struct _ecore_exe_dead_exe
 HANDLE _ecore_exe_win32_job = NULL;
 #endif
 
+/**
+ * @brief Event type for when a new Ecore_Exe process is started.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI int ECORE_EXE_EVENT_ADD = 0;
+/**
+ * @brief Event type for when an Ecore_Exe process terminates.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI int ECORE_EXE_EVENT_DEL = 0;
+/**
+ * @brief Event type for when an Ecore_Exe process sends data (stdout/stderr).
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI int ECORE_EXE_EVENT_DATA = 0;
+/**
+ * @brief Event type for when an Ecore_Exe process sends error data (stderr, if separated).
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI int ECORE_EXE_EVENT_ERROR = 0;
 
+/**
+ * @brief Sets the priority for processes run by ecore_exe_run() or ecore_exe_pipe_run().
+ *
+ * @param pri The priority to set. This value is typically platform-dependent.
+ *            For POSIX systems, this might correspond to nice levels.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI void
 ecore_exe_run_priority_set(int pri)
 {
@@ -53,6 +76,12 @@ ecore_exe_run_priority_set(int pri)
    _impl_ecore_exe_run_priority_set(pri);
 }
 
+/**
+ * @brief Gets the current priority set for processes run by ecore_exe.
+ *
+ * @return The current priority value.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI int
 ecore_exe_run_priority_get(void)
 {
@@ -60,6 +89,17 @@ ecore_exe_run_priority_get(void)
    return _impl_ecore_exe_run_priority_get();
 }
 
+/**
+ * @brief Runs the given command.
+ *
+ * This function forks and runs the command @p exe_cmd.
+ *
+ * @param exe_cmd The command to run with all its arguments.
+ *                Example: "ls -l /tmp"
+ * @param data User data to associate with this Ecore_Exe instance.
+ * @return A new Ecore_Exe object if successful, @c NULL otherwise.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI Ecore_Exe *
 ecore_exe_run(const char *exe_cmd,
               const void *data)
@@ -68,6 +108,20 @@ ecore_exe_run(const char *exe_cmd,
    return ecore_exe_pipe_run(exe_cmd, 0, data);
 }
 
+/**
+ * @brief Runs the given command with specified pipe behavior.
+ *
+ * This function is a more advanced version of ecore_exe_run() that allows
+ * specifying how the child process's standard I/O streams (stdin, stdout, stderr)
+ * should be handled using @p flags.
+ *
+ * @param exe_cmd The command to run with all its arguments.
+ *                Example: "my_program --input /dev/null"
+ * @param flags Flags to control pipe behavior (e.g., ECORE_EXE_PIPE_READ, ECORE_EXE_PIPE_WRITE).
+ * @param data User data to associate with this Ecore_Exe instance.
+ * @return A new Ecore_Exe object if successful, @c NULL otherwise.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI Ecore_Exe *
 ecore_exe_pipe_run(const char      *exe_cmd,
                    Ecore_Exe_Flags  flags,
@@ -109,6 +163,16 @@ _ecore_exe_efl_object_finalize(Eo *obj, Ecore_Exe_Data *exe)
    return _impl_ecore_exe_efl_object_finalize(obj, exe);
 }
 
+/**
+ * @brief Sets a callback function to be called just before an Ecore_Exe object is freed.
+ *
+ * This can be used for cleaning up any resources associated with the Ecore_Exe
+ * that are managed outside of the Ecore_Exe itself.
+ *
+ * @param obj The Ecore_Exe object.
+ * @param func The callback function to set.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI void
 ecore_exe_callback_pre_free_set(Ecore_Exe   *obj,
                                 Ecore_Exe_Cb func)
@@ -119,6 +183,19 @@ ecore_exe_callback_pre_free_set(Ecore_Exe   *obj,
    exe->pre_free_cb = func;
 }
 
+/**
+ * @brief Sends data to the stdin of the running process.
+ *
+ * The Ecore_Exe must have been started with ECORE_EXE_PIPE_WRITE flag for this
+ * function to work.
+ *
+ * @param obj The Ecore_Exe object.
+ * @param data The data to send.
+ * @param size The size of the data in bytes.
+ * @return @c EINA_TRUE if the send was successful or queued, @c EINA_FALSE on error
+ *         (e.g., stdin is not piped or is closed).
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI Eina_Bool
 ecore_exe_send(Ecore_Exe  *obj,
                const void *data,
@@ -138,6 +215,15 @@ ecore_exe_send(Ecore_Exe  *obj,
    return _impl_ecore_exe_send(obj, exe, data, size);
 }
 
+/**
+ * @brief Closes the stdin pipe of the running process.
+ *
+ * After calling this, no more data can be sent to the process using ecore_exe_send().
+ * This is typically used to signal EOF to the child process's stdin.
+ *
+ * @param obj The Ecore_Exe object.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI void
 ecore_exe_close_stdin(Ecore_Exe *obj)
 {
@@ -147,6 +233,19 @@ ecore_exe_close_stdin(Ecore_Exe *obj)
    exe->close_stdin = 1;
 }
 
+/**
+ * @brief Sets the limits for auto-buffering of stdout/stderr data.
+ *
+ * Ecore_Exe can automatically buffer data read from the child process's
+ * stdout and stderr. These parameters control the size of those buffers.
+ *
+ * @param obj The Ecore_Exe object.
+ * @param start_bytes The initial size of the byte buffer.
+ * @param end_bytes The maximum size the byte buffer can grow to.
+ * @param start_lines The initial number of lines in the line buffer.
+ * @param end_lines The maximum number of lines the line buffer can grow to.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI void
 ecore_exe_auto_limits_set(Ecore_Exe *obj,
                           int        start_bytes,
@@ -161,6 +260,20 @@ ecore_exe_auto_limits_set(Ecore_Exe *obj,
                                    start_lines, end_lines);
 }
 
+/**
+ * @brief Retrieves buffered data from the process's stdout or stderr.
+ *
+ * This function allows polling for data that has been buffered by Ecore_Exe.
+ * The data is returned in an Ecore_Exe_Event_Data structure, which must be
+ * freed using ecore_exe_event_data_free() when no longer needed.
+ *
+ * @param obj The Ecore_Exe object.
+ * @param flags Specifies whether to get data from stdout (ECORE_EXE_PIPE_READ)
+ *              or stderr (ECORE_EXE_PIPE_ERROR).
+ * @return An Ecore_Exe_Event_Data structure containing the buffered data,
+ *         or @c NULL if no data is available or on error.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI Ecore_Exe_Event_Data *
 ecore_exe_event_data_get(Ecore_Exe      *obj,
                          Ecore_Exe_Flags flags)
@@ -171,6 +284,16 @@ ecore_exe_event_data_get(Ecore_Exe      *obj,
    return _impl_ecore_exe_event_data_get(obj, exe, flags);
 }
 
+/**
+ * @brief Sets a string tag for an Ecore_Exe object.
+ *
+ * This tag can be used to identify or categorize Ecore_Exe instances.
+ * The provided string is duplicated by the function.
+ *
+ * @param obj The Ecore_Exe object.
+ * @param tag The string tag to set. If @c NULL, any existing tag is removed.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI void
 ecore_exe_tag_set(Ecore_Exe  *obj,
                   const char *tag)
@@ -183,6 +306,14 @@ ecore_exe_tag_set(Ecore_Exe  *obj,
    else exe->tag = NULL;
 }
 
+/**
+ * @brief Gets the string tag associated with an Ecore_Exe object.
+ *
+ * @param obj The Ecore_Exe object.
+ * @return The string tag, or @c NULL if no tag is set or on error.
+ *         The returned string is an internal pointer and should not be modified or freed.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI const char *
 ecore_exe_tag_get(const Ecore_Exe *obj)
 {
@@ -192,6 +323,18 @@ ecore_exe_tag_get(const Ecore_Exe *obj)
    return exe->tag;
 }
 
+/**
+ * @brief Frees an Ecore_Exe object.
+ *
+ * This function will terminate the running process if it's still active,
+ * close any open pipes, and free all resources associated with the Ecore_Exe.
+ * The user data associated with the Ecore_Exe (set by ecore_exe_run() or
+ * ecore_exe_data_set()) is returned.
+ *
+ * @param obj The Ecore_Exe object to free.
+ * @return The user data associated with the Ecore_Exe.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI void *
 ecore_exe_free(Ecore_Exe *obj)
 {
@@ -210,6 +353,15 @@ _ecore_exe_efl_object_destructor(Eo *obj, Ecore_Exe_Data *exe)
    _impl_ecore_exe_efl_object_destructor(obj, exe);
 }
 
+/**
+ * @brief Frees an Ecore_Exe_Event_Data structure.
+ *
+ * This function should be called on Ecore_Exe_Event_Data structures received
+ * from ECORE_EXE_EVENT_DATA events or ecore_exe_event_data_get().
+ *
+ * @param e The Ecore_Exe_Event_Data structure to free.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI void
 ecore_exe_event_data_free(Ecore_Exe_Event_Data *e)
 {
@@ -219,6 +371,14 @@ ecore_exe_event_data_free(Ecore_Exe_Event_Data *e)
    free(e);
 }
 
+/**
+ * @brief Gets the process ID (PID) of the running executable.
+ *
+ * @param obj The Ecore_Exe object.
+ * @return The PID of the child process, or -1 on error or if the process
+ *         has not been started or has already exited.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI pid_t
 ecore_exe_pid_get(const Ecore_Exe *obj)
 {
@@ -228,6 +388,14 @@ ecore_exe_pid_get(const Ecore_Exe *obj)
    return exe->pid;
 }
 
+/**
+ * @brief Gets the command string that was used to start the Ecore_Exe.
+ *
+ * @param obj The Ecore_Exe object.
+ * @return The command string. This string is an internal pointer and should not
+ *         be modified or freed. It remains valid as long as @p obj is valid.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI const char *
 ecore_exe_cmd_get(const Ecore_Exe *obj)
 {
@@ -237,6 +405,16 @@ ecore_exe_cmd_get(const Ecore_Exe *obj)
    return ret;
 }
 
+/**
+ * @brief Gets the user data associated with an Ecore_Exe object.
+ *
+ * This is the data pointer provided when calling ecore_exe_run(),
+ * ecore_exe_pipe_run(), or subsequently set by ecore_exe_data_set().
+ *
+ * @param obj The Ecore_Exe object.
+ * @return The user data pointer, or @c NULL if no data is associated or on error.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI void *
 ecore_exe_data_get(const Ecore_Exe *obj)
 {
@@ -246,6 +424,17 @@ ecore_exe_data_get(const Ecore_Exe *obj)
    return exe->data;
 }
 
+/**
+ * @brief Sets the user data associated with an Ecore_Exe object.
+ *
+ * This function allows changing the user data pointer associated with an
+ * Ecore_Exe instance after it has been created.
+ *
+ * @param obj The Ecore_Exe object.
+ * @param data The new user data pointer to associate.
+ * @return The previously associated user data pointer.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI void *
 ecore_exe_data_set(Ecore_Exe *obj,
                    void      *data)
@@ -259,6 +448,15 @@ ecore_exe_data_set(Ecore_Exe *obj,
    return ret;
 }
 
+/**
+ * @brief Gets the flags used to start the Ecore_Exe.
+ *
+ * These are the flags originally passed to ecore_exe_pipe_run().
+ *
+ * @param obj The Ecore_Exe object.
+ * @return The Ecore_Exe_Flags used for this instance.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI Ecore_Exe_Flags
 ecore_exe_flags_get(const Ecore_Exe *obj)
 {
@@ -268,12 +466,28 @@ ecore_exe_flags_get(const Ecore_Exe *obj)
    return exe->flags;
 }
 
+/**
+ * @brief Pauses a running Ecore_Exe process.
+ *
+ * This typically sends a SIGSTOP signal on POSIX systems.
+ *
+ * @param obj The Ecore_Exe object.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI void
 ecore_exe_pause(Ecore_Exe *obj)
 {
    efl_control_suspend_set(obj, EINA_TRUE);
 }
 
+/**
+ * @brief Resumes a paused Ecore_Exe process.
+ *
+ * This typically sends a SIGCONT signal on POSIX systems.
+ *
+ * @param obj The Ecore_Exe object.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI void
 ecore_exe_continue(Ecore_Exe *obj)
 {
@@ -288,6 +502,12 @@ _ecore_exe_efl_control_suspend_set(Eo *obj EINA_UNUSED, Ecore_Exe_Data *exe, Ein
    else _impl_ecore_exe_continue(obj, exe);
 }
 
+/**
+ * @brief Sends an interrupt signal (SIGINT) to the Ecore_Exe process.
+ *
+ * @param obj The Ecore_Exe object.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI void
 ecore_exe_interrupt(Ecore_Exe *obj)
 {
@@ -297,6 +517,12 @@ ecore_exe_interrupt(Ecore_Exe *obj)
    _impl_ecore_exe_interrupt(obj, exe);
 }
 
+/**
+ * @brief Sends a quit signal (SIGQUIT) to the Ecore_Exe process.
+ *
+ * @param obj The Ecore_Exe object.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI void
 ecore_exe_quit(Ecore_Exe *obj)
 {
@@ -306,6 +532,14 @@ ecore_exe_quit(Ecore_Exe *obj)
    _impl_ecore_exe_quit(obj, exe);
 }
 
+/**
+ * @brief Sends a terminate signal (SIGTERM) to the Ecore_Exe process.
+ *
+ * This is generally a polite request for the process to exit.
+ *
+ * @param obj The Ecore_Exe object.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI void
 ecore_exe_terminate(Ecore_Exe *obj)
 {
@@ -315,6 +549,14 @@ ecore_exe_terminate(Ecore_Exe *obj)
    _impl_ecore_exe_terminate(obj, exe);
 }
 
+/**
+ * @brief Sends a kill signal (SIGKILL) to the Ecore_Exe process.
+ *
+ * This is a forceful termination of the process.
+ *
+ * @param obj The Ecore_Exe object.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI void
 ecore_exe_kill(Ecore_Exe *obj)
 {
@@ -324,6 +566,13 @@ ecore_exe_kill(Ecore_Exe *obj)
    _impl_ecore_exe_kill(obj, exe);
 }
 
+/**
+ * @brief Sends a specific signal to the Ecore_Exe process.
+ *
+ * @param obj The Ecore_Exe object.
+ * @param num The signal number to send (e.g., SIGUSR1, SIGUSR2).
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI void
 ecore_exe_signal(Ecore_Exe *obj,
                  int        num)
@@ -334,6 +583,12 @@ ecore_exe_signal(Ecore_Exe *obj,
    _impl_ecore_exe_signal(obj, exe, num);
 }
 
+/**
+ * @brief Sends a hangup signal (SIGHUP) to the Ecore_Exe process.
+ *
+ * @param obj The Ecore_Exe object.
+ * @ingroup Ecore_Exe_Group
+ */
 EAPI void
 ecore_exe_hup(Ecore_Exe *obj)
 {
@@ -343,6 +598,15 @@ ecore_exe_hup(Ecore_Exe *obj)
    _impl_ecore_exe_hup(obj, exe);
 }
 
+/**
+ * @internal
+ * @brief Initializes the Ecore_Exe subsystem.
+ *
+ * This function sets up the event types used by Ecore_Exe and performs
+ * any platform-specific initialization (like creating a Job Object on Windows
+ * to manage child processes).
+ * It is called by ecore_init().
+ */
 void
 _ecore_exe_init(void)
 {
@@ -367,6 +631,15 @@ _ecore_exe_init(void)
    ECORE_EXE_EVENT_ERROR = ecore_event_type_new();
 }
 
+/**
+ * @internal
+ * @brief Shuts down the Ecore_Exe subsystem.
+ *
+ * This function frees any running Ecore_Exe instances, flushes associated
+ * event types, and performs platform-specific cleanup (like closing the
+ * Windows Job Object).
+ * It is called by ecore_shutdown().
+ */
 void
 _ecore_exe_shutdown(void)
 {
@@ -388,6 +661,13 @@ _ecore_exe_shutdown(void)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Finds an Ecore_Exe instance by its process ID (PID).
+ *
+ * @param pid The process ID to search for.
+ * @return The Ecore_Exe object if found, @c NULL otherwise.
+ */
 Ecore_Exe *
 _ecore_exe_find(pid_t pid)
 {
@@ -403,6 +683,14 @@ _ecore_exe_find(pid_t pid)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Allocates and initializes a new Ecore_Exe_Event_Del structure.
+ *
+ * This structure is used for ECORE_EXE_EVENT_DEL events.
+ *
+ * @return A pointer to the newly allocated Ecore_Exe_Event_Del structure.
+ */
 void *
 _ecore_exe_event_del_new(void)
 {
@@ -410,6 +698,17 @@ _ecore_exe_event_del_new(void)
    return e;
 }
 
+/**
+ * @internal
+ * @brief Frees an Ecore_Exe_Event_Del structure.
+ *
+ * If the event structure contains a reference to an Ecore_Exe object
+ * (e->exe), that object is also freed. This is typically used as the
+ * free function for ECORE_EXE_EVENT_DEL events.
+ *
+ * @param data User data (unused).
+ * @param ev Pointer to the Ecore_Exe_Event_Del structure to free.
+ */
 void
 _ecore_exe_event_del_free(void *data EINA_UNUSED,
                           void *ev)
@@ -419,6 +718,17 @@ _ecore_exe_event_del_free(void *data EINA_UNUSED,
    free(e);
 }
 
+/**
+ * @internal
+ * @brief Frees an Ecore_Exe_Event_Data structure.
+ *
+ * This function is a wrapper around ecore_exe_event_data_free() and is
+ * typically used as the free function for ECORE_EXE_EVENT_DATA and
+ * ECORE_EXE_EVENT_ERROR events.
+ *
+ * @param data User data (unused).
+ * @param ev Pointer to the Ecore_Exe_Event_Data structure to free.
+ */
 void
 _ecore_exe_event_exe_data_free(void *data EINA_UNUSED,
                                void *ev)
@@ -427,6 +737,14 @@ _ecore_exe_event_exe_data_free(void *data EINA_UNUSED,
    ecore_exe_event_data_free(e);
 }
 
+/**
+ * @internal
+ * @brief Allocates and initializes a new Ecore_Exe_Event_Add structure.
+ *
+ * This structure is used for ECORE_EXE_EVENT_ADD events.
+ *
+ * @return A pointer to the newly allocated Ecore_Exe_Event_Add structure.
+ */
 Ecore_Exe_Event_Add *
 _ecore_exe_event_add_new(void)
 {
@@ -434,6 +752,15 @@ _ecore_exe_event_add_new(void)
    return e;
 }
 
+/**
+ * @internal
+ * @brief Frees an Ecore_Exe_Event_Add structure.
+ *
+ * This is typically used as the free function for ECORE_EXE_EVENT_ADD events.
+ *
+ * @param data User data (unused).
+ * @param ev Pointer to the Ecore_Exe_Event_Add structure to free.
+ */
 void
 _ecore_exe_event_add_free(void *data EINA_UNUSED,
                           void *ev)

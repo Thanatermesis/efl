@@ -10,15 +10,23 @@
 
 extern FILE *efreetd_log_file;
 
-static int init = 0;
-static Ecore_Ipc_Server *ipc = NULL;
-static Ecore_Event_Handler *hnd_add = NULL;
-static Ecore_Event_Handler *hnd_del = NULL;
-static Ecore_Event_Handler *hnd_data = NULL;
-static int clients = 0;
-static Ecore_Timer *quit_timer_start = NULL;
-static Ecore_Timer *quit_timer = NULL;
+static int init = 0; /**< Initialization counter for IPC. */
+static Ecore_Ipc_Server *ipc = NULL; /**< The Ecore IPC server instance. */
+static Ecore_Event_Handler *hnd_add = NULL; /**< Event handler for client connect. */
+static Ecore_Event_Handler *hnd_del = NULL; /**< Event handler for client disconnect. */
+static Ecore_Event_Handler *hnd_data = NULL; /**< Event handler for client data. */
+static int clients = 0; /**< Number of currently connected clients. */
+static Ecore_Timer *quit_timer_start = NULL; /**< Timer to start the quit countdown when no clients are initially connected. */
+static Ecore_Timer *quit_timer = NULL; /**< Timer to quit efreetd when no clients are connected for a period. */
 
+/**
+ * @brief Callback function for the quit timer.
+ *
+ * This function is called when the quit_timer expires, indicating that
+ * efreetd should shut down due to inactivity.
+ * @param data Unused.
+ * @return EINA_FALSE to stop the timer.
+ */
 static Eina_Bool
 _cb_quit_timer(void *data EINA_UNUSED)
 {
@@ -27,6 +35,14 @@ _cb_quit_timer(void *data EINA_UNUSED)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Callback function for the initial quit timer.
+ *
+ * This function is called when efreetd starts and no clients connect
+ * within a certain timeframe. It then starts the final quit_timer.
+ * @param data Unused.
+ * @return EINA_FALSE to stop the timer.
+ */
 static Eina_Bool
 _cb_quit_timer_start(void *data EINA_UNUSED)
 {
@@ -36,6 +52,14 @@ _cb_quit_timer_start(void *data EINA_UNUSED)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Broadcasts a message to all connected IPC clients.
+ * @param svr The IPC server.
+ * @param major The major opcode of the message.
+ * @param minor The minor opcode of the message.
+ * @param data The data payload of the message.
+ * @param size The size of the data payload.
+ */
 static void
 _broadcast(Ecore_Ipc_Server *svr, int major, int minor, void *data, int size)
 {
@@ -51,6 +75,13 @@ _broadcast(Ecore_Ipc_Server *svr, int major, int minor, void *data, int size)
      }
 }
 
+/**
+ * @brief Parses a single null-terminated string from raw data.
+ * @param data Pointer to the raw data.
+ * @param size Size of the raw data.
+ * @return A newly allocated string, or NULL on failure. The caller must free the returned string.
+ * @note The input data is expected to contain a single string.
+ */
 static char *
 _parse_str(void *data, int size)
 {
@@ -61,6 +92,16 @@ _parse_str(void *data, int size)
    return str;
 }
 
+/**
+ * @brief Parses a list of null-terminated strings from raw data.
+ *
+ * The raw data is expected to be a sequence of null-terminated strings,
+ * concatenated together. For example: "string1\0string2\0string3\0".
+ * @param data Pointer to the raw data.
+ * @param size Size of the raw data.
+ * @return A list (Eina_List) of newly allocated strings, or NULL on failure.
+ *         The caller must free the list and its string elements.
+ */
 static Eina_List *
 _parse_strs(void *data, int size)
 {
@@ -97,11 +138,27 @@ _parse_strs(void *data, int size)
    return list;
 }
 
+/**
+ * @def IPC_HEAD(_type)
+ * @brief Macro to boilerplate check if an IPC event is for our server.
+ *
+ * This macro retrieves the event structure and checks if the client's
+ * server matches the current IPC server instance. If not, it passes
+ * the event on.
+ * @param _type The type of the Ecore_Ipc_Event_Client (e.g., Add, Del, Data).
+ */
 #define IPC_HEAD(_type) \
    Ecore_Ipc_Event_Client_##_type *e = event; \
    if (ecore_ipc_client_server_get(e->client) != ipc) \
      return ECORE_CALLBACK_PASS_ON
 
+/**
+ * @brief Callback for when a new client connects to the IPC server.
+ * @param data Unused.
+ * @param type Unused.
+ * @param event The Ecore_Ipc_Event_Client_Add event data.
+ * @return ECORE_CALLBACK_DONE to indicate the event was handled.
+ */
 static Eina_Bool
 _cb_client_add(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -123,6 +180,13 @@ _cb_client_add(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_DONE;
 }
 
+/**
+ * @brief Callback for when a client disconnects from the IPC server.
+ * @param data Unused.
+ * @param type Unused.
+ * @param event The Ecore_Ipc_Event_Client_Del event data.
+ * @return ECORE_CALLBACK_DONE to indicate the event was handled.
+ */
 static Eina_Bool
 _cb_client_del(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -139,6 +203,23 @@ _cb_client_del(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_DONE;
 }
 
+/**
+ * @brief Callback for when a client sends data to the IPC server.
+ *
+ * This function handles various client requests based on the major opcode
+ * in the event data.
+ * - Major 1: Register language. Client sends its LANG setting.
+ *            Server replies with whether the desktop cache exists.
+ * - Major 2: Add desktop directories. Client sends a list of directories.
+ * - Major 3: Build desktop cache. Client may send its LANG setting.
+ * - Major 4: Add icon directories. Client sends a list of directories.
+ * - Major 5: Add icon extensions. Client sends a list of extensions.
+ *
+ * @param data Unused.
+ * @param type Unused.
+ * @param event The Ecore_Ipc_Event_Client_Data event data.
+ * @return ECORE_CALLBACK_DONE to indicate the event was handled.
+ */
 static Eina_Bool
 _cb_client_data(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {

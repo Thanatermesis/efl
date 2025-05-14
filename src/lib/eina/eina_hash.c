@@ -148,6 +148,17 @@ struct _Eina_Hash_Each
                        + (uint32_t)(((const uint8_t *)(d))[0]))
 #endif
 
+/**
+ * @internal
+ * @brief Compare a hash head with a given hash value.
+ *
+ * @param hash_head The hash head to compare.
+ * @param hash The hash value to compare against.
+ * @return The difference between the hash head's hash and the given hash.
+ *
+ * This function is used as a callback for rbtree lookups to find a
+ * specific hash head within a bucket.
+ */
 static inline int
 _eina_hash_hash_rbtree_cmp_hash(const Eina_Hash_Head *hash_head,
                                 const int *hash,
@@ -157,6 +168,17 @@ _eina_hash_hash_rbtree_cmp_hash(const Eina_Hash_Head *hash_head,
    return hash_head->hash - *hash;
 }
 
+/**
+ * @internal
+ * @brief Compare two hash heads based on their hash values.
+ *
+ * @param left The left hash head.
+ * @param right The right hash head.
+ * @return EINA_RBTREE_LEFT if left < right, EINA_RBTREE_RIGHT otherwise.
+ *
+ * This function is used as a callback for rbtree node comparisons when
+ * inserting or organizing hash heads within a bucket.
+ */
 static Eina_Rbtree_Direction
 _eina_hash_hash_rbtree_cmp_node(const Eina_Hash_Head *left,
                                 const Eina_Hash_Head *right,
@@ -168,6 +190,23 @@ _eina_hash_hash_rbtree_cmp_node(const Eina_Hash_Head *left,
    return EINA_RBTREE_RIGHT;
 }
 
+/**
+ * @internal
+ * @brief Compare a hash element with a key/data tuple.
+ *
+ * @param hash_element The hash element to compare.
+ * @param tuple The key/data tuple to compare against.
+ * @param key_length Unused.
+ * @param cmp The key comparison function.
+ * @return An integer less than, equal to, or greater than zero if the
+ *         hash_element's key is found, respectively, to be less than, to
+ *         match, or be greater than the tuple's key.
+ *
+ * This function is used for rbtree lookups within a hash head to find an
+ * element that matches a given key. If the tuple also contains a data
+ * pointer, it will further refine the search to match that specific data
+ * pointer, allowing for multiple elements with the same key.
+ */
 static inline int
 _eina_hash_key_rbtree_cmp_key_data(const Eina_Hash_Element *hash_element,
                                    const Eina_Hash_Tuple *tuple,
@@ -187,6 +226,18 @@ _eina_hash_key_rbtree_cmp_key_data(const Eina_Hash_Element *hash_element,
    return result;
 }
 
+/**
+ * @internal
+ * @brief Compare two hash elements based on their keys.
+ *
+ * @param left The left hash element.
+ * @param right The right hash element.
+ * @param cmp The key comparison function.
+ * @return EINA_RBTREE_LEFT if left < right, EINA_RBTREE_RIGHT otherwise.
+ *
+ * This function is used for rbtree node comparisons when inserting or
+ * organizing hash elements within a hash head's rbtree.
+ */
 static Eina_Rbtree_Direction
 _eina_hash_key_rbtree_cmp_node(const Eina_Hash_Element *left,
                                const Eina_Hash_Element *right,
@@ -203,6 +254,25 @@ _eina_hash_key_rbtree_cmp_node(const Eina_Hash_Element *left,
    return EINA_RBTREE_RIGHT;
 }
 
+/**
+ * @internal
+ * @brief Core function to add a new key/data pair to the hash table.
+ *
+ * @param hash The hash table.
+ * @param key The key to add.
+ * @param key_length The length of the key.
+ * @param alloc_length The length of the key to allocate and copy. If 0,
+ *        the key pointer is used directly (direct add).
+ * @param key_hash The pre-calculated hash of the key.
+ * @param data The data associated with the key.
+ * @return #EINA_TRUE on success, #EINA_FALSE on failure.
+ *
+ * This function handles the logic of finding the correct bucket, creating
+ * a bucket if it doesn't exist, finding or creating a hash head for the
+ * given hash value, and finally creating and inserting the hash element
+ * into the head's rbtree. It also handles allocation for the key if
+ * alloc_length > 0.
+ */
 static inline Eina_Bool
 eina_hash_add_alloc_by_hash(Eina_Hash *hash,
                             const void *key, int key_length, int alloc_length,
@@ -289,6 +359,23 @@ on_error:
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief A callback for iterating through an rbtree of hash heads to find
+ *        an element by its data pointer.
+ *
+ * @param container Unused.
+ * @param hash_head The current hash head being processed.
+ * @param data A structure containing the data to search for and to store
+ *        the results.
+ * @return #EINA_TRUE to continue iteration, #EINA_FALSE to stop.
+ *
+ * This function iterates through all elements in the given hash_head's
+ * rbtree, comparing their data pointers with the one provided in the
+ * `Eina_Hash_Each` structure. If a match is found, it stores the
+ * element and its head in the structure and returns #EINA_FALSE to
+ * stop the search.
+ */
 static Eina_Bool
 _eina_hash_rbtree_each(EINA_UNUSED const Eina_Rbtree *container,
                        const Eina_Hash_Head *hash_head,
@@ -314,6 +401,20 @@ _eina_hash_rbtree_each(EINA_UNUSED const Eina_Rbtree *container,
    return found;
 }
 
+/**
+ * @internal
+ * @brief Finds a hash element using a pre-calculated hash.
+ *
+ * @param hash The hash table to search in.
+ * @param tuple A tuple containing the key and optionally data to find.
+ * @param key_hash The pre-calculated hash of the key.
+ * @param[out] hash_head A pointer to store the found hash head.
+ * @return The found hash element, or @c NULL if not found.
+ *
+ * This function performs the lookup. It first finds the bucket, then
+ * the hash head within the bucket's rbtree, and finally the element
+ * within the hash head's rbtree.
+ */
 static inline Eina_Hash_Element *
 _eina_hash_find_by_hash(const Eina_Hash *hash,
                         Eina_Hash_Tuple *tuple,
@@ -348,6 +449,20 @@ _eina_hash_find_by_hash(const Eina_Hash *hash,
    return hash_element;
 }
 
+/**
+ * @internal
+ * @brief Finds a hash element by its data pointer.
+ *
+ * @param hash The hash table.
+ * @param data The data pointer to search for.
+ * @param[out] key_hash A pointer to store the bucket index.
+ * @param[out] hash_head A pointer to store the found hash head.
+ * @return The found hash element, or @c NULL if not found.
+ *
+ * This is a slow operation as it requires iterating through all buckets
+ * and potentially all elements in the hash table until a match is found.
+ * It uses `_eina_hash_rbtree_each` as a callback for the iteration.
+ */
 static inline Eina_Hash_Element *
 _eina_hash_find_by_data(const Eina_Hash *hash,
                         const void *data,
@@ -384,6 +499,16 @@ _eina_hash_find_by_data(const Eina_Hash *hash,
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Frees a hash element.
+ *
+ * @param hash_element The element to free.
+ * @param hash The hash table it belongs to.
+ *
+ * If a data free callback is set on the hash table, it is called with
+ * the element's data. Then, the element itself is freed.
+ */
 static void
 _eina_hash_el_free(Eina_Hash_Element *hash_element, Eina_Hash *hash)
 {
@@ -393,6 +518,17 @@ _eina_hash_el_free(Eina_Hash_Element *hash_element, Eina_Hash *hash)
    free(hash_element);
 }
 
+/**
+ * @internal
+ * @brief Frees a hash head and all elements within it.
+ *
+ * @param hash_head The hash head to free.
+ * @param hash The hash table it belongs to.
+ *
+ * This function recursively deletes the rbtree of elements within the
+ * head, using `_eina_hash_el_free` for each element. After the rbtree is
+ * empty, it frees the hash head itself.
+ */
 static void
 _eina_hash_head_free(Eina_Hash_Head *hash_head, Eina_Hash *hash)
 {
@@ -400,6 +536,21 @@ _eina_hash_head_free(Eina_Hash_Head *hash_head, Eina_Hash *hash)
    free(hash_head);
 }
 
+/**
+ * @internal
+ * @brief Deletes a specific hash element from the table.
+ *
+ * @param hash The hash table.
+ * @param hash_element The element to delete.
+ * @param hash_head The head containing the element.
+ * @param key_hash The hash of the element's key.
+ * @return #EINA_TRUE on success.
+ *
+ * This function removes the element from its head's rbtree. If the head
+ * becomes empty, the head is removed from its bucket's rbtree. If the
+ * entire hash becomes empty, the bucket array is freed. Finally, it
+ * frees the element using `_eina_hash_el_free`.
+ */
 static Eina_Bool
 _eina_hash_del_by_hash_el(Eina_Hash *hash,
                           Eina_Hash_Element *hash_element,
@@ -435,6 +586,20 @@ _eina_hash_del_by_hash_el(Eina_Hash *hash,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Deletes an element from the hash table by its key and hash.
+ *
+ * @param hash The hash table.
+ * @param key The key of the element to delete.
+ * @param key_length The length of the key.
+ * @param key_hash The pre-calculated hash of the key.
+ * @param data The specific data pointer to delete (if not NULL).
+ * @return #EINA_TRUE on success, #EINA_FALSE if the element is not found.
+ *
+ * This function first finds the element using `_eina_hash_find_by_hash`
+ * and then deletes it using `_eina_hash_del_by_hash_el`.
+ */
 static Eina_Bool
 _eina_hash_del_by_key_hash(Eina_Hash *hash,
                            const void *key,
@@ -464,6 +629,18 @@ _eina_hash_del_by_key_hash(Eina_Hash *hash,
    return _eina_hash_del_by_hash_el(hash, hash_element, hash_head, key_hash);
 }
 
+/**
+ * @internal
+ * @brief Computes the length and hash of a key.
+ *
+ * @param hash The hash table, containing the callbacks.
+ * @param key The key to process.
+ * @param[out] key_length Pointer to store the key length.
+ * @param[out] key_hash Pointer to store the computed hash.
+ *
+ * This helper function calls the user-provided callbacks to get the
+ * length and hash value for a given key.
+ */
 static void
 _eina_hash_compute(const Eina_Hash *hash, const void *key, int *key_length, int *key_hash)
 {
@@ -471,6 +648,18 @@ _eina_hash_compute(const Eina_Hash *hash, const void *key, int *key_length, int 
    *key_hash = hash->key_hash_cb(key, *key_length);
 }
 
+/**
+ * @internal
+ * @brief Deletes an element from the hash table by its key.
+ *
+ * @param hash The hash table.
+ * @param key The key of the element to delete.
+ * @param data The specific data pointer to delete (if not NULL).
+ * @return #EINA_TRUE on success, #EINA_FALSE if not found.
+ *
+ * This function computes the key's hash and then calls the internal
+ * delete function.
+ */
 static Eina_Bool
 _eina_hash_del_by_key(Eina_Hash *hash, const void *key, const void *data)
 {
@@ -487,12 +676,29 @@ _eina_hash_del_by_key(Eina_Hash *hash, const void *key, const void *data)
    return _eina_hash_del_by_key_hash(hash, key, key_length, key_hash, data);
 }
 
+/**
+ * @internal
+ * @brief Hash function for stringshared keys.
+ *
+ * @param key The stringshared key (a pointer).
+ * @param key_length Unused.
+ * @return The hash value of the pointer.
+ *
+ * Since stringshared strings with the same content have the same pointer,
+ * we can hash the pointer value itself for efficiency.
+ */
 static int
 _eina_stringshared_hash(const void *key, int key_length EINA_UNUSED)
 {
    return eina_hash_superfast((const void*) &key, sizeof (void*));
 }
 
+/**
+ * @internal
+ * @brief Key length function for standard C strings.
+ * @param key The string key.
+ * @return The length of the string, including the null terminator.
+ */
 static unsigned int
 _eina_string_key_length(const char *key)
 {
@@ -502,6 +708,19 @@ _eina_string_key_length(const char *key)
    return (int)strlen(key) + 1;
 }
 
+/**
+ * @internal
+ * @brief Key comparison function for standard C strings.
+ *
+ * @param key1 The first key.
+ * @param key1_length The first key's length.
+ * @param key2 The second key.
+ * @param key2_length The second key's length.
+ * @return An integer less than, equal to, or greater than zero.
+ *
+ * It first compares lengths for a quick check, then uses `strcmp` for
+ * a full comparison if lengths are equal.
+ */
 static int
 _eina_string_key_cmp(const char *key1, int key1_length,
                      const char *key2, int key2_length)
@@ -513,6 +732,23 @@ _eina_string_key_cmp(const char *key1, int key1_length,
    return strcmp(key1, key2);
 }
 
+/**
+ * @internal
+ * @brief Key comparison function for stringshared keys.
+ *
+ * @param key1 The first key (pointer).
+ * @param key1_length Unused.
+ * @param key2 The second key (pointer).
+ * @param key2_length Unused.
+ * @return 0 if pointers are equal, 1 if key1 > key2, -1 otherwise.
+ *
+ * This function compares pointer values directly, not the string content.
+ * This is a valid and fast approach for stringshared strings because
+ * identical strings are guaranteed to have the same pointer address.
+ *
+ * Note: A simple subtraction `key1 - key2` is not portable as the
+ * difference between two pointers might not fit in an `int`.
+ */
 static int
 _eina_stringshared_key_cmp(const char *key1, EINA_UNUSED int key1_length,
                            const char *key2, EINA_UNUSED int key2_length)
@@ -535,12 +771,27 @@ _eina_stringshared_key_cmp(const char *key1, EINA_UNUSED int key1_length,
 // frankly as good as anything. :) (this is only within the bucket too)
 }
 
+/**
+ * @internal
+ * @brief Key length function for 32-bit integer keys.
+ * @param key Unused.
+ * @return Always returns 4.
+ */
 static unsigned int
 _eina_int32_key_length(EINA_UNUSED const uint32_t *key)
 {
    return 4;
 }
 
+/**
+ * @internal
+ * @brief Key comparison function for 32-bit integer keys.
+ * @param key1 The first key.
+ * @param key1_length Unused.
+ * @param key2 The second key.
+ * @param key2_length Unused.
+ * @return 0 if equal, 1 if key1 > key2, -1 otherwise.
+ */
 static int
 _eina_int32_key_cmp(const uint32_t *key1, EINA_UNUSED int key1_length,
                     const uint32_t *key2, EINA_UNUSED int key2_length)
@@ -550,12 +801,27 @@ _eina_int32_key_cmp(const uint32_t *key1, EINA_UNUSED int key1_length,
    return -1;
 }
 
+/**
+ * @internal
+ * @brief Key length function for 64-bit integer keys.
+ * @param key Unused.
+ * @return Always returns `sizeof(int64_t)`.
+ */
 static unsigned int
 _eina_int64_key_length(EINA_UNUSED const uint64_t *key)
 {
    return sizeof(int64_t);
 }
 
+/**
+ * @internal
+ * @brief Key comparison function for 64-bit integer keys.
+ * @param key1 The first key.
+ * @param key1_length Unused.
+ * @param key2 The second key.
+ * @param key2_length Unused.
+ * @return 0 if equal, 1 if key1 > key2, -1 otherwise.
+ */
 static int
 _eina_int64_key_cmp(const uint64_t *key1, EINA_UNUSED int key1_length,
                     const uint64_t *key2, EINA_UNUSED int key2_length)
@@ -565,6 +831,20 @@ _eina_int64_key_cmp(const uint64_t *key1, EINA_UNUSED int key1_length,
    return -1;
 }
 
+/**
+ * @internal
+ * @brief Wrapper callback used by `eina_hash_foreach`.
+ *
+ * @param hash The hash table being iterated.
+ * @param data The current hash tuple (key/data pair).
+ * @param fdata A structure containing the user's callback and data.
+ * @return The boolean result from the user's callback.
+ *
+ * This function acts as an adapter. `eina_iterator_foreach` provides
+ * an `Eina_Hash_Tuple`, but the public `eina_hash_foreach` API expects
+ * separate key and data arguments. This function unpacks the tuple
+ * and calls the user's function with the expected signature.
+ */
 static Eina_Bool
 _eina_foreach_cb(const Eina_Hash *hash,
                  Eina_Hash_Tuple *data,
@@ -576,6 +856,12 @@ _eina_foreach_cb(const Eina_Hash *hash,
                     (void *)fdata->fdata);
 }
 
+/**
+ * @internal
+ * @brief Gets the data from the current iterator position.
+ * @param it The hash iterator.
+ * @return The data pointer, or @c NULL if at the end.
+ */
 static void *
 _eina_hash_iterator_data_get_content(Eina_Iterator_Hash *it)
 {
@@ -591,6 +877,12 @@ _eina_hash_iterator_data_get_content(Eina_Iterator_Hash *it)
    return stuff->tuple.data;
 }
 
+/**
+ * @internal
+ * @brief Gets the key from the current iterator position.
+ * @param it The hash iterator.
+ * @return The key pointer, or @c NULL if at the end.
+ */
 static void *
 _eina_hash_iterator_key_get_content(Eina_Iterator_Hash *it)
 {
@@ -606,6 +898,12 @@ _eina_hash_iterator_key_get_content(Eina_Iterator_Hash *it)
    return (void *)stuff->tuple.key;
 }
 
+/**
+ * @internal
+ * @brief Gets the key/data tuple from the current iterator position.
+ * @param it The hash iterator.
+ * @return A pointer to the `Eina_Hash_Tuple`, or @c NULL if at the end.
+ */
 static Eina_Hash_Tuple *
 _eina_hash_iterator_tuple_get_content(Eina_Iterator_Hash *it)
 {
@@ -621,6 +919,21 @@ _eina_hash_iterator_tuple_get_content(Eina_Iterator_Hash *it)
    return &stuff->tuple;
 }
 
+/**
+ * @internal
+ * @brief Advances the hash iterator to the next element.
+ *
+ * @param it The hash iterator.
+ * @param[out] data A pointer to store the content of the next element.
+ * @return #EINA_TRUE if there is a next element, #EINA_FALSE otherwise.
+ *
+ * This function implements the core logic for hash table iteration. It
+ * traverses the main bucket array sequentially. For each bucket, it
+ * iterates through the rbtree of hash heads, and for each head, it
+ * iterates through the rbtree of hash elements. It maintains state
+ * in the `Eina_Iterator_Hash` struct to resume iteration from the correct
+ * position on the next call.
+ */
 static Eina_Bool
 _eina_hash_iterator_next(Eina_Iterator_Hash *it, void **data)
 {
@@ -697,6 +1010,12 @@ _eina_hash_iterator_next(Eina_Iterator_Hash *it, void **data)
    return ok;
 }
 
+/**
+ * @internal
+ * @brief Gets the container (the hash table) from an iterator.
+ * @param it The hash iterator.
+ * @return A pointer to the hash table.
+ */
 static void *
 _eina_hash_iterator_get_container(Eina_Iterator_Hash *it)
 {
@@ -704,6 +1023,14 @@ _eina_hash_iterator_get_container(Eina_Iterator_Hash *it)
    return (void *)it->hash;
 }
 
+/**
+ * @internal
+ * @brief Frees a hash iterator.
+ * @param it The hash iterator to free.
+ *
+ * This function frees the internal iterators for buckets and elements
+ * if they are active, and then frees the iterator structure itself.
+ */
 static void
 _eina_hash_iterator_free(Eina_Iterator_Hash *it)
 {

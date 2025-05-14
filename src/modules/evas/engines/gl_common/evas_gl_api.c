@@ -31,6 +31,16 @@ static void *_gles3_handle = NULL;
 static Evas_GL_API _gles3_api;
 //---------------------------------------//
 // API Debug Error Checking Code
+/**
+ * @brief Checks if a valid Evas_GL context is currently active.
+ *
+ * This is a debug helper function that verifies that a GL context is set
+ * before a GL call is made. It also checks if the context version is
+ * compatible (GLES 2.x or GLES 3.x). It prints a critical error
+ * message if the context is not set or has an invalid version.
+ *
+ * @param api The name of the API function being checked (for error reporting).
+ */
 static
 void _make_current_check(const char* api)
 {
@@ -44,6 +54,15 @@ void _make_current_check(const char* api)
      CRI("\e[1;33m%s\e[m: This API is being called with the wrong context (invalid version).", api);
 }
 
+/**
+ * @brief Checks if a GL call is made within the allowed direct rendering context.
+ *
+ * This debug helper verifies that a GL call is performed inside the pixel
+ * get callback when direct rendering is used. It prints a critical error
+ * if the call is made outside of this callback.
+ *
+ * @param api The name of the API function being checked (for error reporting).
+ */
 static
 void _direct_rendering_check(const char *api)
 {
@@ -62,6 +81,14 @@ void _direct_rendering_check(const char *api)
      }
 }
 
+/**
+ * @brief Entry point for debugging GL API calls.
+ *
+ * This function calls various check functions to ensure that the GL API
+ * is being used correctly in the current context.
+ *
+ * @param api The name of the API function being checked.
+ */
 static
 void _func_begin_debug(const char *api)
 {
@@ -72,6 +99,20 @@ void _func_begin_debug(const char *api)
 //-------------------------------------------------------------//
 // GL to GLES Compatibility Functions
 //-------------------------------------------------------------//
+/**
+ * @brief Wrapper for glBindFramebuffer to handle Evas GL specifics.
+ *
+ * This function intercepts calls to glBindFramebuffer to manage differences
+ * between direct rendering mode and rendering to an FBO.
+ * When `framebuffer` is 0 (the default framebuffer), this function redirects
+ * the binding to either the window's surface FBO (in indirect rendering) or
+ * to the actual framebuffer 0 (in direct rendering).
+ * It also handles partial rendering logic when switching between the default
+ * framebuffer and user-created FBOs in direct rendering mode.
+ *
+ * @param target The framebuffer target, e.g., GL_FRAMEBUFFER.
+ * @param framebuffer The ID of the framebuffer to bind.
+ */
 void
 _evgl_glBindFramebuffer(GLenum target, GLuint framebuffer)
 {
@@ -210,6 +251,14 @@ _evgl_glBindFramebuffer(GLenum target, GLuint framebuffer)
      }
 }
 
+/**
+ * @brief Compatibility wrapper for glClearDepthf.
+ *
+ * Provides glClearDepthf functionality on platforms that only have glClearDepth.
+ * On GLES, it calls glClearDepthf directly. On desktop GL, it calls glClearDepth.
+ *
+ * @param depth The depth value to clear to.
+ */
 void
 _evgl_glClearDepthf(GLclampf depth)
 {
@@ -220,6 +269,17 @@ _evgl_glClearDepthf(GLclampf depth)
 #endif
 }
 
+/**
+ * @brief Wrapper for glDeleteFramebuffers to handle current FBO unbinding.
+ *
+ * Before deleting framebuffers, this function checks if any of the framebuffers
+ * to be deleted is currently bound. If so, it unbinds it and binds the
+ * default Evas GL surface FBO to avoid leaving a deleted FBO bound.
+ * This is particularly important when not in direct rendering mode.
+ *
+ * @param n The number of framebuffers to delete.
+ * @param framebuffers An array of framebuffer IDs to be deleted.
+ */
 void
 _evgl_glDeleteFramebuffers(GLsizei n, const GLuint* framebuffers)
 {
@@ -275,6 +335,15 @@ _evgl_glDeleteFramebuffers(GLsizei n, const GLuint* framebuffers)
    glDeleteFramebuffers(n, framebuffers);
 }
 
+/**
+ * @brief Compatibility wrapper for glDepthRangef.
+ *
+ * Provides glDepthRangef functionality on platforms that only have glDepthRange.
+ * On GLES, it calls glDepthRangef directly. On desktop GL, it calls glDepthRange.
+ *
+ * @param zNear The near clipping plane.
+ * @param zFar The far clipping plane.
+ */
 void
 _evgl_glDepthRangef(GLclampf zNear, GLclampf zFar)
 {
@@ -285,6 +354,17 @@ _evgl_glDepthRangef(GLclampf zNear, GLclampf zFar)
 #endif
 }
 
+/**
+ * @brief Wrapper for glGetError to include Evas GL's internal error state.
+ *
+ * This function first checks if an error has been set internally within Evas GL.
+ * If so, it returns that error and clears the internal error state. Otherwise,
+ * it calls the native glGetError(). This ensures that both Evas GL-specific
+ * errors and native GL errors are reported through a single interface.
+ * Once an error is reported, both Evas GL and native GL error states are cleared.
+ *
+ * @return The GL error code. Returns GL_NO_ERROR if no error has occurred.
+ */
 GLenum
 _evgl_glGetError(void)
 {
@@ -313,6 +393,22 @@ _evgl_glGetError(void)
      }
 }
 
+/**
+ * @brief Provides glGetShaderPrecisionFormat functionality.
+ *
+ * On GLES platforms, this function is a direct wrapper around the native
+ * glGetShaderPrecisionFormat. On desktop GL, where this function is not
+ * available, it provides a hardcoded implementation that returns typical
+ * values for mediump float precision.
+ *
+ * @param shadertype The type of shader (e.g., GL_VERTEX_SHADER).
+ * @param precisiontype The precision type (e.g., GL_MEDIUM_FLOAT).
+ * @param range Output array of 2 integers for the range of the precision.
+ *              `range[0]` = `floor(log2(FLT_MIN))`
+ *              `range[1]` = `floor(log2(FLT_MAX))`
+ * @param precision Output integer for the precision.
+ *                  `precision[0]` = `floor(-log2((1.0/16777218.0)))`
+ */
 void
 _evgl_glGetShaderPrecisionFormat(GLenum shadertype, GLenum precisiontype, GLint* range, GLint* precision)
 {
@@ -333,6 +429,19 @@ _evgl_glGetShaderPrecisionFormat(GLenum shadertype, GLenum precisiontype, GLint*
 #endif
 }
 
+/**
+ * @brief Wrapper for glShaderBinary.
+ *
+ * On GLES, this calls the native glShaderBinary. On other platforms (like
+ * desktop GL), it currently prints an error as binary shaders are not
+ * supported.
+ *
+ * @param n Number of shader objects.
+ * @param shaders Array of shader handles.
+ * @param binaryformat Format of the binary.
+ * @param binary Pointer to the binary data.
+ * @param length Length of the binary data.
+ */
 void
 _evgl_glShaderBinary(GLsizei n, const GLuint* shaders, GLenum binaryformat, const void* binary, GLsizei length)
 {
@@ -349,6 +458,12 @@ _evgl_glShaderBinary(GLsizei n, const GLuint* shaders, GLenum binaryformat, cons
 #endif
 }
 
+/**
+ * @brief Wrapper for glReleaseShaderCompiler.
+ *
+ * On GLES, this calls the native glReleaseShaderCompiler. On desktop GL,
+ * it is a no-op as there is no equivalent function.
+ */
 void
 _evgl_glReleaseShaderCompiler(void)
 {
@@ -366,6 +481,37 @@ _evgl_glReleaseShaderCompiler(void)
 // returns: imgc[4] (oc[4]) original image object dimension in gl coord
 // returns: objc[4] (nc[4]) tranformed  (x, y, width, heigth) in gl coord
 // returns: cc[4] cliped coordinate in original coordinate
+/**
+ * @brief Transforms coordinates from Evas canvas space to GL window space.
+ *
+ * This function is central to direct rendering. It converts coordinates
+ * and dimensions from the Evas object's coordinate system to the
+ * OpenGL coordinate system, which has its origin at the bottom-left.
+ * It takes into account window rotation and clipping rectangles.
+ *
+ * The output arrays are modified in-place to return the results.
+ * For example, `imgc` will contain `[x, y, width, height]`.
+ *
+ * @param win_w The width of the window.
+ * @param win_h The height of the window.
+ * @param rot The rotation angle of the canvas (0, 90, 180, 270).
+ * @param clip_image If true, the final coordinates are clipped against the image object's bounds.
+ * @param x The x-offset within the image object.
+ * @param y The y-offset within the image object.
+ * @param width The width of the area to transform.
+ * @param height The height of the area to transform.
+ * @param img_x The x-coordinate of the Evas image object on the canvas.
+ * @param img_y The y-coordinate of the Evas image object on the canvas.
+ * @param img_w The width of the Evas image object.
+ * @param img_h The height of the Evas image object.
+ * @param clip_x The x-coordinate of the clip rectangle.
+ * @param clip_y The y-coordinate of the clip rectangle.
+ * @param clip_w The width of the clip rectangle.
+ * @param clip_h The height of the clip rectangle.
+ * @param imgc Output array for the image object's GL coordinates. `[x, y, width, height]`
+ * @param objc Output array for the transformed sub-region's GL coordinates. `[x, y, width, height]`
+ * @param cc Output array for the clip rectangle's GL coordinates. `[x, y, width, height]`
+ */
 void
 compute_gl_coordinates(int win_w, int win_h, int rot, int clip_image,
                        int x, int y, int width, int height,
@@ -488,6 +634,19 @@ compute_gl_coordinates(int win_w, int win_h, int rot, int clip_image,
    //DBG( "\e[1;32m     Img[%d %d %d %d] Original [%d %d %d %d]  Transformed[%d %d %d %d]  Clip[%d %d %d %d] Clipped[%d %d %d %d] \e[m", img_x, img_y, img_w, img_h, imgc[0], imgc[1], imgc[2], imgc[3], objc[0], objc[1], objc[2], objc[3], clip[0], clip[1], clip[2], clip[3], cc[0], cc[1], cc[2], cc[3]);
 }
 
+/**
+ * @brief Wrapper for glClearColor for direct rendering.
+ *
+ * This function wraps glClearColor. When in direct rendering mode, it caches
+ * the clear color. This cached color is used by `_evgl_glClear` to implement
+ * special handling for transparent clears. In all cases, it calls the native
+ * glClearColor.
+ *
+ * @param red Red component of the clear color.
+ * @param green Green component of the clear color.
+ * @param blue Blue component of the clear color.
+ * @param alpha Alpha component of the clear color.
+ */
 static void
 _evgl_glClearColor(GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha)
 {
@@ -509,6 +668,24 @@ _evgl_glClearColor(GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha)
    glClearColor(red, green, blue, alpha);
 }
 
+/**
+ * @brief Wrapper for glClear with special handling for direct rendering.
+ *
+ * When in direct rendering mode and clearing the default framebuffer, this
+ * function implements several workarounds:
+ * 1. Skips clearing the color buffer if the clear color is fully transparent
+ *    black, to avoid erasing underlying Evas content.
+ * 2. Issues a warning for semi-transparent clears as they can have
+ *    unexpected results.
+ * 3. Sets up a scissor box to constrain the clear operation to the Evas
+ *    GL image object's area on the canvas. This is crucial for correct
+ *    rendering within Evas.
+ *
+ * If not in direct rendering mode, or if clearing an FBO, it behaves like a
+ * standard glClear call.
+ *
+ * @param mask Bitmask of buffers to clear (e.g., GL_COLOR_BUFFER_BIT).
+ */
 static void
 _evgl_glClear(GLbitfield mask)
 {
@@ -628,6 +805,19 @@ _evgl_glClear(GLbitfield mask)
      }
 }
 
+/**
+ * @brief Wrapper for glEnable, handling GL_SCISSOR_TEST for direct rendering.
+ *
+ * When enabling GL_SCISSOR_TEST in direct rendering mode (i.e., rendering to
+ * the default framebuffer), this function sets the scissor box to match the
+ * Evas GL image object's area on the canvas. This ensures that rendering is
+ * clipped correctly within the object's boundaries. It respects any
+ * user-defined scissor box set via `glScissor`.
+ *
+ * When rendering to an FBO, it manages the scissor state normally.
+ *
+ * @param cap The capability to enable (e.g., GL_SCISSOR_TEST).
+ */
 static void
 _evgl_glEnable(GLenum cap)
 {
@@ -702,6 +892,19 @@ _evgl_glEnable(GLenum cap)
    glEnable(cap);
 }
 
+/**
+ * @brief Wrapper for glDisable, handling GL_SCISSOR_TEST for direct rendering.
+ *
+ * When disabling GL_SCISSOR_TEST in direct rendering mode, instead of truly
+ * disabling it, this function resets the scissor box to the full area of the
+ * Evas GL image object. This is a key part of the direct rendering illusion,
+ * as it prevents the GL content from "leaking" outside its designated object
+ * area on the Evas canvas.
+ *
+ * When rendering to an FBO, it correctly disables the scissor test.
+ *
+ * @param cap The capability to disable (e.g., GL_SCISSOR_TEST).
+ */
 static void
 _evgl_glDisable(GLenum cap)
 {
@@ -753,6 +956,18 @@ _evgl_glDisable(GLenum cap)
    glDisable(cap);
 }
 
+/**
+ * @brief Wrapper for glFramebufferParameteri to protect the default framebuffer.
+ *
+ * This function prevents calls to glFramebufferParameteri on the default
+ * framebuffer (ID 0), as this is not a valid operation in GLES. If such an
+ * attempt is made when not in direct rendering mode, it sets an
+ * GL_INVALID_OPERATION error. Otherwise, it calls the native GLES 3 function.
+ *
+ * @param target The framebuffer target.
+ * @param pname The parameter name.
+ * @param param The parameter value.
+ */
 void
 _evgl_glFramebufferParameteri(GLenum target, GLenum pname, GLint param)
 {
@@ -803,6 +1018,19 @@ _evgl_glFramebufferParameteri(GLenum target, GLenum pname, GLint param)
    _gles3_api.glFramebufferParameteri(target, pname, param);
 }
 
+/**
+ * @brief Wrapper for glFramebufferTexture to protect the default framebuffer.
+ *
+ * This function prevents attaching a texture to the default framebuffer (ID 0),
+ * as this is an invalid operation. If such an attempt is made when not in
+ * direct rendering mode, it sets a GL_INVALID_OPERATION error. Otherwise, it
+ * calls the native GLES 3 function.
+ *
+ * @param target The framebuffer target.
+ * @param attachment The attachment point.
+ * @param texture The texture to attach.
+ * @param level The mipmap level of the texture.
+ */
 static void
 _evgl_glFramebufferTexture(GLenum target, GLenum attachment, GLuint texture, GLint level)
 {
@@ -863,6 +1091,20 @@ _evgl_glFramebufferTexture(GLenum target, GLenum attachment, GLuint texture, GLi
 }
 
 
+/**
+ * @brief Wrapper for glFramebufferTexture2D to protect the default framebuffer.
+ *
+ * This function prevents attaching a 2D texture to the default framebuffer (ID 0),
+ * as this is an invalid operation. If such an attempt is made when not in
+ * direct rendering mode, it sets a GL_INVALID_OPERATION error. Otherwise, it
+ * calls the native function.
+ *
+ * @param target The framebuffer target.
+ * @param attachment The attachment point.
+ * @param textarget The texture target.
+ * @param texture The texture to attach.
+ * @param level The mipmap level of the texture.
+ */
 static void
 _evgl_glFramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level)
 {
@@ -922,6 +1164,19 @@ _evgl_glFramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget,
    glFramebufferTexture2D(target, attachment, textarget, texture, level);
 }
 
+/**
+ * @brief Wrapper for glFramebufferRenderbuffer to protect the default framebuffer.
+ *
+ * This function prevents attaching a renderbuffer to the default framebuffer (ID 0),
+ * as this is an invalid operation. If such an attempt is made when not in
+ * direct rendering mode, it sets a GL_INVALID_OPERATION error. Otherwise, it
+ * calls the native function.
+ *
+ * @param target The framebuffer target.
+ * @param attachment The attachment point.
+ * @param renderbuffertarget The renderbuffer target.
+ * @param renderbuffer The renderbuffer to attach.
+ */
 static void
 _evgl_glFramebufferRenderbuffer(GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer)
 {
@@ -981,6 +1236,25 @@ _evgl_glFramebufferRenderbuffer(GLenum target, GLenum attachment, GLenum renderb
    glFramebufferRenderbuffer(target, attachment, renderbuffertarget, renderbuffer);
 }
 
+/**
+ * @brief Wrapper for glGetFloatv to provide correct values in Evas GL contexts.
+ *
+ * This function intercepts several queries to return values consistent with the
+ * state managed by Evas GL, especially in direct rendering mode.
+ * - For `GL_SCISSOR_BOX` and `GL_VIEWPORT` in direct rendering, it returns the
+ *   user-set values, not the transformed, internal GL values. If not set by
+ *   the user, it returns the dimensions of the image object.
+ * - For `GL_FRAMEBUFFER_BINDING` (and its GLES3 variants), it returns the
+ *   currently bound FBO ID tracked by Evas GL.
+ * - For `GL_NUM_EXTENSIONS`, it returns the count of extensions supported by Evas GL.
+ * - For `GL_READ_BUFFER`, it translates `GL_COLOR_ATTACHMENT0` to `GL_BACK` when
+ *   the default framebuffer is bound.
+ *
+ * For other queries, it calls the native glGetFloatv.
+ *
+ * @param pname The parameter to query.
+ * @param params A pointer to store the returned float values.
+ */
 void
 _evgl_glGetFloatv(GLenum pname, GLfloat* params)
 {
@@ -1136,6 +1410,22 @@ _evgl_glGetFloatv(GLenum pname, GLfloat* params)
    glGetFloatv(pname, params);
 }
 
+/**
+ * @brief Wrapper for glGetFramebufferAttachmentParameteriv to handle the default framebuffer.
+ *
+ * In GLES, the default framebuffer has a `GL_BACK` buffer, but queries are
+ * often made against `GL_COLOR_ATTACHMENT0`. This wrapper handles this
+ * translation. When querying the default framebuffer (ID 0) for the `GL_BACK`
+ * attachment, it internally queries for `GL_COLOR_ATTACHMENT0` on the underlying
+ * surface FBO.
+ * It also protects against querying a non-existent default FBO by setting an
+ * error.
+ *
+ * @param target The framebuffer target.
+ * @param attachment The attachment point to query.
+ * @param pname The parameter to query.
+ * @param params A pointer to store the returned integer values.
+ */
 void
 _evgl_glGetFramebufferAttachmentParameteriv(GLenum target, GLenum attachment, GLenum pname, GLint* params)
 {
@@ -1183,6 +1473,18 @@ _evgl_glGetFramebufferAttachmentParameteriv(GLenum target, GLenum attachment, GL
    glGetFramebufferAttachmentParameteriv(target, attachment, pname, params);
 }
 
+/**
+ * @brief Wrapper for glGetFramebufferParameteriv to protect the default framebuffer.
+ *
+ * This function prevents querying parameters from the default framebuffer (ID 0),
+ * as it is not a complete framebuffer object and this is an invalid operation.
+ * If attempted, it sets a GL_INVALID_OPERATION error. For valid FBOs, it
+ * calls the native GLES 3 function.
+ *
+ * @param target The framebuffer target.
+ * @param pname The parameter to query.
+ * @param params A pointer to store the returned integer values.
+ */
 void
 _evgl_glGetFramebufferParameteriv(GLenum target, GLenum pname, GLint* params)
 {
@@ -1232,6 +1534,20 @@ _evgl_glGetFramebufferParameteriv(GLenum target, GLenum pname, GLint* params)
 
    _gles3_api.glGetFramebufferParameteriv(target, pname, params);
 }
+
+/**
+ * @brief Wrapper for glGetIntegerv to provide correct values in Evas GL contexts.
+ *
+ * This function is the integer version of `_evgl_glGetFloatv`. It intercepts
+ * the same queries (`GL_SCISSOR_BOX`, `GL_VIEWPORT`,
+ * `GL_FRAMEBUFFER_BINDING`, `GL_NUM_EXTENSIONS`, `GL_READ_BUFFER`) to return
+ * values consistent with the state managed by Evas GL.
+ *
+ * @see _evgl_glGetFloatv
+ *
+ * @param pname The parameter to query.
+ * @param params A pointer to store the returned integer values.
+ */
 void
 _evgl_glGetIntegerv(GLenum pname, GLint* params)
 {
@@ -1382,6 +1698,25 @@ _evgl_glGetIntegerv(GLenum pname, GLint* params)
    glGetIntegerv(pname, params);
 }
 
+/**
+ * @brief Wrapper for glGetString to provide a consistent GLES 2.0 environment.
+ *
+ * This function is a crucial part of the Evas GL compatibility layer. It
+ * intercepts queries for several strings to ensure applications see a
+ * consistent environment.
+ * - `GL_VERSION`: Reports "OpenGL ES 2.x Evas GL" to hide the underlying
+ *   desktop GL or GLES 3+ version. The actual version is appended in parens.
+ * - `GL_SHADING_LANGUAGE_VERSION`: Reports "OpenGL ES GLSL ES 1.00 Evas GL"
+ *   for maximum compatibility with GLES 2.0 shaders.
+ * - `GL_EXTENSIONS`: Returns a filtered list of extensions that are known to
+ *   be supported and stable within Evas GL. This prevents applications from
+ *   trying to use unsupported or buggy driver extensions.
+ * - `GL_VENDOR`, `GL_RENDERER`: These are passed through from the native driver.
+ *
+ * @param name The string to query.
+ * @return A pointer to the requested string. Returns NULL on error or if
+ *         no context is current.
+ */
 static const GLubyte *
 _evgl_glGetString(GLenum name)
 {
@@ -1478,6 +1813,19 @@ _evgl_glGetString(GLenum name)
    return glGetString(name);
 }
 
+/**
+ * @brief Wrapper for glGetStringi to provide indexed extension strings.
+ *
+ * This function allows querying the Evas GL supported extensions list by index.
+ * It's the indexed counterpart to querying `GL_EXTENSIONS` with `glGetString`.
+ * It will return `GL_INVALID_VALUE` if the index is out of bounds and
+ * `GL_INVALID_ENUM` for unsupported `name` queries.
+ *
+ * @param name The parameter to query, must be `GL_EXTENSIONS`.
+ * @param index The index of the extension string to return.
+ * @return A pointer to the indexed extension string, or NULL if the index
+ *         is invalid or an error occurs.
+ */
 static const GLubyte *
 _evgl_glGetStringi(GLenum name, GLuint index)
 {
@@ -1509,6 +1857,22 @@ _evgl_glGetStringi(GLenum name, GLuint index)
    return NULL;
 }
 
+/**
+ * @brief Wrapper for glReadPixels with coordinate transformation for direct rendering.
+ *
+ * When reading from the default framebuffer in direct rendering mode, this
+ * function transforms the source rectangle from the Evas object's coordinate
+ * space to the GL window's coordinate space before calling the native
+ * glReadPixels. This ensures that the correct area of the screen is read.
+ *
+ * @param x The x-coordinate of the rectangle to read.
+ * @param y The y-coordinate of the rectangle to read.
+ * @param width The width of the rectangle.
+ * @param height The height of the rectangle.
+ * @param format The format of the pixel data.
+ * @param type The data type of the pixel data.
+ * @param pixels A pointer to the buffer where pixel data is stored.
+ */
 static void
 _evgl_glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, void* pixels)
 {
@@ -1564,6 +1928,20 @@ _evgl_glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum forma
      }
 }
 
+/**
+ * @brief Wrapper for glScissor with coordinate transformation for direct rendering.
+ *
+ * When in direct rendering mode and setting a scissor box, this function
+ * transforms the given rectangle from the Evas object's coordinate space to
+ * the GL window's coordinate space. It also clips the result against the
+ * canvas clipping rectangle. The original, untransformed coordinates are
+ * saved so they can be returned by `glGetIntegerv`.
+ *
+ * @param x The x-coordinate of the scissor box.
+ * @param y The y-coordinate of the scissor box.
+ * @param width The width of the scissor box.
+ * @param height The height of the scissor box.
+ */
 static void
 _evgl_glScissor(GLint x, GLint y, GLsizei width, GLsizei height)
 {
@@ -1652,6 +2030,21 @@ _evgl_glScissor(GLint x, GLint y, GLsizei width, GLsizei height)
      }
 }
 
+/**
+ * @brief Wrapper for glViewport with coordinate transformation for direct rendering.
+ *
+ * When in direct rendering mode, this function transforms the viewport
+ * rectangle from the Evas object's coordinate space to the GL window's
+ * coordinate space. It also re-calculates and applies the scissor box to
+ * ensure rendering stays within the Evas object boundaries.
+ * The original, untransformed coordinates are saved so they can be returned
+ * by `glGetIntegerv`.
+ *
+ * @param x The x-coordinate of the viewport.
+ * @param y The y-coordinate of the viewport.
+ * @param width The width of the viewport.
+ * @param height The height of the viewport.
+ */
 static void
 _evgl_glViewport(GLint x, GLint y, GLsizei width, GLsizei height)
 {
@@ -1771,6 +2164,19 @@ _evgl_glViewport(GLint x, GLint y, GLsizei width, GLsizei height)
      }
 }
 
+/**
+ * @brief Wrapper for glDrawBuffers to handle the default framebuffer.
+ *
+ * This function translates a `GL_BACK` draw buffer target to
+ * `GL_COLOR_ATTACHMENT0` when drawing to the default framebuffer (ID 0)
+ * in an indirect rendering context. This is necessary because the default
+ * framebuffer is implemented as an FBO with a color attachment. Drawing to
+ * multiple buffers or to a color attachment directly on the default framebuffer
+ * is an invalid operation.
+ *
+ * @param n The number of buffers in the `bufs` array.
+ * @param bufs An array of draw buffer enums.
+ */
 static void
 _evgl_glDrawBuffers(GLsizei n, const GLenum *bufs)
 {
@@ -1828,6 +2234,17 @@ _evgl_glDrawBuffers(GLsizei n, const GLenum *bufs)
       }
 }
 
+/**
+ * @brief Wrapper for glReadBuffer to handle the default framebuffer.
+ *
+ * This function translates a `GL_BACK` read buffer source to
+ * `GL_COLOR_ATTACHMENT0` when reading from the default framebuffer (ID 0)
+ * in an indirect rendering context. This is necessary because the default
+ * framebuffer is implemented as an FBO with a color attachment. Reading from
+ * a color attachment directly is an invalid operation on the default framebuffer.
+ *
+ * @param src The buffer to be set as the read source.
+ */
 static void
 _evgl_glReadBuffer(GLenum src)
 {
@@ -1872,6 +2289,15 @@ _evgl_glReadBuffer(GLenum src)
 
 //-------------------------------------------------------------//
 // Open GLES 2.0 APIs
+//
+// The following macros and include statement generate the public Evas_GL
+// API functions for GLES 2.0.
+// For each function in evas_gl_api_def.h, a wrapper is created.
+// - Wrappers for functions with special Evas GL implementations (e.g., _evgl_glClear)
+//   are generated by _EVASGL_FUNCTION_PRIVATE_BEGIN*.
+// - Wrappers for functions that call directly into the native GL library
+//   are generated by _EVASGL_FUNCTION_BEGIN*.
+//
 #define _EVASGL_FUNCTION_PRIVATE_BEGIN(ret, name, param1, param2) \
 static ret evgl_##name param1 { \
    EVGL_FUNC_BEGIN(); \
@@ -1906,6 +2332,13 @@ static void evgl_##name param1 { \
 
 //-------------------------------------------------------------//
 // Open GLES 2.0 APIs DEBUG
+//
+// The following macros and include statement generate the *debug* versions of
+// the Evas_GL API functions for GLES 2.0. These wrappers are used when
+// Evas GL is run in debug mode. They are similar to the normal wrappers but
+// also include calls to EVGLD_FUNC_BEGIN() and EVGLD_FUNC_END() to perform
+// pre-call and post-call checks (e.g., error checking).
+//
 #define _EVASGL_FUNCTION_PRIVATE_BEGIN(ret, name, param1, param2) \
 static ret _evgld_##name param1 { \
    EVGLD_FUNC_BEGIN(); \
@@ -1946,6 +2379,13 @@ static void _evgld_##name param1 { \
 
 //-------------------------------------------------------------//
 // Open GLES 3.0 APIs
+//
+// The following macros and include statement generate the public Evas_GL
+// API functions for GLES 3.0, defined in evas_gl_api_gles3_def.h.
+// These wrappers check if the corresponding GLES 3.0 function pointer is
+// available in the loaded library (`_gles3_api`) before making the call.
+// If the function is not available, they return a default value.
+//
 #define _EVASGL_FUNCTION_PRIVATE_BEGIN(ret, name, param1, param2) \
 static ret evgl_gles3_##name param1 { \
    EVGL_FUNC_BEGIN(); \
@@ -1984,6 +2424,12 @@ static void evgl_gles3_##name param1 { \
 
 //-------------------------------------------------------------//
 // Open GLES 3.0 APIs DEBUG
+//
+// The following macros and include statement generate the *debug* versions of
+// the Evas_GL API functions for GLES 3.0. These wrappers add pre-call and
+// post-call checks, similar to the GLES 2.0 debug wrappers. They also verify
+// that the GLES 3.0 function pointer is available before making the call.
+//
 #define _EVASGL_FUNCTION_PRIVATE_BEGIN(ret, name, param1, param2) \
 static ret _evgld_##name param1 { \
    EVGLD_FUNC_BEGIN(); \
@@ -2296,6 +2742,15 @@ finish:
 
 //-------------------------------------------------------------//
 
+/**
+ * @brief Populates an Evas_GL_API structure with the standard GLES 2.0 function pointers.
+ *
+ * This function fills the provided `funcs` structure with pointers to the
+ * Evas GL wrapper functions for the GLES 2.0 API. These are the non-debug
+ * versions of the functions.
+ *
+ * @param funcs Pointer to the Evas_GL_API structure to be populated.
+ */
 static void
 _normal_gles2_api_get(Evas_GL_API *funcs)
 {
@@ -2449,6 +2904,17 @@ _normal_gles2_api_get(Evas_GL_API *funcs)
 #undef ORD
 }
 
+/**
+ * @brief Overrides certain API functions when direct scissoring is disabled.
+ *
+ * Some GL drivers have issues with the scissor-based approach used for direct
+ * rendering. If the `direct_scissor_off` flag is set in the engine, this
+ * function is called to replace some of the wrapped API functions with their
+ * native GL counterparts, effectively disabling the special direct rendering
+ * logic for them.
+ *
+ * @param funcs Pointer to the Evas_GL_API structure to be modified.
+ */
 static void
 _direct_scissor_off_api_get(Evas_GL_API *funcs)
 {
@@ -2467,6 +2933,15 @@ _direct_scissor_off_api_get(Evas_GL_API *funcs)
 }
 
 
+/**
+ * @brief Populates an Evas_GL_API structure with the debug GLES 2.0 function pointers.
+ *
+ * This function fills the provided `funcs` structure with pointers to the
+ * debug versions of the Evas GL wrapper functions (e.g., `_evgld_glClear`).
+ * These versions include extra checks and error reporting.
+ *
+ * @param funcs Pointer to the Evas_GL_API structure to be populated.
+ */
 static void
 _debug_gles2_api_get(Evas_GL_API *funcs)
 {
@@ -2620,6 +3095,17 @@ _debug_gles2_api_get(Evas_GL_API *funcs)
 #undef ORD
 }
 
+/**
+ * @brief Gets the complete GLES 2.0 API function table for Evas GL.
+ *
+ * This is the main entry point for retrieving the GLES 2.0 API. It populates
+ * the `funcs` structure with either the normal or debug function pointers
+ * based on the `debug` flag. It also applies any necessary overrides for
+ * engines that do not support direct scissoring.
+ *
+ * @param funcs Pointer to the Evas_GL_API structure to be populated.
+ * @param debug If EINA_TRUE, the debug version of the API is returned.
+ */
 void
 _evgl_api_gles2_get(Evas_GL_API *funcs, Eina_Bool debug)
 {
@@ -2632,6 +3118,16 @@ _evgl_api_gles2_get(Evas_GL_API *funcs, Eina_Bool debug)
      _direct_scissor_off_api_get(funcs);
 }
 
+/**
+ * @brief Populates an Evas_GL_API structure with standard GLES 3.x function pointers.
+ *
+ * This function populates the `funcs` structure with all the GLES 2.0 API
+ * functions plus the new functions available in GLES 3.x, up to the specified
+ * `minor_version`. It uses the non-debug Evas GL wrappers.
+ *
+ * @param funcs Pointer to the Evas_GL_API structure to be populated.
+ * @param minor_version The GLES 3 minor version to support (0, 1, or 2).
+ */
 static void
 _normal_gles3_api_get(Evas_GL_API *funcs, int minor_version)
 {
@@ -3015,6 +3511,16 @@ _normal_gles3_api_get(Evas_GL_API *funcs, int minor_version)
 #undef ORD
 }
 
+/**
+ * @brief Populates an Evas_GL_API structure with debug GLES 3.x function pointers.
+ *
+ * This function populates the `funcs` structure with all the GLES 2.0 and
+ * GLES 3.x API functions, using the debug Evas GL wrappers which provide
+ * additional error checking.
+ *
+ * @param funcs Pointer to the Evas_GL_API structure to be populated.
+ * @param minor_version The GLES 3 minor version to support (0, 1, or 2).
+ */
 static void
 _debug_gles3_api_get(Evas_GL_API *funcs, int minor_version)
 {
@@ -3396,6 +3902,20 @@ _debug_gles3_api_get(Evas_GL_API *funcs, int minor_version)
 }
 
 
+/**
+ * @brief Dynamically loads GLES 3.x function pointers from a library handle.
+ *
+ * This function attempts to load all GLES 3.x API functions up to the
+ * specified `minor_version` using `dlsym` (or `get_proc_address` as a
+ * fallback). It populates the internal `_gles3_api` structure with the
+ * resolved function pointers.
+ *
+ * @param dl_handle A handle to the opened GL library.
+ * @param funcs The Evas_GL_API structure to populate with function pointers.
+ * @param minor_version The GLES 3 minor version to load.
+ * @param get_proc_address A function pointer to a `get_proc_address` style function.
+ * @return EINA_TRUE on success, EINA_FALSE if any required symbol is not found.
+ */
 static Eina_Bool
 _evgl_load_gles3_apis(void *dl_handle, Evas_GL_API *funcs, int minor_version,
                       void *(*get_proc_address)(const char *))
@@ -3646,6 +4166,18 @@ _evgl_load_gles3_apis(void *dl_handle, Evas_GL_API *funcs, int minor_version,
 
 
 
+/**
+ * @brief Initializes the GLES 3 API support.
+ *
+ * This function performs a one-time initialization for GLES 3. It attempts
+ * to `dlopen` the appropriate GLES/GL library and then calls
+ * `_evgl_load_gles3_apis` to resolve the function pointers. This must succeed
+ * for Evas GL to offer GLES 3 contexts.
+ *
+ * @param minor_version The GLES 3 minor version to initialize.
+ * @param get_proc_address A function pointer to a `get_proc_address` style function.
+ * @return EINA_TRUE if initialization was successful, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _evgl_gles3_api_init(int minor_version, void *(*get_proc_address)(const char *))
 {
@@ -3692,6 +4224,20 @@ _evgl_gles3_api_init(int minor_version, void *(*get_proc_address)(const char *))
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the complete GLES 3.x API function table for Evas GL.
+ *
+ * This is the main entry point for retrieving the GLES 3.x API. It first
+ * ensures the GLES 3 support is initialized. Then, it populates the `funcs`
+ * structure with either normal or debug function pointers based on the `debug`
+ * flag, for the requested `minor_version`. It also applies any engine-specific
+ * overrides.
+ *
+ * @param funcs Pointer to the Evas_GL_API structure to be populated.
+ * @param get_proc_address A function pointer to a `get_proc_address` style function.
+ * @param debug If EINA_TRUE, the debug version of the API is returned.
+ * @param minor_version The GLES 3 minor version requested.
+ */
 void
 _evgl_api_gles3_get(Evas_GL_API *funcs, void *(*get_proc_address)(const char *),
                     Eina_Bool debug, int minor_version)
@@ -3716,6 +4262,15 @@ _evgl_api_gles3_get(Evas_GL_API *funcs, void *(*get_proc_address)(const char *),
    return;
 }
 
+/**
+ * @brief Returns a pointer to the internal GLES 3.x API function table.
+ *
+ * This provides direct access to the `_gles3_api` struct which contains the
+ * raw, unresolved function pointers loaded from the GL library. This is used
+ * internally to check if specific GLES 3 features are available.
+ *
+ * @return A pointer to the internal `_gles3_api` structure.
+ */
 Evas_GL_API *
 _evgl_api_gles3_internal_get(void)
 {

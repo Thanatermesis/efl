@@ -54,6 +54,17 @@ EFL_CALLBACKS_ARRAY_DEFINE(_video_cb,
    { EFL_CANVAS_VIDEO_EVENT_VOLUME_CHANGE, _on_audio_level_changed }
 );
 
+/**
+ * @internal
+ * @brief Handles key actions for seeking in the video.
+ *
+ * It seeks forward for "right" and backward for "left". The seek step is
+ * 1/100th of the total length.
+ *
+ * @param obj The video object.
+ * @param params The direction of movement, "left" or "right".
+ * @return EINA_TRUE if the action was handled, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _key_action_move(Evas_Object *obj, const char *params)
 {
@@ -92,6 +103,14 @@ _key_action_move(Evas_Object *obj, const char *params)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Handles key action for toggling play/pause.
+ *
+ * @param obj The video object.
+ * @param params EINA_UNUSED.
+ * @return EINA_TRUE always.
+ */
 static Eina_Bool
 _key_action_play(Evas_Object *obj, const char *params EINA_UNUSED)
 {
@@ -103,6 +122,18 @@ _key_action_play(Evas_Object *obj, const char *params EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Calculates the minimum size of the video widget.
+ *
+ * This function is called when the layout needs to be recalculated. It takes the
+ * minimum size from the emotion object (the video itself) and uses it to calculate
+ * the minimum size of the whole widget, also considering the theme.
+ * It also sets the aspect ratio hint to maintain the video's aspect.
+ *
+ * @param obj The video widget object.
+ * @param sd The private data of the video widget.
+ */
 EOLIAN static void
 _efl_ui_video_efl_canvas_group_group_calculate(Eo *obj, Efl_Ui_Video_Data *sd)
 {
@@ -126,6 +157,17 @@ _efl_ui_video_efl_canvas_group_group_calculate(Eo *obj, Efl_Ui_Video_Data *sd)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback function for when the size hints of the object change.
+ *
+ * This triggers a recalculation of the container canvas group.
+ *
+ * @param data EINA_UNUSED.
+ * @param e EINA_UNUSED.
+ * @param obj The object that changed.
+ * @param event_info EINA_UNUSED.
+ */
 static void
 _on_size_hints_changed(void *data EINA_UNUSED,
                        Evas *e EINA_UNUSED,
@@ -135,6 +177,16 @@ _on_size_hints_changed(void *data EINA_UNUSED,
    efl_canvas_group_change(obj);
 }
 
+/**
+ * @internal
+ * @brief Callback for the "open,done" signal from the emotion object.
+ *
+ * Emits a "video,open" signal to the edje theme. The signal name depends
+ * on whether it's a legacy widget ("elm,video,open") or not ("efl,video,open").
+ *
+ * @param data The video object.
+ * @param event EINA_UNUSED.
+ */
 static void
 _on_open_done(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -144,6 +196,16 @@ _on_open_done(void *data, const Efl_Event *event EINA_UNUSED)
      elm_layout_signal_emit(data, "efl,video,open", "efl");
 }
 
+/**
+ * @internal
+ * @brief Callback for the "playback,start" event from the emotion object.
+ *
+ * Emits a "video,play" signal to the edje theme. The signal name depends
+ * on whether it's a legacy widget ("elm,video,play") or not ("efl,video,play").
+ *
+ * @param data The video object.
+ * @param event EINA_UNUSED.
+ */
 static void
 _on_playback_started(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -156,6 +218,17 @@ _on_playback_started(void *data, const Efl_Event *event EINA_UNUSED)
 
 }
 
+/**
+ * @internal
+ * @brief Callback for the "playback,stop" event from the emotion object.
+ *
+ * This function is called when the video playback naturally finishes.
+ * It ensures the emotion object's play property is set to false and
+ * emits a "video,end" signal to the edje theme.
+ *
+ * @param data The video object.
+ * @param event EINA_UNUSED.
+ */
 static void
 _on_playback_finished(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -168,12 +241,32 @@ _on_playback_finished(void *data, const Efl_Event *event EINA_UNUSED)
      elm_layout_signal_emit(data, "efl,video,end", "efl");
 }
 
+/**
+ * @internal
+ * @brief Callback for the "frame,resize" event from the emotion object.
+ *
+ * This event indicates that the video's aspect ratio has changed.
+ * It triggers a recalculation of the widget's size.
+ *
+ * @param data The video object.
+ * @param event EINA_UNUSED.
+ */
 static void
 _on_aspect_ratio_updated(void *data, const Efl_Event *event EINA_UNUSED)
 {
    efl_canvas_group_change(data);
 }
 
+/**
+ * @internal
+ * @brief Callback for the "title,change" event from the emotion object.
+ *
+ * Updates the "title" text part in the theme and emits a "video,title"
+ * signal to the edje theme.
+ *
+ * @param data The video object.
+ * @param event EINA_UNUSED.
+ */
 static void
 _on_title_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -195,12 +288,33 @@ _on_title_changed(void *data, const Efl_Event *event EINA_UNUSED)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for the "volume,change" event from the emotion object.
+ *
+ * Currently, this function does nothing.
+ *
+ * @param data The video object.
+ * @param event EINA_UNUSED.
+ */
 static void
 _on_audio_level_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
    (void)data;
 }
 
+/**
+ * @internal
+ * @brief Timer callback to progressively suspend the video object.
+ *
+ * This function is called periodically when the video is paused. It increases
+ * the suspend level of the emotion object over time to save resources.
+ * The progression is SLEEP -> DEEP_SLEEP -> HIBERNATE. Once in HIBERNATE,
+ * the timer is cancelled.
+ *
+ * @param data The video object.
+ * @return ECORE_CALLBACK_RENEW to continue the timer, or ECORE_CALLBACK_CANCEL to stop it.
+ */
 static Eina_Bool
 _suspend_cb(void *data)
 {
@@ -225,6 +339,15 @@ _suspend_cb(void *data)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @internal
+ * @brief Checks if an object is a valid Efl_Ui_Video widget.
+ *
+ * This is an internal helper function.
+ *
+ * @param video The object to check.
+ * @return EINA_TRUE if the object is a valid video widget, EINA_FALSE otherwise.
+ */
 Eina_Bool
 _elm_video_check(Evas_Object *video)
 {
@@ -232,6 +355,19 @@ _elm_video_check(Evas_Object *video)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Adds the Efl_Ui_Video object to the canvas.
+ *
+ * This function is the Evas smart 'add' implementation for the video widget.
+ * It sets up the theme, creates and initializes the internal emotion object,
+ * swallows the emotion object into the layout, and sets up various event
+ * callbacks for video events and size changes. It also starts a timer for
+ * resource-saving suspend modes.
+ *
+ * @param obj The video widget object.
+ * @param priv The private data for the video widget.
+ */
 EOLIAN static void
 _efl_ui_video_efl_canvas_group_group_add(Eo *obj, Efl_Ui_Video_Data *priv)
 {
@@ -266,6 +402,17 @@ _efl_ui_video_efl_canvas_group_group_add(Eo *obj, Efl_Ui_Video_Data *priv)
    priv->timer = ecore_timer_add(20.0, _suspend_cb, obj);
 }
 
+/**
+ * @internal
+ * @brief Deletes the Efl_Ui_Video object from the canvas.
+ *
+ * This function is the Evas smart 'del' implementation for the video widget.
+ * It cleans up resources, including deleting the suspend timer and, if enabled,
+ * saving the last playback position.
+ *
+ * @param obj The video widget object.
+ * @param sd The private data for the video widget.
+ */
 EOLIAN static void
 _efl_ui_video_efl_canvas_group_group_del(Eo *obj, Efl_Ui_Video_Data *sd)
 {
@@ -275,6 +422,17 @@ _efl_ui_video_efl_canvas_group_group_del(Eo *obj, Efl_Ui_Video_Data *sd)
    efl_canvas_group_del(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Constructor for the Efl_Ui_Video object.
+ *
+ * Initializes the object by calling the parent constructor, setting up
+ * smart callback descriptions, and setting the accessibility role.
+ *
+ * @param obj The object being constructed.
+ * @param _pd EINA_UNUSED.
+ * @return The constructed object.
+ */
 EOLIAN static Eo *
 _efl_ui_video_efl_object_constructor(Eo *obj, Efl_Ui_Video_Data *_pd EINA_UNUSED)
 {
@@ -424,6 +582,25 @@ _efl_ui_video_remember_position_get(const Eo *obj EINA_UNUSED, Efl_Ui_Video_Data
    return sd->remember;
 }
 
+/**
+ * @internal
+ * @brief Get the accessibility actions available for the video widget.
+ *
+ * Provides a list of actions that can be performed on the widget through
+ * accessibility APIs. The returned array contains structures with the
+ * following format:
+ * @code
+ * { "action_name", "action_type", "action_params", function_pointer }
+ * @endcode
+ * The available actions are:
+ * - @c { "move,left", "move", "left", _key_action_move}
+ * - @c { "move,right", "move", "right", _key_action_move}
+ * - @c { "play", "play", NULL, _key_action_play}
+ *
+ * @param obj EINA_UNUSED.
+ * @param pd EINA_UNUSED.
+ * @return A static, null-terminated array of Efl_Access_Action_Data describing the actions.
+ */
 EOLIAN const Efl_Access_Action_Data *
 _efl_ui_video_efl_access_widget_action_elm_actions_get(const Eo *obj EINA_UNUSED, Efl_Ui_Video_Data *pd EINA_UNUSED)
 {

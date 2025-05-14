@@ -5,15 +5,45 @@
 
 #define MY_CLASS EFL_CANVAS_VG_IMAGE_CLASS
 
+/**
+ * @internal
+ * @brief Private data for the Efl_Canvas_Vg_Image class.
+ *
+ * This structure holds the data specific to an Efl_Canvas_Vg_Image object,
+ * including the Ector_Buffer used for rendering, a pointer to the raw image
+ * data, and the dimensions of the image.
+ */
 typedef struct _Efl_Canvas_Vg_Image_Data Efl_Canvas_Vg_Image_Data;
 struct _Efl_Canvas_Vg_Image_Data
 {
-   Ector_Buffer *buffer;
-   void *image;
-   int w;
-   int h;
+   Ector_Buffer *buffer; /**< Ector buffer holding the image data for rendering. This is created on demand. */
+   void *image; /**< Pointer to the raw pixel data. */
+   int w; /**< Width of the image. */
+   int h; /**< Height of the image. */
 };
 
+/**
+ * @internal
+ * @brief Pre-render callback for the Efl_Canvas_Vg_Image object.
+ *
+ * This function is called before the Efl_Canvas_Vg_Image object is rendered.
+ * It sets up the renderer with the image data, transformation, color,
+ * and other rendering properties. It creates an Ector_Buffer from the
+ * raw image data if one doesn't exist yet.
+ *
+ * @param vg_pd Pointer to the protected data of the Evas object.
+ * @param obj The Efl_VG object being rendered.
+ * @param nd Pointer to the Efl_Canvas_Vg_Node_Data for this node.
+ * @param engine The rendering engine (unused).
+ * @param output The rendering output (unused).
+ * @param context The rendering context (unused).
+ * @param surface The Ector_Surface to render on.
+ * @param ptransform The parent's transformation matrix.
+ * @param p_opacity The parent's opacity.
+ * @param comp The Ector_Buffer for compositing.
+ * @param comp_method The compositing method.
+ * @param data The private data for the Efl_Canvas_Vg_Image (Efl_Canvas_Vg_Image_Data).
+ */
 static void
 _efl_canvas_vg_image_render_pre(Evas_Object_Protected_Data *vg_pd,
                                 Efl_VG *obj EINA_UNUSED,
@@ -68,6 +98,17 @@ _efl_canvas_vg_image_render_pre(Evas_Object_Protected_Data *vg_pd,
    ector_renderer_prepare(nd->renderer);
 }
 
+/**
+ * @internal
+ * @brief Constructor for the Efl_Canvas_Vg_Image object.
+ *
+ * Initializes the Efl_Canvas_Vg_Image object, sets up its node data,
+ * assigns the render_pre callback, and sets the default color to white opaque.
+ *
+ * @param obj The Efl_Canvas_Vg_Image object being constructed.
+ * @param pd The private data for the Efl_Canvas_Vg_Image.
+ * @return The constructed Efl_Canvas_Vg_Image object.
+ */
 static Eo *
 _efl_canvas_vg_image_efl_object_constructor(Eo *obj, Efl_Canvas_Vg_Image_Data *pd)
 {
@@ -84,6 +125,16 @@ _efl_canvas_vg_image_efl_object_constructor(Eo *obj, Efl_Canvas_Vg_Image_Data *p
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Destructor for the Efl_Canvas_Vg_Image object.
+ *
+ * Cleans up resources used by the Efl_Canvas_Vg_Image object, specifically
+ * unreferencing the Ector_Buffer if it was created.
+ *
+ * @param obj The Efl_Canvas_Vg_Image object being destructed.
+ * @param pd The private data for the Efl_Canvas_Vg_Image.
+ */
 static void
 _efl_canvas_vg_image_efl_object_destructor(Eo *obj, Efl_Canvas_Vg_Image_Data *pd EINA_UNUSED)
 {
@@ -95,6 +146,21 @@ _efl_canvas_vg_image_efl_object_destructor(Eo *obj, Efl_Canvas_Vg_Image_Data *pd
      }
 }
 
+/**
+ * @internal
+ * @brief Sets the image data and size for the Efl_Canvas_Vg_Image object.
+ *
+ * Updates the internal image data pointer and dimensions. If the new data or
+ * dimensions differ from the current ones and an Ector_Buffer exists,
+ * the buffer is unreferenced to be recreated later with the new data.
+ *
+ * @param obj The Efl_Canvas_Vg_Image object (unused).
+ * @param pd The private data for the Efl_Canvas_Vg_Image.
+ * @param data Pointer to the raw pixel data.
+ *             Example: For an ARGB8888 image, this would be an array of `uint32_t` pixels.
+ * @param size The dimensions (width and height) of the image.
+ *             Example: `{ .w = 100, .h = 50 }` for a 100x50 image.
+ */
 static void
 _efl_canvas_vg_image_data_set(Eo *obj EINA_UNUSED, Efl_Canvas_Vg_Image_Data *pd, void *data, Eina_Size2D size)
 {

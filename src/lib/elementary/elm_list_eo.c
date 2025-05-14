@@ -19,6 +19,18 @@ EWAPI const Efl_Event_Description _ELM_LIST_EVENT_ITEM_FOCUSED =
 EWAPI const Efl_Event_Description _ELM_LIST_EVENT_ITEM_UNFOCUSED =
    EFL_EVENT_DESCRIPTION("item,unfocused");
 
+/**
+ * @internal
+ * @brief Sets the horizontal mode of the list.
+ *
+ * This is the internal implementation for the Eolian function elm_obj_list_horizontal_set().
+ * It directly manipulates the Elm_List_Data structure.
+ *
+ * @param obj The Eo object.
+ * @param pd The private data of the Elm_List object.
+ * @param horizontal EINA_TRUE for horizontal mode, EINA_FALSE for vertical.
+ * @see elm_obj_list_horizontal_set
+ */
 void _elm_list_horizontal_set(Eo *obj, Elm_List_Data *pd, Eina_Bool horizontal);
 
 
@@ -191,6 +203,18 @@ Elm_Widget_Item *_elm_list_item_sorted_insert(Eo *obj, Elm_List_Data *pd, const 
 
 EOAPI EFL_FUNC_BODYV(elm_obj_list_item_sorted_insert, Elm_Widget_Item *, NULL, EFL_FUNC_CALL(label, icon, end, func, data, cmp_func), const char *label, Efl_Canvas_Object *icon, Efl_Canvas_Object *end, Evas_Smart_Cb func, const void *data, Eina_Compare_Cb cmp_func);
 
+/**
+ * @internal
+ * @brief Constructor for the Elm_List object.
+ *
+ * This function is called when a new Elm_List object is created.
+ * It initializes the object's private data and sets up default states.
+ * Implements the Efl.Object.constructor interface.
+ *
+ * @param obj The Eo object being constructed.
+ * @param pd The private data of the Elm_List object.
+ * @return The initialized Eo object, or NULL on failure.
+ */
 Efl_Object *_elm_list_efl_object_constructor(Eo *obj, Elm_List_Data *pd);
 
 
@@ -272,6 +296,17 @@ Eina_Bool _elm_list_efl_access_selection_all_children_select(Eo *obj, Elm_List_D
 Eina_Bool _elm_list_efl_access_selection_access_selection_clear(Eo *obj, Elm_List_Data *pd);
 
 
+/**
+ * @internal
+ * @brief Initializes the Elm_List Eolian class.
+ *
+ * This function is called once when the Efl_Class for Elm_List is being set up.
+ * It defines the operations (methods) and property reflection capabilities
+ * for all Elm_List instances.
+ *
+ * @param klass The Efl_Class to initialize.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_list_class_initializer(Efl_Class *klass)
 {
@@ -340,6 +375,18 @@ _elm_list_class_initializer(Efl_Class *klass)
    );
    opsp = &ops;
 
+   /**
+    * @internal
+    * @brief Eolian property reflection table.
+    *
+    * This table maps property names (as strings) to their respective
+    * reflection getter and setter functions. These functions allow Eolian
+    * to dynamically access and modify object properties.
+    * Each entry consists of:
+    * - const char* name: The name of the property.
+    * - Efl_Object_Property_Reflection_Set_Cb set: Setter function.
+    * - Efl_Object_Property_Reflection_Get_Cb get: Getter function.
+    */
    static const Efl_Object_Property_Reflection refl_table[] = {
       {"horizontal", __eolian_elm_list_horizontal_set_reflect, __eolian_elm_list_horizontal_get_reflect},
       {"focus_on_selection", __eolian_elm_list_focus_on_selection_set_reflect, __eolian_elm_list_focus_on_selection_get_reflect},
@@ -353,6 +400,23 @@ _elm_list_class_initializer(Efl_Class *klass)
    return efl_class_functions_set(klass, opsp, ropsp);
 }
 
+/**
+ * @internal
+ * @brief Describes the Elm_List Eolian class.
+ *
+ * This structure provides metadata for the Elm_List class, including its
+ * version, name, type, instance data size, and pointers to class
+ * initializer and constructor functions. It is used by the Eolian system
+ * to manage the class.
+ *
+ * - EO_VERSION: The Eolian version this class complies with.
+ * - "Elm.List": The fully qualified name of the class.
+ * - EFL_CLASS_TYPE_REGULAR: Indicates a standard instantiable class.
+ * - sizeof(Elm_List_Data): The size of the private data structure for instances.
+ * - _elm_list_class_initializer: Pointer to the class initializer function.
+ * - _elm_list_class_constructor: Pointer to the instance constructor function.
+ * - NULL: Pointer to the class destructor function (none in this case).
+ */
 static const Efl_Class_Description _elm_list_class_desc = {
    EO_VERSION,
    "Elm.List",

@@ -2,13 +2,50 @@
 #include "evas_private.h"
 #include "evas_blend_private.h"
 
+/**
+ * @internal
+ * @brief Draws a rectangle internally, handling clipping and pixel operations.
+ *
+ * This function is the core drawing routine for rectangles. It takes into account
+ * the draw context's clipping region and mask, and uses the appropriate graphics
+ * function (either Pixman or a software fallback) to render the rectangle.
+ *
+ * @param dst The destination image.
+ * @param dc The drawing context.
+ * @param x The x-coordinate of the top-left corner of the rectangle.
+ * @param y The y-coordinate of the top-left corner of the rectangle.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ */
 static void rectangle_draw_internal(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y, int w, int h);
 
+/**
+ * @brief Initializes common rectangle drawing functionalities.
+ *
+ * This function is called to set up any necessary resources or states
+ * for drawing rectangles. Currently, it's a no-op.
+ */
 EVAS_API void
 evas_common_rectangle_init(void)
 {
 }
 
+/**
+ * @brief Draws a rectangle using a callback function, handling cutouts.
+ *
+ * This function manages the drawing of a rectangle, taking into account
+ * cutouts defined in the draw context. It iterates through the cutouts
+ * and calls the provided callback function for each resulting drawable area.
+ *
+ * @param dst The destination image.
+ * @param dc The drawing context.
+ * @param x The x-coordinate of the top-left corner of the rectangle.
+ * @param y The y-coordinate of the top-left corner of the rectangle.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ * @param cb The callback function to perform the actual drawing for each segment.
+ *           The callback signature is: `void (*cb)(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y, int w, int h)`
+ */
 EVAS_API void
 evas_common_rectangle_draw_cb(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y, int w, int h, Evas_Common_Rectangle_Draw_Cb cb)
 {
@@ -48,12 +85,57 @@ evas_common_rectangle_draw_cb(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int
    dc->clip.use = c; dc->clip.x = cx; dc->clip.y = cy; dc->clip.w = cw; dc->clip.h = ch;
 }
 
+/**
+ * @brief Draws a rectangle using the internal drawing function.
+ *
+ * This is a convenience function that calls evas_common_rectangle_draw_cb
+ * with the default internal rectangle drawing implementation.
+ *
+ * @param dst The destination image.
+ * @param dc The drawing context.
+ * @param x The x-coordinate of the top-left corner of the rectangle.
+ * @param y The y-coordinate of the top-left corner of the rectangle.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ */
 EVAS_API void
 evas_common_rectangle_draw(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y, int w, int h)
 {
    evas_common_rectangle_draw_cb(dst, dc, x, y, w, h, rectangle_draw_internal);
 }
 
+/**
+ * @brief Prepares for drawing a rectangle by calculating cutout regions.
+ *
+ * This function checks if the rectangle is valid and visible. If cutouts
+ * are present in the draw context, it calculates the resulting drawable
+ * regions and stores them in the `reuse` parameter. This allows for
+ * optimizing subsequent drawing operations by pre-calculating cutouts.
+ *
+ * @param reuse Pointer to a Cutout_Rects structure that will be populated
+ *              with the calculated cutout regions. If no cutouts are applied,
+ *              this might remain unchanged or be set to reflect the original rectangle.
+ *              Example of Cutout_Rects structure:
+ *              `typedef struct _Cutout_Rects Cutout_Rects;`
+ *              `struct _Cutout_Rects {`
+ *              `  Cutout_Rect *rects; // Array of Cutout_Rect`
+ *              `  int active;         // Number of active rectangles in rects`
+ *              `  int total;          // Total allocated size of rects`
+ *              `};`
+ *              Example of Cutout_Rect structure:
+ *              `typedef struct _Cutout_Rect Cutout_Rect;`
+ *              `struct _Cutout_Rect {`
+ *              `  int x, y, w, h; // Geometry of the cutout rectangle`
+ *              `};`
+ * @param dst The destination image (const, as it's only used for dimensions).
+ * @param dc The drawing context.
+ * @param x The x-coordinate of the top-left corner of the rectangle.
+ * @param y The y-coordinate of the top-left corner of the rectangle.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ * @return EINA_TRUE if drawing is possible (rectangle is valid and visible),
+ *         EINA_FALSE otherwise.
+ */
 EVAS_API Eina_Bool
 evas_common_rectangle_draw_prepare(Cutout_Rects **reuse, const RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y, int w, int h)
 {
@@ -74,6 +156,26 @@ evas_common_rectangle_draw_prepare(Cutout_Rects **reuse, const RGBA_Image *dst, 
    return EINA_TRUE;
 }
 
+/**
+ * @brief Performs the actual drawing of a rectangle, using pre-calculated cutouts.
+ *
+ * This function draws a rectangle, potentially using a set of pre-calculated
+ * cutout regions. If `reuse` is NULL, it draws the rectangle directly, clipped
+ * by the `clip` rectangle. Otherwise, it iterates through the `reuse` cutouts,
+ * intersects each with the `clip` rectangle, and draws the resulting segment.
+ *
+ * @param reuse Pre-calculated cutout regions from evas_common_rectangle_draw_prepare.
+ *              If NULL, the rectangle is drawn without considering these pre-calculated cutouts.
+ *              See evas_common_rectangle_draw_prepare for Cutout_Rects structure.
+ * @param clip An Eina_Rectangle defining the overall clipping area for this draw operation.
+ *             Example: `Eina_Rectangle clip_rect = { .x = 10, .y = 10, .w = 100, .h = 100 };`
+ * @param dst The destination image.
+ * @param dc The drawing context.
+ * @param x The x-coordinate of the top-left corner of the rectangle.
+ * @param y The y-coordinate of the top-left corner of the rectangle.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ */
 EVAS_API void
 evas_common_rectangle_draw_do(const Cutout_Rects *reuse,
                               const Eina_Rectangle *clip,
@@ -167,6 +269,24 @@ rectangle_draw_internal(RGBA_Image *dst, RGBA_Draw_Context *dc, int x, int y, in
      }
 }
 
+/**
+ * @brief Draws a rectangle with a specific RGBA color and render operation.
+ *
+ * This function provides a more direct way to draw a colored rectangle,
+ * bypassing some of the higher-level context setup. It allows specifying
+ * the color, render operation, and an optional mask directly.
+ *
+ * @param dst The destination image.
+ * @param color The RGBA color to draw the rectangle with (e.g., 0xAARRGGBB).
+ * @param render_op The rendering operation (e.g., _EVAS_RENDER_BLEND, _EVAS_RENDER_COPY).
+ * @param x The x-coordinate of the top-left corner of the rectangle.
+ * @param y The y-coordinate of the top-left corner of the rectangle.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ * @param mask_ie Optional mask image. If NULL, no mask is applied.
+ * @param mask_x The x-offset of the mask image relative to the destination.
+ * @param mask_y The y-offset of the mask image relative to the destination.
+ */
 EVAS_API void
 evas_common_rectangle_rgba_draw(RGBA_Image *dst, DATA32 color, int render_op, int x, int y, int w, int h, RGBA_Image *mask_ie, int mask_x, int mask_y)
 {

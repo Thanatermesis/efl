@@ -1,14 +1,54 @@
 #include "edje_private.h"
 
+/**
+ * @internal
+ * @brief Hash table for Edje_File structures, keyed by Eina_File.
+ */
 Eina_Hash *_edje_file_hash = NULL;
+/**
+ * @internal
+ * @brief Hash table for Edje_File structures, keyed by their string ID.
+ */
 Eina_Hash *_edje_id_hash = NULL;
 
+/**
+ * @internal
+ * @brief Hash table for pending required Edje_File structures.
+ * Keyed by the required file's string ID, value is a list of Edje_File
+ * that require it.
+ */
 static Eina_Hash *_edje_requires_pending;
+/**
+ * @internal
+ * @brief Maximum number of Edje_File structures to keep in the cache.
+ */
 static int _edje_file_cache_size = 16;
+/**
+ * @internal
+ * @brief List of recently unused Edje_File structures for caching.
+ */
 static Eina_List *_edje_file_cache = NULL;
 
+/**
+ * @internal
+ * @brief Maximum number of Edje_Part_Collection structures to keep in the cache per Edje_File.
+ */
 static int _edje_collection_cache_size = 16;
 
+/**
+ * @internal
+ * @brief Allocates Eina Mempools for a given Edje Part Collection Directory Entry.
+ *
+ * This function initializes memory pools for various Edje part description types
+ * (RECTANGLE, TEXT, IMAGE, etc.) and for Edje_Part itself. These mempools
+ * are used for efficient allocation and deallocation of part descriptions
+ * and parts within the collection. It initializes both normal and RTL (Right-To-Left)
+ * mempools for description types that may require direction-specific handling.
+ *
+ * @param ce Pointer to the Edje_Part_Collection_Directory_Entry for which
+ *           to allocate mempools. This structure must have its `count` field
+ *           populated with the number of elements for each type.
+ */
 EAPI void
 edje_cache_emp_alloc(Edje_Part_Collection_Directory_Entry *ce)
 {
@@ -44,6 +84,17 @@ edje_cache_emp_alloc(Edje_Part_Collection_Directory_Entry *ce)
   INIT_EMP(part, Edje_Part, ce);
 }
 
+/**
+ * @internal
+ * @brief Frees Eina Mempools associated with an Edje Part Collection Directory Entry.
+ *
+ * This function deallocates all memory pools that were previously allocated by
+ * edje_cache_emp_alloc() for the given collection entry. It also clears
+ * the mempool structures and frees the `ce->mp` itself.
+ *
+ * @param ce Pointer to the Edje_Part_Collection_Directory_Entry whose
+ *           mempools are to be freed.
+ */
 EAPI void
 edje_cache_emp_free(Edje_Part_Collection_Directory_Entry *ce)
 {  /* Free Eina Mempools this is also used in edje_pick.c */
@@ -85,6 +136,21 @@ edje_cache_emp_free(Edje_Part_Collection_Directory_Entry *ce)
    free(ce->mp);
 }
 
+/**
+ * @internal
+ * @brief Initializes signal and source patterns for programs in an Edje Part Collection.
+ *
+ * This function processes the programs defined in an Edje_Part_Collection
+ * and prepares them for efficient matching. It categorizes programs based on
+ * their comparison type (strcmp, strncmp, etc.) and builds specialized data
+ * structures (hash tables, globing lists) to speed up the process of
+ * finding matching programs when signals are emitted.
+ *
+ * If the environment variable `EDJE_DUMP_PROGRAMS` is set, it will print
+ * information about the programs in the collection.
+ *
+ * @param edc Pointer to the Edje_Part_Collection whose programs are to be initialized.
+ */
 void
 _edje_programs_patterns_init(Edje_Part_Collection *edc)
 {
@@ -147,6 +213,23 @@ _edje_programs_patterns_init(Edje_Part_Collection *edc)
    ssp->sources_patterns = edje_match_programs_source_init(all, j);
 }
 
+/**
+ * @internal
+ * @brief Performs consistency checks and fixes on an Edje_Part_Collection.
+ *
+ * This function iterates through the parts in a collection and validates
+ * properties like `confine_id`, `event_id`, and `clip_to_id`. It checks for:
+ * - IDs that are out of bounds (greater than or equal to `edc->parts_count`).
+ * - Circular dependencies (loops) in `confine_to`, `events_to`, and `clip_to` chains.
+ * - `events_to` pointing to a part that is not draggable.
+ *
+ * If any invalid configurations are found, the corresponding ID is set to -1
+ * to disable the feature and prevent crashes or undefined behavior.
+ * The function ensures it only processes each collection once by checking and
+ * setting the `edc->checked` flag.
+ *
+ * @param edc Pointer to the Edje_Part_Collection to be checked and fixed.
+ */
 static inline void
 _edje_part_collection_fix(Edje_Part_Collection *edc)
 {
@@ -245,6 +328,21 @@ _edje_part_collection_fix(Edje_Part_Collection *edc)
      eina_array_flush(&hist);
 }
 
+/**
+ * @internal
+ * @brief Opens and loads an Edje_Part_Collection from an Edje_File.
+ *
+ * This function retrieves a specific collection (group) from a loaded Edje file.
+ * It first checks if the collection is already referenced or cached. If not,
+ * it reads the collection data from the EET file, loads associated Embryo and Lua
+ * scripts, initializes program patterns, and performs necessary fixes.
+ * The reference count of the collection is incremented.
+ *
+ * @param edf Pointer to the loaded Edje_File.
+ * @param coll The name of the collection (group) to open.
+ * @return A pointer to the loaded Edje_Part_Collection, or NULL on failure.
+ *         The returned collection has its reference count incremented.
+ */
 static Edje_Part_Collection *
 _edje_file_coll_open(Edje_File *edf, const char *coll)
 {
@@ -397,6 +495,23 @@ _edje_file_coll_open(Edje_File *edf, const char *coll)
    return edc;
 }
 
+/**
+ * @internal
+ * @brief Extracts .mo (Machine Object) translation files from an Edje_File.
+ *
+ * This function iterates through the MO entries specified in the Edje file's
+ * MO directory. For each entry, it reads the compressed MO data from the EET
+ * archive and writes it to a cache location in the user's Efreet cache home
+ * directory (typically `~/.cache/efreet/edje/`).
+ *
+ * The cached MO files are named using a combination of the Edje file's
+ * modification time, size, a CRC of its filename, and the original MO source
+ * filename (e.g., `~/.cache/efreet/edje/LOCALE/LC_MESSAGES/MTIME-SIZE-CRC-FILENAME.mo`).
+ * This helps in managing cache validity. If an existing cached file is older
+ * than the Edje file's modification time, it is removed and re-extracted.
+ *
+ * @param edf Pointer to the Edje_File from which to extract MO files.
+ */
 void
 _edje_extract_mo_files(Edje_File *edf)
 {
@@ -490,6 +605,33 @@ _edje_extract_mo_files(Edje_File *edf)
 extern size_t  _edje_data_string_mapping_size;
 extern void   *_edje_data_string_mapping;
 
+/**
+ * @internal
+ * @brief Opens an Edje file and loads its main structure.
+ *
+ * This function opens an Edje file from the given Eina_File handle. It memory-maps
+ * the file using EET, reads the main "edje/file" data structure, and performs
+ * various initializations. These include:
+ * - Checking file version and compatibility.
+ * - Setting up string shares for paths and other strings.
+ * - Parsing and fixing textblock styles.
+ * - Initializing hash tables for styles, color classes, text classes, and size classes.
+ * - Handling required external Edje files (dependencies).
+ * - Loading external modules (plugins).
+ * - Extracting embedded MO (translation) files.
+ *
+ * A workaround for very old Edje files that do not store strings correctly in
+ * their dictionary for hashes is included.
+ *
+ * @param f Pointer to the Eina_File representing the Edje file to open.
+ * @param error_ret Pointer to an integer where an Edje_Load_Error code will be
+ *                  stored in case of failure.
+ * @param mtime The modification time of the file, used for cache validation.
+ * @param coll A boolean indicating if collection data is expected to be present.
+ *             If EINA_TRUE and no collection directory is found, it's an error.
+ * @return A pointer to the loaded Edje_File structure, or NULL on failure.
+ *         If successful, the returned Edje_File has a reference count of 1.
+ */
 static Edje_File *
 _edje_file_open(const Eina_File *f, int *error_ret, time_t mtime, Eina_Bool coll)
 {
@@ -681,6 +823,14 @@ _edje_file_dangling(Edje_File *edf)
 
 #endif
 
+/**
+ * @internal
+ * @brief Initializes the global Edje file cache structures if they haven't been already.
+ *
+ * This function ensures that `_edje_id_hash` (for mapping file IDs to Edje_File pointers)
+ * and `_edje_file_hash` (for mapping Eina_File pointers to Edje_File pointers)
+ * are created. These hash tables are fundamental for the Edje file caching mechanism.
+ */
 static inline void
 _edje_file_cache_init()
 {
@@ -690,6 +840,24 @@ _edje_file_cache_init()
      _edje_file_hash = eina_hash_pointer_new(NULL);
 }
 
+/**
+ * @internal
+ * @brief Retrieves an Edje_File from the cache's "trash" list.
+ *
+ * The "trash" list (`_edje_file_cache`) holds Edje_File structures that are
+ * no longer actively referenced but are kept for a short period in case they
+ * are needed again soon. This function searches this list for an Edje_File
+ * corresponding to the given Eina_File.
+ *
+ * If found, the Edje_File is removed from the trash list, its reference count
+ * is set to 1, it's re-added to the main active file hash (`_edje_file_hash`),
+ * and then returned.
+ *
+ * @param file Pointer to the Eina_File whose corresponding Edje_File is sought
+ *             in the trash cache.
+ * @return Pointer to the Edje_File if found and successfully "popped" from trash,
+ *         otherwise NULL.
+ */
 static inline Edje_File*
 _edje_file_cache_trash_pop(const Eina_File *file)
 {
@@ -709,6 +877,26 @@ _edje_file_cache_trash_pop(const Eina_File *file)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Finds an Edje_File in the cache or loads it if not found.
+ *
+ * This function attempts to locate an Edje_File associated with the given
+ * Eina_File handle. It performs the search in two stages:
+ * 1. Checks the main active file hash (`_edje_file_hash`). If found,
+ *    its reference count is incremented and it's returned.
+ * 2. If not in the active hash, checks the "trash" list (`_edje_file_cache`)
+ *    via `_edje_file_cache_trash_pop()`. If found there, it's reactivated.
+ *
+ * The cache structures are initialized via `_edje_file_cache_init()` if they
+ * haven't been already.
+ *
+ * @param file Pointer to the Eina_File to find in the cache.
+ * @return Pointer to the cached Edje_File with its reference count incremented,
+ *         or NULL if the file is not in any part of the cache. This function
+ *         does *not* open the file if it's not cached; that's typically handled
+ *         by its callers like `_edje_cache_file_coll_open`.
+ */
 Edje_File*
 _edje_file_cache_find(const Eina_File *file)
 {
@@ -729,6 +917,20 @@ _edje_file_cache_find(const Eina_File *file)
    return _edje_file_cache_trash_pop(file);
 }
 
+/**
+ * @internal
+ * @brief Adds a newly opened Edje_File to the active cache.
+ *
+ * This function registers an Edje_File into the main caching structures:
+ * - It's added to `_edje_file_hash`, keyed by its `edf->f` (Eina_File pointer).
+ * - If the Edje_File has an ID (`edf->id`), it's also added to `_edje_id_hash`,
+ *   keyed by this string ID. This allows lookup by ID, which is useful for
+ *   handling inter-file dependencies (requirements).
+ *
+ * @param edf Pointer to the Edje_File to add to the cache. It's assumed
+ *            this file has just been opened and its reference count is
+ *            appropriately set (usually to 1).
+ */
 static inline void
 _edje_file_cache_add(Edje_File *edf)
 {
@@ -737,6 +939,33 @@ _edje_file_cache_add(Edje_File *edf)
      eina_hash_list_append(_edje_id_hash, edf->id, edf);
 }
 
+/**
+ * @internal
+ * @brief Opens an Edje file and a specific collection within it, utilizing the cache.
+ *
+ * This is a central function for accessing Edje collections. It first tries to
+ * find the Edje_File in the cache using `_edje_file_cache_find()`. If not found,
+ * it opens the file using `_edje_file_open()` and adds it to the cache.
+ *
+ * If a collection name (`coll`) is provided, it then attempts to open that
+ * collection from the Edje_File using `_edje_file_coll_open()`.
+ *
+ * @param file Pointer to the Eina_File representing the Edje file.
+ * @param coll The name of the collection (group) to open. Can be NULL if only
+ *             the Edje_File itself is needed.
+ * @param error_ret Pointer to an integer where an Edje_Load_Error code will be
+ *                  stored in case of failure.
+ * @param edc_ret Pointer to an Edje_Part_Collection pointer, which will be
+ *                set to the opened collection if `coll` is not NULL and opening
+ *                is successful.
+ * @param ed Unused parameter (marked EINA_UNUSED).
+ * @return Pointer to the Edje_File. This will be non-NULL if the file was
+ *         successfully found in cache or opened. If `coll` was specified and
+ *         the collection failed to open, `*edc_ret` will be NULL and
+ *         `*error_ret` will contain the error, but the Edje_File might still
+ *         be returned if the file itself was valid. Returns NULL if the
+ *         Edje_File itself cannot be opened.
+ */
 Edje_File *
 _edje_cache_file_coll_open(const Eina_File *file, const char *coll, int *error_ret, Edje_Part_Collection **edc_ret, Edje *ed EINA_UNUSED)
 {
@@ -764,6 +993,17 @@ _edje_cache_file_coll_open(const Eina_File *file, const char *coll, int *error_r
    return edf;
 }
 
+/**
+ * @internal
+ * @brief Cleans the collection cache for a given Edje_File.
+ *
+ * This function ensures that the number of cached collections for the specified
+ * Edje_File does not exceed `_edje_collection_cache_size`. If it does,
+ * the least recently used collections (those at the end of `edf->collection_cache` list)
+ * are freed using `_edje_collection_free()` until the cache size is within limit.
+ *
+ * @param edf Pointer to the Edje_File whose collection cache needs cleaning.
+ */
 void
 _edje_cache_coll_clean(Edje_File *edf)
 {
@@ -781,6 +1021,16 @@ _edje_cache_coll_clean(Edje_File *edf)
      }
 }
 
+/**
+ * @internal
+ * @brief Flushes (empties) the collection cache for a given Edje_File.
+ *
+ * This function removes and frees all collections currently held in the
+ * `edf->collection_cache` list for the specified Edje_File.
+ * Each collection is freed using `_edje_collection_free()`.
+ *
+ * @param edf Pointer to the Edje_File whose collection cache is to be flushed.
+ */
 void
 _edje_cache_coll_flush(Edje_File *edf)
 {
@@ -800,6 +1050,19 @@ _edje_cache_coll_flush(Edje_File *edf)
      }
 }
 
+/**
+ * @internal
+ * @brief Decrements the reference count of an Edje_Part_Collection.
+ *
+ * If the reference count drops to zero, the collection is either freed
+ * immediately (if its parent Edje_File is marked as 'dangling') or moved
+ * to the `edf->collection_cache` list for potential reuse.
+ * The `_edje_cache_coll_clean()` function is then called to ensure the
+ * cache size limits are respected.
+ *
+ * @param edf Pointer to the Edje_File to which the collection belongs.
+ * @param edc Pointer to the Edje_Part_Collection whose reference count is to be decremented.
+ */
 void
 _edje_cache_coll_unref(Edje_File *edf, Edje_Part_Collection *edc)
 {
@@ -831,6 +1094,16 @@ _edje_cache_coll_unref(Edje_File *edf, Edje_Part_Collection *edc)
      }
 }
 
+/**
+ * @internal
+ * @brief Cleans the global Edje file cache.
+ *
+ * This function ensures that the number of Edje_File structures in the
+ * `_edje_file_cache` (the "trash" list of unreferenced files) does not
+ * exceed `_edje_file_cache_size`. If it does, the least recently used
+ * files (those at the end of the list) are freed using `_edje_file_free()`
+ * until the cache size is within limit.
+ */
 static void
 _edje_cache_file_clean(void)
 {
@@ -850,6 +1123,22 @@ _edje_cache_file_clean(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Decrements the reference count of an Edje_File.
+ *
+ * If the reference count drops to zero, this function handles the file's
+ * removal or caching.
+ * - It recursively decrements references to any files this Edje_File `requires`.
+ * - If the file is marked 'dangling', it's freed immediately.
+ * - Otherwise, it's removed from the active file hashes (`_edje_file_hash`, `_edje_id_hash`)
+ *   and added to the `_edje_file_cache` (the "trash" list) for potential reuse.
+ * - `_edje_cache_file_clean()` is then called to maintain cache size limits.
+ *
+ * If hash tables become empty after removal, they are freed.
+ *
+ * @param edf Pointer to the Edje_File whose reference count is to be decremented.
+ */
 EAPI void
 _edje_cache_file_unref(Edje_File *edf)
 {
@@ -901,6 +1190,16 @@ _edje_cache_file_unref(Edje_File *edf)
    _edje_cache_file_clean();
 }
 
+/**
+ * @internal
+ * @brief Shuts down the Edje file cache system.
+ *
+ * This function effectively flushes the entire file cache by calling
+ * `edje_file_cache_flush()`. This ensures all cached Edje_File
+ * structures are freed.
+ *
+ * This is typically called during Edje library shutdown.
+ */
 void
 _edje_file_cache_shutdown(void)
 {
@@ -915,6 +1214,18 @@ _edje_file_cache_shutdown(void)
 *                                   API                                      *
 *============================================================================*/
 
+/**
+ * @brief Sets the maximum number of Edje files to keep in the cache.
+ *
+ * This function adjusts the size of the global Edje file cache.
+ * If the new `count` is smaller than the current number of cached files,
+ * `_edje_cache_file_clean()` is called to trim the cache.
+ *
+ * @param count The new maximum number of files to cache. If negative, it's treated as 0.
+ *
+ * @see edje_file_cache_get()
+ * @see edje_file_cache_flush()
+ */
 EAPI void
 edje_file_cache_set(int count)
 {
@@ -923,12 +1234,29 @@ edje_file_cache_set(int count)
    _edje_cache_file_clean();
 }
 
+/**
+ * @brief Gets the current maximum number of Edje files to keep in the cache.
+ *
+ * @return The current maximum size of the Edje file cache.
+ *
+ * @see edje_file_cache_set()
+ */
 EAPI int
 edje_file_cache_get(void)
 {
    return _edje_file_cache_size;
 }
 
+/**
+ * @brief Flushes the entire Edje file cache.
+ *
+ * This function clears all Edje_File structures currently held in the
+ * file cache. It temporarily sets the cache size to 0, calls
+ * `_edje_cache_file_clean()` to free all cached files, and then restores
+ * the original cache size.
+ *
+ * @see edje_file_cache_set()
+ */
 EAPI void
 edje_file_cache_flush(void)
 {
@@ -940,6 +1268,22 @@ edje_file_cache_flush(void)
    _edje_file_cache_size = ps;
 }
 
+/**
+ * @brief Sets the maximum number of Edje collections to keep cached per Edje file.
+ *
+ * This function adjusts the size of the collection cache for each Edje file.
+ * If the new `count` is smaller, `_edje_cache_coll_clean()` is called for
+ * each file currently in the file cache to trim their respective collection caches.
+ *
+ * @note This function currently only affects files in `_edje_file_cache` (the "trash" list).
+ *       A FIXME comment indicates it should also iterate through files in `_edje_file_hash` (active files).
+ *
+ * @param count The new maximum number of collections to cache per file.
+ *              If negative, it's treated as 0.
+ *
+ * @see edje_collection_cache_get()
+ * @see edje_collection_cache_flush()
+ */
 EAPI void
 edje_collection_cache_set(int count)
 {
@@ -953,12 +1297,32 @@ edje_collection_cache_set(int count)
    /* FIXME: freach in file hash too! */
 }
 
+/**
+ * @brief Gets the current maximum number of Edje collections cached per Edje file.
+ *
+ * @return The current maximum size of the collection cache per file.
+ *
+ * @see edje_collection_cache_set()
+ */
 EAPI int
 edje_collection_cache_get(void)
 {
    return _edje_collection_cache_size;
 }
 
+/**
+ * @brief Flushes the collection cache for all Edje files.
+ *
+ * This function clears all Edje_Part_Collection structures currently held in
+ * the collection caches of all Edje files. It temporarily sets the global
+ * collection cache size to 0, calls `_edje_cache_coll_flush()` for each
+ * file in the file cache, and then restores the original collection cache size.
+ *
+ * @note This function currently only affects files in `_edje_file_cache` (the "trash" list).
+ *       A FIXME comment indicates it should also iterate through files in `_edje_file_hash` (active files).
+ *
+ * @see edje_collection_cache_set()
+ */
 EAPI void
 edje_collection_cache_flush(void)
 {

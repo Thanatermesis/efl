@@ -20,36 +20,101 @@
 /* make mono happy - this is evil though... */
 #undef SIGPWR
 
+/**
+ * @internal
+ * @struct _Pid_Info
+ * @brief Holds information about a process ID and its associated file descriptor.
+ *
+ * This structure is used to keep track of PIDs for which custom exit
+ * information needs to be written to a specific file descriptor.
+ */
 typedef struct _Pid_Info Pid_Info;
 
 struct _Pid_Info
 {
-   pid_t pid;
-   int fd;
+   pid_t pid; /**< The process ID. */
+   int fd;    /**< The file descriptor to write exit information to. */
 };
 
+/**
+ * @internal
+ * @brief Delays the sending of an ECORE_EXE_EVENT_DEL event.
+ *
+ * This function is called by a timer when an executable with piped I/O exits.
+ * It ensures that any "last words" from the executable can be read before
+ * the DEL event is processed.
+ *
+ * @param data An Ecore_Exe_Event_Del structure containing details of the exited process.
+ * @param event The EFL event that triggered this callback (timer tick).
+ */
 static void _ecore_signal_exe_exit_delay(void *data, const Efl_Event *event);
+/**
+ * @internal
+ * @brief Handles SIGCHLD signals by calling waitpid() to reap exited child processes.
+ *
+ * This function is called when a SIGCHLD signal is received, indicating that
+ * a child process has changed state (e.g., terminated). It calls waitpid()
+ * to get the status of exited children and generates ECORE_EXE_EVENT_DEL events.
+ *
+ * @param once If EINA_TRUE, only process one child and then return.
+ *             If EINA_FALSE, process all available exited children.
+ * @param info Signal information associated with the SIGCHLD.
+ */
 static void _ecore_signal_waitpid(Eina_Bool once, siginfo_t info);
+/**
+ * @internal
+ * @brief Generic free function for Ecore events that simply frees the event data.
+ *
+ * @param data User data associated with the event (unused).
+ * @param event The event data to be freed.
+ */
 static void _ecore_signal_generic_free(void *data, void *event);
 
+/**
+ * @internal
+ * @typedef Signal_Handler
+ * @brief Defines the signature for a signal handler function.
+ *
+ * @param sig The signal number.
+ * @param si A pointer to a siginfo_t structure containing detailed information about the signal.
+ * @param foo Unused context pointer (matches sa_sigaction signature).
+ */
 typedef void (*Signal_Handler)(int sig, siginfo_t *si, void *foo);
 
 #define NUM_PIPES 5
 
-static int sig_pipe[NUM_PIPES][2] = {{ -1 }}; // [0] == read, [1] == write
-static Eo *sig_pipe_handler[NUM_PIPES] = {NULL};
-static Eina_Spinlock sig_pid_lock;
-static Eina_List *sig_pid_info_list = NULL;
+static int sig_pipe[NUM_PIPES][2] = {{ -1 }}; /**< @internal Array of pipe file descriptors. [0] is read, [1] is write. Used for signal handling. */
+static Eo *sig_pipe_handler[NUM_PIPES] = {NULL}; /**< @internal Array of Efl_Loop_Handler objects for reading from signal pipes. */
+static Eina_Spinlock sig_pid_lock; /**< @internal Spinlock to protect access to sig_pid_info_list. */
+static Eina_List *sig_pid_info_list = NULL; /**< @internal List of Pid_Info structures for custom PID exit handling. */
 
-volatile int pipe_dead = 0;
-volatile int exit_signal_received = 0;
+volatile int pipe_dead = 0; /**< @internal Flag indicating if the signal pipes are considered dead (e.g., during shutdown). */
+volatile int exit_signal_received = 0; /**< @internal Flag indicating if an exit signal (SIGQUIT, SIGINT, SIGTERM) has been received. */
 
+/**
+ * @internal
+ * @struct _Signal_Data
+ * @brief Structure to hold signal number and associated siginfo_t.
+ *
+ * This structure is written to the internal pipes when a signal is caught
+ * by the signal handler, to be processed by the main loop.
+ */
 typedef struct _Signal_Data
 {
-   int sig;
-   siginfo_t info;
+   int sig;        /**< The signal number. */
+   siginfo_t info; /**< The siginfo_t structure associated with the signal. */
 } Signal_Data;
 
+/**
+ * @internal
+ * @brief Reads signal data from the internal pipes and processes them.
+ *
+ * This function is called when there is data to be read from one of the
+ * signal pipes. It reads Signal_Data structures and generates corresponding
+ * Ecore events or calls EFL application event callbacks.
+ *
+ * @param obj The Efl_Loop_Handler object that triggered the read.
+ */
 static void
 _ecore_signal_pipe_read(Eo *obj)
 {
@@ -149,12 +214,36 @@ _ecore_signal_pipe_read(Eo *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback function for EFL_LOOP_HANDLER_EVENT_READ on signal pipes.
+ *
+ * This function is invoked by the main loop when one of the signal pipes
+ * has data available for reading. It calls _ecore_signal_pipe_read to
+ * process the incoming signal data.
+ *
+ * @param data User data associated with the callback (unused).
+ * @param event The EFL_LOOP_HANDLER_EVENT_READ event.
+ */
 static void
 _ecore_signal_cb_read(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
 {
    _ecore_signal_pipe_read(event->object);
 }
 
+/**
+ * @internal
+ * @brief The actual signal handler function installed via sigaction.
+ *
+ * This function is executed in the signal handler context when a registered
+ * signal is caught. It writes the signal information (Signal_Data) to the
+ * internal pipes to be processed by the main loop. It also sets the
+ * `exit_signal_received` flag for exit signals.
+ *
+ * @param sig The signal number that was caught.
+ * @param si A pointer to a siginfo_t structure containing detailed information about the signal.
+ * @param foo Unused context pointer (matches sa_sigaction signature).
+ */
 static void
 _ecore_signal_callback(int sig, siginfo_t *si, void *foo EINA_UNUSED)
 {
@@ -198,6 +287,16 @@ _ecore_signal_callback(int sig, siginfo_t *si, void *foo EINA_UNUSED)
      }
 }
 
+/**
+ * @internal
+ * @brief Sets up a signal handler for a given signal.
+ *
+ * This function configures and installs a signal handler using sigaction.
+ * It sets the SA_RESTART and SA_SIGINFO flags.
+ *
+ * @param sig The signal number to handle.
+ * @param func The Signal_Handler function to be called when the signal occurs.
+ */
 static void
 _ecore_signal_callback_set(int sig, Signal_Handler func)
 {
@@ -209,6 +308,14 @@ _ecore_signal_callback_set(int sig, Signal_Handler func)
    sigaction(sig, &sa, NULL);
 }
 
+/**
+ * @internal
+ * @brief Sets up all necessary signal handlers for Ecore.
+ *
+ * This function calls _ecore_signal_callback_set for various signals
+ * like SIGPIPE, SIGALRM, SIGCHLD, etc., to use _ecore_signal_callback
+ * as their handler. It also unblocks these signals for the current thread.
+ */
 static void
 _signalhandler_setup(void)
 {
@@ -245,6 +352,15 @@ _signalhandler_setup(void)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Initializes the signal handling pipes and related structures.
+ *
+ * This function creates the spinlock for PID info, sets up signal handlers
+ * via _signalhandler_setup(), creates the communication pipes, sets them
+ * to non-blocking and close-on-exec, and adds Efl_Loop_Handlers to
+ * monitor the read ends of these pipes.
+ */
 static void
 _ecore_signal_pipe_init(void)
 {
@@ -282,6 +398,13 @@ _ecore_signal_pipe_init(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Shuts down the signal handling pipes and cleans up resources.
+ *
+ * This function closes all pipe file descriptors, deletes the associated
+ * Efl_Loop_Handlers, and frees the spinlock.
+ */
 static void
 _ecore_signal_pipe_shutdown(void)
 {
@@ -298,6 +421,17 @@ _ecore_signal_pipe_shutdown(void)
    eina_spinlock_free(&sig_pid_lock);
 }
 
+/**
+ * @internal
+ * @brief Callback function registered with ecore_fork_reset_callback_add.
+ *
+ * This function is called after a fork() to re-initialize the signal
+ * handling mechanism (pipes, handlers) in the child process. It first
+ * shuts down the existing (copied from parent) pipe setup and then
+ * initializes a new one.
+ *
+ * @param data User data associated with the callback (unused).
+ */
 static void
 _ecore_signal_cb_fork(void *data EINA_UNUSED)
 {
@@ -305,6 +439,14 @@ _ecore_signal_cb_fork(void *data EINA_UNUSED)
    _ecore_signal_pipe_init();
 }
 
+/**
+ * @internal
+ * @brief Initializes the Ecore signal handling subsystem.
+ *
+ * Sets up the signal pipes and registers a callback to re-initialize
+ * after a fork.
+ * This is called once during Ecore initialization.
+ */
 void
 _ecore_signal_init(void)
 {
@@ -313,6 +455,14 @@ _ecore_signal_init(void)
    ecore_fork_reset_callback_add(_ecore_signal_cb_fork, NULL);
 }
 
+/**
+ * @internal
+ * @brief Shuts down the Ecore signal handling subsystem.
+ *
+ * Unregisters the fork callback, marks pipes as dead, blocks signals,
+ * and shuts down the signal pipes.
+ * This is called once during Ecore shutdown.
+ */
 void
 _ecore_signal_shutdown(void)
 {
@@ -343,12 +493,33 @@ _ecore_signal_shutdown(void)
    exit_signal_received = 0;
 }
 
+/**
+ * @internal
+ * @brief Processes received signals. (Currently a no-op).
+ *
+ * This function is intended to be called by the Efl_Loop to process signals.
+ * However, signal processing is handled by the EFL_LOOP_HANDLER_EVENT_READ
+ * callback (_ecore_signal_cb_read) on the signal pipes.
+ *
+ * @param obj The Efl_Loop object (unused).
+ * @param pd The Efl_Loop_Data (unused).
+ */
 void
 _ecore_signal_received_process(Eo *obj EINA_UNUSED, Efl_Loop_Data *pd EINA_UNUSED)
 {
    // do nothing - the efl loop handler read event will handle it
 }
 
+/**
+ * @internal
+ * @brief Gets the count of pending signals. (Always returns 0).
+ *
+ * Signals are processed via pipe reads, not a direct queue count here.
+ *
+ * @param obj The Efl_Loop object (unused).
+ * @param pd The Efl_Loop_Data (unused).
+ * @return int Always 0, as signals are handled via pipe events.
+ */
 int
 _ecore_signal_count_get(Eo *obj EINA_UNUSED, Efl_Loop_Data *pd EINA_UNUSED)
 {
@@ -358,18 +529,40 @@ _ecore_signal_count_get(Eo *obj EINA_UNUSED, Efl_Loop_Data *pd EINA_UNUSED)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Acquires the spinlock for PID information list access.
+ *
+ * This ensures thread-safe access to `sig_pid_info_list`.
+ */
 void
 _ecore_signal_pid_lock(void)
 {
    eina_spinlock_take(&sig_pid_lock);
 }
 
+/**
+ * @internal
+ * @brief Releases the spinlock for PID information list access.
+ */
 void
 _ecore_signal_pid_unlock(void)
 {
    eina_spinlock_release(&sig_pid_lock);
 }
 
+/**
+ * @internal
+ * @brief Registers a PID and an associated file descriptor for custom exit signal handling.
+ *
+ * When a child process with the given `pid` exits, its exit information
+ * (Ecore_Signal_Pid_Info) will be written to the specified `fd` instead of
+ * generating a standard ECORE_EXE_EVENT_DEL.
+ * The `sig_pid_lock` should be held before calling this function.
+ *
+ * @param pid The process ID to monitor.
+ * @param fd The file descriptor to write exit information to.
+ */
 void
 _ecore_signal_pid_register(pid_t pid, int fd)
 {
@@ -380,6 +573,16 @@ _ecore_signal_pid_register(pid_t pid, int fd)
    sig_pid_info_list = eina_list_append(sig_pid_info_list, pi);
 }
 
+/**
+ * @internal
+ * @brief Unregisters a PID and file descriptor previously registered with _ecore_signal_pid_register().
+ *
+ * Removes the Pid_Info entry from `sig_pid_info_list`.
+ * The `sig_pid_lock` should be held before calling this function.
+ *
+ * @param pid The process ID to unregister.
+ * @param fd The file descriptor associated with the PID.
+ */
 void
 _ecore_signal_pid_unregister(pid_t pid, int fd)
 {
@@ -517,6 +720,16 @@ _ecore_signal_waitpid(Eina_Bool once, siginfo_t info)
      }
 }
 
+/**
+ * @internal
+ * @brief Frees an Ecore_Event_Signal_* event structure.
+ *
+ * This function is used as the `free_func` for various signal-related
+ * Ecore events added via `ecore_event_add`.
+ *
+ * @param data User-supplied data (unused in this context).
+ * @param event Pointer to the event structure to be freed.
+ */
 static void
 _ecore_signal_generic_free(void *data EINA_UNUSED, void *event)
 {

@@ -51,49 +51,132 @@ static const char _tooltip_key[] = "_elm_tooltip";
     }                                                   \
   while (0)
 
+/**
+ * @brief Structure defining a tooltip.
+ *
+ * This structure holds all the necessary information for managing
+ * and displaying a tooltip associated with an Evas_Object.
+ */
 struct _Elm_Tooltip
 {
-   Elm_Tooltip_Content_Cb   func;
-   Evas_Smart_Cb            del_cb;
-   const void              *data;
-   const char              *style;
-   Evas                    *evas, *tt_evas;
-   Evas_Object             *eventarea, *owner;
-   Evas_Object             *tooltip, *content;
-   Evas_Object             *tt_win;
-   Ecore_Timer             *show_timer;
-   Ecore_Timer             *hide_timer;
-   Ecore_Job               *reconfigure_job;
-   Evas_Coord               mouse_x, mouse_y;
+   Elm_Tooltip_Content_Cb   func; /**< Callback function to create the tooltip content. */
+   Evas_Smart_Cb            del_cb; /**< Callback function to clean up data when the tooltip is no longer needed. */
+   const void              *data; /**< User data to be passed to func and del_cb. */
+   const char              *style; /**< The style to be used for the tooltip. */
+   Evas                    *evas, *tt_evas; /**< Evas canvas for the owner and tooltip window respectively. */
+   Evas_Object             *eventarea, *owner; /**< The object that triggers the tooltip and its owner widget. */
+   Evas_Object             *tooltip, *content; /**< The tooltip Edje object and its content object. */
+   Evas_Object             *tt_win; /**< The tooltip window, if free_size is EINA_TRUE. */
+   Ecore_Timer             *show_timer; /**< Timer to delay showing the tooltip. */
+   Ecore_Timer             *hide_timer; /**< Timer to delay hiding the tooltip (for animations). */
+   Ecore_Job               *reconfigure_job; /**< Job to reconfigure the tooltip geometry. */
+   Evas_Coord               mouse_x, mouse_y; /**< Last recorded mouse coordinates. */
    struct
      {
-        Evas_Coord            x, y, bx, by;
+        Evas_Coord            x, y, bx, by; /**< Padding values (x, y) and border padding (bx, by) from theme. */
      } pad;
    struct
      {
-        double                x, y;
+        double                x, y; /**< Relative position of the tooltip to the mouse or event area. */
      } rel_pos;
-   Elm_Tooltip_Orient       orient; /** orientation for tooltip */
-   int                      move_freeze;
-   unsigned short           ref;
+   Elm_Tooltip_Orient       orient; /**< Preferred orientation for the tooltip. */
+   int                      move_freeze; /**< Counter to freeze tooltip movement. */
+   unsigned short           ref; /**< Reference count to prevent premature deletion during callbacks. */
 
-   double                   hide_timeout; /* from theme */
-   Eina_Bool                visible_lock:1;
-   Eina_Bool                changed_style:1;
-   Eina_Bool                free_size : 1;
-   Eina_Bool                unset_me : 1;
+   double                   hide_timeout; /**< Timeout value for hiding the tooltip, read from the theme. */
+   Eina_Bool                visible_lock:1; /**< If EINA_TRUE, tooltip remains visible until explicitly hidden. */
+   Eina_Bool                changed_style:1; /**< Flag indicating if the style has changed and needs reloading. */
+   Eina_Bool                free_size : 1; /**< If EINA_TRUE, tooltip is in a separate window, otherwise it's part of the owner's canvas. */
+   Eina_Bool                unset_me : 1; /**< Flag to mark the tooltip for unsetting if a ref exists. */
 };
 
+/**
+ * @brief Reconfigures the tooltip's position, size, and content.
+ *
+ * This function is responsible for updating the tooltip's appearance and
+ * placement based on its content, style, and the position of the mouse
+ * or owner object. It handles theme changes, content creation, and
+ * size calculations.
+ *
+ * @param tt The tooltip instance to reconfigure.
+ */
 static void _elm_tooltip_reconfigure(Elm_Tooltip *tt);
+/**
+ * @brief Starts or restarts the ecore job for reconfiguring the tooltip.
+ *
+ * This ensures that multiple rapid requests to reconfigure (e.g., during
+ * mouse movement) are coalesced into a single reconfiguration operation.
+ *
+ * @param tt The tooltip instance.
+ */
 static void _elm_tooltip_reconfigure_job_start(Elm_Tooltip *tt);
+/**
+ * @brief Stops the ecore job for reconfiguring the tooltip.
+ *
+ * @param tt The tooltip instance.
+ */
 static void _elm_tooltip_reconfigure_job_stop(Elm_Tooltip *tt);
+/**
+ * @brief Starts the animation for hiding the tooltip.
+ *
+ * This typically involves an Edje signal and a timer to actually
+ * hide and delete the tooltip object after the animation duration.
+ *
+ * @param tt The tooltip instance.
+ */
 static void _elm_tooltip_hide_anim_start(Elm_Tooltip *tt);
+/**
+ * @brief Stops the animation for hiding the tooltip.
+ *
+ * If a hide animation is in progress, this function cancels it and
+ * ensures the tooltip remains visible or is immediately shown.
+ *
+ * @param tt The tooltip instance.
+ */
 static void _elm_tooltip_hide_anim_stop(Elm_Tooltip *tt);
+/**
+ * @brief Stops the timer that delays showing the tooltip.
+ *
+ * @param tt The tooltip instance.
+ */
 static void _elm_tooltip_show_timer_stop(Elm_Tooltip *tt);
+/**
+ * @brief Hides and cleans up the tooltip object and its content.
+ *
+ * This function is called when the tooltip needs to be removed from the screen.
+ * It deletes the tooltip Evas objects and cleans up associated resources.
+ *
+ * @param tt The tooltip instance.
+ */
 static void _elm_tooltip_hide(Elm_Tooltip *tt);
+/**
+ * @brief Cleans up the user-provided data and content of the tooltip.
+ *
+ * Calls the del_cb if provided and deletes the content object.
+ *
+ * @param tt The tooltip instance.
+ */
 static void _elm_tooltip_data_clean(Elm_Tooltip *tt);
+/**
+ * @brief Unsets and frees all resources associated with a tooltip.
+ *
+ * This function removes all callbacks, deletes Evas objects, and frees
+ * the Elm_Tooltip structure itself.
+ *
+ * @param tt The tooltip instance.
+ */
 static void _elm_tooltip_unset(Elm_Tooltip *tt);
 
+/**
+ * @brief Callback invoked when the tooltip content's size hints change.
+ *
+ * Schedules a reconfiguration of the tooltip.
+ *
+ * @param data The Elm_Tooltip instance.
+ * @param e Evas canvas (unused).
+ * @param obj The content object whose hints changed (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _elm_tooltip_content_changed_hints_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -101,6 +184,16 @@ _elm_tooltip_content_changed_hints_cb(void *data, Evas *e EINA_UNUSED, Evas_Obje
    TTDBG("HINTS CHANGED\n");
 }
 
+/**
+ * @brief Callback invoked when the tooltip content object is deleted.
+ *
+ * Marks the content as NULL and hides the tooltip if it's visible.
+ *
+ * @param data The Elm_Tooltip instance.
+ * @param e Evas canvas (unused).
+ * @param obj The content object being deleted (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _elm_tooltip_content_del_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -110,6 +203,16 @@ _elm_tooltip_content_del_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EI
    if (tt->tooltip) _elm_tooltip_hide(tt);
 }
 
+/**
+ * @brief Callback invoked when the eventarea object (owner of the tooltip) is moved.
+ *
+ * Schedules a reconfiguration of the tooltip.
+ *
+ * @param data The Elm_Tooltip instance.
+ * @param e Evas canvas (unused).
+ * @param obj The eventarea object that moved (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _elm_tooltip_obj_move_cb(void *data, Evas *e  EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info  EINA_UNUSED)
 {
@@ -118,6 +221,16 @@ _elm_tooltip_obj_move_cb(void *data, Evas *e  EINA_UNUSED, Evas_Object *obj EINA
    TTDBG("TT MOVED\n");
 }
 
+/**
+ * @brief Callback invoked when the eventarea object (owner of the tooltip) is resized.
+ *
+ * Schedules a reconfiguration of the tooltip.
+ *
+ * @param data The Elm_Tooltip instance.
+ * @param e Evas canvas (unused).
+ * @param obj The eventarea object that resized (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _elm_tooltip_obj_resize_cb(void *data, Evas *e  EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info  EINA_UNUSED)
 {
@@ -126,6 +239,18 @@ _elm_tooltip_obj_resize_cb(void *data, Evas *e  EINA_UNUSED, Evas_Object *obj EI
    TTDBG("TT RESIZE\n");
 }
 
+/**
+ * @brief Callback invoked when the mouse moves over the eventarea object.
+ *
+ * Updates the stored mouse coordinates and schedules a reconfiguration
+ * of the tooltip if the movement exceeds a small threshold (to avoid
+ * excessive updates for minor jitters).
+ *
+ * @param data The Elm_Tooltip instance.
+ * @param e Evas canvas (unused).
+ * @param obj The eventarea object (unused).
+ * @param event_info Pointer to Evas_Event_Mouse_Move structure.
+ */
 static void
 _elm_tooltip_obj_mouse_move_cb(void *data, Evas *e  EINA_UNUSED,
                                Evas_Object *obj EINA_UNUSED, void *event_info)
@@ -148,6 +273,15 @@ _elm_tooltip_obj_mouse_move_cb(void *data, Evas *e  EINA_UNUSED,
    _elm_tooltip_reconfigure_job_start(tt);
 }
 
+/**
+ * @brief Creates and shows the tooltip window and its content.
+ *
+ * This function handles the creation of the tooltip's Evas objects (window,
+ * Edje object for styling, and content). It sets up necessary callbacks
+ * and initiates the reconfiguration process.
+ *
+ * @param tt The tooltip instance to show.
+ */
 static void
 _elm_tooltip_show(Elm_Tooltip *tt)
 {
@@ -197,6 +331,13 @@ _elm_tooltip_show(Elm_Tooltip *tt)
    _elm_tooltip_reconfigure_job_start(tt);
 }
 
+/**
+ * @brief Deletes the content of the tooltip.
+ *
+ * Removes callbacks associated with the content object and deletes it.
+ *
+ * @param tt The tooltip instance whose content is to be deleted.
+ */
 static void
 _elm_tooltip_content_del(Elm_Tooltip *tt)
 {
@@ -242,6 +383,11 @@ _elm_tooltip_hide(Elm_Tooltip *tt)
    evas_object_del(del);
 }
 
+/**
+ * @brief Ecore job callback that performs the tooltip reconfiguration.
+ *
+ * @param data The Elm_Tooltip instance.
+ */
 static void
 _elm_tooltip_reconfigure_job(void *data)
 {
@@ -263,6 +409,12 @@ _elm_tooltip_reconfigure_job_start(Elm_Tooltip *tt)
    tt->reconfigure_job = ecore_job_add(_elm_tooltip_reconfigure_job, tt);
 }
 
+/**
+ * @brief Timer callback that actually hides the tooltip after an animation delay.
+ *
+ * @param data The Elm_Tooltip instance.
+ * @return EINA_FALSE to stop the timer.
+ */
 static Eina_Bool
 _elm_tooltip_hide_anim_cb(void *data)
 {
@@ -304,6 +456,23 @@ _elm_tooltip_hide_anim_stop(Elm_Tooltip *tt)
    ELM_SAFE_FREE(tt->hide_timer, ecore_timer_del);
 }
 
+/**
+ * @brief Repositions the tooltip based on its orientation setting.
+ *
+ * Calculates the tooltip's (mx, my) position relative to the owner object (ox, oy, ow, oh)
+ * and adjusts it to fit within the canvas boundaries (cw, ch). It also updates
+ * the relative position (tt->rel_pos) used for Edje animations.
+ *
+ * @param tt The tooltip instance.
+ * @param ox X-coordinate of the owner object.
+ * @param oy Y-coordinate of the owner object.
+ * @param ow Width of the owner object.
+ * @param oh Height of the owner object.
+ * @param tw Width of the tooltip.
+ * @param th Height of the tooltip.
+ * @param cw Width of the canvas/screen.
+ * @param ch Height of the canvas/screen.
+ */
 static void
 _elm_tooltip_reconfigure_orient(Elm_Tooltip *tt,
                                 Evas_Coord ox, Evas_Coord oy, Evas_Coord ow, Evas_Coord oh,
@@ -706,6 +875,12 @@ _elm_tooltip_show_timer_stop(Elm_Tooltip *tt)
    ELM_SAFE_FREE(tt->show_timer, ecore_timer_del);
 }
 
+/**
+ * @brief Timer callback that triggers showing the tooltip after a delay.
+ *
+ * @param data The Elm_Tooltip instance.
+ * @return ECORE_CALLBACK_CANCEL to stop the timer.
+ */
 static Eina_Bool
 _elm_tooltip_timer_show_cb(void *data)
 {
@@ -715,6 +890,17 @@ _elm_tooltip_timer_show_cb(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Callback invoked when the mouse enters the eventarea object.
+ *
+ * Stops any pending hide animation and starts a timer to show the tooltip
+ * after a configured delay.
+ *
+ * @param data The Elm_Tooltip instance.
+ * @param e Evas canvas (unused).
+ * @param obj The eventarea object (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _elm_tooltip_obj_mouse_in_cb(void *data, Evas *e  EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info  EINA_UNUSED)
 {
@@ -728,6 +914,17 @@ _elm_tooltip_obj_mouse_in_cb(void *data, Evas *e  EINA_UNUSED, Evas_Object *obj 
    TTDBG("MOUSE IN\n");
 }
 
+/**
+ * @brief Callback invoked when the mouse leaves the eventarea object.
+ *
+ * If the tooltip is not locked visible, it stops the show timer (if active)
+ * or starts the hide animation (if the tooltip is already visible).
+ *
+ * @param tt The Elm_Tooltip instance.
+ * @param e Evas canvas (unused).
+ * @param obj The eventarea object (unused).
+ * @param event The mouse out event data (unused).
+ */
 static void
 _elm_tooltip_obj_mouse_out_cb(Elm_Tooltip *tt, Evas *e  EINA_UNUSED, Evas_Object *obj EINA_UNUSED, Evas_Event_Mouse_Out *event EINA_UNUSED)
 {
@@ -742,8 +939,29 @@ _elm_tooltip_obj_mouse_out_cb(Elm_Tooltip *tt, Evas *e  EINA_UNUSED, Evas_Object
    TTDBG("MOUSE OUT\n");
 }
 
+/**
+ * @brief Callback invoked when the eventarea or owner object is freed.
+ *
+ * Marks the respective object pointer in the tooltip as NULL and
+ * proceeds to unset the tooltip.
+ *
+ * @param data The Elm_Tooltip instance.
+ * @param e Evas canvas (unused).
+ * @param obj The object being freed.
+ * @param event_info Event-specific information (unused).
+ */
 static void _elm_tooltip_obj_free_cb(void *data, Evas *e  EINA_UNUSED, Evas_Object *obj, void *event_info  EINA_UNUSED);
 
+/**
+ * @brief Unsets and frees all resources associated with a tooltip.
+ *
+ * This function removes all callbacks, deletes Evas objects, and frees
+ * the Elm_Tooltip structure itself. If there's an outstanding reference
+ * (tt->ref > 0), it marks the tooltip for unsetting (tt->unset_me = EINA_TRUE)
+ * to be handled later when the reference is released.
+ *
+ * @param tt The tooltip instance.
+ */
 static void
 _elm_tooltip_unset(Elm_Tooltip *tt)
 {
@@ -789,6 +1007,15 @@ _elm_tooltip_obj_free_cb(void *data, Evas *e  EINA_UNUSED, Evas_Object *obj, voi
    _elm_tooltip_unset(tt);
 }
 
+/**
+ * @brief Creates a new tooltip structure and associates it with an eventarea object.
+ *
+ * Initializes the tooltip structure, sets up mouse in/out and free callbacks
+ * on the eventarea.
+ *
+ * @param eventarea The Evas_Object that will trigger this tooltip.
+ * @return A pointer to the newly created Elm_Tooltip, or NULL on failure.
+ */
 static Elm_Tooltip *
 _elm_tooltip_create(Evas_Object *eventarea)
 {
@@ -811,6 +1038,15 @@ _elm_tooltip_create(Evas_Object *eventarea)
    return tt;
 }
 
+/**
+ * @brief Sets the style for a tooltip label.
+ *
+ * Constructs the style string based on the tooltip's current style
+ * (e.g., "tooltip/default") and applies it to the label.
+ *
+ * @param obj The owner object of the tooltip.
+ * @param label The label object whose style is to be set.
+ */
 static void
 _tooltip_label_style_set(Evas_Object *obj, Evas_Object *label)
 {
@@ -827,6 +1063,16 @@ _tooltip_label_style_set(Evas_Object *obj, Evas_Object *label)
      }
 }
 
+/**
+ * @brief Default content creation callback for simple text tooltips.
+ *
+ * Creates an Elm_Label, sets its style and text.
+ *
+ * @param data The text (char *) to display in the label.
+ * @param obj The owner object of the tooltip.
+ * @param tooltip The tooltip Evas_Object (parent for the label).
+ * @return The created Elm_Label object, or NULL on failure.
+ */
 static Evas_Object *
 _elm_tooltip_label_create(void *data, Evas_Object *obj, Evas_Object *tooltip)
 {
@@ -838,6 +1084,18 @@ _elm_tooltip_label_create(void *data, Evas_Object *obj, Evas_Object *tooltip)
    return label;
 }
 
+/**
+ * @brief Content creation callback for translatable text tooltips.
+ *
+ * Creates an Elm_Label, sets its style and translatable text.
+ *
+ * @param data A pointer to an array of two const char* strings:
+ *             `data[0]` is the translation domain.
+ *             `data[1]` is the original text to be translated.
+ * @param obj The owner object of the tooltip.
+ * @param tooltip The tooltip Evas_Object (parent for the label).
+ * @return The created Elm_Label object, or NULL on failure.
+ */
 static Evas_Object *
 _elm_tooltip_trans_label_create(void *data, Evas_Object *obj, Evas_Object *tooltip)
 {
@@ -850,12 +1108,30 @@ _elm_tooltip_trans_label_create(void *data, Evas_Object *obj, Evas_Object *toolt
    return label;
 }
 
+/**
+ * @brief Deletion callback for data used by _elm_tooltip_label_create.
+ *
+ * Frees the stringshared text.
+ *
+ * @param data The stringshared text (char *) that was used for the label.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _elm_tooltip_label_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    eina_stringshare_del(data);
 }
 
+/**
+ * @brief Deletion callback for data used by _elm_tooltip_trans_label_create.
+ *
+ * Frees the stringshared domain and text, and the array holding them.
+ *
+ * @param data The array of const char* (domain and text) that was used.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _elm_tooltip_trans_label_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -865,6 +1141,14 @@ _elm_tooltip_trans_label_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *
    free(text);
 }
 
+/**
+ * @brief Cleans up the user-provided data and content of the tooltip.
+ *
+ * Calls the del_cb if provided to free the user data, and then
+ * deletes the tooltip content object.
+ *
+ * @param tt The tooltip instance.
+ */
 static void
 _elm_tooltip_data_clean(Elm_Tooltip *tt)
 {

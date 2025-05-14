@@ -46,17 +46,23 @@ static unsigned int efl_del_api_generation = 0;
 static Efl_Object_Op _efl_del_api_op_id = 0;
 static Eina_Hash *class_overrides;
 
+/**
+ * @brief Enumerates the types of reference operations for logging purposes.
+ */
 typedef enum _Eo_Ref_Op {
-   EO_REF_OP_NONE,
-   EO_REF_OP_NEW,
+   EO_REF_OP_NONE, /**< No operation / Error. */
+   EO_REF_OP_NEW,  /**< Object creation. */
    EO_REF_OP_FREE,
-   EO_REF_OP_REF,
-   EO_REF_OP_UNREF,
-   EO_REF_OP_REUSE,
+   EO_REF_OP_REF,  /**< Object reference increment. */
+   EO_REF_OP_UNREF,/**< Object reference decrement. */
+   EO_REF_OP_REUSE,/**< Object reuse. */
 } Eo_Ref_Op;
 
+/** @internal Initializes object logging. */
 static inline void _eo_log_obj_init(void);
+/** @internal Shuts down object logging. */
 static inline void _eo_log_obj_shutdown(void);
+/** @internal Logs a reference operation on an object. */
 static inline void _eo_log_obj_ref_op(const _Eo_Object *obj, Eo_Ref_Op ref_op);
 #ifdef EO_DEBUG
 #define EO_LOG_OBJS_BACKTRACE_MAX     1022
@@ -76,34 +82,43 @@ static const char *_eo_ref_op_str[] = {
    "Reuse",
 };
 #ifdef HAVE_BACKTRACE
-static Eina_Array _eo_log_objs;
-static Eina_Spinlock _eo_log_objs_lock;
+static Eina_Array _eo_log_objs; /**< Array for storing object log entries when backtrace is enabled. */
+static Eina_Spinlock _eo_log_objs_lock; /**< Spinlock for thread-safe access to _eo_log_objs. */
 #endif
 #else
+/** @internal Empty stub for object logging initialization when EO_DEBUG is not defined. */
 static inline void _eo_log_obj_init(void) { }
+/** @internal Empty stub for object logging shutdown when EO_DEBUG is not defined. */
 static inline void _eo_log_obj_shutdown(void) { }
+/** @internal Empty stub for logging reference operations when EO_DEBUG is not defined. */
 static inline void _eo_log_obj_ref_op(const _Eo_Object *obj EINA_UNUSED, Eo_Ref_Op ref_op EINA_UNUSED) { }
+/** @internal Empty stub for reporting object log information when EO_DEBUG is not defined. */
 void _eo_log_obj_report(const Eo_Id id EINA_UNUSED, int log_level EINA_UNUSED, const char *func_name EINA_UNUSED, const char *file EINA_UNUSED, int line EINA_UNUSED) { }
 #endif
 
-static _Efl_Class **_eo_classes = NULL;
-static Eo_Id _eo_classes_last_id = 0;
-static Eo_Id _eo_classes_alloc = 0;
-static int _efl_object_init_count = 0;
-static Eina_Hash *_ops_storage = NULL;
-static Eina_Spinlock _ops_storage_lock;
+static _Efl_Class **_eo_classes = NULL; /**< Global array storing pointers to all registered Eo classes. */
+static Eo_Id _eo_classes_last_id = 0; /**< The ID of the last registered class. Used for sizing vtables. */
+static Eo_Id _eo_classes_alloc = 0; /**< The allocated size of the _eo_classes array. */
+static int _efl_object_init_count = 0; /**< Initialization counter for the Eo system. */
+static Eina_Hash *_ops_storage = NULL; /**< Hash table storing a mapping from API function pointers to their operation IDs (Efl_Object_Op). */
+static Eina_Spinlock _ops_storage_lock; /**< Spinlock for thread-safe access to _ops_storage. */
 
-static const Efl_Object_Optional efl_object_optional_cow_default = {};
-Eina_Cow *efl_object_optional_cow = NULL;
+static const Efl_Object_Optional efl_object_optional_cow_default = {}; /**< Default values for the Efl_Object_Optional COW structure. */
+Eina_Cow *efl_object_optional_cow = NULL; /**< Copy-On-Write manager for Efl_Object_Optional data. */
 
-static size_t _eo_sz = 0;
-static size_t _eo_class_sz = 0;
+static size_t _eo_sz = 0; /**< Aligned size of the base _Eo_Object structure. */
+static size_t _eo_class_sz = 0; /**< Aligned size of the base _Efl_Class structure. */
 
+/** @internal Resets the constructor/destructor tracking for an object. */
 static void _eo_condtor_reset(_Eo_Object *obj);
+/** @internal Retrieves the data scope for a given object and class. */
 static inline void *_efl_data_scope_get(const _Eo_Object *obj, const _Efl_Class *klass);
+/** @internal Internal function for cross-referencing data between objects. */
 static inline void *_efl_data_xref_internal(const char *file, int line, _Eo_Object *obj, const _Efl_Class *klass, const _Eo_Object *ref_obj);
+/** @internal Internal function for removing a data cross-reference. */
 static inline void _efl_data_xunref_internal(_Eo_Object *obj, void *data, const _Eo_Object *ref_obj);
 
+/** @internal Retrieves the operation ID for a given API function pointer. */
 static inline Efl_Object_Op _efl_object_api_op_id_get_internal(const void *api_func);
 
 /* Start of Dich */
@@ -112,16 +127,27 @@ static inline Efl_Object_Op _efl_object_api_op_id_get_internal(const void *api_f
 /* We are substracting the mask here instead of "AND"ing because it's a hot path,
  * it should be a valid class at this point, and this lets the compiler do 1
  * substraction at compile time. */
+/** @internal Removes the class tag from an Eo_Id to get its numerical index. */
 #define _UNMASK_ID(id) ((id) - MASK_CLASS_TAG)
+/** @internal Retrieves the _Efl_Class pointer from a class Eo_Id. */
 #define ID_CLASS_GET(id) ({ \
       (_Efl_Class *) (((_UNMASK_ID(id) <= _eo_classes_last_id) && (_UNMASK_ID(id) > 0)) ? \
       (_eo_classes[_UNMASK_ID(id) - 1]) : NULL); \
       })
 
+/** @internal Extracts the class ID part from an Efl_Object_Op. */
 #define EFL_OBJECT_OP_CLASS_PART(op) op >> 16
+/** @internal Extracts the function ID part from an Efl_Object_Op. */
 #define EFL_OBJECT_OP_FUNC_PART(op) op & 0xffff
+/** @internal Creates an Efl_Object_Op from a class ID and a function ID. */
 #define EFL_OBJECT_OP_CREATE_OP_ID(class_id, func_id) ((unsigned short)class_id)<<16|((unsigned short)func_id&0xffff)
 
+/**
+ * @internal
+ * @brief Retrieves the class associated with an operation ID.
+ * @param op The operation ID.
+ * @return The _Efl_Class pointer for the class part of the operation ID.
+ */
 static const _Efl_Class *
 _eo_op_class_get(Efl_Object_Op op)
 {
@@ -131,6 +157,13 @@ _eo_op_class_get(Efl_Object_Op op)
 #if defined(DEBUG_VTABLE_ALLOCATION)
 static int _allocated_memory = 0;
 
+/**
+ * @internal
+ * @brief Allocates memory for vtable structures, tracking total allocation if DEBUG_VTABLE_ALLOCATION is defined.
+ * @param n Number of elements to allocate.
+ * @param elem Size of each element.
+ * @return A pointer to the allocated and zeroed memory, or NULL on failure.
+ */
 static inline void*
 _vtable_alloc(unsigned long n, size_t elem)
 {
@@ -138,6 +171,13 @@ _vtable_alloc(unsigned long n, size_t elem)
    return calloc(n, elem);
 }
 #else
+/**
+ * @internal
+ * @brief Allocates memory for vtable structures.
+ * @param n Number of elements to allocate.
+ * @param elem Size of each element.
+ * @return A pointer to the allocated and zeroed memory, or NULL on failure.
+ */
 static inline void*
 _vtable_alloc(unsigned long n, size_t elem)
 {
@@ -147,7 +187,11 @@ _vtable_alloc(unsigned long n, size_t elem)
 
 
 /**
- * This inits the vtable with a given size
+ * @internal
+ * @brief Initializes a vtable with a specific size.
+ * The vtable chain (array of Eo_Vtable_Node) is allocated based on this size.
+ * @param vtable Pointer to the Eo_Vtable to initialize.
+ * @param size The number of entries in the vtable chain, typically corresponding to the number of classes.
  */
 static void
 _vtable_init_size(Eo_Vtable *vtable, unsigned int size)
@@ -158,7 +202,10 @@ _vtable_init_size(Eo_Vtable *vtable, unsigned int size)
 }
 
 /**
- * This inits the vtable wit hthe current size of allocated tables
+ * @internal
+ * @brief Initializes a vtable with the current number of registered classes.
+ * This function relies on `_eo_classes_last_id` being up-to-date.
+ * @param vtable Pointer to the Eo_Vtable to initialize.
  */
 static void
 _vtable_init(Eo_Vtable *vtable)
@@ -168,7 +215,11 @@ _vtable_init(Eo_Vtable *vtable)
 }
 
 /**
- * This removes all nodes from the klass that are copied from mro
+ * @internal
+ * @brief Frees function pointers in a class's vtable that were merely copied from its MRO (Method Resolution Order) parents.
+ * This is done to avoid double-freeing or incorrect ownership when the class itself is destroyed.
+ * Only function pointers that are identical to those in an MRO parent (excluding the class itself) are nulled out.
+ * @param klass The class whose vtable MRO entries are to be cleared.
  */
 static void
 _vtable_mro_free(const _Efl_Class *klass)
@@ -192,6 +243,16 @@ _vtable_mro_free(const _Efl_Class *klass)
      }
 }
 
+/**
+ * @internal
+ * @brief Frees the memory associated with a vtable.
+ * If a `root` vtable is provided, it checks if function arrays are shared
+ * to avoid double-freeing. Only frees `funcs` arrays if `count` is non-zero
+ * or if they are not shared with the `root` vtable.
+ * @param vtable The vtable to free.
+ * @param root Optional. A root vtable to compare against for shared function arrays.
+ *             If NULL, all non-NULL `funcs` with non-zero `count` are freed.
+ */
 static void
 _vtable_free(Eo_Vtable *vtable, const Eo_Vtable *root)
 {
@@ -203,69 +264,93 @@ _vtable_free(Eo_Vtable *vtable, const Eo_Vtable *root)
    for (int i = 0; i < vtable->size; ++i)
      {
         if (root && root->chain[i].funcs == vtable->chain[i].funcs)
-          vtable->chain[i].count = 0;
+          vtable->chain[i].count = 0; // Mark as shared, don't free funcs
 
-        if (vtable->chain[i].count)
+        if (vtable->chain[i].count) // Only free if count is non-zero (implies funcs was allocated)
           {
              free(vtable->chain[i].funcs);
           }
      }
-   free(vtable->chain);
+   free(vtable->chain); // Free the main chain array
 }
 
 /**
- * This takes over all set chains of the src to dest.
- * This should only be called on Eo_Vtables, which are initialized with this value.
- * Previous setted values are going to be overwritten.
+ * @internal
+ * @brief Copies all set function chains (Eo_Vtable_Node) from a source vtable to a destination vtable.
+ * This is a shallow copy for the nodes themselves; if `src->chain[i].funcs` is set,
+ * `dest->chain[i]` will point to the same `Eo_Vtable_Node` data.
+ * This is typically used when initializing a new vtable from a parent or extension.
+ * @param dest The destination vtable.
+ * @param src The source vtable.
  */
 static void
 _vtable_take_over(Eo_Vtable *dest, const Eo_Vtable *src)
 {
    for (int i = 0; i < src->size; ++i)
      {
-        if (src->chain[i].funcs)
+        if (src->chain[i].funcs) // If the source node has functions defined
           {
-             dest->chain[i] = src->chain[i];
+             dest->chain[i] = src->chain[i]; // Copy the node structure
           }
      }
 }
 
 /**
- * Fills the node of the passed class id with a empty none NULL pointer.
- * This is used to indicate that a specific node has a normal 0 size, but is set.
+ * @internal
+ * @brief Marks a vtable node for a specific class ID as "set" but with no actual functions.
+ * This uses a sentinel pointer value (0x1010101) for `funcs` and sets `count` to 0.
+ * It indicates that this class ID has an entry in the vtable, even if it's empty,
+ * which is important for `efl_isa` checks and vtable merging logic.
+ * @param vtable The vtable to modify.
+ * @param class_id The class ID for which to insert the empty/sentinel node.
  */
 static void
 _vtable_insert_empty_funcs(Eo_Vtable *vtable, unsigned short class_id)
 {
-   vtable->chain[class_id].funcs = (void*)0x1010101;
+   vtable->chain[class_id].funcs = (void*)0x1010101; // Sentinel to indicate "set but empty"
    vtable->chain[class_id].count = 0;
 }
 
 /**
- * duplicate the source node, and write the duplicated values to the destination
- * No logical changes are applied to src.
+ * @internal
+ * @brief Deep copies a vtable node from source to destination.
+ * This allocates new memory for the `funcs` array in the destination
+ * and copies the content from the source.
+ * @param dest Pointer to the destination Eo_Vtable_Node.
+ * @param src Pointer to the source Eo_Vtable_Node.
  */
 static void
 _vtable_copy_node(Eo_Vtable_Node *dest, const Eo_Vtable_Node *src)
 {
    dest->count = src->count;
-   dest->funcs = _vtable_alloc(sizeof(op_type_funcs), src->count);
-   memcpy(dest->funcs, src->funcs, sizeof(op_type_funcs) * src->count);
+   dest->funcs = _vtable_alloc(sizeof(op_type_funcs), src->count); // Allocate new funcs array
+   memcpy(dest->funcs, src->funcs, sizeof(op_type_funcs) * src->count); // Copy function entries
 }
 
 /**
- * Initialize a node with a empty funcs array of the passed length
+ * @internal
+ * @brief Initializes a vtable node for a specific class ID with an empty function array of a given length.
+ * This allocates memory for `funcs` but does not fill it.
+ * @param dest The vtable containing the node to prepare.
+ * @param length The number of function slots to allocate for this node.
+ * @param class_id The class ID of the node to prepare.
  */
 static void
 _vtable_prepare_empty_node(Eo_Vtable *dest, unsigned int length, unsigned int class_id)
 {
    dest->chain[class_id].count = length;
-   dest->chain[class_id].funcs = _vtable_alloc(sizeof(op_type_funcs), dest->chain[class_id].count);
+   dest->chain[class_id].funcs = _vtable_alloc(sizeof(op_type_funcs), dest->chain[class_id].count); // Allocate empty funcs array
 }
 
 /**
- * Copy all setted APIs from src to dest.
- * Already set function slots are going to be replaced.
+ * @internal
+ * @brief Merges defined API functions from a source vtable into a destination vtable.
+ * If a function slot in `dest` is not yet set, it takes the one from `src`.
+ * If `dest` already has functions for a class ID, and it hasn't been "hit" (copied for modification) yet,
+ * it's deep-copied first. Then, individual function pointers from `src` overwrite those in `dest`.
+ * @param dest The destination vtable to merge into.
+ * @param src The source vtable to merge from.
+ * @param hitmap A boolean array tracking which class ID nodes in `dest` have been deep-copied (hit).
  */
 static void
 _vtable_merge_defined_api(Eo_Vtable *dest, const Eo_Vtable *src, Eina_Bool *hitmap)
@@ -273,28 +358,29 @@ _vtable_merge_defined_api(Eo_Vtable *dest, const Eo_Vtable *src, Eina_Bool *hitm
    for (unsigned int i = 0; i < src->size; ++i)
      {
         //if there is a source node evalulate if we need to copy it
-        if (src->chain[i].funcs)
+        if (src->chain[i].funcs) // If source has functions for this class_id
           {
-             if (!dest->chain[i].funcs)
+             if (!dest->chain[i].funcs) // If dest doesn't have this node yet
                {
-                  dest->chain[i] = src->chain[i];
-                  EINA_SAFETY_ON_FALSE_RETURN(hitmap[i] == EINA_FALSE);
+                  dest->chain[i] = src->chain[i]; // Shallow copy the node
+                  EINA_SAFETY_ON_FALSE_RETURN(hitmap[i] == EINA_FALSE); // Ensure it wasn't marked hit before
                }
-             else
+             else // Dest already has a node (possibly from parent or another mixin)
                {
-                  if (!hitmap[i])
+                  if (!hitmap[i]) // If this node in dest hasn't been deep-copied yet
                     {
-                       const Eo_Vtable_Node node = dest->chain[i];
-                       if (!node.count)
-                         _vtable_insert_empty_funcs(dest, i);
+                       const Eo_Vtable_Node node = dest->chain[i]; // Save current dest node
+                       if (!node.count) // If it's an empty sentinel
+                         _vtable_insert_empty_funcs(dest, i); // Re-insert sentinel (might be overwritten)
                        else
-                         _vtable_copy_node(&dest->chain[i], &node); //we copy what we have, and overwrite in the later for loop
-                       hitmap[i] = EINA_TRUE;
+                         _vtable_copy_node(&dest->chain[i], &node); // Deep copy what we have in dest
+                       hitmap[i] = EINA_TRUE; // Mark as hit (copied for modification)
                     }
+                  // Now, merge individual functions from src to the (potentially newly copied) dest node
                   for (int j = 0; j < src->chain[i].count; ++j)
                     {
-                       if (src->chain[i].funcs[j].func)
-                         dest->chain[i].funcs[j] = src->chain[i].funcs[j];
+                       if (src->chain[i].funcs[j].func) // If src has a specific function
+                         dest->chain[i].funcs[j] = src->chain[i].funcs[j]; // Overwrite/set in dest
                     }
               }
           }
@@ -302,50 +388,78 @@ _vtable_merge_defined_api(Eo_Vtable *dest, const Eo_Vtable *src, Eina_Bool *hitm
 }
 
 /**
- * Ensure that all set nodes from src are also set on dest.
- * No real values are copied, the newly taken or allocated slots will be empty.
+ * @internal
+ * @brief Ensures that for every "set" node (even if empty) in `src`, `dest` also has a corresponding node.
+ * If `src` has an empty sentinel node and `dest` doesn't, `dest` gets the sentinel.
+ * If `src` has a node with actual function slots (even if all NULL) and `dest` doesn't,
+ * `dest` gets a newly prepared empty node of the same size.
+ * This is crucial for `efl_isa` to work correctly across complex inheritance involving interfaces/mixins.
+ * @param dest The destination vtable.
+ * @param src The source vtable (e.g., from an extension or interface).
+ * @param hitmap A boolean array tracking which class ID nodes in `dest` have been deep-copied or prepared.
  */
 static void
 _vtable_merge_empty(Eo_Vtable *dest, const Eo_Vtable *src, Eina_Bool *hitmap)
 {
    for (unsigned int i = 0; i < src->size; ++i)
      {
-        if (src->chain[i].funcs && !dest->chain[i].funcs)
+        if (src->chain[i].funcs && !dest->chain[i].funcs) // If src has a node and dest doesn't
           {
-             if (!src->chain[i].count)
+             if (!src->chain[i].count) // If src node is an empty sentinel
                {
-                  dest->chain[i].funcs = src->chain[i].funcs;
-                  dest->chain[i].count = src->chain[i].count;
+                  dest->chain[i].funcs = src->chain[i].funcs; // Copy sentinel pointer
+                  dest->chain[i].count = src->chain[i].count; // Copy count (0)
                }
-             else
+             else // Src node has a defined size (even if functions are NULL)
                {
-                  _vtable_prepare_empty_node(dest, src->chain[i].count, i);
-                  hitmap[i] = EINA_TRUE;
+                  _vtable_prepare_empty_node(dest, src->chain[i].count, i); // Prepare an empty node in dest
+                  hitmap[i] = EINA_TRUE; // Mark as prepared
                }
           }
      }
 }
 
+/**
+ * @internal
+ * @brief Retrieves a specific function pointer from a vtable based on an operation ID.
+ * @param vtable The vtable to search.
+ * @param op The operation ID, which contains both class ID and function ID.
+ * @return A pointer to the op_type_funcs structure for the function, or NULL if not found or out of bounds.
+ */
 static inline const op_type_funcs *
 _vtable_func_get(const Eo_Vtable *vtable, Efl_Object_Op op)
 {
    unsigned short class_id = EFL_OBJECT_OP_CLASS_PART(op);
    unsigned short func_id = EFL_OBJECT_OP_FUNC_PART(op);
 
+   // Bounds check for class_id against vtable size
    if (EINA_UNLIKELY(vtable->size <= class_id))
      return NULL;
+   // Bounds check for func_id against the count of functions for that class_id
    if (EINA_UNLIKELY(vtable->chain[class_id].count <= func_id))
      return NULL;
 
    return &vtable->chain[class_id].funcs[func_id];
 }
 
+/**
+ * @internal
+ * @brief Sets a function pointer in a vtable for a given operation ID.
+ * @param vtable The vtable to modify.
+ * @param klass The class that is providing the function implementation.
+ * @param hierarchy_klass The class in the hierarchy for which this function is being set (used for overrides or ensuring correct context).
+ *                        If NULL, `klass` is used. If `func` is NULL, this class's vtable is used to find the original function.
+ * @param op The operation ID.
+ * @param func The function pointer to set. If NULL and `hierarchy_klass` is provided, it attempts to revert to `hierarchy_klass`'s implementation.
+ * @param allow_same_override If EINA_FALSE, disallows overriding a function that was already set by the same `klass`.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., safety checks fail, or disallowed override).
+ */
 static inline Eina_Bool
 _vtable_func_set(Eo_Vtable *vtable, const _Efl_Class *klass,
                  const _Efl_Class *hierarchy_klass, Efl_Object_Op op,
                  Eo_Op_Func_Type func, Eina_Bool allow_same_override)
 {
-   op_type_funcs *fsrc;
+   op_type_funcs *fsrc; // Pointer to the function slot in the vtable
    unsigned short class_id = EFL_OBJECT_OP_CLASS_PART(op);
    unsigned short func_id = EFL_OBJECT_OP_FUNC_PART(op);
    Eo_Vtable_Node *hirachy_node = NULL;
@@ -391,33 +505,60 @@ _vtable_func_set(Eo_Vtable *vtable, const _Efl_Class *klass,
 
 /* END OF DICH */
 
+/** @internal Casts an Eo pointer (which can be an object or class) to an Eo_Id. */
 #define _EO_ID_GET(Id) ((Eo_Id) (Id))
 
 
+/**
+ * @internal
+ * @brief Checks if the given Eo pointer represents an Eo object instance.
+ * @param eo_id The Eo pointer to check.
+ * @return EINA_TRUE if it's an object, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _eo_is_a_obj(const Eo *eo_id)
 {
    Eo_Id oid = (Eo_Id) _EO_ID_GET(eo_id);
-   return !!(oid & MASK_OBJ_TAG);
+   return !!(oid & MASK_OBJ_TAG); // Check if the object tag bit is set
 }
 
+/**
+ * @internal
+ * @brief Checks if the given Eo pointer represents an Efl_Class.
+ * @param eo_id The Eo pointer to check.
+ * @return EINA_TRUE if it's a class, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _eo_is_a_class(const Eo *eo_id)
 {
    Eo_Id oid = (Eo_Id) _EO_ID_GET(eo_id);
-   return !!(oid & MASK_CLASS_TAG);
+   return !!(oid & MASK_CLASS_TAG); // Check if the class tag bit is set
 }
 
+/**
+ * @internal
+ * @brief Converts an Efl_Class pointer (which is an Eo_Id with a class tag) to an _Efl_Class structure pointer.
+ * @param klass_id The Efl_Class pointer (Eo_Id).
+ * @return A pointer to the _Efl_Class structure, or NULL if invalid.
+ */
 static inline _Efl_Class *
 _eo_class_pointer_get(const Efl_Class *klass_id)
 {
-   return ID_CLASS_GET((Eo_Id)klass_id);
+   return ID_CLASS_GET((Eo_Id)klass_id); // Uses the ID_CLASS_GET macro for lookup
 }
 
+/**
+ * @internal
+ * @brief Retrieves the name of the API function from an Efl_Op_Description.
+ * This function attempts to use `dladdr` to get the symbol name if available,
+ * otherwise it might fall back to a less precise name (e.g., on Windows).
+ * @param desc Pointer to the Efl_Op_Description.
+ * @return The name of the function, or "unknown" if it cannot be determined.
+ */
 static const char *
 _eo_op_desc_name_get(const Efl_Op_Description *desc)
 {
-   static const char *fct_name = "unknown";
+   static const char *fct_name = "unknown"; // Default name
 
    if (!desc)
      {
@@ -436,11 +577,21 @@ _eo_op_desc_name_get(const Efl_Op_Description *desc)
    return fct_name;
 }
 
+/**
+ * @internal
+ * @brief Iterates through the Method Resolution Order (MRO) to find the next implementation of a function.
+ * This is used for `efl_super` calls. It starts searching from the class *after* `cur_klass` in the MRO of `orig_kls`.
+ * @param orig_kls The original class of the object on which the method was called. Its MRO is used.
+ * @param cur_klass The current class in the MRO from which the search for the super implementation should begin.
+ * @param op The operation ID of the function to find.
+ * @param super If EINA_TRUE, starts searching from the class *after* `cur_klass`. If EINA_FALSE (though typically true for this function's purpose), it would start from `cur_klass` itself.
+ * @return A pointer to the `op_type_funcs` for the found super implementation, or NULL if not found.
+ */
 static inline const op_type_funcs *
 _eo_kls_itr_next(const _Efl_Class *orig_kls, const _Efl_Class *cur_klass,
                  Efl_Object_Op op, Eina_Bool super)
 {
-   const _Efl_Class **kls_itr = NULL;
+   const _Efl_Class **kls_itr = NULL; // Iterator for the MRO array
 
    /* Find the kls itr. */
    kls_itr = orig_kls->mro;
@@ -465,24 +616,44 @@ _eo_kls_itr_next(const _Efl_Class *orig_kls, const _Efl_Class *cur_klass,
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Handles automatic unreferencing of an object if its `auto_unref` counter reaches zero.
+ * This is typically used for objects that are automatically managed by a parent or container
+ * and should be unreferenced (potentially leading to destruction) when the `auto_unref`
+ * count, decremented by this function, hits zero. The object must also be finalized.
+ * @param obj The internal _Eo_Object structure.
+ * @param eo_obj The public Eo pointer for the object.
+ */
 static inline void
 _apply_auto_unref(_Eo_Object *obj, const Eo *eo_obj)
 {
-   if (EINA_UNLIKELY(obj && obj->auto_unref))
+   if (EINA_UNLIKELY(obj && obj->auto_unref)) // If auto_unref is enabled for this object
      {
-        if (obj->finalized && !(--obj->auto_unref))
-          efl_unref(eo_obj);
+        if (obj->finalized && !(--obj->auto_unref)) // If finalized and decrementing auto_unref makes it zero
+          efl_unref(eo_obj); // Perform the unreference
      }
 }
 
 /************************************ EO ************************************/
 
-static EFL_FUNC_TLS _Efl_Class *_super_klass = NULL;
+static EFL_FUNC_TLS _Efl_Class *_super_klass = NULL; /**< Thread-local storage for the class context during an efl_super(CLASS_ID, ...) call. */
 
+/**
+ * @internal
+ * @brief Core logic for efl_super() and efl_cast(). Sets up the object's internal state
+ * (`cur_klass` and `super` flag) to modify how the next method call on this object is resolved.
+ * For `efl_super(Class_ID, ...)`, it stores the target class in TLS.
+ *
+ * @param eo_id The object or class ID being targeted.
+ * @param cur_klass The class context for the super call or cast. For `efl_super`, this is the class whose parent's method will be called. For `efl_cast`, this is the class type the object is being cast to for the next call.
+ * @param super EINA_TRUE for `efl_super` behavior (call parent's method), EINA_FALSE for `efl_cast` behavior (call method as if object is of `cur_klass` type, if it `isa` `cur_klass`).
+ * @return The original `eo_id` prepared for the modified call, or NULL on error (e.g., invalid class, object not an instance of `cur_klass` for `efl_cast`).
+ */
 static Eo *
 _efl_super_cast(const Eo *eo_id, const Efl_Class *cur_klass, Eina_Bool super)
 {
-   EO_CLASS_POINTER_GOTO(cur_klass, super_klass, err);
+   EO_CLASS_POINTER_GOTO(cur_klass, super_klass, err); // Get internal _Efl_Class* for cur_klass
 
 #ifdef EO_DEBUG
    if (EINA_UNLIKELY(!_eo_is_a_obj(eo_id) && !_eo_is_a_class(eo_id))) goto err_obj;
@@ -539,9 +710,9 @@ efl_cast(const Eo *eo_id, const Efl_Class *cur_klass)
 EO_API Eina_Bool
 _efl_object_call_resolve(Eo *eo_id, const char *func_name, Efl_Object_Op_Call_Data *call, Efl_Object_Op op, const char *file, int line)
 {
-   const _Efl_Class *klass, *main_klass;
-   const _Efl_Class *cur_klass = NULL;
-   _Eo_Object *obj = NULL;
+   const _Efl_Class *klass, *main_klass; // klass is the current class in resolution, main_klass is the object's actual class
+   const _Efl_Class *cur_klass = NULL; // Used if resolving a super call, indicates the class context of the super
+   _Eo_Object *obj = NULL; // Internal object data
    const Eo_Vtable *vtable = NULL;
    const op_type_funcs *func;
    Eina_Bool super = EINA_TRUE;
@@ -692,22 +863,44 @@ on_null:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Finalizes a resolved object call.
+ * This function is called after an Eo method invocation to perform cleanup,
+ * primarily decrementing the internal reference count that was incremented
+ * by `_efl_object_call_resolve` and handling any auto-unref logic.
+ * It also releases the object pointer obtained via `_eo_obj_pointer_get`.
+ *
+ * @param call Pointer to the Efl_Object_Op_Call_Data structure that was populated
+ *             by `_efl_object_call_resolve` and used for the call.
+ */
 EO_API void
 _efl_object_call_end(Efl_Object_Op_Call_Data *call)
 {
-   if (EINA_LIKELY(!!call->obj))
+   if (EINA_LIKELY(!!call->obj)) // If a valid object was part of the call
      {
-        _apply_auto_unref(call->obj, call->eo_id);
-        _efl_unref(call->obj);
-        _eo_obj_pointer_done((Eo_Id)call->eo_id);
+        _apply_auto_unref(call->obj, call->eo_id); // Handle auto-unreferencing
+        _efl_unref(call->obj); // Decrement internal refcount
+        _eo_obj_pointer_done((Eo_Id)call->eo_id); // Release object pointer
      }
 }
 
+/**
+ * @internal
+ * @brief Compares two API function pointers for equality.
+ * On most platforms, this is a direct pointer comparison.
+ * On Windows, due to how DLL exports/imports can result in different addresses
+ * for the same function, it falls back to string comparison of the function names
+ * if the pointers are different. This is slower and assumes the function pointers
+ * are actually char* names on Windows in that specific fallback case.
+ * @param api_func1 First API function pointer.
+ * @param api_func2 Second API function pointer.
+ * @return EINA_TRUE if considered equal, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _eo_api_func_equal(const void *api_func1, const void *api_func2)
 {
 #ifndef _WIN32
-   return (api_func1 == api_func2);
+   return (api_func1 == api_func2); // Direct pointer comparison
 #else
    /* On Windows, DLL API's will be exported using the dllexport flag.
     * When used by another library or executable, they will be declared
@@ -716,17 +909,29 @@ _eo_api_func_equal(const void *api_func1, const void *api_func2)
     * them. We fallback to plain string comparison based on the
     * function name itself. Slow, but this should rarely happen.
     */
-   return (api_func2 && api_func1 && !strcmp(api_func2, api_func1));
+   // This assumes api_func1 and api_func2 are char* if direct comparison fails.
+   return (api_func2 && api_func1 && !strcmp((const char*)api_func2, (const char*)api_func1));
 #endif
 }
 
+/**
+ * @internal
+ * @brief Retrieves the Efl_Object_Op (operation ID) associated with an API function pointer.
+ * It looks up the function pointer in the global `_ops_storage` hash table.
+ * This function is thread-safe due to the use of `_ops_storage_lock`.
+ * @param api_func The API function pointer (e.g., `efl_name_get`, `efl_del`).
+ *                 On Windows, this might be the function name string.
+ * @return The Efl_Object_Op if found, or EFL_NOOP (0) if not found.
+ */
 static inline Efl_Object_Op
 _efl_object_api_op_id_get_internal(const void *api_func)
 {
    eina_spinlock_take(&_ops_storage_lock);
 #ifndef _WIN32
+   // On non-Windows, the key is the address of the function pointer.
    Efl_Object_Op op = (uintptr_t) eina_hash_find(_ops_storage, &api_func);
 #else
+   // On Windows, the key is the function pointer itself (which might be a string name).
    Efl_Object_Op op = (uintptr_t) eina_hash_find(_ops_storage, api_func);
 #endif
    eina_spinlock_release(&_ops_storage_lock);
@@ -735,6 +940,14 @@ _efl_object_api_op_id_get_internal(const void *api_func)
 }
 
 /* LEGACY, should be removed before next release */
+/**
+ * @brief Retrieves the Efl_Object_Op (operation ID) for a given API function. (LEGACY)
+ * This is a wrapper around `_efl_object_api_op_id_get_internal` that logs an error
+ * if the operation ID cannot be resolved.
+ * @deprecated This function is considered legacy.
+ * @param api_func The API function pointer.
+ * @return The Efl_Object_Op, or EFL_NOOP if not found (after logging an error).
+ */
 EO_API Efl_Object_Op
 _efl_object_api_op_id_get(const void *api_func)
 {
@@ -748,6 +961,20 @@ _efl_object_api_op_id_get(const void *api_func)
    return op;
 }
 
+/**
+ * @brief Retrieves the operation ID (Efl_Object_Op) for a given API function, with error reporting.
+ * This function is typically called by the EO_OP_FUNC_CALL macros.
+ * It gets the operation ID using `_efl_object_api_op_id_get_internal`. If the ID is EFL_NOOP (not found),
+ * it logs an error message including the source file, line number, API function name,
+ * object pointer, and class name of the object.
+ *
+ * @param api_func The API function pointer (e.g., `efl_name_get`).
+ * @param eo_obj The Eo object instance involved in the call (used for error reporting).
+ * @param api_func_name The string name of the API function (for error reporting).
+ * @param file The source file where the call is made (for error reporting).
+ * @param line The line number in the source file (for error reporting).
+ * @return The Efl_Object_Op if resolved, otherwise EFL_NOOP.
+ */
 EO_API Efl_Object_Op
 _efl_object_op_api_id_get(const void *api_func, const Eo *eo_obj, const char *api_func_name, const char *file, int line)
 {
@@ -773,11 +1000,33 @@ _efl_object_op_api_id_get(const void *api_func, const Eo *eo_obj, const char *ap
 
 /* klass is the klass we are working on. hierarchy_klass is the class whe should
  * use when validating. */
+/**
+ * @internal
+ * @brief Sets or overrides functions in a class's vtable based on the provided operations.
+ * This function handles both initial function registration for a class and overriding functions
+ * for a specific object instance (efl_object_override).
+ *
+ * It performs sanity checks (e.g., no NULL API functions, no duplicate API definitions within the same `ops` block).
+ * For new functions (not previously having an op ID), it assigns a new op ID.
+ * It then updates the vtable with the new function pointers. If a vtable node for a
+ * particular class ID needs to be modified and hasn't been copied yet (indicated by `hitmap`),
+ * it first performs a deep copy of that node.
+ *
+ * @param vtable The vtable to modify. This could be a class's main vtable or an object's override vtable.
+ * @param ops A structure containing an array of Efl_Op_Description, defining the API functions and their implementations.
+ * @param hierarchy_klass For overrides, this is the original class of the object being overridden. For regular class function setting, this is the class itself. Used for context and validation.
+ * @param klass The class providing the functions. For regular setup, this is the class being defined. For overrides, this is often EFL_OBJECT_OVERRIDE_CLASS.
+ * @param override_only If EINA_TRUE, this function is being called in an override context (e.g., from efl_object_override).
+ *                      This affects error checking (e.g., disallows defining new functions not already in the hierarchy_klass).
+ * @param class_id The numerical ID of the `klass`. If `override_only` is false, new functions will be associated with this `class_id`.
+ * @param hitmap A boolean array used to track which vtable nodes (indexed by class_id) have already been deep-copied for modification. This prevents redundant copies.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., validation error, allocation failure).
+ */
 static Eina_Bool
 _eo_class_funcs_set(Eo_Vtable *vtable, const Efl_Object_Ops *ops, const _Efl_Class *hierarchy_klass, const _Efl_Class *klass, Eina_Bool override_only, unsigned int class_id, Eina_Bool *hitmap)
 {
-   unsigned int i, j;
-   unsigned int number_of_new_functions = 0;
+   unsigned int i, j; // Loop counters
+   unsigned int number_of_new_functions = 0; // Counter for functions that don't have an op_id yet
    const Efl_Op_Description *op_desc;
    const Efl_Op_Description *op_descs;
    const _Efl_Class *override_class;
@@ -986,109 +1235,146 @@ err_vtable:
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Core implementation for starting the object creation process (efl_add, efl_add_ref).
+ * This function handles:
+ * - Checking for class overrides.
+ * - Validating the class and parent object (if any).
+ * - Ensuring only regular classes are instantiated.
+ * - Allocating memory for the new object (reusing from trash if available).
+ * - Initializing the object's COW optional data.
+ * - Incrementing the object's internal reference count.
+ * - Assigning the object's class.
+ * - Allocating an Eo_Id for the object.
+ * - Logging the 'new' operation.
+ * - Resetting constructor/destructor state.
+ * - Incrementing the object's user reference count (making it 1).
+ * - Setting the parent if provided.
+ * - Calling the object's constructor (either standard efl_constructor or a substitute).
+ * - Handling cases where the constructor returns a different object (e.g., a singleton or factory).
+ *
+ * @param file Source file name where the add operation was initiated (for debugging).
+ * @param line Line number in the source file (for debugging).
+ * @param klass_id The class of the object to create.
+ * @param parent_id Optional parent object. If `ref` is EINA_FALSE, a parent is expected.
+ * @param ref If EINA_TRUE, the returned object will have an extra reference (for efl_add_ref).
+ *            If EINA_FALSE (for efl_add), the object is expected to be managed by its parent.
+ * @param is_fallback EINA_TRUE if this creation is part of a fallback mechanism.
+ * @param substitute_ctor Optional callback to substitute the standard efl_constructor.
+ * @param sub_ctor_data Data for the substitute_ctor.
+ * @return The newly created (and constructed) Eo object, or NULL on failure.
+ *         The returned object has a user_refcount of 1.
+ */
 static Eo *
 _efl_add_internal_start_do(const char *file, int line, const Efl_Class *klass_id, Eo *parent_id, Eina_Bool ref, Eina_Bool is_fallback, Efl_Substitute_Ctor_Cb substitute_ctor, void *sub_ctor_data)
 {
    const char *func_name = __func__;
-   _Eo_Object *obj;
-   Eo_Stack_Frame *fptr = NULL;
+   _Eo_Object *obj; // Internal object structure
+   Eo_Stack_Frame *fptr = NULL; // For fallback stack, if used
 
    if (is_fallback) fptr = _efl_add_fallback_stack_push(NULL);
 
+   // Check for class overrides
    if (class_overrides)
      {
         const Efl_Class *override = eina_hash_find(class_overrides, &klass_id);
-        if (override) klass_id = override;
+        if (override) klass_id = override; // Use the override class instead
      }
 
-   EO_CLASS_POINTER_GOTO_PROXY(klass_id, klass, err_klass);
+   EO_CLASS_POINTER_GOTO_PROXY(klass_id, klass, err_klass); // Get internal _Efl_Class*
 
-   // Check that in the case of efl_add we do pass a parent.
+   // Check that in the case of efl_add (ref=FALSE) we do pass a parent.
    if (!ref && !parent_id)
      ERR("Creation of '%s' object at line %i in '%s' is done without parent. This should use efl_add_ref.",
          klass->desc->name, line, file);
 
    if (parent_id)
      {
-        EO_OBJ_POINTER_GOTO_PROXY(parent_id, parent, err_parent);
+        EO_OBJ_POINTER_GOTO_PROXY(parent_id, parent, err_parent); // Get internal _Eo_Object* for parent
      }
 
-   // not likely so use goto to alleviate l1 instruction cache of rare code
+   // Only regular classes can be instantiated directly.
    if (EINA_UNLIKELY(klass->desc->type != EFL_CLASS_TYPE_REGULAR))
      goto err_noreg;
 
+   // Allocate object: try to pop from trash first
    eina_spinlock_take(&klass->objects.trash_lock);
    obj = eina_trash_pop(&klass->objects.trash);
-   if (obj)
+   if (obj) // Reused from trash
      {
-        memset(obj, 0, klass->obj_size);
+        memset(obj, 0, klass->obj_size); // Clear reused memory
         klass->objects.trash_count--;
      }
-   else
+   else // Allocate new
      {
         obj = calloc(1, klass->obj_size);
      }
    eina_spinlock_release(&klass->objects.trash_lock);
 
-   obj->opt = eina_cow_alloc(efl_object_optional_cow);
-   _efl_ref(obj);
-   obj->klass = klass;
+   obj->opt = eina_cow_alloc(efl_object_optional_cow); // Allocate copy-on-write optional data
+   _efl_ref(obj); // Increment internal refcount (becomes 1)
+   obj->klass = klass; // Assign class
 
-   obj->header.id = _eo_id_allocate(obj, parent_id);
-   Eo *eo_id = _eo_obj_id_get(obj);
+   obj->header.id = _eo_id_allocate(obj, parent_id); // Allocate a unique Eo ID
+   Eo *eo_id = _eo_obj_id_get(obj); // Get the public Eo* from the internal object
 
-   _eo_log_obj_ref_op(obj, EO_REF_OP_NEW);
+   _eo_log_obj_ref_op(obj, EO_REF_OP_NEW); // Log creation
 
-   _eo_condtor_reset(obj);
+   _eo_condtor_reset(obj); // Reset constructor/destructor flags
 
-   efl_ref(eo_id);
+   efl_ref(eo_id); // Increment user refcount (becomes 1)
 
    /* Reference for the parent if is_ref is done in _efl_add_end */
-   if (parent_id) efl_parent_set(eo_id, parent_id);
+   if (parent_id) efl_parent_set(eo_id, parent_id); // Set parent, which might inc parent's ref to child
 
-   /* eo_id can change here. Freeing is done on the resolved object. */
-   if (!substitute_ctor) eo_id = efl_constructor(eo_id);
-   else eo_id = substitute_ctor(sub_ctor_data, eo_id);
-   // not likely so use goto to alleviate l1 instruction cache of rare code
-   if (!eo_id) goto err_noid;
-   // not likely so use goto to alleviate l1 instruction cache of rare code
+   /* eo_id can change here if constructor returns a different object.
+    * Freeing is done on the resolved object. */
+   if (!substitute_ctor) eo_id = efl_constructor(eo_id); // Call constructor
+   else eo_id = substitute_ctor(sub_ctor_data, eo_id); // Or substitute constructor
+
+   if (!eo_id) goto err_noid; // Constructor failed
+
+   // If constructor returned a *different* object (e.g. singleton)
    else if (eo_id != _eo_obj_id_get(obj)) goto ok_nomatch;
-ok_nomatch_back:
-   if (is_fallback) fptr->obj = eo_id;
-   if (parent_id) EO_OBJ_DONE(parent_id);
-   return eo_id;
 
-ok_nomatch:
+ok_nomatch_back: // Common return path
+   if (is_fallback) fptr->obj = eo_id;
+   if (parent_id) EO_OBJ_DONE(parent_id); // Release parent object pointer
+   return eo_id; // Return the (potentially substituted) object
+
+ok_nomatch: // Handling when constructor returns a different object
      {
-        EO_OBJ_POINTER_GOTO_PROXY(eo_id, new_obj, err_newid);
-        _efl_ref(new_obj);
-        efl_ref(eo_id);
-        /* We might have two refs on the old object at this point. */
-        efl_parent_set((Eo *) obj->header.id, NULL);
-        efl_unref(_eo_obj_id_get(obj));
-        _efl_unref(obj);
-        EO_OBJ_DONE(eo_id);
+        EO_OBJ_POINTER_GOTO_PROXY(eo_id, new_obj, err_newid); // Get internal pointer for the new eo_id
+        _efl_ref(new_obj); // Internal ref for the new object
+        efl_ref(eo_id);    // User ref for the new object
+
+        // Cleanup the originally allocated 'obj' as it's not used
+        efl_parent_set((Eo *) obj->header.id, NULL); // Clear its parent
+        efl_unref(_eo_obj_id_get(obj)); // User unref original obj (was 1, becomes 0)
+        _efl_unref(obj);                // Internal unref original obj (was 1, becomes 0, leads to free)
+        EO_OBJ_DONE(eo_id); // Release new_obj pointer
      }
    goto ok_nomatch_back;
 
-err_noid:
+err_noid: // Constructor returned NULL
    ERR("in %s:%d: Object of class '%s' - Error while constructing object",
        file, line, klass->desc->name);
-   /* We might have two refs at this point. */
+   // Cleanup the originally allocated 'obj'
    efl_parent_set((Eo *) obj->header.id, NULL);
-   efl_unref(_eo_obj_id_get(obj));
-   _efl_unref(obj);
-err_newid:
+   efl_unref(_eo_obj_id_get(obj)); // User unref
+   _efl_unref(obj);                // Internal unref
+err_newid: // Failed to get pointer for the new_id from constructor
    if (parent_id) EO_OBJ_DONE(parent_id);
    return NULL;
-err_noreg:
+err_noreg: // Tried to instantiate a non-regular class
    ERR("in %s:%d: Class '%s' is not instantiate-able. Aborting.", file, line, klass->desc->name);
    if (parent_id) EO_OBJ_DONE(parent_id);
    return NULL;
 
-err_klass:
+err_klass: // Invalid class_id provided
    _EO_POINTER_ERR(klass_id, "in %s:%d: Class (%p) is an invalid ref.", file, line, klass_id);
-err_parent:
+err_parent: // Invalid parent_id provided or failed to get its pointer
    return NULL;
 }
 
@@ -1103,10 +1389,27 @@ EO_API Eo * _efl_add_internal_start_bindings(const char *file, int line, const E
    return _efl_add_internal_start_do(file, line, klass_id, parent_id, ref, is_fallback, substitute_ctor, sub_ctor_data);
 }
 
+/**
+ * @internal
+ * @brief Completes the object creation process initiated by `_efl_add_internal_start*`.
+ * This function checks if all constructors were run (condtor_done flag).
+ * If finalization failed (finalized_id is NULL), it cleans up the object.
+ * Otherwise, it marks the object as finalized and decrements its internal reference count
+ * (which was incremented by `_efl_add_internal_start*`).
+ *
+ * @param eo_id The object ID as returned by `_efl_add_internal_start*` (before finalization).
+ *              This object should have a user_refcount of 1 and an internal_refcount of 1.
+ * @param finalized_id The object ID after `efl_finalize()` has been called on `eo_id`.
+ *                     This might be NULL if finalization failed.
+ * @return The `eo_id` if successful, or NULL if finalization or constructor checks fail.
+ *         If successful, the object is finalized, and its internal refcount is back to what it was
+ *         before `_efl_add_internal_start*` incremented it (effectively, the user_refcount of 1
+ *         is the main remaining reference unless `is_ref` was true in `_efl_add_end`).
+ */
 static Eo *
 _efl_add_internal_end(Eo *eo_id, Eo *finalized_id)
 {
-   EO_OBJ_POINTER_RETURN_VAL(eo_id, obj, NULL);
+   EO_OBJ_POINTER_RETURN_VAL(eo_id, obj, NULL); // Get internal object data
 
    // rare so move error handling to end to save l1 instruction cache
    if (!obj->condtor_done) goto err_condtor;
@@ -1181,10 +1484,30 @@ efl_reuse(const Eo *eo_id)
    EO_OBJ_DONE(eo_id);
 }
 
+/**
+ * @internal
+ * @brief Frees an Eo object's internal resources and memory.
+ * This function is called when an object's internal reference count drops to zero.
+ * It performs several cleanup tasks:
+ * - Logs the free operation (if EO_DEBUG is enabled).
+ * - Performs debug checks for lingering data references or cross-references if `manual_free` is true
+ *   (though `manual_free` is EINA_UNUSED in the non-debug path).
+ * - Frees the object's override vtable if it exists.
+ * - Releases the object's Eo_Id.
+ * - Frees the object's copy-on-write optional data.
+ * - Puts the object's memory block into its class's trash for potential reuse,
+ *   or directly frees it if the trash is full or trash bypass is enabled.
+ *
+ * @param obj The internal _Eo_Object structure to free.
+ * @param manual_free EINA_TRUE if this free is initiated by `efl_manual_free()`.
+ *                    This parameter is primarily used for extra debugging checks.
+ *                    (Marked EINA_UNUSED in the function signature for non-debug builds
+ *                     where it might not be used).
+ */
 void
 _eo_free(_Eo_Object *obj, Eina_Bool manual_free EINA_UNUSED)
 {
-   _Efl_Class *klass = (_Efl_Class*) obj->klass;
+   _Efl_Class *klass = (_Efl_Class*) obj->klass; // Get the class of the object
 
    _eo_log_obj_ref_op(obj, EO_REF_OP_FREE);
 
@@ -1318,24 +1641,41 @@ err_obj:
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Checks if a class `find` is present in the Method Resolution Order (MRO) of another class `klass`.
+ * This is used to determine if `klass` inherits from or implements `find`.
+ * @param klass The class whose MRO is to be searched.
+ * @param find The class to search for within `klass`'s MRO.
+ * @return EINA_TRUE if `find` is in the MRO of `klass`, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _eo_class_mro_has(const _Efl_Class *klass, const _Efl_Class *find)
 {
-   const _Efl_Class **itr;
-   for (itr = klass->mro ; *itr ; itr++)
+   const _Efl_Class **itr; // MRO is an array of _Efl_Class pointers
+   for (itr = klass->mro ; *itr ; itr++) // Iterate through the MRO
      {
-        if (*itr == find)
+        if (*itr == find) // If the current MRO entry matches 'find'
           {
              return EINA_TRUE;
           }
      }
-   return EINA_FALSE;
+   return EINA_FALSE; // 'find' not found in MRO
 }
 
+/**
+ * @internal
+ * @brief Removes duplicate entries from a list of _Efl_Class pointers.
+ * It iterates from the end of the list, comparing each element with all preceding elements.
+ * If a duplicate is found, the earlier occurrence (closer to the head of the list) is removed.
+ * This is important for MRO construction to ensure each class appears only once.
+ * @param list The Eina_List of _Efl_Class pointers.
+ * @return The modified Eina_List with duplicates removed. The list itself might be modified.
+ */
 static Eina_List *
 _eo_class_list_remove_duplicates(Eina_List* list)
 {
-   Eina_List *itr1, *itr2, *itr2n;
+   Eina_List *itr1, *itr2, *itr2n; // List iterators
 
    itr1 = eina_list_last(list);
    while (itr1)
@@ -1360,36 +1700,67 @@ _eo_class_list_remove_duplicates(Eina_List* list)
    return list;
 }
 
+/**
+ * @internal
+ * @brief Recursively builds a linearized list of classes for MRO (Method Resolution Order) construction.
+ * It follows the C3 linearization algorithm principle:
+ * 1. Add the current class `klass` to the MRO list.
+ * 2. Recursively add all MIXIN extensions of `klass` to the MRO list.
+ * 3. Recursively add the parent of `klass` to the MRO list.
+ * Duplicates are handled later by `_eo_class_list_remove_duplicates`.
+ * The order is important: class itself, then its mixins, then its parent's MRO.
+ * @param mro The Eina_List representing the MRO being built.
+ * @param klass The current _Efl_Class to add to the MRO.
+ * @return The updated MRO Eina_List.
+ */
 static Eina_List *
 _eo_class_mro_add(Eina_List *mro, const _Efl_Class *klass)
 {
-   if (!klass)
+   if (!klass) // Base case for recursion (no class, e.g., parent of top-level class)
      return mro;
 
-   mro = eina_list_append(mro, klass);
+   mro = eina_list_append(mro, klass); // Add current class
 
    /* Recursively add MIXINS extensions. */
      {
-        const _Efl_Class **extn_itr;
+        const _Efl_Class **extn_itr; // Iterator for class extensions array
 
-        for (extn_itr = klass->extensions ; *extn_itr ; extn_itr++)
+        for (extn_itr = klass->extensions ; *extn_itr ; extn_itr++) // For each extension
           {
              const _Efl_Class *extn = *extn_itr;
-             if (extn->desc->type == EFL_CLASS_TYPE_MIXIN)
-               mro = _eo_class_mro_add(mro, extn);
+             if (extn->desc->type == EFL_CLASS_TYPE_MIXIN) // If it's a mixin
+               mro = _eo_class_mro_add(mro, extn); // Recursively add the mixin's MRO
           }
      }
 
-   mro = _eo_class_mro_add(mro, klass->parent);
+   mro = _eo_class_mro_add(mro, klass->parent); // Recursively add parent's MRO
 
    return mro;
 }
 
+/**
+ * @internal
+ * @brief Initializes the Method Resolution Order (MRO) for a new class.
+ * This function orchestrates the MRO creation by:
+ * 1. Adding all MIXIN extensions (and their MROs) to a preliminary MRO list.
+ * 2. Checking for MRO consistency (C3 linearization requirement: if a class extends multiple mixins,
+ *    and one mixin appears later in the MRO of another, it's an error).
+ * 3. Adding the parent class (and its MRO) to the list.
+ * 4. Removing duplicate class entries from the list.
+ * 5. Prepending a NULL placeholder, which will later be replaced by the class itself.
+ *
+ * @param desc The Efl_Class_Description of the class being created.
+ * @param parent The _Efl_Class pointer of the parent class.
+ * @param extensions An Eina_List of _Efl_Class pointers representing the extensions (interfaces/mixins).
+ * @return An Eina_List representing the MRO (with a NULL placeholder at the head), or NULL on MRO inconsistency.
+ * Example MRO for class D(B, C): [NULL, D_impl, B_impl, C_impl, A_impl, EFL_OBJECT_CLASS] (if B and C inherit A)
+ * The list returned here would be [NULL, B_mro_parts..., C_mro_parts..., Parent_mro_parts...], then duplicates removed.
+ */
 static Eina_List *
 _eo_class_mro_init(const Efl_Class_Description *desc, const _Efl_Class *parent, Eina_List *extensions)
 {
-   Eina_List *mro = NULL;
-   Eina_List *extn_itr = NULL;
+   Eina_List *mro = NULL; // The MRO list being built
+   Eina_List *extn_itr = NULL; // Iterator for extensions
    Eina_List *extn_pos = NULL;
    const _Efl_Class *extn = NULL;
 
@@ -1437,31 +1808,60 @@ _eo_class_mro_init(const Efl_Class_Description *desc, const _Efl_Class *parent, 
    return mro;
 }
 
+/**
+ * @internal
+ * @brief Calls the class initializer function if defined for the given class.
+ * The class initializer is part of the class description and is called during
+ * the class creation process, before the class constructor.
+ * @param klass The _Efl_Class whose initializer is to be called.
+ * @return EINA_TRUE if the initializer succeeds (or if no initializer is defined),
+ *         EINA_FALSE if the initializer function returns EINA_FALSE.
+ */
 static Eina_Bool
 _eo_class_initializer(_Efl_Class *klass)
 {
-   if (klass->desc->class_initializer)
-     return klass->desc->class_initializer(_eo_class_id_get(klass));
+   if (klass->desc->class_initializer) // If an initializer function is provided in the class description
+     return klass->desc->class_initializer(_eo_class_id_get(klass)); // Call it
 
-   return EINA_TRUE;
+   return EINA_TRUE; // Default success if no initializer
 }
 
+/**
+ * @internal
+ * @brief Calls the class constructor function if defined for the given class.
+ * Marks the class as constructed and records the construction thread.
+ * The class constructor is part of the class description and is called at the
+ * end of the class creation process.
+ * @param klass The _Efl_Class whose constructor is to be called.
+ */
 static void
 _eo_class_constructor(_Efl_Class *klass)
 {
-   klass->constructed = EINA_TRUE;
+   klass->constructed = EINA_TRUE; // Mark class as constructed
 
-   klass->construction_thread = eina_thread_self();
+   klass->construction_thread = eina_thread_self(); // Store the thread that constructed the class
 
-   if (klass->desc->class_constructor)
-     klass->desc->class_constructor(_eo_class_id_get(klass));
+   if (klass->desc->class_constructor) // If a constructor function is provided
+     klass->desc->class_constructor(_eo_class_id_get(klass)); // Call it
 }
 
+/**
+ * @internal
+ * @brief Frees resources associated with an _Efl_Class structure.
+ * This includes:
+ * - Calling the class destructor (if defined).
+ * - Freeing vtable MRO entries and the vtable itself (if constructed).
+ * - Cleaning object and iterator trashes associated with the class.
+ * - Freeing spinlocks.
+ * - Finally, freeing the class structure itself.
+ * It includes a check to warn if called from an unexpected thread.
+ * @param klass The _Efl_Class to free.
+ */
 static void
 eo_class_free(_Efl_Class *klass)
 {
-   void *data;
-   Eina_Thread self = eina_thread_self();
+   void *data; // Temporary variable for trash iteration
+   Eina_Thread self = eina_thread_self(); // Current thread
 
    if ((self != _efl_object_main_thread) &&
        (self != klass->construction_thread))
@@ -1485,42 +1885,57 @@ eo_class_free(_Efl_Class *klass)
    eina_spinlock_free(&klass->objects.trash_lock);
    eina_spinlock_free(&klass->iterators.trash_lock);
 
-   eina_freeq_ptr_main_add(klass, free, 0);
+   eina_freeq_ptr_main_add(klass, free, 0); // Queue the class structure itself for freeing
 }
 
-EO_API int _eo_no_anon = -1;
+EO_API int _eo_no_anon = -1; /**< Global flag to control anonymous mmap usage for _eo_classes. -1: unset, 0: use mmap, 1: use realloc. Checked via "EFL_NO_MMAP_ANON" env var. */
 
+/**
+ * @internal
+ * @brief Releases the memory allocated for the global `_eo_classes` array.
+ * Depending on compilation flags (HAVE_MMAP, HAVE_VALGRIND) and the `_eo_no_anon` flag,
+ * this will either `free()` or `munmap()` the memory.
+ * It also resets related global variables like `_eo_classes_last_id` and `_eo_classes_alloc`.
+ */
 static inline void
 _eo_classes_release(void)
 {
 #ifdef HAVE_MMAP
 # ifdef HAVE_VALGRIND
-   if (RUNNING_ON_VALGRIND) free(_eo_classes);
+   if (RUNNING_ON_VALGRIND) free(_eo_classes); // Use free under Valgrind
    else
 # endif
      {
-        if (_eo_no_anon == 1) free(_eo_classes);
+        if (_eo_no_anon == 1) free(_eo_classes); // If mmap disabled by env var
         else
           {
              size_t size;
 
              size = _eo_classes_alloc * sizeof(_Efl_Class *);
-             if (_eo_classes) munmap(_eo_classes, size);
+             if (_eo_classes) munmap(_eo_classes, size); // Use munmap
           }
      }
 #else
-   free(_eo_classes);
+   free(_eo_classes); // Fallback to free if no mmap
 #endif
    _eo_classes = NULL;
    _eo_classes_last_id = 0;
    _eo_classes_alloc = 0;
 }
 
+/**
+ * @internal
+ * @brief Expands the global `_eo_classes` array if needed to accommodate a new class.
+ * It increments `_eo_classes_last_id`. If this exceeds `_eo_classes_alloc`,
+ * the array is reallocated (using `realloc` or `mmap`+`memcpy`+`munmap` depending
+ * on `HAVE_MMAP` and `_eo_no_anon`). The new portion of the array is zeroed.
+ * The expansion size is typically a page or a fixed number of entries.
+ */
 static inline void
 _eo_classes_expand(void)
 {
-   unsigned char *ptr;
-   size_t newsize, psize;
+   unsigned char *ptr; // New pointer after reallocation
+   size_t newsize, psize; // New and previous sizes
 
    _eo_classes_last_id++;
    if (_eo_classes_last_id <= _eo_classes_alloc) return;
@@ -2187,34 +2602,62 @@ efl_del_intercept_get(const Eo *obj_id)
    return func;
 }
 
+/**
+ * @internal
+ * @brief Marks an object's constructor/destructor sequence as complete.
+ * This function sets the `condtor_done` flag in the object's internal data.
+ * It is an error to call this if the flag is already set.
+ * This flag is checked during `_efl_add_internal_end` to ensure all
+ * constructors in the hierarchy have run.
+ * @param obj_id The Eo object ID.
+ */
 void
 _eo_condtor_done(Eo *obj_id)
 {
-   EO_OBJ_POINTER_RETURN(obj_id, obj);
-   if (obj->condtor_done)
+   EO_OBJ_POINTER_RETURN(obj_id, obj); // Get internal object pointer
+   if (obj->condtor_done) // If already marked as done
      {
         ERR("Object %p is already constructed at this point.", obj);
         EO_OBJ_DONE(obj_id);
         return;
      }
-   obj->condtor_done = EINA_TRUE;
+   obj->condtor_done = EINA_TRUE; // Set the flag
    EO_OBJ_DONE(obj_id);
 }
 
+/**
+ * @internal
+ * @brief Safely retrieves the data scope for a given object and class, ensuring the class has data.
+ * This is a wrapper around `_efl_data_scope_get` that first checks if `klass->desc->data_size > 0`.
+ * @param obj The internal _Eo_Object structure.
+ * @param klass The _Efl_Class for which to get the data scope.
+ * @return Pointer to the data scope, or NULL if the class has no data (`data_size` is 0) or other errors.
+ */
 static inline void *
 _efl_data_scope_safe_get(const _Eo_Object *obj, const _Efl_Class *klass)
 {
-   if (EINA_LIKELY(klass->desc->data_size > 0))
+   if (EINA_LIKELY(klass->desc->data_size > 0)) // Check if the class actually has data
      {
-        return _efl_data_scope_get(obj, klass);
+        return _efl_data_scope_get(obj, klass); // Call the main getter
      }
 
-   return NULL;
+   return NULL; // No data for this class
 }
 
+/**
+ * @internal
+ * @brief Retrieves the data scope (private data pointer) for a specific class within an object's memory layout.
+ * For regular classes, this is a direct offset from the object's base pointer.
+ * For mixin classes, it iterates through the object's class's `extn_data_off` array
+ * to find the correct offset for the requested mixin's data.
+ * @param obj The internal _Eo_Object structure.
+ * @param klass The _Efl_Class (can be a regular class or a mixin) for which to find the data scope.
+ * @return Pointer to the start of the data for `klass` within `obj`, or NULL if not found or `klass` has no data.
+ */
 static inline void *
 _efl_data_scope_get(const _Eo_Object *obj, const _Efl_Class *klass)
 {
+   // If it's not a mixin, data_offset is directly applicable
    if (EINA_LIKELY(klass->desc->type != EFL_CLASS_TYPE_MIXIN))
      return ((char *) obj) + klass->data_offset;
 
@@ -2420,18 +2863,18 @@ static void
 _eo_table_del_cb(void *in)
 {
    Eo_Id_Data *data = in;
-   _eo_free_ids_tables(data);
+   _eo_free_ids_tables(data); // Free the tables associated with this domain data
 }
 
 /* FIXME: Support other domains and tables, at the moment only the main
  * domain and table.
  * This is used by the gdb debug helper script */
-Eo_Id_Data *_eo_gdb_main_domain = NULL;
+Eo_Id_Data *_eo_gdb_main_domain = NULL; /**< Pointer to the main domain's Eo_Id_Data, used by GDB helper scripts. */
 
 EO_API Eina_Bool
 efl_object_init(void)
 {
-   const char *log_dom = "eo";
+   const char *log_dom = "eo"; // Log domain name for Eo
    if (_efl_object_init_count++ > 0)
      return EINA_TRUE;
 
@@ -2601,17 +3044,40 @@ efl_domain_get(void)
    return data->local_domain;
 }
 
+/**
+ * @brief Gets the currently active Eo ID domain from the top of the current thread's domain stack.
+ * Eo objects are associated with domains, and operations on them are typically
+ * performed within their domain. The domain stack allows temporarily switching
+ * the active domain, for example, when an object from one thread (domain)
+ * needs to be manipulated by another.
+ * @return The current Efl_Id_Domain from the top of the stack.
+ * @see efl_domain_current_push()
+ * @see efl_domain_current_pop()
+ * @see efl_domain_get()
+ */
 EO_API Efl_Id_Domain
 efl_domain_current_get(void)
 {
-   Eo_Id_Data *data = _eo_table_data_get();
-   return data->domain_stack[data->stack_top];
+   Eo_Id_Data *data = _eo_table_data_get(); // Get current thread's Eo_Id_Data
+   return data->domain_stack[data->stack_top]; // Return domain at the top of the stack
 }
 
+/**
+ * @brief Switches the local domain for the current thread.
+ * This function changes the primary domain associated with the current thread.
+ * It involves allocating new Eo_Id_Data for the target domain if it's the first
+ * time this thread is switching to it, and potentially freeing the Eo_Id_Data
+ * of the previous local domain if it's no longer needed by this thread.
+ * The new domain also becomes the current domain at the bottom of the domain stack.
+ *
+ * @param domain The Efl_Id_Domain to switch to. Must be a valid per-thread domain
+ *               (EFL_ID_DOMAIN_MAIN, EFL_ID_DOMAIN_BACKGROUND, etc., but not EFL_ID_DOMAIN_SHARED).
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., invalid domain, allocation error).
+ */
 EO_API Eina_Bool
 efl_domain_switch(Efl_Id_Domain domain)
 {
-   Eo_Id_Data *data = _eo_table_data_get();
+   Eo_Id_Data *data = _eo_table_data_get(); // Get current thread's Eo_Id_Data
    Eo_Id_Data *new_data;
    if ((domain < EFL_ID_DOMAIN_MAIN) || (domain > EFL_ID_DOMAIN_THREAD) ||
        (domain == EFL_ID_DOMAIN_SHARED))
@@ -2658,21 +3124,36 @@ _efl_domain_pop(Eo_Id_Data *data)
 EO_API Eina_Bool
 efl_domain_current_push(Efl_Id_Domain domain)
 {
-   Eo_Id_Data *data = _eo_table_data_get();
-   return _efl_domain_push(data, domain);
+   Eo_Id_Data *data = _eo_table_data_get(); // Get current thread's Eo_Id_Data
+   return _efl_domain_push(data, domain); // Use the internal push function
 }
 
+/**
+ * @brief Pops the current Eo ID domain from the top of the current thread's domain stack.
+ * This reverts the active domain to the one previously on the stack.
+ * It does not pop below the initial local domain entry.
+ * @see efl_domain_current_push()
+ * @see efl_domain_current_get()
+ */
 EO_API void
 efl_domain_current_pop(void)
 {
-   Eo_Id_Data *data = _eo_table_data_get();
-   _efl_domain_pop(data);
+   Eo_Id_Data *data = _eo_table_data_get(); // Get current thread's Eo_Id_Data
+   _efl_domain_pop(data); // Use the internal pop function
 }
 
+/**
+ * @brief Sets the current Eo ID domain at the top of the current thread's domain stack.
+ * This directly changes the active domain without pushing a new entry.
+ * It's a more forceful way to change the current domain compared to push/pop.
+ *
+ * @param domain The Efl_Id_Domain to set as current. Must be a valid per-thread domain.
+ * @return EINA_TRUE on success, EINA_FALSE if the domain is invalid.
+ */
 EO_API Eina_Bool
 efl_domain_current_set(Efl_Id_Domain domain)
 {
-   Eo_Id_Data *data = _eo_table_data_get();
+   Eo_Id_Data *data = _eo_table_data_get(); // Get current thread's Eo_Id_Data
    if ((domain < EFL_ID_DOMAIN_MAIN) || (domain > EFL_ID_DOMAIN_THREAD))
      {
         ERR("Invalid domain %i being set", domain);
@@ -2887,87 +3368,111 @@ efl_callbacks_cmp(const Efl_Callback_Array_Item *a, const Efl_Callback_Array_Ite
 
 
 #ifdef EO_DEBUG
-/* NOTE: cannot use ecore_time_get()! */
+/* NOTE: cannot use ecore_time_get()! Eo is lower level. */
+/**
+ * @internal
+ * @brief Gets the current time as a double for logging purposes.
+ * Uses platform-specific high-resolution timers if available (mach_absolute_time on Apple,
+ * clock_gettime with CLOCK_MONOTONIC on Linux/POSIX), falling back to gettimeofday.
+ * This is used by the EO_DEBUG logging system to timestamp events.
+ * @return The current time in seconds with microsecond or nanosecond precision.
+ */
 static inline double
 _eo_log_time_now(void)
 {
 #ifdef _WIN32
-   return evil_time_get();
+   return evil_time_get(); // Windows specific time function from libevil
 #elif defined(__APPLE__) && defined(__MACH__)
-   static double clk_conv = -1.0;
+   static double clk_conv = -1.0; // Conversion factor for mach_absolute_time
 
-   if (EINA_UNLIKELY(clk_conv < 0))
+   if (EINA_UNLIKELY(clk_conv < 0)) // Initialize conversion factor on first call
      {
         mach_timebase_info_data_t info;
         kern_return_t err = mach_timebase_info(&info);
-        if (err == 0)
-          clk_conv = 1e-9 * (double)info.numer / (double)info.denom;
+        if (err == 0) // Successfully got timebase info
+          clk_conv = 1e-9 * (double)info.numer / (double)info.denom; // Calculate nanoseconds factor
         else
-          clk_conv = 1e-9;
+          clk_conv = 1e-9; // Fallback if info fails (assuming nanoseconds)
      }
 
-   return clk_conv * mach_absolute_time();
-#else
+   return clk_conv * mach_absolute_time(); // Return time in seconds
+#else // POSIX-like systems
 #if defined (HAVE_CLOCK_GETTIME)
    struct timespec t;
-   static int clk_id = -1;
+   static int clk_id = -1; // Clock ID to use, initialized to -1
 
-   if (EINA_UNLIKELY(clk_id == -2)) goto try_gettimeofday;
-   if (EINA_UNLIKELY(clk_id == -1))
+   if (EINA_UNLIKELY(clk_id == -2)) goto try_gettimeofday; // If clock_gettime failed permanently
+   if (EINA_UNLIKELY(clk_id == -1)) // First call, determine clock_id
      {
      retry_clk_id:
-        clk_id = CLOCK_MONOTONIC;
-        if (EINA_UNLIKELY(clock_gettime(clk_id, &t)))
+        clk_id = CLOCK_MONOTONIC; // Prefer monotonic clock
+        if (EINA_UNLIKELY(clock_gettime(clk_id, &t))) // Try monotonic
           {
              WRN("CLOCK_MONOTONIC failed!");
-             clk_id = CLOCK_REALTIME;
-             if (EINA_UNLIKELY(clock_gettime(clk_id, &t)))
+             clk_id = CLOCK_REALTIME; // Fallback to realtime clock
+             if (EINA_UNLIKELY(clock_gettime(clk_id, &t))) // Try realtime
                {
                   WRN("CLOCK_REALTIME failed!");
-                  clk_id = -2;
-                  goto try_gettimeofday;
+                  clk_id = -2; // Mark as permanently failed
+                  goto try_gettimeofday; // Use gettimeofday
                }
           }
      }
-   else
+   else // Subsequent calls, use established clk_id
      {
-        if (EINA_UNLIKELY(clock_gettime(clk_id, &t)))
+        if (EINA_UNLIKELY(clock_gettime(clk_id, &t))) // If it fails now (e.g. context switch issue)
           {
              WRN("clk_id=%d previously ok, now failed... retry", clk_id);
-             goto retry_clk_id;
+             goto retry_clk_id; // Retry clock selection
           }
      }
-   return (double)t.tv_sec + (((double)t.tv_nsec) / 1000000000.0);
+   return (double)t.tv_sec + (((double)t.tv_nsec) / 1000000000.0); // Combine seconds and nanoseconds
 
- try_gettimeofday:
-#endif
-   {
+ try_gettimeofday: // Fallback label for gettimeofday
+#endif // HAVE_CLOCK_GETTIME
+   { // Scope for timeval if only gettimeofday is available or clock_gettime failed
       struct timeval timev;
 
-      gettimeofday(&timev, NULL);
-      return (double)timev.tv_sec + (((double)timev.tv_usec) / 1000000);
+      gettimeofday(&timev, NULL); // Standard gettimeofday
+      return (double)timev.tv_sec + (((double)timev.tv_usec) / 1000000); // Combine seconds and microseconds
    }
-#endif
+#endif // _WIN32 / __APPLE__ / POSIX
 }
 
 #ifdef HAVE_BACKTRACE
+/**
+ * @internal
+ * @brief Structure to store an entry in the object lifecycle log when backtraces are enabled.
+ */
 typedef struct _Eo_Log_Obj_Entry {
-   Eo_Id id;
-   const _Eo_Object *obj;
-   const _Efl_Class *klass;
-   double timestamp;
-   Eo_Ref_Op ref_op;
-   unsigned bt_size;
-   unsigned bt_hits;
-   uintptr_t bt_hash;
-   void *bt[];
+   Eo_Id id;                    /**< The Eo_Id of the object. */
+   const _Eo_Object *obj;       /**< Raw pointer to the _Eo_Object structure. */
+   const _Efl_Class *klass;     /**< Pointer to the object's _Efl_Class. */
+   double timestamp;            /**< Timestamp of the event. */
+   Eo_Ref_Op ref_op;            /**< The reference operation type (New, Free, Ref, Unref, Reuse). */
+   unsigned bt_size;            /**< Number of frames in the backtrace. */
+   unsigned bt_hits;            /**< Number of times this exact backtrace was encountered for similar ops (used for condensing reports). */
+   uintptr_t bt_hash;           /**< Hash of the backtrace addresses for quick comparison. */
+   void *bt[];                  /**< Flexible array member for backtrace addresses. */
 } Eo_Log_Obj_Entry;
 
+/**
+ * @internal
+ * @brief Finds the 'New' (added) and 'Free' (deleted) log entries for a given Eo_Id.
+ * Iterates through the `_eo_log_objs` array to find the most recent EO_REF_OP_NEW
+ * and any EO_REF_OP_FREE entry for the specified object ID.
+ * This is used by `_eo_log_obj_report` to provide context about an object's lifecycle.
+ *
+ * @param id The Eo_Id of the object to search for.
+ * @param[out] added Pointer to store the found 'New' entry.
+ * @param[out] added_idx Pointer to store the index of the 'New' entry in `_eo_log_objs`.
+ * @param[out] deleted Pointer to store the found 'Free' entry (if any).
+ */
 static void
 _eo_log_obj_find(const Eo_Id id, const Eo_Log_Obj_Entry **added, int *added_idx, const Eo_Log_Obj_Entry **deleted)
 {
-   const Eo_Log_Obj_Entry *entry;
-   Eina_Array_Iterator it;
+   const Eo_Log_Obj_Entry *entry; // Current entry being examined
+   Eina_Array_Iterator it; // Iterator for the _eo_log_objs array
    unsigned int idx;
 
    *added_idx = -1;
@@ -2992,10 +3497,23 @@ _eo_log_obj_find(const Eo_Id id, const Eo_Log_Obj_Entry **added, int *added_idx,
    eina_spinlock_release(&_eo_log_objs_lock);
 }
 
+/**
+ * @internal
+ * @brief Prints a detailed log message for an Eo_Log_Obj_Entry, including its backtrace.
+ * This function formats and prints information about an object lifecycle event (new, free, ref, etc.),
+ * including the object ID, class name, timestamps, and a symbolized backtrace if `dladdr` is available.
+ *
+ * @param entry The log entry to display.
+ * @param log_level The Eina log level to use for printing.
+ * @param func_name The function name from where this report is being generated (for context in logs).
+ * @param file The file name from where this report is being generated.
+ * @param line The line number from where this report is being generated.
+ * @param now The current time, used to calculate "ago" timestamps.
+ */
 static void
 _eo_log_obj_entry_show(const Eo_Log_Obj_Entry *entry, int log_level, const char *func_name, const char *file, int line, double now)
 {
-   unsigned i;
+   unsigned i; // Loop counter for backtrace frames
 
    eina_log_print(_eo_log_objs_dom, log_level, file, func_name, line,
                   "%s obj_id=%p obj=%p, class=%p (%s) [%0.4fs, %0.4fs ago] [%d hits]:",
@@ -3057,44 +3575,79 @@ _eo_log_obj_entry_show(const Eo_Log_Obj_Entry *entry, int log_level, const char 
 #endif
 
 #ifdef HAVE_BACKTRACE
+/**
+ * @internal
+ * @brief Calculates (and caches) a hash value for the backtrace stored in an Eo_Log_Obj_Entry.
+ * This hash is used to quickly identify if two log entries have the same backtrace,
+ * allowing for consolidation of log messages (incrementing `bt_hits` instead of printing duplicates).
+ * The hash is a simple XOR of all backtrace frame addresses.
+ *
+ * @param entry The log entry whose backtrace is to be hashed.
+ * @return The calculated (or cached) hash value.
+ */
 static uintptr_t
 _eo_log_obj_backtrace_hash(Eo_Log_Obj_Entry *entry)
 {
-   if (!entry->bt_hash)
+   if (!entry->bt_hash) // If hash not already computed and cached
      {
-        entry->bt_hash = (uintptr_t) 4294967291;
+        entry->bt_hash = (uintptr_t) 4294967291; // Initial hash value (a large prime)
         for (unsigned k = 0; k < entry->bt_size; k++)
-          entry->bt_hash ^= ((uintptr_t) (entry->bt[k]));
+          entry->bt_hash ^= ((uintptr_t) (entry->bt[k])); // XOR with each frame address
      }
 
    return entry->bt_hash;
 }
 
+/**
+ * @internal
+ * @brief Checks if a given log entry's backtrace is new compared to a list of existing entries.
+ * It calculates the hash of the `entry`'s backtrace and compares it with the hashes of `other` entries
+ * in the `entries` list. If a matching hash is found, it increments the `bt_hits` counter of the
+ * `other` entry and returns EINA_FALSE (not new). Otherwise, it returns EINA_TRUE (new).
+ *
+ * @param entries A list of Eo_Log_Obj_Entry structures to compare against.
+ * @param entry The Eo_Log_Obj_Entry whose backtrace is to be checked for novelty.
+ * @return EINA_TRUE if the backtrace is new, EINA_FALSE if it's a duplicate of an existing one in the list.
+ */
 static Eina_Bool
 _eo_log_obj_entry_is_new_backtrace(const Eina_List *entries, Eo_Log_Obj_Entry *entry)
 {
-   Eina_Bool ret = EINA_TRUE;
-   Eo_Log_Obj_Entry *other;
-   const Eina_List *li;
-   uintptr_t hash;
+   Eina_Bool ret = EINA_TRUE; // Assume new by default
+   Eo_Log_Obj_Entry *other; // Iterator for existing entries
+   const Eina_List *li; // List iterator
+   uintptr_t hash; // Hash of the entry's backtrace
 
-   hash = _eo_log_obj_backtrace_hash(entry);
-   EINA_LIST_FOREACH(entries, li, other)
-     if (_eo_log_obj_backtrace_hash(other) == hash)
+   hash = _eo_log_obj_backtrace_hash(entry); // Get hash of the new entry
+   EINA_LIST_FOREACH(entries, li, other) // Iterate through existing entries
+     if (_eo_log_obj_backtrace_hash(other) == hash) // If hashes match (strong indication of same backtrace)
        {
-          other->bt_hits++;
-          ret = EINA_FALSE;
+          other->bt_hits++; // Increment hit count of the existing entry
+          ret = EINA_FALSE; // Mark as not new
+          // Note: This doesn't break, so if multiple identical backtraces are somehow in 'entries',
+          // all their hit counts would be incremented. Typically, 'entries' should not have duplicates itself.
        }
 
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Finds all relevant log entries for a specific Eo_Id, starting after a given index.
+ * This function scans the global `_eo_log_objs` array for entries matching `id`.
+ * It filters by `_eo_log_objs_level` and stops if an EO_REF_OP_FREE entry is encountered.
+ * It also uses `_eo_log_obj_entry_is_new_backtrace` to avoid adding multiple entries
+ * with the exact same backtrace to the returned list, consolidating them by incrementing `bt_hits`.
+ *
+ * @param id The Eo_Id of the object whose log entries are sought.
+ * @param start_idx The index in `_eo_log_objs` after which to start searching.
+ * @return An Eina_List of unique (by backtrace) Eo_Log_Obj_Entry pointers. The caller must free this list.
+ */
 static Eina_List *
 _eo_log_obj_find_all(const Eo_Id id, int start_idx)
 {
-   Eo_Log_Obj_Entry *entry;
-   Eina_List *entries = NULL;
-   unsigned int idx;
+   Eo_Log_Obj_Entry *entry; // Current entry being examined
+   Eina_List *entries = NULL; // List of found, unique entries
+   unsigned int idx; // Loop index for _eo_log_objs
 
    eina_spinlock_take(&_eo_log_objs_lock);
    for (idx = start_idx + 1; idx < eina_array_count(&_eo_log_objs); idx++)
@@ -3227,38 +3780,64 @@ _eo_log_obj_report(const Eo_Id id, int log_level, const char *func_name, const c
 }
 
 #ifdef HAVE_BACKTRACE
+/**
+ * @internal
+ * @brief Creates and stores a new Eo_Log_Obj_Entry for a reference operation.
+ * This function is called when an object undergoes a significant lifecycle event
+ * (New, Free, Ref, Unref, Reuse) and backtrace logging is enabled.
+ * It allocates an Eo_Log_Obj_Entry, populates it with details of the object,
+ * the operation, timestamp, and the provided backtrace, then adds it to the
+ * global `_eo_log_objs` array.
+ *
+ * @param obj The _Eo_Object on which the operation occurred.
+ * @param refop The type of reference operation (Eo_Ref_Op).
+ * @param size The number of frames in the backtrace `bt`.
+ * @param bt An array of `void*` representing the backtrace addresses.
+ * @return A pointer to the newly created Eo_Log_Obj_Entry, or NULL on allocation failure.
+ *         The returned entry is owned by the `_eo_log_objs` array.
+ */
 static Eo_Log_Obj_Entry *
 _eo_log_obj_entry_ref_op(const _Eo_Object *obj, Eo_Ref_Op refop, unsigned size, void *const *bt)
 {
-   Eo_Log_Obj_Entry *entry;
-   Eina_Bool ret;
+   Eo_Log_Obj_Entry *entry; // The new log entry
+   Eina_Bool ret; // Result of array push
 
+   // Allocate memory for the entry structure plus the flexible array member for backtrace
    entry = calloc(1, sizeof(Eo_Log_Obj_Entry) + size * sizeof(void *));
-   if (EINA_UNLIKELY(!entry)) return NULL;
+   if (EINA_UNLIKELY(!entry)) return NULL; // Allocation failed
 
+   // Populate the entry
    entry->id = (Eo_Id)_eo_obj_id_get(obj);
    entry->timestamp = _eo_log_time_now();
    entry->obj = obj;
    entry->klass = obj->klass;
    entry->ref_op = refop;
    entry->bt_size = size;
-   entry->bt_hash = 0;
-   entry->bt_hits = 1;
-   if (size && bt)
-     memcpy(entry->bt, bt, size * sizeof(void *));
+   entry->bt_hash = 0; // Hash will be computed on demand
+   entry->bt_hits = 1; // First time this specific backtrace for this op is seen
+   if (size && bt) // If there's a backtrace
+     memcpy(entry->bt, bt, size * sizeof(void *)); // Copy backtrace addresses
 
+   // Add to global log array (thread-safe)
    eina_spinlock_take(&_eo_log_objs_lock);
    ret = eina_array_push(&_eo_log_objs, entry);
    eina_spinlock_release(&_eo_log_objs_lock);
-   if (!ret)
+
+   if (!ret) // If push to array failed
      {
-        free(entry);
+        free(entry); // Free the allocated entry
         return NULL;
      }
 
    return entry;
 }
 
+/**
+ * @internal
+ * @brief Frees an Eo_Log_Obj_Entry structure.
+ * Simple wrapper around `free()`. Used when cleaning up the `_eo_log_objs` array.
+ * @param entry The log entry to free.
+ */
 static inline void
 _eo_log_obj_entry_free(Eo_Log_Obj_Entry *entry)
 {
@@ -3266,6 +3845,16 @@ _eo_log_obj_entry_free(Eo_Log_Obj_Entry *entry)
 }
 #endif
 
+/**
+ * @internal
+ * @brief Comparison function for Eina_Slice structures, used for sorting class names.
+ * Compares slices first by length, then by memory content (memcmp).
+ * This is used with `eina_inarray_search_sorted` for filtering log messages
+ * based on class names specified in EO_LIFECYCLE_DEBUG/NO_DEBUG.
+ * @param pa Pointer to the first Eina_Slice.
+ * @param pb Pointer to the second Eina_Slice.
+ * @return -1 if a < b, 0 if a == b, 1 if a > b.
+ */
 static int
 _eo_class_name_slice_cmp(const void *pa, const void *pb)
 {
@@ -3274,13 +3863,24 @@ _eo_class_name_slice_cmp(const void *pa, const void *pb)
 
    if (a->len < b->len) return -1;
    if (a->len > b->len) return 1;
-   return memcmp(a->mem, b->mem, a->len);
+   return memcmp(a->mem, b->mem, a->len); // Lexicographical compare if lengths are equal
 }
 
+/**
+ * @internal
+ * @brief Determines if an object's lifecycle events should be logged based on environment variable filters.
+ * Checks the object's class name against lists of class names provided in
+ * `EO_LIFECYCLE_DEBUG` (include only these) and `EO_LIFECYCLE_NO_DEBUG` (exclude these).
+ * `EO_LIFECYCLE_NO_DEBUG` takes precedence.
+ * If neither variable is set, or if `EO_LIFECYCLE_DEBUG` is "*" or "1", all objects are desired.
+ *
+ * @param obj The _Eo_Object to check.
+ * @return EINA_TRUE if logging is desired for this object, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _eo_log_obj_desired(const _Eo_Object *obj)
 {
-   Eina_Slice cls_name;
+   Eina_Slice cls_name; // Slice representing the class name for searching
 
    if (EINA_LIKELY((_eo_log_objs_debug.len == 0) &&
                    (_eo_log_objs_no_debug.len == 0)))
@@ -3546,14 +4146,33 @@ _eo_classes_iterator_next(Eina_Iterator *it, void **data)
 static void
 _eo_classes_iterator_free(Eina_Iterator *it)
 {
-   EINA_MAGIC_SET(it, EINA_MAGIC_NONE);
-   free(it);
+   EINA_MAGIC_SET(it, EINA_MAGIC_NONE); // Clear iterator magic
+   free(it); // Free the iterator structure
 }
 
+/**
+ * @brief Creates a new iterator over all registered Eo classes.
+ * The iterator will yield `Efl_Class *` (which are `Eo *` with a class tag)
+ * for each class known to the Eo system at the time of iterator creation.
+ *
+ * @return A new Eina_Iterator instance, or NULL on allocation failure.
+ *         The caller is responsible for freeing the iterator using `eina_iterator_free()`.
+ *
+ * Example:
+ * ```c
+ * Eina_Iterator *iter = eo_classes_iterator_new();
+ * const Efl_Class *klass;
+ * EINA_ITERATOR_FOREACH(iter, klass)
+ * {
+ *     printf("Class: %s\n", efl_class_name_get(klass));
+ * }
+ * eina_iterator_free(iter);
+ * ```
+ */
 EO_API Eina_Iterator *
 eo_classes_iterator_new(void)
 {
-   _Eo_Classes_Iterator *it;
+   _Eo_Classes_Iterator *it; // Internal iterator structure
 
    it = calloc(1, sizeof (*it));
    if (!it) return NULL;
@@ -3623,14 +4242,36 @@ _eo_objects_iterator_next(Eina_Iterator *it, void **data)
 static void
 _eo_objects_iterator_free(Eina_Iterator *it)
 {
-   EINA_MAGIC_SET(it, EINA_MAGIC_NONE);
-   free(it);
+   EINA_MAGIC_SET(it, EINA_MAGIC_NONE); // Clear iterator magic
+   free(it); // Free the iterator structure
 }
 
+/**
+ * @brief Creates a new iterator over all active Eo objects in the main domain.
+ * The iterator yields `Eo *` pointers for each live object.
+ * Note: This iterates objects in the EFL_ID_DOMAIN_MAIN. Behavior for objects
+ * in other domains might require different or more specific iterators if they were to exist.
+ *
+ * @return A new Eina_Iterator instance, or NULL if the main domain data cannot be accessed
+ *         or on allocation failure. The caller is responsible for freeing the iterator
+ *         using `eina_iterator_free()`.
+ *
+ * Example:
+ * ```c
+ * Eina_Iterator *iter = eo_objects_iterator_new();
+ * Eo *obj;
+ * EINA_ITERATOR_FOREACH(iter, obj)
+ * {
+ *     printf("Object: %p, Class: %s\n", obj, efl_class_name_get(obj));
+ * }
+ * eina_iterator_free(iter);
+ * ```
+ */
 EO_API Eina_Iterator *
 eo_objects_iterator_new(void)
 {
-   _Eo_Objects_Iterator *it;
+   _Eo_Objects_Iterator *it; // Internal iterator structure
+   // Get table data for the main domain; this iterator is specific to it.
    Eo_Id_Table_Data *tdata = _eo_table_data_table_get(_eo_table_data_get(), EFL_ID_DOMAIN_MAIN);
 
    if (!tdata) return NULL;
@@ -3647,89 +4288,99 @@ eo_objects_iterator_new(void)
    return (Eina_Iterator *)it;
 }
 
+/** @internal Eina_Value setup function for EINA_VALUE_TYPE_OBJECT. Initializes memory to NULL. */
 static Eina_Bool
 _eo_value_setup(const Eina_Value_Type *type EINA_UNUSED, void *mem)
 {
-   Eo **tmem = mem;
-   *tmem = NULL;
+   Eo **tmem = mem; // Memory holds an Eo*
+   *tmem = NULL;    // Initialize to NULL
    return EINA_TRUE;
 }
 
+/** @internal Eina_Value flush function for EINA_VALUE_TYPE_OBJECT. Unrefs the Eo object if not NULL. */
 static Eina_Bool
 _eo_value_flush(const Eina_Value_Type *type EINA_UNUSED, void *mem)
 {
-   Eo **tmem = mem;
-   if (*tmem)
+   Eo **tmem = mem; // Memory holds an Eo*
+   if (*tmem)        // If it holds an object
      {
-        efl_unref(*tmem);
-        *tmem = NULL;
+        efl_unref(*tmem); // Unreference it
+        *tmem = NULL;     // Set to NULL
      }
    return EINA_TRUE;
 }
 
+/** @internal Eina_Value vset function for EINA_VALUE_TYPE_OBJECT. Sets from va_list. */
 static Eina_Bool
 _eo_value_vset(const Eina_Value_Type *type EINA_UNUSED, void *mem, va_list args)
 {
-   Eo **dst = mem;
-   Eo *src = va_arg(args, Eo *);
-   efl_replace(dst, src);
+   Eo **dst = mem; // Destination Eo* pointer in the Eina_Value memory
+   Eo *src = va_arg(args, Eo *); // Source Eo* from varargs
+   efl_replace(dst, src); // Safely replaces *dst with src (handles ref/unref)
    return EINA_TRUE;
 }
 
+/** @internal Eina_Value pset function for EINA_VALUE_TYPE_OBJECT. Sets from a pointer to Eo*. */
 static Eina_Bool
 _eo_value_pset(const Eina_Value_Type *type EINA_UNUSED,
               void *mem, const void *ptr)
 {
-   Eo **dst = mem;
-   Eo * const *src = ptr;
-   efl_replace(dst, *src);
+   Eo **dst = mem; // Destination Eo* pointer in the Eina_Value memory
+   Eo * const *src = ptr; // Source is a pointer to an Eo*
+   efl_replace(dst, *src); // Safely replaces *dst with *src
    return EINA_TRUE;
 }
 
+/** @internal Eina_Value pget function for EINA_VALUE_TYPE_OBJECT. Gets to a pointer to Eo*. */
 static Eina_Bool
 _eo_value_pget(const Eina_Value_Type *type EINA_UNUSED,
               const void *mem, void *ptr)
 {
-   Eo * const *src = mem;
-   Eo **dst = ptr;
-   *dst = *src;
+   Eo * const *src = mem; // Source Eo* pointer in the Eina_Value memory
+   Eo **dst = ptr; // Destination is a pointer to an Eo*
+   *dst = *src; // Direct copy of the Eo* pointer (no ref change here)
    return EINA_TRUE;
 }
 
+/** @internal Eina_Value convert_to function for EINA_VALUE_TYPE_OBJECT. Converts Eo* to string. */
 static Eina_Bool
 _eo_value_convert_to(const Eina_Value_Type *type EINA_UNUSED, const Eina_Value_Type *convert, const void *type_mem, void *convert_mem)
 {
-   Eo * const *eo = type_mem;
+   Eo * const *eo = type_mem; // The Eo* stored in the source Eina_Value
 
+   // Check if converting to a string type
    if (convert == EINA_VALUE_TYPE_STRINGSHARE ||
        convert == EINA_VALUE_TYPE_STRING)
      {
-        const char *other_mem;
-        char buf[256];
+        const char *other_mem; // Pointer to the string representation
+        char buf[256]; // Buffer for formatting the string
+        // Format: "Object id: <addr>, class: <class_name>, name: <debug_name>"
         snprintf(buf, sizeof(buf), "Object id: %p, class: %s, name: %s",
-                 *eo, efl_class_name_get(efl_class_get(*eo)),
-                 efl_debug_name_get(*eo));
-        other_mem = buf;
-        return eina_value_type_pset(convert, convert_mem, &other_mem);
+                 *eo, efl_class_name_get(efl_class_get(*eo)), // Get class and its name
+                 efl_debug_name_get(*eo)); // Get debug name (may include instance name)
+        other_mem = buf; // Point to the buffer (stack allocated, careful with lifetime if not stringshare)
+        return eina_value_type_pset(convert, convert_mem, &other_mem); // Set the string in the destination Eina_Value
      }
-   return EINA_FALSE;
+   return EINA_FALSE; // Conversion not supported
 }
 
+/** @internal Eina_Value copy function for EINA_VALUE_TYPE_OBJECT. Copies by reffing the Eo object. */
 static Eina_Bool
 _eo_value_copy(const Eina_Value_Type *type EINA_UNUSED, const void *mem, void *ptr)
 {
-   Eo * const *src = mem;
-   Eo **dst = ptr;
+   Eo * const *src = mem; // Source Eo* pointer from Eina_Value memory
+   Eo **dst = ptr;       // Destination Eo* pointer in another Eina_Value memory
 
    if (!src || !dst) return EINA_FALSE;
-   *dst = efl_ref(*src);
+   *dst = efl_ref(*src); // Reference the object and assign to destination
 
    return EINA_TRUE;
 }
 
+/** @internal Definition of the EINA_VALUE_TYPE_OBJECT for Eina_Value system. */
 static const Eina_Value_Type _EINA_VALUE_TYPE_OBJECT = {
   .version = EINA_VALUE_TYPE_VERSION,
-  .value_size = sizeof(Eo *),
+  .value_size = sizeof(Eo *), // Stores one Eo*
   .name = "Efl_Object",
   .setup = _eo_value_setup,
   .flush = _eo_value_flush,
@@ -3744,42 +4395,64 @@ static const Eina_Value_Type _EINA_VALUE_TYPE_OBJECT = {
 
 EO_API const Eina_Value_Type *EINA_VALUE_TYPE_OBJECT = &_EINA_VALUE_TYPE_OBJECT;
 
+/**
+ * @internal
+ * @brief Recursively finds the reflection data for a property by name within a class hierarchy.
+ * It searches in the current class's reflection table, then its parent's, and then its extensions'.
+ *
+ * @param klass The _Efl_Class to start searching from.
+ * @param property_name The name of the property to find.
+ * @return A pointer to the Efl_Object_Property_Reflection structure if found, otherwise NULL.
+ */
 static const Efl_Object_Property_Reflection*
 _efl_class_reflection_find(const _Efl_Class *klass, const char *property_name)
 {
-   const _Efl_Class **klass_iter = klass->extensions;
-   const Efl_Object_Property_Reflection_Ops *ref_ops = klass->reflection;
-   unsigned int i;
+   const _Efl_Class **klass_iter = klass->extensions; // Iterator for class extensions
+   const Efl_Object_Property_Reflection_Ops *ref_ops = klass->reflection; // Reflection operations for the current class
+   unsigned int i; // Loop counter
 
+   // Search in the current class's direct reflection table
    for (i = 0; ref_ops && i < ref_ops->count; ++i)
      {
         if (eina_streq(property_name, ref_ops->table[i].property_name))
-          return &ref_ops->table[i];
+          return &ref_ops->table[i]; // Found
      }
 
+   // If not found, search in the parent class recursively
    if (klass->parent)
      {
         const Efl_Object_Property_Reflection *ref;
-
         ref = _efl_class_reflection_find(klass->parent, property_name);
-        if (ref) return ref;
+        if (ref) return ref; // Found in parent
      }
 
+   // If still not found, search in extensions recursively
    for (; *klass_iter; klass_iter++)
      {
         const Efl_Object_Property_Reflection *ref;
-
         ref = _efl_class_reflection_find(*klass_iter, property_name);
-        if (ref) return ref;
+        if (ref) return ref; // Found in an extension
      }
 
-   return NULL;
+   return NULL; // Not found anywhere in the hierarchy
 }
 
+/**
+ * @brief Sets the value of a property on an Eo object using reflection.
+ * It finds the property's reflection data and calls its `set` function.
+ * The provided Eina_Value is consumed (flushed) by this function or by the
+ * underlying property setter, regardless of success or failure.
+ *
+ * @param obj_id The Eo object.
+ * @param property_name The name of the property to set.
+ * @param value The Eina_Value containing the new value for the property.
+ * @return EINA_ERROR_NONE on success, EINA_ERROR_NOT_IMPLEMENTED if the property
+ *         or its setter is not found, or another Eina_Error code from the setter.
+ */
 EO_API Eina_Error
 efl_property_reflection_set(Eo *obj_id, const char *property_name, Eina_Value value)
 {
-   Eina_Error r = EINA_ERROR_NOT_IMPLEMENTED;
+   Eina_Error r = EINA_ERROR_NOT_IMPLEMENTED; // Default error
    Eina_Bool freed = EINA_FALSE;
 
    EO_OBJ_POINTER_GOTO(obj_id, obj, end);

@@ -2,6 +2,14 @@
 # include <config.h>
 #endif
 
+/**
+ * @file
+ * @brief This file implements a helper mechanism to resolve proxy URIs using an
+ * external process. This is typically used when libproxy is not available or
+ * not working correctly. It communicates with a helper executable
+ * (efl_net_proxy_helper) via stdin/stdout.
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
@@ -16,32 +24,40 @@
 #include "ecore_con_private.h"
 #include "../../static_libs/buildsystem/buildsystem.h"
 
+/**
+ * @brief Represents a request to the proxy helper.
+ */
 typedef struct {
-   Eina_Thread_Queue  *thq;
-   char               *str;
-   char              **proxies;
-   int                 id;
-   int                 busy;
-   int                 fails;
+   Eina_Thread_Queue  *thq;      /**< Thread queue for communication back to the requesting thread. */
+   char               *str;      /**< The string sent to the helper process (e.g., "P ID URL\n"). */
+   char              **proxies;  /**< Array of proxy strings returned by the helper. NULL-terminated.
+                                   * Example: {"http://proxy.example.com:8080", "socks5://localhost:1080", NULL} */
+   int                 id;       /**< Unique identifier for this request. */
+   int                 busy;     /**< Counter indicating if the request is being processed (e.g., waiting for thread queue). */
+   int                 fails;    /**< Number of times this request has failed (e.g., due to helper process restart). */
 } Efl_Net_Proxy_Helper_Req;
 
+/**
+ * @brief Message structure for the thread queue.
+ */
 typedef struct {
-   Eina_Thread_Queue_Msg   head;
-   char                  **proxies;
+   Eina_Thread_Queue_Msg   head;     /**< Standard thread queue message header. */
+   char                  **proxies;  /**< Array of proxy strings. Ownership is transferred.
+                                      * Example: {"http://proxy.example.com:8080", NULL} */
 } Efl_Net_Proxy_Helper_Thq_Msg;
 
-static Eina_Bool            _efl_net_proxy_helper_works            = EINA_TRUE;
-static Ecore_Exe           *_efl_net_proxy_helper_exe              = NULL;
-static Eina_Prefix         *_efl_net_proxy_helper_prefix           = NULL;
-static Eina_Spinlock        _efl_net_proxy_helper_queue_lock;
-static int                  _efl_net_proxy_helper_req_id           = 0;
-static Eina_List           *_efl_net_proxy_helper_queue            = NULL;
-static Ecore_Event_Handler *_efl_net_proxy_helper_handler_exe_del  = NULL;
-static Ecore_Event_Handler *_efl_net_proxy_helper_handler_exe_data = NULL;
-static Eina_Bool            _efl_net_proxy_helper_queue_lock_init  = EINA_FALSE;
-static int                  _efl_net_proxy_helper_init_num         = 0;
+static Eina_Bool            _efl_net_proxy_helper_works            = EINA_TRUE; /**< Flag indicating if the helper mechanism is functional. Set to EINA_FALSE on fatal errors. */
+static Ecore_Exe           *_efl_net_proxy_helper_exe              = NULL; /**< Handle for the running helper executable. */
+static Eina_Prefix         *_efl_net_proxy_helper_prefix           = NULL; /**< Prefix for finding helper executable and other resources. */
+static Eina_Spinlock        _efl_net_proxy_helper_queue_lock; /**< Spinlock to protect access to the request queue. */
+static int                  _efl_net_proxy_helper_req_id           = 0; /**< Counter for generating unique request IDs. */
+static Eina_List           *_efl_net_proxy_helper_queue            = NULL; /**< List of pending Efl_Net_Proxy_Helper_Req. */
+static Ecore_Event_Handler *_efl_net_proxy_helper_handler_exe_del  = NULL; /**< Event handler for helper process deletion. */
+static Ecore_Event_Handler *_efl_net_proxy_helper_handler_exe_data = NULL; /**< Event handler for data received from helper process. */
+static Eina_Bool            _efl_net_proxy_helper_queue_lock_init  = EINA_FALSE; /**< Flag indicating if the queue lock has been initialized. */
+static int                  _efl_net_proxy_helper_init_num         = 0; /**< Initialization counter for the helper system. */
 
-static int locks = 0;
+static int locks = 0; /**< Debugging counter for spinlock usage, potentially for detecting unbalanced lock/unlock. */
 
 #ifdef _WIN32
 # define HELPER_EXT ".exe"
@@ -49,6 +65,15 @@ static int locks = 0;
 # define HELPER_EXT
 #endif
 
+/**
+ * @brief Callback invoked when the helper Ecore_Exe object is deleted.
+ *
+ * This can happen if the helper process exits unexpectedly or is killed.
+ * It sets _efl_net_proxy_helper_exe to NULL.
+ *
+ * @param data User data (unused).
+ * @param ev The EFL event information.
+ */
 static void
 _efl_net_proxy_helper_delete_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -59,6 +84,14 @@ _efl_net_proxy_helper_delete_cb(void *data EINA_UNUSED, const Efl_Event *ev)
      }
 }
 
+/**
+ * @brief Spawns the external proxy helper executable.
+ *
+ * If the helper is already running or the system is marked as not working,
+ * this function does nothing. It constructs the path to the helper
+ * executable and launches it with piped stdin/stdout.
+ * Existing requests in the queue are resent to the new helper instance.
+ */
 static void
 _efl_net_proxy_helper_spawn(void)
 {
@@ -111,6 +144,13 @@ _efl_net_proxy_helper_spawn(void)
                           _efl_net_proxy_helper_delete_cb, NULL);
 }
 
+/**
+ * @brief Kills the running proxy helper executable.
+ *
+ * If no helper is running or if there are pending requests in the queue,
+ * this function does nothing. Otherwise, it terminates and frees the
+ * helper process.
+ */
 static void
 _efl_net_proxy_helper_kill(void)
 {
@@ -122,6 +162,13 @@ _efl_net_proxy_helper_kill(void)
    _efl_net_proxy_helper_exe = NULL;
 }
 
+/**
+ * @brief Cancels all pending proxy requests.
+ *
+ * This function iterates through the request queue, sends a NULL proxy list
+ * back to each waiting thread (signifying cancellation or failure), and
+ * cleans up the request data.
+ */
 static void
 _efl_net_proxy_helper_cancel(void)
 {
@@ -152,6 +199,17 @@ _efl_net_proxy_helper_cancel(void)
    eina_spinlock_release(&_efl_net_proxy_helper_queue_lock);
 }
 
+/**
+ * @brief Adds a resolved proxy URL to a specific request or finalizes the request.
+ *
+ * This function is called when the helper process sends back a proxy URL
+ * or an end-of-proxies marker for a given request ID.
+ *
+ * @param id The ID of the request to update.
+ * @param url The proxy URL string (e.g., "http://proxy.example.com:8080").
+ *            If NULL, it signifies the end of proxies for this request, and
+ *            the accumulated list is sent back to the waiting thread.
+ */
 static void
 _efl_net_proxy_helper_proxy_add(int id, const char *url)
 {
@@ -209,6 +267,18 @@ err:
    eina_spinlock_release(&_efl_net_proxy_helper_queue_lock);
 }
 
+/**
+ * @brief Callback for ECORE_EXE_EVENT_DEL events.
+ *
+ * Handles the unexpected termination of the helper executable.
+ * It may attempt to respawn the helper if requests are pending,
+ * unless it has failed too many times, in which case it cancels all requests.
+ *
+ * @param data User data (unused).
+ * @param type The event type (ECORE_EXE_EVENT_DEL).
+ * @param info Event-specific information (Ecore_Exe_Event_Del).
+ * @return ECORE_CALLBACK_PASS_ON or ECORE_CALLBACK_DONE.
+ */
 static Eina_Bool
 _efl_net_proxy_helper_cb_exe_del(void *data EINA_UNUSED, int type EINA_UNUSED, void *info)
 {
@@ -256,6 +326,20 @@ _efl_net_proxy_helper_cb_exe_del(void *data EINA_UNUSED, int type EINA_UNUSED, v
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for ECORE_EXE_EVENT_DATA events.
+ *
+ * Processes data received from the stdout of the helper executable.
+ * Lines are parsed to extract proxy information or failure notifications.
+ * - 'F': Fatal error, helper system is disabled.
+ * - 'P ID P PROXY_URL': A proxy URL for the given ID.
+ * - 'P ID E': End of proxies for the given ID.
+ *
+ * @param data User data (unused).
+ * @param type The event type (ECORE_EXE_EVENT_DATA).
+ * @param info Event-specific information (Ecore_Exe_Event_Data).
+ * @return ECORE_CALLBACK_PASS_ON or ECORE_CALLBACK_DONE.
+ */
 static Eina_Bool
 _efl_net_proxy_helper_cb_exe_data(void *data EINA_UNUSED, int type EINA_UNUSED, void *info)
 {
@@ -297,13 +381,26 @@ _efl_net_proxy_helper_cb_exe_data(void *data EINA_UNUSED, int type EINA_UNUSED, 
    return EINA_TRUE;
 }
 
+/**
+ * @brief Checks if the proxy helper system is currently considered functional.
+ * @return EINA_TRUE if the helper can be used, EINA_FALSE otherwise.
+ */
 Eina_Bool
 _efl_net_proxy_helper_can_do(void)
 {
    return _efl_net_proxy_helper_works;
 }
 
-
+/**
+ * @brief Sends a string to the helper process's stdin.
+ *
+ * This function is typically called from the main loop thread via
+ * ecore_main_loop_thread_safe_call_async. It ensures the helper
+ * process is spawned if not already running.
+ *
+ * @param data The string to send (e.g., "P ID URL\n"). This string is freed
+ *             by the function.
+ */
 static void
 _efl_net_proxy_helper_cb_send_do(void *data)
 {
@@ -316,6 +413,19 @@ _efl_net_proxy_helper_cb_send_do(void *data)
    free(str);
 }
 
+/**
+ * @brief Sends a URL to the proxy helper to resolve proxies.
+ *
+ * This function is called from a worker thread. It queues a request and
+ * sends a message to the helper process (via the main loop) to look up
+ * proxies for the given URL.
+ *
+ * @param url The URL for which to find proxies (e.g., "http://example.com").
+ * @param eth The Ecore_Thread from which this function is called. Used for
+ *            sanity checks.
+ * @return A unique request ID if successful, or -1 on failure. This ID is
+ *         used with _efl_net_proxy_helper_url_wait().
+ */
 int
 _efl_net_proxy_helper_url_req_send(const char *url, Ecore_Thread *eth)
 {
@@ -370,6 +480,30 @@ _efl_net_proxy_helper_url_req_send(const char *url, Ecore_Thread *eth)
    return id;
 }
 
+/**
+ * @brief Waits for the result of a proxy lookup request.
+ *
+ * This function is called from the same worker thread that initiated the
+ * request with _efl_net_proxy_helper_url_req_send(). It blocks until the
+ * helper process responds or the request is cancelled.
+ *
+ * @param id The request ID returned by _efl_net_proxy_helper_url_req_send().
+ * @return A NULL-terminated array of proxy strings (e.g.,
+ *         `{"direct://", "http://proxy.example.com:8080", NULL}`).
+ *         The caller is responsible for freeing this array and its contents
+ *         using ecore_con_libproxy_proxies_free(). Returns NULL on failure,
+ *         if the ID is invalid, or if the request was cancelled.
+ *         Example of a returned array:
+ *         char **proxies = _efl_net_proxy_helper_url_wait(req_id);
+ *         if (proxies) {
+ *           for (int i = 0; proxies[i]; i++) {
+ *             printf("Proxy: %s\n", proxies[i]);
+ *           }
+ *           // Assuming ecore_con_libproxy_proxies_free iterates and frees strings
+ *           // and then the array itself.
+ *           ecore_con_libproxy_proxies_free(proxies);
+ *         }
+ */
 char **
 _efl_net_proxy_helper_url_wait(int id)
 {
@@ -417,6 +551,13 @@ end:
    return ret;
 }
 
+/**
+ * @brief Initializes the proxy helper system.
+ *
+ * This function sets up necessary resources like prefixes for finding the
+ * helper executable, spinlocks, and event handlers. It uses a reference
+ * counter (_efl_net_proxy_helper_init_num) to allow multiple initializations.
+ */
 void
 _efl_net_proxy_helper_init(void)
 {
@@ -439,6 +580,14 @@ _efl_net_proxy_helper_init(void)
                              _efl_net_proxy_helper_cb_exe_data, NULL);
 }
 
+/**
+ * @brief Shuts down the proxy helper system.
+ *
+ * This function cleans up resources allocated by _efl_net_proxy_helper_init().
+ * It uses a reference counter to ensure resources are freed only when the
+ * last user shuts down. If the helper executable is running, it's cancelled
+ * and killed.
+ */
 void
 _efl_net_proxy_helper_shutdown(void)
 {

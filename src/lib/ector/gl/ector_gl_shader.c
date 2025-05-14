@@ -11,29 +11,51 @@
 
 #include "shader/ector_gl_shaders.x"
 
+/**
+ * @brief Array of strings representing shader flags.
+ * Each string corresponds to a specific shader feature or optimization.
+ * These flags are used to generate preprocessor directives (e.g., #define SHD_TEX)
+ * in the shader source code, enabling or disabling specific code paths.
+ */
 static const char *_shader_flags[SHADER_FLAG_COUNT] = {
-  "TEX",
-  "BGRA",
-  "MASK",
-  "SAM12",
-  "SAM21",
-  "SAM22",
-  "MASKSAM12",
-  "MASKSAM21",
-  "MASKSAM22",
-  "IMG",
-  "BIGENDIAN",
-  "YUV",
-  "YUY2",
-  "NV12",
-  "YUV_709",
-  "EXTERNAL",
-  "AFILL",
-  "NOMUL",
-  "ALPHA",
-  "RGB_A_PAIR"
+  "TEX",        /**< Texture mapping enabled */
+  "BGRA",       /**< BGRA pixel format (instead of RGBA) */
+  "MASK",       /**< Masking enabled */
+  "SAM12",      /**< Sampler 1 and 2 used */
+  "SAM21",      /**< Sampler 2 and 1 used (alternative ordering) */
+  "SAM22",      /**< Sampler 2 used twice */
+  "MASKSAM12",  /**< Mask sampler 1 and 2 used */
+  "MASKSAM21",  /**< Mask sampler 2 and 1 used */
+  "MASKSAM22",  /**< Mask sampler 2 used twice */
+  "IMG",        /**< Image specific operations */
+  "BIGENDIAN",  /**< Big-endian data format */
+  "YUV",        /**< YUV color space */
+  "YUY2",       /**< YUY2 pixel format */
+  "NV12",       /**< NV12 pixel format */
+  "YUV_709",    /**< YUV color space with BT.709 coefficients */
+  "EXTERNAL",   /**< External texture (e.g., EGL_EXTERNAL_IMAGE_KHR) */
+  "AFILL",      /**< Alpha fill mode */
+  "NOMUL",      /**< No multiplication (direct color) */
+  "ALPHA",      /**< Alpha channel processing */
+  "RGB_A_PAIR", /**< RGB and Alpha are paired in texture (e.g. ETC1+Alpha) */
 };
 
+/**
+ * @brief Generates the GLSL shader source code by prepending preprocessor directives based on flags.
+ *
+ * This function takes a set of flags and a base GLSL shader string. It iterates
+ * through the known shader flags. If a flag is set in the `flags` bitmask,
+ * a corresponding `#define SHD_FLAGNAME` directive is added to the beginning
+ * of the shader source. Finally, the base shader code is appended.
+ *
+ * @param flags A bitmask representing the shader features to enable.
+ *              Each bit corresponds to an entry in `_shader_flags`.
+ *              Example: (1 << 0) | (1 << 2) would enable SHD_TEX and SHD_MASK.
+ * @param base The base GLSL shader source code (either vertex or fragment).
+ * @return A new Eina_Strbuf containing the complete GLSL shader source,
+ *         or NULL on allocation failure. The caller is responsible for freeing
+ *         this strbuf.
+ */
 static Eina_Strbuf *
 _ector_gl_shader_glsl_get(uint64_t flags, const char *base)
 {
@@ -52,6 +74,19 @@ _ector_gl_shader_glsl_get(uint64_t flags, const char *base)
    return r;
 }
 
+/**
+ * @brief Compiles a GLSL shader.
+ *
+ * This function takes a GL shader object ID, the shader source code, and a string
+ * indicating the shader type (e.g., "vertex", "fragment"). It attempts to compile
+ * the shader and logs any errors encountered.
+ *
+ * @param s The OpenGL shader object ID (created by glCreateShader).
+ * @param shader An Eina_Strbuf containing the GLSL shader source code.
+ * @param type A string describing the type of shader (e.g., "vertex", "fragment"),
+ *             used for error reporting.
+ * @return GL_TRUE if compilation was successful, GL_FALSE otherwise.
+ */
 static GLint
 _ector_gl_shader_glsl_compile(GLuint s, const Eina_Strbuf *shader, const char *type)
 {
@@ -81,6 +116,20 @@ _ector_gl_shader_glsl_compile(GLuint s, const Eina_Strbuf *shader, const char *t
    return ok;
 }
 
+/**
+ * @brief Links vertex and fragment shaders into a GL program.
+ *
+ * This function compiles the provided vertex and fragment shader sources,
+ * then links them into a new GL program object. It also binds standard
+ * attribute locations before linking.
+ *
+ * @param flags The bitmask of shader flags used for compiling the shaders.
+ *              This is primarily used for error reporting if linking fails.
+ * @param vertex An Eina_Strbuf containing the vertex shader source code.
+ * @param fragment An Eina_Strbuf containing the fragment shader source code.
+ * @return The OpenGL program object ID if linking was successful, or 0 on failure.
+ *         Shader objects used for compilation are deleted before returning.
+ */
 static GLint
 _ector_gl_shader_glsl_link(uint64_t flags,
                            const Eina_Strbuf *vertex,
@@ -139,6 +188,20 @@ _ector_gl_shader_glsl_link(uint64_t flags,
    return prg;
 }
 
+/**
+ * @brief Compiles and links a complete GL shader program based on flags.
+ *
+ * This is the main entry point for creating a shader program. It generates
+ * the vertex and fragment shader sources using `_ector_gl_shader_glsl_get`,
+ * then links them using `_ector_gl_shader_glsl_link`.
+ *
+ * @param flags A bitmask representing the shader features to enable.
+ *              This determines which preprocessor directives are added to the
+ *              base vertex and fragment shaders.
+ *              Example: (1 << 0) | (1 << 3) would enable SHD_TEX and SHD_SAM12.
+ * @return The OpenGL program object ID if compilation and linking were successful,
+ *         or 0 on failure.
+ */
 GLuint
 ector_gl_shader_compile(uint64_t flags)
 {

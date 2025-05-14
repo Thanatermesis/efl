@@ -11,6 +11,12 @@
 #define WIN_W WIN_H
 #define TRANSIT_DURATION 1.0
 
+/**
+ * @brief Holds the context data for the custom transit effect.
+ *
+ * This struct stores the initial and final dimensions for the resizing
+ * animation performed by the custom effect.
+ */
 typedef struct _Custom_Effect Custom_Effect;
 
 struct _Custom_Effect
@@ -21,6 +27,12 @@ struct _Custom_Effect
      } from, to;
 };
 
+/**
+ * @brief Reverts the given transit animation.
+ * @param data The Elm_Transit object to revert.
+ * @param obj The Evas_Object that triggered the callback.
+ * @param event_info The event-specific information.
+ */
 static void
 _transit_revert(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -28,6 +40,15 @@ _transit_revert(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_
    elm_transit_revert(trans);
 }
 
+/**
+ * @brief Callback executed when a transit animation finishes.
+ *
+ * This function cleans up resources associated with the revert functionality.
+ * It removes the "clicked" callback from the revert button and disables it.
+ *
+ * @param data The revert button object.
+ * @param trans The transit that has finished.
+ */
 static void
 _transit_rev_cb_del(void *data, Elm_Transit *trans EINA_UNUSED)
 {
@@ -36,6 +57,18 @@ _transit_rev_cb_del(void *data, Elm_Transit *trans EINA_UNUSED)
    elm_object_disabled_set(rev_bt, EINA_TRUE);
 }
 
+/**
+ * @brief The operation function for a custom transit effect.
+ *
+ * This function is called for each frame of the animation to update the
+ * properties of the objects in the transit. It creates a two-stage
+ * resizing effect: it animates the height for the first half of the
+ * duration, and then the width for the second half.
+ *
+ * @param effect The custom effect context data.
+ * @param transit The transit object.
+ * @param progress The progress of the transit, from 0.0 to 1.0.
+ */
 static void
 _custom_op(Elm_Transit_Effect *effect, Elm_Transit *transit, double progress)
 {
@@ -63,6 +96,15 @@ _custom_op(Elm_Transit_Effect *effect, Elm_Transit *transit, double progress)
       evas_object_resize(obj, w, h);
 }
 
+/**
+ * @brief Creates and initializes the context for the custom transit effect.
+ *
+ * @param from_w The initial width of the object.
+ * @param from_h The initial height of the object.
+ * @param to_w The final width of the object.
+ * @param to_h The final height of the object.
+ * @return A new Elm_Transit_Effect context for the custom effect.
+ */
 static Elm_Transit_Effect *
 _custom_context_new(Evas_Coord from_w, Evas_Coord from_h, Evas_Coord to_w, Evas_Coord to_h)
 {
@@ -79,6 +121,11 @@ _custom_context_new(Evas_Coord from_w, Evas_Coord from_h, Evas_Coord to_w, Evas_
    return custom_effect;
 }
 
+/**
+ * @brief Frees the context for the custom transit effect.
+ * @param effect The custom effect context to free.
+ * @param transit The transit object (unused).
+ */
 static void
 _custom_context_free(Elm_Transit_Effect *effect, Elm_Transit *transit EINA_UNUSED)
 {
@@ -86,6 +133,17 @@ _custom_context_free(Elm_Transit_Effect *effect, Elm_Transit *transit EINA_UNUSE
    free(custom_effect);
 }
 
+/**
+ * @brief Starts a transit that combines color and rotation effects.
+ *
+ * The object's color will animate from its current color to (100, 255, 100, 255)
+ * and the object will rotate by 135 degrees. The animation auto-reverses
+ * and repeats twice.
+ *
+ * @param data Unused.
+ * @param obj The object to apply the transit to.
+ * @param event_info Unused.
+ */
 static void
 _transit_rotation_color(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -106,6 +164,16 @@ _transit_rotation_color(void *data EINA_UNUSED, Evas_Object *obj, void *event_in
    elm_transit_go(trans);
 }
 
+/**
+ * @brief Starts a transit with a wipe effect.
+ *
+ * The object will be hidden with a wipe animation moving to the right.
+ * The animation auto-reverses.
+ *
+ * @param data Unused.
+ * @param obj The object to apply the transit to.
+ * @param event_info Unused.
+ */
 static void
 _transit_wipe(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -123,12 +191,32 @@ _transit_wipe(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UN
    elm_transit_go(trans);
 }
 
+/**
+ * @brief Callback executed when a transit animation finishes.
+ *
+ * This re-enables events on the object passed as @p data, which were
+ * frozen during the animation.
+ *
+ * @param data The object on which to re-enable events.
+ * @param transit The transit that has finished.
+ */
 static void
 _transit_del_cb(void *data, Elm_Transit *transit EINA_UNUSED)
 {
    evas_object_freeze_events_set(data, EINA_FALSE);
 }
 
+/**
+ * @brief Starts an image animation transit.
+ *
+ * Animates an icon object by cycling through a list of images.
+ * Events on the button that triggered the animation are frozen during
+ * the transit.
+ *
+ * @param data The icon object (Evas_Object *) to be animated.
+ * @param obj The button object that triggered the animation.
+ * @param event_info Unused.
+ */
 static void
 _transit_image_animation(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -159,6 +247,16 @@ _transit_image_animation(void *data, Evas_Object *obj, void *event_info EINA_UNU
    evas_object_freeze_events_set(obj, EINA_TRUE);
 }
 
+/**
+ * @brief Starts a resizing transit.
+ *
+ * Animates the size of an object. A revert button is enabled and
+ * configured to reverse the animation.
+ *
+ * @param data The revert button object.
+ * @param obj The object to be resized.
+ * @param event_info Unused.
+ */
 static void
 _transit_resizing(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -176,6 +274,16 @@ _transit_resizing(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_transit_go(trans);
 }
 
+/**
+ * @brief Starts a flip transit.
+ *
+ * Flips two objects around the X axis, revealing the back object.
+ * A revert button is enabled to reverse the animation.
+ *
+ * @param data The second object involved in the flip.
+ * @param obj The first object involved in the flip (the one clicked).
+ * @param event_info Unused.
+ */
 static void
 _transit_flip(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -196,6 +304,16 @@ _transit_flip(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_transit_go(trans);
 }
 
+/**
+ * @brief Starts a zoom transit.
+ *
+ * Zooms an object from its normal size to 3x its size.
+ * A revert button is enabled to reverse the animation.
+ *
+ * @param data The revert button object.
+ * @param obj The object to be zoomed.
+ * @param event_info Unused.
+ */
 static void
 _transit_zoom(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -214,6 +332,16 @@ _transit_zoom(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UN
    elm_transit_go(trans);
 }
 
+/**
+ * @brief Starts a blend transit.
+ *
+ * Blends between two objects. One object fades out while the other
+ * fades in. A revert button is enabled to reverse the animation.
+ *
+ * @param data The second object for the blend.
+ * @param obj The first object for the blend.
+ * @param event_info Unused.
+ */
 static void
 _transit_blend(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -235,6 +363,17 @@ _transit_blend(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_transit_go(trans);
 }
 
+/**
+ * @brief Starts a fade transit.
+ *
+ * Fades from one object to another. This is similar to blend but might
+ * have a different visual appearance. A revert button is enabled to
+ * reverse the animation.
+ *
+ * @param data The second object for the fade.
+ * @param obj The first object for the fade.
+ * @param event_info Unused.
+ */
 static void
 _transit_fade(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -256,6 +395,16 @@ _transit_fade(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_transit_go(trans);
 }
 
+/**
+ * @brief Starts a resizable flip transit.
+ *
+ * Flips two objects of different sizes around the Y axis. The size of
+ * the object changes during the flip.
+ *
+ * @param data The second object involved in the flip.
+ * @param obj The first object involved in the flip.
+ * @param event_info Unused.
+ */
 static void
 _transit_resizable_flip(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -272,6 +421,16 @@ _transit_resizable_flip(void *data, Evas_Object *obj, void *event_info EINA_UNUS
    elm_transit_go(trans);
 }
 
+/**
+ * @brief Callback executed when a tween transit finishes.
+ *
+ * This function is used to re-enable the "Go All" button when all individual
+ * tween animations have completed. It uses a data property on the button
+ * as a counter.
+ *
+ * @param data The "Go All" button.
+ * @param trans The transit that has finished.
+ */
 static void
 _transit_tween_del_cb(void *data, Elm_Transit *trans EINA_UNUSED)
 {
@@ -282,6 +441,16 @@ _transit_tween_del_cb(void *data, Elm_Transit *trans EINA_UNUSED)
    if (disabled == 0) elm_object_disabled_set(btn, EINA_FALSE);
 }
 
+/**
+ * @brief Starts a tween transit on a single object.
+ *
+ * This is triggered when one of the individual "Go" buttons is clicked.
+ * It moves a button horizontally across the window.
+ *
+ * @param data The "Go All" button, used for the deletion callback.
+ * @param obj The button to animate.
+ * @param event_info Unused.
+ */
 static void
 _transit_tween(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -309,6 +478,17 @@ _transit_tween(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_disabled_set(bt_all, EINA_TRUE);
 }
 
+/**
+ * @brief Starts tween transits on all objects simultaneously.
+ *
+ * This is triggered by the "Go All" button. It iterates through an
+ * array of buttons and starts a translation animation for each.
+ *
+ * @param data An array of Evas_Object pointers to the buttons to be animated.
+ *        Example: Evas_Object* buttons[] = { button1, button2, ... };
+ * @param obj The "Go All" button that was clicked.
+ * @param event_info Unused.
+ */
 static void
 _transit_tween_all(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -335,6 +515,15 @@ _transit_tween_all(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_disabled_set(obj, EINA_TRUE);
 }
 
+/**
+ * @brief Callback for the window delete request.
+ *
+ * Frees the memory allocated for the button array in the tween test.
+ *
+ * @param data The button array to be freed.
+ * @param obj The window object.
+ * @param event_info Unused.
+ */
 static void
 _win_delete_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -342,6 +531,14 @@ _win_delete_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_U
    free(bt);
 }
 
+/**
+ * @brief Test for basic transit effects.
+ *
+ * Creates a window with buttons to demonstrate Image Animation,
+ * combined Rotation and Color, and Wipe effects.
+ *
+ * @ingroup Elementary_Tests
+ */
 /* Translation, Rotation, Color, Wipe, ImagemAnimation Effect */
 void
 test_transit(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
@@ -391,6 +588,14 @@ test_transit(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_i
    evas_object_show(win);
 }
 
+/**
+ * @brief Test for the resizing transit effect.
+ *
+ * Creates a window with a button that changes size when clicked.
+ * A "Revert" button is provided to reverse the animation.
+ *
+ * @ingroup Elementary_Tests
+ */
 /* Resizing Effect */
 void
 test_transit_resizing(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
@@ -420,6 +625,14 @@ test_transit_resizing(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void
    evas_object_show(win);
 }
 
+/**
+ * @brief Test for the flip transit effect.
+ *
+ * Creates a window with two buttons that flip to reveal each other.
+ * A "Revert" button is provided to reverse the animation.
+ *
+ * @ingroup Elementary_Tests
+ */
 /* Flip Effect */
 void
 test_transit_flip(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
@@ -457,6 +670,14 @@ test_transit_flip(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *ev
    evas_object_smart_callback_add(bt2, "clicked", _transit_flip, bt);
 }
 
+/**
+ * @brief Test for the zoom transit effect.
+ *
+ * Creates a window with a button that zooms in when clicked.
+ * A "Revert" button is provided to reverse the animation.
+ *
+ * @ingroup Elementary_Tests
+ */
 /* Zoom Effect */
 void
 test_transit_zoom(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
@@ -486,6 +707,14 @@ test_transit_zoom(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *ev
    evas_object_show(win);
 }
 
+/**
+ * @brief Test for the blend transit effect.
+ *
+ * Creates a window to demonstrate blending between two buttons.
+ * A "Revert" button is provided to reverse the animation.
+ *
+ * @ingroup Elementary_Tests
+ */
 /* Blend Effect */
 void
 test_transit_blend(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
@@ -536,6 +765,14 @@ test_transit_blend(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *e
    evas_object_smart_callback_add(bt2, "clicked", _transit_blend, bt);
 }
 
+/**
+ * @brief Test for the fade transit effect.
+ *
+ * Creates a window to demonstrate fading between two buttons.
+ * A "Revert" button is provided to reverse the animation.
+ *
+ * @ingroup Elementary_Tests
+ */
 /* Fade Effect */
 void
 test_transit_fade(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
@@ -586,6 +823,14 @@ test_transit_fade(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *ev
    evas_object_smart_callback_add(bt2, "clicked", _transit_fade, bt);
 }
 
+/**
+ * @brief Test for the resizable flip transit effect.
+ *
+ * Creates a window with two buttons of different sizes that flip to
+ * reveal each other, resizing during the transition.
+ *
+ * @ingroup Elementary_Tests
+ */
 /* Resizable Flip Effect */
 void
 test_transit_resizable_flip(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
@@ -614,6 +859,14 @@ test_transit_resizable_flip(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED
    evas_object_smart_callback_add(bt2, "clicked", _transit_resizable_flip, bt);
 }
 
+/**
+ * @brief Test for a custom transit effect.
+ *
+ * Demonstrates how to create and use a custom transit effect to perform
+ * a two-stage resize animation on a button.
+ *
+ * @ingroup Elementary_Tests
+ */
 /* Custom Effect */
 void
 test_transit_custom(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
@@ -656,6 +909,15 @@ test_transit_custom(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *
    evas_object_show(win);
 }
 
+/**
+ * @brief Test for chained transit effects.
+ *
+ * Demonstrates how to chain multiple transits together to create a
+ * sequence of animations. Four buttons animate one after another in a
+ * square path.
+ *
+ * @ingroup Elementary_Tests
+ */
 /* Chain Transit Effect */
 void
 test_transit_chain(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
@@ -727,6 +989,15 @@ test_transit_chain(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *e
    evas_object_show(win);
 }
 
+/**
+ * @brief Test for different transit tween modes.
+ *
+ * Creates a window to demonstrate various tweening modes (acceleration
+ * curves) for animations. Each mode can be triggered individually, or
+ * all at once.
+ *
+ * @ingroup Elementary_Tests
+ */
 /* Transit Tween Mode */
 void
 test_transit_tween(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)

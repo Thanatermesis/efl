@@ -32,6 +32,16 @@
 
 static void  _device_modifiers_update(Ecore_Drm_Evdev *edev);
 
+/**
+ * @brief Sets the calibration matrix for a libinput device.
+ *
+ * Reads calibration data from udev properties (WL_CALIBRATION)
+ * and applies it to the given libinput device. The calibration
+ * values are expected to be 6 floating-point numbers.
+ * The 3rd and 6th values are normalized by the output width and height.
+ *
+ * @param edev The Ecore_Drm_Evdev device to calibrate.
+ */
 static void
 _device_calibration_set(Ecore_Drm_Evdev *edev)
 {
@@ -74,6 +84,16 @@ cont:
      }
 }
 
+/**
+ * @brief Sets the output for a libinput device.
+ *
+ * Determines the Ecore_Drm_Output associated with the libinput device.
+ * If the device specifies an output name, that output is used.
+ * Otherwise, the first available output is used.
+ * It also initializes pointer coordinates if the device has pointer capability.
+ *
+ * @param edev The Ecore_Drm_Evdev device to set the output for.
+ */
 static void
 _device_output_set(Ecore_Drm_Evdev *edev)
 {
@@ -112,6 +132,14 @@ _device_output_set(Ecore_Drm_Evdev *edev)
      }
 }
 
+/**
+ * @brief Configures a libinput device.
+ *
+ * Sets up tap-to-click if available, retrieves output geometry,
+ * and applies output and calibration settings.
+ *
+ * @param edev The Ecore_Drm_Evdev device to configure.
+ */
 static void
 _device_configure(Ecore_Drm_Evdev *edev)
 {
@@ -131,6 +159,14 @@ _device_configure(Ecore_Drm_Evdev *edev)
    _device_calibration_set(edev);
 }
 
+/**
+ * @brief Sets up keyboard-specific resources for a device.
+ *
+ * Initializes the XKB keymap and state for the given Ecore_Drm_Evdev device.
+ * It also caches modifier masks (Ctrl, Alt, Shift, etc.).
+ *
+ * @param edev The Ecore_Drm_Evdev device to set up.
+ */
 static void
 _device_keyboard_setup(Ecore_Drm_Evdev *edev)
 {
@@ -173,6 +209,19 @@ _device_keyboard_setup(Ecore_Drm_Evdev *edev)
      1 << xkb_map_mod_get_index(edev->xkb.keymap, "ISO_Level3_Shift");
 }
 
+/**
+ * @brief Translates a keysym and modifiers into a character string.
+ *
+ * This function attempts to convert a given XKB keysym and modifier state
+ * into a single character. It handles some special keys and control
+ * character combinations.
+ *
+ * @param keysym The XKB keysym to translate.
+ * @param modifiers The active Ecore event modifiers (e.g., ECORE_EVENT_MODIFIER_CTRL).
+ * @param buffer The buffer to store the translated character.
+ * @param bytes The size of the buffer.
+ * @return 1 if a character was written to the buffer, 0 otherwise.
+ */
 static int
 _device_keysym_translate(xkb_keysym_t keysym, unsigned int modifiers, char *buffer, int bytes)
 {
@@ -217,6 +266,16 @@ _device_keysym_translate(xkb_keysym_t keysym, unsigned int modifiers, char *buff
    return 1;
 }
 
+/**
+ * @brief Updates the modifier state of an Ecore_Drm_Evdev device based on another.
+ *
+ * This function copies the XKB modifier state (depressed, latched, locked, group)
+ * from the `from` device to the `edev` device and then updates the
+ * `edev->xkb.modifiers` bitmask (ECORE_EVENT_MODIFIER_*).
+ *
+ * @param edev The Ecore_Drm_Evdev device whose modifiers are to be updated.
+ * @param from The Ecore_Drm_Evdev device to source the modifier state from.
+ */
 static void
 _device_modifiers_update_device(Ecore_Drm_Evdev *edev, Ecore_Drm_Evdev *from)
 {
@@ -251,6 +310,15 @@ _device_modifiers_update_device(Ecore_Drm_Evdev *edev, Ecore_Drm_Evdev *from)
      edev->xkb.modifiers |= ECORE_EVENT_MODIFIER_ALTGR;
 }
 
+/**
+ * @brief Updates the modifier state for an Ecore_Drm_Evdev device.
+ *
+ * If the device itself is a keyboard, its own state is used.
+ * Otherwise, it iterates through all keyboard devices on the same seat
+ * to determine the effective modifier state.
+ *
+ * @param edev The Ecore_Drm_Evdev device to update.
+ */
 static void
 _device_modifiers_update(Ecore_Drm_Evdev *edev)
 {
@@ -272,6 +340,17 @@ _device_modifiers_update(Ecore_Drm_Evdev *edev)
 
 }
 
+/**
+ * @brief Gets the remapped keycode for a given original keycode.
+ *
+ * If key remapping is enabled for the device and a mapping exists
+ * for the given `code`, the remapped keycode is returned. Otherwise,
+ * the original `code` is returned.
+ *
+ * @param edev The Ecore_Drm_Evdev device.
+ * @param code The original keycode.
+ * @return The remapped keycode, or the original keycode if no mapping exists or remapping is disabled.
+ */
 static int
 _device_remapped_key_get(Ecore_Drm_Evdev *edev, int code)
 {
@@ -288,6 +367,16 @@ _device_remapped_key_get(Ecore_Drm_Evdev *edev, int code)
    return code;
 }
 
+/**
+ * @brief Handles a keyboard key event from libinput.
+ *
+ * Processes a key press or release event, translates the keycode and
+ * keysym, updates modifier states, and emits an Ecore_Event_Key_Down or
+ * Ecore_Event_Key_Up event.
+ *
+ * @param device The libinput device that generated the event.
+ * @param event The libinput keyboard event.
+ */
 static void
 _device_handle_key(struct libinput_device *device, struct libinput_event_keyboard *event)
 {
@@ -398,6 +487,16 @@ err:
    if (tmp) free(tmp);
 }
 
+/**
+ * @brief Handles pointer motion and generates an Ecore_Event_Mouse_Move.
+ *
+ * This function is called to process both relative and absolute pointer
+ * motion events. It ensures coordinates are within bounds, updates
+ * modifier states, and emits an ECORE_EVENT_MOUSE_MOVE.
+ *
+ * @param edev The Ecore_Drm_Evdev device associated with the pointer.
+ * @param event The libinput pointer event (can be NULL if called internally, e.g., by _ecore_drm_pointer_motion_post).
+ */
 static void
 _device_pointer_motion(Ecore_Drm_Evdev *edev, struct libinput_event_pointer *event)
 {
@@ -449,12 +548,31 @@ _device_pointer_motion(Ecore_Drm_Evdev *edev, struct libinput_event_pointer *eve
    ecore_event_add(ECORE_EVENT_MOUSE_MOVE, ev, NULL, NULL);
 }
 
+/**
+ * @brief Posts a pointer motion event.
+ *
+ * This function is typically called to synthesize a mouse move event,
+ * for example, after a device's output has changed.
+ *
+ * @param edev The Ecore_Drm_Evdev device for which to post the motion event.
+ */
 void
 _ecore_drm_pointer_motion_post(Ecore_Drm_Evdev *edev)
 {
    _device_pointer_motion(edev, NULL);
 }
 
+/**
+ * @brief Handles relative pointer motion events from libinput.
+ *
+ * Updates the device's internal pointer coordinates based on deltas
+ * from the libinput event and then calls _device_pointer_motion
+ * to generate the Ecore mouse move event if the pointer has actually moved
+ * to a new integer coordinate.
+ *
+ * @param device The libinput device that generated the event.
+ * @param event The libinput pointer motion event.
+ */
 static void
 _device_handle_pointer_motion(struct libinput_device *device, struct libinput_event_pointer *event)
 {
@@ -476,6 +594,17 @@ _device_handle_pointer_motion(struct libinput_device *device, struct libinput_ev
   _device_pointer_motion(edev, event);
 }
 
+/**
+ * @brief Handles absolute pointer motion events from libinput.
+ *
+ * Updates the device's internal pointer coordinates based on absolute
+ * transformed coordinates from the libinput event and then calls
+ * _device_pointer_motion to generate the Ecore mouse move event if
+ * the pointer has actually moved to a new integer coordinate.
+ *
+ * @param device The libinput device that generated the event.
+ * @param event The libinput absolute pointer motion event.
+ */
 static void
 _device_handle_pointer_motion_absolute(struct libinput_device *device, struct libinput_event_pointer *event)
 {
@@ -498,6 +627,17 @@ _device_handle_pointer_motion_absolute(struct libinput_device *device, struct li
    _device_pointer_motion(edev, event);
 }
 
+/**
+ * @brief Handles pointer button events from libinput.
+ *
+ * Processes button press or release events, updates modifier states,
+ * detects double/triple clicks, and emits an Ecore_Event_Mouse_Button_Down
+ * or Ecore_Event_Mouse_Button_Up event.
+ * Note: Button numbers are remapped (2 becomes 3, 3 becomes 2) for compatibility.
+ *
+ * @param device The libinput device that generated the event.
+ * @param event The libinput pointer button event.
+ */
 static void
 _device_handle_button(struct libinput_device *device, struct libinput_event_pointer *event)
 {
@@ -586,6 +726,17 @@ _device_handle_button(struct libinput_device *device, struct libinput_event_poin
      ecore_event_add(ECORE_EVENT_MOUSE_BUTTON_UP, ev, NULL, NULL);
 }
 
+/**
+ * @brief Gets the scroll value from a libinput pointer event.
+ *
+ * Retrieves the scroll value depending on the axis source (wheel, finger, continuous).
+ * For wheel sources, it returns discrete scroll steps. For finger or continuous
+ * sources, it returns the continuous axis value.
+ *
+ * @param pe The libinput pointer event.
+ * @param axis The libinput pointer axis (e.g., LIBINPUT_POINTER_AXIS_SCROLL_VERTICAL).
+ * @return The scroll value.
+ */
 static double
 _event_scroll_get(struct libinput_event_pointer *pe, enum libinput_pointer_axis axis)
 {
@@ -600,6 +751,16 @@ _event_scroll_get(struct libinput_event_pointer *pe, enum libinput_pointer_axis 
    return 0.0;
 }
 
+/**
+ * @brief Handles pointer axis events (scroll events) from libinput.
+ *
+ * Processes scroll events, updates modifier states, and emits an
+ * Ecore_Event_Mouse_Wheel event. It handles both vertical and
+ * horizontal scroll axes.
+ *
+ * @param device The libinput device that generated the event.
+ * @param event The libinput pointer axis event.
+ */
 static void
 _device_handle_axis(struct libinput_device *device, struct libinput_event_pointer *event)
 {
@@ -644,6 +805,18 @@ _device_handle_axis(struct libinput_device *device, struct libinput_event_pointe
    ecore_event_add(ECORE_EVENT_MOUSE_WHEEL, ev, NULL, NULL);
 }
 
+/**
+ * @brief Creates and initializes an Ecore_Drm_Evdev structure for a libinput device.
+ *
+ * Allocates an Ecore_Drm_Evdev structure, associates it with the given
+ * seat and libinput device, determines its capabilities (keyboard, pointer, touch),
+ * sets up keyboard resources if applicable, configures left-handed mode if
+ * necessary, and sets the device user data in libinput.
+ *
+ * @param seat The Ecore_Drm_Seat this device belongs to.
+ * @param device The libinput_device to wrap.
+ * @return A newly allocated and initialized Ecore_Drm_Evdev structure, or NULL on failure.
+ */
 Ecore_Drm_Evdev *
 _ecore_drm_evdev_device_create(Ecore_Drm_Seat *seat, struct libinput_device *device)
 {
@@ -720,6 +893,18 @@ _ecore_drm_evdev_device_create(Ecore_Drm_Seat *seat, struct libinput_device *dev
    return edev;
 }
 
+/**
+ * @brief Sends a touch-related mouse button event.
+ *
+ * This function is a helper to generate ECORE_EVENT_MOUSE_BUTTON_DOWN or
+ * ECORE_EVENT_MOUSE_BUTTON_UP events based on touch input. It populates
+ * the event structure, including multi-touch information and double/triple
+ * click detection.
+ *
+ * @param edev The Ecore_Drm_Evdev device.
+ * @param event The libinput touch event.
+ * @param state The Ecore event type (ECORE_EVENT_MOUSE_BUTTON_DOWN or ECORE_EVENT_MOUSE_BUTTON_UP).
+ */
 static void
 _device_handle_touch_event_send(Ecore_Drm_Evdev *edev, struct libinput_event_touch *event, int state)
 {
@@ -797,6 +982,16 @@ _device_handle_touch_event_send(Ecore_Drm_Evdev *edev, struct libinput_event_tou
    ecore_event_add(state, ev, NULL, NULL);
 }
 
+/**
+ * @brief Sends a mouse motion event based on touch input.
+ *
+ * This function generates an ECORE_EVENT_MOUSE_MOVE event using the
+ * coordinates from a touch event. It populates the event structure,
+ * including multi-touch information.
+ *
+ * @param edev The Ecore_Drm_Evdev device.
+ * @param event The libinput touch event.
+ */
 static void
 _device_handle_touch_motion_send(Ecore_Drm_Evdev *edev, struct libinput_event_touch *event)
 {
@@ -836,6 +1031,16 @@ _device_handle_touch_motion_send(Ecore_Drm_Evdev *edev, struct libinput_event_to
    ecore_event_add(ECORE_EVENT_MOUSE_MOVE, ev, NULL, NULL);
 }
 
+/**
+ * @brief Handles touch down events from libinput.
+ *
+ * Updates pointer coordinates based on the touch location, sets the
+ * multi-touch slot, and then calls helper functions to send
+ * corresponding mouse motion and mouse button down events.
+ *
+ * @param device The libinput device that generated the event.
+ * @param event The libinput touch down event.
+ */
 static void
 _device_handle_touch_down(struct libinput_device *device, struct libinput_event_touch *event)
 {
@@ -854,6 +1059,16 @@ _device_handle_touch_down(struct libinput_device *device, struct libinput_event_
    _device_handle_touch_event_send(edev, event, ECORE_EVENT_MOUSE_BUTTON_DOWN);
 }
 
+/**
+ * @brief Handles touch motion events from libinput.
+ *
+ * Updates pointer coordinates based on the touch location. If the
+ * integer coordinates have changed, it sets the multi-touch slot
+ * and calls a helper function to send a corresponding mouse motion event.
+ *
+ * @param device The libinput device that generated the event.
+ * @param event The libinput touch motion event.
+ */
 static void
 _device_handle_touch_motion(struct libinput_device *device, struct libinput_event_touch *event)
 {
@@ -877,6 +1092,15 @@ _device_handle_touch_motion(struct libinput_device *device, struct libinput_even
    _device_handle_touch_motion_send(edev, event);
 }
 
+/**
+ * @brief Handles touch up events from libinput.
+ *
+ * Sets the multi-touch slot and then calls a helper function to send
+ * a corresponding mouse button up event.
+ *
+ * @param device The libinput device that generated the event.
+ * @param event The libinput touch up event.
+ */
 static void
 _device_handle_touch_up(struct libinput_device *device, struct libinput_event_touch *event)
 {
@@ -889,12 +1113,30 @@ _device_handle_touch_up(struct libinput_device *device, struct libinput_event_to
    _device_handle_touch_event_send(edev, event, ECORE_EVENT_MOUSE_BUTTON_UP);
 }
 
+/**
+ * @brief Handles touch frame events from libinput.
+ *
+ * Currently, this function is a no-op. Touch frame events indicate the
+ * end of a set of touch updates within a single hardware frame.
+ *
+ * @param device The libinput device that generated the event (unused).
+ * @param event The libinput touch frame event (unused).
+ */
 static void
 _device_handle_touch_frame(struct libinput_device *device EINA_UNUSED, struct libinput_event_touch *event EINA_UNUSED)
 {
    /* DBG("Unhandled Touch Frame Event"); */
 }
 
+/**
+ * @brief Destroys an Ecore_Drm_Evdev structure.
+ *
+ * Frees resources associated with the Ecore_Drm_Evdev device, including
+ * XKB state and keymap if it's a keyboard device, stringshared paths,
+ * the libinput device reference, and the key remapping hash table.
+ *
+ * @param edev The Ecore_Drm_Evdev device to destroy.
+ */
 void
 _ecore_drm_evdev_device_destroy(Ecore_Drm_Evdev *edev)
 {
@@ -913,6 +1155,15 @@ _ecore_drm_evdev_device_destroy(Ecore_Drm_Evdev *edev)
    free(edev);
 }
 
+/**
+ * @brief Processes a generic libinput event.
+ *
+ * Dispatches the libinput event to the appropriate handler function
+ * based on the event type (key, pointer motion, button, axis, touch).
+ *
+ * @param event The libinput event to process.
+ * @return EINA_TRUE if the event was handled, EINA_FALSE otherwise (e.g., for unknown event types).
+ */
 Eina_Bool
 _ecore_drm_evdev_event_process(struct libinput_event *event)
 {

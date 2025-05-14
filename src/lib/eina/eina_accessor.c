@@ -190,18 +190,44 @@ eina_accessor_unlock(Eina_Accessor *accessor)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Internal structure for C array accessors.
+ * This structure holds the necessary information to access elements
+ * in a C array, such as the start and end pointers, and element size.
+ * It is used by both value-copying and pointer-providing C array accessors.
+ */
 typedef struct _Eina_Accessor_CArray_Length Eina_Accessor_CArray_Length;
 
 struct _Eina_Accessor_CArray_Length
 {
-   Eina_Accessor accessor;
+   Eina_Accessor accessor; /**< The base Eina_Accessor structure. Must be the first member. */
 
-   void** array;
+   void** array; /**< Stores the pointer to the start of the C array's data.
+                  *   Although typed as `void**`, this is treated as a base memory address
+                  *   (effectively like `void*` or `char*`) for pointer arithmetic.
+                  *   This matches the type of the `array` parameter passed to the _new functions. */
 
-   void** end;
-   unsigned int step;
+   void** end;   /**< Stores a pointer to the memory location immediately after the end of the C array data.
+                  *   Calculated as `array + (length * step)`. Used for bounds checking.
+                  *   Like `array`, this is treated as a base memory address. */
+   unsigned int step; /**< Size of a single element in the array, in bytes (e.g., `sizeof(int)`). */
 };
 
+/**
+ * @internal
+ * @brief Get_at callback for C array accessors that copy element values.
+ * @param accessor The C array accessor instance.
+ * @param idx The zero-based index of the element to retrieve.
+ * @param data Output parameter; a pointer to a memory location where the
+ *             element's value (accessor->step bytes) will be copied.
+ *             When used with EINA_ACCESSOR_FOREACH(acc, i, var), 'data'
+ *             will effectively be `(void**)&var`.
+ * @return EINA_TRUE if the element is successfully copied, EINA_FALSE if 'idx' is out of bounds.
+ *
+ * This function calculates the address of the element at 'idx' within the C array
+ * and copies 'accessor->step' bytes from that address into the location pointed to by 'data'.
+ */
 static Eina_Bool
 eina_carray_length_accessor_get_at(Eina_Accessor_CArray_Length *accessor, unsigned int idx, void **data)
 {
@@ -212,26 +238,65 @@ eina_carray_length_accessor_get_at(Eina_Accessor_CArray_Length *accessor, unsign
 
    return EINA_TRUE;
 }
+
+/**
+ * @internal
+ * @brief Get_at callback for C array accessors that provide pointers to elements.
+ * @param accessor The C array accessor instance.
+ * @param idx The zero-based index of the element to retrieve a pointer to.
+ * @param data Output parameter; a pointer to a `void*` variable. This `void*`
+ *             variable will be set to point directly to the element at 'idx'
+ *             within the original C array.
+ *             When used with EINA_ACCESSOR_FOREACH(acc, i, ptr_var), 'data'
+ *             will effectively be `(void**)&ptr_var`.
+ * @return EINA_TRUE if the pointer is successfully set, EINA_FALSE if 'idx' is out of bounds.
+ *
+ * This function calculates the address of the element at 'idx' and stores this
+ * address in the `void*` variable pointed to by 'data'.
+ */
 static Eina_Bool
 eina_carray_length_accessor_ptr_get_at(Eina_Accessor_CArray_Length *accessor, unsigned int idx, void **data)
 {
-   if ((char*)accessor->array + idx*accessor->step >= (char*)accessor->end)
+   // Calculate the address of the target element.
+   char *element_ptr = (char*)accessor->array + (idx * accessor->step);
+
+   // Bounds check: ensure the element is within the array.
+   if (element_ptr >= (char*)accessor->end)
      return EINA_FALSE;
 
-   *data = (((char*)accessor->array) + idx*accessor->step);
+   // 'data' is a pointer to a void* variable (e.g., &my_ptr_var from EINA_ACCESSOR_FOREACH, cast to void**).
+   // This sets that void* variable (*data) to point directly to the element within the C array.
+   *data = (void*)element_ptr;
 
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Get_container callback for C array accessors.
+ * @param accessor The C array accessor instance.
+ * @return Returns the `void**` pointer that was originally passed as the C array
+ *         during the accessor's creation. This typically represents the base
+ *         address of the C array.
+ */
 static void**
 eina_carray_length_accessor_get_container(Eina_Accessor_CArray_Length *accessor)
 {
    return accessor->array;
 }
 
+/**
+ * @internal
+ * @brief Free callback for C array accessors.
+ * @param accessor The C array accessor instance to be freed.
+ *
+ * This function releases the memory allocated for the Eina_Accessor_CArray_Length structure.
+ * It does not free the C array itself, as the accessor does not own the array data.
+ */
 static void
 eina_carray_length_accessor_free(Eina_Accessor_CArray_Length *accessor)
 {
+   // The Eina_Accessor_CArray_Length structure itself was allocated with calloc.
    free(accessor);
 }
 
@@ -246,7 +311,12 @@ eina_carray_length_accessor_new(void** array, unsigned int step, unsigned int le
    EINA_MAGIC_SET(&accessor->accessor, EINA_MAGIC_ACCESSOR);
 
    accessor->array = array;
-   accessor->end = (void**)((char*)accessor->array + length * step);
+   // Calculate the end pointer: base address + (number of elements * size of each element).
+   // This pointer points one position *past* the last valid element's data block.
+   // It's used for bounds checking in the get_at functions.
+   // The casts to (char*) ensure byte-level pointer arithmetic. The result is cast back
+   // to void** to match the type of accessor->end.
+   accessor->end = (void**)((char*)array + length * step);
    accessor->step = step;
 
    accessor->accessor.version = EINA_ACCESSOR_VERSION;
@@ -269,7 +339,10 @@ eina_carray_length_ptr_accessor_new(void** array, unsigned int step, unsigned in
    EINA_MAGIC_SET(&accessor->accessor, EINA_MAGIC_ACCESSOR);
 
    accessor->array = array;
-   accessor->end = (void**)((char*)accessor->array + length * step);
+   // Calculate the end pointer, similar to eina_carray_length_accessor_new.
+   // This pointer points one position *past* the last valid element's data block
+   // and is used for bounds checking.
+   accessor->end = (void**)((char*)array + length * step);
    accessor->step = step;
 
    accessor->accessor.version = EINA_ACCESSOR_VERSION;

@@ -5,6 +5,16 @@
 #include "eldbus_private.h"
 #include "eldbus_private_types.h"
 
+/**
+ * @file
+ * @brief Core Eldbus connection and initialization logic.
+ *
+ * This file implements the core functionalities of Eldbus, including
+ * connection management (session, system, address-specific),
+ * initialization and shutdown of the library, and handling of
+ * D-Bus messages, signals, and events.
+ */
+
 #define ELDBUS_CONNECTION_CHECK(conn)                        \
   do                                                        \
     {                                                       \
@@ -31,53 +41,88 @@
     }                                                               \
   while (0)
 
+/**
+ * @brief Represents a callback context for connection events.
+ *
+ * This structure holds information about a registered callback function
+ * for a specific connection event, such as connect, disconnect, etc.
+ * It is used internally to manage lists of event handlers.
+ */
 typedef struct _Eldbus_Connection_Context_Event_Cb
 {
-   EINA_INLIST;
-   Eldbus_Connection_Event_Cb cb;
-   const void               *cb_data;
-   Eina_Bool                 deleted : 1;
+   EINA_INLIST; /**< Macro for Eina_Inlist node integration. */
+   Eldbus_Connection_Event_Cb cb; /**< The callback function pointer. */
+   const void               *cb_data; /**< User data passed to the callback. */
+   Eina_Bool                 deleted : 1; /**< Flag indicating if the callback is marked for deletion. */
 } Eldbus_Connection_Context_Event_Cb;
 
+/**
+ * @brief Represents a callback context for NameOwnerChanged signals.
+ *
+ * This structure holds information about a registered callback function
+ * for D-Bus NameOwnerChanged signals. It allows tracking changes in
+ * service ownership on the bus.
+ */
 typedef struct _Eldbus_Connection_Context_NOC_Cb
 {
-   EINA_INLIST;
-   Eldbus_Name_Owner_Changed_Cb cb;
-   const void                 *cb_data;
-   Eina_Bool                   deleted : 1;
-   Ecore_Idle_Enterer         *idle_enterer;
-   Eina_Bool                   allow_initial : 1;
+   EINA_INLIST; /**< Macro for Eina_Inlist node integration. */
+   Eldbus_Name_Owner_Changed_Cb cb; /**< The callback function pointer. */
+   const void                 *cb_data; /**< User data passed to the callback. */
+   Eina_Bool                   deleted : 1; /**< Flag indicating if the callback is marked for deletion. */
+   Ecore_Idle_Enterer         *idle_enterer; /**< Ecore idle enterer for deferred initial callback. */
+   Eina_Bool                   allow_initial : 1; /**< Flag to allow an initial call if the name already has an owner. */
 } Eldbus_Connection_Context_NOC_Cb;
 
+/**
+ * @brief Holds data related to a D-Bus watch and its corresponding Ecore Fd_Handler.
+ *
+ * This structure links a D-Bus watch (for monitoring file descriptor activity)
+ * with an Ecore_Fd_Handler, enabling integration with the Ecore main loop.
+ */
 typedef struct _Eldbus_Handler_Data
 {
-   EINA_INLIST;
-   int               fd;
-   Ecore_Fd_Handler *fd_handler;
-   Eldbus_Connection *conn;
-   DBusWatch        *watch;
-   int               enabled;
+   EINA_INLIST; /**< Macro for Eina_Inlist node integration. */
+   int               fd; /**< The file descriptor being watched. */
+   Ecore_Fd_Handler *fd_handler; /**< The Ecore file descriptor handler. */
+   Eldbus_Connection *conn; /**< The Eldbus connection associated with this watch. */
+   DBusWatch        *watch; /**< The D-Bus watch object. */
+   int               enabled; /**< The enabled state of the D-Bus watch. */
 } Eldbus_Handler_Data;
 
+/**
+ * @brief Holds data related to a D-Bus timeout and its corresponding Ecore_Timer.
+ *
+ * This structure links a D-Bus timeout with an Ecore_Timer, allowing
+ * D-Bus timeouts to be handled within the Ecore main loop.
+ */
 typedef struct _Eldbus_Timeout_Data
 {
-   EINA_INLIST;
-   Ecore_Timer      *handler;
-   DBusTimeout      *timeout;
-   Eldbus_Connection *conn;
-   int               interval;
+   EINA_INLIST; /**< Macro for Eina_Inlist node integration. */
+   Ecore_Timer      *handler; /**< The Ecore timer. */
+   DBusTimeout      *timeout; /**< The D-Bus timeout object. */
+   Eldbus_Connection *conn; /**< The Eldbus connection associated with this timeout. */
+   int               interval; /**< The timeout interval in milliseconds. */
 } Eldbus_Timeout_Data;
 
 static const Eldbus_Version _version = {VMAJ, VMIN, VMIC, VREV};
 EAPI const Eldbus_Version * eldbus_version = &_version;
 
-static int _eldbus_init_count = 0;
-int _eldbus_log_dom = -1;
-int eldbus_model_log_dom = -1;
+static int _eldbus_init_count = 0; /**< Global counter for eldbus_init() calls. */
+int _eldbus_log_dom = -1; /**< Log domain for general Eldbus messages. */
+int eldbus_model_log_dom = -1; /**< Log domain for Eldbus model-specific messages. */
 
 /* We don't save ELDBUS_CONNECTION_TYPE_UNKNOWN in here so we need room for
  * last - 1 elements */
+/**
+ * @brief Array storing shared Eldbus_Connection instances (e.g., session, system).
+ * Indexed by `Eldbus_Connection_Type - 1`.
+ */
 static void *shared_connections[ELDBUS_CONNECTION_TYPE_LAST - 1];
+/**
+ * @brief Hash table storing shared Eldbus_Connection instances for specific D-Bus addresses.
+ * Keys are D-Bus addresses (strings), values are Eldbus_Connection pointers.
+ * This is also stored in `shared_connections[ELDBUS_CONNECTION_TYPE_ADDRESS - 1]`.
+ */
 static Eina_Hash *address_connections = NULL;
 
 static void _eldbus_connection_event_callback_call(Eldbus_Connection *conn, Eldbus_Connection_Event_Type type, const void *event_info);
@@ -85,6 +130,15 @@ static void _eldbus_connection_context_event_cb_del(Eldbus_Connection_Context_Ev
 static void eldbus_dispatch_name_owner_change(Eldbus_Connection_Name *cn, const char *old_id);
 static void _eldbus_connection_free(Eldbus_Connection *conn);
 
+/**
+ * @internal
+ * @brief Deletes an Eldbus_Handler_Data structure and its associated Ecore fd handler.
+ *
+ * This function removes the fd handler from the connection's list of handlers,
+ * deletes the Ecore fd handler, and frees the Eldbus_Handler_Data structure.
+ *
+ * @param hd The Eldbus_Handler_Data to delete.
+ */
 static void
 eldbus_fd_handler_del(Eldbus_Handler_Data *hd)
 {
@@ -102,6 +156,17 @@ eldbus_fd_handler_del(Eldbus_Handler_Data *hd)
    free(hd);
 }
 
+/**
+ * @internal
+ * @brief Resets Eldbus state after a fork.
+ *
+ * This function is registered as an Ecore fork reset callback. It clears
+ * shared connections and address connections to ensure the child process
+ * starts with a clean Eldbus state. It also nullifies data in D-Bus watches
+ * to prevent issues with fd handlers in the child.
+ *
+ * @param data Unused.
+ */
 static void
 _eldbus_fork_reset(void *data EINA_UNUSED)
 {
@@ -124,6 +189,22 @@ _eldbus_fork_reset(void *data EINA_UNUSED)
    address_connections = NULL;
 }
 
+/**
+ * @brief Initializes the Eldbus library.
+ *
+ * This function initializes Eldbus and its dependencies (Eina, Ecore).
+ * It sets up logging domains, registers magic strings for Eldbus types,
+ * and initializes various Eldbus subsystems (message, signal handler, etc.).
+ * It also registers a fork reset callback.
+ *
+ * This function uses a reference counter (`_eldbus_init_count`).
+ * eldbus_shutdown() must be called a corresponding number of times to fully
+ * shut down the library.
+ *
+ * @return The new initialization count, or 0 on failure.
+ *
+ * @see eldbus_shutdown()
+ */
 EAPI int
 eldbus_init(void)
 {
@@ -203,6 +284,17 @@ message_failed:
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Prints information about live objects and pending calls for a connection.
+ *
+ * This function is used for debugging purposes, typically during shutdown,
+ * to report any Eldbus_Object instances or Eldbus_Pending calls that are
+ * still active on a given connection. This can help identify resource leaks
+ * or improper cleanup.
+ *
+ * @param conn The Eldbus_Connection to inspect.
+ */
 static void
 print_live_connection(Eldbus_Connection *conn)
 {
@@ -242,6 +334,21 @@ print_live_connection(Eldbus_Connection *conn)
      }
 }
 
+/**
+ * @brief Shuts down the Eldbus library.
+ *
+ * This function decrements the Eldbus initialization counter. If the counter
+ * reaches zero, it performs a full shutdown of Eldbus and its subsystems.
+ * This includes cleaning up shared connections, shutting down Ecore, and
+ * unregistering log domains.
+ *
+ * It will print critical errors if any shared connections still have live
+ * objects or pending calls, indicating potential issues in application cleanup.
+ *
+ * @return The new initialization count.
+ *
+ * @see eldbus_init()
+ */
 EAPI int
 eldbus_shutdown(void)
 {
@@ -310,13 +417,32 @@ eldbus_shutdown(void)
 }
 
 /* TODO: mempool of Eldbus_Context_Free_Cb */
+/**
+ * @internal
+ * @brief Structure to hold a free callback and its associated data.
+ *
+ * This is used to manage lists of callbacks that should be invoked when
+ * an Eldbus resource (like a connection) is being freed.
+ */
 typedef struct _Eldbus_Context_Free_Cb
 {
-   EINA_INLIST;
-   Eldbus_Free_Cb cb;
-   const void   *data;
+   EINA_INLIST; /**< Macro for Eina_Inlist node integration. */
+   Eldbus_Free_Cb cb; /**< The free callback function. */
+   const void   *data; /**< User data for the callback. */
 } Eldbus_Context_Free_Cb;
 
+/**
+ * @internal
+ * @brief Dispatches (calls) all registered free callbacks in a list.
+ *
+ * Iterates through a list of Eldbus_Context_Free_Cb structures, calls
+ * each callback function, and frees the context structure. The list
+ * itself is cleared.
+ *
+ * @param p_lst A pointer to the Eina_Inlist of Eldbus_Context_Free_Cb.
+ *              The list will be set to NULL after dispatch.
+ * @param dead_pointer The pointer to the object being freed, passed to callbacks.
+ */
 void
 eldbus_cbs_free_dispatch(Eina_Inlist **p_lst, const void *dead_pointer)
 {
@@ -335,6 +461,18 @@ eldbus_cbs_free_dispatch(Eina_Inlist **p_lst, const void *dead_pointer)
      }
 }
 
+/**
+ * @internal
+ * @brief Adds a free callback to a list.
+ *
+ * Creates a new Eldbus_Context_Free_Cb structure with the given callback
+ * and data, and appends it to the provided Eina_Inlist.
+ *
+ * @param lst The Eina_Inlist to add the callback to.
+ * @param cb The Eldbus_Free_Cb function to add.
+ * @param data The user data to associate with the callback.
+ * @return The (potentially new) head of the Eina_Inlist.
+ */
 Eina_Inlist *
 eldbus_cbs_free_add(Eina_Inlist *lst, Eldbus_Free_Cb cb, const void *data)
 {
@@ -347,6 +485,19 @@ eldbus_cbs_free_add(Eina_Inlist *lst, Eldbus_Free_Cb cb, const void *data)
    return eina_inlist_append(lst, EINA_INLIST_GET(ctx));
 }
 
+/**
+ * @internal
+ * @brief Deletes a specific free callback from a list.
+ *
+ * Searches for an Eldbus_Context_Free_Cb in the list that matches the
+ * provided callback function and, if `data` is not NULL, the user data.
+ * If found, it removes the context from the list and frees it.
+ *
+ * @param lst The Eina_Inlist to delete the callback from.
+ * @param cb The Eldbus_Free_Cb function to find.
+ * @param data The user data to match (if not NULL).
+ * @return The (potentially modified) head of the Eina_Inlist.
+ */
 Eina_Inlist *
 eldbus_cbs_free_del(Eina_Inlist *lst, Eldbus_Free_Cb cb, const void *data)
 {
@@ -366,14 +517,34 @@ eldbus_cbs_free_del(Eina_Inlist *lst, Eldbus_Free_Cb cb, const void *data)
    return lst;
 }
 
+/**
+ * @internal
+ * @brief Structure to hold arbitrary key-value data associated with Eldbus objects.
+ *
+ * This is used to implement generic data storage (e.g., eldbus_connection_data_set).
+ * The key is a string, and the value is a void pointer.
+ * The key string is stored inline after the structure members.
+ */
 typedef struct _Eldbus_Data
 {
-   EINA_INLIST;
-   const void  *data;
-   unsigned int keylen;
-   char         key[];
+   EINA_INLIST; /**< Macro for Eina_Inlist node integration. */
+   const void  *data; /**< Pointer to the stored data. */
+   unsigned int keylen; /**< Length of the key string (excluding null terminator). */
+   char         key[]; /**< Flexible array member for the key string. */
 } Eldbus_Data;
 
+/**
+ * @internal
+ * @brief Finds an Eldbus_Data item in a list by its key.
+ *
+ * Searches an Eina_Inlist of Eldbus_Data structures for an item
+ * matching the given key. If found, it promotes the item to the
+ * front of the list (as a simple cache optimization) and returns it.
+ *
+ * @param p_lst Pointer to the Eina_Inlist of Eldbus_Data.
+ * @param key The key string to search for.
+ * @return The found Eldbus_Data item, or NULL if not found.
+ */
 static inline Eldbus_Data *
 eldbus_data_find(Eina_Inlist **p_lst, const char *key)
 {
@@ -392,6 +563,18 @@ eldbus_data_find(Eina_Inlist **p_lst, const char *key)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Sets (adds or updates) a key-value data item in a list.
+ *
+ * If an item with the given key already exists, it is removed and freed.
+ * A new Eldbus_Data item is then created with the key and data, and
+ * prepended to the list.
+ *
+ * @param p_lst Pointer to the Eina_Inlist of Eldbus_Data.
+ * @param key The key string.
+ * @param data The data pointer to associate with the key.
+ */
 void
 eldbus_data_set(Eina_Inlist **p_lst, const char *key, const void *data)
 {
@@ -414,6 +597,16 @@ eldbus_data_set(Eina_Inlist **p_lst, const char *key, const void *data)
    *p_lst = eina_inlist_prepend(*p_lst, EINA_INLIST_GET(d));
 }
 
+/**
+ * @internal
+ * @brief Gets the data associated with a key from a list.
+ *
+ * Finds an Eldbus_Data item by its key using eldbus_data_find().
+ *
+ * @param p_lst Pointer to the Eina_Inlist of Eldbus_Data.
+ * @param key The key string.
+ * @return The data pointer if the key is found, otherwise NULL.
+ */
 void *
 eldbus_data_get(Eina_Inlist **p_lst, const char *key)
 {
@@ -421,6 +614,18 @@ eldbus_data_get(Eina_Inlist **p_lst, const char *key)
    return d ? (void *)d->data : NULL;
 }
 
+/**
+ * @internal
+ * @brief Deletes a key-value data item from a list and returns its data.
+ *
+ * Finds an Eldbus_Data item by its key. If found, it removes the item
+ * from the list, frees the Eldbus_Data structure, and returns the
+ * associated data pointer.
+ *
+ * @param p_lst Pointer to the Eina_Inlist of Eldbus_Data.
+ * @param key The key string.
+ * @return The data pointer if the key was found and deleted, otherwise NULL.
+ */
 void *
 eldbus_data_del(Eina_Inlist **p_lst, const char *key)
 {
@@ -435,6 +640,15 @@ eldbus_data_del(Eina_Inlist **p_lst, const char *key)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Deletes all key-value data items from a list.
+ *
+ * Iterates through the Eina_Inlist of Eldbus_Data items, removes each one,
+ * and frees its memory. The list is set to NULL.
+ *
+ * @param p_list Pointer to the Eina_Inlist of Eldbus_Data.
+ */
 void
 eldbus_data_del_all(Eina_Inlist **p_list)
 {
@@ -450,6 +664,23 @@ eldbus_data_del_all(Eina_Inlist **p_list)
      }
 }
 
+/**
+ * @internal
+ * @brief Garbage collects an Eldbus_Connection_Name structure if it's no longer needed.
+ *
+ * An Eldbus_Connection_Name (representing a bus name and its associated objects)
+ * is considered eligible for garbage collection if:
+ * - Its reference count is zero.
+ * - It has no associated Eldbus_Object instances.
+ * - It has no registered event handlers (e.g., for NameOwnerChanged).
+ *
+ * If these conditions are met, the function removes the Eldbus_Connection_Name
+ * from the connection's `names` hash, cleans up its resources (signal handlers,
+ * pending calls, stringshares), and frees the structure.
+ *
+ * @param conn The Eldbus_Connection owning the name.
+ * @param cn The Eldbus_Connection_Name to potentially garbage collect.
+ */
 static void
 eldbus_connection_name_gc(Eldbus_Connection *conn, Eldbus_Connection_Name *cn)
 {
@@ -474,6 +705,18 @@ eldbus_connection_name_gc(Eldbus_Connection *conn, Eldbus_Connection_Name *cn)
    free(cn);
 }
 
+/**
+ * @internal
+ * @brief Deletes an Eldbus_Object from its associated Eldbus_Connection_Name.
+ *
+ * This function finds the Eldbus_Connection_Name corresponding to the object's
+ * bus name (`obj->name`). It then removes the object from the `objects` hash
+ * within that Eldbus_Connection_Name. After removal, it attempts to garbage
+ * collect the Eldbus_Connection_Name if it's no longer needed.
+ *
+ * @param conn The Eldbus_Connection.
+ * @param obj The Eldbus_Object to delete from its name tracking.
+ */
 void
 eldbus_connection_name_object_del(Eldbus_Connection *conn, const Eldbus_Object *obj)
 {
@@ -486,6 +729,18 @@ eldbus_connection_name_object_del(Eldbus_Connection *conn, const Eldbus_Object *
    eldbus_connection_name_gc(conn, cn);
 }
 
+/**
+ * @internal
+ * @brief Associates an Eldbus_Object with its Eldbus_Connection_Name.
+ *
+ * This function retrieves or creates an Eldbus_Connection_Name for the
+ * object's bus name (`obj->name`). It then adds the object to the `objects`
+ * hash within that Eldbus_Connection_Name, keyed by the object's path
+ * (`obj->path`).
+ *
+ * @param conn The Eldbus_Connection.
+ * @param obj The Eldbus_Object to associate.
+ */
 void
 eldbus_connection_name_object_set(Eldbus_Connection *conn, Eldbus_Object *obj)
 {

@@ -7,6 +7,13 @@
 #include "ecore_con_private.h"
 #include "efl_net-connman.h"
 
+/**
+ * @brief Private data structure for Efl_Net_Control_Technology.
+ *
+ * This structure holds all the internal data associated with a ConnMan
+ * technology object, such as its D-Bus proxy, properties, and pending
+ * operations.
+ */
 typedef struct
 {
    /* Eldbus_Proxy/Eldbus_Object keeps a list of pending calls, but
@@ -15,23 +22,32 @@ typedef struct
     * our private data, that may be gone before other refs. So
     * keep the pending list.
     */
-   Eina_List *pending;
-   Eina_List *signal_handlers;
-   Eldbus_Proxy *proxy;
-   Eina_Stringshare *path;
-   Eina_Stringshare *name;
+   Eina_List *pending; /**< List of pending D-Bus calls. */
+   Eina_List *signal_handlers; /**< List of D-Bus signal handlers. */
+   Eldbus_Proxy *proxy; /**< D-Bus proxy for net.connman.Technology. */
+   Eina_Stringshare *path; /**< D-Bus object path for this technology. */
+   Eina_Stringshare *name; /**< Name of the technology (e.g., "WiFi", "Ethernet"). */
    struct {
-      Eina_Stringshare *identifier;
-      Eina_Stringshare *passphrase;
-      Eina_Bool enabled;
-   } tethering;
-   Efl_Net_Control_Technology_Type type;
-   Eina_Bool powered;
-   Eina_Bool connected;
+      Eina_Stringshare *identifier; /**< Tethering identifier (SSID for WiFi). */
+      Eina_Stringshare *passphrase; /**< Tethering passphrase. */
+      Eina_Bool enabled; /**< Tethering enabled state. */
+   } tethering; /**< Tethering specific properties. */
+   Efl_Net_Control_Technology_Type type; /**< Type of the technology. */
+   Eina_Bool powered; /**< Powered state of the technology. */
+   Eina_Bool connected; /**< Connected state of the technology. */
 } Efl_Net_Control_Technology_Data;
 
 #define MY_CLASS EFL_NET_CONTROL_TECHNOLOGY_CLASS
 
+/**
+ * @brief Handles the "Powered" property change from D-Bus.
+ *
+ * Updates the internal powered state and emits the 'changed' event.
+ *
+ * @param o The Efl_Net_Control_Technology object.
+ * @param pd The private data of the technology object.
+ * @param value The D-Bus message iterator containing the new property value.
+ */
 static void
 _efl_net_control_technology_property_powered_changed(Eo *o, Efl_Net_Control_Technology_Data *pd, Eldbus_Message_Iter *value)
 {
@@ -49,6 +65,15 @@ _efl_net_control_technology_property_powered_changed(Eo *o, Efl_Net_Control_Tech
    efl_event_callback_call(o, EFL_NET_CONTROL_TECHNOLOGY_EVENT_CHANGED, NULL);
 }
 
+/**
+ * @brief Handles the "Connected" property change from D-Bus.
+ *
+ * Updates the internal connected state and emits the 'changed' event.
+ *
+ * @param o The Efl_Net_Control_Technology object.
+ * @param pd The private data of the technology object.
+ * @param value The D-Bus message iterator containing the new property value.
+ */
 static void
 _efl_net_control_technology_property_connected_changed(Eo *o, Efl_Net_Control_Technology_Data *pd, Eldbus_Message_Iter *value)
 {
@@ -66,6 +91,15 @@ _efl_net_control_technology_property_connected_changed(Eo *o, Efl_Net_Control_Te
    efl_event_callback_call(o, EFL_NET_CONTROL_TECHNOLOGY_EVENT_CHANGED, NULL);
 }
 
+/**
+ * @brief Handles the "Name" property change from D-Bus.
+ *
+ * Updates the internal name and emits the 'changed' event.
+ *
+ * @param o The Efl_Net_Control_Technology object.
+ * @param pd The private data of the technology object.
+ * @param value The D-Bus message iterator containing the new property value.
+ */
 static void
 _efl_net_control_technology_property_name_changed(Eo *o, Efl_Net_Control_Technology_Data *pd, Eldbus_Message_Iter *value)
 {
@@ -82,6 +116,13 @@ _efl_net_control_technology_property_name_changed(Eo *o, Efl_Net_Control_Technol
    efl_event_callback_call(o, EFL_NET_CONTROL_TECHNOLOGY_EVENT_CHANGED, NULL);
 }
 
+/**
+ * @brief Converts a ConnMan technology type string to an Efl_Net_Control_Technology_Type enum.
+ *
+ * @param str The technology type string (e.g., "wifi", "ethernet").
+ * @return The corresponding Efl_Net_Control_Technology_Type enum value,
+ *         or EFL_NET_CONTROL_TECHNOLOGY_TYPE_UNKNOWN if not found.
+ */
 Efl_Net_Control_Technology_Type
 efl_net_connman_technology_type_from_str(const char *str)
 {
@@ -109,6 +150,15 @@ efl_net_connman_technology_type_from_str(const char *str)
    return EFL_NET_CONTROL_TECHNOLOGY_TYPE_UNKNOWN;
 }
 
+/**
+ * @brief Handles the "Type" property change from D-Bus.
+ *
+ * Updates the internal technology type and emits the 'changed' event.
+ *
+ * @param o The Efl_Net_Control_Technology object.
+ * @param pd The private data of the technology object.
+ * @param value The D-Bus message iterator containing the new property value.
+ */
 static void
 _efl_net_control_technology_property_type_changed(Eo *o, Efl_Net_Control_Technology_Data *pd, Eldbus_Message_Iter *value)
 {
@@ -128,6 +178,15 @@ _efl_net_control_technology_property_type_changed(Eo *o, Efl_Net_Control_Technol
    efl_event_callback_call(o, EFL_NET_CONTROL_TECHNOLOGY_EVENT_CHANGED, NULL);
 }
 
+/**
+ * @brief Handles the "Tethering" property change from D-Bus.
+ *
+ * Updates the internal tethering enabled state and emits the 'changed' event.
+ *
+ * @param o The Efl_Net_Control_Technology object.
+ * @param pd The private data of the technology object.
+ * @param value The D-Bus message iterator containing the new property value.
+ */
 static void
 _efl_net_control_technology_property_tethering_changed(Eo *o, Efl_Net_Control_Technology_Data *pd, Eldbus_Message_Iter *value)
 {
@@ -145,6 +204,15 @@ _efl_net_control_technology_property_tethering_changed(Eo *o, Efl_Net_Control_Te
    efl_event_callback_call(o, EFL_NET_CONTROL_TECHNOLOGY_EVENT_CHANGED, NULL);
 }
 
+/**
+ * @brief Handles the "TetheringIdentifier" property change from D-Bus.
+ *
+ * Updates the internal tethering identifier and emits the 'changed' event.
+ *
+ * @param o The Efl_Net_Control_Technology object.
+ * @param pd The private data of the technology object.
+ * @param value The D-Bus message iterator containing the new property value.
+ */
 static void
 _efl_net_control_technology_property_tethering_identifier_changed(Eo *o, Efl_Net_Control_Technology_Data *pd, Eldbus_Message_Iter *value)
 {
@@ -161,6 +229,15 @@ _efl_net_control_technology_property_tethering_identifier_changed(Eo *o, Efl_Net
    efl_event_callback_call(o, EFL_NET_CONTROL_TECHNOLOGY_EVENT_CHANGED, NULL);
 }
 
+/**
+ * @brief Handles the "TetheringPassphrase" property change from D-Bus.
+ *
+ * Updates the internal tethering passphrase and emits the 'changed' event.
+ *
+ * @param o The Efl_Net_Control_Technology object.
+ * @param pd The private data of the technology object.
+ * @param value The D-Bus message iterator containing the new property value.
+ */
 static void
 _efl_net_control_technology_property_tethering_passphrase_changed(Eo *o, Efl_Net_Control_Technology_Data *pd, Eldbus_Message_Iter *value)
 {
@@ -177,7 +254,18 @@ _efl_net_control_technology_property_tethering_passphrase_changed(Eo *o, Efl_Net
    efl_event_callback_call(o, EFL_NET_CONTROL_TECHNOLOGY_EVENT_CHANGED, NULL);
 }
 
-
+/**
+ * @brief Internal handler for property changes.
+ *
+ * This function is called when a "PropertyChanged" D-Bus signal is received
+ * or during initial property population. It dispatches to specific property
+ * handlers based on the property name.
+ *
+ * @param o The Efl_Net_Control_Technology object.
+ * @param pd The private data of the technology object.
+ * @param itr The D-Bus message iterator containing the property name and value.
+ *            Expected signature: "sv" (string name, variant value).
+ */
 static void
 _efl_net_control_technology_property_changed_internal(Eo *o, Efl_Net_Control_Technology_Data *pd, Eldbus_Message_Iter *itr)
 {
@@ -208,6 +296,12 @@ _efl_net_control_technology_property_changed_internal(Eo *o, Efl_Net_Control_Tec
      WRN("Unknown property name: %s", name);
 }
 
+/**
+ * @brief D-Bus signal callback for "PropertyChanged" on net.connman.Technology.
+ *
+ * @param data The Efl_Net_Control_Technology object (user data).
+ * @param msg The received D-Bus message.
+ */
 static void
 _efl_net_control_technology_property_changed(void *data, const Eldbus_Message *msg)
 {
@@ -246,6 +340,15 @@ _efl_net_control_technology_efl_object_destructor(Eo *o, Efl_Net_Control_Technol
    eina_stringshare_replace(&pd->tethering.passphrase, NULL);
 }
 
+/**
+ * @brief Callback for D-Bus SetProperty method calls.
+ *
+ * Handles the reply from ConnMan after attempting to set a property.
+ *
+ * @param data The Efl_Net_Control_Technology object (user data).
+ * @param msg The D-Bus reply message.
+ * @param pending The Eldbus_Pending object for this call.
+ */
 static void
 _efl_net_control_technology_property_set_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
 {
@@ -261,6 +364,18 @@ _efl_net_control_technology_property_set_cb(void *data, const Eldbus_Message *ms
      }
 }
 
+/**
+ * @brief Sets a property on the ConnMan technology object via D-Bus.
+ *
+ * This is a generic helper function to call the SetProperty method on
+ * net.connman.Technology.
+ *
+ * @param o The Efl_Net_Control_Technology object.
+ * @param pd The private data of the technology object.
+ * @param name The name of the property to set (e.g., "Powered").
+ * @param signature The D-Bus signature of the property value (e.g., "b" for boolean).
+ * @param ... The value(s) to set for the property, matching the signature.
+ */
 static void
 _efl_net_control_technology_property_set(Eo *o, Efl_Net_Control_Technology_Data *pd, const char *name, const char *signature, ...)
 {
@@ -344,6 +459,16 @@ _efl_net_control_technology_type_get(const Eo *o EINA_UNUSED, Efl_Net_Control_Te
    return pd->type;
 }
 
+/**
+ * @brief Callback for the D-Bus Scan method call.
+ *
+ * Handles the reply from ConnMan after a scan request. Resolves or rejects
+ * the associated promise.
+ *
+ * @param data The Eina_Promise to be resolved/rejected.
+ * @param msg The D-Bus reply message.
+ * @param pending The Eldbus_Pending object for this call.
+ */
 static void
 _efl_net_control_technology_scan_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
 {
@@ -366,6 +491,17 @@ _efl_net_control_technology_scan_cb(void *data, const Eldbus_Message *msg, Eldbu
    eina_promise_resolve(promise, EINA_VALUE_EMPTY);
 }
 
+/**
+ * @brief Cancellation handler for the scan promise.
+ *
+ * Called when the future associated with a scan operation is cancelled.
+ * It cancels the pending D-Bus call.
+ *
+ * @param o The Efl_Net_Control_Technology object.
+ * @param data The Eldbus_Pending object associated with the scan.
+ * @param error The cancellation error code.
+ * @return An Eina_Value containing the error.
+ */
 static Eina_Value
 _efl_net_control_technology_scan_promise_cancel(Eo *o EINA_UNUSED, void *data, Eina_Error error)
 {
@@ -380,6 +516,16 @@ _efl_net_control_technology_scan_promise_cancel(Eo *o EINA_UNUSED, void *data, E
    return eina_value_error_init(error);
 }
 
+/**
+ * @brief Deletion handler for the scan promise data.
+ *
+ * Called when the future associated with a scan operation is freed.
+ * It removes the pending D-Bus call from the internal list.
+ *
+ * @param o The Efl_Net_Control_Technology object.
+ * @param data The Eldbus_Pending object associated with the scan.
+ * @param dead_future The future that is being freed.
+ */
 static void
 _efl_net_control_technology_scan_promise_del(Eo *o, void *data, const Eina_Future *dead_future EINA_UNUSED)
 {
@@ -420,6 +566,13 @@ _efl_net_control_technology_scan(Eo *o, Efl_Net_Control_Technology_Data *pd)
    return efl_future_then(o, f);
 }
 
+/**
+ * @brief Gets the D-Bus object path for a ConnMan technology.
+ *
+ * @param o The Efl_Net_Control_Technology object.
+ * @return The D-Bus object path as a stringshare, or @c NULL on error.
+ *         The returned stringshare should not be modified or freed by the caller.
+ */
 const char *
 efl_net_connman_technology_path_get(Efl_Net_Control_Technology *o)
 {
@@ -428,6 +581,27 @@ efl_net_connman_technology_path_get(Efl_Net_Control_Technology *o)
    return pd->path;
 }
 
+/**
+ * @brief Creates a new Efl_Net_Control_Technology object for a ConnMan technology.
+ *
+ * This function is typically called by the Efl_Net_Control_Manager when a new
+ * technology is discovered. It sets up the D-Bus proxy, signal handlers,
+ * and populates initial properties.
+ *
+ * @param ctl The parent Efl_Net_Control_Manager object.
+ * @param path The D-Bus object path of the technology (e.g., "/net/connman/technology/wifi").
+ * @param itr A D-Bus message iterator positioned at the array of properties for this technology.
+ *            Each entry in the array is a dictionary entry ('e') containing
+ *            a property name (string 's') and its value (variant 'v').
+ *            Example structure for `itr` pointing to properties:
+ *            [
+ *              { "Name", "WiFi" },
+ *              { "Type", "wifi" },
+ *              { "Powered", true },
+ *              ...
+ *            ]
+ * @return A new Efl_Net_Control_Technology object, or @c NULL on failure.
+ */
 Efl_Net_Control_Technology *
 efl_net_connman_technology_new(Efl_Net_Control_Manager *ctl, const char *path, Eldbus_Message_Iter *itr)
 {

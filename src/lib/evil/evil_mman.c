@@ -19,6 +19,21 @@
  * PAGE_READONLY (equivalent to PAGE_WRITECOPY)
  * PAGE_READWRITE
  */
+
+/**
+ * @internal
+ * @brief Converts POSIX protection flags to Windows memory protection constants.
+ *
+ * This function takes POSIX-style memory protection flags (PROT_READ,
+ * PROT_WRITE, PROT_EXEC) and translates them into the corresponding
+ * Windows DWORD values (e.g., PAGE_READONLY, PAGE_READWRITE,
+ * PAGE_EXECUTE_READWRITE).
+ *
+ * @param prot An integer representing the POSIX protection flags.
+ *             Example: PROT_READ | PROT_WRITE
+ * @return The corresponding Windows memory protection constant, or 0xffffffff
+ *         if an invalid or unsupported combination of flags is provided.
+ */
 static DWORD
 _evil_mmap_protection_get(int prot)
 {
@@ -44,6 +59,7 @@ _evil_mmap_protection_get(int prot)
 
 /***** API *****/
 
+/* See evil_mman.h for extensive Doxygen comments on mmap, munmap, and mprotect */
 
 EVIL_API void *
 mmap(void  *addr EVIL_UNUSED,

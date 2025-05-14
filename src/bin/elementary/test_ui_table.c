@@ -8,17 +8,45 @@
 
 static void _custom_layout_update(Eo *pack, void *_pd EINA_UNUSED);
 
+/**
+ * @brief An array to hold references to UI objects created in the test.
+ *
+ * The first element (index 0) is a background rectangle, and the subsequent
+ * elements (indices 1 to 6) are buttons placed within the table. This array
+ * allows various callback functions to easily access and manipulate these
+ * objects.
+ *
+ * The structure is as follows:
+ * - objects[0]: Background Efl_Canvas_Rectangle.
+ * - objects[1-6]: Efl_Ui_Button objects.
+ */
 static Evas_Object *objects[7] = {};
 
+/**
+ * @brief Defines different modes for setting weight hints on table children.
+ *
+ * This enum is used by the radio button group to control how child objects
+ * within the table expand or shrink.
+ */
 typedef enum {
-   NONE,
-   NONE_BUT_FILL,
-   EQUAL,
-   ONE,
-   TWO,
-   CUSTOM
+   NONE,           /**< No weight, children will not expand. */
+   NONE_BUT_FILL,  /**< No weight, but table fills available space. */
+   EQUAL,          /**< All children have equal weight and expand equally. */
+   ONE,            /**< Only one child (objects[2]) has weight. */
+   TWO,            /**< Two children (objects[2], objects[3]) have weight. */
+   CUSTOM          /**< A custom layout function is used. */
 } Weight_Mode;
 
+/**
+ * @brief Callback for the weight mode radio buttons.
+ * @param data The Efl_Ui_Table object.
+ * @param obj The radio button that triggered the event.
+ * @param event_info Not used.
+ *
+ * This function changes the weight hints of the objects in the table based on
+ * the selected radio button mode. It also handles overriding the layout function
+ * for the CUSTOM mode.
+ */
 static void
 weights_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -67,6 +95,13 @@ weights_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback for the user minimum size slider.
+ * @param data Not used.
+ * @param event The EFL_UI_RANGE_EVENT_CHANGED event from the slider.
+ *
+ * Sets the minimum size hint for all objects in the `objects` array.
+ */
 static void
 user_min_slider_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -75,6 +110,13 @@ user_min_slider_cb(void *data EINA_UNUSED, const Efl_Event *event)
      efl_gfx_hint_size_min_set(objects[i], EINA_SIZE2D(val, val));
 }
 
+/**
+ * @brief Callback for the padding slider.
+ * @param data The Efl_Ui_Table object.
+ * @param event The EFL_UI_RANGE_EVENT_CHANGED event from the slider.
+ *
+ * Sets the internal content padding for the table.
+ */
 static void
 padding_slider_cb(void *data, const Efl_Event *event)
 {
@@ -82,6 +124,13 @@ padding_slider_cb(void *data, const Efl_Event *event)
    efl_gfx_arrangement_content_padding_set(data, val, val);
 }
 
+/**
+ * @brief Callback for the table margin slider.
+ * @param data The Efl_Ui_Table object.
+ * @param event The EFL_UI_RANGE_EVENT_CHANGED event from the slider.
+ *
+ * Sets the margin hint for the entire table.
+ */
 static void
 margin_slider_cb(void *data, const Efl_Event *event)
 {
@@ -89,6 +138,13 @@ margin_slider_cb(void *data, const Efl_Event *event)
    efl_gfx_hint_margin_set(data, val, val, val, val);
 }
 
+/**
+ * @brief Callback for the button margins slider.
+ * @param data Not used.
+ * @param event The EFL_UI_RANGE_EVENT_CHANGED event from the slider.
+ *
+ * Sets the margin hint for each of the buttons in the table.
+ */
 static void
 btnmargins_slider_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -97,6 +153,13 @@ btnmargins_slider_cb(void *data EINA_UNUSED, const Efl_Event *event)
      efl_gfx_hint_margin_set(objects[i], val, val, val, val);
 }
 
+/**
+ * @brief Callback for the vertical alignment slider.
+ * @param data Not used.
+ * @param event The EFL_UI_RANGE_EVENT_CHANGED event from the slider.
+ *
+ * Adjusts the vertical alignment hint of the first button (objects[1]).
+ */
 static void
 alignv_slider_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -107,6 +170,13 @@ alignv_slider_cb(void *data EINA_UNUSED, const Efl_Event *event)
    efl_gfx_hint_align_set(objects[1], ax, val);
 }
 
+/**
+ * @brief Callback for the horizontal alignment slider.
+ * @param data Not used.
+ * @param event The EFL_UI_RANGE_EVENT_CHANGED event from the slider.
+ *
+ * Adjusts the horizontal alignment hint of the first button (objects[1]).
+ */
 static void
 alignh_slider_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -117,6 +187,14 @@ alignh_slider_cb(void *data EINA_UNUSED, const Efl_Event *event)
    efl_gfx_hint_align_set(objects[1], val, ay);
 }
 
+/**
+ * @brief Callback for the EFL_PACK_EVENT_LAYOUT_UPDATED event on the table.
+ * @param data The Elm_Label to update with layout info.
+ * @param event The layout updated event.
+ *
+ * Updates a label to show the current number of items, columns, and rows in
+ * the table whenever its layout is recalculated.
+ */
 static void
 layout_updated_cb(void *data, const Efl_Event *event)
 {
@@ -130,6 +208,14 @@ layout_updated_cb(void *data, const Efl_Event *event)
    elm_object_text_set(o, buf);
 }
 
+/**
+ * @brief Callback for content added/removed events on the table.
+ * @param data The Elm_Label to update with event info.
+ * @param event The container event.
+ *
+ * Updates a label with information about the child that was added or removed,
+ * including its cell position and span.
+ */
 static void
 child_evt_cb(void *data, const Efl_Event *event)
 {
@@ -147,14 +233,23 @@ child_evt_cb(void *data, const Efl_Event *event)
    elm_object_text_set(o, buf);
 }
 
+/**
+ * @brief An example custom layout function for an Efl_Ui_Table.
+ * @param pack The table object to be laid out.
+ * @param _pd Not used.
+ *
+ * This function provides a simplistic custom layout. It divides the available
+ * space into equally sized regions based on the number of columns and rows,
+ * then centers each child object within its assigned cell(s) using its minimum
+ * size hint.
+ *
+ * @note This is a demonstrative layout function and is intentionally simple.
+ * It does not respect standard layout hints like alignment or weight, which
+ * a production-ready layout function should.
+ */
 static void
 _custom_layout_update(Eo *pack, void *_pd EINA_UNUSED)
 {
-   /* Example custom layout for table:
-    * divide space into regions of same size, place objects in center of their
-    * cells using their min size
-    * Note: This is a TERRIBLE layout function (disregards align, weig.ht, ...)
-    */
 
    int rows, cols, c, r, cs, rs, gmw = 0, gmh = 0;
    Eina_Iterator *it;
@@ -189,6 +284,21 @@ end:
    efl_gfx_hint_size_min_set(pack, EINA_SIZE2D(gmw * cols, gmh * rows));
 }
 
+/**
+ * @brief Main test function for Efl.Ui.Table with cell-based packing.
+ *
+ * This function sets up a window containing an Efl_Ui_Table and a control
+ * panel. The control panel includes various widgets (radio buttons, sliders)
+ * to dynamically change the table's properties and the properties of its
+ * children. This allows for testing features like packing, spanning, alignment,
+ * weighting, margins, and padding.
+ *
+ * The test demonstrates:
+ * - Packing objects into specific table cells with row/column spans.
+ * - Dynamically changing layout properties via UI controls.
+ * - Using event callbacks to monitor layout changes and content modifications.
+ * - Overriding the default layout logic with a custom layout function.
+ */
 void
 test_ui_table(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -522,6 +632,16 @@ test_ui_table(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_
    efl_gfx_entity_visible_set(win, 1);
 }
 
+/**
+ * @brief Generates a unique, static string for button labels.
+ * @param str A base string, or NULL to use a default "item" string.
+ * @return A statically allocated string in the format "base_string id".
+ *
+ * This helper function is used to create distinct labels for dynamically
+ * added buttons. It is not thread-safe.
+ *
+ * @warning The returned buffer is overwritten on each call.
+ */
 static const char *
 btn_text(const char *str)
 {
@@ -531,12 +651,25 @@ btn_text(const char *str)
    return buf;
 }
 
+/**
+ * @brief Callback to remove an object when it is clicked.
+ * @param data Not used.
+ * @param ev The click event. The object to be deleted is `ev->object`.
+ */
 static void
 remove_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
    efl_del(ev->object);
 }
 
+/**
+ * @brief Callback for the "Append" button.
+ * @param data The Efl_Ui_Table to which a new item will be appended.
+ * @param ev Not used.
+ *
+ * Creates and appends a new button to the table using the linear packing API
+ * (`efl_pack`).
+ */
 static void
 append_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -551,6 +684,13 @@ append_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_gfx_entity_visible_set(o, 1);
 }
 
+/**
+ * @brief Callback for the "Clear" button.
+ * @param data The Efl_Ui_Table to be cleared.
+ * @param ev Not used.
+ *
+ * Removes all children from the table.
+ */
 static void
 clear_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -558,6 +698,18 @@ clear_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_pack_clear(table);
 }
 
+/**
+ * @brief Test function for Efl.Ui.Table's linear packing APIs.
+ *
+ * This function sets up a window to test the "linear" or "flow" packing
+ * behavior of Efl_Ui_Table, where items are added sequentially using
+ * `efl_pack` rather than being placed in specific cells.
+ *
+ * The test demonstrates:
+ * - Setting a fixed number of columns or rows to control flow.
+ * - Appending and clearing items from the table.
+ * - Monitoring table properties and events in a linear packing context.
+ */
 void
 test_ui_table_linear(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                     void *event_info EINA_UNUSED)

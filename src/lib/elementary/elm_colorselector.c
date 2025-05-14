@@ -30,10 +30,33 @@ static const char SIG_CHANGED[] = "changed";
 static const char SIG_CHANGED_USER[] = "changed,user";
 static const char SIG_COLOR_ITEM_SELECTED[] = "color,item,selected";
 static const char SIG_COLOR_ITEM_LONGPRESSED[] = "color,item,longpressed";
+
+/**
+ * @brief Smart callback descriptions for the Elm_Colorselector widget.
+ *
+ * This array defines the smart callbacks that instances of Elm_Colorselector can emit.
+ * Each entry is an Evas_Smart_Cb_Description, which has two fields:
+ * - name: The name of the signal (e.g., "changed").
+ * - type: A string describing the type of the event_info passed to the callback.
+ *         Often empty for Elementary signals.
+ *
+ * Example structure of an element:
+ *   { "signal_name", "event_info_type_description" }
+ *
+ * Current signals:
+ * - "color,item,selected": User clicked on a color item. event_info is the selected Elm_Object_Item.
+ * - "color,item,longpressed": User long-pressed a color item. event_info is the selected Elm_Object_Item.
+ * - "changed": The selected color value changed (e.g., via sliders, spinners). event_info is NULL.
+ * - "changed,user": The selected color value changed due to direct user interaction (not programmatic). event_info is NULL.
+ * - SIG_WIDGET_LANG_CHANGED: Handled by elm_widget (language changed).
+ * - SIG_WIDGET_ACCESS_CHANGED: Handled by elm_widget (accessibility state changed).
+ * - SIG_LAYOUT_FOCUSED: Handled by elm_layout (widget focused).
+ * - SIG_LAYOUT_UNFOCUSED: Handled by elm_layout (widget unfocused).
+ */
 static const Evas_Smart_Cb_Description _smart_callbacks[] =
 {
-   {SIG_COLOR_ITEM_SELECTED, ""},
-   {SIG_COLOR_ITEM_LONGPRESSED, ""},
+   {SIG_COLOR_ITEM_SELECTED, ""}, /**< Elm_Object_Item for the selected color item */
+   {SIG_COLOR_ITEM_LONGPRESSED, ""}, /**< Elm_Object_Item for the longpressed color item */
    {SIG_CHANGED, ""},
    {SIG_WIDGET_LANG_CHANGED, ""}, /**< handled by elm_widget */
    {SIG_WIDGET_ACCESS_CHANGED, ""}, /**< handled by elm_widget */
@@ -43,9 +66,24 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] =
    {NULL, NULL}
 };
 
+/**
+ * @brief Defines a mapping between RGBA color values and human-readable names.
+ *
+ * This array is used, for example, to provide accessible names for colors.
+ * Each element is an Elm_Color_Name struct, which contains:
+ * - color: An Elm_Color_RGBA struct {r, g, b, a} defining the color.
+ * - name: A const char* for the human-readable name of the color.
+ *
+ * Example structure of an element:
+ *   { {R_val, G_val, B_val, A_val}, "ColorName" }
+ *
+ * The array is sorted by color components (R, then G, then B) to allow
+ * for efficient searching (e.g., binary search in _get_color_name).
+ * Only colors with alpha = 255 are typically named.
+ */
 static const Elm_Color_Name _color_name[] = {
-   {{0, 0, 0, 255},       "black"},
-   {{0, 0, 128, 255},     "navy"},
+   {{0, 0, 0, 255},       "black"}, /**< Black color */
+   {{0, 0, 128, 255},     "navy"}, /**< Navy color */
    {{0, 0, 139, 255},     "dark blue"},
    {{0, 0, 205, 255},     "medium blue"},
    {{0, 0, 255, 255},     "blue"},
@@ -189,12 +227,34 @@ static const Elm_Color_Name _color_name[] = {
 static Eina_Bool _key_action_move(Evas_Object *obj, const char *params);
 static Eina_Bool _key_action_activate(Evas_Object *obj, const char *params);
 
+/**
+ * @brief Defines the keyboard actions supported by the Elm_Colorselector widget.
+ *
+ * This array maps action names (strings) to their corresponding handler functions.
+ * It's used by the accessibility and keyboard navigation systems.
+ * Each element is an Elm_Action struct, which contains:
+ * - name: The name of the action (e.g., "move", "activate").
+ * - func: A function pointer to the handler for this action.
+ *         The handler function takes the widget object and a parameter string.
+ *
+ * Example structure of an element:
+ *   { "action_name", action_handler_function }
+ */
 static const Elm_Action key_actions[] = {
-   {"move", _key_action_move},
-   {"activate", _key_action_activate},
+   {"move", _key_action_move},       /**< Handles directional movement (e.g., "left", "right", "up", "down") */
+   {"activate", _key_action_activate}, /**< Handles activation of a focused item (e.g., selecting a color) */
    {NULL, NULL}
 };
 
+/**
+ * @brief Updates the list of focusable children for composition.
+ * @param obj The colorselector widget.
+ * @param pd The private data of the colorselector.
+ *
+ * This function sets the elements that can be part of the focus chain
+ * within the colorselector, depending on its current mode (palette, components, picker, etc.).
+ * This is important for keyboard navigation and accessibility.
+ */
 static void
 _flush_color_children(Eo *obj, Elm_Colorselector_Data *pd)
 {
@@ -220,9 +280,21 @@ _flush_color_children(Eo *obj, Elm_Colorselector_Data *pd)
 enum Palette_Box_Direction
 {
    PALETTE_BOX_UP,
-   PALETTE_BOX_DOWN
+   PALETTE_BOX_DOWN /**< Direction for navigating downwards in the palette. */
 };
 
+/**
+ * @brief Retrieves the human-readable name for a given RGBA color.
+ * @param R Red component (0-255).
+ * @param G Green component (0-255).
+ * @param B Blue component (0-255).
+ * @param A Alpha component (0-255).
+ * @return The name of the color if found in the _color_name array and A is 255,
+ *         otherwise NULL.
+ *
+ * This function performs a binary search on the pre-defined `_color_name` array.
+ * It's primarily used for accessibility purposes, providing text alternatives for colors.
+ */
 static const char *
 _get_color_name(unsigned int R, unsigned int G, unsigned int B, unsigned int A)
 {
@@ -251,6 +323,14 @@ _get_color_name(unsigned int R, unsigned int G, unsigned int B, unsigned int A)
     return NULL;
 }
 
+/**
+ * @brief Deletes all color items from the palette.
+ * @param sd The private data of the colorselector.
+ *
+ * This function iterates through the list of color items (sd->items),
+ * deletes each item, and clears the list. It also resets the selected
+ * and focused item pointers.
+ */
 static void
 _items_del(Elm_Colorselector_Data *sd)
 {
@@ -268,6 +348,18 @@ _items_del(Elm_Colorselector_Data *sd)
    sd->focus_items = NULL;
 }
 
+/**
+ * @brief Calculates RGB color values adjusted by saturation.
+ * @param sd The private data of the colorselector, containing base color (er, eg, eb) and saturation (s).
+ * @param[out] sr Pointer to store the resulting red component.
+ * @param[out] sg Pointer to store the resulting green component.
+ * @param[out] sb Pointer to store the resulting blue component.
+ *
+ * The base color (sd->er, sd->eg, sd->eb) is assumed to be a fully saturated color
+ * at the current hue. This function desaturates it based on sd->s (saturation value, 0.0 to 1.0).
+ * A saturation of 1.0 means full color, 0.0 means grayscale.
+ * The calculation interpolates towards mid-gray (127, 127, 127).
+ */
 static void
 _color_with_saturation(Elm_Colorselector_Data *sd, int *sr, int *sg, int *sb)
 {
@@ -287,6 +379,18 @@ _color_with_saturation(Elm_Colorselector_Data *sd, int *sr, int *sg, int *sb)
      *sb = 127 - (int)((double)(127 - sd->eb) * sd->s);
 }
 
+/**
+ * @brief Calculates RGB color values adjusted by lightness.
+ * @param sd The private data of the colorselector, containing base color (er, eg, eb) and lightness (l).
+ * @param[out] lr Pointer to store the resulting red component.
+ * @param[out] lg Pointer to store the resulting green component.
+ * @param[out] lb Pointer to store the resulting blue component.
+ *
+ * The base color (sd->er, sd->eg, sd->eb) is modified based on sd->l (lightness value, 0.0 to 1.0).
+ * - If sd->l > 0.5, the color is lightened by interpolating towards white (255, 255, 255).
+ * - If sd->l < 0.5, the color is darkened by interpolating towards black (0, 0, 0).
+ * - If sd->l == 0.5, the base color is used as is.
+ */
 static void
 _color_with_lightness(Elm_Colorselector_Data *sd, int *lr, int *lg, int *lb)
 {
@@ -310,6 +414,17 @@ _color_with_lightness(Elm_Colorselector_Data *sd, int *lr, int *lg, int *lb)
      }
 }
 
+/**
+ * @brief Initializes or updates the color picker display area.
+ * @param sd The private data of the colorselector.
+ *
+ * This function is called when the color picker mode is active or when the
+ * selected color changes. It updates:
+ * - The RGBA spinners with the current color values (sd->r, g, b, a).
+ * - The 17x17 pixel preview image (sd->picker_display) to show the current color.
+ *   The alpha component is premultiplied into RGB for display.
+ * It ensures that spinners are only updated if they weren't the source of the change.
+ */
 static void
 _color_picker_init(Elm_Colorselector_Data *sd)
 {
@@ -359,6 +474,15 @@ _color_picker_init(Elm_Colorselector_Data *sd)
    evas_object_image_data_update_add(sd->picker_display, 0, 0, w, h);
 }
 
+/**
+ * @brief Converts RGB color values to HSL (Hue, Saturation, Lightness).
+ * @param sd The private data of the colorselector. The input RGB values are
+ *           taken from sd->r, sd->g, sd->b. The results are stored in
+ *           sd->h (0-360), sd->s (0-1), sd->l (0-1).
+ *
+ * This function implements a standard RGB to HSL conversion algorithm.
+ * The RGB values are first normalized to the range [0, 1].
+ */
 static void
 _rgb_to_hsl(Elm_Colorselector_Data *sd)
 {
@@ -406,6 +530,17 @@ _rgb_to_hsl(Elm_Colorselector_Data *sd)
    sd->h *= 60.0;
 }
 
+/**
+ * @brief Converts HSL (Hue, Saturation, Lightness) color values to RGB.
+ * @param sd The private data of the colorselector. The input HSL values are
+ *           taken from sd->h (0-360), sd->s (0-1), sd->l (0-1).
+ *           The resulting RGB values (0-255) are stored in sd->r, sd->g, sd->b.
+ * @return EINA_TRUE if the RGB values changed as a result of the conversion,
+ *         EINA_FALSE otherwise (i.e., if the new RGB is the same as the old).
+ *
+ * This function implements a standard HSL to RGB conversion algorithm.
+ * The resulting R, G, B values are rounded to the nearest integer.
+ */
 static Eina_Bool
 _hsl_to_rgb(Elm_Colorselector_Data *sd)
 {
@@ -498,6 +633,16 @@ _hsl_to_rgb(Elm_Colorselector_Data *sd)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Updates the 'extreme' RGB values (sd->er, sd->eg, sd->eb) based on hue.
+ * @param sd The private data of the colorselector.
+ * @param x The normalized hue value (0.0 to 1.0, where 0.0 and 1.0 correspond to red).
+ *
+ * The 'extreme' RGB values represent the pure, fully saturated color for the given hue.
+ * These values are used as a base for calculating colors with varying saturation and lightness.
+ * The conversion from hue to RGB follows a piecewise linear path through the color spectrum
+ * (Red -> Yellow -> Green -> Cyan -> Blue -> Magenta -> Red).
+ */
 static void
 _update_ergb(Elm_Colorselector_Data *sd, double x)
 {
@@ -541,6 +686,15 @@ _update_ergb(Elm_Colorselector_Data *sd, double x)
      }
 }
 
+/**
+ * @brief Updates the visual appearance of all color component bars (Hue, Saturation, Lightness, Alpha).
+ * @param sd The private data of the colorselector.
+ *
+ * This function sets the colors of the arrows and backgrounds of the HSLA bars
+ * to reflect the current color state (sd->er, eg, eb, s, l, a).
+ * For example, the saturation bar's background might change based on the current hue,
+ * and its arrow color will reflect the hue with current saturation.
+ */
 static void
 _update_colorbars(Elm_Colorselector_Data *sd)
 {
@@ -567,6 +721,19 @@ _update_colorbars(Elm_Colorselector_Data *sd)
                          sd->a);
 }
 
+/**
+ * @brief Updates HSLA values based on a change from one of the color bars.
+ * @param obj The colorselector widget.
+ * @param type The type of color bar that changed (HUE, SATURATION, LIGHTNESS, ALPHA).
+ * @param x The new normalized value (0.0 to 1.0) from the color bar.
+ *
+ * This function is called when a user interacts with a color bar (e.g., drags its arrow).
+ * It updates the corresponding H, S, L, or A value in `sd`, then:
+ * - If H, S, or L changed, it calls `_hsl_to_rgb` to update R, G, B.
+ * - Calls `_update_colorbars` to refresh the visual state of all bars.
+ * - If in picker mode, calls `_color_picker_init` to update the picker display.
+ * - Emits "changed" and "changed,user" signals.
+ */
 static void
 _update_hsla_from_colorbar(Evas_Object *obj, Color_Type type, double x)
 {
@@ -608,6 +775,25 @@ _update_hsla_from_colorbar(Evas_Object *obj, Color_Type type, double x)
    evas_object_smart_callback_call(obj, "changed,user", NULL);
 }
 
+/**
+ * @brief Sets the current color of the colorselector and updates all UI components.
+ * @param obj The colorselector widget.
+ * @param r Red component (0-255).
+ * @param g Green component (0-255).
+ * @param b Blue component (0-255).
+ * @param a Alpha component (0-255).
+ * @param mode_change EINA_TRUE if this color change is due to a mode switch,
+ *                    EINA_FALSE for regular color changes. This affects whether
+ *                    the "changed" signal is emitted.
+ *
+ * This is a central function for updating the colorselector's state. It:
+ * - Stores the new RGBA values in `sd`.
+ * - If components/HSLA bars are visible, converts RGB to HSL and updates
+ *   the positions of the arrows on the H, S, L, A bars.
+ * - Calls `_update_ergb` and `_update_colorbars` to refresh bar visuals.
+ * - If the color picker is visible, calls `_color_picker_init`.
+ * - Emits the "changed" signal if `mode_change` is EINA_FALSE and the color actually changed.
+ */
 static void
 _colors_set(Evas_Object *obj,
             int r,
@@ -665,6 +851,14 @@ _colors_set(Evas_Object *obj,
      evas_object_smart_callback_call(obj, "changed", NULL);
 }
 
+/**
+ * @brief Visually unselects the currently selected item in the color palette.
+ * @param sd The private data of the colorselector.
+ *
+ * If there is a selected color item (sd->selected is not NULL), this function
+ * sets its 'selected' state to EINA_FALSE, which typically updates its visual
+ * appearance (e.g., removes a highlight).
+ */
 static void
 _unselect_selected_item(Elm_Colorselector_Data *sd)
 {
@@ -677,6 +871,18 @@ _unselect_selected_item(Elm_Colorselector_Data *sd)
      }
 }
 
+/**
+ * @brief Callback invoked when the value of an RGBA spinner changes.
+ * @param data The Elm_Colorselector_Data (private data of the colorselector).
+ * @param event The ELM_SPINNER_EVENT_CHANGED event object.
+ *
+ * This function identifies which spinner (R, G, B, or A) triggered the event,
+ * retrieves its new value, and then calls `_colors_set` to update the
+ * colorselector's state. It also unselects any selected palette item and
+ * emits the "changed,user" signal.
+ * A temporary data flag "_changed" is used on the spinner to prevent feedback loops
+ * if `_color_picker_init` subsequently tries to set the spinner value.
+ */
 static void
 _spinner_changed_cb(void *data, const Efl_Event *event)
 {

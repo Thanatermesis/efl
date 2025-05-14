@@ -30,16 +30,22 @@ static Evas_Func func, pfunc;
 /* engine struct data */
 typedef struct _Render_Engine Render_Engine;
 
+/**
+ * @brief Structure holding the state for a software_x11 render engine instance.
+ *
+ * Contains the generic software rendering data and specific function pointers
+ * or data relevant to the X11 backend (like EGL info, though potentially unused here).
+ */
 struct _Render_Engine
 {
-   Render_Output_Software_Generic generic;
-   Eina_Bool                      (*outbuf_alpha_get)(Outbuf *ob);
+   Render_Output_Software_Generic generic; /**< Generic software rendering data. */
+   Eina_Bool                      (*outbuf_alpha_get)(Outbuf *ob); /**< Function pointer to get alpha status of the output buffer. */
 
    struct
    {
-      void *disp;
-      void *config;
-      void *surface;
+      void *disp;    /**< EGL display connection (potentially unused). */
+      void *config;  /**< EGL configuration (potentially unused). */
+      void *surface; /**< EGL surface (potentially unused). */
    } egl;
 };
 
@@ -48,9 +54,34 @@ static void        *_best_visual_get(void *connection, int screen);
 static unsigned int _best_colormap_get(void *connection, int screen);
 static int          _best_depth_get(void *connection, int screen);
 
+/** @brief Global list tracking all active output buffers (_Outbuf). */
 static Eina_List *_outbufs = NULL;
 
 /* internal engine routines */
+/**
+ * @brief Sets up an output buffer using standard Xlib rendering.
+ *
+ * Initializes the necessary Xlib resources (GCs, etc.) and configures the
+ * output buffer (`Outbuf`) for rendering directly via XPutImage or similar.
+ * It also initializes the generic software rendering parts.
+ *
+ * @param engine The engine pointer (unused in generic init).
+ * @param w Width of the output buffer.
+ * @param h Height of the output buffer.
+ * @param rot Rotation angle (0, 90, 180, 270).
+ * @param disp X11 Display connection.
+ * @param draw Target X11 Drawable (Window or Pixmap).
+ * @param vis X11 Visual to use.
+ * @param cmap X11 Colormap to use.
+ * @param depth Depth of the drawable.
+ * @param debug Enable debugging features.
+ * @param grayscale Hint for grayscale allocation (unused?).
+ * @param max_colors Maximum colors for palette modes (unused?).
+ * @param mask Optional shape mask Pixmap.
+ * @param shape_dither Enable dithering for shape mask.
+ * @param destination_alpha Indicates if the destination drawable supports alpha.
+ * @return A pointer to the initialized Render_Engine structure, or NULL on failure.
+ */
 static void *
 _output_xlib_setup(void *engine, int w, int h, int rot, Display *disp, Drawable draw,
                    Visual *vis, Colormap cmap, int depth, int debug,
@@ -109,6 +140,30 @@ on_error:
    return NULL;
 }
 
+/**
+ * @brief Sets up an output buffer using DRI/SwapBuffers for rendering.
+ *
+ * Initializes the necessary Xlib resources and configures the output buffer
+ * (`Outbuf`) for rendering using potentially hardware-accelerated buffer swapping
+ * (e.g., via DRI). It also initializes the generic software rendering parts.
+ *
+ * @param engine The engine pointer (unused in generic init).
+ * @param w Width of the output buffer.
+ * @param h Height of the output buffer.
+ * @param rot Rotation angle (0, 90, 180, 270).
+ * @param disp X11 Display connection.
+ * @param draw Target X11 Drawable (Window or Pixmap).
+ * @param vis X11 Visual to use.
+ * @param cmap X11 Colormap to use.
+ * @param depth Depth of the drawable.
+ * @param debug Enable debugging features (unused by swapbuf setup itself).
+ * @param grayscale Hint for grayscale allocation (unused?).
+ * @param max_colors Maximum colors for palette modes (unused?).
+ * @param mask Optional shape mask Pixmap.
+ * @param shape_dither Enable dithering for shape mask.
+ * @param destination_alpha Indicates if the destination drawable supports alpha.
+ * @return A pointer to the initialized Render_Engine structure, or NULL on failure.
+ */
 static void *
 _output_swapbuf_setup(void *engine, int w, int h, int rot, Display *disp, Drawable draw,
                       Visual *vis, Colormap cmap, int depth,
@@ -155,6 +210,12 @@ on_error:
    return NULL;
 }
 
+/**
+ * @brief Gets the default visual for a given screen.
+ * @param connection The X11 display connection (Display *).
+ * @param screen The screen number.
+ * @return The default Visual * for the screen, or NULL if connection is invalid.
+ */
 static void *
 _best_visual_get(void *connection, int screen)
 {
@@ -163,6 +224,12 @@ _best_visual_get(void *connection, int screen)
    return DefaultVisual((Display *)connection, screen);
 }
 
+/**
+ * @brief Gets the default colormap for a given screen.
+ * @param connection The X11 display connection (Display *).
+ * @param screen The screen number.
+ * @return The default Colormap for the screen, or 0 if connection is invalid.
+ */
 static unsigned int
 _best_colormap_get(void *connection, int screen)
 {
@@ -171,6 +238,12 @@ _best_colormap_get(void *connection, int screen)
    return DefaultColormap((Display *)connection, screen);
 }
 
+/**
+ * @brief Gets the default depth for a given screen.
+ * @param connection The X11 display connection (Display *).
+ * @param screen The screen number.
+ * @return The default depth (int) for the screen, or 0 if connection is invalid.
+ */
 static int
 _best_depth_get(void *connection, int screen)
 {
@@ -179,6 +252,14 @@ _best_depth_get(void *connection, int screen)
    return DefaultDepth((Display *)connection, screen);
 }
 
+/**
+ * @brief Dynamically links symbols needed from the generic software engine.
+ *
+ * This function uses dlsym to find symbols related to native surface handling
+ * (specifically TBM surfaces) that are provided by the linked software_generic
+ * engine module. It ensures these functions are available for use.
+ * This is typically needed when Evas is not built statically.
+ */
 static void
 _symbols(void)
 {
@@ -197,6 +278,14 @@ _symbols(void)
 }
 
 /* engine api this module provides */
+/**
+ * @brief Sets up the engine info structure with software_x11 specific details.
+ *
+ * Populates the Evas_Engine_Info_Software_X11 structure with default values
+ * and function pointers for querying display capabilities (visual, colormap, depth).
+ *
+ * @param info Pointer to the Evas_Engine_Info_Software_X11 structure to be filled.
+ */
 static void
 eng_output_info_setup(void *info)
 {
@@ -211,6 +300,20 @@ eng_output_info_setup(void *info)
    einfo->render_mode = EVAS_RENDER_MODE_BLOCKING;
 }
 
+/**
+ * @brief Sets up the rendering engine output for a given canvas configuration.
+ *
+ * Creates and initializes a Render_Engine instance based on the provided
+ * Evas_Engine_Info_Software_X11 settings. It attempts to use the swapbuffer
+ * (DRI) backend first, falling back to the standard Xlib backend if unavailable
+ * or disabled via environment variable (EVAS_NO_DRI_SWAPBUF).
+ *
+ * @param engine The engine pointer (passed to backend setup).
+ * @param in Pointer to the Evas_Engine_Info_Software_X11 structure containing setup parameters.
+ * @param w Width of the canvas.
+ * @param h Height of the canvas.
+ * @return A pointer to the initialized Render_Engine structure, or NULL on failure.
+ */
 static void *
 eng_output_setup(void *engine, void *in, unsigned int w, unsigned int h)
 {
@@ -259,6 +362,21 @@ eng_output_setup(void *engine, void *in, unsigned int w, unsigned int h)
    return re;
 }
 
+/**
+ * @brief Updates the rendering engine output configuration.
+ *
+ * Reconfigures an existing Render_Engine instance, typically used when the
+ * target window/drawable or its properties (size, rotation, etc.) change.
+ * It determines the backend type (swapbuf or xlib) based on the existing
+ * engine data and re-initializes the output buffer accordingly.
+ *
+ * @param engine The engine pointer (unused).
+ * @param data Pointer to the existing Render_Engine structure.
+ * @param in Pointer to the Evas_Engine_Info_Software_X11 structure containing the new setup parameters.
+ * @param w New width of the canvas.
+ * @param h New height of the canvas.
+ * @return 1 on success, although the return value isn't strictly checked elsewhere. Failure might involve internal errors during setup.
+ */
 static int
 eng_output_update(void *engine EINA_UNUSED, void *data, void *in, unsigned int w, unsigned int h)
 {
@@ -315,6 +433,15 @@ eng_output_update(void *engine EINA_UNUSED, void *data, void *in, unsigned int w
    return 1;
 }
 
+/**
+ * @brief Frees the resources associated with a rendering engine instance.
+ *
+ * Cleans up the generic software engine parts and frees the Render_Engine structure.
+ * It also removes the associated output buffer from the global list.
+ *
+ * @param engine The engine pointer (passed to generic clean).
+ * @param data Pointer to the Render_Engine structure to be freed.
+ */
 static void
 eng_output_free(void *engine, void *data)
 {
@@ -328,6 +455,15 @@ eng_output_free(void *engine, void *data)
      }
 }
 
+/**
+ * @brief Checks if the canvas associated with the engine supports an alpha channel.
+ *
+ * Determines alpha support based on the output buffer's properties
+ * (destination_alpha flag or the result of the outbuf_alpha_get function).
+ *
+ * @param engine Pointer to the Render_Engine structure.
+ * @return EINA_TRUE if alpha is supported, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 eng_canvas_alpha_get(void *engine)
 {
@@ -338,6 +474,14 @@ eng_canvas_alpha_get(void *engine)
           (re->outbuf_alpha_get(re->generic.ob));
 }
 
+/**
+ * @brief Frees resources associated with an EvasGL native surface wrapper.
+ *
+ * Cleans up the Native structure allocated when setting an EvasGL surface
+ * as the source for an RGBA_Image.
+ *
+ * @param image Pointer to the RGBA_Image whose native data should be freed.
+ */
 static void
 _native_evasgl_free(void *image)
 {
@@ -352,6 +496,16 @@ _native_evasgl_free(void *image)
    free(n);
 }
 
+/**
+ * @brief Initializes native surface support for a given type.
+ *
+ * Checks if the specified native surface type (X11, TBM, EvasGL) is supported
+ * by this engine backend. For TBM, it might perform specific initialization.
+ *
+ * @param engine The engine pointer (unused).
+ * @param type The Evas_Native_Surface_Type to initialize.
+ * @return 1 if supported/initialized successfully, 0 otherwise.
+ */
 static int
 eng_image_native_init(void *engine EINA_UNUSED, Evas_Native_Surface_Type type)
 {
@@ -372,6 +526,15 @@ eng_image_native_init(void *engine EINA_UNUSED, Evas_Native_Surface_Type type)
      }
 }
 
+/**
+ * @brief Shuts down native surface support for a given type.
+ *
+ * Performs any necessary cleanup for the specified native surface type.
+ * For TBM, it might call a specific shutdown function.
+ *
+ * @param engine The engine pointer (unused).
+ * @param type The Evas_Native_Surface_Type to shut down.
+ */
 static void
 eng_image_native_shutdown(void *engine EINA_UNUSED, Evas_Native_Surface_Type type)
 {
@@ -393,6 +556,20 @@ eng_image_native_shutdown(void *engine EINA_UNUSED, Evas_Native_Surface_Type typ
      }
 }
 
+/**
+ * @brief Sets a native surface as the data source for an Evas image.
+ *
+ * Associates an Evas image (RGBA_Image/Image_Entry) with a native surface
+ * (X11 Pixmap, TBM buffer, EvasGL surface). This allows Evas to potentially
+ * use the native surface directly for rendering or texture uploading, avoiding
+ * copies where possible. It handles different surface types and may involve
+ * cache lookups or specific backend functions (like DRI or TBM setters).
+ *
+ * @param engine Pointer to the Render_Engine structure.
+ * @param image Pointer to the Evas image (Image_Entry/RGBA_Image).
+ * @param native Pointer to the Evas_Native_Surface structure describing the native source. If NULL, disassociates any existing native surface.
+ * @return A pointer to the (potentially new) Evas image (Image_Entry) associated with the native surface, or NULL on failure or if native is NULL.
+ */
 static void *
 eng_image_native_set(void *engine, void *image, void *native)
 {
@@ -496,6 +673,17 @@ eng_image_native_set(void *engine, void *image, void *native)
    return ie;
 }
 
+/**
+ * @brief Retrieves the native surface information associated with an Evas image.
+ *
+ * If an Evas image has been associated with a native surface via
+ * eng_image_native_set(), this function returns a pointer to the
+ * Evas_Native_Surface structure describing that association.
+ *
+ * @param engine The engine pointer (unused).
+ * @param image Pointer to the Evas image (RGBA_Image).
+ * @return A pointer to the associated Evas_Native_Surface structure, or NULL if no native surface is associated.
+ */
 static void *
 eng_image_native_get(void *engine EINA_UNUSED, void *image)
 {
@@ -508,6 +696,17 @@ eng_image_native_get(void *engine EINA_UNUSED, void *image)
 }
 
 /* module advertising code */
+/**
+ * @brief Opens/initializes the software_x11 engine module.
+ *
+ * Inherits function pointers from the "software_generic" engine, registers
+ * a log domain, overrides specific engine functions with the software_x11
+ * implementations, dynamically links necessary symbols, and advertises the
+ * engine's API.
+ *
+ * @param em Pointer to the Evas_Module structure for this engine.
+ * @return 1 on successful initialization, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -546,6 +745,13 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Closes/shuts down the software_x11 engine module.
+ *
+ * Unregisters the log domain associated with this engine.
+ *
+ * @param em Pointer to the Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

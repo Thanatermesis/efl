@@ -1,3 +1,17 @@
+/**
+ * @file
+ * @brief A test scheduler for the Exactness testing framework.
+ *
+ * This program runs a series of tests defined in a list file. It can operate
+ * in several modes:
+ * - 'init': To generate initial reference screenshots ("golden masters").
+ * - 'play': To run tests and compare current output against the golden masters.
+ * - 'simulation': To run tests without generating or comparing screenshots,
+ *   useful for debugging.
+ *
+ * It supports parallel execution of tests and generates an HTML report for
+ * failures.
+ */
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -25,39 +39,64 @@
 #define ERR(...) EINA_LOG_DOM_ERR(_log_domain, __VA_ARGS__)
 #define CRI(...) EINA_LOG_DOM_CRIT(_log_domain, __VA_ARGS__)
 
-static int _log_domain = -1;
+static int _log_domain = -1; /**< Log domain for Eina logging. */
 
+/**
+ * @brief Represents a single test entry in the test list.
+ *
+ * This structure is part of an Eina_Inlist, forming a queue of tests to be
+ * executed.
+ */
 typedef struct
 {
-   EINA_INLIST;
-   char *name;
-   const char *command;
-   double start_time;
+   EINA_INLIST; /**< Eina Inlist macro, makes this struct part of a linked list. */
+   char *name; /**< The name of the test, derived from the .exu file name. */
+   const char *command; /**< The command to execute for this test. */
+   double start_time; /**< Timestamp when the test execution began. */
 } List_Entry;
 
+/**
+ * @brief Defines the operational modes for the exactness test runner.
+ */
 typedef enum
 {
-   RUN_SIMULATION,
-   RUN_PLAY,
-   RUN_INIT
+   RUN_SIMULATION, /**< Run tests to display actions without screenshotting. For debugging. */
+   RUN_PLAY,       /**< Run tests and compare screenshots against reference images. */
+   RUN_INIT        /**< Run tests to create the initial reference screenshots. */
 } Run_Mode;
 
-static unsigned short _running_jobs = 0, _max_jobs = 1;
-static Eina_List *_base_dirs = NULL;
-static char *_dest_dir;
-static char *_wrap_command = NULL, *_fonts_dir = NULL;
-static int _verbose = 0;
-static Eina_Bool _scan_objs = EINA_FALSE, _disable_screenshots = EINA_FALSE, _stabilize_shots = EINA_FALSE;
+static unsigned short _running_jobs = 0, /**< Number of currently running test jobs. */
+                      _max_jobs = 1; /**< Maximum number of parallel jobs. */
+static Eina_List *_base_dirs = NULL; /**< List of directories to search for .exu files. */
+static char *_dest_dir; /**< Destination directory for output files and reports. */
+static char *_wrap_command = NULL, /**< A command to prefix test executions with (e.g., "valgrind"). */
+            *_fonts_dir = NULL; /**< Path to a directory of fonts to be used. */
+static int _verbose = 0; /**< Verbosity level. */
+static Eina_Bool _scan_objs = EINA_FALSE, /**< If true, scan all objects at every shot (unused). */
+                 _disable_screenshots = EINA_FALSE, /**< If true, disable screenshot generation. */
+                 _stabilize_shots = EINA_FALSE; /**< If true, wait for frames to stabilize before taking shots. */
 
-static Run_Mode _mode;
-static List_Entry *_next_test_to_run = NULL;
-static unsigned int _tests_executed = 0;
+static Run_Mode _mode; /**< The current operational mode. */
+static List_Entry *_next_test_to_run = NULL; /**< Pointer to the next test to be executed from the queue. */
+static unsigned int _tests_executed = 0; /**< Counter for the number of tests executed so far. */
 
-static Eina_List *_errors;
-static Eina_List *_compare_errors;
+static Eina_List *_errors; /**< A list of tests that failed during execution (e.g., crashed). */
+static Eina_List *_compare_errors; /**< A list of image names that failed the visual comparison. */
 
 static Eina_Bool _job_consume();
 
+/**
+ * @brief Loads an image from a file into an Exactness_Image structure.
+ *
+ * This function uses Ecore_Evas to open an image file and then copies its pixel
+ * data into a newly allocated Exactness_Image structure. This decouples image
+ * data from the Evas canvas, allowing it to be processed independently.
+ *
+ * @param filename The path to the image file to load.
+ * @return A pointer to a new Exactness_Image on success, or NULL on failure.
+ *         The caller is responsible for freeing the returned structure using
+ *         exactness_image_free().
+ */
 static Exactness_Image *
 _image_load(const char *filename)
 {
@@ -88,6 +127,15 @@ _image_load(const char *filename)
    return ex_img;
 }
 
+/**
+ * @brief Saves an Exactness_Image to a file.
+ *
+ * A temporary Evas canvas is created to handle the image saving process.
+ *
+ * @param ex_img The image data to save.
+ * @param output The path to the output file.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _image_save(Exactness_Image *ex_img, const char *output)
 {
@@ -105,6 +153,18 @@ _image_save(Exactness_Image *ex_img, const char *output)
    return ret;
 }
 
+/**
+ * @brief Compares two image files and generates a diff image on mismatch.
+ *
+ * It compares an image from a reference ('orig') directory with a an image
+ * from the 'current' test run. If a difference is found, a composite diff
+_image
+ * is saved and the test name is added to the `_compare_errors` list.
+ *
+ * @param orig_dir The directory containing the original reference images.
+ * @param ent_name The filename of the image to compare (e.g., "test_name_001.png").
+ * @return EINA_TRUE if the images are different, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _file_compare(const char *orig_dir, const char *ent_name)
 {
@@ -134,6 +194,17 @@ cleanup:
    return result;
 }
 
+/**
+ * @brief Unpacks images from an .exu test unit file into a directory.
+ *
+ * Reads an Exactness_Unit file and saves all embedded images as individual PNG
+ * files in the specified directory. The output filenames are constructed from
+ * the test name and a sequence number (e.g., "mytest_001.png").
+ *
+ * @param exu_path Path to the .exu file.
+ * @param dir The directory where the unpacked PNG images will be saved.
+ * @param ent_name The base name for the output image files (usually the test name).
+ */
 static void
 _exu_imgs_unpack(const char *exu_path, const char *dir, const char *ent_name)
 {
@@ -161,6 +232,15 @@ _exu_imgs_unpack(const char *exu_path, const char *dir, const char *ent_name)
    ecore_evas_free(ee);
 }
 
+/**
+ * @brief Manages the comparison phase for a single test.
+ *
+ * For a given test entry, this function finds its .exu file, unpacks the
+ * reference and current images, and then compares each pair of screenshots.
+ * It prints the final status (SUCCESS or FAIL) for the test.
+ *
+ * @param ent The test entry to process.
+ */
 static void
 _run_test_compare(const List_Entry *ent)
 {
@@ -214,7 +294,20 @@ found:
       printf("STATUS %s: END - FAIL (%d/%d)\n", ent->name, nb_fails, n - 1);
 }
 
-#define CONFIG "ELM_SCALE=1 ELM_FINGER_SIZE=10 "
+#define CONFIG "ELM_SCALE=1 ELM_FINGER_SIZE=10 " /**< Default environment variables for test execution. */
+
+/**
+ * @brief Prepares the full command-line string to execute a test.
+ *
+ * This function constructs the command to run `exactness_play` with all the
+ * necessary arguments based on the current mode and configuration (e.g.,
+ * verbosity, custom fonts, output directories).
+ *
+ * @param[in] ent The test entry for which to prepare the command.
+ * @param[out] buf The buffer where the generated command string will be stored.
+ *                 Must have a size of at least SCHEDULER_CMD_SIZE.
+ * @return EINA_TRUE on success, EINA_FALSE if the test's .exu file cannot be found.
+ */
 static Eina_Bool
 _run_command_prepare(List_Entry *ent, char *buf)
 {
@@ -262,6 +355,15 @@ ok:
    return EINA_TRUE;
 }
 
+/**
+ * @brief A callback function executed as a job to perform image comparison.
+ *
+ * This is scheduled via `ecore_job_add` after a test run completes in 'play'
+ * mode. It triggers the comparison, manages job counters, and checks if the
+ * main loop should terminate.
+ *
+ * @param data A pointer to the `List_Entry` of the completed test.
+ */
 static void
 _job_compare(void *data)
 {
@@ -273,6 +375,18 @@ _job_compare(void *data)
    if (!_running_jobs) ecore_main_loop_quit();
 }
 
+/**
+ * @brief Callback for the ECORE_EXE_EVENT_DEL event, triggered when a test process finishes.
+ *
+ * This function is the main handler for completed test processes. It checks for
+ * execution errors, and for 'play' mode, it schedules the comparison job.
+ * It also tries to start the next test in the queue.
+ *
+ * @param data User data, unused here.
+ * @param type The type of the event, unused here.
+ * @param event The event information, an `Ecore_Exe_Event_Del` struct.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
+ */
 static Eina_Bool
 _job_deleted_cb(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -298,6 +412,16 @@ _job_deleted_cb(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Consumes and runs the next available test from the queue.
+ *
+ * If the number of running jobs is less than the maximum allowed, this function
+ * takes the next test from `_next_test_to_run`, prepares its command, and
+ * executes it as a child process.
+ *
+ * @return EINA_TRUE if a new job was started, EINA_FALSE otherwise (e.g.,
+ *         queue is empty or max jobs are running).
+ */
 static Eina_Bool
 _job_consume()
 {
@@ -331,12 +455,31 @@ _job_consume()
    return EINA_TRUE;
 }
 
+/**
+ * @brief Starts the test execution scheduler.
+ *
+ * This function kicks off the testing process by calling `_job_consume()`
+ * repeatedly to fill all available parallel job slots. The actual scheduling
+ * logic continues in the event-driven callbacks.
+ */
 static void
 _scheduler_run()
 {
    while (_job_consume());
 }
 
+/**
+ * @brief Loads a test list from a file.
+ *
+ * Parses a file where each line specifies a test. The format for each line is:
+ * `test_name command_and_arguments`
+ * Lines starting with '#' or empty lines are ignored.
+ *
+ * @param filename The path to the test list file.
+ * @return A pointer to the head of an `Eina_Inlist` of `List_Entry`
+ *         structures, or NULL on failure. The list should be freed with
+ *         `_list_file_free()`.
+ */
 static List_Entry *
 _list_file_load(const char *filename)
 {
@@ -389,6 +532,14 @@ _list_file_load(const char *filename)
    return ret;
 }
 
+/**
+ * @brief Frees all memory associated with a test list.
+ *
+ * Iterates through the `Eina_Inlist` of `List_Entry` and frees each entry's
+ * allocated memory.
+ *
+ * @param list The head of the list to be freed.
+ */
 static void
 _list_file_free(List_Entry *list)
 {
@@ -404,6 +555,18 @@ _list_file_free(List_Entry *list)
      }
 }
 
+/**
+ * @brief Comparison function for sorting `List_Entry` items by name.
+ *
+ * Used with `eina_list_sort()` to sort the list of tests that had
+ * execution errors.
+ *
+ * @param a The first list entry.
+ * @param b The second list entry.
+ * @return An integer less than, equal to, or greater than zero if `a->name`
+ *         is found, respectively, to be less than, to match, or be greater
+ *         than `b->name`.
+ */
 static int
 _errors_sort_cb(List_Entry *a, List_Entry *b)
 {
@@ -469,6 +632,18 @@ static const Ecore_Getopt optdesc = {
   }
 };
 
+/**
+ * @brief Main entry point of the exactness test scheduler.
+ *
+ * Parses command-line arguments, initializes the test environment, loads the
+ * test list, starts the scheduler, and enters the Ecore main loop. After
+ * tests are complete, it prints a summary and generates an HTML report for
+ * any failures.
+ *
+ * @param argc The argument count.
+ * @param argv The argument vector.
+ * @return 0 on success, 1 on failure.
+ */
 int
 main(int argc, char *argv[])
 {

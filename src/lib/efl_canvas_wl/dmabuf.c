@@ -31,6 +31,15 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/**
+ * @file
+ * @brief Implementation of the Linux DMA-BUF Wayland protocol handling.
+ *
+ * This file contains the server-side implementation for the
+ * `zwp_linux_dmabuf_v1` Wayland protocol. It handles requests from clients
+ * to create `wl_buffer` objects from DMA-BUF file descriptors.
+ */
+
 #include <sys/mman.h>
 
 #include <assert.h>
@@ -46,6 +55,16 @@ __attribute__ ((visibility("hidden"))) Eina_Bool comp_dmabuf_test(struct linux_d
 __attribute__ ((visibility("hidden"))) void comp_dmabuf_formats_query(void *c, int **formats, int *num_formats);
 __attribute__ ((visibility("hidden"))) void comp_dmabuf_modifiers_query(void *c, int format, uint64_t **modifiers, int *num_modifiers);
 
+/**
+ * @brief Destroys a `linux_dmabuf_buffer` instance.
+ *
+ * Closes all file descriptors associated with the buffer's planes and frees
+ * the memory allocated for the `linux_dmabuf_buffer` structure itself.
+ * This function does not handle the destruction of associated Wayland resources
+ * or user data; those are managed by their respective destructors.
+ *
+ * @param buffer The DMA-BUF buffer to destroy.
+ */
 static void
 linux_dmabuf_buffer_destroy(struct linux_dmabuf_buffer *buffer)
 {
@@ -60,6 +79,17 @@ linux_dmabuf_buffer_destroy(struct linux_dmabuf_buffer *buffer)
 	free(buffer);
 }
 
+/**
+ * @brief Destructor for the `zwp_linux_buffer_params_v1` resource.
+ *
+ * This function is called when a `zwp_linux_buffer_params_v1` resource is
+ * destroyed by the Wayland library (e.g., client disconnects or explicitly
+ * destroys the object). If the params object was not used to create a
+ * `wl_buffer` (i.e., `buffer->buffer_resource` is NULL), this function
+ * cleans up the associated `linux_dmabuf_buffer`.
+ *
+ * @param params_resource The `zwp_linux_buffer_params_v1` resource being destroyed.
+ */
 static void
 destroy_params(struct wl_resource *params_resource)
 {
@@ -73,12 +103,37 @@ destroy_params(struct wl_resource *params_resource)
 	linux_dmabuf_buffer_destroy(buffer);
 }
 
+/**
+ * @brief Handles the `destroy` request for `zwp_linux_buffer_params_v1`.
+ *
+ * This is the Wayland protocol request to explicitly destroy a params object.
+ *
+ * @param client The client that sent the request.
+ * @param resource The `zwp_linux_buffer_params_v1` resource to be destroyed.
+ */
 static void
 params_destroy(struct wl_client *client, struct wl_resource *resource)
 {
 	wl_resource_destroy(resource);
 }
 
+/**
+ * @brief Handles the `add` request for `zwp_linux_buffer_params_v1`.
+ *
+ * Adds a DMA-BUF file descriptor and its associated plane metadata (offset,
+ * stride, modifier) to the params object. This can be called multiple times
+ * for multi-planar formats.
+ *
+ * @param client The client that sent the request.
+ * @param params_resource The `zwp_linux_buffer_params_v1` resource to which
+ *                        the plane information is being added.
+ * @param name_fd The file descriptor for the DMA-BUF.
+ * @param plane_idx The index of the plane being added (0-based).
+ * @param offset The offset within the DMA-BUF for this plane.
+ * @param stride The stride (row pitch in bytes) for this plane.
+ * @param modifier_hi The upper 32 bits of the 64-bit DRM format modifier.
+ * @param modifier_lo The lower 32 bits of the 64-bit DRM format modifier.
+ */
 static void
 params_add(struct wl_client *client,
 	   struct wl_resource *params_resource,
@@ -139,6 +194,15 @@ static const struct wl_buffer_interface linux_dmabuf_buffer_implementation = {
 	linux_dmabuf_wl_buffer_destroy
 };
 
+/**
+ * @brief Destructor for the `wl_buffer` resource created from a DMA-BUF.
+ *
+ * This function is called when a `wl_buffer` (that was created via the
+ * DMA-BUF protocol) is destroyed. It calls the user data destructor if one
+ * was set, and then cleans up the underlying `linux_dmabuf_buffer` structure.
+ *
+ * @param resource The `wl_buffer` resource being destroyed.
+ */
 static void
 destroy_linux_dmabuf_wl_buffer(struct wl_resource *resource)
 {
@@ -154,6 +218,28 @@ destroy_linux_dmabuf_wl_buffer(struct wl_resource *resource)
 	linux_dmabuf_buffer_destroy(buffer);
 }
 
+/**
+ * @brief Common logic for creating a `wl_buffer` from `zwp_linux_buffer_params_v1`.
+ *
+ * This function handles both `create` and `create_immed` requests. It validates
+ * the parameters (dimensions, format, plane data), checks for completeness,
+ * performs sanity checks on offsets and strides against FD sizes, and
+ * attempts to import the buffer using the compositor-specific `comp_dmabuf_test`
+ * function. If successful, it creates a `wl_buffer` resource.
+ *
+ * @param client The client that initiated the buffer creation.
+ * @param params_resource The `zwp_linux_buffer_params_v1` resource containing
+ *                        the buffer definition. This resource will be consumed
+ *                        (user_data set to NULL) by this function.
+ * @param buffer_id If non-zero, this is the ID for the new `wl_buffer` resource
+ *                  (for `create_immed`). If zero (for `create`), a new ID is
+ *                  not pre-assigned, and the `created` event will carry the
+ *                  new `wl_buffer`.
+ * @param width The width of the buffer in pixels.
+ * @param height The height of the buffer in pixels.
+ * @param format The DRM pixel format (e.g., `DRM_FORMAT_ARGB8888`).
+ * @param flags Flags for the buffer (e.g., `ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_Y_INVERT`).
+ */
 static void
 params_create_common(struct wl_client *client,
 		     struct wl_resource *params_resource,
@@ -329,6 +415,22 @@ params_create(struct wl_client *client,
 			     flags);
 }
 
+/**
+ * @brief Handles the `create_immed` request for `zwp_linux_buffer_params_v1`.
+ *
+ * This request creates a `wl_buffer` immediately with a client-supplied ID.
+ * It calls `params_create_common` to perform the actual creation and validation.
+ * If creation fails, it's a protocol error, and the client is typically
+ * disconnected.
+ *
+ * @param client The client that sent the request.
+ * @param params_resource The `zwp_linux_buffer_params_v1` resource.
+ * @param buffer_id The ID to be used for the new `wl_buffer` resource.
+ * @param width The width of the buffer.
+ * @param height The height of the buffer.
+ * @param format The DRM pixel format.
+ * @param flags Buffer flags.
+ */
 static void
 params_create_immed(struct wl_client *client,
 		    struct wl_resource *params_resource,
@@ -350,12 +452,32 @@ zwp_linux_buffer_params_implementation = {
 	params_create_immed
 };
 
+/**
+ * @brief Handles the `destroy` request for `zwp_linux_dmabuf_v1`.
+ *
+ * This is the Wayland protocol request to explicitly destroy the main
+ * `zwp_linux_dmabuf_v1` factory object.
+ *
+ * @param client The client that sent the request.
+ * @param resource The `zwp_linux_dmabuf_v1` resource to be destroyed.
+ */
 static void
 linux_dmabuf_destroy(struct wl_client *client, struct wl_resource *resource)
 {
 	wl_resource_destroy(resource);
 }
 
+/**
+ * @brief Handles the `create_params` request for `zwp_linux_dmabuf_v1`.
+ *
+ * Creates a new `zwp_linux_buffer_params_v1` object. This object is then
+ * used by the client to specify the attributes of a DMA-BUF and subsequently
+ * create a `wl_buffer` from it.
+ *
+ * @param client The client that sent the request.
+ * @param linux_dmabuf_resource The main `zwp_linux_dmabuf_v1` factory resource.
+ * @param params_id The ID to be used for the new `zwp_linux_buffer_params_v1` resource.
+ */
 static void
 linux_dmabuf_create_params(struct wl_client *client,
 			   struct wl_resource *linux_dmabuf_resource,
@@ -474,6 +596,20 @@ static const struct zwp_linux_dmabuf_v1_interface linux_dmabuf_implementation = 
 	linux_dmabuf_create_params
 };
 
+/**
+ * @brief Bind function for the `zwp_linux_dmabuf_v1` global.
+ *
+ * This function is called when a client binds to the `zwp_linux_dmabuf_v1`
+ * global object. It creates a `zwp_linux_dmabuf_v1` resource for the client
+ * and, if the protocol version supports it, sends the supported format/modifier
+ * combinations to the client.
+ *
+ * @param client The client binding to the global.
+ * @param data The compositor-specific data provided when the global was created
+ *             (see `linux_dmabuf_setup`).
+ * @param version The protocol version requested by the client.
+ * @param id The ID for the new `zwp_linux_dmabuf_v1` resource.
+ */
 static void
 bind_linux_dmabuf(struct wl_client *client,
 		  void *data, uint32_t version, uint32_t id)

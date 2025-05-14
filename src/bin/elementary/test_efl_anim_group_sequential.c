@@ -3,14 +3,30 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Application data structure.
+ *
+ * This structure holds all the necessary data for the test application,
+ * including the animation object, the button to be animated, and its
+ * visibility state.
+ */
 typedef struct _App_Data
 {
-   Efl_Canvas_Animation        *sequential_hide_anim;
-   Elm_Button                  *button;
+   Efl_Canvas_Animation        *sequential_hide_anim; /**< The sequential group animation for hiding/showing the button. */
+   Elm_Button                  *button; /**< The button that will be animated. */
 
-   Eina_Bool             is_btn_visible;
+   Eina_Bool             is_btn_visible; /**< A flag to track the visibility state of the button. */
 } App_Data;
 
+/**
+ * @brief Callback for animation start/end events.
+ *
+ * This function is called when an animation starts or stops.
+ * The event info is the animation object on start, and NULL on stop.
+ *
+ * @param data User data. Not used here.
+ * @param event The event structure containing event information.
+ */
 static void
 _anim_changed_cb(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
 {
@@ -26,6 +42,16 @@ _anim_changed_cb(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback for animation progress updates.
+ *
+ * This function is called periodically as the animation runs, providing
+ * progress updates.
+ *
+ * @param data User data. Not used here.
+ * @param event The event structure, where event->info is a double pointer
+ * to the current progress (0.0 to 1.0).
+ */
 static void
 _anim_running_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -33,11 +59,41 @@ _anim_running_cb(void *data EINA_UNUSED, const Efl_Event *event)
    printf("Animation is running! Current progress(%lf)\n", *progress);
 }
 
+/**
+ * @brief Array of callbacks for animation events.
+ *
+ * This bundles the callbacks for animation state changes and progress updates
+ * to be registered on the animated object.
+ *
+ * The array elements are structured as follows:
+ * @code
+ * {
+ *   .desc = EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_CHANGED, // Event descriptor
+ *   .func = _anim_changed_cb                                    // Callback function
+ * },
+ * {
+ *   .desc = EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_PROGRESS_UPDATED,
+ *   .func = _anim_running_cb
+ * }
+ * @endcode
+ */
 EFL_CALLBACKS_ARRAY_DEFINE(animation_stats_cb,
   {EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_CHANGED, _anim_changed_cb },
   {EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_PROGRESS_UPDATED, _anim_running_cb },
 )
 
+/**
+ * @brief Callback for the "clicked" event on the control button.
+ *
+ * This function toggles the animation on the target button. It starts the
+ * animation forwards to hide the button and backwards to show it.
+ * A negative speed value for efl_canvas_object_animation_start() plays the
+ * animation in reverse.
+ *
+ * @param data The application data (_App_Data).
+ * @param obj The control button that was clicked.
+ * @param event_info Extra event information. Not used here.
+ */
 static void
 _btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -59,6 +115,16 @@ _btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback for the window "delete,request" event.
+ *
+ * This function is called when the window is closed, and it is responsible
+ * for freeing the application data.
+ *
+ * @param data The application data (_App_Data).
+ * @param obj The window object. Not used here.
+ * @param event_info Extra event information. Not used here.
+ */
 static void
 _win_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -66,6 +132,21 @@ _win_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    free(ad);
 }
 
+/**
+ * @brief Test case for a sequential group animation.
+ *
+ * This test demonstrates how to create and use an Efl_Canvas_Sequential_Group_Animation.
+ * It sets up a window with two buttons. One button is the target of the
+ * animation, and the other button controls the animation.
+ *
+ * The sequential animation consists of three parts:
+ * 1. Rotate the button by 45 degrees.
+ * 2. Scale the button to double its size.
+ * 3. Fade out the button (alpha to 0).
+ *
+ * Clicking the control button starts the animation. Clicking it again plays
+ * the animation in reverse to show the button.
+ */
 void
 test_efl_anim_group_sequential(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

@@ -4,6 +4,13 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Creates a standard window for a test case.
+ *
+ * @param id The window identifier.
+ * @param name The window title.
+ * @return A new Evas_Object window instance.
+ */
 static Evas_Object *_test_code_win_create(const char *id, const char *name)
 {
    Evas_Object *win;
@@ -17,6 +24,14 @@ static Evas_Object *_test_code_win_create(const char *id, const char *name)
    return win;
 }
 
+/**
+ * @brief Appends a string as a new line to an Elm_Code_File.
+ *
+ * This is a convenience wrapper around elm_code_file_line_append.
+ *
+ * @param file The Elm_Code_File to append to.
+ * @param line The string content of the line to add.
+ */
 static void _append_line(Elm_Code_File *file, const char *line)
 {
    int length;
@@ -25,6 +40,14 @@ static void _append_line(Elm_Code_File *file, const char *line)
    elm_code_file_line_append(file, line, length, NULL);
 }
 
+/**
+ * @brief Callback for when a line is clicked in the code widget.
+ *
+ * Prints the line number of the clicked line to standard output.
+ *
+ * @param data User data, unused in this callback.
+ * @param event The Efl_Event details. The event info is an Elm_Code_Line.
+ */
 static void
 _elm_code_test_line_clicked_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -35,6 +58,17 @@ _elm_code_test_line_clicked_cb(void *data EINA_UNUSED, const Efl_Event *event)
    printf("CLICKED line %d\n", line->number);
 }
 
+/**
+ * @brief Callback for when a line has finished loading.
+ *
+ * This callback is used to apply special formatting or status to lines
+ * after they are loaded. It demonstrates adding a token to the first line
+ * and setting an error status on the second line.
+ * It stops further event processing for this event.
+ *
+ * @param data User data, unused in this callback.
+ * @param event The Efl_Event details. The event info is an Elm_Code_Line.
+ */
 static void
 _elm_code_test_line_done_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -53,6 +87,18 @@ _elm_code_test_line_done_cb(void *data EINA_UNUSED, const Efl_Event *event)
    efl_event_callback_stop(event->object);
 }
 
+/**
+ * @brief Sets up the "Welcome" test case widget.
+ *
+ * This demonstrates basic features of Elm_Code, including:
+ * - Adding lines of text.
+ * - Adding tokens for highlighting.
+ * - Programmatically setting a text selection.
+ * - Toggling a status on a line.
+ *
+ * @param parent The parent Evas_Object.
+ * @return The created Elm_Code_Widget.
+ */
 static Evas_Object *
 _elm_code_test_welcome_setup(Evas_Object *parent)
 {
@@ -88,6 +134,19 @@ _elm_code_test_welcome_setup(Evas_Object *parent)
    return widget;
 }
 
+/**
+ * @brief Sets up a basic code editor widget.
+ *
+ * This function creates an Elm_Code_Widget configured as a simple
+ * text editor. It can be initialized with some default text or
+ * left empty for logging purposes.
+ *
+ * @param parent The parent Evas_Object.
+ * @param log If EINA_TRUE, the editor is initialized empty, intended
+ *        for dynamic content like logs. If EINA_FALSE, it's populated
+ *        with some sample editable text.
+ * @return The created Elm_Code_Widget.
+ */
 static Evas_Object *
 _elm_code_test_editor_setup(Evas_Object *parent, Eina_Bool log)
 {
@@ -121,6 +180,16 @@ _elm_code_test_editor_setup(Evas_Object *parent, Eina_Bool log)
    return widget;
 }
 
+/**
+ * @brief Sets up a code editor to demonstrate syntax highlighting.
+ *
+ * The widget is populated with a small C code example. Syntax highlighting
+ * is enabled and the MIME type is set to "text/x-csrc" to trigger the
+ * C syntax parser. The indentation style uses spaces.
+ *
+ * @param parent The parent Evas_Object.
+ * @return The created Elm_Code_Widget with syntax highlighting.
+ */
 static Evas_Object *
 _elm_code_test_syntax_setup(Evas_Object *parent)
 {
@@ -153,6 +222,16 @@ _elm_code_test_syntax_setup(Evas_Object *parent)
    return widget;
 }
 
+/**
+ * @brief Sets up a code editor to demonstrate syntax highlighting with tabs.
+ *
+ * Similar to _elm_code_test_syntax_setup, but configures the widget to
+ * use actual tab characters for indentation instead of spaces. The C code
+ * example provided also uses tabs.
+ *
+ * @param parent The parent Evas_Object.
+ * @return The created Elm_Code_Widget configured for tabs.
+ */
 static Evas_Object *
 _elm_code_test_syntax_tabbed_setup(Evas_Object *parent)
 {
@@ -187,6 +266,18 @@ _elm_code_test_syntax_tabbed_setup(Evas_Object *parent)
    return widget;
 }
 
+/**
+ * @brief Creates a "mirror" code widget for an existing Elm_Code model.
+ *
+ * A mirror widget shares the same underlying Elm_Code document (the model)
+ * but can have its own view-specific settings, like a different font.
+ * This demonstrates how multiple views can display the same data.
+ *
+ * @param code The existing Elm_Code object to share.
+ * @param font_name The font to use for this mirror widget, e.g. "Mono:style=Oblique".
+ * @param parent The parent Evas_Object.
+ * @return The created mirror Elm_Code_Widget.
+ */
 static Evas_Object *
 _elm_code_test_mirror_setup(Elm_Code *code, char *font_name, Evas_Object *parent)
 {
@@ -203,6 +294,16 @@ _elm_code_test_mirror_setup(Elm_Code *code, char *font_name, Evas_Object *parent
    return widget;
 }
 
+/**
+ * @brief Sets up a widget to display an inline diff.
+ *
+ * This function loads a .diff file and uses the standard diff parser
+ * to display the changes within a single widget. Additions and deletions
+ * are shown in place.
+ *
+ * @param parent The parent Evas_Object.
+ * @return The created Elm_Code_Widget showing the diff.
+ */
 static Evas_Object *
 _elm_code_test_diff_inline_setup(Evas_Object *parent)
 {
@@ -221,6 +322,15 @@ _elm_code_test_diff_inline_setup(Evas_Object *parent)
    return diff;
 }
 
+/**
+ * @brief Sets up a widget for a side-by-side diff view.
+ *
+ * It loads a .diff file and uses the Elm_Code_Diff_Widget to show
+ * the original and modified versions next to each other.
+ *
+ * @param parent The parent Evas_Object.
+ * @return The created Elm_Code_Diff_Widget.
+ */
 static Evas_Object *
 _elm_code_test_diff_setup(Evas_Object *parent)
 {
@@ -234,6 +344,16 @@ _elm_code_test_diff_setup(Evas_Object *parent)
    return diff;
 }
 
+/**
+ * @brief Timer callback to continuously append lines to a code widget.
+ *
+ * This function is used to test the performance of the code widget when
+ * lines are added at a high frequency. It adds a new line with an
+ * incrementing counter every time it's called.
+ *
+ * @param data The Elm_Code object to append lines to.
+ * @return ECORE_CALLBACK_RENEW to keep the timer running.
+ */
 static Eina_Bool
 _elm_code_test_log_timer(void *data)
 {
@@ -247,6 +367,16 @@ _elm_code_test_log_timer(void *data)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Click handler to start or stop the logging timer.
+ *
+ * Toggles a timer that calls _elm_code_test_log_timer. The button's
+ * text is updated to reflect the current state ("Start" or "Stop").
+ *
+ * @param data The Elm_Code object to be passed to the timer.
+ * @param obj The button that was clicked.
+ * @param event_info Unused event information.
+ */
 static void
 _elm_code_test_log_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -264,6 +394,16 @@ _elm_code_test_log_clicked(void *data, Evas_Object *obj, void *event_info EINA_U
    elm_object_text_set(obj, "Stop");
 }
 
+/**
+ * @brief Test case for a simple text editor.
+ *
+ * Creates a window containing a single Elm_Code_Widget configured
+ * as a basic text editor with some initial content.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_code_editor(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -279,6 +419,16 @@ test_code_editor(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *eve
    evas_object_show(win);
 }
 
+/**
+ * @brief Test case for syntax highlighting.
+ *
+ * Creates a window containing an Elm_Code_Widget that demonstrates
+ * C syntax highlighting.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_code_syntax(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -294,6 +444,16 @@ test_code_syntax(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *eve
    evas_object_show(win);
 }
 
+/**
+ * @brief Test case for syntax highlighting with tab indentation.
+ *
+ * Creates a window with an Elm_Code_Widget demonstrating C syntax
+ * highlighting where indentation is done with tabs instead of spaces.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_code_syntax_tabbed(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -309,7 +469,17 @@ test_code_syntax_tabbed(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, vo
    evas_object_show(win);
 }
 
-
+/**
+ * @brief Test case for logging performance.
+ *
+ * Creates a window with a code widget and a button. Clicking the button
+ * starts/stops a timer that rapidly adds lines to the widget, testing
+ * its performance under high load.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_code_log(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -334,6 +504,18 @@ test_code_log(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_
    evas_object_show(win);
 }
 
+/**
+ * @brief Test case for mirrored code views.
+ *
+ * This test creates a window with one main editor widget and two "mirror"
+ * widgets. All three widgets share the same underlying text document, so
+ * edits in the main widget are reflected in the mirrors. Each mirror,
+ * however, uses a different font.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_code_mirror(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -358,6 +540,16 @@ test_code_mirror(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *eve
    evas_object_show(win);
 }
 
+/**
+ * @brief Test case for the inline diff viewer.
+ *
+ * Creates a window that displays a diff file in an inline format, where
+ * added and removed lines are shown within a single view.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_code_diff_inline(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -373,6 +565,16 @@ test_code_diff_inline(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void
    evas_object_show(win);
 }
 
+/**
+ * @brief Test case for the side-by-side diff viewer.
+ *
+ * Creates a window containing an Elm_Code_Diff_Widget, which shows
+ * a side-by-side comparison from a diff file.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_code_diff(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -388,6 +590,16 @@ test_code_diff(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event
    evas_object_show(win);
 }
 
+/**
+ * @brief Test case for the "welcome" screen.
+ *
+ * Creates a window to show a basic welcome message with some highlighted
+ * text and a selection, demonstrating simple markup capabilities.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_code_welcome(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

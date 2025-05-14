@@ -25,10 +25,30 @@
 #if (__BYTE_ORDER == 1234)
 #define byteReverse(buf, len)	/* Nothing */
 #else
+/**
+ * @brief Reverses the byte order of an array of 32-bit words.
+ *
+ * This function is used to convert data between little-endian and
+ * big-endian formats. It operates in-place.
+ * @param buf Pointer to the buffer of 32-bit words (represented as uchars).
+ * @param longs The number of 32-bit words in the buffer.
+ */
 void byteReverse(unsigned char *buf, unsigned longs);
 
 /*
  * Note: this code is harmless on little-endian machines.
+ */
+/**
+ * @brief Reverses the byte order of an array of 32-bit words.
+ *
+ * This function converts an array of 32-bit unsigned integers from
+ * one endianness to another (e.g., little-endian to big-endian or vice-versa)
+ * by reversing the byte order within each 32-bit word.
+ * The operation is performed in-place.
+ *
+ * @param buf Pointer to the beginning of the byte array. The array is treated
+ *            as a sequence of `longs` 32-bit unsigned integers.
+ * @param longs The number of 32-bit words to process.
  */
 void byteReverse(unsigned char *buf, unsigned longs)
 {
@@ -42,24 +62,38 @@ void byteReverse(unsigned char *buf, unsigned longs)
 }
 #endif
 
-/*
- * Start MD5 accumulation.  Set bit count to 0 and buffer to mysterious
- * initialization constants.
+/**
+ * @brief Initializes the MD5 context structure.
+ *
+ * Sets the initial hash values (magic initialization constants) and
+ * resets the bit count. This must be called before any calls to MD5Update.
+ *
+ * @param ctx Pointer to the MD5_CTX structure to be initialized.
+ *            The `buf` array will be filled with initial hash values,
+ *            and `bits` will be set to 0.
  */
 void MD5Init(MD5_CTX *ctx)
 {
-    ctx->buf[0] = 0x67452301;
-    ctx->buf[1] = 0xefcdab89;
-    ctx->buf[2] = 0x98badcfe;
-    ctx->buf[3] = 0x10325476;
+    ctx->buf[0] = 0x67452301; /* A */
+    ctx->buf[1] = 0xefcdab89; /* B */
+    ctx->buf[2] = 0x98badcfe; /* C */
+    ctx->buf[3] = 0x10325476; /* D */
 
     ctx->bits[0] = 0;
     ctx->bits[1] = 0;
 }
 
-/*
- * Update context to reflect the concatenation of another buffer full
- * of bytes.
+/**
+ * @brief Processes a chunk of data and updates the MD5 context.
+ *
+ * This function can be called multiple times to process data in segments.
+ * It updates the internal state of the MD5 computation (bit count,
+ * input buffer, and intermediate hash).
+ *
+ * @param ctx Pointer to the MD5_CTX structure. This structure holds the
+ *            current state of the MD5 computation and will be updated.
+ * @param buf Pointer to the input data buffer.
+ * @param len Length of the input data buffer in bytes.
  */
 void MD5Update(MD5_CTX *ctx, unsigned char const *buf, unsigned len)
 {
@@ -105,9 +139,19 @@ void MD5Update(MD5_CTX *ctx, unsigned char const *buf, unsigned len)
     memcpy(ctx->in.s, buf, len);
 }
 
-/*
- * Final wrapup - pad to 64-byte boundary with the bit pattern
- * 1 0* (64-bit count of bits processed, MSB-first)
+/**
+ * @brief Completes the MD5 computation and produces the final hash digest.
+ *
+ * This function pads the input data to a multiple of 64 bytes, appends
+ * the original message length, and performs the final transformations.
+ * The resulting 16-byte MD5 hash is stored in the `digest` array.
+ * After this function is called, the MD5_CTX is cleared for security.
+ *
+ * @param digest Output array of 16 bytes where the computed MD5 hash
+ *               will be stored.
+ *               Example: `unsigned char my_hash[16];`
+ * @param ctx Pointer to the MD5_CTX structure. The context will be
+ *            used to finalize the hash and then cleared.
  */
 void MD5Final(unsigned char digest[16], MD5_CTX *ctx)
 {
@@ -150,22 +194,53 @@ void MD5Final(unsigned char digest[16], MD5_CTX *ctx)
     memset(ctx, 0, sizeof(MD5_CTX));	/* In case it's sensitive */
 }
 
+/** @name MD5 Core Functions
+ *  These are the four non-linear functions used in MD5 rounds.
+ *  @{
+ */
 /* The four core functions - F1 is optimized somewhat */
 
 /* #define F1(x, y, z) (x & y | ~x & z) */
+/** @brief MD5 F function: (X AND Y) OR (NOT X AND Z). Optimized version. */
 #define F1(x, y, z) (z ^ (x & (y ^ z)))
+/** @brief MD5 G function: (X AND Z) OR (Y AND NOT Z). Implemented using F1. */
 #define F2(x, y, z) F1(z, x, y)
+/** @brief MD5 H function: X XOR Y XOR Z. */
 #define F3(x, y, z) (x ^ y ^ z)
+/** @brief MD5 I function: Y XOR (X OR NOT Z). */
 #define F4(x, y, z) (y ^ (x | ~z))
+/** @} */
 
-/* This is the central step in the MD5 algorithm. */
+/**
+ * @brief Performs a single step in the MD5 algorithm's rounds.
+ *
+ * This macro encapsulates the core calculation of an MD5 round:
+ * w = w + f(x, y, z) + data
+ * w = (w <<< s) | (w >>> (32-s))  (rotate left)
+ * w = w + x
+ *
+ * @param f One of the MD5 core functions (F1, F2, F3, F4).
+ * @param w The accumulator (a, b, c, or d) being modified.
+ * @param x One of the other accumulators.
+ * @param y One of the other accumulators.
+ * @param z One of the other accumulators.
+ * @param data A 32-bit word from the current input block.
+ * @param s The number of bits to rotate left.
+ */
 #define MD5STEP(f, w, x, y, z, data, s) \
 	( w += f(x, y, z) + data,  w = w<<s | w>>(32-s),  w += x )
 
-/*
- * The core of the MD5 algorithm, this alters an existing MD5 hash to
- * reflect the addition of 16 longwords of new data.  MD5Update blocks
- * the data and converts bytes into longwords for this routine.
+/**
+ * @brief The core MD5 transformation function.
+ *
+ * Processes one 512-bit (16-word) block of input data and updates the
+ * 128-bit (4-word) MD5 buffer. This is the heart of the MD5 algorithm,
+ * performing the four rounds of operations.
+ *
+ * @param buf The 4-word (A, B, C, D) MD5 state buffer. This is updated in place.
+ *            Example: `uint32_t state[4] = {0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476};`
+ * @param in  The 16-word input data block to be processed.
+ *            Example: `uint32_t data_block[16]; // Filled with 64 bytes of input data`
  */
 void MD5Transform(uint32_t buf[4], uint32_t const in[16])
 {

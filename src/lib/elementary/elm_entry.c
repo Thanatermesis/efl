@@ -107,6 +107,16 @@ struct _Mod_Api
 static void _create_selection_handlers(Evas_Object *obj, Elm_Entry_Data *sd);
 static void _magnifier_move(void *data);
 
+/**
+ * @brief Gets the top-level window for the given entry object.
+ *
+ * This function traverses up the widget hierarchy from @p obj to find the
+ * top-level window. It handles cases where the window might be an
+ * inlined image window.
+ *
+ * @param obj The entry Evas_Object.
+ * @return The top-level Evas_Object window, or NULL if not found.
+ */
 static Evas_Object *
 _entry_win_get(Evas_Object *obj)
 {
@@ -117,6 +127,19 @@ _entry_win_get(Evas_Object *obj)
    return top;
 }
 
+/**
+ * @brief Finds and loads the entry module API.
+ *
+ * This function looks for an Elementary module named "entry/api".
+ * If found, it loads the module and retrieves its API functions:
+ * obj_hook, obj_unhook, and obj_longpress.
+ * The loaded module and its API are cached for subsequent calls.
+ *
+ * @param obj The Evas_Object (currently unused, but kept for API consistency).
+ * @return A pointer to the Mod_Api structure containing function pointers
+ *         from the module, or NULL if the module cannot be found or
+ *         its API cannot be loaded.
+ */
 static Mod_Api *
 _module_find(Evas_Object *obj EINA_UNUSED)
 {
@@ -138,6 +161,17 @@ ok: // ok - return api
    return m->api;
 }
 
+/**
+ * @brief Loads the content of the file associated with the entry object.
+ *
+ * This function reads the entire content of the file specified by
+ * efl_file_mmap_get(obj) into a newly allocated string.
+ *
+ * @param obj The entry Eo object, which must have a file associated via efl_file_set().
+ * @return A newly allocated string containing the file content, or NULL on failure
+ *         (e.g., file not found, memory allocation error, mmap error).
+ *         The caller is responsible for freeing the returned string.
+ */
 static char *
 _file_load(Eo *obj)
 {
@@ -173,6 +207,17 @@ _file_load(Eo *obj)
    return text;
 }
 
+/**
+ * @brief Loads the content of the file associated with the entry object as plain text and converts it to markup.
+ *
+ * This function first loads the file content using _file_load().
+ * Then, it converts the loaded plain UTF-8 text into Elementary markup format
+ * using elm_entry_utf8_to_markup().
+ *
+ * @param obj The entry Eo object, which must have a file associated.
+ * @return A newly allocated string containing the markup-converted text, or NULL on failure.
+ *         The caller is responsible for freeing the returned string.
+ */
 static char *
 _plain_load(Eo *obj)
 {
@@ -191,6 +236,17 @@ _plain_load(Eo *obj)
    return NULL;
 }
 
+/**
+ * @brief Performs the actual file loading based on the entry's format.
+ *
+ * This function is called to load the content from the file specified in the
+ * Elm_Entry_Data structure. It handles different text formats (plain UTF-8
+ * or markup UTF-8) and sets the entry's text accordingly.
+ *
+ * @param obj The entry Evas_Object.
+ * @return 0 on success, or an Eina_Error code (e.g., EINVAL, ENOENT) on failure.
+ *         If the file is not set in sd->file, it sets the entry text to "" and returns 0.
+ */
 static Eina_Error
 _load_do(Evas_Object *obj)
 {
@@ -242,6 +298,15 @@ _load_do(Evas_Object *obj)
    return err;
 }
 
+/**
+ * @brief Saves the given markup text to a file.
+ *
+ * If @p text is NULL, the file specified by @p file is unlinked (deleted).
+ * Otherwise, the @p text (assumed to be markup UTF-8) is written to the file.
+ *
+ * @param file The path to the file where the text should be saved.
+ * @param text The markup UTF-8 text to save. Can be NULL to delete the file.
+ */
 static void
 _utf8_markup_save(const char *file,
                   const char *text)
@@ -266,6 +331,16 @@ _utf8_markup_save(const char *file,
    fclose(f);
 }
 
+/**
+ * @brief Converts markup text to plain UTF-8 and saves it to a file.
+ *
+ * This function first converts the input @p text (assumed to be markup)
+ * to plain UTF-8 using elm_entry_markup_to_utf8(). Then, it saves the
+ * resulting plain text to the specified @p file using _utf8_markup_save().
+ *
+ * @param file The path to the file where the plain text should be saved.
+ * @param text The markup text to convert and save.
+ */
 static void
 _utf8_plain_save(const char *file,
                  const char *text)
@@ -280,6 +355,15 @@ _utf8_plain_save(const char *file,
    free(text2);
 }
 
+/**
+ * @brief Performs the actual file saving based on the entry's format.
+ *
+ * This function saves the current content of the entry to its associated file,
+ * respecting the format specified in Elm_Entry_Data (plain UTF-8 or markup UTF-8).
+ * It only saves if the file has been loaded (efl_file_loaded_get(obj) is true).
+ *
+ * @param obj The entry Evas_Object.
+ */
 static void
 _save_do(Evas_Object *obj)
 {
@@ -301,6 +385,16 @@ _save_do(Evas_Object *obj)
      }
 }
 
+/**
+ * @brief Callback function for delayed file saving.
+ *
+ * This function is typically triggered by a timer. It calls _save_do()
+ * to save the entry's content and then clears the delay_write timer handle
+ * in the Elm_Entry_Data structure.
+ *
+ * @param data The entry Evas_Object (passed as user data to the timer).
+ * @return ECORE_CALLBACK_CANCEL to remove the timer after execution.
+ */
 static Eina_Bool
 _delay_write(void *data)
 {
@@ -312,6 +406,16 @@ _delay_write(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Updates the state of the guide text in the entry.
+ *
+ * This function emits Edje signals ("elm,guide,disabled" or "elm,guide,enabled")
+ * to the entry's Edje object based on whether the entry currently contains text.
+ * It updates the sd->has_text flag.
+ *
+ * @param obj The entry Evas_Object.
+ * @param has_text EINA_TRUE if the entry has text, EINA_FALSE otherwise.
+ */
 static void
 _elm_entry_guide_update(Evas_Object *obj,
                         Eina_Bool has_text)

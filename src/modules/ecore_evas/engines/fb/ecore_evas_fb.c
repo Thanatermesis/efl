@@ -35,19 +35,53 @@
 # define EMODAPI
 #endif
 
+/**
+ * @internal
+ * @brief Counter for Ecore_Evas FB initialization.
+ */
 static int _ecore_evas_init_count = 0;
 
+/**
+ * @internal
+ * @brief Default display name for Ecore_Evas FB.
+ */
 static char *ecore_evas_default_display = "0";
+/**
+ * @internal
+ * @brief List of Ecore_Fb_Input_Device instances.
+ */
 static Eina_List *ecore_evas_input_devices = NULL;
+/**
+ * @internal
+ * @brief Array of Ecore_Event_Handler for mouse events.
+ * Stores handlers for MOUSE_BUTTON_DOWN, MOUSE_BUTTON_UP, MOUSE_MOVE, MOUSE_WHEEL.
+ */
 static Ecore_Event_Handler *ecore_evas_event_handlers[4] = {NULL, NULL, NULL, NULL};
 
+/**
+ * @internal
+ * @struct _Ecore_Evas_Engine_FB_Data
+ * @brief Private data structure for the Ecore_Evas FB engine.
+ *
+ * This structure holds data specific to the framebuffer engine instance of Ecore_Evas.
+ */
 typedef struct _Ecore_Evas_Engine_FB_Data Ecore_Evas_Engine_FB_Data;
 
 struct _Ecore_Evas_Engine_FB_Data {
-   int real_w;
-   int real_h;
+   int real_w; /**< Stores the real width of the Ecore_Evas before fullscreen mode. */
+   int real_h; /**< Stores the real height of the Ecore_Evas before fullscreen mode. */
 };
 
+/**
+ * @internal
+ * @brief Processes mouse movement for the framebuffer Ecore_Evas.
+ *
+ * Updates the cursor object's position based on the Ecore_Evas rotation.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param x The new x-coordinate of the mouse.
+ * @param y The new y-coordinate of the mouse.
+ */
 static void
 _ecore_evas_mouse_move_process_fb(Ecore_Evas *ee, int x, int y)
 {
@@ -85,6 +119,14 @@ _ecore_evas_mouse_move_process_fb(Ecore_Evas *ee, int x, int y)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback function invoked when the framebuffer VT is lost.
+ *
+ * Sets the Ecore_Evas visibility to false and stops listening to input devices.
+ *
+ * @param data The Ecore_Evas instance passed as user data.
+ */
 static void
 _ecore_evas_fb_lose(void *data)
 {
@@ -98,6 +140,15 @@ _ecore_evas_fb_lose(void *data)
      ecore_fb_input_device_listen(dev, 0);
 }
 
+/**
+ * @internal
+ * @brief Callback function invoked when the framebuffer VT is gained.
+ *
+ * Sets the Ecore_Evas visibility to true, redraws the canvas,
+ * and starts listening to input devices.
+ *
+ * @param data The Ecore_Evas instance passed as user data.
+ */
 static void
 _ecore_evas_fb_gain(void *data)
 {
@@ -118,6 +169,17 @@ _ecore_evas_fb_gain(void *data)
      ecore_fb_input_device_listen(dev, 1);
 }
 
+/**
+ * @internal
+ * @brief Event handler for mouse button down events.
+ *
+ * Processes the mouse position before passing the event on.
+ *
+ * @param data The Ecore_Evas instance associated with this handler.
+ * @param type The type of the event (unused).
+ * @param event The actual Ecore_Event_Mouse_Button event data.
+ * @return ECORE_CALLBACK_PASS_ON to allow other handlers to process the event.
+ */
 static Eina_Bool
 _ecore_evas_event_mouse_button_down(void *data, int type EINA_UNUSED, void *event)
 {
@@ -130,6 +192,17 @@ _ecore_evas_event_mouse_button_down(void *data, int type EINA_UNUSED, void *even
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @internal
+ * @brief Event handler for mouse button up events.
+ *
+ * Processes the mouse position before passing the event on.
+ *
+ * @param data The Ecore_Evas instance associated with this handler.
+ * @param type The type of the event (unused).
+ * @param event The actual Ecore_Event_Mouse_Button event data.
+ * @return ECORE_CALLBACK_PASS_ON to allow other handlers to process the event.
+ */
 static Eina_Bool
 _ecore_evas_event_mouse_button_up(void *data, int type EINA_UNUSED, void *event)
 {
@@ -142,6 +215,17 @@ _ecore_evas_event_mouse_button_up(void *data, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @internal
+ * @brief Event handler for mouse move events.
+ *
+ * Processes the mouse position before passing the event on.
+ *
+ * @param data The Ecore_Evas instance associated with this handler.
+ * @param type The type of the event (unused).
+ * @param event The actual Ecore_Event_Mouse_Move event data.
+ * @return ECORE_CALLBACK_PASS_ON to allow other handlers to process the event.
+ */
 static Eina_Bool
 _ecore_evas_event_mouse_move(void *data, int type EINA_UNUSED, void *event)
 {
@@ -154,6 +238,17 @@ _ecore_evas_event_mouse_move(void *data, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @internal
+ * @brief Event handler for mouse wheel events.
+ *
+ * Processes the mouse position before passing the event on.
+ *
+ * @param data The Ecore_Evas instance associated with this handler.
+ * @param type The type of the event (unused).
+ * @param event The actual Ecore_Event_Mouse_Wheel event data.
+ * @return ECORE_CALLBACK_PASS_ON to allow other handlers to process the event.
+ */
 static Eina_Bool
 _ecore_evas_event_mouse_wheel(void *data, int type EINA_UNUSED, void *event)
 {
@@ -166,6 +261,19 @@ _ecore_evas_event_mouse_wheel(void *data, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @internal
+ * @brief Initializes the Ecore_Evas FB subsystem.
+ *
+ * This function increments an initialization counter. If it's the first call,
+ * it initializes ecore_event_evas, scans for input devices in /dev/input/,
+ * sets up event handlers for mouse input, and initializes tslib if necessary.
+ *
+ * @param ee The Ecore_Evas instance being initialized.
+ * @param w The width of the Ecore_Evas.
+ * @param h The height of the Ecore_Evas.
+ * @return The current initialization count.
+ */
 static int
 _ecore_evas_fb_init(Ecore_Evas *ee, int w, int h)
 {
@@ -241,6 +349,15 @@ _ecore_evas_fb_init(Ecore_Evas *ee, int w, int h)
    return _ecore_evas_init_count;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the Ecore_Evas FB subsystem.
+ *
+ * Decrements the initialization counter. If the counter reaches zero,
+ * it cleans up event handlers, shuts down tslib, and ecore_event_evas.
+ *
+ * @return The current initialization count.
+ */
 int
 _ecore_evas_fb_shutdown(void)
 {
@@ -261,6 +378,16 @@ _ecore_evas_fb_shutdown(void)
    return _ecore_evas_init_count;
 }
 
+/**
+ * @internal
+ * @brief Frees resources associated with an Ecore_Evas FB instance.
+ *
+ * This function is part of the Ecore_Evas_Engine_Func structure.
+ * It unregisters input events, frees engine-specific data,
+ * and shuts down the FB subsystem and ecore_fb.
+ *
+ * @param ee The Ecore_Evas instance to free.
+ */
 static void
 _ecore_evas_fb_free(Ecore_Evas *ee)
 {
@@ -272,6 +399,18 @@ _ecore_evas_fb_free(Ecore_Evas *ee)
    ecore_fb_shutdown();
 }
 
+/**
+ * @internal
+ * @brief Handles resizing of the Ecore_Evas.
+ *
+ * Updates the Ecore_Evas dimensions and informs Evas about the new output size
+ * and viewport. It also triggers a damage event for the entire area and calls
+ * the user-provided resize callback if set.
+ *
+ * @param ee The Ecore_Evas instance to resize.
+ * @param w The new width.
+ * @param h The new height.
+ */
 static void
 _ecore_evas_resize(Ecore_Evas *ee, int w, int h)
 {
@@ -295,6 +434,19 @@ _ecore_evas_resize(Ecore_Evas *ee, int w, int h)
    if (ee->func.fn_resize) ee->func.fn_resize(ee);
 }
 
+/**
+ * @internal
+ * @brief Handles moving and resizing of the Ecore_Evas.
+ *
+ * For framebuffer, moving is not applicable, so this function primarily handles
+ * the resize part, similar to _ecore_evas_resize.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param x The new x-coordinate (unused for fb).
+ * @param y The new y-coordinate (unused for fb).
+ * @param w The new width.
+ * @param h The new height.
+ */
 static void
 _ecore_evas_move_resize(Ecore_Evas *ee, int x EINA_UNUSED, int y EINA_UNUSED, int w, int h)
 {
@@ -318,6 +470,19 @@ _ecore_evas_move_resize(Ecore_Evas *ee, int x EINA_UNUSED, int y EINA_UNUSED, in
    if (ee->func.fn_resize) ee->func.fn_resize(ee);
 }
 
+/**
+ * @internal
+ * @brief Sets the rotation of the Ecore_Evas.
+ *
+ * Updates the Evas engine info with the new rotation. If the rotation changes
+ * the orientation (e.g., 0 to 90 degrees), it swaps width and height for
+ * non-fullscreen Ecore_Evas instances. It then updates Evas output size,
+ * viewports, damages the full area, and re-processes mouse position.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param rotation The new rotation angle (0, 90, 180, 270).
+ * @param resize Unused parameter in this context.
+ */
 static void
 _ecore_evas_rotation_set(Ecore_Evas *ee, int rotation, int resize EINA_UNUSED)
 {
@@ -387,6 +552,15 @@ _ecore_evas_rotation_set(Ecore_Evas *ee, int rotation, int resize EINA_UNUSED)
    if (ee->func.fn_resize) ee->func.fn_resize(ee);
 }
 
+/**
+ * @internal
+ * @brief Shows the Ecore_Evas.
+ *
+ * Marks the Ecore_Evas as not withdrawn, calls the state change callback,
+ * and sets focus to it.
+ *
+ * @param ee The Ecore_Evas instance to show.
+ */
 static void
 _ecore_evas_show(Ecore_Evas *ee)
 {
@@ -396,6 +570,15 @@ _ecore_evas_show(Ecore_Evas *ee)
    _ecore_evas_focus_device_set(ee, NULL, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Hides the Ecore_Evas.
+ *
+ * Marks the Ecore_Evas as withdrawn, calls the state change callback,
+ * and removes focus from it.
+ *
+ * @param ee The Ecore_Evas instance to hide.
+ */
 static void
 _ecore_evas_hide(Ecore_Evas *ee)
 {
@@ -404,6 +587,18 @@ _ecore_evas_hide(Ecore_Evas *ee)
    _ecore_evas_focus_device_set(ee, NULL, EINA_FALSE);
 }
 
+/**
+ * @internal
+ * @brief Sets or unsets fullscreen mode for the Ecore_Evas.
+ *
+ * When entering fullscreen, it stores the current dimensions and resizes
+ * the Ecore_Evas to the full framebuffer size. When exiting, it restores
+ * the original dimensions. Updates Evas output, viewports, input device axis sizes,
+ * and calls the resize callback if dimensions changed.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param on EINA_TRUE to set fullscreen, EINA_FALSE to unset.
+ */
 static void
 _ecore_evas_fullscreen_set(Ecore_Evas *ee, Eina_Bool on)
 {
@@ -458,6 +653,19 @@ _ecore_evas_fullscreen_set(Ecore_Evas *ee, Eina_Bool on)
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the geometry of the screen (framebuffer).
+ *
+ * For framebuffer, the screen origin is always (0,0). The width and height
+ * are the dimensions of the framebuffer.
+ *
+ * @param ee The Ecore_Evas instance (unused).
+ * @param x Pointer to store the x-coordinate of the screen (will be 0).
+ * @param y Pointer to store the y-coordinate of the screen (will be 0).
+ * @param w Pointer to store the width of the screen.
+ * @param h Pointer to store the height of the screen.
+ */
 static void
 _ecore_evas_screen_geometry_get(const Ecore_Evas *ee EINA_UNUSED, int *x, int *y, int *w, int *h)
 {
@@ -560,6 +768,24 @@ static Ecore_Evas_Engine_Func _ecore_fb_engine_func =
      NULL, //fn_last_tick_get
 };
 
+/**
+ * @brief Creates a new Ecore_Evas backed by the Linux framebuffer.
+ * @internal
+ *
+ * This function initializes a new Ecore_Evas instance that renders directly
+ * to the Linux framebuffer. It sets up the Evas canvas, configures the
+ * framebuffer engine, and initializes input handling.
+ *
+ * @param disp_name The display name, typically a number string like "0"
+ *                  representing /dev/fb0. If NULL, uses a default.
+ * @param rotation The initial rotation of the Ecore_Evas (0, 90, 180, 270).
+ * @param w The initial width of the Ecore_Evas.
+ * @param h The initial height of the Ecore_Evas.
+ * @return A pointer to the newly created Ecore_Evas, or NULL on failure.
+ *
+ * @note This is an internal function and should not be used directly by applications.
+ *       Applications should use ecore_evas_new() with the appropriate engine name.
+ */
 EMODAPI Ecore_Evas *
 ecore_evas_fb_new_internal(const char *disp_name, int rotation, int w, int h)
 {

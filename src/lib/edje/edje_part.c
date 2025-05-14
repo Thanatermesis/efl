@@ -5,6 +5,16 @@
 PROXY_IMPLEMENTATION(other, MY_CLASS, EINA_FALSE)
 #undef PROXY_IMPLEMENTATION
 
+/**
+ * @brief Converts a part type enum to its string representation.
+ *
+ * This function is used for debugging and logging purposes to get a
+ * human-readable string for a given Edje_Part_Type.
+ *
+ * @param type The part type (Edje_Part_Type) to convert.
+ * @return A string representation of the part type. Returns "UNKNOWN"
+ *         if the type is not recognized.
+ */
 const char *
 _part_type_to_string(unsigned char type)
 {
@@ -32,6 +42,18 @@ _part_type_to_string(unsigned char type)
    return typestr;
 }
 
+/**
+ * @brief Logs an error message when an efl_part handle is misused.
+ *
+ * This function is called when a part handle, obtained via efl_part(),
+ * is used incorrectly (e.g., used after the object it refers to is
+ * no longer valid or for a non-implemented function). It provides
+ * detailed debugging information.
+ *
+ * @param pd Pointer to the Efl_Canvas_Layout_Part_Data structure
+ *           associated with the misused part. This structure contains
+ *           information about the part and its parent Edje object.
+ */
 void
 _part_reuse_error(Efl_Canvas_Layout_Part_Data *pd)
 {
@@ -63,6 +85,12 @@ PROXY_INIT(text)
 PROXY_INIT(other)
 PROXY_INIT(invalid)
 
+/**
+ * @brief Shuts down all internal proxy handlers.
+ *
+ * This function is called during Edje shutdown to clean up resources
+ * associated with different types of proxy parts (box, table, swallow, etc.).
+ */
 void
 _edje_internal_proxy_shutdown(void)
 {
@@ -75,6 +103,19 @@ _edje_internal_proxy_shutdown(void)
    _other_shutdown();
 }
 
+/**
+ * @brief Initializes the internal data for a real part proxy object.
+ *
+ * This function sets up the Efl_Canvas_Layout_Part_Data for a given
+ * part proxy object. It links the proxy object (`obj`) with its
+ * corresponding Edje object (`ed`), the actual Edje_Real_Part (`rp`),
+ * and the part name. It also sets the parent of the proxy object.
+ *
+ * @param obj The Efl_Canvas_Layout_Part proxy object.
+ * @param ed The main Edje object.
+ * @param rp The Edje_Real_Part structure representing the actual part.
+ * @param part The name of the part.
+ */
 void
 _edje_real_part_set(Eo *obj EINA_UNUSED, Edje *ed, Edje_Real_Part *rp, const char *part)
 {
@@ -88,6 +129,16 @@ _edje_real_part_set(Eo *obj EINA_UNUSED, Edje *ed, Edje_Real_Part *rp, const cha
    efl_parent_set(obj, ed->obj);
 }
 
+/**
+ * @internal
+ * @brief Finalizes the Efl_Canvas_Layout_Part object.
+ * @param obj The Efl_Canvas_Layout_Part object.
+ * @param pd Private data for the Efl_Canvas_Layout_Part.
+ * @return The finalized Efl_Object, or NULL on failure.
+ *
+ * Ensures that the part data (real part, edje object, part name) is valid
+ * before calling the super finalize function.
+ */
 EOLIAN static Efl_Object *
 _efl_canvas_layout_part_efl_object_finalize(Eo *obj EINA_UNUSED, Efl_Canvas_Layout_Part_Data *pd)
 {
@@ -95,6 +146,17 @@ _efl_canvas_layout_part_efl_object_finalize(Eo *obj EINA_UNUSED, Efl_Canvas_Layo
    return efl_finalize(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Gets the geometry of the Edje part.
+ * @param obj The Efl_Canvas_Layout_Part object.
+ * @param pd Private data for the Efl_Canvas_Layout_Part.
+ * @return The geometry (Eina_Rect) of the part. Returns EINA_RECT_ZERO if
+ *         the part is not valid or calculations are pending.
+ *
+ * Triggers a recalculation of the Edje object if needed before returning
+ * the part's rectangle.
+ */
 EOLIAN Eina_Rect
 _efl_canvas_layout_part_efl_gfx_entity_geometry_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Layout_Part_Data *pd)
 {
@@ -107,6 +169,16 @@ _efl_canvas_layout_part_efl_gfx_entity_geometry_get(const Eo *obj EINA_UNUSED, E
    return (Eina_Rect) rp->rect;
 }
 
+/**
+ * @internal
+ * @brief Gets the current state of the Edje part.
+ * @param obj The Efl_Canvas_Layout_Part object.
+ * @param pd Private data for the Efl_Canvas_Layout_Part.
+ * @param[out] name Pointer to store the name of the current state (e.g., "default").
+ * @param[out] val Pointer to store the value of the current state (e.g., 0.0).
+ *
+ * Retrieves the name and value of the part's current state.
+ */
 EOLIAN static void
 _efl_canvas_layout_part_state_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Layout_Part_Data *pd, const char **name, double *val)
 {
@@ -117,6 +189,17 @@ _efl_canvas_layout_part_state_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Layout_P
    if (name) *name = str;
 }
 
+/**
+ * @internal
+ * @brief Gets the type of the Edje part.
+ * @param obj The Efl_Canvas_Layout_Part object.
+ * @param pd Private data for the Efl_Canvas_Layout_Part.
+ * @return The type of the part (Efl_Canvas_Layout_Part_Type).
+ *         Returns EFL_CANVAS_LAYOUT_PART_TYPE_NONE if the part is not valid.
+ *
+ * Retrieves the underlying Edje_Part_Type and casts it to
+ * Efl_Canvas_Layout_Part_Type.
+ */
 EOLIAN static Efl_Canvas_Layout_Part_Type
 _efl_canvas_layout_part_efl_canvas_layout_part_type_provider_part_type_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Layout_Part_Data *pd)
 {
@@ -128,72 +211,190 @@ _efl_canvas_layout_part_efl_canvas_layout_part_type_provider_part_type_get(const
    return (Efl_Canvas_Layout_Part_Type) rp->part->type;
 }
 
+/**
+ * @internal
+ * @brief Sets the drag value for a draggable part.
+ * @param obj The Efl_Canvas_Layout_Part object.
+ * @param pd Private data for the Efl_Canvas_Layout_Part.
+ * @param dx The x component of the drag value.
+ * @param dy The y component of the drag value.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ * @see _edje_object_part_drag_value_set
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_layout_part_efl_ui_drag_drag_value_set(Eo *obj EINA_UNUSED, Efl_Canvas_Layout_Part_Data *pd, double dx, double dy)
 {
    return _edje_object_part_drag_value_set(pd->ed, pd->part, dx, dy);
 }
 
+/**
+ * @internal
+ * @brief Gets the drag value for a draggable part.
+ * @param obj The Efl_Canvas_Layout_Part object.
+ * @param pd Private data for the Efl_Canvas_Layout_Part.
+ * @param[out] dx Pointer to store the x component of the drag value.
+ * @param[out] dy Pointer to store the y component of the drag value.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ * @see _edje_object_part_drag_value_get
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_layout_part_efl_ui_drag_drag_value_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Layout_Part_Data *pd, double *dx, double *dy)
 {
    return _edje_object_part_drag_value_get(pd->ed, pd->part, dx, dy);
 }
 
+/**
+ * @internal
+ * @brief Sets the drag size for a draggable part.
+ * @param obj The Efl_Canvas_Layout_Part object.
+ * @param pd Private data for the Efl_Canvas_Layout_Part.
+ * @param dw The width component of the drag size.
+ * @param dh The height component of the drag size.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ * @see _edje_object_part_drag_size_set
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_layout_part_efl_ui_drag_drag_size_set(Eo *obj EINA_UNUSED, Efl_Canvas_Layout_Part_Data *pd, double dw, double dh)
 {
    return _edje_object_part_drag_size_set(pd->ed, pd->part, dw, dh);
 }
 
+/**
+ * @internal
+ * @brief Gets the drag size for a draggable part.
+ * @param obj The Efl_Canvas_Layout_Part object.
+ * @param pd Private data for the Efl_Canvas_Layout_Part.
+ * @param[out] dw Pointer to store the width component of the drag size.
+ * @param[out] dh Pointer to store the height component of the drag size.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ * @see _edje_object_part_drag_size_get
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_layout_part_efl_ui_drag_drag_size_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Layout_Part_Data *pd, double *dw, double *dh)
 {
    return _edje_object_part_drag_size_get(pd->ed, pd->part, dw, dh);
 }
 
+/**
+ * @internal
+ * @brief Gets the drag direction for a draggable part.
+ * @param obj The Efl_Canvas_Layout_Part object.
+ * @param pd Private data for the Efl_Canvas_Layout_Part.
+ * @return The drag direction (Efl_Ui_Drag_Dir).
+ * @see _edje_object_part_drag_dir_get
+ */
 EOLIAN static Efl_Ui_Drag_Dir
 _efl_canvas_layout_part_efl_ui_drag_drag_dir_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Layout_Part_Data *pd)
 {
    return (Efl_Ui_Drag_Dir)_edje_object_part_drag_dir_get(pd->ed, pd->part);
 }
 
+/**
+ * @internal
+ * @brief Sets the drag step for a draggable part.
+ * @param obj The Efl_Canvas_Layout_Part object.
+ * @param pd Private data for the Efl_Canvas_Layout_Part.
+ * @param dx The x component of the drag step.
+ * @param dy The y component of the drag step.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ * @see _edje_object_part_drag_step_set
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_layout_part_efl_ui_drag_drag_step_set(Eo *obj EINA_UNUSED, Efl_Canvas_Layout_Part_Data *pd, double dx, double dy)
 {
    return _edje_object_part_drag_step_set(pd->ed, pd->part, dx, dy);
 }
 
+/**
+ * @internal
+ * @brief Gets the drag step for a draggable part.
+ * @param obj The Efl_Canvas_Layout_Part object.
+ * @param pd Private data for the Efl_Canvas_Layout_Part.
+ * @param[out] dx Pointer to store the x component of the drag step.
+ * @param[out] dy Pointer to store the y component of the drag step.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ * @see _edje_object_part_drag_step_get
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_layout_part_efl_ui_drag_drag_step_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Layout_Part_Data *pd, double *dx, double *dy)
 {
    return _edje_object_part_drag_step_get(pd->ed, pd->part, dx, dy);
 }
 
+/**
+ * @internal
+ * @brief Moves a draggable part by one step.
+ * @param obj The Efl_Canvas_Layout_Part object.
+ * @param pd Private data for the Efl_Canvas_Layout_Part.
+ * @param dx The x component of the step movement.
+ * @param dy The y component of the step movement.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ * @see _edje_object_part_drag_step
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_layout_part_efl_ui_drag_drag_step_move(Eo *obj EINA_UNUSED, Efl_Canvas_Layout_Part_Data *pd, double dx, double dy)
 {
    return _edje_object_part_drag_step(pd->ed, pd->part, dx, dy);
 }
 
+/**
+ * @internal
+ * @brief Sets the drag page for a draggable part.
+ * @param obj The Efl_Canvas_Layout_Part object.
+ * @param pd Private data for the Efl_Canvas_Layout_Part.
+ * @param dx The x component of the drag page.
+ * @param dy The y component of the drag page.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ * @see _edje_object_part_drag_page_set
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_layout_part_efl_ui_drag_drag_page_set(Eo *obj EINA_UNUSED, Efl_Canvas_Layout_Part_Data *pd, double dx, double dy)
 {
    return _edje_object_part_drag_page_set(pd->ed, pd->part, dx, dy);
 }
 
+/**
+ * @internal
+ * @brief Gets the drag page for a draggable part.
+ * @param obj The Efl_Canvas_Layout_Part object.
+ * @param pd Private data for the Efl_Canvas_Layout_Part.
+ * @param[out] dx Pointer to store the x component of the drag page.
+ * @param[out] dy Pointer to store the y component of the drag page.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ * @see _edje_object_part_drag_page_get
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_layout_part_efl_ui_drag_drag_page_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Layout_Part_Data *pd, double *dx, double *dy)
 {
    return _edje_object_part_drag_page_get(pd->ed, pd->part, dx, dy);
 }
 
+/**
+ * @internal
+ * @brief Moves a draggable part by one page.
+ * @param obj The Efl_Canvas_Layout_Part object.
+ * @param pd Private data for the Efl_Canvas_Layout_Part.
+ * @param dx The x component of the page movement.
+ * @param dy The y component of the page movement.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ * @see _edje_object_part_drag_page
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_layout_part_efl_ui_drag_drag_page_move(Eo *obj EINA_UNUSED, Efl_Canvas_Layout_Part_Data *pd, double dx, double dy)
 {
    return _edje_object_part_drag_page(pd->ed, pd->part, dx, dy);
 }
 
+/**
+ * @internal
+ * @brief Overrides the debug name for the Efl_Canvas_Layout_Part object.
+ * @param obj The Efl_Canvas_Layout_Part object.
+ * @param pd Private data for the Efl_Canvas_Layout_Part.
+ * @param sb The Eina_Strbuf to append the debug name to.
+ *
+ * Appends the part name, type, and group to the debug string buffer.
+ * Example: "my_part_name : RECTANGLE : my_group_name"
+ */
 EOLIAN static void
 _efl_canvas_layout_part_efl_object_debug_name_override(Eo *obj, Efl_Canvas_Layout_Part_Data *pd, Eina_Strbuf *sb)
 {

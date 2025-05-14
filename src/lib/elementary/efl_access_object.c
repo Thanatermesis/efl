@@ -1,3 +1,11 @@
+/**
+ * @file
+ * @brief This file implements the Efl.Access.Object mixin, providing accessibility features.
+ *
+ * It handles object attributes, roles, states, relationships, and events
+ * related to accessibility.
+ */
+
 #ifdef HAVE_CONFIG_H
   #include "elementary_config.h"
 #endif
@@ -6,9 +14,17 @@
 
 #include "elm_priv.h"
 
+/**
+ * @brief Array of human-readable names for EFL_ACCESS_ROLE_* enumerations.
+ *
+ * This array maps each Efl_Access_Role enum value to its string representation.
+ * It is used by efl_access_object_role_name_get() to provide a textual
+ * description of an accessible object's role.
+ * The order of strings must match the order of Efl_Access_Role enum values.
+ */
 const char* Access_Name[] = {
-    "invalid",
-    "accelerator label",
+    "invalid", /**< EFL_ACCESS_ROLE_INVALID */
+    "accelerator label", /**< EFL_ACCESS_ROLE_ACCELERATOR_LABEL */
     "alert",
     "animation",
     "arrow",
@@ -109,34 +125,58 @@ const char* Access_Name[] = {
     "grouping",
     "image map",
     "notification",
-    "info bar",
-    "last defined"
+    "info bar", /**< EFL_ACCESS_ROLE_INFO_BAR */
+    "last defined" /**< EFL_ACCESS_ROLE_LAST_DEFINED */
 };
 
+/**
+ * @brief Structure to hold an accessibility event callback and its associated data.
+ *
+ * This is used to manage globally registered event handlers for accessibility events.
+ */
 struct _Efl_Access_Event_Handler
 {
-   Efl_Event_Cb cb;
-   void *data;
+   Efl_Event_Cb cb; /**< The callback function to be invoked when an event occurs. */
+   void *data; /**< User-provided data to be passed to the callback function. */
 };
 
+/**
+ * @brief Private data structure for Efl_Access_Object.
+ *
+ * This structure holds all the accessibility-specific information for an Eo object
+ * that mixes in Efl_Access_Object.
+ */
 struct _Efl_Access_Object_Data
 {
-   Eina_List     *relations;
-   Eina_List     *attr_list;
-   const char    *name;
-   const char    *description;
-   const char    *translation_domain;
-   Efl_Access_Role role;
-   Efl_Access_Reading_Info_Type reading_info;
-   Efl_Access_Type type: 2;
+   Eina_List     *relations; /**< A list of Efl_Access_Relation, representing relationships to other accessible objects. Example: `relations` might contain an Efl_Access_Relation where `type` is EFL_ACCESS_RELATION_TYPE_LABELLED_BY and `objects` is a list containing the labelling Eo object. */
+   Eina_List     *attr_list; /**< A list of Efl_Access_Attribute, storing key-value pairs of attributes. Example: `attr_list` could contain an attribute where `key` is "style" and `value` is "bold". */
+   const char    *name; /**< The accessible name of the object (eina_stringshare). */
+   const char    *description; /**< The accessible description of the object (eina_stringshare). */
+   const char    *translation_domain; /**< The translation domain for i18n of name and description (eina_stringshare). */
+   Efl_Access_Role role; /**< The accessibility role of the object (e.g., button, label). */
+   Efl_Access_Reading_Info_Type reading_info; /**< Specifies what information should be read by screen readers. */
+   Efl_Access_Type type: 2; /**< The accessibility type (regular, skipped, disabled). */
 };
 
 typedef struct _Efl_Access_Object_Data Efl_Access_Object_Data;
 
-
+/** @brief List of globally registered accessibility event handlers. */
 static Eina_List *global_callbacks;
+/** @brief The root accessible object for the application. */
 static Eo *root;
 
+/**
+ * @internal
+ * @brief Gets the index of the object in its parent's list of accessible children.
+ *
+ * This function determines the position of the given object among its siblings
+ * that are also accessible.
+ *
+ * @param[in] obj The accessible object.
+ * @param[in] pd Private data of the accessible object (unused).
+ * @return The 0-based index if found, or -1 if the object has no accessible parent
+ *         or is not found in its parent's children list.
+ */
 EOLIAN static int
 _efl_access_object_index_in_parent_get(const Eo *obj, Efl_Access_Object_Data *pd EINA_UNUSED)
 {
@@ -165,7 +205,20 @@ _efl_access_object_index_in_parent_get(const Eo *obj, Efl_Access_Object_Data *pd
    return ret;
 }
 
-
+/**
+ * @internal
+ * @brief Finds a provider for a given class, considering accessibility type.
+ *
+ * This function extends the default efl_provider_find behavior. If the requested
+ * class is EFL_ACCESS_OBJECT_MIXIN, it only returns the object if its access type
+ * is not EFL_ACCESS_TYPE_SKIPPED. Otherwise, it behaves like the superclass's
+ * provider_find.
+ *
+ * @param[in] obj The object to search on.
+ * @param[in] pd Private data of the accessible object (unused).
+ * @param[in] klass The Efl_Class to find a provider for.
+ * @return The provider object if found, otherwise NULL.
+ */
 EOLIAN static Efl_Object *
 _efl_access_object_efl_object_provider_find(const Eo *obj, Efl_Access_Object_Data *pd EINA_UNUSED, const Efl_Object *klass)
 {
@@ -181,6 +234,22 @@ _efl_access_object_efl_object_provider_find(const Eo *obj, Efl_Access_Object_Dat
    return efl_provider_find(efl_super(obj, EFL_ACCESS_OBJECT_MIXIN), klass);
 }
 
+/**
+ * @internal
+ * @brief Gets a copy of the object's accessibility attributes.
+ *
+ * The returned list and its contents (Efl_Access_Attribute structs and their
+ * string members) are newly allocated and must be freed by the caller using
+ * efl_access_attributes_list_free().
+ *
+ * @param[in] obj The accessible object (unused).
+ * @param[in] pd Private data of the accessible object.
+ * @return A new Eina_List of Efl_Access_Attribute pointers, or NULL if no attributes
+ *         are set or on allocation failure. Each attribute in the list is a copy.
+ *         Example of a returned list structure:
+ *         `list -> [attr1, attr2, ...]`
+ *         where `attr1` is `Efl_Access_Attribute*` like `{ key="name", value="Button1" }`.
+ */
 EOLIAN Eina_List*
 _efl_access_object_attributes_get(const Eo *obj EINA_UNUSED, Efl_Access_Object_Data *pd)
 {
@@ -203,6 +272,19 @@ _efl_access_object_attributes_get(const Eo *obj EINA_UNUSED, Efl_Access_Object_D
    return attr_list;
 }
 
+/**
+ * @internal
+ * @brief Appends or updates an accessibility attribute.
+ *
+ * If an attribute with the given key already exists, its value is updated.
+ * Otherwise, a new attribute (key-value pair) is added.
+ * The key and value strings are duplicated using eina_stringshare.
+ *
+ * @param[in] obj The accessible object (unused).
+ * @param[in] pd Private data of the accessible object.
+ * @param[in] key The attribute key (e.g., "class", "id"). Must not be NULL.
+ * @param[in] value The attribute value. Must not be NULL.
+ */
 EOLIAN static void
 _efl_access_object_attribute_append(Eo *obj EINA_UNUSED, Efl_Access_Object_Data *pd, const char *key, const char *value)
 {
@@ -230,6 +312,17 @@ _efl_access_object_attribute_append(Eo *obj EINA_UNUSED, Efl_Access_Object_Data 
    pd->attr_list = eina_list_append(pd->attr_list, attr);
 }
 
+/**
+ * @internal
+ * @brief Deletes an accessibility attribute by its key.
+ *
+ * If an attribute with the specified key is found, it is removed from the
+ * object's attribute list, and its resources (stringshares and struct) are freed.
+ *
+ * @param[in] obj The accessible object (unused).
+ * @param[in] pd Private data of the accessible object.
+ * @param[in] key The key of the attribute to delete. Must not be NULL.
+ */
 EOLIAN static void
 _efl_access_object_attribute_del(Eo *obj EINA_UNUSED, Efl_Access_Object_Data *pd, const char *key)
 {
@@ -253,6 +346,15 @@ _efl_access_object_attribute_del(Eo *obj EINA_UNUSED, Efl_Access_Object_Data *pd
      }
 }
 
+/**
+ * @internal
+ * @brief Clears all accessibility attributes from the object.
+ *
+ * Removes all attributes, freeing associated resources.
+ *
+ * @param[in] obj The accessible object (unused).
+ * @param[in] pd Private data of the accessible object.
+ */
 EOLIAN static void _efl_access_object_attributes_clear(Eo *obj EINA_UNUSED, Efl_Access_Object_Data *pd)
 {
    if (!pd->attr_list) return;
@@ -266,6 +368,20 @@ EOLIAN static void _efl_access_object_attributes_clear(Eo *obj EINA_UNUSED, Efl_
    pd->attr_list = NULL;
 }
 
+/**
+ * @internal
+ * @brief Sets the reading information types for the object.
+ *
+ * This determines what information (name, role, description, state) a screen reader
+ * should announce for this object. It also updates a "reading_info_type"
+ * accessibility attribute with a pipe-separated string representing the flags
+ * (e.g., "name|role|description").
+ *
+ * @param[in] obj The accessible object.
+ * @param[in] pd Private data of the accessible object.
+ * @param[in] reading_info A bitmask of Efl_Access_Reading_Info_Type flags.
+ *                         Example: `EFL_ACCESS_READING_INFO_TYPE_NAME | EFL_ACCESS_READING_INFO_TYPE_ROLE`.
+ */
 EOLIAN static void
 _efl_access_object_reading_info_type_set(Eo *obj, Efl_Access_Object_Data *pd, Efl_Access_Reading_Info_Type reading_info)
 {
@@ -303,18 +419,47 @@ _efl_access_object_reading_info_type_set(Eo *obj, Efl_Access_Object_Data *pd, Ef
    eina_strbuf_free(buf);
 }
 
+/**
+ * @internal
+ * @brief Gets the reading information types for the object.
+ *
+ * @param[in] obj The accessible object (unused).
+ * @param[in] pd Private data of the accessible object.
+ * @return A bitmask of Efl_Access_Reading_Info_Type flags.
+ *         Example: `EFL_ACCESS_READING_INFO_TYPE_NAME | EFL_ACCESS_READING_INFO_TYPE_DESCRIPTION`.
+ */
 EOLIAN Efl_Access_Reading_Info_Type
 _efl_access_object_reading_info_type_get(const Eo *obj EINA_UNUSED, Efl_Access_Object_Data *pd)
 {
    return pd->reading_info;
 }
 
+/**
+ * @internal
+ * @brief Gets the accessibility role of the object.
+ *
+ * @param[in] obj The accessible object (unused).
+ * @param[in] pd Private data of the accessible object.
+ * @return The Efl_Access_Role enum value for the object.
+ *         Example: `EFL_ACCESS_ROLE_BUTTON`.
+ */
 EOLIAN static Efl_Access_Role
 _efl_access_object_role_get(const Eo *obj EINA_UNUSED, Efl_Access_Object_Data *pd)
 {
    return pd->role;
 }
 
+/**
+ * @internal
+ * @brief Sets the accessibility role of the object.
+ *
+ * If the role changes, it emits an `efl_access_role_changed_signal`.
+ *
+ * @param[in] obj The accessible object.
+ * @param[in] pd Private data of the accessible object.
+ * @param[in] role The new Efl_Access_Role for the object.
+ *                 Example: `EFL_ACCESS_ROLE_LABEL`.
+ */
 EOLIAN static void
 _efl_access_object_role_set(Eo *obj, Efl_Access_Object_Data *pd, Efl_Access_Role role)
 {
@@ -325,6 +470,18 @@ _efl_access_object_role_set(Eo *obj, Efl_Access_Object_Data *pd, Efl_Access_Role
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the human-readable, non-localized name of the object's role.
+ *
+ * This uses the `Access_Name` array to map the role enum to a string.
+ *
+ * @param[in] obj The accessible object.
+ * @param[in] pd Private data of the accessible object (unused).
+ * @return A string representing the role name (e.g., "push button"), or "" if the
+ *         role is invalid or out of bounds. The returned string is a pointer
+ *         to a global constant and should not be freed.
+ */
 EOLIAN const char *
 _efl_access_object_role_name_get(const Eo *obj, Efl_Access_Object_Data *pd EINA_UNUSED)
 {
@@ -335,6 +492,19 @@ _efl_access_object_role_name_get(const Eo *obj, Efl_Access_Object_Data *pd EINA_
    return role > EFL_ACCESS_ROLE_LAST_DEFINED ? "" : Access_Name[role];
 }
 
+/**
+ * @internal
+ * @brief Gets the internationalized accessible name of the object.
+ *
+ * If NLS (Native Language Support) is enabled and a translation domain is set,
+ * this function attempts to translate the name. Otherwise, it returns the raw name.
+ *
+ * @param[in] obj The accessible object (unused).
+ * @param[in] pd Private data of the accessible object.
+ * @return The (potentially translated) accessible name. This is an eina_stringshare
+ *         if not translated, or a temporary gettext buffer if translated.
+ *         The caller should not free this string if it comes from gettext.
+ */
 EOLIAN const char *
 _efl_access_object_i18n_name_get(const Eo *obj EINA_UNUSED, Efl_Access_Object_Data *pd)
 {
@@ -345,12 +515,35 @@ _efl_access_object_i18n_name_get(const Eo *obj EINA_UNUSED, Efl_Access_Object_Da
    return pd->name;
 }
 
+/**
+ * @internal
+ * @brief Sets the accessible name of the object.
+ *
+ * The provided name string is stored as an eina_stringshare.
+ *
+ * @param[in] obj The accessible object (unused).
+ * @param[in] pd Private data of the accessible object.
+ * @param[in] val The new accessible name.
+ */
 EOLIAN static void
 _efl_access_object_i18n_name_set(Eo *obj EINA_UNUSED, Efl_Access_Object_Data *pd, const char *val)
 {
    eina_stringshare_replace(&pd->name, val);
 }
 
+/**
+ * @internal
+ * @brief Gets the internationalized accessible description of the object.
+ *
+ * If NLS is enabled and a translation domain is set, this function attempts
+ * to translate the description. Otherwise, it returns the raw description.
+ *
+ * @param[in] obj The accessible object (unused).
+ * @param[in] pd Private data of the accessible object.
+ * @return The (potentially translated) accessible description. This is an eina_stringshare
+ *         if not translated, or a temporary gettext buffer if translated.
+ *         The caller should not free this string if it comes from gettext.
+ */
 const char * _efl_access_object_description_get(const Eo *obj EINA_UNUSED, Efl_Access_Object_Data *pd)
 {
 #ifdef ENABLE_NLS
@@ -360,12 +553,33 @@ const char * _efl_access_object_description_get(const Eo *obj EINA_UNUSED, Efl_A
    return pd->description;
 }
 
+/**
+ * @internal
+ * @brief Sets the accessible description of the object.
+ *
+ * The provided description string is stored as an eina_stringshare.
+ *
+ * @param[in] obj The accessible object (unused).
+ * @param[in] pd Private data of the accessible object.
+ * @param[in] val The new accessible description.
+ */
 EOLIAN static void
 _efl_access_object_description_set(Eo *obj EINA_UNUSED, Efl_Access_Object_Data *pd, const char *val)
 {
    eina_stringshare_replace(&pd->description, val);
 }
 
+/**
+ * @internal
+ * @brief Gets the localized human-readable name of the object's role.
+ *
+ * This first gets the non-localized role name and then attempts to translate it
+ * using gettext if NLS is enabled.
+ *
+ * @param[in] obj The accessible object.
+ * @param[in] pd Private data of the accessible object (unused).
+ * @return The localized role name. The caller should not free this string.
+ */
 EOLIAN static const char *
 _efl_access_object_localized_role_name_get(const Eo *obj, Efl_Access_Object_Data *pd EINA_UNUSED)
 {

@@ -1,8 +1,26 @@
 #include "eldbus_private.h"
 #include "eldbus_private_types.h"
 
+/**
+ * @internal
+ * @brief Populates an Eina_Value array with basic types from an Eldbus_Message_Iter.
+ *
+ * This function iterates through an Eldbus_Message_Iter containing an array of basic D-Bus types
+ * (integers, strings, booleans, etc.) and appends each element to the provided Eina_Value array.
+ *
+ * @param type The D-Bus type character of the elements in the array (e.g., 'i', 's', 'b').
+ * @param value An initialized Eina_Value of type EINA_VALUE_TYPE_ARRAY, to which elements will be appended.
+ * @param iter The Eldbus_Message_Iter positioned at the start of the D-Bus array.
+ */
 static void _message_iter_basic_array_to_eina_value(char type, Eina_Value *value, Eldbus_Message_Iter *iter);
 
+/**
+ * @internal
+ * @brief Converts a D-Bus type character to its corresponding Eina_Value_Type.
+ *
+ * @param type The D-Bus type character (e.g., 'i', 's', 'a', '(', '{').
+ * @return The corresponding Eina_Value_Type, or NULL if the type is unknown.
+ */
 const Eina_Value_Type *
 _dbus_type_to_eina_value_type(char type)
 {
@@ -44,6 +62,15 @@ _dbus_type_to_eina_value_type(char type)
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the size in bytes of a D-Bus basic type.
+ *
+ * This is used for calculating memory layout, particularly for structs.
+ *
+ * @param type The D-Bus type character.
+ * @return The size of the type in bytes, or 0 if the type is unknown.
+ */
 static unsigned int
 _type_size(char type)
 {
@@ -82,6 +109,20 @@ _type_size(char type)
      }
 }
 
+/**
+ * @internal
+ * @brief Calculates the memory offset for a D-Bus type, ensuring proper alignment.
+ *
+ * D-Bus types have alignment requirements. This function calculates the next
+ * valid offset for a given type, starting from a base offset.
+ * For example, a 4-byte integer (type 'i') must be aligned to a 4-byte boundary.
+ * If base is 1 and type is 'i', the returned offset will be 4.
+ * If base is 4 and type is 'i', the returned offset will be 4.
+ *
+ * @param type The D-Bus type character for which to calculate the offset.
+ * @param base The current base offset.
+ * @return The new offset, aligned for the given type.
+ */
 static unsigned int
 _type_offset(char type, unsigned base)
 {
@@ -95,6 +136,26 @@ _type_offset(char type, unsigned base)
    return base + padding;
 }
 
+/**
+ * @internal
+ * @brief Converts a D-Bus array from an Eldbus_Message_Iter to an Eina_Value.
+ *
+ * This function handles arrays of basic types, arrays of structs, arrays of variants,
+ * and arrays of arrays.
+ *
+ * For an array of structs, e.g., "a(is)", the Eina_Value will be an array
+ * where each element is an Eina_Value struct with members "arg0" (int) and "arg1" (string).
+ * Example: `[ { "arg0": 1, "arg1": "foo" }, { "arg0": 2, "arg1": "bar" } ]`
+ *
+ * For an array of arrays, e.g., "aai", the Eina_Value will be an array
+ * where each element is another Eina_Value array of integers.
+ * Example: `[ [1, 2], [3, 4, 5] ]`
+ *
+ * @param iter The Eldbus_Message_Iter positioned at the D-Bus array.
+ * @return A new Eina_Value of type EINA_VALUE_TYPE_ARRAY containing the converted
+ *         array elements, or NULL on failure. The caller is responsible for freeing
+ *         the returned Eina_Value.
+ */
 static Eina_Value *
 _message_iter_array_to_eina_value(Eldbus_Message_Iter *iter)
 {
@@ -235,11 +296,22 @@ static void *
 _ops_malloc(const Eina_Value_Struct_Operations *ops EINA_UNUSED, const Eina_Value_Struct_Desc *desc)
 {
    Eldbus_Struct_Desc *edesc = (Eldbus_Struct_Desc*)desc;
-   edesc->refcount++;
+   edesc->refcount++; // Increment refcount for the descriptor
    DBG("%p refcount=%d", edesc, edesc->refcount);
    return malloc(desc->size);
 }
 
+/**
+ * @internal
+ * @brief Custom free operation for Eina_Value structs created from D-Bus messages.
+ *
+ * This function decrements the reference count of the Eldbus_Struct_Desc.
+ * If the refcount reaches zero, it frees the descriptor and its associated members.
+ *
+ * @param ops Pointer to the Eina_Value_Struct_Operations (unused).
+ * @param desc Pointer to the Eina_Value_Struct_Desc (cast to Eldbus_Struct_Desc).
+ * @param memory Pointer to the memory allocated for the struct instance.
+ */
 static void
 _ops_free(const Eina_Value_Struct_Operations *ops EINA_UNUSED, const Eina_Value_Struct_Desc *desc, void *memory)
 {
@@ -267,6 +339,28 @@ static Eina_Value_Struct_Operations operations =
    NULL
 };
 
+/**
+ * @internal
+ * @brief Converts a D-Bus struct or variant from an Eldbus_Message_Iter to an Eina_Value.
+ *
+ * This function iterates through the members of a D-Bus struct (or the single item
+ * in a D-Bus variant, which is treated as a struct with one member) and constructs
+ * an Eina_Value of type EINA_VALUE_TYPE_STRUCT.
+ *
+ * Each member of the D-Bus struct will correspond to a member in the Eina_Value struct,
+ * named "arg0", "arg1", "arg2", etc., based on its position in the D-Bus struct.
+ *
+ * For example, a D-Bus struct "(isd)" (int, string, double) will be converted to
+ * an Eina_Value struct with three members:
+ * - "arg0": EINA_VALUE_TYPE_INT
+ * - "arg1": EINA_VALUE_TYPE_STRING
+ * - "arg2": EINA_VALUE_TYPE_DOUBLE
+ *
+ * @param iter The Eldbus_Message_Iter positioned at the D-Bus struct or variant.
+ * @return A new Eina_Value of type EINA_VALUE_TYPE_STRUCT representing the
+ *         D-Bus struct, or NULL if the iterator is empty or on failure.
+ *         The caller is responsible for freeing the returned Eina_Value.
+ */
 Eina_Value *
 _message_iter_struct_to_eina_value(Eldbus_Message_Iter *iter)
 {
@@ -449,6 +543,22 @@ end:
    return value_st;
 }
 
+/**
+ * @brief Converts an entire Eldbus_Message payload to an Eina_Value.
+ *
+ * The D-Bus message payload is typically a series of arguments. This function
+ * treats these arguments as if they were fields of a single top-level struct.
+ * The resulting Eina_Value will be of type EINA_VALUE_TYPE_STRUCT, where
+ * each member ("arg0", "arg1", ...) corresponds to an argument from the message.
+ *
+ * For example, if a message contains an integer and a string, the returned Eina_Value
+ * will be a struct: `{ "arg0": <integer_value>, "arg1": "<string_value>" }`.
+ *
+ * @param msg The Eldbus_Message to convert. Must not be NULL.
+ * @return A new Eina_Value representing the message payload, or NULL on failure
+ *         (e.g., if the message is NULL or has no arguments). The caller is
+ *         responsible for freeing the returned Eina_Value.
+ */
 EAPI Eina_Value *
 eldbus_message_to_eina_value(const Eldbus_Message *msg)
 {
@@ -459,6 +569,22 @@ eldbus_message_to_eina_value(const Eldbus_Message *msg)
    return _message_iter_struct_to_eina_value(iter);
 }
 
+/**
+ * @brief Converts a D-Bus iterator pointing to a struct-like type (struct, dict entry, variant) to an Eina_Value.
+ *
+ * This function is similar to _message_iter_struct_to_eina_value but is exposed
+ * as an EAPI function. It's useful when you have an iterator already positioned
+ * at a D-Bus struct, dictionary entry ('e'), or variant ('v') and want to convert
+ * that specific element to an Eina_Value struct.
+ *
+ * - For a D-Bus struct `(is)`: results in Eina_Value struct `{ "arg0": <int>, "arg1": <string> }`
+ * - For a D-Bus dict entry `{is}` (type 'e'): results in Eina_Value struct `{ "arg0": <int_key>, "arg1": <string_value> }`
+ * - For a D-Bus variant `v` containing `is`: results in Eina_Value struct `{ "arg0": <int>, "arg1": <string> }` (assuming the variant's content is a struct)
+ *
+ * @param iter The Eldbus_Message_Iter positioned at a D-Bus struct, dict entry, or variant. Must not be NULL.
+ * @return A new Eina_Value of type EINA_VALUE_TYPE_STRUCT, or NULL on failure.
+ *         The caller is responsible for freeing the returned Eina_Value.
+ */
 EAPI Eina_Value *
 eldbus_message_iter_struct_like_to_eina_value(const Eldbus_Message_Iter *iter)
 {

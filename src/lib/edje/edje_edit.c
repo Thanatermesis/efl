@@ -31,7 +31,15 @@ EAPI Eina_Error EDJE_EDIT_ERROR_GROUP_CURRENTLY_USED = 0;
 EAPI Eina_Error EDJE_EDIT_ERROR_GROUP_REFERENCED = 0;
 EAPI Eina_Error EDJE_EDIT_ERROR_GROUP_DOES_NOT_EXIST = 0;
 
-/* Get eed(Edje_Edit*) from obj(Evas_Object*) */
+/**
+ * @def GET_EED_OR_RETURN(RET)
+ * @brief Macro to get the Edje_Edit data from an Evas_Object.
+ *
+ * If the object is not an Edje_Edit object or if the Edje_Edit data
+ * cannot be retrieved, it returns the specified value @p RET.
+ *
+ * @param RET The value to return on failure.
+ */
 #define GET_EED_OR_RETURN(RET)            \
   Edje_Edit *eed;                         \
   if (!efl_isa(obj, MY_CLASS))             \
@@ -39,21 +47,48 @@ EAPI Eina_Error EDJE_EDIT_ERROR_GROUP_DOES_NOT_EXIST = 0;
   eed = efl_data_scope_get(obj, MY_CLASS); \
   if (!eed) return RET;
 
-/* Get ed(Edje*) from obj(Evas_Object*) */
+/**
+ * @def GET_ED_OR_RETURN(RET)
+ * @brief Macro to get the Edje data from an Evas_Object.
+ *
+ * If the object is not an EFL_CANVAS_LAYOUT_CLASS object or if the Edje data
+ * cannot be retrieved, it returns the specified value @p RET.
+ *
+ * @param RET The value to return on failure.
+ */
 #define GET_ED_OR_RETURN(RET)          \
   Edje *ed;                            \
   if (!efl_isa(obj, EFL_CANVAS_LAYOUT_CLASS)) \
     return RET;                        \
   ed = efl_data_scope_get(obj, EFL_CANVAS_LAYOUT_CLASS);
 
-/* Get rp(Edje_Real_Part*) from obj(Evas_Object*) and part(char*) */
+/**
+ * @def GET_RP_OR_RETURN(RET)
+ * @brief Macro to get the Edje_Real_Part data from an Evas_Object and part name.
+ *
+ * This macro first calls GET_ED_OR_RETURN. If successful, it attempts to
+ * retrieve the Edje_Real_Part. If retrieval fails at any point,
+ * it returns the specified value @p RET.
+ *
+ * @param RET The value to return on failure.
+ */
 #define GET_RP_OR_RETURN(RET)         \
   GET_ED_OR_RETURN(RET)               \
   Edje_Real_Part *rp;                 \
   rp = _edje_real_part_get(ed, part); \
   if (!rp) return RET;
 
-/* Get pd(Edje_Part_Description*) from obj(Evas_Object*), part(char*) and state (char*) */
+/**
+ * @def GET_PD_OR_RETURN(RET)
+ * @brief Macro to get the Edje_Part_Description_Common data.
+ *
+ * This macro calls GET_EED_OR_RETURN and GET_ED_OR_RETURN.
+ * If successful, it retrieves the Edje_Real_Part and then finds the
+ * Edje_Part_Description_Common by name, state, and value.
+ * If retrieval fails at any point, it returns the specified value @p RET.
+ *
+ * @param RET The value to return on failure.
+ */
 #define GET_PD_OR_RETURN(RET)                                       \
   GET_EED_OR_RETURN(RET)                                            \
   GET_ED_OR_RETURN(RET)                                             \
@@ -64,7 +99,15 @@ EAPI Eina_Error EDJE_EDIT_ERROR_GROUP_DOES_NOT_EXIST = 0;
   pd = _edje_part_description_find_byname(eed, part, state, value); \
   if (!pd) return RET;
 
-/* Get epr(Edje_Program*) from obj(Evas_Object*) and prog(char*)*/
+/**
+ * @def GET_EPR_OR_RETURN(RET)
+ * @brief Macro to get the Edje_Program data from an Evas_Object and program name.
+ *
+ * If the object is not an Edje_Edit object or if the Edje_Program
+ * cannot be retrieved by name, it returns the specified value @p RET.
+ *
+ * @param RET The value to return on failure.
+ */
 #define GET_EPR_OR_RETURN(RET)               \
   Edje_Program *epr;                         \
   if (!efl_isa(obj, MY_CLASS))                \
@@ -72,6 +115,16 @@ EAPI Eina_Error EDJE_EDIT_ERROR_GROUP_DOES_NOT_EXIST = 0;
   epr = _edje_program_get_byname(obj, prog); \
   if (!epr) return RET;
 
+/**
+ * @internal
+ * @brief Allocates memory using calloc and logs an error on failure.
+ *
+ * This is a wrapper around calloc that provides centralized error logging
+ * if memory allocation fails.
+ *
+ * @param size The number of bytes to allocate.
+ * @return A pointer to the allocated memory, or NULL on failure.
+ */
 static void *
 _alloc(size_t size)
 {
@@ -90,38 +143,65 @@ _alloc(size_t size)
 
 /* Edje_Edit smart! Overloads the edje one adding some more control stuff */
 
+/**
+ * @internal
+ * @struct _Edje_Edit
+ * @brief Internal data structure for an Edje_Edit object.
+ *
+ * This structure holds data specific to the Edje_Edit functionality,
+ * extending the base Edje object. It manages Embryo scripts, bytecode,
+ * and dirty flags for tracking changes.
+ */
 typedef struct _Edje_Edit Edje_Edit;
 struct _Edje_Edit
 {
-   Edje      *base;
+   Edje      *base; /**< Pointer to the base Edje object data. */
 
-   void      *bytecode;
-   int        bytecode_size;
+   void      *bytecode; /**< Compiled Embryo bytecode for the current group. */
+   int        bytecode_size; /**< Size of the compiled bytecode. */
 
-   char      *embryo_source;
-   char      *embryo_processed;
-   Eina_Hash *program_scripts;
+   char      *embryo_source; /**< Raw Embryo source code for the group's global script. */
+   char      *embryo_processed; /**< Processed Embryo source code (after macro expansion, etc.). */
+   Eina_Hash *program_scripts; /**< Hash table of Program_Script structures, keyed by program ID. Stores individual scripts associated with programs. */
 
-   Eina_List *errors;
+   Eina_List *errors; /**< List of Edje_Edit_Script_Error encountered during script processing or compilation. */
 
-   Eina_Bool  bytecode_dirty : 1;
-   Eina_Bool  embryo_source_dirty : 1;
-   Eina_Bool  all_dirty : 1;
-   Eina_Bool  script_need_recompile : 1;
+   Eina_Bool  bytecode_dirty : 1; /**< Flag indicating if the bytecode needs to be saved. */
+   Eina_Bool  embryo_source_dirty : 1; /**< Flag indicating if the global Embryo source has changed. */
+   Eina_Bool  all_dirty : 1; /**< Flag indicating if all scripts (global and program-specific) need reprocessing. */
+   Eina_Bool  script_need_recompile : 1; /**< Flag indicating if any script change requires recompilation. */
 };
 
+/**
+ * @internal
+ * @struct _Program_Script
+ * @brief Represents an Embryo script associated with a specific Edje program.
+ *
+ * This structure holds the source code, processed code, and status flags
+ * for an individual script tied to an Edje program action.
+ */
 typedef struct _Program_Script Program_Script;
 struct _Program_Script
 {
-   int       id;
-   char     *code;
-   char     *processed;
-   Eina_Bool dirty : 1;
-   Eina_Bool delete_me : 1;
+   int       id; /**< ID of the Edje_Program this script is associated with. */
+   char     *code; /**< Raw Embryo source code for this program script. */
+   char     *processed; /**< Processed Embryo source code for this program script. */
+   Eina_Bool dirty : 1; /**< Flag indicating if this script has changed and needs to be saved/reprocessed. */
+   Eina_Bool delete_me : 1; /**< Flag indicating if this script should be deleted. */
 };
 
 static Eina_Bool _edje_edit_edje_file_save(Eet_File *eetf, Edje_File *ef);
 
+/**
+ * @internal
+ * @brief Cleans up all data specific to the Edje_Edit instance.
+ *
+ * This function frees memory allocated for bytecode, Embryo source codes,
+ * program scripts, and error lists. It resets all associated fields and
+ * dirty flags to their initial states.
+ *
+ * @param eed Pointer to the Edje_Edit data to clean.
+ */
 static void
 _edje_edit_data_clean(Edje_Edit *eed)
 {
@@ -152,6 +232,15 @@ _edje_edit_data_clean(Edje_Edit *eed)
    eed->script_need_recompile = EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Destructor for the Edje_Edit object, overriding efl_canvas_group_del.
+ *
+ * Cleans up Edje_Edit specific data before calling the parent's destructor.
+ *
+ * @param obj The Edje_Edit Evas_Object.
+ * @param eed The Edje_Edit private data.
+ */
 EOLIAN static void
 _edje_edit_efl_canvas_group_group_del(Eo *obj, Edje_Edit *eed)
 {
@@ -160,6 +249,12 @@ _edje_edit_efl_canvas_group_group_del(Eo *obj, Edje_Edit *eed)
    efl_canvas_group_del(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Frees a Program_Script structure and its contents.
+ *
+ * @param ps Pointer to the Program_Script to free.
+ */
 static void
 _edje_edit_program_script_free(Program_Script *ps)
 {
@@ -168,6 +263,19 @@ _edje_edit_program_script_free(Program_Script *ps)
    free(ps);
 }
 
+/**
+ * @internal
+ * @brief Opens the Eet_File associated with an Edje object.
+ *
+ * Depending on the mode, it either returns the existing Eet_File handle
+ * (for read mode) or opens a new one (for write or read-write modes).
+ * Logs an error if opening for writing fails.
+ *
+ * @param ed Pointer to the Edje object.
+ * @param mode The Eet_File_Mode to open the file with (EET_FILE_MODE_READ,
+ *             EET_FILE_MODE_WRITE, EET_FILE_MODE_READ_WRITE).
+ * @return A pointer to the Eet_File, or NULL on failure or invalid mode.
+ */
 static Eet_File *
 _edje_edit_eet_open(Edje *ed, Eet_File_Mode mode)
 {
@@ -189,6 +297,17 @@ _edje_edit_eet_open(Edje *ed, Eet_File_Mode mode)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Closes an Eet_File if it was not opened in read-only mode.
+ *
+ * This function checks the mode of the Eet_File. If the mode is
+ * EET_FILE_MODE_WRITE or EET_FILE_MODE_READ_WRITE, it closes the file.
+ * It does nothing if the mode is EET_FILE_MODE_READ, as the file handle
+ * might be shared.
+ *
+ * @param ef Pointer to the Eet_File to potentially close.
+ */
 static void
 _edje_edit_eet_close(Eet_File *ef)
 {
@@ -197,6 +316,18 @@ _edje_edit_eet_close(Eet_File *ef)
      eet_close(ef);
 }
 
+/**
+ * @internal
+ * @brief Loads Embryo scripts (global and program-specific) from the Edje file.
+ *
+ * This function reads the global Embryo source script and all individual
+ * program scripts associated with the current collection from the Eet file.
+ * The scripts are stored in the Edje_Edit data structure.
+ *
+ * @param obj The Edje_Edit Evas_Object.
+ * @param eed Pointer to the Edje_Edit data structure to populate with scripts.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., if Edje data is missing).
+ */
 static Eina_Bool
 _load_scripts(Eo *obj, Edje_Edit *eed)
 {

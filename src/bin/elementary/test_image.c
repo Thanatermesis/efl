@@ -4,9 +4,20 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Maps image orientation enum values to human-readable names.
+ *
+ * This array is used to create radio buttons for selecting image orientation.
+ * Each element consists of an Evas_Image_Orient enum and its string representation.
+ * The list is terminated by an element with a NULL name.
+ * Example:
+ * @code
+ * { EVAS_IMAGE_ORIENT_90, "Rotate 90" }
+ * @endcode
+ */
 static const struct {
-   Evas_Image_Orient orient;
-   const char *name;
+   Evas_Image_Orient orient; /**< The image orientation enum from Evas. */
+   const char *name; /**< The human-readable name of the orientation. */
 } images_orient[] = {
   { EVAS_IMAGE_ORIENT_NONE, "None" },
   { EVAS_IMAGE_ORIENT_90, "Rotate 90" },
@@ -19,6 +30,16 @@ static const struct {
   { 0, NULL }
 };
 
+/**
+ * @brief Callback function for image orientation change.
+ *
+ * This function is called when a radio button for image orientation is changed.
+ * It retrieves the selected orientation value and applies it to the image object.
+ *
+ * @param data The user data, which is the window Evas_Object.
+ * @param obj The radio button object that triggered the event.
+ * @param event_info The event-specific information (not used).
+ */
 static void
 my_im_ch(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -32,6 +53,17 @@ my_im_ch(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
            v, elm_image_orient_get(im));
 }
 
+/**
+ * @brief Test function for basic image orientation.
+ *
+ * Creates a window with an image and a set of radio buttons to control the
+ * image's orientation (rotation and flip). This tests the elm_image_orient_set()
+ * and elm_image_orient_get() functions.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_image(void *data EINA_UNUSED, Evas_Object *obj  EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -84,6 +116,16 @@ test_image(void *data EINA_UNUSED, Evas_Object *obj  EINA_UNUSED, void *event_in
 }
 
 
+/**
+ * @brief Callback for slider changes to adjust image alignment.
+ *
+ * Retrieves the values from horizontal and vertical sliders and applies them
+ * as alignment hints to the image object.
+ *
+ * @param data The user data, which is the window Evas_Object.
+ * @param obj The slider object that triggered the event.
+ * @param event_info The event-specific information (not used).
+ */
 static void
 im_align_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -100,9 +142,20 @@ im_align_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    printf("align %.3f %.3f\n", h, v);
 }
 
+/**
+ * @brief Maps image scale method enum values to human-readable names.
+ *
+ * This array is used to create radio buttons for selecting the image scaling method.
+ * Each element consists of an Efl_Gfx_Image_Scale_Method enum and its string
+ * representation. The list is terminated by an element with a NULL name.
+ * Example:
+ * @code
+ * { EFL_GFX_IMAGE_SCALE_METHOD_FIT, "Fit" }
+ * @endcode
+ */
 static const struct {
-   Efl_Gfx_Image_Scale_Method scale_type;
-   const char *name;
+   Efl_Gfx_Image_Scale_Method scale_type; /**< The image scale method enum from Efl_Gfx. */
+   const char *name; /**< The human-readable name of the scale method. */
 } images_scale_type[] = {
   { EFL_GFX_IMAGE_SCALE_METHOD_NONE, "None" },
   { EFL_GFX_IMAGE_SCALE_METHOD_FILL, "Fill" },
@@ -114,6 +167,16 @@ static const struct {
   { 0, NULL }
 };
 
+/**
+ * @brief Callback function for image scale method change.
+ *
+ * This function is called when a radio button for image scaling is changed.
+ * It retrieves the selected scale method and applies it to the image object.
+ *
+ * @param data The user data, which is the window Evas_Object.
+ * @param obj The radio button object that triggered the event.
+ * @param event_info The event-specific information (not used).
+ */
 static void
 my_im_scale_ch(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -127,6 +190,17 @@ my_im_scale_ch(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_U
    images_scale_type[v].scale_type, images_scale_type[v].name, efl_gfx_image_scale_method_get(im));
 }
 
+/**
+ * @brief Test function for image scaling methods.
+ *
+ * Creates a window with an image and radio buttons to control the image's
+ * scaling method (e.g., fill, fit, tile). This tests the
+ * efl_gfx_image_scale_method_set() and efl_gfx_image_scale_method_get() functions.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_image_scale_type(void *data EINA_UNUSED, Evas_Object *obj  EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -178,6 +252,17 @@ test_image_scale_type(void *data EINA_UNUSED, Evas_Object *obj  EINA_UNUSED, voi
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for image alignment within a layout swallow part.
+ *
+ * Creates a window containing a layout with a swallow part. An image is
+ * placed inside the swallow part, and sliders are provided to control the
+ * horizontal and vertical alignment of the image within the layout.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_image_swallow_align(void *data EINA_UNUSED, Evas_Object *obj  EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -234,6 +319,15 @@ test_image_swallow_align(void *data EINA_UNUSED, Evas_Object *obj  EINA_UNUSED, 
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback invoked when a remote image download starts.
+ *
+ * Updates a text label to indicate that the download process has begun.
+ *
+ * @param data The user data, which is the window Evas_Object.
+ * @param obj The image object that started the download.
+ * @param event_info The event-specific information (not used).
+ */
 static void
 _download_start_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -250,6 +344,17 @@ _download_start_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EI
    fflush(stdout);
 }
 
+/**
+ * @brief Callback for remote image download progress updates.
+ *
+ * Updates a text label with the current download progress, showing bytes
+ * received versus the total size.
+ *
+ * @param data The user data, which is the window Evas_Object.
+ * @param obj The image object that is downloading.
+ * @param event_info A pointer to an Elm_Image_Progress struct containing
+ *        progress information.
+ */
 static void
 _download_progress_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -264,6 +369,15 @@ _download_progress_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void
    fflush(stdout);
 }
 
+/**
+ * @brief Callback invoked when a remote image download is successfully completed.
+ *
+ * Updates a text label to indicate completion and then hides the label.
+ *
+ * @param data The user data, which is the window Evas_Object.
+ * @param obj The image object that finished downloading.
+ * @param event_info The event-specific information (not used).
+ */
 static void
 _download_done_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -279,6 +393,16 @@ _download_done_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EIN
    evas_object_hide(txt);
 }
 
+/**
+ * @brief Callback invoked when a remote image download fails.
+ *
+ * Updates a text label to indicate that the download has failed and ensures
+ * the label is visible.
+ *
+ * @param data The user data, which is the window Evas_Object.
+ * @param obj The image object that failed to download.
+ * @param event_info The event-specific information (not used).
+ */
 static void
 _download_error_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -294,6 +418,17 @@ _download_error_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EI
    evas_object_show(txt);
 }
 
+/**
+ * @brief Callback for activating the URL entry field.
+ *
+ * This is triggered when the user presses Enter in the URL entry. It takes the
+ * URL from the entry and sets it as the source file for the image, initiating
+ * a download.
+ *
+ * @param data The user data, which is the window Evas_Object.
+ * @param obj The entry object containing the URL.
+ * @param event_info The event-specific information (not used).
+ */
 static void
 _url_activate_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -309,6 +444,17 @@ _url_activate_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    evas_object_show(txt);
 }
 
+/**
+ * @brief Test function for downloading and displaying a remote image.
+ *
+ * Creates a window that allows a user to enter a URL for an image. The image
+ * is then downloaded and displayed. Progress of the download is shown in a
+ * label. Controls for image orientation are also provided.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_remote_image(void *data EINA_UNUSED, Evas_Object *obj  EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -403,12 +549,29 @@ test_remote_image(void *data EINA_UNUSED, Evas_Object *obj  EINA_UNUSED, void *e
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback for when the image is clicked.
+ *
+ * @param data Not used.
+ * @param obj The image object that was clicked.
+ * @param event_info Not used.
+ */
 static void
 _img_clicked_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    fprintf(stderr, "%p - clicked\n", obj);
 }
 
+/**
+ * @brief Test function for image clickability.
+ *
+ * Creates a window with a focusable and clickable image. When the image is
+ * clicked or activated via keyboard, a message is printed to stderr.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_click_image(void *data EINA_UNUSED, Evas_Object *obj  EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -447,11 +610,28 @@ test_click_image(void *data EINA_UNUSED, Evas_Object *obj  EINA_UNUSED, void *ev
    evas_object_show(win);
 }
 
+/**
+ * @def STATUS_SET(obj, fmt)
+ * @brief A macro to set the text of a label and print it to stderr.
+ *
+ * This is a convenience macro used in the async loading test to update a status
+ * label and simultaneously log the status message to the console.
+ *
+ * @param obj The Evas_Object (a label) to set the text on.
+ * @param fmt The string to set as the text.
+ */
 #define STATUS_SET(obj, fmt) do { \
    elm_object_text_set(obj, fmt); \
    fprintf(stderr, "%s\n", fmt); fflush(stderr); \
    } while (0)
 
+/**
+ * @brief Callback for when an async image file open is complete.
+ *
+ * @param data The status label Evas_Object.
+ * @param obj The image object.
+ * @param event_info Not used.
+ */
 static void
 _img_load_open_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -460,6 +640,13 @@ _img_load_open_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EIN
    STATUS_SET(status_text, "Async file open done.");
 }
 
+/**
+ * @brief Callback for when an image's data is loaded and ready for display.
+ *
+ * @param data The status label Evas_Object.
+ * @param obj The image object.
+ * @param event_info Not used.
+ */
 static void
 _img_load_ready_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -468,6 +655,13 @@ _img_load_ready_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EI
    STATUS_SET(status_text, "Image is ready to show.");
 }
 
+/**
+ * @brief Callback for an error during async image loading.
+ *
+ * @param data The status label Evas_Object.
+ * @param obj The image object.
+ * @param event_info Not used.
+ */
 static void
 _img_load_error_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -476,6 +670,13 @@ _img_load_error_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EI
    STATUS_SET(status_text, "Async file load failed.");
 }
 
+/**
+ * @brief Callback for when an async image load is cancelled.
+ *
+ * @param data The status label Evas_Object.
+ * @param obj The image object.
+ * @param event_info Not used.
+ */
 static void
 _img_load_cancel_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -484,6 +685,17 @@ _img_load_cancel_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info E
    STATUS_SET(status_text, "Async file open has been cancelled.");
 }
 
+/**
+ * @brief Helper function to create and configure an image for the load test.
+ *
+ * This function creates an image, sets its async and preload properties,
+ * connects its loading-related smart callbacks, and sets its file.
+ *
+ * @param data The window Evas_Object, used as user data container.
+ * @param async Whether to enable asynchronous opening of the image file.
+ * @param preload Whether to disable preloading of the image data.
+ * @param logo If true, load the small logo; otherwise, load the huge image.
+ */
 static void
 _create_image(Evas_Object *data, Eina_Bool async, Eina_Bool preload, Eina_Bool logo)
 {
@@ -526,6 +738,17 @@ _create_image(Evas_Object *data, Eina_Bool async, Eina_Bool preload, Eina_Bool l
    elm_image_file_set(im, buf, NULL);
 }
 
+/**
+ * @brief Callback to reload the current image.
+ *
+ * This function deletes the existing image and creates a new one with the
+ * same source file but potentially different async/preload settings based on
+ * the state of the checkboxes.
+ *
+ * @param data The window Evas_Object.
+ * @param obj The button that was clicked.
+ * @param event_info Not used.
+ */
 static void
 _reload_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -545,6 +768,17 @@ _reload_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_
    _create_image(win, async, preload, logo);
 }
 
+/**
+ * @brief Callback to switch between the large and small test images.
+ *
+ * This function changes the source file of the image object to toggle between
+ * a huge JPEG and a small PNG, allowing for testing of load times and behavior
+ * with different file sizes. It also applies the current async/preload settings.
+ *
+ * @param data The window Evas_Object.
+ * @param obj The button that was clicked.
+ * @param event_info Not used.
+ */
 static void
 _switch_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -575,6 +809,18 @@ _switch_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_
    elm_image_file_set(im, buf, NULL);
 }
 
+/**
+ * @brief Test function for asynchronous image loading capabilities.
+ *
+ * Creates a window to demonstrate and test asynchronous image loading. It
+ * provides checkboxes to enable/disable async file opening and preloading.
+ * Buttons are provided to reload the image with new settings or to switch
+ * between a very large image and a small one.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_load_image(void *data EINA_UNUSED, Evas_Object *obj  EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -650,6 +896,13 @@ test_load_image(void *data EINA_UNUSED, Evas_Object *obj  EINA_UNUSED, void *eve
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback for radio button changes to adjust image prescale.
+ *
+ * @param data The image Evas_Object whose prescale is to be set.
+ * @param obj The radio button object that changed.
+ * @param event Not used.
+ */
 static void
 _cb_prescale_radio_changed(void *data, Evas_Object *obj, void *event EINA_UNUSED)
 {
@@ -659,6 +912,17 @@ _cb_prescale_radio_changed(void *data, Evas_Object *obj, void *event EINA_UNUSED
    elm_image_prescale_set(o_bg, size);
 }
 
+/**
+ * @brief Test function for image prescaling.
+ *
+ * Creates a window with an image and radio buttons to control the prescale
+ * size. Prescaling downsamples the image when loading it, which can save
+ * memory and improve performance for large images that are displayed small.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_image_prescale(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

@@ -3,16 +3,28 @@
 #endif
 #include <Elementary.h>
 
-
+/**
+ * @brief Structure to hold application data.
+ */
 struct _api_data
 {
-   Evas_Object *win;
-   Elm_Win_Keygrab_Mode mode;  /* Mode of keygr    */
-   char keyname[PATH_MAX];     /* Keyname          */
+   Evas_Object *win;            /**< The main window object */
+   Elm_Win_Keygrab_Mode mode;  /**< Current keygrab mode selected by the user */
+   char keyname[PATH_MAX];     /**< Key name to be grabbed/ungrabbed */
 };
 
 typedef struct _api_data api_data;
 
+/**
+ * @brief Callback function for radio button group changes.
+ *
+ * This function is called when the selected radio button in the keygrab mode
+ * group changes. It updates the keygrab mode in the api_data structure.
+ *
+ * @param data Pointer to the api_data structure.
+ * @param obj The radio object that triggered the event.
+ * @param event_info Not used.
+ */
 static void
 _rdg_changed_cb(void *data EINA_UNUSED, Evas_Object *obj,
                void *event_info EINA_UNUSED)
@@ -52,6 +64,16 @@ _rdg_changed_cb(void *data EINA_UNUSED, Evas_Object *obj,
    api->mode = keygrab_mode;
 }
 
+/**
+ * @brief Callback function for entry field changes.
+ *
+ * This function is called when the text in the keyname entry field changes.
+ * It updates the keyname in the api_data structure.
+ *
+ * @param data Pointer to the api_data structure.
+ * @param obj The entry object that triggered the event.
+ * @param event_info Not used.
+ */
 static void
 _entry_changed_cb(void *data , Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -62,6 +84,17 @@ _entry_changed_cb(void *data , Evas_Object *obj, void *event_info EINA_UNUSED)
    printf("entry: %s\n",str);
 }
 
+/**
+ * @brief Callback function for cleaning up resources.
+ *
+ * This function is called when the main window is freed.
+ * It frees the allocated api_data structure.
+ *
+ * @param data Pointer to the api_data structure.
+ * @param e Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -69,6 +102,17 @@ _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void 
      free(data);
 }
 
+/**
+ * @brief Callback function for the "Keygrab Set" button click.
+ *
+ * This function is called when the "Keygrab Set" button is clicked.
+ * It attempts to set a keygrab on the window using the current keyname and mode
+ * from the api_data structure.
+ *
+ * @param data Pointer to the api_data structure.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _set_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -79,6 +123,16 @@ _set_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_
    printf("Keyname:\"%s\" mode:\"%d\" keygrab set. ret=%d\n", api->keyname, api->mode, ret);
 }
 
+/**
+ * @brief Callback function for the "Keygrab Unset" button click.
+ *
+ * This function is called when the "Keygrab Unset" button is clicked.
+ * It attempts to unset a keygrab on the window for the current keyname.
+ *
+ * @param data Pointer to the api_data structure.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _unset_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -89,6 +143,15 @@ _unset_bt_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EIN
    printf("Keyname:\"%s\" mode:\"%d\" keygrab unset. ret=%d.\n", api->keyname, api->mode, ret);
 }
 
+/**
+ * @brief Creates UI elements for keyname input.
+ *
+ * This function creates a frame containing a label and an entry field
+ * for the user to input the keyname to be grabbed.
+ *
+ * @param bx The parent box widget to pack UI elements into.
+ * @param api Pointer to the api_data structure.
+ */
 static void
 _group_1_create(Evas_Object *bx, api_data *api)
 {
@@ -125,6 +188,15 @@ _group_1_create(Evas_Object *bx, api_data *api)
 
 }
 
+/**
+ * @brief Creates UI elements for selecting keygrab mode.
+ *
+ * This function creates a frame containing a radio button group
+ * for the user to select the desired keygrab mode.
+ *
+ * @param bx The parent box widget to pack UI elements into.
+ * @param api Pointer to the api_data structure.
+ */
 static void
 _group_2_create(Evas_Object *bx, api_data *api)
 {
@@ -186,6 +258,14 @@ _group_2_create(Evas_Object *bx, api_data *api)
    evas_object_smart_callback_add(rd3, "changed", _rdg_changed_cb, api);
 }
 
+/**
+ * @brief Creates UI elements for keygrab actions.
+ *
+ * This function creates a "Keygrab Set" button and a "Keygrab Unset" button.
+ *
+ * @param bx The parent box widget to pack UI elements into.
+ * @param api Pointer to the api_data structure.
+ */
 static void
 _group_3_create(Evas_Object *bx, api_data *api)
 {
@@ -206,6 +286,18 @@ _group_3_create(Evas_Object *bx, api_data *api)
    evas_object_show(bt);
 }
 
+/**
+ * @brief Main function for the keygrab test.
+ *
+ * This function sets up the main window and UI elements for testing
+ * the elm_win_keygrab_set and elm_win_keygrab_unset functionalities.
+ * It creates input fields for the keyname, radio buttons for the grab mode,
+ * and buttons to set or unset the keygrab.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_win_keygrab(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
            void *event_info EINA_UNUSED)

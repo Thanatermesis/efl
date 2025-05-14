@@ -1,3 +1,11 @@
+/**
+ * @file
+ * @brief These routines are bindings to an EFL Evas Object.
+ *
+ * This header defines the C API for the Elm_Route Eo class.
+ * Elm_Route is a widget for displaying routes on a map.
+ */
+
 #ifndef _ELM_ROUTE_EO_H_
 #define _ELM_ROUTE_EO_H_
 

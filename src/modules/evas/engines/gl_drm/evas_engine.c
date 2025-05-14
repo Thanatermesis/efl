@@ -55,22 +55,31 @@
 # define EGL_DMA_BUF_PLANE3_MODIFIER_HI_EXT 0x344A
 #endif
 
+/**
+ * @brief Structure to hold scanout handler and its associated data.
+ * Used for managing callbacks related to native surface scanout status.
+ */
 struct scanout_handle
 {
-   Evas_Native_Scanout_Handler handler;
-   void *data;
+   Evas_Native_Scanout_Handler handler; /**< Callback function for scanout status changes. */
+   void *data; /**< User data for the scanout handler. */
 };
 
 /* external variables */
-int _evas_engine_gl_drm_log_dom = -1;
-int _extn_have_buffer_age = 1;
-int _extn_have_context_priority = 0;
+int _evas_engine_gl_drm_log_dom = -1; // Documented in evas_engine.h
+int _extn_have_buffer_age = 1; // Documented in evas_engine.h
+int _extn_have_context_priority = 0; // Documented in evas_engine.h
 
 /* local variables */
+/** @brief Flag indicating if the Evas GL DRM engine has been initialized. */
 static Eina_Bool initted = EINA_FALSE;
+/** @brief Flag indicating if DMA buffer import extension (EGL_EXT_image_dma_buf_import) is present. */
 static Eina_Bool dmabuf_present = EINA_FALSE;
+/** @brief Counter for the number of active GL windows (Outbuf instances). */
 static int gl_wins = 0;
+/** @brief Pointer to the global GBM device. */
 static struct gbm_device *gbm_dev = NULL;
+/** @brief Reference counter for the global GBM device. */
 static int gbm_dev_refs = 0;
 
 /* local function prototype types */
@@ -115,19 +124,105 @@ unsigned int (*glsym_eglQueryWaylandBufferWL)(EGLDisplay a, void *b, EGLint c, E
 unsigned int (*glsym_eglSetDamageRegionKHR)(EGLDisplay a, EGLSurface b, EGLint *c, EGLint d) = NULL;
 
 /* local function prototypes */
+/**
+ * @brief Checks EGL extensions and disables certain features if necessary.
+ * For example, partial updates might be disabled based on environment variables
+ * or missing extensions.
+ * @param re Pointer to the Render_Engine.
+ */
 static void gl_extn_veto(Render_Engine *re);
 
+/**
+ * @brief EVGL_Interface callback: Gets the EGL display.
+ * @param data Custom data, expected to be a Render_Engine pointer.
+ * @return The EGLDisplay handle or NULL on error.
+ */
 static void *evgl_eng_display_get(void *data);
+
+/**
+ * @brief EVGL_Interface callback: Gets the EGL surface associated with the Evas canvas.
+ * @param data Custom data, expected to be a Render_Engine pointer.
+ * @return The EGLSurface handle or NULL on error.
+ */
 static void *evgl_eng_evas_surface_get(void *data);
+
+/**
+ * @brief EVGL_Interface callback: Makes an EGL context current.
+ * @param data Custom data, expected to be a Render_Engine pointer.
+ * @param surface The EGLSurface to bind to (can be NULL).
+ * @param context The EGLContext to make current (can be NULL).
+ * @param flush If true, flushes pending GL commands for the previous context.
+ * @return 1 on success, 0 on failure.
+ */
 static int evgl_eng_make_current(void *data, void *surface, void *context, int flush);
+
+/**
+ * @brief EVGL_Interface callback: Creates a native window (GBM surface).
+ * @param data Custom data, expected to be a Render_Engine pointer.
+ * @return A handle to the native window (struct gbm_surface *) or NULL on failure.
+ */
 static void *evgl_eng_native_window_create(void *data);
+
+/**
+ * @brief EVGL_Interface callback: Destroys a native window (GBM surface).
+ * @param data Custom data, expected to be a Render_Engine pointer.
+ * @param native_window Handle to the native window to destroy.
+ * @return 1 on success, 0 on failure.
+ */
 static int evgl_eng_native_window_destroy(void *data, void *native_window);
+
+/**
+ * @brief EVGL_Interface callback: Creates an EGL window surface from a native window.
+ * @param data Custom data, expected to be a Render_Engine pointer.
+ * @param native_window Handle to the native window (GBM surface).
+ * @return The EGLSurface handle or EGL_NO_SURFACE on failure.
+ */
 static void *evgl_eng_window_surface_create(void *data, void *native_window);
+
+/**
+ * @brief EVGL_Interface callback: Destroys an EGL window surface.
+ * @param data Custom data, expected to be a Render_Engine pointer.
+ * @param surface The EGLSurface handle to destroy.
+ * @return 1 on success, 0 on failure.
+ */
 static int evgl_eng_window_surface_destroy(void *data, void *surface);
+
+/**
+ * @brief EVGL_Interface callback: Creates a new EGL context.
+ * @param data Custom data, expected to be a Render_Engine pointer.
+ * @param share_ctx An existing EGLContext to share resources with, or NULL.
+ * @param version The GLES version required (currently only GLES 2.0 supported).
+ * @return The EGLContext handle or EGL_NO_CONTEXT on failure.
+ */
 static void *evgl_eng_context_create(void *data, void *share_ctx, Evas_GL_Context_Version version);
+
+/**
+ * @brief EVGL_Interface callback: Destroys an EGL context.
+ * @param data Custom data, expected to be a Render_Engine pointer.
+ * @param context The EGLContext handle to destroy.
+ * @return 1 on success, 0 on failure.
+ */
 static int evgl_eng_context_destroy(void *data, void *context);
+
+/**
+ * @brief EVGL_Interface callback: Gets the EGL extension string.
+ * @param data Custom data, expected to be a Render_Engine pointer.
+ * @return The EGL extension string or NULL on error.
+ */
 static const char *evgl_eng_string_get(void *data);
+
+/**
+ * @brief EVGL_Interface callback: Gets the address of an EGL/GL extension function.
+ * @param name The name of the function.
+ * @return A pointer to the function, or NULL if not found.
+ */
 static void *evgl_eng_proc_address_get(const char *name);
+
+/**
+ * @brief EVGL_Interface callback: Gets the current rotation angle of the Evas surface.
+ * @param data Custom data, expected to be a Render_Engine pointer.
+ * @return The rotation angle in degrees (0, 90, 180, 270).
+ */
 static int evgl_eng_rotation_angle_get(void *data);
 
 /* function tables - filled in later (func and parent func) */
@@ -198,6 +293,11 @@ eng_gbm_shutdown(Evas_Engine_Info_GL_Drm *info)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Dynamically loads symbols from the Evas GL common library.
+ * This function uses dlsym to resolve function pointers at runtime.
+ * It ensures that the GL_Generic engine part of Evas provides these symbols.
+ */
 static void
 symbols(void)
 {
@@ -243,6 +343,13 @@ symbols(void)
    done = EINA_TRUE;
 }
 
+/**
+ * @brief Dynamically loads EGL extension function pointers and checks for specific extensions.
+ * @param edsp The EGLDisplay to use for querying extensions and function pointers.
+ * This function resolves pointers for functions like glEGLImageTargetTexture2DOES,
+ * eglSwapBuffersWithDamage, eglSetDamageRegionKHR, and eglQueryWaylandBufferWL.
+ * It also checks for EGL_IMG_context_priority.
+ */
 void
 eng_egl_symbols(EGLDisplay edsp)
 {
@@ -618,6 +725,13 @@ evgl_eng_rotation_angle_get(void *data)
      }
 }
 
+/**
+ * @brief Makes the EGL context of an Outbuf current or releases it.
+ * This is a helper function used by the preload mechanism.
+ * @param data Pointer to the Outbuf.
+ * @param doit If non-NULL, makes the context current. If NULL, releases the context.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 eng_preload_make_current(void *data, void *doit)
 {
@@ -642,6 +756,11 @@ eng_preload_make_current(void *data, void *doit)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Frees window-related resources for a Render_Engine.
+ * Specifically, it relaxes preload rendering and unsurfaces the output buffer.
+ * @param re Pointer to the Render_Engine.
+ */
 static void
 _re_winfree(Render_Engine *re)
 {
@@ -671,6 +790,24 @@ drm_import_simple_dmabuf(Ecore_Drm2_Device *dev, struct dmabuf_attributes *attri
 }
 
 /* Code from weston's gl-renderer... */
+/**
+ * @brief Imports a DMA buffer as an EGLImage.
+ * This function takes dmabuf attributes (FDs, offsets, strides, format, modifiers)
+ * and creates an EGLImageKHR from them. This EGLImage can then be used as a texture source.
+ * @param display The EGLDisplay.
+ * @param attributes Pointer to a struct dmabuf_attributes containing:
+ *        - width, height: dimensions of the buffer.
+ *        - format: DRM_FORMAT_* fourcc code.
+ *        - fd[4]: array of file descriptors for each plane.
+ *        - stride[4]: array of strides for each plane.
+ *        - offset[4]: array of offsets for each plane.
+ *        - modifier[4]: array of DRM format modifiers for each plane.
+ *        - n_planes: number of planes in the buffer.
+ * @return An EGLImageKHR handle on success, or EGL_NO_IMAGE_KHR on failure.
+ *
+ * @note Requires EGL_EXT_image_dma_buf_import and potentially
+ *       EGL_EXT_image_dma_buf_import_modifiers extensions.
+ */
 static EGLImageKHR
 gl_import_simple_dmabuf(EGLDisplay display, struct dmabuf_attributes *attributes)
 {
@@ -777,6 +914,13 @@ gl_import_simple_dmabuf(EGLDisplay display, struct dmabuf_attributes *attributes
                                               NULL, attribs);
 }
 
+/**
+ * @brief Native surface callback: Binds a native surface to a GL texture.
+ * This function is called when Evas GL needs to use a native surface (e.g., Wayland DMABUF)
+ * as a texture. It handles re-importing DMABUF EGLImages if necessary and
+ * calls glEGLImageTargetTexture2DOES or glBindTexture.
+ * @param image Pointer to the Evas_GL_Image representing the native surface.
+ */
 static void
 _native_cb_bind(void *image)
 {
@@ -819,6 +963,12 @@ _native_cb_bind(void *image)
    /* TODO: NATIVE_SURFACE_TBM and NATIVE_SURFACE_EVASGL */
 }
 
+/**
+ * @brief Native surface callback: Unbinds a native surface.
+ * For DMABUF surfaces, this typically involves destroying the temporary EGLImage
+ * created during the bind operation.
+ * @param image Pointer to the Evas_GL_Image representing the native surface.
+ */
 static void
 _native_cb_unbind(void *image)
 {
@@ -846,6 +996,14 @@ _native_cb_unbind(void *image)
    /* TODO: NATIVE_SURFACE_TBM and NATIVE_SURFACE_EVASGL */
 }
 
+/**
+ * @brief Callback invoked by Ecore_Drm2 when a framebuffer's status changes.
+ * This function translates Ecore_Drm2 framebuffer statuses (like scanout on/off)
+ * into Evas native surface statuses and calls the registered handler.
+ * @param fb The Ecore_Drm2_Fb whose status changed (unused in this function).
+ * @param status The new Ecore_Drm2_Fb_Status.
+ * @param data User data, expected to be a struct scanout_handle.
+ */
 static void
 _eng_fb_release(Ecore_Drm2_Fb *fb EINA_UNUSED, Ecore_Drm2_Fb_Status status, void *data)
 {
@@ -879,6 +1037,17 @@ _eng_fb_release(Ecore_Drm2_Fb *fb EINA_UNUSED, Ecore_Drm2_Fb_Status status, void
      }
 }
 
+/**
+ * @brief Assigns an Evas_GL_Image (specifically a DMABUF native surface) to a DRM plane.
+ * This allows for hardware overlay composition.
+ * @param data Engine data (Render_Engine pointer).
+ * @param image The Evas_GL_Image to assign. Must be a WL_DMABUF native surface.
+ * @param x The X position on the output for the plane.
+ * @param y The Y position on the output for the plane.
+ * @return A handle to the Ecore_Drm2_Plane if successful, otherwise NULL.
+ *         The caller is responsible for releasing this plane handle later using
+ *         eng_image_plane_release or ecore_drm2_plane_release.
+ */
 static void *
 eng_image_plane_assign(void *data, void *image, int x, int y)
 {
@@ -926,6 +1095,12 @@ out:
    return plane;
 }
 
+/**
+ * @brief Releases a DRM plane previously assigned via eng_image_plane_assign.
+ * @param data Engine data (unused).
+ * @param image The Evas_GL_Image associated with the plane (unused).
+ * @param plin The Ecore_Drm2_Plane handle to release.
+ */
 static void
 eng_image_plane_release(void *data EINA_UNUSED, void *image EINA_UNUSED, void *plin)
 {
@@ -934,6 +1109,13 @@ eng_image_plane_release(void *data EINA_UNUSED, void *image EINA_UNUSED, void *p
    ecore_drm2_plane_release(plane);
 }
 
+/**
+ * @brief Native surface callback: Frees resources associated with a native Evas_GL_Image.
+ * This function is called when a native Evas_GL_Image is no longer needed.
+ * It removes the image from internal caches (native_wl_hash, native_tex_hash)
+ * and destroys any associated EGLImages or other resources.
+ * @param image Pointer to the Evas_GL_Image to free.
+ */
  static void
 _native_cb_free(void *image)
 {
@@ -989,6 +1171,13 @@ _native_cb_free(void *image)
 }
 
 /* engine specific override functions */
+/**
+ * @brief Engine function: Sets up initial engine information.
+ * This function is called by Evas core to allow the engine to provide
+ * default settings or capabilities. For GL_DRM, it sets the default
+ * render mode to EVAS_RENDER_MODE_BLOCKING.
+ * @param info Pointer to Evas_Engine_Info_GL_Drm structure to be filled.
+ */
 static void
 eng_output_info_setup(void *info)
 {
@@ -997,6 +1186,16 @@ eng_output_info_setup(void *info)
    einfo->render_mode = EVAS_RENDER_MODE_BLOCKING;
 }
 
+/**
+ * @brief Engine function: Sets up an output (e.g., a window or screen).
+ * This function initializes the rendering context, GBM, EGL, and creates
+ * an Outbuf structure for the given dimensions.
+ * @param engine Generic engine pointer from Evas core.
+ * @param in Pointer to Evas_Engine_Info_GL_Drm containing setup parameters.
+ * @param w Width of the output.
+ * @param h Height of the output.
+ * @return A pointer to the engine-specific output data (Render_Engine *), or NULL on failure.
+ */
 static void *
 eng_output_setup(void *engine, void *in, unsigned int w, unsigned int h)
 {
@@ -1073,6 +1272,17 @@ eng_output_setup(void *engine, void *in, unsigned int w, unsigned int h)
    return re;
 }
 
+/**
+ * @brief Engine function: Updates an existing output's configuration.
+ * This is called when an output is resized, or its properties (like depth or rotation) change.
+ * It reconfigures the Outbuf and underlying EGL/GBM resources.
+ * @param engine Generic engine pointer from Evas core (unused).
+ * @param data Pointer to the engine-specific output data (Render_Engine *).
+ * @param in Pointer to Evas_Engine_Info_GL_Drm containing new parameters.
+ * @param w New width of the output.
+ * @param h New height of the output.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 eng_output_update(void *engine EINA_UNUSED, void *data, void *in, unsigned int w, unsigned int h)
 {
@@ -1125,6 +1335,12 @@ eng_output_update(void *engine EINA_UNUSED, void *data, void *in, unsigned int w
    return 1;
 }
 
+/**
+ * @brief Engine function: Frees an output and its associated resources.
+ * This cleans up the Render_Engine, Outbuf, EGL context, GBM surface, etc.
+ * @param engine Generic engine pointer from Evas core.
+ * @param data Pointer to the engine-specific output data (Render_Engine *) to free.
+ */
 static void
 eng_output_free(void *engine, void *data)
 {
@@ -1156,6 +1372,11 @@ eng_output_free(void *engine, void *data)
      }
 }
 
+/**
+ * @brief Engine function: Gets whether the canvas supports an alpha channel.
+ * @param data Pointer to the engine-specific output data (Render_Engine *).
+ * @return EINA_TRUE if destination alpha is enabled for the output, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 eng_canvas_alpha_get(void *data)
 {
@@ -1167,6 +1388,13 @@ eng_canvas_alpha_get(void *data)
    return eng_get_ob(re)->destination_alpha;
 }
 
+/**
+ * @brief Engine function: Dumps caches and frees some resources.
+ * This is typically called when the application is idle or memory is low.
+ * It unloads images, fonts, and frees the window surface.
+ * @param engine Generic engine pointer from Evas core (Render_Engine_GL_Generic *).
+ * @param data Pointer to the engine-specific output data (Render_Engine *).
+ */
 static void
 eng_output_dump(void *engine, void *data)
 {
@@ -1182,6 +1410,13 @@ eng_output_dump(void *engine, void *data)
    _re_winfree(re);
 }
 
+/**
+ * @brief Engine function: Initializes support for a specific native surface type.
+ * @param engine Generic engine pointer from Evas core (unused).
+ * @param type The Evas_Native_Surface_Type to initialize.
+ *             Supported types: EVAS_NATIVE_SURFACE_OPENGL, EVAS_NATIVE_SURFACE_WL (includes DMABUF).
+ * @return 1 if the type is supported, 0 otherwise.
+ */
 static int
 eng_image_native_init(void *engine EINA_UNUSED, Evas_Native_Surface_Type type)
 {
@@ -1196,6 +1431,11 @@ eng_image_native_init(void *engine EINA_UNUSED, Evas_Native_Surface_Type type)
      }
 }
 
+/**
+ * @brief Engine function: Shuts down support for a specific native surface type.
+ * @param engine Generic engine pointer from Evas core (unused).
+ * @param type The Evas_Native_Surface_Type to shut down.
+ */
 static void
 eng_image_native_shutdown(void *engine EINA_UNUSED, Evas_Native_Surface_Type type)
 {
@@ -1210,6 +1450,43 @@ eng_image_native_shutdown(void *engine EINA_UNUSED, Evas_Native_Surface_Type typ
      }
 }
 
+/**
+ * @brief Engine function: Sets or updates a native surface for an Evas image.
+ * This function associates an Evas_GL_Image with a native surface resource
+ * (e.g., an OpenGL texture ID, a Wayland DMABUF, or a Wayland legacy buffer).
+ * It handles caching and reuse of Evas_GL_Images for the same native resource.
+ * @param engine Generic engine pointer from Evas core (used to get an Outbuf).
+ * @param image An existing Evas_GL_Image to update, or NULL to create a new one.
+ * @param native Pointer to an Evas_Native_Surface structure describing the native resource.
+ *               If NULL, and `image` is provided, the native association is removed.
+ * @return A pointer to the Evas_GL_Image now associated with the native surface,
+ *         or NULL on failure or if the native surface was removed.
+ *
+ * @details Evas_Native_Surface structure example for EVAS_NATIVE_SURFACE_WL_DMABUF:
+ *   Evas_Native_Surface ns;
+ *   ns.type = EVAS_NATIVE_SURFACE_WL_DMABUF;
+ *   ns.version = EVAS_NATIVE_SURFACE_VERSION;
+ *   ns.data.wl_dmabuf.resource = (void*)wl_buffer_resource; // Optional Wayland resource
+ *   ns.data.wl_dmabuf.attr = &dmabuf_attributes; // struct dmabuf_attributes*
+ *   // dmabuf_attributes members:
+ *   //   int version; // EVAS_DMABUF_ATTRIBUTE_VERSION
+ *   //   int width, height;
+ *   //   int format; // DRM_FORMAT_*
+ *   //   int n_planes;
+ *   //   int fd[4];
+ *   //   int stride[4];
+ *   //   int offset[4];
+ *   //   uint64_t modifier[4]; // DRM_FORMAT_MOD_*
+ *
+ * @details Evas_Native_Surface structure example for EVAS_NATIVE_SURFACE_OPENGL:
+ *   Evas_Native_Surface ns;
+ *   ns.type = EVAS_NATIVE_SURFACE_OPENGL;
+ *   ns.version = EVAS_NATIVE_SURFACE_VERSION;
+ *   ns.data.opengl.texture_id = (GLuint)texture_id;
+ *   ns.data.opengl.framebuffer_id = (GLuint)fbo_id; // Optional
+ *   ns.data.opengl.w = width;
+ *   ns.data.opengl.h = height;
+ */
 static void *
 eng_image_native_set(void *engine, void *image, void *native)
 {
@@ -1513,6 +1790,15 @@ eng_image_native_set(void *engine, void *image, void *native)
 }
 
 /* module api functions */
+/**
+ * @brief Evas module API: Opens and initializes the engine module.
+ * This function is called by Evas when loading the engine. It inherits
+ * functions from the "gl_generic" engine, sets up logging, overrides
+ * necessary engine functions with GL_DRM specific implementations,
+ * and loads required symbols.
+ * @param em Pointer to the Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -1567,6 +1853,12 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Evas module API: Closes and cleans up the engine module.
+ * This function is called by Evas when unloading the engine.
+ * It unregisters the logging domain and performs Ecore shutdown.
+ * @param em Pointer to the Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

@@ -4,6 +4,9 @@
 #ifndef _ELM_BUBBLE_EO_CLASS_TYPE
 #define _ELM_BUBBLE_EO_CLASS_TYPE
 
+/** @brief Represents an Elm_Bubble widget.
+ * @ingroup Elm_Bubble
+ */
 typedef Eo Elm_Bubble;
 
 #endif
@@ -34,12 +37,24 @@ typedef enum
 
 
 #endif
-/** Speech bubble widget used in messaging applications
+/**
+ * @brief Speech bubble widget used in messaging applications.
+ *
+ * This macro provides a convenient way to get the Efl_Class for Elm_Bubble.
  *
  * @ingroup Elm_Bubble
  */
 #define ELM_BUBBLE_CLASS elm_bubble_class_get()
 
+/**
+ * @brief Get the Efl_Class for the Elm_Bubble widget.
+ *
+ * This function returns the Efl_Class object associated with the Elm_Bubble widget,
+ * which can be used for object instantiation and type checking.
+ *
+ * @return The Efl_Class for Elm_Bubble.
+ * @ingroup Elm_Bubble
+ */
 EWAPI const Efl_Class *elm_bubble_class_get(void) EINA_CONST;
 
 /**

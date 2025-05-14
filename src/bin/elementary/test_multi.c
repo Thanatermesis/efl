@@ -7,6 +7,18 @@
 
 static Evas_Object *indicator[IND_NUM];
 
+/**
+ * @brief Callback for mouse down events.
+ *
+ * This function handles mouse down events on the main window's event
+ * rectangle. It is used to demonstrate single-touch or mouse input.
+ * It shows and positions the first indicator at the event coordinates.
+ *
+ * @param data Unused user data.
+ * @param e The Evas canvas.
+ * @param o The Evas object that triggered the event.
+ * @param event_info The event-specific information.
+ */
 static void
 _mouse_down(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *o EINA_UNUSED, void *event_info)
 {
@@ -19,6 +31,17 @@ _mouse_down(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *o EINA_UNU
    evas_object_show(indicator[0]);
 }
 
+/**
+ * @brief Callback for mouse up events.
+ *
+ * This function handles mouse up events, hiding the primary indicator
+ * used for single-touch or mouse input.
+ *
+ * @param data Unused user data.
+ * @param e The Evas canvas.
+ * @param o The Evas object that triggered the event.
+ * @param event_info The event-specific information.
+ */
 static void
 _mouse_up(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *o EINA_UNUSED, void *event_info)
 {
@@ -28,6 +51,17 @@ _mouse_up(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *o EINA_UNUSE
    evas_object_hide(indicator[0]);
 }
 
+/**
+ * @brief Callback for mouse move events.
+ *
+ * This function handles mouse move events, repositioning the primary
+ * indicator to follow the cursor's movement.
+ *
+ * @param data Unused user data.
+ * @param e The Evas canvas.
+ * @param o The Evas object that triggered the event.
+ * @param event_info The event-specific information.
+ */
 static void
 _mouse_move(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *o EINA_UNUSED, void *event_info)
 {
@@ -37,6 +71,22 @@ _mouse_move(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *o EINA_UNU
    evas_object_resize(indicator[0], 1, 1);
 }
 
+/**
+ * @brief Callback for multi-touch down events.
+ *
+ * This function handles the start of a new touch point in a multi-touch
+ * sequence. It uses the device ID from the event to select a unique
+ * indicator from the `indicator` array, which it then shows and positions
+ * at the touch coordinates. The `indicator` array is a static global array
+ * of Evas_Object pointers, with `IND_NUM` elements.
+ * For example, `indicator[0]` for device 0, `indicator[1]` for device 1, etc.
+ *
+ * @param data Unused user data.
+ * @param e The Evas canvas.
+ * @param o The Evas object that triggered the event.
+ * @param event_info The event-specific information, containing details
+ *                   like coordinates and device ID.
+ */
 static void
 _multi_down(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *o EINA_UNUSED, void *event_info)
 {
@@ -48,6 +98,17 @@ _multi_down(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *o EINA_UNU
    evas_object_show(indicator[ev->device]);
 }
 
+/**
+ * @brief Callback for multi-touch up events.
+ *
+ * This function handles the end of a touch point (finger lifted). It uses
+ * the device ID to identify the correct indicator and hides it.
+ *
+ * @param data Unused user data.
+ * @param e The Evas canvas.
+ * @param o The Evas object that triggered the event.
+ * @param event_info The event-specific information, containing the device ID.
+ */
 static void
 _multi_up(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *o EINA_UNUSED, void *event_info)
 {
@@ -57,6 +118,18 @@ _multi_up(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *o EINA_UNUSE
    evas_object_hide(indicator[ev->device]);
 }
 
+/**
+ * @brief Callback for multi-touch move events.
+ *
+ * This function tracks the movement of an active touch point. It uses the
+ * device ID to update the position of the corresponding indicator.
+ *
+ * @param data Unused user data.
+ * @param e The Evas canvas.
+ * @param o The Evas object that triggered the event.
+ * @param event_info The event-specific information, containing coordinates
+ *                   and device ID.
+ */
 static void
 _multi_move(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *o EINA_UNUSED, void *event_info)
 {
@@ -68,6 +141,16 @@ _multi_move(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *o EINA_UNU
    evas_object_resize(indicator[ev->device], 1, 1);
 }
 
+/**
+ * @brief Rotates the main window by 90 degrees.
+ *
+ * This is a callback function for a button's "clicked" event. Each click
+ * rotates the window by an additional 90 degrees clockwise.
+ *
+ * @param data The main window Evas_Object.
+ * @param obj The button object that was clicked.
+ * @param event_info Unused event information.
+ */
 void
 my_bt_rot(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -75,6 +158,19 @@ my_bt_rot(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED
    elm_win_rotation_set(win, elm_win_rotation_get(win) + 90);
 }
 
+/**
+ * @brief Sets up and runs the multi-touch test window.
+ *
+ * This function creates the main window, a background, and a transparent
+ * rectangle on top to capture all mouse and touch events. It initializes
+ * an array of visual indicators for touch points and registers the
+ * necessary event callbacks for single and multi-touch input. It also
+ * adds a button to rotate the window.
+ *
+ * @param data Unused user data.
+ * @param obj Unused object.
+ * @param event_info Unused event information.
+ */
 void
 test_multi(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

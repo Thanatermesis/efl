@@ -42,27 +42,52 @@
 #define ABORT_COLOR 255, 0, 0, 255
 #define END_COLOR 0, 255, 0, 255
 
+/**
+ * @brief Holds properties for a gesture icon.
+ *
+ * This struct maintains the state of an icon that visually represents a gesture,
+ * including its Evas object, current color, and associated gesture name.
+ */
 struct _icon_properties
 {
-   Evas_Object *icon;
-   int r; /* current r */
-   int g;
-   int b;
-   int a;
+   Evas_Object *icon; /**< The Evas icon object. */
+   int r; /**< Current red color component. */
+   int g; /**< Current green color component. */
+   int b; /**< Current blue color component. */
+   int a; /**< Current alpha component. */
 
-   const char *name;
+   const char *name; /**< The name of the gesture (e.g., "tap"). */
 };
 typedef struct _icon_properties icon_properties;
 
+/**
+ * @brief Application context data.
+ *
+ * This struct holds data passed between callbacks, serving as a replacement
+ * for global variables. It contains all the necessary state for the
+ * gesture test application.
+ */
 struct _infra_data
 {  /* Some data that is passed aroung between callbacks (replacing globals) */
+   /**
+    * @brief Array of icon properties for each gesture type.
+    * Example:
+    * @code
+    * icons[0] = { .name = "tap", .icon = tap_icon_obj, ... };
+    * icons[1] = { .name = "double_tap", .icon = double_tap_icon_obj, ... };
+    * @endcode
+    */
    icon_properties *icons;
-   Ecore_Timer *colortimer;
-   char buf[1024];
-   int long_press_count;
+   Ecore_Timer *colortimer; /**< Timer for animating icon colors back to their initial state. */
+   char buf[1024]; /**< General purpose buffer, primarily for building image file paths. */
+   int long_press_count; /**< Counter for long press gestures (currently unused). */
 };
 typedef struct _infra_data infra_data;
 
+/**
+ * @brief Frees the application context data.
+ * @param infra The application context data to free.
+ */
 static void
 _infra_data_free(infra_data *infra)
 {
@@ -78,6 +103,10 @@ _infra_data_free(infra_data *infra)
      }
 }
 
+/**
+ * @brief Allocates and initializes the application context data.
+ * @return A new instance of infra_data, or NULL on failure.
+ */
 static infra_data *
 _infra_data_alloc(void)
 {
@@ -90,12 +119,27 @@ _infra_data_alloc(void)
    return infra;
 }
 
+/**
+ * @brief Callback function for the window's "delete,request" event.
+ *
+ * This function is called when the main window is requested to be deleted.
+ * It ensures that the application data is freed.
+ * @param data The application context data (infra_data).
+ * @param obj The window object.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 my_win_del(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {  /* called when my_win_main is requested to be deleted */
    _infra_data_free(data);
 }
 
+/**
+ * @brief Finds an icon_properties struct by its gesture name.
+ * @param icons An array of icon_properties.
+ * @param name The gesture name to search for (e.g., "tap").
+ * @return A pointer to the matching icon_properties struct, or NULL if not found.
+ */
 static icon_properties *
 _icon_properties_find(icon_properties *icons, char *name)
 {
@@ -108,6 +152,14 @@ _icon_properties_find(icon_properties *icons, char *name)
    return NULL;
 }
 
+/**
+ * @brief Sets the color of a gesture icon.
+ * @param i The icon properties struct to modify.
+ * @param r Red component (0-255).
+ * @param g Green component (0-255).
+ * @param b Blue component (0-255).
+ * @param a Alpha component (0-255).
+ */
 static void
 _icon_color_set(icon_properties *i, int r, int g, int b, int a)
 {
@@ -118,6 +170,17 @@ _icon_color_set(icon_properties *i, int r, int g, int b, int a)
    evas_object_color_set(i->icon, i->r,  i->g,  i->b,  i->a);
 }
 
+/**
+ * @brief Timer callback to animate icon colors back to their initial state.
+ *
+ * This function is called repeatedly by an Ecore_Timer. It gradually
+ * changes the color of each icon back to its initial RGBA values (INI_R,
+ * INI_G, INI_B, INI_A). This creates a fade-out effect for the gesture
+ * state colors (START, UPDATE, END, ABORT).
+ *
+ * @param data A pointer to the array of icon_properties.
+ * @return ECORE_CALLBACK_RENEW to continue the timer, or ECORE_CALLBACK_CANCEL to stop.
+ */
 static Eina_Bool
 _icon_color_set_cb(void *data)
 {
@@ -149,6 +212,22 @@ _icon_color_set_cb(void *data)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Sets the image and color for a specific gesture icon.
+ *
+ * This function finds a gesture icon by its name and updates its visual state.
+ * It sets the icon's image based on a sequence number and applies a specific color
+ * to indicate the gesture state (e.g., start, end).
+ *
+ * @param infra The application context data.
+ * @param name The name of the gesture to update (e.g., "tap").
+ * @param n The sequence number for the icon image (e.g., 1 for tap_1.png).
+ * @param max The maximum sequence number for the icon image.
+ * @param r Red color component.
+ * @param g Green color component.
+ * @param b Blue color component.
+ * @param a Alpha color component.
+ */
 static void
 _color_and_icon_set(infra_data *infra, char *name, int n, int max,
       int r, int g, int b, int a)
@@ -172,6 +251,15 @@ _color_and_icon_set(infra_data *infra, char *name, int n, int max,
 }
 
 /* START - Callbacks for gestures */
+/**
+ * @brief Handles the start of a tap gesture.
+ *
+ * Called when a tap gesture is recognized. It updates the tap icon to show
+ * the "start" state and prints gesture details to stdout.
+ *
+ * @param data The application context data (infra_data).
+ * @param tap The gesture object containing event details.
+ */
 static void
 finger_tap_start(void *data , Efl_Canvas_Gesture *tap)
 {
@@ -181,6 +269,15 @@ finger_tap_start(void *data , Efl_Canvas_Gesture *tap)
    printf("Tap Gesture started x,y=<%d,%d> \n", pos.x, pos.y);
 }
 
+/**
+ * @brief Handles the end of a tap gesture.
+ *
+ * Called when a tap gesture successfully completes. It updates the tap icon
+ * to show the "end" state and prints gesture details to stdout.
+ *
+ * @param data The application context data (infra_data).
+ * @param tap The gesture object containing event details.
+ */
 static void
 finger_tap_end(void *data , Efl_Canvas_Gesture *tap)
 {
@@ -190,6 +287,15 @@ finger_tap_end(void *data , Efl_Canvas_Gesture *tap)
    printf("Tap Gesture ended x,y=<%d,%d> \n", pos.x, pos.y);
 }
 
+/**
+ * @brief Handles the abortion of a tap gesture.
+ *
+ * Called when a tap gesture is canceled. It updates the tap icon to show
+ * the "abort" state.
+ *
+ * @param data The application context data (infra_data).
+ * @param tap The gesture object (unused).
+ */
 static void
 finger_tap_abort(void *data , Efl_Canvas_Gesture *tap EINA_UNUSED)
 {
@@ -287,6 +393,15 @@ finger_momentum_start(void *data , Efl_Canvas_Gesture *tap)
    printf("Momentum Gesture started x,y=<%d,%d> time=<%d>\n", pos.x, pos.y, t);
 }
 
+/**
+ * @brief Handles the update of a momentum gesture.
+ *
+ * Called during a momentum gesture. It updates the momentum icon to show
+ * the "update" state and prints gesture details to stdout.
+ *
+ * @param data The application context data (infra_data).
+ * @param tap The gesture object containing event details.
+ */
 static void
 finger_momentum_update(void *data , Efl_Canvas_Gesture *tap EINA_UNUSED)
 {
@@ -418,6 +533,16 @@ finger_long_press_abort(void *data , Efl_Canvas_Gesture *tap EINA_UNUSED)
    printf("Long Tap Aborted\n");
 }
 
+/**
+ * @brief Dispatches tap gesture events to the appropriate handler.
+ *
+ * This callback is triggered for all state changes of a tap gesture.
+ * It uses a switch statement on the gesture state to call the corresponding
+ * function (e.g., finger_tap_start, finger_tap_end).
+ *
+ * @param data The application context data (infra_data).
+ * @param ev The EFL event object, where ev->info is the Efl_Canvas_Gesture.
+ */
 static void
 tap_gesture_cb(void *data , const Efl_Event *ev)
 {
@@ -498,6 +623,16 @@ zoom_gesture_cb(void *data , const Efl_Event *ev)
    }
 }
 
+/**
+ * @brief Dispatches momentum gesture events to the appropriate handler.
+ *
+ * This callback is triggered for all state changes of a momentum gesture.
+ * It uses a switch statement on the gesture state to call the corresponding
+ * function (e.g., finger_momentum_start, finger_momentum_update).
+ *
+ * @param data The application context data (infra_data).
+ * @param ev The EFL event object, where ev->info is the Efl_Canvas_Gesture.
+ */
 static void
 momentum_gesture_cb(void *data , const Efl_Event *ev)
 {
@@ -592,6 +727,20 @@ long_press_gesture_cb(void *data , const Efl_Event *ev)
 
 /* END   - Callbacks for gestures */
 
+/**
+ * @brief Creates a UI box containing a gesture icon and a label.
+ *
+ * This helper function constructs a vertical box with an icon representing a
+ * gesture and a label with its name. It initializes the icon's properties
+ * within the provided `icons` array.
+ *
+ * @param win The parent window.
+ * @param icons The array of icon_properties where the new icon's data will be stored.
+ * @param idx The index in the `icons` array to use.
+ * @param name The name of the gesture (e.g., "tap"), used for finding image files.
+ * @param lb_txt The text to display in the label below the icon.
+ * @return The newly created Evas_Object (an elm_box).
+ */
 static Evas_Object *
 create_gesture_box(Evas_Object *win, icon_properties *icons,
                    int idx, const char *name, const char *lb_txt)
@@ -622,6 +771,17 @@ create_gesture_box(Evas_Object *win, icon_properties *icons,
    return bx;
 }
 
+/**
+ * @brief Callback for window resize events.
+ *
+ * This function is called when the main window is resized. It resizes the
+ * transparent gesture target object to match the new window dimensions.
+ *
+ * @param data The target Evas_Object to resize.
+ * @param e The Evas canvas (unused).
+ * @param obj The object that triggered the event (the window).
+ * @param event_info Event-specific information (unused).
+ */
 void
 _tb_resize(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -633,6 +793,22 @@ _tb_resize(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info E
    evas_object_show(data);
 }
 
+/**
+ * @brief Main function for the gesture framework test.
+ *
+ * This function sets up the entire UI for the gesture test application. It:
+ * - Creates the main window.
+ * - Allocates the application data structure.
+ * - Builds a table of gesture icons and a legend for gesture states.
+ * - Creates a transparent rectangle (`target`) overlaid on the UI to capture
+ *   all gesture events.
+ * - Registers callbacks for all supported gesture types on the `target` object.
+ * - Starts a timer to animate icon colors.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_gesture_framework(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
       void *event_info EINA_UNUSED)

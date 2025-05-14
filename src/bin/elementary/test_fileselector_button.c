@@ -9,21 +9,40 @@
 
 #include <Elementary.h>
 
+/**
+ * @brief Test-specific data structure to hold UI state and widgets.
+ */
 struct _api_data
 {
-   unsigned int state;  /* What state we are testing       */
-   Evas_Object *box;    /* Additional data defined by test */
-   Eina_Bool free_data; /* free data on close              */
+   unsigned int state;  /**< Current state of the API test sequence. */
+   Evas_Object *box;    /**< A box widget used as a container for other UI elements. */
+   Eina_Bool free_data; /**< Flag to indicate whether this struct should be freed on cleanup. */
 };
 typedef struct _api_data api_data;
+
+/**
+ * @brief States for the API test cycle.
+ *
+ * Each state corresponds to a specific API function call on the
+ * fileselector button widget.
+ */
 enum _api_state
 {
-   ICON_UNSET,
-   WINDOW_TITLE_SET,
-   API_STATE_LAST
+   ICON_UNSET, /**< Unset the icon of the fileselector button. */
+   WINDOW_TITLE_SET, /**< Set a custom window title for the fileselector. */
+   API_STATE_LAST /**< Marker for the end of the test sequence. */
 };
 typedef enum _api_state api_state;
 
+/**
+ * @brief Applies an API function to the fileselector button based on the
+ *        current test state.
+ * @param api The test data structure, containing the current state.
+ *
+ * This function retrieves the fileselector button from the UI and modifies
+ * one of its properties according to the `api->state` value. It is called
+ * to cycle through different API function tests.
+ */
 static void
 set_api_state(api_data *api)
 {
@@ -53,6 +72,16 @@ set_api_state(api_data *api)
      }
 }
 
+/**
+ * @brief Callback for the "Next API function" button.
+ * @param data The api_data struct.
+ * @param obj The button object that was clicked.
+ * @param event_info Not used.
+ *
+ * This function advances the API test to the next state, calls set_api_state()
+ * to apply the change, and updates the button's text to reflect the next
+ * state. It disables the button when the last state is reached.
+ */
 static void
 _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {  /* Will add here a SWITCH command containing code to modify test-object */
@@ -68,6 +97,13 @@ _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_disabled_set(obj, a->state == API_STATE_LAST);
 }
 
+/**
+ * @brief Creates a temporary directory structure for testing.
+ *
+ * This function sets up a directory `/tmp/test_fs_bt` containing a few
+ * files and a subdirectory. This provides a consistent environment for
+ * testing the fileselector button.
+ */
 static void
 _create_dir_struct(void)
 {
@@ -89,6 +125,16 @@ _create_dir_struct(void)
    if (fp) fclose(fp);
 }
 
+/**
+ * @brief Callback for the "file,chosen" event from the fileselector button.
+ * @param data The entry widget to display the selected path.
+ * @param obj The fileselector button that emitted the event.
+ * @param event_info A string containing the full path to the chosen file.
+ *
+ * This function is called when a user selects a file from the fileselector.
+ * It updates an entry widget to show the path of the selected file. If no
+ * file is selected (e.g., the user cancels), `event_info` will be NULL.
+ */
 static void
 _file_chosen(void            *data,
              Evas_Object *obj EINA_UNUSED,
@@ -105,6 +151,16 @@ _file_chosen(void            *data,
      printf("File selection canceled.\n");
 }
 
+/**
+ * @brief Toggles the "in-window" mode of the fileselector button.
+ * @param data The fileselector button widget.
+ * @param obj The checkbox that triggered the callback.
+ * @param event_info Not used.
+ *
+ * "In-window" mode means the fileselector opens within the current window's
+ * space rather than as a separate new window. This callback inverts the
+ * current setting.
+ */
 static void
 _inwin_mode_toggle(void            *data,
                    Evas_Object *obj EINA_UNUSED,
@@ -116,6 +172,16 @@ _inwin_mode_toggle(void            *data,
    printf("Inwin mode set to: %s\n", value ? "false" : "true");
 }
 
+/**
+ * @brief Toggles the "is-save" property of the fileselector.
+ * @param data The fileselector button widget.
+ * @param obj The checkbox that triggered the callback.
+ * @param event_info Not used.
+ *
+ * When set, the fileselector is in "save" mode, which typically provides
+ * an editable text entry for the filename. This callback toggles that state
+ * based on a checkbox.
+ */
 static void
 _current_sel_toggle(void            *data,
                     Evas_Object *obj,
@@ -128,6 +194,15 @@ _current_sel_toggle(void            *data,
           value ? "true" : "false");
 }
 
+/**
+ * @brief Toggles the "folder-only" mode of the fileselector.
+ * @param data The fileselector button widget.
+ * @param obj The checkbox that triggered the callback.
+ * @param event_info Not used.
+ *
+ * In "folder-only" mode, the fileselector will only allow selecting directories,
+ * not files. This callback toggles that mode.
+ */
 static void
 _folder_only_toggle(void            *data,
                     Evas_Object *obj,
@@ -139,6 +214,15 @@ _folder_only_toggle(void            *data,
    printf("Folder only flag set to: %s\n", value ? "true" : "false");
 }
 
+/**
+ * @brief Toggles the "expandable" mode of the fileselector.
+ * @param data The fileselector button widget.
+ * @param obj The checkbox that triggered the callback.
+ * @param event_info Not used.
+ *
+ * In "expandable" mode, the directory view can be expanded or collapsed.
+ * This callback toggles that mode.
+ */
 static void
 _expandable_toggle(void            *data,
                    Evas_Object *obj,
@@ -150,12 +234,32 @@ _expandable_toggle(void            *data,
    printf("Expandable flag set to: %s\n", value ? "true" : "false");
 }
 
+/**
+ * @brief Frees test-specific data on window close.
+ * @param data The api_data struct to be freed.
+ * @param e Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This is a callback for the EVAS_CALLBACK_FREE event on the main window,
+ * ensuring that the allocated api_data structure is released.
+ */
 static void
 _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Main function for the fileselector button test.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This function creates a window and populates it with a fileselector button
+ * and various controls (buttons, checkboxes) to test its functionality and
+ * API. It sets up the initial state and connects all the callbacks.
+ */
 void
 test_fileselector_button(void *data       EINA_UNUSED,
                          Evas_Object *obj EINA_UNUSED,

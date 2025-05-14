@@ -30,39 +30,85 @@
 
 typedef struct _Efl_Io_Manager_Data Efl_Io_Manager_Data;
 
+/**
+ * @brief Private data structure for the Efl_Io_Manager class.
+ *
+ * This structure holds the instance-specific data for an Efl_Io_Manager object,
+ * including a pointer to the Eo object itself and a list of pending I/O operations.
+ */
 struct _Efl_Io_Manager_Data
 {
-   Eo *object;
-   Eina_List *operations;
+   Eo *object; /**< The Eo object this data belongs to. */
+   Eina_List *operations; /**< A list of currently active Eio_File operations. */
 };
 
+/**
+ * @brief Function pointer type for direct listing operations.
+ *
+ * This defines the signature for functions that perform direct (non-recursive)
+ * directory listing or file information retrieval.
+ *
+ * @param path The file system path to list or inspect.
+ * @param Eio_Filter_Direct_Cb Filter callback for each entry found.
+ * @param Eio_Main_Direct_Cb Main callback to process entries in the main loop.
+ * @param Eio_Done_Cb Callback invoked when the operation is complete.
+ * @param Eio_Error_Cb Callback invoked if an error occurs.
+ * @param data User-provided data for the callbacks.
+ * @return An Eio_File handle representing the asynchronous operation.
+ */
 typedef Eio_File* (*Efl_Io_Manager_Direct_Ls_Func)(const char *path, Eio_Filter_Direct_Cb, Eio_Main_Direct_Cb, Eio_Done_Cb, Eio_Error_Cb, const void *data);
 
 typedef struct _Job_Closure Job_Closure;
+/**
+ * @brief Structure to hold data for a job closure.
+ *
+ * This is likely used to pass context information to asynchronous operations
+ * or their callbacks.
+ */
 struct _Job_Closure
 {
-   Eo *object;
-   Efl_Io_Manager_Data *pdata;
-   Eio_File *file;
-   Eina_Bool delete_me;
-   void *delayed_arg;
-   Efl_Io_Manager_Direct_Ls_Func direct_func;  // Used when dispatching direct ls funcs.
+   Eo *object; /**< The associated Eo object. */
+   Efl_Io_Manager_Data *pdata; /**< Pointer to the manager's private data. */
+   Eio_File *file; /**< The Eio_File handle for the operation. */
+   Eina_Bool delete_me; /**< Flag indicating if this closure should be deleted. */
+   void *delayed_arg; /**< Argument for a delayed operation. */
+   Efl_Io_Manager_Direct_Ls_Func direct_func;  /**< Used when dispatching direct ls funcs. */
 };
 
 /* Future have to be resolved right away in the thread context */
 typedef struct _Eio_Future_Entry Eio_Future_Entry;
+/**
+ * @brief Represents an entry for an Eina_Future scheduled by EIO.
+ *
+ * This structure holds the necessary information to execute a callback
+ * associated with an Eina_Future when its value is ready. It's managed
+ * by a custom scheduler (`eio_future_scheduler`).
+ */
 struct _Eio_Future_Entry
 {
-   Eina_Future_Schedule_Entry base;
-   Eina_Future_Scheduler_Cb cb;
-   Eina_Future *future;
-   Eina_Value value;
+   Eina_Future_Schedule_Entry base; /**< Base structure for Eina_Future_Scheduler. */
+   Eina_Future_Scheduler_Cb cb;    /**< The callback to execute. */
+   Eina_Future *future;            /**< The Eina_Future this entry is for. */
+   Eina_Value value;               /**< The value to pass to the callback. */
 };
 
-static Eina_Trash *eio_entry_trash = NULL;
-static unsigned int eio_entry_trash_count = 0;
-static Eina_List *entries = NULL;
+static Eina_Trash *eio_entry_trash = NULL; /**< A trash stack for recycling Eio_Future_Entry allocations. */
+static unsigned int eio_entry_trash_count = 0; /**< Count of items currently in eio_entry_trash. */
+static Eina_List *entries = NULL; /**< List of pending Eio_Future_Entry items to be processed. */
 
+/**
+ * @brief Schedules a callback for an Eina_Future using the EIO custom scheduler.
+ *
+ * This function is part of the Eina_Future_Scheduler interface. It creates
+ * or reuses an Eio_Future_Entry and adds it to a list of pending entries
+ * to be processed later in the main loop context.
+ *
+ * @param sched The scheduler invoking this function.
+ * @param cb The callback function to be executed.
+ * @param future The future associated with this schedule request.
+ * @param value The value to be passed to the callback.
+ * @return A schedule entry handle, or NULL on allocation failure.
+ */
 static Eina_Future_Schedule_Entry *
 eio_future_schedule(Eina_Future_Scheduler *sched,
                     Eina_Future_Scheduler_Cb cb,
@@ -91,6 +137,14 @@ eio_future_schedule(Eina_Future_Scheduler *sched,
    return &ef->base;
 }
 
+/**
+ * @brief Frees or recycles an Eio_Future_Entry.
+ *
+ * Removes the entry from the pending list and either frees its memory
+ * or adds it to a trash stack for later reuse, to optimize allocations.
+ *
+ * @param ef The Eio_Future_Entry to free or recycle.
+ */
 static void
 eio_future_free(Eio_Future_Entry *ef)
 {
@@ -105,6 +159,15 @@ eio_future_free(Eio_Future_Entry *ef)
    eio_entry_trash_count++;
 }
 
+/**
+ * @brief Recalls (cancels) a previously scheduled Eio_Future_Entry.
+ *
+ * This function is part of the Eina_Future_Scheduler interface. It's called
+ * when a future is cancelled before its callback could be executed.
+ * It flushes any associated Eina_Value and frees/recycles the entry.
+ *
+ * @param se The schedule entry to recall.
+ */
 static void
 eio_future_recall(Eina_Future_Schedule_Entry *se)
 {
@@ -119,11 +182,27 @@ static Eina_Future_Scheduler eio_future_scheduler = {
    .recall = eio_future_recall,
 };
 
+/**
+ * @brief A dummy cancellation function for Eina_Promise.
+ *
+ * This function does nothing. It's used when creating Eina_Promise instances
+ * where custom cancellation logic is not needed or handled elsewhere.
+ *
+ * @param data User data associated with the promise (unused).
+ * @param p The promise being cancelled (unused).
+ */
 static void
 eio_dummy_cancel(void *data EINA_UNUSED, const Eina_Promise *p EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Processes all pending Eio_Future_Entry items.
+ *
+ * Iterates through the `entries` list, executing the callback for each
+ * Eio_Future_Entry with its associated value, and then frees/recycles the entry.
+ * This ensures that future callbacks are run in the correct (main loop) context.
+ */
 static void
 eio_process_entry(void)
 {
@@ -137,6 +216,16 @@ eio_process_entry(void)
      }
 }
 
+/**
+ * @brief Creates a new Eina_Promise associated with an Eo object.
+ *
+ * The promise is configured to use the `eio_future_scheduler`.
+ * It checks if the associated Eo object is still alive before creating
+ * the promise.
+ *
+ * @param obj The Eo object to associate with the promise.
+ * @return A new Eina_Promise, or NULL if the object is not alive or on error.
+ */
 static Eina_Promise *
 eio_promise_new(const Eo *obj)
 {
@@ -146,6 +235,15 @@ eio_promise_new(const Eo *obj)
 }
 
 /* Helper functions */
+/**
+ * @brief Callback for successful EIO file operations that return a file length.
+ *
+ * This function is typically used as the `Eio_Done_Cb`. It resolves the
+ * associated Eina_Promise with the file length (handler->length) as a uint64.
+ *
+ * @param data The Eina_Promise to resolve.
+ * @param handler The Eio_File handle for the completed operation.
+ */
 static void
 _future_file_done_cb(void *data, Eio_File *handler)
 {
@@ -155,6 +253,17 @@ _future_file_done_cb(void *data, Eio_File *handler)
    eio_process_entry();
 }
 
+/**
+ * @brief Callback for failed EIO file operations.
+ *
+ * This function is typically used as the `Eio_Error_Cb`. It rejects the
+ * associated Eina_Promise with the given error code. If the error code is 0,
+ * it assumes the promise was cancelled and does nothing.
+ *
+ * @param data The Eina_Promise to reject.
+ * @param handler The Eio_File handle for the failed operation (unused).
+ * @param error The error code.
+ */
 static void
 _future_file_error_cb(void *data,
                       Eio_File *handler EINA_UNUSED,
@@ -168,6 +277,19 @@ _future_file_error_cb(void *data,
 }
 
 /* Basic listing callbacks */
+/**
+ * @brief Callback for EIO operations that gather a list of strings (e.g., file names).
+ *
+ * This function is used as an `Eio_Main_Direct_Cb` or similar. It retrieves
+ * a user-provided callback (`EflIoPath`) and associated data from thread-local storage
+ * and invokes it with the gathered array of strings.
+ * It then cleans up the string array.
+ *
+ * @param data User data (unused in this specific callback, context is from thread-local).
+ * @param handler The Eio_File handle for the operation.
+ * @param gather An Eina_Array containing Eina_Stringshare* elements (file paths).
+ *               Example: `gather` might contain ["file1.txt", "file2.png", "subdir"].
+ */
 static void
 _future_string_cb(void *data EINA_UNUSED, Eio_File *handler, Eina_Array *gather)
 {
@@ -187,6 +309,25 @@ _future_string_cb(void *data EINA_UNUSED, Eio_File *handler, Eina_Array *gather)
 }
 
 /* Direct listing callbacks */
+/**
+ * @brief Callback for EIO operations that gather detailed file information.
+ *
+ * This function is used as an `Eio_Main_Direct_Cb` or similar for direct listing
+ * operations (like `direct_ls`, `stat_ls`). It retrieves a user-provided callback
+ * (`EflIoDirectInfo`) and associated data from thread-local storage and invokes it
+ * with the gathered array of `Eio_File_Direct_Info` structures.
+ * It then cleans up the array of info structures.
+ *
+ * @param data User data (unused in this specific callback, context is from thread-local).
+ * @param handler The Eio_File handle for the operation.
+ * @param gather An Eina_Array containing `Eio_File_Direct_Info*` elements.
+ *               Each `Eio_File_Direct_Info` contains path, name, and stat information.
+ *               Example: `gather` might contain:
+ *               [
+ *                 { path="dir/file1.txt", name="file1.txt", type=EINA_FILE_REG, ... },
+ *                 { path="dir/subdir", name="subdir", type=EINA_FILE_DIR, ... }
+ *               ]
+ */
 static void
 _future_file_info_cb(void *data EINA_UNUSED, Eio_File *handler, Eina_Array *gather)
 {
@@ -206,6 +347,26 @@ _future_file_info_cb(void *data EINA_UNUSED, Eio_File *handler, Eina_Array *gath
 }
 
 /* Method implementations */
+/**
+ * @brief Performs a direct (non-recursive or recursive) listing of a directory,
+ *        retrieving detailed file information.
+ *
+ * This implements the `efl_io_manager_direct_ls` method. It creates an Eina_Promise
+ * and initiates an EIO operation (`_eio_file_direct_ls` or `_eio_dir_direct_ls`).
+ * The user-provided `info` callback will be called for batches of `Eio_File_Direct_Info`
+ * structures.
+ *
+ * @param obj The Efl_Io_Manager object.
+ * @param pd Private data of the Efl_Io_Manager (unused).
+ * @param path The directory path to list.
+ * @param recursive If EINA_TRUE, list recursively. Otherwise, list non-recursively.
+ * @param info_data User data to be passed to the `info` callback.
+ * @param info Callback function (`EflIoDirectInfo`) to process batches of file information.
+ *             It receives `info_data` and an `Eina_Array` of `Eio_File_Direct_Info*`.
+ * @param info_free_cb Callback to free `info_data` when the operation completes.
+ * @return An Eina_Future that resolves with the total number of entries processed (uint64)
+ *         upon completion, or rejects with an error code.
+ */
 static Eina_Future *
 _efl_io_manager_direct_ls(const Eo *obj,
                           Efl_Io_Manager_Data *pd EINA_UNUSED,
@@ -248,6 +409,26 @@ _efl_io_manager_direct_ls(const Eo *obj,
    return future;
 }
 
+/**
+ * @brief Performs a direct (non-recursive or recursive) listing of a directory,
+ *        retrieving stat information for each file.
+ *
+ * This implements the `efl_io_manager_stat_ls` method. Similar to `direct_ls`,
+ * but uses EIO functions that specifically focus on stat information (`_eio_file_stat_ls`
+ * or `_eio_dir_stat_ls`).
+ *
+ * @param obj The Efl_Io_Manager object.
+ * @param pd Private data of the Efl_Io_Manager (unused).
+ * @param path The directory path to list.
+ * @param recursive If EINA_TRUE, list recursively. Otherwise, list non-recursively.
+ * @param info_data User data to be passed to the `info` callback.
+ * @param info Callback function (`EflIoDirectInfo`) to process batches of file information
+ *             (containing stat details). It receives `info_data` and an `Eina_Array` of
+ *             `Eio_File_Direct_Info*`.
+ * @param info_free_cb Callback to free `info_data` when the operation completes.
+ * @return An Eina_Future that resolves with the total number of entries processed (uint64)
+ *         upon completion, or rejects with an error code.
+ */
 static Eina_Future *
 _efl_io_manager_stat_ls(const Eo *obj,
                         Efl_Io_Manager_Data *pd EINA_UNUSED,
@@ -290,6 +471,23 @@ _efl_io_manager_stat_ls(const Eo *obj,
    return future;
 }
 
+/**
+ * @brief Performs a basic listing of a directory, retrieving only file names.
+ *
+ * This implements the `efl_io_manager_ls` method. It uses `_eio_file_ls`
+ * to get a list of file names. The user-provided `paths` callback will be
+ * called for batches of path strings.
+ *
+ * @param obj The Efl_Io_Manager object.
+ * @param pd Private data of the Efl_Io_Manager (unused).
+ * @param path The directory path to list.
+ * @param paths_data User data to be passed to the `paths` callback.
+ * @param paths Callback function (`EflIoPath`) to process batches of file names.
+ *              It receives `paths_data` and an `Eina_Array` of `Eina_Stringshare*`.
+ * @param paths_free_cb Callback to free `paths_data` when the operation completes.
+ * @return An Eina_Future that resolves with the total number of entries processed (uint64)
+ *         upon completion, or rejects with an error code.
+ */
 static Eina_Future *
 _efl_io_manager_ls(const Eo *obj,
                    Efl_Io_Manager_Data *pd EINA_UNUSED,
@@ -321,6 +519,17 @@ _efl_io_manager_ls(const Eo *obj,
 }
 
 /* Stat function */
+/**
+ * @brief Callback for successful EIO stat operations.
+ *
+ * This function is used as the `Eio_Done_Cb` for `eio_file_direct_stat`.
+ * It resolves the associated Eina_Promise with an Eina_Value containing
+ * the `Eina_Stat` structure.
+ *
+ * @param data The Eina_Promise to resolve.
+ * @param handle The Eio_File handle for the completed operation (unused).
+ * @param st A pointer to the `Eina_Stat` structure containing file status information.
+ */
 static void
 _file_stat_done_cb(void *data, Eio_File *handle EINA_UNUSED, const Eina_Stat *st)
 {
@@ -344,6 +553,18 @@ _file_stat_done_cb(void *data, Eio_File *handle EINA_UNUSED, const Eina_Stat *st
    eio_process_entry();
 }
 
+/**
+ * @brief Retrieves status information (stat) for a single file or directory.
+ *
+ * This implements the `efl_io_manager_stat` method. It uses `eio_file_direct_stat`
+ * to perform the operation.
+ *
+ * @param obj The Efl_Io_Manager object.
+ * @param pd Private data of the Efl_Io_Manager (unused).
+ * @param path The path to the file or directory.
+ * @return An Eina_Future that resolves with an Eina_Value containing the `Eina_Stat`
+ *         structure upon success, or rejects with an error code.
+ */
 static Eina_Future *
 _efl_io_manager_stat(const Eo *obj,
                      Efl_Io_Manager_Data *pd EINA_UNUSED,
@@ -371,6 +592,23 @@ _efl_io_manager_stat(const Eo *obj,
 
 /* eXtended attribute manipulation */
 
+/**
+ * @brief Lists the extended attributes of a file or directory.
+ *
+ * This implements the `efl_io_manager_xattr_ls` method. It uses `_eio_file_xattr`
+ * to retrieve the names of extended attributes. The user-provided `paths` callback
+ * will be called for batches of attribute names.
+ *
+ * @param obj The Efl_Io_Manager object.
+ * @param pd Private data of the Efl_Io_Manager (unused).
+ * @param path The path to the file or directory.
+ * @param paths_data User data to be passed to the `paths` callback.
+ * @param paths Callback function (`EflIoPath`) to process batches of attribute names.
+ *              It receives `paths_data` and an `Eina_Array` of `Eina_Stringshare*`.
+ * @param paths_free_cb Callback to free `paths_data` when the operation completes.
+ * @return An Eina_Future that resolves with the total number of attributes (uint64)
+ *         upon completion, or rejects with an error code.
+ */
 static Eina_Future *
 _efl_io_manager_xattr_ls(const Eo *obj,
                          Efl_Io_Manager_Data *pd EINA_UNUSED,
@@ -402,6 +640,18 @@ _efl_io_manager_xattr_ls(const Eo *obj,
    return efl_future_then(obj, future);;
 }
 
+/**
+ * @brief Callback for successful EIO operations that return raw data (e.g., xattr value).
+ *
+ * This function is used as a done callback (like `Eio_Xattr_Get_Cb`).
+ * It resolves the associated Eina_Promise with an Eina_Value of type BLOB,
+ * containing a copy of the received data.
+ *
+ * @param data The Eina_Promise to resolve.
+ * @param handler The Eio_File handle for the completed operation (unused).
+ * @param attr_data Pointer to the raw data (e.g., extended attribute value).
+ * @param size Size of the `attr_data` in bytes.
+ */
 static void
 _future_file_done_data_cb(void *data, Eio_File *handler EINA_UNUSED, const char *attr_data, unsigned int size)
 {
@@ -420,6 +670,21 @@ _future_file_done_data_cb(void *data, Eio_File *handler EINA_UNUSED, const char 
    eio_process_entry();
 }
 
+/**
+ * @brief Sets an extended attribute on a file or directory.
+ *
+ * This implements the `efl_io_manager_xattr_set` method. It uses `eio_file_xattr_set`
+ * to perform the operation.
+ *
+ * @param obj The Efl_Io_Manager object.
+ * @param pd Private data of the Efl_Io_Manager (unused).
+ * @param path The path to the file or directory.
+ * @param attribute The name of the extended attribute to set.
+ * @param data An Eina_Binbuf containing the value of the attribute.
+ * @param flags Flags for the xattr operation (e.g., EINA_XATTR_CREATE, EINA_XATTR_REPLACE).
+ * @return An Eina_Future that resolves with 0 (uint64) upon success,
+ *         or rejects with an error code.
+ */
 static Eina_Future *
 _efl_io_manager_xattr_set(Eo *obj,
                           Efl_Io_Manager_Data *pd EINA_UNUSED,
@@ -451,6 +716,19 @@ _efl_io_manager_xattr_set(Eo *obj,
    return future;
 }
 
+/**
+ * @brief Gets the value of an extended attribute from a file or directory.
+ *
+ * This implements the `efl_io_manager_xattr_get` method. It uses `eio_file_xattr_get`
+ * to retrieve the attribute's value.
+ *
+ * @param obj The Efl_Io_Manager object.
+ * @param pd Private data of the Efl_Io_Manager (unused).
+ * @param path The path to the file or directory.
+ * @param attribute The name of the extended attribute to get.
+ * @return An Eina_Future that resolves with an Eina_Value of type BLOB containing
+ *         the attribute's data upon success, or rejects with an error code.
+ */
 static Eina_Future *
 _efl_io_manager_xattr_get(const Eo *obj,
                           Efl_Io_Manager_Data *pd EINA_UNUSED,
@@ -477,6 +755,16 @@ _efl_io_manager_xattr_get(const Eo *obj,
    return future;
 }
 
+/**
+ * @brief Callback for successful EIO file open operations.
+ *
+ * This function is used as the `Eio_Open_Cb`. It resolves the associated
+ * Eina_Promise with an Eina_Value containing the opened `Eina_File` handle.
+ *
+ * @param data The Eina_Promise to resolve.
+ * @param handler The Eio_File handle for the completed operation (unused).
+ * @param file The opened `Eina_File` handle.
+ */
 static void
 _future_file_open_cb(void *data, Eio_File *handler EINA_UNUSED, Eina_File *file)
 {
@@ -489,6 +777,19 @@ _future_file_open_cb(void *data, Eio_File *handler EINA_UNUSED, Eina_File *file)
    eio_process_entry();
 }
 
+/**
+ * @brief Opens a file.
+ *
+ * This implements the `efl_io_manager_open` method. It uses `eio_file_open`
+ * to perform the operation.
+ *
+ * @param obj The Efl_Io_Manager object.
+ * @param pd Private data of the Efl_Io_Manager (unused).
+ * @param path The path to the file to open.
+ * @param shared If EINA_TRUE, open the file in shared mode.
+ * @return An Eina_Future that resolves with an Eina_Value containing the
+ *         `Eina_File` handle upon success, or rejects with an error code.
+ */
 static Eina_Future *
 _efl_io_manager_open(const Eo *obj,
                      Efl_Io_Manager_Data *pd EINA_UNUSED,
@@ -515,6 +816,18 @@ _efl_io_manager_open(const Eo *obj,
    return future;
 }
 
+/**
+ * @brief Closes an opened file.
+ *
+ * This implements the `efl_io_manager_close` method. It uses `eio_file_close`
+ * to perform the operation.
+ *
+ * @param obj The Efl_Io_Manager object.
+ * @param pd Private data of the Efl_Io_Manager (unused).
+ * @param file The `Eina_File` handle to close.
+ * @return An Eina_Future that resolves with 0 (uint64) upon success,
+ *         or rejects with an error code.
+ */
 static Eina_Future *
 _efl_io_manager_close(const Eo *obj,
                       Efl_Io_Manager_Data *pd EINA_UNUSED,

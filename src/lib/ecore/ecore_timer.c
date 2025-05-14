@@ -33,8 +33,14 @@ struct _Ecore_Timer_Legacy
    const void *data;
 
    Eina_Bool inside_call : 1;
-   Eina_Bool delete_me   : 1;
+   Eina_Bool delete_me   : 1; /**< Flag to mark the timer for deletion. */
 };
+/**
+ * @brief Legacy timer structure used for Ecore_Timer compatibility.
+ *
+ * This structure holds data for timers created using the older ecore_timer_add API.
+ * It bridges the legacy API with the new Eo-based timer system.
+ */
 typedef struct _Ecore_Timer_Legacy Ecore_Timer_Legacy;
 struct _Efl_Loop_Timer_Data
 {
@@ -56,13 +62,54 @@ struct _Efl_Loop_Timer_Data
    Eina_Bool  initialized : 1;
    Eina_Bool  noparent    : 1;
    Eina_Bool  constructed : 1;
-   Eina_Bool  finalized   : 1;
+   Eina_Bool  finalized   : 1; /**< Flag indicating the object has been finalized. */
 };
 
+/**
+ * @brief Delays a timer by a specified amount of time.
+ *
+ * This utility function adjusts the timer's scheduled execution time.
+ * If the timer is frozen, its pending duration is adjusted. Otherwise,
+ * its 'at' time is updated.
+ *
+ * @param timer The timer data structure to modify.
+ * @param add The amount of time (in seconds) to add to the timer's delay.
+ */
 static void _efl_loop_timer_util_delay(Efl_Loop_Timer_Data *timer, double add);
+/**
+ * @brief (Re-)Inserts a timer into the appropriate list within a loop.
+ *
+ * This function first removes the timer from any list it might currently be in.
+ * Then, based on its state (listening, frozen, time 'at', interval 'in'),
+ * it's either added to the 'suspended' list or sorted into the 'timers' list
+ * based on its scheduled execution time 'at'.
+ *
+ * @param loop The loop data where the timer will be managed. Can be NULL if timer is not associated with a loop.
+ * @param timer The timer data structure to instanciate.
+ */
 static void _efl_loop_timer_util_instanciate(Efl_Loop_Data *loop, Efl_Loop_Timer_Data *timer);
+/**
+ * @brief Sets or updates a timer's properties and re-instanciates it.
+ *
+ * This function initializes or updates a timer's execution time ('at') and
+ * interval ('in'). It marks the timer as 'just_added' and 'initialized'.
+ * If the timer is not frozen, its 'at' time is set and 'pending' duration is cleared.
+ * Finally, it calls _efl_loop_timer_util_instanciate to place the timer in the
+ * correct list within its loop.
+ *
+ * @param timer The timer data structure to set.
+ * @param at The absolute time (in seconds, typically from ecore_time_get()) when the timer should fire.
+ * @param in The interval (in seconds) for recurring timers.
+ */
 static void _efl_loop_timer_set(Efl_Loop_Timer_Data *timer, double at, double in);
 
+/**
+ * @brief Default precision for timers.
+ *
+ * This value (10 microseconds) is used when comparing timer execution times,
+ * for example, in _efl_loop_timer_after_get to determine if multiple timers
+ * should be considered as firing "at the same time".
+ */
 static double precision = 10.0 / 1000000.0;
 
 EAPI double
@@ -80,6 +127,24 @@ ecore_timer_precision_set(double value)
    precision = value;
 }
 
+/**
+ * @brief Callback invoked when an event listener is added to a timer object.
+ *
+ * Specifically, this function checks if the added listener is for the
+ * EFL_LOOP_TIMER_EVENT_TIMER_TICK event. If so, it increments the
+ * `listening` counter on the timer. If this is the first listener for
+ * TIMER_TICK and the timer is already finalized, it re-instanciates
+ * the timer to ensure it's correctly scheduled in the loop.
+ *
+ * @param data Pointer to the Efl_Loop_Timer_Data associated with the timer.
+ * @param event The event structure containing details about the added callback.
+ *              The `event->info` is expected to be an Efl_Callback_Array_Item_Full array.
+ *              Example of array structure:
+ *              const Efl_Callback_Array_Item_Full array[] = {
+ *                  { EFL_LOOP_TIMER_EVENT_TIMER_TICK, _my_tick_handler_func },
+ *                  { NULL, NULL } // Terminator
+ *              };
+ */
 static void
 _check_timer_event_catcher_add(void *data, const Efl_Event *event)
 {
@@ -101,6 +166,24 @@ _check_timer_event_catcher_add(void *data, const Efl_Event *event)
      }
 }
 
+/**
+ * @brief Callback invoked when an event listener is removed from a timer object.
+ *
+ * This function checks if the removed listener was for the
+ * EFL_LOOP_TIMER_EVENT_TIMER_TICK event. If so, it decrements the
+ * `listening` counter. If the `listening` count drops to zero (meaning no
+ * more listeners for TIMER_TICK), it re-instanciates the timer. This
+ * typically moves it to a suspended list if it's no longer being listened to.
+ *
+ * @param data Pointer to the Efl_Loop_Timer_Data associated with the timer.
+ * @param event The event structure containing details about the removed callback.
+ *              The `event->info` is expected to be an Efl_Callback_Array_Item_Full array.
+ *              Example of array structure:
+ *              const Efl_Callback_Array_Item_Full array[] = {
+ *                  { EFL_LOOP_TIMER_EVENT_TIMER_TICK, _my_tick_handler_func },
+ *                  { NULL, NULL } // Terminator
+ *              };
+ */
 static void
 _check_timer_event_catcher_del(void *data, const Efl_Event *event)
 {
@@ -156,12 +239,35 @@ _efl_loop_timer_efl_object_finalize(Eo *obj, Efl_Loop_Timer_Data *pd)
    return efl_finalize(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Callback for the EFL_EVENT_DEL event on legacy timers.
+ *
+ * This function is responsible for freeing the Ecore_Timer_Legacy structure
+ * when a legacy timer object is deleted.
+ *
+ * @param data Pointer to the Ecore_Timer_Legacy structure to be freed.
+ * @param event The event structure (unused in this function).
+ */
 static void
 _ecore_timer_legacy_del(void *data, const Efl_Event *event EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Callback for the EFL_LOOP_TIMER_EVENT_TIMER_TICK event on legacy timers.
+ *
+ * This function is invoked when a legacy timer fires. It calls the user-provided
+ * callback function (`legacy->func`).
+ * If the user callback returns ECORE_CALLBACK_CANCEL (or EINA_FALSE) or if
+ * `legacy->delete_me` is set (e.g., by ecore_timer_del during the callback),
+ * the timer is marked for deletion. If not currently inside a recursive call
+ * to this tick function, the timer object is deleted immediately.
+ *
+ * @param data Pointer to the Efl_Loop_Timer_Data of the timer.
+ *             The actual legacy data is retrieved from this.
+ * @param event The event structure, `event->object` is the timer Eo object.
+ */
 static void
 _ecore_timer_legacy_tick(void *data, const Efl_Event *event)
 {
@@ -405,6 +511,16 @@ ecore_timer_dump(void)
    return NULL;
 }
 
+/**
+ * @brief Removes a timer from its current list within the loop data.
+ *
+ * This utility function ensures a timer is no longer part of the 'timers'
+ * or 'suspended' lists in its associated loop_data. It also handles the
+ * case where the timer being cleared is the 'timer_current' in the loop_data,
+ * advancing 'timer_current' to the next timer to prevent processing issues.
+ *
+ * @param pd The timer data structure to remove from loop lists.
+ */
 static void
 _efl_loop_timer_util_loop_clear(Efl_Loop_Timer_Data *pd)
 {
@@ -523,6 +639,18 @@ _efl_loop_timer_efl_object_destructor(Eo *obj, Efl_Loop_Timer_Data *pd)
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Clears the 'just_added' flag for all timers in a loop.
+ *
+ * This function is called after newly added timers have been processed or
+ * integrated into the main timer list. It iterates through all timers
+ * in the `pd->timers` list and resets their `just_added` flag to 0.
+ * This ensures that these timers are considered for execution in subsequent
+ * timer processing cycles. The `pd->timers_added` flag is also reset.
+ *
+ * @param obj The loop object (unused).
+ * @param pd The loop data containing the list of timers.
+ */
 void
 _efl_loop_timer_enable_new(Eo *obj EINA_UNUSED, Efl_Loop_Data *pd)
 {
@@ -533,12 +661,32 @@ _efl_loop_timer_enable_new(Eo *obj EINA_UNUSED, Efl_Loop_Data *pd)
    EINA_INLIST_FOREACH(pd->timers, timer) timer->just_added = 0;
 }
 
+/**
+ * @brief Checks if there are any active (non-suspended) timers in the loop.
+ *
+ * @param obj The loop object (unused).
+ * @param pd The loop data.
+ * @return 1 (EINA_TRUE) if there are timers in the `pd->timers` list, 0 (EINA_FALSE) otherwise.
+ */
 int
 _efl_loop_timers_exists(Eo *obj EINA_UNUSED, Efl_Loop_Data *pd)
 {
    return !!pd->timers;
 }
 
+/**
+ * @brief Gets the first timer in the loop that is not 'just_added'.
+ *
+ * This function iterates through the `pd->timers` list and returns the
+ * Eo object of the first timer it finds whose `just_added` flag is false.
+ * Timers marked as 'just_added' are typically those recently created or
+ * rescheduled and might not be ready for immediate processing in some contexts
+ * (e.g., calculating next sleep time).
+ *
+ * @param ob The loop object (unused).
+ * @param pd The loop data containing the list of timers.
+ * @return The Eo object of the first eligible timer, or NULL if no such timer is found.
+ */
 static inline Ecore_Timer *
 _efl_loop_timer_first_get(Eo *ob EINA_UNUSED, Efl_Loop_Data *pd)
 {
@@ -551,6 +699,24 @@ _efl_loop_timer_first_get(Eo *ob EINA_UNUSED, Efl_Loop_Data *pd)
    return NULL;
 }
 
+/**
+ * @brief Finds the last timer in a sequence that should fire "at the same time" as a base timer.
+ *
+ * Starting from the timer immediately following `base` in its inlist, this function
+ * iterates through subsequent timers. It considers timers to be "at the same time"
+ * if their scheduled `at` time is within `base->at + precision`.
+ * It skips uninitialized timers and timers marked as `just_added`.
+ * The function returns the data of the last such timer found (which could be the
+ * `base` timer itself if no subsequent timers meet the criteria).
+ *
+ * This is used to group timers that are scheduled very close together, allowing
+ * the main loop to potentially wake up for the latest one in such a group,
+ * processing all of them in one go.
+ *
+ * @param base The base timer data from which to start the search.
+ * @return The Efl_Loop_Timer_Data of the last timer considered to be firing
+ *         at approximately the same time as or shortly after the base timer.
+ */
 static inline Efl_Loop_Timer_Data *
 _efl_loop_timer_after_get(Efl_Loop_Timer_Data *base)
 {
@@ -585,6 +751,31 @@ _efl_loop_timer_next_get(Eo *obj, Efl_Loop_Data *pd)
    return in;
 }
 
+/**
+ * @brief Reschedules a timer after it has ticked (or if its time was adjusted).
+ *
+ * This function is called after a timer's callback has been executed or if
+ * the system time jumped. It calculates the next firing time for the timer.
+ *
+ * If the timer is frozen, invalidated, or marked for deletion (for legacy timers),
+ * it does nothing.
+ *
+ * It first ensures the timer is removed from its current list in the loop_data
+ * if it's part of one and not a 'noparent' timer.
+ *
+ * A key piece of logic here is handling system time jumps or long delays:
+ * If the timer's next scheduled time (`timer->at + timer->in`) would have been
+ * more than 15 seconds in the past relative to `when` (current time),
+ * it's assumed a significant hang or suspend occurred. In this case, the timer
+ * is rescheduled to fire `timer->in` seconds from `when`.
+ * Otherwise, it's rescheduled to `timer->at + timer->in`.
+ *
+ * Finally, it calls `_efl_loop_timer_set` to update the timer's properties and
+ * re-insert it into the loop's timer list.
+ *
+ * @param timer The timer data to reschedule.
+ * @param when The current time, used as a reference for rescheduling.
+ */
 static inline void
 _efl_loop_timer_reschedule(Efl_Loop_Timer_Data *timer, double when)
 {

@@ -7,6 +7,18 @@
 
 #include "elm_prefs_cc.h"
 
+/**
+ * @brief Allocates memory and exits on failure.
+ *
+ * This function is a wrapper around calloc(1, size) that provides
+ * error handling. If memory allocation fails, an error message
+ * is printed to standard error, and the program exits with a status of -1.
+ *
+ * @param size The number of bytes to allocate.
+ * @return A pointer to the allocated memory, or NULL if allocation fails (though
+ *         the program will exit before NULL can be returned in case of error).
+ *         The memory is initialized to zero.
+ */
 void *
 mem_alloc(size_t size)
 {
@@ -20,6 +32,19 @@ mem_alloc(size_t size)
    return NULL;
 }
 
+/**
+ * @brief Duplicates a string and exits on failure.
+ *
+ * This function is a wrapper around strdup(s) that provides
+ * error handling. If string duplication fails (due to memory allocation
+ * failure), an error message is printed to standard error, and the
+ * program exits with a status of -1.
+ *
+ * @param s The null-terminated string to duplicate.
+ * @return A pointer to the newly allocated string, which is a duplicate of s.
+ *         Returns NULL if duplication fails (though the program will exit
+ *         before NULL can be returned in case of error).
+ */
 char *
 mem_strdup(const char *s)
 {

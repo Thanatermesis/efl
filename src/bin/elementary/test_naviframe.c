@@ -16,6 +16,12 @@ static char img5[PATH_MAX];
 static char img6[PATH_MAX];
 static char img7[PATH_MAX];
 
+/**
+ * @brief Creates a new photo object to be used as content in a naviframe item.
+ * @param parent The parent widget.
+ * @param img Path to the image file.
+ * @return The new photo object.
+ */
 Evas_Object *
 _content_new(Evas_Object *parent, const char *img)
 {
@@ -26,24 +32,49 @@ _content_new(Evas_Object *parent, const char *img)
    return photo;
 }
 
+/**
+ * @brief Callback function to pop an item from the naviframe.
+ * @param data The naviframe widget.
+ * @param obj The object that emitted the signal (unused).
+ * @param event_info The event-specific data (unused).
+ */
 void
 _navi_pop(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_naviframe_item_pop(data);
 }
 
+/**
+ * @brief Callback function to delete a specific naviframe item.
+ * @param data The naviframe item to be deleted.
+ * @param obj The object that emitted the signal (unused).
+ * @param event_info The event-specific data (unused).
+ */
 void
 _navi_it_del(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_object_item_del(data);
 }
 
+/**
+ * @brief Callback function for the 'title,clicked' smart event of the naviframe.
+ * @param data User data (unused).
+ * @param obj The naviframe widget (unused).
+ * @param event_info The event-specific data (unused).
+ */
 void
 _title_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("Title Clicked!\n");
 }
 
+/**
+ * @brief Callback function for the 'item,activated' smart event of the naviframe.
+ * This is called when an item is shown and its transition has finished.
+ * @param data User data (unused).
+ * @param obj The naviframe widget (unused).
+ * @param event_info The activated naviframe item.
+ */
 void
 _item_activated(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -51,6 +82,12 @@ _item_activated(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *even
    printf("Item(%p) is activated! The Title is \"%s\"\n", it, elm_object_item_text_get(it));
 }
 
+/**
+ * @brief Toggles the visibility of the naviframe item's title with an animation.
+ * @param data The naviframe item whose title visibility will be toggled.
+ * @param obj The object that emitted the signal (unused).
+ * @param event_info The event-specific data (unused).
+ */
 void
 _title_visible(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -59,12 +96,27 @@ _title_visible(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_U
                                         EINA_TRUE);
 }
 
+/**
+ * @brief Promotes a naviframe item to be the top item on the stack.
+ * @param data The naviframe item to promote.
+ * @param obj The object that emitted the signal (unused).
+ * @param event_info The event-specific data (unused).
+ */
 void
 _promote(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_naviframe_item_promote(data);
 }
 
+/**
+ * @brief A callback function called when a naviframe item is being popped.
+ * This function manually deletes the item and returns EINA_FALSE to prevent
+ * the default pop transition and automatic deletion.
+ * @param data User data (unused).
+ * @param it The naviframe item being popped.
+ * @return EINA_FALSE to prevent default pop behavior. Returning EINA_TRUE
+ *         would allow the default transition and deletion.
+ */
 Eina_Bool
 _pop_cb(void *data EINA_UNUSED, Elm_Object_Item *it)
 {
@@ -78,6 +130,13 @@ _pop_cb(void *data EINA_UNUSED, Elm_Object_Item *it)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Creates and pushes page 9 onto the naviframe stack.
+ * This page sets a custom pop callback (`_pop_cb`) for its item.
+ * @param data The naviframe widget.
+ * @param obj The object that emitted the signal (unused).
+ * @param event_info The event-specific data (unused).
+ */
 void
 _page9(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -102,6 +161,12 @@ _page9(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    evas_object_smart_callback_add(bt, "clicked", _navi_pop, nf);
 }
 
+/**
+ * @brief Creates and pushes page 8 onto the naviframe stack.
+ * @param data The naviframe widget.
+ * @param obj The object that emitted the signal (unused).
+ * @param event_info The event-specific data (unused).
+ */
 void
 _page8(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -125,6 +190,14 @@ _page8(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    evas_object_smart_callback_add(bt, "clicked", _navi_pop, nf);
 }
 
+/**
+ * @brief Callback for mouse down event on a button in page 7.
+ * It changes the button color and pushes page 8.
+ * @param data The naviframe widget.
+ * @param e The Evas canvas (unused).
+ * @param obj The button object.
+ * @param event_info The event-specific data (unused).
+ */
 static void
 _page7_btn_down_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj,
                    void *event_info EINA_UNUSED)
@@ -133,6 +206,14 @@ _page7_btn_down_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj,
    _page8(data, NULL, NULL);
 }
 
+/**
+ * @brief Callback for mouse up event on a button in page 7.
+ * It resets the button color.
+ * @param data User data (unused).
+ * @param e The Evas canvas (unused).
+ * @param obj The button object.
+ * @param event_info The event-specific data (unused).
+ */
 static void
 _page7_btn_up_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj,
                  void *event_info EINA_UNUSED)
@@ -141,6 +222,12 @@ _page7_btn_up_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj,
    printf("Page7 Button Mouse Up!\n");
 }
 
+/**
+ * @brief Creates a custom content object for page 7.
+ * The content is a button with specific mouse down/up event handlers.
+ * @param nf The naviframe widget, used as parent and passed to callbacks.
+ * @return The new content object (a button).
+ */
 Evas_Object *
 _page7_content_new(Evas_Object *nf)
 {
@@ -156,6 +243,14 @@ _page7_content_new(Evas_Object *nf)
    return bt;
 }
 
+/**
+ * @brief Creates and pushes page 7 onto the naviframe stack.
+ * This page uses the "overlap" style, where the new page content
+ * animates over the previous page's content.
+ * @param data The naviframe widget.
+ * @param obj The object that emitted the signal (unused).
+ * @param event_info The event-specific data (unused).
+ */
 void
 _page7(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -177,6 +272,13 @@ _page7(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    evas_object_smart_callback_add(bt, "clicked", _navi_pop, nf);
 }
 
+/**
+ * @brief Creates and pushes page 6 onto the naviframe stack.
+ * This page also uses the "overlap" style.
+ * @param data The naviframe widget.
+ * @param obj The object that emitted the signal (unused).
+ * @param event_info The event-specific data (unused).
+ */
 void
 _page6(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -200,6 +302,14 @@ _page6(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    evas_object_smart_callback_add(bt, "clicked", _navi_pop, nf);
 }
 
+/**
+ * @brief Creates and inserts page 5 into the naviframe stack.
+ * Instead of pushing on top, this page is inserted after the current top item
+ * without any transition animation.
+ * @param data The naviframe widget.
+ * @param obj The object that emitted the signal (unused).
+ * @param event_info The event-specific data (unused).
+ */
 void
 _page5(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -228,6 +338,14 @@ _page5(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    evas_object_smart_callback_add(bt, "clicked", _navi_it_del, it);
 }
 
+/**
+ * @brief Creates and pushes page 4 onto the naviframe stack.
+ * This page demonstrates hiding the title bar initially and allowing the user
+ * to toggle its visibility by clicking the content area.
+ * @param data The naviframe widget.
+ * @param obj The object that emitted the signal (unused).
+ * @param event_info The event-specific data (unused).
+ */
 void
 _page4(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -264,6 +382,13 @@ _page4(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    evas_object_smart_callback_add(content, "clicked", _title_visible, it);
 }
 
+/**
+ * @brief Creates and pushes page 3 onto the naviframe stack.
+ * This page has a "Next" button but no "Back" button initially.
+ * @param data The naviframe widget.
+ * @param obj The object that emitted the signal (unused).
+ * @param event_info The event-specific data (unused).
+ */
 void
 _page3(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -285,6 +410,13 @@ _page3(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
                            NULL);
 }
 
+/**
+ * @brief Creates and pushes page 2 onto the naviframe stack.
+ * This page demonstrates using a long title and a subtitle.
+ * @param data The naviframe widget.
+ * @param obj The object that emitted the signal (unused).
+ * @param event_info The event-specific data (unused).
+ */
 void
 _page2(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -308,6 +440,17 @@ _page2(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_object_item_part_text_set(it, "subtitle", "Here is sub-title part!");
 }
 
+/**
+ * @brief Test case for basic naviframe functionality.
+ *
+ * This test sets up a window with a naviframe and demonstrates:
+ * - Pushing items (pages) onto the stack.
+ * - Callbacks for title clicks and item activation.
+ * - Page transitions.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_naviframe(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -341,6 +484,15 @@ test_naviframe(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event
    evas_object_show(win);
 }
 
+/**
+ * @brief Test case for placing widgets in the naviframe title bar.
+ *
+ * This test sets up a naviframe and places a segment control and a button
+ * in the title bar area of an item. The title text itself is hidden.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_naviframe2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -377,6 +529,12 @@ test_naviframe2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *even
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback to pop all items from the naviframe stack until the root item is reached.
+ * @param data The naviframe widget.
+ * @param obj The button that was clicked. It holds a pointer to the root item.
+ * @param event_info Not used.
+ */
 static void
 _bt_pop_all(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -386,6 +544,16 @@ _bt_pop_all(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      elm_naviframe_item_pop(data);
 }
 
+/**
+ * @brief Test case for naviframe used alongside another widget (toolbar).
+ *
+ * This test places a naviframe and a toolbar side-by-side in a box.
+ * The toolbar contains a button to pop all pages from the naviframe,
+ * demonstrating interaction between separate widgets.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_naviframe3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

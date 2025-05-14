@@ -58,12 +58,29 @@ typedef struct _Size_Params
 
 #define PAGE_NUM 3
 
+/**
+ * @brief Callback function for a click event on a button page.
+ *
+ * This function is called when a button page within the spotlight is clicked.
+ * It simply prints a message to the console.
+ * @param data Unused user data.
+ * @param ev Unused event information.
+ */
 static void
 page_clicked_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
    printf("Button Page is clicked!\n");
 }
 
+/**
+ * @brief Creates and returns a new view (page) of a specified type.
+ *
+ * This function creates a new Evas_Object to be used as a page in the spotlight.
+ * The type of the view is determined by the `p` parameter.
+ * @param p The type of view to create (LAYOUT, LIST, or BUTTON).
+ * @param parent The parent widget for the new view.
+ * @return The newly created view object.
+ */
 static Eo *
 view_add(View_Type p, Eo *parent)
 {
@@ -121,6 +138,12 @@ view_add(View_Type p, Eo *parent)
    return page;
 }
 
+/**
+ * @brief Callback to navigate to the previous element in the spotlight.
+ *
+ * @param data The spotlight widget.
+ * @param ev Unused event information.
+ */
 static void
 prev_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -131,6 +154,12 @@ prev_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
      efl_ui_spotlight_active_element_set(spotlight, efl_pack_content_get(spotlight, active_index - 1));
 }
 
+/**
+ * @brief Callback to navigate to the next element in the spotlight.
+ *
+ * @param data The spotlight widget.
+ * @param ev Unused event information.
+ */
 static void
 next_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -141,6 +170,18 @@ next_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
      efl_ui_spotlight_active_element_set(spotlight, efl_pack_content_get(spotlight, active_index + 1));
 }
 
+/**
+ * @brief Callback executed when the future from `efl_ui_spotlight_pop` is resolved.
+ *
+ * Hides the content object if it was not deleted by the pop operation.
+ * `efl_ui_spotlight_pop` can be configured to not delete the content, in which
+ * case the content is passed in the `value` parameter.
+ *
+ * @param data Unused user data.
+ * @param value The value from the resolved future, potentially containing the popped object.
+ * @param dead_future Unused.
+ * @return An empty Eina_Value.
+ */
 static Eina_Value
 future_then_cb(void *data EINA_UNUSED, const Eina_Value value, const Eina_Future *dead_future EINA_UNUSED)
 {
@@ -153,6 +194,14 @@ future_then_cb(void *data EINA_UNUSED, const Eina_Value value, const Eina_Future
    return EINA_VALUE_EMPTY;
 }
 
+/**
+ * @brief Callback for the "Pop" button click event.
+ *
+ * This function pops the active element from the spotlight stack.
+ * It uses a future to handle the result of the pop operation.
+ * @param data The spotlight widget.
+ * @param ev Unused event information.
+ */
 static void
 pop_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -164,6 +213,14 @@ pop_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    eina_future_then(future, future_then_cb, NULL);
 }
 
+/**
+ * @brief Callback for the "Push" button click event.
+ *
+ * This function pushes a new view onto the spotlight stack. The type of view
+ * cycles through BUTTON, LIST, and LAYOUT.
+ * @param data The spotlight widget.
+ * @param ev Unused event information.
+ */
 static void
 push_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -192,18 +249,41 @@ push_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_spotlight_push(spotlight, view);
 }
 
+/**
+ * @brief Callback for the "Back" button in the naviframe.
+ *
+ * Pops the current item from the naviframe, effectively going back to the
+ * previous view.
+ * @param data The naviframe widget.
+ * @param ev Unused event information.
+ */
 static void
 back_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    elm_naviframe_item_pop(data);
 }
 
+/**
+ * @brief Callback for the deletion of the main list view.
+ *
+ * Frees the `Params` struct that was allocated for the test UI.
+ * @param data The `Params` struct to free.
+ * @param ev Unused event information.
+ */
 static void
 list_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Callback for the width slider value change.
+ *
+ * Updates the width of the spotlight view based on the slider's value.
+ * If the height is set to fill, it is passed as -1.
+ * @param data The `Params` struct containing the spotlight and size info.
+ * @param ev The event object, containing the slider.
+ */
 static void
 width_slider_cb(void *data, const Efl_Event *ev)
 {
@@ -217,6 +297,14 @@ width_slider_cb(void *data, const Efl_Event *ev)
    efl_ui_spotlight_size_set(params->spotlight, EINA_SIZE2D(params->w, h));
 }
 
+/**
+ * @brief Callback for the height slider value change.
+ *
+ * Updates the height of the spotlight view based on the slider's value.
+ * If the width is set to fill, it is passed as -1.
+ * @param data The `Params` struct containing the spotlight and size info.
+ * @param ev The event object, containing the slider.
+ */
 static void
 height_slider_cb(void *data, const Efl_Event *ev)
 {
@@ -230,6 +318,15 @@ height_slider_cb(void *data, const Efl_Event *ev)
    efl_ui_spotlight_size_set(params->spotlight, EINA_SIZE2D(w, params->h));
 }
 
+/**
+ * @brief Callback for the 'fill width' checkbox state change.
+ *
+ * Toggles the width of the spotlight between a fixed value and 'fill' (-1).
+ * It also disables/enables the width slider accordingly.
+ * @param data The `Size_Params` struct.
+ * @param obj The checkbox widget.
+ * @param event_info Unused.
+ */
 static void
 width_check_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -250,6 +347,15 @@ width_check_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    efl_ui_spotlight_size_set(params->spotlight, EINA_SIZE2D(w, h));
 }
 
+/**
+ * @brief Callback for the 'fill height' checkbox state change.
+ *
+ * Toggles the height of the spotlight between a fixed value and 'fill' (-1).
+ * It also disables/enables the height slider accordingly.
+ * @param data The `Size_Params` struct.
+ * @param obj The checkbox widget.
+ * @param event_info Unused.
+ */
 static void
 height_check_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -270,12 +376,30 @@ height_check_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    efl_ui_spotlight_size_set(params->spotlight, EINA_SIZE2D(w, h));
 }
 
+/**
+ * @brief Callback for the deletion of the checkbox.
+ *
+ * Frees the `Size_Params` struct associated with the checkbox and slider.
+ * @param data The `Size_Params` struct to free.
+ * @param ev Unused event information.
+ */
 static void
 check_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Callback for various packing operation buttons.
+ *
+ * This function handles different packing operations on the spotlight container,
+ * like pack_begin, pack_end, pack_before, pack_after, pack_at, unpack_at, and clear.
+ * The specific operation is determined by the `type` field in the `Pack_Params` struct.
+ * It also updates the state of UI controls related to packing.
+ *
+ * @param data A `Pack_Params` struct containing the spotlight and other UI elements.
+ * @param ev Unused event information.
+ */
 static void
 pack_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -369,12 +493,26 @@ pack_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback for the deletion of a pack operation button.
+ *
+ * Frees the `Pack_Params` struct associated with the button.
+ * @param data The `Pack_Params` struct to free.
+ * @param ev Unused event information.
+ */
 static void
 pack_btn_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Callback for the "Set Active Index" button.
+ *
+ * Sets the active element of the spotlight to the index specified by the spinner.
+ * @param data A `Page_Set_Params` struct containing the spotlight and spinner.
+ * @param ev Unused event information.
+ */
 static void
 page_set_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -385,12 +523,26 @@ page_set_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
       efl_ui_range_value_get(psp->spinner)));
 }
 
+/**
+ * @brief Callback for the deletion of the "Set Active Index" button.
+ *
+ * Frees the `Page_Set_Params` struct associated with the button.
+ * @param data The `Page_Set_Params` struct to free.
+ * @param ev Unused event information.
+ */
 static void
 page_set_btn_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Callback to set the spotlight indicator to an icon-based indicator.
+ *
+ * Creates a new icon indicator and sets it on the spotlight.
+ * @param data The `Params` struct containing the spotlight.
+ * @param ev Unused event information.
+ */
 static void
 indicator_icon_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -400,6 +552,13 @@ indicator_icon_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_spotlight_indicator_set(params->spotlight, params->indicator);
 }
 
+/**
+ * @brief Callback to remove the spotlight indicator.
+ *
+ * Sets the spotlight indicator to NULL, effectively removing it.
+ * @param data The `Params` struct containing the spotlight.
+ * @param ev Unused event information.
+ */
 static void
 indicator_none_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -407,6 +566,17 @@ indicator_none_btn_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_spotlight_indicator_set(params->spotlight, NULL);
 }
 
+/**
+ * @brief Creates the UI for controlling the spotlight's size.
+ *
+ * This function is called when "View Size" is selected from the list. It pushes
+ * a new view to the naviframe containing sliders and checkboxes to control the
+ * width and height of the spotlight, including 'fill' options.
+ *
+ * @param data The main `Params` struct.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 spotlight_size(void *data,
                  Evas_Object *obj EINA_UNUSED,
@@ -507,6 +677,13 @@ spotlight_size(void *data,
      }
 }
 
+/**
+ * @brief Callback for the animation checkbox.
+ *
+ * Toggles animated transitions for the spotlight manager.
+ * @param data The `Params` struct containing the spotlight.
+ * @param ev The event object, containing the checkbox.
+ */
 static void
 _animation_cb(void *data, const Efl_Event *ev)
 {
@@ -515,6 +692,17 @@ _animation_cb(void *data, const Efl_Event *ev)
    efl_ui_spotlight_manager_animated_transition_set(efl_ui_spotlight_manager_get(params->spotlight), efl_ui_selectable_selected_get(ev->object));
 }
 
+/**
+ * @brief Creates the UI for toggling spotlight animations.
+ *
+ * This function is called when "Animation" is selected from the list. It pushes
+ * a new view to the naviframe containing a checkbox to enable or disable
+ * animated transitions for the spotlight manager.
+ *
+ * @param data The main `Params` struct.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 view_animation_cb(void *data,
                   Evas_Object *obj EINA_UNUSED,
@@ -541,6 +729,13 @@ view_animation_cb(void *data,
    efl_gfx_entity_visible_set(ck, 1);
 }
 
+/**
+ * @brief Callback for the scroll block checkbox.
+ *
+ * Toggles the scroll block state for the spotlight manager.
+ * @param data The `Params` struct containing the spotlight.
+ * @param ev The event object, containing the checkbox.
+ */
 static void
 _scroll_block_check_cb(void *data, const Efl_Event *ev)
 {
@@ -549,6 +744,17 @@ _scroll_block_check_cb(void *data, const Efl_Event *ev)
    efl_ui_spotlight_manager_scroll_block_set(efl_ui_spotlight_manager_get(params->spotlight), efl_ui_selectable_selected_get(ev->object));
 }
 
+/**
+ * @brief Creates the UI for toggling the scroll block feature.
+ *
+ * This function is called when "Scroll Block" is selected from the list. It pushes
+ * a new view to the naviframe containing a checkbox to enable or disable
+ * scroll blocking for the spotlight manager.
+ *
+ * @param data The main `Params` struct.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 scroll_block_cb(void *data,
                 Evas_Object *obj EINA_UNUSED,
@@ -575,6 +781,17 @@ scroll_block_cb(void *data,
    efl_gfx_entity_visible_set(ck, 1);
 }
 
+/**
+ * @brief Creates the UI for packing and unpacking elements.
+ *
+ * This function is called when "Pack / Unpack" is selected from the list. It pushes
+ * a new view to the naviframe containing buttons and spinners to perform various
+ * packing operations on the spotlight container.
+ *
+ * @param data The main `Params` struct.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 pack_cb(void *data,
         Evas_Object *obj EINA_UNUSED,
@@ -762,6 +979,17 @@ pack_cb(void *data,
            efl_pack_end(box, efl_added));
 }
 
+/**
+ * @brief Creates the UI for setting the active element index.
+ *
+ * This function is called when "Active Index" is selected from the list. It pushes
+ * a new view to the naviframe containing a spinner to select an index and a button
+ * to set it as the active element in the spotlight.
+ *
+ * @param data The main `Params` struct.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 active_index_cb(void *data,
                 Evas_Object *obj EINA_UNUSED,
@@ -812,6 +1040,17 @@ active_index_cb(void *data,
    efl_event_callback_add(btn, EFL_EVENT_DEL, page_set_btn_del_cb, psp);
 }
 
+/**
+ * @brief Creates the UI for changing the spotlight indicator.
+ *
+ * This function is called when "Indicator" is selected from the list. It pushes
+ * a new view to the naviframe containing buttons to change the indicator type
+ * (e.g., to an icon-based indicator or to none).
+ *
+ * @param data The main `Params` struct.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 indicator_cb(void *data,
              Evas_Object *obj EINA_UNUSED,
@@ -844,6 +1083,18 @@ indicator_cb(void *data,
            efl_pack_end(box, efl_added));
 }
 
+/**
+ * @brief Test case for Efl.Ui.Stack as a spotlight.
+ *
+ * This test sets up a window with a naviframe for controls and an Efl.Ui.Stack
+ * widget. The stack behaves as a spotlight where you can push and pop views.
+ * This variant does not allow interactive scrolling between views; navigation
+ * is done via push/pop buttons.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_ui_spotlight_stack(void *data EINA_UNUSED,
                           Evas_Object *obj EINA_UNUSED,
@@ -940,6 +1191,18 @@ test_ui_spotlight_stack(void *data EINA_UNUSED,
    efl_gfx_entity_size_set(win, EINA_SIZE2D(580, 320));
 }
 
+/**
+ * @brief Test case for Efl.Ui.Spotlight.Container.
+ *
+ * This test sets up a window with a naviframe for controls and an
+ * Efl.Ui.Spotlight.Container widget. This container shows one item at a time
+ * and allows navigating between them with 'Prev' and 'Next' buttons. It does
+ * not support interactive scrolling.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_ui_spotlight_plain(void *data EINA_UNUSED,
                           Evas_Object *obj EINA_UNUSED,
@@ -1034,6 +1297,17 @@ test_ui_spotlight_plain(void *data EINA_UNUSED,
    efl_gfx_entity_size_set(win, EINA_SIZE2D(580, 320));
 }
 
+/**
+ * @brief Test case for Efl.Ui.Pager as a spotlight with scrolling.
+ *
+ * This test sets up a window with a naviframe for controls and an Efl.Ui.Pager
+ * widget. The pager acts as a spotlight that allows interactive scrolling
+ * between views, in addition to 'Prev' and 'Next' buttons.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_ui_spotlight_scroll(void *data EINA_UNUSED,
                            Evas_Object *obj EINA_UNUSED,
@@ -1130,6 +1404,18 @@ test_ui_spotlight_scroll(void *data EINA_UNUSED,
 }
 
 
+/**
+ * @brief Test case for custom spotlight animations.
+ *
+ * This test demonstrates how to use a custom animation manager with a spotlight
+ * container. It defines separate animations for push, pop, and jump transitions
+ * and applies them to the spotlight. The spotlight itself is a stack-like
+ * container, navigated via 'Push' and 'Pop' buttons.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_ui_spotlight_animation(void *data EINA_UNUSED,
                            Evas_Object *obj EINA_UNUSED,

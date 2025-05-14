@@ -28,10 +28,32 @@
 
 #include "ecore_drm_private.h"
 
+/**
+ * @brief Event type for when a new seat is added.
+ * This event is triggered when a new input seat is created and added to the system.
+ * The event_info parameter of the Ecore_Event_Handler will be NULL for this event.
+ */
 EAPI int ECORE_DRM_EVENT_SEAT_ADD = -1;
+
+/**
+ * @brief Hash table to store file descriptors associated with device paths.
+ * This is used to keep track of opened device file descriptors, mapping the
+ * device path (char *) to the file descriptor (int).
+ */
 static Eina_Hash *_fd_hash = NULL;
 
 /* local functions */
+/**
+ * @brief Callback function to open a device file in a restricted manner.
+ * This function is part of the libinput_interface and is called by libinput
+ * when it needs to open a device file. It uses the ecore_drm_launcher
+ * to perform the open operation, which may involve special privileges.
+ *
+ * @param path The path to the device file to open.
+ * @param flags The flags to use when opening the file (e.g., O_RDONLY, O_RDWR).
+ * @param data User data, expected to be an Ecore_Drm_Input pointer.
+ * @return The file descriptor of the opened device, or -1 on error.
+ */
 static int
 _cb_open_restricted(const char *path, int flags, void *data)
 {
@@ -49,6 +71,15 @@ _cb_open_restricted(const char *path, int flags, void *data)
    return fd;
 }
 
+/**
+ * @brief Callback function to close a device file that was opened by _cb_open_restricted.
+ * This function is part of the libinput_interface and is called by libinput
+ * when it needs to close a device file. It uses the ecore_drm_launcher
+ * to perform the close operation.
+ *
+ * @param fd The file descriptor of the device to close.
+ * @param data User data, expected to be an Ecore_Drm_Input pointer.
+ */
 static void
 _cb_close_restricted(int fd, void *data)
 {
@@ -75,6 +106,17 @@ _cb_close_restricted(int fd, void *data)
      }
 }
 
+/**
+ * @brief Creates a new Ecore_Drm_Seat structure.
+ * A seat represents a collection of input devices (keyboard, mouse, touch, etc.)
+ * that belong to a single user. This function allocates and initializes a new
+ * seat, associates it with the given input, and adds it to the list of seats
+ * for the Ecore_Drm_Device. It also triggers an ECORE_DRM_EVENT_SEAT_ADD event.
+ *
+ * @param input The Ecore_Drm_Input this seat will be associated with.
+ * @param seat The name of the seat to create (e.g., "seat0").
+ * @return A pointer to the newly created Ecore_Drm_Seat, or NULL on failure.
+ */
 static Ecore_Drm_Seat *
 _seat_create(Ecore_Drm_Input *input, const char *seat)
 {
@@ -95,6 +137,15 @@ _seat_create(Ecore_Drm_Input *input, const char *seat)
    return s;
 }
 
+/**
+ * @brief Retrieves an existing Ecore_Drm_Seat by name, or creates it if not found.
+ * This function first searches for a seat with the given name. If found, it is
+ * returned. Otherwise, a new seat with that name is created using _seat_create().
+ *
+ * @param input The Ecore_Drm_Input to search within or associate a new seat with.
+ * @param seat The name of the seat to find or create.
+ * @return A pointer to the Ecore_Drm_Seat, or NULL if creation fails.
+ */
 static Ecore_Drm_Seat *
 _seat_get(Ecore_Drm_Input *input, const char *seat)
 {
@@ -108,6 +159,15 @@ _seat_get(Ecore_Drm_Input *input, const char *seat)
    return _seat_create(input, seat);
 }
 
+/**
+ * @brief Handles the addition of a new input device by libinput.
+ * This function is called when libinput detects a new input device. It retrieves
+ * the seat associated with the device, creates an Ecore_Drm_Evdev representation
+ * for the device, and adds it to the seat's device list.
+ *
+ * @param input The Ecore_Drm_Input context.
+ * @param device The libinput_device structure for the newly added device.
+ */
 static void
 _device_added(Ecore_Drm_Input *input, struct libinput_device *device)
 {
@@ -139,6 +199,16 @@ _device_added(Ecore_Drm_Input *input, struct libinput_device *device)
    seat->devices = eina_list_append(seat->devices, edev);
 }
 
+/**
+ * @brief Handles the removal of an input device by libinput.
+ * This function is called when libinput detects that an input device has been
+ * removed. It retrieves the Ecore_Drm_Evdev structure associated with the
+ * libinput_device, removes it from its seat's device list, closes the device
+ * via the launcher, and frees the Ecore_Drm_Evdev structure.
+ *
+ * @param input The Ecore_Drm_Input context (unused in this function).
+ * @param device The libinput_device structure for the removed device.
+ */
 static void
 _device_removed(Ecore_Drm_Input *input EINA_UNUSED, struct libinput_device *device)
 {
@@ -161,6 +231,16 @@ _device_removed(Ecore_Drm_Input *input EINA_UNUSED, struct libinput_device *devi
    _ecore_drm_evdev_device_destroy(edev);
 }
 
+/**
+ * @brief Processes udev-related events from libinput.
+ * This function specifically handles LIBINPUT_EVENT_DEVICE_ADDED and
+ * LIBINPUT_EVENT_DEVICE_REMOVED events. Other event types are ignored by
+ * this function.
+ *
+ * @param event The libinput_event to process.
+ * @return EINA_TRUE if the event was a device added/removed event and was handled,
+ *         EINA_FALSE otherwise.
+ */
 static int
 _udev_event_process(struct libinput_event *event)
 {
@@ -188,6 +268,14 @@ _udev_event_process(struct libinput_event *event)
    return ret;
 }
 
+/**
+ * @brief Processes a single input event from libinput.
+ * This function acts as a dispatcher. It first attempts to process the event
+ * as a udev event (device added/removed). If not handled, it then attempts
+ * to process it as an evdev event (actual input like key presses, pointer motion).
+ *
+ * @param event The libinput_event to process.
+ */
 static void
 _input_event_process(struct libinput_event *event)
 {
@@ -195,6 +283,14 @@ _input_event_process(struct libinput_event *event)
    if (_ecore_drm_evdev_event_process(event)) return;
 }
 
+/**
+ * @brief Processes all pending input events from libinput.
+ * This function retrieves and processes events from the libinput context
+ * in a loop until no more events are pending. Each event is passed to
+ * _input_event_process() for handling.
+ *
+ * @param input The Ecore_Drm_Input context from which to fetch events.
+ */
 static void
 _input_events_process(Ecore_Drm_Input *input)
 {
@@ -207,6 +303,17 @@ _input_events_process(Ecore_Drm_Input *input)
      }
 }
 
+/**
+ * @brief Callback function for handling input events from the libinput file descriptor.
+ * This function is registered as an Ecore_Fd_Handler callback. When data is
+ * available on the libinput file descriptor, this function is called. It
+ * dispatches pending libinput events and then processes them.
+ *
+ * @param data User data, expected to be an Ecore_Drm_Input pointer.
+ * @param hdlr The Ecore_Fd_Handler that triggered this callback (unused).
+ * @return EINA_TRUE to keep the handler active, EINA_FALSE to remove it.
+ *         Currently always returns EINA_TRUE.
+ */
 static Eina_Bool
 _cb_input_dispatch(void *data, Ecore_Fd_Handler *hdlr EINA_UNUSED)
 {
@@ -223,6 +330,12 @@ _cb_input_dispatch(void *data, Ecore_Fd_Handler *hdlr EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @brief libinput_interface implementation for Ecore_Drm.
+ * This structure provides libinput with functions to open and close
+ * device files in a restricted (potentially privileged) manner, typically
+ * through a launcher mechanism.
+ */
 const struct libinput_interface _input_interface =
 {
    _cb_open_restricted,
@@ -230,6 +343,15 @@ const struct libinput_interface _input_interface =
 };
 
 /* public functions */
+/**
+ * @brief Creates and initializes input handling for an Ecore_Drm_Device.
+ * This function sets up libinput for the given DRM device. It creates an
+ * Ecore_Drm_Input structure, initializes a libinput context using udev,
+ * assigns the seat, processes any initial pending events, and enables input.
+ *
+ * @param dev The Ecore_Drm_Device to create input handling for.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 EAPI Eina_Bool
 ecore_drm_inputs_create(Ecore_Drm_Device *dev)
 {
@@ -285,6 +407,15 @@ err:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Destroys input handling resources for an Ecore_Drm_Device.
+ * This function cleans up all resources associated with input handling for the
+ * given DRM device. It iterates through all seats and their devices, closing
+ * them via the launcher and destroying the Ecore_Drm_Evdev structures. It also
+ * frees all Ecore_Drm_Seat and Ecore_Drm_Input structures.
+ *
+ * @param dev The Ecore_Drm_Device whose input resources are to be destroyed.
+ */
 EAPI void
 ecore_drm_inputs_destroy(Ecore_Drm_Device *dev)
 {
@@ -313,6 +444,15 @@ ecore_drm_inputs_destroy(Ecore_Drm_Device *dev)
      }
 }
 
+/**
+ * @brief Enables input processing for a given Ecore_Drm_Input.
+ * This function sets up an Ecore_Fd_Handler to listen for events on the
+ * libinput file descriptor. If input was previously suspended, it resumes
+ * libinput and processes any pending events.
+ *
+ * @param input The Ecore_Drm_Input to enable.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 EAPI Eina_Bool
 ecore_drm_inputs_enable(Ecore_Drm_Input *input)
 {
@@ -351,6 +491,15 @@ err:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Disables input processing for a given Ecore_Drm_Input.
+ * This function suspends libinput, effectively stopping it from generating
+ * new input events. It also processes any events that were pending before
+ * suspension. The Ecore_Fd_Handler is not removed here, but libinput
+ * will stop signaling activity on its fd.
+ *
+ * @param input The Ecore_Drm_Input to disable.
+ */
 EAPI void
 ecore_drm_inputs_disable(Ecore_Drm_Input *input)
 {
@@ -366,12 +515,24 @@ ecore_drm_inputs_disable(Ecore_Drm_Input *input)
    input->suspended = EINA_TRUE;
 }
 
+/**
+ * @brief Initializes the Ecore_Drm input subsystem.
+ * This function is called, usually at application startup, to prepare the
+ * input handling components. Currently, it initializes the _fd_hash.
+ * @internal
+ */
 void
 _ecore_drm_inputs_init(void)
 {
    _fd_hash = eina_hash_string_superfast_new(NULL);
 }
 
+/**
+ * @brief Shuts down the Ecore_Drm input subsystem.
+ * This function is called, usually at application shutdown, to clean up
+ * resources used by the input handling components. Currently, it frees the _fd_hash.
+ * @internal
+ */
 void
 _ecore_drm_inputs_shutdown(void)
 {

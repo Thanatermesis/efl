@@ -40,9 +40,35 @@
 # define O_BINARY 0
 #endif
 
+/**
+ * @internal
+ * @brief Holds the compiled version of the Ecore library.
+ * This structure is initialized with major, minor, micro, and revision numbers
+ * defined at compile time (VMAJ, VMIN, VMIC, VREV).
+ */
 static Ecore_Version _version = { VMAJ, VMIN, VMIC, VREV };
+
+/**
+ * @brief A pointer to the Ecore library version information.
+ *
+ * This variable allows applications to query the version of Ecore
+ * they are linked against.
+ *
+ * Example:
+ * @code
+ * const Ecore_Version *version = ecore_version;
+ * printf("Ecore version: %d.%d.%d.%d\n",
+ *        version->major, version->minor, version->micro, version->revision);
+ * @endcode
+ */
 EAPI Ecore_Version *ecore_version = &_version;
 
+/**
+ * @internal
+ * @brief Stores the timestamp when EFL (Enlightenment Foundation Libraries) started.
+ * This is typically set during Ecore initialization and used to calculate
+ * the time taken for the first main loop iteration to begin.
+ */
 EAPI double _efl_startup_time = 0;
 
 #if defined(HAVE_MALLINFO) || defined(HAVE_MALLOC_INFO) || defined(HAVE_MALLINFO2)
@@ -50,80 +76,333 @@ EAPI double _efl_startup_time = 0;
    if (Global < (Local))         \
        Global = Local;
 
+/**
+ * @internal
+ * @brief Callback function for Ecore poller to gather memory statistics.
+ * This function is periodically called if ECORE_MEM_STAT environment variable is set.
+ * It collects memory usage information using mallinfo() or mallinfo2() and
+ * logs it. It also records maximum memory usage.
+ * @param data User data passed to the poller (unused in this function).
+ * @return ECORE_CALLBACK_RENEW to keep the poller active.
+ */
 static Eina_Bool _ecore_memory_statistic(void *data);
 # ifdef HAVE_MALLINFO2
+/**
+ * @internal
+ * @brief Stores the maximum total allocated space observed by _ecore_memory_statistic.
+ * Used when HAVE_MALLINFO2 is defined.
+ */
 static size_t _ecore_memory_max_total = 0;
+/**
+ * @internal
+ * @brief Stores the maximum free space observed by _ecore_memory_statistic.
+ * Used when HAVE_MALLINFO2 is defined.
+ */
 static size_t _ecore_memory_max_free = 0;
 # else
+/**
+ * @internal
+ * @brief Stores the maximum total allocated space observed by _ecore_memory_statistic.
+ * Used when HAVE_MALLINFO2 is not defined (uses mallinfo).
+ */
 static int _ecore_memory_max_total = 0;
+/**
+ * @internal
+ * @brief Stores the maximum free space observed by _ecore_memory_statistic.
+ * Used when HAVE_MALLINFO2 is not defined (uses mallinfo).
+ */
 static int _ecore_memory_max_free = 0;
 # endif
+/**
+ * @internal
+ * @brief Process ID for which memory statistics are being collected.
+ */
 static pid_t _ecore_memory_pid = 0;
 #ifdef HAVE_MALLOC_INFO
+/**
+ * @internal
+ * @brief File pointer for detailed memory statistics output when HAVE_MALLOC_INFO is defined.
+ * If ECORE_MEM_STAT is set, detailed info from malloc_info() is written to a file
+ * named ecore_mem_stat.<pid>.
+ */
 static FILE *_ecore_memory_statistic_file = NULL;
 #endif
 #endif
 
+/**
+ * @internal
+ * @brief Flag to indicate whether system modules should be loaded.
+ * Initialized to 0xff (uninitialized). Set to EINA_TRUE if ECORE_NO_SYSTEM_MODULES
+ * environment variable is set to a non-zero value, or if ecore_app_no_system_modules()
+ * is called. Otherwise, set to EINA_FALSE.
+ */
 static Eina_Bool _no_system_modules = 0xff;
 
+/**
+ * @internal
+ * @brief Converts an Ecore_Magic value to its string representation.
+ * Used for debugging purposes, especially in _ecore_magic_fail, to provide
+ * human-readable names for Ecore object types.
+ * @param m The Ecore_Magic value.
+ * @return A string representing the Ecore_Magic value, or "<UNKNOWN>" if not recognized.
+ */
 static const char *_ecore_magic_string_get(Ecore_Magic m);
+
+/**
+ * @internal
+ * @brief Initialization counter for Ecore.
+ * Incremented by ecore_init() and decremented by ecore_shutdown().
+ * Ecore is fully initialized when this counter is 1.
+ */
 static int _ecore_init_count = 0;
+
+/**
+ * @internal
+ * @brief Stores the init count value at which Ecore was considered fully initialized.
+ * This is used by ecore_shutdown() to ensure it only performs a full shutdown
+ * when the init count matches this threshold.
+ */
 static int _ecore_init_count_threshold = 0;
+
+/**
+ * @internal
+ * @brief Log domain for Ecore library messages.
+ * Registered with Eina logging system during ecore_init().
+ */
 int _ecore_log_dom = -1;
+
+/**
+ * @internal
+ * @brief Flag to enable FPS (Frames Per Second) debugging.
+ * Set to 1 if the ECORE_FPS_DEBUG environment variable is set.
+ * When enabled, Ecore tracks and reports time spent in the application's main loop.
+ */
 int _ecore_fps_debug = 0;
 
+/**
+ * @internal
+ * @brief External function, likely related to joining Ecore threads.
+ * Its specific implementation is in another part of Ecore, possibly related
+ * to ecore_thread module.
+ */
 extern void _ecore_thread_join();
 
 typedef struct _Ecore_Safe_Call Ecore_Safe_Call;
+/**
+ * @internal
+ * @brief Structure to manage thread-safe calls to the main loop.
+ * This structure encapsulates the necessary information for executing a function
+ * call (either synchronously or asynchronously) from a non-main thread in the
+ * context of the main Ecore loop.
+ */
 struct _Ecore_Safe_Call
 {
    union {
-      Ecore_Cb      async;
-      Ecore_Data_Cb sync;
-   } cb;
-   void          *data;
+      Ecore_Cb      async; /**< Callback for asynchronous execution. */
+      Ecore_Data_Cb sync;  /**< Callback for synchronous execution. */
+   } cb; /**< Union of callback function pointers. */
+   void          *data; /**< User data to be passed to the callback. For sync calls, this is also used to return data. */
 
-   Eina_Lock      m;
-   Eina_Condition c;
+   Eina_Lock      m; /**< Mutex for synchronization, primarily for synchronous calls and suspend. */
+   Eina_Condition c; /**< Condition variable for synchronous calls and suspend. */
 
-   Efl_Domain_Data *eo_domain_data;
-   int              current_id;
+   Efl_Domain_Data *eo_domain_data; /**< EO domain data for thread suspension. */
+   int              current_id;    /**< ID for the current thread when suspending. */
 
-   Eina_Bool      sync : 1;
-   Eina_Bool      suspend : 1;
+   Eina_Bool      sync : 1;    /**< Flag: EINA_TRUE if the call is synchronous. */
+   Eina_Bool      suspend : 1; /**< Flag: EINA_TRUE if this call is to suspend the main loop for a thread. */
 };
 
+/**
+ * @internal
+ * @brief Queues a function call to be executed safely in the main Ecore loop.
+ * This function takes an Ecore_Safe_Call structure, adds it to a list,
+ * and signals the main loop (via a pipe) to process the pending calls.
+ * @param order Pointer to the Ecore_Safe_Call structure describing the call.
+ */
 static void _ecore_main_loop_thread_safe_call(Ecore_Safe_Call *order);
+
+/**
+ * @internal
+ * @brief Cleans up resources associated with a synchronous Ecore_Safe_Call.
+ * This function is typically called asynchronously after a synchronous call
+ * has completed to free the lock and condition variable.
+ * @param data Pointer to the Ecore_Safe_Call structure to clean up.
+ */
 static void _thread_safe_cleanup(void *data);
+
+/**
+ * @internal
+ * @brief Callback executed in the main loop when data is written to the _thread_call pipe.
+ * This function is triggered by ecore_pipe_write (e.g., from _ecore_main_loop_thread_safe_call)
+ * and is responsible for processing the queue of pending thread-safe calls (_thread_cb).
+ * @param data User data associated with the pipe (unused).
+ * @param buffer Data read from the pipe (unused, serves as a wakeup signal).
+ * @param nbyte Number of bytes read from the pipe (unused).
+ */
 static void _thread_callback(void        *data,
                              void        *buffer,
                              unsigned int nbyte);
+
+/**
+ * @internal
+ * @brief List of pending Ecore_Safe_Call requests.
+ * Functions enqueued by _ecore_main_loop_thread_safe_call are added to this list.
+ * The main loop processes this list in _thread_callback.
+ * Access to this list is protected by _thread_safety lock.
+ * Example of an element in the list:
+ * @code
+ * // For an asynchronous call:
+ * Ecore_Safe_Call *call_async = {
+ *   .cb.async = my_async_function,
+ *   .data = my_user_data,
+ *   .sync = EINA_FALSE,
+ *   .suspend = EINA_FALSE
+ * };
+ * // For a synchronous call:
+ * Ecore_Safe_Call *call_sync = {
+ *   .cb.sync = my_sync_function,
+ *   .data = my_user_data_for_sync, // also used for return
+ *   .m = // initialized lock
+ *   .c = // initialized condition
+ *   .sync = EINA_TRUE,
+ *   .suspend = EINA_FALSE
+ * };
+ * @endcode
+ */
 static Eina_List *_thread_cb = NULL;
+
+/**
+ * @internal
+ * @brief Pipe used to signal the main loop about pending thread-safe calls.
+ * When a thread needs to execute a function in the main loop, it writes to this
+ * pipe. The main loop listens on this pipe and calls _thread_callback when data arrives.
+ */
 static Ecore_Pipe *_thread_call = NULL;
+
+/**
+ * @internal
+ * @brief Lock to protect access to the _thread_cb list and related operations.
+ * This ensures that adding to and processing the list of thread-safe calls is atomic.
+ */
 static Eina_Lock _thread_safety;
+
+/**
+ * @internal
+ * @brief A constant integer value (42) written to the _thread_call pipe to wake up the main loop.
+ * The actual value doesn't matter, its presence in the pipe is the signal.
+ */
 static const int wakeup = 42;
 
+/**
+ * @internal
+ * @brief Counter for nested calls to ecore_thread_main_loop_begin() from the same thread.
+ * A thread is considered to have "locked" the main loop if this is > 0.
+ */
 static int _thread_loop = 0;
+
+/**
+ * @internal
+ * @brief Mutex for synchronizing access to _thread_id and _thread_id_update, and for the _thread_cond condition variable.
+ * Used in ecore_thread_main_loop_begin/end.
+ */
 static Eina_Lock _thread_mutex;
+
+/**
+ * @internal
+ * @brief Condition variable used by ecore_thread_main_loop_begin() to wait for its turn to acquire the main loop.
+ * Signaled by ecore_thread_main_loop_end().
+ */
 static Eina_Condition _thread_cond;
+
+/**
+ * @internal
+ * @brief Mutex for the _thread_feedback_cond condition variable.
+ * Used in ecore_thread_main_loop_end() to wait for confirmation that the main loop has acknowledged the release.
+ */
 static Eina_Lock _thread_feedback_mutex;
+
+/**
+ * @internal
+ * @brief Condition variable used by ecore_thread_main_loop_end() to wait for the main loop to fully release control.
+ * Signaled by the main loop after processing the thread's release request.
+ */
 static Eina_Condition _thread_feedback_cond;
 
+/**
+ * @internal
+ * @brief Lock to protect access to _thread_id_max.
+ */
 static Eina_Lock _thread_id_lock;
+
+/**
+ * @internal
+ * @brief Identifier of the thread currently holding the main loop "lock" (via ecore_thread_main_loop_begin).
+ * -1 indicates no thread holds the lock.
+ */
 static int _thread_id = -1;
+
+/**
+ * @internal
+ * @brief Maximum thread ID assigned so far for main loop suspension.
+ * Used to generate unique IDs for threads calling ecore_thread_main_loop_begin().
+ */
 static int _thread_id_max = 0;
+
+/**
+ * @internal
+ * @brief Stores the ID of the thread that is releasing the main loop.
+ * Used in the synchronization logic between ecore_thread_main_loop_end() and the main loop.
+ */
 static int _thread_id_update = 0;
 
+/**
+ * @internal
+ * @brief Current power state of the system (e.g., mains, battery, low power).
+ * Updated by ecore_power_state_set() and queried by ecore_power_state_get().
+ */
 static Ecore_Power_State _ecore_power_state = ECORE_POWER_STATE_MAINS;
+
+/**
+ * @internal
+ * @brief Current memory state of the system (e.g., normal, low memory).
+ * Updated by ecore_memory_state_set() and queried by ecore_memory_state_get().
+ */
 static Ecore_Memory_State _ecore_memory_state = ECORE_MEMORY_STATE_NORMAL;
 
 #ifdef HAVE_SYSTEMD
+/**
+ * @internal
+ * @brief Callback function for the systemd watchdog timer.
+ * This function is called periodically when systemd watchdog support is enabled.
+ * It notifies systemd that the application is still alive ("WATCHDOG=1").
+ * @param data User data associated with the timer (unused).
+ * @param event Event information (unused).
+ */
 static void _systemd_watchdog_cb(void *data, const Efl_Event *event);
 
+/**
+ * @internal
+ * @brief Timer object for systemd watchdog integration.
+ * If the WATCHDOG_USEC environment variable is set, this timer is created
+ * to periodically call _systemd_watchdog_cb.
+ */
 static Efl_Loop_Timer *_systemd_watchdog = NULL;
 #endif
 
+/**
+ * @internal
+ * @brief Lock for protecting critical sections within the Ecore main loop itself.
+ * This is distinct from locks used for thread-safe calls from other threads.
+ * It's used, for example, during main loop iteration.
+ */
 Eina_Lock _ecore_main_loop_lock;
+
+/**
+ * @internal
+ * @brief Counter for the number of times _ecore_main_loop_lock has been acquired.
+ * Used to handle recursive locking of the main loop.
+ */
 int _ecore_main_lock_count;
 
 /* OpenBSD does not define CODESET
@@ -134,9 +413,42 @@ int _ecore_main_lock_count;
 # define CODESET "INVALID"
 #endif
 
+/**
+ * @internal
+ * @brief Eina_Prefix structure for Ecore.
+ * Initialized during ecore_init(), this holds information about Ecore's
+ * installation paths (binary, library, data directories).
+ */
 static Eina_Prefix *_ecore_pfx = NULL;
+
+/**
+ * @internal
+ * @brief Eina_Array to store loaded Ecore system modules.
+ * Populated by ecore_system_modules_load() and cleared by
+ * ecore_system_modules_unload().
+ * The array would contain Eina_Module pointers.
+ * Example structure (conceptual):
+ * @code
+ * // module_list might contain:
+ * // [ eina_module_new("path/to/systemd_module.so"),
+ * //   eina_module_new("path/to/tizen_module.so") ]
+ * @endcode
+ */
 static Eina_Array *module_list = NULL;
 
+/**
+ * @internal
+ * @brief Loads Ecore system-specific modules.
+ *
+ * This function searches for and loads modules from predefined system paths
+ * or build directory (if EFL_RUN_IN_TREE is set). Modules like "systemd"
+ * or "tizen" might be loaded depending on availability and build configuration.
+ * Loaded modules are added to the `module_list`.
+ *
+ * @note The function has a "MODFIX" comment indicating a potential area
+ * for improvement: instead of loading all found modules, it could detect
+ * and load only necessary ones.
+ */
 static void
 ecore_system_modules_load(void)
 {
@@ -191,6 +503,13 @@ ecore_system_modules_load(void)
    eina_module_list_load(module_list);
 }
 
+/**
+ * @internal
+ * @brief Unloads all Ecore system modules that were previously loaded.
+ *
+ * This function iterates through the `module_list`, unloads each module,
+ * and then frees the list itself. It's typically called during Ecore shutdown.
+ */
 static void
 ecore_system_modules_unload(void)
 {
@@ -202,6 +521,21 @@ ecore_system_modules_unload(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback executed after the first main loop iteration if EFL_FIRST_LOOP is set.
+ *
+ * This function is registered to run on the EFL_APP_EVENT_RESUME event after
+ * the main loop starts. Its behavior depends on the first character of the
+ * string provided by the EFL_FIRST_LOOP environment variable:
+ * - 'A': Calls abort().
+ * - 'E' or 'D': Calls exit(-1).
+ * - 'T': Prints the time taken from EFL startup to the first loop iteration.
+ * After execution, it removes itself as an event callback.
+ *
+ * @param data A C-string, the value of the EFL_FIRST_LOOP environment variable.
+ * @param event The EFL_APP_EVENT_RESUME event object.
+ */
 static void
 _efl_first_loop_iterate(void *data, const Efl_Event *event)
 {

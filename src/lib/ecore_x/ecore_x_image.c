@@ -22,9 +22,21 @@
 #include <X11/extensions/XShm.h>
 #include <X11/Xutil.h>
 
-static int _ecore_x_image_shm_can = -1;
-static int _ecore_x_image_err = 0;
+static int _ecore_x_image_shm_can = -1; /**< Cache for SHM availability: -1 unk, 0 no, 1 yes */
+static int _ecore_x_image_err = 0; /**< Flag to indicate if an X error occurred */
 
+/**
+ * @internal
+ * @brief X error handler for image operations.
+ *
+ * This function is registered as a temporary X error handler during
+ * certain image operations to detect failures. It sets the
+ * global _ecore_x_image_err flag if an error occurs.
+ *
+ * @param d The display connection.
+ * @param ev The XErrorEvent structure.
+ * @return Always 0.
+ */
 static int
 _ecore_x_image_error_handler(Display *d EINA_UNUSED, XErrorEvent *ev)
 {
@@ -86,6 +98,16 @@ _ecore_x_image_error_handler(Display *d EINA_UNUSED, XErrorEvent *ev)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Checks if the X server supports MIT-SHM extension and it's usable.
+ *
+ * This function attempts to create a small SHM segment and attach it
+ * to verify that SHM operations are working correctly. The result is
+ * cached in _ecore_x_image_shm_can.
+ *
+ * @return 1 if SHM is available and usable, 0 otherwise.
+ */
 int
 _ecore_x_image_shm_check(void)
 {
@@ -174,9 +196,24 @@ struct _Ecore_X_Image
    int             w, h;
    int             bpl, bpp, rows;
    unsigned char  *data;
-   Eina_Bool       shm : 1;
+   Eina_Bool       shm : 1; /**< EINA_TRUE if SHM is used, EINA_FALSE otherwise */
 };
 
+/**
+ * @brief Creates a new Ecore_X_Image.
+ *
+ * This function allocates and initializes an Ecore_X_Image structure.
+ * It determines whether to use SHM based on server capabilities.
+ * The actual XImage is not created until data is accessed or the image is used.
+ *
+ * @param w The width of the image.
+ * @param h The height of the image.
+ * @param vis The Ecore_X_Visual to use for the image. If NULL, the default visual is used.
+ * @param depth The depth of the image. If 0, the default depth is used.
+ * @return A pointer to the newly created Ecore_X_Image, or NULL on failure.
+ *
+ * @see ecore_x_image_free()
+ */
 EAPI Ecore_X_Image *
 ecore_x_image_new(int w,
                   int h,
@@ -203,6 +240,16 @@ ecore_x_image_new(int w,
    return im;
 }
 
+/**
+ * @brief Frees an Ecore_X_Image.
+ *
+ * This function releases all resources associated with an Ecore_X_Image,
+ * including any XImage data and SHM segments if used.
+ *
+ * @param im The Ecore_X_Image to free.
+ *
+ * @see ecore_x_image_new()
+ */
 EAPI void
 ecore_x_image_free(Ecore_X_Image *im)
 {
@@ -227,6 +274,15 @@ ecore_x_image_free(Ecore_X_Image *im)
    free(im);
 }
 
+/**
+ * @internal
+ * @brief Finalizes Ecore_X_Image properties after XImage creation.
+ *
+ * This function sets up internal fields like data pointer, bytes per line,
+ * rows, and bytes per pixel based on the created XImage.
+ *
+ * @param im The Ecore_X_Image to finalize.
+ */
 static void
 _ecore_x_image_finalize(Ecore_X_Image *im)
 {
@@ -239,6 +295,16 @@ _ecore_x_image_finalize(Ecore_X_Image *im)
    else im->bpp = 4;
 }
 
+/**
+ * @internal
+ * @brief Creates an XImage using SHM.
+ *
+ * This function allocates an XImage and associated SHM segment.
+ * It handles SHM setup, attachment, and error checking.
+ *
+ * @param im The Ecore_X_Image for which to create the SHM XImage.
+ *           The im->xim will be set on success.
+ */
 static void
 _ecore_x_image_shm_create(Ecore_X_Image *im)
 {
@@ -277,6 +343,15 @@ _ecore_x_image_shm_create(Ecore_X_Image *im)
    _ecore_x_image_finalize(im);
 }
 
+/**
+ * @internal
+ * @brief Creates an XImage without using SHM.
+ *
+ * This function allocates a standard XImage and its data buffer in client memory.
+ *
+ * @param im The Ecore_X_Image for which to create the XImage.
+ *           The im->xim will be set on success.
+ */
 static void
 _ecore_x_image_create(Ecore_X_Image *im)
 {
@@ -293,6 +368,29 @@ _ecore_x_image_create(Ecore_X_Image *im)
    _ecore_x_image_finalize(im);
 }
 
+/**
+ * @brief Gets image data from a drawable into an Ecore_X_Image.
+ *
+ * This function copies a rectangular region from the given drawable
+ * (Window or Pixmap) into the Ecore_X_Image. If SHM is used and the
+ * source region matches the image dimensions and starts at (0,0) in the image,
+ * an optimized path using XShmGetImage directly into the image buffer is taken.
+ * Otherwise, if SHM is used but the regions don't align perfectly, a temporary
+ * SHM image is created for the XShmGetImage call, and then the data is copied
+ * to the target Ecore_X_Image. If SHM is not used, XGetSubImage is used.
+ *
+ * The Ecore_X_Image's internal XImage is created if it doesn't exist.
+ *
+ * @param im The Ecore_X_Image to store the data in.
+ * @param draw The source Ecore_X_Drawable (Window or Pixmap).
+ * @param x The x-coordinate in the drawable from which to get the image data.
+ * @param y The y-coordinate in the drawable from which to get the image data.
+ * @param sx The x-coordinate in the Ecore_X_Image where the retrieved data will be placed.
+ * @param sy The y-coordinate in the Ecore_X_Image where the retrieved data will be placed.
+ * @param w The width of the rectangular region to get.
+ * @param h The height of the rectangular region to get.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 EAPI Eina_Bool
 ecore_x_image_get(Ecore_X_Image *im,
                   Ecore_X_Drawable draw,
@@ -387,6 +485,28 @@ ecore_x_image_get(Ecore_X_Image *im,
    return ret;
 }
 
+/**
+ * @brief Puts image data from an Ecore_X_Image to a drawable.
+ *
+ * This function copies a rectangular region from the Ecore_X_Image
+ * to the specified drawable (Window or Pixmap) using the given
+ * graphics context (GC). If SHM is used, XShmPutImage is called,
+ * otherwise XPutImage is used.
+ *
+ * The Ecore_X_Image's internal XImage is created if it doesn't exist.
+ * If no GC is provided, a temporary one is created.
+ *
+ * @param im The source Ecore_X_Image.
+ * @param draw The destination Ecore_X_Drawable (Window or Pixmap).
+ * @param gc The Ecore_X_GC (Graphics Context) to use for the operation.
+ *           If 0, a default GC is created and used.
+ * @param x The x-coordinate in the drawable where the image data will be placed.
+ * @param y The y-coordinate in the drawable where the image data will be placed.
+ * @param sx The x-coordinate in the Ecore_X_Image from which to get the data.
+ * @param sy The y-coordinate in the Ecore_X_Image from which to get the data.
+ * @param w The width of the rectangular region to put.
+ * @param h The height of the rectangular region to put.
+ */
 EAPI void
 ecore_x_image_put(Ecore_X_Image *im,
                   Ecore_X_Drawable draw,
@@ -428,6 +548,20 @@ ecore_x_image_put(Ecore_X_Image *im,
    if (tgc) ecore_x_gc_free(tgc);
 }
 
+/**
+ * @brief Gets a pointer to the raw image data of an Ecore_X_Image.
+ *
+ * This function provides direct access to the image pixel data.
+ * The Ecore_X_Image's internal XImage is created if it doesn't exist.
+ *
+ * @param im The Ecore_X_Image.
+ * @param bpl If not NULL, stores the number of bytes per line of the image data.
+ * @param rows If not NULL, stores the number of rows (height) of the image data.
+ * @param bpp If not NULL, stores the number of bytes per pixel of the image data.
+ * @return A pointer to the raw image data, or NULL on failure or if the image
+ *         has not been populated yet. The data format depends on the image's
+ *         depth and visual.
+ */
 EAPI void *
 ecore_x_image_data_get(Ecore_X_Image *im,
                        int *bpl,
@@ -447,6 +581,17 @@ ecore_x_image_data_get(Ecore_X_Image *im,
    return im->data;
 }
 
+/**
+ * @brief Checks if the Ecore_X_Image is in a format compatible with ARGB32.
+ *
+ * This function determines if the image's visual and depth correspond to
+ * a 32-bit ARGB format with specific masks (0xff0000 for red, 0x00ff00 for green,
+ * 0x0000ff for blue) and considers the system's byte order and X server's
+ * bitmap bit order.
+ *
+ * @param im The Ecore_X_Image to check.
+ * @return EINA_TRUE if the image is ARGB32 compatible, EINA_FALSE otherwise.
+ */
 EAPI Eina_Bool
 ecore_x_image_is_argb32_get(Ecore_X_Image *im)
 {
@@ -467,6 +612,39 @@ ecore_x_image_is_argb32_get(Ecore_X_Image *im)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Converts image data from a source format to ARGB32 format.
+ *
+ * This function takes raw image data in a format described by the source
+ * bits per pixel (sbpp), source bytes per line (sbpl), colormap (c), and
+ * visual (v), and converts a specified rectangular region of it into a
+ * 32-bit ARGB format (0xAARRGGBB, where alpha is always 0xFF).
+ *
+ * The supported source formats include:
+ * - Indexed color (8-bit) if colormap and visual allow palette lookup.
+ * - TrueColor/DirectColor:
+ *   - 24-bit RGB (RR GG BB) or BGR (BB GG RR).
+ *   - 32-bit ARGB (AA RR GG BB), ABGR (AA BB GG RR), RGBA (RR GG BB AA), BGRA (BB GG RR AA).
+ *   - 18-bit (6 bits per channel) ARGBX666.
+ *   - 16-bit RGB565, BGR565, RGBX555.
+ *
+ * @param src Pointer to the source image data.
+ * @param sbpp Source bits per pixel (e.g., 8, 16, 24, 32). Note: this is converted to bytes internally.
+ * @param sbpl Source bytes per line (stride).
+ * @param c Source Ecore_X_Colormap (used for indexed color). Can be 0 for default.
+ * @param v Source Ecore_X_Visual, describes the pixel format of @p src.
+ * @param x X-coordinate of the top-left corner of the region in the source data.
+ * @param y Y-coordinate of the top-left corner of the region in the source data.
+ * @param w Width of the region to convert.
+ * @param h Height of the region to convert.
+ * @param dst Pointer to the destination buffer for ARGB32 data.
+ *            The ARGB32 format is 0xffRRGGBB (alpha is opaque).
+ *            Example: `unsigned int *pixels = malloc(w * h * sizeof(unsigned int));`
+ * @param dbpl Destination bytes per line (stride) for @p dst.
+ * @param dx X-coordinate of the top-left corner in the destination buffer.
+ * @param dy Y-coordinate of the top-left corner in the destination buffer.
+ * @return EINA_TRUE on successful conversion, EINA_FALSE otherwise (e.g., unsupported format).
+ */
 EAPI Eina_Bool
 ecore_x_image_to_argb_convert(void *src,
                               int sbpp,

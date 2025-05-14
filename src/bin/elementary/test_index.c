@@ -4,36 +4,61 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Structure to hold data for the index test.
+ *
+ * This structure contains a pointer to the index widget and an item
+ * that is used for search operations within the test.
+ */
 struct _Idx_Data_Type
 {
-   Evas_Object *id;  /* Pointer to Index */
-   Elm_Object_Item *item; /* Item we use for search */
+   Evas_Object *id;  /**< Pointer to Index widget */
+   Elm_Object_Item *item; /**< Item we use for search */
 };
 typedef struct _Idx_Data_Type Idx_Data_Type;
 
+/**
+ * @brief Structure to hold API test data.
+ *
+ * This contains the current state of the API test and the
+ * index data associated with it.
+ */
 struct _api_data
 {
-   unsigned int state;  /* What state we are testing       */
-   Idx_Data_Type dt;
+   unsigned int state;  /**< What state we are testing */
+   Idx_Data_Type dt; /**< Index data for the test */
 };
 typedef struct _api_data api_data;
 
+/**
+ * @brief Enumeration of API test states.
+ *
+ * Each value corresponds to a specific API function of the index
+ * widget that is being tested.
+ */
 enum _api_state
 {
-   INDEX_LEVEL_SET,
-   INDEX_ACTIVE_SET,
-   INDEX_DELAY_CHANGE_TIME_SET,
-   INDEX_APPEND_RELATIVE,
-   INDEX_PREPEND,
-   INDEX_ITEM_DEL,
-   INDEX_ITEM_FIND,
-   INDEX_HORIZONTAL,
-   INDEX_INDICATOR_DISABLED,
-   INDEX_CLEAR,
-   API_STATE_LAST
+   INDEX_LEVEL_SET, /**< Test elm_index_item_level_set() */
+   INDEX_ACTIVE_SET, /**< Test elm_index_autohide_disabled_set() */
+   INDEX_DELAY_CHANGE_TIME_SET, /**< Test elm_index_delay_change_time_set() */
+   INDEX_APPEND_RELATIVE, /**< Test elm_index_item_insert_after() and elm_index_item_insert_before() */
+   INDEX_PREPEND, /**< Test elm_index_item_prepend() */
+   INDEX_ITEM_DEL, /**< Test elm_object_item_del() on an index item */
+   INDEX_ITEM_FIND, /**< Test elm_index_item_find() */
+   INDEX_HORIZONTAL, /**< Test elm_index_horizontal_set() */
+   INDEX_INDICATOR_DISABLED, /**< Test elm_index_indicator_disabled_set() */
+   INDEX_CLEAR, /**< Test elm_index_item_clear() */
+   API_STATE_LAST /**< Marker for the end of API states */
 };
 typedef enum _api_state api_state;
 
+/**
+ * @brief Sequentially tests the API of the Index widget.
+ * @param api The API data structure containing the current test state.
+ *
+ * This function is called to apply a specific test case on the index
+ * widget based on the state value in the @p api parameter.
+ */
 static void
 set_api_state(api_data *api)
 {
@@ -101,6 +126,16 @@ set_api_state(api_data *api)
      }
 }
 
+/**
+ * @brief Callback for the 'Next API' button click.
+ * @param data The api_data struct.
+ * @param obj The button object.
+ * @param event_info Not used.
+ *
+ * This function is called when the "Next API function" button is clicked.
+ * It triggers the next API test case, updates the button's text to
+ * reflect the new state, and disables the button when all tests are done.
+ */
 static void
 _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {  /* Will add here a SWITCH command containing code to modify test-object */
@@ -117,6 +152,17 @@ _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 }
 
 static Elm_Genlist_Item_Class itci;
+/**
+ * @brief Get the text for a genlist item.
+ * @param data The item data.
+ * @param obj The genlist object.
+ * @param part The part name.
+ * @return A newly allocated string for the item's text.
+ *
+ * This function generates a two-character text label for genlist items,
+ * based on the integer value passed in @p data. For example, if data is 0,
+ * it returns "Aa".
+ */
 static char *
 _gli_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
@@ -129,6 +175,16 @@ _gli_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UN
    return strdup(buf);
 }
 
+/**
+ * @brief Callback for the "delay,changed" smart event of the index.
+ * @param data Not used.
+ * @param obj The index object.
+ * @param event_info The selected index item.
+ *
+ * This callback is invoked after a series of rapid changes to the index have
+ * ceased, after a certain delay. It brings the corresponding genlist item
+ * to the top of the viewport.
+ */
 static void
 _index_delay_changed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -138,6 +194,14 @@ _index_delay_changed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, vo
                               ELM_GENLIST_ITEM_SCROLLTO_TOP);
 }
 
+/**
+ * @brief Callback for the "changed" smart event of the index.
+ * @param data Not used.
+ * @param obj The index object.
+ * @param event_info The selected index item.
+ *
+ * This is called on every single change of the selected item in the index.
+ */
 static void
 _index_changed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -145,6 +209,15 @@ _index_changed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *ev
    // elm_genlist_item_bring_in(event_info);
 }
 
+/**
+ * @brief Callback for the "selected" smart event of the index.
+ * @param data Not used.
+ * @param obj The index object.
+ * @param event_info The selected index item.
+ *
+ * This callback is invoked when an index item is selected (e.g., on mouse up).
+ * It brings the corresponding genlist item to the top of the viewport.
+ */
 static void
 _index_selected_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -153,18 +226,47 @@ _index_selected_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *e
                               ELM_GENLIST_ITEM_SCROLLTO_TOP);
 }
 
+/**
+ * @brief Cleanup callback to free allocated data.
+ * @param data The data to be freed (api_data struct).
+ * @param e Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This is called when the window is destroyed, ensuring that dynamically
+ * allocated memory for test data is released.
+ */
 static void
 _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Callback function for an index item selection.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info The selected index item.
+ *
+ * This function is associated with individual index items. When an item
+ * is selected, it prints the letter of that item.
+ */
 static void
 _id_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
    printf("Current Index : %s\n", elm_index_item_letter_get((const Elm_Object_Item *)event_info));
 }
 
+/**
+ * @brief Callback for the 'Omit mode' checkbox change.
+ * @param data The index widget.
+ * @param obj The checkbox object.
+ * @param event_info Not used.
+ *
+ * This is called when the state of the "Omit mode" checkbox changes.
+ * It enables or disables the omit feature on the index widget, which
+ * hides index items that don't have corresponding active items in the list.
+ */
 static void
 _omit_check_changed_cb(void *data, Evas_Object *obj,
                        void *event_info EINA_UNUSED)
@@ -177,6 +279,17 @@ _omit_check_changed_cb(void *data, Evas_Object *obj,
    elm_index_omit_enabled_set(id, omit);
 }
 
+/**
+ * @brief The main test function for the Index widget.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This test creates a window with a Genlist and an Index widget.
+ * It demonstrates the basic functionality and provides a button to
+ * step through various API functions for testing purposes. It also
+ * includes a checkbox to toggle the "omit" feature.
+ */
 void
 test_index(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -266,11 +379,28 @@ test_index(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_inf
 
 /***********/
 
+/**
+ * @brief Structure to hold UI elements for the second index test.
+ *
+ * This structure aggregates pointers to the main widgets used in
+ * the test_index2 function for easier access in callbacks.
+ */
 typedef struct _Test_Index2_Elements
 {
-   Evas_Object *entry, *lst, *id;
+   Evas_Object *entry; /**< The entry widget for new item labels */
+   Evas_Object *lst;   /**< The list widget */
+   Evas_Object *id;    /**< The index widget */
 } Test_Index2_Elements;
 
+/**
+ * @brief Deletion callback for the second index test.
+ * @param data The Test_Index2_Elements struct.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * Frees the memory allocated for the GUI elements structure when
+ * the window is closed.
+ */
 static void
 _test_index2_del(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -278,6 +408,17 @@ _test_index2_del(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA
    free(data);
 }
 
+/**
+ * @brief Comparison function for list items.
+ * @param data1 First list item (Elm_Object_Item *).
+ * @param data2 Second list item (Elm_Object_Item *).
+ * @return An integer less than, equal to, or greater than zero if the
+ *         first item's label is found, respectively, to be less than, to
+ *         match, or be greater than the second.
+ *
+ * Used for sorted insertion into the list widget. It performs a
+ * case-insensitive comparison of the item labels.
+ */
 static int
 _test_index2_cmp(const void *data1, const void *data2)
 {
@@ -291,6 +432,17 @@ _test_index2_cmp(const void *data1, const void *data2)
    return strcasecmp(label1, label2);
 }
 
+/**
+ * @brief Comparison function for index items.
+ * @param data1 First index item (Elm_Object_Item *).
+ * @param data2 Second index item (Elm_Object_Item *).
+ * @return An integer less than, equal to, or greater than zero if the
+ *         first item's letter is found, respectively, to be less than, to
+ *         match, or be greater than the second.
+ *
+ * Used for sorted insertion into the index widget. It performs a
+ * case-insensitive comparison of the item letters.
+ */
 static int
 _test_index2_icmp(const void *data1, const void *data2)
 {
@@ -304,6 +456,16 @@ _test_index2_icmp(const void *data1, const void *data2)
    return strcasecmp(label1, label2);
 }
 
+/**
+ * @brief Adds a new item to the sorted list and index.
+ * @param data The Test_Index2_Elements struct.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This function is called to add a new item. It takes the text from the
+ * entry widget, inserts it into the list in sorted order, and adds a
+ * corresponding item to the index, also in sorted order.
+ */
 static void
 _test_index2_it_add(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -324,6 +486,12 @@ _test_index2_it_add(void *data, Evas_Object *obj EINA_UNUSED, void *event_info E
    elm_list_item_show(list_it);
 }
 
+/**
+ * @brief Clears all items from the list and index.
+ * @param data The Test_Index2_Elements struct.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _test_index2_clear(void *data, Evas_Object *obj EINA_UNUSED,
                    void *event_info EINA_UNUSED)
@@ -334,6 +502,16 @@ _test_index2_clear(void *data, Evas_Object *obj EINA_UNUSED,
    elm_index_item_clear(gui->id);
 }
 
+/**
+ * @brief Deletes a selected item from the list and index.
+ * @param data The Test_Index2_Elements struct.
+ * @param obj Not used.
+ * @param event_info The list item to be deleted.
+ *
+ * This function handles the deletion of an item from the list. It also
+ * finds and removes the corresponding item from the index, or updates
+ * it if another item shares the same index letter.
+ */
 static void
 _test_index2_it_del(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -365,12 +543,32 @@ _test_index2_it_del(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
    elm_object_item_del(list_it);
 }
 
+/**
+ * @brief Callback for index changes in the second test.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info The selected index item.
+ *
+ * When the index selection changes, this function brings the corresponding
+ * list item into the visible area of the list.
+ */
 static void
 _test_index2_id_changed(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
    elm_list_item_show(elm_object_item_data_get(event_info));
 }
 
+/**
+ * @brief The main function for the second index test (sorted list).
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This test demonstrates the use of an index with a sorted list.
+ * It provides UI to add, delete, and clear items, showing how the
+ * index and list can be kept in sync. This is useful for applications
+ * like contact lists.
+ */
 void
 test_index2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -438,6 +636,17 @@ test_index2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
 
 /***** Index 3 Mode ******/
 
+/**
+ * @brief Callback to change the priority of index items.
+ * @param data The index widget.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This function toggles the standard priority of the index between 0 and 1.
+ * When the priority is changed, the index will display items of that
+ * priority level. This is useful for multilingual applications where the user
+ * might want to switch between different character sets (e.g., English and Korean).
+ */
 static void
 _index_priority_change_cb(void *data, Evas_Object *obj EINA_UNUSED,
                        void *event_info EINA_UNUSED)
@@ -455,6 +664,17 @@ _index_priority_change_cb(void *data, Evas_Object *obj EINA_UNUSED,
    printf("Priority changed to : %d\n", elm_index_standard_priority_get(index));
 }
 
+/**
+ * @brief The main function for the third index test (item priority).
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This test demonstrates the item priority feature of the index widget.
+ * It creates an index with items from different character sets (Korean and
+ * English) assigned to different priorities. A button allows toggling
+ * which priority level is displayed.
+ */
 void
 test_index3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -532,6 +752,15 @@ test_index3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
 
 /***** Index Horizontal Mode ******/
 
+/**
+ * @brief Callback for index changes in the horizontal test.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info The selected index item.
+ *
+ * When the index selection changes, this function brings the corresponding
+ * horizontal list item into view.
+ */
 static void
 _index_list_changed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                        void *event_info)
@@ -539,6 +768,15 @@ _index_list_changed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    elm_list_item_bring_in(elm_object_item_data_get(event_info));
 }
 
+/**
+ * @brief The main function for the horizontal index test.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This test creates a window with a horizontal list and a corresponding
+ * horizontal index widget, demonstrating the horizontal mode for both.
+ */
 void
 test_index_horizontal(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                       void *event_info EINA_UNUSED)

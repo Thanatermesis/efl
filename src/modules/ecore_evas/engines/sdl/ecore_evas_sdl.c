@@ -67,12 +67,29 @@ static Ecore_Poller             *ecore_evas_event;
 static int                      _ecore_evas_fps_debug = 0;
 static int                       ecore_evas_sdl_count = 0;
 
+/**
+ * @brief Finds the Ecore_Evas instance associated with a given SDL window ID.
+ *
+ * @param windowID The ID of the SDL window.
+ * @return A pointer to the Ecore_Evas instance if found, otherwise NULL.
+ */
 static Ecore_Evas *
 _ecore_evas_sdl_match(unsigned int windowID)
 {
    return SDL_GetWindowData(SDL_GetWindowFromID(windowID), "_Ecore_Evas");
 }
 
+/**
+ * @brief Switches the rendering buffer for double-buffered setups.
+ *
+ * This function is called by Evas when it needs to switch to the next
+ * buffer for rendering. It unlocks the current texture, copies it to the
+ * renderer, presents it, then locks the next texture and returns its pixel data.
+ *
+ * @param data Pointer to Ecore_Evas_SDL_Switch_Data containing buffer information.
+ * @param dest Unused parameter.
+ * @return Pointer to the pixel data of the newly locked texture, or NULL on failure.
+ */
 static void *
 _ecore_evas_sdl_switch_buffer(void *data, void *dest EINA_UNUSED)
 {
@@ -93,6 +110,16 @@ _ecore_evas_sdl_switch_buffer(void *data, void *dest EINA_UNUSED)
    return pixels;
 }
 
+/**
+ * @brief Handles the ECORE_SDL_EVENT_GOT_FOCUS event.
+ *
+ * Sets focus to the Ecore_Evas instance associated with the window that gained focus.
+ *
+ * @param data Unused.
+ * @param type Unused.
+ * @param event Pointer to Ecore_Sdl_Event_Window containing event details.
+ * @return ECORE_CALLBACK_PASS_ON to allow other handlers to process the event.
+ */
 static Eina_Bool
 _ecore_evas_sdl_event_got_focus(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -106,6 +133,16 @@ _ecore_evas_sdl_event_got_focus(void *data EINA_UNUSED, int type EINA_UNUSED, vo
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Handles the ECORE_SDL_EVENT_LOST_FOCUS event.
+ *
+ * Removes focus from the Ecore_Evas instance associated with the window that lost focus.
+ *
+ * @param data Unused.
+ * @param type Unused.
+ * @param event Pointer to Ecore_Sdl_Event_Window containing event details.
+ * @return ECORE_CALLBACK_PASS_ON to allow other handlers to process the event.
+ */
 static Eina_Bool
 _ecore_evas_sdl_event_lost_focus(void *data EINA_UNUSED, int type EINA_UNUSED, void *event EINA_UNUSED)
 {
@@ -120,6 +157,18 @@ _ecore_evas_sdl_event_lost_focus(void *data EINA_UNUSED, int type EINA_UNUSED, v
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Handles the ECORE_SDL_EVENT_RESIZE event.
+ *
+ * Updates the Ecore_Evas and Evas dimensions when the SDL window is resized.
+ * For buffer-based rendering, it recreates SDL textures to match the new size.
+ *
+ * @param data Unused.
+ * @param type Unused.
+ * @param event Pointer to Ecore_Sdl_Event_Video_Resize containing new dimensions.
+ * @return ECORE_CALLBACK_PASS_ON to allow other handlers to process the event,
+ *         or EINA_FALSE if setting new engine info fails.
+ */
 static Eina_Bool
 _ecore_evas_sdl_event_video_resize(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -183,6 +232,17 @@ _ecore_evas_sdl_event_video_resize(void *data EINA_UNUSED, int type EINA_UNUSED,
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Handles the ECORE_SDL_EVENT_EXPOSE event.
+ *
+ * Marks the entire Evas canvas as damaged to trigger a redraw when the
+ * window is exposed.
+ *
+ * @param data Unused.
+ * @param type Unused.
+ * @param event Pointer to Ecore_Sdl_Event_Window containing event details.
+ * @return ECORE_CALLBACK_PASS_ON to allow other handlers to process the event.
+ */
 static Eina_Bool
 _ecore_evas_sdl_event_video_expose(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -200,6 +260,12 @@ _ecore_evas_sdl_event_video_expose(void *data EINA_UNUSED, int type EINA_UNUSED,
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Ecore poller callback to feed SDL events into the Ecore event loop.
+ *
+ * @param data Unused.
+ * @return ECORE_CALLBACK_RENEW to keep the poller active.
+ */
 static Eina_Bool
 _ecore_evas_sdl_event(void *data EINA_UNUSED)
 {
@@ -207,6 +273,16 @@ _ecore_evas_sdl_event(void *data EINA_UNUSED)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Initializes the Ecore_Evas SDL integration.
+ *
+ * Sets up event handlers and a poller for SDL events.
+ * Manages an initialization counter to ensure it's only fully initialized once.
+ *
+ * @param w Unused width parameter.
+ * @param h Unused height parameter.
+ * @return The current initialization count.
+ */
 static int
 _ecore_evas_sdl_init(int w EINA_UNUSED, int h EINA_UNUSED)
 {
@@ -236,6 +312,14 @@ _ecore_evas_sdl_init(int w EINA_UNUSED, int h EINA_UNUSED)
    return _ecore_evas_init_count;
 }
 
+/**
+ * @brief Shuts down the Ecore_Evas SDL integration.
+ *
+ * Removes event handlers and the SDL event poller.
+ * Manages a shutdown counter.
+ *
+ * @return The current initialization count after decrementing.
+ */
 static int
 _ecore_evas_sdl_shutdown(void)
 {
@@ -257,6 +341,16 @@ _ecore_evas_sdl_shutdown(void)
    return _ecore_evas_init_count;
 }
 
+/**
+ * @brief Frees resources associated with an Ecore_Evas SDL instance.
+ *
+ * This function is part of the Ecore_Evas_Engine_Func structure and is
+ * called when an Ecore_Evas instance is destroyed. It cleans up SDL
+ * textures, renderer, and window, and shuts down SDL subsystems if this
+ * is the last Ecore_Evas SDL instance.
+ *
+ * @param ee The Ecore_Evas instance to free.
+ */
 static void
 _ecore_evas_sdl_free(Ecore_Evas *ee)
 {
@@ -283,6 +377,18 @@ _ecore_evas_sdl_free(Ecore_Evas *ee)
    SDL_VideoQuit();
 }
 
+/**
+ * @brief Resizes the Ecore_Evas canvas and associated SDL resources.
+ *
+ * This function is called when the Ecore_Evas needs to be resized.
+ * It updates internal dimensions, and if using the buffer engine,
+ * recreates SDL textures to match the new size. It then updates
+ * Evas output and viewport sizes and damages the entire canvas.
+ *
+ * @param ee The Ecore_Evas instance to resize.
+ * @param w The new width.
+ * @param h The new height.
+ */
 static void
 _ecore_evas_resize(Ecore_Evas *ee, int w, int h)
 {
@@ -341,6 +447,19 @@ _ecore_evas_resize(Ecore_Evas *ee, int w, int h)
    if (ee->func.fn_resize) ee->func.fn_resize(ee);
 }
 
+/**
+ * @brief Moves and resizes the Ecore_Evas.
+ *
+ * Updates the position and dimensions of the Ecore_Evas.
+ * If the position changes, it calls the `fn_move` callback.
+ * Then, it calls _ecore_evas_resize to handle the size change.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param x The new x-coordinate.
+ * @param y The new y-coordinate.
+ * @param w The new width.
+ * @param h The new height.
+ */
 static void
 _ecore_evas_move_resize(Ecore_Evas *ee, int x, int y, int w, int h)
 {
@@ -355,6 +474,14 @@ _ecore_evas_move_resize(Ecore_Evas *ee, int x, int y, int w, int h)
    _ecore_evas_resize(ee, w, h);
 }
 
+/**
+ * @brief Shows the Ecore_Evas window.
+ *
+ * Marks the Ecore_Evas as not withdrawn, calls the state change callback,
+ * sets focus to the Evas, and feeds a mouse_in event.
+ *
+ * @param ee The Ecore_Evas instance to show.
+ */
 static void
 _ecore_evas_show(Ecore_Evas *ee)
 {
@@ -457,6 +584,22 @@ static Ecore_Evas_Engine_Func _ecore_sdl_engine_func =
    NULL, //fn_selection_request
 };
 
+/**
+ * @brief Internal function to create a new Ecore_Evas SDL instance.
+ *
+ * This function handles the common logic for creating an Ecore_Evas backed by SDL,
+ * supporting different rendering methods (buffer or GL).
+ *
+ * @param rmethod The Evas render method ID (e.g., from evas_render_method_lookup("buffer")).
+ * @param name The window title.
+ * @param w The initial width of the window.
+ * @param h The initial height of the window.
+ * @param fullscreen Boolean, true if the window should be fullscreen.
+ * @param hwsurface Boolean, (often ignored or specific to older SDL versions/engines).
+ * @param noframe Boolean, (used by GL engine) true if the window should be borderless.
+ * @param alpha Boolean, true if the window should support alpha.
+ * @return A pointer to the newly created Ecore_Evas instance, or NULL on failure.
+ */
 static Ecore_Evas*
 _ecore_evas_internal_sdl_new(int rmethod, const char* name, int w, int h, int fullscreen, int hwsurface, int noframe EINA_UNUSED, int alpha)
 {
@@ -628,6 +771,22 @@ _ecore_evas_internal_sdl_new(int rmethod, const char* name, int w, int h, int fu
    return NULL;
 }
 
+/**
+ * @brief Creates a new Ecore_Evas SDL instance using the software buffer engine.
+ * @ingroup Ecore_Evas_SDL_Group
+ *
+ * @param name The window title. If NULL, a default title "EFL SDL" is used.
+ * @param w The initial width of the window.
+ * @param h The initial height of the window.
+ * @param fullscreen EINA_TRUE for fullscreen, EINA_FALSE otherwise.
+ * @param hwsurface EINA_TRUE to request hardware surface (behavior may vary).
+ * @param noframe EINA_TRUE for a borderless window.
+ * @param alpha EINA_TRUE to enable alpha channel support for the window.
+ * @return A pointer to the newly created Ecore_Evas instance, or NULL on failure.
+ *
+ * This function creates an Ecore_Evas that uses SDL for windowing and
+ * the Evas software buffer rendering engine.
+ */
 EMODAPI Ecore_Evas *
 ecore_evas_sdl_new_internal(const char* name, int w, int h, int fullscreen,
                             int hwsurface, int noframe, int alpha)
@@ -642,6 +801,23 @@ ecore_evas_sdl_new_internal(const char* name, int w, int h, int fullscreen,
    return ee;
 }
 
+/**
+ * @brief Placeholder for SDL 1.6 backend (deprecated/non-functional).
+ * @ingroup Ecore_Evas_SDL_Group
+ *
+ * @param name Unused.
+ * @param w Unused.
+ * @param h Unused.
+ * @param fullscreen Unused.
+ * @param hwsurface Unused.
+ * @param noframe Unused.
+ * @param alpha Unused.
+ * @return Always NULL.
+ *
+ * This function is a stub and will print an error message.
+ * It's likely a remnant from older versions or for compatibility
+ * that is no longer maintained for SDL 2.
+ */
 EMODAPI Ecore_Evas*
 ecore_evas_sdl16_new_internal(const char* name EINA_UNUSED, int w EINA_UNUSED, int h EINA_UNUSED, int fullscreen EINA_UNUSED, int hwsurface EINA_UNUSED, int noframe EINA_UNUSED, int alpha EINA_UNUSED)
 {
@@ -650,6 +826,20 @@ ecore_evas_sdl16_new_internal(const char* name EINA_UNUSED, int w EINA_UNUSED, i
 }
 
 #ifdef BUILD_ECORE_EVAS_OPENGL_SDL
+/**
+ * @brief Creates a new Ecore_Evas SDL instance using the OpenGL SDL engine.
+ * @ingroup Ecore_Evas_GL_SDL_Group
+ *
+ * @param name The window title. If NULL, a default title "EFL SDL" is used.
+ * @param w The initial width of the window.
+ * @param h The initial height of the window.
+ * @param fullscreen EINA_TRUE for fullscreen, EINA_FALSE otherwise.
+ * @param noframe EINA_TRUE for a borderless window.
+ * @return A pointer to the newly created Ecore_Evas instance, or NULL on failure.
+ *
+ * This function creates an Ecore_Evas that uses SDL for windowing and
+ * the Evas OpenGL SDL rendering engine.
+ */
 EMODAPI Ecore_Evas *
 ecore_evas_gl_sdl_new_internal(const char* name, int w, int h, int fullscreen, int noframe)
 {

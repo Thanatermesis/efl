@@ -4,6 +4,10 @@
 #ifndef _ELM_SEPARATOR_EO_CLASS_TYPE
 #define _ELM_SEPARATOR_EO_CLASS_TYPE
 
+/**
+ * @brief Opaque handle to an Elementary Separator instance.
+ * @ingroup Elm_Separator
+ */
 typedef Eo Elm_Separator;
 
 #endif
@@ -11,6 +15,11 @@ typedef Eo Elm_Separator;
 #ifndef _ELM_SEPARATOR_EO_TYPES
 #define _ELM_SEPARATOR_EO_TYPES
 
+/**
+ * @brief Placeholder for future Elm_Separator specific types.
+ * Currently, there are no specific types defined beyond the Eo handle.
+ * @ingroup Elm_Separator
+ */
 
 #endif
 /** Elementary separator class

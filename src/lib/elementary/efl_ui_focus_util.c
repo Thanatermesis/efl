@@ -9,12 +9,33 @@ typedef struct {
 
 } Efl_Ui_Focus_Util_Data;
 
+/**
+ * @brief Callback function invoked when the focus manager for an object changes.
+ *
+ * This function is typically used to re-apply focus to the object (`data`)
+ * after its manager has been established or changed.
+ *
+ * @param data The focus object that might need to regain focus.
+ * @param event The event information (unused in this function).
+ */
 static void
 _manager_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
    efl_ui_focus_util_focus(data);
 }
 
+/**
+ * @brief Checks if a given focus object can actually take focus within a manager.
+ *
+ * This function determines if a `user` object is capable of receiving focus.
+ * If the `user` is itself a focus manager, it checks if it can delegate focus
+ * to a subchild. Otherwise, it checks if the provided manager `m` can delegate
+ * focus to the `user`.
+ *
+ * @param m The focus manager to check against.
+ * @param user The focus object attempting to take focus.
+ * @return @c EINA_TRUE if the object can take focus, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _can_take_focus(Efl_Ui_Focus_Manager *m, Efl_Ui_Focus_Object *user)
 {
@@ -24,6 +45,18 @@ _can_take_focus(Efl_Ui_Focus_Manager *m, Efl_Ui_Focus_Object *user)
      return !!efl_ui_focus_manager_request_subchild(m, user);
 }
 
+/**
+ * @brief Sets the focus to the given Efl_Ui_Focus_Object.
+ *
+ * This function attempts to set the keyboard focus to the `user` object.
+ * It navigates up the focus manager hierarchy to find a suitable manager
+ * (ideally a window or a manager that can accept focus). If a manager
+ * is not immediately available (e.g., the object is not yet part of a window),
+ * it delays the focus request by registering a callback for when the
+ * manager becomes available.
+ *
+ * @param user The Efl_Ui_Focus_Object to set focus to.
+ */
 EOLIAN static void
 _efl_ui_focus_util_focus(Efl_Ui_Focus_Object *user)
 {
@@ -63,6 +96,16 @@ _efl_ui_focus_util_focus(Efl_Ui_Focus_Object *user)
      }
 }
 
+/**
+ * @brief Retrieves the currently active focus manager.
+ *
+ * This function traverses the chain of focus manager redirections
+ * to find the ultimate, non-redirecting focus manager.
+ *
+ * @param manager The initial Efl_Ui_Focus_Manager to start from.
+ * @return The active Efl_Ui_Focus_Manager at the end of the redirection chain.
+ *         Returns the input `manager` if it does not redirect.
+ */
 EOLIAN static Efl_Ui_Focus_Manager*
 _efl_ui_focus_util_active_manager(Efl_Ui_Focus_Manager *manager)
 {
@@ -72,6 +115,19 @@ _efl_ui_focus_util_active_manager(Efl_Ui_Focus_Manager *manager)
    return manager;
 }
 
+/**
+ * @brief Calculates the complementary focus direction.
+ *
+ * Given a focus direction, this function returns its opposite.
+ * For example, if `EFL_UI_FOCUS_DIRECTION_RIGHT` is provided,
+ * `EFL_UI_FOCUS_DIRECTION_LEFT` is returned.
+ *
+ * @param dir The Efl_Ui_Focus_Direction for which to find the complement.
+ *            Example: `EFL_UI_FOCUS_DIRECTION_UP`.
+ * @return The complementary Efl_Ui_Focus_Direction.
+ *         Example: `EFL_UI_FOCUS_DIRECTION_DOWN`.
+ *         Returns `EFL_UI_FOCUS_DIRECTION_LAST` if no complement is found (should not happen for valid directions).
+ */
 EOLIAN static Efl_Ui_Focus_Direction
 _efl_ui_focus_util_direction_complement(Efl_Ui_Focus_Direction dir)
 {

@@ -5,40 +5,74 @@
 #include "evas_common_private.h"
 #include "evas_private.h"
 
+/**
+ * @file
+ * @brief This file implements the QOI image saving functionality for Evas.
+ * It is based on the original qoi.h code.
+ */
+
 /*
  * code based on original qoi.h code (MIT license):
  * https://github.com/phoboslab/qoi/blob/master/qoi.h
  * date: 2023 march the 14th
  */
 
-#define QOI_SRGB   0
+#define QOI_SRGB   0 /**< QOI colorspace sRGB. */
 
-#define QOI_ZEROARR(a) memset((a),0,sizeof(a))
+#define QOI_ZEROARR(a) memset((a),0,sizeof(a)) /**< Macro to zero out an array. */
 
-#define QOI_OP_INDEX  0x00 /* 00xxxxxx */
-#define QOI_OP_DIFF   0x40 /* 01xxxxxx */
-#define QOI_OP_LUMA   0x80 /* 10xxxxxx */
-#define QOI_OP_RUN    0xc0 /* 11xxxxxx */
-#define QOI_OP_RGB    0xfe /* 11111110 */
-#define QOI_OP_RGBA   0xff /* 11111111 */
+#define QOI_OP_INDEX  0x00 /**< QOI operation: index. 00xxxxxx */
+#define QOI_OP_DIFF   0x40 /**< QOI operation: diff. 01xxxxxx */
+#define QOI_OP_LUMA   0x80 /**< QOI operation: luma. 10xxxxxx */
+#define QOI_OP_RUN    0xc0 /**< QOI operation: run.   11xxxxxx */
+#define QOI_OP_RGB    0xfe /**< QOI operation: RGB.   11111110 */
+#define QOI_OP_RGBA   0xff /**< QOI operation: RGBA.  11111111 */
 
+/**
+ * @brief Macro to calculate a hash for a QOI RGBA color.
+ * @param C The qoi_rgba_t color.
+ * @return The hash value.
+ */
 #define QOI_COLOR_HASH(C) (C.rgba.r*3 + C.rgba.g*5 + C.rgba.b*7 + C.rgba.a*11)
 
+/**
+ * @brief Magic number for QOI file format ('qoif').
+ */
 #define QOI_MAGIC \
 	(((unsigned int)'q') << 24 | ((unsigned int)'o') << 16 | \
 	 ((unsigned int)'i') <<  8 | ((unsigned int)'f'))
 
-#define QOI_HEADER_SIZE 14
+#define QOI_HEADER_SIZE 14 /**< Size of the QOI header in bytes. */
 
-#define QOI_PIXELS_MAX ((unsigned int)400000000)
+#define QOI_PIXELS_MAX ((unsigned int)400000000) /**< Maximum number of pixels QOI can handle (width * height). */
 
+/**
+ * @brief Union representing a QOI RGBA color.
+ * Can be accessed as individual r, g, b, a components or as a single unsigned int.
+ */
 typedef union {
-	struct { unsigned char r, g, b, a; } rgba;
-	unsigned int v;
+	struct { unsigned char r, g, b, a; } rgba; /**< RGBA components. */
+	unsigned int v; /**< Integer representation of the color. */
 } qoi_rgba_t;
 
+/**
+ * @brief Padding bytes for the end of a QOI file.
+ * The QOI format specification requires a specific 7-byte padding followed by a 1.
+ */
 static const unsigned char qoi_padding[8] = {0,0,0,0,0,0,0,1};
 
+/**
+ * @brief Saves an RGBA_Image to a QOI file.
+ *
+ * This function implements the core QOI encoding logic.
+ *
+ * @param im Pointer to the RGBA_Image structure to save.
+ *           The image data is expected to be in pre-multiplied ARGB format if alpha is present,
+ *           or BGRx if no alpha. This function handles conversion to non-premultiplied RGBA.
+ * @param file The path to the output QOI file.
+ * @param quality Unused parameter, present for API compatibility.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 save_image_qoi(RGBA_Image *im, const char *file, int quality EINA_UNUSED)
 {
@@ -229,19 +263,39 @@ save_image_qoi(RGBA_Image *im, const char *file, int quality EINA_UNUSED)
    return ret;
 }
 
-
+/**
+ * @brief Wrapper function to save an RGBA_Image to a QOI file.
+ *
+ * This function conforms to the Evas_Image_Save_Func interface.
+ *
+ * @param im Pointer to the RGBA_Image structure to save.
+ * @param file The path to the output QOI file.
+ * @param key Unused parameter.
+ * @param quality Quality setting for the save operation (unused for QOI).
+ * @param compress Compression level (unused for QOI).
+ * @param encoding Encoding type (unused for QOI).
+ * @return 1 on success, 0 on failure.
+ */
 static int evas_image_save_file_qoi(RGBA_Image *im, const char *file, const char *key EINA_UNUSED,
                                      int quality, int compress EINA_UNUSED, const char *encoding EINA_UNUSED)
 {
    return save_image_qoi(im, file, quality);
 }
 
-
+/**
+ * @brief Structure holding the QOI image save function.
+ */
 static Evas_Image_Save_Func evas_image_save_qoi_func =
 {
    evas_image_save_file_qoi
 };
 
+/**
+ * @brief Opens the QOI image saver module.
+ *
+ * @param em Pointer to the Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -250,11 +304,19 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Closes the QOI image saver module.
+ *
+ * @param em Pointer to the Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {
 }
 
+/**
+ * @brief API structure for the QOI image saver module.
+ */
 static Evas_Module_Api evas_modapi =
 {
    EVAS_MODULE_API_VERSION,

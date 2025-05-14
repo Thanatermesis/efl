@@ -1,5 +1,10 @@
 #include "efl_ui_container_layout.h"
 
+/**
+ * @internal
+ * @brief Calculates and adjusts minimum and maximum dimensions based on aspect ratio.
+ * @see _efl_ui_container_layout_min_max_calc in efl_ui_container_layout.h for parameter details.
+ */
 void
 _efl_ui_container_layout_min_max_calc(Efl_Ui_Container_Item_Hints *item, int *cw, int *ch, Eina_Bool aspect_check)
 {
@@ -40,6 +45,21 @@ _efl_ui_container_layout_min_max_calc(Efl_Ui_Container_Item_Hints *item, int *cw
    *ch = h;
 }
 
+/**
+ * @internal
+ * @brief Initializes item hints from an Efl_Gfx_Hint object.
+ * @see _efl_ui_container_layout_item_init in efl_ui_container_layout.h for parameter details.
+ *
+ * This function fetches various graphical hints like weight, alignment, margins,
+ * fill policy, min/max sizes, and aspect ratio from the provided Evas object.
+ * It then normalizes these values. For instance, an alignment of -1.0 is
+ * interpreted as 0.5 (center) with fill enabled. Min/max sizes are clamped
+ * to valid ranges (e.g., min size cannot be negative, max size defaults to INT_MAX
+ * if unspecified). Aspect ratio values are validated, and if one component (width or height)
+ * is zero while the other is not, it's considered an error, and aspect is disabled.
+ * Finally, it calculates the initial `space` required by the item, which is its
+ * minimum dimension plus its start and end margins.
+ */
 void
 _efl_ui_container_layout_item_init(Eo* o, Efl_Ui_Container_Item_Hints *item)
 {
@@ -107,6 +127,20 @@ _efl_ui_container_layout_item_init(Eo* o, Efl_Ui_Container_Item_Hints *item)
    item[1].space = item[1].min + item[1].margin[0] + item[1].margin[1];
 }
 
+/**
+ * @internal
+ * @brief Initializes layout calculation data for a container object.
+ * @see _efl_ui_container_layout_init in efl_ui_container_layout.h for parameter details.
+ *
+ * This function retrieves the container's geometry (x, y, width, height),
+ * its margins, content padding (space between items), and content alignment.
+ * Content alignment is used when no items within the container have a weight,
+ * determining how the packed items are positioned within the available space.
+ * Similar to item alignment, a content alignment of -1.0 implies centering
+ * and filling the space. The function then calculates the initial position (`pos`)
+ * and available size (`size`) for the content area within the container,
+ * accounting for the container's own margins.
+ */
 void
 _efl_ui_container_layout_init(Eo* obj, Efl_Ui_Container_Layout_Calc *calc)
 {

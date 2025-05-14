@@ -169,13 +169,42 @@ BCRYPT_ALG_HANDLE _eina_bcrypt_provider;
    S(abstract_content);
 #undef S
 
+/**
+ * @struct eina_desc_setup
+ * @brief Describes an Eina module's initialization and shutdown procedures.
+ *
+ * This structure holds the necessary information to manage the lifecycle
+ * of an individual Eina module, including its name and function pointers
+ * for its initialization and shutdown routines.
+ */
 struct eina_desc_setup
 {
-   const char *name;
-   Eina_Bool (*init)(void);
-   Eina_Bool (*shutdown)(void);
+   const char *name; /**< The name of the module (e.g., "list", "hash"). */
+   Eina_Bool (*init)(void); /**< Pointer to the module's initialization function. Must return #EINA_TRUE on success, #EINA_FALSE on failure. */
+   Eina_Bool (*shutdown)(void); /**< Pointer to the module's shutdown function. Must return #EINA_TRUE on success, #EINA_FALSE on failure (though failure is usually just logged). */
 };
 
+/**
+ * @brief Array of Eina module descriptors for ordered initialization and shutdown.
+ *
+ * This array lists all core Eina modules that need to be initialized when
+ * eina_init() is called and shut down when eina_shutdown() is called.
+ * The order in this array defines the initialization order. Shutdown occurs
+ * in the reverse order.
+ *
+ * Each element is an `eina_desc_setup` struct:
+ * @code
+ * {
+ *   "module_name",      // const char *name
+ *   eina_module_init,   // Eina_Bool (*init)(void)
+ *   eina_module_shutdown // Eina_Bool (*shutdown)(void)
+ * }
+ * @endcode
+ * For example:
+ * @code
+ *   { "list", eina_list_init, eina_list_shutdown }
+ * @endcode
+ */
 static const struct eina_desc_setup _eina_desc_setup[] = {
 #define S(x) {# x, eina_ ## x ## _init, eina_ ## x ## _shutdown}
    /* log is a special case as it needs printf */
@@ -221,6 +250,17 @@ static const struct eina_desc_setup _eina_desc_setup[] = {
 static const size_t _eina_desc_setup_len = sizeof(_eina_desc_setup) /
    sizeof(_eina_desc_setup[0]);
 
+/**
+ * @brief Shuts down Eina modules based on the _eina_desc_setup array.
+ *
+ * Iterates through the `_eina_desc_setup` array in reverse order of
+ * initialization and calls the shutdown function for each module.
+ * This function is called as part of eina_shutdown().
+ *
+ * @param itr A pointer to the element in `_eina_desc_setup` *after* the last
+ *            one that was successfully initialized. The function will iterate
+ *            backwards from `itr - 1` down to the beginning of the array.
+ */
 static void
 _eina_shutdown_from_desc(const struct eina_desc_setup *itr)
 {
@@ -235,6 +275,16 @@ _eina_shutdown_from_desc(const struct eina_desc_setup *itr)
    eina_log_shutdown();
 }
 
+/**
+ * @brief Performs the actual shutdown of Eina's threading subsystems.
+ *
+ * This function is called when the thread initialization count reaches zero
+ * and Eina is either shutting down or thread support is being shut down
+ * independently. It handles cleaning up thread-specific resources like
+ * shared data and logging mechanisms for threads.
+ * It also includes debugging checks for any locks still held if
+ * EINA_HAVE_DEBUG_THREADS is enabled.
+ */
 static void
 _eina_threads_do_shutdown(void)
 {

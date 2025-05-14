@@ -1,3 +1,35 @@
+/**
+ * @file
+ * @brief Implements the Eolian parser.
+ *
+ * This file contains the logic for parsing Eolian (.eo and .eot) files.
+ * It uses a lexer (eo_lexer.c) to tokenize the input and then recursively
+ * descends through the grammar to build up Eolian objects like classes,
+ * types, methods, properties, constants, and events. These objects are
+ * then added to the Eolian database.
+ *
+ * The parser handles various language constructs, including:
+ * - Versioning directives (#version)
+ * - Imports (import, parse)
+ * - Type definitions (type, struct, enum, function pointers)
+ * - Constants (const)
+ * - Errors (error)
+ * - Class definitions (class, abstract, mixin, interface)
+ *   - Inheritance (extends, implements)
+ *   - Composition (composites)
+ *   - Requirements (requires for mixins)
+ *   - C prefixes (c_prefix, event_c_prefix)
+ *   - Data types (data)
+ *   - Methods (methods, @property)
+ *   - Parts (parts)
+ *   - Implements (implements)
+ *   - Constructors (constructors)
+ *   - Events (events)
+ * - Expressions (for constant values, default parameter values, etc.)
+ *
+ * Error handling is done via setjmp/longjmp to unwind the parsing stack
+ * upon encountering a syntax error.
+ */
 #include <assert.h>
 #include <limits.h>
 
@@ -28,6 +60,11 @@
         eo_lexer_get(ls); \
      }
 
+/**
+ * @brief Reports a syntax error indicating an expected token was not found.
+ * @param ls The lexer state.
+ * @param token The token that was expected.
+ */
 static void
 error_expected(Eo_Lexer *ls, int token)
 {
@@ -38,6 +75,12 @@ error_expected(Eo_Lexer *ls, int token)
    eo_lexer_syntax_error(ls, buf);
 }
 
+/**
+ * @brief Tests if the current token matches the given token and advances the lexer if it does.
+ * @param ls The lexer state.
+ * @param token The token to test against.
+ * @return EINA_TRUE if the current token matches and the lexer was advanced, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 test_next(Eo_Lexer *ls, int token)
 {
@@ -49,6 +92,11 @@ test_next(Eo_Lexer *ls, int token)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Checks if the current token matches the given token, raising a syntax error if not.
+ * @param ls The lexer state.
+ * @param token The token to check for.
+ */
 static void
 check(Eo_Lexer *ls, int token)
 {
@@ -56,6 +104,11 @@ check(Eo_Lexer *ls, int token)
      error_expected(ls, token);
 }
 
+/**
+ * @brief Checks if the current token's keyword matches the given keyword, raising a syntax error if not.
+ * @param ls The lexer state.
+ * @param kw The keyword to check for.
+ */
 static void
 check_kw(Eo_Lexer *ls, int kw)
 {
@@ -63,6 +116,11 @@ check_kw(Eo_Lexer *ls, int kw)
      error_expected(ls, TOK_VALUE + kw);
 }
 
+/**
+ * @brief Checks if the current token matches the given token, advances the lexer, raising a syntax error if not.
+ * @param ls The lexer state.
+ * @param token The token to check for.
+ */
 static void
 check_next(Eo_Lexer *ls, int token)
 {
@@ -70,6 +128,11 @@ check_next(Eo_Lexer *ls, int token)
    eo_lexer_get(ls);
 }
 
+/**
+ * @brief Checks if the current token's keyword matches, advances the lexer, raising a syntax error if not.
+ * @param ls The lexer state.
+ * @param kw The keyword to check for.
+ */
 static void
 check_kw_next(Eo_Lexer *ls, int kw)
 {
@@ -77,6 +140,17 @@ check_kw_next(Eo_Lexer *ls, int kw)
    eo_lexer_get(ls);
 }
 
+/**
+ * @brief Checks if the current token matches 'what', intended to close 'who' opened at 'where':'col'.
+ *
+ * Provides a more informative error message if the token doesn't match,
+ * indicating what was expected and where the opening token was.
+ * @param ls The lexer state.
+ * @param what The expected closing token (e.g., ')', '}').
+ * @param who The opening token that 'what' is supposed to close (e.g., '(', '{').
+ * @param where The line number where 'who' was encountered.
+ * @param col The column number where 'who' was encountered.
+ */
 static void
 check_match(Eo_Lexer *ls, int what, int who, int where, int col)
 {
@@ -99,6 +173,14 @@ check_match(Eo_Lexer *ls, int what, int who, int where, int col)
      }
 }
 
+/**
+ * @brief Converts a fully qualified Eolian name (e.g., "My.Object.Name") to a C-style name.
+ *
+ * Dots ('.') are replaced with underscores ('_').
+ * @param fulln The fully qualified Eolian name. Example: "Efl.Ui.Widget.text_set"
+ * @return A new Eina_Stringshare containing the C-style name. Example: "Efl_Ui_Widget_text_set"
+ *         The caller owns a reference to the returned stringshare.
+ */
 static Eina_Stringshare *
 make_c_name(const char *fulln)
 {
@@ -110,13 +192,26 @@ make_c_name(const char *fulln)
    return ret;
 }
 
+/**
+ * @brief Compares two filenames for equality.
+ * @param fn1 The first filename.
+ * @param fn2 The second filename.
+ * @return EINA_TRUE if the filenames are identical, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 compare_class_file(const char *fn1, const char *fn2)
 {
    return !strcmp(fn1, fn2);
 }
 
-
+/**
+ * @brief Retrieves an Eolian declaration (class, typedecl, constant) by name.
+ *
+ * Searches first in the main unit's objects, then in the staging unit's objects.
+ * @param ls The lexer state, used to access the Eolian state.
+ * @param name The name of the declaration to find.
+ * @return A pointer to the Eolian_Object if found and is of a valid type, NULL otherwise.
+ */
 static Eolian_Object *
 _eolian_decl_get(Eo_Lexer *ls, const char *name)
 {
@@ -131,6 +226,12 @@ _eolian_decl_get(Eo_Lexer *ls, const char *name)
    return NULL;
 }
 
+/**
+ * @brief Gets a human-readable string representation of an Eolian object's declaration type.
+ * @param obj The Eolian object.
+ * @return A string describing the object's declaration type (e.g., "class", "type alias", "constant").
+ *         Returns "unknown" if the type is not recognized.
+ */
 static const char *
 _eolian_decl_name_get(Eolian_Object *obj)
 {
@@ -161,6 +262,12 @@ end:
    return "unknown";
 }
 
+/**
+ * @brief Reports a syntax error for redefinition of an Eolian object.
+ * @param ls The lexer state.
+ * @param obj The original Eolian object that was defined.
+ * @param nobj The new Eolian object that is causing the redefinition.
+ */
 static void
 redef_error(Eo_Lexer *ls, Eolian_Object *obj, Eolian_Object *nobj)
 {
@@ -181,6 +288,17 @@ redef_error(Eo_Lexer *ls, Eolian_Object *obj, Eolian_Object *nobj)
    eo_lexer_syntax_error(ls, buf);
 }
 
+/**
+ * @brief Parses a potentially qualified name (e.g., "Foo.Bar.Baz" or "MyName").
+ *
+ * Appends the parsed name to the provided string buffer.
+ * Expects the lexer to be positioned at the start of the name.
+ * Consumes tokens forming the name.
+ * @param ls The lexer state.
+ * @param buf The string buffer to append the parsed name to. It will be reset before appending.
+ * @return The same string buffer `buf` containing the parsed name.
+ *         Example: If input is "My.Identifier", buf will contain "My.Identifier".
+ */
 static Eina_Strbuf *
 parse_name(Eo_Lexer *ls, Eina_Strbuf *buf)
 {
@@ -202,6 +320,16 @@ parse_name(Eo_Lexer *ls, Eina_Strbuf *buf)
    return buf;
 }
 
+/**
+ * @brief Parses a C name specified with the `@c_name("actual_c_name")` syntax.
+ *
+ * Expects the lexer to be positioned at the `@c_name` keyword.
+ * Consumes the `@c_name`, '(', the C name string, and ')'.
+ * @param ls The lexer state.
+ * @return A new Eina_Stringshare containing the parsed C name.
+ *         Example: If input is `@c_name("my_custom_c_identifier")`, returns "my_custom_c_identifier".
+ *         The caller owns a reference to the returned stringshare. Returns NULL on parsing error (unreachable due to longjmp).
+ */
 static Eina_Stringshare *
 parse_c_name(Eo_Lexer *ls)
 {
@@ -223,6 +351,11 @@ parse_c_name(Eo_Lexer *ls)
    return cname;
 }
 
+/**
+ * @brief Converts a token to its corresponding Eolian_Binary_Operator enum value.
+ * @param tok The token representing a binary operator (e.g., '+', TOK_EQ, TOK_AND).
+ * @return The Eolian_Binary_Operator enum value, or EOLIAN_BINOP_INVALID if the token is not a recognized binary operator.
+ */
 static Eolian_Binary_Operator
 get_binop_id(int tok)
 {
@@ -295,11 +428,22 @@ static const int binprec[] = {
    7  /* >> */
 };
 
+/** @brief Precedence level for unary operators. */
 #define UNARY_PRECEDENCE 10
 
 static Eolian_Expression *parse_expr_bin(Eo_Lexer *ls, int min_prec);
 static Eolian_Expression *parse_expr(Eo_Lexer *ls);
 
+/**
+ * @brief Parses a simple expression component.
+ *
+ * This handles literals (numbers, strings, chars, booleans, null),
+ * named identifiers (constants, enum fields), unary operations, and
+ * parenthesized expressions.
+ * @param ls The lexer state.
+ * @return A new Eolian_Expression representing the parsed simple expression.
+ *         The caller receives a new reference that it must manage (typically by passing to eo_lexer_expr_release_ref).
+ */
 static Eolian_Expression *
 parse_expr_simple(Eo_Lexer *ls)
 {
@@ -404,6 +548,16 @@ parse_expr_simple(Eo_Lexer *ls)
    return expr;
 }
 
+/**
+ * @brief Parses a binary expression using precedence climbing.
+ *
+ * This function recursively parses expressions, handling binary operators
+ * according to their precedence and associativity.
+ * @param ls The lexer state.
+ * @param min_prec The minimum precedence level for operators to be considered at this level of recursion.
+ * @return A new Eolian_Expression representing the parsed binary (or simple, if no operators apply) expression.
+ *         The caller receives a new reference that it must manage.
+ */
 static Eolian_Expression *
 parse_expr_bin(Eo_Lexer *ls, int min_prec)
 {
@@ -431,6 +585,14 @@ parse_expr_bin(Eo_Lexer *ls, int min_prec)
    return lhs;
 }
 
+/**
+ * @brief Parses a full expression.
+ *
+ * This is the main entry point for expression parsing, starting with the lowest precedence.
+ * @param ls The lexer state.
+ * @return A new Eolian_Expression representing the parsed expression.
+ *         The caller receives a new reference that it must manage.
+ */
 static Eolian_Expression *
 parse_expr(Eo_Lexer *ls)
 {
@@ -439,6 +601,16 @@ parse_expr(Eo_Lexer *ls)
 
 static Eolian_Type *parse_type_void(Eo_Lexer *ls, Eina_Bool allow_ptr, Eina_Bool allow_const);
 
+/**
+ * @brief Parses a type name, ensuring it is not 'void'.
+ *
+ * Wraps parse_type_void and raises an error if 'void' is parsed.
+ * @param ls The lexer state.
+ * @param allow_ptr Whether pointer types (ptr()) are allowed.
+ * @param allow_const Whether const qualifiers (const()) are allowed.
+ * @return A new Eolian_Type representing the parsed non-void type.
+ *         The caller receives a new reference that it must manage.
+ */
 static Eolian_Type *
 parse_type(Eo_Lexer *ls, Eina_Bool allow_ptr, Eina_Bool allow_const)
 {
@@ -454,6 +626,10 @@ parse_type(Eo_Lexer *ls, Eina_Bool allow_ptr, Eina_Bool allow_const)
    return ret;
 }
 
+/**
+ * @brief Frees an Eolian_Struct_Type_Field object.
+ * @param def The struct field to free.
+ */
 static void
 _struct_field_free(Eolian_Struct_Type_Field *def)
 {
@@ -464,6 +640,32 @@ _struct_field_free(Eolian_Struct_Type_Field *def)
    free(def);
 }
 
+/**
+ * @brief Parses a struct definition.
+ *
+ * Handles struct fields, their types, and optional @by_ref/@move qualifiers.
+ * Also handles documentation for the struct and its fields.
+ *
+ * Example Eolian syntax:
+ * @code
+ * struct My_Struct @beta {
+ *   doc: "A cool struct.";
+ *   field1: int; // A field
+ *   field2: string @move;
+ * }
+ * @endcode
+ *
+ * @param ls The lexer state.
+ * @param name The name of the struct.
+ * @param is_extern Whether the struct is marked @extern.
+ * @param is_beta Whether the struct is marked @beta.
+ * @param line The line number where the struct keyword was found.
+ * @param column The column number where the struct keyword was found.
+ * @param freefunc Optional C function name for freeing the struct (from @free).
+ * @param cname Optional C name for the struct (from @c_name).
+ * @return A new Eolian_Typedecl representing the parsed struct.
+ *         The caller receives a new reference that it must manage.
+ */
 static Eolian_Typedecl *
 parse_struct(Eo_Lexer *ls, const char *name, Eina_Bool is_extern,
              Eina_Bool is_beta, int line, int column, const char *freefunc,
@@ -543,6 +745,10 @@ qual_end:
    return def;
 }
 
+/**
+ * @brief Frees an Eolian_Enum_Type_Field object.
+ * @param def The enum field to free.
+ */
 static void
 _enum_field_free(Eolian_Enum_Type_Field *def)
 {
@@ -553,6 +759,35 @@ _enum_field_free(Eolian_Enum_Type_Field *def)
    free(def);
 }
 
+/**
+ * @brief Parses an enum definition.
+ *
+ * Handles enum fields, their optional explicit values, and documentation.
+ * If values are not explicit, they are auto-incremented from the previous field
+ * or from 0 for the first field.
+ * Also handles legacy enum mapping.
+ *
+ * Example Eolian syntax:
+ * @code
+ * enum My_Enum @beta {
+ *   doc: "An enumeration.";
+ *   legacy: "MY_PFX"; // Optional legacy prefix
+ *   FIELD_A,          // Value will be 0
+ *   FIELD_B = 5,      // Value will be 5
+ *   FIELD_C           // Value will be 6 (5+1)
+ * }
+ * @endcode
+ *
+ * @param ls The lexer state.
+ * @param name The name of the enum.
+ * @param is_extern Whether the enum is marked @extern.
+ * @param is_beta Whether the enum is marked @beta.
+ * @param line The line number where the enum keyword was found.
+ * @param column The column number where the enum keyword was found.
+ * @param cname Optional C name for the enum (from @c_name).
+ * @return A new Eolian_Typedecl representing the parsed enum.
+ *         The caller receives a new reference that it must manage.
+ */
 static Eolian_Typedecl *
 parse_enum(Eo_Lexer *ls, const char *name, Eina_Bool is_extern,
            Eina_Bool is_beta, int line, int column, const char *cname)
@@ -667,7 +902,17 @@ parse_enum(Eo_Lexer *ls, const char *name, Eina_Bool is_extern,
    return def;
 }
 
-/* error(Error1, Error2, Error3, ...) */
+/**
+ * @brief Parses an error type specification, e.g., `error(Eina.Error, My.Custom.Error)`.
+ *
+ * An error type can list one or more error names, separated by commas.
+ * Expects the lexer to be positioned after the `error(` part.
+ *
+ * @param ls The lexer state.
+ * @return A new Eolian_Type representing the parsed error type. This may be a
+ *         linked list of types if multiple errors are specified.
+ *         The caller receives a new reference that it must manage.
+ */
 static Eolian_Type *
 parse_type_error(Eo_Lexer *ls)
 {
@@ -690,6 +935,22 @@ parse_type_error(Eo_Lexer *ls)
    return def;
 }
 
+/**
+ * @brief Parses a type name, which can be 'void', a basic type, a user-defined type,
+ *        or a complex type like ptr(), const(), error(), or generic types (e.g. list<int>).
+ *
+ * This is the core type parsing function.
+ *
+ * @param ls The lexer state.
+ * @param allow_ptr Whether pointer types (ptr()) are allowed in the current context.
+ * @param allow_const Whether const qualifiers (const()) are allowed in the current context.
+ * @return A new Eolian_Type representing the parsed type.
+ *         The caller receives a new reference that it must manage.
+ *         Example return for `ptr(const(int))`:
+ *         Eolian_Type (is_ptr=TRUE)
+ *         `->` base_type: Eolian_Type (is_const=TRUE)
+ *             `->` base_type: Eolian_Type (name="int", btype=EOLIAN_TYPE_BUILTIN_INT)
+ */
 static Eolian_Type *
 parse_type_void(Eo_Lexer *ls, Eina_Bool allow_ptr, Eina_Bool allow_const)
 {
@@ -825,6 +1086,19 @@ parse_type_void(Eo_Lexer *ls, Eina_Bool allow_ptr, Eina_Bool allow_const)
    return def;
 }
 
+/**
+ * @brief Parses a type alias (typedef) definition.
+ *
+ * Example Eolian syntax:
+ * @code
+ * type My_Int_Alias @beta : int;
+ * type My_Object_Alias @c_name("my_c_obj_alias") : Some.Other.Object;
+ * @endcode
+ *
+ * @param ls The lexer state. Expects lexer at 'type' keyword.
+ * @return A new Eolian_Typedecl representing the parsed type alias.
+ *         The caller receives a new reference that it must manage.
+ */
 static Eolian_Typedecl *
 parse_typedef(Eo_Lexer *ls)
 {
@@ -883,6 +1157,19 @@ tags_done:
    return def;
 }
 
+/**
+ * @brief Parses a constant definition.
+ *
+ * Example Eolian syntax:
+ * @code
+ * const MY_CONSTANT @beta : int = 42;
+ * const MY_STRING_CONST @c_name("MY_C_STR") : string = "hello";
+ * @endcode
+ *
+ * @param ls The lexer state. Expects lexer at 'const' keyword.
+ * @return A new Eolian_Constant representing the parsed constant.
+ *         The caller receives a new reference that it must manage.
+ */
 static Eolian_Constant *
 parse_constant(Eo_Lexer *ls)
 {
@@ -947,6 +1234,21 @@ tags_done:
    return def;
 }
 
+/**
+ * @brief Parses an error definition.
+ *
+ * Error definitions associate a name with a descriptive message.
+ *
+ * Example Eolian syntax:
+ * @code
+ * error My.Custom.Error @beta = "A custom error occurred.";
+ * error Another.Error @c_name("ANOTHER_C_ERROR") = "Something else went wrong.";
+ * @endcode
+ *
+ * @param ls The lexer state. Expects lexer at 'error' keyword.
+ * @return A new Eolian_Error representing the parsed error.
+ *         The caller receives a new reference that it must manage.
+ */
 static Eolian_Error *
 parse_error(Eo_Lexer *ls)
 {
@@ -1018,10 +1320,33 @@ typedef struct _Eo_Ret_Def
    Eolian_Documentation *doc;
    Eolian_Expression *default_ret_val;
    Eina_Bool no_unused: 1;
-   Eina_Bool move: 1;
-   Eina_Bool by_ref: 1;
+   Eina_Bool move: 1; /**< @move qualifier for the return value. */
+   Eina_Bool by_ref: 1; /**< @by_ref qualifier for the return value. */
 } Eo_Ret_Def;
 
+/**
+ * @brief Parses a return type specification for a function, method, or property getter.
+ *
+ * Handles the return type, optional default value, documentation, and qualifiers
+ * like @no_unused, @move, @by_ref.
+ *
+ * Example Eolian syntax (within a method/property):
+ * @code
+ * return: int (0) @no_unused; // Returns int, default 0, must be used
+ *   doc: "The return value.";
+ * return: string @move;
+ *   doc: "A moved string.";
+ * @endcode
+ *
+ * @param ls The lexer state. Expects lexer at 'return' keyword.
+ * @param[out] ret Pointer to an Eo_Ret_Def struct to be filled with parsed information.
+ *                 The `type`, `doc`, and `default_ret_val` fields will be allocated
+ *                 by the parser and their ownership is transferred via this struct.
+ *                 The caller is responsible for managing these resources if they are set.
+ * @param allow_void Whether 'void' is a permissible return type.
+ * @param allow_def Whether a default return value `(expr)` is allowed.
+ * @param is_funcptr Whether this return is for a function pointer (disables some qualifiers).
+ */
 static void
 parse_return(Eo_Lexer *ls, Eo_Ret_Def *ret, Eina_Bool allow_void,
              Eina_Bool allow_def, Eina_Bool is_funcptr)
@@ -1073,6 +1398,27 @@ end:
    FILL_DOC(ls, ret, doc);
 }
 
+/**
+ * @brief Parses a single function/method parameter.
+ *
+ * Handles parameter direction (@in, @out, @inout), name, type, optional
+ * default value (for 'values' blocks or out parameters), documentation,
+ * and qualifiers like @optional, @move, @by_ref.
+ *
+ * Example Eolian syntax (within a params/values block):
+ * @code
+ * @in my_param: int @optional;
+ *   doc: "An optional input parameter.";
+ * @out result: string @move (null);
+ *   doc: "An output string, moved.";
+ * @endcode
+ *
+ * @param ls The lexer state. Expects lexer at the start of the parameter definition (e.g., @in or name).
+ * @param[in,out] params A pointer to an Eina_List of Eolian_Function_Parameter. The new parameter will be appended.
+ * @param allow_inout Whether @in, @out, @inout direction specifiers are allowed.
+ * @param is_vals Whether this parameter is part of a 'values' block (affects default value parsing).
+ * @param func The parent function/method, used to check beta status for type parsing.
+ */
 static void
 parse_param(Eo_Lexer *ls, Eina_List **params, Eina_Bool allow_inout,
             Eina_Bool is_vals, const Eolian_Function *func)
@@ -1151,6 +1497,23 @@ end:
    FILL_DOC(ls, par, doc);
 }
 
+/**
+ * @brief Parses a block of parameters (e.g., `params { ... }` or `keys { ... }` or `values { ... }`).
+ *
+ * Example Eolian syntax:
+ * @code
+ * params {
+ *   @in p1: int;
+ *   @out p2: string;
+ * }
+ * @endcode
+ *
+ * @param ls The lexer state. Expects lexer at the keyword like 'params', 'keys', 'values'.
+ * @param[in,out] params A pointer to an Eina_List of Eolian_Function_Parameter. Parsed parameters will be appended.
+ * @param allow_inout Whether @in, @out, @inout direction specifiers are allowed for parameters in this block.
+ * @param is_vals Whether this block is a 'values' block (affects default value parsing for parameters).
+ * @param func The parent function/method, passed down to parse_param.
+ */
 static void
 parse_params(Eo_Lexer *ls, Eina_List **params, Eina_Bool allow_inout,
              Eina_Bool is_vals, const Eolian_Function *func)
@@ -1164,6 +1527,13 @@ parse_params(Eo_Lexer *ls, Eina_List **params, Eina_Bool allow_inout,
    check_match(ls, '}', '{', line, col);
 }
 
+/**
+ * @brief Checks if the current class context allows for @pure_virtual methods/properties.
+ *
+ * @pure_virtual is only allowed in abstract classes or mixins.
+ * Raises a syntax error if the context is invalid.
+ * @param ls The lexer state.
+ */
 static void
 check_abstract_pure_virtual(Eo_Lexer *ls)
 {
@@ -1171,6 +1541,28 @@ check_abstract_pure_virtual(Eo_Lexer *ls)
      eo_lexer_syntax_error(ls, "@pure_virtual only allowed in abstract classes or mixins");
 }
 
+/**
+ * @brief Parses a property accessor (get or set block).
+ *
+ * Handles @pure_virtual, @protected qualifiers, return type (for get),
+ * key parameters, and value parameters.
+ *
+ * Example Eolian syntax (within a property):
+ * @code
+ * get @pure_virtual {
+ *   doc: "Getter documentation.";
+ *   return: int;
+ *   keys { k: string; }
+ * }
+ * set @protected {
+ *   doc: "Setter documentation.";
+ *   values { v: int; }
+ * }
+ * @endcode
+ *
+ * @param ls The lexer state. Expects lexer at 'get' or 'set' keyword.
+ * @param prop The Eolian_Function (property) object to populate with accessor details.
+ */
 static void
 parse_accessor(Eo_Lexer *ls, Eolian_Function *prop)
 {
@@ -1291,6 +1683,18 @@ end:
    check_match(ls, '}', '{', line, col);
 }
 
+/**
+ * @brief Sets the pure_virtual flag on a function's implementation details.
+ *
+ * This is used for methods and properties. If the class is an interface,
+ * or if the `virt` flag is explicitly true (from an @pure_virtual tag),
+ * the corresponding pure_virtual flags in the function's Eolian_Implement
+ * structure are set.
+ *
+ * @param ls The lexer state (to check class type).
+ * @param foo_id The function (method or property) whose implementation flags are to be set.
+ * @param virt EINA_TRUE if @pure_virtual was explicitly specified for this function/property.
+ */
 static void
 _func_pure_virtual_set(Eo_Lexer *ls, Eolian_Function *foo_id, Eina_Bool virt)
 {
@@ -1305,6 +1709,24 @@ _func_pure_virtual_set(Eo_Lexer *ls, Eolian_Function *foo_id, Eina_Bool virt)
      foo_id->impl->get_pure_virtual = foo_id->impl->set_pure_virtual = EINA_TRUE;
 }
 
+/**
+ * @brief Parses a property definition (introduced by `@property` inside `methods { ... }`).
+ *
+ * A property can have get and/or set accessors, keys, and values.
+ * It can also have qualifiers like @protected, @static, @beta, @pure_virtual.
+ *
+ * Example Eolian syntax:
+ * @code
+ * @property my_prop @beta {
+ *   doc: "A property.";
+ *   keys { k: string; }
+ *   get { return: int; }
+ *   set { values { v: int; } }
+ * }
+ * @endcode
+ *
+ * @param ls The lexer state. Expects lexer after `@property` keyword.
+ */
 static void
 parse_property(Eo_Lexer *ls)
 {
@@ -1401,6 +1823,27 @@ end:
    _func_pure_virtual_set(ls, prop, has_virtp);
 }
 
+/**
+ * @brief Parses a function pointer type definition.
+ *
+ * Example Eolian syntax:
+ * @code
+ * function My_Callback_Type @beta (
+ *   @c_name("my_c_callback_t")
+ * ) {
+ *   doc: "A callback function type.";
+ *   return: void;
+ *   params {
+ *     @in data: ptr(void);
+ *     @in event_info: ptr(const(Some_Event));
+ *   }
+ * }; // Note the semicolon at the end
+ * @endcode
+ *
+ * @param ls The lexer state. Expects lexer at 'function' keyword.
+ * @return A new Eolian_Typedecl representing the parsed function pointer type.
+ *         The caller receives a new reference that it must manage.
+ */
 static Eolian_Typedecl*
 parse_function_pointer(Eo_Lexer *ls)
 {
@@ -1496,6 +1939,29 @@ end:
    return def;
 }
 
+/**
+ * @brief Parses a method definition.
+ *
+ * Methods can have parameters, a return type, and qualifiers like
+ * @protected, @const (for the object instance), @static, @beta, @pure_virtual.
+ *
+ * Example Eolian syntax:
+ * @code
+ * my_method @const @beta (
+ *   param1: int,
+ *   param2: string
+ * ) {
+ *   doc: "A method.";
+ *   return: bool;
+ *   params {
+ *     p1: int;
+ *     p2: string @optional;
+ *   }
+ * }
+ * @endcode
+ *
+ * @param ls The lexer state. Expects lexer at the method name.
+ */
 static void
 parse_method(Eo_Lexer *ls)
 {
@@ -1591,6 +2057,19 @@ end:
    _func_pure_virtual_set(ls, meth, has_virtp);
 }
 
+/**
+ * @brief Parses a class part definition.
+ *
+ * Parts declare a named member of a class that is an instance of another class.
+ *
+ * Example Eolian syntax:
+ * @code
+ * my_part @beta : Other.Class;
+ *   doc: "This is a part of the class.";
+ * @endcode
+ *
+ * @param ls The lexer state. Expects lexer at the part name.
+ */
 static void
 parse_part(Eo_Lexer *ls)
 {
@@ -1630,6 +2109,35 @@ parse_part(Eo_Lexer *ls)
    FILL_DOC(ls, part, doc);
 }
 
+/**
+ * @brief Parses an implement directive for a class.
+ *
+ * This specifies how a class implements methods/properties from its interfaces
+ * or its own declared functions. It can involve aliasing, or specifying
+ * @auto/@empty implementations.
+ *
+ * Example Eolian syntax:
+ * @code
+ * // Implementing an interface method
+ * Interface.Name.method_name;
+ *   doc: "Implementation details for this interface method.";
+ *
+ * // Implementing a property from an interface with specific get/set handling
+ * Interface.Name.property_name {
+ *   get @auto; // Auto-generate getter
+ *   set @empty; // Provide an empty setter
+ * }
+ *
+ * // Implementing a class's own constructor/destructor
+ * class.constructor;
+ * .my_own_method @auto; // Implement local method automatically
+ * @endcode
+ *
+ * @param ls The lexer state. Expects lexer at the start of the implement statement
+ *           (e.g., class name, '.', or @auto/@empty).
+ * @param iface EINA_TRUE if parsing implements for an interface class type,
+ *              EINA_FALSE otherwise. This affects validation for `class.constructor/destructor`.
+ */
 static void
 parse_implement(Eo_Lexer *ls, Eina_Bool iface)
 {
@@ -1797,6 +2305,24 @@ propend:
      }
 }
 
+/**
+ * @brief Parses a constructor declaration for a class.
+ *
+ * Constructors are functions from other classes (often parents or interfaces)
+ * that are designated as constructors for the current class. They can be optional.
+ *
+ * Example Eolian syntax:
+ * @code
+ * // Using a constructor from a parent/interface
+ * Parent.Class.constructor_name @optional;
+ *
+ * // Designating a local method as a constructor (less common, typically via implements)
+ * .my_local_constructor_method;
+ * @endcode
+ *
+ * @param ls The lexer state. Expects lexer at the start of the constructor name
+ *           (e.g., class name or '.').
+ */
 static void
 parse_constructor(Eo_Lexer *ls)
 {
@@ -1855,6 +2381,22 @@ parse_constructor(Eo_Lexer *ls)
    eo_lexer_dtor_pop(ls);
 }
 
+/**
+ * @brief Parses an event declaration for a class.
+ *
+ * Events declare named signals that a class can emit, along with the type of
+ * data associated with the event. Events can have scope (@private, @protected),
+ * and qualifiers (@beta, @hot, @restart).
+ *
+ * Example Eolian syntax:
+ * @code
+ * my_event_name @hot @beta : ptr(const(My_Event_Info_Struct));
+ *   doc: "Description of the event.";
+ * another_event, yet_another_event : void; // Multiple events with same type/doc
+ * @endcode
+ *
+ * @param ls The lexer state. Expects lexer at the event name.
+ */
 static void
 parse_event(Eo_Lexer *ls)
 {
@@ -1917,6 +2459,12 @@ end:
    ev->klass = ls->klass;
 }
 
+/**
+ * @brief Parses a `methods { ... }` block within a class definition.
+ *
+ * This block contains method and property (@property) definitions.
+ * @param ls The lexer state. Expects lexer at the 'methods' keyword.
+ */
 static void
 parse_methods(Eo_Lexer *ls)
 {
@@ -1937,6 +2485,12 @@ parse_methods(Eo_Lexer *ls)
    check_match(ls, '}', '{', line, col);
 }
 
+/**
+ * @brief Parses a `parts { ... }` block within a class definition.
+ *
+ * This block contains part definitions.
+ * @param ls The lexer state. Expects lexer at the 'parts' keyword.
+ */
 static void
 parse_parts(Eo_Lexer *ls)
 {
@@ -1949,6 +2503,14 @@ parse_parts(Eo_Lexer *ls)
    check_match(ls, '}', '{', line, col);
 }
 
+/**
+ * @brief Parses an `implements { ... }` block within a class definition.
+ *
+ * This block contains implement directives.
+ * @param ls The lexer state. Expects lexer at the 'implements' keyword.
+ * @param iface EINA_TRUE if parsing implements for an interface class type,
+ *              EINA_FALSE otherwise. Passed to parse_implement.
+ */
 static void
 parse_implements(Eo_Lexer *ls, Eina_Bool iface)
 {
@@ -1961,6 +2523,12 @@ parse_implements(Eo_Lexer *ls, Eina_Bool iface)
    check_match(ls, '}', '{', line, col);
 }
 
+/**
+ * @brief Parses a `constructors { ... }` block within a class definition.
+ *
+ * This block contains constructor declarations.
+ * @param ls The lexer state. Expects lexer at the 'constructors' keyword.
+ */
 static void
 parse_constructors(Eo_Lexer *ls)
 {
@@ -1973,6 +2541,12 @@ parse_constructors(Eo_Lexer *ls)
    check_match(ls, '}', '{', line, col);
 }
 
+/**
+ * @brief Parses an `events { ... }` block within a class definition.
+ *
+ * This block contains event declarations.
+ * @param ls The lexer state. Expects lexer at the 'events' keyword.
+ */
 static void
 parse_events(Eo_Lexer *ls)
 {
@@ -1987,6 +2561,14 @@ parse_events(Eo_Lexer *ls)
    check_match(ls, '}', '{', line, col);
 }
 
+/**
+ * @brief Validates a C prefix string (for `c_prefix` or `event_c_prefix`).
+ *
+ * A valid prefix must start with an underscore or a lowercase letter,
+ * and subsequent characters can be underscores, lowercase letters, or digits.
+ * Raises a syntax error if the prefix is invalid.
+ * @param ls The lexer state. Expects current token to be the prefix string.
+ */
 static void
 _validate_pfx(Eo_Lexer *ls)
 {
@@ -2011,6 +2593,15 @@ error:
    eo_lexer_syntax_error(ls, ebuf);
 }
 
+/**
+ * @brief Parses the body of a class definition (contents within `{ ... }`).
+ *
+ * This handles various class elements like documentation, c_prefix, event_c_prefix,
+ * data type, methods, parts, implements, constructors, and events sections.
+ *
+ * @param ls The lexer state. Expects lexer to be positioned after the opening '{' of the class body.
+ * @param type The type of the class being parsed (e.g., EOLIAN_CLASS_REGULAR, EOLIAN_CLASS_INTERFACE).
+ */
 static void
 parse_class_body(Eo_Lexer *ls, Eolian_Class_Type type)
 {
@@ -2084,6 +2675,17 @@ parse_class_body(Eo_Lexer *ls, Eolian_Class_Type type)
      }
 }
 
+/**
+ * @brief Parses an inherited class name and registers it as a dependency.
+ *
+ * This is used for `extends ParentClass` and `implements Interface1, Interface2`.
+ * It checks for self-inheritance and duplicate inherits.
+ *
+ * @param ls The lexer state. Expects lexer at the start of the inherited class name.
+ * @param buf A temporary string buffer for parsing the name.
+ * @param parent EINA_TRUE if this is a parent class (from `extends`),
+ *               EINA_FALSE if it's an extended interface (from `implements`).
+ */
 static void
 _inherit_dep(Eo_Lexer *ls, Eina_Strbuf *buf, Eina_Bool parent)
 {
@@ -2143,6 +2745,15 @@ inherit_dup:
    eo_lexer_syntax_error(ls, ebuf);
 }
 
+/**
+ * @brief Parses a required interface name for a mixin class and adds it to the class's requirements.
+ *
+ * This is used for `requires Interface1, Interface2` in mixin definitions.
+ * It checks for duplicate entries and registers the required interface as a dependency.
+ *
+ * @param ls The lexer state. Expects lexer at the start of the required interface name.
+ * @param buf A temporary string buffer for parsing the name.
+ */
 static void
 _requires_add(Eo_Lexer *ls, Eina_Strbuf *buf)
 {
@@ -2176,6 +2787,16 @@ _requires_add(Eo_Lexer *ls, Eina_Strbuf *buf)
    free(fnm);
 }
 
+/**
+ * @brief Parses a composite interface name for a class and adds it to the class's composite list.
+ *
+ * This is used for `composites Interface1, Interface2`.
+ * It checks for duplicate entries, unknown interfaces, and registers the composite
+ * interface as a dependency.
+ *
+ * @param ls The lexer state. Expects lexer at the start of the composite interface name.
+ * @param buf A temporary string buffer for parsing the name.
+ */
 static void
 _composite_add(Eo_Lexer *ls, Eina_Strbuf *buf)
 {
@@ -2215,6 +2836,28 @@ _composite_add(Eo_Lexer *ls, Eina_Strbuf *buf)
    eo_lexer_context_pop(ls);
 }
 
+/**
+ * @brief Parses a class definition (regular, abstract, mixin, or interface).
+ *
+ * This handles the class name, optional @beta/@c_name qualifiers,
+ * inheritance (`extends`, `implements`), mixin requirements (`requires`),
+ * composite interfaces (`composites`), and the class body.
+ * It also validates that the class name matches the filename.
+ *
+ * Example Eolian syntax:
+ * @code
+ * class My.Class @beta extends Parent.Class implements Iface1, Iface2 {
+ *   // class body
+ * }
+ *
+ * mixin My.Mixin requires Iface1 {
+ *   // mixin body
+ * }
+ * @endcode
+ *
+ * @param ls The lexer state. Expects lexer at the class type keyword (e.g., 'class', 'mixin').
+ * @param type The Eolian_Class_Type of the class to parse.
+ */
 static void
 parse_class(Eo_Lexer *ls, Eolian_Class_Type type)
 {
@@ -2340,6 +2983,19 @@ inherit_done:
    check_match(ls, '}', '{', line, col);
 }
 
+/**
+ * @brief Parses a single top-level declaration unit within an Eolian file.
+ *
+ * This can be a class definition, an import statement, a type definition,
+ * a constant, an error, a struct, or an enum.
+ * For .eo files, it expects primarily a class definition.
+ * For .eot files, it can parse various declarations but typically not a full class.
+ *
+ * @param ls The lexer state.
+ * @param eot EINA_TRUE if parsing an .eot file (restricts to one class definition if any).
+ * @return EINA_TRUE if a class was parsed (and thus, for .eot, no more units should be parsed),
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 parse_unit(Eo_Lexer *ls, Eina_Bool eot)
 {
@@ -2522,6 +3178,16 @@ found_class:
    return EINA_TRUE;
 }
 
+/**
+ * @brief Parses a chunk of an Eolian file, which consists of a header and then declarations.
+ *
+ * The header can contain a `#version` directive. After the header, it parses
+ * declaration units one by one.
+ *
+ * @param ls The lexer state.
+ * @param eot EINA_TRUE if parsing an .eot file. This flag is passed to `parse_unit`
+ *            and influences whether multiple class definitions are allowed.
+ */
 static void
 parse_chunk(Eo_Lexer *ls, Eina_Bool eot)
 {

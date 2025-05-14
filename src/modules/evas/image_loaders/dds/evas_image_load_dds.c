@@ -1,8 +1,11 @@
 /* @file evas_image_load_dds.c
+/**
+ * @file evas_image_load_dds.c
+ * @brief Evas module for loading Microsoft DirectDraw Surface (DDS) files.
  * @author Jean-Philippe ANDRE <jpeg@videolan.org>
  *
- * Load Microsoft DirectDraw Surface files.
- * Decode S3TC image format.
+ * This module provides functionality to load DDS image files,
+ * including support for S3TC (DXT) texture compression formats.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -16,29 +19,52 @@
 # include <ddraw.h>
 #endif
 
-#define DDS_HEADER_SIZE 128
+#define DDS_HEADER_SIZE 128 /**< Standard size of the DDS file header, excluding the "DDS " magic number. */
 
+/**
+ * @internal
+ * @brief Internal structure for managing DDS loader state.
+ *
+ * This structure holds all necessary information for loading a DDS file,
+ * including the file handle, image properties, and pixel format details.
+ */
 typedef struct _Evas_Loader_Internal Evas_Loader_Internal;
 struct _Evas_Loader_Internal
 {
-   Eina_File *f;
+   Eina_File *f; /**< Eina file handle for the opened DDS file. */
 
-   Evas_Colorspace format;
-   unsigned int stride, block_size, data_size;
+   Evas_Colorspace format; /**< Detected Evas colorspace of the DDS image (e.g., EVAS_COLORSPACE_RGB_S3TC_DXT1). */
+   unsigned int stride;     /**< Calculated stride (bytes per row) for the main image data. */
+   unsigned int block_size; /**< Size in bytes of a single S3TC block (e.g., 8 for DXT1, 16 for DXT2-5). */
+   unsigned int data_size;  /**< Total size in bytes of the main image data (excluding header and mipmaps). */
 
+   /**
+    * @brief Pixel format information extracted from the DDS header.
+    */
    struct {
-      unsigned int flags;
-      unsigned int fourcc;
-      unsigned int rgb_bitcount;
-      unsigned int r_mask;
-      unsigned int g_mask;
-      unsigned int b_mask;
-      unsigned int a_mask;
+      unsigned int flags;        /**< Flags indicating which members of the pixel format structure are valid (e.g., DDPF_FOURCC). */
+      unsigned int fourcc;       /**< FourCC code for compressed formats (e.g., 'DXT1'). */
+      unsigned int rgb_bitcount; /**< Bits per pixel for uncompressed RGB formats. */
+      unsigned int r_mask;       /**< Red channel bitmask for uncompressed RGB formats. */
+      unsigned int g_mask;       /**< Green channel bitmask for uncompressed RGB formats. */
+      unsigned int b_mask;       /**< Blue channel bitmask for uncompressed RGB formats. */
+      unsigned int a_mask;       /**< Alpha channel bitmask for uncompressed RGB formats. */
       // TODO: check mipmaps to load faster a small image :)
-   } pf; // pixel format
+   } pf; /**< Pixel format details. */
 };
 
 #undef FOURCC
+/**
+ * @def FOURCC(a,b,c,d)
+ * @brief Macro to generate a FourCC code from four characters.
+ * Handles endianness automatically.
+ * @param a First character.
+ * @param b Second character.
+ * @param c Third character.
+ * @param d Fourth character.
+ * @return The 32-bit FourCC code.
+ * @example FOURCC('D','X','T','1') results in 0x31545844 on little-endian systems.
+ */
 #ifndef WORDS_BIGENDIAN
 # define FOURCC(a,b,c,d) ((d << 24) | (c << 16) | (b << 8) | a)
 #else
@@ -49,64 +75,99 @@ struct _Evas_Loader_Internal
 // DIRECTDRAW_VERSION is defined in ddraw.h
 // These definitions are from the MSDN reference.
 
+/**
+ * @brief Flags to indicate which members of a DDS_HEADER structure are valid.
+ * These correspond to the `dwFlags` member of the `DDSURFACEDESC2` structure.
+ */
 enum DDSFlags {
-   DDSD_CAPS = 0x1,
-   DDSD_HEIGHT = 0x2,
-   DDSD_WIDTH = 0x4,
-   DDSD_PITCH = 0x8,
-   DDSD_PIXELFORMAT = 0x1000,
-   DDSD_MIPMAPCOUNT = 0x20000,
-   DDSD_LINEARSIZE = 0x80000,
-   DDSD_DEPTH = 0x800000
+   DDSD_CAPS = 0x1,        /**< Required in every .dds file. */
+   DDSD_HEIGHT = 0x2,      /**< Required in every .dds file. */
+   DDSD_WIDTH = 0x4,       /**< Required in every .dds file. */
+   DDSD_PITCH = 0x8,       /**< Required when pitch is provided for an uncompressed texture. */
+   DDSD_PIXELFORMAT = 0x1000, /**< Required in every .dds file. */
+   DDSD_MIPMAPCOUNT = 0x20000, /**< Required in a mipmapped texture. */
+   DDSD_LINEARSIZE = 0x80000, /**< Required when pitch is provided for a compressed texture. */
+   DDSD_DEPTH = 0x800000   /**< Required in a depth texture. */
 };
 
+/**
+ * @brief Flags to indicate the nature of the pixel data in a DDS_PIXELFORMAT structure.
+ * These correspond to the `dwFlags` member of the `DDS_PIXELFORMAT` structure.
+ */
 enum DDSPixelFormatFlags {
-   DDPF_ALPHAPIXELS = 0x1,
-   DDPF_ALPHA = 0x2,
-   DDPF_FOURCC = 0x4,
-   DDPF_RGB = 0x40,
-   DDPF_YUV = 0x200,
-   DDPF_LUMINANCE = 0x20000
+   DDPF_ALPHAPIXELS = 0x1, /**< Texture contains alpha data; dwRGBAlphaBitMask is valid. */
+   DDPF_ALPHA = 0x2,       /**< Used in some older DDS files for alpha channel only uncompressed data. */
+   DDPF_FOURCC = 0x4,      /**< Texture is compressed (FourCC code is valid). */
+   DDPF_RGB = 0x40,        /**< Texture contains uncompressed RGB data; dwRGBBitCount and the RGB masks are valid. */
+   DDPF_YUV = 0x200,       /**< Texture contains uncompressed YUV data. */
+   DDPF_LUMINANCE = 0x20000 /**< Texture contains uncompressed luminance data. */
 };
 
+/**
+ * @brief Flags to indicate the capabilities of a DirectDraw surface.
+ * These correspond to the `ddsCaps.dwCaps1` member of the `DDSURFACEDESC2` structure.
+ */
 enum DDSCaps {
-   DDSCAPS_COMPLEX = 0x8,
-   DDSCAPS_MIPMAP = 0x400000,
-   DDSCAPS_TEXTURE = 0x1000
+   DDSCAPS_COMPLEX = 0x8,    /**< Optional; must be used on any file that contains more than one surface. */
+   DDSCAPS_MIPMAP = 0x400000, /**< Optional; should be used for a mipmap. */
+   DDSCAPS_TEXTURE = 0x1000  /**< Required; must be used on any file that contains a texture. */
 };
 
 #endif
 
+/** @brief Supported Evas colorspaces for DXT1 RGB (no alpha) format. */
 static const Evas_Colorspace cspaces_s3tc_dxt1_rgb[] = {
    EVAS_COLORSPACE_RGB_S3TC_DXT1,
-   EVAS_COLORSPACE_ARGB8888
+   EVAS_COLORSPACE_ARGB8888 /**< Fallback/decode target colorspace. */
 };
 
+/** @brief Supported Evas colorspaces for DXT1 RGBA (1-bit alpha) format. */
 static const Evas_Colorspace cspaces_s3tc_dxt1_rgba[] = {
-   //EVAS_COLORSPACE_RGBA_S3TC_DXT1,
-   EVAS_COLORSPACE_ARGB8888
+   //EVAS_COLORSPACE_RGBA_S3TC_DXT1, /**< Native S3TC DXT1 with alpha. */
+   EVAS_COLORSPACE_ARGB8888 /**< Fallback/decode target colorspace. */
 };
 
+/** @brief Supported Evas colorspaces for DXT2 (premultiplied alpha) format. */
 static const Evas_Colorspace cspaces_s3tc_dxt2[] = {
-   EVAS_COLORSPACE_RGBA_S3TC_DXT2,
-   EVAS_COLORSPACE_ARGB8888
+   EVAS_COLORSPACE_RGBA_S3TC_DXT2, /**< Native S3TC DXT2. */
+   EVAS_COLORSPACE_ARGB8888 /**< Fallback/decode target colorspace. */
 };
 
+/** @brief Supported Evas colorspaces for DXT3 (explicit alpha) format. */
 static const Evas_Colorspace cspaces_s3tc_dxt3[] = {
-   //EVAS_COLORSPACE_RGBA_S3TC_DXT3,
-   EVAS_COLORSPACE_ARGB8888
+   //EVAS_COLORSPACE_RGBA_S3TC_DXT3, /**< Native S3TC DXT3. */
+   EVAS_COLORSPACE_ARGB8888 /**< Fallback/decode target colorspace. */
 };
 
+/** @brief Supported Evas colorspaces for DXT4 (premultiplied alpha) format. */
 static const Evas_Colorspace cspaces_s3tc_dxt4[] = {
-   EVAS_COLORSPACE_RGBA_S3TC_DXT4,
-   EVAS_COLORSPACE_ARGB8888
+   EVAS_COLORSPACE_RGBA_S3TC_DXT4, /**< Native S3TC DXT4. */
+   EVAS_COLORSPACE_ARGB8888 /**< Fallback/decode target colorspace. */
 };
 
+/** @brief Supported Evas colorspaces for DXT5 (interpolated alpha) format. */
 static const Evas_Colorspace cspaces_s3tc_dxt5[] = {
-   //EVAS_COLORSPACE_RGBA_S3TC_DXT5,
-   EVAS_COLORSPACE_ARGB8888
+   //EVAS_COLORSPACE_RGBA_S3TC_DXT5, /**< Native S3TC DXT5. */
+   EVAS_COLORSPACE_ARGB8888 /**< Fallback/decode target colorspace. */
 };
 
+/**
+ * @brief Opens a DDS file for loading.
+ *
+ * This function is called by Evas to open a DDS image file. It performs
+ * basic validation of the file size and allocates an internal loader structure.
+ *
+ * @param[in] f Eina_File handle to the opened file.
+ * @param[in] key Optional key associated with the image file.
+ * @param[in] opts Load options for the image.
+ * @param[out] animated Information about image animation (not used for DDS).
+ * @param[out] error Pointer to an integer to store the error code on failure.
+ *                   Set to EVAS_LOAD_ERROR_NONE on success.
+ * @return A pointer to an Evas_Loader_Internal structure on success, NULL on failure.
+ *         Example error codes:
+ *         - EVAS_LOAD_ERROR_CORRUPT_FILE: If file size is too small.
+ *         - EVAS_LOAD_ERROR_RESOURCE_ALLOCATION_FAILED: If memory allocation fails.
+ */
 static void *
 evas_image_load_file_open_dds(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
                               Evas_Image_Load_Opts *opts EINA_UNUSED,
@@ -140,6 +201,14 @@ evas_image_load_file_open_dds(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
    return loader;
 }
 
+/**
+ * @brief Closes a DDS file and frees associated resources.
+ *
+ * This function is called by Evas to close a previously opened DDS image file
+ * and release any resources allocated by evas_image_load_file_open_dds().
+ *
+ * @param[in] loader_data Pointer to the Evas_Loader_Internal structure.
+ */
 static void
 evas_image_load_file_close_dds(void *loader_data)
 {
@@ -149,6 +218,16 @@ evas_image_load_file_close_dds(void *loader_data)
    free(loader);
 }
 
+/**
+ * @brief Reads a 32-bit unsigned integer (DWORD) from a memory mapped region.
+ *
+ * Advances the memory pointer by 4 bytes after reading.
+ * This function assumes little-endian byte order.
+ *
+ * @param[in,out] m Pointer to a const char pointer, which points to the current
+ *                  position in the memory map. This pointer is advanced by 4 bytes.
+ * @return The 32-bit unsigned integer value read from memory.
+ */
 static inline unsigned int
 _dword_read(const char **m)
 {
@@ -157,15 +236,36 @@ _dword_read(const char **m)
    return val;
 }
 
-#define FAIL() do { /*fprintf(stderr, "DDS: ERROR at %s:%d\n", __func__, __LINE__);*/ goto on_error; } while (0)
+#define FAIL() do { /*fprintf(stderr, "DDS: ERROR at %s:%d\n", __func__, __LINE__);*/ goto on_error; } while (0) /**< Macro to simplify error handling by jumping to the on_error label. */
 
+/**
+ * @brief Reads the header of a DDS file and populates image properties.
+ *
+ * This function is called by Evas to read the DDS header, validate it,
+ * and extract image properties like width, height, alpha presence, and
+ * supported colorspaces.
+ *
+ * @param[in] loader_data Pointer to the Evas_Loader_Internal structure.
+ * @param[out] prop Pointer to an Emile_Image_Property structure to be filled
+ *                  with image properties.
+ *                  - `prop->w`: width of the image.
+ *                  - `prop->h`: height of the image.
+ *                  - `prop->alpha`: EINA_TRUE if alpha channel is present, EINA_FALSE otherwise.
+ *                  - `prop->cspaces`: array of supported Evas_Colorspace.
+ * @param[out] error Pointer to an integer to store the error code on failure.
+ *                   Set to EVAS_LOAD_ERROR_NONE on success.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ *         Example error codes:
+ *         - EVAS_LOAD_ERROR_CORRUPT_FILE: If the header is malformed or essential data is missing.
+ *         - EVAS_LOAD_ERROR_UNKNOWN_FORMAT: If the DDS format (e.g., DX10, uncompressed non-FourCC) is not supported.
+ */
 static Eina_Bool
 evas_image_load_file_head_dds(void *loader_data,
                               Emile_Image_Property *prop,
                               int *error)
 {
    static const unsigned int base_flags = /* 0x1007 */
-         DDSD_CAPS | DDSD_WIDTH | DDSD_HEIGHT | DDSD_PIXELFORMAT;
+         DDSD_CAPS | DDSD_WIDTH | DDSD_HEIGHT | DDSD_PIXELFORMAT; /**< Minimum required flags in DDS_HEADER.dwFlags. */
 
    Evas_Loader_Internal *loader = loader_data;
    unsigned int flags, height, width, pitchOrLinearSize, caps, caps2;
@@ -312,6 +412,34 @@ on_error:
    return (*error == EVAS_LOAD_ERROR_NONE);
 }
 
+/**
+ * @internal
+ * @brief Loads S3TC compressed image data with borders.
+ *
+ * This function handles loading of S3TC (DXT) compressed data when Evas requests
+ * the image in its native compressed format, including handling of border pixels
+ * required by S3TC decoding. It copies the main image data and then generates
+ * border blocks by flipping edge blocks.
+ *
+ * @param[in] loader Pointer to the Evas_Loader_Internal structure.
+ * @param[in] prop Pointer to the Emile_Image_Property structure containing image properties.
+ *                 The `prop->cspace` must match `loader->format`.
+ * @param[in] map Pointer to the memory-mapped DDS file content.
+ * @param[out] pixels Pointer to the destination buffer where the S3TC data (including borders) will be written.
+ *                    The layout is expected to accommodate border pixels around the main image data.
+ *                    Example for a 4x4 block image (W pixels wide, H pixels high):
+ *                    - Top border row of blocks
+ *                    - Left border block | Main image block 0,0 | Main image block 1,0 | ... | Right border block
+ *                    - Left border block | Main image block 0,1 | Main image block 1,1 | ... | Right border block
+ *                    - ...
+ *                    - Bottom border row of blocks
+ * @param[out] error Pointer to an integer to store the error code on failure.
+ *                   Set to EVAS_LOAD_ERROR_NONE on success.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ *         Example error codes:
+ *         - EVAS_LOAD_ERROR_GENERIC: If `loader->format` doesn't match `prop->cspace` or an unknown format is encountered.
+ *         - EVAS_LOAD_ERROR_CORRUPT_FILE: If the file is smaller than expected.
+ */
 static Eina_Bool
 _dds_data_load(Evas_Loader_Internal *loader, Emile_Image_Property *prop,
                unsigned char *map, void *pixels, int *error)
@@ -320,40 +448,40 @@ _dds_data_load(Evas_Loader_Internal *loader, Emile_Image_Property *prop,
    int bsize = 16, srcstride, dststride, w, h;
    unsigned char *dst;
 
-   void (* flip) (unsigned char *, const unsigned char *, int) = NULL;
+   void (* flip) (unsigned char *dst_block, const unsigned char *src_block, int vertical_flip); /**< Function pointer for S3TC block flipping. */
 
    *error = EVAS_LOAD_ERROR_GENERIC;
 
    if (loader->format != prop->cspace)
-     FAIL();
+     FAIL(); // Requested colorspace must be the native S3TC format.
 
    switch (loader->format)
      {
       case EVAS_COLORSPACE_RGB_S3TC_DXT1:
       case EVAS_COLORSPACE_RGBA_S3TC_DXT1:
         flip = s3tc_encode_dxt1_flip;
-        bsize = 8;
+        bsize = 8; // DXT1 uses 8 bytes per 4x4 block.
         break;
       case EVAS_COLORSPACE_RGBA_S3TC_DXT2:
         flip = s3tc_encode_dxt2_rgba_flip;
-        bsize = 16;
+        bsize = 16; // DXT2 uses 16 bytes per 4x4 block.
         break;
       case EVAS_COLORSPACE_RGBA_S3TC_DXT3:
         flip = s3tc_encode_dxt3_rgba_flip;
-        bsize = 16;
+        bsize = 16; // DXT3 uses 16 bytes per 4x4 block.
         break;
       case EVAS_COLORSPACE_RGBA_S3TC_DXT4:
         flip = s3tc_encode_dxt4_rgba_flip;
-        bsize = 16;
+        bsize = 16; // DXT4 uses 16 bytes per 4x4 block.
         break;
       case EVAS_COLORSPACE_RGBA_S3TC_DXT5:
         flip = s3tc_encode_dxt5_rgba_flip;
-        bsize = 16;
+        bsize = 16; // DXT5 uses 16 bytes per 4x4 block.
         break;
-      default: FAIL();
+      default: FAIL(); // Should not happen if header parsing was correct.
      }
 
-   src = map + DDS_HEADER_SIZE;
+   src = map + DDS_HEADER_SIZE; // Start of pixel data in the mapped file.
    w = prop->w;
    h = prop->h;
    srcstride = ((prop->w + 3) / 4) * bsize;
@@ -440,15 +568,40 @@ on_error:
    return (*error == EVAS_LOAD_ERROR_NONE);
 }
 
+/**
+ * @brief Loads the image data from a DDS file.
+ *
+ * This function is called by Evas to load the actual pixel data.
+ * If the requested colorspace (`prop->cspace`) is a native S3TC format,
+ * it calls `_dds_data_load()` to copy the compressed data with borders.
+ * If the requested colorspace is ARGB8888, it decodes the S3TC data
+ * into an ARGB8888 pixel buffer.
+ *
+ * @param[in] loader_data Pointer to the Evas_Loader_Internal structure.
+ * @param[in,out] prop Pointer to an Emile_Image_Property structure.
+ *                     `prop->cspace` specifies the desired output colorspace.
+ *                     `prop->premul` will be set based on the S3TC format if decoding to ARGB8888.
+ * @param[out] pixels Pointer to the destination buffer for the pixel data.
+ *                    If `prop->cspace` is native S3TC, this buffer receives S3TC blocks with borders.
+ *                    If `prop->cspace` is ARGB8888, this buffer receives decoded 32-bit ARGB pixels.
+ *                    Example for ARGB8888 output (pixels is `unsigned int*`):
+ *                    `pixels[y * prop->w + x]` corresponds to the pixel at (x,y).
+ * @param[out] error Pointer to an integer to store the error code on failure.
+ *                   Set to EVAS_LOAD_ERROR_NONE on success.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ *         Example error codes:
+ *         - EVAS_LOAD_ERROR_CORRUPT_FILE: If file mapping fails or file is too small.
+ *         - EVAS_LOAD_ERROR_GENERIC: For internal errors or unsupported decode paths.
+ */
 Eina_Bool
 evas_image_load_file_data_dds(void *loader_data,
                               Emile_Image_Property *prop,
                               void *pixels,
                               int *error)
 {
-   void (*func) (unsigned int *bgra, const unsigned char *s3tc) = NULL;
+   void (*func) (unsigned int *bgra, const unsigned char *s3tc_block) = NULL; /**< Function pointer for S3TC block decoding. */
    Evas_Loader_Internal *loader = loader_data;
-   unsigned int *pix = pixels;
+   unsigned int *pix = pixels; // Assuming ARGB8888 output if not native S3TC.
    unsigned char *map = NULL;
    const unsigned char *src;
 
@@ -527,19 +680,34 @@ on_error:
    return (*error == EVAS_LOAD_ERROR_NONE);
 }
 
+/**
+ * @brief Structure defining the Evas image loader functions for DDS files.
+ *
+ * This structure provides Evas with the necessary function pointers to handle
+ * opening, closing, reading header, and reading data for DDS image files.
+ */
 Evas_Image_Load_Func evas_image_load_dds_func =
 {
-  EVAS_IMAGE_LOAD_VERSION,
-  evas_image_load_file_open_dds,
-  evas_image_load_file_close_dds,
-  (void*) evas_image_load_file_head_dds,
-  NULL,
-  (void*) evas_image_load_file_data_dds,
-  NULL,
-  EINA_TRUE,
-  EINA_FALSE
+  EVAS_IMAGE_LOAD_VERSION, /**< Loader API version. */
+  evas_image_load_file_open_dds, /**< Function to open the image file. */
+  evas_image_load_file_close_dds, /**< Function to close the image file. */
+  (void*) evas_image_load_file_head_dds, /**< Function to read image header. */
+  NULL, /**< Function to read image data (legacy, not used). */
+  (void*) evas_image_load_file_data_dds, /**< Function to read image pixel data. */
+  NULL, /**< Function to get animated image frame information (not applicable). */
+  EINA_TRUE, /**< Indicates if the loader supports region loading (not fully utilized here for S3TC). */
+  EINA_FALSE /**< Indicates if the loader supports loading into a user-provided buffer for compressed data (not used). */
 };
 
+/**
+ * @brief Initializes the DDS image loader module.
+ *
+ * This function is called by Evas when the module is loaded. It registers
+ * the loader functions with the Evas module system.
+ *
+ * @param[in] em Pointer to the Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -548,23 +716,37 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Shuts down the DDS image loader module.
+ *
+ * This function is called by Evas when the module is unloaded.
+ * Currently, it performs no specific cleanup.
+ *
+ * @param[in] em Pointer to the Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Evas module API structure for the DDS loader.
+ *
+ * This structure defines the module's API version, name, and entry points
+ * for opening and closing the module.
+ */
 static Evas_Module_Api evas_modapi =
 {
-   EVAS_MODULE_API_VERSION,
-   "dds",
-   "none",
+   EVAS_MODULE_API_VERSION, /**< Evas module API version. */
+   "dds", /**< Module name. */
+   "none", /**< Module license (placeholder). */
    {
-     module_open,
-     module_close
+     module_open, /**< Function to open/initialize the module. */
+     module_close /**< Function to close/shutdown the module. */
    }
 };
 
-EVAS_MODULE_DEFINE(EVAS_MODULE_TYPE_IMAGE_LOADER, image_loader, dds);
+EVAS_MODULE_DEFINE(EVAS_MODULE_TYPE_IMAGE_LOADER, image_loader, dds); /**< Macro to define the Evas image loader module. */
 
 #ifndef EVAS_STATIC_BUILD_DDS
 EVAS_EINA_MODULE_DEFINE(image_loader, dds);

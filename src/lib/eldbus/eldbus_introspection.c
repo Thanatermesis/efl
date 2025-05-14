@@ -10,20 +10,119 @@ struct _Eldbus_Introspection_Element_Parse_Table
    Eina_List **list;
 };
 
+/**
+ * @brief Retrieves the value of a specific attribute from a list of XML attributes.
+ * @param attributes The list of Eina_Simple_XML_Attribute.
+ * @param key The name of the attribute to find.
+ * @return The string value of the attribute, or NULL if not found.
+ */
 static const char *_eldbus_introspection_attribute_value_get(Eina_Inlist *, const char *);
+
+/**
+ * @brief Parses an XML node tag representing a D-Bus node element.
+ * @param tag The Eina_Simple_XML_Node_Tag representing the <node> element.
+ * @return A pointer to an Eldbus_Introspection_Node structure, or NULL on failure.
+ *         The returned node contains parsed child nodes and interfaces.
+ *         Example: <node name="org.example.Service">...</node>
+ */
 static void *_eldbus_introspection_parse_node(Eina_Simple_XML_Node_Tag *);
+
+/**
+ * @brief Parses an XML node tag representing a D-Bus interface element.
+ * @param tag The Eina_Simple_XML_Node_Tag representing the <interface> element.
+ * @return A pointer to an Eldbus_Introspection_Interface structure, or NULL on failure.
+ *         The returned interface contains parsed methods, signals, properties, and annotations.
+ *         Example: <interface name="org.freedesktop.DBus.Properties">...</interface>
+ */
 static void *_eldbus_introspection_parse_interface(Eina_Simple_XML_Node_Tag *);
+
+/**
+ * @brief Parses an XML node tag representing a D-Bus method element.
+ * @param tag The Eina_Simple_XML_Node_Tag representing the <method> element.
+ * @return A pointer to an Eldbus_Introspection_Method structure, or NULL on failure.
+ *         The returned method contains parsed arguments and annotations.
+ *         Example: <method name="GetName">...</method>
+ */
 static void *_eldbus_introspection_parse_method(Eina_Simple_XML_Node_Tag *);
+
+/**
+ * @brief Parses an XML node tag representing a D-Bus signal element.
+ * @param tag The Eina_Simple_XML_Node_Tag representing the <signal> element.
+ * @return A pointer to an Eldbus_Introspection_Signal structure, or NULL on failure.
+ *         The returned signal contains parsed arguments and annotations.
+ *         Example: <signal name="NameChanged">...</signal>
+ */
 static void *_eldbus_introspection_parse_signal(Eina_Simple_XML_Node_Tag *);
+
+/**
+ * @brief Parses an XML node tag representing a D-Bus argument element.
+ * @param tag The Eina_Simple_XML_Node_Tag representing the <arg> element.
+ * @return A pointer to an Eldbus_Introspection_Argument structure, or NULL on failure.
+ *         Example: <arg name="name" type="s" direction="out"/>
+ */
 static void *_eldbus_introspection_parse_argument(Eina_Simple_XML_Node_Tag *);
+
+/**
+ * @brief Parses an XML node tag representing a D-Bus property element.
+ * @param tag The Eina_Simple_XML_Node_Tag representing the <property> element.
+ * @return A pointer to an Eldbus_Introspection_Property structure, or NULL on failure.
+ *         The returned property contains parsed annotations.
+ *         Example: <property name="Version" type="s" access="read"/>
+ */
 static void *_eldbus_introspection_parse_property(Eina_Simple_XML_Node_Tag *);
+
+/**
+ * @brief Parses an XML node tag representing a D-Bus annotation element.
+ * @param tag The Eina_Simple_XML_Node_Tag representing the <annotation> element.
+ * @return A pointer to an Eldbus_Introspection_Annotation structure, or NULL on failure.
+ *         Example: <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="true"/>
+ */
 static void *_eldbus_introspection_parse_annotation(Eina_Simple_XML_Node_Tag *);
+
+/**
+ * @brief Parses child XML elements based on a table of element names and corresponding parser functions.
+ * @param children An Eina_Inlist of Eina_Simple_XML_Node children to parse.
+ * @param table An array of Eldbus_Introspection_Element_Parse_Table defining how to parse each child type.
+ *              The table maps element names (e.g., "method", "signal") to parser functions
+ *              and specifies the Eina_List where parsed items should be appended.
+ *              Example table entry: { "method", _eldbus_introspection_parse_method, &interface->methods }
+ */
 static void _eldbus_introspection_parse_children(Eina_Inlist *, const Eldbus_Introspection_Element_Parse_Table[]);
+
+/**
+ * @brief Frees an Eldbus_Introspection_Interface structure and its contents.
+ * @param interface The interface to free.
+ */
 static void _eldbus_introspection_interface_free(Eldbus_Introspection_Interface *);
+
+/**
+ * @brief Frees an Eldbus_Introspection_Method structure and its contents.
+ * @param method The method to free.
+ */
 static void _eldbus_introspection_method_free(Eldbus_Introspection_Method *);
+
+/**
+ * @brief Frees an Eldbus_Introspection_Signal structure and its contents.
+ * @param signal The signal to free.
+ */
 static void _eldbus_introspection_signal_free(Eldbus_Introspection_Signal *);
+
+/**
+ * @brief Frees an Eldbus_Introspection_Argument structure and its contents.
+ * @param argument The argument to free.
+ */
 static void _eldbus_introspection_argument_free(Eldbus_Introspection_Argument *);
+
+/**
+ * @brief Frees an Eldbus_Introspection_Property structure and its contents.
+ * @param property The property to free.
+ */
 static void _eldbus_introspection_property_free(Eldbus_Introspection_Property *);
+
+/**
+ * @brief Frees an Eldbus_Introspection_Annotation structure and its contents.
+ * @param annotation The annotation to free.
+ */
 static void _eldbus_introspection_annotation_free(Eldbus_Introspection_Annotation *);
 
 EAPI Eldbus_Introspection_Node *

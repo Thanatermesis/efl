@@ -9,10 +9,30 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_view_form_widget_add, EFL_FUNC_CALL(propname, evas
 
 void _elm_view_form_efl_object_destructor(Eo *obj, Elm_View_Form_Data *pd);
 
+/**
+ * @internal
+ * @brief Destructor for the Elm_View_Form object.
+ *
+ * This function is called when the Elm_View_Form object is being destroyed.
+ * It should free any allocated resources specific to the Elm_View_Form instance.
+ *
+ * @param obj The Eo object to be destructed.
+ * @param pd The private data of the Elm_View_Form object.
+ */
 
 static Eina_Bool
 _elm_view_form_class_initializer(Efl_Class *klass)
 {
+   /**
+    * @internal
+    * @brief Initializes the Elm_View_Form Efl_Class.
+    *
+    * This function is called once when the Efl_Class for Elm_View_Form is being created.
+    * It sets up the Evas Object operations (functions) for this class.
+    *
+    * @param klass The Efl_Class to initialize.
+    * @return EINA_TRUE on success, EINA_FALSE otherwise.
+    */
    const Efl_Object_Ops *opsp = NULL;
 
    const Efl_Object_Property_Reflection_Ops *ropsp = NULL;
@@ -32,6 +52,13 @@ _elm_view_form_class_initializer(Efl_Class *klass)
    return efl_class_functions_set(klass, opsp, ropsp);
 }
 
+/**
+ * @internal
+ * @brief Describes the Elm_View_Form Efl_Class.
+ *
+ * This structure provides metadata for the Elm_View_Form class,
+ * including its version, name, type, instance size, and initializer functions.
+ */
 static const Efl_Class_Description _elm_view_form_class_desc = {
    EO_VERSION,
    "Elm.View.Form",

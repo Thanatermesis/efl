@@ -19,6 +19,14 @@ typedef void (*Eldbus_Dict_Cb_Get)(void *data, const void *key, Eldbus_Message_I
 /**
  * Iterate over a dictionary.
  *
+ * The @p dict iterator is expected to yield dictionary entries one by one.
+ * For instance, if you have a D-Bus message containing an array of
+ * dictionary entries (e.g., type signature "a{sv}", an array of string-to-variant
+ * entries), you would first recurse into this array to get an iterator over its
+ * elements. This element iterator is what should be passed as @p dict.
+ * Each element this iterator points to will have a D-Bus type corresponding
+ * to a dictionary entry structure (e.g., "{sv}").
+ *
  * @param dict iterator with array of entry
  * @param signature of entry, example: "sv"
  * @param cb callback that will be called in each entry

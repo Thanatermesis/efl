@@ -1,7 +1,22 @@
+/**
+ * @file
+ * @brief Legacy implementation for the Efl Ui Win Inlined object.
+ *
+ * This class provides a legacy inlined window, primarily for compatibility.
+ * It inherits from Efl.Ui.Win_Inlined.
+ */
 
 Efl_Object *_efl_ui_win_inlined_legacy_efl_object_finalize(Eo *obj, void *pd);
 
-
+/**
+ * @brief Initializes the Efl_Ui_Win_Inlined_Legacy class.
+ *
+ * This function is called once when the class is first used.
+ * It sets up the operations (methods) for the class.
+ *
+ * @param klass The class to initialize.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _efl_ui_win_inlined_legacy_class_initializer(Efl_Class *klass)
 {
@@ -22,10 +37,16 @@ _efl_ui_win_inlined_legacy_class_initializer(Efl_Class *klass)
    return efl_class_functions_set(klass, opsp, ropsp);
 }
 
+/**
+ * @brief Class description for Efl_Ui_Win_Inlined_Legacy.
+ *
+ * This structure provides metadata about the class, such as its version,
+ * name, type, and pointers to its initializer and constructor functions.
+ */
 static const Efl_Class_Description _efl_ui_win_inlined_legacy_class_desc = {
-   EO_VERSION,
-   "Efl.Ui.Win_Inlined_Legacy",
-   EFL_CLASS_TYPE_REGULAR,
+   EO_VERSION, /**< Class version. */
+   "Efl.Ui.Win_Inlined_Legacy", /**< Class name. */
+   EFL_CLASS_TYPE_REGULAR, /**< Class type. */
    0,
    _efl_ui_win_inlined_legacy_class_initializer,
    _efl_ui_win_inlined_legacy_class_constructor,

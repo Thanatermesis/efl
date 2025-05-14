@@ -3,6 +3,17 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback for the "Aspect Fixed" checkbox.
+ *
+ * This function is called when the state of the "Aspect Fixed" checkbox
+ * changes. It sets the aspect_fixed property of the icon based on the
+ * checkbox's state.
+ *
+ * @param data The icon Evas_Object.
+ * @param obj The checkbox Evas_Object that triggered the callback.
+ * @param event_info EINA_UNUSED.
+ */
 static void
 aspect_fixed_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -10,6 +21,17 @@ aspect_fixed_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_image_aspect_fixed_set(ic, elm_check_state_get(obj));
 }
 
+/**
+ * @brief Callback for the "Fill Outside" checkbox.
+ *
+ * This function is called when the state of the "Fill Outside" checkbox
+ * changes. It sets the fill_outside property of the icon based on the
+ * checkbox's state.
+ *
+ * @param data The icon Evas_Object.
+ * @param obj The checkbox Evas_Object that triggered the callback.
+ * @param event_info EINA_UNUSED.
+ */
 static void
 fill_outside_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -17,6 +39,17 @@ fill_outside_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_image_fill_outside_set(ic, elm_check_state_get(obj));
 }
 
+/**
+ * @brief Callback for the "Smooth" checkbox.
+ *
+ * This function is called when the state of the "Smooth" checkbox
+ * changes. It sets the smooth scaling property of the icon based on the
+ * checkbox's state.
+ *
+ * @param data The icon Evas_Object.
+ * @param obj The checkbox Evas_Object that triggered the callback.
+ * @param event_info EINA_UNUSED.
+ */
 static void
 smooth_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -24,6 +57,18 @@ smooth_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_image_smooth_set(ic, elm_check_state_get(obj));
 }
 
+/**
+ * @brief Callback for the "Preload & Prescale" button.
+ *
+ * This function is called when the "Preload & Prescale" button is clicked.
+ * It creates a new window to demonstrate the preload and prescale
+ * functionalities on a very large image. Preloading is disabled to show
+ * that prescaling can work without it.
+ *
+ * @param data EINA_UNUSED.
+ * @param obj EINA_UNUSED.
+ * @param event_info EINA_UNUSED.
+ */
 static void
 bt_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -50,6 +95,17 @@ bt_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_inf
    evas_object_show(win);
 }
 
+/**
+ * @brief Main function for the basic icon test.
+ *
+ * This function creates a window with an icon and several checkboxes
+ * to test basic icon properties like aspect ratio, filling, and smoothing.
+ * It also includes a button to test preloading and prescaling.
+ *
+ * @param data EINA_UNUSED.
+ * @param obj EINA_UNUSED.
+ * @param event_info EINA_UNUSED.
+ */
 void
 test_icon(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -121,12 +177,32 @@ test_icon(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info
 }
 
 /* Test: Icon Transparent */
+/**
+ * @brief Simple click callback for the transparent icon test.
+ *
+ * Prints a message to stdout when the icon is clicked.
+ *
+ * @param data EINA_UNUSED.
+ * @param obj EINA_UNUSED.
+ * @param event_info EINA_UNUSED.
+ */
 static void
 icon_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("clicked!\n");
 }
 
+/**
+ * @brief Main function for the transparent icon test.
+ *
+ * This test creates a window with alpha channel enabled, making it transparent.
+ * An icon is added to this window, and the window's aspect ratio is controlled
+ * by the icon's dimensions. This demonstrates using icons in transparent windows.
+ *
+ * @param data EINA_UNUSED.
+ * @param obj EINA_UNUSED.
+ * @param event_info EINA_UNUSED.
+ */
 void
 test_icon_transparent(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -157,18 +233,51 @@ test_icon_transparent(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void
 }
 
 /* Test: Icon Standard */
+/**
+ * @brief Genlist group item text get callback for standard icon test.
+ *
+ * This function provides the text for group items in the genlist.
+ *
+ * @param data The text for the group item, a char*.
+ * @param obj EINA_UNUSED.
+ * @param part EINA_UNUSED.
+ * @return A duplicated string of the group name. The caller is responsible for freeing it.
+ */
 static char *
 _gl_group_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
    return strdup(data);
 }
 
+/**
+ * @brief Genlist item text get callback for standard icon test.
+ *
+ * This function provides the text for regular items in the genlist.
+ * In this test, it's the standard icon name.
+ *
+ * @param data The text for the item, a char* representing an icon name.
+ * @param obj EINA_UNUSED.
+ * @param part EINA_UNUSED.
+ * @return A duplicated string of the icon name. The caller is responsible for freeing it.
+ */
 static char *
 _gl_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
    return strdup(data);
 }
 
+/**
+ * @brief Genlist item content get callback for standard icon test.
+ *
+ * This function provides the content for a genlist item, which in this case
+ * is an icon. It creates an icon, sets its standard name, and applies a minimum size
+ * if specified by the radio button group.
+ *
+ * @param data The standard icon name as a const char*.
+ * @param obj The genlist object.
+ * @param part The part of the item to get content for, should be "elm.swallow.icon".
+ * @return An Evas_Object* for the new icon, or NULL on failure.
+ */
 static Evas_Object *
 _gl_content_get(void *data, Evas_Object *obj, const char *part)
 {
@@ -189,6 +298,15 @@ _gl_content_get(void *data, Evas_Object *obj, const char *part)
    return NULL;
 }
 
+/**
+ * @brief Populates the genlist with standard icon names.
+ *
+ * This function adds a comprehensive list of freedesktop.org standard icons
+ * to the given genlist, categorized into groups. This is used for the
+ * standard icon test.
+ *
+ * @param gl The genlist object to populate.
+ */
 static void
 _standard_genlist_populate(Evas_Object *gl)
 {
@@ -638,6 +756,17 @@ _standard_genlist_populate(Evas_Object *gl)
    elm_genlist_item_class_free(itc_g);
 }
 
+/**
+ * @brief Callback for the radio group controlling icon size.
+ *
+ * When the selected radio button changes, this function is called to
+ * update the realized items in the genlist, which will recreate the
+ * icons with the new minimum size.
+ *
+ * @param data The genlist object.
+ * @param obj EINA_UNUSED.
+ * @param event_info EINA_UNUSED.
+ */
 static void
 _rdg_changed_cb(void *data, Evas_Object *obj EINA_UNUSED,
                 void *event_info EINA_UNUSED)
@@ -647,6 +776,16 @@ _rdg_changed_cb(void *data, Evas_Object *obj EINA_UNUSED,
    elm_genlist_realized_items_update(li);
 }
 
+/**
+ * @brief Callback for the slider controlling live resize icon's minimum size.
+ *
+ * This function updates the minimum size hint of a target icon based on the
+ * slider's value. This demonstrates live resizing of an icon.
+ *
+ * @param data The icon Evas_Object to resize.
+ * @param obj The slider Evas_Object.
+ * @param event_info EINA_UNUSED.
+ */
 static void
 _slider_changed_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -656,6 +795,16 @@ _slider_changed_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    evas_object_size_hint_min_set(icon, size, size);
 }
 
+/**
+ * @brief Callback for when a genlist item is selected.
+ *
+ * When an item in the standard icon list is selected, this function updates
+ * the preview icon to display the selected standard icon.
+ *
+ * @param data EINA_UNUSED.
+ * @param obj The genlist object.
+ * @param event_info The selected Elm_Object_Item.
+ */
 static void
 _list_selected_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info)
 {
@@ -665,6 +814,17 @@ _list_selected_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info)
    elm_icon_standard_set(icon, elm_object_item_text_get(list_it));
 }
 
+/**
+ * @brief Callback for the "Another size test" button.
+ *
+ * Creates a new window with two standard icons inside a panes widget.
+ * This is to test how standard icons behave with automatic sizing
+ * within containers, without explicitly setting a minimum size.
+ *
+ * @param data EINA_UNUSED.
+ * @param obj EINA_UNUSED.
+ * @param event_info EINA_UNUSED.
+ */
 static void
 _std_btn_clicked_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                     void *event_info EINA_UNUSED)
@@ -700,6 +860,21 @@ _std_btn_clicked_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    evas_object_show(win);
 }
 
+/**
+ * @brief Main function for the standard icon test.
+ *
+ * This function sets up a complex UI to test various aspects of standard icons.
+ * It includes:
+ * - A genlist populated with all standard icon names.
+ * - Radio buttons to control the minimum size of icons in the list.
+ * - A live preview of a selected icon that can be resized with a slider.
+ * - Information about where icon lookup order is configured.
+ * - A button to launch another test window for automatic icon sizing.
+ *
+ * @param data EINA_UNUSED.
+ * @param obj EINA_UNUSED.
+ * @param event_info EINA_UNUSED.
+ */
 void
 test_icon_standard(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                    void *event_info EINA_UNUSED)

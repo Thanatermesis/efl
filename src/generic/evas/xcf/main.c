@@ -156,23 +156,31 @@ typedef enum
    Channel, e.g. for use as a layer mask.
                                             --cK.
 */
+/**
+ * @brief Represents a layer or a channel within an XCF image.
+ *
+ * This structure holds all properties and data associated with a single layer,
+ * including its dimensions, pixel data, visibility, opacity, blending mode,
+ * and any associated layer mask. It's a simplified version of GIMP's internal
+ * layer representation.
+ */
 struct _Layer
 {
-  int            visible;               /* controls visibility            */
-  int            width, height;		/* size of drawable               */
-  int            bpp;                   /* depth                          */
-  int            offset_x, offset_y;	/* offset of layer in image       */
+  int            visible;               /**< Non-zero if the layer is visible. */
+  int            width, height;		/**< Dimensions of the layer in pixels. */
+  int            bpp;                   /**< Bytes per pixel for this layer's original data (before conversion). */
+  int            offset_x, offset_y;	/**< Position of the layer's top-left corner relative to the image canvas. */
 
-  int            ID;			/* provides a unique ID           */
-  GimpImageType  type;			/* type of drawable               */
-  char           has_alpha;		/* drawable has alpha             */
+  int            ID;			/**< Unique identifier for the layer (not actively used by this loader). */
+  GimpImageType  type;			/**< The GIMP image type (e.g., RGB_GIMAGE, RGBA_GIMAGE). */
+  char           has_alpha;		/**< Non-zero if the layer has an alpha channel. */
 
-  int            preserve_trans;	/*  preserve transparency         */
+  int            preserve_trans;	/**< Non-zero if transparency should be preserved. */
 
-  Layer          *mask;                 /*  possible layer mask           */
+  Layer          *mask;                 /**< Pointer to another Layer struct representing the layer mask, if any. */
 
-  int        opacity;                   /*  layer opacity                 */
-  LayerModeEffects  mode;               /*  layer combination mode        */
+  int        opacity;                   /**< Layer opacity, ranging from 0 (transparent) to 255 (opaque). */
+  LayerModeEffects  mode;               /**< Blending mode used to combine this layer with layers below it. */
 
 
   /* XCF stores the actual image data as tiles. A Layer is covered with
@@ -181,70 +189,78 @@ struct _Layer
      columns.
   */
 
-  Tile*   tiles;                        /* tiles for drawable data        */
-  int     num_rows;
-  int     num_cols;
+  Tile*   tiles;                        /**< Array of Tile structures holding the raw pixel data for this layer. */
+  int     num_rows;                     /**< Number of rows of tiles. */
+  int     num_cols;                     /**< Number of columns of tiles. */
 
   /* After the tiles are read in, they're serialized int an array
      of DATA8's, that will always contain 4 bpp data. Not optimal,
      I know, but makes life easier
   */
 
-  DATA8*  data;
+  DATA8*  data;                         /**< Pointer to the processed pixel data for the layer, always in 32-bit RGBA format. */
 
   /* Layers are stored as a linked list. */
-  struct _Layer* next;
-  struct _Layer* prev;
+  struct _Layer* next;                  /**< Pointer to the next layer in the image stack (layer above). */
+  struct _Layer* prev;                  /**< Pointer to the previous layer in the image stack (layer below). */
 };
 
 
-/* The tile structure:
-*/
+/**
+ * @brief Represents a single tile of pixel data within a layer.
+ *
+ * XCF files store image data in a grid of tiles (typically 64x64 pixels)
+ * to manage large images efficiently.
+ */
 struct _Tile
 {
-  unsigned char  bpp;     /* the bytes per pixel (1, 2, 3 or 4) */
-  unsigned short ewidth;  /* the effective width of the tile */
-  unsigned short eheight; /* the effective height of the tile */
+  unsigned char  bpp;     /**< Bytes per pixel for the data within this tile (1, 2, 3, or 4). */
+  unsigned short ewidth;  /**< Effective width of the tile in pixels. May be less than TILE_WIDTH for edge tiles. */
+  unsigned short eheight; /**< Effective height of the tile in pixels. May be less than TILE_HEIGHT for edge tiles. */
 
   /* a tile's effective width and height may be smaller
    * (but not larger) than TILE_WIDTH and TILE_HEIGHT.
    * This is to handle edge tiles of a drawable.
    */
 
-  DATA8 *data;
+  DATA8 *data;            /**< Raw pixel data for this tile. */
 };
 
 
-/* This struct simply contains everything that didn't fit elsewhere,
-   based on GimpImage :)
-*/
+/**
+ * @brief Represents the overall XCF image being loaded.
+ *
+ * This structure holds global image properties, file handling information,
+ * the list of layers, and the final composited image data.
+ * It's a global instance named `_image`.
+ */
 struct _GimpImage
 {
-  void               *file;
-  char               *filename;
-  long                cp;
-  int                 compression;     /*  file compression mode        */
-  int                 file_version;
+  void               *file;             /**< Pointer to the File structure for low-level file access. */
+  char               *filename;         /**< Name of the XCF file being processed. */
+  long                cp;               /**< Current position (offset) in the file stream. */
+  int                 compression;      /**< Compression type used in the XCF file (e.g., COMPRESS_NONE, COMPRESS_RLE). */
+  int                 file_version;     /**< Version of the XCF file format. */
 
-  int                 width, height;   /*  width and height attributes  */
-  GimpImageBaseType   base_type;       /*  base gimp_image type         */
+  int                 width, height;    /**< Overall dimensions of the image canvas in pixels. */
+  GimpImageBaseType   base_type;        /**< Base image type (e.g., RGB, GRAY, INDEXED). */
 
-  DATA32              floating_sel_offset;
+  DATA32              floating_sel_offset; /**< File offset for the floating selection, if any. */
 
-  DATA8*              cmap;            /*  colormap--for indexed        */
-  int                 num_cols;        /*  number of colors in map      */
+  DATA8*              cmap;             /**< Colormap data for indexed images. Stored as [R1,G1,B1, R2,G2,B2, ...]. */
+  int                 num_cols;         /**< Number of colors in the colormap. */
 
  /* If a layer number was passed to the loader, it goes here: */
-  int                 single_layer_index;
+  int                 single_layer_index; /**< If >= 0, only this layer index will be loaded and flattened. Otherwise, all layers are processed. */
 
   /* Tadaa -- the final image data. Layers get pasted
      onto this one, bottom-up.
   */
-  DATA8*              data;
+  DATA8*              data;             /**< Pointer to the final, flattened image data in 32-bit RGBA format, stored in shared memory. */
 
-  Layer*              layers;
-  Layer*              last_layer;
-  Layer*              floating_sel;
+  Layer*              layers;           /**< Pointer to the first layer in the linked list of layers (bottom-most). */
+  Layer*              last_layer;       /**< Pointer to the last layer in the linked list (top-most). */
+  Layer*              floating_sel;     /**< Pointer to the layer acting as a floating selection, if any. */
 }
 _image;
 
@@ -256,21 +272,36 @@ typedef struct _Chunk Chunk;
 #define FBUF 1
 #define CHUNK_SIZE (32 * 1024)
 
+/**
+ * @brief A chunk of data read from the file. Used for buffered reading.
+ */
 struct _Chunk
 {
-   int            size;
-   unsigned char  data[CHUNK_SIZE];
+   int            size;                 /**< Actual number of bytes read into this chunk. */
+   unsigned char  data[CHUNK_SIZE];     /**< Buffer holding the chunk data. CHUNK_SIZE is typically 32KB. */
 };
 
+/**
+ * @brief Structure for managing file I/O, supporting gzip compression and buffering.
+ */
 struct _File
 {
-   int            fd;
-   gzFile         fp;
-   long           pos, size;
-   int            chunk_num;
-   Chunk        **chunk;
+   int            fd;                   /**< File descriptor for the opened file. */
+   gzFile         fp;                   /**< gzFile handle for reading from gzipped files. */
+   long           pos;                  /**< Current logical read position in the file. */
+   long           size;                 /**< Total size of the file if known (set when end of file is reached during chunked reading). -1 or 0 initially. */
+   int            chunk_num;            /**< Number of chunks currently allocated/read. */
+   Chunk        **chunk;                /**< Array of pointers to Chunk structures for buffered reading. */
 };
 
+/**
+ * @brief Opens a file for reading, with support for gzip decompression.
+ *
+ * Initializes a File structure for the given filepath.
+ *
+ * @param file The path to the file to open.
+ * @return A pointer to a new File structure on success, or NULL on failure.
+ */
 static File *
 f_open(const char *file)
 {
@@ -296,6 +327,11 @@ f_open(const char *file)
    return f;
 }
 
+/**
+ * @brief Closes an opened file and frees associated resources.
+ *
+ * @param f Pointer to the File structure to close.
+ */
 static void
 f_close(File *f)
 {
@@ -305,6 +341,17 @@ f_close(File *f)
 }
 
 #ifdef FBUF
+/**
+ * @brief Ensures that data up to a certain position and length is read into chunks.
+ *
+ * This function is part of the buffered file reading mechanism (FBUF).
+ * It reads data from the file into memory chunks if they haven't been read yet,
+ * extending the `f->chunk` array as needed.
+ *
+ * @param f Pointer to the File structure.
+ * @param pos The starting file position from which data is needed.
+ * @param bytes The number of bytes needed from the starting position.
+ */
 static void
 _f_read_pos(File *f, long pos, long bytes)
 {
@@ -340,6 +387,18 @@ _f_read_pos(File *f, long pos, long bytes)
 }
 #endif
 
+/**
+ * @brief Reads a specified number of bytes from the file into a destination buffer.
+ *
+ * This function handles both buffered (FBUF) and direct gzread access.
+ * For buffered reading, it copies data from pre-loaded chunks.
+ *
+ * @param f Pointer to the File structure.
+ * @param dest Pointer to the destination buffer where data will be stored.
+ * @param bytes The number of bytes to read.
+ * @return The number of bytes actually read. This may be less than `bytes`
+ *         if EOF is reached or an error occurs. Returns 0 or negative on error/EOF for gzread.
+ */
 static long
 f_read(File *f, unsigned char *dest, long bytes)
 {
@@ -375,6 +434,16 @@ f_read(File *f, unsigned char *dest, long bytes)
 #endif
 }
 
+/**
+ * @brief Seeks to a specified position in the file.
+ *
+ * For buffered reading (FBUF), this updates the current position `f->pos`
+ * and ensures the relevant chunk is loaded if needed.
+ * For direct reading, it uses `gzseek`.
+ *
+ * @param f Pointer to the File structure.
+ * @param pos The file offset to seek to.
+ */
 static void
 f_seek(File *f, long pos)
 {

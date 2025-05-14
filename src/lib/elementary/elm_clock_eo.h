@@ -4,6 +4,10 @@
 #ifndef _ELM_CLOCK_EO_CLASS_TYPE
 #define _ELM_CLOCK_EO_CLASS_TYPE
 
+/**
+ * @brief The Efl object representing an Elm_Clock.
+ * @ingroup Elm_Clock
+ */
 typedef Eo Elm_Clock;
 
 #endif

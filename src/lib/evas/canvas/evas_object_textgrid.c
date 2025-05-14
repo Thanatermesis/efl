@@ -1,3 +1,12 @@
+/**
+ * @file
+ * @brief Evas textgrid object internal implementation.
+ *
+ * This file contains the internal implementation of the Evas textgrid object.
+ * The textgrid object allows for displaying a grid of characters, each with
+ * its own formatting (color, style, etc.), similar to a terminal emulator.
+ */
+
 #include "evas_common_private.h" /* Includes evas_bidi_utils stuff. */
 #include "evas_private.h"
 
@@ -10,105 +19,202 @@ static const char o_type[] = "textgrid";
 
 /* private struct for line object internal data */
 typedef struct _Evas_Textgrid_Data         Evas_Textgrid_Data;
+/// @brief Represents a single cell in the textgrid.
+/// This structure is defined in evas_obj_textgrid_eo.legacy.h
+/// and typically contains character codepoint, foreground/background colors,
+/// and style attributes (bold, italic, underline, strikethrough).
 typedef struct _Evas_Object_Textgrid_Cell  Evas_Object_Textgrid_Cell;
+/// @brief Represents a color with RGBA components.
 typedef struct _Evas_Object_Textgrid_Color Evas_Object_Textgrid_Color;
-
+/// @brief Represents a row in the textgrid, containing rendering primitives.
 typedef struct _Evas_Object_Textgrid_Row   Evas_Object_Textgrid_Row;
+/// @brief Represents a colored rectangle, used for cell backgrounds.
 typedef struct _Evas_Object_Textgrid_Rect  Evas_Object_Textgrid_Rect;
+/// @brief Represents a piece of text to be rendered, with its properties.
 typedef struct _Evas_Object_Textgrid_Text  Evas_Object_Textgrid_Text;
+/// @brief Represents a line (underline or strikethrough).
 typedef struct _Evas_Object_Textgrid_Line  Evas_Object_Textgrid_Line;
 
+/**
+ * @brief Private data for the Evas_Textgrid object.
+ *
+ * This structure holds all the internal state of a textgrid object,
+ * including its dimensions, cell data, font information, palettes,
+ * and rendering state.
+ */
 struct _Evas_Textgrid_Data
 {
+   /// @brief Current and previous states of the textgrid properties.
+   /// This is used to detect changes and optimize rendering.
    struct {
-      int                         w, h;
-      int                         char_width;
-      int                         char_height;
-      Evas_Object_Textgrid_Row   *rows;
-      Evas_Textgrid_Cell         *cells;
+      int                         w, h; ///< Grid width and height in cells.
+      int                         char_width; ///< Width of a single character cell in pixels.
+      int                         char_height; ///< Height of a single character cell in pixels.
+      Evas_Object_Textgrid_Row   *rows; ///< Array of rows, each containing rendering primitives.
+                                        ///< Example: `rows[0]` is the first row.
+      Evas_Textgrid_Cell         *cells; ///< Flat array of cells. Access via `cells[y * w + x]`.
+                                         ///< Example: `cells[0]` is the cell at (0,0).
 
-      const char                 *font_source;
-      const char                 *font_name;
-      Evas_Font_Size              font_size;
-      Evas_Font_Description      *font_description_normal;
+      const char                 *font_source; ///< Font source file path.
+      const char                 *font_name; ///< Font name (e.g., "Monospace").
+      Evas_Font_Size              font_size; ///< Font size in points.
+      Evas_Font_Description      *font_description_normal; ///< Parsed font description for the normal style.
 
-      Eina_Array                  palette_standard;
-      Eina_Array                  palette_extended;
-      Efl_Text_Font_Bitmap_Scalable bitmap_scalable;
-   } cur, prev;
+      Eina_Array                  palette_standard; ///< Standard color palette (Evas_Object_Textgrid_Color).
+                                                    ///< Example: `eina_array_data_get(&palette_standard, 0)` gets the first color.
+      Eina_Array                  palette_extended; ///< Extended color palette (Evas_Object_Textgrid_Color).
+      Efl_Text_Font_Bitmap_Scalable bitmap_scalable; ///< Font bitmap scaling mode.
+   } cur, prev; ///< Current and previous states.
 
-   int                            ascent;
+   int                            ascent; ///< Font ascent in pixels.
 
-   Evas_Font_Set                 *font_normal;
-   Evas_Font_Set                 *font_bold;
-   Evas_Font_Set                 *font_italic;
-   Evas_Font_Set                 *font_bolditalic;
+   Evas_Font_Set                 *font_normal; ///< Loaded font set for normal style.
+   Evas_Font_Set                 *font_bold; ///< Loaded font set for bold style.
+   Evas_Font_Set                 *font_italic; ///< Loaded font set for italic style.
+   Evas_Font_Set                 *font_bolditalic; ///< Loaded font set for bold-italic style.
 
-   unsigned int                   changed : 1;
-   unsigned int                   core_change : 1;
-   unsigned int                   row_change : 1;
-   unsigned int                   pal_change : 1;
+   unsigned int                   changed : 1; ///< General flag indicating if the object changed.
+   unsigned int                   core_change : 1; ///< Flag indicating a core property change (size, font).
+   unsigned int                   row_change : 1; ///< Flag indicating a change in row data.
+   unsigned int                   pal_change : 1; ///< Flag indicating a palette change.
 };
 
+/**
+ * @brief Represents a color with RGBA components.
+ */
 struct _Evas_Object_Textgrid_Color
 {
-   unsigned char r, g, b, a;
+   unsigned char r, g, b, a; ///< Red, Green, Blue, Alpha components (0-255).
 };
 
+/**
+ * @brief Represents a row in the textgrid.
+ *
+ * Each row caches rendering primitives (rectangles for backgrounds,
+ * text segments, and lines for underlines/strikethroughs) derived
+ * from the cell data for that row. This helps optimize rendering.
+ */
 struct _Evas_Object_Textgrid_Row
 {
-   int ch1, ch2; // change region, -1 == none
-   int rects_num, texts_num, lines_num;
-   int rects_alloc, texts_alloc, lines_alloc;
-   Evas_Object_Textgrid_Rect *rects; // rects + colors
-   Evas_Object_Textgrid_Text *texts; // text
-   Evas_Object_Textgrid_Line *lines; // underlines, strikethroughs
+   int ch1, ch2; ///< Start and end column indices of the changed region in this row. -1 means no change or entire row.
+   int rects_num, texts_num, lines_num; ///< Number of active rects, texts, and lines.
+   int rects_alloc, texts_alloc, lines_alloc; ///< Allocated capacity for rects, texts, and lines.
+   Evas_Object_Textgrid_Rect *rects; ///< Array of background rectangles.
+                                     ///< Example: `rects[0]` is the first background rect for this row.
+   Evas_Object_Textgrid_Text *texts; ///< Array of text segments.
+                                     ///< Example: `texts[0]` is the first text segment for this row.
+   Evas_Object_Textgrid_Line *lines; ///< Array of lines (underlines, strikethroughs).
+                                     ///< Example: `lines[0]` is the first line for this row.
 };
 
+/**
+ * @brief Represents a colored rectangle for cell backgrounds.
+ */
 struct _Evas_Object_Textgrid_Rect
 {
-   unsigned char r, g, b, a;
-   int x, w;
+   unsigned char r, g, b, a; ///< Color of the rectangle.
+   int x, w; ///< Horizontal position (offset from row start) and width in pixels.
 };
 
+/**
+ * @brief Represents a segment of text with specific attributes.
+ */
 struct _Evas_Object_Textgrid_Text
 {
-   Evas_Text_Props text_props;
-   unsigned char r, g, b, a;
-   int           x      : 30;
-   unsigned char bold   :  1;
-   unsigned char italic :  1;
+   Evas_Text_Props text_props; ///< Evas text properties (glyphs, script, etc.).
+   unsigned char r, g, b, a; ///< Color of the text.
+   int           x      : 30; ///< Horizontal position (offset from row start) in pixels.
+   unsigned char bold   :  1; ///< Bold style flag.
+   unsigned char italic :  1; ///< Italic style flag.
 };
 
+/**
+ * @brief Represents a horizontal line (underline or strikethrough).
+ */
 struct _Evas_Object_Textgrid_Line
 {
-   unsigned char r, g, b, a;
-   int x, w, y;
+   unsigned char r, g, b, a; ///< Color of the line.
+   int x, w, y; ///< Horizontal position, width, and vertical offset (from row baseline) in pixels.
 };
 
 /* private methods for textgrid objects */
+
+/**
+ * @brief Initializes a new textgrid object.
+ * @param eo_obj The Evas object to initialize.
+ */
 static void evas_object_textgrid_init(Evas_Object *eo_obj);
+/**
+ * @brief Renders the textgrid object.
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @param type_private_data The private data of the textgrid object.
+ * @param engine The rendering engine.
+ * @param output The rendering output.
+ * @param context The rendering context.
+ * @param surface The target surface for rendering.
+ * @param x The x-offset for rendering.
+ * @param y The y-offset for rendering.
+ * @param do_async Flag for asynchronous rendering.
+ */
 static void evas_object_textgrid_render(Evas_Object *eo_obj,
                                         Evas_Object_Protected_Data *obj,
                                         void *type_private_data,
                                         void *engine, void *output, void *context, void *surface,
                                         int x, int y, Eina_Bool do_async);
+/**
+ * @brief Pre-rendering operations for the textgrid object.
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @param type_private_data The private data of the textgrid object.
+ */
 static void evas_object_textgrid_render_pre(Evas_Object *eo_obj,
 					    Evas_Object_Protected_Data *obj,
 					    void *type_private_data);
+/**
+ * @brief Post-rendering operations for the textgrid object.
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @param type_private_data The private data of the textgrid object.
+ */
 static void evas_object_textgrid_render_post(Evas_Object *eo_obj,
 					     Evas_Object_Protected_Data *obj,
 					     void *type_private_data);
 
+/**
+ * @brief Gets engine-specific data for the textgrid object.
+ * @param eo_obj The Evas object.
+ * @return Engine-specific data (typically font data).
+ */
 static void *evas_object_textgrid_engine_data_get(Evas_Object *eo_obj);
 
+/**
+ * @brief Checks if the textgrid object is currently opaque.
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @param type_private_data The private data of the textgrid object.
+ * @return 1 if opaque, 0 otherwise. (Currently always returns 0).
+ */
 static int evas_object_textgrid_is_opaque(Evas_Object *eo_obj,
 					  Evas_Object_Protected_Data *obj,
 					  void *type_private_data);
+/**
+ * @brief Checks if the textgrid object was opaque in the previous state.
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @param type_private_data The private data of the textgrid object.
+ * @return 1 if was opaque, 0 otherwise. (Currently always returns 0).
+ */
 static int evas_object_textgrid_was_opaque(Evas_Object *eo_obj,
 					   Evas_Object_Protected_Data *obj,
 					   void *type_private_data);
 
+/**
+ * @brief Evas object function table for textgrid objects.
+ *
+ * This structure maps generic Evas object operations to the
+ * specific implementations for the textgrid type.
+ */
 static const Evas_Object_Func object_func =
 {
    /* methods (compulsory) */
@@ -142,12 +248,18 @@ evas_object_textgrid_init(Evas_Object *eo_obj)
    obj->type = o_type;
 
    Evas_Textgrid_Data *o = obj->private_data;
+   // Initialize bitmap scalable mode for fonts.
    o->prev.bitmap_scalable = o->cur.bitmap_scalable = EFL_TEXT_FONT_BITMAP_SCALABLE_COLOR;
    o->prev = o->cur;
    eina_array_step_set(&o->cur.palette_standard, sizeof (Eina_Array), 16);
    eina_array_step_set(&o->cur.palette_extended, sizeof (Eina_Array), 16);
 }
 
+/**
+ * @brief Clears the rendering primitives (rects, texts, lines) for a given row.
+ * @param o The textgrid private data (unused in this function but kept for consistency).
+ * @param r The row to clear.
+ */
 static void
 evas_object_textgrid_row_clear(Evas_Textgrid_Data *o EINA_UNUSED,
                                Evas_Object_Textgrid_Row *r)
@@ -179,6 +291,10 @@ evas_object_textgrid_row_clear(Evas_Textgrid_Data *o EINA_UNUSED,
      }
 }
 
+/**
+ * @brief Clears rendering primitives for all rows and marks them as changed.
+ * @param eo_obj The textgrid Evas object.
+ */
 static void
 evas_object_textgrid_rows_clear(Evas_Object *eo_obj)
 {
@@ -194,6 +310,11 @@ evas_object_textgrid_rows_clear(Evas_Object *eo_obj)
      }
 }
 
+/**
+ * @brief Frees resources associated with a textgrid object.
+ * @param eo_obj The textgrid Evas object.
+ * @param obj The protected data of the Evas object (unused).
+ */
 static void
 evas_object_textgrid_free(Evas_Object *eo_obj, Evas_Object_Protected_Data *obj EINA_UNUSED)
 {
@@ -231,6 +352,16 @@ _evas_textgrid_efl_object_destructor(Eo *eo_obj, Evas_Textgrid_Data *o EINA_UNUS
    efl_destructor(efl_super(eo_obj, MY_CLASS));
 }
 
+/**
+ * @brief Appends a background rectangle to a row's rendering primitives.
+ * @param row The row to append the rectangle to.
+ * @param x The x-coordinate of the rectangle (relative to row start).
+ * @param w The width of the rectangle.
+ * @param r Red component of the color.
+ * @param g Green component of the color.
+ * @param b Blue component of the color.
+ * @param a Alpha component of the color.
+ */
 static void
 evas_object_textgrid_row_rect_append(Evas_Object_Textgrid_Row *row,
                                      int x, int w,
@@ -258,6 +389,13 @@ evas_object_textgrid_row_rect_append(Evas_Object_Textgrid_Row *row,
    row->rects[row->rects_num - 1].a = a;
 }
 
+/**
+ * @brief Retrieves the appropriate font set based on bold and italic flags.
+ * @param o The textgrid private data.
+ * @param is_bold Whether bold font is requested.
+ * @param is_italic Whether italic font is requested.
+ * @return The corresponding Evas_Font_Set, or the normal font if a specific style is not available.
+ */
 static Evas_Font_Set *
 _textgrid_font_get(Evas_Textgrid_Data *o,
                    Eina_Bool is_bold,
@@ -295,6 +433,20 @@ _textgrid_font_get(Evas_Textgrid_Data *o,
      }
 }
 
+/**
+ * @brief Appends a text segment to a row's rendering primitives.
+ * @param row The row to append the text to.
+ * @param obj The protected data of the Evas object.
+ * @param o The textgrid private data.
+ * @param x The x-coordinate of the text (relative to row start).
+ * @param codepoint The Unicode codepoint of the character.
+ * @param r Red component of the text color.
+ * @param g Green component of the text color.
+ * @param b Blue component of the text color.
+ * @param a Alpha component of the text color.
+ * @param is_bold Whether the text is bold.
+ * @param is_italic Whether the text is italic.
+ */
 static void
 evas_object_textgrid_row_text_append(Evas_Object_Textgrid_Row *row,
                                      Evas_Object_Protected_Data *obj,
@@ -347,6 +499,17 @@ evas_object_textgrid_row_text_append(Evas_Object_Textgrid_Row *row,
    text->a = a;
 }
 
+/**
+ * @brief Appends a line (underline or strikethrough) to a row's rendering primitives.
+ * @param row The row to append the line to.
+ * @param x The x-coordinate of the line (relative to row start).
+ * @param w The width of the line.
+ * @param y The y-coordinate of the line (vertical offset from baseline).
+ * @param r Red component of the line color.
+ * @param g Green component of the line color.
+ * @param b Blue component of the line color.
+ * @param a Alpha component of the line color.
+ */
 static void
 evas_object_textgrid_row_line_append(Evas_Object_Textgrid_Row *row, int x, int w, int y, int r, int g, int b, int a)
 {
@@ -373,6 +536,14 @@ evas_object_textgrid_row_line_append(Evas_Object_Textgrid_Row *row, int x, int w
    row->lines[row->lines_num - 1].a = a;
 }
 
+/**
+ * @brief Callback function to unreference glyph data in an Eina_Array.
+ * Used when cleaning up asynchronously drawn text.
+ * @param container The Eina_Array container (unused).
+ * @param data The Evas_Font_Array_Data containing glyphs to unreference.
+ * @param fdata The Evas_Public_Data (used for unref queue).
+ * @return EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 _drop_glyphs_ref(const void *container EINA_UNUSED, void *data, void *fdata)
 {

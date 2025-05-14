@@ -45,6 +45,17 @@ static const Evas_Colorspace cspace_grey_alpha[2] = {
    EVAS_COLORSPACE_ARGB8888
 };
 
+/**
+ * @brief Updates the horizontal properties of a rectangle based on an index.
+ *
+ * This function is used to define a horizontal region, typically for 9-patch
+ * image content areas. When called for the first time on a rectangle
+ * (where r->x is 0), it sets the starting x-coordinate. On subsequent calls,
+ * it updates the width.
+ *
+ * @param r The rectangle to update.
+ * @param index The current horizontal index (e.g., column).
+ */
 static void
 _evas_image_png_update_x_content(Eina_Rectangle *r, int index)
 {
@@ -59,6 +70,17 @@ _evas_image_png_update_x_content(Eina_Rectangle *r, int index)
      }
 }
 
+/**
+ * @brief Updates the vertical properties of a rectangle based on an index.
+ *
+ * This function is used to define a vertical region, typically for 9-patch
+ * image content areas. When called for the first time on a rectangle
+ * (where r->y is 0), it sets the starting y-coordinate. On subsequent calls,
+ * it updates the height.
+ *
+ * @param r The rectangle to update.
+ * @param index The current vertical index (e.g., row).
+ */
 static void
 _evas_image_png_update_y_content(Eina_Rectangle *r, int index)
 {
@@ -73,6 +95,17 @@ _evas_image_png_update_y_content(Eina_Rectangle *r, int index)
      }
 }
 
+/**
+ * @brief Custom read function for libpng to read from a memory-mapped file.
+ *
+ * This function is registered with libpng via png_set_read_fn(). It reads
+ * a specified number of bytes from a memory buffer (which is a map of the
+ * PNG file) into libpng's internal buffer.
+ *
+ * @param png_ptr The libpng read structure.
+ * @param out Pointer to the buffer where data should be copied.
+ * @param count The number of bytes to read.
+ */
 static void
 _evas_image_png_read(png_structp png_ptr, png_bytep out, png_size_t count)
 {
@@ -86,6 +119,21 @@ _evas_image_png_read(png_structp png_ptr, png_bytep out, png_size_t count)
    epi->position += count;
 }
 
+/**
+ * @brief Opens a PNG file for loading.
+ *
+ * This function is part of the Evas image loader interface. It allocates
+ * a loader-specific data structure that holds the file handle and loading
+ * options. This structure is then used for subsequent operations like
+ * reading the header or image data.
+ *
+ * @param f The file handle from Eina.
+ * @param key The key for caching (unused).
+ * @param opts The image loading options.
+ * @param animated Information about animated images (unused).
+ * @param error Pointer to an integer to store the error code.
+ * @return A handle to the loader internal data, or NULL on failure.
+ */
 static void *
 evas_image_load_file_open_png(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
                               Evas_Image_Load_Opts *opts,
@@ -106,12 +154,42 @@ evas_image_load_file_open_png(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
    return loader;
 }
 
+/**
+ * @brief Closes a PNG file loader.
+ *
+ * This function is part of the Evas image loader interface. It frees the
+ * resources allocated by evas_image_load_file_open_png().
+ *
+ * @param loader_data The loader handle created by evas_image_load_file_open_png().
+ */
 static void
 evas_image_load_file_close_png(void *loader_data)
 {
    free(loader_data);
 }
 
+/**
+ * @brief Internal function to read the header of a PNG file.
+ *
+ * This function handles the core logic for reading PNG image metadata. It
+ * memory-maps the file, validates the PNG signature, initializes libpng,
+ * and reads the IHDR chunk to get image dimensions and other properties.
+ * It also applies Evas-specific loading options like region extraction and
+ * scaling. It can detect and prepare for 9-patch PNGs.
+ *
+ * The behavior slightly changes based on `is_for_head`. If true, it is
+ * optimized for just header loading and cleans up all resources. If false,
+ * it leaves resources (like the file map and libpng structs) ready for the
+ * subsequent image data loading phase.
+ *
+ * @param loader The internal loader data.
+ * @param prop The Evas image property structure to fill.
+ * @param epi The PNG info structure to use for this operation.
+ * @param error Pointer to an integer to store the error code.
+ * @param is_for_head EINA_TRUE if only loading the header, EINA_FALSE if
+ *                    preparing to load data as well.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _evas_image_load_file_internal_head_png(Evas_Loader_Internal *loader,
                                         Evas_Image_Property *prop,
@@ -265,6 +343,18 @@ _evas_image_load_file_internal_head_png(Evas_Loader_Internal *loader,
    return r;
 }
 
+/**
+ * @brief Reads the header of a PNG file.
+ *
+ * This is the Evas image loader interface function for reading image
+ * properties (like dimensions, alpha channel presence) without decoding
+ * the entire image data. It wraps _evas_image_load_file_internal_head_png.
+ *
+ * @param loader_data The loader handle.
+ * @param prop The Evas image property structure to fill.
+ * @param error Pointer to an integer to store the error code.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_head_png(void *loader_data,
                               Evas_Image_Property *prop,
@@ -281,6 +371,12 @@ evas_image_load_file_head_png(void *loader_data,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Checks if a 32-bit pixel is black (and opaque).
+ *
+ * @param ptr Pointer to the pixel data (DATA32).
+ * @return EINA_TRUE if the pixel is 0xFF000000 (black), EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _is_black(DATA32 *ptr)
 {
@@ -288,6 +384,30 @@ _is_black(DATA32 *ptr)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Reads image header and data, with special handling for 9-patch PNGs.
+ *
+ * This function is called when `prop->need_data` is true, which is the case
+ * for files identified as 9-patch PNGs (e.g., ending in ".9.png").
+ *
+ * It performs the following steps:
+ * 1. Reads the PNG header and sets up libpng for decoding.
+ * 2. Decodes the entire image into a temporary buffer.
+ * 3. Parses the 1-pixel border of the decoded image to extract 9-patch
+ *    information:
+ *    - The top and left borders define stretchable regions (black pixels).
+ *    - The bottom and right borders define the content area (black pixels).
+ * 4. Fills the `prop->stretch` and `prop->content` structures with this data.
+ * 5. Copies the actual image content (i.e., the image without its 1-pixel
+ *    border) into the `pixels` buffer provided by the caller.
+ *
+ * @param loader_data The loader handle.
+ * @param prop The Evas image property structure, which will be filled with
+ *             9-patch information.
+ * @param pixels The buffer to store the final image data (without the border).
+ * @param error Pointer to an integer to store the error code.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_head_with_data_png(void *loader_data,
                                         Evas_Image_Property *prop,
@@ -620,6 +740,27 @@ evas_image_load_file_head_with_data_png(void *loader_data,
    return r;
 }
 
+/**
+ * @brief Loads the pixel data of a PNG image.
+ *
+ * This is the Evas image loader interface function for decoding the actual
+ * pixel data. It is typically called after `evas_image_load_file_head_png`.
+ *
+ * This function handles:
+ * - Setting up libpng transformations to get the desired output pixel format
+ *   (e.g., ARGB8888, GRY8).
+ * - Reading the pixel data row by row.
+ * - Handling interlaced PNGs.
+ * - Performing scale-down operations if requested in the load options.
+ *   A custom interpolation is used for scaling down.
+ * - Loading a specific region of the image if requested.
+ *
+ * @param loader_data The loader handle.
+ * @param prop The Evas image property structure.
+ * @param pixels The buffer to store the decoded pixel data.
+ * @param error Pointer to an integer to store the error code.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_data_png(void *loader_data,
                               Evas_Image_Property *prop,

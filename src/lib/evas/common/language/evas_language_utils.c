@@ -47,10 +47,22 @@
 #define EXPLICIT_SCRIPT(script) \
    (((script) != EVAS_SCRIPT_UNKNOWN) && ((script) > EVAS_SCRIPT_INHERITED))
 
-static char lang[6]; /* FIXME: Maximum length I know about */
-static char lang_full[32];
-static Evas_BiDi_Direction lang_dir = EVAS_BIDI_DIRECTION_NEUTRAL;
+static char lang[6]; /**< Cached language code (e.g., "en") from locale. @see evas_common_language_from_locale_get */
+static char lang_full[32]; /**< Cached full language code (e.g., "en_US") from locale. @see evas_common_language_from_locale_full_get */
+static Evas_BiDi_Direction lang_dir = EVAS_BIDI_DIRECTION_NEUTRAL; /**< Cached language direction. @see evas_common_language_direction_get */
 
+/**
+ * @internal
+ * @brief Searches for the script of a Unicode character in a pre-sorted table.
+ *
+ * This function performs a binary search on the `_evas_script_slow_table`
+ * to find the script property for a given Unicode character. This table is
+ * typically used for characters outside the range covered by the faster direct
+ * lookup table (`_evas_script_fast_table`).
+ *
+ * @param unicode The Unicode character to find the script for.
+ * @return The Evas_Script_Type of the character, or EVAS_SCRIPT_UNKNOWN if not found.
+ */
 static Evas_Script_Type
 _evas_common_language_char_script_search(Eina_Unicode unicode)
 {

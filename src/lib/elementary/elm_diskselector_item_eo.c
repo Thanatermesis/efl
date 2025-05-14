@@ -9,7 +9,20 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_diskselector_item_next_get, Elm_Widget_Item *,
 
 void _elm_diskselector_item_selected_set(Eo *obj, Elm_Diskselector_Item_Data *pd, Eina_Bool selected);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function for the 'selected' property setter.
+ *
+ * This function is part of the Eolian reflection mechanism. It is called
+ * when the 'selected' property is set via reflection (e.g., through scripting
+ * or introspection). It converts the generic Eina_Value @p val to an Eina_Bool
+ * and then calls the actual property setter elm_obj_diskselector_item_selected_set().
+ *
+ * @param[in] obj The Efl_Object instance.
+ * @param[in] val An Eina_Value containing the boolean value to set.
+ *                The Eina_Value should hold an EINA_VALUE_TYPE_BOOL.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code if conversion fails.
+ */
 static Eina_Error
 __eolian_elm_diskselector_item_selected_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -29,7 +42,19 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_diskselector_item_selected_set, EFL_FUNC_CALL(
 
 Eina_Bool _elm_diskselector_item_selected_get(const Eo *obj, Elm_Diskselector_Item_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function for the 'selected' property getter.
+ *
+ * This function is part of the Eolian reflection mechanism. It is called
+ * when the 'selected' property is accessed via reflection. It calls the
+ * actual property getter elm_obj_diskselector_item_selected_get() and
+ * wraps the returned Eina_Bool into an Eina_Value.
+ *
+ * @param[in] obj The Efl_Object instance.
+ * @return An Eina_Value containing the boolean state of the 'selected' property.
+ *         The Eina_Value will hold an EINA_VALUE_TYPE_BOOL.
+ */
 static Eina_Value
 __eolian_elm_diskselector_item_selected_get_reflect(const Eo *obj)
 {
@@ -56,7 +81,18 @@ void _elm_diskselector_item_elm_widget_item_part_content_set(Eo *obj, Elm_Diskse
 
 Efl_Canvas_Object *_elm_diskselector_item_elm_widget_item_part_content_get(const Eo *obj, Elm_Diskselector_Item_Data *pd, const char *part);
 
-
+/**
+ * @internal
+ * @brief Initializes the Elm_Diskselector_Item Efl_Class.
+ *
+ * This function is called once when the Elm_Diskselector_Item class is being
+ * constructed. It sets up the Efl_Object operations (mapping Eolian methods
+ * to their C implementations) and Efl_Object property reflection operations
+ * for this class.
+ *
+ * @param[in] klass The Efl_Class to initialize.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_diskselector_item_class_initializer(Efl_Class *klass)
 {
@@ -94,10 +130,20 @@ _elm_diskselector_item_class_initializer(Efl_Class *klass)
    return efl_class_functions_set(klass, opsp, ropsp);
 }
 
+/**
+ * @internal
+ * @brief Describes the Elm_Diskselector_Item Efl_Class.
+ *
+ * This static constant structure provides metadata for the
+ * Elm.Diskselector.Item class, including its version, name, type,
+ * instance data size, and pointers to class lifecycle functions like
+ * the class initializer. This descriptor is used by the Eo system to
+ * manage the class.
+ */
 static const Efl_Class_Description _elm_diskselector_item_class_desc = {
-   EO_VERSION,
-   "Elm.Diskselector.Item",
-   EFL_CLASS_TYPE_REGULAR,
+   EO_VERSION, /**< Eolian Object version. */
+   "Elm.Diskselector.Item", /**< Class name. */
+   EFL_CLASS_TYPE_REGULAR, /**< Class type. */
    sizeof(Elm_Diskselector_Item_Data),
    _elm_diskselector_item_class_initializer,
    NULL,

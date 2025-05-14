@@ -1,3 +1,12 @@
+/**
+ * @file
+ * @brief Eina Chained Mempool implementation
+ *
+ * This file implements a memory pool that allocates memory in chained blocks.
+ * It is designed to reduce fragmentation and improve allocation speed for
+ * fixed-size objects.
+ */
+
 /* EINA - EFL data type library
  * Copyright (C) 2008-2010 Cedric BAIL, Vincent Torri
  *
@@ -73,32 +82,45 @@ static int _eina_chained_mp_log_dom = -1;
 static int aligned_chained_pool = 0;
 static int page_size = 0;
 
+/**
+ * @brief Represents a single pool (block) in the chained mempool.
+ *
+ * Each Chained_Pool holds a contiguous block of memory from which items
+ * are allocated. Pools are linked in an inlist and also managed in an
+ * rbtree for efficient searching.
+ */
 typedef struct _Chained_Pool Chained_Pool;
 struct _Chained_Pool
 {
-   EINA_INLIST;
-   EINA_RBTREE;
-   Eina_Trash *base;
-   unsigned int usage;
+   EINA_INLIST; /**< Macro for inlist node integration. */
+   EINA_RBTREE; /**< Macro for rbtree node integration. */
+   Eina_Trash *base; /**< Pointer to a list of freed items within this pool (for recycling). */
+   unsigned int usage; /**< Number of currently allocated items in this pool. */
 
-   unsigned char *last;
-   unsigned char *limit;
+   unsigned char *last; /**< Pointer to the next available memory slot for a new allocation. NULL if no space left for new allocations (only recycled ones). */
+   unsigned char *limit; /**< Pointer to the end of the allocatable memory in this pool. */
 };
 
+/**
+ * @brief Represents the entire chained memory pool manager.
+ *
+ * This structure holds all the metadata for a chained mempool, including
+ * lists of individual pools, allocation sizes, and statistics.
+ */
 typedef struct _Chained_Mempool Chained_Mempool;
 struct _Chained_Mempool
 {
-   Eina_Inlist *first;
-   Eina_Rbtree *root;
-   const char *name;
-   unsigned int item_alloc;
-   unsigned int pool_size;
-   unsigned int alloc_size;
-   unsigned int group_size;
-   unsigned int usage;
-   Chained_Pool* first_fill; //All allocation will happen in this chain,unless it is filled
+   Eina_Inlist *first; /**< Inlist of all Chained_Pool instances, ordered by recent usage or availability. */
+   Eina_Rbtree *root; /**< Rbtree of all Chained_Pool instances, for fast address-based lookups. */
+   const char *name; /**< Name of the mempool, for debugging and identification. */
+   unsigned int item_alloc; /**< Size of each item to be allocated, including alignment. */
+   unsigned int pool_size; /**< Number of items that can be allocated in a single Chained_Pool. */
+   unsigned int alloc_size; /**< Total size of a Chained_Pool structure plus its item data area. */
+   unsigned int group_size; /**< Total size of the item data area in a Chained_Pool (item_alloc * pool_size). */
+   unsigned int usage; /**< Total number of currently allocated items across all pools. */
+   Chained_Pool* first_fill; /**< Optimization: Pointer to the pool currently preferred for allocations. All allocations will happen in this chain, unless it is filled. */
 #ifdef EINA_DEBUG_MALLOC
-   int minimal_size;
+   int minimal_size; /**< Minimal expected size of a pool, for debugging memory overhead. */
 #endif
 #ifdef EINA_HAVE_DEBUG_THREADS
    Eina_Thread self;
@@ -106,7 +128,15 @@ struct _Chained_Mempool
    Eina_Spinlock mutex;
 };
 
-
+/**
+ * @brief Compares two Chained_Pool instances for rbtree ordering.
+ * @param left The left Chained_Pool (as Eina_Rbtree node).
+ * @param right The right Chained_Pool (as Eina_Rbtree node).
+ * @param data User data (unused).
+ * @return EINA_RBTREE_LEFT if left < right, EINA_RBTREE_RIGHT otherwise.
+ *
+ * Comparison is based on memory addresses of the pool structures.
+ */
 static inline Eina_Rbtree_Direction
 _eina_chained_mp_pool_cmp(const Eina_Rbtree *left, const Eina_Rbtree *right, EINA_UNUSED void *data)
 {
@@ -114,17 +144,37 @@ _eina_chained_mp_pool_cmp(const Eina_Rbtree *left, const Eina_Rbtree *right, EIN
    return EINA_RBTREE_RIGHT;
 }
 
+/**
+ * @brief Compares a Chained_Pool with a key (memory address) for rbtree lookup.
+ * @param node The Chained_Pool (as Eina_Rbtree node) to compare.
+ * @param key The memory address (pointer) to check.
+ * @param length Unused.
+ * @param data User data (unused).
+ * @return 0 if the key is within the memory range of the pool,
+ *         -1 if the key is greater than the pool's limit,
+ *         1 if the key is less than the pool's start.
+ */
 static inline int
 _eina_chained_mp_pool_key_cmp(const Eina_Rbtree *node, const void *key,
                               EINA_UNUSED int length, EINA_UNUSED void *data)
 {
    const Chained_Pool *r = EINA_RBTREE_CONTAINER_GET(node, const Chained_Pool);
 
-   if (key > (void *) r->limit) return -1;
-   if (key < (void *) r) return 1;
-   return 0;
+   // The key (a pointer) is being checked if it falls within the memory
+   // range managed by this specific pool 'r'.
+   // The pool 'r' itself is a struct, and its allocatable memory starts right after it.
+   // r->limit points to the end of this allocatable memory.
+   if (key > (void *) r->limit) return -1; // Key is beyond this pool's managed memory
+   if (key < (void *) r) return 1; // Key is before this pool's structure (and thus its managed memory)
+   return 0; // Key is within the address range of this pool's structure or its managed memory.
+             // Further checks are needed to confirm it's a valid item from this pool.
 }
 
+/**
+ * @brief Allocates and initializes a new Chained_Pool.
+ * @param pool The parent Chained_Mempool.
+ * @return A pointer to the newly allocated Chained_Pool, or NULL on failure.
+ */
 static inline Chained_Pool *
 _eina_chained_mp_pool_new(Chained_Mempool *pool)
 {
@@ -161,12 +211,26 @@ _eina_chained_mp_pool_new(Chained_Mempool *pool)
    return p;
 }
 
+/**
+ * @brief Frees a Chained_Pool.
+ * @param p The Chained_Pool to free.
+ */
 static inline void
 _eina_chained_mp_pool_free(Chained_Pool *p)
 {
    free(p);
 }
 
+/**
+ * @brief Compares two Chained_Pool instances based on their usage for sorting.
+ * @param l1 The first Chained_Pool (as Eina_Inlist node).
+ * @param l2 The second Chained_Pool (as Eina_Inlist node).
+ * @return A positive value if p2 has higher usage than p1 (sorts descending by usage),
+ *         a negative value if p1 has higher usage, 0 if equal.
+ *
+ * This function is used to sort pools so that less used pools can be
+ * identified, potentially for repacking or freeing.
+ */
 static int
 _eina_chained_mempool_usage_cmp(const Eina_Inlist *l1, const Eina_Inlist *l2)
 {
@@ -176,9 +240,24 @@ _eina_chained_mempool_usage_cmp(const Eina_Inlist *l1, const Eina_Inlist *l2)
   p1 = EINA_INLIST_CONTAINER_GET(l1, const Chained_Pool);
   p2 = EINA_INLIST_CONTAINER_GET(l2, const Chained_Pool);
 
+  // Sorts in descending order of usage (p2->usage - p1->usage)
+  // so that pools with more free space (lower usage) come first if sorted ascending,
+  // or pools with higher usage come first if sorted descending.
+  // The list is typically sorted to find pools with free slots or to repack.
   return p2->usage - p1->usage;
 }
 
+/**
+ * @brief Allocates an item from a specific Chained_Pool.
+ * @param pool The parent Chained_Mempool.
+ * @param p The Chained_Pool to allocate from.
+ * @return A pointer to the allocated memory item, or NULL if the pool is full
+ *         and has no recycled items.
+ *
+ * This function first tries to recycle a previously freed item from the pool's
+ * trash list. If no recycled items are available, it allocates a new item
+ * from the pool's contiguous memory block.
+ */
 static void *
 _eina_chained_mempool_alloc_in(Chained_Mempool *pool, Chained_Pool *p)
 {
@@ -215,6 +294,18 @@ _eina_chained_mempool_alloc_in(Chained_Mempool *pool, Chained_Pool *p)
   return mem;
 }
 
+/**
+ * @brief Frees an item within a specific Chained_Pool.
+ * @param pool The parent Chained_Mempool.
+ * @param p The Chained_Pool from which the item was allocated.
+ * @param ptr The memory item to free.
+ * @return EINA_TRUE if the Chained_Pool `p` became empty and was freed,
+ *         EINA_FALSE otherwise.
+ *
+ * The freed item is added to the pool's trash list for recycling.
+ * If the pool becomes completely empty (all items freed), the pool itself
+ * is deallocated and removed from the mempool's management.
+ */
 static Eina_Bool
 _eina_chained_mempool_free_in(Chained_Mempool *pool, Chained_Pool *p, void *ptr)
 {
@@ -269,6 +360,16 @@ _eina_chained_mempool_free_in(Chained_Mempool *pool, Chained_Pool *p, void *ptr)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Allocates an item from the chained mempool.
+ * @param data The Chained_Mempool instance.
+ * @param size The size of the item to allocate (unused, as item size is fixed per pool).
+ * @return A pointer to the allocated memory item, or NULL on failure.
+ *
+ * This function implements the malloc behavior for the mempool. It tries to
+ * allocate from the `first_fill` pool if available and has space. If not,
+ * it searches for other pools with free space or creates a new pool.
+ */
 static void *
 eina_chained_mempool_malloc(void *data, EINA_UNUSED unsigned int size)
 {
@@ -328,6 +429,15 @@ eina_chained_mempool_malloc(void *data, EINA_UNUSED unsigned int size)
    return mem;
 }
 
+/**
+ * @brief Frees an item allocated from the chained mempool.
+ * @param data The Chained_Mempool instance.
+ * @param ptr The memory item to free.
+ *
+ * This function implements the free behavior for the mempool. It locates
+ * the Chained_Pool to which the item belongs and then calls
+ * `_eina_chained_mempool_free_in` to perform the actual free operation.
+ */
 static void
 eina_chained_mempool_free(void *data, void *ptr)
 {
@@ -371,6 +481,22 @@ eina_chained_mempool_free(void *data, void *ptr)
    return;
 }
 
+/**
+ * @brief Allocates an item from the chained mempool, trying to allocate
+ *        near a given existing allocation.
+ * @param data The Chained_Mempool instance.
+ * @param after A pointer to an existing allocation after which the new
+ *              allocation should ideally be placed.
+ * @param before A pointer to an existing allocation before which the new
+ *               allocation should ideally be placed.
+ * @param size The size of the item to allocate (unused).
+ * @return A pointer to the allocated memory item, or NULL on failure.
+ *
+ * This function attempts to allocate memory from the same Chained_Pool
+ * as the `after` or `before` pointers, if possible. If not, it falls
+ * back to the standard `eina_chained_mempool_malloc`. This can be useful
+ * for improving data locality.
+ */
 static void *
 eina_chained_mempool_malloc_near(void *data,
                                  void *after, void *before,
@@ -421,6 +547,17 @@ eina_chained_mempool_malloc_near(void *data,
    return mem;
 }
 
+/**
+ * @brief Checks if a given pointer was allocated from this mempool.
+ * @param data The Chained_Mempool instance.
+ * @param ptr The pointer to check.
+ * @return EINA_TRUE if the pointer was allocated from this mempool and is
+ *         currently considered live (not freed), EINA_FALSE otherwise.
+ *
+ * This function verifies if the pointer falls within the memory range of
+ * any Chained_Pool managed by this mempool, if it's correctly aligned,
+ * and if it's not currently in the trash list of that pool.
+ */
 static Eina_Bool
 eina_chained_mempool_from(void *data, void *ptr)
 {
@@ -507,15 +644,21 @@ eina_chained_mempool_from(void *data, void *ptr)
 typedef struct _Eina_Iterator_Chained_Mempool Eina_Iterator_Chained_Mempool;
 struct _Eina_Iterator_Chained_Mempool
 {
-   Eina_Iterator iterator;
+   Eina_Iterator iterator; /**< The Eina_Iterator interface. */
 
-   Eina_Iterator *walker;
-   Chained_Pool *current;
-   Chained_Mempool *pool;
+   Eina_Iterator *walker; /**< An iterator for the list of Chained_Pools. */
+   Chained_Pool *current; /**< The current Chained_Pool being iterated. */
+   Chained_Mempool *pool; /**< The Chained_Mempool being iterated. */
 
-   unsigned int offset;
+   unsigned int offset; /**< Offset within the current Chained_Pool's data block. */
 };
 
+/**
+ * @brief Advances the mempool iterator to the next live allocated item.
+ * @param it The mempool iterator.
+ * @param data Pointer to store the next item.
+ * @return EINA_TRUE if an item was found, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 eina_mempool_iterator_next(Eina_Iterator_Chained_Mempool *it, void **data)
 {
@@ -547,12 +690,21 @@ eina_mempool_iterator_next(Eina_Iterator_Chained_Mempool *it, void **data)
    goto retry;
 }
 
+/**
+ * @brief Gets the container (Chained_Mempool) of the iterator.
+ * @param it The mempool iterator.
+ * @return The Chained_Mempool instance.
+ */
 static Chained_Mempool *
 eina_mempool_iterator_get_container(Eina_Iterator_Chained_Mempool *it)
 {
    return it->pool;
 }
 
+/**
+ * @brief Frees the mempool iterator.
+ * @param it The mempool iterator to free.
+ */
 static void
 eina_mempool_iterator_free(Eina_Iterator_Chained_Mempool *it)
 {
@@ -560,6 +712,14 @@ eina_mempool_iterator_free(Eina_Iterator_Chained_Mempool *it)
    free(it);
 }
 
+/**
+ * @brief Creates a new iterator for the chained mempool.
+ * @param data The Chained_Mempool instance.
+ * @return A new Eina_Iterator for the live items in the mempool, or NULL on failure.
+ *
+ * The iterator will walk through all live (currently allocated and not freed)
+ * items in the mempool.
+ */
 static Eina_Iterator *
 eina_chained_mempool_iterator_new(void *data)
 {
@@ -583,6 +743,18 @@ eina_chained_mempool_iterator_new(void *data)
    return &it->iterator;
 }
 
+/**
+ * @brief Repacks the mempool to consolidate allocations and free empty pools.
+ * @param data The Chained_Mempool instance.
+ * @param cb Callback function to notify about moved items.
+ *           `cb(new_pointer, old_pointer, callback_data)`
+ * @param cb_data User data for the callback.
+ *
+ * This function attempts to move allocations from sparsely populated pools
+ * to more densely populated ones, potentially freeing up entire pool blocks.
+ * The callback `cb` is invoked for each item that is moved, allowing the
+ * application to update any references to the old item pointer.
+ */
 static void
 eina_chained_mempool_repack(void *data,
 			    Eina_Mempool_Repack_Cb cb,
@@ -669,14 +841,35 @@ eina_chained_mempool_repack(void *data,
    eina_spinlock_release(&pool->mutex);
 }
 
+/**
+ * @brief Reallocates an item from the chained mempool.
+ * @param data The Chained_Mempool instance.
+ * @param element The existing memory item to reallocate.
+ * @param size The new size for the item.
+ * @return This implementation currently does not support realloc and always returns NULL.
+ *
+ * @note Realloc is not naturally supported by fixed-size mempools.
+ */
 static void *
 eina_chained_mempool_realloc(EINA_UNUSED void *data,
                              EINA_UNUSED void *element,
                              EINA_UNUSED unsigned int size)
 {
+   // Fixed-size mempools typically don't support realloc in the traditional sense.
+   // If an item needs to change size, it usually means freeing the old one
+   // and allocating a new one from a different pool (if sizes differ) or the same pool.
    return NULL;
 }
 
+/**
+ * @brief Initializes a new chained mempool.
+ * @param context Name for the mempool (e.g., "my_object_pool").
+ * @param option Options string (unused in this implementation).
+ * @param args Variable arguments:
+ *             - int: item_size (size of each element to be stored)
+ *             - int: pool_size (number of items per Chained_Pool block)
+ * @return A pointer to the newly initialized Chained_Mempool, or NULL on failure.
+ */
 static void *
 eina_chained_mempool_init(const char *context,
                           EINA_UNUSED const char *option,
@@ -727,6 +920,14 @@ eina_chained_mempool_init(const char *context,
    return mp;
 }
 
+/**
+ * @brief Shuts down and frees a chained mempool.
+ * @param data The Chained_Mempool instance to shut down.
+ *
+ * This function frees all Chained_Pool blocks and the Chained_Mempool
+ * structure itself. It will log errors if the mempool is not empty at shutdown
+ * (i.e., if there are memory leaks).
+ */
 static void
 eina_chained_mempool_shutdown(void *data)
 {
@@ -777,9 +978,16 @@ static Eina_Mempool_Backend _eina_chained_mp_backend = {
    &eina_chained_mempool_repack,
    &eina_chained_mempool_from,
    &eina_chained_mempool_iterator_new,
-   &eina_chained_mempool_malloc_near
+   &eina_chained_mempool_malloc_near /**< Function to allocate memory near another block. */
 };
 
+/**
+ * @brief Initializes the chained mempool module.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ *
+ * Registers the chained mempool backend with Eina's mempool system.
+ * Also initializes logging domain and retrieves system page size.
+ */
 Eina_Bool chained_init(void)
 {
 #if defined DEBUG || defined EINA_DEBUG_MALLOC
@@ -798,6 +1006,12 @@ Eina_Bool chained_init(void)
    return eina_mempool_register(&_eina_chained_mp_backend);
 }
 
+/**
+ * @brief Shuts down the chained mempool module.
+ *
+ * Unregisters the chained mempool backend from Eina's mempool system
+ * and unregisters the logging domain.
+ */
 void chained_shutdown(void)
 {
    eina_mempool_unregister(&_eina_chained_mp_backend);

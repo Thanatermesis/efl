@@ -11,6 +11,16 @@
 
 #define memset do not use memset to reset flick data, use _reset_recognizer
 
+/**
+ * @internal
+ * @brief Resets the internal state of the flick recognizer.
+ *
+ * This function is called to clear any ongoing flick gesture detection data,
+ * typically when a gesture is completed, canceled, or at the beginning of
+ * a new potential gesture.
+ *
+ * @param pd Pointer to the private data of the flick recognizer.
+ */
 static void
 _reset_recognizer(Efl_Canvas_Gesture_Recognizer_Flick_Data *pd)
 {
@@ -27,6 +37,22 @@ _efl_canvas_gesture_recognizer_flick_efl_canvas_gesture_recognizer_type_get(cons
    return EFL_CANVAS_GESTURE_FLICK_CLASS;
 }
 
+/**
+ * @internal
+ * @brief Calculates and sets the momentum for a flick gesture.
+ *
+ * Momentum is determined by the velocity of the touch movement.
+ * It considers the start and end points of a touch segment and the time
+ * taken to traverse it. Configuration values for friction and threshold
+ * are used to decide if the momentum is significant enough to be reported.
+ *
+ * @param obj The Efl_Canvas_Gesture_Recognizer_Flick object.
+ * @param fd Pointer to the flick gesture data where momentum will be stored.
+ * @param v1 The starting position of the touch segment.
+ * @param v2 The ending position of the touch segment.
+ * @param t1 The timestamp at the start of the touch segment.
+ * @param t2 The timestamp at the end of the touch segment.
+ */
 static void
 _momentum_set(Eo *obj,
               Efl_Canvas_Gesture_Flick_Data *fd,
@@ -72,6 +98,20 @@ _momentum_set(Eo *obj,
      }
 }
 
+/**
+ * @internal
+ * @brief Processes a single touch event to update flick gesture state.
+ *
+ * This function handles the beginning, update, and end of a touch event
+ * as part of a potential flick gesture. It records start/end times and
+ * positions, and triggers momentum calculation.
+ *
+ * @param obj The Efl_Canvas_Gesture_Recognizer_Flick object.
+ * @param pd Pointer to the private data of the flick recognizer.
+ * @param gesture The Efl_Canvas_Gesture object being processed.
+ * @param fd Pointer to the flick gesture data.
+ * @param event The touch event that triggered this processing.
+ */
 static void
 _single_line_process(Eo *obj,
                      Efl_Canvas_Gesture_Recognizer_Flick_Data *pd,
@@ -113,6 +153,15 @@ _single_line_process(Eo *obj,
                  pd->t_st, efl_gesture_touch_current_timestamp_get(event));
 }
 
+/**
+ * @internal
+ * @brief Calculates the length and angle of a vector defined by two points.
+ *
+ * @param v1 The starting point of the vector.
+ * @param v2 The ending point of the vector.
+ * @param[out] l Pointer to store the calculated length of the vector.
+ * @param[out] a Pointer to store the calculated angle of the vector (in degrees).
+ */
 static void
 _vector_get(Eina_Position2D v1,
             Eina_Position2D v2,
@@ -127,6 +176,23 @@ _vector_get(Eina_Position2D v1,
    *a = _angle_get((int)v1.x, (int)v1.y, (int)v2.x, (int)v2.y);
 }
 
+/**
+ * @internal
+ * @brief Main recognition logic for the flick gesture.
+ *
+ * This function is called by the gesture manager for each relevant touch event.
+ * It analyzes the sequence of touch events to determine if a flick gesture
+ * has occurred. It considers factors like touch duration, distance, angle consistency,
+ * and momentum.
+ *
+ * @param obj The Efl_Canvas_Gesture_Recognizer_Flick object.
+ * @param pd Pointer to the private data of the flick recognizer.
+ * @param gesture The Efl_Canvas_Gesture object to update based on recognition.
+ * @param watched The Efl_Object being watched for gestures.
+ * @param event The Efl_Canvas_Gesture_Touch event to process.
+ * @return An Efl_Canvas_Gesture_Recognizer_Result indicating the outcome of
+ *         the recognition process (e.g., TRIGGER, FINISH, CANCEL, IGNORE).
+ */
 EOLIAN static Efl_Canvas_Gesture_Recognizer_Result
 _efl_canvas_gesture_recognizer_flick_efl_canvas_gesture_recognizer_recognize(Eo *obj,
                                                                              Efl_Canvas_Gesture_Recognizer_Flick_Data *pd,

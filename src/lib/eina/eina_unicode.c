@@ -190,6 +190,43 @@ eina_unicode_escape(const Eina_Unicode *str)
 /* The replacement range that will be used for bad utf8 chars. */
 #define ERROR_REPLACEMENT_END   0xDCFF
 
+/**
+ * @internal
+ * @brief Decodes a multi-byte UTF-8 character sequence, typically starting from its second byte.
+ *
+ * This function is the core decoding logic used by the inline eina_unicode_utf8_next_get()
+ * for sequences of 3 to 6 bytes, or for handling encoding errors if the inline function
+ * cannot process the character directly.
+ * It assumes the first byte of the sequence (`d`) has already been read and `ind` points
+ * to the position of the second byte.
+ *
+ * On successful decoding, it returns the Unicode codepoint and updates
+ * `*iindex` (the caller's original index) to point to the beginning of the
+ * next character in `buf`.
+ *
+ * On error (e.g., invalid continuation byte, unexpected end of string,
+ * sequence too short for its declared type, or overlong encoding):
+ * - It returns a special error codepoint. This codepoint is constructed by
+ *   ORing `ERROR_REPLACEMENT_BASE` with the byte value at the original
+ *   starting position `*iindex` that caused the error. This typically falls
+ *   in the range 0xDC80-0xDCFF if `ERROR_REPLACEMENT_BASE` is 0xDC00 and
+ *   the byte is 0x80-0xFF, or other values depending on `ERROR_REPLACEMENT_BASE`.
+ * - `*iindex` is advanced by one by the error handling block, effectively
+ *   consuming the problematic starting byte.
+ *
+ * @param[in] ind The index in `buf` from which to start reading
+ *                continuation bytes (i.e., `buf[ind]` is expected to be the
+ *                second byte of the UTF-8 sequence).
+ * @param[in] d The first byte of the UTF-8 sequence.
+ * @param[in] buf The UTF-8 encoded string.
+ * @param[in,out] iindex Pointer to an integer holding the starting index in `buf`
+ *                     of the character being decoded (points to where `d` was read from).
+ *                     This function will update `*iindex` (via its error path or by
+ *                     setting it to the calculated `ind` on success) to the starting
+ *                     index of the next character.
+ * @return The decoded Eina_Unicode codepoint, or an error codepoint
+ *         if decoding fails.
+ */
 EINA_API Eina_Unicode
 _eina_unicode_utf8_next_get(int ind,
                             unsigned char d,
@@ -390,6 +427,11 @@ eina_unicode_unicode_to_utf8_range(const Eina_Unicode *uni, int ulen, int *_len)
              if (*uind >= ERROR_REPLACEMENT_BASE &&
                  *uind <= ERROR_REPLACEMENT_END)
                {
+                  /* This Eina_Unicode value represents an invalid UTF-8 byte
+                   * encountered during a previous decoding. The original
+                   * invalid byte's value was stored in the lower 8 bits
+                   * of this codepoint (e.g., ERROR_REPLACEMENT_BASE | original_byte).
+                   * We write out that original byte. */
                   *ind++ = *uind & 0xFF;
                   len += 1;
                }

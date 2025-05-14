@@ -1,3 +1,13 @@
+/**
+ * @file ecore_drm2_device.c
+ * @brief Functions for managing DRM devices in Ecore.
+ *
+ * This file contains the implementation for discovering, opening, configuring,
+ * and closing DRM (Direct Rendering Manager) devices. It handles aspects
+ * like session management, device capabilities, atomic modesetting,
+ * input device integration, and output properties.
+ */
+
 #include "ecore_drm2_private.h"
 
 #ifndef DRM_CAP_DUMB_PREFERRED_DEPTH
@@ -12,6 +22,18 @@
 
 Eina_Bool _ecore_drm2_use_atomic = EINA_TRUE;
 
+/**
+ * @brief Callback function for session activation events.
+ *
+ * This function is triggered when the session associated with the DRM device
+ * becomes active or inactive. It updates the DPMS state of outputs accordingly
+ * and sends an ECORE_DRM2_EVENT_ACTIVATE event.
+ *
+ * @param data The Ecore_Drm2_Device instance.
+ * @param type The type of the event (unused).
+ * @param event The Elput_Event_Session_Active event data.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
+ */
 static Eina_Bool
 _cb_session_active(void *data, int type EINA_UNUSED, void *event)
 {
@@ -38,6 +60,18 @@ _cb_session_active(void *data, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Callback function for input device change events.
+ *
+ * This function is triggered when an input device is added or removed.
+ * If a device is added, it may trigger a recalibration of the input
+ * coordinate space based on the output dimensions.
+ *
+ * @param data The Ecore_Drm2_Device instance.
+ * @param type The type of the event (unused).
+ * @param event The Elput_Event_Device_Change event data.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
+ */
 static Eina_Bool
 _cb_device_change(void *data, int type EINA_UNUSED, void *event)
 {
@@ -75,6 +109,15 @@ _cb_device_change(void *data, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Checks if a DRM device is modesetting capable.
+ *
+ * A device is considered modesetting capable if it has at least one CRTC,
+ * connector, and encoder.
+ *
+ * @param fd The file descriptor of the DRM device.
+ * @return EINA_TRUE if the device is modesetting capable, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _drm2_device_modeset_capable(int fd)
 {
@@ -95,6 +138,20 @@ _drm2_device_modeset_capable(int fd)
    return ret;
 }
 
+/**
+ * @brief Finds a suitable DRM device path for a given seat.
+ *
+ * This function searches for DRM devices (e.g., "card0", "card1") associated
+ * with the specified seat. It prioritizes devices marked as "boot_vga".
+ * The environment variable ECORE_DRM2_CARD can be used to override the
+ * automatic detection and specify a particular card.
+ *
+ * @param em The Elput_Manager instance.
+ * @param seat The seat identifier (e.g., "seat0").
+ * @return A stringshared device path (e.g., "/dev/dri/card0") on success,
+ *         or NULL on failure. The caller is responsible for freeing the
+ *         returned stringshare.
+ */
 static const char *
 _drm2_device_find(Elput_Manager *em, const char *seat)
 {
@@ -211,6 +268,16 @@ _drm2_atomic_usable(int fd)
 }
 # endif
 
+/**
+ * @brief Fills the CRTC state structure with properties from the DRM device.
+ *
+ * This function queries the DRM device for properties of a specific CRTC
+ * (e.g., MODE_ID, ACTIVE, BACKGROUND_COLOR) and populates the
+ * Ecore_Drm2_Crtc_State structure.
+ *
+ * @param cstate Pointer to the Ecore_Drm2_Crtc_State structure to fill.
+ * @param fd The file descriptor of the DRM device.
+ */
 static void
 _drm2_atomic_state_crtc_fill(Ecore_Drm2_Crtc_State *cstate, int fd)
 {
@@ -284,6 +351,16 @@ cont:
    sym_drmModeFreeObjectProperties(oprops);
 }
 
+/**
+ * @brief Fills the connector state structure with properties from the DRM device.
+ *
+ * This function queries the DRM device for properties of a specific connector
+ * (e.g., CRTC_ID, DPMS, EDID, aspect ratio, scaling mode) and populates the
+ * Ecore_Drm2_Connector_State structure.
+ *
+ * @param cstate Pointer to the Ecore_Drm2_Connector_State structure to fill.
+ * @param fd The file descriptor of the DRM device.
+ */
 static void
 _drm2_atomic_state_conn_fill(Ecore_Drm2_Connector_State *cstate, int fd)
 {
@@ -368,6 +445,16 @@ cont:
    sym_drmModeFreeObjectProperties(oprops);
 }
 
+/**
+ * @brief Fills the plane state structure with properties from the DRM device.
+ *
+ * This function queries the DRM device for properties of a specific plane
+ * (e.g., CRTC_ID, FB_ID, CRTC_X/Y/W/H, SRC_X/Y/W/H, type, rotation)
+ * and populates the Ecore_Drm2_Plane_State structure.
+ *
+ * @param pstate Pointer to the Ecore_Drm2_Plane_State structure to fill.
+ * @param fd The file descriptor of the DRM device.
+ */
 static void
 _drm2_atomic_state_plane_fill(Ecore_Drm2_Plane_State *pstate, int fd)
 {
@@ -502,6 +589,16 @@ _drm2_atomic_state_plane_fill(Ecore_Drm2_Plane_State *pstate, int fd)
    sym_drmModeFreeObjectProperties(oprops);
 }
 
+/**
+ * @brief Fills the overall atomic state structure for the DRM device.
+ *
+ * This function gathers state information for all CRTCs, connectors, and
+ * planes associated with the DRM device and populates the
+ * Ecore_Drm2_Atomic_State structure.
+ *
+ * @param state Pointer to the Ecore_Drm2_Atomic_State structure to fill.
+ * @param fd The file descriptor of the DRM device.
+ */
 static void
 _drm2_atomic_state_fill(Ecore_Drm2_Atomic_State *state, int fd)
 {
@@ -583,6 +680,11 @@ err:
    sym_drmModeFreeResources(res);
 }
 
+/**
+ * @brief Frees the memory allocated for an Ecore_Drm2_Atomic_State structure.
+ *
+ * @param state Pointer to the Ecore_Drm2_Atomic_State structure to free.
+ */
 static void
 _drm2_atomic_state_free(Ecore_Drm2_Atomic_State *state)
 {
@@ -592,6 +694,18 @@ _drm2_atomic_state_free(Ecore_Drm2_Atomic_State *state)
    free(state);
 }
 
+/**
+ * @brief Opens and initializes a DRM device.
+ *
+ * This function finds a suitable DRM device for the given seat and TTY,
+ * opens it, initializes input handling via Elput, and sets up atomic
+ * modesetting capabilities if available and not disabled.
+ *
+ * @param seat The seat identifier (e.g., "seat0"). If NULL, "seat0" is used.
+ * @param tty The TTY number to associate with.
+ * @return A pointer to an Ecore_Drm2_Device structure on success,
+ *         or NULL on failure.
+ */
 EAPI Ecore_Drm2_Device *
 ecore_drm2_device_open(const char *seat, unsigned int tty)
 {
@@ -678,6 +792,14 @@ man_err:
    return NULL;
 }
 
+/**
+ * @brief Closes a DRM device and cleans up associated resources.
+ *
+ * This function shuts down input handling, closes the DRM device file
+ * descriptor, frees atomic state information, and unregisters event handlers.
+ *
+ * @param device The Ecore_Drm2_Device to close.
+ */
 EAPI void
 ecore_drm2_device_close(Ecore_Drm2_Device *device)
 {
@@ -694,6 +816,15 @@ ecore_drm2_device_close(Ecore_Drm2_Device *device)
    free(device);
 }
 
+/**
+ * @brief Gets the clock ID used for DRM timestamps.
+ *
+ * This function queries the DRM device for its timestamping capabilities.
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @return CLOCK_MONOTONIC if supported and preferred, otherwise CLOCK_REALTIME.
+ *         Returns -1 if device is NULL.
+ */
 EAPI int
 ecore_drm2_device_clock_id_get(Ecore_Drm2_Device *device)
 {
@@ -709,6 +840,16 @@ ecore_drm2_device_clock_id_get(Ecore_Drm2_Device *device)
      return CLOCK_REALTIME;
 }
 
+/**
+ * @brief Gets the supported cursor dimensions for the DRM device.
+ *
+ * Queries the DRM device for DRM_CAP_CURSOR_WIDTH and DRM_CAP_CURSOR_HEIGHT.
+ * Defaults to 64x64 if the capabilities cannot be determined.
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @param[out] width Pointer to store the maximum cursor width.
+ * @param[out] height Pointer to store the maximum cursor height.
+ */
 EAPI void
 ecore_drm2_device_cursor_size_get(Ecore_Drm2_Device *device, int *width, int *height)
 {
@@ -739,6 +880,15 @@ ecore_drm2_device_cursor_size_get(Ecore_Drm2_Device *device, int *width, int *he
      }
 }
 
+/**
+ * @brief Gets the current pointer coordinates.
+ *
+ * Retrieves the pointer's X and Y coordinates from the underlying input system (Elput).
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @param[out] x Pointer to store the X coordinate. Can be NULL.
+ * @param[out] y Pointer to store the Y coordinate. Can be NULL.
+ */
 EAPI void
 ecore_drm2_device_pointer_xy_get(Ecore_Drm2_Device *device, int *x, int *y)
 {
@@ -750,6 +900,15 @@ ecore_drm2_device_pointer_xy_get(Ecore_Drm2_Device *device, int *x, int *y)
    elput_input_pointer_xy_get(device->em, NULL, x, y);
 }
 
+/**
+ * @brief Warps (moves) the pointer to the specified coordinates.
+ *
+ * Sets the pointer's X and Y coordinates using the underlying input system (Elput).
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @param x The target X coordinate.
+ * @param y The target Y coordinate.
+ */
 EAPI void
 ecore_drm2_device_pointer_warp(Ecore_Drm2_Device *device, int x, int y)
 {
@@ -758,6 +917,15 @@ ecore_drm2_device_pointer_warp(Ecore_Drm2_Device *device, int x, int y)
    elput_input_pointer_xy_set(device->em, NULL, x, y);
 }
 
+/**
+ * @brief Sets the pointer to left-handed mode.
+ *
+ * Configures the pointer for left-handed or right-handed operation via Elput.
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @param left EINA_TRUE for left-handed mode, EINA_FALSE for right-handed.
+ * @return EINA_TRUE on success, EINA_FALSE on failure or if device is NULL.
+ */
 EAPI Eina_Bool
 ecore_drm2_device_pointer_left_handed_set(Ecore_Drm2_Device *device, Eina_Bool left)
 {
@@ -766,6 +934,17 @@ ecore_drm2_device_pointer_left_handed_set(Ecore_Drm2_Device *device, Eina_Bool l
    return elput_input_pointer_left_handed_set(device->em, NULL, left);
 }
 
+/**
+ * @brief Sets the rotation for pointer input.
+ *
+ * This typically affects how touch input or tablet input is mapped to screen
+ * coordinates when the display is rotated.
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @param rotation The rotation angle (e.g., 0, 90, 180, 270).
+ *                 The exact interpretation depends on the Elput backend.
+ * @return EINA_TRUE on success, EINA_FALSE on failure or if device is NULL.
+ */
 EAPI Eina_Bool
 ecore_drm2_device_pointer_rotation_set(Ecore_Drm2_Device *device, int rotation)
 {
@@ -774,6 +953,13 @@ ecore_drm2_device_pointer_rotation_set(Ecore_Drm2_Device *device, int rotation)
    return elput_input_pointer_rotation_set(device->em, rotation);
 }
 
+/**
+ * @brief Sets the pointer acceleration speed.
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @param speed The acceleration speed factor. The interpretation of this value
+ *              (e.g., range, effect) depends on the Elput backend.
+ */
 EAPI void
 ecore_drm2_device_pointer_accel_speed_set(Ecore_Drm2_Device *device, double speed)
 {
@@ -782,6 +968,13 @@ ecore_drm2_device_pointer_accel_speed_set(Ecore_Drm2_Device *device, double spee
    elput_input_pointer_accel_speed_set(device->em, NULL, speed);
 }
 
+/**
+ * @brief Sets the pointer acceleration profile.
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @param profile An identifier for the acceleration profile. The available
+ *                profiles and their meanings depend on the Elput backend.
+ */
 EAPI void
 ecore_drm2_device_pointer_accel_profile_set(Ecore_Drm2_Device *device, uint32_t profile)
 {
@@ -790,6 +983,12 @@ ecore_drm2_device_pointer_accel_profile_set(Ecore_Drm2_Device *device, uint32_t 
    elput_input_pointer_accel_profile_set(device->em, NULL, profile);
 }
 
+/**
+ * @brief Enables or disables tap-to-click for touch devices.
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @param enabled EINA_TRUE to enable tap-to-click, EINA_FALSE to disable.
+ */
 EAPI void
 ecore_drm2_device_touch_tap_to_click_enabled_set(Ecore_Drm2_Device *device, Eina_Bool enabled)
 {
@@ -798,6 +997,15 @@ ecore_drm2_device_touch_tap_to_click_enabled_set(Ecore_Drm2_Device *device, Eina
    elput_input_touch_tap_to_click_enabled_set(device->em, NULL, enabled);
 }
 
+/**
+ * @brief Sets the window context for Elput.
+ *
+ * This is used by Elput to associate input events with a specific window,
+ * particularly in environments where Elput manages input for a compositor.
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @param window The window identifier.
+ */
 EAPI void
 ecore_drm2_device_window_set(Ecore_Drm2_Device *device, unsigned int window)
 {
@@ -806,6 +1014,16 @@ ecore_drm2_device_window_set(Ecore_Drm2_Device *device, unsigned int window)
    elput_manager_window_set(device->em, window);
 }
 
+/**
+ * @brief Sets the maximum pointer coordinates (input surface dimensions).
+ *
+ * This informs Elput about the logical size of the area the pointer can move within.
+ * It's often set to the total dimensions of the combined display outputs.
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @param w The maximum width.
+ * @param h The maximum height.
+ */
 EAPI void
 ecore_drm2_device_pointer_max_set(Ecore_Drm2_Device *device, int w, int h)
 {
@@ -815,6 +1033,17 @@ ecore_drm2_device_pointer_max_set(Ecore_Drm2_Device *device, int w, int h)
    elput_input_pointer_max_set(device->em, w, h);
 }
 
+/**
+ * @brief Sets keyboard information for Elput.
+ *
+ * Provides Elput with the necessary XKB context, keymap, and initial group
+ * for keyboard input processing.
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @param context Pointer to the XKB context (e.g., struct xkb_context *).
+ * @param keymap Pointer to the XKB keymap (e.g., struct xkb_keymap *).
+ * @param group The initial keyboard layout group.
+ */
 EAPI void
 ecore_drm2_device_keyboard_info_set(Ecore_Drm2_Device *device, void *context, void *keymap, int group)
 {
@@ -823,6 +1052,12 @@ ecore_drm2_device_keyboard_info_set(Ecore_Drm2_Device *device, void *context, vo
    elput_input_keyboard_info_set(device->em, context, keymap, group);
 }
 
+/**
+ * @brief Sets the current keyboard layout group.
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @param group The keyboard layout group to activate.
+ */
 EAPI void
 ecore_drm2_device_keyboard_group_set(Ecore_Drm2_Device *device, int group)
 {
@@ -831,6 +1066,19 @@ ecore_drm2_device_keyboard_group_set(Ecore_Drm2_Device *device, int group)
    elput_input_keyboard_group_set(device->em, group);
 }
 
+/**
+ * @brief Gets the list of CRTC IDs for the device.
+ *
+ * @note The returned array is internal to the Ecore_Drm2_Device structure
+ *       and should not be modified or freed by the caller. Its lifetime is
+ *       tied to the device.
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @param[out] num Pointer to store the number of CRTCs. Can be NULL.
+ * @return A pointer to an array of CRTC IDs.
+ *         Returns NULL if device is NULL.
+ *         Example: If num is 2, the array might contain {crtc_id1, crtc_id2}.
+ */
 EAPI unsigned int *
 ecore_drm2_device_crtcs_get(Ecore_Drm2_Device *device, int *num)
 {
@@ -840,6 +1088,17 @@ ecore_drm2_device_crtcs_get(Ecore_Drm2_Device *device, int *num)
    return device->crtcs;
 }
 
+/**
+ * @brief Gets the minimum and maximum supported screen dimensions by the DRM device.
+ *
+ * These values are typically derived from DRM capabilities.
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @param[out] minw Pointer to store the minimum width. Can be NULL.
+ * @param[out] minh Pointer to store the minimum height. Can be NULL.
+ * @param[out] maxw Pointer to store the maximum width. Can be NULL.
+ * @param[out] maxh Pointer to store the maximum height. Can be NULL.
+ */
 EAPI void
 ecore_drm2_device_screen_size_range_get(Ecore_Drm2_Device *device, int *minw, int *minh, int *maxw, int *maxh)
 {
@@ -856,6 +1115,17 @@ ecore_drm2_device_screen_size_range_get(Ecore_Drm2_Device *device, int *minw, in
    if (maxh) *maxh = device->max.height;
 }
 
+/**
+ * @brief Calibrates input devices based on screen dimensions.
+ *
+ * This function tells Elput to adjust input device mappings (e.g., for
+ * touchscreens) to match the given width and height, which usually
+ * correspond to the dimensions of an output or the total screen area.
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @param w The width to calibrate against.
+ * @param h The height to calibrate against.
+ */
 EAPI void
 ecore_drm2_device_calibrate(Ecore_Drm2_Device *device, int w, int h)
 {
@@ -864,6 +1134,13 @@ ecore_drm2_device_calibrate(Ecore_Drm2_Device *device, int w, int h)
    elput_input_devices_calibrate(device->em, w, h);
 }
 
+/**
+ * @brief Switches to the specified virtual terminal (VT).
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @param vt The VT number to switch to.
+ * @return EINA_TRUE on success, EINA_FALSE on failure or if device is NULL.
+ */
 EAPI Eina_Bool
 ecore_drm2_device_vt_set(Ecore_Drm2_Device *device, int vt)
 {
@@ -872,6 +1149,17 @@ ecore_drm2_device_vt_set(Ecore_Drm2_Device *device, int vt)
    return elput_manager_vt_set(device->em, vt);
 }
 
+/**
+ * @brief Checks if the DRM device prefers shadow framebuffers.
+ *
+ * Queries the DRM_CAP_DUMB_PREFER_SHADOW capability. This is relevant for
+ * drivers that perform better when a shadow buffer is used for scanout,
+ * allowing rendering to a separate buffer that is then copied.
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @return EINA_TRUE if shadow framebuffers are preferred, EINA_FALSE otherwise
+ *         or if device is NULL.
+ */
 EAPI Eina_Bool
 ecore_drm2_device_prefer_shadow(Ecore_Drm2_Device *device)
 {
@@ -887,6 +1175,15 @@ ecore_drm2_device_prefer_shadow(Ecore_Drm2_Device *device)
      return EINA_FALSE;
 }
 
+/**
+ * @brief Gets the preferred color depth and bits-per-pixel for dumb buffers.
+ *
+ * Queries the DRM_CAP_DUMB_PREFERRED_DEPTH capability.
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @param[out] depth Pointer to store the preferred color depth (e.g., 24). Can be NULL.
+ * @param[out] bpp Pointer to store the preferred bits per pixel (e.g., 32). Can be NULL.
+ */
 EAPI void
 ecore_drm2_device_preferred_depth_get(Ecore_Drm2_Device *device, int *depth, int *bpp)
 {
@@ -903,6 +1200,12 @@ ecore_drm2_device_preferred_depth_get(Ecore_Drm2_Device *device, int *depth, int
      }
 }
 
+/**
+ * @brief Gets the file descriptor of the opened DRM device.
+ *
+ * @param device The Ecore_Drm2_Device instance.
+ * @return The file descriptor on success, or -1 if device is NULL.
+ */
 EAPI int
 ecore_drm2_device_fd_get(Ecore_Drm2_Device *device)
 {
@@ -911,6 +1214,14 @@ ecore_drm2_device_fd_get(Ecore_Drm2_Device *device)
    return device->fd;
 }
 
+/**
+ * @brief Checks if waiting for vertical blank (vblank) is supported.
+ *
+ * This function attempts a relative vblank wait to determine support.
+ *
+ * @param dev The Ecore_Drm2_Device instance.
+ * @return EINA_TRUE if vblank is supported, EINA_FALSE otherwise or if dev is NULL.
+ */
 EAPI Eina_Bool
 ecore_drm2_vblank_supported(Ecore_Drm2_Device *dev)
 {
@@ -928,6 +1239,14 @@ ecore_drm2_vblank_supported(Ecore_Drm2_Device *dev)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Deprecated function for setting cached keyboard context.
+ * @deprecated This function is a no-op and kept for ABI compatibility.
+ */
 /* prevent crashing with old apps compiled against these functions */
 EAPI void ecore_drm2_device_keyboard_cached_context_set(){};
+/**
+ * @brief Deprecated function for setting cached keyboard keymap.
+ * @deprecated This function is a no-op and kept for ABI compatibility.
+ */
 EAPI void ecore_drm2_device_keyboard_cached_keymap_set(){};

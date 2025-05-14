@@ -8,8 +8,11 @@
 
 static void _ecore_fb_size_get(const char *name, int *w, int *h);
 
+/** @internal Keep track of the number of times ecore_fb_init() has been called. */
 static int _ecore_fb_init_count = 0;
+/** @internal Store the width of the framebuffer console, in pixels. */
 static int _ecore_fb_console_w = 0;
+/** @internal Store the height of the framebuffer console, in pixels. */
 static int _ecore_fb_console_h = 0;
 
 /**
@@ -18,8 +21,18 @@ static int _ecore_fb_console_h = 0;
  * @{
  */
 
+/** @internal Stores the previous signal handler for SIGINT. */
 static sighandler_t oldhand = NULL;
 
+/**
+ * @internal
+ * @brief A dummy signal handler for SIGINT.
+ *
+ * This function is used to temporarily replace the existing SIGINT handler
+ * to prevent interruption during critical operations.
+ *
+ * @param val The signal number (unused).
+ */
 static void
 nosigint(int val EINA_UNUSED)
 {
@@ -115,6 +128,18 @@ ecore_fb_size_get(int *w, int *h)
    if (h) *h = _ecore_fb_console_h;
 }
 
+/**
+ * @internal
+ * @brief Get the actual width and height of the frame buffer in pixels.
+ *
+ * This function attempts to open the framebuffer device and query its
+ * dimensions using ioctl. It tries various common framebuffer device paths
+ * and also respects the EVAS_FB_DEV environment variable.
+ *
+ * @param name The device name or number (e.g., "0"). If NULL, "0" is assumed.
+ * @param w Pointer to an integer to store the width.
+ * @param h Pointer to an integer to store the height.
+ */
 static void
 _ecore_fb_size_get(const char *name, int *w, int *h)
 {

@@ -53,6 +53,29 @@ static int errstart;	/* line number at which the instruction started */
  *                     fcurrent   (referred to only)
  *                     errflag    (altered)
  */
+/**
+ * @brief Reports an error, warning or fatal error.
+ * @param number The error code.
+ *               - < 100: A regular error. This will set the "panic mode" flag
+ *                 to suppress subsequent errors until a synchronization point.
+ *               - 100-199: A fatal error. This will abort compilation.
+ *               - >= 200: A warning. This will not set the "panic mode" flag.
+ * @param ...    Variable arguments to be formatted into the error message.
+ *
+ * This function handles error reporting during compilation. It uses a "panic
+ * mode" (the `errflag` global) to avoid cascading error messages. Once an
+ * error is reported, subsequent non-fatal errors are suppressed until the
+ * parser reaches a point where it thinks it can recover (like a semicolon).
+ *
+ * Error reporting is also suppressed during the first pass of the compiler.
+ *
+ * After a large number of errors, or upon a fatal error, compilation is
+ * aborted using longjmp(). This function also detects and reports when too
+ * many errors occur on a single line.
+ *
+ * @return 0 on success. Note that for fatal errors, this function does not
+ *         return, as it aborts via longjmp().
+ */
 int
 error(int number, ...)
 {
@@ -132,6 +155,18 @@ error(int number, ...)
    return 0;
 }
 
+/**
+ * @brief Manages the error state of the compiler.
+ * @param code The action to perform.
+ *             - `sRESET`: Resets the error flag, allowing new errors to be
+ *               reported. This is typically called after a synchronization
+ *               point (like a semicolon) is reached in the source code.
+ *             - `sFORCESET`: Sets the error flag, suppressing subsequent
+ *               error messages. This is the "panic mode".
+ *             - `sEXPRMARK`: Marks the starting line of an expression or
+ *               statement. This is used to report more accurate error locations.
+ *             - `sEXPRRELEASE`: Clears the stored starting line of an expression.
+ */
 void
 errorset(int code)
 {

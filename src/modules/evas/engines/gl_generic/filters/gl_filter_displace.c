@@ -1,5 +1,22 @@
 #include "gl_engine_filter.h"
 
+/**
+ * @file
+ * @brief This file implements the displacement map filter for the GL engine.
+ */
+
+/**
+ * @brief Applies a displacement map filter to an image.
+ *
+ * This function takes an input image and a displacement map image. It displaces
+ * the pixels of the input image based on the color values of the displacement
+ * map. The result is written to the output surface.
+ *
+ * @param re The GL generic render engine.
+ * @param cmd The filter command containing input, output, mask (displacement map),
+ *            and other filter parameters.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 _gl_filter_displace(Render_Engine_GL_Generic *re, Evas_Filter_Command *cmd)
 {
@@ -73,6 +90,26 @@ _gl_filter_displace(Render_Engine_GL_Generic *re, Evas_Filter_Command *cmd)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the function pointer for the displacement filter.
+ *
+ * This function checks the validity of the filter command and its components
+ * (input, output, mask) and returns a pointer to the _gl_filter_displace
+ * function if all checks pass.
+ *
+ * @param re The GL generic render engine (unused in this function).
+ * @param cmd The filter command to be validated.
+ * @return A function pointer to _gl_filter_displace if the command is valid,
+ *         otherwise @c NULL.
+ *         Example:
+ *         @code
+ *         // Assuming cmd is a valid Evas_Filter_Command for displacement
+ *         GL_Filter_Apply_Func func = gl_filter_displace_func_get(re, cmd);
+ *         if (func) {
+ *           func(re, cmd);
+ *         }
+ *         @endcode
+ */
 GL_Filter_Apply_Func
 gl_filter_displace_func_get(Render_Engine_GL_Generic *re EINA_UNUSED, Evas_Filter_Command *cmd)
 {

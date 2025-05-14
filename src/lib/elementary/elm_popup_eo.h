@@ -4,6 +4,7 @@
 #ifndef _ELM_POPUP_EO_CLASS_TYPE
 #define _ELM_POPUP_EO_CLASS_TYPE
 
+/** @brief Represents an Elementary Popup object. This is an Evas_Object (Eo). */
 typedef Eo Elm_Popup;
 
 #endif

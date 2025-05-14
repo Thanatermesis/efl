@@ -5,24 +5,44 @@
 
 typedef struct _GL_Data GL_Data;
 
-// GL related data here..
+/**
+ * @struct _GL_Data
+ * @brief  Holds all private GL data for our application.
+ */
 struct _GL_Data
 {
-   Evas_GL_API *glapi;
-   GLuint       program;
-   GLuint       vtx_shader;
-   GLuint       fgmt_shader;
-   GLuint       vbo;
+   Evas_GL_API *glapi; /**< Pointer to the GL API structure */
+   GLuint       program; /**< The shader program handle */
+   GLuint       vtx_shader; /**< The vertex shader handle */
+   GLuint       fgmt_shader; /**< The fragment shader handle */
+   GLuint       vbo; /**< The vertex buffer object handle */
 };
 
 static float red = 1.0;
 
+/**
+ * @brief Callback for the window's "free" event.
+ * @param data The GL_Data structure to free.
+ *
+ * This function is called when the window is destroyed and frees the associated
+ * GL_Data structure.
+ */
 static void
 _win_free_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Loads and compiles a shader from source.
+ * @param gld The GL data structure.
+ * @param type The type of shader to create (e.g., GL_VERTEX_SHADER).
+ * @param shader_src The string containing the shader source code.
+ * @return The shader handle, or 0 on failure.
+ *
+ * This function creates a shader, loads the source, compiles it, and checks
+ * for compilation errors.
+ */
 static GLuint
 load_shader(GL_Data *gld, GLenum type, const char *shader_src)
 {
@@ -59,7 +79,15 @@ load_shader(GL_Data *gld, GLenum type, const char *shader_src)
    return shader;
 }
 
-// Initialize the shader and program object
+/**
+ * @brief Initializes the GL shaders and program.
+ * @param gld The GL data structure.
+ * @return 1 on success, 0 on failure.
+ *
+ * This function defines, loads, and compiles the vertex and fragment shaders.
+ * It then creates a shader program, attaches the shaders, and links the program.
+ * Error checking is performed at each step.
+ */
 static int
 init_shaders(GL_Data *gld)
 {
@@ -116,7 +144,18 @@ init_shaders(GL_Data *gld)
    return 1;
 }
 
-// Callbacks
+/**
+ * @brief Callback to initialize the GLView component.
+ * @param obj The GLView object.
+ *
+ * This function is called when the GLView is ready for GL initialization.
+ * It sets up the GL API, initializes shaders, and creates the vertex buffer
+ * for a triangle. The vertex data defines a simple triangle:
+ *
+ *   - Top vertex: (0.0, 0.5, 0.0)
+ *   - Bottom-left vertex: (-0.5, -0.5, 0.0)
+ *   - Bottom-right vertex: (0.5, -0.5, 0.0)
+ */
 static void
 _init_gl(Evas_Object *obj)
 {
@@ -141,6 +180,13 @@ _init_gl(Evas_Object *obj)
    gl->glEnableVertexAttribArray(0);
 }
 
+/**
+ * @brief Callback to clean up GL resources.
+ * @param obj The GLView object.
+ *
+ * This function is called when the GLView is being deleted. It is responsible
+ * for freeing all allocated GL resources, such as shaders, programs, and buffers.
+ */
 static void
 _del_gl(Evas_Object *obj)
 {
@@ -160,6 +206,13 @@ _del_gl(Evas_Object *obj)
    evas_object_data_del(obj, "gld");
 }
 
+/**
+ * @brief Callback for when the GLView is resized.
+ * @param obj The GLView object.
+ *
+ * This function is called whenever the GLView object changes size. It's
+ * responsible for updating the GL viewport to match the new dimensions.
+ */
 static void
 _resize_gl(Evas_Object *obj)
 {
@@ -174,6 +227,14 @@ _resize_gl(Evas_Object *obj)
    gl->glViewport(0, 0, w, h);
 }
 
+/**
+ * @brief Callback to render a frame in the GLView.
+ * @param obj The GLView object.
+ *
+ * This function is called when the GLView needs to be redrawn. It clears the
+ * color buffer, uses the shader program, and draws a triangle. It also animates
+ * the background color by decreasing the red component over time.
+ */
 static void
 _draw_gl(Evas_Object *obj)
 {
@@ -204,6 +265,14 @@ _draw_gl(Evas_Object *obj)
    if (red < 0.0) red = 1.0;
 }
 
+/**
+ * @brief Animator callback to continuously render frames.
+ * @param data The GLView object to be redrawn.
+ * @return ECORE_CALLBACK_RENEW to continue the animation.
+ *
+ * This function is called on every animator tick. It simply marks the GLView
+ * as "changed", which will trigger a call to the _draw_gl function.
+ */
 static Eina_Bool
 _anim(void *data)
 {
@@ -211,6 +280,13 @@ _anim(void *data)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Callback for the "clicked" event on the close button.
+ * @param data The window object to be deleted.
+ *
+ * This function is called when the close button is clicked. It deletes the
+ * main window, which will terminate the application.
+ */
 static void
 _close_cb(void *data, Evas_Object *obj EINA_UNUSED,
           void *event_info EINA_UNUSED)
@@ -218,12 +294,27 @@ _close_cb(void *data, Evas_Object *obj EINA_UNUSED,
    evas_object_del(data);
 }
 
+/**
+ * @brief Callback for the GLView's "del" event.
+ * @param data The Ecore_Animator to be deleted.
+ *
+ * This function is called when the GLView object is deleted. It ensures that
+ * the animator driving the rendering loop is also stopped and deleted.
+ */
 static void
 _gl_del_cb(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    ecore_animator_del(data);
 }
 
+/**
+ * @brief The main test function for a simple GLView example.
+ *
+ * This function sets up a window with a GLView that displays a simple animated
+ * scene. It demonstrates how to initialize Elementary, create a window, set up
+ * a GLView with callbacks for initialization, drawing, and resizing, and how
+ to drive animation using an Ecore_Animator.
+ */
 void
 test_glview_simple(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

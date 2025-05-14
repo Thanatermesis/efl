@@ -21,14 +21,45 @@
 #include "ecore_private.h"
 
 #if defined(_WIN32)
+/** @internal
+ * @brief Stores the frequency of the performance counter on Windows.
+ * Used to convert raw counter values to seconds.
+ */
 static LONGLONG _ecore_time_freq;
 #elif defined (HAVE_CLOCK_GETTIME)
+/** @internal
+ * @brief Stores the clock ID to be used with clock_gettime().
+ * This is determined during initialization.
+ */
 static clockid_t _ecore_time_clock_id;
+/** @internal
+ * @brief Flag indicating whether a valid clock ID has been obtained.
+ */
 static Eina_Bool _ecore_time_got_clock_id = EINA_FALSE;
 #elif defined(__APPLE__) && defined(__MACH__)
+/** @internal
+ * @brief Conversion factor for mach_absolute_time() to seconds on macOS.
+ * Calculated from mach_timebase_info.
+ */
 static double _ecore_time_clock_conversion = 1e-9;
 #endif
 
+/**
+ * @brief Retrieves the current time in seconds.
+ *
+ * This function returns the current time in seconds since an arbitrary
+ * fixed point in the past. It aims to provide a monotonic clock where
+ * available, otherwise it may fall back to a system clock that can
+ * be adjusted (e.g., CLOCK_REALTIME or gettimeofday).
+ *
+ * The precision of the returned time depends on the underlying system
+ * clock source.
+ *
+ * @return The current time in seconds. Returns 0.0 on critical error.
+ *
+ * @see ecore_time_unix_get()
+ * @see ecore_loop_time_get()
+ */
 EAPI double
 ecore_time_get(void)
 {
@@ -57,6 +88,26 @@ ecore_time_get(void)
 #endif
 }
 
+/**
+ * @brief Retrieves the current time in seconds using gettimeofday().
+ *
+ * This function provides the current time based on the gettimeofday()
+ * system call, which typically returns time since the Unix epoch
+ * (00:00:00 Coordinated Universal Time (UTC), Thursday, 1 January 1970).
+ * This clock is not necessarily monotonic and can be subject to system
+ * time adjustments.
+ *
+ * This function serves as a fallback for ecore_time_get() on systems
+ * where higher-resolution or monotonic clocks are not available or
+ * could not be initialized.
+ *
+ * @return The current time in seconds.
+ *
+ * @note This function will cause a compile-time error if gettimeofday()
+ *       is not available on the target platform.
+ *
+ * @see ecore_time_get()
+ */
 EAPI double
 ecore_time_unix_get(void)
 {
@@ -70,12 +121,41 @@ ecore_time_unix_get(void)
 #endif
 }
 
+/**
+ * @brief Retrieves the time of the last iteration of the main loop.
+ *
+ * This function returns the time, in seconds, at which the last iteration
+ * of the Ecore main loop started. This time is updated by the main loop
+ * itself.
+ *
+ * @return The time of the last main loop iteration in seconds.
+ *
+ * @see efl_loop_time_get()
+ * @see ecore_loop_time_set()
+ */
 EAPI double
 ecore_loop_time_get(void)
 {
    return efl_loop_time_get(ML_OBJ);
 }
 
+/**
+ * @brief Sets the current time of the main loop.
+ *
+ * This function is typically used internally to update the main loop's
+ * concept of the current time. It includes a check to prevent setting
+ * the loop time to a point significantly in the future, as this could
+ * indicate a problem or cause unexpected behavior in timed events.
+ *
+ * @param t The time in seconds to set as the current loop time.
+ *          Example: `1678886400.5` (representing a specific point in time).
+ *
+ * @warning Setting the loop time far into the future will print an error
+ *          and the operation will be ignored.
+ *
+ * @see efl_loop_time_set()
+ * @see ecore_loop_time_get()
+ */
 EAPI void
 ecore_loop_time_set(double t)
 {
@@ -97,6 +177,30 @@ ecore_loop_time_set(double t)
 /* TODO: Documentation says "All  implementations  support  the  system-wide
  * real-time clock, which is identified by CLOCK_REALTIME. Check if the fallback
  * to unix time (without specifying the resolution) might be removed
+ */
+/**
+ * @internal
+ * @brief Initializes the Ecore time subsystem.
+ *
+ * This function is called internally to set up the necessary resources
+ * for time measurement. It attempts to find the best available clock
+ * source on the system:
+ * - On Windows, it queries the performance counter frequency.
+ * - On systems with `clock_gettime`, it tries to use `CLOCK_MONOTONIC`,
+ *   falling back to `CLOCK_REALTIME` if `CLOCK_MONOTONIC` is unavailable.
+ * - On macOS, it initializes the conversion factor for `mach_absolute_time`.
+ *
+ * If a preferred clock source cannot be initialized, it logs an error and
+ * may rely on `ecore_time_unix_get()` (i.e., `gettimeofday`) as a final
+ * fallback.
+ *
+ * After setting up the clock source, it initializes the main loop time
+ * to the current time.
+ *
+ * @see _ecore_time_freq
+ * @see _ecore_time_clock_id
+ * @see _ecore_time_got_clock_id
+ * @see _ecore_time_clock_conversion
  */
 void
 _ecore_time_init(void)

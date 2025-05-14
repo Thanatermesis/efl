@@ -1,3 +1,15 @@
+/**
+ * @defgroup Efl_Ui_Check Efl.Ui.Check
+ * @ingroup Elementary
+ *
+ * @brief The Efl Ui Check widget.
+ *
+ * This is a check widget, which is a square that can be ticked or
+ * unticked. It is a specialization of @ref Efl_Ui_Selectable.
+ *
+ * @{
+ */
+
 #ifdef HAVE_CONFIG_H
 # include "elementary_config.h"
 #endif
@@ -17,6 +29,19 @@
 
 #define MY_CLASS_NAME "Efl.Ui.Check"
 
+/**
+ * @brief Describes aliases for text parts of the check widget.
+ *
+ * This array maps abstract text part names (e.g., "default", "on", "off")
+ * to concrete theme part names (e.g., "elm.text", "elm.ontext", "elm.offtext").
+ *
+ * @example
+ * @code
+ * // "default" alias maps to "elm.text" theme part.
+ * // "on" alias maps to "elm.ontext" theme part.
+ * // "off" alias maps to "elm.offtext" theme part.
+ * @endcode
+ */
 static const Elm_Layout_Part_Alias_Description _text_aliases[] =
 {
    {"default", "elm.text"},
@@ -25,6 +50,17 @@ static const Elm_Layout_Part_Alias_Description _text_aliases[] =
    {NULL, NULL}
 };
 
+/**
+ * @brief Describes aliases for content parts of the check widget.
+ *
+ * This array maps abstract content part names (e.g., "icon")
+ * to concrete theme part names (e.g., "elm.swallow.content").
+ *
+ * @example
+ * @code
+ * // "icon" alias maps to "elm.swallow.content" theme part.
+ * @endcode
+ */
 static const Elm_Layout_Part_Alias_Description _content_aliases[] =
 {
    {"icon", "elm.swallow.content"},
@@ -33,6 +69,22 @@ static const Elm_Layout_Part_Alias_Description _content_aliases[] =
 
 static const char SIG_CHANGED[] = "changed";
 
+/**
+ * @brief Smart callback function descriptions.
+ *
+ * These are used by Evas to describe the smart callbacks that objects of
+ * this class emit.
+ * @see evas_object_smart_callbacks_descriptions_set()
+ *
+ * @example
+ * @code
+ * // { "changed", "" } - "changed" signal.
+ * // { "language,changed", "" } - "language,changed" signal (handled by elm_widget).
+ * // { "access,changed", "" } - "access,changed" signal (handled by elm_widget).
+ * // { "focused", "" } - "focused" signal (handled by elm_layout).
+ * // { "unfocused", "" } - "unfocused" signal (handled by elm_layout).
+ * @endcode
+ */
 /* smart callbacks coming from elm check objects: */
 static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {SIG_CHANGED, ""},
@@ -45,11 +97,31 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
 
 static Eina_Bool _key_action_activate(Evas_Object *obj, const char *params);
 
+/**
+ * @brief Defines the key actions for the check widget.
+ *
+ * This array maps action names to their corresponding callback functions.
+ * It's used for handling keyboard interactions.
+ *
+ * @example
+ * @code
+ * // "activate" action triggers the _key_action_activate function.
+ * @endcode
+ */
 static const Elm_Action key_actions[] = {
    {"activate", _key_action_activate},
    {NULL, NULL}
 };
 
+/**
+ * @brief Emits the legacy "changed" smart callback.
+ *
+ * This function is responsible for emitting the "changed" smart callback
+ * for legacy (pre-Eo API) check widgets. It ensures the callback is
+ * emitted only once per state change to avoid redundant notifications.
+ *
+ * @param obj The Evas_Object (check widget) that changed.
+ */
 static void
 _check_legacy_event(Eo *obj)
 {
@@ -69,6 +141,17 @@ _check_legacy_event(Eo *obj)
    evas_object_smart_callback_call(obj, "changed", NULL);
 }
 
+/**
+ * @brief Activates or deactivates the check widget.
+ *
+ * This function handles the core logic for toggling the check widget's state.
+ * It emits appropriate signals for state changes (both legacy and Eo API),
+ * updates accessibility information, and then calls
+ * efl_ui_selectable_selected_set() to finalize the state change and trigger
+ * theme updates.
+ *
+ * @param obj The Evas_Object (check widget) to activate/deactivate.
+ */
 static void
 _activate(Evas_Object *obj)
 {
@@ -130,6 +213,7 @@ _efl_ui_check_efl_access_object_state_set_get(const Eo *obj, Efl_Ui_Check_Data *
 
    states = efl_access_object_state_set_get(efl_super(obj, EFL_UI_CHECK_CLASS));
 
+   // Add the CHECKED state if the check is currently selected.
    if (elm_check_state_get(obj))
        STATE_TYPE_SET(states, EFL_ACCESS_STATE_TYPE_CHECKED);
 
@@ -147,6 +231,17 @@ _efl_ui_check_efl_ui_widget_on_access_activate(Eo *obj EINA_UNUSED, Efl_Ui_Check
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for the "activate" key action.
+ *
+ * This function is invoked when the "activate" key action (e.g., pressing Space
+ * or Enter when the widget is focused) is triggered. It simply calls the
+ * internal _activate() function.
+ *
+ * @param obj The Evas_Object (check widget) that received the key action.
+ * @param params Associated parameters for the action (unused).
+ * @return EINA_TRUE if the action was handled, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _key_action_activate(Evas_Object *obj, const char *params EINA_UNUSED)
 {
@@ -184,6 +279,19 @@ _efl_ui_check_efl_ui_widget_theme_apply(Eo *obj, Efl_Ui_Check_Data *sd EINA_UNUS
    return int_ret;
 }
 
+/**
+ * @brief Provides accessibility information for the check widget.
+ *
+ * This callback retrieves the accessibility information string. It first checks
+ * for explicitly set access info via elm_widget_access_info_get(). If not found,
+ * it falls back to the main text of the check widget (from the "default" part).
+ *
+ * @param data Custom data pointer (unused).
+ * @param obj The Evas_Object (check widget).
+ * @return A newly allocated string containing the accessibility information,
+ *         or NULL if no information is available. The caller is responsible
+ *         for freeing the returned string.
+ */
 static char *
 _access_info_cb(void *data EINA_UNUSED, Evas_Object *obj)
 {
@@ -195,6 +303,19 @@ _access_info_cb(void *data EINA_UNUSED, Evas_Object *obj)
    return NULL;
 }
 
+/**
+ * @brief Provides the accessibility state string for the check widget.
+ *
+ * This callback constructs a string describing the current state of the check
+ * widget (e.g., "State: On", "State: Off", "State: Disabled"). It considers
+ * whether the widget is disabled and uses custom "on" or "off" text parts
+ * if they are set in the theme.
+ *
+ * @param data The Evas_Object (check widget), passed as custom data.
+ * @param obj The Evas_Object for which state is queried (same as data).
+ * @return A newly allocated string representing the widget's state.
+ *         The caller is responsible for freeing this string.
+ */
 static char *
 _access_state_cb(void *data, Evas_Object *obj)
 {
@@ -229,6 +350,16 @@ _access_state_cb(void *data, Evas_Object *obj)
    return strdup(E_("State: Off"));
 }
 
+/**
+ * @brief Sets the selected state and emits accessibility state change signal.
+ *
+ * This function is a helper to centralize setting the selected state via
+ * efl_ui_selectable_selected_set() and then, if AT-SPI is enabled, emitting
+ * the EFL_ACCESS_STATE_TYPE_CHECKED state changed signal.
+ *
+ * @param obj The Evas_Object (check widget).
+ * @param sel The new selected state (EINA_TRUE for selected, EINA_FALSE for unselected).
+ */
 static void
 _flush_selected(Eo *obj, Eina_Bool sel)
 {
@@ -240,6 +371,18 @@ _flush_selected(Eo *obj, Eina_Bool sel)
                                           efl_ui_selectable_selected_get(obj));
 }
 
+/**
+ * @brief Callback for "elm,action,check,off" or "efl,action,unselect" theme signals.
+ *
+ * This function is triggered by theme signals indicating the check should be
+ * turned off. It updates the selected state to EINA_FALSE and, for legacy
+ * widgets, emits the "changed" event.
+ *
+ * @param data The Evas_Object (check widget), passed as custom data.
+ * @param o The Evas_Object that emitted the signal (the edje object).
+ * @param emission The emitted signal string.
+ * @param source The source of the signal.
+ */
 static void
 _on_check_off(void *data,
               Evas_Object *o EINA_UNUSED,
@@ -253,6 +396,18 @@ _on_check_off(void *data,
      _check_legacy_event(obj);
 }
 
+/**
+ * @brief Callback for "elm,action,check,on" or "efl,action,select" theme signals.
+ *
+ * This function is triggered by theme signals indicating the check should be
+ * turned on. It updates the selected state to EINA_TRUE and, for legacy
+ * widgets, emits the "changed" event.
+ *
+ * @param data The Evas_Object (check widget), passed as custom data.
+ * @param o The Evas_Object that emitted the signal (the edje object).
+ * @param emission The emitted signal string.
+ * @param source The source of the signal.
+ */
 static void
 _on_check_on(void *data,
              Evas_Object *o EINA_UNUSED,
@@ -266,6 +421,17 @@ _on_check_on(void *data,
      _check_legacy_event(obj);
 }
 
+/**
+ * @brief Callback for "elm,action,check,toggle" theme signal.
+ *
+ * This function is triggered by a theme signal indicating the check should
+ * toggle its state. It calls _activate() to handle the state change.
+ *
+ * @param data The Evas_Object (check widget), passed as custom data.
+ * @param o The Evas_Object that emitted the signal (the edje object).
+ * @param emission The emitted signal string.
+ * @param source The source of the signal.
+ */
 static void
 _on_check_toggle(void *data,
                  Evas_Object *o EINA_UNUSED,
@@ -275,6 +441,16 @@ _on_check_toggle(void *data,
    _activate(data);
 }
 
+/**
+ * @brief Callback for the EFL_INPUT_EVENT_CLICKED event.
+ *
+ * This function is triggered when the check widget is clicked.
+ * It calls _activate() to toggle the check's state. This is primarily
+ * for non-legacy (Eo API) widgets where click handling is bound directly.
+ *
+ * @param data The Evas_Object (check widget), passed as custom data.
+ * @param ev The Efl_Event details (unused).
+ */
 static void
 _clicked_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -435,6 +611,15 @@ EFL_UI_LAYOUT_TEXT_ALIASES_IMPLEMENT(MY_CLASS_PFX)
 
 #define MY_CLASS_NAME_LEGACY "elm_check"
 
+/**
+ * @brief Legacy class constructor for elm_check.
+ *
+ * Registers the legacy "elm_check" class name with Evas. This allows
+ * legacy applications to create check widgets using elm_object_add()
+ * with the old class name.
+ *
+ * @param klass The Efl_Class being constructed.
+ */
 static void
 _efl_ui_check_legacy_class_constructor(Efl_Class *klass)
 {
@@ -485,6 +670,22 @@ _efl_ui_check_legacy_efl_ui_widget_widget_sub_object_del(Eo *obj, void *_pd EINA
 /* FIXME: replicated from elm_layout just because check's icon spot
  * is elm.swallow.content, not elm.swallow.icon. Fix that whenever we
  * can changed the theme API */
+/**
+ * @brief Sets content for a part in the legacy check widget.
+ *
+ * This function is a part of the Efl.Content interface implementation
+ * for the legacy check widget. It sets the content of a specified part.
+ * It includes a FIXME note indicating that some logic is replicated from
+ * elm_layout due to specific part naming ("elm.swallow.content" instead of
+ * "elm.swallow.icon"). After setting the content, it emits a legacy icon
+ * signal.
+ *
+ * @param obj The legacy check widget.
+ * @param _pd Private data (unused).
+ * @param part The name of the part to set content for.
+ * @param content The Evas_Object to set as content.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _efl_ui_check_legacy_content_set(Eo *obj, void *_pd EINA_UNUSED, const char *part, Evas_Object *content)
 {
@@ -500,6 +701,17 @@ _efl_ui_check_legacy_content_set(Eo *obj, void *_pd EINA_UNUSED, const char *par
 
 /* Efl.Part begin */
 
+/**
+ * @brief Checks if a given part name is a valid content part for the legacy check.
+ *
+ * This function is used by the Efl.Part machinery to determine if a string
+ * refers to a known content swallow part of this legacy widget. For elm_check,
+ * the primary content part is "elm.swallow.content".
+ *
+ * @param obj The legacy check widget (unused).
+ * @param part The name of the part to check.
+ * @return EINA_TRUE if the part name is "elm.swallow.content", EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _part_is_efl_ui_check_legacy_part(const Eo *obj EINA_UNUSED, const char *part)
 {
@@ -519,4 +731,7 @@ elm_check_add(Evas_Object *parent)
    return elm_legacy_add(EFL_UI_CHECK_LEGACY_CLASS, parent);
 }
 
+/**
+ * @}
+ */
 #include "efl_ui_check_legacy_eo.c"

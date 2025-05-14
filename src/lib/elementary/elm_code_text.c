@@ -110,6 +110,18 @@ elm_code_line_text_substr(Elm_Code_Line *line, unsigned int position, int length
    return eina_strndup(content + position, length);
 }
 
+/**
+ * @internal
+ * @brief Adjusts token positions to the right after text insertion.
+ *
+ * When text is inserted into a line, tokens at or after the insertion
+ * point need to have their start and end positions shifted to the right
+ * by the length of the inserted text.
+ *
+ * @param line The code line whose tokens are to be adjusted.
+ * @param position The character position in the line where text was inserted.
+ * @param move The number of characters inserted (how much to move tokens).
+ */
 static void
 _elm_code_line_tokens_move_right(Elm_Code_Line *line, int position, int move)
 {
@@ -126,6 +138,19 @@ _elm_code_line_tokens_move_right(Elm_Code_Line *line, int position, int move)
      }
 }
 
+/**
+ * @internal
+ * @brief Adjusts token positions to the left after text deletion.
+ *
+ * When text is deleted from a line, tokens at or after the deletion
+ * point need to have their start and end positions shifted to the left.
+ * Tokens that become invalid (e.g., end position becomes less than
+ * start position) as a result of the deletion are removed.
+ *
+ * @param line The code line whose tokens are to be adjusted.
+ * @param position The character position in the line where text deletion started.
+ * @param move The number of characters deleted (how much to move tokens).
+ */
 static void
 _elm_code_line_tokens_move_left(Elm_Code_Line *line, int position, int move)
 {
@@ -225,12 +250,31 @@ elm_code_line_text_remove(Elm_Code_Line *line, unsigned int position, int length
      }
 }
 
+/**
+ * @internal
+ * @brief Checks if a character is a whitespace character (space or tab).
+ *
+ * @param c The character to check.
+ * @return EINA_TRUE if the character is a space or tab, EINA_FALSE otherwise.
+ */
 Eina_Bool
 _elm_code_text_char_is_whitespace(char c)
 {
    return c == ' ' || c == '\t';
 }
 
+/**
+ * @internal
+ * @brief Calculates the length of trailing whitespace in a given text.
+ *
+ * This function iterates backwards from the end of the text to count
+ * consecutive whitespace characters (space or tab).
+ *
+ * @param text The character array to check.
+ * @param length The length of the text.
+ * @return The number of trailing whitespace characters. Returns 0 if
+ *         the text is empty or has no trailing whitespace.
+ */
 static unsigned int
 _elm_code_text_trailing_whitespace_length(const char *text, unsigned int length)
 {

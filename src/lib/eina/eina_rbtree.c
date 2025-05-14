@@ -68,6 +68,17 @@ struct _Eina_Iterator_Rbtree_List
 static Eina_Array iterator_trash;
 static Eina_Spinlock iterator_trash_lock;
 
+/**
+ * @internal
+ * @brief Allocates and initializes a new rbtree iterator list item.
+ *
+ * This function attempts to reuse an item from the iterator's trash
+ * or allocates a new one if the trash is empty.
+ *
+ * @param it The rbtree iterator.
+ * @param tree The rbtree node to associate with this list item.
+ * @return A pointer to the new Eina_Iterator_Rbtree_List item, or NULL on failure.
+ */
 static Eina_Iterator_Rbtree_List *
 _eina_rbtree_iterator_list_new(Eina_Iterator_Rbtree *it, const Eina_Rbtree *tree)
 {
@@ -87,6 +98,16 @@ _eina_rbtree_iterator_list_new(Eina_Iterator_Rbtree *it, const Eina_Rbtree *tree
    return new;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the current rbtree node from the iterator's stack.
+ *
+ * This function is used by the Eina_Iterator interface to get the
+ * container (the rbtree node itself) of the current iteration step.
+ *
+ * @param it The rbtree iterator.
+ * @return A pointer to the current Eina_Rbtree node, or NULL if the stack is empty.
+ */
 static Eina_Rbtree *
 _eina_rbtree_iterator_get_content(Eina_Iterator_Rbtree *it)
 {
@@ -96,6 +117,15 @@ _eina_rbtree_iterator_get_content(Eina_Iterator_Rbtree *it)
    return eina_array_data_get(it->stack, 0);
 }
 
+/**
+ * @internal
+ * @brief Frees all resources associated with an rbtree iterator.
+ *
+ * This function is called when the iterator trash is full, ensuring
+ * all allocated memory for the iterator and its components is released.
+ *
+ * @param it The rbtree iterator to free.
+ */
 static void
 _eina_rbtree_iterator_forced_free(Eina_Iterator_Rbtree *it)
 {
@@ -113,6 +143,15 @@ _eina_rbtree_iterator_forced_free(Eina_Iterator_Rbtree *it)
    free(it);
 }
 
+/**
+ * @internal
+ * @brief Frees an rbtree iterator, potentially caching it for reuse.
+ *
+ * If the global iterator_trash array has space, the iterator is cleaned
+ * and pushed onto the trash for later reuse. Otherwise, it's forcibly freed.
+ *
+ * @param it The rbtree iterator to free.
+ */
 static void
 _eina_rbtree_iterator_free(Eina_Iterator_Rbtree *it)
 {
@@ -138,6 +177,17 @@ _eina_rbtree_iterator_free(Eina_Iterator_Rbtree *it)
    eina_spinlock_release(&iterator_trash_lock);
 }
 
+/**
+ * @internal
+ * @brief Advances the rbtree iterator to the next element.
+ *
+ * This function implements the core logic for tree traversal (prefix, infix, postfix)
+ * based on the iterator's mask. It manages a stack to keep track of the traversal path.
+ *
+ * @param it The rbtree iterator.
+ * @param data Pointer to a void pointer where the next rbtree node will be stored.
+ * @return EINA_TRUE if a next element was found, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _eina_rbtree_iterator_next(Eina_Iterator_Rbtree *it, void **data)
 {
@@ -260,6 +310,15 @@ on_error:
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Initializes a new rbtree node.
+ *
+ * Sets the node's children to NULL and its color to RED,
+ * which is the default for new nodes before rebalancing.
+ *
+ * @param node The rbtree node to initialize.
+ */
 static void
 _eina_rbtree_node_init(Eina_Rbtree *node)
 {
@@ -272,6 +331,17 @@ _eina_rbtree_node_init(Eina_Rbtree *node)
    node->color = EINA_RBTREE_RED;
 }
 
+/**
+ * @internal
+ * @brief Performs a single rotation in the rbtree.
+ *
+ * This is a fundamental operation for rebalancing the tree after
+ * insertions or deletions.
+ *
+ * @param node The node around which the rotation is performed.
+ * @param dir The direction of the rotation (EINA_RBTREE_LEFT or EINA_RBTREE_RIGHT).
+ * @return The new root of the rotated subtree.
+ */
 static inline Eina_Rbtree *
 _eina_rbtree_inline_single_rotation(Eina_Rbtree *node,
                                     Eina_Rbtree_Direction dir)
@@ -287,6 +357,17 @@ _eina_rbtree_inline_single_rotation(Eina_Rbtree *node,
    return save;
 }
 
+/**
+ * @internal
+ * @brief Performs a double rotation in the rbtree.
+ *
+ * This operation is composed of two single rotations and is used
+ * for rebalancing the tree.
+ *
+ * @param node The node around which the double rotation is performed.
+ * @param dir The direction of the initial rotation.
+ * @return The new root of the rotated subtree.
+ */
 static inline Eina_Rbtree *
 _eina_rbtree_inline_double_rotation(Eina_Rbtree *node,
                                     Eina_Rbtree_Direction dir)
@@ -548,6 +629,15 @@ eina_rbtree_delete(Eina_Rbtree *root, Eina_Rbtree_Free_Cb func, void *data)
    func(root, data);
 }
 
+/**
+ * @brief Initializes the rbtree subsystem.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ * @since 1.1.0
+ *
+ * This function sets up internal structures needed for rbtree iterators,
+ * specifically the iterator_trash array and its associated spinlock.
+ * It should be called once at application startup if rbtrees are used.
+ */
 Eina_Bool
 eina_rbtree_init(void)
 {
@@ -555,6 +645,15 @@ eina_rbtree_init(void)
    return eina_spinlock_new(&iterator_trash_lock);
 }
 
+/**
+ * @brief Shuts down the rbtree subsystem.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ * @since 1.1.0
+ *
+ * This function cleans up resources used by the rbtree subsystem,
+ * including freeing any cached iterators and the iterator_trash spinlock.
+ * It should be called once at application shutdown.
+ */
 Eina_Bool
 eina_rbtree_shutdown(void)
 {

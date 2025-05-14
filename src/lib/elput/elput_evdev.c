@@ -1,5 +1,18 @@
 #include "elput_private.h"
 
+/**
+ * @brief Frees the resources associated with a seat event.
+ *
+ * This function is typically used as a callback for ecore_event_add when
+ * an event related to a seat (like ELPUT_EVENT_SEAT_CAPS or
+ * ELPUT_EVENT_SEAT_FRAME) is added. It ensures that the seat data
+ * (referenced by @p d) is properly destroyed and the event data (@p ev)
+ * is freed.
+ *
+ * @param d User data, expected to be an Elput_Seat or related structure
+ *          that needs to be destroyed via _udev_seat_destroy.
+ * @param ev The event data to be freed.
+ */
 static void
 _seat_event_free(void *d, void *ev)
 {
@@ -7,6 +20,16 @@ _seat_event_free(void *d, void *ev)
    free(ev);
 }
 
+/**
+ * @brief Updates and sends an event about the capabilities of a seat.
+ *
+ * This function is called when the capabilities of a seat (e.g., number of
+ * pointers, keyboards, touch devices) might have changed. It allocates an
+ * Elput_Event_Seat_Caps event, populates it with the current counts from
+ * the seat, and adds it to the ecore event queue.
+ *
+ * @param seat The seat whose capabilities need to be updated and broadcast.
+ */
 static void
 _seat_caps_update(Elput_Seat *seat)
 {
@@ -24,6 +47,16 @@ _seat_caps_update(Elput_Seat *seat)
    ecore_event_add(ELPUT_EVENT_SEAT_CAPS, ev, _seat_event_free, seat);
 }
 
+/**
+ * @brief Sends a seat frame event.
+ *
+ * A frame event indicates that a logical set of input events has been
+ * processed and that the application can now update its state or redraw.
+ * This function allocates an Elput_Event_Seat_Frame event and adds it to
+ * the ecore event queue.
+ *
+ * @param seat The seat for which the frame event is being sent.
+ */
 static void
 _seat_frame_send(Elput_Seat *seat)
 {
@@ -37,6 +70,17 @@ _seat_frame_send(Elput_Seat *seat)
    ecore_event_add(ELPUT_EVENT_SEAT_FRAME, ev, _seat_event_free, seat);
 }
 
+/**
+ * @brief Updates the physical LEDs on a keyboard device.
+ *
+ * Translates Elput_Leds bitmask (NUM, CAPS, SCROLL) into libinput's
+ * LED equivalents and instructs libinput to update the LEDs on the
+ * specified device.
+ *
+ * @param edev The Elput_Device representing the keyboard.
+ * @param leds A bitmask of Elput_Leds to be set on the keyboard.
+ *             Example: ELPUT_LED_NUM | ELPUT_LED_CAPS
+ */
 static void
 _evdev_leds_update(Elput_Device *edev, Elput_Leds leds)
 {
@@ -52,6 +96,18 @@ _evdev_leds_update(Elput_Device *edev, Elput_Leds leds)
    libinput_device_led_update(edev->device, input_leds);
 }
 
+/**
+ * @brief Updates the modifier state for a keyboard and its associated seat.
+ *
+ * This function serializes the depressed, latched, locked, and effective
+ * group states from the XKB state. It then translates these XKB modifier
+ * states into Ecore_Event_Modifier flags on the seat. It also checks if
+ * the LED state has changed based on active XKB LEDs and, if so, updates
+ * the physical LEDs on all keyboard devices associated with the seat.
+ *
+ * @param kbd The keyboard whose XKB state is used to derive modifiers.
+ * @param seat The seat whose modifier flags will be updated.
+ */
 static void
 _keyboard_modifiers_update(Elput_Keyboard *kbd, Elput_Seat *seat)
 {
@@ -111,6 +167,21 @@ _keyboard_modifiers_update(Elput_Keyboard *kbd, Elput_Seat *seat)
      }
 }
 
+/**
+ * @brief Creates and initializes an Elput_Keyboard_Info structure from an XKB keymap.
+ *
+ * This function allocates an Elput_Keyboard_Info structure, takes a reference
+ * to the provided XKB keymap, and populates the structure with modifier and
+ * LED indices obtained from the keymap. These indices are used for quick
+ * lookup of common modifiers (Ctrl, Alt, Shift, Super, etc.) and LEDs
+ * (Num Lock, Caps Lock, Scroll Lock).
+ *
+ * @param keymap The XKB keymap from which to derive keyboard information.
+ *               The function will take its own reference to this keymap.
+ * @return A pointer to the newly created Elput_Keyboard_Info structure,
+ *         or NULL on allocation failure. The caller is responsible for
+ *         eventually calling _keyboard_info_destroy on the returned structure.
+ */
 static Elput_Keyboard_Info *
 _keyboard_info_create(struct xkb_keymap *keymap)
 {
@@ -147,6 +218,14 @@ _keyboard_info_create(struct xkb_keymap *keymap)
    return info;
 }
 
+/**
+ * @brief Decrements the reference count of an Elput_Keyboard_Info structure and frees it if the count reaches zero.
+ *
+ * This function unrefs the XKB keymap associated with the info structure
+ * and then frees the structure itself when its reference count drops to zero.
+ *
+ * @param info The Elput_Keyboard_Info structure to destroy.
+ */
 static void
 _keyboard_info_destroy(Elput_Keyboard_Info *info)
 {
@@ -188,6 +267,18 @@ _keyboard_global_build(Elput_Keyboard *kbd)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Allocates and initializes a basic Elput_Keyboard structure.
+ *
+ * This function allocates memory for an Elput_Keyboard structure and
+ * associates it with the given seat. Further initialization, such as
+ * setting up XKB context and keymap, is done elsewhere (e.g., in
+ * _keyboard_init or _keyboard_global_build).
+ *
+ * @param seat The Elput_Seat to which this keyboard will belong.
+ * @return A pointer to the newly allocated Elput_Keyboard structure,
+ *         or NULL on allocation failure.
+ */
 static Elput_Keyboard *
 _keyboard_create(Elput_Seat *seat)
 {
@@ -201,6 +292,17 @@ _keyboard_create(Elput_Seat *seat)
    return kbd;
 }
 
+/**
+ * @brief Initializes or reinitializes the XKB compose state for a keyboard.
+ *
+ * This function determines the current locale (from LC_ALL, LC_CTYPE, or LANG
+ * environment variables, defaulting to "C") and creates an XKB compose table
+ * and state based on that locale. If a compose table or state already exists
+ * for the keyboard, they are unreferenced first. This allows for dynamic
+ * updates to compose behavior if the locale changes.
+ *
+ * @param kbd The Elput_Keyboard for which to initialize the compose state.
+ */
 static void
 _keyboard_compose_init(Elput_Keyboard *kbd)
 {
@@ -276,6 +378,16 @@ err:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Resets the XKB state of a keyboard.
+ *
+ * This function creates a new, clean XKB state object based on the
+ * keyboard's current keymap and replaces the existing state. This is
+ * typically done when a keyboard device is released or its state needs
+ * to be cleared (e.g., to remove any stuck modifiers).
+ *
+ * @param kbd The Elput_Keyboard whose XKB state is to be reset.
+ */
 static void
 _keyboard_state_reset(Elput_Keyboard *kbd)
 {
@@ -288,6 +400,17 @@ _keyboard_state_reset(Elput_Keyboard *kbd)
    kbd->state = state;
 }
 
+/**
+ * @brief Decrements the keyboard count for a seat and updates capabilities if it reaches zero.
+ *
+ * This function is called when a keyboard device is removed or disassociated
+ * from a seat. It decrements the seat's keyboard counter. If the count
+ * drops to zero, it means there are no more active keyboards on the seat,
+ * so the XKB state of the seat's keyboard object is reset, and a seat
+ * capabilities update event is triggered.
+ *
+ * @param seat The Elput_Seat from which a keyboard is being released.
+ */
 static void
 _keyboard_release(Elput_Seat *seat)
 {
@@ -299,6 +422,18 @@ _keyboard_release(Elput_Seat *seat)
      }
 }
 
+/**
+ * @brief Frees an Ecore_Event_Key and unreferences its associated Evas_Device.
+ *
+ * This function is used as a callback for ecore_event_add when keyboard
+ * or mouse events are generated. It unreferences the Evas_Device (if any)
+ * associated with the event and then frees the event structure itself.
+ *
+ * @param dev User data, expected to be an Evas_Device (or NULL) associated
+ *            with the event. This device will be unreferenced.
+ * @param ev The event data (e.g., Ecore_Event_Key, Ecore_Event_Mouse_Button)
+ *           to be freed.
+ */
 static void
 _event_free(void *dev, void *ev)
 {
@@ -347,6 +482,17 @@ _keyboard_key_send(Elput_Device *dev, enum libinput_key_state state, const char 
      ecore_event_add(ECORE_EVENT_KEY_UP, ev, _event_free, ev->dev);
 }
 
+/**
+ * @brief Sends an event containing the current XKB modifier states.
+ *
+ * This function allocates an Elput_Event_Modifiers_Send event, populates it
+ * with the depressed, latched, locked, and group modifier states from the
+ * provided keyboard's XKB state, and adds it to the ecore event queue.
+ * This is used to notify interested parties (e.g., a window manager or
+ * toolkit) about changes in the raw XKB modifier states.
+ *
+ * @param kbd The Elput_Keyboard whose modifier states are to be sent.
+ */
 static void
 _keyboard_modifiers_send(Elput_Keyboard *kbd)
 {
@@ -363,6 +509,20 @@ _keyboard_modifiers_send(Elput_Keyboard *kbd)
    ecore_event_add(ELPUT_EVENT_MODIFIERS_SEND, ev, NULL, NULL);
 }
 
+/**
+ * @brief Updates the XKB state for a keyboard, typically after a keymap change.
+ *
+ * This function creates new XKB state objects (both regular and maskless)
+ * based on the provided new keymap. It preserves the currently latched and
+ * locked modifiers from the old state and applies them to the new state.
+ * The keyboard's group is also applied from the seat manager's cached group.
+ *
+ * @param kbd The Elput_Keyboard whose XKB state is to be updated.
+ * @param map The new XKB keymap to use for creating the state.
+ * @param[out] latched Pointer to store the serialized latched modifiers from the old state.
+ * @param[out] locked Pointer to store the serialized locked modifiers from the old state.
+ * @return EINA_TRUE if the state was successfully updated, EINA_FALSE otherwise (e.g., on allocation failure).
+ */
 static Eina_Bool
 _keyboard_state_update(Elput_Keyboard *kbd, struct xkb_keymap *map, xkb_mod_mask_t *latched, xkb_mod_mask_t *locked)
 {
@@ -389,6 +549,27 @@ _keyboard_state_update(Elput_Keyboard *kbd, struct xkb_keymap *map, xkb_mod_mask
    return EINA_TRUE;
 }
 
+/**
+ * @brief Updates the keymap for the keyboard associated with a seat.
+ *
+ * This function is called when the system keymap changes. It retrieves the
+ * keyboard for the seat and marks it as pending a keymap update. If there are
+ * no keys currently pressed (key_count is 0), it proceeds to update the
+ * keymap immediately.
+ *
+ * The update involves:
+ * 1. If a cached keymap exists in the seat manager, it uses that.
+ *    A new Elput_Keyboard_Info is created from this cached keymap.
+ * 2. Otherwise, it performs a global build of the keyboard (defaulting to
+ *    "evdev" rules, "pc105" model, "us" layout).
+ * 3. The XKB state is updated using _keyboard_state_update, preserving
+ *    latched and locked modifiers.
+ * 4. The old Elput_Keyboard_Info is destroyed, and the new one is assigned.
+ * 5. The XKB compose state is re-initialized.
+ * 6. Keyboard modifiers are updated and, if necessary, an event is sent.
+ *
+ * @param seat The Elput_Seat whose keyboard keymap needs to be updated.
+ */
 void
 _keyboard_keymap_update(Elput_Seat *seat)
 {
@@ -439,6 +620,19 @@ _keyboard_keymap_update(Elput_Seat *seat)
    _keyboard_modifiers_send(kbd);
 }
 
+/**
+ * @brief Updates the keyboard layout group for the keyboard associated with a seat.
+ *
+ * This function is called when the active keyboard layout group changes.
+ * It retrieves the keyboard for the seat, updates its XKB state using the
+ * existing keymap but applying the new group (implicitly handled by
+ * _keyboard_state_update which uses seat->manager->cached.group).
+ * It then re-initializes the XKB compose state (as compose sequences can
+ * be layout-dependent) and updates the keyboard modifiers. If latched or
+ * locked modifiers are active, a modifier update event is sent.
+ *
+ * @param seat The Elput_Seat whose keyboard group needs to be updated.
+ */
 void
 _keyboard_group_update(Elput_Seat *seat)
 {
@@ -460,6 +654,18 @@ _keyboard_group_update(Elput_Seat *seat)
    _keyboard_modifiers_send(kbd);
 }
 
+/**
+ * @brief Retrieves a remapped key code for a given original key code on a specific device.
+ *
+ * If key remapping is enabled for the device (edev->key_remap is true and
+ * edev->key_remap_hash exists), this function looks up the original key code
+ * in the hash table. If a mapping is found, the remapped key code is returned.
+ * Otherwise, the original key code is returned.
+ *
+ * @param edev The Elput_Device for which to check for remapped keys.
+ * @param code The original key code.
+ * @return The remapped key code if a mapping exists, otherwise the original @p code.
+ */
 static int
 _keyboard_remapped_key_get(Elput_Device *edev, int code)
 {
@@ -507,7 +713,22 @@ in this Software without prior written authorization from The Open Group.
 */
    if (!keysym) return 0;
 
-   /* check for possible control codes */
+   /*
+    * This section handles the translation of keysyms when the Control
+    * modifier is active. It attempts to produce ASCII control characters
+    * (e.g., Ctrl+C -> ETX (0x03)).
+    * The logic is based on common terminal behavior and X11's KeyBind.c.
+    *
+    * It checks if the keysym is a basic Latin character or a specific
+    * control-related key (like BackSpace, Return, Escape, KP_Space, etc.).
+    * If so, it maps it to the corresponding C0 control code.
+    * For example:
+    *   - '@' through '_' (and 'a' through 'z') are mapped by `c &= 0x1F`.
+    *   - ' ' (space) is also mapped by `c &= 0x1F` to NUL (0x00) if it's KP_Space,
+    *     or to itself (0x20) then masked to NUL (0x00).
+    *   - Specific numeric keys ('2' through '7', '8', '/') are mapped to
+    *     alternative control codes or DEL.
+    */
    if (modifiers & ECORE_EVENT_MODIFIER_CTRL)
      {
         Eina_Bool valid_control_code = EINA_TRUE;
@@ -575,7 +796,28 @@ in this Software without prior written authorization from The Open Group.
 }
 
 /* from weston/clients/window.c */
-/* Translate symbols appropriately if a compose sequence is being entered */
+/**
+ * @brief Processes a key press through the XKB compose sequence state.
+ *
+ * If a compose sequence is active (i.e., kbd->compose_state exists), this
+ * function feeds the given keysym @p sym into the compose state.
+ *
+ * - If the keysym is accepted and the sequence is still composing,
+ *   it returns XKB_KEY_NoSymbol (indicating the key press is consumed by
+ *   the compose sequence).
+ * - If the keysym completes a compose sequence, it returns the resulting
+ *   composed keysym.
+ * - If the compose sequence is cancelled or nothing happens, it returns
+ *   XKB_KEY_NoSymbol or the original symbol, respectively.
+ * - If no compose state exists or the keysym is XKB_KEY_NoSymbol, the
+ *   original symbol is returned.
+ *
+ * @param sym The keysym from the current key press.
+ * @param kbd The Elput_Keyboard containing the XKB compose state.
+ * @return The resulting keysym after processing by the compose state,
+ *         or XKB_KEY_NoSymbol if the key press was consumed by composition,
+ *         or the original @p sym if no composition occurred.
+ */
 static xkb_keysym_t
 process_key_press(xkb_keysym_t sym, Elput_Keyboard *kbd)
 {
@@ -714,6 +956,17 @@ _keyboard_key(struct libinput_device *idevice, struct libinput_event_keyboard *e
      }
 }
 
+/**
+ * @brief Allocates and initializes a basic Elput_Pointer structure.
+ *
+ * This function allocates memory for an Elput_Pointer structure, associates
+ * it with the given seat, and sets a default mouse click threshold.
+ * Further initialization related to device capabilities is done elsewhere.
+ *
+ * @param seat The Elput_Seat to which this pointer will belong.
+ * @return A pointer to the newly allocated Elput_Pointer structure,
+ *         or NULL on allocation failure.
+ */
 static Elput_Pointer *
 _pointer_create(Elput_Seat *seat)
 {
@@ -728,6 +981,22 @@ _pointer_create(Elput_Seat *seat)
    return ptr;
 }
 
+/**
+ * @brief Initializes pointer capabilities for a seat.
+ *
+ * If the seat does not already have an active pointer (seat->ptr is NULL),
+ * this function creates a new Elput_Pointer structure for it using
+ * _pointer_create, sets its initial pressure to 1.0, and increments the
+ * seat's pointer device count.
+ * If a pointer already exists, it simply increments the count.
+ * In either case where the count becomes 1 (i.e., a pointer becomes active
+ * for the first time or reactivated), it calls _seat_caps_update to notify
+ * about the change in seat capabilities.
+ *
+ * @param seat The Elput_Seat for which to initialize pointer capabilities.
+ * @return EINA_TRUE if initialization was successful (or if a pointer already existed),
+ *         EINA_FALSE if creating a new pointer failed.
+ */
 static Eina_Bool
 _pointer_init(Elput_Seat *seat)
 {
@@ -753,6 +1022,17 @@ _pointer_init(Elput_Seat *seat)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Decrements the pointer device count for a seat.
+ *
+ * This function is called when a pointer device is removed or disassociated
+ * from a seat. It decrements the seat's pointer counter. If the count
+ * drops to zero, it means there are no more active pointer devices on the seat.
+ * In this case, it resets the button state of the seat's pointer object and
+ * calls _seat_caps_update to notify about the change in seat capabilities.
+ *
+ * @param seat The Elput_Seat from which a pointer device is being released.
+ */
 static void
 _pointer_release(Elput_Seat *seat)
 {
@@ -764,6 +1044,17 @@ _pointer_release(Elput_Seat *seat)
      }
 }
 
+/**
+ * @brief Allocates and initializes a basic Elput_Touch structure.
+ *
+ * This function allocates memory for an Elput_Touch structure, associates
+ * it with the given seat, and sets a default pressure value.
+ * Further initialization related to device capabilities is done elsewhere.
+ *
+ * @param seat The Elput_Seat to which this touch device will belong.
+ * @return A pointer to the newly allocated Elput_Touch structure,
+ *         or NULL on allocation failure.
+ */
 static Elput_Touch *
 _touch_create(Elput_Seat *seat)
 {
@@ -778,6 +1069,21 @@ _touch_create(Elput_Seat *seat)
    return touch;
 }
 
+/**
+ * @brief Initializes touch capabilities for a seat.
+ *
+ * If the seat does not already have an active touch device (seat->touch is NULL),
+ * this function creates a new Elput_Touch structure for it using _touch_create
+ * and increments the seat's touch device count.
+ * If a touch device already exists, it simply increments the count.
+ * In either case where the count becomes 1 (i.e., a touch device becomes active
+ * for the first time or reactivated), it calls _seat_caps_update to notify
+ * about the change in seat capabilities.
+ *
+ * @param seat The Elput_Seat for which to initialize touch capabilities.
+ * @return EINA_TRUE if initialization was successful (or if a touch device already existed),
+ *         EINA_FALSE if creating a new touch device failed.
+ */
 static Eina_Bool
 _touch_init(Elput_Seat *seat)
 {
@@ -802,6 +1108,17 @@ _touch_init(Elput_Seat *seat)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Decrements the touch device count for a seat.
+ *
+ * This function is called when a touch device is removed or disassociated
+ * from a seat. It decrements the seat's touch counter. If the count
+ * drops to zero, it means there are no more active touch devices on the seat.
+ * In this case, it resets the touch points count of the seat's touch object
+ * and calls _seat_caps_update to notify about the change in seat capabilities.
+ *
+ * @param seat The Elput_Seat from which a touch device is being released.
+ */
 static void
 _touch_release(Elput_Seat *seat)
 {
@@ -813,6 +1130,18 @@ _touch_release(Elput_Seat *seat)
      }
 }
 
+/**
+ * @brief Sends an ECORE_EVENT_MOUSE_MOVE event based on the current pointer state.
+ *
+ * This function retrieves the pointer and keyboard state for the device's seat.
+ * It clamps the pointer coordinates to the configured output dimensions.
+ * It then allocates and populates an Ecore_Event_Mouse_Move event with the
+ * current pointer position, timestamp, modifiers, and multi-touch information
+ * (if applicable from a touch device on the same seat). The event is then
+ * added to the ecore event queue.
+ *
+ * @param edev The Elput_Device that generated the motion.
+ */
 static void
 _pointer_motion_send(Elput_Device *edev)
 {
@@ -879,6 +1208,19 @@ _pointer_motion_send(Elput_Device *edev)
    ecore_event_add(ECORE_EVENT_MOUSE_MOVE, ev, _event_free, ev->dev);
 }
 
+/**
+ * @brief Sends an ELPUT_EVENT_POINTER_MOTION event with explicitly provided deltas.
+ *
+ * This function is used to report relative motion when the deltas are calculated
+ * externally (e.g., from absolute motion events). It creates and populates an
+ * Elput_Event_Pointer_Motion event with the given deltas and the timestamp
+ * from the original libinput event. Both accelerated and unaccelerated deltas
+ * are set to the same provided values.
+ *
+ * @param event The original libinput pointer event, used for timestamp.
+ * @param dx The relative change in the X-coordinate.
+ * @param dy The relative change in the Y-coordinate.
+ */
 static void
 _pointer_motion_relative_fake(struct libinput_event_pointer *event, double dx, double dy)
 {
@@ -896,6 +1238,17 @@ _pointer_motion_relative_fake(struct libinput_event_pointer *event, double dx, d
    ecore_event_add(ELPUT_EVENT_POINTER_MOTION, ev, NULL, NULL);
 }
 
+/**
+ * @brief Sends an ELPUT_EVENT_POINTER_MOTION event based on a libinput relative motion event.
+ *
+ * This function extracts the timestamp, accelerated deltas (dx, dy), and
+ * unaccelerated deltas (dx_unaccel, dy_unaccel) from the libinput pointer
+ * event. It then creates and populates an Elput_Event_Pointer_Motion event
+ * with this information and adds it to the ecore event queue. This event
+ * provides raw motion data, separate from the ECORE_EVENT_MOUSE_MOVE.
+ *
+ * @param event The libinput pointer event containing relative motion data.
+ */
 static void
 _pointer_motion_relative(struct libinput_event_pointer *event)
 {
@@ -913,6 +1266,22 @@ _pointer_motion_relative(struct libinput_event_pointer *event)
    ecore_event_add(ELPUT_EVENT_POINTER_MOTION, ev, NULL, NULL);
 }
 
+/**
+ * @brief Handles relative pointer motion events from libinput.
+ *
+ * This function processes a LIBINPUT_EVENT_POINTER_MOTION event.
+ * It retrieves the Elput_Device and Elput_Pointer associated with the event.
+ * It applies device-specific transformations (swap axes, invert X/Y) to the
+ * deltas obtained from libinput. The seat's pointer coordinates are updated
+ * with these transformed deltas.
+ * Finally, it calls _pointer_motion_send to generate an ECORE_EVENT_MOUSE_MOVE
+ * and _pointer_motion_relative to generate an ELPUT_EVENT_POINTER_MOTION.
+ *
+ * @param idev The libinput device that generated the event.
+ * @param event The libinput pointer event data for relative motion.
+ * @return EINA_TRUE if the event was processed successfully, EINA_FALSE otherwise
+ *         (e.g., if the device or pointer could not be retrieved).
+ */
 static Eina_Bool
 _pointer_motion(struct libinput_device *idev, struct libinput_event_pointer *event)
 {
@@ -948,6 +1317,23 @@ _pointer_motion(struct libinput_device *idev, struct libinput_event_pointer *eve
    return EINA_TRUE;
 }
 
+/**
+ * @brief Handles absolute pointer motion events from libinput.
+ *
+ * This function processes a LIBINPUT_EVENT_POINTER_MOTION_ABSOLUTE event.
+ * It retrieves the Elput_Device and Elput_Pointer. It gets the transformed
+ * absolute X and Y coordinates from the libinput event (scaled to the
+ * device's output width/height: edev->ow, edev->oh).
+ * These absolute coordinates update the device's internal absolute position
+ * (edev->absx, edev->absy) and the seat's pointer position.
+ * It then calls _pointer_motion_send to generate an ECORE_EVENT_MOUSE_MOVE
+ * and _pointer_motion_relative_fake to generate an ELPUT_EVENT_POINTER_MOTION
+ * using the difference between the new and old absolute positions as deltas.
+ *
+ * @param idev The libinput device that generated the event.
+ * @param event The libinput pointer event data for absolute motion.
+ * @return EINA_TRUE if the event was processed successfully, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _pointer_motion_abs(struct libinput_device *idev, struct libinput_event_pointer *event)
 {
@@ -981,6 +1367,20 @@ _pointer_motion_abs(struct libinput_device *idev, struct libinput_event_pointer 
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sends an ECORE_EVENT_MOUSE_BUTTON_DOWN or ECORE_EVENT_MOUSE_BUTTON_UP event.
+ *
+ * This function constructs and sends a mouse button event based on the current
+ * state of the pointer and the provided button state (pressed or released).
+ * It populates the event with coordinates, timestamp, button number,
+ * click status (double/triple), modifiers, and multi-touch information.
+ *
+ * @param edev The Elput_Device that generated the button event.
+ * @param state The state of the button (LIBINPUT_BUTTON_STATE_PRESSED or
+ *              LIBINPUT_BUTTON_STATE_RELEASED), though this function uses
+ *              its boolean interpretation (1 for pressed, 0 for released)
+ *              to determine event type.
+ */
 static void
 _pointer_button_send(Elput_Device *edev, enum libinput_button_state state)
 {
@@ -1036,6 +1436,18 @@ _pointer_button_send(Elput_Device *edev, enum libinput_button_state state)
      ecore_event_add(ECORE_EVENT_MOUSE_BUTTON_UP, ev, _event_free, ev->dev);
 }
 
+/**
+ * @brief Updates double and triple click detection state for a pointer.
+ *
+ * This function checks if the current button press (@p btn) constitutes a
+ * double or triple click based on the time elapsed since the previous
+ * press(es) and whether the same button was involved. It updates the
+ * `ptr->mouse.double_click` and `ptr->mouse.triple_click` flags accordingly.
+ * It also updates the history of previous button presses and timestamps.
+ *
+ * @param ptr The Elput_Pointer whose click state is to be updated.
+ * @param btn The button number that was just pressed.
+ */
 static void
 _pointer_click_update(Elput_Pointer *ptr, unsigned int btn)
 {
@@ -1066,6 +1478,24 @@ _pointer_click_update(Elput_Pointer *ptr, unsigned int btn)
    ptr->mouse.prev_button = ptr->buttons;
 }
 
+/**
+ * @brief Handles pointer button events from libinput.
+ *
+ * This function processes a LIBINPUT_EVENT_POINTER_BUTTON event.
+ * It retrieves the Elput_Device and Elput_Pointer. It checks if the event
+ * represents a seat-wide state change (i.e., the first press or last release
+ * of a button on the seat).
+ * It translates the libinput button code (e.g., BTN_MIDDLE to 2, BTN_RIGHT to 3,
+ * effectively swapping them from typical kernel/libinput to X11-like numbering).
+ * If the button is being pressed, it calls _pointer_click_update to detect
+ * double/triple clicks. If there's a pending motion event for the seat,
+ * it's sent first. Finally, _pointer_button_send is called to generate
+ * the Ecore mouse button event.
+ *
+ * @param idev The libinput device that generated the event.
+ * @param event The libinput pointer event data for button press/release.
+ * @return EINA_TRUE if the event was processed successfully, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _pointer_button(struct libinput_device *idev, struct libinput_event_pointer *event)
 {
@@ -1106,6 +1536,18 @@ _pointer_button(struct libinput_device *idev, struct libinput_event_pointer *eve
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sends an ECORE_EVENT_MOUSE_WHEEL event.
+ *
+ * This function constructs and sends a mouse wheel (scroll) event.
+ * It populates the event with the current pointer coordinates, timestamp,
+ * scroll direction (0 for vertical, 1 for horizontal), scroll value (amount),
+ * and current keyboard modifiers.
+ *
+ * @param dev The Elput_Device that generated the axis event.
+ * @param direction The direction of the scroll: 0 for vertical, 1 for horizontal.
+ * @param value The discrete value of the scroll (e.g., number of wheel ticks).
+ */
 static void
 _pointer_axis_send(Elput_Device *dev, int direction, int value)
 {
@@ -1143,6 +1585,21 @@ _pointer_axis_send(Elput_Device *dev, int direction, int value)
    ecore_event_add(ECORE_EVENT_MOUSE_WHEEL, ev, _event_free, ev->dev);
 }
 
+/**
+ * @brief Retrieves the axis value from a libinput pointer event, considering the source.
+ *
+ * Libinput provides axis values differently depending on the source:
+ * - LIBINPUT_POINTER_AXIS_SOURCE_WHEEL: Discrete values (e.g., wheel ticks).
+ * - LIBINPUT_POINTER_AXIS_SOURCE_FINGER, LIBINPUT_POINTER_AXIS_SOURCE_CONTINUOUS:
+ *   Continuous values (e.g., from touchpad scrolling).
+ * This function calls the appropriate libinput getter based on the source.
+ *
+ * @param event The libinput pointer event containing axis data.
+ * @param axis The specific axis (e.g., LIBINPUT_POINTER_AXIS_SCROLL_VERTICAL)
+ *             for which to get the value.
+ * @return The axis value, interpreted as discrete or continuous based on source.
+ *         Returns 0.0 if the source is unknown or not handled.
+ */
 static double
 _pointer_axis_value(struct libinput_event_pointer *event, enum libinput_pointer_axis axis)
 {
@@ -1166,6 +1623,24 @@ _pointer_axis_value(struct libinput_event_pointer *event, enum libinput_pointer_
    return val;
 }
 
+/**
+ * @brief Handles pointer axis (scroll) events from libinput.
+ *
+ * This function processes a LIBINPUT_EVENT_POINTER_AXIS event.
+ * It checks if the event has vertical or horizontal scroll data.
+ * For each present axis, it retrieves the scroll value using
+ * _pointer_axis_value and determines the direction (0 for vertical,
+ * 1 for horizontal). The pointer's timestamp is updated, and then
+ * _pointer_axis_send is called to generate an ECORE_EVENT_MOUSE_WHEEL.
+ * If both vertical and horizontal data are present, horizontal typically
+ * takes precedence for the `val` and `dir` sent to _pointer_axis_send
+ * due to the order of checks.
+ *
+ * @param idevice The libinput device that generated the event.
+ * @param event The libinput pointer event data for axis scroll.
+ * @return EINA_TRUE if a scroll event was processed and sent, EINA_FALSE otherwise
+ *         (e.g., if no axis data was found or device/pointer retrieval failed).
+ */
 static Eina_Bool
 _pointer_axis(struct libinput_device *idevice, struct libinput_event_pointer *event)
 {
@@ -1209,6 +1684,20 @@ _pointer_axis(struct libinput_device *idevice, struct libinput_event_pointer *ev
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sends a touch-related event, masquerading as a mouse button event.
+ *
+ * This function is used to send ECORE_EVENT_MOUSE_BUTTON_DOWN or
+ * ECORE_EVENT_MOUSE_BUTTON_UP events for touch interactions.
+ * It populates the event with the current touch coordinates (from the seat's
+ * pointer, which is updated by touch events), timestamp, modifiers, and
+ * multi-touch specific information like slot ID and pressure.
+ * The button number is hardcoded to 1 (left mouse button equivalent).
+ *
+ * @param dev The Elput_Device that generated the touch event.
+ * @param type The Ecore event type to send (ECORE_EVENT_MOUSE_BUTTON_DOWN or
+ *             ECORE_EVENT_MOUSE_BUTTON_UP).
+ */
 static void
 _touch_event_send(Elput_Device *dev, int type)
 {
@@ -1258,6 +1747,16 @@ _touch_event_send(Elput_Device *dev, int type)
    ecore_event_add(type, ev, NULL, NULL);
 }
 
+/**
+ * @brief Sends a touch motion event, masquerading as a mouse move event.
+ *
+ * This function constructs and sends an ECORE_EVENT_MOUSE_MOVE event for
+ * touch motion. It populates the event with the current touch coordinates
+ * (rounded, from the seat's pointer), timestamp, modifiers, and multi-touch
+ * specific information like slot ID and pressure.
+ *
+ * @param dev The Elput_Device that generated the touch motion.
+ */
 static void
 _touch_motion_send(Elput_Device *dev)
 {
@@ -1299,6 +1798,25 @@ _touch_motion_send(Elput_Device *dev)
    ecore_event_add(ECORE_EVENT_MOUSE_MOVE, ev, _event_free, ev->dev);
 }
 
+/**
+ * @brief Handles touch down events from libinput.
+ *
+ * This function processes a LIBINPUT_EVENT_TOUCH_DOWN event.
+ * It retrieves the Elput_Device and Elput_Touch structures.
+ * It updates the touch slot, timestamp, and the seat's pointer coordinates
+ * based on the transformed touch coordinates from the event (scaled to
+ * device's output dimensions: dev->ow, dev->oh).
+ * If this touch down corresponds to the "grabbed" slot (primary touch point),
+ * its grab coordinates are updated. The number of active touch points is
+ * incremented.
+ * A touch motion event is sent via _touch_motion_send, followed by a
+ * touch down event (as mouse button down) via _touch_event_send.
+ * If this is the first touch point (points == 1), it establishes this slot
+ * as the grabbed slot for gesture tracking or primary interaction.
+ *
+ * @param idevice The libinput device that generated the event.
+ * @param event The libinput touch event data for touch down.
+ */
 static void
 _touch_down(struct libinput_device *idevice, struct libinput_event_touch *event)
 {
@@ -1344,6 +1862,20 @@ _touch_down(struct libinput_device *idevice, struct libinput_event_touch *event)
      }
 }
 
+/**
+ * @brief Handles touch up events from libinput.
+ *
+ * This function processes a LIBINPUT_EVENT_TOUCH_UP event.
+ * It retrieves the Elput_Device and Elput_Touch structures.
+ * The number of active touch points is decremented. The touch slot and
+ * timestamp are updated from the event.
+ * A touch motion event is sent via _touch_motion_send (to update to the
+ * final position before lift-off), followed by a touch up event (as mouse
+ * button up) via _touch_event_send.
+ *
+ * @param idevice The libinput device that generated the event.
+ * @param event The libinput touch event data for touch up.
+ */
 static void
 _touch_up(struct libinput_device *idevice, struct libinput_event_touch *event)
 {
@@ -1364,6 +1896,19 @@ _touch_up(struct libinput_device *idevice, struct libinput_event_touch *event)
    _touch_event_send(dev, ECORE_EVENT_MOUSE_BUTTON_UP);
 }
 
+/**
+ * @brief Handles touch motion events from libinput.
+ *
+ * This function processes a LIBINPUT_EVENT_TOUCH_MOTION event.
+ * It retrieves the Elput_Device and Elput_Touch structures.
+ * It updates the seat's pointer coordinates based on the transformed touch
+ * coordinates from the event (scaled to device's output dimensions:
+ * dev->ow, dev->oh). The touch slot and timestamp are also updated.
+ * Finally, a touch motion event is sent via _touch_motion_send.
+ *
+ * @param idevice The libinput device that generated the event.
+ * @param event The libinput touch event data for touch motion.
+ */
 static void
 _touch_motion(struct libinput_device *idevice, struct libinput_event_touch *event)
 {
@@ -1392,6 +1937,30 @@ _touch_motion(struct libinput_device *idevice, struct libinput_event_touch *even
    _touch_motion_send(dev);
 }
 
+/**
+ * @brief Applies a calibration matrix to a libinput device.
+ *
+ * This function attempts to apply a calibration matrix to the given Elput_Device.
+ * It first checks if the device supports calibration and can retrieve a default matrix.
+ * Then, it queries udev for a property "WL_CALIBRATION" associated with the
+ * device's sysname. If found, this property is expected to contain 6 float values
+ * for the calibration matrix (a, b, c, d, e, f for x' = ax + by + c, y' = dx + ey + f).
+ * The translational components (c and f, which are cal[2] and cal[5]) are
+ * normalized by the device's output width (dev->ow) and height (dev->oh)
+ * respectively, before being applied to the libinput device.
+ *
+ * The calibration matrix format is typically:
+ *   cal[0] = sx (scale x)
+ *   cal[1] = rxy (rotation/shear xy)
+ *   cal[2] = tx (translate x, in pixels)
+ *   cal[3] = ryx (rotation/shear yx)
+ *   cal[4] = sy (scale y)
+ *   cal[5] = ty (translate y, in pixels)
+ *
+ * Libinput expects normalized translation, so tx/width and ty/height.
+ *
+ * @param dev The Elput_Device to calibrate.
+ */
 void
 _evdev_device_calibrate(Elput_Device *dev)
 {
@@ -1435,6 +2004,17 @@ cont:
      }
 }
 
+/**
+ * @brief Frees an Ecore_Event_Axis_Update event and its associated data.
+ *
+ * This function is used as a callback for ecore_event_add when axis update
+ * events (typically from tablet tools) are generated. It unreferences the
+ * Evas_Device (if any) associated with the event, frees the array of
+ * Ecore_Axis data, and then frees the event structure itself.
+ *
+ * @param d User data, unused in this function.
+ * @param event The Ecore_Event_Axis_Update event data to be freed.
+ */
 static void
 _axis_event_free(void *d EINA_UNUSED, void *event)
 {
@@ -1445,6 +2025,26 @@ _axis_event_free(void *d EINA_UNUSED, void *event)
    free(ev);
 }
 
+/**
+ * @brief Handles tablet tool axis events from libinput.
+ *
+ * This function processes a LIBINPUT_EVENT_TABLET_TOOL_AXIS event.
+ * It updates the seat's pointer coordinates based on the transformed absolute
+ * X and Y coordinates from the tablet tool event.
+ * It then checks for changes in various axes supported by the tablet tool:
+ * X, Y, pressure, distance, tilt (calculating magnitude and azimuth), and rotation.
+ * For each changed axis, it populates an Ecore_Axis structure with the
+ * appropriate label and value.
+ *
+ * If X or Y coordinates changed, a standard pointer motion event is sent
+ * via _pointer_motion_send.
+ * If any axis values changed, an ECORE_EVENT_AXIS_UPDATE event is created,
+ * populated with an array of Ecore_Axis structures for all changed axes,
+ * and added to the ecore event queue.
+ *
+ * @param idev The libinput device that generated the event.
+ * @param event The libinput tablet tool event data.
+ */
 static void
 _tablet_tool_axis(struct libinput_device *idev, struct libinput_event_tablet_tool *event)
 {
@@ -1554,6 +2154,22 @@ _tablet_tool_axis(struct libinput_device *idev, struct libinput_event_tablet_too
    ecore_event_add(ECORE_EVENT_AXIS_UPDATE, ev, _axis_event_free, NULL);
 }
 
+/**
+ * @brief Handles tablet tool tip (pen down/up) events from libinput.
+ *
+ * This function processes a LIBINPUT_EVENT_TABLET_TOOL_TIP event, which
+ * indicates the pen tip touching or leaving the surface.
+ * It maps the libinput tip state (LIBINPUT_TABLET_TOOL_TIP_DOWN or
+ * LIBINPUT_TABLET_TOOL_TIP_UP) to a libinput button state (PRESSED or RELEASED).
+ * The pointer's button state is set to 1 (simulating a left mouse button).
+ * If the tip is pressed down, _pointer_click_update is called to handle
+ * potential double/triple click logic (though less common for pens).
+ * Finally, _pointer_button_send is called to generate an Ecore mouse button
+ * down or up event, effectively treating the pen tip as a mouse button.
+ *
+ * @param idev The libinput device that generated the event.
+ * @param event The libinput tablet tool event data for tip state change.
+ */
 static void
 _tablet_tool_tip(struct libinput_device *idev, struct libinput_event_tablet_tool *event)
 {
@@ -1578,6 +2194,17 @@ _tablet_tool_tip(struct libinput_device *idev, struct libinput_event_tablet_tool
    _pointer_button_send(dev, press[state]);
 }
 
+/**
+ * @brief Frees an Elput_Event_Switch event and its associated device reference.
+ *
+ * This function is used as a callback for ecore_event_add when switch toggle
+ * events are generated. It decrements the reference count of the Elput_Device
+ * associated with the switch event (destroying it if refs hit zero) and then
+ * frees the event structure itself.
+ *
+ * @param data User data, unused in this function.
+ * @param event The Elput_Event_Switch event data to be freed.
+ */
 static void
 _switch_event_free(void *data EINA_UNUSED, void *event)
 {
@@ -1587,6 +2214,18 @@ _switch_event_free(void *data EINA_UNUSED, void *event)
    free(ev);
 }
 
+/**
+ * @brief Handles switch toggle events from libinput.
+ *
+ * This function processes a LIBINPUT_EVENT_SWITCH_TOGGLE event (e.g., lid switch,
+ * tablet mode switch).
+ * It allocates an Elput_Event_Switch, populates it with the device (taking a
+ * reference), timestamp, switch type, and switch state from the libinput event.
+ * The Elput_Event_Switch is then added to the ecore event queue.
+ *
+ * @param idev The libinput device that generated the event.
+ * @param event The libinput switch event data.
+ */
 static void
 _switch_toggle(struct libinput_device *idev, struct libinput_event_switch *event)
 {
@@ -1602,6 +2241,24 @@ _switch_toggle(struct libinput_device *idev, struct libinput_event_switch *event
    ecore_event_add(ELPUT_EVENT_SWITCH, ev, _switch_event_free, NULL);
 }
 
+/**
+ * @brief Processes a generic libinput event and dispatches it to the appropriate handler.
+ *
+ * This function is the main entry point for handling events received from
+ * libinput. It determines the type of the libinput event and calls the
+ * corresponding internal processing function (e.g., _keyboard_key for
+ * keyboard events, _pointer_motion for pointer motion, etc.).
+ *
+ * If the event results in a state change that should trigger a "frame"
+ * (e.g., pointer motion, button press/release, axis event), it sets the
+ * `frame` flag. After processing, if `frame` is true, it calls
+ * _seat_frame_send to notify that a logical frame of input is complete.
+ *
+ * @param event The libinput_event to process.
+ * @return 1 if the event was recognized and handled (or ignored by design,
+ *           like LIBINPUT_EVENT_TOUCH_FRAME), 0 if the event type was
+ *           not recognized or handled by this function.
+ */
 int
 _evdev_event_process(struct libinput_event *event)
 {
@@ -1668,6 +2325,28 @@ _evdev_event_process(struct libinput_event *event)
    return ret;
 }
 
+/**
+ * @brief Creates and initializes an Elput_Device from a libinput_device.
+ *
+ * This function allocates an Elput_Device structure and associates it with
+ * the given Elput_Seat and libinput_device. It sets the output dimensions
+ * from the seat manager and stores the device's output name (or device name
+ * as a fallback).
+ *
+ * It then checks the capabilities of the libinput_device (keyboard, pointer,
+ * touch, tablet, switch, gesture) and sets corresponding flags in
+ * `edev->caps`. Based on these capabilities, it initializes the necessary
+ * sub-systems on the seat (e.g., _keyboard_init, _pointer_init, _touch_init).
+ *
+ * The Elput_Device is set as user data for the libinput_device, and a
+ * reference to the libinput_device is taken.
+ * If the device supports tap-to-click, it's configured with its default state.
+ *
+ * @param seat The Elput_Seat to which this new device will belong.
+ * @param device The libinput_device to wrap.
+ * @return A pointer to the newly created and initialized Elput_Device,
+ *         or NULL on allocation failure.
+ */
 Elput_Device *
 _evdev_device_create(Elput_Seat *seat, struct libinput_device *device)
 {
@@ -1727,6 +2406,19 @@ _evdev_device_create(Elput_Seat *seat, struct libinput_device *device)
    return edev;
 }
 
+/**
+ * @brief Destroys an Elput_Device and releases its resources.
+ *
+ * This function decrements the reference count of the Elput_Device. If the
+ * reference count reaches zero, it proceeds to release resources associated
+ * with the device's capabilities (e.g., calling _pointer_release,
+ * _keyboard_release, _touch_release for the seat).
+ * It then unreferences the underlying libinput_device, frees the output name
+ * stringshare, frees any key remapping hash table, and finally frees the
+ * Elput_Device structure itself.
+ *
+ * @param edev The Elput_Device to destroy.
+ */
 void
 _evdev_device_destroy(Elput_Device *edev)
 {
@@ -1749,6 +2441,18 @@ _evdev_device_destroy(Elput_Device *edev)
    free(edev);
 }
 
+/**
+ * @brief Destroys an Elput_Keyboard structure and its associated XKB resources.
+ *
+ * This function frees all allocated strings within the `kbd->names` structure
+ * (rules, model, layout, variant, options). It then unreferences XKB
+ * resources: compose table, compose state, XKB state, maskless XKB state,
+ * and the Elput_Keyboard_Info (which in turn unrefs the XKB keymap).
+ * Finally, it unreferences the XKB context and frees the Elput_Keyboard
+ * structure itself.
+ *
+ * @param kbd The Elput_Keyboard structure to destroy.
+ */
 void
 _evdev_keyboard_destroy(Elput_Keyboard *kbd)
 {
@@ -1770,6 +2474,15 @@ _evdev_keyboard_destroy(Elput_Keyboard *kbd)
    free(kbd);
 }
 
+/**
+ * @brief Destroys an Elput_Pointer structure.
+ *
+ * Currently, this function primarily frees the Elput_Pointer structure itself.
+ * The "FIXME" comment suggests that if any dynamically allocated resources
+ * were added to Elput_Pointer, they should be freed here.
+ *
+ * @param ptr The Elput_Pointer structure to destroy.
+ */
 void
 _evdev_pointer_destroy(Elput_Pointer *ptr)
 {
@@ -1777,6 +2490,15 @@ _evdev_pointer_destroy(Elput_Pointer *ptr)
    free(ptr);
 }
 
+/**
+ * @brief Destroys an Elput_Touch structure.
+ *
+ * Currently, this function primarily frees the Elput_Touch structure itself.
+ * The "FIXME" comment suggests that if any dynamically allocated resources
+ * were added to Elput_Touch, they should be freed here.
+ *
+ * @param touch The Elput_Touch structure to destroy.
+ */
 void
 _evdev_touch_destroy(Elput_Touch *touch)
 {
@@ -1784,12 +2506,32 @@ _evdev_touch_destroy(Elput_Touch *touch)
    free(touch);
 }
 
+/**
+ * @brief Publicly accessible wrapper to send a pointer motion event.
+ *
+ * This function simply calls the internal _pointer_motion_send function.
+ * It provides a way for other parts of the elput system to trigger a
+ * pointer motion event dispatch if needed, for example, after a programmatic
+ * cursor move or focus change that should also emit a move event.
+ *
+ * @param edev The Elput_Device for which to send a pointer motion event.
+ *             The event will use the current state of this device's seat pointer.
+ */
 void
 _evdev_pointer_motion_send(Elput_Device *edev)
 {
    _pointer_motion_send(edev);
 }
 
+/**
+ * @brief Retrieves the Elput_Pointer associated with a seat, if one is active.
+ *
+ * This function checks if the given seat is valid and if it has an active
+ * pointer device (i.e., seat->count.ptr > 0).
+ *
+ * @param seat The Elput_Seat from which to get the pointer.
+ * @return A pointer to the Elput_Pointer structure if active, otherwise NULL.
+ */
 Elput_Pointer *
 _evdev_pointer_get(Elput_Seat *seat)
 {
@@ -1798,6 +2540,15 @@ _evdev_pointer_get(Elput_Seat *seat)
    return NULL;
 }
 
+/**
+ * @brief Retrieves the Elput_Keyboard associated with a seat, if one is active.
+ *
+ * This function checks if the given seat is valid and if it has an active
+ * keyboard device (i.e., seat->count.kbd > 0).
+ *
+ * @param seat The Elput_Seat from which to get the keyboard.
+ * @return A pointer to the Elput_Keyboard structure if active, otherwise NULL.
+ */
 Elput_Keyboard *
 _evdev_keyboard_get(Elput_Seat *seat)
 {
@@ -1806,6 +2557,15 @@ _evdev_keyboard_get(Elput_Seat *seat)
    return NULL;
 }
 
+/**
+ * @brief Retrieves the Elput_Touch associated with a seat, if one is active.
+ *
+ * This function checks if the given seat is valid and if it has an active
+ * touch device (i.e., seat->count.touch > 0).
+ *
+ * @param seat The Elput_Seat from which to get the touch device.
+ * @return A pointer to the Elput_Touch structure if active, otherwise NULL.
+ */
 Elput_Touch *
 _evdev_touch_get(Elput_Seat *seat)
 {

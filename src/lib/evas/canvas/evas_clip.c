@@ -1,8 +1,29 @@
 #include "evas_common_private.h"
 #include "evas_private.h"
 
+/**
+ * @internal
+ * @brief Unsets the clipper for the given Evas object.
+ *
+ * This function is a core part of removing a clipping relationship.
+ * It handles cleaning up references and triggering necessary recalculations.
+ *
+ * @param eo_obj The Evas object (Eo pointer) from which the clipper is to be unset.
+ * @param obj The protected data of the Evas object.
+ */
 static void _clip_unset(Eo *eo_obj, Evas_Object_Protected_Data *obj);
 
+/**
+ * @internal
+ * @brief Marks an object's clip information as dirty and propagates this to its clipees.
+ *
+ * When a clipper changes in a way that affects its clipping area (e.g., move, resize,
+ * visibility change), its clipees need to be re-rendered. This function marks the
+ * clipper's state as dirty and recursively calls evas_object_clip_dirty() on all
+ * objects it clips (clipees).
+ *
+ * @param obj The protected data of the clipper object whose clip state is now dirty.
+ */
 void
 evas_object_clip_dirty_do(Evas_Object_Protected_Data *obj)
 {
@@ -21,6 +42,18 @@ evas_object_clip_dirty_do(Evas_Object_Protected_Data *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Recalculates clipping for an object and its clipees if the clip is marked dirty.
+ *
+ * This function first checks if the object's own clip cache is dirty. If so, it
+ * recalculates its clip information via evas_object_clip_recalc(). Then, it
+ * recursively calls itself for all objects that this object clips (its clipees),
+ * ensuring that the entire chain of clipping dependencies is updated.
+ *
+ * @param obj The protected data of the object for which to recalculate clippees.
+ *            This object acts as a clipper for other objects.
+ */
 void
 evas_object_recalc_clippees(Evas_Object_Protected_Data *obj)
 {
@@ -73,6 +106,34 @@ evas_object_recalc_clippees(Evas_Object_Protected_Data *obj)
  */
 
 #define MAP_ACROSS 1
+/**
+ * @internal
+ * @brief Marks child objects when a map boundary is crossed by a clip.
+ *
+ * This function is part of the mechanism to handle complex interactions
+ * between clipping and EFL maps. When an object is clipped by another object
+ * that resides in a different map space (i.e., its `map_parent` is different),
+ * this function is invoked to propagate the `map_parent` information down
+ * the hierarchy of smart object children and clipees that are not themselves
+ * mapped. This ensures that clipping calculations are aware of these map
+ * boundaries.
+ *
+ * The `visited` array is used to prevent infinite recursion in complex object
+ * hierarchies, especially with circular dependencies or extensive sharing of
+ * sub-objects. If `visited` is NULL, a temporary array from the Evas canvas
+ * (`obj->layer->evas->map_clip_objects`) is used.
+ *
+ * @param eo_obj The Evas object (Eo pointer) being processed.
+ * @param obj The protected data of `eo_obj`.
+ * @param map_obj The Evas object (Eo pointer) that defines the current map
+ *                context. This is typically the closest mapped ancestor or
+ *                NULL if there isn't one.
+ * @param force If EINA_TRUE, forces the update even if `obj->map->cur.map_parent`
+ *              already matches `map_obj`.
+ * @param visited An Eina_Array used to keep track of visited objects to prevent
+ *                infinite loops. If NULL, a canvas-global array is used.
+ *                Example of `visited` elements: `Evas_Object*` (as `void*`).
+ */
 static void
 evas_object_child_map_across_mark(Evas_Object *eo_obj, Evas_Object_Protected_Data *obj, Evas_Object *map_obj, Eina_Bool force, Eina_Array* visited)
 {
@@ -131,6 +192,18 @@ end:
 #endif
 }
 
+/**
+ * @internal
+ * @brief Checks if an object's clipper is in a different map space and marks accordingly.
+ *
+ * If an object `obj` has a clipper, and that clipper's `map_parent` is different
+ * from `obj`'s `map_parent`, it means the clip spans across a map boundary.
+ * In such cases, this function calls `evas_object_child_map_across_mark` to
+ * update the map context for `obj` and its relevant children/clipees.
+ *
+ * @param eo_obj The Evas object (Eo pointer) to check.
+ * @param obj The protected data of `eo_obj`.
+ */
 void
 evas_object_clip_across_check(Evas_Object *eo_obj, Evas_Object_Protected_Data *obj)
 {
@@ -142,6 +215,19 @@ evas_object_clip_across_check(Evas_Object *eo_obj, Evas_Object_Protected_Data *o
 #endif
 }
 
+/**
+ * @internal
+ * @brief Propagates map boundary checks to an object's clipees.
+ *
+ * This function is called on a clipper object. It first ensures its own
+ * map-across status is up-to-date using `evas_object_child_map_across_mark`.
+ * Then, if its clip state is dirty (indicating a potential change that
+ * affects clipees), it recursively calls this function for all objects
+ * it clips.
+ *
+ * @param eo_obj The Evas object (Eo pointer) which acts as a clipper.
+ * @param obj The protected data of `eo_obj`.
+ */
 void
 evas_object_clip_across_clippees_check(Evas_Object *eo_obj, Evas_Object_Protected_Data *obj)
 {
@@ -169,6 +255,21 @@ evas_object_clip_across_clippees_check(Evas_Object *eo_obj, Evas_Object_Protecte
 // thus creating a "map boundary" at that point.
 //
 // FIXME: flip2 test broken in elm - might be show/hide of clips
+/**
+ * @internal
+ * @brief Updates map-across information when an object's map state changes.
+ *
+ * This function is called when a map is enabled or disabled on `eo_obj`.
+ * If a map is enabled, `eo_obj` itself becomes the new `map_parent` for its
+ * children/clipees that are not independently mapped.
+ * If a map is disabled, the `map_parent` for its children/clipees reverts
+ * to that of `eo_obj`'s own smart parent (if any), or NULL.
+ * This ensures that the `map_parent` information is correctly propagated
+ * when map boundaries are created or removed.
+ *
+ * @param eo_obj The Evas object (Eo pointer) whose map state has changed.
+ * @param obj The protected data of `eo_obj`.
+ */
 void
 evas_object_mapped_clip_across_mark(Evas_Object *eo_obj, Evas_Object_Protected_Data *obj)
 {
@@ -190,6 +291,18 @@ evas_object_mapped_clip_across_mark(Evas_Object *eo_obj, Evas_Object_Protected_D
 #endif
 }
 
+/**
+ * @internal
+ * @brief Unsets the mask properties of an object if it's no longer acting as a mask.
+ *
+ * This function is called when an object that was potentially used as a mask
+ * (e.g., a non-rectangular clipper) might no longer need its mask surface.
+ * It checks if the object is still marked as a mask (`obj->mask->is_mask`)
+ * and if it has any clipees. If it's a mask but has no clipees, its mask
+ * properties are cleared, and its mask surface is freed.
+ *
+ * @param obj The protected data of the object whose mask properties are to be evaluated.
+ */
 static void
 _efl_canvas_object_clipper_mask_unset(Evas_Object_Protected_Data *obj)
 {
@@ -218,6 +331,27 @@ extern const char *o_image_type;
 
 static void _clipper_invalidated_cb(void *data, const Efl_Event *event);
 
+/**
+ * @internal
+ * @brief Performs preliminary checks to determine if setting a clipper should be blocked.
+ *
+ * This function validates various conditions before allowing `eo_clip` to be set
+ * as the clipper for `eo_obj`. It checks for:
+ * - Setting an object as its own clipper.
+ * - Using a deleted object as a clipper.
+ * - Clipping a deleted object.
+ * - Objects not belonging to the same Evas canvas.
+ * - Objects not having a layer.
+ * If any of these error conditions are met, an error message is logged, and
+ * the function returns `EINA_TRUE` to indicate that the clipping operation
+ * should not proceed. Otherwise, it returns `EINA_FALSE`.
+ *
+ * @param eo_obj The Evas object (Eo pointer) to be clipped.
+ * @param obj The protected data of `eo_obj`. If NULL, it's retrieved from `eo_obj`.
+ * @param eo_clip The Evas object (Eo pointer) to be used as the clipper.
+ * @param clip The protected data of `eo_clip`. If NULL, it's retrieved from `eo_clip`.
+ * @return EINA_TRUE if the clipper setting should be blocked, EINA_FALSE otherwise.
+ */
 Eina_Bool
 _efl_canvas_object_clipper_set_block(Eo *eo_obj, Evas_Object_Protected_Data *obj,
                                   Evas_Object *eo_clip, Evas_Object_Protected_Data *clip)
@@ -254,6 +388,19 @@ err_diff_evas:
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Common logic for unsetting the current clipper of an object.
+ *
+ * This function handles the core tasks of removing `obj` from its current
+ * clipper's list of clipees. It updates the clipper's `have_clipees` status,
+ * potentially unsets the clipper's mask if it's no longer needed, triggers
+ * damage events if the clipper was visible and colored (as its removal might
+ * change rendering), and removes event callbacks.
+ *
+ * @param obj The protected data of the object whose clipper is being unset.
+ * @param warn If EINA_TRUE, a warning is issued if a static clipper is overridden.
+ */
 static inline void
 _efl_canvas_object_clipper_unset_common(Evas_Object_Protected_Data *obj, Eina_Bool warn)
 {
@@ -311,6 +458,18 @@ _efl_canvas_object_clipper_unset_common(Evas_Object_Protected_Data *obj, Eina_Bo
    EINA_COW_STATE_WRITE_END(obj, state_write, cur);
 }
 
+/**
+ * @internal
+ * @brief Sets whether the Evas object has a fixed size.
+ * @since 1.26
+ *
+ * This informs Evas that the object's size will not change unless explicitly
+ * set. This can be an optimization hint for layouting or rendering.
+ *
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @param enable EINA_TRUE if the object has a fixed size, EINA_FALSE otherwise.
+ */
 EOLIAN void
 _efl_canvas_object_has_fixed_size_set(Eo *eo_obj EINA_UNUSED, Evas_Object_Protected_Data *obj, Eina_Bool enable)
 {
@@ -326,6 +485,15 @@ _efl_canvas_object_has_fixed_size_set(Eo *eo_obj EINA_UNUSED, Evas_Object_Protec
     */
 }
 
+/**
+ * @internal
+ * @brief Gets whether the Evas object has a fixed size.
+ * @since 1.26
+ *
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @return EINA_TRUE if the object has a fixed size, EINA_FALSE otherwise.
+ */
 EOLIAN Eina_Bool
 _efl_canvas_object_has_fixed_size_get(const Eo *eo_obj EINA_UNUSED, Evas_Object_Protected_Data *obj)
 {
@@ -333,6 +501,20 @@ _efl_canvas_object_has_fixed_size_get(const Eo *eo_obj EINA_UNUSED, Evas_Object_
    return obj->cur->has_fixed_size;
 }
 
+/**
+ * @internal
+ * @brief Sets the clipper for an Evas object.
+ * @since 1.26
+ *
+ * This function establishes a clipping relationship where `eo_clip` becomes the
+ * clipper for `eo_obj`. The visible parts of `eo_obj` will be limited to the
+ * area occupied by `eo_clip`.
+ *
+ * @param eo_obj The Evas object (Eo pointer) to be clipped.
+ * @param obj The protected data of `eo_obj`.
+ * @param eo_clip The Evas object (Eo pointer) to use as the clipper.
+ *                Pass NULL to unset the current clipper.
+ */
 EOLIAN void
 _efl_canvas_object_clipper_set(Eo *eo_obj, Evas_Object_Protected_Data *obj, Evas_Object *eo_clip)
 {
@@ -409,6 +591,16 @@ _efl_canvas_object_clipper_set(Eo *eo_obj, Evas_Object_Protected_Data *obj, Evas
    evas_object_clip_across_check(eo_obj, obj);
 }
 
+/**
+ * @internal
+ * @brief Gets the clipper of an Evas object.
+ * @since 1.26
+ *
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @return The Evas_Object (Eo pointer) that is clipping `eo_obj`, or NULL if
+ *         `eo_obj` is not clipped or an error occurred.
+ */
 EOLIAN Evas_Object *
 _efl_canvas_object_clipper_get(const Eo *eo_obj EINA_UNUSED, Evas_Object_Protected_Data *obj)
 {
@@ -418,6 +610,20 @@ _efl_canvas_object_clipper_get(const Eo *eo_obj EINA_UNUSED, Evas_Object_Protect
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Performs preliminary checks before unsetting a clipper.
+ *
+ * This function checks if there is actually a clipper set on the object.
+ * If no clipper is set, it returns `EINA_TRUE` to indicate that the unsetting
+ * operation can be skipped. It also blocks async operations on the object
+ * and clears any cached clipees answer.
+ *
+ * @param eo_obj The Evas object (Eo pointer) whose clipper is to be unset.
+ * @param obj The protected data of `eo_obj`.
+ * @return EINA_TRUE if unsetting should be blocked (e.g., no clipper set),
+ *         EINA_FALSE otherwise.
+ */
 Eina_Bool
 _efl_canvas_object_clipper_unset_block(Eo *eo_obj EINA_UNUSED, Evas_Object_Protected_Data *obj)
 {
@@ -459,12 +665,35 @@ _clip_unset(Eo *eo_obj, Evas_Object_Protected_Data *obj)
    evas_object_clip_across_check(eo_obj, obj);
 }
 
+/**
+ * @brief Unset the clipper of an Evas object.
+ * @param eo_obj The object.
+ * @see evas_object_clip_set()
+ * @ingroup Evas_Object_Group_Clipping
+ *
+ * This function removes any clipper that was previously set on @p eo_obj.
+ * The object will no longer be clipped.
+ */
 EVAS_API void
 evas_object_clip_unset(Evas_Object *eo_obj)
 {
    efl_canvas_object_clipper_set(eo_obj, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback function invoked when a clipper object is invalidated (e.g., deleted).
+ *
+ * When an object that acts as a clipper is invalidated (typically meaning it's
+ * being deleted or is no longer valid for use), this callback is triggered for
+ * all objects it was clipping. The callback then unsets the clipper relationship
+ * for the affected clipee. It also handles cleaning up the `prev->clipper` state
+ * if the invalidated clipper was also the previous clipper.
+ *
+ * @param data User data, which is the Evas_Object (clipee) that was being clipped.
+ * @param event The Efl_Event structure containing event information. The
+ *              `event->object` is the clipper that was invalidated.
+ */
 static void
 _clipper_invalidated_cb(void *data, const Efl_Event *event)
 {
@@ -485,6 +714,23 @@ _clipper_invalidated_cb(void *data, const Efl_Event *event)
      }
 }
 
+/**
+ * @internal
+ * @brief Resets the 'previous' clipper state of an object.
+ *
+ * Evas objects maintain a 'current' and 'previous' state for various properties
+ * to optimize rendering and detect changes. This function deals with the
+ * `prev->clipper` field. If a previous clipper existed (`obj->prev->clipper`),
+ * this function may nullify that reference and remove associated event callbacks,
+ * particularly if the previous clipper is different from the current one.
+ *
+ * @param obj The protected data of the Evas object whose previous clipper state
+ *            is to be reset.
+ * @param cur_prev If EINA_TRUE, it implies the current state is being copied to
+ *                 the previous state, so `prev->clipper` should not be nulled out
+ *                 if it matches `cur->clipper`. If EINA_FALSE, `prev->clipper`
+ *                 is unconditionally nulled if it exists.
+ */
 void
 _efl_canvas_object_clipper_prev_reset(Evas_Object_Protected_Data *obj, Eina_Bool cur_prev)
 {
@@ -502,6 +748,40 @@ _efl_canvas_object_clipper_prev_reset(Evas_Object_Protected_Data *obj, Eina_Bool
      }
 }
 
+/**
+ * @brief Get a list of objects that are clipped by @p eo_obj.
+ * @param eo_obj The object to get the clipees of.
+ * @return A new Eina_List of Evas_Object pointers that are clipped by @p eo_obj.
+ *         This list must be freed using eina_list_free() when no longer needed.
+ *         The contents of the list (the Evas_Object pointers) should not be freed.
+ *         Returns NULL on failure or if @p eo_obj has no clipees.
+ * @ingroup Evas_Object_Group_Clipping
+ *
+ * This function returns a list of all Evas objects that are currently being
+ * clipped by the given object @p eo_obj.
+ * The returned list is a new list and is cached internally. Subsequent calls
+ * without changes to the clipee list will return a new list with the same content
+ * but the internal cache is cleared on modification or next call.
+ *
+ * Example:
+ * @code
+ * Evas_Object *clipper = evas_object_rectangle_add(evas);
+ * Evas_Object *clipped1 = evas_object_rectangle_add(evas);
+ * Evas_Object *clipped2 = evas_object_image_add(evas);
+ *
+ * evas_object_clip_set(clipped1, clipper);
+ * evas_object_clip_set(clipped2, clipper);
+ *
+ * const Eina_List *clipees = evas_object_clipees_get(clipper);
+ * Evas_Object *obj;
+ * Eina_List *l;
+ * EINA_LIST_FOREACH(clipees, l, obj)
+ *   {
+ *      printf("Object %p is clipped by %p\n", obj, clipper);
+ *   }
+ * eina_list_free(clipees); // Free the list, not its content
+ * @endcode
+ */
 EVAS_API const Eina_List *
 evas_object_clipees_get(const Evas_Object *eo_obj)
 {
@@ -519,6 +799,16 @@ evas_object_clipees_get(const Evas_Object *eo_obj)
    return answer;
 }
 
+/**
+ * @brief Query whether an object has any clipees.
+ * @param eo_obj The object to query.
+ * @return EINA_TRUE if the object clips one or more other objects,
+ *         EINA_FALSE otherwise (or on errors).
+ * @ingroup Evas_Object_Group_Clipping
+ *
+ * This function checks if @p eo_obj is currently acting as a clipper for any
+ * other Evas objects.
+ */
 EVAS_API Eina_Bool
 evas_object_clipees_has(const Evas_Object *eo_obj)
 {
@@ -531,9 +821,19 @@ typedef struct
    Eina_Iterator  iterator;
    Eina_List     *list;
    Eina_Iterator *real_iterator;
-   Evas_Object   *object;
+   Evas_Object   *object; /**< The clipper object this iterator is for. */
 } Clipee_Iterator;
 
+/**
+ * @internal
+ * @brief Advances the clipee iterator to the next clipee.
+ *
+ * Implements the `next` function for the Eina_Iterator interface for clipees.
+ *
+ * @param it The Clipee_Iterator instance.
+ * @param data Pointer to a `void*` where the next Evas_Object (clipee) will be stored.
+ * @return EINA_TRUE if a next element is available, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _clipee_iterator_next(Clipee_Iterator *it, void **data)
 {
@@ -546,12 +846,30 @@ _clipee_iterator_next(Clipee_Iterator *it, void **data)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Gets the container (the clipper object) for the clipee iterator.
+ *
+ * Implements the `get_container` function for the Eina_Iterator interface.
+ *
+ * @param it The Clipee_Iterator instance.
+ * @return The Evas_Object that is the clipper for this iterator.
+ */
 static void *
 _clipee_iterator_get_container(Clipee_Iterator *it)
 {
    return it->object;
 }
 
+/**
+ * @internal
+ * @brief Frees the clipee iterator.
+ *
+ * Implements the `free` function for the Eina_Iterator interface.
+ * Frees the internal list iterator and the Clipee_Iterator structure itself.
+ *
+ * @param it The Clipee_Iterator instance to free.
+ */
 static void
 _clipee_iterator_free(Clipee_Iterator *it)
 {
@@ -559,6 +877,17 @@ _clipee_iterator_free(Clipee_Iterator *it)
    free(it);
 }
 
+/**
+ * @internal
+ * @brief Gets an iterator for the objects clipped by this Evas object.
+ * @since 1.26
+ *
+ * @param eo_obj The Evas object (clipper).
+ * @param obj The protected data of `eo_obj`.
+ * @return An Eina_Iterator that yields Evas_Object pointers (clipees).
+ *         The iterator must be freed using eina_iterator_free() when no longer needed.
+ *         Returns NULL on failure.
+ */
 EOLIAN Eina_Iterator *
 _efl_canvas_object_clipped_objects_get(const Eo *eo_obj, Evas_Object_Protected_Data *obj)
 {
@@ -580,18 +909,49 @@ _efl_canvas_object_clipped_objects_get(const Eo *eo_obj, Evas_Object_Protected_D
    return &it->iterator;
 }
 
+/**
+ * @internal
+ * @brief Counts the number of objects clipped by this Evas object.
+ * @since 1.26
+ *
+ * @param eo_obj The Evas object (clipper).
+ * @param obj The protected data of `eo_obj`.
+ * @return The number of objects clipped by `eo_obj`.
+ */
 EOLIAN unsigned int
 _efl_canvas_object_clipped_objects_count(Eo *eo_obj EINA_UNUSED, Evas_Object_Protected_Data *obj)
 {
    return eina_list_count(obj->clip.clipees);
 }
 
+/**
+ * @internal
+ * @brief Sets the 'no_render' flag for an Evas object.
+ * @since 1.26
+ *
+ * If `enable` is EINA_TRUE, this object will not be rendered. This is an
+ * optimization and can be used for objects that are part of the scene graph
+ * for logic (e.g., as clippers, event catchers) but should not be visually drawn.
+ *
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @param enable EINA_TRUE to enable no_render, EINA_FALSE to disable.
+ */
 EOLIAN void
 _efl_canvas_object_no_render_set(Eo *eo_obj EINA_UNUSED, Evas_Object_Protected_Data *obj, Eina_Bool enable)
 {
    obj->no_render = !!enable;
 }
 
+/**
+ * @internal
+ * @brief Gets the 'no_render' flag for an Evas object.
+ * @since 1.26
+ *
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @return EINA_TRUE if the object is set to no_render, EINA_FALSE otherwise.
+ */
 EOLIAN Eina_Bool
 _efl_canvas_object_no_render_get(const Eo *eo_obj EINA_UNUSED, Evas_Object_Protected_Data *obj)
 {

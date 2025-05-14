@@ -4,35 +4,65 @@
 #include "Efl_Ui.h"
 #include "elm_priv.h" /* To be able to use elm_widget_is_legacy() */
 
+/**
+ * @brief Internal enumeration for the type of data expected by a format string.
+ *
+ * This is determined by parsing the format string provided by the user.
+ */
 typedef enum _Format_Type
 {
    /* When a format string is used, it is parsed to find out the expected data type */
-   FORMAT_TYPE_INVALID, /* Format description not understood */
-   FORMAT_TYPE_DOUBLE,  /* double */
-   FORMAT_TYPE_INT,     /* int */
-   FORMAT_TYPE_TM,      /* struct tm, for time and date values */
-   FORMAT_TYPE_STRING,  /* const char* */
-   FORMAT_TYPE_STATIC   /* No value is passed, the format string IS the formatted output */
+   FORMAT_TYPE_INVALID, /**< The format string is invalid or not understood. */
+   FORMAT_TYPE_DOUBLE,  /**< The format expects a double-precision floating-point value. */
+   FORMAT_TYPE_INT,     /**< The format expects an integer value. */
+   FORMAT_TYPE_TM,      /**< The format expects a `struct tm` for time/date. */
+   FORMAT_TYPE_STRING,  /**< The format expects a string value. */
+   FORMAT_TYPE_STATIC   /**< The format string contains no placeholders and is used as-is. */
 } Format_Type;
 
+/**
+ * @brief Private data structure for the Efl_Ui_Format mixin.
+ *
+ * This structure holds all the formatting-related properties for a widget.
+ */
 typedef struct
 {
-   Efl_Ui_Format_Func  format_func;         /* User-supplied formatting function */
-   void                *format_func_data;   /* User data for the above function */
-   Eina_Free_Cb        format_func_free;    /* How to free the above data */
+   Efl_Ui_Format_Func  format_func;         /**< User-supplied formatting function. @see efl_ui_format_func_set() */
+   void                *format_func_data;   /**< User data for the format_func. */
+   Eina_Free_Cb        format_func_free;    /**< Callback to free format_func_data. */
 
-   Eina_Inarray        *format_values;      /* Array of formatting values, owned by us */
+   Eina_Inarray        *format_values;      /**< Sorted array of Efl_Ui_Format_Value, used for mapping discrete values to text. */
 
-   const char          *format_string;      /* User-supplied formatting string, stringshare */
-   Format_Type         format_string_type;  /* Type of data expected in the above string */
+   const char          *format_string;      /**< User-supplied formatting string (e.g., "%1.2f"). @see efl_ui_format_string_set() */
+   Format_Type         format_string_type;  /**< The type of data expected by format_string, determined by _format_string_check(). */
 } Efl_Ui_Format_Data;
 
+/**
+ * @brief Checks if a character is a digit or a decimal point.
+ *
+ * @param x The character to check.
+ * @return @c EINA_TRUE if the character is a digit or '.', @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _is_valid_digit(char x)
 {
    return ((x >= '0' && x <= '9') || (x == '.')) ? EINA_TRUE : EINA_FALSE;
 }
 
+/**
+ * @brief Parses a format string to determine its expected data type.
+ *
+ * This function analyzes the format string `fmt` to find the type of its
+ * placeholder (e.g., %d for int, %f for double). It only supports a single
+ * placeholder in the string. If no placeholder is found, it is considered
+ * a static string.
+ *
+ * @param fmt The format string to check (e.g., "Value: %.2f").
+ * @param type The user-specified type of format string, which can override
+ *        the check for time formats.
+ * @return The detected Format_Type. Returns FORMAT_TYPE_INVALID if the format
+ *         string is not supported (e.g., multiple placeholders).
+ */
 static Format_Type
 _format_string_check(const char *fmt, Efl_Ui_Format_String_Type type)
 {
@@ -102,6 +132,18 @@ _format_string_check(const char *fmt, Efl_Ui_Format_String_Type type)
    return ret_type;
 }
 
+/**
+ * @brief Formats a value using the format string and appends it to a buffer.
+ *
+ * This function takes a generic Eina_Value, converts it to the type expected
+ * by the format string (as determined by `_format_string_check`), and then
+ * performs the formatting.
+ *
+ * @param pd The private data for the format mixin.
+ * @param str The string buffer to append the formatted string to.
+ * @param value The value to format.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 _do_format_string(Efl_Ui_Format_Data *pd, Eina_Strbuf *str, const Eina_Value value)
 {
@@ -154,6 +196,19 @@ _do_format_string(Efl_Ui_Format_Data *pd, Eina_Strbuf *str, const Eina_Value val
    return EINA_TRUE;
 }
 
+/**
+ * @brief Default format function used for legacy widgets.
+ *
+ * When a format string is set on a legacy widget, this function is set as the
+ * default formatting callback. It attempts to use the format string, but falls
+ * back to a direct string conversion of the value if formatting fails. This
+ * preserves the behavior of older Elm widgets.
+ *
+ * @param data The private data for the format mixin, passed as user data.
+ * @param str The string buffer to append the formatted string to.
+ * @param value The value to format.
+ * @return Always returns @c EINA_TRUE.
+ */
 static Eina_Bool
 _legacy_default_format_func(void *data, Eina_Strbuf *str, const Eina_Value value)
 {
@@ -167,6 +222,26 @@ _legacy_default_format_func(void *data, Eina_Strbuf *str, const Eina_Value value
    return EINA_TRUE;
 }
 
+/**
+ * @brief Implements efl_ui_format_func_set.
+ *
+ * Sets a custom function to format the value into a string. The previously
+ * set function and data are freed, if any.
+ *
+ * Example of a format function:
+ * @code
+ * static Eina_Bool
+ * _my_format_cb(void *data, Eina_Strbuf *str, const Eina_Value *value)
+ * {
+ *    int v = 0;
+ *    eina_value_int_get(value, &v);
+ *    eina_strbuf_append_printf(str, "Value is %d", v);
+ *    return EINA_TRUE;
+ * }
+ *
+ * efl_ui_format_func_set(widget, NULL, _my_format_cb, NULL);
+ * @endcode
+ */
 EOLIAN static void
 _efl_ui_format_format_func_set(Eo *obj, Efl_Ui_Format_Data *pd, void *func_data, Efl_Ui_Format_Func func, Eina_Free_Cb func_free_cb)
 {
@@ -180,18 +255,60 @@ _efl_ui_format_format_func_set(Eo *obj, Efl_Ui_Format_Data *pd, void *func_data,
      efl_ui_format_apply_formatted_value(obj);
 }
 
+/**
+ * @brief Implements efl_ui_format_func_get.
+ *
+ * Retrieves the custom formatting function.
+ */
 EOLIAN static Efl_Ui_Format_Func
 _efl_ui_format_format_func_get(const Eo *obj EINA_UNUSED, Efl_Ui_Format_Data *pd)
 {
    return pd->format_func;
 }
 
+/**
+ * @brief Comparison function for sorting Efl_Ui_Format_Value structs by value.
+ *
+ * Used with eina_inarray_insert_sorted() to keep the format_values array sorted.
+ *
+ * @param val1 The first value to compare.
+ * @param val2 The second value to compare.
+ * @return An integer less than, equal to, or greater than zero if val1->value
+ *         is found, respectively, to be less than, to match, or be greater
+ *         than val2->value.
+ */
 static int
 _value_compare(const Efl_Ui_Format_Value *val1, const Efl_Ui_Format_Value *val2)
 {
    return val1->value - val2->value;
 }
 
+/**
+ * @brief Implements efl_ui_format_values_set.
+ *
+ * Sets a list of value-to-text mappings. This is useful when the widget needs
+ * to display specific strings for a set of discrete integer values. For example,
+ * mapping 0 to "off" and 1 to "on".
+ *
+ * The provided accessor must yield `Efl_Ui_Format_Value` structs.
+ * The internal list is kept sorted by the `value` field.
+ *
+ * Example of a values array:
+ * @code
+ * const Efl_Ui_Format_Value values[] = {
+ *   { 0, "None" },
+ *   { 1, "Some" },
+ *   { 10, "Many" },
+ *   { -1, "Error" }
+ * };
+ * Eina_Array *array = eina_array_new(EINA_C_ARRAY_LENGTH(values));
+ * for (size_t i = 0; i < EINA_C_ARRAY_LENGTH(values); i++)
+ *   eina_array_push(array, &values[i]);
+ *
+ * efl_ui_format_values_set(widget, eina_array_accessor_new(array));
+ * eina_array_free(array);
+ * @endcode
+ */
 EOLIAN static void
 _efl_ui_format_format_values_set(Eo *obj, Efl_Ui_Format_Data *pd, Eina_Accessor *values)
 {
@@ -228,6 +345,15 @@ _efl_ui_format_format_values_set(Eo *obj, Efl_Ui_Format_Data *pd, Eina_Accessor 
      efl_ui_format_apply_formatted_value(obj);
 }
 
+/**
+ * @brief Implements efl_ui_format_values_get.
+ *
+ * Retrieves the list of value-to-text mappings. The returned accessor will
+ * yield pointers to `Efl_Ui_Format_Value` structs.
+ *
+ * @return An accessor over the list of format values, or @c NULL if none is set.
+ *         The caller is responsible for freeing the accessor.
+ */
 EOLIAN static Eina_Accessor *
 _efl_ui_format_format_values_get(const Eo *obj EINA_UNUSED, Efl_Ui_Format_Data *pd)
 {
@@ -235,6 +361,18 @@ _efl_ui_format_format_values_get(const Eo *obj EINA_UNUSED, Efl_Ui_Format_Data *
    return eina_inarray_accessor_new(pd->format_values);
 }
 
+/**
+ * @brief Implements efl_ui_format_string_set.
+ *
+ * Sets the format string used for formatting the value. The string must contain
+ * at most one format specifier of type d, u, i, o, x, X, f, F, or s.
+ *
+ * For legacy widgets, setting a format string also installs a default format
+ * function to maintain compatibility.
+ *
+ * @param string The format string (e.g., "Value: %d" or "%.2f units").
+ * @param type The type hint for the format string, particularly for time formats.
+ */
 EOLIAN static void
 _efl_ui_format_format_string_set(Eo *obj EINA_UNUSED, Efl_Ui_Format_Data *sd, const char *string, Efl_Ui_Format_String_Type type)
 {
@@ -253,6 +391,11 @@ _efl_ui_format_format_string_set(Eo *obj EINA_UNUSED, Efl_Ui_Format_Data *sd, co
      efl_ui_format_apply_formatted_value(obj);
 }
 
+/**
+ * @brief Implements efl_ui_format_string_get.
+ *
+ * Retrieves the format string and its type.
+ */
 EOLIAN static void
 _efl_ui_format_format_string_get(const Eo *obj EINA_UNUSED, Efl_Ui_Format_Data *sd, const char **string, Efl_Ui_Format_String_Type *type)
 {
@@ -261,6 +404,30 @@ _efl_ui_format_format_string_get(const Eo *obj EINA_UNUSED, Efl_Ui_Format_Data *
      EFL_UI_FORMAT_STRING_TYPE_TIME : EFL_UI_FORMAT_STRING_TYPE_SIMPLE;
 }
 
+/**
+ * @brief Implements efl_ui_format_formatted_value_get.
+ *
+ * Generates a formatted string for a given value and stores it in `str`.
+ * The formatting follows a specific precedence:
+ *
+ * 1. If `format_values` are set, it looks for a direct mapping from the value
+ *    (converted to an integer) to a text string. If a match is found, that
+ *    text is used.
+ *
+ * 2. If no mapping is found or `format_values` is not set, it tries to use the
+ *    `format_func` if one is provided. If the function returns `EINA_TRUE`,
+ *    its result is used.
+ *
+ * 3. If the `format_func` is not set or returns `EINA_FALSE`, it attempts to
+ *    use the `format_string`.
+ *
+ * 4. If all of the above fail or are not set, it falls back to a simple
+ *    conversion of the `value` to a string.
+ *
+ * @param str The string buffer to store the result. The buffer is reset
+ *            before being used.
+ * @param value The value to be formatted.
+ */
 EOLIAN static void
 _efl_ui_format_formatted_value_get(Eo *obj EINA_UNUSED, Efl_Ui_Format_Data *pd, Eina_Strbuf *str, const Eina_Value value)
 {
@@ -299,6 +466,18 @@ _efl_ui_format_formatted_value_get(Eo *obj EINA_UNUSED, Efl_Ui_Format_Data *pd, 
    free(v);
 }
 
+/**
+ * @brief Implements efl_ui_format_decimal_places_get.
+ *
+ * Determines the number of decimal places specified in a format string for
+ * floating-point numbers. For example, for "%.3f", it would return 3.
+ *
+ * This function is not a full-featured printf parser. It finds the first
+ * format specifier (`%` not followed by `%`), finds the `.` within it,
+ * and reads the number before the `f`.
+ *
+ * @return The number of decimal places, or 0 if not specified or not applicable.
+ */
 EOLIAN static int
 _efl_ui_format_decimal_places_get(Eo *obj EINA_UNUSED, Efl_Ui_Format_Data *pd)
 {
@@ -333,6 +512,12 @@ _efl_ui_format_decimal_places_get(Eo *obj EINA_UNUSED, Efl_Ui_Format_Data *pd)
    return atoi(result);
 }
 
+/**
+ * @brief Implements efl_object_destructor.
+ *
+ * Cleans up resources allocated by the format mixin, such as the format
+ * string, format values, and custom format function data.
+ */
 EOLIAN static void
 _efl_ui_format_efl_object_destructor(Eo *obj, Efl_Ui_Format_Data *pd EINA_UNUSED)
 {

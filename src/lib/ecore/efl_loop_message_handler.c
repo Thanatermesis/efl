@@ -23,6 +23,16 @@ struct _Efl_Loop_Message_Handler_Data
    Efl_Loop_Data *loop_data;
 };
 
+/**
+ * @brief Adds a new message to be processed by the message handler.
+ *
+ * This function creates a new message object associated with the handler.
+ * The message is not yet sent; it's prepared for sending.
+ *
+ * @param obj The Efl_Loop_Message_Handler object.
+ * @param pd The private data of the Efl_Loop_Message_Handler object.
+ * @return A new Efl_Loop_Message object, or NULL on failure.
+ */
 EOLIAN static Efl_Loop_Message *
 _efl_loop_message_handler_message_add(Eo *obj, Efl_Loop_Message_Handler_Data *pd EINA_UNUSED)
 {
@@ -33,6 +43,19 @@ _efl_loop_message_handler_message_add(Eo *obj, Efl_Loop_Message_Handler_Data *pd
    return message;
 }
 
+/**
+ * @brief Sends a message to the associated event loop for processing.
+ *
+ * This function queues the given message to be handled by the main loop.
+ * It initializes the loop and loop_data if they haven't been already.
+ * Messages are added to a pending queue if the main loop is currently
+ * iterating through messages (`message_walking > 0`), otherwise they are
+ * added to the main message queue.
+ *
+ * @param obj The Efl_Loop_Message_Handler object.
+ * @param pd The private data of the Efl_Loop_Message_Handler object.
+ * @param message The Efl_Loop_Message object to send.
+ */
 EOLIAN static void
 _efl_loop_message_handler_message_send(Eo *obj, Efl_Loop_Message_Handler_Data *pd, Efl_Loop_Message *message)
 {
@@ -71,6 +94,21 @@ _efl_loop_message_handler_message_send(Eo *obj, Efl_Loop_Message_Handler_Data *p
    efl_del(message);
 }
 
+/**
+ * @brief Processes a message that has been received by the loop.
+ *
+ * This function is called by the event loop when it's time to handle a message.
+ * It finds the message in the queue, removes it, and triggers the
+ * EFL_LOOP_MESSAGE_EVENT_MESSAGE event on the message object itself,
+ * and the EFL_LOOP_MESSAGE_HANDLER_EVENT_MESSAGE event on the handler.
+ * If the loop is iterating messages (`message_walking > 0`) and the
+ * message is not the first one, it's marked for deletion (`delete_me`)
+ * to be cleaned up later, otherwise it's freed immediately.
+ *
+ * @param obj The Efl_Loop_Message_Handler object.
+ * @param pd The private data of the Efl_Loop_Message_Handler object.
+ * @param message The Efl_Loop_Message object to process.
+ */
 EOLIAN static void
 _efl_loop_message_handler_message_call(Eo *obj, Efl_Loop_Message_Handler_Data *pd, Efl_Loop_Message *message)
 {
@@ -108,6 +146,21 @@ _efl_loop_message_handler_message_call(Eo *obj, Efl_Loop_Message_Handler_Data *p
    ERR("Cannot find message called object %p on message queue", message);
 }
 
+/**
+ * @brief Clears all pending messages associated with this handler.
+ *
+ * This function iterates through the message queue and removes all messages
+ * that were sent by this specific handler. Messages are marked for deletion
+ * and either freed immediately or during a later cleanup phase if the
+ * loop is currently iterating messages (`message_walking > 0`).
+ *
+ * @param obj The Efl_Loop_Message_Handler object.
+ * @param pd The private data of the Efl_Loop_Message_Handler object.
+ * @return EINA_FALSE if there was no loop or no messages to clear,
+ *         otherwise EINA_FALSE (the return value seems to be consistently EINA_FALSE,
+ *         perhaps indicating it doesn't signify success/failure of clearing itself
+ *         but rather a state).
+ */
 EOLIAN static Eina_Bool
 _efl_loop_message_handler_message_clear(Eo *obj, Efl_Loop_Message_Handler_Data *pd)
 {
@@ -139,6 +192,15 @@ _efl_loop_message_handler_message_clear(Eo *obj, Efl_Loop_Message_Handler_Data *
    return EINA_FALSE;
 }
 
+/**
+ * @brief Constructor for the Efl_Loop_Message_Handler object.
+ *
+ * Standard EFL object constructor.
+ *
+ * @param obj The Efl_Loop_Message_Handler object being constructed.
+ * @param pd The private data of the Efl_Loop_Message_Handler object.
+ * @return The constructed Efl_Loop_Message_Handler object.
+ */
 EOLIAN static Efl_Object *
 _efl_loop_message_handler_efl_object_constructor(Eo *obj, Efl_Loop_Message_Handler_Data *pd EINA_UNUSED)
 {
@@ -146,6 +208,16 @@ _efl_loop_message_handler_efl_object_constructor(Eo *obj, Efl_Loop_Message_Handl
    return obj;
 }
 
+/**
+ * @brief Destructor for the Efl_Loop_Message_Handler object.
+ *
+ * Standard EFL object destructor. It's important that message_clear
+ * has been called or that messages are otherwise handled to prevent leaks,
+ * though this destructor itself doesn't explicitly clear messages.
+ *
+ * @param obj The Efl_Loop_Message_Handler object being destructed.
+ * @param pd The private data of the Efl_Loop_Message_Handler object.
+ */
 EOLIAN static void
 _efl_loop_message_handler_efl_object_destructor(Eo *obj, Efl_Loop_Message_Handler_Data *pd EINA_UNUSED)
 {

@@ -1,3 +1,17 @@
+/**
+ * @file
+ * @brief Edje Decompiler (edje_decc)
+ *
+ * This program decompiles Edje binary files (.edj) back into
+ * their source (.edc) and resource files (images, fonts, sounds).
+ *
+ * It reads an .edj file, extracts its components, and reconstructs
+ * the original source structure as closely as possible.
+ *
+ * @note Some information, like lossy compression details or original
+ *       image formats if converted, might not be perfectly recoverable.
+ */
+
 /* ugly ugly. avert your eyes. */
 
 #ifdef HAVE_CONFIG_H
@@ -17,26 +31,83 @@
 
 #include "edje_decc.h"
 
-int _edje_cc_log_dom = -1;
-static const char *progname = NULL;
-char *file_in = NULL;
-char *file_out = NULL;
-char *outdir = NULL;
-int compress_mode = EET_COMPRESSION_DEFAULT;
+int _edje_cc_log_dom = -1; /**< Log domain for edje_decc. */
+static const char *progname = NULL; /**< Program name, extracted from argv[0]. */
+char *file_in = NULL; /**< Path to the input .edj file. */
+char *file_out = NULL; /**< Path for the main output .edc file (symbolic link target). */
+char *outdir = NULL; /**< Directory where decompiled files will be saved. */
+int compress_mode = EET_COMPRESSION_DEFAULT; /**< Compression mode for Eet (not actively used in decompiler). */
 
-Edje_File *edje_file = NULL;
-SrcFile_List *srcfiles = NULL;
-Edje_Font_List *fontlist = NULL;
+Edje_File *edje_file = NULL; /**< Main Edje file structure loaded from the .edj. */
+SrcFile_List *srcfiles = NULL; /**< List of source files (.edc, .lua, etc.) extracted. */
+Edje_Font_List *fontlist = NULL; /**< List of fonts used in the Edje file. */
 
-int line = 0;
-int build_sh = 1;
-int new_dir = 1;
+int line = 0; /**< Current line number during parsing (not actively used in decompiler). */
+int build_sh = 1; /**< Flag to control generation of build.sh script (1 = yes, 0 = no). */
+int new_dir = 1; /**< Flag to control output directory creation (1 = create new subdir, 0 = use current dir). */
 
+/**
+ * @brief Decompiles the input Edje file.
+ *
+ * Opens the .edj file, reads its structure, and extracts
+ * source file information, Edje file data, and font mappings.
+ * @return 1 on success, 0 on failure.
+ */
 int        decomp(void);
+
+/**
+ * @brief Writes the decompiled files to the output directory.
+ *
+ * This function handles:
+ * - Creating the output directory if needed.
+ * - Extracting and saving images.
+ * - Writing out the source files (.edc, etc.).
+ * - Extracting and saving fonts.
+ * - Generating a `build.sh` script to recompile the Edje.
+ * - Creating a symbolic link to the main .edc file if requested.
+ * - Extracting and saving sound samples.
+ * - Extracting and saving vibration samples.
+ */
 void       output(void);
+/**
+ * @brief Checks if the compiler command stored in the Edje file is sane.
+ *
+ * A "sane" command consists only of alphanumeric characters, underscores, and hyphens.
+ * This is a security measure to prevent execution of arbitrary commands.
+ * @return 1 if sane, 0 otherwise.
+ * @see edje_file
+ * @see edje_file::compiler
+ */
 static int compiler_cmd_is_sane(void);
+/**
+ * @brief Checks if the root filename (main .edc file) is sane.
+ *
+ * A "sane" filename consists of alphanumeric characters, underscores, hyphens,
+ * dots, and forward slashes. This is a security measure to prevent writing
+ * files to unintended locations or with malicious names.
+ * @return 1 if sane, 0 otherwise.
+ * @see srcfiles
+ * @see SrcFile_List::list
+ * @see SrcFile::name
+ */
 static int root_filename_is_sane(void);
 
+/**
+ * @brief Custom log callback for edje_decc.
+ *
+ * This function formats log messages from the "edje_decc" domain,
+ * adding color and prefixes based on the log level. Other domains
+ * are passed to the default Eina stderr log printer.
+ *
+ * @param d The log domain.
+ * @param level The log level.
+ * @param file The source file where the log message originated.
+ * @param fnc The function where the log message originated.
+ * @param cur_line The line number where the log message originated.
+ * @param fmt The format string for the log message.
+ * @param data User data (unused).
+ * @param args Variable arguments for the format string.
+ */
 static void
 _edje_cc_log_cb(const Eina_Log_Domain *d,
                 Eina_Log_Level level,
@@ -124,6 +195,9 @@ _edje_cc_log_cb(const Eina_Log_Domain *d,
      eina_log_print_cb_stderr(d, level, file, fnc, cur_line, fmt, NULL, args);
 }
 
+/**
+ * @brief Prints the command-line help message.
+ */
 static void
 main_help(void)
 {
@@ -140,9 +214,19 @@ main_help(void)
      , progname);
 }
 
-Eet_File *ef;
-Eet_Dictionary *ed;
+Eet_File *ef; /**< Eet file handle for the input .edj file. */
+Eet_Dictionary *ed; /**< Eet dictionary (not actively used in this scope). */
 
+/**
+ * @brief Main entry point for the edje_decc application.
+ *
+ * Parses command-line arguments, initializes Eina and Edje,
+ * calls the decompilation and output functions, and then cleans up.
+ *
+ * @param argc Number of command-line arguments.
+ * @param argv Array of command-line argument strings.
+ * @return 0 on success, -1 on failure.
+ */
 int
 main(int argc, char **argv)
 {
@@ -219,6 +303,22 @@ main(int argc, char **argv)
    return 0;
 }
 
+/**
+ * @brief Implements the decompilation logic.
+ *
+ * This function is the core of the decompilation process. It opens the
+ * input .edj file using Eet, loads the embedded source files, validates the
+ * main source filename, reads the main Edje file data structure, and loads
+ * the font map. It populates the global `edje_file`, `srcfiles`, and
+ * `fontlist` structures.
+ *
+ * @note The function overrides the compiler command found in the Edje file
+ *       to "edje_cc" for security and consistency. It also performs a sanity
+ *       check on the original compiler command.
+ *
+ * @return 1 on success, 0 on failure (e.g., file not found, not a valid
+ *         Edje file, no decompile information present).
+ */
 int
 decomp(void)
 {
@@ -265,6 +365,19 @@ decomp(void)
    return 1;
 }
 
+/**
+ * @brief Writes the decompiled files to the output directory.
+ *
+ * This function handles:
+ * - Creating the output directory if needed.
+ * - Extracting and saving images.
+ * - Writing out the source files (.edc, etc.).
+ * - Extracting and saving fonts.
+ * - Generating a `build.sh` script to recompile the Edje.
+ * - Creating a symbolic link to the main .edc file if requested.
+ * - Extracting and saving sound samples.
+ * - Extracting and saving vibration samples.
+ */
 void
 output(void)
 {
@@ -581,6 +694,15 @@ output(void)
    if (outdir) free(outdir);
 }
 
+/**
+ * @brief Checks if the compiler command stored in the Edje file is sane.
+ *
+ * A "sane" command consists only of alphanumeric characters, underscores, and hyphens.
+ * This is a security measure to prevent execution of arbitrary commands.
+ * @return 1 if sane, 0 otherwise.
+ * @see edje_file
+ * @see edje_file::compiler
+ */
 static int
 compiler_cmd_is_sane()
 {
@@ -603,6 +725,17 @@ compiler_cmd_is_sane()
    return 1;
 }
 
+/**
+ * @brief Checks if the root filename (main .edc file) is sane.
+ *
+ * A "sane" filename consists of alphanumeric characters, underscores, hyphens,
+ * dots, and forward slashes. This is a security measure to prevent writing
+ * files to unintended locations or with malicious names.
+ * @return 1 if sane, 0 otherwise.
+ * @see srcfiles
+ * @see SrcFile_List::list
+ * @see SrcFile::name
+ */
 static int
 root_filename_is_sane()
 {

@@ -4,6 +4,7 @@
 #ifndef _ELM_TOOLBAR_ITEM_EO_CLASS_TYPE
 #define _ELM_TOOLBAR_ITEM_EO_CLASS_TYPE
 
+/** @brief Represents an item in an Elm_Toolbar widget. */
 typedef Eo Elm_Toolbar_Item;
 
 #endif
@@ -34,11 +35,11 @@ typedef enum
  */
 typedef struct _Elm_Toolbar_Item_State
 {
-  const char *label; /**< Item label */
-  const char *icon_str; /**< Item icon string */
-  Efl_Canvas_Object *icon; /**< Item icon */
-  Evas_Smart_Cb func; /**< Item callback function */
-  const void *data; /**< Item data */
+  const char *label; /**< Item label. This text is displayed on the item. E.g., "Save" */
+  const char *icon_str; /**< Item icon string (name or path). Used to set the icon for this state. E.g., "document-save" or "/path/to/icon.png" */
+  Efl_Canvas_Object *icon; /**< Actual item icon object (Evas_Object in legacy). This is typically an Elm_Icon widget. This might be set internally or could be an icon object provided. */
+  Evas_Smart_Cb func; /**< Callback function to be invoked when the item is activated (e.g., clicked) while this state is active. */
+  const void *data; /**< User-specific data pointer passed to the callback function @p func when it's invoked. */
 } Elm_Toolbar_Item_State;
 
 
@@ -146,7 +147,7 @@ EAPI int elm_toolbar_item_priority_get(const Elm_Toolbar_Item *obj);
  *
  * @param[in] obj The object.
  * @param[in] icon A string with icon name or the absolute path of an image
- * file.
+ * file. For example, "edit-cut" or "/usr/share/icons/hicolor/32x32/actions/edit-cut.png".
  *
  * @ingroup Elm_Toolbar_Item_Group
  */
@@ -265,9 +266,9 @@ EAPI Elm_Toolbar_Item_State *elm_toolbar_item_state_get(const Elm_Toolbar_Item *
  * @param[in] obj The object.
  * @param[in] img The binary data that will be used as an image.
  * @param[in] size The size of binary data @c img.
- * @param[in] format Optional format of @c img to pass to the image loader.
+ * @param[in] format Optional format of @c img to pass to the image loader. For example, "png".
  * @param[in] key Optional key of @c img to pass to the image loader (eg. if
- * @c img is an edje file).
+ * @c img is an edje file). For example, "my_icon_group/main".
  *
  * @return @c true on success, @c false otherwise
  *
@@ -282,9 +283,9 @@ EAPI Eina_Bool elm_toolbar_item_icon_memfile_set(Elm_Toolbar_Item *obj, const vo
  * elm_toolbar_item_icon_set().
  *
  * @param[in] obj The object.
- * @param[in] file The file that contains the image.
+ * @param[in] file The file that contains the image. For example, "/path/to/my_icon.edj".
  * @param[in] key Optional key of @c img to pass to the image loader (eg. if
- * @c img is an edje file).
+ * @c img is an edje file). For example, "my_icon_group/main".
  *
  * @return @c true on success, @c false otherwise
  *
@@ -304,8 +305,8 @@ EAPI Eina_Bool elm_toolbar_item_icon_file_set(Elm_Toolbar_Item *obj, const char 
  *
  * @param[in] obj The object.
  * @param[in] icon A string with icon name or the absolute path of an image
- * file.
- * @param[in] label The label of the new state.
+ * file. For example, "home" or "/path/to/icon.png".
+ * @param[in] label The label of the new state. For example, "Home State".
  * @param[in] func The function to call when the item is clicked when this
  * state is selected.
  * @param[in] data The data to associate with the state.

@@ -4,6 +4,10 @@
 #ifndef _ELM_ICON_EO_CLASS_TYPE
 #define _ELM_ICON_EO_CLASS_TYPE
 
+/**
+ * @brief Opaque handle for Elm_Icon objects.
+ * @ingroup Elm_Icon
+ */
 typedef Eo Elm_Icon;
 
 #endif
@@ -19,8 +23,18 @@ typedef Eo Elm_Icon;
  */
 #define ELM_ICON_CLASS elm_icon_class_get()
 
+/**
+ * @brief Get the Efl_Class for the Elm_Icon.
+ *
+ * @return The Efl_Class for Elm_Icon.
+ * @ingroup Elm_Icon
+ */
 EWAPI const Efl_Class *elm_icon_class_get(void) EINA_CONST;
 
+/**
+ * @brief Global Efl_Event_Description for the "thumb,done" event.
+ * @ingroup Elm_Icon
+ */
 EWAPI extern const Efl_Event_Description _ELM_ICON_EVENT_THUMB_DONE;
 
 /** Called when thumb nailing is successfully done
@@ -29,6 +43,10 @@ EWAPI extern const Efl_Event_Description _ELM_ICON_EVENT_THUMB_DONE;
  */
 #define ELM_ICON_EVENT_THUMB_DONE (&(_ELM_ICON_EVENT_THUMB_DONE))
 
+/**
+ * @brief Global Efl_Event_Description for the "thumb,error" event.
+ * @ingroup Elm_Icon
+ */
 EWAPI extern const Efl_Event_Description _ELM_ICON_EVENT_THUMB_ERROR;
 
 /** Called when thumb nailing failed

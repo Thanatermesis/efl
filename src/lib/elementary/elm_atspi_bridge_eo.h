@@ -4,6 +4,10 @@
 #ifndef _ELM_ATSPI_BRIDGE_EO_CLASS_TYPE
 #define _ELM_ATSPI_BRIDGE_EO_CLASS_TYPE
 
+/**
+ * @brief Opaque handle to an Elm_Atspi_Bridge object.
+ * @ingroup Elm_Atspi_Bridge
+ */
 typedef Eo Elm_Atspi_Bridge;
 
 #endif

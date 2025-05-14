@@ -43,28 +43,58 @@
  * @cond LOCAL
  */
 
+/**
+ * @struct _Eina_Counter
+ * @brief Represents a counter, holding a list of clock measurements and a name.
+ *
+ * This structure is used to group multiple time measurements (clocks)
+ * under a single named counter. The `EINA_INLIST` macro allows instances
+ * of this structure to be part of an Eina_Inlist.
+ */
 typedef struct _Eina_Clock Eina_Clock;
 
 struct _Eina_Counter
 {
-   EINA_INLIST;
+   EINA_INLIST; /**< Macro for intrusive linked list support. */
 
-   Eina_Inlist *clocks;
-   const char *name;
+   Eina_Inlist *clocks; /**< A list of Eina_Clock structures associated with this counter. */
+   const char *name;    /**< The name of the counter, used for identification. */
 };
 
+/**
+ * @struct _Eina_Clock
+ * @brief Represents a single time measurement (a clock).
+ *
+ * This structure stores the start and end times of a measurement,
+ * an identifier for the specimen (test run), and a validity flag.
+ * The `EINA_INLIST` macro allows instances of this structure to be
+ * part of an Eina_Inlist, typically managed by an Eina_Counter.
+ */
 struct _Eina_Clock
 {
-   EINA_INLIST;
+   EINA_INLIST; /**< Macro for intrusive linked list support. */
 
-   Eina_Nano_Time start;
-   Eina_Nano_Time end;
-   int specimen;
+   Eina_Nano_Time start; /**< The starting timestamp of the measurement. */
+   Eina_Nano_Time end;   /**< The ending timestamp of the measurement. */
+   int specimen;         /**< An identifier for the specific test run or sample being measured. */
 
-   Eina_Bool valid;
+   Eina_Bool valid;      /**< A flag indicating whether this clock measurement is valid (EINA_TRUE) or not (EINA_FALSE). */
 };
 
-
+/**
+ * @brief Appends a formatted string to an existing string, reallocating as needed.
+ * @param base The base string to append to. Can be NULL.
+ * @param position A pointer to an integer holding the current end position (length) of the base string. This will be updated.
+ * @param format The format string, as in printf.
+ * @param ... Additional arguments for the format string.
+ * @return A pointer to the (potentially reallocated) string with the new content appended, or the original base if reallocation failed at a critical point.
+ *
+ * This function is similar to asprintf, but it appends to an existing,
+ * dynamically allocated string. It handles reallocation if the current
+ * buffer `base` is not large enough. The `position` argument tracks the
+ * current length of the content in `base` and is updated to reflect the
+ * new length after appending.
+ */
 static char *
 _eina_counter_asiprintf(char *base, int *position, const char *format, ...)
 {

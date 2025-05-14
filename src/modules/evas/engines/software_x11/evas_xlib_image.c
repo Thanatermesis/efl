@@ -5,6 +5,21 @@
 #include "evas_common_private.h"
 #include "evas_xlib_image.h"
 
+/**
+ * @brief Updates a region of the Evas image from its native Xlib source.
+ *
+ * This function is called to synchronize a portion of the Evas image
+ * with the content of the underlying Xlib Pixmap. It fetches the pixel
+ * data from the X server for the specified rectangle and updates the
+ * Evas image buffer. If the XImage format is not ARGB32, a conversion
+ * is performed.
+ *
+ * @param image Pointer to the RGBA_Image whose data needs to be updated.
+ * @param x The x-coordinate of the top-left corner of the region to update.
+ * @param y The y-coordinate of the top-left corner of the region to update.
+ * @param w The width of the region to update.
+ * @param h The height of the region to update.
+ */
 static void
 evas_xlib_image_update(void *image, int x, int y, int w, int h)
 {
@@ -32,6 +47,19 @@ evas_xlib_image_update(void *image, int x, int y, int w, int h)
      }
 }
 
+/**
+ * @brief Callback function invoked when a native surface is bound to an image.
+ *
+ * This function is registered as the `bind` callback for an Evas image
+ * that uses a native Xlib surface. It triggers an update of the image
+ * data from the Xlib Pixmap for the specified region.
+ *
+ * @param image Pointer to the RGBA_Image.
+ * @param x The x-coordinate of the region to update upon binding.
+ * @param y The y-coordinate of the region to update upon binding.
+ * @param w The width of the region to update upon binding.
+ * @param h The height of the region to update upon binding.
+ */
 static void
 _native_bind_cb(void *image, int x, int y, int w, int h)
 {
@@ -44,6 +72,16 @@ _native_bind_cb(void *image, int x, int y, int w, int h)
      }
 }
 
+/**
+ * @brief Callback function invoked when a native surface is freed.
+ *
+ * This function is registered as the `free` callback for an Evas image
+ * that uses a native Xlib surface. It is responsible for cleaning up
+ * resources associated with the native surface, such as the XImage
+ * and the internal Native data structure.
+ *
+ * @param image Pointer to the RGBA_Image whose native surface is being freed.
+ */
 static void
 _native_free_cb(void *image)
 {
@@ -65,6 +103,38 @@ _native_free_cb(void *image)
    free(n);
 }
 
+/**
+ * @brief Sets a native Xlib surface for an Evas image.
+ *
+ * This function configures an Evas image object to use an existing Xlib
+ * Pixmap as its underlying data source. It allocates necessary internal
+ * structures, creates an XImage for data transfer, and sets up callbacks
+ * for binding and freeing the native surface.
+ *
+ * @param data The Evas engine data. Marked as EINA_UNUSED, indicating it's
+ *             not directly used in this Xlib-specific implementation.
+ * @param image Pointer to the Evas RGBA_Image object to be configured.
+ *              This image's `native` member will be populated.
+ * @param native Pointer to an Evas_Native_Surface structure describing the
+ *               Xlib Pixmap and Visual to use.
+ *               Example of Evas_Native_Surface structure for X11:
+ *               typedef struct _Evas_Native_Surface_X11
+ *               {
+ *                 Pixmap pixmap;    // The X11 Pixmap ID
+ *                 Visual *visual;  // The X11 Visual
+ *                 Display *display; // The X11 Display (optional, can be NULL)
+ *                 int screen_num;   // The X11 screen number (optional)
+ *               } Evas_Native_Surface_X11;
+ *
+ *               Evas_Native_Surface ns;
+ *               ns.type = EVAS_NATIVE_SURFACE_X11;
+ *               ns.version = EVAS_NATIVE_SURFACE_VERSION;
+ *               ns.data.x11.visual = xlib_visual_ptr;
+ *               ns.data.x11.pixmap = (Pixmap)xlib_pixmap_id;
+ * @return Returns the `image` pointer on success, or NULL on failure.
+ *         On success, the `image`'s `native.data`, `native.func.bind`,
+ *         and `native.func.free` members are set.
+ */
 void *
 evas_xlib_image_native_set(void *data EINA_UNUSED, void *image, void *native)
 {

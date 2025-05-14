@@ -6,6 +6,17 @@
 
 //In implementations that gets properties for user-created edje,
 //edje calculation should be performed regardless of the size of edje.
+/**
+ * @brief Macro to safely trigger an Edje object recalculation.
+ *
+ * This macro ensures that an Edje object @p ed is recalculated using
+ * _edje_recalc_do(). It temporarily sets the @c ed->has_size flag to EINA_TRUE
+ * if it was EINA_FALSE, performs the recalculation, and then restores the
+ * original @c ed->has_size value. This is crucial for scenarios where
+ * recalculation needs to happen even if the Edje object's final size
+ * hasn't been determined yet, ensuring properties dependent on layout
+ * (like text fitting) are computed.
+ */
 #define EDJE_RECALC_DO(ed) \
    do { \
      Eina_Bool calc_flag = EINA_FALSE; \
@@ -18,52 +29,84 @@
      if (calc_flag) ed->has_size = EINA_FALSE; \
    } while (0)
 
+/**
+ * @internal
+ * @brief Structure to hold custom box layout information.
+ *
+ * This structure is used to register and manage custom layout functions
+ * for Edje BOX parts. It's part of an Rbtree for efficient lookup.
+ */
 typedef struct _Edje_Box_Layout Edje_Box_Layout;
 struct _Edje_Box_Layout
 {
-   EINA_RBTREE;
+   EINA_RBTREE; /**< Rbtree node data */
    Evas_Object_Box_Layout func;
    void                  *(*layout_data_get)(void *);
    void                   (*layout_data_free)(void *);
-   void                  *data;
-   void                   (*free_data)(void *);
-   char                   name[];
+   void                  *data; /**< Custom data for the layout function */
+   void                   (*free_data)(void *); /**< Function to free the custom data */
+   char                   name[]; /**< Name of the custom layout */
 };
 
+/** @internal Global hash table for storing Edje_Color_Class definitions. Key: color_class name (char *), Value: Edje_Color_Class * */
 static Eina_Hash *_edje_color_class_hash = NULL;
+/** @internal Global hash table for storing Edje_Text_Class definitions. Key: text_class name (char *), Value: Edje_Text_Class * */
 static Eina_Hash *_edje_text_class_hash = NULL;
+/** @internal Global hash table for storing Edje_Size_Class definitions. Key: size_class name (char *), Value: Edje_Size_Class * */
 static Eina_Hash *_edje_size_class_hash = NULL;
 
+/** @internal Observable for global color class members. Used to notify Edje objects of changes to global color classes. */
 Efl_Observable *_edje_color_class_member = NULL;
+/** @internal Observable for global text class members. Used to notify Edje objects of changes to global text classes. */
 Efl_Observable *_edje_text_class_member = NULL;
+/** @internal Observable for global size class members. Used to notify Edje objects of changes to global size classes. */
 Efl_Observable *_edje_size_class_member = NULL;
 
+/** @internal Rbtree registry for custom box layout functions. Key: layout name (char *), Value: Edje_Box_Layout * */
 static Eina_Rbtree *_edje_box_layout_registry = NULL;
 
+/** @internal Global string to append to font names. */
 char *_edje_fontset_append = NULL;
+/** @internal Escaped version of _edje_fontset_append for use in markup. */
 char *_edje_fontset_append_escaped = NULL;
+/** @internal Global scaling factor for all Edje objects. */
 FLOAT_T _edje_scale = ZERO;
+/** @internal Global flag for password visibility behavior (show last character). */
 Eina_Bool _edje_password_show_last = EINA_FALSE;
+/** @internal Global timeout for showing the last character in password fields. */
 double _edje_password_show_last_timeout = 0;
+/** @internal Global freeze counter for Edje operations. Incremented by edje_freeze(), decremented by edje_thaw(). */
 int _edje_util_freeze_val = 0;
+/** @internal Counter for Edje objects whose calculations were deferred due to freezing. */
 int _edje_util_freeze_calc_count = 0;
+/** @internal List of Edje objects whose calculations were deferred due to freezing. */
 Eina_List *_edje_util_freeze_calc_list = NULL;
 
+/** @internal Global language/locale string (e.g., "en_US", "ko_KR"). */
 const char *_edje_language = NULL;
+/** @internal Path for Edje's cache files. (Currently unused based on inspection, but defined) */
 const char *_edje_cache_path = NULL;
 
+/**
+ * @internal
+ * @brief Helper structure for eina_hash_foreach to collect keys or data into an Eina_List.
+ */
 typedef struct _Edje_List_Foreach_Data Edje_List_Foreach_Data;
 struct _Edje_List_Foreach_Data
 {
-   Eina_List *list;
+   Eina_List *list; /**< List to store collected items. */
 };
 
+/**
+ * @internal
+ * @brief Structure for managing reference counts of Edje objects, typically for asynchronous operations or shared resources.
+ */
 typedef struct _Edje_Refcount Edje_Refcount;
 struct _Edje_Refcount
 {
-   EINA_REFCOUNT;
+   EINA_REFCOUNT; /**< Base refcounting data. */
 
-   Edje *ed;
+   Edje *ed; /**< Pointer to the Edje object being refcounted. */
 };
 
 static Eina_Bool _edje_color_class_list_foreach(const Eina_Hash *hash, const void *key, void *data, void *fdata);
@@ -76,6 +119,16 @@ static void      _edje_child_remove(Edje *ed, Edje_Real_Part *rp, Evas_Object *c
 
 Edje_Real_Part  *_edje_real_part_recursive_get_helper(Edje **ed, char **path);
 
+/**
+ * @internal
+ * @brief Frees the internal data of an Edje_User_Defined structure.
+ *
+ * This function handles the actual memory deallocation for an Edje_User_Defined
+ * structure and its associated data, like stringshares. It also removes
+ * the EVAS_CALLBACK_DEL callback if a child object was associated.
+ *
+ * @param eud The Edje_User_Defined structure to free.
+ */
 static void
 _edje_user_definition_free_internal(Edje_User_Defined *eud)
 {
@@ -101,6 +154,16 @@ _edje_user_definition_free_internal(Edje_User_Defined *eud)
    free(eud);
 }
 
+/**
+ * @internal
+ * @brief Frees a list of Edje_User_Defined structures.
+ *
+ * This function is typically used as an Eina_Free_Cb for hashes storing lists
+ * of user definitions. It iterates through the list and frees each
+ * Edje_User_Defined structure using _edje_user_definition_free_internal().
+ *
+ * @param l The Eina_List of Edje_User_Defined structures to free.
+ */
 static void
 _edje_user_definition_list_free_internal(Eina_List *l)
 {
@@ -109,6 +172,21 @@ _edje_user_definition_list_free_internal(Eina_List *l)
      _edje_user_definition_free_internal(eud);
 }
 
+/**
+ * @internal
+ * @brief Creates and registers a new user-defined property for an Edje part.
+ *
+ * User-defined properties allow runtime modifications or additions to parts
+ * that are not specified in the EDJ file, such as swallowing an object,
+ * packing items into a box, or overriding text styles.
+ * This function allocates an Edje_User_Defined structure, initializes it,
+ * and adds it to the Edje object's `user_defined` hash.
+ *
+ * @param type The type of user definition (e.g., EDJE_USER_SWALLOW).
+ * @param part The name of the part this definition applies to.
+ * @param ed The Edje object.
+ * @return A pointer to the newly created Edje_User_Defined structure, or NULL on failure.
+ */
 static Edje_User_Defined *
 _edje_user_definition_new(Edje_User_Defined_Type type, const char *part, Edje *ed)
 {
@@ -129,6 +207,21 @@ _edje_user_definition_new(Edje_User_Defined_Type type, const char *part, Edje *e
    return eud;
 }
 
+/**
+ * @internal
+ * @brief Frees an Edje_User_Defined structure and performs associated cleanup.
+ *
+ * This function handles the complete removal of a user-defined property.
+ * Depending on the type of the definition (@p eud->type), it performs
+ * specific cleanup actions:
+ * - For SWALLOW: Clears the swallowed object from the part.
+ * - For BOX_PACK/TABLE_PACK: Removes the child object from the container part.
+ * - For TEXT_STYLE: Frees associated text properties.
+ * Finally, it removes the definition from the Edje object's `user_defined` hash
+ * and calls _edje_user_definition_free_internal() for the actual deallocation.
+ *
+ * @param eud The Edje_User_Defined structure to free.
+ */
 void
 _edje_user_definition_free(Edje_User_Defined *eud)
 {
@@ -196,6 +289,19 @@ _edje_user_definition_free(Edje_User_Defined *eud)
    _edje_user_definition_free_internal(eud);
 }
 
+/**
+ * @internal
+ * @brief Callback function invoked when an Evas_Object associated with an Edje_User_Defined is deleted.
+ *
+ * This callback ensures that the corresponding Edje_User_Defined structure
+ * is properly freed when the Evas_Object it refers to (e.g., a swallowed child)
+ * is deleted externally.
+ *
+ * @param data Pointer to the Edje_User_Defined structure.
+ * @param e The Evas canvas.
+ * @param child The Evas_Object that was deleted.
+ * @param einfo Event specific information (unused).
+ */
 static void
 _edje_user_def_del_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *child EINA_UNUSED, void *einfo EINA_UNUSED)
 {
@@ -208,6 +314,19 @@ _edje_user_def_del_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *child EINA_U
 
 #define FASTFREEZE 1
 
+/**
+ * @brief Freezes all Edje processing.
+ * @ingroup Edje_Object_Group
+ *
+ * This function increments a global freeze counter. While this counter is
+ * greater than zero, Edje objects will defer recalculations and other updates.
+ * This is useful for making multiple changes to Edje objects without incurring
+ * the cost of recalculation for each change.
+ *
+ * Each call to edje_freeze() must be matched by a call to edje_thaw().
+ *
+ * @see edje_thaw()
+ */
 EAPI void
 edje_freeze(void)
 {
@@ -223,6 +342,17 @@ edje_freeze(void)
 }
 
 #ifdef FASTFREEZE
+/**
+ * @internal
+ * @brief Recursively thaws an Edje object and its sub-objects (groups swallowed in parts).
+ *
+ * This function is part of the FASTFREEZE mechanism. When the global freeze
+ * counter reaches zero, this function is called for Edje objects that had
+ * their calculations deferred. It ensures that the object and any Edje groups
+ * it swallows are recalculated if needed.
+ *
+ * @param ed The Edje object to thaw.
+ */
 static void
 _edje_util_thaw_edje(Edje *ed)
 {
@@ -249,6 +379,20 @@ _edje_util_thaw_edje(Edje *ed)
 
 #endif
 
+/**
+ * @internal
+ * @brief Emits a language change signal and forces recalculation for an Edje object.
+ *
+ * This function is called when the language for an Edje object (or globally)
+ * changes. It iterates through all text/textblock parts, clears any cached
+ * translated strings (forcing them to be re-fetched), emits the specified
+ * language signal (e.g., "edje,language,en_US"), and forces a recalculation
+ * of the Edje object.
+ *
+ * @param ed The Edje object.
+ * @param obj The Evas_Object associated with the Edje data.
+ * @param signal The language signal string to emit (e.g., "edje,language,en_US").
+ */
 void
 _edje_language_signal_emit(Edje *ed, Evas_Object *obj, char *signal)
 {
@@ -286,6 +430,20 @@ _edje_language_signal_emit(Edje *ed, Evas_Object *obj, char *signal)
    edje_object_calc_force(obj);
 }
 
+/**
+ * @internal
+ * @brief Sets the language for a specific Edje object.
+ * @implements efl_ui_i18n_language_set
+ *
+ * This function updates the language for the given Edje object @p ed.
+ * It extracts the language code from the @p locale string (e.g., "en" from "en_US.UTF-8"),
+ * stores it in @c ed->language, and then calls _edje_language_signal_emit()
+ * to propagate the change.
+ *
+ * @param obj The Efl_Canvas_Layout object.
+ * @param ed The Edje private data.
+ * @param locale The full locale string (e.g., "en_US.UTF-8", "ko_KR").
+ */
 EOLIAN void
 _efl_canvas_layout_efl_ui_i18n_language_set(Eo *obj, Edje *ed, const char *locale)
 {
@@ -308,6 +466,19 @@ _efl_canvas_layout_efl_ui_i18n_language_set(Eo *obj, Edje *ed, const char *local
    _edje_language_signal_emit(ed, obj, signal);
 }
 
+/**
+ * @internal
+ * @brief Gets the language for a specific Edje object.
+ * @implements efl_ui_i18n_language_get
+ *
+ * If the Edje object @p ed has its own language set ( @c ed->language ),
+ * that is returned. Otherwise, the global Edje language ( @_edje_language )
+ * is returned.
+ *
+ * @param obj The Efl_Canvas_Layout object (unused).
+ * @param ed The Edje private data.
+ * @return The language string (e.g., "en", "ko") or NULL if none is set.
+ */
 EOLIAN const char *
 _efl_canvas_layout_efl_ui_i18n_language_get(const Eo *obj EINA_UNUSED, Edje *ed)
 {
@@ -317,6 +488,19 @@ _efl_canvas_layout_efl_ui_i18n_language_get(const Eo *obj EINA_UNUSED, Edje *ed)
    return ed->language;
 }
 
+/**
+ * @brief Sets the global language for all Edje objects.
+ * @ingroup Edje_Object_Group
+ *
+ * This function sets a global language that will be used by all Edje objects
+ * that do not have their own language explicitly set via
+ * efl_ui_i18n_language_set() on the object itself.
+ * It iterates through all existing Edje objects and calls
+ * _edje_language_signal_emit() for those that don't have a per-object language.
+ *
+ * @param locale The language/locale string (e.g., "en_US", "ko_KR").
+ *               Only the language part (e.g., "en", "ko") is used.
+ */
 EAPI void
 edje_language_set(const char *locale)
 {
@@ -345,6 +529,20 @@ edje_language_set(const char *locale)
      }
 }
 
+/**
+ * @brief Thaws Edje processing.
+ * @ingroup Edje_Object_Group
+ *
+ * This function decrements the global freeze counter. If the counter reaches
+ * zero, any Edje objects that had their calculations deferred (due to
+ * `FASTFREEZE` being enabled and `_edje_util_freeze_calc_count > 0`)
+ * will be thawed using `_edje_util_thaw_edje()`, triggering their
+ * recalculations.
+ *
+ * Each call to edje_thaw() must match a previous call to edje_freeze().
+ *
+ * @see edje_freeze()
+ */
 EAPI void
 edje_thaw(void)
 {
@@ -369,6 +567,16 @@ edje_thaw(void)
 #endif
 }
 
+/**
+ * @brief Sets a global string to be appended to all font names used by Edje.
+ * @ingroup Edje_Object_Group
+ *
+ * This allows for globally modifying font choices, for example, to append
+ * a style like ",Bold" or a fallback font.
+ *
+ * @param fonts The font string to append (e.g., ",Bold", ",Sans").
+ *              If NULL, the append string is cleared.
+ */
 EAPI void
 edje_fontset_append_set(const char *fonts)
 {
@@ -381,12 +589,28 @@ edje_fontset_append_set(const char *fonts)
    _edje_fontset_append_escaped = fonts ? eina_str_escape(fonts) : NULL;
 }
 
+/**
+ * @brief Gets the global font append string.
+ * @ingroup Edje_Object_Group
+ * @return The currently set global font append string, or NULL if none is set.
+ *         The returned string should not be modified or freed.
+ */
 EAPI const char *
 edje_fontset_append_get(void)
 {
    return _edje_fontset_append;
 }
 
+/**
+ * @brief Sets the global scaling factor for all Edje objects.
+ * @ingroup Edje_Object_Group
+ *
+ * This scale factor affects the rendering size of all elements within
+ * Edje objects. A scale of 1.0 is normal size.
+ * After setting the scale, all Edje objects are forced to recalculate.
+ *
+ * @param scale The scaling factor.
+ */
 EAPI void
 edje_scale_set(double scale)
 {
@@ -397,12 +621,23 @@ edje_scale_set(double scale)
    EINA_INLIST_FOREACH(_edje_edjes, ed) edje_object_calc_force(ed->obj);
 }
 
+/**
+ * @brief Gets the global Edje scaling factor.
+ * @ingroup Edje_Object_Group
+ * @return The current global scaling factor.
+ */
 EAPI double
 edje_scale_get(void)
 {
    return TO_DOUBLE(_edje_scale);
 }
 
+/**
+ * @brief Sets whether the last character typed in a password field should be briefly shown.
+ * @ingroup Edje_Entry_Group
+ *
+ * @param password_show_last EINA_TRUE to show the last character, EINA_FALSE otherwise.
+ */
 EAPI void
 edje_password_show_last_set(Eina_Bool password_show_last)
 {
@@ -410,6 +645,12 @@ edje_password_show_last_set(Eina_Bool password_show_last)
    _edje_password_show_last = password_show_last;
 }
 
+/**
+ * @brief Sets the timeout for showing the last character in a password field.
+ * @ingroup Edje_Entry_Group
+ *
+ * @param password_show_last_timeout The timeout duration in seconds.
+ */
 EAPI void
 edje_password_show_last_timeout_set(double password_show_last_timeout)
 {
@@ -417,6 +658,19 @@ edje_password_show_last_timeout_set(double password_show_last_timeout)
    _edje_password_show_last_timeout = password_show_last_timeout;
 }
 
+/**
+ * @internal
+ * @brief Sets the scaling factor for a specific Edje object.
+ * @implements efl_gfx_entity_scale_set
+ *
+ * This function sets the individual scale factor for the Edje object @p ed.
+ * It also propagates this scale to any nested Edje groups and forces a
+ * recalculation of the object.
+ *
+ * @param obj The Efl_Canvas_Layout object (unused).
+ * @param ed The Edje private data.
+ * @param scale The scaling factor to set.
+ */
 EOLIAN void
 _efl_canvas_layout_efl_gfx_entity_scale_set(Eo *obj EINA_UNUSED, Edje *ed, double scale)
 {
@@ -443,12 +697,31 @@ _efl_canvas_layout_efl_gfx_entity_scale_set(Eo *obj EINA_UNUSED, Edje *ed, doubl
    _edje_recalc(ed);
 }
 
+/**
+ * @internal
+ * @brief Gets the scaling factor of a specific Edje object.
+ * @implements efl_gfx_entity_scale_get
+ *
+ * @param obj The Efl_Canvas_Layout object (unused).
+ * @param ed The Edje private data.
+ * @return The scaling factor of the Edje object.
+ */
 EOLIAN double
 _efl_canvas_layout_efl_gfx_entity_scale_get(const Eo *obj EINA_UNUSED, Edje *ed)
 {
    return TO_DOUBLE(ed->scale);
 }
 
+/**
+ * @brief Get the base scaling factor of an Edje object's definition.
+ * @ingroup Edje_Object_Group
+ *
+ * This retrieves the `base_scale` property defined in the EDJ file for
+ * the collection that the Edje object @p obj instantiates.
+ *
+ * @param obj The Edje object.
+ * @return The base scale value from the EDJ file, or 1.0 if not found or on error.
+ */
 EAPI double
 edje_object_base_scale_get(const Evas_Object *obj)
 {
@@ -459,12 +732,30 @@ edje_object_base_scale_get(const Evas_Object *obj)
    return TO_DOUBLE(ed->file->base_scale);
 }
 
+/**
+ * @internal
+ * @brief Gets the mirrored (RTL) state of an Edje object.
+ * @implements efl_ui_i18n_mirrored_get
+ *
+ * @param obj The Efl_Canvas_Layout object (unused).
+ * @param ed The Edje private data.
+ * @return EINA_TRUE if the object is in RTL mode, EINA_FALSE otherwise.
+ */
 EOLIAN Eina_Bool
 _efl_canvas_layout_efl_ui_i18n_mirrored_get(const Eo *obj EINA_UNUSED, Edje *ed)
 {
    return ed->is_rtl;
 }
 
+/**
+ * @internal
+ * @brief Emits signals indicating the current orientation (LTR/RTL) of an Edje object.
+ *
+ * If the object is mirrored (RTL), it emits "edje,state,rtl".
+ * Otherwise, it emits "edje,state,ltr".
+ *
+ * @param obj The Edje object.
+ */
 void
 _edje_object_orientation_inform(Evas_Object *obj)
 {
@@ -475,6 +766,20 @@ _edje_object_orientation_inform(Evas_Object *obj)
      edje_object_signal_emit(obj, "edje,state,ltr", "edje");
 }
 
+/**
+ * @internal
+ * @brief Sets the mirrored (RTL/LTR) state of an Edje object.
+ * @implements efl_ui_i18n_mirrored_set
+ *
+ * This function updates the RTL mode for the Edje object @p ed.
+ * It then reapplies the current state description to all parts to reflect
+ * potential layout changes due to mirroring, forces a recalculation if not
+ * frozen, and informs about the new orientation using _edje_object_orientation_inform().
+ *
+ * @param obj The Efl_Canvas_Layout object.
+ * @param ed The Edje private data.
+ * @param rtl EINA_TRUE to set RTL mode, EINA_FALSE for LTR mode.
+ */
 EOLIAN void
 _efl_canvas_layout_efl_ui_i18n_mirrored_set(Eo *obj, Edje *ed, Eina_Bool rtl)
 {
@@ -503,6 +808,20 @@ _efl_canvas_layout_efl_ui_i18n_mirrored_set(Eo *obj, Edje *ed, Eina_Bool rtl)
    return;
 }
 
+/**
+ * @internal
+ * @brief Retrieves a data string associated with an Edje object's group/collection.
+ * @implements efl_layout_group_data_get
+ *
+ * This function looks up a value in the data block of the Edje collection
+ * definition (from the EDJ file) using the provided @p key.
+ *
+ * @param obj The Efl_Canvas_Layout object (unused).
+ * @param ed The Edje private data.
+ * @param key The key of the data item to retrieve.
+ * @return The string value associated with the key, or NULL if not found or on error.
+ *         The returned string is managed by Edje and should not be freed.
+ */
 EOLIAN const char *
 _efl_canvas_layout_efl_layout_group_group_data_get(const Eo *obj EINA_UNUSED, Edje *ed, const char *key)
 {
@@ -513,6 +832,20 @@ _efl_canvas_layout_efl_layout_group_group_data_get(const Eo *obj EINA_UNUSED, Ed
    return edje_string_get(eina_hash_find(ed->collection->data, key));
 }
 
+/**
+ * @internal
+ * @brief Freezes calculations for an Edje object and its swallowed Edje sub-objects.
+ * @implements efl_layout_calc_freeze
+ *
+ * This function increments the freeze counter for the Edje object @p ed.
+ * It also iterates through all parts of @p ed, and if a part is a GROUP
+ * type that has swallowed another Edje object, it calls edje_object_freeze()
+ * on that swallowed object.
+ *
+ * @param obj The Efl_Canvas_Layout object (unused).
+ * @param ed The Edje private data.
+ * @return The new freeze count for the object @p ed.
+ */
 EOLIAN int
 _efl_canvas_layout_efl_layout_calc_calc_freeze(Eo *obj EINA_UNUSED, Edje *ed)
 {
@@ -531,6 +864,21 @@ _efl_canvas_layout_efl_layout_calc_calc_freeze(Eo *obj EINA_UNUSED, Edje *ed)
    return _edje_util_freeze(ed);
 }
 
+/**
+ * @internal
+ * @brief Thaws calculations for an Edje object and its swallowed Edje sub-objects.
+ * @implements efl_layout_calc_thaw
+ *
+ * This function decrements the freeze counter for the Edje object @p ed.
+ * It also iterates through all parts of @p ed, and if a part is a GROUP
+ * type that has swallowed another Edje object, it calls edje_object_thaw()
+ * on that swallowed object. If thawing @p ed results in its freeze count
+ * reaching zero and it has pending recalculations, it will be recalculated.
+ *
+ * @param obj The Efl_Canvas_Layout object (unused).
+ * @param ed The Edje private data.
+ * @return The new freeze count for the object @p ed.
+ */
 EOLIAN int
 _efl_canvas_layout_efl_layout_calc_calc_thaw(Eo *obj EINA_UNUSED, Edje *ed)
 {
@@ -550,6 +898,27 @@ _efl_canvas_layout_efl_layout_calc_calc_thaw(Eo *obj EINA_UNUSED, Edje *ed)
    return _edje_util_thaw(ed);
 }
 
+/**
+ * @internal
+ * @brief Internal utility to set a color class definition in a hash table.
+ *
+ * This function sets or updates a color class definition within the provided
+ * @p hash. It handles creating a new Edje_Color_Class if one doesn't exist
+ * for @p color_class, or updates the existing one. Color values are clamped
+ * to the 0-255 range.
+ *
+ * @param hash The Eina_Hash to store/update the color class in.
+ *             (e.g., _edje_color_class_hash, ed->color_classes, ed->file->color_hash)
+ * @param color_class The name of the color class.
+ * @param layer The specific layer of the color class to set (normal, outline, shadow).
+ * @param r Red component (0-255).
+ * @param g Green component (0-255).
+ * @param b Blue component (0-255).
+ * @param a Alpha component (0-255).
+ * @param[out] need_update Set to EINA_TRUE if the color class was actually changed,
+ *                         EINA_FALSE if the new values were identical to existing ones.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., memory allocation).
+ */
 static Eina_Bool
 _edje_color_class_set_internal(Eina_Hash *hash, const char *color_class, Efl_Gfx_Color_Class_Layer layer, int r, int g, int b, int a, Eina_Bool *need_update)
 {
@@ -651,6 +1020,22 @@ _edje_color_class_set_internal(Eina_Hash *hash, const char *color_class, Efl_Gfx
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Internal utility to retrieve a color class definition.
+ *
+ * This function retrieves the color components for a specific @p layer
+ * from an Edje_Color_Class structure.
+ *
+ * @param cc Pointer to the Edje_Color_Class structure. If NULL, default (0,0,0,0)
+ *           values are returned and the function returns EINA_FALSE.
+ * @param layer The specific layer of the color class to get (normal, outline, shadow).
+ * @param[out] r Pointer to store the red component.
+ * @param[out] g Pointer to store the green component.
+ * @param[out] b Pointer to store the blue component.
+ * @param[out] a Pointer to store the alpha component.
+ * @return EINA_TRUE if @p cc was valid and colors were retrieved, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _edje_color_class_get_internal(Edje_Color_Class *cc, Efl_Gfx_Color_Class_Layer layer, int *r, int *g, int *b, int *a)
 {
@@ -692,6 +1077,29 @@ _edje_color_class_get_internal(Edje_Color_Class *cc, Efl_Gfx_Color_Class_Layer l
      }
 }
 
+/**
+ * @brief Sets a global color class with all its color layers.
+ * @ingroup Edje_Color_Class_Group
+ *
+ * This function defines or updates a global color class. A color class can
+ * have three layers: normal, outline, and shadow, each with its own RGBA values.
+ * If any layer's color changes, it notifies observers via `_edje_color_class_member`.
+ *
+ * @param color_class The name of the color class (e.g., "button_text_color").
+ * @param r Red component for the normal layer (0-255).
+ * @param g Green component for the normal layer (0-255).
+ * @param b Blue component for the normal layer (0-255).
+ * @param a Alpha component for the normal layer (0-255).
+ * @param r2 Red component for the outline layer (0-255).
+ * @param g2 Green component for the outline layer (0-255).
+ * @param b2 Blue component for the outline layer (0-255).
+ * @param a2 Alpha component for the outline layer (0-255).
+ * @param r3 Red component for the shadow layer (0-255).
+ * @param g3 Green component for the shadow layer (0-255).
+ * @param b3 Blue component for the shadow layer (0-255).
+ * @param a3 Alpha component for the shadow layer (0-255).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 EAPI Eina_Bool
 edje_color_class_set(const char *color_class, int r, int g, int b, int a, int r2, int g2, int b2, int a2, int r3, int g3, int b3, int a3)
 {
@@ -712,6 +1120,16 @@ edje_color_class_set(const char *color_class, int r, int g, int b, int a, int r2
    return result;
 }
 
+/**
+ * @brief Forces all Edje objects to re-evaluate and apply current color classes.
+ * @ingroup Edje_Color_Class_Group
+ *
+ * After making changes to global color classes (e.g., via edje_color_class_set()
+ * or efl_gfx_color_class_set() on the global Edje object), this function
+ * can be called to ensure all Edje instances update their appearance.
+ * It iterates through all active Edje objects, marks them as dirty, and
+ * triggers a recalculation.
+ */
 EAPI void
 edje_color_class_apply(void)
 {
@@ -772,12 +1190,34 @@ _edje_global_efl_gfx_color_class_color_class_get(const Eo *obj EINA_UNUSED, void
    return _edje_color_class_get_internal(cc, layer, r, g, b, a);
 }
 
+/**
+ * @brief Deletes a global color class definition.
+ * @ingroup Edje_Color_Class_Group
+ *
+ * This is a convenience wrapper around efl_gfx_color_class_del() called on
+ * the global Edje object.
+ *
+ * @param color_class The name of the color class to delete.
+ */
 EAPI void
 edje_color_class_del(const char *color_class)
 {
    efl_gfx_color_class_del(_edje_global(), color_class);
 }
 
+/**
+ * @internal
+ * @brief Deletes a global color class definition.
+ * @implements efl_gfx_color_class_del
+ *
+ * Removes the specified @p color_class from the global `_edje_color_class_hash`.
+ * It frees the associated Edje_Color_Class structure and its name stringshare.
+ * Notifies observers about the deletion.
+ *
+ * @param obj The Efl_Gfx_Color_Class object (unused, should be _edje_global()).
+ * @param pd Private data (unused).
+ * @param color_class The name of the color class to delete.
+ */
 EOLIAN void
 _edje_global_efl_gfx_color_class_color_class_del(Eo *obj EINA_UNUSED, void *pd EINA_UNUSED, const char *color_class)
 {
@@ -795,6 +1235,15 @@ _edje_global_efl_gfx_color_class_color_class_del(Eo *obj EINA_UNUSED, void *pd E
    efl_observable_observers_update(_edje_color_class_member, color_class, "color_class,del");
 }
 
+/**
+ * @brief Retrieves a list of all globally defined color class names.
+ * @ingroup Edje_Color_Class_Group
+ *
+ * @return An Eina_List of strings, where each string is a color class name.
+ *         The list and its contents must be freed by the caller (strings with free(),
+ *         list with eina_list_free()). Returns NULL if no global color classes
+ *         are defined or on error.
+ */
 Eina_List *
 edje_color_class_list(void)
 {
@@ -815,14 +1264,27 @@ struct _Edje_Active_Color_Class_Iterator
 
    Edje_Color_Class cc;
 
-   Eina_Iterator   *classes;
+   Eina_Iterator   *classes; /**< Iterator over observable tuples (key: color_class_name, data: list of observers) */
 };
 
+/**
+ * @internal
+ * @brief Advances the active color class iterator to the next element.
+ *
+ * This function iterates through color classes that are actively used by
+ * at least one Edje object. For each such color class, it retrieves its
+ * effective values (considering object-local, global, and file-defined values)
+ * and its description from the EDJ file.
+ *
+ * @param it The iterator.
+ * @param[out] data Pointer to store the Edje_Color_Class data for the current item.
+ * @return EINA_TRUE if successful, EINA_FALSE if no more items or error.
+ */
 static Eina_Bool
 _edje_color_class_active_iterator_next(Eina_Iterator *it, void **data)
 {
    Edje_Active_Color_Class_Iterator *et = (void *)it;
-   Efl_Observable_Tuple *tuple = NULL;
+   Efl_Observable_Tuple *tuple = NULL; /**< Tuple from _edje_color_class_member: key=color_class_name, data=list_of_observers */
    Efl_Observer *o;
    Edje *ed;
    Edje_Color_Class *cc = NULL;
@@ -894,6 +1356,19 @@ edje_color_class_active_iterator_new(void)
    return &it->iterator;
 }
 
+/**
+ * @internal
+ * @brief Eina_Hash_Foreach_Cb to collect color class names (keys) into a list.
+ *
+ * Used by edje_color_class_list() and other functions that need a list of
+ * color class names from a hash.
+ *
+ * @param hash The hash being iterated (unused).
+ * @param key The color class name (const char *).
+ * @param data The color class data (Edje_Color_Class *, unused).
+ * @param fdata Pointer to Edje_List_Foreach_Data, where the key is appended to fd->list.
+ * @return EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 _edje_color_class_list_foreach(const Eina_Hash *hash EINA_UNUSED, const void *key, void *data EINA_UNUSED, void *fdata)
 {
@@ -904,6 +1379,31 @@ _edje_color_class_list_foreach(const Eina_Hash *hash EINA_UNUSED, const void *ke
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets a color class for a specific Edje object, including all layers.
+ * @ingroup Edje_Object_Specific_Color_Class_Group
+ *
+ * This function defines or updates a color class that is local to the given
+ * Edje object @p obj. It sets the normal, outline, and shadow colors.
+ * This is a convenience wrapper around efl_gfx_color_class_set() called
+ * multiple times for each layer.
+ *
+ * @param obj The Edje object.
+ * @param color_class The name of the color class.
+ * @param r Red component for the normal layer (0-255).
+ * @param g Green component for the normal layer (0-255).
+ * @param b Blue component for the normal layer (0-255).
+ * @param a Alpha component for the normal layer (0-255).
+ * @param r2 Red component for the outline layer (0-255).
+ * @param g2 Green component for the outline layer (0-255).
+ * @param b2 Blue component for the outline layer (0-255).
+ * @param a2 Alpha component for the outline layer (0-255).
+ * @param r3 Red component for the shadow layer (0-255).
+ * @param g3 Green component for the shadow layer (0-255).
+ * @param b3 Blue component for the shadow layer (0-255).
+ * @param a3 Alpha component for the shadow layer (0-255).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 EAPI Eina_Bool
 edje_object_color_class_set(Evas_Object *obj, const char *color_class, int r, int g, int b, int a, int r2, int g2, int b2, int a2, int r3, int g3, int b3, int a3)
 {
@@ -972,17 +1472,46 @@ _efl_canvas_layout_efl_gfx_color_class_color_class_get(const Eo *obj EINA_UNUSED
    if (!color_class)
      cc = NULL;
    else
+     /**
+      * Retrieve color class by searching object-local, then global, then file-defined,
+      * and finally attempting fallback to parent color classes (e.g. "/bg" for "/bg/specific").
+      */
      cc = _edje_color_class_recursive_find(ed, color_class);
 
    return _edje_color_class_get_internal(cc, layer, r, g, b, a);
 }
 
+/**
+ * @brief Gets the description string for a color class as defined in the EDJ file.
+ * @ingroup Edje_Object_Specific_Color_Class_Group
+ *
+ * This function retrieves the textual description associated with a color class
+ * from the EDJ file.
+ *
+ * @param obj The Edje object.
+ * @param color_class The name of the color class.
+ * @return The description string if found, or NULL otherwise.
+ *         The returned string is managed by Edje and should not be freed.
+ */
 EAPI const char *
 edje_object_color_class_description_get(const Evas_Object *obj, const char *color_class)
 {
    return efl_gfx_color_class_description_get(obj, color_class);
 }
 
+/**
+ * @internal
+ * @brief Gets the description string for a color class.
+ * @implements efl_gfx_color_class_description_get
+ *
+ * This retrieves the description associated with a color class, searching
+ * recursively through object-local, global, and file-defined color classes.
+ *
+ * @param obj The Efl_Canvas_Layout object (unused).
+ * @param ed The Edje private data.
+ * @param color_class The name of the color class.
+ * @return The description string if found, or NULL.
+ */
 EOLIAN const char *
 _efl_canvas_layout_efl_gfx_color_class_color_class_description_get(const Eo *obj EINA_UNUSED, Edje *ed, const char *color_class)
 {
@@ -990,12 +1519,36 @@ _efl_canvas_layout_efl_gfx_color_class_color_class_description_get(const Eo *obj
    return cc ? cc->desc : NULL;
 }
 
+/**
+ * @brief Deletes an object-local color class definition.
+ * @ingroup Edje_Object_Specific_Color_Class_Group
+ *
+ * Removes a color class definition that is specific to the Edje object @p obj.
+ * This does not affect global or file-defined color classes.
+ *
+ * @param obj The Edje object.
+ * @param color_class The name of the object-local color class to delete.
+ */
 EAPI void
 edje_object_color_class_del(Evas_Object *obj, const char *color_class)
 {
    efl_gfx_color_class_del(obj, color_class);
 }
 
+/**
+ * @internal
+ * @brief Deletes an object-local color class definition.
+ * @implements efl_gfx_color_class_del
+ *
+ * Removes the specified @p color_class from the Edje object's local
+ * `ed->color_classes` hash. It also propagates this deletion to any
+ * swallowed Edje group objects. Triggers a recalculation and emits a
+ * "color_class,del" signal.
+ *
+ * @param obj The Efl_Canvas_Layout object (unused).
+ * @param ed The Edje private data.
+ * @param color_class The name of the object-local color class to delete.
+ */
 EOLIAN void
 _efl_canvas_layout_efl_gfx_color_class_color_class_del(Eo *obj EINA_UNUSED, Edje *ed, const char *color_class)
 {
@@ -1035,6 +1588,19 @@ edje_object_color_class_clear(const Evas_Object *obj)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Clears all object-local color class definitions for an Edje object.
+ * @implements efl_gfx_color_class_clear
+ *
+ * Removes all color classes from the Edje object's local `ed->color_classes` hash.
+ * It also propagates this clearing to any swallowed Edje group objects.
+ * Triggers a recalculation and emits "color_class,del" signals for each
+ * cleared color class.
+ *
+ * @param obj The Efl_Canvas_Layout object (unused).
+ * @param ed The Edje private data.
+ */
 EOLIAN void
 _efl_canvas_layout_efl_gfx_color_class_color_class_clear(Eo *obj EINA_UNUSED, Edje *ed)
 {
@@ -1081,14 +1647,25 @@ struct _Edje_File_Color_Class_Iterator
 {
    Edje_Active_Color_Class_Iterator it;
 
-   Edje_File                       *edf;
+   Edje_File                       *edf; /**< Reference to the Edje_File whose color classes are being iterated. */
 };
 
+/**
+ * @internal
+ * @brief Advances the mmap'd EDJ file color class iterator to the next element.
+ *
+ * This function iterates through color classes defined directly in an EDJ file
+ * (accessed via mmap).
+ *
+ * @param it The iterator.
+ * @param[out] data Pointer to store the Edje_Color_Class data for the current item.
+ * @return EINA_TRUE if successful, EINA_FALSE if no more items or error.
+ */
 static Eina_Bool
 _edje_mmap_color_class_iterator_next(Eina_Iterator *it, void **data)
 {
    Edje_File_Color_Class_Iterator *et = (void *)it;
-   Eina_Hash_Tuple *tuple = NULL;
+   Eina_Hash_Tuple *tuple = NULL; /**< Tuple from edf->color_hash: key=color_class_name, data=Edje_Color_Class* */
    Edje_Color_Class *cc = NULL;
 
    if (!eina_iterator_next(et->it.classes, (void **)&tuple)) return EINA_FALSE;
@@ -1273,14 +1850,27 @@ struct _Edje_Active_Text_Class_Iterator
 {
    Eina_Iterator    iterator;
    Edje_Text_Class  tc;
-   Eina_Iterator   *classes;
+   Eina_Iterator   *classes; /**< Iterator over observable tuples (key: text_class_name, data: list of observers) */
 };
 
+/**
+ * @internal
+ * @brief Advances the active text class iterator to the next element.
+ *
+ * This function iterates through text classes that are actively used by
+ * at least one Edje object. For each such text class, it retrieves its
+ * effective font and size values (considering object-local, global, and
+ * file-defined values).
+ *
+ * @param it The iterator.
+ * @param[out] data Pointer to store the Edje_Text_Class data for the current item.
+ * @return EINA_TRUE if successful, EINA_FALSE if no more items or error.
+ */
 static Eina_Bool
 _edje_text_class_active_iterator_next(Eina_Iterator *it, void **data)
 {
    Edje_Active_Text_Class_Iterator *et = (void *)it;
-   Efl_Observable_Tuple *tuple = NULL;
+   Efl_Observable_Tuple *tuple = NULL; /**< Tuple from _edje_text_class_member: key=text_class_name, data=list_of_observers */
    Efl_Observer *o;
    Edje *ed;
    Edje_Text_Class *tc;
@@ -1343,6 +1933,20 @@ edje_text_class_active_iterator_new(void)
    return &it->iterator;
 }
 
+/**
+ * @internal
+ * @brief Eina_Hash_Foreach_Cb to collect text class names (keys) into a list.
+ *
+ * Used by edje_text_class_list() and other functions that need a list of
+ * text class names from a hash. The key (text class name) is stringshared
+ * before being added to the list.
+ *
+ * @param hash The hash being iterated (unused).
+ * @param key The text class name (const char *).
+ * @param data The text class data (Edje_Text_Class *, unused).
+ * @param fdata Pointer to Edje_List_Foreach_Data, where the key is appended to fd->list.
+ * @return EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 _edje_text_class_list_foreach(const Eina_Hash *hash EINA_UNUSED, const void *key, void *data EINA_UNUSED, void *fdata)
 {
@@ -1353,6 +1957,22 @@ _edje_text_class_list_foreach(const Eina_Hash *hash EINA_UNUSED, const void *key
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Finds and opens an Edje_File structure from the cache or disk.
+ *
+ * This function resolves the given @p file path, opens the EDJ file,
+ * and retrieves its corresponding Edje_File structure from the cache.
+ * If not in cache, it implies the file would be loaded (though this specific
+ * function seems more about finding an already processed/cached Edje_File).
+ * The reference count of the returned Edje_File is incremented.
+ *
+ * @param file The path to the EDJ file.
+ * @return A pointer to the Edje_File structure with its refcount incremented,
+ *         or NULL if the file cannot be found or opened.
+ *         The caller is responsible for calling _edje_cache_file_unref()
+ *         on the returned Edje_File when no longer needed.
+ */
 static Edje_File *
 _edje_file_find(const char *file)
 {
@@ -1619,14 +2239,25 @@ struct _Edje_File_Text_Class_Iterator
 {
    Edje_Active_Text_Class_Iterator it;
 
-   Edje_File                       *edf;
+   Edje_File                       *edf; /**< Reference to the Edje_File whose text classes are being iterated. */
 };
 
+/**
+ * @internal
+ * @brief Advances the mmap'd EDJ file text class iterator to the next element.
+ *
+ * This function iterates through text classes defined directly in an EDJ file
+ * (accessed via mmap).
+ *
+ * @param it The iterator.
+ * @param[out] data Pointer to store the Edje_Text_Class data for the current item.
+ * @return EINA_TRUE if successful, EINA_FALSE if no more items or error.
+ */
 static Eina_Bool
 _edje_mmap_text_class_iterator_next(Eina_Iterator *it, void **data)
 {
    Edje_File_Text_Class_Iterator *et = (void *)it;
-   Eina_Hash_Tuple *tuple = NULL;
+   Eina_Hash_Tuple *tuple = NULL; /**< Tuple from edf->text_hash: key=text_class_name, data=Edje_Text_Class* */
    Edje_Text_Class *tc = NULL;
 
    if (!eina_iterator_next(et->it.classes, (void **)&tuple)) return EINA_FALSE;
@@ -1817,14 +2448,27 @@ struct _Edje_Active_Size_Class_Iterator
 {
    Eina_Iterator    iterator;
    Edje_Size_Class  sc;
-   Eina_Iterator   *classes;
+   Eina_Iterator   *classes; /**< Iterator over observable tuples (key: size_class_name, data: list of observers) */
 };
 
+/**
+ * @internal
+ * @brief Advances the active size class iterator to the next element.
+ *
+ * This function iterates through size classes that are actively used by
+ * at least one Edje object. For each such size class, it retrieves its
+ * effective min/max width/height values (considering object-local, global,
+ * and file-defined values).
+ *
+ * @param it The iterator.
+ * @param[out] data Pointer to store the Edje_Size_Class data for the current item.
+ * @return EINA_TRUE if successful, EINA_FALSE if no more items or error.
+ */
 static Eina_Bool
 _edje_size_class_active_iterator_next(Eina_Iterator *it, void **data)
 {
    Edje_Active_Size_Class_Iterator *et = (void *)it;
-   Efl_Observable_Tuple *tuple = NULL;
+   Efl_Observable_Tuple *tuple = NULL; /**< Tuple from _edje_size_class_member: key=size_class_name, data=list_of_observers */
    Efl_Observer *o;
    Edje *ed;
    Edje_Size_Class *sc;
@@ -1887,6 +2531,20 @@ edje_size_class_active_iterator_new(void)
    return &it->iterator;
 }
 
+/**
+ * @internal
+ * @brief Eina_Hash_Foreach_Cb to collect size class names (keys) into a list.
+ *
+ * Used by edje_size_class_list() and other functions that need a list of
+ * size class names from a hash. The key (size class name) is stringshared
+ * before being added to the list.
+ *
+ * @param hash The hash being iterated (unused).
+ * @param key The size class name (const char *).
+ * @param data The size class data (Edje_Size_Class *, unused).
+ * @param fdata Pointer to Edje_List_Foreach_Data, where the key is appended to fd->list.
+ * @return EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 _edje_size_class_list_foreach(const Eina_Hash *hash EINA_UNUSED, const void *key, void *data EINA_UNUSED, void *fdata)
 {
@@ -1897,12 +2555,47 @@ _edje_size_class_list_foreach(const Eina_Hash *hash EINA_UNUSED, const void *key
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets an object-local size class.
+ * @ingroup Edje_Object_Specific_Size_Class_Group
+ *
+ * Defines or updates a size class (minimum and maximum dimensions) that is
+ * local to the specified Edje object @p obj.
+ *
+ * @param obj The Edje object.
+ * @param size_class The name of the size class.
+ * @param minw Minimum width.
+ * @param minh Minimum height.
+ * @param maxw Maximum width.
+ * @param maxh Maximum height.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 EAPI Eina_Bool
 edje_object_size_class_set(Evas_Object *obj, const char *size_class, Evas_Coord minw, Evas_Coord minh, Evas_Coord maxw, Evas_Coord maxh)
 {
    return efl_gfx_size_class_set(obj, size_class, minw, minh, maxw, maxh);
 }
 
+/**
+ * @internal
+ * @brief Sets an object-local size class.
+ * @implements efl_gfx_size_class_set
+ *
+ * Defines or updates a size class in the Edje object's local `ed->size_classes`
+ * hash. If the size class already exists and its values are different, it's updated.
+ * If it doesn't exist, a new one is created and added.
+ * Propagates the size class change to swallowed Edje group objects and
+ * notifies observers via `_edje_size_class_member`.
+ *
+ * @param obj The Efl_Canvas_Layout object (unused).
+ * @param ed The Edje private data.
+ * @param size_class The name of the size class.
+ * @param minw Minimum width.
+ * @param minh Minimum height.
+ * @param maxw Maximum width.
+ * @param maxh Maximum height.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 EOLIAN Eina_Bool
 _efl_canvas_layout_efl_gfx_size_class_size_class_set(Eo *obj EINA_UNUSED, Edje *ed, const char *size_class, Evas_Coord minw, Evas_Coord minh, Evas_Coord maxw, Evas_Coord maxh)
 {
@@ -2030,14 +2723,25 @@ typedef struct _Edje_File_Size_Class_Iterator Edje_File_Size_Class_Iterator;
 struct _Edje_File_Size_Class_Iterator
 {
    Edje_Active_Size_Class_Iterator it;
-   Edje_File                      *edf;
+   Edje_File                      *edf; /**< Reference to the Edje_File whose size classes are being iterated. */
 };
 
+/**
+ * @internal
+ * @brief Advances the mmap'd EDJ file size class iterator to the next element.
+ *
+ * This function iterates through size classes defined directly in an EDJ file
+ * (accessed via mmap).
+ *
+ * @param it The iterator.
+ * @param[out] data Pointer to store the Edje_Size_Class data for the current item.
+ * @return EINA_TRUE if successful, EINA_FALSE if no more items or error.
+ */
 static Eina_Bool
 _edje_mmap_size_class_iterator_next(Eina_Iterator *it, void **data)
 {
    Edje_File_Size_Class_Iterator *et = (void *)it;
-   Eina_Hash_Tuple *tuple = NULL;
+   Eina_Hash_Tuple *tuple = NULL; /**< Tuple from edf->size_hash: key=size_class_name, data=Edje_Size_Class* */
    Edje_Size_Class *sc = NULL;
 
    if (!eina_iterator_next(et->it.classes, (void **)&tuple)) return EINA_FALSE;
@@ -2118,6 +2822,24 @@ edje_object_part_object_get(const Eo *obj, const char *part)
    return rp->object;
 }
 
+/**
+ * @brief Sets a custom item provider function for an Edje object.
+ * @ingroup Edje_Object_Part_Extending
+ *
+ * The item provider function is called by Edje when it needs to create
+ * an Evas_Object for an EXTERNAL part. This allows applications to
+ * supply their own custom objects to be used within an Edje layout.
+ *
+ * @param obj The Edje object.
+ * @param func The callback function to provide items.
+ *             Example: `Evas_Object *my_item_provider(void *data, Evas_Object *owner, const char *part_name, const char *item_name)`
+ *             - @p data: The @p data pointer passed to edje_object_item_provider_set().
+ *             - @p owner: The Edje object requesting the item.
+ *             - @p part_name: The name of the EXTERNAL part.
+ *             - @p item_name: The "item" string specified in the EDC for the external part's description.
+ *             The function should return a new Evas_Object, or NULL.
+ * @param data Custom data to be passed to the @p func.
+ */
 EAPI void
 edje_object_item_provider_set(Edje_Object *obj, Edje_Item_Provider_Cb func, void *data)
 {
@@ -2127,6 +2849,21 @@ edje_object_item_provider_set(Edje_Object *obj, Edje_Item_Provider_Cb func, void
    ed->item_provider.data = data;
 }
 
+/**
+ * @brief Sets a callback function to be invoked when text in any part of an Edje object changes.
+ * @ingroup Edje_Object_Part_Text_Group
+ *
+ * This callback is triggered after the text of a TEXT or TEXTBLOCK part
+ * has been modified (e.g., via edje_object_part_text_set()).
+ *
+ * @param obj The Edje object.
+ * @param func The callback function.
+ *             Example: `void my_text_change_cb(void *data, Evas_Object *edje_obj, const char *part_name)`
+ *             - @p data: The @p data pointer passed to edje_object_text_change_cb_set().
+ *             - @p edje_obj: The Edje object whose part's text changed.
+ *             - @p part_name: The name of the part whose text changed.
+ * @param data Custom data to be passed to the @p func.
+ */
 EAPI void
 edje_object_text_change_cb_set(Eo *obj, Edje_Text_Change_Cb func, void *data)
 {
@@ -2199,6 +2936,21 @@ _edje_object_part_text_raw_generic_set(Edje *ed, Evas_Object *obj, Edje_Real_Par
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Sets the raw text content of a text/textblock part (legacy behavior).
+ *
+ * This is a wrapper around _edje_object_part_text_raw_generic_set() with
+ * `set_markup` as EINA_FALSE and `legacy` as EINA_TRUE. This implies that
+ * for TEXTBLOCK parts, the input `text` is treated as markup.
+ *
+ * @param ed The Edje private data.
+ * @param obj The Evas_Object (Edje object).
+ * @param rp The Edje_Real_Part corresponding to the text part.
+ * @param part The name of the part.
+ * @param text The text or markup string to set.
+ * @return EINA_TRUE on success, EINA_FALSE on error (though currently always returns EINA_TRUE from the generic function).
+ */
 Eina_Bool
 _edje_object_part_text_raw_set(Edje *ed, Evas_Object *obj, Edje_Real_Part *rp, const char *part, const char *text)
 {
@@ -2206,6 +2958,18 @@ _edje_object_part_text_raw_set(Edje *ed, Evas_Object *obj, Edje_Real_Part *rp, c
                                                  EINA_FALSE, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Fetches or creates a user-defined text style definition for a part.
+ *
+ * If a user-defined text style (EDJE_USER_TEXT_STYLE) already exists for the
+ * specified @p part in @p ed, it is returned. Otherwise, a new one is created
+ * and initialized. This is used for runtime modification of text styles.
+ *
+ * @param ed The Edje object.
+ * @param part The name of the part.
+ * @return Pointer to the Edje_User_Defined structure for text style, or NULL on failure.
+ */
 Edje_User_Defined *
 _edje_user_text_style_definition_fetch(Edje *ed, const char *part)
 {
@@ -2227,6 +2991,19 @@ _edje_user_text_style_definition_fetch(Edje *ed, const char *part)
    return eud;
 }
 
+/**
+ * @internal
+ * @brief Fetches or creates a user-defined text expansion property for a part.
+ *
+ * If a user-defined text expansion setting (EDJE_USER_TEXT_EXPAND) already
+ * exists for the specified @p part in @p ed, it is returned. Otherwise, a new
+ * one is created and initialized to EFL_CANVAS_LAYOUT_PART_TEXT_EXPAND_NONE.
+ * This is used for runtime control of text expansion behavior (e.g., ellipsis).
+ *
+ * @param ed The Edje object.
+ * @param part The name of the part.
+ * @return Pointer to the Edje_User_Defined structure for text expansion, or NULL on failure.
+ */
 Edje_User_Defined *
 _edje_user_text_expand_definition_fetch(Edje *ed, const char *part)
 {
@@ -2247,6 +3024,25 @@ _edje_user_text_expand_definition_fetch(Edje *ed, const char *part)
    return eud;
 }
 
+/**
+ * @internal
+ * @brief Defines or updates a user-set string for a text part.
+ *
+ * This function manages user-defined strings (EDJE_USER_STRING) for parts.
+ * If a user definition for this @p part already exists, its text and type are
+ * updated. If @p raw_text is NULL, the existing definition is freed.
+ * Otherwise, a new user definition is created.
+ * This is used to store text set at runtime, especially when an EDJ file
+ * hasn't been loaded yet (ed->file is NULL). The `raw_text` is expected to be
+ * stringshared if it's to be kept.
+ *
+ * @param ed The Edje object.
+ * @param part The name of the part.
+ * @param raw_text The text string (potentially markup). This function expects
+ *                 this string to be valid for the lifetime of the user definition
+ *                 or be stringshared. If NULL, the definition is removed.
+ * @param type The type of the text (EDJE_TEXT_TYPE_NORMAL or EDJE_TEXT_TYPE_MARKUP).
+ */
 void
 _edje_user_define_string(Edje *ed, const char *part, const char *raw_text, Edje_Text_Type type)
 {
@@ -2320,6 +3116,7 @@ _edje_efl_text_text_get(const Eo *obj EINA_UNUSED, Edje *ed, const char *part,
        (!rp->typedata.text)) return NULL;
    if (rp->part->entry_mode > EDJE_ENTRY_EDIT_MODE_NONE)
      {
+        // For editable entries, get the current text from the entry widget.
         return _edje_entry_text_get(rp);
      }
    else
@@ -2327,9 +3124,10 @@ _edje_efl_text_text_get(const Eo *obj EINA_UNUSED, Edje *ed, const char *part,
         if (rp->part->type == EDJE_PART_TYPE_TEXT)
           {
              Edje_Part_Description_Text *desc;
+             // Return user-set text if available.
              if (rp->typedata.text->text)
                return rp->typedata.text->text;
-             else
+             else // Otherwise, return text from the EDJ definition (potentially translated).
                {
                   desc = (Edje_Part_Description_Text *) rp->chosen_description;
                   if (desc->text.text.translated)
@@ -2341,7 +3139,7 @@ _edje_efl_text_text_get(const Eo *obj EINA_UNUSED, Edje *ed, const char *part,
         if (rp->part->type == EDJE_PART_TYPE_TEXTBLOCK)
           {
              const char *entry;
-             if (legacy)
+             if (legacy) // Legacy mode: if user text is set, use it, else get markup from object.
                {
                   if (rp->typedata.text->text)
                     {
@@ -2349,6 +3147,7 @@ _edje_efl_text_text_get(const Eo *obj EINA_UNUSED, Edje *ed, const char *part,
                     }
                   else
                     {
+                       // Force recalc if dirty to get up-to-date markup from evas textblock.
 #ifdef EDJE_CALC_CACHE
                        if (rp->invalidate || ed->all_part_change)
 #else
@@ -2358,9 +3157,9 @@ _edje_efl_text_text_get(const Eo *obj EINA_UNUSED, Edje *ed, const char *part,
                        entry = evas_object_textblock_text_markup_get(rp->object);
                     }
                }
-             else
+             else // Modern mode
                {
-                  if (get_markup)
+                  if (get_markup) // If markup is requested, get it from the Efl_Text object.
                     {
 #ifdef EDJE_CALC_CACHE
                        if (rp->invalidate || ed->all_part_change)
@@ -2370,7 +3169,7 @@ _edje_efl_text_text_get(const Eo *obj EINA_UNUSED, Edje *ed, const char *part,
                          EDJE_RECALC_DO(ed);
                        entry = efl_text_markup_get(rp->object);
                     }
-                  else
+                  else // Otherwise, return the plain text stored in rp->typedata.text->text.
                     {
                        entry = rp->typedata.text->text;
                     }
@@ -2383,6 +3182,18 @@ _edje_efl_text_text_get(const Eo *obj EINA_UNUSED, Edje *ed, const char *part,
    return NULL;
 }
 
+/**
+ * @brief Gets the currently selected text within an editable text part.
+ * @ingroup Edje_Object_Part_Text_Group
+ *
+ * This function is only applicable to parts that are editable (entry_mode > EDJE_ENTRY_EDIT_MODE_NONE).
+ *
+ * @param obj The Edje object.
+ * @param part The name of the editable text part.
+ * @return A string containing the selected text, or NULL if no selection,
+ *         the part is not editable, or on error. The returned string is
+ *         newly allocated and must be freed by the caller.
+ */
 EAPI const char *
 edje_object_part_text_selection_get(const Eo *obj, const char *part)
 {
@@ -2450,6 +3261,14 @@ _efl_canvas_layout_part_text_cursor_geometry_get(Eo *obj EINA_UNUSED, Edje *ed, 
      }
 }
 
+/**
+ * @brief Sets whether text selection is allowed in an editable text part.
+ * @ingroup Edje_Object_Part_Text_Group
+ *
+ * @param obj The Edje object.
+ * @param part The name of the editable text part.
+ * @param allow EINA_TRUE to allow selection, EINA_FALSE to disallow.
+ */
 EAPI void
 edje_object_part_text_select_allow_set(const Eo *obj, const char *part, Eina_Bool allow)
 {
@@ -5644,39 +6463,41 @@ _edje_children_get(Edje_Real_Part *rp, const char *partid)
    switch (rp->part->type)
      {
       case EDJE_PART_TYPE_EXTERNAL:
+        // For EXTERNAL parts, delegate to the external object's content_get method.
         if ((rp->type != EDJE_RP_TYPE_SWALLOW) ||
             (!rp->typedata.swallow)) return NULL;
         return _edje_external_content_get
                  (rp->typedata.swallow->swallowed_object, partid);
 
       case EDJE_PART_TYPE_BOX:
-        it = evas_object_box_iterator_new(rp->object);
+        it = evas_object_box_iterator_new(rp->object); // Iterate over box children.
         break;
 
       case EDJE_PART_TYPE_TABLE:
-        it = evas_object_table_iterator_new(rp->object);
+        it = evas_object_table_iterator_new(rp->object); // Iterate over table children.
         break;
 
       default:
-        return NULL;
+        return NULL; // Part type does not support named/indexed children.
      }
 
+   // Try to parse partid as an integer (index).
    v = strtol(partid, &p, 10);
-   if ((*p == '\0') && (v >= 0))
+   if ((*p == '\0') && (v >= 0)) // If partid is a valid non-negative integer.
      {
         int i = 0;
-        EINA_ITERATOR_FOREACH(it, child)
+        EINA_ITERATOR_FOREACH(it, child) // Find the child at that index.
           {
              if (i == v) break;
              i++;
           }
-        if (i != v) child = NULL;
+        if (i != v) child = NULL; // Index out of bounds.
      }
-   else
+   else // If partid is not a simple integer, treat it as a name.
      {
         Evas_Object *cur;
 
-        EINA_ITERATOR_FOREACH(it, cur)
+        EINA_ITERATOR_FOREACH(it, cur) // Find the child with that name.
           {
              const char *name = evas_object_name_get(cur);
              if ((name) && (!strcmp(name, partid)))
@@ -5691,7 +6512,20 @@ _edje_children_get(Edje_Real_Part *rp, const char *partid)
    return child;
 }
 
-/* rebuild alternative path */
+/**
+ * @internal
+ * @brief Merges an alias with a path suffix to form a new path string.
+ *
+ * This is used for resolving part aliases. For example, if `alias` is "base_part"
+ * and `path` is `{"child_part", "grandchild_part", NULL}`, the result would be
+ * "base_part@child_part@grandchild_part".
+ *
+ * @param alias The base part name or alias.
+ * @param path An array of path components to append, separated by EDJE_PART_PATH_SEPARATOR_STRING.
+ *             Example: `{"component1", "component2", NULL}`
+ * @return A newly allocated string representing the merged path, or NULL on error.
+ *         The caller is responsible for freeing the returned string.
+ */
 char *
 _edje_merge_path(const char *alias, char *const *path)
 {
@@ -5725,18 +6559,20 @@ _edje_real_part_recursive_get_helper(Edje **ed, char **path)
 {
    Edje_Real_Part *rp;
    Evas_Object *child;
-   char *idx = NULL;
+   char *idx = NULL; // Pointer to index/name within a container part (e.g., "part[index_or_name]")
 
-   if (!path[0])
+   if (!path[0]) // End of path.
      return NULL;
 
+   // Check for aliases in the current Edje object's collection.
    if ((*ed)->collection && (*ed)->collection->alias)
      {
         char *alias;
-
+        // Try to find an alias for the first component of the path.
         alias = _edje_merge_path(eina_hash_find((*ed)->collection->alias, path[0]), path + 1);
         if (alias)
           {
+             // If an alias is found and merged, recursively get the part using the aliased path.
              rp = _edje_real_part_recursive_get(ed, alias);
              free(alias);
              return rp;
@@ -5744,54 +6580,67 @@ _edje_real_part_recursive_get_helper(Edje **ed, char **path)
      }
 
    //printf("  lookup: %s on %s\n", path[0], ed->parent ? ed->parent : "-");
-   idx = strchr(path[0], EDJE_PART_PATH_SEPARATOR_INDEXL);
+   // Check if the current path component specifies an index or child name (e.g., "my_box[child_name]" or "my_table[0]").
+   idx = strchr(path[0], EDJE_PART_PATH_SEPARATOR_INDEXL); // Look for '['
    if (idx)
      {
         char *end;
-
-        end = strchr(idx + 1, EDJE_PART_PATH_SEPARATOR_INDEXR);
+        end = strchr(idx + 1, EDJE_PART_PATH_SEPARATOR_INDEXR); // Look for ']'
         if (end)
           {
-             *end = '\0';
-             *idx = '\0';
-             idx++;
+             *end = '\0'; // Null-terminate the index/name string.
+             *idx = '\0'; // Null-terminate the part name string.
+             idx++;       // Move idx to point to the start of the index/name.
           }
+        // If ']' is not found, idx remains as it was, and it's treated as part of the name.
      }
 
+   // Get the real part in the current Edje object.
    rp = _edje_real_part_get(*ed, path[0]);
+
+   // If this is the last component of the path and no index/child name was specified, return the found part.
    if (!path[1] && !idx) return rp;
-   if (!rp) return NULL;
+   if (!rp) return NULL; // Part not found.
 
    switch (rp->part->type)
      {
-      case EDJE_PART_TYPE_GROUP:
+      case EDJE_PART_TYPE_GROUP: // If the part is a group, recurse into the swallowed Edje object.
         if ((rp->type != EDJE_RP_TYPE_SWALLOW) ||
             (!rp->typedata.swallow)) return NULL;
         if (!rp->typedata.swallow->swallowed_object) return NULL;
-        *ed = _edje_fetch(rp->typedata.swallow->swallowed_object);
+        *ed = _edje_fetch(rp->typedata.swallow->swallowed_object); // Update *ed to the swallowed Edje object.
         if (!*ed) return NULL;
-        path++;
+        path++; // Move to the next component in the path.
         return _edje_real_part_recursive_get_helper(ed, path);
 
       case EDJE_PART_TYPE_BOX:
       case EDJE_PART_TYPE_TABLE:
-      case EDJE_PART_TYPE_EXTERNAL:
-        if (!idx) return rp;
-        path++;
+      case EDJE_PART_TYPE_EXTERNAL: // If the part is a container (BOX, TABLE, EXTERNAL).
+        if (!idx) return rp; // If no index/child name, this part itself is the target.
+        path++; // Move to the next component in the path.
 
-        child = _edje_children_get(rp, idx);
+        child = _edje_children_get(rp, idx); // Get the child object by index/name.
+        *ed = _edje_fetch(child); // Update *ed to the child Edje object (if it's an Edje object).
 
-        *ed = _edje_fetch(child);
+        if (!*ed) return NULL; // If child is not an Edje object or not found.
+        return _edje_real_part_recursive_get_helper(ed, path); // Recurse into the child.
 
-        if (!*ed) return NULL;
-        return _edje_real_part_recursive_get_helper(ed, path);
-
-      default:
+      default: // Other part types cannot have children in this context.
         return NULL;
      }
 }
 
-/* Private Routines - do not call eo_do inside this one */
+/**
+ * @internal
+ * @brief Retrieves a real part by name from an Edje object's part table.
+ *
+ * This function performs a direct lookup in the `ed->table_parts` array.
+ * It does not handle recursive lookups into nested Edje objects or aliases.
+ *
+ * @param ed The Edje object.
+ * @param part The name of the part to find.
+ * @return The Edje_Real_Part if found, otherwise NULL.
+ */
 Edje_Real_Part *
 _edje_real_part_get(const Edje *ed, const char *part)
 {
@@ -5854,6 +6703,23 @@ _edje_hash_find_helper(const Eina_Hash *hash, const char *key)
    return data;
 }
 
+/**
+ * @internal
+ * @brief Helper function to find a color class, potentially using path-based fallback.
+ *
+ * This function first tries a direct lookup of @p color_class in the @p hash.
+ * If not found, and if the Edje object @p ed has a file with a color tree defined
+ * ( @c ed->file->color_tree_hash ), it attempts to find the color class by
+ * traversing up the color tree (parent relationships defined in the EDJ).
+ * This allows for hierarchical color class definitions where a more specific
+ * class can inherit from a more general one if not explicitly defined.
+ * Example: "button/focus" might fall back to "button" if "button/focus" isn't found.
+ *
+ * @param ed The Edje object (used to access ed->file->color_tree_hash).
+ * @param hash The hash table to search (e.g., object-local, global, or file-defined color classes).
+ * @param color_class The name of the color class to find.
+ * @return The found Edje_Color_Class, or NULL if not found.
+ */
 Edje_Color_Class *
 _edje_color_class_recursive_find_helper(const Edje *ed, Eina_Hash *hash, const char *color_class)
 {
@@ -5927,6 +6793,19 @@ _edje_color_class_recursive_find(const Edje *ed, const char *color_class)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Eina_Hash_Foreach_Cb to free Edje_Color_Class structures stored in a hash.
+ *
+ * This function is used when freeing a hash table that contains Edje_Color_Class
+ * instances as values. It deletes the stringshared name and frees the structure itself.
+ *
+ * @param hash The hash being iterated (unused).
+ * @param key The hash key (unused).
+ * @param data Pointer to the Edje_Color_Class to free.
+ * @param fdata User data (unused).
+ * @return EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 color_class_hash_list_free(const Eina_Hash *hash EINA_UNUSED, const void *key EINA_UNUSED, void *data, void *fdata EINA_UNUSED)
 {
@@ -5947,6 +6826,18 @@ _edje_color_class_hash_free(void)
    _edje_color_class_hash = NULL;
 }
 
+/**
+ * @internal
+ * @brief Unregisters an Edje object as an observer for color classes used by one of its parts.
+ *
+ * When an Edje part (Edje_Part @p ep) is being deleted or its Edje object
+ * (@p ed) is being finalized, this function ensures that @p ed is no longer
+ * listening for changes to any color classes referenced by @p ep's descriptions
+ * (default and others). This prevents dangling pointers or unnecessary notifications.
+ *
+ * @param ed The Edje object.
+ * @param ep The Edje_Part whose color class usages are being cleaned up.
+ */
 void
 _edje_color_class_on_del(Edje *ed, Edje_Part *ep)
 {
@@ -5987,6 +6878,20 @@ _edje_text_class_find(Edje *ed, const char *text_class)
    return tc;
 }
 
+/**
+ * @internal
+ * @brief Eina_Hash_Foreach_Cb to free Edje_Text_Class structures stored in a hash.
+ *
+ * This function is used when freeing a hash table that contains Edje_Text_Class
+ * instances as values. It deletes the stringshared name and font, and frees
+ * the structure itself.
+ *
+ * @param hash The hash being iterated (unused).
+ * @param key The hash key (unused).
+ * @param data Pointer to the Edje_Text_Class to free.
+ * @param fdata User data (unused).
+ * @return EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 text_class_hash_list_free(const Eina_Hash *hash EINA_UNUSED, const void *key EINA_UNUSED, void *data, void *fdata EINA_UNUSED)
 {
@@ -6031,6 +6936,19 @@ _edje_size_class_find(Edje *ed, const char *size_class)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Eina_Hash_Foreach_Cb to free Edje_Size_Class structures stored in a hash.
+ *
+ * This function is used when freeing a hash table that contains Edje_Size_Class
+ * instances as values. It deletes the stringshared name and frees the structure itself.
+ *
+ * @param hash The hash being iterated (unused).
+ * @param key The hash key (unused).
+ * @param data Pointer to the Edje_Size_Class to free.
+ * @param fdata User data (unused).
+ * @return EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 size_class_hash_list_free(const Eina_Hash *hash EINA_UNUSED, const void *key EINA_UNUSED, void *data, void *fdata EINA_UNUSED)
 {
@@ -6063,6 +6981,15 @@ _edje_fetch(const Evas_Object *obj)
    return ed;
 }
 
+/**
+ * @internal
+ * @brief Increments the freeze counter of an Edje object.
+ *
+ * When an Edje object is frozen (freeze count > 0), recalculations are deferred.
+ *
+ * @param ed The Edje object to freeze.
+ * @return The new freeze count.
+ */
 int
 _edje_util_freeze(Edje *ed)
 {
@@ -6071,6 +6998,16 @@ _edje_util_freeze(Edje *ed)
    return ed->freeze;
 }
 
+/**
+ * @internal
+ * @brief Decrements the freeze counter of an Edje object.
+ *
+ * If the freeze count reaches 0 and a recalculation was pending (ed->recalc is true),
+ * _edje_recalc() is called.
+ *
+ * @param ed The Edje object to thaw.
+ * @return The new freeze count, or 0 if already unfrozen.
+ */
 int
 _edje_util_thaw(Edje *ed)
 {
@@ -6084,6 +7021,17 @@ _edje_util_thaw(Edje *ed)
    return ed->freeze;
 }
 
+/**
+ * @internal
+ * @brief Increments the block counter of an Edje object and its refcount.
+ *
+ * Blocking is used to prevent certain operations (like signal processing or
+ * script execution) during critical sections, often related to object
+ * destruction or major state changes.
+ *
+ * @param ed The Edje object to block.
+ * @return The new block count.
+ */
 int
 _edje_block(Edje *ed)
 {
@@ -6092,6 +7040,15 @@ _edje_block(Edje *ed)
    return ed->block;
 }
 
+/**
+ * @internal
+ * @brief Decrements the block counter of an Edje object and its refcount.
+ *
+ * If the block count reaches 0, the `block_break` flag is reset.
+ *
+ * @param ed The Edje object to unblock.
+ * @return The new block count.
+ */
 int
 _edje_unblock(Edje *ed)
 {
@@ -6106,6 +7063,16 @@ _edje_unblock(Edje *ed)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Checks if the block state of an Edje object has been violated.
+ *
+ * A block violation (ed->block_break is true) indicates that an operation
+ * that should have been deferred due to blocking was attempted.
+ *
+ * @param ed The Edje object.
+ * @return 1 if block was violated, 0 otherwise.
+ */
 int
 _edje_block_break(Edje *ed)
 {
@@ -6113,12 +7080,38 @@ _edje_block_break(Edje *ed)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Marks the block state of an Edje object as violated.
+ *
+ * This is called when a blocked operation is attempted, setting ed->block_break
+ * to true if the object is currently blocked (ed->block > 0).
+ *
+ * @param ed The Edje object.
+ */
 void
 _edje_block_violate(Edje *ed)
 {
    if (ed->block > 0) ed->block_break = EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a swallowed Evas_Object is deleted.
+ *
+ * This function handles cleanup when an object that was swallowed into an Edje
+ * part is deleted externally. It:
+ * 1. Finds and frees any Edje_User_Defined entry of type EDJE_USER_SWALLOW
+ *    that corresponds to the deleted object @p obj.
+ * 2. If the object was indeed swallowed by a part (identified by evas_object_data
+ *    "\377 edje.swallowing_part"), it calls edje_object_part_unswallow() to
+ *    properly detach it from the Edje layout.
+ *
+ * @param data Unused (was intended for Edje_Real_Part, but logic fetches Edje from obj).
+ * @param e The Evas canvas.
+ * @param obj The Evas_Object that was deleted.
+ * @param event_info Event specific information (unused).
+ */
 void
 _edje_object_part_swallow_free_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -6148,6 +7141,18 @@ out:
    return;
 }
 
+/**
+ * @internal
+ * @brief Updates the cached size hints (min, max, aspect) for a SWALLOW part based on its swallowed object.
+ *
+ * This function is called when a swallowed object's size hints change or when
+ * an object is initially swallowed. It queries the swallowed object for its
+ * minimum, maximum, and aspect ratio hints and stores them in
+ * `rp->typedata.swallow->swallow_params`. These cached hints are then used
+ * during Edje's layout calculations.
+ *
+ * @param rp The Edje_Real_Part of SWALLOW type whose hints need updating.
+ */
 static void
 _edje_real_part_swallow_hints_update(Edje_Real_Part *rp)
 {
@@ -6237,11 +7242,11 @@ _edje_object_part_swallow_changed_hints_cb(void *data, Evas *e EINA_UNUSED, Evas
    Edje_Real_Part *rp;
    Edje *ed;
 
-   rp = data;
-   ed = evas_object_data_get(obj, ".edje");
+   rp = data; // rp is the Edje_Real_Part of SWALLOW type.
+   ed = evas_object_data_get(obj, ".edje"); // obj is the swallowed Evas_Object.
    if (!ed) return;
-   _edje_real_part_swallow_hints_update(rp);
-   ed->dirty = EINA_TRUE;
+   _edje_real_part_swallow_hints_update(rp); // Update cached hints in the SWALLOW part.
+   ed->dirty = EINA_TRUE; // Mark the parent Edje object as dirty.
    ed->recalc_call = EINA_TRUE;
    ed->recalc_hints = EINA_TRUE;
 
@@ -6418,8 +7423,17 @@ _edje_object_signal_preload_cb(void *data, Evas_Object *obj, const char *emissio
 
 /**
  * @internal
+ * @brief Removes an Edje_Program from its appropriate categorized array within an Edje_Part_Collection.
  *
- * for edje_cc
+ * Edje programs are categorized (nocmp, strcmp, strncmp, strrncmp, fnmatch)
+ * based on the complexity of their signal and source patterns for optimized matching.
+ * This function identifies the correct category for program @p p and removes it
+ * from the corresponding array in @p edc->programs.
+ * This function is primarily intended for use by the Edje compiler (edje_cc)
+ * during EDC processing or optimization.
+ *
+ * @param edc The Edje_Part_Collection from which to remove the program.
+ * @param p The Edje_Program to remove.
  */
 EAPI void
 _edje_program_remove(Edje_Part_Collection *edc, Edje_Program *p)
@@ -6468,8 +7482,18 @@ _edje_program_remove(Edje_Part_Collection *edc, Edje_Program *p)
 
 /**
  * @internal
+ * @brief Inserts an Edje_Program into its appropriate categorized array within an Edje_Part_Collection.
  *
- * for edje_cc
+ * Similar to _edje_program_remove(), this function categorizes the program @p p
+ * based on its signal/source patterns and adds it to the corresponding dynamic
+ * array in @p edc->programs.
+ * This function is primarily intended for use by the Edje compiler (edje_cc).
+ *
+ * @param edc The Edje_Part_Collection to which the program will be added.
+ * @param p The Edje_Program to insert.
+ *          Example structure of elements in `*array` after insertion (conceptual):
+ *          `(*array)` points to `[prog1*, prog2*, ..., p*, NULL]` (if it were NULL terminated, though it's size-counted)
+ *          where `progX*` are `Edje_Program*`.
  */
 EAPI void
 _edje_program_insert(Edje_Part_Collection *edc, Edje_Program *p)
@@ -6534,6 +7558,18 @@ edje_string_id_get(const Edje_String *es)
    return es->str;
 }
 
+/**
+ * @internal
+ * @brief Callback function invoked when a registered sub-object of an Edje object is deleted.
+ *
+ * This callback ensures that the sub-object is unregistered from its parent
+ * Edje object when it's deleted externally.
+ *
+ * @param data Pointer to the parent Edje object (Edje *).
+ * @param e The Evas canvas (unused).
+ * @param obj The sub-object that was deleted.
+ * @param event_info Event specific information (unused).
+ */
 static void
 _cb_subobj_del(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -6541,6 +7577,19 @@ _cb_subobj_del(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_in
    _edje_subobj_unregister(ed, obj);
 }
 
+/**
+ * @internal
+ * @brief Registers an Evas_Object as a sub-object of an Edje object.
+ *
+ * Sub-objects are typically Evas objects created and managed by Edje parts
+ * (e.g., the Evas_Object for a TEXT part). This registration adds the
+ * sub-object to the Edje object's `subobjs` list and sets up a delete
+ * callback (`_cb_subobj_del`) so that Edje is notified if the sub-object
+ * is deleted.
+ *
+ * @param ed The parent Edje object.
+ * @param ob The Evas_Object to register as a sub-object.
+ */
 void
 _edje_subobj_register(Edje *ed, Evas_Object *ob)
 {
@@ -6549,6 +7598,16 @@ _edje_subobj_register(Edje *ed, Evas_Object *ob)
                                   _cb_subobj_del, ed);
 }
 
+/**
+ * @internal
+ * @brief Unregisters an Evas_Object as a sub-object of an Edje object.
+ *
+ * This removes the sub-object from the Edje object's `subobjs` list and
+ * removes the delete callback.
+ *
+ * @param ed The parent Edje object.
+ * @param obj The Evas_Object to unregister.
+ */
 void
 _edje_subobj_unregister(Edje *ed, Evas_Object *obj)
 {
@@ -6557,6 +7616,21 @@ _edje_subobj_unregister(Edje *ed, Evas_Object *obj)
                                        _cb_subobj_del, ed);
 }
 
+/**
+ * @brief Get the name of the Edje part that an Evas object represents.
+ * @ingroup Edje_Object_Part_Group
+ *
+ * This function is typically used with Evas objects that are direct
+ * representations of Edje parts (e.g., the object returned by
+ * edje_object_part_object_get() for a simple IMAGE part, or the internal
+ * Evas_Object for a TEXT part). It retrieves the original part name
+ * from the Edje definition.
+ *
+ * @param obj The Evas_Object associated with an Edje part.
+ * @return The name of the Edje part, or NULL if the object is not
+ *         directly associated with a named Edje part in this way or on error.
+ *         The returned string is managed by Edje and should not be freed.
+ */
 EAPI const char *
 edje_object_part_object_name_get(const Evas_Object *obj)
 {
@@ -6566,6 +7640,13 @@ edje_object_part_object_name_get(const Evas_Object *obj)
    return rp ? rp->part->name : NULL;
 }
 
+/**
+ * @internal
+ * @brief Gets whether a real part is set to receive mouse events.
+ * @param ed The Edje object (unused).
+ * @param rp The real part.
+ * @return EINA_TRUE if mouse events are enabled for the part, EINA_FALSE otherwise.
+ */
 Eina_Bool
 _edje_real_part_mouse_events_get(Edje *ed EINA_UNUSED, Edje_Real_Part *rp)
 {
@@ -6574,6 +7655,15 @@ _edje_real_part_mouse_events_get(Edje *ed EINA_UNUSED, Edje_Real_Part *rp)
    return rp->mouse_events;
 }
 
+/**
+ * @internal
+ * @brief Sets whether a real part should receive mouse events.
+ * If enabled, event callbacks are added and pass_events is set to 0.
+ * If disabled, event callbacks are removed and pass_events is set to 1.
+ * @param ed The Edje object.
+ * @param rp The real part.
+ * @param mouse_events EINA_TRUE to enable mouse events, EINA_FALSE to disable.
+ */
 void
 _edje_real_part_mouse_events_set(Edje *ed EINA_UNUSED, Edje_Real_Part *rp, Eina_Bool mouse_events)
 {
@@ -6583,16 +7673,23 @@ _edje_real_part_mouse_events_set(Edje *ed EINA_UNUSED, Edje_Real_Part *rp, Eina_
 
    if (rp->mouse_events)
      {
-        evas_object_pass_events_set(rp->object, 0);
+        evas_object_pass_events_set(rp->object, 0); // Don't pass events, handle them.
         _edje_callbacks_add(rp->object, ed, rp);
      }
    else
      {
-        evas_object_pass_events_set(rp->object, 1);
+        evas_object_pass_events_set(rp->object, 1); // Pass events through.
         _edje_callbacks_del(rp->object, ed);
      }
 }
 
+/**
+ * @internal
+ * @brief Gets whether a real part is set to repeat events.
+ * @param ed The Edje object (unused).
+ * @param rp The real part.
+ * @return EINA_TRUE if repeat events are enabled, EINA_FALSE otherwise.
+ */
 Eina_Bool
 _edje_real_part_repeat_events_get(Edje *ed EINA_UNUSED, Edje_Real_Part *rp)
 {
@@ -6601,6 +7698,13 @@ _edje_real_part_repeat_events_get(Edje *ed EINA_UNUSED, Edje_Real_Part *rp)
    return rp->repeat_events;
 }
 
+/**
+ * @internal
+ * @brief Sets whether a real part should repeat events.
+ * @param ed The Edje object (unused).
+ * @param rp The real part.
+ * @param repeat_events EINA_TRUE to enable repeat events, EINA_FALSE to disable.
+ */
 void
 _edje_real_part_repeat_events_set(Edje *ed EINA_UNUSED, Edje_Real_Part *rp, Eina_Bool repeat_events)
 {
@@ -6614,6 +7718,13 @@ _edje_real_part_repeat_events_set(Edje *ed EINA_UNUSED, Edje_Real_Part *rp, Eina
      evas_object_repeat_events_set(rp->object, 0);
 }
 
+/**
+ * @internal
+ * @brief Sets the pointer mode for a real part's object.
+ * @param ed The Edje object (unused).
+ * @param rp The real part.
+ * @param mode The Evas_Object_Pointer_Mode to set.
+ */
 void
 _edje_real_part_pointer_mode_set(Edje *ed EINA_UNUSED, Edje_Real_Part *rp, Evas_Object_Pointer_Mode mode)
 {
@@ -6624,6 +7735,13 @@ _edje_real_part_pointer_mode_set(Edje *ed EINA_UNUSED, Edje_Real_Part *rp, Evas_
    evas_object_pointer_mode_set(rp->object, mode);
 }
 
+/**
+ * @internal
+ * @brief Gets the event ignore flags for a real part.
+ * @param ed The Edje object (unused).
+ * @param rp The real part.
+ * @return The Evas_Event_Flags that are ignored by this part.
+ */
 Evas_Event_Flags
 _edje_real_part_ignore_flags_get(Edje *ed EINA_UNUSED, Edje_Real_Part *rp)
 {
@@ -6632,6 +7750,13 @@ _edje_real_part_ignore_flags_get(Edje *ed EINA_UNUSED, Edje_Real_Part *rp)
    return rp->ignore_flags;
 }
 
+/**
+ * @internal
+ * @brief Sets the event ignore flags for a real part.
+ * @param ed The Edje object (unused).
+ * @param rp The real part.
+ * @param ignore_flags The Evas_Event_Flags to ignore.
+ */
 void
 _edje_real_part_ignore_flags_set(Edje *ed EINA_UNUSED, Edje_Real_Part *rp, Evas_Event_Flags ignore_flags)
 {
@@ -6640,6 +7765,13 @@ _edje_real_part_ignore_flags_set(Edje *ed EINA_UNUSED, Edje_Real_Part *rp, Evas_
    rp->ignore_flags = ignore_flags;
 }
 
+/**
+ * @internal
+ * @brief Gets the event mask flags for a real part.
+ * @param ed The Edje object (unused).
+ * @param rp The real part.
+ * @return The Evas_Event_Flags that are masked by this part.
+ */
 Evas_Event_Flags
 _edje_real_part_mask_flags_get(Edje *ed EINA_UNUSED, Edje_Real_Part *rp)
 {
@@ -6648,6 +7780,13 @@ _edje_real_part_mask_flags_get(Edje *ed EINA_UNUSED, Edje_Real_Part *rp)
    return rp->mask_flags;
 }
 
+/**
+ * @internal
+ * @brief Sets the event mask flags for a real part.
+ * @param ed The Edje object (unused).
+ * @param rp The real part.
+ * @param mask_flags The Evas_Event_Flags to mask.
+ */
 void
 _edje_real_part_mask_flags_set(Edje *ed EINA_UNUSED, Edje_Real_Part *rp, Evas_Event_Flags mask_flags)
 {
@@ -6658,6 +7797,22 @@ _edje_real_part_mask_flags_set(Edje *ed EINA_UNUSED, Edje_Real_Part *rp, Evas_Ev
 
 /* Legacy APIs */
 
+/**
+ * @internal
+ * @brief Helper to fetch Edje private data and a specific Edje_Real_Part.
+ *
+ * This inline function is a common preamble for many legacy API functions
+ * that operate on a specific part of an Edje object. It retrieves the
+ * Edje private data (@p ped) from the Evas_Object @p obj and then finds
+ * the Edje_Real_Part (@p prp) corresponding to the @p part name.
+ *
+ * @param obj The Edje Evas_Object.
+ * @param part The name of the part to fetch.
+ * @param[out] ped Pointer to store the fetched Edje private data.
+ * @param[out] prp Pointer to store the fetched Edje_Real_Part.
+ * @return EINA_TRUE if both Edje data and the real part are successfully fetched,
+ *         EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _edje_part_fetch(const Edje_Object *obj, const char *part, Edje **ped, Edje_Real_Part **prp)
 {

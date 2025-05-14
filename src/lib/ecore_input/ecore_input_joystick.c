@@ -16,40 +16,56 @@
 #include "Ecore_Input.h"
 #include "ecore_input_private.h"
 
-static int _ecore_input_joystick_init_count = 0;
-static int _event_axis_deadzone = 200;
+static int _ecore_input_joystick_init_count = 0; /**< Counter for joystick subsystem initialization. */
+static int _event_axis_deadzone = 200; /**< Deadzone value for joystick axis events. Axis events with absolute value less than this will be ignored. */
 
 #ifdef HAVE_EEZE
 
+/**
+ * @brief Function pointer type for joystick event mapping.
+ * @param event The raw joystick event.
+ * @param e The Ecore joystick event to be filled.
+ */
 typedef void (*Joystick_Mapper)(struct js_event *event, Ecore_Event_Joystick *e);
 static void _joystick_xbox360_mapper(struct js_event *event, Ecore_Event_Joystick *e);
 static void _joystick_xboxone_mapper(struct js_event *event, Ecore_Event_Joystick *e);
 static void _joystick_ps4_mapper(struct js_event *event, Ecore_Event_Joystick *e);
 
+/**
+ * @brief Structure to hold information about a connected joystick.
+ */
 struct _Joystick_Info
 {
-   Ecore_Fd_Handler *fd_handler;
-   Eina_Stringshare *system_path;
-   int index;
-   Joystick_Mapper mapper;
+   Ecore_Fd_Handler *fd_handler; /**< File descriptor handler for the joystick device. */
+   Eina_Stringshare *system_path; /**< System path of the joystick device. */
+   int index; /**< Index of the joystick. */
+   Joystick_Mapper mapper; /**< Mapper function for this joystick type. */
 };
 typedef struct _Joystick_Info Joystick_Info;
 
+/**
+ * @brief Structure to map vendor and product IDs to specific joystick mappers.
+ */
 struct _Joystick_Mapping_Info
 {
-   const char *vendor;
-   const char *product;
-   Joystick_Mapper mapper;
+   const char *vendor; /**< Vendor ID string. */
+   const char *product; /**< Product ID string. */
+   Joystick_Mapper mapper; /**< Mapper function for this joystick. */
 } Joystick_Mapping_Info[] = {
    {"045e", "028e", _joystick_xbox360_mapper}, /* Microsoft X-Box 360 pad */
    {"045e", "02dd", _joystick_xboxone_mapper}, /* Microsoft X-Box One pad (Covert Forces) */
    {"054c", "05c4", _joystick_ps4_mapper} /* Sony Computer Entertainment Wireless Controller */
 };
 
-static const char joystickPrefix[] = "/dev/input/js";
-static Eina_List *joystick_list;
-static Eeze_Udev_Watch *watch = NULL;
+static const char joystickPrefix[] = "/dev/input/js"; /**< Prefix for joystick device nodes. */
+static Eina_List *joystick_list; /**< List of currently connected and managed joysticks (_Joystick_Info). */
+static Eeze_Udev_Watch *watch = NULL; /**< Udev watch for joystick hotplug events. */
 
+/**
+ * @brief Adds a joystick connected or disconnected event.
+ * @param index The index of the joystick.
+ * @param connected EINA_TRUE if connected, EINA_FALSE if disconnected.
+ */
 static void
 _joystick_connected_event_add(int index, Eina_Bool connected)
 {
@@ -66,6 +82,11 @@ _joystick_connected_event_add(int index, Eina_Bool connected)
    ecore_event_add(ECORE_EVENT_JOYSTICK, e, NULL, NULL);
 }
 
+/**
+ * @brief Maps raw PS4 controller events to Ecore_Event_Joystick events.
+ * @param event The raw joystick event from the PS4 controller.
+ * @param e The Ecore_Event_Joystick structure to populate.
+ */
 static void
 _joystick_ps4_mapper(struct js_event *event, Ecore_Event_Joystick *e)
 {
@@ -169,6 +190,11 @@ _joystick_ps4_mapper(struct js_event *event, Ecore_Event_Joystick *e)
      }
 }
 
+/**
+ * @brief Maps raw Xbox 360 controller events to Ecore_Event_Joystick events.
+ * @param event The raw joystick event from the Xbox 360 controller.
+ * @param e The Ecore_Event_Joystick structure to populate.
+ */
 static void
 _joystick_xbox360_mapper(struct js_event *event, Ecore_Event_Joystick *e)
 {
@@ -272,6 +298,11 @@ _joystick_xbox360_mapper(struct js_event *event, Ecore_Event_Joystick *e)
      }
 }
 
+/**
+ * @brief Maps raw Xbox One controller events to Ecore_Event_Joystick events.
+ * @param event The raw joystick event from the Xbox One controller.
+ * @param e The Ecore_Event_Joystick structure to populate.
+ */
 static void
 _joystick_xboxone_mapper(struct js_event *event, Ecore_Event_Joystick *e)
 {
@@ -375,6 +406,11 @@ _joystick_xboxone_mapper(struct js_event *event, Ecore_Event_Joystick *e)
      }
 }
 
+/**
+ * @brief Processes a raw joystick event, maps it, and adds it to the Ecore event queue.
+ * @param event The raw joystick event.
+ * @param ji Information about the joystick that generated the event.
+ */
 static void
 _joystick_event_add(struct js_event *event, Joystick_Info *ji)
 {
@@ -397,6 +433,12 @@ _joystick_event_add(struct js_event *event, Joystick_Info *ji)
    ecore_event_add(ECORE_EVENT_JOYSTICK, e, NULL, NULL);
 }
 
+/**
+ * @brief Callback function for Ecore_Fd_Handler to read joystick events.
+ * @param userData Pointer to Joystick_Info for this joystick.
+ * @param fdHandler The Ecore_Fd_Handler that triggered the callback.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active, ECORE_CALLBACK_CANCEL to remove it.
+ */
 static Eina_Bool
 _fd_handler_cb(void* userData, Ecore_Fd_Handler* fdHandler)
 {
@@ -419,6 +461,12 @@ _fd_handler_cb(void* userData, Ecore_Fd_Handler* fdHandler)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Retrieves the appropriate joystick mapper function based on vendor and product ID.
+ * @param syspath The system path of the joystick device.
+ * @return A Joystick_Mapper function pointer if a mapping is found, otherwise NULL.
+ * @note This function inspects the parent device in sysfs to get vendor/product IDs.
+ */
 static Joystick_Mapper
 _joystick_mapping_info_get(const char* syspath)
 {
@@ -450,6 +498,11 @@ _joystick_mapping_info_get(const char* syspath)
    return ret;
 }
 
+/**
+ * @brief Extracts the joystick index from its device node path (e.g., /dev/input/jsX).
+ * @param dev The device node path string (e.g., "/dev/input/js0").
+ * @return The joystick index (e.g., 0 for "/dev/input/js0"), or -1 on failure.
+ */
 static int
 _joystick_index_get(const char *dev)
 {
@@ -467,6 +520,15 @@ _joystick_index_get(const char *dev)
    return ret;
 }
 
+/**
+ * @brief Registers a new joystick device.
+ *
+ * This function is called when a new joystick is detected (e.g., via udev).
+ * It opens the device, sets up an fd handler for reading events,
+ * and adds it to the internal list of joysticks.
+ *
+ * @param syspath The system path of the joystick device to register.
+ */
 static void
 _joystick_register(const char* syspath)
 {
@@ -515,6 +577,14 @@ register_failed:
    eina_stringshare_del(devnode);
 }
 
+/**
+ * @brief Unregisters a joystick device.
+ *
+ * This function is called when a joystick is removed.
+ * It closes the device, removes the fd handler, and cleans up associated resources.
+ *
+ * @param syspath The system path of the joystick device to unregister.
+ */
 static void
 _joystick_unregister(const char *syspath)
 {
@@ -540,6 +610,13 @@ _joystick_unregister(const char *syspath)
      }
 }
 
+/**
+ * @brief Callback for udev watch events (joystick add/remove).
+ * @param syspath The system path of the device that triggered the event.
+ * @param event The type of udev event (add, remove, etc.).
+ * @param data User data associated with the watch (unused here).
+ * @param w The Eeze_Udev_Watch that triggered the callback (unused here).
+ */
 static void
 _watch_cb(const char *syspath, Eeze_Udev_Event  event,
           void *data EINA_UNUSED, Eeze_Udev_Watch *w EINA_UNUSED)
@@ -559,6 +636,16 @@ _watch_cb(const char *syspath, Eeze_Udev_Event  event,
 }
 #endif
 
+/**
+ * @brief Initializes the Ecore input joystick subsystem.
+ *
+ * This function sets up udev monitoring for joystick devices if Eeze is available.
+ * It should be called before any other ecore_input_joystick functions.
+ *
+ * @return The new reference count for the joystick subsystem.
+ *         Returns 0 on failure or if Eeze initialization fails.
+ * @see ecore_input_joystick_shutdown()
+ */
 int
 ecore_input_joystick_init(void)
 {
@@ -587,6 +674,15 @@ ecore_input_joystick_init(void)
    return _ecore_input_joystick_init_count;
 }
 
+/**
+ * @brief Shuts down the Ecore input joystick subsystem.
+ *
+ * This function cleans up resources used by the joystick subsystem,
+ * including stopping udev monitoring.
+ *
+ * @return The new reference count for the joystick subsystem.
+ * @see ecore_input_joystick_init()
+ */
 int
 ecore_input_joystick_shutdown(void)
 {

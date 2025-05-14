@@ -10,9 +10,27 @@
 #include "eeze_udev_private.h"
 #include "eeze_disk_private.h"
 
+/**
+ * @internal
+ * @brief Log domain for the Eeze_Disk module.
+ */
 int _eeze_disk_log_dom = -1;
+/**
+ * @internal
+ * @brief List of all currently tracked Eeze_Disk objects.
+ */
 Eina_List *_eeze_disks = NULL;
 
+/**
+ * @internal
+ * @brief Determines the type of a disk.
+ *
+ * This function inspects various udev properties of the disk and its children
+ * to determine if it's a CD-ROM, internal drive, USB drive, flash drive, etc.
+ *
+ * @param disk The Eeze_Disk object to analyze.
+ * @return The determined Eeze_Disk_Type.
+ */
 static Eeze_Disk_Type
 _eeze_disk_type_find(Eeze_Disk *disk)
 {
@@ -78,6 +96,18 @@ _eeze_disk_type_find(Eeze_Disk *disk)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Finds a udev device based on a filesystem property (UUID or label).
+ *
+ * This function enumerates block devices and matches them against the provided
+ * property value.
+ *
+ * @param prop The property value to search for (e.g., a UUID string or a label string).
+ * @param uuid EINA_TRUE if @p prop is a UUID, EINA_FALSE if it's a label.
+ * @return A pointer to the found _udev_device, or NULL if not found or on error.
+ *         The caller is responsible for unreferencing the returned device.
+ */
 static _udev_device *
 _eeze_disk_device_from_property(const char *prop, Eina_Bool uuid)
 {
@@ -108,6 +138,13 @@ _eeze_disk_device_from_property(const char *prop, Eina_Bool uuid)
 
 }
 
+/**
+ * @brief Shuts down the Eeze_Disk subsystem.
+ *
+ * This function cleans up resources used by the Eeze_Disk module,
+ * including shutting down the eeze_mount and ecore_file subsystems
+ * and unregistering the log domain.
+ */
 void
 eeze_disk_shutdown(void)
 {
@@ -117,6 +154,14 @@ eeze_disk_shutdown(void)
    _eeze_disk_log_dom = -1;
 }
 
+/**
+ * @brief Initializes the Eeze_Disk subsystem.
+ *
+ * This function sets up the necessary components for Eeze_Disk to operate,
+ * including registering a log domain and initializing ecore_file and eeze_mount.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 Eina_Bool
 eeze_disk_init(void)
 {
@@ -143,11 +188,28 @@ disk_fail:
    return EINA_FALSE;
 }
 
+/**
+ * @brief A placeholder or example function for Eeze_Disk.
+ * @since 1.23
+ *
+ * This function currently does nothing. It might be a template or
+ * a function reserved for future use.
+ */
 EAPI void
 eeze_disk_function(void)
 {
 }
 
+/**
+ * @brief Creates a new Eeze_Disk object from a device path or syspath.
+ *
+ * If @p path starts with "/dev/", it's treated as a device node path (e.g., "/dev/sda1").
+ * Otherwise, it's treated as a syspath (e.g., "/sys/devices/pci0000:00/0000:00:1f.2/ata1/host0/target0:0:0/0:0:0:0/block/sda/sda1").
+ *
+ * @param path The device path or syspath of the disk.
+ * @return A pointer to the newly created Eeze_Disk object, or NULL on failure.
+ *         The caller is responsible for freeing the returned object using eeze_disk_free().
+ */
 EAPI Eeze_Disk *
 eeze_disk_new(const char *path)
 {
@@ -199,6 +261,17 @@ eeze_disk_new(const char *path)
    return disk;
 }
 
+/**
+ * @brief Creates a new Eeze_Disk object from a mount point.
+ *
+ * This function identifies the source device associated with the given
+ * @p mount_point (e.g., "/media/usb_stick") and creates an Eeze_Disk object for it.
+ * It can resolve the source device from UUID, LABEL, or device path.
+ *
+ * @param mount_point The mount point string (e.g., "/mnt/my_disk").
+ * @return A pointer to the newly created Eeze_Disk object, or NULL on failure or if the mount point is not found.
+ *         The caller is responsible for freeing the returned object using eeze_disk_free().
+ */
 EAPI Eeze_Disk *
 eeze_disk_new_from_mount(const char *mount_point)
 {
@@ -267,6 +340,15 @@ error:
    return NULL;
 }
 
+/**
+ * @brief Frees an Eeze_Disk object.
+ *
+ * This function releases all resources associated with the given @p disk,
+ * including unreferencing its udev device, freeing command string buffers,
+ * killing any associated mounter process, and removing it from internal lists.
+ *
+ * @param disk The Eeze_Disk object to free.
+ */
 EAPI void
 eeze_disk_free(Eeze_Disk *disk)
 {
@@ -286,6 +368,16 @@ eeze_disk_free(Eeze_Disk *disk)
    free(disk);
 }
 
+/**
+ * @brief Scans and caches properties of an Eeze_Disk object.
+ *
+ * This function populates the internal cache of the @p disk with properties
+ * like vendor, model, serial number, UUID, label, type, and removability.
+ * The scan is performed only once; subsequent calls for a disk with
+ * a filled cache will do nothing.
+ *
+ * @param disk The Eeze_Disk object to scan.
+ */
 EAPI void
 eeze_disk_scan(Eeze_Disk *disk)
 {
@@ -323,6 +415,12 @@ eeze_disk_scan(Eeze_Disk *disk)
    disk->cache.filled = EINA_TRUE;
 }
 
+/**
+ * @brief Associates arbitrary user data with an Eeze_Disk object.
+ *
+ * @param disk The Eeze_Disk object.
+ * @param data A pointer to the user data to associate.
+ */
 EAPI void
 eeze_disk_data_set(Eeze_Disk *disk, void *data)
 {
@@ -331,6 +429,12 @@ eeze_disk_data_set(Eeze_Disk *disk, void *data)
    disk->data = data;
 }
 
+/**
+ * @brief Retrieves arbitrary user data associated with an Eeze_Disk object.
+ *
+ * @param disk The Eeze_Disk object.
+ * @return A pointer to the user data, or NULL if no data is set or @p disk is NULL.
+ */
 EAPI void *
 eeze_disk_data_get(Eeze_Disk *disk)
 {
@@ -339,6 +443,15 @@ eeze_disk_data_get(Eeze_Disk *disk)
    return disk->data;
 }
 
+/**
+ * @brief Gets the syspath of an Eeze_Disk object.
+ *
+ * The syspath is the path to the device within the sysfs filesystem
+ * (e.g., "/sys/devices/pci0000:00/0000:00:1f.2/ata1/host0/target0:0:0/0:0:0:0/block/sda").
+ *
+ * @param disk The Eeze_Disk object.
+ * @return The syspath string, or NULL if @p disk is NULL. The string is an Eina_Stringshare.
+ */
 EAPI const char *
 eeze_disk_syspath_get(Eeze_Disk *disk)
 {
@@ -347,6 +460,17 @@ eeze_disk_syspath_get(Eeze_Disk *disk)
    return disk->syspath;
 }
 
+/**
+ * @brief Gets the device path (devnode) of an Eeze_Disk object.
+ *
+ * The device path is the path to the device node in the /dev directory
+ * (e.g., "/dev/sda1"). If the devpath was not set during creation (e.g., if
+ * created from syspath), this function will query udev for it.
+ *
+ * @param disk The Eeze_Disk object.
+ * @return The device path string, or NULL if @p disk is NULL or the devnode cannot be determined.
+ *         The string is an Eina_Stringshare.
+ */
 EAPI const char *
 eeze_disk_devpath_get(Eeze_Disk *disk)
 {
@@ -358,6 +482,17 @@ eeze_disk_devpath_get(Eeze_Disk *disk)
    return disk->devpath;
 }
 
+/**
+ * @brief Gets the filesystem type of an Eeze_Disk object.
+ *
+ * This typically refers to the filesystem detected on the disk, like "ext4", "vfat", etc.
+ * Note: This field might not always be populated directly from udev properties in the current implementation
+ * and might rely on other mechanisms or be set after a mount operation.
+ *
+ * @param disk The Eeze_Disk object.
+ * @return The filesystem type string (e.g., "ext4"), or NULL if not available or @p disk is NULL.
+ *         The string is an Eina_Stringshare.
+ */
 EAPI const char *
 eeze_disk_fstype_get(Eeze_Disk *disk)
 {
@@ -366,6 +501,16 @@ eeze_disk_fstype_get(Eeze_Disk *disk)
    return disk->fstype;
 }
 
+/**
+ * @brief Gets the vendor name of an Eeze_Disk object.
+ *
+ * This function retrieves the vendor information from the disk's cached properties.
+ * If not cached, it queries udev properties ("ID_VENDOR", "vendor" sysattr).
+ *
+ * @param disk The Eeze_Disk object.
+ * @return The vendor string (e.g., "ATA"), or NULL if not available or @p disk is NULL.
+ *         The string is an Eina_Stringshare.
+ */
 EAPI const char *
 eeze_disk_vendor_get(Eeze_Disk *disk)
 {
@@ -379,6 +524,16 @@ eeze_disk_vendor_get(Eeze_Disk *disk)
    return disk->cache.vendor;
 }
 
+/**
+ * @brief Gets the model name of an Eeze_Disk object.
+ *
+ * This function retrieves the model information from the disk's cached properties.
+ * If not cached, it queries udev properties ("ID_MODEL", "model" sysattr).
+ *
+ * @param disk The Eeze_Disk object.
+ * @return The model string (e.g., "VBOX_HARDDISK"), or NULL if not available or @p disk is NULL.
+ *         The string is an Eina_Stringshare.
+ */
 EAPI const char *
 eeze_disk_model_get(Eeze_Disk *disk)
 {
@@ -392,6 +547,16 @@ eeze_disk_model_get(Eeze_Disk *disk)
    return disk->cache.model;
 }
 
+/**
+ * @brief Gets the serial number of an Eeze_Disk object.
+ *
+ * This function retrieves the serial number from the disk's cached properties.
+ * If not cached, it queries the udev property "ID_SERIAL_SHORT".
+ *
+ * @param disk The Eeze_Disk object.
+ * @return The serial number string, or NULL if not available or @p disk is NULL.
+ *         The string is an Eina_Stringshare.
+ */
 EAPI const char *
 eeze_disk_serial_get(Eeze_Disk *disk)
 {
@@ -403,6 +568,16 @@ eeze_disk_serial_get(Eeze_Disk *disk)
    return disk->cache.serial;
 }
 
+/**
+ * @brief Gets the filesystem UUID of an Eeze_Disk object.
+ *
+ * This function retrieves the UUID from the disk's cached properties.
+ * If not cached, it queries the udev property "ID_FS_UUID".
+ *
+ * @param disk The Eeze_Disk object.
+ * @return The UUID string (e.g., "1234-ABCD"), or NULL if not available or @p disk is NULL.
+ *         The string is an Eina_Stringshare.
+ */
 EAPI const char *
 eeze_disk_uuid_get(Eeze_Disk *disk)
 {
@@ -414,6 +589,16 @@ eeze_disk_uuid_get(Eeze_Disk *disk)
    return disk->cache.uuid;
 }
 
+/**
+ * @brief Gets the filesystem label of an Eeze_Disk object.
+ *
+ * This function retrieves the label from the disk's cached properties.
+ * If not cached, it queries the udev property "ID_FS_LABEL".
+ *
+ * @param disk The Eeze_Disk object.
+ * @return The label string (e.g., "MyUSB"), or NULL if not available or @p disk is NULL.
+ *         The string is an Eina_Stringshare.
+ */
 EAPI const char *
 eeze_disk_label_get(Eeze_Disk *disk)
 {
@@ -425,6 +610,16 @@ eeze_disk_label_get(Eeze_Disk *disk)
    return disk->cache.label;
 }
 
+/**
+ * @brief Gets the type of an Eeze_Disk object.
+ *
+ * This function retrieves the disk type (e.g., CD-ROM, USB, internal)
+ * from the disk's cached properties. If not cached, it calls _eeze_disk_type_find()
+ * to determine and cache the type.
+ *
+ * @param disk The Eeze_Disk object.
+ * @return The Eeze_Disk_Type, or EEZE_DISK_TYPE_UNKNOWN if @p disk is NULL or type cannot be determined.
+ */
 EAPI Eeze_Disk_Type
 eeze_disk_type_get(Eeze_Disk *disk)
 {
@@ -436,6 +631,16 @@ eeze_disk_type_get(Eeze_Disk *disk)
    return disk->cache.type;
 }
 
+/**
+ * @brief Checks if an Eeze_Disk object represents a removable device.
+ *
+ * This function retrieves the removability status from the disk's cached properties.
+ * If the cache is not filled (i.e., eeze_disk_scan() hasn't been effectively run),
+ * it queries udev sysattr "removable" or walks children devices to determine this.
+ *
+ * @param disk The Eeze_Disk object.
+ * @return EINA_TRUE if the disk is removable, EINA_FALSE otherwise or if @p disk is NULL.
+ */
 EAPI Eina_Bool
 eeze_disk_removable_get(Eeze_Disk *disk)
 {
@@ -457,6 +662,14 @@ eeze_disk_removable_get(Eeze_Disk *disk)
    return disk->cache.removable;
 }
 
+/**
+ * @brief Checks if the system has the capability to mount disks using the configured mount utility.
+ *
+ * This function checks for the existence and executability of the mount binary
+ * (defined by EEZE_MOUNT_BIN).
+ *
+ * @return EINA_TRUE if mounting is possible, EINA_FALSE otherwise.
+ */
 EAPI Eina_Bool
 eeze_disk_can_mount(void)
 {
@@ -465,6 +678,14 @@ eeze_disk_can_mount(void)
                            EINA_FILE_ACCESS_MODE_READ);
 }
 
+/**
+ * @brief Checks if the system has the capability to unmount disks using the configured unmount utility.
+ *
+ * This function checks for the existence and executability of the unmount binary
+ * (defined by EEZE_UNMOUNT_BIN).
+ *
+ * @return EINA_TRUE if unmounting is possible, EINA_FALSE otherwise.
+ */
 EAPI Eina_Bool
 eeze_disk_can_unmount(void)
 {
@@ -473,6 +694,14 @@ eeze_disk_can_unmount(void)
                            EINA_FILE_ACCESS_MODE_READ);
 }
 
+/**
+ * @brief Checks if the system has the capability to eject disks using the configured eject utility.
+ *
+ * This function checks for the existence and executability of the eject binary
+ * (defined by EEZE_EJECT_BIN).
+ *
+ * @return EINA_TRUE if ejecting is possible, EINA_FALSE otherwise.
+ */
 EAPI Eina_Bool
 eeze_disk_can_eject(void)
 {

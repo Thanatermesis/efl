@@ -19,16 +19,29 @@
 static void _ecore_imf_module_free(Ecore_IMF_Module *module);
 static int _ecore_imf_modules_exists(const char *ctx_id);
 
+/**
+ * @internal
+ * @brief Structure used to select IMF modules based on a criteria.
+ * This structure is used internally for filtering modules.
+ */
 typedef struct _Ecore_IMF_Selector
 {
-   const char *toselect;
-   void       *selected;
+   const char *toselect; /**< The string criteria to select by (e.g., canvas type). */
+   void       *selected; /**< A pointer to an Eina_List where selected items (e.g. module IDs) are stored. */
 } Ecore_IMF_Selector;
 
-static Eina_Hash *modules = NULL;
-static Eina_Array *module_list = NULL;
-static Eina_Prefix *pfx = NULL;
+static Eina_Hash *modules = NULL; /**< Hash table storing registered IMF modules, keyed by context ID. */
+static Eina_Array *module_list = NULL; /**< Array of loaded Eina_Module instances. */
+static Eina_Prefix *pfx = NULL; /**< Prefix for locating module files. */
 
+/**
+ * @internal
+ * @brief Initializes the Ecore IMF module system.
+ * This function discovers and loads available IMF modules.
+ * It checks for modules in the build directory if running in tree,
+ * otherwise it loads modules based on environment variables or
+ * a default order.
+ */
 void
 ecore_imf_module_init(void)
 {
@@ -159,6 +172,11 @@ ecore_imf_module_init(void)
    if (module_list) eina_module_list_load(module_list);
 }
 
+/**
+ * @internal
+ * @brief Shuts down the Ecore IMF module system.
+ * This function unloads all loaded IMF modules and frees associated resources.
+ */
 void
 ecore_imf_module_shutdown(void)
 {
@@ -178,6 +196,18 @@ ecore_imf_module_shutdown(void)
    pfx = NULL;
 }
 
+/**
+ * @internal
+ * @brief Callback function for eina_hash_foreach to collect module data.
+ * This function is used to iterate over the `modules` hash and append
+ * each Ecore_IMF_Module (cast to int* for historical reasons, but it's a pointer)
+ * to the provided Eina_List.
+ *
+ * @param hash The hash being iterated.
+ * @param data The Ecore_IMF_Module pointer (as int*).
+ * @param list A pointer to an Eina_List to append the module to.
+ * @return EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 _hash_module_available_get(const Eina_Hash *hash EINA_UNUSED, int *data, void *list)
 {
@@ -185,6 +215,29 @@ _hash_module_available_get(const Eina_Hash *hash EINA_UNUSED, int *data, void *l
    return EINA_TRUE;
 }
 
+/**
+ * @brief Retrieves a list of available (loaded) IMF modules.
+ *
+ * @return A new Eina_List containing pointers to Ecore_IMF_Module structures
+ *         for each available module. The caller is responsible for freeing
+ *         this list with eina_list_free() when no longer needed.
+ *         The data pointers within the list are owned by the module system
+ *         and should not be freed. Returns NULL if no modules are loaded or
+ *         an error occurs.
+ *
+ * Example:
+ * @code
+ * Eina_List *available_modules, *l;
+ * Ecore_IMF_Module *module;
+ *
+ * available_modules = ecore_imf_module_available_get();
+ * EINA_LIST_FOREACH(available_modules, l, module)
+ *   {
+ *      printf("Available module ID: %s\n", module->info->id);
+ *   }
+ * eina_list_free(available_modules);
+ * @endcode
+ */
 Eina_List *
 ecore_imf_module_available_get(void)
 {
@@ -203,6 +256,13 @@ ecore_imf_module_available_get(void)
    return values;
 }
 
+/**
+ * @brief Retrieves a specific IMF module by its context ID.
+ *
+ * @param ctx_id The context ID of the module to retrieve (e.g., "xim", "ibus").
+ * @return A pointer to the Ecore_IMF_Module structure if found, otherwise NULL.
+ *         The returned pointer is owned by the module system and should not be freed.
+ */
 Ecore_IMF_Module *
 ecore_imf_module_get(const char *ctx_id)
 {
@@ -210,6 +270,15 @@ ecore_imf_module_get(const char *ctx_id)
    return eina_hash_find(modules, ctx_id);
 }
 
+/**
+ * @brief Creates an IMF context instance from a module specified by its context ID.
+ *
+ * @param ctx_id The context ID of the module from which to create a context
+ *               (e.g., "xim", "ibus").
+ * @return A pointer to the newly created Ecore_IMF_Context if successful,
+ *         otherwise NULL. The caller is responsible for freeing this context
+ *         using ecore_imf_context_del() when no longer needed.
+ */
 Ecore_IMF_Context *
 ecore_imf_module_context_create(const char *ctx_id)
 {
@@ -232,6 +301,17 @@ ecore_imf_module_context_create(const char *ctx_id)
    return ctx;
 }
 
+/**
+ * @internal
+ * @brief Callback function for eina_hash_foreach to collect module context IDs.
+ * This function is used to iterate over the `modules` hash and append
+ * each module's context ID (the key of the hash entry) to the provided Eina_List.
+ *
+ * @param hash The hash being iterated.
+ * @param key The context ID string (key of the hash entry).
+ * @param list A pointer to an Eina_List to append the context ID to.
+ * @return EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 _hash_ids_get(const Eina_Hash *hash EINA_UNUSED, const char *key, void *list)
 {
@@ -239,6 +319,31 @@ _hash_ids_get(const Eina_Hash *hash EINA_UNUSED, const char *key, void *list)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Retrieves a list of all available IMF context IDs.
+ *
+ * These IDs can be used with ecore_imf_context_new() or
+ * ecore_imf_module_context_create().
+ *
+ * @return A new Eina_List containing const char* strings of the context IDs.
+ *         The caller is responsible for freeing this list with eina_list_free()
+ *         when no longer needed. The strings themselves are owned by the
+ *         module system and should not be freed or modified.
+ *         Returns NULL if no modules are loaded or an error occurs.
+ *
+ * Example:
+ * @code
+ * Eina_List *context_ids, *l;
+ * const char *id;
+ *
+ * context_ids = ecore_imf_module_context_ids_get();
+ * EINA_LIST_FOREACH(context_ids, l, id)
+ *   {
+ *      printf("Available context ID: %s\n", id);
+ *   }
+ * eina_list_free(context_ids);
+ * @endcode
+ */
 Eina_List *
 ecore_imf_module_context_ids_get(void)
 {
@@ -257,6 +362,25 @@ ecore_imf_module_context_ids_get(void)
    return l;
 }
 
+/**
+ * @internal
+ * @brief Callback function for eina_hash_foreach to collect module context IDs
+ *        that match a specific canvas type.
+ *
+ * This function iterates over the `modules` hash. For each module, it checks
+ * if its `canvas_type` (from `module->info->canvas_type`) matches the
+ * `toselect` field in the `Ecore_IMF_Selector` structure passed via `fdata`.
+ * If they match, the module's ID (`module->info->id`) is appended to the
+ * `selected` list within the `Ecore_IMF_Selector`.
+ *
+ * @param hash The hash being iterated.
+ * @param data A pointer to an Ecore_IMF_Module (the value of the hash entry).
+ * @param fdata A pointer to an Ecore_IMF_Selector structure.
+ *              `fdata->toselect` contains the canvas type string to match.
+ *              `fdata->selected` is a pointer to an Eina_List where matching
+ *              module IDs (const char *) will be appended.
+ * @return EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 _hash_ids_by_canvas_type_get(const Eina_Hash *hash EINA_UNUSED, void *data, void *fdata)
 {
@@ -269,6 +393,35 @@ _hash_ids_by_canvas_type_get(const Eina_Hash *hash EINA_UNUSED, void *data, void
    return EINA_TRUE;
 }
 
+/**
+ * @brief Retrieves a list of IMF context IDs that support a specific canvas type.
+ *
+ * @param canvas_type The canvas type string to filter by (e.g., "evas", "wayland").
+ *                    If NULL, this function behaves like ecore_imf_module_context_ids_get()
+ *                    and returns all available context IDs.
+ * @return A new Eina_List containing const char* strings of the context IDs
+ *         that support the specified canvas type. The caller is responsible
+ *         for freeing this list with eina_list_free() when no longer needed.
+ *         The strings themselves are owned by the module system and should not
+ *         be freed or modified. Returns NULL if no modules are loaded, no modules
+ *         match the canvas type, or an error occurs.
+ *
+ * Example:
+ * @code
+ * Eina_List *wayland_context_ids, *l;
+ * const char *id;
+ *
+ * wayland_context_ids = ecore_imf_module_context_ids_by_canvas_type_get("wayland");
+ * if (wayland_context_ids)
+ *   {
+ *      EINA_LIST_FOREACH(wayland_context_ids, l, id)
+ *        {
+ *           printf("Wayland-compatible context ID: %s\n", id);
+ *        }
+ *      eina_list_free(wayland_context_ids);
+ *   }
+ * @endcode
+ */
 Eina_List *
 ecore_imf_module_context_ids_by_canvas_type_get(const char *canvas_type)
 {
@@ -293,6 +446,46 @@ ecore_imf_module_context_ids_by_canvas_type_get(const char *canvas_type)
    return values;
 }
 
+/**
+ * @brief Registers an IMF module with the Ecore IMF system.
+ * @since 1.1
+ *
+ * This function is typically called by an IMF module itself during its
+ * initialization (e.g., in its `module_open` function if it's a dynamic module,
+ * or by a static linking mechanism).
+ *
+ * @param info A pointer to an Ecore_IMF_Context_Info structure describing the module.
+ *             This structure contains the ID, name, and canvas type of the module.
+ *             The `info` pointer must remain valid for the lifetime of the module registration.
+ * @param imf_module_create A function pointer to the module's context creation function.
+ *                          This function will be called to create new IMF context instances.
+ *                          It should return a new Ecore_IMF_Context or NULL on failure.
+ * @param imf_module_exit A function pointer to the module's exit/cleanup function.
+ *                        This function is called when the module is being freed.
+ *                        It can be NULL if no specific cleanup is needed by the module itself
+ *                        beyond what _ecore_imf_module_free handles.
+ *
+ * Example (typically within a module's own code):
+ * @code
+ * // In my_imf_module.c
+ * static const Ecore_IMF_Context_Info my_module_info = {
+ *   "my_imf",    // id
+ *   "My IMF",    // name
+ *   "evas",      // canvas_type
+ *   NULL,        // default_id (usually NULL, Ecore IMF handles selection)
+ *   EINA_FALSE   // needs_preedit_set (module specific)
+ * };
+ *
+ * static Ecore_IMF_Context *my_context_create(void) { ... return new_context; }
+ * static Ecore_IMF_Context *my_context_exit(void) { ... cleanup; return NULL; } // Or just void
+ *
+ * Eina_Bool my_module_init(void) // Or module_open for dynamic modules
+ * {
+ *    ecore_imf_module_register(&my_module_info, my_context_create, my_context_exit);
+ *    return EINA_TRUE;
+ * }
+ * @endcode
+ */
 EAPI void
 ecore_imf_module_register(const Ecore_IMF_Context_Info *info,
                           Ecore_IMF_Context *(*imf_module_create)(void),
@@ -316,6 +509,16 @@ ecore_imf_module_register(const Ecore_IMF_Context_Info *info,
    eina_hash_add(modules, info->id, module);
 }
 
+/**
+ * @internal
+ * @brief Frees an Ecore_IMF_Module structure.
+ * This function is used as a callback for eina_hash_free when the `modules`
+ * hash is destroyed, or when a module is explicitly unregistered (if such
+ * functionality existed). It calls the module's exit function, if provided,
+ * and then frees the module structure itself.
+ *
+ * @param module The Ecore_IMF_Module to free.
+ */
 static void
 _ecore_imf_module_free(Ecore_IMF_Module *module)
 {
@@ -323,6 +526,13 @@ _ecore_imf_module_free(Ecore_IMF_Module *module)
    free(module);
 }
 
+/**
+ * @internal
+ * @brief Checks if an IMF module with the given context ID is already registered.
+ *
+ * @param ctx_id The context ID to check.
+ * @return 1 if a module with the given ID exists, 0 otherwise.
+ */
 static int
 _ecore_imf_modules_exists(const char *ctx_id)
 {

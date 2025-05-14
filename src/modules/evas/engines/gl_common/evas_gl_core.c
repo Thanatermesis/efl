@@ -48,6 +48,16 @@ extern GLenum (*EXT_FUNC_GLES1(glCheckFramebufferStatusOES)) (GLenum target);
 // Internal Resources:
 //  - Surface and Context used for internal buffer creation
 //---------------------------------------------------------------//
+/**
+ * @brief Creates internal resources for a thread.
+ *
+ * Each thread that uses Evas GL needs a set of internal resources, such as
+ * a display connection and a resource holder object. This function creates
+ * these for the calling thread. The resources are stored in thread-local storage.
+ *
+ * @param eng_data A pointer to the engine-specific data.
+ * @return A pointer to the allocated EVGL_Resource structure, or NULL on failure.
+ */
 static void *
 _internal_resources_create(void *eng_data)
 {
@@ -85,6 +95,15 @@ error:
    return NULL;
 }
 
+/**
+ * @brief Destroys the internal resources for a thread.
+ *
+ * This function cleans up resources created by _internal_resources_create(),
+ * including any associated contexts, surfaces, or native windows.
+ *
+ * @param eng_data A pointer to the engine-specific data.
+ * @param rsc A pointer to the EVGL_Resource structure to destroy.
+ */
 static void
 _internal_resources_destroy(void *eng_data, EVGL_Resource *rsc)
 {
@@ -106,6 +125,24 @@ _internal_resources_destroy(void *eng_data, EVGL_Resource *rsc)
    free(rsc);
 }
 
+/**
+ * @brief Makes an internal resource current.
+ *
+ * This is a key function that prepares the GL context for rendering. It handles
+ * various rendering paths:
+ * - Direct rendering to the window back buffer.
+ * - Indirect rendering via an intermediate pixmap.
+ * - FBO-based off-screen rendering.
+ *
+ * It ensures that the correct context and surface (or lack thereof) are bound
+ * for the intended operation. It will create resources like contexts and
+ * surfaces on-demand if they don't exist for the current thread.
+ *
+ * @param eng_data A pointer to the engine-specific data.
+ * @param sfc The target surface, or NULL.
+ * @param ctx The target context, or NULL.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 _internal_resource_make_current(void *eng_data, EVGL_Surface *sfc, EVGL_Context *ctx)
 {
@@ -228,6 +265,10 @@ _internal_resource_make_current(void *eng_data, EVGL_Surface *sfc, EVGL_Context 
 //  - Internal config choose function
 //---------------------------------------------------------------//
 // Gen Texture
+/**
+ * @brief Generates a new GL texture object.
+ * @param tex Pointer to a GLuint to store the new texture ID.
+ */
 static void
 _texture_create(GLuint *tex)
 {
@@ -235,6 +276,19 @@ _texture_create(GLuint *tex)
 }
 
 // Create and allocate 2D texture
+/**
+ * @brief Creates and allocates storage for a 2D texture.
+ *
+ * This function sets up a 2D texture with standard parameters (CLAMP_TO_EDGE, NEAREST)
+ * and allocates its image data store.
+ *
+ * @param tex The texture ID.
+ * @param ifmt The internal format of the texture.
+ * @param fmt The format of the pixel data.
+ * @param type The data type of the pixel data.
+ * @param w The width of the texture.
+ * @param h The height of the texture.
+ */
 static void
 _texture_allocate_2d(GLuint tex, GLint ifmt, GLenum fmt, GLenum type, int w, int h)
 {
@@ -253,6 +307,10 @@ _texture_allocate_2d(GLuint tex, GLint ifmt, GLenum fmt, GLenum type, int w, int
 }
 
 // Destroy Texture
+/**
+ * @brief Deletes a GL texture object.
+ * @param tex Pointer to the texture ID to delete. It is set to 0 on return.
+ */
 static void
 _texture_destroy(GLuint *tex)
 {
@@ -268,7 +326,18 @@ _texture_destroy(GLuint *tex)
 }
 
 // Attach 2D texture with the given format to already bound FBO
-// *NOTE: attach2 here is used for depth_stencil attachment in GLES env.
+/**
+ * @brief Attaches a 2D texture to the currently bound framebuffer.
+ *
+ * This handles different codepaths for GLES1, GLES2/3 and for MSAA.
+ * @note attach2 here is used for depth_stencil attachment in GLES env.
+ *
+ * @param tex The texture ID to attach.
+ * @param attach The framebuffer attachment point (e.g., GL_COLOR_ATTACHMENT0).
+ * @param attach2 A secondary attachment point, used for combined depth/stencil textures.
+ * @param samples The number of samples for multisampling.
+ * @param version The GLES version of the current context.
+ */
 static void
 _texture_attach_2d(GLuint tex, GLenum attach, GLenum attach2, int samples, Evas_GL_Context_Version version)
 {
@@ -311,6 +380,17 @@ _texture_attach_2d(GLuint tex, GLenum attach, GLenum attach2, int samples, Evas_
      }
 }
 
+/**
+ * @brief Creates an EGLImage from a client buffer.
+ *
+ * This is a wrapper around eglCreateImageKHR. It is used to share image data
+ * efficiently between client APIs (like GL) and EGL.
+ *
+ * @param context The EVGL context.
+ * @param target The EGL image target (e.g., EGL_GL_TEXTURE_2D_KHR).
+ * @param buffer The client buffer handle.
+ * @return An EGLImage handle, or EGL_NO_IMAGE_KHR on failure.
+ */
 static void *
 _egl_image_create(EVGL_Context *context, int target, void *buffer)
 {
@@ -346,6 +426,10 @@ _egl_image_create(EVGL_Context *context, int target, void *buffer)
 #endif
 }
 
+/**
+ * @brief Destroys an EGLImage.
+ * @param image The EGLImage handle to destroy.
+ */
 static void
 _egl_image_destroy(void *image)
 {
@@ -369,6 +453,14 @@ _egl_image_destroy(void *image)
 #endif
 }
 
+/**
+ * @brief Generates a new framebuffer object.
+ *
+ * This handles GLES1 (OES extension) and GLES2/3 paths.
+ *
+ * @param buf Pointer to a GLuint to store the new framebuffer ID.
+ * @param version The GLES version of the current context.
+ */
 static void
 _framebuffer_create(GLuint *buf, Evas_GL_Context_Version version)
 {
@@ -383,6 +475,14 @@ _framebuffer_create(GLuint *buf, Evas_GL_Context_Version version)
      }
 }
 
+/**
+ * @brief Binds a framebuffer object.
+ *
+ * This handles GLES1 (OES extension) and GLES2/3 paths.
+ *
+ * @param buf The framebuffer ID to bind.
+ * @param version The GLES version of the current context.
+ */
 static void
 _framebuffer_bind(GLuint buf, Evas_GL_Context_Version version)
 {
@@ -397,6 +497,12 @@ _framebuffer_bind(GLuint buf, Evas_GL_Context_Version version)
      }
 }
 
+/**
+ * @brief Binds a framebuffer to the GL_DRAW_FRAMEBUFFER target (GLES3+).
+ *
+ * @param buf The framebuffer ID to bind.
+ * @param version The GLES version of the current context.
+ */
 static void
 _framebuffer_draw_bind(GLuint buf, Evas_GL_Context_Version version)
 {
@@ -404,8 +510,15 @@ _framebuffer_draw_bind(GLuint buf, Evas_GL_Context_Version version)
      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, buf);
 }
 
-//This function is not needed in EvasGL backend engine with GLES 2.0.
-//But It is useful when EvasGL backend works with GLES 3.X and use read buffers.
+/**
+ * @brief Binds a framebuffer to the GL_READ_FRAMEBUFFER target (GLES3+).
+ *
+ * @note This function is not needed in EvasGL backend engine with GLES 2.0.
+ * But It is useful when EvasGL backend works with GLES 3.X and use read buffers.
+ *
+ * @param buf The framebuffer ID to bind.
+ * @param version The GLES version of the current context.
+ */
 static void
 _framebuffer_read_bind(GLuint buf, Evas_GL_Context_Version version)
 {
@@ -413,6 +526,14 @@ _framebuffer_read_bind(GLuint buf, Evas_GL_Context_Version version)
      glBindFramebuffer(GL_READ_FRAMEBUFFER, buf);
 }
 
+/**
+ * @brief Checks the status of the currently bound framebuffer.
+ *
+ * This handles GLES1 (OES extension) and GLES2/3 paths.
+ *
+ * @param version The GLES version of the current context.
+ * @return The framebuffer status (e.g., GL_FRAMEBUFFER_COMPLETE).
+ */
 static GLenum
 _framebuffer_check(Evas_GL_Context_Version version)
 {
@@ -430,6 +551,10 @@ _framebuffer_check(Evas_GL_Context_Version version)
 }
 
 // Gen Renderbuffer
+/**
+ * @brief Generates a new renderbuffer object.
+ * @param buf Pointer to a GLuint to store the new renderbuffer ID.
+ */
 static void
 _renderbuffer_create(GLuint *buf)
 {
@@ -438,6 +563,17 @@ _renderbuffer_create(GLuint *buf)
 
 
 // Attach a renderbuffer with the given format to already bound FBO
+/**
+ * @brief Creates and allocates storage for a renderbuffer.
+ *
+ * This handles MSAA and non-MSAA cases.
+ *
+ * @param buf The renderbuffer ID.
+ * @param fmt The internal format of the renderbuffer.
+ * @param w Width of the renderbuffer.
+ * @param h Height of the renderbuffer.
+ * @param samples The number of samples for multisampling.
+ */
 static void
 _renderbuffer_allocate(GLuint buf, GLenum fmt, int w, int h, int samples)
 {
@@ -461,6 +597,10 @@ _renderbuffer_allocate(GLuint buf, GLenum fmt, int w, int h, int samples)
    glBindRenderbuffer(GL_RENDERBUFFER, 0);
 }
 
+/**
+ * @brief Deletes a renderbuffer object.
+ * @param buf Pointer to the renderbuffer ID to delete. It is set to 0 on return.
+ */
 static void
 _renderbuffer_destroy(GLuint *buf)
 {
@@ -472,6 +612,15 @@ _renderbuffer_destroy(GLuint *buf)
 }
 
 // Attach a renderbuffer with the given format to already bound FBO
+/**
+ * @brief Attaches a renderbuffer to the currently bound framebuffer.
+ *
+ * This handles GLES1 (OES extension) and GLES2/3 paths.
+ *
+ * @param buf The renderbuffer ID to attach.
+ * @param attach The framebuffer attachment point (e.g., GL_DEPTH_ATTACHMENT).
+ * @param version The GLES version of the current context.
+ */
 static void
 _renderbuffer_attach(GLuint buf, GLenum attach, Evas_GL_Context_Version version)
 {
@@ -488,6 +637,21 @@ _renderbuffer_attach(GLuint buf, GLenum attach, Evas_GL_Context_Version version)
 
 // Check whether the given FBO surface config is supported by the driver
 // TODO - we also should test with GLES3's formats.
+/**
+ * @brief Tests if a given FBO configuration is supported by the driver.
+ *
+ * This function attempts to create a temporary FBO with the specified color,
+ * depth, and stencil formats, and with a given number of multisamples. It then
+ * checks the FBO's completeness to determine if the driver supports this
+ * particular combination. All created resources are cleaned up before returning.
+ *
+ * @param color_ifmt The internal format for the color buffer texture.
+ * @param color_fmt The format for the color buffer texture.
+ * @param depth_fmt The format for the depth buffer. Can be a renderbuffer or texture format.
+ * @param stencil_fmt The format for the stencil buffer.
+ * @param mult_samples The number of samples for multisampling.
+ * @return 1 if the FBO configuration is complete (supported), 0 otherwise.
+ */
 static int
 _fbo_surface_cap_test(GLint color_ifmt, GLenum color_fmt,
                       GLenum depth_fmt, GLenum stencil_fmt, int mult_samples)
@@ -591,6 +755,20 @@ _fbo_surface_cap_test(GLint color_ifmt, GLenum color_fmt,
       return 1;
 }
 
+/**
+ * @brief A wrapper around _fbo_surface_cap_test to populate surface format structures.
+ *
+ * This function calls _fbo_surface_cap_test and, if the test is successful,
+ * it populates an EVGL_Surface_Format structure with the details of the
+ * supported format. It also handles the special case of combined depth-stencil formats.
+ *
+ * @param fmt A pointer to the EVGL_Surface_Format structure to populate.
+ * @param color A pointer to a GL_Format struct for the color format.
+ * @param depth A pointer to a GL_Format struct for the depth format.
+ * @param stencil A pointer to a GL_Format struct for the stencil format.
+ * @param samples The number of multisamples.
+ * @return 1 if the format is supported, 0 otherwise.
+ */
 static int
 _surface_cap_test(EVGL_Surface_Format *fmt, GL_Format *color,
                   GL_Format *depth, GL_Format *stencil, int samples)
@@ -634,6 +812,16 @@ _surface_cap_test(EVGL_Surface_Format *fmt, GL_Format *color,
 }
 
 
+/**
+ * @brief Probes for all supported FBO surface formats.
+ *
+ * This function iterates through a predefined list of common color, depth, and
+ * stencil formats, and multisampling configurations. For each combination, it
+ * calls _surface_cap_test to check for driver support. The supported formats
+ * are stored in the global engine capabilities structure.
+ *
+ * @return The number of supported FBO formats found.
+ */
 static int
 _surface_cap_check()
 {

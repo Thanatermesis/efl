@@ -1,11 +1,28 @@
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
+
+/**
+ * @file emotion_gstreamer.c
+ * @brief Implementation of the GStreamer backend for Emotion.
+ *
+ * This file contains the GStreamer-specific logic for video and audio
+ * playback, including pipeline management, event handling, and
+ * interaction with the Evas display system.
+ */
+
 #include "emotion_gstreamer.h"
 
 int _emotion_gstreamer_log_domain = -1;
 Eina_Bool debug_fps = EINA_FALSE;
 
+/**
+ * @brief Counter for module initialization.
+ *
+ * Tracks how many times gstreamer_module_init() has been called without
+ * a corresponding gstreamer_module_shutdown(). This ensures that GStreamer
+ * is initialized only once and deinitialized when no longer needed.
+ */
 static int _emotion_init_count = 0;
 
 /* Callbacks to get the eos */
@@ -18,11 +35,25 @@ static GstBusSyncReply _bus_sync_handler(GstBus *bus,
                                          GstMessage *message,
                                          gpointer data);
 
+// These are forward declarations for functions defined later and used by the Emotion_Engine struct.
+// Their full Doxygen comments will be with their definitions.
 static void em_audio_channel_volume_set(void *video, double vol);
 static void em_audio_channel_mute_set(void *video, int mute);
 
 /* Module interface */
 
+/**
+ * @brief Get the GStreamer element name for a given visualization type.
+ *
+ * This function maps an Emotion_Vis enum value to the corresponding
+ * GStreamer element name that provides the visualization.
+ *
+ * @param visualisation The Emotion_Vis enum value.
+ * @return The GStreamer element name as a string, or NULL if no specific
+ *         element is associated with EMOTION_VIS_NONE. Returns "goom"
+ *         for unknown or default visualization types.
+ * @example emotion_visualization_element_name_get(EMOTION_VIS_GOOM) returns "goom".
+ */
 static const char *
 emotion_visualization_element_name_get(Emotion_Vis visualisation)
 {
@@ -71,6 +102,13 @@ emotion_visualization_element_name_get(Emotion_Vis visualisation)
      }
 }
 
+/**
+ * @brief Increments the reference count of an Emotion_Gstreamer instance.
+ * @param ev The Emotion_Gstreamer instance.
+ * @return The same Emotion_Gstreamer instance.
+ * @see emotion_gstreamer_unref
+ * @note This function is already documented in emotion_gstreamer.h.
+ */
 Emotion_Gstreamer *
 emotion_gstreamer_ref(Emotion_Gstreamer *ev)
 {
@@ -78,6 +116,13 @@ emotion_gstreamer_ref(Emotion_Gstreamer *ev)
   return ev;
 }
 
+/**
+ * @brief Decrements the reference count of an Emotion_Gstreamer instance.
+ * If the reference count reaches zero, the instance is freed.
+ * @param ev The Emotion_Gstreamer instance.
+ * @see emotion_gstreamer_ref
+ * @note This function is already documented in emotion_gstreamer.h.
+ */
 void
 emotion_gstreamer_unref(Emotion_Gstreamer *ev)
 {
@@ -92,6 +137,17 @@ emotion_gstreamer_unref(Emotion_Gstreamer *ev)
     }
 }
 
+/**
+ * @brief Opens a media file or URI for playback.
+ *
+ * Implements the `file_open` callback for the Emotion_Engine API.
+ * This function initializes the GStreamer pipeline for the given media.
+ *
+ * @param video A void pointer to the Emotion_Gstreamer instance.
+ * @param file The path or URI of the media file to open.
+ *             Example: "/path/to/video.mp4" or "http://example.com/stream.ogg"
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 em_file_open(void *video,
              const char *file)
@@ -136,6 +192,15 @@ em_file_open(void *video,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Closes the currently open media file and releases associated resources.
+ *
+ * Implements the `file_close` callback for the Emotion_Engine API.
+ * This function stops playback, tears down the GStreamer pipeline, and
+ * cleans up resources.
+ *
+ * @param video A void pointer to the Emotion_Gstreamer instance.
+ */
 static void
 em_file_close(void *video)
 {
@@ -181,6 +246,15 @@ em_file_close(void *video)
    ev->ready = EINA_FALSE;
 }
 
+/**
+ * @brief Deletes the Emotion_Gstreamer instance and frees all associated resources.
+ *
+ * Implements the `del` callback for the Emotion_Engine API.
+ * This function ensures that the file is closed before unreferencing
+ * the GStreamer instance, which might lead to its deallocation.
+ *
+ * @param video A void pointer to the Emotion_Gstreamer instance.
+ */
 static void
 em_del(void *video)
 {
@@ -191,6 +265,17 @@ em_del(void *video)
    emotion_gstreamer_unref(ev);
 }
 
+/**
+ * @brief Starts or resumes playback of the media.
+ *
+ * Implements the `play` callback for the Emotion_Engine API.
+ * Sets the GStreamer pipeline state to PLAYING if it's ready and not buffering.
+ * The `pos` parameter is currently unused by this backend for starting playback,
+ * as position is typically set via `em_pos_set` before play or during seeking.
+ *
+ * @param video A void pointer to the Emotion_Gstreamer instance.
+ * @param pos The position from which to start playback (currently unused here).
+ */
 static void
 em_play(void   *video,
         double  pos EINA_UNUSED)
@@ -204,6 +289,15 @@ em_play(void   *video,
    ev->play = EINA_TRUE;
 }
 
+/**
+ * @brief Pauses playback of the media.
+ *
+ * Implements the `stop` callback for the Emotion_Engine API.
+ * Sets the GStreamer pipeline state to PAUSED if it's ready.
+ * Note: In Emotion's API, "stop" often means "pause".
+ *
+ * @param video A void pointer to the Emotion_Gstreamer instance.
+ */
 static void
 em_stop(void *video)
 {
@@ -216,6 +310,16 @@ em_stop(void *video)
    ev->play = EINA_FALSE;
 }
 
+/**
+ * @brief Gets the dimensions (width and height) of the video stream.
+ *
+ * Implements the `size_get` callback for the Emotion_Engine API.
+ * Queries the GStreamer pipeline for the video dimensions.
+ *
+ * @param video A void pointer to the Emotion_Gstreamer instance.
+ * @param[out] width Pointer to an integer where the video width will be stored.
+ * @param[out] height Pointer to an integer where the video height will be stored.
+ */
 static void
 em_size_get(void  *video,
             int   *width,
@@ -249,6 +353,16 @@ em_size_get(void  *video,
    gst_caps_unref(caps);
 }
 
+/**
+ * @brief Sets the current playback position.
+ *
+ * Implements the `pos_set` callback for the Emotion_Engine API.
+ * Seeks the GStreamer pipeline to the specified time position.
+ *
+ * @param video A void pointer to the Emotion_Gstreamer instance.
+ * @param pos The desired playback position in seconds.
+ *            Example: 120.5 for 2 minutes and 0.5 seconds.
+ */
 static void
 em_pos_set(void   *video,
            double  pos)
@@ -265,6 +379,15 @@ em_pos_set(void   *video,
                           GST_SEEK_TYPE_NONE, -1);
 }
 
+/**
+ * @brief Gets the total duration of the media.
+ *
+ * Implements the `len_get` callback for the Emotion_Engine API.
+ * Queries the GStreamer pipeline for the media duration.
+ *
+ * @param video A void pointer to the Emotion_Gstreamer instance.
+ * @return The total duration of the media in seconds, or 0.0 if not available.
+ */
 static double
 em_len_get(void *video)
 {
@@ -282,6 +405,16 @@ em_len_get(void *video)
    return val / 1000000000.0;
 }
 
+/**
+ * @brief Gets the current buffer fill level.
+ *
+ * Implements the `buffer_size_get` callback for the Emotion_Engine API.
+ * Queries the GStreamer pipeline for the buffering progress.
+ *
+ * @param video A void pointer to the Emotion_Gstreamer instance.
+ * @return The buffer fill level as a fraction (0.0 to 1.0).
+ *         Example: 0.75 means the buffer is 75% full.
+ */
 static double
 em_buffer_size_get(void *video)
 {
@@ -302,6 +435,17 @@ em_buffer_size_get(void *video)
    return ((float)(percent)) / 100.0;
 }
 
+/**
+ * @brief Internal helper function to get the frames per second (FPS) of the video.
+ *
+ * This function queries the GStreamer pipeline for the video's FPS,
+ * returned as a numerator and a denominator.
+ *
+ * @param ev The Emotion_Gstreamer instance.
+ * @param[out] n Pointer to an integer where the FPS numerator will be stored.
+ * @param[out] d Pointer to an integer where the FPS denominator will be stored.
+ * @return EINA_TRUE if FPS information was successfully retrieved, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _em_fps_get(Emotion_Gstreamer *ev, int *n, int *d)
 {
@@ -338,6 +482,14 @@ _em_fps_get(Emotion_Gstreamer *ev, int *n, int *d)
    return ret;
 }
 
+/**
+ * @brief Gets the numerator of the video's frames per second (FPS).
+ *
+ * Implements the `fps_num_get` callback for the Emotion_Engine API.
+ *
+ * @param video A void pointer to the Emotion_Gstreamer instance.
+ * @return The FPS numerator, or 0 if not available.
+ */
 static int
 em_fps_num_get(void *video)
 {
@@ -349,6 +501,14 @@ em_fps_num_get(void *video)
    return num;
 }
 
+/**
+ * @brief Gets the denominator of the video's frames per second (FPS).
+ *
+ * Implements the `fps_den_get` callback for the Emotion_Engine API.
+ *
+ * @param video A void pointer to the Emotion_Gstreamer instance.
+ * @return The FPS denominator, or 1 if not available (to avoid division by zero).
+ */
 static int
 em_fps_den_get(void *video)
 {
@@ -360,6 +520,14 @@ em_fps_den_get(void *video)
    return den;
 }
 
+/**
+ * @brief Gets the video's frames per second (FPS) as a double.
+ *
+ * Implements the `fps_get` callback for the Emotion_Engine API.
+ *
+ * @param video A void pointer to the Emotion_Gstreamer instance.
+ * @return The FPS as a double value (e.g., 29.97), or 0.0 if not available.
+ */
 static double
 em_fps_get(void *video)
 {

@@ -12,6 +12,16 @@ _efl_canvas_gesture_recognizer_tap_efl_canvas_gesture_recognizer_type_get(const 
    return EFL_CANVAS_GESTURE_TAP_CLASS;
 }
 
+/**
+ * @brief Callback function invoked when the tap gesture times out.
+ *
+ * This function is called if a touch event doesn't complete within the
+ * predefined tap timeout duration. It cancels the ongoing gesture and
+ * triggers a tap event with a canceled state.
+ *
+ * @param data Pointer to Efl_Canvas_Gesture_Recognizer_Tap_Data.
+ * @return ECORE_CALLBACK_CANCEL to automatically remove the timer.
+ */
 static Eina_Bool
 _tap_timeout_cb(void *data)
 {
@@ -24,6 +34,25 @@ _tap_timeout_cb(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Recognizes a tap gesture based on touch events.
+ *
+ * This function processes touch events to determine if a tap gesture has occurred.
+ * It handles touch begin, update, and end states, manages a timeout for tap recognition,
+ * and considers factors like finger movement and multi-touch scenarios.
+ *
+ * @param obj The Efl_Canvas_Gesture_Recognizer_Tap object.
+ * @param pd The private data for the tap recognizer.
+ * @param gesture The Efl_Canvas_Gesture object representing the current gesture.
+ * @param watched The Efl_Object being watched for gestures.
+ * @param event The Efl_Canvas_Gesture_Touch event that triggered the recognizer.
+ * @return An Efl_Canvas_Gesture_Recognizer_Result indicating the outcome of the recognition.
+ *         Possible values include:
+ *         - EFL_GESTURE_RECOGNIZER_RESULT_TRIGGER: Gesture is ongoing.
+ *         - EFL_GESTURE_RECOGNIZER_RESULT_FINISH: Gesture completed successfully.
+ *         - EFL_GESTURE_RECOGNIZER_RESULT_CANCEL: Gesture was canceled.
+ *         - EFL_GESTURE_RECOGNIZER_RESULT_IGNORE: Event should be ignored for this gesture.
+ */
 EOLIAN static Efl_Canvas_Gesture_Recognizer_Result
 _efl_canvas_gesture_recognizer_tap_efl_canvas_gesture_recognizer_recognize(Eo *obj EINA_UNUSED,
                                                                            Efl_Canvas_Gesture_Recognizer_Tap_Data *pd,
@@ -43,6 +72,8 @@ _efl_canvas_gesture_recognizer_tap_efl_canvas_gesture_recognizer_recognize(Eo *o
      {
       case EFL_GESTURE_TOUCH_STATE_BEGIN:
       {
+        /* This label is used to restart the tap recognition process if a new distinct touch occurs
+         * during the UPDATE phase, effectively treating it as a new potential tap. */
 new_tap:
          pos = efl_gesture_touch_start_point_get(event);
          efl_gesture_hotspot_set(gesture, pos);
@@ -57,16 +88,19 @@ new_tap:
       }
 
       case EFL_GESTURE_TOUCH_STATE_UPDATE:
-        /* multi-touch */
+        /* Handle multi-touch scenarios during the update phase. */
         if (efl_gesture_touch_current_data_get(event)->action == EFL_POINTER_ACTION_DOWN)
           {
-             /* a second finger was pressed at the same time-ish as the first: combine into same event */
+             /* If a second finger is pressed very shortly after the first,
+              * it's considered part of the same initial touch interaction and ignored for tap purposes,
+              * as a tap is typically a single-finger action. */
              if (efl_gesture_touch_current_timestamp_get(event) - efl_gesture_timestamp_get(gesture) < TAP_TOUCH_TIME_THRESHOLD)
                {
                   result = EFL_GESTURE_RECOGNIZER_RESULT_IGNORE;
                   break;
                }
-             /* another distinct touch occurred, treat this as a new touch */
+             /* If a second finger press occurs after a significant delay,
+              * it's treated as a new, distinct touch, and the tap recognition process restarts. */
              goto new_tap;
           }
         EINA_FALLTHROUGH;

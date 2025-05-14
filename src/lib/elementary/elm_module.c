@@ -6,6 +6,24 @@
 #include "../../static_libs/buildsystem/buildsystem.h"
 #include "elm_priv.h"
 
+/**
+ * @file
+ * @brief Elementary module loading and management.
+ *
+ * This file implements the module system for Elementary. Modules allow for
+ * extending or modifying the behavior of Elementary widgets and core
+ * functionalities at runtime. They are identified by names and can be
+ * plugged into specific "slots" to serve particular purposes.
+ *
+ * Configuration of modules is typically done via the ELM_MODULES environment
+ * variable. For example:
+ * @code
+ * export ELM_MODULES="my_module>entry/api:another_module>widget/custom_behavior"
+ * @endcode
+ * This would load "my_module" into the "entry/api" slot and
+ * "another_module" into the "widget/custom_behavior" slot.
+ */
+
 /* what are moodules in elementary for? for modularising behavior and features
  * so they can be plugged in and out where you dont want the core source to
  * always behave like that or do it that way. plug it at runtime!

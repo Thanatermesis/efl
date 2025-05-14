@@ -1,3 +1,13 @@
+/**
+ * @file
+ * @brief Evas engine for rendering to a memory buffer.
+ *
+ * This engine allows Evas to render its canvas content directly into a
+ * pre-allocated memory buffer. It's useful for scenarios where Evas is
+ * used as an off-screen rendering tool or for integration with custom
+ * display mechanisms.
+ */
+
 #include "evas_common_private.h"
 #include "evas_private.h"
 #include "evas_engine.h"
@@ -23,6 +33,26 @@ typedef Render_Output_Software_Generic Render_Engine;
 static void eng_output_free(void *engine EINA_UNUSED, void *data);
 
 /* engine api this module provides */
+
+/**
+ * @brief Sets up the output buffer for rendering.
+ *
+ * This function initializes the rendering engine with the provided buffer
+ * information. It configures the output buffer (Outbuf) based on the
+ * destination buffer details, color depth, and other parameters.
+ *
+ * @param engine The Evas engine instance.
+ * @param in Pointer to Evas_Engine_Info_Buffer containing setup details.
+ *        Example:
+ *        info->info.dest_buffer = my_pixel_data;
+ *        info->info.dest_buffer_row_bytes = my_width * 4; // For ARGB32
+ *        info->info.depth_type = EVAS_ENGINE_BUFFER_DEPTH_ARGB32;
+ *        info->info.use_color_key = 0;
+ *        info->info.alpha_threshold = 0;
+ * @param w Width of the output buffer.
+ * @param h Height of the output buffer.
+ * @return A pointer to the configured Render_Engine, or NULL on failure.
+ */
 static void *
 eng_output_setup(void *engine, void *in, unsigned int w, unsigned int h)
 {
@@ -97,6 +127,15 @@ eng_output_setup(void *engine, void *in, unsigned int w, unsigned int h)
    return NULL;
 }
 
+/**
+ * @brief Sets up engine-specific information.
+ *
+ * This function configures properties of the Evas_Engine_Info_Buffer
+ * structure that are specific to this buffer engine.
+ *
+ * @param info Pointer to Evas_Engine_Info_Buffer to be configured.
+ *             The render_mode field will be set.
+ */
 static void
 eng_output_info_setup(void *info)
 {
@@ -105,8 +144,19 @@ eng_output_info_setup(void *info)
    einfo->render_mode = EVAS_RENDER_MODE_BLOCKING;
 }
 
+/**
+ * @brief Frees the resources associated with the output engine.
+ *
+ * Cleans up and deallocates the Render_Engine structure and any
+ * associated resources, including the underlying generic software
+ * rendering engine components.
+ *
+ * @param engine The Evas engine instance (unused in this specific function
+ *               but part of the Evas_Func signature).
+ * @param data Pointer to the Render_Engine data to be freed.
+ */
 static void
-eng_output_free(void *engine, void *data)
+eng_output_free(void *engine EINA_UNUSED, void *data)
 {
    Render_Engine *re;
 
@@ -117,6 +167,16 @@ eng_output_free(void *engine, void *data)
      }
 }
 
+/**
+ * @brief Gets the alpha channel state of the canvas.
+ *
+ * Determines if the canvas (specifically its back buffer) uses an
+ * alpha channel.
+ *
+ * @param data Pointer to the Render_Engine data.
+ * @return EINA_TRUE if the canvas has an alpha channel, EINA_FALSE otherwise.
+ *         Returns EINA_TRUE if Render_Engine or its back buffer is NULL.
+ */
 static Eina_Bool
 eng_canvas_alpha_get(void *data)
 {
@@ -129,6 +189,18 @@ eng_canvas_alpha_get(void *data)
 }
 
 /* module advertising code */
+
+/**
+ * @brief Opens and initializes the buffer engine module.
+ *
+ * This function is called when the Evas module is loaded. It inherits
+ * functions from a parent "software_generic" engine, registers a log
+ * domain, and overrides specific engine functions with implementations
+ * from this buffer engine.
+ *
+ * @param em Pointer to the Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -158,6 +230,14 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Closes the buffer engine module.
+ *
+ * This function is called when the Evas module is unloaded.
+ * It unregisters the log domain used by this engine.
+ *
+ * @param em Pointer to the Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

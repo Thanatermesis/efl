@@ -1,5 +1,17 @@
 EOAPI EFL_FUNC_BODY_CONST(elm_widget_item_container_focused_item_get, Elm_Widget_Item *, NULL);
 
+/**
+ * @brief Initializes the Elm_Widget_Item_Container interface class.
+ *
+ * @details This function is called once when the class is first constructed.
+ * It sets up the vtable for the interface, binding the Efl_Object operations
+ * to their implementations. In this case, it registers a default (NULL)
+ * implementation for elm_widget_item_container_focused_item_get.
+ *
+ * @param[in] klass The Efl_Class to initialize.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ * @internal
+ */
 static Eina_Bool
 _elm_widget_item_container_class_initializer(Efl_Class *klass)
 {

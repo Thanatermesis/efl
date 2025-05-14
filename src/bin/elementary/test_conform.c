@@ -3,6 +3,17 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Test basic conformant functionality.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event Not used.
+ *
+ * This test creates a window with a conformant object that holds a box
+ * with several widgets. It is designed to verify that the conformant
+ * area correctly resizes and positions its content, especially when
+ * dealing with entries that might trigger a virtual keyboard.
+ */
 void
 test_conformant(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event EINA_UNUSED)
 {
@@ -81,12 +92,35 @@ test_conformant(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *even
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback to pop an item from a naviframe.
+ * @param data The naviframe widget.
+ * @param obj The object that triggered the event.
+ * @param event Not used.
+ *
+ * This function is typically connected to a "back" or "delete" button's
+ * "clicked" signal. It pops the top view from the naviframe stack provided
+ * in the @p data parameter.
+ */
 static void
 popobj(void *data, Evas_Object *obj EINA_UNUSED, void *event EINA_UNUSED)
 {
    elm_naviframe_item_pop(data);
 }
 
+/**
+ * @brief Test conformant widget within a naviframe.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event Not used.
+ *
+ * This test sets up a window with a naviframe. Several views, each
+ * containing a conformant object, are pushed onto the naviframe.
+ * Buttons are provided to pop these views. The test's purpose is to ensure
+ * that conformant objects behave as expected within the lifecycle of
+ * naviframe views (pushing and popping), which can involve complex
+ * geometry changes.
+ */
 void
 test_conformant2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event EINA_UNUSED)
 {

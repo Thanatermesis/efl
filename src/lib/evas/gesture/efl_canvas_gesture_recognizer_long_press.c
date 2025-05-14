@@ -4,12 +4,27 @@
 
 #define EFL_GESTURE_LONG_PRESS_TIME_OUT 1.2
 
+/**
+ * @brief Gets the Efl_Canvas_Gesture_Long_Press class type.
+ *
+ * @param[in] obj The Efl_Object instance.
+ * @param[in] pd The private data for the long press recognizer.
+ * @return The Efl_Canvas_Gesture_Long_Press class.
+ */
 EOLIAN static const Efl_Class *
 _efl_canvas_gesture_recognizer_long_press_efl_canvas_gesture_recognizer_type_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Gesture_Recognizer_Long_Press_Data *pd EINA_UNUSED)
 {
    return EFL_CANVAS_GESTURE_LONG_PRESS_CLASS;
 }
 
+/**
+ * @brief Destructor for the Efl_Canvas_Gesture_Recognizer_Long_Press object.
+ *
+ * Cleans up resources, specifically the ecore_timer used for long press detection.
+ *
+ * @param[in] obj The Efl_Object instance to destruct.
+ * @param[in] pd The private data for the long press recognizer.
+ */
 EOLIAN static void
 _efl_canvas_gesture_recognizer_long_press_efl_object_destructor(Eo *obj,
                                                               Efl_Canvas_Gesture_Recognizer_Long_Press_Data *pd)
@@ -20,6 +35,19 @@ _efl_canvas_gesture_recognizer_long_press_efl_object_destructor(Eo *obj,
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Callback function triggered when the long press timer expires.
+ *
+ * This function is called by an ecore_timer when the duration defined for a
+ * long press has been met without the touch being cancelled or moving
+ * significantly. It sets the gesture state to UPDATED and triggers the
+ * EFL_EVENT_GESTURE_LONG_PRESS event.
+ *
+ * @param[in] data Pointer to Efl_Canvas_Gesture_Recognizer_Long_Press_Data.
+ * @return ECORE_CALLBACK_RENEW to keep the timer going if needed, though
+ *         typically a long press event is a one-off for a given touch sequence.
+ *         However, the current implementation uses RENEW.
+ */
 static Eina_Bool
 _long_press_timeout_cb(void *data)
 {
@@ -34,6 +62,25 @@ _long_press_timeout_cb(void *data)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Recognizes a long press gesture based on touch events.
+ *
+ * This function processes touch events (BEGIN, UPDATE, END) to determine if
+ * a long press gesture has occurred.
+ * A long press is typically recognized when a touch point remains relatively
+ * stationary for a specific duration.
+ *
+ * @param[in] obj The Efl_Object instance.
+ * @param[in] pd The private data for the long press recognizer.
+ * @param[in] gesture The Efl_Canvas_Gesture object to update.
+ * @param[in] watched The Efl_Object being watched for gestures.
+ * @param[in] event The Efl_Canvas_Gesture_Touch event data.
+ * @return An Efl_Canvas_Gesture_Recognizer_Result indicating the outcome:
+ *         - EFL_GESTURE_RECOGNIZER_RESULT_TRIGGER: Gesture may start.
+ *         - EFL_GESTURE_RECOGNIZER_RESULT_MAYBE: Gesture might continue.
+ *         - EFL_GESTURE_RECOGNIZER_RESULT_FINISH: Gesture recognized.
+ *         - EFL_GESTURE_RECOGNIZER_RESULT_CANCEL: Gesture cancelled.
+ */
 EOLIAN static Efl_Canvas_Gesture_Recognizer_Result
 _efl_canvas_gesture_recognizer_long_press_efl_canvas_gesture_recognizer_recognize(Eo *obj,
                                                                                 Efl_Canvas_Gesture_Recognizer_Long_Press_Data *pd,

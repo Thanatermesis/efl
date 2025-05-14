@@ -1,7 +1,20 @@
 
 void _evas_canvas_image_cache_set(Eo *obj, Evas_Public_Data *pd, int size);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function for setting the 'image_cache' property.
+ *
+ * This function is part of the Eolian reflection system. It is called when
+ * the 'image_cache' property of an Evas_Canvas object is set using
+ * efl_property_set() or similar Eolian mechanisms. It converts the
+ * Eina_Value @p val to an integer and calls the public
+ * evas_canvas_image_cache_set() function.
+ *
+ * @param obj The Evas Canvas object.
+ * @param val The Eina_Value containing the new image cache size (expected to be an integer).
+ * @return EINA_ERROR_NO_ERROR on success, or an error code if conversion fails.
+ */
 static Eina_Error
 __eolian_evas_canvas_image_cache_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -21,7 +34,20 @@ EVAS_API EVAS_API_WEAK EFL_VOID_FUNC_BODYV(evas_canvas_image_cache_set, EFL_FUNC
 
 int _evas_canvas_image_cache_get(const Eo *obj, Evas_Public_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function for getting the 'image_cache' property.
+ *
+ * This function is part of the Eolian reflection system. It is called when
+ * the 'image_cache' property of an Evas_Canvas object is retrieved using
+ * efl_property_get() or similar Eolian mechanisms. It calls the public
+ * evas_canvas_image_cache_get() function and wraps the integer result
+ * in an Eina_Value.
+ *
+ * @param obj The Evas Canvas object.
+ * @return An Eina_Value containing the image cache size as an integer.
+ *         The Eina_Value should be flushed by the caller if it's not an error value.
+ */
 static Eina_Value
 __eolian_evas_canvas_image_cache_get_reflect(const Eo *obj)
 {
@@ -31,6 +57,17 @@ __eolian_evas_canvas_image_cache_get_reflect(const Eo *obj)
 
 EVAS_API EVAS_API_WEAK EFL_FUNC_BODY_CONST(evas_canvas_image_cache_get, int, 0);
 
+/**
+ * @internal
+ * @brief Declaration of the internal implementation for evas_canvas_event_default_flags_set().
+ *
+ * This function is the core implementation for setting the default event flags
+ * on an Evas_Canvas.
+ *
+ * @param obj The Evas Canvas object.
+ * @param pd Pointer to the Evas_Public_Data structure, holding internal state for the canvas.
+ * @param flags The Evas_Event_Flags to be set as default.
+ */
 void _evas_canvas_event_default_flags_set(Eo *obj, Evas_Public_Data *pd, Evas_Event_Flags flags);
 
 EVAS_API EVAS_API_WEAK EFL_VOID_FUNC_BODYV(evas_canvas_event_default_flags_set, EFL_FUNC_CALL(flags), Evas_Event_Flags flags);
@@ -41,7 +78,20 @@ EVAS_API EVAS_API_WEAK EFL_FUNC_BODY_CONST(evas_canvas_event_default_flags_get, 
 
 void _evas_canvas_font_cache_set(Eo *obj, Evas_Public_Data *pd, int size);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function for setting the 'font_cache' property.
+ *
+ * This function is part of the Eolian reflection system. It is called when
+ * the 'font_cache' property of an Evas_Canvas object is set using
+ * efl_property_set() or similar Eolian mechanisms. It converts the
+ * Eina_Value @p val to an integer and calls the public
+ * evas_canvas_font_cache_set() function.
+ *
+ * @param obj The Evas Canvas object.
+ * @param val The Eina_Value containing the new font cache size (expected to be an integer).
+ * @return EINA_ERROR_NO_ERROR on success, or an error code if conversion fails.
+ */
 static Eina_Error
 __eolian_evas_canvas_font_cache_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -61,7 +111,20 @@ EVAS_API EVAS_API_WEAK EFL_VOID_FUNC_BODYV(evas_canvas_font_cache_set, EFL_FUNC_
 
 int _evas_canvas_font_cache_get(const Eo *obj, Evas_Public_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function for getting the 'font_cache' property.
+ *
+ * This function is part of the Eolian reflection system. It is called when
+ * the 'font_cache' property of an Evas_Canvas object is retrieved using
+ * efl_property_get() or similar Eolian mechanisms. It calls the public
+ * evas_canvas_font_cache_get() function and wraps the integer result
+ * in an Eina_Value.
+ *
+ * @param obj The Evas Canvas object.
+ * @return An Eina_Value containing the font cache size as an integer.
+ *         The Eina_Value should be flushed by the caller if it's not an error value.
+ */
 static Eina_Value
 __eolian_evas_canvas_font_cache_get_reflect(const Eo *obj)
 {
@@ -315,9 +378,31 @@ int _evas_canvas_coord_world_y_to_screen(const Eo *obj, Evas_Public_Data *pd, in
 
 EVAS_API EVAS_API_WEAK EFL_FUNC_BODYV_CONST(evas_canvas_coord_world_y_to_screen, int, 0, EFL_FUNC_CALL(y), int y);
 
+/**
+ * @internal
+ * @brief Declaration of the Efl_Object constructor implementation for Evas_Canvas.
+ *
+ * This function is called when a new Evas_Canvas object is constructed.
+ * It is responsible for initializing the Evas_Public_Data and any other
+ * internal state specific to an Evas_Canvas instance.
+ *
+ * @param obj The Evas Canvas object (Eo *) being constructed.
+ * @param pd Pointer to the Evas_Public_Data structure associated with the object.
+ * @return The constructed Efl_Object, typically @p obj itself, or NULL on failure.
+ */
 Efl_Object *_evas_canvas_efl_object_constructor(Eo *obj, Evas_Public_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Declaration of the Efl_Object destructor implementation for Evas_Canvas.
+ *
+ * This function is called when an Evas_Canvas object is being destroyed.
+ * It must free all resources allocated by the constructor and associated
+ * with this canvas instance, stored within @p pd or elsewhere.
+ *
+ * @param obj The Evas Canvas object (Eo *) being destroyed.
+ * @param pd Pointer to the Evas_Public_Data structure associated with the object.
+ */
 void _evas_canvas_efl_object_destructor(Eo *obj, Evas_Public_Data *pd);
 
 
@@ -371,7 +456,18 @@ void _evas_canvas_efl_canvas_scene_group_objects_calculate(Eo *obj, Evas_Public_
 
 Eina_Bool _evas_canvas_efl_canvas_scene_group_objects_calculating_get(const Eo *obj, Evas_Public_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Initializes the Evas_Canvas Efl_Class structure.
+ *
+ * This function is called by the Efl object system when the Evas_Canvas
+ * class is first loaded or used. It sets up the vtable (ops) for Evas_Canvas
+ * methods and registers its Eolian properties along with their reflection
+ * functions.
+ *
+ * @param klass The Efl_Class pointer for Evas_Canvas to be initialized.
+ * @return EINA_TRUE on successful initialization, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _evas_canvas_class_initializer(Efl_Class *klass)
 {
@@ -383,6 +479,9 @@ _evas_canvas_class_initializer(Efl_Class *klass)
 #define EVAS_CANVAS_EXTRA_OPS
 #endif
 
+   // Defines the Efl_Object_Ops structure for Evas_Canvas.
+   // This structure maps Eolian-defined operations (methods) to their
+   // C function implementations (the _evas_canvas_... prefixed functions).
    EFL_OPS_DEFINE(ops,
       EFL_OBJECT_OP_FUNC(evas_canvas_image_cache_set, _evas_canvas_image_cache_set),
       EFL_OBJECT_OP_FUNC(evas_canvas_image_cache_get, _evas_canvas_image_cache_get),
@@ -474,6 +573,12 @@ _evas_canvas_class_initializer(Efl_Class *klass)
    );
    opsp = &ops;
 
+   // Defines the Eolian property reflection table for Evas_Canvas.
+   // This table maps property names (as strings) to their corresponding
+   // setter and getter reflection functions (__eolian_..._reflect).
+   // These reflection functions are used by the Eolian system to
+   // dynamically access properties, for instance, via efl_property_set()
+   // or through scripting language bindings.
    static const Efl_Object_Property_Reflection refl_table[] = {
       {"image_cache", __eolian_evas_canvas_image_cache_set_reflect, __eolian_evas_canvas_image_cache_get_reflect},
       {"font_cache", __eolian_evas_canvas_font_cache_set_reflect, __eolian_evas_canvas_font_cache_get_reflect},

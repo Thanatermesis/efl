@@ -77,29 +77,68 @@ static int EINA_MODULE_LOG_DOM = -1;
 #define EINA_MODULE_SYMBOL_INIT "__eina_module_init"
 #define EINA_MODULE_SYMBOL_SHUTDOWN "__eina_module_shutdown"
 
+/**
+ * @internal
+ * @struct _Eina_Module
+ * @brief Represents a dynamically loadable module.
+ *
+ * This structure holds the state of a module, including its handle,
+ * reference count, and the file path from which it was loaded.
+ */
 struct _Eina_Module
 {
-   void *handle;
-   int ref;
+   void *handle; /**< Handle to the loaded module, e.g., from dlopen(). */
+   int ref; /**< Reference count for the module. */
 
-   Eina_Bool global;
+   Eina_Bool global; /**< Flag indicating if symbols should be globally visible. */
 
-   const char file[1];
+   const char file[1]; /**< Flexible array member for the module's file path. Must be the last member. */
 };
 
+/**
+ * @internal
+ * @struct _Dir_List_Get_Cb_Data
+ * @brief Data structure used as a callback context for eina_module_list_get.
+ *
+ * This structure is passed to the internal _dir_list_get_cb callback.
+ * It holds the user-provided callback, user data, and the array to populate
+ * with Eina_Module instances.
+ */
 typedef struct _Dir_List_Get_Cb_Data
 {
-   Eina_Module_Cb cb;
-   void *data;
-   Eina_Array *array;
+   Eina_Module_Cb cb; /**< User-provided callback function. */
+   void *data; /**< User-provided data for the callback. */
+   Eina_Array *array; /**< Array to store found Eina_Module instances. */
 } Dir_List_Get_Cb_Data;
 
+/**
+ * @internal
+ * @struct _Dir_List_Cb_Data
+ * @brief Data structure used as a callback context for eina_file_dir_list.
+ *
+ * This structure is passed to the _dir_list_cb callback when listing directory contents.
+ * It wraps the actual module processing callback and its data.
+ */
 typedef struct _Dir_List_Cb_Data
 {
-   Eina_Module_Cb cb;
-   void *data;
+   Eina_Module_Cb cb; /**< The callback to be invoked by _dir_list_get_cb. */
+   void *data; /**< Data for the callback `cb`, typically a `_Dir_List_Get_Cb_Data*`. */
 } Dir_List_Cb_Data;
 
+/**
+ * @internal
+ * @brief Callback function used with eina_file_dir_list via _dir_list_cb.
+ *
+ * This function is an intermediary. It receives an Eina_Module and data
+ * (which is a _Dir_List_Get_Cb_Data*). It then calls the user-provided
+ * callback (if any) and, if that callback returns EINA_TRUE, adds the module
+ * to the array.
+ *
+ * @param m The module to process.
+ * @param data A pointer to a Dir_List_Get_Cb_Data structure.
+ * @return EINA_TRUE if the module should be kept (or if no user callback),
+ *         EINA_FALSE if the user callback indicates the module should be discarded.
+ */
 static Eina_Bool _dir_list_get_cb(Eina_Module *m, void *data)
 {
    Dir_List_Get_Cb_Data *cb_data = data;
@@ -114,6 +153,19 @@ static Eina_Bool _dir_list_get_cb(Eina_Module *m, void *data)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Callback function for eina_file_dir_list.
+ *
+ * This function is called by eina_file_dir_list for each entry in a directory.
+ * It checks if the entry is a shared library (based on SHARED_LIB_SUFFIX).
+ * If it is, it creates an Eina_Module for it and calls the next-level callback
+ * (which is _dir_list_get_cb) with the new module.
+ *
+ * @param name The name of the directory entry.
+ * @param path The path to the directory containing the entry.
+ * @param data A pointer to a Dir_List_Cb_Data structure.
+ */
 static void _dir_list_cb(const char *name, const char *path, void *data)
 {
    Dir_List_Cb_Data *cb_data = data;
@@ -146,6 +198,20 @@ static void _dir_list_cb(const char *name, const char *path, void *data)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback function for eina_file_dir_list, specifically for architecture-based module listing.
+ *
+ * This function is called by eina_file_dir_list for each entry in a directory
+ * when searching for modules within architecture-specific subdirectories.
+ * It constructs a full path to an expected module file (e.g., path/name/arch/module.so)
+ * and creates an Eina_Module for it, then adds it to the array.
+ *
+ * @param name The name of the subdirectory (often a category or group name for modules).
+ * @param path The base path being searched.
+ * @param data A pointer to a Dir_List_Get_Cb_Data structure. The `data` field
+ *             of `cb_data` is repurposed here to hold the architecture string.
+ */
 static void _dir_arch_list_cb(const char *name, const char *path, void *data)
 {
    Dir_List_Get_Cb_Data *cb_data = data;

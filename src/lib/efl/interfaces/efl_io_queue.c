@@ -26,21 +26,32 @@
  * all used, would be freed.
  */
 
+/**
+ * @brief Private data structure for Efl_Io_Queue.
+ */
 typedef struct _Efl_Io_Queue_Data
 {
-   uint8_t *bytes;
-   size_t allocated;
-   size_t preallocated;
-   size_t limit;
-   size_t position_read; /* to avoid memmove(), allows some slack */
-   size_t position_write;
-   Eina_Bool pending_eos;
-   Eina_Bool eos;
-   Eina_Bool closed;
-   Eina_Bool can_read;
-   Eina_Bool can_write;
+   uint8_t *bytes;          /**< The internal buffer holding the queue data. */
+   size_t allocated;        /**< Current allocated size of the buffer. */
+   size_t preallocated;     /**< Minimum amount of memory to keep preallocated. */
+   size_t limit;            /**< Maximum size the buffer can grow to. 0 means no limit. */
+   size_t position_read;    /**< Current read offset in the buffer. Used to implement slack. */
+   size_t position_write;   /**< Current write offset in the buffer. Data is [position_read, position_write). */
+   Eina_Bool pending_eos;   /**< EINA_TRUE if EOS is marked but data still needs to be read. */
+   Eina_Bool eos;           /**< EINA_TRUE if End-Of-Stream has been reached and signaled. */
+   Eina_Bool closed;        /**< EINA_TRUE if the queue has been closed. */
+   Eina_Bool can_read;      /**< Cached value of efl_io_reader_can_read_get(). */
+   Eina_Bool can_write;     /**< Cached value of efl_io_writer_can_write_get(). */
 } Efl_Io_Queue_Data;
 
+/**
+ * @brief Reallocates the internal buffer to the specified size.
+ *
+ * @param o The Efl_Io_Queue object.
+ * @param pd The private data of the Efl_Io_Queue object.
+ * @param size The new desired size for the buffer.
+ * @return EINA_TRUE if reallocation occurred, EINA_FALSE otherwise (e.g., size is same as current).
+ */
 static Eina_Bool
 _efl_io_queue_realloc(Eo *o, Efl_Io_Queue_Data *pd, size_t size)
 {
@@ -68,6 +79,16 @@ _efl_io_queue_realloc(Eo *o, Efl_Io_Queue_Data *pd, size_t size)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Calculates the slack amount based on current buffer usage.
+ *
+ * Slack is the amount of "wasted" space at the beginning of the buffer
+ * (due to reads) that is tolerated before a memmove() is triggered to
+ * reclaim it. This helps to avoid frequent memmove() operations.
+ *
+ * @param pd The private data of the Efl_Io_Queue object.
+ * @return The calculated slack size.
+ */
 static size_t
 _efl_io_queue_slack_get(const Efl_Io_Queue_Data *pd)
 {
@@ -79,6 +100,17 @@ _efl_io_queue_slack_get(const Efl_Io_Queue_Data *pd)
    else return 32;
 }
 
+/**
+ * @brief Reallocates the internal buffer to a rounded-up size.
+ *
+ * This function rounds the requested size up to certain thresholds
+ * (32, 128, 1024, 4096 bytes) to reduce the frequency of reallocations.
+ *
+ * @param o The Efl_Io_Queue object.
+ * @param pd The private data of the Efl_Io_Queue object.
+ * @param size The desired minimum size.
+ * @return EINA_TRUE if reallocation occurred, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _efl_io_queue_realloc_rounded(Eo *o, Efl_Io_Queue_Data *pd, size_t size)
 {
@@ -94,7 +126,16 @@ _efl_io_queue_realloc_rounded(Eo *o, Efl_Io_Queue_Data *pd, size_t size)
    return _efl_io_queue_realloc(o, pd, size);
 }
 
-/* reset position_read to zero, allowing all memory for write */
+/**
+ * @brief Adjusts the buffer by moving data to the beginning.
+ *
+ * This function performs a memmove() to shift the unread data
+ * (from position_read to position_write) to the start of the buffer.
+ * It then resets position_read to 0 and updates position_write accordingly.
+ * This reclaims space at the beginning of the buffer.
+ *
+ * @param pd The private data of the Efl_Io_Queue object.
+ */
 static void
 _efl_io_queue_adjust(Efl_Io_Queue_Data *pd)
 {
@@ -104,6 +145,17 @@ _efl_io_queue_adjust(Efl_Io_Queue_Data *pd)
    pd->position_read = 0;
 }
 
+/**
+ * @brief Adjusts the buffer and reallocates if spare space is too large or too small.
+ *
+ * This function first checks if an adjustment (memmove) is needed based on
+ * the current slack and limit. Then, it checks if the spare space at the end
+ * of the buffer is significantly larger than the slack, and if so, shrinks
+ * the buffer (respecting preallocated size).
+ *
+ * @param o The Efl_Io_Queue object.
+ * @param pd The private data of the Efl_Io_Queue object.
+ */
 static void
 _efl_io_queue_adjust_and_realloc_if_needed(Eo *o, Efl_Io_Queue_Data *pd)
 {
@@ -188,18 +240,36 @@ _efl_io_queue_limit_set(Eo *o, Efl_Io_Queue_Data *pd, size_t limit)
    _efl_io_queue_update_cans(o, pd);
 }
 
+/**
+ * @brief Gets the configured limit for the queue size.
+ * @param o The Efl_Io_Queue object (unused).
+ * @param pd The private data of the Efl_Io_Queue object.
+ * @return The size limit in bytes. 0 means no limit.
+ */
 EOLIAN static size_t
 _efl_io_queue_limit_get(const Eo *o EINA_UNUSED, Efl_Io_Queue_Data *pd)
 {
    return pd->limit;
 }
 
+/**
+ * @brief Gets the current number of bytes used in the queue.
+ * @param o The Efl_Io_Queue object (unused).
+ * @param pd The private data of the Efl_Io_Queue object.
+ * @return The number of bytes currently stored and readable.
+ */
 EOLIAN static size_t
 _efl_io_queue_usage_get(const Eo *o EINA_UNUSED, Efl_Io_Queue_Data *pd)
 {
    return pd->position_write - pd->position_read;
 }
 
+/**
+ * @brief Gets a slice representing the currently readable data in the queue.
+ * @param o The Efl_Io_Queue object.
+ * @param pd The private data of the Efl_Io_Queue object.
+ * @return An Eina_Slice pointing to the readable data. The slice is empty if closed or no data.
+ */
 EOLIAN static Eina_Slice
 _efl_io_queue_slice_get(const Eo *o, Efl_Io_Queue_Data *pd)
 {
@@ -214,6 +284,15 @@ _efl_io_queue_slice_get(const Eo *o, Efl_Io_Queue_Data *pd)
    return slice;
 }
 
+/**
+ * @brief Clears all data from the queue.
+ *
+ * Resets read and write positions. If EOS was pending, it's now signaled.
+ * Updates can_read status and emits SLICE_CHANGED event.
+ *
+ * @param o The Efl_Io_Queue object.
+ * @param pd The private data of the Efl_Io_Queue object.
+ */
 EOLIAN static void
 _efl_io_queue_clear(Eo *o, Efl_Io_Queue_Data *pd)
 {
@@ -226,6 +305,16 @@ _efl_io_queue_clear(Eo *o, Efl_Io_Queue_Data *pd)
      efl_io_reader_eos_set(o, EINA_TRUE);
 }
 
+/**
+ * @brief Marks the queue for End-Of-Stream (EOS).
+ *
+ * If there's no data currently in the queue, EOS is signaled immediately.
+ * Otherwise, EOS is marked as pending and will be signaled once all
+ * existing data is read.
+ *
+ * @param o The Efl_Io_Queue object.
+ * @param pd The private data of the Efl_Io_Queue object.
+ */
 EOLIAN static void
 _efl_io_queue_eos_mark(Eo *o, Efl_Io_Queue_Data *pd)
 {
@@ -237,6 +326,15 @@ _efl_io_queue_eos_mark(Eo *o, Efl_Io_Queue_Data *pd)
      efl_io_reader_eos_set(o, EINA_TRUE);
 }
 
+/**
+ * @brief Finalizes the Efl_Io_Queue object.
+ *
+ * Calls the parent's finalize method and then updates the can_read/can_write status.
+ *
+ * @param o The Efl_Io_Queue object.
+ * @param pd The private data of the Efl_Io_Queue object.
+ * @return The finalized Efl_Object, or NULL on failure.
+ */
 EOLIAN static Efl_Object *
 _efl_io_queue_efl_object_finalize(Eo *o, Efl_Io_Queue_Data *pd EINA_UNUSED)
 {
@@ -248,6 +346,15 @@ _efl_io_queue_efl_object_finalize(Eo *o, Efl_Io_Queue_Data *pd EINA_UNUSED)
    return o;
 }
 
+/**
+ * @brief Destructor for the Efl_Io_Queue object.
+ *
+ * Ensures the queue is closed, calls the parent's destructor, and frees
+ * the internal buffer.
+ *
+ * @param o The Efl_Io_Queue object.
+ * @param pd The private data of the Efl_Io_Queue object.
+ */
 EOLIAN static void
 _efl_io_queue_efl_object_destructor(Eo *o, Efl_Io_Queue_Data *pd)
 {
@@ -309,6 +416,15 @@ _efl_io_queue_efl_io_reader_read(Eo *o, Efl_Io_Queue_Data *pd, Eina_Rw_Slice *rw
    return EINVAL;
 }
 
+/**
+ * @brief Discards a specified amount of data from the read end of the queue.
+ *
+ * This is similar to reading, but the data is simply dropped instead of copied.
+ *
+ * @param o The Efl_Io_Queue object.
+ * @param pd The private data of the Efl_Io_Queue object.
+ * @param amount The number of bytes to discard. If greater than available data, all available data is discarded.
+ */
 EOLIAN static void
 _efl_io_queue_discard(Eo *o, Efl_Io_Queue_Data *pd, size_t amount)
 {
@@ -334,12 +450,24 @@ _efl_io_queue_discard(Eo *o, Efl_Io_Queue_Data *pd, size_t amount)
      efl_io_reader_eos_set(o, EINA_TRUE);
 }
 
+/**
+ * @brief Gets the cached can_read status.
+ * @param o The Efl_Io_Queue object (unused).
+ * @param pd The private data of the Efl_Io_Queue object.
+ * @return EINA_TRUE if the queue might have data to read, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_io_queue_efl_io_reader_can_read_get(const Eo *o EINA_UNUSED, Efl_Io_Queue_Data *pd)
 {
    return pd->can_read;
 }
 
+/**
+ * @brief Sets the can_read status and emits an event if it changed.
+ * @param o The Efl_Io_Queue object.
+ * @param pd The private data of the Efl_Io_Queue object.
+ * @param can_read The new can_read status.
+ */
 EOLIAN static void
 _efl_io_queue_efl_io_reader_can_read_set(Eo *o, Efl_Io_Queue_Data *pd, Eina_Bool can_read)
 {
@@ -349,12 +477,24 @@ _efl_io_queue_efl_io_reader_can_read_set(Eo *o, Efl_Io_Queue_Data *pd, Eina_Bool
    efl_event_callback_call(o, EFL_IO_READER_EVENT_CAN_READ_CHANGED, &can_read);
 }
 
+/**
+ * @brief Gets the EOS status.
+ * @param o The Efl_Io_Queue object (unused).
+ * @param pd The private data of the Efl_Io_Queue object.
+ * @return EINA_TRUE if EOS has been signaled, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_io_queue_efl_io_reader_eos_get(const Eo *o EINA_UNUSED, Efl_Io_Queue_Data *pd EINA_UNUSED)
 {
    return pd->eos;
 }
 
+/**
+ * @brief Sets the EOS status and emits an event if it's being set to true.
+ * @param o The Efl_Io_Queue object.
+ * @param pd The private data of the Efl_Io_Queue object.
+ * @param is_eos The new EOS status.
+ */
 EOLIAN static void
 _efl_io_queue_efl_io_reader_eos_set(Eo *o, Efl_Io_Queue_Data *pd EINA_UNUSED, Eina_Bool is_eos)
 {
@@ -436,12 +576,24 @@ _efl_io_queue_efl_io_writer_write(Eo *o, Efl_Io_Queue_Data *pd, Eina_Slice *slic
    return err;
 }
 
+/**
+ * @brief Gets the cached can_write status.
+ * @param o The Efl_Io_Queue object (unused).
+ * @param pd The private data of the Efl_Io_Queue object.
+ * @return EINA_TRUE if the queue can accept more data, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_io_queue_efl_io_writer_can_write_get(const Eo *o EINA_UNUSED, Efl_Io_Queue_Data *pd)
 {
    return pd->can_write;
 }
 
+/**
+ * @brief Sets the can_write status and emits an event if it changed.
+ * @param o The Efl_Io_Queue object.
+ * @param pd The private data of the Efl_Io_Queue object.
+ * @param can_write The new can_write status.
+ */
 EOLIAN static void
 _efl_io_queue_efl_io_writer_can_write_set(Eo *o, Efl_Io_Queue_Data *pd, Eina_Bool can_write)
 {
@@ -451,6 +603,16 @@ _efl_io_queue_efl_io_writer_can_write_set(Eo *o, Efl_Io_Queue_Data *pd, Eina_Boo
    efl_event_callback_call(o, EFL_IO_WRITER_EVENT_CAN_WRITE_CHANGED, &can_write);
 }
 
+/**
+ * @brief Closes the Efl_Io_Queue.
+ *
+ * Marks EOS, clears any remaining data, sets the closed flag, and emits the CLOSED event.
+ * After closing, no more reads or writes are possible.
+ *
+ * @param o The Efl_Io_Queue object.
+ * @param pd The private data of the Efl_Io_Queue object.
+ * @return 0 on success, or an error code (EINVAL if already closed).
+ */
 EOLIAN static Eina_Error
 _efl_io_queue_efl_io_closer_close(Eo *o, Efl_Io_Queue_Data *pd)
 {
@@ -462,12 +624,28 @@ _efl_io_queue_efl_io_closer_close(Eo *o, Efl_Io_Queue_Data *pd)
    return 0;
 }
 
+/**
+ * @brief Gets the closed status of the queue.
+ * @param o The Efl_Io_Queue object (unused).
+ * @param pd The private data of the Efl_Io_Queue object.
+ * @return EINA_TRUE if closed, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_io_queue_efl_io_closer_closed_get(const Eo *o EINA_UNUSED, Efl_Io_Queue_Data *pd)
 {
    return pd->closed;
 }
 
+/**
+ * @brief Sets the close_on_exec property.
+ * For Efl_Io_Queue, this is a no-op that always effectively behaves as true,
+ * as it's an in-memory queue not tied to a system file descriptor.
+ * @param o The Efl_Io_Queue object (unused).
+ * @param pd The private data of the Efl_Io_Queue object (unused).
+ * @param close_on_exec If EINA_TRUE, it's a request to close on exec.
+ * @return EINA_TRUE if close_on_exec is EINA_TRUE, EINA_FALSE otherwise.
+ *         Effectively, it can only be "set" to true.
+ */
 EOLIAN static Eina_Bool
 _efl_io_queue_efl_io_closer_close_on_exec_set(Eo *o EINA_UNUSED, Efl_Io_Queue_Data *pd EINA_UNUSED, Eina_Bool close_on_exec)
 {
@@ -476,17 +654,38 @@ _efl_io_queue_efl_io_closer_close_on_exec_set(Eo *o EINA_UNUSED, Efl_Io_Queue_Da
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the close_on_exec property.
+ * For Efl_Io_Queue, this always returns EINA_TRUE.
+ * @param o The Efl_Io_Queue object (unused).
+ * @param pd The private data of the Efl_Io_Queue object (unused).
+ * @return Always EINA_TRUE.
+ */
 EOLIAN static Eina_Bool
 _efl_io_queue_efl_io_closer_close_on_exec_get(const Eo *o EINA_UNUSED, Efl_Io_Queue_Data *pd EINA_UNUSED)
 {
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets the close_on_invalidate property.
+ * For Efl_Io_Queue, this is a no-op as it's always closed on invalidate (destruction).
+ * @param o The Efl_Io_Queue object (unused).
+ * @param pd The private data of the Efl_Io_Queue object (unused).
+ * @param close_on_invalidate Unused.
+ */
 EOLIAN static void
 _efl_io_queue_efl_io_closer_close_on_invalidate_set(Eo *o EINA_UNUSED, Efl_Io_Queue_Data *pd EINA_UNUSED, Eina_Bool close_on_invalidate EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Gets the close_on_invalidate property.
+ * For Efl_Io_Queue, this always returns EINA_TRUE.
+ * @param o The Efl_Io_Queue object (unused).
+ * @param pd The private data of the Efl_Io_Queue object (unused).
+ * @return Always EINA_TRUE.
+ */
 EOLIAN static Eina_Bool
 _efl_io_queue_efl_io_closer_close_on_invalidate_get(const Eo *o EINA_UNUSED, Efl_Io_Queue_Data *pd EINA_UNUSED)
 {

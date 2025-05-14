@@ -5,6 +5,14 @@
 #include <Eina.h>
 #include "eo_lexer.h"
 
+/**
+ * @brief Deletes an Eolian_Type object and its associated data.
+ *
+ * This function recursively deletes the base type and next type if they exist.
+ * It also unreferences the object and frees associated stringshares and memory.
+ *
+ * @param tp The Eolian_Type object to delete.
+ */
 void
 database_type_del(Eolian_Type *tp)
 {
@@ -17,6 +25,15 @@ database_type_del(Eolian_Type *tp)
    free(tp);
 }
 
+/**
+ * @brief Deletes an Eolian_Typedecl object and its associated data.
+ *
+ * This function unreferences the object and frees associated stringshares,
+ * hash tables, lists, and memory. It also deletes the base type and
+ * any associated function pointer or documentation.
+ *
+ * @param tp The Eolian_Typedecl object to delete.
+ */
 void
 database_typedecl_del(Eolian_Typedecl *tp)
 {
@@ -33,6 +50,15 @@ database_typedecl_del(Eolian_Typedecl *tp)
    free(tp);
 }
 
+/**
+ * @brief Adds an Eolian_Typedecl (alias) to the Eolian_Unit.
+ *
+ * This function registers the type declaration as an alias within the unit's
+ * object database and staging area.
+ *
+ * @param unit The Eolian_Unit to add the type declaration to.
+ * @param tp The Eolian_Typedecl (alias) to add.
+ */
 void
 database_type_add(Eolian_Unit *unit, Eolian_Typedecl *tp)
 {
@@ -43,6 +69,15 @@ database_type_add(Eolian_Unit *unit, Eolian_Typedecl *tp)
    database_object_add(unit, &tp->base);
 }
 
+/**
+ * @brief Adds an Eolian_Typedecl (struct) to the Eolian_Unit.
+ *
+ * This function registers the type declaration as a struct within the unit's
+ * object database and staging area.
+ *
+ * @param unit The Eolian_Unit to add the type declaration to.
+ * @param tp The Eolian_Typedecl (struct) to add.
+ */
 void
 database_struct_add(Eolian_Unit *unit, Eolian_Typedecl *tp)
 {
@@ -53,6 +88,15 @@ database_struct_add(Eolian_Unit *unit, Eolian_Typedecl *tp)
    database_object_add(unit, &tp->base);
 }
 
+/**
+ * @brief Adds an Eolian_Typedecl (enum) to the Eolian_Unit.
+ *
+ * This function registers the type declaration as an enum within the unit's
+ * object database and staging area.
+ *
+ * @param unit The Eolian_Unit to add the type declaration to.
+ * @param tp The Eolian_Typedecl (enum) to add.
+ */
 void
 database_enum_add(Eolian_Unit *unit, Eolian_Typedecl *tp)
 {
@@ -62,6 +106,20 @@ database_enum_add(Eolian_Unit *unit, Eolian_Typedecl *tp)
    database_object_add(unit, &tp->base);
 }
 
+/**
+ * @brief Checks if an Eolian_Type is "ownable" in C.
+ *
+ * An ownable type is typically a pointer type or a type that can be
+ * treated as such (e.g., function pointers, classes). This function
+ * determines if a given Eolian_Type qualifies.
+ *
+ * @param unit The Eolian_Unit context (can be NULL if not resolving aliases).
+ * @param tp The Eolian_Type to check.
+ * @param allow_void If EINA_TRUE, 'void' types are considered ownable.
+ * @param otp Optional output parameter. If not NULL, it will be set to the
+ *            effective type after resolving aliases (if any).
+ * @return EINA_TRUE if the type is ownable, EINA_FALSE otherwise.
+ */
 Eina_Bool
 database_type_is_ownable(const Eolian_Unit *unit, const Eolian_Type *tp, Eina_Bool allow_void, const Eolian_Type **otp)
 {
@@ -90,6 +148,16 @@ database_type_is_ownable(const Eolian_Unit *unit, const Eolian_Type *tp, Eina_Bo
    return (tp->type == EOLIAN_TYPE_CLASS);
 }
 
+/**
+ * @internal
+ * @brief Appends a suffix to a string buffer, adding a space if needed.
+ *
+ * If the last character in the buffer is not a '*', a space is appended
+ * before the suffix. This is typically used for C type string construction.
+ *
+ * @param buf The Eina_Strbuf to append to.
+ * @param suffix The suffix string to append.
+ */
 static void
 _buf_add_suffix(Eina_Strbuf *buf, const char *suffix)
 {
@@ -99,6 +167,19 @@ _buf_add_suffix(Eina_Strbuf *buf, const char *suffix)
    eina_strbuf_append(buf, suffix);
 }
 
+/**
+ * @brief Converts an Eolian_Type to its C string representation.
+ *
+ * This function generates the C type string (e.g., "const char *", "int")
+ * for a given Eolian_Type and appends it to the provided string buffer.
+ * It handles constness, pointers, and specific C type contexts (like return types).
+ *
+ * @param tp The Eolian_Type to convert.
+ * @param buf The Eina_Strbuf to append the C type string to.
+ * @param name Optional name to append after the type (e.g., for a variable name).
+ * @param ctype The C type context (e.g., return, parameter).
+ * @param by_ref EINA_TRUE if the type is passed by reference (adds an extra '*').
+ */
 void
 database_type_to_str(const Eolian_Type *tp,
                      Eina_Strbuf *buf, const char *name,
@@ -145,6 +226,17 @@ database_type_to_str(const Eolian_Type *tp,
    _buf_add_suffix(buf, name);
 }
 
+/**
+ * @internal
+ * @brief Converts an Eolian_Typedecl (struct) to its C string representation.
+ *
+ * Generates the C `struct` definition string, including its fields.
+ * For opaque structs, only "struct foo" is generated.
+ * For regular structs, "struct foo { field1_type field1_name; ... }" is generated.
+ *
+ * @param tp The Eolian_Typedecl (struct) to convert.
+ * @param buf The Eina_Strbuf to append the C struct string to.
+ */
 static void
 _stype_to_str(const Eolian_Typedecl *tp, Eina_Strbuf *buf)
 {
@@ -164,6 +256,16 @@ _stype_to_str(const Eolian_Typedecl *tp, Eina_Strbuf *buf)
    eina_strbuf_append(buf, "}");
 }
 
+/**
+ * @internal
+ * @brief Converts an Eolian_Typedecl (enum) to its C string representation.
+ *
+ * Generates the C `enum` definition string, including its fields and their
+ * optional values. Example: "enum foo { BAR, BAZ = 2, QUX }"
+ *
+ * @param tp The Eolian_Typedecl (enum) to convert.
+ * @param buf The Eina_Strbuf to append the C enum string to.
+ */
 static void
 _etype_to_str(const Eolian_Typedecl *tp, Eina_Strbuf *buf)
 {
@@ -191,6 +293,15 @@ _etype_to_str(const Eolian_Typedecl *tp, Eina_Strbuf *buf)
    eina_strbuf_append(buf, " }");
 }
 
+/**
+ * @internal
+ * @brief Converts an Eolian_Typedecl (alias/typedef) to its C string representation.
+ *
+ * Generates the C `typedef` string. Example: "typedef int my_int_alias;"
+ *
+ * @param tp The Eolian_Typedecl (alias) to convert.
+ * @param buf The Eina_Strbuf to append the C typedef string to.
+ */
 static void
 _atype_to_str(const Eolian_Typedecl *tp, Eina_Strbuf *buf)
 {
@@ -199,6 +310,15 @@ _atype_to_str(const Eolian_Typedecl *tp, Eina_Strbuf *buf)
                         EOLIAN_C_TYPE_DEFAULT, EINA_FALSE);
 }
 
+/**
+ * @brief Converts an Eolian_Typedecl to its C string representation.
+ *
+ * This function dispatches to the appropriate internal function based on the
+ * type of the Eolian_Typedecl (alias, enum, struct).
+ *
+ * @param tp The Eolian_Typedecl to convert.
+ * @param buf The Eina_Strbuf to append the C type declaration string to.
+ */
 void
 database_typedecl_to_str(const Eolian_Typedecl *tp, Eina_Strbuf *buf)
 {
@@ -219,6 +339,19 @@ database_typedecl_to_str(const Eolian_Typedecl *tp, Eina_Strbuf *buf)
      }
 }
 
+/**
+ * @brief Finds the Eolian_Typedecl corresponding to an Eolian_Type.
+ *
+ * This function attempts to resolve an Eolian_Type (which might be a simple
+ * type name) to its full Eolian_Typedecl definition within the given unit.
+ * It checks if the type already has a cached declaration, then looks up
+ * in the unit's objects. It handles built-in types by returning NULL.
+ *
+ * @param unit The Eolian_Unit to search within.
+ * @param tp The Eolian_Type to find the declaration for.
+ * @return The Eolian_Typedecl if found, otherwise NULL.
+ *         Returns NULL for built-in types or if the type is not EOLIAN_TYPE_REGULAR.
+ */
 Eolian_Typedecl *database_type_decl_find(const Eolian_Unit *unit, const Eolian_Type *tp)
 {
    if (tp->type != EOLIAN_TYPE_REGULAR)

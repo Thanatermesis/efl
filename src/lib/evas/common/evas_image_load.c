@@ -10,16 +10,29 @@
 #include "evas_private.h"
 //#include "evas_cs.h"
 
+/**
+ * @brief Structure to map file extensions to their corresponding image loaders.
+ */
 struct ext_loader_s
 {
-   unsigned int length;
-   const char *extension;
-   const char *loader;
+   unsigned int length;    /**< Length of the file extension string. */
+   const char *extension; /**< The file extension (e.g., ".png"). */
+   const char *loader;    /**< The name of the loader module (e.g., "png"). */
 };
 
 #define MATCHING(Ext, Module)                   \
 { sizeof (Ext), Ext, Module }
 
+/**
+ * @brief Array defining mappings from file extensions to specific loader modules.
+ * This array is used for a first-pass attempt to quickly find an appropriate
+ * loader based on the file extension.
+ *
+ * Example:
+ * @code
+ *   { sizeof(".png") - 1, ".png", "png" } // maps .png files to the "png" loader
+ * @endcode
+ */
 static const struct ext_loader_s loaders[] =
 { /* map extensions to loaders to use for good first-guess tries */
    MATCHING(".png", "png"),
@@ -194,6 +207,16 @@ static const struct ext_loader_s loaders[] =
    MATCHING(".wmv", "generic")
 };
 
+/**
+ * @brief Array of loader names, ordered by likelihood of use or preference.
+ * This list is used when iterating through available loaders if the
+ * extension-based lookup fails or if a generic fallback is needed.
+ *
+ * Example:
+ * @code
+ *   "png", "jpeg", "eet", ...
+ * @endcode
+ */
 static const char *loaders_name[] =
 { /* in order of most likely needed */
   "png", "jpeg", "eet", "xpm", "tiff", "gif", "svg", "webp", "pmaps",
@@ -201,13 +224,32 @@ static const char *loaders_name[] =
   "heif", "generic"
 };
 
+/**
+ * @brief Data structure used when iterating over image loaders.
+ * This structure is passed as an argument to the callback function
+ * in `evas_module_foreach_image_loader`.
+ */
 struct evas_image_foreach_loader_data
 {
-   Image_Entry *ie;
-   int *error;
-   Evas_Module *em;
+   Image_Entry *ie; /**< Pointer to the image entry being processed. */
+   int *error;      /**< Pointer to an integer to store any error code. */
+   Evas_Module *em; /**< Pointer to the Evas module that successfully loaded the header. */
 };
 
+/**
+ * @brief Attempts to load an image file's header using a specific Evas module.
+ *
+ * This function tries to open the image file (if not already open),
+ * then calls the module's `file_open` and `file_head` functions
+ * to read the image properties (dimensions, alpha, etc.).
+ *
+ * @param em The Evas module to use for loading.
+ * @param ie The image entry to populate with header information.
+ * @param error Pointer to an integer where the error code will be stored.
+ *              Possible error codes are defined by EVAS_LOAD_ERROR_*.
+ * @return EINA_TRUE if the header loading failed and other loaders should be tried,
+ *         EINA_FALSE if the header was loaded successfully or a critical error occurred.
+ */
 static Eina_Bool
 _evas_image_file_header(Evas_Module *em, Image_Entry *ie, int *error)
 {
@@ -284,6 +326,20 @@ load_error:
    return r;
 }
 
+/**
+ * @brief Callback function used with `evas_module_foreach_image_loader`.
+ *
+ * This function is called for each available image loader module. It attempts
+ * to load the image header using `_evas_image_file_header`.
+ *
+ * @param hash The hash table containing the modules (unused).
+ * @param key The key for the current module in the hash (unused).
+ * @param data A pointer to the current Evas_Module.
+ * @param fdata A pointer to a `struct evas_image_foreach_loader_data` containing
+ *              the image entry and error status.
+ * @return EINA_TRUE to continue iterating through loaders if header loading failed,
+ *         EINA_FALSE to stop if the header was loaded successfully.
+ */
 static Eina_Bool
 _evas_image_foreach_loader(const Eina_Hash *hash EINA_UNUSED, const void *key EINA_UNUSED, void *data, void *fdata)
 {
@@ -297,6 +353,23 @@ _evas_image_foreach_loader(const Eina_Hash *hash EINA_UNUSED, const void *key EI
    return r;
 }
 
+/**
+ * @brief Finds and prepares an image loader module for a given image file.
+ *
+ * This function attempts to identify the appropriate image loader for the
+ * file specified in the Image_Entry. It first tries to match the file
+ * extension against a list of known extensions. If a match is found,
+ * it attempts to use the corresponding loader. If no match is found or
+ * the initial loader fails, it iterates through a list of preferred loaders
+ * and then through all available image loaders until one successfully
+ * reads the image header.
+ *
+ * @param ie Pointer to the Image_Entry for the image file.
+ *           The `ie->file` or `ie->f` field must be set.
+ *           The `ie->info.module` and `ie->info.loader` will be populated
+ *           if a suitable loader is found.
+ * @return An EVAS_LOAD_ERROR_* code. EVAS_LOAD_ERROR_NONE on success.
+ */
 EVAS_API int
 evas_common_load_rgba_image_module_from_file(Image_Entry *ie)
 {
@@ -408,6 +481,16 @@ end:
    return ret;
 }
 
+/**
+ * @brief Populates an Image_Timestamp structure from a stat structure.
+ *
+ * This function extracts file modification time, size, and inode number
+ * from the `struct stat` and stores them in the `Image_Timestamp` structure.
+ * It also handles nanosecond precision for modification time if available.
+ *
+ * @param tstamp Pointer to the Image_Timestamp structure to populate.
+ * @param st Pointer to the struct stat containing file information.
+ */
 static void
 _timestamp_build(Image_Timestamp *tstamp, struct stat *st)
 {
@@ -419,6 +502,25 @@ _timestamp_build(Image_Timestamp *tstamp, struct stat *st)
 #endif
 }
 
+/**
+ * @brief Loads the actual pixel data for an image from a file.
+ *
+ * This function assumes that `evas_common_load_rgba_image_module_from_file`
+ * has already been called successfully and that `ie->info.module` and
+ * `ie->info.loader` are set. It uses the determined loader to read the
+ * image pixel data into a buffer allocated in the image cache.
+ * It also updates the image timestamp.
+ *
+ * @param ie Pointer to the Image_Entry for the image.
+ *           `ie->info.module` and `ie->info.loader` must be valid.
+ *           `ie->f` (file handle) must be open if the loader requires it.
+ *           `ie->w` and `ie->h` (width and height) should be known (from header load).
+ * @return An EVAS_LOAD_ERROR_* code. EVAS_LOAD_ERROR_NONE on success.
+ *         Returns EVAS_LOAD_ERROR_GENERIC if the image is already loaded (and not animated)
+ *         or if no module is set.
+ *         Returns EVAS_LOAD_ERROR_DOES_NOT_EXIST if the file handle is invalid or module/loader data is missing.
+ *         Returns EVAS_LOAD_ERROR_RESOURCE_ALLOCATION_FAILED if pixel buffer allocation fails.
+ */
 EVAS_API int
 evas_common_load_rgba_image_data_from_file(Image_Entry *ie)
 {
@@ -522,6 +624,21 @@ end:
    return ret;
 }
 
+/**
+ * @brief Retrieves the duration of a specific frame in an animated image.
+ *
+ * This function calls the `frame_duration` function of the image loader
+ * associated with the Image_Entry.
+ *
+ * @param ie Pointer to the Image_Entry for the animated image.
+ *           `ie->info.module` and `ie->info.loader` must be valid.
+ *           `ie->f` (file handle) must be open.
+ * @param start The starting frame number (context for the loader, often 0).
+ * @param frame_num The specific frame number for which to get the duration.
+ * @return The duration of the frame in seconds. Returns -1.0 if the loader
+ *         doesn't support frame duration, if the module is not set,
+ *         or if the file handle is invalid.
+ */
 EVAS_API double
 evas_common_load_rgba_image_frame_duration_from_file(Image_Entry *ie, const int start, const int frame_num)
 {
@@ -539,6 +656,16 @@ evas_common_load_rgba_image_frame_duration_from_file(Image_Entry *ie, const int 
    return -1;
 }
 
+/**
+ * @brief Checks if there is a known loader associated with a given file extension.
+ *
+ * This function iterates through the `loaders` array to see if the provided
+ * file name (or path) ends with an extension that has a registered loader.
+ *
+ * @param file The file name or path string (e.g., "image.png", "/path/to/image.jpg").
+ * @return EINA_TRUE if a loader is associated with the file's extension,
+ *         EINA_FALSE otherwise.
+ */
 EVAS_API Eina_Bool
 evas_common_extension_can_load_get(const char *file)
 {

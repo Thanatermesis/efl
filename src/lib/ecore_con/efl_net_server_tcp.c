@@ -24,13 +24,30 @@
 # include <arpa/inet.h>
 #endif
 
+/**
+ * @file
+ * @brief These routines are used for EFL_NET_SERVER_TCP.
+ */
+
 #define MY_CLASS EFL_NET_SERVER_TCP_CLASS
 
+/**
+ * @brief Private data for the Efl_Net_Server_Tcp class.
+ */
 typedef struct _Efl_Net_Server_Tcp_Data
 {
-   Ecore_Thread *resolver;
+   Ecore_Thread *resolver; /**< Thread used for asynchronous hostname resolution. */
 } Efl_Net_Server_Tcp_Data;
 
+/**
+ * @internal
+ * @brief Destructor for the Efl_Net_Server_Tcp object.
+ *
+ * Cleans up resources, particularly the resolver thread if it's active.
+ *
+ * @param o The Efl_Net_Server_Tcp object.
+ * @param pd The private data associated with the object.
+ */
 EOLIAN void
 _efl_net_server_tcp_efl_object_destructor(Eo *o, Efl_Net_Server_Tcp_Data *pd)
 {
@@ -42,6 +59,19 @@ _efl_net_server_tcp_efl_object_destructor(Eo *o, Efl_Net_Server_Tcp_Data *pd)
    efl_destructor(efl_super(o, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Binds the server to a resolved network address.
+ *
+ * This function is called after a hostname has been successfully resolved.
+ * It creates a socket, binds it to the given address, and starts listening
+ * for incoming connections.
+ *
+ * @param o The Efl_Net_Server_Tcp object.
+ * @param pd The private data associated with the object (unused).
+ * @param addr The address information to bind to.
+ * @return 0 on success, or an Eina_Error code on failure.
+ */
 static Eina_Error
 _efl_net_server_tcp_resolved_bind(Eo *o, Efl_Net_Server_Tcp_Data *pd EINA_UNUSED, const struct addrinfo *addr)
 {
@@ -109,6 +139,21 @@ _efl_net_server_tcp_resolved_bind(Eo *o, Efl_Net_Server_Tcp_Data *pd EINA_UNUSED
    return err;
 }
 
+/**
+ * @internal
+ * @brief Callback function for asynchronous hostname resolution.
+ *
+ * This function is invoked when efl_net_ip_resolve_async_new() completes.
+ * It iterates through the resolved addresses and attempts to bind the server
+ * to the first suitable one.
+ *
+ * @param data User data, which is the Efl_Net_Server_Tcp object.
+ * @param host The hostname that was resolved (unused).
+ * @param port The port that was resolved (unused).
+ * @param hints The hints used for resolution (unused).
+ * @param result A linked list of addrinfo structures containing resolved addresses.
+ * @param gai_error Error code from getaddrinfo, 0 on success.
+ */
 static void
 _efl_net_server_tcp_resolved(void *data, const char *host EINA_UNUSED, const char *port EINA_UNUSED, const struct addrinfo *hints EINA_UNUSED, struct addrinfo *result, int gai_error)
 {
@@ -140,6 +185,20 @@ _efl_net_server_tcp_resolved(void *data, const char *host EINA_UNUSED, const cha
    efl_unref(o);
 }
 
+/**
+ * @internal
+ * @brief Activates the server using a pre-existing socket (e.g., from systemd).
+ *
+ * This function handles server activation when the socket is provided by an
+ * external entity like systemd socket activation. It checks if the socket
+ * is already listening and sets up the server accordingly.
+ *
+ * @param o The Efl_Net_Server_Tcp object.
+ * @param pd The private data associated with the object (unused).
+ * @param address The address string, used to identify the correct activated socket.
+ *                Example: "127.0.0.1:8080" or "[::1]:80"
+ * @return 0 on success, or an Eina_Error code on failure.
+ */
 EOLIAN static Eina_Error
 _efl_net_server_tcp_efl_net_server_fd_socket_activate(Eo *o, Efl_Net_Server_Tcp_Data *pd EINA_UNUSED, const char *address)
 {
@@ -198,6 +257,20 @@ _efl_net_server_tcp_efl_net_server_fd_socket_activate(Eo *o, Efl_Net_Server_Tcp_
 #endif
 }
 
+/**
+ * @internal
+ * @brief Starts serving on the given network address.
+ *
+ * This function initiates the process of listening for incoming connections.
+ * It parses the address, resolves the hostname (if necessary, asynchronously),
+ * and then binds to the address.
+ *
+ * @param o The Efl_Net_Server_Tcp object.
+ * @param pd The private data associated with the object.
+ * @param address The network address to serve on.
+ *                Examples: "127.0.0.1:8080", "[::1]:80", "example.com:http", ":0" (any address, ephemeral port)
+ * @return 0 on success or if resolution is pending, or an Eina_Error code on immediate failure.
+ */
 EOLIAN static Eina_Error
 _efl_net_server_tcp_efl_net_server_serve(Eo *o, Efl_Net_Server_Tcp_Data *pd, const char *address)
 {
@@ -245,6 +318,17 @@ _efl_net_server_tcp_efl_net_server_serve(Eo *o, Efl_Net_Server_Tcp_Data *pd, con
    return err;
 }
 
+/**
+ * @internal
+ * @brief Handles a new accepted client connection.
+ *
+ * This function is called when a new client connection is accepted by the server.
+ * It creates an Efl_Net_Socket_Tcp object for the client and announces it.
+ *
+ * @param o The Efl_Net_Server_Tcp object (server).
+ * @param pd The private data associated with the server object (unused).
+ * @param client_fd The file descriptor for the new client socket.
+ */
 static void
 _efl_net_server_tcp_efl_net_server_fd_client_add(Eo *o, Efl_Net_Server_Tcp_Data *pd EINA_UNUSED, int client_fd)
 {
@@ -262,6 +346,18 @@ _efl_net_server_tcp_efl_net_server_fd_client_add(Eo *o, Efl_Net_Server_Tcp_Data 
    efl_net_server_client_announce(o, client);
 }
 
+/**
+ * @internal
+ * @brief Handles a rejected client connection.
+ *
+ * This function is called when a new client connection is rejected (e.g., due to
+ * reaching a connection limit or other policy). It closes the client socket
+ * and emits a "client_rejected" event with the client's address.
+ *
+ * @param o The Efl_Net_Server_Tcp object (server).
+ * @param pd The private data associated with the server object (unused).
+ * @param client_fd The file descriptor for the rejected client socket.
+ */
 static void
 _efl_net_server_tcp_efl_net_server_fd_client_reject(Eo *o, Efl_Net_Server_Tcp_Data *pd EINA_UNUSED, int client_fd)
 {

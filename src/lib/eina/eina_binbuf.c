@@ -17,6 +17,14 @@
  * @cond LOCAL
  */
 
+/*
+ * These macros are used to configure the generic string buffer implementation
+ * located in "eina_binbuf_template_c.x" for the Eina_Binbuf type, which
+ * handles binary data (unsigned char). They define type-specific details
+ * like the data type itself, its size, the structure name, and magic numbers
+ * for runtime checking, allowing the template to be compiled for Eina_Binbuf.
+ */
+
 #ifdef _STRBUF_DATA_TYPE
 # undef _STRBUF_DATA_TYPE
 #endif

@@ -4,17 +4,46 @@
 #include "Efl_Canvas_Wl.h"
 #include "Elementary.h"
 
+/**
+ * @brief The main window for the application.
+ */
 static Evas_Object *win;
 
+/**
+ * @brief Array of commands to be executed.
+ *
+ * Each string in this array represents a command that will be launched
+ * as a Wayland client. For example:
+ * @code
+ * "weston-terminal" // Launches weston-terminal
+ * "terminology"     // Launches terminology
+ * @endcode
+ */
 static const char *cmds[] =
 {
    "weston-terminal",
    "terminology",
 };
 
+/**
+ * @brief The number of commands in the cmds array.
+ */
 static unsigned int num_cmds = EINA_C_ARRAY_LENGTH(cmds);
+/**
+ * @brief Index for iterating through the cmds array.
+ */
 static unsigned int n;
 
+/**
+ * @brief Executes a command from the cmds array as a Wayland client.
+ *
+ * This function is called by an ecore_timer to sequentially launch
+ * applications defined in the cmds array. It also sets focus to the
+ * Wayland surface.
+ *
+ * @param data The Efl_Canvas_Wl object (Wayland compositor).
+ * @return EINA_TRUE if there are more commands to run, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 dostuff(void *data)
 {
@@ -23,18 +52,49 @@ dostuff(void *data)
    return n != num_cmds;
 }
 
+/**
+ * @brief Callback function for the "previous" button.
+ *
+ * This function is called when the "previous" button is clicked.
+ * It tells the Wayland compositor to switch to the previous client surface.
+ *
+ * @param data The Efl_Canvas_Wl object (Wayland compositor).
+ * @param obj The Evas_Object that triggered the callback (the button).
+ * @param event_info Additional event information (unused).
+ */
 static void
 prev_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    efl_canvas_wl_surface_prev(data);
 }
 
+/**
+ * @brief Callback function for the "next" button.
+ *
+ * This function is called when the "next" button is clicked.
+ * It tells the Wayland compositor to switch to the next client surface.
+ *
+ * @param data The Efl_Canvas_Wl object (Wayland compositor).
+ * @param obj The Evas_Object that triggered the callback (the button).
+ * @param event_info Additional event information (unused).
+ */
 static void
 next_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    efl_canvas_wl_surface_next(data);
 }
 
+/**
+ * @brief Main function for the Efl Canvas Wayland test application.
+ *
+ * Initializes Elementary, creates a window, sets up a Wayland compositor
+ * object (Efl_Canvas_Wl), and adds buttons to switch between client surfaces.
+ * It then starts launching client applications using a timer.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv An array of command-line arguments.
+ * @return 0 on successful execution.
+ */
 int
 main(int argc, char *argv[])
 {

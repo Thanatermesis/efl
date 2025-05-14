@@ -22,11 +22,53 @@
 #include <Ector.h>
 #include "ector_private.h"
 
+/**
+ * @internal
+ * @brief Global structure to hold OpenGL function pointers.
+ *
+ * This structure is populated by ector_glsym_set() and provides
+ * access to the required OpenGL functions throughout the Ector library.
+ * The 'init' member indicates if the GL symbols have been successfully loaded.
+ */
 Ector_GL_API GL;
+
+/**
+ * @internal
+ * @brief Global log domain for Ector.
+ *
+ * This variable holds the Eina log domain identifier registered for Ector.
+ * It is used for logging messages specific to the Ector library.
+ */
 int _ector_log_dom_global = 0;
 
+/**
+ * @internal
+ * @brief Initialization counter for the Ector library.
+ *
+ * This counter tracks the number of times ector_init() has been called
+ * minus the number of times ector_shutdown() has been called. The library
+ * is actually initialized on the first call to ector_init() and shut down
+ * when the counter reaches zero after a call to ector_shutdown().
+ */
 static int _ector_main_count = 0;
 
+/**
+ * @brief Initializes the Ector library.
+ *
+ * This function initializes all the Ector subsystems. It must be called
+ * before any other Ector function. It internally calls eina_init() and
+ * efl_object_init().
+ *
+ * It also registers a log domain for Ector.
+ *
+ * This function maintains an internal counter. For each call to ector_init(),
+ * a corresponding call to ector_shutdown() must be made. The actual
+ * initialization happens on the first call, and the actual shutdown happens
+ * when the counter reaches zero.
+ *
+ * @return The new initialization counter value. Returns 0 on failure.
+ * @see ector_shutdown()
+ */
 ECTOR_API int
 ector_init(void)
 {
@@ -57,11 +99,41 @@ ector_init(void)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief A no-operation function.
+ *
+ * This function does nothing. It is used as a placeholder for OpenGL
+ * function pointers if a specific function cannot be loaded via glsym.
+ * This prevents null pointer dereferences when attempting to call an
+ * unloaded GL function.
+ */
 static void
 donothing(void)
 {
 }
 
+/**
+ * @brief Sets the OpenGL function symbol resolver.
+ *
+ * This function is used to provide Ector with the necessary OpenGL
+ * functions. It takes a function pointer `glsym` which Ector will use
+ * to look up OpenGL function symbols (e.g., `glActiveTexture`, `glBindBuffer`).
+ *
+ * If a symbol cannot be found, it will be replaced by a `donothing` function
+ * to prevent crashes, and the function will return @c EINA_FALSE.
+ *
+ * @param glsym A function pointer that takes a library handle and a symbol name,
+ *              and returns a pointer to the symbol.
+ *              Example: `dlsym` on POSIX systems.
+ * @param lib The library handle to be passed to `glsym` when looking up symbols.
+ *            Example: `RTLD_DEFAULT` or a handle from `dlopen`.
+ * @return @c EINA_TRUE if all essential symbols were successfully loaded (or at least
+ *         assigned a `donothing` stub), @c EINA_FALSE if `glsym` is NULL or if
+ *         critical symbol loading failed (though current implementation always tries
+ *         to stub and returns based on `glsym` presence).
+ *         The `GL.init` flag is set to the return value.
+ */
 ECTOR_API Eina_Bool
 ector_glsym_set(void *(*glsym)(void *lib, const char *name), void *lib)
 {
@@ -221,6 +293,22 @@ ector_glsym_set(void *(*glsym)(void *lib, const char *name), void *lib)
    return r;
 }
 
+/**
+ * @brief Shuts down the Ector library.
+ *
+ * This function shuts down all the Ector subsystems. It must be called
+ * when Ector is no longer needed. It internally calls efl_object_shutdown()
+ * and eina_shutdown() when the internal initialization counter reaches zero.
+ *
+ * For each call to ector_init(), a corresponding call to ector_shutdown()
+ * must be made. The library is only truly shut down when the counter
+ * (decremented by this call) reaches zero.
+ *
+ * @return The new initialization counter value. Returns 0 if the library was
+ *         fully shut down or if there was an error (e.g., shutting down
+ *         without being initialized).
+ * @see ector_init()
+ */
 ECTOR_API int
 ector_shutdown(void)
 {

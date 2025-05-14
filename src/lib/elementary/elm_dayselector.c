@@ -36,6 +36,18 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {NULL, NULL}
 };
 
+/**
+ * @internal
+ * @brief Callback function for the resize event of the dayselector object.
+ *
+ * This function is called when the dayselector object is resized. It triggers
+ * a re-evaluation of the layout sizing.
+ *
+ * @param data The Evas_Object (dayselector) that was resized.
+ * @param e Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _dayselector_resize(void *data,
                     Evas *e EINA_UNUSED,
@@ -45,6 +57,18 @@ _dayselector_resize(void *data,
    elm_layout_sizing_eval(data);
 }
 
+/**
+ * @internal
+ * @brief Updates the displayed day names based on the current locale.
+ *
+ * This function is called when the language changes. It iterates through
+ * the dayselector items and updates their text to the abbreviated day name
+ * in the current locale (e.g., "Mon", "Tue"). This is skipped if custom
+ * weekday names have been set by the application.
+ *
+ * @param obj The dayselector Evas_Object.
+ * @param sd The dayselector's private data.
+ */
 EOLIAN static void
 _elm_dayselector_efl_ui_l10n_translation_update(Eo *obj EINA_UNUSED, Elm_Dayselector_Data *sd)
 {
@@ -69,6 +93,17 @@ _elm_dayselector_efl_ui_l10n_translation_update(Eo *obj EINA_UNUSED, Elm_Daysele
    efl_ui_l10n_translation_update(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Updates the visual style and position signals for all day items.
+ *
+ * This function iterates through each day item in the dayselector and
+ * applies the appropriate style (weekday/weekend) and position signals
+ * (left/middle/right) based on the current configuration (week start,
+ * weekend settings, and RTL mode).
+ *
+ * @param obj The dayselector Evas_Object.
+ */
 static void
 _update_items(Evas_Object *obj)
 {
@@ -103,6 +138,19 @@ _update_items(Evas_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Calculates the display location (index) of a day item.
+ *
+ * This function determines the visual position of a day item within the
+ * dayselector's layout, considering the configured start day of the week.
+ * For example, if the week starts on Monday (1) and the item is Sunday (0),
+ * its location will be 6.
+ *
+ * @param sd The dayselector's private data.
+ * @param it The dayselector item data.
+ * @return The calculated display location (0-6).
+ */
 static inline unsigned int
 _item_location_get(Elm_Dayselector_Data *sd,
                    Elm_Dayselector_Item_Data *it)
@@ -111,6 +159,18 @@ _item_location_get(Elm_Dayselector_Data *sd,
           ELM_DAYSELECTOR_MAX;
 }
 
+/**
+ * @internal
+ * @brief Applies the current theme to the dayselector and its items.
+ *
+ * This function is called when the widget's theme needs to be updated.
+ * It applies the theme to the base layout and then iterates through each
+ * day item, setting its style and emitting visibility signals.
+ *
+ * @param obj The dayselector Evas_Object.
+ * @param sd The dayselector's private data.
+ * @return Eina_Error indicating success or failure.
+ */
 EOLIAN static Eina_Error
 _elm_dayselector_efl_ui_widget_theme_apply(Eo *obj, Elm_Dayselector_Data *sd)
 {
@@ -145,6 +205,18 @@ _elm_dayselector_efl_ui_widget_theme_apply(Eo *obj, Elm_Dayselector_Data *sd)
    return int_ret;
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a dayselector item (check widget) is deleted.
+ *
+ * This function removes the corresponding item data from the dayselector's
+ * internal list and emits signals to reset the item's visual state in the layout.
+ *
+ * @param data The dayselector Evas_Object (passed as user data).
+ * @param e Unused.
+ * @param obj The Evas_Object (check widget) that is being deleted.
+ * @param event_info Unused.
+ */
 static void
 _item_del_cb(void *data,
              Evas *e EINA_UNUSED,
@@ -180,6 +252,19 @@ _item_del_cb(void *data,
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for signals emitted by individual day items (check widgets).
+ *
+ * This function is triggered when a day item emits a style-related signal
+ * (e.g., "elm,type,weekday,default"). It updates the internal `day_style`
+ * for the corresponding item.
+ *
+ * @param data The Elm_Dayselector_Item_Data for the item.
+ * @param obj Unused.
+ * @param emission The emitted signal string (e.g., "elm,type,weekday,default").
+ * @param source Unused.
+ */
 static void
 _item_signal_emit_cb(void *data,
                      Evas_Object *obj EINA_UNUSED,
@@ -191,6 +276,17 @@ _item_signal_emit_cb(void *data,
    eina_stringshare_replace(&it->day_style, emission);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a day item (check widget) is clicked.
+ *
+ * This function forwards the "changed" signal from the individual check item
+ * to the parent dayselector widget.
+ *
+ * @param data The Elm_Dayselector_Item_Data for the clicked item.
+ * @param obj Unused.
+ * @param event_info Event information from the click.
+ */
 static void
 _item_clicked_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -199,6 +295,17 @@ _item_clicked_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
    evas_object_smart_callback_call(WIDGET(it), "changed", event_info);
 }
 
+/**
+ * @internal
+ * @brief Finds a dayselector item by its day enum value.
+ *
+ * Iterates through the internal list of items to find the one
+ * corresponding to the given Elm_Dayselector_Day.
+ *
+ * @param obj The dayselector Evas_Object.
+ * @param day The Elm_Dayselector_Day to find (e.g., ELM_DAYSELECTOR_SUNDAY).
+ * @return Pointer to Elm_Dayselector_Item_Data if found, otherwise NULL.
+ */
 static Elm_Dayselector_Item_Data *
 _item_find(const Evas_Object *obj,
            Elm_Dayselector_Day day)
@@ -214,6 +321,21 @@ _item_find(const Evas_Object *obj,
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Sets the content of a specific day item part.
+ *
+ * This function allows replacing the check widget for a specific day.
+ * The `item` string is expected to be in the format "dayN" (e.g., "day0" for Sunday).
+ * If the content is NULL, the existing item is effectively removed.
+ * If an item for the day doesn't exist, it's created.
+ *
+ * @param obj The dayselector Evas_Object.
+ * @param sd The dayselector's private data.
+ * @param item A string identifying the day part (e.g., "day0", "day1").
+ * @param content The new Evas_Object (must be an EFL_UI_CHECK_CLASS) to set as content.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _elm_dayselector_content_set(Eo *obj, Elm_Dayselector_Data *sd, const char *item, Evas_Object *content)
 {
@@ -302,6 +424,16 @@ _elm_dayselector_content_set(Eo *obj, Elm_Dayselector_Data *sd, const char *item
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Constructor for an Elm_Dayselector_Item.
+ *
+ * Initializes a new dayselector item object.
+ *
+ * @param eo_item The Eolian object for the item.
+ * @param item The private data structure for the item.
+ * @return The constructed Eolian object.
+ */
 EOLIAN static Eo *
 _elm_dayselector_item_efl_object_constructor(Eo *eo_item, Elm_Dayselector_Item_Data *item)
 {
@@ -311,6 +443,18 @@ _elm_dayselector_item_efl_object_constructor(Eo *eo_item, Elm_Dayselector_Item_D
    return eo_item;
 }
 
+/**
+ * @internal
+ * @brief Unsets (removes) the content of a specific day item part.
+ *
+ * This function removes and returns the check widget for a specific day.
+ * The `item` string is expected to be in the format "dayN" (e.g., "day0" for Sunday).
+ *
+ * @param obj The dayselector Evas_Object.
+ * @param sd The dayselector's private data.
+ * @param item A string identifying the day part (e.g., "day0", "day1").
+ * @return The Evas_Object that was unset (the check widget), or NULL if not found or on error.
+ */
 static Evas_Object*
 _elm_dayselector_content_unset(Eo *obj, Elm_Dayselector_Data *sd, const char *item)
 {
@@ -354,6 +498,16 @@ _elm_dayselector_content_unset(Eo *obj, Elm_Dayselector_Data *sd, const char *it
    return content;
 }
 
+/**
+ * @internal
+ * @brief Sets the default style (weekday/weekend) for all day items.
+ *
+ * This function iterates through all day items and applies either the
+ * weekday or weekend default style based on the configured weekend start
+ * day and length.
+ *
+ * @param obj The dayselector Evas_Object.
+ */
 static void
 _items_style_set(Evas_Object *obj)
 {
@@ -390,6 +544,17 @@ _items_style_set(Evas_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Creates and initializes all the day items (check widgets).
+ *
+ * This function is called during the dayselector's construction. It creates
+ * seven check widgets, one for each day of the week. It sets their default
+ * style, localized text (abbreviated day name), and swallows them into the
+ * appropriate parts of the dayselector's layout.
+ *
+ * @param obj The dayselector Evas_Object.
+ */
 static void
 _items_create(Evas_Object *obj)
 {
@@ -428,6 +593,18 @@ _items_create(Evas_Object *obj)
    _update_items(obj);
 }
 
+/**
+ * @internal
+ * @brief Efl.Canvas.Group group_add override for Elm_Dayselector.
+ *
+ * This function is called when the dayselector is added to a canvas.
+ * It sets up the theme, initializes default values for week start,
+ * weekend start, and weekend length from configuration, sets finger size
+ * multiplier, creates the individual day items, and sets up a resize callback.
+ *
+ * @param obj The dayselector Eolian object.
+ * @param priv The dayselector's private data.
+ */
 EOLIAN static void
 _elm_dayselector_efl_canvas_group_group_add(Eo *obj, Elm_Dayselector_Data *priv)
 {
@@ -449,6 +626,18 @@ _elm_dayselector_efl_canvas_group_group_add(Eo *obj, Elm_Dayselector_Data *priv)
    elm_layout_sizing_eval(obj);
 }
 
+/**
+ * @internal
+ * @brief Efl.Canvas.Group group_del override for Elm_Dayselector.
+ *
+ * This function is called when the dayselector is being deleted.
+ * It frees the list of dayselector items and their associated data.
+ * The actual Evas_Objects for items are expected to be handled by their parent's
+ * deletion or by content_unset.
+ *
+ * @param obj The dayselector Eolian object.
+ * @param sd The dayselector's private data.
+ */
 EOLIAN static void
 _elm_dayselector_efl_canvas_group_group_del(Eo *obj, Elm_Dayselector_Data *sd)
 {
@@ -472,6 +661,17 @@ elm_dayselector_add(Evas_Object *parent)
    return elm_legacy_add(MY_CLASS, parent);
 }
 
+/**
+ * @internal
+ * @brief Efl.Object constructor override for Elm_Dayselector.
+ *
+ * Initializes the dayselector object, sets its legacy type name,
+ * registers smart callbacks, and sets the accessibility role.
+ *
+ * @param obj The dayselector Eolian object.
+ * @param _pd Unused.
+ * @return The constructed Eolian object.
+ */
 EOLIAN static Eo *
 _elm_dayselector_efl_object_constructor(Eo *obj, Elm_Dayselector_Data *_pd EINA_UNUSED)
 {
@@ -483,6 +683,17 @@ _elm_dayselector_efl_object_constructor(Eo *obj, Elm_Dayselector_Data *_pd EINA_
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Sets the selected state of a specific day.
+ *
+ * Finds the item corresponding to the given day and sets its check state.
+ *
+ * @param obj The dayselector Eolian object.
+ * @param _pd Unused.
+ * @param day The Elm_Dayselector_Day to modify (e.g., ELM_DAYSELECTOR_MONDAY).
+ * @param selected EINA_TRUE to select the day, EINA_FALSE to deselect.
+ */
 EOLIAN static void
 _elm_dayselector_day_selected_set(Eo *obj, Elm_Dayselector_Data *_pd EINA_UNUSED, Elm_Dayselector_Day day, Eina_Bool selected)
 {
@@ -495,6 +706,17 @@ _elm_dayselector_day_selected_set(Eo *obj, Elm_Dayselector_Data *_pd EINA_UNUSED
    elm_check_state_set(VIEW(it), selected);
 }
 
+/**
+ * @internal
+ * @brief Gets the selected state of a specific day.
+ *
+ * Finds the item corresponding to the given day and returns its check state.
+ *
+ * @param obj The dayselector Eolian object.
+ * @param _pd Unused.
+ * @param day The Elm_Dayselector_Day to query (e.g., ELM_DAYSELECTOR_TUESDAY).
+ * @return EINA_TRUE if the day is selected, EINA_FALSE otherwise or on error.
+ */
 EOLIAN static Eina_Bool
 _elm_dayselector_day_selected_get(const Eo *obj, Elm_Dayselector_Data *_pd EINA_UNUSED, Elm_Dayselector_Day day)
 {
@@ -507,6 +729,17 @@ _elm_dayselector_day_selected_get(const Eo *obj, Elm_Dayselector_Data *_pd EINA_
    return elm_check_state_get(VIEW(it));
 }
 
+/**
+ * @internal
+ * @brief Sets the first day of the week for the dayselector.
+ *
+ * Updates the internal week_start day and re-swallows the day items into
+ * the layout parts according to the new starting day. Then updates item styles.
+ *
+ * @param obj The dayselector Eolian object.
+ * @param sd The dayselector's private data.
+ * @param day The Elm_Dayselector_Day to set as the start of the week.
+ */
 EOLIAN static void
 _elm_dayselector_week_start_set(Eo *obj, Elm_Dayselector_Data *sd, Elm_Dayselector_Day day)
 {
@@ -530,12 +763,30 @@ _elm_dayselector_week_start_set(Eo *obj, Elm_Dayselector_Data *sd, Elm_Dayselect
    _update_items(obj);
 }
 
+/**
+ * @internal
+ * @brief Gets the first day of the week for the dayselector.
+ *
+ * @param obj Unused.
+ * @param sd The dayselector's private data.
+ * @return The Elm_Dayselector_Day that is the current start of the week.
+ */
 EOLIAN static Elm_Dayselector_Day
 _elm_dayselector_week_start_get(const Eo *obj EINA_UNUSED, Elm_Dayselector_Data *sd)
 {
    return sd->week_start;
 }
 
+/**
+ * @internal
+ * @brief Sets the starting day of the weekend.
+ *
+ * Updates the internal weekend_start day and then refreshes the styles of all items.
+ *
+ * @param obj The dayselector Eolian object.
+ * @param sd The dayselector's private data.
+ * @param day The Elm_Dayselector_Day to set as the start of the weekend.
+ */
 EOLIAN static void
 _elm_dayselector_weekend_start_set(Eo *obj, Elm_Dayselector_Data *sd, Elm_Dayselector_Day day)
 {
@@ -545,12 +796,30 @@ _elm_dayselector_weekend_start_set(Eo *obj, Elm_Dayselector_Data *sd, Elm_Daysel
    _update_items(obj);
 }
 
+/**
+ * @internal
+ * @brief Gets the starting day of the weekend.
+ *
+ * @param obj Unused.
+ * @param sd The dayselector's private data.
+ * @return The Elm_Dayselector_Day that is the current start of the weekend.
+ */
 EOLIAN static Elm_Dayselector_Day
 _elm_dayselector_weekend_start_get(const Eo *obj EINA_UNUSED, Elm_Dayselector_Data *sd)
 {
    return sd->weekend_start;
 }
 
+/**
+ * @internal
+ * @brief Sets the length of the weekend in days.
+ *
+ * Updates the internal weekend_len and then refreshes the styles of all items.
+ *
+ * @param obj The dayselector Eolian object.
+ * @param sd The dayselector's private data.
+ * @param length The duration of the weekend in days (e.g., 2 for Saturday and Sunday).
+ */
 EOLIAN static void
 _elm_dayselector_weekend_length_set(Eo *obj, Elm_Dayselector_Data *sd, unsigned int length)
 {
@@ -560,12 +829,34 @@ _elm_dayselector_weekend_length_set(Eo *obj, Elm_Dayselector_Data *sd, unsigned 
    _update_items(obj);
 }
 
+/**
+ * @internal
+ * @brief Gets the length of the weekend in days.
+ *
+ * @param obj Unused.
+ * @param sd The dayselector's private data.
+ * @return The current length of the weekend in days.
+ */
 EOLIAN static unsigned int
 _elm_dayselector_weekend_length_get(const Eo *obj EINA_UNUSED, Elm_Dayselector_Data *sd)
 {
    return sd->weekend_len;
 }
 
+/**
+ * @internal
+ * @brief Sets custom names for the days of the week.
+ *
+ * Allows the application to provide an array of strings to be used as display
+ * names for the days. If `weekdays` is NULL, the widget reverts to using
+ * localized abbreviations.
+ *
+ * @param obj The dayselector Eolian object.
+ * @param sd The dayselector's private data.
+ * @param weekdays An array of 7 strings for the day names (Sunday to Saturday).
+ *                 Example: `const char *days[] = {"Sun", "Mon", ..., "Sat"};`
+ *                 Pass NULL to revert to default localized names.
+ */
 EOLIAN static void
 _elm_dayselector_weekdays_names_set(Eo *obj, Elm_Dayselector_Data *sd, const char **weekdays)
 {
@@ -600,6 +891,21 @@ _elm_dayselector_weekdays_names_set(Eo *obj, Elm_Dayselector_Data *sd, const cha
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the current names used for the days of the week.
+ *
+ * Returns a list of strings representing the display names of the days.
+ * The caller is responsible for freeing the list and its stringshare'd contents.
+ *
+ * @param obj The dayselector Eolian object.
+ * @param sd Unused.
+ * @return A new Eina_List containing 7 stringshared day names (Sunday to Saturday).
+ *         Example list structure:
+ *         `["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]` (if default US locale)
+ *         or custom names if set.
+ *         Returns NULL on error or if items are not found.
+ */
 EOLIAN static Eina_List *
 _elm_dayselector_weekdays_names_get(const Eo *obj, Elm_Dayselector_Data *sd EINA_UNUSED)
 {
@@ -619,6 +925,14 @@ _elm_dayselector_weekdays_names_get(const Eo *obj, Elm_Dayselector_Data *sd EINA
    return weekdays;
 }
 
+/**
+ * @internal
+ * @brief Class constructor for Elm_Dayselector.
+ *
+ * Registers the legacy type name for the widget.
+ *
+ * @param klass The Efl_Class for Elm_Dayselector.
+ */
 static void
 _elm_dayselector_class_constructor(Efl_Class *klass)
 {

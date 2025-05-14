@@ -3,6 +3,17 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback function to close the anchor hover pop-up.
+ *
+ * This function is called when a button within the anchor's hover pop-up
+ * is clicked. It programmatically ends the hover state, effectively
+ * closing the pop-up.
+ *
+ * @param data The entry widget (Evas_Object *) that contains the anchor.
+ * @param obj The Evas_Object that triggered the callback (unused).
+ * @param event_info The event-specific information (unused).
+ */
 static void
 my_entry_anchor_bt(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -10,6 +21,21 @@ my_entry_anchor_bt(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EI
    elm_entry_anchor_hover_end(av);
 }
 
+/**
+ * @brief Callback function for an anchor click event.
+ *
+ * This function is invoked when an anchor within the entry widget is clicked.
+ * It prints details about the click event, such as the mouse button used,
+ * the anchor's name, and the coordinates of the click.
+ *
+ * @param data Custom data passed to the callback (unused).
+ * @param obj The Evas_Object that triggered the callback (unused).
+ * @param event_info A pointer to an Elm_Entry_Anchor_Info struct containing
+ *        details about the anchor click event. For example:
+ *        - ev->button: The mouse button that was clicked (e.g., 1 for left-click).
+ *        - ev->name: The string from the 'href' attribute of the anchor tag.
+ *        - ev->x, ev->y: The coordinates of the click.
+ */
 static void
 _anchor_clicked_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -17,6 +43,26 @@ _anchor_clicked_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *e
    printf("anchor click %d: '%s' (%d, %d)\n", ev->button, ev->name, ev->x, ev->y);
 }
 
+/**
+ * @brief Callback function for an anchor hover opened event.
+ *
+ * This function is called when the user hovers over an anchor in the entry
+ * widget and the hover pop-up is created. It's responsible for populating
+ * the content of this pop-up. The pop-up has several content areas
+ * ("middle", "top", "bottom", "left", "right") that can be filled.
+ *
+ * The function checks which areas are available for content (e.g., `ei->hover_top`)
+ * and adds widgets (buttons, in this case) to them.
+ *
+ * @param data The entry widget (Evas_Object *) that contains the anchor.
+ * @param obj The entry widget object.
+ * @param event_info A pointer to an Elm_Entry_Anchor_Hover_Info struct which
+ *        contains information about the hover, including:
+ *        - ei->anchor_info: Details about the anchor being hovered.
+ *        - ei->hover: The hover object itself, to which content is added.
+ *        - ei->hover_top, ei->hover_bottom, ei->hover_left, ei->hover_right: Booleans
+ *          indicating if the respective content areas are available.
+ */
 static void
 _anchor_hover_opened_cb(void *data, Evas_Object *obj, void *event_info)
 {
@@ -77,6 +123,26 @@ _anchor_hover_opened_cb(void *data, Evas_Object *obj, void *event_info)
      }
 }
 
+/**
+ * @brief Main function for the Entry Anchor 2 test.
+ *
+ * This test demonstrates the functionality of anchors within an Elm_Entry widget,
+ * specifically focusing on the hover pop-up feature. It creates a window with
+ * an entry widget containing text formatted with HTML-like markup, including
+ * anchor tags (`<a href=... >`).
+ *
+ * It sets up callbacks to handle:
+ * 1. Clicks on anchors (`"anchor,clicked"` event).
+ * 2. The creation of a hover pop-up when the mouse is over an anchor
+ *    (`"anchor,hover,opened"` event).
+ *
+ * The hover style is set to "popout", which creates a separate window for the
+ * hover content.
+ *
+ * @param data Custom data passed to the callback (unused).
+ * @param obj The Evas_Object that triggered the callback (unused).
+ * @param event_info The event-specific information (unused).
+ */
 void
 test_entry_anchor2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

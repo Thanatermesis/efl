@@ -11,6 +11,11 @@ typedef Eo Elm_Calendar_Item;
 #ifndef _ELM_CALENDAR_ITEM_EO_TYPES
 #define _ELM_CALENDAR_ITEM_EO_TYPES
 
+/**
+ * @brief Eolian types related to Elm_Calendar_Item.
+ *
+ * @ingroup Elm_Calendar_Item
+ */
 
 #endif
 /** Elm Calendar Item class

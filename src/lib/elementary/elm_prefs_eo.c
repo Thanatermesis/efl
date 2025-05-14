@@ -19,7 +19,18 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_prefs_data_get, Elm_Prefs_Data *, NULL);
 
 void _elm_prefs_autosave_set(Eo *obj, Elm_Prefs_Data *pd, Eina_Bool autosave);
 
-
+/**
+ * @internal
+ * @brief Reflection function for setting the "autosave" property.
+ *
+ * This function is called by the Eolian reflection system when the "autosave"
+ * property is set. It converts the Eina_Value to a boolean and calls the
+ * actual setter function.
+ *
+ * @param obj The Evas_Object instance.
+ * @param val The Eina_Value containing the boolean value to set.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 static Eina_Error
 __eolian_elm_prefs_autosave_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -39,7 +50,17 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_prefs_autosave_set, EFL_FUNC_CALL(autosave), E
 
 Eina_Bool _elm_prefs_autosave_get(const Eo *obj, Elm_Prefs_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for getting the "autosave" property.
+ *
+ * This function is called by the Eolian reflection system when the "autosave"
+ * property is read. It calls the actual getter function and wraps the
+ * returned boolean value in an Eina_Value.
+ *
+ * @param obj The Evas_Object instance.
+ * @return An Eina_Value containing the boolean value of the "autosave" property.
+ */
 static Eina_Value
 __eolian_elm_prefs_autosave_get_reflect(const Eo *obj)
 {
@@ -99,7 +120,17 @@ EOAPI EFL_FUNC_BODYV_CONST(elm_obj_prefs_item_visible_get, Eina_Bool, 0, EFL_FUN
 
 Efl_Object *_elm_prefs_efl_object_constructor(Eo *obj, Elm_Prefs_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Initializes the Elm_Prefs Efl_Class.
+ *
+ * This function is called once when the Elm_Prefs class is being set up.
+ * It defines the Efl_Object operations (methods) and property reflection
+ * capabilities for the class.
+ *
+ * @param klass The Efl_Class to initialize.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_prefs_class_initializer(Efl_Class *klass)
 {
@@ -144,9 +175,17 @@ _elm_prefs_class_initializer(Efl_Class *klass)
    return efl_class_functions_set(klass, opsp, ropsp);
 }
 
+/**
+ * @internal
+ * @brief Describes the Elm_Prefs Efl_Class.
+ *
+ * This structure contains metadata about the Elm_Prefs class,
+ * such as its version, name, type, instance data size, and pointers
+ * to its class initializer and constructor functions.
+ */
 static const Efl_Class_Description _elm_prefs_class_desc = {
-   EO_VERSION,
-   "Elm.Prefs",
+   EO_VERSION, /**< Eolian Object version. */
+   "Elm.Prefs", /**< Class name. */
    EFL_CLASS_TYPE_REGULAR,
    sizeof(Elm_Prefs_Data),
    _elm_prefs_class_initializer,

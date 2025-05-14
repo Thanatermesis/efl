@@ -1,29 +1,52 @@
 #include "buffer_queue.h"
 
+/**
+ * @brief Structure representing a buffer queue.
+ *
+ * This structure holds information about the queue, including its dimensions,
+ * a list of shared buffers, connection state, and the queue itself with its capacity.
+ */
 struct _Ecore_Buffer_Queue
 {
-   int w, h;
-   Eina_List *shared_buffers;
-   Eina_Bool connected;
+   int w, h; /**< Width and height of the buffers in the queue. */
+   Eina_List *shared_buffers; /**< List of all shared buffers associated with this queue. */
+   Eina_Bool connected; /**< Flag indicating if the queue is connected. */
    struct
    {
-      unsigned int capacity;
-      Eina_List *list;
-   } queue;
+      unsigned int capacity; /**< Maximum number of buffers the queue can hold. */
+      Eina_List *list; /**< The actual list of buffers in the queue. */
+   } queue; /**< Queue specific data. */
 };
 
+/**
+ * @brief Checks if the buffer queue is full.
+ * @param ebq The buffer queue to check.
+ * @return EINA_TRUE if the queue is full, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _queue_is_full(Ecore_Buffer_Queue *ebq)
 {
    return (eina_list_count(ebq->queue.list) == ebq->queue.capacity);
 }
 
+/**
+ * @brief Checks if the buffer queue is empty.
+ * @param ebq The buffer queue to check.
+ * @return EINA_TRUE if the queue is empty, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _queue_is_empty(Ecore_Buffer_Queue *ebq)
 {
    return (eina_list_count(ebq->queue.list) == 0);
 }
 
+/**
+ * @brief Creates a new buffer queue.
+ * @param w The width of the buffers in the queue.
+ * @param h The height of the buffers in the queue.
+ * @param queue_size The maximum number of buffers the queue can hold. Must be >= 1.
+ * @return A pointer to the newly created Ecore_Buffer_Queue, or NULL on failure.
+ */
 Ecore_Buffer_Queue *
 _ecore_buffer_queue_new(int w, int h, int queue_size)
 {
@@ -42,6 +65,10 @@ _ecore_buffer_queue_new(int w, int h, int queue_size)
    return ebq;
 }
 
+/**
+ * @brief Frees the resources associated with a buffer queue.
+ * @param ebq The buffer queue to free.
+ */
 void
 _ecore_buffer_queue_free(Ecore_Buffer_Queue *ebq)
 {
@@ -52,6 +79,16 @@ _ecore_buffer_queue_free(Ecore_Buffer_Queue *ebq)
    free(ebq);
 }
 
+/**
+ * @brief Enqueues a shared buffer into the buffer queue.
+ *
+ * The buffer is added to the beginning of the queue.
+ * The buffer must already be registered as a shared buffer with the queue.
+ * If the queue is full or the buffer is not shared, the operation fails.
+ *
+ * @param ebq The buffer queue.
+ * @param sb The shared buffer to enqueue.
+ */
 void
 _ecore_buffer_queue_enqueue(Ecore_Buffer_Queue *ebq, Shared_Buffer *sb)
 {
@@ -67,6 +104,16 @@ _ecore_buffer_queue_enqueue(Ecore_Buffer_Queue *ebq, Shared_Buffer *sb)
    ebq->queue.list = eina_list_prepend(ebq->queue.list, sb);
 }
 
+/**
+ * @brief Dequeues a shared buffer from the buffer queue.
+ *
+ * The buffer is removed from the end of the queue (FIFO).
+ * If the queue is empty, the operation fails.
+ *
+ * @param ebq The buffer queue.
+ * @param ret_sb Pointer to store the dequeued Shared_Buffer. Can be NULL if not needed.
+ * @return EINA_TRUE if a buffer was successfully dequeued, EINA_FALSE otherwise.
+ */
 Eina_Bool
 _ecore_buffer_queue_dequeue(Ecore_Buffer_Queue *ebq, Shared_Buffer **ret_sb)
 {
@@ -85,6 +132,11 @@ _ecore_buffer_queue_dequeue(Ecore_Buffer_Queue *ebq, Shared_Buffer **ret_sb)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Checks if the buffer queue is empty.
+ * @param ebq The buffer queue.
+ * @return EINA_TRUE if the queue is empty, EINA_FALSE otherwise.
+ */
 Eina_Bool
 _ecore_buffer_queue_is_empty(Ecore_Buffer_Queue *ebq)
 {
@@ -93,6 +145,15 @@ _ecore_buffer_queue_is_empty(Ecore_Buffer_Queue *ebq)
    return _queue_is_empty(ebq);
 }
 
+/**
+ * @brief Adds a shared buffer to the list of buffers managed by the queue.
+ *
+ * This function registers a shared buffer with the queue, allowing it to be
+ * enqueued later. It does not add the buffer to the actual processing queue.
+ *
+ * @param ebq The buffer queue.
+ * @param sb The shared buffer to add.
+ */
 void
 _ecore_buffer_queue_shared_buffer_add(Ecore_Buffer_Queue *ebq, Shared_Buffer *sb)
 {
@@ -101,6 +162,15 @@ _ecore_buffer_queue_shared_buffer_add(Ecore_Buffer_Queue *ebq, Shared_Buffer *sb
    ebq->shared_buffers = eina_list_append(ebq->shared_buffers, sb);
 }
 
+/**
+ * @brief Removes a shared buffer from the list of managed buffers and from the queue itself.
+ *
+ * This function unregisters a shared buffer. If the buffer is currently in the
+ * processing queue, it will also be removed from there.
+ *
+ * @param ebq The buffer queue.
+ * @param sb The shared buffer to remove.
+ */
 void
 _ecore_buffer_queue_shared_buffer_remove(Ecore_Buffer_Queue *ebq, Shared_Buffer *sb)
 {
@@ -111,6 +181,12 @@ _ecore_buffer_queue_shared_buffer_remove(Ecore_Buffer_Queue *ebq, Shared_Buffer 
      ebq->queue.list = eina_list_remove(ebq->queue.list, sb);
 }
 
+/**
+ * @brief Finds a shared buffer associated with a given Ecore_Buffer.
+ * @param ebq The buffer queue.
+ * @param buffer The Ecore_Buffer to search for.
+ * @return The Shared_Buffer if found, NULL otherwise.
+ */
 Shared_Buffer *
 _ecore_buffer_queue_shared_buffer_find(Ecore_Buffer_Queue *ebq, Ecore_Buffer *buffer)
 {
@@ -128,6 +204,12 @@ _ecore_buffer_queue_shared_buffer_find(Ecore_Buffer_Queue *ebq, Ecore_Buffer *bu
    return NULL;
 }
 
+/**
+ * @brief Gets the list of all shared buffers managed by the queue.
+ * @param ebq The buffer queue.
+ * @return A pointer to the Eina_List of Shared_Buffer objects.
+ *         The list should not be modified by the caller.
+ */
 Eina_List *
 _ecore_buffer_queue_shared_buffer_list_get(Ecore_Buffer_Queue *ebq)
 {
@@ -136,6 +218,11 @@ _ecore_buffer_queue_shared_buffer_list_get(Ecore_Buffer_Queue *ebq)
    return ebq->shared_buffers;
 }
 
+/**
+ * @brief Sets the connection state of the buffer queue.
+ * @param ebq The buffer queue.
+ * @param connect The connection state to set (EINA_TRUE for connected, EINA_FALSE for disconnected).
+ */
 void
 _ecore_buffer_queue_connection_state_set(Ecore_Buffer_Queue *ebq, Eina_Bool connect)
 {
@@ -144,6 +231,11 @@ _ecore_buffer_queue_connection_state_set(Ecore_Buffer_Queue *ebq, Eina_Bool conn
    ebq->connected = connect;
 }
 
+/**
+ * @brief Gets the connection state of the buffer queue.
+ * @param ebq The buffer queue.
+ * @return EINA_TRUE if connected, EINA_FALSE otherwise.
+ */
 Eina_Bool
 _ecore_buffer_queue_connection_state_get(Ecore_Buffer_Queue *ebq)
 {

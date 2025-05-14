@@ -20,6 +20,34 @@
 static void *_gles1_handle = NULL;
 static Evas_GL_API _gles1_api;
 
+/**
+ * @brief Computes GL coordinates for various elements for direct rendering.
+ *
+ * This function is central to Evas's direct rendering feature. It translates
+ * Evas's coordinate system to OpenGL's coordinate system, considering window
+ * dimensions, rotation, and various clipping rectangles. The results are used
+ * to set up OpenGL states like viewport and scissor box correctly.
+ *
+ * @param win_w The width of the window.
+ * @param win_h The height of the window.
+ * @param rot The rotation angle of the Evas canvas.
+ * @param clip_image A flag indicating if the image should be clipped.
+ * @param x The x-coordinate of the object.
+ * @param y The y-coordinate of the object.
+ * @param width The width of the object.
+ * @param height The height of the object.
+ * @param img_x The x-coordinate of the image region within the object.
+ * @param img_y The y-coordinate of the image region within the object.
+ * @param img_w The width of the image region.
+ * @param img_h The height of the image region.
+ * @param clip_x The x-coordinate of the clipping rectangle.
+ * @param clip_y The y-coordinate of the clipping rectangle.
+ * @param clip_w The width of the clipping rectangle.
+ * @param clip_h The height of the clipping rectangle.
+ * @param[out] imgc An array of 4 integers to store the computed image coordinates [x, y, w, h].
+ * @param[out] objc An array of 4 integers to store the computed object coordinates [x, y, w, h].
+ * @param[out] cc An array of 4 integers to store the computed clip coordinates [x, y, w, h].
+ */
 void
 compute_gl_coordinates(int win_w, int win_h, int rot, int clip_image,
                        int x, int y, int width, int height,
@@ -30,6 +58,16 @@ compute_gl_coordinates(int win_w, int win_h, int rot, int clip_image,
 //---------------------------------------//
 // API Debug Error Checking Code
 
+/**
+ * @brief Performs a check to ensure a valid GLES 1.x context is current.
+ *
+ * This debug function is called at the beginning of wrapped GL functions
+ * to validate that a context has been made current using `evas_gl_make_current()`
+ * and that its version is GLES 1.x. It prints a critical error message if
+ * the checks fail.
+ *
+ * @param api The name of the API function being called, for error reporting.
+ */
 static
 void _make_current_check(const char* api)
 {
@@ -43,6 +81,16 @@ void _make_current_check(const char* api)
      CRI("\e[1;33m%s\e[m: This API is being called with the wrong context (invalid version).", api);
 }
 
+/**
+ * @brief Performs checks related to direct rendering mode.
+ *
+ * This debug function verifies conditions required for direct rendering.
+ * It ensures that a context is set and that GL calls are made from within
+ * the pixel get callback, which is a requirement for direct rendering. It also
+ * checks for the correct context version.
+ *
+ * @param api The name of the API function being called, for error reporting.
+ */
 static
 void _direct_rendering_check(const char *api)
 {
@@ -61,6 +109,15 @@ void _direct_rendering_check(const char *api)
      CRI("\e[1;33m%s\e[m: This API is being called with the wrong context (invalid version).", api);
 }
 
+/**
+ * @brief Runs all initial debug checks for a wrapped GL function.
+ *
+ * This is a convenience function that groups all the debug checks
+ * that should be run at the beginning of any wrapped GLES 1.x API call
+ * when debugging is enabled.
+ *
+ * @param api The name of the API function being called, for error reporting.
+ */
 static
 void _func_begin_debug(const char *api)
 {
@@ -78,6 +135,18 @@ _evgl_gles1_glAlphaFunc(GLenum func, GLclampf ref)
    _gles1_api.glAlphaFunc(func, ref);
 }
 
+/**
+ * @brief Wrapper for glClearColor.
+ *
+ * In direct rendering mode, this function caches the clear color values in the
+ * current thread's resource data. This cached color is later used by `glClear`
+ * to decide whether to skip the clear operation (e.g., for transparent colors).
+ *
+ * @param red The red component of the clear color.
+ * @param green The green component of the clear color.
+ * @param blue The blue component of the clear color.
+ * @param alpha The alpha component of the clear color.
+ */
 static void
 _evgl_gles1_glClearColor(GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha)
 {
@@ -499,6 +568,21 @@ _evgl_gles1_glBufferSubData(GLenum target, GLintptr offset, GLsizeiptr size, con
    _gles1_api.glBufferSubData(target, offset, size, data);
 }
 
+/**
+ * @brief Wrapper for glClear.
+ *
+ * This wrapper contains significant logic for direct rendering mode.
+ * When rendering directly to the Evas surface (not an FBO):
+ * - It may skip clearing the color buffer if the clear color is fully transparent,
+ *   to avoid erasing underlying Evas content.
+ * - It warns if clearing with a semi-transparent color, as this can have
+ *   unexpected blending results with the Evas canvas.
+ * - It manages the `GL_SCISSOR_TEST` to ensure that `glClear` only affects
+ *   the area of the evas object being rendered. It uses `compute_gl_coordinates`
+ *   to calculate the correct scissor box.
+ *
+ * @param mask A bitmask of buffers to clear (e.g., GL_COLOR_BUFFER_BIT).
+ */
 static void
 _evgl_gles1_glClear(GLbitfield mask)
 {
@@ -798,6 +882,15 @@ _evgl_gles1_glDepthRangex(GLclampx zNear, GLclampx zFar)
    _gles1_api.glDepthRangex(zNear, zFar);
 }
 
+/**
+ * @brief Wrapper for glDisable.
+ *
+ * This wrapper tracks the state of `GL_SCISSOR_TEST` in the EVGL_Context.
+ * This is important for the direct rendering logic to know whether client
+ * code has explicitly disabled scissoring.
+ *
+ * @param cap The GL capability to disable.
+ */
 static void
 _evgl_gles1_glDisable(GLenum cap)
 {
@@ -852,6 +945,15 @@ _evgl_gles1_glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid
    _gles1_api.glDrawElements(mode, count, type, indices);
 }
 
+/**
+ * @brief Wrapper for glEnable.
+ *
+ * This wrapper tracks the state of `GL_SCISSOR_TEST` in the EVGL_Context.
+ * This is important for the direct rendering logic to know whether client
+ * code has explicitly enabled scissoring.
+ *
+ * @param cap The GL capability to enable.
+ */
 static void
 _evgl_gles1_glEnable(GLenum cap)
 {
@@ -1007,6 +1109,19 @@ _evgl_gles1_glGetFixedv(GLenum pname, GLfixed *params)
    _gles1_api.glGetFixedv(pname, params);
 }
 
+/**
+ * @brief Wrapper for glGetIntegerv.
+ *
+ * In direct rendering mode and when querying `GL_SCISSOR_BOX`, this function
+ * returns the original scissor coordinates set by the user, rather than the
+ * transformed coordinates used internally by Evas GL. This provides a consistent
+ * view to the client application, which is unaware of the coordinate
+ * transformations. If no scissor has been set, it returns the dimensions of the
+ * image object.
+ *
+ * @param pname The parameter to query.
+ * @param params A pointer to store the returned integer value(s).
+ */
 static void
 _evgl_gles1_glGetIntegerv(GLenum pname, GLint *params)
 {
@@ -1109,6 +1224,20 @@ _evgl_gles1_glGetPointerv(GLenum pname, GLvoid **params)
    _gles1_api.glGetPointerv(pname, params);
 }
 
+/**
+ * @brief Wrapper for glGetString.
+ *
+ * This function intercepts queries for `GL_VERSION` and `GL_EXTENSIONS`
+ * to provide Evas GL-specific information.
+ * - For `GL_VERSION`, it returns a string identifying it as "OpenGL ES-CM 1.1 Evas GL",
+ *   wrapping the native version string. This helps in identifying the Evas GL
+ *   environment.
+ * - For `GL_EXTENSIONS`, it returns a custom string of extensions supported
+ *   by Evas GL, which may be a superset or subset of the native driver's extensions.
+ *
+ * @param name The string to query (e.g., GL_VENDOR, GL_VERSION).
+ * @return A pointer to the requested string, or NULL on error.
+ */
 static const GLubyte *
 _evgl_gles1_glGetString(GLenum name)
 {
@@ -1456,6 +1585,23 @@ _evgl_gles1_glPushMatrix(void)
    _gles1_api.glPushMatrix();
 }
 
+/**
+ * @brief Wrapper for glReadPixels.
+ *
+ * In direct rendering mode, this function transforms the source rectangle
+ * `(x, y, width, height)` from the Evas object's coordinate system to the
+ * window's coordinate system before calling the native `glReadPixels`. This
+ * ensures that pixels are read from the correct location on the screen.
+ * It uses `compute_gl_coordinates` for this transformation.
+ *
+ * @param x The x-coordinate of the pixel rectangle to read.
+ * @param y The y-coordinate of the pixel rectangle to read.
+ * @param width The width of the pixel rectangle.
+ * @param height The height of the pixel rectangle.
+ * @param format The format of the pixel data.
+ * @param type The data type of the pixel data.
+ * @param[out] pixels A pointer to store the pixel data.
+ */
 static void
 _evgl_gles1_glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLvoid *pixels)
 {
@@ -1555,6 +1701,21 @@ _evgl_gles1_glScalex(GLfixed x, GLfixed y, GLfixed z)
    _gles1_api.glScalex(x, y, z);
 }
 
+/**
+ * @brief Wrapper for glScissor.
+ *
+ * In direct rendering mode, this function transforms the scissor rectangle
+ * from the Evas object's coordinate system to the window's coordinate system.
+ * The transformed rectangle is then clipped against the evas object's clip
+ * rectangle. This ensures that rendering is constrained to the visible area
+ * of the object on the canvas. The original, untransformed scissor box is
+ * saved so it can be returned by `glGetIntegerv`.
+ *
+ * @param x The x-coordinate of the scissor box.
+ * @param y The y-coordinate of the scissor box.
+ * @param width The width of the scissor box.
+ * @param height The height of the scissor box.
+ */
 static void
 _evgl_gles1_glScissor(GLint x, GLint y, GLsizei width, GLsizei height)
 {
@@ -1802,6 +1963,20 @@ _evgl_gles1_glVertexPointer(GLint size, GLenum type, GLsizei stride, const GLvoi
    _gles1_api.glVertexPointer(size, type, stride, pointer);
 }
 
+/**
+ * @brief Wrapper for glViewport.
+ *
+ * In direct rendering mode, this function transforms the viewport rectangle
+ * from the Evas object's coordinate system to the window's coordinate system.
+ * It also implicitly sets a scissor box to the object's clip area to ensure
+ * rendering does not spill outside the object's bounds. The original,
+ * untransformed viewport is saved for potential future use (e.g., `glGet`).
+ *
+ * @param x The x-coordinate of the viewport.
+ * @param y The y-coordinate of the viewport.
+ * @param width The width of the viewport.
+ * @param height The height of the viewport.
+ */
 static void
 _evgl_gles1_glViewport(GLint x, GLint y, GLsizei width, GLsizei height)
 {
@@ -1931,6 +2106,24 @@ _evgl_gles1_glViewport(GLint x, GLint y, GLsizei width, GLsizei height)
      }
 }
 
+/*
+ * ----------------------------------------------------------------
+ * Debug-wrapped GLES 1.x API functions
+ * ----------------------------------------------------------------
+ *
+ * The following `_evgld_` functions are wrappers around the `_evgl_`
+ * functions. They are used when Evas GL is run in debug mode.
+ * Each wrapper performs the following steps:
+ * 1. Checks if the underlying GLES function was successfully loaded.
+ * 2. Calls `EVGLD_FUNC_BEGIN()`, which performs various checks, such as
+ *    ensuring a valid GL context is current.
+ * 3. Calls the corresponding `_evgl_` function to perform the actual work.
+ * 4. Calls `EVGLD_FUNC_END()`, which checks for any OpenGL errors that
+ *    may have occurred during the function's execution.
+ *
+ * This provides a layer of validation and error checking for applications
+ * during development.
+ */
 static void
 _evgld_gles1_glAlphaFunc(GLenum func, GLclampf ref)
 {
@@ -3828,6 +4021,18 @@ _evgld_gles1_glViewport(GLint x, GLint y, GLsizei width, GLsizei height)
 
 
 
+/**
+ * @brief Loads GLES 1.x function pointers from a dynamic library.
+ *
+ * This function uses `dlsym` (or the equivalent on Windows) to resolve
+ * the addresses of all the standard GLES 1.x API functions from a
+ * previously opened library handle. The resolved function pointers are stored
+ * in the provided Evas_GL_API structure.
+ *
+ * @param dl_handle A handle to the dynamically loaded GLES 1.x library.
+ * @param[out] funcs A pointer to an Evas_GL_API structure to be populated with
+ *                   function pointers.
+ */
 static void
 _evgl_load_gles1_apis(void *dl_handle, Evas_GL_API *funcs)
 {
@@ -3984,6 +4189,18 @@ _evgl_load_gles1_apis(void *dl_handle, Evas_GL_API *funcs)
 #undef ORD
 }
 
+/**
+ * @brief Initializes the GLES 1.x API bindings.
+ *
+ * This function is responsible for finding and loading the native GLES 1.x
+ * library (`libGLES_CM.so` on Linux, `libGLESv1_CM.dll` on Windows, or `libGL.so`
+ * as a fallback for desktop systems). It tries several common names for the
+ * library. Once loaded, it calls `_evgl_load_gles1_apis` to resolve the
+ * function pointers. This function is called only once.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE if the GLES 1.x library
+ *         could not be found or loaded.
+ */
 static Eina_Bool
 _evgl_gles1_api_init(void)
 {
@@ -4023,6 +4240,14 @@ _evgl_gles1_api_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Populates an Evas_GL_API structure with debug-wrapped GLES 1.x functions.
+ *
+ * This function fills the given `funcs` structure with pointers to the `_evgld_`
+ * wrapper functions. These wrappers include extra checks for debugging purposes.
+ *
+ * @param[out] funcs A pointer to an Evas_GL_API structure to be populated.
+ */
 static void
 _debug_gles1_api_get(Evas_GL_API *funcs)
 {
@@ -4180,6 +4405,15 @@ _debug_gles1_api_get(Evas_GL_API *funcs)
 #undef ORD
 }
 
+/**
+ * @brief Populates an Evas_GL_API structure with standard-wrapped GLES 1.x functions.
+ *
+ * This function fills the given `funcs` structure with pointers to the `_evgl_`
+ * wrapper functions. These wrappers provide the core Evas GL functionality,
+ * such as direct rendering support, without the overhead of debug checks.
+ *
+ * @param[out] funcs A pointer to an Evas_GL_API structure to be populated.
+ */
 static void
 _normal_gles1_api_get(Evas_GL_API *funcs)
 {
@@ -4337,6 +4571,18 @@ _normal_gles1_api_get(Evas_GL_API *funcs)
 #undef ORD
 }
 
+/**
+ * @brief Gets the GLES 1.x API function table for Evas GL.
+ *
+ * This is the main entry point for obtaining the GLES 1.x API. It ensures
+ * that the GLES 1.x library is initialized and then populates the provided
+ * `funcs` structure with either normal or debug-wrapped functions, based on
+ * the `debug` flag.
+ *
+ * @param[out] funcs A pointer to an Evas_GL_API structure to be populated.
+ * @param debug If EINA_TRUE, the structure is populated with debug-wrapped
+ *              functions. Otherwise, it's populated with normal functions.
+ */
 void
 _evgl_api_gles1_get(Evas_GL_API *funcs, Eina_Bool debug)
 {
@@ -4354,6 +4600,16 @@ _evgl_api_gles1_get(Evas_GL_API *funcs, Eina_Bool debug)
      //_direct_scissor_off_api_get(funcs);
 }
 
+/**
+ * @brief Gets the internal, unmodified GLES 1.x function pointers.
+ *
+ * This function returns a pointer to the internal `Evas_GL_API` structure
+ * that holds the original, unwrapped function pointers resolved from the
+ * native GLES 1.x library. This is used for internal purposes where a direct
+ * call to the native GL function is needed, bypassing any Evas GL wrappers.
+ *
+ * @return A pointer to the internal GLES 1.x API structure.
+ */
 Evas_GL_API *
 _evgl_api_gles1_internal_get(void)
 {

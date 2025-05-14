@@ -8,14 +8,26 @@
 #include "Ecore_Con.h"
 #include "ecore_con_private.h"
 
+/**
+ * @brief Private data structure for Efl_Net_Server_Simple.
+ */
 typedef struct
 {
-   const Efl_Class *inner_class;
-   Eo *inner_server;
+   const Efl_Class *inner_class; /**< The class to be used for the inner server, if not explicitly set. */
+   Eo *inner_server; /**< The actual server object that handles connections. */
 } Efl_Net_Server_Simple_Data;
 
 #define MY_CLASS EFL_NET_SERVER_SIMPLE_CLASS
 
+/**
+ * @brief Callback for when a client connection is closed.
+ *
+ * This function is called when an Efl.Io.Closer.closed event occurs on a client socket.
+ * It removes the event callback and unparents the client if it's still a child of the server.
+ *
+ * @param data The server object (Eo *).
+ * @param event The Efl_Event structure containing event details.
+ */
 static void
 _efl_net_server_simple_client_event_closed(void *data, const Efl_Event *event)
 {
@@ -30,6 +42,18 @@ _efl_net_server_simple_client_event_closed(void *data, const Efl_Event *event)
    //efl_net_server_clients_count_set(server, efl_net_server_clients_count_get(server) - 1);
 }
 
+/**
+ * @brief Announces a new client to the Efl_Net_Server_Simple instance.
+ *
+ * This function is called by the inner server when a new client is accepted.
+ * It performs safety checks, emits the EFL_NET_SERVER_EVENT_CLIENT_ADD event,
+ * and sets up a callback for when the client connection closes.
+ *
+ * @param o The Efl_Net_Server_Simple object.
+ * @param pd The private data of the Efl_Net_Server_Simple object.
+ * @param client The new client socket object.
+ * @return EINA_TRUE if the client was successfully announced, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _efl_net_server_simple_efl_net_server_client_announce(Eo *o, Efl_Net_Server_Simple_Data *pd EINA_UNUSED, Eo *client)
 {
@@ -77,6 +101,16 @@ _efl_net_server_simple_efl_net_server_client_announce(Eo *o, Efl_Net_Server_Simp
    return EINA_FALSE;
 }
 
+/**
+ * @brief Callback for when the inner server adds a new client.
+ *
+ * This function is triggered by the EFL_NET_SERVER_EVENT_CLIENT_ADD event from the inner_server.
+ * It wraps the inner client socket with an EFL_NET_SOCKET_SIMPLE_CLASS instance
+ * and then announces this new simple client to the Efl_Net_Server_Simple instance.
+ *
+ * @param data The Efl_Net_Server_Simple object (Eo *).
+ * @param event The Efl_Event structure, where event->info is the inner client socket (Eo *).
+ */
 static void
 _efl_net_server_simple_inner_server_client_add(void *data, const Efl_Event *event)
 {
@@ -98,6 +132,15 @@ _efl_net_server_simple_inner_server_client_add(void *data, const Efl_Event *even
    efl_net_server_client_announce(o, client_simple);
 }
 
+/**
+ * @brief Callback for when the inner server rejects a client.
+ *
+ * This function is triggered by the EFL_NET_SERVER_EVENT_CLIENT_REJECTED event from the inner_server.
+ * It forwards the event to the Efl_Net_Server_Simple instance.
+ *
+ * @param data The Efl_Net_Server_Simple object (Eo *).
+ * @param event The Efl_Event structure, where event->info is typically a const char* address.
+ */
 static void
 _efl_net_server_simple_inner_server_client_rejected(void *data, const Efl_Event *event)
 {
@@ -105,6 +148,15 @@ _efl_net_server_simple_inner_server_client_rejected(void *data, const Efl_Event 
    efl_event_callback_call(o, EFL_NET_SERVER_EVENT_CLIENT_REJECTED, event->info);
 }
 
+/**
+ * @brief Callback for when the inner server encounters an error.
+ *
+ * This function is triggered by the EFL_NET_SERVER_EVENT_SERVER_ERROR event from the inner_server.
+ * It forwards the event to the Efl_Net_Server_Simple instance.
+ *
+ * @param data The Efl_Net_Server_Simple object (Eo *).
+ * @param event The Efl_Event structure, where event->info is typically an Eina_Error.
+ */
 static void
 _efl_net_server_simple_inner_server_error(void *data, const Efl_Event *event)
 {
@@ -112,6 +164,15 @@ _efl_net_server_simple_inner_server_error(void *data, const Efl_Event *event)
    efl_event_callback_call(o, EFL_NET_SERVER_EVENT_SERVER_ERROR, event->info);
 }
 
+/**
+ * @brief Callback for when the inner server starts serving.
+ *
+ * This function is triggered by the EFL_NET_SERVER_EVENT_SERVING event from the inner_server.
+ * It forwards the event to the Efl_Net_Server_Simple instance.
+ *
+ * @param data The Efl_Net_Server_Simple object (Eo *).
+ * @param event The Efl_Event structure (event->info is usually NULL for this event).
+ */
 static void
 _efl_net_server_simple_inner_server_serving(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -119,6 +180,16 @@ _efl_net_server_simple_inner_server_serving(void *data, const Efl_Event *event E
    efl_event_callback_call(o, EFL_NET_SERVER_EVENT_SERVING, NULL);
 }
 
+/**
+ * @brief Array of callbacks to register on the inner server.
+ *
+ * This array maps events from the inner_server to their respective handler functions
+ * within Efl_Net_Server_Simple.
+ * - EFL_NET_SERVER_EVENT_CLIENT_ADD: Handled by _efl_net_server_simple_inner_server_client_add
+ * - EFL_NET_SERVER_EVENT_CLIENT_REJECTED: Handled by _efl_net_server_simple_inner_server_client_rejected
+ * - EFL_NET_SERVER_EVENT_SERVER_ERROR: Handled by _efl_net_server_simple_inner_server_error
+ * - EFL_NET_SERVER_EVENT_SERVING: Handled by _efl_net_server_simple_inner_server_serving
+ */
 EFL_CALLBACKS_ARRAY_DEFINE(_efl_net_server_simple_inner_server_cbs,
                            { EFL_NET_SERVER_EVENT_CLIENT_ADD, _efl_net_server_simple_inner_server_client_add },
                            { EFL_NET_SERVER_EVENT_CLIENT_REJECTED, _efl_net_server_simple_inner_server_client_rejected },

@@ -9,6 +9,16 @@
 #define MY_CLASS ELDBUS_MODEL_CONNECTION_CLASS
 #define MY_CLASS_NAME "Eldbus_Model_Connection"
 
+/**
+ * @brief Callback for the eldbus_names_list function.
+ *
+ * This function is called when the list of names (bus services) is retrieved.
+ * It processes the message, populates the children list, and resolves pending promises.
+ *
+ * @param data User data, expected to be Eldbus_Model_Connection_Data.
+ * @param msg The Eldbus_Message containing the list of names or an error.
+ * @param pending The Eldbus_Pending object associated with the request.
+ */
 static void _eldbus_model_connection_names_list_cb(void *, const Eldbus_Message *, Eldbus_Pending *);
 
 static Efl_Object*
@@ -21,6 +31,16 @@ _eldbus_model_connection_efl_object_constructor(Eo *obj, Eldbus_Model_Connection
    return obj;
 }
 
+/**
+ * @brief Invalidates the Eldbus_Model_Connection object.
+ *
+ * This function is called when the object is being invalidated.
+ * It cancels any pending D-Bus requests, rejects any pending promises for
+ * children slices, and frees the list of children.
+ *
+ * @param obj The Eo object.
+ * @param pd The private data of the Eldbus_Model_Connection.
+ */
 static void
 _eldbus_model_connection_efl_object_invalidate(Eo *obj, Eldbus_Model_Connection_Data *pd)
 {
@@ -39,6 +59,15 @@ _eldbus_model_connection_efl_object_invalidate(Eo *obj, Eldbus_Model_Connection_
    efl_invalidate(efl_super(obj, ELDBUS_MODEL_CONNECTION_CLASS));
 }
 
+/**
+ * @brief Initiates the listing of D-Bus service names (children).
+ *
+ * If not already listing or listed, this function requests the list of
+ * available service names from the D-Bus connection.
+ *
+ * @param obj The Eo object (const as it's not modified directly here, but through pd).
+ * @param pd The private data of the Eldbus_Model_Connection.
+ */
 static void
 _eldbus_model_children_list(const Eo *obj, Eldbus_Model_Connection_Data *pd)
 {
@@ -53,6 +82,29 @@ _eldbus_model_children_list(const Eo *obj, Eldbus_Model_Connection_Data *pd)
                                    pd);
 }
 
+/**
+ * @brief Gets a slice of the children (D-Bus service names).
+ *
+ * Implements Efl.Model.children_slice_get.
+ * If the children have already been listed, it returns a resolved future
+ * with the requested slice. Otherwise, it creates a promise, stores the
+ * request, and initiates the listing of children if not already started.
+ *
+ * @param obj The Eo object.
+ * @param pd The private data of the Eldbus_Model_Connection.
+ * @param start The starting index of the slice.
+ * @param count The number of items in the slice.
+ * @return An Eina_Future that will be resolved with an Eina_Value array
+ *         containing the children slice. The Eina_Value array will contain
+ *         Eo pointers to Eldbus_Model_Object instances.
+ *         Example of Eina_Value array structure:
+ *         EINA_VALUE_TYPE_ARRAY
+ *         {
+ *           [0] = (Eo *) eldbus_model_object_representing_service_1,
+ *           [1] = (Eo *) eldbus_model_object_representing_service_2,
+ *           ...
+ *         }
+ */
 static Eina_Future *
 _eldbus_model_connection_efl_model_children_slice_get(Eo *obj,
                                                       Eldbus_Model_Connection_Data *pd,
@@ -83,6 +135,17 @@ _eldbus_model_connection_efl_model_children_slice_get(Eo *obj,
    return efl_future_then(obj, eina_future_new(p));;
 }
 
+/**
+ * @brief Gets the count of children (D-Bus service names).
+ *
+ * Implements Efl.Model.children_count_get.
+ * Initiates the listing of children if not already started and returns
+ * the current count of known children.
+ *
+ * @param obj The Eo object (const as it's not modified directly here).
+ * @param pd The private data of the Eldbus_Model_Connection.
+ * @return The number of children.
+ */
 static unsigned int
 _eldbus_model_connection_efl_model_children_count_get(const Eo *obj,
                                                       Eldbus_Model_Connection_Data *pd)

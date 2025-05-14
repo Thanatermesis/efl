@@ -56,6 +56,16 @@ _elm_prefs_efl_canvas_group_group_add(Eo *obj, Elm_Prefs_Data *_pd EINA_UNUSED)
 
 static void _item_free(Elm_Prefs_Item_Node *it);
 
+/**
+ * @internal
+ * @brief Frees all memory associated with a prefs page node.
+ *
+ * This includes freeing the page's name, title, subtitle, widget name,
+ * style, icon, the Evas object associated with the page, and all items
+ * belonging to this page.
+ *
+ * @param p The prefs page node to free.
+ */
 static void
 _page_free(Elm_Prefs_Page_Node *p)
 {
@@ -78,6 +88,17 @@ _page_free(Elm_Prefs_Page_Node *p)
    free(p);
 }
 
+/**
+ * @internal
+ * @brief Frees all memory associated with a prefs item node.
+ *
+ * This function handles freeing type-specific data for various
+ * Elm_Prefs_Item_Type values (e.g., stringshares for text/textarea,
+ * subpages for page items). It also frees common item properties like
+ * name, label, icon, style, widget name, and the Evas object.
+ *
+ * @param it The prefs item node to free.
+ */
 static void
 _item_free(Elm_Prefs_Item_Node *it)
 {
@@ -149,12 +170,29 @@ end:
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @internal
+ * @brief Frees the root page node of the prefs widget.
+ *
+ * @param sd The private data of the Elm_Prefs widget.
+ */
 static void
 _root_node_free(Elm_Prefs_Data *sd)
 {
    _page_free(sd->root);
 }
 
+/**
+ * @internal
+ * @brief Checks if an Eina_Value_Type matches a corresponding Elm_Prefs_Item_Type.
+ *
+ * This function is used to ensure that the data type stored in Elm_Prefs_Data
+ * is compatible with the expected type of an item widget.
+ *
+ * @param t The Eina_Value_Type to check.
+ * @param epd_t The Elm_Prefs_Item_Type to check against.
+ * @return EINA_TRUE if the types match or are compatible, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _prefs_data_types_match(const Eina_Value_Type *t,
                         Elm_Prefs_Item_Type epd_t)
@@ -169,6 +207,21 @@ _prefs_data_types_match(const Eina_Value_Type *t,
             epd_t == ELM_PREFS_TYPE_TEXTAREA));
 }
 
+/**
+ * @internal
+ * @brief Attempts to convert an Eina_Value to the correct type for a given prefs item.
+ *
+ * If the provided @p value has a type different from what is expected by the
+ * @p it (Elm_Prefs_Item_Node), this function tries to convert @p value to the
+ * item's expected type. The conversion is done in-place on the @p value.
+ *
+ * @param it The prefs item node defining the target type.
+ * @param value The Eina_Value to potentially convert. This value will be modified
+ *              if a conversion is successful.
+ * @return EINA_TRUE if the value is already of the correct type or if conversion
+ *         was successful, EINA_FALSE otherwise (e.g., bad item type, setup error,
+ *         conversion error).
+ */
 static Eina_Bool
 _prefs_data_type_fix(Elm_Prefs_Item_Node *it,
                      Eina_Value *value)
@@ -225,6 +278,22 @@ _prefs_data_type_fix(Elm_Prefs_Item_Node *it,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Sets the value of an item's widget using a value from Elm_Prefs_Data.
+ *
+ * This function retrieves a value (passed as @p value) that is assumed to come
+ * from an Elm_Prefs_Data store. It checks for type mismatches between the
+ * stored value and the item's expected type, attempting to fix them using
+ * _prefs_data_type_fix(). If types are compatible, it sets the value on the
+ * item's widget (it->w_obj) using the widget's implementation (it->w_impl->value_set).
+ *
+ * @param sd The private data of the Elm_Prefs widget.
+ * @param it The prefs item node whose widget's value is to be set.
+ * @param value The Eina_Value retrieved from Elm_Prefs_Data.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., bad item type,
+ *         type fix failure, widget unavailable, widget set failure).
+ */
 static Eina_Bool
 _prefs_item_widget_value_from_data(Elm_Prefs_Data *sd,
                                    Elm_Prefs_Item_Node *it,
@@ -278,6 +347,15 @@ _prefs_item_widget_value_from_data(Elm_Prefs_Data *sd,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Marks the prefs widget as dirty and schedules a save if autosave is enabled.
+ *
+ * Sets the `dirty` flag in the widget's private data. If autosave is enabled
+ * and a saving poller is not already active, it adds one to save the data.
+ *
+ * @param obj The Elm_Prefs widget.
+ */
 static void
 _elm_prefs_mark_as_dirty(Eo *obj)
 {
@@ -293,6 +371,16 @@ _elm_prefs_mark_as_dirty(Eo *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Emits the "item,changed" signal for a modified prefs item.
+ *
+ * Constructs the full item path (e.g., "page_name:item_name") and
+ * calls the legacy event callback for ELM_PREFS_EVENT_ITEM_CHANGED.
+ *
+ * @param obj The Elm_Prefs widget.
+ * @param it The prefs item node that changed.
+ */
 static void
 _elm_prefs_item_changed_report(Eo *obj,
                                Elm_Prefs_Item_Node *it)
@@ -306,6 +394,18 @@ _elm_prefs_item_changed_report(Eo *obj,
      (obj, ELM_PREFS_EVENT_ITEM_CHANGED, buf);
 }
 
+/**
+ * @internal
+ * @brief Recursively searches for an item node within a page hierarchy by its path.
+ *
+ * The path is a colon-separated string representing the item's location
+ * within nested pages. For example, "item_name" or "subpage_name:item_name".
+ * The @p path string is modified by strsep().
+ *
+ * @param p The current page node to search within.
+ * @param path A pointer to the path string. This string will be tokenized.
+ * @return The found Elm_Prefs_Item_Node, or NULL if not found.
+ */
 static Elm_Prefs_Item_Node *
 _elm_prefs_page_item_by_name(Elm_Prefs_Page_Node *p,
                              char **path)
@@ -329,6 +429,18 @@ _elm_prefs_page_item_by_name(Elm_Prefs_Page_Node *p,
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Finds a prefs item node by its full hierarchical name.
+ *
+ * The name is expected to be in the format "root_page_name:item_name" or
+ * "root_page_name:subpage_name:item_name", etc.
+ *
+ * @param sd The private data of the Elm_Prefs widget.
+ * @param name The full hierarchical name of the item.
+ * @return The found Elm_Prefs_Item_Node, or NULL if not found or if the
+ *         first part of the name doesn't match the root page name.
+ */
 static Elm_Prefs_Item_Node *
 _elm_prefs_item_node_by_name(Elm_Prefs_Data *sd,
                              const char *name)
@@ -348,6 +460,17 @@ _elm_prefs_item_node_by_name(Elm_Prefs_Data *sd,
    return _elm_prefs_page_item_by_name(sd->root, &aux);
 }
 
+/**
+ * @internal
+ * @brief Finds the Eina_List node containing a direct child item of the root page by name.
+ *
+ * This function only searches for items that are direct children of the
+ * root page (sd->root->items). It does not search recursively into subpages.
+ *
+ * @param sd The private data of the Elm_Prefs widget.
+ * @param name The name of the item to find (not hierarchical).
+ * @return The Eina_List node containing the item, or NULL if not found.
+ */
 static Eina_List *
 _elm_prefs_item_list_node_by_name(Elm_Prefs_Data *sd,
                                   const char *name)

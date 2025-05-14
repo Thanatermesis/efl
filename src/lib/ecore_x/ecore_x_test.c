@@ -12,6 +12,22 @@
 #include "Ecore_X.h"
 #include <string.h>
 
+/**
+ * @brief Simulates a key down event.
+ *
+ * This function fakes a key press event using the XTest extension.
+ * The key can be specified by its name (e.g., "Control_L", "a", "b", "F1")
+ * or by its keycode string (e.g., "Keycode-37").
+ *
+ * @param key The name of the key (e.g., "Alt_L") or its keycode string (e.g., "Keycode-64").
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ *         Returns @c EINA_FALSE if ECORE_XTEST is not defined.
+ *
+ * @see ecore_x_test_fake_key_up()
+ * @see ecore_x_test_fake_key_press()
+ *
+ * @since 1.1
+ */
 EAPI Eina_Bool
 #ifdef ECORE_XTEST
 ecore_x_test_fake_key_down(const char *key)
@@ -44,6 +60,22 @@ ecore_x_test_fake_key_down(const char *key EINA_UNUSED)
 #endif /* ifdef ECORE_XTEST */
 }
 
+/**
+ * @brief Simulates a key up event.
+ *
+ * This function fakes a key release event using the XTest extension.
+ * The key can be specified by its name (e.g., "Control_L", "a", "b", "F1")
+ * or by its keycode string (e.g., "Keycode-37").
+ *
+ * @param key The name of the key (e.g., "Alt_L") or its keycode string (e.g., "Keycode-64").
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ *         Returns @c EINA_FALSE if ECORE_XTEST is not defined.
+ *
+ * @see ecore_x_test_fake_key_down()
+ * @see ecore_x_test_fake_key_press()
+ *
+ * @since 1.1
+ */
 EAPI Eina_Bool
 #ifdef ECORE_XTEST
 ecore_x_test_fake_key_up(const char *key)
@@ -76,6 +108,27 @@ ecore_x_test_fake_key_up(const char *key EINA_UNUSED)
 #endif /* ifdef ECORE_XTEST */
 }
 
+/**
+ * @brief Simulates a key press event (down then up).
+ *
+ * This function fakes a key press and release event sequence using the XTest extension.
+ * It can handle keys by name (e.g., "Control_L", "a", "b", "F1") or by keycode string
+ * (e.g., "Keycode-37"). It also attempts to handle shifted keys.
+ * If the key is not directly mappable, it may try to temporarily remap a keycode
+ * to achieve the desired keysym.
+ *
+ * @param key The name of the key (e.g., "Shift_L", "A") or its keycode string (e.g., "Keycode-50").
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ *         Returns @c EINA_FALSE if ECORE_XTEST is not defined.
+ *
+ * @note This function's attempt to remap keys might have side effects on the
+ *       keyboard mapping, though it tries to be transient.
+ *
+ * @see ecore_x_test_fake_key_down()
+ * @see ecore_x_test_fake_key_up()
+ *
+ * @since 1.1
+ */
 EAPI Eina_Bool
 #ifdef ECORE_XTEST
 ecore_x_test_fake_key_press(const char *key)
@@ -147,12 +200,35 @@ ecore_x_test_fake_key_press(const char *key EINA_UNUSED)
 #endif /* ifdef ECORE_XTEST */
 }
 
+/**
+ * @brief Gets the string representation of a keysym.
+ *
+ * This function converts an X11 keysym value (e.g., XK_Shift_L, XK_a)
+ * into its string name (e.g., "Shift_L", "a").
+ *
+ * @param keysym The keysym value. For example, `XK_Return` for the Enter key.
+ * @return A pointer to the string name of the keysym, or @c NULL if the
+ *         keysym is not valid. The returned string should not be freed.
+ *
+ * @since 1.1
+ */
 EAPI const char *
 ecore_x_keysym_string_get(int keysym)
 {
    return XKeysymToString(keysym);
 }
 
+/**
+ * @brief Gets the keycode for a given key name or keycode string.
+ *
+ * This function converts a key name (e.g., "Control_L", "a") or a
+ * keycode string (e.g., "Keycode-37") into its corresponding X11 keycode.
+ *
+ * @param keyname The name of the key (e.g., "space") or its keycode string (e.g., "Keycode-65").
+ * @return The keycode for the given key name, or 0 if not found.
+ *
+ * @since 1.1
+ */
 EAPI int
 ecore_x_keysym_keycode_get(const char *keyname)
 {
@@ -166,6 +242,17 @@ ecore_x_keysym_keycode_get(const char *keyname)
    return keycode;
 }
 
+/**
+ * @brief Gets the keysym for a given key string.
+ *
+ * This function converts a key string name (e.g., "Control_L", "a", "F1")
+ * into its corresponding X11 keysym value.
+ *
+ * @param string The string name of the key (e.g., "Return" for the Enter key).
+ * @return The keysym value for the given string, or @c NoSymbol if not found.
+ *
+ * @since 1.1
+ */
 EAPI unsigned int
 ecore_x_keysym_get(const char *string)
 {

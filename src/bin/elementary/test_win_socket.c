@@ -3,6 +3,14 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback function to delete the socket window when the main window is deleted.
+ *
+ * @param data The socket window (Evas_Object *) to be deleted.
+ * @param e Unused Evas canvas.
+ * @param obj Unused Evas object.
+ * @param event_info Unused event information.
+ */
 static void
 _win_del(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -10,6 +18,16 @@ _win_del(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *ev
    evas_object_del(socket_win);
 }
 
+/**
+ * @brief Fills the given window with a set of Elementary widgets.
+ *
+ * This function populates the window with a background (optional),
+ * a scroller, a box layout, entries, icons, and bubbles to demonstrate
+ * various UI elements.
+ *
+ * @param win The Evas_Object (window) to fill with content.
+ * @param do_bg If EINA_TRUE, a background object is added to the window.
+ */
 static void
 fill(Evas_Object *win, Eina_Bool do_bg)
 {
@@ -140,6 +158,21 @@ fill(Evas_Object *win, Eina_Bool do_bg)
    evas_object_show(sc);
 }
 
+/**
+ * @brief Test function for demonstrating an Elm_Win socket.
+ *
+ * This function creates two windows:
+ * 1. A standard window (`win`) that displays informational labels.
+ * 2. A socket window (`win_socket`) that listens on a socket name ("ello")
+ *    and is populated with UI elements by the fill() function.
+ *
+ * The standard window has a delete callback (_win_del) that ensures the
+ * socket window is also deleted when the standard window is closed.
+ *
+ * @param data Unused data pointer.
+ * @param obj Unused Evas_Object.
+ * @param event_info Unused event information.
+ */
 void
 test_win_socket(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

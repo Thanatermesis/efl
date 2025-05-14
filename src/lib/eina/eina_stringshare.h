@@ -334,9 +334,54 @@ EINA_API int                eina_stringshare_strlen(Eina_Stringshare *str) EINA_
  */
 EINA_API void               eina_stringshare_dump(void);
 
+/**
+ * @brief Replaces a stringshare instance with a new one.
+ *
+ * @param[in,out] p_str Pointer to the stringshare variable to be replaced.
+ * @param[in] news The new NULL-terminated string to use.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ *
+ * This function is a convenience wrapper. It unreferences the original
+ * stringshare pointed to by @p p_str and replaces it with a new
+ * stringshare created from @p news. This is the safe way to change
+ * a stringshare variable.
+ *
+ * Example:
+ * @code
+ * const char *s = eina_stringshare_add("hello");
+ * // ...
+ * eina_stringshare_replace(&s, "world");
+ * // s now points to the "world" stringshare
+ * eina_stringshare_del(s); // release "world"
+ * @endcode
+ */
 static inline Eina_Bool eina_stringshare_replace(Eina_Stringshare **p_str, const char *news) EINA_ARG_NONNULL(1);
+/**
+ * @brief Replaces a stringshare instance with a new one of a given length.
+ *
+ * @param[in,out] p_str Pointer to the stringshare variable to be replaced.
+ * @param[in] news The new string to use.
+ * @param[in] slen The length of the new string.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ *
+ * This function is similar to eina_stringshare_replace(), but it uses
+ * a string with a specific length instead of a NULL-terminated string.
+ */
 static inline Eina_Bool eina_stringshare_replace_length(Eina_Stringshare **p_str, const char *news, unsigned int slen) EINA_ARG_NONNULL(1);
 
+/**
+ * @brief Get an Eina_Slice from a stringshare.
+ *
+ * @param str The stringshare instance. It is safe to give @c NULL,
+ *            in that case a slice with len 0 is returned.
+ * @return An Eina_Slice representing the stringshare.
+ *
+ * This provides a convenient way to get a slice from a stringshare, which
+ * can be useful for functions that operate on slices. The slice will
+ * be valid as long as the stringshare is.
+ *
+ * @since 1.18
+ */
 static inline Eina_Slice eina_stringshare_slice_get(Eina_Stringshare *str) EINA_PURE EINA_WARN_UNUSED_RESULT;
 
 #include "eina_inline_stringshare.x"

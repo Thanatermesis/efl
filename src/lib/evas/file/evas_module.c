@@ -3,6 +3,9 @@
 #endif
 
 #include <string.h>
+#include <stdlib.h> // For malloc, free
+#include <stdio.h> // For snprintf
+#include <sys/stat.h> // For stat (used in NEED_RUN_IN_TREE)
 
 #include "evas_common_private.h"
 #include "evas_private.h"
@@ -29,15 +32,39 @@
 #define EVAS_MODULE_NO_VG_SAVERS 0
 #endif
 
+/**
+ * @internal
+ * @struct _Evas_Module_Task
+ * @brief Structure to hold task cancellation information for a module.
+ *
+ * This structure is used with thread-local storage to allow modules
+ * to check if their current operation/task has been cancelled.
+ */
 typedef struct _Evas_Module_Task Evas_Module_Task;
 struct _Evas_Module_Task
 {
-   Eina_Bool (*cancelled)(void *data);
-   void *data;
+   Eina_Bool (*cancelled)(void *data); /**< Callback function to check if the task is cancelled. */
+   void *data; /**< User data to be passed to the cancelled callback. */
 };
 
+/**
+ * @internal
+ * @brief Thread-local storage key for Evas_Module_Task.
+ *
+ * This TLS key holds a pointer to an Evas_Module_Task structure,
+ * allowing different threads to have their own task cancellation contexts.
+ */
 static Eina_TLS task = 0;
 
+/**
+ * @brief Checks if the current module task has been cancelled.
+ *
+ * This function retrieves the task cancellation status from thread-local storage.
+ * Modules performing long operations can periodically call this to check
+ * if they should abort.
+ *
+ * @return @c EINA_TRUE if the task has been cancelled, @c EINA_FALSE otherwise.
+ */
 EVAS_API Eina_Bool
 evas_module_task_cancelled(void)
 {
@@ -49,6 +76,16 @@ evas_module_task_cancelled(void)
    return t->cancelled(t->data);
 }
 
+/**
+ * @brief Registers a task cancellation callback for the current thread.
+ *
+ * Stores the provided cancellation callback and data in thread-local storage.
+ * This allows a module to define how its cancellation status is determined.
+ *
+ * @param cancelled The callback function that will be called to check for cancellation.
+ *                  It should return EINA_TRUE if cancelled, EINA_FALSE otherwise.
+ * @param data      User data to be passed to the `cancelled` callback.
+ */
 EVAS_API void
 evas_module_task_register(Eina_Bool (*cancelled)(void *data), void *data)
 {
@@ -63,6 +100,13 @@ evas_module_task_register(Eina_Bool (*cancelled)(void *data), void *data)
    eina_tls_set(task, t);
 }
 
+/**
+ * @brief Unregisters the task cancellation callback for the current thread.
+ *
+ * Removes the task cancellation information from thread-local storage and
+ * frees the associated Evas_Module_Task structure. This is also used as
+ * the delete callback for the TLS key `task`.
+ */
 EVAS_API void
 evas_module_task_unregister(void)
 {
@@ -75,18 +119,59 @@ evas_module_task_unregister(void)
     free(t);
 }
 
+/**
+ * @internal
+ * @brief Array of hash tables for different module types.
+ *
+ * Each Evas_Module_Type (engine, image_loader, etc.) has its own hash table
+ * where modules are stored, keyed by their name.
+ * The array is indexed by Evas_Module_Type enum values.
+ * For example:
+ * evas_modules[EVAS_MODULE_TYPE_ENGINE] stores engine modules.
+ * evas_modules[EVAS_MODULE_TYPE_IMAGE_LOADER] stores image loader modules.
+ */
 static Eina_Hash *evas_modules[6] = {
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL
+  NULL, /**< EVAS_MODULE_TYPE_ENGINE */
+  NULL, /**< EVAS_MODULE_TYPE_IMAGE_LOADER */
+  NULL, /**< EVAS_MODULE_TYPE_IMAGE_SAVER */
+  NULL, /**< EVAS_MODULE_TYPE_OBJECT */
+  NULL, /**< EVAS_MODULE_TYPE_VG_LOADER */
+  NULL  /**< EVAS_MODULE_TYPE_VG_SAVER */
 };
 
+/**
+ * @internal
+ * @brief List of paths where Evas modules are searched.
+ *
+ * This list contains strings, each representing a directory path.
+ * Example: ["/usr/local/lib/evas/modules", "~/.evas/modules"]
+ */
 static Eina_List *evas_module_paths = NULL;
+
+/**
+ * @internal
+ * @brief Array of loaded engine modules.
+ *
+ * This array stores pointers to Evas_Module structures for engine modules.
+ * The index in this array (plus one) serves as the engine's ID.
+ * Example: If evas_engines contains [module_A, module_B], then
+ * module_A has ID 1, and module_B has ID 2.
+ */
 static Eina_Array *evas_engines = NULL;
 
+/**
+ * @internal
+ * @brief Appends a path to a list if the path exists.
+ *
+ * If the given path string is not NULL and the path exists in the filesystem,
+ * it is appended to the list. If the path does not exist or the path string is NULL,
+ * the path string is freed (if not NULL).
+ *
+ * @param list The list to append to.
+ * @param path The path string to append. This function takes ownership of the string if appended,
+ *             or frees it if not.
+ * @return The (potentially modified) list.
+ */
 static Eina_List *
 _evas_module_append(Eina_List *list, char *path)
 {
@@ -100,12 +185,18 @@ _evas_module_append(Eina_List *list, char *path)
    return list;
 }
 
-/* this will alloc a list of paths to search for the modules */
-/* by now these are:  */
-/* 1. ~/.evas/modules/ */
-/* 2. $(EVAS_MODULE_DIR)/evas/modules/ */
-/* 3. dladdr/evas/modules/ */
-/* 4. PREFIX/evas/modules/ */
+/**
+ * @internal
+ * @brief Initializes the search paths for Evas modules.
+ *
+ * This function populates `evas_module_paths` with directories where Evas
+ * will look for modules. The search order is generally:
+ * 1. Build directory (if `EFL_RUN_IN_TREE` is set and applicable).
+ * 2. Path relative to the Evas library (`libevas.so/../evas/modules/`).
+ * 3. Standard system library path (`PACKAGE_LIB_DIR/evas/modules/`).
+ *
+ * Paths are only added if they exist and are not already in the list.
+ */
 void
 evas_module_paths_init(void)
 {
@@ -431,12 +522,26 @@ evas_module_init(void)
      evas_static_module[i].init();
 }
 
+/**
+ * @brief Registers a module with the Evas module system.
+ *
+ * This function is typically called by a module itself during its initialization
+ * (e.g., from its `module_open` function if it's a dynamic module, or from
+ * a static initializer). It adds the module to the appropriate hash table
+ * based on its type.
+ *
+ * @param module Pointer to the module's API structure. This structure contains
+ *               metadata about the module (name, version) and function pointers.
+ * @param type The type of the module (e.g., EVAS_MODULE_TYPE_ENGINE).
+ * @return @c EINA_TRUE if the module was registered successfully, @c EINA_FALSE otherwise
+ *         (e.g., invalid type, NULL module, version mismatch, or module already registered).
+ */
 Eina_Bool
 evas_module_register(const Evas_Module_Api *module, Evas_Module_Type type)
 {
    Evas_Module *em;
 
-   if ((unsigned int)type > 5) return EINA_FALSE;
+   if ((unsigned int)type > 5) return EINA_FALSE; /* EVAS_MODULE_TYPE_LAST is 5 */
    if (!module) return EINA_FALSE;
    if (module->version != EVAS_MODULE_API_VERSION) return EINA_FALSE;
 
@@ -460,6 +565,18 @@ evas_module_register(const Evas_Module_Api *module, Evas_Module_Type type)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Retrieves a list of available engine module names.
+ *
+ * This function scans the configured module paths for engine subdirectories
+ * and also includes the names of statically linked engines.
+ * The returned list contains stringshared names of the engines.
+ *
+ * @return A new Eina_List containing engine names (const char *).
+ *         The caller is responsible for freeing this list and its contents
+ *         (e.g., using EINA_LIST_FREE and eina_stringshare_del).
+ *         Example of list elements: ["software_x11", "gl_generic", "buffer"]
+ */
 Eina_List *
 evas_module_engine_list(void)
 {
@@ -540,12 +657,24 @@ evas_module_engine_list(void)
    return r;
 }
 
+/**
+ * @brief Unregisters a module from the Evas module system.
+ *
+ * This function removes a module from the Evas module system. It's typically
+ * called by a module during its shutdown sequence.
+ *
+ * @param module Pointer to the module's API structure that was used for registration.
+ * @param type The type of the module.
+ * @return @c EINA_TRUE if the module was successfully unregistered, @c EINA_FALSE otherwise
+ *         (e.g., module not found, or the provided `module` pointer doesn't match
+ *         the registered one).
+ */
 Eina_Bool
 evas_module_unregister(const Evas_Module_Api *module, Evas_Module_Type type)
 {
    Evas_Module *em;
 
-   if ((unsigned int)type > 5) return EINA_FALSE;
+   if ((unsigned int)type > 5) return EINA_FALSE; /* EVAS_MODULE_TYPE_LAST is 5 */
    if (!module) return EINA_FALSE;
 
    em = eina_hash_find(evas_modules[type], module->name);
@@ -556,6 +685,22 @@ evas_module_unregister(const Evas_Module_Api *module, Evas_Module_Type type)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Callback function to free Evas_Module structures stored in hash tables.
+ *
+ * This function is called when a module is removed from one of the `evas_modules`
+ * hash tables (e.g., during shutdown or unregistration).
+ * It calls the module's close function if it's loaded and then frees the
+ * Evas_Module structure itself.
+ *
+ * @note This function intentionally does not call `dlclose()` on the module's
+ *       Eina_Module handle. This is a design choice to avoid issues related to
+ *       unloading shared libraries that might still be in use or have complex
+ *       dependencies. The Eina_Module itself might be leaked.
+ *
+ * @param data Pointer to the Evas_Module to be freed.
+ */
 static void
 _evas_module_hash_free_cb(void *data)
 {
@@ -578,11 +723,29 @@ _evas_module_hash_free_cb(void *data)
 }
 
 #if defined(_WIN32) || defined(__CYGWIN__)
+/** @internal @brief Defines the standard module file extension for Windows systems. */
 # define EVAS_MODULE_NAME "module.dll"
 #else
+/** @internal @brief Defines the standard module file extension for Unix-like systems. */
 # define EVAS_MODULE_NAME "module.so"
 #endif
 
+/**
+ * @internal
+ * @brief Finds a module of a specific type by its name. (Implementation)
+ *
+ * This is the internal implementation for `evas_module_find_type`.
+ * It first checks statically linked/already registered modules. If not found,
+ * it iterates through `evas_module_paths`, constructing potential module file paths
+ * (e.g., `<path>/<type_str>/<name>/<MODULE_ARCH>/module.so`) and attempts to
+ * load them using `eina_module_new` and `eina_module_load`.
+ * If a dynamic module loads successfully, it's expected to register itself via
+ * `evas_module_register`, at which point it will be found in the hash.
+ *
+ * @param type The type of the module to find.
+ * @param name The name of the module.
+ * @return Pointer to the Evas_Module if found and loaded, NULL otherwise.
+ */
 Evas_Module *
 evas_module_find_type(Evas_Module_Type type, const char *name)
 {
@@ -675,6 +838,13 @@ evas_module_find_type(Evas_Module_Type type, const char *name)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Retrieves an engine module by its render method ID. (Implementation)
+ *
+ * @param render_method The ID of the render method (1-based index).
+ * @return Pointer to the Evas_Module if found, NULL otherwise.
+ */
 Evas_Module *
 evas_module_engine_get(int render_method)
 {
@@ -684,12 +854,27 @@ evas_module_engine_get(int render_method)
    return eina_array_data_get(evas_engines, render_method - 1);
 }
 
+/**
+ * @internal
+ * @brief Iterates over all registered image loader modules. (Implementation)
+ *
+ * @param cb The callback function.
+ * @param fdata User data for the callback.
+ */
 void
 evas_module_foreach_image_loader(Eina_Hash_Foreach cb, const void *fdata)
 {
    eina_hash_foreach(evas_modules[EVAS_MODULE_TYPE_IMAGE_LOADER], cb, fdata);
 }
 
+/**
+ * @internal
+ * @brief Loads an Evas module. (Implementation)
+ * Calls the module's `open` function if not already loaded.
+ *
+ * @param em The module to load.
+ * @return 1 on success or if already loaded, 0 on failure.
+ */
 int
 evas_module_load(Evas_Module *em)
 {
@@ -702,6 +887,16 @@ evas_module_load(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @internal
+ * @brief Unloads an Evas module. (Implementation)
+ *
+ * @note Currently, this function is a no-op. Modules are not actually
+ *       unloaded by calling their `close` function to prevent potential
+ *       instability if they are still in use.
+ *
+ * @param em The module to unload.
+ */
 void
 evas_module_unload(Evas_Module *em)
 {
@@ -716,6 +911,13 @@ evas_module_unload(Evas_Module *em)
 
 }
 
+/**
+ * @internal
+ * @brief Increments the reference count of an Evas module. (Implementation)
+ * Uses a lock to ensure thread safety.
+ *
+ * @param em The module to reference.
+ */
 void
 evas_module_ref(Evas_Module *em)
 {
@@ -724,6 +926,13 @@ evas_module_ref(Evas_Module *em)
    LKU(em->lock);
 }
 
+/**
+ * @internal
+ * @brief Decrements the reference count of an Evas module. (Implementation)
+ * Uses a lock to ensure thread safety.
+ *
+ * @param em The module to unreference.
+ */
 void
 evas_module_unref(Evas_Module *em)
 {
@@ -732,14 +941,41 @@ evas_module_unref(Evas_Module *em)
    LKU(em->lock);
 }
 
+/**
+ * @internal
+ * @brief Global counter for module usage, used by `evas_module_clean`.
+ * This counter increments periodically and helps determine how "long ago"
+ * a module was last used.
+ */
 static int use_count = 0;
 
+/**
+ * @internal
+ * @brief Marks an Evas module as recently used. (Implementation)
+ * Sets the module's `last_used` field to the current `use_count`.
+ *
+ * @param em The module to mark.
+ */
 void
 evas_module_use(Evas_Module *em)
 {
    em->last_used = use_count;
 }
 
+/**
+ * @internal
+ * @brief Cleans up unused Evas modules. (Implementation)
+ *
+ * This function is intended to unload modules that are not referenced and
+ * have not been used for a certain number of cleaning cycles.
+ * It is called periodically (every 256 calls to this function).
+ * Module cleaning can be disabled by setting the `EVAS_NOCLEAN` environment
+ * variable.
+ *
+ * @note Currently, the actual unloading logic within this function is
+ *       commented out, effectively disabling module cleaning even if
+ *       `EVAS_NOCLEAN` is not set.
+ */
 void
 evas_module_clean(void)
 {
@@ -788,9 +1024,20 @@ evas_module_clean(void)
 /*      } */
 }
 
+/**
+ * @internal
+ * @brief Eina_Prefix object for Evas.
+ * Used to determine library and data directories.
+ */
 static Eina_Prefix *pfx = NULL;
 
-/* will dlclose all the modules loaded and free all the structs */
+/**
+ * @internal
+ * @brief Shuts down the Evas module system. (Implementation)
+ *
+ * Calls shutdown for all static modules, frees all module hash tables,
+ * the TLS key, module paths list, engines array, and the Eina_Prefix object.
+ */
 void
 evas_module_shutdown(void)
 {
@@ -848,27 +1095,49 @@ _evas_module_engine_inherit(Evas_Func *funcs, char *name, size_t info)
    return 0;
 }
 
+/**
+ * @brief Gets the Evas library directory.
+ *
+ * Uses Eina_Prefix to determine the correct library directory for Evas.
+ * This is used, for example, to find module paths relative to the library.
+ *
+ * @return A string containing the library directory path. Do not free.
+ *         Returns an empty string if Eina_Prefix fails.
+ */
 EVAS_API const char *
 _evas_module_libdir_get(void)
 {
    if (!pfx) pfx = eina_prefix_new
-      (NULL, _evas_module_libdir_get, "EVAS", "evas", "checkme",
+      (NULL, _evas_module_libdir_get, "EVAS", "evas", "checkme", /* "checkme" is a placeholder file to find prefix */
        PACKAGE_BIN_DIR, PACKAGE_LIB_DIR, PACKAGE_DATA_DIR, PACKAGE_DATA_DIR);
    if (!pfx) return "";
    return eina_prefix_lib_get(pfx);
 }
 
+/**
+ * @internal
+ * @brief Gets the Evas data directory.
+ *
+ * Uses Eina_Prefix to determine the correct data directory for Evas.
+ *
+ * @return A string containing the data directory path. Do not free.
+ *         Returns NULL if Eina_Prefix fails.
+ */
 const char *
 _evas_module_datadir_get(void)
 {
    if (!pfx) pfx = eina_prefix_new
-      (NULL, _evas_module_libdir_get, "EVAS", "evas", "checkme",
+      (NULL, _evas_module_libdir_get, "EVAS", "evas", "checkme", /* "checkme" is a placeholder file to find prefix */
        PACKAGE_BIN_DIR, PACKAGE_LIB_DIR, PACKAGE_DATA_DIR, PACKAGE_DATA_DIR);
    if (!pfx) return NULL;
    return eina_prefix_data_get(pfx);
 }
 
-/* deprecated */
+/**
+ * @deprecated This function is deprecated and always returns NULL.
+ * @brief Gets the CServe path.
+ * @return Always NULL.
+ */
 EVAS_API const char *
 evas_cserve_path_get(void)
 {

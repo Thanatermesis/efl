@@ -1,3 +1,11 @@
+/**
+ * @file
+ * @brief Implementation of the libcurl wrapper for Ecore_Con.
+ *
+ * This file contains the functions for initializing, shutting down,
+ * and interacting with a dynamically loaded libcurl. It also handles
+ * error code mapping between CURLcode/CURLMcode and Eina_Error.
+ */
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -18,9 +26,9 @@
 #include "ecore_con_private.h"
 #include "ecore_con_url_curl.h"
 
-Ecore_Con_Curl *_c = NULL;
-Eina_Bool _c_fail = EINA_FALSE;
-double _c_timeout = 0.0;
+Ecore_Con_Curl *_c = NULL; /**< Global instance of the libcurl wrapper structure. */
+Eina_Bool _c_fail = EINA_FALSE; /**< Flag indicating if libcurl loading/initialization has failed. */
+double _c_timeout = 0.0; /**< Default timeout for curl operations, in seconds. */
 
 ECORE_CON_API ECORE_CON_API_WEAK Eina_Error EFL_NET_HTTP_ERROR_BAD_CONTENT_ENCODING = 0;
 ECORE_CON_API ECORE_CON_API_WEAK Eina_Error EFL_NET_HTTP_ERROR_BAD_DOWNLOAD_RESUME = 0;
@@ -74,6 +82,17 @@ ECORE_CON_API ECORE_CON_API_WEAK Eina_Error EFL_NET_HTTP_ERROR_URL_MALFORMAT = 0
 ECORE_CON_API ECORE_CON_API_WEAK Eina_Error EFL_NET_HTTP_ERROR_USE_SSL_FAILED = 0;
 ECORE_CON_API ECORE_CON_API_WEAK Eina_Error EFL_NET_HTTP_ERROR_WRITE_ERROR = 0;
 
+/**
+ * @brief Converts a CURLcode error to an Eina_Error.
+ *
+ * This function maps specific CURLcode values to corresponding Eina_Error
+ * values. If a CURLcode is not explicitly mapped, it logs an error and
+ * returns EINVAL.
+ *
+ * @param code The CURLcode to convert.
+ * @return The corresponding Eina_Error. Returns 0 (EINA_ERROR_NO_ERROR) for CURLE_OK.
+ *         Returns EINVAL for unmapped error codes.
+ */
 Eina_Error
 _curlcode_to_eina_error(const CURLcode code)
 {
@@ -149,6 +168,17 @@ _curlcode_to_eina_error(const CURLcode code)
    }
 }
 
+/**
+ * @brief Converts a CURLMcode error to an Eina_Error.
+ *
+ * This function maps specific CURLMcode values to corresponding Eina_Error
+ * values. If a CURLMcode is not explicitly mapped, it logs an error and
+ * returns EINVAL.
+ *
+ * @param code The CURLMcode to convert.
+ * @return The corresponding Eina_Error. Returns 0 (EINA_ERROR_NO_ERROR) for CURLM_OK.
+ *         Returns EINVAL for unmapped error codes.
+ */
 Eina_Error
 _curlmcode_to_eina_error(const CURLMcode code)
 {
@@ -169,6 +199,18 @@ _curlmcode_to_eina_error(const CURLMcode code)
    }
 }
 
+/**
+ * @brief Initializes static Eina_Error variables for CURL error codes.
+ *
+ * This function is called once during the initialization of the libcurl wrapper.
+ * It registers static error messages for various CURL Eina_Error codes by
+ * calling eina_error_msg_static_register(), using the descriptions provided
+ * by curl_easy_strerror(). This allows these errors to be used throughout
+ * the application with consistent messaging.
+ *
+ * It checks if EFL_NET_HTTP_ERROR_BAD_CONTENT_ENCODING is already set to
+ * ensure it only runs once.
+ */
 static void
 _c_init_errors(void)
 {
@@ -235,6 +277,24 @@ _c_init_errors(void)
 }
 
 
+/**
+ * @brief Initializes the libcurl wrapper.
+ *
+ * This function handles the dynamic loading of the libcurl library,
+ * resolving necessary function symbols, and initializing libcurl globally.
+ * It uses a reference counting mechanism (_c->ref) to allow multiple
+ * initializations and ensure cleanup only happens when the last reference
+ * is released.
+ *
+ * If libcurl has previously failed to load (_c_fail is EINA_TRUE),
+ * this function will return EINA_FALSE immediately.
+ *
+ * On successful initialization, it sets up a global CURLM handle and
+ * determines a default timeout value.
+ *
+ * @return EINA_TRUE if initialization is successful or if it was already
+ *         initialized. EINA_FALSE if loading or initializing libcurl fails.
+ */
 Eina_Bool
 _c_init(void)
 {
@@ -340,6 +400,19 @@ error:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Shuts down the libcurl wrapper.
+ *
+ * This function decrements the reference count for the libcurl wrapper.
+ * If the reference count drops to zero, it performs the necessary cleanup:
+ * - Cleans up the global CURLM handle using curl_multi_cleanup().
+ * - Cleans up libcurl global state using curl_global_cleanup().
+ * - Frees the Eina_Module for libcurl if it was loaded.
+ * - Frees the memory allocated for the _c structure.
+ *
+ * If the wrapper is not initialized (_c is NULL) or the reference count
+ * is still greater than zero after decrementing, the function returns early.
+ */
 void
 _c_shutdown(void)
 {

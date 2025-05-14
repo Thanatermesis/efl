@@ -4,12 +4,28 @@
 
 #define TAP_TIME_OUT 0.33
 
+/**
+ * @brief Gets the gesture type for the double tap recognizer.
+ *
+ * @param[in] obj The Eolian object.
+ * @param[in] pd The private data for the double tap recognizer.
+ * @return The Efl_Canvas_Gesture_Double_Tap class.
+ */
 EOLIAN static const Efl_Class *
 _efl_canvas_gesture_recognizer_double_tap_efl_canvas_gesture_recognizer_type_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Gesture_Recognizer_Double_Tap_Data *pd EINA_UNUSED)
 {
    return EFL_CANVAS_GESTURE_DOUBLE_TAP_CLASS;
 }
 
+/**
+ * @brief Destructor for the Efl_Canvas_Gesture_Recognizer_Double_Tap object.
+ *
+ * This function is called when the Eolian object is being destroyed.
+ * It cleans up any resources allocated by the recognizer, such as timers.
+ *
+ * @param[in] obj The Eolian object being destroyed.
+ * @param[in] pd The private data associated with the object.
+ */
 EOLIAN static void
 _efl_canvas_gesture_recognizer_double_tap_efl_object_destructor(Eo *obj,
                                                                 Efl_Canvas_Gesture_Recognizer_Double_Tap_Data *pd)
@@ -20,6 +36,17 @@ _efl_canvas_gesture_recognizer_double_tap_efl_object_destructor(Eo *obj,
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Callback function for the tap timeout.
+ *
+ * This function is called when the timer for detecting a double tap expires.
+ * If the timer expires, it means a double tap did not occur within the
+ * allowed time frame. The gesture state is set to CANCELED, and a
+ * corresponding event is triggered.
+ *
+ * @param[in] data The Eolian object (recognizer) associated with this timer.
+ * @return ECORE_CALLBACK_CANCEL to automatically delete the timer.
+ */
 static Eina_Bool
 _tap_timeout_cb(void *data)
 {
@@ -39,6 +66,21 @@ _tap_timeout_cb(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Recognizes a double tap gesture based on touch events.
+ *
+ * This function processes incoming touch events to determine if a double tap
+ * gesture has occurred. It manages tap counting, timing, and finger movement
+ * thresholds.
+ *
+ * @param[in] obj The Eolian object (recognizer).
+ * @param[in] pd The private data for the double tap recognizer.
+ * @param[in] gesture The gesture object to update.
+ * @param[in] watched The object being watched for gestures.
+ * @param[in] event The touch event data.
+ * @return An Efl_Canvas_Gesture_Recognizer_Result indicating the outcome of
+ *         the recognition process (e.g., TRIGGER, FINISH, CANCEL, IGNORE).
+ */
 EOLIAN static Efl_Canvas_Gesture_Recognizer_Result
 _efl_canvas_gesture_recognizer_double_tap_efl_canvas_gesture_recognizer_recognize(Eo *obj,
                                                                                   Efl_Canvas_Gesture_Recognizer_Double_Tap_Data *pd,
@@ -72,9 +114,13 @@ _efl_canvas_gesture_recognizer_double_tap_efl_canvas_gesture_recognizer_recogniz
      {
       case EFL_GESTURE_TOUCH_STATE_BEGIN:
       {
+         /// A new touch sequence has started.
+         /// Set the initial hotspot for the gesture.
          pos = efl_gesture_touch_start_point_get(event);
          efl_gesture_hotspot_set(gesture, pos);
 
+         /// If a timeout timer is already running (e.g., from a previous tap),
+         /// reset it. Otherwise, start a new timer.
          if (pd->timeout)
            ecore_timer_reset(pd->timeout);
          else
@@ -88,6 +134,9 @@ _efl_canvas_gesture_recognizer_double_tap_efl_canvas_gesture_recognizer_recogniz
       case EFL_GESTURE_TOUCH_STATE_UPDATE:
       {
         /* multi-touch */
+        /// Check for a second finger press occurring almost simultaneously with the first.
+        /// If so, this is likely part of a multi-touch interaction, not a double tap,
+        /// so ignore it for this recognizer.
         if (efl_gesture_touch_current_data_get(event)->action == EFL_POINTER_ACTION_DOWN)
           {
              /* a second finger was pressed at the same time-ish as the first: combine into same event */
@@ -99,12 +148,16 @@ _efl_canvas_gesture_recognizer_double_tap_efl_canvas_gesture_recognizer_recogniz
           }
          result = EFL_GESTURE_RECOGNIZER_RESULT_IGNORE;
 
+         /// If the gesture is active and it's not a multi-touch event,
+         /// check for finger movement.
          if (efl_gesture_state_get(gesture) != EFL_GESTURE_STATE_NONE &&
              !_event_multi_touch_get(event))
            {
               dist = efl_gesture_touch_distance(event, efl_gesture_touch_current_data_get(event)->id);
               length = fabs(dist.x) + fabs(dist.y);
 
+              /// If the finger has moved beyond the allowed threshold,
+              /// cancel the double tap recognition.
               if (length > pd->finger_size)
                 {
                    if (pd->timeout)
@@ -124,9 +177,12 @@ _efl_canvas_gesture_recognizer_double_tap_efl_canvas_gesture_recognizer_recogniz
 
       case EFL_GESTURE_TOUCH_STATE_END:
       {
+         /// A touch sequence has ended (finger lifted).
          if (efl_gesture_state_get(gesture) != EFL_GESTURE_STATE_NONE &&
              !_event_multi_touch_get(event))
            {
+              /// Check for multi-touch scenarios where a second finger lift might occur
+              /// close in time to the first, which should be ignored for double tap.
               if (efl_gesture_touch_previous_data_get(event))
                 {
                    Efl_Pointer_Action prev_act = efl_gesture_touch_previous_data_get(event)->action;
@@ -144,34 +200,40 @@ _efl_canvas_gesture_recognizer_double_tap_efl_canvas_gesture_recognizer_recogniz
               dist = efl_gesture_touch_distance(event, efl_gesture_touch_current_data_get(event)->id);
               length = fabs(dist.x) + fabs(dist.y);
 
+              /// If the finger movement was within the allowed threshold for a tap.
               if (length <= pd->finger_size)
                 {
                    pd->tap_count++;
-                   if (pd->tap_count == 1)
+                   if (pd->tap_count == 1) /// First tap detected.
                      {
+                        /// Reset the timeout timer to wait for the second tap.
                         if (pd->timeout)
                           ecore_timer_reset(pd->timeout);
 
                         result = EFL_GESTURE_RECOGNIZER_RESULT_TRIGGER;
                      }
-                   else
+                   else /// Second tap detected (pd->tap_count would be 2).
                      {
+                        /// Double tap successful, cancel the timeout timer.
                         if (pd->timeout)
                           {
                              ecore_timer_del(pd->timeout);
                              pd->timeout = NULL;
                           }
 
+                        /// If the touch state is END, the gesture is finished.
+                        /// Otherwise, it's still triggering (e.g. if it was a CANCEL state that still met tap criteria).
                         if (efl_gesture_touch_state_get(event) == EFL_GESTURE_TOUCH_STATE_END)
                           result = EFL_GESTURE_RECOGNIZER_RESULT_FINISH;
                         else
                           result = EFL_GESTURE_RECOGNIZER_RESULT_TRIGGER;
 
-                        pd->tap_count = 0;
+                        pd->tap_count = 0; /// Reset tap count for the next potential double tap.
                      }
                 }
-              else
+              else /// Finger moved too much, not a valid tap.
                 {
+                   /// Cancel the timeout and the gesture recognition.
                    if (pd->timeout)
                      {
                         ecore_timer_del(pd->timeout);

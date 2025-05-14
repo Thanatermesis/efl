@@ -39,19 +39,46 @@
 # define ATOS_COMPATIBLE
 #endif
 
+/**
+ * @brief Structure to hold parsed backtrace line information.
+ */
 typedef struct _Bt Bt;
 
+/**
+ * @struct _Bt
+ * @brief Holds the parsed components of a single backtrace line.
+ *
+ * This structure stores the directory and name of the binary,
+ * the directory and name of the source file, the function name,
+ * any associated comment, and the line number.
+ */
 struct _Bt
 {
-   char *bin_dir;
-   char *bin_name;
-   char *file_dir;
-   char *file_name;
-   char *func_name;
-   char *comment;
-   int line;
+   char *bin_dir;       /**< Directory of the binary/library. */
+   char *bin_name;      /**< Name of the binary/library. */
+   char *file_dir;      /**< Directory of the source file. */
+   char *file_name;     /**< Name of the source file. */
+   char *func_name;     /**< Name of the function. */
+   char *comment;       /**< Optional comment or original unparsed part of the line. */
+   int line;            /**< Line number in the source file. */
 };
 
+/**
+ * @brief Function pointer type for address translation functions.
+ *
+ * A function of this type attempts to translate a memory address within a given
+ * binary into a file name, function name, and line number.
+ *
+ * @param prog The program to use for translation (e.g., "addr2line", "atos").
+ * @param bin_dir The directory of the binary file.
+ * @param bin_name The name of the binary file.
+ * @param addr The memory address to translate.
+ * @param[out] file_dir Pointer to store the resolved source file directory.
+ * @param[out] file_name Pointer to store the resolved source file name.
+ * @param[out] func_name Pointer to store the resolved function name.
+ * @param[out] file_line Pointer to store the resolved line number.
+ * @return EINA_TRUE if translation was successful, EINA_FALSE otherwise.
+ */
 typedef Eina_Bool (*Translate_Func)(const char *prog,
                                     const char *bin_dir,
                                     const char *bin_name,
@@ -61,14 +88,24 @@ typedef Eina_Bool (*Translate_Func)(const char *prog,
                                     char **func_name,
                                     int *file_line);
 
+/**
+ * @brief Structure to describe an address translation method.
+ */
 typedef struct _Translation_Desc Translation_Desc;
 
+/**
+ * @struct _Translation_Desc
+ * @brief Describes a method for translating addresses to symbols.
+ *
+ * This structure holds the name of the translation method, a command to test
+ * its availability, the translation function itself, and the program to execute.
+ */
 struct _Translation_Desc
 {
-   const char *name;
-   const char *test;
-   Translate_Func func;
-   const char *prog;
+   const char *name;      /**< User-friendly name of the translator (e.g., "addr2line"). */
+   const char *test;      /**< Shell command to test if the translator program is available. */
+   Translate_Func func;   /**< Pointer to the translation function. */
+   const char *prog;      /**< The actual program/command to execute for translation. */
 };
 
 static Translate_Func _translate = NULL;
@@ -77,6 +114,19 @@ static Eina_Bool color = EINA_TRUE;
 static Eina_Bool show_comments = EINA_TRUE;
 static Eina_Bool show_compact = EINA_FALSE;
 
+/**
+ * @brief Splits a full path into its directory and file components.
+ *
+ * The directory part will contain everything up to the last '/', and the
+ * file part will contain everything after the last '/'. If no '/' is present,
+ * the directory part will be NULL and the file part will be the original path.
+ *
+ * @param path The full path string to split.
+ * @param[out] dir Pointer to a char pointer that will store the allocated directory string.
+ *                 The caller is responsible for freeing this memory.
+ * @param[out] file Pointer to a char pointer that will store the allocated file name string.
+ *                  The caller is responsible for freeing this memory.
+ */
 static void
 path_split(const char *path, char **dir, char **file)
 {
@@ -107,6 +157,25 @@ path_split(const char *path, char **dir, char **file)
    *file = strdup(p + 1);
 }
 
+/**
+ * @brief Translates an address to file/line/function using addr2line.
+ *
+ * This function invokes the `addr2line` utility to resolve a memory address
+ * to its corresponding source file, line number, and function name.
+ *
+ * @param prog The `addr2line` executable name (usually "addr2line" or "gaddr2line").
+ * @param bin_dir The directory containing the binary or shared object.
+ * @param bin_name The name of the binary or shared object.
+ * @param addr The address to resolve.
+ * @param[out] file_dir Pointer to store the directory of the source file.
+ *                      Memory is allocated by this function and must be freed by the caller.
+ * @param[out] file_name Pointer to store the name of the source file.
+ *                       Memory is allocated by this function and must be freed by the caller.
+ * @param[out] func_name Pointer to store the demangled name of the function.
+ *                       Memory is allocated by this function and must be freed by the caller.
+ * @param[out] file_line Pointer to store the line number in the source file.
+ * @return EINA_TRUE on successful translation, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _addr2line(const char *prog, const char *bin_dir, const char *bin_name, unsigned long long addr,
            char **file_dir, char **file_name, char **func_name, int *file_line)
@@ -150,6 +219,28 @@ _addr2line(const char *prog, const char *bin_dir, const char *bin_name, unsigned
 }
 
 #ifdef ATOS_COMPATIBLE
+/**
+ * @brief Translates an address to file/line/function using atos (macOS).
+ *
+ * This function invokes the `atos` utility on macOS to resolve a memory address
+ * to its corresponding source file, line number, and function name.
+ * It parses the output of `atos` which can vary slightly.
+ *
+ * @param prog The `atos` executable name (usually "atos" or "xcrun atos").
+ * @param bin_dir The directory containing the binary or shared object.
+ * @param bin_name The name of the binary or shared object.
+ * @param addr The address to resolve.
+ * @param[out] file_dir Pointer to store the directory of the source file.
+ *                      Currently, this is set to "??" as atos doesn't provide it directly.
+ *                      Memory is allocated by this function and must be freed by the caller.
+ * @param[out] file_name Pointer to store the name of the source file.
+ *                       Memory is allocated by this function and must be freed by the caller.
+ * @param[out] func_name Pointer to store the name of the function.
+ *                       Memory is allocated by this function and must be freed by the caller.
+ * @param[out] file_line Pointer to store the line number in the source file.
+ *                       Set to -1 if not determinable.
+ * @return EINA_TRUE on successful translation or partial translation, EINA_FALSE on popen failure.
+ */
 static Eina_Bool
 _atos(const char *prog, const char *bin_dir, const char *bin_name, unsigned long long addr,
       char **file_dir, char **file_name, char **func_name, int *file_line)
@@ -231,6 +322,22 @@ end:
 }
 #endif
 
+/**
+ * @brief Translates a new format backtrace line to the older expected format.
+ *
+ * The new backtrace format is more human-readable but needs to be
+ * converted to the format `bt_append` expects (binary_path address base_address).
+ * Example input:
+ *   "ERR<23314>:eo_lifecycle ../src/lib/eo/efl_object.eo.c:78 efl_del()    0x00000005c7c291: __libc_start_main+0xf1 (in /usr/lib/libc.so.6 0x5c5c000)"
+ * Output format:
+ *   "/usr/lib/libc.so.6 0x00000005c7c291 0x5c5c000\n"
+ * The part before the first address is extracted as a comment.
+ *
+ * @param line The input backtrace line in the new format.
+ * @param[out] comment Pointer to store the extracted comment part (prefix of the line).
+ *                     Memory is allocated by this function and must be freed by the caller.
+ * @return A pointer to a static buffer containing the translated line, or NULL if parsing fails.
+ */
 static const char *
 bt_input_translate(const char *line, char **comment)
 {
@@ -270,6 +377,25 @@ bt_input_translate(const char *line, char **comment)
    return local;
 }
 
+/**
+ * @brief Parses a backtrace line and appends it to the list of Bt structures.
+ *
+ * This function takes a line from a backtrace, parses it to extract
+ * the binary path, memory offset, and base address. It then uses the
+ * selected translation function (`_translate`) to resolve this information
+ * into source file, line number, and function name.
+ *
+ * It handles two main formats for `btline`:
+ * 1. Original format: "binary_path offset base_address"
+ *    Example: "/usr/local/lib/libeina.so.1 0x1ec88 0x0" (base might be 0 if not available)
+ * 2. A newer, more verbose format which is pre-processed by `bt_input_translate`.
+ *
+ * If a line cannot be fully parsed and translated, it's stored as a comment.
+ *
+ * @param btl The list of backtrace entries to append to.
+ * @param btline The raw backtrace line string.
+ * @return The updated list of backtrace entries.
+ */
 static Eina_List *
 bt_append(Eina_List *btl, const char *btline)
 {
@@ -323,6 +449,33 @@ bt_append(Eina_List *btl, const char *btline)
    return btl;
 }
 
+/**
+ * @brief Detects and selects an available address translation utility.
+ *
+ * Iterates through a list of known translation methods (like addr2line, atos)
+ * and tests if the corresponding command-line utility is available on the system.
+ * The first one found is set as the active translator.
+ *
+ * @param desc An array of `Translation_Desc` structures, terminated by a NULL entry.
+ *             Each entry describes a potential translation method.
+ *             Example `desc` array elements:
+ *             ```c
+ *             {
+ *                .name = "addr2line",
+ *                .test = "addr2line --help &> /dev/null", // Command to check availability
+ *                .func = _addr2line,                      // Function to perform translation
+ *                .prog = "addr2line"                       // Program to execute
+ *             },
+ *             {
+ *                .name = "atos",
+ *                .test = "atos --help &> /dev/null",
+ *                .func = _atos,
+ *                .prog = "atos"
+ *             }
+ *             ```
+ * @return EINA_TRUE if a suitable translation utility is found and configured,
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _translation_function_detect(const Translation_Desc *desc)
 {
@@ -349,6 +502,16 @@ _translation_function_detect(const Translation_Desc *desc)
    return (_translate == NULL) ? EINA_FALSE : EINA_TRUE;
 }
 
+/**
+ * @brief Main function for the eina_btlog utility.
+ *
+ * Parses command-line arguments, reads backtrace lines from stdin,
+ * translates addresses to symbols, and prints a formatted backtrace.
+ *
+ * @param argc Argument count.
+ * @param argv Argument vector.
+ * @return 0 on success, 1 on failure (e.g., no translation utility found).
+ */
 int
 main(int argc, char **argv)
 {

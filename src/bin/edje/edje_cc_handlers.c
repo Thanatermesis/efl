@@ -1133,6 +1133,15 @@ New_Statement_Handler statement_handlers_short_single[] =
    {"collections.group.parts.part.description.inherit", st_collections_group_parts_part_description_inherit},
 };
 
+/**
+ * @brief Registers a color class name.
+ *
+ * This function adds a new color class name to a global hash table if it
+ * doesn't exist already. This is used to keep track of all defined color
+ * classes.
+ *
+ * @param name The name of the color class to register.
+ */
 void
 color_class_register(const char *name)
 {
@@ -1146,6 +1155,16 @@ color_class_register(const char *name)
    eina_hash_add(color_class_reg, name, color_class_reg);
 }
 
+/**
+ * @brief Registers a color class from a substring.
+ *
+ * This function extracts a substring defined by start and end pointers,
+ * and registers it as a color class. This is a helper function for
+ * color_class_register_color_tag().
+ *
+ * @param start Pointer to the beginning of the substring.
+ * @param end Pointer to the end of the substring.
+ */
 static void
 color_class_register_color_tag_span(const char *start, const char *end)
 {
@@ -1165,6 +1184,16 @@ color_class_register_color_tag_span(const char *start, const char *end)
    free(tmps);
 }
 
+/**
+ * @brief Parses a style tag string and registers any found color classes.
+ *
+ * This function searches for color class definitions in the format `...=cc:yyy...`
+ * within a given tag string. For each color class found, it calls
+ * color_class_register() to register it.
+ *
+ * @param tag The style tag string to parse. For example:
+ * "font_size=10 color=cc:my_color_class"
+ */
 static void
 color_class_register_color_tag(const char *tag)
 {
@@ -1230,6 +1259,21 @@ color_class_register_color_tag(const char *tag)
        String without quotes except for 'true' or 'false' is considered as a choice.
     @since 1.18
     @endblock
+ */
+/**
+ * @brief Determines the type of an external parameter from its string token.
+ *
+ * This function analyzes a string token to determine if it represents an
+ * integer, double, boolean, string, or choice. The type is determined based on
+ * the token's content.
+ *
+ * @param token The string token to parse.
+ * @return The determined Edje_External_Param_Type.
+ * @retval EDJE_EXTERNAL_PARAM_TYPE_INT if the token is an integer.
+ * @retval EDJE_EXTERNAL_PARAM_TYPE_DOUBLE if the token is a floating-point number.
+ * @retval EDJE_EXTERNAL_PARAM_TYPE_BOOL if the token is "true" or "false".
+ * @retval EDJE_EXTERNAL_PARAM_TYPE_STRING if the token was quoted.
+ * @retval EDJE_EXTERNAL_PARAM_TYPE_CHOICE for other unquoted strings.
  */
 static Edje_External_Param_Type
 _parse_external_param_type(char *token)
@@ -1712,6 +1756,19 @@ part_description_image_cleanup(Edje_Part *ep)
      }
 }
 
+/**
+ * @brief Allocates and initializes a new part description structure.
+ *
+ * This function acts as a factory for creating part description structures
+ * of various types. It allocates memory for the specific description type
+ * and sets default values for its properties.
+ *
+ * @param type The type of the part (e.g., EDJE_PART_TYPE_TEXT, EDJE_PART_TYPE_IMAGE).
+ * @param collection The name of the collection the part belongs to.
+ * @param part The name of the part this description is for.
+ * @return A pointer to the allocated and initialized Edje_Part_Description_Common
+ *         structure, or it exits on failure.
+ */
 static Edje_Part_Description_Common *
 _edje_part_description_alloc(unsigned char type, const char *collection, const char *part)
 {
@@ -1866,6 +1923,19 @@ _edje_part_description_alloc(unsigned char type, const char *collection, const c
    return result;
 }
 
+/**
+ * @brief Checks for duplicate program names and handles overrides.
+ *
+ * This function iterates through a list of programs to check if a program with
+ * the given name already exists. If a duplicate is found, it checks if the
+ * existing program can be overridden. If not, it reports an error and exits.
+ * If it can be overridden, it replaces the new program with the existing one.
+ *
+ * @param name The name of the program to check.
+ * @param me A pointer to the current program being processed.
+ * @param pgrms An array of pointers to existing programs.
+ * @param count The number of programs in the pgrms array.
+ */
 static void
 _edje_program_check(const char *name, Edje_Program *me, Edje_Program **pgrms, unsigned int count)
 {
@@ -1898,6 +1968,17 @@ _edje_program_check(const char *name, Edje_Program *me, Edje_Program **pgrms, un
          }
 }
 
+/**
+ * @brief Copies properties from one Edje_Program to another.
+ *
+ * This function performs a deep copy of an Edje_Program structure, duplicating
+ * all its properties including name, signal, source, actions, targets, and
+ * after-programs. This is typically used when inheriting programs from a
+ * parent group.
+ *
+ * @param ep The destination program to copy properties to.
+ * @param ep2 The source program to copy properties from.
+ */
 static void
 _edje_program_copy(Edje_Program *ep, Edje_Program *ep2)
 {
@@ -4059,6 +4140,15 @@ st_collections_group_translation_file_source(void)
    mo_entry->mo_src = parse_str(0);
 }
 
+/**
+ * @brief Combines link definitions into full-fledged programs.
+ *
+ * The `link` block is a shorthand for creating state transition programs.
+ * This function iterates through all the parsed `link` definitions for the
+ * current group, combines links that have identical transition properties,
+ * and creates the corresponding Edje_Program structures. This optimization
+ * reduces the number of programs generated for similar transitions.
+ */
 static void
 _link_combine(void)
 {
@@ -4203,6 +4293,16 @@ ob_collections_group(void)
 #endif
 }
 
+/**
+ * @brief Sets the name for the current group being parsed.
+ *
+ * This function assigns a name to the current Edje_Part_Collection. It handles
+ * cases where a group might be renamed and manages entries in the global
+ * collection hash. It also checks for and reports errors if a group is named
+ * more than once.
+ *
+ * @param name The name to assign to the group.
+ */
 static void
 _group_name(char *name)
 {
@@ -4295,6 +4395,18 @@ struct _Edje_List_Foreach_Data
    Eina_List *list;
 };
 
+/**
+ * @brief Eina_Hash_Foreach_Cb to collect keys from a hash into a list.
+ *
+ * This callback is used with eina_hash_foreach to iterate over a hash
+ * and append each key (as a duplicated string) to a list stored in `fdata`.
+ *
+ * @param hash The hash being iterated.
+ * @param key The current key in the hash.
+ * @param data The data associated with the key (unused).
+ * @param fdata A pointer to an Edje_List_Foreach_Data struct containing the list to populate.
+ * @return EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 _edje_data_item_list_foreach(const Eina_Hash *hash EINA_UNUSED, const void *key, void *data EINA_UNUSED, void *fdata)
 {
@@ -4306,6 +4418,16 @@ _edje_data_item_list_foreach(const Eina_Hash *hash EINA_UNUSED, const void *key,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Copies filter properties from a parent description.
+ *
+ * This function performs a deep copy of filter specifications from a parent
+ * description to a child description. This is used during inheritance to
+ * ensure that filters are correctly duplicated.
+ *
+ * @param ed The destination filter specification.
+ * @param parent The source filter specification from the parent.
+ */
 static void
 _filter_copy(Edje_Part_Description_Spec_Filter *ed, const Edje_Part_Description_Spec_Filter *parent)
 {
@@ -4336,6 +4458,16 @@ _filter_copy(Edje_Part_Description_Spec_Filter *ed, const Edje_Part_Description_
    else memset(ed, 0, sizeof(*ed));
 }
 
+/**
+ * @brief Updates the count of part types in the current collection directory entry.
+ *
+ * This function increments or decrements the counters for specific part types
+ * (e.g., RECTANGLE, TEXT) and the total part count within the current
+ * Edje_Part_Collection_Directory_Entry.
+ *
+ * @param type The type of the part to update the count for.
+ * @param inc The increment value (typically 1 for adding, -1 for removing).
+ */
 static void
 _parts_count_update(unsigned int type, int inc)
 {
@@ -4396,6 +4528,17 @@ _parts_count_update(unsigned int type, int inc)
    current_de->count.part += inc;
 }
 
+/**
+ * @brief Copies properties from one Edje_Part to another.
+ *
+ * This function performs a deep copy of an Edje_Part structure, duplicating
+ * all its properties including name, type, sources, dragable properties,
+ * items, and descriptions. This is typically used when inheriting a part
+ * from a parent group.
+ *
+ * @param ep The destination part to copy properties to.
+ * @param ep2 The source part to copy properties from.
+ */
 static void
 _part_copy(Edje_Part *ep, Edje_Part *ep2)
 {
@@ -4804,6 +4947,17 @@ st_collections_group_target_group(void)
         allowed.
     @since 1.10
     @endproperty
+ */
+/**
+ * @brief Handles inheritance of one group from another.
+ *
+ * This function implements group inheritance. It copies all properties, parts,
+ * programs, and other attributes from a specified parent group to the current
+ * group. This allows for creating variations of a base group without
+ * duplicating the entire definition. It handles aliasing and ensures that
+ * all necessary data structures are deeply copied.
+ *
+ * It is triggered by the `inherit` keyword in a group definition.
  */
 static void
 st_collections_group_inherit(void)
@@ -5393,6 +5547,14 @@ st_collections_group_noinherit_script(void)
    pcp->inherit_script = EINA_FALSE;
 }
 
+/**
+ * @brief Processes and combines inherited Embryo scripts.
+ *
+ * When a group inherits from another and `inherit_script` is enabled, this
+ * function is called to merge the scripts from all base groups into the
+ * current group's script. It rewrites the script to handle the combined code.
+ * It also handles cases where scripts are overridable.
+ */
 static void
 _script_flush(void)
 {
@@ -6136,6 +6298,18 @@ edje_cc_handlers_part_make(int id)
   return ep;
 }
 
+/**
+ * @brief Frees a part description and its associated resources.
+ *
+ * This function deallocates a given part description, including any lookups
+ * for relative parts, clip parts, and map parts. It also handles freeing
+ * type-specific data within the description (e.g., for text or proxy parts).
+ *
+ * @param pc The part collection to which the part belongs.
+ * @param ep The part to which the description belongs.
+ * @param ed The description to be freed.
+ * @return Always returns NULL.
+ */
 static void *
 _part_desc_free(Edje_Part_Collection *pc,
                 Edje_Part *ep,
@@ -6196,6 +6370,16 @@ _part_desc_free(Edje_Part_Collection *pc,
    return NULL;
 }
 
+/**
+ * @brief Sets the type of the current part, handling inherited parts correctly.
+ *
+ * When a part's type is changed (usually during inheritance), this function
+ * ensures that all of its descriptions are re-allocated to match the new type.
+ * It copies properties from the old descriptions to the new ones to preserve
+ * state.
+ *
+ * @param type The new type for the part (e.g., EDJE_PART_TYPE_IMAGE).
+ */
 static void
 _part_type_set(unsigned int type)
 {
@@ -6257,6 +6441,14 @@ _part_type_set(unsigned int type)
    _parts_count_update(current_part->type, 1);
 }
 
+/**
+ * @brief Creates a new part and adds it to the hierarchy.
+ *
+ * This function is called when a new part block is encountered. It creates a new
+ * Edje_Part, pushes the current parsing state onto the hierarchy stack, and
+ * makes the new part the current one. If the new part is nested, it updates the
+ * parent part's child count.
+ */
 static void
 _part_create(void)
 {
@@ -6305,6 +6497,17 @@ ob_collections_group_parts_part(void)
    _part_create();
 }
 
+/**
+ * @brief Frees an Edje_Part and all its associated resources.
+ *
+ * This function deallocates an Edje_Part, including all its descriptions,
+ * items, and other allocated memory. It also cleans up any associated
+ * data lookups.
+ *
+ * @param pc The part collection the part belongs to.
+ * @param ep The part to be freed.
+ * @return Always returns NULL.
+ */
 static void *
 _part_free(Edje_Part_Collection *pc, Edje_Part *ep)
 {
@@ -6469,6 +6672,16 @@ _program_remove(const char *name, Edje_Program **pgrms, unsigned int count)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Checks if the current part's name is unique within the group.
+ *
+ * This function verifies that the name assigned to the current part does not
+ * conflict with any other part in the same group. It handles cases where
+ * parts can be overridden during inheritance.
+ *
+ * @return EINA_TRUE if the name is valid (or has been handled by override),
+ *         EINA_FALSE if the part has no name yet.
+ */
 static Eina_Bool
 _part_name_check(void)
 {
@@ -13731,6 +13944,15 @@ _program_sequence_check(void)
    exit(-1);
 }
 
+/**
+ * @brief Schedules a program to run after the current program completes.
+ *
+ * This function adds the specified program name to the `after` list of the
+ * current program. It ensures that the same program is not added more than
+ * once.
+ *
+ * @param name The name of the program to run afterwards.
+ */
 static void
 _program_after(const char *name)
 {
@@ -13761,6 +13983,15 @@ _program_after(const char *name)
      current_program_lookups = eina_list_append(current_program_lookups, pl);
 }
 
+/**
+ * @brief Creates a new program to be chained in a sequence.
+ *
+ * This function is a helper for handling program sequences. It creates a new,
+ * empty program and schedules it to run after the current program, effectively
+ * extending the sequence.
+ *
+ * @return A pointer to the newly created program in the sequence.
+ */
 static Edje_Program *
 _program_sequence_new(void)
 {
@@ -13839,6 +14070,15 @@ ob_collections_group_programs_program(void)
    pc->programs.total_count++;
 }
 
+/**
+ * @brief Sets the name of the current program and checks for duplicates.
+ *
+ * This function updates the name of the current program being parsed. It then
+ * checks against all existing programs in the collection to ensure the name is
+ * unique, handling overrides where applicable.
+ *
+ * @param name The new name for the program.
+ */
 static void
 _program_name(char *name)
 {
@@ -14494,6 +14734,16 @@ st_collections_group_programs_program_transition(void)
      current_program->tween.mode |= EDJE_TWEEN_MODE_OPT_FROM_CURRENT;
 }
 
+/**
+ * @brief Adds a target part or program to the current program.
+ *
+ * This function appends a new target to the `targets` list of the current
+ * program. It prevents duplicate targets from being added. Depending on the
+ * program's action, it queues a lookup for either a part or another program.
+ *
+ * @param name The name of the target to add. The string is consumed by this
+ * function.
+ */
 static void
 _program_target_add(char *name)
 {
@@ -15009,6 +15259,16 @@ st_collections_group_physics_world_z(void)
     </table>
  */
 
+/**
+ * @brief Notification callback for when a block is popped from the parsing stack.
+ *
+ * This function is called by the parser whenever a block (like `group`,
+ * `sequence`, `link`) is closed. It performs cleanup and finalization tasks
+ * specific to the closed block, such as combining links into programs or
+ * flushing inherited scripts.
+ *
+ * @param token The name of the block that was just closed.
+ */
 void
 edje_cc_handlers_pop_notify(const char *token)
 {
@@ -15032,9 +15292,18 @@ edje_cc_handlers_pop_notify(const char *token)
      free_anchors();
 }
 
+/**
+ * @brief Sets the current part's position relative to a source part.
+ *
+ * This function makes the current part's `rel1` and `rel2` properties relative
+ * to the given source part `src`. This is a key part of handling nested part
+ * layouts.
+ *
+ * @param src The source part to be relative to.
+ */
 static void
 edje_cc_handlers_hierarchy_set(Edje_Part *src)
-{  /* This funcion makes current part rel_1.id, rel_2.id relative to src */
+{
   if (!src->name)
     {
        ERR("parse error %s:%i. You must set parent name before creating nested part",
@@ -15045,9 +15314,14 @@ edje_cc_handlers_hierarchy_set(Edje_Part *src)
   st_collections_group_parts_part_description_rel2_to_set(src->name);
 }
 
+/**
+ * @brief Gets the parent part from the hierarchy stack.
+ *
+ * @return A pointer to the parent Edje_Part, or NULL if there is no parent.
+ */
 static Edje_Part *
 edje_cc_handlers_hierarchy_parent_get(void)
-{  /* Return the parent part pointer */
+{
   int idx = eina_array_count(part_hierarchy) - 2;
   Edje_Cc_Handlers_Hierarchy_Info *info = (idx >= 0) ?
     eina_array_data_get(part_hierarchy, idx) : NULL;
@@ -15055,9 +15329,19 @@ edje_cc_handlers_hierarchy_parent_get(void)
   return (info) ? info->ep : NULL;
 }
 
+/**
+ * @brief Pushes the current parsing context onto the part hierarchy stack.
+ *
+ * When a nested part is encountered, this function saves the current parsing
+ * state (current part, description, etc.) onto a stack. This allows the parser to
+ * handle nested structures and restore the state when the nested block is closed.
+ *
+ * @param ep The new part being pushed onto the hierarchy (the nested part).
+ * @param cp The current part which becomes the parent.
+ */
 static void
 edje_cc_handlers_hierarchy_push(Edje_Part *ep, Edje_Part *cp)
-{  /* Remove part from hierarchy stack when finished parsing it */
+{
   Edje_Cc_Handlers_Hierarchy_Info *info = malloc(sizeof(*info));
   info->current_de = current_de;
   info->current_part = cp;   /* current_part restored on pop */
@@ -15070,6 +15354,16 @@ edje_cc_handlers_hierarchy_push(Edje_Part *ep, Edje_Part *cp)
   eina_array_push(part_hierarchy, info);
 }
 
+/**
+ * @brief Renames a part within the hierarchy stack.
+ *
+ * When a part is overridden during inheritance, its pointer changes. This
+ * function iterates through the hierarchy stack and updates any references from
+ * the old part pointer to the new one.
+ *
+ * @param old The old part pointer.
+ * @param new The new part pointer.
+ */
 static void
 edje_cc_handlers_hierarchy_rename(Edje_Part *old, Edje_Part *new)
 {
@@ -15097,9 +15391,17 @@ edje_cc_handlers_hierarchy_free(void)
    part_hierarchy = NULL;
 }
 
+/**
+ * @brief Pops a parsing context from the part hierarchy stack.
+ *
+ * This function is called when a nested part block is closed. It restores the
+ * previous parsing state from the hierarchy stack. It also performs validation
+ * and cleanup for the part that was just finished, like ensuring it has a name
+ * and a default description.
+ */
 static void
 edje_cc_handlers_hierarchy_pop(void)
-{  /* Remove part from hierarchy stack when finished parsing it */
+{
   Edje_Cc_Handlers_Hierarchy_Info *info = eina_array_pop(part_hierarchy);
 
   if (current_part)
@@ -15140,6 +15442,17 @@ edje_cc_handlers_hierarchy_pop(void)
     }
 }
 
+/**
+ * @brief Handles LazEDC wildcard/shorthand syntax.
+ *
+ * This function is called by the parser when it encounters a token that doesn't
+ * match a standard keyword. It attempts to interpret the token as part of
+ * LazEDC's shorthand syntax, such as omitting the `name:` keyword for parts
+ * and groups, or setting state values directly.
+ *
+ * @return EINA_TRUE if the token was successfully handled as a wildcard,
+ *         EINA_FALSE otherwise.
+ */
 Eina_Bool
 edje_cc_handlers_wildcard(void)
 {

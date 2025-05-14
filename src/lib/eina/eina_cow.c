@@ -59,42 +59,56 @@ struct _Eina_Cow_Ptr
    EINA_MAGIC;
 # ifdef HAVE_BACKTRACE
    Eina_Bt_Func writer_bt[EINA_DEBUG_BT_NUM];
-   int  writer_bt_num;
+   int  writer_bt_num; ///< Number of frames in writer_bt.
 # endif
 #endif
-   int refcount;
+   int refcount; ///< Number of references to this COW data block.
 
 #ifdef EINA_COW_MAGIC_ON
-   unsigned int writing;
+   unsigned int writing; ///< Debug counter: non-zero if a write operation is in progress.
 #endif
 
-   Eina_Bool hashed : 1;
-   Eina_Bool togc : 1;
+   Eina_Bool hashed : 1; ///< EINA_TRUE if this block is currently in the 'match' hash table.
+   Eina_Bool togc : 1;   ///< EINA_TRUE if this block is a candidate for garbage collection (in 'togc' hash table).
 };
 
+/**
+ * @internal
+ * @brief Structure to hold information for a COW data block that is a candidate
+ * for garbage collection.
+ */
 struct _Eina_Cow_GC
 {
 #ifdef EINA_COW_MAGIC_ON
    EINA_MAGIC;
 #endif
 
-   Eina_Cow_Ptr *ref;
-   const void **dst;
+   Eina_Cow_Ptr *ref; ///< Pointer to the metadata of the COW data block.
+   const void **dst;  ///< Address of the user's variable holding the pointer to the COW data.
+                      ///< Used to update the user's pointer if GC merges this block.
 };
+
+/**
+ * @internal
+ * @brief Main structure for an Eina_Cow pool.
+ */
 struct _Eina_Cow
 {
 #ifdef EINA_COW_MAGIC_ON
    EINA_MAGIC;
 #endif
 
-   Eina_Hash *togc;
-   Eina_Hash *match;
+   Eina_Hash *togc; ///< Hash table of Eina_Cow_GC structures, for blocks pending garbage collection.
+                    ///< Key: Eina_Cow_Ptr* (address of the metadata block), Value: Eina_Cow_GC*.
+   Eina_Hash *match; ///< Hash table of unique data blocks.
+                     ///< Key: Actual data content, Value: Pointer to the data content (within an Eina_Cow_Ptr block).
+                     ///< Used to find and merge identical blocks.
 
-   Eina_Mempool *pool;
-   const Eina_Cow_Data *default_value;
+   Eina_Mempool *pool; ///< Memory pool for allocating Eina_Cow_Ptr structures and their associated data.
+   const Eina_Cow_Data *default_value; ///< Pointer to the shared, read-only default instance for this COW.
 
-   unsigned int struct_size;
-   unsigned int total_size;
+   unsigned int struct_size; ///< Size of the user data structure managed by this COW.
+   unsigned int total_size;  ///< Total allocated size for one COW instance (Eina_Cow_Ptr metadata + user data).
 };
 
 typedef int (*Eina_Cow_Hash)(const void *, int);
@@ -143,8 +157,22 @@ static int _eina_cow_log_dom = -1;
 #define DBG(...) EINA_LOG_DOM_DBG(_eina_cow_log_dom, __VA_ARGS__)
 
 
-static Eina_Mempool *gc_pool = NULL;
+static Eina_Mempool *gc_pool = NULL; ///< Memory pool for Eina_Cow_GC structures.
 
+/**
+ * @internal
+ * @brief Generic hash generation function.
+ *
+ * Iteratively applies a given hash function to chunks of a data block
+ * to compute an overall hash value.
+ *
+ * @param key Pointer to the data to be hashed.
+ * @param key_length Total length of the data in bytes.
+ * @param hash Function pointer to a hash function that processes a single chunk.
+ *             This function takes (const void *chunk_data, int chunk_size) and returns an int hash.
+ * @param size Size of each chunk to be processed by the 'hash' function.
+ * @return The computed hash value for the entire key.
+ */
 static inline int
 _eina_cow_hash_gen(const void *key, int key_length,
                    Eina_Cow_Hash hash,
@@ -165,6 +193,13 @@ _eina_cow_hash_gen(const void *key, int key_length,
 }
 
 #ifdef EFL64
+/**
+ * @internal
+ * @brief Computes a hash for COW data using 64-bit integer hashing for chunks.
+ * @param key Pointer to the COW data.
+ * @param key_length Length of the COW data.
+ * @return The computed hash value.
+ */
 static int
 _eina_cow_hash64(const void *key, int key_length)
 {
@@ -172,6 +207,13 @@ _eina_cow_hash64(const void *key, int key_length)
                              (Eina_Cow_Hash) eina_hash_int64, sizeof (unsigned long long int));
 }
 #else
+/**
+ * @internal
+ * @brief Computes a hash for COW data using 32-bit integer hashing for chunks.
+ * @param key Pointer to the COW data.
+ * @param key_length Length of the COW data.
+ * @return The computed hash value.
+ */
 static int
 _eina_cow_hash32(const void *key, int key_length)
 {
@@ -180,8 +222,19 @@ _eina_cow_hash32(const void *key, int key_length)
 }
 #endif
 
-static int current_cow_size = 0;
+static int current_cow_size = 0; ///< Global variable to store the current COW structure size for hash length callback.
 
+/**
+ * @internal
+ * @brief Eina_Hash key length callback.
+ *
+ * Returns the size of the COW data structure. This relies on the
+ * global variable `current_cow_size` being set correctly before
+ * hash operations that require key length.
+ *
+ * @param key The key (COW data), unused by this function.
+ * @return The size of the COW data structure, as stored in `current_cow_size`.
+ */
 static unsigned int
 _eina_cow_length(const void *key EINA_UNUSED)
 {
@@ -191,6 +244,19 @@ _eina_cow_length(const void *key EINA_UNUSED)
    return current_cow_size;
 }
 
+/**
+ * @internal
+ * @brief Eina_Hash key comparison callback.
+ *
+ * Compares two COW data blocks using memcmp.
+ *
+ * @param key1 Pointer to the first COW data block.
+ * @param key1_length Length of the first data block.
+ * @param key2 Pointer to the second COW data block.
+ * @param key2_length Length of the second data block (unused).
+ * @return An integer less than, equal to, or greater than zero if key1 is found,
+ *         respectively, to be less than, to match, or be greater than key2.
+ */
 static int
 _eina_cow_cmp(const void *key1, int key1_length,
               const void *key2, int key2_length EINA_UNUSED)
@@ -198,6 +264,19 @@ _eina_cow_cmp(const void *key1, int key1_length,
    return memcmp(key1, key2, key1_length);
 }
 
+/**
+ * @internal
+ * @brief Removes a COW data block from the 'match' hash table.
+ *
+ * This function is called when a COW data block is no longer unique
+ * (e.g., it's about to be modified) or when its reference count drops to zero.
+ * It ensures that the 'match' hash table only contains pointers to
+ * currently unique and referenced data blocks.
+ *
+ * @param cow The Eina_Cow instance.
+ * @param data Pointer to the user data part of the COW block.
+ * @param ref Pointer to the Eina_Cow_Ptr metadata of the block.
+ */
 static inline void
 _eina_cow_hash_del(Eina_Cow *cow,
                    const void *data,
@@ -211,12 +290,32 @@ _eina_cow_hash_del(Eina_Cow *cow,
    ref->hashed = EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Frees an Eina_Cow_GC structure.
+ *
+ * This function is used as a callback for `eina_hash_free_cb` when
+ * destroying the `cow->togc` hash table, or when an item is removed
+ * from it and needs to be freed.
+ *
+ * @param data Pointer to the Eina_Cow_GC structure to be freed.
+ */
 static void
 _eina_cow_gc_free(void *data)
 {
    eina_mempool_free(gc_pool, data);
 }
 
+/**
+ * @internal
+ * @brief Removes a COW data block from the 'togc' (to-be-garbage-collected) hash table.
+ *
+ * This is typically called when a block that was a candidate for GC is no longer
+ * eligible (e.g., it was merged or its state changed).
+ *
+ * @param cow The Eina_Cow instance.
+ * @param ref Pointer to the Eina_Cow_Ptr metadata of the block.
+ */
 static inline void
 _eina_cow_togc_del(Eina_Cow *cow, Eina_Cow_Ptr *ref)
 {
@@ -226,6 +325,19 @@ _eina_cow_togc_del(Eina_Cow *cow, Eina_Cow_Ptr *ref)
    ref->togc = EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Adds a COW data block to the 'togc' hash table.
+ *
+ * Marks the block as a candidate for garbage collection. An Eina_Cow_GC
+ * structure is allocated to store metadata for the GC process, including
+ * a pointer to the user's variable (`dst`) that holds the COW data.
+ * This allows the GC to update the user's pointer if the block is merged.
+ *
+ * @param cow The Eina_Cow instance.
+ * @param ref Pointer to the Eina_Cow_Ptr metadata of the block.
+ * @param dst Address of the user's pointer that holds this COW data.
+ */
 static void
 _eina_cow_togc_add(Eina_Cow *cow,
                    Eina_Cow_Ptr *ref,
@@ -254,6 +366,25 @@ _eina_cow_togc_add(Eina_Cow *cow,
 #endif
 }
 
+/**
+ * @internal
+ * @brief Processes a single COW data block candidate for garbage collection.
+ *
+ * This function attempts to find an identical data block already present in the
+ * `cow->match` hash table.
+ * - If a match is found, the current block (`gc->ref`) is merged: its reference
+ *   count is added to the matched block's refcount, the user's pointer (`*gc->dst`)
+ *   is updated to point to the matched block, and the current block is freed.
+ * - If no match is found, the current block is considered unique and is added to
+ *   the `cow->match` hash table.
+ *
+ * This function is typically called for one item from the `cow->togc` queue.
+ *
+ * @param cow The Eina_Cow instance.
+ * @param gc Pointer to the Eina_Cow_GC structure representing the block to process.
+ *           This structure contains the Eina_Cow_Ptr of the block and the address
+ *           of the user's pointer to it.
+ */
 static void
 _eina_cow_gc(Eina_Cow *cow, Eina_Cow_GC *gc)
 {

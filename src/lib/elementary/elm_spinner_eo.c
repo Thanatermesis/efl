@@ -13,7 +13,17 @@ EWAPI const Efl_Event_Description _ELM_SPINNER_EVENT_MAX_REACHED =
 
 void _elm_spinner_wrap_set(Eo *obj, Elm_Spinner_Data *pd, Eina_Bool wrap);
 
-
+/**
+ * @brief Reflection function for the "wrap" property set operation.
+ *
+ * This function is called by the Eolian reflection system when the "wrap"
+ * property is set. It converts the Eina_Value to a Eina_Bool and calls
+ * the concrete implementation elm_obj_spinner_wrap_set().
+ *
+ * @param[in] obj The Efl object.
+ * @param[in] val The Eina_Value containing the boolean value for "wrap".
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 static Eina_Error
 __eolian_elm_spinner_wrap_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -33,7 +43,16 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_spinner_wrap_set, EFL_FUNC_CALL(wrap), Eina_Bo
 
 Eina_Bool _elm_spinner_wrap_get(const Eo *obj, Elm_Spinner_Data *pd);
 
-
+/**
+ * @brief Reflection function for the "wrap" property get operation.
+ *
+ * This function is called by the Eolian reflection system when the "wrap"
+ * property is retrieved. It calls elm_obj_spinner_wrap_get() and
+ * converts the returned Eina_Bool to an Eina_Value.
+ *
+ * @param[in] obj The Efl object.
+ * @return An Eina_Value containing the boolean value of "wrap".
+ */
 static Eina_Value
 __eolian_elm_spinner_wrap_get_reflect(const Eo *obj)
 {
@@ -45,7 +64,17 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_spinner_wrap_get, Eina_Bool, 0);
 
 void _elm_spinner_interval_set(Eo *obj, Elm_Spinner_Data *pd, double interval);
 
-
+/**
+ * @brief Reflection function for the "interval" property set operation.
+ *
+ * This function is called by the Eolian reflection system when the "interval"
+ * property is set. It converts the Eina_Value to a double and calls
+ * the concrete implementation elm_obj_spinner_interval_set().
+ *
+ * @param[in] obj The Efl object.
+ * @param[in] val The Eina_Value containing the double value for "interval".
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 static Eina_Error
 __eolian_elm_spinner_interval_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -65,7 +94,16 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_spinner_interval_set, EFL_FUNC_CALL(interval),
 
 double _elm_spinner_interval_get(const Eo *obj, Elm_Spinner_Data *pd);
 
-
+/**
+ * @brief Reflection function for the "interval" property get operation.
+ *
+ * This function is called by the Eolian reflection system when the "interval"
+ * property is retrieved. It calls elm_obj_spinner_interval_get() and
+ * converts the returned double to an Eina_Value.
+ *
+ * @param[in] obj The Efl object.
+ * @return An Eina_Value containing the double value of "interval".
+ */
 static Eina_Value
 __eolian_elm_spinner_interval_get_reflect(const Eo *obj)
 {
@@ -77,7 +115,17 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_spinner_interval_get, double, 0);
 
 void _elm_spinner_round_set(Eo *obj, Elm_Spinner_Data *pd, int rnd);
 
-
+/**
+ * @brief Reflection function for the "round" property set operation.
+ *
+ * This function is called by the Eolian reflection system when the "round"
+ * property is set. It converts the Eina_Value to an int and calls
+ * the concrete implementation elm_obj_spinner_round_set().
+ *
+ * @param[in] obj The Efl object.
+ * @param[in] val The Eina_Value containing the integer value for "round".
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 static Eina_Error
 __eolian_elm_spinner_round_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -97,7 +145,16 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_spinner_round_set, EFL_FUNC_CALL(rnd), int rnd
 
 int _elm_spinner_round_get(const Eo *obj, Elm_Spinner_Data *pd);
 
-
+/**
+ * @brief Reflection function for the "round" property get operation.
+ *
+ * This function is called by the Eolian reflection system when the "round"
+ * property is retrieved. It calls elm_obj_spinner_round_get() and
+ * converts the returned int to an Eina_Value.
+ *
+ * @param[in] obj The Efl object.
+ * @return An Eina_Value containing the integer value of "round".
+ */
 static Eina_Value
 __eolian_elm_spinner_round_get_reflect(const Eo *obj)
 {
@@ -109,7 +166,17 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_spinner_round_get, int, 0);
 
 void _elm_spinner_editable_set(Eo *obj, Elm_Spinner_Data *pd, Eina_Bool editable);
 
-
+/**
+ * @brief Reflection function for the "editable" property set operation.
+ *
+ * This function is called by the Eolian reflection system when the "editable"
+ * property is set. It converts the Eina_Value to a Eina_Bool and calls
+ * the concrete implementation elm_obj_spinner_editable_set().
+ *
+ * @param[in] obj The Efl object.
+ * @param[in] val The Eina_Value containing the boolean value for "editable".
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 static Eina_Error
 __eolian_elm_spinner_editable_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -129,7 +196,16 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_spinner_editable_set, EFL_FUNC_CALL(editable),
 
 Eina_Bool _elm_spinner_editable_get(const Eo *obj, Elm_Spinner_Data *pd);
 
-
+/**
+ * @brief Reflection function for the "editable" property get operation.
+ *
+ * This function is called by the Eolian reflection system when the "editable"
+ * property is retrieved. It calls elm_obj_spinner_editable_get() and
+ * converts the returned Eina_Bool to an Eina_Value.
+ *
+ * @param[in] obj The Efl object.
+ * @return An Eina_Value containing the boolean value of "editable".
+ */
 static Eina_Value
 __eolian_elm_spinner_editable_get_reflect(const Eo *obj)
 {
@@ -141,7 +217,17 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_spinner_editable_get, Eina_Bool, 0);
 
 void _elm_spinner_base_set(Eo *obj, Elm_Spinner_Data *pd, double base);
 
-
+/**
+ * @brief Reflection function for the "base" property set operation.
+ *
+ * This function is called by the Eolian reflection system when the "base"
+ * property is set. It converts the Eina_Value to a double and calls
+ * the concrete implementation elm_obj_spinner_base_set().
+ *
+ * @param[in] obj The Efl object.
+ * @param[in] val The Eina_Value containing the double value for "base".
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 static Eina_Error
 __eolian_elm_spinner_base_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -161,7 +247,16 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_spinner_base_set, EFL_FUNC_CALL(base), double 
 
 double _elm_spinner_base_get(const Eo *obj, Elm_Spinner_Data *pd);
 
-
+/**
+ * @brief Reflection function for the "base" property get operation.
+ *
+ * This function is called by the Eolian reflection system when the "base"
+ * property is retrieved. It calls elm_obj_spinner_base_get() and
+ * converts the returned double to an Eina_Value.
+ *
+ * @param[in] obj The Efl object.
+ * @return An Eina_Value containing the double value of "base".
+ */
 static Eina_Value
 __eolian_elm_spinner_base_get_reflect(const Eo *obj)
 {
@@ -173,7 +268,17 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_spinner_base_get, double, 0);
 
 void _elm_spinner_label_format_set(Eo *obj, Elm_Spinner_Data *pd, const char *fmt);
 
-
+/**
+ * @brief Reflection function for the "label_format" property set operation.
+ *
+ * This function is called by the Eolian reflection system when the "label_format"
+ * property is set. It converts the Eina_Value to a const char* and calls
+ * the concrete implementation elm_obj_spinner_label_format_set().
+ *
+ * @param[in] obj The Efl object.
+ * @param[in] val The Eina_Value containing the string value for "label_format".
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 static Eina_Error
 __eolian_elm_spinner_label_format_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -193,7 +298,16 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_spinner_label_format_set, EFL_FUNC_CALL(fmt), 
 
 const char *_elm_spinner_label_format_get(const Eo *obj, Elm_Spinner_Data *pd);
 
-
+/**
+ * @brief Reflection function for the "label_format" property get operation.
+ *
+ * This function is called by the Eolian reflection system when the "label_format"
+ * property is retrieved. It calls elm_obj_spinner_label_format_get() and
+ * converts the returned const char* to an Eina_Value.
+ *
+ * @param[in] obj The Efl object.
+ * @return An Eina_Value containing the string value of "label_format".
+ */
 static Eina_Value
 __eolian_elm_spinner_label_format_get_reflect(const Eo *obj)
 {
@@ -257,7 +371,16 @@ double _elm_spinner_efl_access_value_increment_get(const Eo *obj, Elm_Spinner_Da
 
 const Efl_Access_Action_Data *_elm_spinner_efl_access_widget_action_elm_actions_get(const Eo *obj, Elm_Spinner_Data *pd);
 
-
+/**
+ * @brief Initializes the Elm_Spinner Efl class.
+ *
+ * This function is called once when the Elm_Spinner class is first used.
+ * It sets up the Efl operations (methods) and property reflection capabilities
+ * for instances of this class.
+ *
+ * @param[in] klass The Efl_Class to initialize.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_spinner_class_initializer(Efl_Class *klass)
 {
@@ -266,9 +389,12 @@ _elm_spinner_class_initializer(Efl_Class *klass)
    const Efl_Object_Property_Reflection_Ops *ropsp = NULL;
 
 #ifndef ELM_SPINNER_EXTRA_OPS
-#define ELM_SPINNER_EXTRA_OPS
+#define ELM_SPINNER_EXTRA_OPS // Allows for extending operations from other files if defined elsewhere.
 #endif
 
+   // Defines the Efl operations (methods) for the Elm_Spinner class.
+   // Each entry maps an Efl operation ID (e.g., elm_obj_spinner_wrap_set)
+   // to its C implementation function (e.g., _elm_spinner_wrap_set).
    EFL_OPS_DEFINE(ops,
       EFL_OBJECT_OP_FUNC(elm_obj_spinner_wrap_set, _elm_spinner_wrap_set),
       EFL_OBJECT_OP_FUNC(elm_obj_spinner_wrap_get, _elm_spinner_wrap_get),
@@ -304,6 +430,10 @@ _elm_spinner_class_initializer(Efl_Class *klass)
    );
    opsp = &ops;
 
+   // Defines the Eolian property reflection table.
+   // This table maps property names (e.g., "wrap") to their
+   // respective setter and getter reflection functions. These functions
+   // bridge Eolian property access with the C implementation.
    static const Efl_Object_Property_Reflection refl_table[] = {
       {"wrap", __eolian_elm_spinner_wrap_set_reflect, __eolian_elm_spinner_wrap_get_reflect},
       {"interval", __eolian_elm_spinner_interval_set_reflect, __eolian_elm_spinner_interval_get_reflect},
@@ -317,6 +447,7 @@ _elm_spinner_class_initializer(Efl_Class *klass)
    };
    ropsp = &rops;
 
+   // Registers the defined operations and property reflection ops with the class.
    return efl_class_functions_set(klass, opsp, ropsp);
 }
 

@@ -11,27 +11,99 @@
 #include "ecore_buffer_private.h"
 #include "ecore_buffer_con.h"
 
+/**
+ * @internal
+ * @brief Represents a buffer provider instance.
+ *
+ * This structure holds all necessary information for a buffer provider,
+ * including its underlying Wayland resource, associated Ecore_Buffer_Queue,
+ * callback functions, and state.
+ */
 struct _Ecore_Buffer_Provider
 {
-   struct bq_provider *resource;
-   Ecore_Buffer_Queue *ebq;
-   int free_slot;
+   struct bq_provider *resource; /**< The Wayland buffer queue provider resource. */
+   Ecore_Buffer_Queue *ebq;      /**< The associated Ecore_Buffer_Queue instance. */
+   int free_slot;                /**< Number of available slots for new buffers. */
    struct
      {
-        void  (*consumer_add) (Ecore_Buffer_Provider *provider, int queue_size, int w, int h, void *data);
-        void  (*consumer_del) (Ecore_Buffer_Provider *provider, void *data);
-        void  (*enqueue)      (Ecore_Buffer_Provider *provider, void *data);
-        void *data;
-     } cb;
+        void  (*consumer_add) (Ecore_Buffer_Provider *provider, int queue_size, int w, int h, void *data); /**< Callback for when a consumer connects. */
+        void  (*consumer_del) (Ecore_Buffer_Provider *provider, void *data); /**< Callback for when a consumer disconnects. */
+        void  (*enqueue)      (Ecore_Buffer_Provider *provider, void *data); /**< Callback for when a buffer is enqueued by the consumer (released by provider). */
+        void *data; /**< User data for the callbacks. */
+     } cb; /**< Callback functions. */
 };
 
+/**
+ * @internal
+ * @brief Callback invoked when a consumer connects to the provider.
+ *
+ * @param data The Ecore_Buffer_Provider instance.
+ * @param bq_provider The bq_provider resource.
+ * @param queue_size The size of the buffer queue.
+ * @param width The width of the buffers.
+ * @param height The height of the buffers.
+ */
 static void _ecore_buffer_provider_cb_consumer_connected(void *data, struct bq_provider *bq_provider, int32_t queue_size, int32_t width, int32_t height);
+/**
+ * @internal
+ * @brief Callback invoked when a consumer disconnects from the provider.
+ *
+ * @param data The Ecore_Buffer_Provider instance.
+ * @param bq_provider The bq_provider resource.
+ */
 static void _ecore_buffer_provider_cb_consumer_disconnected(void *data, struct bq_provider *bq_provider);
+/**
+ * @internal
+ * @brief Callback invoked when the consumer has processed and released a buffer,
+ * making it available to the provider again. This corresponds to the consumer
+ * enqueuing the buffer.
+ *
+ * @param data The Ecore_Buffer_Provider instance.
+ * @param bq_provider The bq_provider resource.
+ * @param buffer The bq_buffer resource that was released by the consumer.
+ * @param serial A serial number for the operation (unused).
+ */
 static void _ecore_buffer_provider_cb_add_buffer(void *data, struct bq_provider *bq_provider, struct bq_buffer *buffer, uint32_t serial);
+/**
+ * @internal
+ * @brief Creates a new Shared_Buffer instance and attaches an Ecore_Buffer to it.
+ *
+ * This function handles the creation of a Wayland buffer resource (`bq_buffer`)
+ * and associates it with the given Ecore_Buffer.
+ *
+ * @param provider The Ecore_Buffer_Provider instance.
+ * @param buffer The Ecore_Buffer to be shared.
+ * @return A new Shared_Buffer instance on success, or NULL on failure.
+ */
 static Shared_Buffer *_ecore_buffer_provider_shared_buffer_new(Ecore_Buffer_Provider *provider, Ecore_Buffer *buffer);
+/**
+ * @internal
+ * @brief Frees a Shared_Buffer instance and detaches its resources.
+ *
+ * This function detaches the Wayland buffer resource and cleans up
+ * the Shared_Buffer.
+ *
+ * @param provider The Ecore_Buffer_Provider instance.
+ * @param sb The Shared_Buffer to be freed.
+ */
 static void _ecore_buffer_provider_shared_buffer_free(Ecore_Buffer_Provider *provider, Shared_Buffer *sb);
+/**
+ * @internal
+ * @brief Callback invoked when an Ecore_Buffer associated with a Shared_Buffer is freed.
+ *
+ * This ensures that the corresponding Shared_Buffer is also cleaned up.
+ *
+ * @param buf The Ecore_Buffer that was freed.
+ * @param data The Ecore_Buffer_Provider instance.
+ */
 static void _ecore_buffer_provider_cb_buffer_free(Ecore_Buffer *buf, void *data);
 
+/**
+ * @internal
+ * @brief Listener for bq_provider events.
+ *
+ * This structure maps Wayland buffer queue provider events to internal callback functions.
+ */
 struct bq_provider_listener _ecore_buffer_provider_listener =
 {
    _ecore_buffer_provider_cb_consumer_connected,
@@ -39,6 +111,16 @@ struct bq_provider_listener _ecore_buffer_provider_listener =
    _ecore_buffer_provider_cb_add_buffer
 };
 
+/**
+ * @brief Creates a new Ecore_Buffer_Provider.
+ *
+ * This function establishes a connection to the Wayland display and creates
+ * a buffer queue provider resource with the given name.
+ *
+ * @param name The name for the buffer provider (e.g., "my-app-provider").
+ *             This name is used to identify the provider in the Wayland compositor.
+ * @return A new Ecore_Buffer_Provider instance on success, or NULL on failure.
+ */
 EAPI Ecore_Buffer_Provider *
 ecore_buffer_provider_new(const char *name)
 {
@@ -71,6 +153,15 @@ ecore_buffer_provider_new(const char *name)
    return provider;
 }
 
+/**
+ * @brief Frees an Ecore_Buffer_Provider.
+ *
+ * This function disconnects from the Wayland display, destroys the
+ * buffer queue provider resource, and frees all associated memory.
+ * Any shared buffers still managed by this provider will also be freed.
+ *
+ * @param provider The Ecore_Buffer_Provider to free.
+ */
 EAPI void
 ecore_buffer_provider_free(Ecore_Buffer_Provider *provider)
 {
@@ -96,6 +187,22 @@ ecore_buffer_provider_free(Ecore_Buffer_Provider *provider)
    free(provider);
 }
 
+/**
+ * @brief Acquires an available buffer from the provider.
+ *
+ * This function attempts to dequeue a buffer that has been released by the consumer.
+ * If a buffer is successfully acquired, its state is set to `SHARED_BUFFER_STATE_ACQUIRE`.
+ *
+ * @param provider The Ecore_Buffer_Provider instance.
+ * @param[out] ret_buf Pointer to store the acquired Ecore_Buffer.
+ *                     This will be set to the acquired buffer on success.
+ * @return An Ecore_Buffer_Return code indicating the result:
+ *         - @c ECORE_BUFFER_RETURN_SUCCESS if a buffer was acquired.
+ *         - @c ECORE_BUFFER_RETURN_EMPTY if no buffers are currently available (all are with the consumer).
+ *         - @c ECORE_BUFFER_RETURN_NEED_ALLOC if no buffers are available, but there are free slots
+ *           in the queue, indicating the provider should allocate a new buffer and enqueue it.
+ *         - @c ECORE_BUFFER_RETURN_ERROR on an internal error.
+ */
 EAPI Ecore_Buffer_Return
 ecore_buffer_provider_buffer_acquire(Ecore_Buffer_Provider *provider, Ecore_Buffer **ret_buf)
 {
@@ -136,6 +243,21 @@ ecore_buffer_provider_buffer_acquire(Ecore_Buffer_Provider *provider, Ecore_Buff
    return ret_flag;
 }
 
+/**
+ * @brief Enqueues a buffer to be shared with the consumer.
+ *
+ * This function makes the provided Ecore_Buffer available to the consumer.
+ * If the buffer has not been seen before and there are free slots, it will be
+ * attached to the provider (a new Shared_Buffer will be created).
+ * The buffer's state is set to `SHARED_BUFFER_STATE_ENQUEUE` and it is
+ * sent to the consumer.
+ *
+ * @param provider The Ecore_Buffer_Provider instance.
+ * @param buffer The Ecore_Buffer to enqueue. This buffer should be in an
+ *               `ACQUIRE` state (if previously acquired) or `NEW` (if freshly allocated).
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure (e.g., not connected,
+ *         no free slots, buffer in wrong state).
+ */
 EAPI Eina_Bool
 ecore_buffer_provider_buffer_enqueue(Ecore_Buffer_Provider *provider, Ecore_Buffer *buffer)
 {
@@ -191,6 +313,20 @@ ecore_buffer_provider_buffer_enqueue(Ecore_Buffer_Provider *provider, Ecore_Buff
    return EINA_TRUE;
 }
 
+/**
+ * @brief Checks if there are buffers ready to be acquired or if new buffers can be allocated.
+ *
+ * This function helps the provider determine if it should attempt to acquire a buffer
+ * or if it needs to allocate a new one.
+ *
+ * @param provider The Ecore_Buffer_Provider instance.
+ * @return An Ecore_Buffer_Return code:
+ *         - @c ECORE_BUFFER_RETURN_NOT_EMPTY if there is at least one buffer ready to be acquired.
+ *         - @c ECORE_BUFFER_RETURN_NEED_ALLOC if the queue is empty but there are free slots,
+ *           meaning a new buffer can be allocated and enqueued.
+ *         - @c ECORE_BUFFER_RETURN_EMPTY if the queue is empty and there are no free slots.
+ *         - @c EINA_FALSE (cast to Ecore_Buffer_Return) if provider is NULL (due to EINA_SAFETY).
+ */
 EAPI Ecore_Buffer_Return
 ecore_buffer_provider_buffer_acquirable_check(Ecore_Buffer_Provider *provider)
 {
@@ -207,6 +343,14 @@ ecore_buffer_provider_buffer_acquirable_check(Ecore_Buffer_Provider *provider)
    return ECORE_BUFFER_RETURN_NOT_EMPTY;
 }
 
+/**
+ * @brief Sets the callback function to be invoked when a consumer connects.
+ *
+ * @param provider The Ecore_Buffer_Provider instance.
+ * @param func The callback function.
+ *             Example: `void my_consumer_add_cb(Ecore_Buffer_Provider *p, int q_size, int w, int h, void *user_data)`
+ * @param data User data to be passed to the callback function.
+ */
 EAPI void
 ecore_buffer_provider_consumer_add_cb_set(Ecore_Buffer_Provider *provider, Ecore_Buffer_Provider_Consumer_Add_Cb func, void *data)
 {
@@ -216,6 +360,14 @@ ecore_buffer_provider_consumer_add_cb_set(Ecore_Buffer_Provider *provider, Ecore
    provider->cb.data = data;
 }
 
+/**
+ * @brief Sets the callback function to be invoked when a consumer disconnects.
+ *
+ * @param provider The Ecore_Buffer_Provider instance.
+ * @param func The callback function.
+ *             Example: `void my_consumer_del_cb(Ecore_Buffer_Provider *p, void *user_data)`
+ * @param data User data to be passed to the callback function.
+ */
 EAPI void
 ecore_buffer_provider_consumer_del_cb_set(Ecore_Buffer_Provider *provider, Ecore_Buffer_Provider_Consumer_Del_Cb func, void *data)
 {
@@ -225,6 +377,17 @@ ecore_buffer_provider_consumer_del_cb_set(Ecore_Buffer_Provider *provider, Ecore
    provider->cb.data = data;
 }
 
+/**
+ * @brief Sets the callback function to be invoked when a buffer is released by the consumer
+ * (and thus available to be acquired by the provider).
+ *
+ * This corresponds to the consumer enqueuing a buffer.
+ *
+ * @param provider The Ecore_Buffer_Provider instance.
+ * @param func The callback function.
+ *             Example: `void my_buffer_released_cb(Ecore_Buffer_Provider *p, void *user_data)`
+ * @param data User data to be passed to the callback function.
+ */
 EAPI void
 ecore_buffer_provider_buffer_released_cb_set(Ecore_Buffer_Provider *provider, Ecore_Buffer_Provider_Enqueue_Cb func, void *data)
 {

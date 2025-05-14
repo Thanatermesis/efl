@@ -1,3 +1,12 @@
+/**
+ * @file
+ * @brief This file implements the Evas filter mixin, providing functionalities
+ * for applying graphical filters to Evas objects.
+ *
+ * It handles filter program parsing, state management, rendering,
+ * and interactions with Evas' rendering pipeline.
+ */
+
 #define EFL_CANVAS_FILTER_INTERNAL_PROTECTED
 
 #include <Evas.h>
@@ -18,46 +27,58 @@
 typedef struct _Evas_Filter_Data Evas_Filter_Data;
 typedef struct _Evas_Filter_Post_Render_Data Evas_Filter_Post_Render_Data;
 
+/**
+ * @brief Internal data structure for managing filter properties of an Evas object.
+ * This structure is managed by an Eina_Cow (Copy-On-Write) mechanism.
+ */
 struct _Evas_Object_Filter_Data
 {
-   Evas_Object_Protected_Data *obj;
-   Eina_Stringshare    *name;
-   Eina_Stringshare    *code;
-   Evas_Filter_Program *chain;
-   Evas_Filter_Context *context;
-   Eina_Hash           *sources; // Evas_Filter_Proxy_Binding
-   Eina_Inlist         *data; // Evas_Filter_Data_Binding
-   Eina_Rectangle       prev_obscured, obscured;
-   Evas_Filter_Padding  prev_padding, padding;
-   void                *output;
+   Evas_Object_Protected_Data *obj; /**< Pointer to the protected data of the Evas object. */
+   Eina_Stringshare    *name; /**< Name of the filter program. */
+   Eina_Stringshare    *code; /**< Lua script code for the filter. */
+   Evas_Filter_Program *chain; /**< Parsed filter program chain. */
+   Evas_Filter_Context *context; /**< Rendering context for the filter. */
+   Eina_Hash           *sources; /**< Hash table of source objects for the filter (Evas_Filter_Proxy_Binding).
+                                   * Example: `sources["source_name"] = Evas_Filter_Proxy_Binding_ptr;` */
+   Eina_Inlist         *data; /**< Inlist of data bindings for the filter (Evas_Filter_Data_Binding).
+                                * Example: `data = [{name="var1", value="1.0", execute=EINA_FALSE}, ...];` */
+   Eina_Rectangle       prev_obscured, obscured; /**< Previous and current obscured regions. */
+   Evas_Filter_Padding  prev_padding, padding; /**< Previous and current filter padding. */
+   void                *output; /**< Output buffer of the filter rendering. */
    struct {
       struct {
-         Eina_Stringshare *name;
-         double            value;
-      } cur;
+         Eina_Stringshare *name; /**< Name of the current filter state. e.g., "default", "blur_strong" */
+         double            value; /**< Value associated with the current state. */
+      } cur; /**< Current filter state. */
       struct {
-         Eina_Stringshare *name;
-         double            value;
-      } next;
-      double               pos;
-   } state;
-   int                  obscured_changes;
-   Eina_Bool            changed : 1;
-   Eina_Bool            invalid : 1; // Code parse failed
-   Eina_Bool            async : 1;
-   Eina_Bool            reuse : 1;
+         Eina_Stringshare *name; /**< Name of the next filter state for transitions. */
+         double            value; /**< Value associated with the next state. */
+      } next; /**< Next filter state for transitions. */
+      double               pos; /**< Position (0.0 to 1.0) for interpolation between current and next states. */
+   } state; /**< Filter state information for animations and transitions. */
+   int                  obscured_changes; /**< Counter for changes in the obscured region, used for heuristics. */
+   Eina_Bool            changed : 1; /**< Flag indicating if the filter properties have changed. */
+   Eina_Bool            invalid : 1; /**< Flag indicating if the filter code parsing failed. */
+   Eina_Bool            async : 1; /**< Flag indicating if the filter rendering is asynchronous. */
+   Eina_Bool            reuse : 1; /**< Flag indicating if the filter context should be reused. */
 };
 
+/**
+ * @brief Wrapper structure for filter data, primarily used for passing to EOLIAN methods.
+ */
 struct _Evas_Filter_Data
 {
-   const Evas_Object_Filter_Data *data;
+   const Evas_Object_Filter_Data *data; /**< Const pointer to the actual filter data. */
 };
 
+/**
+ * @brief Data structure for post-render tasks, used in asynchronous filter rendering.
+ */
 struct _Evas_Filter_Post_Render_Data
 {
-   Evas_Filter_Data *pd;
-   Evas_Filter_Context *ctx;
-   Eina_Bool success;
+   Evas_Filter_Data *pd; /**< Pointer to the filter data. */
+   Evas_Filter_Context *ctx; /**< Filter context used for rendering. */
+   Eina_Bool success; /**< Flag indicating if the rendering was successful. */
 };
 
 // FIXME: This should be enabled (with proper heuristics)
@@ -66,8 +87,13 @@ struct _Evas_Filter_Post_Render_Data
 static const Evas_Object_Filter_Data evas_filter_data_cow_default = {
    .reuse = FILTER_CONTEXT_REUSE
 };
-Eina_Cow *evas_object_filter_cow = NULL;
+Eina_Cow *evas_object_filter_cow = NULL; /**< Eina_Cow instance for managing Evas_Object_Filter_Data. */
 
+/**
+ * @brief Initializes the Evas filter mixin.
+ * This function sets up the Eina_Cow for Evas_Object_Filter_Data.
+ * It should be called once during Evas initialization.
+ */
 void
 evas_filter_mixin_init(void)
 {
@@ -76,6 +102,11 @@ evas_filter_mixin_init(void)
           &evas_filter_data_cow_default, EINA_TRUE);
 }
 
+/**
+ * @brief Shuts down the Evas filter mixin.
+ * This function cleans up the Eina_Cow for Evas_Object_Filter_Data.
+ * It should be called once during Evas shutdown.
+ */
 void
 evas_filter_mixin_shutdown(void)
 {
@@ -83,6 +114,12 @@ evas_filter_mixin_shutdown(void)
    evas_object_filter_cow = NULL;
 }
 
+/**
+ * @brief Ensures that the filter state names (current and next) are initialized.
+ * If state names are NULL, they are set to "default". This prevents crashes
+ * when accessing uninitialized state names.
+ * @param fcow Pointer to the writable filter data (Evas_Object_Filter_Data).
+ */
 static inline void
 _state_check(Evas_Object_Filter_Data *fcow)
 {
@@ -92,6 +129,15 @@ _state_check(Evas_Object_Filter_Data *fcow)
      fcow->state.next.name = eina_stringshare_add("default");
 }
 
+/**
+ * @brief Handles the completion of a synchronous or asynchronous filter rendering operation.
+ * This function updates the filter's output buffer, cleans up resources,
+ * and marks the filter as dirty if rendering failed.
+ * @param ctx The filter context used for rendering.
+ * @param obj The protected data of the Evas object being filtered.
+ * @param pd The filter data associated with the object.
+ * @param success EINA_TRUE if rendering was successful, EINA_FALSE otherwise.
+ */
 static void
 _filter_end_sync(Evas_Filter_Context *ctx, Evas_Object_Protected_Data *obj,
                  Evas_Filter_Data *pd, Eina_Bool success)
@@ -128,6 +174,12 @@ _filter_end_sync(Evas_Filter_Context *ctx, Evas_Object_Protected_Data *obj,
    efl_unref(eo_obj);
 }
 
+/**
+ * @brief Callback function executed after an asynchronous filter rendering job is completed.
+ * This function is called from the main loop and then calls _filter_end_sync
+ * to finalize the rendering process.
+ * @param data Pointer to Evas_Filter_Post_Render_Data containing task details.
+ */
 static void
 _filter_async_post_render_cb(void *data)
 {
@@ -142,6 +194,15 @@ _filter_async_post_render_cb(void *data)
    free(task);
 }
 
+/**
+ * @brief Callback function invoked when a filter rendering operation (either sync or async) finishes.
+ * For synchronous operations, it directly calls _filter_end_sync.
+ * For asynchronous operations, it schedules _filter_async_post_render_cb to be
+ * executed in the main loop.
+ * @param ctx The filter context used for rendering.
+ * @param data Pointer to Evas_Filter_Data.
+ * @param success EINA_TRUE if rendering was successful, EINA_FALSE otherwise.
+ */
 static void
 _filter_cb(Evas_Filter_Context *ctx, void *data, Eina_Bool success)
 {
@@ -169,6 +230,11 @@ _filter_cb(Evas_Filter_Context *ctx, void *data, Eina_Bool success)
    evas_post_render_job_add(obj->layer->evas, _filter_async_post_render_cb, post_data);
 }
 
+/**
+ * @brief Callback function used to free Evas_Filter_Proxy_Binding data when removed from the sources hash.
+ * This function also updates the proxy lists in the source and proxy objects.
+ * @param data Pointer to the Evas_Filter_Proxy_Binding to be freed.
+ */
 void
 _evas_filter_source_hash_free_cb(void *data)
 {
@@ -204,6 +270,14 @@ _evas_filter_source_hash_free_cb(void *data)
    free(pb);
 }
 
+/**
+ * @brief Sets the current state (current, next, position) on a given filter program.
+ * It prepares an Efl_Canvas_Filter_State structure based on the object's
+ * filter data and applies it to the program.
+ * @param pgm The filter program to update.
+ * @param pd The filter data containing the state information.
+ * @return EINA_TRUE if the state was successfully set, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _evas_filter_state_set_internal(Evas_Filter_Program *pgm, Evas_Filter_Data *pd)
 {
@@ -219,6 +293,12 @@ _evas_filter_state_set_internal(Evas_Filter_Program *pgm, Evas_Filter_Data *pd)
    return evas_filter_program_state_set(pgm, &state);
 }
 
+/**
+ * @brief Checks if the obscured region of a filtered object has significantly changed.
+ * This is used to determine if a redraw is necessary.
+ * @param pd The filter data containing current and previous obscured regions.
+ * @return EINA_TRUE if the obscured region has changed, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _evas_filter_obscured_region_changed(Evas_Filter_Data *pd)
 {
@@ -237,6 +317,29 @@ _evas_filter_obscured_region_changed(Evas_Filter_Data *pd)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Renders an Evas object with an applied filter.
+ * This is the core function for filter rendering. It handles:
+ * - Filter program compilation (if not already compiled).
+ * - Checking for changes that necessitate a re-render (object content, state, sources).
+ * - Setting up the filter context.
+ * - Rendering proxy sources.
+ * - Rendering the input for the filter (the object itself).
+ * - Executing the filter program.
+ * - Managing output buffers and asynchronous rendering.
+ *
+ * @param eo_obj The Evas object (Eo pointer) to render.
+ * @param obj The protected data of the Evas object.
+ * @param engine The Evas engine pointer.
+ * @param output The Evas engine's output structure.
+ * @param context The Evas engine's context for drawing.
+ * @param surface The target surface for rendering.
+ * @param x The x-coordinate for rendering.
+ * @param y The y-coordinate for rendering.
+ * @param do_async EINA_TRUE to perform rendering asynchronously, EINA_FALSE for synchronous.
+ * @param alpha EINA_TRUE if the object has an alpha channel.
+ * @return EINA_TRUE if rendering was successful or is in progress (async), EINA_FALSE on failure.
+ */
 Eina_Bool
 evas_filter_object_render(Eo *eo_obj, Evas_Object_Protected_Data *obj,
                           void *engine, void *output, void *context, void *surface,
@@ -458,6 +561,17 @@ evas_filter_object_render(Eo *eo_obj, Evas_Object_Protected_Data *obj,
    return ok;
 }
 
+/**
+ * @internal
+ * @brief Sets the filter program (Lua script) and its name for the object.
+ * This function parses the provided Lua code and prepares the filter program.
+ * If the code or name changes, the existing filter program and context are invalidated.
+ *
+ * @param eo_obj The Evas object.
+ * @param pd The filter data for the object.
+ * @param code The Lua script string for the filter. Example: "blur { radius = 5 }"
+ * @param name A descriptive name for the filter program. Example: "my_blur_filter"
+ */
 EOLIAN static void
 _efl_canvas_filter_internal_efl_gfx_filter_filter_program_set(Eo *eo_obj, Evas_Filter_Data *pd,
                                                               const char *code, const char *name)
@@ -512,6 +626,15 @@ _efl_canvas_filter_internal_efl_gfx_filter_filter_program_set(Eo *eo_obj, Evas_F
    evas_filter_dirty(eo_obj);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the filter program code and name for the object.
+ *
+ * @param eo_obj The Evas object (unused).
+ * @param pd The filter data for the object.
+ * @param code Pointer to store the filter program code string.
+ * @param name Pointer to store the filter program name string.
+ */
 EOLIAN static void
 _efl_canvas_filter_internal_efl_gfx_filter_filter_program_get(const Eo *eo_obj EINA_UNUSED, Evas_Filter_Data *pd, const char **code, const char **name)
 {
@@ -519,6 +642,16 @@ _efl_canvas_filter_internal_efl_gfx_filter_filter_program_get(const Eo *eo_obj E
    if (name) *name = pd->data->name;
 }
 
+/**
+ * @internal
+ * @brief Sets a source object for the filter program.
+ * Source objects can be referenced within the filter script to use their content as input.
+ *
+ * @param eo_obj The Evas object (the filter proxy).
+ * @param pd The filter data for the object.
+ * @param name The name by which the source will be identified in the filter script. Example: "background_image"
+ * @param eo_source The Efl_Gfx_Entity to be used as a source.
+ */
 EOLIAN static void
 _efl_canvas_filter_internal_efl_gfx_filter_filter_source_set(Eo *eo_obj, Evas_Filter_Data *pd,
                                                              const char *name, Efl_Gfx_Entity *eo_source)
@@ -606,6 +739,15 @@ update:
    evas_filter_dirty(eo_obj);
 }
 
+/**
+ * @internal
+ * @brief Retrieves a source object previously set for the filter program.
+ *
+ * @param obj The Evas object (unused).
+ * @param pd The filter data for the object.
+ * @param name The name of the source to retrieve.
+ * @return The Efl_Gfx_Entity associated with the name, or NULL if not found.
+ */
 EOLIAN static Efl_Gfx_Entity *
 _efl_canvas_filter_internal_efl_gfx_filter_filter_source_get(const Eo *obj EINA_UNUSED, Evas_Filter_Data *pd,
                                                              const char * name)
@@ -615,6 +757,19 @@ _efl_canvas_filter_internal_efl_gfx_filter_filter_source_get(const Eo *obj EINA_
    return pb->eo_source;
 }
 
+/**
+ * @internal
+ * @brief Sets the filter state, including current and next states for transitions, and the transition position.
+ * This allows for animating filter parameters over time.
+ *
+ * @param eo_obj The Evas object.
+ * @param pd The filter data for the object.
+ * @param cur_state Name of the current state. Example: "default"
+ * @param cur_val Value associated with the current state.
+ * @param next_state Name of the next state for transition. Example: "focused"
+ * @param next_val Value associated with the next state.
+ * @param pos Transition position (0.0 to 1.0). 0.0 means fully `cur_state`, 1.0 means fully `next_state`.
+ */
 EOLIAN static void
 _efl_canvas_filter_internal_efl_gfx_filter_filter_state_set(Eo *eo_obj, Evas_Filter_Data *pd,
                                                             const char *cur_state, double cur_val,
@@ -648,6 +803,18 @@ _efl_canvas_filter_internal_efl_gfx_filter_filter_state_set(Eo *eo_obj, Evas_Fil
      }
 }
 
+/**
+ * @internal
+ * @brief Retrieves the current filter state information.
+ *
+ * @param obj The Evas object (unused).
+ * @param pd The filter data for the object.
+ * @param cur_state Pointer to store the name of the current state.
+ * @param cur_val Pointer to store the value of the current state.
+ * @param next_state Pointer to store the name of the next state.
+ * @param next_val Pointer to store the value of the next state.
+ * @param pos Pointer to store the current transition position.
+ */
 EOLIAN static void
 _efl_canvas_filter_internal_efl_gfx_filter_filter_state_get(const Eo *obj EINA_UNUSED, Evas_Filter_Data *pd,
                                                             const char **cur_state, double *cur_val,
@@ -661,6 +828,19 @@ _efl_canvas_filter_internal_efl_gfx_filter_filter_state_get(const Eo *obj EINA_U
    if (pos) *pos = pd->data->state.pos;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the padding required by the filter.
+ * Padding indicates how much extra space the filter might need around the object
+ * to render correctly (e.g., for blurs or shadows).
+ *
+ * @param eo_obj The Evas object (unused).
+ * @param pd The filter data for the object.
+ * @param l Pointer to store the left padding.
+ * @param r Pointer to store the right padding.
+ * @param t Pointer to store the top padding.
+ * @param b Pointer to store the bottom padding.
+ */
 EOLIAN static void
 _efl_canvas_filter_internal_efl_gfx_filter_filter_padding_get(const Eo *eo_obj EINA_UNUSED, Evas_Filter_Data *pd,
                                                               int *l, int *r, int *t, int *b)
@@ -676,6 +856,16 @@ _efl_canvas_filter_internal_efl_gfx_filter_filter_padding_get(const Eo *eo_obj E
    if (b) *b = pad.b;
 }
 
+/**
+ * @internal
+ * @brief Sets the 'changed' flag for the filter.
+ * This flag is used internally to indicate that the filter's properties or inputs
+ * have changed and a re-render might be necessary.
+ *
+ * @param eo_obj The Evas object (unused).
+ * @param pd The filter data for the object.
+ * @param val The new value for the 'changed' flag.
+ */
 EOLIAN static void
 _efl_canvas_filter_internal_filter_changed_set(Eo *eo_obj EINA_UNUSED, Evas_Filter_Data *pd, Eina_Bool val)
 {
@@ -687,6 +877,15 @@ _efl_canvas_filter_internal_filter_changed_set(Eo *eo_obj EINA_UNUSED, Evas_Filt
      }
 }
 
+/**
+ * @internal
+ * @brief Sets the 'invalid' flag for the filter.
+ * This flag indicates whether the filter program code is invalid (e.g., due to a parsing error).
+ *
+ * @param eo_obj The Evas object (unused).
+ * @param pd The filter data for the object.
+ * @param val The new value for the 'invalid' flag.
+ */
 EOLIAN static void
 _efl_canvas_filter_internal_filter_invalid_set(Eo *eo_obj EINA_UNUSED, Evas_Filter_Data *pd, Eina_Bool val)
 {
@@ -698,6 +897,15 @@ _efl_canvas_filter_internal_filter_invalid_set(Eo *eo_obj EINA_UNUSED, Evas_Filt
      }
 }
 
+/**
+ * @internal
+ * @brief Constructor for the Efl.Canvas.Filter.Internal mixin.
+ * Initializes the filter data for the object using Eina_Cow.
+ *
+ * @param eo_obj The Evas object being constructed.
+ * @param pd The filter data to initialize.
+ * @return The constructed Efl_Object.
+ */
 EOLIAN static Efl_Object *
 _efl_canvas_filter_internal_efl_object_constructor(Eo *eo_obj, Evas_Filter_Data *pd)
 {
@@ -709,6 +917,15 @@ _efl_canvas_filter_internal_efl_object_constructor(Eo *eo_obj, Evas_Filter_Data 
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Destructor for the Efl.Canvas.Filter.Internal mixin.
+ * Cleans up all resources associated with the filter, including the filter program,
+ * context, output buffers, sources, and data bindings.
+ *
+ * @param eo_obj The Evas object being destructed.
+ * @param pd The filter data to clean up.
+ */
 EOLIAN static void
 _efl_canvas_filter_internal_efl_object_destructor(Eo *eo_obj, Evas_Filter_Data *pd)
 {
@@ -755,6 +972,20 @@ finish:
    efl_destructor(efl_super(eo_obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Sets a data binding for the filter program.
+ * Data bindings allow passing named string values to the filter script.
+ * The `execute` flag indicates if the value string should be treated as Lua code
+ * to be executed to get the actual value.
+ *
+ * @param eo_obj The Evas object.
+ * @param pd The filter data for the object.
+ * @param name The name of the data binding. Example: "blur_radius_str"
+ * @param value The string value for the binding. Example: "5.0" or "my_lua_function_returning_a_value()"
+ * @param execute If EINA_TRUE, the `value` string is executed as Lua code.
+ *                If EINA_FALSE, `value` is treated as a literal string.
+ */
 EOLIAN static void
 _efl_canvas_filter_internal_efl_gfx_filter_filter_data_set(Eo *eo_obj, Evas_Filter_Data *pd,
                                                            const char *name, const char *value,
@@ -811,6 +1042,16 @@ _efl_canvas_filter_internal_efl_gfx_filter_filter_data_set(Eo *eo_obj, Evas_Filt
    evas_filter_dirty(eo_obj);
 }
 
+/**
+ * @internal
+ * @brief Retrieves a data binding previously set for the filter program.
+ *
+ * @param obj The Evas object (unused).
+ * @param pd The filter data for the object.
+ * @param name The name of the data binding to retrieve.
+ * @param value Pointer to store the string value of the binding.
+ * @param execute Pointer to store the 'execute' flag of the binding.
+ */
 EOLIAN static void
 _efl_canvas_filter_internal_efl_gfx_filter_filter_data_get(const Eo *obj EINA_UNUSED, Evas_Filter_Data *pd,
                                                            const char *name, const char **value,
@@ -835,12 +1076,32 @@ _efl_canvas_filter_internal_efl_gfx_filter_filter_data_get(const Eo *obj EINA_UN
    if (execute) *execute = EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the current output buffer of the filter.
+ * This buffer contains the result of the last filter rendering operation.
+ *
+ * @param obj The Evas object (unused).
+ * @param pd The filter data for the object.
+ * @return Pointer to the output buffer, or NULL if not available.
+ */
 EOLIAN static void *
 _efl_canvas_filter_internal_filter_output_buffer_get(const Eo *obj EINA_UNUSED, Evas_Filter_Data *pd)
 {
    return pd->data->output;
 }
 
+/**
+ * @brief Updates the obscured region for a filtered object based on a tiler.
+ * This function identifies the largest opaque rectangle from the tiler and sets it
+ * as the obscured region. It includes heuristics to prevent excessive redraws
+ * if the obscured region changes too frequently.
+ *
+ * @param obj The protected data of the Evas object.
+ * @param tiler The Eina_Tiler containing obscured regions.
+ * @return EINA_TRUE if a redraw is needed due to changes in obscured regions or padding,
+ *         EINA_FALSE otherwise.
+ */
 Eina_Bool
 _evas_filter_obscured_regions_set(Evas_Object_Protected_Data *obj, const Eina_Tiler *tiler)
 {
@@ -909,6 +1170,17 @@ _evas_filter_obscured_regions_set(Evas_Object_Protected_Data *obj, const Eina_Ti
    return EINA_FALSE;
 }
 
+/**
+ * @brief Retrieves the effective radius (padding) of the filter applied to an object.
+ * This is similar to `_efl_canvas_filter_internal_efl_gfx_filter_filter_padding_get`
+ * but is intended for internal Evas use.
+ *
+ * @param obj The protected data of the Evas object.
+ * @param l Pointer to store the left padding (radius).
+ * @param r Pointer to store the right padding (radius).
+ * @param t Pointer to store the top padding (radius).
+ * @param b Pointer to store the bottom padding (radius).
+ */
 void
 _evas_filter_radius_get(Evas_Object_Protected_Data *obj, int *l, int *r, int *t, int *b)
 {

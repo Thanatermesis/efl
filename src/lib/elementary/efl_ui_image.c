@@ -19,19 +19,42 @@
 #define MY_CLASS EFL_UI_IMAGE_CLASS
 #define MY_CLASS_NAME "Efl.Ui.Image"
 
-#define NON_EXISTING (void *)-1
-static const char *icon_theme = NULL;
+#define NON_EXISTING (void *)-1 /**< Placeholder for a non-existing icon theme. */
+static const char *icon_theme = NULL; /**< Cached icon theme name. */
 
+/** @brief Signal emitted when a drag'n'drop operation occurs. Event info is the path to the dropped file. */
 static const char SIG_DND[] = "drop";
+/** @brief Signal emitted when the image is clicked. */
 static const char SIG_CLICKED[] = "clicked";
+/** @brief Signal emitted when a remote image download starts. */
 static const char SIG_DOWNLOAD_START[] = "download,start";
+/** @brief Signal emitted during a remote image download to indicate progress. Event info is an #Efl_Ui_Image_Progress struct. */
 static const char SIG_DOWNLOAD_PROGRESS[] = "download,progress";
+/** @brief Signal emitted when a remote image download successfully completes. */
 static const char SIG_DOWNLOAD_DONE[] = "download,done";
+/** @brief Signal emitted if an error occurs during remote image download. Event info is an #Efl_Ui_Image_Error struct. */
 static const char SIG_DOWNLOAD_ERROR[] = "download,error";
+/** @brief Signal emitted when the image file has been opened and its size is known. */
 static const char SIG_LOAD_OPEN[] = "load,open";
+/** @brief Signal emitted when the image file is loaded and ready for display. */
 static const char SIG_LOAD_READY[] = "load,ready";
+/** @brief Signal emitted if an I/O or decoding error occurs while loading the image. */
 static const char SIG_LOAD_ERROR[] = "load,error";
+/** @brief Signal emitted if an asynchronous I/O operation for loading the image was cancelled. */
 static const char SIG_LOAD_CANCEL[] = "load,cancel";
+
+/**
+ * @brief Descriptions for the smart callbacks (legacy signals) supported by Efl.Ui.Image.
+ *
+ * Each entry defines a signal name and a brief description of when it's emitted.
+ * For example:
+ * @code
+ * {
+ *   "signal_name", // Name of the signal
+ *   "Description of when the signal is triggered" // Human-readable description
+ * }
+ * @endcode
+ */
 static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {SIG_DND, ""},
    {SIG_CLICKED, ""},
@@ -54,21 +77,48 @@ static void _on_size_hints_changed(void *data, const Efl_Event *e);
 static Eina_Bool _efl_ui_image_download(Eo *obj, Efl_Ui_Image_Data *sd, const char *url);
 static void _update_viewmodel(Eo *obj, Efl_Ui_Image_Data *pd);
 
+/**
+ * @brief Defines actions triggered by key inputs.
+ *
+ * Each entry maps an action name (e.g., "activate") to a callback function.
+ * For example:
+ * @code
+ * {
+ *   "action_name", // Name of the action, typically from key bindings
+ *   _callback_function // Function to execute when the action is triggered
+ * }
+ * @endcode
+ */
 static const Elm_Action key_actions[] = {
    {"activate", _key_action_activate},
    {NULL, NULL}
 };
 
-typedef struct _Async_Open_Data Async_Open_Data;
+typedef struct _Async_Open_Data Async_Open_Data; /**< Forward declaration for asynchronous open operation data. */
 
+/**
+ * @brief Structure to hold data for asynchronous file opening operations.
+ *
+ * This structure is used to pass necessary information between the main thread
+ * and the worker thread performing the asynchronous file I/O.
+ */
 struct _Async_Open_Data
 {
-   Eo               *obj;
-   Eina_Stringshare *file, *key;
-   Eina_File        *f_set, *f_open;
-   void             *map;
+   Eo               *obj; /**< The Efl.Ui.Image object initiating the async open. */
+   Eina_Stringshare *file; /**< The path to the image file to be opened. */
+   Eina_Stringshare *key; /**< The key/group within the image file (e.g., for EDJ files). */
+   Eina_File        *f_set; /**< An Eina_File handle if the file is already set (e.g., via mmap). Duplicated for the thread. */
+   Eina_File        *f_open; /**< The Eina_File handle after successfully opening the file in the thread. */
+   void             *map; /**< A pointer to the memory-mapped region of the file, if applicable. */
 };
 
+/**
+ * @brief Deletes the previous image object.
+ *
+ * When a new image is set, the old one might be kept temporarily (e.g., for transitions).
+ * This function handles the cleanup of such a previous image.
+ * @param sd Pointer to the Efl_Ui_Image_Data structure.
+ */
 static void
 _prev_img_del(Efl_Ui_Image_Data *sd)
 {
@@ -78,6 +128,15 @@ _prev_img_del(Efl_Ui_Image_Data *sd)
    sd->prev_img = NULL;
 }
 
+/**
+ * @brief Restores visual properties from the Efl.Ui.Image widget to its internal Evas_Object image.
+ *
+ * This is typically called when a new internal image object is created (e.g., after
+ * changing the image file) to ensure it inherits properties like color, visibility,
+ * and clipper from the main widget.
+ * @param obj The Efl.Ui.Image object.
+ * @param sd Pointer to the Efl_Ui_Image_Data structure.
+ */
 static void
 _recover_status(Eo *obj, Efl_Ui_Image_Data *sd)
 {
@@ -90,6 +149,18 @@ _recover_status(Eo *obj, Efl_Ui_Image_Data *sd)
    efl_gfx_entity_visible_set(sd->img, sd->show);
 }
 
+/**
+ * @brief Callback invoked when an image has finished preloading.
+ *
+ * This function updates the preload status, shows the image if it's meant to be visible,
+ * deletes any previous image, and emits "load,ready" or "load,error" signals
+ * based on the success of the image load. It also starts autoplay if enabled.
+ *
+ * @param data Custom data, expected to be Efl_Ui_Image_Data.
+ * @param e The Evas canvas.
+ * @param obj The Evas_Object (image) that was preloaded.
+ * @param event Unused event information.
+ */
 static void
 _on_image_preloaded(void *data,
                     Evas *e EINA_UNUSED,
@@ -111,6 +182,18 @@ _on_image_preloaded(void *data,
    else evas_object_smart_callback_call(sd->self, SIG_LOAD_ERROR, NULL);
 }
 
+/**
+ * @brief Callback for EVAS_CALLBACK_MOUSE_UP events on the hit rectangle.
+ *
+ * This function is used in legacy widgets to detect clicks. It checks if the
+ * primary mouse button was released without being held and if the mouse is
+ * still within the widget boundaries, then emits the "clicked" signal.
+ *
+ * @param data Custom data, expected to be the Efl.Ui.Image widget.
+ * @param e The Evas canvas.
+ * @param obj The Evas_Object that received the event (hit_rect).
+ * @param event_info Pointer to Evas_Event_Mouse_Up structure.
+ */
 static void
 _on_mouse_up(void *data,
              Evas *e EINA_UNUSED,
@@ -128,6 +211,16 @@ _on_mouse_up(void *data,
    evas_object_smart_callback_call(data, "clicked", NULL);
 }
 
+/**
+ * @brief Ecore_Timer callback to advance animated images.
+ *
+ * This function is called periodically to display the next frame of an
+ * animated image. It handles looping and updates the timer interval
+ * based on the current frame's duration and playback speed.
+ *
+ * @param data Custom data, expected to be the Efl.Ui.Image widget.
+ * @return ECORE_CALLBACK_RENEW to continue the timer, ECORE_CALLBACK_CANCEL to stop.
+ */
 static Eina_Bool
 _efl_ui_image_animate_cb(void *data)
 {
@@ -159,6 +252,16 @@ _efl_ui_image_animate_cb(void *data)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Creates and configures a new Evas image object.
+ *
+ * This helper function initializes a new Evas_Object of type image,
+ * sets its scale hint, adds it as a smart member and sub-object to the
+ * parent Efl.Ui.Image widget, and registers the preload callback.
+ *
+ * @param obj The parent Efl.Ui.Image widget.
+ * @return The newly created Evas_Object (image).
+ */
 static Evas_Object *
 _img_new(Evas_Object *obj)
 {
@@ -176,6 +279,26 @@ _img_new(Evas_Object *obj)
    return img;
 }
 
+/**
+ * @brief Calculates and applies the sizing and positioning of the internal image object.
+ *
+ * This function is responsible for determining the final geometry (position and size)
+ * of the displayed image within the Efl.Ui.Image widget's bounds. It considers:
+ * - Original image size.
+ * - Widget's current size.
+ * - `scale_type` (Efl_Gfx_Image_Scale_Method: NONE, FILL, FIT, FIT_WIDTH, FIT_HEIGHT, EXPAND, TILE).
+ * - `scale_up` and `scale_down` properties.
+ * - `align_x` and `align_y` properties (or legacy size_hint_align).
+ * - `scale` (overall zoom factor).
+ *
+ * For `EFL_GFX_IMAGE_SCALE_METHOD_TILE`, it sets the image fill directly.
+ * For other scale types, it calculates the target width (w) and height (h)
+ * and the top-left position (x, y) for the image.
+ *
+ * @param obj The Efl.Ui.Image widget.
+ * @param sd Pointer to the Efl_Ui_Image_Data structure.
+ * @param img The internal Evas_Object (image or Edje) to be sized.
+ */
 static void
 _image_sizing_eval(Eo *obj, Efl_Ui_Image_Data *sd, Evas_Object *img)
 {

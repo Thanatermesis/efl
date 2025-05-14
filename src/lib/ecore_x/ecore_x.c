@@ -29,6 +29,9 @@
 #include "Ecore_Input.h"
 
 static Ecore_X_Version _version = { VMAJ, VMIN, VMIC, VREV };
+/**
+ * @brief The version of the Ecore_X library.
+ */
 EAPI Ecore_X_Version *ecore_x_version = &_version;
 
 static Eina_Bool _ecore_x_fd_handler(void *data,
@@ -38,6 +41,7 @@ static Eina_Bool _ecore_x_fd_handler_buf(void *data,
 static int       _ecore_x_key_mask_get(XModifierKeymap *mod, KeySym sym);
 static int       _ecore_x_event_modifier(unsigned int state);
 
+/**< Handler for the X server file descriptor */
 static Ecore_Fd_Handler *_ecore_x_fd_handler_handle = NULL;
 
 static const int AnyXEvent = 0; /* 0 can be used as there are no event types
@@ -45,12 +49,12 @@ static const int AnyXEvent = 0; /* 0 can be used as there are no event types
                                  * errors
                                  */
 
-static int _ecore_x_event_shape_id = 0;
-static int _ecore_x_event_screensaver_id = 0;
-static int _ecore_x_event_sync_id = 0;
-int _ecore_xlib_log_dom = -1;
+static int _ecore_x_event_shape_id = 0; /**< Event ID for Shape extension */
+static int _ecore_x_event_screensaver_id = 0; /**< Event ID for Screensaver extension */
+static int _ecore_x_event_sync_id = 0; /**< Event ID for Sync extension */
+int _ecore_xlib_log_dom = -1; /**< Log domain for Ecore_Xlib */
 
-Eina_Bool _ecore_xlib_sync = EINA_FALSE;
+Eina_Bool _ecore_xlib_sync = EINA_FALSE; /**< Flag to enable/disable X synchronization after calls */
 
 #ifdef ECORE_XRANDR
 static int _ecore_x_event_randr_id = 0;
@@ -83,87 +87,159 @@ Ecore_X_Window _ecore_x_private_win = 0;
 
 Ecore_X_Atom _ecore_x_atoms_wm_protocols[ECORE_X_WM_PROTOCOL_NUM];
 
+/** @brief A generic Ecore_X event. */
 EAPI int ECORE_X_EVENT_ANY = 0;
+/** @brief Mouse enter event. */
 EAPI int ECORE_X_EVENT_MOUSE_IN = 0;
+/** @brief Mouse leave event. */
 EAPI int ECORE_X_EVENT_MOUSE_OUT = 0;
+/** @brief Window focus in event. */
 EAPI int ECORE_X_EVENT_WINDOW_FOCUS_IN = 0;
+/** @brief Window focus out event. */
 EAPI int ECORE_X_EVENT_WINDOW_FOCUS_OUT = 0;
+/** @brief Window keymap event. */
 EAPI int ECORE_X_EVENT_WINDOW_KEYMAP = 0;
+/** @brief Window damage event. */
 EAPI int ECORE_X_EVENT_WINDOW_DAMAGE = 0;
+/** @brief Window visibility change event. */
 EAPI int ECORE_X_EVENT_WINDOW_VISIBILITY_CHANGE = 0;
+/** @brief Window creation event. */
 EAPI int ECORE_X_EVENT_WINDOW_CREATE = 0;
+/** @brief Window destruction event. */
 EAPI int ECORE_X_EVENT_WINDOW_DESTROY = 0;
+/** @brief Window hide (unmap) event. */
 EAPI int ECORE_X_EVENT_WINDOW_HIDE = 0;
+/** @brief Window show (map) event. */
 EAPI int ECORE_X_EVENT_WINDOW_SHOW = 0;
+/** @brief Window show request (map request) event. */
 EAPI int ECORE_X_EVENT_WINDOW_SHOW_REQUEST = 0;
+/** @brief Window reparent event. */
 EAPI int ECORE_X_EVENT_WINDOW_REPARENT = 0;
+/** @brief Window configure (geometry change) event. */
 EAPI int ECORE_X_EVENT_WINDOW_CONFIGURE = 0;
+/** @brief Window configure request event. */
 EAPI int ECORE_X_EVENT_WINDOW_CONFIGURE_REQUEST = 0;
+/** @brief Window gravity change event. */
 EAPI int ECORE_X_EVENT_WINDOW_GRAVITY = 0;
+/** @brief Window resize request event. */
 EAPI int ECORE_X_EVENT_WINDOW_RESIZE_REQUEST = 0;
+/** @brief Window stack (raise/lower) event. */
 EAPI int ECORE_X_EVENT_WINDOW_STACK = 0;
+/** @brief Window stack request event. */
 EAPI int ECORE_X_EVENT_WINDOW_STACK_REQUEST = 0;
+/** @brief Window property change event. */
 EAPI int ECORE_X_EVENT_WINDOW_PROPERTY = 0;
+/** @brief Window colormap change event. */
 EAPI int ECORE_X_EVENT_WINDOW_COLORMAP = 0;
+/** @brief Window mapping event. */
 EAPI int ECORE_X_EVENT_WINDOW_MAPPING = 0;
+/** @brief Keyboard mapping change event. */
 EAPI int ECORE_X_EVENT_MAPPING_CHANGE = 0;
+/** @brief Selection clear event. */
 EAPI int ECORE_X_EVENT_SELECTION_CLEAR = 0;
+/** @brief Selection request event. */
 EAPI int ECORE_X_EVENT_SELECTION_REQUEST = 0;
+/** @brief Selection notify event. */
 EAPI int ECORE_X_EVENT_SELECTION_NOTIFY = 0;
+/** @brief XFixes selection notify event. */
 EAPI int ECORE_X_EVENT_FIXES_SELECTION_NOTIFY = 0;
+/** @brief Client message event. */
 EAPI int ECORE_X_EVENT_CLIENT_MESSAGE = 0;
+/** @brief Window shape change event. */
 EAPI int ECORE_X_EVENT_WINDOW_SHAPE = 0;
+/** @brief Screensaver notify event. */
 EAPI int ECORE_X_EVENT_SCREENSAVER_NOTIFY = 0;
+/** @brief Gesture flick notify event. */
 EAPI int ECORE_X_EVENT_GESTURE_NOTIFY_FLICK;
+/** @brief Gesture pan notify event. */
 EAPI int ECORE_X_EVENT_GESTURE_NOTIFY_PAN;
+/** @brief Gesture pinch/rotation notify event. */
 EAPI int ECORE_X_EVENT_GESTURE_NOTIFY_PINCHROTATION;
+/** @brief Gesture tap notify event. */
 EAPI int ECORE_X_EVENT_GESTURE_NOTIFY_TAP;
+/** @brief Gesture tap and hold notify event. */
 EAPI int ECORE_X_EVENT_GESTURE_NOTIFY_TAPNHOLD;
+/** @brief Gesture hold notify event. */
 EAPI int ECORE_X_EVENT_GESTURE_NOTIFY_HOLD;
+/** @brief Gesture group notify event. */
 EAPI int ECORE_X_EVENT_GESTURE_NOTIFY_GROUP;
+/** @brief Sync counter event. */
 EAPI int ECORE_X_EVENT_SYNC_COUNTER = 0;
+/** @brief Sync alarm event. */
 EAPI int ECORE_X_EVENT_SYNC_ALARM = 0;
+/** @brief Screen change event (XRandr). */
 EAPI int ECORE_X_EVENT_SCREEN_CHANGE = 0;
+/** @brief Damage notify event (XDamage). */
 EAPI int ECORE_X_EVENT_DAMAGE_NOTIFY = 0;
+/** @brief RandR CRTC change event. */
 EAPI int ECORE_X_EVENT_RANDR_CRTC_CHANGE = 0;
+/** @brief RandR output change event. */
 EAPI int ECORE_X_EVENT_RANDR_OUTPUT_CHANGE = 0;
+/** @brief RandR output property notify event. */
 EAPI int ECORE_X_EVENT_RANDR_OUTPUT_PROPERTY_NOTIFY = 0;
+/** @brief Window delete request event (WM_DELETE_WINDOW). */
 EAPI int ECORE_X_EVENT_WINDOW_DELETE_REQUEST = 0;
+/** @brief Window move/resize request event (NETWM). */
 EAPI int ECORE_X_EVENT_WINDOW_MOVE_RESIZE_REQUEST = 0;
+/** @brief Window state request event (NETWM). */
 EAPI int ECORE_X_EVENT_WINDOW_STATE_REQUEST = 0;
+/** @brief Frame extents request event (NETWM). */
 EAPI int ECORE_X_EVENT_FRAME_EXTENTS_REQUEST = 0;
+/** @brief Ping event (NETWM). */
 EAPI int ECORE_X_EVENT_PING = 0;
+/** @brief Desktop change event (NETWM). */
 EAPI int ECORE_X_EVENT_DESKTOP_CHANGE = 0;
 
+/** @brief Startup sequence new event. */
 EAPI int ECORE_X_EVENT_STARTUP_SEQUENCE_NEW = 0;
+/** @brief Startup sequence change event. */
 EAPI int ECORE_X_EVENT_STARTUP_SEQUENCE_CHANGE = 0;
+/** @brief Startup sequence remove event. */
 EAPI int ECORE_X_EVENT_STARTUP_SEQUENCE_REMOVE = 0;
 
+/** @brief XKB state notify event. */
 EAPI int ECORE_X_EVENT_XKB_STATE_NOTIFY = 0;
+/** @brief XKB new keyboard notify event. */
 EAPI int ECORE_X_EVENT_XKB_NEWKBD_NOTIFY = 0;
 
-
+/** @brief Generic X event (XInput2). */
 EAPI int ECORE_X_EVENT_GENERIC = 0;
 
+/** @brief Present configure notify event. */
 EAPI int ECORE_X_EVENT_PRESENT_CONFIGURE = 0;
+/** @brief Present complete notify event. */
 EAPI int ECORE_X_EVENT_PRESENT_COMPLETE = 0;
+/** @brief Present idle notify event. */
 EAPI int ECORE_X_EVENT_PRESENT_IDLE = 0;
 
+/** @brief Shift modifier mask. */
 EAPI int ECORE_X_MODIFIER_SHIFT = 0;
+/** @brief Control modifier mask. */
 EAPI int ECORE_X_MODIFIER_CTRL = 0;
+/** @brief Alt modifier mask. */
 EAPI int ECORE_X_MODIFIER_ALT = 0;
+/** @brief Windows/Super modifier mask. */
 EAPI int ECORE_X_MODIFIER_WIN = 0;
+/** @brief AltGr modifier mask. */
 EAPI int ECORE_X_MODIFIER_ALTGR = 0;
 
+/** @brief ScrollLock lock mask. */
 EAPI int ECORE_X_LOCK_SCROLL = 0;
+/** @brief NumLock lock mask. */
 EAPI int ECORE_X_LOCK_NUM = 0;
+/** @brief CapsLock lock mask. */
 EAPI int ECORE_X_LOCK_CAPS = 0;
+/** @brief ShiftLock lock mask. */
 EAPI int ECORE_X_LOCK_SHIFT = 0;
 
+/** @brief Raw button press event (XInput2). */
 EAPI int ECORE_X_RAW_BUTTON_PRESS = 0;
+/** @brief Raw button release event (XInput2). */
 EAPI int ECORE_X_RAW_BUTTON_RELEASE = 0;
+/** @brief Raw motion event (XInput2). */
 EAPI int ECORE_X_RAW_MOTION = 0;
 
+/** @brief Devices change event (XInput2). */
 EAPI int ECORE_X_DEVICES_CHANGE = 0;
 
 #ifdef LOGRT
@@ -241,7 +317,22 @@ _XReply(Display *disp,
 
 #endif /* ifdef LOGRT */
 
-/* wrapper to use XkbKeycodeToKeysym when possible */
+/**
+ * @internal
+ * @brief Wrapper to use XkbKeycodeToKeysym when ECORE_XKB is defined,
+ *        otherwise uses XKeycodeToKeysym.
+ *
+ * This function abstracts the keycode-to-keysym conversion, allowing
+ * the use of XKB extensions if available, which can provide more
+ * accurate or extended key mappings.
+ *
+ * @param display The display connection.
+ * @param keycode The hardware keycode to convert.
+ * @param idx The index of the keysym to retrieve for the given keycode
+ *            (e.g., 0 for the unshifted symbol, 1 for the shifted symbol).
+ * @return The KeySym corresponding to the keycode and index, or NoSymbol
+ *         if no such keysym exists.
+ */
 KeySym
 _ecore_x_XKeycodeToKeysym(Display *display, KeyCode keycode, int idx)
 {
@@ -252,6 +343,17 @@ _ecore_x_XKeycodeToKeysym(Display *display, KeyCode keycode, int idx)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Retrieves and sets the global Ecore_X modifier and lock masks.
+ *
+ * This function queries the X server for the current modifier key mapping
+ * (Shift, Ctrl, Alt, Win, AltGr) and lock key states (ScrollLock, NumLock,
+ * CapsLock, ShiftLock). It then populates the global ECORE_X_MODIFIER_*
+ * and ECORE_X_LOCK_* variables with the corresponding X modifier masks.
+ * It also handles potential conflicts between modifiers (e.g., if Alt and
+ * Win map to the same X modifier).
+ */
 void
 _ecore_x_modifiers_get(void)
 {
@@ -349,6 +451,16 @@ clean_up:
      }
 }
 
+/**
+ * @internal
+ * @brief First stage of Ecore_X initialization.
+ *
+ * This function initializes Eina and Ecore core components, and registers
+ * the Ecore_X log domain. It's the first part of the two-stage
+ * initialization process for Ecore_X.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _ecore_x_init1(void)
 {
@@ -382,6 +494,24 @@ shutdown_eina:
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Second stage of Ecore_X initialization.
+ *
+ * This function performs the X-specific parts of initialization after a
+ * display connection has been established. This includes:
+ * - Initializing error handlers.
+ * - Querying for X extension support (Shape, Screensaver, Sync, RandR, etc.)
+ *   and setting up their event IDs.
+ * - Allocating and populating the X event handler array.
+ * - Initializing Ecore_X event types.
+ * - Getting initial modifier key mappings.
+ * - Initializing various Ecore_X subsystems (atoms, ICCCM, NetWM, DND, etc.).
+ * - Adding the X connection's file descriptor to the Ecore main loop.
+ * - Creating a private helper window.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _ecore_x_init2(void)
 {
@@ -696,8 +826,8 @@ close_display:
 }
 
 /**
- * @defgroup Ecore_X_Init_Group X Library Init and Shutdown Functions
- *
+ * @defgroup Ecore_X_Init_Group X Library Initialization and Shutdown Functions
+ * @ingroup Ecore_X_Group
  * Functions that start and shut down the Ecore X Library.
  */
 
@@ -736,6 +866,14 @@ shutdown_ecore_event:
    return --_ecore_x_init_count;
 }
 
+/**
+ * Initialize the X display connection using an existing X Display.
+ *
+ * @param   display An existing X Display connection.
+ * @return  The number of times the library has been initialized without
+ *          being shut down.  0 is returned if an error occurs.
+ * @ingroup Ecore_X_Init_Group
+ */
 EAPI int
 ecore_x_init_from_display(Ecore_X_Display *display)
 {
@@ -755,7 +893,19 @@ ecore_x_init_from_display(Ecore_X_Display *display)
    eina_shutdown();
    return --_ecore_x_init_count;
 }
-static Eina_Bool _ecore_x_window_manage_succeeded = EINA_FALSE;
+static Eina_Bool _ecore_x_window_manage_succeeded = EINA_FALSE; /**< Flag to track if the last XSelectInput for managing a window succeeded */
+
+/**
+ * @internal
+ * @brief Internal part of the Ecore_X shutdown process.
+ *
+ * This function performs the core cleanup tasks when Ecore_X is shut down,
+ * assuming a display connection exists. It flushes event types, removes
+ * the X FD handler, frees event handler structures, and shuts down
+ * various Ecore_X subsystems.
+ *
+ * @return Always returns 0.
+ */
 int
 _ecore_x_shutdown(void)
 {
@@ -842,6 +992,14 @@ _ecore_x_shutdown(void)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Second part of the internal Ecore_X shutdown process.
+ *
+ * This function shuts down Ecore event and core systems, unregisters the
+ * Ecore_X log domain, and shuts down Eina. It also resets the
+ * _ecore_xlib_sync flag.
+ */
 static void
 _ecore_x_shutdown2(void)
 {
@@ -906,6 +1064,7 @@ ecore_x_disconnect(void)
 
 /**
  * @defgroup Ecore_X_Display_Attr_Group X Display Attributes
+ * @ingroup Ecore_X_Group
  *
  * Functions that set and retrieve X display attributes.
  */
@@ -1054,6 +1213,7 @@ ecore_x_double_click_time_get(void)
 
 /**
  * @defgroup Ecore_X_Flush_Group X Synchronization Functions
+ * @ingroup Ecore_X_Group
  *
  * Functions that ensure that all commands that have been issued by the
  * Ecore X library have been sent to the server.
@@ -1138,7 +1298,15 @@ ecore_x_kill(Ecore_X_Window win)
 }
 
 /**
- * Return the last event time
+ * Return the last event time recorded by Ecore_X.
+ *
+ * This time is typically the timestamp from the last processed X event.
+ * It can be used when a timestamp is required for X operations (e.g.,
+ * setting input focus, grabbing the pointer/keyboard). Using @c CurrentTime
+ * is often acceptable, but using the last known event time can sometimes
+ * avoid race conditions.
+ *
+ * @return The timestamp of the last X event.
  */
 EAPI Ecore_X_Time
 ecore_x_current_time_get(void)
@@ -1194,6 +1362,19 @@ ecore_x_bell(int percent)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Ecore Fd_Handler callback for the X connection.
+ *
+ * This function is called by the Ecore main loop when there is data
+ * available to be read from the X server's file descriptor. It reads
+ * all pending X events, filters them if XIM is active, and dispatches
+ * them to registered Ecore_X event handlers.
+ *
+ * @param data The X Display pointer.
+ * @param fd_handler The Ecore_Fd_Handler that triggered this callback.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
+ */
 static Eina_Bool
 _ecore_x_fd_handler(void *data,
                     Ecore_Fd_Handler *fd_handler EINA_UNUSED)
@@ -1224,6 +1405,19 @@ _ecore_x_fd_handler(void *data,
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @internal
+ * @brief Ecore Fd_Handler buffer check callback for the X connection.
+ *
+ * This function is called by the Ecore main loop before polling to check
+ * if there's already data in the X connection's buffer. If data is pending,
+ * it means an immediate call to _ecore_x_fd_handler is warranted without
+ * needing to poll.
+ *
+ * @param data The X Display pointer.
+ * @param fd_handler The Ecore_Fd_Handler.
+ * @return ECORE_CALLBACK_RENEW if data is pending, ECORE_CALLBACK_CANCEL otherwise.
+ */
 static Eina_Bool
 _ecore_x_fd_handler_buf(void *data,
                         Ecore_Fd_Handler *fd_handler EINA_UNUSED)
@@ -1237,6 +1431,18 @@ _ecore_x_fd_handler_buf(void *data,
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @internal
+ * @brief Get the X modifier mask for a given KeySym.
+ *
+ * This function iterates through the X server's modifier map to find
+ * which modifier mask (e.g., ShiftMask, ControlMask) corresponds to the
+ * provided KeySym (e.g., XK_Shift_L, XK_Control_L).
+ *
+ * @param mod The XModifierKeymap obtained from XGetModifierMapping.
+ * @param sym The KeySym to find the mask for (e.g., XK_Shift_L).
+ * @return The X modifier mask (e.g., ShiftMask) if found, otherwise 0.
+ */
 static int
 _ecore_x_key_mask_get(XModifierKeymap *mod, KeySym sym)
 {
@@ -1265,12 +1471,17 @@ _ecore_x_key_mask_get(XModifierKeymap *mod, KeySym sym)
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-/* FIXME: these funcs need categorising */
+/**
+ * @defgroup Ecore_X_Window_Root_Group Root Window Functions
+ * @ingroup Ecore_X_Window_Group
+ *
+ * Functions specifically dealing with X root windows.
+ */
 /*****************************************************************************/
 
 /**
  * Get a list of all the root windows on the server.
- *
+ * @ingroup Ecore_X_Window_Root_Group
  * @note   The returned array will need to be freed after use.
  * @param  num_ret Pointer to integer to put number of windows returned in.
  * @return An array of all the root windows.  @c NULL is returned if memory
@@ -1300,6 +1511,14 @@ ecore_x_window_root_list(int *num_ret)
    return roots;
 }
 
+/**
+ * Get the first root window of the display.
+ *
+ * This is typically the root window of screen 0.
+ *
+ * @return The Ecore_X_Window ID of the first root window, or 0 on error.
+ * @ingroup Ecore_X_Window_Root_Group
+ */
 EAPI Ecore_X_Window
 ecore_x_window_root_first_get(void)
 {
@@ -1323,8 +1542,19 @@ ecore_x_window_root_first_get(void)
  */
 }
 
-static void _ecore_x_window_manage_error(void *data);
-
+/**
+ * @internal
+ * @brief X error handler callback for ecore_x_window_manage.
+ *
+ * This function is temporarily set as the X error handler during
+ * ecore_x_window_manage. It checks if a BadAccess error occurred during
+ * an XChangeWindowAttributes request, which typically means the client
+ * is not a window manager and cannot select for SubstructureRedirectMask.
+ * If such an error occurs, it sets _ecore_x_window_manage_succeeded
+ * to EINA_FALSE.
+ *
+ * @param data User data (unused).
+ */
 static void
 _ecore_x_window_manage_error(void *data EINA_UNUSED)
 {
@@ -1333,6 +1563,24 @@ _ecore_x_window_manage_error(void *data EINA_UNUSED)
      _ecore_x_window_manage_succeeded = EINA_FALSE;
 }
 
+/**
+ * @brief Select input events for a window, typically for window management.
+ *
+ * This function attempts to select a comprehensive set of events on the given
+ * window, suitable for a window manager. This includes events for window
+ * geometry changes, substructure notifications (child window creation/destruction),
+ * property changes, and input events (mouse and keyboard).
+ *
+ * It temporarily installs an error handler to detect if selecting for
+ * SubstructureRedirectMask fails (which happens if another window manager
+ * is already running).
+ *
+ * @param win The window to manage.
+ * @return EINA_TRUE if event selection was successful (or seemed to be),
+ *         EINA_FALSE otherwise (e.g., another WM is running, or the window
+ *         does not exist).
+ * @ingroup Ecore_X_Window_Group
+ */
 EAPI Eina_Bool
 ecore_x_window_manage(Ecore_X_Window win)
 {
@@ -1367,6 +1615,17 @@ ecore_x_window_manage(Ecore_X_Window win)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Select input events for a container window.
+ *
+ * This function selects for SubstructureRedirectMask and SubstructureNotifyMask
+ * on the given window. This is typically used for windows that will contain
+ * other windows and need to intercept or be notified of requests to change
+ * their children's geometry or state.
+ *
+ * @param win The container window.
+ * @ingroup Ecore_X_Window_Group
+ */
 EAPI void
 ecore_x_window_container_manage(Ecore_X_Window win)
 {
@@ -1379,6 +1638,18 @@ ecore_x_window_container_manage(Ecore_X_Window win)
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * @brief Select input events for a client window (managed by a window manager).
+ *
+ * This function selects a set of events appropriate for a window that is
+ * being managed by the current client (acting as a window manager).
+ * This includes property changes, focus changes, colormap changes,
+ * visibility changes, and structure/substructure notifications. It also
+ * selects for ShapeNotifyMask if the Shape extension is available.
+ *
+ * @param win The client window to manage.
+ * @ingroup Ecore_X_Window_Group
+ */
 EAPI void
 ecore_x_window_client_manage(Ecore_X_Window win)
 {
@@ -1399,6 +1670,17 @@ ecore_x_window_client_manage(Ecore_X_Window win)
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * @brief Select input events for "sniffing" a window's properties and substructure.
+ *
+ * This function selects for PropertyChangeMask and SubstructureNotifyMask.
+ * It's a lighter-weight way to monitor a window for property changes and
+ * child window events, without attempting full management (which might
+ * involve redirecting requests).
+ *
+ * @param win The window to sniff.
+ * @ingroup Ecore_X_Window_Group
+ */
 EAPI void
 ecore_x_window_sniff(Ecore_X_Window win)
 {
@@ -1411,7 +1693,17 @@ ecore_x_window_sniff(Ecore_X_Window win)
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
-/* this is internal-only for now */
+/**
+ * @internal
+ * @brief Selects PropertyChangeMask on the first root window.
+ *
+ * This function is used to monitor property changes on the root window.
+ * It only performs the selection if `_ecore_x_window_manage_succeeded` is false,
+ * implying that the current client is not the window manager (as a WM would
+ * typically select more events on the root).
+ *
+ * This is marked as internal-only.
+ */
 EAPI void
 ecore_x_window_root_properties_select(void)
 {
@@ -1422,6 +1714,19 @@ ecore_x_window_root_properties_select(void)
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * @brief Select input events for "sniffing" a client window.
+ *
+ * This function selects a broader set of events than ecore_x_window_sniff(),
+ * including focus changes, colormap changes, visibility changes, and
+ * structure/substructure notifications, as well as property changes.
+ * It also selects for ShapeNotifyMask if the Shape extension is available.
+ * This is suitable for monitoring client windows more closely without
+ * full management.
+ *
+ * @param win The client window to sniff.
+ * @ingroup Ecore_X_Window_Group
+ */
 EAPI void
 ecore_x_window_client_sniff(Ecore_X_Window win)
 {
@@ -1486,6 +1791,17 @@ ecore_x_window_attributes_get(Ecore_X_Window win,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Add a window to the client's save-set.
+ *
+ * When a client exits, windows in its save-set are reparented to the
+ * closest surviving ancestor if they are children of the exiting client's
+ * windows. This is primarily used by window managers to prevent client
+ * windows from being destroyed when the window manager exits.
+ *
+ * @param win The window to add to the save-set.
+ * @ingroup Ecore_X_Window_Group
+ */
 EAPI void
 ecore_x_window_save_set_add(Ecore_X_Window win)
 {
@@ -1495,6 +1811,13 @@ ecore_x_window_save_set_add(Ecore_X_Window win)
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * @brief Remove a window from the client's save-set.
+ *
+ * @param win The window to remove from the save-set.
+ * @see ecore_x_window_save_set_add()
+ * @ingroup Ecore_X_Window_Group
+ */
 EAPI void
 ecore_x_window_save_set_del(Ecore_X_Window win)
 {
@@ -1538,6 +1861,17 @@ ecore_x_window_children_get(Ecore_X_Window win,
    return windows;
 }
 
+/**
+ * @brief Set pointer acceleration and threshold.
+ *
+ * @param accel_num The numerator for pointer acceleration.
+ * @param accel_denom The denominator for pointer acceleration.
+ *        Pointer acceleration is accel_num / accel_denom.
+ * @param threshold The pointer movement threshold (in pixels) before
+ *        acceleration takes effect.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ * @ingroup Ecore_X_Input_Group
+ */
 EAPI Eina_Bool
 ecore_x_pointer_control_set(int accel_num,
                             int accel_denom,
@@ -1552,6 +1886,15 @@ ecore_x_pointer_control_set(int accel_num,
    return ret;
 }
 
+/**
+ * @brief Get current pointer acceleration and threshold.
+ *
+ * @param[out] accel_num Pointer to store the numerator for acceleration.
+ * @param[out] accel_denom Pointer to store the denominator for acceleration.
+ * @param[out] threshold Pointer to store the threshold.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ * @ingroup Ecore_X_Input_Group
+ */
 EAPI Eina_Bool
 ecore_x_pointer_control_get(int *accel_num,
                             int *accel_denom,
@@ -1566,6 +1909,22 @@ ecore_x_pointer_control_get(int *accel_num,
    return ret;
 }
 
+/**
+ * @brief Set the pointer button mapping.
+ *
+ * The @p map array defines the mapping of physical pointer buttons
+ * to logical button numbers. For example, `map[0] = 3, map[1] = 1, map[2] = 2`
+ * would map physical button 1 to logical button 3, physical button 2 to
+ * logical button 1, and physical button 3 to logical button 2.
+ * A value of 0 in the map disables that physical button.
+ *
+ * @param map An array of @p nmap unsigned chars specifying the mapping.
+ *            Example: `unsigned char map[] = {1, 2, 3};` (standard mapping for 3 buttons)
+ *                     `unsigned char map[] = {3, 2, 1};` (buttons 1 and 3 swapped)
+ * @param nmap The number of entries in the @p map array.
+ * @return EINA_TRUE if the mapping was successfully set, EINA_FALSE otherwise.
+ * @ingroup Ecore_X_Input_Group
+ */
 EAPI Eina_Bool
 ecore_x_pointer_mapping_set(unsigned char *map,
                             int nmap)
@@ -1578,6 +1937,18 @@ ecore_x_pointer_mapping_set(unsigned char *map,
    return ret;
 }
 
+/**
+ * @brief Get the current pointer button mapping.
+ *
+ * @param[out] map A pre-allocated array of unsigned chars to store the mapping.
+ *                 The size of this array should be at least @p nmap.
+ * @param nmap The number of mapping entries to retrieve. This should typically
+ *             be the value returned by ecore_x_pointer_mapping_count_get().
+ * @return EINA_TRUE on success, EINA_FALSE on failure. The @p map array is
+ *         filled with the current mapping on success.
+ *         Example of returned map structure: `map[0]` is logical button for physical 1, etc.
+ * @ingroup Ecore_X_Input_Group
+ */
 EAPI Eina_Bool
 ecore_x_pointer_mapping_get(unsigned char *map,
                             int nmap)
@@ -1590,6 +1961,17 @@ ecore_x_pointer_mapping_get(unsigned char *map,
    return ret;
 }
 
+/**
+ * @brief Grab the pointer.
+ *
+ * This function actively grabs the pointer, directing all pointer events
+ * to the specified window @p win. The grab is asynchronous for both
+ * pointer and keyboard events.
+ *
+ * @param win The window to which pointer events will be reported.
+ * @return EINA_TRUE if the grab was successful, EINA_FALSE otherwise.
+ * @ingroup Ecore_X_Input_Group
+ */
 EAPI Eina_Bool
 ecore_x_pointer_grab(Ecore_X_Window win)
 {
@@ -1605,6 +1987,19 @@ ecore_x_pointer_grab(Ecore_X_Window win)
    return ret;
 }
 
+/**
+ * @brief Grab the pointer and confine it to a window.
+ *
+ * This function actively grabs the pointer, directing all pointer events
+ * to the specified window @p win. Additionally, the pointer cursor is
+ * confined to the boundaries of @p win. The grab is asynchronous for both
+ * pointer and keyboard events.
+ *
+ * @param win The window to which pointer events will be reported and to
+ *            which the cursor will be confined.
+ * @return EINA_TRUE if the grab was successful, EINA_FALSE otherwise.
+ * @ingroup Ecore_X_Input_Group
+ */
 EAPI Eina_Bool
 ecore_x_pointer_confine_grab(Ecore_X_Window win)
 {
@@ -1620,6 +2015,12 @@ ecore_x_pointer_confine_grab(Ecore_X_Window win)
    return ret;
 }
 
+/**
+ * @brief Ungrab the pointer.
+ *
+ * Releases any active pointer grab made by this client.
+ * @ingroup Ecore_X_Input_Group
+ */
 EAPI void
 ecore_x_pointer_ungrab(void)
 {
@@ -1629,6 +2030,16 @@ ecore_x_pointer_ungrab(void)
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * @brief Warp (move) the pointer to a specific location within a window.
+ *
+ * @param win The destination window. If None, coordinates are relative to the
+ *            root window of the screen the pointer is currently on.
+ * @param x The target x-coordinate within @p win.
+ * @param y The target y-coordinate within @p win.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ * @ingroup Ecore_X_Input_Group
+ */
 EAPI Eina_Bool
 ecore_x_pointer_warp(Ecore_X_Window win,
                      int x,
@@ -1642,6 +2053,17 @@ ecore_x_pointer_warp(Ecore_X_Window win,
    return ret;
 }
 
+/**
+ * @brief Grab the keyboard.
+ *
+ * This function actively grabs the keyboard, directing all keyboard events
+ * to the specified window @p win. The grab is asynchronous for both
+ * pointer and keyboard events.
+ *
+ * @param win The window to which keyboard events will be reported.
+ * @return EINA_TRUE if the grab was successful, EINA_FALSE otherwise.
+ * @ingroup Ecore_X_Input_Group
+ */
 EAPI Eina_Bool
 ecore_x_keyboard_grab(Ecore_X_Window win)
 {
@@ -1655,6 +2077,12 @@ ecore_x_keyboard_grab(Ecore_X_Window win)
    return ret;
 }
 
+/**
+ * @brief Ungrab the keyboard.
+ *
+ * Releases any active keyboard grab made by this client.
+ * @ingroup Ecore_X_Input_Group
+ */
 EAPI void
 ecore_x_keyboard_ungrab(void)
 {
@@ -1663,6 +2091,16 @@ ecore_x_keyboard_ungrab(void)
    XUngrabKeyboard(_ecore_x_disp, CurrentTime);
 }
 
+/**
+ * @brief Grab the X server.
+ *
+ * This function increments a grab counter and, if the counter becomes 1,
+ * issues an XGrabServer request. This prevents any other clients from
+ * communicating with the X server until ecore_x_ungrab() is called a
+ * corresponding number of times. This is a very heavyweight operation
+ * and should be used sparingly and for very short durations.
+ * @ingroup Ecore_X_Server_Group
+ */
 EAPI void
 ecore_x_grab(void)
 {
@@ -1673,6 +2111,15 @@ ecore_x_grab(void)
      XGrabServer(_ecore_x_disp);
 }
 
+/**
+ * @brief Ungrab the X server.
+ *
+ * This function decrements the server grab counter. If the counter reaches 0,
+ * an XUngrabServer request is issued, allowing other clients to communicate
+ * with the X server again.
+ * @see ecore_x_grab()
+ * @ingroup Ecore_X_Server_Group
+ */
 EAPI void
 ecore_x_ungrab(void)
 {
@@ -1686,11 +2133,42 @@ ecore_x_ungrab(void)
      XUngrabServer(_ecore_x_disp);
 }
 
+/**
+ * @brief Function pointer type for replaying events during a passive grab.
+ * @param data User-supplied data.
+ * @param event_type The type of the event being replayed.
+ * @param event Pointer to the event structure.
+ * @return EINA_TRUE to allow further processing or re-queueing, EINA_FALSE otherwise.
+ */
 Eina_Bool (*_ecore_window_grab_replay_func)(void *data,
                                             int event_type,
                                             void *event);
+/** @brief User data for the passive grab replay function. */
 void *_ecore_window_grab_replay_data;
 
+/**
+ * @brief Set the function to be called when replaying events from a passive grab.
+ *
+ * When a passive grab (e.g., via XGrabButton with GrabModeSync) is triggered,
+ * events are queued by the server. This function allows specifying a callback
+ * that can inspect or modify these events before they are replayed (e.g., by
+ * XAllowEvents).
+ *
+ * @param func The function to call for replaying events.
+ *             Example:
+ *             @code
+ *             Eina_Bool my_replay_handler(void *data, int type, void *event) {
+ *                 XEvent *xev = event;
+ *                 if (xev->type == ButtonPress) {
+ *                     printf("Replaying button press on window %lx\n", xev->xbutton.window);
+ *                 }
+ *                 return EINA_TRUE; // Allow event to be replayed
+ *             }
+ *             ecore_x_passive_grab_replay_func_set(my_replay_handler, NULL);
+ *             @endcode
+ * @param data Custom data to be passed to the @p func.
+ * @ingroup Ecore_X_Input_Group
+ */
 EAPI void
 ecore_x_passive_grab_replay_func_set(Eina_Bool (*func)(void *data,
                                                        int event_type,
@@ -1708,9 +2186,40 @@ ecore_x_passive_grab_replay_func_set(Eina_Bool (*func)(void *data,
 
 
 //////////////////////////////////////////////////////////////////////////////
+/** @internal @brief Number of active window button grabs. */
 int _ecore_window_grabs_num = 0;
+/**
+ * @internal
+ * @brief Array storing information about active window button grabs.
+ * Each element is a Wingrab struct:
+ * @code
+ * typedef struct _Wingrab
+ * {
+ *    Ecore_X_Window     win;        // The window on which the grab is set
+ *    int                button;     // The button number (0 for AnyButton)
+ *    Ecore_X_Event_Mask event_mask; // Event mask for the grab
+ *    int                mod;        // Modifier mask
+ *    int                any_mod;    // Boolean, true if AnyModifier is used
+ * } Wingrab;
+ * @endcode
+ */
 Wingrab *_ecore_window_grabs = NULL;
 
+/**
+ * @internal
+ * @brief Internal function to perform an XGrabButton.
+ *
+ * This function handles the low-level details of calling XGrabButton,
+ * including translating Ecore_X modifiers to X modifiers and iterating
+ * through all possible lock key combinations (Caps Lock, Num Lock, etc.)
+ * to ensure the grab works regardless of their state.
+ *
+ * @param win The window to grab the button on.
+ * @param button The button number (1-5, or 0 for AnyButton).
+ * @param event_mask The event mask for the grab (e.g., ButtonPressMask).
+ * @param mod An Ecore_X_Modifier mask.
+ * @param any_mod If true, @p mod is ignored and AnyModifier is used.
+ */
 static void
 _ecore_x_window_button_grab_internal(Ecore_X_Window win,
                                      int button,
@@ -1746,6 +2255,30 @@ _ecore_x_window_button_grab_internal(Ecore_X_Window win,
                  win, False, ev, GrabModeSync, GrabModeAsync, None, None);
 }
 
+/**
+ * @brief Passively grab a mouse button on a window.
+ *
+ * This function sets up a passive grab for a specific mouse button and
+ * modifier combination on the given window. When the button is pressed
+ * with the specified modifiers, the grab becomes active.
+ * The grab is set up with GrabModeSync for the pointer and GrabModeAsync
+ * for the keyboard. This means pointer events are queued until
+ * XAllowEvents is called, while keyboard events are processed as usual.
+ *
+ * This function also records the grab internally to allow re-establishing
+ * grabs (e.g., after a window manager restarts or grabs are temporarily
+ * suspended).
+ *
+ * @param win The window on which to grab the button.
+ * @param button The button number to grab (1-5). Use 0 for AnyButton.
+ * @param event_mask The event mask to activate on grab (e.g., ButtonPressMask | ButtonReleaseMask).
+ *                   Example: `ECORE_X_EVENT_MASK_MOUSE_DOWN | ECORE_X_EVENT_MASK_MOUSE_UP | ECORE_X_EVENT_MASK_MOUSE_MOVE`
+ * @param mod A combination of Ecore_X_Modifier flags (e.g., ECORE_X_MODIFIER_CTRL | ECORE_X_MODIFIER_SHIFT).
+ *            See @ref ECORE_X_MODIFIER_SHIFT etc.
+ * @param any_mod If non-zero, the @p mod parameter is ignored, and the grab
+ *                applies regardless of modifiers (AnyModifier).
+ * @ingroup Ecore_X_Input_Group
+ */
 EAPI void
 ecore_x_window_button_grab(Ecore_X_Window win,
                            int button,
@@ -1768,6 +2301,25 @@ ecore_x_window_button_grab(Ecore_X_Window win,
    _ecore_window_grabs[_ecore_window_grabs_num - 1].any_mod = any_mod;
 }
 
+/**
+ * @internal
+ * @brief Sends a "magic" ClientMessage event to Ecore_X's private window.
+ *
+ * This is used internally to signal changes to grabs (button or key)
+ * across different parts of Ecore_X or potentially to other cooperating
+ * clients that might be listening on the private window for these specific
+ * messages. The message type is 27777.
+ *
+ * The `val` parameter indicates the type of operation:
+ * - 1: Button ungrab
+ * - 2: Key ungrab
+ *
+ * @param val An integer indicating the operation type.
+ * @param swin The subject window of the grab/ungrab operation.
+ * @param b For button grabs, the button number. For key grabs, the KeySym.
+ * @param mod The modifier mask.
+ * @param anymod Non-zero if AnyModifier was used.
+ */
 static void
 _ecore_x_sync_magic_send(int val, Ecore_X_Window swin, int b, int mod, int anymod)
 {
@@ -1788,6 +2340,19 @@ _ecore_x_sync_magic_send(int val, Ecore_X_Window swin, int b, int mod, int anymo
    XSendEvent(_ecore_x_disp, _ecore_x_private_win, False, NoEventMask, &xev);
 }
 
+/**
+ * @internal
+ * @brief Removes a window button grab from the internal tracking list.
+ *
+ * This function searches the `_ecore_window_grabs` array for a grab
+ * matching the provided parameters and removes it.
+ *
+ * @param win The window of the grab to remove.
+ * @param button The button number of the grab. If -1, all grabs for @p win are considered.
+ * @param mod The modifier mask of the grab.
+ * @param any_mod The any_mod flag of the grab.
+ * @return 1 if a grab was found and removed, 0 otherwise.
+ */
 int
 _ecore_x_window_grab_remove(Ecore_X_Window win, int button, int mod, int any_mod)
 {
@@ -1826,6 +2391,20 @@ _ecore_x_window_grab_remove(Ecore_X_Window win, int button, int mod, int any_mod
    return shuffle;
 }
 
+/**
+ * @internal
+ * @brief Internal function to perform an XUngrabButton.
+ *
+ * This function handles the low-level details of calling XUngrabButton,
+ * including translating Ecore_X modifiers to X modifiers and iterating
+ * through all possible lock key combinations to ensure the ungrab
+ * applies correctly.
+ *
+ * @param win The window to ungrab the button on.
+ * @param button The button number (1-5, or 0 for AnyButton).
+ * @param mod An Ecore_X_Modifier mask.
+ * @param any_mod If true, @p mod is ignored and AnyModifier is used.
+ */
 static void
 _ecore_x_window_button_ungrab_internal(Ecore_X_Window win,
                                        int button,
@@ -1869,10 +2448,20 @@ ecore_x_window_button_ungrab(Ecore_X_Window win,
 {
    EINA_SAFETY_ON_NULL_RETURN(_ecore_x_disp);
    _ecore_x_window_button_ungrab_internal(win, button, mod, any_mod);
-   _ecore_x_sync_magic_send(1, win, button, mod, any_mod);
-//   _ecore_x_window_grab_remove(win, button, mod, any_mod);
+   _ecore_x_sync_magic_send(1, win, button, mod, any_mod); // Notify about ungrab
+// _ecore_x_window_grab_remove(win, button, mod, any_mod); // This is now handled by client message or elsewhere
 }
 
+/**
+ * @internal
+ * @brief Temporarily suspends all active window button grabs.
+ *
+ * This function iterates through all internally tracked button grabs
+ * (in `_ecore_window_grabs`) and ungrabs them using XUngrabButton.
+ * This is typically used when, for example, a menu is popped up, and
+ * existing application-level grabs need to be temporarily disabled.
+ * The grabs can be restored later using _ecore_x_window_grab_resume().
+ */
 void _ecore_x_window_grab_suspend(void)
 {
    int i;
@@ -1885,6 +2474,15 @@ void _ecore_x_window_grab_suspend(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Resumes all previously suspended window button grabs.
+ *
+ * This function iterates through all internally tracked button grabs
+ * (in `_ecore_window_grabs`) and re-establishes them using XGrabButton.
+ * This is used to restore grabs that were temporarily disabled by
+ * _ecore_x_window_grab_suspend().
+ */
 void _ecore_x_window_grab_resume(void)
 {
    int i;
@@ -1907,16 +2505,44 @@ void _ecore_x_window_grab_resume(void)
 
 //////////////////////////////////////////////////////////////////////////////
 
+/** @internal @brief Number of active key grabs. */
 int _ecore_key_grabs_num = 0;
+/**
+ * @internal
+ * @brief Structure to store information about an active key grab.
+ */
 typedef struct _Keygrab Keygrab;
 struct _Keygrab
 {
-   Window win;
-   char *key;
-   int mod, any_mod;
+   Window win;      /**< The window on which the key is grabbed. */
+   char  *key;      /**< The string representation of the key (e.g., "Control_L", "a", "Keycode-65"). */
+   int    mod;      /**< The Ecore_X_Modifier mask. */
+   int    any_mod;  /**< Boolean, true if AnyModifier is used. */
 };
+/**
+ * @internal
+ * @brief Array storing information about active key grabs.
+ * Each element is a Keygrab struct.
+ */
 Keygrab *_ecore_key_grabs = NULL;
 
+/**
+ * @internal
+ * @brief Internal function to perform an XGrabKey.
+ *
+ * This function handles the low-level details of calling XGrabKey.
+ * It converts the key string (which can be a KeySym name like "Return"
+ * or a "Keycode-XXX" string) to a KeyCode. It also translates Ecore_X
+ * modifiers to X modifiers and iterates through all possible lock key
+ * combinations to ensure the grab works regardless of their state.
+ *
+ * @param win The window to grab the key on.
+ * @param key The string name of the key (e.g., "space", "Control_L") or
+ *            a keycode string (e.g., "Keycode-65").
+ * @param mod An Ecore_X_Modifier mask.
+ * @param any_mod If true, @p mod is ignored and AnyModifier is used.
+ * @return The KeyCode that was grabbed, or 0 on failure (e.g., invalid key name).
+ */
 static KeyCode
 _ecore_x_window_key_grab_internal(Ecore_X_Window win,
                                   const char *key,
@@ -1965,6 +2591,29 @@ _ecore_x_window_key_grab_internal(Ecore_X_Window win,
    return keycode;
 }
 
+/**
+ * @brief Passively grab a key on a window.
+ *
+ * This function sets up a passive grab for a specific key and modifier
+ * combination on the given window. When the key is pressed with the
+ * specified modifiers, the grab becomes active.
+ * The grab is set up with GrabModeAsync for both pointer and keyboard,
+ * meaning events are processed as usual once the grab activates.
+ *
+ * This function also records the grab internally to allow re-establishing
+ * grabs (e.g., after a window manager restarts or grabs are temporarily
+ * suspended).
+ *
+ * @param win The window on which to grab the key.
+ * @param key The name of the key to grab (e.g., "Control_L", "a", "F1").
+ *            It can also be a string like "Keycode-37" for a specific keycode.
+ *            Example key names: "Return", "Escape", "Shift_L", "a", "b", "1", "plus".
+ * @param mod A combination of Ecore_X_Modifier flags (e.g., ECORE_X_MODIFIER_CTRL | ECORE_X_MODIFIER_SHIFT).
+ *            See @ref ECORE_X_MODIFIER_SHIFT etc.
+ * @param any_mod If non-zero, the @p mod parameter is ignored, and the grab
+ *                applies regardless of modifiers (AnyModifier).
+ * @ingroup Ecore_X_Input_Group
+ */
 EAPI void
 ecore_x_window_key_grab(Ecore_X_Window win,
                         const char *key,
@@ -1988,6 +2637,19 @@ ecore_x_window_key_grab(Ecore_X_Window win,
    _ecore_key_grabs[_ecore_key_grabs_num - 1].any_mod = any_mod;
 }
 
+/**
+ * @internal
+ * @brief Removes a key grab from the internal tracking list.
+ *
+ * This function searches the `_ecore_key_grabs` array for a grab
+ * matching the provided parameters and removes it.
+ *
+ * @param win The window of the grab to remove.
+ * @param key The key string of the grab. If NULL, all grabs for @p win are considered.
+ * @param mod The modifier mask of the grab.
+ * @param any_mod The any_mod flag of the grab.
+ * @return 1 if a grab was found and removed, 0 otherwise.
+ */
 int
 _ecore_x_key_grab_remove(Ecore_X_Window win,
                          const char *key,
@@ -2033,6 +2695,21 @@ _ecore_x_key_grab_remove(Ecore_X_Window win,
    return shuffle;
 }
 
+/**
+ * @internal
+ * @brief Internal function to perform an XUngrabKey.
+ *
+ * This function handles the low-level details of calling XUngrabKey.
+ * It converts the key string to a KeyCode, translates Ecore_X modifiers
+ * to X modifiers, and iterates through all possible lock key combinations
+ * to ensure the ungrab applies correctly.
+ *
+ * @param win The window to ungrab the key on.
+ * @param key The string name of the key or keycode string.
+ * @param mod An Ecore_X_Modifier mask.
+ * @param any_mod If true, @p mod is ignored and AnyModifier is used.
+ * @return The KeyCode that was ungrabbed, or 0 on failure.
+ */
 static KeyCode
 _ecore_x_window_key_ungrab_internal(Ecore_X_Window win,
                                     const char *key,
@@ -2085,10 +2762,20 @@ ecore_x_window_key_ungrab(Ecore_X_Window win,
 {
    EINA_SAFETY_ON_NULL_RETURN(_ecore_x_disp);
    _ecore_x_window_key_ungrab_internal(win, key, mod, any_mod);
-   _ecore_x_sync_magic_send(2, win, XStringToKeysym(key), mod, any_mod);
-//   _ecore_x_key_grab_remove(win, key, mod, any_mod);
+   _ecore_x_sync_magic_send(2, win, XStringToKeysym(key), mod, any_mod); // Notify about ungrab
+// _ecore_x_key_grab_remove(win, key, mod, any_mod); // This is now handled by client message or elsewhere
 }
 
+/**
+ * @internal
+ * @brief Temporarily suspends all active key grabs.
+ *
+ * This function iterates through all internally tracked key grabs
+ * (in `_ecore_key_grabs`) and ungrabs them using XUngrabKey.
+ * This is used to temporarily disable global or application-wide
+ * key bindings. The grabs can be restored later using
+ * _ecore_x_key_grab_resume().
+ */
 void
 _ecore_x_key_grab_suspend(void)
 {
@@ -2102,6 +2789,15 @@ _ecore_x_key_grab_suspend(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Resumes all previously suspended key grabs.
+ *
+ * This function iterates through all internally tracked key grabs
+ * (in `_ecore_key_grabs`) and re-establishes them using XGrabKey.
+ * This is used to restore key grabs that were temporarily disabled by
+ * _ecore_x_key_grab_suspend().
+ */
 void
 _ecore_x_key_grab_resume(void)
 {
@@ -2204,6 +2900,18 @@ ecore_x_client_message8_send(Ecore_X_Window win,
    return ret;
 }
 
+/**
+ * @brief Send a synthetic mouse motion event to a window.
+ *
+ * This function creates and sends an X MotionNotify event to the specified
+ * window. This can be used to simulate mouse movement.
+ *
+ * @param win The window to send the event to.
+ * @param x The x-coordinate of the mouse pointer relative to the window.
+ * @param y The y-coordinate of the mouse pointer relative to the window.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ * @ingroup Ecore_X_Event_Group
+ */
 EAPI Eina_Bool
 ecore_x_mouse_move_send(Ecore_X_Window win,
                         int x,
@@ -2236,6 +2944,19 @@ ecore_x_mouse_move_send(Ecore_X_Window win,
    return ret;
 }
 
+/**
+ * @brief Send a synthetic mouse button press event to a window.
+ *
+ * This function creates and sends an X ButtonPress event to the specified
+ * window. This can be used to simulate a mouse button click.
+ *
+ * @param win The window to send the event to.
+ * @param x The x-coordinate of the mouse pointer relative to the window.
+ * @param y The y-coordinate of the mouse pointer relative to the window.
+ * @param b The button number (1 for left, 2 for middle, 3 for right, etc.).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ * @ingroup Ecore_X_Event_Group
+ */
 EAPI Eina_Bool
 ecore_x_mouse_down_send(Ecore_X_Window win,
                         int x,
@@ -2269,6 +2990,19 @@ ecore_x_mouse_down_send(Ecore_X_Window win,
    return ret;
 }
 
+/**
+ * @brief Send a synthetic mouse button release event to a window.
+ *
+ * This function creates and sends an X ButtonRelease event to the specified
+ * window. This can be used to simulate releasing a mouse button.
+ *
+ * @param win The window to send the event to.
+ * @param x The x-coordinate of the mouse pointer relative to the window.
+ * @param y The y-coordinate of the mouse pointer relative to the window.
+ * @param b The button number (1 for left, 2 for middle, 3 for right, etc.).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ * @ingroup Ecore_X_Event_Group
+ */
 EAPI Eina_Bool
 ecore_x_mouse_up_send(Ecore_X_Window win,
                       int x,
@@ -2302,6 +3036,18 @@ ecore_x_mouse_up_send(Ecore_X_Window win,
    return ret;
 }
 
+/**
+ * @brief Send a synthetic mouse enter event to a window.
+ *
+ * This function creates and sends an X EnterNotify event to the specified
+ * window. This can be used to simulate the mouse pointer entering a window.
+ *
+ * @param win The window to send the event to.
+ * @param x The x-coordinate of the mouse pointer relative to the window.
+ * @param y The y-coordinate of the mouse pointer relative to the window.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ * @ingroup Ecore_X_Event_Group
+ */
 EAPI Eina_Bool
 ecore_x_mouse_in_send(Ecore_X_Window win,
                       int x,
@@ -2336,6 +3082,18 @@ ecore_x_mouse_in_send(Ecore_X_Window win,
    return ret;
 }
 
+/**
+ * @brief Send a synthetic mouse leave event to a window.
+ *
+ * This function creates and sends an X LeaveNotify event to the specified
+ * window. This can be used to simulate the mouse pointer leaving a window.
+ *
+ * @param win The window to send the event to.
+ * @param x The x-coordinate of the mouse pointer relative to the window.
+ * @param y The y-coordinate of the mouse pointer relative to the window.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ * @ingroup Ecore_X_Event_Group
+ */
 EAPI Eina_Bool
 ecore_x_mouse_out_send(Ecore_X_Window win,
                       int x,
@@ -2370,6 +3128,15 @@ ecore_x_mouse_out_send(Ecore_X_Window win,
    return ret;
 }
 
+/**
+ * @brief Reset the input focus to PointerRoot.
+ *
+ * This function sets the X input focus to the root window of the screen
+ * where the pointer is currently located (PointerRoot). The focus will
+ * revert to this state (RevertToPointerRoot). This is often used to
+ * clear the focus from any specific client window.
+ * @ingroup Ecore_X_Input_Group
+ */
 EAPI void
 ecore_x_focus_reset(void)
 {
@@ -2379,6 +3146,15 @@ ecore_x_focus_reset(void)
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * @brief Allow processing of all queued events after a synchronous grab.
+ *
+ * If a grab was made with GrabModeSync (e.g., via XGrabButton or XGrabKey
+ * with such mode), the X server queues further events. This function calls
+ * XAllowEvents with AsyncBoth, which releases events from both the keyboard
+ * and pointer queues and allows normal event processing to resume.
+ * @ingroup Ecore_X_Event_Group
+ */
 EAPI void
 ecore_x_events_allow_all(void)
 {
@@ -2388,6 +3164,17 @@ ecore_x_events_allow_all(void)
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * @brief Get the last known root coordinates of the pointer.
+ *
+ * This function retrieves the root X and Y coordinates of the pointer
+ * as recorded from the last processed X event that contained pointer
+ * position information (e.g., MotionNotify, ButtonPress).
+ *
+ * @param[out] x Pointer to store the last known root X-coordinate. Can be NULL.
+ * @param[out] y Pointer to store the last known root Y-coordinate. Can be NULL.
+ * @ingroup Ecore_X_Input_Group
+ */
 EAPI void
 ecore_x_pointer_last_xy_get(int *x,
                             int *y)
@@ -2399,6 +3186,19 @@ ecore_x_pointer_last_xy_get(int *x,
      *y = _ecore_x_event_last_root_y;
 }
 
+/**
+ * @brief Get the current pointer coordinates relative to a window.
+ *
+ * This function queries the X server for the current position of the mouse
+ * pointer. The coordinates returned are relative to the specified window @p win.
+ *
+ * @param win The window to get pointer coordinates relative to.
+ * @param[out] x Pointer to store the X-coordinate. Can be NULL.
+ *               Returns -1 if the query fails.
+ * @param[out] y Pointer to store the Y-coordinate. Can be NULL.
+ *               Returns -1 if the query fails.
+ * @ingroup Ecore_X_Input_Group
+ */
 EAPI void
 ecore_x_pointer_xy_get(Ecore_X_Window win,
                        int *x,
@@ -2420,6 +3220,19 @@ ecore_x_pointer_xy_get(Ecore_X_Window win,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * @brief Get the current pointer coordinates relative to the root window.
+ *
+ * This function queries the X server for the current position of the mouse
+ * pointer. The coordinates returned are relative to the root window of the
+ * screen the pointer is currently on.
+ *
+ * @param[out] x Pointer to store the root X-coordinate. Can be NULL.
+ *               Returns -1 if the query fails.
+ * @param[out] y Pointer to store the root Y-coordinate. Can be NULL.
+ *               Returns -1 if the query fails.
+ * @ingroup Ecore_X_Input_Group
+ */
 EAPI void
 ecore_x_pointer_root_xy_get(int *x, int *y)
 {
@@ -2526,6 +3339,16 @@ ecore_x_connection_get(void)
    return XGetXCBConnection(_ecore_x_disp);
 }
 
+/**
+ * @brief Selects (activates) a specific XKB keyboard group.
+ *
+ * This function attempts to switch the active keyboard layout group
+ * if the XKB extension is available and enabled.
+ *
+ * @param group The 0-indexed group number to select.
+ *              Example: `0` for the primary layout, `1` for the secondary, etc.
+ * @ingroup Ecore_X_XKB_Group
+ */
 EAPI void
 ecore_x_xkb_select_group(int group)
 {
@@ -2536,6 +3359,18 @@ ecore_x_xkb_select_group(int group)
 #endif
 }
 
+/**
+ * @brief Enables XKB event tracking for keyboard state changes.
+ *
+ * If the XKB extension is available, this function selects for XKB events
+ * related to keyboard state, map, and new keyboard notifications. This allows
+ * Ecore_X to receive events like ECORE_X_EVENT_XKB_STATE_NOTIFY and
+ * ECORE_X_EVENT_XKB_NEWKBD_NOTIFY.
+ *
+ * @return EINA_TRUE if XKB event selection was successful, EINA_FALSE otherwise
+ *         (or if XKB is not available).
+ * @ingroup Ecore_X_XKB_Group
+ */
 EAPI Eina_Bool
 ecore_x_xkb_track_state(void)
 {
@@ -2550,6 +3385,27 @@ ecore_x_xkb_track_state(void)
    return ret;
 }
 
+/**
+ * @brief Retrieves the current XKB keyboard state.
+ *
+ * If the XKB extension is available, this function queries the server for the
+ * current XKB state, including active group, base group, latched group,
+ * locked group, and similar information for modifiers.
+ *
+ * @param[out] state Pointer to an Ecore_X_Xkb_State structure to be filled.
+ *                   The structure contains fields like:
+ *                   - `group`: Current effective group.
+ *                   - `base_group`: Group set by core protocol.
+ *                   - `latched_group`: Latched group (temporary).
+ *                   - `locked_group`: Locked group (persistent).
+ *                   - `mods`: Current effective modifiers.
+ *                   - `base_mods`: Modifiers from core protocol.
+ *                   - `latched_mods`: Latched modifiers.
+ *                   - `locked_mods`: Locked modifiers.
+ * @return EINA_TRUE if the state was successfully retrieved, EINA_FALSE
+ *         otherwise (or if XKB is not available).
+ * @ingroup Ecore_X_XKB_Group
+ */
 EAPI Eina_Bool
 ecore_x_xkb_state_get(Ecore_X_Xkb_State *state)
 {
@@ -2578,6 +3434,19 @@ ecore_x_xkb_state_get(Ecore_X_Xkb_State *state)
 /*****************************************************************************/
 /*****************************************************************************/
 
+/**
+ * @internal
+ * @brief Convert Ecore event modifier/lock state to X modifier/lock mask.
+ *
+ * This function takes an Ecore event state bitmask (which includes both
+ * modifiers like ECORE_EVENT_MODIFIER_SHIFT and locks like
+ * ECORE_EVENT_LOCK_CAPS) and converts it into an X11 modifier mask
+ * (e.g., ShiftMask, LockMask, ControlMask).
+ *
+ * @param state An unsigned int bitmask representing Ecore modifier and lock states.
+ *              Example: `ECORE_EVENT_MODIFIER_CTRL | ECORE_EVENT_LOCK_CAPS`
+ * @return The corresponding X11 modifier mask.
+ */
 static int
 _ecore_x_event_modifier(unsigned int state)
 {

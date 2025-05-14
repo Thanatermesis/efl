@@ -1,19 +1,32 @@
 #include "edje_private.h"
 
+/**
+ * @file
+ * @brief Core initialization and shutdown routines for the Edje library.
+ *
+ * This file contains the primary functions for managing the lifecycle of the
+ * Edje library, including initialization of its subsystems (Eina, Ecore,
+ * Embryo, Eet, Evas, Efreet), management of global resources like mempools
+ * and COW (Copy-On-Write) structures, and the graceful shutdown of these
+ * components. It also handles reference counting for library usage.
+ */
+
 static Edje_Version _version = { VMAJ, VMIN, VMIC, VREV };
+/** @internal Current Edje library version information. */
 EAPI Edje_Version * edje_version = &_version;
+/**< Publicly accessible pointer to the Edje library version. */
 
-static int _edje_init_count = 0;
-static Eina_Bool _need_imf = EINA_FALSE;
+static int _edje_init_count = 0; /**< @internal Counter for edje_init() calls. */
+static Eina_Bool _need_imf = EINA_FALSE; /**< @internal Flag indicating if Ecore_IMF is needed. */
 
-int _edje_default_log_dom = -1;
-Eina_Mempool *_edje_real_part_mp = NULL;
-Eina_Mempool *_edje_real_part_state_mp = NULL;
+int _edje_default_log_dom = -1; /**< @internal Log domain for Edje. */
+Eina_Mempool *_edje_real_part_mp = NULL; /**< @internal Mempool for Edje_Real_Part. */
+Eina_Mempool *_edje_real_part_state_mp = NULL; /**< @internal Mempool for Edje_Real_Part_State. */
 
-Eina_Cow *_edje_calc_params_map_cow = NULL;
-Eina_Cow *_edje_calc_params_physics_cow = NULL;
+Eina_Cow *_edje_calc_params_map_cow = NULL; /**< @internal COW for Edje_Calc_Params_Map. */
+Eina_Cow *_edje_calc_params_physics_cow = NULL; /**< @internal COW for Edje_Calc_Params_Physics. */
 
-Edje_Global *_edje_global_obj = NULL;
+Edje_Global *_edje_global_obj = NULL; /**< @internal Global Edje object. */
 
 static const Edje_Calc_Params_Map default_calc_map = {
    { 0, 0, 0 }, { 0, 0 }, { 0.0, 0.0, 0.0 }, { 0, 0, 0, 0, 0, 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0.0, 0.0 }, NULL, 0
@@ -31,6 +44,20 @@ static void _edje_ephysics_clear(void);
 /*============================================================================*
 *                                   API                                      *
 *============================================================================*/
+
+/**
+ * @brief Initializes the Edje library.
+ *
+ * This function initializes all the subsystems required by Edje, such as
+ * Eina, Ecore, Embryo, Eet, Evas, and Efreet. It also sets up logging,
+ * mempools, and other global resources.
+ *
+ * This function uses a counter, so for each call to it, a matching call to
+ * edje_shutdown() must be made.
+ *
+ * @return The new init count, or 0 on failure.
+ * @see edje_shutdown()
+ */
 EAPI int
 edje_init(void)
 {
@@ -176,8 +203,19 @@ shutdown_eina:
    return --_edje_init_count;
 }
 
-static int _edje_users = 0;
+static int _edje_users = 0; /**< @internal Counter for active users of the Edje library (e.g., open Edje files). */
 
+/**
+ * @internal
+ * @brief Core shutdown logic for the Edje library.
+ *
+ * This function performs the actual shutdown of Edje subsystems and frees
+ * global resources. It's called by edje_shutdown() when the init count
+ * reaches zero and there are no active users.
+ *
+ * @see edje_shutdown()
+ * @see _edje_lib_unref()
+ */
 static void
 _edje_shutdown_core(void)
 {
@@ -244,12 +282,27 @@ _edje_shutdown_core(void)
    eina_shutdown();
 }
 
+/**
+ * @internal
+ * @brief Increments the Edje library user counter.
+ *
+ * This is typically called when an Edje file is opened or an Edje object
+ * is created that requires the library to remain initialized.
+ */
 void
 _edje_lib_ref(void)
 {
    _edje_users++;
 }
 
+/**
+ * @internal
+ * @brief Decrements the Edje library user counter.
+ *
+ * If the user counter reaches zero and the main init counter is also zero,
+ * this function triggers the core shutdown logic.
+ * @see _edje_shutdown_core()
+ */
 void
 _edje_lib_unref(void)
 {
@@ -258,6 +311,17 @@ _edje_lib_unref(void)
    if (_edje_init_count == 0) _edje_shutdown_core();
 }
 
+/**
+ * @brief Shuts down the Edje library.
+ *
+ * This function decrements the initialization counter. If the counter reaches
+ * zero and there are no active users (tracked by _edje_lib_ref/_unref),
+ * it calls _edje_shutdown_core() to free all resources used by Edje.
+ *
+ * @return The new init count. Returns 0 if the library is fully shut down.
+ * @see edje_init()
+ * @see _edje_shutdown_core()
+ */
 EAPI int
 edje_shutdown(void)
 {
@@ -275,6 +339,14 @@ edje_shutdown(void)
 }
 
 /* Private Routines */
+
+/**
+ * @internal
+ * @brief Initializes global Edje class members.
+ *
+ * These members are used for observing changes in color, text, and size classes
+ * across different Edje objects.
+ */
 void
 _edje_class_init(void)
 {
@@ -286,6 +358,12 @@ _edje_class_init(void)
      _edje_size_class_member = efl_add(EFL_OBSERVABLE_CLASS, efl_main_loop_get());
 }
 
+/**
+ * @internal
+ * @brief Shuts down global Edje class members.
+ *
+ * Frees the observable objects created in _edje_class_init().
+ */
 void
 _edje_class_shutdown(void)
 {
@@ -306,6 +384,16 @@ _edje_class_shutdown(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Deletes an Edje object's internal data.
+ *
+ * This function is responsible for freeing all resources associated with a
+ * specific Edje instance (`ed`). It handles message processing flags,
+ * callbacks, file data, path strings, and class associations.
+ *
+ * @param ed The Edje object to delete.
+ */
 void
 _edje_del(Edje *ed)
 {
@@ -348,6 +436,12 @@ _edje_del(Edje *ed)
    efl_observable_observer_clean(_edje_size_class_member, ed->obj);
 }
 
+/**
+ * @internal
+ * @brief Increments the reference count of an Edje object.
+ *
+ * @param ed The Edje object to reference.
+ */
 void
 _edje_ref(Edje *ed)
 {
@@ -355,6 +449,15 @@ _edje_ref(Edje *ed)
    ed->references++;
 }
 
+/**
+ * @internal
+ * @brief Decrements the reference count of an Edje object.
+ *
+ * If the reference count drops to zero, this function calls _edje_del()
+ * to free the Edje object's resources.
+ *
+ * @param ed The Edje object to unreference.
+ */
 void
 _edje_unref(Edje *ed)
 {
@@ -362,6 +465,13 @@ _edje_unref(Edje *ed)
    if (ed->references == 0) _edje_del(ed);
 }
 
+/**
+ * @internal
+ * @brief Signals that Ecore_IMF (Input Method Framework) is needed.
+ *
+ * If Ecore_IMF has not been initialized yet, this function initializes it.
+ * This is typically called when an Edje part requires input method support.
+ */
 void
 _edje_need_imf(void)
 {
@@ -373,8 +483,18 @@ _edje_need_imf(void)
 }
 
 #ifdef HAVE_EPHYSICS
-Edje_Ephysics *_edje_ephysics = NULL;
+Edje_Ephysics *_edje_ephysics = NULL; /**< @internal Global handle for EPhysics integration. */
 
+/**
+ * @internal
+ * @brief Loads the EPhysics library and resolves its symbols.
+ *
+ * This function dynamically loads the EPhysics shared library (e.g.,
+ * libephysics.so.1) and retrieves pointers to its core functions.
+ * It handles platform-specific library names.
+ *
+ * @return EINA_TRUE on successful load and symbol resolution, EINA_FALSE otherwise.
+ */
 Eina_Bool
 _edje_ephysics_load(void)
 {
@@ -493,6 +613,13 @@ err:
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Clears EPhysics resources.
+ *
+ * Unloads the EPhysics module if it was loaded and frees the
+ * _edje_ephysics structure.
+ */
 static void
 _edje_ephysics_clear(void)
 {

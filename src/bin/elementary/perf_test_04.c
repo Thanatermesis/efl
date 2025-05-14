@@ -8,6 +8,15 @@ TPROT(04);
 # include "perf.h"
 static Evas_Object *objs[NUM];
 
+/**
+ * @brief Initializes the test by creating and configuring solid rectangle objects.
+ *
+ * This function creates NUM (defined in perf.h) Evas rectangle objects.
+ * Each object is assigned a random color and is set to pass events.
+ * The objects are stored in the global `objs` array for later manipulation.
+ *
+ * @param e The Evas canvas on which to create the objects.
+ */
 TST(04, init) (Evas *e) {
    Evas_Object *o;
    int i;
@@ -24,6 +33,20 @@ TST(04, init) (Evas *e) {
      }
 }
 
+/**
+ * @brief Updates the geometry of the rectangle objects for each frame.
+ *
+ * This function is called for each animation tick. It recalculates the
+ * position (x, y) and size (w, h) of each rectangle object stored in `objs`.
+ * The new geometry is based on sinusoidal functions of the time factor `f`
+ * and the object's index `i`, creating an animated effect.
+ *
+ * @param e The Evas canvas (unused in this function).
+ * @param f A time factor, typically incrementing, used for animation.
+ *          Example: 0.0, 0.016, 0.032, ...
+ * @param win_w The current width of the window.
+ * @param win_h The current height of the window.
+ */
 TST(04, tick) (Evas *e EINA_UNUSED, double f, Evas_Coord win_w, Evas_Coord win_h) {
    int i;
    Evas_Coord x, y, w, h, w0, h0;

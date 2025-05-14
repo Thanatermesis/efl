@@ -5,40 +5,58 @@ typedef struct _Item_Calc Item_Calc;
 typedef struct _Cell_Calc Cell_Calc;
 typedef struct _Table_Calc Table_Calc;
 
+/**
+ * @brief Structure to hold calculation data for a single item in the table.
+ */
 struct _Item_Calc
 {
-   Evas_Object *obj;
-   int cell_span[2];
-   int cell_index[2];
-   Efl_Ui_Container_Item_Hints hints[2]; /* 0 is x-axis, 1 is y-axis */
+   Evas_Object *obj; /**< The Evas object representing the item. */
+   int cell_span[2]; /**< How many cells this item spans in [col, row] dimensions. Example: `{2, 1}` means it spans 2 columns and 1 row. */
+   int cell_index[2]; /**< The starting [col, row] index of this item. Example: `{0, 0}` is the top-left cell. */
+   Efl_Ui_Container_Item_Hints hints[2]; /**< Layout hints for [x-axis, y-axis]. */
 };
 
+/**
+ * @brief Structure to hold calculation data for a single cell (column or row).
+ */
 struct _Cell_Calc
 {
-   EINA_INLIST;
+   EINA_INLIST; /**< Macro to make this struct usable in an Eina_Inlist. */
 
-   int       index;
-   int       next;
-   double    acc;
-   double    space;
-   double    weight;
-   double    weight_factor;
-   Eina_Bool occupied : 1;
+   int       index; /**< The logical index of this cell (0 to N-1 occupied cells). */
+   int       next; /**< The actual index in the `cell_calc` array of the next occupied cell. */
+   double    acc; /**< Accumulated size of cells up to this one (excluding this one's space). */
+   double    space; /**< The calculated space (width or height) this cell should occupy. */
+   double    weight; /**< The sum of weights of items in this cell. */
+   double    weight_factor; /**< Factor used for sorting cells by weight distribution priority. */
+   Eina_Bool occupied : 1; /**< Flag indicating if this cell is occupied by any item. */
 };
 
+/**
+ * @brief Structure to hold overall table calculation data.
+ */
 struct _Table_Calc
 {
-   /* 0 is x-axis, 1 is y-axis */
+   /* 0 is x-axis (columns), 1 is y-axis (rows) */
 
-   int                           rows;
-   int                           cols;
-   int                           want[2];
-   int                           hgsize[2];
-   double                        weight_sum[2];
-   Cell_Calc                    *cell_calc[2];
-   Efl_Ui_Container_Layout_Calc  layout_calc[2];
+   int                           rows; /**< Total number of rows in the table. */
+   int                           cols; /**< Total number of columns in the table. */
+   int                           want[2]; /**< The total desired size [width, height] of the table content. */
+   int                           hgsize[2]; /**< The size [width, height] of a single cell in homogeneous mode. */
+   double                        weight_sum[2]; /**< Sum of all cell weights for [x-axis, y-axis]. */
+   Cell_Calc                    *cell_calc[2]; /**< Array of Cell_Calc structures for [columns, rows]. Example `cell_calc[0]` is for columns, `cell_calc[1]` for rows. `cell_calc[0][i]` would be the i-th column's calculation data. */
+   Efl_Ui_Container_Layout_Calc  layout_calc[2]; /**< General container layout calculation data for [x-axis, y-axis]. */
 };
 
+/**
+ * @brief Comparison function for sorting Cell_Calc structures by weight_factor.
+ *
+ * Sorts in descending order of weight_factor.
+ *
+ * @param l1 Pointer to the first Eina_Inlist node (Cell_Calc).
+ * @param l2 Pointer to the second Eina_Inlist node (Cell_Calc).
+ * @return -1 if cc1->weight_factor >= cc2->weight_factor, 1 otherwise.
+ */
 static int
 _weight_sort_cb(const void *l1, const void *l2)
 {
@@ -50,6 +68,17 @@ _weight_sort_cb(const void *l1, const void *l2)
    return cc2->weight_factor <= cc1->weight_factor ? -1 : 1;
 }
 
+/**
+ * @brief Calculates cell sizes based on their weights when there's extra space.
+ *
+ * This function distributes remaining space among cells proportionally to their
+ * weights, ensuring that cells with higher weights get more of the available
+ * extra space. It handles cases where distributing space based on weight might
+ * cause a cell to shrink below its minimum required space.
+ *
+ * @param table_calc Pointer to the main table calculation data.
+ * @param axis EINA_TRUE for y-axis (rows), EINA_FALSE for x-axis (columns).
+ */
 static void
 _cell_weight_calc(Table_Calc *table_calc, Eina_Bool axis)
 {
@@ -98,6 +127,15 @@ _cell_weight_calc(Table_Calc *table_calc, Eina_Bool axis)
      }
 }
 
+/**
+ * @brief Initializes cell calculation data for a homogeneous table layout.
+ *
+ * In a homogeneous layout, all occupied cells along the specified axis
+ * will have the same size. This function determines that size.
+ *
+ * @param table_calc Pointer to the main table calculation data.
+ * @param axis EINA_TRUE for y-axis (rows), EINA_FALSE for x-axis (columns).
+ */
 static void
 _efl_ui_table_homogeneous_cell_init(Table_Calc *table_calc, Eina_Bool axis)
 {
@@ -142,6 +180,16 @@ _efl_ui_table_homogeneous_cell_init(Table_Calc *table_calc, Eina_Bool axis)
    table_calc->hgsize[axis] += table_calc->layout_calc[axis].pad;
 }
 
+/**
+ * @brief Initializes cell calculation data for a regular (non-homogeneous) table layout.
+ *
+ * In a regular layout, cells can have different sizes based on the items they contain
+ * and their weights. This function calculates initial cell properties like accumulated
+ * size and total weight.
+ *
+ * @param table_calc Pointer to the main table calculation data.
+ * @param axis EINA_TRUE for y-axis (rows), EINA_FALSE for x-axis (columns).
+ */
 static void
 _efl_ui_table_regular_cell_init(Table_Calc *table_calc, Eina_Bool axis)
 {
@@ -185,6 +233,13 @@ _efl_ui_table_regular_cell_init(Table_Calc *table_calc, Eina_Bool axis)
      cell_calc[i].acc = acc;
 }
 
+/**
+ * @brief Gets the position of an item in a homogeneous layout.
+ * @param table_calc Pointer to the main table calculation data.
+ * @param item Pointer to the item's calculation data.
+ * @param axis EINA_TRUE for y-axis, EINA_FALSE for x-axis.
+ * @return The calculated position (x or y coordinate) of the item.
+ */
 static inline int
 _efl_ui_table_homogeneous_item_pos_get(Table_Calc *table_calc, Item_Calc *item, Eina_Bool axis)
 {
@@ -192,6 +247,13 @@ _efl_ui_table_homogeneous_item_pos_get(Table_Calc *table_calc, Item_Calc *item, 
            * table_calc->cell_calc[axis][item->cell_index[axis]].index);
 }
 
+/**
+ * @brief Gets the size of an item in a homogeneous layout.
+ * @param table_calc Pointer to the main table calculation data.
+ * @param item Pointer to the item's calculation data.
+ * @param axis EINA_TRUE for y-axis, EINA_FALSE for x-axis.
+ * @return The calculated size (width or height) of the item.
+ */
 static inline int
 _efl_ui_table_homogeneous_item_size_get(Table_Calc *table_calc, Item_Calc *item, Eina_Bool axis)
 {
@@ -199,6 +261,13 @@ _efl_ui_table_homogeneous_item_size_get(Table_Calc *table_calc, Item_Calc *item,
           - table_calc->layout_calc[axis].pad;
 }
 
+/**
+ * @brief Gets the position of an item in a regular layout.
+ * @param table_calc Pointer to the main table calculation data.
+ * @param item Pointer to the item's calculation data.
+ * @param axis EINA_TRUE for y-axis, EINA_FALSE for x-axis.
+ * @return The calculated position (x or y coordinate) of the item.
+ */
 static inline int
 _efl_ui_table_regular_item_pos_get(Table_Calc *table_calc, Item_Calc *item, Eina_Bool axis)
 {
@@ -208,6 +277,13 @@ _efl_ui_table_regular_item_pos_get(Table_Calc *table_calc, Item_Calc *item, Eina
              table_calc->layout_calc[axis].pad);
 }
 
+/**
+ * @brief Gets the size of an item in a regular layout.
+ * @param table_calc Pointer to the main table calculation data.
+ * @param item Pointer to the item's calculation data.
+ * @param axis EINA_TRUE for y-axis, EINA_FALSE for x-axis.
+ * @return The calculated size (width or height) of the item.
+ */
 static inline int
 _efl_ui_table_regular_item_size_get(Table_Calc *table_calc, Item_Calc *item, Eina_Bool axis)
 {
@@ -225,6 +301,16 @@ _efl_ui_table_regular_item_size_get(Table_Calc *table_calc, Item_Calc *item, Ein
 
 /* this function performs a simplified layout when the table has changed position
  * but no other changes have occurred, e.g., when a table is being scrolled
+ */
+/**
+ * @brief Performs a simplified layout update when only the table's position changes.
+ *
+ * This is an optimization for scenarios like scrolling, where item sizes and
+ * relative positions remain the same, and only their absolute screen positions
+ * need updating.
+ *
+ * @param ui_table The Efl_Ui_Table object.
+ * @param pd The private data of the Efl_Ui_Table.
  */
 static void
 _efl_ui_table_layout_simple(Efl_Ui_Table *ui_table, Efl_Ui_Table_Data *pd)
@@ -244,6 +330,16 @@ _efl_ui_table_layout_simple(Efl_Ui_Table *ui_table, Efl_Ui_Table_Data *pd)
    efl_event_callback_call(ui_table, EFL_PACK_EVENT_LAYOUT_UPDATED, NULL);
 }
 
+/**
+ * @brief Performs the full custom layout calculation for the table.
+ *
+ * This function is called when a full recalculation of item positions and sizes
+ * is necessary. It handles both homogeneous and regular layouts, considers item
+ * spans, weights, hints, and applies padding and alignment.
+ *
+ * @param ui_table The Efl_Ui_Table object.
+ * @param pd The private data of the Efl_Ui_Table.
+ */
 void
 _efl_ui_table_custom_layout(Efl_Ui_Table *ui_table, Efl_Ui_Table_Data *pd)
 {

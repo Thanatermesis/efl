@@ -1,3 +1,12 @@
+/**
+ * @file
+ * @brief Evas image loader for PSD (Photoshop Document) files.
+ *
+ * This loader handles reading metadata and pixel data from PSD files,
+ * supporting various color modes (Greyscale, Indexed, RGB, CMYK) and
+ * both uncompressed and RLE compressed data.
+ */
+
 #define _XOPEN_SOURCE 600
 
 #ifdef HAVE_CONFIG_H
@@ -22,42 +31,86 @@
 #include "evas_common_private.h"
 #include "evas_private.h"
 
+/**
+ * @brief Represents the header of a PSD file.
+ *
+ * This structure holds essential metadata about the PSD image,
+ * such as its dimensions, color mode, and number of channels.
+ */
 typedef struct _PSD_Header PSD_Header;
 
+/**
+ * @brief Enumerates the possible color modes in a PSD file.
+ */
 typedef enum _PSD_Mode
   {
-    PSD_GREYSCALE = 1,
-    PSD_INDEXED = 2,
-    PSD_RGB = 3,
-    PSD_CMYK = 4
+    PSD_GREYSCALE = 1, /**< Greyscale color mode. */
+    PSD_INDEXED = 2,   /**< Indexed color mode. */
+    PSD_RGB = 3,       /**< RGB color mode. */
+    PSD_CMYK = 4       /**< CMYK color mode. */
   } PSD_Mode;
 
+/**
+ * @struct _PSD_Header
+ * @brief Detailed structure of the PSD file header.
+ */
 struct _PSD_Header
 {
-   unsigned char signature[4];
-   unsigned short version;
-   unsigned char reserved[9];
-   unsigned short channels;
-   unsigned int height;
-   unsigned int width;
-   unsigned short depth;
+   unsigned char signature[4]; /**< File signature, should be "8BPS". */
+   unsigned short version;     /**< Version number, should be 1. */
+   unsigned char reserved[9];  /**< Reserved bytes, must be zero. (Note: spec says 6 bytes, but code reads 9, likely a typo in struct def or a misunderstanding of spec. The read_block for reserved is 6 bytes long in psd_get_header) */
+   unsigned short channels;    /**< Number of color channels in the image, including alpha. Range: 1 to 56. */
+   unsigned int height;        /**< Height of the image in pixels. Range: 1 to 30,000. */
+   unsigned int width;         /**< Width of the image in pixels. Range: 1 to 30,000. */
+   unsigned short depth;       /**< Number of bits per channel. Supported values: 1, 8, 16. */
 
-   unsigned short channel_num;
+   unsigned short channel_num; /**< Original number of channels, used for compressed data calculations. */
 
-   PSD_Mode mode;
+   PSD_Mode mode;              /**< Color mode of the file. See #PSD_Mode. */
 };
 
+/**
+ * @brief Status codes for reading compressed channel data.
+ */
 enum {
-  READ_COMPRESSED_SUCCESS,
-  READ_COMPRESSED_ERROR_FILE_CORRUPT,
-  READ_COMPRESSED_ERROR_FILE_READ_ERROR
+  READ_COMPRESSED_SUCCESS,                 /**< Compressed data read successfully. */
+  READ_COMPRESSED_ERROR_FILE_CORRUPT,      /**< Compressed data is corrupt. */
+  READ_COMPRESSED_ERROR_FILE_READ_ERROR    /**< Error reading file while processing compressed data. */
 };
 
+/**
+ * @brief Calculates the length of each compressed channel.
+ *
+ * Reads the RLE (Run-Length Encoding) table which contains the byte counts
+ * for each scan line in each channel. It then sums these counts to determine
+ * the total compressed length for each channel.
+ *
+ * @param Head Pointer to the PSD_Header structure.
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total length of the mapped data.
+ * @param position Current reading position in the mapped data. This will be updated.
+ * @param rle_table Buffer to store the RLE byte counts. Must be pre-allocated
+ *                  to `Head->height * Head->channel_num * sizeof(unsigned short)`.
+ * @param chanlen Output array to store the calculated length of each channel.
+ *                Must be pre-allocated to `Head->channel_num * sizeof(unsigned int)`.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., read error).
+ */
 static Eina_Bool get_compressed_channels_length(PSD_Header *Head,
                                                 const unsigned char *map, size_t length, size_t *position,
                                                 unsigned short *rle_table,
                                                 unsigned int *chanlen);
 
+/**
+ * @brief Reads an unsigned short (2 bytes) from the memory map.
+ *
+ * Assumes big-endian byte order as per PSD specification.
+ *
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total length of the mapped data.
+ * @param position Current reading position in the mapped data. This will be updated.
+ * @param ret Pointer to an unsigned short where the read value will be stored.
+ * @return 1 on success, 0 on failure (e.g., reading past end of map).
+ */
 static int
 read_ushort(const unsigned char *map, size_t length, size_t *position, unsigned short *ret)
 {
@@ -68,6 +121,17 @@ read_ushort(const unsigned char *map, size_t length, size_t *position, unsigned 
    return 1;
 }
 
+/**
+ * @brief Reads an unsigned int (4 bytes) from the memory map.
+ *
+ * Assumes big-endian byte order.
+ *
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total length of the mapped data.
+ * @param position Current reading position in the mapped data. This will be updated.
+ * @param ret Pointer to an unsigned int where the read value will be stored.
+ * @return 1 on success, 0 on failure (e.g., reading past end of map).
+ */
 static int
 read_uint(const unsigned char *map, size_t length, size_t *position, unsigned int *ret)
 {
@@ -78,6 +142,16 @@ read_uint(const unsigned char *map, size_t length, size_t *position, unsigned in
    return 1;
 }
 
+/**
+ * @brief Reads a block of data from the memory map.
+ *
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total length of the mapped data.
+ * @param position Current reading position in the mapped data. This will be updated.
+ * @param target Pointer to the buffer where the read data will be copied.
+ * @param size Number of bytes to read.
+ * @return 1 on success, 0 on failure (e.g., reading past end of map).
+ */
 static int
 read_block(const unsigned char *map, size_t length, size_t *position, void *target, size_t size)
 {
@@ -87,7 +161,18 @@ read_block(const unsigned char *map, size_t length, size_t *position, void *targ
    return 1;
 }
 
-// Internal function used to get the Psd header from the current file.
+/**
+ * @brief Reads and parses the PSD file header.
+ *
+ * Populates the PSD_Header structure with data read from the
+ * beginning of the PSD file.
+ *
+ * @param header Pointer to a PSD_Header structure to be filled.
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total length of the mapped data.
+ * @param position Current reading position in the mapped data. This will be updated.
+ * @return EINA_TRUE on successful header parsing, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 psd_get_header(PSD_Header *header, const unsigned char *map, size_t length, size_t *position)
 {
@@ -112,8 +197,15 @@ psd_get_header(PSD_Header *header, const unsigned char *map, size_t length, size
    return EINA_TRUE;
 }
 
-
-// Internal function used to check if the HEADER is a valid Psd header.
+/**
+ * @brief Validates the parsed PSD header.
+ *
+ * Checks if the header fields conform to the PSD specification
+ * (e.g., correct signature, version, valid dimensions, depth, channels).
+ *
+ * @param header Pointer to the PSD_Header structure to validate.
+ * @return EINA_TRUE if the header is valid, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 is_psd(PSD_Header *header)
 {
@@ -131,6 +223,19 @@ is_psd(PSD_Header *header)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Opens a PSD file for loading. (Evas loader plugin function)
+ *
+ * This function is part of the Evas image loader plugin interface.
+ * For PSD, it simply returns the Eina_File handle as loader data.
+ *
+ * @param f Eina_File handle for the opened file.
+ * @param key Unused.
+ * @param opts Unused.
+ * @param animated Unused.
+ * @param error Unused.
+ * @return The Eina_File handle `f` as loader_data.
+ */
 static void *
 evas_image_load_file_open_psd(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
 			      Evas_Image_Load_Opts *opts EINA_UNUSED,
@@ -140,11 +245,31 @@ evas_image_load_file_open_psd(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
    return f;
 }
 
+/**
+ * @brief Closes a PSD file. (Evas loader plugin function)
+ *
+ * This function is part of the Evas image loader plugin interface.
+ * For PSD, it's a no-op as Eina_File is managed externally.
+ *
+ * @param loader_data Unused.
+ */
 static void
 evas_image_load_file_close_psd(void *loader_data EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Reads the header of a PSD file to get image properties. (Evas loader plugin function)
+ *
+ * This function maps the file, parses the PSD header, validates it,
+ * and populates the Emile_Image_Property structure with image dimensions
+ * and alpha channel information.
+ *
+ * @param loader_data The Eina_File handle returned by evas_image_load_file_open_psd.
+ * @param prop Pointer to Emile_Image_Property structure to be filled.
+ * @param error Pointer to an integer to store error codes (EVAS_LOAD_ERROR_*).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_head_psd(void *loader_data,
 			      Emile_Image_Property *prop,
@@ -188,6 +313,24 @@ evas_image_load_file_head_psd(void *loader_data,
    return r;
 }
 
+/**
+ * @brief Reads and decompresses a single RLE-compressed channel.
+ *
+ * PSD uses PackBits RLE compression. This function decodes one channel's data.
+ * - A byte `n` from 0 to 127 means copy the next `n+1` bytes literally.
+ * - A byte `n` from -1 to -127 means repeat the next byte `-n+1` times.
+ * - A byte -128 is a no-op.
+ *
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total length of the mapped data.
+ * @param position Current reading position in the mapped data. This will be updated.
+ * @param channel_length The total compressed length of this channel (currently unused in function body, but passed).
+ * @param size The expected uncompressed size of the channel data (pixels_count * bytes_per_component).
+ * @param channel Output buffer to store the decompressed channel data. Must be pre-allocated.
+ * @return READ_COMPRESSED_SUCCESS on success.
+ * @return READ_COMPRESSED_ERROR_FILE_CORRUPT if data seems corrupt (e.g., overruns).
+ * @return READ_COMPRESSED_ERROR_FILE_READ_ERROR if a read operation fails.
+ */
 static unsigned int
 read_compressed_channel(const unsigned char *map, size_t length, size_t *position,
 			const unsigned int channel_length EINA_UNUSED,
@@ -237,7 +380,24 @@ read_compressed_channel(const unsigned char *map, size_t length, size_t *positio
    return READ_COMPRESSED_SUCCESS;
 }
 
-
+/**
+ * @brief Reads and processes pixel data from the PSD file.
+ *
+ * This function handles both uncompressed and RLE compressed pixel data.
+ * It reads channel data plane by plane, then interleaves it into the
+ * output buffer. It also handles alpha channel accumulation for formats
+ * with more than 3/4 channels.
+ *
+ * @param head Pointer to the PSD_Header structure.
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total length of the mapped data.
+ * @param position Current reading position in the mapped data. This will be updated.
+ * @param buffer Output buffer to store the final RGBA pixel data.
+ *               Must be pre-allocated to `head->width * head->height * 4`.
+ * @param compressed EINA_TRUE if the data is RLE compressed, EINA_FALSE otherwise.
+ * @param error Pointer to an integer to store error codes (EVAS_LOAD_ERROR_*).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 psd_get_data(PSD_Header *head,
              const unsigned char *map, size_t length, size_t *position,
@@ -497,7 +657,22 @@ psd_get_data(PSD_Header *head,
    return EINA_FALSE;
 }
 
-
+/**
+ * @brief Reads a single channel's data, handling compression.
+ *
+ * This function is used primarily for CMYK images to read the 'K' (black)
+ * channel separately after the CMY channels have been processed by psd_get_data.
+ * It supports both uncompressed and RLE compressed data.
+ *
+ * @param head Pointer to the PSD_Header structure.
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total length of the mapped data.
+ * @param position Current reading position in the mapped data. This will be updated.
+ * @param buffer Output buffer to store the channel data.
+ *               Must be pre-allocated to `head->width * head->height * (head->depth / 8)`.
+ * @param compressed EINA_TRUE if the data is RLE compressed, EINA_FALSE otherwise.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 get_single_channel(PSD_Header *head,
 		   const unsigned char *map, size_t length, size_t *position,
@@ -558,6 +733,20 @@ get_single_channel(PSD_Header *head,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Reads pixel data for Greyscale PSD images.
+ *
+ * Skips Color Mode Data, Image Resources, and Layer/Mask Info sections.
+ * Then calls psd_get_data to read the actual pixel data.
+ *
+ * @param pixels Output buffer for RGBA pixel data.
+ * @param head Pointer to the PSD_Header structure.
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total length of the mapped data.
+ * @param position Current reading position in the mapped data. This will be updated.
+ * @param error Pointer to an integer to store error codes (EVAS_LOAD_ERROR_*).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 read_psd_grey(void *pixels, PSD_Header *head, const unsigned char *map, size_t length, size_t *position, int *error)
 {
@@ -611,7 +800,23 @@ read_psd_grey(void *pixels, PSD_Header *head, const unsigned char *map, size_t l
    return EINA_FALSE;
 }
 
-
+/**
+ * @brief Reads pixel data for Indexed Color PSD images.
+ *
+ * Skips Color Mode Data (palette), Image Resources, and Layer/Mask Info sections.
+ * Then calls psd_get_data to read the indexed pixel data, which psd_get_data
+ * will treat as single-channel data. The actual palette conversion to RGB
+ * is not explicitly handled here, implying psd_get_data might produce grayscale
+ * or that the Evas pipeline handles palette conversion later if needed.
+ *
+ * @param pixels Output buffer for RGBA pixel data.
+ * @param head Pointer to the PSD_Header structure.
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total length of the mapped data.
+ * @param position Current reading position in the mapped data. This will be updated.
+ * @param error Pointer to an integer to store error codes (EVAS_LOAD_ERROR_*).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 read_psd_indexed(void *pixels, PSD_Header *head, const unsigned char *map, size_t length, size_t *position, int *error)
 {
@@ -662,6 +867,20 @@ read_psd_indexed(void *pixels, PSD_Header *head, const unsigned char *map, size_
 #undef CHECK_RET
 }
 
+/**
+ * @brief Reads pixel data for RGB Color PSD images.
+ *
+ * Skips Color Mode Data, Image Resources, and Layer/Mask Info sections.
+ * Then calls psd_get_data to read the RGB (and possibly Alpha) pixel data.
+ *
+ * @param pixels Output buffer for RGBA pixel data.
+ * @param head Pointer to the PSD_Header structure.
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total length of the mapped data.
+ * @param position Current reading position in the mapped data. This will be updated.
+ * @param error Pointer to an integer to store error codes (EVAS_LOAD_ERROR_*).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 read_psd_rgb(void *pixels, PSD_Header *head, const unsigned char *map, size_t length, size_t *position, int *error)
 {
@@ -708,6 +927,25 @@ read_psd_rgb(void *pixels, PSD_Header *head, const unsigned char *map, size_t le
 #undef CHECK_RET
 }
 
+/**
+ * @brief Reads pixel data for CMYK Color PSD images.
+ *
+ * Skips Color Mode Data, Image Resources, and Layer/Mask Info sections.
+ * Calls psd_get_data to read CMY channels (treating it as RGB temporarily).
+ * Then reads the K (black) channel separately using get_single_channel.
+ * Finally, it converts CMYK to RGB using a simple formula:
+ * R = C * K / 255 (and similarly for G, B).
+ * If an alpha channel is present (5 channels total), it's handled as alpha.
+ *
+ * @param prop Pointer to Emile_Image_Property (used for width/height).
+ * @param pixels Output buffer for RGBA pixel data.
+ * @param head Pointer to the PSD_Header structure.
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total length of the mapped data.
+ * @param position Current reading position in the mapped data. This will be updated.
+ * @param error Pointer to an integer to store error codes (EVAS_LOAD_ERROR_*).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 read_psd_cmyk(Emile_Image_Property *prop, void *pixels, PSD_Header *head, const unsigned char *map, size_t length, size_t *position, int *error)
 {
@@ -817,6 +1055,22 @@ read_psd_cmyk(Emile_Image_Property *prop, void *pixels, PSD_Header *head, const 
    return r;
 }
 
+/**
+ * @brief Loads the actual image data from a PSD file. (Evas loader plugin function)
+ *
+ * This function is the main entry point for loading pixel data after the
+ * header has been parsed. It maps the file, re-parses and validates the header,
+ * then dispatches to color mode specific functions (read_psd_grey,
+ * read_psd_indexed, read_psd_rgb, read_psd_cmyk) to load the pixel data
+ * into the provided buffer.
+ *
+ * @param loader_data The Eina_File handle.
+ * @param prop Pointer to Emile_Image_Property containing expected image properties.
+ *             Used to verify against the re-parsed header.
+ * @param pixels Output buffer to store the final RGBA pixel data.
+ * @param error Pointer to an integer to store error codes (EVAS_LOAD_ERROR_*).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_data_psd(void *loader_data,
 			      Emile_Image_Property *prop,
@@ -875,6 +1129,10 @@ evas_image_load_file_data_psd(void *loader_data,
    return bpsd;
 }
 
+/*
+ * get_compressed_channels_length is defined earlier with Doxygen comments.
+ * This is the actual implementation.
+ */
 static Eina_Bool
 get_compressed_channels_length(PSD_Header *head,
                                const unsigned char *map, size_t length, size_t *position,
@@ -915,6 +1173,15 @@ static const Evas_Image_Load_Func evas_image_load_psd_func = {
   EINA_FALSE
 };
 
+/**
+ * @brief Opens the Evas image loader module for PSD. (Evas module function)
+ *
+ * Initializes the module by setting up the function pointers for the
+ * Evas image loading API.
+ *
+ * @param em Pointer to the Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -923,11 +1190,21 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Closes the Evas image loader module for PSD. (Evas module function)
+ *
+ * Currently a no-op for this loader.
+ *
+ * @param em Unused.
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Evas module API structure for the PSD loader.
+ */
 static Evas_Module_Api evas_modapi =
   {
     EVAS_MODULE_API_VERSION,

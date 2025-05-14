@@ -96,6 +96,16 @@ EFL_CALLBACKS_ARRAY_DEFINE(monitoring_callbacks,
                           { EFL_MODEL_EVENT_CHILD_ADDED, _resource_created },
                           { EFL_MODEL_EVENT_CHILD_REMOVED, _resource_deleted });
 
+/**
+ * @internal
+ * @brief Updates the focus chain for the fileselector widget.
+ *
+ * This function gathers all focusable elements within the fileselector
+ * and sets them in the correct order for keyboard navigation.
+ *
+ * @param obj The fileselector Evas_Object.
+ * @param pd The private data of the fileselector widget.
+ */
 static void
 _focus_chain_update(Eo *obj, Elm_Fileselector_Data *pd)
 {
@@ -119,6 +129,17 @@ _focus_chain_update(Eo *obj, Elm_Fileselector_Data *pd)
    efl_ui_focus_composition_elements_set(obj, tmp);
 }
 
+/**
+ * @internal
+ * @brief Calls a legacy smart callback.
+ *
+ * This function retrieves the Efl_Event_Description for a given legacy event name
+ * and then triggers the corresponding callback on the object.
+ *
+ * @param obj The Evas_Object on which to call the event.
+ * @param legacy_evt The name of the legacy event (e.g., "selected").
+ * @param event_info The data to pass to the event callback.
+ */
 void
 _event_to_legacy_call(Eo *obj, const char *legacy_evt, void *event_info)
 {
@@ -126,6 +147,19 @@ _event_to_legacy_call(Eo *obj, const char *legacy_evt, void *event_info)
    efl_event_callback_call(obj, legacy_desc, event_info);
 }
 
+/**
+ * @internal
+ * @brief Calls both a legacy smart callback (with path) and an Eo event (with model).
+ *
+ * This is a helper to bridge legacy event emission with new Eo event emission,
+ * typically used when an event involves a file path and its corresponding model.
+ *
+ * @param obj The Evas_Object on which to call the events.
+ * @param evt_desc The Efl_Event_Description for the Eo event.
+ * @param legacy_evt The name of the legacy event (e.g., "done").
+ * @param model The Efl_Model associated with the event.
+ * @param path The file path string associated with the event.
+ */
 void
 _model_event_call(Eo *obj, const Efl_Event_Description *evt_desc, const char *legacy_evt, Efl_Model *model, const char *path)
 {
@@ -133,6 +167,17 @@ _model_event_call(Eo *obj, const Efl_Event_Description *evt_desc, const char *le
    efl_event_callback_call(obj, evt_desc, model);
 }
 
+/**
+ * @internal
+ * @brief Starts monitoring an Efl_Model for changes (child added/removed).
+ *
+ * If not already monitoring, this function adds callbacks to the given model
+ * to listen for EFL_MODEL_EVENT_CHILD_ADDED and EFL_MODEL_EVENT_CHILD_REMOVED events.
+ *
+ * @param fs The fileselector widget.
+ * @param sd The private data of the fileselector widget.
+ * @param model The Efl_Model to monitor.
+ */
 static void
 _monitoring_start(Elm_Fileselector *fs, Elm_Fileselector_Data *sd, Efl_Model *model)
 {
@@ -141,6 +186,17 @@ _monitoring_start(Elm_Fileselector *fs, Elm_Fileselector_Data *sd, Efl_Model *mo
    efl_event_callback_array_add(model, monitoring_callbacks(), fs);
 }
 
+/**
+ * @internal
+ * @brief Stops monitoring an Efl_Model for changes.
+ *
+ * If monitoring is active, this function removes the previously added callbacks
+ * from the model.
+ *
+ * @param fs The fileselector widget.
+ * @param sd The private data of the fileselector widget.
+ * @param model The Efl_Model to stop monitoring.
+ */
 static void
 _monitoring_stop(Elm_Fileselector *fs, Elm_Fileselector_Data *sd, Efl_Model *model)
 {
@@ -156,6 +212,18 @@ EFL_CALLBACKS_ARRAY_DEFINE(noref_death,
                            { EFL_EVENT_NOREF, _noref_death },
                            { EFL_EVENT_INVALIDATE, _invalidated });
 
+/**
+ * @internal
+ * @brief Callback for EFL_EVENT_NOREF on a model.
+ *
+ * When a model object that the fileselector holds a reference to (but is not its parent)
+ * is no longer referenced externally, this function is called. It cleans up
+ * its own callbacks and deletes the model object. This is typically used for
+ * models created temporarily, like for a selected path.
+ *
+ * @param data User data (unused).
+ * @param event The Efl_Event structure.
+ */
 static void
 _noref_death(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -163,6 +231,16 @@ _noref_death(void *data EINA_UNUSED, const Efl_Event *event)
    efl_del(event->object);
 }
 
+/**
+ * @internal
+ * @brief Callback for EFL_EVENT_INVALIDATE on a model.
+ *
+ * This function is called when a model object is being invalidated (e.g., its parent is dying).
+ * It removes the noref_death callbacks to prevent issues if NOREF is called later.
+ *
+ * @param data User data (unused).
+ * @param event The Efl_Event structure.
+ */
 static void
 _invalidated(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -170,6 +248,16 @@ _invalidated(void *data EINA_UNUSED, const Efl_Event *event)
    efl_event_callback_array_del(event->object, noref_death(), NULL);
 }
 
+/**
+ * @internal
+ * @brief Resets the target model in the fileselector.
+ *
+ * This function removes the properties changed callback from the current target model
+ * and sets the target model to NULL. This is used when a selection is made or
+ * when the target is no longer needed.
+ *
+ * @param pd The private data of the fileselector widget.
+ */
 static void
 _reset_target(Elm_Fileselector_Data *pd)
 {
@@ -177,6 +265,18 @@ _reset_target(Elm_Fileselector_Data *pd)
    efl_replace(&pd->target, NULL);
 }
 
+/**
+ * @internal
+ * @brief Replaces the current model and path of the fileselector.
+ *
+ * Stops monitoring the old model, updates the internal model and path references,
+ * and starts monitoring the new model if provided.
+ *
+ * @param fs The fileselector widget.
+ * @param sd The private data of the fileselector widget.
+ * @param model The new Efl_Model to set. Can be NULL.
+ * @param path The new path string to set. Can be NULL.
+ */
 static void
 _elm_fileselector_replace_model(Elm_Fileselector *fs, Elm_Fileselector_Data *sd, Efl_Model *model, const char *path)
 {
@@ -192,6 +292,16 @@ _elm_fileselector_replace_model(Elm_Fileselector *fs, Elm_Fileselector_Data *sd,
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the path from an Efl_Model, potentially unwrapping it from a view model.
+ *
+ * If the model is an Efl_Io_Model, its path is returned. If it's an Efl_Ui_View_Model,
+ * it recursively calls itself with the underlying model.
+ *
+ * @param model The Efl_Model from which to get the path.
+ * @return The path string if found, otherwise NULL. The string is owned by the model.
+ */
 static const char *
 _io_path_get(Efl_Model *model)
 {
@@ -200,6 +310,18 @@ _io_path_get(Efl_Model *model)
    return _io_path_get(efl_ui_view_model_get(model));
 }
 
+/**
+ * @internal
+ * @brief Checks if a fetched Eina_Value indicates an error that requires retrying (EAGAIN).
+ *
+ * This is used after an efl_model_property_get() call to see if the property
+ * is not yet ready and the operation should be tried again later. It also logs
+ * other unexpected errors.
+ *
+ * @param fetch The Eina_Value returned by efl_model_property_get().
+ * @return EINA_TRUE if the error is EAGAIN or if it's another unexpected error,
+ *         EINA_FALSE if there is no error in the Eina_Value.
+ */
 static Eina_Bool
 _check_again(Eina_Value *fetch)
 {
@@ -219,6 +341,19 @@ _check_again(Eina_Value *fetch)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Fetches a string property from an Efl_Model.
+ *
+ * Retrieves the property specified by `name` from the `child` model.
+ * Handles potential EAGAIN errors and converts the value to a string.
+ *
+ * @param child The Efl_Model to fetch the property from.
+ * @param name The name of the property (e.g., "path", "filename").
+ * @param[out] str Pointer to a char* that will be allocated and filled with the string value.
+ *                 The caller is responsible for freeing this string.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., error, wrong type).
+ */
 static Eina_Bool
 _fetch_string_value(Efl_Model *child, const char *name, char **str)
 {
@@ -238,6 +373,18 @@ _fetch_string_value(Efl_Model *child, const char *name, char **str)
    return r;
 }
 
+/**
+ * @internal
+ * @brief Fetches a boolean property from an Efl_Model.
+ *
+ * Retrieves the property specified by `name` from the `child` model.
+ * Handles potential EAGAIN errors and gets the boolean value.
+ *
+ * @param child The Efl_Model to fetch the property from.
+ * @param name The name of the property (e.g., "is_dir").
+ * @param[out] b Pointer to an Eina_Bool that will be filled with the boolean value.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., error, wrong type).
+ */
 static Eina_Bool
 _fetch_bool_value(Efl_Model *child, const char *name, Eina_Bool *b)
 {
@@ -255,6 +402,18 @@ _fetch_bool_value(Efl_Model *child, const char *name, Eina_Bool *b)
    return r;
 }
 
+/**
+ * @internal
+ * @brief Fetches a double property from an Efl_Model.
+ *
+ * Retrieves the property specified by `name` from the `child` model.
+ * Handles potential EAGAIN errors and converts the value to a double.
+ *
+ * @param child The Efl_Model to fetch the property from.
+ * @param name The name of the property (e.g., "mtime").
+ * @param[out] d Pointer to a double that will be filled with the value.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., error, wrong type).
+ */
 static Eina_Bool
 _fetch_double_value(Efl_Model *child, const char *name, double *d)
 {
@@ -278,6 +437,18 @@ _fetch_double_value(Efl_Model *child, const char *name, double *d)
    return r;
 }
 
+/**
+ * @internal
+ * @brief Fetches an int64_t property from an Efl_Model.
+ *
+ * Retrieves the property specified by `name` from the `child` model.
+ * Handles potential EAGAIN errors and converts the value to an int64_t.
+ *
+ * @param child The Efl_Model to fetch the property from.
+ * @param name The name of the property (e.g., "size").
+ * @param[out] i Pointer to an int64_t that will be filled with the value.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., error, wrong type).
+ */
 static Eina_Bool
 _fetch_int64_value(Efl_Model *child, const char *name, int64_t *i)
 {
@@ -300,7 +471,17 @@ _fetch_int64_value(Efl_Model *child, const char *name, int64_t *i)
    return r;
 }
 
-/* final routine on deletion */
+/**
+ * @internal
+ * @brief Performs final cleanup when the fileselector widget is being deleted.
+ *
+ * This function is called as part of the smart deletion process. It frees
+ * all child objects, replaces the model with NULL, unrefs the previous model,
+ * deletes any pending idler, and finally deletes the superclass's canvas group.
+ *
+ * @param fs The fileselector widget being deleted.
+ * @param sd The private data of the fileselector widget.
+ */
 static void
 _elm_fileselector_smart_del_do(Elm_Fileselector *fs, Elm_Fileselector_Data *sd)
 {
@@ -314,6 +495,16 @@ _elm_fileselector_smart_del_do(Elm_Fileselector *fs, Elm_Fileselector_Data *sd)
    efl_canvas_group_del(efl_super(sd->obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Sets the mirrored mode for various internal parts of the fileselector.
+ *
+ * This function is called when the fileselector's mirrored mode changes. It propagates
+ * the RTL (Right-To-Left) setting to its child widgets like buttons, views, etc.
+ *
+ * @param obj The fileselector Evas_Object.
+ * @param rtl EINA_TRUE if mirrored mode is enabled, EINA_FALSE otherwise.
+ */
 static void
 _mirrored_set(Evas_Object *obj, Eina_Bool rtl)
 {

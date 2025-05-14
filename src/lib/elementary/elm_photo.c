@@ -2,6 +2,17 @@
 # include "elementary_config.h"
 #endif
 
+/**
+ * @internal
+ * @addtogroup Widget
+ * @{
+ *
+ * @section elm-photo-internal Internal functions for Elm_Photo widget
+ *
+ * These are internal functions, data structures, and macros used
+ * for the Elm_Photo widget.
+ */
+
 #define EFL_ACCESS_OBJECT_PROTECTED
 
 #include <Elementary.h>
@@ -16,9 +27,11 @@
 #define MY_CLASS_NAME "Elm_Photo"
 #define MY_CLASS_NAME_LEGACY "elm_photo"
 
-static const char SIG_CLICKED[] = "clicked";
-static const char SIG_DRAG_START[] = "drag,start";
-static const char SIG_DRAG_END[] = "drag,end";
+static const char SIG_CLICKED[] = "clicked"; /**< Signal emitted when photo is clicked */
+static const char SIG_DRAG_START[] = "drag,start"; /**< Signal emitted when dragging the inner image starts */
+static const char SIG_DRAG_END[] = "drag,end"; /**< Signal emitted when the dragged image is dropped */
+
+/**< Smart Callbacks descriptions for Elm_Photo */
 static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {SIG_CLICKED, ""},
    {SIG_DRAG_START, ""},
@@ -26,6 +39,16 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {NULL, NULL}
 };
 
+/**
+ * @internal
+ * @brief Recalculates and applies sizing for the photo widget.
+ *
+ * This function is called when the photo's size, scale, or theme changes.
+ * It sets the minimum and maximum size hints for the widget based on the
+ * configured photo size and finger size adjustments.
+ *
+ * @param obj The Evas_Object (Elm_Photo) to evaluate sizing for.
+ */
 static void
 _sizing_eval(Evas_Object *obj)
 {
@@ -49,6 +72,18 @@ _sizing_eval(Evas_Object *obj)
    evas_object_size_hint_max_set(obj, maxw, maxh);
 }
 
+/**
+ * @internal
+ * @brief Applies the theme to the Elm_Photo widget.
+ *
+ * This EOLIAN function is called when the widget's theme needs to be (re)applied.
+ * It sets the theme for the base widget and the internal icon, handles mirroring,
+ * and triggers a sizing evaluation.
+ *
+ * @param obj The Eo object (Elm_Photo).
+ * @param sd The Elm_Photo_Data private data.
+ * @return Eina_Error indicating success or failure.
+ */
 EOLIAN static Eina_Error
 _elm_photo_efl_ui_widget_theme_apply(Eo *obj, Elm_Photo_Data *sd)
 {
@@ -74,6 +109,15 @@ _elm_photo_efl_ui_widget_theme_apply(Eo *obj, Elm_Photo_Data *sd)
    return int_ret;
 }
 
+/**
+ * @internal
+ * @brief Sets whether the photo can be a drag target.
+ * (Currently a stub, Elm_Photo is not a drop target by default via this Efl_Ui_Draggable interface).
+ *
+ * @param obj The Eo object (Elm_Photo).
+ * @param pd The Elm_Photo_Data private data.
+ * @param set EINA_TRUE to enable as drag target, EINA_FALSE otherwise.
+ */
 EOLIAN static void
 _elm_photo_efl_ui_draggable_drag_target_set(Eo *obj EINA_UNUSED,
                                             Elm_Photo_Data *pd EINA_UNUSED,
@@ -81,6 +125,15 @@ _elm_photo_efl_ui_draggable_drag_target_set(Eo *obj EINA_UNUSED,
 {
 }
 
+/**
+ * @internal
+ * @brief Gets whether the photo can be a drag target.
+ * (Currently a stub, Elm_Photo is not a drop target by default via this Efl_Ui_Draggable interface).
+ *
+ * @param obj The Eo object (Elm_Photo).
+ * @param pd The Elm_Photo_Data private data.
+ * @return EINA_FALSE.
+ */
 EOLIAN static Eina_Bool
 _elm_photo_efl_ui_draggable_drag_target_get(const Eo *obj EINA_UNUSED,
                                             Elm_Photo_Data *pd EINA_UNUSED)
@@ -88,6 +141,19 @@ _elm_photo_efl_ui_draggable_drag_target_get(const Eo *obj EINA_UNUSED,
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Callback for move or resize events on the internal icon.
+ *
+ * If `fill_inside` is enabled, this function sends a message to the Edje
+ * theme object with the new dimensions of the image. It also re-applies
+ * the thumbnail if one is set.
+ *
+ * @param data The Elm_Photo Evas_Object.
+ * @param e The Evas canvas.
+ * @param obj The Evas_Object that triggered the event (the internal icon's image).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _icon_move_resize_cb(void *data,
                      Evas *e EINA_UNUSED,
@@ -118,6 +184,16 @@ _icon_move_resize_cb(void *data,
      elm_icon_thumb_set(sd->icon, sd->thumb.file.path, sd->thumb.file.key);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a drag operation initiated by the photo is completed.
+ *
+ * This function unfreezes scrolling on the object and emits the "drag,end"
+ * smart callback. It also resets the `drag_started` flag.
+ *
+ * @param unused Unused data pointer.
+ * @param obj The Elm_Photo Evas_Object.
+ */
 static void
 _drag_done_cb(void *unused EINA_UNUSED,
               Evas_Object *obj)
@@ -129,6 +205,19 @@ _drag_done_cb(void *unused EINA_UNUSED,
    sd->drag_started = EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse move events on the icon, used for long press detection.
+ *
+ * If a long press timer is active, this function checks if the mouse has
+ * moved beyond a certain threshold or if the event is on hold. If so,
+ * it cancels the long press timer.
+ *
+ * @param data The Elm_Photo Evas_Object.
+ * @param e The Evas canvas.
+ * @param icon The Evas_Object that triggered the event (the internal icon).
+ * @param event The Evas_Event_Mouse_Move event information.
+ */
 static void
 _mouse_move(void *data,
             Evas *e EINA_UNUSED,
@@ -157,6 +246,16 @@ _mouse_move(void *data,
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for the long press timer.
+ *
+ * This function is triggered when the long press timeout is reached.
+ * It initiates a drag operation for the photo's image if a file is set.
+ *
+ * @param obj The Elm_Photo Evas_Object.
+ * @return EINA_FALSE to ensure the timer does not run again.
+ */
 static Eina_Bool
 _long_press_cb(void *obj)
 {
@@ -198,6 +297,19 @@ _long_press_cb(void *obj)
    return EINA_FALSE; /* Don't call again */
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse down events on the icon.
+ *
+ * This function starts a long press timer if the primary mouse button (button 1)
+ * is pressed. It also registers a mouse move callback to detect if the
+ * pointer moves significantly during the long press period.
+ *
+ * @param data The Elm_Photo Evas_Object.
+ * @param e The Evas canvas.
+ * @param icon The Evas_Object that triggered the event (the internal icon).
+ * @param event_info The Evas_Event_Mouse_Down event information.
+ */
 static void
 _mouse_down(void *data,
             Evas *e EINA_UNUSED,
@@ -217,6 +329,18 @@ _mouse_down(void *data,
      (icon, EVAS_CALLBACK_MOUSE_MOVE, _mouse_move, data);
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse up events on the icon.
+ *
+ * This function cancels any active long press timer. If a drag operation
+ * was not started, it emits the "clicked" smart callback.
+ *
+ * @param data The Elm_Photo Evas_Object.
+ * @param e The Evas canvas.
+ * @param obj The Evas_Object that triggered the event (the internal icon).
+ * @param event_info The Evas_Event_Mouse_Up event information.
+ */
 static void
 _mouse_up(void *data,
           Evas *e EINA_UNUSED,
@@ -235,6 +359,17 @@ _mouse_up(void *data,
      evas_object_smart_callback_call(data, "clicked", NULL);
 }
 
+/**
+ * @internal
+ * @brief Sets up callbacks on the internal image object of the icon.
+ *
+ * This function retrieves the actual image object from the internal icon
+ * and attaches move and resize event callbacks to it (_icon_move_resize_cb).
+ * This allows the photo widget to react to changes in the displayed image's
+ * geometry, for example, to update Edje messages when `fill_inside` is true.
+ *
+ * @param obj The Elm_Photo Evas_Object.
+ */
 static void
 _elm_photo_internal_image_follow(Evas_Object *obj)
 {
@@ -250,12 +385,34 @@ _elm_photo_internal_image_follow(Evas_Object *obj)
      (img, EVAS_CALLBACK_RESIZE, _icon_move_resize_cb, obj);
 }
 
+/**
+ * @internal
+ * @brief Callback for the ELM_ICON_EVENT_THUMB_DONE event.
+ *
+ * This function is called when the icon's thumbnail generation is complete.
+ * It then calls _elm_photo_internal_image_follow to set up necessary
+ * callbacks on the (newly available) internal image.
+ *
+ * @param data The Elm_Photo Evas_Object.
+ * @param event The Efl_Event details (unused).
+ */
 static void
 _on_thumb_done(void *data, const Efl_Event *event EINA_UNUSED)
 {
    _elm_photo_internal_image_follow(data);
 }
 
+/**
+ * @internal
+ * @brief EOLIAN function called when the Elm_Photo object is added to a canvas group.
+ *
+ * This function performs initialization for the photo widget. It creates
+ * the internal icon, sets up mouse event callbacks for click and drag detection,
+ * initializes the theme, and sets the initial sizing.
+ *
+ * @param obj The Eo object (Elm_Photo).
+ * @param priv The Elm_Photo_Data private data.
+ */
 EOLIAN static void
 _elm_photo_efl_canvas_group_group_add(Eo *obj, Elm_Photo_Data *priv)
 {
@@ -298,6 +455,15 @@ _elm_photo_efl_canvas_group_group_add(Eo *obj, Elm_Photo_Data *priv)
    elm_photo_file_set(obj, NULL);
 }
 
+/**
+ * @internal
+ * @brief EOLIAN function called when the Elm_Photo object is being deleted from a canvas group.
+ *
+ * This function performs cleanup, primarily deleting any active long press timer.
+ *
+ * @param obj The Eo object (Elm_Photo).
+ * @param sd The Elm_Photo_Data private data.
+ */
 EOLIAN static void
 _elm_photo_efl_canvas_group_group_del(Eo *obj, Elm_Photo_Data *sd)
 {
@@ -306,6 +472,12 @@ _elm_photo_efl_canvas_group_group_del(Eo *obj, Elm_Photo_Data *sd)
    efl_canvas_group_del(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Adds a new photo widget to the given parent Evas_Object.
+ * @param parent The parent object.
+ * @return The new photo object, or @c NULL on errors.
+ * @ingroup Elm_Photo
+ */
 EAPI Evas_Object *
 elm_photo_add(Evas_Object *parent)
 {
@@ -313,6 +485,17 @@ elm_photo_add(Evas_Object *parent)
    return elm_legacy_add(MY_CLASS, parent);
 }
 
+/**
+ * @internal
+ * @brief EOLIAN function called when the Elm_Photo object is finalized.
+ *
+ * This function finalizes the object creation. If a file or mmap was set on
+ * the internal icon, it triggers a load operation.
+ *
+ * @param obj The Eo object (Elm_Photo).
+ * @param sd The Elm_Photo_Data private data.
+ * @return The finalized Eo object, or NULL on failure.
+ */
 EOLIAN static Eo *
 _elm_photo_efl_object_finalize(Eo *obj, Elm_Photo_Data *sd)
 {
@@ -324,6 +507,18 @@ _elm_photo_efl_object_finalize(Eo *obj, Elm_Photo_Data *sd)
    return obj;
 }
 
+/**
+ * @internal
+ * @brief EOLIAN constructor for the Elm_Photo object.
+ *
+ * This function is called during object construction. It sets the legacy
+ * class name, registers smart callback descriptions, and sets the
+ * accessibility role.
+ *
+ * @param obj The Eo object (Elm_Photo).
+ * @param _pd The Elm_Photo_Data private data (unused in this function).
+ * @return The constructed Eo object.
+ */
 EOLIAN static Eo *
 _elm_photo_efl_object_constructor(Eo *obj, Elm_Photo_Data *_pd EINA_UNUSED)
 {
@@ -335,6 +530,16 @@ _elm_photo_efl_object_constructor(Eo *obj, Elm_Photo_Data *_pd EINA_UNUSED)
    return obj;
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for Efl_File.unload.
+ *
+ * Unloads the current image from the photo, reverting to the "no_photo"
+ * standard icon and re-evaluating sizing.
+ *
+ * @param obj The Eo object (Elm_Photo).
+ * @param sd The Elm_Photo_Data private data.
+ */
 EOLIAN static void
 _elm_photo_efl_file_unload(Eo *obj, Elm_Photo_Data *sd)
 {
@@ -342,6 +547,18 @@ _elm_photo_efl_file_unload(Eo *obj, Elm_Photo_Data *sd)
    _sizing_eval(obj);
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for Efl_File.load.
+ *
+ * Loads the image file specified by efl_file_get() into the photo.
+ * If no file is set, it attempts to set the "no_photo" standard icon.
+ * Triggers a sizing evaluation after loading.
+ *
+ * @param obj The Eo object (Elm_Photo).
+ * @param sd The Elm_Photo_Data private data.
+ * @return Eina_Error indicating success or failure of the load operation.
+ */
 EOLIAN static Eina_Error
 _elm_photo_efl_file_load(Eo *obj, Elm_Photo_Data *sd)
 {
@@ -363,48 +580,96 @@ _elm_photo_efl_file_load(Eo *obj, Elm_Photo_Data *sd)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for Efl_File.mmap_get.
+ * Delegates to the internal icon's efl_file_mmap_get.
+ */
 EOLIAN static const Eina_File *
 _elm_photo_efl_file_mmap_get(const Eo *obj EINA_UNUSED, Elm_Photo_Data *sd)
 {
    return efl_file_mmap_get(sd->icon);
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for Efl_File.mmap_set.
+ * Delegates to the internal icon's efl_file_mmap_set.
+ */
 EOLIAN static Eina_Error
 _elm_photo_efl_file_mmap_set(Eo *obj EINA_UNUSED, Elm_Photo_Data *sd, const Eina_File *file)
 {
    return efl_file_mmap_set(sd->icon, file);
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for Efl_File.file_set.
+ * Delegates to the internal icon's efl_file_set.
+ */
 EOLIAN static Eina_Error
 _elm_photo_efl_file_file_set(Eo *obj EINA_UNUSED, Elm_Photo_Data *sd, const char *file)
 {
    return efl_file_set(sd->icon, file);
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for Efl_File.file_get.
+ * Delegates to the internal icon's efl_file_get.
+ */
 EOLIAN static const char *
 _elm_photo_efl_file_file_get(const Eo *obj EINA_UNUSED, Elm_Photo_Data *sd)
 {
    return efl_file_get(sd->icon);
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for Efl_File.key_set.
+ * Delegates to the internal icon's efl_file_key_set.
+ */
 EOLIAN static void
 _elm_photo_efl_file_key_set(Eo *obj EINA_UNUSED, Elm_Photo_Data *sd, const char *key)
 {
    return efl_file_key_set(sd->icon, key);
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for Efl_File.key_get.
+ * Delegates to the internal icon's efl_file_key_get.
+ */
 EOLIAN static const char *
 _elm_photo_efl_file_key_get(const Eo *obj EINA_UNUSED, Elm_Photo_Data *sd)
 {
    return efl_file_key_get(sd->icon);
 }
 
+/**
+ * @internal
+ * @brief Class constructor for Elm_Photo.
+ *
+ * Registers the legacy type name for the Elm_Photo class.
+ *
+ * @param klass The Efl_Class to construct.
+ */
 static void
 _elm_photo_class_constructor(Efl_Class *klass)
 {
    evas_smart_legacy_type_register(MY_CLASS_NAME_LEGACY, klass);
 }
 
+/**
+ * @brief Set the file to be shown in the photo widget.
+ *
+ * @param obj The photo object.
+ * @param file The path to the image file.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ *
+ * @deprecated Use efl_file_set() instead.
+ * @ingroup Elm_Photo
+ */
 EAPI Eina_Bool
 elm_photo_file_set(Eo *obj, const char *file)
 {
@@ -412,6 +677,16 @@ elm_photo_file_set(Eo *obj, const char *file)
 }
 
 /* Legacy deprecated functions */
+
+/**
+ * @brief Set the edje group to be used for the photo frame when in editable mode.
+ *
+ * @param obj The photo object.
+ * @param edit @c EINA_TRUE to set editable, @c EINA_FALSE otherwise.
+ *
+ * @deprecated This function is deprecated as edit mode is handled by elm_image.
+ * @ingroup Elm_Photo
+ */
 EAPI void
 elm_photo_editable_set(Evas_Object *obj, Eina_Bool edit)
 {
@@ -420,6 +695,15 @@ elm_photo_editable_set(Evas_Object *obj, Eina_Bool edit)
    elm_image_editable_set(sd->icon, edit);
 }
 
+/**
+ * @brief Get the editable state of the photo.
+ *
+ * @param obj The photo object.
+ * @return @c EINA_TRUE if editable, @c EINA_FALSE otherwise.
+ *
+ * @deprecated This function is deprecated.
+ * @ingroup Elm_Photo
+ */
 EAPI Eina_Bool
 elm_photo_editable_get(const Evas_Object *obj)
 {
@@ -428,6 +712,15 @@ elm_photo_editable_get(const Evas_Object *obj)
    return elm_image_editable_get(sd->icon);
 }
 
+/**
+ * @brief Set the size of the photo.
+ *
+ * This is the size of the inner icon, not the entire widget.
+ *
+ * @param obj The photo object.
+ * @param size The size (width and height) to set. Must be greater than 0.
+ * @ingroup Elm_Photo
+ */
 EAPI void
 elm_photo_size_set(Evas_Object *obj, int size)
 {
@@ -440,6 +733,13 @@ elm_photo_size_set(Evas_Object *obj, int size)
    _sizing_eval(obj);
 }
 
+/**
+ * @brief Get the size of the photo.
+ *
+ * @param obj The photo object.
+ * @return The size of the photo.
+ * @ingroup Elm_Photo
+ */
 EAPI int
 elm_photo_size_get(const Evas_Object *obj)
 {
@@ -448,6 +748,19 @@ elm_photo_size_get(const Evas_Object *obj)
    return sd->size;
 }
 
+/**
+ * @brief Set whether the original photo should be fit to photo widget's area.
+ *
+ * When @p fill is @c EINA_FALSE, the photo will be scaled to fit
+ * within the object's bounds without cropping. When @p fill is
+ * @c EINA_TRUE, the photo will be scaled to fill the object's bounds,
+ * potentially cropping parts of the image.
+ *
+ * @param obj The photo object.
+ * @param fill @c EINA_TRUE to fill the photo widget's area,
+ *             @c EINA_FALSE to fit into it.
+ * @ingroup Elm_Photo
+ */
 EAPI void
 elm_photo_fill_inside_set(Evas_Object *obj, Eina_Bool fill)
 {
@@ -459,6 +772,14 @@ elm_photo_fill_inside_set(Evas_Object *obj, Eina_Bool fill)
    _sizing_eval(obj);
 }
 
+/**
+ * @brief Get whether the original photo should be fit to photo widget's area.
+ *
+ * @param obj The photo object.
+ * @return @c EINA_TRUE if the photo is set to fill the widget's area,
+ *         @c EINA_FALSE otherwise.
+ * @ingroup Elm_Photo
+ */
 EAPI Eina_Bool
 elm_photo_fill_inside_get(const Evas_Object *obj)
 {
@@ -467,6 +788,13 @@ elm_photo_fill_inside_get(const Evas_Object *obj)
    return sd->fill_inside;
 }
 
+/**
+ * @brief Set whether the photo widget should keep its aspect ratio.
+ *
+ * @param obj The photo object.
+ * @param fixed @c EINA_TRUE to keep aspect ratio, @c EINA_FALSE otherwise.
+ * @ingroup Elm_Photo
+ */
 EAPI void
 elm_photo_aspect_fixed_set(Evas_Object *obj, Eina_Bool fixed)
 {
@@ -475,6 +803,13 @@ elm_photo_aspect_fixed_set(Evas_Object *obj, Eina_Bool fixed)
    elm_image_aspect_fixed_set(sd->icon, fixed);
 }
 
+/**
+ * @brief Get whether the photo widget should keep its aspect ratio.
+ *
+ * @param obj The photo object.
+ * @return @c EINA_TRUE if aspect ratio is fixed, @c EINA_FALSE otherwise.
+ * @ingroup Elm_Photo
+ */
 EAPI Eina_Bool
 elm_photo_aspect_fixed_get(const Evas_Object *obj)
 {
@@ -483,6 +818,18 @@ elm_photo_aspect_fixed_get(const Evas_Object *obj)
    return elm_image_aspect_fixed_get(sd->icon);
 }
 
+/**
+ * @brief Set the file that will be used as a thumbnail for the photo.
+ *
+ * This function sets a thumbnail for the photo widget using the Evas
+ * Eet_File (or Edje_File) and group key provided. This is typically
+ * used for faster loading of a preview before the full image is decoded.
+ *
+ * @param obj The photo object.
+ * @param file The path to the EET/EDJ file containing the thumbnail.
+ * @param group The key or group within the file for the thumbnail image.
+ * @ingroup Elm_Photo
+ */
 EAPI void
 elm_photo_thumb_set(Evas_Object *obj, const char *file, const char *group)
 {
@@ -497,6 +844,10 @@ elm_photo_thumb_set(Evas_Object *obj, const char *file, const char *group)
 /* Internal EO APIs and hidden overrides */
 
 #define ELM_PHOTO_EXTRA_OPS \
-   EFL_CANVAS_GROUP_ADD_DEL_OPS(elm_photo)
+   EFL_CANVAS_GROUP_ADD_DEL_OPS(elm_photo) /**< Macro defining extra Eolian operations for Elm_Photo */
 
 #include "elm_photo_eo.c"
+
+/**
+ * @}
+ */

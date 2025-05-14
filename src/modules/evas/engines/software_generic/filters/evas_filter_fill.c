@@ -1,5 +1,21 @@
 #include "evas_engine_filter.h"
 
+/**
+ * @file
+ * @brief Implements the fill filter operation for the software engine.
+ */
+
+/**
+ * @brief Fills a rectangular area of the output buffer with a solid color using CPU.
+ *
+ * This function calculates the target rectangle based on the command's draw
+ * context (clip rectangle or LRTB margins) and fills it with the specified
+ * color (or alpha value if alpha_only).
+ *
+ * @param cmd The filter command containing parameters like output buffer,
+ *            color, and clipping information.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., buffer mapping failed).
+ */
 static Eina_Bool
 _fill_cpu(Evas_Filter_Command *cmd)
 {
@@ -56,6 +72,16 @@ _fill_cpu(Evas_Filter_Command *cmd)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the appropriate CPU function for the fill filter operation.
+ *
+ * Currently, this always returns the CPU implementation (_fill_cpu).
+ * It performs safety checks on the command and its output buffer.
+ *
+ * @param cmd The filter command.
+ * @return A pointer to the function _fill_cpu if the command is valid,
+ *         otherwise NULL.
+ */
 Software_Filter_Func
 eng_filter_fill_func_get(Evas_Filter_Command *cmd)
 {

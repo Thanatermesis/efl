@@ -19,6 +19,14 @@
  * if not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * @file
+ * @brief These routines are used for asynchronous file and memory map operations.
+ *
+ * It provides function to open, close, and map files in a non-blocking way
+ * using Ecore_Thread for background processing.
+ */
+
 #include "eio_private.h"
 #include "Eio.h"
 
@@ -31,6 +39,15 @@
  * @cond LOCAL
  */
 
+/**
+ * @brief Job function to open a file.
+ *
+ * This function is executed in a separate thread. It attempts to open the
+ * file specified in the Eio_File_Map structure.
+ *
+ * @param data Pointer to the Eio_File_Map structure.
+ * @param thread Pointer to the Ecore_Thread executing this job.
+ */
 static void
 _eio_file_open_job(void *data, Ecore_Thread *thread)
 {
@@ -40,6 +57,11 @@ _eio_file_open_job(void *data, Ecore_Thread *thread)
    if (!map->result) eio_file_thread_error(&map->common, thread);
 }
 
+/**
+ * @brief Frees resources associated with an Eio_File_Map structure used for file opening.
+ *
+ * @param map Pointer to the Eio_File_Map structure to free.
+ */
 static void
 _eio_file_open_free(Eio_File_Map *map)
 {
@@ -47,6 +69,12 @@ _eio_file_open_free(Eio_File_Map *map)
    eio_file_free((Eio_File*)map);
 }
 
+/**
+ * @brief Callback function executed in the main loop after a file open job completes successfully.
+ *
+ * @param data Pointer to the Eio_File_Map structure.
+ * @param thread Pointer to the Ecore_Thread that executed the job (unused).
+ */
 static void
 _eio_file_open_end(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -56,6 +84,12 @@ _eio_file_open_end(void *data, Ecore_Thread *thread EINA_UNUSED)
    _eio_file_open_free(map);
 }
 
+/**
+ * @brief Callback function executed in the main loop if a file open job is cancelled or fails.
+ *
+ * @param data Pointer to the Eio_File_Map structure.
+ * @param thread Pointer to the Ecore_Thread that was supposed to execute the job (unused).
+ */
 static void
 _eio_file_open_cancel(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -65,6 +99,15 @@ _eio_file_open_cancel(void *data, Ecore_Thread *thread EINA_UNUSED)
    _eio_file_open_free(map);
 }
 
+/**
+ * @brief Job function to close a file.
+ *
+ * This function is executed in a separate thread. It retrieves the file size
+ * and then closes the file.
+ *
+ * @param data Pointer to the Eio_File_Map structure.
+ * @param thread Pointer to the Ecore_Thread executing this job (unused).
+ */
 static void
 _eio_file_close_job(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -74,6 +117,12 @@ _eio_file_close_job(void *data, Ecore_Thread *thread EINA_UNUSED)
    eina_file_close(map->result);
 }
 
+/**
+ * @brief Callback function executed in the main loop after a file close job completes successfully.
+ *
+ * @param data Pointer to the Eio_File_Map structure.
+ * @param thread Pointer to the Ecore_Thread that executed the job (unused).
+ */
 static void
 _eio_file_close_end(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -83,6 +132,12 @@ _eio_file_close_end(void *data, Ecore_Thread *thread EINA_UNUSED)
    _eio_file_open_free(map);
 }
 
+/**
+ * @brief Callback function executed in the main loop if a file close job is cancelled or fails.
+ *
+ * @param data Pointer to the Eio_File_Map structure.
+ * @param thread Pointer to the Ecore_Thread that was supposed to execute the job (unused).
+ */
 static void
 _eio_file_close_cancel(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -92,6 +147,16 @@ _eio_file_close_cancel(void *data, Ecore_Thread *thread EINA_UNUSED)
    _eio_file_open_free(map);
 }
 
+/**
+ * @brief Job function to map an entire file into memory.
+ *
+ * This function is executed in a separate thread. It maps the entire file
+ * specified in the Eio_File_Map_Rule structure. If a filter callback is provided,
+ * it is called to potentially reject the map.
+ *
+ * @param data Pointer to the Eio_File_Map_Rule structure.
+ * @param thread Pointer to the Ecore_Thread executing this job.
+ */
 static void
 _eio_file_map_all_job(void *data, Ecore_Thread *thread)
 {
@@ -115,6 +180,16 @@ _eio_file_map_all_job(void *data, Ecore_Thread *thread)
      eio_file_thread_error(&map->common, thread);
 }
 
+/**
+ * @brief Job function to map a specific region of a file into memory.
+ *
+ * This function is executed in a separate thread. It maps a region of the file
+ * specified by offset and length in the Eio_File_Map_Rule structure.
+ * If a filter callback is provided, it is called to potentially reject the map.
+ *
+ * @param data Pointer to the Eio_File_Map_Rule structure.
+ * @param thread Pointer to the Ecore_Thread executing this job.
+ */
 static void
 _eio_file_map_new_job(void *data, Ecore_Thread *thread)
 {
@@ -139,6 +214,12 @@ _eio_file_map_new_job(void *data, Ecore_Thread *thread)
      eio_file_thread_error(&map->common, thread);
 }
 
+/**
+ * @brief Callback function executed in the main loop after a file map job completes successfully.
+ *
+ * @param data Pointer to the Eio_File_Map_Rule structure.
+ * @param thread Pointer to the Ecore_Thread that executed the job (unused).
+ */
 static void
 _eio_file_map_end(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -148,6 +229,12 @@ _eio_file_map_end(void *data, Ecore_Thread *thread EINA_UNUSED)
    eio_file_free((Eio_File*)map);
 }
 
+/**
+ * @brief Callback function executed in the main loop if a file map job is cancelled or fails.
+ *
+ * @param data Pointer to the Eio_File_Map_Rule structure.
+ * @param thread Pointer to the Ecore_Thread that was supposed to execute the job (unused).
+ */
 static void
 _eio_file_map_cancel(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -179,6 +266,21 @@ _eio_file_map_cancel(void *data, Ecore_Thread *thread EINA_UNUSED)
  *                                   API                                      *
  *============================================================================*/
 
+/**
+ * @brief Asynchronously opens a file.
+ *
+ * This function queues a request to open a file. The actual file opening
+ * is performed in a separate thread.
+ *
+ * @param name The path to the file to open.
+ * @param shared EINA_TRUE if the file should be opened with shared access, EINA_FALSE otherwise.
+ * @param open_cb Callback function to be called when the file is successfully opened.
+ *                The opened Eina_File handle is passed to this callback.
+ * @param error_cb Callback function to be called if an error occurs during file opening.
+ * @param data Custom data to be passed to the callback functions.
+ * @return An Eio_File handle representing the asynchronous operation, or NULL on failure to queue.
+ *         The Eina_File* itself is delivered via the open_cb.
+ */
 EIO_API Eio_File *
 eio_file_open(const char *name, Eina_Bool shared,
 	      Eio_Open_Cb open_cb,
@@ -211,6 +313,19 @@ eio_file_open(const char *name, Eina_Bool shared,
    return &map->common;
 }
 
+/**
+ * @brief Asynchronously closes an opened file.
+ *
+ * This function queues a request to close an already opened file.
+ * The actual file closing is performed in a separate thread.
+ *
+ * @param f The Eina_File handle to close. This handle must have been obtained
+ *          from a successful eio_file_open() operation or similar.
+ * @param done_cb Callback function to be called when the file is successfully closed.
+ * @param error_cb Callback function to be called if an error occurs during file closing.
+ * @param data Custom data to be passed to the callback functions.
+ * @return An Eio_File handle representing the asynchronous operation, or NULL on failure to queue.
+ */
 EIO_API Eio_File *
 eio_file_close(Eina_File *f,
                Eio_Done_Cb done_cb,
@@ -241,6 +356,24 @@ eio_file_close(Eina_File *f,
    return &map->common;
 }
 
+/**
+ * @brief Asynchronously maps an entire file into memory.
+ *
+ * This function queues a request to map an entire opened file into memory.
+ * The actual mapping is performed in a separate thread.
+ *
+ * @param f The Eina_File handle of the file to map.
+ * @param rule The population rule for the memory map (e.g., EINA_FILE_POPULATE, EINA_FILE_WILLNEED).
+ * @param filter_cb Optional callback function to filter/validate the mapped memory region
+ *                  before the main map_cb is called. If this callback returns EINA_FALSE,
+ *                  the map is considered failed/rejected.
+ * @param map_cb Callback function to be called when the file is successfully mapped.
+ *               The pointer to the mapped memory and its length are passed to this callback.
+ * @param error_cb Callback function to be called if an error occurs during mapping.
+ * @param data Custom data to be passed to the callback functions.
+ * @return An Eio_File handle representing the asynchronous operation, or NULL on failure to queue.
+ *         The mapped memory region is delivered via the map_cb.
+ */
 EIO_API Eio_File *
 eio_file_map_all(Eina_File *f,
                  Eina_File_Populate rule,
@@ -277,6 +410,26 @@ eio_file_map_all(Eina_File *f,
    return &map->common;
 }
 
+/**
+ * @brief Asynchronously maps a specific region of a file into memory.
+ *
+ * This function queues a request to map a specified region of an opened file into memory.
+ * The actual mapping is performed in a separate thread.
+ *
+ * @param f The Eina_File handle of the file to map.
+ * @param rule The population rule for the memory map (e.g., EINA_FILE_POPULATE, EINA_FILE_WILLNEED).
+ * @param offset The starting offset within the file for the memory map.
+ * @param length The length of the region to map.
+ * @param filter_cb Optional callback function to filter/validate the mapped memory region
+ *                  before the main map_cb is called. If this callback returns EINA_FALSE,
+ *                  the map is considered failed/rejected.
+ * @param map_cb Callback function to be called when the region is successfully mapped.
+ *               The pointer to the mapped memory and its length are passed to this callback.
+ * @param error_cb Callback function to be called if an error occurs during mapping.
+ * @param data Custom data to be passed to the callback functions.
+ * @return An Eio_File handle representing the asynchronous operation, or NULL on failure to queue.
+ *         The mapped memory region is delivered via the map_cb.
+ */
 EIO_API Eio_File *
 eio_file_map_new(Eina_File *f,
                  Eina_File_Populate rule,

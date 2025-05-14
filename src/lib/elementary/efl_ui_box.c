@@ -10,8 +10,20 @@
 #define EFL_UI_BOX_DATA_GET(o, sd) \
    Efl_Ui_Box_Data *sd = efl_data_scope_get(o, EFL_UI_BOX_CLASS)
 
+/**
+ * @brief Performs the custom layout calculation for the box.
+ * @param ui_box The box object.
+ * @param pd The private data of the box.
+ */
 void _efl_ui_box_custom_layout(Efl_Ui_Box *ui_box, Efl_Ui_Box_Data *pd);
 
+/**
+ * @brief Callback triggered when a child's size changes.
+ *
+ * Requests a layout update for the box.
+ * @param data The box object.
+ * @param event The Efl_Event details (unused).
+ */
 static void
 _on_child_size_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -19,6 +31,13 @@ _on_child_size_changed(void *data, const Efl_Event *event EINA_UNUSED)
    efl_pack_layout_request(box);
 }
 
+/**
+ * @brief Callback triggered when a child object is deleted.
+ *
+ * Removes the child from the box's internal list and requests a layout update.
+ * @param data The box object.
+ * @param event The Efl_Event details, where event->object is the child being deleted.
+ */
 static void
 _on_child_del(void *data, const Efl_Event *event)
 {
@@ -30,6 +49,13 @@ _on_child_del(void *data, const Efl_Event *event)
    efl_pack_layout_request(box);
 }
 
+/**
+ * @brief Callback triggered when a child's hints change.
+ *
+ * Requests a layout update for the box.
+ * @param data The box object.
+ * @param event The Efl_Event details (unused).
+ */
 static void
 _on_child_hints_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -43,6 +69,24 @@ EFL_CALLBACKS_ARRAY_DEFINE(efl_ui_box_callbacks,
   { EFL_EVENT_DEL, _on_child_del }
 );
 
+/**
+ * @brief Registers a child object with the box.
+ *
+ * This internal helper performs several actions:
+ * - Checks if the sub-object is already added or invalid.
+ * - Adds the sub-object to the widget if not an internal part.
+ * - Sets a key "_elm_leaveme" on the child (legacy, indicates the widget manager should not remove it).
+ * - Adds the child to the canvas group.
+ * - Sets the clipper for the child using the box's clipper.
+ * - Requests a layout update for the box.
+ * - Adds event callbacks for size changes, hints changes, and deletion of the child.
+ * - Emits EFL_CONTAINER_EVENT_CONTENT_ADDED.
+ *
+ * @param obj The box object.
+ * @param pd The private data of the box.
+ * @param subobj The child object to register.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _efl_ui_box_child_register(Eo *obj, Efl_Ui_Box_Data *pd, Efl_Gfx_Entity *subobj)
 {
@@ -69,6 +113,24 @@ _efl_ui_box_child_register(Eo *obj, Efl_Ui_Box_Data *pd, Efl_Gfx_Entity *subobj)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Unregisters a child object from the box.
+ *
+ * This internal helper performs several actions:
+ * - Checks if the sub-object is part of this widget.
+ * - Redirects the sub-object to top if not an internal part (legacy behavior).
+ * - Removes the child from the canvas group.
+ * - Clears the clipper for the child.
+ * - Clears the "_elm_leaveme" key on the child.
+ * - Requests a layout update for the box.
+ * - Removes event callbacks previously added during registration.
+ * - Emits EFL_CONTAINER_EVENT_CONTENT_REMOVED.
+ *
+ * @param obj The box object.
+ * @param pd The private data of the box (unused).
+ * @param subobj The child object to unregister.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _efl_ui_box_child_unregister(Eo *obj, Efl_Ui_Box_Data *pd EINA_UNUSED, Efl_Gfx_Entity *subobj)
 {
@@ -98,6 +160,13 @@ _efl_ui_box_child_unregister(Eo *obj, Efl_Ui_Box_Data *pd EINA_UNUSED, Efl_Gfx_E
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for hints changed event on the box itself.
+ *
+ * Requests a layout update for the box.
+ * @param data User data (unused).
+ * @param ev Event info, ev->object is the box.
+ */
 static void
 _efl_ui_box_size_hints_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -176,6 +245,15 @@ _efl_ui_box_efl_canvas_group_group_del(Eo *obj, Efl_Ui_Box_Data *_pd EINA_UNUSED
    efl_canvas_group_del(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Constructor for Efl.Ui.Box.
+ *
+ * Initializes the box object, sets its type, accessibility role,
+ * and default layout parameters.
+ * @param obj The object being constructed.
+ * @param pd Private data for the object.
+ * @return The constructed object.
+ */
 EOLIAN static Eo *
 _efl_ui_box_efl_object_constructor(Eo *obj, Efl_Ui_Box_Data *pd)
 {
@@ -192,6 +270,15 @@ _efl_ui_box_efl_object_constructor(Eo *obj, Efl_Ui_Box_Data *pd)
    return obj;
 }
 
+/**
+ * @brief Invalidates the Efl.Ui.Box object.
+ *
+ * Cleans up resources, specifically removing event callbacks from all children
+ * before they are potentially deleted or unparented by the superclass invalidation.
+ * The children list itself is freed.
+ * @param obj The object being invalidated.
+ * @param pd Private data for the object.
+ */
 EOLIAN static void
 _efl_ui_box_efl_object_invalidate(Eo *obj, Efl_Ui_Box_Data *pd)
 {
@@ -213,6 +300,15 @@ _efl_ui_box_efl_container_content_count(Eo *obj EINA_UNUSED, Efl_Ui_Box_Data *pd
    return eina_list_count(pd->children);
 }
 
+/**
+ * @brief Removes all packed children from the box and deletes them.
+ *
+ * Iterates through all children, removes their event callbacks, and then
+ * deletes each child object. Finally, requests a layout update.
+ * @param obj The box object.
+ * @param pd Private data of the box.
+ * @return EINA_TRUE on success (always in this implementation).
+ */
 EOLIAN static Eina_Bool
 _efl_ui_box_efl_pack_pack_clear(Eo *obj, Efl_Ui_Box_Data *pd)
 {
@@ -228,6 +324,15 @@ _efl_ui_box_efl_pack_pack_clear(Eo *obj, Efl_Ui_Box_Data *pd)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Removes all packed children from the box without deleting them.
+ *
+ * Iterates through all children and unregisters them using
+ * `_efl_ui_box_child_unregister`. The children list becomes empty.
+ * @param obj The box object.
+ * @param pd Private data of the box.
+ * @return EINA_TRUE if all children were successfully unregistered, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_box_efl_pack_unpack_all(Eo *obj, Efl_Ui_Box_Data *pd)
 {
@@ -240,6 +345,16 @@ _efl_ui_box_efl_pack_unpack_all(Eo *obj, Efl_Ui_Box_Data *pd)
    return ret;
 }
 
+/**
+ * @brief Removes a specific child from the box without deleting it.
+ *
+ * Unregisters the child using `_efl_ui_box_child_unregister` and then
+ * removes it from the internal list of children.
+ * @param obj The box object.
+ * @param pd Private data of the box.
+ * @param subobj The child object to remove.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_box_efl_pack_unpack(Eo *obj, Efl_Ui_Box_Data *pd, Efl_Gfx_Entity *subobj)
 {
@@ -251,6 +366,15 @@ _efl_ui_box_efl_pack_unpack(Eo *obj, Efl_Ui_Box_Data *pd, Efl_Gfx_Entity *subobj
    return EINA_TRUE;
 }
 
+/**
+ * @brief Default pack operation. Adds an object to the end of the box.
+ *
+ * This is equivalent to `efl_pack_end`.
+ * @param obj The box object.
+ * @param pd Private data of the box (unused).
+ * @param subobj The child object to pack.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_box_efl_pack_pack(Eo *obj, Efl_Ui_Box_Data *pd EINA_UNUSED, Efl_Gfx_Entity *subobj)
 {
@@ -305,18 +429,31 @@ _efl_ui_box_efl_pack_linear_pack_after(Eo *obj, Efl_Ui_Box_Data *pd, Efl_Gfx_Ent
    return EINA_TRUE;
 }
 
+/**
+ * @brief Packs a child object at a specific index.
+ *
+ * Handles negative indexing (from the end) and out-of-bounds indices
+ * (packing at beginning or end). Registers the child and inserts it
+ * into the children list at the specified position.
+ * @param obj The box object.
+ * @param pd Private data of the box.
+ * @param subobj The child object to pack.
+ * @param index The index at which to pack the child.
+ *              Example: 0 for beginning, -1 for end (before append).
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_box_efl_pack_linear_pack_at(Eo *obj, Efl_Ui_Box_Data *pd, Efl_Gfx_Entity *subobj, int index)
 {
    int count = eina_list_count(pd->children);
 
-   if (index < -count)
+   if (index < -count) // Index too small, pack at beginning
      return efl_pack_begin(obj, subobj);
 
-   if (index >= count)
+   if (index >= count) // Index too large, pack at end
      return efl_pack_end(obj, subobj);
 
-   if (index < 0)
+   if (index < 0) // Negative index, count from the end
      index += count;
 
    if (!_efl_ui_box_child_register(obj, pd, subobj))
@@ -328,23 +465,42 @@ _efl_ui_box_efl_pack_linear_pack_at(Eo *obj, Efl_Ui_Box_Data *pd, Efl_Gfx_Entity
    return EINA_TRUE;
 }
 
+/**
+ * @brief Retrieves the child object at a specific index.
+ *
+ * Handles negative indexing and out-of-bounds indices (returns first or last element).
+ * @param obj The box object (unused).
+ * @param pd Private data of the box.
+ * @param index The index of the child to retrieve.
+ *              Example: 0 for first, -1 for last.
+ * @return The child object at the specified index, or NULL if list is empty.
+ */
 EOLIAN static Efl_Gfx_Entity *
 _efl_ui_box_efl_pack_linear_pack_content_get(Eo *obj EINA_UNUSED, Efl_Ui_Box_Data *pd, int index)
 {
    int count = eina_list_count(pd->children);
 
-   if (index <= -count)
+   if (index <= -count) // Index too small, get first
      return eina_list_data_get(pd->children);
 
-   if (index >= count)
+   if (index >= count) // Index too large, get last
      return eina_list_last_data_get(pd->children);
 
-   if (index < 0)
+   if (index < 0) // Negative index, count from the end
      index += count;
 
    return eina_list_nth(pd->children, index);
 }
 
+/**
+ * @brief Unpacks (removes) the child object at a specific index.
+ *
+ * Retrieves the content at the index and then unpacks it.
+ * @param obj The box object.
+ * @param pd Private data of the box (unused).
+ * @param index The index of the child to unpack.
+ * @return The unpacked child object, or NULL on failure or if no child at index.
+ */
 EOLIAN static Efl_Gfx_Entity *
 _efl_ui_box_efl_pack_linear_pack_unpack_at(Eo *obj, Efl_Ui_Box_Data *pd EINA_UNUSED, int index)
 {
@@ -365,6 +521,15 @@ _efl_ui_box_efl_pack_linear_pack_index_get(Eo *obj EINA_UNUSED, Efl_Ui_Box_Data 
    return eina_list_data_idx(pd->children, (Efl_Gfx_Entity *)subobj);
 }
 
+/**
+ * @brief Requests a layout update for the box.
+ *
+ * Marks the box for a full recalculation and signals that the canvas group
+ * needs recalculation. `full_recalc` typically indicates that cached sizes
+ * or positions might be invalid and need to be recomputed from scratch.
+ * @param obj The box object.
+ * @param pd Private data of the box.
+ */
 EOLIAN static void
 _efl_ui_box_efl_pack_layout_layout_request(Eo *obj, Efl_Ui_Box_Data *pd)
 {

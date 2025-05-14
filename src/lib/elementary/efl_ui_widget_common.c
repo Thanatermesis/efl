@@ -21,12 +21,23 @@
 #include "elm_part_helper.h"
 #include "elm_widget_combobox.h"
 
+/**
+ * @internal
+ * @brief Structure to hold the state of a widget tree iterator.
+ */
 typedef struct {
-   Eina_Iterator iterator;
-   Efl_Ui_Widget *origin; //where we started
-   Efl_Ui_Widget *current; // the current widget where the iterator is
+   Eina_Iterator iterator; /**< The Eina_Iterator structure itself. */
+   Efl_Ui_Widget *origin; /**< The widget where the iteration started. */
+   Efl_Ui_Widget *current; /**< The current widget the iterator is pointing to. */
 } Widget_Iterator;
 
+/**
+ * @internal
+ * @brief Initializes a new Widget_Iterator.
+ *
+ * @param origin The widget from which the iteration will start.
+ * @return A pointer to the newly allocated Widget_Iterator, or NULL on failure.
+ */
 static Widget_Iterator*
 iter_init(Efl_Ui_Widget *origin)
 {
@@ -44,6 +55,17 @@ iter_init(Efl_Ui_Widget *origin)
    return it;
 }
 
+/**
+ * @internal
+ * @brief Fetches the parent widget of a given Efl_Gfx_Entity.
+ *
+ * This function checks if the object is an Efl_Ui_Widget and calls
+ * efl_ui_widget_parent_get, otherwise it retrieves the "elm-parent"
+ * data. This is a compatibility layer.
+ *
+ * @param o The Efl_Gfx_Entity to get the parent from.
+ * @return The parent Efl_Ui_Widget, or NULL if not found.
+ */
 static Efl_Ui_Widget*
 _fetch_parent_widget(Efl_Gfx_Entity* o)
 {
@@ -57,6 +79,16 @@ _fetch_parent_widget(Efl_Gfx_Entity* o)
    return parent;
 }
 
+/**
+ * @internal
+ * @brief Finds the next sibling widget of a given Efl_Gfx_Entity.
+ *
+ * It first fetches the parent of @p o, then looks for @p o in the
+ * parent's children list to find the next child.
+ *
+ * @param o The Efl_Gfx_Entity whose next sibling is to be found.
+ * @return The next sibling Efl_Ui_Widget, or NULL if it's the last child or not found.
+ */
 static Efl_Ui_Widget*
 _next_widget(Efl_Gfx_Entity* o)
 {
@@ -71,6 +103,20 @@ _next_widget(Efl_Gfx_Entity* o)
      return NULL;
 }
 
+/**
+ * @internal
+ * @brief Advances the widget tree iterator to the next element.
+ *
+ * This function implements a depth-first traversal of the widget tree.
+ * - If the current widget has children, it moves to the first child.
+ * - If the current widget has no children, it moves to its next sibling.
+ * - If there are no more siblings, it moves up to the parent and tries to find the parent's next sibling.
+ * This process continues until the next widget is found or the entire subtree from the origin has been traversed.
+ *
+ * @param it The widget iterator.
+ * @param data Pointer to store the next widget (Efl_Ui_Widget or Efl_Gfx_Entity).
+ * @return EINA_TRUE if a next widget was found, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _widget_next(Widget_Iterator *it, void **data)
 {
@@ -131,6 +177,17 @@ efl_ui_widget_tree_iterator(Efl_Ui_Widget *obj)
    return &it->iterator;
 }
 
+/**
+ * @internal
+ * @brief Filter function for eina_iterator_filter_new.
+ *
+ * Checks if the given data item is an Efl_Ui_Widget.
+ *
+ * @param container The iterator container (unused).
+ * @param data The data item to check.
+ * @param fdata User data for the filter (unused).
+ * @return EINA_TRUE if data is an Efl_Ui_Widget, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _only_widget(const void *container EINA_UNUSED, void *data, void *fdata EINA_UNUSED)
 {
@@ -146,6 +203,17 @@ efl_ui_widget_tree_widget_iterator(Efl_Ui_Widget *obj)
    return eina_iterator_filter_new(tree_iterator, _only_widget, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Advances the parent iterator to the next parent.
+ *
+ * If it's the first call, it returns the origin widget.
+ * Otherwise, it returns the parent of the current widget.
+ *
+ * @param it The widget iterator.
+ * @param data Pointer to store the next parent widget.
+ * @return EINA_TRUE if a next parent was found, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _parent_next(Widget_Iterator *it, void **data)
 {

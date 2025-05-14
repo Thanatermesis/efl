@@ -20,6 +20,17 @@
 
 //////////////////////////////////////////////////////////////////////////
 
+/**
+ * @internal
+ * @brief Constructor for the Efl_Appthread object.
+ *
+ * Initializes the file descriptors and control pipe descriptors to -1,
+ * and sets the initial can_write state to EINA_TRUE.
+ *
+ * @param obj The Efl_Appthread object.
+ * @param pd The private data for the Efl_Appthread object.
+ * @return The constructed Efl_Appthread object.
+ */
 EOLIAN static Efl_Object *
 _efl_appthread_efl_object_constructor(Eo *obj, Efl_Appthread_Data *pd)
 {
@@ -32,6 +43,16 @@ _efl_appthread_efl_object_constructor(Eo *obj, Efl_Appthread_Data *pd)
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Destructor for the Efl_Appthread object.
+ *
+ * Closes all open file descriptors and control pipe descriptors.
+ * It also nullifies the handlers associated with these descriptors.
+ *
+ * @param obj The Efl_Appthread object.
+ * @param pd The private data for the Efl_Appthread object.
+ */
 EOLIAN static void
 _efl_appthread_efl_object_destructor(Eo *obj, Efl_Appthread_Data *pd)
 {
@@ -57,6 +78,18 @@ _efl_appthread_efl_object_destructor(Eo *obj, Efl_Appthread_Data *pd)
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Io.Closer.close.
+ *
+ * Closes the I/O streams associated with the appthread.
+ * Sets can_write and can_read to EINA_FALSE, and eos to EINA_TRUE.
+ * Closes the input and output file descriptors and deletes their handlers.
+ *
+ * @param obj The Efl_Appthread object.
+ * @param pd The private data for the Efl_Appthread object.
+ * @return 0 on success, or an error code on failure. EBADF if already closed.
+ */
 EOLIAN static Eina_Error
 _efl_appthread_efl_io_closer_close(Eo *obj, Efl_Appthread_Data *pd)
 {
@@ -75,6 +108,16 @@ _efl_appthread_efl_io_closer_close(Eo *obj, Efl_Appthread_Data *pd)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Io.Closer.closed_get.
+ *
+ * Checks if the I/O streams are closed.
+ *
+ * @param obj The Efl_Appthread object (unused).
+ * @param pd The private data for the Efl_Appthread object.
+ * @return EINA_TRUE if both input and output file descriptors are -1, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_appthread_efl_io_closer_closed_get(const Eo *obj EINA_UNUSED, Efl_Appthread_Data *pd)
 {
@@ -82,6 +125,19 @@ _efl_appthread_efl_io_closer_closed_get(const Eo *obj EINA_UNUSED, Efl_Appthread
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Io.Reader.read.
+ *
+ * Reads data from the appthread's output file descriptor.
+ * If the read operation results in 0 bytes read (EOF), it sets can_read to EINA_FALSE,
+ * eos to EINA_TRUE, closes the output fd, and cleans up its handler.
+ *
+ * @param obj The Efl_Appthread object.
+ * @param pd The private data for the Efl_Appthread object.
+ * @param rw_slice The slice to read data into. Its len field will be updated with the number of bytes read.
+ * @return 0 on success. EPIPE if EOF is reached. EINVAL on other errors or if fd is invalid.
+ */
 EOLIAN static Eina_Error
 _efl_appthread_efl_io_reader_read(Eo *obj, Efl_Appthread_Data *pd, Eina_Rw_Slice *rw_slice)
 {
@@ -128,6 +184,17 @@ err:
    return EINVAL;
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Io.Reader.can_read_set.
+ *
+ * Sets the can_read status and adjusts the activity of the input handler accordingly.
+ * Emits the EFL_IO_READER_EVENT_CAN_READ_CHANGED event if the status changes.
+ *
+ * @param obj The Efl_Appthread object.
+ * @param pd The private data for the Efl_Appthread object.
+ * @param can_read The new can_read status.
+ */
 EOLIAN static void
 _efl_appthread_efl_io_reader_can_read_set(Eo *obj, Efl_Appthread_Data *pd, Eina_Bool can_read)
 {
@@ -142,12 +209,33 @@ _efl_appthread_efl_io_reader_can_read_set(Eo *obj, Efl_Appthread_Data *pd, Eina_
    efl_event_callback_call(obj, EFL_IO_READER_EVENT_CAN_READ_CHANGED, &can_read);
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Io.Reader.can_read_get.
+ *
+ * Gets the current can_read status.
+ *
+ * @param obj The Efl_Appthread object (unused).
+ * @param pd The private data for the Efl_Appthread object.
+ * @return The current can_read status.
+ */
 EOLIAN static Eina_Bool
 _efl_appthread_efl_io_reader_can_read_get(const Eo *obj EINA_UNUSED, Efl_Appthread_Data *pd)
 {
    return pd->fd.can_read;
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Io.Reader.eos_set.
+ *
+ * Sets the end-of-stream (EOS) status for reading.
+ * If EOS is reached, it deactivates the output handler and emits the EFL_IO_READER_EVENT_EOS event.
+ *
+ * @param obj The Efl_Appthread object.
+ * @param pd The private data for the Efl_Appthread object.
+ * @param is_eos The new EOS status.
+ */
 EOLIAN static void
 _efl_appthread_efl_io_reader_eos_set(Eo *obj, Efl_Appthread_Data *pd, Eina_Bool is_eos)
 {
@@ -161,12 +249,40 @@ _efl_appthread_efl_io_reader_eos_set(Eo *obj, Efl_Appthread_Data *pd, Eina_Bool 
    efl_event_callback_call(obj, EFL_IO_READER_EVENT_EOS, NULL);
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Io.Reader.eos_get.
+ *
+ * Gets the current end-of-stream (EOS) status for reading.
+ *
+ * @param obj The Efl_Appthread object (unused).
+ * @param pd The private data for the Efl_Appthread object.
+ * @return The current EOS status for reading.
+ */
 EOLIAN static Eina_Bool
 _efl_appthread_efl_io_reader_eos_get(const Eo *obj EINA_UNUSED, Efl_Appthread_Data *pd)
 {
    return pd->fd.eos_read;
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Io.Writer.write.
+ *
+ * Writes data to the appthread's input file descriptor.
+ * If the write operation results in 0 bytes written (which usually indicates an issue or closed pipe),
+ * it closes the input fd and cleans up its handler.
+ * If any data is written, can_write is set to EINA_FALSE.
+ *
+ * @param obj The Efl_Appthread object.
+ * @param pd The private data for the Efl_Appthread object.
+ * @param slice The slice of data to write. Its len field will be updated with the number of bytes written.
+ * @param remaining If not NULL, this slice will be updated to reflect any data that was not written.
+ *                  Example: If slice is {mem="abc", len=3} and 1 byte is written,
+ *                           slice becomes {mem="abc", len=1} and
+ *                           remaining becomes {mem="bc", len=2}.
+ * @return 0 on success. EPIPE if the pipe is closed. EINVAL on other errors or if fd is invalid.
+ */
 EOLIAN static Eina_Error
 _efl_appthread_efl_io_writer_write(Eo *obj, Efl_Appthread_Data *pd, Eina_Slice *slice, Eina_Slice *remaining)
 {
@@ -221,6 +337,17 @@ err:
    return EINVAL;
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Io.Writer.can_write_set.
+ *
+ * Sets the can_write status and adjusts the activity of the input handler accordingly.
+ * Emits the EFL_IO_WRITER_EVENT_CAN_WRITE_CHANGED event if the status changes.
+ *
+ * @param obj The Efl_Appthread object.
+ * @param pd The private data for the Efl_Appthread object.
+ * @param can_write The new can_write status.
+ */
 EOLIAN static void
 _efl_appthread_efl_io_writer_can_write_set(Eo *obj, Efl_Appthread_Data *pd, Eina_Bool can_write)
 {
@@ -235,12 +362,35 @@ _efl_appthread_efl_io_writer_can_write_set(Eo *obj, Efl_Appthread_Data *pd, Eina
    efl_event_callback_call(obj, EFL_IO_WRITER_EVENT_CAN_WRITE_CHANGED, &can_write);
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Io.Writer.can_write_get.
+ *
+ * Gets the current can_write status.
+ *
+ * @param obj The Efl_Appthread object (unused).
+ * @param pd The private data for the Efl_Appthread object.
+ * @return The current can_write status.
+ */
 EOLIAN static Eina_Bool
 _efl_appthread_efl_io_writer_can_write_get(const Eo *obj EINA_UNUSED, Efl_Appthread_Data *pd)
 {
    return pd->fd.can_write;
 }
 
+/**
+ * @internal
+ * @brief Forwarding function for asynchronous calls to the appthread's context.
+ *
+ * This is the Eolian exposed function that wraps the internal implementation.
+ *
+ * @param obj The Efl_Appthread object.
+ * @param pd The private data for the Efl_Appthread object.
+ * @param func_data User data to be passed to the callback function.
+ * @param func The callback function to execute in the appthread's context.
+ *             Example: `void my_callback(void *data, Eo *thread_obj, Efl_Io_Closer *io) { ... }`
+ * @param func_free_cb Optional callback to free func_data when the call is completed or cancelled.
+ */
 void _appthread_threadio_call(Eo *obj, Efl_Appthread_Data *pd, void *func_data, EflThreadIOCall func, Eina_Free_Cb func_free_cb);
 
 EOLIAN static void
@@ -249,6 +399,20 @@ _efl_appthread_efl_threadio_call(Eo *obj, Efl_Appthread_Data *pd, void *func_dat
    _appthread_threadio_call(obj, pd, func_data, func, func_free_cb);
 }
 
+/**
+ * @internal
+ * @brief Forwarding function for synchronous calls to the appthread's context.
+ *
+ * This is the Eolian exposed function that wraps the internal implementation.
+ *
+ * @param obj The Efl_Appthread object.
+ * @param pd The private data for the Efl_Appthread object.
+ * @param func_data User data to be passed to the callback function.
+ * @param func The callback function to execute in the appthread's context.
+ *             Example: `void *my_sync_callback(void *data, Eo *thread_obj, Efl_Io_Closer *io) { return result_data; }`
+ * @param func_free_cb Optional callback to free func_data when the call is completed.
+ * @return The value returned by the synchronous callback function `func`.
+ */
 void *_appthread_threadio_call_sync(Eo *obj, Efl_Appthread_Data *pd, void *func_data, EflThreadIOCallSync func, Eina_Free_Cb func_free_cb);
 
 EOLIAN static void *

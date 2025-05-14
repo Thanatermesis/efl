@@ -37,8 +37,20 @@
 
 #define ECORE_EXE_WIN32_TIMEOUT 3000
 
+/** @internal
+ * @brief Default priority for running processes.
+ * This can be changed by ecore_exe_run_priority_set().
+ */
 static int run_pri = NORMAL_PRIORITY_CLASS;
 
+/**
+ * @internal
+ * @brief Terminates the I/O polling thread associated with an Ecore_Exe object.
+ *
+ * This function cancels the thread and waits for a short period for it to exit.
+ *
+ * @param obj The Ecore_Exe object whose I/O thread is to be terminated.
+ */
 static void
 _ecore_exe_threads_terminate(Ecore_Exe *obj)
 {
@@ -51,6 +63,17 @@ _ecore_exe_threads_terminate(Ecore_Exe *obj)
    exe->th = NULL;
 }
 
+/**
+ * @internal
+ * @brief Callback function invoked when a child process handle is signaled (e.g., process termination).
+ *
+ * This function retrieves the exit code of the process and adds an ECORE_EXE_EVENT_DEL
+ * event to the Ecore event queue.
+ *
+ * @param data Pointer to the Ecore_Exe object.
+ * @param wh Unused Ecore_Win32_Handler.
+ * @return EINA_FALSE to indicate the handler should not be called again (it will be deleted).
+ */
 static Eina_Bool
 _ecore_exe_close_cb(void *data,
                     Ecore_Win32_Handler *wh EINA_UNUSED)
@@ -81,24 +104,43 @@ _ecore_exe_close_cb(void *data,
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Structure to hold data for the I/O polling thread.
+ */
 typedef struct
 {
-   Ecore_Exe  *obj;
-   HANDLE      read_pipe;
-   HANDLE      error_pipe;
-   Eina_Bool   read : 1;
-   Eina_Bool   error : 1;
+   Ecore_Exe  *obj;        /**< The Ecore_Exe object associated with this thread. */
+   HANDLE      read_pipe;  /**< Handle to the child's stdout pipe. */
+   HANDLE      error_pipe; /**< Handle to the child's stderr pipe. */
+   Eina_Bool   read : 1;   /**< Flag indicating if stdout should be polled. */
+   Eina_Bool   error : 1;  /**< Flag indicating if stderr should be polled. */
 } Threaddata;
 
+/**
+ * @internal
+ * @brief Structure to hold data passed from the I/O polling thread to the main thread.
+ */
 typedef struct
 {
-   Ecore_Exe     *obj;
-   unsigned char *buf;
-   int            buf_size;
-   Eina_Bool      read : 1;
-   Eina_Bool      error : 1;
+   Ecore_Exe     *obj;        /**< The Ecore_Exe object. */
+   unsigned char *buf;        /**< Buffer containing data read from the pipe. */
+   int            buf_size; /**< Size of the data in the buffer. */
+   Eina_Bool      read : 1;   /**< Flag indicating if data is from stdout. */
+   Eina_Bool      error : 1;  /**< Flag indicating if data is from stderr. */
 } Threadreply;
 
+/**
+ * @internal
+ * @brief I/O polling thread function for reading data from child process pipes.
+ *
+ * This thread continuously polls the stdout and stderr pipes of the child process.
+ * When data is available, it reads the data and sends it to the main thread
+ * via ecore_thread_feedback().
+ *
+ * @param data Pointer to a Threaddata structure.
+ * @param th The Ecore_Thread this function is running in.
+ */
 static void
 _ecore_exe_win32_io_poll_thread(void *data, Ecore_Thread *th)
 {
@@ -177,6 +219,18 @@ _ecore_exe_win32_io_poll_thread(void *data, Ecore_Thread *th)
    free(tdat);
 }
 
+/**
+ * @internal
+ * @brief Notification callback executed in the main thread when data is received from the I/O polling thread.
+ *
+ * This function processes the data received from the child process's pipes.
+ * It appends the new data to existing buffers and triggers ECORE_EXE_EVENT_DATA
+ * or ECORE_EXE_EVENT_ERROR events.
+ *
+ * @param data Unused user data.
+ * @param th Unused Ecore_Thread.
+ * @param msg Pointer to a Threadreply structure containing the received data.
+ */
 static void
 _ecore_exe_win32_io_poll_notify(void *data EINA_UNUSED,
                                 Ecore_Thread *th EINA_UNUSED, void *msg)
@@ -255,6 +309,15 @@ _ecore_exe_win32_io_poll_notify(void *data EINA_UNUSED,
    free(trep);
 }
 
+/**
+ * @internal
+ * @brief Thread procedure used by CreateRemoteThread to send Ctrl+C/Ctrl+Break events.
+ *
+ * This function is injected into the target process to simulate console control events.
+ *
+ * @param data Unused.
+ * @return Always 1.
+ */
 static DWORD WINAPI
 _ecore_exe_thread_procedure(LPVOID data EINA_UNUSED)
 {
@@ -263,6 +326,15 @@ _ecore_exe_thread_procedure(LPVOID data EINA_UNUSED)
    return 1;
 }
 
+/**
+ * @internal
+ * @brief Thread procedure used by CreateRemoteThread to call ExitProcess in the target process.
+ *
+ * This function is injected into the target process to force it to exit with a specific code.
+ *
+ * @param data Pointer to a UINT containing the exit code.
+ * @return Always 1 (though ExitProcess should prevent this from being reached).
+ */
 static DWORD __stdcall
 _ecore_exe_exit_process(void *data)
 {
@@ -272,6 +344,18 @@ _ecore_exe_exit_process(void *data)
    return 1;
 }
 
+/**
+ * @internal
+ * @brief Callback procedure for EnumWindows, used to send signals/messages to a child process's windows.
+ *
+ * This function iterates through top-level windows. If a window belongs to the
+ * target child process (identified by thread ID), it attempts to terminate or
+ * signal the process using various methods (Ctrl+C, WM_CLOSE, WM_QUIT, TerminateProcess).
+ *
+ * @param window Handle to a top-level window.
+ * @param data LPARAM, cast to Ecore_Exe* representing the target child process.
+ * @return EINA_TRUE to continue enumeration, EINA_FALSE to stop.
+ */
 static BOOL CALLBACK
 _ecore_exe_enum_windows_procedure(HWND window,
                                   LPARAM data)
@@ -322,6 +406,13 @@ _ecore_exe_enum_windows_procedure(HWND window,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Sets the default priority for new processes created by ecore_exe_run.
+ *
+ * @param pri The desired priority class, one of ECORE_EXE_WIN32_PRIORITY_*.
+ * @see _impl_ecore_exe_run_priority_get()
+ */
 void
 _impl_ecore_exe_run_priority_set(int pri)
 {
@@ -356,6 +447,13 @@ _impl_ecore_exe_run_priority_set(int pri)
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the current default priority for new processes.
+ *
+ * @return The current priority class, one of ECORE_EXE_WIN32_PRIORITY_*.
+ * @see _impl_ecore_exe_run_priority_set()
+ */
 int
 _impl_ecore_exe_run_priority_get(void)
 {
@@ -385,6 +483,19 @@ _impl_ecore_exe_run_priority_get(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Extracts the child executable name from a command string.
+ *
+ * This function parses the command string to find the first token, which is
+ * assumed to be the executable. It handles quoted paths.
+ *
+ * @param cmd The full command string.
+ * @return A newly allocated string containing the child executable name, or NULL on failure.
+ *         The caller is responsible for freeing the returned string.
+ * @note Example: "C:\\Path\\To\\program.exe" -arg1 -> "C:\\Path\\To\\program.exe"
+ * @note Example: program.exe -arg1 -> "program.exe"
+ */
 static char *
 _ecore_exe_win32_child_get(const char *cmd)
 {
@@ -427,6 +538,19 @@ _ecore_exe_win32_child_get(const char *cmd)
    return child;
 }
 
+/**
+ * @internal
+ * @brief Reads a file to find a shebang ("#!") line and extracts the interpreter.
+ *
+ * This function opens the specified file, reads the first line, and if it's a
+ * shebang line, parses the interpreter. It handles optional "/usr/bin/env"
+ * and quotes the extracted interpreter.
+ *
+ * @param child Path to the script file.
+ * @return A newly allocated string containing the quoted interpreter (e.g., "\"python.exe\""),
+ *         or NULL if no shebang is found, the file cannot be opened, or on error.
+ *         The caller is responsible for freeing the returned string.
+ */
 static char *
 _ecore_exe_win32_shebang_interpreter_get(const char *child)
 {
@@ -535,6 +659,15 @@ _ecore_exe_win32_shebang_interpreter_get(const char *child)
    return interpreter;
 }
 
+/**
+ * @internal
+ * @brief Constructs a command string to execute a batch file using "cmd.exe /C".
+ *
+ * @param exe_cmd The original command string (path to the .bat file and its arguments).
+ * @return A newly allocated string formatted as "\"cmd.exe\" \"/C\" original_command",
+ *         or NULL on allocation failure. The caller must free the returned string.
+ * @note Example: mybatch.bat arg1 -> "\"cmd.exe\" \"/C\" mybatch.bat arg1"
+ */
 static char *
 _ecore_exe_win32_batch_cmd_get(const char *exe_cmd)
 {
@@ -560,6 +693,21 @@ _ecore_exe_win32_batch_cmd_get(const char *exe_cmd)
    return cmd;
 }
 
+/**
+ * @internal
+ * @brief Constructs a command string to execute a script using its shebang interpreter.
+ *
+ * This function gets the interpreter from the shebang line of the `child` script
+ * and prepends it to the `exe_cmd`.
+ *
+ * @param exe_cmd The original command string (script path and its arguments).
+ * @param child Path to the script file (used to read the shebang).
+ * @return A newly allocated string formatted as "interpreter original_command",
+ *         or NULL if the interpreter cannot be determined or on allocation failure.
+ *         The caller must free the returned string.
+ * @note Example: if myscript.sh has "#!/usr/bin/python.exe", and exe_cmd is "myscript.sh -v",
+ *       this returns "\"python.exe\" myscript.sh -v".
+ */
 static char *
 _ecore_exe_win32_shebang_cmd_get(const char *exe_cmd, const char *child)
 {
@@ -598,6 +746,20 @@ _ecore_exe_win32_shebang_cmd_get(const char *exe_cmd, const char *child)
    return cmd;
 }
 
+/**
+ * @internal
+ * @brief Finalizes the Ecore_Exe object, creating and starting the child process.
+ *
+ * This function is called when the Ecore_Exe object is finalized. It sets up
+ * pipes for stdin, stdout, and stderr as specified by the flags, then creates
+ * the child process using CreateProcess. It handles .bat files and shebangs
+ * by modifying the command line appropriately. It also sets up a handler to
+ * detect process termination.
+ *
+ * @param obj The Ecore_Exe object being finalized.
+ * @param exe The private data associated with the Ecore_Exe object.
+ * @return The finalized Ecore_Exe object (obj) on success, or NULL on failure.
+ */
 Eo *
 _impl_ecore_exe_efl_object_finalize(Eo *obj, Ecore_Exe_Data *exe)
 {
@@ -794,6 +956,16 @@ error:
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Sends data to the stdin of the child process.
+ *
+ * @param obj The Ecore_Exe object.
+ * @param exe The private data of the Ecore_Exe object.
+ * @param data Pointer to the data to send.
+ * @param size The size of the data in bytes.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., pipe closed or write error).
+ */
 Eina_Bool
 _impl_ecore_exe_send(Ecore_Exe  *obj,
                      Ecore_Exe_Data *exe,
@@ -814,6 +986,28 @@ _impl_ecore_exe_send(Ecore_Exe  *obj,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Retrieves data from the internal buffers for stdout or stderr and prepares an event.
+ *
+ * This function is called to construct an Ecore_Exe_Event_Data structure when
+ * data has been read from the child process's stdout or stderr pipes.
+ * It handles line buffering if enabled for the respective pipe.
+ *
+ * @param obj The Ecore_Exe object.
+ * @param exe The private data of the Ecore_Exe object.
+ * @param flags Indicates whether to get data for ECORE_EXE_PIPE_READ or ECORE_EXE_PIPE_ERROR.
+ * @return A newly allocated Ecore_Exe_Event_Data structure, or NULL if no complete lines
+ *         are available (for line-buffered mode) or on allocation failure.
+ *         The caller is responsible for the event data if not NULL.
+ *         The `data` field within the returned struct points to the buffered data.
+ *         If line-buffered, `lines` array is populated:
+ *         Example `e->lines` structure:
+ *         `e->lines[0] = { .line = "First line data", .size = 15 }`
+ *         `e->lines[1] = { .line = "Second line data", .size = 16 }`
+ *         `...`
+ *         `e->lines[n] = { .line = NULL, .size = 0 }` (terminator)
+ */
 Ecore_Exe_Event_Data *
 _impl_ecore_exe_event_data_get(Ecore_Exe      *obj,
                                Ecore_Exe_Data *exe,
@@ -944,6 +1138,16 @@ _impl_ecore_exe_event_data_get(Ecore_Exe      *obj,
    return e;
 }
 
+/**
+ * @internal
+ * @brief Destructor for the Ecore_Exe object.
+ *
+ * Cleans up resources associated with the Ecore_Exe, including terminating
+ * I/O threads, closing handles (process, thread, pipes), and freeing allocated memory.
+ *
+ * @param obj The Ecore_Exe object being destructed.
+ * @param exe The private data of the Ecore_Exe object.
+ */
 void
 _impl_ecore_exe_efl_object_destructor(Eo *obj, Ecore_Exe_Data *exe)
 {
@@ -970,6 +1174,13 @@ _impl_ecore_exe_efl_object_destructor(Eo *obj, Ecore_Exe_Data *exe)
    IF_FREE(exe->tag);
 }
 
+/**
+ * @internal
+ * @brief Pauses (suspends) the child process.
+ *
+ * @param obj Unused Ecore_Exe object.
+ * @param exe The private data of the Ecore_Exe object.
+ */
 void
 _impl_ecore_exe_pause(Ecore_Exe *obj EINA_UNUSED, Ecore_Exe_Data *exe)
 {
@@ -977,6 +1188,13 @@ _impl_ecore_exe_pause(Ecore_Exe *obj EINA_UNUSED, Ecore_Exe_Data *exe)
    if (SuspendThread(exe->process_thread) != (DWORD)-1) exe->is_suspended = 1;
 }
 
+/**
+ * @internal
+ * @brief Resumes a paused (suspended) child process.
+ *
+ * @param obj Unused Ecore_Exe object.
+ * @param exe The private data of the Ecore_Exe object.
+ */
 void
 _impl_ecore_exe_continue(Ecore_Exe *obj EINA_UNUSED, Ecore_Exe_Data *exe)
 {
@@ -984,6 +1202,16 @@ _impl_ecore_exe_continue(Ecore_Exe *obj EINA_UNUSED, Ecore_Exe_Data *exe)
    if (ResumeThread(exe->process_thread) != (DWORD)-1) exe->is_suspended = 0;
 }
 
+/**
+ * @internal
+ * @brief Sends an interrupt signal (simulates Ctrl+C) to the child process.
+ *
+ * This attempts to send a Ctrl+C event to the console window of the process.
+ * It uses EnumWindows to find windows belonging to the child process.
+ *
+ * @param obj The Ecore_Exe object.
+ * @param exe The private data of the Ecore_Exe object.
+ */
 void
 _impl_ecore_exe_interrupt(Ecore_Exe *obj, Ecore_Exe_Data *exe)
 {
@@ -995,6 +1223,16 @@ _impl_ecore_exe_interrupt(Ecore_Exe *obj, Ecore_Exe_Data *exe)
    EnumWindows(_ecore_exe_enum_windows_procedure, (LPARAM)obj);
 }
 
+/**
+ * @internal
+ * @brief Sends a quit signal (simulates Ctrl+Break or WM_CLOSE/WM_QUIT) to the child process.
+ *
+ * This attempts to gracefully terminate the child process by sending
+ * Ctrl+Break, WM_CLOSE, and WM_QUIT messages to its windows.
+ *
+ * @param obj The Ecore_Exe object.
+ * @param exe The private data of the Ecore_Exe object.
+ */
 void
 _impl_ecore_exe_quit(Ecore_Exe *obj, Ecore_Exe_Data *exe)
 {
@@ -1006,6 +1244,16 @@ _impl_ecore_exe_quit(Ecore_Exe *obj, Ecore_Exe_Data *exe)
    EnumWindows(_ecore_exe_enum_windows_procedure, (LPARAM)obj);
 }
 
+/**
+ * @internal
+ * @brief Terminates the child process forcefully (similar to SIGTERM).
+ *
+ * This function attempts to terminate the child process, potentially using
+ * TerminateProcess as a last resort via _ecore_exe_enum_windows_procedure.
+ *
+ * @param obj The Ecore_Exe object.
+ * @param exe The private data of the Ecore_Exe object.
+ */
 void
 _impl_ecore_exe_terminate(Ecore_Exe *obj, Ecore_Exe_Data *exe)
 {
@@ -1016,6 +1264,16 @@ _impl_ecore_exe_terminate(Ecore_Exe *obj, Ecore_Exe_Data *exe)
    while (EnumWindows(_ecore_exe_enum_windows_procedure, (LPARAM)obj));
 }
 
+/**
+ * @internal
+ * @brief Kills the child process immediately (similar to SIGKILL).
+ *
+ * This function forcefully terminates the child process using TerminateProcess
+ * via _ecore_exe_enum_windows_procedure.
+ *
+ * @param obj The Ecore_Exe object.
+ * @param exe The private data of the Ecore_Exe object.
+ */
 void
 _impl_ecore_exe_kill(Ecore_Exe *obj, Ecore_Exe_Data *exe)
 {
@@ -1027,6 +1285,17 @@ _impl_ecore_exe_kill(Ecore_Exe *obj, Ecore_Exe_Data *exe)
    while (EnumWindows(_ecore_exe_enum_windows_procedure, (LPARAM)obj));
 }
 
+/**
+ * @internal
+ * @brief Sets auto-flushing limits for pipe data (Not implemented on Windows).
+ *
+ * @param obj Unused.
+ * @param exe Unused.
+ * @param start_bytes Unused.
+ * @param end_bytes Unused.
+ * @param start_lines Unused.
+ * @param end_lines Unused.
+ */
 void
 _impl_ecore_exe_auto_limits_set(Ecore_Exe *obj EINA_UNUSED,
                                 Ecore_Exe_Data *exe EINA_UNUSED,
@@ -1038,6 +1307,14 @@ _impl_ecore_exe_auto_limits_set(Ecore_Exe *obj EINA_UNUSED,
    ERR("Not implemented on windows!");
 }
 
+/**
+ * @internal
+ * @brief Sends a signal to the child process (Not implemented on Windows).
+ *
+ * @param obj Unused.
+ * @param exe Unused.
+ * @param num Unused.
+ */
 void
 _impl_ecore_exe_signal(Ecore_Exe *obj EINA_UNUSED,
                        Ecore_Exe_Data *exe EINA_UNUSED,
@@ -1046,6 +1323,13 @@ _impl_ecore_exe_signal(Ecore_Exe *obj EINA_UNUSED,
    ERR("Not implemented on windows!");
 }
 
+/**
+ * @internal
+ * @brief Sends a SIGHUP signal to the child process (Not implemented on Windows).
+ *
+ * @param obj Unused.
+ * @param exe Unused.
+ */
 void
 _impl_ecore_exe_hup(Ecore_Exe *obj EINA_UNUSED,
                     Ecore_Exe_Data *exe EINA_UNUSED)

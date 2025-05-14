@@ -157,7 +157,7 @@ typedef Eina_Bool           (*Eina_Iterator_Lock_Callback)(Eina_Iterator *it);
  */
 struct _Eina_Iterator
 {
-#define EINA_ITERATOR_VERSION 1
+#define EINA_ITERATOR_VERSION 1 /**< Defines the current version of the Eina_Iterator structure. Used for compatibility checks. */
    int                                  version; /**< Version of the Iterator API. */
 
    Eina_Iterator_Next_Callback          next          EINA_ARG_NONNULL(1, 2) EINA_WARN_UNUSED_RESULT; /**< Callback called when a next element is requested. */
@@ -167,7 +167,7 @@ struct _Eina_Iterator
    Eina_Iterator_Lock_Callback          lock          EINA_WARN_UNUSED_RESULT; /**< Callback called when the container is locked. */
    Eina_Iterator_Lock_Callback          unlock        EINA_WARN_UNUSED_RESULT; /**< Callback called when the container is unlocked. */
 
-#define EINA_MAGIC_ITERATOR 0x98761233
+#define EINA_MAGIC_ITERATOR 0x98761233 /**< Magic number used to identify Eina_Iterator structures in memory. Helps in debugging and type checking. */
    EINA_MAGIC
 };
 
@@ -305,7 +305,9 @@ EINA_API Eina_Iterator *eina_carray_iterator_new(void** array) EINA_ARG_NONNULL(
  * @brief Creates an Eina_Iterator that iterates through a
  * C array of specified size.
  *
- * @param[in] array The array
+ * @param[in] array The array to iterate over.
+ * @param[in] step The size of each element in the array in bytes (e.g., `sizeof(array[0])`).
+ * @param[in] length The number of elements in the array (e.g., `EINA_C_ARRAY_LENGTH(array)`).
  * @return The iterator that will walk over the array.
  *
  * You can create it like this:
@@ -337,12 +339,15 @@ EINA_API Eina_Iterator *eina_carray_length_iterator_new(void** array, unsigned i
 /**
  * @brief Creates a new iterator which which iterates through all elements with are accepted by the filter callback
  *
- * @param[in] original the iterator the use as original set
- * @param[in] filter if the callback returns true the element from the original set is taken into the the new set.
- * @param[in] free_cb when the iterator is gone this callback will be called with data as argument
- * @param[in] data the data which is passed to the filter callback
+ * @param[in] original The iterator to use as the original set. This iterator will be owned by the new filter iterator and freed when the filter iterator is freed.
+ * @param[in] filter The callback function to determine if an element should be included.
+ *                 It receives the original iterator (or rather, its container), the element data, and the user-provided @p data.
+ *                 It should return #EINA_TRUE to include the element, #EINA_FALSE otherwise.
+ * @param[in] free_cb Optional callback function to free the @p data when the iterator is freed.
+ *                  Can be @c NULL if @p data does not need freeing or is managed elsewhere.
+ * @param[in] data User-specific data to be passed to the @p filter callback and @p free_cb.
  *
- * The iterator is filtered while it is being iterated.
+ * The iterator is filtered dynamically as it is being iterated.
  * The original iterator you pass in here is is then owned and will be freed once the the new iterator is freed.
  *
  * @since 1.19
@@ -353,10 +358,14 @@ EINA_API Eina_Iterator* eina_iterator_filter_new(Eina_Iterator *original, Eina_E
  * @brief Creates an Eina_Iterator that iterates through a series
  * of Eina_Iterator.
  *
- * @param[in] it The first Eina_Iterator to iterate over
- * @return The iterator that will walk all the other iterator
+ * @param[in] it The first Eina_Iterator to iterate over.
+ * @param[in] ... A @c NULL -terminated list of subsequent @c Eina_Iterator pointers to chain together.
+ * @return The iterator that will walk all the other iterators sequentially.
  *
- * Eina_Iterator* iterator = eina_multi_iterator_new(it1, it2, it3, NULL);
+ * Example:
+ * @code
+ * Eina_Iterator *iterator = eina_multi_iterator_internal_new(it1, it2, it3, NULL);
+ * @endcode
  *
  * @note The returned array will destroy iterator given to it once they are not
  * necessary anymore. Taking ownership of those iterator.
@@ -370,10 +379,12 @@ EINA_API Eina_Iterator *eina_multi_iterator_internal_new(Eina_Iterator *it, ...)
  * @brief Calls the process method on each node of iterator, producing new "processed"
  * nodes and returning a new iterator which contains them.
  *
- * @param[in] iterator Iterator containing the nodes to process.
- * @param[in] process Method to call on each node.
- * @param[in] free_cb Method called when all nodes have been processed. It receives "data" as a parameter.
- * @param[in] fdata Additional data passed to the process method.
+ * @param[in] iterator Iterator containing the nodes to process. This iterator will be owned by the new processed iterator and freed when the processed iterator is freed.
+ * @param[in] process Callback function to transform an element. It receives the original iterator's container, the element data, and the user-provided @p fdata.
+ *                  It should return the processed (transformed) element. The ownership of the returned data depends on the @p process implementation.
+ * @param[in] free_cb Optional callback function to free the @p fdata when the iterator is freed.
+ *                  Can be @c NULL if @p fdata does not need freeing or is managed elsewhere.
+ * @param[in] fdata Additional user-specific data passed to the @p process callback and @p free_cb.
  *
  * Processes every node in the input iterator and returns a new iterator containing
  * the processed nodes. This is akin to a Map function:
@@ -388,10 +399,14 @@ EINA_API Eina_Iterator* eina_iterator_processed_new(Eina_Iterator *iterator, Ein
  * @brief Creates an Eina_Iterator that iterates through a series
  * of Eina_Iterator.
  *
- * @param[in] It The first Eina_Iterator to iterate over
- * @return The iterator that will walk all the other iterator
+ * @param[in] It The first Eina_Iterator to iterate over.
+ * @param[in] ... Subsequent @c Eina_Iterator pointers to chain together. The list is implicitly @c NULL -terminated by the macro.
+ * @return The iterator that will walk all the other iterators sequentially.
  *
+ * Example:
+ * @code
  * Eina_Iterator* iterator = eina_multi_iterator_new(it1, it2, it3);
+ * @endcode
  *
  * @note The returned array will destroy iterator given to it once they are not
  * necessary anymore. Taking ownership of those iterator.

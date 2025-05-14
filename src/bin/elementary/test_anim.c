@@ -3,6 +3,21 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief An array of names for evas objects, structured in pairs.
+ *
+ * Each pair consists of a name for a "bubble" object and its corresponding
+ * "shadow" object.
+ *
+ * Example:
+ * @code
+ * {
+ *    "bub1", "sh1", // First bubble and its shadow
+ *    "bub2", "sh2", // Second bubble and its shadow
+ *    ...
+ * }
+ * @endcode
+ */
 static const char *names[] =
 {
      "bub1", "sh1",
@@ -10,6 +25,19 @@ static const char *names[] =
      "bub3", "sh3",
 };
 
+/**
+ * @brief Callback function for the animator tick event.
+ *
+ * This function is called on every animation frame to update the positions
+ * and sizes of the bubble and shadow objects, creating a dynamic animation.
+ * The bubble objects move in a circular path and pulsate in size, while their
+ * shadows follow them with a parallax effect relative to the mouse pointer.
+ *
+ * @param data Custom data pointer (unused).
+ * @param event The Efl_Event structure containing event information. The
+ *        event->object is the window (`win`) object that this animator is
+ *        attached to.
+ */
 static void
 _anim_tick(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -51,6 +79,20 @@ _anim_tick(void *data EINA_UNUSED, const Efl_Event *event)
      }
 }
 
+/**
+ * @brief Sets up and runs an animation test.
+ *
+ * This function creates a window, sets a background, and populates it with
+ * several "bubble" and "shadow" image objects. It then registers an animator
+ * tick callback (`_anim_tick`) to animate these objects.
+ *
+ * This function is intended to be used as a test case, often called from
+ * a main test harness.
+ *
+ * @param data Custom data pointer (unused).
+ * @param obj The parent object (unused).
+ * @param event_info Event-specific information (unused).
+ */
 void
 test_anim(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

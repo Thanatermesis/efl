@@ -19,6 +19,18 @@ typedef enum {
    TWO
 } Weight_Mode;
 
+/**
+ * @brief Callback function to adjust the weight hints of child objects.
+ *
+ * This function is triggered by a radio button group. Based on the selected
+ * option, it changes the weight hints of the objects within the main box,
+ * demonstrating different weight configurations. The `objects` array contains
+ * all the children of the box.
+ *
+ * @param data The container box whose alignment is modified.
+ * @param obj The radio button that triggered the event.
+ * @param event_info Unused event information.
+ */
 static void
 weights_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -61,6 +73,15 @@ weights_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback to set the minimum size of a specific UI object.
+ *
+ * Triggered by a slider, this function adjusts the minimum width and height
+ * of the fourth object (`objects[3]`) in the `objects` array.
+ *
+ * @param data Unused.
+ * @param event The event structure containing the slider object.
+ */
 static void
 user_min_slider_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -69,6 +90,15 @@ user_min_slider_cb(void *data EINA_UNUSED, const Efl_Event *event)
    efl_gfx_hint_size_min_set(objects[3], EINA_SIZE2D(val, val));
 }
 
+/**
+ * @brief Callback to adjust the padding between content of the main box.
+ *
+ * This function is connected to a slider and dynamically changes the horizontal
+ * and vertical padding of the box container.
+ *
+ * @param data The window containing the box.
+ * @param event The event structure containing the slider object.
+ */
 static void
 padding_slider_cb(void *data, const Efl_Event *event)
 {
@@ -79,6 +109,15 @@ padding_slider_cb(void *data, const Efl_Event *event)
    efl_gfx_arrangement_content_padding_set(box, val, val);
 }
 
+/**
+ * @brief Callback to adjust the margin of the main box.
+ *
+ * This function is connected to a slider and dynamically changes the
+ * margin on all sides of the box container.
+ *
+ * @param data The window containing the box.
+ * @param event The event structure containing the slider object.
+ */
 static void
 margin_slider_cb(void *data, const Efl_Event *event)
 {
@@ -89,6 +128,15 @@ margin_slider_cb(void *data, const Efl_Event *event)
    efl_gfx_hint_margin_set(box, val, val, val, val);
 }
 
+/**
+ * @brief Callback to adjust the horizontal alignment of content within the main box.
+ *
+ * This function is connected to a slider and dynamically changes the
+ * horizontal alignment of all content within the box.
+ *
+ * @param data The window containing the box.
+ * @param event The event structure containing the slider object.
+ */
 static void
 alignh_slider_cb(void *data, const Efl_Event *event)
 {
@@ -101,6 +149,15 @@ alignh_slider_cb(void *data, const Efl_Event *event)
    efl_gfx_arrangement_content_align_set(box, val, av);
 }
 
+/**
+ * @brief Callback to adjust the vertical alignment of content within the main box.
+ *
+ * This function is connected to a slider and dynamically changes the
+ * vertical alignment of all content within the box.
+ *
+ * @param data The window containing the box.
+ * @param event The event structure containing the slider object.
+ */
 static void
 alignv_slider_cb(void *data, const Efl_Event *event)
 {
@@ -113,6 +170,15 @@ alignv_slider_cb(void *data, const Efl_Event *event)
    efl_gfx_arrangement_content_align_set(box, ah, val);
 }
 
+/**
+ * @brief Callback to adjust the horizontal alignment hint of a specific button.
+ *
+ * This function is connected to a slider and dynamically changes the
+ * horizontal alignment hint for a specific button within the box.
+ *
+ * @param data The window containing the button.
+ * @param event The event structure containing the slider object.
+ */
 static void
 alignh_btn_slider_cb(void *data, const Efl_Event *event)
 {
@@ -125,6 +191,15 @@ alignh_btn_slider_cb(void *data, const Efl_Event *event)
    efl_gfx_hint_align_set(btn, val, av);
 }
 
+/**
+ * @brief Callback to adjust the vertical alignment hint of a specific button.
+ *
+ * This function is connected to a slider and dynamically changes the
+ * vertical alignment hint for a specific button within the box.
+ *
+ * @param data The window containing the button.
+ * @param event The event structure containing the slider object.
+ */
 static void
 alignv_btn_slider_cb(void *data, const Efl_Event *event)
 {
@@ -137,6 +212,18 @@ alignv_btn_slider_cb(void *data, const Efl_Event *event)
    efl_gfx_hint_align_set(btn, ah, val);
 }
 
+/**
+ * @brief Callback to toggle between a standard box and a flow box layout.
+ *
+ * When the checkbox state changes, this function unpacks all children from
+ * the current box, deletes the box, and creates a new one (either
+ * EFL_UI_BOX_CLASS or EFL_UI_BOX_FLOW_CLASS). It then repacks the children
+ * into the new box. This demonstrates how to dynamically change layout types.
+ *
+ * @param data The window containing the box.
+ * @param obj The checkbox that triggered the event.
+ * @param event_info Unused event information.
+ */
 static void
 flow_check_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -166,6 +253,16 @@ flow_check_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      efl_pack(box, sobj);
 }
 
+/**
+ * @brief Callback to toggle the orientation of the main box.
+ *
+ * This function is connected to a checkbox and switches the box layout
+ * orientation between horizontal and vertical.
+ *
+ * @param data The window containing the box.
+ * @param obj The checkbox that triggered the event.
+ * @param event_info Unused event information.
+ */
 static void
 horiz_check_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -174,6 +271,16 @@ horiz_check_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    efl_ui_layout_orientation_set(box, chk ? EFL_UI_LAYOUT_ORIENTATION_HORIZONTAL : EFL_UI_LAYOUT_ORIENTATION_VERTICAL);
 }
 
+/**
+ * @brief Callback to toggle homogeneous mode for the main box.
+ *
+ * This function is connected to a checkbox and enables or disables
+ * homogeneous mode, where all children are allocated equal space.
+ *
+ * @param data The window containing the box.
+ * @param obj The checkbox that triggered the event.
+ * @param event_info Unused event information.
+ */
 static void
 homo_check_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -182,6 +289,17 @@ homo_check_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    efl_ui_box_homogeneous_set(box, chk);
 }
 
+/**
+ * @brief A custom layout update function for a box.
+ *
+ * This function demonstrates how to provide a custom layout logic for a box
+ * object. It arranges children in a diagonal line from top-left to
+ * bottom-right. This is not intended as a practical layout but as an
+ * example of the API.
+ *
+ * @param pack The box object to be laid out.
+ * @param data Unused user data.
+ */
 static void
 _custom_layout_update(Eo *pack, const void *data EINA_UNUSED)
 {
@@ -209,6 +327,18 @@ _custom_layout_update(Eo *pack, const void *data EINA_UNUSED)
    eina_iterator_free(it);
 }
 
+/**
+ * @brief Callback to enable or disable a custom layout function on the box.
+ *
+ * When the checkbox is toggled, this function uses `efl_object_override`
+ * to either set a custom layout function (`_custom_layout_update`) on the
+ * box or revert to the default layout function by passing NULL.
+ * A layout update is then requested to apply the change.
+ *
+ * @param data The window containing the box.
+ * @param obj The checkbox that triggered the event.
+ * @param event_info Unused event information.
+ */
 static void
 custom_check_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -228,6 +358,32 @@ custom_check_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    efl_pack_layout_request(box);
 }
 
+/**
+ * @brief Main function to set up and run the Efl.Ui.Box test.
+ *
+ * This function creates the main window and populates it with various controls
+ * (sliders, checkboxes, radio buttons) to manipulate the properties of an
+ * Efl.Ui.Box widget. It also creates the box and a set of child objects
+ * within it to demonstrate the effects of different properties like padding,
+ * margin, alignment, weight, and layout modes.
+ *
+ * The `objects` array holds static references to child elements of the box
+ * for individual manipulation. Its structure is:
+ * - `objects[0]`: Button "Btn1"
+ * - `objects[1]`: Button "Button 2"
+ * - `objects[2]`: Label "This label is not marked as fill"
+ * - `objects[3]`: Button "Min size"
+ * - `objects[4]`: Button "Quit!"
+ * - `objects[5]`: Label "This label on the other hand..."
+ * - `objects[6]`: Button "Button with a quite long text."
+ * - `objects[7]`: Button "BtnA"
+ * - `objects[8]`: Button "BtnB"
+ * - `objects[9]`: Button "BtnC"
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_ui_box(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

@@ -52,6 +52,25 @@ static const char SIG_DOWNLOAD_START[] = "download,start";
 static const char SIG_DOWNLOAD_PROGRESS[] = "download,progress";
 static const char SIG_DOWNLOAD_DONE[] = "download,done";
 static const char SIG_DOWNLOAD_ERROR[] = "download,error";
+
+/**
+ * @internal
+ * @brief Descriptions of smart callbacks available for Efl_Ui_Image_Zoomable.
+ *
+ * This array lists all the smart callbacks that instances of
+ * Efl_Ui_Image_Zoomable can emit. Each Evas_Smart_Cb_Description entry
+ * defines a callback by its name (e.g., "clicked") and its type string
+ * (which is empty for these callbacks, indicating no specific event info
+ * structure is passed beyond what's standard for the signal).
+ *
+ * Example structure of an element:
+ * @code
+ * {
+ *   "signal_name_str",  // Name of the signal (e.g., SIG_CLICKED)
+ *   "type_info_str"     // Type information for the event_info parameter (empty here)
+ * }
+ * @endcode
+ */
 static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {SIG_CLICKED, ""},
    {SIG_PRESS, ""},
@@ -91,6 +110,24 @@ static void _efl_ui_image_zoomable_remote_copier_cancel(Eo *obj, Efl_Ui_Image_Zo
 static Eina_Bool _internal_efl_ui_image_zoomable_icon_set(Evas_Object *obj, const char *name, Eina_Bool *fdo, Eina_Bool resize);
 static void _min_obj_size_get(Evas_Object *o, int *w, int *h);
 
+/**
+ * @internal
+ * @brief Defines keyboard actions for the Efl_Ui_Image_Zoomable widget.
+ *
+ * This array maps action names (strings) to their corresponding handler functions.
+ * These actions can be triggered by key events if the widget has focus and
+ * the key bindings are set up appropriately in the theme or application.
+ *
+ * Example structure of an element:
+ * @code
+ * {
+ *   "action_name_str", // Name of the action (e.g., "move")
+ *   handler_function_ptr // Pointer to the function handling this action
+ *                        // (e.g., _key_action_move)
+ * }
+ * @endcode
+ * The handler function typically takes the Evas_Object and a parameter string.
+ */
 static const Elm_Action key_actions[] = {
    {"move", _key_action_move},
    {"zoom", _key_action_zoom},
@@ -211,6 +248,28 @@ _image_place(Evas_Object *obj,
      }
 }
 
+/**
+ * @internal
+ * @brief Manages loading and unloading of image tiles for a given grid.
+ *
+ * This function iterates through all tiles in the specified grid @p g.
+ * For each tile, it calculates its position and size relative to the
+ * full image and checks if it intersects with the current viewport.
+ *
+ * - If a tile becomes visible and is not yet loaded or requested (@c want flag),
+ *   it initiates loading for that tile (sets image file, region, scale down,
+ *   and calls evas_object_image_preload()).
+ * - If a requested tile (@c want flag) is no longer visible, it cancels the
+ *   preload request.
+ * - If a loaded tile (@c have flag) is no longer visible, it unloads the tile
+ *   (preloads with cancel, clears image file) to free resources.
+ *
+ * It also manages the @c preload_num counter and emits "busy,start" and
+ * "busy,stop" signals accordingly.
+ *
+ * @param obj The Efl_Ui_Image_Zoomable object.
+ * @param g The grid whose tiles are to be managed.
+ */
 static void
 _grid_load(Evas_Object *obj,
            Efl_Ui_Image_Zoomable_Grid *g)
@@ -454,6 +513,18 @@ _efl_ui_image_zoomable_pan_class_constructor(Efl_Class *klass)
 
 #include "efl_ui_image_zoomable_pan.eo.c"
 
+/**
+ * @internal
+ * @brief Calculates the smallest power of two greater than or equal to the input number.
+ *
+ * This is a common bit manipulation algorithm to find the next power of two.
+ * For example, if num is 10, it returns 16. If num is 8, it returns 8.
+ *
+ * @param num The integer for which to find the nearest power of two.
+ * @return The smallest power of two that is >= num. Returns 0 if num is 0,
+ *         and 1 if num is 1. For negative inputs, behavior is undefined by this
+ *         specific implementation due to casting to unsigned int.
+ */
 static int
 _nearest_pow2_get(int num)
 {
@@ -554,6 +625,44 @@ _grid_zoom_calc(double zoom)
    return _nearest_pow2_get(z);
 }
 
+/**
+ * @internal
+ * @brief Creates and initializes a new image grid for a specific zoom level.
+ *
+ * A grid (@c Efl_Ui_Image_Zoomable_Grid) represents the image divided into
+ * tiles for efficient loading and display at a particular zoom level.
+ * This function calculates the required number of tiles (grid width @c gw and
+ * grid height @c gh) based on the full image dimensions (@c sd->size.imw,
+ * @c sd->size.imh), the target zoom factor for the grid (@c g->zoom, derived
+ * from @c sd->zoom), and the configured tile size (@c sd->tsize).
+ *
+ * It allocates memory for the grid structure and for an array of
+ * @c Efl_Ui_Image_Zoomable_Grid_Item to hold individual tile data.
+ * For each tile, it:
+ * - Calculates its output rectangle (@c out.x, @c out.y, @c out.w, @c out.h)
+ *   within the scaled grid.
+ * - Calculates its source rectangle (@c src.x, @c src.y, @c src.w, @c src.h)
+ *   from the original full-resolution image.
+ * - Creates an Evas_Object_Image for the tile.
+ * - Sets up properties for the tile image (orientation, scale hint, event passing).
+ * - Adds the tile image as a smart member of the pan object and a sub-object
+ *   of the photocam widget.
+ * - Registers a callback (@c _tile_preloaded_cb) for the
+ *   @c EVAS_CALLBACK_IMAGE_PRELOADED event on the tile image.
+ *
+ * The grid zoom level (@c g->zoom) is determined by @c _grid_zoom_calc(),
+ * which typically rounds the actual zoom to the nearest power of two
+ * for efficient downscaling by Evas.
+ *
+ * If the zoom level is too high (>= 8, meaning image is scaled down by 8x or more),
+ * or if region loading is not supported/needed, the grid might be simplified
+ * or not created.
+ *
+ * @param obj The Efl_Ui_Image_Zoomable object.
+ * @return A pointer to the newly created @c Efl_Ui_Image_Zoomable_Grid, or
+ *         @c NULL on failure (e.g., memory allocation error, or zoom level
+ *         too high for tiled rendering).
+ */
 static Efl_Ui_Image_Zoomable_Grid *
 _grid_create(Evas_Object *obj)
 {

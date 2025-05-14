@@ -391,6 +391,16 @@ static void _elm_win_frame_obj_update(Efl_Ui_Win_Data *sd, Eina_Bool force);
 static void _ee_backbone_init(Efl_Ui_Win *obj, Efl_Ui_Win_Data *pd);
 static void _ee_backbone_shutdown(Efl_Ui_Win *obj, Efl_Ui_Win_Data *pd);
 
+/**
+ * @internal
+ * @brief Converts an Elm_Win_Type to its corresponding Efl_Ui_Win_Type.
+ *
+ * This function maps legacy Elementary window types to the newer EFL
+ * UI window types.
+ *
+ * @param type The Elm_Win_Type to convert.
+ * @return The corresponding Efl_Ui_Win_Type, or EFL_UI_WIN_TYPE_UNKNOWN if no match is found.
+ */
 static inline Efl_Ui_Win_Type
 _elm_win_type_to_efl_ui_win_type(Elm_Win_Type type)
 {
@@ -421,6 +431,16 @@ _elm_win_type_to_efl_ui_win_type(Elm_Win_Type type)
 #undef CONVERT_TYPE
 }
 
+/**
+ * @internal
+ * @brief Converts an Efl_Ui_Win_Type to its corresponding Elm_Win_Type.
+ *
+ * This function maps EFL UI window types back to the legacy Elementary
+ * window types.
+ *
+ * @param type The Efl_Ui_Win_Type to convert.
+ * @return The corresponding Elm_Win_Type, or ELM_WIN_UNKNOWN if no match is found.
+ */
 static inline Elm_Win_Type
 _efl_ui_win_type_to_elm_win_type(Efl_Ui_Win_Type type)
 {
@@ -475,6 +495,17 @@ _elm_win_first_frame_do(void *data, Evas *e EINA_UNUSED, void *event_info EINA_U
    evas_event_callback_del_full(e, EVAS_CALLBACK_RENDER_POST, _elm_win_first_frame_do, data);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the X11 window ID from an Ecore_Evas instance.
+ *
+ * This function checks the Ecore_Evas engine type and calls the appropriate
+ * function to get the X11 window ID. It supports software_x11 and opengl_x11
+ * engines.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @return The X11 window ID (Ecore_X_Window), or 0 if not applicable or on error.
+ */
 Ecore_X_Window
 _elm_ee_xwin_get(const Ecore_Evas *ee)
 {
@@ -516,6 +547,17 @@ _internal_elm_win_xwindow_get(Efl_Ui_Win_Data *sd)
 }
 #endif
 
+/**
+ * @internal
+ * @brief Retrieves the Wayland window (Ecore_Wl2_Window) from an Ecore_Evas instance.
+ *
+ * This function checks the Ecore_Evas engine type and calls the appropriate
+ * function to get the Wayland window. It supports wayland_shm and wayland_egl
+ * engines.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @return The Ecore_Wl2_Window pointer, or NULL if not applicable or on error.
+ */
 Ecore_Wl2_Window *
 _elm_ee_wlwin_get(const Ecore_Evas *ee)
 {
@@ -574,6 +616,19 @@ _win_noblank_eval(void)
 
 static Elm_Process_State _elm_process_state = ELM_PROCESS_STATE_FOREGROUND;
 
+/**
+ * @brief Get the current process state (foreground or background).
+ *
+ * This function returns whether the Elementary application is considered
+ * to be in the foreground or background. This state is typically updated
+ * based on window visibility and focus.
+ *
+ * @return The current process state.
+ * @see Elm_Process_State
+ * @see _elm_win_state_eval()
+ *
+ * @ingroup Elm_Win_Group
+ */
 EAPI Elm_Process_State
 elm_process_state_get(void)
 {
@@ -1250,6 +1305,16 @@ _elm_win_focus_highlight_visible_set(Efl_Ui_Win_Data *sd,
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the focus highlight Edje object for a given window.
+ *
+ * The focus highlight object is an Edje object responsible for visually
+ * indicating which widget currently has focus within the window.
+ *
+ * @param obj The Efl_Ui_Win object.
+ * @return The Evas_Object for the focus highlight, or NULL if not available.
+ */
 Evas_Object *
 _elm_win_focus_highlight_object_get(Evas_Object *obj)
 {

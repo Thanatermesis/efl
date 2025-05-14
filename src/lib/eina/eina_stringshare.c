@@ -67,6 +67,16 @@ extern Eina_Bool _share_common_threads_activated;
 static Eina_Spinlock _mutex_small;
 
 /* Stringshare optimizations */
+/**
+ * @internal
+ * @brief A pre-allocated table for all possible single-character strings.
+ *
+ * This table is used as an optimization for stringshares of length 1.
+ * It contains all 256 possible characters, each followed by a null
+ * terminator, effectively creating 256 read-only C strings. This
+ * avoids allocations and lookups for very common single-character strings.
+ * The structure is `[char_0, '\0', char_1, '\0', ..., char_255, '\0']`.
+ */
 static const unsigned char _eina_stringshare_single[512] = {
    0,0,1,0,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0,12,0,13,0,14,0,15,0,
    16,0,17,0,18,0,19,0,20,0,21,0,22,0,23,0,24,0,25,0,26,0,27,0,28,0,29,0,30,0,
@@ -101,24 +111,56 @@ static const unsigned char _eina_stringshare_single[512] = {
 typedef struct _Eina_Stringshare_Small Eina_Stringshare_Small;
 typedef struct _Eina_Stringshare_Small_Bucket Eina_Stringshare_Small_Bucket;
 
+/**
+ * @internal
+ * @struct _Eina_Stringshare_Small_Bucket
+ * @brief A bucket for storing small shared strings.
+ *
+ * This structure holds sorted arrays of small strings that share the same
+ * first character. Using separate arrays for strings, lengths, and reference
+ * counts is a form of struct-of-arrays, which can improve cache performance
+ * during lookups.
+ */
 struct _Eina_Stringshare_Small_Bucket
 {
    /* separate arrays for faster lookups */
-   const char **strings;
-   unsigned char *lengths;
-   unsigned int *references;
-   int count;
-   int size;
+   const char **strings; /**< Array of pointers to the string data */
+   unsigned char *lengths; /**< Array of string lengths */
+   unsigned int *references; /**< Array of reference counts for each string */
+   int count; /**< Number of strings currently in the bucket */
+   int size; /**< Allocated size of the arrays */
 };
 
+/**
+ * @internal
+ * @struct _Eina_Stringshare_Small
+ * @brief Main structure for managing small stringshares.
+ *
+ * This structure contains an array of 256 pointers to buckets. Each bucket
+ * corresponds to a possible starting character of a string. This allows for
+ * quick dispatch to the correct bucket for a given string.
+ */
 struct _Eina_Stringshare_Small
 {
-   Eina_Stringshare_Small_Bucket *buckets[256];
+   Eina_Stringshare_Small_Bucket *buckets[256]; /**< One bucket for each possible first character. */
 };
 
 #define EINA_STRINGSHARE_SMALL_BUCKET_STEP 8
 static Eina_Stringshare_Small _eina_small_share;
 
+/**
+ * @internal
+ * @brief Compares two "small" strings for sorting and searching.
+ * @param bucket The bucket where the string to compare against is stored.
+ * @param i The index of the string to compare against in the bucket.
+ * @param pstr The other string to compare. This string has its first character skipped.
+ * @param plength The length of the other string, minus one.
+ * @return < 0 if the bucket string is less than pstr, 0 if they are equal, > 0 otherwise.
+ *
+ * This function is an optimized comparison for strings of length 2 or 3.
+ * It assumes the first character of both strings are identical and thus
+ * starts comparison from the second character.
+ */
 static inline int
 _eina_stringshare_small_cmp(const Eina_Stringshare_Small_Bucket *bucket,
                             int i,
@@ -159,6 +201,20 @@ _eina_stringshare_small_cmp(const Eina_Stringshare_Small_Bucket *bucket,
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Finds a small string within a bucket using binary search.
+ * @param bucket The bucket to search in.
+ * @param str The string to find.
+ * @param length The length of the string.
+ * @param idx Pointer to an integer where the index of the string will be
+ *        stored if found, or the index where it should be inserted.
+ * @return The found shared string, or NULL if not found.
+ *
+ * This function performs a binary search in the given bucket for the
+ * provided string. The search is optimized by skipping the first character,
+ * which is common to all strings in the bucket.
+ */
 static const char *
 _eina_stringshare_small_bucket_find(const Eina_Stringshare_Small_Bucket *bucket,
                                     const char *str,
@@ -200,6 +256,16 @@ _eina_stringshare_small_bucket_find(const Eina_Stringshare_Small_Bucket *bucket,
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Resizes the arrays within a small string bucket.
+ * @param bucket The bucket to resize.
+ * @param size The new size for the bucket arrays.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ *
+ * This function reallocates the 'strings', 'lengths', and 'references'
+ * arrays in the bucket to the new specified size.
+ */
 static Eina_Bool
 _eina_stringshare_small_bucket_resize(Eina_Stringshare_Small_Bucket *bucket,
                                       int size)
@@ -222,6 +288,18 @@ _eina_stringshare_small_bucket_resize(Eina_Stringshare_Small_Bucket *bucket,
    return 1;
 }
 
+/**
+ * @internal
+ * @brief Inserts a new small string into a bucket at a given index.
+ * @param p_bucket Pointer to the bucket pointer. The bucket can be created if it's NULL.
+ * @param str The string to insert.
+ * @param length The length of the string.
+ * @param idx The index at which to insert the string.
+ * @return The newly allocated and inserted shared string, or NULL on failure.
+ *
+ * This function handles memory allocation for the new string and resizing
+ * the bucket if necessary. It also initializes the reference count to 1.
+ */
 static const char *
 _eina_stringshare_small_bucket_insert_at(
    Eina_Stringshare_Small_Bucket **p_bucket,
@@ -272,6 +350,16 @@ _eina_stringshare_small_bucket_insert_at(
    return snew;
 }
 
+/**
+ * @internal
+ * @brief Removes a string from a bucket at a given index.
+ * @param p_bucket Pointer to the bucket pointer.
+ * @param idx The index of the string to remove.
+ *
+ * This function decrements the reference count of the string. If the
+ * reference count reaches zero, the string is freed and removed from the
+ * bucket's arrays. The bucket itself is freed if it becomes empty.
+ */
 static void
 _eina_stringshare_small_bucket_remove_at(
    Eina_Stringshare_Small_Bucket **p_bucket,
@@ -320,6 +408,18 @@ end:
      }
 }
 
+/**
+ * @internal
+ * @brief Adds a "small" string (length 2 or 3) to the small string share.
+ * @param str The string to add.
+ * @param length The length of the string.
+ * @return The shared string instance.
+ *
+ * This function manages small strings to avoid the overhead of the main
+ * stringshare hash. It finds the appropriate bucket (based on the first
+ * character of the string) and then adds the string to that bucket.
+ * If the string already exists, its reference count is incremented.
+ */
 static const char *
 _eina_stringshare_small_add(const char *str, unsigned char length)
 {
@@ -343,6 +443,16 @@ _eina_stringshare_small_add(const char *str, unsigned char length)
    return _eina_stringshare_small_bucket_insert_at(bucket, str, length, i);
 }
 
+/**
+ * @internal
+ * @brief Deletes a "small" string from the small string share.
+ * @param str The string to delete.
+ * @param length The length of the string.
+ *
+ * This function finds the string in the appropriate bucket and decreases
+ * its reference count. If the reference count drops to zero, the string
+ * is removed. It logs an error if a non-shared string is passed.
+ */
 static void
 _eina_stringshare_small_del(const char *str, unsigned char length)
 {
@@ -365,6 +475,15 @@ error:
    CRI("EEEK trying to del non-shared stringshare \"%s\"", str);
 }
 
+/**
+ * @internal
+ * @brief Initializes the small string sharing mechanism.
+ *
+ * This function sets up the spinlock and initializes the data structure
+ * for managing shared strings of small length (2 or 3 characters). This
+ * is an optimization to handle frequent, small strings more efficiently
+ * than the generic stringsharing mechanism.
+ */
 static void
 _eina_stringshare_small_init(void)
 {
@@ -372,6 +491,14 @@ _eina_stringshare_small_init(void)
    memset(&_eina_small_share, 0, sizeof(_eina_small_share));
 }
 
+/**
+ * @internal
+ * @brief Shuts down the small string sharing mechanism.
+ *
+ * This function frees all resources used by the small string share,
+ * including all the buckets and the strings they contain. It also
+ * destroys the spinlock.
+ */
 static void
 _eina_stringshare_small_shutdown(void)
 {
@@ -403,6 +530,16 @@ _eina_stringshare_small_shutdown(void)
    eina_spinlock_free(&_mutex_small);
 }
 
+/**
+ * @internal
+ * @brief Dumps statistics for a single small string bucket.
+ * @param bucket The bucket to dump.
+ * @param di A struct to accumulate dump information.
+ *
+ * This function iterates through a bucket and prints information about
+ * each shared string (length, refcount, value) and updates the global
+ * dump statistics.
+ */
 static void
 _eina_stringshare_small_bucket_dump(Eina_Stringshare_Small_Bucket *bucket,
                                     struct dumpinfo *di)
@@ -432,6 +569,15 @@ _eina_stringshare_small_bucket_dump(Eina_Stringshare_Small_Bucket *bucket,
      }
 }
 
+/**
+ * @internal
+ * @brief Dumps statistics for all small string buckets.
+ * @param di A struct to accumulate dump information.
+ *
+ * This function is a callback used by eina_share_common_dump(). It iterates
+ * over all possible buckets and calls the bucket-specific dump function
+ * for each one that is active.
+ */
 static void
 _eina_stringshare_small_dump(struct dumpinfo *di)
 {

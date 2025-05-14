@@ -1,3 +1,12 @@
+/**
+ * @file
+ * @brief Main program for rendering SVG files.
+ *
+ * This program loads an SVG file, optionally scales it, and then outputs
+ * its dimensions and pixel data. It can output just the header information
+ * or the full pixel data, potentially using shared memory.
+ */
+
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -18,11 +27,20 @@
 
 #define DATA32 unsigned int
 
-static RsvgHandle *rsvg = NULL;
-static int width = 0;
-static int height = 0;
-static RsvgDimensionData dim;
+static RsvgHandle *rsvg = NULL; /**< Global RsvgHandle for the loaded SVG. */
+static int width = 0; /**< Width of the rendered SVG. */
+static int height = 0; /**< Height of the rendered SVG. */
+static RsvgDimensionData dim; /**< Dimensions data from rsvg_handle_get_dimensions. */
 
+/**
+ * @brief Checks if the given file path likely points to an SVG file.
+ *
+ * This function inspects the file extension to determine if it's an SVG.
+ * It handles ".svg" and ".svg.gz" (or ".svgz") extensions.
+ *
+ * @param file The path to the file.
+ * @return EINA_TRUE if the file is likely an SVG, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 evas_image_load_file_is_svg(const char *file)
 {
@@ -60,6 +78,14 @@ evas_image_load_file_is_svg(const char *file)
      }
 }
 
+/**
+ * @brief Initializes the Rsvg library and loads an SVG file.
+ *
+ * Sets up the Rsvg library and creates a new RsvgHandle from the given file.
+ *
+ * @param file Path to the SVG file.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 _svg_init(const char *file)
 {
@@ -79,6 +105,11 @@ _svg_init(const char *file)
    return 1;
 }
 
+/**
+ * @brief Shuts down the Rsvg library and cleans up resources.
+ *
+ * Frees the RsvgHandle and terminates the Rsvg library if necessary.
+ */
 static void
 _svg_shutdown(void)
 {
@@ -94,6 +125,23 @@ _svg_shutdown(void)
 #endif
 }
 
+/**
+ * @brief Reads SVG header information and calculates rendering dimensions.
+ *
+ * Retrieves the intrinsic dimensions of the SVG and adjusts them based on
+ * scaling parameters (scale_down, dpi, or target size_w/size_h).
+ * The resulting width and height are stored in global variables.
+ *
+ * @param scale_down Factor to scale down the image (e.g., 2 for half size).
+ *                   If > 1, this takes precedence over dpi and size_w/size_h.
+ * @param dpi Target DPI for rendering. If > 0.0 and scale_down <= 1,
+ *            this is used for scaling.
+ * @param size_w Target width for rendering. If > 0 and size_h > 0,
+ *               and other scaling options are not used, the SVG is scaled
+ *               to fit within these dimensions while maintaining aspect ratio.
+ * @param size_h Target height for rendering. Used with size_w.
+ * @return 1 on success (valid dimensions found), 0 on failure.
+ */
 static int
 read_svg_header(int scale_down, double dpi, int size_w, int size_h)
 {
@@ -153,6 +201,15 @@ read_svg_header(int scale_down, double dpi, int size_w, int size_h)
    return 1;
 }
 
+/**
+ * @brief Renders the SVG data into a shared memory buffer.
+ *
+ * Allocates shared memory, creates a Cairo surface and context,
+ * and then renders the loaded SVG onto this surface.
+ * The pixel data is in ARGB32 format.
+ *
+ * @return 1 on success, 0 on failure (e.g., memory allocation or cairo error).
+ */
 static int
 read_svg_data(void)
 {
@@ -196,6 +253,25 @@ read_svg_data(void)
    return 1;
 }
 
+/**
+ * @brief Main entry point for the SVG rendering application.
+ *
+ * Parses command-line arguments, initializes SVG loading, reads header
+ * information, optionally renders the SVG data, and prints output
+ * to stdout.
+ *
+ * @param argc Number of command-line arguments.
+ * @param argv Array of command-line argument strings.
+ *             Expected arguments:
+ *             - argv[1]: Path to the SVG file (required).
+ *             - Optional flags:
+ *               - "-head": Output only header information (size, alpha).
+ *               - "-key <key_string>": (Ignored by this SVG loader).
+ *               - "-opt-scale-down-by <factor>": Integer factor to scale down.
+ *               - "-opt-dpi <dpi_value>": DPI value (integer, e.g., 96000 for 96 DPI).
+ *               - "-opt-size <width> <height>": Target width and height.
+ * @return 0 on success, -1 on failure.
+ */
 int
 main(int argc, char **argv)
 {

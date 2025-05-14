@@ -1,26 +1,42 @@
 #include "private.h"
 
+/**
+ * @brief Structure to hold parameters for the video widget.
+ * This structure is used to pass parameters when creating or updating
+ * a video widget through the Edje external interface.
+ */
 typedef struct _Elm_Params_Video
 {
-   Elm_Params base;
-   const char *file;
-   const char *uri;
-   Eina_Bool play:1;
-   Eina_Bool play_exists:1;
-   Eina_Bool pause:1;
-   Eina_Bool pause_exists:1;
-   Eina_Bool stop:1;
-   Eina_Bool stop_exists:1;
-   Eina_Bool audio_mute:1;
-   Eina_Bool audio_mute_exists:1;
-   double audio_level;
-   Eina_Bool audio_level_exists:1;
-   double play_position;
-   Eina_Bool play_position_exists:1;
-   Eina_Bool remember_position:1;
-   Eina_Bool remember_position_exists:1;
+   Elm_Params base; /**< Base parameters, common to all Elm widgets */
+   const char *file; /**< Path to the video file to be played. Mutually exclusive with uri. */
+   const char *uri; /**< URI of the video stream to be played. Mutually exclusive with file. */
+   Eina_Bool play:1; /**< If true, start playing the video. */
+   Eina_Bool play_exists:1; /**< Internal flag to check if 'play' parameter was set. */
+   Eina_Bool pause:1; /**< If true, pause the video. */
+   Eina_Bool pause_exists:1; /**< Internal flag to check if 'pause' parameter was set. */
+   Eina_Bool stop:1; /**< If true, stop the video. */
+   Eina_Bool stop_exists:1; /**< Internal flag to check if 'stop' parameter was set. */
+   Eina_Bool audio_mute:1; /**< If true, mute the audio. */
+   Eina_Bool audio_mute_exists:1; /**< Internal flag to check if 'audio_mute' parameter was set. */
+   double audio_level; /**< Audio volume level (0.0 to 1.0). */
+   Eina_Bool audio_level_exists:1; /**< Internal flag to check if 'audio_level' parameter was set. */
+   double play_position; /**< Playback position in seconds. */
+   Eina_Bool play_position_exists:1; /**< Internal flag to check if 'play_position' parameter was set. */
+   Eina_Bool remember_position:1; /**< If true, remember the last playback position. */
+   Eina_Bool remember_position_exists:1; /**< Internal flag to check if 'remember_position' parameter was set. */
 } Elm_Params_Video;
 
+/**
+ * @brief Sets the state of the video object based on parameters.
+ * This function is called by Edje to apply a new state to the video object,
+ * typically during animations or state transitions.
+ *
+ * @param data Unused.
+ * @param obj The Evas_Object (video widget) to modify.
+ * @param from_params The previous state parameters (can be NULL).
+ * @param to_params The new state parameters to apply (can be NULL).
+ * @param pos Unused.
+ */
 static void
 external_video_state_set(void *data EINA_UNUSED, Evas_Object *obj,
                          const void *from_params, const void *to_params,
@@ -45,6 +61,16 @@ external_video_state_set(void *data EINA_UNUSED, Evas_Object *obj,
      elm_video_remember_position_set(obj, p->remember_position);
 }
 
+/**
+ * @brief Sets a specific parameter on the video object.
+ * This function is called by Edje to set individual parameters on the
+ * video object.
+ *
+ * @param data Unused.
+ * @param obj The Evas_Object (video widget) to modify.
+ * @param param The parameter to set, including its name, type, and value.
+ * @return EINA_TRUE if the parameter was successfully set, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 external_video_param_set(void *data EINA_UNUSED, Evas_Object *obj,
                          const Edje_External_Param *param)
@@ -113,6 +139,17 @@ external_video_param_set(void *data EINA_UNUSED, Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Gets a specific parameter from the video object.
+ * This function is called by Edje to retrieve individual parameters from the
+ * video object.
+ *
+ * @param data Unused.
+ * @param obj The Evas_Object (video widget) to query.
+ * @param param The parameter to get. The name and type are inputs, and the
+ *              value (e.g., param->i, param->s, param->d) is an output.
+ * @return EINA_TRUE if the parameter was successfully retrieved, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 external_video_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
                          Edje_External_Param *param)
@@ -185,6 +222,21 @@ external_video_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
 
    return EINA_FALSE; }
 
+/**
+ * @brief Parses a list of Edje_External_Param into an Elm_Params_Video structure.
+ * This function is called by Edje to convert a list of parameters (e.g., from an
+ * EDC file) into a structured format that can be used by external_video_state_set.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param params A list of Edje_External_Param structures to parse.
+ *               Example of params list elements:
+ *               - Edje_External_Param { name="file", type=EDJE_EXTERNAL_PARAM_TYPE_STRING, s="/path/to/video.mp4" }
+ *               - Edje_External_Param { name="play", type=EDJE_EXTERNAL_PARAM_TYPE_BOOL, i=1 }
+ *               - Edje_External_Param { name="audio_level", type=EDJE_EXTERNAL_PARAM_TYPE_DOUBLE, d=0.8 }
+ * @return A pointer to a newly allocated Elm_Params_Video structure, or NULL on failure.
+ *         The caller is responsible for freeing this memory using external_video_params_free.
+ */
 static void * external_video_params_parse(void *data EINA_UNUSED,
                                           Evas_Object *obj EINA_UNUSED,
                                           const Eina_List *params)
@@ -241,6 +293,17 @@ static void * external_video_params_parse(void *data EINA_UNUSED,
    return mem;
 }
 
+/**
+ * @brief Retrieves a specific content part from the video object.
+ * For the video widget, this function is not implemented and always returns NULL,
+ * as video objects typically do not have named sub-content parts accessible
+ * this way.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param content Unused.
+ * @return Always NULL.
+ */
 static Evas_Object *external_video_content_get(void *data EINA_UNUSED,
                                                const Evas_Object *obj EINA_UNUSED,
                                                const char *content EINA_UNUSED)
@@ -249,6 +312,13 @@ static Evas_Object *external_video_content_get(void *data EINA_UNUSED,
    return NULL;
 }
 
+/**
+ * @brief Frees the memory allocated for Elm_Params_Video.
+ * This function is called by Edje to release the parameter structure
+ * previously allocated by external_video_params_parse.
+ *
+ * @param params A pointer to the Elm_Params_Video structure to free.
+ */
 static void external_video_params_free(void *params)
 {
    Elm_Params_Video *mem = params;
@@ -258,18 +328,29 @@ static void external_video_params_free(void *params)
    free(params);
 }
 
+/**
+ * @brief Array describing the parameters supported by the video external type.
+ * This array provides metadata about each parameter, including its name and type.
+ * It is used by Edje to validate and handle parameters.
+ *
+ * Example structure of elements in this array:
+ * - { "file", EDJE_EXTERNAL_PARAM_TYPE_STRING, ... }
+ * - { "play", EDJE_EXTERNAL_PARAM_TYPE_BOOL, ... }
+ * - { "audio_level", EDJE_EXTERNAL_PARAM_TYPE_DOUBLE, ... }
+ */
 static Edje_External_Param_Info external_video_params[] = {
-     DEFINE_EXTERNAL_COMMON_PARAMS, EDJE_EXTERNAL_PARAM_INFO_STRING("file"),
-     EDJE_EXTERNAL_PARAM_INFO_STRING("uri"),
-     EDJE_EXTERNAL_PARAM_INFO_BOOL("play"),
-     EDJE_EXTERNAL_PARAM_INFO_BOOL("pause"),
-     EDJE_EXTERNAL_PARAM_INFO_BOOL("stop"),
-     EDJE_EXTERNAL_PARAM_INFO_BOOL("audio mute"),
-     EDJE_EXTERNAL_PARAM_INFO_DOUBLE("audio level"),
-     EDJE_EXTERNAL_PARAM_INFO_DOUBLE("play position"),
-     EDJE_EXTERNAL_PARAM_INFO_DOUBLE("play length"),
-     EDJE_EXTERNAL_PARAM_INFO_BOOL("remember position"),
-     EDJE_EXTERNAL_PARAM_INFO_SENTINEL
+     DEFINE_EXTERNAL_COMMON_PARAMS, /**< Common parameters like "id", "class", etc. */
+     EDJE_EXTERNAL_PARAM_INFO_STRING("file"), /**< Parameter for setting the video file path. */
+     EDJE_EXTERNAL_PARAM_INFO_STRING("uri"), /**< Parameter for setting the video URI. */
+     EDJE_EXTERNAL_PARAM_INFO_BOOL("play"), /**< Parameter to start video playback. */
+     EDJE_EXTERNAL_PARAM_INFO_BOOL("pause"), /**< Parameter to pause video playback. */
+     EDJE_EXTERNAL_PARAM_INFO_BOOL("stop"), /**< Parameter to stop video playback. */
+     EDJE_EXTERNAL_PARAM_INFO_BOOL("audio mute"), /**< Parameter to mute/unmute audio. */
+     EDJE_EXTERNAL_PARAM_INFO_DOUBLE("audio level"), /**< Parameter to set audio volume. */
+     EDJE_EXTERNAL_PARAM_INFO_DOUBLE("play position"), /**< Parameter to set playback position. */
+     EDJE_EXTERNAL_PARAM_INFO_DOUBLE("play length"), /**< Parameter to get video duration (read-only). */
+     EDJE_EXTERNAL_PARAM_INFO_BOOL("remember position"), /**< Parameter to enable/disable remembering playback position. */
+     EDJE_EXTERNAL_PARAM_INFO_SENTINEL /**< Marks the end of the parameter list. */
 };
 
 DEFINE_EXTERNAL_ICON_ADD(video, "video");

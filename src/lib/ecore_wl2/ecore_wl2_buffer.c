@@ -51,19 +51,27 @@ static int drm_fd = -1;
 
 typedef struct _Ecore_Wl2_Buffer Ecore_Wl2_Buffer;
 typedef struct _Buffer_Handle Buffer_Handle;
+
+/**
+ * @brief Manages different buffer allocation strategies (intel, exynos, vc4, shm).
+ *
+ * This struct holds function pointers to implement a specific buffer
+ * allocation and management backend. It allows for a unified interface
+ * to different hardware or software rendering buffer types.
+ */
 typedef struct _Buffer_Manager Buffer_Manager;
 struct _Buffer_Manager
 {
-   Buffer_Handle *(*alloc)(Buffer_Manager *self, const char *name, int w, int h, unsigned long *stride, int32_t *fd);
-   struct wl_buffer *(*to_buffer)(Ecore_Wl2_Display *ewd, Ecore_Wl2_Buffer *db);
-   void *(*map)(Ecore_Wl2_Buffer *buf);
-   void (*unmap)(Ecore_Wl2_Buffer *buf);
-   void (*discard)(Ecore_Wl2_Buffer *buf);
-   void (*lock)(Ecore_Wl2_Buffer *buf);
-   void (*unlock)(Ecore_Wl2_Buffer *buf);
-   void (*manager_destroy)(void);
-   void *priv;
-   void *dl_handle;
+   Buffer_Handle *(*alloc)(Buffer_Manager *self, const char *name, int w, int h, unsigned long *stride, int32_t *fd); /**< Allocates a new buffer handle. */
+   struct wl_buffer *(*to_buffer)(Ecore_Wl2_Display *ewd, Ecore_Wl2_Buffer *db); /**< Converts an Ecore_Wl2_Buffer to a Wayland wl_buffer. */
+   void *(*map)(Ecore_Wl2_Buffer *buf); /**< Maps the buffer into memory. */
+   void (*unmap)(Ecore_Wl2_Buffer *buf); /**< Unmaps the buffer from memory. */
+   void (*discard)(Ecore_Wl2_Buffer *buf); /**< Discards/deallocates the buffer handle. */
+   void (*lock)(Ecore_Wl2_Buffer *buf); /**< Locks the buffer for access (e.g., DMA_BUF_IOCTL_SYNC START). */
+   void (*unlock)(Ecore_Wl2_Buffer *buf); /**< Unlocks the buffer after access (e.g., DMA_BUF_IOCTL_SYNC END). */
+   void (*manager_destroy)(void); /**< Destroys the buffer manager private data. */
+   void *priv; /**< Private data for the buffer manager implementation. */
+   void *dl_handle; /**< Handle for the dynamically loaded library (e.g., libdrm_intel.so). */
    int refcount;
    Eina_Bool destroyed;
 };
@@ -84,6 +92,17 @@ static void *(*sym_exynos_bo_map)(struct exynos_bo *bo) = NULL;
 static void (*sym_exynos_bo_destroy)(struct exynos_bo *bo) = NULL;
 static void (*sym_exynos_device_destroy)(struct exynos_device *) = NULL;
 
+/**
+ * @brief Callback for when the compositor releases a wl_buffer.
+ *
+ * This function is called by the Wayland compositor when it no longer
+ * needs the buffer. It marks the Ecore_Wl2_Buffer as not busy.
+ * If the buffer was orphaned (marked for destruction while busy),
+ * it proceeds with destroying the buffer.
+ *
+ * @param data The Ecore_Wl2_Buffer associated with the wl_buffer.
+ * @param buffer The wl_buffer being released (unused in function body).
+ */
 static void
 buffer_release(void *data, struct wl_buffer *buffer EINA_UNUSED)
 {
@@ -98,6 +117,16 @@ static const struct wl_buffer_listener buffer_listener =
    buffer_release
 };
 
+/**
+ * @brief Creates a wl_buffer from a DMA-BUF based Ecore_Wl2_Buffer.
+ *
+ * This function uses the zwp_linux_dmabuf_v1 protocol to create
+ * a Wayland buffer from a DMA buffer file descriptor.
+ *
+ * @param ewd The Ecore_Wl2_Display.
+ * @param db The Ecore_Wl2_Buffer containing DMA-BUF information.
+ * @return A new wl_buffer, or NULL on failure.
+ */
 static struct wl_buffer *
 _evas_dmabuf_wl_buffer_from_dmabuf(Ecore_Wl2_Display *ewd, Ecore_Wl2_Buffer *db)
 {
@@ -123,6 +152,14 @@ _evas_dmabuf_wl_buffer_from_dmabuf(Ecore_Wl2_Display *ewd, Ecore_Wl2_Buffer *db)
    return buf;
 }
 
+/**
+ * @brief Locks a DMA-BUF buffer for CPU access (SYNC_START).
+ *
+ * This function performs a DMA_BUF_IOCTL_SYNC with DMA_BUF_SYNC_START
+ * to ensure that CPU access to the buffer is synchronized.
+ *
+ * @param b The Ecore_Wl2_Buffer to lock.
+ */
 static void
 _dmabuf_lock(Ecore_Wl2_Buffer *b)
 {
@@ -138,6 +175,14 @@ _dmabuf_lock(Ecore_Wl2_Buffer *b)
    if (ret) WRN("Failed to lock dmabuf");
 }
 
+/**
+ * @brief Unlocks a DMA-BUF buffer after CPU access (SYNC_END).
+ *
+ * This function performs a DMA_BUF_IOCTL_SYNC with DMA_BUF_SYNC_END
+ * to signal that CPU access to the buffer is finished.
+ *
+ * @param b The Ecore_Wl2_Buffer to unlock.
+ */
 static void
 _dmabuf_unlock(Ecore_Wl2_Buffer *b)
 {
@@ -153,6 +198,17 @@ _dmabuf_unlock(Ecore_Wl2_Buffer *b)
    if (ret) WRN("Failed to unlock dmabuf");
 }
 
+/**
+ * @brief Allocates a buffer using Intel's GEM buffer manager.
+ *
+ * @param self The buffer manager instance.
+ * @param name Name for the buffer (for debugging).
+ * @param w Width of the buffer.
+ * @param h Height of the buffer.
+ * @param stride Pointer to store the calculated stride of the buffer.
+ * @param fd Pointer to store the file descriptor of the DMA-BUF.
+ * @return A Buffer_Handle (drm_intel_bo *) on success, NULL on failure.
+ */
 static Buffer_Handle *
 _intel_alloc(Buffer_Manager *self, const char *name, int w, int h, unsigned long *stride, int32_t *fd)
 {
@@ -183,6 +239,12 @@ err:
    return NULL;
 }
 
+/**
+ * @brief Maps an Intel GEM buffer for CPU access.
+ *
+ * @param buf The Ecore_Wl2_Buffer to map.
+ * @return A pointer to the mapped memory, or NULL on failure.
+ */
 static void *
 _intel_map(Ecore_Wl2_Buffer *buf)
 {
@@ -193,6 +255,11 @@ _intel_map(Ecore_Wl2_Buffer *buf)
    return bo->virtual;
 }
 
+/**
+ * @brief Unmaps an Intel GEM buffer.
+ *
+ * @param buf The Ecore_Wl2_Buffer to unmap.
+ */
 static void
 _intel_unmap(Ecore_Wl2_Buffer *buf)
 {
@@ -202,6 +269,11 @@ _intel_unmap(Ecore_Wl2_Buffer *buf)
    sym_drm_intel_bo_unmap(bo);
 }
 
+/**
+ * @brief Discards/unreferences an Intel GEM buffer.
+ *
+ * @param buf The Ecore_Wl2_Buffer whose underlying drm_intel_bo to unreference.
+ */
 static void
 _intel_discard(Ecore_Wl2_Buffer *buf)
 {
@@ -211,12 +283,24 @@ _intel_discard(Ecore_Wl2_Buffer *buf)
    sym_drm_intel_bo_unreference(bo);
 }
 
+/**
+ * @brief Destroys the Intel buffer manager instance.
+ */
 static void
 _intel_manager_destroy()
 {
    sym_drm_intel_bufmgr_destroy(buffer_manager->priv);
 }
 
+/**
+ * @brief Sets up the Intel buffer manager.
+ *
+ * Loads libdrm_intel.so and initializes the buffer manager function pointers
+ * for Intel GEM-based buffer allocation.
+ *
+ * @param fd The DRM device file descriptor.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _intel_buffer_manager_setup(int fd)
 {
@@ -256,6 +340,17 @@ err:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Allocates a buffer using Exynos DRM.
+ *
+ * @param self The buffer manager instance.
+ * @param name Unused.
+ * @param w Width of the buffer.
+ * @param h Height of the buffer.
+ * @param stride Pointer to store the calculated stride of the buffer.
+ * @param fd Pointer to store the file descriptor of the DMA-BUF.
+ * @return A Buffer_Handle (struct exynos_bo *) on success, NULL on failure.
+ */
 static Buffer_Handle *
 _exynos_alloc(Buffer_Manager *self, const char *name EINA_UNUSED, int w, int h, unsigned long *stride, int32_t *fd)
 {
@@ -283,6 +378,12 @@ err:
    return NULL;
 }
 
+/**
+ * @brief Maps an Exynos buffer for CPU access using mmap on its fd.
+ *
+ * @param buf The Ecore_Wl2_Buffer to map.
+ * @return A pointer to the mapped memory, or NULL on failure.
+ */
 static void *
 _exynos_map(Ecore_Wl2_Buffer *buf)
 {
@@ -295,6 +396,11 @@ _exynos_map(Ecore_Wl2_Buffer *buf)
    return ptr;
 }
 
+/**
+ * @brief Unmaps an Exynos buffer.
+ *
+ * @param buf The Ecore_Wl2_Buffer to unmap.
+ */
 static void
 _exynos_unmap(Ecore_Wl2_Buffer *buf)
 {
@@ -304,6 +410,11 @@ _exynos_unmap(Ecore_Wl2_Buffer *buf)
    munmap(buf->mapping, bo->size);
 }
 
+/**
+ * @brief Discards/destroys an Exynos buffer object.
+ *
+ * @param buf The Ecore_Wl2_Buffer whose underlying exynos_bo to destroy.
+ */
 static void
 _exynos_discard(Ecore_Wl2_Buffer *buf)
 {
@@ -313,12 +424,24 @@ _exynos_discard(Ecore_Wl2_Buffer *buf)
    sym_exynos_bo_destroy(bo);
 }
 
+/**
+ * @brief Destroys the Exynos buffer manager (Exynos device).
+ */
 static void
 _exynos_manager_destroy()
 {
    sym_exynos_device_destroy(buffer_manager->priv);
 }
 
+/**
+ * @brief Sets up the Exynos buffer manager.
+ *
+ * Loads libdrm_exynos.so and initializes the buffer manager function pointers
+ * for Exynos DRM-based buffer allocation.
+ *
+ * @param fd The DRM device file descriptor.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _exynos_buffer_manager_setup(int fd)
 {
@@ -363,6 +486,20 @@ err:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Allocates a shared memory (SHM) buffer.
+ *
+ * Creates a temporary file, truncates it to the required size, and maps it.
+ * This is used for wl_shm buffers.
+ *
+ * @param self Unused.
+ * @param name Unused.
+ * @param w Width of the buffer.
+ * @param h Height of the buffer.
+ * @param stride Pointer to store the calculated stride of the buffer.
+ * @param fd Pointer to store the file descriptor of the SHM segment.
+ * @return A Buffer_Handle (pointer to mapped memory) on success, NULL on failure.
+ */
 static Buffer_Handle *
 _wl_shm_alloc(Buffer_Manager *self EINA_UNUSED, const char *name EINA_UNUSED, int w, int h, unsigned long *stride, int32_t *fd)
 {
@@ -394,30 +531,68 @@ err:
    return NULL;
 }
 
+/**
+ * @brief "Maps" a wl_shm buffer.
+ *
+ * For wl_shm, the buffer handle (bh) is already the mapped address.
+ *
+ * @param buf The Ecore_Wl2_Buffer.
+ * @return The pointer to the mapped memory (buf->bh).
+ */
 static void *
 _wl_shm_map(Ecore_Wl2_Buffer *buf)
 {
    return buf->bh;
 }
 
+/**
+ * @brief "Unmaps" a wl_shm buffer.
+ *
+ * This is a no-op as wl_shm buffers are typically mapped for their lifetime.
+ *
+ * @param buf Unused.
+ */
 static void
 _wl_shm_unmap(Ecore_Wl2_Buffer *buf EINA_UNUSED)
 {
    /* wl_shm is mapped for its lifetime */
 }
 
+/**
+ * @brief Discards a wl_shm buffer.
+ *
+ * Unmaps the shared memory region. The file descriptor is closed
+ * when the wl_buffer is created by _wl_shm_to_buffer.
+ *
+ * @param buf The Ecore_Wl2_Buffer whose SHM mapping to unmap.
+ */
 static void
 _wl_shm_discard(Ecore_Wl2_Buffer *buf)
 {
    munmap(buf->bh, buf->size);
 }
 
+/**
+ * @brief Destroys the wl_shm buffer manager.
+ *
+ * This is a no-op as there's no specific manager data to free for wl_shm.
+ */
 static void
 _wl_shm_manager_destroy()
 {
    /* Nop. */
 }
 
+/**
+ * @brief Creates a wl_buffer from an SHM-based Ecore_Wl2_Buffer.
+ *
+ * This function uses the wl_shm protocol to create a Wayland buffer
+ * from a shared memory file descriptor.
+ *
+ * @param ewd The Ecore_Wl2_Display.
+ * @param db The Ecore_Wl2_Buffer containing SHM information.
+ * @return A new wl_buffer, or NULL on failure.
+ */
 static struct wl_buffer *
 _wl_shm_to_buffer(Ecore_Wl2_Display *ewd, Ecore_Wl2_Buffer *db)
 {
@@ -441,6 +616,15 @@ _wl_shm_to_buffer(Ecore_Wl2_Display *ewd, Ecore_Wl2_Buffer *db)
    return buf;
 }
 
+/**
+ * @brief Sets up the wl_shm buffer manager.
+ *
+ * Initializes the buffer manager function pointers for wl_shm-based
+ * buffer allocation.
+ *
+ * @param fd Unused.
+ * @return EINA_TRUE always.
+ */
 static Eina_Bool
 _wl_shm_buffer_manager_setup(int fd EINA_UNUSED)
 {
@@ -457,15 +641,32 @@ struct internal_vc4_bo
 {
    __u32 handle;
    int size;
-   int fd;
+   int fd; /**< File descriptor for the buffer object, if mmapped directly. */
 };
 
+/**
+ * @brief Aligns a value to a specified boundary.
+ * @param v The value to align.
+ * @param a The alignment boundary.
+ * @return The aligned value.
+ */
 static int
 align(int v, int a)
 {
    return (v + a - 1) & ~((uint64_t)a - 1);
 }
 
+/**
+ * @brief Allocates a buffer using VC4 DRM (e.g., Raspberry Pi).
+ *
+ * @param self Unused.
+ * @param name Unused.
+ * @param w Width of the buffer.
+ * @param h Height of the buffer.
+ * @param stride Pointer to store the calculated stride of the buffer.
+ * @param fd Pointer to store the file descriptor of the DMA-BUF.
+ * @return A Buffer_Handle (struct internal_vc4_bo *) on success, NULL on failure.
+ */
 static Buffer_Handle *
 _vc4_alloc(Buffer_Manager *self EINA_UNUSED, const char *name EINA_UNUSED, int w, int h, unsigned long *stride, int32_t *fd)
 {
@@ -513,6 +714,14 @@ err:
    return NULL;
 }
 
+/**
+ * @brief Maps a VC4 buffer for CPU access.
+ *
+ * Uses DRM_IOCTL_VC4_MMAP_BO to get an offset, then mmap on the DRM fd.
+ *
+ * @param buf The Ecore_Wl2_Buffer to map.
+ * @return A pointer to the mapped memory, or NULL on failure.
+ */
 static void *
 _vc4_map(Ecore_Wl2_Buffer *buf)
 {
@@ -535,6 +744,11 @@ _vc4_map(Ecore_Wl2_Buffer *buf)
    return ptr;
 }
 
+/**
+ * @brief Unmaps a VC4 buffer.
+ *
+ * @param buf The Ecore_Wl2_Buffer to unmap.
+ */
 static void
 _vc4_unmap(Ecore_Wl2_Buffer *buf)
 {
@@ -544,6 +758,13 @@ _vc4_unmap(Ecore_Wl2_Buffer *buf)
    munmap(buf->mapping, bo->size);
 }
 
+/**
+ * @brief Discards/closes a VC4 buffer object.
+ *
+ * Uses DRM_IOCTL_GEM_CLOSE.
+ *
+ * @param buf The Ecore_Wl2_Buffer whose underlying VC4 BO to close.
+ */
 static void
 _vc4_discard(Ecore_Wl2_Buffer *buf)
 {
@@ -557,6 +778,16 @@ _vc4_discard(Ecore_Wl2_Buffer *buf)
    ioctl(drm_fd, DRM_IOCTL_GEM_CLOSE, &cl);
 }
 
+/**
+ * @brief Sets up the VC4 buffer manager.
+ *
+ * Checks for VC4 support by trying to create a small BO.
+ * Loads libdrm.so for drmPrimeHandleToFD.
+ * Initializes the buffer manager function pointers for VC4 DRM-based allocation.
+ *
+ * @param fd The DRM device file descriptor.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _vc4_buffer_manager_setup(int fd)
 {
@@ -595,6 +826,17 @@ err:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Initializes the buffer management system.
+ *
+ * This function sets up the appropriate buffer manager (Intel, Exynos, VC4, or SHM)
+ * based on availability and requested types. It opens /dev/dri/renderD128
+ * for DMA-BUF capable managers.
+ *
+ * @param ewd The Ecore_Wl2_Display.
+ * @param types A bitmask of Ecore_Wl2_Buffer_Type indicating preferred buffer types.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 EAPI Eina_Bool
 ecore_wl2_buffer_init(Ecore_Wl2_Display *ewd, Ecore_Wl2_Buffer_Type types)
 {
@@ -641,12 +883,21 @@ err_alloc:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Increments the reference count of the global buffer manager.
+ */
 static void
 _buffer_manager_ref(void)
 {
    buffer_manager->refcount++;
 }
 
+/**
+ * @brief Decrements the reference count of the global buffer manager.
+ *
+ * If the reference count drops to zero and the manager is marked as destroyed,
+ * it cleans up and frees the buffer manager resources.
+ */
 static void
 _buffer_manager_deref(void)
 {
@@ -659,6 +910,13 @@ _buffer_manager_deref(void)
    if (drm_fd >=0) close(drm_fd);
 }
 
+/**
+ * @brief Marks the global buffer manager for destruction.
+ *
+ * This function sets a flag indicating the buffer manager should be destroyed
+ * and then calls _buffer_manager_deref() to potentially perform the cleanup
+ * if the refcount is also zero.
+ */
 static void
 _buffer_manager_destroy(void)
 {
@@ -667,6 +925,19 @@ _buffer_manager_destroy(void)
    _buffer_manager_deref();
 }
 
+/**
+ * @brief Allocates a buffer using the current buffer manager.
+ *
+ * This is a wrapper around the active buffer manager's alloc function.
+ * It also handles reference counting for the buffer manager.
+ *
+ * @param name Name for the buffer.
+ * @param w Width of the buffer.
+ * @param h Height of the buffer.
+ * @param stride Pointer to store the calculated stride.
+ * @param fd Pointer to store the buffer's file descriptor.
+ * @return A Buffer_Handle on success, NULL on failure.
+ */
 static Buffer_Handle *
 _buffer_manager_alloc(const char *name, int w, int h, unsigned long *stride, int32_t *fd)
 {
@@ -678,6 +949,12 @@ _buffer_manager_alloc(const char *name, int w, int h, unsigned long *stride, int
    return out;
 }
 
+/**
+ * @brief Gets the Wayland wl_buffer associated with an Ecore_Wl2_Buffer.
+ *
+ * @param buf The Ecore_Wl2_Buffer.
+ * @return The wl_buffer, or NULL if not created or if buf is NULL.
+ */
 EAPI struct wl_buffer *
 ecore_wl2_buffer_wl_buffer_get(Ecore_Wl2_Buffer *buf)
 {
@@ -831,6 +1108,18 @@ ecore_wl2_buffer_fit(Ecore_Wl2_Buffer *b, int w, int h)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Partially creates an Ecore_Wl2_Buffer.
+ *
+ * This function allocates the Ecore_Wl2_Buffer struct and the underlying
+ * hardware/SHM buffer handle using the active buffer manager.
+ * It does not yet create the Wayland `wl_buffer` object.
+ *
+ * @param w Width of the buffer.
+ * @param h Height of the buffer.
+ * @param alpha Whether the buffer should support alpha.
+ * @return A new partially initialized Ecore_Wl2_Buffer, or NULL on failure.
+ */
 static Ecore_Wl2_Buffer *
 _ecore_wl2_buffer_partial_create(int w, int h, Eina_Bool alpha)
 {
@@ -854,6 +1143,19 @@ _ecore_wl2_buffer_partial_create(int w, int h, Eina_Bool alpha)
    return out;
 }
 
+/**
+ * @brief Creates a complete Ecore_Wl2_Buffer, including the Wayland wl_buffer.
+ *
+ * This function first calls _ecore_wl2_buffer_partial_create to allocate
+ * the buffer and its handle, then uses the buffer manager's to_buffer
+ * function to create the corresponding Wayland `wl_buffer`.
+ *
+ * @param ewd The Ecore_Wl2_Display.
+ * @param w Width of the buffer.
+ * @param h Height of the buffer.
+ * @param alpha Whether the buffer should support alpha.
+ * @return A new Ecore_Wl2_Buffer, or NULL on failure.
+ */
 EAPI Ecore_Wl2_Buffer *
 ecore_wl2_buffer_create(Ecore_Wl2_Display *ewd, int w, int h, Eina_Bool alpha)
 {
@@ -867,6 +1169,15 @@ ecore_wl2_buffer_create(Ecore_Wl2_Display *ewd, int w, int h, Eina_Bool alpha)
    return out;
 }
 
+/**
+ * @brief Callback for successful creation of a wl_buffer via zwp_linux_buffer_params_v1.
+ *
+ * Used during DMA-BUF capability testing. Destroys the temporary buffer and params.
+ *
+ * @param data Unused user data.
+ * @param params The zwp_linux_buffer_params_v1 object used for creation.
+ * @param new_buffer The newly created (temporary) wl_buffer.
+ */
 static void
 _create_succeeded(void *data EINA_UNUSED,
                  struct zwp_linux_buffer_params_v1 *params,
@@ -876,6 +1187,15 @@ _create_succeeded(void *data EINA_UNUSED,
    zwp_linux_buffer_params_v1_destroy(params);
 }
 
+/**
+ * @brief Callback for failed creation of a wl_buffer via zwp_linux_buffer_params_v1.
+ *
+ * Used during DMA-BUF capability testing. Destroys the params,
+ * cleans up the buffer manager, and marks DMA-BUF as unavailable on the display.
+ *
+ * @param data The Ecore_Wl2_Display.
+ * @param params The zwp_linux_buffer_params_v1 object that failed.
+ */
 static void
 _create_failed(void *data, struct zwp_linux_buffer_params_v1 *params)
 {
@@ -892,6 +1212,16 @@ static const struct zwp_linux_buffer_params_v1_listener params_listener =
    _create_failed
 };
 
+/**
+ * @brief Tests DMA-BUF buffer creation capability.
+ *
+ * This function attempts to create a minimal (1x1) DMA-BUF buffer.
+ * If successful, it means the system supports DMA-BUF with the current
+ * DRM driver. If it fails, DMA-BUF support is disabled for the display.
+ * This is typically called during display initialization.
+ *
+ * @param ewd The Ecore_Wl2_Display to test DMA-BUF on.
+ */
 void
 _ecore_wl2_buffer_test(Ecore_Wl2_Display *ewd)
 {

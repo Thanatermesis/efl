@@ -1,9 +1,21 @@
+/**
+ * @file
+ * @brief These routines are bindings to an Elementary @c view_list object.
+ *
+ * Elm_View_List is a widget that aims to provide a list of items
+ * that can be rendered as a genlist. It uses an Efl_Model to populate
+ * the list items.
+ */
 #ifndef _ELM_VIEW_LIST_EO_H_
 #define _ELM_VIEW_LIST_EO_H_
 
 #ifndef _ELM_VIEW_LIST_EO_CLASS_TYPE
 #define _ELM_VIEW_LIST_EO_CLASS_TYPE
 
+/**
+ * @brief Opaque handle to the Elm_View_List object.
+ * @ingroup Elm_View_List
+ */
 typedef Eo Elm_View_List;
 
 #endif
@@ -13,7 +25,10 @@ typedef Eo Elm_View_List;
 
 
 #endif
-/** Elementary view list class
+/**
+ * @brief Elementary view list class.
+ *
+ * @details Use this macro to get the Efl_Class for the Elm_View_List type.
  *
  * @ingroup Elm_View_List
  */
@@ -87,7 +102,9 @@ EOAPI Efl_Model *elm_view_list_model_get(const Eo *obj);
 
 EWAPI extern const Efl_Event_Description _ELM_VIEW_LIST_EVENT_MODEL_SELECTED;
 
-/** Called when model was selected
+/**
+ * @brief Called when a model item was selected in the view list.
+ * @details The event_info payload will be an Efl_Object representing the selected model.
  * @return Efl_Object *
  *
  * @ingroup Elm_View_List

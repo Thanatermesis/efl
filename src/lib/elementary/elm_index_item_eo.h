@@ -2,15 +2,23 @@
 #define _ELM_INDEX_ITEM_EO_H_
 
 #ifndef _ELM_INDEX_ITEM_EO_CLASS_TYPE
-#define _ELM_INDEX_ITEM_EO_CLASS_TYPE
+#define _ELM_INDEX_ITEM_EO_CLASS_TYPE /**< Define to prevent redefinition of Elm_Index_Item type. */
 
+/**
+ * @brief Represents an Elementary Index Item.
+ * @ingroup Elm_Index_Item
+ */
 typedef Eo Elm_Index_Item;
 
 #endif
 
 #ifndef _ELM_INDEX_ITEM_EO_TYPES
-#define _ELM_INDEX_ITEM_EO_TYPES
+#define _ELM_INDEX_ITEM_EO_TYPES /**< Define to prevent redefinition of Elm_Index_Item specific types. */
 
+/**
+ * @brief Placeholder for future Elm_Index_Item specific types.
+ * @ingroup Elm_Index_Item
+ */
 
 #endif
 /** Elementary index item class

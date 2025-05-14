@@ -9,6 +9,17 @@
 #  define MAJOR(x) ((((x) >> 8) & 0xfff) | (((x) >> 32) & ~0xfff))
 # endif
 
+/**
+ * @brief Checks if the current user is a member of the "input" group.
+ *
+ * This function is crucial for security, ensuring that only users with
+ * appropriate permissions (i.e., part of the "input" group) can
+ * access input devices.
+ *
+ * @return EINA_TRUE if the user is part of the "input" group,
+ *         EINA_FALSE otherwise or if an error occurs (e.g., user or group
+ *         not found, memory allocation failure).
+ */
 static Eina_Bool
 _user_part_of_input(void)
 {
@@ -46,6 +57,23 @@ _user_part_of_input(void)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Connects and initializes the Elput manager for root operations.
+ *
+ * This function allocates and sets up an Elput_Manager structure. It also
+ * verifies that the current user is part of the "input" group before
+ * proceeding.
+ *
+ * @param[out] manager Pointer to a location where the newly created
+ *                     Elput_Manager pointer will be stored.
+ * @param[in] seat The seat identifier string (e.g., "seat0"). This is
+ *                 stored in the Elput_Manager.
+ * @param[in] tty The TTY number. This parameter is currently unused in this
+ *                function.
+ * @return EINA_TRUE on successful connection and initialization,
+ *         EINA_FALSE on failure (e.g., memory allocation error, user not
+ *         in "input" group).
+ */
 static Eina_Bool
 _root_connect(Elput_Manager **manager EINA_UNUSED, const char *seat EINA_UNUSED, unsigned int tty EINA_UNUSED)
 {
@@ -66,12 +94,38 @@ _root_connect(Elput_Manager **manager EINA_UNUSED, const char *seat EINA_UNUSED,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Disconnects the Elput manager for root operations.
+ *
+ * Currently, this function is a no-op as there are no specific resources
+ * allocated by _root_connect that need explicit freeing here beyond what
+ * higher-level management might handle.
+ *
+ * @param[in] em Pointer to the Elput_Manager to disconnect. This parameter
+ *               is currently unused.
+ */
 static void
 _root_disconnect(Elput_Manager *em EINA_UNUSED)
 {
    //Nothing to do here, there is no data to free
 }
 
+/**
+ * @brief Opens a device file with specified flags when running as root.
+ *
+ * This function performs necessary checks (e.g., if the path is a character
+ * device) before opening the file. It also tracks the number of opened DRM
+ * devices.
+ *
+ * @param[in,out] em Pointer to the Elput_Manager. Used to increment
+ *                   `drm_opens` if a DRM device is opened.
+ * @param[in] path The file system path to the device to open (e.g.,
+ *                 "/dev/input/event0", "/dev/dri/card0").
+ * @param[in] flags The flags to use when opening the file (e.g., O_RDWR,
+ *                  O_NONBLOCK).
+ * @return The file descriptor on success, or -1 on error (e.g., path not
+ *         found, not a character device, open failed).
+ */
 static int
 _root_open(Elput_Manager *em EINA_UNUSED, const char *path, int flags)
 {
@@ -105,6 +159,19 @@ err:
    return -1;
 }
 
+/**
+ * @brief Opens a device file asynchronously and sends the fd via a pipe.
+ *
+ * This function calls _root_open to open the device and then writes the
+ * resulting file descriptor to a pipe specified in `em->input.pipe`.
+ * This is typically used when the open operation might block or needs to be
+ * handled in a non-blocking fashion by another part of the system.
+ *
+ * @param[in] em Pointer to the Elput_Manager. `em->input.pipe` is used to
+ *               send the opened file descriptor.
+ * @param[in] path The file system path to the device to open.
+ * @param[in] flags The flags to use when opening the file.
+ */
 static void
 _root_open_async(Elput_Manager *em, const char *path, int flags)
 {
@@ -126,12 +193,31 @@ _root_open_async(Elput_Manager *em, const char *path, int flags)
    em->input.pipe = -1;
 }
 
+/**
+ * @brief Closes a file descriptor.
+ *
+ * @param[in] em Pointer to the Elput_Manager. This parameter is currently
+ *               unused.
+ * @param[in] fd The file descriptor to close.
+ */
 static void
 _root_close(Elput_Manager *em EINA_UNUSED, int fd)
 {
    close(fd);
 }
 
+/**
+ * @brief Sets the active virtual terminal (VT).
+ *
+ * This function is intended for operations that require changing the VT.
+ * Currently, it's a no-op and always returns success.
+ *
+ * @param[in] em Pointer to the Elput_Manager. This parameter is currently
+ *               unused.
+ * @param[in] vt The virtual terminal number to switch to. This parameter is
+ *               currently unused.
+ * @return EINA_TRUE, as the operation is currently a no-op.
+ */
 static Eina_Bool
 _root_vt_set(Elput_Manager *em EINA_UNUSED, int vt EINA_UNUSED)
 {
@@ -139,12 +225,18 @@ _root_vt_set(Elput_Manager *em EINA_UNUSED, int vt EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Interface for Elput operations when running with root privileges.
+ *
+ * This structure maps generic Elput operations to their root-specific
+ * implementations.
+ */
 Elput_Interface _root_interface =
 {
-   _root_connect,
-   _root_disconnect,
-   _root_open,
-   _root_open_async,
-   _root_close,
-   _root_vt_set,
+   _root_connect,    /**< Function to connect and initialize the manager. */
+   _root_disconnect, /**< Function to disconnect the manager. */
+   _root_open,       /**< Function to open a device file. */
+   _root_open_async, /**< Function to open a device file asynchronously. */
+   _root_close,      /**< Function to close a file descriptor. */
+   _root_vt_set,     /**< Function to set the virtual terminal. */
 };

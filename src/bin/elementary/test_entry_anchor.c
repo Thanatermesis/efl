@@ -3,12 +3,29 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback for when a bubble is clicked.
+ *
+ * This function is registered as a "clicked" smart callback for bubble widgets.
+ * It simply prints a message to standard output to indicate that a bubble
+ * has been clicked.
+ */
 static void
 _print_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("bubble clicked\n");
 }
 
+/**
+ * @brief Callback for buttons inside an anchor hover popup.
+ *
+ * This function is triggered when a button within the anchor hover popup
+ * is clicked. Its purpose is to dismiss the hover popup.
+ *
+ * @param data The entry widget containing the anchor.
+ * @param obj The button object that was clicked (unused).
+ * @param event_info The event-specific information (unused).
+ */
 static void
 my_entry_anchor_bt(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -16,6 +33,22 @@ my_entry_anchor_bt(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EI
    elm_entry_anchor_hover_end(av);
 }
 
+/**
+ * @brief Callback to populate an anchor hover popup.
+ *
+ * This function is called when the mouse hovers over an anchor in the entry.
+ * It dynamically creates content for the hover popup based on the anchor
+ * and hover information.
+ *
+ * It demonstrates how to add content to different parts of the hover
+ * (middle, top, bottom, left, right).
+ *
+ * @param data The entry widget passed during callback registration.
+ * @param obj The entry object that contains the anchor.
+ * @param event_info A pointer to Elm_Entry_Anchor_Hover_Info, which contains
+ * details about the hover event, such as the hover object itself and hints
+ * on where content can be placed.
+ */
 static void
 my_entry_anchor(void *data, Evas_Object *obj, void *event_info)
 {
@@ -76,30 +109,60 @@ my_entry_anchor(void *data, Evas_Object *obj, void *event_info)
      }
 }
 
+/**
+ * @brief Callback for scroller reaching the left edge.
+ *
+ * This function is triggered when the scroller hits its leftmost boundary.
+ */
 static void
 my_entry_anchor_edge_left(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("left\n");
 }
 
+/**
+ * @brief Callback for scroller reaching the right edge.
+ *
+ * This function is triggered when the scroller hits its rightmost boundary.
+ */
 static void
 my_entry_anchor_edge_right(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("right\n");
 }
 
+/**
+ * @brief Callback for scroller reaching the top edge.
+ *
+ * This function is triggered when the scroller hits its topmost boundary.
+ */
 static void
 my_entry_anchor_edge_top(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("top\n");
 }
 
+/**
+ * @brief Callback for scroller reaching the bottom edge.
+ *
+ * This function is triggered when the scroller hits its bottommost boundary.
+ */
 static void
 my_entry_anchor_edge_bottom(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("bottom\n");
 }
 
+/**
+ * @brief Callback for scroller scroll events.
+ *
+ * This function is called whenever the scroller's content is scrolled.
+ * It prints the current scroll region details (position and size) and the
+ * total size of the scrollable child content. This is useful for debugging
+ * scrolling behavior.
+ *
+ * @param obj The scroller object.
+ */
 static void
 my_entry_anchor_scroll(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -110,6 +173,20 @@ my_entry_anchor_scroll(void *data EINA_UNUSED, Evas_Object *obj, void *event_inf
    printf("scroll %ix%i +%i+%i in %ix%i\n", w, h, x, y, vw, vh);
 }
 
+/**
+ * @brief Main test function for entry anchor functionality.
+ *
+ * This function creates a window with a scrollable list of bubbles. Each bubble
+ * contains an entry widget with text that includes clickable anchors.
+ * Anchors are created using HTML-like tags (`<a>` and `<item>`).
+ *
+ * This test demonstrates:
+ * - Creating entries with anchors.
+ * - Setting up hover popups for anchors.
+ * - Populating hover popups with interactive content (buttons).
+ * - Using a scroller with edge detection callbacks.
+ * - Displaying content in bubbles.
+ */
 void
 test_entry_anchor(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

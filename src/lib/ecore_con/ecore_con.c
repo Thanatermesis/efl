@@ -1,3 +1,13 @@
+/**
+ * @file
+ * @brief Ecore_Con functions for network connections.
+ *
+ * This file contains the core functionalities for Ecore_Con, including
+ * initialization, shutdown, SSL availability checks, and various network
+ * utility functions for IP address manipulation, socket operations,
+ * asynchronous connections, and proxy handling.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -51,19 +61,57 @@
 #endif
 
 #ifdef HAVE_SYSTEMD
-int sd_fd_index = 0;
-int sd_fd_max = 0;
+int sd_fd_index = 0; /**< Index for iterating through systemd passed file descriptors. */
+int sd_fd_max = 0; /**< Maximum number of systemd passed file descriptors. */
 #endif
 
-static int _ecore_con_init_count = 0;
-int _ecore_con_log_dom = -1;
+static int _ecore_con_init_count = 0; /**< Counter for ecore_con_init() calls. */
+int _ecore_con_log_dom = -1; /**< Log domain for Ecore_Con. */
 
+/**
+ * @brief Checks if the proxy helper can be used.
+ * @return EINA_TRUE if the proxy helper can be used, EINA_FALSE otherwise.
+ * @internal
+ */
 Eina_Bool   _efl_net_proxy_helper_can_do      (void);
+/**
+ * @brief Sends a URL request to the proxy helper.
+ * @param url The URL to request proxy information for.
+ * @param eth The Ecore_Thread to use for the request.
+ * @return An ID for the request, or a negative value on error.
+ * @internal
+ */
 int         _efl_net_proxy_helper_url_req_send(const char *url, Ecore_Thread *eth);
+/**
+ * @brief Waits for the proxy helper to respond to a URL request.
+ * @param id The ID of the request to wait for.
+ * @return A NULL-terminated array of proxy strings, or NULL on error or if no proxies are found.
+ *         The caller is responsible for freeing the array and its contents.
+ *         Example: `char **proxies = { "socks5://localhost:1080", "direct://", NULL };`
+ * @internal
+ */
 char      **_efl_net_proxy_helper_url_wait    (int id);
+/**
+ * @brief Initializes the proxy helper.
+ * @internal
+ */
 void        _efl_net_proxy_helper_init        (void);
+/**
+ * @brief Shuts down the proxy helper.
+ * @internal
+ */
 void        _efl_net_proxy_helper_shutdown    (void);
 
+/**
+ * @brief Initializes the Ecore_Con library.
+ *
+ * This function initializes all the necessary subsystems for Ecore_Con.
+ * It increments a counter for each call, and only performs full initialization
+ * on the first call.
+ *
+ * @return The number of times the library has been initialized.
+ *         Returns 0 on failure.
+ */
 ECORE_CON_API int
 ecore_con_init(void)
 {
@@ -129,6 +177,17 @@ ecore_con_log_error:
    return --_ecore_con_init_count;
 }
 
+/**
+ * @brief Shuts down the Ecore_Con library.
+ *
+ * This function shuts down all the subsystems used by Ecore_Con.
+ * It decrements a counter for each call, and only performs full shutdown
+ * when the counter reaches zero.
+ *
+ * @return The number of times the library has been initialized.
+ *         Returns 0 if the library is fully shut down or if called
+ *         without prior initialization.
+ */
 ECORE_CON_API int
 ecore_con_shutdown(void)
 {
@@ -162,6 +221,15 @@ ecore_con_shutdown(void)
    return _ecore_con_init_count;
 }
 
+/**
+ * @brief Gets the availability of SSL/TLS support.
+ *
+ * This function checks if Ecore_Con was compiled with SSL/TLS support
+ * (usually OpenSSL).
+ *
+ * @return 2 if SSL/TLS support is available (OpenSSL).
+ * @return 0 if SSL/TLS support is not available.
+ */
 ECORE_CON_API int
 ecore_con_ssl_available_get(void)
 {
@@ -174,6 +242,25 @@ ecore_con_ssl_available_get(void)
 
 
 #ifndef _WIN32
+/**
+ * @brief Formats a UNIX domain socket address into a string.
+ *
+ * This function converts a `struct sockaddr_un` address into a human-readable
+ * string representation. It handles both named and abstract sockets.
+ * For unnamed sockets (where addrlen is just the offset to sun_path),
+ * it formats as "unnamed:<fd>".
+ * For abstract sockets (sun_path[0] is '\0'), it formats as "abstract:<path>".
+ * For regular path-based sockets, it copies the sun_path.
+ *
+ * @param buf The buffer to store the formatted string.
+ * @param buflen The length of the buffer.
+ * @param fd The socket file descriptor (used for unnamed sockets).
+ * @param addr The UNIX domain socket address structure.
+ * @param addrlen The length of the socket address structure.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., buffer too small,
+ *         unsupported address family).
+ * @internal
+ */
 Eina_Bool
 efl_net_unix_fmt(char *buf, size_t buflen, SOCKET fd, const struct sockaddr_un *addr, socklen_t addrlen)
 {
@@ -232,6 +319,15 @@ efl_net_unix_fmt(char *buf, size_t buflen, SOCKET fd, const struct sockaddr_un *
  *
  * If was parsed, then returns EINA_TRUE, otherwise use getaddrinfo()
  * or efl_net_ip_resolve_async_new().
+ *
+ * @param address The IP address and port string to parse.
+ *                Examples: "192.168.1.10:80", "[::1]:8080", "example.com:443".
+ *                Note: This function primarily handles numeric IP addresses.
+ *                For hostnames, resolution is not performed here.
+ * @param storage Pointer to a `struct sockaddr_storage` to store the parsed address.
+ * @return EINA_TRUE if the string was successfully parsed into an IP address
+ *         and port, EINA_FALSE otherwise.
+ * @internal
  */
 Eina_Bool
 efl_net_ip_port_parse(const char *address, struct sockaddr_storage *storage)
@@ -254,6 +350,22 @@ efl_net_ip_port_parse(const char *address, struct sockaddr_storage *storage)
    return ret;
 }
 
+/**
+ * @brief Parses a host and port string into a sockaddr_storage structure.
+ *
+ * This function takes separate host and port strings and attempts to convert
+ * them into a `struct sockaddr_storage`. It determines the address family
+ * (AF_INET or AF_INET6) based on whether the host string contains a colon.
+ *
+ * @param host The host string (IP address).
+ *             Examples: "192.168.1.1", "::1".
+ * @param port The port string. If NULL, "0" is used.
+ *             Example: "80".
+ * @param storage Pointer to a `struct sockaddr_storage` to store the parsed address.
+ * @return EINA_TRUE if parsing is successful, EINA_FALSE otherwise (e.g., invalid
+ *         port number, invalid IP address format).
+ * @internal
+ */
 Eina_Bool
 efl_net_ip_port_parse_split(const char *host, const char *port, struct sockaddr_storage *storage)
 {
@@ -291,6 +403,20 @@ efl_net_ip_port_parse_split(const char *host, const char *port, struct sockaddr_
    return x == 1;
 }
 
+/**
+ * @brief Formats a sockaddr structure into an IP address and port string.
+ *
+ * This function converts a `struct sockaddr` (expected to be `sockaddr_in` or
+ * `sockaddr_in6`) into a human-readable string representation of the IP address
+ * and port. IPv6 addresses are enclosed in square brackets.
+ *
+ * @param buf The buffer to store the formatted string.
+ * @param buflen The length of the buffer.
+ * @param addr The socket address structure to format.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., buffer too small,
+ *         unsupported address family, error in `inet_ntop`).
+ * @internal
+ */
 Eina_Bool
 efl_net_ip_port_fmt(char *buf, size_t buflen, const struct sockaddr *addr)
 {
@@ -343,6 +469,26 @@ efl_net_ip_port_fmt(char *buf, size_t buflen, const struct sockaddr *addr)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Splits an IP address and port string into host and port components.
+ *
+ * This function takes a string that may contain an IP address and port,
+ * and modifies it in-place to separate the host and port parts.
+ * It handles IPv4 (host:port) and IPv6 ([host]:port) formats.
+ * The input buffer `buf` is modified by inserting null terminators.
+ *
+ * @param buf The input string containing the address and port. This buffer
+ *            will be modified.
+ *            Examples: "192.168.1.1:80", "[::1]:8080", "192.168.1.1", "[::1]".
+ * @param[out] p_host Pointer to a `const char *` that will be set to point to
+ *                    the start of the host part within `buf`.
+ * @param[out] p_port Pointer to a `const char *` that will be set to point to
+ *                    the start of the port part within `buf`. If no port is
+ *                    found, it will be set to NULL.
+ * @return EINA_TRUE if the string could be split (even if no port is present),
+ *         EINA_FALSE if the format is invalid (e.g., mismatched brackets for IPv6).
+ * @internal
+ */
 Eina_Bool
 efl_net_ip_port_split(char *buf, const char **p_host, const char **p_port)
 {
@@ -384,6 +530,30 @@ efl_net_ip_port_split(char *buf, const char **p_host, const char **p_port)
 }
 
 #ifdef HAVE_SYSTEMD
+/**
+ * @brief Checks if a socket matching the given parameters was activated by systemd.
+ *
+ * This function is used for socket activation with systemd. It checks if one of
+ * the file descriptors passed by systemd matches the specified address, family,
+ * and type. It also determines if the socket was a listening socket.
+ *
+ * @param address The address string to match. For AF_UNIX, this is the path
+ *                (optionally prefixed with "abstract:"). For IP sockets,
+ *                this is an "IP:PORT" string.
+ * @param family The address family (e.g., AF_UNIX, AF_INET, AF_INET6, AF_UNSPEC).
+ * @param type The socket type (e.g., SOCK_STREAM, SOCK_DGRAM).
+ * @param[out] listening Pointer to an Eina_Bool that will be set to EINA_TRUE
+ *                       if the activated socket is a listening socket, EINA_FALSE
+ *                       otherwise. Can be NULL if this information is not needed.
+ * @return 0 on success (a matching socket was found).
+ * @return ENOENT if no more systemd file descriptors are available or if systemd
+ *         support is not properly initialized.
+ * @return EINVAL if parameters are invalid, or if the socket properties do not match.
+ * @return Other Eina_Error codes on other errors (e.g., from getsockname, getaddrinfo).
+ * @note This function may block if `address` is a hostname that needs resolution
+ *       and was not found in the fast path (numeric IP:PORT).
+ * @internal
+ */
 Eina_Error
 efl_net_ip_socket_activate_check(const char *address, int family, int type, Eina_Bool *listening)
 {
@@ -560,6 +730,16 @@ efl_net_ip_socket_activate_check(const char *address, int family, int type, Eina
 #endif
 
 
+/**
+ * @brief Cleanup function to close a socket.
+ *
+ * This function is intended to be used with EINA_THREAD_CLEANUP_PUSH.
+ * It closes the socket pointed to by `data` and sets the pointer to
+ * INVALID_SOCKET.
+ *
+ * @param data A pointer to a SOCKET variable.
+ * @internal
+ */
 static void
 _cleanup_close(void *data)
 {
@@ -569,6 +749,25 @@ _cleanup_close(void *data)
    if (fd != INVALID_SOCKET) closesocket(fd);
 }
 
+/**
+ * @brief Creates a socket with optional close-on-exec flag.
+ *
+ * This function is a wrapper around the standard `socket()` call.
+ * It provides a way to request that the socket be created with the
+ * SOCK_CLOEXEC flag (if available) or to set FD_CLOEXEC afterwards.
+ * This ensures the socket is closed automatically when `exec()` is called.
+ *
+ * @param domain The communication domain (e.g., AF_INET, AF_INET6, AF_UNIX).
+ * @param type The socket type (e.g., SOCK_STREAM, SOCK_DGRAM).
+ *             If `close_on_exec` is EINA_TRUE and SOCK_CLOEXEC is defined,
+ *             SOCK_CLOEXEC will be ORed into this type.
+ * @param protocol The protocol to be used with the socket (e.g., IPPROTO_TCP,
+ *                 IPPROTO_UDP). Usually 0.
+ * @param close_on_exec If EINA_TRUE, attempts to make the socket close-on-exec.
+ * @return The new socket file descriptor on success.
+ * @return INVALID_SOCKET on failure, with `errno` set appropriately.
+ * @internal
+ */
 SOCKET
 efl_net_socket4(int domain, int type, int protocol, Eina_Bool close_on_exec)
 {
@@ -603,17 +802,36 @@ efl_net_socket4(int domain, int type, int protocol, Eina_Bool close_on_exec)
    return fd;
 }
 
+/**
+ * @internal
+ * @brief Data structure for asynchronous IP address resolution.
+ *
+ * This structure holds all the necessary information for performing an
+ * asynchronous `getaddrinfo` call and invoking the callback upon completion
+ * or cancellation.
+ */
 typedef struct _Efl_Net_Ip_Resolve_Async_Data
 {
-   Efl_Net_Ip_Resolve_Async_Cb cb;
-   const void *data;
-   char *host;
-   char *port;
-   struct addrinfo *result;
-   struct addrinfo *hints;
-   int gai_error;
+   Efl_Net_Ip_Resolve_Async_Cb cb; /**< Callback function to call on completion/cancellation. */
+   const void *data; /**< User data to pass to the callback. */
+   char *host; /**< Hostname to resolve (duplicated string). */
+   char *port; /**< Service name or port number string (duplicated string). */
+   struct addrinfo *result; /**< Pointer to the linked list of addrinfo structures from getaddrinfo. */
+   struct addrinfo *hints; /**< Hints for getaddrinfo (duplicated structure). */
+   int gai_error; /**< Error code from getaddrinfo (e.g., EAI_NONAME). 0 on success. */
 } Efl_Net_Ip_Resolve_Async_Data;
 
+/**
+ * @brief Worker thread function for asynchronous IP address resolution.
+ *
+ * This function is executed in a separate thread. It calls `getaddrinfo`
+ * with the provided host, port, and hints. It handles retries on EAI_AGAIN
+ * and EINTR errors.
+ *
+ * @param data Pointer to an `Efl_Net_Ip_Resolve_Async_Data` structure.
+ * @param thread The Ecore_Thread this function is running in (unused).
+ * @internal
+ */
 static void
 _efl_net_ip_resolve_async_run(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -651,8 +869,14 @@ _efl_net_ip_resolve_async_run(void *data, Ecore_Thread *thread EINA_UNUSED)
                DBG("resolved host='%s' port='%s': %s", d->host, d->port, buf);
           }
      }
-}
+   }
 
+/**
+ * @brief Frees the resources associated with an Efl_Net_Ip_Resolve_Async_Data structure.
+ *
+ * @param d Pointer to the Efl_Net_Ip_Resolve_Async_Data structure to free.
+ * @internal
+ */
 static void
 _efl_net_ip_resolve_async_data_free(Efl_Net_Ip_Resolve_Async_Data *d)
 {
@@ -662,6 +886,17 @@ _efl_net_ip_resolve_async_data_free(Efl_Net_Ip_Resolve_Async_Data *d)
    free(d);
 }
 
+/**
+ * @brief End callback for asynchronous IP address resolution.
+ *
+ * This function is called in the main thread after the worker thread
+ * (_efl_net_ip_resolve_async_run) completes. It invokes the user-provided
+ * callback and then frees the associated data.
+ *
+ * @param data Pointer to an `Efl_Net_Ip_Resolve_Async_Data` structure.
+ * @param thread The Ecore_Thread (unused).
+ * @internal
+ */
 static void
 _efl_net_ip_resolve_async_end(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -670,6 +905,17 @@ _efl_net_ip_resolve_async_end(void *data, Ecore_Thread *thread EINA_UNUSED)
    _efl_net_ip_resolve_async_data_free(d);
 }
 
+/**
+ * @brief Cancellation callback for asynchronous IP address resolution.
+ *
+ * This function is called if the asynchronous operation is cancelled.
+ * It frees the `addrinfo` results if they were obtained and then frees
+ * the associated data structure.
+ *
+ * @param data Pointer to an `Efl_Net_Ip_Resolve_Async_Data` structure.
+ * @param thread The Ecore_Thread (unused).
+ * @internal
+ */
 static void
 _efl_net_ip_resolve_async_cancel(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -678,6 +924,26 @@ _efl_net_ip_resolve_async_cancel(void *data, Ecore_Thread *thread EINA_UNUSED)
    _efl_net_ip_resolve_async_data_free(d);
 }
 
+/**
+ * @brief Initiates an asynchronous IP address resolution.
+ *
+ * This function creates a new thread to perform a `getaddrinfo` call
+ * without blocking the main loop.
+ *
+ * @param host The hostname or IP address string to resolve.
+ * @param port The service name (e.g., "http") or port number string (e.g., "80").
+ * @param hints Optional `struct addrinfo` containing hints for the resolution.
+ *              If NULL, default hints will be used. The contents of `hints`
+ *              are copied.
+ * @param cb The callback function to be invoked upon completion or cancellation.
+ *           The callback receives the user data, host, port, hints, the
+ *           `addrinfo` result list (which must be freed by the callback using
+ *           `freeaddrinfo` if not NULL), and the `getaddrinfo` error code.
+ * @param data User-specific data to be passed to the callback function.
+ * @return An Ecore_Thread handle for the asynchronous operation, or NULL on failure.
+ *         The returned thread can be cancelled using `ecore_thread_cancel()`.
+ * @internal
+ */
 Ecore_Thread *
 efl_net_ip_resolve_async_new(const char *host, const char *port, const struct addrinfo *hints, Efl_Net_Ip_Resolve_Async_Cb cb, const void *data)
 {

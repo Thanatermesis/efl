@@ -1,3 +1,11 @@
+/**
+ * @file
+ * @brief This file contains the implementation of the Efl_Canvas_Vg_Object.
+ *
+ * It handles the rendering, manipulation, and file operations for vector graphics objects
+ * within the Evas canvas.
+ */
+
 #include "evas_common_private.h"
 #include "evas_private.h"
 
@@ -10,25 +18,66 @@ static const char o_type[] = "vectors";
 
 const char *o_vg_type = o_type;
 
-
+/**
+ * @brief Renders the vector graphics object.
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @param type_private_data The private data specific to this object type.
+ * @param engine The rendering engine.
+ * @param output The rendering output.
+ * @param context The drawing context.
+ * @param surface The target surface for rendering.
+ * @param x The x-coordinate offset for rendering.
+ * @param y The y-coordinate offset for rendering.
+ * @param do_async Whether to perform rendering asynchronously.
+ */
 static void _efl_canvas_vg_object_render(Evas_Object *eo_obj,
                                          Evas_Object_Protected_Data *obj,
                                          void *type_private_data,
                                          void *engine, void *output, void *context, void *surface,
                                          int x, int y, Eina_Bool do_async);
+/**
+ * @brief Performs pre-render operations for the vector graphics object.
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @param type_private_data The private data specific to this object type.
+ */
 static void _efl_canvas_vg_object_render_pre(Evas_Object *eo_obj,
                                              Evas_Object_Protected_Data *obj,
                                              void *type_private_data);
+/**
+ * @brief Performs post-render operations for the vector graphics object.
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @param type_private_data The private data specific to this object type.
+ */
 static void _efl_canvas_vg_object_render_post(Evas_Object *eo_obj,
                                               Evas_Object_Protected_Data *obj,
                                               void *type_private_data);
+/**
+ * @brief Checks if the vector graphics object is currently opaque.
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @param type_private_data The private data specific to this object type.
+ * @return 1 if opaque, 0 otherwise.
+ */
 static int _efl_canvas_vg_object_is_opaque(Evas_Object *eo_obj,
                                            Evas_Object_Protected_Data *obj,
                                            void *type_private_data);
+/**
+ * @brief Checks if the vector graphics object was opaque in the previous state.
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @param type_private_data The private data specific to this object type.
+ * @return 1 if it was opaque, 0 otherwise.
+ */
 static int _efl_canvas_vg_object_was_opaque(Evas_Object *eo_obj,
                                             Evas_Object_Protected_Data *obj,
                                             void *type_private_data);
 
+/**
+ * @brief Structure defining the Evas object functions for vector graphics objects.
+ */
 static const Evas_Object_Func object_func =
 {
    /* methods (compulsory) */
@@ -51,6 +100,17 @@ static const Evas_Object_Func object_func =
    NULL // render_prepare
 };
 
+/**
+ * @brief Updates the viewport transformation of the vector graphics tree.
+ *
+ * This function calculates and applies a transformation matrix to the root node
+ * of the vector graphics tree based on the object's size, viewbox, fill mode,
+ * and alignment. It ensures the vector graphic scales and aligns correctly
+ * within the object's bounds.
+ *
+ * @param obj The Evas object.
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ */
 static void
 _update_vgtree_viewport(Eo *obj, Efl_Canvas_Vg_Object_Data *pd)
 {
@@ -90,6 +150,15 @@ _update_vgtree_viewport(Eo *obj, Efl_Canvas_Vg_Object_Data *pd)
    evas_object_change(obj, efl_data_scope_get(obj, EFL_CANVAS_OBJECT_CLASS));
 }
 
+/**
+ * @brief Callback function invoked when the Evas VG object is resized.
+ *
+ * This function triggers an update of the vector graphics tree viewport if the
+ * viewbox is valid.
+ *
+ * @param data The private data of the Efl_Canvas_Vg_Object (passed as Efl_Canvas_Vg_Object_Data *).
+ * @param ev The Efl_Event structure containing event information.
+ */
 static void
 _evas_vg_resize(void *data, const Efl_Event *ev)
 {
@@ -100,6 +169,18 @@ _evas_vg_resize(void *data, const Efl_Event *ev)
    _update_vgtree_viewport(ev->object, pd);
 }
 
+/**
+ * @brief Gets the root node of the vector graphics tree.
+ *
+ * If the object is associated with a VG cache entry (e.g., loaded from a file),
+ * it retrieves the root node from the cache, potentially resizing the cache entry
+ * if the object's dimensions have changed. Otherwise, it returns the user-set
+ * root node or the default internal root node.
+ *
+ * @param obj The Evas object (const).
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @return The root Efl_VG node.
+ */
 EOLIAN static Efl_VG *
 _efl_canvas_vg_object_root_node_get(const Eo *obj, Efl_Canvas_Vg_Object_Data *pd)
 {
@@ -125,6 +206,17 @@ _efl_canvas_vg_object_root_node_get(const Eo *obj, Efl_Canvas_Vg_Object_Data *pd
    return root;
 }
 
+/**
+ * @brief Sets the root node of the vector graphics tree.
+ *
+ * This function allows replacing the entire vector graphics tree displayed by the object.
+ * If a file was previously set, its cache entry is cleared. The old root node is
+ * detached and freed. If a new root_node is provided, it's associated with the object.
+ *
+ * @param eo_obj The Evas object.
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @param root_node The new root Efl_VG node to set. Can be NULL to clear the current tree.
+ */
 EOLIAN static void
 _efl_canvas_vg_object_root_node_set(Eo *eo_obj, Efl_Canvas_Vg_Object_Data *pd, Efl_VG *root_node)
 {
@@ -177,18 +269,48 @@ _efl_canvas_vg_object_root_node_set(Eo *eo_obj, Efl_Canvas_Vg_Object_Data *pd, E
    evas_object_change(eo_obj, obj);
 }
 
+/**
+ * @brief Sets the fill mode for the vector graphics object.
+ *
+ * The fill mode determines how the vector graphic (defined by its viewbox)
+ * is scaled and positioned within the object's actual area.
+ *
+ * @param obj The Evas object (unused).
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @param fill_mode The desired fill mode (e.g., EFL_CANVAS_VG_FILL_MODE_STRETCH,
+ *                  EFL_CANVAS_VG_FILL_MODE_MEET, EFL_CANVAS_VG_FILL_MODE_SLICE).
+ */
 EOLIAN static void
 _efl_canvas_vg_object_fill_mode_set(Eo *obj EINA_UNUSED, Efl_Canvas_Vg_Object_Data *pd, Efl_Canvas_Vg_Fill_Mode fill_mode)
 {
    pd->fill_mode = fill_mode;
 }
 
+/**
+ * @brief Gets the current fill mode of the vector graphics object.
+ * @param obj The Evas object (unused).
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @return The current Efl_Canvas_Vg_Fill_Mode.
+ */
 EOLIAN static Efl_Canvas_Vg_Fill_Mode
 _efl_canvas_vg_object_fill_mode_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Vg_Object_Data *pd)
 {
    return pd->fill_mode;
 }
 
+/**
+ * @brief Sets the viewbox for the vector graphics object.
+ *
+ * The viewbox defines the coordinate system and aspect ratio of the source
+ * vector graphic. If an empty rectangle is provided, the viewbox is reset.
+ * Setting a valid viewbox registers a resize callback to update the rendering
+ * when the object's size changes.
+ *
+ * @param obj The Evas object.
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @param viewbox The Eina_Rect defining the viewbox (x, y, w, h).
+ *                Example: Eina_Rect r = {0, 0, 100, 100};
+ */
 EOLIAN static void
 _efl_canvas_vg_object_viewbox_set(Eo *obj, Efl_Canvas_Vg_Object_Data *pd, Eina_Rect viewbox)
 {
@@ -216,12 +338,32 @@ _efl_canvas_vg_object_viewbox_set(Eo *obj, Efl_Canvas_Vg_Object_Data *pd, Eina_R
    _update_vgtree_viewport(obj, pd);
 }
 
+/**
+ * @brief Gets the current viewbox of the vector graphics object.
+ * @param obj The Evas object (unused).
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @return The current Eina_Rect viewbox.
+ */
 EOLIAN static Eina_Rect
 _efl_canvas_vg_object_viewbox_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Vg_Object_Data *pd)
 {
    return pd->viewbox;
 }
 
+/**
+ * @brief Sets the alignment for the viewbox within the object's area.
+ *
+ * This is used when the fill mode is EFL_CANVAS_VG_FILL_MODE_MEET or
+ * EFL_CANVAS_VG_FILL_MODE_SLICE, where the aspect ratio is preserved,
+ * potentially leaving empty space. The alignment values (0.0 to 1.0)
+ * determine how the scaled graphic is positioned in that space.
+ * (0,0) is top-left, (0.5,0.5) is center, (1,1) is bottom-right.
+ *
+ * @param obj The Evas object (unused).
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @param align_x The horizontal alignment (0.0 to 1.0).
+ * @param align_y The vertical alignment (0.0 to 1.0).
+ */
 EOLIAN static void
 _efl_canvas_vg_object_viewbox_align_set(Eo *obj EINA_UNUSED, Efl_Canvas_Vg_Object_Data *pd, double align_x, double align_y)
 {
@@ -235,6 +377,13 @@ _efl_canvas_vg_object_viewbox_align_set(Eo *obj EINA_UNUSED, Efl_Canvas_Vg_Objec
    pd->align_y = align_y;
 }
 
+/**
+ * @brief Gets the current viewbox alignment.
+ * @param obj The Evas object (unused).
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @param align_x Pointer to store the horizontal alignment (can be NULL).
+ * @param align_y Pointer to store the vertical alignment (can be NULL).
+ */
 EOLIAN static void
 _efl_canvas_vg_object_viewbox_align_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Vg_Object_Data *pd, double *align_x, double *align_y)
 {
@@ -242,6 +391,18 @@ _efl_canvas_vg_object_viewbox_align_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Vg
    if (align_y) *align_y = pd->align_y;
 }
 
+/**
+ * @brief Sets the file from which to load the vector graphics.
+ *
+ * If a file is already loaded and the new file path is different, the existing
+ * VG cache entry is deleted. This function then calls the superclass's file_set
+ * method. The actual loading happens in _efl_canvas_vg_object_efl_file_load.
+ *
+ * @param eo_obj The Evas object.
+ * @param pd The private data of the Efl_Canvas_Vg_Object (unused in this EOLIAN direct call, but used by logic).
+ * @param file The path to the vector graphics file (e.g., an SVG or Lottie/JSON file).
+ * @return EINA_ERROR_NONE on success, or an error code otherwise.
+ */
 EOLIAN static Eina_Error
 _efl_canvas_vg_object_efl_file_file_set(Eo *eo_obj, Efl_Canvas_Vg_Object_Data *pd EINA_UNUSED, const char *file)
 {
@@ -275,6 +436,18 @@ _efl_canvas_vg_object_efl_file_file_set(Eo *eo_obj, Efl_Canvas_Vg_Object_Data *p
    return 0;
 }
 
+/**
+ * @brief Loads the vector graphics data from the previously set file.
+ *
+ * This function is called after efl_file_set. It loads the file content via
+ * the superclass, then creates a VG cache entry for the loaded data.
+ * The object's viewbox is updated based on the viewbox information from the
+ * loaded file, if available.
+ *
+ * @param eo_obj The Evas object.
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @return EINA_ERROR_NONE on success, or an error code if loading fails.
+ */
 EOLIAN static Eina_Error
 _efl_canvas_vg_object_efl_file_load(Eo *eo_obj, Efl_Canvas_Vg_Object_Data *pd)
 {
@@ -305,6 +478,15 @@ _efl_canvas_vg_object_efl_file_load(Eo *eo_obj, Efl_Canvas_Vg_Object_Data *pd)
    return 0;
 }
 
+/**
+ * @brief Unloads the vector graphics data.
+ *
+ * This function is called when the object's file is unloaded. It removes the
+ * associated VG cache entry.
+ *
+ * @param eo_obj The Evas object.
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ */
 EOLIAN static void
 _efl_canvas_vg_object_efl_file_unload(Eo *eo_obj, Efl_Canvas_Vg_Object_Data *pd)
 {
@@ -317,6 +499,20 @@ _efl_canvas_vg_object_efl_file_unload(Eo *eo_obj, Efl_Canvas_Vg_Object_Data *pd)
    pd->vg_entry = NULL;
 }
 
+/**
+ * @brief Saves the current vector graphics data to a file.
+ *
+ * If the object is associated with a VG cache entry (loaded from a file),
+ * it attempts to save that entry. Otherwise, it saves the current root node
+ * (user-set or default) to the specified file.
+ *
+ * @param obj The Evas object (const).
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @param file The path to the file where the VG data should be saved.
+ * @param key Optional key for saving (e.g., for specific formats or parts).
+ * @param info Additional save information (e.g., quality, compression).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_vg_object_efl_file_save_save(const Eo *obj, Efl_Canvas_Vg_Object_Data *pd, const char *file, const char *key, const Efl_File_Save_Info *info)
 {
@@ -328,6 +524,23 @@ _efl_canvas_vg_object_efl_file_save_save(const Eo *obj, Efl_Canvas_Vg_Object_Dat
    return evas_cache_vg_file_save(pd->root, w, h, file, key, info);
 }
 
+/**
+ * @brief Cleans up references to renderers after a render cycle.
+ *
+ * This function is called as a callback after the scene rendering is complete
+ * (EFL_CANVAS_SCENE_EVENT_RENDER_POST). It iterates through an array of
+ * renderers that were used during asynchronous rendering and unreferences them.
+ * This is crucial for managing the lifecycle of renderer objects that might be
+ * destroyed asynchronously.
+ *
+ * The `pd->cleanup` array stores `Eo *renderer` pointers.
+ * Example structure of `pd->cleanup` elements:
+ * `pd->cleanup[0] = (Eo *)renderer_instance_1;`
+ * `pd->cleanup[1] = (Eo *)renderer_instance_2;`
+ *
+ * @param data The private data of the Efl_Canvas_Vg_Object (Efl_Canvas_Vg_Object_Data *).
+ * @param event The Efl_Event structure (unused).
+ */
 static void
 _cleanup_reference(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -339,6 +552,21 @@ _cleanup_reference(void *data, const Efl_Event *event EINA_UNUSED)
      efl_unref(renderer);
 }
 
+/**
+ * @brief Invalidates the Efl_Canvas_Vg_Object.
+ *
+ * This function is part of the Efl_Object lifecycle. It cleans up resources
+ * associated with the vector graphics object, including:
+ * - Removing the render post cleanup callback.
+ * - Flushing the array of renderers pending cleanup.
+ * - Unreferencing the root VG node.
+ * - Freeing user-specific VG entry data and associated caches.
+ * - Dropping VG cache entries and associated surface caches.
+ * Finally, it calls the superclass's invalidate method.
+ *
+ * @param eo_obj The Evas object being invalidated.
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ */
 EOLIAN static void
 _efl_canvas_vg_object_efl_object_invalidate(Eo *eo_obj, Efl_Canvas_Vg_Object_Data *pd)
 {
@@ -373,6 +601,18 @@ _efl_canvas_vg_object_efl_object_invalidate(Eo *eo_obj, Efl_Canvas_Vg_Object_Dat
    efl_invalidate(efl_super(eo_obj, MY_CLASS));
 }
 
+/**
+ * @brief Constructor for the Efl_Canvas_Vg_Object.
+ *
+ * This function is part of the Efl_Object lifecycle. It initializes the
+ * Evas_Object_Protected_Data with VG-specific functions and type information.
+ * It also creates a default root VG container node and initializes the cleanup array
+ * for asynchronous renderers.
+ *
+ * @param eo_obj The Evas object being constructed.
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @return The constructed Evas object.
+ */
 EOLIAN static Eo *
 _efl_canvas_vg_object_efl_object_constructor(Eo *eo_obj, Efl_Canvas_Vg_Object_Data *pd)
 {
@@ -397,6 +637,18 @@ _efl_canvas_vg_object_efl_object_constructor(Eo *eo_obj, Efl_Canvas_Vg_Object_Da
    return eo_obj;
 }
 
+/**
+ * @brief Finalizer for the Efl_Canvas_Vg_Object.
+ *
+ * This function is part of the Efl_Object lifecycle, called after construction
+ * and all parts are set up. It sets the parent of the internal root VG node
+ * to the object itself. It also registers a callback for cleaning up renderer
+ * references after each render cycle.
+ *
+ * @param obj The Evas object being finalized.
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @return The finalized Evas object.
+ */
 static Efl_Object *
 _efl_canvas_vg_object_efl_object_finalize(Eo *obj, Efl_Canvas_Vg_Object_Data *pd)
 {
@@ -415,6 +667,28 @@ _efl_canvas_vg_object_efl_object_finalize(Eo *obj, Efl_Canvas_Vg_Object_Data *pd
    return obj;
 }
 
+/**
+ * @brief Recursively renders a vector graphics node and its children.
+ *
+ * This function traverses the VG node tree. If the node is a container:
+ * - It handles alpha blending by rendering children to an intermediate buffer if the container has alpha < 255.
+ * - Otherwise, it recursively calls itself for each child.
+ * If the node is a primitive (not a container):
+ * - It uses the engine's ector_renderer_draw function to render the node.
+ * - If rendering asynchronously, it adds the renderer to a cleanup list.
+ *
+ * @param obj The protected data of the Evas object.
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @param engine The rendering engine.
+ * @param output The rendering output target.
+ * @param context The drawing context.
+ * @param node The Efl_VG node to render.
+ * @param clips An array of clipping rectangles (currently unused, passed as NULL).
+ * @param w The width of the rendering area.
+ * @param h The height of the rendering area.
+ * @param ector The Ector_Surface to render onto.
+ * @param do_async Whether to perform rendering asynchronously.
+ */
 static void
 _evas_vg_render(Evas_Object_Protected_Data *obj, Efl_Canvas_Vg_Object_Data *pd,
                 void *engine, void *output, void *context, Efl_VG *node,
@@ -510,7 +784,30 @@ _evas_vg_render(Evas_Object_Protected_Data *obj, Efl_Canvas_Vg_Object_Data *pd,
      }
 }
 
-//renders a vg_tree to an offscreen buffer and push it to the cache.
+/**
+ * @brief Renders a vector graphics tree to an offscreen buffer.
+ *
+ * This function orchestrates the rendering of a given VG root node to a buffer.
+ * If a buffer is not provided, it creates one. It initializes the drawing context,
+ * begins an Ector rendering pass, calls _evas_vg_render to draw the content,
+ * and then ends the Ector pass. If a cache key (ckey) is provided, the resulting
+ * buffer is stored in the Ector surface cache.
+ *
+ * @param obj The protected data of the Evas object.
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @param engine The rendering engine.
+ * @param root The root Efl_VG node of the tree to render.
+ * @param x The x-offset within the buffer (often 0 for full buffer rendering).
+ * @param y The y-offset within the buffer (often 0 for full buffer rendering).
+ * @param w The width of the buffer.
+ * @param h The height of the buffer.
+ * @param buffer An existing buffer to render to (optional, can be NULL). If NULL, a new one is created.
+ * @param ckey A cache key to associate with the rendered buffer (optional).
+ * @param do_async Whether to perform rendering asynchronously.
+ * @return A pointer to the buffer containing the rendered image, or NULL on failure.
+ *         The caller may need to manage the lifecycle of this buffer if `ckey` is NULL
+ *         or if it was passed in.
+ */
 static void *
 _render_to_buffer(Evas_Object_Protected_Data *obj, Efl_Canvas_Vg_Object_Data *pd,
                   void *engine, Efl_VG *root, int x, int y, int w, int h, void *buffer, void *ckey,
@@ -583,6 +880,28 @@ _render_to_buffer(Evas_Object_Protected_Data *obj, Efl_Canvas_Vg_Object_Data *pd
    return buffer;
 }
 
+/**
+ * @brief Renders a pre-rendered buffer (image) to the screen/surface.
+ *
+ * This function takes a buffer (typically an offscreen surface containing a rendered
+ * vector graphic) and draws it onto the final rendering surface (screen).
+ * It handles asynchronous unreferencing of the buffer if `do_async` is true
+ * and the engine indicates the buffer can be unreferenced asynchronously.
+ * If the buffer is not cacheable, it's destroyed after drawing.
+ *
+ * @param obj The protected data of the Evas object.
+ * @param engine The rendering engine.
+ * @param output The rendering output target.
+ * @param context The drawing context.
+ * @param surface The target surface for drawing (e.g., the screen).
+ * @param buffer The source buffer (Image_Entry *) containing the image to draw.
+ * @param x The x-coordinate on the target surface.
+ * @param y The y-coordinate on the target surface.
+ * @param w The width of the image to draw from the buffer.
+ * @param h The height of the image to draw from the buffer.
+ * @param do_async Whether to perform drawing asynchronously.
+ * @param cacheable If EINA_FALSE, the buffer is destroyed after drawing.
+ */
 static void
 _render_buffer_to_screen(Evas_Object_Protected_Data *obj,
                          void *engine, void *output, void *context, void *surface,
@@ -611,6 +930,34 @@ _render_buffer_to_screen(Evas_Object_Protected_Data *obj,
    if (!cacheable) ENFN->ector_surface_destroy(engine, buffer);
 }
 
+/**
+ * @brief Renders a vector graphics object that is managed by a Vg_Cache_Entry.
+ *
+ * This function handles rendering for VG objects loaded from files (which use
+ * Vg_Cache_Entry). It performs several steps:
+ * 1. Updates value providers for the VG entry.
+ * 2. Checks if the object's size has changed; if so, resizes the cache entry
+ *    and adjusts dimensions to maintain aspect ratio if a default size is known.
+ * 3. Retrieves the appropriate VG tree for the current animation frame.
+ * 4. If caching is enabled, tries to get a pre-rendered buffer from the Ector surface cache.
+ * 5. If not found in cache (or caching disabled), renders the VG tree to a new buffer
+ *    using _render_to_buffer().
+ * 6. Renders the buffer (from cache or newly rendered) to the screen using
+ *    _render_buffer_to_screen().
+ *
+ * @param obj The protected data of the Evas object.
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @param engine The rendering engine.
+ * @param output The rendering output target.
+ * @param context The drawing context.
+ * @param surface The target surface for drawing.
+ * @param x The x-coordinate on the target surface.
+ * @param y The y-coordinate on the target surface.
+ * @param w The width of the area to render into.
+ * @param h The height of the area to render into.
+ * @param do_async Whether to perform rendering asynchronously.
+ * @param cacheable Whether the rendered buffer can be cached.
+ */
 static void
 _cache_vg_entry_render(Evas_Object_Protected_Data *obj,
                        Efl_Canvas_Vg_Object_Data *pd,
@@ -714,6 +1061,32 @@ _cache_vg_entry_render(Evas_Object_Protected_Data *obj,
                             do_async, cacheable);
 }
 
+/**
+ * @brief Renders a vector graphics object that is managed by a Vg_User_Entry.
+ *
+ * This function handles rendering for VG objects whose root node is set directly
+ * by the user (using Vg_User_Entry). It performs these main steps:
+ * 1. If the VG content has changed, recalculates the path bounds of the root node.
+ * 2. Determines the rendering rectangle based on path bounds or object geometry.
+ * 3. Adjusts the rendering rectangle based on the object's viewbox, if set.
+ * 4. If the render size has changed, drops any existing surface cache for this entry.
+ * 5. Tries to retrieve a cached buffer for the user entry's root node.
+ * 6. If not cached or if content changed, renders the VG tree to a buffer using
+ *    _render_to_buffer(). The user entry's root node itself is used as the cache key.
+ * 7. Renders the buffer to the screen using _render_buffer_to_screen().
+ *
+ * @param obj The protected data of the Evas object.
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @param engine The rendering engine.
+ * @param output The rendering output target.
+ * @param context The drawing context.
+ * @param surface The target surface for drawing.
+ * @param x The x-coordinate on the target surface.
+ * @param y The y-coordinate on the target surface.
+ * @param w The width of the area to render into.
+ * @param h The height of the area to render into.
+ * @param do_async Whether to perform rendering asynchronously.
+ */
 static void
 _user_vg_entry_render(Evas_Object_Protected_Data *obj,
                       Efl_Canvas_Vg_Object_Data *pd,
@@ -836,6 +1209,19 @@ _efl_canvas_vg_object_render(Evas_Object *eo_obj EINA_UNUSED,
    pd->changed = EINA_FALSE;
 }
 
+/**
+ * @brief Performs pre-render operations for the Efl_Canvas_Vg_Object.
+ *
+ * This is a standard Evas object lifecycle function called before rendering.
+ * It checks for various changes (visibility, color, geometry, clipper, etc.)
+ * and adds appropriate redraw rectangles to the Evas update system if necessary.
+ * If the object's internal `pd->changed` flag is set (indicating a change in
+ * the VG data itself), it forces a redraw.
+ *
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @param type_private_data The private data of the Efl_Canvas_Vg_Object.
+ */
 static void
 _efl_canvas_vg_object_render_pre(Evas_Object *eo_obj,
                                  Evas_Object_Protected_Data *obj,
@@ -955,6 +1341,17 @@ done:
    evas_object_render_pre_effect_updates(&obj->layer->evas->clip_changes, eo_obj, is_v, was_v);
 }
 
+/**
+ * @brief Performs post-render operations for the Efl_Canvas_Vg_Object.
+ *
+ * This is a standard Evas object lifecycle function called after rendering.
+ * It cleans up any clip changes recorded during the render cycle and updates
+ * the object's state by copying current state to previous state.
+ *
+ * @param eo_obj The Evas object (unused).
+ * @param obj The protected data of the Evas object.
+ * @param type_private_data The private data of the Efl_Canvas_Vg_Object (unused).
+ */
 static void
 _efl_canvas_vg_object_render_post(Evas_Object *eo_obj EINA_UNUSED,
                                   Evas_Object_Protected_Data *obj,
@@ -969,6 +1366,14 @@ _efl_canvas_vg_object_render_post(Evas_Object *eo_obj EINA_UNUSED,
    evas_object_cur_prev(obj);
 }
 
+/**
+ * @brief Checks if the VG object is currently opaque.
+ * @note Currently, VG objects are always considered non-opaque.
+ * @param eo_obj The Evas object (unused).
+ * @param obj The protected data of the Evas object (unused).
+ * @param type_private_data The private data of the Efl_Canvas_Vg_Object (unused).
+ * @return Always 0 (not opaque).
+ */
 static int
 _efl_canvas_vg_object_is_opaque(Evas_Object *eo_obj EINA_UNUSED,
                                 Evas_Object_Protected_Data *obj EINA_UNUSED,
@@ -977,6 +1382,14 @@ _efl_canvas_vg_object_is_opaque(Evas_Object *eo_obj EINA_UNUSED,
    return 0;
 }
 
+/**
+ * @brief Checks if the VG object was opaque in its previous state.
+ * @note Currently, VG objects are always considered non-opaque.
+ * @param eo_obj The Evas object (unused).
+ * @param obj The protected data of the Evas object (unused).
+ * @param type_private_data The private data of the Efl_Canvas_Vg_Object (unused).
+ * @return Always 0 (not opaque).
+ */
 static int
 _efl_canvas_vg_object_was_opaque(Evas_Object *eo_obj EINA_UNUSED,
                                  Evas_Object_Protected_Data *obj EINA_UNUSED,
@@ -986,6 +1399,13 @@ _efl_canvas_vg_object_was_opaque(Evas_Object *eo_obj EINA_UNUSED,
 }
 
 /* animated feature */
+/**
+ * @brief Checks if the vector graphic is animated.
+ * @param eo_obj The Evas object (unused).
+ * @param pd The private data of the Efl_Canvas_Vg_Object (unused).
+ * @return EINA_TRUE if animated (currently hardcoded), EINA_FALSE otherwise.
+ * @todo Implement proper check based on VG data.
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_vg_object_efl_gfx_frame_controller_animated_get(const Eo *eo_obj EINA_UNUSED,
                                                                       Efl_Canvas_Vg_Object_Data *pd EINA_UNUSED EINA_UNUSED)
@@ -994,6 +1414,12 @@ _efl_canvas_vg_object_efl_gfx_frame_controller_animated_get(const Eo *eo_obj EIN
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the total number of frames in the animation.
+ * @param eo_obj The Evas object (unused).
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @return The frame count if loaded from a file (via vg_entry), 0 otherwise.
+ */
 EOLIAN static int
 _efl_canvas_vg_object_efl_gfx_frame_controller_frame_count_get(const Eo *eo_obj EINA_UNUSED,
                                                                                   Efl_Canvas_Vg_Object_Data *pd EINA_UNUSED)
@@ -1002,6 +1428,13 @@ _efl_canvas_vg_object_efl_gfx_frame_controller_frame_count_get(const Eo *eo_obj 
    return evas_cache_vg_anim_frame_count_get(pd->vg_entry);
 }
 
+/**
+ * @brief Gets the loop type hint for the animation.
+ * @param eo_obj The Evas object (unused).
+ * @param pd The private data of the Efl_Canvas_Vg_Object (unused).
+ * @return The loop hint (currently EFL_GFX_FRAME_CONTROLLER_LOOP_HINT_NONE).
+ * @todo Implement proper loop type retrieval.
+ */
 EOLIAN static Efl_Gfx_Frame_Controller_Loop_Hint
 _efl_canvas_vg_object_efl_gfx_frame_controller_loop_type_get(const Eo *eo_obj EINA_UNUSED,
                                                                                 Efl_Canvas_Vg_Object_Data *pd EINA_UNUSED)
@@ -1010,6 +1443,13 @@ _efl_canvas_vg_object_efl_gfx_frame_controller_loop_type_get(const Eo *eo_obj EI
    return EFL_GFX_FRAME_CONTROLLER_LOOP_HINT_NONE;
 }
 
+/**
+ * @brief Gets the loop count for the animation.
+ * @param eo_obj The Evas object (unused).
+ * @param pd The private data of the Efl_Canvas_Vg_Object (unused).
+ * @return The loop count (currently 0).
+ * @todo Implement proper loop count retrieval.
+ */
 EOLIAN static int
 _efl_canvas_vg_object_efl_gfx_frame_controller_loop_count_get(const Eo *eo_obj EINA_UNUSED,
                                                                                  Efl_Canvas_Vg_Object_Data *pd EINA_UNUSED)
@@ -1018,6 +1458,15 @@ _efl_canvas_vg_object_efl_gfx_frame_controller_loop_count_get(const Eo *eo_obj E
    return 0;
 }
 
+/**
+ * @brief Gets the duration of a specific frame or sequence of frames.
+ * @param eo_obj The Evas object (unused).
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @param start_frame The starting frame index (unused in current implementation).
+ * @param frame_num The number of frames (unused in current implementation).
+ * @return The total animation duration if loaded from a file, 0 otherwise.
+ * @todo Implement per-frame duration if supported by the backend.
+ */
 EOLIAN static double
 _efl_canvas_vg_object_efl_gfx_frame_controller_frame_duration_get(const Eo *eo_obj EINA_UNUSED,
                                                                                      Efl_Canvas_Vg_Object_Data *pd,
@@ -1028,6 +1477,15 @@ _efl_canvas_vg_object_efl_gfx_frame_controller_frame_duration_get(const Eo *eo_o
    return evas_cache_vg_anim_duration_get(pd->vg_entry);
 }
 
+/**
+ * @brief Sets a named animation sector (a range of frames).
+ * @param obj The Evas object (unused).
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @param name The name of the sector.
+ * @param startframe The starting frame index of the sector.
+ * @param endframe The ending frame index of the sector.
+ * @return EINA_TRUE on success, EINA_FALSE if not supported or vg_entry is NULL.
+ */
 Eina_Bool _efl_canvas_vg_object_efl_gfx_frame_controller_sector_set(Eo *obj EINA_UNUSED,
                                                                     Efl_Canvas_Vg_Object_Data *pd,
                                                                     const char *name,
@@ -1040,6 +1498,15 @@ Eina_Bool _efl_canvas_vg_object_efl_gfx_frame_controller_sector_set(Eo *obj EINA
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets a named animation sector.
+ * @param obj The Evas object (unused).
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @param name The name of the sector.
+ * @param startframe Pointer to store the starting frame index.
+ * @param endframe Pointer to store the ending frame index.
+ * @return EINA_TRUE on success, EINA_FALSE if sector not found or vg_entry is NULL.
+ */
 Eina_Bool _efl_canvas_vg_object_efl_gfx_frame_controller_sector_get(const Eo *obj EINA_UNUSED,
                                                                     Efl_Canvas_Vg_Object_Data *pd,
                                                                     const char *name,
@@ -1052,6 +1519,14 @@ Eina_Bool _efl_canvas_vg_object_efl_gfx_frame_controller_sector_get(const Eo *ob
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets the current animation frame index.
+ * @param eo_obj The Evas object.
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @param frame_index The frame index to set.
+ * @return EINA_TRUE on success.
+ * @todo Add validation for frame_index range.
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_vg_object_efl_gfx_frame_controller_frame_set(Eo *eo_obj,
                                                          Efl_Canvas_Vg_Object_Data *pd,
@@ -1068,6 +1543,12 @@ _efl_canvas_vg_object_efl_gfx_frame_controller_frame_set(Eo *eo_obj,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the current animation frame index.
+ * @param eo_obj The Evas object (unused).
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @return The current frame index.
+ */
 EOLIAN static int
 _efl_canvas_vg_object_efl_gfx_frame_controller_frame_get(const Eo *eo_obj EINA_UNUSED,
                                                                             Efl_Canvas_Vg_Object_Data *pd EINA_UNUSED)
@@ -1075,6 +1556,16 @@ _efl_canvas_vg_object_efl_gfx_frame_controller_frame_get(const Eo *eo_obj EINA_U
    return pd->frame_idx;
 }
 
+/**
+ * @brief Gets the default size of the vector graphic.
+ *
+ * This typically comes from the metadata of a loaded VG file.
+ *
+ * @param eo_obj The Evas object (unused).
+ * @param pd The private data of the Efl_Canvas_Vg_Object.
+ * @return The default Eina_Size2D of the VG content, or {0,0} if not available.
+ *         Example: `{ .w = 100, .h = 100 }`
+ */
 EOLIAN static Eina_Size2D
 _efl_canvas_vg_object_default_size_get(const Eo *eo_obj EINA_UNUSED,
                                        Efl_Canvas_Vg_Object_Data *pd EINA_UNUSED)
@@ -1082,7 +1573,12 @@ _efl_canvas_vg_object_default_size_get(const Eo *eo_obj EINA_UNUSED,
    return evas_cache_vg_entry_default_size_get(pd->vg_entry);
 }
 
-/* the actual api call to add a vector graphic object */
+/**
+ * @brief Adds a new vector graphics object to the Evas canvas.
+ * @param e The Evas canvas to add the object to.
+ * @return A new Evas_Object (Eo *) on success, NULL on failure.
+ * @ingroup Evas_Object_Group
+ */
 EVAS_API Eo *
 evas_object_vg_add(Evas *e)
 {
@@ -1092,36 +1588,81 @@ evas_object_vg_add(Evas *e)
    return efl_add(MY_CLASS, e, efl_canvas_object_legacy_ctor(efl_added));
 }
 
+/**
+ * @brief Gets the current frame index of an animated vector graphics object.
+ * @param obj The Evas object.
+ * @return The current frame index.
+ * @see efl_gfx_frame_controller_frame_get()
+ * @ingroup Evas_Object_Group_VG_Animation
+ */
 EVAS_API int
 evas_object_vg_animated_frame_get(const Evas_Object *obj)
 {
    return efl_gfx_frame_controller_frame_get(obj);
 }
 
+/**
+ * @brief Gets the duration of a specific frame or sequence of frames in an animated vector graphics object.
+ * @param obj The Evas object.
+ * @param start_frame The starting frame index.
+ * @param frame_num The number of frames.
+ * @return The duration in seconds.
+ * @see efl_gfx_frame_controller_frame_duration_get()
+ * @ingroup Evas_Object_Group_VG_Animation
+ */
 EVAS_API double
 evas_object_vg_animated_frame_duration_get(const Evas_Object *obj, int start_frame, int frame_num)
 {
    return efl_gfx_frame_controller_frame_duration_get(obj, start_frame, frame_num);
 }
 
+/**
+ * @brief Gets the total number of frames in an animated vector graphics object.
+ * @param obj The Evas object.
+ * @return The total frame count.
+ * @see efl_gfx_frame_controller_frame_count_get()
+ * @ingroup Evas_Object_Group_VG_Animation
+ */
 EVAS_API int
 evas_object_vg_animated_frame_count_get(const Evas_Object *obj)
 {
    return efl_gfx_frame_controller_frame_count_get(obj);
 }
 
+/**
+ * @brief Sets the current frame index of an animated vector graphics object.
+ * @param obj The Evas object.
+ * @param frame_index The frame index to set.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ * @see efl_gfx_frame_controller_frame_set()
+ * @ingroup Evas_Object_Group_VG_Animation
+ */
 EVAS_API Eina_Bool
 evas_object_vg_animated_frame_set(Evas_Object *obj, int frame_index)
 {
    return efl_gfx_frame_controller_frame_set(obj, frame_index);
 }
 
+/**
+ * @brief Sets the file and key for the vector graphics object and loads it.
+ * @param obj The Evas object.
+ * @param file The path to the vector graphics file.
+ * @param key Optional key within the file (e.g., for Lottie animations or SVG elements).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ * @see efl_file_simple_load()
+ * @ingroup Evas_Object_Group_VG_File
+ */
 EVAS_API Eina_Bool
 evas_object_vg_file_set(Evas_Object *obj, const char *file, const char *key)
 {
    return efl_file_simple_load(obj, file, key);
 }
 
+/**
+ * @brief Converts an Evas_Object_Vg_Fill_Mode to Efl_Canvas_Vg_Fill_Mode.
+ * @param mode The Evas_Object_Vg_Fill_Mode to convert.
+ * @return The corresponding Efl_Canvas_Vg_Fill_Mode.
+ */
 static inline Efl_Canvas_Vg_Fill_Mode
 _evas_object_vg_fill_mode_to_efl_ui_canvas_object_vg_fill_mode(Evas_Object_Vg_Fill_Mode mode)
 {
@@ -1138,6 +1679,11 @@ _evas_object_vg_fill_mode_to_efl_ui_canvas_object_vg_fill_mode(Evas_Object_Vg_Fi
    return EFL_CANVAS_VG_FILL_MODE_NONE;
 }
 
+/**
+ * @brief Converts an Efl_Canvas_Vg_Fill_Mode to Evas_Object_Vg_Fill_Mode.
+ * @param mode The Efl_Canvas_Vg_Fill_Mode to convert.
+ * @return The corresponding Evas_Object_Vg_Fill_Mode.
+ */
 static inline Evas_Object_Vg_Fill_Mode
 _efl_ui_canvas_object_vg_fill_mode_to_evas_object_vg_fill_mode(Efl_Canvas_Vg_Fill_Mode mode)
 {
@@ -1154,18 +1700,48 @@ _efl_ui_canvas_object_vg_fill_mode_to_evas_object_vg_fill_mode(Efl_Canvas_Vg_Fil
    return EVAS_OBJECT_VG_FILL_MODE_NONE;
 }
 
+/**
+ * @brief Sets the fill mode of the vector graphics object.
+ *
+ * The fill mode determines how the vector graphic is scaled and positioned
+ * within the object's area when its viewbox aspect ratio differs from the
+ * object's aspect ratio.
+ *
+ * @param obj The Evas object.
+ * @param fill_mode The Evas_Object_Vg_Fill_Mode to set.
+ *                  Example: EVAS_OBJECT_VG_FILL_MODE_MEET
+ * @see efl_canvas_vg_object_fill_mode_set()
+ * @ingroup Evas_Object_Group_VG
+ */
 EVAS_API void
 evas_object_vg_fill_mode_set(Evas_Object *obj, Evas_Object_Vg_Fill_Mode fill_mode)
 {
    efl_canvas_vg_object_fill_mode_set(obj, _evas_object_vg_fill_mode_to_efl_ui_canvas_object_vg_fill_mode(fill_mode));
 }
 
+/**
+ * @brief Gets the current fill mode of the vector graphics object.
+ * @param obj The Evas object.
+ * @return The current Evas_Object_Vg_Fill_Mode.
+ * @see efl_canvas_vg_object_fill_mode_get()
+ * @ingroup Evas_Object_Group_VG
+ */
 EVAS_API Evas_Object_Vg_Fill_Mode
 evas_object_vg_fill_mode_get(const Evas_Object *obj)
 {
    return _efl_ui_canvas_object_vg_fill_mode_to_evas_object_vg_fill_mode(efl_canvas_vg_object_fill_mode_get(obj));
 }
 
+/**
+ * @brief Checks if the vector graphics object's content has changed.
+ *
+ * This is an internal Evas function to query the `changed` flag of the object's
+ * private data.
+ *
+ * @param obj The protected data of the Evas object.
+ * @return EINA_TRUE if the content has changed, EINA_FALSE otherwise.
+ * @internal
+ */
 Eina_Bool
 evas_object_vg_changed_get(Evas_Object_Protected_Data *obj)
 {

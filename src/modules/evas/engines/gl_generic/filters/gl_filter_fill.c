@@ -1,5 +1,28 @@
 #include "gl_engine_filter.h"
 
+/**
+ * @file
+ * @brief This file implements the fill filter operation for the GL engine.
+ */
+
+/**
+ * @internal
+ * @brief Applies a fill color to a specified region of a buffer.
+ *
+ * This function fills a rectangular area within the output buffer with a
+ * solid color, as defined by the filter command. It handles clipping
+ * based on the command's clip mode and parameters.
+ *
+ * @param re The GL generic render engine instance.
+ * @param cmd The filter command containing draw parameters (color, region, etc.).
+ *            - cmd->output: The target buffer to be filled.
+ *            - cmd->draw.clip: Defines the clipping rectangle.
+ *            - cmd->draw.clip_mode_lrtb: If true, clip is defined by left, right, top, bottom offsets.
+ *                                       Otherwise, clip is defined by x, y, width, height.
+ *            - cmd->draw.R, G, B, A: The color components for the fill.
+ *            - cmd->draw.rop: The render operation to use.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 _gl_filter_fill(Render_Engine_GL_Generic *re, Evas_Filter_Command *cmd)
 {
@@ -61,6 +84,18 @@ _gl_filter_fill(Render_Engine_GL_Generic *re, Evas_Filter_Command *cmd)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Retrieves the function pointer for the GL fill filter.
+ *
+ * This function returns a pointer to the _gl_filter_fill function,
+ * which is responsible for executing the fill operation.
+ *
+ * @param re The GL generic render engine instance (unused in this function).
+ * @param cmd The filter command.
+ *            - cmd->output: Must not be NULL.
+ * @return A function pointer to _gl_filter_fill if the command is valid,
+ *         otherwise @c NULL.
+ */
 GL_Filter_Apply_Func
 gl_filter_fill_func_get(Render_Engine_GL_Generic *re EINA_UNUSED, Evas_Filter_Command *cmd)
 {

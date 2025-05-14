@@ -1,5 +1,31 @@
 #include "evas_gl_private.h"
 
+/**
+ * @brief Draws a rectangle using the Evas GL engine.
+ *
+ * This function handles the drawing of a solid color rectangle, taking into
+ * account the current drawing context, including clipping, color, masking,
+ * and cutouts.
+ *
+ * The function first performs basic checks to see if the rectangle has a
+ * positive size and is within the canvas bounds. It then applies clipping
+ * from the draw context.
+ *
+ * A key part of the logic is how it handles cutouts. If there are no cutouts,
+ * or if the number of active cutouts exceeds a certain threshold
+ * (for performance reasons), it pushes a single rectangle to the GL pipeline.
+ * Otherwise, it calculates the visible portions of the rectangle after
+ * applying all cutouts, and then pushes each of these smaller resulting
+ * rectangles to the GL pipeline.
+ *
+ * The function also handles an optional mask for the drawing operation.
+ *
+ * @param gc The Evas GL engine context, containing all state for drawing.
+ * @param x The x-coordinate of the top-left corner of the rectangle.
+ * @param y The y-coordinate of the top-left corner of the rectangle.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ */
 void
 evas_gl_common_rect_draw(Evas_Engine_GL_Context *gc, int x, int y, int w, int h)
 {

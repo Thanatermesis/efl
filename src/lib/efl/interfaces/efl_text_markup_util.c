@@ -33,6 +33,20 @@
    (_IS_PARAGRAPH_SEPARATOR_SIMPLE(item) ||                                  \
     (o->legacy_newline && _IS_LINE_SEPARATOR(item))) /* Paragraph separator */
 
+/**
+ * @internal
+ * @brief Appends a UTF-8 text string to an Eina_Strbuf, converting special characters to markup.
+ *
+ * This function iterates through the input `text`, character by character.
+ * It converts specific characters like newline, tab, '<', '>', '&', '"',
+ * paragraph separator, and replacement character into their corresponding
+ * markup representations (e.g., "<br/>", "<tab/>", "&lt;", etc.) and appends
+ * them to the `sbuf`. Other characters are appended as is, except for '\r'
+ * which is ignored.
+ *
+ * @param sbuf The Eina_Strbuf to append the markup to.
+ * @param text The UTF-8 text string to convert and append.
+ */
 static void
 _markup_get_text_utf8_append(Eina_Strbuf *sbuf, const char *text)
 {
@@ -67,6 +81,20 @@ _markup_get_text_utf8_append(Eina_Strbuf *sbuf, const char *text)
      }
 }
 
+/**
+ * @internal
+ * @brief Converts a plain UTF-8 text string to a markup string.
+ *
+ * This function takes a plain text string and converts certain characters
+ * (like newlines, tabs, and XML special characters) into their markup
+ * equivalents. For example, a newline character becomes "<br/>".
+ *
+ * @param text The input plain UTF-8 text string.
+ * @return A newly allocated string containing the markup representation of the input text,
+ *         or @c NULL if the input text is @c NULL. The caller is responsible for freeing
+ *         the returned string.
+ * @see _markup_get_text_utf8_append()
+ */
 EOLIAN static char*
 _efl_text_markup_util_text_to_markup(const char *text)
 {
@@ -93,8 +121,22 @@ _efl_text_markup_util_text_to_markup(const char *text)
 /**
  * @internal
  * @var escape_strings[]
- * This string consists of NULL terminated pairs of strings, the first of
- * every pair is an escape and the second is the value of the escape.
+ * @brief A flat string database of HTML/XML character entity references and their UTF-8 equivalents.
+ *
+ * This string consists of a sequence of null-terminated string pairs.
+ * The first string in each pair is the entity reference (e.g., "&amp;")
+ * and the second string is its corresponding UTF-8 character sequence (e.g., "&").
+ * The pairs are concatenated together.
+ *
+ * Example structure:
+ * "&entity1;\0char1\0&entity2;\0char2_1char2_2\0..."
+ *
+ * For instance:
+ * "&quot;\0"  "\x22\0"   (represents &quot; -> ")
+ * "&amp;\0"   "\x26\0"   (represents &amp;  -> &)
+ * "&nbsp;\0"  "\xc2\xa0\0" (represents &nbsp; -> non-breaking space)
+ *
+ * The table is ordered with more common escapes first to optimize linear search.
  */
 static const char escape_strings[] =
 /* most common escaped stuff */
@@ -253,6 +295,19 @@ static const char escape_strings[] =
 "&rlm;\0"      "\xe2\x80\x8f\0"
 ;
 
+/**
+ * @internal
+ * @brief Advances a character pointer past the current null-terminated string.
+ *
+ * Given a pointer `p_buf` that points within a sequence of null-terminated
+ * strings (like `escape_strings`), this function advances `p_buf` to point
+ * to the beginning of the next string in the sequence. It does this by
+ * finding the null terminator of the current string and then incrementing
+ * the pointer past it.
+ *
+ * @param p_buf A pointer to a character pointer. On return, the pointed-to
+ *              character pointer will be advanced past the current string.
+ */
 static inline void
 _escaped_advance_after_end_of_string(const char **p_buf)
 {
@@ -260,6 +315,22 @@ _escaped_advance_after_end_of_string(const char **p_buf)
    (*p_buf)++;
 }
 
+/**
+ * @internal
+ * @brief Compares a segment of a string `s` with a string `m` from the escape map.
+ *
+ * This function checks if the string segment `s` (from `s` to `s_end`)
+ * matches the current escape map entry pointed to by `*p_m` (up to `m_end`).
+ * If they match, `*p_m` is advanced to the next entry in the escape map.
+ * If they don't match, `*p_m` is advanced past the current non-matching entry.
+ *
+ * @param s Pointer to the start of the string segment to compare (e.g., an escape sequence like "&amp;").
+ * @param s_end Pointer to one past the end of the string segment `s`.
+ * @param p_m Pointer to a pointer to the current position in the `escape_strings` map.
+ *            This will be advanced by the function.
+ * @param m_end Pointer to one past the end of the `escape_strings` map.
+ * @return 1 if `s` matches the current escape map entry, 0 otherwise.
+ */
 static inline int
 _escaped_is_eq_and_advance(const char *s, const char *s_end,
       const char **p_m, const char *m_end)
@@ -281,6 +352,23 @@ _escaped_is_eq_and_advance(const char *s, const char *s_end,
    return ((s == s_end) && reached_end);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the UTF-8 character sequence for a given HTML/XML escape sequence.
+ *
+ * This function takes an escape sequence (e.g., "&amp;", "&#160;", "&#xA0;")
+ * and returns its corresponding UTF-8 string.
+ * It handles both named character references (like "&amp;") by looking them
+ * up in `escape_strings`, and numeric character references (decimal like "&#160;"
+ * or hexadecimal like "&#xA0;").
+ *
+ * @param s Pointer to the start of the escape sequence (e.g., the '&' in "&amp;").
+ * @param s_end Pointer to one character past the end of the escape sequence (e.g., past the ';').
+ * @return A pointer to a null-terminated string representing the UTF-8 character(s).
+ *         For named entities, this points into `escape_strings`.
+ *         For numeric entities, this points to a static buffer `utf8_escape`.
+ *         Returns @c NULL if the escape sequence is invalid or not found.
+ */
 static inline const char *
 _escaped_char_get(const char *s, const char *s_end)
 {
@@ -342,6 +430,26 @@ _escaped_char_get(const char *s, const char *s_end)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Converts a markup string to a plain UTF-8 text string.
+ *
+ * This function parses a string containing markup (e.g., "<br/>", "&amp;")
+ * and converts it into a plain text representation. Markup tags like "<br/>",
+ * "<tab/>", "<ps/>" are converted to their respective special characters
+ * (newline, tab, paragraph separator). HTML/XML character entities (e.g., "&amp;", "&lt;")
+ * are converted to their actual characters.
+ *
+ * The parsing logic iterates through the input string, identifying tags (enclosed in <>)
+ * and escape sequences (starting with & and ending with ;).
+ * Text outside of tags and escape sequences is appended directly.
+ *
+ * @param text The input markup string.
+ * @return A newly allocated string containing the plain text representation.
+ *         The caller is responsible for freeing this string.
+ *         Returns @c NULL if the input text is @c NULL.
+ * @see _escaped_char_get()
+ */
 static char *
 _text_util_markup_to_text(const char *text)
 {
@@ -489,6 +597,17 @@ _text_util_markup_to_text(const char *text)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Eolian wrapper for _text_util_markup_to_text.
+ *
+ * Converts a markup string (e.g., "Hello &lt;b&gt;World&lt;/b&gt;<br/>")
+ * to its plain text equivalent (e.g., "Hello <B>World</B>\n").
+ *
+ * @param text The input markup string.
+ * @return A newly allocated string containing the plain text, or @c NULL on error.
+ *         The caller must free the returned string.
+ */
 static EOLIAN char*
 _efl_text_markup_util_markup_to_text(const char *text)
 {

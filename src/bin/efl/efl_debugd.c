@@ -32,7 +32,7 @@
 #include <Ecore.h>
 #include <Ecore_Con.h>
 
-static int _log_dom = -1;
+static int _log_dom = -1; /**< Log domain for efl_debugd. */
 #ifdef ERR
 # undef ERR
 #endif
@@ -79,48 +79,72 @@ static int _log_dom = -1;
    _buf += sz; \
 }
 
+/**
+ * @brief Represents a connected client.
+ */
 typedef struct _Client Client;
 
+/**
+ * @struct _Client
+ * @brief Structure holding information about a connected client.
+ */
 struct _Client
 {
-   Eo *              client;
-   Eina_Stringshare *app_name;
+   Eo *              client; /**< The Ecore_Con_Client object for communication. */
+   Eina_Stringshare *app_name; /**< The name of the application connected. */
 
-   int               version;
-   int               cid;
-   pid_t             pid;
+   int               version; /**< Protocol version used by the client. */
+   int               cid; /**< Unique client ID assigned by the daemon. */
+   pid_t             pid; /**< Process ID of the client. */
 
-   Eina_Bool         cl_stat_obs : 1;
-   Eina_Bool         is_master : 1;
+   Eina_Bool         cl_stat_obs : 1; /**< EINA_TRUE if this client is observing client status changes. */
+   Eina_Bool         is_master : 1; /**< EINA_TRUE if this client is a master (e.g., a debugger), EINA_FALSE if a slave (e.g., an application). */
 };
 
-static Eina_List *_clients = NULL;
-static int _retval;
+static Eina_List *_clients = NULL; /**< List of all connected clients (_Client structures). */
+static int _retval; /**< Exit status of the daemon. */
 
-static Eo *_local_server = NULL, *_remote_server = NULL;
+static Eo *_local_server = NULL; /**< Ecore_Con_Server for local Unix domain socket connections. */
+static Eo *_remote_server = NULL; /**< Ecore_Con_Server for remote TCP connections. */
 
+/**
+ * @brief Callback function type for handling specific opcodes.
+ * @param client The client that sent the message.
+ * @param buffer The message payload.
+ * @param size The size of the message payload.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 typedef Eina_Bool (*Opcode_Cb)(Client *client, void *buffer, int size);
 
-static Eina_Hash *_string_to_opcode_hash = NULL;
+static Eina_Hash *_string_to_opcode_hash = NULL; /**< Hash table mapping opcode strings to Opcode_Information. */
 
-static int _free_cid = 1;
+static int _free_cid = 1; /**< Counter for assigning unique client IDs. */
 
-static int _clients_stat_register_opcode = EINA_DEBUG_OPCODE_INVALID;
-static int _slave_added_opcode = EINA_DEBUG_OPCODE_INVALID;
-static int _slave_deleted_opcode = EINA_DEBUG_OPCODE_INVALID;
-static int _cid_from_pid_opcode = EINA_DEBUG_OPCODE_INVALID;
-static int _test_loop_opcode = EINA_DEBUG_OPCODE_INVALID;
+static int _clients_stat_register_opcode = EINA_DEBUG_OPCODE_INVALID; /**< Opcode for client status observer registration. */
+static int _slave_added_opcode = EINA_DEBUG_OPCODE_INVALID; /**< Opcode for notifying about a new slave client. */
+static int _slave_deleted_opcode = EINA_DEBUG_OPCODE_INVALID; /**< Opcode for notifying about a deleted slave client. */
+static int _cid_from_pid_opcode = EINA_DEBUG_OPCODE_INVALID; /**< Opcode for requesting a CID from a PID. */
+static int _test_loop_opcode = EINA_DEBUG_OPCODE_INVALID; /**< Opcode for a simple data loop test. */
 
+/**
+ * @struct Opcode_Information
+ * @brief Structure holding information about a registered opcode.
+ */
 typedef struct
 {
-   int opcode;
-   Eina_Stringshare *opcode_string;
-   Opcode_Cb cb;
+   int opcode; /**< The numerical opcode value. */
+   Eina_Stringshare *opcode_string; /**< The string representation of the opcode. */
+   Opcode_Cb cb; /**< The callback function to handle this opcode. NULL if no specific callback. */
 } Opcode_Information;
 
-#define MAX_OPCODES 1000
-Opcode_Information *_opcodes[MAX_OPCODES];
+#define MAX_OPCODES 1000 /**< Maximum number of opcodes that can be registered. */
+Opcode_Information *_opcodes[MAX_OPCODES]; /**< Array storing registered opcode information, indexed by opcode value. */
 
+/**
+ * @brief Finds a client by its unique client ID (CID).
+ * @param cid The client ID to search for.
+ * @return A pointer to the Client structure if found, otherwise NULL.
+ */
 static Client *
 _client_find_by_cid(int cid)
 {
@@ -131,6 +155,11 @@ _client_find_by_cid(int cid)
    return NULL;
 }
 
+/**
+ * @brief Finds a client by its process ID (PID).
+ * @param pid The process ID to search for.
+ * @return A pointer to the Client structure if found, otherwise NULL.
+ */
 static Client *
 _client_find_by_pid(int pid)
 {
@@ -141,6 +170,13 @@ _client_find_by_pid(int pid)
    return NULL;
 }
 
+/**
+ * @brief Sends a data packet to a specified client.
+ * @param dest The destination client.
+ * @param opcode The opcode of the message.
+ * @param payload Pointer to the data payload.
+ * @param payload_size Size of the data payload in bytes.
+ */
 static void
 _send(Client *dest, int opcode, void *payload, int payload_size)
 {
@@ -181,6 +217,15 @@ _send(Client *dest, int opcode, void *payload, int payload_size)
      }
 }
 
+/**
+ * @brief Dispatches an incoming packet from a client.
+ *
+ * If the packet has a destination CID, it forwards the packet.
+ * Otherwise, it invokes the registered callback for the packet's opcode.
+ * @param src The client that sent the packet.
+ * @param buffer Pointer to the raw packet data (including header).
+ * @return EINA_TRUE if the packet was handled successfully, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _dispatch(Client *src, void *buffer)
 {
@@ -229,10 +274,20 @@ _dispatch(Client *src, void *buffer)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Registers an opcode with the daemon.
+ *
+ * Associates a string name and a callback function with an opcode.
+ * If op_id is EINA_DEBUG_OPCODE_INVALID, a new opcode ID is generated.
+ * @param op_name The string name of the opcode (e.g., "Daemon/greet").
+ * @param op_id The desired opcode ID, or EINA_DEBUG_OPCODE_INVALID to auto-assign.
+ * @param cb The callback function to handle this opcode. Can be NULL.
+ * @return The registered or assigned opcode ID.
+ */
 static int
 _opcode_register(const char *op_name, int op_id, Opcode_Cb cb)
 {
-   static int free_opcode = 0;
+   static int free_opcode = 0; /**< Counter for auto-assigning opcode IDs. */
    Opcode_Information *op_info = eina_hash_find(_string_to_opcode_hash, op_name);
    if (!op_info)
      {
@@ -256,6 +311,20 @@ _opcode_register(const char *op_name, int op_id, Opcode_Cb cb)
    return op_info->opcode;
 }
 
+/**
+ * @brief Callback for the "Daemon/greet" (EINA_DEBUG_OPCODE_HELLO) opcode.
+ *
+ * Handles the initial handshake from a new client. It extracts the client's
+ * version, PID, and application name. Assigns a new CID to the client.
+ * If the new client is a slave, it notifies registered master observers.
+ * @param c The client that sent the hello message.
+ * @param buffer The payload of the hello message. Expected format:
+ *               - int32_t version
+ *               - int32_t pid
+ *               - char[] app_name (null-terminated string)
+ * @param size The size of the buffer.
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _hello_cb(Client *c, void *buffer, int size)
 {
@@ -303,6 +372,15 @@ _hello_cb(Client *c, void *buffer, int size)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for the "Daemon/Client/cid_from_pid" opcode.
+ *
+ * Responds to a request for a client ID (CID) given a process ID (PID).
+ * @param src The client requesting the CID.
+ * @param buffer The payload containing the PID (int32_t).
+ * @param size The size of the buffer (should be sizeof(int)).
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _cid_get_cb(Client *src, void *buffer, int size EINA_UNUSED)
 {
@@ -313,6 +391,15 @@ _cid_get_cb(Client *src, void *buffer, int size EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for the "Test/data_loop" opcode.
+ *
+ * Echoes the received data back to the sender. Used for testing.
+ * @param src The client that sent the data.
+ * @param buffer The data payload.
+ * @param size The size of the data payload.
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _data_test_cb(Client *src, void *buffer, int size)
 {
@@ -321,6 +408,17 @@ _data_test_cb(Client *src, void *buffer, int size)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for the "Daemon/Client/register_observer" opcode.
+ *
+ * Registers a master client to observe slave client additions and deletions.
+ * Upon registration, it sends information about all currently connected slaves
+ * to the new observer.
+ * @param src The master client requesting to be an observer.
+ * @param buffer Unused.
+ * @param size Unused.
+ * @return EINA_TRUE if registration was successful, EINA_FALSE otherwise (e.g., if src is not a master).
+ */
 static Eina_Bool
 _cl_stat_obs_register_cb(Client *src, void *buffer, int size)
 {
@@ -359,6 +457,19 @@ _cl_stat_obs_register_cb(Client *src, void *buffer, int size)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for the "Daemon/opcode_register" (EINA_DEBUG_OPCODE_REGISTER) opcode.
+ *
+ * Allows a client to dynamically register new opcodes. The client sends a list
+ * of opcode strings, and the daemon registers them, returning the assigned
+ * numerical opcodes back to the client.
+ * @param src The client requesting opcode registration.
+ * @param buffer The payload containing:
+ *               - uint64_t (unused, for future expansion or message ID)
+ *               - A series of null-terminated strings, each being an opcode name.
+ * @param size The total size of the buffer.
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _opcode_register_cb(Client *src, void *buffer, int size)
 {
@@ -383,10 +494,19 @@ _opcode_register_cb(Client *src, void *buffer, int size)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Event callback triggered when data is available to be read from a client.
+ *
+ * Reads the packet header to determine packet size, then reads the full packet.
+ * Dispatches the packet for processing. Handles potential errors like invalid
+ * packet size.
+ * @param data The Client structure associated with this connection.
+ * @param event The EFL event data.
+ */
 static void
 _client_data(void *data, const Efl_Event *event)
 {
-   static unsigned char *buffer = NULL;
+   static unsigned char *buffer = NULL; /**< Static buffer to hold incoming packet data. Reused across calls. */
    unsigned int size = 0;
    Eina_Debug_Packet_Header *hdr;
    Client *c = data;
@@ -437,6 +557,11 @@ err:
    fprintf(stderr, "INFO: client %p [pid: %d] sent invalid data\n", c, (int)c->pid);
 }
 
+/**
+ * @brief Event callback triggered when an error occurs on a client connection.
+ * @param data The Client structure.
+ * @param event The EFL event data, where event->info is an Eina_Error*.
+ */
 static void
 _client_error(void *data, const Efl_Event *event)
 {
@@ -448,6 +573,12 @@ _client_error(void *data, const Efl_Event *event)
            c, (int)c->pid, eina_error_msg_get(*perr));
 }
 
+/**
+ * @brief Event callback triggered when a client connection reaches End-Of-Stream (EOS).
+ * This typically means the client has disconnected gracefully.
+ * @param data The Client structure.
+ * @param event The EFL event data.
+ */
 static void
 _client_eos(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -459,6 +590,11 @@ _client_eos(void *data, const Efl_Event *event EINA_UNUSED)
    efl_io_closer_close(c->client);
 }
 
+/**
+ * @brief Event callback triggered when all pending data has been written to a client.
+ * @param data The Client structure.
+ * @param event The EFL event data.
+ */
 static void
 _client_write_finished(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -467,6 +603,12 @@ _client_write_finished(void *data, const Efl_Event *event EINA_UNUSED)
        c, c->client, (int)c->pid, efl_io_buffered_stream_pending_read_get(c->client));
 }
 
+/**
+ * @brief Event callback triggered when the read buffer for a client is empty
+ * and the underlying fd has no more data to read immediately (would block).
+ * @param data The Client structure.
+ * @param event The EFL event data.
+ */
 static void
 _client_read_finished(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -475,8 +617,17 @@ _client_read_finished(void *data, const Efl_Event *event EINA_UNUSED)
        c, c->client, (int)c->pid, efl_io_buffered_stream_pending_write_get(c->client));
 }
 
+/** @internal */
 static Efl_Callback_Array_Item *_client_cbs(void);
 
+/**
+ * @brief Event callback triggered when a client stream is finished (closed and all data processed).
+ *
+ * Cleans up client resources, removes it from the list of active clients,
+ * and notifies observers if the disconnected client was a slave.
+ * @param data The Client structure.
+ * @param event The EFL event data.
+ */
 static void
 _client_finished(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -506,6 +657,14 @@ EFL_CALLBACKS_ARRAY_DEFINE(_client_cbs,
                            { EFL_IO_BUFFERED_STREAM_EVENT_FINISHED, _client_finished },
                            { EFL_IO_BUFFERED_STREAM_EVENT_SLICE_CHANGED, _client_data });
 
+/**
+ * @brief Event callback triggered when a new client connects to one of the servers.
+ *
+ * Allocates a new Client structure, sets it up, and adds it to the list of clients.
+ * Distinguishes between master and slave connections based on which server accepted the client.
+ * @param data Unused user data from efl_event_callback_add.
+ * @param event The EFL event data, where event->info is the new client connection object (Eo*).
+ */
 static void
 _client_add(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -519,6 +678,13 @@ _client_add(void *data EINA_UNUSED, const Efl_Event *event)
    INF("server %p new client %p (%p)", event->object, c, c->client);
 }
 
+/**
+ * @brief Event callback triggered when a server encounters an error.
+ *
+ * Logs the error, quits the main loop, and sets the daemon's exit status to failure.
+ * @param data Unused user data from efl_event_callback_add.
+ * @param event The EFL event data, where event->info is an Eina_Error*.
+ */
 static void
 _error(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -529,6 +695,13 @@ _error(void *data EINA_UNUSED, const Efl_Event *event)
    _retval = EXIT_FAILURE;
 }
 
+/**
+ * @brief Creates and starts the local server (Unix domain socket).
+ *
+ * The server listens on a path derived from LOCAL_SERVER_PATH,
+ * LOCAL_SERVER_NAME, and LOCAL_SERVER_PORT.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _local_server_create(void)
 {
@@ -598,6 +771,12 @@ end:
    return ret;
 }
 
+/**
+ * @brief Creates and starts the remote server (TCP).
+ *
+ * The server listens on 127.0.0.1 at REMOTE_SERVER_PORT.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _remote_server_create(void)
 {
@@ -643,6 +822,10 @@ end:
    return ret;
 }
 
+/**
+ * @brief Launches both local and remote servers.
+ * @return EINA_TRUE if both servers are launched successfully, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _server_launch(void)
 {
@@ -656,6 +839,16 @@ err:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Main entry point for the efl_debugd daemon.
+ *
+ * Initializes Eina, Ecore, Ecore_Con. Registers default opcodes.
+ * Launches the local and remote servers. Starts the Ecore main loop.
+ * Cleans up resources on exit.
+ * @param argc Argument count.
+ * @param argv Argument vector.
+ * @return EXIT_SUCCESS on normal termination, EXIT_FAILURE on error.
+ */
 int
 main(int argc EINA_UNUSED, char **argv EINA_UNUSED)
 {

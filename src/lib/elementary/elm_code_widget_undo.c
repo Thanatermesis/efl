@@ -6,6 +6,16 @@
 
 #include "elm_code_widget_private.h"
 
+/**
+ * @brief Clears all undo information that comes after the current undo stack pointer.
+ *
+ * This function is called when a new change is added to the undo stack,
+ * effectively truncating the "redo" history. It iterates backwards from
+ * the current undo stack pointer (exclusive) to the beginning of the list,
+ * freeing the memory associated with each change info.
+ *
+ * @param widget The Elm_Code_Widget object.
+ */
 static void
 _elm_code_widget_undo_prev_clear(Evas_Object *widget)
 {
@@ -25,6 +35,16 @@ _elm_code_widget_undo_prev_clear(Evas_Object *widget)
      }
 }
 
+/**
+ * @brief Creates a deep copy of an Elm_Code_Widget_Change_Info structure.
+ *
+ * This is necessary because the undo stack stores copies of change information,
+ * not pointers to the original, potentially transient, data.
+ *
+ * @param info Pointer to the Elm_Code_Widget_Change_Info to copy.
+ * @return A pointer to the newly allocated and copied Elm_Code_Widget_Change_Info,
+ *         or NULL on allocation failure. The `content` field is also duplicated.
+ */
 Elm_Code_Widget_Change_Info *
 _elm_code_widget_undo_info_copy(Elm_Code_Widget_Change_Info *info)
 {
@@ -38,6 +58,17 @@ _elm_code_widget_undo_info_copy(Elm_Code_Widget_Change_Info *info)
    return copy;
 }
 
+/**
+ * @brief Adds a new change to the undo stack.
+ *
+ * Before adding the new change, this function clears any existing "redo"
+ * history (changes that were undone and could be redone). A copy of the
+ * provided `info` is made and prepended to the undo stack.
+ *
+ * @param widget The Elm_Code_Widget object.
+ * @param info Pointer to the Elm_Code_Widget_Change_Info describing the change.
+ *             This structure will be copied.
+ */
 void
 _elm_code_widget_undo_change_add(Evas_Object *widget,
                                  Elm_Code_Widget_Change_Info *info)
@@ -54,6 +85,19 @@ _elm_code_widget_undo_change_add(Evas_Object *widget,
    pd->undo_stack = pd->undo_stack_ptr;
 }
 
+/**
+ * @brief Applies a change described by Elm_Code_Widget_Change_Info to the widget.
+ *
+ * This function is the core logic for both undoing and redoing operations.
+ * If `info->insert` is true, it means the original operation was an insert,
+ * so to undo it, the text between `start_line:start_col` and `end_line:end_col`
+ * is deleted.
+ * If `info->insert` is false, it means the original operation was a delete (or replace),
+ * so to undo it, the `info->content` is inserted at `start_line:start_col`.
+ *
+ * @param widget The Elm_Code_Widget object.
+ * @param info Pointer to the Elm_Code_Widget_Change_Info describing the change to apply.
+ */
 static void
 _elm_code_widget_undo_change(Evas_Object *widget,
                              Elm_Code_Widget_Change_Info *info)
@@ -111,12 +155,29 @@ _elm_code_widget_undo_change(Evas_Object *widget,
    efl_event_callback_legacy_call(widget, EFL_UI_CODE_WIDGET_EVENT_CHANGED_USER, NULL);
 }
 
+/**
+ * @brief Checks if an undo operation can be performed.
+ *
+ * @param obj The Elm_Code_Widget object (unused).
+ * @param pd Pointer to the private data of the Elm_Code_Widget.
+ * @return EINA_TRUE if there is at least one action in the undo stack
+ *         that can be undone, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_code_widget_can_undo_get(Eo *obj EINA_UNUSED, Elm_Code_Widget_Data *pd)
 {
    return !!pd->undo_stack_ptr;
 }
 
+/**
+ * @brief Performs an undo operation.
+ *
+ * Retrieves the last change from the undo stack, applies its inverse,
+ * and moves the undo stack pointer to the next older change.
+ *
+ * @param obj The Elm_Code_Widget object.
+ * @param pd Pointer to the private data of the Elm_Code_Widget.
+ */
 static void
 _elm_code_widget_undo(Eo *obj EINA_UNUSED, Elm_Code_Widget_Data *pd)
 {
@@ -131,15 +192,39 @@ _elm_code_widget_undo(Eo *obj EINA_UNUSED, Elm_Code_Widget_Data *pd)
    pd->undo_stack_ptr = eina_list_next(pd->undo_stack_ptr);
 }
 
+/**
+ * @brief Checks if a redo operation can be performed.
+ *
+ * A redo is possible if the `undo_stack_ptr` is not at the head of the
+ * `undo_stack` list (meaning there are undone changes).
+ *
+ * @param obj The Elm_Code_Widget object (unused).
+ * @param pd Pointer to the private data of the Elm_Code_Widget.
+ * @return EINA_TRUE if there is at least one action that can be redone,
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_code_widget_can_redo_get(Eo *obj EINA_UNUSED, Elm_Code_Widget_Data *pd)
 {
    if (pd->undo_stack_ptr)
      return !!eina_list_prev(pd->undo_stack_ptr);
 
+   // If undo_stack_ptr is NULL, it means we've undone all the way to the beginning.
+   // In this case, redo is possible if the undo_stack itself is not empty.
    return !!eina_list_last(pd->undo_stack);
 }
 
+/**
+ * @brief Performs a redo operation.
+ *
+ * Retrieves the next change from the undo stack (the one that was previously undone),
+ * applies it, and moves the undo stack pointer to that redone change.
+ * The `insert` flag of the change info is inverted because redoing an
+ * "undo of an insert" is an insert, and redoing an "undo of a delete" is a delete.
+ *
+ * @param obj The Elm_Code_Widget object.
+ * @param pd Pointer to the private data of the Elm_Code_Widget.
+ */
 static void
 _elm_code_widget_redo(Eo *obj EINA_UNUSED, Elm_Code_Widget_Data *pd)
 {

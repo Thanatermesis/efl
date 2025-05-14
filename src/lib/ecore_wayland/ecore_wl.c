@@ -1,3 +1,13 @@
+/**
+ * @file
+ * @brief Ecore Wayland main loop and display handling.
+ *
+ * This file contains the core initialization, shutdown, and event handling
+ * logic for Ecore Wayland. It manages the connection to the Wayland
+ * compositor, global object discovery, input handling, and screen
+ * information.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -40,64 +50,113 @@ static void _ecore_wl_signal_exit_free(void *data EINA_UNUSED, void *event);
 static void _ecore_wl_init_callback(void *data, struct wl_callback *callback, uint32_t serial EINA_UNUSED);
 
 /* local variables */
+/** @internal Counter for ecore_wl_init() calls. */
 static int _ecore_wl_init_count = 0;
+/** @internal Flag indicating if the animator is currently busy. */
 static Eina_Bool _ecore_wl_animator_busy = EINA_FALSE;
+/** @internal Flag indicating if a fatal error has occurred. */
 static Eina_Bool _ecore_wl_fatal_error = EINA_FALSE;
+/** @internal Flag indicating if Ecore_Wl is running in server mode. */
 Eina_Bool _ecore_wl_server_mode = EINA_FALSE;
 
+/** @internal Wayland registry listener implementation. */
 static const struct wl_registry_listener _ecore_wl_registry_listener =
 {
    _ecore_wl_cb_handle_global,
    _ecore_wl_cb_handle_global_remove
 };
 
+/** @internal Wayland callback listener for display sync. */
 static const struct wl_callback_listener _ecore_wl_sync_listener =
 {
    _ecore_wl_sync_callback
 };
 
+/** @internal Wayland callback listener for initial display sync. */
 static const struct wl_callback_listener _ecore_wl_init_sync_listener =
 {
    _ecore_wl_init_callback
 };
 
+/** @internal Wayland callback listener for animator frames. */
 static const struct wl_callback_listener _ecore_wl_anim_listener =
 {
    _ecore_wl_animator_callback
 };
 
+/**
+ * @internal
+ * @brief Handles the xdg_shell ping event.
+ *
+ * Responds to a ping event from the compositor with a pong.
+ *
+ * @param data User data (unused).
+ * @param shell The xdg_shell object.
+ * @param serial The serial of the ping event.
+ */
 static void
 xdg_shell_ping(void *data EINA_UNUSED, struct xdg_shell *shell, uint32_t serial)
 {
    xdg_shell_pong(shell, serial);
 }
 
+/** @internal XDG shell listener implementation. */
 static const struct xdg_shell_listener xdg_shell_listener =
 {
    xdg_shell_ping,
 };
 
 /* external variables */
+/** @internal Log domain for Ecore Wayland. */
 int _ecore_wl_log_dom = -1;
+/** @internal Global Ecore_Wl_Display structure. */
 Ecore_Wl_Display *_ecore_wl_disp = NULL;
 
+/** Event type for mouse in events. */
 EAPI int ECORE_WL_EVENT_MOUSE_IN = 0;
+/** Event type for mouse out events. */
 EAPI int ECORE_WL_EVENT_MOUSE_OUT = 0;
+/** Event type for focus in events. */
 EAPI int ECORE_WL_EVENT_FOCUS_IN = 0;
+/** Event type for focus out events. */
 EAPI int ECORE_WL_EVENT_FOCUS_OUT = 0;
+/** Event type for window configure events. */
 EAPI int ECORE_WL_EVENT_WINDOW_CONFIGURE = 0;
+/** Event type for drag and drop enter events. */
 EAPI int ECORE_WL_EVENT_DND_ENTER = 0;
+/** Event type for drag and drop position events. */
 EAPI int ECORE_WL_EVENT_DND_POSITION = 0;
+/** Event type for drag and drop leave events. */
 EAPI int ECORE_WL_EVENT_DND_LEAVE = 0;
+/** Event type for drag and drop drop events. */
 EAPI int ECORE_WL_EVENT_DND_DROP = 0;
+/** Event type for drag and drop offer events. */
 EAPI int ECORE_WL_EVENT_DND_OFFER = 0;
+/** Event type for drag and drop end events. */
 EAPI int ECORE_WL_EVENT_DND_END = 0;
+/** Event type for data source target events. */
 EAPI int ECORE_WL_EVENT_DATA_SOURCE_TARGET = 0;
+/** Event type for data source send events. */
 EAPI int ECORE_WL_EVENT_DATA_SOURCE_SEND = 0;
+/** Event type for selection data ready events. */
 EAPI int ECORE_WL_EVENT_SELECTION_DATA_READY = 0;
+/** Event type for data source cancelled events. */
 EAPI int ECORE_WL_EVENT_DATA_SOURCE_CANCELLED = 0;
+/** Event type for when essential Wayland interfaces are bound. */
 EAPI int ECORE_WL_EVENT_INTERFACES_BOUND = 0;
 
+/**
+ * @internal
+ * @brief Callback for the initial wl_display_sync.
+ *
+ * This function is called when the initial wl_display_sync completes,
+ * indicating that the Wayland display is ready. It sets the `init_done`
+ * flag on the Ecore_Wl_Display structure.
+ *
+ * @param data The Ecore_Wl_Display structure.
+ * @param callback The Wayland callback object.
+ * @param serial The serial of the callback event (unused).
+ */
 static void
 _ecore_wl_init_callback(void *data, struct wl_callback *callback, uint32_t serial EINA_UNUSED)
 {
@@ -107,6 +166,14 @@ _ecore_wl_init_callback(void *data, struct wl_callback *callback, uint32_t seria
    ewd->init_done = EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Waits for the initial Wayland display synchronization to complete.
+ *
+ * This function blocks until the `init_done` flag in the global
+ * `_ecore_wl_disp` structure is true. It dispatches Wayland events
+ * while waiting. If a critical error occurs during dispatch, it aborts.
+ */
 static void
 _ecore_wl_init_wait(void)
 {
@@ -124,6 +191,30 @@ _ecore_wl_init_wait(void)
      }
 }
 
+/**
+ * @brief Initializes the Ecore Wayland system.
+ *
+ * This function establishes a connection to the Wayland display specified by
+ * @p name. If @p name is @c NULL, it attempts to connect to the default
+ * Wayland display (usually specified by the WAYLAND_DISPLAY environment
+ * variable).
+ *
+ * It initializes Eina, Ecore, and Ecore_Event if they haven't been
+ * initialized yet. It also sets up logging, creates event types,
+ * allocates the main Ecore_Wl_Display structure, connects to the Wayland
+ * display, sets up an fd handler for the Wayland socket, and an idle
+ * enterer for processing Wayland events. It then retrieves the Wayland
+ * registry and initializes XKB, windowing, and event systems.
+ *
+ * This function increments an initialization counter. It must be paired
+ * with a call to ecore_wl_shutdown() for each successful call.
+ *
+ * @param name The name of the Wayland display to connect to, or @c NULL
+ *             for the default display.
+ * @return The new initialization count on success, or 0 on failure.
+ *
+ * @see ecore_wl_shutdown()
+ */
 EAPI int
 ecore_wl_init(const char *name)
 {
@@ -237,6 +328,17 @@ exit_eina:
    return --_ecore_wl_init_count;
 }
 
+/**
+ * @brief Shuts down the Ecore Wayland system.
+ *
+ * This function decrements an initialization counter. If the counter reaches
+ * zero, it cleans up all Ecore Wayland resources, disconnects from the
+ * Wayland display, and shuts down relevant Ecore subsystems.
+ *
+ * @return The new initialization count.
+ *
+ * @see ecore_wl_init()
+ */
 EAPI int
 ecore_wl_shutdown(void)
 {
@@ -245,6 +347,12 @@ ecore_wl_shutdown(void)
    return _ecore_wl_shutdown(EINA_TRUE);
 }
 
+/**
+ * @brief Flushes the Wayland display connection.
+ *
+ * Sends all buffered requests to the Wayland server.
+ * This is a non-blocking call.
+ */
 EAPI void
 ecore_wl_flush(void)
 {
@@ -252,6 +360,14 @@ ecore_wl_flush(void)
    wl_display_flush(_ecore_wl_disp->wl.display);
 }
 
+/**
+ * @brief Synchronizes with the Wayland display.
+ *
+ * This function blocks until all pending requests have been processed by the
+ * Wayland server and the corresponding events have been received.
+ * It involves sending a `wl_display_sync` request and waiting for its
+ * callback.
+ */
 EAPI void
 ecore_wl_sync(void)
 {
@@ -271,6 +387,16 @@ ecore_wl_sync(void)
      }
 }
 
+/**
+ * @brief Gets the Wayland shared memory (SHM) interface.
+ *
+ * This function returns the `wl_shm` object, which is used for creating
+ * shared memory buffers for window contents. It waits for Ecore Wayland
+ * initialization to complete if it hasn't already.
+ *
+ * @return The `wl_shm` object, or @c NULL on failure or if Ecore Wayland
+ *         is not initialized.
+ */
 EAPI struct wl_shm *
 ecore_wl_shm_get(void)
 {
@@ -281,6 +407,12 @@ ecore_wl_shm_get(void)
    return _ecore_wl_disp->wl.shm;
 }
 
+/**
+ * @brief Gets the Wayland display object.
+ *
+ * @return The `wl_display` object, or @c NULL if Ecore Wayland is not
+ *         initialized.
+ */
 EAPI struct wl_display *
 ecore_wl_display_get(void)
 {
@@ -289,6 +421,27 @@ ecore_wl_display_get(void)
    return _ecore_wl_disp->wl.display;
 }
 
+/**
+ * @brief Gets the list of global Wayland objects.
+ *
+ * This function returns an Eina_Inlist of Ecore_Wl_Global structures,
+ * representing the global objects advertised by the Wayland compositor.
+ * It waits for Ecore Wayland initialization to complete if it hasn't already.
+ *
+ * @return An Eina_Inlist of Ecore_Wl_Global structures, or @c NULL on
+ *         failure or if Ecore Wayland is not initialized.
+ *         The list contains elements of type Ecore_Wl_Global:
+ *         @code
+ *         // Example structure of an Ecore_Wl_Global element:
+ *         typedef struct _Ecore_Wl_Global
+ *         {
+ *           EINA_INLIST; // Macro for intrusive list node
+ *           unsigned int id; // Numeric ID of the global
+ *           char *interface; // Interface name (e.g., "wl_compositor")
+ *           unsigned int version; // Interface version
+ *         } Ecore_Wl_Global;
+ *         @endcode
+ */
 EAPI Eina_Inlist *
 ecore_wl_globals_get(void)
 {
@@ -300,6 +453,12 @@ ecore_wl_globals_get(void)
    return _ecore_wl_disp->globals;
 }
 
+/**
+ * @brief Gets the Wayland registry object.
+ *
+ * @return The `wl_registry` object, or @c NULL if Ecore Wayland is not
+ *         initialized.
+ */
 EAPI struct wl_registry *
 ecore_wl_registry_get(void)
 {
@@ -308,6 +467,14 @@ ecore_wl_registry_get(void)
    return _ecore_wl_disp->wl.registry;
 }
 
+/**
+ * @internal
+ * @brief Gets the Wayland compositor interface.
+ *
+ * Waits for Ecore Wayland initialization if needed.
+ *
+ * @return The `wl_compositor` object, or @c NULL on failure.
+ */
 struct wl_compositor *
 _ecore_wl_compositor_get(void)
 {
@@ -319,6 +486,14 @@ _ecore_wl_compositor_get(void)
    return _ecore_wl_disp->wl.compositor;
 }
 
+/**
+ * @internal
+ * @brief Gets the Wayland subcompositor interface.
+ *
+ * Waits for Ecore Wayland initialization if needed.
+ *
+ * @return The `wl_subcompositor` object, or @c NULL on failure.
+ */
 struct wl_subcompositor *
 _ecore_wl_subcompositor_get(void)
 {
@@ -330,6 +505,17 @@ _ecore_wl_subcompositor_get(void)
    return _ecore_wl_disp->wl.subcompositor;
 }
 
+/**
+ * @brief Gets the total screen size.
+ *
+ * This function calculates the total dimensions of the screen by summing
+ * the dimensions of all available outputs, considering their transformations
+ * (e.g., rotation). It waits for Ecore Wayland initialization and output
+ * discovery if necessary.
+ *
+ * @param[out] w Pointer to store the total width. Can be @c NULL.
+ * @param[out] h Pointer to store the total height. Can be @c NULL.
+ */
 EAPI void
 ecore_wl_screen_size_get(int *w, int *h)
 {
@@ -377,6 +563,14 @@ ecore_wl_screen_size_get(int *w, int *h)
 }
 
 /* @since 1.2 */
+/**
+ * @brief Gets the current pointer coordinates.
+ *
+ * Retrieves the last known x and y coordinates of the primary pointer.
+ *
+ * @param[out] x Pointer to store the x-coordinate. Can be @c NULL.
+ * @param[out] y Pointer to store the y-coordinate. Can be @c NULL.
+ */
 EAPI void
 ecore_wl_pointer_xy_get(int *x, int *y)
 {
@@ -385,6 +579,15 @@ ecore_wl_pointer_xy_get(int *x, int *y)
    _ecore_wl_input_pointer_xy_get(x, y);
 }
 
+/**
+ * @brief Gets the screen DPI.
+ *
+ * Calculates the DPI (dots per inch) of the primary output.
+ * It waits for Ecore Wayland initialization and output discovery if necessary.
+ * If physical dimensions are not available, it defaults to 75 DPI.
+ *
+ * @return The calculated DPI, or 75 if information is unavailable.
+ */
 EAPI int
 ecore_wl_dpi_get(void)
 {
@@ -407,6 +610,14 @@ ecore_wl_dpi_get(void)
    return (((w * 254) / mw) + 5) / 10;
 }
 
+/**
+ * @brief Processes pending Wayland events.
+ *
+ * This function dispatches any pending events from the Wayland display.
+ * It is typically called from the main loop. If a critical error occurs
+ * during dispatch, it aborts. This function does nothing if Ecore_Wl is
+ * in server mode.
+ */
 EAPI void
 ecore_wl_display_iterate(void)
 {
@@ -425,6 +636,23 @@ ecore_wl_display_iterate(void)
 }
 
 /* @since 1.8 */
+/**
+ * @brief Sets the source for Ecore animator ticks.
+ *
+ * This function configures how Ecore animator ticks are driven when using
+ * Ecore Wayland.
+ * If @p source is @c ECORE_ANIMATOR_SOURCE_CUSTOM, Ecore Wayland will use
+ * Wayland frame callbacks to drive animations, synchronizing them with the
+ * display refresh rate.
+ * If @p source is @c ECORE_ANIMATOR_SOURCE_TIMER, Ecore's default timer-based
+ * animator will be used.
+ *
+ * This function does nothing if Ecore_Wl is in server mode.
+ *
+ * @param source The animator source to set.
+ *               Example: ECORE_ANIMATOR_SOURCE_CUSTOM for Wayland frame callbacks.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise (e.g., in server mode).
+ */
 EAPI Eina_Bool
 ecore_wl_animator_source_set(Ecore_Animator_Source source)
 {
@@ -457,6 +685,15 @@ ecore_wl_animator_source_set(Ecore_Animator_Source source)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets a Wayland cursor by name.
+ *
+ * Loads a cursor from the current cursor theme.
+ *
+ * @param cursor_name The name of the cursor to load (e.g., "left_ptr").
+ * @return A `wl_cursor` object, or @c NULL if the cursor cannot be loaded
+ *         or Ecore Wayland is not initialized.
+ */
 EAPI struct wl_cursor *
 ecore_wl_cursor_get(const char *cursor_name)
 {
@@ -467,6 +704,17 @@ ecore_wl_cursor_get(const char *cursor_name)
                                      cursor_name);
 }
 
+/**
+ * @brief Sets whether Ecore Wayland is running in server mode.
+ *
+ * In server mode, Ecore Wayland does not dispatch events from the Wayland
+ * display fd automatically, nor does it perform initial syncs or set up
+ * animator sources based on Wayland frame callbacks. This mode is intended
+ * for use cases where Ecore Wayland is part of a Wayland compositor or
+ * a nested server.
+ *
+ * @param on @c EINA_TRUE to enable server mode, @c EINA_FALSE to disable.
+ */
 EAPI void
 ecore_wl_server_mode_set(Eina_Bool on)
 {
@@ -474,6 +722,16 @@ ecore_wl_server_mode_set(Eina_Bool on)
 }
 
 /* local functions */
+/**
+ * @internal
+ * @brief Internal shutdown function for Ecore Wayland.
+ *
+ * Performs the actual cleanup and resource deallocation for Ecore Wayland.
+ *
+ * @param close If @c EINA_TRUE, also closes the Wayland display connection
+ *              and frees display-related resources.
+ * @return The new initialization count.
+ */
 static int
 _ecore_wl_shutdown(Eina_Bool close)
 {
@@ -575,6 +833,18 @@ _ecore_wl_shutdown(Eina_Bool close)
    return _ecore_wl_init_count;
 }
 
+/**
+ * @internal
+ * @brief Ecore idle enterer callback for Wayland event processing.
+ *
+ * This function is called when the main loop becomes idle. It attempts to
+ * dispatch pending Wayland events and flushes the display connection.
+ * If a fatal error occurs on the Wayland display, it signals an exit.
+ *
+ * @param data The Ecore_Wl_Display structure.
+ * @return @c ECORE_CALLBACK_RENEW to keep the idle enterer active,
+ *         or @c ECORE_CALLBACK_CANCEL on fatal error.
+ */
 static Eina_Bool
 _ecore_wl_cb_idle_enterer(void *data)
 {
@@ -613,6 +883,19 @@ err:
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @internal
+ * @brief Ecore fd handler callback for the Wayland display socket.
+ *
+ * This function is called when there is activity (read, write, or error)
+ * on the Wayland display's file descriptor. It dispatches or flushes
+ * Wayland events accordingly. If a fatal error occurs, it signals an exit.
+ *
+ * @param data The Ecore_Wl_Display structure.
+ * @param hdl The Ecore_Fd_Handler that triggered the callback.
+ * @return @c ECORE_CALLBACK_RENEW to keep the fd handler active,
+ *         or @c ECORE_CALLBACK_CANCEL on fatal error.
+ */
 static Eina_Bool
 _ecore_wl_cb_handle_data(void *data, Ecore_Fd_Handler *hdl)
 {
@@ -658,6 +941,21 @@ _ecore_wl_cb_handle_data(void *data, Ecore_Fd_Handler *hdl)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @internal
+ * @brief Wayland registry listener callback for global object announcements.
+ *
+ * This function is called by the Wayland library when the compositor
+ * announces a new global object (e.g., wl_compositor, wl_shm, wl_seat).
+ * It binds to known interfaces and stores information about them in the
+ * Ecore_Wl_Display structure. It also adds the global to an internal list.
+ *
+ * @param data The Ecore_Wl_Display structure.
+ * @param registry The Wayland registry object.
+ * @param id The numeric ID of the global object.
+ * @param interface The interface name of the global object (e.g., "wl_compositor").
+ * @param version The version of the interface.
+ */
 static void
 _ecore_wl_cb_handle_global(void *data, struct wl_registry *registry, unsigned int id, const char *interface, unsigned int version)
 {
@@ -762,6 +1060,18 @@ _ecore_wl_cb_handle_global(void *data, struct wl_registry *registry, unsigned in
      }
 }
 
+/**
+ * @internal
+ * @brief Wayland registry listener callback for global object removal.
+ *
+ * This function is called by the Wayland library when a previously announced
+ * global object is removed by the compositor. It removes the global from
+ * Ecore Wayland's internal list.
+ *
+ * @param data The Ecore_Wl_Display structure.
+ * @param registry The Wayland registry object (unused).
+ * @param id The numeric ID of the global object being removed.
+ */
 static void
 _ecore_wl_cb_handle_global_remove(void *data, struct wl_registry *registry EINA_UNUSED, unsigned int id)
 {
@@ -783,6 +1093,15 @@ _ecore_wl_cb_handle_global_remove(void *data, struct wl_registry *registry EINA_
      }
 }
 
+/**
+ * @internal
+ * @brief Initializes XKB (X Keyboard Extension) support.
+ *
+ * Creates a new XKB context for handling keyboard input.
+ *
+ * @param ewd The Ecore_Wl_Display structure.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 _ecore_wl_xkb_init(Ecore_Wl_Display *ewd)
 {
@@ -794,6 +1113,15 @@ _ecore_wl_xkb_init(Ecore_Wl_Display *ewd)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Shuts down XKB (X Keyboard Extension) support.
+ *
+ * Frees the XKB context.
+ *
+ * @param ewd The Ecore_Wl_Display structure.
+ * @return @c EINA_TRUE.
+ */
 static Eina_Bool
 _ecore_wl_xkb_shutdown(Ecore_Wl_Display *ewd)
 {
@@ -804,6 +1132,18 @@ _ecore_wl_xkb_shutdown(Ecore_Wl_Display *ewd)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Wayland callback for `wl_display_sync`.
+ *
+ * This function is called when a `wl_display_sync` request completes.
+ * It decrements the `sync_ref_count` in the Ecore_Wl_Display structure
+ * and destroys the Wayland callback object.
+ *
+ * @param data The Ecore_Wl_Display structure.
+ * @param callback The Wayland callback object.
+ * @param serial The serial of the callback event (unused).
+ */
 static void
 _ecore_wl_sync_callback(void *data, struct wl_callback *callback, uint32_t serial EINA_UNUSED)
 {
@@ -813,6 +1153,16 @@ _ecore_wl_sync_callback(void *data, struct wl_callback *callback, uint32_t seria
    wl_callback_destroy(callback);
 }
 
+/**
+ * @internal
+ * @brief Initiates a `wl_display_sync` and sets up a callback.
+ *
+ * This function sends a `wl_display_sync` request to the Wayland server
+ * and registers `_ecore_wl_sync_callback` to be called upon completion.
+ * It increments the `sync_ref_count` in the Ecore_Wl_Display structure.
+ *
+ * @param ewd The Ecore_Wl_Display structure.
+ */
 static void
 _ecore_wl_sync_wait(Ecore_Wl_Display *ewd)
 {
@@ -823,6 +1173,17 @@ _ecore_wl_sync_wait(Ecore_Wl_Display *ewd)
    wl_callback_add_listener(callback, &_ecore_wl_sync_listener, ewd);
 }
 
+/**
+ * @internal
+ * @brief Callback executed at the beginning of a custom animator tick.
+ *
+ * This function is set as the `tick_begin_callback` for Ecore's custom
+ * animator source when `ECORE_ANIMATOR_SOURCE_CUSTOM` is used with
+ * Ecore Wayland. It sets a flag indicating the animator is busy and
+ * requests Wayland frame callbacks for all visible windows.
+ *
+ * @param data User data (unused).
+ */
 static void
 _ecore_wl_animator_tick_cb_begin(void *data EINA_UNUSED)
 {
@@ -834,12 +1195,33 @@ _ecore_wl_animator_tick_cb_begin(void *data EINA_UNUSED)
    eina_hash_foreach(windows, _ecore_wl_animator_window_add, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback executed at the end of a custom animator tick.
+ *
+ * This function is set as the `tick_end_callback` for Ecore's custom
+ * animator source. It clears the flag indicating the animator is busy.
+ *
+ * @param data User data (unused).
+ */
 static void
 _ecore_wl_animator_tick_cb_end(void *data EINA_UNUSED)
 {
    _ecore_wl_animator_busy = EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Wayland frame callback for driving animations.
+ *
+ * This function is called when a Wayland surface is ready for a new frame.
+ * It triggers `ecore_animator_custom_tick()` to advance animations.
+ * If the animator is still busy, it requests another frame callback.
+ *
+ * @param data The Ecore_Wl_Window associated with the frame callback.
+ * @param callback The Wayland callback object.
+ * @param serial The serial of the callback event (unused), typically a timestamp.
+ */
 static void
 _ecore_wl_animator_callback(void *data, struct wl_callback *callback, uint32_t serial EINA_UNUSED)
 {
@@ -861,6 +1243,19 @@ _ecore_wl_animator_callback(void *data, struct wl_callback *callback, uint32_t s
      }
 }
 
+/**
+ * @internal
+ * @brief Adds a window to the animator by requesting a frame callback.
+ *
+ * This function is called for each window when the animator starts a tick.
+ * If the window has a surface and no pending frame callback, it requests one.
+ *
+ * @param hash The hash table being iterated (unused).
+ * @param key The key of the hash element (unused).
+ * @param data The Ecore_Wl_Window.
+ * @param fdata User data (unused).
+ * @return @c EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 _ecore_wl_animator_window_add(const Eina_Hash *hash EINA_UNUSED, const void *key EINA_UNUSED, void *data, void *fdata EINA_UNUSED)
 {
@@ -877,6 +1272,13 @@ _ecore_wl_animator_window_add(const Eina_Hash *hash EINA_UNUSED, const void *key
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Emits an ECORE_EVENT_SIGNAL_EXIT event.
+ *
+ * This function is called when a fatal Wayland error occurs, signaling
+ * the application to terminate.
+ */
 static void
 _ecore_wl_signal_exit(void)
 {
@@ -890,6 +1292,16 @@ _ecore_wl_signal_exit(void)
                    _ecore_wl_signal_exit_free, NULL);
 }
 
+/**
+ * @internal
+ * @brief Frees an Ecore_Event_Signal_Exit event.
+ *
+ * This function is used as the free callback for ECORE_EVENT_SIGNAL_EXIT
+ * events generated by `_ecore_wl_signal_exit`.
+ *
+ * @param data User data (unused).
+ * @param event The event data to free.
+ */
 static void
 _ecore_wl_signal_exit_free(void *data EINA_UNUSED, void *event)
 {

@@ -1,6 +1,16 @@
 #include "elementary_config.h"
 #include <Elementary.h>
 
+/**
+ * @brief Callback for the "dismissed" smart event of the hover.
+ *
+ * This function is called when the hover object is dismissed (hidden).
+ * It simply prints a message to standard output.
+ *
+ * @param data User data pointer (unused).
+ * @param obj The Evas_Object that emitted the signal (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _dismissed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
               void *event_info EINA_UNUSED)
@@ -8,6 +18,16 @@ _dismissed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    printf("hover dismissed callback is called!\n");
 }
 
+/**
+ * @brief Callback to show a hover object.
+ *
+ * This function is typically connected to a button's "clicked" event.
+ * It shows the hover Evas_Object passed in the @p data parameter.
+ *
+ * @param data The hover object (Evas_Object *) to be shown.
+ * @param obj The button object that was clicked (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 my_hover_bt(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -16,6 +36,16 @@ my_hover_bt(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    evas_object_show(hv);
 }
 
+/**
+ * @brief Callback to dismiss a hover object.
+ *
+ * This function is connected to a button's "clicked" event inside the hover.
+ * It dismisses the hover Evas_Object passed in the @p data parameter.
+ *
+ * @param data The hover object (Evas_Object *) to be dismissed.
+ * @param obj The button object that was clicked (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _dismiss_hover(void *data, Evas_Object *obj EINA_UNUSED,
                void *event_info EINA_UNUSED)
@@ -25,6 +55,18 @@ _dismiss_hover(void *data, Evas_Object *obj EINA_UNUSED,
    elm_hover_dismiss(hv);
 }
 
+/**
+ * @brief Test function for a standard hover widget.
+ *
+ * This test creates a window with a button. Clicking the button shows a
+ * hover widget. The hover has content set for its "top", "bottom", "left",
+ * "right", and "middle" parts. One of the buttons inside the hover content
+ * can dismiss it.
+ *
+ * @param data User data pointer (unused).
+ * @param obj The Evas_Object that initiated the test (unused).
+ * @param event_info Event-specific information (unused).
+ */
 void
 test_hover(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -101,6 +143,16 @@ test_hover(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_inf
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for a "popout" style hover widget.
+ *
+ * This test is similar to test_hover(), but it sets the hover's style to
+ * "popout". This style can provide a different visual appearance for the hover.
+ *
+ * @param data User data pointer (unused).
+ * @param obj The Evas_Object that initiated the test (unused).
+ * @param event_info Event-specific information (unused).
+ */
 void
 test_hover2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -174,6 +226,20 @@ test_hover2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback to show a hover at a specific mouse position.
+ *
+ * This function is called on a EVAS_CALLBACK_MOUSE_DOWN event. It retrieves a
+ * "fake" Evas_Object from the object that received the event. This fake object
+ * is used as the hover's target, allowing the hover to appear anywhere. The
+ * function moves the fake object to the mouse down coordinates and then shows
+ * the hover, which is passed as the @p data parameter.
+ *
+ * @param data The hover object (Evas_Object *) to show.
+ * @param e The Evas canvas (unused).
+ * @param obj The object that received the mouse down event.
+ * @param event_info Pointer to an Evas_Event_Mouse_Down struct.
+ */
 static void
 _hover_show_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj,
                void *event_info)
@@ -188,6 +254,22 @@ _hover_show_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj,
    evas_object_show(data);
 }
 
+/**
+ * @brief Test function for a hover that acts like a context menu.
+ *
+ * This test creates a window with a transparent rectangle covering the entire
+ * area. When the user clicks on this rectangle, a hover appears at the
+ * cursor's position. This is achieved by using a "fake" object as the hover's
+ * target, and moving this fake object to the click location before showing
+ * the hover. The hover contains several widgets, including a close button.
+ *
+ * This demonstrates how a hover can be used to implement right-click menus
+ * or other context-sensitive popups.
+ *
+ * @param data User data pointer (unused).
+ * @param obj The Evas_Object that initiated the test (unused).
+ * @param event_info Event-specific information (unused).
+ */
 /*
  * hover acts like elm_menu but it has all the hover features such as:
  * 1. positioning: left, top-left, top, top-right, right, bottom-right, bottom,

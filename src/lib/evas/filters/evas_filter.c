@@ -23,9 +23,40 @@
 
 #define _assert(a) if (!(a)) CRI("Failed on %s", #a);
 
+/**
+ * @internal
+ * @brief Frees an Evas_Filter_Buffer and its associated resources.
+ * @param fb The filter buffer to free.
+ */
 static void _buffer_free(Evas_Filter_Buffer *fb);
+
+/**
+ * @internal
+ * @brief Deletes an Evas_Filter_Command and frees its resources.
+ * @param ctx The filter context.
+ * @param cmd The filter command to delete.
+ */
 static void _command_del(Evas_Filter_Context *ctx, Evas_Filter_Command *cmd);
+
+/**
+ * @internal
+ * @brief Allocates a new Evas_Filter_Buffer and its underlying Ector_Buffer.
+ * @param ctx The filter context.
+ * @param w The width of the buffer.
+ * @param h The height of the buffer.
+ * @param alpha_only EINA_TRUE if the buffer is alpha-only, EINA_FALSE otherwise.
+ * @param render EINA_TRUE if the buffer is renderable.
+ * @param draw EINA_TRUE if the buffer is drawable.
+ * @return A pointer to the newly allocated Evas_Filter_Buffer, or NULL on failure.
+ */
 static Evas_Filter_Buffer *_buffer_alloc_new(Evas_Filter_Context *ctx, int w, int h, Eina_Bool alpha_only, Eina_Bool render, Eina_Bool draw);
+
+/**
+ * @internal
+ * @brief Unlocks all transient buffers in the filter context.
+ *        Transient buffers are locked when retrieved by evas_filter_temporary_buffer_get().
+ * @param ctx The filter context.
+ */
 static void _filter_buffer_unlock_all(Evas_Filter_Context *ctx);
 
 #define DRAW_COLOR_SET(r, g, b, a) do { cmd->draw.R = r; cmd->draw.G = g; cmd->draw.B = b; cmd->draw.A = a; } while (0)
@@ -41,6 +72,13 @@ static void _filter_buffer_unlock_all(Evas_Filter_Context *ctx);
 /* FIXME: This code is come from a log by
    CRI<14853>:eo lib/eo/eo.c:1894 efl_unref() Calling efl_unref instead of efl_del or efl_parent_set(NULL).
    Temporary fallback in place triggered." When u get correct method, please fix this. */
+/**
+ * @internal
+ * @brief Deletes an Ector buffer (Eo object).
+ *        This function handles whether to call efl_del or efl_unref
+ *        based on whether the buffer has a parent.
+ * @param buffer The Ector buffer to delete.
+ */
 static void
 _buffer_del(Eo *buffer)
 {
@@ -52,6 +90,18 @@ _buffer_del(Eo *buffer)
      efl_unref(buffer);
 }
 
+/**
+ * @brief Creates a new Evas_Filter_Context.
+ *
+ * This context holds all the information needed to define and run a filter chain,
+ * including buffers, commands, and target information.
+ *
+ * @param evas The Evas public data.
+ * @param async If EINA_TRUE, the filter chain will be run asynchronously in a separate thread.
+ * @param user_data Custom data to associate with this context.
+ * @return A pointer to the newly created Evas_Filter_Context, or NULL on failure.
+ *         The caller is responsible for freeing the context using evas_filter_context_unref().
+ */
 Evas_Filter_Context *
 evas_filter_context_new(Evas_Public_Data *evas, Eina_Bool async, void *user_data)
 {
@@ -74,6 +124,11 @@ evas_filter_context_new(Evas_Public_Data *evas, Eina_Bool async, void *user_data
    return ctx;
 }
 
+/**
+ * @brief Retrieves the user data associated with an Evas_Filter_Context.
+ * @param ctx The filter context.
+ * @return A pointer to the user data, or NULL if no data is set or ctx is NULL.
+ */
 void *
 evas_filter_context_data_get(Evas_Filter_Context *ctx)
 {
@@ -82,12 +137,24 @@ evas_filter_context_data_get(Evas_Filter_Context *ctx)
    return ctx->user_data;
 }
 
+/**
+ * @brief Checks if the filter context is set to run asynchronously.
+ * @param ctx The filter context.
+ * @return EINA_TRUE if the context is asynchronous, EINA_FALSE otherwise.
+ */
 Eina_Bool
 evas_filter_context_async_get(Evas_Filter_Context *ctx)
 {
    return ctx->async;
 }
 
+/**
+ * @brief Gets the base width and height of the filter context.
+ *        This size is typically the size of the target output area for the filter.
+ * @param ctx The filter context.
+ * @param w Pointer to store the width. Can be NULL.
+ * @param h Pointer to store the height. Can be NULL.
+ */
 void
 evas_filter_context_size_get(Evas_Filter_Context *ctx, int *w, int *h)
 {
@@ -95,7 +162,13 @@ evas_filter_context_size_get(Evas_Filter_Context *ctx, int *w, int *h)
    if (h) *h = ctx->h;
 }
 
-/* Private function to reset the filter context. Used from parser.c */
+/**
+ * @internal
+ * @brief Clears the filter context, removing commands and optionally buffers.
+ *        This function is primarily used by the filter parser to reset the context.
+ * @param ctx The filter context to clear.
+ * @param keep_buffers If EINA_TRUE, buffers are not freed. If EINA_FALSE, all buffers are freed.
+ */
 void
 evas_filter_context_clear(Evas_Filter_Context *ctx, Eina_Bool keep_buffers)
 {
@@ -123,6 +196,11 @@ evas_filter_context_clear(Evas_Filter_Context *ctx, Eina_Bool keep_buffers)
    // Note: don't reset post_run, as it it set by the client
 }
 
+/**
+ * @internal
+ * @brief Frees the backing Ector_Buffer of an Evas_Filter_Buffer.
+ * @param fb The filter buffer whose backing store to free.
+ */
 static void
 _filter_buffer_backing_free(Evas_Filter_Buffer *fb)
 {
@@ -131,7 +209,20 @@ _filter_buffer_backing_free(Evas_Filter_Buffer *fb)
    fb->buffer = NULL;
 }
 
-/** @hidden private render proxy objects */
+/**
+ * @internal
+ * @brief Renders all proxy source objects associated with buffers in the filter context.
+ *
+ * This function iterates through buffers that are configured as proxy sources.
+ * If a proxy source needs rendering (e.g., it's marked for redraw or has no surface),
+ * it triggers a sub-render operation for that source. The rendered surface is then
+ * wrapped or updated in the corresponding Evas_Filter_Buffer.
+ *
+ * @param ctx The filter context.
+ * @param eo_obj The Evas object to which the filter is being applied.
+ * @param output The rendering output target (e.g., a canvas surface).
+ * @param do_async EINA_TRUE if rendering should be performed asynchronously.
+ */
 void
 evas_filter_context_proxy_render_all(Evas_Filter_Context *ctx, Eo *eo_obj, void *output,
                                      Eina_Bool do_async)
@@ -183,6 +274,21 @@ evas_filter_context_proxy_render_all(Evas_Filter_Context *ctx, Eo *eo_obj, void 
        }
 }
 
+/**
+ * @internal
+ * @brief Reinitializes render buffers for reuse in a filter program.
+ *
+ * This function is called when a filter program (a sequence of filter commands)
+ * is to be reused. It iterates through the buffers in the context.
+ * For buffers marked as `is_render` and not being a proxy source,
+ * it clears them by drawing a transparent rectangle if they have a valid surface.
+ * This ensures that render buffers are in a clean state before the filter
+ * program runs again. It also resets `used`, `locked`, and `dirty` flags.
+ *
+ * @param engine The graphics engine context.
+ * @param output The rendering output target.
+ * @param ctx The filter context.
+ */
 void
 _evas_filter_context_program_reuse(void *engine, void *output, Evas_Filter_Context *ctx)
 {
@@ -215,6 +321,13 @@ _evas_filter_context_program_reuse(void *engine, void *output, Evas_Filter_Conte
      }
 }
 
+/**
+ * @internal
+ * @brief Destroys an Evas_Filter_Context and frees all its resources.
+ *        This is typically called when the refcount of the context reaches zero
+ *        and the context is not currently running a filter chain.
+ * @param data A pointer to the Evas_Filter_Context to destroy.
+ */
 static void
 _context_destroy(void *data)
 {
@@ -225,6 +338,11 @@ _context_destroy(void *data)
    _free(ctx);
 }
 
+/**
+ * @brief Increments the reference count of an Evas_Filter_Context.
+ * @param ctx The filter context to reference.
+ * @return The new reference count, or -1 on error.
+ */
 int
 evas_filter_context_ref(Evas_Filter_Context *ctx)
 {
@@ -238,6 +356,15 @@ evas_filter_context_ref(Evas_Filter_Context *ctx)
    return (++ctx->refcount);
 }
 
+/**
+ * @brief Decrements the reference count of an Evas_Filter_Context.
+ *
+ * If the reference count drops to zero and the context is not currently
+ * running a filter chain, the context is destroyed. If it is running,
+ * destruction is deferred until the post_run_cb is called.
+ *
+ * @param ctx The filter context to unreference.
+ */
 void
 evas_filter_context_unref(Evas_Filter_Context *ctx)
 {
@@ -255,6 +382,16 @@ evas_filter_context_unref(Evas_Filter_Context *ctx)
    // else: post_run_cb will be called
 }
 
+/**
+ * @brief Sets a callback function to be invoked after a filter chain run completes.
+ *
+ * This callback is useful for cleanup or notification when an asynchronous
+ * filter operation finishes, or when a context is unreferenced while running.
+ *
+ * @param ctx The filter context.
+ * @param cb The callback function.
+ * @param data User data to be passed to the callback function.
+ */
 void
 evas_filter_context_post_run_callback_set(Evas_Filter_Context *ctx,
                                           Evas_Filter_Cb cb, void *data)
@@ -264,6 +401,17 @@ evas_filter_context_post_run_callback_set(Evas_Filter_Context *ctx,
    ctx->post_run.data = data;
 }
 
+/**
+ * @internal
+ * @brief Creates a new, empty Evas_Filter_Buffer structure without an Ector_Buffer.
+ *        The Ector_Buffer (backing store) is allocated later.
+ * @param ctx The filter context.
+ * @param w The width of the buffer.
+ * @param h The height of the buffer.
+ * @param alpha_only EINA_TRUE if the buffer is alpha-only, EINA_FALSE for ARGB.
+ * @param transient EINA_TRUE if this is a temporary buffer that can be reused.
+ * @return A pointer to the newly created Evas_Filter_Buffer, or NULL on failure.
+ */
 static Evas_Filter_Buffer *
 _buffer_empty_new(Evas_Filter_Context *ctx, int w, int h, Eina_Bool alpha_only,
                   Eina_Bool transient)
@@ -284,6 +432,15 @@ _buffer_empty_new(Evas_Filter_Context *ctx, int w, int h, Eina_Bool alpha_only,
    return fb;
 }
 
+/**
+ * @internal
+ * @brief Creates an Ector_Buffer with specified properties.
+ *        This is the actual pixel data storage for an Evas_Filter_Buffer.
+ * @param fb Constant pointer to the Evas_Filter_Buffer metadata (width, height, alpha_only).
+ * @param render EINA_TRUE if the buffer should be renderable (target for drawing operations).
+ * @param draw EINA_TRUE if the buffer should be drawable (source for drawing operations).
+ * @return A pointer to the newly created Ector_Buffer, or NULL on failure.
+ */
 static Ector_Buffer *
 _ector_buffer_create(Evas_Filter_Buffer const *fb, Eina_Bool render, Eina_Bool draw)
 {
@@ -300,6 +457,17 @@ _ector_buffer_create(Evas_Filter_Buffer const *fb, Eina_Bool render, Eina_Bool d
                                      fb->w, fb->h, cspace, flags);
 }
 
+/**
+ * @brief Allocates backing Ector_Buffers for all necessary Evas_Filter_Buffers in the context.
+ *
+ * This function iterates through the commands in the filter chain to determine
+ * which buffers are used and need allocation. It also handles allocation of
+ * temporary buffers required for certain operations like stretching.
+ * Unused buffers might be cleaned up.
+ *
+ * @param ctx The filter context.
+ * @return EINA_TRUE on success, EINA_FALSE if any buffer allocation fails.
+ */
 Eina_Bool
 evas_filter_context_buffers_allocate_all(Evas_Filter_Context *ctx)
 {
@@ -448,6 +616,19 @@ alloc_fail:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Creates or retrieves an empty buffer with specified dimensions and format.
+ *
+ * If a suitable, unused buffer already exists in the context, it is reused.
+ * Otherwise, a new Evas_Filter_Buffer structure is created (without allocating
+ * the Ector_Buffer yet). The buffer is marked as used.
+ *
+ * @param ctx The filter context.
+ * @param w The desired width of the buffer.
+ * @param h The desired height of thebuffer.
+ * @param alpha_only EINA_TRUE for an alpha-only buffer, EINA_FALSE for ARGB.
+ * @return The ID of the (newly created or reused) buffer, or -1 on failure.
+ */
 int
 evas_filter_buffer_empty_new(Evas_Filter_Context *ctx, int w, int h, Eina_Bool alpha_only)
 {
@@ -473,6 +654,25 @@ evas_filter_buffer_empty_new(Evas_Filter_Context *ctx, int w, int h, Eina_Bool a
    return fb->id;
 }
 
+/**
+ * @brief Creates or retrieves a buffer that acts as a proxy for an Evas_Object.
+ *
+ * This allows an Evas_Object (e.g., another image, text) to be used as an input
+ * source within the filter chain. If a proxy buffer for the same Evas_Object
+ * with the same name and dimensions already exists and is unused, it's reused.
+ * Otherwise, a new proxy buffer is created. The dimensions of the source object
+ * are returned via the w and h parameters.
+ *
+ * @param ctx The filter context.
+ * @param pb Pointer to an Evas_Filter_Proxy_Binding structure containing the
+ *           Evas_Object source (eo_source) and its name.
+ *           Example:
+ *           Evas_Filter_Proxy_Binding binding = { .eo_source = source_object, .name = "my_source" };
+ * @param w Pointer to store the width of the proxy source.
+ * @param h Pointer to store the height of the proxy source.
+ * @return The ID of the (newly created or reused) proxy buffer, or -1 on failure
+ *         (e.g., source object is invalid, or a conflicting buffer exists).
+ */
 int
 evas_filter_buffer_proxy_new(Evas_Filter_Context *ctx, Evas_Filter_Proxy_Binding *pb,
                              int *w, int *h)
@@ -554,6 +754,13 @@ _buffer_free(Evas_Filter_Buffer *fb)
    _free(fb);
 }
 
+/**
+ * @internal
+ * @brief Retrieves an Evas_Filter_Buffer from the context by its ID.
+ * @param ctx The filter context.
+ * @param bufid The ID of the buffer to retrieve.
+ * @return A pointer to the Evas_Filter_Buffer, or NULL if not found.
+ */
 Evas_Filter_Buffer *
 _filter_buffer_get(Evas_Filter_Context *ctx, int bufid)
 {
@@ -568,6 +775,24 @@ _filter_buffer_get(Evas_Filter_Context *ctx, int bufid)
    return NULL;
 }
 
+/**
+ * @brief Gets the engine-specific backing surface/image of a filter buffer.
+ *
+ * This function retrieves the underlying graphics data (e.g., a software pixel buffer
+ * or a GL texture ID) associated with an Evas_Filter_Buffer.
+ * If the buffer's Ector_Buffer hasn't been allocated yet, this function might
+ * trigger its allocation via evas_filter_buffer_backing_set(..., NULL).
+ * The caller receives a new reference to the image and is responsible for
+ * releasing it using evas_ector_buffer_engine_image_release().
+ *
+ * @param ctx The filter context.
+ * @param bufid The ID of the buffer.
+ * @param render If EINA_TRUE, requests the renderable image (e.g., for use as a texture).
+ *               If EINA_FALSE, requests the drawable image (e.g., for CPU access).
+ * @return A pointer to the engine-specific image data, or NULL on failure or if the
+ *         buffer doesn't exist. The interpretation of this pointer depends on the
+ *         Evas engine in use.
+ */
 void *
 evas_filter_buffer_backing_get(Evas_Filter_Context *ctx, int bufid, Eina_Bool render)
 {
@@ -585,6 +810,21 @@ evas_filter_buffer_backing_get(Evas_Filter_Context *ctx, int bufid, Eina_Bool re
      return evas_ector_buffer_drawable_image_get(fb->buffer); // ref++
 }
 
+/**
+ * @brief Sets or allocates the engine-specific backing for a filter buffer.
+ *
+ * If `engine_buffer` is NULL, a new Ector_Buffer is created based on the
+ * Evas_Filter_Buffer's properties (size, format, render/draw flags).
+ * If `engine_buffer` is provided, it's wrapped by an Ector_Buffer. This is
+ * typically used for input buffers that are pre-existing engine surfaces.
+ * The function updates the `fb->buffer` pointer.
+ *
+ * @param ctx The filter context.
+ * @param bufid The ID of the buffer.
+ * @param engine_buffer An optional, pre-existing engine-specific buffer to wrap.
+ *                      If NULL, a new buffer is allocated.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 Eina_Bool
 evas_filter_buffer_backing_set(Evas_Filter_Context *ctx, int bufid,
                                void *engine_buffer)
@@ -618,6 +858,22 @@ end:
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Creates a new Evas_Filter_Command structure.
+ *
+ * Initializes a filter command with the given mode, input/mask/output buffers,
+ * and default draw parameters. The new command is added to the context's
+ * command list. If an output buffer is specified, it's marked as `is_render`
+ * and `dirty`.
+ *
+ * @param ctx The filter context.
+ * @param mode The filter operation mode (e.g., EVAS_FILTER_MODE_BLUR).
+ * @param input The input buffer for the command.
+ * @param mask An optional mask buffer (used by modes like MASK, BUMP, DISPLACE).
+ * @param output The output buffer for the command.
+ * @return A pointer to the newly created Evas_Filter_Command, or NULL on failure.
+ */
 static Evas_Filter_Command *
 _command_new(Evas_Filter_Context *ctx, Evas_Filter_Mode mode,
              Evas_Filter_Buffer *input, Evas_Filter_Buffer *mask,
@@ -690,6 +946,7 @@ evas_filter_temporary_buffer_get(Evas_Filter_Context *ctx, int w, int h,
      }
 
    fb = _buffer_empty_new(ctx, w, h, alpha_only, EINA_TRUE);
+   if (!fb) return NULL; // Added safety check
    fb->locked = EINA_TRUE;
    fb->is_render = EINA_TRUE;
    XDBG("Created temporary buffer %d %s", fb->id, alpha_only ? "alpha" : "rgba");
@@ -707,6 +964,21 @@ _filter_buffer_unlock_all(Evas_Filter_Context *ctx)
      buf->locked = EINA_FALSE;
 }
 
+/**
+ * @brief Adds a fill command to the filter chain.
+ *
+ * This command fills the specified buffer with a color defined in the
+ * draw_context. The fill operation respects the clip region set in the
+ * draw_context.
+ *
+ * @param ctx The filter context.
+ * @param draw_context The Evas draw context from which color and clip are retrieved.
+ * @param bufid The ID of the buffer to fill. This buffer acts as both input and output.
+ * @return A pointer to the newly created Evas_Filter_Command, or NULL on failure.
+ *         Example:
+ *         // Assuming draw_context is set up with a red color and a clip rectangle
+ *         evas_filter_command_fill_add(filter_ctx, evas_draw_context, buffer_id);
+ */
 Evas_Filter_Command *
 evas_filter_command_fill_add(Evas_Filter_Context *ctx, void *draw_context,
                              int bufid)
@@ -742,6 +1014,32 @@ evas_filter_command_fill_add(Evas_Filter_Context *ctx, void *draw_context,
    return cmd;
 }
 
+/**
+ * @internal
+ * @brief Adds a GL-specific blur command or sequence of commands.
+ *
+ * This function implements blur using a multi-pass approach suitable for GL:
+ * 1. Optional downscaling of the input to a temporary buffer (T1) if blur radius is large.
+ * 2. Apply X-axis blur from T1 to another temporary buffer (T2) (or directly to output if no Y-blur).
+ * 3. Apply Y-axis blur from T2 to the output buffer (or from input if no X-blur).
+ * 4. Optional upscaling from the final blur stage to the output buffer if downscaling was used.
+ *
+ * It handles padding to align pixels for downscaling to avoid artifacts.
+ *
+ * @param ctx The filter context.
+ * @param in The input buffer.
+ * @param out The output buffer.
+ * @param type The type of blur (e.g., EVAS_FILTER_BLUR_DEFAULT, EVAS_FILTER_BLUR_GAUSSIAN).
+ * @param rx Horizontal blur radius.
+ * @param ry Vertical blur radius.
+ * @param ox Horizontal offset for the final blended result.
+ * @param oy Vertical offset for the final blended result.
+ * @param count Blur iterations (usually for box blur, Gaussian is single pass effectively).
+ * @param R, G, B, A Color multiplier for the blur effect.
+ * @param alphaonly EINA_TRUE if only the alpha channel should be affected/produced.
+ * @return A pointer to the last Evas_Filter_Command added in the sequence (typically the final blend/upscale),
+ *         or NULL on failure (e.g., temporary buffer allocation fails).
+ */
 static Evas_Filter_Command *
 evas_filter_command_blur_add_gl(Evas_Filter_Context *ctx,
                                 Evas_Filter_Buffer *in, Evas_Filter_Buffer *out,
@@ -885,6 +1183,17 @@ fail:
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Checks if the current engine supports GL-accelerated blur for the given buffers.
+ *
+ * It creates a dummy blur command and queries the engine's filter support capabilities.
+ *
+ * @param ctx The filter context.
+ * @param in The input buffer for the hypothetical blur.
+ * @param out The output buffer for the hypothetical blur.
+ * @return EINA_TRUE if GL blur is supported, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _blur_support_gl(Evas_Filter_Context *ctx, Evas_Filter_Buffer *in, Evas_Filter_Buffer *out)
 {
@@ -900,6 +1209,36 @@ _blur_support_gl(Evas_Filter_Context *ctx, Evas_Filter_Buffer *in, Evas_Filter_B
    return cmd.ENFN->gfx_filter_supports(_evas_engine_context(cmd.ctx->evas), &cmd) == EVAS_FILTER_SUPPORT_GL;
 }
 
+/**
+ * @brief Adds a blur command to the filter chain.
+ *
+ * This function adds a blur effect. It can be a 1D (horizontal or vertical) or 2D blur.
+ * If the engine supports GL blur (_blur_support_gl returns true), it delegates to
+ * evas_filter_command_blur_add_gl. Otherwise, it sets up a sequence of commands
+ * for software blur, potentially using temporary buffers for multi-pass operations
+ * (e.g., X-blur then Y-blur, or handling in-place blurs).
+ *
+ * For EVAS_FILTER_BLUR_DEFAULT, it adaptively chooses blur type (Gaussian or Box)
+ * and iterations based on radius for a balance of quality and performance in software.
+ *
+ * @param ctx The filter context.
+ * @param drawctx The Evas draw context (used for color multiplier and render operation).
+ * @param inbuf The ID of the input buffer.
+ * @param outbuf The ID of the output buffer.
+ * @param type The type of blur (e.g., EVAS_FILTER_BLUR_GAUSSIAN, EVAS_FILTER_BLUR_BOX, EVAS_FILTER_BLUR_DEFAULT).
+ * @param dx Horizontal blur radius.
+ * @param dy Vertical blur radius.
+ * @param ox Horizontal offset for the final result.
+ * @param oy Vertical offset for the final result.
+ * @param count Number of blur iterations (primarily for EVAS_FILTER_BLUR_BOX).
+ *              If 0 and type is EVAS_FILTER_BLUR_DEFAULT, count is determined automatically.
+ * @param alphaonly EINA_TRUE to blur only the alpha channel, EINA_FALSE for all channels.
+ * @return A pointer to the (last) Evas_Filter_Command added, or NULL on failure.
+ *         Example:
+ *         // Blur buffer_A into buffer_B with a 5px radius Gaussian blur
+ *         evas_filter_command_blur_add(filter_ctx, evas_draw_context, buffer_A_id, buffer_B_id,
+ *                                      EVAS_FILTER_BLUR_GAUSSIAN, 5, 5, 0, 0, 1, EINA_FALSE);
+ */
 Evas_Filter_Command *
 evas_filter_command_blur_add(Evas_Filter_Context *ctx, void *drawctx,
                              int inbuf, int outbuf, Evas_Filter_Blur_Type type,
@@ -1198,6 +1537,28 @@ fail:
    return NULL;
 }
 
+/**
+ * @brief Adds a blend (or copy) command to the filter chain.
+ *
+ * This command blends (or copies) the input buffer onto the output buffer.
+ * It respects the color multiplier, render operation (copy or blend), and
+ * clip region from the provided draw context.
+ *
+ * @param ctx The filter context.
+ * @param drawctx The Evas draw context.
+ * @param inbuf The ID of the input (source) buffer.
+ * @param outbuf The ID of the output (destination) buffer.
+ * @param ox Horizontal offset for drawing the input onto the output.
+ * @param oy Vertical offset for drawing the input onto the output.
+ * @param fillmode Fill mode if the input and output sizes differ (e.g., stretch, tile).
+ *                 See Evas_Filter_Fill_Mode.
+ * @param alphaonly EINA_TRUE to operate on the alpha channel only (if supported by operation).
+ * @return A pointer to the newly created Evas_Filter_Command, or NULL on failure or if inbuf equals outbuf.
+ *         Example:
+ *         // Blend buffer_A onto buffer_B at offset (10,10)
+ *         evas_filter_command_blend_add(filter_ctx, evas_draw_context, buffer_A_id, buffer_B_id,
+ *                                       10, 10, EVAS_FILTER_FILL_MODE_NONE, EINA_FALSE);
+ */
 Evas_Filter_Command *
 evas_filter_command_blend_add(Evas_Filter_Context *ctx, void *drawctx,
                               int inbuf, int outbuf, int ox, int oy,
@@ -1261,6 +1622,28 @@ evas_filter_command_blend_add(Evas_Filter_Context *ctx, void *drawctx,
    return cmd;
 }
 
+/**
+ * @brief Adds a "grow" or "shrink" effect command sequence to the filter chain.
+ *
+ * This effect expands or contracts the opaque regions of an image.
+ * It's implemented as a sequence of:
+ * 1. Blur: To soften the edges. The blur radius is based on the `radius` parameter.
+ * 2. Curve (Threshold): To make the blurred areas opaque (for grow) or transparent (for shrink).
+ * 3. Blend: To combine the result with the output buffer if necessary.
+ *
+ * A positive `radius` results in a grow effect, while a negative `radius`
+ * results in a shrink effect.
+ *
+ * @param ctx The filter context.
+ * @param draw_context The Evas draw context.
+ * @param inbuf The ID of the input buffer.
+ * @param outbuf The ID of the output buffer.
+ * @param radius The radius of the grow/shrink effect. Positive for grow, negative for shrink.
+ *               Example: `radius = 5` grows by 5 pixels. `radius = -3` shrinks by 3 pixels.
+ * @param smooth EINA_TRUE for a smoother transition at the edges, EINA_FALSE for a hard edge.
+ * @param alphaonly EINA_TRUE to operate on the alpha channel only.
+ * @return A pointer to the first command in the sequence (the blur command), or NULL on failure.
+ */
 Evas_Filter_Command *
 evas_filter_command_grow_add(Evas_Filter_Context *ctx, void *draw_context,
                              int inbuf, int outbuf, int radius, Eina_Bool smooth,
@@ -1350,6 +1733,27 @@ fail:
    return NULL;
 }
 
+/**
+ * @brief Adds a color curve adjustment command to the filter chain.
+ *
+ * This command applies a transfer curve to one or more color channels of the input buffer.
+ * The `curve` parameter is an array of 256 values, where `curve[input_value]`
+ * defines the `output_value`.
+ * If input and output buffers are the same, a temporary buffer is used internally.
+ *
+ * @param ctx The filter context.
+ * @param draw_context The Evas draw context (used if a blend is needed for in-place operation).
+ * @param inbuf The ID of the input buffer.
+ * @param outbuf The ID of the output buffer.
+ * @param curve A pointer to an array of 256 DATA8 values defining the curve.
+ *              Example for inverting alpha:
+ *              DATA8 invert_alpha_curve[256];
+ *              for (int i = 0; i < 256; ++i) invert_alpha_curve[i] = 255 - i;
+ * @param channel The channel(s) to apply the curve to (e.g., EVAS_FILTER_CHANNEL_ALPHA,
+ *                EVAS_FILTER_CHANNEL_RGB, EVAS_FILTER_CHANNEL_LUMINANCE).
+ * @return A pointer to the newly created Evas_Filter_Command (or the blend command if temp buffer used),
+ *         or NULL on failure.
+ */
 Evas_Filter_Command *
 evas_filter_command_curve_add(Evas_Filter_Context *ctx,
                               void *draw_context EINA_UNUSED,
@@ -1415,6 +1819,28 @@ evas_filter_command_curve_add(Evas_Filter_Context *ctx,
    return cmd;
 }
 
+/**
+ * @brief Adds a displacement map command to the filter chain.
+ *
+ * This command displaces pixels in the input buffer based on the color values
+ * in a displacement map buffer. The red channel of the map typically controls
+ * X displacement, and the green channel controls Y displacement.
+ * If input and output buffers are the same, a temporary buffer is used.
+ *
+ * @param ctx The filter context.
+ * @param draw_context The Evas draw context (used for render op and if a blend is needed).
+ * @param inbuf The ID of the input buffer (the image to be displaced).
+ * @param outbuf The ID of the output buffer.
+ * @param dispbuf The ID of the displacement map buffer. This buffer's R/G channels
+ *                are typically used to control X/Y displacement.
+ * @param flags Flags controlling the displacement behavior (e.g., EVAS_FILTER_DISPLACE_NEAREST).
+ *              See Evas_Filter_Displacement_Flags.
+ * @param intensity A factor scaling the displacement effect.
+ * @param fillmode Fill mode for pixels displaced outside the original bounds.
+ *                 See Evas_Filter_Fill_Mode.
+ * @return A pointer to the newly created Evas_Filter_Command (or the blend command if temp buffer used),
+ *         or NULL on failure.
+ */
 Evas_Filter_Command *
 evas_filter_command_displacement_map_add(Evas_Filter_Context *ctx,
                                          void *draw_context EINA_UNUSED,
@@ -1482,6 +1908,22 @@ fail:
    return NULL;
 }
 
+/**
+ * @brief Adds a mask command to the filter chain.
+ *
+ * This command combines the input buffer with the output buffer, using the
+ * mask buffer to control the blending. Typically, the alpha channel of the
+ * mask buffer determines the opacity of the input buffer when applied to the output.
+ * The operation is similar to `output = output * (1-mask_alpha) + input * mask_alpha`.
+ *
+ * @param ctx The filter context.
+ * @param draw_context The Evas draw context (used for render op and color multiplier).
+ * @param inbuf The ID of the input (source) buffer.
+ * @param maskbuf The ID of the mask buffer.
+ * @param outbuf The ID of the output (destination) buffer.
+ * @param fillmode Fill mode if buffer sizes differ. See Evas_Filter_Fill_Mode.
+ * @return A pointer to the newly created Evas_Filter_Command, or NULL on failure.
+ */
 Evas_Filter_Command *
 evas_filter_command_mask_add(Evas_Filter_Context *ctx, void *draw_context,
                              int inbuf, int maskbuf, int outbuf,
@@ -1514,6 +1956,31 @@ evas_filter_command_mask_add(Evas_Filter_Context *ctx, void *draw_context,
    return cmd;
 }
 
+/**
+ * @brief Adds a bump map (or emboss) lighting effect command to the filter chain.
+ *
+ * This command applies a lighting effect to the input buffer using the bump (height)
+ * map buffer to simulate surface relief. The lighting is defined by light source
+ * angles, elevation, and material colors.
+ *
+ * @param ctx The filter context.
+ * @param draw_context The Evas draw context (currently unused by this command).
+ * @param inbuf The ID of the input buffer (texture to apply lighting to, typically alpha).
+ * @param bumpbuf The ID of the bump map buffer (height map, typically alpha).
+ * @param outbuf The ID of the output buffer.
+ * @param xyangle Light source angle in the XY plane (degrees).
+ * @param zangle Light source angle in the Z plane (degrees, elevation from surface).
+ * @param elevation Surface elevation factor.
+ * @param sf Specular factor.
+ * @param black Color for darkest shadowed areas (ARGB).
+ * @param color Base color of the material (ARGB).
+ * @param white Color for brightest highlighted areas (ARGB).
+ * @param flags Flags for bump mapping (e.g., EVAS_FILTER_BUMP_COMPENSATE).
+ *              See Evas_Filter_Bump_Flags.
+ * @param fillmode Fill mode if buffer sizes differ. See Evas_Filter_Fill_Mode.
+ * @return A pointer to the newly created Evas_Filter_Command, or NULL on failure.
+ *         Note: Currently, this function expects `inbuf != outbuf` and `mapbuf != outbuf`.
+ */
 Evas_Filter_Command *
 evas_filter_command_bump_map_add(Evas_Filter_Context *ctx,
                                  void *draw_context EINA_UNUSED,
@@ -1563,6 +2030,22 @@ evas_filter_command_bump_map_add(Evas_Filter_Context *ctx,
    return cmd;
 }
 
+/**
+ * @brief Adds a geometric transformation command to the filter chain.
+ *
+ * This command can perform operations like flipping the input buffer horizontally
+ * or vertically. The result is placed in the output buffer with an optional offset.
+ *
+ * @param ctx The filter context.
+ * @param draw_context The Evas draw context (currently unused by this command).
+ * @param inbuf The ID of the input buffer.
+ * @param outbuf The ID of the output buffer.
+ * @param flags Transformation flags (e.g., EVAS_FILTER_TRANSFORM_FLIP_X, EVAS_FILTER_TRANSFORM_FLIP_Y).
+ *              See Evas_Filter_Transform_Flags.
+ * @param ox Horizontal offset for placing the transformed result into the output buffer.
+ * @param oy Vertical offset for placing the transformed result into the output buffer.
+ * @return A pointer to the newly created Evas_Filter_Command, or NULL on failure.
+ */
 Evas_Filter_Command *
 evas_filter_command_transform_add(Evas_Filter_Context *ctx,
                                   void *draw_context EINA_UNUSED,
@@ -1599,6 +2082,18 @@ evas_filter_command_transform_add(Evas_Filter_Context *ctx,
    return cmd;
 }
 
+/**
+ * @brief Adds a grayscale conversion command to the filter chain.
+ *
+ * This command converts the colors in the input buffer to shades of gray
+ * and stores the result in the output buffer.
+ *
+ * @param ctx The filter context.
+ * @param draw_context The Evas draw context (currently unused by this command).
+ * @param inbuf The ID of the input buffer.
+ * @param outbuf The ID of the output buffer.
+ * @return A pointer to the newly created Evas_Filter_Command, or NULL on failure.
+ */
 Evas_Filter_Command *
 evas_filter_command_grayscale_add(Evas_Filter_Context *ctx,
                                   void *draw_context EINA_UNUSED,
@@ -1621,6 +2116,18 @@ evas_filter_command_grayscale_add(Evas_Filter_Context *ctx,
    return cmd;
 }
 
+/**
+ * @brief Adds an inverse color (negative) command to the filter chain.
+ *
+ * This command inverts the colors (RGB channels) of the input buffer
+ * and stores the result in the output buffer. The alpha channel is typically unchanged.
+ *
+ * @param ctx The filter context.
+ * @param draw_context The Evas draw context (currently unused by this command).
+ * @param inbuf The ID of the input buffer.
+ * @param outbuf The ID of the output buffer.
+ * @return A pointer to the newly created Evas_Filter_Command, or NULL on failure.
+ */
 Evas_Filter_Command *
 evas_filter_command_inverse_color_add(Evas_Filter_Context *ctx,
                                      void *draw_context EINA_UNUSED,
@@ -1643,13 +2150,53 @@ evas_filter_command_inverse_color_add(Evas_Filter_Context *ctx,
    return cmd;
 }
 
+/**
+ * @brief Sets the region of the target surface that is known to be obscured by other content.
+ *
+ * This information can potentially be used by the filter engine to optimize rendering
+ * by skipping processing for obscured parts. The `_filter_obscured_region_calc` function
+ * later adjusts this "real" obscured region by the filter's calculated padding
+ * to determine the "effective" obscured region.
+ *
+ * @param ctx The filter context.
+ * @param rect The rectangle defining the obscured region in target coordinates.
+ *             Example: `Eina_Rectangle obscured_rect = { .x = 10, .y = 10, .w = 50, .h = 50 };`
+ */
 void
 evas_filter_context_obscured_region_set(Evas_Filter_Context *ctx, Eina_Rectangle rect)
 {
    ctx->obscured.real = rect;
 }
 
-/* Final target */
+/**
+ * @brief Sets the final rendering target for the filter chain.
+ *
+ * This specifies where the content of the EVAS_FILTER_BUFFER_OUTPUT_ID buffer
+ * will be drawn after all filter commands have been processed. It includes
+ * the target surface, position, clipping, color modulation, render operation,
+ * and an optional RGBA_Map for complex drawing.
+ *
+ * @param ctx The filter context.
+ * @param draw_context The Evas draw context from which clip, color, and render op are taken.
+ * @param surface The engine-specific target surface to draw onto.
+ * @param x The X coordinate on the target surface.
+ * @param y The Y coordinate on the target surface.
+ * @param map An optional RGBA_Map for drawing (e.g., for perspective transforms). If NULL, simple image draw is used.
+ *            The structure of RGBA_Map includes a count of points and an array of RGBA_Map_Point.
+ *            Each RGBA_Map_Point has source (sx, sy, sz) and destination (dx, dy, dz) coordinates,
+ *            and a color. Example:
+ *            RGBA_Map_Point points[4] = {
+ *              { {0,0,0}, {10,10,0}, {255,255,255,255} }, // Top-left
+ *              { {W,0,0}, {W+10,10,0}, {255,255,255,255} }, // Top-right
+ *              { {W,H,0}, {W+10,H+10,0}, {255,255,255,255} }, // Bottom-right
+ *              { {0,H,0}, {10,H+10,0}, {255,255,255,255} }  // Bottom-left
+ *            };
+ *            RGBA_Map my_map;
+ *            my_map.count = 4;
+ *            my_map.points = points; // In reality, this needs to be a flexible array member or allocated together.
+ *                                    // The code actually copies this structure.
+ * @return EINA_TRUE on success, EINA_FALSE if ctx is NULL.
+ */
 Eina_Bool
 evas_filter_target_set(Evas_Filter_Context *ctx, void *draw_context,
                        void *surface, int x, int y, const RGBA_Map *map)
@@ -1690,6 +2237,20 @@ evas_filter_target_set(Evas_Filter_Context *ctx, void *draw_context,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Renders the final output buffer (EVAS_FILTER_BUFFER_OUTPUT_ID) to the target surface.
+ *
+ * This function is called after all filter commands in the chain have been executed.
+ * It retrieves the image from the output buffer and draws it to the target surface
+ * specified by `evas_filter_target_set`, applying clipping, color modulation,
+ * render operation, and RGBA map if configured.
+ *
+ * @param engine The graphics engine context.
+ * @param output The rendering output context (often same as engine for software).
+ * @param ctx The filter context containing target information and the output buffer.
+ * @return EINA_TRUE on successful rendering, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _filter_target_render(void *engine, void *output, Evas_Filter_Context *ctx)
 {
@@ -1759,8 +2320,29 @@ fail:
    return EINA_FALSE;
 }
 
-
-/* Font drawing stuff */
+/**
+ * @brief Draws text into a specified filter buffer.
+ *
+ * This function is used to render text directly into a filter buffer, which can
+ * then be used as an input for subsequent filter operations (e.g., blurring text).
+ * It handles asynchronous glyph unreferencing if `do_async` is true.
+ *
+ * @param ctx The filter context.
+ * @param engine The graphics engine context.
+ * @param output The rendering output context.
+ * @param draw_context The Evas draw context for the text rendering.
+ * @param bufid The ID of the target filter buffer to draw the text into.
+ * @param font The Evas_Font_Set to use for rendering.
+ * @param x The X coordinate within the buffer to start drawing the text.
+ * @param y The Y coordinate within the buffer to start drawing the text.
+ * @param text_props The Evas_Text_Props structure containing the text and its properties.
+ *                   Example (simplified):
+ *                   Evas_Text_Props props;
+ *                   props.text = eina_stringshare_add("Hello");
+ *                   props.glyphs = evas_common_text_props_to_glyphs(&props, font, ...); // Simplified
+ * @param do_async EINA_TRUE if the font drawing operation might be asynchronous.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., buffer not found or backing get fails).
+ */
 Eina_Bool
 evas_filter_font_draw(Evas_Filter_Context *ctx,
                       void *engine, void *output, void *draw_context, int bufid,
@@ -1791,8 +2373,36 @@ evas_filter_font_draw(Evas_Filter_Context *ctx,
    return EINA_TRUE;
 }
 
-/* Clip full input rect (0, 0, sw, sh) to target (dx, dy, dw, dh)
- * and get source's clipped sx, sy as well as destination x, y, cols and rows */
+/**
+ * @internal
+ * @brief Clips a source rectangle against a destination rectangle with an offset.
+ *
+ * Given a source rectangle of size (sw, sh) at (0,0) in its own coordinates,
+ * and a destination rectangle of size (dw, dh) at (0,0) in its own coordinates,
+ * this function calculates the overlapping region when the source is placed
+ * at an offset (ox, oy) relative to the destination.
+ *
+ * It outputs:
+ * - (sx, sy): The top-left corner of the valid (clipped) region in the source's coordinates.
+ * - (dx, dy): The top-left corner of the valid (clipped) region in the destination's coordinates.
+ * - (cols, rows): The width and height of this valid (clipped) overlapping region.
+ *
+ * This is useful for determining how much of a source image can be drawn onto a
+ * destination surface and at what corresponding coordinates.
+ *
+ * @param[out] sx Pointer to store the clipped source X coordinate.
+ * @param[out] sy Pointer to store the clipped source Y coordinate.
+ * @param sw Width of the source rectangle.
+ * @param sh Height of the source rectangle.
+ * @param ox X offset of the source rectangle relative to the destination.
+ * @param oy Y offset of the source rectangle relative to the destination.
+ * @param dw Width of the destination rectangle.
+ * @param dh Height of the destination rectangle.
+ * @param[out] dx Pointer to store the clipped destination X coordinate.
+ * @param[out] dy Pointer to store the clipped destination Y coordinate.
+ * @param[out] rows Pointer to store the height of the clipped region (number of rows).
+ * @param[out] cols Pointer to store the width of the clipped region (number of columns).
+ */
 void
 _clip_to_target(int *sx /* OUT */, int *sy /* OUT */, int sw, int sh,
                 int ox, int oy, int dw, int dh,
@@ -1849,6 +2459,13 @@ _clip_to_target(int *sx /* OUT */, int *sy /* OUT */, int sw, int sh,
 }
 
 #ifdef FILTERS_DEBUG
+/**
+ * @internal
+ * @brief Returns a string representation of an Evas_Filter_Mode enum value.
+ *        Used for debugging purposes.
+ * @param mode The filter mode enum value.
+ * @return A string name for the filter mode, or "INVALID" if not recognized.
+ */
 static const char *
 _filter_name_get(int mode)
 {
@@ -1869,6 +2486,19 @@ _filter_name_get(int mode)
 }
 #endif
 
+/**
+ * @internal
+ * @brief Executes a single filter command.
+ *
+ * This function checks for basic validity (e.g., non-empty input/output buffers
+ * for most operations). It then queries the engine for support of the given
+ * filter command and, if supported, calls the engine's processing function.
+ *
+ * @param cmd The Evas_Filter_Command to run.
+ * @return EINA_TRUE if the command was run successfully (or skipped appropriately),
+ *         EINA_FALSE on failure (e.g., unsupported filter, invalid buffer sizes,
+ *         or engine processing error).
+ */
 static Eina_Bool
 _filter_command_run(Evas_Filter_Command *cmd)
 {
@@ -1909,6 +2539,21 @@ _filter_command_run(Evas_Filter_Command *cmd)
    return cmd->ENFN->gfx_filter_process(CMD_ENC, cmd);
 }
 
+/**
+ * @internal
+ * @brief Executes the entire chain of filter commands and renders the result to the target.
+ *
+ * This function iterates through all commands in the Evas_Filter_Context,
+ * executing each one using `_filter_command_run`. If all commands succeed,
+ * it then calls `_filter_target_render` to draw the final output.
+ * Finally, it invokes the post-run callback.
+ *
+ * @param engine The graphics engine context.
+ * @param output The rendering output context.
+ * @param ctx The filter context containing the command chain and target information.
+ * @return EINA_TRUE if the entire chain and target rendering were successful,
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _filter_chain_run(void *engine, void *output, Evas_Filter_Context *ctx)
 {
@@ -1954,6 +2599,18 @@ _filter_thread_run_cb(void *data)
    _free(ftd);
 }
 
+/**
+ * @internal
+ * @brief Calculates the effective obscured region based on the "real" obscured region and filter padding.
+ *
+ * The "real" obscured region is set by `evas_filter_context_obscured_region_set`.
+ * This function adjusts that rectangle by the calculated padding values of the filter
+ * (how much the filter might expand beyond its nominal bounds). The result is stored
+ * in `ctx->obscured.effective`. This effective region can be used by rendering
+ * engines to optimize away drawing of fully obscured parts of the filtered output.
+ *
+ * @param ctx The filter context, containing `obscured.real` and `pad.calculated`.
+ */
 static void
 _filter_obscured_region_calc(Evas_Filter_Context *ctx)
 {
@@ -2003,6 +2660,23 @@ _filter_obscured_region_calc(Evas_Filter_Context *ctx)
    ctx->obscured.effective = rect;
 }
 
+/**
+ * @brief Runs the configured filter chain in the given context.
+ *
+ * This function initiates the execution of all filter commands.
+ * It first increments the context's reference count, calculates the effective
+ * obscured region, and then either runs the filter chain synchronously via
+ * `_filter_chain_run` or schedules it for asynchronous execution in a
+ * separate thread if `ctx->async` is true.
+ *
+ * @param engine The graphics engine context.
+ * @param output The rendering output context.
+ * @param ctx The filter context to run.
+ * @return EINA_TRUE if the filter chain was successfully started (or run synchronously).
+ *         For asynchronous runs, this indicates successful queuing. The actual
+ *         result of the async run is reported via the post-run callback.
+ *         For synchronous runs, it returns the result of `_filter_chain_run`.
+ */
 Eina_Bool
 evas_filter_context_run(void *engine, void *output, Evas_Filter_Context *ctx)
 {
@@ -2033,6 +2707,13 @@ evas_filter_context_run(void *engine, void *output, Evas_Filter_Context *ctx)
 static int init_cnt = 0;
 int _evas_filter_log_dom = 0;
 
+/**
+ * @brief Initializes the Evas filter subsystem.
+ *
+ * This function sets up logging for filters and initializes any
+ * associated components like mixins. It uses a static counter
+ * to ensure initialization happens only once.
+ */
 void
 evas_filter_init(void)
 {
@@ -2041,6 +2722,14 @@ evas_filter_init(void)
    evas_filter_mixin_init();
 }
 
+/**
+ * @brief Shuts down the Evas filter subsystem.
+ *
+ * This function cleans up resources used by the filter system,
+ * including unregistering the log domain and shutting down
+ * associated components. It uses a static counter to ensure
+ * shutdown occurs only when the init count reaches zero.
+ */
 void
 evas_filter_shutdown(void)
 {

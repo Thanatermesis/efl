@@ -14,6 +14,15 @@
 #define MY_CLASS EFL_UI_NAVIGATION_BAR_CLASS
 #define MY_CLASS_NAME "Efl.Ui.Navigation_Bar"
 
+/**
+ * @brief Callback function invoked when the back button is clicked.
+ *
+ * This function attempts to find the spotlight container associated with the
+ * navigation bar and pops the current item from it.
+ *
+ * @param data The navigation bar Eo object.
+ * @param ev The Efl_Event data (unused).
+ */
 static void
 _back_button_clicked_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -29,6 +38,16 @@ _back_button_clicked_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_spotlight_pop(spotlight, EINA_TRUE);
 }
 
+/**
+ * @brief Constructor for the Efl.Ui.Navigation_Bar.
+ *
+ * Initializes the navigation bar widget, sets its theme, and creates
+ * the back button.
+ *
+ * @param obj The Eo object to construct.
+ * @param pd The private data for the navigation bar.
+ * @return The constructed Eo object, or NULL on failure.
+ */
 EOLIAN static Eo *
 _efl_ui_navigation_bar_efl_object_constructor(Eo *obj, Efl_Ui_Navigation_Bar_Data *pd)
 {

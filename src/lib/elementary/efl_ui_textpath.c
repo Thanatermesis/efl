@@ -19,32 +19,46 @@
 #define EFL_UI_TEXT_PART_NAME "efl.text"
 
 #define SLICE_DEFAULT_NO 99
+
+/**
+ * @brief Represents a 2D point.
+ */
 typedef struct _Efl_Ui_Textpath_Point Efl_Ui_Textpath_Point;
+/**
+ * @brief Represents a line segment defined by two points.
+ */
 typedef struct _Efl_Ui_Textpath_Line Efl_Ui_Textpath_Line;
+/**
+ * @brief Represents a segment of the path, which can be a line or a Bezier curve.
+ *        These segments form an Eina_Inlist.
+ */
 typedef struct _Efl_Ui_Textpath_Segment Efl_Ui_Textpath_Segment;
+/**
+ * @brief Private data structure for the Efl_Ui_Textpath widget.
+ */
 typedef struct _Efl_Ui_Textpath_Data Efl_Ui_Textpath_Data;
 
 struct _Efl_Ui_Textpath_Point
 {
-   double x;
-   double y;
+   double x; /**< The x-coordinate of the point. */
+   double y; /**< The y-coordinate of the point. */
 };
 
 struct _Efl_Ui_Textpath_Line
 {
-   Efl_Ui_Textpath_Point start;
-   Efl_Ui_Textpath_Point end;
+   Efl_Ui_Textpath_Point start; /**< The starting point of the line. */
+   Efl_Ui_Textpath_Point end;   /**< The ending point of the line. */
 };
 
 struct _Efl_Ui_Textpath_Segment
 {
-   EINA_INLIST;
-   int length;
-   Efl_Gfx_Path_Command_Type type;
+   EINA_INLIST; /**< Macro to make this struct usable in an Eina_Inlist. */
+   int length;  /**< The calculated length of this segment. */
+   Efl_Gfx_Path_Command_Type type; /**< The type of the path segment (line or cubic Bezier). */
    union
      {
-        Eina_Bezier bezier;
-        Efl_Ui_Textpath_Line line;
+        Eina_Bezier bezier; /**< Bezier curve data if type is EFL_GFX_PATH_COMMAND_TYPE_CUBIC_TO. */
+        Efl_Ui_Textpath_Line line; /**< Line data if type is EFL_GFX_PATH_COMMAND_TYPE_LINE_TO. */
      };
 };
 
@@ -54,37 +68,65 @@ struct _Efl_Ui_Textpath_Segment
 
 struct _Efl_Ui_Textpath_Data
 {
-   Evas_Object *text_obj;
-   char *text;
-   Eina_Strbuf *user_style;
-   Efl_Gfx_Path *path;
+   Evas_Object *text_obj; /**< The internal Edje object used to render the text. */
+   char *text; /**< The text string to be displayed along the path. (Legacy, consider if still needed directly) */
+   Eina_Strbuf *user_style; /**< User-defined text style string. */
+   Efl_Gfx_Path *path;      /**< The graphics path object defining the trajectory for the text. (Legacy, path is now part of the object itself) */
+   /**
+    * @brief Parameters for circular text path.
+    */
    struct {
-        double x, y;
-        double radius;
-        double start_angle;
+        double x;           /**< X-coordinate of the circle's center. */
+        double y;           /**< Y-coordinate of the circle's center. */
+        double radius;      /**< Radius of the circle. */
+        double start_angle; /**< Starting angle for the text on the circle (in degrees). */
    } circle;
-   Efl_Ui_Textpath_Direction direction;
-   int slice_no;
-   Eina_Bool ellipsis;
+   Efl_Ui_Textpath_Direction direction; /**< Direction of text on a circular path (clockwise/counter-clockwise). */
+   int slice_no; /**< Number of slices used to approximate curves, affecting smoothness. */
+   Eina_Bool ellipsis; /**< Whether to apply ellipsis if the text overflows the path. */
 
-   Eina_Inlist *segments;
-   int total_length;
+   Eina_Inlist *segments; /**< List of path segments (lines or Bezier curves). @see _Efl_Ui_Textpath_Segment */
+   int total_length;      /**< Total calculated length of all path segments. */
 #ifdef EFL_UI_TEXTPATH_LINE_DEBUG
-   Eina_List *lines;
+   Eina_List *lines; /**< List of Evas_Object lines for debugging segment drawing. */
 #endif
-   Eina_Bool need_redraw : 1;
-   Eina_Bool circular : 1;   //TODO: Remove this flag when elm_textpath_circle_set() is removed.
+   Eina_Bool need_redraw : 1; /**< Flag indicating if the text path needs to be redrawn. */
+   Eina_Bool circular : 1;   /**< Flag indicating if the path is currently circular. TODO: Remove this flag when elm_textpath_circle_set() is removed. */
 };
 
 #define EFL_UI_TEXTPATH_DATA_GET(o, sd) \
    Efl_Ui_Textpath_Data *sd = efl_data_scope_get(o, EFL_UI_TEXTPATH_CLASS)
 
+/**
+ * @brief Converts radians to degrees.
+ * @param rad Angle in radians.
+ * @return Angle in degrees.
+ */
 static inline double
 _rad_to_deg(double rad)
 {
    return 180 * rad / M_PI;
 }
 
+/**
+ * @brief Draws a segment of the text along a Bezier curve using Evas_Map.
+ *
+ * This function divides the Bezier curve segment into smaller slices and maps
+ * corresponding parts of the text object onto these slices.
+ *
+ * @param pd Private data of the textpath widget.
+ * @param slice_no Number of slices to divide this Bezier segment into.
+ * @param dt Parameter step for traversing the Bezier curve for each slice.
+ * @param dist Horizontal distance in the source text image corresponding to each slice.
+ * @param w1 Starting horizontal position (u-coordinate) in the source text image for this segment.
+ * @param cmp Current map point index to start adding points from.
+ * @param map The Evas_Map to populate with transformation points.
+ * @param bezier The Bezier curve definition for this segment.
+ * @param last_x1 Pointer to store the x-coordinate of the last top-left point.
+ * @param last_y1 Pointer to store the y-coordinate of the last top-left point.
+ * @param last_x2 Pointer to store the x-coordinate of the last bottom-left point.
+ * @param last_y2 Pointer to store the y-coordinate of the last bottom-left point.
+ */
 static void
 _segment_draw(Efl_Ui_Textpath_Data *pd, int slice_no, double dt, double dist,
               int w1, int cmp, Evas_Map *map, Eina_Bezier bezier,
@@ -260,6 +302,19 @@ _segment_draw(Efl_Ui_Textpath_Data *pd, int slice_no, double dt, double dist,
      }
 }
 
+/**
+ * @brief Draws a segment of the text along a straight line using Evas_Map.
+ *
+ * This function maps a rectangular portion of the text object onto a quadrilateral
+ * defined by the line segment and the text height.
+ *
+ * @param pd Private data of the textpath widget.
+ * @param w1 Starting horizontal position (u-coordinate) in the source text image for this segment.
+ * @param w2 Ending horizontal position (u-coordinate) in the source text image for this segment.
+ * @param cmp Current map point index to start adding points from (expects 4 points for a quad).
+ * @param map The Evas_Map to populate with transformation points.
+ * @param line The line segment definition.
+ */
 static void
 _text_on_line_draw(Efl_Ui_Textpath_Data *pd, int w1, int w2, int cmp, Evas_Map *map, Efl_Ui_Textpath_Line line)
 {
@@ -300,6 +355,17 @@ _text_on_line_draw(Efl_Ui_Textpath_Data *pd, int w1, int w2, int cmp, Evas_Map *
    evas_map_point_image_uv_set(map, cmp + 3, w1, r.h);
 }
 
+/**
+ * @brief Calculates the total number of Evas_Map points required to draw the text along the path.
+ *
+ * Each line segment requires 4 map points (for one quadrilateral).
+ * Each Bezier curve segment requires `slice_no_for_segment * 4` map points,
+ * where `slice_no_for_segment` is proportional to the segment's length relative
+ * to the total path length and the global `slice_no` setting.
+ *
+ * @param pd Private data of the textpath widget.
+ * @return The total number of map points needed.
+ */
 static int
 _map_point_calc(Efl_Ui_Textpath_Data *pd)
 {
@@ -324,6 +390,16 @@ _map_point_calc(Efl_Ui_Textpath_Data *pd)
    return map_no;
 }
 
+/**
+ * @brief Main function to draw the text along the defined path.
+ *
+ * It iterates through all path segments (lines or Bezier curves) and calls
+ * the appropriate drawing function (_text_on_line_draw or _segment_draw)
+ * to populate an Evas_Map. This map is then applied to the text object
+ * to render it along the path.
+ *
+ * @param pd Private data of the textpath widget.
+ */
 static void
 _text_draw(Efl_Ui_Textpath_Data *pd)
 {
@@ -397,12 +473,32 @@ _text_draw(Efl_Ui_Textpath_Data *pd)
    pd->need_redraw = EINA_FALSE;
 }
 
+/**
+ * @brief Evas pre-render callback.
+ *
+ * This function is called before rendering each frame. If a redraw is needed
+ * (pd->need_redraw is true), it calls _text_draw to update the text rendering.
+ *
+ * @param data User data, which is the Efl_Ui_Textpath_Data pointer.
+ * @param e The Evas canvas.
+ * @param ev Event specific information (unused).
+ */
 static void
 _render_pre_cb(void *data, Evas *e EINA_UNUSED, void *ev EINA_UNUSED)
 {
    _text_draw(data);
 }
 
+/**
+ * @brief Parses the Efl_Gfx_Path data and populates the internal segment list.
+ *
+ * This function iterates over the commands and points in the object's path,
+ * converting them into a list of _Efl_Ui_Textpath_Segment structures.
+ * It calculates the length of each segment and the total path length.
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ */
 static void
 _path_data_get(Eo *obj, Efl_Ui_Textpath_Data *pd)
 {
@@ -521,12 +617,30 @@ _path_data_get(Eo *obj, Efl_Ui_Textpath_Data *pd)
      }
 }
 
+/**
+ * @brief Marks the textpath for redraw and recalculation.
+ *
+ * Typically called when properties affecting the layout or appearance change.
+ * Sets the need_redraw flag.
+ *
+ * @param pd Private data of the textpath widget.
+ */
 static void
 _sizing_eval(Efl_Ui_Textpath_Data *pd)
 {
    pd->need_redraw = EINA_TRUE;
 }
 
+/**
+ * @brief Applies or removes the ellipsis style to the text part of the internal Edje object.
+ *
+ * Modifies the user style string to include or exclude "ellipsis=1.0"
+ * and pushes it to the Edje object.
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ * @param enabled EINA_TRUE to enable ellipsis, EINA_FALSE to disable.
+ */
 static void
 _textpath_ellipsis_set(Eo *obj, Efl_Ui_Textpath_Data *pd, Eina_Bool enabled)
 {
@@ -564,6 +678,17 @@ _textpath_ellipsis_set(Eo *obj, Efl_Ui_Textpath_Data *pd, Eina_Bool enabled)
      }
 }
 
+/**
+ * @brief Configures ellipsis behavior based on text length versus path length.
+ *
+ * This function checks if the native width of the text exceeds the total path length.
+ * If ellipsis is enabled (pd->ellipsis is EINA_TRUE) and the text is too long,
+ * it enables the ellipsis style via _textpath_ellipsis_set and adjusts the
+ * size of the text object to the path length. Otherwise, it disables the ellipsis style.
+ *
+ * @param pd Private data of the textpath widget.
+ * @param obj The Efl_Ui_Textpath object.
+ */
 static void
 _ellipsis_set(Efl_Ui_Textpath_Data *pd, Eo *obj)
 {
@@ -592,6 +717,16 @@ _ellipsis_set(Efl_Ui_Textpath_Data *pd, Eo *obj)
    _textpath_ellipsis_set(obj, pd, is_ellipsis);
 }
 
+/**
+ * @brief Called when the graphics path of the textpath object is committed (updated).
+ *
+ * This function re-parses the path data using _path_data_get and triggers
+ * a sizing evaluation/redraw.
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ * @implements Efl_Gfx_Path_Commit
+ */
 static void
 _efl_ui_textpath_efl_gfx_path_commit(Eo *obj, Efl_Ui_Textpath_Data *pd)
 {
@@ -599,6 +734,17 @@ _efl_ui_textpath_efl_gfx_path_commit(Eo *obj, Efl_Ui_Textpath_Data *pd)
    _sizing_eval(pd);
 }
 
+/**
+ * @brief Adjusts the start angle of a circular path to center the text.
+ *
+ * For circular paths with `EFL_UI_TEXTPATH_DIRECTION_CW_CENTER` or
+ * `EFL_UI_TEXTPATH_DIRECTION_CCW_CENTER`, this function calculates the
+ * angular extent of the text on the circle and adjusts the path's start
+ * angle so that the text appears centered around the original start_angle.
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ */
 static void
 _path_start_angle_adjust(Eo *obj, Efl_Ui_Textpath_Data *pd)
 {
@@ -674,6 +820,18 @@ _path_start_angle_adjust(Eo *obj, Efl_Ui_Textpath_Data *pd)
    _path_data_get(obj, pd);
 }
 
+/**
+ * @brief Internal function to set the text on a specified part of the Edje object.
+ *
+ * This function updates the text in the Edje object, handles ellipsis configuration,
+ * adjusts the start angle for circular paths if necessary, and triggers a sizing evaluation.
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ * @param part The Edje part name where the text should be set (e.g., "efl.text").
+ * @param text The text string to set. If NULL, it's treated as an empty string.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _textpath_text_set_internal(Eo *obj, Efl_Ui_Textpath_Data *pd, const char *part, const char *text)
 {
@@ -693,6 +851,14 @@ _textpath_text_set_internal(Eo *obj, Efl_Ui_Textpath_Data *pd, const char *part,
    return ret;
 }
 
+/**
+ * @brief Implements Efl.Canvas.Group.group_calculate.
+ *
+ * Clears the recalculate flag and triggers a sizing evaluation to update the layout.
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ */
 EOLIAN static void
 _efl_ui_textpath_efl_canvas_group_group_calculate(Eo *obj, Efl_Ui_Textpath_Data *pd)
 {
@@ -700,6 +866,15 @@ _efl_ui_textpath_efl_canvas_group_group_calculate(Eo *obj, Efl_Ui_Textpath_Data 
    _sizing_eval(pd);
 }
 
+/**
+ * @brief Implements Efl.Canvas.Group.group_add.
+ *
+ * Initializes the textpath widget by creating and configuring the internal
+ * Edje object used for text rendering.
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param priv Private data of the textpath widget.
+ */
 EOLIAN static void
 _efl_ui_textpath_efl_canvas_group_group_add(Eo *obj, Efl_Ui_Textpath_Data *priv)
 {
@@ -718,6 +893,16 @@ _efl_ui_textpath_efl_canvas_group_group_add(Eo *obj, Efl_Ui_Textpath_Data *priv)
    elm_widget_sub_object_add(obj, priv->text_obj);
 }
 
+/**
+ * @brief Implements Efl.Object.constructor.
+ *
+ * Initializes the textpath object, sets default values (slice_no, direction),
+ * and registers the pre-render callback.
+ *
+ * @param obj The Efl_Ui_Textpath object being constructed.
+ * @param pd Private data of the textpath widget.
+ * @return The constructed Efl_Object.
+ */
 EOLIAN static Efl_Object *
 _efl_ui_textpath_efl_object_constructor(Eo *obj, Efl_Ui_Textpath_Data *pd)
 {
@@ -730,6 +915,16 @@ _efl_ui_textpath_efl_object_constructor(Eo *obj, Efl_Ui_Textpath_Data *pd)
    return obj;
 }
 
+/**
+ * @brief Implements Efl.Object.destructor.
+ *
+ * Cleans up resources used by the textpath object, including deleting
+ * the pre-render callback, freeing allocated memory for text, user style,
+ * path segments, and the internal Edje object.
+ *
+ * @param obj The Efl_Ui_Textpath object being destructed.
+ * @param pd Private data of the textpath widget.
+ */
 EOLIAN static void
 _efl_ui_textpath_efl_object_destructor(Eo *obj, Efl_Ui_Textpath_Data *pd)
 {
@@ -757,30 +952,79 @@ _efl_ui_textpath_efl_object_destructor(Eo *obj, Efl_Ui_Textpath_Data *pd)
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Implements Elm.Layout.text_set. (Legacy part text setting)
+ *
+ * Sets the text for a given part.
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ * @param part The name of the part to set text for.
+ * @param text The text to set.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_textpath_text_set(Eo *obj, Efl_Ui_Textpath_Data *pd, const char *part, const char *text)
 {
    return _textpath_text_set_internal(obj, pd, part, text);
 }
 
+/**
+ * @brief Implements Elm.Layout.text_get. (Legacy part text retrieval)
+ *
+ * Gets the text from a given part.
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ * @param part The name of the part to get text from.
+ * @return The text of the part, or NULL on failure.
+ */
 EOLIAN static const char *
 _efl_ui_textpath_text_get(Eo *obj EINA_UNUSED, Efl_Ui_Textpath_Data *pd, const char *part)
 {
    return edje_object_part_text_get(pd->text_obj, part);
 }
 
+/**
+ * @brief Implements Efl.Text.text_set.
+ *
+ * Sets the main text content of the textpath. This typically corresponds to the "efl.text" part.
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ * @param text The text to set.
+ */
 EOLIAN static void
 _efl_ui_textpath_efl_text_text_set(Eo *obj, Efl_Ui_Textpath_Data *pd, const char *text)
 {
    _textpath_text_set_internal(obj, pd, "efl.text", text);
 }
 
+/**
+ * @brief Implements Efl.Text.text_get.
+ *
+ * Gets the main text content of the textpath. This typically corresponds to the "efl.text" part.
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ * @return The main text content.
+ */
 EOLIAN static const char *
 _efl_ui_textpath_efl_text_text_get(const Eo *obj EINA_UNUSED, Efl_Ui_Textpath_Data *pd)
 {
    return edje_object_part_text_get(pd->text_obj, "efl.text");
 }
 
+/**
+ * @brief Implements Efl.Ui.Widget.theme_apply.
+ *
+ * Applies the current theme to the textpath widget and its internal Edje object.
+ * Also re-evaluates ellipsis settings as theme changes might affect text rendering.
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ * @return Eina_Error indicating success or failure.
+ */
 EOLIAN static Eina_Error
 _efl_ui_textpath_efl_ui_widget_theme_apply(Eo *obj, Efl_Ui_Textpath_Data *pd)
 {
@@ -796,6 +1040,16 @@ _efl_ui_textpath_efl_ui_widget_theme_apply(Eo *obj, Efl_Ui_Textpath_Data *pd)
    return ret;
 }
 
+/**
+ * @brief Implements Efl.Gfx.Entity.position_set.
+ *
+ * Sets the position of the textpath object. This also adjusts the coordinates
+ * of all internal path segments to reflect the new position and triggers a redraw.
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ * @param pos The new position (x, y) for the object.
+ */
 EOLIAN static void
 _efl_ui_textpath_efl_gfx_entity_position_set(Eo *obj, Efl_Ui_Textpath_Data *pd, Eina_Position2D pos)
 {
@@ -831,6 +1085,17 @@ _efl_ui_textpath_efl_gfx_entity_position_set(Eo *obj, Efl_Ui_Textpath_Data *pd, 
    _text_draw(pd);
 }
 
+/**
+ * @brief Implements Efl.Gfx.Entity.size_set.
+ *
+ * Sets the size of the textpath object. If the path is not circular (or legacy circle_set is not used),
+ * this function adjusts the coordinates of all internal path segments to scale them
+ * relative to the center of the object and triggers a redraw.
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ * @param size The new size (width, height) for the object.
+ */
 EOLIAN static void
 _efl_ui_textpath_efl_gfx_entity_size_set(Eo *obj, Efl_Ui_Textpath_Data *pd EINA_UNUSED, Eina_Size2D size)
 {
@@ -869,6 +1134,20 @@ _efl_ui_textpath_efl_gfx_entity_size_set(Eo *obj, Efl_Ui_Textpath_Data *pd EINA_
    _text_draw(pd);
 }
 
+/**
+ * @brief Sets the textpath to follow a circular trajectory.
+ *
+ * This function defines a circular path for the text. The circle's center is
+ * automatically calculated to be within the object's bounds, considering the text height.
+ * The path is then generated as an arc.
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ * @param radius The radius of the circular path.
+ * @param start_angle The starting angle on the circle for the text, in degrees.
+ * @param direction The direction of the text along the circle (clockwise or counter-clockwise).
+ *                  Example: EFL_UI_TEXTPATH_DIRECTION_CW
+ */
 EOLIAN static void
 _efl_ui_textpath_circular_set(Eo *obj, Efl_Ui_Textpath_Data *pd, double radius, double start_angle, Efl_Ui_Textpath_Direction direction)
 {
@@ -920,12 +1199,28 @@ _efl_ui_textpath_circular_set(Eo *obj, Efl_Ui_Textpath_Data *pd, double radius, 
    efl_gfx_hint_size_restricted_min_set(obj, EINA_SIZE2D((radius * 2) + text_size.h, (radius * 2) + text_size.h));
 }
 
+/**
+ * @brief Gets the number of slices used for rendering curves.
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ * @return The number of slices.
+ */
 EOLIAN static int
 _efl_ui_textpath_slice_number_get(const Eo *obj EINA_UNUSED, Efl_Ui_Textpath_Data *pd)
 {
    return pd->slice_no;
 }
 
+/**
+ * @brief Sets the number of slices used for rendering curves.
+ *
+ * A higher number results in smoother curves but may impact performance.
+ * Default is SLICE_DEFAULT_NO (99).
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ * @param slice_no The number of slices. Example: 50
+ */
 EOLIAN static void
 _efl_ui_textpath_slice_number_set(Eo *obj EINA_UNUSED, Efl_Ui_Textpath_Data *pd, int slice_no)
 {
@@ -934,6 +1229,12 @@ _efl_ui_textpath_slice_number_set(Eo *obj EINA_UNUSED, Efl_Ui_Textpath_Data *pd,
    _sizing_eval(pd);
 }
 
+/**
+ * @brief Enables or disables ellipsis for overflowing text.
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ * @param ellipsis EINA_TRUE to enable ellipsis, EINA_FALSE to disable.
+ */
 EOLIAN static void
 _efl_ui_textpath_ellipsis_set(Eo *obj, Efl_Ui_Textpath_Data *pd, Eina_Bool ellipsis)
 {
@@ -944,6 +1245,12 @@ _efl_ui_textpath_ellipsis_set(Eo *obj, Efl_Ui_Textpath_Data *pd, Eina_Bool ellip
    _sizing_eval(pd);
 }
 
+/**
+ * @brief Gets whether ellipsis is enabled for overflowing text.
+ * @param obj The Efl_Ui_Textpath object.
+ * @param pd Private data of the textpath widget.
+ * @return EINA_TRUE if ellipsis is enabled, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_textpath_ellipsis_get(const Eo *obj EINA_UNUSED, Efl_Ui_Textpath_Data *pd)
 {
@@ -952,6 +1259,18 @@ _efl_ui_textpath_ellipsis_get(const Eo *obj EINA_UNUSED, Efl_Ui_Textpath_Data *p
 
 /* Efl.Part begin */
 
+/**
+ * @brief Checks if a given part name is specific to Efl_Ui_Textpath.
+ *
+ * This is used by the ELM_PART_OVERRIDE_PARTIAL macro to determine if
+ * the textpath should handle this part or defer to its parent class.
+ * Textpath handles its own text parts but uses Efl.Ui.Widget's "background"
+ * and "shadow" parts.
+ *
+ * @param obj The Efl_Ui_Textpath object (unused).
+ * @param part The name of the part to check.
+ * @return EINA_TRUE if it's a textpath-specific part, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _part_is_efl_ui_textpath_part(const Eo *obj EINA_UNUSED, const char *part)
 {
@@ -979,12 +1298,24 @@ ELM_PART_OVERRIDE_TEXT_GET(efl_ui_textpath, EFL_UI_TEXTPATH, Efl_Ui_Textpath_Dat
 #define MY_CLASS_NAME_LEGACY "elm_textpath"
 /* Legacy APIs */
 
+/**
+ * @brief Legacy class constructor for elm_textpath.
+ * Registers the legacy type name.
+ * @param klass The Efl_Class.
+ */
 static void
 _efl_ui_textpath_legacy_class_constructor(Efl_Class *klass)
 {
    evas_smart_legacy_type_register(MY_CLASS_NAME_LEGACY, klass);
 }
 
+/**
+ * @brief Legacy object constructor for elm_textpath.
+ * Sets the Evas object type.
+ * @param obj The Eo object.
+ * @param _pd Private data (unused).
+ * @return The constructed Eo object.
+ */
 EOLIAN static Eo *
 _efl_ui_textpath_legacy_efl_object_constructor(Eo *obj, void *_pd EINA_UNUSED)
 {
@@ -993,6 +1324,12 @@ _efl_ui_textpath_legacy_efl_object_constructor(Eo *obj, void *_pd EINA_UNUSED)
    return obj;
 }
 
+/**
+ * @brief Adds a new textpath widget to the given parent Evas object.
+ * @deprecated Use efl_add(EFL_UI_TEXTPATH_CLASS, parent) instead.
+ * @param parent The parent Evas object.
+ * @return The new Evas_Object, or NULL on failure.
+ */
 EAPI Evas_Object *
 elm_textpath_add(Evas_Object *parent)
 {
@@ -1000,6 +1337,20 @@ elm_textpath_add(Evas_Object *parent)
    return elm_legacy_add(EFL_UI_TEXTPATH_LEGACY_CLASS, parent);
 }
 
+/**
+ * @brief Sets the textpath to follow a circular trajectory with a user-defined center.
+ * @deprecated Use efl_ui_textpath_circular_set() instead.
+ *
+ * This function defines a circular path for the text with an explicitly set center (x, y).
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param x The x-coordinate of the circle's center.
+ * @param y The y-coordinate of the circle's center.
+ * @param radius The radius of the circular path.
+ * @param start_angle The starting angle on the circle for the text, in degrees.
+ * @param direction The direction of the text along the circle.
+ *                  Example: EFL_UI_TEXTPATH_DIRECTION_CW
+ */
 EAPI void
 elm_textpath_circle_set(Eo *obj, double x, double y, double radius, double start_angle, Efl_Ui_Textpath_Direction direction)
 {
@@ -1040,6 +1391,16 @@ elm_textpath_circle_set(Eo *obj, double x, double y, double radius, double start
    efl_gfx_hint_size_restricted_min_set(obj, EINA_SIZE2D(x * 2, y * 2));
 }
 
+/**
+ * @brief Sets a custom style for the text.
+ * @deprecated Use Edje direct text styling capabilities or other Efl_Text properties.
+ *
+ * This function allows applying a custom Edje text style string to the text.
+ *
+ * @param obj The Efl_Ui_Textpath object.
+ * @param style The Edje style string. Example: "DEFAULT='font=Sans font_size=20 color=#FF0000'"
+ *              Pass NULL to clear the user style.
+ */
 EAPI void
 elm_textpath_text_user_style_set(Eo *obj, const char *style)
 {

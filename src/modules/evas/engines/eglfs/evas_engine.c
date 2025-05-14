@@ -1,3 +1,12 @@
+/**
+ * @file
+ * @brief Evas EGLFS engine implementation.
+ *
+ * This engine provides Evas rendering capabilities using EGL on a framebuffer device.
+ * It leverages Evas_GL_Generic for common GL operations and extends it with
+ * EGLFS specific functionalities.
+ */
+
 #include "config.h"
 #include "evas_engine.h"
 #include <wayland-client.h>
@@ -26,18 +35,29 @@ static Eina_Bool initted = EINA_FALSE;
 static int gl_wins = 0;
 
 /* local structures */
+/**
+ * @brief Structure representing the EGLFS rendering engine.
+ *
+ * This structure holds the generic GL rendering output information.
+ */
 typedef struct _Render_Engine Render_Engine;
 struct _Render_Engine
 {
-   Render_Output_GL_Generic generic;
+   Render_Output_GL_Generic generic; /**< Generic GL rendering output data. */
 };
 
+/**
+ * @brief Structure representing a native surface.
+ *
+ * This structure holds information about a native surface, which can be
+ * a Wayland buffer or an EGL surface.
+ */
 typedef struct _Native Native;
 struct _Native
 {
-   Evas_Native_Surface ns;
-   struct wl_buffer *wl_buf;
-   void *egl_surface;
+   Evas_Native_Surface ns;      /**< Evas native surface information. */
+   struct wl_buffer *wl_buf;  /**< Wayland buffer, if applicable. */
+   void *egl_surface;         /**< EGL surface, if applicable. */
 };
 
 /* local function prototype types */
@@ -86,20 +106,118 @@ unsigned int (*glsym_eglSwapBuffersWithDamage)(EGLDisplay a, void *b, const EGLi
 unsigned int (*glsym_eglQueryWaylandBufferWL)(EGLDisplay a, struct wl_resource *b, EGLint c, EGLint *d) = NULL;
 
 /* local function prototypes */
+/**
+ * @brief Loads necessary EGL and GLES symbols.
+ *
+ * This function dynamically loads EGL and GLES function pointers required
+ * by the engine. It ensures that all necessary symbols are available before
+ * they are used.
+ */
 static void gl_symbols(void);
+
+/**
+ * @brief Checks and disables certain EGL extensions based on environment or availability.
+ *
+ * This function queries available EGL extensions and may disable features like
+ * partial rendering (buffer age) or swap-with-damage if explicitly disabled
+ * via environment variables or if the extensions are not supported.
+ *
+ * @param re Pointer to the Render_Engine structure.
+ */
 static void gl_extn_veto(Render_Engine *re);
 
+/**
+ * @brief Retrieves the EGL display associated with the render engine.
+ * @param data Pointer to the Render_Engine structure.
+ * @return A void pointer to the EGLDisplay, or NULL on error.
+ */
 static void *evgl_eng_display_get(void *data);
+
+/**
+ * @brief Retrieves the EGL surface associated with the Evas canvas.
+ * @param data Pointer to the Render_Engine structure.
+ * @return A void pointer to the EGLSurface, or NULL on error.
+ */
 static void *evgl_eng_evas_surface_get(void *data);
+
+/**
+ * @brief Makes the given EGL context and surface current.
+ * @param data Pointer to the Render_Engine structure.
+ * @param surface The EGLSurface to make current. Can be EGL_NO_SURFACE.
+ * @param context The EGLContext to make current. Can be EGL_NO_CONTEXT.
+ * @param flush If non-zero, flushes the previous context before making the new one current.
+ * @return 1 on success, 0 on failure.
+ */
 static int evgl_eng_make_current(void *data, void *surface, void *context, int flush);
+
+/**
+ * @brief Creates a native window.
+ * @param data Pointer to the Render_Engine structure.
+ * @return A void pointer to the native window (EGLNativeWindowType), or NULL on error.
+ * @note This function currently creates an HWC (Hardware Composer) native window.
+ */
 static void *evgl_eng_native_window_create(void *data);
+
+/**
+ * @brief Destroys a native window.
+ * @param data Pointer to the Render_Engine structure.
+ * @param native_window The native window to destroy.
+ * @return 1 on success, 0 on failure.
+ */
 static int evgl_eng_native_window_destroy(void *data, void *native_window);
+
+/**
+ * @brief Creates an EGL window surface from a native window.
+ * @param data Pointer to the Render_Engine structure.
+ * @param native_window The native window (EGLNativeWindowType) to create the surface from.
+ * @return A void pointer to the EGLSurface, or NULL on error.
+ */
 static void *evgl_eng_window_surface_create(void *data, void *native_window);
+
+/**
+ * @brief Destroys an EGL window surface.
+ * @param data Pointer to the Render_Engine structure.
+ * @param surface The EGLSurface to destroy.
+ * @return 1 on success, 0 on failure.
+ */
 static int evgl_eng_window_surface_destroy(void *data, void *surface);
+
+/**
+ * @brief Creates an EGL context.
+ * @param data Pointer to the Render_Engine structure.
+ * @param share_ctx An EGLContext to share resources with, or NULL for no sharing (shares with Evas' main GL context by default).
+ * @param version The GLES version for the context (currently only EVAS_GL_GLES_2_X is supported).
+ * @return A void pointer to the EGLContext, or NULL on error.
+ */
 static void *evgl_eng_context_create(void *data, void *share_ctx, Evas_GL_Context_Version version);
+
+/**
+ * @brief Destroys an EGL context.
+ * @param data Pointer to the Render_Engine structure.
+ * @param context The EGLContext to destroy.
+ * @return 1 on success, 0 on failure.
+ */
 static int evgl_eng_context_destroy(void *data, void *context);
+
+/**
+ * @brief Retrieves the EGL extension string.
+ * @param data Pointer to the Render_Engine structure.
+ * @return A const char pointer to the EGL extension string, or NULL on error.
+ */
 static const char *evgl_eng_string_get(void *data);
+
+/**
+ * @brief Retrieves the address of an EGL or GLES extension function.
+ * @param name The name of the function to retrieve.
+ * @return A void pointer to the function, or NULL if not found.
+ */
 static void *evgl_eng_proc_address_get(const char *name);
+
+/**
+ * @brief Retrieves the current rotation angle of the Evas canvas.
+ * @param data Pointer to the Render_Engine structure.
+ * @return The rotation angle in degrees (0, 90, 180, 270), or 0 on error.
+ */
 static int evgl_eng_rotation_angle_get(void *data);
 
 /* function tables - filled in later (func and parent func) */
@@ -135,6 +253,14 @@ eng_get_ob(Render_Engine *re)
 }
 
 /* local functions */
+/**
+ * @brief Loads necessary EGL and GLES symbols.
+ *
+ * This function dynamically loads EGL and GLES function pointers required
+ * by the engine. It ensures that all necessary symbols are available before
+ * they are used. It uses dlsym and eglGetProcAddress to find the symbols.
+ * This function is called only once.
+ */
 static void
 gl_symbols(void)
 {
@@ -213,6 +339,17 @@ gl_symbols(void)
    done = EINA_TRUE;
 }
 
+/**
+ * @brief Checks and disables certain EGL extensions based on environment or availability.
+ *
+ * This function queries available EGL extensions and may disable features like
+ * partial rendering (buffer age) or swap-with-damage if explicitly disabled
+ * via environment variables (EVAS_GL_PARTIAL_DISABLE) or if the extensions
+ * (EGL_EXT_buffer_age, EGL_EXT_swap_buffers_with_damage, EGL_KHR_swap_buffers_with_damage)
+ * are not supported by the EGL implementation.
+ *
+ * @param re Pointer to the Render_Engine structure, used to get the EGL display.
+ */
 static void
 gl_extn_veto(Render_Engine *re)
 {
@@ -244,6 +381,13 @@ gl_extn_veto(Render_Engine *re)
      }
 }
 
+/**
+ * @brief Retrieves the EGL display associated with the render engine.
+ * Implements the EVGL_Interface::display_get function.
+ * @param data Pointer to the Render_Engine structure.
+ * @return A void pointer to the EGLDisplay, or NULL if data is invalid or
+ *         the output buffer or EGL display is not available.
+ */
 static void *
 evgl_eng_display_get(void *data)
 {
@@ -262,6 +406,14 @@ evgl_eng_display_get(void *data)
      return NULL;
 }
 
+/**
+ * @brief Retrieves the EGL surface associated with the Evas canvas.
+ * Implements the EVGL_Interface::evas_surface_get function.
+ * @param data Pointer to the Render_Engine structure.
+ * @return A void pointer to the EGLSurface (specifically the first surface
+ *         in the output buffer's EGL surface array), or NULL if data is invalid
+ *         or the output buffer or EGL surface is not available.
+ */
 static void *
 evgl_eng_evas_surface_get(void *data)
 {
@@ -280,6 +432,24 @@ evgl_eng_evas_surface_get(void *data)
      return NULL;
 }
 
+/**
+ * @brief Makes the given EGL context and surface current for the calling thread.
+ * Implements the EVGL_Interface::make_current function.
+ *
+ * If both context and surface are NULL, it makes no context/surface current.
+ * Otherwise, it makes the specified context and surface current.
+ * If `flush` is true, it ensures that any pending operations on the
+ * previous Evas output buffer are completed.
+ *
+ * @param data Pointer to the Render_Engine structure.
+ * @param surface The EGLSurface to make current. Can be EGL_NO_SURFACE.
+ *                Example: (EGLSurface)my_egl_surface
+ * @param context The EGLContext to make current. Can be EGL_NO_CONTEXT.
+ *                Example: (EGLContext)my_egl_context
+ * @param flush If non-zero (true), flushes the previous context (evas_outbuf_use(NULL))
+ *              before making the new one current.
+ * @return 1 on success, 0 on failure (e.g., eglMakeCurrent fails or invalid data).
+ */
 static int
 evgl_eng_make_current(void *data, void *surface, void *context, int flush)
 {
@@ -330,12 +500,34 @@ evgl_eng_make_current(void *data, void *surface, void *context, int flush)
    return 1;
 }
 
+/**
+ * @brief Callback for HWC (Hardware Composer) present operations.
+ *
+ * This function is intended as a callback for ANativeWindow present operations,
+ * but it is currently empty and does not perform any actions.
+ *
+ * @param user_data User-defined data (unused).
+ * @param window The ANativeWindow associated with the event (unused).
+ * @param buffer The ANativeWindowBuffer being presented (unused).
+ */
 static void _hwc_present_cb(void *user_data, struct ANativeWindow *window,
                             struct ANativeWindowBuffer *buffer)
 {
 
 }
 
+/**
+ * @brief Creates a native window suitable for EGL rendering.
+ * Implements the EVGL_Interface::native_window_create function.
+ *
+ * This function currently creates an HWC (Hardware Composer) native window
+ * using `create_hwcomposernativewindow()`.
+ *
+ * @param data Pointer to the Render_Engine structure.
+ * @return A void pointer to the created native window (EGLNativeWindowType),
+ *         or NULL if data is invalid, Evas engine info is missing, or
+ *         native window creation fails.
+ */
 static void *
 evgl_eng_native_window_create(void *data)
 {
@@ -361,6 +553,18 @@ evgl_eng_native_window_create(void *data)
    return (void *)win;
 }
 
+/**
+ * @brief Destroys a previously created native window.
+ * Implements the EVGL_Interface::native_window_destroy function.
+ *
+ * This function destroys an HWC (Hardware Composer) native window
+ * using `HWCNativeWindowDestroy()`.
+ *
+ * @param data Pointer to the Render_Engine structure.
+ * @param native_window The native window (EGLNativeWindowType) to destroy.
+ *                      Example: (EGLNativeWindowType)my_native_window
+ * @return 1 on success, 0 if data or native_window is invalid.
+ */
 static int
 evgl_eng_native_window_destroy(void *data, void *native_window)
 {
@@ -383,6 +587,18 @@ evgl_eng_native_window_destroy(void *data, void *native_window)
    return 1;
 }
 
+/**
+ * @brief Creates an EGL window surface from a given native window.
+ * Implements the EVGL_Interface::window_surface_create function.
+ *
+ * Uses `eglCreateWindowSurface` to create the EGL surface.
+ *
+ * @param data Pointer to the Render_Engine structure.
+ * @param native_window The native window (EGLNativeWindowType) from which to create the surface.
+ *                      Example: (EGLNativeWindowType)my_native_window
+ * @return A void pointer to the created EGLSurface, or NULL if data is invalid,
+ *         or if `eglCreateWindowSurface` fails.
+ */
 static void *
 evgl_eng_window_surface_create(void *data, void *native_window)
 {
@@ -410,6 +626,18 @@ evgl_eng_window_surface_create(void *data, void *native_window)
    return (void *)surface;
 }
 
+/**
+ * @brief Destroys an EGL window surface.
+ * Implements the EVGL_Interface::window_surface_destroy function.
+ *
+ * Uses `eglDestroySurface` to destroy the EGL surface.
+ *
+ * @param data Pointer to the Render_Engine structure.
+ * @param surface The EGLSurface to destroy.
+ *                Example: (EGLSurface)my_egl_surface
+ * @return 1 on success (EGL_TRUE from eglDestroySurface), 0 if data or surface is invalid,
+ *         or if `eglDestroySurface` fails.
+ */
 static int
 evgl_eng_window_surface_destroy(void *data, void *surface)
 {
@@ -435,6 +663,23 @@ evgl_eng_window_surface_destroy(void *data, void *surface)
    return 0;
 }
 
+/**
+ * @brief Creates an EGL context.
+ * Implements the EVGL_Interface::context_create function.
+ *
+ * This engine currently only supports creating OpenGL ES 2.0 contexts.
+ * The created context will share resources with `share_ctx`. If `share_ctx` is NULL,
+ * it shares with the main Evas GL context.
+ *
+ * @param data Pointer to the Render_Engine structure.
+ * @param share_ctx An EGLContext to share resources with. If NULL, shares with
+ *                  the Evas' main GL context (`eng_get_ob(re)->egl.context[0]`).
+ *                  Example: (EGLContext)my_shared_context
+ * @param version The desired OpenGL ES version. Currently, only EVAS_GL_GLES_2_X is supported.
+ *                Example: EVAS_GL_GLES_2_X
+ * @return A void pointer to the created EGLContext, or NULL if data is invalid,
+ *         an unsupported version is requested, or `eglCreateContext` fails.
+ */
 static void *
 evgl_eng_context_create(void *data, void *share_ctx, Evas_GL_Context_Version version)
 {
@@ -484,6 +729,18 @@ evgl_eng_context_create(void *data, void *share_ctx, Evas_GL_Context_Version ver
    return (void *)context;
 }
 
+/**
+ * @brief Destroys an EGL context.
+ * Implements the EVGL_Interface::context_destroy function.
+ *
+ * Uses `eglDestroyContext` to destroy the EGL context.
+ *
+ * @param data Pointer to the Render_Engine structure.
+ * @param context The EGLContext to destroy.
+ *                Example: (EGLContext)my_egl_context
+ * @return 1 on success (EGL_TRUE from eglDestroyContext), 0 if data or context is invalid,
+ *         or if `eglDestroyContext` fails.
+ */
 static int
 evgl_eng_context_destroy(void *data, void *context)
 {
@@ -504,6 +761,16 @@ evgl_eng_context_destroy(void *data, void *context)
    return 0;
 }
 
+/**
+ * @brief Retrieves the EGL extensions string for the current display.
+ * Implements the EVGL_Interface::string_get function.
+ *
+ * Uses `eglQueryString` with `EGL_EXTENSIONS`.
+ *
+ * @param data Pointer to the Render_Engine structure.
+ * @return A const char pointer to the EGL extensions string, or NULL if
+ *         data is invalid or the EGL display is not available.
+ */
 static const char *
 evgl_eng_string_get(void *data)
 {
@@ -519,6 +786,17 @@ evgl_eng_string_get(void *data)
    return eglQueryString(eng_get_ob(re)->egl.disp, EGL_EXTENSIONS);
 }
 
+/**
+ * @brief Retrieves the address of an EGL or GLES extension function.
+ * Implements the EVGL_Interface::proc_address_get function.
+ *
+ * It first tries to use the loaded `eglGetProcAddress` symbol (`glsym_eglGetProcAddress`).
+ * If that's not available or fails, it falls back to `dlsym(RTLD_DEFAULT, name)`.
+ *
+ * @param name The name of the function to retrieve.
+ *             Example: "glEGLImageTargetTexture2DOES"
+ * @return A void pointer to the function, or NULL if not found by either method.
+ */
 static void *
 evgl_eng_proc_address_get(const char *name)
 {
@@ -526,6 +804,15 @@ evgl_eng_proc_address_get(const char *name)
    return dlsym(RTLD_DEFAULT, name);
 }
 
+/**
+ * @brief Retrieves the current rotation angle of the Evas canvas.
+ * Implements the EVGL_Interface::rotation_angle_get function.
+ *
+ * @param data Pointer to the Render_Engine structure.
+ * @return The rotation angle in degrees (e.g., 0, 90, 180, 270) as stored in
+ *         the output buffer's GL context, or 0 if data is invalid or the
+ *         output buffer/GL context is not available.
+ */
 static int
 evgl_eng_rotation_angle_get(void *data)
 {
@@ -547,6 +834,18 @@ evgl_eng_rotation_angle_get(void *data)
      }
 }
 
+/**
+ * @brief Makes the EGL context current for preloading operations.
+ *
+ * This function is used by the Evas GL preloading mechanism.
+ * If `doit` is true, it makes the output buffer's EGL context and surface current.
+ * If `doit` is false, it makes no context/surface current.
+ *
+ * @param data Pointer to an Outbuf structure.
+ * @param doit A void pointer interpreted as a boolean. If non-NULL (true),
+ *             makes the context current. If NULL (false), releases the current context.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., invalid Outbuf or eglMakeCurrent fails).
+ */
 static Eina_Bool
 eng_preload_make_current(void *data, void *doit)
 {
@@ -571,6 +870,15 @@ eng_preload_make_current(void *data, void *doit)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Releases resources associated with the render engine's window/surface.
+ *
+ * This function is typically called when the window or surface is no longer needed
+ * or needs to be recreated. It relaxes the GL preload rendering lock and
+ * un-surfaces the output buffer.
+ *
+ * @param re Pointer to the Render_Engine structure.
+ */
 static void
 _re_winfree(Render_Engine *re)
 {
@@ -580,6 +888,16 @@ _re_winfree(Render_Engine *re)
    evas_outbuf_unsurf(eng_get_ob(re));
 }
 
+/**
+ * @brief Callback function to bind a native surface's texture.
+ *
+ * This function is set as the `bind` callback for Evas_GL_Image native surfaces.
+ * It binds the appropriate texture based on the native surface type:
+ * - For EVAS_NATIVE_SURFACE_WL: Calls `glEGLImageTargetTexture2DOES` if the EGL image surface exists.
+ * - For EVAS_NATIVE_SURFACE_OPENGL: Calls `glBindTexture` with the texture ID.
+ *
+ * @param image Pointer to the Evas_GL_Image whose native texture is to be bound.
+ */
 static void
 _native_cb_bind(void *image)
 {
@@ -609,6 +927,16 @@ _native_cb_bind(void *image)
    /* TODO: NATIVE_SURFACE_TBM and NATIVE_SURFACE_EVASGL */
 }
 
+/**
+ * @brief Callback function to unbind a native surface's texture.
+ *
+ * This function is set as the `unbind` callback for Evas_GL_Image native surfaces.
+ * It unbinds the texture:
+ * - For EVAS_NATIVE_SURFACE_OPENGL: Calls `glBindTexture(GL_TEXTURE_2D, 0)`.
+ * - Other types currently do not have specific unbind actions in this function.
+ *
+ * @param image Pointer to the Evas_GL_Image whose native texture is to be unbound.
+ */
 static void
 _native_cb_unbind(void *image)
 {
@@ -624,6 +952,20 @@ _native_cb_unbind(void *image)
    /* TODO: NATIVE_SURFACE_TBM and NATIVE_SURFACE_EVASGL */
 }
 
+/**
+ * @brief Callback function to free resources associated with a native surface.
+ *
+ * This function is set as the `free` callback for Evas_GL_Image native surfaces.
+ * It performs cleanup based on the native surface type:
+ * - For EVAS_NATIVE_SURFACE_WL: Removes the image from the Wayland native hash,
+ *   and destroys the EGL image surface using `eglDestroyImage` if it exists.
+ * - For EVAS_NATIVE_SURFACE_OPENGL: Removes the image from the native texture hash.
+ *
+ * It also clears the native data and function pointers in the Evas_GL_Image
+ * and frees the associated Native structure.
+ *
+ * @param image Pointer to the Evas_GL_Image whose native resources are to be freed.
+ */
 static void
 _native_cb_free(void *image)
 {
@@ -667,6 +1009,16 @@ _native_cb_free(void *image)
 }
 
 /* engine specific override functions */
+/**
+ * @brief Sets up engine-specific information.
+ *
+ * This function is an override for the Evas engine's `output_info_setup`
+ * method. It configures the render mode for the EGLFS engine.
+ * Currently, it sets the render mode to EVAS_RENDER_MODE_BLOCKING.
+ *
+ * @param info Pointer to an Evas_Engine_Info_Eglfs structure that will be
+ *             populated with engine-specific settings.
+ */
 static void
 eng_output_info_setup(void *info)
 {
@@ -675,6 +1027,27 @@ eng_output_info_setup(void *info)
    einfo->render_mode = EVAS_RENDER_MODE_BLOCKING;
 }
 
+/**
+ * @brief Sets up the rendering output for the EGLFS engine.
+ *
+ * This function is an override for the Evas engine's `output_setup` method.
+ * It initializes the rendering environment, including:
+ * - Initializing Evas GL preloading if not already done.
+ * - Allocating a Render_Engine structure.
+ * - Creating an Outbuf (output buffer) for rendering.
+ * - Initializing the generic GL rendering engine components.
+ * - Vetoing EGL extensions if this is the first window.
+ *
+ * @param engine The Evas engine pointer (unused in this function but part of the API).
+ * @param in Pointer to an Evas_Engine_Info_Eglfs structure containing setup information.
+ *           Example:
+ *           Evas_Engine_Info_Eglfs my_info;
+ *           // ... populate my_info ...
+ *           eng_output_setup(evas_object_evas_get(canvas), &my_info, width, height);
+ * @param w The width of the output surface.
+ * @param h The height of the output surface.
+ * @return A pointer to the initialized Render_Engine structure on success, or NULL on failure.
+ */
 static void *
 eng_output_setup(void *engine, void *in, unsigned int w, unsigned int h)
 {
@@ -740,6 +1113,24 @@ eng_output_setup(void *engine, void *in, unsigned int w, unsigned int h)
    return NULL;
 }
 
+/**
+ * @brief Updates the rendering output configuration.
+ *
+ * This function is an override for the Evas engine's `output_update` method.
+ * It handles changes in output parameters like depth, alpha, size, or rotation.
+ * If significant properties like depth or destination alpha change, it may
+ * recreate the output buffer. If only size or rotation changes, it reconfigures
+ * the existing output buffer.
+ *
+ * @param engine The Evas engine pointer (unused).
+ * @param data Pointer to the Render_Engine structure.
+ * @param info Pointer to an Evas_Engine_Info_Eglfs structure containing the new configuration.
+ *             The `info->info` sub-structure contains fields like `depth`,
+ *             `destination_alpha`, `rotation`.
+ * @param w The new width of the output surface.
+ * @param h The new height of the output surface.
+ * @return 1 on success, 0 on failure (e.g., if recreating the output buffer fails).
+ */
 static int
 eng_output_update(void *engine EINA_UNUSED, void *data, void *info, unsigned int w, unsigned int h)
 {
@@ -792,6 +1183,20 @@ eng_output_update(void *engine EINA_UNUSED, void *data, void *info, unsigned int
    return 1;
 }
 
+/**
+ * @brief Frees resources associated with the rendering output.
+ *
+ * This function is an override for the Evas engine's `output_free` method.
+ * It cleans up resources used by the Render_Engine, including:
+ * - Relaxing the GL preload render lock.
+ * - Shutting down the EVGL engine if this is the last window.
+ * - Cleaning the generic software rendering components (which also frees the Outbuf).
+ * - Freeing the Render_Engine structure itself.
+ * - Shutting down Evas GL preloading if this was the last window and preloading was initialized.
+ *
+ * @param engine The Evas engine pointer, used for cleaning generic software components.
+ * @param data Pointer to the Render_Engine structure to be freed.
+ */
 static void
 eng_output_free(void *engine, void *data)
 {
@@ -819,6 +1224,16 @@ eng_output_free(void *engine, void *data)
      }
 }
 
+/**
+ * @brief Gets the alpha channel state of the canvas.
+ *
+ * This function is an override for the Evas engine's `canvas_alpha_get` method.
+ * It returns whether the destination surface has an alpha channel.
+ *
+ * @param data Pointer to the Render_Engine structure.
+ * @return EINA_TRUE if the destination surface has an alpha channel, EINA_FALSE otherwise.
+ *         Returns EINA_FALSE if `data` is NULL.
+ */
 static Eina_Bool
 eng_canvas_alpha_get(void *data)
 {
@@ -830,6 +1245,17 @@ eng_canvas_alpha_get(void *data)
    return eng_get_ob(re)->destination_alpha;
 }
 
+/**
+ * @brief Dumps rendering resources, typically to free up memory.
+ *
+ * This function is an override for the Evas engine's `output_dump` method.
+ * It unloads all common image and font data, unloads GL images specific
+ * to the engine's GL context, and frees window-specific resources.
+ * This is often called in low-memory situations.
+ *
+ * @param engine The Evas engine pointer (unused).
+ * @param data Pointer to the Render_Engine structure.
+ */
 static void
 eng_output_dump(void *engine EINA_UNUSED, void *data)
 {
@@ -844,6 +1270,47 @@ eng_output_dump(void *engine EINA_UNUSED, void *data)
    _re_winfree(re);
 }
 
+/**
+ * @brief Sets or updates a native surface for an Evas image.
+ *
+ * This function is an override for the Evas engine's `image_native_set` method.
+ * It allows Evas to use externally managed graphics resources (native surfaces)
+ * as image sources.
+ *
+ * The function handles different types of native surfaces:
+ * - EVAS_NATIVE_SURFACE_WL (Wayland buffer): Creates an EGLImage from the Wayland
+ *   buffer and associates it with the Evas_GL_Image. It uses a hash to reuse
+ *   existing Evas_GL_Images for the same Wayland buffer.
+ * - EVAS_NATIVE_SURFACE_OPENGL (OpenGL texture): Associates an existing OpenGL
+ *   texture with the Evas_GL_Image. It uses a hash to reuse existing
+ *   Evas_GL_Images for the same texture ID.
+ *
+ * If `image` is NULL and `native` specifies an OpenGL surface, a new Evas_GL_Image
+ * is created.
+ * If `native` is NULL, any existing native surface association for `image` is cleared.
+ *
+ * @param engine The Evas engine pointer (unused).
+ * @param data Pointer to the Render_Engine structure.
+ * @param image Pointer to an Evas_GL_Image. If NULL and `native` is an OpenGL
+ *              surface, a new image might be created.
+ *              Example: (Evas_GL_Image *)my_evas_gl_image
+ * @param native Pointer to an Evas_Native_Surface structure describing the native resource.
+ *               Example:
+ *               Evas_Native_Surface ns;
+ *               ns.type = EVAS_NATIVE_SURFACE_WL;
+ *               ns.version = EVAS_NATIVE_SURFACE_VERSION;
+ *               ns.data.wl.legacy_buffer = my_wl_buffer;
+ *               // or for OpenGL:
+ *               // ns.type = EVAS_NATIVE_SURFACE_OPENGL;
+ *               // ns.data.opengl.texture_id = my_texture_id;
+ *               // ns.data.opengl.framebuffer_id = my_fbo_id;
+ *               // ns.data.opengl.w = tex_width;
+ *               // ns.data.opengl.h = tex_height;
+ *               eng_image_native_set(engine, re, evas_image, &ns);
+ *               If NULL, clears the native surface from the image.
+ * @return Pointer to the Evas_GL_Image (possibly a new or reused one) associated
+ *         with the native surface, or NULL on failure or if `native` is NULL.
+ */
 static void *
 eng_image_native_set(void *engine EINA_UNUSED, void *data, void *image, void *native)
 {
@@ -1066,6 +1533,21 @@ eng_image_native_set(void *engine EINA_UNUSED, void *data, void *image, void *na
 }
 
 /* module api functions */
+/**
+ * @brief Opens and initializes the EGLFS engine module.
+ *
+ * This function is the entry point for the Evas module system to load the EGLFS engine.
+ * It performs the following steps:
+ * 1. Inherits functions from the "gl_generic" engine module.
+ * 2. Registers an Eina log domain for the eglfs engine.
+ * 3. Overrides specific engine functions with EGLFS implementations (e.g., output_setup, output_free).
+ * 4. Sets the EGL_PLATFORM environment variable to "fbdev".
+ * 5. Loads EGL/GLES symbols using `gl_symbols()`.
+ * 6. Advertises the engine's API functions to the Evas module system.
+ *
+ * @param em Pointer to the Evas_Module structure for this engine.
+ * @return 1 on successful initialization, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -1112,6 +1594,14 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Closes and deinitializes the EGLFS engine module.
+ *
+ * This function is called by the Evas module system when the engine is unloaded.
+ * It unregisters the Eina log domain previously registered by `module_open()`.
+ *
+ * @param em Pointer to the Evas_Module structure for this engine (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

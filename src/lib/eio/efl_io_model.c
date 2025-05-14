@@ -35,6 +35,16 @@ EINA_VALUE_STRUCT_DESC_DEFINE(_eina_file_direct_info_desc,
  *  Callbacks
  *  Property
  */
+
+/**
+ * @brief Callback invoked when an EIO file move operation completes successfully.
+ *
+ * This function resolves the promise associated with the move operation
+ * with the new path of the moved file.
+ *
+ * @param data User data, expected to be an Eina_Promise* to be resolved.
+ * @param handler The Eio_File handler for the completed operation.
+ */
 static void
 _eio_move_done_cb(void *data, Eio_File *handler)
 {
@@ -47,6 +57,16 @@ _eio_move_done_cb(void *data, Eio_File *handler)
    pd->request.move = NULL;
 }
 
+/**
+ * @brief Callback invoked when an EIO file operation encounters an error.
+ *
+ * This function rejects the promise associated with the operation
+ * with the given error code.
+ *
+ * @param data User data, expected to be an Eina_Promise* to be rejected.
+ * @param handler The Eio_File handler for the failed operation.
+ * @param error The error code (errno) that occurred.
+ */
 static void
 _eio_file_error_cb(void *data, Eio_File *handler, int error)
 {
@@ -57,7 +77,16 @@ _eio_file_error_cb(void *data, Eio_File *handler, int error)
    pd->request.move = NULL;
 }
 
-
+/**
+ * @brief Checks if a file or directory at the given path is already listed in the model.
+ *
+ * This is used to prevent duplicate entries when processing file system events
+ * or listing directory contents.
+ *
+ * @param pd The private data of the Efl_Io_Model.
+ * @param path The absolute path of the file/directory to check.
+ * @return EINA_TRUE if the path is already present in pd->files, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _already_added(Efl_Io_Model_Data *pd, const char *path)
 {
@@ -75,6 +104,22 @@ _already_added(Efl_Io_Model_Data *pd, const char *path)
 /**
  *  Callbacks
  *  Ecore Events
+ */
+
+/**
+ * @brief Ecore event callback triggered when a file or directory is created.
+ *
+ * This function handles EIO_MONITOR_DIRECTORY_CREATED and EIO_MONITOR_FILE_CREATED
+ * events. It checks if the new item is a direct child of the monitored path,
+ * is not already listed, and then creates an Efl_Io_Model_Info structure for it.
+ * If a filter is set, it's applied. Finally, it appends the new item to the
+ * model's internal list (pd->files) and emits EFL_MODEL_EVENT_CHILD_ADDED and
+ * EFL_MODEL_EVENT_CHILDREN_COUNT_CHANGED events.
+ *
+ * @param data User data, expected to be the Efl_Io_Model* instance.
+ * @param type The type of Ecore event (e.g., EIO_MONITOR_FILE_CREATED).
+ * @param event The Eio_Monitor_Event* containing details about the created item.
+ * @return EINA_TRUE to continue processing events, EINA_FALSE to stop.
  */
 static Eina_Bool
 _efl_model_evt_added_ecore_cb(void *data, int type, void *event)
@@ -155,6 +200,18 @@ _efl_model_evt_added_ecore_cb(void *data, int type, void *event)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Removes a child, specified by its path, from the model's internal list.
+ *
+ * This function finds the child in pd->files based on its path,
+ * emits EFL_MODEL_EVENT_CHILD_REMOVED and EFL_MODEL_EVENT_CHILDREN_COUNT_CHANGED
+ * events, removes the entry from the list, and then frees the associated
+ * Efl_Io_Model_Info structure if no other references exist.
+ *
+ * @param obj The Efl_Io_Model object (parent).
+ * @param pd The private data of the parent Efl_Io_Model.
+ * @param path The stringshared path of the child to remove.
+ */
 static void
 _model_child_remove(Efl_Io_Model *obj, Efl_Io_Model_Data *pd, Eina_Stringshare *path)
 {
@@ -187,6 +244,17 @@ _model_child_remove(Efl_Io_Model *obj, Efl_Io_Model_Data *pd, Eina_Stringshare *
    _efl_io_model_info_free(mi, EINA_FALSE);
 }
 
+/**
+ * @brief Ecore event callback triggered when a file or directory is deleted.
+ *
+ * This function handles EIO_MONITOR_DIRECTORY_DELETED and EIO_MONITOR_FILE_DELETED
+ * events. It calls _model_child_remove to update the model's state.
+ *
+ * @param data User data, expected to be the Efl_Io_Model* instance.
+ * @param type The type of Ecore event (e.g., EIO_MONITOR_FILE_DELETED).
+ * @param event The Eio_Monitor_Event* containing details about the deleted item.
+ * @return EINA_TRUE to continue processing events, EINA_FALSE to stop.
+ */
 static Eina_Bool
 _efl_model_evt_deleted_ecore_cb(void *data, int type, void *event)
 {

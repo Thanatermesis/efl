@@ -5,12 +5,32 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Callback for button click events.
+ *
+ * This function is invoked when a button in the UI is clicked. It prints
+ * a confirmation message to standard output, including the memory address
+ * of the clicked button object.
+ *
+ * @param data User data pointer (unused).
+ * @param ev The event information structure.
+ */
 static void
 _bt_clicked(void *data EINA_UNUSED, const Efl_Event *ev)
 {
    printf("click went through on %p\n", ev->object);
 }
 
+/**
+ * @brief Callback for scroll start events.
+ *
+ * This function is triggered when a scrolling action begins on a scroller
+ * widget. It retrieves and prints the starting scroll position (x, y) of the
+ * scroller's content.
+ *
+ * @param data User data pointer (unused).
+ * @param ev The event information structure, with ev->object being the scroller.
+ */
 static void
 _scroll_started_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -18,6 +38,16 @@ _scroll_started_cb(void *data EINA_UNUSED, const Efl_Event *ev)
    printf("scroll start: %p x: %d y: %d\n", ev->object, pos.x, pos.y);
 }
 
+/**
+ * @brief Callback for scroll finished events.
+ *
+ * This function is triggered when a scrolling action completes on a scroller
+ * widget. It retrieves and prints the final scroll position (x, y) of the
+ * scroller's content.
+ *
+ * @param data User data pointer (unused).
+ * @param ev The event information structure, with ev->object being the scroller.
+ */
 static void
 _scroll_finished_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -25,6 +55,24 @@ _scroll_finished_cb(void *data EINA_UNUSED, const Efl_Event *ev)
    printf("scroll finish: %p x: %d y: %d\n", ev->object, pos.x, pos.y);
 }
 
+/**
+ * @brief UI test for complex scroller layouts.
+ *
+ * This test function creates a window containing a main vertical scroller (`sc`).
+ * The main scroller contains a vertical box (`bx`) which holds various widgets
+ * to test complex scrolling behaviors:
+ *
+ * - A slider.
+ * - Several vertical buttons.
+ * - A horizontal scroller (`sc2`) with horizontal buttons.
+ * - More vertical buttons.
+ * - A table (`gd`) containing a scroller (`sc3`) with a grid of buttons,
+ *   demonstrating scrolling in both directions within a fixed area.
+ * - A large number of vertical buttons to ensure the main scroller is active.
+ *
+ * This setup is designed to test nested scrollers, mixed scroll directions,
+ * and scrollers within different layout containers.
+ */
 void
 test_efl_ui_scroller(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -129,6 +177,14 @@ test_efl_ui_scroller(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void 
       }
 }
 
+/**
+ * @brief UI test for a simple vertical scroller.
+ *
+ * This test creates a window with a single vertical scroller (`sc`).
+ * The scroller contains a vertical box (`bx`) packed with a large number
+ * (2000) of buttons. This is a basic performance and functionality test
+ * for a simple, long, vertical scrolling list.
+ */
 void
 test_efl_ui_scroller_simple(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -164,6 +220,14 @@ test_efl_ui_scroller_simple(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED
       }
 }
 
+/**
+ * @brief UI test for a scroller with a table layout.
+ *
+ * This test sets up a window with a scroller (`sc`) containing a table (`tb`)
+ * with two columns. It then populates the table with 1000 rows, where each
+ * row has two buttons. This tests the scroller's behavior when its content
+ * is a table layout manager.
+ */
 void
 test_efl_ui_scroller_simple2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

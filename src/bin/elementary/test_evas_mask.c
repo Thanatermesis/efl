@@ -5,6 +5,17 @@
 #include <Efl_Ui.h>
 
 
+/**
+ * @brief Genlist content get callback.
+ *
+ * This function is called by the genlist to get the content object for a
+ * given item. It creates a layout containing either an image or text.
+ *
+ * @param data The item data, used here as an integer index.
+ * @param obj The genlist object.
+ * @param part The part name of the swallow content.
+ * @return The content object for the genlist item.
+ */
 static Evas_Object *
 _gl_content_get(void *data, Evas_Object *obj, const char *part)
 {
@@ -40,6 +51,18 @@ _gl_content_get(void *data, Evas_Object *obj, const char *part)
    return ly;
 }
 
+/**
+ * @brief Genlist text get callback.
+ *
+ * This function is called by the genlist to get the text label for a
+ * given item.
+ *
+ * @param data The item data, used here as an integer index.
+ * @param obj The genlist object (unused).
+ * @param part The part name of the text (unused).
+ * @return A newly allocated string with the item's label. The caller is
+ *         responsible for freeing this string.
+ */
 static char *
 _gl_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
@@ -48,18 +71,52 @@ _gl_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNU
    return strdup(buf);
 }
 
+/**
+ * @brief Genlist state get callback.
+ *
+ * This function is called by the genlist to get the state of a given item.
+ * It always returns EINA_FALSE, indicating no special state.
+ *
+ * @param data The item data (unused).
+ * @param obj The genlist object (unused).
+ * @param part The part name of the state (unused).
+ * @return EINA_FALSE always.
+ */
 static Eina_Bool
 _gl_state_get(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
    return EINA_FALSE;
 }
 
+/**
+ * @brief Genlist delete callback.
+ *
+ * This function is called when a genlist item is deleted. It performs no
+ * action here.
+ *
+ * @param data The item data (unused).
+ * @param obj The genlist object (unused).
+ */
 static void
 _gl_del(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED)
 {
 
 }
 
+/**
+ * @brief Toggles the masking effect on the main layout.
+ *
+ * This callback cycles through different masking modes for the genlist layout:
+ * - "image": Masks with an image.
+ * - "smart": Masks with a smart object (another layout).
+ * - "text": Masks with a text object.
+ * - NULL (none): No masking.
+ * The current mode is stored as key data on the layout object. It also updates
+ * the button's text to reflect the current mask state.
+ *
+ * @param data The layout object to apply the mask to.
+ * @param ev The event information.
+ */
 static void
 _toggle_mask(void *data, const Efl_Event *ev)
 {
@@ -94,6 +151,15 @@ _toggle_mask(void *data, const Efl_Event *ev)
    efl_text_set(ev->object, text);
 }
 
+/**
+ * @brief Toggles a graphics map on the main layout.
+ *
+ * If no map is applied to the layout, this function applies a zoom (0.8x) and
+ * a 45-degree rotation. If a map is already present, it removes it.
+ *
+ * @param data The layout object to apply the map to.
+ * @param ev The event information (unused).
+ */
 static void
 _toggle_map(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -107,6 +173,14 @@ _toggle_map(void *data, const Efl_Event *ev EINA_UNUSED)
    else efl_gfx_mapping_reset(ly);
 }
 
+/**
+ * @brief Rotates the main window.
+ *
+ * This function rotates the window by 90 degrees clockwise on each call.
+ *
+ * @param data The window object to rotate.
+ * @param ev The event information (unused).
+ */
 static void
 _rotate_win(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -115,6 +189,23 @@ _rotate_win(void *data, const Efl_Event *ev EINA_UNUSED)
    elm_win_rotation_set(win, (elm_win_rotation_get(win) + 90) % 360);
 }
 
+/**
+ * @brief Evas masking demo setup.
+ *
+ * This function creates a window to demonstrate Evas masking capabilities.
+ * It sets up a layout containing a genlist, which is then masked.
+ * Control buttons are provided to:
+ * - Toggle different types of masks on the genlist.
+ * - Apply/remove a transformation map (zoom/rotate) on the layout.
+ * - Rotate the window itself.
+ *
+ * This test showcases how a container object (the layout) can act as a mask
+ * for its content (the genlist).
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_evas_mask(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

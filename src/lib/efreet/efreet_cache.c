@@ -31,82 +31,130 @@ static int _efreet_cache_log_dom = -1;
 
 typedef struct _Efreet_Old_Cache Efreet_Old_Cache;
 
+/**
+ * @brief Structure to hold references to old cache data.
+ * This is used during cache updates to ensure that data accessed by
+ * other parts of the application remains valid until it's no longer needed.
+ */
 struct _Efreet_Old_Cache
 {
-    Eina_Hash *hash;
-    Eet_File *ef;
+    Eina_Hash *hash; /**< The hash table containing the old cache entries. */
+    Eet_File *ef;    /**< The Eet file handle for the old cache. */
 };
 
-static Ecore_Ipc_Server    *ipc = NULL;
-static Ecore_Event_Handler *hnd_add = NULL;
-static Ecore_Event_Handler *hnd_del = NULL;
-static Ecore_Event_Handler *hnd_data = NULL;
+static Ecore_Ipc_Server    *ipc = NULL; /**< IPC server connection to efreetd. */
+static Ecore_Event_Handler *hnd_add = NULL; /**< Event handler for IPC server add events. */
+static Ecore_Event_Handler *hnd_del = NULL; /**< Event handler for IPC server delete events. */
+static Ecore_Event_Handler *hnd_data = NULL; /**< Event handler for IPC server data events. */
 
-static Eina_Lock _lock;
+static Eina_Lock _lock; /**< Mutex for thread-safe access to cache data, primarily for desktop cache. */
 
 /**
  * Data for cache files
  */
-static Eet_Data_Descriptor *directory_edd = NULL;
-static Eet_Data_Descriptor *icon_theme_edd = NULL;
-static Eet_Data_Descriptor *icon_theme_directory_edd = NULL;
+static Eet_Data_Descriptor *directory_edd = NULL; /**< Eet Data Descriptor for Efreet_Cache_Directory. */
+static Eet_Data_Descriptor *icon_theme_edd = NULL; /**< Eet Data Descriptor for Efreet_Cache_Icon_Theme. */
+static Eet_Data_Descriptor *icon_theme_directory_edd = NULL; /**< Eet Data Descriptor for Efreet_Icon_Theme_Directory. */
 
-static Eet_Data_Descriptor *icon_fallback_edd = NULL;
-static Eet_Data_Descriptor *icon_element_pointer_edd = NULL;
-static Eet_Data_Descriptor *icon_element_edd = NULL;
-static Eet_Data_Descriptor *icon_edd = NULL;
+static Eet_Data_Descriptor *icon_fallback_edd = NULL; /**< Eet Data Descriptor for Efreet_Cache_Fallback_Icon. */
+static Eet_Data_Descriptor *icon_element_pointer_edd = NULL; /**< Eet Data Descriptor for a pointer to Efreet_Cache_Icon_Element. */
+static Eet_Data_Descriptor *icon_element_edd = NULL; /**< Eet Data Descriptor for Efreet_Cache_Icon_Element. */
+static Eet_Data_Descriptor *icon_edd = NULL; /**< Eet Data Descriptor for Efreet_Cache_Icon. */
 
-static Eet_File            *icon_cache = NULL;
-static Eet_File            *fallback_cache = NULL;
-static Eet_File            *icon_theme_cache = NULL;
+static Eet_File            *icon_cache = NULL; /**< Eet file handle for the current icon cache. */
+static Eet_File            *fallback_cache = NULL; /**< Eet file handle for the fallback icon cache. */
+static Eet_File            *icon_theme_cache = NULL; /**< Eet file handle for the icon theme cache. */
 
-static Eina_Hash           *themes = NULL;
-static Eina_Hash           *icons = NULL;
-static Eina_Hash           *fallbacks = NULL;
+static Eina_Hash           *themes = NULL; /**< In-memory hash of loaded icon themes (Efreet_Cache_Icon_Theme). */
+static Eina_Hash           *icons = NULL; /**< In-memory hash of loaded icons (Efreet_Cache_Icon) for the current theme. */
+static Eina_Hash           *fallbacks = NULL; /**< In-memory hash of loaded fallback icons (Efreet_Cache_Fallback_Icon). */
 
-static const char          *icon_theme_cache_file = NULL;
+static const char          *icon_theme_cache_file = NULL; /**< Path to the icon theme cache file. Stringshared. */
 
-static const char          *theme_name = NULL;
+static const char          *theme_name = NULL; /**< Name of the currently loaded icon theme. Stringshared. */
 
-static Eet_Data_Descriptor *version_edd = NULL;
-static Eet_Data_Descriptor *desktop_edd = NULL;
-static Eet_Data_Descriptor *desktop_action_edd = NULL;
-static Eet_Data_Descriptor *hash_array_string_edd = NULL;
-static Eet_Data_Descriptor *array_string_edd = NULL;
-static Eet_Data_Descriptor *hash_string_edd = NULL;
+static Eet_Data_Descriptor *version_edd = NULL; /**< Eet Data Descriptor for Efreet_Cache_Version. */
+static Eet_Data_Descriptor *desktop_edd = NULL; /**< Eet Data Descriptor for Efreet_Cache_Desktop. */
+static Eet_Data_Descriptor *desktop_action_edd = NULL; /**< Eet Data Descriptor for Efreet_Desktop_Action. */
+static Eet_Data_Descriptor *hash_array_string_edd = NULL; /**< Eet Data Descriptor for a hash of string arrays (Efreet_Cache_Hash containing Efreet_Cache_Array_String). */
+static Eet_Data_Descriptor *array_string_edd = NULL; /**< Eet Data Descriptor for Efreet_Cache_Array_String. */
+static Eet_Data_Descriptor *hash_string_edd = NULL; /**< Eet Data Descriptor for a hash of strings (Efreet_Cache_Hash containing char*). */
 
-static Eina_Hash           *desktops = NULL;
-static Eet_File            *desktop_cache = NULL;
-static const char          *desktop_cache_file = NULL;
+static Eina_Hash           *desktops = NULL; /**< In-memory hash of loaded desktop files (Efreet_Cache_Desktop). */
+static Eet_File            *desktop_cache = NULL; /**< Eet file handle for the current desktop cache. */
+static const char          *desktop_cache_file = NULL; /**< Path to the desktop cache file. Stringshared. */
 
-static Eina_List           *old_desktop_caches = NULL;
+static Eina_List           *old_desktop_caches = NULL; /**< List of Efreet_Old_Cache structures for previously loaded desktop caches. */
 
-static const char                *util_cache_file = NULL;
-static Eet_File                  *util_cache = NULL;
-static Efreet_Cache_Hash         *util_cache_hash = NULL;
-static const char                *util_cache_hash_key = NULL;
-static Efreet_Cache_Array_String *util_cache_names = NULL;
-static const char                *util_cache_names_key = NULL;
+static const char                *util_cache_file = NULL; /**< Path to the utility cache file. Stringshared. */
+static Eet_File                  *util_cache = NULL; /**< Eet file handle for the utility cache. */
+static Efreet_Cache_Hash         *util_cache_hash = NULL; /**< In-memory utility hash cache (Efreet_Cache_Hash). */
+static const char                *util_cache_hash_key = NULL; /**< Key for the current in-memory utility hash cache. Stringshared. */
+static Efreet_Cache_Array_String *util_cache_names = NULL; /**< In-memory utility string array cache (Efreet_Cache_Array_String). */
+static const char                *util_cache_names_key = NULL; /**< Key for the current in-memory utility string array cache. Stringshared. */
 
+/**
+ * @brief Shuts down and frees all Eet_Data_Descriptors used by the cache.
+ */
 static void efreet_cache_edd_shutdown(void);
+/**
+ * @brief Frees an Efreet_Cache_Icon structure.
+ * @param icon The icon cache entry to free.
+ */
 static void efreet_cache_icon_free(Efreet_Cache_Icon *icon);
+/**
+ * @brief Frees an Efreet_Cache_Fallback_Icon structure.
+ * @param icon The fallback icon cache entry to free.
+ */
 static void efreet_cache_icon_fallback_free(Efreet_Cache_Fallback_Icon *icon);
+/**
+ * @brief Frees an Efreet_Icon_Theme structure (actually Efreet_Cache_Icon_Theme).
+ * @param theme The icon theme cache entry to free.
+ */
 static void efreet_cache_icon_theme_free(Efreet_Icon_Theme *theme);
 
+/**
+ * @brief Checks if a cache file is valid and matches the expected version.
+ * Opens the Eet_File if it's not already open.
+ * @param ef Pointer to the Eet_File handle. Will be updated.
+ * @param path Path to the cache file.
+ * @param major The expected major version of the cache.
+ * @return EINA_TRUE if the cache is valid, EINA_FALSE otherwise.
+ */
 static Eina_Bool efreet_cache_check(Eet_File **ef, const char *path, int major);
+/**
+ * @brief Closes an Eet_File and returns NULL.
+ * Safe to call with NULL or NON_EXISTING.
+ * @param ef The Eet_File to close.
+ * @return Always NULL.
+ */
 static void *efreet_cache_close(Eet_File *ef);
 
+/**
+ * @brief Frees data associated with an icon cache update event.
+ * This typically involves freeing old cache structures.
+ * @param data The data to free (an Eina_List of Efreet_Old_Cache).
+ * @param ev The event structure (unused).
+ */
 static void icon_cache_update_free(void *data, void *ev);
 
+/**
+ * @brief Helper function for Eet to add string arrays to a hash.
+ * Used by efreet_hash_array_string_edd.
+ * @param hash The hash to add to (or NULL to create a new one).
+ * @param key The key for the new entry.
+ * @param data The Efreet_Cache_Array_String data to add.
+ * @return The hash, or NULL on failure.
+ */
 static void *hash_array_string_add(void *hash, const char *key, void *data);
 
-static Eina_Bool disable_cache;
-static Eina_Bool run_in_tree;
-static int relaunch_try = 0;
+static Eina_Bool disable_cache = EINA_FALSE; /**< If EINA_TRUE, efreetd communication and caching are disabled. */
+static Eina_Bool run_in_tree = EINA_FALSE; /**< If EINA_TRUE, efreetd is expected to be in the build tree. */
+static int relaunch_try = 0; /**< Counter for efreetd relaunch attempts. */
 
-EAPI int EFREET_EVENT_ICON_CACHE_UPDATE = 0;
-EAPI int EFREET_EVENT_DESKTOP_CACHE_UPDATE = 0;
-EAPI int EFREET_EVENT_DESKTOP_CACHE_BUILD = 0;
+EAPI int EFREET_EVENT_ICON_CACHE_UPDATE = 0; /**< Event ID for icon cache updates. */
+EAPI int EFREET_EVENT_DESKTOP_CACHE_UPDATE = 0; /**< Event ID for desktop cache updates. */
+EAPI int EFREET_EVENT_DESKTOP_CACHE_BUILD = 0; /**< Event ID for desktop cache build completion/failure. */
 
 extern Eina_Prefix *_efreet_pfx;
 
@@ -115,6 +163,13 @@ extern Eina_Prefix *_efreet_pfx;
    if (e->server != ipc) \
      return ECORE_CALLBACK_PASS_ON
 
+/**
+ * @brief Attempts to connect to or launch the efreetd daemon.
+ * Tries to connect first, and if that fails, attempts to launch efreetd
+ * and then connect again, with retries.
+ * Environment variables EFREETD_CONNECT_TRIES and EFREETD_CONNECT_TRY_GAP
+ * can control retry behavior.
+ */
 static void
 _ipc_launch(void)
 {
@@ -167,6 +222,14 @@ _ipc_launch(void)
    if (!ipc) ERR("Timeout in trying to start and then connect to efreetd");
 }
 
+/**
+ * @brief Callback for ECORE_IPC_EVENT_SERVER_ADD events.
+ * Decrements relaunch_try, indicating a successful connection or launch.
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param event The Ecore_Ipc_Event_Server_Add event.
+ * @return ECORE_CALLBACK_DONE if the event is handled, ECORE_CALLBACK_PASS_ON otherwise.
+ */
 static Eina_Bool
 _cb_server_add(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -175,9 +238,16 @@ _cb_server_add(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_DONE;
 }
 
-static Ecore_Timer *reconnect_timer = NULL;
-static unsigned int reconnect_count = 0;
+static Ecore_Timer *reconnect_timer = NULL; /**< Timer for scheduling efreetd reconnection attempts. */
+static unsigned int reconnect_count = 0; /**< Counter for reconnection attempts. */
 
+/**
+ * @brief Timer callback to attempt reconnection to efreetd.
+ * Tries to launch efreetd and re-establish IPC connection.
+ * Sends current language settings upon successful connection.
+ * @param data User data (unused).
+ * @return EINA_FALSE (timer should not repeat automatically).
+ */
 static Eina_Bool
 _cb_server_reconnect(void *data EINA_UNUSED)
 {
@@ -198,6 +268,15 @@ _cb_server_reconnect(void *data EINA_UNUSED)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Callback for ECORE_IPC_EVENT_SERVER_DEL events.
+ * Handles disconnection from efreetd. Schedules a reconnection attempt
+ * if caching is not disabled and reconnection attempts haven't exceeded a limit.
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param event The Ecore_Ipc_Event_Server_Del event.
+ * @return ECORE_CALLBACK_DONE if the event is handled, ECORE_CALLBACK_PASS_ON or EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _cb_server_del(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -221,6 +300,12 @@ _cb_server_del(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_DONE;
 }
 
+/**
+ * @brief Resets the efreetd IPC connection.
+ * Called when the process forks to ensure the child process
+ * establishes its own connection if needed.
+ * @param data User data (unused).
+ */
 static void
 _efreet_cache_reset(void *data EINA_UNUSED)
 {
@@ -239,6 +324,14 @@ _efreet_cache_reset(void *data EINA_UNUSED)
    efreet_icon_extensions_refresh();
 }
 
+/**
+ * @brief Handles common logic for icon and desktop cache update events from efreetd.
+ * This function closes current icon/theme/fallback caches, moves them to an
+ * "old caches" list, creates new empty caches, and sends an Ecore event
+ * (EFREET_EVENT_ICON_CACHE_UPDATE or EFREET_EVENT_DESKTOP_CACHE_UPDATE)
+ * to notify the application. The old caches are freed when the event is processed.
+ * @param event_type The type of Ecore event to send (e.g., EFREET_EVENT_ICON_CACHE_UPDATE).
+ */
 static void
 _icon_desktop_cache_update_event_add(int event_type)
 {
@@ -291,8 +384,21 @@ _icon_desktop_cache_update_event_add(int event_type)
    ecore_event_add(event_type, ev, icon_cache_update_free, l);
 }
 
-EAPI void (*_efreet_mime_update_func) (void) = NULL;
+EAPI void (*_efreet_mime_update_func) (void) = NULL; /**< Function pointer for external mime update handling. */
 
+/**
+ * @brief Callback for ECORE_IPC_EVENT_SERVER_DATA events from efreetd.
+ * Handles messages from efreetd, such as cache update notifications.
+ * - Major 1: Registration confirmation. Minor 1 triggers EFREET_EVENT_DESKTOP_CACHE_BUILD.
+ * - Major 2: Icon cache update. Minor 1 calls _icon_desktop_cache_update_event_add,
+ *            otherwise sends EFREET_EVENT_ICON_CACHE_UPDATE.
+ * - Major 3: Desktop cache update. Calls _icon_desktop_cache_update_event_add.
+ * - Major 4: Mime cache update. Calls _efreet_mime_update_func if set.
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param event The Ecore_Ipc_Event_Server_Data event.
+ * @return ECORE_CALLBACK_DONE if the event is handled, ECORE_CALLBACK_PASS_ON otherwise.
+ */
 static Eina_Bool
 _cb_server_data(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {

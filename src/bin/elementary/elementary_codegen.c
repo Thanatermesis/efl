@@ -1,3 +1,14 @@
+/**
+ * @file
+ * @brief This file contains the source code for the elementary_codegen utility.
+ *
+ * The elementary_codegen utility generates C source and header files
+ * with boilerplate code to interact with Edje group parts and programs.
+ * It takes an Edje file (.edj), a group name, and output file names
+ * as input, and produces C code that simplifies accessing and manipulating
+ * elements within the specified Edje group.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include "elementary_config.h"
 #endif
@@ -25,17 +36,17 @@
 # endif
 #endif
 
-static int _log_dom;
+static int _log_dom; /**< Log domain for the application. */
 #define DBG(...)  EINA_LOG_DOM_DBG(_log_dom, __VA_ARGS__)
 #define ERR(...)  EINA_LOG_DOM_ERR(_log_dom, __VA_ARGS__)
 #define WRN(...)  EINA_LOG_DOM_WARN(_log_dom, __VA_ARGS__)
 
-static Ecore_Evas *ee = NULL;
-static char *file = NULL;
-static char *group = NULL;
-static char *prefix = NULL;
-static FILE *source_fd = NULL;
-static FILE *header_fd = NULL;
+static Ecore_Evas *ee = NULL; /**< Ecore_Evas instance for Edje object creation. */
+static char *file = NULL; /**< Path to the input Edje file. */
+static char *group = NULL; /**< Name of the group within the Edje file to process. */
+static char *prefix = NULL; /**< Optional prefix for generated C function names. */
+static FILE *source_fd = NULL; /**< File descriptor for the output C source file. */
+static FILE *header_fd = NULL; /**< File descriptor for the output C header file. */
 
 #define H_HEADER                       \
   "#ifndef _%s\n"                      \
@@ -280,6 +291,17 @@ const Ecore_Getopt optdesc =
    }
 };
 
+/**
+ * @brief Standardizes a filename to be used as a C header guard.
+ *
+ * This function takes a filename, extracts the base name (without directory path),
+ * replaces '.' with '_', and converts all characters to uppercase.
+ * For example, "my_header.h" becomes "MY_HEADER_H".
+ *
+ * @param filename The input filename string.
+ * @return A newly allocated string with the standardized header name.
+ *         The caller is responsible for freeing this string.
+ */
 static char *
 _header_standardize(const char *filename)
 {
@@ -297,6 +319,13 @@ _header_standardize(const char *filename)
    return str;
 }
 
+/**
+ * @brief Opens file descriptors for the output source and header files.
+ *
+ * @param source The path to the C source file to be created.
+ * @param header The path to the C header file to be created.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., if files cannot be opened).
+ */
 static Eina_Bool
 _file_descriptors_open(const char *source, const char *header)
 {
@@ -315,6 +344,11 @@ _file_descriptors_open(const char *source, const char *header)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Closes the file descriptors for the output source and header files.
+ *
+ * @return EINA_TRUE if both files were closed successfully, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _file_descriptors_close(void)
 {
@@ -329,6 +363,15 @@ _file_descriptors_close(void)
    return ret;
 }
 
+/**
+ * @brief Writes the initial header content to both source and header files.
+ *
+ * This includes the header guard and standard includes for the header file,
+ * and an include for the generated header in the source file.
+ *
+ * @param filename The name of the header file (used to generate header guards and include statements).
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., write error).
+ */
 static Eina_Bool
 _headers_write(const char *filename)
 {
@@ -352,6 +395,12 @@ _headers_write(const char *filename)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Writes the footer content (closing header guard) to the header file.
+ *
+ * @param filename The name of the header file (used to generate the closing header guard).
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., write error).
+ */
 static Eina_Bool
 _footer_write(const char *filename)
 {
@@ -371,6 +420,16 @@ _footer_write(const char *filename)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Writes the layout_add function to the source and header files.
+ *
+ * This function generates code for a helper function that creates an Elm_Layout
+ * object, sets its theme based on the provided Edje group, and adds the
+ * specified Edje file (or the default one) as a theme extension.
+ * The group name is expected to be in the format "elm/widget_name/style_name/group_name".
+ *
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., write error or invalid group format).
+ */
 static Eina_Bool
 _theme_set_write(void)
 {
@@ -413,6 +472,18 @@ end:
    return ret;
 }
 
+/**
+ * @brief Writes the C functions for a specific Edje part to source and header files.
+ *
+ * Depending on the part type (SWALLOW, TEXT, BOX, TABLE), different sets of
+ * getter/setter/utility functions are generated.
+ *
+ * @param apiname The C-safe API name for the part (e.g., "my_part_name").
+ * @param partname The actual name of the part in the Edje file.
+ * @param description The API description of the part, if available.
+ * @param type The type of the Edje part.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., write error).
+ */
 static Eina_Bool
 _part_write(const char *apiname, const char *partname, const char *description,
             Edje_Part_Type type)
@@ -476,6 +547,16 @@ _part_write(const char *apiname, const char *partname, const char *description,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Checks if a character is allowed in a C identifier.
+ *
+ * Allowed characters are alphanumeric (0-9, a-z, A-Z).
+ * Note: This function does not check if the character is valid as the *first*
+ * character of an identifier (which cannot be a digit).
+ *
+ * @param c The character to check.
+ * @return EINA_TRUE if the character is allowed, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _c_id_allowed(char c)
 {
@@ -486,6 +567,16 @@ _c_id_allowed(char c)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Converts an original Edje part/program name into a C-safe API name.
+ *
+ * Replaces characters not allowed in C identifiers with underscores ('_').
+ * For example, "my-part.name" becomes "my_part_name".
+ *
+ * @param orig The original name string.
+ * @return A newly allocated string with the C-safe API name.
+ *         The caller is responsible for freeing this string. Returns NULL if orig is NULL.
+ */
 static char *
 _api_name_fix(const char *orig)
 {
@@ -506,6 +597,18 @@ _api_name_fix(const char *orig)
    return strdup(buf);
 }
 
+/**
+ * @brief Retrieves and sanitizes the API name for an Edje part.
+ *
+ * Fetches the API name defined in the Edje file for a given part and
+ * then converts it to a C-safe identifier using _api_name_fix().
+ *
+ * @param ed The Edje edit object.
+ * @param program The name of the part. (Note: parameter name seems misleading, it's a part name)
+ * @return A newly allocated, C-safe API name string.
+ *         The caller is responsible for freeing this string.
+ *         Returns NULL if no API name is defined or if the original name is NULL.
+ */
 static char *
 _part_api_name_get(Evas_Object *ed, const char *program)
 {
@@ -519,6 +622,17 @@ _part_api_name_get(Evas_Object *ed, const char *program)
    return fix;
 }
 
+/**
+ * @brief Parses all relevant parts from the Edje object and generates C code for them.
+ *
+ * Iterates through all parts in the loaded Edje group. For parts that have an
+ * API name defined and are of a supported type (SWALLOW, TEXT, BOX, TABLE),
+ * it calls _part_write() to generate the corresponding C functions.
+ *
+ * @param ed The Edje edit object, with a file and group already loaded.
+ * @return EINA_TRUE if all parts were parsed and code generated successfully,
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _parts_parse(Evas_Object *ed)
 {
@@ -564,6 +678,18 @@ _parts_parse(Evas_Object *ed)
    return ret;
 }
 
+/**
+ * @brief Writes C functions to emit a signal for an Edje program.
+ *
+ * Generates a function `prefix_apiname_emit(Evas_Object *o)` that calls
+ * `elm_layout_signal_emit()`.
+ *
+ * @param apiname The C-safe API name for the program.
+ * @param source The source string for the signal.
+ * @param sig The signal string.
+ * @param description The API description of the program, if available.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., write error).
+ */
 static Eina_Bool
 _program_emit_write(const char *apiname, const char *source, const char *sig,
                     const char *description)
@@ -594,6 +720,20 @@ _program_emit_write(const char *apiname, const char *source, const char *sig,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Writes C functions to add and delete callbacks for an Edje program signal.
+ *
+ * Generates two functions:
+ * - `prefix_apiname_callback_add(Evas_Object *o, Edje_Signal_Cb func, void *data)`
+ * - `prefix_apiname_callback_del(Evas_Object *o, Edje_Signal_Cb func)`
+ * These functions wrap `elm_layout_signal_callback_add()` and `elm_layout_signal_callback_del()`.
+ *
+ * @param apiname The C-safe API name for the program.
+ * @param source The source string for the signal.
+ * @param sig The signal string.
+ * @param description The API description of the program, if available.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., write error).
+ */
 static Eina_Bool
 _program_add_write(const char *apiname, const char *source, const char *sig,
                    const char *description)
@@ -634,6 +774,18 @@ _program_add_write(const char *apiname, const char *source, const char *sig,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Retrieves and sanitizes the API name for an Edje program.
+ *
+ * Fetches the API name defined in the Edje file for a given program and
+ * then converts it to a C-safe identifier using _api_name_fix().
+ *
+ * @param ed The Edje edit object.
+ * @param program The name of the program.
+ * @return A newly allocated, C-safe API name string.
+ *         The caller is responsible for freeing this string.
+ *         Returns NULL if no API name is defined or if the original name is NULL.
+ */
 static char *
 _program_api_name_get(Evas_Object *ed, const char *program)
 {
@@ -647,6 +799,19 @@ _program_api_name_get(Evas_Object *ed, const char *program)
    return fix;
 }
 
+/**
+ * @brief Parses all relevant programs from the Edje object and generates C code for them.
+ *
+ * Iterates through all programs in the loaded Edje group. For programs that
+ * have an API name defined, it generates C functions based on the program's
+ * action type and properties (signal, source).
+ * - For `EDJE_ACTION_TYPE_SIGNAL_EMIT`: generates callback add/delete functions via `_program_add_write()`.
+ * - If a signal is defined: generates a signal emit function via `_program_emit_write()`.
+ *
+ * @param ed The Edje edit object, with a file and group already loaded.
+ * @return EINA_TRUE if all programs were parsed and code generated successfully,
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _programs_parse(Evas_Object *ed)
 {
@@ -722,6 +887,15 @@ _programs_parse(Evas_Object *ed)
    return ret;
 }
 
+/**
+ * @brief Main parsing function that orchestrates Edje file loading and code generation.
+ *
+ * Creates an Edje edit object, loads the specified file and group,
+ * then calls _parts_parse() and _programs_parse() to generate the C code.
+ *
+ * @return EINA_TRUE on successful parsing and code generation for both parts and programs,
+ *         EINA_FALSE otherwise (e.g., file load error, parsing error).
+ */
 static Eina_Bool
 _parse(void)
 {
@@ -745,6 +919,28 @@ _parse(void)
    return ret;
 }
 
+/**
+ * @brief Main entry point for the elementary_codegen utility.
+ *
+ * Parses command-line arguments, initializes necessary Efl libraries,
+ * sets up file I/O, and calls the core parsing and code generation logic.
+ * Handles errors and cleanup.
+ *
+ * @param argc Argument count.
+ * @param argv Argument vector. Expected arguments:
+ *             `[options] <file.edj> <group> <source_file_name> <header_file_name>`
+ *             Options include:
+ *             - `-p` or `--prefix`: Prefix for generated C functions.
+ * @return 0 on success, non-zero on failure with specific error codes:
+ *         - 1: General error (e.g., missing action, argument parsing error, log domain registration).
+ *         - 2: Group does not exist in the Edje file.
+ *         - 3: Could not create Ecore_Evas buffer.
+ *         - 4: Could not create output source/header files.
+ *         - 5: Could not write initial headers to output files.
+ *         - 6: Error parsing the Edje file (parts or programs).
+ *         - 7: Could not write footers to output files.
+ *         - 8: Could not close output source/header files.
+ */
 int
 main(int argc, char *argv[])
 {

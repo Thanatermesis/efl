@@ -21,14 +21,29 @@
 # define O_BINARY 0
 #endif
 
+/**
+ * @internal
+ * @brief Internal structure for holding loader-specific data.
+ * This structure is used to pass around file handle, key, and load options
+ * between the open, head, and data loading functions for a generic image.
+ */
 typedef struct _Evas_Loader_Internal Evas_Loader_Internal;
 struct _Evas_Loader_Internal
 {
-   Eina_File *f;
-   const char *key;
-   Evas_Image_Load_Opts *opts;
+   Eina_File *f; /**< The Eina_File handle for the image file. */
+   const char *key; /**< The key (sub-image name) if any. */
+   Evas_Image_Load_Opts *opts; /**< Image loading options. */
 };
 
+/**
+ * @internal
+ * @brief Checks if a string contains characters that are considered illegal
+ *        for use in certain contexts (e.g., file paths or command arguments
+ *        that might be problematic).
+ *
+ * @param str The string to check.
+ * @return EINA_TRUE if an illegal character is found, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 illegal_char(const char *str)
 {
@@ -56,6 +71,19 @@ illegal_char(const char *str)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Copies a source string to a destination string, escaping certain
+ *        special characters with a backslash.
+ *
+ * This function is used to make strings safe for inclusion in shell commands.
+ * Characters like space, '!', '"', '#', '$', '%', '&', ''', '(', ')', '*',
+ * '[', '\', ']', '`', '{', '|', '}', '~' are prefixed with a backslash.
+ *
+ * @param src The source string.
+ * @param dst The destination buffer. It must be large enough to hold the
+ *            escaped string (potentially twice the length of src plus null terminator).
+ */
 static void
 escape_copy(const char *src, char *dst)
 {
@@ -93,6 +121,18 @@ escape_copy(const char *src, char *dst)
    *d = 0;
 }
 
+/**
+ * @internal
+ * @brief Concatenates a source string to a destination string after converting
+ *        the source string to lowercase. It assumes the source string starts
+ *        with a dot ('.') representing a file extension.
+ *
+ * Example: if dest is "/path/to/loader" and src is ".JPG",
+ * dest becomes "/path/to/loader.jpg".
+ *
+ * @param dest The destination string buffer.
+ * @param src The source string (typically a file extension starting with '.').
+ */
 static void
 dotcat(char *dest, const char *src)
 {
@@ -104,6 +144,28 @@ dotcat(char *dest, const char *src)
    *d = 0;
 }
 
+/**
+ * @internal
+ * @brief Core logic for loading image information (header) or actual pixel data
+ *        by invoking an external loader utility.
+ *
+ * This function constructs a command to execute an external `evas_image_loader`
+ * utility. It tries different loader names based on the file extension.
+ * The external loader communicates back image properties (size, alpha) and
+ * pixel data via stdout or temporary/shared memory files.
+ *
+ * @param ef Eina_File handle for the image file.
+ * @param key Optional key for images with multiple sub-images (e.g., "image.edj/key").
+ * @param[out] prop Pointer to Emile_Image_Property struct to be filled with image
+ *                  properties (width, height, alpha).
+ * @param opts Image loading options.
+ * @param[out] pixels Buffer to store pixel data if get_data is EINA_TRUE.
+ *                    Must be pre-allocated by the caller based on properties
+ *                    retrieved from a previous header load.
+ * @param[out] error Pointer to an integer to store the Evas_Load_Error code.
+ * @param get_data If EINA_TRUE, load pixel data. If EINA_FALSE, only load header.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _load(Eina_File *ef, const char *key,
       Emile_Image_Property *prop,
@@ -395,6 +457,22 @@ getdata:
    return res;
 }
 
+/**
+ * @internal
+ * @brief Opens an image file for generic loading.
+ *
+ * This function is part of the Evas_Image_Load_Func interface.
+ * It allocates and initializes an Evas_Loader_Internal structure to hold
+ * state for subsequent head/data load calls.
+ *
+ * @param f The Eina_File handle for the image.
+ * @param key The stringshared key for the image, if any.
+ * @param opts Image loading options.
+ * @param animated Unused in this loader.
+ * @param[out] error Pointer to store an Evas_Load_Error code.
+ * @return A void pointer to an Evas_Loader_Internal structure on success,
+ *         NULL on failure.
+ */
 static void *
 evas_image_load_file_open_generic(Eina_File *f, Eina_Stringshare *key,
 				  Evas_Image_Load_Opts *opts,
@@ -416,6 +494,15 @@ evas_image_load_file_open_generic(Eina_File *f, Eina_Stringshare *key,
    return loader;
 }
 
+/**
+ * @internal
+ * @brief Closes an image file previously opened by evas_image_load_file_open_generic.
+ *
+ * This function is part of the Evas_Image_Load_Func interface.
+ * It frees the resources associated with the Evas_Loader_Internal structure.
+ *
+ * @param loader_data Pointer to the Evas_Loader_Internal structure.
+ */
 static void
 evas_image_load_file_close_generic(void *loader_data)
 {
@@ -425,6 +512,18 @@ evas_image_load_file_close_generic(void *loader_data)
    free(loader);
 }
 
+/**
+ * @internal
+ * @brief Loads the header information (metadata) of an image.
+ *
+ * This function is part of the Evas_Image_Load_Func interface.
+ * It calls the internal _load function with get_data set to EINA_FALSE.
+ *
+ * @param loader_data Pointer to the Evas_Loader_Internal structure.
+ * @param[out] prop Pointer to Emile_Image_Property to store image metadata.
+ * @param[out] error Pointer to store an Evas_Load_Error code.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_head_generic(void *loader_data,
                                   Emile_Image_Property *prop,
@@ -435,6 +534,22 @@ evas_image_load_file_head_generic(void *loader_data,
    return _load(loader->f, loader->key, prop, loader->opts, NULL, error, EINA_FALSE);
 }
 
+/**
+ * @internal
+ * @brief Loads the actual pixel data of an image.
+ *
+ * This function is part of the Evas_Image_Load_Func interface.
+ * It calls the internal _load function with get_data set to EINA_TRUE.
+ * The caller must have already called evas_image_load_file_head_generic
+ * to get image dimensions and allocate the pixels buffer.
+ *
+ * @param loader_data Pointer to the Evas_Loader_Internal structure.
+ * @param prop Pointer to Emile_Image_Property containing expected image metadata.
+ *             This is used to verify consistency with the data being loaded.
+ * @param[out] pixels Buffer to store the loaded pixel data.
+ * @param[out] error Pointer to store an Evas_Load_Error code.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_data_generic(void *loader_data,
                                   Emile_Image_Property *prop,
@@ -459,6 +574,16 @@ Evas_Image_Load_Func evas_image_load_generic_func =
   EINA_FALSE
 };
 
+/**
+ * @internal
+ * @brief Evas module open function.
+ *
+ * Called by Evas when loading this image loader module.
+ * It registers the loader functions with the Evas_Module structure.
+ *
+ * @param em Pointer to the Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -467,6 +592,15 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @internal
+ * @brief Evas module close function.
+ *
+ * Called by Evas when unloading this image loader module.
+ * Currently does nothing.
+ *
+ * @param em Pointer to the Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

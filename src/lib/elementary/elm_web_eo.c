@@ -1,4 +1,14 @@
-
+/**
+ * @internal
+ * @brief Eolian reflection function for the elm_obj_web_text_matches_highlight_set property.
+ *
+ * This function is called when the "text_matches_highlight" property is set via Eolian.
+ * It converts the Eina_Value to a Eina_Bool and calls the underlying C implementation.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the boolean value to set.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code if conversion fails.
+ */
 static Eina_Error
 __eolian_elm_web_text_matches_highlight_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -16,6 +26,16 @@ __eolian_elm_web_text_matches_highlight_set_reflect(Eo *obj, Eina_Value val)
 
 EOAPI EFL_FUNC_BODYV(elm_obj_web_text_matches_highlight_set, Eina_Bool, 0, EFL_FUNC_CALL(highlight), Eina_Bool highlight);
 
+/**
+ * @internal
+ * @brief Eolian reflection function for the elm_obj_web_text_matches_highlight_get property.
+ *
+ * This function is called when the "text_matches_highlight" property is read via Eolian.
+ * It calls the underlying C implementation and converts the returned Eina_Bool to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the boolean state of text matches highlighting.
+ */
 static Eina_Value
 __eolian_elm_web_text_matches_highlight_get_reflect(const Eo *obj)
 {
@@ -25,6 +45,17 @@ __eolian_elm_web_text_matches_highlight_get_reflect(const Eo *obj)
 
 EOAPI EFL_FUNC_BODY_CONST(elm_obj_web_text_matches_highlight_get, Eina_Bool, 0);
 
+/**
+ * @internal
+ * @brief Eolian reflection function for the elm_obj_web_useragent_set property.
+ *
+ * This function is called when the "useragent" property is set via Eolian.
+ * It converts the Eina_Value (string) to a const char* and calls the underlying C implementation.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the useragent string.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code if conversion fails.
+ */
 static Eina_Error
 __eolian_elm_web_useragent_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -42,6 +73,16 @@ __eolian_elm_web_useragent_set_reflect(Eo *obj, Eina_Value val)
 
 EOAPI EFL_VOID_FUNC_BODYV(elm_obj_web_useragent_set, EFL_FUNC_CALL(user_agent), const char *user_agent);
 
+/**
+ * @internal
+ * @brief Eolian reflection function for the elm_obj_web_useragent_get property.
+ *
+ * This function is called when the "useragent" property is read via Eolian.
+ * It calls the underlying C implementation and converts the returned const char* to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the useragent string.
+ */
 static Eina_Value
 __eolian_elm_web_useragent_get_reflect(const Eo *obj)
 {
@@ -51,6 +92,17 @@ __eolian_elm_web_useragent_get_reflect(const Eo *obj)
 
 EOAPI EFL_FUNC_BODY_CONST(elm_obj_web_useragent_get, const char *, NULL);
 
+/**
+ * @internal
+ * @brief Eolian reflection function for the elm_obj_web_url_set property.
+ *
+ * This function is called when the "url" property is set via Eolian.
+ * It converts the Eina_Value (string) to a const char* and calls the underlying C implementation.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the URL string.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code if conversion fails.
+ */
 static Eina_Error
 __eolian_elm_web_url_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -68,6 +120,16 @@ __eolian_elm_web_url_set_reflect(Eo *obj, Eina_Value val)
 
 EOAPI EFL_FUNC_BODYV(elm_obj_web_url_set, Eina_Bool, 0, EFL_FUNC_CALL(url), const char *url);
 
+/**
+ * @internal
+ * @brief Eolian reflection function for the elm_obj_web_url_get property.
+ *
+ * This function is called when the "url" property is read via Eolian.
+ * It calls the underlying C implementation and converts the returned const char* to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the URL string.
+ */
 static Eina_Value
 __eolian_elm_web_url_get_reflect(const Eo *obj)
 {
@@ -79,6 +141,17 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_web_url_get, const char *, NULL);
 EOAPI EFL_VOID_FUNC_BODYV(elm_obj_web_bg_color_set, EFL_FUNC_CALL(r, g, b, a), int r, int g, int b, int a);
 EOAPI EFL_VOID_FUNC_BODYV_CONST(elm_obj_web_bg_color_get, EFL_FUNC_CALL(r, g, b, a), int *r, int *g, int *b, int *a);
 
+/**
+ * @internal
+ * @brief Eolian reflection function for the elm_obj_web_inwin_mode_set property.
+ *
+ * This function is called when the "inwin_mode" property is set via Eolian.
+ * It converts the Eina_Value (boolean) to a Eina_Bool and calls the underlying C implementation.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the boolean value for inwin mode.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code if conversion fails.
+ */
 static Eina_Error
 __eolian_elm_web_inwin_mode_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -96,6 +169,16 @@ __eolian_elm_web_inwin_mode_set_reflect(Eo *obj, Eina_Value val)
 
 EOAPI EFL_VOID_FUNC_BODYV(elm_obj_web_inwin_mode_set, EFL_FUNC_CALL(value), Eina_Bool value);
 
+/**
+ * @internal
+ * @brief Eolian reflection function for the elm_obj_web_inwin_mode_get property.
+ *
+ * This function is called when the "inwin_mode" property is read via Eolian.
+ * It calls the underlying C implementation and converts the returned Eina_Bool to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the boolean state of inwin mode.
+ */
 static Eina_Value
 __eolian_elm_web_inwin_mode_get_reflect(const Eo *obj)
 {
@@ -105,6 +188,17 @@ __eolian_elm_web_inwin_mode_get_reflect(const Eo *obj)
 
 EOAPI EFL_FUNC_BODY_CONST(elm_obj_web_inwin_mode_get, Eina_Bool, 0);
 
+/**
+ * @internal
+ * @brief Eolian reflection function for the elm_obj_web_tab_propagate_set property.
+ *
+ * This function is called when the "tab_propagate" property is set via Eolian.
+ * It converts the Eina_Value (boolean) to a Eina_Bool and calls the underlying C implementation.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the boolean value for tab propagation.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code if conversion fails.
+ */
 static Eina_Error
 __eolian_elm_web_tab_propagate_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -122,6 +216,16 @@ __eolian_elm_web_tab_propagate_set_reflect(Eo *obj, Eina_Value val)
 
 EOAPI EFL_VOID_FUNC_BODYV(elm_obj_web_tab_propagate_set, EFL_FUNC_CALL(propagate), Eina_Bool propagate);
 
+/**
+ * @internal
+ * @brief Eolian reflection function for the elm_obj_web_tab_propagate_get property.
+ *
+ * This function is called when the "tab_propagate" property is read via Eolian.
+ * It calls the underlying C implementation and converts the returned Eina_Bool to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the boolean state of tab propagation.
+ */
 static Eina_Value
 __eolian_elm_web_tab_propagate_get_reflect(const Eo *obj)
 {
@@ -131,6 +235,17 @@ __eolian_elm_web_tab_propagate_get_reflect(const Eo *obj)
 
 EOAPI EFL_FUNC_BODY_CONST(elm_obj_web_tab_propagate_get, Eina_Bool, 0);
 
+/**
+ * @internal
+ * @brief Eolian reflection function for the elm_obj_web_history_enabled_set property.
+ *
+ * This function is called when the "history_enabled" property is set via Eolian.
+ * It converts the Eina_Value (boolean) to a Eina_Bool and calls the underlying C implementation.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the boolean value for history enabled state.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code if conversion fails.
+ */
 static Eina_Error
 __eolian_elm_web_history_enabled_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -148,6 +263,16 @@ __eolian_elm_web_history_enabled_set_reflect(Eo *obj, Eina_Value val)
 
 EOAPI EFL_VOID_FUNC_BODYV(elm_obj_web_history_enabled_set, EFL_FUNC_CALL(enable), Eina_Bool enable);
 
+/**
+ * @internal
+ * @brief Eolian reflection function for the elm_obj_web_history_enabled_get property.
+ *
+ * This function is called when the "history_enabled" property is read via Eolian.
+ * It calls the underlying C implementation and converts the returned Eina_Bool to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the boolean state of history enabled.
+ */
 static Eina_Value
 __eolian_elm_web_history_enabled_get_reflect(const Eo *obj)
 {
@@ -161,6 +286,18 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_web_window_create_hook_set, EFL_FUNC_CALL(func
 EOAPI EFL_VOID_FUNC_BODYV(elm_obj_web_dialog_file_selector_hook_set, EFL_FUNC_CALL(func, data), Elm_Web_Dialog_File_Selector func, void *data);
 EOAPI EFL_VOID_FUNC_BODYV(elm_obj_web_dialog_confirm_hook_set, EFL_FUNC_CALL(func, data), Elm_Web_Dialog_Confirm func, void *data);
 
+/**
+ * @internal
+ * @brief Eolian reflection function for the elm_obj_web_popup_selected_set property.
+ *
+ * This function is called when the "popup_selected" property is set via Eolian.
+ * It converts the Eina_Value (integer) to an int and calls the underlying C implementation.
+ * Note: This property is write-only from Eolian perspective, so there is no corresponding _get_reflect.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the integer index of the selected popup item.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code if conversion fails.
+ */
 static Eina_Error
 __eolian_elm_web_popup_selected_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -202,7 +339,17 @@ EOAPI EFL_FUNC_BODY(elm_obj_web_reload, Eina_Bool, 0);
 
 Efl_Object *_elm_web_efl_object_constructor(Eo *obj, Elm_Web_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Initializes the Elm_Web Efl_Class.
+ *
+ * This function is called once when the Elm_Web class is being set up.
+ * It defines the Eolian operations (methods) and property reflection
+ * capabilities for the class.
+ *
+ * @param klass The Efl_Class to initialize.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_web_class_initializer(Efl_Class *klass)
 {

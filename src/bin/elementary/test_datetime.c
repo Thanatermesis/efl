@@ -7,12 +7,28 @@
 
 Evas_Object *dt1, *dt2, *dt3;
 
+/**
+ * @brief Callback function for the "changed" event of the datetime widget.
+ *
+ * This function is called whenever the value of the datetime widget it's
+ * attached to is modified by the user. It simply prints a confirmation
+ * message to standard output.
+ */
 static void
 _changed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("Datetime value is changed\n");
 }
 
+/**
+ * @brief Callback function for the "clicked" event of the test button.
+ *
+ * This function simulates the "Back to the future" movie plot point.
+ * It sets the first datetime widget (dt1) to a specific past date and time
+ * (October 26, 1985, 09:00:00), disables it, and also removes the other two
+ * datetime widgets from the view. The button itself is also disabled after
+ * being clicked.
+ */
 static void
 _bt_clicked(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -40,6 +56,22 @@ _bt_clicked(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUS
    dt2 = dt3 = NULL;
 }
 
+/**
+ * @brief The main function for the datetime test.
+ *
+ * This function creates a window and populates it with three elm_datetime
+ * widgets and a button to demonstrate various features of the widget.
+ * - The first datetime widget (dt1) shows only date fields initially.
+ * - The second datetime widget (dt2) shows only time fields and is disabled.
+ * - The third datetime widget (dt3) demonstrates setting minimum/maximum
+ *   datetime values and range limits for specific fields (e.g., minutes).
+ * A button is provided to trigger a state change, as a reference to the
+ * "Back to the future" movie.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_datetime(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

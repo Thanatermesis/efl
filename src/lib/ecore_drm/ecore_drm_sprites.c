@@ -37,6 +37,18 @@
 
 /* TODO: DOXY !! */
 
+/**
+ * @brief Creates and initializes sprites for a DRM device.
+ *
+ * This function queries the DRM device for available hardware planes (sprites)
+ * and creates an Ecore_Drm_Sprite structure for each one. These structures
+ * are then added to the device's list of sprites.
+ *
+ * @param dev The Ecore_Drm_Device to create sprites for.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ *
+ * @ingroup Ecore_Drm_Sprites_Group
+ */
 EAPI Eina_Bool
 ecore_drm_sprites_create(Ecore_Drm_Device *dev)
 {
@@ -84,6 +96,17 @@ ecore_drm_sprites_create(Ecore_Drm_Device *dev)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Destroys all sprites associated with a DRM device.
+ *
+ * This function iterates through the list of sprites in the given
+ * Ecore_Drm_Device, releases any associated framebuffer resources,
+ * and frees the memory allocated for each Ecore_Drm_Sprite structure.
+ *
+ * @param dev The Ecore_Drm_Device whose sprites are to be destroyed.
+ *
+ * @ingroup Ecore_Drm_Sprites_Group
+ */
 EAPI void
 ecore_drm_sprites_destroy(Ecore_Drm_Device *dev)
 {
@@ -106,6 +129,20 @@ ecore_drm_sprites_destroy(Ecore_Drm_Device *dev)
      }
 }
 
+/**
+ * @brief Sets or removes a framebuffer for a sprite.
+ *
+ * This function configures a sprite plane to display a given framebuffer (fb_id)
+ * or disables the sprite plane if fb_id is 0. It uses drmModeSetPlane to
+ * apply the settings.
+ *
+ * @param sprite The Ecore_Drm_Sprite to configure.
+ * @param fb_id The ID of the framebuffer to display, or 0 to disable the sprite.
+ * @param flags DRM plane configuration flags (e.g., for synchronization).
+ *              See drmModeSetPlane documentation for details.
+ *
+ * @ingroup Ecore_Drm_Sprites_Group
+ */
 EAPI void
 ecore_drm_sprites_fb_set(Ecore_Drm_Sprite *sprite, int fb_id, int flags)
 {
@@ -127,6 +164,23 @@ ecore_drm_sprites_fb_set(Ecore_Drm_Sprite *sprite, int fb_id, int flags)
      }
 }
 
+/**
+ * @brief Checks if a CRTC associated with an output is supported by a sprite's capabilities.
+ *
+ * This function determines if the CRTC (Cathode Ray Tube Controller) used by
+ * the given Ecore_Drm_Output is compatible with a sprite, based on the
+ * sprite's `possible_crtcs` bitmask.
+ *
+ * @param output The Ecore_Drm_Output whose CRTC is to be checked.
+ * @param supported A bitmask representing the CRTCs supported by a sprite.
+ *                  Each bit corresponds to a CRTC index. If the bit is set,
+ *                  the CRTC at that index is supported.
+ *                  Example: if `supported` is `(1 << 0) | (1 << 2)`, it means
+ *                  CRTC at index 0 and CRTC at index 2 are supported.
+ * @return EINA_TRUE if the output's CRTC is supported, EINA_FALSE otherwise.
+ *
+ * @ingroup Ecore_Drm_Sprites_Group
+ */
 EAPI Eina_Bool
 ecore_drm_sprites_crtc_supported(Ecore_Drm_Output *output, unsigned int supported)
 {

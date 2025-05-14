@@ -4,12 +4,31 @@
 
 #include "Eolian_Aux.h"
 
+/**
+ * @internal
+ * @brief Free function for a hash that has Eina_List as value.
+ *
+ * @param ptr The Eina_List to free.
+ */
 static void
 _hashlist_free(void *ptr)
 {
    eina_list_free((Eina_List *)ptr);
 }
 
+/**
+ * @brief Finds all direct children of all classes in the state.
+ *
+ * This creates a map from a parent class to a list of its direct children
+ * classes. A class is considered a child if it inherits from or extends
+ * the parent class.
+ *
+ * @param[in] state The Eolian state.
+ *
+ * @return A hash where keys are 'const Eolian_Class *' of the parent and
+ *         values are 'Eina_List *' of 'const Eolian_Class *' of the children.
+ *         The caller is responsible for freeing the hash.
+ */
 EOLIAN_API Eina_Hash *
 eolian_aux_state_class_children_find(const Eolian_State *state)
 {
@@ -40,6 +59,21 @@ eolian_aux_state_class_children_find(const Eolian_State *state)
    return h;
 }
 
+/**
+ * @internal
+ * @brief Finds all functions and events in the given class.
+ *
+ * This function gets all implements and events from a class and appends them
+ * to the given lists. It checks against the 'written' hash to avoid adding
+ * duplicate functions that have been overridden in child classes.
+ *
+ * @param[in] pcl The class to search in.
+ * @param[in,out] funcs The list to append found functions (implements) to.
+ * @param[in,out] events The list to append found events to.
+ * @param[in] written A hash of functions that have already been found.
+ *
+ * @return The total number of callables found in this class.
+ */
 static size_t
 _callables_find_body(const Eolian_Class *pcl,
                      Eina_List **funcs, Eina_List **events,
@@ -79,6 +113,21 @@ justevs:
    return total;
 }
 
+/**
+ * @internal
+ * @brief Recursively finds all callables in parent and extended classes.
+ *
+ * This function traverses the inheritance tree upwards from the given class,
+ * collecting all functions and events. It uses _callables_find_body to
+ * process each parent class.
+ *
+ * @param[in] cl The class to start searching from (upwards).
+ * @param[in,out] funcs The list to append found functions to.
+ * @param[in,out] events The list to append found events to.
+ * @param[in] written A hash of functions that have already been found.
+ *
+ * @return The total number of callables found in parent classes.
+ */
 static size_t
 _callables_find(const Eolian_Class *cl, Eina_List **funcs,
                 Eina_List **events, Eina_Hash *written)
@@ -105,6 +154,26 @@ _callables_find(const Eolian_Class *cl, Eina_List **funcs,
    return total;
 }
 
+/**
+ * @brief Gets all callables (functions and events) for a given class,
+ * including inherited ones.
+ *
+ * This function collects all functions (as Eolian_Implement) and events
+ * from the specified class and all its parent classes. It can also provide
+ * counts of the callables owned directly by the class.
+ *
+ * @param[in] klass The class to get callables for.
+ * @param[out] funcs A pointer to a list where function implements will be
+ *                   appended. Can be NULL.
+ * @param[out] events A pointer to a list where events will be appended.
+ *                    Can be NULL.
+ * @param[out] ownfuncs A pointer to store the number of functions owned by
+ *                      the class. Can be NULL.
+ * @param[out] ownevs A pointer to store the number of events owned by the
+ *                    class. Can be NULL.
+ *
+ * @return The total number of callables found (own and inherited).
+ */
 EOLIAN_API size_t
 eolian_aux_class_callables_get(const Eolian_Class *klass,
                                Eina_List **funcs, Eina_List **events,
@@ -152,6 +221,21 @@ eolian_aux_class_callables_get(const Eolian_Class *klass,
    return total;
 }
 
+/**
+ * @internal
+ * @brief Recursively finds all implementations of a function in a class and
+ * its descendants.
+ *
+ * This function traverses the class hierarchy downwards, starting from 'cl',
+ * to find all implementations of a specific 'func'.
+ *
+ * @param[in,out] l The list to append found implementations to.
+ * @param[in] cl The class to search in.
+ * @param[in] func The function to find implementations of.
+ * @param[in,out] got A hash to keep track of visited classes to avoid cycles.
+ * @param[in] children A map from parent classes to their children, used for
+ *                     traversal.
+ */
 static void
 _all_impls_find(Eina_List **l, const Eolian_Class *cl,
                 const Eolian_Function *func, Eina_Hash *got,
@@ -178,6 +262,21 @@ _all_impls_find(Eina_List **l, const Eolian_Class *cl,
      _all_impls_find(l, icl, func, got, children);
 }
 
+/**
+ * @brief Gets a list of all implementations of a given function in the
+ * class hierarchy.
+ *
+ * This function finds all classes that implement the given function,
+ * including the class that originally defines it and all its descendants.
+ *
+ * @param[in] func The function to find implementations for.
+ * @param[in] class_children A hash mapping parent classes to their children.
+ *                           This can be created with
+ *                           eolian_aux_state_class_children_find().
+ *
+ * @return A list of 'Eolian_Implement *' for the given function.
+ *         The caller is responsible for freeing the list.
+ */
 EOLIAN_API Eina_List *
 eolian_aux_function_all_implements_get(const Eolian_Function *func,
                                        Eina_Hash *class_children)
@@ -216,6 +315,19 @@ _parent_impl_find_body(const Eolian_Class *icl, const char *fulln)
    return _parent_impl_find(fulln, icl);
  }
 
+/**
+ * @internal
+ * @brief Recursively finds an implement with a given name in the parent
+ * classes.
+ *
+ * This function searches for an implement by its full name in the inheritance
+ * hierarchy of a class, going upwards.
+ *
+ * @param[in] fulln The full name of the implement to find.
+ * @param[in] cl The class from which to start the upward search.
+ *
+ * @return The found 'Eolian_Implement *' or NULL if not found.
+ */
 static const Eolian_Implement *
 _parent_impl_find(const char *fulln, const Eolian_Class *cl)
 {
@@ -239,6 +351,18 @@ _parent_impl_find(const char *fulln, const Eolian_Class *cl)
    return NULL;
 }
 
+/**
+ * @brief Gets the parent implement of a given implement.
+ *
+ * A parent implement is the implement that is being overridden by 'impl'.
+ * This is found by searching for an implement with the same name in the
+ * parent classes of the implementing class of 'impl'.
+ *
+ * @param[in] impl The implement to find the parent for.
+ *
+ * @return The parent 'Eolian_Implement *' or NULL if it doesn't override
+ *         anything.
+ */
 EOLIAN_API const Eolian_Implement *
 eolian_aux_implement_parent_get(const Eolian_Implement *impl)
 {
@@ -246,6 +370,18 @@ eolian_aux_implement_parent_get(const Eolian_Implement *impl)
                             eolian_implement_implementing_class_get(impl));
 }
 
+/**
+ * @internal
+ * @brief Recursively finds documentation in parent implements.
+ *
+ * This function searches up the inheritance chain for an implement that has
+ * documentation for a specific function type.
+ *
+ * @param[in] impl The implement to start searching from.
+ * @param[in] ftype The type of function documentation to look for (get/set).
+ *
+ * @return The found 'Eolian_Documentation *' or NULL.
+ */
 static const Eolian_Documentation *
 _parent_documentation_find(const Eolian_Implement *impl,
                            Eolian_Function_Type ftype)
@@ -262,6 +398,21 @@ _parent_documentation_find(const Eolian_Implement *impl,
    return pdoc;
 }
 
+/**
+ * @brief Gets documentation for an implement, falling back to parent
+ * implements if necessary.
+ *
+ * This function first checks for documentation on the implement itself. If not
+ * found, it searches for documentation on parent implements. This is useful
+ * for inheriting documentation for overridden methods. For properties that are
+ * implemented in a child class but defined in a parent, this allows fetching
+ * documentation from the original definition.
+ *
+ * @param[in] impl The implement to get documentation for.
+ * @param[in] ftype The function type (get/set) for which to get documentation.
+ *
+ * @return The 'Eolian_Documentation *' or NULL if no documentation is found.
+ */
 EOLIAN_API const Eolian_Documentation *
 eolian_aux_implement_documentation_get(const Eolian_Implement *impl,
                                     Eolian_Function_Type ftype)
@@ -286,6 +437,20 @@ eolian_aux_implement_documentation_get(const Eolian_Implement *impl,
    return _parent_documentation_find(impl, ftype);
 }
 
+/**
+ * @brief Gets documentation for a property implement as a fallback.
+ *
+ * This function is used when documentation for a property is needed, but it's
+ * not clear whether to use the get or set documentation. If an implement is
+ * only a getter or only a setter, it returns the documentation for that
+ * specific part. This is useful for properties where get and set are
+ * implemented separately.
+ *
+ * @param[in] impl The property implement.
+ *
+ * @return The 'Eolian_Documentation *' if it's exclusively a getter or
+ *         setter, otherwise NULL.
+ */
 EOLIAN_API const Eolian_Documentation *
 eolian_aux_implement_documentation_fallback_get(const Eolian_Implement *impl)
 {

@@ -16,23 +16,30 @@
 #include <Ecore_Evas.h>
 #include <Edje.h>
 
+/**
+ * @struct opts
+ * @brief Holds all the command-line options for the player.
+ *
+ * This structure is used to store the values of the command-line
+ * arguments parsed by Ecore_Getopt.
+ */
 struct opts
 {
-   char          *file;
-   char          *group;
-   Eina_Bool      list_groups;
-   char          *engine;
-   Eina_Rectangle size;
-   unsigned char  color[3];
-   Eina_Bool      borderless;
-   Eina_Bool      sticky;
-   Eina_Bool      shaped;
-   Eina_Bool      alpha;
-   Eina_Bool      print;
-   Eina_Bool      slave_mode;
-   double         scale;
-   int            pad;
-   char          *title;
+   char          *file; /**< Path to the Edje file. */
+   char          *group; /**< Name of the group to load from the Edje file. */
+   Eina_Bool      list_groups; /**< If true, list groups in the file and exit. */
+   char          *engine; /**< Ecore_Evas engine to use. */
+   Eina_Rectangle size; /**< Initial window size. */
+   unsigned char  color[3]; /**< Background color as {R, G, B}. */
+   Eina_Bool      borderless; /**< If true, create a borderless window. */
+   Eina_Bool      sticky; /**< If true, create a sticky window. */
+   Eina_Bool      shaped; /**< If true, create a shaped window. */
+   Eina_Bool      alpha; /**< If true, create a window with an alpha channel. */
+   Eina_Bool      print; /**< If true, print signals and messages to stdout. */
+   Eina_Bool      slave_mode; /**< If true, enable slave mode, reading commands from stdin. */
+   double         scale; /**< Global scaling factor for Edje. */
+   int            pad; /**< Padding around the Edje object. */
+   char          *title; /**< Custom window title. */
 };
 
 static Eina_Bool _edje_load_or_show_error(Evas_Object *edje, const char *file, const char *group);
@@ -42,6 +49,14 @@ static Evas *evas;
 static Evas_Object *bg, *bg2 = NULL, *edje;
 static struct opts opts;
 
+/**
+ * @brief Sets the window title based on the loaded group and file.
+ *
+ * The title will be in the format "Edje_Player - <group> of <file>".
+ *
+ * @param group The name of the loaded Edje group.
+ * @param file The path to the Edje file.
+ */
 static void
 _win_title_set(const char *group, const char *file)
 {
@@ -50,6 +65,26 @@ _win_title_set(const char *group, const char *file)
    ecore_evas_title_set(win, buf);
 }
 
+/**
+ * @brief Tokenizes a string for slave mode command parsing.
+ *
+ * This function extracts the next token from the string pointed to by @p p_arg.
+ * A token is a sequence of non-whitespace characters, or a sequence of
+ * characters enclosed in double quotes.
+ *
+ * It modifies @p p_arg to point to the beginning of the extracted token, and
+ * the character after the token is null-terminated.
+ *
+ * @param p_arg A pointer to a string pointer. On entry, it points to the
+ *              string to be tokenized. On exit, it's updated to point
+ *              to the start of the token within the original string.
+ * @return A pointer to the character immediately following the extracted token,
+ *         or NULL if no more tokens are found or an error occurs.
+ *         The returned pointer can be used for subsequent calls to find
+ *         the next token.
+ *
+ * @note This function modifies the input string by inserting null terminators.
+ */
 static char *
 _slave_mode_tok(char **p_arg)
 {
@@ -93,6 +128,16 @@ _slave_mode_tok(char **p_arg)
    return e + 1;
 }
 
+/**
+ * @brief Handles the "signal" command in slave mode.
+ *
+ * Parses emission and source from @p args and emits an Edje signal.
+ * The arguments are expected to be two tokens: emission and source.
+ *
+ * @param edje The Edje object to send the signal to.
+ * @param args A string containing the arguments for the signal command.
+ *        Example: `"my_signal" "my_source"`
+ */
 static void
 _slave_mode_signal(Evas_Object *edje, char *args)
 {
@@ -111,6 +156,13 @@ _slave_mode_signal(Evas_Object *edje, char *args)
    edje_object_signal_emit(edje, emission, source);
 }
 
+/**
+ * @brief Sends an EDJE_MESSAGE_STRING to an Edje object.
+ *
+ * @param edje The Edje object.
+ * @param id The message ID.
+ * @param arg The string to send.
+ */
 static void
 _slave_mode_message_string(Evas_Object *edje, int id, char *arg)
 {
@@ -119,6 +171,13 @@ _slave_mode_message_string(Evas_Object *edje, int id, char *arg)
    edje_object_message_send(edje, EDJE_MESSAGE_STRING, id, &msg);
 }
 
+/**
+ * @brief Sends an EDJE_MESSAGE_INT to an Edje object.
+ *
+ * @param edje The Edje object.
+ * @param id The message ID.
+ * @param arg A string representation of the integer to send.
+ */
 static void
 _slave_mode_message_int(Evas_Object *edje, int id, char *arg)
 {
@@ -127,6 +186,13 @@ _slave_mode_message_int(Evas_Object *edje, int id, char *arg)
    edje_object_message_send(edje, EDJE_MESSAGE_INT, id, &msg);
 }
 
+/**
+ * @brief Sends an EDJE_MESSAGE_FLOAT to an Edje object.
+ *
+ * @param edje The Edje object.
+ * @param id The message ID.
+ * @param arg A string representation of the float to send.
+ */
 static void
 _slave_mode_message_float(Evas_Object *edje, int id, char *arg)
 {
@@ -135,6 +201,17 @@ _slave_mode_message_float(Evas_Object *edje, int id, char *arg)
    edje_object_message_send(edje, EDJE_MESSAGE_FLOAT, id, &msg);
 }
 
+/**
+ * @brief Sends an EDJE_MESSAGE_STRING_SET to an Edje object.
+ *
+ * The message consists of a count and an array of strings.
+ *
+ * @param edje The Edje object.
+ * @param id The message ID.
+ * @param arg A string representation of the number of strings in the set.
+ * @param extra_args A string containing the space-separated strings of the set.
+ *        Example: `"string1" "string2" ...`
+ */
 static void
 _slave_mode_message_string_set(Evas_Object *edje, int id, char *arg,
                                char *extra_args)
@@ -161,6 +238,17 @@ _slave_mode_message_string_set(Evas_Object *edje, int id, char *arg,
    edje_object_message_send(edje, EDJE_MESSAGE_STRING_SET, id, msg);
 }
 
+/**
+ * @brief Sends an EDJE_MESSAGE_INT_SET to an Edje object.
+ *
+ * The message consists of a count and an array of integers.
+ *
+ * @param edje The Edje object.
+ * @param id The message ID.
+ * @param arg A string representation of the number of integers in the set.
+ * @param extra_args A string containing the space-separated integers of the set.
+ *        Example: `123 456 ...`
+ */
 static void
 _slave_mode_message_int_set(Evas_Object *edje, int id, char *arg,
                             char *extra_args)
@@ -187,6 +275,17 @@ _slave_mode_message_int_set(Evas_Object *edje, int id, char *arg,
    edje_object_message_send(edje, EDJE_MESSAGE_INT_SET, id, msg);
 }
 
+/**
+ * @brief Sends an EDJE_MESSAGE_FLOAT_SET to an Edje object.
+ *
+ * The message consists of a count and an array of floats.
+ *
+ * @param edje The Edje object.
+ * @param id The message ID.
+ * @param arg A string representation of the number of floats in the set.
+ * @param extra_args A string containing the space-separated floats of the set.
+ *        Example: `1.23 4.56 ...`
+ */
 static void
 _slave_mode_message_float_set(Evas_Object *edje, int id, char *arg,
                               char *extra_args)
@@ -213,6 +312,16 @@ _slave_mode_message_float_set(Evas_Object *edje, int id, char *arg,
    edje_object_message_send(edje, EDJE_MESSAGE_FLOAT_SET, id, msg);
 }
 
+/**
+ * @brief Sends an EDJE_MESSAGE_STRING_INT to an Edje object.
+ *
+ * The message consists of a string and an integer.
+ *
+ * @param edje The Edje object.
+ * @param id The message ID.
+ * @param arg The string part of the message.
+ * @param extra_args A string representation of the integer part of the message.
+ */
 static void
 _slave_mode_message_string_int(Evas_Object *edje, int id, char *arg,
                                char *extra_args)
@@ -232,6 +341,16 @@ _slave_mode_message_string_int(Evas_Object *edje, int id, char *arg,
    edje_object_message_send(edje, EDJE_MESSAGE_STRING_INT, id, &msg);
 }
 
+/**
+ * @brief Sends an EDJE_MESSAGE_STRING_FLOAT to an Edje object.
+ *
+ * The message consists of a string and a float.
+ *
+ * @param edje The Edje object.
+ * @param id The message ID.
+ * @param arg The string part of the message.
+ * @param extra_args A string representation of the float part of the message.
+ */
 static void
 _slave_mode_message_string_float(Evas_Object *edje, int id, char *arg,
                                  char *extra_args)
@@ -251,6 +370,17 @@ _slave_mode_message_string_float(Evas_Object *edje, int id, char *arg,
    edje_object_message_send(edje, EDJE_MESSAGE_STRING_FLOAT, id, &msg);
 }
 
+/**
+ * @brief Sends an EDJE_MESSAGE_STRING_INT_SET to an Edje object.
+ *
+ * The message consists of a string, a count, and an array of integers.
+ *
+ * @param edje The Edje object.
+ * @param id The message ID.
+ * @param arg The string part of the message.
+ * @param extra_args A string containing the count followed by space-separated
+ *                   integers. Example: `3 1 2 3`
+ */
 static void
 _slave_mode_message_string_int_set(Evas_Object *edje, int id, char *arg,
                                    char *extra_args)
@@ -287,6 +417,17 @@ _slave_mode_message_string_int_set(Evas_Object *edje, int id, char *arg,
    edje_object_message_send(edje, EDJE_MESSAGE_STRING_INT_SET, id, msg);
 }
 
+/**
+ * @brief Sends an EDJE_MESSAGE_STRING_FLOAT_SET to an Edje object.
+ *
+ * The message consists of a string, a count, and an array of floats.
+ *
+ * @param edje The Edje object.
+ * @param id The message ID.
+ * @param arg The string part of the message.
+ * @param extra_args A string containing the count followed by space-separated
+ *                   floats. Example: `2 1.5 2.5`
+ */
 static void
 _slave_mode_message_string_float_set(Evas_Object *edje, int id, char *arg,
                                      char *extra_args)
@@ -323,6 +464,17 @@ _slave_mode_message_string_float_set(Evas_Object *edje, int id, char *arg,
    edje_object_message_send(edje, EDJE_MESSAGE_STRING_FLOAT_SET, id, msg);
 }
 
+/**
+ * @brief Handles the "message" command in slave mode.
+ *
+ * Parses the message type and arguments, and calls the appropriate
+ * function to send the message to the Edje object.
+ *
+ * @param edje The Edje object.
+ * @param args A string containing the message arguments.
+ *        Format: `<id> <type> <args...>`
+ *        Example: `1 STRING "hello"`
+ */
 static void
 _slave_mode_message(Evas_Object *edje, char *args)
 {
@@ -417,6 +569,14 @@ _slave_mode_message(Evas_Object *edje, char *args)
    fputs("ERROR: Invalid type. Check types list using \"help\".\n", stderr);
 }
 
+/**
+ * @brief Handles the "info" command in slave mode.
+ *
+ * Prints geometry and state information about a given part.
+ *
+ * @param edje The Edje object.
+ * @param args A string containing the part name.
+ */
 static void
 _slave_mode_info(Evas_Object *edje, char *args)
 {
@@ -440,6 +600,16 @@ _slave_mode_info(Evas_Object *edje, char *args)
      }
 }
 
+/**
+ * @brief Handles the "text" command in slave mode.
+ *
+ * Sets the text of a given part in the Edje object.
+ *
+ * @param edje The Edje object.
+ * @param args A string containing the part name and the text to set,
+ *        separated by a space. The text can be quoted.
+ *        Example: `my_text_part "Some new text"`
+ */
 static void
 _slave_mode_text(Evas_Object *edje, char *args)
 {
@@ -456,6 +626,14 @@ _slave_mode_text(Evas_Object *edje, char *args)
    free(part);
 }
 
+/**
+ * @brief Handles the "quit" command in slave mode.
+ *
+ * Exits the main loop, terminating the application.
+ *
+ * @param edje Unused.
+ * @param args Unused.
+ */
 static void
 _slave_mode_quit(Evas_Object *edje EINA_UNUSED, char *args EINA_UNUSED)
 {
@@ -463,6 +641,14 @@ _slave_mode_quit(Evas_Object *edje EINA_UNUSED, char *args EINA_UNUSED)
    ecore_main_loop_quit();
 }
 
+/**
+ * @brief Handles the "help" command in slave mode.
+ *
+ * Prints a help message detailing the available commands to stdout.
+ *
+ * @param edje Unused.
+ * @param args Unused.
+ */
 static void
 _slave_mode_help(Evas_Object *edje EINA_UNUSED, char *args EINA_UNUSED)
 {
@@ -506,11 +692,16 @@ _slave_mode_help(Evas_Object *edje EINA_UNUSED, char *args EINA_UNUSED)
     */
 }
 
+/**
+ * @struct slave_cmd
+ * @brief Associates a slave mode command string with its handler function.
+ */
 struct slave_cmd
 {
-   const char *cmd;
-   void        (*func)(Evas_Object *edje, char *args);
-} _slave_mode_commands[] = {
+   const char *cmd; /**< The command string (e.g., "signal", "message"). */
+   void        (*func)(Evas_Object *edje, char *args); /**< Pointer to the handler function. */
+} /** @brief Array of available slave mode commands. */
+_slave_mode_commands[] = {
    {"signal", _slave_mode_signal},
    {"message", _slave_mode_message},
    {"info", _slave_mode_info},
@@ -521,6 +712,17 @@ struct slave_cmd
 };
 
 #ifndef _WIN32
+/**
+ * @brief Ecore_Fd_Handler callback for slave mode.
+ *
+ * Reads commands from stdin, parses them, and executes them. This function
+ * is called by the main loop when there is data to be read from stdin.
+ *
+ * @param data The Edje object.
+ * @param fd_handler The Ecore file descriptor handler.
+ * @return ECORE_CALLBACK_RENEW to continue listening, or ECORE_CALLBACK_CANCEL
+ *         to stop.
+ */
 static Eina_Bool
 _slave_mode(void *data, Ecore_Fd_Handler *fd_handler)
 {
@@ -593,12 +795,35 @@ _slave_mode(void *data, Ecore_Fd_Handler *fd_handler)
 
 #endif
 
+/**
+ * @brief Callback to print signals received from the Edje object.
+ *
+ * This function is registered as a signal callback when the --print
+ * option is used. It prints the emission and source of any signal.
+ *
+ * @param data Unused user data.
+ * @param o Unused Evas_Object that emitted the signal.
+ * @param emission The signal's emission string.
+ * @param source The signal's source string.
+ */
 static void
 _print_signal(void *data EINA_UNUSED, Evas_Object *o EINA_UNUSED, const char *emission, const char *source)
 {
    printf("SIGNAL: \"%s\" \"%s\"\n", emission, source);
 }
 
+/**
+ * @brief Callback to print messages received from the Edje object.
+ *
+ * This function is set as the message handler when the --print option
+ * is used. It decodes and prints the content of various message types.
+ *
+ * @param data Unused user data.
+ * @param edje Unused Edje object that received the message.
+ * @param type The type of the message.
+ * @param id The ID of the message.
+ * @param msg A pointer to the message data structure.
+ */
 static void
 _print_message(void *data EINA_UNUSED, Evas_Object *edje EINA_UNUSED, Edje_Message_Type type, int id, void *msg)
 {
@@ -757,6 +982,19 @@ _print_message(void *data EINA_UNUSED, Evas_Object *edje EINA_UNUSED, Edje_Messa
    putchar('\n');
 }
 
+/**
+ * @brief Evas key down event callback.
+ *
+ * Handles key presses for scaling the Edje object.
+ * - '=' or '+': Increase scale.
+ * - '-' or '_': Decrease scale.
+ * - '0': Reset scale to 1.0.
+ *
+ * @param data Unused user data.
+ * @param e Unused Evas canvas.
+ * @param obj Unused Evas object.
+ * @param event_info The key down event information.
+ */
 static void
 _key_down(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -776,6 +1014,15 @@ _key_down(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNU
    edje_scale_set(opts.scale);
 }
 
+/**
+ * @brief Creates a background rectangle object.
+ *
+ * The background is filled with the color specified by the command-line
+ * options.
+ *
+ * @param show If EINA_TRUE, show the object after creation.
+ * @return The newly created background object, or NULL on failure.
+ */
 static Evas_Object *
 _create_bg(Eina_Bool show)
 {
@@ -791,6 +1038,17 @@ _create_bg(Eina_Bool show)
    return o;
 }
 
+/**
+ * @brief Callback for the "edje,change,file" signal.
+ *
+ * This is triggered when the source .edj file is modified. It reloads the
+ * current group from the file.
+ *
+ * @param data Unused user data.
+ * @param obj The Edje object that emitted the signal.
+ * @param emission Unused emission string.
+ * @param source Unused source string.
+ */
 static void
 _edje_reload(void *data EINA_UNUSED, Evas_Object *obj, const char *emission EINA_UNUSED, const char *source EINA_UNUSED)
 {
@@ -801,6 +1059,16 @@ _edje_reload(void *data EINA_UNUSED, Evas_Object *obj, const char *emission EINA
    _edje_load_or_show_error(obj, file, group);
 }
 
+/**
+ * @brief Callback for circular dependency errors in Edje.
+ *
+ * Edje emits this smart event if it detects a circular dependency among
+ * parts. This function logs the error to stderr.
+ *
+ * @param data The group name (as a string).
+ * @param obj Unused Edje object.
+ * @param event_info An Eina_List of part names involved in the cycle.
+ */
 static void
 _edje_circul(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -825,6 +1093,16 @@ _edje_circul(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
            group, buf);
 }
 
+/**
+ * @brief Loads an Edje file and group into an Edje object.
+ *
+ * If loading fails, it prints a detailed error message to stderr.
+ *
+ * @param edje The Edje object to load into.
+ * @param file The path to the .edj file.
+ * @param group The name of the group to load.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _edje_load_or_show_error(Evas_Object *edje, const char *file, const char *group)
 {
@@ -849,6 +1127,15 @@ _edje_load_or_show_error(Evas_Object *edje, const char *file, const char *group)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Creates and initializes the main Edje object.
+ *
+ * This function creates the Edje object, determines which group to load
+ * (based on command-line options or defaults), loads it, and sets up
+ * various properties and callbacks.
+ *
+ * @return The newly created and configured Edje object, or NULL on failure.
+ */
 static Evas_Object *
 _create_edje(void)
 {
@@ -919,6 +1206,20 @@ _create_edje(void)
    return o;
 }
 
+/**
+ * @brief Ecore_Getopt callback to parse a color string.
+ *
+ * Parses a color string in "R,G,B" format (e.g., "255,128,0") and
+ * stores the result in the provided storage.
+ *
+ * @param parser Unused.
+ * @param desc Unused.
+ * @param str The string to parse.
+ * @param data Unused.
+ * @param storage The Ecore_Getopt_Value where the parsed color (as an
+ *                unsigned char[3]) will be stored.
+ * @return 1 on success, 0 on failure.
+ */
 static unsigned char
 _parse_color(EINA_UNUSED const Ecore_Getopt *parser, EINA_UNUSED const Ecore_Getopt_Desc *desc, const char *str, EINA_UNUSED void *data, Ecore_Getopt_Value *storage)
 {
@@ -933,12 +1234,28 @@ _parse_color(EINA_UNUSED const Ecore_Getopt *parser, EINA_UNUSED const Ecore_Get
    return 1;
 }
 
+/**
+ * @brief Ecore_Evas delete request callback.
+ *
+ * Called when the user tries to close the window. It quits the main loop.
+ *
+ * @param ee Unused Ecore_Evas instance.
+ */
 static void
 _cb_delete(EINA_UNUSED Ecore_Evas *ee)
 {
    ecore_main_loop_quit();
 }
 
+/**
+ * @brief Ecore_Evas resize callback.
+ *
+ * Called when the window is resized. It resizes the internal objects
+ * (background and Edje object) to fit the new window dimensions,
+ * respecting any padding.
+ *
+ * @param ee The Ecore_Evas instance that was resized.
+ */
 static void
 _cb_resize(Ecore_Evas *ee)
 {

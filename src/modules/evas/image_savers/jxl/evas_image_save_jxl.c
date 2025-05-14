@@ -10,7 +10,19 @@
 #include "evas_common_private.h"
 #include "evas_private.h"
 
-
+/**
+ * @brief Saves an RGBA_Image to a JXL file.
+ *
+ * This function encodes the image data using the libjxl library and writes
+ * the compressed data to the specified file.
+ *
+ * @param im Pointer to the RGBA_Image structure containing the image data.
+ *           The image data is expected in RGBA format.
+ * @param file The path to the output JXL file.
+ * @param quality The desired quality level for the JXL encoding (0-100).
+ *                Higher values mean better quality and potentially larger file size.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 save_image_jxl(RGBA_Image *im, const char *file, int quality)
 {
@@ -98,7 +110,27 @@ save_image_jxl(RGBA_Image *im, const char *file, int quality)
    if (st != JXL_ENC_SUCCESS)
      goto destroy_encoder;
 
-   /* conversion RGBA --> BGRA */
+   /*
+    * JXL encoder expects pixel data in BGRA format for 4 channels.
+    * Evas provides data in RGBA format.
+    * This loop converts the pixel data from RGBA to BGRA.
+    * It processes two pixels (8 bytes) at a time using 64-bit integers
+    * for potential performance improvement.
+    *
+    * Example for one pixel (represented as 32-bit integer 0xAAGGBBRR):
+    * Input RGBA pixel:   [RR, GG, BB, AA] (e.g., 0xFF0000FF for opaque red)
+    * Output BGRA pixel:  [BB, GG, RR, AA] (e.g., 0x0000FFFF for opaque red)
+    *
+    * The 64-bit operation processes two adjacent pixels P1 and P2:
+    * Input (iter_src): [R1 G1 B1 A1 R2 G2 B2 A2]
+    * Output (iter_dst):[B1 G1 R1 A1 B2 G2 R2 A2]
+    *
+    * Masking and shifting:
+    * - Keep A and G:   (*iter_src & 0xff00ff00ff00ff00) -> [00 G1 00 A1 00 G2 00 A2]
+    * - Shift R:        ((*iter_src & 0x000000ff000000ff) << 16) -> [00 00 R1 00 00 00 R2 00]
+    * - Shift B:        ((*iter_src & 0x00ff000000ff0000) >> 16) -> [B1 00 00 00 B2 00 00 00]
+    * - Combine:        OR-ing these results gives the BGRA format.
+    */
    pixels = malloc(4 * im->cache_entry.w * im->cache_entry.h);
    if (!pixels)
      goto destroy_encoder;
@@ -123,9 +155,15 @@ save_image_jxl(RGBA_Image *im, const char *file, int quality)
    if (st != JXL_ENC_SUCCESS)
      goto free_pixels;
 
+   /* Signal that all input frames have been added. */
    JxlEncoderCloseInput(encoder);
 
-   size = 64;
+   /*
+    * Process the encoded output. The JXL encoder might require multiple calls
+    * to JxlEncoderProcessOutput to retrieve all compressed data.
+    * The output buffer `compressed` is dynamically resized as needed.
+    */
+   size = 64; /* Initial buffer size */
    compressed = (unsigned char *)malloc(size);
    if (!compressed)
      goto free_pixels;
@@ -170,9 +208,24 @@ save_image_jxl(RGBA_Image *im, const char *file, int quality)
    return ret;
 }
 
+/**
+ * @brief Evas image saver function for JXL format.
+ *
+ * This function acts as a wrapper around save_image_jxl, conforming to the
+ * Evas_Image_Save_Func interface.
+ *
+ * @param im Pointer to the RGBA_Image structure.
+ * @param file The output filename.
+ * @param key Unused parameter.
+ * @param quality Quality setting (0-100).
+ * @param compress Unused parameter.
+ * @param encoding Unused parameter.
+ * @return 1 on success, 0 on failure.
+ */
 static int evas_image_save_file_jxl(RGBA_Image *im, const char *file, const char *key EINA_UNUSED,
                                      int quality, int compress EINA_UNUSED, const char *encoding EINA_UNUSED)
 {
+   /* Call the core JXL saving function, passing only relevant parameters. */
    return save_image_jxl(im, file, quality);
 }
 
@@ -182,19 +235,37 @@ static Evas_Image_Save_Func evas_image_save_jxl_func =
    evas_image_save_file_jxl
 };
 
+/**
+ * @brief Opens the JXL image saver module.
+ *
+ * Called by Evas when loading the module. It registers the save function.
+ *
+ * @param em Pointer to the Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
    if (!em) return 0;
+   /* Assign the function pointer structure to the module. */
    em->functions = (void *)(&evas_image_save_jxl_func);
    return 1;
 }
 
+/**
+ * @brief Closes the JXL image saver module.
+ *
+ * Called by Evas when unloading the module. Currently does nothing.
+ *
+ * @param em Pointer to the Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {
+   /* Nothing to clean up in this specific module. */
 }
 
+/* Module API structure */
 static Evas_Module_Api evas_modapi =
 {
    EVAS_MODULE_API_VERSION,

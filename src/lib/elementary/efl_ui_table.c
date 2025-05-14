@@ -6,6 +6,20 @@
 #define EFL_UI_TABLE_DATA_GET(o, pd) \
    Efl_Ui_Table_Data *pd = efl_data_scope_get(o, EFL_UI_TABLE_CLASS)
 
+/**
+ * @internal
+ * @brief Retrieves the table item data associated with a sub-object.
+ *
+ * This function first attempts a quick lookup using efl_key_data_get(). If that
+ * fails, it performs a linear search through the table's items. This fallback
+ * is necessary for cases where the data might not have been set with the key,
+ * but the object is still a child.
+ *
+ * @param obj The table object.
+ * @param pd The private data of the table.
+ * @param subobj The sub-object for which to get the item data.
+ * @return The table item data on success, or NULL on failure.
+ */
 inline static Table_Item *
 _efl_ui_table_item_date_get(Eo *obj, Efl_Ui_Table_Data *pd, Efl_Gfx_Entity *subobj)
 {
@@ -34,6 +48,15 @@ _efl_ui_table_item_date_get(Eo *obj, Efl_Ui_Table_Data *pd, Efl_Gfx_Entity *subo
    return gi;
 }
 
+/**
+ * @internal
+ * @brief Callback for when a child object's size changes.
+ *
+ * Triggers a layout recalculation for the table.
+ *
+ * @param data The table object.
+ * @param event The event information.
+ */
 static void
 _on_child_size_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -41,6 +64,15 @@ _on_child_size_changed(void *data, const Efl_Event *event EINA_UNUSED)
    efl_pack_layout_request(table);
 }
 
+/**
+ * @internal
+ * @brief Callback for when a child object's hints change.
+ *
+ * Triggers a layout recalculation for the table.
+ *
+ * @param data The table object.
+ * @param event The event information.
+ */
 static void
 _on_child_hints_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -48,6 +80,17 @@ _on_child_hints_changed(void *data, const Efl_Event *event EINA_UNUSED)
    efl_pack_layout_request(table);
 }
 
+/**
+ * @internal
+ * @brief Callback for when a child object is deleted.
+ *
+ * This function cleans up internal data associated with the deleted child.
+ * It removes the item from the table's internal list, frees associated memory,
+ * and flags that the layout and dimensions might need recalculation.
+ *
+ * @param data The table object.
+ * @param event The event information, containing the object being deleted.
+ */
 static void
 _on_child_del(void *data, const Efl_Event *event)
 {
@@ -82,6 +125,20 @@ EFL_CALLBACKS_ARRAY_DEFINE(efl_ui_table_callbacks,
   { EFL_EVENT_DEL, _on_child_del }
 );
 
+/**
+ * @internal
+ * @brief Gets the column and row of the last item in the table.
+ *
+ * This is used to determine where to place the next item when packing
+ * automatically. The calculation depends on the fill direction (horizontal or
+ * vertical). It caches the result and only recalculates if `pd->linear_recalc`
+ * is true.
+ *
+ * @param obj The table object.
+ * @param pd The private data of the table.
+ * @param[out] last_col The column of the last item.
+ * @param[out] last_row The row of the last item.
+ */
 static void
 _efl_ui_table_last_position_get(Eo * obj, Efl_Ui_Table_Data *pd, int *last_col, int *last_row)
 {
@@ -146,6 +203,16 @@ _efl_ui_table_last_position_get(Eo * obj, Efl_Ui_Table_Data *pd, int *last_col, 
    pd->linear_recalc = EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Callback for when the table's own size hints change.
+ *
+ * Triggers a layout recalculation for the table itself. This is attached to
+ * the table object, not its children.
+ *
+ * @param data Not used.
+ * @param ev The event info, `ev->object` is the table.
+ */
 static void
 _efl_ui_table_size_hints_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -200,6 +267,13 @@ _efl_ui_table_efl_gfx_entity_position_set(Eo *obj, Efl_Ui_Table_Data *_pd EINA_U
    efl_canvas_group_change(obj);
 }
 
+/**
+ * @brief Custom group_add implementation for the table.
+ *
+ * This function sets up a clipper for the table's contents, initializes widget
+ * parent-child relationships, and sets up event handling for size hint changes
+ * on the table itself.
+ */
 EOLIAN static void
 _efl_ui_table_efl_canvas_group_group_add(Eo *obj, Efl_Ui_Table_Data *pd)
 {
@@ -219,6 +293,11 @@ _efl_ui_table_efl_canvas_group_group_add(Eo *obj, Efl_Ui_Table_Data *pd)
                           _efl_ui_table_size_hints_changed_cb, NULL);
 }
 
+/**
+ * @brief Custom group_del implementation for the table.
+ *
+ * Cleans up resources allocated in group_add, such as event callbacks.
+ */
 EOLIAN static void
 _efl_ui_table_efl_canvas_group_group_del(Eo *obj, Efl_Ui_Table_Data *_pd EINA_UNUSED)
 {
@@ -228,6 +307,11 @@ _efl_ui_table_efl_canvas_group_group_del(Eo *obj, Efl_Ui_Table_Data *_pd EINA_UN
    efl_canvas_group_del(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Constructor for the Efl.Ui.Table object.
+ *
+ * Initializes the table's private data with default values.
+ */
 EOLIAN static Eo *
 _efl_ui_table_efl_object_constructor(Eo *obj, Efl_Ui_Table_Data *pd)
 {
@@ -249,6 +333,12 @@ _efl_ui_table_efl_object_constructor(Eo *obj, Efl_Ui_Table_Data *pd)
    return obj;
 }
 
+/**
+ * @brief Invalidator for the Efl.Ui.Table object.
+ *
+ * This function is called when the object is being invalidated. It frees all
+ * packed items and associated data, ensuring no memory leaks.
+ */
 EOLIAN static void
 _efl_ui_table_efl_object_invalidate(Eo *obj, Efl_Ui_Table_Data *pd)
 {
@@ -309,6 +399,24 @@ _efl_ui_table_efl_gfx_arrangement_content_align_get(const Eo *obj EINA_UNUSED, E
    if (v) *v = pd->align.v;
 }
 
+/**
+ * @internal
+ * @brief Core logic for packing a sub-object into the table.
+ *
+ * This function handles adding a sub-object at a specified column, row,
+ * with a given colspan and rowspan. It performs safety checks, allocates
+ * internal data for the new item, sets up parent-child relationships, and
+ * triggers a layout update.
+ *
+ * @param obj The table object.
+ * @param pd The table's private data.
+ * @param subobj The object to pack.
+ * @param col The column to pack into.
+ * @param row The row to pack into.
+ * @param colspan The number of columns to span.
+ * @param rowspan The number of rows to span.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 _pack_at(Eo *obj, Efl_Ui_Table_Data *pd, Efl_Gfx_Entity *subobj, int col, int row, int colspan, int rowspan)
 {
@@ -509,6 +617,19 @@ _efl_ui_table_efl_pack_table_table_content_get(Eo *obj EINA_UNUSED, Efl_Ui_Table
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Removes a single item from the table.
+ *
+ * This function handles the logic of removing an item from the table,
+ * cleaning up its associated data and properties, and flagging the table for
+ * a layout update. It does not delete the sub-object itself, just unpacks it.
+ *
+ * @param obj The table object.
+ * @param pd The table's private data.
+ * @param gi The internal item data for the object to remove.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 _item_remove(Efl_Ui_Table *obj, Efl_Ui_Table_Data *pd, Table_Item *gi)
 {
@@ -609,6 +730,13 @@ _efl_ui_table_efl_pack_layout_layout_request(Eo *obj, Efl_Ui_Table_Data *pd)
    efl_canvas_group_need_recalculate_set(obj, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Advances the table item iterator and returns the next item.
+ * @param it The iterator.
+ * @param[out] data The next item.
+ * @return @c EINA_TRUE if there is a next item, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _efl_ui_table_item_iterator_next(Table_Item_Iterator *it, void **data)
 {
@@ -628,12 +756,23 @@ _efl_ui_table_item_iterator_next(Table_Item_Iterator *it, void **data)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Gets the container of the iterator.
+ * @param it The iterator.
+ * @return The container object (the table).
+ */
 static Eo *
 _efl_ui_table_item_iterator_get_container(Table_Item_Iterator *it)
 {
    return it->object;
 }
 
+/**
+ * @internal
+ * @brief Frees the table item iterator.
+ * @param it The iterator to free.
+ */
 static void
 _efl_ui_table_item_iterator_free(Table_Item_Iterator *it)
 {
@@ -793,6 +932,18 @@ _efl_ui_table_efl_pack_table_table_rows_get(const Eo *obj EINA_UNUSED, Efl_Ui_Ta
    return pd->req_rows ? : pd->rows;
 }
 
+/**
+ * @brief Packs an object into the next available cell.
+ *
+ * This function implements the `efl_pack()` interface. It determines the next
+ * available cell based on the table's orientation and packs the sub-object
+ * there with a default span of 1x1.
+ *
+ * @param obj The table object.
+ * @param pd The table's private data.
+ * @param subobj The object to pack.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_table_efl_pack_pack(Eo *obj, Efl_Ui_Table_Data *pd, Efl_Gfx_Entity *subobj)
 {

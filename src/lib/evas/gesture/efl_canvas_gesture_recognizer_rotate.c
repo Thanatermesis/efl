@@ -4,6 +4,16 @@
 
 #define MY_CLASS EFL_CANVAS_GESTURE_RECOGNIZER_ROTATE_CLASS
 
+/**
+ * @internal
+ * @brief Resets the internal state of the rotate gesture recognizer.
+ *
+ * This function is called to clear any stored touch point data, momentum,
+ * angles, and step information, effectively preparing the recognizer for
+ * a new gesture or when a gesture is cancelled or finished.
+ *
+ * @param pd Pointer to the private data of the rotate gesture recognizer.
+ */
 static void
 _reset_recognizer(Efl_Canvas_Gesture_Recognizer_Rotate_Data *pd)
 {
@@ -18,7 +28,26 @@ _reset_recognizer(Efl_Canvas_Gesture_Recognizer_Rotate_Data *pd)
 
 #define memset do not use memset to reset rotate data, use _reset_recognizer
 
-
+/**
+ * @internal
+ * @brief Calculates rotation properties like radius, angle, and momentum.
+ *
+ * This function computes the current radius of the gesture (half the distance
+ * between two touch points), the angle formed by the two touch points, and
+ * the momentum of the rotation. The momentum calculation is marked as needing
+ * a fix.
+ *
+ * @param pd Pointer to the private data of the rotate gesture recognizer.
+ * @param gd Pointer to the gesture data to be filled.
+ * @param xx1 X-coordinate of the first touch point.
+ * @param yy1 Y-coordinate of the first touch point.
+ * @param xx2 X-coordinate of the second touch point.
+ * @param yy2 Y-coordinate of the second touch point.
+ * @param[in,out] angle Pointer to the current angle, updated by this function.
+ *                      On input, it's the previous angle.
+ * @param started EINA_TRUE if this is the start of the gesture (no momentum
+ *                is calculated), EINA_FALSE otherwise.
+ */
 static void
 _rotate_properties_get(Efl_Canvas_Gesture_Recognizer_Rotate_Data *pd,
                        Efl_Canvas_Gesture_Rotate_Data *gd,
@@ -77,6 +106,20 @@ _rotate_properties_get(Efl_Canvas_Gesture_Recognizer_Rotate_Data *pd,
      gd->momentum = 0;
 }
 
+/**
+ * @internal
+ * @brief Checks if the current rotation has exceeded the defined angular tolerance.
+ *
+ * This function determines if the change in angle from the base_angle
+ * is significant enough to be considered an actual rotation, based on the
+ * `rotate_angular_tolerance`. It handles angle wrapping around 0/360 degrees.
+ * Once tolerance is broken, `rotate_angular_tolerance` is set to `NEGATIVE_ANGLE`
+ * to indicate that the gesture has started.
+ *
+ * @param pd Pointer to the private data of the rotate gesture recognizer.
+ * @param gd Pointer to the current gesture data, containing the current angle.
+ * @return EINA_TRUE if the tolerance was broken, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _on_rotation_broke_tolerance(Efl_Canvas_Gesture_Recognizer_Rotate_Data *pd, Efl_Canvas_Gesture_Rotate_Data *gd)
 {
@@ -123,12 +166,36 @@ _on_rotation_broke_tolerance(Efl_Canvas_Gesture_Recognizer_Rotate_Data *pd, Efl_
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Gets the Efl_Class associated with this recognizer type.
+ *
+ * @param obj The Efl_Object instance.
+ * @param pd Private data for the recognizer.
+ * @return The Efl_Class for EFL_CANVAS_GESTURE_ROTATE_CLASS.
+ */
 EOLIAN static const Efl_Class *
 _efl_canvas_gesture_recognizer_rotate_efl_canvas_gesture_recognizer_type_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Gesture_Recognizer_Rotate_Data *pd EINA_UNUSED)
 {
    return EFL_CANVAS_GESTURE_ROTATE_CLASS;
 }
 
+/**
+ * @internal
+ * @brief Main recognition logic for the rotate gesture.
+ *
+ * This function processes touch events and determines the state of the rotate
+ * gesture. It handles the lifecycle of the gesture: MAYBE, TRIGGER, FINISH,
+ * CANCEL, IGNORE.
+ * It requires two touch points to start.
+ *
+ * @param obj The Efl_Object instance of the recognizer.
+ * @param pd Pointer to the private data of the rotate gesture recognizer.
+ * @param gesture The gesture object being processed.
+ * @param watched The Efl_Object being watched for gestures.
+ * @param event The touch event that triggered the recognition attempt.
+ * @return The result of the recognition process (e.g., TRIGGER, CANCEL).
+ */
 EOLIAN static Efl_Canvas_Gesture_Recognizer_Result
 _efl_canvas_gesture_recognizer_rotate_efl_canvas_gesture_recognizer_recognize(Eo *obj,
                                                                             Efl_Canvas_Gesture_Recognizer_Rotate_Data *pd,

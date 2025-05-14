@@ -9,8 +9,32 @@
 
 #include "eina_crc.h"
 
-#define POLYNOMIAL 0xEDB88320
+#define POLYNOMIAL 0xEDB88320 // Standard CRC-32 polynomial (IEEE 802.3), reversed representation (0x04C11DB7).
 
+/**
+ * @internal
+ * @brief Precomputed CRC32 lookup table for an efficient "slicing-by-8" algorithm.
+ *
+ * This table stores precomputed CRC values that allow processing 8 bytes of input
+ * data simultaneously, significantly speeding up CRC computation. It is based on
+ * the CRC32 polynomial defined by POLYNOMIAL.
+ *
+ * The table is organized as 8 arrays (slices), `table[0]` through `table[7]`,
+ * each containing 256 entries (one for each possible byte value).
+ * Each `table[i]` contributes to the CRC calculation for a specific byte
+ * position within an 8-byte chunk of data.
+ *
+ * In the 8-byte processing loop within `_eina_crc`:
+ *   `word1 = (first 4 bytes of data chunk) ^ current_crc_value;`
+ *   `word2 = (next 4 bytes of data chunk);`
+ * The new CRC is then calculated by XORing results looked up in these tables:
+ *   `new_crc = table[7][byte0_of_word1] ^ table[6][byte1_of_word1] ^ ... ^ table[0][byte3_of_word2];`
+ * (Where byte0 is the LSB and byte3 is the MSB of a 4-byte word).
+ *
+ * The structure is `table[slice_index][byte_value]`:
+ * - `slice_index`: 0 to 7. Corresponds to a byte position within the 8-byte data chunk.
+ * - `byte_value`: 0 to 255. The value of the byte at that position (or derived from it).
+ */
 static const unsigned int table[8][256] =
 {
    {

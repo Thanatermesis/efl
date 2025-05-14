@@ -4,6 +4,17 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Test case for Efl.Ui.Panel.
+ *
+ * This function creates a window with four panels (top, right, bottom, left),
+ * each containing a button. This setup tests the basic functionality and
+ * orientation of the panel widget.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_ui_panel(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -63,12 +74,32 @@ test_ui_panel(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_
    efl_gfx_entity_size_set(win, EINA_SIZE2D(280, 320));
 }
 
+/**
+ * @brief Callback for the 'selected,changed' event of a check widget.
+ *
+ * Toggles the global thumbscroll setting based on the check widget's state.
+ * This is used for temporarily enabling/disabling thumbscroll for testing purposes.
+ *
+ * @param data Not used.
+ * @param ev The event information. ev->object is the check widget.
+ */
 static void
 _check_changed(void *data EINA_UNUSED, const Efl_Event *ev)
 {
    elm_config_scroll_thumbscroll_enabled_set(efl_ui_selectable_selected_get(ev->object));
 }
 
+/**
+ * @brief Callback for the 'toggled' event of a panel.
+ *
+ * If the associated check widget (`data`) is selected, this function
+ * replaces the content of the panel with a new list of items. This tests
+ * dynamic content updates within a panel. It also prints the panel's
+ * visibility state.
+ *
+ * @param data A pointer to a check widget.
+ * @param ev The event information. ev->object is the panel.
+ */
 static void
 _panel_toggled(void *data, const Efl_Event *ev)
 {
@@ -90,12 +121,36 @@ _panel_toggled(void *data, const Efl_Event *ev)
    printf("Panel toggled:%s\n", efl_ui_panel_hidden_get(ev->object) ? "hidden" : "visible");
 }
 
+/**
+ * @brief Callback for the 'clicked' event of a button.
+ *
+ * Toggles the visibility of the associated panel.
+ *
+ * @param data A pointer to the panel object to be toggled.
+ * @param ev Not used.
+ */
 static void
 _btn_clicked(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    Eo *panel = data;
    efl_ui_panel_toggle(panel);
 }
+/**
+ * @brief Advanced test case for Efl.Ui.Panel.
+ *
+ * This function tests more advanced features of the panel widget, including:
+ * - A scrollable panel.
+ * - Toggling panel visibility with a button.
+ * - Dynamically changing panel content when it is toggled.
+ * - Interaction with other widgets like check boxes.
+ *
+ * The layout consists of a main box with controls at the top and a table below.
+ * The table holds a central list and a left-side panel, which also contains a list.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_ui_panel2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

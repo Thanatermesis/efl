@@ -1,6 +1,36 @@
 #include "gl_engine_filter.h"
 
+/**
+ * @file
+ * @brief OpenGL filter blend operations
+ *
+ * This file implements blending operations for the Evas GL engine,
+ * handling different fill modes like repeat and stretch.
+ */
+
 // Copied logic from SW engine
+/**
+ * @internal
+ * @brief Blends a source image onto a destination area with various fill modes.
+ *
+ * This function handles the core logic of blending an image, considering
+ * fill modes such as repeat and stretch. It calculates the necessary
+ * source and destination rectangles for each part of the blend operation.
+ *
+ * @param gc The Evas GL context.
+ * @param image The source Evas_GL_Image to blend.
+ * @param fillmode The fill mode to apply (e.g., EVAS_FILTER_FILL_MODE_REPEAT_X, EVAS_FILTER_FILL_MODE_STRETCH_Y).
+ * @param sx Source X coordinate.
+ * @param sy Source Y coordinate.
+ * @param sw Source width.
+ * @param sh Source height.
+ * @param dx Destination X coordinate.
+ * @param dy Destination Y coordinate.
+ * @param dw Destination width.
+ * @param dh Destination height.
+ * @param alphaonly If EINA_TRUE, only the alpha channel is blended.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _mapped_blend(Evas_Engine_GL_Context *gc,
               Evas_GL_Image *image,
@@ -156,6 +186,18 @@ _mapped_blend(Evas_Engine_GL_Context *gc,
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Applies a blend filter command using OpenGL.
+ *
+ * This function sets up the OpenGL context and parameters for a blend operation
+ * based on the provided filter command. It then calls _mapped_blend to perform
+ * the actual blending.
+ *
+ * @param re The generic GL rendering engine.
+ * @param cmd The Evas filter command containing blend parameters.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _gl_filter_blend(Render_Engine_GL_Generic *re, Evas_Filter_Command *cmd)
 {
@@ -248,6 +290,23 @@ _gl_filter_blend(Render_Engine_GL_Generic *re, Evas_Filter_Command *cmd)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the function pointer for the GL blend filter.
+ *
+ * This function returns a pointer to the _gl_filter_blend function if the
+ * provided command and its input/output buffers are valid.
+ *
+ * @param re The generic GL rendering engine (unused).
+ * @param cmd The Evas filter command.
+ * @return A function pointer to _gl_filter_blend on success, or NULL on failure.
+ *         Example:
+ *         @code
+ *         GL_Filter_Apply_Func func = gl_filter_blend_func_get(re, cmd);
+ *         if (func) {
+ *             func(re, cmd);
+ *         }
+ *         @endcode
+ */
 GL_Filter_Apply_Func
 gl_filter_blend_func_get(Render_Engine_GL_Generic *re EINA_UNUSED, Evas_Filter_Command *cmd)
 {

@@ -1,3 +1,16 @@
+/**
+ * @file ecore_anim.c
+ * @brief Ecore animator functions.
+ *
+ * This file implements the Ecore animator system, which provides a way to
+ * create animations by repeatedly calling specified callback functions.
+ * Animators can be driven by a system timer or a custom source, and their
+ * behavior can be customized with various position mapping functions.
+ * It handles the timing, execution, and management of animator tasks,
+ * including support for different animation curves (position mappings)
+ * and integration with Ecore_Evas.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -44,8 +57,8 @@
 #include "Ecore.h"
 #include "ecore_private.h"
 
-static int _ecore_anim_log_dom = -1;
-static Eina_Bool _ee_animators_setup = EINA_FALSE;
+static int _ecore_anim_log_dom = -1; /**< Log domain for ecore_animator messages. */
+static Eina_Bool _ee_animators_setup = EINA_FALSE; /**< Flag indicating if Ecore_Evas animator interface has been set up. */
 
 #ifdef ERR
 # undef ERR
@@ -75,33 +88,43 @@ static Eina_Bool _ee_animators_setup = EINA_FALSE;
 static void _do_tick(void);
 static Eina_Bool _ecore_animator_run(void *data);
 
-static int animators_delete_me = 0;
-static Ecore_Animator *animators = NULL;
-static volatile double animators_frametime = 1.0 / 60.0;
-static unsigned int animators_suspended = 0;
+static int animators_delete_me = 0; /**< Counter for animators marked for deletion. */
+static Ecore_Animator *animators = NULL; /**< Head of the linked list of active animators. */
+static volatile double animators_frametime = 1.0 / 60.0; /**< The target time in seconds between animator ticks (e.g., 1.0/60.0 for 60 FPS). */
+static unsigned int animators_suspended = 0; /**< Count of currently suspended animators. */
 
-static Ecore_Animator_Source src = ECORE_ANIMATOR_SOURCE_TIMER;
-static int ticking = 0;
-static Ecore_Cb begin_tick_cb = NULL;
-static const void *begin_tick_data = NULL;
-static Ecore_Cb end_tick_cb = NULL;
-static const void *end_tick_data = NULL;
-static Eina_Bool animator_ran = EINA_FALSE;
+static Ecore_Animator_Source src = ECORE_ANIMATOR_SOURCE_TIMER; /**< The current source driving animator ticks (default is system timer). */
+static int ticking = 0; /**< Flag indicating if the animator system is currently active and processing ticks. */
+static Ecore_Cb begin_tick_cb = NULL; /**< User-supplied callback for when a custom tick source begins a tick. */
+static const void *begin_tick_data = NULL; /**< User data for begin_tick_cb. */
+static Ecore_Cb end_tick_cb = NULL; /**< User-supplied callback for when a custom tick source ends a tick. */
+static const void *end_tick_data = NULL; /**< User data for end_tick_cb. */
+static Eina_Bool animator_ran = EINA_FALSE; /**< Flag set to EINA_TRUE if any animator ran during the last tick processing. */
 
-static volatile int timer_fd_read = -1;
-static volatile int timer_fd_write = -1;
-static Ecore_Thread *timer_thread = NULL;
-static volatile int timer_event_is_busy = 0;
-static Eina_Spinlock tick_queue_lock;
-static int           tick_queue_count = 0;
-static Eina_Bool     tick_skip = EINA_FALSE;
+static volatile int timer_fd_read = -1; /**< Read file descriptor for the pipe used by the timer thread to signal the main loop. */
+static volatile int timer_fd_write = -1; /**< Write file descriptor for the pipe used by the main loop to control the timer thread. */
+static Ecore_Thread *timer_thread = NULL; /**< Handle for the dedicated timer thread that generates ticks. */
+static volatile int timer_event_is_busy = 0; /**< Flag to indicate if the timer event processing logic is currently active/expecting events. */
+static Eina_Spinlock tick_queue_lock; /**< Spinlock to protect access to tick_queue_count. */
+static int           tick_queue_count = 0; /**< Number of ticks currently queued from the timer thread, awaiting processing. */
+static Eina_Bool     tick_skip = EINA_FALSE; /**< If EINA_TRUE, animator ticks might be skipped (e.g., if ECORE_ANIMATOR_SKIP is set). */
 
 #ifndef _WIN32
 extern volatile int exit_signal_received;
 #endif
 
-static Ecore_Evas_Object_Animator_Interface _anim_iface;
+static Ecore_Evas_Object_Animator_Interface _anim_iface; /**< Interface for Ecore_Evas specific animator handling. */
 
+/**
+ * @brief Sends a control signal to the timer thread.
+ * @param val The byte value to send:
+ *            -  1: Start/resume ticking.
+ *            -  0: Pause ticking.
+ *            - -1: Stop/quit thread.
+ *
+ * This function writes a single byte to the timer_fd_write pipe, which is
+ * read by the timer thread to control its behavior.
+ */
 static void
 _tick_send(signed char val)
 {
@@ -111,6 +134,15 @@ _tick_send(signed char val)
      }
 }
 
+/**
+ * @brief Sends a timestamp from the timer thread to the main thread.
+ * @param t The timestamp (usually target frame time) to send.
+ * @param thread The Ecore_Thread from which this function is called.
+ *
+ * This function allocates memory for the timestamp, increments a queue counter,
+ * and then uses ecore_thread_feedback() to send the timestamp to the
+ * main thread for processing by _timer_tick_notify().
+ */
 static void
 _timer_send_time(double t, Ecore_Thread *thread)
 {
@@ -125,6 +157,18 @@ _timer_send_time(double t, Ecore_Thread *thread)
      }
 }
 
+/**
+ * @brief Core logic for the timer thread.
+ * @param data Unused user data.
+ * @param thread The Ecore_Thread context.
+ *
+ * This function runs in a separate thread and is responsible for generating
+ * timing signals (ticks) for the animator system. It uses either epoll (if available)
+ * or select to wait for timer events and control signals from the main thread.
+ * When a tick is due, it calls _timer_send_time() to notify the main thread.
+ * The thread continues to loop until a stop signal is received or
+ * ecore_thread_check() indicates it should terminate.
+ */
 static void
 _timer_tick_core(void *data EINA_UNUSED, Ecore_Thread *thread)
 {

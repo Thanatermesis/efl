@@ -5,6 +5,17 @@
 #include <Eina.h>
 #include "eolian_database.h"
 
+/**
+ * @brief Deletes an Eolian_Class object and frees all its associated resources.
+ *
+ * This function will unreference the Eolian_Class object. If the reference
+ * count reaches zero, it will proceed to free all memory allocated for the
+ * class, including its name, C name, implemented interfaces, constructors,
+ * methods, properties, events, parts, required types, callables, composite
+ * elements, C prefix, event prefix, data type, and documentation.
+ *
+ * @param cl A pointer to the Eolian_Class object to be deleted.
+ */
 void
 database_class_del(Eolian_Class *cl)
 {

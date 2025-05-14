@@ -4,6 +4,16 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Callback function for the 'clicked' event on a button.
+ *
+ * This function is called when a button is clicked. It prints information
+ * about the click event, such as whether it was a repeated click and which
+ * mouse button was used.
+ *
+ * @param data User data pointer (unused).
+ * @param ev The event information structure.
+ */
 static void
 _clicked(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -11,18 +21,49 @@ _clicked(void *data EINA_UNUSED, const Efl_Event *ev)
    printf("Button is clicked!!! repeated(%d) button(%d)\n", clicked->repeated, clicked->button);
 }
 
+/**
+ * @brief Callback function for the 'pressed' event on a button.
+ *
+ * This function is invoked when a button is pressed down.
+ *
+ * @param data User data pointer (unused).
+ * @param ev The event information structure (unused).
+ */
 static void
 _pressed(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
    printf("Button is pressed!!!\n");
 }
 
+/**
+ * @brief Callback function for the 'unpressed' event on a button.
+ *
+ * This function is called when a button is released.
+ *
+ * @param data User data pointer (unused).
+ * @param ev The event information structure (unused).
+ */
 static void
 _unpressed(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
    printf("Button is unpressed!!!\n");
 }
 
+/**
+ * @brief Test function for Efl.Ui.Button.
+ *
+ * This function creates a window and demonstrates different types of buttons:
+ * - A button with only text.
+ * - A button with only an icon.
+ * - A button with both text and an icon.
+ *
+ * It attaches event listeners for clicked, pressed, and unpressed events to
+ * each button.
+ *
+ * @param data User data pointer (unused).
+ * @param obj The Evas_Object parent (unused).
+ * @param event_info The event information (unused).
+ */
 void
 test_ui_button(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

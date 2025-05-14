@@ -3,19 +3,36 @@
 #include "evas_engine.h"
 #include "Evas_Engine_Software_Gdi.h"
 
+/** Log domain for the Evas Software GDI engine module. */
 int _evas_engine_soft_gdi_log_dom = -1;
 /* function tables - filled in later (func and parent func) */
-static Evas_Func func, pfunc;
+/** Function table for this engine, inheriting from software_generic. */
+static Evas_Func func;
+/** Function table of the parent engine (software_generic). */
+static Evas_Func pfunc;
 
 /* engine struct data */
 typedef struct _Render_Engine Render_Engine;
 
+/**
+ * @brief Structure holding the state for the Software GDI rendering engine instance.
+ *
+ * This primarily wraps the generic software rendering engine's data.
+ */
 struct _Render_Engine
 {
-   Render_Output_Software_Generic generic;
+   Render_Output_Software_Generic generic; /**< Generic software rendering engine data. */
 };
 
 /* engine api this module provides */
+/**
+ * @brief Sets up the engine info structure.
+ * @param info Pointer to the Evas_Engine_Info_Software_Gdi structure to be filled.
+ *
+ * This function is called by Evas core to get information about the engine's
+ * capabilities and requirements before setting up an output. It sets the
+ * default render mode.
+ */
 static void
 eng_output_info_setup(void *info)
 {
@@ -24,6 +41,17 @@ eng_output_info_setup(void *info)
    einfo->render_mode = EVAS_RENDER_MODE_BLOCKING;
 }
 
+/**
+ * @brief Sets up the rendering engine for a specific output window.
+ * @param engine The Evas engine pointer (unused in this function).
+ * @param in Pointer to the Evas_Engine_Info_Software_Gdi structure containing setup parameters.
+ * @param w Initial width of the output surface.
+ * @param h Initial height of the output surface.
+ * @return A pointer to the newly allocated Render_Engine structure on success, NULL on failure.
+ *
+ * This function initializes the GDI output buffer (`Outbuf`) and the generic
+ * software rendering engine, linking them together.
+ */
 static void *
 eng_output_setup(void *engine, void *in, unsigned int w, unsigned int h)
 {

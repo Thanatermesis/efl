@@ -3,7 +3,10 @@
 
 #ifndef _EDJE_EDIT_EO_CLASS_TYPE
 #define _EDJE_EDIT_EO_CLASS_TYPE
-
+/**
+ * @brief Opaque handle to an Edje_Edit object.
+ * @ingroup Edje_Edit
+ */
 typedef Eo Edje_Edit;
 
 #endif

@@ -7,44 +7,64 @@
 
 // FIXME: handle if canvas resizes
 
+/**
+ * @internal
+ * @brief Structure to hold the private data of the factory widget.
+ */
 typedef struct _Widget_Data Widget_Data;
 
+/**
+ * @internal
+ * @brief Private data for the factory widget.
+ */
 struct _Widget_Data
 {
-   Evas_Object *obj;
-   Evas_Object *content;
-   int last_calc_count;
-   Evas_Coord maxminw, maxminh;
-   Eina_Bool eval : 1;
-   Eina_Bool szeval : 1;
-   Eina_Bool maxmin : 1;
+   Evas_Object *obj; /**< The factory widget itself. */
+   Evas_Object *content; /**< The current content object displayed by the factory. */
+   int last_calc_count; /**< The smart object calculation count at the last realize/unrealize event. Used to detect if content should be unrealized. */
+   Evas_Coord maxminw, maxminh; /**< Stored maximum width and height when maxmin mode is enabled. */
+   Eina_Bool eval : 1; /**< Flag to indicate if the factory needs to re-evaluate its state. */
+   Eina_Bool szeval : 1; /**< Flag to indicate if the factory needs to re-evaluate its size. */
+   Eina_Bool maxmin : 1; /**< Flag indicating if max/min mode is enabled. @see elm_factory_maxmin_mode_set */
 };
 
-static const char *widtype = NULL;
-static void _del_hook(Evas_Object *obj);
-static Eina_Bool _focus_next_hook(const Evas_Object *obj, Elm_Focus_Direction dir, Evas_Object **next);
-static void _sizing_eval(Evas_Object *obj);
-static void _eval(Evas_Object *obj);
-static void _changed(Evas_Object *obj);
-static void _move(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED);
-static void _resize(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED);
-static void _child_change(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED);
-static void _child_del(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED);
-static void _content_set_hook(Evas_Object *obj, const char *part, Evas_Object *content);
-static Evas_Object *_content_get_hook(const Evas_Object *obj, const char *part);
-static Evas_Object *_content_unset_hook(Evas_Object *obj, const char *part);
+static const char *widtype = NULL; /**< Widget type string, used for type checking. */
+static void _del_hook(Evas_Object *obj); /**< Hook called when the factory object is deleted. */
+static Eina_Bool _focus_next_hook(const Evas_Object *obj, Elm_Focus_Direction dir, Evas_Object **next); /**< Hook for focus handling. */
+static void _sizing_eval(Evas_Object *obj); /**< Evaluates and applies size hints for the factory. */
+static void _eval(Evas_Object *obj); /**< Evaluates whether the content should be realized or unrealized based on viewport intersection. */
+static void _changed(Evas_Object *obj); /**< Hook called when the factory object's smart data has changed. */
+static void _move(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED); /**< Callback for EVAS_CALLBACK_MOVE on the factory object. */
+static void _resize(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED); /**< Callback for EVAS_CALLBACK_RESIZE on the factory object. */
+static void _child_change(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED); /**< Callback for EVAS_CALLBACK_CHANGED_SIZE_HINTS on the content object. */
+static void _child_del(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED); /**< Callback for EVAS_CALLBACK_DEL on the content object. */
+static void _content_set_hook(Evas_Object *obj, const char *part, Evas_Object *content); /**< Hook for setting content on the factory. */
+static Evas_Object *_content_get_hook(const Evas_Object *obj, const char *part); /**< Hook for getting content from the factory. */
+static Evas_Object *_content_unset_hook(Evas_Object *obj, const char *part); /**< Hook for unsetting content from the factory. */
 
-static const char SIG_REALIZE[] = "realize";
-static const char SIG_UNREALIZE[] = "unrealize";
+static const char SIG_REALIZE[] = "realize"; /**< Signal emitted when the factory content becomes visible/realized. */
+static const char SIG_UNREALIZE[] = "unrealize"; /**< Signal emitted when the factory content becomes hidden/unrealized. */
 
+/**
+ * @internal
+ * @brief Array defining the smart callbacks supported by the factory widget.
+ */
 static const Evas_Smart_Cb_Description _signals[] = {
    {SIG_REALIZE, ""},
    {SIG_UNREALIZE, ""},
    {NULL, NULL}
 };
 
-static int fac = 0;
+static int fac = 0; /**< Counter, possibly for debugging or tracking active factories. Its exact purpose is unclear from the context. */
 
+/**
+ * @internal
+ * @brief Cleans up the factory widget when it's deleted.
+ *
+ * This function is set as the delete hook for the factory widget. It frees
+ * the widget data and unreferences/deletes its content if any.
+ * @param obj The factory object being deleted.
+ */
 static void
 _del_hook(Evas_Object *obj)
 {
@@ -68,6 +88,17 @@ _del_hook(Evas_Object *obj)
    free(wd);
 }
 
+/**
+ * @internal
+ * @brief Handles focus movement for the factory widget.
+ *
+ * This function is set as the focus_next hook. It attempts to pass focus
+ * to the factory's content object.
+ * @param obj The factory object.
+ * @param dir The direction of focus change.
+ * @param next Pointer to store the next focusable object.
+ * @return EINA_TRUE if focus was successfully passed, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _focus_next_hook(const Evas_Object *obj, Elm_Focus_Direction dir, Evas_Object **next)
 {
@@ -79,6 +110,15 @@ _focus_next_hook(const Evas_Object *obj, Elm_Focus_Direction dir, Evas_Object **
    return efl_ui_widget_focus_next_get(cur, dir, next);
 }
 
+/**
+ * @internal
+ * @brief Calculates and sets the size hints for the factory widget.
+ *
+ * This function retrieves size hints from the content object and applies them
+ * to the factory. If max/min mode is enabled, it updates and uses the
+ * stored maximum minimum dimensions.
+ * @param obj The factory object.
+ */
 static void
 _sizing_eval(Evas_Object *obj)
 {
@@ -103,6 +143,19 @@ _sizing_eval(Evas_Object *obj)
 //   DBG("FAC SZ: %i %i | %i %i", minw, minh, maxw, maxh);
 }
 
+/**
+ * @internal
+ * @brief Evaluates if the factory's content should be realized or unrealized.
+ *
+ * This function checks if the factory widget intersects with the Evas canvas
+ * viewport. If it intersects and has no content, it emits the "realize" signal,
+ * potentially triggering content creation. If it does not intersect and has
+ * content, it emits the "unrealize" signal, potentially triggering content
+ * deletion, but only if the Evas smart calculation count has changed since
+ * the last realization (to avoid unrealizing during animations or fast moves
+ * that don't involve actual recalculations).
+ * @param obj The factory object.
+ */
 static void
 _eval(Evas_Object *obj)
 {
@@ -153,6 +206,15 @@ _eval(Evas_Object *obj)
    evas_event_thaw_eval(evas_object_evas_get(obj));
 }
 
+/**
+ * @internal
+ * @brief Handles pending evaluations for the factory.
+ *
+ * This function is called when the factory's smart data changes. It checks
+ * flags (wd->eval, wd->szeval) to see if a full state evaluation or sizing
+ * evaluation is needed and calls the respective functions.
+ * @param obj The factory object.
+ */
 static void
 _changed(Evas_Object *obj)
 {
@@ -170,6 +232,16 @@ _changed(Evas_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for the EVAS_CALLBACK_MOVE event on the factory object.
+ *
+ * Schedules a re-evaluation of the factory's state.
+ * @param data User data (unused).
+ * @param e The Evas canvas (unused).
+ * @param obj The factory object that moved.
+ * @param event_info Event specific information (unused).
+ */
 static void
 _move(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -179,6 +251,16 @@ _move(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event
    evas_object_smart_changed(obj);
 }
 
+/**
+ * @internal
+ * @brief Callback for the EVAS_CALLBACK_RESIZE event on the factory object.
+ *
+ * Schedules a re-evaluation of the factory's state.
+ * @param data User data (unused).
+ * @param e The Evas canvas (unused).
+ * @param obj The factory object that was resized.
+ * @param event_info Event specific information (unused).
+ */
 static void
 _resize(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -188,6 +270,16 @@ _resize(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *eve
    evas_object_smart_changed(obj);
 }
 
+/**
+ * @internal
+ * @brief Callback for the EVAS_CALLBACK_CHANGED_SIZE_HINTS event on the content object.
+ *
+ * Schedules a re-evaluation of the factory's state and size.
+ * @param data The factory object (passed as user data).
+ * @param e The Evas canvas (unused).
+ * @param obj The content object whose size hints changed (unused).
+ * @param event_info Event specific information (unused).
+ */
 static void
 _child_change(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -198,6 +290,17 @@ _child_change(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj EINA
    evas_object_smart_changed(data);
 }
 
+/**
+ * @internal
+ * @brief Callback for the EVAS_CALLBACK_DEL event on the content object.
+ *
+ * This function is called when the content object is deleted externally.
+ * It cleans up references to the content within the factory.
+ * @param data The factory object (passed as user data).
+ * @param e The Evas canvas (unused).
+ * @param obj The content object being deleted.
+ * @param event_info Event specific information (unused).
+ */
 static void
 _child_del(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -216,6 +319,17 @@ _child_del(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info E
 //   DBG("FAC-- = %i", fac);
 }
 
+/**
+ * @internal
+ * @brief Unsets (removes) content from the factory.
+ *
+ * This is the widget content unset hook. It removes the specified content part
+ * (currently only "default" is supported). It detaches callbacks from the
+ * content and clears the factory's reference to it.
+ * @param obj The factory object.
+ * @param part The name of the content part to unset (e.g., "default").
+ * @return The Evas_Object that was unset, or NULL if no content was set for the part.
+ */
 static Evas_Object *
 _content_unset_hook(Evas_Object *obj, const char *part)
 {
@@ -240,6 +354,18 @@ _content_unset_hook(Evas_Object *obj, const char *part)
    return content;
 }
 
+/**
+ * @internal
+ * @brief Sets content on the factory.
+ *
+ * This is the widget content set hook. It sets the given Evas_Object as the
+ * content for the specified part (currently only "default" is supported).
+ * It unsets any previous content, sets up callbacks on the new content,
+ * and schedules a re-evaluation.
+ * @param obj The factory object.
+ * @param part The name of the content part to set (e.g., "default").
+ * @param content The Evas_Object to set as content.
+ */
 static void
 _content_set_hook(Evas_Object *obj, const char *part, Evas_Object *content)
 {
@@ -268,6 +394,16 @@ _content_set_hook(Evas_Object *obj, const char *part, Evas_Object *content)
    fac++;
 }
 
+/**
+ * @internal
+ * @brief Gets content from the factory.
+ *
+ * This is the widget content get hook. It retrieves the Evas_Object currently
+ * set as content for the specified part (currently only "default" is supported).
+ * @param obj The factory object.
+ * @param part The name of the content part to get (e.g., "default").
+ * @return The Evas_Object set as content, or NULL if none.
+ */
 static Evas_Object *
 _content_get_hook(const Evas_Object *obj, const char *part)
 {

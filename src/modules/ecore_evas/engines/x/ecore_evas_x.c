@@ -171,6 +171,17 @@ static void _ecore_evas_x_selection_window_init(Ecore_Evas *ee);
 
 #define SWAP_INT(a, b) do { a ^= b; b ^= a; a ^= b; } while (0)
 
+/**
+ * @brief Updates the ICCCM hints for a given Ecore_Evas window.
+ *
+ * This function sets various hints as defined by the Inter-Client
+ * Communication Conventions Manual (ICCCM). These hints inform the
+ * window manager about the window's desired behavior, such as its
+ * initial state (normal or iconic), whether it accepts focus,
+ * its window group, and urgency status.
+ *
+ * @param ee The Ecore_Evas instance to update.
+ */
 static void
 _ecore_evas_x_hints_update(Ecore_Evas *ee)
 {
@@ -190,6 +201,18 @@ _ecore_evas_x_hints_update(Ecore_Evas *ee)
          ee->prop.urgent /* is_urgent */);
 }
 
+/**
+ * @brief Sets the group leader for an Ecore_Evas window.
+ *
+ * This function manages a shared group leader window for all Ecore_Evas
+ * windows in the application. The first window to call this function
+ * creates a hidden override-redirect window to act as the group leader.
+ * Subsequent windows will just reference this leader. The group leader
+ * is used by window managers to group related windows together (e.g.,
+ * in a taskbar).
+ *
+ * @param ee The Ecore_Evas instance for which to set the group leader.
+ */
 static void
 _ecore_evas_x_group_leader_set(Ecore_Evas *ee)
 {
@@ -210,6 +233,16 @@ _ecore_evas_x_group_leader_set(Ecore_Evas *ee)
    ecore_x_icccm_client_leader_set(ee->prop.window, leader_win);
 }
 
+/**
+ * @brief Unsets the group leader from an Ecore_Evas window.
+ *
+ * This function decrements the reference count to the shared group leader
+ * window. If the reference count drops to zero, the group leader window
+ * is destroyed. It also removes the WM_CLIENT_LEADER property from the
+ * Ecore_Evas window.
+ *
+ * @param ee The Ecore_Evas instance to update.
+ */
 static void
 _ecore_evas_x_group_leader_unset(Ecore_Evas *ee)
 {
@@ -229,6 +262,14 @@ _ecore_evas_x_group_leader_unset(Ecore_Evas *ee)
      }
 }
 
+/**
+ * @brief Updates the client leader property on the window.
+ *
+ * This is typically called when a window is re-created, to ensure
+ * it is still associated with the correct group leader.
+ *
+ * @param ee The Ecore_Evas instance to update.
+ */
 static void
 _ecore_evas_x_group_leader_update(Ecore_Evas *ee)
 {
@@ -237,6 +278,20 @@ _ecore_evas_x_group_leader_update(Ecore_Evas *ee)
       ecore_x_icccm_client_leader_set(ee->prop.window, edata->leader);
 }
 
+/**
+ * @brief Sets the WM protocols for the window.
+ *
+ * This function informs the window manager about the protocols the application
+ * supports. This includes:
+ * - WM_DELETE_WINDOW: The WM will send a message when the user tries to close
+ *   the window, rather than killing the client directly.
+ * - _NET_WM_PING: Allows the WM to check if the application is responsive.
+ * - _NET_WM_SYNC_REQUEST: Part of the EWMH protocol for synchronizing drawing
+ *   with window state changes.
+ * - E_DEICONIFY_APPROVE: A custom protocol for approving de-iconification.
+ *
+ * @param ee The Ecore_Evas instance to set protocols for.
+ */
 static void
 _ecore_evas_x_protocols_set(Ecore_Evas *ee)
 {
@@ -266,6 +321,15 @@ _ecore_evas_x_protocols_set(Ecore_Evas *ee)
                                   &tmp, 1);
 }
 
+/**
+ * @brief Checks and sets whether the WM supports the E window rotation protocol.
+ *
+ * This function queries the root window to see if the running window manager
+ * supports the _E_WINDOW_ROTATION_SUPPORTED property. The result is stored
+ * in the Ecore_Evas properties.
+ *
+ * @param ee The Ecore_Evas instance to check.
+ */
 static void
 _ecore_evas_x_wm_rotation_protocol_set(Ecore_Evas *ee)
 {
@@ -277,6 +341,16 @@ _ecore_evas_x_wm_rotation_protocol_set(Ecore_Evas *ee)
      ee->prop.wm_rot.supported = 0;
 }
 
+/**
+ * @brief Checks and sets whether the WM supports the E window profile protocol.
+ *
+ * This function queries the root window to see if the running window manager
+ * supports the _E_WINDOW_PROFILE_SUPPORTED property. If so, it sets the same
+ * property on the application window to indicate that it can handle profiles.
+ * The result is also stored in the Ecore_Evas properties.
+ *
+ * @param ee The Ecore_Evas instance to check.
+ */
 static void
 _ecore_evas_x_window_profile_protocol_set(Ecore_Evas *ee)
 {
@@ -297,6 +371,15 @@ _ecore_evas_x_window_profile_protocol_set(Ecore_Evas *ee)
      ee->profile_supported = 0;
 }
 
+/**
+ * @brief Sets the available profiles and current profile for the window.
+ *
+ * If the window is visible and profiles are supported, this function updates
+ * the window manager with the list of available profiles and sends a message
+ * to change the current profile if requested.
+ *
+ * @param ee The Ecore_Evas instance to set the profile for.
+ */
 static void
 _ecore_evas_x_window_profile_set(Ecore_Evas *ee)
 {
@@ -338,6 +421,15 @@ _ecore_evas_x_window_profile_set(Ecore_Evas *ee)
      }
 }
 
+/**
+ * @brief Job function to signal that a manual window rotation is complete.
+ *
+ * This function is called as an Ecore_Job to send a notification to the
+ * window manager that the application has finished handling a rotation
+ * event that was in manual mode.
+ *
+ * @param data A pointer to the Ecore_Evas instance.
+ */
 static void
 _ecore_evas_x_wm_rot_manual_rotation_done_job(void *data)
 {
@@ -353,6 +445,17 @@ _ecore_evas_x_wm_rot_manual_rotation_done_job(void *data)
    edata->wm_rot.done = 0;
 }
 
+/**
+ * @brief Updates the list of supported auxiliary hints from the WM.
+ *
+ * This function queries the root window for the
+ * `_E_WINDOW_AUX_HINT_SUPPORTED_LIST` property, which contains a
+ * comma-separated list of auxiliary hints supported by the window manager.
+ * It parses this list and stores the supported hints in the Ecore_Evas
+ * properties.
+ *
+ * @param ee The Ecore_Evas instance to update.
+ */
 static void
 _ecore_evas_x_aux_hints_supported_update(Ecore_Evas *ee)
 {
@@ -392,6 +495,15 @@ _ecore_evas_x_aux_hints_supported_update(Ecore_Evas *ee)
    free(data);
 }
 
+/**
+ * @brief Updates the auxiliary hints property on the window.
+ *
+ * This function constructs the auxiliary hints string from the Ecore_Evas
+ * properties and then calls `_ecore_evas_x_aux_hints_set` to apply it to
+ * the window.
+ *
+ * @param ee The Ecore_Evas instance to update.
+ */
 static void
 _ecore_evas_x_aux_hints_update(Ecore_Evas *ee)
 {
@@ -404,6 +516,33 @@ _ecore_evas_x_aux_hints_update(Ecore_Evas *ee)
 }
 
 # ifdef BUILD_ECORE_EVAS_OPENGL_X11
+/**
+ * @brief Creates a new X11 window suitable for OpenGL rendering.
+ *
+ * This function handles the creation of an X window with the appropriate
+ * visual, colormap, and depth for use with an OpenGL engine. It queries the
+ * Evas GL engine for the best settings and uses them to create the window.
+ * It also processes engine-specific options.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param parent The parent window.
+ * @param x The initial x coordinate of the window.
+ * @param y The initial y coordinate of the window.
+ * @param w The initial width of the window.
+ * @param h The initial height of the window.
+ * @param override Whether to create an override-redirect window.
+ * @param argb Whether the window should support an alpha channel.
+ * @param opt An array of engine-specific options, terminated by 0.
+ *            Example of options array:
+ *            @code
+ *            const int opt[] = {
+ *                ECORE_EVAS_GL_X11_OPT_VSYNC, 1,
+ *                ECORE_EVAS_GL_X11_OPT_GL_DEPTH, 24,
+ *                0
+ *            };
+ *            @endcode
+ * @return The newly created Ecore_X_Window, or 0 on failure.
+ */
 static Ecore_X_Window
 _ecore_evas_x_gl_window_new(Ecore_Evas *ee, Ecore_X_Window parent, int x, int y, int w, int h, Eina_Bool override, int argb, const int *opt)
 {

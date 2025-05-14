@@ -36,7 +36,23 @@
  *                                   API                                      *
  *============================================================================*/
 
-
+/**
+ * @brief Sets the clipboard content.
+ *
+ * This function attempts to set the clipboard content for the given window.
+ * It currently supports "text/" MIME types, setting both CF_TEXT (UTF-8)
+ * and CF_UNICODETEXT (UTF-16) formats.
+ *
+ * @param window The Ecore_Win32_Window to associate with the clipboard operation.
+ *               This window must be valid.
+ * @param data A pointer to the data to be set on the clipboard.
+ * @param size The size of the data in bytes.
+ * @param mime_type The MIME type of the data. Currently, only types starting
+ *                  with "text/" are supported (e.g., "text/plain").
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ *         Failure can occur if the window is invalid, data is NULL, size is 0,
+ *         the MIME type is unsupported, or if Win32 API calls fail.
+ */
 EAPI Eina_Bool
 ecore_win32_clipboard_set(const Ecore_Win32_Window *window,
                           const void *data,
@@ -121,6 +137,27 @@ ecore_win32_clipboard_set(const Ecore_Win32_Window *window,
    return res;
 }
 
+/**
+ * @brief Retrieves the clipboard content.
+ *
+ * This function attempts to retrieve the clipboard content associated with the
+ * given window. It currently supports "text/" MIME types. It prioritizes
+ * CF_UNICODETEXT (UTF-16) and converts it to UTF-8. If CF_UNICODETEXT is not
+ * available, it attempts to retrieve CF_TEXT (UTF-8/ANSI).
+ *
+ * @param window The Ecore_Win32_Window to associate with the clipboard operation.
+ *               This window must be valid.
+ * @param[out] size A pointer to a size_t variable where the size of the
+ *                  retrieved data (in bytes, including null terminator for text)
+ *                  will be stored.
+ * @param mime_type The desired MIME type of the data. Currently, only types
+ *                  starting with "text/" are supported (e.g., "text/plain").
+ * @return A pointer to the retrieved data on success, or @c NULL on failure.
+ *         The caller is responsible for freeing the returned data using free().
+ *         Failure can occur if the window is invalid, size is NULL,
+ *         the MIME type is unsupported, or if Win32 API calls fail or no
+ *         suitable data format is found. If NULL is returned, @p size will be 0.
+ */
 EAPI void *
 ecore_win32_clipboard_get(const Ecore_Win32_Window *window,
                           size_t *size,
@@ -225,6 +262,14 @@ ecore_win32_clipboard_get(const Ecore_Win32_Window *window,
    return NULL;
 }
 
+/**
+ * @brief Clears the clipboard content.
+ *
+ * This function attempts to clear the clipboard content.
+ *
+ * @param window The Ecore_Win32_Window to associate with the clipboard operation.
+ *               This window must be valid for the OpenClipboard call.
+ */
 EAPI void
 ecore_win32_clipboard_clear(const Ecore_Win32_Window *window)
 {

@@ -26,13 +26,31 @@
 #include "eina_debug_private.h"
 
 #ifndef _WIN32
+/** @internal
+ * @brief Flag to indicate if the system monitor needs to reset its state.
+ * Set to 1 to trigger a reset, 0 otherwise.
+ */
 volatile int           _eina_debug_sysmon_reset = 0;
+/** @internal
+ * @brief Flag to indicate if the system monitor thread is currently active.
+ * Set to 1 if active, 0 otherwise.
+ */
 volatile int           _eina_debug_sysmon_active = 0;
+/** @internal
+ * @brief Flag to indicate if event logging is currently active.
+ * Set to 1 if active, 0 otherwise.
+ */
 volatile int           _eina_debug_evlog_active = 0;
+/** @internal
+ * @brief Flag to indicate if CPU monitoring is active.
+ * 1 if active, 0 if inactive, -1 if thread has exited.
+ */
 volatile int           _eina_debug_cpu_active = 0;
 
+/** @internal @brief Lock to protect access to system monitor shared resources. */
 Eina_Lock       _sysmon_lock;
 
+/** @internal @brief Handle for the system monitor thread. */
 static Eina_Thread       _sysmon_thread;
 
 // this is a DEDICATED thread tojust collect system info and to have the
@@ -40,9 +58,26 @@ static Eina_Thread       _sysmon_thread;
 // is sleep and wait for a command to begin polling for the cpu state.
 // right now that means iterating through cpu's and getting their cpu
 // frequency to match up with event logs.
+
+/**
+ * @internal
+ * @brief System monitor thread function.
+ *
+ * This thread is dedicated to collecting system information, primarily CPU
+ * frequency and thread CPU usage, with minimal impact on system performance.
+ * It sleeps and waits for a command to begin polling. When active, it
+ * periodically reads CPU frequencies from sysfs and calculates CPU usage
+ * for registered threads. This data is then logged via eina_evlog.
+ *
+ * @param data Unused.
+ * @param thr Unused.
+ * @return Always NULL.
+ */
 static void *
 _sysmon(void *data EINA_UNUSED, Eina_Thread thr EINA_UNUSED)
 {
+   // Stores the last known CPU frequencies for up to 64 cores.
+   // cpufreqs[i] holds the frequency of CPU i in MHz, rounded to the nearest 100.
    static int cpufreqs[64] = { 0 };
    int i, fd, freq;
    char buf[256], path[256];
@@ -241,6 +276,20 @@ _sysmon(void *data EINA_UNUSED, Eina_Thread thr EINA_UNUSED)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Callback function to enable CPU frequency monitoring.
+ *
+ * This function is invoked when a "CPU/Freq/on" debug command is received.
+ * It starts the event logging if not already active, and creates and starts
+ * the system monitor thread (_sysmon) if it's not already running.
+ *
+ * @param session Unused.
+ * @param cid Unused.
+ * @param buffer Unused.
+ * @param size Unused.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., thread creation failed).
+ */
 static Eina_Bool
 _cpufreq_on_cb(Eina_Debug_Session *session EINA_UNUSED, int cid EINA_UNUSED, void *buffer EINA_UNUSED, int size EINA_UNUSED)
 {
@@ -269,6 +318,14 @@ _cpufreq_on_cb(Eina_Debug_Session *session EINA_UNUSED, int cid EINA_UNUSED, voi
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Stops the CPU monitoring thread.
+ *
+ * This function signals the _sysmon thread to terminate and waits for its
+ * completion. It uses a lock and checks the _eina_debug_cpu_active flag
+ * to coordinate the shutdown.
+ */
 static void
 _stop_cpu_thread(void)
 {
@@ -291,6 +348,20 @@ _stop_cpu_thread(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback function to disable CPU frequency monitoring.
+ *
+ * This function is invoked when a "CPU/Freq/off" debug command is received.
+ * It stops the system monitor thread and, if event logging was started by
+ * CPU monitoring, it stops event logging as well.
+ *
+ * @param session Unused.
+ * @param cid Unused.
+ * @param buffer Unused.
+ * @param size Unused.
+ * @return Always EINA_TRUE.
+ */
 static Eina_Bool
 _cpufreq_off_cb(Eina_Debug_Session *session EINA_UNUSED, int cid EINA_UNUSED, void *buffer EINA_UNUSED, int size EINA_UNUSED)
 {
@@ -304,6 +375,14 @@ _cpufreq_off_cb(Eina_Debug_Session *session EINA_UNUSED, int cid EINA_UNUSED, vo
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Defines the debug opcodes related to CPU frequency monitoring.
+ *
+ * This array maps string commands to their respective callback functions.
+ * - "CPU/Freq/on": Enables CPU frequency monitoring by calling _cpufreq_on_cb.
+ * - "CPU/Freq/off": Disables CPU frequency monitoring by calling _cpufreq_off_cb.
+ */
 EINA_DEBUG_OPCODES_ARRAY_DEFINE(_OPS,
       {"CPU/Freq/on", NULL, &_cpufreq_on_cb},
       {"CPU/Freq/off", NULL, &_cpufreq_off_cb},
@@ -311,6 +390,16 @@ EINA_DEBUG_OPCODES_ARRAY_DEFINE(_OPS,
 );
 #endif
 
+/**
+ * @internal
+ * @brief Initializes the CPU debugging module.
+ *
+ * This function sets up the necessary resources for CPU monitoring,
+ * such as initializing the system monitor lock and registering the
+ * CPU frequency debug opcodes. This is not available on Windows.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE otherwise (though currently always returns EINA_TRUE).
+ */
 Eina_Bool
 _eina_debug_cpu_init(void)
 {
@@ -321,6 +410,16 @@ _eina_debug_cpu_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the CPU debugging module.
+ *
+ * This function cleans up resources used by CPU monitoring. It stops
+ * the system monitor thread if it's active and frees the associated lock.
+ * It also resets various state flags. This is not available on Windows.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE otherwise (though currently always returns EINA_TRUE).
+ */
 Eina_Bool
 _eina_debug_cpu_shutdown(void)
 {

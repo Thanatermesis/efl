@@ -17,6 +17,15 @@
 #define MY_CLASS ECORE_AUDIO_OUT_CLASS
 #define MY_CLASS_NAME "Ecore_Audio_Out"
 
+/**
+ * @brief Callback function to write audio data to the output.
+ *
+ * This function is called by an idler to continuously read data from
+ * attached inputs and write it to the VIO (Virtual I/O) interface.
+ *
+ * @param data The Ecore_Audio_Output Eo object.
+ * @return EINA_TRUE if writing should continue, EINA_FALSE otherwise.
+ */
 static Eina_Bool _write_cb(void *data)
 {
   Eo *eo_obj = data;

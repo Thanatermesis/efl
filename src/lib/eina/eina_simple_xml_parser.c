@@ -98,7 +98,13 @@ static const char EINA_MAGIC_SIMPLE_XML_ATTRIBUTE_STR[] = "Eina Simple XML Attri
 #endif
 #define DBG(...) EINA_LOG_DOM_DBG(_eina_simple_xml_log_dom, __VA_ARGS__)
 
-
+/**
+ * @internal
+ * @brief Finds the first whitespace character in a string segment.
+ * @param itr Pointer to the start of the string segment.
+ * @param itr_end Pointer to the end of the string segment.
+ * @return Pointer to the first whitespace character, or itr_end if none is found.
+ */
 static inline const char *
 _eina_simple_xml_whitespace_find(const char *itr, const char *itr_end)
 {
@@ -107,6 +113,13 @@ _eina_simple_xml_whitespace_find(const char *itr, const char *itr_end)
    return itr;
 }
 
+/**
+ * @internal
+ * @brief Skips leading whitespace characters in a string segment.
+ * @param itr Pointer to the start of the string segment.
+ * @param itr_end Pointer to the end of the string segment.
+ * @return Pointer to the first non-whitespace character, or itr_end if all are whitespace.
+ */
 static inline const char *
 _eina_simple_xml_whitespace_skip(const char *itr, const char *itr_end)
 {
@@ -115,6 +128,13 @@ _eina_simple_xml_whitespace_skip(const char *itr, const char *itr_end)
    return itr;
 }
 
+/**
+ * @internal
+ * @brief Skips trailing whitespace characters in a string segment (moves backward).
+ * @param itr Pointer to the character *after* the end of the relevant part of the string segment.
+ * @param itr_start Pointer to the beginning of the string segment.
+ * @return Pointer to the character *after* the last non-whitespace character.
+ */
 static inline const char *
 _eina_simple_xml_whitespace_unskip(const char *itr, const char *itr_start)
 {
@@ -123,12 +143,27 @@ _eina_simple_xml_whitespace_unskip(const char *itr, const char *itr_start)
    return itr + 1;
 }
 
+/**
+ * @internal
+ * @brief Finds the start of an XML tag ('<').
+ * @param itr Pointer to the start of the string segment.
+ * @param itr_end Pointer to the end of the string segment.
+ * @return Pointer to the '<' character, or NULL if not found.
+ */
 static inline const char *
 _eina_simple_xml_tag_start_find(const char *itr, const char *itr_end)
 {
    return memchr(itr, '<', itr_end - itr);
 }
 
+/**
+ * @internal
+ * @brief Finds the end of an XML tag ('>' or '<' if nested/error).
+ *        Handles quoted attributes to avoid premature termination.
+ * @param itr Pointer to the start of the string segment (inside a tag).
+ * @param itr_end Pointer to the end of the string segment.
+ * @return Pointer to the '>' or '<' character, or NULL if not found.
+ */
 static inline const char *
 _eina_simple_xml_tag_end_find(const char *itr, const char *itr_end)
 {
@@ -145,6 +180,13 @@ _eina_simple_xml_tag_end_find(const char *itr, const char *itr_end)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Finds the end of an XML comment ("-->").
+ * @param itr Pointer to the start of the string segment (inside a comment).
+ * @param itr_end Pointer to the end of the string segment.
+ * @return Pointer to the character *after* "-->", or NULL if not found.
+ */
 static inline const char *
 _eina_simple_xml_tag_comment_end_find(const char *itr, const char *itr_end)
 {
@@ -156,6 +198,13 @@ _eina_simple_xml_tag_comment_end_find(const char *itr, const char *itr_end)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Finds the end of a CDATA section ("]]>").
+ * @param itr Pointer to the start of the string segment (inside a CDATA section).
+ * @param itr_end Pointer to the end of the string segment.
+ * @return Pointer to the character *after* "]]>", or NULL if not found.
+ */
 static inline const char *
 _eina_simple_xml_tag_cdata_end_find(const char *itr, const char *itr_end)
 {
@@ -167,6 +216,13 @@ _eina_simple_xml_tag_cdata_end_find(const char *itr, const char *itr_end)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Finds the end of a DOCTYPE child declaration ('>').
+ * @param itr Pointer to the start of the string segment (inside a DOCTYPE child).
+ * @param itr_end Pointer to the end of the string segment.
+ * @return Pointer to the '>' character, or NULL if not found.
+ */
 static inline const char *
 _eina_simple_xml_tag_doctype_child_end_find(const char *itr, const char *itr_end)
 {
@@ -633,7 +689,7 @@ eina_simple_xml_attribute_new(Eina_Simple_XML_Node_Tag *parent, const char *key,
    EINA_MAGIC_SET(attr, EINA_MAGIC_SIMPLE_XML_ATTRIBUTE);
    attr->parent = parent;
    attr->key = eina_stringshare_add(key);
-   attr->value = eina_stringshare_add(value ? value : "");
+   attr->value = eina_stringshare_add(value ? value : ""); // Ensure value is not NULL
 
    if (parent)
      parent->attributes = eina_inlist_append
@@ -660,6 +716,13 @@ eina_simple_xml_attribute_free(Eina_Simple_XML_Attribute *attr)
    eina_mempool_free(_eina_simple_xml_attribute_mp, attr);
 }
 
+/**
+ * @internal
+ * @brief Frees an Eina_Simple_XML_Node_Data and removes it from its parent.
+ * @param node The data node to free.
+ * This function is used internally to free various data-type nodes
+ * (data, cdata, comment, etc.) by casting them to Eina_Simple_XML_Node_Data.
+ */
 static void
 _eina_simple_xml_node_data_free(Eina_Simple_XML_Node_Data *node)
 {
@@ -668,7 +731,7 @@ _eina_simple_xml_node_data_free(Eina_Simple_XML_Node_Data *node)
           (node->base.parent->children, EINA_INLIST_GET(&node->base));
 
    EINA_MAGIC_SET(&node->base, EINA_MAGIC_NONE);
-   free(node);
+   free(node); // Data nodes are allocated with malloc, not mempool
 }
 
 EINA_API Eina_Simple_XML_Node_Tag *
@@ -700,6 +763,14 @@ eina_simple_xml_node_tag_new(Eina_Simple_XML_Node_Tag *parent, const char *name)
    return n;
 }
 
+/**
+ * @internal
+ * @brief Recursively frees an Eina_Simple_XML_Node_Tag and all its children and attributes.
+ * @param tag The tag node to free.
+ * This is the core recursive freeing function. It handles freeing child tags
+ * by calling itself, and child data nodes by calling _eina_simple_xml_node_data_free.
+ * It also frees all attributes associated with the tag.
+ */
 void
 _eina_simple_xml_node_tag_free(Eina_Simple_XML_Node_Tag *tag)
 {
@@ -744,6 +815,16 @@ eina_simple_xml_node_tag_free(Eina_Simple_XML_Node_Tag *tag)
    _eina_simple_xml_node_tag_free(tag);
 }
 
+/**
+ * @internal
+ * @brief Creates a new generic data node (data, cdata, comment, etc.).
+ * @param parent The parent tag node. Can be NULL.
+ * @param type The type of the data node (EINA_SIMPLE_XML_NODE_DATA, EINA_SIMPLE_XML_NODE_CDATA, etc.).
+ * @param content The content of the data node.
+ * @param length The length of the content.
+ * @return A newly allocated Eina_Simple_XML_Node_Data, or NULL on error.
+ * The actual data is copied into the structure.
+ */
 static Eina_Simple_XML_Node_Data *
 _eina_simple_xml_node_data_new(Eina_Simple_XML_Node_Tag *parent, Eina_Simple_XML_Node_Type type, const char *content, unsigned length)
 {
@@ -751,6 +832,7 @@ _eina_simple_xml_node_data_new(Eina_Simple_XML_Node_Tag *parent, Eina_Simple_XML
 
    if (!content) return NULL;
 
+   // Allocate space for the struct and the flexible array member data[]
    n = malloc(sizeof(*n) + length + 1);
 
    if (!n)
@@ -929,46 +1011,53 @@ _eina_simple_xml_node_parse(void *data, Eina_Simple_XML_Type type, const char *c
 
    switch (type)
      {
-      case EINA_SIMPLE_XML_OPEN:
-      case EINA_SIMPLE_XML_OPEN_EMPTY:
+      case EINA_SIMPLE_XML_OPEN: // <tag>
+      case EINA_SIMPLE_XML_OPEN_EMPTY: // <tag/>
         {
            Eina_Simple_XML_Node_Tag *n;
            const char *name, *name_end, *attrs;
 
+           // Find where attributes start, if any
            attrs = eina_simple_xml_tag_attributes_find(content, length);
-           if (!attrs)
+           if (!attrs) // No attributes, tag name is the whole content
              name_end = content + length;
-           else
+           else // Attributes found, tag name ends before them
              name_end = attrs;
 
+           // Trim trailing whitespace from tag name
            name_end = _eina_simple_xml_whitespace_unskip(name_end, content);
 
+           // Extract and stringshare the tag name
            name = eina_stringshare_add_length(content, name_end - content);
            n = eina_simple_xml_node_tag_new(ctx->current, name);
-           eina_stringshare_del(name);
-           if (!n) return EINA_FALSE;
+           eina_stringshare_del(name); // stringshare_add made a copy
+           if (!n) return EINA_FALSE; // Allocation failed
 
+           // Parse attributes if they exist
            if (attrs)
              eina_simple_xml_attributes_parse
-               (attrs, length - (attrs - content),
-                _eina_simple_xml_attrs_parse, n);
+               (attrs, length - (attrs - content), // Pass only the attribute part
+                _eina_simple_xml_attrs_parse, n); // Callback to add attributes to node n
 
+           // If it's an opening tag (not self-closing), it becomes the new current parent
            if (type == EINA_SIMPLE_XML_OPEN)
              ctx->current = n;
         }
         break;
 
-      case EINA_SIMPLE_XML_CLOSE:
-         if (ctx->current->base.parent)
+      case EINA_SIMPLE_XML_CLOSE: // </tag>
+         if (ctx->current->base.parent) // Check if we are not at the root
            {
               const char *end = _eina_simple_xml_whitespace_unskip
-                (content + length, content);
+                (content + length, content); // Trim whitespace from closing tag name
               int len;
               len = end - content;
+              // Check if the closing tag matches the current open tag name
+              // or if it's an empty closing tag like </>
               if ((len == 0) /* </> closes the tag for us. */ ||
-                  ((eina_stringshare_strlen(ctx->current->name) == len) &&
+                  ((eina_stringshare_strlen(ctx->current->name) == (size_t)len) &&
                    (memcmp(ctx->current->name, content, len) == 0)))
-                ctx->current = ctx->current->base.parent;
+                ctx->current = ctx->current->base.parent; // Move up to the parent tag
               else
                 WRN("closed incorrect tag: '%.*s', '%s' was expected!",
                     len, content, ctx->current->name);
@@ -978,26 +1067,26 @@ _eina_simple_xml_node_parse(void *data, Eina_Simple_XML_Type type, const char *c
                length, content);
          break;
 
-      case EINA_SIMPLE_XML_DATA:
+      case EINA_SIMPLE_XML_DATA: // text data
          return !!eina_simple_xml_node_data_new
            (ctx->current, content, length);
-      case EINA_SIMPLE_XML_CDATA:
+      case EINA_SIMPLE_XML_CDATA: // <![CDATA[...]]>
          return !!eina_simple_xml_node_cdata_new
            (ctx->current, content, length);
-      case EINA_SIMPLE_XML_PROCESSING:
+      case EINA_SIMPLE_XML_PROCESSING: // <?...?>
          return !!eina_simple_xml_node_processing_new
            (ctx->current, content, length);
-      case EINA_SIMPLE_XML_DOCTYPE:
+      case EINA_SIMPLE_XML_DOCTYPE: // <!DOCTYPE ...>
          return !!eina_simple_xml_node_doctype_new
            (ctx->current, content, length);
-      case EINA_SIMPLE_XML_DOCTYPE_CHILD:
+      case EINA_SIMPLE_XML_DOCTYPE_CHILD: // <!ELEMENT ...> or similar inside DOCTYPE
          return !!eina_simple_xml_node_doctype_child_new
            (ctx->current, content, length);
-      case EINA_SIMPLE_XML_COMMENT:
+      case EINA_SIMPLE_XML_COMMENT: // <!-- ... -->
          return !!eina_simple_xml_node_comment_new
            (ctx->current, content, length);
 
-      case EINA_SIMPLE_XML_ERROR:
+      case EINA_SIMPLE_XML_ERROR: // Parser error
          ERR("parser error at offset %u-%u: %.*s",
              offset, length, length, content);
          break;
@@ -1022,11 +1111,11 @@ eina_simple_xml_node_load(const char *buf, unsigned buflen, Eina_Bool strip)
    if (!root) return NULL;
 
    memset(root, 0, sizeof(*root));
-   EINA_MAGIC_SET(&root->base, EINA_MAGIC_SIMPLE_XML_TAG);
+   EINA_MAGIC_SET(&root->base, EINA_MAGIC_SIMPLE_XML_TAG); // Root is also a type of tag
    root->base.type = EINA_SIMPLE_XML_NODE_ROOT;
 
-   ctx.root = root;
-   ctx.current = root;
+   ctx.root = root; // The overall root of the document being built
+   ctx.current = root; // The current parent tag to which new nodes are added
    eina_simple_xml_parse(buf, buflen, strip, _eina_simple_xml_node_parse, &ctx);
 
    return root;
@@ -1045,6 +1134,13 @@ eina_simple_xml_node_root_free(Eina_Simple_XML_Node_Root *root)
    _eina_simple_xml_node_tag_free(root);
 }
 
+/**
+ * @internal
+ * @brief Appends indentation string to the buffer based on the current level.
+ * @param buf The string buffer to append to.
+ * @param indent The string to use for one level of indentation (e.g., "  " or "\t").
+ * @param level The current indentation level.
+ */
 static inline void
 _eina_simple_xml_node_dump_indent(Eina_Strbuf *buf, const char *indent, unsigned level)
 {
@@ -1053,6 +1149,13 @@ _eina_simple_xml_node_dump_indent(Eina_Strbuf *buf, const char *indent, unsigned
      eina_strbuf_append_length(buf, indent, indent_len);
 }
 
+/**
+ * @internal
+ * @brief Appends all attributes of a tag to the string buffer.
+ * @param buf The string buffer to append to.
+ * @param tag The tag whose attributes are to be appended.
+ * Attributes are appended in the format: ` key="value"`.
+ */
 static void
 _eina_simple_xml_node_tag_attributes_append(Eina_Strbuf *buf, Eina_Simple_XML_Node_Tag *tag)
 {
@@ -1062,28 +1165,45 @@ _eina_simple_xml_node_tag_attributes_append(Eina_Strbuf *buf, Eina_Simple_XML_No
      eina_strbuf_append_printf(buf, " %s=\"%s\"", a->key, a->value);
 }
 
-static void _eina_simple_xml_node_dump(Eina_Strbuf *buf, Eina_Simple_XML_Node *node, const char *indent, unsigned level);
+// Forward declaration for the recursive dump function
+static void _eina_simple_xml_node_dump_recursive(Eina_Strbuf *buf, Eina_Simple_XML_Node *node, const char *indent, unsigned level);
 
+/**
+ * @internal
+ * @brief Dumps all children of a tag node to the string buffer.
+ * @param buf The string buffer to append to.
+ * @param tag The parent tag node.
+ * @param indent The indentation string.
+ * @param level The current indentation level for children.
+ */
 static void
 _eina_simple_xml_node_children_dump(Eina_Strbuf *buf, Eina_Simple_XML_Node_Tag *tag, const char *indent, unsigned level)
 {
    Eina_Simple_XML_Node *node;
 
    EINA_INLIST_FOREACH(tag->children, node)
-     _eina_simple_xml_node_dump(buf, node, indent, level);
+     _eina_simple_xml_node_dump_recursive(buf, node, indent, level);
 }
 
+/**
+ * @internal
+ * @brief Recursively dumps an XML node and its children to a string buffer.
+ * @param buf The string buffer to append to.
+ * @param node The XML node to dump.
+ * @param indent The string to use for indentation (e.g., "  "). If NULL, no indentation or newlines are added.
+ * @param level The current indentation level.
+ */
 static void
-_eina_simple_xml_node_dump(Eina_Strbuf *buf, Eina_Simple_XML_Node *node, const char *indent, unsigned level)
+_eina_simple_xml_node_dump_recursive(Eina_Strbuf *buf, Eina_Simple_XML_Node *node, const char *indent, unsigned level)
 {
    switch (node->type)
      {
-      case EINA_SIMPLE_XML_NODE_ROOT:
+      case EINA_SIMPLE_XML_NODE_ROOT: // The document root itself is not dumped, only its children
          _eina_simple_xml_node_children_dump
-           (buf, (Eina_Simple_XML_Node_Tag *)node, indent, level);
+           (buf, (Eina_Simple_XML_Node_Tag *)node, indent, level); // Start with level 0 for children of root
          break;
 
-      case EINA_SIMPLE_XML_NODE_TAG:
+      case EINA_SIMPLE_XML_NODE_TAG: // <tag attr="val">children</tag> or <tag attr="val"/>
         {
            Eina_Simple_XML_Node_Tag *n = (Eina_Simple_XML_Node_Tag *)node;
 
@@ -1203,7 +1323,7 @@ eina_simple_xml_node_dump(Eina_Simple_XML_Node *node, const char *indent)
    buf = eina_strbuf_new();
    if (!buf) return NULL;
 
-   _eina_simple_xml_node_dump(buf, node, indent, 0);
+   _eina_simple_xml_node_dump_recursive(buf, node, indent, 0);
 
    ret = eina_strbuf_string_steal(buf);
    eina_strbuf_free(buf);

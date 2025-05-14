@@ -9,6 +9,16 @@ static Eina_Hash *_funcs_params_init_get = NULL;
 static Eina_Hash *_funcs_params_init_set = NULL;
 extern char* _eolian_api_symbol;
 
+/**
+ * @brief Determines if a '*' (pointer indirection) should be added to a type name.
+ *
+ * This is used when generating C code for parameters, particularly for OUT or INOUT
+ * parameters, or for the return value of a GET property.
+ *
+ * @param ftype The type of the Eolian function (e.g., EOLIAN_PROP_GET).
+ * @param pdir The direction of the Eolian parameter (e.g., EOLIAN_PARAMETER_OUT).
+ * @return "*" if a star should be added, "" otherwise.
+ */
 static const char *
 _get_add_star(Eolian_Function_Type ftype, Eolian_Parameter_Direction pdir)
 {
@@ -19,6 +29,17 @@ _get_add_star(Eolian_Function_Type ftype, Eolian_Parameter_Direction pdir)
    return "";
 }
 
+/**
+ * @brief Checks if a function name already exists within a given string buffer.
+ *
+ * This function searches for the exact function name, ensuring it's not a substring
+ * of another identifier. It checks for common delimiters like space, '(', or newline
+ * around the function name.
+ *
+ * @param fname The function name to search for (e.g., "my_function").
+ * @param buf The string buffer to search within.
+ * @return EINA_TRUE if the function name is found, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _function_exists(const char *fname, Eina_Strbuf *buf)
 {
@@ -42,7 +63,17 @@ _function_exists(const char *fname, Eina_Strbuf *buf)
    return EINA_FALSE;
 }
 
-/* Check if the type is used in the file, not if it is a typedef... */
+/**
+ * @brief Checks if a type name is used within a given string buffer.
+ *
+ * This function searches for the exact type name, ensuring it's not a substring
+ * of another identifier. It checks for common delimiters like space, ',', ';', or newline
+ * around the type name. This is used to avoid redundant typedefs or includes.
+ *
+ * @param tname The type name to search for (e.g., "Eina_Rect").
+ * @param buf The string buffer to search within.
+ * @return EINA_TRUE if the type name is found, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _type_exists(const char *tname, Eina_Strbuf *buf)
 {
@@ -69,6 +100,22 @@ _type_exists(const char *tname, Eina_Strbuf *buf)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Generates C code for function pointer parameters.
+ *
+ * Function pointers in Eolian are often passed as three separate C parameters:
+ * a data pointer, the function pointer itself, and a free callback for the data.
+ * This function appends these to the various parameter list buffers.
+ *
+ * @param name The base name of the parameter (e.g., "my_callback").
+ * @param c_type The C type of the function pointer (e.g., "void (*My_Cb)(int)").
+ * @param typedecl The Eolian typedecl for the function pointer (unused in current impl).
+ * @param params Buffer for parameter names only (e.g., "cb_data, cb, cb_free_cb").
+ * @param params_full Buffer for full parameter declarations for public API
+ *                    (e.g., "void *cb_data, My_Cb_Type cb, Eina_Free_Cb cb_free_cb").
+ * @param params_full_imp Buffer for full parameter declarations for internal implementation.
+ * @param is_empty Unused in current implementation.
+ */
 static void
 _gen_func_pointer_param(const char *name, Eina_Stringshare *c_type,
                         const Eolian_Typedecl *typedecl EINA_UNUSED,
@@ -103,6 +150,18 @@ _gen_func_pointer_param(const char *name, Eina_Stringshare *c_type,
    eina_strbuf_free(freename);
 }
 
+/**
+ * @brief Appends the C representation of a default value for a given type to a buffer.
+ *
+ * If an Eolian_Expression for the default value is provided, it attempts to evaluate
+ * and use that. Otherwise, it falls back to common defaults like NULL for pointers,
+ * 0 for basic types, (TYPENAME){0} for structs/slices, or EINA_RECT_EMPTY() for Eina_Rect.
+ *
+ * @param buf The string buffer to append the default value to.
+ * @param exp The Eolian_Expression representing the default value (can be NULL).
+ * @param tp The Eolian_Type of the parameter or return value.
+ * @param ctp The C type string (e.g., "int", "char *").
+ */
 static void
 _append_defval(Eina_Strbuf *buf, const Eolian_Expression *exp, const Eolian_Type *tp, const char *ctp)
 {
@@ -154,6 +213,18 @@ _append_defval(Eina_Strbuf *buf, const Eolian_Expression *exp, const Eolian_Type
    eina_strbuf_append(buf, "0");
 }
 
+/**
+ * @brief Gets the name of the C function used to free a variable of the given Eolian type.
+ *
+ * This function maps Eolian built-in types (and some specific known types like classes)
+ * to their corresponding deallocation functions (e.g., "free" for MSTRING,
+ * "eina_stringshare_del" for STRINGSHARE, "efl_del" for classes).
+ *
+ * @param type The Eolian_Type for which to find the free function.
+ * @return A string containing the name of the free function (e.g., "free", "eina_list_free"),
+ *         or NULL if no standard free function is known for the type.
+ *         Returns "(void)" for EOLIAN_TYPE_BUILTIN_FUTURE as it's a placeholder.
+ */
 static const char *
 _free_func_get(const Eolian_Type *type)
 {
@@ -198,6 +269,19 @@ _free_func_get(const Eolian_Type *type)
      }
 }
 
+/**
+ * @brief Generates C code to free a variable using its standard free function.
+ *
+ * This function looks up the appropriate free function for the given Eolian_Type
+ * and generates a C statement to call it on the specified parameter.
+ * For EOLIAN_TYPE_BUILTIN_HASH, it also generates a call to eina_hash_free_cb_set(param, NULL)
+ * before eina_hash_free(param).
+ *
+ * @param buf Pointer to the Eina_Strbuf where the C code will be appended.
+ * @param type The Eolian_Type of the variable to be freed.
+ * @param parameter An Eina_Strbuf containing the C name of the variable to be freed.
+ * @param additional_intention A string to prepend to the generated line, typically for indentation (e.g., "   ").
+ */
 static void
 _generate_normal_free(Eina_Strbuf **buf, const Eolian_Type *type, const Eina_Strbuf *parameter, const char *additional_intention)
 {
@@ -220,6 +304,18 @@ _generate_normal_free(Eina_Strbuf **buf, const Eolian_Type *type, const Eina_Str
    eina_strbuf_append(*buf, ");\n");
 }
 
+/**
+ * @brief Generates the content of a loop for freeing elements within a container.
+ *
+ * This is a helper function used by _generate_iterative_free. It generates
+ * the C code block that calls _generate_normal_free for an individual element
+ * of a container.
+ *
+ * @param buf Pointer to the Eina_Strbuf where the C code will be appended.
+ * @param inner_type The Eolian_Type of the elements within the container.
+ * @param iter_param An Eina_Strbuf containing the C name of the loop iteration variable
+ *                   representing an element from the container.
+ */
 static void
 _generate_loop_content(Eina_Strbuf **buf, const Eolian_Type *inner_type, const Eina_Strbuf *iter_param)
 {
@@ -228,6 +324,23 @@ _generate_loop_content(Eina_Strbuf **buf, const Eolian_Type *inner_type, const E
    eina_strbuf_append(*buf, "     }\n");
 }
 
+/**
+ * @brief Generates C code to free elements of a container type (List, Iterator, Accessor, Hash, Array).
+ *
+ * This function handles the complexities of iterating over different Eolian container
+ * types and freeing their elements, potentially recursively if the elements themselves
+ * are complex types that require freeing.
+ * For Hashes with movable inner types, it sets the free callback on the hash.
+ * For other containers, it generates the appropriate Eina iteration macro (EINA_LIST_FREE,
+ * EINA_ITERATOR_FOREACH, EINA_ACCESSOR_FOREACH, or a while loop with eina_array_pop)
+ * and calls _generate_loop_content to free each element.
+ *
+ * @param buf Pointer to the Eina_Strbuf where the C code will be appended.
+ * @param type The Eolian_Type of the container itself.
+ * @param inner_type The Eolian_Type of the elements within the container.
+ * @param parameter The Eolian_Function_Parameter representing the container variable.
+ * @param param An Eina_Strbuf containing the C name of the container variable.
+ */
 static void
 _generate_iterative_free(Eina_Strbuf **buf, const Eolian_Type *type, const Eolian_Type *inner_type, Eolian_Function_Parameter *parameter, Eina_Strbuf *param)
 {
@@ -304,6 +417,24 @@ _generate_iterative_free(Eina_Strbuf **buf, const Eolian_Type *type, const Eolia
    eina_strbuf_free(iter_param);
 }
 
+/**
+ * @brief Generates C code for freeing "owned" parameters in a fallback scenario.
+ *
+ * This function iterates through a list of Eolian function parameters. If a parameter
+ * is marked as "move" (ownership is transferred) and is not an OUT parameter,
+ * this function generates code to free it. This is typically used to clean up
+ * resources if a function call fails partway through after some parameters have
+ * already been processed or allocated.
+ * It handles simple types with _generate_normal_free and container types with
+ * _generate_iterative_free. Non-owned parameters or OUT parameters result in
+ * a `(void)param_name;` statement to suppress unused variable warnings.
+ *
+ * @param itr An Eina_Iterator over Eolian_Function_Parameter objects.
+ * @param fallback_free_ownership The Eina_Strbuf to append the generated C free statements to.
+ * @param param_call An Eina_Strbuf used as a temporary buffer to construct the parameter name
+ *                   (potentially with a '*' for INOUT parameters).
+ * @return The number of parameters for which ownership-freeing code was generated.
+ */
 static int
 _gen_function_param_fallback(Eina_Iterator *itr, Eina_Strbuf *fallback_free_ownership, Eina_Strbuf *param_call)
 {
@@ -354,6 +485,18 @@ _gen_function_param_fallback(Eina_Iterator *itr, Eina_Strbuf *fallback_free_owne
    return owners;
 }
 
+/**
+ * @brief Gets the suffix for `eina_value_..._init` or `eina_value_..._convert`
+ *        functions based on an Eolian built-in type.
+ *
+ * This is used for generating reflection code that interacts with Eina_Value.
+ * For example, EOLIAN_TYPE_BUILTIN_INT maps to "int", so functions like
+ * `eina_value_int_init` or `eina_value_int_convert` would be used.
+ *
+ * @param abtp The aliased base Eolian_Type.
+ * @return A string representing the Eina_Value type suffix (e.g., "char", "int", "double", "stringshare"),
+ *         or NULL if the type is not directly supported by a simple Eina_Value init/convert function.
+ */
 static const char *
 _get_reflect_initf(const Eolian_Type *abtp)
 {
@@ -387,6 +530,22 @@ _get_reflect_initf(const Eolian_Type *abtp)
    return initf;
 }
 
+/**
+ * @brief Generates the C implementation of a reflection getter function.
+ *
+ * This function creates a static C function named `__eolian_CLASS_PROPERTY_get_reflect`
+ * that takes an `Eo *obj`, calls the actual property getter, and then wraps the
+ * result in an `Eina_Value` using the appropriate `eina_value_TYPE_init` function.
+ * This is only generated for properties whose value type is not a pointer and
+ * is supported by `_get_reflect_initf`.
+ *
+ * @param buf The Eina_Strbuf to append the generated C code to.
+ * @param cnamel The C-style, lowercased class name (e.g., "my_class").
+ * @param pr The Eolian_Function_Parameter representing the property's value.
+ * @param fid The Eolian_Function (property) ID.
+ * @param refh A hash table used to track reflection capabilities (get, set, or both) for functions.
+ *             This function updates the hash entry for `fid` to indicate EOLIAN_PROP_GET or EOLIAN_PROPERTY.
+ */
 static void
 _gen_reflect_get(Eina_Strbuf *buf, const char *cnamel,
                  const Eolian_Function_Parameter *pr,
@@ -424,6 +583,23 @@ _gen_reflect_get(Eina_Strbuf *buf, const char *cnamel,
    eina_strbuf_append(buf, "}\n\n");
 }
 
+/**
+ * @brief Generates the C implementation of a reflection setter function.
+ *
+ * This function creates a static C function named `__eolian_CLASS_PROPERTY_set_reflect`
+ * that takes an `Eo *obj` and an `Eina_Value val`. It converts the `Eina_Value`
+ * to the appropriate C type using `eina_value_TYPE_convert` and then calls the
+ * actual property setter.
+ * This is only generated for properties whose value type is not a pointer and
+ * is supported by `_get_reflect_initf`.
+ *
+ * @param buf The Eina_Strbuf to append the generated C code to.
+ * @param cnamel The C-style, lowercased class name (e.g., "my_class").
+ * @param pr The Eolian_Function_Parameter representing the property's value.
+ * @param fid The Eolian_Function (property) ID.
+ * @param refh A hash table used to track reflection capabilities (get, set, or both) for functions.
+ *             This function updates the hash entry for `fid` to indicate EOLIAN_PROP_SET or EOLIAN_PROPERTY.
+ */
 static void
 _gen_reflect_set(Eina_Strbuf *buf, const char *cnamel,
                  const Eolian_Function_Parameter *pr,
@@ -472,6 +648,29 @@ _gen_reflect_set(Eina_Strbuf *buf, const char *cnamel,
    eina_strbuf_append(buf, "}\n\n");
 }
 
+/**
+ * @brief Emits the C code for a static class function wrapper.
+ *
+ * Static Eolian functions are exposed as regular C functions. This function
+ * generates the public API for such a static function. It typically calls an
+ * internal, underscore-prefixed version of the function.
+ *
+ * @param buf The Eina_Strbuf to append the generated C code to.
+ * @param fid The Eolian_Function ID of the static function.
+ * @param ftype The Eolian_Function_Type (should be EOLIAN_METHOD for static functions,
+ *              or EOLIAN_PROP_GET/EOLIAN_PROP_SET if it's a static property, though
+ *              static properties are less common and might be handled as methods).
+ * @param rtp The Eolian_Type of the return value, or NULL if void.
+ * @param rtpn The C type string of the return value (e.g., "int", "void").
+ * @param params_full An Eina_Strbuf containing the full parameter declarations for the function
+ *                    (e.g., "int a, const char *b").
+ * @param ocnamel The C-style, lowercased name of the original class if this function is
+ *                an implementation from a different class (e.g., from an interface); NULL otherwise.
+ * @param func_suffix Suffix for the function name (e.g., "_get", "_set", or "").
+ * @param params An Eina_Strbuf containing the comma-separated list of parameter names
+ *               (e.g., "a, b").
+ * @param function_name The fully qualified C name for the public static function.
+ */
 static void
 _emit_class_function(Eina_Strbuf *buf, const Eolian_Function *fid, const Eolian_Function_Type ftype, const Eolian_Type *rtp, const char *rtpn, Eina_Strbuf *params_full,
                      const char *ocnamel, const char *func_suffix, Eina_Strbuf *params, const char *function_name)
@@ -514,6 +713,28 @@ _emit_class_function(Eina_Strbuf *buf, const Eolian_Function *fid, const Eolian_
    eina_strbuf_append(buf, "}\n");
 }
 
+/**
+ * @brief Generates the C code for a single Eolian function (method or property).
+ *
+ * This is a core function responsible for generating various parts of a function's
+ * C representation, including:
+ * - The internal implementation function (e.g., `_class_method_name` or `__eolian_class_method_name`
+ *   if parameter default values or auto-empty implementation is involved).
+ * - Parameter handling, including default value initialization.
+ * - Fallback code for freeing owned parameters if `fallback_free_ownership` is generated.
+ * - Reflection getter/setter functions via `_gen_reflect_get`/`_gen_reflect_set`.
+ * - The public API function wrapper (e.g., `EFL_FUNC_BODY` macros or static function wrappers
+ *   via `_emit_class_function`).
+ *
+ * @param cl The Eolian_Class to which this function implementation belongs.
+ * @param fid The Eolian_Function ID (method or property).
+ * @param ftype The specific Eolian_Function_Type to generate (EOLIAN_METHOD, EOLIAN_PROP_GET, EOLIAN_PROP_SET).
+ *              If the original ftype from eolian_implement_function_get was EOLIAN_PROPERTY, this function
+ *              is called twice, once for _GET and once for _SET.
+ * @param buf The Eina_Strbuf to append the generated C code to.
+ * @param impl The Eolian_Implement object providing details about this specific function implementation.
+ * @param refh A hash table used to track reflection capabilities for properties.
+ */
 static void
 _gen_func(const Eolian_Class *cl, const Eolian_Function *fid,
           Eolian_Function_Type ftype, Eina_Strbuf *buf,

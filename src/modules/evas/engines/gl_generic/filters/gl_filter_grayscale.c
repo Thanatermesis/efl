@@ -1,5 +1,21 @@
 #include "gl_engine_filter.h"
 
+/**
+ * @internal
+ * @brief Applies a grayscale filter to an image buffer using OpenGL.
+ *
+ * This function is the core implementation of the grayscale filter. It sets up
+ * the OpenGL context, binds the input and output buffers, and invokes the
+ * specific GL routine to perform the grayscale conversion.
+ *
+ * It handles both in-place (input buffer is the same as output buffer) and
+ * out-of-place filtering. For in-place operations, EVAS_RENDER_COPY is used.
+ *
+ * @param[in] re The GL render engine instance.
+ * @param[in] cmd The filter command containing all necessary data like
+ *                input/output buffers, dimensions, and drawing parameters.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 _gl_filter_grayscale(Render_Engine_GL_Generic *re, Evas_Filter_Command *cmd)
 {
@@ -42,6 +58,22 @@ _gl_filter_grayscale(Render_Engine_GL_Generic *re, Evas_Filter_Command *cmd)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the function pointer for the grayscale filter.
+ *
+ * This function acts as a factory for the grayscale filter. Based on the
+ * provided command, it can potentially return different filter implementations.
+ * In this case, it always returns _gl_filter_grayscale.
+ *
+ * It performs basic validation on the filter command to ensure that input
+ * and output buffers are valid before returning the filter function.
+ *
+ * @param[in] re The GL render engine instance (unused).
+ * @param[in] cmd The filter command to be executed.
+ * @return A function pointer to the correct grayscale filter implementation
+ *         (GL_Filter_Apply_Func), or @c NULL if the command is invalid.
+ */
 GL_Filter_Apply_Func
 gl_filter_grayscale_func_get(Render_Engine_GL_Generic *re EINA_UNUSED, Evas_Filter_Command *cmd)
 {

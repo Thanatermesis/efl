@@ -50,6 +50,13 @@ typedef enum _api_state api_state;
 
 static int bounce_max = 50;
 
+/**
+ * @brief Set the API state for the genlist test.
+ * This function applies a specific test state to the genlist widget,
+ * cycling through different configurations to test various genlist APIs.
+ * It's part of a simple state machine for the API test.
+ * @param api The api_data struct containing the current state and widgets.
+ */
 static void
 set_api_state(api_data *api)
 {
@@ -109,6 +116,15 @@ set_api_state(api_data *api)
      }
 }
 
+/**
+ * @brief Callback for the "Next API function" button.
+ * This function is called when the API test button is clicked. It advances
+ * the test state, calls set_api_state() to apply the changes, and updates
+ * the button's text to reflect the next state.
+ * @param data The api_data struct.
+ * @param obj The button object that was clicked.
+ * @param event_info Evas event info (unused).
+ */
 static void
 _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {  /* Will add here a SWITCH command containing code to modify test-object */
@@ -139,6 +155,15 @@ typedef struct _Testitem
    Eina_Bool checked;
 } Testitem;
 
+/**
+ * @brief Get the text for a genlist item.
+ * This is a callback function for the Elm_Genlist_Item_Class, used to
+ * retrieve the text for an item's text part.
+ * @param data The item data, here an integer cast to void*.
+ * @param obj The genlist object (unused).
+ * @param part The name of the part to get text for (unused).
+ * @return A newly allocated string with the item's text.
+ */
 static char *
 gl_text_get1(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
@@ -150,6 +175,15 @@ gl_text_get1(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNU
    return strdup(buf);
 }
 
+/**
+ * @brief Get the content for a genlist item.
+ * This is a callback function for the Elm_Genlist_Item_Class, used to
+ * retrieve an Evas_Object for an item's swallow part.
+ * @param data The item data (unused).
+ * @param obj The genlist item's object.
+ * @param part The name of the part to get content for.
+ * @return A new Evas_Object (an icon) to be swallowed.
+ */
 Evas_Object *gl_content_get(void *data EINA_UNUSED, Evas_Object *obj, const char *part)
 {
    char buf[PATH_MAX];
@@ -163,16 +197,39 @@ Evas_Object *gl_content_get(void *data EINA_UNUSED, Evas_Object *obj, const char
    return ic;
 }
 
+/**
+ * @brief Callback for a button click event within a genlist item.
+ * Prints a message to stdout. Used in the 'full' item style test.
+ * @param data User data (unused).
+ * @param obj The button object (unused).
+ * @param event_info Event info (unused).
+ */
 static void on_bt_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("button clicked\n");
 }
 
+/**
+ * @brief Callback for a checkbox changed event within a genlist item.
+ * Prints a message to stdout. Used in the 'full' item style test.
+ * @param data User data (unused).
+ * @param obj The checkbox object (unused).
+ * @param event_info Event info (unused).
+ */
 static void on_ck_changed(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("checkbox changed\n");
 }
 
+/**
+ * @brief Get the content for a "full" style genlist item.
+ * This callback creates a complex layout with a frame, box, icon, button,
+ * and checkbox, to be swallowed into the item's content area.
+ * @param data The item data (unused).
+ * @param obj The genlist item's object.
+ * @param part The name of the part to get content for. Must be "elm.swallow.content".
+ * @return A new Evas_Object (a frame containing other widgets).
+ */
 Evas_Object *gl_content_full_get(void *data EINA_UNUSED, Evas_Object *obj, const char *part)
 {
    Evas_Object *fr, *bx, *ic, *bt, *ck;
@@ -216,11 +273,33 @@ Evas_Object *gl_content_full_get(void *data EINA_UNUSED, Evas_Object *obj, const
 }
 
 
+/**
+ * @brief Get the state for a genlist item.
+ * This is a callback function for the Elm_Genlist_Item_Class. It's used
+ * to determine the state of a part, e.g., "selected". Here it always
+ * returns false.
+ * @param data The item data (unused).
+ * @param obj The genlist item's object (unused).
+ * @param part The name of the part to get state for (unused).
+ * @return EINA_FALSE always.
+ */
 Eina_Bool gl_state_get(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
    return EINA_FALSE;
 }
 
+/**
+ * @brief Get reusable content for a genlist item.
+ * This callback demonstrates content reuse. If an old content object is provided
+ * and it's for the "elm.swallow.end" part, it is reused. Otherwise, new
+ * content is created. This is a performance optimization to avoid creating
+ * and destroying objects frequently during scrolling.
+ * @param data The item data (unused).
+ * @param obj The genlist item's object.
+ * @param part The name of the part to get content for.
+ * @param old A previously used content object that can be reused, or NULL.
+ * @return A new or reused Evas_Object for the content part.
+ */
 Evas_Object *gl_reusable_content_get(void *data EINA_UNUSED, Evas_Object *obj, const char *part, Evas_Object *old)
 {
    if (old && !strcmp(part, "elm.swallow.end"))
@@ -250,6 +329,13 @@ Evas_Object *gl_reusable_content_get(void *data EINA_UNUSED, Evas_Object *obj, c
    // return NULL;
 }
 
+/**
+ * @brief Callback for when a genlist item is selected.
+ * Prints the item data, genlist object pointer, item pointer, and index.
+ * @param data The function data provided at item creation.
+ * @param obj The genlist object.
+ * @param event_info A pointer to the selected Elm_Object_Item.
+ */
 static void
 gl_sel(void *data, Evas_Object *obj, void *event_info)
 {
@@ -257,6 +343,15 @@ gl_sel(void *data, Evas_Object *obj, void *event_info)
           data, obj, event_info, elm_genlist_item_index_get(event_info));
 }
 
+/**
+ * @brief Callback for mouse move events over the genlist.
+ * Determines which genlist item is under the cursor and prints information
+ * about it. This is used to test elm_genlist_at_xy_item_get().
+ * @param data The genlist object.
+ * @param evas The evas canvas (unused).
+ * @param obj The object the event is on (unused).
+ * @param event_info The mouse move event data.
+ */
 static void
 _move(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -273,42 +368,90 @@ _move(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *ev
 
 
 /***  Genlist  ***************************************************************/
+/**
+ * @brief Callback to bring item 50 into view.
+ * @param data A pointer to the Elm_Object_Item for item 50.
+ * @param obj The button object (unused).
+ * @param event_info Event info (unused).
+ */
 static void
 _bt50_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_genlist_item_bring_in(data, ELM_GENLIST_ITEM_SCROLLTO_IN);
 }
 
+/**
+ * @brief Callback to bring item 1500 into view.
+ * @param data A pointer to the Elm_Object_Item for item 1500.
+ * @param obj The button object (unused).
+ * @param event_info Event info (unused).
+ */
 static void
 _bt1500_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_genlist_item_bring_in(data, ELM_GENLIST_ITEM_SCROLLTO_MIDDLE);
 }
 
+/**
+ * @brief Callback for the "selected" smart event of the genlist.
+ * Prints the pointer to the selected item.
+ * @param data User data (unused).
+ * @param obj The genlist object (unused).
+ * @param event_info A pointer to the selected Elm_Object_Item.
+ */
 static void
 _gl_selected(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
    printf("selected: %p\n", event_info);
 }
 
+/**
+ * @brief Callback for the "unselected" smart event of the genlist.
+ * Prints the pointer to the unselected item.
+ * @param data User data (unused).
+ * @param obj The genlist object (unused).
+ * @param event_info A pointer to the unselected Elm_Object_Item.
+ */
 static void
 _gl_unselected(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
    printf("unselected: %p\n", event_info);
 }
 
+/**
+ * @brief Callback for the "highlighted" smart event of the genlist.
+ * Prints the pointer to the highlighted item.
+ * @param data User data (unused).
+ * @param obj The genlist object (unused).
+ * @param event_info A pointer to the highlighted Elm_Object_Item.
+ */
 static void
 _gl_highlighted(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
    printf("highlighted: %p\n", event_info);
 }
 
+/**
+ * @brief Callback for the "unhighlighted" smart event of the genlist.
+ * Prints the pointer to the unhighlighted item.
+ * @param data User data (unused).
+ * @param obj The genlist object (unused).
+ * @param event_info A pointer to the unhighlighted Elm_Object_Item.
+ */
 static void
 _gl_unhighlighted(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
    printf("unhighlighted: %p\n", event_info);
 }
 
+/**
+ * @brief Callback for the "clicked,double" smart event of the genlist.
+ * Toggles the "pinned" state of the double-clicked item. A pinned item
+ * will not be scrolled off the screen if possible.
+ * @param data User data (unused).
+ * @param obj The genlist object (unused).
+ * @param event_info A pointer to the double-clicked Elm_Object_Item.
+ */
 static void
 _gl_double_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -320,24 +463,53 @@ _gl_double_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *e
      elm_genlist_item_pin_set(it, EINA_FALSE);
 }
 
+/**
+ * @brief Callback for the "clicked,right" smart event of the genlist.
+ * Prints the pointer to the right-clicked item.
+ * @param data User data (unused).
+ * @param obj The genlist object (unused).
+ * @param event_info A pointer to the right-clicked Elm_Object_Item.
+ */
 static void
 _gl_right_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
    printf("right clicked: %p\n", event_info);
 }
 
+/**
+ * @brief Callback for the "longpressed" smart event of the genlist.
+ * Prints the pointer to the long-pressed item.
+ * @param data User data (unused).
+ * @param obj The genlist object (unused).
+ * @param event_info A pointer to the long-pressed Elm_Object_Item.
+ */
 static void
 _gl_longpress(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
    printf("longpress %p\n", event_info);
 }
 
+/**
+ * @brief Callback for the "changed" smart event of the genlist.
+ * This is called when an item's state changes, e.g., through a checkbox.
+ * @param data User data (unused).
+ * @param obj The genlist object (unused).
+ * @param event_info Event info (unused).
+ */
 static void
 _gl_changed(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
 //   printf("changed %p\n", event_info);
 }
 
+/**
+ * @brief Cleanup callback for the window's "del" event.
+ * Frees the memory allocated for the api_data structure and its members.
+ * @param data The api_data struct to free.
+ * @param e Evas canvas (unused).
+ * @param obj The window object (unused).
+ * @param event_info Event info (unused).
+ */
 static void
 _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -356,6 +528,14 @@ typedef struct
 #ifdef CLOCK_PROCESS_CPUTIME_ID
 static unsigned long long frames = 0;
 
+/**
+ * @brief Frame callback for the bounce performance test.
+ * Increments a frame counter on each render flush. Used for performance
+ * measurement.
+ * @param data User data (unused).
+ * @param e Evas canvas (unused).
+ * @param event_info Event info (unused).
+ */
 static void
 _bounce_cb_frame(void *data EINA_UNUSED, Evas *e EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -363,6 +543,16 @@ _bounce_cb_frame(void *data EINA_UNUSED, Evas *e EINA_UNUSED, void *event_info E
 }
 #endif
 
+/**
+ * @brief Timer callback for the bounce test.
+ * This function is called periodically by a timer to scroll the genlist
+ * back and forth between two items, creating a "bounce" effect. It's used
+ * for performance testing and stress testing the scrolling mechanism.
+ * If the environment variable ELM_TEST_AUTOBOUNCE is set, it will exit
+ * the application after a certain number of bounces.
+ * @param data A pointer to the Bounce struct containing test data.
+ * @return EINA_TRUE to keep the timer ticking.
+ */
 static Eina_Bool
 _bounce_cb(void *data)
 {
@@ -402,6 +592,13 @@ _bounce_cb(void *data)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for the "Bounce" button.
+ * Starts or stops the bounce test timer. If no timer is active, it starts one.
+ * @param data A pointer to the Bounce struct.
+ * @param obj The button object.
+ * @param event_info Event info (unused).
+ */
 static void
 _btbounce_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -414,6 +611,15 @@ _btbounce_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Deletion callback for the bounce button.
+ * Cleans up resources used by the bounce test, such as the timer and the
+ * Bounce data structure, when the button is deleted.
+ * @param data A pointer to the Bounce struct.
+ * @param e Evas canvas (unused).
+ * @param obj The button object being deleted.
+ * @param event_info Event info (unused).
+ */
 static void
 _btdel_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -427,6 +633,25 @@ _btdel_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EI
    free(bounce);
 }
 
+/**
+ * @brief The main test function for genlist.
+ * Creates a window with a genlist widget and various controls to test its
+ * core functionalities, including item creation, scrolling, selection,
+ * API state changes, and performance with a large number of items.
+ *
+ * @param data Test data (unused).
+ * @param obj Parent object (unused).
+ * @param event_info Event info (unused).
+ *
+ * This test demonstrates:
+ * - Basic genlist creation and population.
+ * - Various smart callbacks (selected, clicked, etc.).
+ * - Reusable content for items to improve performance.
+ * - Programmatic scrolling to specific items.
+ * - An API testing state machine.
+ * - A "bounce" test for performance and stress testing.
+ * - Using an overlay to get mouse coordinates for `elm_genlist_at_xy_item_get`.
+ */
 void
 test_genlist(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

@@ -155,6 +155,37 @@ EINA_API void eina_binbuf_reset(Eina_Binbuf *buf) EINA_ARG_NONNULL(1);
  * eina_binbuf_use() to mark them as such, so eina_binbuf_length_get()
  * will account for the new bytes.
  *
+ * @par Example
+ * @code
+ * Eina_Binbuf *buf = eina_binbuf_new();
+ * if (!buf) return; // Handle allocation failure
+ *
+ * // Request space for at least 1024 bytes
+ * Eina_Rw_Slice rw_slice = eina_binbuf_expand(buf, 1024);
+ *
+ * // Check if the requested space was allocated
+ * if (rw_slice.len >= 1024)
+ * {
+ *   // Simulate reading data into the buffer, e.g., from a file or socket.
+ *   // For this example, let's assume 512 bytes were successfully read/written.
+ *   // In a real scenario, this would be the return value of a read() or similar.
+ *   // ((unsigned char*)rw_slice.mem)[0] = 0xDE; // Example: write some data
+ *   // ((unsigned char*)rw_slice.mem)[511] = 0xAD;
+ *   size_t bytes_actually_processed = 512;
+ *
+ *   // Mark these bytes as used so the buffer's length is updated.
+ *   if (eina_binbuf_use(buf, bytes_actually_processed))
+ *   {
+ *     // Buffer length should now be 512
+ *     // printf("Buffer length after use: %zu\n", eina_binbuf_length_get(buf));
+ *   }
+ * }
+ *
+ * // ... further operations with buf ...
+ *
+ * eina_binbuf_free(buf);
+ * @endcode
+ *
  * @see eina_binbuf_rw_slice_get()
  * @see eina_binbuf_use()
  *
@@ -306,6 +337,32 @@ EINA_API Eina_Bool eina_binbuf_insert_char(Eina_Binbuf *buf, unsigned char c, si
  * This function removes a slice of @p buf, starting at @p start
  * (inclusive) and ending at @p end (non-inclusive). Both values are
  * in bytes.
+ *
+ * @par Example
+ * @code
+ * Eina_Binbuf *buf = eina_binbuf_new();
+ * if (!buf) return; // Handle allocation failure
+ *
+ * const unsigned char initial_data[] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE};
+ * eina_binbuf_append_length(buf, initial_data, sizeof(initial_data));
+ * // Buffer content: [0xAA, 0xBB, 0xCC, 0xDD, 0xEE], length: 5
+ *
+ * // Remove elements from index 1 (0xBB) up to (but not including) index 3 (0xDD).
+ * // This will remove 0xBB and 0xCC.
+ * if (eina_binbuf_remove(buf, 1, 3))
+ * {
+ *   // Buffer content should now be: [0xAA, 0xDD, 0xEE], length: 3
+ *   // const unsigned char *content = eina_binbuf_string_get(buf);
+ *   // size_t len = eina_binbuf_length_get(buf);
+ *   // Verification:
+ *   // if (len == 3 && content[0] == 0xAA && content[1] == 0xDD && content[2] == 0xEE)
+ *   // {
+ *   //   printf("Removal successful and content is as expected.\n");
+ *   // }
+ * }
+ *
+ * eina_binbuf_free(buf);
+ * @endcode
  */
 EINA_API Eina_Bool eina_binbuf_remove(Eina_Binbuf *buf, size_t start, size_t end) EINA_ARG_NONNULL(1);
 

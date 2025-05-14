@@ -47,6 +47,17 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] =
 };
 #undef ELM_PRIV_ACTIONSLIDER_SIGNALS
 
+/**
+ * @internal
+ * @brief Adjusts the given position based on the widget's mirrored state.
+ *
+ * If the widget is mirrored, ELM_ACTIONSLIDER_LEFT becomes ELM_ACTIONSLIDER_RIGHT
+ * and vice-versa. ELM_ACTIONSLIDER_CENTER remains unchanged.
+ *
+ * @param obj The actionslider object.
+ * @param pos The original position.
+ * @return The adjusted position considering mirroring.
+ */
 static Elm_Actionslider_Pos
 _get_pos_by_orientation(const Evas_Object *obj,
                         Elm_Actionslider_Pos pos)

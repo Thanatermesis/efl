@@ -60,8 +60,28 @@ static const char PART_NAME_CLOSED_BUTTON[] = "closedbutton";
 static Eina_Bool _elm_multibuttonentry_smart_focus_next_enable = EINA_FALSE;
 static Eina_Bool _elm_multibuttonentry_smart_focus_direction_enable = EINA_TRUE;
 
+/**
+ * @internal
+ * @brief Callback invoked when the text in the entry part changes.
+ * @param data The multibuttonentry widget.
+ * @param event The Efl_Event details.
+ */
 static void _entry_changed_cb(void *data, const Efl_Event *event);
+
+/**
+ * @internal
+ * @brief Callback invoked when the focus state of the entry part changes.
+ * @param data The multibuttonentry widget.
+ * @param event The Efl_Event details, specifically event->object is the entry.
+ */
 static void _entry_focus_changed_cb(void *data, const Efl_Event *event);
+
+/**
+ * @internal
+ * @brief Callback invoked when the entry part is clicked.
+ * @param data The multibuttonentry widget.
+ * @param event The Efl_Event details.
+ */
 static void _entry_clicked_cb(void *data, const Efl_Event *event);
 
 EFL_CALLBACKS_ARRAY_DEFINE(_multi_buttonentry_cb,
@@ -82,6 +102,17 @@ _elm_multibuttonentry_efl_ui_l10n_translation_update(Eo *obj EINA_UNUSED, Elm_Mu
    efl_ui_l10n_translation_update(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Default formatting function for the shrink mode counter.
+ * This function formats the count of hidden items (e.g., "+N").
+ * @param count The number of hidden items.
+ * @param data User data (unused in this default implementation).
+ * @return A newly allocated string representing the formatted count,
+ *         or @c NULL on failure. The caller is responsible for freeing
+ *         this string.
+ * @see elm_multibuttonentry_format_function_set
+ */
 static char *
 _format_count(int count, void *data EINA_UNUSED)
 {
@@ -136,6 +167,14 @@ _elm_multibuttonentry_efl_ui_widget_theme_apply(Eo *obj, Elm_Multibuttonentry_Da
    return int_ret;
 }
 
+/**
+ * @internal
+ * @brief Manages the visibility of the guide text or the entry field.
+ * If no items are present, no text is in the entry, and the widget
+ * is not focused, the guide text is shown. Otherwise, the entry is shown
+ * (if editable).
+ * @param obj The multibuttonentry widget.
+ */
 static void
 _visual_guide_text_set(Evas_Object *obj)
 {
@@ -174,6 +213,15 @@ _visual_guide_text_set(Evas_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Sets the shrink mode of the multibuttonentry.
+ * In shrink mode, only a limited number of items are displayed,
+ * followed by a counter for the remaining items (e.g., "+N").
+ * In expanded mode, all items are displayed.
+ * @param obj The multibuttonentry widget.
+ * @param shrink If @c EINA_TRUE, enable shrink mode; otherwise, disable it.
+ */
 static void
 _shrink_mode_set(Evas_Object *obj,
                  Eina_Bool shrink)
@@ -323,6 +371,13 @@ _shrink_mode_set(Evas_Object *obj,
      _visual_guide_text_set(obj);
 }
 
+/**
+ * @internal
+ * @brief Updates the view of the multibuttonentry.
+ * This function is called when changes occur that might affect the layout,
+ * such as label changes, guide text changes, or shrink mode toggling.
+ * @param sd The private data of the multibuttonentry widget.
+ */
 static void
 _view_update(Elm_Multibuttonentry_Data *sd)
 {
@@ -350,6 +405,13 @@ _view_update(Elm_Multibuttonentry_Data *sd)
    _visual_guide_text_set(obj);
 }
 
+/**
+ * @internal
+ * @brief Internal logic for deleting a multibuttonentry item.
+ * This function removes the item from the internal list, unplugs it
+ * from the box, emits a deletion signal, and updates the view if necessary.
+ * @param item The item data to be deleted.
+ */
 static void
 _item_del(Elm_Multibuttonentry_Item_Data *item)
 {
@@ -376,6 +438,14 @@ _item_del(Elm_Multibuttonentry_Item_Data *item)
      _visual_guide_text_set(obj);
 }
 
+/**
+ * @internal
+ * @brief Changes the visual state of the currently selected item.
+ * For example, emits a signal to change its appearance to "focused" or "default".
+ * @param obj The multibuttonentry widget.
+ * @param state The new state for the selected item.
+ *              Example: MULTIBUTTONENTRY_BUTTON_STATE_SELECTED, MULTIBUTTONENTRY_BUTTON_STATE_DEFAULT
+ */
 static void
 _current_item_state_change(Evas_Object *obj,
                              Multibuttonentry_Button_State state)
@@ -403,6 +473,14 @@ _current_item_state_change(Evas_Object *obj,
      }
 }
 
+/**
+ * @internal
+ * @brief Sets a new item as the currently selected one.
+ * It updates the state of the previously selected item to default and
+ * the new item to selected.
+ * @param obj The multibuttonentry widget.
+ * @param eo_it The Eolian object item to be set as current.
+ */
 static void
 _current_item_change(Evas_Object *obj,
                        Elm_Object_Item *eo_it)
@@ -429,6 +507,15 @@ _current_item_change(Evas_Object *obj,
    _current_item_state_change(obj, MULTIBUTTONENTRY_BUTTON_STATE_SELECTED);
 }
 
+/**
+ * @internal
+ * @brief Handles the selection of an item.
+ * This function updates the current selected item, invokes its callback if any,
+ * manages focus between the item and the entry field, and handles accessibility
+ * announcements.
+ * @param obj The multibuttonentry widget.
+ * @param it The item data to select. If @c NULL, deselects the current item.
+ */
 static void
 _item_select(Evas_Object *obj,
                Elm_Multibuttonentry_Item_Data *it)
@@ -480,6 +567,14 @@ _item_select(Evas_Object *obj,
      }
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when an item's layout (button) is clicked.
+ * @param data The @c Elm_Object_Item associated with the clicked button.
+ * @param obj The Evas_Object that emitted the signal (the item's layout).
+ * @param emission The emitted signal string (e.g., "mouse,clicked,1").
+ * @param source The source of the signal.
+ */
 static void
 _on_item_clicked(void *data,
                    Evas_Object *obj EINA_UNUSED,
@@ -503,6 +598,14 @@ _on_item_clicked(void *data,
        (WIDGET(it), ELM_MULTIBUTTONENTRY_EVENT_ITEM_CLICKED, eo_it);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when an item's layout signals deletion (e.g., via a close button within the item).
+ * @param data The @c Elm_Object_Item associated with the item to be deleted.
+ * @param obj The Evas_Object that emitted the signal (the item's layout).
+ * @param emission The emitted signal string (e.g., "elm,deleted").
+ * @param source The source of the signal.
+ */
 static void
 _on_item_deleted(void *data,
                    Evas_Object *obj,
@@ -527,6 +630,13 @@ _on_item_deleted(void *data,
      }
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when an item gains focus.
+ * @param data The @c Elm_Multibuttonentry_Item_Data of the focused item.
+ * @param obj The Evas_Object that gained focus (the item's layout).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _on_item_focused(void *data,
                  Evas_Object *obj EINA_UNUSED,
@@ -540,6 +650,13 @@ _on_item_focused(void *data,
    sd->focused_it = it;
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when an item loses focus.
+ * @param data The @c Elm_Multibuttonentry_Item_Data of the unfocused item.
+ * @param obj The Evas_Object that lost focus (the item's layout).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _on_item_unfocused(void *data,
                    Evas_Object *obj EINA_UNUSED,
@@ -553,6 +670,13 @@ _on_item_unfocused(void *data,
    sd->focused_it = NULL;
 }
 
+/**
+ * @internal
+ * @brief Timer callback executed when a long press on an item is detected.
+ * Emits the "item,longpressed" signal.
+ * @param data The @c Elm_Multibuttonentry_Item_Data of the long-pressed item.
+ * @return @c ECORE_CALLBACK_CANCEL to stop the timer.
+ */
 static Eina_Bool
 _long_press_cb(void *data)
 {
@@ -568,6 +692,15 @@ _long_press_cb(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse down events on an item's layout.
+ * Used to start a timer for detecting long presses.
+ * @param data The @c Elm_Multibuttonentry_Item_Data of the item.
+ * @param evas The Evas canvas.
+ * @param obj The Evas_Object that received the event (the item's layout).
+ * @param event_info The @c Evas_Event_Mouse_Down details.
+ */
 static void
 _mouse_down_cb(void  *data,
                Evas *evas EINA_UNUSED,
@@ -586,6 +719,15 @@ _mouse_down_cb(void  *data,
       (_elm_config->longpress_timeout, _long_press_cb, it);
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse up events on an item's layout.
+ * Used to cancel the long press timer if the mouse is released before timeout.
+ * @param data The @c Elm_Multibuttonentry_Item_Data of the item.
+ * @param evas The Evas canvas.
+ * @param obj The Evas_Object that received the event (the item's layout).
+ * @param event_info The @c Evas_Event_Mouse_Up details (unused).
+ */
 static void
 _mouse_up_cb(void *data,
              Evas *evas EINA_UNUSED,
@@ -664,6 +806,12 @@ _elm_multibuttonentry_item_efl_object_destructor(Eo *eo_it,
    efl_destructor(efl_super(eo_it, ELM_MULTIBUTTONENTRY_ITEM_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Registers or unregisters the multibuttonentry's main label for accessibility.
+ * @param obj The multibuttonentry widget.
+ * @param is_access If @c EINA_TRUE, register for accessibility; otherwise, unregister.
+ */
 static void
 _access_multibuttonentry_label_register(Evas_Object *obj, Eina_Bool is_access)
 {
@@ -689,6 +837,13 @@ _access_multibuttonentry_label_register(Evas_Object *obj, Eina_Bool is_access)
    evas_object_propagate_events_set(sd->label, !is_access);
 }
 
+/**
+ * @internal
+ * @brief Registers or unregisters a multibuttonentry item for accessibility.
+ * @param obj The parent multibuttonentry widget.
+ * @param eo_item The @c Elm_Object_Item to register/unregister.
+ * @param is_access If @c EINA_TRUE, register for accessibility; otherwise, unregister.
+ */
 static void
 _access_multibuttonentry_item_register(Evas_Object *obj,
                                        Elm_Object_Item *eo_item,
@@ -722,6 +877,20 @@ _elm_multibuttonentry_item_efl_object_constructor(Eo *eo_item, Elm_Multibuttonen
    return eo_item;
 }
 
+/**
+ * @internal
+ * @brief Creates and adds a new item (button) to the multibuttonentry.
+ * This is the core function for item creation, handling filtering,
+ * theming, callbacks, and insertion into the layout.
+ * @param sd The private data of the multibuttonentry widget.
+ * @param str The text label for the new item.
+ * @param pos The position to insert the item.
+ *            Example: MULTIBUTTONENTRY_POS_START, MULTIBUTTONENTRY_POS_END
+ * @param efl_reference The reference item for POS_BEFORE or POS_AFTER insertion.
+ * @param func An optional callback function to be invoked when the item is selected.
+ * @param data Optional user data to be passed to the callback function.
+ * @return The newly created @c Elm_Object_Item, or @c NULL on failure or if filtered out.
+ */
 static Elm_Object_Item *
 _item_new(Elm_Multibuttonentry_Data *sd,
                  const char *str,
@@ -947,6 +1116,16 @@ _elm_multibuttonentry_efl_ui_widget_widget_input_event_handler(Eo *obj EINA_UNUS
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Callback for the "mouse,clicked,1" signal on the main widget's layout.
+ * This typically occurs when clicking on the background area of the widget.
+ * It shows the input panel if the widget is editable and calls the "clicked" smart callback.
+ * @param data User data (unused).
+ * @param obj The multibuttonentry widget.
+ * @param emission The emitted signal string.
+ * @param source The source of the signal.
+ */
 static void
 _mouse_clicked_signal_cb(void *data EINA_UNUSED,
                          Evas_Object *obj,
@@ -960,6 +1139,16 @@ _mouse_clicked_signal_cb(void *data EINA_UNUSED,
    evas_object_smart_callback_call(obj, "clicked", NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when the internal box containing items and entry is resized.
+ * Handles emitting "expanded" or "contracted" signals and adjusts item sizes
+ * if they exceed the new box width. Also re-evaluates shrink mode if active.
+ * @param data The multibuttonentry widget.
+ * @param evas The Evas canvas (unused).
+ * @param obj The box object that was resized (unused but is sd->box).
+ * @param event Event-specific information (unused).
+ */
 static void
 _box_resize_cb(void *data,
                Evas *evas EINA_UNUSED,
@@ -1012,6 +1201,16 @@ _box_resize_cb(void *data,
      _shrink_mode_set(data, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when the entry field is resized.
+ * If the parent multibuttonentry has focus, it ensures the entry's current
+ * text region (e.g., cursor) is shown.
+ * @param data The multibuttonentry widget.
+ * @param e The Evas canvas (unused).
+ * @param obj The entry object that was resized (unused but is sd->entry).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _entry_resize_cb(void *data,
                  Evas *e EINA_UNUSED,
@@ -1069,6 +1268,16 @@ _entry_clicked_cb(void *data, const Efl_Event *event EINA_UNUSED)
    elm_object_focus_set(sd->entry, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Callback for key down events on the main layout's resize object.
+ * Handles BackSpace/Delete to remove selected items or select the last item,
+ * and Enter/Return to activate focused items.
+ * @param data The multibuttonentry widget.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object that received the event (resize_obj).
+ * @param event_info The @c Evas_Event_Key_Down details. Note: cast to Evas_Event_Key_Up in code.
+ */
 static void
 _layout_key_down_cb(void *data,
                   Evas *e EINA_UNUSED,
@@ -1076,7 +1285,7 @@ _layout_key_down_cb(void *data,
                   void *event_info)
 {
    ELM_MULTIBUTTONENTRY_DATA_GET_OR_RETURN(data, sd);
-   Evas_Event_Key_Up *ev = (Evas_Event_Key_Up *)event_info;
+   Evas_Event_Key_Up *ev = (Evas_Event_Key_Up *)event_info; // FIXME: Should be Evas_Event_Key_Down
 
    if (!sd->box) return;
 
@@ -1117,6 +1326,17 @@ _layout_key_down_cb(void *data,
      sd->last_it_select = EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Callback for key down events on the entry field.
+ * Specifically handles BackSpace/Delete when the entry has only one character
+ * to manage the `last_it_select` flag, preventing immediate selection of the
+ * last item if the user is just deleting the first character of a new entry.
+ * @param data The multibuttonentry widget.
+ * @param e The Evas canvas (unused).
+ * @param obj The entry Evas_Object.
+ * @param event_info The @c Evas_Event_Key_Down details.
+ */
 static void
 _entry_key_down_cb(void *data,
                    Evas *e EINA_UNUSED,
@@ -1131,6 +1351,15 @@ _entry_key_down_cb(void *data,
      sd->last_it_select = EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Callback for key up events on the entry field.
+ * Handles Enter/Return to create a new item from the current entry text.
+ * @param data The multibuttonentry widget.
+ * @param e The Evas canvas (unused).
+ * @param obj The entry Evas_Object.
+ * @param event_info The @c Evas_Event_Key_Up details.
+ */
 static void
 _entry_key_up_cb(void *data,
                  Evas *e EINA_UNUSED,
@@ -1154,6 +1383,12 @@ _entry_key_up_cb(void *data,
      }
 }
 
+/**
+ * @internal
+ * @brief Registers all necessary event callbacks for the multibuttonentry widget
+ * and its internal components (entry, box, layout).
+ * @param obj The multibuttonentry widget.
+ */
 static void
 _callbacks_register(Evas_Object *obj)
 {
@@ -1179,6 +1414,14 @@ _callbacks_register(Evas_Object *obj)
    efl_event_callback_array_add(sd->entry, _multi_buttonentry_cb(), obj);
 }
 
+/**
+ * @internal
+ * @brief Sets the main label text of the multibuttonentry.
+ * The label is typically displayed at the beginning of the widget.
+ * If the string is empty, the label is hidden.
+ * @param obj The multibuttonentry widget.
+ * @param str The text to set as the label.
+ */
 static void
 _label_set(Evas_Object *obj,
            const char *str)
@@ -1213,6 +1456,13 @@ _label_set(Evas_Object *obj,
    _view_update(sd);
 }
 
+/**
+ * @internal
+ * @brief Sets the guide text of the multibuttonentry.
+ * The guide text is displayed when the entry is empty and not focused.
+ * @param obj The multibuttonentry widget.
+ * @param str The text to set as the guide text.
+ */
 static void
 _guide_text_set(Evas_Object *obj,
                 const char *str)
@@ -1239,6 +1489,14 @@ _guide_text_set(Evas_Object *obj,
      }
 }
 
+/**
+ * @internal
+ * @brief Allocates and initializes a new item filter structure.
+ * @param func The filter callback function.
+ * @param data User data to be passed to the filter callback.
+ * @return A pointer to the newly allocated @c Elm_Multibuttonentry_Item_Filter,
+ *         or @c NULL on allocation failure.
+ */
 static Elm_Multibuttonentry_Item_Filter *
 _filter_new(Elm_Multibuttonentry_Item_Filter_Cb func,
             void *data)
@@ -1253,12 +1511,28 @@ _filter_new(Elm_Multibuttonentry_Item_Filter_Cb func,
    return item_filter;
 }
 
+/**
+ * @internal
+ * @brief Frees an item filter structure.
+ * @param item_filter The filter to free.
+ */
 static void
 _filter_free(Elm_Multibuttonentry_Item_Filter *item_filter)
 {
    free(item_filter);
 }
 
+/**
+ * @internal
+ * @brief Calculates the minimum required size for the box, considering line wrapping.
+ * This function is used by the custom box layout to determine how many lines
+ * are needed and the height of each line.
+ * @param box The box object.
+ * @param priv The private data of the box object.
+ * @param[out] line_height Pointer to store the calculated height of a single line.
+ * @param data User data (unused).
+ * @return @c EINA_TRUE if calculation was successful, @c EINA_FALSE otherwise (e.g., box width is zero).
+ */
 static Eina_Bool
 _box_min_size_calculate(Evas_Object *box,
                         Evas_Object_Box_Data *priv,
@@ -1300,6 +1574,15 @@ _box_min_size_calculate(Evas_Object *box,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Custom layout callback for the internal Evas_Box.
+ * This function arranges the items (buttons) and the entry field within
+ * the box, handling line wrapping.
+ * @param o The box object being laid out.
+ * @param priv The private data of the box object.
+ * @param data The multibuttonentry widget (passed as user data to elm_box_layout_set).
+ */
 static void
 _box_layout_cb(Evas_Object *o,
                Evas_Object_Box_Data *priv,
@@ -1401,6 +1684,14 @@ _box_layout_cb(Evas_Object *o,
      }
 }
 
+/**
+ * @internal
+ * @brief Initializes the visual components of the multibuttonentry.
+ * This includes creating the internal box, label, entry field, and the
+ * "end" button used in shrink mode.
+ * @param obj The multibuttonentry widget.
+ * @param sd The private data of the multibuttonentry widget.
+ */
 static void
 _view_init(Evas_Object *obj, Elm_Multibuttonentry_Data *sd)
 {
@@ -1500,6 +1791,17 @@ _elm_multibuttonentry_text_get(Eo *obj, Elm_Multibuttonentry_Data *sd, const cha
    return text;
 }
 
+/**
+ * @internal
+ * @brief Callback function to provide accessibility information for the multibuttonentry.
+ * Constructs a string describing the current state, including the label,
+ * visible items, and a count of hidden items if in shrink mode or guide text.
+ * @param data User data (unused).
+ * @param obj The multibuttonentry widget.
+ * @return A newly allocated string with accessibility information.
+ *         The caller is responsible for freeing this string. Returns @c NULL
+ *         if no relevant information can be provided.
+ */
 static char *
 _access_info_cb(void *data EINA_UNUSED, Evas_Object *obj)
 {
@@ -1601,6 +1903,14 @@ _elm_multibuttonentry_efl_canvas_group_group_del(Eo *obj, Elm_Multibuttonentry_D
    efl_canvas_group_del(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Registers or unregisters all relevant parts of the multibuttonentry for accessibility.
+ * This includes the main label and all current items.
+ * @param obj The multibuttonentry widget.
+ * @param is_access If @c EINA_TRUE, register parts for accessibility;
+ *                  otherwise, unregister them.
+ */
 static void
 _access_obj_process(Evas_Object *obj, Eina_Bool is_access)
 {
@@ -1966,6 +2276,14 @@ _elm_multibuttonentry_item_efl_access_object_state_set_get(const Eo *eo_it, Elm_
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Accessibility action: Activate an item.
+ * Simulates a click on the item.
+ * @param obj The Eolian object representing the item.
+ * @param params Action parameters (unused).
+ * @return @c EINA_TRUE on success.
+ */
 static Eina_Bool
 _key_action_activate(Eo *obj, const char *params EINA_UNUSED)
 {
@@ -1974,6 +2292,14 @@ _key_action_activate(Eo *obj, const char *params EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Accessibility action: Delete an item.
+ * Simulates the deletion signal for the item.
+ * @param obj The Eolian object representing the item.
+ * @param params Action parameters (unused).
+ * @return @c EINA_TRUE on success.
+ */
 static Eina_Bool
 _key_action_delete(Eo *obj, const char *params EINA_UNUSED)
 {
@@ -1982,6 +2308,14 @@ _key_action_delete(Eo *obj, const char *params EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Accessibility action: Long press an item.
+ * Emits the item long-pressed event.
+ * @param obj The Eolian object representing the item.
+ * @param params Action parameters (unused).
+ * @return @c EINA_TRUE on success.
+ */
 static Eina_Bool
 _key_action_longpress(Eo *obj, const char *params EINA_UNUSED)
 {

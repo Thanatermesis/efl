@@ -8,12 +8,35 @@
 
 Evas_Object *uicdt1, *uicdt2, *uicdt3, *uicdt4;
 
+/**
+ * @brief Callback function for the "changed" event of the clock.
+ *
+ * This function is called whenever the time on the clock widget is modified
+ * by the user. It simply prints a message to the console.
+ *
+ * @param data User data pointer (unused).
+ * @param ev The event information (unused).
+ */
 static void
 _changed_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
    printf("Clock value is changed\n");
 }
 
+/**
+ * @brief Callback function for the button's "clicked" event.
+ *
+ * This function is triggered when the "Back to the future..." button is clicked.
+ * It demonstrates manipulating clock widgets at runtime.
+ * Specifically, it:
+ * - Sets the first clock (uicdt1) to a specific date and time (Oct 26, 1985 09:00).
+ * - Makes all fields of the first clock visible.
+ * - Disables the first clock and the button itself.
+ * - Deletes the second and third clock widgets.
+ *
+ * @param data User data pointer (unused).
+ * @param ev The event information, containing the button object.
+ */
 static void
 _bt_clicked(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -43,6 +66,22 @@ _bt_clicked(void *data EINA_UNUSED, const Efl_Event *ev)
    uicdt2 = uicdt3 = NULL;
 }
 
+/**
+ * @brief Main function to set up and run the Efl.Ui.Clock test.
+ *
+ * This function creates a window and populates it with several clock widgets
+ * to demonstrate different configurations and functionalities of the Efl.Ui.Clock
+ * component. It includes:
+ * - A clock with initially hidden fields, which are later shown by a button click.
+ * - A disabled clock.
+ * - A clock with default settings.
+ * - An editable clock.
+ * - A button to trigger dynamic changes to the clocks.
+ *
+ * @param data User data pointer (unused).
+ * @param obj Parent object (unused).
+ * @param event_info Event information (unused).
+ */
 void
 test_ui_clock(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

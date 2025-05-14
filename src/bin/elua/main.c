@@ -19,19 +19,35 @@
 
 #include <Elua.h>
 
+/**
+ * @brief Log domain for elua messages.
+ * Initialized to -1 and registered later. If registration fails,
+ * it falls back to EINA_LOG_DOMAIN_GLOBAL.
+ */
 static int _el_log_domain = -1;
 
 #define INF(...) EINA_LOG_DOM_INFO(_el_log_domain, __VA_ARGS__)
 #define ERR(...) EINA_LOG_DOM_ERR(_el_log_domain, __VA_ARGS__)
 
+/**
+ * @brief Structure to hold data passed to the protected main function.
+ * This structure is used to pass command-line arguments and the Elua state
+ * to elua_main() when it's called via lua_cpcall.
+ */
 struct Main_Data
 {
-   Elua_State  *es;
-   int          argc;
-   char       **argv;
-   int          status;
+   Elua_State  *es;     /**< The Elua state. */
+   int          argc;   /**< Argument count from main(). */
+   char       **argv;   /**< Argument vector from main(). */
+   int          status; /**< Exit status to be set by elua_main(). */
 };
 
+/**
+ * @brief Prints help information to the specified stream.
+ *
+ * @param pname The program name.
+ * @param stream The output stream (e.g., stdout, stderr).
+ */
 static void
 elua_print_help(const char *pname, FILE *stream)
 {
@@ -49,7 +65,19 @@ elua_print_help(const char *pname, FILE *stream)
                    "  -E,         Ignore environment variables.\n", pname);
 }
 
-/* protected main */
+/**
+ * @brief The main Lua execution logic, run in a protected environment.
+ *
+ * This function is called via lua_cpcall to ensure that any Lua errors
+ * are caught gracefully. It parses command-line options, sets up the
+ * Elua state, and runs the specified script or enters an interactive
+ * mode if no script is provided.
+ *
+ * @param L The Lua state. The first argument on the Lua stack is expected
+ *          to be a light userdata pointing to a Main_Data struct.
+ * @return int Always returns 0. The actual exit status is communicated
+ *             back via the Main_Data struct's status field.
+ */
 static int
 elua_main(lua_State *L)
 {
@@ -127,6 +155,15 @@ elua_main(lua_State *L)
    return 0;
 }
 
+/**
+ * @brief Shuts down Elua and exits the program.
+ *
+ * This function cleans up Elua resources, unregisters the log domain,
+ * and then calls exit() with the provided status code.
+ *
+ * @param es The Elua state to free. Can be NULL.
+ * @param c The exit code.
+ */
 void
 elua_bin_shutdown(Elua_State *es, int c)
 {
@@ -145,6 +182,19 @@ elua_bin_shutdown(Elua_State *es, int c)
       (lua_pushcfunction(L, f), lua_pushlightuserdata(L, u), lua_pcall(L, 1, 0, 0))
 #endif
 
+/**
+ * @brief Main entry point for the Elua application.
+ *
+ * Initializes Eina, Elua, sets up logging, creates an Elua state,
+ * and then calls elua_main() in a protected environment to execute
+ * Lua scripts or handle other Elua operations.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv An array of command-line argument strings.
+ * @return int The exit status of the program. Returns 0 on success,
+ *             non-zero on failure. Note that this function itself
+ *             never directly returns due to elua_bin_shutdown() calling exit().
+ */
 int
 main(int argc, char **argv)
 {

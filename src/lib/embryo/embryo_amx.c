@@ -45,6 +45,12 @@ static int  _embryo_var_get(Embryo_Program *ep, int idx, char *varname, Embryo_C
 static int  _embryo_program_init(Embryo_Program *ep, void *code);
 
 #ifdef WORDS_BIGENDIAN
+/**
+ * @brief Swaps the byte order of a 16-bit unsigned short.
+ * This function is used on big-endian systems to convert data
+ * to little-endian format, which Embryo expects.
+ * @param v Pointer to the 16-bit value to be byte-swapped.
+ */
 static void
 _embryo_byte_swap_16(unsigned short *v)
 {
@@ -54,6 +60,12 @@ _embryo_byte_swap_16(unsigned short *v)
    t = s[0]; s[0] = s[1]; s[1] = t;
 }
 
+/**
+ * @brief Swaps the byte order of a 32-bit unsigned int.
+ * This function is used on big-endian systems to convert data
+ * to little-endian format, which Embryo expects.
+ * @param v Pointer to the 32-bit value to be byte-swapped.
+ */
 static void
 _embryo_byte_swap_32(unsigned int *v)
 {
@@ -66,6 +78,19 @@ _embryo_byte_swap_32(unsigned int *v)
 
 #endif
 
+/**
+ * @brief Calls a native C function registered with the Embryo program.
+ *
+ * This function looks up a native function by its index in the native
+ * function table and executes it.
+ *
+ * @param ep The Embryo program instance.
+ * @param idx The index of the native function in the program's native table.
+ * @param result Pointer to store the return value of the native function.
+ * @param params Array of Embryo_Cell values passed as parameters to the native function.
+ * @return EMBRYO_ERROR_NONE on success, or an error code if the call fails
+ *         (e.g., invalid index, callback not found).
+ */
 static int
 _embryo_native_call(Embryo_Program *ep, Embryo_Cell idx, Embryo_Cell *result, Embryo_Cell *params)
 {
@@ -92,6 +117,15 @@ _embryo_native_call(Embryo_Program *ep, Embryo_Cell idx, Embryo_Cell *result, Em
    return ep->error;
 }
 
+/**
+ * @brief Retrieves the name of a public function by its index.
+ *
+ * @param ep The Embryo program instance.
+ * @param idx The index of the public function in the program's public function table.
+ * @param funcname Buffer to store the retrieved function name. Must be large enough
+ *                 (e.g., sNAMEMAX + 1).
+ * @return EMBRYO_ERROR_NONE on success, EMBRYO_ERROR_INDEX if the index is out of bounds.
+ */
 static int
 _embryo_func_get(Embryo_Program *ep, int idx, char *funcname)
 {
@@ -107,6 +141,17 @@ _embryo_func_get(Embryo_Program *ep, int idx, char *funcname)
    return EMBRYO_ERROR_NONE;
 }
 
+/**
+ * @brief Retrieves the name and address of a public variable by its index.
+ *
+ * @param ep The Embryo program instance.
+ * @param idx The index of the public variable in the program's public variable table.
+ * @param varname Buffer to store the retrieved variable name. Must be large enough
+ *                (e.g., sNAMEMAX + 1).
+ * @param ep_addr Pointer to store the memory address (offset) of the variable within
+ *                the Embryo program's data segment.
+ * @return EMBRYO_ERROR_NONE on success, EMBRYO_ERROR_INDEX if the index is out of bounds.
+ */
 static int
 _embryo_var_get(Embryo_Program *ep, int idx, char *varname, Embryo_Cell *ep_addr)
 {
@@ -123,6 +168,22 @@ _embryo_var_get(Embryo_Program *ep, int idx, char *varname, Embryo_Cell *ep_addr
    return EMBRYO_ERROR_NONE;
 }
 
+/**
+ * @brief Initializes an Embryo_Program structure with the given P-code.
+ *
+ * This function performs essential setup for an Embryo program, including:
+ * - Validating the P-code header (magic number, version, flags).
+ * - Performing byte-swapping for headers and tables on big-endian systems.
+ * - Setting up internal program flags (e.g., EMBRYO_FLAG_RELOC).
+ * - Initializing native API modules (args, floating point, random, string, time).
+ *
+ * This function is typically called by embryo_program_new() or
+ * embryo_program_const_new().
+ *
+ * @param ep Pointer to the Embryo_Program structure to initialize.
+ * @param code Pointer to the P-code data.
+ * @return 1 on successful initialization, 0 on failure (e.g., invalid P-code).
+ */
 static int
 _embryo_program_init(Embryo_Program *ep, void *code)
 {

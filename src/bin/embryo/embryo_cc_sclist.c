@@ -1,4 +1,5 @@
-/*  Small compiler  - maintenance of various lists
+/** @file
+ *  Small compiler  - maintenance of various lists
  *
  *  Name list (aliases)
  *  Include path list
@@ -34,6 +35,17 @@
 #include <string.h>
 #include "embryo_cc_sc.h"
 
+/**
+ * @brief Inserts a new string pair into a sorted linked list.
+ *
+ * The list is sorted by the 'first' string.
+ *
+ * @param root The head of the stringpair list (a dummy node).
+ * @param first The first string of the pair. This string is duplicated.
+ * @param second The second string of the pair. This string is duplicated.
+ * @param matchlength The length to be used for matching this pair, typically strlen(first).
+ * @return A pointer to the newly inserted stringpair node, or NULL on memory allocation failure.
+ */
 static stringpair  *
 insert_stringpair(stringpair * root, char *first, char *second, int matchlength)
 {
@@ -66,6 +78,14 @@ insert_stringpair(stringpair * root, char *first, char *second, int matchlength)
    return cur;
 }
 
+/**
+ * @brief Deletes all nodes in a stringpair list, freeing associated memory.
+ *
+ * This function iterates through the list starting from root->next and frees
+ * each node and the strings it contains. The root node itself is then zeroed out.
+ *
+ * @param root The head of the stringpair list (a dummy node).
+ */
 static void
 delete_stringpairtable(stringpair * root)
 {
@@ -86,6 +106,18 @@ delete_stringpairtable(stringpair * root)
    memset(root, 0, sizeof(stringpair));
 }
 
+/**
+ * @brief Finds a stringpair in a list based on the 'first' string and a specific match length.
+ *
+ * It searches for a node where the 'first' string matches the provided 'first'
+ * parameter up to 'matchlength' characters, and where the node's 'matchlength'
+ * field also matches the provided 'matchlength'.
+ *
+ * @param cur The starting node to search from (typically root->next).
+ * @param first The string to search for.
+ * @param matchlength The number of characters to compare and the expected matchlength of the node.
+ * @return A pointer to the found stringpair node, or NULL if not found.
+ */
 static stringpair  *
 find_stringpair(stringpair * cur, char *first, int matchlength)
 {
@@ -107,6 +139,13 @@ find_stringpair(stringpair * cur, char *first, int matchlength)
    return NULL;
 }
 
+/**
+ * @brief Deletes a specific item from a stringpair list.
+ *
+ * @param root The head of the stringpair list (a dummy node).
+ * @param item A pointer to the stringpair node to be deleted.
+ * @return TRUE if the item was found and deleted, FALSE otherwise.
+ */
 static int
 delete_stringpair(stringpair * root, stringpair * item)
 {
@@ -132,8 +171,21 @@ delete_stringpair(stringpair * root, stringpair * item)
 }
 
 /* ----- alias table --------------------------------------------- */
+/**
+ * @brief The head of the alias table.
+ *
+ * This is a linked list of stringpair structures, where 'first' is the name
+ * and 'second' is the alias. The list is kept sorted by name.
+ */
 static stringpair   alias_tab = { NULL, NULL, NULL, 0 };    /* alias table */
 
+/**
+ * @brief Inserts a new alias into the alias table.
+ *
+ * @param name The name to be aliased.
+ * @param alias The alias string.
+ * @return A pointer to the newly inserted alias node. Exits with error 103 on memory failure.
+ */
 stringpair *
 insert_alias(char *name, char *alias)
 {
@@ -148,6 +200,15 @@ insert_alias(char *name, char *alias)
    return cur;
 }
 
+/**
+ * @brief Looks up an alias in the alias table.
+ *
+ * If the name is found, the corresponding alias string is copied into target.
+ *
+ * @param target Buffer to store the found alias. Must be at least sEXPMAX+1 characters.
+ * @param name The name to look up.
+ * @return TRUE if the alias was found, FALSE otherwise.
+ */
 int
 lookup_alias(char *target, char *name)
 {
@@ -161,6 +222,9 @@ lookup_alias(char *target, char *name)
    return !!cur;
 }
 
+/**
+ * @brief Deletes all entries from the alias table and frees associated memory.
+ */
 void
 delete_aliastable(void)
 {
@@ -168,8 +232,22 @@ delete_aliastable(void)
 }
 
 /* ----- include paths list -------------------------------------- */
+/**
+ * @brief The head of the include paths list.
+ *
+ * This is a singly linked list of stringlist structures, where each 'line'
+ * member stores an include path. New paths are added to the front of the list.
+ */
 static stringlist   includepaths = { NULL, NULL };	/* directory list for include files */
 
+/**
+ * @brief Inserts a new path into the include paths list.
+ *
+ * The new path is added to the beginning of the list.
+ *
+ * @param path The directory path to add. This string is duplicated.
+ * @return A pointer to the newly inserted stringlist node. Exits with error 103 on memory failure.
+ */
 stringlist *
 insert_path(char *path)
 {
@@ -185,6 +263,14 @@ insert_path(char *path)
    return cur;
 }
 
+/**
+ * @brief Retrieves an include path by its index.
+ *
+ * Paths are indexed starting from 0 for the most recently added path.
+ *
+ * @param idx The index of the path to retrieve.
+ * @return A pointer to the path string if found, NULL otherwise.
+ */
 char *
 get_path(int idx)
 {
@@ -200,6 +286,9 @@ get_path(int idx)
    return NULL;
 }
 
+/**
+ * @brief Deletes all entries from the include paths list and frees associated memory.
+ */
 void
 delete_pathtable(void)
 {
@@ -218,9 +307,35 @@ delete_pathtable(void)
 
 /* ----- text substitution patterns ------------------------------ */
 
+/**
+ * @brief The head of the text substitution patterns list.
+ *
+ * This is a linked list of stringpair structures, where 'first' is the pattern
+ * and 'second' is the substitution. 'matchlength' stores the length of the pattern
+ * to be matched (prefix length). The list is kept sorted by pattern.
+ */
 static stringpair   substpair = { NULL, NULL, NULL, 0 };    /* list of substitution pairs */
+/**
+ * @brief A quick lookup index for substitution patterns.
+ *
+ * `substindex[c - 'A']` points to the first substitution pattern in `substpair`
+ * whose `first` string starts with character `c`. This speeds up searches.
+ * The index covers 'A'-'Z', 'a'-'z', and '_'.
+ * Example: `substindex[0]` for 'A', `substindex['_' - 'A']` for '_'.
+ */
 static stringpair  *substindex['z' - 'A' + 1];	/* quick index to first character */
 
+/**
+ * @brief Adjusts the quick lookup index for a given starting character.
+ *
+ * After a substitution pattern is added or removed, this function updates
+ * the `substindex` for the starting character of that pattern. It finds the
+ * first pattern in the `substpair` list that starts with `c` and updates
+ * the corresponding `substindex` entry.
+ *
+ * @param c The first character of the pattern for which the index needs adjustment.
+ *          Must be 'A'-'Z', 'a'-'z', or '_'.
+ */
 static void
 adjustindex(char c)
 {
@@ -235,6 +350,16 @@ adjustindex(char c)
    substindex[(int)c - 'A'] = cur;
 }
 
+/**
+ * @brief Inserts a new text substitution pattern.
+ *
+ * The pattern and substitution are stored, and the `substindex` is updated.
+ *
+ * @param pattern The pattern string to search for. This string is duplicated.
+ * @param substitution The string to replace the pattern with. This string is duplicated.
+ * @param prefixlen The length of the pattern to match.
+ * @return A pointer to the newly inserted stringpair node. Exits with error 103 on memory failure.
+ */
 stringpair *
 insert_subst(char *pattern, char *substitution, int prefixlen)
 {
@@ -248,6 +373,16 @@ insert_subst(char *pattern, char *substitution, int prefixlen)
    return cur;
 }
 
+/**
+ * @brief Finds a substitution pattern.
+ *
+ * Uses `substindex` for a quick initial lookup, then searches the list.
+ *
+ * @param name The beginning of a string to check for a pattern match.
+ * @param length The length of the prefix of 'name' to match against patterns.
+ * @return A pointer to the found stringpair node if a pattern matches the
+ *         prefix of 'name' with the given 'length', NULL otherwise.
+ */
 stringpair *
 find_subst(char *name, int length)
 {
@@ -263,6 +398,16 @@ find_subst(char *name, int length)
    return item;
 }
 
+/**
+ * @brief Deletes a substitution pattern.
+ *
+ * Finds the pattern matching 'name' and 'length', removes it from the list,
+ * and updates `substindex`.
+ *
+ * @param name The pattern string to delete.
+ * @param length The prefix length of the pattern to delete.
+ * @return TRUE if the pattern was found and deleted, FALSE otherwise.
+ */
 int
 delete_subst(char *name, int length)
 {
@@ -282,6 +427,12 @@ delete_subst(char *name, int length)
    return TRUE;
 }
 
+/**
+ * @brief Deletes all text substitution patterns and resets the index.
+ *
+ * Frees all memory associated with the substitution patterns and clears
+ * the `substpair` list and the `substindex` array.
+ */
 void
 delete_substtable(void)
 {

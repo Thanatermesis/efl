@@ -6,6 +6,10 @@
 
 #include "elm_code_private.h"
 
+/**
+ * @brief Frees the memory allocated for an Elm_Code_Line.
+ * @param line The line to free.
+ */
 EAPI void
 elm_code_line_free(Elm_Code_Line *line)
 {
@@ -20,6 +24,28 @@ elm_code_line_free(Elm_Code_Line *line)
    free(line);
 }
 
+/**
+ * @internal
+ * @brief Splits a list of tokens at a given position and distributes them
+ *        between an old line and a new line.
+ *
+ * This function iterates through a list of tokens. Tokens ending before
+ * the split `position` are assigned to `oldline`. Tokens starting at or after
+ * the `position` are adjusted and assigned to `newline`. Tokens that span
+ * the `position` are split: the first part remains with `oldline` (marked as
+ * continuing), and the second part is created for `newline`.
+ *
+ * @param oldline The original line that is being split. Its token list will
+ *                be populated with tokens (or parts of tokens) that occur
+ *                before the `position`.
+ * @param newline The new line created by the split. Its token list will
+ *                be populated with tokens (or parts of tokens) that occur
+ *                at or after the `position`.
+ * @param tokens The original list of tokens from `oldline` before the split.
+ *               This list will be emptied as tokens are moved.
+ * @param position The character offset within the original line content at
+ *                 which the split occurs.
+ */
 static void
 _elm_code_line_tokens_split_at(Elm_Code_Line *oldline, Elm_Code_Line *newline,
                                Eina_List *tokens, int position)
@@ -85,6 +111,21 @@ EAPI void elm_code_line_split_at(Elm_Code_Line *line, unsigned int position)
    free(content);
 }
 
+/**
+ * @internal
+ * @brief Merges the content and tokens of line2 into line1.
+ *
+ * This function concatenates the text content of `line2` to `line1`.
+ * It then moves all tokens from `line1` and `line2` into `line1`, adjusting
+ * the start and end positions of tokens originally from `line2` to reflect
+ * their new positions within the merged line. `line2` is subsequently
+ * removed from its file.
+ *
+ * @param line1 The line to merge into (target line). Its content and tokens
+ *              will be updated.
+ * @param line2 The line to merge from (source line). Its content and tokens
+ *              will be moved to `line1`, and `line2` will be removed.
+ */
 static void
 _elm_code_line_merge_into(Elm_Code_Line *line1, Elm_Code_Line *line2)
 {

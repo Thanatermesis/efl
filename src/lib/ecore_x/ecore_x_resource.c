@@ -4,9 +4,23 @@
 
 #include "ecore_x_private.h"
 
+/**
+ * @internal
+ * @brief Flag to indicate if the X resource system has been initialized.
+ */
 static Eina_Bool _ecore_x_resource_initted = EINA_FALSE;
+
+/**
+ * @internal
+ * @brief The X resource database.
+ */
 static XrmDatabase _ecore_x_resource_db = NULL;
 
+/**
+ * @internal
+ * @brief Initializes the X resource system if it hasn't been already.
+ * This function calls XrmInitialize().
+ */
 static void
 _ecore_x_resource_init(void)
 {
@@ -15,6 +29,14 @@ _ecore_x_resource_init(void)
    _ecore_x_resource_initted = EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the X resource system.
+ * This function currently only nullifies the internal database reference
+ * if it exists and resets the initialization flag. It does not explicitly
+ * free X resources, relying on Xlib's behavior or other parts of the
+ * application to manage that.
+ */
 void
 _ecore_x_resource_shutdown(void)
 {
@@ -24,6 +46,16 @@ _ecore_x_resource_shutdown(void)
    _ecore_x_resource_initted = EINA_FALSE;
 }
 
+/**
+ * @brief Loads X resources from a specified file.
+ *
+ * This function reads an X resource database from the given file.
+ * If a database is already loaded, it is destroyed and replaced
+ * with the new one.
+ *
+ * @param file The path to the resource file to load.
+ *             Example: "~/.Xresources"
+ */
 EAPI void
 ecore_x_rersource_load(const char *file)
 {
@@ -40,6 +72,16 @@ ecore_x_rersource_load(const char *file)
 //   XrmSetDatabase(_ecore_x_disp, db);
 }
 
+/**
+ * @brief Sets a string value in the X resource database.
+ *
+ * This function adds or updates a resource in the current X resource database.
+ * The resource is specified by a key and a string value.
+ * If the database does not exist, it attempts to retrieve it from the display.
+ *
+ * @param key The resource key (name). Example: "myProgram.mySetting"
+ * @param val The string value to set for the key. Example: "true"
+ */
 EAPI void
 ecore_x_resource_db_string_set(const char *key, const char *val)
 {
@@ -51,6 +93,18 @@ ecore_x_resource_db_string_set(const char *key, const char *val)
    XrmPutStringResource(&_ecore_x_resource_db, key, val);
 }
 
+/**
+ * @brief Retrieves a string value from the X resource database.
+ *
+ * This function looks up a resource by its key in the current X resource
+ * database. It expects the resource to be of type "String".
+ * If the database does not exist, it attempts to retrieve it from the display.
+ *
+ * @param key The resource key (name) to retrieve. Example: "myProgram.mySetting"
+ * @return The string value associated with the key if found and is of type
+ *         "String" with a size greater than 0; otherwise, @c NULL.
+ *         The returned string is owned by the Xrm database and should not be freed.
+ */
 EAPI const char *
 ecore_x_resource_db_string_get(const char *key)
 {
@@ -71,6 +125,15 @@ ecore_x_resource_db_string_get(const char *key)
    return NULL;
 }
 
+/**
+ * @brief Flushes the current X resource database to the X server.
+ *
+ * This function writes the current in-memory X resource database to a
+ * temporary file, then reads its content and sets it as the
+ * `RESOURCE_MANAGER` property on all root windows of the current display.
+ * This makes the resources available to other X clients.
+ * The temporary file is deleted after use.
+ */
 EAPI void
 ecore_x_resource_db_flush(void)
 {

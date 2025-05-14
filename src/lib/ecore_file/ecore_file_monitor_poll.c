@@ -8,6 +8,15 @@
 
 #include "ecore_file_private.h"
 
+/**
+ * @file
+ * @brief This file implements the polling backend for Ecore_File_Monitor.
+ *
+ * This backend periodically checks files and directories for modifications,
+ * creations, or deletions. It's a fallback mechanism when more efficient
+ * OS-specific monitoring (like inotify) is not available or not working.
+ */
+
 /*
  * TODO:
  * - Implement recursive as an option!
@@ -20,32 +29,44 @@ typedef struct _Ecore_File_Monitor_Poll Ecore_File_Monitor_Poll;
 
 #define ECORE_FILE_MONITOR_POLL(x) ((Ecore_File_Monitor_Poll *)(x))
 
+/**
+ * @brief Structure extending Ecore_File_Monitor for polling-specific data.
+ */
 struct _Ecore_File_Monitor_Poll
 {
-   Ecore_File_Monitor  monitor;
-   int                 mtime;
-   unsigned char       deleted;
+   Ecore_File_Monitor  monitor; /**< Base monitor structure. */
+   int                 mtime;   /**< Last known modification time of the monitored path. */
+   unsigned char       deleted; /**< Flag indicating if the monitor is marked for deletion. */
 };
 
 #define ECORE_FILE_INTERVAL_MIN  1.0
 #define ECORE_FILE_INTERVAL_STEP 0.5
 #define ECORE_FILE_INTERVAL_MAX  5.0
 
-static double         _interval = ECORE_FILE_INTERVAL_MIN;
-static Ecore_Timer   *_timer = NULL;
-static Ecore_File_Monitor *_monitors = NULL;
-static int          _lock = 0;
+static double         _interval = ECORE_FILE_INTERVAL_MIN; /**< Current polling interval. */
+static Ecore_Timer   *_timer = NULL; /**< Timer for polling. */
+static Ecore_File_Monitor *_monitors = NULL; /**< List of active monitors. Uses EINA_INLIST. */
+static int          _lock = 0; /**< Lock to prevent modification of the monitors list while iterating. */
 
 static Eina_Bool   _ecore_file_monitor_poll_handler(void *data);
 static void        _ecore_file_monitor_poll_check(Ecore_File_Monitor *em);
 static int         _ecore_file_monitor_poll_checking(Ecore_File_Monitor *em, char *name);
 
+/**
+ * @brief Initializes the polling monitor backend.
+ * @return 1 on success, 0 on failure.
+ */
 int
 ecore_file_monitor_backend_init(void)
 {
    return 1;
 }
 
+/**
+ * @brief Shuts down the polling monitor backend.
+ * Cleans up all active monitors and the polling timer.
+ * @return 1 on success.
+ */
 int
 ecore_file_monitor_backend_shutdown(void)
 {
@@ -60,6 +81,21 @@ ecore_file_monitor_backend_shutdown(void)
    return 1;
 }
 
+/**
+ * @brief Adds a new path to monitor using the polling backend.
+ * @param path The file or directory path to monitor.
+ * @param func The callback function to execute when an event occurs.
+ *             Example: void my_callback(void *data, Ecore_File_Monitor *mon,
+ *                                       Ecore_File_Event event, const char *path) {}
+ * @param data User data to pass to the callback function.
+ * @return A new Ecore_File_Monitor instance, or NULL on failure.
+ *         The returned monitor structure contains an EINA_INLIST of Ecore_File elements
+ *         if the monitored path is a directory. Each Ecore_File represents a file
+ *         or subdirectory within the monitored directory and has the following structure:
+ *         - name: (char *) Name of the file/subdirectory.
+ *         - mtime: (int) Last modification time.
+ *         - is_dir: (Eina_Bool) True if it's a directory.
+ */
 Ecore_File_Monitor *
 ecore_file_monitor_backend_add(const char *path,
                                void (*func) (void *data, Ecore_File_Monitor *em,
@@ -134,6 +170,10 @@ ecore_file_monitor_backend_add(const char *path,
    return em;
 }
 
+/**
+ * @brief Deletes a monitor from the polling backend.
+ * @param em The monitor to delete.
+ */
 void
 ecore_file_monitor_backend_del(Ecore_File_Monitor *em)
 {
@@ -177,6 +217,13 @@ ecore_file_monitor_backend_del(Ecore_File_Monitor *em)
      }
 }
 
+/**
+ * @brief Timer callback function that triggers polling checks.
+ * This function iterates over all registered monitors and checks for changes.
+ * It also handles dynamic adjustment of the polling interval.
+ * @param data Unused.
+ * @return ECORE_CALLBACK_RENEW to keep the timer active.
+ */
 static Eina_Bool
 _ecore_file_monitor_poll_handler(void *data EINA_UNUSED)
 {
@@ -204,6 +251,13 @@ _ecore_file_monitor_poll_handler(void *data EINA_UNUSED)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Checks a single monitor for file system events.
+ * This function compares the current state of the monitored path and its contents
+ * (if it's a directory) with the last known state. It triggers appropriate
+ * event callbacks for creations, deletions, and modifications.
+ * @param em The monitor to check.
+ */
 static void
 _ecore_file_monitor_poll_check(Ecore_File_Monitor *em)
 {
@@ -327,6 +381,13 @@ _ecore_file_monitor_poll_check(Ecore_File_Monitor *em)
    ECORE_FILE_MONITOR_POLL(em)->mtime = mtime;
 }
 
+/**
+ * @brief Checks if a file/directory name already exists in the monitor's list of files.
+ * This is used to determine if a file found during a directory scan is new or existing.
+ * @param em The monitor whose file list is to be checked.
+ * @param name The name of the file or directory to check for.
+ * @return 1 if the name exists in the list, 0 otherwise.
+ */
 static int
 _ecore_file_monitor_poll_checking(Ecore_File_Monitor *em, char *name)
 {

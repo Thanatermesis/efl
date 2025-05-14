@@ -1,14 +1,32 @@
 #include "private.h"
 
+/**
+ * @brief Structure to hold parameters for an Elm_Hoversel widget.
+ *
+ * This structure is used to pass parameters when creating or configuring
+ * an Elm_Hoversel widget through the Edje external interface.
+ */
 typedef struct _Elm_Params_Hoversel
 {
-   Elm_Params base;
-   const char *label;
-   Evas_Object *icon;
-   Eina_Bool horizontal:1;
-   Eina_Bool horizontal_exists:1;
+   Elm_Params base; /**< Base parameters, common to all Elm widgets */
+   const char *label; /**< The text label to set on the hoversel button */
+   Evas_Object *icon; /**< The icon object to set on the hoversel button */
+   Eina_Bool horizontal:1; /**< If true, the hoversel menu expands horizontally */
+   Eina_Bool horizontal_exists:1; /**< Internal flag to check if horizontal was set */
 } Elm_Params_Hoversel;
 
+/**
+ * @brief Sets the state of an Elm_Hoversel object based on external parameters.
+ *
+ * This function is called by Edje to apply a set of parameters (either
+ * initial or a transition state) to the hoversel widget.
+ *
+ * @param data Unused user data.
+ * @param obj The Elm_Hoversel object to modify.
+ * @param from_params The previous state parameters (can be NULL).
+ * @param to_params The new state parameters to apply (can be NULL).
+ * @param pos The position in a transition (0.0 to 1.0), unused here.
+ */
 static void
 external_hoversel_state_set(void *data EINA_UNUSED, Evas_Object *obj,
                             const void *from_params, const void *to_params,
@@ -28,6 +46,17 @@ external_hoversel_state_set(void *data EINA_UNUSED, Evas_Object *obj,
      elm_hoversel_horizontal_set(obj, p->horizontal);
 }
 
+/**
+ * @brief Sets a single external parameter on an Elm_Hoversel object.
+ *
+ * This function is called by Edje to set an individual property of the
+ * hoversel widget.
+ *
+ * @param data Unused user data.
+ * @param obj The Elm_Hoversel object to modify.
+ * @param param The external parameter to set.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 external_hoversel_param_set(void *data EINA_UNUSED, Evas_Object *obj,
                             const Edje_External_Param *param)
@@ -65,6 +94,17 @@ external_hoversel_param_set(void *data EINA_UNUSED, Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Gets a single external parameter from an Elm_Hoversel object.
+ *
+ * This function is called by Edje to retrieve an individual property of the
+ * hoversel widget.
+ *
+ * @param data Unused user data.
+ * @param obj The Elm_Hoversel object to query.
+ * @param param The external parameter to get (name is input, value is output).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 external_hoversel_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
                             Edje_External_Param *param)
@@ -97,6 +137,19 @@ external_hoversel_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Parses a list of Edje_External_Param into an Elm_Params_Hoversel structure.
+ *
+ * This function allocates and populates an Elm_Params_Hoversel structure
+ * from a list of parameters provided by Edje.
+ *
+ * @param data Unused user data.
+ * @param obj The Evas_Object this parse is for (used for icon path resolution).
+ * @param params A list of Edje_External_Param to parse.
+ * @return A newly allocated Elm_Params_Hoversel structure, or NULL on failure.
+ *         The caller is responsible for freeing this structure using
+ *         external_hoversel_params_free().
+ */
 static void *
 external_hoversel_params_parse(void *data EINA_UNUSED, Evas_Object *obj,
                                const Eina_List *params)
@@ -125,6 +178,17 @@ external_hoversel_params_parse(void *data EINA_UNUSED, Evas_Object *obj,
    return mem;
 }
 
+/**
+ * @brief Retrieves content from an Elm_Hoversel object.
+ *
+ * Elm_Hoversel does not support named content parts through the external interface.
+ * This function will always log an error and return NULL.
+ *
+ * @param data Unused user data.
+ * @param obj Unused.
+ * @param content Unused.
+ * @return Always NULL.
+ */
 static Evas_Object *external_hoversel_content_get(void *data EINA_UNUSED,
                                                   const Evas_Object *obj EINA_UNUSED,
                                                   const char *content EINA_UNUSED)
@@ -133,6 +197,14 @@ static Evas_Object *external_hoversel_content_get(void *data EINA_UNUSED,
    return NULL;
 }
 
+/**
+ * @brief Frees an Elm_Params_Hoversel structure.
+ *
+ * This function is used to clean up the memory allocated by
+ * external_hoversel_params_parse().
+ *
+ * @param params The Elm_Params_Hoversel structure to free.
+ */
 static void
 external_hoversel_params_free(void *params)
 {
@@ -142,12 +214,18 @@ external_hoversel_params_free(void *params)
    free(params);
 }
 
+/**
+ * @brief Describes the external parameters available for Elm_Hoversel.
+ *
+ * This array provides metadata about the parameters that can be used
+ * to configure an Elm_Hoversel widget from an Edje theme.
+ */
 static Edje_External_Param_Info external_hoversel_params[] = {
-     DEFINE_EXTERNAL_COMMON_PARAMS,
-     EDJE_EXTERNAL_PARAM_INFO_STRING("label"),
-     EDJE_EXTERNAL_PARAM_INFO_STRING("icon"),
-     EDJE_EXTERNAL_PARAM_INFO_BOOL("horizontal"),
-     EDJE_EXTERNAL_PARAM_INFO_SENTINEL
+     DEFINE_EXTERNAL_COMMON_PARAMS, /**< Common parameters like "disabled" */
+     EDJE_EXTERNAL_PARAM_INFO_STRING("label"), /**< Parameter for setting the hoversel button text */
+     EDJE_EXTERNAL_PARAM_INFO_STRING("icon"), /**< Parameter for setting the hoversel button icon */
+     EDJE_EXTERNAL_PARAM_INFO_BOOL("horizontal"), /**< Parameter for setting horizontal mode */
+     EDJE_EXTERNAL_PARAM_INFO_SENTINEL /**< Marks the end of the parameter list */
 };
 
 DEFINE_EXTERNAL_ICON_ADD(hoversel, "hoversel");

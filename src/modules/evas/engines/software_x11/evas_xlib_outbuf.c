@@ -33,6 +33,28 @@ static Eina_Spinlock shmpool_lock;
 #define SHMPOOL_LOCK()   eina_spinlock_take(&shmpool_lock)
 #define SHMPOOL_UNLOCK() eina_spinlock_release(&shmpool_lock)
 
+/**
+ * @brief Finds a suitable X_Output_Buffer, preferably from the SHM pool.
+ *
+ * This function attempts to reuse an existing X_Output_Buffer from a global
+ * pool (`shmpool`) if shared memory (`shm`) is enabled. It looks for a
+ * buffer that matches the display, visual, depth, and width, and is large
+ * enough to hold the requested height. It selects the buffer with the
+ * smallest size difference ("best fit") to minimize wasted memory.
+ *
+ * If SHM is not used, or if no suitable buffer is found in the pool,
+ * a new X_Output_Buffer is created. When a buffer is taken from the pool,
+ * its size is removed from the `shmsize` counter.
+ *
+ * @param d The X Display.
+ * @param v The X Visual.
+ * @param depth The color depth.
+ * @param w The desired width.
+ * @param h The desired height.
+ * @param shm Boolean indicating whether to use SHM.
+ * @param data Optional data passed to `evas_software_xlib_x_output_buffer_new`.
+ * @return A pointer to an X_Output_Buffer, or NULL on failure.
+ */
 static X_Output_Buffer *
 _find_xob(Display *d, Visual *v, int depth, int w, int h, int shm, void *data)
 {
@@ -99,6 +121,20 @@ have_xob:
    return xob;
 }
 
+/**
+ * @brief Returns an X_Output_Buffer to the pool or destroys it.
+ *
+ * If the given buffer `xob` uses shared memory, it is returned to the
+ * `shmpool` by prepending it to the list. The total memory usage of the pool
+ * (`shmsize`) is updated. If the pool exceeds its memory limit (`shmmemlimit`)
+ * or item count limit (`shmcountlimit`), buffers are removed from the tail of
+ * the list (the oldest ones) and freed until the limits are met.
+ *
+ * If the buffer does not use SHM, it is simply unreferenced and freed.
+ *
+ * @param xob The X_Output_Buffer to release.
+ * @param psync Flag to perform a synchronous free if needed (passed to unref).
+ */
 static void
 _unfind_xob(X_Output_Buffer *xob, int psync)
 {
@@ -133,6 +169,16 @@ _unfind_xob(X_Output_Buffer *xob, int psync)
      }
 }
 
+/**
+ * @brief Clears the entire SHM output buffer pool.
+ *
+ * Iterates through all `X_Output_Buffer`s currently in the `shmpool`,
+ * removes them, and unreferences them, effectively freeing all pooled
+ * SHM resources. The total pool size (`shmsize`) is reset to zero.
+ * This is typically called on shutdown or major reconfiguration.
+ *
+ * @param psync Flag to perform a synchronous free if needed (passed to unref).
+ */
 static void
 _clear_xob(int psync)
 {

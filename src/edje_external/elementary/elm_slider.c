@@ -1,23 +1,45 @@
 #include "private.h"
 
+/**
+ * @brief Structure to hold parameters for an Elm_Slider widget.
+ *
+ * This structure is used to store and apply a set of configuration
+ * parameters to an Elm_Slider widget, often during its creation or
+ * state transition.
+ */
 typedef struct _Elm_Params_Slider
 {
-   Elm_Params base;
-   const char *label;
-   Evas_Object *icon;
-   const char *indicator, *unit;
-   double min, max, value;
-   Evas_Coord span;
-   Eina_Bool min_exists:1;
-   Eina_Bool max_exists:1;
-   Eina_Bool value_exists:1;
-   Eina_Bool inverted:1;
-   Eina_Bool inverted_exists:1;
-   Eina_Bool span_exists:1;
-   Eina_Bool horizontal:1;
-   Eina_Bool horizontal_exists:1;
+   Elm_Params base; /**< Base parameters, common to all Elm widgets. */
+   const char *label; /**< The text label to set on the slider. */
+   Evas_Object *icon; /**< An Evas_Object to use as an icon for the slider. */
+   const char *indicator; /**< Format string for the indicator label (e.g., "%.2f"). */
+   const char *unit; /**< Format string for the unit label (e.g., "%s units"). */
+   double min; /**< The minimum value of the slider. */
+   double max; /**< The maximum value of the slider. */
+   double value; /**< The current value of the slider. */
+   Evas_Coord span; /**< The span of the slider on the canvas. */
+   Eina_Bool min_exists:1; /**< Flag indicating if 'min' value is set. */
+   Eina_Bool max_exists:1; /**< Flag indicating if 'max' value is set. */
+   Eina_Bool value_exists:1; /**< Flag indicating if 'value' is set. */
+   Eina_Bool inverted:1; /**< Flag indicating if the slider is inverted. */
+   Eina_Bool inverted_exists:1; /**< Flag indicating if 'inverted' state is set. */
+   Eina_Bool span_exists:1; /**< Flag indicating if 'span' value is set. */
+   Eina_Bool horizontal:1; /**< Flag indicating if the slider is horizontal. */
+   Eina_Bool horizontal_exists:1; /**< Flag indicating if 'horizontal' state is set. */
 } Elm_Params_Slider;
 
+/**
+ * @brief Sets the state of an external slider widget.
+ *
+ * This function applies parameters to an Elm_Slider object, typically
+ * during animations or state transitions managed by Edje.
+ *
+ * @param data Unused.
+ * @param obj The Elm_Slider Evas_Object to modify.
+ * @param from_params The previous state parameters (can be NULL).
+ * @param to_params The target state parameters (can be NULL).
+ * @param pos Unused.
+ */
 static void
 external_slider_state_set(void *data EINA_UNUSED, Evas_Object *obj,
                           const void *from_params, const void *to_params,
@@ -58,6 +80,17 @@ external_slider_state_set(void *data EINA_UNUSED, Evas_Object *obj,
      elm_slider_unit_format_set(obj, p->unit);
 }
 
+/**
+ * @brief Sets a specific parameter for an external slider widget.
+ *
+ * This function is called by Edje to set individual properties of an
+ * Elm_Slider widget based on external parameters defined in an Edje theme.
+ *
+ * @param data Unused.
+ * @param obj The Elm_Slider Evas_Object to modify.
+ * @param param The Edje_External_Param describing the property to set.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 external_slider_param_set(void *data EINA_UNUSED, Evas_Object *obj,
                           const Edje_External_Param *param)
@@ -155,6 +188,20 @@ external_slider_param_set(void *data EINA_UNUSED, Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Gets a specific parameter from an external slider widget.
+ *
+ * This function is called by Edje to retrieve individual properties of an
+ * Elm_Slider widget for use in external parameter definitions.
+ *
+ * @param data Unused.
+ * @param obj The Elm_Slider Evas_Object to query.
+ * @param param The Edje_External_Param to fill with the property value.
+ *              The `name` field indicates which parameter to get.
+ *              The `type` field indicates the expected type.
+ *              The corresponding value field (e.g., `s`, `i`, `d`) will be set.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 external_slider_param_get(void *data EINA_UNUSED, const Evas_Object *obj, Edje_External_Param *param)
 {
@@ -246,6 +293,22 @@ external_slider_param_get(void *data EINA_UNUSED, const Evas_Object *obj, Edje_E
    return EINA_FALSE;
 }
 
+/**
+ * @brief Parses a list of Edje external parameters and creates an Elm_Params_Slider structure.
+ *
+ * This function converts a list of Edje_External_Param objects into a
+ * more usable Elm_Params_Slider structure, allocating memory for it.
+ * The caller is responsible for freeing this memory using external_slider_params_free().
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param params A list of Edje_External_Param objects to parse.
+ *               Example of params list structure:
+ *               - param1: Edje_External_Param { name="label", type=EDJE_EXTERNAL_PARAM_TYPE_STRING, s="My Slider" }
+ *               - param2: Edje_External_Param { name="min", type=EDJE_EXTERNAL_PARAM_TYPE_DOUBLE, d=0.0 }
+ *               - param3: Edje_External_Param { name="max", type=EDJE_EXTERNAL_PARAM_TYPE_DOUBLE, d=100.0 }
+ * @return A pointer to a newly allocated Elm_Params_Slider structure, or NULL on failure.
+ */
 static void *
 external_slider_params_parse(void *data EINA_UNUSED,
                              Evas_Object *obj EINA_UNUSED,
@@ -304,6 +367,18 @@ external_slider_params_parse(void *data EINA_UNUSED,
    return mem;
 }
 
+/**
+ * @brief Retrieves content from an external slider widget.
+ *
+ * Currently, sliders do not support named content parts beyond "icon"
+ * (handled by elm_object_part_content_set/get), so this function
+ * always returns NULL and logs an error.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param content Unused.
+ * @return Always NULL.
+ */
 static Evas_Object *external_slider_content_get(void *data EINA_UNUSED,
                                                 const Evas_Object *obj EINA_UNUSED,
                                                 const char *content EINA_UNUSED)
@@ -312,6 +387,14 @@ static Evas_Object *external_slider_content_get(void *data EINA_UNUSED,
    return NULL;
 }
 
+/**
+ * @brief Frees the memory allocated for Elm_Params_Slider.
+ *
+ * This function releases the resources held by an Elm_Params_Slider
+ * structure, including any shared strings.
+ *
+ * @param params A pointer to the Elm_Params_Slider structure to free.
+ */
 static void
 external_slider_params_free(void *params)
 {
@@ -326,19 +409,26 @@ external_slider_params_free(void *params)
    free(params);
 }
 
+/**
+ * @brief Array defining the external parameters available for Elm_Slider.
+ *
+ * This array is used by Edje to understand what parameters can be
+ * set or get from an Elm_Slider widget. Each entry defines the name,
+ * type, and optionally default values for a parameter.
+ */
 static Edje_External_Param_Info external_slider_params[] = {
-     DEFINE_EXTERNAL_COMMON_PARAMS,
-     EDJE_EXTERNAL_PARAM_INFO_STRING("label"),
-     EDJE_EXTERNAL_PARAM_INFO_STRING("icon"),
-     EDJE_EXTERNAL_PARAM_INFO_DOUBLE("min"),
-     EDJE_EXTERNAL_PARAM_INFO_DOUBLE_DEFAULT("max", 10.0),
-     EDJE_EXTERNAL_PARAM_INFO_DOUBLE("value"),
-     EDJE_EXTERNAL_PARAM_INFO_BOOL("horizontal"),
-     EDJE_EXTERNAL_PARAM_INFO_BOOL("inverted"),
-     EDJE_EXTERNAL_PARAM_INFO_INT("span"),
-     EDJE_EXTERNAL_PARAM_INFO_STRING_DEFAULT("unit format", "%1.2f"),
-     EDJE_EXTERNAL_PARAM_INFO_STRING_DEFAULT("indicator format", "%1.2f"),
-     EDJE_EXTERNAL_PARAM_INFO_SENTINEL
+     DEFINE_EXTERNAL_COMMON_PARAMS, /**< Common parameters like "disabled", "visible". */
+     EDJE_EXTERNAL_PARAM_INFO_STRING("label"), /**< The text label of the slider. */
+     EDJE_EXTERNAL_PARAM_INFO_STRING("icon"), /**< The icon for the slider (filename or group name). */
+     EDJE_EXTERNAL_PARAM_INFO_DOUBLE("min"), /**< The minimum value of the slider. */
+     EDJE_EXTERNAL_PARAM_INFO_DOUBLE_DEFAULT("max", 10.0), /**< The maximum value of the slider, defaults to 10.0. */
+     EDJE_EXTERNAL_PARAM_INFO_DOUBLE("value"), /**< The current value of the slider. */
+     EDJE_EXTERNAL_PARAM_INFO_BOOL("horizontal"), /**< Whether the slider is horizontal (true) or vertical (false). */
+     EDJE_EXTERNAL_PARAM_INFO_BOOL("inverted"), /**< Whether the slider's direction is inverted. */
+     EDJE_EXTERNAL_PARAM_INFO_INT("span"), /**< The pixel span of the slider on the canvas. */
+     EDJE_EXTERNAL_PARAM_INFO_STRING_DEFAULT("unit format", "%1.2f"), /**< Format string for the unit label (e.g., "%.2f units"). */
+     EDJE_EXTERNAL_PARAM_INFO_STRING_DEFAULT("indicator format", "%1.2f"), /**< Format string for the indicator label (e.g., "Value: %.2f"). */
+     EDJE_EXTERNAL_PARAM_INFO_SENTINEL /**< Marks the end of the parameter list. */
 };
 
 DEFINE_EXTERNAL_ICON_ADD(slider, "slider");

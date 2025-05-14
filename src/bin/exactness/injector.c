@@ -64,6 +64,17 @@ EINA_DEBUG_OPCODES_ARRAY_DEFINE(_debug_ops,
       {NULL, NULL, NULL}
       );
 
+/**
+ * @brief Serializes and sends an action event to the debug session.
+ *
+ * This function takes an action from the scenario, packs its data into a
+ * buffer, and sends it to the connected application through the debug
+ * session. The structure of the data sent depends on the action type.
+ *
+ * @param type The type of the action to feed.
+ * @param n_evas The number of Evas canvases to which the event applies.
+ * @param data A pointer to the action-specific data structure.
+ */
 static void
 _feed_event(Exactness_Action_Type type, unsigned int n_evas, void *data)
 {
@@ -214,6 +225,18 @@ _feed_event(Exactness_Action_Type type, unsigned int n_evas, void *data)
      }
 }
 
+/**
+ * @brief Timer callback to feed events from the scenario.
+ *
+ * This function is called by an ecore timer. It retrieves the current
+ * action from the global list `_cur_event_list`, sends it using
+ * `_feed_event`, and then schedules the next action based on its delay.
+ * If there are no more actions, it sends a finish signal and quits the
+ * main loop.
+ *
+ * @param data Not used.
+ * @return ECORE_CALLBACK_CANCEL to prevent the timer from being called again.
+ */
 static Eina_Bool
 _feed_event_timer_cb(void *data EINA_UNUSED)
 {
@@ -235,6 +258,15 @@ _feed_event_timer_cb(void *data EINA_UNUSED)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Opens and parses the scenario file.
+ *
+ * Reads an Exactness unit file (.exu) specified by `_src_filename`,
+ * populates the list of actions `_cur_event_list`, and schedules the first
+ * event injection.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _src_open()
 {
@@ -261,6 +293,25 @@ _src_open()
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback to handle the list of available applications.
+ *
+ * This function is called when the daemon sends a list of running
+ * applications that can be connected to. It iterates through the list
+ * and selects the target application based on either the PID provided via
+ * command-line arguments (`_pid`) or by looking for an application named
+ * "exactness_play". Once a target is found, it establishes the connection
+ * by setting `_cid` and starts the test by calling `_src_open()`.
+ *
+ * @param session The debug session. Not used.
+ * @param srcid The source ID. Not used.
+ * @param buffer The raw buffer containing the list of applications.
+ *        The buffer has the following structure for each application:
+ *        - int cid: connection ID
+ *        - int pid: process ID
+ *        - char[] name: null-terminated string for the application name
+ * @param size The size of the buffer. Not used.
+ */
 static void
 _main_loop_all_apps_get_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_UNUSED, void *buffer, int size EINA_UNUSED)
 {
@@ -306,6 +357,16 @@ _main_loop_all_apps_get_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EI
 
 WRAPPER_TO_XFER_MAIN_LOOP(_all_apps_get_cb)
 
+/**
+ * @brief Callback invoked when debug opcodes are registered.
+ *
+ * Once the debug opcodes are successfully registered with the daemon, this
+ * function is called. It triggers a request to get the list of all
+ * available applications from the daemon.
+ *
+ * @param data Not used.
+ * @param status EINA_TRUE if opcodes were registered successfully, EINA_FALSE otherwise.
+ */
 static void
 _ops_ready_cb(void *data EINA_UNUSED, Eina_Bool status)
 {
@@ -335,6 +396,17 @@ static const Ecore_Getopt optdesc = {
   }
 };
 
+/**
+ * @brief Main function for the exactness_inject tool.
+ *
+ * Parses command line options, initializes EFL, connects to the debug
+ * daemon (either local or remote), registers debug opcodes, and starts
+ * the main loop to inject events from a specified test file.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv The array of command-line arguments.
+ * @return The exit code of the application.
+ */
 int main(int argc, char **argv)
 {
    int opt_args = 0, real__ = 1, port = -1;

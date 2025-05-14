@@ -6,38 +6,55 @@
 
 #define MESSAGE_OVERRIDE
 
+/**
+ * @brief Represents a symbol (variable or function) in the Edje script.
+ */
 typedef struct _Code_Symbol
 {
-   const char *name;
-   const char *tag;
-   Eina_List  *args;
-   char       *body;
-   Eina_Bool   is_public : 1;
+   const char *name;        /**< The name of the symbol. */
+   const char *tag;         /**< Optional type tag for the symbol (e.g., "Float", "Int"). */
+   Eina_List  *args;        /**< A list of Code_Symbol for function arguments. NULL for variables. */
+   char       *body;        /**< The body of the function, if it's a function. NULL for variables. */
+   Eina_Bool   is_public : 1; /**< Flag indicating if the symbol is public. */
 } Code_Symbol;
 
+/**
+ * @brief Defines the types of tokens that can be encountered during parsing.
+ */
 typedef enum
 {
-   TOKEN_TYPE_INVALID = -1,
-   TOKEN_TYPE_EOF,
-   TOKEN_TYPE_COLON = (1 << 0),
-   TOKEN_TYPE_SEMICOLON = (1 << 1),
-   TOKEN_TYPE_COMMA = (1 << 2),
-   TOKEN_TYPE_PARENS = (1 << 3),
-   TOKEN_TYPE_BRACES = (1 << 4),
-   TOKEN_TYPE_EQUAL_MARK = (1 << 5),
-   TOKEN_TYPE_PUBLIC = (1 << 6),
-   TOKEN_TYPE_IDENTIFIER = (1 << 7)
+   TOKEN_TYPE_INVALID = -1, /**< Invalid token type. */
+   TOKEN_TYPE_EOF,          /**< End of file/input. */
+   TOKEN_TYPE_COLON = (1 << 0), /**< Colon ':'. */
+   TOKEN_TYPE_SEMICOLON = (1 << 1), /**< Semicolon ';'. */
+   TOKEN_TYPE_COMMA = (1 << 2),      /**< Comma ','. */
+   TOKEN_TYPE_PARENS = (1 << 3),     /**< Parentheses '()'. */
+   TOKEN_TYPE_BRACES = (1 << 4),     /**< Braces '{}'. */
+   TOKEN_TYPE_EQUAL_MARK = (1 << 5), /**< Equal mark '='. */
+   TOKEN_TYPE_PUBLIC = (1 << 6),     /**< "public" keyword. */
+   TOKEN_TYPE_IDENTIFIER = (1 << 7)  /**< An identifier (variable or function name). */
 } Token_Type;
 
+/**
+ * @brief Represents a token extracted from the script code.
+ */
 typedef struct _Token
 {
-   char      *str;
-   Token_Type type;
+   char      *str;  /**< The string value of the token. */
+   Token_Type type; /**< The type of the token. */
 } Token;
 
 static void   code_parse_internal(Code *code);
 static Token *next_token(char **begin, char *end);
 
+/**
+ * @brief Parses the script code associated with a given Code object.
+ *
+ * This function handles parsing of base (inherited) scripts before parsing
+ * the current script. It ensures that a script is parsed only once.
+ *
+ * @param code The Code object whose script is to be parsed.
+ */
 static void
 code_parse(Code *code)
 {
@@ -60,6 +77,16 @@ code_parse(Code *code)
    code->parsed = EINA_TRUE;
 }
 
+/**
+ * @brief Internal function to parse the actual script content.
+ *
+ * This function tokenizes the script string and builds lists of variables
+ * (code->vars) and functions (code->func) represented by Code_Symbol structs.
+ * It handles Embryo C-like syntax for declarations, function definitions,
+ * and public/private visibility.
+ *
+ * @param code The Code object containing the script string to parse.
+ */
 static void
 code_parse_internal(Code *code)
 {
@@ -234,6 +261,19 @@ code_parse_internal(Code *code)
    eina_array_free(name_stack);
 }
 
+/**
+ * @brief Extracts the next token from the input string.
+ *
+ * It advances the `begin` pointer past the consumed token.
+ * Skips whitespace. Recognizes single-character tokens (':', ';', ',', '(', ')', '{', '}', '='),
+ * keywords ("public"), and identifiers.
+ *
+ * @param begin Pointer to a char pointer indicating the start of the string to parse.
+ *              This will be updated to point after the extracted token.
+ * @param end Pointer to the end of the input string.
+ * @return A newly allocated Token structure, or NULL if no more tokens or an error occurs.
+ *         The caller is responsible for freeing the returned Token and its `str` member.
+ */
 static Token *
 next_token(char **begin, char *end)
 {
@@ -335,6 +375,18 @@ exit:
    return token;
 }
 
+/**
+ * @brief Adds a symbol to a list of symbols, ensuring uniqueness by name.
+ *
+ * If a symbol with the same name already exists in the list, the existing
+ * symbol is removed and a warning is issued before the new symbol is added.
+ * This effectively means the latter defined symbol shadows the former.
+ *
+ * @param total Pointer to the Eina_List of Code_Symbol structs.
+ *              This list will be modified.
+ * @param sym The Code_Symbol to add.
+ * @param pc The Edje_Part_Collection context, used for warning messages.
+ */
 static void
 _push_symbol(Eina_List **total, Code_Symbol *sym, Edje_Part_Collection *pc)
 {
@@ -357,6 +409,19 @@ _push_symbol(Eina_List **total, Code_Symbol *sym, Edje_Part_Collection *pc)
    *total = list;
 }
 
+/**
+ * @brief Rewrites the script code after parsing and merging symbols.
+ *
+ * This function first ensures the script (and its base scripts) are parsed.
+ * It then collects all variables and functions, including those inherited
+ * from base scripts, resolving any name conflicts (later definitions
+ * shadow earlier ones).
+ * Finally, it reconstructs the script string (`code->shared` and `code->original`)
+ * with public symbols declared first, followed by function definitions.
+ * It also handles a special case for "message" functions if MESSAGE_OVERRIDE is defined.
+ *
+ * @param code The Code object whose script is to be rewritten.
+ */
 void
 script_rewrite(Code *code)
 {

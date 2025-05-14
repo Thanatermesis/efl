@@ -1,5 +1,15 @@
 #include "evas_gl_private.h"
 
+/**
+ * @internal
+ * @brief Ensures that the underlying RGBA_Image data is allocated.
+ *
+ * This function is a wrapper around evas_cache_image_size_set. It is used
+ * to make sure that an image has its pixel buffer allocated before it is
+ * used, for instance before being modified or rendered.
+ *
+ * @param im The Evas_GL_Image to allocate.
+ */
 void
 evas_gl_common_image_alloc_ensure(Evas_GL_Image *im)
 {
@@ -8,6 +18,18 @@ evas_gl_common_image_alloc_ensure(Evas_GL_Image *im)
                                                     im->w, im->h);
 }
 
+/**
+ * @internal
+ * @brief Unloads all image data from memory and GPU.
+ *
+ * This function iterates through all images associated with the given
+ * GL context and unloads their pixel data from CPU memory via the image
+ * cache. It also frees any associated GL textures that are not dynamic.
+ * This is useful for freeing resources when the application is minimized
+ * or backgrounded.
+ *
+ * @param gc The Evas GL engine context.
+ */
 EMODAPI void
 evas_gl_common_image_all_unload(Evas_Engine_GL_Context *gc)
 {
@@ -29,6 +51,17 @@ evas_gl_common_image_all_unload(Evas_Engine_GL_Context *gc)
      }
 }
 
+/**
+ * @internal
+ * @brief Trims the image cache to respect the configured cache size.
+ *
+ * This function is called when the total size of cached images exceeds the
+ * limit set by `evas_common_image_get_cache()`. It iterates through the
+ * list of images in reverse (starting from the least recently used) and
+ * removes any unreferenced images until the cache size is within the limit.
+ *
+ * @param gc The Evas GL engine context.
+ */
 static void
 _evas_gl_image_cache_trim(Evas_Engine_GL_Context *gc)
 {
@@ -64,6 +97,19 @@ _evas_gl_image_cache_trim(Evas_Engine_GL_Context *gc)
      }
 }
 
+/**
+ * @internal
+ * @brief Adds an unreferenced image to the cache or removes a referenced one.
+ *
+ * This function manages an image's presence in the cache. If an image has no
+ * references, it is added to the cache, its size is accounted for, and the
+ * cache is trimmed if necessary. If the image has references, it is removed
+ * from the cache list.
+ *
+ * @param im The image to process.
+ * @return @c EINA_TRUE if the image was added to the cache, @c EINA_FALSE
+ * otherwise.
+ */
 static Eina_Bool
 _evas_gl_image_cache_add(Evas_GL_Image *im)
 {
@@ -89,6 +135,16 @@ _evas_gl_image_cache_add(Evas_GL_Image *im)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Increments the reference count of an Evas_GL_Image.
+ *
+ * When an image's reference count goes from 0 to 1, it is considered "in use"
+ * and is removed from the cache-size accounting, though it may remain in the
+ * `images` list.
+ *
+ * @param im The image to reference.
+ */
 EMODAPI void
 evas_gl_common_image_ref(Evas_GL_Image *im)
 {
@@ -99,6 +155,15 @@ evas_gl_common_image_ref(Evas_GL_Image *im)
    im->references++;
 }
 
+/**
+ * @internal
+ * @brief Decrements the reference count of an Evas_GL_Image.
+ *
+ * If the reference count drops to zero, the image is no longer considered
+ * "in use" and is added to the cache via `_evas_gl_image_cache_add()`.
+ *
+ * @param im The image to unreference.
+ */
 EMODAPI void
 evas_gl_common_image_unref(Evas_GL_Image *im)
 {
@@ -109,6 +174,17 @@ evas_gl_common_image_unref(Evas_GL_Image *im)
      }
 }
 
+/**
+ * @internal
+ * @brief Populates the list of supported colorspaces for the GL engine.
+ *
+ * This function checks for hardware support for various texture compression
+ * formats (like ETC1, ETC2, S3TC) and populates the `cspaces` list in the
+ * shared GL context information. This list is then used to select the most
+ * optimal colorspace for loaded images.
+ *
+ * @param gc The Evas GL engine context.
+ */
 static void
 _evas_gl_cspace_list_fill(Evas_Engine_GL_Context *gc)
 {
@@ -140,6 +216,18 @@ _evas_gl_cspace_list_fill(Evas_Engine_GL_Context *gc)
    CS_APPEND(EVAS_COLORSPACE_ARGB8888);
 }
 
+/**
+ * @internal
+ * @brief Callback executed when image data preloading is complete.
+ *
+ * This function is registered as a callback with the image cache. When the
+ * image loader finishes preloading an image header, this function is called
+ * to update the Evas_GL_Image properties (like dimensions, alpha, colorspace)
+ * from the now-available image data. It selects the best colorspace based
+ * on hardware capabilities.
+ *
+ * @param data A pointer to the Evas_GL_Image.
+ */
 void
 evas_gl_common_image_preload_done(void *data)
 {
@@ -184,6 +272,17 @@ found_cspace:
      }
 }
 
+/**
+ * @internal
+ * @brief Removes the preload callback for a given image.
+ *
+ * This is a workaround to stop watching for preload completion. It iterates
+ * through the cache entry's targets and removes the one that matches this
+ * image's preload callback. This is typically done when the image is being
+ * freed.
+ *
+ * @param im The image for which to remove the preload watcher.
+ */
 //FIXME: This is a hacky way. Need an proper interface...
 void
 evas_gl_common_image_preload_unwatch(Evas_GL_Image *im)
@@ -201,6 +300,22 @@ evas_gl_common_image_preload_unwatch(Evas_GL_Image *im)
      }
 }
 
+/**
+ * @internal
+ * @brief Creates a new Evas_GL_Image from an existing RGBA_Image.
+ *
+ * This function wraps an RGBA_Image (which is a CPU-side image representation
+ * from Evas' cache) in an Evas_GL_Image. It first checks if a GL image for
+ * the given RGBA_Image already exists to avoid duplication. If not, it
+ * allocates a new Evas_GL_Image, determines the optimal colorspace, and
+ * adds it to the list of managed images.
+ *
+ * @param gc The Evas GL engine context.
+ * @param im_im The source RGBA_Image.
+ * @param lo The load options used for loading the image.
+ * @param[out] error A pointer to an integer where a load error code will be stored.
+ * @return A new or existing Evas_GL_Image, or @c NULL on failure.
+ */
 Evas_GL_Image *
 evas_gl_common_image_new_from_rgbaimage(Evas_Engine_GL_Context *gc, RGBA_Image *im_im,
                                         Evas_Image_Load_Opts *lo, int *error)
@@ -288,6 +403,22 @@ found_cspace:
    return im;
 }
 
+/**
+ * @internal
+ * @brief Loads an image from a file and creates an Evas_GL_Image for it.
+ *
+ * This is a convenience function that first calls the common image loader
+ * to get an RGBA_Image from a file, and then calls
+ * `evas_gl_common_image_new_from_rgbaimage()` to wrap it in a GL-specific
+ * image object.
+ *
+ * @param gc The Evas GL engine context.
+ * @param file The path to the image file.
+ * @param key Optional key for image identification in the cache.
+ * @param lo Load options for the image.
+ * @param[out] error A pointer to an integer where a load error code will be stored.
+ * @return A new Evas_GL_Image, or @c NULL on failure.
+ */
 Evas_GL_Image *
 evas_gl_common_image_load(Evas_Engine_GL_Context *gc, const char *file, const char *key, Evas_Image_Load_Opts *lo, int *error)
 {
@@ -299,6 +430,20 @@ evas_gl_common_image_load(Evas_Engine_GL_Context *gc, const char *file, const ch
    return evas_gl_common_image_new_from_rgbaimage(gc, im_im, lo, error);
 }
 
+/**
+ * @internal
+ * @brief Loads an image from a memory-mapped file and creates an Evas_GL_Image.
+ *
+ * Similar to `evas_gl_common_image_load`, but loads the image from an
+ * Eina_File (which could be a memory map).
+ *
+ * @param gc The Evas GL engine context.
+ * @param f The Eina_File handle.
+ * @param key Optional key for image identification in the cache.
+ * @param lo Load options for the image.
+ * @param[out] error A pointer to an integer where a load error code will be stored.
+ * @return A new Evas_GL_Image, or @c NULL on failure.
+ */
 Evas_GL_Image *
 evas_gl_common_image_mmap(Evas_Engine_GL_Context *gc, Eina_File *f, const char *key, Evas_Image_Load_Opts *lo, int *error)
 {
@@ -310,6 +455,29 @@ evas_gl_common_image_mmap(Evas_Engine_GL_Context *gc, Eina_File *f, const char *
    return evas_gl_common_image_new_from_rgbaimage(gc, im_im, lo, error);
 }
 
+/**
+ * @internal
+ * @brief Creates a new Evas_GL_Image from a raw data buffer.
+ *
+ * This function creates an image that uses the provided `data` buffer directly,
+ * without copying it. The caller is responsible for ensuring the buffer remains
+ * valid for the lifetime of the image. It checks for existing images that might
+ * already be using the same data buffer.
+ *
+ * @param gc The Evas GL engine context.
+ * @param w Width of the image in pixels.
+ * @param h Height of the image in pixels.
+ * @param data Pointer to the pixel data. For YUV formats, this is a pointer
+ * to an array of plane pointers. Example for `EVAS_COLORSPACE_YCBCR422P601_PL`:
+ * @code
+ * unsigned char *planes[3] = { y_plane, u_plane, v_plane };
+ * evas_gl_common_image_new_from_data(gc, w, h, (DATA32 *)planes, 0,
+ *                                    EVAS_COLORSPACE_YCBCR422P601_PL);
+ * @endcode
+ * @param alpha Whether the image has an alpha channel.
+ * @param cspace The colorspace of the data.
+ * @return A new Evas_GL_Image, or @c NULL on failure.
+ */
 EMODAPI Evas_GL_Image *
 evas_gl_common_image_new_from_data(Evas_Engine_GL_Context *gc, unsigned int w, unsigned int h, DATA32 *data, int alpha, Evas_Colorspace cspace)
 {
@@ -378,6 +546,23 @@ evas_gl_common_image_new_from_data(Evas_Engine_GL_Context *gc, unsigned int w, u
    return im;
 }
 
+/**
+ * @internal
+ * @brief Creates a new Evas_GL_Image by copying from a raw data buffer.
+ *
+ * This function creates an image by allocating new memory and copying the
+ * provided pixel data into it. This is safer than `evas_gl_common_image_new_from_data`
+ * as the caller does not need to maintain the original data buffer.
+ *
+ * @param gc The Evas GL engine context.
+ * @param w Width of the image in pixels.
+ * @param h Height of the image in pixels.
+ * @param data Pointer to the source pixel data. For YUV formats, this is a pointer
+ * to an array of plane pointers, similar to `evas_gl_common_image_new_from_data`.
+ * @param alpha Whether the image has an alpha channel.
+ * @param cspace The colorspace of the data.
+ * @return A new Evas_GL_Image, or @c NULL on failure.
+ */
 Evas_GL_Image *
 evas_gl_common_image_new_from_copied_data(Evas_Engine_GL_Context *gc, unsigned int w, unsigned int h, DATA32 *data, int alpha, Evas_Colorspace cspace)
 {
@@ -432,6 +617,22 @@ evas_gl_common_image_new_from_copied_data(Evas_Engine_GL_Context *gc, unsigned i
    return im;
 }
 
+/**
+ * @internal
+ * @brief Creates a new, empty (blank) Evas_GL_Image.
+ *
+ * This function allocates an Evas_GL_Image of the specified dimensions and
+ * colorspace, but does not initialize its pixel data (it will be cleared to
+ * black/transparent). The underlying image buffer is managed by the Evas
+ * image cache.
+ *
+ * @param gc The Evas GL engine context.
+ * @param w Width of the image in pixels.
+ * @param h Height of the image in pixels.
+ * @param alpha Whether the image should have an alpha channel.
+ * @param cspace The colorspace of the image.
+ * @return A new Evas_GL_Image, or @c NULL on failure.
+ */
 Evas_GL_Image *
 evas_gl_common_image_new(Evas_Engine_GL_Context *gc, unsigned int w, unsigned int h, int alpha, Evas_Colorspace cspace)
 {
@@ -494,6 +695,18 @@ evas_gl_common_image_new(Evas_Engine_GL_Context *gc, unsigned int w, unsigned in
    return im;
 }
 
+/**
+ * @internal
+ * @brief Sets the alpha channel flag for an image.
+ *
+ * This function modifies the alpha flag of an image. If the flag changes, it
+ * may trigger a re-creation and re-upload of the associated GL texture to
+ * ensure it has the correct format (e.g., RGB vs. RGBA).
+ *
+ * @param im The image to modify.
+ * @param alpha @c 1 to enable alpha, @c 0 to disable.
+ * @return The modified Evas_GL_Image, or @c NULL on failure.
+ */
 Evas_GL_Image *
 evas_gl_common_image_alpha_set(Evas_GL_Image *im, int alpha)
 {
@@ -519,6 +732,18 @@ evas_gl_common_image_alpha_set(Evas_GL_Image *im, int alpha)
    return im;
 }
 
+/**
+ * @internal
+ * @brief Converts an image to use a native texture surface.
+ *
+ * This function transitions an Evas_GL_Image from being backed by CPU-side
+ * pixel data (in `im->im`) to being backed by a native texture. This is
+ * often used for zero-copy video playback where the texture is managed by an
+ * external entity (e.g., a hardware decoder). It frees any CPU-side buffers
+ * and creates a new native GL texture.
+ *
+ * @param im The image to convert.
+ */
 EMODAPI void
 evas_gl_common_image_native_enable(Evas_GL_Image *im)
 {
@@ -551,6 +776,17 @@ evas_gl_common_image_native_enable(Evas_GL_Image *im)
    im->tex_only = 1;
 }
 
+/**
+ * @internal
+ * @brief Converts an image from using a native texture back to a standard image.
+ *
+ * This function reverses the effect of `evas_gl_common_image_native_enable`.
+ * It frees the native texture and replaces it with a standard, empty,
+ * CPU-backed Evas image cache entry. The image content is lost in this
+ * process.
+ *
+ * @param im The image to convert.
+ */
 EMODAPI void
 evas_gl_common_image_native_disable(Evas_GL_Image *im)
 {
@@ -576,6 +812,17 @@ evas_gl_common_image_native_disable(Evas_GL_Image *im)
  */
 }
 
+/**
+ * @internal
+ * @brief Sets a hint about the scaling behavior of an image.
+ *
+ * This hint can be used by the engine to optimize texture memory usage. For
+ * example, if an image is always scaled down, the engine could potentially
+ * create a smaller texture to save memory.
+ *
+ * @param im The image to modify.
+ * @param hint The scaling hint (e.g., EVAS_IMAGE_SCALE_HINT_STATIC).
+ */
 void
 evas_gl_common_image_scale_hint_set(Evas_GL_Image *im, int hint)
 {
@@ -585,6 +832,18 @@ evas_gl_common_image_scale_hint_set(Evas_GL_Image *im, int hint)
    // the texture res down for "non dynamic" stuff to save memory)
 }
 
+/**
+ * @internal
+ * @brief Sets a hint about the content of an image.
+ *
+ * This hint indicates whether the image content is expected to change
+ * frequently (dynamic) or not (static). For dynamic content, the engine
+ * can switch to using special texture types (like TBM or EGLImage) that
+ * allow for more efficient updates, especially in zero-copy scenarios.
+ *
+ * @param im The image to modify.
+ * @param hint The content hint (e.g., EVAS_IMAGE_CONTENT_HINT_DYNAMIC).
+ */
 void
 evas_gl_common_image_content_hint_set(Evas_GL_Image *im, int hint)
 {
@@ -665,12 +924,33 @@ evas_gl_common_image_content_hint_set(Evas_GL_Image *im, int hint)
      }
 }
 
+/**
+ * @internal
+ * @brief Flushes the image cache.
+ *
+ * This function attempts to trim the image cache by freeing unreferenced
+ * images.
+ *
+ * @param gc The Evas GL engine context.
+ */
 void
 evas_gl_common_image_cache_flush(Evas_Engine_GL_Context *gc)
 {
    _evas_gl_image_cache_trim(gc);
 }
 
+/**
+ * @internal
+ * @brief Frees an Evas_GL_Image, possibly caching it.
+ *
+ * This function decrements the image's reference count. If the count becomes
+ * greater than zero, the function does nothing else. If it drops to zero,
+ * the image is either freed or added to a cache of unused images for later
+ * reuse. It handles freeing all associated resources like GL textures and
+ * CPU-side data.
+ *
+ * @param im The image to free.
+ */
 EMODAPI void
 evas_gl_common_image_free(Evas_GL_Image *im)
 {
@@ -731,6 +1011,21 @@ evas_gl_common_image_free(Evas_GL_Image *im)
    free(im);
 }
 
+/**
+ * @internal
+ * @brief Creates a new Evas_GL_Image that is a render target (surface).
+ *
+ * This function creates an image that is not backed by a CPU buffer but
+ * directly by a renderable GL texture (via a Framebuffer Object). This is
+ * used for rendering to a texture.
+ *
+ * @param gc The Evas GL engine context.
+ * @param w The width of the surface.
+ * @param h The height of the surface.
+ * @param alpha Whether the surface should have an alpha channel.
+ * @param stencil Whether the surface should have a stencil buffer.
+ * @return A new surface Evas_GL_Image, or @c NULL on failure.
+ */
 Evas_GL_Image *
 evas_gl_common_image_surface_new(Evas_Engine_GL_Context *gc, unsigned int w, unsigned int h, int alpha, int stencil)
 {
@@ -753,6 +1048,20 @@ evas_gl_common_image_surface_new(Evas_Engine_GL_Context *gc, unsigned int w, uns
    return im;
 }
 
+/**
+ * @internal
+ * @brief Creates a new Evas_GL_Image surface that is not scaled.
+ *
+ * This is similar to `evas_gl_common_image_surface_new`, but creates a
+ * texture that is not meant to be scaled by the hardware. This can be an
+ * optimization for surfaces that are always rendered 1:1.
+ *
+ * @param gc The Evas GL engine context.
+ * @param w The width of the surface.
+ * @param h The height of the surface.
+ * @param alpha Whether the surface should have an alpha channel.
+ * @return A new surface Evas_GL_Image, or @c NULL on failure.
+ */
 Evas_GL_Image *
 evas_gl_common_image_surface_noscale_new(Evas_Engine_GL_Context *gc, unsigned int w, unsigned int h, int alpha)
 {
@@ -775,6 +1084,20 @@ evas_gl_common_image_surface_noscale_new(Evas_Engine_GL_Context *gc, unsigned in
    return im;
 }
 
+/**
+ * @internal
+ * @brief Marks a region of an image as dirty.
+ *
+ * This function flags that a portion of the image's CPU-side data has
+ * changed. This will cause the corresponding texture region to be updated
+ * on the GPU during the next rendering pass (`evas_gl_common_image_update`).
+ *
+ * @param im The image to mark as dirty.
+ * @param x The x-coordinate of the dirty rectangle.
+ * @param y The y-coordinate of the dirty rectangle.
+ * @param w The width of the dirty rectangle.
+ * @param h The height of the dirty rectangle.
+ */
 void
 evas_gl_common_image_dirty(Evas_GL_Image *im, unsigned int x, unsigned int y, unsigned int w, unsigned int h)
 {
@@ -791,6 +1114,19 @@ evas_gl_common_image_dirty(Evas_GL_Image *im, unsigned int x, unsigned int y, un
    im->dirty = 1;
 }
 
+/**
+ * @internal
+ * @brief Updates the GL texture for an image if necessary.
+ *
+ * This function is central to synchronizing CPU-side image data with the
+ * GPU. If the image has no GL texture yet, it creates one. If the image has
+ * been marked as dirty (or is animated), it uploads the modified data to the
+ * existing GL texture. It handles various colorspaces and formats, including
+ * YUV planes.
+ *
+ * @param gc The Evas GL engine context.
+ * @param im The image to update.
+ */
 void
 evas_gl_common_image_update(Evas_Engine_GL_Context *gc, Evas_GL_Image *im)
 {
@@ -928,6 +1264,19 @@ evas_gl_common_image_update(Evas_Engine_GL_Context *gc, Evas_GL_Image *im)
     }
 }
 
+/**
+ * @internal
+ * @brief Updates a GL surface with pixel data from a CPU-backed image.
+ *
+ * This function is used to upload pixel data into an image that is a render
+ * surface. It effectively converts a CPU-data image into a GPU-only surface,
+ * by creating a new surface, copying the pixels, and freeing the original
+ * image.
+ *
+ * @param im The source Evas_GL_Image with CPU pixel data.
+ * @return The new surface-based Evas_GL_Image, or @c NULL on failure.
+ *         The original `im` is freed on success.
+ */
 Evas_GL_Image *
 evas_gl_common_image_surface_update(Evas_GL_Image *im)
 {
@@ -989,6 +1338,17 @@ fail:
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Detaches the CPU-side RGBA_Image from a surface.
+ *
+ * After pixels have been uploaded to a surface texture, the CPU-side buffer
+ * may no longer be needed. This function drops the reference to the cache
+ * entry, allowing the memory to be freed.
+ *
+ * @param im The surface image.
+ * @return The modified surface image.
+ */
 Evas_GL_Image *
 evas_gl_common_image_surface_detach(Evas_GL_Image *im)
 {
@@ -1000,6 +1360,26 @@ evas_gl_common_image_surface_detach(Evas_GL_Image *im)
    return im;
 }
 
+/**
+ * @internal
+ * @brief Creates or updates a "virtual" scaled image.
+ *
+ * This function provides a memory-efficient way to handle scaled images,
+ * particularly for masks. It doesn't create a new scaled texture. Instead, it
+ * creates a new `Evas_GL_Image` that re-uses the texture of the original
+ * `image` but stores different dimensions (`dst_w`, `dst_h`). The actual
+ * scaling is handled by the GPU using texture coordinates at draw time.
+ *
+ * This is an optimization to avoid allocating large temporary surfaces for
+ * operations like masked rendering where the mask is scaled.
+ *
+ * @param scaled A previously returned scaled image to be updated, or @c NULL.
+ * @param image The original source image.
+ * @param dst_w The desired width of the virtual scaled image.
+ * @param dst_h The desired height of the virtual scaled image.
+ * @param smooth Whether scaling should be smooth (bilinear filtering).
+ * @return A new or updated `Evas_GL_Image` representing the scaled version.
+ */
 Evas_GL_Image *
 evas_gl_common_image_virtual_scaled_get(Evas_GL_Image *scaled, Evas_GL_Image *image,
                                         int dst_w, int dst_h, Eina_Bool smooth)
@@ -1079,6 +1459,30 @@ evas_gl_common_image_virtual_scaled_get(Evas_GL_Image *scaled, Evas_GL_Image *im
    return newdst;
 }
 
+/**
+ * @internal
+ * @brief Draws an image mapped onto a 3D-transformed quad.
+ *
+ * This function draws an image (or parts of it) with perspective
+ * transformation. It takes an array of map points, each defining a vertex
+ * with 3D coordinates (x, y, z), texture coordinates (u, v), and color.
+ * The function pushes these quads to the GL context for rendering.
+ *
+ * @param gc The Evas GL engine context.
+ * @param im The source image to draw.
+ * @param npoints The number of points in the map (must be a multiple of 4).
+ * @param p An array of `RGBA_Map_Point` defining the vertices.
+ *        Example of a single quad's points:
+ *        @code
+ *        RGBA_Map_Point p[4];
+ *        p[0].x, p[0].y, p[0].z; // 3D coordinates
+ *        p[0].u, p[0].v;       // Texture coordinates
+ *        p[0].col;             // Vertex color
+ *        // ... and so on for p[1], p[2], p[3]
+ *        @endcode
+ * @param smooth Enables smooth (bilinear) filtering for the texture.
+ * @param level Unused.
+ */
 void
 evas_gl_common_image_map_draw(Evas_Engine_GL_Context *gc, Evas_GL_Image *im,
                               int npoints, RGBA_Map_Point *p, int smooth, int level EINA_UNUSED)
@@ -1142,6 +1546,25 @@ evas_gl_common_image_map_draw(Evas_Engine_GL_Context *gc, Evas_GL_Image *im,
      }
 }
 
+/**
+ * @internal
+ * @brief Pushes a clipped and masked image draw operation to the GL pipeline.
+ *
+ * This is the core helper function for drawing scaled/clipped images. It takes
+ * source and destination rectangles, a clip rectangle, and a mask, and calculates
+ * the final geometry and texture coordinates. It then calls the appropriate
+ * context push function based on the image's colorspace (e.g., RGBA, YUV, etc.).
+ *
+ * @param gc The Evas GL engine context.
+ * @param im The source image.
+ * @param dx,dy,dw,dh Destination rectangle in canvas coordinates.
+ * @param sx,sy,sw,sh Source rectangle in image coordinates.
+ * @param cx,cy,cw,ch Clip rectangle in canvas coordinates.
+ * @param r,g,b,a Color multiplier.
+ * @param mask Optional mask image.
+ * @param smooth Enable smooth scaling.
+ * @param yuv,yuv_709,yuy2,nv12,rgb_a_pair Flags indicating special colorspaces.
+ */
 static void
 _evas_gl_common_image_push(Evas_Engine_GL_Context *gc, Evas_GL_Image *im,
                            int dx, int dy, int dw, int dh,
@@ -1292,6 +1715,22 @@ _evas_gl_common_image_push(Evas_Engine_GL_Context *gc, Evas_GL_Image *im,
                                        smooth, im->tex_only, EINA_FALSE);
 }
 
+/**
+ * @internal
+ * @brief Draws a scaled portion of an image to the canvas.
+ *
+ * This is the high-level function for drawing an image. It handles updating
+ * the image texture if needed, applying color multipliers, and handling
+ * cutouts (rendering the image in multiple pieces to avoid drawing over
+ * occluding objects). It ultimately uses `_evas_gl_common_image_push` to
+ * perform the actual drawing operations.
+ *
+ * @param gc The Evas GL engine context.
+ * @param im The source image.
+ * @param sx,sy,sw,sh The source rectangle within the image.
+ * @param dx,dy,dw,dh The destination rectangle on the canvas.
+ * @param smooth Enables smooth (bilinear) filtering if the image is scaled.
+ */
 void
 evas_gl_common_image_draw(Evas_Engine_GL_Context *gc, Evas_GL_Image *im,
                           int sx, int sy, int sw, int sh,

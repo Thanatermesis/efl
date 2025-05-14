@@ -7,6 +7,16 @@
 
 #include "elm_code_private.h"
 
+/**
+ * @brief Checks if a line starts with a C-like keyword that typically affects indentation.
+ * @param line The code line to check.
+ * @return EINA_TRUE if the line starts with a relevant keyword, EINA_FALSE otherwise.
+ *
+ * This function uses a regular expression to identify keywords like `if`, `else if`,
+ * `while`, `for`, `switch`, `else`, `do`, `case`, or `default` at the beginning of
+ * the line, possibly preceded by whitespace and followed by an opening parenthesis
+ * or brace.
+ */
 static Eina_Bool
 elm_code_line_indent_startswith_keyword(Elm_Code_Line *line)
 {
@@ -33,6 +43,23 @@ elm_code_line_indent_startswith_keyword(Elm_Code_Line *line)
    return ret == 0;
 }
 
+/**
+ * @brief Calculates and returns the appropriate indentation string for a given line.
+ * @param line The code line for which to calculate indentation.
+ * @return A newly allocated string containing the indentation (e.g., "   ", "\t\t").
+ *         The caller is responsible for freeing this string. Returns an empty string
+ *         for the first line or if no specific indentation rules apply.
+ *
+ * This function determines the indentation for the current `line` based on the content
+ * of the `prevline` (the line immediately preceding it). It considers:
+ * - The indentation of the `prevline`.
+ * - Whether the `prevline` ends with an opening brace '{'.
+ * - Whether the `prevline` starts with a keyword that increases indentation (e.g., `if`, `for`).
+ * - Special handling for EFL indentation style (uses spaces instead of tabs and adds extra
+ *   indentation for keywords).
+ * - Comment-specific indentation adjustments (e.g., aligning `*` in multi-line comments).
+ * - Adjusting indentation when a line follows a closing brace '}'.
+ */
 EAPI char *
 elm_code_line_indent_get(Elm_Code_Line *line)
 {
@@ -118,6 +145,23 @@ elm_code_line_indent_get(Elm_Code_Line *line)
    return buf;
 }
 
+/**
+ * @brief Finds the indentation of the line containing the opening brace that matches
+ *        a closing brace on or before the current line's scope.
+ * @param line The current code line, used as a starting point for searching upwards.
+ * @param length Pointer to an unsigned int where the length of the indentation string
+ *               will be stored.
+ * @return A pointer to the beginning of the indentation characters in the source line's text,
+ *         or an empty string if no matching opening brace is found or if the line with
+ *         the opening brace has no indentation. The returned pointer is valid as long as
+ *         the underlying Elm_Code_Line text is valid.
+ *
+ * This function searches upwards from the line preceding the given `line` to find
+ * a matching opening brace '{'. It keeps a stack count, decrementing for '{' and
+ * incrementing for '}'. When the stack becomes negative, it means an unmatched
+ * opening brace has been found. The function then returns the leading whitespace
+ * (indentation) of that line.
+ */
 EAPI const char *
 elm_code_line_indent_matching_braces_get(Elm_Code_Line *line, unsigned int *length)
 {

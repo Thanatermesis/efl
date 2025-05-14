@@ -16,43 +16,57 @@
 
 #define BUFFER_SIZE (4 * 4096)
 
+/**
+ * @brief Private data structure for Efl_Net_Socket_Windows.
+ *
+ * This structure holds all the necessary data for managing a Windows socket,
+ * including local and remote addresses, pending operations, receive and send
+ * buffers, the socket handle, and various status flags.
+ */
 typedef struct _Efl_Net_Socket_Windows_Data
 {
-   Eina_Stringshare *address_local;
-   Eina_Stringshare *address_remote;
-   Eina_List *pending_ops;
+   Eina_Stringshare *address_local; /**< Local address of the socket. */
+   Eina_Stringshare *address_remote; /**< Remote address of the socket. */
+   Eina_List *pending_ops; /**< List of pending asynchronous operations. */
    struct {
       union {
-         uint8_t *bytes;
-         void *mem;
+         uint8_t *bytes; /**< Pointer to the receive buffer. */
+         void *mem;      /**< Generic pointer to the receive buffer memory. */
       };
-      DWORD len;
-      DWORD used;
-      DWORD base;
-      Efl_Net_Socket_Windows_Operation *pending;
-   } recv;
+      DWORD len;        /**< Total length of the receive buffer. */
+      DWORD used;       /**< Amount of data currently stored in the receive buffer. */
+      DWORD base;       /**< Offset of the first unread byte in the receive buffer. */
+      Efl_Net_Socket_Windows_Operation *pending; /**< Pending receive operation, if any. */
+   } recv; /**< Receive buffer and state. */
    struct {
       union {
-         uint8_t *bytes;
-         void *mem;
+         uint8_t *bytes; /**< Pointer to the send buffer. */
+         void *mem;      /**< Generic pointer to the send buffer memory. */
       };
-      DWORD len;
-      DWORD used;
-      Efl_Net_Socket_Windows_Operation *pending;
-   } send;
-   HANDLE handle;
-   Eina_Bool can_read;
-   Eina_Bool eos;
-   Eina_Bool pending_eos;
-   Eina_Bool can_write;
-   Eina_Bool io_started;
-   Eina_Bool close_on_exec;
-   Eina_Bool close_on_invalidate;
+      DWORD len;        /**< Total length of the send buffer. */
+      DWORD used;       /**< Amount of data currently queued in the send buffer. */
+      Efl_Net_Socket_Windows_Operation *pending; /**< Pending send operation, if any. */
+   } send; /**< Send buffer and state. */
+   HANDLE handle; /**< The Windows socket handle. */
+   Eina_Bool can_read; /**< Flag indicating if data can be read from the socket. */
+   Eina_Bool eos; /**< Flag indicating if End-Of-Stream has been reached. */
+   Eina_Bool pending_eos; /**< Flag indicating if EOS should be set after the current buffer drains. */
+   Eina_Bool can_write; /**< Flag indicating if data can be written to the socket. */
+   Eina_Bool io_started; /**< Flag indicating if I/O operations have been started. */
+   Eina_Bool close_on_exec; /**< Flag indicating if the socket should be closed on exec (not supported on Windows). */
+   Eina_Bool close_on_invalidate; /**< Flag indicating if the socket should be closed when the Eo object is invalidated. */
 } Efl_Net_Socket_Windows_Data;
 
+/**
+ * @brief Represents an asynchronous I/O operation on a Windows socket.
+ *
+ * This structure encapsulates an OVERLAPPED structure for Windows asynchronous I/O,
+ * along with callbacks for success and failure, user data, an event handler,
+ * and a reference to the Eo socket object.
+ */
 struct _Efl_Net_Socket_Windows_Operation
 {
-   OVERLAPPED base;
+   OVERLAPPED base; /**< Windows OVERLAPPED structure for asynchronous operations. */
    Efl_Net_Socket_Windows_Operation_Success_Cb success_cb;
    Efl_Net_Socket_Windows_Operation_Failure_Cb failure_cb;
    const void *data;
@@ -66,6 +80,17 @@ struct _Efl_Net_Socket_Windows_Operation
  *  - shorter string
  *  - no newline
  *  - fallback to error code if format fails
+ */
+/**
+ * @brief Formats a Windows error code into a human-readable string.
+ *
+ * This function is similar to `evil_format_message()` but produces a shorter
+ * string without a newline and falls back to the error code if formatting fails.
+ *
+ * @param win32err The Windows error code (e.g., from `GetLastError()`).
+ * @return A newly allocated string containing the formatted error message.
+ *         The caller is responsible for freeing this string.
+ *         Returns a string representation of the error code on failure.
  */
 char *
 _efl_net_windows_error_msg_get(DWORD win32err)
@@ -124,6 +149,16 @@ _efl_net_windows_error_msg_get(DWORD win32err)
    }
 }
 
+/**
+ * @brief Closes a Windows handle, attempting to flush buffers and disconnect.
+ *
+ * This function handles the necessary steps to properly close a Windows handle
+ * that was used for I/O, such as a named pipe or socket. It attempts to
+ * flush file buffers and disconnect a named pipe before closing the handle.
+ * Warnings are logged if these operations fail.
+ *
+ * @param h The Windows HANDLE to close.
+ */
 static void
 _efl_net_socket_windows_handle_close(HANDLE h)
 {
@@ -154,6 +189,20 @@ _efl_net_socket_windows_handle_close(HANDLE h)
 
 static Eina_Bool _efl_net_socket_windows_operation_event(void *, Ecore_Win32_Handler *wh);
 
+/**
+ * @brief Creates a new asynchronous I/O operation structure.
+ *
+ * This function allocates and initializes an `Efl_Net_Socket_Windows_Operation`
+ * structure. It creates a Windows event object for the OVERLAPPED structure
+ * and sets up an Ecore event handler to be notified when the I/O operation
+ * completes.
+ *
+ * @param o The Eo socket object associated with this operation.
+ * @param success_cb Callback function to be invoked on successful completion.
+ * @param failure_cb Callback function to be invoked on failed completion.
+ * @param data User-defined data to be passed to the callbacks.
+ * @return A pointer to the newly created operation structure, or NULL on failure.
+ */
 Efl_Net_Socket_Windows_Operation *
 _efl_net_socket_windows_operation_new(Eo *o, Efl_Net_Socket_Windows_Operation_Success_Cb success_cb, Efl_Net_Socket_Windows_Operation_Failure_Cb failure_cb, const void *data)
 {
@@ -203,6 +252,21 @@ _efl_net_socket_windows_operation_new(Eo *o, Efl_Net_Socket_Windows_Operation_Su
    return NULL;
 }
 
+/**
+ * @brief Finalizes an asynchronous I/O operation.
+ *
+ * This function is called when an asynchronous operation (read or write)
+ * has completed, either successfully or with an error. It invokes the
+ * appropriate callback (success or failure), cleans up resources associated
+ * with the operation (event handler, event object), and removes the operation
+ * from the pending list.
+ *
+ * @param op The operation to finalize.
+ * @param win32err The Windows error code from the operation. 0 for success.
+ * @param used_size The number of bytes transferred by the operation (for success).
+ * @return The error code returned by the failure callback, or 0 if successful
+ *         or if the operation is still pending (ERROR_IO_INCOMPLETE).
+ */
 static Eina_Error
 _efl_net_socket_windows_operation_done(Efl_Net_Socket_Windows_Operation *op, DWORD win32err, DWORD used_size)
 {
@@ -276,6 +340,16 @@ _efl_net_socket_windows_operation_done(Efl_Net_Socket_Windows_Operation *op, DWO
    return err;
 }
 
+/**
+ * @brief Marks an asynchronous operation as failed and finalizes it.
+ *
+ * This is a convenience function that calls
+ * `_efl_net_socket_windows_operation_done` with a 0 `used_size`.
+ *
+ * @param op The operation that failed.
+ * @param win32err The Windows error code indicating the failure reason.
+ * @return The error code returned by the failure callback.
+ */
 Eina_Error
 _efl_net_socket_windows_operation_failed(Efl_Net_Socket_Windows_Operation *op, DWORD win32err)
 {
@@ -285,6 +359,16 @@ _efl_net_socket_windows_operation_failed(Efl_Net_Socket_Windows_Operation *op, D
    return _efl_net_socket_windows_operation_done(op, win32err, 0);
 }
 
+/**
+ * @brief Marks an asynchronous operation as succeeded and finalizes it.
+ *
+ * This is a convenience function that calls
+ * `_efl_net_socket_windows_operation_done` with a 0 `win32err`.
+ *
+ * @param op The operation that succeeded.
+ * @param used_size The number of bytes transferred by the operation.
+ * @return 0 on success.
+ */
 Eina_Error
 _efl_net_socket_windows_operation_succeeded(Efl_Net_Socket_Windows_Operation *op, DWORD used_size)
 {
@@ -294,6 +378,19 @@ _efl_net_socket_windows_operation_succeeded(Efl_Net_Socket_Windows_Operation *op
    return _efl_net_socket_windows_operation_done(op, 0, used_size);
 }
 
+/**
+ * @brief Event callback for completed asynchronous I/O operations.
+ *
+ * This function is invoked by the Ecore main loop when a Windows event
+ * associated with an OVERLAPPED I/O operation is signaled. It retrieves
+ * the result of the operation using `GetOverlappedResult` and then calls
+ * either `_efl_net_socket_windows_operation_succeeded` or
+ * `_efl_net_socket_windows_operation_failed` to finalize the operation.
+ *
+ * @param data Pointer to the `Efl_Net_Socket_Windows_Operation` structure.
+ * @param wh The Ecore_Win32_Handler that triggered this callback (unused).
+ * @return ECORE_CALLBACK_CANCEL to remove the handler after it's triggered.
+ */
 static Eina_Bool
 _efl_net_socket_windows_operation_event(void *data, Ecore_Win32_Handler *wh EINA_UNUSED)
 {
@@ -334,6 +431,18 @@ _efl_net_socket_windows_operation_event(void *data, Ecore_Win32_Handler *wh EINA
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Initializes the Efl_Net_Socket_Windows object with a given Windows handle.
+ *
+ * This function associates an existing Windows HANDLE (e.g., from a socket
+ * or named pipe) with the Eo socket object. It should be called before
+ * starting any I/O operations.
+ *
+ * @param o The Eo socket object.
+ * @param h The Windows HANDLE to adopt. Must not be INVALID_HANDLE_VALUE.
+ * @return 0 on success, or an Eina_Error code on failure (e.g., EINVAL if
+ *         parameters are invalid, EALREADY if already initialized).
+ */
 Eina_Error
 _efl_net_socket_windows_init(Eo *o, HANDLE h)
 {
@@ -351,6 +460,19 @@ _efl_net_socket_windows_init(Eo *o, HANDLE h)
 
 static Eina_Error _efl_net_socket_windows_recv(Eo *o, Efl_Net_Socket_Windows_Data *pd);
 
+/**
+ * @brief Callback for successful asynchronous receive operations.
+ *
+ * This function is called when an asynchronous `ReadFile` operation completes
+ * successfully. It updates the receive buffer state, notifies the user via
+ * `efl_io_reader_can_read_set`, and potentially initiates another read
+ * operation if the buffer is not full and no other read is pending.
+ *
+ * @param data User data associated with the operation (unused).
+ * @param o The Eo socket object.
+ * @param used_size The number of bytes received.
+ * @return 0 on success, or an Eina_Error code if a subsequent operation fails.
+ */
 static Eina_Error
 _efl_net_socket_windows_recv_success(void *data EINA_UNUSED, Eo *o, DWORD used_size)
 {
@@ -373,6 +495,19 @@ _efl_net_socket_windows_recv_success(void *data EINA_UNUSED, Eo *o, DWORD used_s
    return _efl_net_socket_windows_recv(o, pd);
 }
 
+/**
+ * @brief Callback for failed asynchronous receive operations.
+ *
+ * This function is called when an asynchronous `ReadFile` operation fails.
+ * It updates the socket state, potentially setting `pending_eos` if some
+ * data was already received, or directly setting EOS if the buffer is empty.
+ * It maps Windows error codes to Eina_Error codes.
+ *
+ * @param data User data associated with the operation (unused).
+ * @param o The Eo socket object.
+ * @param win32err The Windows error code indicating the failure reason.
+ * @return An Eina_Error code corresponding to the `win32err`.
+ */
 static Eina_Error
 _efl_net_socket_windows_recv_failure(void *data EINA_UNUSED, Eo *o, DWORD win32err)
 {
@@ -406,6 +541,21 @@ _efl_net_socket_windows_recv_failure(void *data EINA_UNUSED, Eo *o, DWORD win32e
      }
 }
 
+/**
+ * @brief Initiates an asynchronous receive (ReadFile) operation.
+ *
+ * This function attempts to read data from the socket into the receive buffer
+ * using Windows' asynchronous `ReadFile`. It manages the `OVERLAPPED`
+ * operation and handles immediate success or pending I/O.
+ * Before reading, it compacts the receive buffer if `pd->recv.base > 0`.
+ *
+ * @param o The Eo socket object.
+ * @param pd The private data for the socket.
+ * @return 0 if the operation was successfully initiated (either completed
+ *         synchronously or is pending), or an Eina_Error code on failure.
+ *         Returns EINPROGRESS if a receive operation is already pending.
+ *         Returns ENOSPC if the receive buffer is full.
+ */
 static Eina_Error
 _efl_net_socket_windows_recv(Eo *o, Efl_Net_Socket_Windows_Data *pd)
 {
@@ -468,6 +618,20 @@ _efl_net_socket_windows_recv(Eo *o, Efl_Net_Socket_Windows_Data *pd)
 
 static Eina_Error _efl_net_socket_windows_send(Eo *o, Efl_Net_Socket_Windows_Data *pd);
 
+/**
+ * @brief Callback for successful asynchronous send operations.
+ *
+ * This function is called when an asynchronous `WriteFile` operation completes
+ * successfully. It updates the send buffer state (removing the sent data),
+ * notifies the user via `efl_io_writer_can_write_set` if the buffer is now empty,
+ * and potentially initiates another send operation if there's more data queued
+ * and no other send is pending.
+ *
+ * @param data User data associated with the operation (unused).
+ * @param o The Eo socket object.
+ * @param used_size The number of bytes sent.
+ * @return 0 on success, or an Eina_Error code if a subsequent operation fails.
+ */
 static Eina_Error
 _efl_net_socket_windows_send_success(void *data EINA_UNUSED, Eo *o, DWORD used_size)
 {
@@ -497,6 +661,19 @@ _efl_net_socket_windows_send_success(void *data EINA_UNUSED, Eo *o, DWORD used_s
    return _efl_net_socket_windows_send(o, pd);
 }
 
+/**
+ * @brief Callback for failed asynchronous send operations.
+ *
+ * This function is called when an asynchronous `WriteFile` operation fails.
+ * It updates the socket state, sets `can_write` to false, and potentially
+ * sets EOS if the receive buffer is also empty. It maps Windows error codes
+ * to Eina_Error codes.
+ *
+ * @param data User data associated with the operation (unused).
+ * @param o The Eo socket object.
+ * @param win32err The Windows error code indicating the failure reason.
+ * @return An Eina_Error code corresponding to the `win32err`.
+ */
 static Eina_Error
 _efl_net_socket_windows_send_failure(void *data EINA_UNUSED, Eo *o, DWORD win32err)
 {
@@ -533,6 +710,20 @@ _efl_net_socket_windows_send_failure(void *data EINA_UNUSED, Eo *o, DWORD win32e
      }
 }
 
+/**
+ * @brief Initiates an asynchronous send (WriteFile) operation.
+ *
+ * This function attempts to write data from the send buffer to the socket
+ * using Windows' asynchronous `WriteFile`. It manages the `OVERLAPPED`
+ * operation and handles immediate success or pending I/O.
+ *
+ * @param o The Eo socket object.
+ * @param pd The private data for the socket.
+ * @return 0 if the operation was successfully initiated (either completed
+ *         synchronously or is pending), or an Eina_Error code on failure.
+ *         Returns EINPROGRESS if a send operation is already pending.
+ *         Returns 0 if there is no data to send (`pd->send.used == 0`).
+ */
 static Eina_Error
 _efl_net_socket_windows_send(Eo *o, Efl_Net_Socket_Windows_Data *pd)
 {
@@ -583,6 +774,18 @@ _efl_net_socket_windows_send(Eo *o, Efl_Net_Socket_Windows_Data *pd)
    return _efl_net_socket_windows_operation_succeeded(op, used_size);
 }
 
+/**
+ * @brief Starts I/O operations on the socket.
+ *
+ * This function allocates send and receive buffers if they haven't been
+ * allocated yet. It then initiates the first asynchronous receive operation
+ * and sets the `can_write` flag to true, allowing data to be written.
+ *
+ * @param o The Eo socket object.
+ * @return 0 on success, or an Eina_Error code on failure (e.g., ENOMEM if
+ *         buffer allocation fails, or errors from the initial receive).
+ *         Returns EALREADY if I/O has already been started.
+ */
 Eina_Error
 _efl_net_socket_windows_io_start(Eo *o)
 {
@@ -617,6 +820,13 @@ _efl_net_socket_windows_io_start(Eo *o)
    return 0;
 }
 
+/**
+ * @brief Gets the underlying Windows HANDLE for the socket.
+ *
+ * @param o The Eo socket object.
+ * @return The Windows HANDLE, or INVALID_HANDLE_VALUE if the object is not
+ *         properly initialized or an error occurs.
+ */
 HANDLE
 _efl_net_socket_windows_handle_get(const Eo *o)
 {

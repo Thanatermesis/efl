@@ -11,9 +11,20 @@
 #include <Eeze.h>
 #include "eeze_udev_private.h"
 
+/**
+ * @internal
+ * @brief List of active udev watches.
+ */
 static Eina_Inlist *watches;
 
-/* opaque */
+/**
+ * @internal
+ * @brief Structure representing a udev watch.
+ *
+ * This structure holds all necessary information for a udev watch,
+ * including the file descriptor handler, callback function, user data,
+ * event type, udev monitor instance, and the type of udev device being watched.
+ */
 struct Eeze_Udev_Watch
 {
    EINA_INLIST;
@@ -29,6 +40,18 @@ struct Eeze_Udev_Watch
 /* private function to further filter watch results based on Eeze_Udev_Type
  * specified; helpful for new udev versions, but absolutely required for
  * old udev, which does not implement filtering in device monitors.
+ */
+/**
+ * @internal
+ * @brief Callback function for Ecore_Fd_Handler to process udev monitor events.
+ *
+ * This function is called when there is activity on the udev monitor's
+ * file descriptor. It receives the udev device, filters it based on the
+ * watch type and event, and then calls the user-provided callback.
+ *
+ * @param data The Eeze_Udev_Watch instance.
+ * @param fd_handler The Ecore_Fd_Handler that triggered this callback.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active, ECORE_CALLBACK_CANCEL otherwise.
  */
 static Eina_Bool
 _get_syspath_from_watch(void             *data,
@@ -270,6 +293,17 @@ error:
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Initializes a udev monitor for a given watch.
+ *
+ * Sets up the udev monitor, applies necessary filters based on the
+ * Eeze_Udev_Type, enables receiving, and adds an Ecore_Fd_Handler
+ * to listen for events.
+ *
+ * @param watch The Eeze_Udev_Watch to initialize.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _watch_init(Eeze_Udev_Watch *watch)
 {
@@ -361,6 +395,17 @@ error:
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Resets all active udev watches.
+ *
+ * This function is typically called after a fork to re-initialize
+ * udev monitors in the new process. It iterates through all active
+ * watches, cleans up their existing monitor and fd_handler, and
+ * then re-initializes them.
+ *
+ * @param data Unused.
+ */
 static void
 _eeze_udev_watch_reset(void *data EINA_UNUSED)
 {
@@ -376,6 +421,48 @@ _eeze_udev_watch_reset(void *data EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Adds a new udev watch.
+ *
+ * Creates and starts a new watch for udev events of a specific type.
+ *
+ * @param type The type of udev device to watch (e.g., EEZE_UDEV_TYPE_KEYBOARD).
+ * @param event A bitmask of events to watch for (e.g., EEZE_UDEV_EVENT_ADD | EEZE_UDEV_EVENT_REMOVE).
+ *              Use EEZE_UDEV_EVENT_NONE to watch for all event types.
+ * @param cb The callback function to be executed when an event occurs.
+ *           The callback will receive:
+ *           - const char *device_syspath: The syspath of the device.
+ *           - Eeze_Udev_Event event_type: The type of event that occurred.
+ *           - void *user_data: The user_data pointer passed to eeze_udev_watch_add().
+ *           - Eeze_Udev_Watch *watch: The watch that triggered this callback.
+ * @param user_data Custom data to be passed to the callback function.
+ * @return A pointer to the new Eeze_Udev_Watch on success, or NULL on failure.
+ *         This pointer is used to delete the watch later with eeze_udev_watch_del().
+ *
+ * @see Eeze_Udev_Type
+ * @see Eeze_Udev_Event
+ * @see Eeze_Udev_Watch_Cb
+ * @see eeze_udev_watch_del()
+ *
+ * Example:
+ * @code
+ * void my_device_event_cb(const char *syspath, Eeze_Udev_Event event, void *data, Eeze_Udev_Watch *watch)
+ * {
+ *   if (event & EEZE_UDEV_EVENT_ADD)
+ *     printf("Device added: %s\n", syspath);
+ *   else if (event & EEZE_UDEV_EVENT_REMOVE)
+ *     printf("Device removed: %s\n", syspath);
+ * }
+ *
+ * // Watch for USB drive additions and removals
+ * Eeze_Udev_Watch *usb_watch = eeze_udev_watch_add(EEZE_UDEV_TYPE_DRIVE_REMOVABLE,
+ *                                                EEZE_UDEV_EVENT_ADD | EEZE_UDEV_EVENT_REMOVE,
+ *                                                my_device_event_cb,
+ *                                                NULL);
+ * if (!usb_watch)
+ *   fprintf(stderr, "Failed to add USB watch\n");
+ * @endcode
+ */
 EAPI Eeze_Udev_Watch *
 eeze_udev_watch_add(Eeze_Udev_Type     type,
                     int                event,
@@ -402,6 +489,25 @@ error:
    return NULL;
 }
 
+/**
+ * @brief Deletes a udev watch.
+ *
+ * Stops watching for udev events associated with the given watch and frees
+ * allocated resources.
+ *
+ * @param watch The Eeze_Udev_Watch to delete, as returned by eeze_udev_watch_add().
+ * @return The user_data pointer originally passed to eeze_udev_watch_add(),
+ *         or NULL if the watch was NULL.
+ *
+ * @see eeze_udev_watch_add()
+ *
+ * Example:
+ * @code
+ * // Assuming usb_watch is a valid Eeze_Udev_Watch* from eeze_udev_watch_add()
+ * void *user_data = eeze_udev_watch_del(usb_watch);
+ * // user_data can now be freed if it was dynamically allocated
+ * @endcode
+ */
 EAPI void *
 eeze_udev_watch_del(Eeze_Udev_Watch *watch)
 {

@@ -57,80 +57,96 @@
 
 #define MY_CLASS EFL_CANVAS_VIDEO_CLASS
 
+/**
+ * @brief Private data structure for the Efl_Canvas_Video object.
+ *
+ * This structure holds all the internal state of an Emotion video object,
+ * including engine details, file information, playback state, and rendering
+ * properties.
+ */
 typedef struct _Efl_Canvas_Video_Data Efl_Canvas_Video_Data;
+
+/**
+ * @brief Private data structure for managing extended attributes (xattr) of a video file.
+ *
+ * This structure is used to store and manage file-specific metadata, such as
+ * the last playback position, primarily for features like resuming playback.
+ * It includes a reference count for managing its lifecycle and Eio_File handles
+ * for asynchronous xattr operations if HAVE_EIO is defined.
+ */
 typedef struct _Emotion_Xattr_Data Emotion_Xattr_Data;
 
 struct _Efl_Canvas_Video_Data
 {
-   Emotion_Engine_Instance *engine_instance;
+   Emotion_Engine_Instance *engine_instance; /**< Instance of the Emotion video engine. */
 
-   const char    *engine;
-   const char    *file;
-   Evas_Object   *obj;
-   Evas_Object   *bg;
+   const char    *engine; /**< Name of the video engine being used (e.g., "gstreamer1"). */
+   const char    *file; /**< Path to the video file. */
+   Evas_Object   *obj; /**< The Evas image object used for displaying video frames. */
+   Evas_Object   *bg; /**< Background Evas object. */
 
-   Ecore_Job     *job;
+   Ecore_Job     *job; /**< Ecore job for deferred position setting. */
 
-   Emotion_Xattr_Data *xattr;
+   Emotion_Xattr_Data *xattr; /**< Extended attributes data for the video file. */
 
-   const char *title;
-
-   struct {
-      const char *info;
-      double  stat;
-   } progress;
-   struct {
-      const char *file;
-      int   num;
-   } ref;
-   struct {
-      int button_num;
-      int button;
-   } spu;
-   struct {
-      int l; /* left */
-      int r; /* right */
-      int t; /* top */
-      int b; /* bottom */
-      Evas_Object *clipper;
-   } crop;
+   const char *title; /**< Title of the video. */
 
    struct {
-      int         w, h;
-   } video;
+      const char *info; /**< Progress information string. */
+      double  stat; /**< Progress status (0.0 to 1.0). */
+   } progress; /**< Playback progress data. */
    struct {
-      double      w, h;
-   } fill;
+      const char *file; /**< Referenced file path. */
+      int   num; /**< Reference number. */
+   } ref; /**< Reference file data. */
+   struct {
+      int button_num; /**< Number of SPU buttons. */
+      int button; /**< Current SPU button. */
+   } spu; /**< SPU (Subpicture Unit) data. */
+   struct {
+      int l; /**< Left crop value. */
+      int r; /**< Right crop value. */
+      int t; /**< Top crop value. */
+      int b; /**< Bottom crop value. */
+      Evas_Object *clipper; /**< Evas object used for cropping. */
+   } crop; /**< Video cropping data. */
 
-   double         ratio;
-   double         pos;
-   double         remember_jump;
-   double         seek_pos;
-   double         len;
+   struct {
+      int         w, h; /**< Width and height of the video stream. */
+   } video; /**< Video stream dimensions. */
+   struct {
+      double      w, h; /**< Fill width and height factors. */
+   } fill; /**< Video fill mode data. */
 
-   Emotion_Module_Options module_options;
+   double         ratio; /**< Aspect ratio of the video. */
+   double         pos; /**< Current playback position in seconds. */
+   double         remember_jump; /**< Position to jump to after opening. */
+   double         seek_pos; /**< Target position for seeking. */
+   double         len; /**< Total length of the video in seconds. */
 
-   Emotion_Suspend state;
-   Emotion_Aspect aspect;
+   Emotion_Module_Options module_options; /**< Options for the Emotion module. */
 
-   Ecore_Animator *anim;
+   Emotion_Suspend state; /**< Current suspend state of the video object. */
+   Emotion_Aspect aspect; /**< Aspect ratio handling mode. */
 
-   Eina_Bool open : 1;
-   Eina_Bool play : 1;
-   Eina_Bool pause : 1;
-   Eina_Bool remember_play : 1;
-   Eina_Bool seek : 1;
-   Eina_Bool seeking : 1;
-   Eina_Bool loaded : 1;
+   Ecore_Animator *anim; /**< Ecore animator for frame updates. */
+
+   Eina_Bool open : 1; /**< Flag indicating if the video file is open. */
+   Eina_Bool play : 1; /**< Flag indicating if the video is playing. */
+   Eina_Bool pause : 1; /**< Flag indicating if the video is paused. */
+   Eina_Bool remember_play : 1; /**< Flag to remember play state before opening. */
+   Eina_Bool seek : 1; /**< Flag indicating a seek operation is pending. */
+   Eina_Bool seeking : 1; /**< Flag indicating a seek operation is in progress. */
+   Eina_Bool loaded : 1; /**< Flag indicating if the video file is loaded. */
 };
 
 struct _Emotion_Xattr_Data
 {
-   EINA_REFCOUNT;
-   Eo       *obj_wref;
+   EINA_REFCOUNT; /**< Reference count for the xattr data. */
+   Eo       *obj_wref; /**< Weak reference to the Emotion object. */
 #ifdef HAVE_EIO
-   Eio_File *load;
-   Eio_File *save;
+   Eio_File *load; /**< Eio handle for loading xattr. */
+   Eio_File *save; /**< Eio handle for saving xattr. */
 #endif
 };
 
@@ -139,6 +155,11 @@ static void _mouse_down(void *data, Evas *ev, Evas_Object *obj, void *event_info
 static void _pos_set_job(void *data);
 static void _pixels_get(void *data, Evas_Object *obj);
 
+/**
+ * @brief Initializes the Emotion engine instance if not already initialized.
+ * @param obj The Emotion Evas object.
+ * @param sd Pointer to the private data of the Emotion object.
+ */
 static void
 _engine_init(Eo *obj, Efl_Canvas_Video_Data *sd)
 {
@@ -147,6 +168,15 @@ _engine_init(Eo *obj, Efl_Canvas_Video_Data *sd)
                                                      &(sd->module_options));
 }
 
+/**
+ * @brief Fills the image data buffer of an Evas image object with zeros.
+ *
+ * This is used to clear the video display area, for example, when a video
+ * is closed or before a new frame is decoded into a differently sized buffer.
+ * It handles different colorspaces (ARGB8888, YCbCr planar formats).
+ *
+ * @param img The Evas image object whose data is to be zeroed.
+ */
 static void
 _emotion_image_data_zero(Evas_Object *img)
 {
@@ -170,6 +200,15 @@ _emotion_image_data_zero(Evas_Object *img)
    evas_object_image_data_set(img, data);
 }
 
+/**
+ * @brief Cancels ongoing EIO operations for extended attributes.
+ *
+ * If EIO is enabled and there are active load or save operations for
+ * file extended attributes (like last playback position), this function
+ * cancels them.
+ *
+ * @param xattr Pointer to the Emotion_Xattr_Data structure.
+ */
 static void
 _xattr_data_cancel(Emotion_Xattr_Data *xattr)
 {
@@ -183,6 +222,13 @@ _xattr_data_cancel(Emotion_Xattr_Data *xattr)
 #endif
 }
 
+/**
+ * @brief Decrements the reference count of Emotion_Xattr_Data and frees it if count reaches zero.
+ *
+ * Also cancels any pending EIO operations and removes the weak reference to the object.
+ *
+ * @param xattr Pointer to the Emotion_Xattr_Data structure to unreference.
+ */
 static void
 _xattr_data_unref(Emotion_Xattr_Data *xattr)
 {
@@ -193,6 +239,22 @@ _xattr_data_unref(Emotion_Xattr_Data *xattr)
    free(xattr);
 }
 
+/**
+ * @brief Updates the position and size of the video image and its clipper.
+ *
+ * This function is responsible for scaling and positioning the actual video
+ * image (`sd->obj`) within the bounds of the Emotion object, taking into
+ * account any cropping (`sd->crop`) and fill settings (`sd->fill`).
+ * If cropping is active, it also manages the clipper Evas object.
+ *
+ * @param obj The Emotion Evas object.
+ * @param x The target x-coordinate for the Emotion object.
+ * @param y The target y-coordinate for the Emotion object.
+ * @param w The target width for the Emotion object.
+ * @param h The target height for the Emotion object.
+ * @param vid_w The native width of the video stream.
+ * @param vid_h The native height of the video stream.
+ */
 static void
 _clipper_position_size_update(Evas_Object *obj, int x, int y, int w, int h, int vid_w, int vid_h)
 {
@@ -232,7 +294,16 @@ _clipper_position_size_update(Evas_Object *obj, int x, int y, int w, int h, int 
 /*******************************/
 
 
-
+/**
+ * @brief Adds a new Emotion video object to the given Evas canvas.
+ *
+ * This is the primary way to create an Emotion object.
+ *
+ * @param evas The Evas canvas to add the object to.
+ * @return A new Emotion Evas_Object on success, or @c NULL on failure.
+ *
+ * @ingroup Emotion_Group_Basic
+ */
 EMOTION_API Evas_Object *
 emotion_object_add(Evas *evas)
 {
@@ -256,6 +327,19 @@ _efl_canvas_video_efl_object_constructor(Eo *obj, Efl_Canvas_Video_Data *pd)
    return obj;
 }
 
+/**
+ * @brief Gets the underlying Evas image object used by Emotion for video display.
+ *
+ * This function returns the Evas_Object that Emotion uses internally to render
+ * video frames. This can be useful for advanced manipulation or inspection, but
+ * direct modification of this object is generally not recommended as it may
+ * interfere with Emotion's operations.
+ *
+ * @param obj The Emotion object.
+ * @return The internal Evas image object, or @c NULL if @p obj is invalid.
+ *
+ * @ingroup Emotion_Group_Advanced
+ */
 EMOTION_API Evas_Object *
 emotion_object_image_get(const Evas_Object *obj)
 {
@@ -351,12 +435,37 @@ _efl_canvas_video_engine_set(Eo *obj, Efl_Canvas_Video_Data *pd, const char *eng
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets the media file to be played by the Emotion object.
+ *
+ * This function tells Emotion which file (or URI) to load and play.
+ * The actual loading might be deferred.
+ *
+ * @param obj The Emotion object.
+ * @param file The path or URI of the media file. For example, "/path/to/video.mp4" or "file:///path/to/video.ogv".
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ *
+ * @ingroup Emotion_Group_File
+ */
 EMOTION_API Eina_Bool
 emotion_object_file_set(Evas_Object *obj, const char *file)
 {
    return efl_file_simple_load(obj, file, NULL);
 }
 
+/**
+ * @brief Implements Efl.File.file_set for the Emotion object.
+ * @internal
+ *
+ * Sets the file path for the video. This updates the internal file path
+ * stringshare and marks the video as not loaded. It then calls the parent
+ * class's implementation.
+ *
+ * @param obj The Emotion Eo object.
+ * @param sd Pointer to the private data of the Emotion object.
+ * @param file The file path to set.
+ * @return An Eina_Error code, typically 0 on success.
+ */
 EOLIAN static Eina_Error
 _efl_canvas_video_efl_file_file_set(Eo *obj, Efl_Canvas_Video_Data *sd, const char *file)
 {
@@ -444,12 +553,37 @@ _efl_canvas_video_efl_file_load(Eo *obj EINA_UNUSED, Efl_Canvas_Video_Data *sd)
    return 0;
 }
 
+/**
+ * @brief Gets the media file currently set for the Emotion object.
+ *
+ * @param obj The Emotion object.
+ * @return The path or URI of the current media file as a stringshared string,
+ *         or @c NULL if no file is set or @p obj is invalid. The returned string
+ *         should not be freed by the caller.
+ *
+ * @ingroup Emotion_Group_File
+ */
 EMOTION_API const char *
 emotion_object_file_get(const Evas_Object *obj)
 {
    return efl_file_get(obj);
 }
 
+/**
+ * @brief Applies aspect ratio and border settings to the video display.
+ * @internal
+ *
+ * This function is called when the object's geometry or aspect/border
+ * settings change. It configures the clipper object if borders are used,
+ * and then calls _clipper_position_size_update to adjust the video image.
+ *
+ * @param obj The Emotion Evas object.
+ * @param sd Pointer to the private data of the Emotion object.
+ * @param w The current width of the Emotion object.
+ * @param h The current height of the Emotion object.
+ * @param iw The native width of the video stream.
+ * @param ih The native height of the video stream.
+ */
 static void
 _emotion_aspect_borders_apply(Evas_Object *obj, Efl_Canvas_Video_Data *sd, int w, int h, int iw, int ih)
 {
@@ -488,6 +622,20 @@ _emotion_aspect_borders_apply(Evas_Object *obj, Efl_Canvas_Video_Data *sd, int w
    _clipper_position_size_update(obj, x, y, w, h, iw, ih);
 }
 
+/**
+ * @brief Calculates and applies borders based on aspect ratio settings.
+ * @internal
+ *
+ * This function determines the necessary cropping borders (sd->crop.l, .r, .t, .b)
+ * based on the current aspect ratio mode (sd->aspect), the object's dimensions (w, h),
+ * and the video's native dimensions and aspect ratio. It then calls
+ * _emotion_aspect_borders_apply to effect these changes.
+ *
+ * @param obj The Emotion Evas object.
+ * @param sd Pointer to the private data of the Emotion object.
+ * @param w The width of the Emotion object.
+ * @param h The height of the Emotion object.
+ */
 static void
 _efl_canvas_video_aspect_border_apply(Evas_Object *obj, Efl_Canvas_Video_Data *sd, int w, int h)
 {
@@ -579,6 +727,21 @@ _efl_canvas_video_aspect_border_apply(Evas_Object *obj, Efl_Canvas_Video_Data *s
    _emotion_aspect_borders_apply(obj, sd, w, h, iw, ih);
 }
 
+/**
+ * @brief Sets custom borders for the video display.
+ *
+ * This function allows specifying how many pixels to crop from each side of
+ * the video. Positive values crop from the edge, effectively zooming in.
+ * Using this function sets the aspect mode to #EMOTION_ASPECT_CUSTOM.
+ *
+ * @param obj The Emotion object.
+ * @param l Pixels to crop from the left.
+ * @param r Pixels to crop from the right.
+ * @param t Pixels to crop from the top.
+ * @param b Pixels to crop from the bottom.
+ *
+ * @ingroup Emotion_Group_Aspect
+ */
 EMOTION_API void
 emotion_object_border_set(Evas_Object *obj, int l, int r, int t, int b)
 {
@@ -596,6 +759,20 @@ emotion_object_border_set(Evas_Object *obj, int l, int r, int t, int b)
    _efl_canvas_video_aspect_border_apply(obj, sd, w, h);
 }
 
+/**
+ * @brief Gets the current custom borders for the video display.
+ *
+ * Retrieves the border values previously set by emotion_object_border_set().
+ * Note that these values are the negative of the internal crop values.
+ *
+ * @param obj The Emotion object.
+ * @param[out] l Pointer to store the left border value.
+ * @param[out] r Pointer to store the right border value.
+ * @param[out] t Pointer to store the top border value.
+ * @param[out] b Pointer to store the bottom border value.
+ *
+ * @ingroup Emotion_Group_Aspect
+ */
 EMOTION_API void
 emotion_object_border_get(const Evas_Object *obj, int *l, int *r, int *t, int *b)
 {
@@ -608,6 +785,21 @@ emotion_object_border_get(const Evas_Object *obj, int *l, int *r, int *t, int *b
    *b = -sd->crop.b;
 }
 
+/**
+ * @brief Sets the background color of the Emotion object.
+ *
+ * This color is visible in areas not covered by the video, for example,
+ * if the video's aspect ratio does not match the object's aspect ratio
+ * and "letterboxing" or "pillarboxing" occurs.
+ *
+ * @param obj The Emotion object.
+ * @param r Red component (0-255).
+ * @param g Green component (0-255).
+ * @param b Blue component (0-255).
+ * @param a Alpha component (0-255).
+ *
+ * @ingroup Emotion_Group_Display
+ */
 EMOTION_API void
 emotion_object_bg_color_set(Evas_Object *obj, int r, int g, int b, int a)
 {
@@ -617,6 +809,17 @@ emotion_object_bg_color_set(Evas_Object *obj, int r, int g, int b, int a)
    evas_object_color_set(sd->bg, r, g, b, a);
 }
 
+/**
+ * @brief Gets the background color of the Emotion object.
+ *
+ * @param obj The Emotion object.
+ * @param[out] r Pointer to store the red component.
+ * @param[out] g Pointer to store the green component.
+ * @param[out] b Pointer to store the blue component.
+ * @param[out] a Pointer to store the alpha component.
+ *
+ * @ingroup Emotion_Group_Display
+ */
 EMOTION_API void
 emotion_object_bg_color_get(const Evas_Object *obj, int *r, int *g, int *b, int *a)
 {
@@ -626,6 +829,17 @@ emotion_object_bg_color_get(const Evas_Object *obj, int *r, int *g, int *b, int 
    evas_object_color_get(sd->bg, r, g, b, a);
 }
 
+/**
+ * @brief Sets the aspect ratio handling mode for the video.
+ *
+ * This determines how the video is scaled and displayed within the
+ * Emotion object's bounds if their aspect ratios differ.
+ *
+ * @param obj The Emotion object.
+ * @param a The desired #Emotion_Aspect mode.
+ *
+ * @ingroup Emotion_Group_Aspect
+ */
 EMOTION_API void
 emotion_object_keep_aspect_set(Evas_Object *obj, Emotion_Aspect a)
 {
@@ -640,6 +854,14 @@ emotion_object_keep_aspect_set(Evas_Object *obj, Emotion_Aspect a)
    _efl_canvas_video_aspect_border_apply(obj, sd, w, h);
 }
 
+/**
+ * @brief Gets the current aspect ratio handling mode.
+ *
+ * @param obj The Emotion object.
+ * @return The current #Emotion_Aspect mode.
+ *
+ * @ingroup Emotion_Group_Aspect
+ */
 EMOTION_API Emotion_Aspect
 emotion_object_keep_aspect_get(const Evas_Object *obj)
 {
@@ -649,6 +871,21 @@ emotion_object_keep_aspect_get(const Evas_Object *obj)
    return sd->aspect;
 }
 
+/**
+ * @brief Starts or stops video playback.
+ *
+ * This is a convenience function. Setting @p play to @c EINA_TRUE
+ * is equivalent to `efl_player_playing_set(obj, EINA_TRUE)` followed by
+ * `efl_player_paused_set(obj, EINA_FALSE)`.
+ * Setting @p play to @c EINA_FALSE is equivalent to
+ * `efl_player_playing_set(obj, EINA_FALSE)` (which also implies unpausing)
+ * and then `efl_player_paused_set(obj, EINA_TRUE)` to effectively stop.
+ *
+ * @param obj The Emotion object.
+ * @param play @c EINA_TRUE to start playback, @c EINA_FALSE to stop.
+ *
+ * @ingroup Emotion_Group_Playback
+ */
 EMOTION_API void
 emotion_object_play_set(Evas_Object *obj, Eina_Bool play)
 {
@@ -658,6 +895,19 @@ emotion_object_play_set(Evas_Object *obj, Eina_Bool play)
    efl_player_paused_set(obj, !play);
 }
 
+/**
+ * @brief Implements Efl.Player.playing_set for the Emotion object.
+ * @internal
+ *
+ * Sets the playing state of the video. If play is true, it starts playback.
+ * If play is false, it stops playback and resets the position to 0.
+ * Handles remembering the play state if the file is not yet open.
+ *
+ * @param obj The Emotion Eo object.
+ * @param sd Pointer to the private data of the Emotion object.
+ * @param play The desired playing state.
+ * @return @c EINA_TRUE if the state was successfully set or queued, @c EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_video_efl_player_playing_set(Eo *obj, Efl_Canvas_Video_Data *sd, Eina_Bool play)
 {
@@ -710,12 +960,31 @@ _efl_canvas_video_efl_player_paused_set(Eo *obj, Efl_Canvas_Video_Data *sd, Eina
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the current playback state of the video.
+ *
+ * @param obj The Emotion object.
+ * @return @c EINA_TRUE if the video is currently playing (and not paused),
+ *         @c EINA_FALSE otherwise.
+ *
+ * @ingroup Emotion_Group_Playback
+ */
 EMOTION_API Eina_Bool
 emotion_object_play_get(const Evas_Object *obj)
 {
    return efl_player_playing_get(obj) && !efl_player_paused_get(obj);
 }
 
+/**
+ * @brief Implements Efl.Player.playing_get for the Emotion object.
+ * @internal
+ *
+ * Returns the current playing state (sd->play).
+ *
+ * @param obj The Emotion Eo object (unused).
+ * @param sd Pointer to the private data of the Emotion object.
+ * @return @c EINA_TRUE if playing, @c EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_video_efl_player_playing_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Video_Data *sd)
 {
@@ -731,12 +1000,34 @@ _efl_canvas_video_efl_player_paused_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Vi
    return sd->pause;
 }
 
+/**
+ * @brief Sets the current playback position of the video.
+ *
+ * Jumps to the specified time in the video.
+ *
+ * @param obj The Emotion object.
+ * @param sec The desired position in seconds from the beginning of the video.
+ *            Example: 120.5 for 2 minutes and 0.5 seconds.
+ *
+ * @ingroup Emotion_Group_Playback
+ */
 EMOTION_API void
 emotion_object_position_set(Evas_Object *obj, double sec)
 {
    efl_player_playback_position_set(obj, sec);
 }
 
+/**
+ * @brief Implements Efl.Player.playback_position_set for the Emotion object.
+ * @internal
+ *
+ * Sets the playback position. If the file is not open, remembers the jump position.
+ * Otherwise, schedules a job to perform the seek operation.
+ *
+ * @param obj The Emotion Eo object.
+ * @param sd Pointer to the private data of the Emotion object.
+ * @param sec The target position in seconds.
+ */
 EOLIAN static void
 _efl_canvas_video_efl_player_playback_position_set(Eo *obj, Efl_Canvas_Video_Data *sd, double sec)
 {
@@ -756,12 +1047,31 @@ _efl_canvas_video_efl_player_playback_position_set(Eo *obj, Efl_Canvas_Video_Dat
    sd->job = ecore_job_add(_pos_set_job, obj);
 }
 
+/**
+ * @brief Gets the current playback position of the video.
+ *
+ * @param obj The Emotion object.
+ * @return The current position in seconds from the beginning of the video.
+ *         Example: 60.0 for 1 minute.
+ *
+ * @ingroup Emotion_Group_Playback
+ */
 EMOTION_API double
 emotion_object_position_get(const Evas_Object *obj)
 {
    return efl_player_playback_position_get(obj);
 }
 
+/**
+ * @brief Implements Efl.Player.playback_position_get for the Emotion object.
+ * @internal
+ *
+ * Retrieves the current playback position from the engine instance.
+ *
+ * @param obj The Emotion Eo object (unused).
+ * @param sd Pointer to the private data of the Emotion object.
+ * @return The current playback position in seconds.
+ */
 EOLIAN static double
 _efl_canvas_video_efl_player_playback_position_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Video_Data *sd)
 {
@@ -770,6 +1080,19 @@ _efl_canvas_video_efl_player_playback_position_get(const Eo *obj EINA_UNUSED, Ef
    return sd->pos;
 }
 
+/**
+ * @brief Gets the current buffer fill status.
+ *
+ * This indicates how much of the media stream is buffered by the underlying
+ * engine. A value of 1.0 means the buffer is full or buffering is complete
+ * for the current segment.
+ *
+ * @param obj The Emotion object.
+ * @return The buffer size as a fraction (0.0 to 1.0). Returns 0.0 if no
+ *         engine instance is available.
+ *
+ * @ingroup Emotion_Group_Info
+ */
 EMOTION_API double
 emotion_object_buffer_size_get(const Evas_Object *obj)
 {
@@ -780,12 +1103,33 @@ emotion_object_buffer_size_get(const Evas_Object *obj)
    return emotion_engine_instance_buffer_size_get(sd->engine_instance);
 }
 
+/**
+ * @brief Checks if the current media is seekable.
+ *
+ * @param obj The Emotion object.
+ * @return @c EINA_TRUE if the media is seekable, @c EINA_FALSE otherwise
+ *         (e.g., for a live stream or if no engine is active).
+ *
+ * @ingroup Emotion_Group_Info
+ */
 EMOTION_API Eina_Bool
 emotion_object_seekable_get(const Evas_Object *obj)
 {
    return efl_playable_seekable_get(obj);
 }
 
+/**
+ * @brief Checks if the video stream is being handled by the current engine.
+ *
+ * Some media files might be audio-only, or the engine might not support
+ * the video codec.
+ *
+ * @param obj The Emotion object.
+ * @return @c EINA_TRUE if video is handled, @c EINA_FALSE otherwise or if no
+ *         engine instance is available.
+ *
+ * @ingroup Emotion_Group_Info
+ */
 EMOTION_API Eina_Bool
 emotion_object_video_handled_get(const Evas_Object *obj)
 {
@@ -796,6 +1140,18 @@ emotion_object_video_handled_get(const Evas_Object *obj)
    return emotion_engine_instance_video_handled(sd->engine_instance);
 }
 
+/**
+ * @brief Checks if the audio stream is being handled by the current engine.
+ *
+ * Some media files might be video-only, or the engine might not support
+ * the audio codec.
+ *
+ * @param obj The Emotion object.
+ * @return @c EINA_TRUE if audio is handled, @c EINA_FALSE otherwise or if no
+ *         engine instance is available.
+ *
+ * @ingroup Emotion_Group_Info
+ */
 EMOTION_API Eina_Bool
 emotion_object_audio_handled_get(const Evas_Object *obj)
 {
@@ -806,12 +1162,30 @@ emotion_object_audio_handled_get(const Evas_Object *obj)
    return emotion_engine_instance_audio_handled(sd->engine_instance);
 }
 
+/**
+ * @brief Gets the total playback length (duration) of the video.
+ *
+ * @param obj The Emotion object.
+ * @return The total length in seconds. Example: 300.0 for a 5-minute video.
+ *         Returns 0.0 if the length is unknown or no engine is active.
+ *
+ * @ingroup Emotion_Group_Info
+ */
 EMOTION_API double
 emotion_object_play_length_get(const Evas_Object *obj)
 {
    return efl_playable_length_get(obj);
 }
 
+/**
+ * @brief Gets the native size (resolution) of the video stream.
+ *
+ * @param obj The Emotion object.
+ * @param[out] iw Pointer to store the native width of the video in pixels. Can be @c NULL.
+ * @param[out] ih Pointer to store the native height of the video in pixels. Can be @c NULL.
+ *
+ * @ingroup Emotion_Group_Info
+ */
 EMOTION_API void
 emotion_object_size_get(const Evas_Object *obj, int *iw, int *ih)
 {
@@ -822,6 +1196,16 @@ emotion_object_size_get(const Evas_Object *obj, int *iw, int *ih)
    if (ih) *ih = sz.h;
 }
 
+/**
+ * @brief Implements Efl.Gfx.ImageLoadController.load_size_get for Emotion.
+ * @internal
+ *
+ * Returns the native video dimensions.
+ *
+ * @param obj The Emotion Eo object (unused).
+ * @param sd Pointer to the private data of the Emotion object.
+ * @return Eina_Size2D struct containing the video width and height.
+ */
 EOLIAN static Eina_Size2D
 _efl_canvas_video_efl_gfx_image_load_controller_load_size_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Video_Data *sd)
 {
@@ -829,36 +1213,97 @@ _efl_canvas_video_efl_gfx_image_load_controller_load_size_get(const Eo *obj EINA
    return EINA_SIZE2D(sd->video.w, sd->video.h);
 }
 
+/**
+ * @brief Enables or disables smooth scaling for the video.
+ *
+ * Smooth scaling typically provides better visual quality when the video is
+ * scaled up or down, but may incur a performance cost.
+ *
+ * @param obj The Emotion object.
+ * @param smooth @c EINA_TRUE to enable smooth scaling, @c EINA_FALSE to disable.
+ *
+ * @ingroup Emotion_Group_Display
+ */
 EMOTION_API void
 emotion_object_smooth_scale_set(Evas_Object *obj, Eina_Bool smooth)
 {
    efl_gfx_image_smooth_scale_set(obj, smooth);
 }
 
+/**
+ * @brief Implements Efl.Gfx.Image.smooth_scale_set for Emotion.
+ * @internal
+ *
+ * Sets the smooth scaling property on the internal Evas image object.
+ *
+ * @param obj The Emotion Eo object (unused).
+ * @param sd Pointer to the private data of the Emotion object.
+ * @param smooth The desired smooth scaling state.
+ */
 EOLIAN static void
 _efl_canvas_video_efl_gfx_image_smooth_scale_set(Eo *obj EINA_UNUSED, Efl_Canvas_Video_Data *sd, Eina_Bool smooth)
 {
    evas_object_image_smooth_scale_set(sd->obj, smooth);
 }
 
+/**
+ * @brief Gets the current smooth scaling state for the video.
+ *
+ * @param obj The Emotion object.
+ * @return @c EINA_TRUE if smooth scaling is enabled, @c EINA_FALSE otherwise.
+ *
+ * @ingroup Emotion_Group_Display
+ */
 EMOTION_API Eina_Bool
 emotion_object_smooth_scale_get(const Evas_Object *obj)
 {
    return efl_gfx_image_smooth_scale_get(obj);
 }
 
+/**
+ * @brief Implements Efl.Gfx.Image.smooth_scale_get for Emotion.
+ * @internal
+ *
+ * Gets the smooth scaling property from the internal Evas image object.
+ *
+ * @param obj The Emotion Eo object (unused).
+ * @param sd Pointer to the private data of the Emotion object.
+ * @return The current smooth scaling state.
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_video_efl_gfx_image_smooth_scale_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Video_Data *sd)
 {
    return evas_object_image_smooth_scale_get(sd->obj);
 }
 
+/**
+ * @brief Gets the pixel aspect ratio of the video.
+ *
+ * This is the ratio of width to height of a single pixel in the video stream.
+ * For most modern digital video, this is 1.0 (square pixels).
+ *
+ * @param obj The Emotion object.
+ * @return The pixel aspect ratio (width/height). Returns 0.0 if no engine
+ *         instance is available.
+ *
+ * @ingroup Emotion_Group_Info
+ */
 EMOTION_API double
 emotion_object_ratio_get(const Evas_Object *obj)
 {
    return efl_gfx_image_ratio_get(obj);
 }
 
+/**
+ * @brief Implements Efl.Gfx.Image.ratio_get for Emotion.
+ * @internal
+ *
+ * Returns the stored pixel aspect ratio (sd->ratio).
+ *
+ * @param obj The Emotion Eo object (unused).
+ * @param sd Pointer to the private data of the Emotion object.
+ * @return The pixel aspect ratio.
+ */
 EOLIAN static double
 _efl_canvas_video_efl_gfx_image_ratio_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Video_Data *sd)
 {
@@ -866,8 +1311,17 @@ _efl_canvas_video_efl_gfx_image_ratio_get(const Eo *obj EINA_UNUSED, Efl_Canvas_
    return sd->ratio;
 }
 
-/*
- * Send a control event to the DVD.
+/**
+ * @brief Sends a simple event to the media player.
+ *
+ * This is typically used for DVD-like navigation events (e.g., menu, next, prev).
+ * The available events and their effects depend on the underlying media and engine.
+ *
+ * @param obj The Emotion object.
+ * @param ev The #Emotion_Event to send.
+ *           Example: #EMOTION_EVENT_PREV for previous chapter/track.
+ *
+ * @ingroup Emotion_Group_Control
  */
 EMOTION_API void
 emotion_object_event_simple_send(Evas_Object *obj, Emotion_Event ev)
@@ -879,12 +1333,32 @@ emotion_object_event_simple_send(Evas_Object *obj, Emotion_Event ev)
    emotion_engine_instance_event_feed(sd->engine_instance, ev);
 }
 
+/**
+ * @brief Sets the audio volume.
+ *
+ * @param obj The Emotion object.
+ * @param vol The desired volume level, from 0.0 (mute) to 1.0 (full volume).
+ *            Values outside this range may be clamped by the engine.
+ *            Example: 0.5 for 50% volume.
+ *
+ * @ingroup Emotion_Group_Audio
+ */
 EMOTION_API void
 emotion_object_audio_volume_set(Evas_Object *obj, double vol)
 {
    efl_audio_control_volume_set(obj, vol);
 }
 
+/**
+ * @brief Implements Efl.Audio.Control.volume_set for Emotion.
+ * @internal
+ *
+ * Sets the audio volume on the engine instance.
+ *
+ * @param obj The Emotion Eo object (unused).
+ * @param sd Pointer to the private data of the Emotion object.
+ * @param vol The volume level (0.0 to 1.0).
+ */
 EOLIAN static void
 _efl_canvas_video_efl_audio_control_volume_set(Eo *obj EINA_UNUSED, Efl_Canvas_Video_Data *sd, double vol)
 {
@@ -893,12 +1367,30 @@ _efl_canvas_video_efl_audio_control_volume_set(Eo *obj EINA_UNUSED, Efl_Canvas_V
    emotion_engine_instance_audio_channel_volume_set(sd->engine_instance, vol);
 }
 
+/**
+ * @brief Gets the current audio volume.
+ *
+ * @param obj The Emotion object.
+ * @return The current volume level (0.0 to 1.0).
+ *
+ * @ingroup Emotion_Group_Audio
+ */
 EMOTION_API double
 emotion_object_audio_volume_get(const Evas_Object *obj)
 {
    return efl_audio_control_volume_get(obj);
 }
 
+/**
+ * @brief Implements Efl.Audio.Control.volume_get for Emotion.
+ * @internal
+ *
+ * Gets the audio volume from the engine instance.
+ *
+ * @param obj The Emotion Eo object (unused).
+ * @param sd Pointer to the private data of the Emotion object.
+ * @return The current volume level.
+ */
 EOLIAN static double
 _efl_canvas_video_efl_audio_control_volume_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Video_Data *sd)
 {
@@ -906,12 +1398,30 @@ _efl_canvas_video_efl_audio_control_volume_get(const Eo *obj EINA_UNUSED, Efl_Ca
    return emotion_engine_instance_audio_channel_volume_get(sd->engine_instance);
 }
 
+/**
+ * @brief Sets the audio mute state.
+ *
+ * @param obj The Emotion object.
+ * @param mute @c EINA_TRUE to mute audio, @c EINA_FALSE to unmute.
+ *
+ * @ingroup Emotion_Group_Audio
+ */
 EMOTION_API void
 emotion_object_audio_mute_set(Evas_Object *obj, Eina_Bool mute)
 {
    efl_audio_control_mute_set(obj, mute);
 }
 
+/**
+ * @brief Implements Efl.Audio.Control.mute_set for Emotion.
+ * @internal
+ *
+ * Sets the audio mute state on the engine instance.
+ *
+ * @param obj The Emotion Eo object (unused).
+ * @param sd Pointer to the private data of the Emotion object.
+ * @param mute The desired mute state.
+ */
 EOLIAN static void
 _efl_canvas_video_efl_audio_control_mute_set(Eo *obj EINA_UNUSED, Efl_Canvas_Video_Data *sd, Eina_Bool mute)
 {
@@ -920,12 +1430,30 @@ _efl_canvas_video_efl_audio_control_mute_set(Eo *obj EINA_UNUSED, Efl_Canvas_Vid
    emotion_engine_instance_audio_channel_mute_set(sd->engine_instance, mute);
 }
 
+/**
+ * @brief Gets the current audio mute state.
+ *
+ * @param obj The Emotion object.
+ * @return @c EINA_TRUE if audio is muted, @c EINA_FALSE otherwise.
+ *
+ * @ingroup Emotion_Group_Audio
+ */
 EMOTION_API Eina_Bool
 emotion_object_audio_mute_get(const Evas_Object *obj)
 {
    return efl_audio_control_mute_get(obj);
 }
 
+/**
+ * @brief Implements Efl.Audio.Control.mute_get for Emotion.
+ * @internal
+ *
+ * Gets the audio mute state from the engine instance.
+ *
+ * @param obj The Emotion Eo object (unused).
+ * @param sd Pointer to the private data of the Emotion object.
+ * @return The current mute state.
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_video_efl_audio_control_mute_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Video_Data *sd)
 {
@@ -933,6 +1461,17 @@ _efl_canvas_video_efl_audio_control_mute_get(const Eo *obj EINA_UNUSED, Efl_Canv
    return emotion_engine_instance_audio_channel_mute_get(sd->engine_instance);
 }
 
+/**
+ * @brief Gets the number of available audio channels (tracks).
+ *
+ * Some media files may contain multiple audio tracks (e.g., different languages).
+ *
+ * @param obj The Emotion object.
+ * @return The number of audio channels. Returns 0 if no engine instance or
+ *         if channel information is unavailable.
+ *
+ * @ingroup Emotion_Group_Audio
+ */
 EMOTION_API int
 emotion_object_audio_channel_count(const Evas_Object *obj)
 {
@@ -943,6 +1482,18 @@ emotion_object_audio_channel_count(const Evas_Object *obj)
    return emotion_engine_instance_audio_channel_count(sd->engine_instance);
 }
 
+/**
+ * @brief Gets the name of a specific audio channel (track).
+ *
+ * @param obj The Emotion object.
+ * @param channel The index of the audio channel (0 to count-1).
+ *                Example: 0 for the first audio track.
+ * @return The name of the audio channel (e.g., "English", "Stereo"), or @c NULL
+ *         if the channel index is invalid, no engine instance, or name is unavailable.
+ *         The returned string is managed by Emotion and should not be freed.
+ *
+ * @ingroup Emotion_Group_Audio
+ */
 EMOTION_API const char *
 emotion_object_audio_channel_name_get(const Evas_Object *obj, int channel)
 {
@@ -953,6 +1504,15 @@ emotion_object_audio_channel_name_get(const Evas_Object *obj, int channel)
    return emotion_engine_instance_audio_channel_name_get(sd->engine_instance, channel);
 }
 
+/**
+ * @brief Sets the currently active audio channel (track).
+ *
+ * @param obj The Emotion object.
+ * @param channel The index of the audio channel to activate.
+ *                Example: 1 to switch to the second audio track.
+ *
+ * @ingroup Emotion_Group_Audio
+ */
 EMOTION_API void
 emotion_object_audio_channel_set(Evas_Object *obj, int channel)
 {
@@ -964,6 +1524,15 @@ emotion_object_audio_channel_set(Evas_Object *obj, int channel)
    emotion_engine_instance_audio_channel_set(sd->engine_instance, channel);
 }
 
+/**
+ * @brief Gets the currently active audio channel (track) index.
+ *
+ * @param obj The Emotion object.
+ * @return The index of the current audio channel. Returns 0 if no engine
+ *         instance or if the current channel cannot be determined.
+ *
+ * @ingroup Emotion_Group_Audio
+ */
 EMOTION_API int
 emotion_object_audio_channel_get(const Evas_Object *obj)
 {
@@ -974,6 +1543,17 @@ emotion_object_audio_channel_get(const Evas_Object *obj)
    return emotion_engine_instance_audio_channel_get(sd->engine_instance);
 }
 
+/**
+ * @brief Sets the video mute state.
+ *
+ * Muting video typically means the video track is still processed (e.g., for timing)
+ * but not rendered to the screen. This can be used to make a video player "audio-only".
+ *
+ * @param obj The Emotion object.
+ * @param mute @c EINA_TRUE to mute video, @c EINA_FALSE to unmute.
+ *
+ * @ingroup Emotion_Group_Video
+ */
 EMOTION_API void
 emotion_object_video_mute_set(Evas_Object *obj, Eina_Bool mute)
 {
@@ -985,6 +1565,14 @@ emotion_object_video_mute_set(Evas_Object *obj, Eina_Bool mute)
    emotion_engine_instance_video_channel_mute_set(sd->engine_instance, mute);
 }
 
+/**
+ * @brief Gets the current video mute state.
+ *
+ * @param obj The Emotion object.
+ * @return @c EINA_TRUE if video is muted, @c EINA_FALSE otherwise.
+ *
+ * @ingroup Emotion_Group_Video
+ */
 EMOTION_API Eina_Bool
 emotion_object_video_mute_get(const Evas_Object *obj)
 {
@@ -995,6 +1583,16 @@ emotion_object_video_mute_get(const Evas_Object *obj)
    return emotion_engine_instance_video_channel_mute_get(sd->engine_instance);
 }
 
+/**
+ * @brief Sets the subtitle file to be used for the current video.
+ *
+ * @param obj The Emotion object.
+ * @param filepath Path to the subtitle file (e.g., ".srt", ".ssa").
+ *                 Set to @c NULL to disable external subtitles.
+ *                 Example: "/path/to/subtitles.srt".
+ *
+ * @ingroup Emotion_Group_Subtitle
+ */
 EMOTION_API void
 emotion_object_video_subtitle_file_set(Evas_Object *obj, const char *filepath)
 {
@@ -1007,6 +1605,16 @@ emotion_object_video_subtitle_file_set(Evas_Object *obj, const char *filepath)
    emotion_engine_instance_video_subtitle_file_set(sd->engine_instance, filepath);
 }
 
+/**
+ * @brief Gets the path of the currently set subtitle file.
+ *
+ * @param obj The Emotion object.
+ * @return The path to the subtitle file, or @c NULL if none is set or
+ *         no engine instance is available. The returned string is managed by
+ *         Emotion and should not be freed.
+ *
+ * @ingroup Emotion_Group_Subtitle
+ */
 EMOTION_API const char *
 emotion_object_video_subtitle_file_get(const Evas_Object *obj)
 {
@@ -1017,6 +1625,18 @@ emotion_object_video_subtitle_file_get(const Evas_Object *obj)
    return emotion_engine_instance_video_subtitle_file_get(sd->engine_instance);
 }
 
+/**
+ * @brief Gets the number of available video channels (tracks).
+ *
+ * While less common than multiple audio tracks, some media might offer
+ * multiple video angles or versions.
+ *
+ * @param obj The Emotion object.
+ * @return The number of video channels. Returns 0 if no engine instance or
+ *         if channel information is unavailable.
+ *
+ * @ingroup Emotion_Group_Video
+ */
 EMOTION_API int
 emotion_object_video_channel_count(const Evas_Object *obj)
 {
@@ -1027,6 +1647,17 @@ emotion_object_video_channel_count(const Evas_Object *obj)
    return emotion_engine_instance_video_channel_count(sd->engine_instance);
 }
 
+/**
+ * @brief Gets the name of a specific video channel (track).
+ *
+ * @param obj The Emotion object.
+ * @param channel The index of the video channel (0 to count-1).
+ * @return The name of the video channel, or @c NULL if the index is invalid,
+ *         no engine instance, or name is unavailable. The returned string is
+ *         managed by Emotion and should not be freed.
+ *
+ * @ingroup Emotion_Group_Video
+ */
 EMOTION_API const char *
 emotion_object_video_channel_name_get(const Evas_Object *obj, int channel)
 {
@@ -1037,6 +1668,14 @@ emotion_object_video_channel_name_get(const Evas_Object *obj, int channel)
    return emotion_engine_instance_video_channel_name_get(sd->engine_instance, channel);
 }
 
+/**
+ * @brief Sets the currently active video channel (track).
+ *
+ * @param obj The Emotion object.
+ * @param channel The index of the video channel to activate.
+ *
+ * @ingroup Emotion_Group_Video
+ */
 EMOTION_API void
 emotion_object_video_channel_set(Evas_Object *obj, int channel)
 {
@@ -1048,6 +1687,15 @@ emotion_object_video_channel_set(Evas_Object *obj, int channel)
    emotion_engine_instance_video_channel_set(sd->engine_instance, channel);
 }
 
+/**
+ * @brief Gets the currently active video channel (track) index.
+ *
+ * @param obj The Emotion object.
+ * @return The index of the current video channel. Returns 0 if no engine
+ *         instance or if the current channel cannot be determined.
+ *
+ * @ingroup Emotion_Group_Video
+ */
 EMOTION_API int
 emotion_object_video_channel_get(const Evas_Object *obj)
 {
@@ -1058,6 +1706,16 @@ emotion_object_video_channel_get(const Evas_Object *obj)
    return emotion_engine_instance_video_channel_get(sd->engine_instance);
 }
 
+/**
+ * @brief Sets the mute state for SPU (Subpicture Unit / Subtitles).
+ *
+ * This controls the visibility of embedded subtitles or DVD subpictures.
+ *
+ * @param obj The Emotion object.
+ * @param mute @c EINA_TRUE to mute (hide) SPU, @c EINA_FALSE to unmute (show).
+ *
+ * @ingroup Emotion_Group_Subtitle
+ */
 EMOTION_API void
 emotion_object_spu_mute_set(Evas_Object *obj, Eina_Bool mute)
 {
@@ -1069,6 +1727,14 @@ emotion_object_spu_mute_set(Evas_Object *obj, Eina_Bool mute)
    emotion_engine_instance_spu_channel_mute_set(sd->engine_instance, mute);
 }
 
+/**
+ * @brief Gets the current mute state for SPU (Subpicture Unit / Subtitles).
+ *
+ * @param obj The Emotion object.
+ * @return @c EINA_TRUE if SPU is muted, @c EINA_FALSE otherwise.
+ *
+ * @ingroup Emotion_Group_Subtitle
+ */
 EMOTION_API Eina_Bool
 emotion_object_spu_mute_get(const Evas_Object *obj)
 {
@@ -1079,6 +1745,17 @@ emotion_object_spu_mute_get(const Evas_Object *obj)
    return emotion_engine_instance_spu_channel_mute_get(sd->engine_instance);
 }
 
+/**
+ * @brief Gets the number of available SPU (subtitle) channels.
+ *
+ * Media like DVDs can have multiple subtitle tracks.
+ *
+ * @param obj The Emotion object.
+ * @return The number of SPU channels. Returns 0 if no engine instance or
+ *         if channel information is unavailable.
+ *
+ * @ingroup Emotion_Group_Subtitle
+ */
 EMOTION_API int
 emotion_object_spu_channel_count(const Evas_Object *obj)
 {
@@ -1089,6 +1766,17 @@ emotion_object_spu_channel_count(const Evas_Object *obj)
    return emotion_engine_instance_spu_channel_count(sd->engine_instance);
 }
 
+/**
+ * @brief Gets the name of a specific SPU (subtitle) channel.
+ *
+ * @param obj The Emotion object.
+ * @param channel The index of the SPU channel (0 to count-1).
+ * @return The name of the SPU channel (e.g., "English subtitles"), or @c NULL
+ *         if the index is invalid, no engine instance, or name is unavailable.
+ *         The returned string is managed by Emotion and should not be freed.
+ *
+ * @ingroup Emotion_Group_Subtitle
+ */
 EMOTION_API const char *
 emotion_object_spu_channel_name_get(const Evas_Object *obj, int channel)
 {
@@ -1099,6 +1787,15 @@ emotion_object_spu_channel_name_get(const Evas_Object *obj, int channel)
    return emotion_engine_instance_spu_channel_name_get(sd->engine_instance, channel);
 }
 
+/**
+ * @brief Sets the currently active SPU (subtitle) channel.
+ *
+ * @param obj The Emotion object.
+ * @param channel The index of the SPU channel to activate.
+ *                Example: 0 to select the first subtitle track.
+ *
+ * @ingroup Emotion_Group_Subtitle
+ */
 EMOTION_API void
 emotion_object_spu_channel_set(Evas_Object *obj, int channel)
 {
@@ -1110,6 +1807,15 @@ emotion_object_spu_channel_set(Evas_Object *obj, int channel)
    emotion_engine_instance_spu_channel_set(sd->engine_instance, channel);
 }
 
+/**
+ * @brief Gets the currently active SPU (subtitle) channel index.
+ *
+ * @param obj The Emotion object.
+ * @return The index of the current SPU channel. Returns 0 if no engine
+ *         instance or if the current channel cannot be determined.
+ *
+ * @ingroup Emotion_Group_Subtitle
+ */
 EMOTION_API int
 emotion_object_spu_channel_get(const Evas_Object *obj)
 {
@@ -1120,6 +1826,17 @@ emotion_object_spu_channel_get(const Evas_Object *obj)
    return emotion_engine_instance_spu_channel_get(sd->engine_instance);
 }
 
+/**
+ * @brief Gets the number of chapters in the current media.
+ *
+ * This is common for DVDs or media files with chapter markers.
+ *
+ * @param obj The Emotion object.
+ * @return The number of chapters. Returns 0 if no engine instance or
+ *         if chapter information is unavailable.
+ *
+ * @ingroup Emotion_Group_Chapter
+ */
 EMOTION_API int
 emotion_object_chapter_count(const Evas_Object *obj)
 {
@@ -1130,6 +1847,18 @@ emotion_object_chapter_count(const Evas_Object *obj)
    return emotion_engine_instance_chapter_count(sd->engine_instance);
 }
 
+/**
+ * @brief Sets the current chapter.
+ *
+ * Playback will jump to the beginning of the specified chapter.
+ *
+ * @param obj The Emotion object.
+ * @param chapter The chapter number to set (usually 0-indexed or 1-indexed
+ *                depending on the engine/media).
+ *                Example: 0 for the first chapter.
+ *
+ * @ingroup Emotion_Group_Chapter
+ */
 EMOTION_API void
 emotion_object_chapter_set(Evas_Object *obj, int chapter)
 {
@@ -1141,6 +1870,15 @@ emotion_object_chapter_set(Evas_Object *obj, int chapter)
    emotion_engine_instance_chapter_set(sd->engine_instance, chapter);
 }
 
+/**
+ * @brief Gets the current chapter number.
+ *
+ * @param obj The Emotion object.
+ * @return The current chapter number. Returns 0 if no engine instance or
+ *         if the current chapter cannot be determined.
+ *
+ * @ingroup Emotion_Group_Chapter
+ */
 EMOTION_API int
 emotion_object_chapter_get(const Evas_Object *obj)
 {
@@ -1151,6 +1889,17 @@ emotion_object_chapter_get(const Evas_Object *obj)
    return emotion_engine_instance_chapter_get(sd->engine_instance);
 }
 
+/**
+ * @brief Gets the name of a specific chapter.
+ *
+ * @param obj The Emotion object.
+ * @param chapter The chapter number.
+ * @return The name of the chapter, or @c NULL if the chapter number is invalid,
+ *         no engine instance, or name is unavailable. The returned string is
+ *         managed by Emotion and should not be freed.
+ *
+ * @ingroup Emotion_Group_Chapter
+ */
 EMOTION_API const char *
 emotion_object_chapter_name_get(const Evas_Object *obj, int chapter)
 {
@@ -1161,6 +1910,17 @@ emotion_object_chapter_name_get(const Evas_Object *obj, int chapter)
    return emotion_engine_instance_chapter_name_get(sd->engine_instance, chapter);
 }
 
+/**
+ * @brief Sets the playback speed.
+ *
+ * @param obj The Emotion object.
+ * @param speed The desired playback speed. 1.0 is normal speed.
+ *              Values > 1.0 for faster playback, < 1.0 for slower.
+ *              Negative values might be supported for reverse playback by some engines.
+ *              Example: 2.0 for double speed, 0.5 for half speed.
+ *
+ * @ingroup Emotion_Group_Playback
+ */
 EMOTION_API void
 emotion_object_play_speed_set(Evas_Object *obj, double speed)
 {
@@ -1172,6 +1932,15 @@ emotion_object_play_speed_set(Evas_Object *obj, double speed)
    emotion_engine_instance_speed_set(sd->engine_instance, speed);
 }
 
+/**
+ * @brief Gets the current playback speed.
+ *
+ * @param obj The Emotion object.
+ * @return The current playback speed. 1.0 is normal.
+ *         Returns 0.0 if no engine instance.
+ *
+ * @ingroup Emotion_Group_Playback
+ */
 EMOTION_API double
 emotion_object_play_speed_get(const Evas_Object *obj)
 {
@@ -1182,6 +1951,16 @@ emotion_object_play_speed_get(const Evas_Object *obj)
    return emotion_engine_instance_speed_get(sd->engine_instance);
 }
 
+/**
+ * @brief Ejects the current media.
+ *
+ * This is typically applicable to physical media like DVDs or CDs.
+ * The effect on file-based playback may vary by engine.
+ *
+ * @param obj The Emotion object.
+ *
+ * @ingroup Emotion_Group_Control
+ */
 EMOTION_API void
 emotion_object_eject(Evas_Object *obj)
 {
@@ -1192,6 +1971,17 @@ emotion_object_eject(Evas_Object *obj)
    emotion_engine_instance_eject(sd->engine_instance);
 }
 
+/**
+ * @brief Gets the title of the current media.
+ *
+ * This is usually read from the media's metadata.
+ *
+ * @param obj The Emotion object.
+ * @return The title string, or @c NULL if not available or no object.
+ *         The returned string is stringshared and should not be freed.
+ *
+ * @ingroup Emotion_Group_Meta
+ */
 EMOTION_API const char *
 emotion_object_title_get(const Evas_Object *obj)
 {
@@ -1201,6 +1991,18 @@ emotion_object_title_get(const Evas_Object *obj)
    return sd->title;
 }
 
+/**
+ * @brief Gets a human-readable string describing the current progress.
+ *
+ * This might be something like "Buffering 50%" or "Downloading chapter 2".
+ * The format and content depend on the engine.
+ *
+ * @param obj The Emotion object.
+ * @return The progress information string, or @c NULL if not available.
+ *         The returned string is stringshared and should not be freed.
+ *
+ * @ingroup Emotion_Group_Info
+ */
 EMOTION_API const char *
 emotion_object_progress_info_get(const Evas_Object *obj)
 {
@@ -1210,18 +2012,52 @@ emotion_object_progress_info_get(const Evas_Object *obj)
    return sd->progress.info;
 }
 
+/**
+ * @brief Gets the numerical status of the current progress.
+ *
+ * This is typically a value from 0.0 to 1.0, where 1.0 means completion.
+ * The exact meaning (e.g., buffering progress, download progress) depends
+ * on the engine and the current operation.
+ *
+ * @param obj The Emotion object.
+ * @return The progress status (0.0 to 1.0).
+ *
+ * @ingroup Emotion_Group_Info
+ */
 EMOTION_API double
 emotion_object_progress_status_get(const Evas_Object *obj)
 {
    return efl_player_playback_progress_get(obj);
 }
 
+/**
+ * @brief Implements Efl.Player.playback_progress_get for Emotion.
+ * @internal
+ *
+ * Returns the stored progress status (sd->progress.stat).
+ *
+ * @param obj The Emotion Eo object (unused).
+ * @param sd Pointer to the private data of the Emotion object.
+ * @return The progress status.
+ */
 EOLIAN static double
 _efl_canvas_video_efl_player_playback_progress_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Video_Data *sd)
 {
    return sd->progress.stat;
 }
 
+/**
+ * @brief Implements Efl.Player.playback_progress_set for Emotion.
+ * @internal
+ *
+ * This is called by the Efl.Player interface when progress is updated.
+ * It internally calls _emotion_progress_set to update the smart data and
+ * emit signals.
+ *
+ * @param obj The Emotion Eo object.
+ * @param sd Pointer to the private data of the Emotion object (unused here, but part of signature).
+ * @param progress The new progress value.
+ */
 EOLIAN static void
 _efl_canvas_video_efl_player_playback_progress_set(Eo *obj, Efl_Canvas_Video_Data *sd EINA_UNUSED, double progress)
 {
@@ -1229,6 +2065,16 @@ _efl_canvas_video_efl_player_playback_progress_set(Eo *obj, Efl_Canvas_Video_Dat
    _emotion_progress_set(obj, (char*)info, progress);
 }
 
+/**
+ * @brief Implements Efl.Playable.length_get for Emotion.
+ * @internal
+ *
+ * Retrieves the media length from the engine instance and updates sd->len.
+ *
+ * @param obj The Emotion Eo object (unused).
+ * @param sd Pointer to the private data of the Emotion object.
+ * @return The length of the media in seconds.
+ */
 EOLIAN static double
 _efl_canvas_video_efl_playable_length_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Video_Data *sd)
 {
@@ -1237,6 +2083,16 @@ _efl_canvas_video_efl_playable_length_get(const Eo *obj EINA_UNUSED, Efl_Canvas_
    return sd->len;
 }
 
+/**
+ * @brief Implements Efl.Playable.seekable_get for Emotion.
+ * @internal
+ *
+ * Checks if the current media is seekable via the engine instance.
+ *
+ * @param obj The Emotion Eo object (unused).
+ * @param sd Pointer to the private data of the Emotion object.
+ * @return @c EINA_TRUE if seekable, @c EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_video_efl_playable_seekable_get(const Eo *obj EINA_UNUSED, Efl_Canvas_Video_Data *sd)
 {
@@ -1244,6 +2100,18 @@ _efl_canvas_video_efl_playable_seekable_get(const Eo *obj EINA_UNUSED, Efl_Canva
    return emotion_engine_instance_seekable(sd->engine_instance);
 }
 
+/**
+ * @brief Gets the referenced file path, if any.
+ *
+ * Some media (e.g., playlists, streaming manifests) might refer to other files.
+ * This function retrieves the path of such a referenced file.
+ *
+ * @param obj The Emotion object.
+ * @return The path of the referenced file, or @c NULL if none.
+ *         The returned string is stringshared and should not be freed.
+ *
+ * @ingroup Emotion_Group_Info
+ */
 EMOTION_API const char *
 emotion_object_ref_file_get(const Evas_Object *obj)
 {
@@ -1253,6 +2121,18 @@ emotion_object_ref_file_get(const Evas_Object *obj)
    return sd->ref.file;
 }
 
+/**
+ * @brief Gets the reference number associated with a referenced file.
+ *
+ * This is often used in conjunction with emotion_object_ref_file_get()
+ * to identify a specific item in a list of referenced files (e.g., track
+ * number in a playlist).
+ *
+ * @param obj The Emotion object.
+ * @return The reference number.
+ *
+ * @ingroup Emotion_Group_Info
+ */
 EMOTION_API int
 emotion_object_ref_num_get(const Evas_Object *obj)
 {
@@ -1262,6 +2142,16 @@ emotion_object_ref_num_get(const Evas_Object *obj)
    return sd->ref.num;
 }
 
+/**
+ * @brief Gets the number of SPU (Subpicture Unit) buttons available.
+ *
+ * This is relevant for interactive DVD menus where subpictures act as buttons.
+ *
+ * @param obj The Emotion object.
+ * @return The number of SPU buttons.
+ *
+ * @ingroup Emotion_Group_DVD
+ */
 EMOTION_API int
 emotion_object_spu_button_count_get(const Evas_Object *obj)
 {
@@ -1271,6 +2161,16 @@ emotion_object_spu_button_count_get(const Evas_Object *obj)
    return sd->spu.button_num;
 }
 
+/**
+ * @brief Gets the currently highlighted or active SPU button.
+ *
+ * This is relevant for interactive DVD menus.
+ *
+ * @param obj The Emotion object.
+ * @return The index of the current SPU button, or -1 if none.
+ *
+ * @ingroup Emotion_Group_DVD
+ */
 EMOTION_API int
 emotion_object_spu_button_get(const Evas_Object *obj)
 {
@@ -1280,6 +2180,18 @@ emotion_object_spu_button_get(const Evas_Object *obj)
    return sd->spu.button;
 }
 
+/**
+ * @brief Gets various metadata information about the current media.
+ *
+ * @param obj The Emotion object.
+ * @param meta The type of #Emotion_Meta_Info to retrieve.
+ *             Example: #EMOTION_META_INFO_TRACK_ARTIST to get the artist name.
+ * @return A string containing the requested metadata, or @c NULL if not available
+ *         or an invalid meta type is requested. The returned string is managed
+ *         by Emotion and should not be freed.
+ *
+ * @ingroup Emotion_Group_Meta
+ */
 EMOTION_API const char *
 emotion_object_meta_info_get(const Evas_Object *obj, Emotion_Meta_Info meta)
 {
@@ -1319,7 +2231,24 @@ emotion_object_meta_info_get(const Evas_Object *obj, Emotion_Meta_Info meta)
    return emotion_engine_instance_meta_get(sd->engine_instance, id);
 }
 
-
+/**
+ * @brief Retrieves artwork associated with a media file.
+ *
+ * This function attempts to extract artwork (e.g., album cover) from the
+ * media file specified by @p path. The type of artwork to retrieve is
+ * specified by @p type.
+ *
+ * @param obj The Emotion object (used to get the Evas canvas).
+ * @param path The path to the media file from which to extract artwork.
+ *             Example: "/path/to/music.mp3".
+ * @param type The #Emotion_Artwork_Info type of artwork to retrieve (e.g., front cover).
+ * @return A new Evas_Object (image) containing the artwork on success,
+ *         or @c NULL on failure (e.g., artwork not found, load error).
+ *         The caller is responsible for deleting the returned Evas_Object
+ *         when no longer needed.
+ *
+ * @ingroup Emotion_Group_Meta
+ */
 EMOTION_API Evas_Object *
 emotion_file_meta_artwork_get(const Evas_Object *obj, const char *path, Emotion_Artwork_Info type)
 {
@@ -1339,6 +2268,18 @@ emotion_file_meta_artwork_get(const Evas_Object *obj, const char *path, Emotion_
    return result;
 }
 
+/**
+ * @brief Sets the audio visualization to be used.
+ *
+ * When playing audio-only content or when video is muted, Emotion can
+ * display visualizations (e.g., spectrum analyzer) if supported by the engine.
+ *
+ * @param obj The Emotion object.
+ * @param visualization The #Emotion_Vis type to set.
+ *                      Use #EMOTION_VIS_NONE to disable visualization.
+ *
+ * @ingroup Emotion_Group_Vis
+ */
 EMOTION_API void
 emotion_object_vis_set(Evas_Object *obj, Emotion_Vis visualization)
 {
@@ -1350,6 +2291,15 @@ emotion_object_vis_set(Evas_Object *obj, Emotion_Vis visualization)
    emotion_engine_instance_vis_set(sd->engine_instance, visualization);
 }
 
+/**
+ * @brief Gets the currently active audio visualization.
+ *
+ * @param obj The Emotion object.
+ * @return The current #Emotion_Vis type, or #EMOTION_VIS_NONE if disabled
+ *         or no engine instance.
+ *
+ * @ingroup Emotion_Group_Vis
+ */
 EMOTION_API Emotion_Vis
 emotion_object_vis_get(const Evas_Object *obj)
 {
@@ -1360,6 +2310,16 @@ emotion_object_vis_get(const Evas_Object *obj)
    return emotion_engine_instance_vis_get(sd->engine_instance);
 }
 
+/**
+ * @brief Checks if a specific audio visualization is supported by the current engine.
+ *
+ * @param obj The Emotion object.
+ * @param visualization The #Emotion_Vis type to check.
+ * @return @c EINA_TRUE if the visualization is supported, @c EINA_FALSE otherwise
+ *         or if no engine instance.
+ *
+ * @ingroup Emotion_Group_Vis
+ */
 EMOTION_API Eina_Bool
 emotion_object_vis_supported(const Evas_Object *obj, Emotion_Vis visualization)
 {
@@ -1370,6 +2330,19 @@ emotion_object_vis_supported(const Evas_Object *obj, Emotion_Vis visualization)
    return emotion_engine_instance_vis_supported(sd->engine_instance, visualization);
 }
 
+/**
+ * @brief Sets the priority of the Emotion object for resource allocation.
+ *
+ * If @p priority is set to @c EINA_TRUE, the underlying engine may try to
+ * allocate more resources or give higher scheduling priority to this object,
+ * potentially at the expense of other, lower-priority Emotion objects or
+ * applications. The exact behavior is engine-dependent.
+ *
+ * @param obj The Emotion object.
+ * @param priority @c EINA_TRUE to set high priority, @c EINA_FALSE for normal.
+ *
+ * @ingroup Emotion_Group_Advanced
+ */
 EMOTION_API void
 emotion_object_priority_set(Evas_Object *obj, Eina_Bool priority)
 {
@@ -1380,6 +2353,14 @@ emotion_object_priority_set(Evas_Object *obj, Eina_Bool priority)
    emotion_engine_instance_priority_set(sd->engine_instance, priority);
 }
 
+/**
+ * @brief Gets the current priority setting of the Emotion object.
+ *
+ * @param obj The Emotion object.
+ * @return @c EINA_TRUE if high priority is set, @c EINA_FALSE otherwise.
+ *
+ * @ingroup Emotion_Group_Advanced
+ */
 EMOTION_API Eina_Bool
 emotion_object_priority_get(const Evas_Object *obj)
 {
@@ -1391,6 +2372,15 @@ emotion_object_priority_get(const Evas_Object *obj)
 }
 
 #ifdef HAVE_EIO
+/**
+ * @brief Cleans up resources after an EIO xattr load operation.
+ * @internal
+ *
+ * Nullifies the Eio_File handle in the xattr data and unreferences the xattr data.
+ *
+ * @param xattr The Emotion_Xattr_Data associated with the operation.
+ * @param handler The Eio_File handle for the completed operation.
+ */
 static void
 _eio_load_xattr_cleanup(Emotion_Xattr_Data *xattr, Eio_File *handler)
 {
@@ -1398,6 +2388,17 @@ _eio_load_xattr_cleanup(Emotion_Xattr_Data *xattr, Eio_File *handler)
    _xattr_data_unref(xattr);
 }
 
+/**
+ * @brief Callback for successful EIO xattr load operation.
+ * @internal
+ *
+ * Sets the object's position to the loaded xattr value (last saved position)
+ * and emits success signals/callbacks. Then cleans up.
+ *
+ * @param data User data (Emotion_Xattr_Data pointer).
+ * @param handler The Eio_File handle for the operation.
+ * @param xattr_double The double value read from the extended attribute.
+ */
 static void
 _eio_load_xattr_done(void *data, Eio_File *handler, double xattr_double)
 {
@@ -1409,6 +2410,16 @@ _eio_load_xattr_done(void *data, Eio_File *handler, double xattr_double)
    _eio_load_xattr_cleanup(xattr, handler);
 }
 
+/**
+ * @brief Callback for failed EIO xattr load operation.
+ * @internal
+ *
+ * Emits failure signals/callbacks and cleans up.
+ *
+ * @param data User data (Emotion_Xattr_Data pointer).
+ * @param handler The Eio_File handle for the operation.
+ * @param err The error code from EIO (unused in this function).
+ */
 static void
 _eio_load_xattr_error(void *data, Eio_File *handler, int err EINA_UNUSED)
 {
@@ -1420,6 +2431,23 @@ _eio_load_xattr_error(void *data, Eio_File *handler, int err EINA_UNUSED)
 }
 #endif
 
+/**
+ * @brief Loads the last saved playback position for the current file.
+ *
+ * This function attempts to read an extended attribute ("user.e.time_seek")
+ * from the media file, which should contain the last playback position.
+ * If successful, it sets the video to this position.
+ * This uses EIO for asynchronous operation if HAVE_EIO is defined, otherwise
+ * it's synchronous.
+ *
+ * Signals "position_load,succeed" or "position_load,failed" are emitted.
+ * EFL events EFL_CANVAS_VIDEO_EVENT_POSITION_LOAD_DONE or
+ * EFL_CANVAS_VIDEO_EVENT_POSITION_LOAD_FAIL are called.
+ *
+ * @param obj The Emotion object.
+ *
+ * @ingroup Emotion_Group_Persistence
+ */
 EMOTION_API void
 emotion_object_last_position_load(Evas_Object *obj)
 {
@@ -1463,6 +2491,15 @@ emotion_object_last_position_load(Evas_Object *obj)
 }
 
 #ifdef HAVE_EIO
+/**
+ * @brief Cleans up resources after an EIO xattr save operation.
+ * @internal
+ *
+ * Nullifies the Eio_File handle in the xattr data and unreferences the xattr data.
+ *
+ * @param xattr The Emotion_Xattr_Data associated with the operation.
+ * @param handler The Eio_File handle for the completed operation.
+ */
 static void
 _eio_save_xattr_cleanup(Emotion_Xattr_Data *xattr, Eio_File *handler)
 {
@@ -1470,6 +2507,15 @@ _eio_save_xattr_cleanup(Emotion_Xattr_Data *xattr, Eio_File *handler)
    _xattr_data_unref(xattr);
 }
 
+/**
+ * @brief Callback for successful EIO xattr save operation.
+ * @internal
+ *
+ * Emits success signals/callbacks and cleans up.
+ *
+ * @param data User data (Emotion_Xattr_Data pointer).
+ * @param handler The Eio_File handle for the operation.
+ */
 static void
 _eio_save_xattr_done(void *data, Eio_File *handler)
 {
@@ -1480,6 +2526,16 @@ _eio_save_xattr_done(void *data, Eio_File *handler)
    _eio_save_xattr_cleanup(xattr, handler);
 }
 
+/**
+ * @brief Callback for failed EIO xattr save operation.
+ * @internal
+ *
+ * Emits failure signals/callbacks and cleans up.
+ *
+ * @param data User data (Emotion_Xattr_Data pointer).
+ * @param handler The Eio_File handle for the operation.
+ * @param err The error code from EIO (unused in this function).
+ */
 static void
 _eio_save_xattr_error(void *data, Eio_File *handler, int err EINA_UNUSED)
 {
@@ -1491,6 +2547,24 @@ _eio_save_xattr_error(void *data, Eio_File *handler, int err EINA_UNUSED)
 }
 #endif
 
+/**
+ * @brief Saves the current playback position to the media file's extended attributes.
+ *
+ * This function writes the current playback position (obtained via
+ * emotion_object_position_get()) to an extended attribute named "user.e.time_seek"
+ * on the media file. This allows the position to be restored later using
+ * emotion_object_last_position_load().
+ * This uses EIO for asynchronous operation if HAVE_EIO is defined, otherwise
+ * it's synchronous.
+ *
+ * Signals "position_save,succeed" or "position_save,failed" are emitted.
+ * EFL events EFL_CANVAS_VIDEO_EVENT_POSITION_SAVE_DONE or
+ * EFL_CANVAS_VIDEO_EVENT_POSITION_SAVE_FAIL are called.
+ *
+ * @param obj The Emotion object.
+ *
+ * @ingroup Emotion_Group_Persistence
+ */
 EMOTION_API void
 emotion_object_last_position_save(Evas_Object *obj)
 {
@@ -1530,6 +2604,23 @@ emotion_object_last_position_save(Evas_Object *obj)
 #endif
 }
 
+/**
+ * @brief Sets the suspend state of the Emotion object.
+ *
+ * This function controls how the Emotion object behaves when it's not
+ * actively being used, allowing for different levels of resource saving.
+ * - #EMOTION_WAKEUP: Normal operation.
+ * - #EMOTION_SLEEP: May destroy some rendering parts.
+ * - #EMOTION_DEEP_SLEEP: Destroys most rendering parts, keeps last frame.
+ * - #EMOTION_HIBERNATE: Destroys rendering, keeps small thumbnail.
+ *
+ * The exact behavior can be engine-dependent.
+ *
+ * @param obj The Emotion object.
+ * @param state The desired #Emotion_Suspend state.
+ *
+ * @ingroup Emotion_Group_Advanced
+ */
 EMOTION_API void
 emotion_object_suspend_set(Evas_Object *obj, Emotion_Suspend state)
 {
@@ -1552,6 +2643,14 @@ emotion_object_suspend_set(Evas_Object *obj, Emotion_Suspend state)
    sd->state = state;
 }
 
+/**
+ * @brief Gets the current suspend state of the Emotion object.
+ *
+ * @param obj The Emotion object.
+ * @return The current #Emotion_Suspend state.
+ *
+ * @ingroup Emotion_Group_Advanced
+ */
 EMOTION_API Emotion_Suspend
 emotion_object_suspend_get(Evas_Object *obj)
 {
@@ -1565,6 +2664,16 @@ emotion_object_suspend_get(Evas_Object *obj)
 /* Utility calls for modules */
 /*****************************/
 
+/**
+ * @internal
+ * @brief Gets the engine-specific data associated with the Emotion object.
+ *
+ * This function is intended for use by Emotion engine modules to access
+ * their private data structures.
+ *
+ * @param obj The Emotion object.
+ * @return A pointer to the engine-specific data, or @c NULL on failure.
+ */
 EMOTION_API void *
 _emotion_video_get(const Evas_Object *obj)
 {
@@ -1574,6 +2683,18 @@ _emotion_video_get(const Evas_Object *obj)
    return emotion_engine_instance_data_get(sd->engine_instance);
 }
 
+/**
+ * @internal
+ * @brief Animator callback for processing a new video frame.
+ *
+ * This function is called by an Ecore_Animator when it's time to update
+ * the video display with a new frame. It marks the Evas image as dirty,
+ * updates position information, and emits frame decode signals/callbacks.
+ *
+ * @param data The Emotion Evas object.
+ * @return EINA_FALSE to indicate the animator should not run again automatically
+ *         (it will be re-added by _emotion_frame_new when needed).
+ */
 static Eina_Bool
 _emotion_frame_anim(void *data)
 {
@@ -1592,6 +2713,16 @@ _emotion_frame_anim(void *data)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Signals that a new video frame is available from the engine.
+ *
+ * This function is called by engine modules when they have a new decoded
+ * video frame ready for display. It schedules an animator (_emotion_frame_anim)
+ * to handle the actual update on the Evas canvas in the next rendering cycle.
+ *
+ * @param obj The Emotion Evas object.
+ */
 EMOTION_API void
 _emotion_frame_new(Evas_Object *obj)
 {
@@ -1602,6 +2733,17 @@ _emotion_frame_new(Evas_Object *obj)
      sd->anim = ecore_evas_animator_add(obj, _emotion_frame_anim, obj);
 }
 
+/**
+ * @internal
+ * @brief Updates the playback position and length, emitting signals if changed.
+ *
+ * Called by engine modules to inform the Emotion object about changes in
+ * the current playback time or total duration of the media.
+ *
+ * @param obj The Emotion Evas object.
+ * @param pos The new current playback position in seconds.
+ * @param len The new total length of the media in seconds.
+ */
 EMOTION_API void
 _emotion_video_pos_update(Evas_Object *obj, double pos, double len)
 {
@@ -1625,6 +2767,19 @@ _emotion_video_pos_update(Evas_Object *obj, double pos, double len)
      }
 }
 
+/**
+ * @internal
+ * @brief Handles a change in the video stream's dimensions or aspect ratio.
+ *
+ * Called by engine modules when the native resolution or pixel aspect ratio
+ * of the video stream changes (e.g., mid-stream format change).
+ * It updates internal data, emits signals, and reapplies aspect/border settings.
+ *
+ * @param obj The Emotion Evas object.
+ * @param w The new native width of the video stream.
+ * @param h The new native height of the video stream.
+ * @param ratio The new pixel aspect ratio of the video stream.
+ */
 EMOTION_API void
 _emotion_frame_resize(Evas_Object *obj, int w, int h, double ratio)
 {
@@ -1658,6 +2813,16 @@ _emotion_frame_resize(Evas_Object *obj, int w, int h, double ratio)
      }
 }
 
+/**
+ * @internal
+ * @brief Resets the content of the Evas image object used for video display.
+ *
+ * This function calls _emotion_image_data_zero to clear the image buffer.
+ * It's typically used by engine modules when the video stream stops or
+ * the underlying image data becomes invalid.
+ *
+ * @param obj The Emotion Evas object.
+ */
 EMOTION_API void
 _emotion_image_reset(Evas_Object *obj)
 {
@@ -1667,6 +2832,16 @@ _emotion_image_reset(Evas_Object *obj)
    _emotion_image_data_zero(sd->obj);
 }
 
+/**
+ * @internal
+ * @brief Signals that video decoding has stopped.
+ *
+ * Called by engine modules when they stop decoding video frames (e.g., at
+ * end of stream, or due to an error). It updates the play state and emits
+ * a "decode_stop" smart callback.
+ *
+ * @param obj The Emotion Evas object.
+ */
 EMOTION_API void
 _emotion_decode_stop(Evas_Object *obj)
 {
@@ -1680,6 +2855,16 @@ _emotion_decode_stop(Evas_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Signals that the media file has been successfully opened by the engine.
+ *
+ * Called by engine modules after they have successfully opened and initialized
+ * the media file. This function updates the open state, applies any remembered
+ * jump position or play state, and emits "open_done" signals/callbacks.
+ *
+ * @param obj The Emotion Evas object.
+ */
 EMOTION_API void
 _emotion_open_done(Evas_Object *obj)
 {
@@ -1701,6 +2886,15 @@ _emotion_open_done(Evas_Object *obj)
    evas_object_smart_callback_call(obj, "open_done", NULL);
 }
 
+/**
+ * @internal
+ * @brief Signals that playback has started.
+ *
+ * Called by engine modules when media playback actually begins.
+ * Emits "playback_started" signals/callbacks.
+ *
+ * @param obj The Emotion Evas object.
+ */
 EMOTION_API void
 _emotion_playback_started(Evas_Object *obj)
 {
@@ -1708,6 +2902,15 @@ _emotion_playback_started(Evas_Object *obj)
    evas_object_smart_callback_call(obj, "playback_started", NULL);
 }
 
+/**
+ * @internal
+ * @brief Signals that playback has finished.
+ *
+ * Called by engine modules when media playback reaches the end or is otherwise
+ * considered finished. Emits "playback_finished" signals/callbacks.
+ *
+ * @param obj The Emotion Evas object.
+ */
 EMOTION_API void
 _emotion_playback_finished(Evas_Object *obj)
 {
@@ -1718,6 +2921,16 @@ _emotion_playback_finished(Evas_Object *obj)
    evas_object_smart_callback_call(obj, "playback_finished", NULL);
 }
 
+/**
+ * @internal
+ * @brief Signals that the audio level (volume or mute state) has changed.
+ *
+ * Called by engine modules when the audio volume or mute status is changed
+ * externally to the Emotion object (e.g., by the engine itself or system).
+ * Emits "audio_level_change" signals/callbacks.
+ *
+ * @param obj The Emotion Evas object.
+ */
 EMOTION_API void
 _emotion_audio_level_change(Evas_Object *obj)
 {
@@ -1725,6 +2938,16 @@ _emotion_audio_level_change(Evas_Object *obj)
    evas_object_smart_callback_call(obj, "audio_level_change", NULL);
 }
 
+/**
+ * @internal
+ * @brief Signals that the available audio/video/SPU channels have changed.
+ *
+ * Called by engine modules when the number or properties of available
+ * media tracks (audio, video, subtitles) change.
+ * Emits "channels_change" signals/callbacks.
+ *
+ * @param obj The Emotion Evas object.
+ */
 EMOTION_API void
 _emotion_channels_change(Evas_Object *obj)
 {
@@ -1735,6 +2958,17 @@ _emotion_channels_change(Evas_Object *obj)
    evas_object_smart_callback_call(obj, "channels_change", NULL);
 }
 
+/**
+ * @internal
+ * @brief Sets the title of the media and signals the change.
+ *
+ * Called by engine modules when the title of the currently playing media
+ * is determined or changes. Updates the internal title stringshare and
+ * emits "title_change" signals/callbacks.
+ *
+ * @param obj The Emotion Evas object.
+ * @param title The new title string. This string will be stringshared.
+ */
 EMOTION_API void
 _emotion_title_set(Evas_Object *obj, char *title)
 {
@@ -1746,6 +2980,17 @@ _emotion_title_set(Evas_Object *obj, char *title)
    evas_object_smart_callback_call(obj, "title_change", NULL);
 }
 
+/**
+ * @internal
+ * @brief Sets the progress information and status, signaling the change.
+ *
+ * Called by engine modules to update progress information (e.g., buffering status).
+ * Updates internal progress data and emits "progress_change" signals/callbacks.
+ *
+ * @param obj The Emotion Evas object.
+ * @param info A string describing the progress. This string will be stringshared.
+ * @param st A numerical status of the progress (typically 0.0 to 1.0).
+ */
 EMOTION_API void
 _emotion_progress_set(Evas_Object *obj, char *info, double st)
 {
@@ -1758,6 +3003,18 @@ _emotion_progress_set(Evas_Object *obj, char *info, double st)
    evas_object_smart_callback_call(obj, "progress_change", NULL);
 }
 
+/**
+ * @internal
+ * @brief Sets information about a referenced file and signals the change.
+ *
+ * Called by engine modules when the media refers to another file (e.g.,
+ * an item in a playlist). Updates internal reference data and emits
+ * "ref_change" signals/callbacks.
+ *
+ * @param obj The Emotion Evas object.
+ * @param file The path/URI of the referenced file. This string will be stringshared.
+ * @param num A number associated with the reference (e.g., track number).
+ */
 EMOTION_API void
 _emotion_file_ref_set(Evas_Object *obj, const char *file, int num)
 {
@@ -1770,6 +3027,17 @@ _emotion_file_ref_set(Evas_Object *obj, const char *file, int num)
    evas_object_smart_callback_call(obj, "ref_change", NULL);
 }
 
+/**
+ * @internal
+ * @brief Sets the number of SPU (DVD menu) buttons and signals the change.
+ *
+ * Called by engine modules (typically DVD engines) when the number of
+ * available SPU buttons changes. Updates internal SPU data and emits
+ * "button_num_change" signals/callbacks.
+ *
+ * @param obj The Emotion Evas object.
+ * @param num The new number of SPU buttons.
+ */
 EMOTION_API void
 _emotion_spu_button_num_set(Evas_Object *obj, int num)
 {
@@ -1781,6 +3049,16 @@ _emotion_spu_button_num_set(Evas_Object *obj, int num)
    evas_object_smart_callback_call(obj, "button_num_change", NULL);
 }
 
+/**
+ * @internal
+ * @brief Sets the currently highlighted SPU (DVD menu) button and signals the change.
+ *
+ * Called by engine modules when the highlighted SPU button changes.
+ * Updates internal SPU data and emits "button_change" signals/callbacks.
+ *
+ * @param obj The Emotion Evas object.
+ * @param button The index of the new highlighted SPU button.
+ */
 EMOTION_API void
 _emotion_spu_button_set(Evas_Object *obj, int button)
 {
@@ -1792,6 +3070,15 @@ _emotion_spu_button_set(Evas_Object *obj, int button)
    evas_object_smart_callback_call(obj, "button_change", NULL);
 }
 
+/**
+ * @internal
+ * @brief Signals that a seek operation has completed.
+ *
+ * Called by engine modules after a requested seek operation is finished.
+ * If another seek was queued (sd->seek is true), it initiates that seek.
+ *
+ * @param obj The Emotion Evas object.
+ */
 EMOTION_API void
 _emotion_seek_done(Evas_Object *obj)
 {
@@ -1805,6 +3092,23 @@ _emotion_seek_done(Evas_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Adjusts the fill parameters of the Evas image object.
+ *
+ * This function is called to change how the video frame is scaled within
+ * the Evas image object, potentially overscanning or underscanning relative
+ * to the object's actual size. This is different from aspect ratio handling
+ * and cropping, as it directly manipulates the `evas_object_image_fill_set`
+ * properties.
+ *
+ * @param obj The Emotion Evas object.
+ * @param w The desired fill width factor. If <= 0, resets to default fill behavior.
+ *          A value of 1.0 means the source image width will fill the target width.
+ *          A value of 2.0 means the source image width will be twice the target width (zoomed in).
+ * @param h The desired fill height factor. If <= 0, resets to default fill behavior.
+ *          Similar to @p w for height.
+ */
 EMOTION_API void
 _emotion_frame_refill(Evas_Object *obj, double w, double h)
 {
@@ -1841,6 +3145,18 @@ _emotion_frame_refill(Evas_Object *obj, double w, double h)
 /* Internal object routines */
 /****************************/
 
+/**
+ * @internal
+ * @brief Handles mouse move events on the video object.
+ *
+ * Converts canvas coordinates to video-relative coordinates and feeds them
+ * to the engine instance. This is used for features like interactive DVD menus.
+ *
+ * @param data User data (Efl_Canvas_Video_Data pointer).
+ * @param ev The Evas canvas (unused).
+ * @param obj The Evas object that received the event (the internal image object).
+ * @param event_info Pointer to Evas_Event_Mouse_Move structure.
+ */
 static void
 _mouse_move(void *data, Evas *ev EINA_UNUSED, Evas_Object *obj, void *event_info)
 {
@@ -1860,6 +3176,19 @@ _mouse_move(void *data, Evas *ev EINA_UNUSED, Evas_Object *obj, void *event_info
    emotion_engine_instance_event_mouse_move_feed(sd->engine_instance, x, y);
 }
 
+/**
+ * @internal
+ * @brief Handles mouse down events on the video object.
+ *
+ * Converts canvas coordinates to video-relative coordinates and feeds them
+ * (along with button 1, assuming left-click) to the engine instance.
+ * Used for features like interactive DVD menus.
+ *
+ * @param data User data (Efl_Canvas_Video_Data pointer).
+ * @param ev The Evas canvas (unused).
+ * @param obj The Evas object that received the event (the internal image object).
+ * @param event_info Pointer to Evas_Event_Mouse_Down structure.
+ */
 static void
 _mouse_down(void *data, Evas *ev EINA_UNUSED, Evas_Object *obj, void *event_info)
 {
@@ -1879,6 +3208,16 @@ _mouse_down(void *data, Evas *ev EINA_UNUSED, Evas_Object *obj, void *event_info
    emotion_engine_instance_event_mouse_button_feed(sd->engine_instance, 1, x, y);
 }
 
+/**
+ * @internal
+ * @brief Ecore_Job callback to perform a deferred seek operation.
+ *
+ * This job is scheduled when emotion_object_position_set() is called.
+ * It ensures that seek operations are not performed too rapidly and allows
+ * for coalescing multiple seek requests.
+ *
+ * @param data User data (the Emotion Evas_Object).
+ */
 static void
 _pos_set_job(void *data)
 {
@@ -1898,7 +3237,18 @@ _pos_set_job(void *data)
      }
 }
 
-/* called by evas when it needs pixels for the image object */
+/**
+ * @internal
+ * @brief Evas image pixels_get_callback.
+ *
+ * This function is called by Evas when it needs pixel data for the internal
+ * image object (`sd->obj`) used to display video. It retrieves the latest
+ * video frame data from the engine instance (in YUV or BGRA format) and
+ * provides it to Evas.
+ *
+ * @param data User data (Efl_Canvas_Video_Data pointer).
+ * @param obj The Evas image object for which pixels are needed.
+ */
 static void
 _pixels_get(void *data, Evas_Object *obj)
 {
@@ -2002,6 +3352,21 @@ _efl_canvas_video_efl_canvas_group_group_add(Evas_Object *obj, Efl_Canvas_Video_
    sd->xattr = xattr;
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Canvas.Group.group_del for Emotion. (Smart object destructor)
+ *
+ * Cleans up all resources associated with the Emotion object, including:
+ * - Closing and deleting the engine instance.
+ * - Deleting Ecore jobs and animators.
+ * - Freeing stringshared data (file path, progress info, etc.).
+ * - Unreferencing xattr data.
+ * - Calling the parent class's group_del.
+ * - Shutting down Emotion (if this was the last instance).
+ *
+ * @param obj The Emotion Eo object (unused here, but part of signature).
+ * @param sd Pointer to the private data of the Emotion object.
+ */
 EOLIAN static void
 _efl_canvas_video_efl_canvas_group_group_del(Evas_Object *obj EINA_UNUSED, Efl_Canvas_Video_Data *sd)
 {
@@ -2026,6 +3391,18 @@ _efl_canvas_video_efl_canvas_group_group_del(Evas_Object *obj EINA_UNUSED, Efl_C
    emotion_shutdown();
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Gfx.Entity.position_set for Emotion.
+ *
+ * Handles setting the position of the Emotion object. After calling the
+ * parent's implementation, it updates the position of the internal video
+ * image and clipper via _clipper_position_size_update().
+ *
+ * @param obj The Emotion Eo object.
+ * @param sd Pointer to the private data of the Emotion object.
+ * @param pos The new Eina_Position2D for the object.
+ */
 EOLIAN static void
 _efl_canvas_video_efl_gfx_entity_position_set(Evas_Object *obj, Efl_Canvas_Video_Data *sd, Eina_Position2D pos)
 {
@@ -2040,6 +3417,18 @@ _efl_canvas_video_efl_gfx_entity_position_set(Evas_Object *obj, Efl_Canvas_Video
    _clipper_position_size_update(obj, pos.x, pos.y, sz.w, sz.h, sd->video.w, sd->video.h);
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Gfx.Entity.size_set for Emotion.
+ *
+ * Handles setting the size of the Emotion object. After calling the
+ * parent's implementation, it applies aspect/border rules via
+ * _efl_canvas_video_aspect_border_apply() and resizes the background object.
+ *
+ * @param obj The Emotion Eo object.
+ * @param sd Pointer to the private data of the Emotion object.
+ * @param sz The new Eina_Size2D for the object.
+ */
 EOLIAN static void
 _efl_canvas_video_efl_gfx_entity_size_set(Evas_Object *obj, Efl_Canvas_Video_Data *sd, Eina_Size2D sz)
 {
@@ -2055,7 +3444,7 @@ _efl_canvas_video_efl_gfx_entity_size_set(Evas_Object *obj, Efl_Canvas_Video_Dat
 /* Internal EO APIs and hidden overrides */
 
 #define EFL_CANVAS_VIDEO_EXTRA_OPS \
-   EFL_CANVAS_GROUP_ADD_DEL_OPS(efl_canvas_video)
+   EFL_CANVAS_GROUP_ADD_DEL_OPS(efl_canvas_video) /**< Macro defining extra operations for the Efl_Canvas_Video class, likely related to group add/delete. */
 
 
 #include "efl_canvas_video.eo.c"

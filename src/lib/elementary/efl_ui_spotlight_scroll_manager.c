@@ -31,12 +31,30 @@ typedef struct {
 
 static void _page_set_animation(void *data, const Efl_Event *event);
 
+/**
+ * @brief Propagates the current scroll position.
+ *
+ * This function emits an event indicating the updated scroll position.
+ *
+ * @param obj The Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param pos The current scroll position, typically between 0.0 and (number_of_items - 1).
+ */
 static void
 _propagate_progress(Eo *obj, double pos)
 {
    efl_event_callback_call(obj, EFL_UI_SPOTLIGHT_MANAGER_EVENT_POS_UPDATE, &pos);
 }
 
+/**
+ * @brief Applies geometry and clipping to all elements in the container.
+ *
+ * This function calculates and sets the position and size of each element
+ * based on the current scroll position and page size. It also applies
+ * clipping to elements that are partially or fully outside the visible area.
+ *
+ * @param obj The Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param pd The private data of the Efl_Ui_Spotlight_Scroll_Manager object.
+ */
 static void
 _apply_box_properties(Eo *obj, Efl_Ui_Spotlight_Scroll_Manager_Data *pd)
 {
@@ -79,6 +97,15 @@ _apply_box_properties(Eo *obj, Efl_Ui_Spotlight_Scroll_Manager_Data *pd)
    _propagate_progress(obj, current_pos);
 }
 
+/**
+ * @brief Handles mouse down events on the scroll manager.
+ *
+ * Initializes mouse movement tracking and prepares for a potential scroll
+ * or swipe gesture. It stops any ongoing animation.
+ *
+ * @param data The Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param event The Efl_Input_Pointer event details.
+ */
 static void
 _mouse_down_cb(void *data,
                const Efl_Event *event)
@@ -106,6 +133,16 @@ _mouse_down_cb(void *data,
    pd->transition.progress = 0.0;
 }
 
+/**
+ * @brief Handles mouse move events on the scroll manager.
+ *
+ * Updates the scroll position based on mouse movement if a drag is active.
+ * It calculates the progress of the scroll and applies the new positions
+ * to the elements.
+ *
+ * @param data The Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param event The Efl_Input_Pointer event details.
+ */
 static void
 _mouse_move_cb(void *data,
                const Efl_Event *event)
@@ -138,6 +175,15 @@ _mouse_move_cb(void *data,
      }
 }
 
+/**
+ * @brief Handles mouse up events on the scroll manager.
+ *
+ * Finalizes the scroll operation. It determines the target element based
+ * on the scroll position and snaps to it.
+ *
+ * @param data The Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param event The Efl_Input_Pointer event details.
+ */
 static void
 _mouse_up_cb(void *data,
              const Efl_Event *event)
@@ -167,6 +213,16 @@ EFL_CALLBACKS_ARRAY_DEFINE(mouse_listeners,
   {EFL_EVENT_POINTER_MOVE, _mouse_move_cb},
 );
 
+/**
+ * @internal
+ * @brief Binds the scroll manager to a spotlight container.
+ * @param obj The Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param pd The private data of the Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param spotlight The Efl_Ui_Spotlight_Container to bind to.
+ *
+ * This function sets up the necessary event listeners, clippers, and
+ * initial properties for the scroll manager to operate on the given container.
+ */
 EOLIAN static void
 _efl_ui_spotlight_scroll_manager_efl_ui_spotlight_manager_bind(Eo *obj, Efl_Ui_Spotlight_Scroll_Manager_Data *pd, Efl_Ui_Spotlight_Container *spotlight)
 {
@@ -204,6 +260,17 @@ _efl_ui_spotlight_scroll_manager_efl_ui_spotlight_manager_bind(Eo *obj, Efl_Ui_S
      }
 }
 
+/**
+ * @internal
+ * @brief Handles the addition of content to the spotlight container.
+ * @param obj The Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param pd The private data of the Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param subobj The content Efl_Gfx_Entity being added.
+ * @param index The index at which the content is added (unused).
+ *
+ * Sets up the new content item, including visibility, clipping, and stacking order.
+ * It then re-applies box properties if no transition is active.
+ */
 EOLIAN static void
 _efl_ui_spotlight_scroll_manager_efl_ui_spotlight_manager_content_add(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Scroll_Manager_Data *pd, Efl_Gfx_Entity *subobj, int index EINA_UNUSED)
 {
@@ -216,7 +283,17 @@ _efl_ui_spotlight_scroll_manager_efl_ui_spotlight_manager_content_add(Eo *obj EI
      _apply_box_properties(obj, pd);
 }
 
-
+/**
+ * @internal
+ * @brief Handles the deletion of content from the spotlight container.
+ * @param obj The Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param pd The private data of the Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param subobj The content Efl_Gfx_Entity being deleted.
+ * @param index The index from which the content is deleted (unused).
+ *
+ * Cleans up the content item by removing its clipper and unregistering it from the container.
+ * It then re-applies box properties if no transition is active.
+ */
 EOLIAN static void
 _efl_ui_spotlight_scroll_manager_efl_ui_spotlight_manager_content_del(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Scroll_Manager_Data *pd, Efl_Gfx_Entity *subobj, int index EINA_UNUSED)
 {
@@ -228,6 +305,17 @@ _efl_ui_spotlight_scroll_manager_efl_ui_spotlight_manager_content_del(Eo *obj EI
      _apply_box_properties(obj, pd);
 }
 
+/**
+ * @brief Animator tick callback for page transition animations.
+ *
+ * This function is called on each animator tick to update the progress
+ * of a page transition. It calculates the current progress using an
+ * easing function and applies the new element positions.
+ * When the animation completes, it cleans up the animator.
+ *
+ * @param data The Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param event The Efl_Canvas_Object_Animator_Tick event (unused).
+ */
 static void
 _page_set_animation(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -249,6 +337,19 @@ _page_set_animation(void *data, const Efl_Event *event EINA_UNUSED)
    _apply_box_properties(data, pd);
 }
 
+/**
+ * @brief Requests and configures an animated switch between pages.
+ *
+ * This function sets up the parameters for an animated transition from a
+ * 'from' page index to a 'to' page index. It handles cases where an
+ * animation might already be in progress, adjusting timing and start
+ * positions accordingly.
+ *
+ * @param obj The Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param pd The private data of the Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param from The starting page index for the animation.
+ * @param to The target page index for the animation.
+ */
 static void
 _animation_request_switch(Eo *obj, Efl_Ui_Spotlight_Scroll_Manager_Data *pd, int from, int to)
 {
@@ -284,6 +385,18 @@ _animation_request_switch(Eo *obj, Efl_Ui_Spotlight_Scroll_Manager_Data *pd, int
    efl_event_callback_add(pd->container, EFL_CANVAS_OBJECT_EVENT_ANIMATOR_TICK, _page_set_animation, obj);
 }
 
+/**
+ * @internal
+ * @brief Switches the active page, potentially with an animation.
+ * @param obj The Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param pd The private data of the Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param from The current active page index.
+ * @param to The target page index.
+ * @param reason The reason for the switch (unused).
+ *
+ * If animations are enabled, it requests an animated switch. Otherwise,
+ * it directly jumps to the target page and updates properties.
+ */
 EOLIAN static void
 _efl_ui_spotlight_scroll_manager_efl_ui_spotlight_manager_switch_to(Eo *obj, Efl_Ui_Spotlight_Scroll_Manager_Data *pd, int from, int to, Efl_Ui_Spotlight_Manager_Switch_Reason reason EINA_UNUSED)
 {
@@ -300,6 +413,16 @@ _efl_ui_spotlight_scroll_manager_efl_ui_spotlight_manager_switch_to(Eo *obj, Efl
      }
 }
 
+/**
+ * @internal
+ * @brief Sets the size of a single page/element in the spotlight.
+ * @param obj The Efl_Ui_Spotlight_Scroll_Manager object (unused).
+ * @param pd The private data of the Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param size The new Eina_Size2D for each page.
+ *
+ * Updates the internal page size and re-applies box properties if no
+ * transition is currently active.
+ */
 EOLIAN static void
 _efl_ui_spotlight_scroll_manager_efl_ui_spotlight_manager_size_set(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Scroll_Manager_Data *pd, Eina_Size2D size)
 {
@@ -308,6 +431,16 @@ _efl_ui_spotlight_scroll_manager_efl_ui_spotlight_manager_size_set(Eo *obj EINA_
      _apply_box_properties(obj, pd);
 }
 
+/**
+ * @internal
+ * @brief Enables or disables animated transitions.
+ * @param obj The Efl_Ui_Spotlight_Scroll_Manager object (unused).
+ * @param pd The private data of the Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param animation EINA_TRUE to enable animations, EINA_FALSE to disable.
+ *
+ * If animations are disabled while a transition is active, the transition
+ * is immediately stopped, and elements are set to their final positions.
+ */
 EOLIAN static void
 _efl_ui_spotlight_scroll_manager_efl_ui_spotlight_manager_animated_transition_set(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Scroll_Manager_Data *pd, Eina_Bool animation)
 {
@@ -320,13 +453,29 @@ _efl_ui_spotlight_scroll_manager_efl_ui_spotlight_manager_animated_transition_se
      }
 }
 
+/**
+ * @internal
+ * @brief Gets whether animated transitions are enabled.
+ * @param obj The Efl_Ui_Spotlight_Scroll_Manager object (unused).
+ * @param pd The private data of the Efl_Ui_Spotlight_Scroll_Manager object.
+ * @return EINA_TRUE if animations are enabled, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_spotlight_scroll_manager_efl_ui_spotlight_manager_animated_transition_get(const Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Scroll_Manager_Data *pd)
 {
    return pd->animation;
 }
 
-
+/**
+ * @internal
+ * @brief Invalidates the scroll manager object.
+ * @param obj The Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param pd The private data of the Efl_Ui_Spotlight_Scroll_Manager object (unused for direct access, members are used).
+ *
+ * This function is called when the object is being invalidated (e.g., during deletion).
+ * It cleans up resources such as event rectangles, clippers, and resets clippers
+ * on all content items. Finally, it calls the superclass's invalidate method.
+ */
 EOLIAN static void
 _efl_ui_spotlight_scroll_manager_efl_object_invalidate(Eo *obj, Efl_Ui_Spotlight_Scroll_Manager_Data *pd EINA_UNUSED)
 {
@@ -342,6 +491,16 @@ _efl_ui_spotlight_scroll_manager_efl_object_invalidate(Eo *obj, Efl_Ui_Spotlight
    efl_invalidate(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Sets the scroll block state.
+ * @param obj The Efl_Ui_Spotlight_Scroll_Manager object (unused).
+ * @param pd The private data of the Efl_Ui_Spotlight_Scroll_Manager object.
+ * @param scroll_block EINA_TRUE to block scrolling, EINA_FALSE to allow.
+ *
+ * When scrolling is blocked, any active mouse move or transition is immediately
+ * stopped, and elements are set to their current (potentially intermediate) positions.
+ */
 EOLIAN static void
 _efl_ui_spotlight_scroll_manager_scroll_block_set(Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Scroll_Manager_Data *pd, Eina_Bool scroll_block)
 {
@@ -357,6 +516,13 @@ _efl_ui_spotlight_scroll_manager_scroll_block_set(Eo *obj EINA_UNUSED, Efl_Ui_Sp
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the scroll block state.
+ * @param obj The Efl_Ui_Spotlight_Scroll_Manager object (unused).
+ * @param pd The private data of the Efl_Ui_Spotlight_Scroll_Manager object.
+ * @return EINA_TRUE if scrolling is blocked, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_spotlight_scroll_manager_scroll_block_get(const Eo *obj EINA_UNUSED, Efl_Ui_Spotlight_Scroll_Manager_Data *pd)
 {

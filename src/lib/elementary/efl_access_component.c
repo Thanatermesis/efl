@@ -7,7 +7,14 @@
 
 #include "elm_priv.h"
 
-
+/**
+ * @brief Gets the screen coordinates of the top-left corner of the accessible object.
+ *
+ * @param[in] obj The Eolian object.
+ * @param[in] _pd Private data for the Eolian object.
+ * @param[out] x Pointer to store the x-coordinate.
+ * @param[out] y Pointer to store the y-coordinate.
+ */
 EOLIAN static void
 _efl_access_component_screen_position_get(const Eo *obj EINA_UNUSED, void *_pd EINA_UNUSED, int *x, int *y)
 {
@@ -18,6 +25,15 @@ _efl_access_component_screen_position_get(const Eo *obj EINA_UNUSED, void *_pd E
    if (y) *y = r.y;
 }
 
+/**
+ * @brief Sets the screen coordinates of the top-left corner of the accessible object.
+ *
+ * @param[in] obj The Eolian object.
+ * @param[in] _pd Private data for the Eolian object.
+ * @param[in] x The x-coordinate to set.
+ * @param[in] y The y-coordinate to set.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_access_component_screen_position_set(Eo *obj EINA_UNUSED, void *_pd EINA_UNUSED, int x, int y)
 {
@@ -29,6 +45,17 @@ _efl_access_component_screen_position_set(Eo *obj EINA_UNUSED, void *_pd EINA_UN
    return efl_access_component_extents_set(obj, EINA_TRUE, r);
 }
 
+/**
+ * @brief Checks if the accessible object contains the given point.
+ *
+ * @param[in] obj The Eolian object.
+ * @param[in] _pd Private data for the Eolian object.
+ * @param[in] type If @c EINA_TRUE, coordinates are relative to the screen;
+ *                 otherwise, they are relative to the parent object's top-left corner.
+ * @param[in] x The x-coordinate of the point.
+ * @param[in] y The y-coordinate of the point.
+ * @return @c EINA_TRUE if the point is contained, @c EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_access_component_contains(Eo *obj EINA_UNUSED, void *_pd EINA_UNUSED, Eina_Bool type, int x, int y)
 {
@@ -38,6 +65,21 @@ _efl_access_component_contains(Eo *obj EINA_UNUSED, void *_pd EINA_UNUSED, Eina_
    return eina_rectangle_coords_inside(&r.rect, x, y);
 }
 
+/**
+ * @brief Gets the accessible child object at the given point.
+ *
+ * This function iterates through the children of the given object and returns
+ * the first child that implements EFL_ACCESS_COMPONENT_MIXIN and contains
+ * the specified point.
+ *
+ * @param[in] obj The Eolian object.
+ * @param[in] _pd Private data for the Eolian object.
+ * @param[in] screen_coords If @c EINA_TRUE, coordinates (x, y) are relative to the screen;
+ *                          otherwise, they are relative to the parent object's top-left corner.
+ * @param[in] x The x-coordinate of the point.
+ * @param[in] y The y-coordinate of the point.
+ * @return The accessible child object at the point, or @c NULL if none is found.
+ */
 EOLIAN static Eo *
 _efl_access_component_accessible_at_point_get(Eo *obj, void *_pd EINA_UNUSED, Eina_Bool screen_coords, int x, int y)
 {
@@ -64,6 +106,17 @@ _efl_access_component_accessible_at_point_get(Eo *obj, void *_pd EINA_UNUSED, Ei
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Adjusts the given rectangle coordinates to be screen-relative.
+ *
+ * This function takes a rectangle @p r (assumed to be relative to the object's canvas)
+ * and adds the Ecore_Evas window's top-left coordinates to make @p r screen-relative.
+ *
+ * @param[in] obj The Evas object.
+ * @param[in] r The rectangle with coordinates relative to the object's canvas.
+ * @return The rectangle with screen-relative coordinates.
+ */
 Eina_Rect
 _efl_access_component_screen_coords_extents_get(const Eo *obj, Eina_Rect r)
 {
@@ -79,6 +132,16 @@ _efl_access_component_screen_coords_extents_get(const Eo *obj, Eina_Rect r)
    return r;
 }
 
+/**
+ * @brief Gets the extents (bounding box) of the accessible object.
+ *
+ * @param[in] obj The Eolian object.
+ * @param[in] _pd Private data for the Eolian object.
+ * @param[in] screen_coords If @c EINA_TRUE, coordinates are relative to the screen;
+ *                          otherwise, they are relative to the parent object's top-left corner.
+ * @return The Eina_Rect representing the extents of the object.
+ *         Example: { .x = 10, .y = 20, .w = 100, .h = 50 }
+ */
 EOLIAN static Eina_Rect
 _efl_access_component_extents_get(const Eo *obj, void *_pd EINA_UNUSED, Eina_Bool screen_coords)
 {
@@ -92,6 +155,17 @@ _efl_access_component_extents_get(const Eo *obj, void *_pd EINA_UNUSED, Eina_Boo
    return r;
 }
 
+/**
+ * @brief Sets the extents (bounding box) of the accessible object.
+ *
+ * @param[in] obj The Eolian object.
+ * @param[in] _pd Private data for the Eolian object.
+ * @param[in] screen_coords If @c EINA_TRUE, coordinates in @p r are relative to the screen;
+ *                          otherwise, they are relative to the parent object's top-left corner.
+ * @param[in] r The Eina_Rect representing the new extents.
+ *              Example: { .x = 10, .y = 20, .w = 100, .h = 50 }
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise (e.g., if rect is invalid or Ecore_Evas is not found).
+ */
 EOLIAN static Eina_Bool
 _efl_access_component_extents_set(Eo *obj, void *_pd EINA_UNUSED, Eina_Bool screen_coords, Eina_Rect r)
 {
@@ -114,7 +188,16 @@ _efl_access_component_extents_set(Eo *obj, void *_pd EINA_UNUSED, Eina_Bool scre
    return EINA_TRUE;
 }
 
-
+/**
+ * @brief Gets the Z-order of the component.
+ *
+ * This function currently returns 0 as Z-ordering is not fully implemented
+ * or used for accessibility components in this context.
+ *
+ * @param[in] obj The Eolian object.
+ * @param[in] _pd Private data for the Eolian object.
+ * @return The Z-order value (currently always 0).
+ */
 EOLIAN static int
 _efl_access_component_z_order_get(const Eo *obj EINA_UNUSED, void *_pd EINA_UNUSED)
 {
@@ -122,6 +205,13 @@ _efl_access_component_z_order_get(const Eo *obj EINA_UNUSED, void *_pd EINA_UNUS
    return 0;
 }
 
+/**
+ * @brief Attempts to grab focus for the accessible object.
+ *
+ * @param[in] obj The Eolian object.
+ * @param[in] _pd Private data for the Eolian object.
+ * @return @c EINA_TRUE if focus was successfully grabbed, @c EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_access_component_focus_grab(Eo *obj EINA_UNUSED, void *_pd EINA_UNUSED)
 {

@@ -3,6 +3,15 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Gets the top-level window for a given Evas object.
+ *
+ * This function traverses up the widget hierarchy from the given object
+ * to find the root window object.
+ *
+ * @param obj The Evas object whose parent window is to be found.
+ * @return The top-level Evas_Object (window) or the object itself if it has no parent widget.
+ */
 static Evas_Object *
 _parent_win_get(Evas_Object *obj)
 {
@@ -14,6 +23,16 @@ _parent_win_get(Evas_Object *obj)
    return obj;
 }
 
+/**
+ * @brief Callback function to close a window.
+ *
+ * This function is typically used as a callback for a "clicked" event
+ * on a close button. It deletes the window object passed in the data parameter.
+ *
+ * @param data A pointer to the Evas_Object (window) to be closed.
+ * @param obj The Evas_Object that triggered the callback (unused).
+ * @param event_info Additional event information (unused).
+ */
 static void
 _close_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -22,6 +41,19 @@ _close_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED
    evas_object_del(win);
 }
 
+/**
+ * @brief Creates and displays a modal window.
+ *
+ * This function demonstrates the creation of a modal window in Elementary.
+ * The modal window blocks input to other windows in the application until
+ * it is closed. It includes a label and buttons to open another modal
+ * window or to close the current one.
+ *
+ * @param data Custom data pointer (unused).
+ * @param obj The Evas_Object that triggered this function, typically a button
+ *            in a parent window. Used to get the parent window.
+ * @param event_info Additional event information (unused).
+ */
 void
 test_win_modal(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {

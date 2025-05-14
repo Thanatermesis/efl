@@ -502,8 +502,16 @@ static unsigned char is_space[256];
 
 static int           annotate = 0;
 
-/* Initialize syntactic classifications of characters.  */
-
+/**
+ * @brief Initializes character syntax tables based on preprocessor options.
+ *
+ * This function sets up lookup tables (`is_idchar`, `is_idstart`, `is_hor_space`,
+ * `is_space`) to quickly classify characters. These tables determine which
+ * characters can be part of identifiers, what constitutes whitespace, etc.
+ * The behavior can be modified by `opts->dollars_in_ident`.
+ *
+ * @param opts The preprocessor options.
+ */
 static void
 initialize_char_syntax(struct cpp_options *opts)
 {
@@ -544,8 +552,20 @@ initialize_char_syntax(struct cpp_options *opts)
    is_space[(unsigned char)'\r'] = 1;
 }
 
-/* Place into PFILE a quoted string representing the string SRC.
- * Caller must reserve enough space in pfile->token_buffer. */
+/**
+ * @brief Converts a source string into a C-style quoted string literal.
+ *
+ * This function takes a raw string and produces a double-quoted string,
+ * escaping special characters like `"` and `\` and representing non-printable
+ * characters as octal escape sequences. The result is appended directly to
+ * the `pfile`'s token buffer. The caller is responsible for ensuring
+ * sufficient space is available in the buffer.
+ *
+ * @param pfile The preprocessor state, containing the output buffer.
+ * @param src The null-terminated source string to be quoted.
+ * @example
+ *   quote_string(pfile, "ab\"c") appends "\"ab\\\"c\"" to the buffer.
+ */
 static void
 quote_string(cpp_reader * pfile, const char *src)
 {
@@ -578,8 +598,17 @@ quote_string(cpp_reader * pfile, const char *src)
 	}
 }
 
-/* Make sure PFILE->token_buffer will hold at least N more chars. */
-
+/**
+ * @brief Ensures the token buffer has enough capacity for more data.
+ *
+ * If the current token buffer cannot hold at least `n` more characters,
+ * it is reallocated to a larger size. The new size is typically double the
+ * old size plus the required extra space, to amortize the cost of reallocation.
+ * The contents of the buffer are preserved.
+ *
+ * @param pfile The preprocessor state, containing the token buffer to grow.
+ * @param n The minimum number of additional characters needed in the buffer.
+ */
 void
 cpp_grow_buffer(cpp_reader * pfile, long n)
 {
@@ -591,13 +620,19 @@ cpp_grow_buffer(cpp_reader * pfile, long n)
    CPP_SET_WRITTEN(pfile, old_written);
 }
 
-/*
- * process a given definition string, for initialization
- * If STR is just an identifier, define it with value 1.
- * If STR has anything after the identifier, then it should
- * be identifier=definition.
+/**
+ * @brief Defines a macro from a command-line style string.
+ *
+ * This function processes a string like "FOO" or "FOO=BAR" and creates a
+ * macro definition, as if from a `-D` command-line option.
+ * - If `str` is just an identifier (e.g., "FOO"), it is defined with the value "1".
+ * - If `str` is `identifier=definition` (e.g., "FOO=bar baz"), it is defined accordingly.
+ * Backslash-newline sequences in the definition part are handled.
+ * It reports an error for malformed strings.
+ *
+ * @param pfile The preprocessor state.
+ * @param str The definition string (e.g., "MACRO=VALUE" or "MACRO").
  */
-
 void
 cpp_define(cpp_reader * pfile, unsigned char *str)
 {
@@ -648,9 +683,20 @@ cpp_define(cpp_reader * pfile, unsigned char *str)
    do_define(pfile, NULL, buf, buf + strlen((char *)buf));
 }
 
-/* Process the string STR as if it appeared as the body of a #assert.
- * OPTION is the option name for which STR was the argument.  */
-
+/**
+ * @brief Creates an assertion from a command-line style string.
+ *
+ * This function processes a string `str` as if it were the argument to an
+ * `#assert` directive, for example from a `-A` command-line option.
+ * The string should be in the format "predicate(answer)".
+ * It pushes the string onto a temporary buffer and calls `do_assert`
+ * to perform the actual assertion logic.
+ *
+ * @param pfile The preprocessor state.
+ * @param option The command-line option that provided the assertion (e.g., "-A"),
+ *               used for error messages.
+ * @param str The assertion string, e.g., "machine(sun4)".
+ */
 static void
 make_assertion(cpp_reader * pfile, const char *option, const char *str)
 {
@@ -687,10 +733,18 @@ make_assertion(cpp_reader * pfile, const char *option, const char *str)
    cpp_pop_buffer(pfile);
 }
 
-/* Append a chain of `file_name_list's
- * to the end of the main include chain.
- * FIRST is the beginning of the chain to append, and LAST is the end.  */
-
+/**
+ * @brief Appends a chain of directory entries to the main include search path.
+ *
+ * This function links a new chain of `file_name_list` nodes, starting at `first`
+ * and ending at `last`, to the end of the preprocessor's include directory list.
+ * It also updates pointers for the start of bracketed includes (`<...>`) and
+ * tracks the maximum length of an include path for buffer allocation purposes.
+ *
+ * @param pfile The preprocessor state.
+ * @param first The first node of the `file_name_list` chain to append.
+ * @param last The last node of the `file_name_list` chain to append.
+ */
 static void
 append_include_chain(cpp_reader * pfile, file_name_list * first,
 		     file_name_list * last)
@@ -723,11 +777,20 @@ append_include_chain(cpp_reader * pfile, file_name_list * first,
    opts->last_include = last;
 }
 
-/* Add output to `deps_buffer' for the -M switch.
- * STRING points to the text to be output.
- * SPACER is ':' for targets, ' ' for dependencies, zero for text
- * to be inserted literally.  */
-
+/**
+ * @brief Appends text to the dependency output buffer.
+ *
+ * This function is used to build the dependency list for options like `-M`.
+ * It appends the given `string` to `pfile->deps_buffer`, handling line
+ * wrapping to keep lines under `MAX_OUTPUT_COLUMNS`.
+ *
+ * @param pfile The preprocessor state, containing the dependency buffer.
+ * @param string The text to append.
+ * @param spacer
+ *   - If ':', appends `string` followed by a colon (for targets).
+ *   - If ' ', appends `string` prefixed by a space (for dependencies).
+ *   - If 0, appends `string` literally.
+ */
 static void
 deps_output(cpp_reader * pfile, const char *string, int spacer)
 {
@@ -762,9 +825,17 @@ deps_output(cpp_reader * pfile, const char *string, int spacer)
    pfile->deps_buffer[pfile->deps_size] = 0;
 }
 
-/* Given a colon-separated list of file names PATH,
- * add all the names to the search path for include files.  */
-
+/**
+ * @brief Parses a path string and adds each directory to the include search path.
+ *
+ * The `path` string is a list of directories separated by `PATH_SEPARATOR`
+ * (typically ':' on Unix-like systems). Each directory is added to the end of
+ * the include chain. An empty name in the path (e.g., `:/usr/include`) is
+ * interpreted as the current directory ".".
+ *
+ * @param pfile The preprocessor state.
+ * @param path The separator-delimited string of include paths.
+ */
 static void
 path_include(cpp_reader * pfile, char *path)
 {
@@ -815,6 +886,15 @@ path_include(cpp_reader * pfile, char *path)
 	}
 }
 
+/**
+ * @brief Initializes a `cpp_options` structure to its default values.
+ *
+ * This function resets an options struct, setting flags for language features,
+ * warnings, and output modes to their defaults. For example, it enables
+ * C++ comments and `$` in identifiers by default, and disables most warnings.
+ *
+ * @param opts A pointer to the `cpp_options` structure to initialize.
+ */
 void
 init_parse_options(struct cpp_options *opts)
 {
@@ -848,18 +928,55 @@ init_parse_options(struct cpp_options *opts)
    opts->warnings_are_errors = 0;
 }
 
+/**
+ * @brief A buffer underflow handler that simply returns end-of-file.
+ *
+ * This function is used for buffers that do not source their data from an
+ * external stream, such as string buffers created for macro expansion. When
+ * the end of such a buffer is reached, this handler signals that there is
+ * no more input.
+ *
+ * @param pfile The preprocessor state (unused).
+ * @return Always returns `CPP_EOF`.
+ */
 static enum cpp_token
 null_underflow(cpp_reader * pfile EINA_UNUSED)
 {
    return CPP_EOF;
 }
 
+/**
+ * @brief A buffer cleanup handler that does nothing.
+ *
+ * This is the default cleanup function for buffers that do not own any
+ * dynamically allocated resources that need to be freed when the buffer
+ * is popped.
+ *
+ * @param pbuf The buffer being popped (unused).
+ * @param pfile The preprocessor state (unused).
+ * @return Always returns 0 (success).
+ */
 static int
 null_cleanup(cpp_buffer * pbuf EINA_UNUSED, cpp_reader * pfile EINA_UNUSED)
 {
    return 0;
 }
 
+/**
+ * @brief Cleanup handler for a macro expansion buffer.
+ *
+ * This function is called when a buffer created for a macro expansion is
+ * popped from the input stack. It performs two main tasks:
+ * 1. It re-enables the macro that was being expanded by changing its type from
+ *    `T_DISABLED` back to `T_MACRO`, preventing infinite recursion.
+ * 2. It frees the memory used for the expanded text, unless it's a simple
+ *    object-like macro whose expansion text is shared directly from the
+ *    definition.
+ *
+ * @param pbuf The macro expansion buffer to clean up.
+ * @param pfile The preprocessor state (unused).
+ * @return Always returns 0 (success).
+ */
 static int
 macro_cleanup(cpp_buffer * pbuf, cpp_reader * pfile EINA_UNUSED)
 {
@@ -872,6 +989,17 @@ macro_cleanup(cpp_buffer * pbuf, cpp_reader * pfile EINA_UNUSED)
    return 0;
 }
 
+/**
+ * @brief Cleanup handler for a file buffer.
+ *
+ * This function is called when a buffer associated with an included file is
+ * popped. Its primary responsibility is to free the memory that was allocated
+ * to hold the file's contents.
+ *
+ * @param pbuf The file buffer to clean up.
+ * @param pfile The preprocessor state (unused).
+ * @return Always returns 0 (success).
+ */
 static int
 file_cleanup(cpp_buffer * pbuf, cpp_reader * pfile EINA_UNUSED)
 {
@@ -883,12 +1011,23 @@ file_cleanup(cpp_buffer * pbuf, cpp_reader * pfile EINA_UNUSED)
    return 0;
 }
 
-/* Assuming we have read '/'.
- * If this is the start of a comment (followed by '*' or '/'),
- * skip to the end of the comment, and return ' '.
- * Return EOF if we reached the end of file before the end of the comment.
- * If not the start of a comment, return '/'. */
-
+/**
+ * @brief Skips over a C or C++ style comment.
+ *
+ * This function is called after a '/' has been seen. It checks for a following
+ * '*' (for a C-style block comment) or '/' (for a C++-style line comment, if
+ * enabled). If a comment is found, it consumes characters until the end of the
+ * comment is reached.
+ *
+ * @param pfile The preprocessor state.
+ * @param linep If not NULL, this is incremented for each newline encountered
+ *              within the comment. This is important for tracking line numbers
+ *              correctly.
+ * @return
+ *   - ' ' if a comment was successfully skipped.
+ *   - `EOF` if end-of-file was reached inside a block comment.
+ *   - '/' if the character sequence was not a comment (e.g., just a division operator).
+ */
 static int
 skip_comment(cpp_reader * pfile, long *linep)
 {

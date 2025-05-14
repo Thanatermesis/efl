@@ -88,6 +88,16 @@ static Eina_Bool _pause_request = EINA_FALSE;
 static Eina_Bool _playing_status = EINA_FALSE;
 static Eina_Bool _ready_to_write = EINA_FALSE;
 
+/**
+ * @brief Get a snapshot of an Evas canvas.
+ *
+ * This function creates a snapshot object of the given Evas canvas if it
+ * doesn't exist, and then copies the pixel data into a new Exactness_Image
+ * struct. The caller is responsible for freeing the returned struct.
+ *
+ * @param e The Evas canvas to take a snapshot of.
+ * @return A new Exactness_Image struct containing the snapshot, or NULL on failure.
+ */
 static Exactness_Image *
 _snapshot_shot_get(Evas *e)
 {
@@ -127,6 +137,24 @@ _snapshot_shot_get(Evas *e)
    return ex_img;
 }
 
+/**
+ * @brief Post-render callback for an Evas canvas.
+ *
+ * This callback is triggered after an Evas canvas has been rendered. If a
+ * screenshot has been requested (_shot_needed is true), this function will
+ * capture the rendered frame.
+ *
+ * The destination of the screenshot is determined by _dest_type:
+ * - FTYPE_DIR: Save as a PNG file in the destination directory.
+ * - FTYPE_EXU: Store in memory within an Exactness_Unit structure.
+ * - FTYPE_REMOTE: Send over the network to a remote client.
+ *
+ * After the shot is taken, it resets the _shot_needed flag and may quit the
+ * main loop if an exit was requested.
+ *
+ * @param data User data (unused).
+ * @param event The EFL event information.
+ */
 static void
 _evas_render_post_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -187,6 +215,19 @@ _evas_render_post_cb(void *data EINA_UNUSED, const Efl_Event *event)
      }
 }
 
+/**
+ * @brief Prepares and triggers a screenshot of an Evas canvas.
+ *
+ * This function sets up the necessary data structures for taking a screenshot
+ * based on the destination type (_dest_type). It then flags that a shot is
+ * needed, which will be handled by the _evas_render_post_cb callback.
+ *
+ * If _scan_objects is enabled and the destination is an .exu file, this
+ * function will also iterate through all canvas objects and store their
+ * properties (name, geometry, hierarchy) in the destination unit.
+ *
+ * @param e The Evas canvas to take a screenshot of.
+ */
 static void
 _shot_do(Evas *e)
 {
@@ -271,6 +312,22 @@ _shot_do(Evas *e)
      }
 }
 
+/**
+ * @brief Feeds a single event into an Evas canvas.
+ *
+ * This function is the core of the event replaying mechanism. It takes an
+ * action description and injects the corresponding event (e.g., mouse move,
+ * key press) into the specified Evas canvas.
+ *
+ * For visual debugging (_verbose mode), it displays a small colored rectangle
+ * that follows the mouse cursor and changes color on clicks.
+ *
+ * It also handles meta-actions like TAKE_SHOT, CLICK_ON, and STABILIZE.
+ *
+ * @param type The type of action to perform.
+ * @param n_evas The index of the target Evas canvas in the global _evas_list.
+ * @param data A pointer to the action-specific data structure.
+ */
 static void
 _feed_event(Exactness_Action_Type type, unsigned int n_evas, void *data)
 {
@@ -503,6 +560,18 @@ wdg_found:
      }
 }
 
+/**
+ * @brief Timer callback to process the event queue.
+ *
+ * This function is called by an ecore timer to process the next event in the
+ * `_cur_event_list`. It feeds the event using `_feed_event` and then schedules
+ * the next timer for the subsequent event based on its delay.
+ *
+ * If the event list is exhausted, it requests to exit the main loop.
+ *
+ * @param data User data (unused).
+ * @return ECORE_CALLBACK_CANCEL to prevent the timer from repeating automatically.
+ */
 static Eina_Bool
 _feed_event_timer_cb(void *data EINA_UNUSED)
 {
@@ -531,6 +600,19 @@ _feed_event_timer_cb(void *data EINA_UNUSED)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Timer callback to wait for UI stabilization.
+ *
+ * This function repeatedly takes snapshots of all Evas canvases and compares
+ * them to the previous ones. The UI is considered "stable" when the snapshots
+ * remain unchanged for a certain number of consecutive checks (STAB_MAX).
+ *
+ * Once stable, it stops and allows the event playback to continue.
+ *
+ * @param data User data (unused).
+ * @return ECORE_CALLBACK_RENEW to continue checking, or ECORE_CALLBACK_CANCEL
+ *         once stabilization is achieved.
+ */
 static Eina_Bool
 _stabilization_timer_cb(void *data EINA_UNUSED)
 {
@@ -575,6 +657,18 @@ _stabilization_timer_cb(void *data EINA_UNUSED)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Debug callback for a remote "mouse in" event.
+ *
+ * This function is called when a "mouse in" event is received from a remote
+ * debugging session. It extracts the event data from the buffer and feeds it
+ * into the appropriate Evas canvas.
+ *
+ * @param session The debug session.
+ * @param srcid The source client ID.
+ * @param buffer The raw data buffer containing event details.
+ * @param size The size of the buffer.
+ */
 static void
 _main_loop_mouse_in_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_UNUSED, void *buffer, int size EINA_UNUSED)
 {
@@ -583,6 +677,10 @@ _main_loop_mouse_in_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_U
    _feed_event(EXACTNESS_ACTION_MOUSE_IN, n_evas, NULL);
 }
 
+/**
+ * @brief Debug callback for a remote "mouse out" event.
+ * @see _main_loop_mouse_in_cb
+ */
 static void
 _main_loop_mouse_out_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_UNUSED, void *buffer, int size EINA_UNUSED)
 {
@@ -591,6 +689,10 @@ _main_loop_mouse_out_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_
    _feed_event(EXACTNESS_ACTION_MOUSE_OUT, n_evas, NULL);
 }
 
+/**
+ * @brief Debug callback for a remote "mouse wheel" event.
+ * @see _main_loop_mouse_in_cb
+ */
 static void
 _main_loop_mouse_wheel_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_UNUSED, void *buffer, int size EINA_UNUSED)
 {
@@ -602,6 +704,10 @@ _main_loop_mouse_wheel_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EIN
    _feed_event(EXACTNESS_ACTION_MOUSE_WHEEL, n_evas, &t);
 }
 
+/**
+ * @brief Debug callback for a remote "multi-touch down" event.
+ * @see _main_loop_mouse_in_cb
+ */
 static void
 _main_loop_multi_down_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_UNUSED, void *buffer, int size EINA_UNUSED)
 {
@@ -623,6 +729,10 @@ _main_loop_multi_down_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA
    _feed_event(EXACTNESS_ACTION_MULTI_DOWN, n_evas, &t);
 }
 
+/**
+ * @brief Debug callback for a remote "multi-touch up" event.
+ * @see _main_loop_mouse_in_cb
+ */
 static void
 _main_loop_multi_up_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_UNUSED, void *buffer, int size EINA_UNUSED)
 {
@@ -644,6 +754,10 @@ _main_loop_multi_up_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_U
    _feed_event(EXACTNESS_ACTION_MULTI_UP, n_evas, &t);
 }
 
+/**
+ * @brief Debug callback for a remote "multi-touch move" event.
+ * @see _main_loop_mouse_in_cb
+ */
 static void
 _main_loop_multi_move_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_UNUSED, void *buffer, int size EINA_UNUSED)
 {
@@ -663,6 +777,10 @@ _main_loop_multi_move_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA
    _feed_event(EXACTNESS_ACTION_MULTI_MOVE, n_evas, &t);
 }
 
+/**
+ * @brief Debug callback for a remote "key down" event.
+ * @see _main_loop_mouse_in_cb
+ */
 static void
 _main_loop_key_down_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_UNUSED, void *buffer, int size EINA_UNUSED)
 {
@@ -677,6 +795,10 @@ _main_loop_key_down_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_U
    _feed_event(EXACTNESS_ACTION_KEY_DOWN, n_evas, &t);
 }
 
+/**
+ * @brief Debug callback for a remote "key up" event.
+ * @see _main_loop_mouse_in_cb
+ */
 static void
 _main_loop_key_up_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_UNUSED, void *buffer, int size EINA_UNUSED)
 {
@@ -691,6 +813,10 @@ _main_loop_key_up_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_UNU
    _feed_event(EXACTNESS_ACTION_KEY_UP, n_evas, &t);
 }
 
+/**
+ * @brief Debug callback for a remote "take shot" request.
+ * @see _main_loop_mouse_in_cb
+ */
 static void
 _main_loop_take_shot_cb(Eina_Debug_Session *session, int srcid, void *buffer, int size EINA_UNUSED)
 {
@@ -701,6 +827,10 @@ _main_loop_take_shot_cb(Eina_Debug_Session *session, int srcid, void *buffer, in
    _last_debug_src_cid = srcid;
 }
 
+/**
+ * @brief Debug callback for a remote request to trigger a legacy EFL event.
+ * @see _main_loop_mouse_in_cb
+ */
 static void
 _main_loop_efl_event_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_UNUSED, void *buffer, int size EINA_UNUSED)
 {
@@ -711,6 +841,10 @@ _main_loop_efl_event_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_
    _feed_event(EXACTNESS_ACTION_EFL_EVENT, 0, &t);
 }
 
+/**
+ * @brief Debug callback for a remote request to click on a named widget.
+ * @see _main_loop_mouse_in_cb
+ */
 static void
 _main_loop_click_on_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_UNUSED, void *buffer, int size EINA_UNUSED)
 {
@@ -720,18 +854,34 @@ _main_loop_click_on_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_U
    _feed_event(EXACTNESS_ACTION_CLICK_ON, 0, &t);
 }
 
+/**
+ * @brief Debug callback for a remote request to wait for UI stabilization.
+ * @see _main_loop_mouse_in_cb
+ */
 static void
 _main_loop_stabilize_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_UNUSED, void *buffer EINA_UNUSED, int size EINA_UNUSED)
 {
    _feed_event(EXACTNESS_ACTION_STABILIZE, 0, NULL);
 }
 
+/**
+ * @brief Debug callback for a remote request to finish the test.
+ *
+ * This quits the main loop, effectively ending the test run.
+ * @see _main_loop_mouse_in_cb
+ */
 static void
 _main_loop_finish_cb(Eina_Debug_Session *session EINA_UNUSED, int srcid EINA_UNUSED, void *buffer EINA_UNUSED, int size EINA_UNUSED)
 {
    ecore_main_loop_quit();
 }
 
+/**
+ * The following macros wrap the debug callback functions (e.g., _main_loop_mouse_in_cb)
+ * to ensure they are executed in the main loop thread. This is necessary because
+ * the debug session may receive data on a different thread.
+ * The WRAPPER_TO_XFER_MAIN_LOOP macro is defined in common.h.
+ */
 WRAPPER_TO_XFER_MAIN_LOOP(_mouse_in_cb)
 WRAPPER_TO_XFER_MAIN_LOOP(_mouse_out_cb)
 WRAPPER_TO_XFER_MAIN_LOOP(_mouse_wheel_cb)
@@ -746,6 +896,24 @@ WRAPPER_TO_XFER_MAIN_LOOP(_click_on_cb)
 WRAPPER_TO_XFER_MAIN_LOOP(_stabilize_cb)
 WRAPPER_TO_XFER_MAIN_LOOP(_finish_cb)
 
+/**
+ * @brief Defines the set of debug opcodes handled by the player.
+ *
+ * This array maps string-based command names (e.g., "Exactness/Actions/Mouse In")
+ * to their corresponding handler functions. This is used by the Eina debug
+ * infrastructure to dispatch commands received from a remote client.
+ *
+ * The structure of each element is:
+ * @code{.c}
+ * { "Command Name", &opcode_storage, &handler_function }
+ * @endcode
+ *
+ * - @c "Command Name": The string identifier for the command.
+ * - @c opcode_storage: An optional pointer to an int where the assigned opcode
+ *                   ID will be stored. This is useful for commands that need
+ *                   to send back replies, like "Take Shot".
+ * - @c handler_function: The callback function to execute for this command.
+ */
 EINA_DEBUG_OPCODES_ARRAY_DEFINE(_debug_ops,
      {"Exactness/Actions/Mouse In", NULL, &_mouse_in_cb},
      {"Exactness/Actions/Mouse Out", NULL, &_mouse_out_cb},
@@ -763,6 +931,16 @@ EINA_DEBUG_OPCODES_ARRAY_DEFINE(_debug_ops,
      {NULL, NULL, NULL}
 );
 
+/**
+ * @brief Starts the event playback from a source file.
+ *
+ * This function is typically called once from an ecore idler at the start. It
+ * initializes the event queue pointer (`_cur_event_list`) and schedules the
+ * first event to be processed by `_feed_event_timer_cb`.
+ *
+ * @param data User data (unused).
+ * @return EINA_FALSE to ensure the idler only runs once.
+ */
 static Eina_Bool
 _src_feed(void *data EINA_UNUSED)
 {
@@ -782,6 +960,18 @@ _src_feed(void *data EINA_UNUSED)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Opens and prepares the event source.
+ *
+ * If the source is an .exu file, this function reads it into the `_src_unit`
+ * structure. It can also perform modifications on the loaded event list, such as:
+ * - Adding STABILIZE actions before every TAKE_SHOT if `_stabilize_shots` is on.
+ * - Adjusting event delays based on the playback `_speed`.
+ *
+ * If the source is remote, it registers the debug opcodes to handle incoming commands.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _src_open()
 {
@@ -824,6 +1014,19 @@ _src_open()
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback to remove old screenshot files.
+ *
+ * This function is used with `eina_file_dir_list` to iterate through a
+ * directory. It checks if a filename matches the pattern for a screenshot
+ * from a previous run of the same test and deletes it.
+ *
+ * The pattern is `<test_name><SHOT_DELIMITER><id>.png`.
+ *
+ * @param name The name of the file or directory.
+ * @param path The path to the file or directory.
+ * @param data A pointer to the test name prefix (`_test_name`).
+ */
 static void
 _old_shots_rm_cb(const char *name, const char *path, void *data)
 {
@@ -842,6 +1045,15 @@ _old_shots_rm_cb(const char *name, const char *path, void *data)
      }
 }
 
+/**
+ * @brief Callback for when an Evas canvas is deleted.
+ *
+ * This function finds the deleted Evas canvas in the global `_evas_list` and
+ * sets its entry to NULL. This prevents attempts to use the invalid canvas pointer later.
+ *
+ * @param data User data (unused).
+ * @param event The EFL event information containing the deleted object.
+ */
 static void
 _evas_del_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -849,6 +1061,15 @@ _evas_del_cb(void *data EINA_UNUSED, const Efl_Event *event)
    eina_list_data_set(p, NULL);
 }
 
+/**
+ * @brief Global key event callback.
+ *
+ * This function listens for key presses. It specifically handles the PAUSE_KEY_STR
+ * (e.g., "F2") to toggle the pause state of the event playback.
+ *
+ * @param data User data (unused).
+ * @param event The EFL event information for the key press/release.
+ */
 static void
 _event_key_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -869,6 +1090,18 @@ _event_key_cb(void *data EINA_UNUSED, const Efl_Event *event)
      }
 }
 
+/**
+ * @brief Defines the set of global callbacks for all created Evas canvases.
+ *
+ * This array maps EFL event descriptions to their handler functions. These
+ * callbacks will be automatically added to every Evas canvas created via
+ * `_my_evas_new`.
+ *
+ * The structure of each element is:
+ * @code{.c}
+ * { EFL_EVENT_DESCRIPTION, handler_function }
+ * @endcode
+ */
 EFL_CALLBACKS_ARRAY_DEFINE(_evas_callbacks,
       { EFL_EVENT_DEL, _evas_del_cb },
       { EFL_CANVAS_SCENE_EVENT_RENDER_POST, _evas_render_post_cb },
@@ -876,6 +1109,20 @@ EFL_CALLBACKS_ARRAY_DEFINE(_evas_callbacks,
       { EFL_EVENT_KEY_UP, _event_key_cb }
       )
 
+/**
+ * @brief Factory function for creating new Evas canvases.
+ *
+ * This function is set as the default Evas creation function using
+ * `ecore_evas_callback_new_set`. When the application creates an Evas canvas,
+ * this function is called.
+ *
+ * It creates the canvas, adds it to the global `_evas_list`, and attaches
+ * the common event handlers defined in `_evas_callbacks`.
+ *
+ * @param w Unused width parameter.
+ * @param h Unused height parameter.
+ * @return A newly created and configured Evas canvas.
+ */
 static Evas *
 _my_evas_new(int w EINA_UNUSED, int h EINA_UNUSED)
 {
@@ -890,6 +1137,23 @@ _my_evas_new(int w EINA_UNUSED, int h EINA_UNUSED)
    return e;
 }
 
+/**
+ * @brief Determines and configures the destination for test results.
+ *
+ * This function parses the destination string (`dest`) to determine where to
+ * save screenshots and other test artifacts.
+ *
+ * - If `dest` ends with ".exu", the destination type is FTYPE_EXU.
+ * - Otherwise, it's assumed to be a directory (FTYPE_DIR).
+ * - If `external_injection` is true, it implies a remote connection, and the
+ *   source/destination types are set to FTYPE_REMOTE.
+ *
+ * It also creates the destination directory if needed.
+ *
+ * @param dest The destination path (can be NULL).
+ * @param external_injection True if events are coming from a remote client.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _setup_dest_type(const char *dest, Eina_Bool external_injection)
 {
@@ -927,6 +1191,23 @@ _setup_dest_type(const char *dest, Eina_Bool external_injection)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets up source type and test name from the source path.
+ *
+ * This function parses the source file path (`src`). It determines if the
+ * source is an .exu file and sets `_src_type` accordingly.
+ * It also extracts the base name of the file (without directory and extension)
+ * to be used as the `_test_name`.
+ *
+ * For example, "/path/to/my_test.exu" becomes:
+ * @code
+ * _src_filename: "/path/to/my_test.exu"
+ * _src_type: FTYPE_EXU
+ * _test_name: "my_test"
+ * @endcode
+ *
+ * @param src The full path to the source file.
+ */
 static void
 _setup_names(const char *src)
 {
@@ -950,6 +1231,13 @@ _setup_names(const char *src)
      }
 }
 
+/**
+ * @brief Initializes the destination unit structure.
+ *
+ * If the destination type is FTYPE_EXU, this function allocates and initializes
+ * the `_dest_unit` structure, which will be used to accumulate test results
+ * (screenshots, object data) before writing to the output .exu file.
+ */
 static void
 _setup_dest_unit(void)
 {
@@ -957,6 +1245,12 @@ _setup_dest_unit(void)
 
 }
 
+/**
+ * @brief Removes old screenshots from the destination directory.
+ *
+ * If the destination is a directory, this function scans it and deletes any
+ * existing screenshots that match the current test name, to ensure a clean run.
+ */
 static void
 _remove_old_shots(void)
 {
@@ -964,6 +1258,20 @@ _remove_old_shots(void)
       eina_file_dir_list(_dest, 0, _old_shots_rm_cb, (void *)_test_name);
 }
 
+/**
+ * @brief Configures font settings for the test run.
+ *
+ * This function ensures that the application uses a specific, consistent set
+ * of fonts, which is crucial for reproducible rendering.
+ *
+ * It can get the font path from the source .exu file (`_src_unit`) or by
+ * finding the latest dated subdirectory in the `fonts_dir`. It then uses
+ * an environment variable (`FONTCONFIG_FILE`) to point fontconfig to a
+ * temporary configuration file that exclusively uses these fonts.
+ *
+ * @param fonts_dir The base directory where versioned font folders are stored.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _setup_font_settings(const char *fonts_dir)
 {
@@ -1014,6 +1322,13 @@ _setup_font_settings(const char *fonts_dir)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets up Ecore_Evas integration.
+ *
+ * This function hooks into the Evas creation process by setting `_my_evas_new`
+ * as the default canvas factory. It also starts the event playback by adding
+ * `_src_feed` as an ecore idler, unless running in remote injection mode.
+ */
 static void
 _setup_ee_creation(void)
 {
@@ -1022,6 +1337,14 @@ _setup_ee_creation(void)
       ecore_idler_add(_src_feed, NULL);
 }
 
+/**
+ * @brief Writes the collected test results to the destination .exu file.
+ *
+ * This function is called at the end of the test run. If the destination is
+ * an .exu file, it takes the `_dest_unit` (which contains new screenshots
+ * and object data) and merges it with the actions from the original source
+ * `_src_unit` before writing the complete result to the destination file.
+ */
 static void
 _write_unit_file(void)
 {
@@ -1057,6 +1380,20 @@ _write_unit_file(void)
 #define ORIGINAL_CALL(name, ...) \
    ORIGINAL_CALL_T(int, name, __VA_ARGS__)
 
+/**
+ * @brief Hook for the eina_init() library function.
+ *
+ * This function is called instead of the real `eina_init()` because the player
+ * is preloaded (LD_PRELOAD). It first calls the original `eina_init()` using
+ * dlsym.
+ *
+ * After the original initialization, it reads environment variables
+ * (EXACTNESS_SRC, EXACTNESS_DEST, etc.) to configure the player's behavior,
+ * such as source/destination paths, speed, and other options. It then proceeds
+ * to open the source, set up fonts, and prepare for the test run.
+ *
+ * @return The return value of the original `eina_init()`.
+ */
 EAPI int
 eina_init(void)
 {
@@ -1100,6 +1437,16 @@ eina_init(void)
    return original_return;
 }
 
+/**
+ * @brief Hook for the ecore_evas_init() library function.
+ *
+ * This function hooks the initialization of Ecore_Evas. After calling the
+ * original function, it sets up the custom Evas creation callback, which
+ * allows the player to intercept and manage all Evas canvases created by
+ * the application.
+ *
+ * @return The return value of the original `ecore_evas_init()`.
+ */
 EAPI int
 ecore_evas_init(void)
 {
@@ -1115,7 +1462,17 @@ ecore_evas_init(void)
    return original_return;
 }
 
-//hook, to hook in our theme
+/**
+ * @brief Hook for the elm_init() library function.
+ *
+ * This hook is used to prepare the Elementary theme overlay after the original
+ * `elm_init()` has run. This is necessary to ensure custom theme elements
+ * required by the player are available.
+ *
+ * @param argc The argument count from the application's main().
+ * @param argv The argument vector from the application's main().
+ * @return The return value of the original `elm_init()`.
+ */
 EAPI int
 elm_init(int argc, char **argv)
 {
@@ -1128,6 +1485,13 @@ elm_init(int argc, char **argv)
    return original_return;
 }
 
+/**
+ * @brief Hook for the ecore_main_loop_begin() function.
+ *
+ * This function hooks the start of the Ecore main loop. It's used as a
+ * trigger point to write the final output file, but it seems to be
+ * a fallback, as `efl_loop_begin` and `eina_shutdown` also have this logic.
+ */
 EAPI void
 ecore_main_loop_begin(void)
 {
@@ -1138,6 +1502,16 @@ ecore_main_loop_begin(void)
    (void)original_return;
 }
 
+/**
+ * @brief Hook for the efl_loop_begin() function (part of Eo).
+ *
+ * This hooks the start of the newer EFL main loop. This is one of the
+ * points where the final output file is written, ensuring that results are
+ * saved before the application potentially exits.
+ *
+ * @param obj The main loop object.
+ * @return The return value from the original `efl_loop_begin()`.
+ */
 EAPI Eina_Value*
 efl_loop_begin(Eo *obj)
 {
@@ -1148,6 +1522,16 @@ efl_loop_begin(Eo *obj)
    return original_return;
 }
 
+/**
+ * @brief Hook for the eina_shutdown() library function.
+ *
+ * This hooks the Eina shutdown process. It serves as a final opportunity to
+ * write the output .exu file, which is crucial if the application exits
+ * without explicitly running the main loop to completion. A static guard
+ * (`output_written`) prevents writing the file multiple times.
+ *
+ * @return The return value of the original `eina_shutdown()`.
+ */
 EAPI int
 eina_shutdown(void)
 {

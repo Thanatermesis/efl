@@ -8,6 +8,17 @@
 #define MAX_BUFFERS 10
 #define QUEUE_TRIM_DURATION 100
 
+/**
+ * @brief Creates a new framebuffer object (Outbuf_Fb).
+ *
+ * This function allocates and initializes an Outbuf_Fb structure,
+ * which includes creating an underlying ecore_drm2_fb.
+ *
+ * @param ob The parent Outbuf structure.
+ * @param w The width of the framebuffer to create.
+ * @param h The height of the framebuffer to create.
+ * @return A pointer to the newly created Outbuf_Fb, or NULL on failure.
+ */
 static Outbuf_Fb *
 _outbuf_fb_create(Outbuf *ob, int w, int h)
 {
@@ -33,6 +44,14 @@ _outbuf_fb_create(Outbuf *ob, int w, int h)
    return out;
 }
 
+/**
+ * @brief Destroys an Outbuf_Fb object.
+ *
+ * This function discards the underlying ecore_drm2_fb and frees
+ * the memory associated with the Outbuf_Fb structure.
+ *
+ * @param ofb The Outbuf_Fb object to destroy.
+ */
 static void
 _outbuf_fb_destroy(Outbuf_Fb *ofb)
 {
@@ -45,6 +64,19 @@ _outbuf_fb_destroy(Outbuf_Fb *ofb)
    free(ofb);
 }
 
+/**
+ * @brief Waits for an available framebuffer or trims unused ones.
+ *
+ * This function searches for an available (not busy) framebuffer from the
+ * list of framebuffers associated with the Outbuf. It prioritizes the
+ * oldest available buffer. If unused buffers have persisted for a certain
+ * duration (QUEUE_TRIM_DURATION), the oldest one is destroyed to free
+ * resources.
+ *
+ * @param ob The parent Outbuf structure.
+ * @return A pointer to an available Outbuf_Fb, or NULL if none are
+ *         immediately available (though it might trigger a destroy and recurse).
+ */
 static Outbuf_Fb *
 _outbuf_fb_wait(Outbuf *ob)
 {
@@ -90,6 +122,18 @@ _outbuf_fb_wait(Outbuf *ob)
    return best;
 }
 
+/**
+ * @brief Assigns a framebuffer for drawing.
+ *
+ * This function attempts to get an available framebuffer using _outbuf_fb_wait.
+ * If no buffer is available and the maximum number of buffers has not been
+ * reached, a new framebuffer is created. If still no buffer is available,
+ * it attempts to release the current output's framebuffer and tries again.
+ * It also manages the age of existing framebuffers.
+ *
+ * @param ob The parent Outbuf structure.
+ * @return A pointer to the assigned Outbuf_Fb for drawing, or NULL on failure.
+ */
 static Outbuf_Fb *
 _outbuf_fb_assign(Outbuf *ob)
 {
@@ -139,6 +183,16 @@ _outbuf_fb_assign(Outbuf *ob)
    return ob->priv.draw;
 }
 
+/**
+ * @brief Swaps the current drawing buffer to the display.
+ *
+ * This function ensures a valid drawing buffer is assigned (using
+ * _outbuf_fb_assign if necessary). It then assigns the framebuffer to
+ * a DRM plane (creating one if it doesn't exist) and flips the
+ * framebuffer to the output, making it visible.
+ *
+ * @param ob The parent Outbuf structure.
+ */
 static void
 _outbuf_buffer_swap(Outbuf *ob)
 {
@@ -165,6 +219,16 @@ _outbuf_buffer_swap(Outbuf *ob)
    ofb->age = 0;
 }
 
+/**
+ * @brief Sets up and initializes an Outbuf structure.
+ *
+ * @param info Pointer to Evas_Engine_Info_Drm containing DRM device
+ *             information, output, depth, bpp, format, alpha, and rotation.
+ * @param w The width of the output buffer.
+ * @param h The height of the output buffer.
+ * @return A pointer to the newly allocated and initialized Outbuf structure,
+ *         or NULL on allocation failure.
+ */
 Outbuf *
 _outbuf_setup(Evas_Engine_Info_Drm *info, int w, int h)
 {
@@ -188,6 +252,15 @@ _outbuf_setup(Evas_Engine_Info_Drm *info, int w, int h)
    return ob;
 }
 
+/**
+ * @brief Frees an Outbuf structure and its associated resources.
+ *
+ * This function releases all pending image updates, flushes any remaining
+ * operations, destroys all associated framebuffers, and frees the Outbuf
+ * structure itself.
+ *
+ * @param ob The Outbuf structure to free.
+ */
 void
 _outbuf_free(Outbuf *ob)
 {
@@ -219,12 +292,33 @@ _outbuf_free(Outbuf *ob)
    free(ob);
 }
 
+/**
+ * @brief Gets the current rotation of the output buffer.
+ *
+ * @param ob The Outbuf structure.
+ * @return The current rotation angle (0, 90, 180, or 270).
+ */
 int
 _outbuf_rotation_get(Outbuf *ob)
 {
    return ob->rotation;
 }
 
+/**
+ * @brief Reconfigures the output buffer with new dimensions, rotation, or depth.
+ *
+ * This function updates the Outbuf's properties. If the new configuration
+ * differs from the current one, it updates the width, height, depth, pixel
+ * format, and rotation. It also resets the unused buffer duration and
+ * flushes any idle buffers.
+ *
+ * @param ob The Outbuf structure to reconfigure.
+ * @param w The new width.
+ * @param h The new height.
+ * @param rotation The new rotation (0, 90, 180, 270).
+ * @param depth The new color depth, which determines the pixel format.
+ *              Example: OUTBUF_DEPTH_ARGB_32BPP_8888_8888 results in DRM_FORMAT_ARGB8888.
+ */
 void
 _outbuf_reconfigure(Outbuf *ob, int w, int h, int rotation, Outbuf_Depth depth)
 {
@@ -283,6 +377,18 @@ _outbuf_reconfigure(Outbuf *ob, int w, int h, int rotation, Outbuf_Depth depth)
    _outbuf_idle_flush(ob);
 }
 
+/**
+ * @brief Gets the current swap mode state of the output buffer.
+ *
+ * The swap mode is determined by the age of the current drawing buffer.
+ * This indicates how many frames the current buffer has been displayed,
+ * suggesting different rendering strategies (e.g., full redraw, copy, double/triple/quadruple buffering).
+ *
+ * @param ob The Outbuf structure.
+ * @return The current Render_Output_Swap_Mode.
+ *         Example: MODE_FULL if the buffer is new or very old (age > 4),
+ *                  MODE_COPY if age is 1, etc.
+ */
 Render_Output_Swap_Mode
 _outbuf_state_get(Outbuf *ob)
 {
@@ -300,6 +406,27 @@ _outbuf_state_get(Outbuf *ob)
    return MODE_FULL;
 }
 
+/**
+ * @brief Creates a new image buffer for updating a region of the output.
+ *
+ * This function allocates an RGBA_Image from the cache to hold pixel data
+ * for a specified region. The region is clipped to the Outbuf dimensions.
+ * The allocated image is added to a list of pending updates.
+ *
+ * @param ob The Outbuf structure.
+ * @param x The x-coordinate of the region to update.
+ * @param y The y-coordinate of the region to update.
+ * @param w The width of the region to update.
+ * @param h The height of the region to update.
+ * @param[out] cx Pointer to store the clipped x-coordinate (relative to the new buffer, usually 0).
+ * @param[out] cy Pointer to store the clipped y-coordinate (relative to the new buffer, usually 0).
+ * @param[out] cw Pointer to store the clipped width.
+ * @param[out] ch Pointer to store the clipped height.
+ * @return A pointer to the allocated RGBA_Image, or NULL on failure.
+ *         The RGBA_Image contains:
+ *         - cache_entry: Evas_Cache_Image for image data and properties.
+ *         - extended_info: Eina_Rectangle storing the original x, y, w, h.
+ */
 void *
 _outbuf_update_region_new(Outbuf *ob, int x, int y, int w, int h, int *cx, int *cy, int *cw, int *ch)
 {
@@ -339,6 +466,22 @@ _outbuf_update_region_new(Outbuf *ob, int x, int y, int w, int h, int *cx, int *
    return img;
 }
 
+/**
+ * @brief Pushes pixel data from an RGBA_Image to the current drawing framebuffer.
+ *
+ * This function converts and copies pixel data from the source `update` image
+ * to the corresponding region in the current drawing framebuffer (ob->priv.draw).
+ * It handles rotation by adjusting coordinates and selecting the appropriate
+ * conversion function. The destination region is clipped to the framebuffer
+ * dimensions.
+ *
+ * @param ob The Outbuf structure.
+ * @param update The RGBA_Image containing the source pixel data.
+ * @param x The x-offset within the `update` image (typically 0).
+ * @param y The y-offset within the `update` image (typically 0).
+ * @param w The width of the sub-region in `update` to push.
+ * @param h The height of the sub-region in `update` to push.
+ */
 void
 _outbuf_update_region_push(Outbuf *ob, RGBA_Image *update, int x, int y, int w, int h)
 {
@@ -469,6 +612,28 @@ _outbuf_update_region_push(Outbuf *ob, RGBA_Image *update, int x, int y, int w, 
         rect.w, rect.h, x + rx, y + ry, NULL);
 }
 
+/**
+ * @brief Flushes pending updates to the screen.
+ *
+ * This function processes all RGBA_Image updates that were previously added
+ * via _outbuf_update_region_new and (implicitly) written to by
+ * _outbuf_update_region_push. It collects the damage rectangles,
+ * transforms them according to rotation, and then swaps the buffer to make
+ * the changes visible. Pending images are then released.
+ *
+ * The `ob->priv.rects` array will contain `Eina_Rectangle` elements,
+ * where each rectangle describes a damaged region:
+ *   typedef struct _Eina_Rectangle
+ *   {
+ *      int x, y, w, h;
+ *   } Eina_Rectangle;
+ *
+ * @param ob The Outbuf structure.
+ * @param surface_damage Unused parameter.
+ * @param buffer_damage Unused parameter.
+ * @param render_mode The current rendering mode. If EVAS_RENDER_MODE_ASYNC_INIT,
+ *                    the function returns early.
+ */
 void
 _outbuf_flush(Outbuf *ob, Tilebuf_Rect *surface_damage EINA_UNUSED, Tilebuf_Rect *buffer_damage EINA_UNUSED, Evas_Render_Mode render_mode)
 {
@@ -544,6 +709,25 @@ _outbuf_flush(Outbuf *ob, Tilebuf_Rect *surface_damage EINA_UNUSED, Tilebuf_Rect
    _outbuf_buffer_swap(ob);
 }
 
+/**
+ * @brief Sets the dirty regions on the current drawing framebuffer.
+ *
+ * This function takes a list of Tilebuf_Rect structures, converts them
+ * to Eina_Rectangle, and marks these regions as dirty on the
+ * ecore_drm2_fb associated with the current drawing buffer. This is
+ * typically used by the DRM backend to optimize screen updates.
+ *
+ * The `damage` parameter is an Eina_Inlist of `Tilebuf_Rect` structures:
+ *   typedef struct _Tilebuf_Rect
+ *   {
+ *     EINA_INLIST;
+ *     int x, y, w, h;
+ *   } Tilebuf_Rect;
+ *
+ * @param ob The Outbuf structure.
+ * @param damage An Eina_Inlist of Tilebuf_Rect structures representing
+ *               the damaged regions.
+ */
 void
 _outbuf_damage_region_set(Outbuf *ob, Tilebuf_Rect *damage)
 {
@@ -571,6 +755,16 @@ _outbuf_damage_region_set(Outbuf *ob, Tilebuf_Rect *damage)
    ecore_drm2_fb_dirty(fb, rects, count);
 }
 
+/**
+ * @brief Flushes pending image updates and releases unused framebuffers.
+ *
+ * This function discards all images currently in the pending update list
+ * without actually drawing them. It then attempts to release any framebuffers
+ * held by the output that are not currently busy, effectively cleaning up
+ * resources during idle periods.
+ *
+ * @param ob The Outbuf structure.
+ */
 void
 _outbuf_idle_flush(Outbuf *ob)
 {

@@ -45,47 +45,74 @@ extern char **environ;
 
 typedef struct _Efl_Exe_Data Efl_Exe_Data;
 
+/**
+ * @brief Private data structure for Efl_Exe.
+ *
+ * This structure holds all the internal state for an Efl_Exe object,
+ * including file descriptors, process ID, flags, and handlers for I/O
+ * and exit events.
+ */
 struct _Efl_Exe_Data
 {
-   Efl_Core_Env *env;
-   int exit_signal;
-   Efl_Exe_Flags flags;
+   Efl_Core_Env *env; /**< Environment variables for the executable. */
+   int exit_signal; /**< Signal number that caused the process to exit, if any. -1 otherwise. */
+   Efl_Exe_Flags flags; /**< Flags controlling the execution behavior. */
 #ifdef _WIN32
    struct {
-      Eo *in_handler, *out_handler;
-      Eina_Bool can_read : 1;
-      Eina_Bool eos_read : 1;
-      Eina_Bool can_write : 1;
-   } fd;
+      Eo *in_handler; /**< Handler for stdin. */
+      Eo *out_handler; /**< Handler for stdout. */
+      Eina_Bool can_read : 1; /**< Flag indicating if stdout can be read. */
+      Eina_Bool eos_read : 1; /**< Flag indicating if end-of-stream has been reached for stdout. */
+      Eina_Bool can_write : 1; /**< Flag indicating if stdin can be written to. */
+   } fd; /**< File descriptor and handler information for Windows. */
 #else
-   Eo *exit_handler;
-   pid_t pid;
+   Eo *exit_handler; /**< Handler for process exit events. */
+   pid_t pid; /**< Process ID of the executed command. -1 if not running. */
    struct {
-      int in, out, exited_read, exited_write;
-      Eo *in_handler, *out_handler;
-      Eina_Bool can_read : 1;
-      Eina_Bool eos_read : 1;
-      Eina_Bool can_write : 1;
-   } fd;
+      int in; /**< File descriptor for stdin of the child process. */
+      int out; /**< File descriptor for stdout of the child process. */
+      int exited_read; /**< File descriptor to read exit status from the child. */
+      int exited_write; /**< File descriptor to write exit status to the parent. */
+      Eo *in_handler; /**< Handler for stdin write events. */
+      Eo *out_handler; /**< Handler for stdout read events. */
+      Eina_Bool can_read : 1; /**< Flag indicating if stdout can be read. */
+      Eina_Bool eos_read : 1; /**< Flag indicating if end-of-stream has been reached for stdout. */
+      Eina_Bool can_write : 1; /**< Flag indicating if stdin can be written to. */
+   } fd; /**< File descriptor and handler information for POSIX systems. */
 #endif
-   Eina_Bool exit_called : 1;
-   Eina_Bool exit_signalled : 1;
-   Eina_Bool run : 1;
+   Eina_Bool exit_called : 1; /**< Flag indicating if the exit event has been called. */
+   Eina_Bool exit_signalled : 1; /**< Flag indicating if a signal was sent to terminate the process. */
+   Eina_Bool run : 1; /**< Flag indicating if the executable is currently running. */
 };
 
 //////////////////////////////////////////////////////////////////////////
 
 #ifdef _WIN32
 #else
+/**
+ * @brief Maps Efl_Task_Priority enum values to system priority values (nice levels).
+ * Lower values indicate higher priority.
+ * For example, EFL_TASK_PRIORITY_NORMAL (index 0) maps to nice value 10.
+ * EFL_TASK_PRIORITY_ULTRA (index 4) maps to nice value 0.
+ */
 static const signed char primap[EFL_TASK_PRIORITY_ULTRA + 1] =
 {
-   10, // EFL_TASK_PRIORITY_NORMAL
-   19, // EFL_TASK_PRIORITY_BACKGROUND
+   10, /**< EFL_TASK_PRIORITY_NORMAL */
+   19, /**< EFL_TASK_PRIORITY_BACKGROUND */
    15, // EFL_TASK_PRIORITY_LOW
     5, // EFL_TASK_PRIORITY_HIGH
-    0  // EFL_TASK_PRIORITY_ULTRA
+    0  /**< EFL_TASK_PRIORITY_ULTRA */
 };
 
+/**
+ * @brief Closes all file descriptors associated with the Efl_Exe instance.
+ *
+ * This function is a helper to ensure that all pipes used for communication
+ * with the child process are properly closed. It sets the file descriptor
+ * values in the Efl_Exe_Data structure to -1 after closing them.
+ *
+ * @param pd Pointer to the Efl_Exe_Data structure.
+ */
 static void
 _close_fds(Efl_Exe_Data *pd)
 {
@@ -99,6 +126,20 @@ _close_fds(Efl_Exe_Data *pd)
    pd->fd.exited_write = -1;
 }
 
+/**
+ * @brief Executes the command.
+ *
+ * This function is called in the child process after fork(). It attempts to
+ * execute the command directly using execvp() if possible, by parsing the
+ * command string into arguments. If the command contains shell metacharacters,
+ * it falls back to executing the command via "/bin/sh -c".
+ * It also handles setting process group, and platform-specific flags like
+ * PR_SET_PDEATHSIG or PROC_PDEATHSIG_CTL.
+ *
+ * @param cmd The command string to execute.
+ * @param flags Efl_Exe_Flags controlling execution behavior (e.g., group leader).
+ * @param task_flags Efl_Task_Flags controlling task behavior (e.g., exit with parent).
+ */
 static void
 _exec(const char *cmd, Efl_Exe_Flags flags, Efl_Task_Flags task_flags)
 {
@@ -179,18 +220,46 @@ _exec(const char *cmd, Efl_Exe_Flags flags, Efl_Task_Flags task_flags)
      }
 }
 
+/**
+ * @brief Evaluates if the executable has fully exited and triggers cleanup.
+ *
+ * This function checks if all relevant file descriptors (stdout, exit status pipe)
+ * are closed and if the exit event has not yet been called. If these conditions
+ * are met, it marks the exit as called, emits the EFL_TASK_EVENT_EXIT event,
+ * and deletes the Efl_Exe object.
+ *
+ * @param obj The Efl_Exe Eo object.
+ * @param pd Pointer to the Efl_Exe_Data structure.
+ */
 static void
 _exe_exit_eval(Eo *obj, Efl_Exe_Data *pd)
 {
-   if ((pd->fd.out == -1) && /*(pd->fd.in == -1) &&*/
+   // Condition to check for full exit:
+   // 1. stdout pipe from child is closed (pd->fd.out == -1).
+   //    (stdin pipe to child (pd->fd.in) closure is handled separately when writing finishes or explicitly closed).
+   // 2. Exit status pipe from child is closed (pd->fd.exited_read == -1).
+   // 3. Exit event has not been called yet (!pd->exit_called).
+   if ((pd->fd.out == -1) && /*(pd->fd.in == -1) &&*/ // stdin (pd->fd.in) is not strictly required here for exit eval
        (pd->fd.exited_read == -1) && (!pd->exit_called))
      {
         pd->exit_called = EINA_TRUE;
         efl_event_callback_call(obj, EFL_TASK_EVENT_EXIT, NULL);
-        efl_del(obj);
+        efl_del(obj); // Self-deletion after exit event.
      }
 }
 
+/**
+ * @brief Callback for when data is available on the exit status pipe.
+ *
+ * This function is called when the child process has exited and its exit
+ * status information (exit code, exit signal) has been written to the
+ * `exited_read` pipe by the SIGCHLD handler mechanism. It reads this
+ * information, updates the task data, closes the pipe, and then calls
+ * _exe_exit_eval() to potentially finalize the Efl_Exe object.
+ *
+ * @param data The Efl_Exe Eo object (passed as user data).
+ * @param event The Efl_Event structure (unused).
+ */
 static void
 _cb_exe_exit_read(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -224,6 +293,17 @@ _cb_exe_exit_read(void *data, const Efl_Event *event EINA_UNUSED)
    // and then del/unref the obj there... always del/unref it immediately.
 }
 
+/**
+ * @brief Callback for when the stdout pipe of the child process is readable.
+ *
+ * This function is triggered by an EFL_LOOP_HANDLER_EVENT_READ event on the
+ * child's stdout file descriptor. It simply sets the `can_read` property
+ * of the Efl_Io_Reader interface to EINA_TRUE, indicating that data is
+ * available to be read from the child process.
+ *
+ * @param data The Efl_Exe Eo object (passed as user data).
+ * @param event The Efl_Event structure (unused).
+ */
 static void
 _cb_exe_out(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -231,6 +311,17 @@ _cb_exe_out(void *data, const Efl_Event *event EINA_UNUSED)
    efl_io_reader_can_read_set(obj, EINA_TRUE);
 }
 
+/**
+ * @brief Callback for when the stdin pipe of the child process is writable.
+ *
+ * This function is triggered by an EFL_LOOP_HANDLER_EVENT_WRITE event on the
+ * child's stdin file descriptor. It sets the `can_write` property of the
+ * Efl_Io_Writer interface to EINA_TRUE, indicating that data can be written
+ * to the child process.
+ *
+ * @param data The Efl_Exe Eo object (passed as user data).
+ * @param event The Efl_Event structure (unused).
+ */
 static void
 _cb_exe_in(void *data, const Efl_Event *event EINA_UNUSED)
 {

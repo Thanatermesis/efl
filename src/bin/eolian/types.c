@@ -6,6 +6,22 @@
 
 extern char* _eolian_api_symbol;
 
+/**
+ * @internal
+ * @brief Generates the C code representation for a given Eolian typedecl.
+ *
+ * This function handles various Eolian typedecl types like alias, struct,
+ * enum, and function pointers, converting them into their C typedef
+ * or struct definition.
+ *
+ * @param state The Eolian state.
+ * @param tp The Eolian typedecl to generate code for.
+ * @param full If EINA_TRUE, generate full definitions (e.g., for structs and enums).
+ *             If EINA_FALSE, generate opaque struct typedefs or skip enums.
+ * @return A new Eina_Strbuf containing the generated C code for the typedecl,
+ *         or NULL if the typedecl type is not handled or an error occurs.
+ *         The caller is responsible for freeing the returned Eina_Strbuf.
+ */
 static Eina_Strbuf *
 _type_generate(const Eolian_State *state, const Eolian_Typedecl *tp,
                Eina_Bool full)
@@ -169,6 +185,18 @@ _type_generate(const Eolian_State *state, const Eolian_Typedecl *tp,
    return buf;
 }
 
+/**
+ * @internal
+ * @brief Generates the C code representation for a given Eolian constant.
+ *
+ * This function creates a C preprocessor macro (#define) for the constant.
+ * It includes documentation and handles beta API support.
+ *
+ * @param state The Eolian state.
+ * @param vr The Eolian constant to generate code for.
+ * @return A new Eina_Strbuf containing the generated C macro definition for the constant.
+ *         The caller is responsible for freeing the returned Eina_Strbuf.
+ */
 static Eina_Strbuf *
 _const_generate(const Eolian_State *state, const Eolian_Constant *vr)
 {
@@ -210,6 +238,19 @@ _const_generate(const Eolian_State *state, const Eolian_Constant *vr)
    return buf;
 }
 
+/**
+ * @internal
+ * @brief Generates the C code for an Eolian error.
+ *
+ * This function creates a C function declaration for retrieving the Eina_Error
+ * value associated with the Eolian error, and a macro for convenience.
+ * It includes documentation and handles beta API support.
+ *
+ * @param state The Eolian state.
+ * @param err The Eolian error to generate code for.
+ * @return A new Eina_Strbuf containing the generated C code for the error.
+ *         The caller is responsible for freeing the returned Eina_Strbuf.
+ */
 static Eina_Strbuf *
 _err_generate(const Eolian_State *state, const Eolian_Error *err)
 {
@@ -245,6 +286,20 @@ _err_generate(const Eolian_State *state, const Eolian_Error *err)
    return buf;
 }
 
+/**
+ * @brief Generates C header code for Eolian types, constants, and errors.
+ *
+ * Iterates through a list of Eolian objects (typedecls, constants, errors)
+ * and generates the corresponding C code definitions or declarations, appending
+ * them to the provided string buffer.
+ *
+ * @param state The Eolian state.
+ * @param itr An iterator over Eolian_Object instances (typedecls, constants, errors).
+ *            The iterator will be freed by this function.
+ * @param buf The Eina_Strbuf to append the generated C code to.
+ * @param full If EINA_TRUE, generate full definitions for types (e.g., structs and enums).
+ *             If EINA_FALSE, generate opaque struct typedefs or skip enums.
+ */
 void eo_gen_types_header_gen(const Eolian_State *state,
                              Eina_Iterator *itr, Eina_Strbuf *buf,
                              Eina_Bool full)
@@ -316,6 +371,17 @@ void eo_gen_types_header_gen(const Eolian_State *state,
    eina_iterator_free(itr);
 }
 
+/**
+ * @internal
+ * @brief Generates the C source code for an Eolian error's accessor function.
+ *
+ * This function creates the C implementation of the function that returns
+ * the Eina_Error value for a given Eolian error. The error message is
+ * statically registered.
+ *
+ * @param buf The Eina_Strbuf to append the generated C code to.
+ * @param err The Eolian_Error to generate the source code for.
+ */
 static void
 _source_gen_error(Eina_Strbuf *buf, const Eolian_Error *err)
 {
@@ -371,6 +437,17 @@ _source_gen_error(Eina_Strbuf *buf, const Eolian_Error *err)
    eina_strbuf_append(buf, "   return err;\n}\n\n");
 }
 
+/**
+ * @brief Generates C source code for Eolian error accessor functions.
+ *
+ * Iterates through a list of Eolian objects and, for each Eolian_Error,
+ * generates the C implementation of its accessor function.
+ *
+ * @param itr An iterator over Eolian_Object instances. This function will
+ *            only process EOLIAN_OBJECT_ERROR types. The iterator will be
+ *            freed by this function.
+ * @param buf The Eina_Strbuf to append the generated C source code to.
+ */
 void eo_gen_types_source_gen(Eina_Iterator *itr, Eina_Strbuf *buf)
 {
    const Eolian_Object *decl;
@@ -384,6 +461,25 @@ void eo_gen_types_source_gen(Eina_Iterator *itr, Eina_Strbuf *buf)
    eina_iterator_free(itr);
 }
 
+/**
+ * @brief Generates a C typedef for an Eolian class.
+ *
+ * Creates a typedef in the form `typedef Eo Class_Name;` for the given
+ * Eolian class specified by its file.
+ *
+ * @param eos The Eolian state.
+ * @param eof The Eolian file path string (e.g., "my_object.eo") from which
+ *            to find the class.
+ * @return A new Eina_Strbuf containing the generated C typedef for the class,
+ *         or NULL if the class is not found or its C name cannot be determined.
+ *         The caller is responsible for freeing the returned Eina_Strbuf.
+ *
+ * @code
+ * // Example: if eof is "my_button.eo" and the class is My.Button
+ * // this might generate:
+ * // typedef Eo My_Button;
+ * @endcode
+ */
 Eina_Strbuf *eo_gen_class_typedef_gen(const Eolian_State *eos, const char *eof)
 {
    const Eolian_Class *cl = eolian_state_class_by_file_get(eos, eof);

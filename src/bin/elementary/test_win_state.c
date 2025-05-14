@@ -9,10 +9,16 @@ typedef struct _Testitem
    int mode, onoff;
 } Testitem;
 
-static int rotate_with_resize = 0;
-static Eina_Bool fullscreen = EINA_FALSE;
-static Eina_Bool floating = EINA_FALSE;
+static int rotate_with_resize = 0; /**< Flag to indicate if rotation should also resize the window. */
+static Eina_Bool fullscreen = EINA_FALSE; /**< Current fullscreen state of the test window. */
+static Eina_Bool floating = EINA_FALSE; /**< Current floating state of the test window. */
 
+/**
+ * @brief Callback function to enable alpha blending for the window.
+ * @param data The window object (Evas_Object *).
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 my_bt_38_alpha_on(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -22,6 +28,12 @@ my_bt_38_alpha_on(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EIN
    elm_win_alpha_set(win, EINA_TRUE);
 }
 
+/**
+ * @brief Callback function to disable alpha blending for the window.
+ * @param data The window object (Evas_Object *).
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 my_bt_38_alpha_off(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -31,6 +43,11 @@ my_bt_38_alpha_off(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EI
    elm_win_alpha_set(win, EINA_FALSE);
 }
 
+/**
+ * @brief Timer callback to activate a window.
+ * @param data The window object (Evas_Object *) to activate.
+ * @return ECORE_CALLBACK_CANCEL to stop the timer after execution.
+ */
 static Eina_Bool
 _activate_timer_cb(void *data)
 {
@@ -39,6 +56,11 @@ _activate_timer_cb(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Timer callback to deiconify (restore) a window.
+ * @param data The window object (Evas_Object *) to deiconify.
+ * @return ECORE_CALLBACK_CANCEL to stop the timer after execution.
+ */
 static Eina_Bool
 _deiconify_timer_cb(void *data)
 {
@@ -47,6 +69,11 @@ _deiconify_timer_cb(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Timer callback to show and activate a previously withdrawn window.
+ * @param data The window object (Evas_Object *) to show and activate.
+ * @return EINA_FALSE to stop the timer after execution.
+ */
 static Eina_Bool
 _unwith(void *data)
 {
@@ -56,6 +83,13 @@ _unwith(void *data)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Callback function to withdraw the window (make it hidden and unmanaged).
+ *        A timer is set to show and activate the window again after 10 seconds.
+ * @param data The window object (Evas_Object *).
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 my_bt_38_withdraw(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -65,6 +99,12 @@ my_bt_38_withdraw(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EIN
    ecore_timer_add(10.0, _unwith, win);
 }
 
+/**
+ * @brief Callback function to resize the window to a very large ("massive") size.
+ * @param data The window object (Evas_Object *).
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 my_bt_38_massive(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -73,12 +113,25 @@ my_bt_38_massive(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA
                            2400 * elm_config_scale_get());
 }
 
+/**
+ * @brief Callback function for a check button that toggles the 'rotate_with_resize' flag.
+ * @param data User data, typically the window object (unused in this function).
+ * @param obj The check button object.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 my_ck_38_resize(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    rotate_with_resize = elm_check_state_get(obj);
 }
 
+/**
+ * @brief Callback function to set the window rotation to 0 degrees.
+ *        It respects the 'rotate_with_resize' flag.
+ * @param data The window object (Evas_Object *).
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 my_bt_38_rot_0(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -89,6 +142,13 @@ my_bt_38_rot_0(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_U
      elm_win_rotation_set(win, 0);
 }
 
+/**
+ * @brief Callback function to set the window rotation to 90 degrees.
+ *        It respects the 'rotate_with_resize' flag.
+ * @param data The window object (Evas_Object *).
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 my_bt_38_rot_90(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -99,6 +159,13 @@ my_bt_38_rot_90(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_
      elm_win_rotation_set(win, 90);
 }
 
+/**
+ * @brief Callback function to set the window rotation to 180 degrees.
+ *        It respects the 'rotate_with_resize' flag.
+ * @param data The window object (Evas_Object *).
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 my_bt_38_rot_180(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -109,6 +176,13 @@ my_bt_38_rot_180(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA
      elm_win_rotation_set(win, 180);
 }
 
+/**
+ * @brief Callback function to set the window rotation to 270 degrees.
+ *        It respects the 'rotate_with_resize' flag.
+ * @param data The window object (Evas_Object *).
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 my_bt_38_rot_270(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -119,6 +193,12 @@ my_bt_38_rot_270(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA
      elm_win_rotation_set(win, 270);
 }
 
+/**
+ * @brief Callback function for a check button that toggles the window's fullscreen state.
+ * @param data The window object (Evas_Object *).
+ * @param obj The check button object.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 my_ck_38_fullscreen(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -127,6 +207,12 @@ my_ck_38_fullscreen(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_win_fullscreen_set(win, fullscreen);
 }
 
+/**
+ * @brief Callback function for a check button that toggles the window's borderless state.
+ * @param data The window object (Evas_Object *).
+ * @param obj The check button object.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 my_ck_38_borderless(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -135,6 +221,12 @@ my_ck_38_borderless(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_win_borderless_set(win, borderless);
 }
 
+/**
+ * @brief Callback function for a check button that toggles the window's floating mode.
+ * @param data The window object (Evas_Object *).
+ * @param obj The check button object.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 my_ck_38_floating(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -143,6 +235,13 @@ my_ck_38_floating(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_win_floating_mode_set(win, floating);
 }
 
+/**
+ * @brief Callback function for the "moved" smart event of a window.
+ *        Prints the new screen coordinates of the window.
+ * @param data User data associated with the callback (unused).
+ * @param obj The window object that was moved.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 my_win_move(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -151,6 +250,14 @@ my_win_move(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUS
    printf("MOVE - win geom: %4i %4i\n", x, y);
 }
 
+/**
+ * @brief Callback function for the EVAS_CALLBACK_RESIZE event of a window.
+ *        Prints the new width and height of the window.
+ * @param data User data associated with the callback (unused).
+ * @param e The Evas canvas (unused).
+ * @param obj The window object that was resized.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _win_resize(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -159,36 +266,74 @@ _win_resize(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void 
    printf("RESIZE - win geom: %4ix%4i\n", w, h);
 }
 
+/**
+ * @brief Callback function for the EVAS_CALLBACK_CANVAS_FOCUS_IN event.
+ *        Indicates that the canvas has gained focus.
+ * @param data User data associated with the callback (unused).
+ * @param e The Evas canvas (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _win_foc_in(void *data EINA_UNUSED, Evas *e EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("FOC IN\n");
 }
 
+/**
+ * @brief Callback function for the EVAS_CALLBACK_CANVAS_FOCUS_OUT event.
+ *        Indicates that the canvas has lost focus.
+ * @param data User data associated with the callback (unused).
+ * @param e The Evas canvas (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _win_foc_out(void *data EINA_UNUSED, Evas *e EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("FOC OUT\n");
 }
 
+/**
+ * @brief Callback function to delete/close a window.
+ * @param data The window object (Evas_Object *) to delete.
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _close_win(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    evas_object_del(data);
 }
 
+/**
+ * @brief Callback function to move the window to screen coordinates (20, 20).
+ * @param data The window object (Evas_Object *) to move.
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _move_20_20(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    evas_object_move(data, 20, 20);
 }
 
+/**
+ * @brief Callback function to move the window to screen coordinates (0, 0).
+ * @param data The window object (Evas_Object *) to move.
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _move_0_0(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    evas_object_move(data, 0, 0);
 }
 
+/**
+ * @brief Callback function to lower the window (send it to the bottom of the stacking order).
+ * @param data The window object (Evas_Object *) to lower.
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _bt_win_lower(void *data, Evas_Object *obj EINA_UNUSED,
               void *event_info EINA_UNUSED)
@@ -197,6 +342,12 @@ _bt_win_lower(void *data, Evas_Object *obj EINA_UNUSED,
    elm_win_lower(data);
 }
 
+/**
+ * @brief Callback function to iconify the window and then activate it after a delay.
+ * @param data The window object (Evas_Object *).
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _bt_win_iconify_and_activate(void *data, Evas_Object *obj EINA_UNUSED,
                              void *event_info EINA_UNUSED)
@@ -208,6 +359,12 @@ _bt_win_iconify_and_activate(void *data, Evas_Object *obj EINA_UNUSED,
    ecore_timer_add(5.0, _activate_timer_cb, data);
 }
 
+/**
+ * @brief Callback function to iconify the window and then deiconify it after a delay.
+ * @param data The window object (Evas_Object *).
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _bt_win_iconify_and_deiconify(void *data, Evas_Object *obj EINA_UNUSED,
                               void *event_info EINA_UNUSED)
@@ -219,6 +376,12 @@ _bt_win_iconify_and_deiconify(void *data, Evas_Object *obj EINA_UNUSED,
    ecore_timer_add(5.0, _deiconify_timer_cb, data);
 }
 
+/**
+ * @brief Callback function to center the window on the screen.
+ * @param data The window object (Evas_Object *) to center.
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _bt_win_center_cb(void *data, Evas_Object *obj EINA_UNUSED,
                   void *event_info EINA_UNUSED)
@@ -227,6 +390,12 @@ _bt_win_center_cb(void *data, Evas_Object *obj EINA_UNUSED,
    elm_win_center(data, EINA_TRUE, EINA_TRUE);
 }
 
+/**
+ * @brief Callback function to maximize the window.
+ * @param data The window object (Evas_Object *) to maximize.
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _bt_win_maximize(void *data, Evas_Object *obj EINA_UNUSED,
                  void *event_info EINA_UNUSED)
@@ -235,6 +404,12 @@ _bt_win_maximize(void *data, Evas_Object *obj EINA_UNUSED,
    elm_win_maximized_set(data, EINA_TRUE);
 }
 
+/**
+ * @brief Callback function to unmaximize (restore) the window.
+ * @param data The window object (Evas_Object *) to unmaximize.
+ * @param obj The button object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _bt_win_unmaximize(void *data, Evas_Object *obj EINA_UNUSED,
                  void *event_info EINA_UNUSED)
@@ -243,30 +418,75 @@ _bt_win_unmaximize(void *data, Evas_Object *obj EINA_UNUSED,
    elm_win_maximized_set(data, EINA_FALSE);
 }
 
+/**
+ * @brief Generic callback function to print a message associated with a window state change.
+ * @param data A string (char *) containing the message to print.
+ * @param obj The window object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _win_state_print_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("WIN: %s\n", (char *)data);
 }
 
+/**
+ * @brief Generic callback function to print a message associated with a window focus state change.
+ * @param data A string (char *) containing the message to print (e.g., "focused", "unfocused").
+ * @param obj The window object that triggered the callback (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _win_state_focus_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("WIN FOCUS: %s\n", (char *)data);
 }
 
+/**
+ * @brief Callback function for the EVAS_CALLBACK_SHOW event of a window.
+ *        Prints a message indicating the window is shown.
+ * @param data User data associated with the callback (unused).
+ * @param e The Evas canvas (unused).
+ * @param obj The window object that was shown (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _win_show(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("win: show\n");
 }
 
+/**
+ * @brief Callback function for the EVAS_CALLBACK_HIDE event of a window.
+ *        Prints a message indicating the window is hidden.
+ * @param data User data associated with the callback (unused).
+ * @param e The Evas canvas (unused).
+ * @param obj The window object that was hidden (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _win_hide(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("win: hide\n");
 }
 
+/**
+ * @brief Callback function for "pressed" events on buttons used for window move/resize.
+ *        This function initiates a window move or resize operation based on the
+ *        integer value passed in `data`.
+ * @param data An integer (cast from uintptr_t) indicating the type of move/resize:
+ *             - 1: Top-Left resize
+ *             - 2: Top resize
+ *             - 3: Top-Right resize
+ *             - 4: Left resize
+ *             - 5: Move
+ *             - 6: Right resize
+ *             - 7: Bottom-Left resize
+ *             - 8: Bottom resize
+ *             - 9: Bottom-Right resize
+ * @param obj The button object that was pressed.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _bt_pressed(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -322,6 +542,16 @@ _bt_pressed(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    fflush(stdout);
 }
 
+/**
+ * @brief Main test function for demonstrating various window states and operations.
+ *        Creates a window with buttons and checkboxes to trigger different
+ *        window manipulations like alpha, withdraw, rotation, fullscreen,
+ *        borderless, floating, move, resize, iconify, maximize, etc.
+ *        It also sets up callbacks to log window events.
+ * @param data Test data (unused).
+ * @param obj Parent object (unused).
+ * @param event_info Event information (unused).
+ */
 void
 test_win_state(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -683,6 +913,15 @@ test_win_state(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for an override-redirect window.
+ *        Creates a window with the override-redirect flag set, making it
+ *        unmanaged by the window manager. It includes controls for alpha,
+ *        closing, moving, and rotation.
+ * @param data Test data (unused).
+ * @param obj Parent object (unused).
+ * @param event_info Event information (unused).
+ */
 void
 test_win_state2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

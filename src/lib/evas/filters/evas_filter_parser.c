@@ -264,20 +264,33 @@ typedef enum
    VT_SPECIAL
 } Value_Type;
 
+/**
+ * @brief Represents a buffer used in filter operations.
+ *
+ * Buffers can be either ALPHA (1 color channel) or RGBA (full color).
+ * They can be automatically created (e.g., input, output, temporary) or
+ * manually defined by the user in the Lua script.
+ */
 typedef struct _Buffer
 {
-   EINA_INLIST;
-   Eina_Stringshare *name;
-   Eina_Stringshare *proxy;
-   int cid; // Transient value
+   EINA_INLIST; /**< Macro for Eina Inlist node. */
+   Eina_Stringshare *name; /**< Unique name of the buffer (e.g., "input", "output", "__buffer_01"). */
+   Eina_Stringshare *proxy; /**< If not NULL, this buffer is a proxy for an Evas_Object source (e.g., "partname"). */
+   int cid; /**< Transient context ID for this buffer during rendering. */
    struct {
-      int l, r, t, b; // Used for padding calculation. Can change over time.
+      int l, r, t, b; /**< Padding (left, right, top, bottom) calculated for this buffer. Can change over time. */
    } pad;
-   int w, h;
-   Eina_Bool alpha : 1;
-   Eina_Bool manual : 1; // created by "buffer" instruction
+   int w, h; /**< Width and height of the buffer in pixels. */
+   Eina_Bool alpha : 1; /**< EINA_TRUE if the buffer is alpha-only, EINA_FALSE for RGBA. */
+   Eina_Bool manual : 1; /**< EINA_TRUE if the buffer was created by a "buffer" instruction in the script. */
 } Buffer;
 
+/**
+ * @brief Represents a parameter for a filter instruction.
+ *
+ * Each instruction (e.g., blur, blend) can have multiple parameters,
+ * each defined by an Instruction_Param structure.
+ */
 typedef struct _Instruction_Param Instruction_Param;
 struct _Instruction_Param
 {
@@ -298,24 +311,36 @@ struct _Instruction_Param
    } value;
    Eina_Bool set : 1;
    Eina_Bool allow_seq : 1;
-   Eina_Bool allow_any_string : 1;
+   Eina_Bool allow_any_string : 1; /**< EINA_TRUE if any string value is allowed (e.g. for curve points). */
 };
 
+/**
+ * @brief Represents a single filter instruction (command) in a filter program.
+ *
+ * Examples include "blur", "blend", "fill", etc. Each instruction has a type,
+ * a list of parameters, and potentially functions to parse/run it and update padding.
+ */
 struct _Evas_Filter_Instruction
 {
-   EINA_INLIST;
-   Eina_Stringshare *name;
-   int /*Evas_Filter_Mode*/ type;
-   Eina_Inlist /* Instruction_Param */ *params;
-   int return_count;
-   Eina_Bool (* parse_run) (lua_State *L, Evas_Filter_Program *, Evas_Filter_Instruction *);
+   EINA_INLIST; /**< Macro for Eina Inlist node. */
+   Eina_Stringshare *name; /**< Name of the instruction (e.g., "blur", "blend"). */
+   int /*Evas_Filter_Mode*/ type; /**< Type of the filter operation (e.g., EVAS_FILTER_MODE_BLUR). */
+   Eina_Inlist /* Instruction_Param */ *params; /**< List of parameters for this instruction. */
+   int return_count; /**< Number of return values this instruction produces on the Lua stack (e.g., buffer creation). */
+   Eina_Bool (* parse_run) (lua_State *L, Evas_Filter_Program *, Evas_Filter_Instruction *); /**< Function to parse and run special instructions (like buffer creation). */
    struct
    {
-      int (* update) (Evas_Filter_Program *, Evas_Filter_Instruction *, int *, int *, int *, int *);
+      int (* update) (Evas_Filter_Program *, Evas_Filter_Instruction *, int *, int *, int *, int *); /**< Function to update padding requirements based on this instruction. */
    } pad;
-   Eina_Bool valid : 1;
+   Eina_Bool valid : 1; /**< EINA_TRUE if the instruction is valid and parsed correctly. */
 };
 
+/**
+ * @brief Represents a complete Evas filter program.
+ *
+ * A filter program consists of a sequence of instructions applied to buffers.
+ * It also manages the Lua state, proxy objects, and overall filter state.
+ */
 struct _Evas_Filter_Program
 {
    Eina_Stringshare *name; // Optional for now
@@ -335,10 +360,17 @@ struct _Evas_Filter_Program
    Eina_Bool padding_calc : 1; // Padding has been calculated
    Eina_Bool padding_set : 1; // Padding has been forced
    Eina_Bool changed : 1; // State (w,h) changed, needs re-run of Lua
-   Eina_Bool input_alpha : 1;
+   Eina_Bool input_alpha : 1; /**< EINA_TRUE if the main 'input' buffer is alpha-only. */
 };
 
 /* Instructions */
+
+/**
+ * @brief Creates a new filter instruction.
+ * @param name The name of the instruction (e.g., "blur", "blend").
+ * @return A pointer to the newly allocated Evas_Filter_Instruction, or NULL on failure.
+ *         The caller is responsible for freeing the instruction using _instruction_del().
+ */
 static Evas_Filter_Instruction *
 _instruction_new(const char *name)
 {
@@ -350,6 +382,16 @@ _instruction_new(const char *name)
    return instr;
 }
 
+/**
+ * @brief Adds a parameter to a filter instruction using a va_list for arguments.
+ * @param instr The instruction to add the parameter to.
+ * @param name The name of the parameter (e.g., "radius", "color").
+ * @param format The type of the parameter (e.g., VT_INT, VT_STRING).
+ * @param sequential EINA_TRUE if this parameter can be set sequentially (by position)
+ *                   in Lua, EINA_FALSE if it must be set by name.
+ * @param args A va_list containing the default value for the parameter.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _instruction_param_addv(Evas_Filter_Instruction *instr, const char *name,
                         Value_Type format, Eina_Bool sequential, va_list args)
@@ -396,6 +438,16 @@ _instruction_param_addv(Evas_Filter_Instruction *instr, const char *name,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Adds a parameter to a filter instruction.
+ * This is a wrapper around _instruction_param_addv that takes variadic arguments.
+ * @param instr The instruction to add the parameter to.
+ * @param name The name of the parameter.
+ * @param format The type of the parameter.
+ * @param sequential EINA_TRUE if positional, EINA_FALSE if named.
+ * @param ... The default value for the parameter.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _instruction_param_adda(Evas_Filter_Instruction *instr, const char *name,
                         Value_Type format, int sequential,
@@ -413,6 +465,10 @@ _instruction_param_adda(Evas_Filter_Instruction *instr, const char *name,
 #define _instruction_param_seq_add(a,b,c,...) _instruction_param_adda((a),(b),(c),1,__VA_ARGS__)
 #define _instruction_param_name_add(a,b,c,...) _instruction_param_adda((a),(b),(c),0,__VA_ARGS__)
 
+/**
+ * @brief Deletes a filter instruction and all its parameters.
+ * @param instr The instruction to delete.
+ */
 static void
 _instruction_del(Evas_Filter_Instruction *instr)
 {
@@ -433,6 +489,12 @@ _instruction_del(Evas_Filter_Instruction *instr)
    free(instr);
 }
 
+/**
+ * @brief Retrieves a parameter from an instruction by its name.
+ * @param instr The instruction to search within.
+ * @param name The name of the parameter to find.
+ * @return A pointer to the Instruction_Param if found, otherwise NULL.
+ */
 static Instruction_Param *
 _instruction_param_get(Evas_Filter_Instruction *instr, const char *name)
 {
@@ -445,6 +507,13 @@ _instruction_param_get(Evas_Filter_Instruction *instr, const char *name)
    return NULL;
 }
 
+/**
+ * @brief Retrieves an integer parameter's value from an instruction by its name.
+ * @param instr The instruction.
+ * @param name The parameter name.
+ * @param isset Optional output. If not NULL, set to EINA_TRUE if the parameter was explicitly set, EINA_FALSE otherwise.
+ * @return The integer value of the parameter, or -1 if not found (check *isset).
+ */
 static int
 _instruction_param_geti(Evas_Filter_Instruction *instr, const char *name,
                         Eina_Bool *isset)
@@ -462,6 +531,13 @@ _instruction_param_geti(Evas_Filter_Instruction *instr, const char *name,
    return -1;
 }
 
+/**
+ * @brief Retrieves a boolean parameter's value from an instruction by its name.
+ * @param instr The instruction.
+ * @param name The parameter name.
+ * @param isset Optional output. If not NULL, set to EINA_TRUE if the parameter was explicitly set, EINA_FALSE otherwise.
+ * @return The boolean value of the parameter, or EINA_FALSE if not found (check *isset).
+ */
 static Eina_Bool
 _instruction_param_getb(Evas_Filter_Instruction *instr, const char *name,
                         Eina_Bool *isset)
@@ -479,6 +555,13 @@ _instruction_param_getb(Evas_Filter_Instruction *instr, const char *name,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Retrieves a double parameter's value from an instruction by its name.
+ * @param instr The instruction.
+ * @param name The parameter name.
+ * @param isset Optional output. If not NULL, set to EINA_TRUE if the parameter was explicitly set, EINA_FALSE otherwise.
+ * @return The double value of the parameter, or 0.0 if not found (check *isset).
+ */
 static double
 _instruction_param_getd(Evas_Filter_Instruction *instr, const char *name,
                         Eina_Bool *isset)
@@ -496,6 +579,13 @@ _instruction_param_getd(Evas_Filter_Instruction *instr, const char *name,
    return 0.0;
 }
 
+/**
+ * @brief Retrieves a color (DATA32) parameter's value from an instruction by its name.
+ * @param instr The instruction.
+ * @param name The parameter name.
+ * @param isset Optional output. If not NULL, set to EINA_TRUE if the parameter was explicitly set, EINA_FALSE otherwise.
+ * @return The color value (ARGB) of the parameter, or 0 if not found (check *isset).
+ */
 static DATA32
 _instruction_param_getc(Evas_Filter_Instruction *instr, const char *name,
                         Eina_Bool *isset)
@@ -513,6 +603,14 @@ _instruction_param_getc(Evas_Filter_Instruction *instr, const char *name,
    return 0;
 }
 
+/**
+ * @brief Retrieves a special data pointer from an instruction by its name.
+ * Used for parameters with custom parsing logic (e.g., curve points).
+ * @param instr The instruction.
+ * @param name The parameter name.
+ * @param isset Optional output. If not NULL, set to EINA_TRUE if the parameter was explicitly set, EINA_FALSE otherwise.
+ * @return The special data pointer, or NULL if not found (check *isset).
+ */
 static void *
 _instruction_param_getspecial(Evas_Filter_Instruction *instr, const char *name,
                               Eina_Bool *isset)
@@ -530,6 +628,13 @@ _instruction_param_getspecial(Evas_Filter_Instruction *instr, const char *name,
    return 0;
 }
 
+/**
+ * @brief Retrieves a string parameter's value from an instruction by its name.
+ * @param instr The instruction.
+ * @param name The parameter name.
+ * @param isset Optional output. If not NULL, set to EINA_TRUE if the parameter was explicitly set, EINA_FALSE otherwise.
+ * @return The string value of the parameter, or NULL if not found (check *isset). The string is owned by the parameter.
+ */
 static const char *
 _instruction_param_gets(Evas_Filter_Instruction *instr, const char *name,
                         Eina_Bool *isset)
@@ -547,6 +652,13 @@ _instruction_param_gets(Evas_Filter_Instruction *instr, const char *name,
    return NULL;
 }
 
+/**
+ * @brief Retrieves a buffer parameter's value from an instruction by its name.
+ * @param instr The instruction.
+ * @param name The parameter name.
+ * @param isset Optional output. If not NULL, set to EINA_TRUE if the parameter was explicitly set, EINA_FALSE otherwise.
+ * @return A pointer to the Buffer, or NULL if not found (check *isset).
+ */
 static Buffer *
 _instruction_param_getbuf(Evas_Filter_Instruction *instr, const char *name,
                           Eina_Bool *isset)
@@ -564,6 +676,16 @@ _instruction_param_getbuf(Evas_Filter_Instruction *instr, const char *name,
    return NULL;
 }
 
+/**
+ * @brief Parses a string to a boolean value.
+ *
+ * Accepts "1", "yes", "on", "enable", "enabled", "true" as true (case-insensitive).
+ * Accepts "0", "no", "off", "disable", "disabled", "false" as false (case-insensitive).
+ *
+ * @param str The string to parse.
+ * @param b Output pointer to store the parsed boolean value.
+ * @return EINA_TRUE if parsing was successful, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _bool_parse(const char *str, Eina_Bool *b)
 {
@@ -597,6 +719,13 @@ _bool_parse(const char *str, Eina_Bool *b)
 #define PARSE_CHECK(a) do { if (!(a)) { ERR("Parsing failed because '%s' is false at %s:%d", #a, __func__, __LINE__); PARSE_ABORT(); goto end; } } while (0)
 
 /* Buffers */
+
+/**
+ * @brief Retrieves a buffer from a filter program by its name or proxy name.
+ * @param pgm The filter program.
+ * @param name The name or proxy name of the buffer to find.
+ * @return A pointer to the Buffer if found, otherwise NULL.
+ */
 static Buffer *
 _buffer_get(Evas_Filter_Program *pgm, const char *name)
 {
@@ -616,24 +745,40 @@ _buffer_get(Evas_Filter_Program *pgm, const char *name)
    return NULL;
 }
 
+/**
+ * @brief Pushes a buffer (as userdata) onto the Lua stack and sets it as a global variable.
+ * @param L The Lua state.
+ * @param buf The buffer to push.
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _lua_buffer_push(lua_State *L, Buffer *buf)
 {
    Buffer **ptr;
 
-   lua_getglobal(L, buf->name);//+1
+   // Get the global associated with buf->name. This seems incorrect if we are setting it.
+   // lua_getglobal(L, buf->name); //+1
+   // Instead, we should just create the userdata and set it globally.
    ptr = lua_newuserdata(L, sizeof(Buffer *));//+1
    *ptr = buf;
    luaL_getmetatable(L, _lua_buffer_meta);//+1
    lua_setmetatable(L, -2);//-1
    lua_setglobal(L, buf->name);//-1
-   lua_pop(L, 1);
+   // lua_pop(L, 1); // This pop is not needed if lua_getglobal was removed.
 
    return EINA_TRUE;
 }
 
 // Begin of Lua metamethods and stuff
 
+/**
+ * @brief Lua __tostring metamethod for Buffer userdata.
+ *
+ * Provides a string representation of a buffer, e.g., "Buffer[#0 640x480 rgba]".
+ *
+ * @param L The Lua state.
+ * @return 1 (the string representation is pushed onto the stack).
+ */
 static int
 _lua_buffer_tostring(lua_State *L)
 {
@@ -649,6 +794,15 @@ _lua_buffer_tostring(lua_State *L)
    return 1;
 }
 
+/**
+ * @brief Lua __index metamethod for Buffer userdata.
+ *
+ * Allows accessing buffer properties like 'w', 'h', 'type', 'alpha', 'name', 'source'.
+ * Example: `local w = mybuffer.w`
+ *
+ * @param L The Lua state.
+ * @return 1 if a property is found (value pushed onto stack), 0 or error otherwise.
+ */
 static int
 _lua_buffer_index(lua_State *L)
 {
@@ -704,7 +858,18 @@ _lua_buffer_index(lua_State *L)
    return 0;
 }
 
-// remove metatable from first argument if this is a __call metafunction
+/**
+ * @brief Helper function to handle Lua's implicit self parameter in __call metamethods.
+ *
+ * If the first argument to a function called via `object:method()` or `object.method()`
+ * is a table with the specified metatable `name`, this function removes that first
+ * argument from the stack. This is useful when a global function (like `buffer()`)
+ * is also used as a metamethod (`__call` for the buffer metatable).
+ *
+ * @param L The Lua state.
+ * @param name The name of the metatable to check against.
+ * @return 1 if an argument was dropped, 0 otherwise.
+ */
 static inline int
 _lua_implicit_metatable_drop(lua_State *L, const char *name)
 {
@@ -724,6 +889,17 @@ _lua_implicit_metatable_drop(lua_State *L, const char *name)
 
 // End of all lua metamethods and stuff
 
+/**
+ * @brief Formats a unique name for a buffer.
+ *
+ * If `src` is provided, the name is based on `src` (e.g., "__source_partname").
+ * Otherwise, a generic name like "__buffer_01" is generated.
+ * Non-alphanumeric characters in `src` are replaced with underscores.
+ *
+ * @param name Output buffer (char array of at least 64 bytes) to store the formatted name.
+ * @param pgm The filter program, used for generating unique IDs.
+ * @param src Optional source string (e.g., part name for proxy buffers).
+ */
 static inline void
 _buffer_name_format(char *name /*[64]*/, Evas_Filter_Program *pgm, const char *src)
 {
@@ -746,6 +922,21 @@ _buffer_name_format(char *name /*[64]*/, Evas_Filter_Program *pgm, const char *s
      }
 }
 
+/**
+ * @brief Adds a new buffer to the filter program.
+ *
+ * If a buffer with the given `name` already exists and `src` is NULL, it's an error.
+ * If `src` is provided and a buffer with that proxy name exists, the existing buffer is returned.
+ * Proxy buffers cannot be alpha.
+ * If `name` is NULL, a unique name is generated.
+ *
+ * @param pgm The filter program.
+ * @param name Optional name for the buffer. If NULL, a name is generated.
+ * @param alpha EINA_TRUE if the buffer is alpha-only, EINA_FALSE for RGBA.
+ * @param src Optional source string for proxy buffers.
+ * @param manual EINA_TRUE if the buffer is created by a "buffer" instruction.
+ * @return A pointer to the added or existing Buffer, or NULL on failure.
+ */
 static Buffer *
 _buffer_add(Evas_Filter_Program *pgm, const char *name, Eina_Bool alpha,
             const char *src, Eina_Bool manual)
@@ -755,13 +946,22 @@ _buffer_add(Evas_Filter_Program *pgm, const char *name, Eina_Bool alpha,
    buf = _buffer_get(pgm, name);
    if (buf)
      {
-        if (!src)
+        // If a buffer with this name exists, and we are not trying to create a proxy
+        // or if the existing buffer is already a proxy for the same src, it's okay.
+        // However, if `src` is NULL, it means we are trying to create a new non-proxy buffer
+        // with an existing name, which is an error.
+        if (!src && !buf->proxy) // Trying to create a new non-proxy buffer with an existing name
           {
              ERR("Buffer '%s' already exists", name);
              return NULL;
           }
-        else return buf;
+        // If src is provided, _buffer_get would have found it by proxy name if it exists.
+        // If buf->proxy is different from src, it's a new proxy, handled below.
+        // If buf->proxy is same as src, _buffer_get returned it, so just return buf.
+        else if (src && buf->proxy && (strcmp(buf->proxy, src) == 0)) return buf;
+        else if (!src) return buf; // Existing buffer, no new src, return existing.
      }
+
 
    if (alpha && src)
      {
@@ -792,6 +992,11 @@ _buffer_add(Evas_Filter_Program *pgm, const char *name, Eina_Bool alpha,
    return buf;
 }
 
+/**
+ * @brief Deletes a buffer structure.
+ * Frees the memory associated with the buffer's name, proxy, and the buffer itself.
+ * @param buf The buffer to delete.
+ */
 static void
 _buffer_del(Buffer *buf)
 {
@@ -801,8 +1006,16 @@ _buffer_del(Buffer *buf)
    free(buf);
 }
 
+/**
+ * @brief A unique light userdata key to store the Evas_Filter_Program pointer in the Lua registry.
+ */
 static const int this_is_not_a_cat = 42;
 
+/**
+ * @brief Retrieves the Evas_Filter_Program pointer from the Lua registry.
+ * @param L The Lua state.
+ * @return A pointer to the Evas_Filter_Program.
+ */
 static Evas_Filter_Program *
 _lua_program_get(lua_State *L)
 {

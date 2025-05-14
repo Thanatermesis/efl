@@ -1,3 +1,11 @@
+/**
+ * @file
+ * @brief This file contains the implementation of the Efl.Ui.Scroller widget.
+ *
+ * The scroller widget provides a scrollable view for its content.
+ * It handles user input for scrolling and manages the visibility of scrollbars.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include "elementary_config.h"
 #endif
@@ -31,11 +39,29 @@
 
 static Eina_Bool _key_action_move(Evas_Object *obj, const char *params);
 
+/**
+ * @brief Array of key actions supported by the scroller.
+ *
+ * Currently, only "move" is supported.
+ */
 static const Elm_Action key_actions[] = {
    {"move", _key_action_move},
    {NULL, NULL}
 };
 
+/**
+ * @brief Handles the "move" key action for the scroller.
+ *
+ * This function processes keyboard input to scroll the content or move focus
+ * within the scroller. It determines the direction of movement based on the
+ * `params` argument and adjusts the scroll position or focus accordingly.
+ *
+ * @param obj The scroller widget object.
+ * @param params A string indicating the direction of movement.
+ *        Possible values: "prior", "next", "left", "right", "up", "down",
+ *        "first", "last".
+ * @return @c EINA_TRUE if the key action was handled, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _key_action_move(Eo *obj, const char *params)
 {
@@ -147,7 +173,14 @@ _key_action_move(Eo *obj, const char *params)
    return EINA_TRUE;
 }
 
-
+/**
+ * @brief Callback function invoked when the scroller's content is deleted.
+ *
+ * This function unsets the content from the scroller.
+ *
+ * @param data The scroller widget object (passed as user data).
+ * @param event The Efl_Event details (unused).
+ */
 static void
 _efl_ui_scroller_content_del_cb(void *data,
                                 const Efl_Event *event EINA_UNUSED)
@@ -155,6 +188,18 @@ _efl_ui_scroller_content_del_cb(void *data,
    efl_content_unset(data);
 }
 
+/**
+ * @internal
+ * @brief Sets the content of the scroller.
+ * @param obj The scroller object.
+ * @param sd The scroller's private data.
+ * @param content The Evas_Object to set as content.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ *
+ * This function handles setting new content for the scroller. It manages
+ * the previous content, adds the new content as a sub-object, and
+ * sets up necessary event callbacks.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_scroller_efl_content_content_set(Eo *obj,
                                            Efl_Ui_Scroller_Data *sd,
@@ -189,12 +234,29 @@ _efl_ui_scroller_efl_content_content_set(Eo *obj,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Gets the content of the scroller.
+ * @param obj The scroller object (unused).
+ * @param pd The scroller's private data.
+ * @return The Evas_Object set as content, or @c NULL if no content is set.
+ */
 EOLIAN static Efl_Gfx_Entity*
 _efl_ui_scroller_efl_content_content_get(const Eo *obj EINA_UNUSED, Efl_Ui_Scroller_Data *pd)
 {
    return pd->content;
 }
 
+/**
+ * @internal
+ * @brief Unsets the content of the scroller.
+ * @param obj The scroller object.
+ * @param pd The scroller's private data.
+ * @return The previously set Evas_Object content, or @c NULL if no content was set.
+ *
+ * This function removes the current content from the scroller, cleans up
+ * associated resources, and updates scrollbar visibility.
+ */
 EOLIAN static Efl_Gfx_Entity*
 _efl_ui_scroller_efl_content_content_unset(Eo *obj EINA_UNUSED, Efl_Ui_Scroller_Data *pd)
 {
@@ -213,6 +275,15 @@ _efl_ui_scroller_efl_content_content_unset(Eo *obj EINA_UNUSED, Efl_Ui_Scroller_
    return old_content;
 }
 
+/**
+ * @brief Callback function invoked when the scroller's pan object is resized.
+ *
+ * This function triggers a recalculation or marks the scroller for a change
+ * if the Evas scene is currently calculating object geometry.
+ *
+ * @param data The scroller widget object (passed as user data).
+ * @param ev The Efl_Event details (unused).
+ */
 static void
 _efl_ui_scroller_pan_resized_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -222,6 +293,15 @@ _efl_ui_scroller_pan_resized_cb(void *data, const Efl_Event *ev EINA_UNUSED)
      efl_canvas_group_change(data);
 }
 
+/**
+ * @brief Callback function invoked when the focus within the scroller's focus manager changes.
+ *
+ * This function ensures that the newly focused element is visible within the
+ * scroller's viewport by scrolling to it if necessary.
+ *
+ * @param data The scroller widget object (passed as user data).
+ * @param event The Efl_Event details, where event->object is the focus manager.
+ */
 static void
 _focused_element(void *data, const Efl_Event *event)
 {
@@ -241,6 +321,16 @@ _focused_element(void *data, const Efl_Event *event)
    efl_ui_scrollable_scroll(obj, geom, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Constructor for the Efl.Ui.Scroller object.
+ * @param obj The scroller object being constructed.
+ * @param sd The scroller's private data.
+ * @return The constructed scroller object.
+ *
+ * Initializes the scroller, sets its theme class, creates and attaches
+ * the scroll manager, and binds the scroll connector.
+ */
 EOLIAN static Eo *
 _efl_ui_scroller_efl_object_constructor(Eo *obj,
                                         Efl_Ui_Scroller_Data *sd)
@@ -258,6 +348,17 @@ _efl_ui_scroller_efl_object_constructor(Eo *obj,
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Finalizes the Efl.Ui.Scroller object.
+ * @param obj The scroller object being finalized.
+ * @param sd The scroller's private data.
+ * @return The finalized scroller object.
+ *
+ * Completes the initialization of the scroller. This includes creating the
+ * pan object, setting it to the scroll manager, enabling focus, and
+ * setting up event callbacks for pan resize and focus changes.
+ */
 EOLIAN static Eo *
 _efl_ui_scroller_efl_object_finalize(Eo *obj,
                                      Efl_Ui_Scroller_Data *sd)
@@ -280,6 +381,15 @@ _efl_ui_scroller_efl_object_finalize(Eo *obj,
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Invalidates the Efl.Ui.Scroller object.
+ * @param obj The scroller object being invalidated.
+ * @param pd The scroller's private data.
+ *
+ * Cleans up resources before the object is fully destructed. This primarily
+ * involves deleting the pan object and its associated event callbacks.
+ */
 EOLIAN static void
 _efl_ui_scroller_efl_object_invalidate(Eo *obj, Efl_Ui_Scroller_Data *pd)
 {
@@ -292,6 +402,14 @@ _efl_ui_scroller_efl_object_invalidate(Eo *obj, Efl_Ui_Scroller_Data *pd)
    efl_invalidate(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Destructor for the Efl.Ui.Scroller object.
+ * @param obj The scroller object being destructed.
+ * @param sd The scroller's private data.
+ *
+ * Performs final cleanup, including unbinding the scroll connector.
+ */
 EOLIAN static void
 _efl_ui_scroller_efl_object_destructor(Eo *obj,
                                        Efl_Ui_Scroller_Data *sd)
@@ -302,6 +420,16 @@ _efl_ui_scroller_efl_object_destructor(Eo *obj,
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Calculates the size of the scroller group.
+ * @param obj The scroller object.
+ * @param sd The scroller's private data.
+ *
+ * This function determines the scroller's size based on its content's
+ * minimum and maximum size hints, weight hints, and the viewport geometry.
+ * It also considers whether the scroller should match its content's width or height.
+ */
 EOLIAN static void
 _efl_ui_scroller_efl_canvas_group_group_calculate(Eo *obj, Efl_Ui_Scroller_Data *sd)
 {
@@ -358,6 +486,16 @@ _efl_ui_scroller_efl_canvas_group_group_calculate(Eo *obj, Efl_Ui_Scroller_Data 
    efl_gfx_hint_size_restricted_min_set(obj, size);
 }
 
+/**
+ * @internal
+ * @brief Applies the theme to the scroller widget.
+ * @param obj The scroller object.
+ * @param sd The scroller's private data.
+ * @return An Eina_Error code indicating success or failure.
+ *
+ * Applies the theme from the superclass and then updates the mirrored
+ * state of the scroll manager.
+ */
 EOLIAN static Eina_Error
 _efl_ui_scroller_efl_ui_widget_theme_apply(Eo *obj, Efl_Ui_Scroller_Data *sd)
 {
@@ -370,6 +508,18 @@ _efl_ui_scroller_efl_ui_widget_theme_apply(Eo *obj, Efl_Ui_Scroller_Data *sd)
    return int_ret;
 }
 
+/**
+ * @internal
+ * @brief Sets whether the scroller should match its content's width and/or height.
+ * @param obj The scroller object (unused).
+ * @param sd The scroller's private data.
+ * @param match_content_w If @c EINA_TRUE, the scroller's width will match its content's width.
+ * @param match_content_h If @c EINA_TRUE, the scroller's height will match its content's height.
+ *
+ * This function updates the internal flags for matching content dimensions
+ * and propagates these settings to the scroll manager. It then triggers
+ * a recalculation of the scroller's layout.
+ */
 EOLIAN static void
 _efl_ui_scroller_efl_ui_scrollable_match_content_set(Eo *obj EINA_UNUSED,
                                                                  Efl_Ui_Scroller_Data *sd,
@@ -384,6 +534,19 @@ _efl_ui_scroller_efl_ui_scrollable_match_content_set(Eo *obj EINA_UNUSED,
    efl_canvas_group_change(obj);
 }
 
+/**
+ * @internal
+ * @brief Applies the focus state to the scroller widget.
+ * @param obj The scroller object.
+ * @param pd The scroller's private data (unused).
+ * @param current_state The current focus state of the widget.
+ * @param configured_state Pointer to the focus state to be configured.
+ * @param redirect The widget to redirect focus to (unused here, scroller handles its own focus).
+ * @return @c EINA_TRUE if the focus state was successfully applied by the superclass.
+ *
+ * This function configures the scroller to always handle logical focus itself.
+ * It then calls the superclass's implementation to apply the focus state.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_scroller_efl_ui_widget_focus_state_apply(Eo *obj, Efl_Ui_Scroller_Data *pd EINA_UNUSED, Efl_Ui_Widget_Focus_State current_state, Efl_Ui_Widget_Focus_State *configured_state, Efl_Ui_Widget *redirect EINA_UNUSED)
 {
@@ -392,6 +555,18 @@ _efl_ui_scroller_efl_ui_widget_focus_state_apply(Eo *obj, Efl_Ui_Scroller_Data *
    return efl_ui_widget_focus_state_apply(efl_super(obj, MY_CLASS), current_state, configured_state, obj);
 }
 
+/**
+ * @internal
+ * @brief Creates a focus manager for the scroller widget.
+ * @param obj The scroller object.
+ * @param pd The scroller's private data (unused).
+ * @param root The root focus object for the new manager.
+ * @return The newly created Efl_Ui_Focus_Manager.
+ *
+ * This function creates a specific type of focus manager
+ * (EFL_UI_FOCUS_MANAGER_ROOT_FOCUS_CLASS) for the scroller,
+ * associating it with the provided root focus object.
+ */
 EOLIAN static Efl_Ui_Focus_Manager*
 _efl_ui_scroller_efl_ui_widget_focus_manager_focus_manager_create(Eo *obj, Efl_Ui_Scroller_Data *pd EINA_UNUSED, Efl_Ui_Focus_Object *root)
 {

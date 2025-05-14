@@ -18,53 +18,87 @@ Eina_Bool grid_state_get(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                          const char *part EINA_UNUSED);
 void grid_del(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED);
 
+/**
+ * @brief Structure to hold data for each gengrid item.
+ *
+ * This structure is used as the data payload for each item created in the
+ * gengrid. It contains all the necessary information to render and manage
+ * the state of an item.
+ */
 typedef struct _Item_Data
 {
-   Elm_Object_Item *item;
-   const char *path;
-   int mode;
-   int onoff;
+   Elm_Object_Item *item; /**< A handle to the gengrid item itself. */
+   const char *path;      /**< Filesystem path to the image to be displayed. */
+   int mode;              /**< An application-specific mode integer. */
+   int onoff;             /**< State for a check widget inside the item (0 or 1). */
 } Item_Data;
 
+/**
+ * @brief Holds data for the API testing UI.
+ *
+ * This structure maintains the state and object references needed for the
+ * automated API tests that are cycled through using a button.
+ */
 struct _api_data
 {
-   unsigned int state;  /* What state we are testing       */
-   Evas_Object *box;           /* Use this to get box content     */
-   Evas_Object *grid;
-   Evas_Object *grid2;
-   Evas_Object *bt;           /* Use this to get button content     */
-   Elm_Gengrid_Item_Field_Type field_type;
+   unsigned int state;  /**< The current step in the API test sequence. See _api_state. */
+   Evas_Object *box;           /**< The main container box for the UI. */
+   Evas_Object *grid;          /**< The primary gengrid widget under test. */
+   Evas_Object *grid2;         /**< A secondary gengrid widget, if needed for a test. */
+   Evas_Object *bt;            /**< The button used to advance to the next API test. */
+   Elm_Gengrid_Item_Field_Type field_type; /**< Flags for which item fields to update. */
 };
 typedef struct _api_data api_data;
 
+/**
+ * @brief Data for testing item show/bring_in functionality.
+ *
+ * This structure is used in test_gengrid4 to manage the state for testing
+ * how items are scrolled into view.
+ */
 struct _Show_Data
 {
-   int scrollto;
-   Evas_Object *grid;
+   int scrollto;         /**< The scrollto policy, e.g., ELM_GENGRID_ITEM_SCROLLTO_IN. */
+   Evas_Object *grid;      /**< The gengrid widget being tested. */
 };
 typedef struct _Show_Data Show_Data;
 
+/**
+ * @brief Defines the sequence of API function tests.
+ *
+ * Each value corresponds to a specific gengrid function call that will be
+ * tested when the user clicks the "Next API function" button.
+ */
 enum _api_state
 {
-   GRID_ALIGN_SET,
-   GRID_BRING_IN,
-   GRID_NO_SELECT_MODE,
-   GRID_NO_BOUNCE,
-   GRID_PAGE_RELATIVE,
-   GRID_PAGE_SIZE,
-   GRID_TOOLTIP_SET_TEXT,
-   GRID_TOOLTIP_UNSET,
-   GRID_ITEM_CLASS_SET,
-   GRID_ITEM_UPDATE_SET,
-   GRID_PAGE_BRING_IN,
-   GRID_PAGE_SHOW,
-   GRID_TOOLTIP_CONTENT_CB,
-   GRID_TOOLTIP_STYLE_SET,
-   GRID_TOOLTIP_WINDOW_MODE_SET,
-   API_STATE_LAST
+   GRID_ALIGN_SET,                 /**< Test elm_gengrid_align_set(). */
+   GRID_BRING_IN,                  /**< Test elm_gengrid_item_bring_in(). */
+   GRID_NO_SELECT_MODE,            /**< Test elm_gengrid_select_mode_set() with NONE. */
+   GRID_NO_BOUNCE,                 /**< Test elm_scroller_bounce_set() to disable vertical bounce. */
+   GRID_PAGE_RELATIVE,             /**< Test elm_scroller_page_relative_set(). */
+   GRID_PAGE_SIZE,                 /**< Test elm_scroller_page_size_set(). */
+   GRID_TOOLTIP_SET_TEXT,          /**< Test elm_gengrid_item_tooltip_text_set(). */
+   GRID_TOOLTIP_UNSET,             /**< Test elm_gengrid_item_tooltip_unset(). */
+   GRID_ITEM_CLASS_SET,            /**< Test for setting an item class. */
+   GRID_ITEM_UPDATE_SET,           /**< Test for updating an item. */
+   GRID_PAGE_BRING_IN,             /**< Test for bringing a page into view. */
+   GRID_PAGE_SHOW,                 /**< Test for showing a specific page. */
+   GRID_TOOLTIP_CONTENT_CB,        /**< Test for setting tooltip content via callback. */
+   GRID_TOOLTIP_STYLE_SET,         /**< Test for setting a tooltip style. */
+   GRID_TOOLTIP_WINDOW_MODE_SET,   /**< Test for setting tooltip window mode. */
+   API_STATE_LAST                  /**< Marker for the end of the test sequence. */
 };
 typedef enum _api_state api_state;
 
+/**
+ * @brief Apply a gengrid API function test based on the current state.
+ *
+ * This function is called to execute a specific test on the gengrid widget.
+ * It uses the state from the `api_data` structure to determine which
+ * function to call.
+ *
+ * @param api The API test data containing the current state and widgets.
+ */
 static void
 set_api_state(api_data *api)
 {
@@ -120,10 +154,20 @@ set_api_state(api_data *api)
      }
 }
 
+/**
+ * @brief Callback for the "Next API function" button.
+ *
+ * This function is triggered on a button click. It advances the API test
+ * state, calls set_api_state() to apply the test, and updates the button
+ * text to reflect the next test.
+ *
+ * @param data The api_data struct.
+ * @param obj The button that was clicked.
+ * @param event_info Evas event info (unused).
+ */
 static void
 _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
-{  /* Will add here a SWITCH command containing code to modify test-object */
-   /* in accordance a->state value. */
+{
    api_data *a = data;
    char str[128];
 
@@ -135,6 +179,13 @@ _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_disabled_set(obj, a->state == API_STATE_LAST);
 }
 
+/**
+ * @brief An array of image file names used to populate the gengrid.
+ *
+ * These are example images that are cycled through when creating items.
+ * The array contains 9 strings, with example contents like:
+ * `{"panel_01.jpg", "plant_01.jpg", ...}`
+ */
 static const char *img[9] =
 {
    "panel_01.jpg",
@@ -148,6 +199,13 @@ static const char *img[9] =
    "wood_01.jpg",
 };
 
+/**
+ * @brief An array of cursor names used for item cursor tests.
+ *
+ * These are predefined cursor strings from Elementary used to set custom
+ * cursors on gengrid items. The array contains 4 strings, with example
+ * contents like: `{ELM_CURSOR_CIRCLE, ELM_CURSOR_CLOCK, ...}`
+ */
 static const char *cur[4] =
 {
    ELM_CURSOR_CIRCLE,
@@ -157,6 +215,16 @@ static const char *cur[4] =
 };
 
 static int n_current_pic = 0;
+/**
+ * @brief Toggles the horizontal mode of the gengrid.
+ *
+ * This callback responds to a check box. When checked, it sets the gengrid
+ * layout to horizontal, and when unchecked, to vertical.
+ *
+ * @param data The gengrid widget.
+ * @param obj The check box that triggered the event.
+ * @param event_info Evas event info (unused).
+ */
 static void
 _horizontal_grid(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -164,6 +232,16 @@ _horizontal_grid(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_gengrid_horizontal_set(grid, elm_check_state_get(obj));
 }
 
+/**
+ * @brief Toggles item looping on the gengrid.
+ *
+ * This callback responds to a check box. When checked, it enables circular
+ * item navigation (looping) in the gengrid.
+ *
+ * @param data The gengrid widget.
+ * @param obj The check box that triggered the event.
+ * @param event_info Evas event info (unused).
+ */
 static void
 _item_loop_enable_changed_cb(void *data, Evas_Object *obj,
                              void *event_info  EINA_UNUSED)
@@ -172,6 +250,16 @@ _item_loop_enable_changed_cb(void *data, Evas_Object *obj,
    elm_object_scroll_item_loop_enabled_set(grid, elm_check_state_get(obj));
 }
 
+/**
+ * @brief Toggles the focus highlight for the window.
+ *
+ * This callback responds to a check box and enables or disables the visual
+ * highlight for focused widgets within the window.
+ *
+ * @param data The window widget.
+ * @param obj The check box that triggered the event.
+ * @param event_info Evas event info (unused).
+ */
 static void
 _focus_highlight_changed_cb(void *data, Evas_Object *obj,
                             void *event_info EINA_UNUSED)
@@ -179,12 +267,24 @@ _focus_highlight_changed_cb(void *data, Evas_Object *obj,
    elm_win_focus_highlight_enabled_set(data, elm_check_state_get(obj));
 }
 
+/**
+ * @brief Callback for the 'drag,start,up' smart event.
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Information about the event.
+ */
 static void
 grid_drag_up(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
    printf("Drag up: %p\n", event_info);
 }
 
+/**
+ * @brief Callback for the 'drag,start,right' smart event.
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Information about the event.
+ */
 static void
 grid_drag_right(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -209,6 +309,12 @@ grid_drag_stop(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event
    printf("Drag stop: %p\n", event_info);
 }
 
+/**
+ * @brief Callback for the 'selected' smart event.
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info The selected item.
+ */
 static void
 grid_selected(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -257,6 +363,16 @@ grid_moved(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_inf
    printf("moved %p\n", event_info);
 }
 
+/**
+ * @brief Callback for the 'changed' event of a check widget inside a gengrid item.
+ *
+ * This function updates the onoff state in the item's data when the user
+ * toggles the checkbox.
+ *
+ * @param data The Item_Data associated with the gengrid item.
+ * @param obj The check widget that was changed.
+ * @param event_info Evas event info (unused).
+ */
 static void
 grid_item_check_changed(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -265,6 +381,18 @@ grid_item_check_changed(void *data, Evas_Object *obj, void *event_info EINA_UNUS
    printf("item %p onoff = %i\n", id, id->onoff);
 }
 
+/**
+ * @brief Gengrid item class function to get the text for an item.
+ *
+ * This function is called by the gengrid to get the string to be displayed
+ * as the label for a given item. The returned string must be allocated with
+ * strdup() or malloc() and will be freed by the caller.
+ *
+ * @param data The Item_Data for the gengrid item.
+ * @param obj The gengrid widget (unused).
+ * @param part The theme part name for the text (unused).
+ * @return A newly allocated string for the item's label.
+ */
 char *
 grid_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
@@ -274,6 +402,17 @@ grid_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UN
    return strdup(buf);
 }
 
+/**
+ * @brief Gengrid item class function to get the content for an item.
+ *
+ * This function is called by the gengrid to get a swallowable Evas_Object
+ * for a given part of the item's layout (e.g., an icon).
+ *
+ * @param data The Item_Data for the gengrid item.
+ * @param obj The parent gengrid item object.
+ * @param part The theme part name to swallow the content into, e.g., "elm.swallow.icon".
+ * @return A new Evas_Object to be displayed, or NULL if none.
+ */
 Evas_Object *
 grid_content_get(void *data, Evas_Object *obj, const char *part)
 {
@@ -298,24 +437,65 @@ grid_content_get(void *data, Evas_Object *obj, const char *part)
    return NULL;
 }
 
+/**
+ * @brief Gengrid item class function to get the state of an item.
+ *
+ * This function is called by the gengrid to query a boolean state for a given
+ * part of the item, such as "selected". In this test, it always returns false.
+ *
+ * @param data The item data (unused).
+ * @param obj The gengrid item object (unused).
+ * @param part The theme part name for the state (unused).
+ * @return EINA_FALSE always.
+ */
 Eina_Bool
 grid_state_get(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
    return EINA_FALSE;
 }
 
+/**
+ * @brief Gengrid item class function to free item data.
+ *
+ * This function is called when a gengrid item is deleted. It is responsible
+ * for freeing the memory allocated for the item's data structure.
+ *
+ * @param data The Item_Data to be freed.
+ * @param obj The gengrid widget (unused).
+ */
 void
 grid_del(void *data, Evas_Object *obj EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Callback for when a gengrid item is selected.
+ *
+ * This function is registered as the selection callback when items are
+ * appended to the gengrid. It prints information about the selected item.
+ *
+ * @param data The custom data pointer provided when the item was created.
+ * @param obj The gengrid widget.
+ * @param event_info A pointer to the selected Elm_Object_Item.
+ */
 static void
 grid_sel(void *data, Evas_Object *obj, void *event_info)
 {
    printf("sel item data [%p] on grid obj [%p], pointer [%p], position [%d]\n", data, obj, event_info, elm_gengrid_item_index_get(event_info));
 }
 
+/**
+ * @brief Callback to free allocated data when a window is destroyed.
+ *
+ * This is typically connected to the EVAS_CALLBACK_FREE event of a window
+ * to clean up any context data associated with that test.
+ *
+ * @param data The data to be freed.
+ * @param e The Evas canvas (unused).
+ * @param obj The object being freed (unused).
+ * @param event_info Evas event info (unused).
+ */
 static void
 _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

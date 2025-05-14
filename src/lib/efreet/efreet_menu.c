@@ -18,165 +18,234 @@ static int _efreet_menu_log_dom = -1;
 
 typedef struct Efreet_Menu_Move Efreet_Menu_Move;
 
+/**
+ * @struct Efreet_Menu_Move
+ * @brief Represents a move operation for a menu item from an old path to a new path.
+ *
+ * This structure is used internally to track menu item relocations specified
+ * within .menu files, typically via `<Move>` tags.
+ */
 struct Efreet_Menu_Move
 {
-    const char *old_name;     /**< The menu path to move from */
-    const char *new_name;     /**< The menu path to move too */
+    const char *old_name;     /**< The original hierarchical path of the menu or item to be moved. e.g., "Applications/OldCategory/Item" */
+    const char *new_name;     /**< The new hierarchical path where the menu or item should be moved. e.g., "Applications/NewCategory/Item" */
 };
 
 typedef struct Efreet_Menu_Internal Efreet_Menu_Internal;
 
+/**
+ * @struct Efreet_Menu_Internal
+ * @brief Internal representation of a menu during parsing and processing.
+ *
+ * This structure holds all the information parsed from a .menu file and
+ * its associated files (merged files, directories, .desktop files). It's
+ * a temporary structure used to build the final Efreet_Menu.
+ */
 struct Efreet_Menu_Internal
 {
+    /** Information about the menu file being processed. */
     struct
     {
-        const char *path;         /**< The base file path */
-        const char *name;         /**< The filename for this menu */
-    } file;                 /**< The menu file information */
+        const char *path;         /**< The base directory path of the menu file. e.g., "/usr/share/menus" */
+        const char *name;         /**< The filename of this menu. e.g., "applications.menu" */
+    } file;
 
+    /** Names associated with this menu. */
     struct
     {
-        const char *internal;     /**< The menu name */
-        const char *name;         /**< Name to use in the menus */
-    } name;                       /**< The names for this menu */
+        const char *internal;     /**< The internal name of the menu, from the <Name> tag. e.g., "Graphics" */
+        const char *name;         /**< The display name for this menu, often derived from a .directory file or the internal name. */
+    } name;
 
-    Eina_Hash *efreet_merged_menus; /**< Merged menus */
-    Eina_Hash *efreet_merged_dirs; /**< Merged dirs */
+    Eina_Hash *efreet_merged_menus; /**< Hash table to track already merged menu files to prevent duplicate merges. Keys are file paths. */
+    Eina_Hash *efreet_merged_dirs;  /**< Hash table to track already merged menu directories. Keys are directory paths. */
 
-    Efreet_Desktop *directory; /**< The directory */
-    Eina_List *directories;  /**< All the directories set in the menu file */
+    Efreet_Desktop *directory; /**< The Efreet_Desktop entry corresponding to the .directory file for this menu, if any. */
+    Eina_List *directories;  /**< List of directory paths (const char *) specified by <Directory> tags. */
 
-    Efreet_Menu_Move *current_move; /**< The current move */
+    Efreet_Menu_Move *current_move; /**< Temporary storage for the current <Move> operation being parsed. */
 
-    Eina_List *app_dirs;           /**< .desktop application directories */
+    Eina_List *app_dirs;           /**< List of Efreet_Menu_App_Dir structures representing application directories to scan for .desktop files. */
 
-    Eina_List *app_pool;           /**< application pool */
-    Eina_List *applications;       /**< applications in this menu */
+    Eina_List *app_pool;           /**< List of Efreet_Menu_Desktop structures representing all .desktop files found in app_dirs relevant to this menu and its children. */
+    Eina_List *applications;       /**< List of Efreet_Menu_Desktop structures representing .desktop files that belong to this specific menu after filtering. */
 
-    Eina_List *directory_dirs;    /**< .directory file directories */
-    Eina_Hash *directory_cache;    /**< .directory dirs */
+    Eina_List *directory_dirs;    /**< List of paths (const char *) to .directory file directories. */
+    Eina_Hash *directory_cache;    /**< Cache of Efreet_Desktop entries for .directory files. Keys are relative paths, values are Efreet_Desktop pointers. */
 
-    Eina_List *moves;              /**< List of moves to be handled by the menu */
-    Eina_List *filters;            /**< Include and Exclude filters */
+    Eina_List *moves;              /**< List of Efreet_Menu_Move structures representing all move operations for this menu. */
+    Eina_List *filters;            /**< List of Efreet_Menu_Filter structures for including/excluding .desktop files. */
 
-    Efreet_Menu_Internal *parent;   /**< Our parent menu */
-    Eina_List *sub_menus;          /**< Our sub menus */
+    Efreet_Menu_Internal *parent;   /**< Pointer to the parent menu in the internal hierarchy. */
+    Eina_List *sub_menus;          /**< List of Efreet_Menu_Internal structures representing sub-menus. */
 
-    Eina_List *layout;             /**< This menus layout */
-    Eina_List *default_layout;     /**< Default layout */
-    signed char show_empty;    /**< Whether to show empty menus */
-    signed char in_line;       /**< Whether this menu can be inlined */
-    signed char inline_limit;  /**< Number of elements which triggers inline */
-    signed char inline_header; /**< Whether we should use the header name when this menu is inlined */
-    signed char inline_alias;  /**< Whether we should use the menu name when inlining */
+    Eina_List *layout;             /**< List of Efreet_Menu_Layout structures defining the explicit layout of this menu. */
+    Eina_List *default_layout;     /**< List of Efreet_Menu_Layout structures defining the default layout for sub-menus. */
+    signed char show_empty;    /**< Flag (-1, 0, or 1) indicating whether to show this menu if it's empty. Inherited or set by <DefaultLayout>. */
+    signed char in_line;       /**< Flag (-1, 0, or 1) indicating whether this menu can be inlined. Inherited or set by <DefaultLayout>. */
+    signed char inline_limit;  /**< Integer (-1 or >=0) specifying the number of items to allow before preventing inlining. Inherited or set by <DefaultLayout>. */
+    signed char inline_header; /**< Flag (-1, 0, or 1) indicating whether to use a header when this menu is inlined. Inherited or set by <DefaultLayout>. */
+    signed char inline_alias;  /**< Flag (-1, 0, or 1) indicating whether to use the menu name as an alias for a single inlined item. Inherited or set by <DefaultLayout>. */
 
-    unsigned char seen_allocated:1;     /**< have we set the only_unallocated */
-    unsigned char only_unallocated:1;   /**< Show only unallocated .desktops */
+    unsigned char seen_allocated:1;     /**< Flag: True if <OnlyUnallocated> or <NotOnlyUnallocated> has been encountered. */
+    unsigned char only_unallocated:1;   /**< Flag: True if this menu should only show unallocated .desktop files. */
 
-    unsigned char seen_deleted:1;       /**< Have we seen the deleted item yet */
-    unsigned char deleted:1;            /**< The menu is deleted */
+    unsigned char seen_deleted:1;       /**< Flag: True if <Deleted> or <NotDeleted> has been encountered. */
+    unsigned char deleted:1;            /**< Flag: True if this menu is marked as deleted. */
 };
 
 typedef struct Efreet_Menu_App_Dir Efreet_Menu_App_Dir;
 
+/**
+ * @struct Efreet_Menu_App_Dir
+ * @brief Represents a directory to be scanned for .desktop application files.
+ *
+ * This structure is used to manage application source directories, including
+ * standard XDG directories and legacy directories.
+ */
 struct Efreet_Menu_App_Dir
 {
-    const char *path;           /**< directory path */
-    const char *prefix;         /**< If it's legacy it can have a prefix */
-    unsigned int legacy:1;      /**< is this a legacy dir */
+    const char *path;           /**< The absolute path to the application directory. e.g., "/usr/share/applications" */
+    const char *prefix;         /**< An optional prefix for .desktop file IDs if this is a legacy directory. e.g., "kde" */
+    unsigned int legacy:1;      /**< Flag: True if this is a legacy directory (e.g., from <LegacyDir>). */
 };
 
+/**
+ * @enum Efreet_Menu_Filter_Op_Type
+ * @brief Defines the logical operation type for combining filter conditions.
+ */
 enum Efreet_Menu_Filter_Op_Type
 {
-    EFREET_MENU_FILTER_OP_OR,
-    EFREET_MENU_FILTER_OP_AND,
-    EFREET_MENU_FILTER_OP_NOT
+    EFREET_MENU_FILTER_OP_OR,   /**< Logical OR: at least one condition must match. */
+    EFREET_MENU_FILTER_OP_AND,  /**< Logical AND: all conditions must match. */
+    EFREET_MENU_FILTER_OP_NOT   /**< Logical NOT: none of the conditions should match. */
 };
 
 typedef enum Efreet_Menu_Filter_Op_Type Efreet_Menu_Filter_Op_Type;
 
+/**
+ * @enum Efreet_Menu_Filter_Type
+ * @brief Defines whether a filter is an inclusion or exclusion filter.
+ */
 enum Efreet_Menu_Filter_Type
 {
-    EFREET_MENU_FILTER_INCLUDE,
-    EFREET_MENU_FILTER_EXCLUDE
+    EFREET_MENU_FILTER_INCLUDE, /**< The filter specifies items to include. */
+    EFREET_MENU_FILTER_EXCLUDE  /**< The filter specifies items to exclude. */
 };
 
 typedef enum Efreet_Menu_Filter_Type Efreet_Menu_Filter_Type;
 
 typedef struct Efreet_Menu_Filter_Op Efreet_Menu_Filter_Op;
 
+/**
+ * @struct Efreet_Menu_Filter_Op
+ * @brief Represents a single filter operation or a group of nested operations.
+ *
+ * This structure defines the conditions (categories, filenames, or all) and
+ * how they are logically combined (OR, AND, NOT). It can also contain
+ * a list of child filter operations for complex filtering logic.
+ */
 struct Efreet_Menu_Filter_Op
 {
-    Efreet_Menu_Filter_Op_Type type; /**< The type of operation */
-    Eina_List *categories;          /**< The categories this op applies too */
-    Eina_List *filenames;           /**< The filenames this op applies too */
+    Efreet_Menu_Filter_Op_Type type; /**< The logical type of this operation (OR, AND, NOT). */
+    Eina_List *categories;          /**< List of category names (const char *) to match. e.g., ["Graphics", "Utility"]. */
+    Eina_List *filenames;           /**< List of .desktop file IDs (const char *) to match. e.g., ["firefox.desktop", "gimp.desktop"]. */
 
-    Eina_List *filters;             /**< Child filters */
+    Eina_List *filters;             /**< List of child Efreet_Menu_Filter_Op structures for nested logic. */
 
-    unsigned char all:1;             /**< Applies to all .desktop files */
+    unsigned char all:1;             /**< Flag: True if this operation applies to all .desktop files (ignores categories/filenames). */
 };
 
 typedef struct Efreet_Menu_Filter Efreet_Menu_Filter;
 
+/**
+ * @struct Efreet_Menu_Filter
+ * @brief Represents a top-level include or exclude filter.
+ *
+ * This structure combines a filter type (Include/Exclude) with a filter operation.
+ */
 struct Efreet_Menu_Filter
 {
-    Efreet_Menu_Filter_Type type;   /**< The type of filter */
-    Efreet_Menu_Filter_Op *op;      /**< The filter operations */
+    Efreet_Menu_Filter_Type type;   /**< The type of filter (EFREET_MENU_FILTER_INCLUDE or EFREET_MENU_FILTER_EXCLUDE). */
+    Efreet_Menu_Filter_Op *op;      /**< The filter operation defining the matching criteria. */
 };
 
+/**
+ * @enum Efreet_Menu_Layout_Type
+ * @brief Defines the type of an element within a menu layout.
+ */
 enum Efreet_Menu_Layout_Type
 {
-    EFREET_MENU_LAYOUT_MENUNAME,
-    EFREET_MENU_LAYOUT_FILENAME,
-    EFREET_MENU_LAYOUT_SEPARATOR,
-    EFREET_MENU_LAYOUT_MERGE
+    EFREET_MENU_LAYOUT_MENUNAME,  /**< Represents a sub-menu, identified by its name. */
+    EFREET_MENU_LAYOUT_FILENAME,  /**< Represents a .desktop file, identified by its file ID. */
+    EFREET_MENU_LAYOUT_SEPARATOR, /**< Represents a separator item. */
+    EFREET_MENU_LAYOUT_MERGE      /**< Represents a merge directive (e.g., merge all remaining files or menus). */
 };
 
 typedef enum Efreet_Menu_Layout_Type Efreet_Menu_Layout_Type;
 
 typedef struct Efreet_Menu_Layout Efreet_Menu_Layout;
 
+/**
+ * @struct Efreet_Menu_Layout
+ * @brief Represents an individual item in a menu's layout definition.
+ *
+ * This structure specifies an element (like a sub-menu, a .desktop file,
+ * a separator, or a merge directive) and its properties within a layout.
+ */
 struct Efreet_Menu_Layout
 {
-    Efreet_Menu_Layout_Type  type;   /**< The type of layout */
-    const char *name;                /**< The name of the element */
+    Efreet_Menu_Layout_Type  type;   /**< The type of this layout element. */
+    const char *name;                /**< The name/identifier for this element. For MENUNAME, it's the sub-menu's internal name. For FILENAME, it's the .desktop file ID. For MERGE, it's "files", "menus", or "all". */
 
-    /* The items below are for Menuname Layout elements */
-    signed char show_empty;    /**< Whether to show empty menus */
-    signed char in_line;       /**< Whether this menu can be inlined */
-    signed char inline_limit;  /**< Number of elements which triggers inline */
-    signed char inline_header; /**< Whether we should use the header name when this menu is inlined */
-    signed char inline_alias;  /**< Whether we should use the menu name when inlining */
+    /* The items below are for Menuname Layout elements, controlling inlining behavior. */
+    signed char show_empty;    /**< Flag (-1, 0, or 1): Override for showing this sub-menu if empty. */
+    signed char in_line;       /**< Flag (-1, 0, or 1): Override for inlining this sub-menu. */
+    signed char inline_limit;  /**< Integer (-1 or >=0): Override for the item limit for inlining. */
+    signed char inline_header; /**< Flag (-1, 0, or 1): Override for showing a header when inlined. */
+    signed char inline_alias;  /**< Flag (-1, 0, or 1): Override for using the sub-menu name as an alias for a single inlined item. */
 };
 
 typedef struct Efreet_Menu_Desktop Efreet_Menu_Desktop;
 
+/**
+ * @struct Efreet_Menu_Desktop
+ * @brief Internal wrapper for an Efreet_Desktop entry within the menu processing context.
+ *
+ * This structure associates an Efreet_Desktop object with its file ID and
+ * tracks whether it has been allocated to a menu.
+ */
 struct Efreet_Menu_Desktop
 {
-    Efreet_Desktop *desktop;   /**< The desktop we refer too */
-    const char *id;            /**< The desktop file id */
-    unsigned char allocated:1; /**< If this desktop has been allocated */
+    Efreet_Desktop *desktop;   /**< Pointer to the actual Efreet_Desktop object. */
+    const char *id;            /**< The file ID of the .desktop file (e.g., "app.desktop" or "prefix-app.desktop"). */
+    unsigned char allocated:1; /**< Flag: True if this .desktop file has been assigned to a menu (used with OnlyUnallocated logic). */
 };
 
 typedef struct Efreet_Menu_Async Efreet_Menu_Async;
 
+/**
+ * @struct Efreet_Menu_Async
+ * @brief Structure to hold data for asynchronous menu parsing operations.
+ * @deprecated Asynchronous operations are deprecated.
+ */
 struct Efreet_Menu_Async
 {
-    Efreet_Menu_Cb    func;
-    void             *data;
-    Eina_Stringshare *path;
-    Efreet_Menu      *menu;
+    Efreet_Menu_Cb    func; /**< Callback function to be called when parsing is complete. */
+    void             *data; /**< User data to be passed to the callback function. */
+    Eina_Stringshare *path; /**< Path to the menu file to be parsed. */
+    Efreet_Menu      *menu; /**< The parsed menu (result). */
 };
 
-static const char *efreet_menu_prefix = NULL; /**< The $XDG_MENU_PREFIX env var */
-Eina_List *efreet_menu_kde_legacy_dirs = NULL; /**< The directories to use for KDELegacy entries */
-static const char *efreet_tag_menu = NULL;
-static const char *efreet_menu_file = NULL; /**< A menu file set explicityl as default */
+static const char *efreet_menu_prefix = NULL; /**< Stores the value of the $XDG_MENU_PREFIX environment variable. e.g., "gnome-" */
+Eina_List *efreet_menu_kde_legacy_dirs = NULL; /**< List of directory paths (const char *) for KDE legacy application locations. */
+static const char *efreet_tag_menu = NULL;    /**< Stringshared representation of "Menu", used for quick XML tag comparison. */
+static const char *efreet_menu_file = NULL;   /**< Path to a menu file explicitly set as the default by efreet_menu_file_set(). */
 
-static Eina_Hash *efreet_menu_handle_cbs = NULL;
-static Eina_Hash *efreet_menu_filter_cbs = NULL;
-static Eina_Hash *efreet_menu_move_cbs = NULL;
-static Eina_Hash *efreet_menu_layout_cbs = NULL;
+static Eina_Hash *efreet_menu_handle_cbs = NULL; /**< Hash table mapping XML tag names (char *) to Efreet_Menu_Internal handler functions for general menu elements. */
+static Eina_Hash *efreet_menu_filter_cbs = NULL; /**< Hash table mapping XML tag names (char *) to Efreet_Menu_Filter_Op handler functions for filter elements. */
+static Eina_Hash *efreet_menu_move_cbs = NULL;   /**< Hash table mapping XML tag names (char *) to Efreet_Menu_Internal handler functions for <Move> sub-elements. */
+static Eina_Hash *efreet_menu_layout_cbs = NULL; /**< Hash table mapping XML tag names (char *) to Efreet_Menu_Internal handler functions for <Layout> sub-elements. */
 
 static Efreet_Menu_Internal *efreet_menu_by_name_find(Efreet_Menu_Internal *internal,
                                                     const char *name,
@@ -321,6 +390,16 @@ static void efreet_menu_path_set(Efreet_Menu_Internal *internal, const char *pat
 static int efreet_menu_save_menu(Efreet_Menu *menu, FILE *f, int indent);
 static int efreet_menu_save_indent(FILE *f, int indent);
 
+/**
+ * @internal
+ * @brief Initializes the efreet_menu subsystem.
+ *
+ * This function sets up logging, reads the XDG_MENU_PREFIX environment variable,
+ * and initializes hash tables for XML tag handlers used in menu parsing.
+ * It must be called before any other efreet_menu functions.
+ *
+ * @return Returns 1 on success, 0 on failure (e.g., if logging or hash table creation fails).
+ */
 int
 efreet_menu_init(void)
 {
@@ -488,6 +567,16 @@ efreet_menu_kde_legacy_init(void)
     return 1;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the efreet_menu subsystem.
+ *
+ * This function releases resources allocated by efreet_menu_init(),
+ * including stringshares, hash tables, and legacy directory lists.
+ * It also unregisters the logging domain.
+ *
+ * @return Returns no value.
+ */
 void
 efreet_menu_shutdown(void)
 {
@@ -759,6 +848,13 @@ efreet_menu_dump(Efreet_Menu *menu, const char *indent)
  * @return Returns a new Efreet_Menu_Internal struct
  * @brief Allocates and initializes a new Efreet_Menu_Internal structure
  */
+/**
+ * @internal
+ * @brief Allocates and initializes a new Efreet_Menu_Internal structure.
+ * @param parent The parent Efreet_Menu_Internal, or NULL if this is a root menu.
+ *               If parent is provided, merged menu/dir hashes are shared.
+ * @return Returns a pointer to the newly allocated Efreet_Menu_Internal, or NULL on failure.
+ */
 static Efreet_Menu_Internal *
 efreet_menu_internal_new(Efreet_Menu_Internal *parent)
 {
@@ -782,9 +878,15 @@ efreet_menu_internal_new(Efreet_Menu_Internal *parent)
 }
 
 /**
- * @param menu The menu to free
- * @return Returns no value
- * @brief Frees up the given menu structure
+ * @internal
+ * @brief Frees an Efreet_Menu_Internal structure and its associated data.
+ *
+ * This includes freeing stringshares for paths and names, lists of directories,
+ * applications, filters, moves, sub-menus, layouts, and hash tables if they
+ * are not shared.
+ *
+ * @param internal The Efreet_Menu_Internal structure to free.
+ * @return Returns no value.
  */
 void
 efreet_menu_internal_free(Efreet_Menu_Internal *internal)
@@ -2981,6 +3083,11 @@ efreet_menu_by_name_find(Efreet_Menu_Internal *internal, const char *name, Efree
  * @return Returns a new Efreet_Menu_Move struct on success or NULL on failure
  * @brief Creates an returns a new Efreet_Menu_Move struct or NULL on failure
  */
+/**
+ * @internal
+ * @brief Allocates and initializes a new Efreet_Menu_Move structure.
+ * @return Returns a pointer to the newly allocated Efreet_Menu_Move, or NULL on failure.
+ */
 static Efreet_Menu_Move *
 efreet_menu_move_new(void)
 {
@@ -2993,9 +3100,10 @@ efreet_menu_move_new(void)
 
 /**
  * @internal
- * @param move The Efreet_Menu_Move to free
+ * @internal
+ * @brief Frees an Efreet_Menu_Move structure and its stringshared names.
+ * @param move The Efreet_Menu_Move structure to free.
  * @return Returns no value.
- * @brief Frees the given move structure
  */
 static void
 efreet_menu_move_free(Efreet_Menu_Move *move)
@@ -3013,6 +3121,11 @@ efreet_menu_move_free(Efreet_Menu_Move *move)
  * @return Returns a new Efreet_Menu_App_Dir on success or NULL on failure
  * @brief Creates and initializes a new Efreet_Menu_App_Dir structure
  */
+/**
+ * @internal
+ * @brief Allocates and initializes a new Efreet_Menu_App_Dir structure.
+ * @return Returns a pointer to the newly allocated Efreet_Menu_App_Dir, or NULL on failure.
+ */
 static Efreet_Menu_App_Dir *
 efreet_menu_app_dir_new(void)
 {
@@ -3025,9 +3138,10 @@ efreet_menu_app_dir_new(void)
 
 /**
  * @internal
- * @param dir The Efreet_Menu_App_Dir to free
+ * @internal
+ * @brief Frees an Efreet_Menu_App_Dir structure and its stringshared path/prefix.
+ * @param dir The Efreet_Menu_App_Dir structure to free.
  * @return Returns no value.
- * @brief Frees the given dir structure
  */
 static void
 efreet_menu_app_dir_free(Efreet_Menu_App_Dir *dir)
@@ -3042,9 +3156,13 @@ efreet_menu_app_dir_free(Efreet_Menu_App_Dir *dir)
 /**
  * @internal
  * @param a The app dir to compare too
- * @param b The path to compare too
- * @return Returns 0 if the strings are equals, != 0 otherwise
- * @brief Compares the too strings
+ * @internal
+ * @brief Comparator function for Efreet_Menu_App_Dir structures based on path.
+ * Used for searching lists of Efreet_Menu_App_Dir.
+ * @param a Pointer to an Efreet_Menu_App_Dir.
+ * @param b Path string (const char *) to compare against a->path.
+ * @return Returns 0 if a->path and b are equal, 1 if a->path or b is NULL or they differ.
+ *         Specifically, strcmp(a->path, b) if both are non-NULL.
  */
 static int
 efreet_menu_cb_app_dirs_compare(Efreet_Menu_App_Dir *a, const char *b)
@@ -3054,6 +3172,7 @@ efreet_menu_cb_app_dirs_compare(Efreet_Menu_App_Dir *a, const char *b)
     return strcmp(a->path, b);
 }
 
+/** @internal @brief Ensures the sub_menus list is initialized (set to NULL if not already). */
 static void
 efreet_menu_create_sub_menu_list(Efreet_Menu_Internal *internal)
 {
@@ -3062,6 +3181,7 @@ efreet_menu_create_sub_menu_list(Efreet_Menu_Internal *internal)
     internal->sub_menus = NULL;
 }
 
+/** @internal @brief Ensures the app_dirs list is initialized. */
 static void
 efreet_menu_create_app_dirs_list(Efreet_Menu_Internal *internal)
 {
@@ -3070,6 +3190,7 @@ efreet_menu_create_app_dirs_list(Efreet_Menu_Internal *internal)
     internal->app_dirs = NULL;
 }
 
+/** @internal @brief Ensures the directory_dirs list is initialized. */
 static void
 efreet_menu_create_directory_dirs_list(Efreet_Menu_Internal *internal)
 {
@@ -3078,6 +3199,7 @@ efreet_menu_create_directory_dirs_list(Efreet_Menu_Internal *internal)
     internal->directory_dirs = NULL;
 }
 
+/** @internal @brief Ensures the moves list is initialized. */
 static void
 efreet_menu_create_move_list(Efreet_Menu_Internal *internal)
 {
@@ -3086,6 +3208,7 @@ efreet_menu_create_move_list(Efreet_Menu_Internal *internal)
     internal->moves = NULL;
 }
 
+/** @internal @brief Ensures the filters list is initialized. */
 static void
 efreet_menu_create_filter_list(Efreet_Menu_Internal *internal)
 {
@@ -3094,6 +3217,7 @@ efreet_menu_create_filter_list(Efreet_Menu_Internal *internal)
     internal->filters = NULL;
 }
 
+/** @internal @brief Ensures the layout list is initialized. */
 static void
 efreet_menu_create_layout_list(Efreet_Menu_Internal *internal)
 {
@@ -3102,6 +3226,7 @@ efreet_menu_create_layout_list(Efreet_Menu_Internal *internal)
     internal->layout = NULL;
 }
 
+/** @internal @brief Ensures the default_layout list is initialized. */
 static void
 efreet_menu_create_default_layout_list(Efreet_Menu_Internal *internal)
 {
@@ -3110,6 +3235,7 @@ efreet_menu_create_default_layout_list(Efreet_Menu_Internal *internal)
     internal->default_layout = NULL;
 }
 
+/** @internal @brief Ensures the directories list is initialized. */
 static void
 efreet_menu_create_directories_list(Efreet_Menu_Internal *internal)
 {
@@ -3118,6 +3244,16 @@ efreet_menu_create_directories_list(Efreet_Menu_Internal *internal)
     internal->directories = NULL;
 }
 
+/**
+ * @internal
+ * @brief Constructs an absolute path from a menu's base path and a suffix.
+ * If the suffix is already an absolute path, it's used directly.
+ * Otherwise, it's appended to the menu's file.path.
+ * @param internal The Efreet_Menu_Internal context, providing internal->file.path.
+ * @param suffix The path suffix, which can be relative or absolute.
+ * @return A stringshared absolute path, or NULL if internal->file.path is missing for a relative suffix.
+ *         The caller is responsible for freeing the returned stringshare if not NULL.
+ */
 static const char *
 efreet_menu_path_get(Efreet_Menu_Internal *internal, const char *suffix)
 {
@@ -3144,14 +3280,36 @@ efreet_menu_path_get(Efreet_Menu_Internal *internal, const char *suffix)
     return eina_stringshare_add(path);
 }
 
+/**
+ * @internal
+ * @brief Comparator function for Efreet_Menu_Internal structures based on their internal names.
+ * Used for searching and sorting lists of Efreet_Menu_Internal.
+ * @param a Pointer to the first Efreet_Menu_Internal.
+ * @param b Pointer to the second Efreet_Menu_Internal.
+ * @return Returns 0 if names are equal or both NULL.
+ *         Returns <0 if a->name.internal < b->name.internal.
+ *         Returns >0 if a->name.internal > b->name.internal.
+ *         Returns 1 if one name is NULL and the other is not (treats NULL as "greater").
+ */
 static int
 efreet_menu_cb_menu_compare(Efreet_Menu_Internal *a, Efreet_Menu_Internal *b)
 {
-    if (!a->name.internal || !b->name.internal) return 1;
+    if (!a->name.internal || !b->name.internal) return 1; /* Or handle NULLs differently if needed */
     if (a->name.internal == b->name.internal) return 0;
     return strcmp(a->name.internal, b->name.internal);
 }
 
+/**
+ * @internal
+ * @brief Processes all application directories (app_dirs) for a given menu.
+ *
+ * This function iterates through the `app_dirs` list of the `internal` menu structure.
+ * For each directory, it calls `efreet_menu_app_dir_scan` to find .desktop files
+ * and populate the menu's `app_pool`. The existing `app_pool` is cleared first.
+ *
+ * @param internal The Efreet_Menu_Internal structure to process.
+ * @return Returns 1 on success (always, in current implementation).
+ */
 static int
 efreet_menu_app_dirs_process(Efreet_Menu_Internal *internal)
 {
@@ -3168,6 +3326,23 @@ efreet_menu_app_dirs_process(Efreet_Menu_Internal *internal)
     return 1;
 }
 
+/**
+ * @internal
+ * @brief Scans a single application directory for .desktop files and adds them to the menu's app_pool.
+ *
+ * Recursively scans subdirectories if not a legacy directory.
+ * For each .desktop file found, an Efreet_Menu_Desktop wrapper is created and added to
+ * `internal->app_pool`. File IDs are prefixed with `id` if provided.
+ * Only .desktop files of type EFREET_DESKTOP_TYPE_APPLICATION are added.
+ * Duplicate file IDs in the app_pool are avoided.
+ *
+ * @param internal The Efreet_Menu_Internal structure whose app_pool is being populated.
+ * @param path The absolute path of the directory to scan.
+ * @param id An optional prefix for the .desktop file IDs (used for legacy dirs or nested structures).
+ *           Example: "kde" or "subdir1-subdir2".
+ * @param legacy If non-zero, subdirectories are not scanned recursively.
+ * @return Returns 1 on success (always, in current implementation, even if directory doesn't exist or is empty).
+ */
 static int
 efreet_menu_app_dir_scan(Efreet_Menu_Internal *internal, const char *path, const char *id, int legacy)
 {
@@ -3377,13 +3552,34 @@ efreet_menu_cb_compare_names(Efreet_Menu_Internal *internal, const char *name)
     return strcmp(internal->name.internal, name);
 }
 
+/**
+ * @internal
+ * @brief Comparator function for Efreet_Menu_Desktop structures based on their ID against a name string.
+ * Used for searching lists of Efreet_Menu_Desktop.
+ * @param md Pointer to an Efreet_Menu_Desktop.
+ * @param name The ID string (const char *) to compare against md->id.
+ * @return Returns 0 if md->id and name are equal (pointer or string comparison).
+ *         Otherwise, returns the result of strcmp(md->id, name).
+ */
 static int
 efreet_menu_cb_md_compare_ids(Efreet_Menu_Desktop *md, const char *name)
 {
-    if (md->id == name) return 0;
+    if (md->id == name) return 0; /* Handles stringshared equality */
     return strcmp(md->id, name);
 }
 
+/**
+ * @internal
+ * @brief Constructs the public Efreet_Menu structure from an Efreet_Menu_Internal representation.
+ *
+ * This function recursively builds the menu structure based on the layout rules
+ * (explicit <Layout>, inherited <DefaultLayout>, or default behavior).
+ * It handles sub-menus, .desktop entries, and applies display properties like NoDisplay.
+ *
+ * @param internal The Efreet_Menu_Internal structure to convert.
+ * @return A pointer to the newly created Efreet_Menu, or NULL on failure.
+ *         The caller is responsible for freeing this menu with efreet_menu_free() or efreet_menu_unref().
+ */
 static Efreet_Menu *
 efreet_menu_layout_menu(Efreet_Menu_Internal *internal)
 {
@@ -3484,6 +3680,12 @@ efreet_menu_layout_menu(Efreet_Menu_Internal *internal)
     return entry;
 }
 
+/**
+ * @internal
+ * @brief Creates an Efreet_Menu entry of type EFREET_MENU_ENTRY_DESKTOP from an Efreet_Menu_Desktop.
+ * @param md The Efreet_Menu_Desktop wrapper containing the .desktop file info.
+ * @return A new Efreet_Menu representing the desktop entry. Caller must free.
+ */
 static Efreet_Menu *
 efreet_menu_layout_desktop(Efreet_Menu_Desktop *md)
 {
@@ -3501,6 +3703,19 @@ efreet_menu_layout_desktop(Efreet_Menu_Desktop *md)
     return entry;
 }
 
+/**
+ * @internal
+ * @brief Populates an Efreet_Menu (entry) based on a single Efreet_Menu_Layout item.
+ *
+ * This function processes one layout directive (Menuname, Filename, Merge, Separator)
+ * from `layout` and adds corresponding items to `entry->entries`. It handles
+ * inlining logic for sub-menus, and removes processed items from `internal->sub_menus`
+ * or `internal->applications` to avoid duplication.
+ *
+ * @param entry The Efreet_Menu being constructed (its `entries` list will be populated).
+ * @param internal The current Efreet_Menu_Internal context, providing available sub-menus and applications.
+ * @param layout The Efreet_Menu_Layout item defining what to add to the menu.
+ */
 static void
 efreet_menu_layout_entries_get(Efreet_Menu *entry, Efreet_Menu_Internal *internal,
         Efreet_Menu_Layout *layout)
@@ -3725,34 +3940,66 @@ efreet_menu_layout_entries_get(Efreet_Menu *entry, Efreet_Menu_Internal *interna
     }
 }
 
+/**
+ * @internal
+ * @brief Comparator function to find an Efreet_Menu (menu type) by the name of an Efreet_Menu_Internal.
+ * Used for searching existing entries in a layout.
+ * @param entry An Efreet_Menu entry (expected to be of type MENU).
+ * @param internal An Efreet_Menu_Internal whose name is used for comparison.
+ * @return 0 if names match and entry is a menu, 1 otherwise.
+ */
 static int
 efreet_menu_cb_entry_compare_menu(Efreet_Menu *entry, Efreet_Menu_Internal *internal)
 {
     if (entry->type != EFREET_MENU_ENTRY_MENU) return 1;
-    if (!entry->name || !internal->name.name) return 1;
-    if (entry->name == internal->name.name) return 0;
+    if (!entry->name || !internal->name.name) return 1; /* Should not happen with valid data */
+    if (entry->name == internal->name.name) return 0; /* Stringshare comparison */
     return strcmp(entry->name, internal->name.name);
 }
 
+/**
+ * @internal
+ * @brief Comparator function to find an Efreet_Menu (desktop type) by an Efreet_Desktop's name.
+ * Used for searching existing entries in a layout or for efreet_menu_desktop_remove.
+ * @param entry An Efreet_Menu entry (expected to be of type DESKTOP).
+ * @param desktop An Efreet_Desktop whose name is used for comparison.
+ * @return 0 if names match and entry is a desktop, -1 or strcmp result otherwise.
+ */
 static int
 efreet_menu_cb_entry_compare_desktop(Efreet_Menu *entry, Efreet_Desktop *desktop)
 {
     if (entry->type != EFREET_MENU_ENTRY_DESKTOP) return -1;
-    if (!entry->name || !desktop->name) return -1;
-    if (entry->name == desktop->name) return 0;
+    if (!entry->name || !desktop->name) return -1; /* Should not happen with valid data */
+    if (entry->name == desktop->name) return 0; /* Stringshare comparison */
     return strcmp(entry->name, desktop->name);
 }
 
 #ifndef STRICT_SPEC
+/**
+ * @internal
+ * @brief Comparator function for Efreet_Menu_Move structures based on the old_name.
+ * Used for searching lists of Efreet_Menu_Move.
+ * @param move Pointer to an Efreet_Menu_Move.
+ * @param old The old_name string (const char *) to compare against.
+ * @return Returns 0 if move->old_name and old are equal (pointer or string comparison).
+ *         Returns 1 otherwise (treats NULLs or differences as non-match).
+ */
 static int
 efreet_menu_cb_move_compare(Efreet_Menu_Move *move, const char *old)
 {
     if (!move->old_name || !old) return 1;
-    if (move->old_name == old) return 0;
-    return 1;
+    if (move->old_name == old) return 0; /* Stringshare comparison */
+    return 1; /* Not strcmp, just equality check for this specific use case */
 }
 #endif
 
+/**
+ * @internal
+ * @brief Checks if a given Efreet_Menu (public representation) is effectively empty.
+ * An empty menu is one that contains no entries or only contains other empty menus or separators.
+ * @param entry The Efreet_Menu to check.
+ * @return 1 if the menu is considered empty, 0 otherwise.
+ */
 static int
 efreet_menu_layout_is_empty(Efreet_Menu *entry)
 {
@@ -3769,6 +4016,16 @@ efreet_menu_layout_is_empty(Efreet_Menu *entry)
     return 1;
 }
 
+/**
+ * @internal
+ * @brief Sets the file path and name components in an Efreet_Menu_Internal structure.
+ *
+ * Parses the provided full `path` string into directory and filename parts,
+ * and stores them as stringshares in `internal->file.path` and `internal->file.name`.
+ *
+ * @param internal The Efreet_Menu_Internal structure to update.
+ * @param path The full path to the menu file. e.g., "/usr/share/menus/applications.menu".
+ */
 static void
 efreet_menu_path_set(Efreet_Menu_Internal *internal, const char *path)
 {
@@ -3789,6 +4046,18 @@ efreet_menu_path_set(Efreet_Menu_Internal *internal, const char *path)
     }
 }
 
+/**
+ * @internal
+ * @brief Recursively saves an Efreet_Menu structure to an XML file stream.
+ *
+ * Writes the menu and its entries (sub-menus, desktop files, separators)
+ * in the FDO .menu XML format.
+ *
+ * @param menu The Efreet_Menu to save.
+ * @param f The FILE stream to write to.
+ * @param indent The current indentation level for pretty-printing the XML.
+ * @return Returns 1 on success (always, in current implementation if file operations succeed).
+ */
 static int
 efreet_menu_save_menu(Efreet_Menu *menu, FILE *f, int indent)
 {
@@ -3877,6 +4146,13 @@ efreet_menu_save_menu(Efreet_Menu *menu, FILE *f, int indent)
     return 1;
 }
 
+/**
+ * @internal
+ * @brief Writes indentation spaces to a file stream.
+ * @param f The FILE stream to write to.
+ * @param indent The number of indentation levels (each level is 2 spaces).
+ * @return Returns 1 on success.
+ */
 static int
 efreet_menu_save_indent(FILE *f, int indent)
 {

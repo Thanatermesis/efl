@@ -83,60 +83,82 @@
      v = GEAR_VERT(v, (p2), 1); \
 } while(0);
 
-// Struct describing a point
+/**
+ * @brief Describes a 2D point with floating point coordinates.
+ *
+ * Used for generating the 2D profile of a gear tooth.
+ */
 typedef struct _Point
 {
-   GLfloat x;
-   GLfloat y;
+   GLfloat x; /**< The x-coordinate of the point. */
+   GLfloat y; /**< The y-coordinate of the point. */
 } Point;
 
-// Struct describing the vertices in triangle strip
+/**
+ * @brief Describes a triangle strip for rendering.
+ *
+ * It specifies a subset of vertices from a vertex buffer.
+ */
 typedef struct _VertexStrip
 {
-   GLint first;
-   GLint count;
+   GLint first;  /**< The starting index of the vertices in the vertex array. */
+   GLint count;  /**< The number of vertices in the strip. */
 } VertexStrip;
 
-// Each vertex consist of GEAR_VERTEX_STRIDE GLfloat attributes
+/**
+ * @brief Represents a single vertex in a gear's mesh.
+ *
+ * Each vertex contains 6 floating-point attributes, laid out as follows:
+ * - `[0-2]`: Position coordinates (x, y, z)
+ * - `[3-5]`: Normal vector components (nx, ny, nz)
+ */
 typedef GLfloat GearVertex[GEAR_VERTEX_STRIDE];
 
-// Struct representing a gear.
+/**
+ * @brief Represents the geometry and rendering data for a single gear.
+ */
 typedef struct _Gear
 {
-   GearVertex  *vertices;
-   int          nvertices;
-   VertexStrip *strips;
-   int          nstrips;
-   GLuint       vbo;
+   GearVertex  *vertices;   /**< Array of vertices that make up the gear mesh. */
+   int          nvertices;  /**< The total number of vertices in the gear. */
+   VertexStrip *strips;     /**< Array of triangle strips for rendering the gear. */
+   int          nstrips;    /**< The number of triangle strips. */
+   GLuint       vbo;        /**< The Vertex Buffer Object (VBO) handle for this gear. */
 } Gear;
 
-// GL related data here..
+/**
+ * @brief Holds all the OpenGL-related data and application state.
+ *
+ * This structure is used to pass around all necessary information for
+ * rendering the scene, including shaders, matrices, gear objects, and
+ * user interaction state.
+ */
 typedef struct _GLData
 {
-   Evas_GL_API *glapi;
-   GLuint       program;
-   GLuint       vtx_shader;
-   GLuint       fgmt_shader;
-   int          initialized : 1;
-   int          mouse_down : 1;
+   Evas_GL_API *glapi; /**< Pointer to the Evas GL API structure. */
+   GLuint       program; /**< The handle for the GLSL shader program. */
+   GLuint       vtx_shader; /**< The handle for the vertex shader. */
+   GLuint       fgmt_shader; /**< The handle for the fragment shader. */
+   int          initialized : 1; /**< Flag to indicate if GL resources are initialized. */
+   int          mouse_down : 1; /**< Flag to track if the mouse button is pressed. */
 
    // Gear Stuff
-   Gear        *gear[6];
-   GLfloat      view_rot[3];
-   GLfloat      light_pos[4];
-   GLfloat      proj_mat[16];
+   Gear        *gear[6]; /**< Array of pointers to the six gear objects. */
+   GLfloat      view_rot[3]; /**< Current rotation of the view (x, y, z angles). */
+   GLfloat      light_pos[4]; /**< Position of the light source in homogeneous coordinates. */
+   GLfloat      proj_mat[16]; /**< The 4x4 projection matrix. */
 
-   GLfloat      angle;
+   GLfloat      angle; /**< The current animation angle for rotating gears. */
 
-   GLuint       mvp_loc;         // ModelViewPorjection Matrix Loc
-   GLuint       norm_mat_loc;
-   GLuint       light_pos_loc;
-   GLuint       material_loc;
+   GLuint       mvp_loc;         /**< Location of the ModelViewProjection matrix uniform in the shader. */
+   GLuint       norm_mat_loc;    /**< Location of the normal matrix uniform in the shader. */
+   GLuint       light_pos_loc;   /**< Location of the light position uniform in the shader. */
+   GLuint       material_loc;    /**< Location of the material color uniform in the shader. */
 
-   GLuint       gear_teeth;
-   GLuint       tot_vertices;
+   GLuint       gear_teeth;   /**< The number of teeth for the main gears. */
+   GLuint       tot_vertices; /**< Total number of vertices across all gears. */
 
-   int          recreate_gears;
+   int          recreate_gears; /**< Flag to indicate that gears need to be regenerated. */
 } GLData;
 
 static void gears_init(GLData *gld);
@@ -145,7 +167,18 @@ static void render_gears(GLData *gld);
 static void gears_reshape(GLData *gld, int width, int height);
 
 //--------------------------------//
-// Fills a gear vertex.
+/**
+ * @brief Fills a GearVertex with position and normal data.
+ *
+ * This is a helper function to simplify populating the vertex array.
+ *
+ * @param v Pointer to the current GearVertex to be filled.
+ * @param x The x-coordinate of the vertex position.
+ * @param y The y-coordinate of the vertex position.
+ * @param z The z-coordinate of the vertex position.
+ * @param n A 3-element array representing the normal vector (nx, ny, nz).
+ * @return A pointer to the next GearVertex in the array.
+ */
 static GearVertex *
 vert(GearVertex *v, GLfloat x, GLfloat y, GLfloat z, GLfloat n[3])
 {
@@ -159,7 +192,22 @@ vert(GearVertex *v, GLfloat x, GLfloat y, GLfloat z, GLfloat n[3])
    return v + 1;
 }
 
-// Create a gear wheel.
+/**
+ * @brief Creates a single gear wheel model.
+ *
+ * This function generates the vertices and triangle strips required to render a
+ * gear. The geometry is created procedurally based on the provided parameters.
+ * The vertices and their attributes (position and normal) are stored in a
+ * Vertex Buffer Object (VBO) for efficient rendering.
+ *
+ * @param gld The GL data structure for the application.
+ * @param inner_radius The radius of the inner circle of the gear.
+ * @param outer_radius The radius of the outer circle of the gear (to the tooth tips).
+ * @param width The width (thickness) of the gear along the z-axis.
+ * @param teeth The number of teeth on the gear.
+ * @param tooth_depth The depth of each tooth.
+ * @return A pointer to the newly created Gear structure, or NULL on failure.
+ */
 static Gear *
 create_gear(GLData *gld, GLfloat inner_radius, GLfloat outer_radius, GLfloat width,
             GLint teeth, GLfloat tooth_depth)
@@ -277,6 +325,14 @@ create_gear(GLData *gld, GLfloat inner_radius, GLfloat outer_radius, GLfloat wid
    return gear;
 }
 
+/**
+ * @brief Frees the resources associated with a gear.
+ *
+ * Deletes the VBO and frees the memory allocated for vertices and strips.
+ *
+ * @param gld The GL data structure for the application.
+ * @param gear The Gear object to be freed.
+ */
 static void
 free_gear(GLData *gld, Gear *gear)
 {
@@ -289,6 +345,15 @@ free_gear(GLData *gld, Gear *gear)
 }
 
 
+/**
+ * @brief Multiplies two 4x4 matrices.
+ *
+ * The result of `n * m` is stored in `m`. The matrices are expected to be
+ * in column-major order, as is standard for OpenGL.
+ *
+ * @param m The first matrix (and destination for the result). A 16-element array.
+ * @param n The second matrix. A 16-element array.
+ */
 static void
 multiply(GLfloat *m, const GLfloat *n)
 {
@@ -309,6 +374,17 @@ multiply(GLfloat *m, const GLfloat *n)
    memcpy(m, &tmp, sizeof tmp);
 }
 
+/**
+ * @brief Applies a rotation transformation to a matrix.
+ *
+ * Multiplies matrix `m` by a rotation matrix.
+ *
+ * @param m The matrix to be rotated. A 16-element array.
+ * @param angle The angle of rotation in radians.
+ * @param x The x component of the rotation axis.
+ * @param y The y component of the rotation axis.
+ * @param z The z component of the rotation axis.
+ */
 static void
 rotate(GLfloat *m, GLfloat angle, GLfloat x, GLfloat y, GLfloat z)
 {
@@ -327,6 +403,16 @@ rotate(GLfloat *m, GLfloat angle, GLfloat x, GLfloat y, GLfloat z)
    multiply(m, r);
 }
 
+/**
+ * @brief Applies a translation transformation to a matrix.
+ *
+ * Multiplies matrix `m` by a translation matrix.
+ *
+ * @param m The matrix to be translated. A 16-element array.
+ * @param x The translation factor on the x-axis.
+ * @param y The translation factor on the y-axis.
+ * @param z The translation factor on the z-axis.
+ */
 static void
 translate(GLfloat *m, GLfloat x, GLfloat y, GLfloat z)
 {
@@ -335,6 +421,11 @@ translate(GLfloat *m, GLfloat x, GLfloat y, GLfloat z)
    multiply(m, t);
 }
 
+/**
+ * @brief Sets a 4x4 matrix to the identity matrix.
+ *
+ * @param m The matrix to be reset. A 16-element array.
+ */
 static void
 identity(GLfloat *m)
 {
@@ -349,7 +440,11 @@ identity(GLfloat *m)
    memcpy(m, t, sizeof(t));
 }
 
-// Transposes a 4x4 matrix.
+/**
+ * @brief Transposes a 4x4 matrix.
+ *
+ * @param m The matrix to be transposed. A 16-element array.
+ */
 static void
 transpose(GLfloat *m)
 {
@@ -364,12 +459,14 @@ transpose(GLfloat *m)
    memcpy(m, t, sizeof(t));
 }
 
-/*
- Inverts a 4x4 matrix.
-
- This function can currently handle only pure translation-rotation matrices.
- Read http://www.gamedev.net/community/forums/topic.asp?topic_id=425118
- for an explanation.
+/**
+ * @brief Inverts a 4x4 matrix.
+ *
+ * @warning This function can currently handle only pure translation-rotation
+ * matrices. For an explanation, see:
+ * http://www.gamedev.net/community/forums/topic.asp?topic_id=425118
+ *
+ * @param m The matrix to be inverted. A 16-element array.
  */
 static void
 invert(GLfloat *m)
@@ -391,7 +488,18 @@ invert(GLfloat *m)
    multiply(m, t);
 }
 
-// Calculate a perspective projection transformation.
+/**
+ * @brief Calculates a perspective projection transformation matrix.
+ *
+ * This function creates a matrix for a perspective projection, similar to
+ * `gluPerspective`.
+ *
+ * @param m The destination matrix. A 16-element array.
+ * @param fovy The field of view angle, in degrees, in the y direction.
+ * @param aspect The aspect ratio of the viewport (width/height).
+ * @param zNear The distance to the near clipping plane.
+ * @param zFar The distance to the far clipping plane.
+ */
 static void
 perspective(GLfloat *m, GLfloat fovy, GLfloat aspect, GLfloat zNear, GLfloat zFar)
 {
@@ -420,7 +528,23 @@ perspective(GLfloat *m, GLfloat fovy, GLfloat aspect, GLfloat zNear, GLfloat zFa
    memcpy(m, tmp, sizeof(tmp));
 }
 
-// Draws a gear
+/**
+ * @brief Draws a single gear with a specific transformation and color.
+ *
+ * This function sets up the model-view matrix for a single gear, applies
+ * transformations, sets shader uniforms, and then issues the draw calls
+ * to render the gear.
+ *
+ * @param gld The GL data structure for the application.
+ * @param gear The gear to be drawn.
+ * @param transform The base transformation matrix for the scene.
+ * @param tx The translation on the x-axis for this gear.
+ * @param ty The translation on the y-axis for this gear.
+ * @param tz The translation on the z-axis for this gear.
+ * @param angle The rotation angle for this gear around the z-axis.
+ * @param rotate_gear A flag indicating if an additional rotation should be applied.
+ * @param color An array of 4 floats representing the RGBA color of the gear.
+ */
 static void
 draw_gear(GLData *gld, Gear *gear, GLfloat *transform,
           GLfloat tx, GLfloat ty, GLfloat tz,
@@ -479,6 +603,15 @@ draw_gear(GLData *gld, Gear *gear, GLfloat *transform,
    gl->glDisableVertexAttribArray(0);
 }
 
+/**
+ * @brief Draws the complete scene with all gears.
+ *
+ * It clears the color and depth buffers, sets up the view transformation matrix
+ * based on user input (view_rot), and then calls draw_gear() for each of the
+ * six gears with their respective positions, colors, and animations.
+ *
+ * @param gld The GL data structure for the application.
+ */
 static void
 gears_draw(GLData *gld)
 {
@@ -512,6 +645,15 @@ gears_draw(GLData *gld)
 
 //-------------------------//
 
+/**
+ * @brief Renders a single frame of the gears animation.
+ *
+ * If the `recreate_gears` flag is set, it first regenerates the gear
+ * geometry. Then it draws all the gears and updates the animation angle
+ * for the next frame.
+ *
+ * @param gld The GL data structure for the application.
+ */
 static void render_gears(GLData *gld)
 {
    if (gld->recreate_gears)
@@ -525,7 +667,13 @@ static void render_gears(GLData *gld)
    gld->angle += 2.0;
 }
 
-// new window size or exposure
+/**
+ * @brief Updates the viewport and projection matrix on window resize.
+ *
+ * @param gld The GL data structure for the application.
+ * @param width The new width of the GL view.
+ * @param height The new height of the GL view.
+ */
 static void
 gears_reshape(GLData *gld, int width, int height)
 {
@@ -577,6 +725,15 @@ static const char fragment_shader[] =
    "    gl_FragColor = color;\n"
    "}";
 
+/**
+ * @brief Creates or re-creates all gear models.
+ *
+ * This function first frees any existing gear data, then generates new gear
+ * models based on the current `gear_teeth` count in the GLData structure.
+ * This is called when the number of teeth is changed by the user.
+ *
+ * @param gld The GL data structure for the application.
+ */
 static void
 create_gears(GLData *gld)
 {
@@ -600,6 +757,15 @@ create_gears(GLData *gld)
    //printf("Teeth: %d, Total Number of vertices %d\n", gld->gear_teeth, gld->tot_vertices);
 }
 
+/**
+ * @brief Initializes OpenGL state, shaders, and gear models.
+ *
+ * Compiles and links the vertex and fragment shaders, gets uniform locations,
+ * and sets up initial OpenGL states like depth testing and face culling.
+ * It also triggers the initial creation of the gear geometry.
+ *
+ * @param gld The GL data structure for the application.
+ */
 static void
 gears_init(GLData *gld)
 {
@@ -645,6 +811,13 @@ gears_init(GLData *gld)
    create_gears(gld);
 }
 
+/**
+ * @brief Initializes the GLData structure with default values.
+ *
+ * Sets initial view rotation, light position, animation angle, and gear teeth count.
+ *
+ * @param gld The GLData structure to initialize.
+ */
 static void
 gldata_init(GLData *gld)
 {
@@ -668,6 +841,14 @@ gldata_init(GLData *gld)
 
 //-------------------------//
 
+/**
+ * @brief The GLView initialization callback.
+ *
+ * This function is called when the GLView is ready. It retrieves the GL API
+ * and calls the main OpenGL initialization function.
+ *
+ * @param obj The Evas_Object (GLView) that triggered the callback.
+ */
 static void
 _init_gl(Evas_Object *obj)
 {
@@ -678,6 +859,15 @@ _init_gl(Evas_Object *obj)
    gears_init(gld);
 }
 
+/**
+ * @brief The GLView deletion callback.
+ *
+ * This function is called when the GLView is being destroyed. It cleans up
+ * all allocated OpenGL resources (shaders, programs, buffers) and application
+ * data.
+ *
+ * @param obj The Evas_Object (GLView) that triggered the callback.
+ */
 static void
 _del_gl(Evas_Object *obj)
 {
@@ -705,6 +895,14 @@ _del_gl(Evas_Object *obj)
 
 }
 
+/**
+ * @brief The GLView resize callback.
+ *
+ * This function is called when the GLView is resized. It updates the
+ * OpenGL viewport and projection matrix.
+ *
+ * @param obj The Evas_Object (GLView) that triggered the callback.
+ */
 static void
 _resize_gl(Evas_Object *obj)
 {
@@ -717,6 +915,14 @@ _resize_gl(Evas_Object *obj)
 }
 
 
+/**
+ * @brief The GLView rendering callback.
+ *
+ * This function is called whenever the GLView needs to be redrawn. It
+ * calls the main gear rendering function.
+ *
+ * @param obj The Evas_Object (GLView) that triggered the callback.
+ */
 static void
 _draw_gl(Evas_Object *obj)
 {
@@ -728,6 +934,15 @@ _draw_gl(Evas_Object *obj)
    gl->glFinish();
 }
 
+/**
+ * @brief The animator callback for continuous rendering.
+ *
+ * This function is called by an Ecore_Animator on every frame. It simply
+ * marks the GLView as "changed", which triggers a redraw.
+ *
+ * @param data The Evas_Object (GLView) to be updated.
+ * @return EINA_TRUE to keep the animator running.
+ */
 static Eina_Bool
 _anim(void *data)
 {
@@ -735,6 +950,15 @@ _anim(void *data)
    return EINA_TRUE;
 }
 
+/**
+ * @brief An idler callback to safely delete the window.
+ *
+ * Scheduled by _on_done to delete the main window in the next main loop
+ * iteration, which is safer than deleting it directly from an event handler.
+ *
+ * @param data The Evas_Object (window) to be deleted.
+ * @return ECORE_CALLBACK_CANCEL to run only once.
+ */
 static Eina_Bool
 _quit_idler(void *data)
 {
@@ -743,12 +967,31 @@ _quit_idler(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Callback for the "Close" button.
+ *
+ * Schedules an idler to quit the application.
+ *
+ * @param data The Evas_Object (window) passed from the smart callback.
+ * @param obj The button object that was clicked.
+ * @param event_info Unused.
+ */
 static void
 _on_done(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    ecore_idler_add(_quit_idler, data);
 }
 
+/**
+ * @brief Callback for the "+ Teeth" button.
+ *
+ * Increments the number of gear teeth and sets a flag to regenerate the
+ * gear models in the next frame.
+ *
+ * @param data The Evas_Object (GLView) passed from the smart callback.
+ * @param obj The button object that was clicked.
+ * @param event_info Unused.
+ */
 static void
 _on_plus(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -757,6 +1000,15 @@ _on_plus(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    gld->recreate_gears = 1;
 }
 
+/**
+ * @brief Callback for the "- Teeth" button.
+ *
+ * Decrements the number of gear teeth if it is greater than 0.
+ *
+ * @param data The Evas_Object (GLView) passed from the smart callback.
+ * @param obj The button object that was clicked.
+ * @param event_info Unused.
+ */
 static void
 _on_minus(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -768,6 +1020,16 @@ _on_minus(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED
      }
 }
 
+/**
+ * @brief Callback for the GLView's EVAS_CALLBACK_DEL event.
+ *
+ * Ensures the animator is deleted when the GLView object is deleted.
+ *
+ * @param data Unused.
+ * @param evas Unused.
+ * @param obj The GLView object being deleted.
+ * @param event_info Unused.
+ */
 static void
 _del(void *data EINA_UNUSED, Evas *evas EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -775,6 +1037,16 @@ _del(void *data EINA_UNUSED, Evas *evas EINA_UNUSED, Evas_Object *obj, void *eve
    ecore_animator_del(ani);
 }
 
+/**
+ * @brief Callback for key down events on the GLView.
+ *
+ * Handles 'Up' and 'Down' arrow keys to change the number of gear teeth.
+ *
+ * @param data Unused.
+ * @param e Unused.
+ * @param obj The GLView object that received the event.
+ * @param event_info The key down event details.
+ */
 static void
 _key_down(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info)
 {
@@ -797,6 +1069,16 @@ _key_down(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *e
      }
 }
 
+/**
+ * @brief Callback for mouse down events on the GLView.
+ *
+ * Sets a flag to indicate that mouse dragging has started for rotating the view.
+ *
+ * @param data Unused.
+ * @param e Unused.
+ * @param obj The GLView object that received the event.
+ * @param event_info Unused.
+ */
 static void
 _mouse_down(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -804,6 +1086,17 @@ _mouse_down(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void 
    gld->mouse_down = 1;
 }
 
+/**
+ * @brief Callback for mouse move events on the GLView.
+ *
+ * If the mouse button is down, it updates the view rotation based on the
+ * mouse movement delta.
+ *
+ * @param data Unused.
+ * @param e Unused.
+ * @param obj The GLView object that received the event.
+ * @param event_info The mouse move event details.
+ */
 static void
 _mouse_move(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info)
 {
@@ -822,6 +1115,16 @@ _mouse_move(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void 
      }
 }
 
+/**
+ * @brief Callback for mouse up events on the GLView.
+ *
+ * Unsets the flag to indicate that mouse dragging has ended.
+ *
+ * @param data Unused.
+ * @param e Unused.
+ * @param obj The GLView object that received the event.
+ * @param event_info Unused.
+ */
 static void
 _mouse_up(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -830,6 +1133,17 @@ _mouse_up(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *e
 }
 
 //---------------------------//
+/**
+ * @brief Main function to set up and run the many gears test.
+ *
+ * This function creates the window, a GLView widget, control buttons, and
+ * sets up all the necessary callbacks for event handling and rendering. It
+ * serves as the entry point for this test case.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_glview_manygears(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

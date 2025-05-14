@@ -18,12 +18,26 @@
 
 #define MY_CLASS EFL_NET_SERVER_UDP_CLIENT_CLASS
 
+/**
+ * @internal
+ * @brief Represents a single UDP packet received for a client.
+ *
+ * This structure is used to queue incoming UDP packets before they are
+ * read by the application. It contains the packet data as an Eina_Rw_Slice
+ * and is managed in an Eina_Inlist.
+ */
 typedef struct _Efl_Net_Server_Udp_Client_Packet
 {
-   EINA_INLIST;
-   Eina_Rw_Slice slice;
+   EINA_INLIST; /**< Macro to make this struct usable with Eina_Inlist */
+   Eina_Rw_Slice slice; /**< The actual data of the UDP packet. The memory for this slice is owned by this struct. */
 } Efl_Net_Server_Udp_Client_Packet;
 
+/**
+ * @internal
+ * @brief Frees an Efl_Net_Server_Udp_Client_Packet and its associated data.
+ *
+ * @param pkt The packet to free.
+ */
 static void
 _efl_net_server_udp_client_packet_free(Efl_Net_Server_Udp_Client_Packet *pkt)
 {
@@ -31,18 +45,26 @@ _efl_net_server_udp_client_packet_free(Efl_Net_Server_Udp_Client_Packet *pkt)
    free(pkt);
 }
 
+/**
+ * @internal
+ * @brief Private data for the Efl_Net_Server_Udp_Client class.
+ *
+ * This structure holds all the internal state for a UDP client object,
+ * including its addresses, queued packets, remote address information,
+ * and state flags.
+ */
 typedef struct _Efl_Net_Server_Udp_Client_Data
 {
-   Eina_Stringshare *address_local;
-   Eina_Stringshare *address_remote;
-   Eina_Inlist *packets;
-   struct sockaddr *addr_remote;
-   socklen_t addr_remote_len;
-   SOCKET fd;
-   Eina_Bool close_on_invalidate;
-   Eina_Bool eos;
-   Eina_Bool can_read;
-   Eina_Bool can_write;
+   Eina_Stringshare *address_local; /**< The local address string (e.g., "192.168.1.5:1234"). */
+   Eina_Stringshare *address_remote; /**< The remote client's address string (e.g., "10.0.0.1:5678"). */
+   Eina_Inlist *packets; /**< A list of Efl_Net_Server_Udp_Client_Packet, queuing incoming data. */
+   struct sockaddr *addr_remote; /**< The low-level socket address structure for the remote client. */
+   socklen_t addr_remote_len; /**< The length of addr_remote. */
+   SOCKET fd; /**< The server's file descriptor, used for sending replies. This is not a per-client FD. */
+   Eina_Bool close_on_invalidate; /**< If true, close the client when the object is invalidated. */
+   Eina_Bool eos; /**< End Of Stream. True if no more data will be received. */
+   Eina_Bool can_read; /**< True if there is data available to be read. */
+   Eina_Bool can_write; /**< True if the client is able to send data. For UDP, this is generally always true if not closed. */
 } Efl_Net_Server_Udp_Client_Data;
 
 EOLIAN static Efl_Object *
@@ -54,6 +76,16 @@ _efl_net_server_udp_client_efl_object_finalize(Eo *o, Efl_Net_Server_Udp_Client_
    return o;
 }
 
+/**
+ * @internal
+ * @brief Cleans up resources associated with a UDP client.
+ *
+ * This function resets the file descriptor to an invalid state and frees
+ * all queued packets. It's typically called when the client is closed
+ * or destroyed.
+ *
+ * @param pd The private data of the Efl_Net_Server_Udp_Client.
+ */
 static void
 _efl_net_server_udp_client_cleanup(Efl_Net_Server_Udp_Client_Data *pd)
 {
@@ -95,6 +127,21 @@ _efl_net_server_udp_client_efl_object_destructor(Eo *o, Efl_Net_Server_Udp_Clien
    pd->addr_remote_len = 0;
 }
 
+/**
+ * @internal
+ * @brief Initializes a new UDP client instance.
+ *
+ * This function is called by the server when a new client (identified by
+ * its unique source address and port) sends a packet. It sets up the
+ * client's remote address information and associates it with the server's
+ * file descriptor.
+ *
+ * @param o The Efl_Net_Server_Udp_Client object.
+ * @param fd The server's socket file descriptor.
+ * @param addr The sockaddr structure of the remote client.
+ * @param addrlen The length of the addr structure.
+ * @param str The string representation of the remote client's address.
+ */
 void
 _efl_net_server_udp_client_init(Eo *o, SOCKET fd, const struct sockaddr *addr, socklen_t addrlen, const char *str)
 {
@@ -107,6 +154,20 @@ _efl_net_server_udp_client_init(Eo *o, SOCKET fd, const struct sockaddr *addr, s
    efl_net_socket_address_remote_set(o, str);
 }
 
+/**
+ * @internal
+ * @brief Feeds incoming data (a UDP packet) to a client.
+ *
+ * This function is called by the server when it receives a UDP packet
+ * destined for this client. The data is encapsulated in an
+ * Efl_Net_Server_Udp_Client_Packet and added to the client's incoming
+ * packet queue. It also signals that the client `can_read`.
+ *
+ * @param o The Efl_Net_Server_Udp_Client object.
+ * @param slice The Eina_Rw_Slice containing the received packet data.
+ *              The ownership of the memory in the slice is transferred
+ *              to the client object.
+ */
 void
 _efl_net_server_udp_client_feed(Eo *o, Eina_Rw_Slice slice)
 {

@@ -21,9 +21,20 @@ static Evas_Native_Tbm_Surface_Stride_Get_Call  glsym__evas_native_tbm_surface_s
 typedef struct _Render_Engine Render_Engine;
 struct _Render_Engine
 {
-   Render_Output_Software_Generic generic;
+   Render_Output_Software_Generic generic; /**< Generic software rendering data. */
 };
 
+/**
+ * @brief Sets up the rendering engine output.
+ *
+ * Initializes the output buffer and the generic software rendering engine.
+ *
+ * @param engine The Evas engine pointer (unused).
+ * @param info Pointer to Evas_Engine_Info_Wayland containing Wayland-specific info.
+ * @param w Initial width of the output surface.
+ * @param h Initial height of the output surface.
+ * @return A pointer to the allocated Render_Engine structure, or NULL on failure.
+ */
 static void *
 eng_output_setup(void *engine, void *info, unsigned int w, unsigned int h)
 {
@@ -68,6 +79,13 @@ err:
    return NULL;
 }
 
+/**
+ * @brief Dynamically links symbols from the generic software engine.
+ *
+ * This function uses dlsym to find symbols related to TBM native surfaces
+ * which are provided by the linked software_generic engine module. This
+ * avoids a direct build dependency. It only runs once.
+ */
 static void
 _symbols(void)
 {
@@ -86,6 +104,14 @@ _symbols(void)
 }
 
 /* ENGINE API FUNCTIONS WE PROVIDE */
+
+/**
+ * @brief Sets up initial engine information.
+ *
+ * Configures default settings for the Wayland engine info structure.
+ *
+ * @param info Pointer to the Evas_Engine_Info_Wayland structure to setup.
+ */
 static void
 eng_output_info_setup(void *info)
 {
@@ -93,9 +119,20 @@ eng_output_info_setup(void *info)
 
    LOGFN;
 
+   /* Default to blocking render mode */
    einfo->render_mode = EVAS_RENDER_MODE_BLOCKING;
 }
 
+/**
+ * @brief Handles resizing of the output surface.
+ *
+ * Reconfigures the output buffer and tile buffer to match the new dimensions.
+ *
+ * @param engine The Evas engine pointer (unused).
+ * @param data Pointer to the Render_Engine structure.
+ * @param w The new width.
+ * @param h The new height.
+ */
 static void
 eng_output_resize(void *engine EINA_UNUSED, void *data, int w, int h)
 {
@@ -119,6 +156,19 @@ eng_output_resize(void *engine EINA_UNUSED, void *data, int w, int h)
    re->generic.h = h;
 }
 
+/**
+ * @brief Performs an update (redraw) of the output surface.
+ *
+ * Checks if the display connection changed, resizes if necessary, and
+ * triggers the generic software rendering update process.
+ *
+ * @param engine The Evas engine pointer.
+ * @param data Pointer to the Render_Engine structure.
+ * @param info Pointer to Evas_Engine_Info_Wayland containing Wayland-specific info.
+ * @param w The current width of the output surface.
+ * @param h The current height of the output surface.
+ * @return Always returns 1 (success).
+ */
 static int
 eng_output_update(void *engine, void *data, void *info, unsigned int w, unsigned int h)
 {
@@ -146,6 +196,15 @@ eng_output_update(void *engine, void *data, void *info, unsigned int w, unsigned
    return 1;
 }
 
+/**
+ * @brief Frees the resources associated with the engine output.
+ *
+ * Cleans up the generic software engine resources and frees the
+ * Render_Engine structure itself.
+ *
+ * @param engine The Evas engine pointer.
+ * @param data Pointer to the Render_Engine structure to free.
+ */
 static void
 eng_output_free(void *engine, void *data)
 {
@@ -158,6 +217,12 @@ eng_output_free(void *engine, void *data)
      }
 }
 
+/**
+ * @brief Initializes native surface support for a given type.
+ * @param engine The Evas engine pointer (unused).
+ * @param type The type of native surface to initialize (e.g., TBM, EvasGL).
+ * @return 1 on success, 0 on failure or unsupported type.
+ */
 static int
 eng_image_native_init(void *engine EINA_UNUSED, Evas_Native_Surface_Type type)
 {
@@ -173,6 +238,11 @@ eng_image_native_init(void *engine EINA_UNUSED, Evas_Native_Surface_Type type)
      }
 }
 
+/**
+ * @brief Shuts down native surface support for a given type.
+ * @param engine The Evas engine pointer (unused).
+ * @param type The type of native surface to shut down.
+ */
 static void
 eng_image_native_shutdown(void *engine EINA_UNUSED, Evas_Native_Surface_Type type)
 {
@@ -187,6 +257,10 @@ eng_image_native_shutdown(void *engine EINA_UNUSED, Evas_Native_Surface_Type typ
      }
 }
 
+/**
+ * @brief Frees resources associated with an EvasGL native surface attached to an image.
+ * @param image Pointer to the RGBA_Image whose EvasGL native data should be freed.
+ */
 static void
 _native_evasgl_free(void *image)
 {
@@ -201,6 +275,18 @@ _native_evasgl_free(void *image)
    free(n);
 }
 
+/**
+ * @brief Sets a native surface for an Evas image.
+ *
+ * Associates a native surface (like TBM or EvasGL) with an Evas image object.
+ * This might involve replacing the image's pixel data with a cached version
+ * or setting up specific native surface handling functions.
+ *
+ * @param engine The Evas engine pointer (unused).
+ * @param image Pointer to the Evas image (Image_Entry/RGBA_Image).
+ * @param native Pointer to the Evas_Native_Surface structure describing the native surface.
+ * @return Pointer to the (potentially modified) Evas image, or the original image on failure.
+ */
 static void *
 eng_image_native_set(void *engine EINA_UNUSED, void *image, void *native)
 {
@@ -278,6 +364,12 @@ eng_image_native_set(void *engine EINA_UNUSED, void *image, void *native)
    return im;
 }
 
+/**
+ * @brief Gets the native surface associated with an Evas image.
+ * @param engine The Evas engine pointer (unused).
+ * @param image Pointer to the Evas image (RGBA_Image).
+ * @return Pointer to the Evas_Native_Surface structure if associated, otherwise NULL.
+ */
 static void *
 eng_image_native_get(void *engine EINA_UNUSED, void *image)
 {
@@ -290,6 +382,17 @@ eng_image_native_get(void *engine EINA_UNUSED, void *image)
 }
 
 /* EVAS MODULE FUNCTIONS */
+
+/**
+ * @brief Opens and initializes the Wayland SHM engine module.
+ *
+ * Inherits functions from the "software_generic" engine, sets up logging,
+ * overrides necessary engine functions with Wayland SHM specific implementations,
+ * resolves required symbols, and registers the engine functions.
+ *
+ * @param em Pointer to the Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -334,6 +437,13 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Closes the Wayland SHM engine module.
+ *
+ * Unregisters the logging domain used by the module.
+ *
+ * @param em Pointer to the Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

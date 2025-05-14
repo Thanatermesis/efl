@@ -43,6 +43,12 @@ typedef struct _Dummy
 {
 } _Dummy;
 
+/**
+ * @internal
+ * @brief Creates an Eet_Data_Descriptor for the Exactness_Action_Mouse_Wheel struct.
+ * This descriptor is used by Eet to serialize and deserialize mouse wheel actions.
+ * @return A new Eet_Data_Descriptor. It is cached and reused on subsequent calls.
+ */
 static Eet_Data_Descriptor *
 _mouse_wheel_desc_make(void)
 {
@@ -57,6 +63,11 @@ _mouse_wheel_desc_make(void)
    return _d;
 }
 
+/**
+ * @internal
+ * @brief Creates an Eet_Data_Descriptor for the Exactness_Action_Key_Down_Up struct.
+ * @return A new Eet_Data_Descriptor. It is cached and reused on subsequent calls.
+ */
 static Eet_Data_Descriptor *
 _key_down_up_desc_make(void)
 {
@@ -74,6 +85,11 @@ _key_down_up_desc_make(void)
    return _d;
 }
 
+/**
+ * @internal
+ * @brief Creates an Eet_Data_Descriptor for the Exactness_Action_Multi_Event struct.
+ * @return A new Eet_Data_Descriptor. It is cached and reused on subsequent calls.
+ */
 static Eet_Data_Descriptor *
 _multi_event_desc_make(void)
 {
@@ -98,6 +114,11 @@ _multi_event_desc_make(void)
    return _d;
 }
 
+/**
+ * @internal
+ * @brief Creates an Eet_Data_Descriptor for the Exactness_Action_Multi_Move struct.
+ * @return A new Eet_Data_Descriptor. It is cached and reused on subsequent calls.
+ */
 static Eet_Data_Descriptor *
 _multi_move_desc_make(void)
 {
@@ -120,6 +141,11 @@ _multi_move_desc_make(void)
    return _d;
 }
 
+/**
+ * @internal
+ * @brief Creates an Eet_Data_Descriptor for the Exactness_Action_Efl_Event struct.
+ * @return A new Eet_Data_Descriptor. It is cached and reused on subsequent calls.
+ */
 static Eet_Data_Descriptor *
 _efl_event_desc_make(void)
 {
@@ -134,6 +160,11 @@ _efl_event_desc_make(void)
    return _d;
 }
 
+/**
+ * @internal
+ * @brief Creates an Eet_Data_Descriptor for the Exactness_Action_Click_On struct.
+ * @return A new Eet_Data_Descriptor. It is cached and reused on subsequent calls.
+ */
 static Eet_Data_Descriptor *
 _click_on_desc_make(void)
 {
@@ -147,6 +178,11 @@ _click_on_desc_make(void)
    return _d;
 }
 
+/**
+ * @internal
+ * @brief Creates an Eet_Data_Descriptor for actions that have no associated data.
+ * @return A new Eet_Data_Descriptor for an empty struct.
+ */
 static Eet_Data_Descriptor *
 _dummy_desc_make(void)
 {
@@ -183,6 +219,15 @@ _exactness_action_type_to_string_get(Exactness_Action_Type type)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Eet callback to get the type name of a variant member.
+ * This is used for the `data` field in the `Exactness_Action` struct,
+ * which can hold different types of structs depending on `type`.
+ * @param data Pointer to the `Exactness_Action` struct.
+ * @param[out] unknow Set to EINA_TRUE if the type is unknown.
+ * @return A string identifying the type of the `data` member.
+ */
 static const char *
 _variant_type_get(const void *data, Eina_Bool  *unknow)
 {
@@ -194,6 +239,17 @@ _variant_type_get(const void *data, Eina_Bool  *unknow)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Eet callback to set the type of a variant member.
+ * This is used when deserializing to set the `type` field in the
+ * `Exactness_Action` struct based on the name of the variant type found
+ * in the EET file.
+ * @param type The string name of the type from the EET file.
+ * @param data Pointer to the `Exactness_Action` struct to be filled.
+ * @param unknow EINA_TRUE if the type was unknown.
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _variant_type_set(const char *type,
                   void       *data,
@@ -208,6 +264,17 @@ _variant_type_set(const char *type,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Creates the master Eet_Data_Descriptor for the Exactness_Unit struct.
+ *
+ * This function is the core of the serialization logic. It recursively builds
+ * data descriptors for all the nested types within an `Exactness_Unit`.
+ * The descriptors are created once and then cached in static variables for
+ * efficiency.
+ *
+ * @return The Eet_Data_Descriptor for `Exactness_Unit`.
+ */
 static Eet_Data_Descriptor *
 _unit_desc_make(void)
 {
@@ -312,19 +379,26 @@ exactness_unit_file_read(const char *filename)
               NULL, NULL, NULL);
         unit->imgs = eina_list_append(unit->imgs, ex_img);
      }
+   /* Reconstruct the object tree from the flat list read from the file.
+    * The file stores all objects in a single list (`e_objs->objs`).
+    * Here, we iterate through them to rebuild the parent-child relationships. */
    EINA_LIST_FOREACH(unit->objs, itr, e_objs)
      {
+        /* Create a hash table for quick lookup of objects by their ID. */
         Eina_Hash *hash = eina_hash_pointer_new(NULL);
         EINA_LIST_FOREACH(e_objs->objs, itr2, e_obj)
           {
              eina_hash_set(hash, &(e_obj->id), e_obj);
           }
+        /* Iterate again to link children to their parents. */
         EINA_LIST_FOREACH(e_objs->objs, itr2, e_obj)
           {
              if (!e_obj->parent_id)
+                /* Objects with no parent are roots. */
                 e_objs->main_objs = eina_list_append(e_objs->main_objs, e_obj);
              else
                {
+                  /* Find the parent in the hash and add this object to its children list. */
                   e_parent = eina_hash_find(hash, &(e_obj->parent_id));
                   if (e_parent) e_parent->children = eina_list_append(e_parent->children, e_obj);
                }
@@ -402,6 +476,9 @@ exactness_image_compare(Exactness_Image *img1, Exactness_Image *img2, Exactness_
                {
                   if (px1 != px2)
                     {
+                       /* Pixels differ: mark them in red in the diff image.
+                        * The green and blue components are a dimmed average of the two
+                        * original pixels to give some context. */
                        new_r = 0xFF;
                        new_g = ((g1 + g2) >> 1) >> 2;
                        new_b = ((b1 + b2) >> 1) >> 2;
@@ -409,6 +486,8 @@ exactness_image_compare(Exactness_Image *img1, Exactness_Image *img2, Exactness_
                     }
                   else
                     {
+                       /* Pixels are the same: show them as a brightened greyscale
+                        * in the diff image. */
                        new_r = (((r1 + r2) >> 1) >> 2) + 0xC0;
                        new_g = (((g1 + g2) >> 1) >> 2) + 0xC0;
                        new_b = (((b1 + b2) >> 1) >> 2) + 0xC0;

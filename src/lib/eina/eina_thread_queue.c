@@ -19,6 +19,36 @@
 // contention at all
 #define RW_SPINLOCK 1
 
+/**
+ * @internal
+ * @def RWLOCK
+ * @brief Macro to define the type of Read-Write lock to use.
+ * Defaults to Eina_Spinlock if RW_SPINLOCK is defined, otherwise Eina_Lock.
+ */
+
+/**
+ * @internal
+ * @def RWLOCK_NEW
+ * @brief Macro to create a new Read-Write lock.
+ */
+
+/**
+ * @internal
+ * @def RWLOCK_FREE
+ * @brief Macro to free a Read-Write lock.
+ */
+
+/**
+ * @internal
+ * @def RWLOCK_LOCK
+ * @brief Macro to acquire/take a Read-Write lock.
+ */
+
+/**
+ * @internal
+ * @def RWLOCK_UNLOCK
+ * @brief Macro to release a Read-Write lock.
+ */
 #ifdef RW_SPINLOCK
 #define RWLOCK           Eina_Spinlock
 #define RWLOCK_NEW(x)    eina_spinlock_new(x)
@@ -35,58 +65,92 @@
 
 typedef struct _Eina_Thread_Queue_Msg_Block Eina_Thread_Queue_Msg_Block;
 
+/**
+ * @internal
+ * @struct _Eina_Thread_Queue
+ * @brief Internal structure representing a thread queue.
+ *
+ * This structure holds all the state for a thread queue, including pointers
+ * to message blocks, locks, semaphores, and configuration like parent queue
+ * or associated file descriptor.
+ */
 struct _Eina_Thread_Queue
 {
-   Eina_Thread_Queue_Msg_Block  *data; // all the data being written to
-   Eina_Thread_Queue_Msg_Block  *last; // the last block where new data goes
-   Eina_Thread_Queue_Msg_Block  *read; // block when reading starts from data
-   Eina_Thread_Queue            *parent; // parent queue to wake on send
-   RWLOCK                        lock_read; // a lock for when doing reads
-   RWLOCK                        lock_write; // a lock for doing writes
-   Eina_Semaphore                sem; // signalling - one per message
+   Eina_Thread_Queue_Msg_Block  *data; /**< Pointer to the first message block available for writing. */
+   Eina_Thread_Queue_Msg_Block  *last; /**< Pointer to the last message block where new data is appended. */
+   Eina_Thread_Queue_Msg_Block  *read; /**< Pointer to the current message block being read from. */
+   Eina_Thread_Queue            *parent; /**< Optional parent queue to notify when a message is sent to this queue. */
+   RWLOCK                        lock_read; /**< Lock to protect read operations and `read` block manipulation. */
+   RWLOCK                        lock_write; /**< Lock to protect write operations and `data`/`last` block manipulation. */
+   Eina_Semaphore                sem; /**< Semaphore used for signaling message availability. Incremented on send, decremented on wait. */
 #ifndef ATOMIC
-   Eina_Spinlock                 lock_pending; // lock for pending field
+   Eina_Spinlock                 lock_pending; /**< Spinlock to protect the `pending` counter if atomic operations are not available. */
 #endif
-   int                           pending; // how many messages left to read
-   int                           fd; // optional fd to write byte to on msg
+   int                           pending; /**< Count of messages currently pending in the queue. */
+   int                           fd; /**< Optional file descriptor to write a byte to when a message is sent. -1 if not set. */
 };
 
+/**
+ * @internal
+ * @union _Eina_Thread_Queue_Msg_Aligned
+ * @brief Union to ensure proper alignment for messages within a message block.
+ *
+ * Messages are always 8-byte aligned. This union helps enforce that by
+ * including types that typically require such alignment.
+ */
 typedef union _Eina_Thread_Queue_Msg_Aligned Eina_Thread_Queue_Msg_Aligned;
 
 union _Eina_Thread_Queue_Msg_Aligned
 {
-   Eina_Thread_Queue_Msg         msg; // actual message
-   void*                         alignment_for_ptr;
-   long long                     alignment_for_integer;
-   double                        alignment_for_floating_point_1;
-   long double                   alignment_for_floating_point_2;
+   Eina_Thread_Queue_Msg         msg; /**< The actual message header. */
+   void*                         alignment_for_ptr; /**< Pointer type for alignment. */
+   long long                     alignment_for_integer; /**< Long long for integer alignment. */
+   double                        alignment_for_floating_point_1; /**< Double for floating point alignment. */
+   long double                   alignment_for_floating_point_2; /**< Long double for further floating point alignment. */
 };
 
+/**
+ * @internal
+ * @struct _Eina_Thread_Queue_Msg_Block
+ * @brief Internal structure representing a block of memory for storing messages.
+ *
+ * Thread queues manage messages in contiguous blocks of memory. This structure
+ * defines such a block, which can be part of a linked list of blocks.
+ */
 struct _Eina_Thread_Queue_Msg_Block
 {
-   Eina_Thread_Queue_Msg_Block  *next; // next block in the list
-   Eina_Lock                     lock_non_0_ref; // block non-0 ref state
+   Eina_Thread_Queue_Msg_Block  *next; /**< Pointer to the next message block in the chain, if any. */
+   Eina_Lock                     lock_non_0_ref; /**< Lock used to ensure safe deallocation when ref count transitions to/from zero. */
 #ifndef ATOMIC
-   Eina_Spinlock                 lock_ref; // lock for ref field
-   Eina_Spinlock                 lock_first; // lock for first field
+   Eina_Spinlock                 lock_ref; /**< Spinlock to protect the `ref` counter if atomic operations are not available. */
+   Eina_Spinlock                 lock_first; /**< Spinlock to protect the `first` offset if atomic operations are not available. */
 #endif
-   int                           ref; // the number of open reads/writes
-   int                           size; // the total allocated bytes of data[]
-   int                           first; // the byte pos of the first msg
-   int                           last; // the byte pos just after the last msg
-   Eina_Bool                     full : 1; // is this block full yet?
-   Eina_Thread_Queue_Msg_Aligned data[1]; // data in memory beyond struct end
+   int                           ref; /**< Reference count for this block (number of active readers/writers). */
+   int                           size; /**< Total allocated size of the `data` field in bytes. */
+   int                           first; /**< Byte offset of the first message to be read in this block. */
+   int                           last; /**< Byte offset indicating the end of the last written message in this block. */
+   Eina_Bool                     full : 1; /**< Flag indicating if this block is completely full. */
+   Eina_Thread_Queue_Msg_Aligned data[1]; /**< Flexible array member holding the actual message data. Messages are stored contiguously here. */
 };
 
+/**
+ * @internal
+ * @def MIN_SIZE
+ * @brief The minimum size for a new message block.
+ * This is typically page-aligned minus the header size to optimize memory use.
+ * It's set to 4096 bytes minus the size of `Eina_Thread_Queue_Msg_Block`
+ * (excluding the flexible array member `data`) plus one `Eina_Thread_Queue_Msg_Aligned` unit.
+ */
 // the minimum size of any message block holding 1 or more messages
 #define MIN_SIZE ((int)(4096 - sizeof(Eina_Thread_Queue_Msg_Block) + sizeof(Eina_Thread_Queue_Msg_Aligned)))
 
-// a pool of spare message blocks that are only of the minimum size so we
-// avoid reallocation via malloc/free etc. to avoid free memory pages and
-// pressure on the malloc subsystem
+/** @internal @brief Logging domain for eina_thread_queue. */
 static int _eina_thread_queue_log_dom = -1;
+/** @internal @brief Count of blocks currently in the spare block pool. */
 static int _eina_thread_queue_block_pool_count = 0;
+/** @internal @brief Spinlock to protect access to the spare block pool. */
 static Eina_Spinlock _eina_thread_queue_block_pool_lock;
+/** @internal @brief Pool of pre-allocated spare message blocks of MIN_SIZE. */
 static Eina_Thread_Queue_Msg_Block *_eina_thread_queue_block_pool = NULL;
 
 #ifdef ERR
@@ -100,6 +164,18 @@ static Eina_Thread_Queue_Msg_Block *_eina_thread_queue_block_pool = NULL;
 #define DBG(...) EINA_LOG_DOM_DBG(_eina_thread_queue_log_dom, __VA_ARGS__)
 
 // api's to get message blocks from the pool or put them back in
+
+/**
+ * @internal
+ * @brief Allocates or retrieves a message block of at least the specified size.
+ *
+ * Attempts to reuse a block from `_eina_thread_queue_block_pool` if a suitable one
+ * (size >= requested size) is available. Otherwise, allocates a new block.
+ * Initializes the block's metadata (first, last, ref, full).
+ *
+ * @param size The minimum required size for the data area of the block.
+ * @return A pointer to an initialized Eina_Thread_Queue_Msg_Block, or NULL on allocation failure.
+ */
 static Eina_Thread_Queue_Msg_Block *
 _eina_thread_queue_msg_block_new(int size)
 {
@@ -147,6 +223,16 @@ _eina_thread_queue_msg_block_new(int size)
    return blk;
 }
 
+/**
+ * @internal
+ * @brief Actually frees the memory associated with a message block.
+ *
+ * This function handles the final deallocation of a block, including freeing
+ * its associated locks. It should be called when a block is no longer needed
+ * and not being returned to a pool.
+ *
+ * @param blk The message block to free.
+ */
 static void
 _eina_thread_queue_msg_block_real_free(Eina_Thread_Queue_Msg_Block *blk)
 {
@@ -164,6 +250,16 @@ _eina_thread_queue_msg_block_real_free(Eina_Thread_Queue_Msg_Block *blk)
    free(blk);
 }
 
+/**
+ * @internal
+ * @brief Frees a message block, potentially returning it to a pool.
+ *
+ * If the block's size is `MIN_SIZE` and the pool is not full, the block is
+ * added to `_eina_thread_queue_block_pool` for reuse. Otherwise, the block
+ * is freed using `_eina_thread_queue_msg_block_real_free()`.
+ *
+ * @param blk The message block to free or pool.
+ */
 static void
 _eina_thread_queue_msg_block_free(Eina_Thread_Queue_Msg_Block *blk)
 {
@@ -186,12 +282,26 @@ _eina_thread_queue_msg_block_free(Eina_Thread_Queue_Msg_Block *blk)
    else _eina_thread_queue_msg_block_real_free(blk);
 }
 
+/**
+ * @internal
+ * @brief Initializes the message block pool.
+ *
+ * Specifically, this initializes the spinlock used to protect the pool.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _eina_thread_queue_msg_block_pool_init(void)
 {
    return eina_spinlock_new(&_eina_thread_queue_block_pool_lock);
 }
 
+/**
+ * @internal
+ * @brief Shuts down and cleans up the message block pool.
+ *
+ * Frees all blocks currently in the pool and then frees the pool's spinlock.
+ */
 static void
 _eina_thread_queue_msg_block_pool_shutdown(void)
 {
@@ -214,6 +324,16 @@ _eina_thread_queue_msg_block_pool_shutdown(void)
 }
 
 // utility functions for waiting/waking threads
+
+/**
+ * @internal
+ * @brief Waits on the thread queue's semaphore.
+ *
+ * This function is called when a thread needs to wait for a message to become
+ * available in the queue. It blocks until the semaphore is released.
+ *
+ * @param thq The thread queue to wait on.
+ */
 static void
 _eina_thread_queue_wait(Eina_Thread_Queue *thq)
 {
@@ -221,6 +341,15 @@ _eina_thread_queue_wait(Eina_Thread_Queue *thq)
      ERR("Thread queue semaphore lock/wait failed - bad things will happen");
 }
 
+/**
+ * @internal
+ * @brief Wakes up a thread waiting on the queue's semaphore.
+ *
+ * This function is called after a message has been successfully sent to the
+ * queue, to signal any waiting consumer.
+ *
+ * @param thq The thread queue whose semaphore should be released.
+ */
 static void
 _eina_thread_queue_wake(Eina_Thread_Queue *thq)
 {
@@ -231,6 +360,26 @@ _eina_thread_queue_wake(Eina_Thread_Queue *thq)
 // how to allocate or release memory within one of the message blocks for
 // an arbitrary sized bit of message data. the size always includes the
 // message header which tells you the size of that message
+
+/**
+ * @internal
+ * @brief Allocates space for a new message within a message block.
+ *
+ * This function finds or creates a suitable message block (`Eina_Thread_Queue_Msg_Block`)
+ * and reserves `size` bytes within it for a new message. The `size` is
+ * rounded up to the nearest 8-byte boundary. If the current `last` block
+ * is full or doesn't have enough space, a new block is allocated and
+ * appended.
+ * The reference count of the block (`blk->ref`) is incremented.
+ *
+ * @param thq The thread queue.
+ * @param size The requested size for the message (including its header).
+ * @param[out] blkret Pointer to store the message block where the message was allocated.
+ *             This is used as the `allocref` in the public API.
+ * @return A pointer to the allocated message space (Eina_Thread_Queue_Msg *),
+ *         or NULL if allocation fails (though current implementation might not return NULL directly here,
+ *         relying on _eina_thread_queue_msg_block_new to handle fatal errors).
+ */
 static Eina_Thread_Queue_Msg *
 _eina_thread_queue_msg_alloc(Eina_Thread_Queue *thq, int size, Eina_Thread_Queue_Msg_Block **blkret)
 {
@@ -290,6 +439,20 @@ _eina_thread_queue_msg_alloc(Eina_Thread_Queue *thq, int size, Eina_Thread_Queue
    return msg;
 }
 
+/**
+ * @internal
+ * @brief Finalizes a message allocation operation on a block.
+ *
+ * This function decrements the reference count of the given message block.
+ * It's called after a message has been written and is ready to be sent,
+ * effectively "releasing" the writer's claim on the block for that specific
+ * allocation operation. If the reference count drops to zero, it means there are
+ * no more active operations (allocations or fetches) on this block, and if it's
+ * also fully read, it can be freed.
+ *
+ * @param blk The message block on which an allocation was completed. This corresponds
+ *            to the `allocref` from `eina_thread_queue_send()`.
+ */
 static void
 _eina_thread_queue_msg_alloc_done(Eina_Thread_Queue_Msg_Block *blk)
 {
@@ -305,6 +468,22 @@ _eina_thread_queue_msg_alloc_done(Eina_Thread_Queue_Msg_Block *blk)
    if (ref == 0) eina_lock_release(&(blk->lock_non_0_ref));
 }
 
+/**
+ * @internal
+ * @brief Fetches the next available message from the thread queue.
+ *
+ * This function retrieves the next message from the `read` block of the queue.
+ * If the current `read` block is NULL or exhausted, it attempts to acquire the
+ * next block from the `data` chain (protected by `lock_write`).
+ * The `first` pointer in the block is advanced past the fetched message.
+ * The reference count of the block (`blk->ref`) is incremented.
+ *
+ * @param thq The thread queue.
+ * @param[out] blkret Pointer to store the message block from which the message was fetched.
+ *             This is used as the `allocref` in the public API.
+ * @return A pointer to the fetched message (Eina_Thread_Queue_Msg *), or NULL if
+ *         no message is available and no block could be prepared.
+ */
 static Eina_Thread_Queue_Msg *
 _eina_thread_queue_msg_fetch(Eina_Thread_Queue *thq, Eina_Thread_Queue_Msg_Block **blkret)
 {
@@ -359,6 +538,19 @@ _eina_thread_queue_msg_fetch(Eina_Thread_Queue *thq, Eina_Thread_Queue_Msg_Block
    return msg;
 }
 
+/**
+ * @internal
+ * @brief Finalizes a message fetch operation on a block.
+ *
+ * This function decrements the reference count of the given message block.
+ * It's called after a fetched message has been processed. If the reference
+ * count drops to zero and all messages in the block have been read
+ * (`first >= last`), the block is freed via `_eina_thread_queue_msg_block_free()`.
+ *
+ * @param blk The message block from which a message was fetched and processed.
+ *            This corresponds to the `allocref` from `eina_thread_queue_wait()`
+ *            or `eina_thread_queue_poll()`.
+ */
 static void
 _eina_thread_queue_msg_fetch_done(Eina_Thread_Queue_Msg_Block *blk)
 {

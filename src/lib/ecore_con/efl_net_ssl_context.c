@@ -21,16 +21,28 @@
  */
 void *efl_net_ssl_context_connection_new(Efl_Net_Ssl_Context *context);
 
+/**
+ * @brief Opaque handle for the platform-specific SSL context implementation.
+ * @internal
+ *
+ * This structure is defined in the platform-specific C files (e.g.,
+ * efl_net_ssl_ctx-openssl.c) and holds the actual SSL context data
+ * (like SSL_CTX* for OpenSSL).
+ */
 typedef struct _Efl_Net_Ssl_Ctx Efl_Net_Ssl_Ctx;
 
+/**
+ * @brief Configuration structure passed to the platform-specific SSL context setup.
+ * @internal
+ */
 typedef struct _Efl_Net_Ssl_Ctx_Config {
-   Efl_Net_Ssl_Cipher cipher;
-   Eina_Bool is_dialer;
-   Eina_Bool load_defaults;
-   Eina_List **certificates;
-   Eina_List **private_keys;
-   Eina_List **certificate_revocation_lists;
-   Eina_List **certificate_authorities;
+   Efl_Net_Ssl_Cipher cipher; /**< The SSL/TLS cipher suite to use. */
+   Eina_Bool is_dialer; /**< EINA_TRUE if this context is for a client (dialer), EINA_FALSE for a server (listener). */
+   Eina_Bool load_defaults; /**< EINA_TRUE to load default CA certificates from system paths. */
+   Eina_List **certificates; /**< Pointer to a list of paths to PEM-encoded certificate files. The list itself may be updated by the setup function. */
+   Eina_List **private_keys; /**< Pointer to a list of paths to PEM-encoded private key files. The list itself may be updated. */
+   Eina_List **certificate_revocation_lists; /**< Pointer to a list of paths to PEM-encoded CRL files. The list itself may be updated. */
+   Eina_List **certificate_authorities; /**< Pointer to a list of paths to PEM-encoded CA certificate files. The list itself may be updated. */
 } Efl_Net_Ssl_Ctx_Config;
 
 /**
@@ -88,23 +100,34 @@ static Eina_Error efl_net_ssl_ctx_hostname_set(Efl_Net_Ssl_Ctx *ctx, const char 
 
 #define MY_CLASS EFL_NET_SSL_CONTEXT_CLASS
 
+/**
+ * @brief Private data for the Efl_Net_Ssl_Context Eo object.
+ * @internal
+ */
 typedef struct _Efl_Net_Ssl_Context_Data
 {
-   Efl_Net_Ssl_Ctx ssl_ctx;
-   Eina_List *certificates;
-   Eina_List *private_keys;
-   Eina_List *certificate_revocation_lists;
-   Eina_List *certificate_authorities;
-   const char *hostname;
-   Efl_Net_Ssl_Cipher cipher;
-   Eina_Bool is_dialer;
-   Efl_Net_Ssl_Verify_Mode verify_mode;
-   Eina_Bool load_defaults;
-   Eina_Bool hostname_verify;
-   Eina_Bool did_handshake;
-   Eina_Bool can_read;
-   Eina_Bool eos;
-   Eina_Bool can_write;
+   Efl_Net_Ssl_Ctx ssl_ctx; /**< Platform-specific SSL context. */
+   Eina_List *certificates; /**< List of eina_stringshare'd paths to PEM-encoded certificate files. */
+   Eina_List *private_keys; /**< List of eina_stringshare'd paths to PEM-encoded private key files. */
+   Eina_List *certificate_revocation_lists; /**< List of eina_stringshare'd paths to PEM-encoded CRL files. */
+   Eina_List *certificate_authorities; /**< List of eina_stringshare'd paths to PEM-encoded CA certificate files. */
+   const char *hostname; /**< eina_stringshare'd hostname to verify against the peer's certificate. */
+   Efl_Net_Ssl_Cipher cipher; /**< SSL/TLS cipher suite configuration. */
+   Eina_Bool is_dialer; /**< EINA_TRUE if the context is for a client (dialer). */
+   Efl_Net_Ssl_Verify_Mode verify_mode; /**< Peer certificate verification mode. Initialized to 0xff (unset). */
+   Eina_Bool load_defaults; /**< EINA_TRUE to load default CA paths. Initialized to 0xff (unset). */
+   Eina_Bool hostname_verify; /**< EINA_TRUE to verify hostname. Initialized to 0xff (unset). */
+
+   /* State flags, typically managed by the Efl.Net.Ssl.Socket layer, not directly here.
+    * These might be legacy or for a different abstraction level.
+    * For Efl.Net.Ssl.Context, the primary role is configuration.
+    * Actual I/O state (handshake, read/write readiness, EOS) is usually
+    * associated with an Efl_Net_Ssl_Socket instance using this context.
+    */
+   Eina_Bool did_handshake; /**< EINA_TRUE if SSL handshake completed. (Potentially managed by socket) */
+   Eina_Bool can_read;      /**< EINA_TRUE if data can be read. (Potentially managed by socket) */
+   Eina_Bool eos;           /**< EINA_TRUE if End-Of-Stream reached. (Potentially managed by socket) */
+   Eina_Bool can_write;     /**< EINA_TRUE if data can be written. (Potentially managed by socket) */
 } Efl_Net_Ssl_Context_Data;
 
 
@@ -126,6 +149,17 @@ _efl_net_ssl_context_setup(Eo *o, Efl_Net_Ssl_Context_Data *pd, Efl_Net_Ssl_Ciph
    pd->is_dialer = is_dialer;
 }
 
+/**
+ * @brief Converts an Eina_Iterator of C strings to an Eina_List of eina_stringshare'd strings.
+ * @internal
+ *
+ * This function iterates over the input iterator, stringshares each non-NULL string,
+ * and appends it to a new Eina_List. The input iterator is freed upon completion.
+ *
+ * @param it The iterator providing C strings. Will be freed by this function.
+ * @return A new Eina_List containing eina_stringshare'd versions of the input strings,
+ *         or NULL if the input iterator was empty or on allocation failure.
+ */
 static Eina_List *
 _efl_net_ssl_context_string_iter_to_list(Eina_Iterator *it)
 {
@@ -140,6 +174,15 @@ _efl_net_ssl_context_string_iter_to_list(Eina_Iterator *it)
    return lst;
 }
 
+/**
+ * @brief Frees an Eina_List of eina_stringshare'd strings.
+ * @internal
+ *
+ * This function iterates over the list, deleting the stringshare for each string,
+ * and then frees the list itself. The list pointer is set to NULL.
+ *
+ * @param p_lst Pointer to the Eina_List to be freed.
+ */
 static void
 _efl_net_ssl_context_string_list_free(Eina_List **p_lst)
 {
@@ -268,6 +311,7 @@ _efl_net_ssl_context_efl_object_finalize(Eo *o, Efl_Net_Ssl_Context_Data *pd)
    Eina_Error err;
    Efl_Net_Ssl_Ctx_Config cfg;
 
+   // Finalize the parent class first.
    o = efl_finalize(efl_super(o, MY_CLASS));
    if (!o) return NULL;
 
@@ -277,22 +321,33 @@ _efl_net_ssl_context_efl_object_finalize(Eo *o, Efl_Net_Ssl_Context_Data *pd)
         return NULL;
      }
 
+   /*
+    * Apply default settings if they haven't been explicitly set by the user.
+    * The 0xff value is used as a sentinel to indicate "not set".
+    * Dialer (client) contexts have stricter defaults (require verification, load default CAs).
+    * Listener (server) contexts have lenient defaults (no verification by default).
+    */
    if (pd->is_dialer)
      {
+        // If verify_mode was not set, default to REQUIRED for dialers.
         if ((uint8_t)pd->verify_mode == 0xff)
           pd->verify_mode = EFL_NET_SSL_VERIFY_MODE_REQUIRED;
-        if (pd->hostname_verify == 0xff)
+        // If hostname_verify was not set, default to TRUE for dialers.
+        if (pd->hostname_verify == 0xff) // 0xff is EINA_TRUE_UNSET like
           pd->hostname_verify = EINA_TRUE;
-        if (pd->load_defaults == 0xff)
+        // If load_defaults was not set, default to TRUE for dialers.
+        if (pd->load_defaults == 0xff) // 0xff is EINA_TRUE_UNSET like
           pd->load_defaults = EINA_TRUE;
      }
-   else
+   else // Listener context
      {
-        cfg.is_dialer = EINA_FALSE;
+        // If verify_mode was not set, default to NONE for listeners.
         if ((uint8_t)pd->verify_mode == 0xff)
           pd->verify_mode = EFL_NET_SSL_VERIFY_MODE_NONE;
+        // If hostname_verify was not set, default to FALSE for listeners.
         if (pd->hostname_verify == 0xff)
           pd->hostname_verify = EINA_FALSE;
+        // If load_defaults was not set, default to FALSE for listeners.
         if (pd->load_defaults == 0xff)
           pd->load_defaults = EINA_FALSE;
      }
@@ -323,11 +378,21 @@ _efl_net_ssl_context_efl_object_finalize(Eo *o, Efl_Net_Ssl_Context_Data *pd)
 EOLIAN static Eo *
 _efl_net_ssl_context_efl_object_constructor(Eo *o, Efl_Net_Ssl_Context_Data *pd)
 {
-   pd->cipher = EFL_NET_SSL_CIPHER_AUTO;
-   pd->is_dialer = EINA_TRUE;
-   pd->load_defaults = 0xff;
-   pd->hostname_verify = 0xff;
-   pd->verify_mode = 0xff;
+   // Initialize properties to default or "unset" states.
+   pd->cipher = EFL_NET_SSL_CIPHER_AUTO; // Default cipher mode.
+   pd->is_dialer = EINA_TRUE; // Default to a dialer (client) context.
+
+   /*
+    * Initialize boolean/enum properties that have specific defaults based on is_dialer
+    * to 0xff. This sentinel value indicates that the user hasn't explicitly set them,
+    * allowing _efl_net_ssl_context_efl_object_finalize to apply appropriate defaults.
+    * 0xff is chosen as it's unlikely to be a valid value for these properties
+    * and can represent an "unset" state for Eina_Bool-like fields if EINA_TRUE_UNSET (2) is not used.
+    */
+   pd->load_defaults = 0xff;   // Mark as unset, to be defaulted in finalize.
+   pd->hostname_verify = 0xff; // Mark as unset, to be defaulted in finalize.
+   pd->verify_mode = 0xff;     // Mark as unset, to be defaulted in finalize.
+
    return efl_constructor(efl_super(o, MY_CLASS));
 }
 
@@ -346,14 +411,37 @@ _efl_net_ssl_context_efl_object_destructor(Eo *o, Efl_Net_Ssl_Context_Data *pd)
    efl_destructor(efl_super(o, MY_CLASS));
 }
 
+/** @brief Global singleton instance for the default SSL dialer context. */
 static Efl_Net_Ssl_Context *_efl_net_ssl_context_default_dialer = NULL;
 
+/**
+ * @brief Event callback to clear the global default dialer when it's deleted.
+ * @internal
+ */
 static void
 _efl_net_ssl_context_default_dialer_del(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
 {
    _efl_net_ssl_context_default_dialer = NULL;
 }
 
+/**
+ * @brief Gets the default SSL context for dialers (clients).
+ *
+ * This function provides a globally shared SSL context instance configured with
+ * common defaults for client connections:
+ * - Verification mode: REQUIRED
+ * - Hostname verification: ENABLED
+ * - Default CA paths: LOADED
+ * - Cipher: AUTO
+ * - Type: Dialer (client)
+ *
+ * The context is created on first request and reused for subsequent calls.
+ * It is automatically cleaned up when the main loop exits or if explicitly deleted.
+ *
+ * @return A pointer to the default Efl_Net_Ssl_Context for dialers.
+ *         This object should not be manually unref'd by the caller if obtained
+ *         through this function, as its lifecycle is managed globally.
+ */
 EOLIAN static Efl_Net_Ssl_Context *
 _efl_net_ssl_context_default_dialer_get(void)
 {

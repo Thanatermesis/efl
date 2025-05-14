@@ -1,5 +1,13 @@
 #include "evas_map.h"
 
+/**
+ * @internal
+ * @brief Handles geometry changes for a mapped object.
+ * This function is called when the map's geometry (bounding box) changes.
+ * It marks the object as changed, dirties its clip, recalculates clippees,
+ * and informs about move/resize events.
+ * @param eo_obj The Evas object whose map geometry changed.
+ */
 static void
 _evas_map_calc_geom_change(Evas_Object *eo_obj)
 {
@@ -20,6 +28,17 @@ _evas_map_calc_geom_change(Evas_Object *eo_obj)
    evas_object_inform_call_resize(eo_obj, obj);
 }
 
+/**
+ * @internal
+ * @brief Calculates the bounding box of the map points and updates the object's
+ * normal_geometry if it has changed.
+ * This function iterates through all points of the current map to find the
+ * min/max x and y coordinates, effectively determining the 2D bounding box
+ * of the transformed object. It also checks if the map points themselves
+ * have changed compared to the previous state to trigger necessary updates.
+ *
+ * @param eo_obj The Evas object whose map geometry is to be calculated.
+ */
 void
 _evas_map_calc_map_geometry(Evas_Object *eo_obj)
 {
@@ -103,6 +122,17 @@ _evas_map_calc_map_geometry(Evas_Object *eo_obj)
    if (ch) _evas_map_calc_geom_change(eo_obj);
 }
 
+/**
+ * @internal
+ * @brief Synchronizes the map points with the object's movement.
+ * If move_sync is enabled for the map and there's a recorded movement difference
+ * (diff_x, diff_y), this function applies that difference to all map points
+ * (both projected and world coordinates) and then resets the difference.
+ * This is used to keep the map visually static relative to the object's content
+ * when the object itself is moved, rather than the map points being transformed.
+ *
+ * @param eo_obj The Evas object whose map needs synchronization.
+ */
 static void
 evas_object_map_move_sync(Evas_Object *eo_obj)
 {
@@ -139,6 +169,15 @@ evas_object_map_move_sync(Evas_Object *eo_obj)
    _evas_map_calc_map_geometry(eo_obj);
 }
 
+/**
+ * @internal
+ * @brief Initializes the fields of an Evas_Map structure.
+ * Sets default values for map properties like alpha, smooth, and point colors.
+ *
+ * @param m The Evas_Map structure to initialize.
+ * @param count The number of points this map will have.
+ * @param sync EINA_TRUE if the map should sync with object movements, EINA_FALSE otherwise.
+ */
 static void
 _evas_map_init(Evas_Map *m, int count, Eina_Bool sync)
 {
@@ -156,6 +195,16 @@ _evas_map_init(Evas_Map *m, int count, Eina_Bool sync)
      }
 }
 
+/**
+ * @internal
+ * @brief Allocates and initializes a new Evas_Map structure.
+ * The actual number of allocated points might be adjusted (e.g., minimum 4, even number)
+ * for engine efficiency.
+ *
+ * @param count The desired number of points for the map.
+ * @param sync EINA_TRUE if the map should sync with object movements.
+ * @return A pointer to the newly allocated Evas_Map, or NULL on failure.
+ */
 Evas_Map *
 _evas_map_new(int count, Eina_Bool sync)
 {
@@ -173,6 +222,14 @@ _evas_map_new(int count, Eina_Bool sync)
    return m;
 }
 
+/**
+ * @internal
+ * @brief Resets an existing Evas_Map structure to its default state.
+ * Preserves the original point count and sync flag, but clears all other
+ * map data (points, colors, transformations) and re-initializes them.
+ *
+ * @param m The Evas_Map to reset.
+ */
 void
 _evas_map_reset(Evas_Map *m)
 {
@@ -192,6 +249,16 @@ _evas_map_reset(Evas_Map *m)
    _evas_map_init(m, count, sync);
 }
 
+/**
+ * @internal
+ * @brief Copies the contents of one Evas_Map to another.
+ * Both maps must have the same number of points.
+ * Copies points, smooth, alpha, move_sync, and perspective data.
+ *
+ * @param dst The destination Evas_Map.
+ * @param src The source Evas_Map.
+ * @return EINA_TRUE on success, EINA_FALSE if maps have different point counts.
+ */
 static inline Eina_Bool
 _evas_map_copy(Evas_Map *dst, const Evas_Map *src)
 {
@@ -210,6 +277,15 @@ _evas_map_copy(Evas_Map *dst, const Evas_Map *src)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Duplicates an Evas_Map structure.
+ * Creates a new map and copies all data from the original map.
+ * The new map's move_sync is initially set to EINA_FALSE.
+ *
+ * @param orig The Evas_Map to duplicate.
+ * @return A pointer to the newly created Evas_Map, or NULL on failure.
+ */
 static inline Evas_Map *
 _evas_map_dup(const Evas_Map *orig)
 {
@@ -223,6 +299,15 @@ _evas_map_dup(const Evas_Map *orig)
    return copy;
 }
 
+/**
+ * @internal
+ * @brief Frees an Evas_Map structure and associated engine resources.
+ * If an Evas_Object is provided, it cleans up engine-specific map data (spans)
+ * associated with that object's map.
+ *
+ * @param eo_obj The Evas_Object associated with this map (can be NULL if map is not tied to an object).
+ * @param m The Evas_Map to free.
+ */
 static inline void
 _evas_map_free(Evas_Object *eo_obj, Evas_Map *m)
 {
@@ -244,6 +329,29 @@ _evas_map_free(Evas_Object *eo_obj, Evas_Map *m)
    free(m);
 }
 
+/**
+ * @brief Converts canvas coordinates to map image UV coordinates.
+ * Given a point (x, y) in canvas coordinates, this function calculates the
+ * corresponding (u, v) coordinates within the map's source image.
+ * This is effectively an inverse texture mapping.
+ *
+ * @param m The map to use for coordinate conversion.
+ * @param x The x-coordinate on the canvas.
+ * @param y The y-coordinate on the canvas.
+ * @param mx Pointer to store the resulting u-coordinate in the map's image. Can be NULL.
+ * @param my Pointer to store the resulting v-coordinate in the map's image. Can be NULL.
+ * @param grab If true, and the point (x,y) is outside the map, the function
+ *        may attempt to extrapolate coordinates. (Currently, this feature seems
+ *        to have limitations or is not fully implemented as per FIXME).
+ * @return EINA_TRUE if the point (x,y) is inside or on the edge of the map
+ *         and coordinates were successfully calculated (or if mx/my are NULL).
+ *         EINA_FALSE otherwise (e.g., map has less than 4 points, or point is
+ *         outside and grab is false).
+ *
+ * @note The current implementation uses a scanline algorithm to find intersections
+ *       and interpolate UV coordinates. It assumes the map is a convex quadrilateral
+ *       for accurate interpolation.
+ */
 EVAS_API Eina_Bool
 evas_map_coords_get(const Evas_Map *m, double x, double y,
                     double *mx, double *my, int grab)
@@ -396,6 +504,16 @@ evas_map_coords_get(const Evas_Map *m, double x, double y,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Checks if a given point (x, y) is inside the boundaries of a map.
+ * This function uses the Ray Casting algorithm (Jordan curve theorem variant)
+ * to determine if the point is inside the polygon defined by the map's points.
+ *
+ * @param m The map.
+ * @param x The x-coordinate of the point to check.
+ * @param y The y-coordinate of the point to check.
+ * @return EINA_TRUE if the point is inside the map, EINA_FALSE otherwise.
+ */
 Eina_Bool
 evas_map_inside_get(const Evas_Map *m, Evas_Coord x, Evas_Coord y)
 {
@@ -520,6 +638,13 @@ evas_object_map_enable_set(Eo *eo_obj, Eina_Bool enabled)
    _evas_object_map_enable_set(eo_obj, obj, enabled);
 }
 
+/**
+ * @brief Gets whether mapping is enabled for an Evas object.
+ *
+ * @param eo_obj The Evas object.
+ * @return EINA_TRUE if mapping is enabled, EINA_FALSE otherwise.
+ * @see evas_object_map_enable_set()
+ */
 EVAS_API Eina_Bool
 evas_object_map_enable_get(const Eo *eo_obj)
 {
@@ -654,6 +779,18 @@ evas_object_map_get(const Evas_Object *eo_obj)
    return obj->map->cur.map;
 }
 
+/**
+ * @brief Creates a new map with a specified number of points.
+ * The number of points must be a multiple of 4 and greater than 0.
+ * Evas maps are typically defined by 4 points to map a rectangle, but
+ * can have more points (e.g., 8, 12, ...) for more complex meshes.
+ *
+ * @param count The number of points for the map. Must be a positive multiple of 4.
+ *              Example: 4 for a simple quadrilateral, 8 for a 2x1 grid of quads.
+ * @return A new Evas_Map instance, or NULL on error (e.g., invalid count).
+ * @see evas_map_free()
+ * @see evas_object_map_set()
+ */
 EVAS_API Evas_Map *
 evas_map_new(int count)
 {
@@ -666,6 +803,14 @@ evas_map_new(int count)
    return _evas_map_new(count, EINA_FALSE);
 }
 
+/**
+ * @brief Sets whether smoothing is enabled for a map.
+ * When smoothing is enabled, the rendering engine may apply anti-aliasing
+ * or other filtering techniques to the mapped object for a smoother appearance.
+ *
+ * @param m The map.
+ * @param enabled EINA_TRUE to enable smoothing, EINA_FALSE to disable.
+ */
 EVAS_API void
 evas_map_smooth_set(Evas_Map *m, Eina_Bool enabled)
 {
@@ -676,6 +821,13 @@ evas_map_smooth_set(Evas_Map *m, Eina_Bool enabled)
    m->smooth = enabled;
 }
 
+/**
+ * @brief Gets whether smoothing is enabled for a map.
+ *
+ * @param m The map.
+ * @return EINA_TRUE if smoothing is enabled, EINA_FALSE otherwise.
+ * @see evas_map_smooth_set()
+ */
 EVAS_API Eina_Bool
 evas_map_smooth_get(const Evas_Map *m)
 {
@@ -686,6 +838,14 @@ evas_map_smooth_get(const Evas_Map *m)
    return m->smooth;
 }
 
+/**
+ * @brief Sets whether alpha blending is enabled for a map.
+ * If alpha is enabled, the per-point alpha values and the overall object alpha
+ * will be considered during rendering, allowing for transparency effects.
+ *
+ * @param m The map.
+ * @param enabled EINA_TRUE to enable alpha blending, EINA_FALSE to disable.
+ */
 EVAS_API void
 evas_map_alpha_set(Evas_Map *m, Eina_Bool enabled)
 {
@@ -696,6 +856,13 @@ evas_map_alpha_set(Evas_Map *m, Eina_Bool enabled)
    m->alpha = enabled;
 }
 
+/**
+ * @brief Gets whether alpha blending is enabled for a map.
+ *
+ * @param m The map.
+ * @return EINA_TRUE if alpha blending is enabled, EINA_FALSE otherwise.
+ * @see evas_map_alpha_set()
+ */
 EVAS_API Eina_Bool
 evas_map_alpha_get(const Evas_Map *m)
 {
@@ -706,6 +873,17 @@ evas_map_alpha_get(const Evas_Map *m)
    return m->alpha;
 }
 
+/**
+ * @brief Sets whether the map points should synchronize with object movements.
+ * If enabled, when the object associated with this map is moved, the map points
+ * will be adjusted internally to maintain their position relative to the object's
+ * content, rather than staying fixed in canvas space. This is useful if the map
+ * defines a transformation that should "stick" to the object as it moves.
+ * If disabled, any accumulated movement difference is reset.
+ *
+ * @param m The map.
+ * @param enabled EINA_TRUE to enable move synchronization, EINA_FALSE to disable.
+ */
 EVAS_API void
 evas_map_util_object_move_sync_set(Evas_Map *m, Eina_Bool enabled)
 {
@@ -721,6 +899,13 @@ evas_map_util_object_move_sync_set(Evas_Map *m, Eina_Bool enabled)
    m->move_sync.enabled = !!enabled;
 }
 
+/**
+ * @brief Gets whether map points synchronization with object movements is enabled.
+ *
+ * @param m The map.
+ * @return EINA_TRUE if move synchronization is enabled, EINA_FALSE otherwise.
+ * @see evas_map_util_object_move_sync_set()
+ */
 EVAS_API Eina_Bool
 evas_map_util_object_move_sync_get(const Evas_Map *m)
 {
@@ -731,6 +916,15 @@ evas_map_util_object_move_sync_get(const Evas_Map *m)
    return m->move_sync.enabled;
 }
 
+/**
+ * @brief Duplicates an existing map.
+ * Creates a new Evas_Map and copies all data (points, properties) from the
+ * source map. The new map is independent of the original.
+ *
+ * @param m The map to duplicate.
+ * @return A new Evas_Map instance which is a copy of @p m, or NULL on error.
+ * @see evas_map_free()
+ */
 EVAS_API Evas_Map *
 evas_map_dup(const Evas_Map *m)
 {
@@ -741,6 +935,16 @@ evas_map_dup(const Evas_Map *m)
    return _evas_map_dup(m);
 }
 
+/**
+ * @brief Frees an Evas_Map instance.
+ * If the map was created with evas_map_new() and not set on an object,
+ * or if it's a map retrieved and then duplicated, it should be freed with this
+ * function to release its memory.
+ * Do not free a map currently set on an object if you haven't duplicated it first;
+ * the object owns its current map.
+ *
+ * @param m The map to free.
+ */
 EVAS_API void
 evas_map_free(Evas_Map *m)
 {
@@ -748,6 +952,12 @@ evas_map_free(Evas_Map *m)
    _evas_map_free(NULL, m);
 }
 
+/**
+ * @brief Gets the number of points in a map.
+ *
+ * @param m The map.
+ * @return The number of points in the map, or -1 on error (e.g., m is NULL).
+ */
 EVAS_API int
 evas_map_count_get(const Evas_Map *m)
 {
@@ -758,9 +968,18 @@ evas_map_count_get(const Evas_Map *m)
    return m->count;
 }
 
-/* FIXME: coordinates should be float/double for accuracy.
-   Rotation center position will be flickered by rounding problem.
-   Now fixed in EO APIs.
+/**
+ * @brief Sets the world coordinates (x, y, z) for a specific point in the map.
+ * These coordinates define the position of the map point in 3D space before
+ * any perspective transformation is applied.
+ * The Evas_Coord type is typically an integer, but the underlying storage and
+ * calculations might use floating-point numbers for precision.
+ *
+ * @param m The map.
+ * @param idx The index of the point to modify (0 to count-1).
+ * @param x The x-coordinate.
+ * @param y The y-coordinate.
+ * @param z The z-coordinate (depth).
  */
 EVAS_API void
 evas_map_point_coord_set(Evas_Map *m, int idx, Evas_Coord x, Evas_Coord y, Evas_Coord z)
@@ -772,6 +991,17 @@ evas_map_point_coord_set(Evas_Map *m, int idx, Evas_Coord x, Evas_Coord y, Evas_
    _map_point_coord_set(m, idx, x, y, z);
 }
 
+/**
+ * @brief Gets the world coordinates (x, y, z) for a specific point in the map.
+ * Retrieves the coordinates set by evas_map_point_coord_set().
+ * Values are returned as Evas_Coord (typically int), rounded from internal double precision.
+ *
+ * @param m The map.
+ * @param idx The index of the point to query (0 to count-1).
+ * @param x Pointer to store the x-coordinate. Can be NULL.
+ * @param y Pointer to store the y-coordinate. Can be NULL.
+ * @param z Pointer to store the z-coordinate. Can be NULL.
+ */
 EVAS_API void
 evas_map_point_coord_get(const Evas_Map *m, int idx, Evas_Coord *x, Evas_Coord *y, Evas_Coord *z)
 {
@@ -783,6 +1013,20 @@ evas_map_point_coord_get(const Evas_Map *m, int idx, Evas_Coord *x, Evas_Coord *
    if (z) *z = lround(dz);
 }
 
+/**
+ * @brief Sets the texture mapping coordinates (u, v) for a specific point in the map.
+ * These coordinates define which part of the source image/surface is mapped to this point.
+ * (0,0) typically refers to the top-left corner of the source image, and
+ * (source_width, source_height) to the bottom-right. However, these can be
+ * any values to select a portion of the image or to tile/stretch it.
+ *
+ * @param m The map.
+ * @param idx The index of the point to modify (0 to count-1).
+ * @param u The u-coordinate (horizontal texture coordinate).
+ * @param v The v-coordinate (vertical texture coordinate).
+ *          Example: For a point that should map to the center of a 100x100 image,
+ *                   u would be 50.0 and v would be 50.0.
+ */
 EVAS_API void
 evas_map_point_image_uv_set(Evas_Map *m, int idx, double u, double v)
 {
@@ -798,6 +1042,14 @@ evas_map_point_image_uv_set(Evas_Map *m, int idx, double u, double v)
    p->v = v;
 }
 
+/**
+ * @brief Gets the texture mapping coordinates (u, v) for a specific point in the map.
+ *
+ * @param m The map.
+ * @param idx The index of the point to query (0 to count-1).
+ * @param u Pointer to store the u-coordinate. Can be NULL.
+ * @param v Pointer to store the v-coordinate. Can be NULL.
+ */
 EVAS_API void
 evas_map_point_image_uv_get(const Evas_Map *m, int idx, double *u, double *v)
 {
@@ -818,6 +1070,18 @@ evas_map_point_image_uv_get(const Evas_Map *m, int idx, double *u, double *v)
    if (v) *v = 0.0;
 }
 
+/**
+ * @brief Sets the color for a specific point in the map.
+ * This color is multiplied with the source image's color at that point.
+ * Values range from 0 to 255.
+ *
+ * @param m The map.
+ * @param idx The index of the point to modify (0 to count-1).
+ * @param r Red component (0-255).
+ * @param g Green component (0-255).
+ * @param b Blue component (0-255).
+ * @param a Alpha component (0-255).
+ */
 EVAS_API void
 evas_map_point_color_set(Evas_Map *m, int idx, int r, int g, int b, int a)
 {
@@ -835,6 +1099,16 @@ evas_map_point_color_set(Evas_Map *m, int idx, int r, int g, int b, int a)
    p->a = a;
 }
 
+/**
+ * @brief Gets the color for a specific point in the map.
+ *
+ * @param m The map.
+ * @param idx The index of the point to query (0 to count-1).
+ * @param r Pointer to store the red component. Can be NULL.
+ * @param g Pointer to store the green component. Can be NULL.
+ * @param b Pointer to store the blue component. Can be NULL.
+ * @param a Pointer to store the alpha component. Can be NULL.
+ */
 EVAS_API void
 evas_map_point_color_get(const Evas_Map *m, int idx, int *r, int *g, int *b, int *a)
 {
@@ -859,6 +1133,22 @@ error:
    if (a) *a = 255;
 }
 
+/**
+ * @brief Populates the points of a 4-point map from an object's geometry, with a specified Z value.
+ * This is a utility function to quickly set up a map to match an object's
+ * current position and size (x, y, w, h) at a given depth z.
+ * The map's points will be:
+ * - Point 0: (obj.x, obj.y, z) with UV (0, 0)
+ * - Point 1: (obj.x + obj.w, obj.y, z) with UV (obj.w, 0)
+ * - Point 2: (obj.x + obj.w, obj.y + obj.h, z) with UV (obj.w, obj.h)
+ * - Point 3: (obj.x, obj.y + obj.h, z) with UV (0, obj.h)
+ *
+ * @warning This function requires the map @p m to have exactly 4 points.
+ *
+ * @param m The 4-point map to populate.
+ * @param eo_obj The Evas object whose geometry will be used.
+ * @param z The z-coordinate to set for all 4 points.
+ */
 EVAS_API void
 evas_map_util_points_populate_from_object_full(Evas_Map *m, const Evas_Object *eo_obj, Evas_Coord z)
 {
@@ -881,6 +1171,17 @@ evas_map_util_points_populate_from_object_full(Evas_Map *m, const Evas_Object *e
                                   obj->cur->geometry.w, obj->cur->geometry.h, z);
 }
 
+/**
+ * @brief Populates the points of a 4-point map from an object's geometry, with Z=0.
+ * This is a convenience function, equivalent to calling
+ * evas_map_util_points_populate_from_object_full() with z = 0.
+ *
+ * @warning This function requires the map @p m to have exactly 4 points.
+ *
+ * @param m The 4-point map to populate.
+ * @param eo_obj The Evas object whose geometry will be used.
+ * @see evas_map_util_points_populate_from_object_full()
+ */
 EVAS_API void
 evas_map_util_points_populate_from_object(Evas_Map *m, const Evas_Object *eo_obj)
 {
@@ -903,6 +1204,25 @@ evas_map_util_points_populate_from_object(Evas_Map *m, const Evas_Object *eo_obj
                                   obj->cur->geometry.w, obj->cur->geometry.h, 0);
 }
 
+/**
+ * @brief Populates the points of a 4-point map from a given geometry.
+ * This utility function sets up a map to cover a rectangle defined by
+ * (x, y, w, h) at a depth z.
+ * The map's points will be:
+ * - Point 0: (x, y, z) with UV (0, 0)
+ * - Point 1: (x + w, y, z) with UV (w, 0)
+ * - Point 2: (x + w, y + h, z) with UV (w, h)
+ * - Point 3: (x, y + h, z) with UV (0, h)
+ *
+ * @warning This function requires the map @p m to have exactly 4 points.
+ *
+ * @param m The 4-point map to populate.
+ * @param x The x-coordinate of the rectangle.
+ * @param y The y-coordinate of the rectangle.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ * @param z The z-coordinate (depth) for all points.
+ */
 EVAS_API void
 evas_map_util_points_populate_from_geometry(Evas_Map *m, Evas_Coord x, Evas_Coord y, Evas_Coord w, Evas_Coord h, Evas_Coord z)
 {
@@ -918,6 +1238,16 @@ evas_map_util_points_populate_from_geometry(Evas_Map *m, Evas_Coord x, Evas_Coor
    _evas_map_util_points_populate(m, x, y, w, h, z);
 }
 
+/**
+ * @brief Sets the color for all points in the map.
+ * This is a utility function to apply a uniform color to every point in the map.
+ *
+ * @param m The map.
+ * @param r Red component (0-255).
+ * @param g Green component (0-255).
+ * @param b Blue component (0-255).
+ * @param a Alpha component (0-255).
+ */
 EVAS_API void
 evas_map_util_points_color_set(Evas_Map *m, int r, int g, int b, int a)
 {
@@ -974,6 +1304,17 @@ evas_map_util_rotate(Evas_Map *m, double degrees, Evas_Coord cx, Evas_Coord cy)
    _map_util_rotate(m, degrees, (double) cx, (double) cy);
 }
 
+/**
+ * @internal
+ * @brief Zooms the map points relative to a center point (cx, cy) using double precision.
+ * This is an internal helper used by the public Evas_Coord version.
+ *
+ * @param m The Evas_Map to zoom.
+ * @param zoomx Zoom factor for the X-axis.
+ * @param zoomy Zoom factor for the Y-axis.
+ * @param cx X-coordinate of the zoom center.
+ * @param cy Y-coordinate of the zoom center.
+ */
 void
 _map_util_zoom(Evas_Map *m, double zoomx, double zoomy, double cx, double cy)
 {
@@ -1007,6 +1348,16 @@ evas_map_util_zoom(Evas_Map *m, double zoomx, double zoomy, Evas_Coord cx, Evas_
    _map_util_zoom(m, zoomx, zoomy, (double) cx, (double) cy);
 }
 
+/**
+ * @internal
+ * @brief Translates all points in the map by (dx, dy, dz) using double precision.
+ * This is an internal helper.
+ *
+ * @param m The Evas_Map to translate.
+ * @param dx Translation amount for the X-axis.
+ * @param dy Translation amount for the Y-axis.
+ * @param dz Translation amount for the Z-axis.
+ */
 void
 _map_util_translate(Evas_Map *m, double dx, double dy, double dz)
 {
@@ -1084,6 +1435,20 @@ evas_map_util_3d_rotate(Evas_Map *m, double dx, double dy, double dz,
    _map_util_3d_rotate(m, dx, dy, dz, (double) cx, (double) cy, (double) cz);
 }
 
+/**
+ * @internal
+ * @brief Rotates map points using a quaternion around a center point (cx, cy, cz)
+ * using double precision coordinates. This is an internal helper.
+ *
+ * @param m The Evas_Map to rotate.
+ * @param qx X component of the quaternion.
+ * @param qy Y component of the quaternion.
+ * @param qz Z component of the quaternion.
+ * @param qw W component of the quaternion.
+ * @param cx X-coordinate of the rotation center.
+ * @param cy Y-coordinate of the rotation center.
+ * @param cz Z-coordinate of the rotation center.
+ */
 void
 _map_util_quat_rotate(Evas_Map *m, double qx, double qy, double qz,
                       double qw, double cx, double cy, double cz)
@@ -1136,6 +1501,25 @@ evas_map_util_quat_rotate(Evas_Map *m, double qx, double qy, double qz,
    _map_util_quat_rotate(m, qx, qy, qz, qw, cx, cy, cz);
 }
 
+/**
+ * @internal
+ * @brief Applies 3D lighting effects to the map points using double precision coordinates for light position.
+ * This is an internal helper. It calculates a simple diffuse lighting model.
+ * For each point, it computes a normal (assuming points form quads),
+ * then calculates the dot product with the light vector to determine brightness.
+ * The final color is a mix of ambient and light color based on this brightness.
+ *
+ * @param m The Evas_Map to apply lighting to.
+ * @param lx X-coordinate of the light source.
+ * @param ly Y-coordinate of the light source.
+ * @param lz Z-coordinate of the light source.
+ * @param lr Red component of the light color (0-255).
+ * @param lg Green component of the light color (0-255).
+ * @param lb Blue component of the light color (0-255).
+ * @param ar Red component of the ambient color (0-255).
+ * @param ag Green component of the ambient color (0-255).
+ * @param ab Blue component of the ambient color (0-255).
+ */
 void
 _map_util_3d_lighting(Evas_Map *m,
                       double lx, double ly, double lz,
@@ -1224,6 +1608,19 @@ evas_map_util_3d_lighting(Evas_Map *m,
                          lz, lr, lg, lb, ar, ag, ab);
 }
 
+/**
+ * @internal
+ * @brief Applies a 3D perspective transformation to the map points using double precision.
+ * This is an internal helper. It projects the 3D points onto a 2D plane.
+ * The perspective parameters (px, py, z0, foc) are stored in the map.
+ *
+ * @param m The Evas_Map to transform.
+ * @param px X-coordinate of the perspective point (vanishing point X on the projection plane).
+ * @param py Y-coordinate of the perspective point (vanishing point Y on the projection plane).
+ * @param z0 Z-coordinate of the Z=0 plane (distance from viewer to the Z=0 plane, typically 0 if px,py is screen center).
+ * @param foc Focal length (distance from the viewer to the projection plane).
+ *            A larger focal length results in less perspective distortion.
+ */
 void
 _map_util_3d_perspective(Evas_Map *m, double px, double py, double z0, double foc)
 {
@@ -1271,6 +1668,16 @@ evas_map_util_3d_perspective(Evas_Map *m,
    _map_util_3d_perspective(m, (double) px, (double) py, (double) z0, (double) foc);
 }
 
+/**
+ * @brief Determines if the map points are defined in a clockwise order.
+ * This is useful for back-face culling or lighting calculations.
+ * It calculates the sum of signed areas of triangles formed by consecutive triplets
+ * of vertices (shoelace formula variant). A positive sum typically indicates
+ * clockwise winding order for a coordinate system where Y increases downwards.
+ *
+ * @param m The map.
+ * @return EINA_TRUE if the points are in clockwise order, EINA_FALSE otherwise or if count < 3.
+ */
 EVAS_API Eina_Bool
 evas_map_util_clockwise_get(Evas_Map *m)
 {
@@ -1304,6 +1711,27 @@ evas_map_util_clockwise_get(Evas_Map *m)
 /****************************************************************************/
 /* If the return value is true, the map surface should be redrawn.          */
 /****************************************************************************/
+/**
+ * @internal
+ * @brief Updates the rendering data (spans) for a mapped object.
+ * This function is called by the rendering pipeline to prepare the map data
+ * for the engine. It converts Evas_Map_Point data into RGBA_Map_Point data,
+ * applying offsets, scaling UV coordinates, and handling perspective.
+ *
+ * It checks if the map data or related parameters (object position, image size)
+ * have changed to determine if an update is necessary.
+ *
+ * @param eo_obj The Evas object being updated.
+ * @param x The current x-offset of the object on the canvas.
+ * @param y The current y-offset of the object on the canvas.
+ * @param imagew The width of the source image/surface being mapped.
+ * @param imageh The height of the source image/surface being mapped.
+ * @param uvw The width dimension used for UV coordinate normalization (often same as imagew).
+ * @param uvh The height dimension used for UV coordinate normalization (often same as imageh).
+ * @return EINA_TRUE if the map surface should be redrawn (due to pchange flag),
+ *         EINA_FALSE otherwise. Note that even if EINA_FALSE is returned,
+ *         the span data might have been updated if obj->changed_map was true.
+ */
 Eina_Bool
 evas_object_map_update(Evas_Object *eo_obj,
                        int x, int y,
@@ -1414,6 +1842,17 @@ evas_object_map_update(Evas_Object *eo_obj,
    return obj->changed_pchange;
 }
 
+/**
+ * @internal
+ * @brief Accumulates movement differences for a map with move_sync enabled.
+ * When an object with a synchronized map is moved, instead of directly
+ * transforming the map points, the difference in movement is stored.
+ * This difference is then applied by evas_object_map_move_sync() before rendering.
+ *
+ * @param m The map.
+ * @param diff_x The change in x-coordinate.
+ * @param diff_y The change in y-coordinate.
+ */
 void
 evas_map_object_move_diff_set(Evas_Map *m,
                               Evas_Coord diff_x,

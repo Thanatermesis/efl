@@ -41,6 +41,15 @@ static Eina_List  *glob_mimes_sorted = NULL;
 #include "efreet_private.h"
 #include "efreet_cache_private.h"
 
+/**
+ * @brief Creates and locks a lock file to ensure only one instance runs.
+ *
+ * This function creates a lock file in the efreet cache directory.
+ * If the lock file cannot be created or locked, it indicates another
+ * instance might be running or there's a permission issue.
+ *
+ * @return The file descriptor of the lock file on success, -1 on failure.
+ */
 static int
 cache_lock_file(void)
 {
@@ -66,12 +75,35 @@ cache_lock_file(void)
    return lockfd;
 }
 
+/**
+ * @brief Comparison function for sorting strings.
+ *
+ * Used by eina_list_sorted_insert to sort keys (strings) alphabetically.
+ *
+ * @param key1 The first string.
+ * @param key2 The second string.
+ * @return An integer less than, equal to, or greater than zero if key1 is
+ *         found, respectively, to be less than, to match, or be greater
+ *         than key2.
+ */
 static int
 hash_list_sort_insert_cmp(const char *key1, const char *key2)
 {
    return strcmp(key1, key2);
 }
 
+/**
+ * @brief Eina_Hash_Foreach callback to insert hash keys into a sorted list.
+ *
+ * This function is called for each key-value pair in a hash table.
+ * It inserts the key into the provided Eina_List in sorted order.
+ *
+ * @param hash The hash table being iterated (unused).
+ * @param key The current key from the hash table.
+ * @param value The current value associated with the key (unused).
+ * @param data A pointer to an Eina_List pointer where keys will be inserted.
+ * @return EINA_TRUE to continue iteration, EINA_FALSE to stop.
+ */
 static Eina_Bool
 hash_list_sort_each(const Eina_Hash *hash EINA_UNUSED, const void *key, void *value EINA_UNUSED, void *data)
 {
@@ -82,12 +114,32 @@ hash_list_sort_each(const Eina_Hash *hash EINA_UNUSED, const void *key, void *va
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sorts the keys of a hash table into a list.
+ *
+ * Iterates over the hash table and inserts each key into the provided list,
+ * maintaining sorted order.
+ *
+ * @param hash The hash table whose keys are to be sorted.
+ * @param list A pointer to an Eina_List pointer that will store the sorted keys.
+ *             The list should be initialized (e.g., to NULL) before calling.
+ */
 static void
 hash_list_sort(Eina_Hash *hash, Eina_List **list)
 {
    eina_hash_foreach(hash, hash_list_sort_each, list);
 }
 
+/**
+ * @brief Loads mime types and their associated extensions from a file.
+ *
+ * Parses a file (typically /etc/mime.types) where each line defines a
+ * mime type followed by space-separated extensions.
+ * Lines starting with '#' are treated as comments and ignored.
+ * Example line: "text/plain txt log"
+ *
+ * @param file The path to the mime.types file.
+ */
 static void
 etc_mime_types_load(const char *file)
 {
@@ -147,6 +199,18 @@ etc_mime_types_load(const char *file)
    fclose(f);
 }
 
+/**
+ * @brief Loads mime types and their associated globs from a file.
+ *
+ * Parses a file (typically /usr/share/mime/globs or similar) where each
+ * line defines a mime type followed by a colon and a glob pattern.
+ * Lines starting with '#' are treated as comments and ignored.
+ * Example line: "application/x-perl:*.pl"
+ * If a glob is of the simple form "*.ext", it's treated as a direct
+ * extension for faster lookup.
+ *
+ * @param file The path to the globs file.
+ */
 static void
 share_mime_globs_load(const char *file)
 {
@@ -210,6 +274,20 @@ share_mime_globs_load(const char *file)
    fclose(f);
 }
 
+/**
+ * @brief Finds the offset of a string within a list of strings.
+ *
+ * This function searches for a given string `str` in `strlist`. If found,
+ * it returns the corresponding data element from `offlist` at the same index.
+ * This is used to find the pre-calculated byte offset of a string in the
+ * cache file's string table.
+ *
+ * @param str The string to search for.
+ * @param strlist An Eina_List of strings to search within.
+ * @param offlist An Eina_List of offsets, corresponding to `strlist`.
+ * @return The offset (as a void pointer, to be cast to size_t) if found,
+ *         otherwise (void *)-1.
+ */
 static void *
 find_off(const char *str, Eina_List *strlist, Eina_List *offlist)
 {
@@ -225,6 +303,34 @@ find_off(const char *str, Eina_List *strlist, Eina_List *offlist)
    return (void *)-1;
 }
 
+/**
+ * @brief Stores the compiled mime information into a binary cache file.
+ *
+ * The cache file has a specific binary format:
+ * 1. Magic Header: "EfrEeT-MiMeS-001" (16 bytes)
+ * 2. Mimes Array:
+ *    - [int] num_mimes: Number of entries in the mimes array.
+ *    - For each mime:
+ *      - [int] offset_to_mime_string: Byte offset from start of file to the mime string.
+ * 3. Extension Mimes Array:
+ *    - [int] num_extn_mimes: Number of entries in the extension mimes array.
+ *    - For each extension mime:
+ *      - [int] offset_to_extn_string: Byte offset from start of file to the extension string.
+ *      - [int] offset_to_mime_string: Byte offset from start of file to the corresponding mime string.
+ * 4. Glob Mimes Array:
+ *    - [int] num_glob_mimes: Number of entries in the glob mimes array.
+ *    - For each glob mime:
+ *      - [int] offset_to_glob_string: Byte offset from start of file to the glob string.
+ *      - [int] offset_to_mime_string: Byte offset from start of file to the corresponding mime string.
+ * 5. String Table:
+ *    - A contiguous block of null-terminated strings. All offsets above point into this table.
+ *      The strings are grouped: all mime strings, then all extension strings, then all glob strings.
+ *
+ * All integer values are written in the native endianness of the machine creating the cache.
+ * The filename itself will contain ".le." or ".be." to indicate endianness.
+ *
+ * @param out The path to the output cache file.
+ */
 static void
 store_cache(const char *out)
 {
@@ -373,6 +479,28 @@ error:
    if (unlink(buf) != 0) WRN("Cannot delete tmp file %s", buf);
 }
 
+/**
+ * @brief Main function for the efreet_mime_cache_create utility.
+ *
+ * This program generates a binary cache file for MIME type information.
+ * It parses system and user MIME databases (/etc/mime.types,
+ * /usr/share/mime/globs, etc.) and compiles them into an efficient
+ * lookup format.
+ *
+ * Command-line arguments:
+ *   -v              : Verbose mode (enables debug logging).
+ *   -h, --help      : Displays help message and exits.
+ *   -d dir1 dir2 ...: Specifies extra directories to scan for mime/globs files.
+ *                     These directories are searched after standard system locations
+ *                     but before the user's data home directory.
+ *
+ * The program uses a lock file to prevent multiple instances from running
+ * simultaneously and potentially corrupting the cache.
+ *
+ * @param argc Argument count.
+ * @param argv Argument vector.
+ * @return 0 on success, -1 on failure.
+ */
 int
 main(int argc, char **argv)
 {

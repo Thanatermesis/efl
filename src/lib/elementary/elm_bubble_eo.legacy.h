@@ -1,15 +1,30 @@
 #ifndef _ELM_BUBBLE_EO_LEGACY_H_
 #define _ELM_BUBBLE_EO_LEGACY_H_
 
+/**
+ * @file
+ * @brief These routines are legacy routines from the old C-style API.
+ * Please use the new Eo API whenever possible.
+ */
+
 #ifndef _ELM_BUBBLE_EO_CLASS_TYPE
 #define _ELM_BUBBLE_EO_CLASS_TYPE
 
+/** @brief Type definition for the Elm_Bubble class.
+ *
+ *  This typedef is used to identify Elm_Bubble objects.
+ */
 typedef Eo Elm_Bubble;
 
 #endif
 
 #ifndef _ELM_BUBBLE_EO_TYPES
 #define _ELM_BUBBLE_EO_TYPES
+
+/**
+ * @def _ELM_BUBBLE_EO_TYPES
+ * @brief Macro to ensure Elm_Bubble specific types are defined only once.
+ */
 
 /**
  * @brief Defines the corner values for a bubble.

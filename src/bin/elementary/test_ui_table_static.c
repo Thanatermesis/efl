@@ -5,30 +5,56 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Data for the table API test.
+ *
+ * This structure holds pointers to the UI elements used in the API tests.
+ */
 struct _Api_Data
 {
-   Eo *table;
-   Eo *child;
+   Eo *table; /**< The table widget being tested. */
+   Eo *child; /**< A child widget used for packing/unpacking tests. */
 };
 typedef struct _Api_Data Api_Data;
 
+/**
+ * @brief Test context data.
+ *
+ * This structure holds the overall state for the API tests, including which
+ * test is currently being run.
+ */
 struct _api_data
 {
-   unsigned int state;  /* What state we are testing       */
-   Api_Data data;
+   unsigned int state;  /**< The current test state, corresponds to api_state enum. */
+   Api_Data data;       /**< Pointers to the widgets under test. */
 };
 typedef struct _api_data api_data;
 
+/**
+ * @brief Defines the different states of the API test.
+ *
+ * Each state corresponds to a specific API function that is being tested.
+ * The test cycles through these states in order.
+ */
 enum _api_state
 {
-   TABLE_PACK_SET,
-   TABLE_UNPACK,
-   TABLE_SIZE,
-   TABLE_CLEAR,
-   API_STATE_LAST
+   TABLE_PACK_SET,   /**< Test efl_pack_table() */
+   TABLE_UNPACK,     /**< Test efl_pack_unpack() */
+   TABLE_SIZE,       /**< Test efl_pack_table_size_get/set() */
+   TABLE_CLEAR,      /**< Test efl_pack_clear() */
+   API_STATE_LAST    /**< Marker for the end of the test sequence. */
 };
 typedef enum _api_state api_state;
 
+/**
+ * @brief Executes a table API function based on the current test state.
+ *
+ * @param api The test context data, containing the current state and widgets.
+ *
+ * This function is the core of the API test. It uses a switch statement
+ * on the current state to call a specific function on the table widget.
+ * This allows testing different table API calls sequentially.
+ */
 static void
 set_api_state(api_data *api)
 {
@@ -65,6 +91,17 @@ set_api_state(api_data *api)
      }
 }
 
+/**
+ * @brief Callback for the "Next API function" button.
+ *
+ * @param data The api_data structure for the test.
+ * @param ev The event information.
+ *
+ * This function is called when the user clicks the button to advance the
+ * API test. It calls set_api_state() to execute the current test,
+ * increments the state, and updates the button's text to reflect the
+ * next test.
+ */
 static void
 _api_bt_clicked(void *data, const Efl_Event *ev)
 {  /* Will add here a SWITCH command containing code to modify test-object */
@@ -80,6 +117,17 @@ _api_bt_clicked(void *data, const Efl_Event *ev)
    elm_object_disabled_set(ev->object, a->state == API_STATE_LAST);
 }
 
+/**
+ * @brief Callback to demonstrate dynamic modification of a child's packing.
+ *
+ * @param data The table widget.
+ * @param ev The event information, where ev->object is the clicked child.
+ *
+ * When the "Change" button is clicked, this function retrieves its current
+ * table cell position and size, then repacks it with slightly larger
+ * dimensions and a shifted position. This demonstrates the dynamic nature
+ * of the table layout.
+ */
 static void
 _ch_table(void *data, const Efl_Event *ev)
 {
@@ -91,12 +139,33 @@ _ch_table(void *data, const Efl_Event *ev)
    efl_pack_table(table, ev->object, x - 1, y - 1, w + 2, h + 2);
 }
 
+/**
+ * @brief Callback for window deletion.
+ *
+ * @param data The api_data structure to be freed.
+ * @param ev The event information (unused).
+ *
+ * Cleans up the allocated test data when the window is closed.
+ */
 static void
 _win_del(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Test case for Efl.Ui.Table_Static.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ *
+ * This function sets up a window with an Efl_Ui_Table_Static widget.
+ * It populates the table with various widgets (buttons, entries, rectangles)
+ * to demonstrate and test its packing capabilities. It also includes an
+ * interactive API test driven by a button, which cycles through various
+ * table API functions like packing, unpacking, and clearing.
+ */
 void
 test_ui_table_static(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

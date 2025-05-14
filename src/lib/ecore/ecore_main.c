@@ -339,6 +339,19 @@ _ecore_main_pre_idle_exit(void)
 }
 
 #ifdef HAVE_LIBUV
+/**
+ * @brief Callback for libuv poll events.
+ *
+ * This function is invoked by libuv when there's activity on a polled
+ * file descriptor. It updates the FD handler's active state based on the
+ * events, transitions out of idle mode if necessary, and then processes
+ * the ready FD handlers.
+ *
+ * @param handle The libuv poll handle associated with the file descriptor.
+ *               The Ecore_Fd_Handler is stored in handle->data.
+ * @param status 0 on success, or a negative error code on failure.
+ * @param events A bitmask of UV_READABLE, UV_WRITABLE, UV_DISCONNECT.
+ */
 static void
 _ecore_main_uv_poll_cb(uv_poll_t *handle, int status, int events)
 {
@@ -379,6 +392,17 @@ _ecore_main_uv_poll_cb(uv_poll_t *handle, int status, int events)
   _efl_loop_timer_expired_timers_call(obj, pd, pd->loop_time);
 }
 
+/**
+ * @brief Converts Ecore_Fd_Handler_Flags to libuv event flags.
+ *
+ * This utility function translates Ecore's FD handler flags (ECORE_FD_READ,
+ * ECORE_FD_WRITE) into the corresponding libuv event flags (UV_READABLE,
+ * UV_WRITABLE) used for polling.
+ *
+ * @param fdh Pointer to the Ecore_Fd_Handler whose flags are to be converted.
+ * @return An integer representing the bitmask of libuv poll events.
+ *         For example, if fdh->flags has ECORE_FD_READ, this returns UV_READABLE.
+ */
 static int
 _ecore_main_uv_events_from_fdh(Ecore_Fd_Handler *fdh)
 {
@@ -390,6 +414,24 @@ _ecore_main_uv_events_from_fdh(Ecore_Fd_Handler *fdh)
 }
 #endif
 
+/**
+ * @brief Adds a file descriptor handler to the appropriate polling mechanism.
+ *
+ * Depending on the compiled-in backend (epoll, libuv, or GMainLoop),
+ * this function registers the given file descriptor handler for event polling.
+ * For epoll, it uses `epoll_ctl` with `EPOLL_CTL_ADD`.
+ * For libuv, it initializes and starts a `uv_poll_t` handle.
+ * For GMainLoop, it adds the FD to a `GPollFD` set associated with a GSource.
+ *
+ * @param pd Pointer to the Efl_Loop_Data structure for the current loop.
+ *           Although marked EINA_UNUSED in some configurations, it's used
+ *           by epoll.
+ * @param fdh Pointer to the Ecore_Fd_Handler to be added. This structure
+ *            contains the file descriptor and the events to monitor.
+ * @return 0 on success, or a negative value on error (typically from epoll_ctl).
+ *         Libuv and GMainLoop paths currently don't explicitly return error codes
+ *         from this function but might log errors.
+ */
 static inline int
 _ecore_main_fdh_poll_add(Efl_Loop_Data *pd EINA_UNUSED, Ecore_Fd_Handler *fdh)
 {
@@ -452,6 +494,19 @@ _ecore_main_fdh_poll_add(Efl_Loop_Data *pd EINA_UNUSED, Ecore_Fd_Handler *fdh)
    return r;
 }
 
+/**
+ * @brief Removes a file descriptor handler from the polling mechanism.
+ *
+ * This function deregisters a file descriptor handler from the active polling
+ * system (epoll, libuv, or GMainLoop).
+ * For epoll, it uses `epoll_ctl` with `EPOLL_CTL_DEL`.
+ * For libuv, it closes the `uv_poll_t` handle using `uv_close`.
+ * For GMainLoop, it removes the `GPollFD` from the GSource.
+ *
+ * @param pd Pointer to the Efl_Loop_Data structure for the current loop.
+ *           Used by epoll to get the epoll file descriptor.
+ * @param fdh Pointer to the Ecore_Fd_Handler to be removed.
+ */
 static inline void
 _ecore_main_fdh_poll_del(Efl_Loop_Data *pd, Ecore_Fd_Handler *fdh)
 {
@@ -508,6 +563,26 @@ _ecore_main_fdh_poll_del(Efl_Loop_Data *pd, Ecore_Fd_Handler *fdh)
      }
 }
 
+/**
+ * @brief Modifies the events monitored for an existing file descriptor handler.
+ *
+ * This function updates the set of events being monitored for a file descriptor
+ * handler already registered with the polling system (epoll, libuv, or GMainLoop).
+ * For epoll, it uses `epoll_ctl` with `EPOLL_CTL_MOD`.
+ * For libuv, it re-starts the `uv_poll_t` handle with the new event set.
+ * For GMainLoop, it updates the `events` field of the `GPollFD` (implicitly,
+ * as GMainLoop doesn't have a direct modify operation like epoll; the next
+ * GSource check will use the updated fdh->gfd.events).
+ *
+ * @param pd Pointer to the Efl_Loop_Data structure for the current loop.
+ *           Although marked EINA_UNUSED in some configurations, it's used
+ *           by epoll.
+ * @param fdh Pointer to the Ecore_Fd_Handler to be modified. The `flags`
+ *            member of this structure should reflect the new set of events
+ *            to monitor.
+ * @return 0 on success, or a negative value on error (typically from epoll_ctl).
+ *         Libuv and GMainLoop paths currently don't explicitly return error codes.
+ */
 static inline int
 _ecore_main_fdh_poll_modify(Efl_Loop_Data *pd EINA_UNUSED, Ecore_Fd_Handler *fdh)
 {

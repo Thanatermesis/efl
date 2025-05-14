@@ -11,18 +11,27 @@
 //static Ecore_Event_Handler *h1;
 //static Ecore_Event_Handler *h2;
 
+/**
+ * @brief Represents a color class with its name, colors, and description.
+ * This struct is used to manage individual color classes within the editor.
+ */
 typedef struct Colorclass
 {
-   Eina_Stringshare *name;
+   Eina_Stringshare *name; /**< The name of the color class. */
    struct {
-     unsigned char r, g, b, a;
-   } color[3];
-   Eina_Stringshare *desc;
+     unsigned char r, g, b, a; /**< RGBA components of the color. */
+   } color[3]; /**< Array of three colors (e.g., base, text, shadow). */
+   Eina_Stringshare *desc; /**< Description of the color class. */
 } Colorclass;
 
+/**
+ * @brief Represents the UI elements and state for a color class editor instance.
+ * This struct holds all necessary UI components and state variables for managing
+ * the color class editor's interaction and display.
+ */
 typedef struct Colorclass_UI
 {
-   EINA_INLIST;
+   EINA_INLIST; /**< Macro for Eina_Inlist node. */
    Evas_Object *ly;
    Evas_Object *gl;
    Evas_Object *reset;
@@ -33,9 +42,9 @@ typedef struct Colorclass_UI
 
    Colorclass *current; //actually Elm_Color_Overlay
    unsigned int num; //color[num]
-   Eina_Bool changed : 1;
-   Eina_Bool change_reset : 1;
-   Eina_Bool exist : 1;
+   Eina_Bool changed : 1; /**< Flag indicating if the color class has been changed by the user. */
+   Eina_Bool change_reset : 1; /**< Flag indicating if the color class was reset to its default. */
+   Eina_Bool exist : 1; /**< Flag indicating if the color class already exists in the configuration. */
 } Colorclass_UI;
 #if 0
 typedef enum
@@ -59,6 +68,14 @@ static Eldbus_Service_Interface *remote_iface;
 static Elm_Color_Class_Name_Cb tl_cb;
 static Elm_Color_Class_List_Cb list_cb;
 
+/**
+ * @brief Comparison function for sorting Elm_Object_Item instances based on color class names.
+ * Used to sort items in the genlist.
+ * @param a The first Elm_Object_Item.
+ * @param b The second Elm_Object_Item.
+ * @return An integer less than, equal to, or greater than zero if a1->name is found,
+ *         respectively, to be less than, to match, or be greater than b1->name.
+ */
 static int
 _colorclass_sort(Elm_Object_Item *a, Elm_Object_Item *b)
 {
@@ -70,6 +87,13 @@ _colorclass_sort(Elm_Object_Item *a, Elm_Object_Item *b)
    return strcmp(a1->name, b1->name);
 }
 
+/**
+ * @brief Updates a specific preview color swatch in the UI.
+ * This function sets an Edje color class used for displaying one of the
+ * three color components (e.g., "elm_colorclass_color1").
+ * @param cc The Colorclass_UI instance.
+ * @param num The index of the color to update (0, 1, or 2).
+ */
 static void
 _colorclass_cc_update(Colorclass_UI *cc, int num)
 {
@@ -82,6 +106,10 @@ _colorclass_cc_update(Colorclass_UI *cc, int num)
                         0, 0, 0, 0);
 }
 #if 0
+/**
+ * @brief Sends a DBus signal indicating that a color class has changed.
+ * @param cc The Colorclass_UI instance containing the changed color class.
+ */
 static void
 _dbus_signal_changed(Colorclass_UI *cc)
 {
@@ -105,6 +133,15 @@ _dbus_signal_changed(Colorclass_UI *cc)
    eldbus_service_signal_send(remote_iface, msg);
 }
 #endif
+/**
+ * @brief Handles the selection of a color component (1, 2, or 3) from the UI.
+ * This is typically called when a user clicks on one of the color swatches
+ * in the editor layout to select it for editing in the color selector.
+ * @param data The Colorclass_UI instance.
+ * @param obj The Evas_Object that emitted the signal (unused).
+ * @param sig The signal string (e.g., "elm,colorclass,select,1").
+ * @param src The source of the signal (unused).
+ */
 static void
 _colorclass_select(void *data, Evas_Object *obj EINA_UNUSED, const char *sig, const char *src EINA_UNUSED)
 {
@@ -128,6 +165,13 @@ _colorclass_select(void *data, Evas_Object *obj EINA_UNUSED, const char *sig, co
                                cc->current->color[cc->num].b, cc->current->color[cc->num].a);
 }
 
+/**
+ * @brief Callback for when the color selector's color changes.
+ * Updates the currently selected color component of the current color class
+ * and applies it to the Edje theme and preview elements.
+ * @param data The Colorclass_UI instance.
+ * @param event The Efl_Event details (unused).
+ */
 static void
 _colorclass_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -151,6 +195,14 @@ _colorclass_changed(void *data, const Efl_Event *event EINA_UNUSED)
    cc->changed = 1;
 }
 
+/**
+ * @brief Callback for when the reset button is clicked.
+ * Resets the currently selected color class to its default values from the theme.
+ * @param data The Colorclass_UI instance.
+ * @param event The Efl_Event details (unused). If the event is stopped,
+ *              it implies the reset was handled externally (e.g., via DBus)
+ *              and local processing should be skipped.
+ */
 static void
 _colorclass_reset(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -193,6 +245,13 @@ _colorclass_reset(void *data, const Efl_Event *event EINA_UNUSED)
    _colorclass_cc_update(cc, 2);
 }
 
+/**
+ * @brief Callback for when a color class item is selected in the genlist.
+ * Loads the selected color class into the editor UI for modification.
+ * @param data The Colorclass_UI instance.
+ * @param obj The genlist object (unused).
+ * @param event_info The selected Elm_Object_Item, which contains the Edje_Color_Class data.
+ */
 static void
 _colorclass_activate(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -234,6 +293,12 @@ _colorclass_activate(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
    elm_layout_signal_emit(cc->ly, "elm,colors,show", "elm");
 }
 
+/**
+ * @brief Applies the current color class changes to the application's configuration.
+ * This function decides whether to add or update the color class in the
+ * `_elm_config->color_overlays` list based on its state (changed, reset, new).
+ * @param cc The Colorclass_UI instance.
+ */
 static void
 _colorclass_apply(Colorclass_UI *cc)
 {
@@ -246,6 +311,12 @@ _colorclass_apply(Colorclass_UI *cc)
      }
 }
 
+/**
+ * @brief Saves the current color class changes to persistent storage.
+ * This function calls _colorclass_apply to update the in-memory configuration
+ * and then triggers elm_config_save() and elm_config_all_flush() if changes were made.
+ * @param cc The Colorclass_UI instance.
+ */
 static void
 _colorclass_save(Colorclass_UI *cc)
 {
@@ -260,6 +331,15 @@ _colorclass_save(Colorclass_UI *cc)
      }
 }
 
+/**
+ * @brief Callback for when the color editor panel is hidden or deactivated.
+ * Saves any pending changes, resets the UI state, and emits a signal
+ * to hide the color editing part of the layout.
+ * @param data The Colorclass_UI instance.
+ * @param obj The Evas_Object that emitted the signal (unused).
+ * @param sig The signal string (unused).
+ * @param src The source of the signal (unused).
+ */
 static void
 _colorclass_deactivate(void *data, Evas_Object *obj EINA_UNUSED, const char *sig EINA_UNUSED, const char *src EINA_UNUSED)
 {
@@ -273,6 +353,14 @@ _colorclass_deactivate(void *data, Evas_Object *obj EINA_UNUSED, const char *sig
    elm_genlist_item_selected_set(elm_genlist_selected_item_get(cc->gl), 0);
 }
 
+/**
+ * @brief Callback for when the color editor is dismissed entirely (e.g., "Done" button).
+ * Emits a "dismissed" smart callback on the main layout object.
+ * @param data The Colorclass_UI instance.
+ * @param obj The Evas_Object that emitted the signal (unused).
+ * @param sig The signal string (unused).
+ * @param src The source of the signal (unused).
+ */
 static void
 _colorclass_dismiss(void *data, Evas_Object *obj EINA_UNUSED, const char *sig EINA_UNUSED, const char *src EINA_UNUSED)
 {
@@ -281,6 +369,14 @@ _colorclass_dismiss(void *data, Evas_Object *obj EINA_UNUSED, const char *sig EI
    evas_object_smart_callback_call(cc->ly, "dismissed", NULL);
 }
 
+/**
+ * @brief Callback for when the color class editor layout object is deleted.
+ * Saves any pending changes and frees the Colorclass_UI structure.
+ * @param data The Colorclass_UI instance.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object being deleted (unused).
+ * @param event_info Event-specific data (unused).
+ */
 static void
 _colorclass_del(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -301,6 +397,14 @@ _colorclass_del(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, v
    free(cc);
 }
 
+/**
+ * @brief Gets the text to display for a genlist item representing a color class.
+ * Returns the description if available, otherwise the name.
+ * @param ecc The Edje_Color_Class data for the item.
+ * @param obj The genlist item object (unused).
+ * @param part The theme part name for which text is requested (unused).
+ * @return A newly allocated string containing the display text. The caller must free this string.
+ */
 static char *
 _colorclass_text_get(Edje_Color_Class *ecc, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
@@ -308,6 +412,12 @@ _colorclass_text_get(Edje_Color_Class *ecc, Evas_Object *obj EINA_UNUSED, const 
    return strdup(ecc->name ?: "");
 }
 
+/**
+ * @brief Callback for when a genlist item representing a color class is deleted.
+ * Frees the Edje_Color_Class structure associated with the item.
+ * @param ecc The Edje_Color_Class data to free.
+ * @param obj The genlist item object (unused).
+ */
 static void
 _colorclass_item_del(Edje_Color_Class *ecc, Evas_Object *obj EINA_UNUSED)
 {
@@ -636,6 +746,11 @@ _dbus_timeout(Colorclass_UI *cc)
    return EINA_FALSE;
 }
 #endif
+/**
+ * @internal
+ * @brief Initializes the color class subsystem.
+ * Currently, this function is a placeholder or intended for future DBus integration setup.
+ */
 /* internal */ void
 elm_color_class_init(void)
 {
@@ -646,6 +761,11 @@ elm_color_class_init(void)
    //h2 = ecore_event_handler_add(ELEMENTARY_COLORCLASS_RESET_EVENT, (Ecore_Event_Handler_Cb)_dbus_reset, NULL);
 }
 
+/**
+ * @internal
+ * @brief Shuts down the color class subsystem.
+ * Currently, this function is a placeholder or intended for future DBus integration cleanup.
+ */
 void
 elm_color_class_shutdown(void)
 {

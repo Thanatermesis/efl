@@ -1,7 +1,17 @@
 
 Eina_Bool _elm_widget_item_tooltip_window_mode_set(Eo *obj, Elm_Widget_Item_Data *pd, Eina_Bool disable);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_wdg_item_tooltip_window_mode_set property.
+ *
+ * This function is used by the Eolian reflection system to set the tooltip_window_mode property.
+ * It converts an Eina_Value to a Eina_Bool and calls the underlying implementation function.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the boolean value to set.
+ * @return EINA_ERROR_VALUE_FAILED if conversion fails, 0 on success.
+ */
 static Eina_Error
 __eolian_elm_widget_item_tooltip_window_mode_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -21,7 +31,16 @@ EOAPI EFL_FUNC_BODYV(elm_wdg_item_tooltip_window_mode_set, Eina_Bool, 0, EFL_FUN
 
 Eina_Bool _elm_widget_item_tooltip_window_mode_get(const Eo *obj, Elm_Widget_Item_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_wdg_item_tooltip_window_mode_get property.
+ *
+ * This function is used by the Eolian reflection system to get the tooltip_window_mode property.
+ * It calls the underlying implementation function and converts the returned Eina_Bool to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the boolean value of the property.
+ */
 static Eina_Value
 __eolian_elm_widget_item_tooltip_window_mode_get_reflect(const Eo *obj)
 {
@@ -33,7 +52,17 @@ EOAPI EFL_FUNC_BODY_CONST(elm_wdg_item_tooltip_window_mode_get, Eina_Bool, 0);
 
 void _elm_widget_item_tooltip_style_set(Eo *obj, Elm_Widget_Item_Data *pd, const char *style);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_wdg_item_tooltip_style_set property.
+ *
+ * This function is used by the Eolian reflection system to set the tooltip_style property.
+ * It converts an Eina_Value to a const char* and calls the underlying implementation function.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the string value (style name) to set.
+ * @return EINA_ERROR_VALUE_FAILED if conversion fails, 0 on success.
+ */
 static Eina_Error
 __eolian_elm_widget_item_tooltip_style_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -53,7 +82,16 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_wdg_item_tooltip_style_set, EFL_FUNC_CALL(style), 
 
 const char *_elm_widget_item_tooltip_style_get(const Eo *obj, Elm_Widget_Item_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_wdg_item_tooltip_style_get property.
+ *
+ * This function is used by the Eolian reflection system to get the tooltip_style property.
+ * It calls the underlying implementation function and converts the returned const char* to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the string value (style name) of the property.
+ */
 static Eina_Value
 __eolian_elm_widget_item_tooltip_style_get_reflect(const Eo *obj)
 {
@@ -65,7 +103,17 @@ EOAPI EFL_FUNC_BODY_CONST(elm_wdg_item_tooltip_style_get, const char *, NULL);
 
 void _elm_widget_item_cursor_set(Eo *obj, Elm_Widget_Item_Data *pd, const char *cursor);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_wdg_item_cursor_set property.
+ *
+ * This function is used by the Eolian reflection system to set the cursor property.
+ * It converts an Eina_Value to a const char* (cursor name) and calls the underlying implementation function.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the string value (cursor name) to set.
+ * @return EINA_ERROR_VALUE_FAILED if conversion fails, 0 on success.
+ */
 static Eina_Error
 __eolian_elm_widget_item_cursor_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -85,7 +133,16 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_wdg_item_cursor_set, EFL_FUNC_CALL(cursor), const 
 
 const char *_elm_widget_item_cursor_get(const Eo *obj, Elm_Widget_Item_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_wdg_item_cursor_get property.
+ *
+ * This function is used by the Eolian reflection system to get the cursor property.
+ * It calls the underlying implementation function and converts the returned const char* (cursor name) to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the string value (cursor name) of the property.
+ */
 static Eina_Value
 __eolian_elm_widget_item_cursor_get_reflect(const Eo *obj)
 {
@@ -97,7 +154,17 @@ EOAPI EFL_FUNC_BODY_CONST(elm_wdg_item_cursor_get, const char *, NULL);
 
 void _elm_widget_item_cursor_style_set(Eo *obj, Elm_Widget_Item_Data *pd, const char *style);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_wdg_item_cursor_style_set property.
+ *
+ * This function is used by the Eolian reflection system to set the cursor_style property.
+ * It converts an Eina_Value to a const char* (cursor style name) and calls the underlying implementation function.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the string value (cursor style name) to set.
+ * @return EINA_ERROR_VALUE_FAILED if conversion fails, 0 on success.
+ */
 static Eina_Error
 __eolian_elm_widget_item_cursor_style_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -117,7 +184,16 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_wdg_item_cursor_style_set, EFL_FUNC_CALL(style), c
 
 const char *_elm_widget_item_cursor_style_get(const Eo *obj, Elm_Widget_Item_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_wdg_item_cursor_style_get property.
+ *
+ * This function is used by the Eolian reflection system to get the cursor_style property.
+ * It calls the underlying implementation function and converts the returned const char* (cursor style name) to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the string value (cursor style name) of the property.
+ */
 static Eina_Value
 __eolian_elm_widget_item_cursor_style_get_reflect(const Eo *obj)
 {
@@ -129,7 +205,17 @@ EOAPI EFL_FUNC_BODY_CONST(elm_wdg_item_cursor_style_get, const char *, NULL);
 
 void _elm_widget_item_cursor_engine_only_set(Eo *obj, Elm_Widget_Item_Data *pd, Eina_Bool engine_only);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_wdg_item_cursor_engine_only_set property.
+ *
+ * This function is used by the Eolian reflection system to set the cursor_engine_only property.
+ * It converts an Eina_Value to a Eina_Bool and calls the underlying implementation function.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the boolean value to set.
+ * @return EINA_ERROR_VALUE_FAILED if conversion fails, 0 on success.
+ */
 static Eina_Error
 __eolian_elm_widget_item_cursor_engine_only_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -149,7 +235,16 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_wdg_item_cursor_engine_only_set, EFL_FUNC_CALL(eng
 
 Eina_Bool _elm_widget_item_cursor_engine_only_get(const Eo *obj, Elm_Widget_Item_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_wdg_item_cursor_engine_only_get property.
+ *
+ * This function is used by the Eolian reflection system to get the cursor_engine_only property.
+ * It calls the underlying implementation function and converts the returned Eina_Bool to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the boolean value of the property.
+ */
 static Eina_Value
 __eolian_elm_widget_item_cursor_engine_only_get_reflect(const Eo *obj)
 {
@@ -185,7 +280,17 @@ EOAPI EFL_FUNC_BODYV_CONST(elm_wdg_item_part_text_custom_get, const char *, NULL
 
 void _elm_widget_item_item_focus_set(Eo *obj, Elm_Widget_Item_Data *pd, Eina_Bool focused);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_wdg_item_focus_set property.
+ *
+ * This function is used by the Eolian reflection system to set the item_focus property.
+ * It converts an Eina_Value to a Eina_Bool and calls the underlying implementation function.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the boolean value (focused state) to set.
+ * @return EINA_ERROR_VALUE_FAILED if conversion fails, 0 on success.
+ */
 static Eina_Error
 __eolian_elm_widget_item_item_focus_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -205,7 +310,16 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_wdg_item_focus_set, EFL_FUNC_CALL(focused), Eina_B
 
 Eina_Bool _elm_widget_item_item_focus_get(const Eo *obj, Elm_Widget_Item_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_wdg_item_focus_get property.
+ *
+ * This function is used by the Eolian reflection system to get the item_focus property.
+ * It calls the underlying implementation function and converts the returned Eina_Bool (focused state) to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the boolean value (focused state) of the property.
+ */
 static Eina_Value
 __eolian_elm_widget_item_item_focus_get_reflect(const Eo *obj)
 {
@@ -217,7 +331,17 @@ EOAPI EFL_FUNC_BODY_CONST(elm_wdg_item_focus_get, Eina_Bool, 0);
 
 void _elm_widget_item_style_set(Eo *obj, Elm_Widget_Item_Data *pd, const char *style);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_wdg_item_style_set property.
+ *
+ * This function is used by the Eolian reflection system to set the style property for an item.
+ * It converts an Eina_Value to a const char* (style name) and calls the underlying implementation function.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the string value (style name) to set.
+ * @return EINA_ERROR_VALUE_FAILED if conversion fails, 0 on success.
+ */
 static Eina_Error
 __eolian_elm_widget_item_style_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -237,7 +361,16 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_wdg_item_style_set, EFL_FUNC_CALL(style), const ch
 
 const char *_elm_widget_item_style_get(const Eo *obj, Elm_Widget_Item_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_wdg_item_style_get property.
+ *
+ * This function is used by the Eolian reflection system to get the style property of an item.
+ * It calls the underlying implementation function and converts the returned const char* (style name) to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the string value (style name) of the property.
+ */
 static Eina_Value
 __eolian_elm_widget_item_style_get_reflect(const Eo *obj)
 {
@@ -249,7 +382,17 @@ EOAPI EFL_FUNC_BODY_CONST(elm_wdg_item_style_get, const char *, NULL);
 
 void _elm_widget_item_disabled_set(Eo *obj, Elm_Widget_Item_Data *pd, Eina_Bool disable);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_wdg_item_disabled_set property.
+ *
+ * This function is used by the Eolian reflection system to set the disabled property for an item.
+ * It converts an Eina_Value to a Eina_Bool (disabled state) and calls the underlying implementation function.
+ *
+ * @param obj The Evas object.
+ * @param val The Eina_Value containing the boolean value (disabled state) to set.
+ * @return EINA_ERROR_VALUE_FAILED if conversion fails, 0 on success.
+ */
 static Eina_Error
 __eolian_elm_widget_item_disabled_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -269,7 +412,16 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_wdg_item_disabled_set, EFL_FUNC_CALL(disable), Ein
 
 Eina_Bool _elm_widget_item_disabled_get(const Eo *obj, Elm_Widget_Item_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the elm_wdg_item_disabled_get property.
+ *
+ * This function is used by the Eolian reflection system to get the disabled property of an item.
+ * It calls the underlying implementation function and converts the returned Eina_Bool (disabled state) to an Eina_Value.
+ *
+ * @param obj The Evas object.
+ * @return An Eina_Value containing the boolean value (disabled state) of the property.
+ */
 static Eina_Value
 __eolian_elm_widget_item_disabled_get_reflect(const Eo *obj)
 {
@@ -285,6 +437,18 @@ EOAPI EFL_FUNC_BODY(elm_wdg_item_access_order_get, const Eina_List *, NULL);
 
 void _elm_widget_item_access_order_set(Eo *obj, Elm_Widget_Item_Data *pd, Eina_List *objs);
 
+/**
+ * @internal
+ * @brief Fallback function for ownership when setting access order.
+ *
+ * This function is called as a fallback if the primary ownership handling
+ * for `elm_wdg_item_access_order_set` is not sufficient or fails.
+ * Its main purpose is to free the list of objects if it's not
+ * managed elsewhere, preventing memory leaks.
+ *
+ * @param objs The list of Evas canvas objects representing the access order.
+ *             This list will be freed by this function.
+ */
 static void
 _elm_wdg_item_access_order_set_ownership_fallback(Eina_List *objs)
 {
@@ -444,7 +608,16 @@ Eina_Rect _elm_widget_item_efl_access_component_extents_get(const Eo *obj, Elm_W
 
 Eina_Bool _elm_widget_item_efl_access_component_focus_grab(Eo *obj, Elm_Widget_Item_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Initializes the Elm_Widget_Item class.
+ *
+ * This function is called once when the Efl_Class for Elm_Widget_Item is being set up.
+ * It defines the operations (methods) and property reflection capabilities for this class.
+ *
+ * @param klass The Efl_Class to initialize.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_widget_item_class_initializer(Efl_Class *klass)
 {

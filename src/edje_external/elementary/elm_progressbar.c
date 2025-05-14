@@ -1,25 +1,45 @@
 #include "private.h"
 
+/**
+ * @brief Structure to hold parameters for an Elm_Progressbar widget.
+ *
+ * This structure is used to store and apply a set of configuration
+ * parameters to a progressbar widget, often during its creation or
+ * state transition.
+ */
 typedef struct _Elm_Params_Progressbar
 {
-   Elm_Params base;
-   const char *label;
-   Evas_Object *icon;
-   const char *unit;
-   double value;
-   Evas_Coord span;
-   Eina_Bool value_exists:1;
-   Eina_Bool span_exists:1;
-   Eina_Bool inverted:1;
-   Eina_Bool inverted_exists:1;
-   Eina_Bool horizontal:1;
-   Eina_Bool horizontal_exists:1;
-   Eina_Bool pulse:1;
-   Eina_Bool pulse_exists:1;
-   Eina_Bool pulsing:1;
-   Eina_Bool pulsing_exists:1;
+   Elm_Params base; /**< Base parameters, common to all Elm widgets. */
+   const char *label; /**< The text label to display on the progressbar. */
+   Evas_Object *icon; /**< An icon object to display on the progressbar. */
+   const char *unit; /**< The unit format string (e.g., "%.2f %%"). */
+   double value; /**< The current progress value (typically between 0.0 and 1.0). */
+   Evas_Coord span; /**< The span of the progressbar, affecting its visual length. */
+   Eina_Bool value_exists:1; /**< Flag indicating if 'value' is set. */
+   Eina_Bool span_exists:1; /**< Flag indicating if 'span' is set. */
+   Eina_Bool inverted:1; /**< Flag indicating if the progressbar is inverted. */
+   Eina_Bool inverted_exists:1; /**< Flag indicating if 'inverted' is set. */
+   Eina_Bool horizontal:1; /**< Flag indicating if the progressbar is horizontal. */
+   Eina_Bool horizontal_exists:1; /**< Flag indicating if 'horizontal' is set. */
+   Eina_Bool pulse:1; /**< Flag indicating if pulse mode is enabled. */
+   Eina_Bool pulse_exists:1; /**< Flag indicating if 'pulse' is set. */
+   Eina_Bool pulsing:1; /**< Flag indicating if the progressbar is currently pulsing. */
+   Eina_Bool pulsing_exists:1; /**< Flag indicating if 'pulsing' is set. */
 } Elm_Params_Progressbar;
 
+/**
+ * @brief Sets the state of an external progressbar widget.
+ *
+ * This function applies parameters to the progressbar object, typically
+ * during animations or state transitions. It uses either `to_params` or
+ * `from_params` to determine the state to apply.
+ *
+ * @param data Unused user data.
+ * @param obj The Evas_Object (progressbar) to modify.
+ * @param from_params The source state parameters (used if to_params is NULL).
+ * @param to_params The target state parameters.
+ * @param pos Unused position value for transitions.
+ */
 static void
 external_progressbar_state_set(void *data EINA_UNUSED, Evas_Object *obj,
                                const void *from_params, const void *to_params,
@@ -51,6 +71,18 @@ external_progressbar_state_set(void *data EINA_UNUSED, Evas_Object *obj,
      elm_progressbar_pulse(obj, p->pulsing);
 }
 
+/**
+ * @brief Sets a specific parameter for an external progressbar widget.
+ *
+ * This function is called by Edje to set individual parameters of the
+ * progressbar widget based on external definitions.
+ *
+ * @param data Unused user data.
+ * @param obj The Evas_Object (progressbar) to modify.
+ * @param param The Edje_External_Param describing the parameter to set.
+ *              Example: param->name = "value", param->type = EDJE_EXTERNAL_PARAM_TYPE_DOUBLE, param->d = 0.5
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., unknown parameter or wrong type).
+ */
 static Eina_Bool
 external_progressbar_param_set(void *data EINA_UNUSED, Evas_Object *obj,
                                const Edje_External_Param *param)
@@ -136,6 +168,20 @@ external_progressbar_param_set(void *data EINA_UNUSED, Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Gets a specific parameter from an external progressbar widget.
+ *
+ * This function is called by Edje to retrieve the current value of
+ * individual parameters of the progressbar widget.
+ *
+ * @param data Unused user data.
+ * @param obj The Evas_Object (progressbar) to query.
+ * @param param The Edje_External_Param structure to fill with the parameter's value.
+ *              The `param->name` field indicates which parameter to get.
+ *              Example: param->name = "value", param->type = EDJE_EXTERNAL_PARAM_TYPE_DOUBLE
+ *                       On return, param->d will contain the current value.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., unknown parameter or wrong type).
+ */
 static Eina_Bool
 external_progressbar_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
                                Edje_External_Param *param)
@@ -216,6 +262,23 @@ external_progressbar_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Parses a list of Edje external parameters and creates an Elm_Params_Progressbar structure.
+ *
+ * This function converts a list of generic Edje parameters into a
+ * progressbar-specific parameter structure. This structure can then be used
+ * to configure a progressbar widget.
+ *
+ * @param data Unused user data.
+ * @param obj Unused Evas_Object.
+ * @param params A list of Edje_External_Param structures to parse.
+ *               Example: params might contain Edje_External_Param elements like:
+ *               - { name="label", type=EDJE_EXTERNAL_PARAM_TYPE_STRING, s="Loading..." }
+ *               - { name="value", type=EDJE_EXTERNAL_PARAM_TYPE_DOUBLE, d=0.75 }
+ *               - { name="horizontal", type=EDJE_EXTERNAL_PARAM_TYPE_BOOL, i=1 }
+ * @return A pointer to a newly allocated Elm_Params_Progressbar structure, or NULL on failure.
+ *         The caller is responsible for freeing this structure using external_progressbar_params_free().
+ */
 static void *
 external_progressbar_params_parse(void *data EINA_UNUSED,
                                   Evas_Object *obj EINA_UNUSED,
@@ -272,6 +335,18 @@ external_progressbar_params_parse(void *data EINA_UNUSED,
    return mem;
 }
 
+/**
+ * @brief Retrieves content from an external progressbar widget.
+ *
+ * Currently, progressbars do not support named content parts beyond "icon"
+ * (handled by elm_object_part_content_set/get), so this function
+ * indicates that no other content is available.
+ *
+ * @param data Unused user data.
+ * @param obj Unused Evas_Object.
+ * @param content Unused content part name.
+ * @return Always NULL, as progressbars don't have other named content parts.
+ */
 static Evas_Object *external_progressbar_content_get(void *data EINA_UNUSED,
                                                      const Evas_Object *obj EINA_UNUSED,
                                                      const char *content EINA_UNUSED)
@@ -280,6 +355,14 @@ static Evas_Object *external_progressbar_content_get(void *data EINA_UNUSED,
    return NULL;
 }
 
+/**
+ * @brief Frees an Elm_Params_Progressbar structure.
+ *
+ * This function releases the memory allocated for an Elm_Params_Progressbar
+ * structure, including any stringshared members.
+ *
+ * @param params A pointer to the Elm_Params_Progressbar structure to free.
+ */
 static void
 external_progressbar_params_free(void *params)
 {
@@ -292,18 +375,30 @@ external_progressbar_params_free(void *params)
    free(params);
 }
 
+/**
+ * @brief Array defining the external parameters for a progressbar widget.
+ *
+ * This array provides metadata about the parameters that can be set or
+ * retrieved for a progressbar widget via Edje's external interface.
+ * Each entry defines the parameter's name and type.
+ *
+ * Example structure of elements:
+ * - { "label", EDJE_EXTERNAL_PARAM_TYPE_STRING, ... }
+ * - { "value", EDJE_EXTERNAL_PARAM_TYPE_DOUBLE, ... }
+ * - { "horizontal", EDJE_EXTERNAL_PARAM_TYPE_BOOL, ... }
+ */
 static Edje_External_Param_Info external_progressbar_params[] = {
-     DEFINE_EXTERNAL_COMMON_PARAMS,
-     EDJE_EXTERNAL_PARAM_INFO_STRING("label"),
-     EDJE_EXTERNAL_PARAM_INFO_STRING("icon"),
-     EDJE_EXTERNAL_PARAM_INFO_DOUBLE("value"),
-     EDJE_EXTERNAL_PARAM_INFO_BOOL("horizontal"),
-     EDJE_EXTERNAL_PARAM_INFO_BOOL("pulse"),
-     EDJE_EXTERNAL_PARAM_INFO_BOOL("pulsing"),
-     EDJE_EXTERNAL_PARAM_INFO_BOOL("inverted"),
-     EDJE_EXTERNAL_PARAM_INFO_INT("span"),
-     EDJE_EXTERNAL_PARAM_INFO_STRING_DEFAULT("unit format", "%1.2f"),
-     EDJE_EXTERNAL_PARAM_INFO_SENTINEL
+     DEFINE_EXTERNAL_COMMON_PARAMS, /**< Common parameters like "disabled". */
+     EDJE_EXTERNAL_PARAM_INFO_STRING("label"), /**< Parameter for the progressbar text label. */
+     EDJE_EXTERNAL_PARAM_INFO_STRING("icon"), /**< Parameter for the progressbar icon. */
+     EDJE_EXTERNAL_PARAM_INFO_DOUBLE("value"), /**< Parameter for the progress value. */
+     EDJE_EXTERNAL_PARAM_INFO_BOOL("horizontal"), /**< Parameter for horizontal orientation. */
+     EDJE_EXTERNAL_PARAM_INFO_BOOL("pulse"), /**< Parameter to enable pulse mode. */
+     EDJE_EXTERNAL_PARAM_INFO_BOOL("pulsing"), /**< Parameter to control pulsing state. */
+     EDJE_EXTERNAL_PARAM_INFO_BOOL("inverted"), /**< Parameter for inverted display. */
+     EDJE_EXTERNAL_PARAM_INFO_INT("span"), /**< Parameter for the progressbar span size. */
+     EDJE_EXTERNAL_PARAM_INFO_STRING_DEFAULT("unit format", "%1.2f"), /**< Parameter for the unit format string, defaults to "%.2f". */
+     EDJE_EXTERNAL_PARAM_INFO_SENTINEL /**< Marks the end of the parameter list. */
 };
 
 DEFINE_EXTERNAL_ICON_ADD(progressbar, "progressbar");

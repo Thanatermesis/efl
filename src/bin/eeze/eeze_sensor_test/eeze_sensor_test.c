@@ -15,6 +15,18 @@
   default they are alll EINA_FALSE - ie dont provide a flow of events).
 */
 
+/**
+ * @brief Callback function for handling sensor events.
+ *
+ * This function is invoked when a sensor event occurs. It retrieves sensor data
+ * such as accuracy, timestamp, and specific sensor readings (e.g., x, y, z for
+ * accelerometer) based on the event type.
+ *
+ * @param data User data passed to the callback (unused in this case).
+ * @param ev_type The type of sensor event that occurred (e.g., EEZE_SENSOR_EVENT_ACCELEROMETER).
+ * @param event A pointer to the Eeze_Sensor_Obj that triggered the event.
+ * @return ECORE_CALLBACK_PASS_ON to allow other handlers to process the event.
+ */
 static Eina_Bool
 event_cb(void *data EINA_UNUSED, int ev_type, void *event)
 {
@@ -46,6 +58,15 @@ event_cb(void *data EINA_UNUSED, int ev_type, void *event)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Main function for the Eeze sensor test program.
+ *
+ * This function initializes Ecore and Eeze, then demonstrates synchronous and
+ * asynchronous reading of various sensor types. It prints sensor data to the
+ * console and sets up event handlers for asynchronous events.
+ *
+ * @return 0 on successful execution.
+ */
 int
 main(void)
 {

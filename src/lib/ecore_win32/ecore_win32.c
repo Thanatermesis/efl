@@ -29,16 +29,30 @@
 
 #define INITGUID
 #include <basetyps.h>
+/* Define OLE Interface Identifiers (IIDs) used for Drag and Drop operations. */
 DEFINE_OLEGUID(IID_IEnumFORMATETC, 0x00000103L, 0, 0);
 DEFINE_OLEGUID(IID_IDataObject,    0x0000010EL, 0, 0);
 DEFINE_OLEGUID(IID_IDropSource,    0x00000121L, 0, 0);
 DEFINE_OLEGUID(IID_IDropTarget,    0x00000122L, 0, 0);
 DEFINE_OLEGUID(IID_IUnknown,       0x00000000L, 0, 0);
 
-#define IDI_ICON 101
+#define IDI_ICON 101 /**< Defines the resource ID for the application icon. This ID is used by LoadImage to load the application's icon. */
 
-static int _ecore_win32_init_count = 0;
+static int _ecore_win32_init_count = 0; /**< Counter for ecore_win32_init() calls. Ensures that initialization and shutdown logic is performed only once. */
 
+/**
+ * @brief Main window procedure for Ecore_Win32 windows.
+ *
+ * This function is called by the Windows operating system to process messages
+ * sent to a window created by Ecore_Win32. It translates these messages
+ * into Ecore events or calls appropriate handlers.
+ *
+ * @param window Handle to the window.
+ * @param message The message identifier.
+ * @param window_param Additional message information. The content depends on the message.
+ * @param data_param Additional message information. The content depends on the message.
+ * @return LRESULT The result of the message processing; depends on the message sent.
+ */
 LRESULT CALLBACK
 _ecore_win32_window_procedure(HWND   window,
                               UINT   message,
@@ -393,28 +407,28 @@ _ecore_win32_window_procedure(HWND   window,
  *============================================================================*/
 
 
-HINSTANCE            _ecore_win32_instance = NULL;
-double               _ecore_win32_double_click_time = 0.25;
-unsigned long        _ecore_win32_event_last_time = 0;
-Ecore_Win32_Window  *_ecore_win32_event_last_window = NULL;
-int                  _ecore_win32_log_dom_global = -1;
-Ecore_Win32_Cursor  *_ecore_win32_cursor_x[77];
+HINSTANCE            _ecore_win32_instance = NULL; /**< Handle to the current instance of the application. Used for resource loading and window class registration. */
+double               _ecore_win32_double_click_time = 0.25; /**< Time in seconds to detect a double-click. Default is 0.25s. */
+unsigned long        _ecore_win32_event_last_time = 0; /**< Timestamp of the last processed Windows event. */
+Ecore_Win32_Window  *_ecore_win32_event_last_window = NULL; /**< Pointer to the Ecore_Win32_Window that received the last event. */
+int                  _ecore_win32_log_dom_global = -1; /**< Log domain identifier for Ecore_Win32 specific logging. */
+Ecore_Win32_Cursor  *_ecore_win32_cursor_x[77]; /**< Array storing pre-defined X11-like cursors. The index corresponds to an X11 cursor shape. */
 
 int ECORE_WIN32_EVENT_MOUSE_IN              = 0;
 int ECORE_WIN32_EVENT_MOUSE_OUT             = 0;
-int ECORE_WIN32_EVENT_WINDOW_FOCUS_IN       = 0;
-int ECORE_WIN32_EVENT_WINDOW_FOCUS_OUT      = 0;
-int ECORE_WIN32_EVENT_WINDOW_DAMAGE         = 0;
-int ECORE_WIN32_EVENT_WINDOW_CREATE         = 0;
-int ECORE_WIN32_EVENT_WINDOW_DESTROY        = 0;
-int ECORE_WIN32_EVENT_WINDOW_SHOW           = 0;
-int ECORE_WIN32_EVENT_WINDOW_HIDE           = 0;
-int ECORE_WIN32_EVENT_WINDOW_CONFIGURE      = 0;
-int ECORE_WIN32_EVENT_WINDOW_RESIZE         = 0;
-int ECORE_WIN32_EVENT_WINDOW_PROPERTY       = 0;
-int ECORE_WIN32_EVENT_WINDOW_DELETE_REQUEST = 0;
-int ECORE_WIN32_EVENT_SELECTION_CLEAR       = 0;
-int ECORE_WIN32_EVENT_SELECTION_NOTIFY      = 0;
+int ECORE_WIN32_EVENT_WINDOW_FOCUS_IN       = 0; /**< Event ID for window focus in events. */
+int ECORE_WIN32_EVENT_WINDOW_FOCUS_OUT      = 0; /**< Event ID for window focus out events. */
+int ECORE_WIN32_EVENT_WINDOW_DAMAGE         = 0; /**< Event ID for window damage (expose) events. */
+int ECORE_WIN32_EVENT_WINDOW_CREATE         = 0; /**< Event ID for window creation notification events. */
+int ECORE_WIN32_EVENT_WINDOW_DESTROY        = 0; /**< Event ID for window destruction notification events. */
+int ECORE_WIN32_EVENT_WINDOW_SHOW           = 0; /**< Event ID for window show (map) events. */
+int ECORE_WIN32_EVENT_WINDOW_HIDE           = 0; /**< Event ID for window hide (unmap) events. */
+int ECORE_WIN32_EVENT_WINDOW_CONFIGURE      = 0; /**< Event ID for window configure (move/resize) events. */
+int ECORE_WIN32_EVENT_WINDOW_RESIZE         = 0; /**< Event ID for window resize events. */
+int ECORE_WIN32_EVENT_WINDOW_PROPERTY       = 0; /**< Event ID for window property change events. */
+int ECORE_WIN32_EVENT_WINDOW_DELETE_REQUEST = 0; /**< Event ID for window delete request (close button) events. */
+int ECORE_WIN32_EVENT_SELECTION_CLEAR       = 0; /**< Event ID for clipboard selection clear events. */
+int ECORE_WIN32_EVENT_SELECTION_NOTIFY      = 0; /**< Event ID for clipboard selection notification (update) events. */
 
 /*============================================================================*
  *                                   API                                      *

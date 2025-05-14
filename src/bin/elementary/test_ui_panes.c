@@ -4,6 +4,25 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Test case for Efl.Ui.Panes minimum size handling.
+ *
+ * This test creates a window with a nested panes layout to verify
+ * that minimum size hints are correctly handled.
+ *
+ * The layout consists of a main vertical panes widget. The first part
+ * contains a button with a user-defined minimum size. The second part
+ * contains a horizontal panes widget.
+ *
+ * The nested horizontal panes widget also has two parts, each with a
+ * button and its own minimum size hints. One of these parts has
+ * the `hint_min_allow` property enabled, which is crucial for
+ * testing if the minimum size hints are respected by the panes logic.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_panes_minsize(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

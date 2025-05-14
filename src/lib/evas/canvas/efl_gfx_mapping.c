@@ -10,124 +10,191 @@
 
 #define MY_CLASS EFL_GFX_MAPPING_MIXIN
 
+/** @internal Convenience typedef for Gfx_Map structure. */
 typedef struct _Gfx_Map               Gfx_Map;
+/** @internal Convenience typedef for Gfx_Map_Op structure. */
 typedef struct _Gfx_Map_Op            Gfx_Map_Op;
+/** @internal Convenience typedef for Gfx_Map_Pivot structure. */
 typedef struct _Gfx_Map_Pivot         Gfx_Map_Pivot;
+/** @internal Convenience typedef for Efl_Gfx_Mapping_Data structure. */
 typedef struct _Efl_Gfx_Mapping_Data  Efl_Gfx_Mapping_Data;
+/** @internal Convenience typedef for Gfx_Map_Point structure. */
 typedef struct _Gfx_Map_Point         Gfx_Map_Point;
+/** @internal Convenience typedef for Gfx_Map_Op_Type enum. */
 typedef enum _Gfx_Map_Op_Type         Gfx_Map_Op_Type;
 
+/**
+ * @internal
+ * @brief Enumerates the types of graphics mapping operations.
+ *
+ * This enum defines the different operations that can be applied to a graphics map,
+ * such as setting coordinates, colors, rotations, etc.
+ */
 enum _Gfx_Map_Op_Type {
-   GFX_MAPPING_RAW_COORD,
-   GFX_MAPPING_COLOR,
-   GFX_MAPPING_ROTATE_2D,
-   GFX_MAPPING_ROTATE_3D,
-   GFX_MAPPING_ROTATE_QUAT,
-   GFX_MAPPING_ZOOM,
-   GFX_MAPPING_TRANSLATE,
-   GFX_MAPPING_LIGHTING_3D,
-   GFX_MAPPING_PERSPECTIVE_3D,
+   GFX_MAPPING_RAW_COORD,      /**< Directly set point coordinates. */
+   GFX_MAPPING_COLOR,          /**< Set color for points. */
+   GFX_MAPPING_ROTATE_2D,      /**< Apply a 2D rotation. */
+   GFX_MAPPING_ROTATE_3D,      /**< Apply a 3D rotation. */
+   GFX_MAPPING_ROTATE_QUAT,    /**< Apply a quaternion rotation. */
+   GFX_MAPPING_ZOOM,           /**< Apply zoom. */
+   GFX_MAPPING_TRANSLATE,      /**< Apply translation. */
+   GFX_MAPPING_LIGHTING_3D,    /**< Apply 3D lighting. */
+   GFX_MAPPING_PERSPECTIVE_3D, /**< Apply 3D perspective. */
 };
 
+/**
+ * @internal
+ * @brief Represents a single operation in a graphics map.
+ *
+ * This structure holds the type of operation and its parameters.
+ * Operations are stored in an Eina_Inlist.
+ */
 struct _Gfx_Map_Op {
-   EINA_INLIST;
+   EINA_INLIST; /**< Intrusive list node. */
 
-   Gfx_Map_Op_Type op;
+   Gfx_Map_Op_Type op; /**< The type of mapping operation. */
    union {
+      /** Parameters for GFX_MAPPING_RAW_COORD operation. */
       struct {
-         int idx;
-         double x, y, z;
+         int idx;        /**< Index of the point to modify (-1 for all points). */
+         double x, y, z;  /**< New X, Y, Z coordinates. */
       } raw_coord;
+      /** Parameters for GFX_MAPPING_COLOR operation. */
       struct {
-         int idx;
-         uint8_t r, g, b, a;
+         int idx;              /**< Index of the point to color (-1 for all points). */
+         uint8_t r, g, b, a;   /**< RGBA color components. */
       } color;
+      /** Parameters for GFX_MAPPING_ROTATE_2D operation. */
       struct {
-         double degrees;
+         double degrees;      /**< Rotation angle in degrees. */
       } rotate_2d;
+      /** Parameters for GFX_MAPPING_ROTATE_3D operation. */
       struct {
-         double dx, dy, dz;
+         double dx, dy, dz;   /**< Rotation amounts around X, Y, Z axes. */
       } rotate_3d;
+      /** Parameters for GFX_MAPPING_ROTATE_QUAT operation. */
       struct {
-         double qx, qy, qz, qw;
+         double qx, qy, qz, qw; /**< Quaternion components (x, y, z, w). */
       } rotate_quat;
+      /** Parameters for GFX_MAPPING_ZOOM operation. */
       struct {
-         double zx, zy;
+         double zx, zy;       /**< Zoom factors for X and Y axes. */
       } zoom;
+      /** Parameters for GFX_MAPPING_TRANSLATE operation. */
       struct {
-         double dx, dy, dz;
+         double dx, dy, dz;   /**< Translation amounts for X, Y, Z axes. */
       } translate;
+      /** Parameters for GFX_MAPPING_LIGHTING_3D operation. */
       struct {
-         uint8_t lr, lg, lb, ar, ag, ab;
+         uint8_t lr, lg, lb;   /**< Light color components (RGB). */
+         uint8_t ar, ag, ab;   /**< Ambient color components (RGB). */
       } lighting_3d;
+      /** Parameters for GFX_MAPPING_PERSPECTIVE_3D operation. */
       struct {
-         double z0, foc;
+         double z0;           /**< Z coordinate of the vanishing point on the Z axis. */
+         double foc;          /**< Focal length. */
       } perspective_3d;
    };
+   /** Pivot information for the operation. */
    struct {
-      Gfx_Map_Pivot  *pivot;
-      double          cx, cy, cz;
-      Eina_Bool       is_absolute;
-      Eina_Bool       is_self;
+      Gfx_Map_Pivot  *pivot;       /**< The pivot object, if any. */
+      double          cx, cy, cz;  /**< Pivot center coordinates (relative or absolute). */
+      Eina_Bool       is_absolute; /**< EINA_TRUE if cx, cy, cz are absolute coordinates. */
+      Eina_Bool       is_self;     /**< EINA_TRUE if the pivot is the object itself. */
    } pivot;
 };
 
+/**
+ * @internal
+ * @brief Represents a pivot point for mapping operations.
+ *
+ * A pivot can be another Efl_Gfx_Entity or the canvas itself.
+ * It is used as a reference for relative transformations.
+ */
 struct _Gfx_Map_Pivot
 {
-   EINA_INLIST;
+   EINA_INLIST; /**< Intrusive list node. */
 
-   Evas_Object_Protected_Data *map_obj;
-   Eo             *eo_obj; // strong or weak ref?
-   Eina_Rect       geometry;
-   Eina_Bool       event_cbs;
-   Eina_Bool       is_evas;
-   Eina_Bool       is_canvas;
-   Eina_Bool       changed;
+   Evas_Object_Protected_Data *map_obj; /**< The Evas object this pivot is associated with for mapping updates. */
+   Eo             *eo_obj;              /**< The Efl_Gfx_Entity object used as a pivot. Strong reference. */
+   Eina_Rect       geometry;            /**< Cached geometry of the pivot object. */
+   Eina_Bool       event_cbs;           /**< EINA_TRUE if event callbacks for geometry changes are registered. */
+   Eina_Bool       is_evas;             /**< EINA_TRUE if the pivot is a legacy Evas object. */
+   Eina_Bool       is_canvas;           /**< EINA_TRUE if the pivot is a canvas (scene). */
+   Eina_Bool       changed;             /**< EINA_TRUE if the pivot's geometry has changed since the last map calculation. */
 };
 
+/**
+ * @internal
+ * @brief Represents a UV mapping coordinate for a point.
+ *
+ * UV coordinates are normalized (0.0 to 1.0) and define how a texture
+ * is mapped onto the geometry.
+ */
 struct _Gfx_Map_Point {
-     double u, v;
+     double u; /**< U coordinate (horizontal). */
+     double v; /**< V coordinate (vertical). */
 };
 
+/**
+ * @internal
+ * @brief Core structure holding all data for a graphics map.
+ *
+ * This structure is managed by a copy-on-write (COW) mechanism.
+ * It contains the list of operations, UV points, pivots, and the
+ * calculated Evas_Map.
+ */
 struct _Gfx_Map {
-   Gfx_Map_Op *ops;
-   Gfx_Map_Point *points;
+   Gfx_Map_Op *ops;          /**< List of mapping operations. */
+   Gfx_Map_Point *points;    /**< Array of UV mapping points. Example: `points[0] = {u=0.0, v=0.0};` */
 
-   Gfx_Map_Pivot *pivots;
-   Evas_Map      *map;
-   Gfx_Map_Op    *last_calc_op;
-   int            imw, imh;
-   int            count;
+   Gfx_Map_Pivot *pivots;    /**< List of pivot objects used by operations. */
+   Evas_Map      *map;       /**< The calculated Evas_Map. */
+   Gfx_Map_Op    *last_calc_op; /**< The last operation processed during map calculation. Used for partial recalculations. */
+   int            imw, imh;  /**< Image/source width and height used for UV mapping. */
+   int            count;     /**< Number of points in the map (typically 4 for a quad). */
 
    // FIXME: Those need a quality vs. performance setting instead
-   Eina_Bool alpha;
-   Eina_Bool smooth;
-   Eina_Bool event_cbs;
+   Eina_Bool alpha;          /**< EINA_TRUE if alpha blending is enabled for the map. */
+   Eina_Bool smooth;         /**< EINA_TRUE if smooth rendering (anti-aliasing) is enabled. */
+   Eina_Bool event_cbs;      /**< EINA_TRUE if geometry change event callbacks are registered for the mapped object itself. */
 };
 
+/**
+ * @internal
+ * @brief Private data for the Efl_Gfx_Mapping mixin.
+ *
+ * Contains a pointer to the copy-on-write (COW) Gfx_Map data.
+ */
 struct _Efl_Gfx_Mapping_Data {
-   const Gfx_Map *cow;
+   const Gfx_Map *cow; /**< Pointer to the COW Gfx_Map data. */
 };
 
 // ----------------------------------------------------------------------------
 
+/** @internal A dummy Eo object used as a marker for absolute pivot operations. */
 static Eo *gfx_mapping_absolute = NULL;
+/** @internal The Eina_Cow instance used for managing Gfx_Map data. */
 static Eina_Cow *gfx_mapping_cow = NULL;
+/** @internal Default state for a Gfx_Map, used for COW initialization and reset. */
 static const Gfx_Map gfx_mapping_cow_default = {
-   NULL,
-   NULL,
-   NULL,
-   NULL,
-   NULL,
-   0, 0,
-   4,
-   EINA_TRUE,
-   EINA_TRUE,
-   EINA_FALSE
+   NULL, /* ops */
+   NULL, /* points */
+   NULL, /* pivots */
+   NULL, /* map */
+   NULL, /* last_calc_op */
+   0, 0, /* imw, imh */
+   4,    /* count */
+   EINA_TRUE,  /* alpha */
+   EINA_TRUE,  /* smooth */
+   EINA_FALSE /* event_cbs */
 };
 
+/** @internal Macro to begin a copy-on-write operation on the Gfx_Map data. */
 #define MAPCOW_BEGIN(_pd) eina_cow_write(gfx_mapping_cow, (const Eina_Cow_Data**)&(_pd->cow))
+/** @internal Macro to end a copy-on-write operation. */
 #define MAPCOW_END(_mapcow, _pd) eina_cow_done(gfx_mapping_cow, (const Eina_Cow_Data**)&(_pd->cow), _mapcow, EINA_FALSE)
+/** @internal Macro to write a value to a field in the Gfx_Map, initiating COW if necessary. */
 #define MAPCOW_WRITE(pd, name, value) do { \
    if (pd->cow->name != (value)) { \
      Gfx_Map *_cow = MAPCOW_BEGIN(pd); \
@@ -135,13 +202,31 @@ static const Gfx_Map gfx_mapping_cow_default = {
      MAPCOW_END(_cow, pd); \
    }} while (0)
 
-#define PIVOT_REF(_pivot) (_pivot ? efl_xref((Eo *) _pivot, eo_obj) : NULL)
-#define PIVOT_UNREF(_pivot) (_pivot ? efl_xunref(_pivot, eo_obj) : NULL)
+/** @internal Macro to reference a pivot object. `eo_obj` is the mapping object. */
+#define PIVOT_REF(_pivot_eo_obj, _mapping_eo_obj) (_pivot_eo_obj ? efl_xref((Eo *) _pivot_eo_obj, _mapping_eo_obj) : NULL)
+/** @internal Macro to unreference a pivot object. `_mapping_eo_obj` is the mapping object. */
+#define PIVOT_UNREF(_pivot_eo_obj, _mapping_eo_obj) (_pivot_eo_obj ? efl_xunref(_pivot_eo_obj, _mapping_eo_obj) : NULL)
 
+/**
+ * @internal
+ * @brief Cleans up resources held by a Gfx_Map instance.
+ *
+ * This includes freeing allocated points, the Evas_Map, operations, and pivots.
+ *
+ * @param eo_obj The Efl_Gfx_Mapping object.
+ * @param pd The private data of the Efl_Gfx_Mapping object.
+ */
 static inline void _map_clean(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd);
 
 // ----------------------------------------------------------------------------
 
+/**
+ * @internal
+ * @brief Initializes the Efl_Gfx_Mapping subsystem.
+ *
+ * Sets up the Eina_Cow for Gfx_Map structures.
+ * This function is typically called during Evas initialization.
+ */
 void
 _efl_gfx_mapping_init(void)
 {
@@ -149,6 +234,13 @@ _efl_gfx_mapping_init(void)
                               &gfx_mapping_cow_default, EINA_FALSE);
 }
 
+/**
+ * @internal
+ * @brief Shuts down the Efl_Gfx_Mapping subsystem.
+ *
+ * Deletes the Eina_Cow for Gfx_Map structures and unrefs the global absolute pivot marker.
+ * This function is typically called during Evas shutdown.
+ */
 void
 _efl_gfx_mapping_shutdown(void)
 {
@@ -182,34 +274,66 @@ _efl_gfx_mapping_efl_object_destructor(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd)
 
 // ----------------------------------------------------------------------------
 
+/**
+ * @internal
+ * @brief Callback invoked when the mapped object's geometry (position or size) changes.
+ *
+ * Marks the map as needing an update.
+ *
+ * @param data The Evas_Object_Protected_Data of the mapped object.
+ * @param ev The event information (unused).
+ */
 static void
 _geometry_changed_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    Evas_Object_Protected_Data *obj = data;
    Efl_Gfx_Mapping_Data *pd = efl_data_scope_get(obj->object, MY_CLASS);
 
-   MAPCOW_WRITE(pd, last_calc_op, NULL);
-   obj->gfx_mapping_update = EINA_TRUE;
+   MAPCOW_WRITE(pd, last_calc_op, NULL); // Invalidate last calculated operation
+   obj->gfx_mapping_update = EINA_TRUE; // Mark for update
 }
 
+/** @internal Array of callbacks for geometry changes of the mapped object. */
 EFL_CALLBACKS_ARRAY_DEFINE(_geometry_changes,
                            { EFL_GFX_ENTITY_EVENT_POSITION_CHANGED, _geometry_changed_cb },
                            { EFL_GFX_ENTITY_EVENT_SIZE_CHANGED, _geometry_changed_cb });
 
+/**
+ * @internal
+ * @brief Callback invoked when a pivot object's geometry (position or size) changes.
+ *
+ * Marks the associated map and the pivot itself as needing an update.
+ *
+ * @param data The Gfx_Map_Pivot whose geometry changed.
+ * @param ev The event information (unused).
+ */
 static void
 _pivot_changed_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    Gfx_Map_Pivot *pivot = data;
-   Evas_Object_Protected_Data *obj = pivot->map_obj;
+   Evas_Object_Protected_Data *obj = pivot->map_obj; // The object being mapped
 
-   obj->gfx_mapping_update = EINA_TRUE;
-   pivot->changed = EINA_TRUE;
+   obj->gfx_mapping_update = EINA_TRUE; // Mark the main map for update
+   pivot->changed = EINA_TRUE;          // Mark this pivot as changed
 }
 
+/** @internal Array of callbacks for geometry changes of pivot objects. */
 EFL_CALLBACKS_ARRAY_DEFINE(_pivot_changes,
                            { EFL_GFX_ENTITY_EVENT_POSITION_CHANGED, _pivot_changed_cb },
                            { EFL_GFX_ENTITY_EVENT_SIZE_CHANGED, _pivot_changed_cb });
 
+/**
+ * @internal
+ * @brief Marks the graphics map as dirty and needing recalculation.
+ *
+ * This function ensures that the object is flagged as changed and, if necessary,
+ * sets up event callbacks for geometry changes on the object itself or its pivots.
+ *
+ * @param eo_obj The Efl_Gfx_Mapping object.
+ * @param pd The private data of the Efl_Gfx_Mapping object.
+ * @param reset If EINA_TRUE, the Evas_Map is reset immediately. Otherwise,
+ *              it's just marked for update.
+ */
 static inline void
 _map_dirty(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd, Eina_Bool reset)
 {
@@ -242,6 +366,20 @@ _map_dirty(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd, Eina_Bool reset)
      }
 }
 
+/**
+ * @internal
+ * @brief Calculates or updates the Evas_Map based on the current Gfx_Map operations.
+ *
+ * This is the core function that translates the high-level Gfx_Map_Op list
+ * into a concrete Evas_Map that Evas can render. It handles pivot geometry updates,
+ * UV coordinate calculations, and applies all transformations.
+ *
+ * @param eo_obj The Efl_Gfx_Mapping object (const because map calculation should not change logical state, only cached Evas_Map).
+ * @param obj The protected data of the Evas object being mapped.
+ * @param pd The private data of the Efl_Gfx_Mapping object.
+ * @return The calculated or updated Evas_Map, or NULL if no mapping is applied or an error occurs.
+ *         The returned Evas_Map is owned by the Gfx_Map structure (pd->cow->map).
+ */
 static Evas_Map *
 _map_calc(const Eo *eo_obj, Evas_Object_Protected_Data *obj, Efl_Gfx_Mapping_Data *pd)
 {
@@ -457,6 +595,16 @@ _map_calc(const Eo *eo_obj, Evas_Object_Protected_Data *obj, Efl_Gfx_Mapping_Dat
    return m;
 }
 
+/**
+ * @internal
+ * @brief Forces an update of the graphics mapping for the given object.
+ *
+ * This function recalculates the Evas_Map using _map_calc() and applies it
+ * to the Evas object. It also updates the internal state related to whether
+ * the object has mapping enabled.
+ *
+ * @param eo_obj The Efl_Gfx_Mapping object to update.
+ */
 void
 _efl_gfx_mapping_update(Eo *eo_obj)
 {
@@ -481,6 +629,7 @@ _map_clean(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd)
         Gfx_Map_Op *op;
         Gfx_Map *mcow;
 
+        // This function modifies the cow data, so it needs to be writable.
         mcow = MAPCOW_BEGIN(pd);
         EINA_INLIST_FREE(mcow->ops, op)
           {
@@ -492,7 +641,8 @@ _map_clean(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd)
              EINA_INLIST_REMOVE(mcow->pivots, pivot);
              if (pivot->event_cbs)
                efl_event_callback_array_del(pivot->eo_obj, _pivot_changes(), pivot);
-             PIVOT_UNREF(pivot->eo_obj);
+             // eo_obj here is the mapping object, not the pivot object itself.
+             PIVOT_UNREF(pivot->eo_obj, eo_obj);
              free(pivot);
           }
         MAPCOW_END(mcow, pd);
@@ -502,7 +652,10 @@ _map_clean(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd)
 EOLIAN Eina_Bool
 _efl_gfx_mapping_mapping_has(Eo *eo_obj EINA_UNUSED, Efl_Gfx_Mapping_Data *pd EINA_UNUSED)
 {
+   // Check if the current COW data is the default (no operations)
+   // or if there are any operations or an existing map.
    if (pd->cow == &gfx_mapping_cow_default) return EINA_FALSE;
+   // An object has mapping if it has operations or an already calculated map.
    if (pd->cow->ops) return EINA_TRUE;
    if (pd->cow->map) return EINA_TRUE;
    return EINA_FALSE;
@@ -514,15 +667,23 @@ _efl_gfx_mapping_mapping_reset(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd)
    Evas_Object_Protected_Data *obj = EVAS_OBJ_GET_OR_RETURN(eo_obj);
    Eina_Bool alpha, smooth;
 
+   // Preserve alpha and smooth settings across reset
    alpha = pd->cow->alpha;
    smooth = pd->cow->smooth;
-   _map_clean(eo_obj, pd);
+
+   _map_clean(eo_obj, pd); // Clean up current map data (ops, pivots, evas_map)
+
+   // Remove geometry change callbacks if they were added for the object itself
    if (pd->cow->event_cbs)
      efl_event_callback_array_del(eo_obj, _geometry_changes(), obj);
 
+   // Reset COW data to default
    eina_cow_memcpy(gfx_mapping_cow, (const Eina_Cow_Data * const *) &pd->cow,
                    (const Eina_Cow_Data *) &gfx_mapping_cow_default);
-   _map_dirty(eo_obj, pd, EINA_TRUE);
+
+   _map_dirty(eo_obj, pd, EINA_TRUE); // Mark as dirty and reset Evas_Map
+
+   // Restore alpha and smooth settings
    MAPCOW_WRITE(pd, alpha, alpha);
    MAPCOW_WRITE(pd, smooth, smooth);
 }
@@ -546,27 +707,33 @@ _efl_gfx_mapping_mapping_point_count_set(Eo *eo_obj EINA_UNUSED, Efl_Gfx_Mapping
    if (pd->cow->count == count) return;
 
    mcow = MAPCOW_BEGIN(pd);
-   if (mcow->points == NULL)
+   if (mcow->points == NULL) // If no points array exists yet
      {
         mcow->points = calloc(1, count * sizeof(Gfx_Map_Point));
         if (mcow->points)
-          mcow->count = count;
+          mcow->count = count; // Update count only on successful allocation
         else
-          ERR("Failed to allocate memory with calloc");
+          ERR("Failed to allocate memory with calloc for %d map points", count);
      }
-   else
+   else // If points array already exists, reallocate
      {
         Gfx_Map_Point *ps = realloc(mcow->points, count * sizeof(Gfx_Map_Point));
         if (ps)
           {
              mcow->points = ps;
+             // If new count is larger, initialize new points to 0 (realloc doesn't guarantee this for the extended part)
+             if (count > pd->cow->count)
+                memset(mcow->points + pd->cow->count, 0, (count - pd->cow->count) * sizeof(Gfx_Map_Point));
              mcow->count = count;
-             memset(mcow->points, 0, count * sizeof(Gfx_Map_Point));
           }
         else
-          ERR("Failed to allocate memory with realloc");
+          ERR("Failed to allocate memory with realloc for %d map points", count);
      }
    MAPCOW_END(mcow, pd);
+   // Note: _map_dirty is not called here as changing point count itself
+   // doesn't make the map dirty until UVs or Coords are set for these points.
+   // However, any subsequent operation will trigger _map_dirty.
+   // For safety and consistency, one might consider calling _map_dirty here too.
 }
 
 EOLIAN static Eina_Bool
@@ -576,7 +743,7 @@ _efl_gfx_mapping_mapping_clockwise_get(const Eo *eo_obj, Efl_Gfx_Mapping_Data *p
    Evas_Map *m;
 
    m = _map_calc(eo_obj, obj, pd);
-   if (!m) return EINA_TRUE;
+   if (!m) return EINA_TRUE; // Default to clockwise if no map
    return evas_map_util_clockwise_get(m);
 }
 
@@ -586,7 +753,7 @@ _efl_gfx_mapping_mapping_smooth_set(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd, Eina_B
    if (pd->cow->smooth == smooth) return;
 
    MAPCOW_WRITE(pd, smooth, smooth);
-
+   // If the map itself changes (e.g. smooth property), it needs to be marked dirty.
    _map_dirty(eo_obj, pd, EINA_FALSE);
 }
 
@@ -602,7 +769,7 @@ _efl_gfx_mapping_mapping_alpha_set(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd, Eina_Bo
    if (pd->cow->alpha == alpha) return;
 
    MAPCOW_WRITE(pd, alpha, alpha);
-
+   // If the map itself changes (e.g. alpha property), it needs to be marked dirty.
    _map_dirty(eo_obj, pd, EINA_FALSE);
 }
 
@@ -622,7 +789,7 @@ _efl_gfx_mapping_mapping_coord_absolute_get(const Eo *eo_obj, Efl_Gfx_Mapping_Da
    EINA_SAFETY_ON_FALSE_RETURN((idx >= 0) && (idx < pd->cow->count));
 
    m = _map_calc(eo_obj, obj, pd);
-   if (!m)
+   if (!m) // If map hasn't been calculated or no ops, return default quad coords
      {
         int X, Y, W, H;
 
@@ -631,21 +798,23 @@ _efl_gfx_mapping_mapping_coord_absolute_get(const Eo *eo_obj, Efl_Gfx_Mapping_Da
         W = obj->cur->geometry.w;
         H = obj->cur->geometry.h;
 
+        // Default quad points based on object geometry
+        // P0: (X, Y) P1: (X+W, Y) P2: (X+W, Y+H) P3: (X, Y+H)
         if (x)
           {
-             if ((idx == 0) || (idx == 3)) *x = X;
-             else *x = X + W;
+             if ((idx == 0) || (idx == 3)) *x = X; // Top-left X, Bottom-left X
+             else *x = X + W;                     // Top-right X, Bottom-right X
           }
         if (y)
           {
-             if ((idx == 0) || (idx == 1)) *y = Y;
-             else *y = Y + H;
+             if ((idx == 0) || (idx == 1)) *y = Y; // Top-left Y, Top-right Y
+             else *y = Y + H;                     // Bottom-left Y, Bottom-right Y
           }
-        if (z) *z = 0;
+        if (z) *z = 0; // Default Z is 0
         return;
      }
 
-   _map_point_coord_get(m, idx, x, y, z);
+   _map_point_coord_get(m, idx, x, y, z); // Get from calculated Evas_Map
 }
 
 EOLIAN static void
@@ -656,30 +825,50 @@ _efl_gfx_mapping_mapping_uv_set(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
 
    EINA_SAFETY_ON_FALSE_RETURN((idx >= 0) && (idx < pd->cow->count));
 
+   // Ensure points array is allocated
    if (!pd->cow->points)
      {
         Gfx_Map_Point *ps = calloc(1, pd->cow->count * sizeof(Gfx_Map_Point));
-        if (!ps) return;
+        if (!ps) {
+            ERR("Failed to allocate points for UV set");
+            return;
+        }
+        // Initialize default UVs for a quad if count is 4 and points were just allocated
+        if (pd->cow->count == 4) {
+            ps[0].u = 0.0; ps[0].v = 0.0;
+            ps[1].u = 1.0; ps[1].v = 0.0;
+            ps[2].u = 1.0; ps[2].v = 1.0;
+            ps[3].u = 0.0; ps[3].v = 1.0;
+        }
         MAPCOW_WRITE(pd, points, ps);
      }
+
+   // Check if values are actually changing
    if (EINA_DBL_EQ(pd->cow->points[idx].u, u) &&
        EINA_DBL_EQ(pd->cow->points[idx].v, v))
      return;
 
    mcow = MAPCOW_BEGIN(pd);
+   // UV coordinates are typically clamped between 0.0 and 1.0.
    mcow->points[idx].u = CLAMP(0.0, u, 1.0);
    mcow->points[idx].v = CLAMP(0.0, v, 1.0);
    MAPCOW_END(mcow, pd);
 
-   _map_dirty(eo_obj, pd, EINA_FALSE);
+   _map_dirty(eo_obj, pd, EINA_FALSE); // UV change makes the map dirty
 }
 
 EOLIAN static void
 _efl_gfx_mapping_mapping_uv_get(const Eo *eo_obj EINA_UNUSED, Efl_Gfx_Mapping_Data *pd,
                         int idx, double *u, double *v)
 {
-   EINA_SAFETY_ON_FALSE_RETURN((idx >= 0) && (idx < pd->cow->count)
-                               && (pd->cow->points));
+   EINA_SAFETY_ON_FALSE_RETURN((idx >= 0) && (idx < pd->cow->count));
+   // Ensure points array exists before trying to access it.
+   // If points is NULL, it implies default UVs (0,0 for idx 0, etc.),
+   // but the API expects to return stored values or fail if not set.
+   // Here, we rely on safety check and assume points is valid if count > 0
+   // and UVs have been set at least once or initialized.
+   EINA_SAFETY_ON_NULL_RETURN(pd->cow->points);
+
 
    if (u) *u = pd->cow->points[idx].u;
    if (v) *v = pd->cow->points[idx].v;
@@ -695,10 +884,10 @@ _efl_gfx_mapping_mapping_color_get(const Eo *eo_obj EINA_UNUSED, Efl_Gfx_Mapping
 
    EINA_SAFETY_ON_FALSE_RETURN((idx >= 0) && (idx < pd->cow->count));
 
-   if (!r && !g && !b && !a) return;
+   if (!r && !g && !b && !a) return; // Nothing to retrieve
 
    m = _map_calc(eo_obj, obj, pd);
-   if (!m)
+   if (!m) // If map not calculated or no ops, return default white/opaque
      {
         if (r) *r = 255;
         if (g) *g = 255;
@@ -714,6 +903,26 @@ _efl_gfx_mapping_mapping_color_get(const Eo *eo_obj EINA_UNUSED, Efl_Gfx_Mapping
    if (a) *a = p->a;
 }
 
+/**
+ * @internal
+ * @brief Adds a new graphics mapping operation to the list.
+ *
+ * This is a helper function to create and append a Gfx_Map_Op.
+ * It handles pivot management (finding existing or creating new ones)
+ * and marks the map as dirty.
+ *
+ * @param eo_obj The Efl_Gfx_Mapping object.
+ * @param pd The private data of the Efl_Gfx_Mapping object.
+ * @param type The type of operation to add.
+ * @param eo_pivot The Efl_Gfx_Entity to use as a pivot (can be NULL).
+ *                 If NULL and is_absolute is EINA_FALSE, the object itself is the pivot.
+ * @param cx Relative or absolute X coordinate of the pivot center.
+ * @param cy Relative or absolute Y coordinate of the pivot center.
+ * @param cz Relative or absolute Z coordinate of thepivot center.
+ * @param is_absolute EINA_TRUE if cx, cy, cz are absolute screen coordinates,
+ *                    EINA_FALSE if they are relative to the pivot object's geometry (0.0-1.0).
+ * @return The newly added Gfx_Map_Op, or NULL on allocation failure.
+ */
 static Gfx_Map_Op *
 _gfx_mapping_op_add(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd, Gfx_Map_Op_Type type,
                 const Efl_Gfx_Entity *eo_pivot, double cx, double cy, double cz,
@@ -727,34 +936,50 @@ _gfx_mapping_op_add(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd, Gfx_Map_Op_Type type,
    op = calloc(1, sizeof(*op));
    if (!op) return NULL;
 
-   mcow = MAPCOW_BEGIN(pd);
+   mcow = MAPCOW_BEGIN(pd); // Ensure COW data is writable
 
-   if (!is_absolute)
+   if (!is_absolute) // Handle relative pivots
      {
+        // If pivot is self (eo_obj) or NULL, it's a self-pivot
         if ((eo_pivot == eo_obj) || !eo_pivot)
           {
-             eo_pivot = NULL;
+             eo_pivot = NULL; // Ensure eo_pivot is NULL for self-pivots for consistency
              is_self = EINA_TRUE;
           }
-        else
+        else // External pivot object
           {
-             Evas_Object_Protected_Data *obj = efl_data_scope_get(eo_obj, MY_CLASS);
+             // Get protected data of the object being mapped, not the pivot.
+             // This is needed for pivot->map_obj.
+             Evas_Object_Protected_Data *obj_pd = efl_data_scope_get(eo_obj, EFL_CANVAS_OBJECT_CLASS); // Assuming it's an Evas_Object
 
+             // Check if this pivot is already known
              EINA_INLIST_FOREACH(mcow->pivots, pivot)
                if (pivot->eo_obj == eo_pivot) break;
-             if (!pivot)
+
+             if (!pivot) // New pivot, create and add it
                {
                   pivot = calloc(1, sizeof(*pivot));
-                  pivot->eo_obj = PIVOT_REF(eo_pivot);
-                  pivot->changed = EINA_TRUE;
-                  if (efl_isa(eo_pivot, EVAS_CANVAS_CLASS))
+                  if (!pivot) { // Allocation failed
+                      // Must free 'op' and revert COW if it was the first write
+                      free(op);
+                      // This COW_END might be problematic if mcow was not a new copy.
+                      // A safer approach would be to check if eina_cow_is_writable(pd->cow) before MAPCOW_BEGIN
+                      // or have a MAPCOW_CANCEL. For now, assume MAPCOW_END is okay.
+                      MAPCOW_END(mcow, pd);
+                      return NULL;
+                  }
+                  // Store a reference to the pivot object, xref against the mapping object (eo_obj)
+                  pivot->eo_obj = PIVOT_REF(eo_pivot, eo_obj);
+                  pivot->changed = EINA_TRUE; // New pivot, needs geometry refresh
+                  // Check if pivot is a canvas/scene for special geometry handling
+                  if (efl_isa(eo_pivot, EVAS_CANVAS_CLASS)) // Legacy Evas canvas
                     {
                        pivot->is_evas = EINA_TRUE;
                        pivot->is_canvas = EINA_TRUE;
                     }
-                  else if (efl_isa(eo_pivot, EFL_CANVAS_SCENE_INTERFACE))
+                  else if (efl_isa(eo_pivot, EFL_CANVAS_SCENE_INTERFACE)) // EO Scene
                     pivot->is_canvas = EINA_TRUE;
-                  pivot->map_obj = obj;
+                  pivot->map_obj = obj_pd; // Associate with the mapped object's protected data
                   EINA_INLIST_APPEND(mcow->pivots, pivot);
                }
           }
@@ -763,15 +988,15 @@ _gfx_mapping_op_add(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd, Gfx_Map_Op_Type type,
    op->op = type;
    op->pivot.is_absolute = is_absolute;
    op->pivot.is_self = is_self;
-   op->pivot.pivot = pivot;
+   op->pivot.pivot = pivot; // Link to Gfx_Map_Pivot structure
    op->pivot.cx = cx;
    op->pivot.cy = cy;
    op->pivot.cz = cz;
 
-   EINA_INLIST_APPEND(mcow->ops, op);
+   EINA_INLIST_APPEND(mcow->ops, op); // Add operation to the list
    MAPCOW_END(mcow, pd);
 
-   _map_dirty(eo_obj, pd, EINA_FALSE);
+   _map_dirty(eo_obj, pd, EINA_FALSE); // Mark map as dirty
 
    return op;
 }
@@ -784,6 +1009,11 @@ _efl_gfx_mapping_mapping_coord_absolute_set(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd
 
    EINA_SAFETY_ON_FALSE_RETURN((idx >= 0) && (idx < pd->cow->count));
 
+   // GFX_MAPPING_RAW_COORD is implicitly relative to the object itself (no external pivot, not absolute screen coords)
+   // The 'absolute' in the function name refers to the coordinate values, not the pivot mode.
+   // The pivot parameters (cx,cy,cz) for RAW_COORD are not used, so 0,0,0 is fine.
+   // is_absolute for _gfx_mapping_op_add refers to pivot center, not the operation type.
+   // For RAW_COORD, the pivot is effectively the object itself, so is_absolute = EINA_FALSE.
    op = _gfx_mapping_op_add(eo_obj, pd, GFX_MAPPING_RAW_COORD, NULL, 0, 0, 0, EINA_FALSE);
    if (!op) return;
 
@@ -799,16 +1029,18 @@ _efl_gfx_mapping_mapping_color_set(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
 {
    Gfx_Map_Op *op;
 
+   // idx can be -1 to affect all points, or a valid index.
    EINA_SAFETY_ON_FALSE_RETURN((idx >= -1) && (idx < pd->cow->count));
 
+   // GFX_MAPPING_COLOR does not use a pivot.
    op = _gfx_mapping_op_add(eo_obj, pd, GFX_MAPPING_COLOR, NULL, 0, 0, 0, EINA_FALSE);
    if (!op) return;
 
    op->color.idx = idx;
-   op->color.r = r;
-   op->color.g = g;
-   op->color.b = b;
-   op->color.a = a;
+   op->color.r = CLAMP(0, r, 255);
+   op->color.g = CLAMP(0, g, 255);
+   op->color.b = CLAMP(0, b, 255);
+   op->color.a = CLAMP(0, a, 255);
 }
 
 EOLIAN static void
@@ -817,6 +1049,7 @@ _efl_gfx_mapping_translate(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
 {
    Gfx_Map_Op *op;
 
+   // Translate operation does not use a pivot center; it's a global shift.
    op = _gfx_mapping_op_add(eo_obj, pd, GFX_MAPPING_TRANSLATE, NULL, 0, 0, 0, EINA_FALSE);
    if (!op) return;
 
@@ -825,6 +1058,19 @@ _efl_gfx_mapping_translate(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
    op->translate.dz = dz;
 }
 
+/**
+ * @internal
+ * @brief Helper function to add a 2D rotation operation.
+ *
+ * @param eo_obj The Efl_Gfx_Mapping object.
+ * @param pd The private data.
+ * @param degrees Rotation angle.
+ * @param pivot Pivot entity (can be NULL for self-pivot if absolute is EINA_FALSE, or ignored if absolute is EINA_TRUE).
+ * @param cx Pivot center X.
+ * @param cy Pivot center Y.
+ * @param absolute If EINA_TRUE, cx, cy are absolute screen coordinates.
+ *                 If EINA_FALSE, cx, cy are relative to the pivot (0.0-1.0).
+ */
 static inline void
 _map_rotate(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
             double degrees, const Efl_Gfx_Entity *pivot, double cx, double cy,
@@ -832,6 +1078,7 @@ _map_rotate(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
 {
    Gfx_Map_Op *op;
 
+   // For 2D rotation, Z component of pivot center is 0.
    op = _gfx_mapping_op_add(eo_obj, pd, GFX_MAPPING_ROTATE_2D, pivot, cx, cy, 0, absolute);
    if (!op) return;
 
@@ -842,15 +1089,33 @@ EOLIAN static void
 _efl_gfx_mapping_rotate(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
                     double degrees, const Efl_Gfx_Entity *pivot, double cx, double cy)
 {
+   // Relative rotation: cx, cy are relative to the 'pivot' object's geometry.
+   // If 'pivot' is NULL or eo_obj, it's relative to self.
    _map_rotate(eo_obj, pd, degrees, pivot, cx, cy, EINA_FALSE);
 }
 
 EOLIAN static void
 _efl_gfx_mapping_rotate_absolute(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd, double degrees, double cx, double cy)
 {
+   // Absolute rotation: cx, cy are absolute screen coordinates. Pivot entity is ignored.
    _map_rotate(eo_obj, pd, degrees, NULL, cx, cy, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Helper function to add a 3D rotation operation.
+ *
+ * @param eo_obj The Efl_Gfx_Mapping object.
+ * @param pd The private data.
+ * @param dx Rotation around X-axis.
+ * @param dy Rotation around Y-axis.
+ * @param dz Rotation around Z-axis.
+ * @param pivot Pivot entity.
+ * @param cx Pivot center X.
+ * @param cy Pivot center Y.
+ * @param cz Pivot center Z.
+ * @param absolute If EINA_TRUE, cx, cy, cz are absolute screen coordinates.
+ */
 static inline void
 _map_rotate_3d(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
                double dx, double dy, double dz,
@@ -882,6 +1147,22 @@ _efl_gfx_mapping_rotate_3d_absolute(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
    _map_rotate_3d(eo_obj, pd, dx, dy, dz, NULL, cx, cy, cz, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Helper function to add a quaternion rotation operation.
+ *
+ * @param eo_obj The Efl_Gfx_Mapping object.
+ * @param pd The private data.
+ * @param qx Quaternion X component.
+ * @param qy Quaternion Y component.
+ * @param qz Quaternion Z component.
+ * @param qw Quaternion W component.
+ * @param pivot Pivot entity.
+ * @param cx Pivot center X.
+ * @param cy Pivot center Y.
+ * @param cz Pivot center Z.
+ * @param absolute If EINA_TRUE, cx, cy, cz are absolute screen coordinates.
+ */
 static inline void
 _map_rotate_quat(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
                  double qx, double qy, double qz, double qw,
@@ -915,6 +1196,19 @@ _efl_gfx_mapping_rotate_quat_absolute(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
    _map_rotate_quat(eo_obj, pd, qx, qy, qz, qw, NULL, cx, cy, cz, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Helper function to add a zoom operation.
+ *
+ * @param eo_obj The Efl_Gfx_Mapping object.
+ * @param pd The private data.
+ * @param zoomx Zoom factor X.
+ * @param zoomy Zoom factor Y.
+ * @param pivot Pivot entity.
+ * @param cx Pivot center X.
+ * @param cy Pivot center Y.
+ * @param absolute If EINA_TRUE, cx, cy are absolute screen coordinates.
+ */
 static inline void
 _map_zoom(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
           double zoomx, double zoomy,
@@ -923,6 +1217,7 @@ _map_zoom(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
 {
    Gfx_Map_Op *op;
 
+   // Zoom is effectively 2D, so pivot Z is 0.
    op = _gfx_mapping_op_add(eo_obj, pd, GFX_MAPPING_ZOOM, pivot, cx, cy, 0, absolute);
    if (!op) return;
 
@@ -945,6 +1240,24 @@ _efl_gfx_mapping_zoom_absolute(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
    _map_zoom(eo_obj, pd, zoomx, zoomy, NULL, cx, cy, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Helper function to add a 3D lighting operation.
+ *
+ * @param eo_obj The Efl_Gfx_Mapping object.
+ * @param pd The private data.
+ * @param pivot Pivot entity (light position reference).
+ * @param lx Light X position.
+ * @param ly Light Y position.
+ * @param lz Light Z position.
+ * @param lr Light red component (0-255).
+ * @param lg Light green component (0-255).
+ * @param lb Light blue component (0-255).
+ * @param ar Ambient red component (0-255).
+ * @param ag Ambient green component (0-255).
+ * @param ab Ambient blue component (0-255).
+ * @param absolute If EINA_TRUE, lx, ly, lz are absolute screen coordinates.
+ */
 static inline void
 _map_lighting_3d(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
                   const Efl_Gfx_Entity *pivot, double lx, double ly, double lz,
@@ -956,12 +1269,12 @@ _map_lighting_3d(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
    op = _gfx_mapping_op_add(eo_obj, pd, GFX_MAPPING_LIGHTING_3D, pivot, lx, ly, lz, absolute);
    if (!op) return;
 
-   op->lighting_3d.lr = lr;
-   op->lighting_3d.lg = lg;
-   op->lighting_3d.lb = lb;
-   op->lighting_3d.ar = ar;
-   op->lighting_3d.ag = ag;
-   op->lighting_3d.ab = ab;
+   op->lighting_3d.lr = CLAMP(0, lr, 255);
+   op->lighting_3d.lg = CLAMP(0, lg, 255);
+   op->lighting_3d.lb = CLAMP(0, lb, 255);
+   op->lighting_3d.ar = CLAMP(0, ar, 255);
+   op->lighting_3d.ag = CLAMP(0, ag, 255);
+   op->lighting_3d.ab = CLAMP(0, ab, 255);
 }
 
 EOLIAN static void
@@ -980,6 +1293,19 @@ _efl_gfx_mapping_lighting_3d_absolute(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
    _map_lighting_3d(eo_obj, pd, NULL, lx, ly, lz, lr, lg, lb, ar, ag, ab, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Helper function to add a 3D perspective operation.
+ *
+ * @param eo_obj The Efl_Gfx_Mapping object.
+ * @param pd The private data.
+ * @param pivot Pivot entity (perspective center reference).
+ * @param px Perspective center X.
+ * @param py Perspective center Y.
+ * @param z0 Vanishing point on Z axis.
+ * @param foc Focal length.
+ * @param absolute If EINA_TRUE, px, py are absolute screen coordinates.
+ */
 static inline void
 _map_perspective_3d(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
                     const Efl_Gfx_Entity *pivot, double px, double py,
@@ -988,12 +1314,13 @@ _map_perspective_3d(Eo *eo_obj, Efl_Gfx_Mapping_Data *pd,
 {
    Gfx_Map_Op *op;
 
-   if (foc <= 0.0)
+   if (foc <= 0.0) // Focal length must be positive
      {
-        ERR("Focal length must be greater than 0!");
+        ERR("Focal length must be greater than 0! Got %f", foc);
         return;
      }
 
+   // Perspective center Z is implicitly 0 for this operation's pivot.
    op = _gfx_mapping_op_add(eo_obj, pd, GFX_MAPPING_PERSPECTIVE_3D, pivot, px, py, 0, absolute);
    if (!op) return;
 

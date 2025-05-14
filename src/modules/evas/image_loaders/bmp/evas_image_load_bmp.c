@@ -9,38 +9,61 @@
 #include "evas_common_private.h"
 #include "evas_private.h"
 
+/**
+ * @brief Structure representing the header information of a BMP file.
+ *
+ * This structure holds various fields parsed from the BMP file header,
+ * including dimensions, color depth, compression type, and optional masks.
+ */
 typedef struct _BMP_Header BMP_Header;
 struct _BMP_Header
 {
-   unsigned int bmpsize;
-   unsigned short res1;
-   unsigned short res2;
-   unsigned int offset;
-   unsigned int head_size;
-   int width;
-   int height;
-   unsigned short bit_count;
-   int comp;
-   // hdpi
-   // vdpi
-   int palette_size;
-   // important_colors
+   unsigned int bmpsize;        /**< Total size of the BMP file in bytes. */
+   unsigned short res1;         /**< Reserved field 1. */
+   unsigned short res2;         /**< Reserved field 2. */
+   unsigned int offset;         /**< Offset from the beginning of the file to the bitmap data. */
+   unsigned int head_size;      /**< Size of the BMP information header in bytes. */
+   int width;                   /**< Width of the image in pixels. */
+   int height;                  /**< Height of the image in pixels. Can be negative for top-down bitmaps. */
+   unsigned short bit_count;    /**< Number of bits per pixel (1, 4, 8, 16, 24, 32). */
+   int comp;                    /**< Compression method used (0=BI_RGB, 1=BI_RLE8, 2=BI_RLE4, 3=BI_BITFIELDS, 4=BI_JPEG, 5=BI_PNG, 6=BI_ALPHABITFIELDS). */
+   // hdpi                     /**< Horizontal resolution (pixels per meter, often unused). */
+   // vdpi                     /**< Vertical resolution (pixels per meter, often unused). */
+   int palette_size;            /**< Number of colors in the color palette (0 means 2^bit_count). */
+   // important_colors         /**< Number of important colors used (0 means all). */
 
-   unsigned int rmask;
-   unsigned int gmask;
-   unsigned int bmask;
-   unsigned int amask;
+   unsigned int rmask;          /**< Red channel bitmask (used with BI_BITFIELDS/BI_ALPHABITFIELDS). */
+   unsigned int gmask;          /**< Green channel bitmask (used with BI_BITFIELDS/BI_ALPHABITFIELDS). */
+   unsigned int bmask;          /**< Blue channel bitmask (used with BI_BITFIELDS/BI_ALPHABITFIELDS). */
+   unsigned int amask;          /**< Alpha channel bitmask (used with BI_ALPHABITFIELDS). */
 
-   Eina_Bool hasa;
+   Eina_Bool hasa;              /**< Flag indicating if the image has an alpha channel (derived from header info). */
 };
 
+/**
+ * @brief Internal data structure for the BMP loader.
+ *
+ * Holds the file handle and loading options specific to an instance
+ * of the BMP image loading process.
+ */
 typedef struct _Evas_Loader_Internal Evas_Loader_Internal;
 struct _Evas_Loader_Internal
 {
-   Eina_File *f;
-   Evas_Image_Load_Opts *opts;
+   Eina_File *f;                /**< Eina file handle for the opened BMP file. */
+   Evas_Image_Load_Opts *opts;  /**< Image loading options provided by Evas. */
 };
 
+/**
+ * @brief Reads a little-endian short (16-bit) value from a memory map.
+ *
+ * Advances the read position by 2 bytes.
+ *
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total size of the mapped data.
+ * @param position Pointer to the current reading position within the map. Will be updated.
+ * @param ret Pointer to store the read short value.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., end of buffer).
+ */
 static Eina_Bool
 read_short(unsigned char *map, size_t length, size_t *position, short *ret)
 {
@@ -53,6 +76,17 @@ read_short(unsigned char *map, size_t length, size_t *position, short *ret)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Reads a little-endian unsigned short (16-bit) value from a memory map.
+ *
+ * Advances the read position by 2 bytes.
+ *
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total size of the mapped data.
+ * @param position Pointer to the current reading position within the map. Will be updated.
+ * @param ret Pointer to store the read unsigned short value.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., end of buffer).
+ */
 static Eina_Bool
 read_ushort(unsigned char *map, size_t length, size_t *position, unsigned short *ret)
 {
@@ -65,6 +99,17 @@ read_ushort(unsigned char *map, size_t length, size_t *position, unsigned short 
    return EINA_TRUE;
 }
 
+/**
+ * @brief Reads a little-endian integer (32-bit) value from a memory map.
+ *
+ * Advances the read position by 4 bytes.
+ *
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total size of the mapped data.
+ * @param position Pointer to the current reading position within the map. Will be updated.
+ * @param ret Pointer to store the read integer value.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., end of buffer).
+ */
 static Eina_Bool
 read_int(unsigned char *map, size_t length, size_t *position, int *ret)
 {
@@ -78,6 +123,17 @@ read_int(unsigned char *map, size_t length, size_t *position, int *ret)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Reads a little-endian unsigned integer (32-bit) value from a memory map.
+ *
+ * Advances the read position by 4 bytes.
+ *
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total size of the mapped data.
+ * @param position Pointer to the current reading position within the map. Will be updated.
+ * @param ret Pointer to store the read unsigned integer value.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., end of buffer).
+ */
 static Eina_Bool
 read_uint(unsigned char *map, size_t length, size_t *position, unsigned int *ret)
 {
@@ -91,6 +147,17 @@ read_uint(unsigned char *map, size_t length, size_t *position, unsigned int *ret
    return EINA_TRUE;
 }
 
+/**
+ * @brief Reads an unsigned char (8-bit) value from a memory map.
+ *
+ * Advances the read position by 1 byte.
+ *
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total size of the mapped data.
+ * @param position Pointer to the current reading position within the map. Will be updated.
+ * @param ret Pointer to store the read unsigned char value.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., end of buffer).
+ */
 static Eina_Bool
 read_uchar(unsigned char *map, size_t length, size_t *position, unsigned char *ret)
 {
@@ -99,6 +166,16 @@ read_uchar(unsigned char *map, size_t length, size_t *position, unsigned char *r
    return EINA_TRUE;
 }
 
+/**
+ * @brief Skips a specified number of bytes in the memory map.
+ *
+ * Advances the read position by `skip` bytes.
+ *
+ * @param length Total size of the mapped data.
+ * @param position Pointer to the current reading position within the map. Will be updated.
+ * @param skip Number of bytes to skip.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., end of buffer).
+ */
 static Eina_Bool
 read_skip(size_t length, size_t *position, int skip)
 {
@@ -107,6 +184,18 @@ read_skip(size_t length, size_t *position, int skip)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Reads a block of memory from the memory map into a buffer.
+ *
+ * Advances the read position by `size` bytes.
+ *
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total size of the mapped data.
+ * @param position Pointer to the current reading position within the map. Will be updated.
+ * @param buffer Pointer to the destination buffer to copy data into.
+ * @param size Number of bytes to read into the buffer.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., end of buffer).
+ */
 static Eina_Bool
 read_mem(unsigned char *map, size_t length, size_t *position, void *buffer, int size)
 {
@@ -116,11 +205,26 @@ read_mem(unsigned char *map, size_t length, size_t *position, void *buffer, int 
    return EINA_TRUE;
 }
 
+/**
+ * @brief Reads and parses the BMP file header and information header.
+ *
+ * This function reads the initial bytes of the BMP file to identify it
+ * and parses the different versions of the BMP header (BITMAPCOREHEADER,
+ * BITMAPINFOHEADER, BITMAPV4HEADER, BITMAPV5HEADER).
+ *
+ * @param map Pointer to the memory-mapped file data.
+ * @param fsize Total size of the mapped data.
+ * @param position Pointer to the current reading position within the map. Will be updated.
+ * @param image_size Pointer to store the calculated or reported size of the bitmap data.
+ * @param header Pointer to the BMP_Header struct to populate.
+ * @param error Pointer to store the Evas load error code on failure.
+ * @return EINA_TRUE on successful header parsing, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _evas_image_load_file_header(void *map, size_t fsize, size_t *position, int *image_size,
                              BMP_Header *header, int *error)
 {
-   if (strncmp(map, "BM", 2)) return EINA_FALSE; // magic number
+   if (strncmp(map, "BM", 2)) return EINA_FALSE; // magic number "BM"
    *position += 2;
    *error = EVAS_LOAD_ERROR_CORRUPT_FILE;
    if (!read_uint(map, fsize, position, &header->bmpsize)) return EINA_FALSE;
@@ -290,6 +394,18 @@ _evas_image_load_file_header(void *map, size_t fsize, size_t *position, int *ima
    return EINA_TRUE;
 }
 
+/**
+ * @brief Opens a BMP file for loading. Evas loader module function.
+ *
+ * Allocates and initializes the internal loader data structure.
+ *
+ * @param f Eina file handle for the BMP file.
+ * @param key Optional key associated with the image file (unused).
+ * @param opts Image loading options provided by Evas.
+ * @param animated Pointer to store animated image properties (unused for BMP).
+ * @param error Pointer to store the Evas load error code on failure.
+ * @return Pointer to the allocated loader internal data (Evas_Loader_Internal), or NULL on failure.
+ */
 static void *
 evas_image_load_file_open_bmp(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
                               Evas_Image_Load_Opts *opts,
@@ -311,12 +427,31 @@ evas_image_load_file_open_bmp(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
    return loader;
 }
 
+/**
+ * @brief Closes the BMP file loader instance. Evas loader module function.
+ *
+ * Frees the internal loader data structure allocated in evas_image_load_file_open_bmp.
+ *
+ * @param loader_data Pointer to the loader internal data (Evas_Loader_Internal) to free.
+ */
 static void
 evas_image_load_file_close_bmp(void *loader_data)
 {
    free(loader_data);
 }
 
+/**
+ * @brief Reads the header of the BMP file to determine image properties. Evas loader module function.
+ *
+ * Maps the file, parses the header using _evas_image_load_file_header,
+ * validates dimensions and format support, and populates the Emile_Image_Property struct.
+ * Handles load options like region loading and scale-down.
+ *
+ * @param loader_data Pointer to the loader internal data (Evas_Loader_Internal).
+ * @param prop Pointer to the Emile_Image_Property struct to populate with image dimensions and alpha status.
+ * @param error Pointer to store the Evas load error code on failure.
+ * @return EINA_TRUE on successful header reading and validation, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 evas_image_load_file_head_bmp(void *loader_data,
                               Emile_Image_Property *prop,
@@ -452,6 +587,23 @@ evas_image_load_file_head_bmp(void *loader_data,
    return r;
 }
 
+/**
+ * @brief Reads and decodes the actual pixel data of the BMP file. Evas loader module function.
+ *
+ * Maps the file, re-parses the header, allocates necessary buffers (including
+ * palette and temporary line buffers for scaling/region loading), and decodes
+ * the pixel data based on bit depth and compression type (uncompressed, RLE4, RLE8).
+ * Handles different pixel formats (1, 4, 8, 16, 24, 32 bits), palettes, bitfields,
+ * top-down vs. bottom-up row order, region loading, and scale-down decoding.
+ * Writes the final ARGB pixel data into the provided `pixels` buffer.
+ *
+ * @param loader_data Pointer to the loader internal data (Evas_Loader_Internal).
+ * @param prop Pointer to the Emile_Image_Property struct containing image properties determined by the head function.
+ * @param pixels Pointer to the destination buffer where the decoded ARGB pixel data should be written.
+ *             The buffer is assumed to be pre-allocated with size prop->w * prop->h * sizeof(DATA32).
+ * @param error Pointer to store the Evas load error code on failure.
+ * @return EINA_TRUE on successful decoding and writing of pixel data, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 evas_image_load_file_data_bmp(void *loader_data,
                               Emile_Image_Property *prop,
@@ -1437,9 +1589,18 @@ static Evas_Image_Load_Func evas_image_load_bmp_func =
   (void*) evas_image_load_file_data_bmp,
   NULL,
   EINA_TRUE,
-  EINA_FALSE
+  EINA_FALSE /* No progressive loading support */
 };
 
+/**
+ * @brief Evas module initialization function.
+ *
+ * Called by Evas when the module is loaded. Registers the loader functions
+ * provided in evas_image_load_bmp_func with the Evas module system.
+ *
+ * @param em The Evas_Module structure provided by Evas to be initialized.
+ * @return 1 on successful registration, 0 otherwise.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -1448,6 +1609,14 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Evas module shutdown function.
+ *
+ * Called by Evas when the module is unloaded. Performs any necessary cleanup.
+ * Currently, no specific cleanup is required for this loader.
+ *
+ * @param em The Evas_Module structure provided by Evas (unused in this function).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

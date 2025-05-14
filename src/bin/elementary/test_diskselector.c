@@ -32,6 +32,15 @@ enum _api_state
 };
 typedef enum _api_state api_state;
 
+/**
+ * @brief Apply a diskselector API function test based on the current state.
+ *
+ * This function uses a state machine to test different aspects of the
+ * diskselector API. Each state corresponds to a specific API function call.
+ *
+ * @param api Pointer to the api_data structure which holds the current test
+ *        state and a pointer to the container box of the diskselectors.
+ */
 static void
 set_api_state(api_data *api)
 {
@@ -127,6 +136,17 @@ set_api_state(api_data *api)
      }
 }
 
+/**
+ * @brief Callback function for the 'Next API function' button.
+ *
+ * This function is called when the button to trigger the next API test is
+ * clicked. It advances the test state, calls set_api_state() to apply
+ * the test, and updates the button text to show the next state.
+ *
+ * @param data The api_data structure.
+ * @param obj The button object that was clicked.
+ * @param event_info Not used.
+ */
 static void
 _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {  /* Will add here a SWITCH command containing code to modify test-object */
@@ -142,6 +162,16 @@ _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_disabled_set(obj, a->state == API_STATE_LAST);
 }
 
+/**
+ * @brief Smart callback triggered when a diskselector item is selected.
+ *
+ * Prints the text of the selected item. This is used as a callback for
+ * specific items in the diskselector.
+ *
+ * @param data Not used.
+ * @param obj The diskselector object.
+ * @param event_info The selected Elm_Object_Item.
+ */
 static void
 _disk_sel(void *data EINA_UNUSED, Evas_Object * obj EINA_UNUSED, void *event_info)
 {
@@ -149,6 +179,17 @@ _disk_sel(void *data EINA_UNUSED, Evas_Object * obj EINA_UNUSED, void *event_inf
    printf("Equinox: %s\n", elm_object_item_text_get(ds_it));
 }
 
+/**
+ * @brief Smart callback for a diskselector item.
+ *
+ * When the item this callback is attached to is selected, this function prints
+ * the text of the previous and next items in the diskselector list. This helps
+ * test item traversal.
+ *
+ * @param data Not used.
+ * @param obj The diskselector object.
+ * @param event_info The Elm_Object_Item that this callback is associated with.
+ */
 static void
 _disk_next(void *data EINA_UNUSED, Evas_Object * obj EINA_UNUSED, void *event_info)
 {
@@ -159,6 +200,15 @@ _disk_next(void *data EINA_UNUSED, Evas_Object * obj EINA_UNUSED, void *event_in
           elm_object_item_text_get(next_ds_it));
 }
 
+/**
+ * @brief Generic smart callback for the "selected" event on a diskselector.
+ *
+ * Prints the label of the currently selected item.
+ *
+ * @param data Not used.
+ * @param obj The diskselector object.
+ * @param event_info The selected Elm_Object_Item.
+ */
 static void
 _print_disk_info_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -166,6 +216,15 @@ _print_disk_info_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *
    printf("Selected label: %s\n", elm_object_item_text_get(ds_it));
 }
 
+/**
+ * @brief Generic smart callback for the "clicked" event on a diskselector item.
+ *
+ * Prints the label of the clicked item.
+ *
+ * @param data Not used.
+ * @param obj The diskselector object.
+ * @param event_info The clicked Elm_Object_Item.
+ */
 static void
 _item_clicked_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -173,6 +232,18 @@ _item_clicked_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *eve
    printf("Clicked label: %s\n", elm_object_item_text_get(ds_it));
 }
 
+/**
+ * @brief Creates and populates a diskselector widget.
+ *
+ * This function creates a diskselector, populates it with items representing
+ * the months of the year, sets one item as selected, and configures whether
+ * the list of items is circular ("round").
+ *
+ * @param parent The parent widget for the new diskselector.
+ * @param rnd If EINA_TRUE, the diskselector will have round mode enabled,
+ *        allowing circular navigation of items.
+ * @return A new Evas_Object* for the created diskselector.
+ */
 static Evas_Object *
 _disk_create(Evas_Object *parent, Eina_Bool rnd)
 {
@@ -200,12 +271,37 @@ _disk_create(Evas_Object *parent, Eina_Bool rnd)
    return di;
 }
 
+/**
+ * @brief Frees the api_data structure when the window is destroyed.
+ *
+ * @param data The api_data pointer to free.
+ * @param e Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief The main function for the diskselector test.
+ *
+ * This function sets up the test window and creates multiple diskselector
+ * widgets with various configurations to test different features like:
+ * - Round vs. non-round item lists.
+ * - Side text length limits.
+ * - Items with and without icons.
+ * - Different languages/character sets.
+ * - Custom number of displayed items.
+ *
+ * It also sets up a button to step through various API function tests.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_diskselector(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

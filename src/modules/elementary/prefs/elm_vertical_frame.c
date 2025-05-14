@@ -1,5 +1,16 @@
 #include "private.h"
 
+/**
+ * @internal
+ * @brief Adds a new vertical frame widget to a preferences page.
+ *
+ * This function creates a new frame object and an inner box to hold items.
+ * The box is stored in the frame's data under the key "bx_container".
+ *
+ * @param iface The prefs page interface (unused).
+ * @param prefs The parent prefs widget.
+ * @return The new frame object, or @c NULL on failure.
+ */
 static Evas_Object *
 elm_prefs_vertical_frame_add(const Elm_Prefs_Page_Iface *iface EINA_UNUSED,
                              Evas_Object *prefs)
@@ -17,6 +28,14 @@ elm_prefs_vertical_frame_add(const Elm_Prefs_Page_Iface *iface EINA_UNUSED,
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Sets the title of the vertical frame widget.
+ *
+ * @param obj The frame object.
+ * @param title The title string to set.
+ * @return @c EINA_TRUE on success.
+ */
 static Eina_Bool
 elm_prefs_vertical_frame_title_set(Evas_Object *obj,
                                    const char *title)
@@ -26,6 +45,19 @@ elm_prefs_vertical_frame_title_set(Evas_Object *obj,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Packs a new item into the vertical frame.
+ *
+ * This function adds a prefs item to the frame's internal box. It adjusts
+ * layout properties for labels and handles special item types like separators.
+ *
+ * @param obj The frame object.
+ * @param it The item to pack.
+ * @param type The type of the item being packed.
+ * @param iface The item's interface.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 elm_prefs_vertical_frame_item_pack(Evas_Object *obj,
                                    Evas_Object *it,
@@ -47,6 +79,17 @@ elm_prefs_vertical_frame_item_pack(Evas_Object *obj,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Unpacks an item from the vertical frame.
+ *
+ * This function removes a prefs item from the frame's internal box and
+ * resets its size hints to default values.
+ *
+ * @param obj The frame object.
+ * @param it The item to unpack.
+ * @return @c EINA_TRUE on success.
+ */
 static Eina_Bool
 elm_prefs_vertical_frame_item_unpack(Evas_Object *obj,
                                      Evas_Object *it)
@@ -63,6 +106,21 @@ elm_prefs_vertical_frame_item_unpack(Evas_Object *obj,
 }
 
 
+/**
+ * @internal
+ * @brief Packs a new item into the vertical frame before a reference item.
+ *
+ * This function adds a prefs item to the frame's internal box before
+ * another specified item. It adjusts layout properties for labels and handles
+ * special item types like separators.
+ *
+ * @param obj The frame object.
+ * @param it The item to pack.
+ * @param it_before The reference item to pack before.
+ * @param type The type of the item being packed.
+ * @param iface The item's interface.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 elm_prefs_vertical_frame_item_pack_before(Evas_Object *obj,
                                           Evas_Object *it,
@@ -85,6 +143,21 @@ elm_prefs_vertical_frame_item_pack_before(Evas_Object *obj,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Packs a new item into the vertical frame after a reference item.
+ *
+ * This function adds a prefs item to the frame's internal box after
+ * another specified item. It adjusts layout properties for labels and handles
+ * special item types like separators.
+ *
+ * @param obj The frame object.
+ * @param it The item to pack.
+ * @param it_after The reference item to pack after.
+ * @param type The type of the item being packed.
+ * @param iface The item's interface.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 elm_prefs_vertical_frame_item_pack_after(Evas_Object *obj,
                                          Evas_Object *it,

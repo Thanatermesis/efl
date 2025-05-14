@@ -16,8 +16,11 @@
 
 #undef EINA_LOG_DOMAIN_DEFAULT
 #define EINA_LOG_DOMAIN_DEFAULT _log_dom
-static int _log_dom = -1;
+static int _log_dom = -1; /**< Log domain for the application. */
 
+/**
+ * @brief Command line options description for Ecore_Getopt.
+ */
 const Ecore_Getopt optdesc = {
   "ecore_evas_convert",
   "%prog [options] <filename-source> <filename-destination>",
@@ -39,19 +42,33 @@ const Ecore_Getopt optdesc = {
   }
 };
 
+/**
+ * @brief Structure to hold information for an image saving job.
+ * This is used to pass data to the ecore_job_add callback.
+ */
 typedef struct _Save_Job {
-   const char *output;
-   const char *extension;
-   const char *flags;
-   Evas_Object *im;
-   int ret;
+   const char *output;    /**< Base output filename. */
+   const char *extension; /**< Original file extension, used when splitting. */
+   const char *flags;     /**< Encoding flags for saving the image. */
+   Evas_Object *im;       /**< Evas image object to save. */
+   int ret;               /**< Return code of the save operation (0 for success, 1 for failure). */
 } Save_Job;
 
-static Save_Job job = { NULL, NULL, NULL, NULL, -1 };
-static unsigned int width = 0, height = 0;
-static unsigned int x = 0, y = 0;
-static int image_w, image_h;
+static Save_Job job = { NULL, NULL, NULL, NULL, -1 }; /**< Global instance of the save job. */
+static unsigned int width = 0, height = 0; /**< Target width for image splitting, 0 means no splitting. */
+static unsigned int x = 0, y = 0; /**< Current x and y offset for image splitting. */
+static int image_w, image_h; /**< Original image width and height. */
 
+/**
+ * @brief Saves the image or a part of it.
+ *
+ * This function is called by an ecore_job. If image splitting is enabled
+ * (width and height are non-zero), it saves a tile of the image and
+ * schedules itself to save the next tile. Otherwise, it saves the whole image.
+ * It quits the main loop when all parts are saved or an error occurs.
+ *
+ * @param data Unused.
+ */
 static void
 _save_do(void *data EINA_UNUSED)
 {
@@ -88,6 +105,15 @@ _save_do(void *data EINA_UNUSED)
 }
 
 #ifndef NO_SIGNAL
+/**
+ * @brief Signal handler for SIGINT (Ctrl+C).
+ *
+ * This function is called when the user interrupts the program.
+ * It logs an error, attempts to delete the (potentially partially written)
+ * output file, and exits.
+ *
+ * @param sig The signal number (unused).
+ */
 static void
 _sigint(int sig EINA_UNUSED)
 {
@@ -98,6 +124,16 @@ _sigint(int sig EINA_UNUSED)
 }
 #endif
 
+/**
+ * @brief Main function for the ecore_evas_convert application.
+ *
+ * Parses command line arguments, loads an image, optionally splits it,
+ * converts it to the desired format, and saves it.
+ *
+ * @param argc Number of command line arguments.
+ * @param argv Array of command line argument strings.
+ * @return 0 on success, a negative value on error.
+ */
 int
 main(int argc, char *argv[])
 {

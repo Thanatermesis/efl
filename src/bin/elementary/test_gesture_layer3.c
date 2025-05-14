@@ -19,6 +19,12 @@
 #define ROTATE_MOMENTUM_FRICTION 30
 #define ZOOM_MOMENTUM_FRICTION 8
 
+/**
+ * @struct _Photo_Object
+ * @brief  Holds all the state information for a photo object being manipulated
+ *         by gestures. This includes Evas objects for the photo, its shadow,
+ *         and hit area, as well as state for momentum, zoom, and rotation.
+ */
 struct _Photo_Object {
      Evas_Object *ic, *shadow;
      Evas_Object *hit;
@@ -52,8 +58,13 @@ struct _Photo_Object {
 };
 typedef struct _Photo_Object Photo_Object;
 
-/* This function applies the information from the Photo_Object to the actual
- * evas objects. Zoom/rotate factors and etc. */
+/**
+ * @brief Applies transformations (zoom, rotation, position) to the photo Evas object.
+ * This function takes the state from a Photo_Object and applies it to the
+ * actual Evas objects using Evas_Map. It handles the photo itself, its shadow,
+ * and updates the hit area polygon.
+ * @param po The Photo_Object containing the transformation state.
+ */
 static void
 apply_changes(Photo_Object *po)
 {
@@ -128,7 +139,15 @@ apply_changes(Photo_Object *po)
    evas_map_free(map);
 }
 
-/* Zoom momentum animation */
+/**
+ * @brief Operation callback for zoom momentum animation.
+ * This function is called on each tick of the zoom momentum transit. It
+ * calculates the new zoom level based on a physics-like formula simulating
+ * friction.
+ * @param _po The Photo_Object to animate.
+ * @param transit The Elm_Transit object (unused).
+ * @param progress The progress of the transition, from 0.0 to 1.0.
+ */
 static void
 zoom_momentum_animation_operation(void *_po, Elm_Transit *transit EINA_UNUSED,
       double progress)
@@ -154,6 +173,13 @@ zoom_momentum_animation_operation(void *_po, Elm_Transit *transit EINA_UNUSED,
    apply_changes(po);
 }
 
+/**
+ * @brief End callback for zoom momentum animation.
+ * This function is called when the zoom momentum transit finishes. It updates
+ * the base zoom factor to the final zoom value of the animation.
+ * @param _po The Photo_Object that was animated.
+ * @param transit The Elm_Transit object (unused).
+ */
 static void
 zoom_momentum_animation_end(void *_po, Elm_Transit *transit EINA_UNUSED)
 {
@@ -162,7 +188,14 @@ zoom_momentum_animation_end(void *_po, Elm_Transit *transit EINA_UNUSED)
    po->zoom_momentum = NULL;
 }
 
-/* Rotate momentum animation */
+/**
+ * @brief Animator callback for rotate momentum animation.
+ * This function is called on each frame by an Ecore_Animator to animate
+ * rotation with momentum. It calculates the new rotation angle, applying
+ * friction to slow down the rotation over time.
+ * @param _po The Photo_Object to animate.
+ * @return ECORE_CALLBACK_RENEW to continue animation, ECORE_CALLBACK_CANCEL to stop.
+ */
 static Eina_Bool
 rotate_momentum_animation_operation(void *_po)
 {
@@ -201,6 +234,12 @@ rotate_momentum_animation_operation(void *_po)
    return rc;
 }
 
+/**
+ * @brief Ensures the photo object remains within the visible screen area.
+ * This function checks if the center of the photo object is outside the
+ * hardcoded screen boundaries and, if so, moves it back so it's fully visible.
+ * @param _po The Photo_Object to check.
+ */
 static void
 pic_obj_keep_inframe(void *_po)
 {  /* Make sure middle is in the screen, if not, fix it. */
@@ -222,6 +261,13 @@ pic_obj_keep_inframe(void *_po)
      po->by = 800 - (po->bh / 2);
 }
 
+/**
+ * @brief Callback for the start of a rotate gesture.
+ * Stores the initial rotation and stops any ongoing rotation momentum animation.
+ * @param _po The Photo_Object being rotated.
+ * @param event_info Information about the rotate gesture.
+ * @return EVAS_EVENT_FLAG_NONE.
+ */
 static Evas_Event_Flags
 rotate_start(void *_po, void *event_info)
 {
@@ -241,6 +287,13 @@ rotate_start(void *_po, void *event_info)
    return EVAS_EVENT_FLAG_NONE;
 }
 
+/**
+ * @brief Callback for the move phase of a rotate gesture.
+ * Updates the photo's rotation angle as the user rotates their fingers.
+ * @param _po The Photo_Object being rotated.
+ * @param event_info Information about the rotate gesture.
+ * @return EVAS_EVENT_FLAG_NONE.
+ */
 static Evas_Event_Flags
 rotate_move(void *_po, void *event_info)
 {
@@ -256,6 +309,14 @@ rotate_move(void *_po, void *event_info)
    return EVAS_EVENT_FLAG_NONE;
 }
 
+/**
+ * @brief Callback for the end of a rotate gesture.
+ * Finalizes the rotation and initiates the rotation momentum animation if
+ * there is momentum.
+ * @param _po The Photo_Object being rotated.
+ * @param event_info Information about the rotate gesture.
+ * @return EVAS_EVENT_FLAG_NONE.
+ */
 static Evas_Event_Flags
 rotate_end(void *_po, void *event_info)
 {
@@ -279,6 +340,13 @@ rotate_end(void *_po, void *event_info)
    return EVAS_EVENT_FLAG_NONE;
 }
 
+/**
+ * @brief Callback for an aborted rotate gesture.
+ * Finalizes the rotation state.
+ * @param _po The Photo_Object being rotated.
+ * @param event_info Information about the rotate gesture.
+ * @return EVAS_EVENT_FLAG_NONE.
+ */
 static Evas_Event_Flags
 rotate_abort(void *_po, void *event_info)
 {
@@ -293,6 +361,13 @@ rotate_abort(void *_po, void *event_info)
    return EVAS_EVENT_FLAG_NONE;
 }
 
+/**
+ * @brief Callback for the start of a zoom gesture.
+ * Stores the initial zoom factor and stops any ongoing zoom momentum animation.
+ * @param _po The Photo_Object being zoomed.
+ * @param event_info Information about the zoom gesture.
+ * @return EVAS_EVENT_FLAG_NONE.
+ */
 static Evas_Event_Flags
 zoom_start(void *_po, void *event_info)
 {
@@ -310,6 +385,13 @@ zoom_start(void *_po, void *event_info)
    return EVAS_EVENT_FLAG_NONE;
 }
 
+/**
+ * @brief Callback for the move phase of a zoom gesture.
+ * Updates the photo's zoom factor as the user performs a pinch/spread gesture.
+ * @param _po The Photo_Object being zoomed.
+ * @param event_info Information about the zoom gesture.
+ * @return EVAS_EVENT_FLAG_NONE.
+ */
 static Evas_Event_Flags
 zoom_move(void *_po, void *event_info)
 {
@@ -321,6 +403,14 @@ zoom_move(void *_po, void *event_info)
    return EVAS_EVENT_FLAG_NONE;
 }
 
+/**
+ * @brief Callback for the end or abort of a zoom gesture.
+ * Finalizes the zoom factor and initiates a zoom momentum animation if there is
+ * momentum. This is used for both GESTURE_STATE_END and GESTURE_STATE_ABORT.
+ * @param _po The Photo_Object being zoomed.
+ * @param event_info Information about the zoom gesture.
+ * @return EVAS_EVENT_FLAG_NONE.
+ */
 static Evas_Event_Flags
 zoom_end(void *_po, void *event_info)
 {
@@ -348,6 +438,14 @@ zoom_end(void *_po, void *event_info)
    return EVAS_EVENT_FLAG_NONE;
 }
 
+/**
+ * @brief Callback for the start of a move/drag (momentum) gesture.
+ * Stores the initial offset between the finger position and the object's origin
+ * and stops any ongoing movement momentum animation.
+ * @param _po The Photo_Object being moved.
+ * @param event_info Information about the momentum gesture.
+ * @return EVAS_EVENT_FLAG_NONE.
+ */
 static Evas_Event_Flags
 momentum_start(void *_po, void *event_info)
 {
@@ -369,6 +467,13 @@ momentum_start(void *_po, void *event_info)
    return EVAS_EVENT_FLAG_NONE;
 }
 
+/**
+ * @brief Callback for the move phase of a drag gesture.
+ * Updates the photo's position as the user drags their finger.
+ * @param _po The Photo_Object being moved.
+ * @param event_info Information about the momentum gesture.
+ * @return EVAS_EVENT_FLAG_NONE.
+ */
 static Evas_Event_Flags
 momentum_move(void *_po, void *event_info)
 {
@@ -383,7 +488,14 @@ momentum_move(void *_po, void *event_info)
    return EVAS_EVENT_FLAG_NONE;
 }
 
-/* Momentum animation */
+/**
+ * @brief Animator callback for move momentum animation.
+ * This function is called on each frame by an Ecore_Animator to animate
+ * movement with momentum (inertia). It simulates friction to slow down
+ * the object.
+ * @param _po The Photo_Object to animate.
+ * @return ECORE_CALLBACK_RENEW to continue animation, ECORE_CALLBACK_CANCEL to stop.
+ */
 static Eina_Bool
 momentum_animation_operation(void *_po)
 {
@@ -413,6 +525,14 @@ momentum_animation_operation(void *_po)
    return rc;
 }
 
+/**
+ * @brief Callback for the end of a move/drag gesture.
+ * Finalizes the position and initiates a movement momentum animation based on
+ * the final flick speed.
+ * @param _po The Photo_Object being moved.
+ * @param event_info Information about the momentum gesture.
+ * @return EVAS_EVENT_FLAG_NONE.
+ */
 static Evas_Event_Flags
 momentum_end(void *_po, void *event_info)
 {
@@ -437,6 +557,13 @@ momentum_end(void *_po, void *event_info)
    return EVAS_EVENT_FLAG_NONE;
 }
 
+/**
+ * @brief Callback for an aborted move/drag gesture.
+ * Finalizes the object's position and ensures it is within the frame.
+ * @param _po The Photo_Object being moved.
+ * @param event_info Information about the momentum gesture.
+ * @return EVAS_EVENT_FLAG_NONE.
+ */
 static Evas_Event_Flags
 momentum_abort(void *_po, void *event_info)
 {
@@ -449,6 +576,17 @@ momentum_abort(void *_po, void *event_info)
    return EVAS_EVENT_FLAG_NONE;
 }
 
+/**
+ * @brief Callback for window deletion request.
+ * Frees memory associated with all Photo_Objects when the window is closed.
+ * The `data` parameter is expected to be a NULL-terminated array of
+ * Photo_Object pointers.
+ * Example of `data` array structure:
+ * Photo_Object *photo_array[] = {po1, po2, po3, NULL};
+ * @param data A pointer to an array of Photo_Object pointers.
+ * @param obj The window object (unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _win_del_req(void *data, Evas_Object *obj EINA_UNUSED,
       void *event_info EINA_UNUSED)
@@ -466,6 +604,21 @@ _win_del_req(void *data, Evas_Object *obj EINA_UNUSED,
    free(data);
 }
 
+/**
+ * @brief Creates and initializes a new photo object.
+ * This function allocates a Photo_Object and creates all its associated Evas
+ * objects, including the icon, shadow, hit area, and gesture layer. It also
+ * sets up the gesture callbacks.
+ * @param parent The parent Evas_Object.
+ * @param ic An existing Evas_Object to use as the icon, or NULL to create a new one.
+ * @param icon The path to the image file if `ic` is NULL.
+ * @param x The initial X coordinate.
+ * @param y The initial Y coordinate.
+ * @param w The width of the photo.
+ * @param h The height of the photo.
+ * @param angle The initial rotation angle.
+ * @return A new Photo_Object instance, or NULL on failure.
+ */
 static Photo_Object *
 photo_object_add(Evas_Object *parent, Evas_Object *ic, const char *icon,
       Evas_Coord x, Evas_Coord y, Evas_Coord w, Evas_Coord h, int angle)
@@ -551,6 +704,15 @@ photo_object_add(Evas_Object *parent, Evas_Object *ic, const char *icon,
    return po;
 }
 
+/**
+ * @brief Main function for the gesture layer test (test_gesture_layer3).
+ * This function sets up the Elementary window, background, and creates one or
+ * more photo objects to demonstrate gesture handling. It's the entry point
+ * for this test case.
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_gesture_layer3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
       void *event_info EINA_UNUSED)

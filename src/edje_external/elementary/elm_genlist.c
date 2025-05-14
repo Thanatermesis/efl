@@ -1,31 +1,47 @@
 #include <assert.h>
 #include "private.h"
 
+/**
+ * @brief Structure to hold parameters for Genlist objects.
+ * This structure is used to parse and store parameters from Edje external
+ * interface, which are then applied to a Genlist widget.
+ */
 typedef struct _Elm_Params_Genlist
 {
-   Elm_Params base;
-   const char *horizontal;
-   Eina_Bool multi:1;
-   Eina_Bool multi_exists:1;
-   Eina_Bool always_select:1;
-   Eina_Bool always_select_exists:1;
-   Eina_Bool no_select:1;
-   Eina_Bool no_select_exists:1;
-   Eina_Bool compress_exists:1;
-   Eina_Bool homogeneous:1;
-   Eina_Bool homogeneous_exists:1;
-   Eina_Bool h_bounce:1;
-   Eina_Bool h_bounce_exists:1;
-   Eina_Bool v_bounce:1;
-   Eina_Bool v_bounce_exists:1;
+   Elm_Params base; /**< Base parameters, common to all Elm widgets. */
+   const char *horizontal; /**< String representation of the horizontal mode (e.g., "scroll", "compress"). */
+   Eina_Bool multi:1; /**< Boolean flag for multi-selection mode. */
+   Eina_Bool multi_exists:1; /**< Flag indicating if 'multi' parameter was provided. */
+   Eina_Bool always_select:1; /**< Boolean flag for always-select mode. */
+   Eina_Bool always_select_exists:1; /**< Flag indicating if 'always_select' parameter was provided. */
+   Eina_Bool no_select:1; /**< Boolean flag for no-selection mode. */
+   Eina_Bool no_select_exists:1; /**< Flag indicating if 'no_select' parameter was provided. */
+   Eina_Bool compress_exists:1; /**< Flag indicating if 'compress' mode related parameter was provided (unused in current parsing logic but present in struct). */
+   Eina_Bool homogeneous:1; /**< Boolean flag for homogeneous mode (items have same size). */
+   Eina_Bool homogeneous_exists:1; /**< Flag indicating if 'homogeneous' parameter was provided. */
+   Eina_Bool h_bounce:1; /**< Boolean flag for horizontal bounce. */
+   Eina_Bool h_bounce_exists:1; /**< Flag indicating if 'h_bounce' parameter was provided. */
+   Eina_Bool v_bounce:1; /**< Boolean flag for vertical bounce. */
+   Eina_Bool v_bounce_exists:1; /**< Flag indicating if 'v_bounce' parameter was provided. */
 } Elm_Params_Genlist;
 
+/**
+ * @brief Array of strings representing the available horizontal modes for Genlist.
+ * The order of strings must match the Elm_List_Mode enum values.
+ * Example: list_horizontal_choices[ELM_LIST_COMPRESS] == "compress"
+ */
 static const char* list_horizontal_choices[] =
 {
    "compress", "scroll", "limit", "expand",
    NULL
 };
 
+/**
+ * @brief Converts a string representation of horizontal mode to Elm_List_Mode enum.
+ *
+ * @param horizontal_str The string to convert (e.g., "scroll", "compress").
+ * @return The corresponding Elm_List_Mode enum value, or ELM_LIST_LAST if not found.
+ */
 static Elm_List_Mode
 _list_horizontal_setting_get(const char *horizontal_str)
 {
@@ -42,6 +58,17 @@ _list_horizontal_setting_get(const char *horizontal_str)
    return ELM_LIST_LAST;
 }
 
+/**
+ * @brief Applies Genlist parameters to an Evas_Object.
+ * This function is called by Edje to set the state of an external Genlist object,
+ * typically during animations or state transitions.
+ *
+ * @param data User data, unused in this function.
+ * @param obj The Evas_Object (Genlist) to configure.
+ * @param from_params The previous state's parameters (Elm_Params_Genlist).
+ * @param to_params The target state's parameters (Elm_Params_Genlist).
+ * @param pos The position in the transition (0.0 to 1.0), unused.
+ */
 static void
 external_genlist_state_set(void *data EINA_UNUSED, Evas_Object *obj,
                            const void *from_params, const void *to_params,
@@ -92,6 +119,16 @@ external_genlist_state_set(void *data EINA_UNUSED, Evas_Object *obj,
      }
 }
 
+/**
+ * @brief Sets a specific Genlist parameter on an Evas_Object.
+ * This function is called by Edje to set individual external parameters.
+ *
+ * @param data User data, unused in this function.
+ * @param obj The Evas_Object (Genlist) to configure.
+ * @param param The Edje_External_Param to apply.
+ *              Example: param->name = "multi select", param->type = EDJE_EXTERNAL_PARAM_TYPE_BOOL, param->i = 1
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., unknown parameter or wrong type).
+ */
 static Eina_Bool
 external_genlist_param_set(void *data EINA_UNUSED, Evas_Object *obj,
                            const Edje_External_Param *param)
@@ -172,6 +209,18 @@ external_genlist_param_set(void *data EINA_UNUSED, Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Retrieves a specific Genlist parameter from an Evas_Object.
+ * This function is called by Edje to get the current value of an external parameter.
+ *
+ * @param data User data, unused in this function.
+ * @param obj The Evas_Object (Genlist) to query.
+ * @param param An Edje_External_Param structure to fill with the parameter's value.
+ *              The `name` and `type` fields are pre-filled by Edje.
+ *              Example: param->name = "multi select", param->type = EDJE_EXTERNAL_PARAM_TYPE_BOOL.
+ *                       This function would fill param->i.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., unknown parameter or wrong type).
+ */
 static Eina_Bool
 external_genlist_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
                            Edje_External_Param *param)
@@ -256,6 +305,20 @@ external_genlist_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Parses a list of Edje external parameters and stores them in an Elm_Params_Genlist structure.
+ * This function is called by Edje when it encounters a block of parameters
+ * for a Genlist object in an Edje file.
+ *
+ * @param data User data, unused in this function.
+ * @param obj The Evas_Object (Genlist) these parameters are for, unused in this function.
+ * @param params A list (Eina_List) of Edje_External_Param structures to parse.
+ *               Example of an Edje_External_Param in the list:
+ *               { name="multi select", type=EDJE_EXTERNAL_PARAM_TYPE_BOOL, i=1 }
+ * @return A pointer to a newly allocated Elm_Params_Genlist structure filled with parsed values,
+ *         or NULL on allocation failure. The caller is responsible for freeing this memory
+ *         using external_genlist_params_free().
+ */
 static void *
 external_genlist_params_parse(void *data EINA_UNUSED,
                               Evas_Object *obj EINA_UNUSED,
@@ -308,6 +371,15 @@ external_genlist_params_parse(void *data EINA_UNUSED,
    return mem;
 }
 
+/**
+ * @brief Retrieves a content part from the Genlist.
+ * Genlist typically does not expose named content parts via this mechanism.
+ *
+ * @param data User data, unused.
+ * @param obj The Genlist object, unused.
+ * @param content The name of the content part to retrieve, unused.
+ * @return Always returns NULL for Genlist as it does not support this.
+ */
 static Evas_Object *external_genlist_content_get(void *data EINA_UNUSED,
                                                  const Evas_Object *obj EINA_UNUSED,
                                                  const char *content EINA_UNUSED)
@@ -316,6 +388,13 @@ static Evas_Object *external_genlist_content_get(void *data EINA_UNUSED,
    return NULL;
 }
 
+/**
+ * @brief Frees the memory allocated for Elm_Params_Genlist.
+ * This function is used to clean up the structure returned by
+ * external_genlist_params_parse().
+ *
+ * @param params A pointer to the Elm_Params_Genlist structure to free.
+ */
 static void
 external_genlist_params_free(void *params)
 {
@@ -327,6 +406,20 @@ external_genlist_params_free(void *params)
    free(mem);
 }
 
+/**
+ * @brief Describes the external parameters supported by the Genlist widget.
+ * This array is used by Edje to understand what parameters can be set
+ * on a Genlist object from an Edje file and their types.
+ *
+ * Example of elements in this array:
+ * - DEFINE_EXTERNAL_COMMON_PARAMS: Macro that expands to common parameters like "visible", "disabled".
+ * - EDJE_EXTERNAL_PARAM_INFO_CHOICE_FULL("horizontal mode", "scroll", list_horizontal_choices):
+ *   Defines a parameter named "horizontal mode" which accepts one of the string values
+ *   from `list_horizontal_choices`, with "scroll" being the default.
+ * - EDJE_EXTERNAL_PARAM_INFO_BOOL("multi select"):
+ *   Defines a boolean parameter named "multi select".
+ * - EDJE_EXTERNAL_PARAM_INFO_SENTINEL: Marks the end of the parameter list.
+ */
 static Edje_External_Param_Info external_genlist_params[] = {
      DEFINE_EXTERNAL_COMMON_PARAMS,
      EDJE_EXTERNAL_PARAM_INFO_CHOICE_FULL("horizontal mode", "scroll",

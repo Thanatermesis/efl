@@ -29,6 +29,17 @@ static const Ecore_Getopt opts =
    }
 };
 
+/**
+ * @brief Callback function for successful disk mount events.
+ *
+ * This function is invoked when a disk has been successfully mounted.
+ * It prints a success message, frees the disk object, and quits the main loop.
+ *
+ * @param data User data, unused in this callback.
+ * @param type The type of the event, unused in this callback.
+ * @param info Event-specific information, in this case an Eeze_Event_Disk_Mount object.
+ * @return EINA_TRUE to continue processing events, though this callback quits the loop.
+ */
 static Eina_Bool
 _mount_cb(void *data EINA_UNUSED, int type EINA_UNUSED, void *info)
 {
@@ -39,6 +50,18 @@ _mount_cb(void *data EINA_UNUSED, int type EINA_UNUSED, void *info)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback function for disk mount error events.
+ *
+ * This function is invoked when an error occurs during a disk mount attempt.
+ * It prints an error message including the device path, frees the disk object,
+ * and quits the main loop.
+ *
+ * @param data User data, unused in this callback.
+ * @param type The type of the event, unused in this callback.
+ * @param info Event-specific information, in this case an Eeze_Event_Disk_Error object.
+ * @return EINA_TRUE to continue processing events, though this callback quits the loop.
+ */
 static Eina_Bool
 _error_cb(void *data EINA_UNUSED, int type EINA_UNUSED, void *info)
 {
@@ -49,6 +72,20 @@ _error_cb(void *data EINA_UNUSED, int type EINA_UNUSED, void *info)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Main function for the eeze_mount utility.
+ *
+ * This program provides a command-line interface to mount block devices
+ * using the Eeze library. It supports mounting by device path (e.g., /dev/sdb1)
+ * or sysfs path (e.g., /sys/block/sdb/sdb1). It can also determine the
+ * device from an existing mount point.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv An array of command-line argument strings.
+ *             Example: eeze_mount /dev/sdb1 /mnt/mydisk
+ *                      eeze_mount /mnt/mydisk (to find device for existing mount)
+ * @return 0 on success, 1 on failure.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -91,9 +128,16 @@ main(int argc, char *argv[])
    dev = argv[args];
    if (args + 1 < argc)
      mount_point = argv[args + 1];
+
+   /* Determine how to initialize the Eeze_Disk object based on input:
+    * - If 'dev' starts with /sys/ or /dev/, treat it as a device path.
+    * - If 'dev' is the only remaining argument and is a directory,
+    *   assume it's an existing mount point and try to find the disk.
+    * - Otherwise, it's an invalid device specification.
+    */
    if ((!strncmp(dev, "/sys/", 5)) || (!strncmp(dev, "/dev/", 5)))
      disk = eeze_disk_new(dev);
-   else if ((args == argc - 1) && (ecore_file_is_dir(dev)))
+   else if ((args == argc - 1) && (ecore_file_is_dir(dev))) // Only device/mountpoint arg, and it's a dir
      disk = eeze_disk_new_from_mount(dev);
    else
      {
@@ -106,9 +150,12 @@ main(int argc, char *argv[])
         printf("[%s] is already mounted!", dev);
         exit(1);
      }
-   if (argc - args > 1)
+   if (argc - args > 1) // If a mount point was provided as a separate argument
      {
         eeze_disk_mount_point_set(disk, mount_point);
+        /* If the device path ends with .iso, assume it's an ISO image
+         * and automatically add the loop mount option.
+         */
         if (eina_str_has_extension(dev, ".iso"))
           {
              int f;

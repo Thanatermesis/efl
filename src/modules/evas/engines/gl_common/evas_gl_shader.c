@@ -86,6 +86,17 @@ static const char *_shader_flags[SHADER_FLAG_COUNT] = {
 static Eina_Bool compiler_released = EINA_FALSE;
 static Eina_Bool _do_dither = EINA_TRUE;
 
+/**
+ * @brief Logs any error that occurs during GL shader compilation or linking.
+ *
+ * This function retrieves the info log from a shader or program object and
+ * prints it to the error log. It is used to debug shader compilation and
+ * linking issues.
+ *
+ * @param target The ID of the shader or program object that failed.
+ * @param action A string describing the failed operation (e.g., "compile vertex shader").
+ * @param is_shader EINA_TRUE if the target is a shader, EINA_FALSE for a program.
+ */
 static void
 gl_compile_link_error(GLuint target, const char *action, Eina_Bool is_shader)
 {
@@ -112,6 +123,14 @@ gl_compile_link_error(GLuint target, const char *action, Eina_Bool is_shader)
      }
 }
 
+/**
+ * @brief Binds the standard vertex attributes to predefined locations for a shader program.
+ *
+ * This ensures that the application C code and the GLSL shaders agree on the
+ * locations for vertex data like position, color, and texture coordinates.
+ *
+ * @param prg The ID of the shader program.
+ */
 static inline void
 _attributes_bind(GLint prg)
 {
@@ -126,6 +145,20 @@ _attributes_bind(GLint prg)
    glBindAttribLocation(prg, SHAD_MASKSAM, "tex_masksample");
 }
 
+/**
+ * @brief Loads a pre-compiled shader program from an Eet cache file.
+ *
+ * This function attempts to load a shader program binary corresponding to the
+ * given flags from the cache. This avoids recompiling the shader from source,
+ * significantly speeding up initialization.
+ *
+ * The function includes a workaround for a rendering bug with glProgramBinary
+ * by creating and attaching dummy shaders before loading the binary.
+ *
+ * @param ef The Eet file handle to the shader cache.
+ * @param flags A bitmask identifying the specific shader variant to load.
+ * @return A new Evas_GL_Program structure if successful, otherwise NULL.
+ */
 static Evas_GL_Program *
 _evas_gl_common_shader_program_binary_load(Eet_File *ef, unsigned int flags)
 {
@@ -205,6 +238,18 @@ finish:
    return p;
 }
 
+/**
+ * @brief Saves a compiled shader program binary to an Eet cache file.
+ *
+ * If supported by the driver, this function retrieves the binary representation
+ * of a linked shader program and stores it in the provided Eet file. This
+ * allows for faster loading in subsequent runs using
+ * _evas_gl_common_shader_program_binary_load().
+ *
+ * @param p The shader program to save.
+ * @param ef The Eet file handle to the shader cache.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 _evas_gl_common_shader_program_binary_save(Evas_GL_Program *p, Eet_File *ef)
 {
@@ -241,6 +286,15 @@ _evas_gl_common_shader_program_binary_save(Evas_GL_Program *p, Eet_File *ef)
    return 1;
 }
 
+/**
+ * @brief Computes and caches a checksum of the core shader source files.
+ *
+ * This hash is used to validate the binary shader cache. If the shader source
+ * code changes, the hash will change, and the cache will be invalidated,
+ * forcing shaders to be recompiled.
+ *
+ * @param shared The shared GL data structure where the checksum is stored.
+ */
 static void
 _evas_gl_common_shader_binary_hash(Evas_GL_Shared *shared)
 {
@@ -255,6 +309,17 @@ _evas_gl_common_shader_binary_hash(Evas_GL_Shared *shared)
           eina_hash_superfast(vertex_glsl, strlen(vertex_glsl)));
 }
 
+/**
+ * @brief Verifies the checksum of the shader cache against the current shader source.
+ *
+ * This function compares the checksum stored in the Eet cache file with the
+ * checksum of the current in-memory shader source code to ensure the cache is
+ * not stale.
+ *
+ * @param shared The shared GL data containing the current shader checksum.
+ * @param ef The Eet file handle to the shader cache.
+ * @return EINA_TRUE if the checksums match, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _evas_gl_common_shader_binary_checksum_check(Evas_GL_Shared *shared, Eet_File *ef)
 {
@@ -273,6 +338,16 @@ _evas_gl_common_shader_binary_checksum_check(Evas_GL_Shared *shared, Eet_File *e
    return ret;
 }
 
+/**
+ * @brief Writes the current shader source checksum to the cache file.
+ *
+ * This is done to mark the cache as valid for the current version of the
+ * shader source code.
+ *
+ * @param shared The shared GL data containing the current shader checksum.
+ * @param ef The Eet file handle to write the checksum to.
+ * @return EINA_TRUE on successful write, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _evas_gl_common_shader_binary_checksum_write(Evas_GL_Shared *shared, Eet_File *ef)
 {
@@ -286,6 +361,16 @@ _evas_gl_common_shader_binary_checksum_write(Evas_GL_Shared *shared, Eet_File *e
    return (ret == len);
 }
 
+/**
+ * @brief Initializes the shader binary cache system.
+ *
+ * This function checks if program binaries are supported, finds or creates the
+ * cache directory, and opens the cache file if it exists and its checksum is
+ * valid. A valid cache file is stored in `shared->shaders_cache`.
+ *
+ * @param shared The shared GL data structure.
+ * @return 1 on success (or if caching is disabled), 0 on failure.
+ */
 static int
 _evas_gl_common_shader_binary_init(Evas_GL_Shared *shared)
 {
@@ -320,6 +405,16 @@ error:
    return 0;
 }
 
+/**
+ * @brief Saves all newly compiled shaders to the binary cache file.
+ *
+ * This function iterates through all shader programs in the hash table. For
+ * any program that hasn't been saved to the binary cache yet, it saves it.
+ * It uses a temporary file and atomic rename to ensure cache integrity.
+ *
+ * @param shared The shared GL data structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 _evas_gl_common_shader_binary_save(Evas_GL_Shared *shared)
 {
@@ -454,6 +549,14 @@ save:
    return 0;
 }
 
+/**
+ * @brief Deletes a shader program and its associated resources.
+ *
+ * This includes freeing any filter-specific textures and the GL program object
+ * itself.
+ *
+ * @param p The shader program to delete.
+ */
 static inline void
 _program_del(Evas_GL_Program *p)
 {
@@ -467,12 +570,30 @@ _program_del(Evas_GL_Program *p)
    free(p);
 }
 
+/**
+ * @brief Callback function used by eina_hash to free a shader program.
+ *
+ * @param data A pointer to the Evas_GL_Program to be deleted.
+ */
 static void
 _shaders_hash_free_cb(void *data)
 {
    _program_del(data);
 }
 
+/**
+ * @brief Generates a full GLSL shader source string from a base template and feature flags.
+ *
+ * This function prepends a series of `#define` directives to the base GLSL code
+ * based on the provided flags. This allows for conditional compilation within
+ * the shader to enable or disable features. The `EVAS_GL_SHADER_GLSL_VERSION`
+ * environment variable can be used to override the GLSL version for debugging.
+ *
+ * @param flags A bitmask of Shader_Flag values that control which `#define`s are added.
+ * @param base The base GLSL source code template.
+ * @return A newly allocated string containing the complete shader source. The
+ *         caller is responsible for freeing this string.
+ */
 static char *
 evas_gl_common_shader_glsl_get(unsigned int flags, const char *base)
 {
@@ -504,6 +625,19 @@ evas_gl_common_shader_glsl_get(unsigned int flags, const char *base)
    return str;
 }
 
+/**
+ * @brief Compiles and links a vertex and fragment shader into a GL program.
+ *
+ * This function handles the standard OpenGL process of creating shader objects,
+ * compiling source, creating a program object, attaching shaders, and linking
+ * them. It also sets the `GL_PROGRAM_BINARY_RETRIEVABLE_HINT` to enable saving
+ * the compiled binary later.
+ *
+ * @param flags The feature flags associated with this shader program.
+ * @param vertex The null-terminated string containing the vertex shader source code.
+ * @param fragment The null-terminated string containing the fragment shader source code.
+ * @return A new Evas_GL_Program on success, or NULL on failure.
+ */
 static Evas_GL_Program *
 evas_gl_common_shader_compile(unsigned int flags, const char *vertex,
                               const char *fragment)
@@ -574,6 +708,18 @@ evas_gl_common_shader_compile(unsigned int flags, const char *vertex,
    return p;
 }
 
+/**
+ * @brief Generates a list of common shader flag combinations to be precompiled.
+ *
+ * To avoid jank during runtime, Evas pre-compiles a set of frequently used
+ * shaders at startup. This function generates the list of shader variants
+ * (represented by their flags) that cover common cases like simple rectangles,
+ * text, and images with various options.
+ *
+ * @param shared The shared GL data.
+ * @return An Eina_List containing integer pointers, where each integer is a
+ *         shader flag combination. The caller is responsible for freeing the list.
+ */
 static Eina_List *
 evas_gl_common_shader_precompile_list(Evas_GL_Shared *shared)
 {
@@ -636,6 +782,18 @@ evas_gl_common_shader_precompile_list(Evas_GL_Shared *shared)
    return li;
 }
 
+/**
+ * @brief Generates GLSL source for given flags, compiles it, and adds it to the cache.
+ *
+ * This is a convenience function that orchestrates the process of turning a set
+ * of shader flags into a usable Evas_GL_Program. It checks if the program
+ * already exists, generates the GLSL source, compiles and links it, and upon
+ * success, adds the new program to the in-memory hash of shaders.
+ *
+ * @param shared The shared GL data structure.
+ * @param flags The bitmask of shader flags for the program to be generated.
+ * @return The new Evas_GL_Program, or NULL if it already existed or compilation failed.
+ */
 static Evas_GL_Program *
 evas_gl_common_shader_generate_and_compile(Evas_GL_Shared *shared, unsigned int flags)
 {
@@ -665,6 +823,18 @@ evas_gl_common_shader_generate_and_compile(Evas_GL_Shared *shared, unsigned int 
    return p;
 }
 
+/**
+ * @brief Precompiles a set of common shaders.
+ *
+ * This function gets a list of shader variations from
+ * `evas_gl_common_shader_precompile_list` and compiles each one. These
+ * precompiled shaders are marked as temporary (`delete_me`), but they are
+ * available immediately if needed, preventing compilation stalls during
+ * rendering. This is typically done when a binary cache is not available.
+ *
+ * @param shared The shared GL data structure.
+ * @return The number of shaders that were successfully precompiled.
+ */
 static int
 evas_gl_common_shader_precompile_all(Evas_GL_Shared *shared)
 {
@@ -688,6 +858,17 @@ evas_gl_common_shader_precompile_all(Evas_GL_Shared *shared)
    return cnt;
 }
 
+/**
+ * @brief Initializes the shader subsystem.
+ *
+ * This function sets up the shader hash table and attempts to initialize the
+ * binary shader cache. It then ensures that a few of the most common shaders
+ * (for rectangles, text, images) are available, either by loading them from the
+ * cache or by compiling them on the fly.
+ *
+ * @param shared The shared GL data structure.
+ * @return 1 on success.
+ */
 int
 evas_gl_common_shader_program_init(Evas_GL_Shared *shared)
 {
@@ -739,6 +920,16 @@ evas_gl_common_shader_program_init(Evas_GL_Shared *shared)
    return 1;
 }
 
+/**
+ * @brief Flushes pending shader operations.
+ * @param shared The shared GL data structure.
+ *
+ * This function performs two main tasks. First, it releases the shader
+ * compiler if it hasn't been already, which can free up significant resources.
+ * Second, if new shaders have been compiled (`needs_shaders_flush` is set),
+ * it saves the entire shader cache to disk and cleans up any temporary shaders
+ * that were created during precompilation but were never used.
+ */
 EMODAPI void
 evas_gl_common_shaders_flush(Evas_GL_Shared *shared)
 {
@@ -775,6 +966,14 @@ evas_gl_common_shaders_flush(Evas_GL_Shared *shared)
      }
 }
 
+/**
+ * @brief Shuts down the shader subsystem.
+ *
+ * Flushes any pending shader cache writes to disk, closes the cache file,
+ * and frees all compiled shader programs and associated data structures.
+ *
+ * @param shared The shared GL data structure.
+ */
 void
 evas_gl_common_shader_program_shutdown(Evas_GL_Shared *shared)
 {
@@ -794,6 +993,35 @@ evas_gl_common_shader_program_shutdown(Evas_GL_Shared *shared)
    shared->shaders_hash = NULL;
 }
 
+/**
+ * @brief Determines the required shader feature flags for a given drawing operation.
+ *
+ * This function is central to Evas's shader system. It analyzes all the
+ * parameters of a drawing operation (such as object type, textures, colors,
+ * and blending modes) and constructs a bitmask of flags that uniquely
+ * identifies the shader program needed to perform that operation.
+ *
+ * @param[in] shared The shared GL data.
+ * @param[in] type The type of primitive being drawn (e.g., rectangle, image, text).
+ * @param[in] map_points Array of map points for gradient-like effects.
+ * @param[in] npoints Number of map points.
+ * @param[in] r,g,b,a The multiplication color.
+ * @param[in] sw,sh Source image dimensions (for an image object).
+ * @param[in] w,h Destination object dimensions on canvas.
+ * @param[in] smooth Whether to use smooth scaling (enables anti-aliasing).
+ * @param[in] tex The primary texture.
+ * @param[in] tex_only Indicates if the texture format is the only consideration.
+ * @param[in] mtex The mask texture.
+ * @param[in] mask_smooth Whether to use smooth scaling for the mask.
+ * @param[in] mask_color Whether the mask is a color mask.
+ * @param[in] mw,mh Destination mask dimensions on canvas.
+ * @param[in] alphaonly For filters, indicates if only the alpha channel is affected.
+ * @param[out] psam Stores the calculated sampling mode for the primary texture.
+ * @param[out] pnomul Stores whether color multiplication can be skipped.
+ * @param[out] pmasksam Stores the calculated sampling mode for the mask texture.
+ *
+ * @return An unsigned integer bitmask of Shader_Flag values.
+ */
 static inline unsigned int
 evas_gl_common_shader_flags_get(Evas_GL_Shared *shared, Shader_Type type,
                                 RGBA_Map_Point *map_points, int npoints,
@@ -950,6 +1178,19 @@ end:
    return flags;
 }
 
+/**
+ * @brief Binds texture samplers to texture units for a given shader program.
+ *
+ * After a shader is compiled, this function must be called to set the sampler
+ * uniforms (e.g., "tex", "texm") to their corresponding texture image units
+ * (0, 1, 2, ...). It inspects the program's flags to determine which samplers
+ * are active and assigns them consecutive texture units.
+ *
+ * @param p The shader program.
+ * @param prog_recover If EINA_TRUE, the function will restore the previously
+ *                     active GL program after it's done. This is important
+ *                     when binding textures for a non-active program.
+ */
 void
 evas_gl_common_shader_textures_bind(Evas_GL_Program *p, Eina_Bool prog_recover)
 {
@@ -1027,6 +1268,20 @@ evas_gl_common_shader_textures_bind(Evas_GL_Program *p, Eina_Bool prog_recover)
      }
 }
 
+/**
+ * @brief Retrieves or creates a shader program for a specific drawing operation.
+ *
+ * This is the main function for obtaining a shader. It first determines the
+ * necessary shader flags using `evas_gl_common_shader_flags_get()`. It then
+ * looks for a matching program in the in-memory hash. If not found, it tries
+ * to load it from the binary cache. As a last resort, it compiles the program
+ * from source.
+ *
+ * The parameters are identical to evas_gl_common_shader_flags_get().
+ *
+ * @return A valid Evas_GL_Program for the requested drawing operation, or NULL
+ *         on failure.
+ */
 Evas_GL_Program *
 evas_gl_common_shader_program_get(Evas_Engine_GL_Context *gc,
                                   Shader_Type type,

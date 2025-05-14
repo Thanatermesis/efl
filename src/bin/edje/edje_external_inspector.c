@@ -23,12 +23,23 @@ static int _log_dom;
 
 static char *module_patterns_str = NULL;
 
-static int detail = 1;
-static Eina_Bool machine = EINA_FALSE;
-static char *type_glob = NULL;
-static char *const *module_patterns;
-static const Eina_List *modules;
+static int detail = 1; /**< Detail level for output. 0=none, 1=terse, 2=all. */
+static Eina_Bool machine = EINA_FALSE; /**< Flag for machine-readable output. */
+static char *type_glob = NULL; /**< Glob pattern to filter types by name. */
+static char *const *module_patterns; /**< Array of glob patterns for module names. */
+static const Eina_List *modules; /**< List of available Edje modules. */
 
+/**
+ * @brief Creates a comma-separated string of module patterns.
+ *
+ * This function takes the global `module_patterns` array and concatenates
+ * the patterns into a single string, separated by ", ". If `module_patterns`
+ * is NULL, it returns "*".
+ *
+ * @return A newly allocated string containing the module patterns, or "*"
+ *         if no patterns are set. The caller is responsible for freeing
+ *         this string.
+ */
 static char *
 _module_patterns_str_new(void)
 {
@@ -48,6 +59,16 @@ _module_patterns_str_new(void)
    return ret;
 }
 
+/**
+ * @brief Checks if a module name matches any of the defined patterns.
+ *
+ * Iterates through the `module_patterns` and uses `eina_fnmatch` to
+ * check if the given `name` matches any pattern.
+ *
+ * @param name The module name to check.
+ * @return @c EINA_TRUE if the name matches a pattern or if no patterns
+ *         are defined, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 module_matches(const char *name)
 {
@@ -60,6 +81,15 @@ module_matches(const char *name)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Checks if a type name matches the defined glob pattern.
+ *
+ * Uses `eina_fnmatch` to check if the given `name` matches `type_glob`.
+ *
+ * @param name The type name to check.
+ * @return @c EINA_TRUE if the name matches the `type_glob` or if
+ *         `type_glob` is NULL, @c EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 type_matches(const char *name)
 {
@@ -67,6 +97,19 @@ type_matches(const char *name)
    return eina_fnmatch(type_glob, name, 0);
 }
 
+/**
+ * @brief Comparator function for sorting Edje_External_Type by module and name.
+ *
+ * Used with `eina_list_sort` to sort a list of `Eina_Hash_Tuple`
+ * where the data is `Edje_External_Type` and the key is the type name.
+ * Sorts primarily by module name, then by type name.
+ *
+ * @param pa Pointer to the first Eina_Hash_Tuple.
+ * @param pb Pointer to the second Eina_Hash_Tuple.
+ * @return An integer less than, equal to, or greater than zero if the
+ *         first argument is considered to be respectively less than,
+ *         equal to, or greater than the second.
+ */
 static int
 _types_sort(const void *pa, const void *pb)
 {
@@ -85,6 +128,13 @@ _types_sort(const void *pa, const void *pb)
    return strcmp(na, nb);
 }
 
+/**
+ * @brief Gets a string representation of an Edje external parameter type.
+ *
+ * @param param Pointer to the Edje_External_Param_Info structure.
+ * @return A string literal representing the parameter type (e.g., "int", "string").
+ *         Returns "???" for unknown types.
+ */
 static const char *
 _param_type_str_get(const Edje_External_Param_Info *param)
 {
@@ -106,6 +156,19 @@ _param_type_str_get(const Edje_External_Param_Info *param)
      }
 }
 
+/**
+ * @brief Gets a string representation of an Edje external parameter's default value.
+ *
+ * @param type Pointer to the Edje_External_Type containing the parameter.
+ * @param param Pointer to the Edje_External_Param_Info structure.
+ * @param buf A character buffer to store the string representation for numeric types.
+ * @param buflen The size of the `buf`.
+ * @return A string representing the default value. For string types, it's a direct
+ *         pointer. For numeric types, it's `buf`. For choices with a getter,
+ *         it calls the getter and stores in `buf`. Returns NULL if no default
+ *         value is set or applicable. The caller should not free the returned
+ *         string if it's not `buf`.
+ */
 static const char *
 _param_value_str_get(const Edje_External_Type *type, const Edje_External_Param_Info *param, char *buf, size_t buflen)
 {
@@ -148,6 +211,13 @@ _param_value_str_get(const Edje_External_Type *type, const Edje_External_Param_I
      }
 }
 
+/**
+ * @brief Gets a string representation of an Edje external parameter's flags.
+ *
+ * @param param Pointer to the Edje_External_Param_Info structure.
+ * @return A string representing the flags (e.g., "GET|SET", "NONE").
+ *         The returned string is a static buffer and should not be modified or freed.
+ */
 static const char *
 _param_flags_str_get(const Edje_External_Param_Info *param)
 {
@@ -182,6 +252,22 @@ _param_flags_str_get(const Edje_External_Param_Info *param)
    return buf;
 }
 
+/**
+ * @brief Prints the choices for a parameter of type EDJE_EXTERNAL_PARAM_TYPE_CHOICE.
+ *
+ * Output format depends on the `machine` flag.
+ * If `machine` is true:
+ *   CHOICES-BEGIN
+ *   choice1
+ *   choice2
+ *   ...
+ *   CHOICES-END
+ * Otherwise:
+ *   , choices: "choice1" "choice2" ...
+ *
+ * @param choices A NULL-terminated array of strings representing the choices.
+ *                Example: `const char *c[] = {"val1", "val2", NULL};`
+ */
 static void
 _param_choices_print(const char *const *choices)
 {
@@ -195,6 +281,16 @@ _param_choices_print(const char *const *choices)
    if (machine) puts("CHOICES-END");
 }
 
+/**
+ * @brief Prints extra details for a parameter, based on its type and the `detail` level.
+ *
+ * This includes flags, min/max/step values for numeric types,
+ * accept/deny formats for strings, true/false strings for booleans,
+ * and choices for choice types. Output format depends on the `machine` flag.
+ *
+ * @param type Pointer to the Edje_External_Type containing the parameter.
+ * @param param Pointer to the Edje_External_Param_Info structure.
+ */
 static void
 _param_extra_details(const Edje_External_Type *type, const Edje_External_Param_Info *param)
 {
@@ -292,6 +388,17 @@ _param_extra_details(const Edje_External_Type *type, const Edje_External_Param_I
    if (!machine) fputs(" */", stdout);  /* \n not desired */
 }
 
+/**
+ * @brief Lists detailed information about Edje external types and their parameters.
+ *
+ * This function iterates through available Edje modules, loads them if they
+ * match the `module_patterns`, then iterates through the external types
+ * provided by these modules. If a type matches `type_glob`, its details
+ * (name, label, description, parameters) are printed.
+ * The output format is controlled by the `machine` and `detail` global variables.
+ *
+ * @return 0 on success, 1 if no matching modules or types were found.
+ */
 static int
 _info_list(void)
 {
@@ -462,6 +569,16 @@ _info_list(void)
    return (!module_found) || (!type_found);
 }
 
+/**
+ * @brief Lists the names of matching Edje external types.
+ *
+ * Iterates through available Edje modules, loads them if they match
+ * `module_patterns`, then iterates through their external types.
+ * If a type matches `type_glob`, its name is printed to standard output,
+ * one name per line.
+ *
+ * @return 0 on success, 1 if no matching modules or types were found.
+ */
 static int
 _types_names_list(void)
 {
@@ -529,6 +646,15 @@ _types_names_list(void)
    return (!module_found) || (!type_found);
 }
 
+/**
+ * @brief Lists the names of matching Edje modules.
+ *
+ * Iterates through the list of available Edje modules. If a module name
+ * matches `module_patterns`, its name is printed to standard output,
+ * one name per line.
+ *
+ * @return 0 on success, 1 if no matching modules were found.
+ */
 static int
 _modules_names_list(void)
 {

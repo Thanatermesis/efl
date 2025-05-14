@@ -4,6 +4,10 @@
 #ifndef _ELM_COLORSELECTOR_EO_CLASS_TYPE
 #define _ELM_COLORSELECTOR_EO_CLASS_TYPE
 
+/**
+ * @brief Opaque type for the Elm_Colorselector widget.
+ * @ingroup Elm_Colorselector
+ */
 typedef Eo Elm_Colorselector;
 
 #endif

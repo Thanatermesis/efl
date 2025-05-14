@@ -7,35 +7,56 @@
 
 #define ICON_MAX 24
 
+/**
+ * @brief Enumeration for box packing positions.
+ * Used for demonstrating different packing functions.
+ */
 typedef enum
 {
-  BOX_PACK_POSITION_START,
-  BOX_PACK_POSITION_BEFORE,
-  BOX_PACK_POSITION_AFTER,
-  BOX_PACK_POSITION_END
+  BOX_PACK_POSITION_START, /**< Pack at the beginning */
+  BOX_PACK_POSITION_BEFORE, /**< Pack before a reference item */
+  BOX_PACK_POSITION_AFTER, /**< Pack after a reference item */
+  BOX_PACK_POSITION_END /**< Pack at the end */
 } Box_Pack_Position;
 
+/**
+ * @brief Structure to hold data for the API test.
+ * This structure is passed to callbacks and contains the state
+ * of the test and a pointer to the box widget being tested.
+ */
 struct _api_data
 {
-   unsigned int state;  /* What state we are testing       */
-   void *box;           /* Use this to get box content     */
+   unsigned int state;  /**< Current test state from api_state enum */
+   void *box;           /**< The box widget being manipulated */
 };
 typedef struct _api_data api_data;
 
+/**
+ * @brief Enumeration for the different API test states.
+ * Each state corresponds to a specific elm_box function to be tested.
+ */
 enum _api_state
 {
-   BOX_PACK_START,
-   BOX_PACK_BEFORE,
-   BOX_PACK_AFTER,
-   BOX_PADDING_SET,
-   BOX_ALIGN_SET,
-   BOX_HOMOGENEOUS_SET,
-   BOX_UNPACK_ALL,
-   BOX_CLEAR,
-   API_STATE_LAST
+   BOX_PACK_START, /**< Test elm_box_pack_start() */
+   BOX_PACK_BEFORE, /**< Test elm_box_pack_before() */
+   BOX_PACK_AFTER, /**< Test elm_box_pack_after() */
+   BOX_PADDING_SET, /**< Test elm_box_padding_set() */
+   BOX_ALIGN_SET, /**< Test elm_box_align_set() */
+   BOX_HOMOGENEOUS_SET, /**< Test elm_box_homogeneous_set() */
+   BOX_UNPACK_ALL, /**< Test elm_box_unpack_all() */
+   BOX_CLEAR, /**< Test elm_box_clear() */
+   API_STATE_LAST /**< Marker for the end of test states */
 };
 typedef enum _api_state api_state;
 
+/**
+ * @brief Apply a test case based on the current API state.
+ * @param api The API test data struct.
+ *
+ * This function modifies the box widget based on the current state
+ * in api->state. It demonstrates various elm_box API functions
+ * like packing, unpacking, and setting properties.
+ */
 static void
 set_api_state(api_data *api)
 {
@@ -106,6 +127,16 @@ set_api_state(api_data *api)
      }
 }
 
+/**
+ * @brief Callback for the "Next API function" button click.
+ * @param data The api_data struct.
+ * @param obj The button object.
+ * @param event_info Not used.
+ *
+ * This function is called when the test button is clicked. It advances
+ * the test state, calls set_api_state() to apply the change, and
+ * updates the button's text to reflect the next state.
+ */
 static void
 _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {  /* Will add here a SWITCH command containing code to modify test-object */
@@ -121,12 +152,32 @@ _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_disabled_set(obj, a->state == API_STATE_LAST);
 }
 
+/**
+ * @brief General cleanup callback to free allocated data.
+ * @param data The data to free.
+ * @param e Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This is a generic callback attached to the EVAS_CALLBACK_FREE event
+ * of a window to release memory allocated for test data.
+ */
 static void
 _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Test function for a vertical box.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This test creates a window with a vertical box containing several icons.
+ * A button is provided to cycle through various box API functions,
+ * demonstrating their effects on the vertical box.
+ */
 void
 test_box_vert(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -184,6 +235,15 @@ test_box_vert(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback to delete an object from its container box.
+ * @param data The container box widget.
+ * @param obj The object to be deleted (a button in this test).
+ * @param event_info Not used.
+ *
+ * This callback unpacks the clicked object from its parent box and
+ * then deletes it. It's used to demonstrate dynamic modification of a box.
+ */
 static void
 _del_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -193,6 +253,16 @@ _del_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    evas_object_del(obj);
 }
 
+/**
+ * @brief Second test function for a vertical box.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This test creates a window with a vertical box filled with buttons.
+ * Clicking a button will remove it from the box, demonstrating the
+ * elm_box_unpack() and object deletion functionality.
+ */
 void
 test_box_vert2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -250,6 +320,16 @@ test_box_vert2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for a horizontal box.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * Similar to test_box_vert(), but for a horizontal box.
+ * It creates a window with a horizontal box containing icons and a button
+ * to cycle through and test various box API functions.
+ */
 void
 test_box_horiz(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -308,8 +388,20 @@ test_box_horiz(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event
    evas_object_show(win);
 }
 
+/**
+ * @brief Tracks the usage of icons for radio buttons to avoid duplicates.
+ * Each element corresponds to an icon file, e.g., icon_00.png, icon_01.png, etc.
+ * EINA_TRUE if the icon at that index is currently in use.
+ */
 static Eina_Bool radio_index[ICON_MAX];
 
+/**
+ * @brief Finds and reserves an unused icon index.
+ * @return The first available index, or -1 if all are in use.
+ *
+ * This function iterates through the global radio_index array to find an
+ * index that is not currently marked as used.
+ */
 static int
 _index_get(void)
 {
@@ -326,6 +418,10 @@ _index_get(void)
    return -1;
 }
 
+/**
+ * @brief Releases a reserved icon index, marking it as available.
+ * @param i The index to release.
+ */
 static void
 _index_remove(int i)
 {
@@ -333,6 +429,9 @@ _index_remove(int i)
    radio_index[i] = EINA_FALSE;
 }
 
+/**
+ * @brief Clears all reserved icon indices, marking them all as available.
+ */
 static void
 _index_clear()
 {
@@ -341,6 +440,15 @@ _index_clear()
      radio_index[i] = EINA_FALSE;
 }
 
+/**
+ * @brief Creates a new radio button with a unique icon.
+ * @param obj The parent object.
+ * @return A new radio object, or NULL if no more icons are available.
+ *
+ * This function gets an available icon index, creates an icon, and sets it
+ * as the content for a new radio button. The radio button is added to the
+ * radio group associated with the parent object.
+ */
 static Evas_Object *
 _radio_new(Evas_Object *obj)
 {
@@ -373,6 +481,12 @@ _radio_new(Evas_Object *obj)
    return rd;
 }
 
+/**
+ * @brief Callback to pack a new radio button at the start of the box.
+ * @param data The box widget.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _pack_start_btn_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -384,6 +498,12 @@ _pack_start_btn_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EI
    elm_box_pack_start(data, rd);
 }
 
+/**
+ * @brief Callback to pack a new radio button before the selected one.
+ * @param data The box widget.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _pack_before_btn_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -401,6 +521,12 @@ _pack_before_btn_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info E
    elm_box_pack_before(data, rd, selected_rd);
 }
 
+/**
+ * @brief Callback to pack a new radio button after the selected one.
+ * @param data The box widget.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _pack_after_btn_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -418,6 +544,12 @@ _pack_after_btn_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EI
    elm_box_pack_after(data, rd, selected_rd);
 }
 
+/**
+ * @brief Callback to pack a new radio button at the end of the box.
+ * @param data The box widget.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _pack_end_btn_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -429,6 +561,12 @@ _pack_end_btn_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA
    elm_box_pack_end(data, rd);
 }
 
+/**
+ * @brief Callback to unpack the selected radio button from the box.
+ * @param data The box widget.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _unpack_btn_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -447,6 +585,12 @@ _unpack_btn_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_U
    elm_radio_value_set(rdg, -1);
 }
 
+/**
+ * @brief Callback to unpack all radio buttons from the box.
+ * @param data The box widget.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _unpack_all_btn_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -468,6 +612,17 @@ _unpack_all_btn_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EI
    elm_radio_value_set(rdg, -1);
 }
 
+/**
+ * @brief Test function for various box packing operations.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This test creates a window with two main sections. The left section contains
+ * a scrollable box of radio buttons. The right section contains buttons to
+ * add new radio buttons to the left box (at start, end, before/after selected)
+ * and to remove them (unpack selected, unpack all).
+ */
 void
 test_box_pack(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -558,6 +713,14 @@ test_box_pack(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback for the "Homogeneous" checkbox state change.
+ * @param data The box widget.
+ * @param obj The checkbox object.
+ * @param event Not used.
+ *
+ * Toggles the homogeneous property of the box based on the checkbox state.
+ */
 static void
 _cb_check_changed(void *data, Evas_Object *obj, void *event EINA_UNUSED)
 {
@@ -568,6 +731,16 @@ _cb_check_changed(void *data, Evas_Object *obj, void *event EINA_UNUSED)
    elm_box_homogeneous_set(box, homo);
 }
 
+/**
+ * @brief Test function for the homogeneous property of a box.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * Creates a window with a box containing a background image and a checkbox.
+ * Toggling the checkbox changes the box's homogeneous setting, demonstrating
+ * how it affects child object sizing.
+ */
 void
 test_box_homo(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -604,13 +777,25 @@ test_box_homo(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_
    evas_object_show(win);
 }
 
+/**
+ * @brief Structure to hold data for the box layout transition test.
+ */
 typedef struct
 {
-   Eina_List *transitions;
-   Evas_Object *box;
-   Evas_Object_Box_Layout last_layout;
+   Eina_List *transitions; /**< A list of Evas_Object_Box_Layout to cycle through. */
+   Evas_Object *box; /**< The box widget being transitioned. */
+   Evas_Object_Box_Layout last_layout; /**< The previous layout used in the transition. */
 } Transitions_Data;
 
+/**
+ * @brief Initiates the next layout transition for the box.
+ * @param data The Transitions_Data struct.
+ *
+ * This function is called to start a transition and also as a callback when
+ * a transition completes. It takes the next layout from the transitions list,
+ * creates a new transition animation, and sets it on the box. It then moves
+ * the used layout to the end of the list to create a continuous cycle.
+ */
 static void
 _test_box_transition_change(void *data)
 {
@@ -629,6 +814,12 @@ _test_box_transition_change(void *data)
    tdata->transitions = eina_list_demote_list(tdata->transitions, tdata->transitions);
 }
 
+/**
+ * @brief Callback for window deletion in the transition test.
+ * @param data The Transitions_Data struct to be freed.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _win_del(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -637,6 +828,16 @@ _win_del(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    free(tdata);
 }
 
+/**
+ * @brief Test function for box layout transitions.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This test creates a window with a box containing several buttons. It then
+ * continuously cycles through different box layouts (e.g., horizontal, vertical,
+ * stack) using animated transitions.
+ */
 void
 test_box_transition(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -704,15 +905,25 @@ test_box_transition(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *
    evas_object_show(win);
 }
 
+/**
+ * @brief Structure to hold data for the box alignment test.
+ */
 typedef struct _Box_Align_Data Box_Align_Data;
 struct _Box_Align_Data
 {
-   Evas_Object *hor_box; // target box horizontal
-   Evas_Object *vert_box; // target box vertical
-   double hor; // horizontal slider
-   double vert; // vertical slider
+   Evas_Object *hor_box; /**< The horizontal box being tested. */
+   Evas_Object *vert_box; /**< The vertical box being tested. */
+   double hor; /**< Current horizontal alignment value (from slider). */
+   double vert; /**< Current vertical alignment value (from slider). */
 };
 
+/**
+ * @brief Callback for window deletion in the alignment test.
+ * @param data The Box_Align_Data struct to be freed.
+ * @param e Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _box_align_win_del_cb(void *data, Evas *e EINA_UNUSED,
                       Evas_Object *obj EINA_UNUSED,
@@ -721,6 +932,15 @@ _box_align_win_del_cb(void *data, Evas *e EINA_UNUSED,
    free(data);
 }
 
+/**
+ * @brief Callback for the horizontal alignment slider change.
+ * @param data The Box_Align_Data struct.
+ * @param obj The slider object.
+ * @param event_info Not used.
+ *
+ * Updates the horizontal alignment for both the horizontal and vertical
+ * test boxes based on the slider's new value.
+ */
 static void
 _hor_slider_changed_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -732,6 +952,15 @@ _hor_slider_changed_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSE
    elm_box_align_set(bdata->vert_box, bdata->hor, bdata->vert);
 }
 
+/**
+ * @brief Callback for the vertical alignment slider change.
+ * @param data The Box_Align_Data struct.
+ * @param obj The slider object.
+ * @param event_info Not used.
+ *
+ * Updates the vertical alignment for both the horizontal and vertical
+ * test boxes based on the slider's new value.
+ */
 static void
 _vert_slider_changed_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -743,6 +972,14 @@ _vert_slider_changed_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUS
    elm_box_align_set(bdata->vert_box, bdata->hor, bdata->vert);
 }
 
+/**
+ * @brief Adds the description and control widgets to the alignment test window.
+ * @param bx_out The main box of the window.
+ * @param bdata The data structure for the alignment test.
+ *
+ * This function creates a frame with a description of the test and two
+ * sliders to control the horizontal and vertical alignment of the test boxes.
+ */
 void
 _description_add(Evas_Object *bx_out, Box_Align_Data *bdata)
 {
@@ -805,6 +1042,15 @@ _description_add(Evas_Object *bx_out, Box_Align_Data *bdata)
    evas_object_smart_callback_add(sl, "changed", _vert_slider_changed_cb, bdata);
 }
 
+/**
+ * @brief Adds the test boxes to the alignment test window.
+ * @param bx_out The main box of the window.
+ * @param bdata The data structure for the alignment test.
+ *
+ * This function creates a vertical box and a horizontal box, each with
+ * a couple of buttons inside. These are the boxes that will have their
+ * alignment properties manipulated by the sliders.
+ */
 void
 _align_box_add(Evas_Object *bx_out, Box_Align_Data *bdata)
 {
@@ -862,6 +1108,16 @@ _align_box_add(Evas_Object *bx_out, Box_Align_Data *bdata)
    evas_object_show(bt);
 }
 
+/**
+ * @brief Test function for box alignment.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This test demonstrates how elm_box_align_set() works. It creates a window
+ * with both a vertical and a horizontal box. Sliders are provided to
+ * dynamically change the alignment of the content within these boxes.
+ */
 void
 test_box_align(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                void *event_info EINA_UNUSED)

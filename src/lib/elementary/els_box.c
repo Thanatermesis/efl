@@ -7,7 +7,30 @@
 #include "elm_priv.h"
 #include "els_box.h"
 
-/* calculate an object's aspected size */
+/**
+ * @internal
+ * @brief Calculates an object's size considering its aspect ratio hints.
+ *
+ * This function determines the output width (ow) and height (oh) of an object
+ * based on its minimum/maximum size hints, fill policies, available container
+ * space (ww, hh), and aspect ratio settings.
+ *
+ * @param[out] ow Pointer to store the calculated object width.
+ * @param[out] oh Pointer to store the calculated object height.
+ * @param minw Minimum width hint of the object.
+ * @param minh Minimum height hint of the object.
+ * @param maxw Maximum width hint of the object (-1 for no limit).
+ * @param maxh Maximum height hint of the object (-1 for no limit).
+ * @param fw Fill width flag (1 if object should fill available width, 0 otherwise).
+ * @param fh Fill height flag (1 if object should fill available height, 0 otherwise).
+ * @param ww Maximum available width in the container for this object.
+ * @param hh Maximum available height in the container for this object.
+ * @param aspect The aspect control type (e.g., EVAS_ASPECT_CONTROL_HORIZONTAL).
+ * @param ratio The aspect ratio (width / height).
+ * @return EINA_TRUE if the aspect calculation was successful and respected min/max,
+ *         EINA_FALSE otherwise (e.g., aspect calculation violated min/max, or
+ *         aspect was EVAS_ASPECT_CONTROL_NONE).
+ */
 static Eina_Bool
 _box_object_aspect_calc(int *ow, int *oh, int minw, int minh, int maxw, int maxh,
                         int fw /* fill width */, int fh /* fill height */,
@@ -72,7 +95,21 @@ _box_object_aspect_calc(int *ow, int *oh, int minw, int minh, int maxw, int maxh
    return EINA_FALSE;
 }
 
-/* add box w/h padding to min/max totals */
+/**
+ * @internal
+ * @brief Adjusts minimum and maximum extents to include inter-child padding.
+ *
+ * This function adds the horizontal or vertical padding (priv->pad.h or priv->pad.v)
+ * between child objects to the total minimum and maximum width/height of the box.
+ * It also ensures that max extents are not smaller than min extents.
+ *
+ * @param priv The private data of the box object, containing padding info.
+ * @param[in,out] minw Pointer to the current minimum width, updated by this function.
+ * @param[in,out] minh Pointer to the current minimum height, updated by this function.
+ * @param[in,out] maxw Pointer to the current maximum width, updated by this function.
+ * @param[in,out] maxh Pointer to the current maximum height, updated by this function.
+ * @param horizontal EINA_TRUE if the layout is horizontal, EINA_FALSE for vertical.
+ */
 static void
 _smart_extents_padding_calc(Evas_Object_Box_Data *priv, int *minw, int *minh, int *maxw, int *maxh, Eina_Bool horizontal)
 {
@@ -96,8 +133,28 @@ _smart_extents_padding_calc(Evas_Object_Box_Data *priv, int *minw, int *minh, in
      }
 }
 
-/* calculate extents for non-homogeneous layout;
- * called twice if aspected items exist
+/**
+ * @internal
+ * @brief Calculates extents for a non-homogeneous box layout.
+ *
+ * This function iterates through child objects to determine the overall minimum
+ * and maximum width/height required by the box. It handles aspect ratio
+ * calculations if `do_aspect` is true. For aspected items, it might be called
+ * twice: once to get a preliminary min size without aspect, and a second time
+ * to refine sizes with aspect calculations using the preliminary overall min size.
+ *
+ * @param priv The private data of the box object.
+ * @param w The available width for the box.
+ * @param h The available height for the box.
+ * @param[out] minw Pointer to store the calculated minimum width of the box.
+ * @param[out] minh Pointer to store the calculated minimum height of the box.
+ * @param[out] maxw Pointer to store the calculated maximum width of the box.
+ * @param[out] maxh Pointer to store the calculated maximum height of the box.
+ * @param expand The total weight sum of expandable children in the layout direction.
+ * @param horizontal EINA_TRUE if the layout is horizontal, EINA_FALSE for vertical.
+ * @param do_aspect EINA_TRUE to perform aspect ratio calculations for children,
+ *        EINA_FALSE to skip them (used for the first pass).
+ * @return EINA_TRUE if any child object has an aspect hint, EINA_FALSE otherwise.
  */
 static Eina_Bool
 _smart_extents_non_homogeneous_calc(Evas_Object_Box_Data *priv, int w, int h, int *minw, int *minh, int *maxw, int *maxh, double expand, Eina_Bool horizontal, Eina_Bool do_aspect)
@@ -224,6 +281,26 @@ _smart_extents_non_homogeneous_calc(Evas_Object_Box_Data *priv, int w, int h, in
    return asp;
 }
 
+/**
+ * @internal
+ * @brief Calculates and sets the size hint extents (min/max) for the box object.
+ *
+ * This function determines the overall minimum and maximum width and height
+ * for the box based on its children's size hints, padding, layout orientation
+ * (horizontal/vertical), and homogeneity. It then sets these calculated
+ * extents as size hints on the box object itself.
+ * For non-homogeneous layouts with aspected children, it uses a two-pass
+ * approach via `_smart_extents_non_homogeneous_calc`.
+ *
+ * @param box The box Evas_Object.
+ * @param priv The private data of the box object.
+ * @param w The current width of the box object's geometry. Used for aspect calculations.
+ * @param h The current height of the box object's geometry. Used for aspect calculations.
+ * @param expand The total weight sum of expandable children in the layout direction.
+ * @param horizontal EINA_TRUE if the layout is horizontal, EINA_FALSE for vertical.
+ * @param homogeneous EINA_TRUE if all children should have the same size in the
+ *        layout direction, EINA_FALSE otherwise.
+ */
 static void
 _smart_extents_calculate(Evas_Object *box, Evas_Object_Box_Data *priv, int w, int h, double expand, Eina_Bool horizontal, Eina_Bool homogeneous)
 {
@@ -352,6 +429,23 @@ _smart_extents_calculate(Evas_Object *box, Evas_Object_Box_Data *priv, int w, in
    evas_object_size_hint_max_set(box, maxw, maxh);
 }
 
+/**
+ * @internal
+ * @brief Layout the child objects of a box. (Implementation)
+ *
+ * This function calculates the position and size of each child object within the
+ * box based on the box's properties (horizontal/vertical, homogeneous/non-homogeneous,
+ * right-to-left/left-to-right) and the size hints of the child objects.
+ * It first calculates the necessary extents for the box using `_smart_extents_calculate`,
+ * then iterates through children to position and resize them.
+ *
+ * @param o The box Evas_Object.
+ * @param priv The private data of the box object.
+ * @param horizontal EINA_TRUE if the layout is horizontal, EINA_FALSE for vertical.
+ * @param homogeneous EINA_TRUE if all children should have the same size in the
+ *        layout direction, EINA_FALSE otherwise.
+ * @param rtl EINA_TRUE if right-to-left layout is enabled, EINA_FALSE otherwise.
+ */
 void
 _els_box_layout(Evas_Object *o, Evas_Object_Box_Data *priv, Eina_Bool horizontal, Eina_Bool homogeneous, Eina_Bool rtl)
 {

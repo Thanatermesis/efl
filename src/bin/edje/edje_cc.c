@@ -17,46 +17,115 @@
 #endif
 
 #include "edje_cc.h"
+
+/**
+ * @brief Log domain for edje_cc.
+ * This is used to filter and categorize log messages specifically for the
+ * Edje compiler. It is registered during initialization.
+ */
 int _edje_cc_log_dom = -1;
+
+/**
+ * @brief Prints the command-line help message to stdout.
+ * This function displays usage instructions, available options, and basic
+ * information about how to run the Edje compiler.
+ */
 static void main_help(void);
 
+/**
+ * @brief Global Eina_Prefix object.
+ * Used for locating data files (themes, fonts, etc.) relative to the
+ * application's installation directory or development environment.
+ * Initialized in main() using eina_prefix_new().
+ */
 Eina_Prefix *pfx = NULL;
+/** @brief List of directories to search for sound files. Paths are `char *`. */
 Eina_List *snd_dirs = NULL;
+/** @brief List of directories to search for localization (.mo) files. Paths are `char *`. */
 Eina_List *mo_dirs = NULL;
+/** @brief List of directories to search for vibration pattern files. Paths are `char *`. */
 Eina_List *vibration_dirs = NULL;
+/** @brief List of directories to search for image files. Paths are `char *`. Default includes ".". */
 Eina_List *img_dirs = NULL;
+/** @brief List of directories to search for font files. Paths are `char *`. */
 Eina_List *fnt_dirs = NULL;
+/** @brief List of directories to search for generic data files. Paths are `char *`. */
 Eina_List *data_dirs = NULL;
+/** @brief List of preprocessor defines (`char *` like "-DNAME=VALUE"). Default includes "-DEDJE_VERSION_12=12". */
 Eina_List *defines = NULL;
+/** @brief Path to the input EDC file. Set from command-line arguments. */
 char *file_in = NULL;
+/** @brief Directory for temporary files. Defaults to system temp or can be set by `-td`. */
 char *tmp_dir = NULL;
+/** @brief Path to the output EDJ file. Set from command-line arguments or derived from input file name. */
 char *file_out = NULL;
+/** @brief Path to the file for dumping source file paths (for watching changes). Set by `-w`. */
 char *watchfile = NULL;
+/** @brief Path to the file for dumping GNU make-style dependencies. Set by `-deps`. */
 char *depfile = NULL;
+/** @brief Path to the main authors file. Set by `-a`. */
 char *authors = NULL;
+/** @brief Path to the main license file. Set by `-l`. */
 char *license = NULL;
+/** @brief List of additional license files. Paths are `char *`. Added by multiple `-l` options. */
 Eina_List *licenses = NULL;
+/**
+ * @brief Array of strings, listing required modules/features for the EDJ.
+ * Example: `eina_array_push(requires, eina_stringshare_add("efl_version=1.20"));`
+ * Initialized in main().
+ */
 Eina_Array *requires;
 
+/** @brief The name of the executable, extracted from argv[0]. Used in help messages and logging. */
 static const char *progname = NULL;
 
+/** @brief Flag: Disallow lossy image compression. Set by `-no-lossy`. */
 int no_lossy = 0;
+/** @brief Flag: Disallow lossless image compression (store uncompressed). Set by `-no-comp`. */
 int no_comp = 0;
+/** @brief Flag: Disallow raw (uncompressed, unoptimized) image storage. Set by `-no-raw`. */
 int no_raw = 0;
+/** @brief Flag: Do not save EDC source files into the EDJ. Set by `-no-save`. */
 int no_save = 0;
+/** @brief Minimum quality for lossy image compression (0-100). Set by `-min-quality`. */
 int min_quality = 0;
+/** @brief Maximum quality for lossy image compression (0-100). Set by `-max-quality`. */
 int max_quality = 100;
+/** @brief EET compression mode for the output EDJ file. See EET_Compression_Type. Set by `-fastcomp` or `-fastdecomp`. Defaults to EET_COMPRESSION_HI. */
 int compress_mode = EET_COMPRESSION_HI;
+/** @brief Number of threads to use for compilation. 0 for main loop only, 1 for multi-threaded (default). Set by `-threads` or `-nothreads`. */
 int threads = 0;
+/** @brief Flag: Annotate dumped source files (used with -w). Set by `-annotate`. */
 int annotate = 0;
+/** @brief Flag: Disallow ETC1 compression for images. Set by `-no-etc1`. */
 int no_etc1 = 0;
+/** @brief Flag: Disallow ETC2 compression for images. Set by `-no-etc2`. */
 int no_etc2 = 0;
+/** @brief Flag: Enable beta features or behavior. Set by `-beta`. */
 int beta = 0;
+/** @brief Flag: Suppress warnings for unused images. Set by `-no-warn-unused-images`. */
 int no_warn_unused_images = 0;
+/** @brief Flag: Enable namespace verification for parts and signals. Set by `-N`. */
 Eina_Bool namespace_verify;
 
+/** @brief System limit for maximum number of open files. Queried using getrlimit. */
 unsigned int max_open_files;
 
+/**
+ * @brief Custom log callback function for edje_cc.
+ * This function formats log messages from the "edje_cc" domain to include
+ * the program name and a prefix indicating the log level (Error, Warning, etc.).
+ * Other log domains fall back to the default eina_log_print_cb_stderr.
+ *
+ * @param d The log domain.
+ * @param level The log level.
+ * @param file The source file where the log was issued.
+ * @param fnc The function where the log was issued.
+ * @param fline The line number where the log was issued.
+ * @param fmt The format string for the log message.
+ * @param data User data (unused here).
+ * @param args Variable arguments for the format string.
+ */
 static void
 _edje_cc_log_cb(const Eina_Log_Domain *d,
                 Eina_Log_Level level,
@@ -140,6 +209,16 @@ main_help(void)
      , progname);
 }
 
+/**
+ * @brief Main entry point for the Edje compiler.
+ *
+ * Parses command-line arguments, initializes necessary subsystems (Eina, Ecore, Edje),
+ * sets up logging, processes the input EDC file, and generates the output EDJ file.
+ *
+ * @param argc Number of command-line arguments.
+ * @param argv Array of command-line argument strings.
+ * @return 0 on success, non-zero on failure.
+ */
 int
 main(int argc, char **argv)
 {

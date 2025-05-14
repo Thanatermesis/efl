@@ -28,18 +28,34 @@ static Evas_Func func, pfunc;
 static Eina_Bool _initted = EINA_FALSE;
 static int _gl_wins = 0;
 
+/**
+ * @brief EVGL_Interface function: Get the native display.
+ * @param data Engine specific data (unused).
+ * @return Native display handle or NULL if not implemented.
+ */
 static void *
 evgl_eng_display_get(void *data EINA_UNUSED)
 {
    GL_COCOA_UNIMPLEMENTED_CALL_SO_RETURN(NULL);
 }
 
+/**
+ * @brief EVGL_Interface function: Create a native window.
+ * @param data Engine specific data (unused).
+ * @return Native window handle or NULL if not implemented.
+ */
 static void *
 evgl_eng_native_window_create(void *data EINA_UNUSED)
 {
    GL_COCOA_UNIMPLEMENTED_CALL_SO_RETURN(NULL);
 }
 
+/**
+ * @brief EVGL_Interface function: Destroy a native window.
+ * @param data Engine specific data (unused).
+ * @param native_window The native window to destroy.
+ * @return 0 on success, 1 on failure (or if not implemented).
+ */
 static int
 evgl_eng_native_window_destroy(void *data          EINA_UNUSED,
                                void *native_window EINA_UNUSED)
@@ -47,6 +63,12 @@ evgl_eng_native_window_destroy(void *data          EINA_UNUSED,
    GL_COCOA_UNIMPLEMENTED_CALL_SO_RETURN(1);
 }
 
+/**
+ * @brief EVGL_Interface function: Create a window surface.
+ * @param data Engine specific data (unused).
+ * @param native_window The native window for which to create the surface.
+ * @return Surface handle or NULL if not implemented.
+ */
 static void *
 evgl_eng_window_surface_create(void *data          EINA_UNUSED,
                                void *native_window EINA_UNUSED)
@@ -54,6 +76,12 @@ evgl_eng_window_surface_create(void *data          EINA_UNUSED,
    GL_COCOA_UNIMPLEMENTED_CALL_SO_RETURN(NULL);
 }
 
+/**
+ * @brief EVGL_Interface function: Destroy a window surface.
+ * @param data Engine specific data (unused).
+ * @param surface The surface to destroy.
+ * @return 0 on success, 1 on failure (or if not implemented).
+ */
 static int
 evgl_eng_window_surface_destroy(void *data EINA_UNUSED,
                                 void *surface EINA_UNUSED)
@@ -61,6 +89,13 @@ evgl_eng_window_surface_destroy(void *data EINA_UNUSED,
    GL_COCOA_UNIMPLEMENTED_CALL_SO_RETURN(1);
 }
 
+/**
+ * @brief EVGL_Interface function: Create a GL context.
+ * @param data Engine specific data (unused).
+ * @param share_ctx A context to share resources with (optional).
+ * @param version The desired GLES version.
+ * @return Context handle or NULL if not implemented.
+ */
 static void *
 evgl_eng_context_create(void                    *data      EINA_UNUSED,
                         void                    *share_ctx EINA_UNUSED,
@@ -69,6 +104,12 @@ evgl_eng_context_create(void                    *data      EINA_UNUSED,
    GL_COCOA_UNIMPLEMENTED_CALL_SO_RETURN(NULL);
 }
 
+/**
+ * @brief EVGL_Interface function: Destroy a GL context.
+ * @param data Engine specific data (unused).
+ * @param context The context to destroy.
+ * @return 0 on success, 1 on failure (or if not implemented).
+ */
 static int
 evgl_eng_context_destroy(void *data    EINA_UNUSED,
                          void *context EINA_UNUSED)
@@ -76,6 +117,14 @@ evgl_eng_context_destroy(void *data    EINA_UNUSED,
    GL_COCOA_UNIMPLEMENTED_CALL_SO_RETURN(1);
 }
 
+/**
+ * @brief EVGL_Interface function: Make a context current with a surface.
+ * @param data Engine specific data (unused).
+ * @param surface The surface to bind the context to.
+ * @param context The context to make current.
+ * @param flush If EINA_TRUE, flush pending operations.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (or if not implemented).
+ */
 static int
 evgl_eng_make_current(void *data    EINA_UNUSED,
                       void *surface EINA_UNUSED,
@@ -85,24 +134,45 @@ evgl_eng_make_current(void *data    EINA_UNUSED,
    GL_COCOA_UNIMPLEMENTED_CALL_SO_RETURN(EINA_FALSE);
 }
 
+/**
+ * @brief EVGL_Interface function: Get the address of an OpenGL extension function.
+ * @param name The name of the function.
+ * @return Function pointer or NULL if not found/implemented.
+ */
 static void *
 evgl_eng_proc_address_get(const char *name EINA_UNUSED)
 {
    GL_COCOA_UNIMPLEMENTED_CALL_SO_RETURN(NULL);
 }
 
+/**
+ * @brief EVGL_Interface function: Get GL-related strings (e.g., GL_VERSION).
+ * @param data Engine specific data (unused).
+ * @return String or NULL if not implemented.
+ */
 static const char *
 evgl_eng_string_get(void *data EINA_UNUSED)
 {
    GL_COCOA_UNIMPLEMENTED_CALL_SO_RETURN(NULL);
 }
 
+/**
+ * @brief EVGL_Interface function: Get the current rotation angle of the display.
+ * @param data Engine specific data (unused).
+ * @return Rotation angle in degrees (0, 90, 180, 270) or 0 if not implemented.
+ */
 static int
 evgl_eng_rotation_angle_get(void *data EINA_UNUSED)
 {
    GL_COCOA_UNIMPLEMENTED_CALL_SO_RETURN(0);
 }
 
+/**
+ * @brief EVGL interface function table for the Cocoa GL engine.
+ *
+ * This structure provides function pointers for Evas GL to interact with the
+ * native Cocoa GL backend. Many functions are currently unimplemented stubs.
+ */
 static const EVGL_Interface evgl_funcs =
 {
    evgl_eng_display_get,
@@ -125,6 +195,19 @@ static const EVGL_Interface evgl_funcs =
    NULL, // native_win_surface_config_get
 };
 
+/**
+ * @brief Sets up the output for the Evas GL Cocoa engine.
+ *
+ * This function initializes the rendering engine, creates an output buffer (Outbuf),
+ * and sets up the generic GL rendering components. It's called when a new
+ * Evas canvas using this engine is created.
+ *
+ * @param engine The Evas generic engine data.
+ * @param in Pointer to Evas_Engine_Info_GL_Cocoa containing setup information.
+ * @param w Initial width of the output.
+ * @param h Initial height of the output.
+ * @return A pointer to the Render_Engine structure on success, NULL on failure.
+ */
 static void *
 eng_output_setup(void *engine, void *in, unsigned int w, unsigned int h)
 {
@@ -193,6 +276,19 @@ err:
    return NULL;
 }
 
+/**
+ * @brief Updates the output configuration.
+ *
+ * This function is intended to handle updates to an existing output,
+ * such as resizing. Currently, it is not implemented.
+ *
+ * @param engine The Evas generic engine data (unused).
+ * @param data The Render_Engine data (unused).
+ * @param info Pointer to Evas_Engine_Info_GL_Cocoa (unused).
+ * @param w New width (unused).
+ * @param h New height (unused).
+ * @return 0, as it's not implemented.
+ */
 static int
 eng_output_update(void *engine EINA_UNUSED,
                   void         *data EINA_UNUSED,
@@ -207,6 +303,16 @@ eng_output_update(void *engine EINA_UNUSED,
    return 0;
 }
 
+/**
+ * @brief Frees the output resources for the Evas GL Cocoa engine.
+ *
+ * This function cleans up the Render_Engine, including the output buffer
+ * and associated GL resources. It's called when an Evas canvas using this
+ * engine is destroyed.
+ *
+ * @param engine The Evas generic engine data (unused).
+ * @param data Pointer to the Render_Engine structure to free.
+ */
 static void
 eng_output_free(void *engine EINA_UNUSED, void *data)
 {
@@ -223,12 +329,30 @@ eng_output_free(void *engine EINA_UNUSED, void *data)
      }
 }
 
+/**
+ * @brief Gets the alpha channel state of the canvas.
+ *
+ * This function indicates whether the canvas (and thus the window)
+ * supports an alpha channel (transparency). For GL Cocoa, it's assumed
+ * to be true.
+ *
+ * @param data The Render_Engine data (unused).
+ * @return EINA_TRUE, indicating alpha channel is supported.
+ */
 static Eina_Bool
 eng_canvas_alpha_get(void *data EINA_UNUSED)
 {
    return EINA_TRUE;
 }
 
+/**
+ * @brief Loads symbols from the GL generic engine.
+ *
+ * This function uses dlsym to dynamically load function pointers from
+ * the Evas GL generic rendering module. This allows the Cocoa-specific
+ * engine to call common GL rendering functions. It ensures symbols are
+ * loaded only once.
+ */
 static void
 _gl_symbols(void)
 {
@@ -258,7 +382,17 @@ _gl_symbols(void)
    done = EINA_TRUE;
 }
 
-
+/**
+ * @brief Opens the Evas GL Cocoa engine module.
+ *
+ * This function is called when the Evas module system loads this engine.
+ * It inherits function pointers from the "gl_generic" engine, registers
+ * a log domain, overrides specific engine functions with Cocoa-specific
+ * implementations, and loads necessary GL symbols.
+ *
+ * @param em Pointer to the Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -295,6 +429,14 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Closes the Evas GL Cocoa engine module.
+ *
+ * This function is called when the Evas module system unloads this engine.
+ * It unregisters the log domain used by the engine.
+ *
+ * @param em Pointer to the Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

@@ -9,7 +9,25 @@
 #include "evas_common_private.h"
 #include "evas_private.h"
 
-
+/**
+ * @brief Saves an RGBA_Image to an AVIF file.
+ *
+ * This function encodes the provided RGBA image data into the AVIF format
+ * and writes it to the specified file path. It handles the conversion
+ * from RGBA to YUV, configures the AVIF encoder based on the quality
+ * setting, and manages the file writing process.
+ *
+ * @param im Pointer to the RGBA_Image structure containing the image data.
+ *           The image data is expected in `im->image.data`.
+ *           The image dimensions are `im->cache_entry.w` and `im->cache_entry.h`.
+ * @param file The path to the output AVIF file.
+ * @param quality The desired quality level for the AVIF encoding (0-100).
+ *                Lower values mean higher compression and lower quality.
+ *                - < 60: Uses YUV420, BT.601 color space.
+ *                - >= 60 and < 90: Uses YUV422, BT.709 color space.
+ *                - >= 90: Uses YUV444, BT.709 color space.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 save_image_avif(RGBA_Image *im, const char *file, int quality)
 {
@@ -140,6 +158,20 @@ save_image_avif(RGBA_Image *im, const char *file, int quality)
    return ret;
 }
 
+/**
+ * @brief Evas image saver function for AVIF format.
+ *
+ * This function serves as the entry point for the Evas image saving mechanism
+ * for the AVIF format. It wraps the internal save_image_avif function.
+ *
+ * @param im Pointer to the RGBA_Image structure.
+ * @param file The output file path.
+ * @param key Unused parameter.
+ * @param quality The quality setting (0-100).
+ * @param compress Unused parameter.
+ * @param encoding Unused parameter.
+ * @return 1 on success, 0 on failure.
+ */
 static int evas_image_save_file_avif(RGBA_Image *im, const char *file, const char *key EINA_UNUSED,
                                      int quality, int compress EINA_UNUSED, const char *encoding EINA_UNUSED)
 {

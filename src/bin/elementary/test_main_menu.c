@@ -2,6 +2,17 @@
 # include "elementary_config.h"
 #endif
 #include <Elementary.h>
+/**
+ * @brief Callback function for the "click me" menu item.
+ *
+ * This function is called when the "click me" menu item is selected.
+ * It toggles the disabled state of another menu item, which is passed
+ * as the @p data parameter.
+ *
+ * @param data The menu item to be enabled/disabled.
+ * @param obj The Evas_Object that triggered the event (unused).
+ * @param event_info The event-specific information (unused).
+ */
 static void
 _click_me(void *data, Evas_Object *obj EINA_UNUSED,
           void *event_info EINA_UNUSED)
@@ -12,6 +23,33 @@ _click_me(void *data, Evas_Object *obj EINA_UNUSED,
    elm_object_item_disabled_set(it, !disabled);
 }
 
+/**
+ * @brief Creates a test window to demonstrate the main menu functionality.
+ *
+ * This function sets up a window with a main menu containing various
+ * items, submenus, separators, and items with callbacks. It also
+ * demonstrates how to check for an environment variable
+ * (`ELM_DISABLE_EXTERNAL_MENU`) to conditionally use a local menu
+ * instead of a desktop-environment-provided one.
+ *
+ * The menu structure created is as follows:
+ * - first item
+ *   - elementary
+ *   - submenu
+ *     - first item
+ *     - second item (with icon)
+ * - second item
+ *   - disabled item
+ *   - --- (separator)
+ *   - click me :-) (triggers _click_me callback)
+ *   - third item (with icon)
+ *   - sub menu
+ *     - first item
+ *
+ * @param data Custom data pointer (unused).
+ * @param obj The Evas_Object that triggered the event (unused).
+ * @param event_info The event-specific information (unused).
+ */
 void
 test_main_menu(void *data EINA_UNUSED,
                Evas_Object *obj EINA_UNUSED,

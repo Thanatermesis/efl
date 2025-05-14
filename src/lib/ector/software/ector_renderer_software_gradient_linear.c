@@ -10,6 +10,19 @@
 #include "ector_software_private.h"
 #include "ector_software_gradient.h"
 
+/**
+ * @internal
+ * @brief Prepares the linear gradient renderer.
+ *
+ * This function initializes the gradient parameters, such as start and end points,
+ * calculates the gradient vector (dx, dy), its length (l), and the offset (off).
+ * It also ensures the color table is updated if necessary.
+ *
+ * @param obj The Ector_Renderer object.
+ * @param pd The private data of the software gradient renderer.
+ * @return EINA_FALSE always, as this function doesn't indicate success/failure of an operation
+ *         in the traditional sense but rather prepares the renderer.
+ */
 static Eina_Bool
 _ector_renderer_software_gradient_linear_ector_renderer_prepare(Eo *obj,
                                                                 Ector_Renderer_Software_Gradient_Data *pd)
@@ -44,6 +57,22 @@ _ector_renderer_software_gradient_linear_ector_renderer_prepare(Eo *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Draws using the linear gradient renderer.
+ *
+ * This function is currently a stub and returns EINA_TRUE, indicating
+ * that the operation is handled, though no actual drawing operations are
+ * performed here directly. The actual drawing is typically handled by
+ * rasterizer operations.
+ *
+ * @param obj The Ector_Renderer object (unused).
+ * @param pd The private data of the software gradient renderer (unused).
+ * @param op The rendering operation (unused).
+ * @param clips An array of clipping regions (unused).
+ * @param mul_col The multiplication color (unused).
+ * @return EINA_TRUE always.
+ */
 static Eina_Bool
 _ector_renderer_software_gradient_linear_ector_renderer_draw(Eo *obj EINA_UNUSED,
                                                              Ector_Renderer_Software_Gradient_Data *pd EINA_UNUSED,
@@ -53,6 +82,17 @@ _ector_renderer_software_gradient_linear_ector_renderer_draw(Eo *obj EINA_UNUSED
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Performs a fill operation using the linear gradient.
+ *
+ * This function sets the linear gradient parameters in the software rasterizer
+ * and ensures the gradient color table is up-to-date.
+ *
+ * @param obj The Ector_Renderer object (unused).
+ * @param pd The private data of the software gradient renderer.
+ * @return EINA_TRUE if the operation was successful.
+ */
 static Eina_Bool
 _ector_renderer_software_gradient_linear_ector_renderer_software_op_fill(Eo *obj EINA_UNUSED,
                                                                          Ector_Renderer_Software_Gradient_Data *pd)
@@ -63,6 +103,17 @@ _ector_renderer_software_gradient_linear_ector_renderer_software_op_fill(Eo *obj
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Constructor for the linear gradient software renderer.
+ *
+ * Initializes the renderer object by calling the superclass constructor and
+ * setting up references to gradient data (generic and linear specific).
+ *
+ * @param obj The Eo object to construct.
+ * @param pd The private data for the software gradient renderer.
+ * @return The constructed Eo object, or NULL on failure.
+ */
 static Eo *
 _ector_renderer_software_gradient_linear_efl_object_constructor(Eo *obj,
                                                                 Ector_Renderer_Software_Gradient_Data *pd)
@@ -77,6 +128,16 @@ _ector_renderer_software_gradient_linear_efl_object_constructor(Eo *obj,
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Destructor for the linear gradient software renderer.
+ *
+ * Cleans up resources used by the renderer, including the color table
+ * and references to surface and gradient data.
+ *
+ * @param obj The Eo object being destructed.
+ * @param pd The private data of the software gradient renderer.
+ */
 static void
 _ector_renderer_software_gradient_linear_efl_object_destructor(Eo *obj,
                                                             Ector_Renderer_Software_Gradient_Data *pd)
@@ -94,6 +155,23 @@ _ector_renderer_software_gradient_linear_efl_object_destructor(Eo *obj,
    efl_destructor(efl_super(obj, ECTOR_RENDERER_SOFTWARE_GRADIENT_LINEAR_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Sets the gradient stops for the linear gradient.
+ *
+ * This function forwards the call to the superclass to set the gradient stops.
+ * The color table status is implicitly affected and will be updated when needed.
+ *
+ * @param obj The Ector_Renderer object.
+ * @param pd The private data of the software gradient renderer (unused here, but part of the function signature).
+ * @param colors An array of Efl_Gfx_Gradient_Stop structures.
+ *               Example:
+ *               Efl_Gfx_Gradient_Stop stops[] = {
+ *                 { { 255, 0, 0, 255 }, 0.0 }, // Red at the start
+ *                 { { 0, 0, 255, 255 }, 1.0 }  // Blue at the end
+ *               };
+ * @param length The number of Efl_Gfx_Gradient_Stop elements in the colors array.
+ */
 void
 _ector_renderer_software_gradient_linear_efl_gfx_gradient_stop_set(Eo *obj, Ector_Renderer_Software_Gradient_Data *pd EINA_UNUSED,
                                                                    const Efl_Gfx_Gradient_Stop *colors, unsigned int length)
@@ -101,6 +179,18 @@ _ector_renderer_software_gradient_linear_efl_gfx_gradient_stop_set(Eo *obj, Ecto
    efl_gfx_gradient_stop_set(efl_super(obj, ECTOR_RENDERER_SOFTWARE_GRADIENT_LINEAR_CLASS), colors, length);
 }
 
+/**
+ * @internal
+ * @brief Calculates a CRC checksum for the current state of the linear gradient renderer.
+ *
+ * This CRC is used to detect changes in the renderer's configuration,
+ * which might necessitate re-caching or re-rendering. It includes the
+ * spread method, color stops, and linear gradient specific data.
+ *
+ * @param obj The Ector_Renderer object.
+ * @param pd The private data of the software gradient renderer.
+ * @return The calculated CRC value.
+ */
 static unsigned int
 _ector_renderer_software_gradient_linear_ector_renderer_crc_get(const Eo *obj, Ector_Renderer_Software_Gradient_Data *pd)
 {

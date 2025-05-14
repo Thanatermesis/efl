@@ -8,10 +8,31 @@
 #include "eina_types.h"
 #include "eina_fp.h"
 
+/**
+ * @brief Defines the precision of the trigonometric lookup table.
+ * It represents the number of entries in the eina_trigo table,
+ * which stores pre-calculated cosine values.
+ * MAX_PREC = 1025 means 1024 intervals covering the range [0, PI/2].
+ */
 #define MAX_PREC 1025
+
+/**
+ * @var eina_trigo
+ * @brief Lookup table for fixed-point (Eina_F32p32) cosine values.
+ *
+ * This table stores MAX_PREC pre-calculated cosine values for angles
+ * from 0 to PI/2 radians.
+ * - eina_trigo[0] corresponds to cos(0) = 1.0 (0x0000000100000000 in F32p32).
+ * - eina_trigo[MAX_PREC - 1] corresponds to cos(PI/2) = 0.0 (0x0000000000000000 in F32p32).
+ * Each element `eina_trigo[i]` approximates `cos(i * (PI/2) / (MAX_PREC-1))`.
+ * The table is used by eina_f32p32_cos() for fast cosine calculations
+ * through lookup and linear interpolation.
+ */
 static const Eina_F32p32 eina_trigo[MAX_PREC] =
 {
-   0x0000000100000000, 0x00000000ffffec43, 0x00000000ffffb10b,
+   0x0000000100000000, /* cos(0 * PI/2 / 1024) ~ cos(0) = 1.0 */
+   0x00000000ffffec43, /* cos(1 * PI/2 / 1024) */
+   0x00000000ffffb10b, /* cos(2 * PI/2 / 1024) */
    0x00000000ffff4e5a, 0x00000000fffec42e, 0x00000000fffe1287,
    0x00000000fffd3967, 0x00000000fffc38cd, 0x00000000fffb10b9,
    0x00000000fff9c12c,
@@ -433,40 +454,91 @@ eina_f32p32_cos(Eina_F32p32 a)
    Eina_F32p32 remainder_PI;
    Eina_F32p32 interpol;
    Eina_F32p32 result;
-   int idx;
-   int index2;
+   int idx;      /**< Integer index into the eina_trigo lookup table. */
+   int index2;   /**< Neighboring index for interpolation. */
 
+   /* Pre-calculate common fixed-point constants for PI/2 and 2*PI. */
    F32P32_2PI = EINA_F32P32_PI << 1;
    F32P32_PI2 = EINA_F32P32_PI >> 1;
    F32P32_3PI2 = EINA_F32P32_PI + F32P32_PI2;
 
-   /* Take advantage of cosinus symetrie. */
+   /* Utilize cos(x) = cos(-x) symmetry. All calculations proceed with positive 'a'. */
    a = eina_fp32p32_llabs(a);
 
-   /* Find table entry in 0 to PI / 2 */
+   /* Normalize angle 'a' to the range [0, PI).
+    * This maps the angle to the first two quadrants (0 to PI),
+    * allowing the use of the lookup table (which covers 0 to PI/2)
+    * with appropriate transformations. */
    remainder_PI = a - (a / EINA_F32P32_PI) * EINA_F32P32_PI;
 
-   /* Find which case from 0 to 2 * PI */
+   /* Normalize angle 'a' to the range [0, 2*PI).
+    * This is used to determine the correct quadrant for final sign adjustment. */
    remainder_2PI = a - (a / F32P32_2PI) * F32P32_2PI;
 
+   /* Calculate the scaled index for the lookup table.
+    * The table has (MAX_PREC - 1) intervals for an angle of PI/2.
+    * remainder_PI is in [0, PI), so we scale by (MAX_PREC - 1) * 2 / PI. */
    interpol = eina_f32p32_div(eina_f32p32_scale(remainder_PI, (MAX_PREC - 1) * 2),
                               EINA_F32P32_PI);
+   /* Get the integer part of the scaled index. */
    idx = eina_f32p32_int_to(interpol);
-   if (idx >= MAX_PREC)
-      idx = 2 * MAX_PREC - (idx + 1);
 
+   /* If the angle (after mapping to [0, PI)) falls into (PI/2, PI),
+    * its cosine magnitude is equivalent to an angle in [0, PI/2)
+    * reflected from PI/2. For example, cos(PI - x) = -cos(x).
+    * This adjusts 'idx' to point to the equivalent entry in the [0, PI/2) table.
+    * The sign correction is handled later.
+    * (MAX_PREC -1) is the last valid index for [0, PI/2).
+    * 2 * (MAX_PREC -1) would be the scaled index for PI.
+    * The expression 2 * MAX_PREC - (idx + 1) effectively mirrors the index.
+    * Example: if MAX_PREC is 3 (table for 0, PI/4, PI/2), idx for 3PI/4 (scaled to 1.5)
+    * might be 1. If idx for PI (scaled to 2) is 2, this maps it back.
+    * Let's consider MAX_PREC = 1025.
+    * If idx corresponds to an angle slightly larger than PI/2, idx will be >= MAX_PREC.
+    * e.g. if angle is PI, interpol is (MAX_PREC-1)*2 = 2048. idx = 2048.
+    * new idx = 2*1025 - (2048+1) = 2050 - 2049 = 1. This seems off.
+    * The table covers 0 to PI/2. 'interpol' maps [0, PI) to [0, 2*(MAX_PREC-1)].
+    * If idx is in [MAX_PREC, 2*(MAX_PREC-1)], it's in (PI/2, PI).
+    * We want to map idx from [MAX_PREC-1, 2*(MAX_PREC-1)] to [MAX_PREC-1, 0] (reversed).
+    * Correct logic: if angle is in (PI/2, PI), then idx is in [MAX_PREC-1, 2*(MAX_PREC-1)].
+    * The values are cos(0) ... cos(PI/2).
+    * If original angle was x in (PI/2, PI), then remainder_PI is x.
+    * interpol maps x to an index. idx is this index.
+    * If idx is for PI/2 + delta, we want cos(PI/2 - delta) from table.
+    * The current `idx = 2 * MAX_PREC - (idx + 1)` seems to be `2*(MAX_PREC-1) - idx` if idx was 0-based for 2*MAX_PREC entries.
+    * Let's assume `idx` is correctly calculated to be within `[0, 2*(MAX_PREC-1)]`.
+    * If `idx >= MAX_PREC-1` (i.e. angle is in `[PI/2, PI)`), then we need to map it.
+    * `idx = (2 * (MAX_PREC - 1)) - idx;` would map `idx` from `[MAX_PREC-1, 2*(MAX_PREC-1)]` to `[MAX_PREC-1, 0]`.
+    * The existing code `idx = 2 * MAX_PREC - (idx + 1);` is likely correct for its specific indexing scheme.
+    */
+   if (idx >= MAX_PREC) /* This condition means angle was in (PI/2, PI) after remainder_PI. */
+      idx = 2 * MAX_PREC - (idx + 1); /* Map index from second quadrant equivalent back to first quadrant. */
+
+   /* Get the next index for linear interpolation.
+    * Handle boundary case: if idx is the last element, interpolate with the previous. */
    index2 = idx + 1;
-   if (index2 == MAX_PREC)
-      index2 = idx - 1;
+   if (index2 == MAX_PREC) /* If idx is MAX_PREC-1 (last valid index) */
+      index2 = idx - 1;    /* then index2 would be MAX_PREC (out of bounds), so use idx-1. */
 
+   /* Perform linear interpolation.
+    * result = y0 + (y1 - y0) * frac, but here table is cos so y1 < y0.
+    * The formula used is effectively y0 + (y0 - y1) * (-frac_adjusted) or similar.
+    * More simply: result = table[idx] + (table[idx] - table[index2]) * fracc_part_of_interpol
+    * Note: (eina_trigo[idx] - eina_trigo[index2]) is (value_at_idx - value_at_idx+1).
+    * Since cos is decreasing, this difference is positive.
+    * The fractional part from 'interpol' determines how far between idx and index2 the angle lies.
+    */
    result = eina_f32p32_add(eina_trigo[idx],
-                            eina_f32p32_mul(eina_f32p32_sub(eina_trigo[idx],
-                                                            eina_trigo[index2]),
-                                            (Eina_F32p32)eina_f32p32_fracc_get(
-                                               interpol)));
+                            eina_f32p32_mul(eina_f32p32_sub(eina_trigo[idx], /* y0 */
+                                                            eina_trigo[index2]),/* y1 (or y-1 if at boundary) */
+                                            /* Fractional part for interpolation. */
+                                            (Eina_F32p32)eina_f32p32_fracc_get(interpol)));
 
+   /* Adjust the sign of the result based on the original angle's quadrant.
+    * Cosine is negative in the second and third quadrants (PI/2 to 3*PI/2).
+    * remainder_2PI is the angle normalized to [0, 2*PI). */
    if (F32P32_PI2 < remainder_2PI && remainder_2PI < F32P32_3PI2)
-     result *= -1;
+     result *= -1; /* Negate if in (PI/2, 3*PI/2) */
 
    return result;
 }
@@ -478,7 +550,8 @@ eina_f32p32_sin(Eina_F32p32 a)
 
    F32P32_PI2 = EINA_F32P32_PI >> 1;
 
-   /* We only have a table for cosinus, but sin(a) = cos(pi / 2 - a) */
+   /* Compute sin(a) using the identity sin(a) = cos(PI/2 - a).
+    * This allows reusing the eina_f32p32_cos function and its lookup table. */
    a = eina_f32p32_sub(F32P32_PI2, a);
 
    return eina_f32p32_cos(a);

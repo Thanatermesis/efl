@@ -7,6 +7,18 @@
 static const char *code_prefix = NULL;
 static char buffer[4028];
 
+/**
+ * @brief Returns "NULL" or "0" based on the DBus type string.
+ *
+ * This function is used to provide a default null-like value for
+ * C variable initialization based on its corresponding DBus type.
+ * - For strings ('s'), object paths ('o'), variants ('v'), or any
+ *   multi-character type (like "as" for array of strings), it returns "NULL".
+ * - For other single-character basic types, it returns "0".
+ *
+ * @param type A C-string representing the DBus type (e.g., "s", "i", "as").
+ * @return "NULL" or "0" as a C-string.
+ */
 static const char *
 null_or_zero(const char *type)
 {
@@ -15,6 +27,16 @@ null_or_zero(const char *type)
    return "0";
 }
 
+/**
+ * @brief Appends a global prefix to the given text, if the prefix is set.
+ *
+ * Uses a static buffer `buffer` for the new string. This means
+ * subsequent calls will overwrite the previous result.
+ *
+ * @param text The text to append the prefix to.
+ * @return A pointer to the new string in the static buffer if `code_prefix` is set,
+ *         otherwise returns the original `text`.
+ */
 static const char *
 prefix_append(const char *text)
 {
@@ -26,6 +48,19 @@ prefix_append(const char *text)
    return text;
 }
 
+/**
+ * @brief Converts a DBus type string to its corresponding C type string.
+ *
+ * This version allows specifying whether the C type should be `const`.
+ *
+ * @param dbus_type The DBus type string (e.g., "s", "i", "a{sv}").
+ *                  Only the first character is typically used for basic types.
+ * @param with_const If EINA_TRUE, pointer types (like char*) will be "const char *".
+ * @return A C-string representing the C type. Returns NULL for unhandled types.
+ *         Example: "s" with `with_const`=EINA_TRUE returns "const char *".
+ *                  "i" returns "int ".
+ *                  "a" (array), "v" (variant), "{" (dict), "(" (struct) return "Eldbus_Message_Iter *".
+ */
 static const char *
 dbus_type2c_type2(const char *dbus_type, Eina_Bool with_const)
 {
@@ -78,6 +113,17 @@ dbus_type2c_type(const char *dbus_type)
    return dbus_type2c_type2(dbus_type, EINA_TRUE);
 }
 
+/**
+ * @brief Generates C code for calling a DBus method with complex input arguments.
+ *
+ * Complex input arguments are typically handled using Eina_Value.
+ * This function generates both the C source code and the header declaration
+ * for the method call.
+ *
+ * @param method Pointer to the DBus_Method structure describing the method.
+ * @param c_code Eina_Strbuf to append the generated C source code.
+ * @param h Eina_Strbuf to append the generated C header code.
+ */
 static void
 source_client_complex_method_call_generate(const DBus_Method *method, Eina_Strbuf *c_code, Eina_Strbuf *h)
 {
@@ -135,6 +181,18 @@ end:
    eina_strbuf_free(full_signature);
 }
 
+/**
+ * @brief Generates C code for calling a DBus method with simple input arguments
+ *        and no expected reply.
+ *
+ * Simple input arguments are passed directly as function parameters.
+ * This function generates both the C source code and the header declaration
+ * for the method call.
+ *
+ * @param method Pointer to the DBus_Method structure describing the method.
+ * @param c_code Eina_Strbuf to append the generated C source code.
+ * @param h Eina_Strbuf to append the generated C header code.
+ */
 static void
 source_client_simple_method_call_no_reply_generate(const DBus_Method *method, Eina_Strbuf *c_code, Eina_Strbuf *h)
 {
@@ -173,6 +231,18 @@ source_client_simple_method_call_no_reply_generate(const DBus_Method *method, Ei
    eina_strbuf_free(args_call);
 }
 
+/**
+ * @brief Generates C code for calling a DBus method with simple input arguments
+ *        and an expected reply.
+ *
+ * Simple input arguments are passed directly as function parameters.
+ * This function generates both the C source code and the header declaration
+ * for the method call, which returns an Eldbus_Pending object.
+ *
+ * @param method Pointer to the DBus_Method structure describing the method.
+ * @param c_code Eina_Strbuf to append the generated C source code.
+ * @param h Eina_Strbuf to append the generated C header code.
+ */
 static void
 source_client_simple_method_call_generate(const DBus_Method *method, Eina_Strbuf *c_code, Eina_Strbuf *h)
 {
@@ -218,6 +288,18 @@ source_client_simple_method_call_generate(const DBus_Method *method, Eina_Strbuf
    eina_strbuf_free(args_call);
 }
 
+/**
+ * @brief Generates C code for the callback function of a DBus method
+ *        that returns complex output arguments.
+ *
+ * Complex output arguments are typically handled using Eina_Value.
+ * This function generates the typedef for the user-provided callback and
+ * the internal Eldbus callback that parses the message and calls the user's callback.
+ *
+ * @param method Pointer to the DBus_Method structure describing the method.
+ * @param c_code Eina_Strbuf to append the generated C source code.
+ * @param h Eina_Strbuf to append the generated C header code.
+ */
 static void
 source_client_complex_method_callback_generate(const DBus_Method *method, Eina_Strbuf *c_code, Eina_Strbuf *h)
 {
@@ -242,6 +324,18 @@ source_client_complex_method_callback_generate(const DBus_Method *method, Eina_S
    eina_strbuf_append_printf(c_code, "}\n");
 }
 
+/**
+ * @brief Generates C code for the callback function of a DBus method
+ *        that returns simple output arguments.
+ *
+ * Simple output arguments are passed as individual parameters to the user's callback.
+ * This function generates the typedef for the user-provided callback and
+ * the internal Eldbus callback that parses the message and calls the user's callback.
+ *
+ * @param method Pointer to the DBus_Method structure describing the method.
+ * @param c_code Eina_Strbuf to append the generated C source code.
+ * @param h Eina_Strbuf to append the generated C header code.
+ */
 static void
 source_client_simple_method_callback_generate(const DBus_Method *method, Eina_Strbuf *c_code, Eina_Strbuf *h)
 {
@@ -293,6 +387,18 @@ source_client_simple_method_callback_generate(const DBus_Method *method, Eina_St
    eina_strbuf_free(arguments_get);
 }
 
+/**
+ * @brief Generates C code for a DBus method, including its call function
+ *        and callback function if applicable.
+ *
+ * This function dispatches to more specialized generation functions based on
+ * whether the method expects a reply, and whether its input/output arguments
+ * are simple or complex.
+ *
+ * @param method Pointer to the DBus_Method structure describing the method.
+ * @param c_code Eina_Strbuf to append the generated C source code.
+ * @param h Eina_Strbuf to append the generated C header code.
+ */
 static void
 source_client_method_generate(const DBus_Method *method, Eina_Strbuf *c_code, Eina_Strbuf *h)
 {
@@ -315,6 +421,23 @@ source_client_method_generate(const DBus_Method *method, Eina_Strbuf *c_code, Ei
      }
 }
 
+/**
+ * @brief Generates C code for handling a DBus signal.
+ *
+ * This includes:
+ * - Adding a signal handler in the proxy initialization.
+ * - Defining an Ecore_Event type for the signal.
+ * - Defining a struct to hold signal data.
+ * - Generating a free function for the signal data.
+ * - Generating the callback function that receives the DBus signal,
+ *   populates the struct, and emits the Ecore_Event.
+ *
+ * @param sig Pointer to the DBus_Signal structure describing the signal.
+ * @param c_code Eina_Strbuf to append the generated C source code for callbacks and free functions.
+ * @param h Eina_Strbuf to append the generated C header code (struct definition, event extern).
+ * @param c_init_function Eina_Strbuf to append C code for the proxy initialization function (e.g., adding signal handlers).
+ * @param c_header Eina_Strbuf to append C code for the C file's header section (e.g., event type static definition).
+ */
 static void
 source_client_signal_generate(const DBus_Signal *sig, Eina_Strbuf *c_code, Eina_Strbuf * h, Eina_Strbuf *c_init_function, Eina_Strbuf *c_header)
 {
@@ -394,6 +517,17 @@ end_signal:
    eina_strbuf_free(string_free);
 }
 
+/**
+ * @brief Determines the appropriate Eldbus codegen callback function name for a property get operation.
+ *
+ * The callback name depends on whether the property is complex or its basic type.
+ * These callback types are expected to be defined in "eldbus_utils.h".
+ *
+ * @param prop Pointer to the DBus_Property structure.
+ * @return A C-string representing the name of the callback function type.
+ *         Example: For a complex property, returns "Eldbus_Codegen_Property_Complex_Get_Cb".
+ *                  For a string property, returns "Eldbus_Codegen_Property_String_Get_Cb".
+ */
 static const char *
 prop_cb_get(const DBus_Property *prop)
 {
@@ -428,6 +562,18 @@ prop_cb_get(const DBus_Property *prop)
      }
 }
 
+/**
+ * @brief Generates C code for getting a DBus property.
+ *
+ * This includes:
+ * - The internal Eldbus callback function that handles the reply from `org.freedesktop.DBus.Properties.Get`.
+ *   This callback parses the variant message, extracts the property value, and invokes the user-provided callback.
+ * - The public `_propget` function that initiates the property get call.
+ *
+ * @param prop Pointer to the DBus_Property structure describing the property.
+ * @param c_code Eina_Strbuf to append the generated C source code.
+ * @param h Eina_Strbuf to append the generated C header code.
+ */
 static void
 source_client_property_generate_get(const DBus_Property *prop, Eina_Strbuf *c_code, Eina_Strbuf *h)
 {
@@ -490,6 +636,18 @@ source_client_property_generate_get(const DBus_Property *prop, Eina_Strbuf *c_co
    eina_strbuf_append_printf(c_code, "}\n");
 }
 
+/**
+ * @brief Generates C code for setting a DBus property.
+ *
+ * This includes:
+ * - The internal Eldbus callback function that handles the reply from `org.freedesktop.DBus.Properties.Set`.
+ *   This callback invokes the user-provided callback, passing any error information.
+ * - The public `_propset` function that initiates the property set call.
+ *
+ * @param prop Pointer to the DBus_Property structure describing the property.
+ * @param c_code Eina_Strbuf to append the generated C source code.
+ * @param h Eina_Strbuf to append the generated C header code.
+ */
 static void
 source_client_property_generate_set(const DBus_Property *prop, Eina_Strbuf *c_code, Eina_Strbuf *h)
 {
@@ -522,6 +680,17 @@ source_client_property_generate_set(const DBus_Property *prop, Eina_Strbuf *c_co
    eina_strbuf_append_printf(c_code, "}\n");
 }
 
+/**
+ * @brief Generates C code for a DBus property, including its get and/or set functions.
+ *
+ * This function checks the access rights of the property (read, write) and calls
+ * the appropriate generation functions (`source_client_property_generate_get`
+ * and/or `source_client_property_generate_set`).
+ *
+ * @param prop Pointer to the DBus_Property structure describing the property.
+ * @param c_code Eina_Strbuf to append the generated C source code.
+ * @param h Eina_Strbuf to append the generated C header code.
+ */
 static void
 source_client_property_generate(const DBus_Property *prop, Eina_Strbuf *c_code, Eina_Strbuf *h)
 {
@@ -531,6 +700,23 @@ source_client_property_generate(const DBus_Property *prop, Eina_Strbuf *c_code, 
      source_client_property_generate_set(prop, c_code, h);
 }
 
+/**
+ * @brief Main function to generate client-side C source and header files
+ *        for DBus interfaces.
+ *
+ * Iterates through interfaces in the provided DBus_Object. For each matching
+ * interface (or all if `interface_name` is NULL), it generates:
+ * - A header file (`.h`) with function prototypes, typedefs, and struct definitions.
+ * - A source file (`.c`) with implementations for method calls, signal handlers,
+ *   and property accessors.
+ *
+ * @param path Pointer to the DBus_Object containing interface definitions.
+ * @param prefix Optional prefix to be added to generated function and type names.
+ * @param interface_name Optional specific interface name to generate code for.
+ *                       If NULL, code is generated for all interfaces in `path`.
+ * @param output_name Optional base name for the output files. If NULL, names are
+ *                    derived from the interface name (e.g., `eldbus_IFACE_NAME.h`).
+ */
 void
 source_client_generate(DBus_Object *path, const char *prefix, const char *interface_name, const char *output_name)
 {

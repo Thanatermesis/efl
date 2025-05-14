@@ -33,6 +33,13 @@
 # define KDSKBMUTE 0x4B51
 #endif
 
+/**
+ * @internal
+ * @brief Global event handler for ECORE_DRM_EVENT_ACTIVATE events.
+ *
+ * This handler is responsible for processing activation/deactivation events,
+ * typically by calling _ecore_drm_logind_cb_activate.
+ */
 static Ecore_Event_Handler *active_hdlr;
 
 #ifdef HAVE_SYSTEMD
@@ -43,6 +50,15 @@ static int (*_ecore_sd_session_get_vt) (const char *session, unsigned *vtnr) = N
 static int (*_ecore_sd_pid_get_session) (pid_t pid, char **session) = NULL;
 static int (*_ecore_sd_session_get_seat) (const char *session, char **seat) = NULL;
 
+/**
+ * @internal
+ * @brief Initializes the connection to libsystemd and resolves symbols.
+ *
+ * This function attempts to load libsystemd.so.0 and get pointers to
+ * necessary functions like sd_session_get_vt, sd_pid_get_session, and
+ * sd_session_get_seat. If loading or symbol resolution fails, it marks
+ * libsystemd support as broken.
+ */
 void
 _ecore_drm_sd_init(void)
 {
@@ -80,6 +96,19 @@ _ecore_drm_sd_init(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Retrieves the virtual terminal (VT) number for the current session using systemd.
+ *
+ * This function uses the systemd function sd_session_get_vt (obtained via
+ * _ecore_drm_sd_init) to determine the VT number associated with the
+ * Ecore_Drm_Device's session.
+ *
+ * @param dev The Ecore_Drm_Device structure. Its 'session' field is used to
+ *            query systemd, and its 'vt' field is updated with the result.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., systemd functions
+ *         not available or sd_session_get_vt fails).
+ */
 static inline Eina_Bool
 _ecore_drm_logind_vt_get(Ecore_Drm_Device *dev)
 {
@@ -102,6 +131,18 @@ _ecore_drm_logind_vt_get(Ecore_Drm_Device *dev)
 }
 #endif
 
+/**
+ * @internal
+ * @brief Sets up the virtual terminal (VT) for the Ecore_Drm_Device.
+ *
+ * This function constructs the TTY device path (e.g., /dev/ttyX) based on the
+ * VT number stored in @p dev and then attempts to open it using
+ * ecore_drm_tty_open().
+ *
+ * @param dev The Ecore_Drm_Device structure. Its 'vt' field is used to
+ *            determine the TTY to open.
+ * @return EINA_TRUE if the TTY was successfully opened, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _ecore_drm_logind_vt_setup(Ecore_Drm_Device *dev)
 {
@@ -116,6 +157,22 @@ _ecore_drm_logind_vt_setup(Ecore_Drm_Device *dev)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Callback function for handling VT switch signals (SIGUSR1, SIGUSR2).
+ *
+ * This function is registered as an Ecore_Event_Handler for ECORE_EVENT_SIGNAL_USER.
+ * It processes signals that indicate a VT switch is requested or acknowledged.
+ * - SIGUSR1 (ev->number == 1): Indicates a request to release the VT.
+ *   It sends a deactivate event and calls ioctl VT_RELDISP to release display.
+ * - SIGUSR2 (ev->number == 2): Indicates the VT has been acquired.
+ *   It calls ioctl VT_RELDISP with VT_ACKACQ to acknowledge and sends an activate event.
+ *
+ * @param data Pointer to the Ecore_Drm_Device.
+ * @param type The type of the event (unused).
+ * @param event Pointer to the Ecore_Event_Signal_User event data.
+ * @return ECORE_CALLBACK_RENEW to keep the handler registered.
+ */
 static Eina_Bool
 _ecore_drm_logind_cb_vt_signal(void *data, int type EINA_UNUSED, void *event)
 {
@@ -146,6 +203,25 @@ _ecore_drm_logind_cb_vt_signal(void *data, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @internal
+ * @brief Callback function for handling ECORE_DRM_EVENT_ACTIVATE events.
+ *
+ * This function is triggered when the DRM device's session becomes active or
+ * inactive (e.g., due to a VT switch).
+ * If activating:
+ *  - Sets the mode for all outputs.
+ *  - Enables all inputs.
+ * If deactivating:
+ *  - Disables all inputs.
+ *  - Disables hardware cursors on all outputs.
+ *  - Disables all sprites.
+ *
+ * @param data Pointer to the Ecore_Drm_Device.
+ * @param type The type of the event (unused).
+ * @param event Pointer to the Ecore_Drm_Event_Activate event data.
+ * @return ECORE_CALLBACK_PASS_ON to allow other handlers to process the event.
+ */
 static Eina_Bool
 _ecore_drm_logind_cb_activate(void *data, int type EINA_UNUSED, void *event)
 {
@@ -192,6 +268,25 @@ _ecore_drm_logind_cb_activate(void *data, int type EINA_UNUSED, void *event)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @internal
+ * @brief Connects to logind and sets up the DRM device for a session.
+ *
+ * This function performs several steps:
+ * 1. If systemd is available, it retrieves the session ID and seat,
+ *    verifying the seat matches the device's configured seat. It then
+ *    gets the VT number.
+ * 2. Initializes D-Bus communication for logind.
+ * 3. Takes control of the logind session.
+ * 4. Sets up the VT using _ecore_drm_logind_vt_setup().
+ * 5. Registers an event handler for VT switch signals (_ecore_drm_logind_cb_vt_signal).
+ * 6. Registers an event handler for activation events (_ecore_drm_logind_cb_activate).
+ *
+ * @param dev The Ecore_Drm_Device to connect and configure.
+ * @return EINA_TRUE on successful connection and setup, EINA_FALSE otherwise.
+ *         On failure, appropriate cleanup (like releasing session control or
+ *         shutting down D-Bus) is attempted.
+ */
 Eina_Bool
 _ecore_drm_logind_connect(Ecore_Drm_Device *dev)
 {
@@ -266,6 +361,18 @@ take_err:
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Disconnects from logind and cleans up resources for the DRM device.
+ *
+ * This function performs the following cleanup:
+ * 1. Deletes the ECORE_DRM_EVENT_ACTIVATE event handler.
+ * 2. Closes the TTY associated with the device.
+ * 3. Releases control of the logind session via D-Bus.
+ * 4. Shuts down D-Bus communication.
+ *
+ * @param dev The Ecore_Drm_Device to disconnect.
+ */
 void
 _ecore_drm_logind_disconnect(Ecore_Drm_Device *dev)
 {
@@ -277,12 +384,42 @@ _ecore_drm_logind_disconnect(Ecore_Drm_Device *dev)
    _ecore_drm_dbus_shutdown();
 }
 
+/**
+ * @internal
+ * @brief Restores the TTY state for the given DRM device.
+ *
+ * This typically involves resetting terminal modes or other TTY-specific
+ * configurations that might have been altered during the session.
+ *
+ * @param dev The Ecore_Drm_Device whose TTY needs to be restored.
+ */
 void
 _ecore_drm_logind_restore(Ecore_Drm_Device *dev)
 {
    _ecore_drm_tty_restore(dev);
 }
 
+/**
+ * @internal
+ * @brief Opens a DRM device through logind, requesting control.
+ *
+ * This function first stats the device file to ensure it's a character device.
+ * Then, it uses D-Bus to ask logind to grant access to the DRM device
+ * identified by its major and minor numbers. The result of this operation
+ * (success or failure, and the opened file descriptor if successful) is
+ * communicated asynchronously via the provided callback.
+ *
+ * @param device The path to the DRM device (e.g., "/dev/dri/card0").
+ * @param callback The function to call when logind responds to the open request.
+ *                 The callback will receive the opened fd (or -1 on error) and
+ *                 a boolean indicating if the device is paused.
+ * @param data User data to pass to the callback function.
+ * @return EINA_TRUE if the request to logind was successfully made, EINA_FALSE
+ *         otherwise (e.g., stat failed, device is not a character device, or
+ *         D-Bus call failed immediately). Note that a EINA_TRUE return does
+ *         not mean the device was successfully opened, only that the request
+ *         was sent.
+ */
 Eina_Bool
 _ecore_drm_logind_device_open(const char *device, Ecore_Drm_Open_Cb callback, void *data)
 {
@@ -298,6 +435,19 @@ _ecore_drm_logind_device_open(const char *device, Ecore_Drm_Open_Cb callback, vo
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Opens a DRM device through logind synchronously, without a pending callback.
+ *
+ * This function is similar to _ecore_drm_logind_device_open but operates
+ * synchronously. It requests access to the DRM device from logind and
+ * directly returns the file descriptor.
+ *
+ * @param device The path to the DRM device (e.g., "/dev/dri/card0").
+ * @return The opened file descriptor for the DRM device on success.
+ *         Returns -1 on failure (e.g., stat failed, not a character device,
+ *         logind denied access, or D-Bus error).
+ */
 int
 _ecore_drm_logind_device_open_no_pending(const char *device)
 {
@@ -309,6 +459,18 @@ _ecore_drm_logind_device_open_no_pending(const char *device)
    return _ecore_drm_dbus_device_take_no_pending(major(st.st_rdev), minor(st.st_rdev), NULL, -1);
 }
 
+/**
+ * @internal
+ * @brief Closes a DRM device through logind, releasing control.
+ *
+ * This function informs logind that the application is done with the specified
+ * DRM device. It stats the device to get its major and minor numbers and then
+ * makes a D-Bus call to logind to release the device.
+ *
+ * @param device The path to the DRM device (e.g., "/dev/dri/card0") that
+ *               was previously opened via _ecore_drm_logind_device_open or
+ *               _ecore_drm_logind_device_open_no_pending.
+ */
 void
 _ecore_drm_logind_device_close(const char *device)
 {

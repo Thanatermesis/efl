@@ -30,24 +30,45 @@
 
 #define MY_CLASS EFL_NET_SERVER_WINDOWS_CLASS
 
+/**
+ * @brief Private data for the Efl_Net_Server_Windows class.
+ *
+ * This structure holds all the internal state for a Windows named pipe server,
+ * including the next client socket to be connected, a list of pending clients
+ * waiting for announcement, server address, client limits, and various status flags.
+ */
 typedef struct _Efl_Net_Server_Windows_Data
 {
-   Eo *next_client;
-   Eina_List *pending_clients;
+   Eo *next_client; /**< The next available client socket instance waiting for a connection. */
+   Eina_List *pending_clients; /**< List of connected clients that are waiting to be announced due to client limits. */
 
-   Eina_Stringshare *address; /* includes prefix: \\.\pipe\, returned without it */
-   Eina_Future *pending_announcer_job;
-   unsigned int clients_count;
-   unsigned int clients_limit;
-   Eina_Bool clients_reject_excess;
-   Eina_Bool serving;
-   Eina_Bool first;
-   Eina_Bool allow_remote;
+   Eina_Stringshare *address; /**< The full named pipe path, including the `\\.\pipe\` prefix. The user-facing address does not include this prefix. */
+   Eina_Future *pending_announcer_job; /**< A future that schedules the announcement of pending clients. */
+   unsigned int clients_count; /**< Current number of active clients. */
+   unsigned int clients_limit; /**< Maximum number of clients allowed. 0 means unlimited. */
+   Eina_Bool clients_reject_excess; /**< If EINA_TRUE, reject new clients when the limit is reached. Otherwise, queue them. */
+   Eina_Bool serving; /**< EINA_TRUE if the server is actively listening for connections. */
+   Eina_Bool first; /**< EINA_TRUE if this is the first pipe instance being created for this server. Used for FILE_FLAG_FIRST_PIPE_INSTANCE. */
+   Eina_Bool allow_remote; /**< EINA_TRUE to allow remote clients to connect (PIPE_ACCEPT_REMOTE_CLIENTS). */
 } Efl_Net_Server_Windows_Data;
 
 static Eina_Error _efl_net_server_windows_client_listen(Eo *o, Efl_Net_Server_Windows_Data *pd);
 static Eina_Error _efl_net_server_windows_client_new(Eo *o, Efl_Net_Server_Windows_Data *pd);
 
+/**
+ * @brief Callback invoked when a client connection attempt succeeds.
+ *
+ * This function handles a successful connection from a client. It retrieves
+ * client and server process IDs, sets socket addresses, and then either
+ * announces the client, queues it if the client limit is reached and
+ * rejection is not enabled, or rejects it. It also ensures a new
+ * "next_client" is prepared if needed.
+ *
+ * @param data The server object (Eo *o).
+ * @param client The client socket object that successfully connected.
+ * @param used_size Unused in this context.
+ * @return Eina_Error 0 on success, or an error code.
+ */
 static Eina_Error
 _efl_net_server_windows_client_listen_success(void *data, Eo *client, DWORD used_size EINA_UNUSED)
 {
@@ -131,6 +152,17 @@ _efl_net_server_windows_client_listen_success(void *data, Eo *client, DWORD used
    return 0;
 }
 
+/**
+ * @brief Callback invoked when a client connection attempt fails.
+ *
+ * This function handles a failed connection attempt. It logs the error
+ * and potentially emits a server error event.
+ *
+ * @param data The server object (Eo *o).
+ * @param client The client socket object that failed to connect (unused).
+ * @param win32err The Windows error code for the failure.
+ * @return Eina_Error An Eina_Error code corresponding to the win32err.
+ */
 static Eina_Error
 _efl_net_server_windows_client_listen_failure(void *data, Eo *client EINA_UNUSED, DWORD win32err)
 {
@@ -160,6 +192,17 @@ _efl_net_server_windows_client_listen_failure(void *data, Eo *client EINA_UNUSED
    return err;
 }
 
+/**
+ * @brief Initiates listening for a client connection on the server's `next_client` socket.
+ *
+ * This function uses `ConnectNamedPipe` with overlapped I/O to wait for a
+ * client to connect to the `pd->next_client` pipe instance.
+ *
+ * @param o The server object.
+ * @param pd The private data of the server.
+ * @return Eina_Error 0 on success (including pending I/O), or an error code if
+ *         the operation fails immediately.
+ */
 static Eina_Error
 _efl_net_server_windows_client_listen(Eo *o, Efl_Net_Server_Windows_Data *pd)
 {
@@ -203,6 +246,19 @@ _efl_net_server_windows_client_listen(Eo *o, Efl_Net_Server_Windows_Data *pd)
    return _efl_net_socket_windows_operation_succeeded(op, 0);
 }
 
+/**
+ * @brief Creates a new named pipe instance and prepares it for listening.
+ *
+ * This function creates a new named pipe using `CreateNamedPipe`,
+ * initializes an `Efl_Net_Socket_Windows` object for this pipe,
+ * and then calls `_efl_net_server_windows_client_listen` to start
+ * waiting for a connection on this new pipe instance. This new instance
+ * becomes `pd->next_client`.
+ *
+ * @param o The server object.
+ * @param pd The private data of the server.
+ * @return Eina_Error 0 on success, or an error code on failure.
+ */
 static Eina_Error
 _efl_net_server_windows_client_new(Eo *o, Efl_Net_Server_Windows_Data *pd)
 {
@@ -313,6 +369,20 @@ _efl_net_server_windows_efl_net_server_address_get(const Eo *o EINA_UNUSED, Efl_
    return pd->address + strlen(PIPE_NS);
 }
 
+/**
+ * @brief Job function to announce a pending client from the main loop.
+ *
+ * This function is scheduled as a job to be run from the main loop. It takes
+ * one client from the `pending_clients` list and announces it, provided the
+ * client limit allows. This is done to avoid potential stack overflows if
+ * many clients become eligible for announcement at once (e.g., after
+ * `clients_count` decreases).
+ *
+ * @param o The server object.
+ * @param data Unused.
+ * @param v The Eina_Value passed to the job, typically an empty value.
+ * @return Eina_Value The input value `v`.
+ */
 static Eina_Value
 _efl_net_server_windows_pending_announce_job(Eo *o, void *data EINA_UNUSED, const Eina_Value v)
 {
@@ -329,6 +399,16 @@ _efl_net_server_windows_pending_announce_job(Eo *o, void *data EINA_UNUSED, cons
    return v;
 }
 
+/**
+ * @brief Schedules the `_efl_net_server_windows_pending_announce_job` if needed.
+ *
+ * This function checks if there are pending clients and if the client limit
+ * allows for more clients to be announced. If so, and if a job is not already
+ * pending, it schedules `_efl_net_server_windows_pending_announce_job` to run.
+ *
+ * @param o The server object.
+ * @param pd The private data of the server.
+ */
 static void
 _efl_net_server_windows_pending_announce_job_schedule(Eo *o, Efl_Net_Server_Windows_Data *pd)
 {
@@ -418,6 +498,19 @@ _efl_net_server_windows_efl_net_server_serve(Eo *o, Efl_Net_Server_Windows_Data 
    return _efl_net_server_windows_client_new(o, pd);
 }
 
+/**
+ * @brief Event callback for when an announced client socket is closed.
+ *
+ * This function is called when an `EFL_IO_CLOSER_EVENT_CLOSED` event occurs
+ * on a client socket that has been previously announced by the server.
+ * It cleans up the client's relationship with the server (removes event
+ * callback, unsets parent if it was the server) and decrements the server's
+ * active client count.
+ *
+ * @param data The server object (Eo *server).
+ * @param event The `EFL_IO_CLOSER_EVENT_CLOSED` event, where `event->object`
+ *              is the client socket that closed.
+ */
 static void
 _efl_net_server_windows_client_event_closed(void *data, const Efl_Event *event)
 {
@@ -441,6 +534,8 @@ _efl_net_server_windows_efl_net_server_client_announce(Eo *o, Efl_Net_Server_Win
    EINA_SAFETY_ON_FALSE_GOTO(efl_parent_get(client) == o, wrong_parent);
    efl_event_callback_call(o, EFL_NET_SERVER_EVENT_CLIENT_ADD, client);
 
+   /* Check if the client was reparented during the CLIENT_ADD event.
+    * If so, the user has taken full ownership, and we should not manage it further. */
    if (efl_parent_get(client) != o)
      {
         DBG("client %s was reparented! Ignoring it...",
@@ -450,11 +545,11 @@ _efl_net_server_windows_efl_net_server_client_announce(Eo *o, Efl_Net_Server_Win
 
    if (efl_ref_count(client) == 1) /* users must take a reference themselves */
      {
-        DBG("client %s was not handled, closing it...",
+        DBG("client %s was not handled (refcount is 1 after announce), closing it...",
             efl_net_socket_address_remote_get(client));
-        if (pd->next_client)
+        if (pd->next_client) /* If there's already a 'next_client' waiting, delete this one. */
           efl_del(client);
-        else
+        else /* Otherwise, reuse this client socket for the next connection. */
           {
              HANDLE h = _efl_net_socket_windows_handle_get(client);
              DisconnectNamedPipe(h);

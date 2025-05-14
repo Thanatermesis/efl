@@ -3,6 +3,21 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Creates a window to test separators.
+ * @ingroup elementary_tests
+ *
+ * This function demonstrates the usage of the elm_separator widget. It creates
+ * a window with four buttons arranged in a 2x2 grid-like layout.
+ * A main horizontal box holds two vertical boxes, with a vertical separator
+ * between them. Each vertical box, in turn, contains two buttons with a
+ * horizontal separator between them. This layout effectively demonstrates both
+ * vertical and horizontal separator usage.
+ *
+ * @param data The data passed to the callback function. Unused in this test.
+ * @param obj The object that triggered the event. Unused in this test.
+ * @param event_info The event-specific information. Unused in this test.
+ */
 void
 test_separator(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

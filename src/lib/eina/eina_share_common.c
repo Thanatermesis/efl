@@ -81,7 +81,11 @@
  * @cond LOCAL
  */
 
-/** The global Eina stringshare log domain */
+/**
+ * @internal
+ * @brief The global Eina stringshare log domain.
+ * Used for logging messages specific to the string sharing mechanism.
+ */
 extern int _eina_share_stringshare_log_dom;
 
 #ifdef DBG_STRINGSHARE
@@ -89,16 +93,26 @@ extern int _eina_share_stringshare_log_dom;
 #endif
 #define DBG_STRINGSHARE(...) EINA_LOG_DOM_DBG(_eina_share_stringshare_log_dom, __VA_ARGS__)
 
-#define EINA_SHARE_COMMON_BUCKETS 256
-#define EINA_SHARE_COMMON_MASK 0xFF
+#define EINA_SHARE_COMMON_BUCKETS 256 /**< Number of primary hash buckets. */
+#define EINA_SHARE_COMMON_MASK 0xFF /**< Mask to extract parts of the hash. */
+/**< Macro to determine the primary bucket index from a full hash. Uses upper bits. */
 #define EINA_SHARE_COMMON_BUCKET_IDX(h) ((h >> 8) & EINA_SHARE_COMMON_MASK)
+/**< Macro to determine the secondary hash for node collision resolution within a bucket. Uses lower bits. */
 #define EINA_SHARE_COMMON_NODE_HASH(h) (h & EINA_SHARE_COMMON_MASK)
 
-static const char EINA_MAGIC_SHARE_STR[] = "Eina Share";
-static const char EINA_MAGIC_SHARE_HEAD_STR[] = "Eina Share Head";
+static const char EINA_MAGIC_SHARE_STR[] = "Eina Share"; /**< Magic string for Eina_Share_Common structure. */
+static const char EINA_MAGIC_SHARE_HEAD_STR[] = "Eina Share Head"; /**< Magic string for Eina_Share_Common_Head structure. */
 
+/**< Global counter for active eina_share_common instances. Used for global init/shutdown of shared resources like mutexes. */
 static int _eina_share_common_count = 0;
 
+/**
+ * @internal
+ * @brief Macro to check the magic number of an Eina_Share_Common_Head structure.
+ * @param d Pointer to the Eina_Share_Common_Head structure.
+ * @param unlock Unlock statement to execute before returning on failure.
+ * @param ... Return value(s) on failure.
+ */
 #define EINA_MAGIC_CHECK_SHARE_COMMON_HEAD(d, unlock, ...)      \
    do {                                                          \
         if (!EINA_MAGIC_CHECK((d), EINA_MAGIC_SHARE_HEAD))  \
@@ -109,6 +123,13 @@ static int _eina_share_common_count = 0;
           }                                                           \
      } while (0)
 
+/**
+ * @internal
+ * @brief Macro to check the magic number of an Eina_Share_Common_Node structure.
+ * @param d Pointer to the Eina_Share_Common_Node structure.
+ * @param _node_magic Expected magic number for the node.
+ * @param unlock Unlock statement to execute before returning on failure.
+ */
 #define EINA_MAGIC_CHECK_SHARE_COMMON_NODE(d, _node_magic, unlock)              \
    do {                                                          \
         if (!EINA_MAGIC_CHECK((d), _node_magic))    \
@@ -119,68 +140,134 @@ static int _eina_share_common_count = 0;
      } while (0)
 
 #ifdef EINA_STRINGSHARE_USAGE
+/**
+ * @internal
+ * @struct _Eina_Share_Common_Population
+ * @brief Structure to track population statistics for string sharing.
+ * Used when EINA_STRINGSHARE_USAGE is defined.
+ */
 typedef struct _Eina_Share_Common_Population Eina_Share_Common_Population;
 struct _Eina_Share_Common_Population
 {
-   int count;
-   int max;
+   int count; /**< Current number of items. */
+   int max;   /**< Maximum number of items observed. */
 };
 #endif
 
+/**
+ * @internal
+ * @struct _Eina_Share_Common
+ * @brief Core data structure for managing shared strings.
+ * Contains an array of buckets, each potentially pointing to a red-black tree
+ * of Eina_Share_Common_Head structures.
+ */
 typedef struct _Eina_Share_Common Eina_Share_Common;
+/**
+ * @internal
+ * @struct _Eina_Share_Common_Node
+ * @brief Represents a single shared string instance.
+ * Nodes with the same hash (but different string content) are chained in a linked list
+ * within an Eina_Share_Common_Head.
+ */
 typedef struct _Eina_Share_Common_Node Eina_Share_Common_Node;
+/**
+ * @internal
+ * @struct _Eina_Share_Common_Head
+ * @brief Represents a collection of shared strings that have the same
+ * EINA_SHARE_COMMON_NODE_HASH value.
+ * These heads are organized in a red-black tree within each primary bucket.
+ * Each head contains a linked list of actual string nodes.
+ * The first node is often embedded (builtin_node) for optimization.
+ */
 typedef struct _Eina_Share_Common_Head Eina_Share_Common_Head;
 
+/**
+ * @internal
+ * @struct _Eina_Share
+ * @brief Public-facing handle for a shared string manager instance.
+ * This wraps the internal _Eina_Share_Common structure and holds
+ * per-instance configuration like the node magic number and usage statistics.
+ */
 struct _Eina_Share
 {
-   Eina_Share_Common *share;
-   Eina_Magic node_magic;
+   Eina_Share_Common *share; /**< Pointer to the internal shared data. */
+   Eina_Magic node_magic;    /**< Magic number for individual string nodes (_Eina_Share_Common_Node). */
 #ifdef EINA_STRINGSHARE_USAGE
-   Eina_Share_Common_Population population;
-   Eina_Share_Common_Population population_group[4];
-   int max_node_population;
+   Eina_Share_Common_Population population; /**< Overall population statistics. */
+   Eina_Share_Common_Population population_group[4]; /**< Population statistics grouped by string length (0, 1, 2, 3). */
+   int max_node_population; /**< Maximum number of strings sharing a single _Eina_Share_Common_Head. */
 #endif
 };
 
+/**
+ * @internal
+ * @struct _Eina_Share_Common
+ * @brief Definition of the core shared string data structure.
+ */
 struct _Eina_Share_Common
 {
-   Eina_Share_Common_Head *buckets[EINA_SHARE_COMMON_BUCKETS];
+   Eina_Share_Common_Head *buckets[EINA_SHARE_COMMON_BUCKETS]; /**< Array of hash buckets. Each bucket is the root of an Rbtree of _Eina_Share_Common_Head. */
 
-   EINA_MAGIC
+   EINA_MAGIC /**< Magic number for _Eina_Share_Common itself. */
 };
 
+/**
+ * @internal
+ * @struct _Eina_Share_Common_Node
+ * @brief Definition of a shared string node.
+ */
 struct _Eina_Share_Common_Node
 {
-   Eina_Share_Common_Node *next;
+   Eina_Share_Common_Node *next; /**< Pointer to the next node in the collision chain (if any). */
 
-   EINA_MAGIC
+   EINA_MAGIC /**< Magic number for this node. */
 
-   unsigned int length;
-   unsigned int references;
-   char str[];
+   unsigned int length;     /**< Length of the string (excluding null terminator). */
+   unsigned int references; /**< Reference count for this string. */
+   char str[];              /**< Flexible array member for the string data. Null termination is handled separately. */
 };
 
+/**
+ * @internal
+ * @struct _Eina_Share_Common_Head
+ * @brief Definition of a hash collision group head.
+ */
 struct _Eina_Share_Common_Head
 {
-   EINA_RBTREE;
-   EINA_MAGIC
+   EINA_RBTREE; /**< Makes this struct usable as an Eina_Rbtree node. */
+   EINA_MAGIC   /**< Magic number for this head structure. */
 
-   int hash;
+   int hash;    /**< The full hash value for strings managed by this head. */
 
 #ifdef EINA_STRINGSHARE_USAGE
-   int population;
+   int population; /**< Number of unique strings currently managed by this head. */
 #endif
 
-   Eina_Share_Common_Node *head;
-   Eina_Share_Common_Node builtin_node;
+   Eina_Share_Common_Node *head;         /**< Pointer to the first string node in the collision list. */
+   Eina_Share_Common_Node builtin_node; /**< Embedded node for the first string added to this head, to save an allocation. */
 };
 
+/**
+ * @internal
+ * @brief Flag indicating whether threading support (mutexes) has been activated.
+ */
 Eina_Bool _share_common_threads_activated = EINA_FALSE;
 
+/**
+ * @internal
+ * @brief A global spinlock protecting access to the shared string tables.
+ * This lock is used for all modifications to the shared data structures.
+ */
 static Eina_Spinlock _mutex_big;
 
 #ifdef EINA_STRINGSHARE_USAGE
 
+/**
+ * @internal
+ * @brief Initializes population statistics for a shared string manager.
+ * Only active if EINA_STRINGSHARE_USAGE is defined.
+ * @param share The Eina_Share instance to initialize.
+ */
 static void
 _eina_share_common_population_init(Eina_Share *share)
 {
@@ -196,6 +283,12 @@ _eina_share_common_population_init(Eina_Share *share)
      }
 }
 
+/**
+ * @internal
+ * @brief Resets population statistics for a shared string manager during shutdown.
+ * Only active if EINA_STRINGSHARE_USAGE is defined.
+ * @param share The Eina_Share instance.
+ */
 static void
 _eina_share_common_population_shutdown(Eina_Share *share)
 {
@@ -215,6 +308,12 @@ _eina_share_common_population_shutdown(Eina_Share *share)
      }
 }
 
+/**
+ * @internal
+ * @brief Prints population statistics for a shared string manager.
+ * Only active if EINA_STRINGSHARE_USAGE is defined.
+ * @param share The Eina_Share instance whose statistics are to be printed.
+ */
 static void
 _eina_share_common_population_stats(Eina_Share *share)
 {
@@ -235,6 +334,13 @@ _eina_share_common_population_stats(Eina_Share *share)
                       share->population_group[i].max);
 }
 
+/**
+ * @internal
+ * @brief Adds to population statistics without taking the global lock.
+ * Assumes the caller holds the lock. Only active if EINA_STRINGSHARE_USAGE is defined.
+ * @param share The Eina_Share instance.
+ * @param slen The length of the string being added.
+ */
 static void
 eina_share_common_population_nolock_add(Eina_Share *share, int slen)
 {
@@ -260,6 +366,13 @@ eina_share_common_population_add(Eina_Share *share, int slen)
    eina_spinlock_release(&_mutex_big);
 }
 
+/**
+ * @internal
+ * @brief Subtracts from population statistics without taking the global lock.
+ * Assumes the caller holds the lock. Only active if EINA_STRINGSHARE_USAGE is defined.
+ * @param share The Eina_Share instance.
+ * @param slen The length of the string being deleted.
+ */
 static void
 eina_share_common_population_nolock_del(Eina_Share *share, int slen)
 {
@@ -268,6 +381,12 @@ eina_share_common_population_nolock_del(Eina_Share *share, int slen)
       share->population_group[slen].count--;
 }
 
+/**
+ * @brief Public function to decrement population statistics (lock-protected).
+ * Only active if EINA_STRINGSHARE_USAGE is defined.
+ * @param share The Eina_Share instance.
+ * @param slen The length of the string being deleted.
+ */
 void
 eina_share_common_population_del(Eina_Share *share, int slen)
 {
@@ -276,6 +395,13 @@ eina_share_common_population_del(Eina_Share *share, int slen)
    eina_spinlock_release(&_mutex_big);
 }
 
+/**
+ * @internal
+ * @brief Initializes population count for a new Eina_Share_Common_Head.
+ * Only active if EINA_STRINGSHARE_USAGE is defined.
+ * @param share The Eina_Share instance (unused if EINA_STRINGSHARE_USAGE is off).
+ * @param head The Eina_Share_Common_Head being initialized.
+ */
 static void
 _eina_share_common_population_head_init(EINA_UNUSED Eina_Share *share,
                                         Eina_Share_Common_Head *head)
@@ -283,6 +409,13 @@ _eina_share_common_population_head_init(EINA_UNUSED Eina_Share *share,
    head->population = 1;
 }
 
+/**
+ * @internal
+ * @brief Increments population count for an Eina_Share_Common_Head.
+ * Only active if EINA_STRINGSHARE_USAGE is defined.
+ * @param share The Eina_Share instance.
+ * @param head The Eina_Share_Common_Head to which a node is added.
+ */
 static void
 _eina_share_common_population_head_add(Eina_Share *share,
                                        Eina_Share_Common_Head *head)
@@ -292,6 +425,13 @@ _eina_share_common_population_head_add(Eina_Share *share,
       share->max_node_population = head->population;
 }
 
+/**
+ * @internal
+ * @brief Decrements population count for an Eina_Share_Common_Head.
+ * Only active if EINA_STRINGSHARE_USAGE is defined.
+ * @param share The Eina_Share instance (unused if EINA_STRINGSHARE_USAGE is off).
+ * @param head The Eina_Share_Common_Head from which a node is removed.
+ */
 static void
 _eina_share_common_population_head_del(EINA_UNUSED Eina_Share *share,
                                        Eina_Share_Common_Head *head)
@@ -301,6 +441,7 @@ _eina_share_common_population_head_del(EINA_UNUSED Eina_Share *share,
 
 #else /* EINA_STRINGSHARE_USAGE undefined */
 
+/* Stubs for population functions when EINA_STRINGSHARE_USAGE is not defined. */
 static void _eina_share_common_population_init(EINA_UNUSED Eina_Share *share) {
 }
 static void _eina_share_common_population_shutdown(EINA_UNUSED Eina_Share *share)
@@ -336,6 +477,17 @@ static void _eina_share_common_population_head_del(
 }
 #endif
 
+/**
+ * @internal
+ * @brief Compares an Eina_Share_Common_Head with a target hash value.
+ * Used for looking up heads in the Rbtree. Compares based on the
+ * EINA_SHARE_COMMON_NODE_HASH part of the head's stored hash.
+ * @param ed The Eina_Share_Common_Head node from the Rbtree.
+ * @param hash Pointer to the target hash value (specifically, the EINA_SHARE_COMMON_NODE_HASH part).
+ * @param length Unused.
+ * @param data Unused.
+ * @return Negative if ed's hash is less than target, positive if greater, zero if equal.
+ */
 static int
 _eina_share_common_cmp(const Eina_Share_Common_Head *ed,
                        const int *hash,
@@ -347,6 +499,15 @@ _eina_share_common_cmp(const Eina_Share_Common_Head *ed,
    return EINA_SHARE_COMMON_NODE_HASH(ed->hash) - *hash;
 }
 
+/**
+ * @internal
+ * @brief Rbtree callback to determine the relative order of two Eina_Share_Common_Head nodes.
+ * Compares based on the EINA_SHARE_COMMON_NODE_HASH part of their stored hashes.
+ * @param left The left Eina_Share_Common_Head node.
+ * @param right The right Eina_Share_Common_Head node.
+ * @param data Unused.
+ * @return EINA_RBTREE_LEFT if left < right, EINA_RBTREE_RIGHT if left >= right.
+ */
 static Eina_Rbtree_Direction
 _eina_share_common_node(const Eina_Share_Common_Head *left,
                         const Eina_Share_Common_Head *right,
@@ -361,6 +522,13 @@ _eina_share_common_node(const Eina_Share_Common_Head *left,
    return EINA_RBTREE_RIGHT;
 }
 
+/**
+ * @internal
+ * @brief Frees an Eina_Share_Common_Head and all its associated Eina_Share_Common_Node(s).
+ * This is typically used as a callback when deleting nodes from the Rbtree.
+ * @param ed The Eina_Share_Common_Head to free.
+ * @param data Unused.
+ */
 static void
 _eina_share_common_head_free(Eina_Share_Common_Head *ed, EINA_UNUSED void *data)
 {
@@ -377,6 +545,16 @@ _eina_share_common_head_free(Eina_Share_Common_Head *ed, EINA_UNUSED void *data)
            MAGIC_FREE(ed);
 }
 
+/**
+ * @internal
+ * @brief Initializes an Eina_Share_Common_Node.
+ * Sets its magic number, reference count, length, and copies the string data.
+ * @param node The node to initialize.
+ * @param str The string content.
+ * @param slen The length of the string content.
+ * @param null_size The size of the null terminator to append.
+ * @param node_magic The magic number to set for this node.
+ */
 static void
 _eina_share_common_node_init(Eina_Share_Common_Node *node,
                              const char *str,
@@ -393,6 +571,14 @@ _eina_share_common_node_init(Eina_Share_Common_Node *node,
    (void) node_magic; /* When magic are disable, node_magic is unused, this remove a warning. */
 }
 
+/**
+ * @internal
+ * @brief Allocates memory for an Eina_Share_Common_Head, including space for its builtin_node's string.
+ * The allocation size is calculated to hold the Eina_Share_Common_Head structure
+ * up to the `str` field of its `builtin_node`, plus the actual string length `slen`.
+ * @param slen The length of the string that the builtin_node will hold.
+ * @return A pointer to the allocated Eina_Share_Common_Head, or NULL on failure.
+ */
 static Eina_Share_Common_Head *
 _eina_share_common_head_alloc(int slen)
 {
@@ -403,6 +589,20 @@ _eina_share_common_head_alloc(int slen)
    return head;
 }
 
+/**
+ * @internal
+ * @brief Adds a new Eina_Share_Common_Head to a given bucket (Rbtree) for a new string.
+ * This function is called when a string is added and no existing head matches its
+ * EINA_SHARE_COMMON_NODE_HASH. It allocates a new head, initializes its builtin_node
+ * with the provided string, and inserts the head into the Rbtree.
+ * @param share The main Eina_Share context.
+ * @param p_bucket Pointer to the Rbtree root for the target bucket.
+ * @param hash The full hash of the string.
+ * @param str The string content.
+ * @param slen The length of the string.
+ * @param null_size The size of the null terminator.
+ * @return Pointer to the string data within the newly added builtin_node, or NULL on failure.
+ */
 static const char *
 _eina_share_common_add_head(Eina_Share *share,
                             Eina_Share_Common_Head **p_bucket,
@@ -437,6 +637,13 @@ _eina_share_common_add_head(Eina_Share *share,
    return head->head->str;
 }
 
+/**
+ * @internal
+ * @brief Deletes an Eina_Share_Common_Head from its bucket (Rbtree) and frees its memory.
+ * This is called when the last string node within a head is removed.
+ * @param p_bucket Pointer to the Rbtree root for the target bucket.
+ * @param head The Eina_Share_Common_Head to delete.
+ */
 static void
 _eina_share_common_del_head(Eina_Share_Common_Head **p_bucket,
                             Eina_Share_Common_Head *head)
@@ -450,7 +657,14 @@ _eina_share_common_del_head(Eina_Share_Common_Head **p_bucket,
          MAGIC_FREE(head);
 }
 
-
+/**
+ * @internal
+ * @brief Checks if an Eina_Share_Common_Node's string content matches a given string and length.
+ * @param node The node to check.
+ * @param str The string to compare against.
+ * @param slen The length of the string to compare.
+ * @return #EINA_TRUE if the node's string matches, #EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _eina_share_common_node_eq(const Eina_Share_Common_Node *node,
                            const char *str,
@@ -460,6 +674,17 @@ _eina_share_common_node_eq(const Eina_Share_Common_Node *node,
            (memcmp(node->str, str, slen) == 0));
 }
 
+/**
+ * @internal
+ * @brief Finds an Eina_Share_Common_Node within a given Eina_Share_Common_Head
+ * that matches the provided string content and length.
+ * Implements a move-to-front heuristic: if a matching node is found and it's not
+ * the first one, it's moved to the head of the list for faster future access.
+ * @param head The Eina_Share_Common_Head to search within.
+ * @param str The string content to find.
+ * @param slen The length of the string.
+ * @return Pointer to the matching Eina_Share_Common_Node, or NULL if not found.
+ */
 static Eina_Share_Common_Node *
 _eina_share_common_head_find(Eina_Share_Common_Head *head,
                              const char *str,
@@ -489,6 +714,13 @@ _eina_share_common_head_find(Eina_Share_Common_Head *head,
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Removes a specific Eina_Share_Common_Node from the linked list within an Eina_Share_Common_Head.
+ * @param head The Eina_Share_Common_Head containing the node.
+ * @param node The Eina_Share_Common_Node to remove.
+ * @return #EINA_TRUE if the node was found and removed, #EINA_FALSE if the node was not found in the list.
+ */
 static Eina_Bool
 _eina_share_common_head_remove_node(Eina_Share_Common_Head *head,
                                     const Eina_Share_Common_Node *node)
@@ -513,6 +745,14 @@ _eina_share_common_head_remove_node(Eina_Share_Common_Head *head,
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Finds an Eina_Share_Common_Head within a bucket (Rbtree) that matches a given hash.
+ * The comparison is based on the EINA_SHARE_COMMON_NODE_HASH part of the full hash.
+ * @param bucket The root of the Rbtree (bucket) to search.
+ * @param hash The EINA_SHARE_COMMON_NODE_HASH part of the full hash to search for.
+ * @return Pointer to the matching Eina_Share_Common_Head, or NULL if not found.
+ */
 static Eina_Share_Common_Head *
 _eina_share_common_find_hash(Eina_Share_Common_Head *bucket, int hash)
 {
@@ -521,20 +761,84 @@ _eina_share_common_find_hash(Eina_Share_Common_Head *bucket, int hash)
              EINA_RBTREE_CMP_KEY_CB(_eina_share_common_cmp), NULL);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the Eina_Share_Common_Head to which a given Eina_Share_Common_Node belongs,
+ * specifically if the node is the `builtin_node` of the head.
+ * This works by traversing to the end of the node's collision list (if any, though
+ * for a builtin_node it should be the only one or the one it points to is NULL)
+ * and then calculating the start of the Eina_Share_Common_Head structure based on the
+ * known offset of `builtin_node`.
+ * @param node Pointer to an Eina_Share_Common_Node, expected to be a `builtin_node`.
+ * @return Pointer to the containing Eina_Share_Common_Head, or NULL/invalid if assumptions are violated or magic check fails.
+ * @warning This function assumes `node` is part of a `builtin_node` structure.
+ *          It traverses `node->next` until it finds the last node in the chain,
+ *          then assumes *that last node* is the `builtin_node`. This logic might be
+ *          fragile if a `builtin_node` could have `next` pointing to other non-builtin nodes
+ *          that are *not* the end of the chain for *this specific head's builtin_node*.
+ *          However, given typical usage, a `builtin_node` is either standalone or its `next`
+ *          is NULL if it's the only node, or it's the actual `builtin_node` structure itself.
+ *          The critical part is that the final node found by traversing `next` pointers
+ *          must be the `builtin_node` for the offset calculation to be correct.
+ */
 static Eina_Share_Common_Head *
 _eina_share_common_head_from_node(Eina_Share_Common_Node *node)
 {
    Eina_Share_Common_Head *head;
    const size_t offset = offsetof(Eina_Share_Common_Head, builtin_node);
 
-   while (node->next)
-     node = node->next;
+   /* Traverse to the end of the list. The last node is assumed to be the builtin_node
+    * if this node originated from a builtin_node context.
+    * This logic is specific to how builtin_nodes are linked or identified.
+    * If 'node' is already the builtin_node and has no 'next', this loop is skipped.
+    * If 'node' is a dynamically allocated node that is part of a list headed by a builtin_node,
+    * this will find the tail, which is NOT the builtin_node.
+    * This function seems intended to be called ONLY with a node that IS the builtin_node,
+    * or where the list structure guarantees the tail is the builtin_node.
+    * Given the context of its use in eina_share_common_del, 'node' can be any node.
+    * If 'node' is the builtin_node, node->next is NULL (if it's the only one) or points to others.
+    * If 'node' is NOT the builtin_node, this logic is problematic.
+    * Re-evaluating: The primary user `eina_share_common_del` calls this.
+    * If `node` is `&ed->builtin_node`, then `node->next` might be set.
+    * The loop `while (node->next) node = node->next;` finds the *last* node in the chain
+    * starting from the given `node`.
+    * Then it assumes *this last node* is the `builtin_node` of some `Eina_Share_Common_Head`.
+    * This is only correct if the original `node` passed in was indeed the `builtin_node`
+    * or part of a chain that *terminates* with the `builtin_node` (which is unusual,
+    * typically builtin_node is at the head).
+    *
+    * A more robust way if `node` could be any node in the list belonging to a head
+    * (where one of them is a builtin_node) would be to have a direct back-pointer
+    * or a different way to identify the head.
+    *
+    * Given the existing code, the assumption is that this function is called in a context
+    * where `node` is the `builtin_node` itself, or the list structure is such that
+    * the tail of the list starting from `node` is the `builtin_node`.
+    * The most common case is when `node` *is* `ed->builtin_node`. In this case,
+    * if `ed->builtin_node.next` is NULL, the loop doesn't run.
+    * If `ed->builtin_node.next` is not NULL, it means other nodes were added *after* the builtin one,
+    * which contradicts the typical list structure where new nodes are prepended.
+    *
+    * Let's assume the intent is: if `node` is the `builtin_node`, this works.
+    * If `node` is a dynamically allocated node, this function is likely to return an incorrect head
+    * unless that dynamic node is the *last* in a chain that *is* the `builtin_node` itself.
+    * The `offsetof` calculation relies on `node` pointing to the `builtin_node` field.
+    */
+   while (node->next) /* This implies that the builtin_node is always the TAIL of its own list if it has one. */
+     node = node->next; /* This will point 'node' to the actual Eina_Share_Common_Node that is embedded. */
    head = (Eina_Share_Common_Head *)((char*)node - offset);
    EINA_MAGIC_CHECK_SHARE_COMMON_HEAD(head, , 0);
 
    return head;
 }
 
+/**
+ * @internal
+ * @brief Allocates memory for an Eina_Share_Common_Node and its associated string data.
+ * @param slen The length of the string data.
+ * @param null_size The size of the null terminator to append.
+ * @return Pointer to the allocated Eina_Share_Common_Node, or NULL on failure.
+ */
 static Eina_Share_Common_Node *
 _eina_share_common_node_alloc(unsigned int slen, unsigned int null_size)
 {
@@ -545,6 +849,15 @@ _eina_share_common_node_alloc(unsigned int slen, unsigned int null_size)
    return node;
 }
 
+/**
+ * @internal
+ * @brief Retrieves an Eina_Share_Common_Node pointer from a pointer to its string data.
+ * This works by subtracting the known offset of the `str` field within the
+ * Eina_Share_Common_Node structure. It then performs a magic check on the presumed node.
+ * @param str Pointer to the character data (the `str` field of an Eina_Share_Common_Node).
+ * @param node_magic The expected magic number for the node.
+ * @return Pointer to the Eina_Share_Common_Node if valid, NULL otherwise (e.g., if magic check fails).
+ */
 static Eina_Share_Common_Node *
 _eina_share_common_node_from_str(const char *str, Eina_Magic node_magic)
 {
@@ -558,6 +871,15 @@ _eina_share_common_node_from_str(const char *str, Eina_Magic node_magic)
    (void) node_magic; /* When magic are disable, node_magic is unused, this remove a warning. */
 }
 
+/**
+ * @internal
+ * @brief Callback function for Eina_Iterator, used during eina_share_common_dump.
+ * Iterates through all nodes in a given Eina_Share_Common_Head and updates dump statistics.
+ * @param rbtree Unused.
+ * @param head The Eina_Share_Common_Head currently being processed.
+ * @param fdata Pointer to the struct dumpinfo to accumulate statistics.
+ * @return #EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 eina_iterator_array_check(const Eina_Rbtree *rbtree EINA_UNUSED,
                           Eina_Share_Common_Head *head,

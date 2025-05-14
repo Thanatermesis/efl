@@ -10,6 +10,24 @@
 #include <Eeze.h>
 #include "eeze_udev_private.h"
 
+/**
+ * @brief Finds udev devices similar to the one specified by syspath.
+ *
+ * This function searches for udev devices that share the same vendor, model,
+ * and revision ID as the device identified by the given syspath.
+ * It also includes parent devices of the found similar devices if they
+ * have an "idVendor" sysattr, indicating they are device roots.
+ *
+ * @param syspath The syspath of the device to find similar devices for.
+ *                Example: "/sys/devices/pci0000:00/0000:00:14.0/usb1/1-1/1-1:1.0"
+ * @return A list of syspaths (Eina_Stringshare *) for similar devices,
+ *         or NULL on failure or if no similar devices are found.
+ *         The caller is responsible for freeing the list and its contents
+ *         using eina_list_free() and eina_stringshare_del() for each item.
+ *         Example of returned list structure:
+ *         ["/sys/devices/pci0000:00/0000:00:14.0/usb1/1-1/1-1:1.0/video4linux/video0",
+ *          "/sys/devices/pci0000:00/0000:00:14.0/usb1/1-2/1-2:1.0/sound/card1"]
+ */
 EAPI Eina_List *
 eeze_udev_find_similar_from_syspath(const char *syspath)
 {
@@ -75,6 +93,27 @@ eeze_udev_find_similar_from_syspath(const char *syspath)
    return ret;
 }
 
+/**
+ * @brief Finds udev devices similar to those in the provided list, including unlisted parents.
+ *
+ * This function iterates through a given list of device syspaths. For each device,
+ * it attempts to find other devices with matching vendor, model, and revision
+ * properties or sysattrs. It also includes parent devices of the found similar
+ * devices if they have an "idVendor" sysattr.
+ *
+ * @param list An Eina_List of device syspaths (const char *) to search for similar devices.
+ *             Example: A list containing strings like
+ *             "/sys/devices/pci0000:00/0000:00:1a.0/usb1/1-1/1-1.5/1-1.5:1.0".
+ * @return The original list, potentially augmented with syspaths (Eina_Stringshare *)
+ *         of newly found similar devices and their relevant parents.
+ *         Returns NULL if the input list is NULL or if critical udev operations fail.
+ *         The caller is responsible for managing the memory of the returned list
+ *         and its stringshared items if it's different from the input or if new items were added.
+ *         Example of returned list structure (if new items are added):
+ *         Original items +
+ *         ["/sys/devices/pci0000:00/0000:00:1d.0/usb2/2-1/2-1.6/2-1.6:1.0/host0/target0:0:0/0:0:0:0/block/sda",
+ *          "/sys/devices/pci0000:00/0000:00:1d.0/usb2/2-1/2-1.6"]
+ */
 EAPI Eina_List *
 eeze_udev_find_unlisted_similar(Eina_List *list)
 {
@@ -147,6 +186,24 @@ eeze_udev_find_unlisted_similar(Eina_List *list)
    return list;
 }
 
+/**
+ * @brief Finds udev devices by a predefined Eeze_Udev_Type and optionally by name.
+ *
+ * This function scans for udev devices matching a specific type (e.g., keyboard, mouse,
+ * storage device) and can further filter them if their syspath contains the given name string.
+ *
+ * @param etype The type of device to search for (Eeze_Udev_Type).
+ *              Example: EEZE_UDEV_TYPE_KEYBOARD
+ * @param name An optional string to filter devices by. If provided, only devices
+ *             whose syspath contains this string will be returned. Can be NULL.
+ *             Example: "event" (to find event-based input devices)
+ * @return A list of syspaths (Eina_Stringshare *) for matching devices,
+ *         or NULL on failure or if no devices are found.
+ *         The caller is responsible for freeing the list and its contents.
+ *         Example of returned list structure:
+ *         ["/sys/devices/platform/i8042/serio0/input/input0/event0",
+ *          "/sys/devices/pci0000:00/0000:00:14.0/usb1/1-1/1-1:1.0/input/input5/mouse0"]
+ */
 EAPI Eina_List *
 eeze_udev_find_by_type(Eeze_Udev_Type etype,
                        const char    *name)
@@ -325,6 +382,26 @@ out:
    return ret;
 }
 
+/**
+ * @brief Finds udev devices by subsystem, a generic type property, and optionally by name.
+ *
+ * This function allows for a more generic search based on subsystem, a udev property
+ * (often used as a type identifier, e.g., "ID_INPUT_KEYBOARD"), and an optional name filter.
+ *
+ * @param subsystem The subsystem to match (e.g., "input", "block"). Can be NULL.
+ *                  Example: "input"
+ * @param type The udev property to match, expecting its value to be "1" (e.g., "ID_INPUT_MOUSE").
+ *             Can be NULL. Example: "ID_INPUT_TOUCHPAD"
+ * @param name An optional string to filter devices by. If provided, only devices
+ *             whose syspath contains this string will be returned. Can be NULL.
+ *             Example: "serio"
+ * @return A list of syspaths (Eina_Stringshare *) for matching devices,
+ *         or NULL on failure, if no criteria are provided, or if no devices are found.
+ *         The caller is responsible for freeing the list and its contents.
+ *         Example of returned list structure:
+ *         ["/sys/devices/platform/i8042/serio1/input/input1",
+ *          "/sys/devices/platform/i8042/serio1/input/input1/mouse1"]
+ */
 EAPI Eina_List *
 eeze_udev_find_by_filter(const char *subsystem,
                          const char *type,
@@ -363,6 +440,23 @@ eeze_udev_find_by_filter(const char *subsystem,
    return ret;
 }
 
+/**
+ * @brief Finds udev devices by a specific sysattr and its value.
+ *
+ * This function searches for devices that have a given sysattr matching a specific value.
+ * If value is NULL, it matches devices that have the sysattr present, regardless of its value.
+ *
+ * @param sysattr The sysattr to match (e.g., "removable", "idVendor"). Must not be NULL.
+ *                Example: "removable"
+ * @param value The expected value of the sysattr. If NULL, matches any device
+ *              that has the sysattr. Example: "1"
+ * @return A list of syspaths (Eina_Stringshare *) for matching devices,
+ *         or NULL on failure, if sysattr is NULL, or if no devices are found.
+ *         The caller is responsible for freeing the list and its contents.
+ *         Example of returned list structure:
+ *         ["/sys/devices/pci0000:00/0000:00:1d.0/usb2/2-1/2-1.6/2-1.6:1.0/host0/target0:0:0/0:0:0:0/block/sda",
+ *          "/sys/devices/pci0000:00/0000:00:1a.0/usb1/1-1/1-1.2/1-1.2:1.0/host1/target1:0:0/1:0:0:0/block/sdb"]
+ */
 EAPI Eina_List *
 eeze_udev_find_by_sysattr(const char *sysattr,
                           const char *value)
@@ -392,6 +486,23 @@ eeze_udev_find_by_sysattr(const char *sysattr,
    return ret;
 }
 
+/**
+ * @brief Finds udev devices by subsystem and sysname.
+ *
+ * This function searches for devices matching a given subsystem and/or sysname.
+ * Either subsystem or sysname (or both) can be provided for filtering.
+ *
+ * @param subsystem The subsystem to match (e.g., "net", "drm"). Can be NULL.
+ *                  Example: "drm"
+ * @param sysname The sysname of the device (e.g., "card0", "eth0"). Can be NULL.
+ *                Example: "card0"
+ * @return A list of syspaths (Eina_Stringshare *) for matching devices,
+ *         or NULL on failure or if no devices are found.
+ *         The caller is responsible for freeing the list and its contents.
+ *         Example of returned list structure:
+ *         ["/sys/devices/pci0000:00/0000:00:02.0/drm/card0",
+ *          "/sys/devices/pci0000:00/0000:00:02.0/drm/card0/card0-VGA-1"]
+ */
 EAPI Eina_List *
 eeze_udev_find_by_subsystem_sysname(const char *subsystem, const char *sysname)
 {

@@ -3,6 +3,17 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Toggles the disabled state of an Evas_Object.
+ *
+ * This callback function retrieves the current disabled status of the
+ * Evas_Object passed in the @p data parameter and sets it to the
+ * opposite value.
+ *
+ * @param data The Evas_Object to disable or enable.
+ * @param obj The Evas_Object that triggered the callback (unused).
+ * @param event_info The event-specific data (unused).
+ */
 static void
 _disable_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -11,6 +22,34 @@ _disable_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    elm_object_disabled_set(data, !status);
 }
 
+/**
+ * @brief Creates a test case for the elm_box widget's disable/enable feature.
+ *
+ * This function sets up a window containing a box layout with several buttons.
+ * The primary purpose is to demonstrate how disabling an `elm_box` container
+ * affects its child widgets. The test UI includes buttons to toggle the
+ * disabled state of the container itself, as well as individual buttons
+ * within it.
+ *
+ * The structure of the created UI is as follows:
+ * - A main window ("box-enable/disable").
+ * - An outer box (`bx_out`).
+ *   - A frame containing:
+ *     - A description of the test.
+ *     - Buttons to control the test:
+ *       - "Disable/Enable Box": Toggles the disabled state of the box below.
+ *       - "Disable/Enable Button 1": Toggles the first button in the box below.
+ *       - "Disable/Enable Button 2": Toggles the second button in the box below.
+ *       - "Disable/Enable Button 3": Toggles the third button in the box below.
+ *   - The `elm_box` (`bx`) under test, containing:
+ *     - "Button 1"
+ *     - "Button 2"
+ *     - "Button 3"
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_box_disable(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -106,6 +145,36 @@ test_box_disable(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *eve
    evas_object_show(win);
 }
 
+/**
+ * @brief Creates a test case for the elm_layout widget's disable/enable feature.
+ *
+ * This function sets up a window containing an `elm_layout` with several
+ * child widgets (buttons). It is designed to test how disabling an `elm_layout`
+ * container affects the widgets placed within its content parts. The UI
+ * provides buttons to toggle the disabled state of the layout as a whole,
+ * and of the individual buttons within it.
+ *
+ * The UI structure includes:
+ * - A main window ("layout").
+ * - A main box (`box`).
+ *   - A frame with:
+ *     - A description of the test.
+ *     - Buttons to control the test:
+ *       - "Disable/Enable Layout": Toggles the disabled state of the layout below.
+ *       - "Disable/Enable Button 1": Toggles the button in "element1" part.
+ *       - "Disable/Enable Button 2": Toggles the button in "element2" part.
+ *       - "Disable/Enable Button 3": Toggles the button in "element3" part.
+ *   - An `elm_layout` used as a title bar.
+ *   - The `elm_layout` (`ly`) under test, loaded from a theme file,
+ *     which contains content parts for buttons:
+ *     - "element1": "Button 1"
+ *     - "element2": "Button 2"
+ *     - "element3": "Button 3"
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_layout_disable(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

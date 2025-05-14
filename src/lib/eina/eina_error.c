@@ -54,31 +54,56 @@
  * @cond LOCAL
  */
 
+/**
+ * @internal
+ * @brief Structure to hold a registered error message.
+ *
+ * This structure stores the error message string and a flag indicating
+ * whether the string was dynamically allocated (and thus needs to be freed)
+ * or if it's a static string.
+ */
 typedef struct _Eina_Error_Message Eina_Error_Message;
 struct _Eina_Error_Message
 {
-   Eina_Bool string_allocated;
-   const char *string;
+   Eina_Bool string_allocated; /**< EINA_TRUE if 'string' was allocated and needs eina_stringshare_del(), EINA_FALSE otherwise. */
+   const char *string;         /**< The error message string. This might be a stringshared string or a static string. */
 };
 
 #ifdef EINA_HAVE_THREADS
-static Eina_Spinlock _eina_errno_msgs_lock;
-static Eina_Hash *_eina_errno_msgs = NULL;
+static Eina_Spinlock _eina_errno_msgs_lock; /**< @internal Spinlock to protect access to _eina_errno_msgs hash table. */
+static Eina_Hash *_eina_errno_msgs = NULL; /**< @internal Hash table to cache stringshared versions of strerror() messages. Key: (int)errno, Value: (const char *)stringshared_message. Used because strerror() is not always thread-safe or might return pointers to static buffers. */
 #endif
-static Eina_Error_Message *_eina_errors = NULL;
-static size_t _eina_errors_count = 0;
-static size_t _eina_errors_allocated = 0;
+static Eina_Error_Message *_eina_errors = NULL; /**< @internal Dynamically allocated array of registered error messages. */
+static size_t _eina_errors_count = 0; /**< @internal Current number of error messages stored in _eina_errors. Also used to generate new error IDs. */
+static size_t _eina_errors_allocated = 0; /**< @internal Current allocated capacity of the _eina_errors array. */
 
 /* used to differentiate registered errors from errno.h */
+/** @internal Bit flag used to distinguish Eina-registered error codes from system errno codes. */
 #define EINA_ERROR_REGISTERED_BIT (1 << 30)
+/** @internal Checks if an error code is an Eina-registered error. */
 #define EINA_ERROR_REGISTERED_CHECK(err) ((err) & EINA_ERROR_REGISTERED_BIT)
 
+/** @internal Converts an internal array index to an Eina-registered error code. */
 #define EINA_ERROR_FROM_INDEX(idx) ((idx) | EINA_ERROR_REGISTERED_BIT)
+/** @internal Converts an Eina-registered error code back to an internal array index. */
 #define EINA_ERROR_TO_INDEX(err) ((err) & (~EINA_ERROR_REGISTERED_BIT))
 
-static Eina_Error _eina_last_error;
-static Eina_TLS _eina_last_key;
+static Eina_Error _eina_last_error; /**< @internal Stores the last error code when not using TLS (e.g., outside main loop or if TLS init failed). */
+static Eina_TLS _eina_last_key;     /**< @internal Thread-Local Storage key for storing the last error code per thread. */
 
+/**
+ * @internal
+ * @brief Allocates space for a new Eina_Error_Message in the internal array.
+ *
+ * This function handles the dynamic resizing of the `_eina_errors` array
+ * if it's full. It increments `_eina_errors_count`.
+ * The initial allocation size is 24 messages, and it grows by 8 messages
+ * each time it needs to reallocate.
+ *
+ * @return A pointer to the newly allocated Eina_Error_Message slot,
+ *         or NULL if reallocation fails. The caller is responsible for
+ *         filling the members of the returned struct.
+ */
 static Eina_Error_Message *
 _eina_error_msg_alloc(void)
 {
@@ -112,7 +137,20 @@ _eina_error_msg_alloc(void)
 # ifdef STRERROR_R_CHAR_P
 #  undef STRERROR_R_CHAR_P
 # endif
-/* Windows has strerror_s(), similar to POSIX strerror_r() */
+/**
+ * @internal
+ * @brief Windows-specific wrapper for strerror_s to behave like POSIX strerror_r.
+ *
+ * Windows provides `strerror_s` which has a similar purpose to the XSI-compliant
+ * `strerror_r`. This function wraps `strerror_s` to provide a consistent
+ * interface. If `strerror_s` returns "Unknown error", this function attempts
+ * to provide a more informative message including the error number.
+ *
+ * @param errnum The error number.
+ * @param buf Buffer to store the error message.
+ * @param buflen Size of the buffer.
+ * @return 0 on success, or an error code on failure (consistent with strerror_r).
+ */
 static inline int strerror_r(int errnum, char *buf, size_t buflen)
 {
    int ret;
@@ -150,12 +188,17 @@ EINA_API Eina_Error EINA_ERROR_OUT_OF_MEMORY = ENOMEM;
  *
  * @return #EINA_TRUE on success, #EINA_FALSE on failure.
  *
- * This function sets up the error module of Eina. It is called by
- * eina_init().
- *
- * This function registers the error #EINA_ERROR_OUT_OF_MEMORY.
+ * This function sets up the Eina error system. It is called by eina_init().
+ * Its main tasks are:
+ * - Creating a Thread-Local Storage (TLS) key (`_eina_last_key`) to store
+ *   per-thread error codes. This is fundamental for thread-safe error
+ *   handling with eina_error_get()/set().
+ * - If `EINA_HAVE_THREADS` is defined, it also initializes a spinlock and
+ *   a hash table (`_eina_errno_msgs`) to cache system `strerror` messages
+ *   in a thread-safe way.
  *
  * @see eina_init()
+ * @see eina_error_shutdown()
  */
 Eina_Bool
 eina_error_init(void)
@@ -187,10 +230,17 @@ eina_error_init(void)
  *
  * @return #EINA_TRUE on success, #EINA_FALSE on failure.
  *
- * This function shuts down the error module set up by
- * eina_error_init(). It is called by eina_shutdown().
+ * This function tears down the Eina error system and frees all associated
+ * resources. It is called by eina_shutdown(). Its tasks include:
+ * - Iterating through all registered custom error messages (`_eina_errors`)
+ *   and deleting the stringshared messages (`eem->string_allocated` is true).
+ * - Freeing the array of error messages itself.
+ * - If `EINA_HAVE_THREADS` is defined, it frees the `strerror` cache hash
+ *   and destroys the spinlock.
+ * - Freeing the TLS key used for per-thread error codes.
  *
  * @see eina_shutdown()
+ * @see eina_error_init()
  */
 Eina_Bool
 eina_error_shutdown(void)
@@ -225,6 +275,23 @@ eina_error_shutdown(void)
 *                                   API                                      *
 *============================================================================*/
 
+/**
+ * @brief Registers a new, dynamically allocated error message.
+ *
+ * @param msg The error message string to register. This string is copied
+ *            using eina_stringshare_add(), so the original can be freed.
+ * @return A new #Eina_Error code on success, or 0 on failure.
+ *
+ * This function allocates space for a new error message and registers it.
+ * The returned error code is a unique identifier that can be used with
+ * eina_error_msg_get() to retrieve the message. The error code is constructed
+ * by setting a specific bit (#EINA_ERROR_REGISTERED_BIT) to distinguish it
+ * from system errno values.
+ *
+ * The internal machinery uses a dynamically growing array to store messages.
+ * If memory allocation for the stringshare copy fails, the allocated slot
+ * for the error message is rolled back.
+ */
 EINA_API Eina_Error
 eina_error_msg_register(const char *msg)
 {
@@ -247,6 +314,22 @@ eina_error_msg_register(const char *msg)
    return EINA_ERROR_FROM_INDEX(_eina_errors_count); /* identifier = index + 1 (== _count). */
 }
 
+/**
+ * @brief Registers a new error message from a static string.
+ *
+ * @param msg The error message string to register. This string is NOT copied,
+ *            so it must be a static literal or have a lifetime that exceeds
+ *            the use of eina_error.
+ * @return A new #Eina_Error code on success, or 0 on failure.
+ *
+ * This function is similar to eina_error_msg_register(), but it avoids
+ * a string copy by storing the pointer directly. This is more efficient
+ * for constant string literals. The `string_allocated` flag in the internal
+ * #Eina_Error_Message struct is set to #EINA_FALSE to prevent a double-free
+ * during shutdown.
+ *
+ * @see eina_error_msg_register()
+ */
 EINA_API Eina_Error
 eina_error_msg_static_register(const char *msg)
 {
@@ -263,6 +346,27 @@ eina_error_msg_static_register(const char *msg)
    return EINA_ERROR_FROM_INDEX(_eina_errors_count); /* identifier = index + 1 (== _count). */
 }
 
+/**
+ * @brief Modifies the message for an already registered error.
+ *
+ * @param error The #Eina_Error code to modify. Must be a registered error,
+ *              not a system errno.
+ * @param msg The new message string.
+ * @return #EINA_TRUE on success, #EINA_FALSE on failure.
+ *
+ * This function allows changing the string associated with an error code
+ * that was previously created with eina_error_msg_register() or
+ * eina_error_msg_static_register().
+ *
+ * A key detail is how it handles memory:
+ * - If the original message was dynamically allocated (via eina_error_msg_register()),
+ *   this function will stringshare the new message and free the old one.
+ * - If the original message was static (via eina_error_msg_static_register()),
+ *   this function simply replaces the pointer, assuming the new message is
+ *   also static. The `string_allocated` flag remains #EINA_FALSE.
+ *
+ * It is not possible to modify system errno messages.
+ */
 EINA_API Eina_Bool
 eina_error_msg_modify(Eina_Error error, const char *msg)
 {
@@ -291,6 +395,32 @@ eina_error_msg_modify(Eina_Error error, const char *msg)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Retrieves the descriptive string for an error code.
+ *
+ * @param error The error code. This can be either a system `errno` value
+ *              (e.g., `ENOMEM`) or an #Eina_Error code returned by
+ *              `eina_error_msg_register()`.
+ * @return A read-only string containing the error message, or `NULL` if
+ *         the error code is not found, is 0, or corresponds to an
+ *         "Unknown error" system message.
+ *
+ * This function translates an error code into a human-readable string.
+ *
+ * For Eina-registered errors (identified by #EINA_ERROR_REGISTERED_CHECK), it
+ * looks up the message in the internal `_eina_errors` array.
+ *
+ * For system `errno` values, its behavior is more complex to ensure
+ * thread-safety, as `strerror()` is not always thread-safe:
+ * - On systems with `strerror_r()`, it uses that to get the message.
+ * - To avoid repeated calls and to provide a stable string pointer, the
+ *   retrieved system messages are cached in a stringshared hash table
+ *   (`_eina_errno_msgs`), protected by a spinlock.
+ * - On systems without `strerror_r()` (or on Windows), it uses fallbacks.
+ *
+ * The function intentionally returns `NULL` for `error == 0` and for generic
+ * "Unknown error" messages from the system to maintain backward compatibility.
+ */
 EINA_API const char *
 eina_error_msg_get(Eina_Error error)
 {
@@ -385,6 +515,22 @@ eina_error_msg_get(Eina_Error error)
    return _eina_errors[error - 1].string;
 }
 
+/**
+ * @brief Retrieves the last error code set for the current context.
+ *
+ * @return The last #Eina_Error code. Returns 0 (#EINA_ERROR_NO_ERROR)
+ *         if no error has been set.
+ *
+ * This function provides thread-safe error retrieval. Its storage mechanism
+ * depends on the execution context:
+ * - If running inside the Ecore main loop (`eina_main_loop_is()` is true),
+ *   it returns a global `_eina_last_error`. This is a performance
+ *   optimization for the common single-threaded main loop case.
+ * - Otherwise (e.g., in worker threads), it uses Thread-Local Storage (TLS)
+ *   via `eina_tls_get()` to retrieve a per-thread error value.
+ *
+ * The cast `(Eina_Error)(uintptr_t)` is necessary because TLS stores a `void*`.
+ */
 EINA_API Eina_Error
 eina_error_get(void)
 {
@@ -394,6 +540,21 @@ eina_error_get(void)
    return (Eina_Error)(uintptr_t) eina_tls_get(_eina_last_key);
 }
 
+/**
+ * @brief Sets the last error code for the current context.
+ *
+ * @param err The #Eina_Error code to set. Use 0 (#EINA_ERROR_NO_ERROR)
+ *            to clear the error state.
+ *
+ * This function provides thread-safe error setting. Like eina_error_get(),
+ * its storage mechanism depends on the execution context:
+ * - If inside the Ecore main loop, it sets a global `_eina_last_error`.
+ * - Otherwise, it uses Thread-Local Storage (TLS) via `eina_tls_set()`
+ *   to store the error on a per-thread basis.
+ *
+ * The cast `(void*)(uintptr_t)` is necessary to store the integer error
+ * code in the `void*` provided by the TLS API.
+ */
 EINA_API void
 eina_error_set(Eina_Error err)
 {
@@ -403,6 +564,27 @@ eina_error_set(Eina_Error err)
      eina_tls_set(_eina_last_key, (void*)(uintptr_t) err);
 }
 
+/**
+ * @brief Finds a registered #Eina_Error code by its message string.
+ *
+ * @param msg The error message string to search for. Must not be `NULL`.
+ * @return The corresponding #Eina_Error code if found, otherwise 0.
+ *
+ * This function performs a reverse lookup, searching for an error code
+ * that matches the given message string. It iterates through all
+ * registered Eina errors.
+ *
+ * The matching logic is twofold:
+ * 1. For stringshared messages (`string_allocated` is true), it first
+ *    attempts a fast pointer comparison. This works if `msg` is the
+ *    exact stringshared pointer.
+ * 2. It then falls back to a full string comparison using `strcmp()` for
+ *    all cases.
+ *
+ * Note: This function only searches through errors registered with
+ * eina_error_msg_register() or eina_error_msg_static_register(). It does
+ * not search through system `errno` messages.
+ */
 EINA_API Eina_Error
 eina_error_find(const char *msg)
 {

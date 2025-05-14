@@ -3,30 +3,48 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Structure to hold pointers to the main grid and a child object
+ *        for API testing purposes.
+ */
 struct _Api_Data
 {
-   Evas_Object *grid;
-   Evas_Object *child;
+   Evas_Object *grid;   /**< The grid widget being tested. */
+   Evas_Object *child;  /**< A child widget within the grid. */
 };
 typedef struct _Api_Data Api_Data;
 
+/**
+ * @brief Test-specific data structure to manage the state of the API test.
+ */
 struct _api_data
 {
-   unsigned int state;  /* What state we are testing       */
-   Api_Data data;
+   unsigned int state;  /**< Current state of the API test, corresponds to an api_state enum value. */
+   Api_Data data;       /**< Pointers to Evas_Objects used in the test. */
 };
 typedef struct _api_data api_data;
 
+/**
+ * @brief Defines the different states of the grid API test, each corresponding
+ *        to a function call to be tested.
+ */
 enum _api_state
 {
-   GRID_PACK_SET,
-   GRID_UNPACK,
-   GRID_SIZE,
-   GRID_CLEAR,
-   API_STATE_LAST
+   GRID_PACK_SET,   /**< Test elm_grid_pack_set() */
+   GRID_UNPACK,     /**< Test elm_grid_unpack() */
+   GRID_SIZE,       /**< Test elm_grid_size_get() and elm_grid_size_set() */
+   GRID_CLEAR,      /**< Test elm_grid_clear() */
+   API_STATE_LAST   /**< Sentinel to mark the end of test states */
 };
 typedef enum _api_state api_state;
 
+/**
+ * @brief Executes a grid API function based on the current test state.
+ * @param api The test data structure containing the current state and widgets.
+ *
+ * This function acts as a state machine for testing various elm_grid APIs.
+ * It is called each time the "Next API function" button is clicked.
+ */
 static void
 set_api_state(api_data *api)
 {
@@ -63,6 +81,16 @@ set_api_state(api_data *api)
      }
 }
 
+/**
+ * @brief Callback for the "Next API function" button's "clicked" event.
+ * @param data The api_data struct.
+ * @param obj The button object that was clicked.
+ * @param event_info Not used.
+ *
+ * This function advances the API test to the next state, calls set_api_state()
+ * to execute the test, and updates the button's label. It disables the
+ * button when all tests have been run.
+ */
 static void
 _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {  /* Will add here a SWITCH command containing code to modify test-object */
@@ -78,6 +106,15 @@ _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_disabled_set(obj, a->state == API_STATE_LAST);
 }
 
+/**
+ * @brief Callback for the "Change" button's "clicked" event.
+ * @param data Not used.
+ * @param obj The button object that was clicked. Its packing is modified.
+ * @param event_info Not used.
+ *
+ * This function demonstrates modifying a child's packing within the grid
+ * dynamically. It gets the current packing and expands it slightly.
+ */
 static void
 _ch_grid(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -87,12 +124,32 @@ _ch_grid(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_grid_pack_set(obj, x - 1, y - 1, w + 2, h + 2);
 }
 
+/**
+ * @brief Callback for the window's EVAS_CALLBACK_FREE event.
+ * @param data The api_data struct to be freed.
+ * @param e Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * Frees the memory allocated for the test's api_data structure.
+ */
 static void
 _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Main function to set up and run the grid test.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This function creates a window and a grid widget. It then populates the grid
+ * with various child widgets (buttons, entries, rectangles) to demonstrate
+ * and test the grid's packing and API functionality. It also sets up a
+ * button to step through different API function calls.
+ */
 void
 test_grid(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

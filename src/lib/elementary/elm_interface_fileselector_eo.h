@@ -4,7 +4,7 @@
 #ifndef _ELM_INTERFACE_FILESELECTOR_EO_CLASS_TYPE
 #define _ELM_INTERFACE_FILESELECTOR_EO_CLASS_TYPE
 
-typedef Eo Elm_Interface_Fileselector;
+typedef Eo Elm_Interface_Fileselector; /**< Base Efl_Object type for the Elm_Interface_Fileselector. Represents an instance of this interface. @since 1.24 */
 
 #endif
 
@@ -51,7 +51,7 @@ typedef enum
  *
  * @ingroup Elm_Interface_Fileselector
  */
-#define ELM_INTERFACE_FILESELECTOR_INTERFACE elm_interface_fileselector_interface_get()
+#define ELM_INTERFACE_FILESELECTOR_INTERFACE elm_interface_fileselector_interface_get() /**< Macro to get the Efl_Class for this interface. @since 1.24 */
 
 EWAPI const Efl_Class *elm_interface_fileselector_interface_get(void) EINA_CONST;
 

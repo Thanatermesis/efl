@@ -6,18 +6,62 @@
 
 #define NUM_OF_VALS 12
 
+/**
+ * @brief Callback for the 'steady' event of the spin button.
+ *
+ * This function is called when the user stops interacting with the spin button
+ * for a short period, and the value has changed. It prints the new value
+ * to standard output.
+ *
+ * @param data User data pointer (not used in this case).
+ * @param ev The event information, containing the source object.
+ */
 static void
 _spin_delay_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
    printf("Value delay changed %d\n", (int)efl_ui_range_value_get(ev->object));
 }
 
+/**
+ * @brief Callback for the 'changed' event of the spin button.
+ *
+ * This function is called immediately whenever the value of the spin button
+ * is changed by the user. It prints the new value to standard output.
+ *
+ * @param data User data pointer (not used in this case).
+ * @param ev The event information, containing the source object.
+ */
 static void
 _spin_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
    printf("Value changed %d\n", (int)efl_ui_range_value_get(ev->object));
 }
 
+/**
+ * @brief Creates the test UI for the Efl.Ui.Spin_Button widget.
+ *
+ * This function sets up a window containing three different spin button
+ * widgets to demonstrate various features:
+ * 1. An integer spin button with wrapping, direct input, and step values.
+ * 2. A floating-point spin button with a custom format string.
+ * 3. A spin button with special text values mapped to numeric values (e.g., months).
+ *
+ * The `special_values` array demonstrates how to map numeric values to
+ * custom strings. Each element is an `Efl_Ui_Format_Value` struct:
+ * @code
+ * Efl_Ui_Format_Value {
+ *   double value;    // The numeric value
+ *   const char *text; // The string representation
+ * };
+ *
+ * // Example from the test:
+ * {1, "January"}, {2, "February"}, ...
+ * @endcode
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_ui_spin_button(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

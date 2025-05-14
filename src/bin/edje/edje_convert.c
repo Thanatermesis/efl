@@ -3,20 +3,48 @@
 #include "edje_cc.h"
 #include "edje_convert.h"
 
+/**
+ * @internal
+ * @brief Global pointer to the currently processed Edje_File.
+ * This is used to provide context to functions that might need
+ * access to the main Edje file structure during conversion or processing.
+ */
 static const Edje_File *_current_edje_file = NULL;
 
+/**
+ * @internal
+ * @brief Retrieves the currently set global Edje_File.
+ * @return A const pointer to the current Edje_File, or NULL if not set.
+ */
 const Edje_File *
 _edje_file_get(void)
 {
    return _current_edje_file;
 }
 
+/**
+ * @internal
+ * @brief Sets the global Edje_File pointer.
+ * @param edf A const pointer to the Edje_File to be set as current.
+ */
 void
 _edje_file_set(const Edje_File *edf)
 {
    _current_edje_file = edf;
 }
 
+/**
+ * @internal
+ * @brief Converts the external directory from an old Edje file format to the new format.
+ *
+ * This function allocates and populates the `external_dir` field in the new
+ * Edje_File structure (`edf`) based on the data from the old Edje_File
+ * structure (`oedf`). It handles memory allocation for the directory and its entries.
+ *
+ * @param edf Pointer to the new Edje_File structure to be populated.
+ * @param oedf Pointer to the old Edje_File structure containing the source data.
+ * @return EINA_TRUE on success, EINA_FALSE on memory allocation failure.
+ */
 static Eina_Bool
 _edje_file_convert_external(Edje_File *edf, Old_Edje_File *oedf)
 {
@@ -47,6 +75,18 @@ _edje_file_convert_external(Edje_File *edf, Old_Edje_File *oedf)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Converts the image directory from an old Edje file format to the new format.
+ *
+ * This function handles the conversion of image entries and image sets.
+ * It determines the maximum ID for entries and sets to allocate appropriately sized
+ * arrays in the new Edje_File structure. Entries and sets are then copied.
+ *
+ * @param edf Pointer to the new Edje_File structure to be populated.
+ * @param oedf Pointer to the old Edje_File structure containing the source data.
+ * @return EINA_TRUE on success, EINA_FALSE on memory allocation failure.
+ */
 static Eina_Bool
 _edje_file_convert_images(Edje_File *edf, Old_Edje_File *oedf)
 {
@@ -104,6 +144,19 @@ _edje_file_convert_images(Edje_File *edf, Old_Edje_File *oedf)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Converts an entire Edje file from an old format (Old_Edje_File) to the current Edje_File format.
+ *
+ * This is a top-level conversion function that orchestrates the conversion of
+ * various components of an Edje file, including data, collections, fonts,
+ * images, and external resources.
+ *
+ * @param ef The Eet_File handle, used for error reporting.
+ * @param oedf Pointer to the old Edje_File structure to be converted.
+ * @return A pointer to the newly allocated and converted Edje_File structure on success,
+ *         or NULL if the version is too old or a memory allocation error occurs.
+ */
 Edje_File *
 _edje_file_convert(Eet_File *ef, Old_Edje_File *oedf)
 {
@@ -184,6 +237,22 @@ on_error:
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Adds an Edje_Program to a dynamically sized array of programs.
+ *
+ * This utility function reallocates the given array to accommodate a new program
+ * and increments the count. It handles potential memory allocation failures by
+ * calling error_and_abort.
+ *
+ * @param array Pointer to a pointer to the array of Edje_Program pointers.
+ *              This will be updated if reallocation occurs.
+ *              Example: Edje_Program **programs_array;
+ *                       _edje_collection_program_add(&programs_array, ...);
+ * @param count Pointer to an unsigned integer holding the current number of programs
+ *              in the array. This will be incremented.
+ * @param add Pointer to the Edje_Program to be added to the array.
+ */
 static void
 _edje_collection_program_add(Edje_Program ***array,
                              unsigned int *count,
@@ -202,6 +271,24 @@ _edje_collection_program_add(Edje_Program ***array,
    *array = tmp;
 }
 
+/**
+ * @internal
+ * @brief Converts an Old_Edje_Part_Collection to the new Edje_Part_Collection format.
+ *
+ * This function handles the complex conversion of a part collection, including:
+ * - Counting part types for mempool allocation.
+ * - Allocating mempools for different part description types.
+ * - Converting and categorizing programs (nocmp, strcmp, strncmp, strrncmp, fnmatch).
+ * - Converting data associated with the collection.
+ * - Converting individual parts and their descriptions.
+ *
+ * @param ef The Eet_File handle, used for error reporting.
+ * @param ce Pointer to the Edje_Part_Collection_Directory_Entry for this collection.
+ *           This structure is updated with part counts and mempool pointers.
+ * @param oedc Pointer to the Old_Edje_Part_Collection to be converted.
+ * @return A pointer to the newly allocated and converted Edje_Part_Collection,
+ *         or it may abort via error_and_abort on memory failure.
+ */
 Edje_Part_Collection *
 _edje_collection_convert(Eet_File *ef, Edje_Part_Collection_Directory_Entry *ce, Old_Edje_Part_Collection *oedc)
 {
@@ -389,6 +476,24 @@ case EDJE_PART_TYPE_##Tp: \
    return edc;
 }
 
+/**
+ * @internal
+ * @brief Converts an Old_Edje_Part_Description to the new Edje_Part_Description_Common format
+ *        or one of its specialized typed variants.
+ *
+ * This function allocates memory from the appropriate mempool (managed by `ce`)
+ * based on the `type` of the part description. It then copies the common data
+ * and type-specific data from the old description (`oed`) to the new structure.
+ *
+ * @param type The type of the part (e.g., EDJE_PART_TYPE_RECTANGLE, EDJE_PART_TYPE_IMAGE).
+ * @param ce Pointer to the Edje_Part_Collection_Directory_Entry which contains
+ *           the mempools for allocating new description structures.
+ * @param oed Pointer to the Old_Edje_Part_Description to be converted. This structure
+ *            will be freed by this function.
+ * @return A pointer to the newly allocated Edje_Part_Description_Common (or a
+ *         compatible typed structure) on success, or NULL on allocation failure
+ *         (specifically for image tweens).
+ */
 Edje_Part_Description_Common *
 _edje_description_convert(int type,
                           Edje_Part_Collection_Directory_Entry *ce,

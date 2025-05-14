@@ -16,20 +16,39 @@
 
 typedef struct _Ector_Renderer_Software_Image_Data Ector_Renderer_Software_Image_Data;
 
+/**
+ * @brief Private data for the Ector Software Image Renderer.
+ *
+ * This structure holds all the necessary data for rendering an image
+ * using the software rendering backend. It includes references to the
+ * target surface, the image data, transformation matrices, and drawing
+ * boundaries.
+ */
 struct _Ector_Renderer_Software_Image_Data
 {
-   Ector_Software_Surface_Data *surface;
-   Ector_Renderer_Image_Data   *image;
-   Ector_Renderer_Data         *base;
-   Ector_Buffer                *comp;
-   Efl_Gfx_Vg_Composite_Method comp_method;
-   int                          opacity;
-   Eina_Matrix3                 inv_m;
+   Ector_Software_Surface_Data *surface; /**< Pointer to the software surface data where rendering occurs. */
+   Ector_Renderer_Image_Data   *image; /**< Pointer to the image data to be rendered. */
+   Ector_Renderer_Data         *base; /**< Pointer to the base renderer data. */
+   Ector_Buffer                *comp; /**< Optional composition buffer (e.g., for masking). */
+   Efl_Gfx_Vg_Composite_Method comp_method; /**< Composition method to be used. */
+   int                          opacity; /**< Overall opacity for the image rendering. */
+   Eina_Matrix3                 inv_m; /**< Inverse transformation matrix. */
    struct {
-      int x1, y1, x2, y2;
-   } boundary;
+      int x1, y1, x2, y2; /**< Boundary coordinates (x1, y1, x2, y2) for the drawing area. */
+   } boundary; /**< Structure to hold the calculated drawing boundary on the target surface. */
 };
 
+/**
+ * @brief Prepares the image renderer for drawing.
+ *
+ * This function initializes the renderer's internal state based on the
+ * current image, surface, and transformation settings. It calculates
+ * the drawing boundaries and the inverse transformation matrix.
+ *
+ * @param obj The Ector_Renderer_Software_Image object.
+ * @param pd The private data of the Ector_Renderer_Software_Image object.
+ * @return EINA_TRUE if preparation was successful, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _ector_renderer_software_image_ector_renderer_prepare(Eo *obj,
                                                       Ector_Renderer_Software_Image_Data *pd)
@@ -88,6 +107,21 @@ _ector_renderer_software_image_ector_renderer_prepare(Eo *obj,
 }
 
 //FIXME: We need to implement that apply op, clips and mul_col.
+/**
+ * @brief Draws the image onto the target surface.
+ *
+ * This function performs the actual rendering of the image. It iterates
+ * over the pixels within the calculated boundary, applies the inverse
+ * transformation to find the corresponding source image pixel, and blends
+ * it onto the destination surface.
+ *
+ * @param obj The Ector_Renderer_Software_Image object (unused).
+ * @param pd The private data of the Ector_Renderer_Software_Image object.
+ * @param op The rendering operation (unused).
+ * @param clips An array of clipping regions (unused).
+ * @param mul_col A color multiplier (unused).
+ * @return EINA_TRUE if drawing was successful or not needed (e.g., fully transparent), EINA_FALSE on error.
+ */
 static Eina_Bool
 _ector_renderer_software_image_ector_renderer_draw(Eo *obj EINA_UNUSED,
                                                    Ector_Renderer_Software_Image_Data *pd,
@@ -151,6 +185,16 @@ _ector_renderer_software_image_ector_renderer_draw(Eo *obj EINA_UNUSED,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Constructor for the Ector_Renderer_Software_Image object.
+ *
+ * Initializes the Ector_Renderer_Software_Image object and its private data.
+ * It also establishes references to related image and base renderer data.
+ *
+ * @param obj The Eo object to construct.
+ * @param pd The private data for the Ector_Renderer_Software_Image.
+ * @return The constructed Eo object, or NULL on failure.
+ */
 static Eo *
 _ector_renderer_software_image_efl_object_constructor(Eo *obj, Ector_Renderer_Software_Image_Data *pd)
 {
@@ -163,6 +207,15 @@ _ector_renderer_software_image_efl_object_constructor(Eo *obj, Ector_Renderer_So
    return obj;
 }
 
+/**
+ * @brief Destructor for the Ector_Renderer_Software_Image object.
+ *
+ * Cleans up resources used by the Ector_Renderer_Software_Image object,
+ * including unreferencing related data.
+ *
+ * @param obj The Eo object to destruct.
+ * @param pd The private data of the Ector_Renderer_Software_Image.
+ */
 static void
 _ector_renderer_software_image_efl_object_destructor(Eo *obj, Ector_Renderer_Software_Image_Data *pd)
 {
@@ -173,6 +226,17 @@ _ector_renderer_software_image_efl_object_destructor(Eo *obj, Ector_Renderer_Sof
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Calculates a CRC checksum for the renderer's current state.
+ *
+ * This function computes a CRC value based on the renderer's superclass
+ * CRC and the image data. This can be used to detect changes in the
+ * renderer's configuration or input.
+ *
+ * @param obj The Ector_Renderer_Software_Image object.
+ * @param pd The private data of the Ector_Renderer_Software_Image object.
+ * @return The calculated CRC value.
+ */
 unsigned int
 _ector_renderer_software_image_ector_renderer_crc_get(const Eo *obj,
                                                       Ector_Renderer_Software_Image_Data *pd)
@@ -185,6 +249,19 @@ _ector_renderer_software_image_ector_renderer_crc_get(const Eo *obj,
    return crc;
 }
 
+/**
+ * @brief Sets the composition method and buffer for the renderer.
+ *
+ * This function configures how the image is composited with the target
+ * surface, potentially using a composition buffer (e.g., for masking).
+ *
+ * @param obj The Ector_Renderer_Software_Image object (unused).
+ * @param pd The private data of the Ector_Renderer_Software_Image object.
+ * @param comp The Ector_Buffer to be used for composition (e.g., a mask).
+ *             Can be NULL if no composition buffer is used.
+ * @param method The Efl_Gfx_Vg_Composite_Method specifying the composition operation.
+ *               Example: EFL_GFX_VG_COMPOSITE_METHOD_MASK for alpha masking.
+ */
 static void
 _ector_renderer_software_image_ector_renderer_comp_method_set(Eo *obj EINA_UNUSED,
                                                               Ector_Renderer_Software_Image_Data *pd,

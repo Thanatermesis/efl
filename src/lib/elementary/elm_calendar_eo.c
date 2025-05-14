@@ -21,7 +21,18 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_calendar_selectable_get, Elm_Calendar_Selectab
 
 void _elm_calendar_interval_set(Eo *obj, Elm_Calendar_Data *pd, double interval);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function for the 'interval' property setter.
+ *
+ * This function is called by the Eolian runtime when the 'interval' property
+ * is set. It converts the Eina_Value to a double and calls the
+ * actual C implementation elm_obj_calendar_interval_set().
+ *
+ * @param obj The Eo object.
+ * @param val The Eina_Value containing the new interval.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code if conversion fails.
+ */
 static Eina_Error
 __eolian_elm_calendar_interval_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -41,7 +52,17 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_calendar_interval_set, EFL_FUNC_CALL(interval)
 
 double _elm_calendar_interval_get(const Eo *obj, Elm_Calendar_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function for the 'interval' property getter.
+ *
+ * This function is called by the Eolian runtime when the 'interval' property
+ * is read. It calls the actual C implementation elm_obj_calendar_interval_get()
+ * and wraps the returned double in an Eina_Value.
+ *
+ * @param obj The Eo object.
+ * @return An Eina_Value containing the interval value.
+ */
 static Eina_Value
 __eolian_elm_calendar_interval_get_reflect(const Eo *obj)
 {
@@ -139,7 +160,20 @@ Eina_Bool _elm_calendar_efl_ui_widget_widget_input_event_handler(Eo *obj, Elm_Ca
 
 const Efl_Access_Action_Data *_elm_calendar_efl_access_widget_action_elm_actions_get(const Eo *obj, Elm_Calendar_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Initializes the Elm_Calendar Efl_Class.
+ *
+ * This function is called once during class construction. It sets up
+ * the Evas Object operations (ops) and Eolian property reflection
+ * operations (ropsp) for the Elm_Calendar class. This includes mapping
+ * EO API functions (e.g., elm_obj_calendar_first_day_of_week_set) to their
+ * C implementations (e.g., _elm_calendar_first_day_of_week_set) and
+ * defining how properties like "interval" are accessed.
+ *
+ * @param klass The Efl_Class to initialize.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_calendar_class_initializer(Efl_Class *klass)
 {

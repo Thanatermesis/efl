@@ -15,9 +15,15 @@
 
 #define MY_CLASS_NAME "Efl.Ui.Grid_Default_Item"
 
-
+/**
+ * @brief Private data structure for Efl_Ui_Group_Item.
+ *
+ * This structure holds a list of items that are registered as children
+ * of this group item. These items are managed within the group item's
+ * parent container.
+ */
 typedef struct {
-   Eina_List *registered_items;
+   Eina_List *registered_items; /**< List of Efl_Gfx_Entity items managed by this group item. */
 } Efl_Ui_Group_Item_Data;
 
 EOLIAN static Efl_Object*
@@ -38,6 +44,15 @@ _efl_ui_group_item_efl_object_invalidate(Eo *obj, Efl_Ui_Group_Item_Data *pd EIN
 
 static void _unregister_item(Eo *obj EINA_UNUSED, Efl_Ui_Group_Item_Data *pd, Efl_Gfx_Entity *subobj);
 
+/**
+ * @brief Callback for the EFL_EVENT_INVALIDATE event on a sub-item.
+ *
+ * When a sub-item is invalidated (e.g., deleted), it needs to be
+ * unregistered from this group item.
+ *
+ * @param data The group item object (Eo *).
+ * @param ev The event information, where ev->object is the sub-item being invalidated.
+ */
 static void
 _invalidate(void *data, const Efl_Event *ev)
 {
@@ -46,6 +61,17 @@ _invalidate(void *data, const Efl_Event *ev)
    _unregister_item(data, pd, ev->object);
 }
 
+/**
+ * @brief Registers a sub-object as a child of this group item.
+ *
+ * This involves setting the sub-object's parent to this group item,
+ * adding an event listener for its invalidation, and adding it to the
+ * internal list of registered items.
+ *
+ * @param obj The group item object.
+ * @param pd The private data of the group item.
+ * @param subobj The sub-object to register.
+ */
 static void
 _register_item(Eo *obj, Efl_Ui_Group_Item_Data *pd, Efl_Gfx_Entity *subobj)
 {
@@ -54,6 +80,17 @@ _register_item(Eo *obj, Efl_Ui_Group_Item_Data *pd, Efl_Gfx_Entity *subobj)
    pd->registered_items = eina_list_append(pd->registered_items, subobj);
 }
 
+/**
+ * @brief Unregisters a sub-object from this group item.
+ *
+ * This involves clearing the sub-object's container, removing the
+ * invalidation event listener, and removing it from the internal list
+ * of registered items.
+ *
+ * @param obj The group item object (unused in current implementation but kept for API consistency).
+ * @param pd The private data of the group item.
+ * @param subobj The sub-object to unregister.
+ */
 static void
 _unregister_item(Eo *obj EINA_UNUSED, Efl_Ui_Group_Item_Data *pd, Efl_Gfx_Entity *subobj)
 {
@@ -104,6 +141,12 @@ _efl_ui_group_item_efl_pack_unpack(Eo *obj, Efl_Ui_Group_Item_Data *pd, Efl_Gfx_
    return EINA_TRUE;
 }
 
+/**
+ * @brief Macro to handle the result of a pack operation.
+ * If the condition (pack operation) fails, it unregisters the subobj and returns EINA_FALSE.
+ * Otherwise, it returns EINA_TRUE.
+ * @param cond The condition to check, typically the result of a pack call.
+ */
 #define HANDLE_REG_CALL(cond) \
   if (!(cond)) \
     { \
@@ -296,9 +339,9 @@ _efl_ui_group_item_efl_container_content_iterate(Eo *obj, Efl_Ui_Group_Item_Data
 
    EINA_MAGIC_SET(&it->iterator, EINA_MAGIC_ITERATOR);
 
-   it->current = efl_pack_index_get(container, obj) + 1;
-   it->max = it->current + eina_list_count(pd->registered_items);
-   it->container = container;
+   it->current = efl_pack_index_get(container, obj) + 1; // Start iterating from the item after the group_item itself
+   it->max = it->current + eina_list_count(pd->registered_items); // Iterate up to the last item in this group
+   it->container = container; // The actual container holding the items
 
    it->iterator.version = EINA_ITERATOR_VERSION;
    it->iterator.next = FUNC_ITERATOR_NEXT(_next_item);

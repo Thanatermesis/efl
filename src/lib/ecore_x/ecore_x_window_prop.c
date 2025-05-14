@@ -16,8 +16,16 @@
   XChangeProperty(_ecore_x_disp, win, atom, XA_CARDINAL, 32, PropModeReplace, \
                   (unsigned char *)p_val, cnt)
 
-/*
- * Set CARD32 (array) property
+/**
+ * @brief Set a window property of type CARDINAL.
+ *
+ * This function sets a property on a window. The property consists of an array
+ * of 32-bit unsigned integers (CARDINAL).
+ *
+ * @param win The window whose property is to be set.
+ * @param atom The atom representing the property to set.
+ * @param val An array of unsigned integers to be set as the property value.
+ * @param num The number of unsigned integers in the @p val array.
  */
 EAPI void
 ecore_x_window_prop_card32_set(Ecore_X_Window win,
@@ -44,13 +52,19 @@ ecore_x_window_prop_card32_set(Ecore_X_Window win,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
-/*
- * Get CARD32 (array) property
+/**
+ * @brief Get a CARDINAL (32-bit unsigned integer) array property from a window.
  *
- * At most len items are returned in val.
- * If the property was successfully fetched the number of items stored in
- * val is returned, otherwise -1 is returned.
- * Note: Return value 0 means that the property exists but has no elements.
+ * This function retrieves a property of type CARDINAL from a window and stores
+ * it in a pre-allocated buffer.
+ *
+ * @param win The window from which to get the property.
+ * @param atom The atom representing the property to get.
+ * @param val A pre-allocated buffer to store the retrieved unsigned integer values.
+ *            If NULL, the function will only return the number of items.
+ * @param len The maximum number of items to store in @p val.
+ * @return On success, the number of items stored in @p val. A value of 0 means
+ *         the property exists but is empty. On failure, -1 is returned.
  */
 EAPI int
 ecore_x_window_prop_card32_get(Ecore_X_Window win,
@@ -93,12 +107,20 @@ ecore_x_window_prop_card32_get(Ecore_X_Window win,
    return num;
 }
 
-/*
- * Get CARD32 (array) property of any length
+/**
+ * @brief Get a CARDINAL (32-bit unsigned integer) array property of any length.
  *
- * If the property was successfully fetched the number of items stored in
- * val is returned, otherwise -1 is returned.
- * Note: Return value 0 means that the property exists but has no elements.
+ * This function retrieves a property of type CARDINAL from a window. It
+ * allocates memory for the returned list of values. The caller is responsible
+ * for freeing this memory with `free()`.
+ *
+ * @param win The window from which to get the property.
+ * @param atom The atom representing the property to get.
+ * @param[out] plst A pointer to a variable that will be set to the newly
+ *                  allocated array of unsigned integers. If the property does
+ *                  not exist or is empty, this will be set to NULL.
+ * @return The number of items in the returned list, or -1 on failure. A value
+ *         of 0 means the property exists but is empty.
  */
 EAPI int
 ecore_x_window_prop_card32_list_get(Ecore_X_Window win,
@@ -146,8 +168,17 @@ ecore_x_window_prop_card32_list_get(Ecore_X_Window win,
    return num;
 }
 
-/*
- * Set X ID (array) property
+/**
+ * @brief Set a window property consisting of an array of X IDs.
+ *
+ * This is a generic function to set properties that are lists of X resource
+ * identifiers, such as Windows, Pixmaps, or Atoms.
+ *
+ * @param win The window whose property is to be set.
+ * @param atom The atom representing the property to set.
+ * @param type The type of the property (e.g., XA_WINDOW, XA_ATOM).
+ * @param lst An array of Ecore_X_ID values to set.
+ * @param num The number of IDs in the @p lst array.
  */
 EAPI void
 ecore_x_window_prop_xid_set(Ecore_X_Window win,
@@ -177,13 +208,21 @@ ecore_x_window_prop_xid_set(Ecore_X_Window win,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
-/*
- * Get X ID (array) property
+/**
+ * @brief Get a window property consisting of an array of X IDs.
  *
- * At most len items are returned in val.
- * If the property was successfully fetched the number of items stored in
- * val is returned, otherwise -1 is returned.
- * Note: Return value 0 means that the property exists but has no elements.
+ * This function retrieves a property that is a list of X resource identifiers
+ * and stores it in a pre-allocated buffer.
+ *
+ * @param win The window from which to get the property.
+ * @param atom The atom representing the property to get.
+ * @param type The expected type of the property (e.g., XA_WINDOW, XA_ATOM).
+ * @param lst A pre-allocated buffer to store the retrieved X IDs.
+ *            If NULL, the function will only return the number of items.
+ * @param len The maximum number of items to store in @p lst.
+ * @return On success, the number of items stored in @p lst. A value of 0 means
+ *         the property exists but is empty. On failure, -1 is returned (e.g.,
+ *         if the actual property type does not match @p type).
  */
 EAPI int
 ecore_x_window_prop_xid_get(Ecore_X_Window win,
@@ -229,13 +268,21 @@ ecore_x_window_prop_xid_get(Ecore_X_Window win,
    return num;
 }
 
-/*
- * Get X ID (array) property
+/**
+ * @brief Get a window property consisting of an array of X IDs of any length.
  *
- * If the property was successfully fetched the number of items stored in
- * val is returned, otherwise -1 is returned.
- * The returned array must be freed with free().
- * Note: Return value 0 means that the property exists but has no elements.
+ * This function retrieves a property that is a list of X resource identifiers.
+ * It allocates memory for the returned list. The caller is responsible for
+ * freeing this memory with `free()`.
+ *
+ * @param win The window from which to get the property.
+ * @param atom The atom representing the property to get.
+ * @param type The expected type of the property (e.g., XA_WINDOW, XA_ATOM).
+ * @param[out] val A pointer to a variable that will be set to the newly
+ *                 allocated array of X IDs. If the property does not exist or
+ *                 is empty, this will be set to NULL.
+ * @return The number of items in the returned list, or -1 on failure. A value
+ *         of 0 means the property exists but is empty.
  */
 EAPI int
 ecore_x_window_prop_xid_list_get(Ecore_X_Window win,
@@ -281,8 +328,22 @@ ecore_x_window_prop_xid_list_get(Ecore_X_Window win,
    return num;
 }
 
-/*
- * Remove/add/toggle X ID list item.
+/**
+ * @brief Modify a window property that is a list of X IDs.
+ *
+ * This function adds, removes, or toggles an item in a list-based property
+ * on a window. It fetches the current list, modifies it, and then writes it
+ * back to the server.
+ *
+ * @param win The window whose property is to be changed.
+ * @param atom The atom representing the property to change.
+ * @param type The type of the property (e.g. XA_ATOM, XA_WINDOW).
+ * @param item The X ID to add, remove, or toggle in the list.
+ * @param op The operation to perform. It can be one of:
+ *           - @c ECORE_X_PROP_LIST_ADD: Add the item if it is not already in the list.
+ *           - @c ECORE_X_PROP_LIST_REMOVE: Remove the item if it is in the list.
+ *           - A different value (like @c ECORE_X_PROP_LIST_TOGGLE):
+ *             Add the item if not present, remove it if it is present.
  */
 EAPI void
 ecore_x_window_prop_xid_list_change(Ecore_X_Window win,
@@ -346,8 +407,16 @@ done:
      free(lst);
 }
 
-/*
- * Set Atom (array) property
+/**
+ * @brief Set a window property with an array of atoms.
+ *
+ * This is a convenience wrapper around ecore_x_window_prop_xid_set() with
+ * the type fixed to @c XA_ATOM.
+ *
+ * @param win The window whose property is to be set.
+ * @param atom The atom representing the property to set.
+ * @param lst An array of atoms to set as the property value.
+ * @param num The number of atoms in the @p lst array.
  */
 EAPI void
 ecore_x_window_prop_atom_set(Ecore_X_Window win,
@@ -359,13 +428,18 @@ ecore_x_window_prop_atom_set(Ecore_X_Window win,
    ecore_x_window_prop_xid_set(win, atom, XA_ATOM, lst, num);
 }
 
-/*
- * Get Atom (array) property
+/**
+ * @brief Get a window property consisting of an array of atoms.
  *
- * At most len items are returned in val.
- * If the property was successfully fetched the number of items stored in
- * val is returned, otherwise -1 is returned.
- * Note: Return value 0 means that the property exists but has no elements.
+ * This is a convenience wrapper around ecore_x_window_prop_xid_get() with
+ * the type fixed to @c XA_ATOM. It stores the result in a pre-allocated buffer.
+ *
+ * @param win The window from which to get the property.
+ * @param atom The atom representing the property to get.
+ * @param lst A pre-allocated buffer to store the retrieved atoms.
+ * @param len The maximum number of atoms to store in @p lst.
+ * @return On success, the number of items stored in @p lst. A value of 0 means
+ *         the property exists but is empty. On failure, -1 is returned.
  */
 EAPI int
 ecore_x_window_prop_atom_get(Ecore_X_Window win,
@@ -379,13 +453,18 @@ ecore_x_window_prop_atom_get(Ecore_X_Window win,
    return ret;
 }
 
-/*
- * Get Atom (array) property
+/**
+ * @brief Get a window property consisting of an array of atoms of any length.
  *
- * If the property was successfully fetched the number of items stored in
- * val is returned, otherwise -1 is returned.
- * The returned array must be freed with free().
- * Note: Return value 0 means that the property exists but has no elements.
+ * This is a convenience wrapper around ecore_x_window_prop_xid_list_get() with
+ * the type fixed to @c XA_ATOM. It allocates memory for the returned list.
+ * The caller is responsible for freeing this memory with `free()`.
+ *
+ * @param win The window from which to get the property.
+ * @param atom The atom representing the property to get.
+ * @param[out] plst A pointer to a variable that will be set to the newly
+ *                  allocated array of atoms.
+ * @return The number of items in the returned list, or -1 on failure.
  */
 EAPI int
 ecore_x_window_prop_atom_list_get(Ecore_X_Window win,
@@ -398,8 +477,17 @@ ecore_x_window_prop_atom_list_get(Ecore_X_Window win,
    return ret;
 }
 
-/*
- * Remove/add/toggle atom list item.
+/**
+ * @brief Modify a window property that is a list of atoms.
+ *
+ * This is a convenience wrapper around ecore_x_window_prop_xid_list_change()
+ * with the type fixed to @c XA_ATOM. It adds, removes, or toggles an atom
+ * in a list-based property.
+ *
+ * @param win The window whose property is to be changed.
+ * @param atom The atom representing the property to change.
+ * @param item The atom to add, remove, or toggle in the list.
+ * @param op The operation to perform (see ecore_x_window_prop_xid_list_change()).
  */
 EAPI void
 ecore_x_window_prop_atom_list_change(Ecore_X_Window win,
@@ -411,8 +499,16 @@ ecore_x_window_prop_atom_list_change(Ecore_X_Window win,
    ecore_x_window_prop_xid_list_change(win, atom, XA_ATOM, item, op);
 }
 
-/*
- * Set Window (array) property
+/**
+ * @brief Set a window property with an array of window IDs.
+ *
+ * This is a convenience wrapper around ecore_x_window_prop_xid_set() with
+ * the type fixed to @c XA_WINDOW.
+ *
+ * @param win The window whose property is to be set.
+ * @param atom The atom representing the property to set.
+ * @param lst An array of window IDs to set as the property value.
+ * @param num The number of window IDs in the @p lst array.
  */
 EAPI void
 ecore_x_window_prop_window_set(Ecore_X_Window win,
@@ -424,13 +520,18 @@ ecore_x_window_prop_window_set(Ecore_X_Window win,
    ecore_x_window_prop_xid_set(win, atom, XA_WINDOW, lst, num);
 }
 
-/*
- * Get Window (array) property
+/**
+ * @brief Get a window property consisting of an array of window IDs.
  *
- * At most len items are returned in val.
- * If the property was successfully fetched the number of items stored in
- * val is returned, otherwise -1 is returned.
- * Note: Return value 0 means that the property exists but has no elements.
+ * This is a convenience wrapper around ecore_x_window_prop_xid_get() with
+ * the type fixed to @c XA_WINDOW. It stores the result in a pre-allocated buffer.
+ *
+ * @param win The window from which to get the property.
+ * @param atom The atom representing the property to get.
+ * @param lst A pre-allocated buffer to store the retrieved window IDs.
+ * @param len The maximum number of window IDs to store in @p lst.
+ * @return On success, the number of items stored in @p lst. A value of 0 means
+ *         the property exists but is empty. On failure, -1 is returned.
  */
 EAPI int
 ecore_x_window_prop_window_get(Ecore_X_Window win,
@@ -444,13 +545,18 @@ ecore_x_window_prop_window_get(Ecore_X_Window win,
    return ret;
 }
 
-/*
- * Get Window (array) property
+/**
+ * @brief Get a window property consisting of an array of window IDs of any length.
  *
- * If the property was successfully fetched the number of items stored in
- * val is returned, otherwise -1 is returned.
- * The returned array must be freed with free().
- * Note: Return value 0 means that the property exists but has no elements.
+ * This is a convenience wrapper around ecore_x_window_prop_xid_list_get() with
+ * the type fixed to @c XA_WINDOW. It allocates memory for the returned list.
+ * The caller is responsible for freeing this memory with `free()`.
+ *
+ * @param win The window from which to get the property.
+ * @param atom The atom representing the property to get.
+ * @param[out] plst A pointer to a variable that will be set to the newly
+ *                  allocated array of window IDs.
+ * @return The number of items in the returned list, or -1 on failure.
  */
 EAPI int
 ecore_x_window_prop_window_list_get(Ecore_X_Window win,
@@ -463,6 +569,15 @@ ecore_x_window_prop_window_list_get(Ecore_X_Window win,
    return ret;
 }
 
+/**
+ * @brief Get the atom for 'AnyPropertyType'.
+ *
+ * This function returns the X atom `AnyPropertyType`, which can be used in
+ * functions like ecore_x_window_prop_property_get() to retrieve a property
+ * without specifying its type.
+ *
+ * @return The `AnyPropertyType` atom.
+ */
 EAPI Ecore_X_Atom
 ecore_x_window_prop_any_type(void)
 {
@@ -470,13 +585,18 @@ ecore_x_window_prop_any_type(void)
 }
 
 /**
- * @brief Set a property of Ecore_X_Window.
- * @param win The window for which the property will be set.
- * @param property The property of the window to be set.
- * @param type The type of the property that will be set.
- * @param size The size of the property that will be set.
- * @param data The data of the property that will be set.
- * @param number The size of data.
+ * @brief Set a property on a window with raw data.
+ *
+ * This function provides a low-level way to set a window property. It is more
+ * flexible than the type-specific functions like ecore_x_window_prop_card32_set().
+ *
+ * @param win The window on which to set the property. If 0, the root window is used.
+ * @param property The atom of the property to set.
+ * @param type The atom of the property's type.
+ * @param size The format of the property, which can be 8, 16, or 32 (bits).
+ *             This defines the size of each element in @p data.
+ * @param data A pointer to the raw data to be set.
+ * @param number The number of elements in @p data (not the number of bytes).
  */
 EAPI void
 ecore_x_window_prop_property_set(Ecore_X_Window win,
@@ -518,16 +638,23 @@ ecore_x_window_prop_property_set(Ecore_X_Window win,
 }
 
 /**
- * @brief Get a property of Ecore_X_Window.
- * @note If there aren't any data to be got the function return NULL.
- *       If the function can't allocate the memory then 0 is returned.
- * @param win The window for which the property will be got.
- * @param property The property of the window that will be gotten.
- * @param type The type of the property that will be gotten.
- * @param size This parameter isn't in use.
- * @param data The data of the property that will be gotten.
- * @param num The size of property.
- * @return size_ret The size of array that contains the property.
+ * @brief Get a property from a window as raw data.
+ *
+ * This function provides a low-level way to retrieve a window property. It
+ * allocates memory for the retrieved data, which must be freed by the caller
+ * using `free()`.
+ *
+ * @param win The window from which to get the property. If 0, the root window is used.
+ * @param property The atom of the property to get.
+ * @param type The expected atom of the property's type. Use
+ *             ecore_x_window_prop_any_type() to match any type.
+ * @param size This parameter is unused.
+ * @param[out] data A pointer to a variable that will be set to the newly
+ *                  allocated buffer containing the property data.
+ * @param[out] num A pointer to an integer that will be filled with the number
+ *                 of elements in the returned data array.
+ * @return The format of the returned property (8, 16, or 32 bits) on success,
+ *         or 0 on failure or if the property does not exist.
  */
 EAPI int
 ecore_x_window_prop_property_get(Ecore_X_Window win,
@@ -598,6 +725,12 @@ ecore_x_window_prop_property_get(Ecore_X_Window win,
    return size_ret;
 }
 
+/**
+ * @brief Delete a property from a window.
+ *
+ * @param win The window from which to delete the property.
+ * @param property The atom of the property to delete.
+ */
 EAPI void
 ecore_x_window_prop_property_del(Ecore_X_Window win,
                                  Ecore_X_Atom property)
@@ -607,6 +740,19 @@ ecore_x_window_prop_property_del(Ecore_X_Window win,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * @brief List all properties of a window.
+ *
+ * This function retrieves a list of all property atoms set on a given window.
+ * It allocates memory for the returned list, which must be freed by the
+ * caller using `free()`.
+ *
+ * @param win The window to query for properties.
+ * @param[out] num_ret A pointer to an integer that will be filled with the
+ *                     number of properties found.
+ * @return A newly allocated array of `Ecore_X_Atom` containing the property
+ *         atoms, or NULL on failure or if no properties are set.
+ */
 EAPI Ecore_X_Atom *
 ecore_x_window_prop_list(Ecore_X_Window win,
                          int *num_ret)
@@ -638,12 +784,14 @@ ecore_x_window_prop_list(Ecore_X_Window win,
 }
 
 /**
- * Set a window string property.
- * @param win The window
- * @param type The property
- * @param str The string
+ * @brief Set a window string property.
  *
- * Set a window string property
+ * This function sets a property on a window using a UTF-8 encoded string.
+ * It uses XSetTextProperty with an encoding of ECORE_X_ATOM_UTF8_STRING.
+ *
+ * @param win The window on which to set the property. If 0, the root window is used.
+ * @param type The atom representing the property to set (e.g., XA_WM_NAME).
+ * @param str The UTF-8 string to set as the property value.
  */
 EAPI void
 ecore_x_window_prop_string_set(Ecore_X_Window win,
@@ -665,10 +813,16 @@ ecore_x_window_prop_string_set(Ecore_X_Window win,
 }
 
 /**
- * Get a window string property.
- * @param win The window
- * @param type The property
- * @return Window string property of a window. String must be free'd when done.
+ * @brief Get a window string property.
+ *
+ * This function retrieves a string property from a window. It attempts to
+ * convert the property to a UTF-8 string if it is not already. The returned
+ * string is allocated with `strdup()` and must be freed by the caller.
+ *
+ * @param win The window from which to get the property. If 0, the root window is used.
+ * @param type The atom representing the property to get.
+ * @return A newly allocated string containing the property value, or NULL if
+ *         the property could not be retrieved or is empty.
  */
 EAPI char *
 ecore_x_window_prop_string_get(Ecore_X_Window win,
@@ -715,6 +869,16 @@ ecore_x_window_prop_string_get(Ecore_X_Window win,
    return str;
 }
 
+/**
+ * @brief Check if a specific WM protocol is supported by a window.
+ *
+ * This function checks the WM_PROTOCOLS property on a window to see if a
+ * given protocol is listed.
+ *
+ * @param win The window to check.
+ * @param protocol The WM protocol to check for (e.g., ECORE_X_WM_PROTOCOL_DELETE_REQUEST).
+ * @return @c EINA_TRUE if the protocol is set, @c EINA_FALSE otherwise or on error.
+ */
 EAPI Eina_Bool
 ecore_x_window_prop_protocol_isset(Ecore_X_Window win,
                                    Ecore_X_WM_Protocol protocol)
@@ -747,12 +911,18 @@ ecore_x_window_prop_protocol_isset(Ecore_X_Window win,
 }
 
 /**
- * @brief Get a array containing the protocols of @a win
- * @note If there aren't any properties to be counted or any protocols to get
- *       then the function returns NULL.
- * @param win The window for which protocol list will be got.
- * @param num_ret Contains the number of elements of the array to be returned.
- * @return The array that contains the protocols.
+ * @brief Get the list of WM protocols supported by a window.
+ *
+ * This function retrieves the WM_PROTOCOLS property from a window and returns
+ * an array of corresponding `Ecore_X_WM_Protocol` enum values. The returned
+ * array must be freed by the caller using `free()`.
+ *
+ * @param win The window to query.
+ * @param[out] num_ret A pointer to an integer that will be filled with the number
+ *                     of protocols in the returned array.
+ * @return A newly allocated array of `Ecore_X_WM_Protocol` values, or NULL
+ *         on failure or if no protocols are set. Unrecognized protocols in the
+ *         property will be represented by the value -1 in the array.
  */
 EAPI Ecore_X_WM_Protocol *
 ecore_x_window_prop_protocol_list_get(Ecore_X_Window win,

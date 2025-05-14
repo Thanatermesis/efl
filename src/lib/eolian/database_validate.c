@@ -9,15 +9,32 @@
 #include "eo_lexer.h"
 #include "eolian_priv.h"
 
+/**
+ * @brief Holds the state during the validation process.
+ *
+ * This structure is used to pass around context and flags that affect
+ * how validation is performed, such as whether the current context is
+ * stable, if warnings have been issued, etc.
+ */
 typedef struct _Validate_State
 {
-   Eina_Bool warned;
-   Eina_Bool stable;
-   Eina_Bool in_tree;
-   Eina_Bool unimplemented_beta;
-   const char *since_ver;
+   Eina_Bool warned; ///< EINA_TRUE if any warning has been issued.
+   Eina_Bool stable; ///< EINA_TRUE if the current validation context is stable.
+   Eina_Bool in_tree; ///< EINA_TRUE if running in the EFL source tree (affects version checks).
+   Eina_Bool unimplemented_beta; ///< EINA_TRUE if unimplemented beta APIs should issue warnings.
+   const char *since_ver; ///< The "@since" version string currently in context.
 } Validate_State;
 
+/**
+ * @brief Sets the 'stable' flag in the validation state and returns the old value.
+ *
+ * This is used to temporarily change the stability context, for example, when
+ * validating a beta API within an otherwise stable context.
+ *
+ * @param vals The validation state.
+ * @param newval The new value for the 'stable' flag.
+ * @return The previous value of the 'stable' flag.
+ */
 static Eina_Bool
 _set_stable(Validate_State *vals, Eina_Bool newval)
 {
@@ -26,6 +43,17 @@ _set_stable(Validate_State *vals, Eina_Bool newval)
    return ret;
 }
 
+/**
+ * @brief Resets the 'stable' flag in the validation state to its old value.
+ *
+ * This is typically called after a temporary change to the stability context
+ * made by _set_stable().
+ *
+ * @param vals The validation state.
+ * @param oldval The value to restore the 'stable' flag to.
+ * @param ret The return value to pass through (often the success status of an intermediate validation).
+ * @return The value of the 'ret' parameter.
+ */
 static Eina_Bool
 _reset_stable(Validate_State *vals, Eina_Bool oldval, Eina_Bool ret)
 {
@@ -33,6 +61,16 @@ _reset_stable(Validate_State *vals, Eina_Bool oldval, Eina_Bool ret)
    return ret;
 }
 
+/**
+ * @brief Marks an Eolian object as validated.
+ *
+ * This function sets the 'validated' flag on an Eolian_Object to EINA_TRUE.
+ * It's a common operation performed after an object has successfully passed
+ * all its validation checks.
+ *
+ * @param obj The Eolian object to mark as validated.
+ * @return EINA_TRUE, indicating the object is now marked as validated.
+ */
 static Eina_Bool
 _validate(Eolian_Object *obj)
 {
@@ -40,9 +78,35 @@ _validate(Eolian_Object *obj)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Logs a message associated with an Eolian object.
+ *
+ * This macro is a convenience wrapper around eolian_state_log_obj to simplify
+ * logging errors or warnings related to a specific Eolian object during parsing
+ * or validation. It automatically passes the state and object information.
+ *
+ * @param _base Pointer to the Eolian_Object the log message pertains to.
+ * @param ...   The format string and arguments for the log message, similar to printf.
+ */
 #define _eo_parser_log(_base, ...) \
    eolian_state_log_obj((_base)->unit->state, (_base), __VA_ARGS__)
 
+/**
+ * @brief Validates a documentation string, checking for valid references.
+ *
+ * This function tokenizes a documentation string and checks if any
+ * EOLIAN_DOC_TOKEN_REF tokens (references to other Eolian entities)
+ * can be resolved within the current Eolian state (staging or main unit).
+ *
+ * @param str The documentation string to validate.
+ * @param info The Eolian object to which this documentation string belongs,
+ *             used for context in error reporting.
+ * @param rdbg A pointer to a list of debug information for references,
+ *             used to pinpoint the location of unresolved references.
+ *             This list is advanced as references are processed.
+ * @return EINA_TRUE if the documentation string is valid or empty,
+ *         EINA_FALSE if an unresolved reference is found.
+ */
 static Eina_Bool
 _validate_docstr(Eina_Stringshare *str, const Eolian_Object *info, Eina_List **rdbg)
 {
@@ -90,6 +154,21 @@ _validate_docstr(Eina_Stringshare *str, const Eolian_Object *info, Eina_List **r
    return ret;
 }
 
+/**
+ * @brief Validates the '@since' tag in an Eolian documentation block.
+ *
+ * If the current validation context is 'stable' (vals->stable is EINA_TRUE),
+ * this function checks:
+ * 1. If a '@since' tag exists and is not empty.
+ * 2. If running in the EFL tree (vals->in_tree), it checks if the version
+ *    is valid for EFL (e.g., "1.22" or higher for stable APIs).
+ * It updates vals->since_ver with the found since version.
+ *
+ * @param vals The current validation state.
+ * @param doc The Eolian documentation object to validate.
+ * @return EINA_TRUE if the '@since' tag is valid or not required,
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _validate_doc_since(Validate_State *vals, Eolian_Documentation *doc)
 {
@@ -132,6 +211,19 @@ _validate_doc_since(Validate_State *vals, Eolian_Documentation *doc)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Validates the '@since' tag and then resets the 'since_ver' in Validate_State.
+ *
+ * This function is used when validating a '@since' tag for a specific documentation
+ * block (e.g., for a field or parameter) without letting its '@since' version
+ * propagate as the context for subsequent items at the same level. It preserves
+ * the original vals->since_ver, calls _validate_doc_since, and then restores
+ * vals->since_ver.
+ *
+ * @param vals The current validation state.
+ * @param doc The Eolian documentation object whose '@since' tag is to be validated.
+ * @return EINA_TRUE if the '@since' tag is valid or not applicable, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _validate_doc_since_reset(Validate_State *vals, Eolian_Documentation *doc)
 {
@@ -144,6 +236,17 @@ _validate_doc_since_reset(Validate_State *vals, Eolian_Documentation *doc)
    return ret;
 }
 
+/**
+ * @brief Validates an Eolian documentation object.
+ *
+ * This function validates the summary and description fields of an
+ * Eolian_Documentation object by calling _validate_docstr for each.
+ * It also marks the base Eolian_Object of the documentation as validated.
+ *
+ * @param doc The Eolian documentation object to validate.
+ * @return EINA_TRUE if the documentation is valid or if the input 'doc' is NULL,
+ *         EINA_FALSE if any part of the documentation is invalid.
+ */
 static Eina_Bool
 _validate_doc(Eolian_Documentation *doc)
 {

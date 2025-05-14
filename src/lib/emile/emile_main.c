@@ -1,3 +1,9 @@
+/**
+ * @file
+ * @brief Main file for the Emile library, providing initialization, shutdown,
+ *        and core cryptographic operations.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif /* ifdef HAVE_CONFIG_H */
@@ -15,8 +21,17 @@
 
 static Eina_Bool _emile_cipher_inited = EINA_FALSE;
 static unsigned int _emile_init_count = 0;
-int _emile_log_dom_global = -1;
+int _emile_log_dom_global = -1; /**< Global log domain for Emile. */
 
+/**
+ * @brief Initializes the cipher subsystem.
+ *
+ * This function initializes the underlying cipher library (e.g., OpenSSL)
+ * if it hasn't been initialized already. It's safe to call this function
+ * multiple times.
+ *
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 EAPI Eina_Bool
 emile_cipher_init(void)
 {
@@ -31,6 +46,14 @@ emile_cipher_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the currently used cipher backend module.
+ *
+ * This function returns which cryptographic backend is being used by Emile.
+ *
+ * @return The active Emile_Cipher_Backend.
+ * @see Emile_Cipher_Backend
+ */
 EAPI Emile_Cipher_Backend
 emile_cipher_module_get(void)
 {
@@ -41,6 +64,19 @@ emile_cipher_module_get(void)
 #endif
 }
 
+/**
+ * @brief Initializes the Emile library.
+ *
+ * This function initializes Emile, including its dependency on Eina.
+ * It sets up logging and increments an initialization counter.
+ * It's safe to call this function multiple times; it will only fully
+ * initialize on the first call.
+ *
+ * @return The current initialization count. A count of 1 means the library
+ *         was just initialized. A count greater than 1 means it was already
+ *         initialized. A count of 0 or less indicates an error during
+ *         initialization.
+ */
 EAPI int
 emile_init(void)
 {
@@ -67,6 +103,16 @@ shutdown_eina:
    return --_emile_init_count;
 }
 
+/**
+ * @brief Shuts down the Emile library.
+ *
+ * This function shuts down Emile and its dependencies, such as Eina and
+ * the cipher subsystem (if initialized). It decrements an initialization
+ * counter. The library is fully shut down when the counter reaches 0.
+ *
+ * @return The current initialization count. A count of 0 means the library
+ *         was just shut down. A count greater than 0 means it's still in use.
+ */
 EAPI int
 emile_shutdown(void)
 {
@@ -93,6 +139,28 @@ emile_shutdown(void)
 
 /* For the moment, we have just one function shared accross both cipher
  * backend, so here it is. */
+
+/**
+ * @brief Derives a key using PBKDF2 with HMAC-SHA1.
+ *
+ * This function implements the PBKDF2 (Password-Based Key Derivation Function 2)
+ * algorithm using HMAC-SHA1 as the pseudorandom function. It is used to
+ * derive a cryptographic key from a password or passphrase.
+ *
+ * @param key The password or master key.
+ * @param key_len The length of the key in bytes.
+ * @param salt The salt value.
+ *             Example: `(const unsigned char *)"mysalt123"`
+ * @param salt_len The length of the salt in bytes.
+ * @param iter The number of iterations to perform. Higher numbers increase
+ *             security but also computation time.
+ *             Example: `10000`
+ * @param[out] res Buffer to store the derived key.
+ *                 The derived key will be written here.
+ *                 Example: `unsigned char derived_key[32];`
+ * @param res_len The desired length of the derived key in bytes.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure (e.g., memory allocation issues).
+ */
 Eina_Bool
 emile_pbkdf2_sha1(const char *key, unsigned int key_len, const unsigned char *salt, unsigned int salt_len, unsigned int iter, unsigned char *res, unsigned int res_len)
 {

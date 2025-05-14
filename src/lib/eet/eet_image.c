@@ -50,25 +50,40 @@ typedef struct _JPEG_error_mgr *emptr;
 
 /*---*/
 
+/**
+ * @brief Custom error manager for libjpeg.
+ * This structure extends the standard jpeg_error_mgr to include a jmp_buf
+ * for error handling via longjmp.
+ */
 struct _JPEG_error_mgr
 {
-   struct jpeg_error_mgr pub;
-   jmp_buf               setjmp_buffer;
+   struct jpeg_error_mgr pub; /**< Standard libjpeg error manager. */
+   jmp_buf               setjmp_buffer; /**< Buffer for longjmp, used to return to a safe point on error. */
 };
 
+/**
+ * @brief Custom libjpeg destination manager for writing to an in-memory buffer.
+ * This structure is used to direct libjpeg's output to a dynamically allocated
+ * memory buffer, which can grow as needed.
+ */
 struct jpeg_membuf_dst
 {
-   struct jpeg_destination_mgr pub;
+   struct jpeg_destination_mgr pub; /**< Standard libjpeg destination manager. */
 
-   void                      **dst_buf;
-   size_t                     *dst_len;
+   void                      **dst_buf; /**< Pointer to the pointer that will hold the final compressed data buffer. */
+   size_t                     *dst_len; /**< Pointer to the variable that will hold the length of the final compressed data. */
 
-   unsigned char              *buf;
-   size_t                      len;
-   int                         failed;
-   struct jpeg_membuf_dst     *self;
+   unsigned char              *buf;    /**< Current internal buffer for compressed data. */
+   size_t                      len;     /**< Current allocated size of the internal buffer. */
+   int                         failed;  /**< Flag indicating if buffer allocation failed. */
+   struct jpeg_membuf_dst     *self;   /**< Self-pointer, used in term_destination to access the full struct. */
 };
 
+/**
+ * @brief Initializes the custom libjpeg destination manager.
+ * This function is a callback for libjpeg, called before writing any data.
+ * @param cinfo Pointer to the jpeg_compress_struct.
+ */
 static void
 _eet_jpeg_membuf_dst_init(j_compress_ptr cinfo)
 {
@@ -76,6 +91,16 @@ _eet_jpeg_membuf_dst_init(j_compress_ptr cinfo)
    (void)cinfo;
 }
 
+/**
+ * @brief Flushes the output buffer for the custom libjpeg destination manager.
+ * This function is a callback for libjpeg, called when the output buffer is full.
+ * It attempts to reallocate the buffer to twice its current size. If reallocation
+ * fails, it sets the failed flag.
+ * @param cinfo Pointer to the jpeg_compress_struct.
+ * @return TRUE if the buffer was successfully flushed (or if an error occurred and
+ *         it's pretending to be flushed to allow libjpeg to terminate), FALSE if
+ *         libjpeg should continue normally after reallocation.
+ */
 static boolean
 _eet_jpeg_membuf_dst_flush(j_compress_ptr cinfo)
 {
@@ -100,6 +125,13 @@ _eet_jpeg_membuf_dst_flush(j_compress_ptr cinfo)
       return FALSE;
 }
 
+/**
+ * @brief Terminates the custom libjpeg destination manager.
+ * This function is a callback for libjpeg, called after all data has been written.
+ * It finalizes the output buffer and length, or clears them if an error occurred.
+ * It also frees the destination manager structure itself.
+ * @param cinfo Pointer to the jpeg_compress_struct.
+ */
 static void
 _eet_jpeg_membuf_dst_term(j_compress_ptr cinfo)
 {
@@ -121,6 +153,19 @@ _eet_jpeg_membuf_dst_term(j_compress_ptr cinfo)
    cinfo->dest = NULL;
 }
 
+/**
+ * @brief Sets up a custom libjpeg destination manager for in-memory compression.
+ * This function allocates and initializes a jpeg_membuf_dst structure and
+ * configures the provided jpeg_compress_struct to use it.
+ *
+ * @param cinfo Pointer to the jpeg_compress_struct to configure.
+ * @param buf Pointer to a void pointer that will receive the address of the
+ *            compressed data buffer upon successful compression. The caller
+ *            is responsible for freeing this buffer.
+ * @param len Pointer to a size_t variable that will receive the length of
+ *            the compressed data.
+ * @return 0 on success, -1 on allocation failure.
+ */
 static int
 eet_jpeg_membuf_dst(j_compress_ptr cinfo,
                     void         **buf,
@@ -157,12 +202,43 @@ eet_jpeg_membuf_dst(j_compress_ptr cinfo,
 
 /*---*/
 
+/**
+ * @brief Decodes the header of a JPEG image from memory.
+ * This function reads JPEG image metadata (width, height, colorspaces)
+ * without decompressing the entire image.
+ *
+ * @param data Pointer to the JPEG image data in memory.
+ * @param size Size of the JPEG image data in bytes.
+ * @param w Pointer to an unsigned int to store the image width.
+ * @param h Pointer to an unsigned int to store the image height.
+ * @param cspaces Pointer to a const Eet_Colorspace pointer to store available colorspaces.
+ *                Can be NULL if not needed.
+ * @return 1 on success, 0 on failure (e.g., invalid JPEG data, memory error).
+ */
 static int
 eet_data_image_jpeg_header_decode(const void   *data,
                                   int           size,
                                   unsigned int *w,
                                   unsigned int *h,
                                   const Eet_Colorspace **cspaces);
+
+/**
+ * @brief Decodes JPEG image data into an RGB(A) buffer.
+ * This function decompresses JPEG image data from memory into a raw pixel buffer.
+ * The output format depends on the `cspace` parameter.
+ *
+ * @param data Pointer to the JPEG image data in memory.
+ * @param size Size of the JPEG image data in bytes.
+ * @param src_x X-coordinate of the top-left corner of the source region to decode (currently unused, full image decoded).
+ * @param src_y Y-coordinate of the top-left corner of the source region to decode (currently unused, full image decoded).
+ * @param d Pointer to the destination buffer for decoded pixel data.
+ *          The buffer should be large enough to hold `w * h * (bytes_per_pixel)` based on `cspace`.
+ *          Example for ARGB8888: `w * h * 4` bytes.
+ * @param w Width of the region to decode.
+ * @param h Height of the region to decode.
+ * @param cspace The desired colorspace for the output data (e.g., EET_COLORSPACE_ARGB8888).
+ * @return 1 on success, 0 on failure.
+ */
 static int
 eet_data_image_jpeg_rgb_decode(const void   *data,
                                int           size,
@@ -172,6 +248,28 @@ eet_data_image_jpeg_rgb_decode(const void   *data,
                                unsigned int  w,
                                unsigned int  h,
                                Eet_Colorspace cspace);
+
+/**
+ * @brief Decodes the alpha channel from a separate JPEG image and merges it into an existing pixel buffer.
+ * This function is used when alpha is stored as a separate greyscale JPEG.
+ * It decodes this greyscale JPEG and writes its values into the alpha component
+ * of the `pixels` buffer.
+ *
+ * @param data Pointer to the JPEG image data (alpha channel) in memory.
+ * @param size Size of the JPEG image data in bytes.
+ * @param src_x X-coordinate of the top-left corner of the source region to decode (currently unused).
+ * @param src_y Y-coordinate of the top-left corner of the source region to decode (currently unused).
+ * @param d Pointer to the destination pixel buffer (e.g., ARGB8888 or AGRY88 data)
+ *               which already contains color information. The alpha channel of this buffer
+ *               will be updated. In the implementation this parameter is named `pixels`.
+ *               Example for ARGB8888: `unsigned int *pixels; pixels[i] = (alpha << 24) | (existing_rgb);`
+ *               Example for AGRY88: `unsigned short *pixels; pixels[i] = (alpha << 8) | (existing_grey);`
+ * @param w Width of the region to decode.
+ * @param h Height of the region to decode.
+ * @param cspace The colorspace of the `pixels` buffer (e.g., EMILE_COLORSPACE_ARGB8888, EMILE_COLORSPACE_AGRY88).
+ *               This determines how the alpha is merged.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 eet_data_image_jpeg_alpha_decode(const void   *data,
                                  int           size,
@@ -181,12 +279,55 @@ eet_data_image_jpeg_alpha_decode(const void   *data,
                                  unsigned int  w,
                                  unsigned int  h,
                                  Eet_Colorspace cspace);
+
+/**
+ * @brief Converts raw ARGB pixel data to Eet's internal lossless image format.
+ * The format consists of a header followed by the raw pixel data.
+ * Header (32 bytes total, 8 integers):
+ * - `[0]`: Magic number (0xac1dfeed)
+ * - `[1]`: Width
+ * - `[2]`: Height
+ * - `[3]`: Alpha flag (1 if alpha, 0 otherwise)
+ * - `[4-7]`: Reserved (0)
+ * Pixel data follows immediately, in ARGB8888 format. Endianness is handled.
+ *
+ * @param[out] size Pointer to an integer to store the size of the converted data.
+ * @param[in] data Pointer to the raw ARGB8888 pixel data.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param alpha Integer flag indicating if the image has an alpha channel (1 for alpha, 0 for no alpha).
+ * @return A pointer to the allocated buffer containing the converted image data.
+ *         The caller is responsible for freeing this buffer. Returns NULL on failure.
+ */
 static void *
 eet_data_image_lossless_convert(int         *size,
                                 const void  *data,
                                 unsigned int w,
                                 unsigned int h,
                                 int          alpha);
+
+/**
+ * @brief Converts raw ARGB pixel data to Eet's internal compressed lossless image format.
+ * The format consists of a header followed by the compressed pixel data.
+ * Header (32 bytes total, 8 integers):
+ * - `[0]`: Magic number (0xac1dfeed)
+ * - `[1]`: Width
+ * - `[2]`: Height
+ * - `[3]`: Alpha flag (1 if alpha, 0 otherwise)
+ * - `[4]`: Compression type (e.g., EMILE_LZ4HC)
+ * - `[5-7]`: Reserved (0)
+ * Compressed pixel data (ARGB8888 compressed) follows. Endianness of header is handled.
+ * If compression results in a larger size, it returns NULL and sets *size to -1.
+ *
+ * @param[out] size Pointer to an integer to store the size of the converted data, or -1 on compression failure.
+ * @param[in] data Pointer to the raw ARGB8888 pixel data.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param alpha Integer flag indicating if the image has an alpha channel.
+ * @param compression Integer specifying the compression algorithm (e.g., from Emile_Compressor).
+ * @return A pointer to the allocated buffer containing the converted and compressed image data.
+ *         The caller is responsible for freeing this buffer. Returns NULL on failure or if compression is ineffective.
+ */
 static void *
 eet_data_image_lossless_compressed_convert(int         *size,
                                            const void  *data,
@@ -194,6 +335,21 @@ eet_data_image_lossless_compressed_convert(int         *size,
                                            unsigned int h,
                                            int          alpha,
                                            int          compression);
+
+/**
+ * @brief Converts raw ARGB pixel data to JPEG format.
+ * This function encodes RGB data (alpha channel is ignored if present in input,
+ * but the `alpha` parameter to this function should be 0).
+ *
+ * @param[out] size Pointer to an integer to store the size of the JPEG data.
+ * @param[in] data Pointer to the raw ARGB8888 pixel data.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param alpha Flag indicating presence of alpha in source, but for this function it's effectively ignored for output (should be 0).
+ * @param quality JPEG quality (0-100).
+ * @return A pointer to the allocated buffer containing the JPEG image data.
+ *         The caller is responsible for freeing this buffer. Returns NULL on failure.
+ */
 static void *
 eet_data_image_jpeg_convert(int         *size,
                             const void  *data,
@@ -201,6 +357,27 @@ eet_data_image_jpeg_convert(int         *size,
                             unsigned int h,
                             int          alpha,
                             int          quality);
+
+/**
+ * @brief Converts raw ARGB pixel data to a custom JPEG format with a separate alpha channel.
+ * The output format consists of a header, followed by JPEG-compressed RGB data,
+ * followed by JPEG-compressed alpha data (as greyscale).
+ * Header (12 bytes total, 3 integers):
+ * - `[0]`: Magic number (0xbeeff00d)
+ * - `[1]`: Size of the RGB JPEG data (sz1)
+ * - `[2]`: Size of the alpha JPEG data (sz2)
+ * RGB JPEG data (sz1 bytes) follows.
+ * Alpha JPEG data (sz2 bytes) follows.
+ *
+ * @param[out] size Pointer to an integer to store the total size of the converted data.
+ * @param[in] data Pointer to the raw ARGB8888 pixel data.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param alpha Integer flag indicating if the image has an alpha channel (should be 1 for this function).
+ * @param quality JPEG quality (0-100) for both RGB and alpha JPEGs.
+ * @return A pointer to the allocated buffer containing the custom JPEG-with-alpha data.
+ *         The caller is responsible for freeing this buffer. Returns NULL on failure.
+ */
 static void *
 eet_data_image_jpeg_alpha_convert(int         *size,
                                   const void  *data,
@@ -235,8 +412,15 @@ eet_data_image_jpeg_alpha_convert(int         *size,
 
 /*---*/
 
+/** Global variable to cache the system's endianness. -1: unknown, 0: little-endian, 1: big-endian. */
 static int _eet_image_words_bigendian = -1;
 
+/**
+ * @brief Checks and caches the system's endianness.
+ * This function determines if the system is big-endian or little-endian
+ * and stores the result in the global `_eet_image_words_bigendian` variable
+ * to avoid repeated checks.
+ */
 static inline void
 _eet_image_endian_check(void)
 {
@@ -252,6 +436,14 @@ _eet_image_endian_check(void)
      }
 }
 
+/**
+ * @brief Swaps the byte order of an array of 32-bit integers if the system is big-endian.
+ * This is typically used when reading/writing data from/to a format that assumes
+ * little-endian byte order.
+ *
+ * @param data Pointer to the array of 32-bit integers (e.g., `unsigned int *`).
+ * @param length The number of 32-bit integers in the array.
+ */
 static inline void
 _eet_image_endian_swap(void *data, unsigned int length)
 {
@@ -266,6 +458,13 @@ _eet_image_endian_swap(void *data, unsigned int length)
 
 /*---*/
 
+/**
+ * @brief libjpeg error exit callback.
+ * This function is called by libjpeg when a fatal error occurs.
+ * It formats the error message, logs it, and then performs a longjmp
+ * to the stored `setjmp_buffer` in the custom error manager.
+ * @param cinfo Pointer to the libjpeg common struct.
+ */
 static void
 _eet_image_jpeg_error_exit_cb(j_common_ptr cinfo)
 {
@@ -278,6 +477,12 @@ _eet_image_jpeg_error_exit_cb(j_common_ptr cinfo)
    longjmp(errmgr->setjmp_buffer, 1);
 }
 
+/**
+ * @brief libjpeg output message callback.
+ * This function is called by libjpeg to output informational messages.
+ * It formats the message and logs it as an error.
+ * @param cinfo Pointer to the libjpeg common struct.
+ */
 static void
 _eet_image_jpeg_output_message_cb(j_common_ptr cinfo)
 {
@@ -292,6 +497,14 @@ _eet_image_jpeg_output_message_cb(j_common_ptr cinfo)
    */
 }
 
+/**
+ * @brief libjpeg emit message callback.
+ * This function is called by libjpeg to emit warnings or trace messages.
+ * It formats the message and logs it as a warning or informational message
+ * based on the `msg_level` and trace_level settings.
+ * @param cinfo Pointer to the libjpeg common struct.
+ * @param msg_level The message level (negative for warnings, positive for trace).
+ */
 static void
 _eet_image_jpeg_emit_message_cb(j_common_ptr cinfo,
                                 int          msg_level)
@@ -508,6 +721,15 @@ eet_data_image_jpeg_alpha_decode(const void   *data,
 }
 
 // FIXME: Importing two functions from evas here: premul & unpremul
+/**
+ * @brief Premultiplies ARGB pixel data.
+ * For each pixel, R, G, and B components are multiplied by Alpha/255.
+ * `data` is an array of pixels, where each pixel is an `unsigned int` in ARGB8888 format.
+ * Example: `0xAARRGGBB`.
+ *
+ * @param data Pointer to the array of ARGB pixels to be premultiplied in place.
+ * @param len The number of pixels in the data array.
+ */
 static void
 _eet_argb_premul(unsigned int *data, unsigned int len)
 {
@@ -524,6 +746,16 @@ _eet_argb_premul(unsigned int *data, unsigned int len)
      }
 }
 
+/**
+ * @brief Un-premultiplies ARGB pixel data.
+ * For each pixel, R, G, and B components are divided by Alpha/255 (if Alpha > 0).
+ * `data` is an array of pixels, where each pixel is an `unsigned int` in ARGB8888 format.
+ * Example: `0xAARRGGBB`.
+ * Includes a small optimization for repeated pixel values.
+ *
+ * @param data Pointer to the array of ARGB pixels to be un-premultiplied in place.
+ * @param len The number of pixels in the data array.
+ */
 static void
 _eet_argb_unpremul(unsigned int *data, unsigned int len)
 {
@@ -551,6 +783,24 @@ _eet_argb_unpremul(unsigned int *data, unsigned int len)
      }
 }
 
+/**
+ * @brief Decodes ETC1/ETC2 (TGV) compressed image data.
+ * This function uses the Emile library to decode TGV formatted image data,
+ * which can contain ETC1, ETC2_RGB, or ETC2_RGBA compressed textures.
+ *
+ * @param data Pointer to the TGV compressed image data.
+ * @param length Length of the compressed data in bytes.
+ * @param p Pointer to the destination buffer for the decoded ARGB8888 pixel data.
+ *          The buffer must be large enough for `dst_w * dst_h * 4` bytes.
+ * @param dst_x X-coordinate of the region to load.
+ * @param dst_y Y-coordinate of the region to load.
+ * @param dst_w Width of the region to load and the width of the output buffer `p`.
+ * @param dst_h Height of the region to load and the height of the output buffer `p`.
+ * @param alpha Expected alpha presence in the decoded data (used for validation against `lossy` type).
+ * @param cspace Desired output colorspace (e.g., EMILE_COLORSPACE_ARGB8888, or specific ETC formats).
+ * @param lossy The specific ETC encoding format (e.g., EET_IMAGE_ETC1, EET_IMAGE_ETC2_RGBA).
+ * @return 1 on successful decoding, 0 on failure.
+ */
 static int
 eet_data_image_etc2_decode(const void *data,
                            unsigned int length,
@@ -750,6 +1000,15 @@ eet_data_image_lossless_compressed_convert(int         *size,
    }
 }
 
+/**
+ * @brief Calculates a block size parameter for TGV1 encoding.
+ * This determines the size of macro blocks used in TGV1 compression,
+ * represented as a power of 2 (4 << k).
+ *
+ * @param size The dimension (width or height) for which to calculate the block size.
+ * @return An integer k, where the block dimension is (4 << k).
+ *         The result is clamped between 0 and MAX_BLOCK (6).
+ */
 static int
 _block_size_get(int size)
 {
@@ -762,6 +1021,16 @@ _block_size_get(int size)
    return MIN(k, MAX_BLOCK);
 }
 
+/**
+ * @brief Converts an ARGB image buffer to a greyscale image buffer using the alpha channel.
+ * Each pixel in the output buffer will have R=G=B=Alpha_input. The original alpha
+ * value is also preserved in the output alpha channel.
+ * Used for preparing the alpha plane for ETC1+Alpha encoding.
+ *
+ * @param data Pointer to the ARGB pixel data to be converted in place.
+ *             Each pixel is `0xAARRGGBB`. After conversion, it becomes `0xAAaaaaaa` where `aa` is original alpha.
+ * @param len The number of pixels in the data array.
+ */
 static inline void
 _alpha_to_greyscale_convert(uint32_t *data, int len)
 {
@@ -772,6 +1041,40 @@ _alpha_to_greyscale_convert(uint32_t *data, int len)
      }
 }
 
+/**
+ * @brief Converts raw ARGB pixel data to TGV1 format (ETC1, ETC2_RGB, ETC2_RGBA, ETC1_ALPHA).
+ * This function encodes an image into the TGV1 container format, which uses
+ * ETC-family texture compression.
+ *
+ * TGV1 Header Structure (total 16 bytes initially, then data blocks):
+ * - `[0-3]`: "TGV1" (magic bytes)
+ * - `[4]`:   bits 0-3: block_width_exponent (k_w for 4 << k_w pixels)
+ *            bits 4-7: block_height_exponent (k_h for 4 << k_h pixels)
+ * - `[5]`:   Algorithm:
+ *            - 0: ETC1
+ *            - 1: RGB8_ETC2
+ *            - 2: RGBA8_ETC2_EAC
+ *            - 3: ETC1_ALPHA (ETC1 for color, separate ETC1 for alpha)
+ * - `[6]`:   Options:
+ *            - bit 0: 0 for raw ETC blocks, 1 for LZ4 compressed ETC blocks.
+ *            - bit 2: 0 for premultiplied alpha, 1 for unpremultiplied alpha (if RGBA).
+ * - `[7]`:   Unused options (0).
+ * - `[8-11]`: Network byte order unsigned int: image width.
+ * - `[12-15]`: Network byte order unsigned int: image height.
+ * Following this header are the compressed data blocks. Each block's size is
+ * encoded using a variable-length scheme (1-3 bytes) before the block data itself.
+ *
+ * @param[out] size Pointer to an integer to store the size of the TGV1 data.
+ * @param[in] data8 Pointer to the raw ARGB8888 pixel data (cast from `uint32_t*`).
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param quality ETC packing quality (influences `rg_etc1_pack_params.m_quality`).
+ *                >95: high, >30: medium, <=30: low.
+ * @param compress Boolean flag (0 or 1) to enable/disable LZ4 compression of ETC blocks.
+ * @param lossy The target Eet_Image_Encoding (EET_IMAGE_ETC1, ETC2_RGB, ETC2_RGBA, ETC1_ALPHA).
+ * @return A pointer to the allocated buffer containing the TGV1 image data.
+ *         The caller is responsible for freeing this buffer. Returns NULL on failure.
+ */
 static void *
 eet_data_image_etc1_compressed_convert(int         *size,
                                        const unsigned char *data8,
@@ -1071,6 +1374,21 @@ finish:
    return result;
 }
 
+/**
+ * @brief Encodes greyscale pixel data (stored in alpha channel of ARGB) into JPEG format.
+ * This function takes ARGB data where the greyscale information is expected to be
+ * in the alpha channel (e.g., `0xGGxxxxxx`, where GG is the grey value). It extracts
+ * this alpha value and encodes it as a JCS_GRAYSCALE JPEG.
+ *
+ * @param data Pointer to the ARGB pixel data. The alpha component of each pixel is used as the grey value.
+ *             Example: `data[i] = 0xGGRRBB;` -> grey value is `(data[i] >> 24) & 0xff`.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param quality JPEG quality (0-100).
+ * @param[out] size Pointer to an integer to store the size of the resulting JPEG data.
+ * @return A pointer to the allocated buffer containing the JPEG image data.
+ *         The caller is responsible for freeing this buffer. Returns NULL on failure.
+ */
 static inline void *
 _eet_data_image_grey_encode(const void *data,
                             unsigned int w,
@@ -1144,6 +1462,21 @@ _eet_data_image_grey_encode(const void *data,
    return dst;
 }
 
+/**
+ * @brief Encodes ARGB pixel data into JPEG format (RGB).
+ * This function first checks if the image is entirely greyscale (R=G=B for all pixels).
+ * If so, it delegates to `_eet_data_image_grey_encode` using the R component as the grey value.
+ * Otherwise, it encodes the image as a standard JCS_RGB JPEG, discarding the alpha channel.
+ *
+ * @param data Pointer to the ARGB8888 pixel data.
+ *             Example: `data[i] = 0xAARRGGBB;`
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param quality JPEG quality (0-100).
+ * @param[out] size Pointer to an integer to store the size of the resulting JPEG data.
+ * @return A pointer to the allocated buffer containing the JPEG image data.
+ *         The caller is responsible for freeing this buffer. Returns NULL on failure.
+ */
 static inline void *
 _eet_data_image_rgb_encode(const void *data,
                            unsigned int w,
@@ -1318,6 +1651,28 @@ eet_data_image_jpeg_alpha_convert(int         *size,
    return d;
 }
 
+/**
+ * @brief Encodes image data and writes it to an Eet file with optional encryption.
+ *
+ * This function first encodes the raw pixel data according to the specified parameters
+ * (lossy/lossless, compression, quality) using `eet_data_image_encode()`.
+ * Then, it writes the resulting encoded data to the Eet file under the given `name`,
+ * optionally encrypting it with `cipher_key`.
+ *
+ * @param ef Pointer to the open Eet_File.
+ * @param name The key name for the data entry in the Eet file.
+ * @param cipher_key Optional encryption key. If NULL, data is not encrypted.
+ * @param data Pointer to the raw pixel data (e.g., ARGB8888).
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param alpha 1 if the image has alpha, 0 otherwise.
+ * @param comp Compression level or type (depends on `lossy`).
+ *             For lossless: compression algorithm (e.g., Emile_Compressor value).
+ *             For lossy (JPEG/ETC): typically 0 (JPEG quality is separate), or boolean for TGV compression.
+ * @param quality Quality setting (e.g., for JPEG: 0-100; for ETC: influences packer).
+ * @param lossy The encoding type (EET_IMAGE_LOSSLESS, EET_IMAGE_JPEG, EET_IMAGE_ETC1, etc.).
+ * @return The number of bytes written on success, or 0 on failure.
+ */
 EAPI int
 eet_data_image_write_cipher(Eet_File    *ef,
                             const char  *name,
@@ -1346,6 +1701,22 @@ eet_data_image_write_cipher(Eet_File    *ef,
    return 0;
 }
 
+/**
+ * @brief Encodes image data and writes it to an Eet file.
+ * This is a convenience wrapper around `eet_data_image_write_cipher` with `cipher_key` set to NULL.
+ *
+ * @param ef Pointer to the open Eet_File.
+ * @param name The key name for the data entry in the Eet file.
+ * @param data Pointer to the raw pixel data (e.g., ARGB8888).
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param alpha 1 if the image has alpha, 0 otherwise.
+ * @param comp Compression level or type.
+ * @param quality Quality setting.
+ * @param lossy The encoding type.
+ * @return The number of bytes written on success, or 0 on failure.
+ * @see eet_data_image_write_cipher() for more details on parameters.
+ */
 EAPI int
 eet_data_image_write(Eet_File    *ef,
                      const char  *name,
@@ -1369,6 +1740,25 @@ eet_data_image_write(Eet_File    *ef,
                                       lossy);
 }
 
+/**
+ * @brief Reads image data from an Eet file, decodes it, and optionally decrypts it.
+ *
+ * This function reads an encoded image entry from the Eet file. If a `cipher_key`
+ * is provided, it attempts to decrypt the data. Then, it decodes the image data
+ * into raw ARGB8888 pixel format and returns metadata about the image.
+ *
+ * @param ef Pointer to the open Eet_File.
+ * @param name The key name of the data entry in the Eet file.
+ * @param cipher_key Optional decryption key. If NULL, data is assumed not encrypted.
+ * @param[out] w Pointer to store the width of the decoded image. Can be NULL.
+ * @param[out] h Pointer to store the height of the decoded image. Can be NULL.
+ * @param[out] alpha Pointer to store the alpha flag (1 if alpha, 0 otherwise). Can be NULL.
+ * @param[out] comp Pointer to store compression information from the image header. Can be NULL.
+ * @param[out] quality Pointer to store quality information from the image header. Can be NULL.
+ * @param[out] lossy Pointer to store the encoding type of the image. Can be NULL.
+ * @return A pointer to the allocated buffer containing the decoded ARGB8888 pixel data.
+ *         The caller is responsible for freeing this buffer. Returns NULL on failure.
+ */
 EAPI void *
 eet_data_image_read_cipher(Eet_File     *ef,
                            const char   *name,
@@ -1404,6 +1794,22 @@ eet_data_image_read_cipher(Eet_File     *ef,
    return d;
 }
 
+/**
+ * @brief Reads image data from an Eet file and decodes it.
+ * This is a convenience wrapper around `eet_data_image_read_cipher` with `cipher_key` set to NULL.
+ *
+ * @param ef Pointer to the open Eet_File.
+ * @param name The key name of the data entry in the Eet file.
+ * @param[out] w Pointer to store the width of the decoded image. Can be NULL.
+ * @param[out] h Pointer to store the height of the decoded image. Can be NULL.
+ * @param[out] alpha Pointer to store the alpha flag. Can be NULL.
+ * @param[out] comp Pointer to store compression information. Can be NULL.
+ * @param[out] quality Pointer to store quality information. Can be NULL.
+ * @param[out] lossy Pointer to store the encoding type. Can be NULL.
+ * @return A pointer to the allocated buffer containing the decoded ARGB8888 pixel data.
+ *         The caller is responsible for freeing this buffer. Returns NULL on failure.
+ * @see eet_data_image_read_cipher() for more details on parameters.
+ */
 EAPI void *
 eet_data_image_read(Eet_File     *ef,
                     const char   *name,
@@ -1418,6 +1824,32 @@ eet_data_image_read(Eet_File     *ef,
                                      comp, quality, lossy);
 }
 
+/**
+ * @brief Reads image data from an Eet file, decodes it to a specified colorspace and region into a pre-allocated surface.
+ *
+ * This function reads an encoded image entry, optionally decrypts it, and then decodes
+ * a specified region (`src_x`, `src_y`, `w`, `h`) of the image directly into the
+ * provided buffer `d`. The output is formatted according to `cspace` and `row_stride`.
+ *
+ * @param ef Pointer to the open Eet_File.
+ * @param name The key name of the data entry in the Eet file.
+ * @param cipher_key Optional decryption key. If NULL, data is assumed not encrypted.
+ * @param src_x X-coordinate of the top-left corner of the source region in the stored image.
+ * @param src_y Y-coordinate of the top-left corner of the source region in the stored image.
+ * @param d Pointer to the pre-allocated destination buffer for the decoded pixel data.
+ *          The buffer must be large enough to hold `row_stride * h` bytes.
+ *          Pixel data is typically `unsigned int` per pixel for ARGB formats.
+ * @param w Width of the region to decode and the width of the target surface area in `d`.
+ * @param h Height of the region to decode and the height of the target surface area in `d`.
+ * @param row_stride The number of bytes from the start of one row of pixels in `d` to the start of the next.
+ *                   Typically `w * bytes_per_pixel_for_cspace`.
+ * @param cspace The desired Eet_Colorspace for the output data in buffer `d`.
+ * @param[out] alpha Pointer to store the alpha flag of the original image. Can be NULL.
+ * @param[out] comp Pointer to store compression information. Can be NULL.
+ * @param[out] quality Pointer to store quality information. Can be NULL.
+ * @param[out] lossy Pointer to store the encoding type. Can be NULL.
+ * @return 1 on success, 0 on failure.
+ */
 EAPI int
 eet_data_image_read_to_cspace_surface_cipher(Eet_File     *ef,
                                              const char   *name,
@@ -1460,6 +1892,27 @@ eet_data_image_read_to_cspace_surface_cipher(Eet_File     *ef,
    return res;
 }
 
+/**
+ * @brief Reads image data from an Eet file and decodes it to an ARGB8888 surface.
+ * This is a convenience wrapper for `eet_data_image_read_to_cspace_surface_cipher`
+ * with `cspace` fixed to `EET_COLORSPACE_ARGB8888`.
+ *
+ * @param ef Pointer to the open Eet_File.
+ * @param name The key name of the data entry.
+ * @param cipher_key Optional decryption key.
+ * @param src_x X-coordinate of the source region.
+ * @param src_y Y-coordinate of the source region.
+ * @param d Pointer to the pre-allocated destination buffer (ARGB8888).
+ * @param w Width of the region to decode.
+ * @param h Height of the region to decode.
+ * @param row_stride Row stride of the destination buffer `d`.
+ * @param[out] alpha Pointer to store the alpha flag. Can be NULL.
+ * @param[out] comp Pointer to store compression information. Can be NULL.
+ * @param[out] quality Pointer to store quality information. Can be NULL.
+ * @param[out] lossy Pointer to store the encoding type. Can be NULL.
+ * @return 1 on success, 0 on failure.
+ * @see eet_data_image_read_to_cspace_surface_cipher() for more details.
+ */
 EAPI int
 eet_data_image_read_to_surface_cipher(Eet_File     *ef,
                                       const char   *name,
@@ -1481,6 +1934,26 @@ eet_data_image_read_to_surface_cipher(Eet_File     *ef,
                                                        alpha, comp, quality, lossy);
 }
 
+/**
+ * @brief Reads image data from an Eet file and decodes it to an ARGB8888 surface (no cipher).
+ * This is a convenience wrapper for `eet_data_image_read_to_surface_cipher`
+ * with `cipher_key` set to NULL.
+ *
+ * @param ef Pointer to the open Eet_File.
+ * @param name The key name of the data entry.
+ * @param src_x X-coordinate of the source region.
+ * @param src_y Y-coordinate of the source region.
+ * @param d Pointer to the pre-allocated destination buffer (ARGB8888).
+ * @param w Width of the region to decode.
+ * @param h Height of the region to decode.
+ * @param row_stride Row stride of the destination buffer `d`.
+ * @param[out] alpha Pointer to store the alpha flag. Can be NULL.
+ * @param[out] comp Pointer to store compression information. Can be NULL.
+ * @param[out] quality Pointer to store quality information. Can be NULL.
+ * @param[out] lossy Pointer to store the encoding type. Can be NULL.
+ * @return 1 on success, 0 on failure.
+ * @see eet_data_image_read_to_surface_cipher() for more details.
+ */
 EAPI int
 eet_data_image_read_to_surface(Eet_File     *ef,
                                const char   *name,
@@ -1502,6 +1975,25 @@ eet_data_image_read_to_surface(Eet_File     *ef,
                                                 lossy);
 }
 
+/**
+ * @brief Reads and decodes the header of an image stored in an Eet file, with optional decryption.
+ *
+ * This function reads the raw image data associated with `name` from the Eet file,
+ * optionally decrypts it using `cipher_key`, and then decodes only its header
+ * to retrieve metadata like dimensions, alpha presence, compression, quality, and encoding type.
+ * It does not decompress or return the full pixel data.
+ *
+ * @param ef Pointer to the open Eet_File.
+ * @param name The key name of the data entry in the Eet file.
+ * @param cipher_key Optional decryption key. If NULL, data is assumed not encrypted.
+ * @param[out] w Pointer to store the width of the image. Can be NULL.
+ * @param[out] h Pointer to store the height of the image. Can be NULL.
+ * @param[out] alpha Pointer to store the alpha flag (1 if alpha, 0 otherwise). Can be NULL.
+ * @param[out] comp Pointer to store compression information from the image header. Can be NULL.
+ * @param[out] quality Pointer to store quality information from the image header. Can be NULL.
+ * @param[out] lossy Pointer to store the encoding type of the image. Can be NULL.
+ * @return 1 on success, 0 on failure (e.g., entry not found, decryption failed, invalid header).
+ */
 EAPI int
 eet_data_image_header_read_cipher(Eet_File     *ef,
                                   const char   *name,
@@ -1537,6 +2029,21 @@ eet_data_image_header_read_cipher(Eet_File     *ef,
    return d;
 }
 
+/**
+ * @brief Reads and decodes the header of an image stored in an Eet file.
+ * This is a convenience wrapper around `eet_data_image_header_read_cipher` with `cipher_key` set to NULL.
+ *
+ * @param ef Pointer to the open Eet_File.
+ * @param name The key name of the data entry.
+ * @param[out] w Pointer to store the image width. Can be NULL.
+ * @param[out] h Pointer to store the image height. Can be NULL.
+ * @param[out] alpha Pointer to store the alpha flag. Can be NULL.
+ * @param[out] comp Pointer to store compression information. Can be NULL.
+ * @param[out] quality Pointer to store quality information. Can be NULL.
+ * @param[out] lossy Pointer to store the encoding type. Can be NULL.
+ * @return 1 on success, 0 on failure.
+ * @see eet_data_image_header_read_cipher() for more details.
+ */
 EAPI int
 eet_data_image_header_read(Eet_File     *ef,
                            const char   *name,
@@ -1552,6 +2059,38 @@ eet_data_image_header_read(Eet_File     *ef,
                                             comp, quality, lossy);
 }
 
+/**
+ * @brief Encodes raw image data into a specified format, with optional encryption.
+ *
+ * This function takes raw pixel data (assumed ARGB8888) and encodes it based on
+ * the `lossy`, `comp`, and `quality` parameters. The resulting encoded data can
+ * then be optionally encrypted using `cipher_key`.
+ *
+ * Supported encodings (`lossy`):
+ * - `EET_IMAGE_LOSSLESS`: Stores raw or compressed ARGB data.
+ *   - `comp > 0`: Uses compression specified by `comp` (e.g., Emile_Compressor value).
+ *   - `comp <= 0`: Stores uncompressed.
+ * - `EET_IMAGE_JPEG`: Encodes as JPEG.
+ *   - `alpha = 0`: Standard JPEG (RGB).
+ *   - `alpha = 1`: Custom format with separate JPEG for RGB and alpha.
+ *   - `quality`: JPEG quality (0-100).
+ * - `EET_IMAGE_ETC1`, `EET_IMAGE_ETC2_RGB`, `EET_IMAGE_ETC2_RGBA`, `EET_IMAGE_ETC1_ALPHA`:
+ *   Encodes as TGV1 format using the respective ETC compression.
+ *   - `comp`: Boolean (0 or 1) for LZ4 compression of ETC blocks within TGV1.
+ *   - `quality`: Influences ETC packer settings.
+ *
+ * @param data Pointer to the raw pixel data (e.g., ARGB8888).
+ * @param cipher_key Optional encryption key. If NULL, data is not encrypted.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param alpha 1 if the image has alpha, 0 otherwise. Used to guide encoding choices.
+ * @param comp Compression setting. Meaning depends on `lossy`.
+ * @param quality Quality setting. Meaning depends on `lossy`.
+ * @param lossy The target `Eet_Image_Encoding` type.
+ * @param[out] size_ret Pointer to an integer to store the size of the resulting encoded (and possibly encrypted) data. Can be NULL.
+ * @return A pointer to an allocated buffer containing the encoded (and possibly encrypted) image data.
+ *         The caller is responsible for freeing this buffer. Returns NULL on failure or if input `data` is NULL.
+ */
 EAPI void *
 eet_data_image_encode_cipher(const void  *data,
                              const char  *cipher_key,
@@ -1625,6 +2164,22 @@ eet_data_image_encode_cipher(const void  *data,
    return d;
 }
 
+/**
+ * @brief Encodes raw image data into a specified format.
+ * This is a convenience wrapper around `eet_data_image_encode_cipher` with `cipher_key` set to NULL.
+ *
+ * @param data Pointer to the raw pixel data.
+ * @param[out] size_ret Pointer to store the size of the encoded data. Can be NULL.
+ * @param w Width of the image.
+ * @param h Height of the image.
+ * @param alpha 1 if the image has alpha, 0 otherwise.
+ * @param comp Compression setting.
+ * @param quality Quality setting.
+ * @param lossy The target encoding type.
+ * @return A pointer to an allocated buffer containing the encoded image data.
+ *         The caller is responsible for freeing this buffer. Returns NULL on failure.
+ * @see eet_data_image_encode_cipher() for detailed parameter descriptions.
+ */
 EAPI void *
 eet_data_image_encode(const void  *data,
                       int         *size_ret,
@@ -1665,6 +2220,35 @@ static const Eet_Colorspace _eet_gry8_alpha_colorspace[] = {
   EET_COLORSPACE_ARGB8888
 };
 
+/**
+ * @brief Decodes the header of an image from a raw data buffer, with optional decryption and colorspace information.
+ *
+ * This function inspects the provided `data` buffer (which might be encrypted if `cipher_key` is given)
+ * to determine the image's metadata. It supports several Eet image formats:
+ * - Lossless (compressed or uncompressed): Magic 0xac1dfeed.
+ * - JPEG with separate alpha: Magic 0xbeeff00d.
+ * - TGV1 (ETC1/ETC2 based): Magic "TGV1".
+ * - Standard JPEG.
+ *
+ * It populates the output parameters with the found metadata. Additionally, if `cspaces` is not NULL,
+ * it can return a list of supported `Eet_Colorspace`s for certain formats (primarily TGV and JPEG).
+ *
+ * @param data Pointer to the raw image data buffer.
+ * @param cipher_key Optional decryption key. If NULL, data is assumed not encrypted.
+ * @param size Size of the `data` buffer in bytes.
+ * @param[out] w Pointer to store the image width. Can be NULL.
+ * @param[out] h Pointer to store the image height. Can be NULL.
+ * @param[out] alpha Pointer to store the alpha flag (1 if alpha, 0 otherwise). Can be NULL.
+ * @param[out] comp Pointer to store compression information. Can be NULL.
+ * @param[out] quality Pointer to store quality information. Can be NULL.
+ * @param[out] lossy Pointer to store the `Eet_Image_Encoding` type. Can be NULL.
+ * @param[out] cspaces If not NULL, a pointer to a `const Eet_Colorspace*` which will be
+ *                     set to an array of supported colorspaces for the image format.
+ *                     The array is terminated by `EET_COLORSPACE_ARGB8888` (or is specific).
+ *                     Example for TGV1 ETC1: `_eet_etc1_colorspace` might be returned.
+ *                     The caller should not free this array; it points to static data.
+ * @return 1 on successful header decoding, 0 on failure (e.g., insufficient data, unknown format, decryption error).
+ */
 static int
 eet_data_image_header_advance_decode_cipher(const void   *data,
                                             const char   *cipher_key,
@@ -1855,6 +2439,23 @@ eet_data_image_header_advance_decode_cipher(const void   *data,
    return r;
 }
 
+/**
+ * @brief Decodes the header of an image from a raw data buffer, with optional decryption.
+ * This is a wrapper around `eet_data_image_header_advance_decode_cipher` that
+ * does not request colorspace information.
+ *
+ * @param data Pointer to the raw image data buffer.
+ * @param cipher_key Optional decryption key.
+ * @param size Size of the `data` buffer.
+ * @param[out] w Pointer to store image width. Can be NULL.
+ * @param[out] h Pointer to store image height. Can be NULL.
+ * @param[out] alpha Pointer to store alpha flag. Can be NULL.
+ * @param[out] comp Pointer to store compression info. Can be NULL.
+ * @param[out] quality Pointer to store quality info. Can be NULL.
+ * @param[out] lossy Pointer to store encoding type. Can be NULL.
+ * @return 1 on success, 0 on failure.
+ * @see eet_data_image_header_advance_decode_cipher() for more details.
+ */
 EAPI int
 eet_data_image_header_decode_cipher(const void   *data,
                                     const char   *cipher_key,
@@ -1872,6 +2473,22 @@ eet_data_image_header_decode_cipher(const void   *data,
                                                       NULL);
 }
 
+/**
+ * @brief Retrieves the list of supported colorspaces for an image stored in an Eet file.
+ *
+ * This function reads an image entry from the Eet file, optionally decrypts it,
+ * and then uses `eet_data_image_header_advance_decode_cipher` to determine the
+ * available colorspaces for that image format.
+ *
+ * @param ef Pointer to the open Eet_File.
+ * @param name The key name of the data entry in the Eet file.
+ * @param cipher_key Optional decryption key. If NULL, data is assumed not encrypted.
+ * @param[out] cspaces A pointer to a `const Eet_Colorspace*` which will be
+ *                     set to an array of supported colorspaces for the image format.
+ *                     The array is terminated by `EET_COLORSPACE_ARGB8888` or is specific.
+ *                     The caller should not free this array; it points to static data.
+ * @return 1 if colorspace information was successfully retrieved, 0 on failure.
+ */
 EAPI int
 eet_data_image_colorspace_get(Eet_File *ef,
                               const char *name,
@@ -1903,6 +2520,21 @@ eet_data_image_colorspace_get(Eet_File *ef,
    return d;
 }
 
+/**
+ * @brief Decodes the header of an image from a raw data buffer.
+ * This is a convenience wrapper around `eet_data_image_header_decode_cipher` with `cipher_key` set to NULL.
+ *
+ * @param data Pointer to the raw image data buffer.
+ * @param size Size of the `data` buffer.
+ * @param[out] w Pointer to store image width. Can be NULL.
+ * @param[out] h Pointer to store image height. Can be NULL.
+ * @param[out] alpha Pointer to store alpha flag. Can be NULL.
+ * @param[out] comp Pointer to store compression info. Can be NULL.
+ * @param[out] quality Pointer to store quality info. Can be NULL.
+ * @param[out] lossy Pointer to store encoding type. Can be NULL.
+ * @return 1 on success, 0 on failure.
+ * @see eet_data_image_header_decode_cipher() for more details.
+ */
 EAPI int
 eet_data_image_header_decode(const void   *data,
                              int           size,
@@ -1924,6 +2556,22 @@ eet_data_image_header_decode(const void   *data,
                                               lossy);
 }
 
+/**
+ * @brief Copies a rectangular region from a source pixel buffer to a destination pixel buffer.
+ * This function handles copying a sub-region (`src_x`, `src_y`, `w`, `h`) from a source buffer
+ * (`src` with width `src_w`) to a destination buffer (`dst` with `row_stride`).
+ * It optimizes for contiguous memory copies if possible.
+ * Assumes 4 bytes per pixel (e.g., ARGB8888).
+ *
+ * @param src Pointer to the source pixel buffer (ARGB8888).
+ * @param src_x X-offset in the source buffer.
+ * @param src_y Y-offset in the source buffer.
+ * @param src_w Width of the source buffer in pixels.
+ * @param dst Pointer to the destination pixel buffer.
+ * @param w Width of the region to copy in pixels.
+ * @param h Height of the region to copy in pixels.
+ * @param row_stride Stride of the destination buffer in bytes (bytes from one row to the next).
+ */
 static void
 _eet_data_image_copy_buffer(const unsigned int *src,
                             unsigned int        src_x,
@@ -1948,6 +2596,29 @@ _eet_data_image_copy_buffer(const unsigned int *src,
      }
 }
 
+/**
+ * @brief Internal function to decode image data from a buffer into a target surface/colorspace.
+ * This function is the core decoding logic, handling different Eet image formats
+ * (lossless, JPEG, ETC1/2) and parameters like source region, destination buffer,
+ * and target colorspace.
+ *
+ * @param data Pointer to the raw encoded image data.
+ * @param size Size of the encoded image data.
+ * @param src_x X-coordinate of the top-left of the source region within the full image.
+ * @param src_y Y-coordinate of the top-left of the source region within the full image.
+ * @param src_w Width of the full source image (from header).
+ * @param src_h Height of the full source image (from header, useful for fast path detection).
+ * @param d Pointer to the destination buffer for decoded pixels.
+ * @param w Width of the region to decode into `d`.
+ * @param h Height of the region to decode into `d`.
+ * @param row_stride Stride of the destination buffer `d` in bytes.
+ * @param alpha Alpha flag from the image header.
+ * @param comp Compression flag/type from the image header.
+ * @param quality Quality flag from the image header.
+ * @param lossy Encoding type from the image header.
+ * @param cspace Target `Eet_Colorspace` for the decoded output in `d`.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 _eet_data_image_decode_inside(const void   *data,
                               int           size,
@@ -2061,6 +2732,25 @@ _eet_data_image_decode_inside(const void   *data,
    return 1;
 }
 
+/**
+ * @brief Decodes image data from a raw buffer, with optional decryption.
+ *
+ * This function takes a buffer of encoded image data, optionally decrypts it,
+ * decodes its header to get image metadata, allocates a buffer for the full
+ * ARGB8888 pixel data, and then decodes the image into this new buffer.
+ *
+ * @param data Pointer to the raw encoded image data buffer.
+ * @param cipher_key Optional decryption key. If NULL, data is assumed not encrypted.
+ * @param size Size of the `data` buffer in bytes.
+ * @param[out] w Pointer to store the width of the decoded image. Can be NULL.
+ * @param[out] h Pointer to store the height of the decoded image. Can be NULL.
+ * @param[out] alpha Pointer to store the alpha flag. Can be NULL.
+ * @param[out] comp Pointer to store compression information. Can be NULL.
+ * @param[out] quality Pointer to store quality information. Can be NULL.
+ * @param[out] lossy Pointer to store the encoding type. Can be NULL.
+ * @return A pointer to a newly allocated buffer containing the decoded ARGB8888 pixel data.
+ *         The caller is responsible for freeing this buffer. Returns NULL on failure.
+ */
 EAPI void *
 eet_data_image_decode_cipher(const void   *data,
                              const char   *cipher_key,
@@ -2133,6 +2823,22 @@ eet_data_image_decode_cipher(const void   *data,
    return d;
 }
 
+/**
+ * @brief Decodes image data from a raw buffer.
+ * This is a convenience wrapper around `eet_data_image_decode_cipher` with `cipher_key` set to NULL.
+ *
+ * @param data Pointer to the raw encoded image data buffer.
+ * @param size Size of the `data` buffer.
+ * @param[out] w Pointer to store image width. Can be NULL.
+ * @param[out] h Pointer to store image height. Can be NULL.
+ * @param[out] alpha Pointer to store alpha flag. Can be NULL.
+ * @param[out] comp Pointer to store compression info. Can be NULL.
+ * @param[out] quality Pointer to store quality info. Can be NULL.
+ * @param[out] lossy Pointer to store encoding type. Can be NULL.
+ * @return A pointer to a newly allocated buffer containing decoded ARGB8888 pixel data.
+ *         The caller is responsible for freeing this buffer. Returns NULL on failure.
+ * @see eet_data_image_decode_cipher() for more details.
+ */
 EAPI void *
 eet_data_image_decode(const void   *data,
                       int           size,
@@ -2147,6 +2853,30 @@ eet_data_image_decode(const void   *data,
                                        alpha, comp, quality, lossy);
 }
 
+/**
+ * @brief Decodes a region of an image from a raw buffer into a pre-allocated surface with a specific colorspace.
+ *
+ * This function takes a buffer of encoded image data, optionally decrypts it,
+ * decodes its header, and then decodes a specified region (`src_x`, `src_y`, `w`, `h`)
+ * directly into the provided buffer `d`. The output is formatted according to `cspace`
+ * and `row_stride`. It also validates if the requested `cspace` is supported by the image format.
+ *
+ * @param data Pointer to the raw encoded image data buffer.
+ * @param cipher_key Optional decryption key. If NULL, data is assumed not encrypted.
+ * @param size Size of the `data` buffer in bytes.
+ * @param src_x X-coordinate of the top-left of the source region within the stored image.
+ * @param src_y Y-coordinate of the top-left of the source region within the stored image.
+ * @param d Pointer to the pre-allocated destination buffer for the decoded pixel data.
+ * @param w Width of the region to decode and the width of the target surface area in `d`.
+ * @param h Height of the region to decode and the height of the target surface area in `d`.
+ * @param row_stride Stride of the destination buffer `d` in bytes.
+ * @param cspace The desired `Eet_Colorspace` for the output data in buffer `d`.
+ * @param[out] alpha Pointer to store the alpha flag of the original image. Can be NULL.
+ * @param[out] comp Pointer to store compression information. Can be NULL.
+ * @param[out] quality Pointer to store quality information. Can be NULL.
+ * @param[out] lossy Pointer to store the encoding type. Can be NULL.
+ * @return 1 on success, 0 on failure (e.g., invalid parameters, unsupported colorspace, decode error).
+ */
 EAPI int
 eet_data_image_decode_to_cspace_surface_cipher(const void   *data,
                                                const char   *cipher_key,
@@ -2237,6 +2967,27 @@ eet_data_image_decode_to_cspace_surface_cipher(const void   *data,
    return 1;
 }
 
+/**
+ * @brief Decodes a region of an image from a raw buffer into a pre-allocated ARGB8888 surface.
+ * This is a convenience wrapper for `eet_data_image_decode_to_cspace_surface_cipher`
+ * with `cspace` fixed to `EET_COLORSPACE_ARGB8888`.
+ *
+ * @param data Pointer to the raw encoded image data buffer.
+ * @param cipher_key Optional decryption key.
+ * @param size Size of the `data` buffer.
+ * @param src_x X-coordinate of the source region.
+ * @param src_y Y-coordinate of the source region.
+ * @param d Pointer to the pre-allocated destination buffer (ARGB8888).
+ * @param w Width of the region to decode.
+ * @param h Height of the region to decode.
+ * @param row_stride Row stride of the destination buffer `d`.
+ * @param[out] alpha Pointer to store the alpha flag. Can be NULL.
+ * @param[out] comp Pointer to store compression information. Can be NULL.
+ * @param[out] quality Pointer to store quality information. Can be NULL.
+ * @param[out] lossy Pointer to store the encoding type. Can be NULL.
+ * @return 1 on success, 0 on failure.
+ * @see eet_data_image_decode_to_cspace_surface_cipher() for more details.
+ */
 EAPI int
 eet_data_image_decode_to_surface_cipher(const void   *data,
                                         const char   *cipher_key,
@@ -2255,6 +3006,26 @@ eet_data_image_decode_to_surface_cipher(const void   *data,
    return eet_data_image_decode_to_cspace_surface_cipher(data, cipher_key, size, src_x, src_y, d, w, h, row_stride, EET_COLORSPACE_ARGB8888, alpha, comp, quality, lossy);
 }
 
+/**
+ * @brief Decodes a region of an image from a raw buffer into a pre-allocated ARGB8888 surface (no cipher).
+ * This is a convenience wrapper for `eet_data_image_decode_to_surface_cipher`
+ * with `cipher_key` set to NULL.
+ *
+ * @param data Pointer to the raw encoded image data buffer.
+ * @param size Size of the `data` buffer.
+ * @param src_x X-coordinate of the source region.
+ * @param src_y Y-coordinate of the source region.
+ * @param d Pointer to the pre-allocated destination buffer (ARGB8888).
+ * @param w Width of the region to decode.
+ * @param h Height of the region to decode.
+ * @param row_stride Row stride of the destination buffer `d`.
+ * @param[out] alpha Pointer to store the alpha flag. Can be NULL.
+ * @param[out] comp Pointer to store compression information. Can be NULL.
+ * @param[out] quality Pointer to store quality information. Can be NULL.
+ * @param[out] lossy Pointer to store the encoding type. Can be NULL.
+ * @return 1 on success, 0 on failure.
+ * @see eet_data_image_decode_to_surface_cipher() for more details.
+ */
 EAPI int
 eet_data_image_decode_to_surface(const void   *data,
                                  int           size,

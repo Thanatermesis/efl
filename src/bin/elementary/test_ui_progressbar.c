@@ -4,21 +4,34 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Structure to hold all the widgets and timer for the progressbar test UI.
+ *
+ * This struct is passed around as user data to callbacks.
+ */
 typedef struct _pbdata
 {
-   Eo *win;
-   Eo *pb1;
-   Eo *pb2;
-   Eo *pb3;
-   Eo *pb4;
-   Eo *pb5;
-   Eo *check;
-   Eo *btn_start;
-   Eo *btn_stop;
-   Eo *btn_reset;
-   Ecore_Timer *timer;
+   Eo *win; /**< The main window. */
+   Eo *pb1; /**< Progressbar with an image as content. */
+   Eo *pb2; /**< Progressbar in infinite mode. */
+   Eo *pb3; /**< Progressbar with a togglable progress label. */
+   Eo *pb4; /**< Progressbar with a custom format string. */
+   Eo *pb5; /**< Progressbar with a custom format function. */
+   Eo *check; /**< Checkbox to toggle the label visibility on pb3. */
+   Eo *btn_start; /**< Button to start the progress animation. */
+   Eo *btn_stop; /**< Button to stop the progress animation. */
+   Eo *btn_reset; /**< Button to reset all progressbars to their initial state. */
+   Ecore_Timer *timer; /**< Timer to drive the progress animation. */
 } pbdata;
 
+/**
+ * @brief Increments the value of a progressbar.
+ *
+ * @param pb The progressbar widget.
+ * @param inc_value The value to increment the progress by.
+ * @return EINA_TRUE when progress reaches 100.0, EINA_FALSE otherwise.
+ *         The return value is used to decide whether to renew an Ecore_Timer.
+ */
 static Eina_Bool
 _set_progress_val(Eo *pb, double inc_value)
 {
@@ -36,6 +49,16 @@ _set_progress_val(Eo *pb, double inc_value)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Timer callback to update progressbars' values.
+ *
+ * This function is called periodically to simulate progress. It updates
+ * several progressbars and then checks if the main progressbar (pb1) has
+ * completed.
+ *
+ * @param d User data, a pointer to a pbdata struct.
+ * @return ECORE_CALLBACK_RENEW to continue the timer, or ECORE_CALLBACK_CANCEL to stop it.
+ */
 static Eina_Bool
 _pb_timer_cb(void *d)
 {
@@ -61,6 +84,15 @@ _pb_timer_cb(void *d)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Callback for the "start" button's clicked event.
+ *
+ * Disables the start button, enables the stop button, and starts the
+ * animation timer if it's not already running.
+ *
+ * @param d User data, a pointer to a pbdata struct.
+ * @param ev The event information.
+ */
 static void
 _start_btn_clicked_cb(void *d, const Efl_Event *ev EINA_UNUSED)
 {
@@ -76,6 +108,15 @@ _start_btn_clicked_cb(void *d, const Efl_Event *ev EINA_UNUSED)
    if (!pd->timer) pd->timer = ecore_timer_add(0.1, _pb_timer_cb, pd);
 }
 
+/**
+ * @brief Callback for the "stop" button's clicked event.
+ *
+ * Enables the start button, disables the stop button, and stops (deletes)
+ * the animation timer if it is running.
+ *
+ * @param d User data, a pointer to a pbdata struct.
+ * @param ev The event information.
+ */
 static void
 _stop_btn_clicked_cb(void *d, const Efl_Event *ev EINA_UNUSED)
 {
@@ -94,6 +135,14 @@ _stop_btn_clicked_cb(void *d, const Efl_Event *ev EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback for the "reset" button's clicked event.
+ *
+ * Resets the value of all progressbars to 0.0.
+ *
+ * @param d User data, a pointer to a pbdata struct.
+ * @param ev The event information.
+ */
 static void
 _reset_btn_clicked_cb(void *d, const Efl_Event *ev EINA_UNUSED)
 {
@@ -109,6 +158,14 @@ _reset_btn_clicked_cb(void *d, const Efl_Event *ev EINA_UNUSED)
    efl_ui_range_value_set(pd->pb5, 0.0);
 }
 
+/**
+ * @brief Callback for the window's delete request event.
+ *
+ * Cleans up resources, including the animation timer and the pbdata struct.
+ *
+ * @param d User data, a pointer to a pbdata struct.
+ * @param ev The event information.
+ */
 static void
 _win_delete_req_cb(void *d, const Efl_Event *ev EINA_UNUSED)
 {
@@ -119,6 +176,16 @@ _win_delete_req_cb(void *d, const Efl_Event *ev EINA_UNUSED)
    free(pd);
 }
 
+/**
+ * @brief Custom formatting function for a progressbar label.
+ *
+ * Provides different text strings for the label based on the progress value.
+ *
+ * @param data User data (unused).
+ * @param str The string buffer to append the formatted string to.
+ * @param value The current progress value.
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _custom_format_cb(void *data EINA_UNUSED, Eina_Strbuf *str, const Eina_Value value)
 {
@@ -132,6 +199,15 @@ _custom_format_cb(void *data EINA_UNUSED, Eina_Strbuf *str, const Eina_Value val
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for the checkbox's "selected,changed" event.
+ *
+ * Toggles the visibility of the progress label on a progressbar based on the
+ * checkbox's state.
+ *
+ * @param data The progressbar widget (pb3) whose label will be toggled.
+ * @param ev The event information, containing the checkbox object.
+ */
 static void
 _toggle_progress_label(void *data, const Efl_Event *ev)
 {
@@ -142,6 +218,13 @@ _toggle_progress_label(void *data, const Efl_Event *ev)
    efl_ui_progressbar_show_progress_label_set(pb3, state);
 }
 
+/**
+ * @brief Test function for Efl.Ui.Progressbar.
+ *
+ * This function creates a window with several progressbar widgets to demonstrate
+ * different features like custom labels, infinite mode, and user interaction
+ * via buttons.
+ */
 void
 test_ui_progressbar(void *data EINA_UNUSED, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

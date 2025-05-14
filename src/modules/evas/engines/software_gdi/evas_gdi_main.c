@@ -1,7 +1,21 @@
 #include "evas_common_private.h"
 #include "evas_engine.h"
 
-
+/**
+ * @brief Initializes the Evas software GDI engine.
+ *
+ * This function sets up the necessary resources for rendering using GDI.
+ * It gets the Device Context (DC) for the given window, checks for
+ * compatible color depth, and initializes a BITMAPINFO structure for
+ * bitmap operations.
+ *
+ * @param window The handle to the window where rendering will occur.
+ * @param borderless A flag indicating if the window is borderless.
+ * @param fullscreen A flag indicating if the window is fullscreen (currently unused).
+ * @param region A flag indicating if the window has a custom region.
+ * @param buf Pointer to the Outbuf structure to be initialized.
+ * @return 1 on success, 0 on failure.
+ */
 int
 evas_software_gdi_init (HWND         window,
                         unsigned int borderless,
@@ -60,6 +74,14 @@ evas_software_gdi_init (HWND         window,
    return 1;
 }
 
+/**
+ * @brief Shuts down the Evas software GDI engine.
+ *
+ * This function releases all resources allocated by evas_software_gdi_init(),
+ * including the bitmap information, the Device Context, and any GDI regions.
+ *
+ * @param buf Pointer to the Outbuf structure containing engine data.
+ */
 void
 evas_software_gdi_shutdown(Outbuf *buf)
 {
@@ -72,6 +94,15 @@ evas_software_gdi_shutdown(Outbuf *buf)
      DeleteObject(buf->priv.gdi.regions);
 }
 
+/**
+ * @brief Resizes the GDI bitmap information.
+ *
+ * This function updates the width, height, and image size in the
+ * BITMAPINFOHEADER structure when the output buffer's dimensions change.
+ *
+ * @param buf Pointer to the Outbuf structure containing the bitmap information
+ *            and new dimensions.
+ */
 void
 evas_software_gdi_bitmap_resize(Outbuf *buf)
 {

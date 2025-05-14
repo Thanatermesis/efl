@@ -25,40 +25,107 @@
 
 //#define SURFDBG 1
 
+/** @internal Global image cache instance. */
 static Evas_Cache_Image *eci = NULL;
+/** @internal Reference count for the Evas image system. */
 static int reference = 0;
+/** @internal Flag to disable mmap usage for image surfaces. -1: uninitialized, 0: mmap enabled, 1: mmap disabled. */
 static int evas_image_no_mmap = -1;
 
 /* static RGBA_Image *evas_rgba_line_buffer = NULL; */
 
+/** @internal Minimum length for a reusable RGBA line buffer. */
 #define EVAS_RGBA_LINE_BUFFER_MIN_LEN 256
+/** @internal Maximum length for a reusable RGBA line buffer. */
 #define EVAS_RGBA_LINE_BUFFER_MAX_LEN 2048
 
 /* static RGBA_Image *evas_alpha_line_buffer = NULL; */
 
+/** @internal Minimum length for a reusable Alpha line buffer. */
 #define EVAS_ALPHA_LINE_BUFFER_MIN_LEN 256
+/** @internal Maximum length for a reusable Alpha line buffer. */
 #define EVAS_ALPHA_LINE_BUFFER_MAX_LEN 2048
 
+/**
+ * @internal
+ * @brief Creates a new, empty RGBA_Image structure (Image_Entry).
+ * @return A pointer to the newly allocated Image_Entry, or NULL on failure.
+ */
 static Image_Entry *_evas_common_rgba_image_new(void);
+/**
+ * @internal
+ * @brief Deletes an RGBA_Image structure (Image_Entry) and associated resources.
+ * @param ie The Image_Entry to delete.
+ */
 static void _evas_common_rgba_image_delete(Image_Entry *ie);
+/**
+ * @internal
+ * @brief Allocates the pixel surface for an Image_Entry.
+ * @param ie The Image_Entry for which to allocate the surface.
+ * @param w The width of the surface to allocate.
+ * @param h The height of the surface to allocate.
+ * @return 0 on success, -1 on failure.
+ */
 static int _evas_common_rgba_image_surface_alloc(Image_Entry *ie,
                                                  unsigned int w,
                                                  unsigned int h);
+/**
+ * @internal
+ * @brief Deletes the pixel surface of an Image_Entry.
+ * @param ie The Image_Entry whose surface is to be deleted.
+ */
 static void _evas_common_rgba_image_surface_delete(Image_Entry *ie);
+/**
+ * @internal
+ * @brief Retrieves a pointer to the pixel data of an Image_Entry's surface.
+ * @param ie The Image_Entry.
+ * @return A pointer to the pixel data (DATA32*), or NULL if no surface is allocated.
+ */
 static DATA32 *_evas_common_rgba_image_surface_pixels(Image_Entry *ie);
+/**
+ * @internal
+ * @brief Unloads an image, potentially deferring the actual unload operation.
+ * @param im The Image_Entry to unload.
+ */
 static void _evas_common_rgba_image_unload(Image_Entry *im);
+/**
+ * @internal
+ * @brief Marks a rectangular region of an image as dirty.
+ * @param im The Image_Entry to mark.
+ * @param x The x-coordinate of the dirty region.
+ * @param y The y-coordinate of the dirty region.
+ * @param w The width of the dirty region.
+ * @param h The height of the dirty region.
+ */
 static void _evas_common_rgba_image_dirty_region(Image_Entry *im,
                                                  unsigned int x,
                                                  unsigned int y,
                                                  unsigned int w,
                                                  unsigned int h);
+/**
+ * @internal
+ * @brief Calculates the estimated RAM usage of an Image_Entry.
+ * @param ie The Image_Entry.
+ * @return The estimated RAM usage in bytes.
+ */
 static int _evas_common_rgba_image_ram_usage(Image_Entry *ie);
 
-/* Only called when references > 0. Need to provide a fresh copie of im. */
-/* The destination surface does have a surface, but no allocated pixel data. */
+/**
+ * @internal
+ * @brief Handles the dirty state when an image is duplicated.
+ * This function is called when `ie_dst` is a new copy of `ie_src` and `ie_src`
+ * might have pending changes or is loaded. It ensures `ie_dst` gets a
+ * properly allocated surface if needed and normalizes colorspaces.
+ * @param dst The destination Image_Entry (the new copy).
+ * @param src The source Image_Entry (the original).
+ * @return 0 on success, 1 on failure (e.g., surface allocation failed).
+ * @note Only called when references > 0.
+ * @note The destination surface might exist but without allocated pixel data.
+ */
 static int _evas_common_rgba_image_dirty(Image_Entry* dst,
                                          const Image_Entry* src);
 
+/** @internal Structure defining the Evas image cache callbacks. */
 static const Evas_Cache_Image_Func _evas_common_image_func =
 {
   _evas_common_rgba_image_new,
@@ -79,6 +146,27 @@ static const Evas_Cache_Image_Func _evas_common_image_func =
   NULL // _evas_common_rgba_image_debug
 };
 
+/**
+ * @internal
+ * @brief Calculates the memory size required for an image surface, potentially aligned to page boundaries.
+ *
+ * This function determines the byte size needed for an image with given dimensions
+ * and colorspace. It also considers mmap usage and page alignment for larger images.
+ * For compressed formats, it adjusts width and height based on border parameters
+ * and ensures dimensions are multiples of block sizes.
+ *
+ * @param w The width of the image in pixels.
+ * @param h The height of the image in pixels.
+ * @param cspace The colorspace of the image.
+ * @param[in,out] l Pointer to the left border size. If non-NULL and the colorspace
+ *                  is compressed, this value is added to `w` before size calculation.
+ *                  If the colorspace is not compressed, this is set to 0.
+ * @param[in,out] r Pointer to the right border size. Similar to `l`.
+ * @param[in,out] t Pointer to the top border size. Similar to `l`, added to `h`.
+ * @param[in,out] b Pointer to the bottom border size. Similar to `l`, added to `h`.
+ * @return The calculated size in bytes for the image surface, or 0 if dimensions
+ *         are invalid for compressed formats.
+ */
 EVAS_API int
 _evas_common_rgba_image_surface_size(unsigned int w, unsigned int h,
                                      Evas_Colorspace cspace,
@@ -156,6 +244,24 @@ _evas_common_rgba_image_surface_size(unsigned int w, unsigned int h,
 #undef ALIGN_TO_PAGE
 }
 
+/**
+ * @internal
+ * @brief Retrieves a specific plane of an image as an Eina_Slice.
+ *
+ * This function provides access to the raw data of a specific image plane.
+ * The interpretation of planes depends on the image's colorspace.
+ * For example:
+ * - ARGB8888, AGRY88, GRY8: Have 1 plane (plane 0).
+ * - YUV formats (e.g., YCBCR422P601_PL): Have multiple planes (Y, U, V).
+ * - Compressed formats (e.g., ETC1): Have 1 plane (plane 0).
+ *
+ * @param im The RGBA_Image to get the plane from.
+ * @param plane The index of the plane to retrieve (0-indexed).
+ * @param[out] slice Pointer to an Eina_Slice structure to be filled with the
+ *                   plane's data (memory pointer and length).
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., invalid image,
+ *         invalid plane index, or data not available).
+ */
 EVAS_API Eina_Bool
 _evas_common_rgba_image_plane_get(const RGBA_Image *im, int plane,
                                   Eina_Slice *slice)
@@ -310,6 +416,32 @@ _evas_common_rgba_image_plane_get(const RGBA_Image *im, int plane,
      }
 }
 
+/**
+ * @internal
+ * @brief Calculates the byte offset for a given rectangular region and plane within an image.
+ *
+ * This function determines the starting byte offset of a specified sub-region
+ * within a particular plane of an image. It's used for accessing specific
+ * parts of image data directly. The calculation depends on the image's
+ * colorspace and the plane index.
+ *
+ * @param rx The x-coordinate of the region's top-left corner.
+ * @param ry The y-coordinate of the region's top-left corner.
+ * @param rw The width of the region.
+ * @param rh The height of the region.
+ * @param plane The plane index (relevant for multi-planar formats like YUV).
+ *              For single-plane formats, this is typically 0.
+ * @param im The RGBA_Image to calculate the offset for.
+ * @return The byte offset from the beginning of the plane's data to the
+ *         start of the specified region, or -1 if the parameters are invalid
+ *         (e.g., region out of bounds, invalid plane, unsupported colorspace,
+ *         or alignment issues for compressed/YUV formats).
+ * @note This function currently does not support strides other than the default
+ *       packed layout for each format.
+ * @warning For compressed formats (ETC, S3TC) and some YUV formats, `rx`, `ry`,
+ *          `rw`, `rh` must adhere to block alignment (e.g., multiples of 4 for
+ *          compressed, multiples of 2 for some YUV chroma components).
+ */
 EVAS_API int
 _evas_common_rgba_image_data_offset(int rx, int ry, int rw, int rh,
                                     int plane, const RGBA_Image *im)
@@ -383,6 +515,30 @@ _evas_common_rgba_image_data_offset(int rx, int ry, int rw, int rh,
      }
 }
 
+/**
+ * @internal
+ * @brief Allocates memory for an image surface, attempting to use mmap for larger images.
+ *
+ * This function calculates the required size using
+ * `_evas_common_rgba_image_surface_size` and then allocates memory.
+ * If the size is large enough and mmap is not disabled (via `evas_image_no_mmap`
+ * or environment variables), it tries to use `mmap` (potentially with
+ * `MAP_HUGETLB` for very large allocations). Otherwise, it falls back to `malloc`.
+ *
+ * @param ie The Image_Entry for which the surface is being allocated.
+ *           Used to access `ie->space` for size calculation.
+ * @param w The base width of the image.
+ * @param h The base height of the image.
+ * @param[in,out] pl Pointer to the left border size. Passed to
+ *                  `_evas_common_rgba_image_surface_size`.
+ * @param[in,out] pr Pointer to the right border size. Passed to
+ *                  `_evas_common_rgba_image_surface_size`.
+ * @param[in,out] pt Pointer to the top border size. Passed to
+ *                  `_evas_common_rgba_image_surface_size`.
+ * @param[in,out] pb Pointer to the bottom border size. Passed to
+ *                  `_evas_common_rgba_image_surface_size`.
+ * @return A pointer to the allocated memory block, or NULL on allocation failure.
+ */
 static void *
 _evas_common_rgba_image_surface_mmap(Image_Entry *ie,
                                      unsigned int w, unsigned int h,
@@ -417,6 +573,20 @@ _evas_common_rgba_image_surface_mmap(Image_Entry *ie,
 #endif
 }
 
+/**
+ * @internal
+ * @brief Frees memory previously allocated for an image surface by
+ *        `_evas_common_rgba_image_surface_mmap`.
+ *
+ * This function determines if the memory was allocated via `mmap` or `malloc`
+ * based on its size and the `evas_image_no_mmap` flag, and calls the
+ * corresponding deallocation function (`munmap` or `free`).
+ *
+ * @param data Pointer to the memory block to free.
+ * @param w The original width used for allocation (needed for size recalculation).
+ * @param h The original height used for allocation (needed for size recalculation).
+ * @param cspace The colorspace used for allocation (needed for size recalculation).
+ */
 void
 evas_common_rgba_image_surface_munmap(void *data, unsigned int w, unsigned int h, Evas_Colorspace cspace)
 {
@@ -436,6 +606,15 @@ evas_common_rgba_image_surface_munmap(void *data, unsigned int w, unsigned int h
 #endif
 }
 
+/**
+ * @brief Initializes the Evas common image handling system.
+ * @api
+ *
+ * This function sets up the global image cache (`eci`) if it hasn't been
+ * initialized yet, increments the reference counter for the image system,
+ * and initializes the scale cache. It should be called before any other
+ * Evas image functions are used.
+ */
 EVAS_API void
 evas_common_image_init(void)
 {
@@ -445,6 +624,16 @@ evas_common_image_init(void)
    evas_common_scalecache_init();
 }
 
+/**
+ * @brief Shuts down the Evas common image handling system.
+ * @api
+ *
+ * This function decrements the reference counter for the image system.
+ * If the reference count drops to zero, it shuts down and frees the
+ * global image cache (`eci`). It also shuts down the scale cache.
+ * This should be called when Evas image handling is no longer needed
+ * to release resources.
+ */
 EVAS_API void
 evas_common_image_shutdown(void)
 {
@@ -472,6 +661,14 @@ evas_common_image_shutdown(void)
    evas_common_scalecache_shutdown();
 }
 
+/**
+ * @brief Unloads all images currently held in the Evas image cache.
+ * @api
+ *
+ * This function first dumps the RGBA image scale cache and then instructs
+ * the main image cache (`eci`) to unload all its entries. This is typically
+ * used to free up memory by clearing cached image data.
+ */
 EVAS_API void
 evas_common_image_image_all_unload(void)
 {
@@ -479,6 +676,16 @@ evas_common_image_image_all_unload(void)
    evas_cache_image_unload_all(eci);
 }
 
+/**
+ * @internal
+ * @brief Allocates and initializes a new RGBA_Image structure.
+ *
+ * This function allocates memory for an RGBA_Image structure, initializes its
+ * flags to RGBA_IMAGE_NOTHING, and initializes its scale cache entry.
+ *
+ * @return A pointer to the `cache_entry` member of the newly allocated
+ *         RGBA_Image, cast to Image_Entry*. Returns NULL on allocation failure.
+ */
 static Image_Entry *
 _evas_common_rgba_image_new(void)
 {
@@ -492,6 +699,22 @@ _evas_common_rgba_image_new(void)
    return &im->cache_entry;
 }
 
+/**
+ * @internal
+ * @brief Frees an RGBA_Image structure and its associated resources.
+ *
+ * This function performs cleanup for an RGBA_Image:
+ * - Removes it from pending unloads.
+ * - Frees pipe render data if applicable.
+ * - Closes the loader if data was loaded via a module.
+ * - Shuts down its scale cache entry.
+ * - Unrefs the loader module if present.
+ * - Frees animated frame data if any.
+ * - Closes the Eina_File if it was opened and not a given mmap.
+ * - Finally, queues the RGBA_Image structure itself for freeing.
+ *
+ * @param ie Pointer to the Image_Entry (cast from RGBA_Image*) to be deleted.
+ */
 static void
 _evas_common_rgba_image_delete(Image_Entry *ie)
 {
@@ -532,6 +755,17 @@ _evas_common_rgba_image_delete(Image_Entry *ie)
    eina_freeq_ptr_add(eina_freeq_main_get(), im, free, sizeof(*im));
 }
 
+/**
+ * @internal
+ * @brief Performs the actual unloading of an image's pixel data.
+ *
+ * This function is responsible for freeing the pixel data associated with an
+ * Image_Entry. It handles cases where color-space-specific data (`im->cs.data`)
+ * might be separate from or the same as the main image data (`im->image.data`).
+ * It also resets loaded flags and allocated dimensions.
+ *
+ * @param ie The Image_Entry whose data is to be unloaded.
+ */
 static void
 evas_common_rgba_image_unload_real(Image_Entry *ie)
 {
@@ -572,8 +806,18 @@ evas_common_rgba_image_unload_real(Image_Entry *ie)
 #endif
 }
 
+/** @internal List of Image_Entry objects that are pending unload. */
 static Eina_List *pending_unloads = NULL;
 
+/**
+ * @internal
+ * @brief Processes the list of images pending unload and unloads them.
+ *
+ * Iterates through the `pending_unloads` list. For each image entry that
+ * `need_unload` is true and is not currently in a preload state,
+ * this function calls `evas_common_rgba_image_unload_real` to free its
+ * pixel data and then removes it from the `pending_unloads` list.
+ */
 EVAS_API void
 evas_common_rgba_pending_unloads_cleanup(void)
 {
@@ -591,6 +835,16 @@ evas_common_rgba_pending_unloads_cleanup(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Removes an Image_Entry from the list of pending unloads.
+ *
+ * If the given Image_Entry `ie` is marked as `need_unload`, this function
+ * resets the `need_unload` flag and removes the entry from the global
+ * `pending_unloads` list.
+ *
+ * @param ie The Image_Entry to remove from the pending unload list.
+ */
 EVAS_API void
 evas_common_rgba_pending_unloads_remove(Image_Entry *ie)
 {
@@ -599,6 +853,18 @@ evas_common_rgba_pending_unloads_remove(Image_Entry *ie)
    pending_unloads = eina_list_remove(pending_unloads, ie);
 }
 
+/**
+ * @internal
+ * @brief Frees an Image_Entry if its reference count is zero.
+ *
+ * This function checks if an Image_Entry has any references. If not (references <= 0),
+ * it proceeds to:
+ * 1. Remove it from any pending unloads.
+ * 2. Delete its surface data using `_evas_common_rgba_image_surface_delete`.
+ * 3. Delete the Image_Entry structure itself using `_evas_common_rgba_image_delete`.
+ *
+ * @param ie The Image_Entry to potentially free.
+ */
 EVAS_API void
 evas_common_rgba_image_free(Image_Entry *ie)
 {
@@ -609,8 +875,19 @@ evas_common_rgba_image_free(Image_Entry *ie)
 }
 
 #ifdef SURFDBG
+/** @internal List used for debugging allocated surfaces. Only active if SURFDBG is defined. */
 static Eina_List *surfs = NULL;
 
+/**
+ * @internal
+ * @brief Prints debugging information about currently allocated image surfaces.
+ *
+ * This function iterates through the `surfs` list (if SURFDBG is defined)
+ * and prints details for each allocated surface, including its memory address,
+ * dimensions, file path, and key.
+ *
+ * @note This function is only compiled if `SURFDBG` is defined.
+ */
 static void
 surf_debug(void)
 {
@@ -632,6 +909,21 @@ surf_debug(void)
 }
 #endif
 
+/**
+ * @internal
+ * @brief Unloads an image's data, potentially deferring the operation.
+ *
+ * This function handles the unloading of an image's pixel data.
+ * - If the image is not loaded, or has no associated module/data1 (for non-file based images),
+ *   or has no file/mmap source, it returns.
+ * - If asynchronous operations are not frozen and the image still has references,
+ *   it marks the image as `need_unload` and adds it to the `pending_unloads` list
+ *   for later processing by `evas_common_rgba_pending_unloads_cleanup`.
+ * - Otherwise (async frozen or no references), or if already marked for unload,
+ *   it calls `evas_common_rgba_image_unload_real` to perform the unload immediately.
+ *
+ * @param ie The Image_Entry to unload.
+ */
 EVAS_API void
 evas_common_rgba_image_unload(Image_Entry *ie)
 {
@@ -651,6 +943,20 @@ evas_common_rgba_image_unload(Image_Entry *ie)
    if (!ie->need_unload) evas_common_rgba_image_unload_real(ie);
 }
 
+/**
+ * @internal
+ * @brief Updates or creates a Pixman image associated with an Image_Entry.
+ *
+ * This function is called after an image's surface data (`im->image.data`)
+ * has been allocated or modified. If Pixman support is enabled
+ * (`HAVE_PIXMAN` and `PIXMAN_IMAGE` are defined), it unrefs any existing
+ * Pixman image and creates a new one (`im->pixman.im`) wrapping the
+ * current pixel data. The Pixman image format (e.g., `PIXMAN_a8r8g8b8` or
+ * `PIXMAN_x8r8g8b8`) is chosen based on whether the image has an alpha channel.
+ *
+ * @param ie The Image_Entry whose Pixman representation needs to be updated.
+ * @note This function does nothing if Pixman support is not compiled in.
+ */
 void
 _evas_common_rgba_image_post_surface(Image_Entry *ie)
 {
@@ -698,6 +1004,26 @@ _evas_common_rgba_image_post_surface(Image_Entry *ie)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Allocates or reallocates the pixel data surface for an Image_Entry.
+ *
+ * If the image already has pixel data (`im->image.data`) and it's not marked
+ * as `no_free`, the existing data is unmapped/freed.
+ * Then, new memory is allocated using `_evas_common_rgba_image_surface_mmap`,
+ * considering any borders defined in `ie->borders`. The actual allocated
+ * dimensions (`ie->allocated.w`, `ie->allocated.h`) and border values
+ * might be adjusted by the mmap function (e.g., due to page alignment for
+ * compressed textures).
+ * After successful allocation, Valgrind macros are used (if enabled) to mark
+ * the memory as readable/defined, and `_evas_common_rgba_image_post_surface`
+ * is called to update any associated Pixman image.
+ *
+ * @param ie The Image_Entry for which to allocate the surface.
+ * @param w The desired logical width of the image surface.
+ * @param h The desired logical height of the image surface.
+ * @return 0 on success, -1 on allocation failure.
+ */
 static int
 _evas_common_rgba_image_surface_alloc(Image_Entry *ie,
                                       unsigned int w, unsigned int h)
@@ -752,6 +1078,22 @@ _evas_common_rgba_image_surface_alloc(Image_Entry *ie,
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Deallocates the pixel data surface and related resources of an Image_Entry.
+ *
+ * This function performs the following cleanup actions:
+ * - Unrefs and NULLs the Pixman image (`im->pixman.im`) if Pixman is used.
+ * - Frees color-space-specific data (`im->cs.data`) if it's separate from
+ *   the main image data and not marked `no_free`.
+ * - Unmaps/frees the main image data (`im->image.data`) if it exists and
+ *   is not marked `no_free`, using `evas_common_rgba_image_surface_munmap`.
+ * - Resets `im->image.data` to NULL and allocated dimensions to 0.
+ * - Clears `preload_done` and `loaded` flags.
+ * - Marks the scale cache entry as dirty.
+ *
+ * @param ie The Image_Entry whose surface is to be deleted.
+ */
 static void
 _evas_common_rgba_image_surface_delete(Image_Entry *ie)
 {
@@ -801,6 +1143,12 @@ _evas_common_rgba_image_surface_delete(Image_Entry *ie)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Marks an image's scale cache as dirty and then unloads the image.
+ * This is typically a callback function used by the image cache system.
+ * @param im The Image_Entry to process.
+ */
 static void
 _evas_common_rgba_image_unload(Image_Entry *im)
 {
@@ -808,6 +1156,17 @@ _evas_common_rgba_image_unload(Image_Entry *im)
    evas_common_rgba_image_unload(im);
 }
 
+/**
+ * @internal
+ * @brief Marks an image as dirty and its scale cache entry as dirty.
+ * This is typically a callback function used by the image cache system when
+ * a region of the image has been modified.
+ * @param ie The Image_Entry to mark as dirty.
+ * @param x The x-coordinate of the start of the dirty region (unused in this impl).
+ * @param y The y-coordinate of the start of the dirty region (unused in this impl).
+ * @param w The width of the dirty region (unused in this impl).
+ * @param h The height of the dirty region (unused in this impl).
+ */
 static void
 _evas_common_rgba_image_dirty_region(Image_Entry* ie,
                                      unsigned int x EINA_UNUSED,
@@ -821,7 +1180,28 @@ _evas_common_rgba_image_dirty_region(Image_Entry* ie,
    evas_common_rgba_image_scalecache_dirty(&im->cache_entry);
 }
 
-/* Only called when references > 0. Need to provide a fresh copie of im. */
+/**
+ * @internal
+ * @brief Handles image duplication when the source image might be dirty or needs loading.
+ *
+ * This function is called by the image cache when a new image entry (`ie_dst`)
+ * is created as a copy of an existing one (`ie_src`), and `ie_src` might have
+ * pending changes or its data needs to be loaded.
+ *
+ * It performs the following steps:
+ * 1. Marks the scale caches of both source and destination images as dirty.
+ * 2. Ensures the source image data is loaded via `evas_cache_image_load_data`.
+ * 3. If the destination image does not have its pixel surface allocated
+ *    (`evas_cache_image_pixels(ie_dst)` returns NULL), it allocates the surface
+ *    for `ie_dst` with the same dimensions as `ie_src`.
+ * 4. Normalizes the colorspaces of both source and destination images.
+ *
+ * @param ie_dst The destination Image_Entry (the new copy).
+ * @param ie_src The source Image_Entry (the original).
+ * @return 0 on success. Returns 1 if surface allocation for `ie_dst` fails.
+ * @note This function is only called when the image cache determines it's
+ *       necessary, typically when `ie_src` has references.
+ */
 static int
 _evas_common_rgba_image_dirty(Image_Entry *ie_dst, const Image_Entry *ie_src)
 {
@@ -845,6 +1225,24 @@ _evas_common_rgba_image_dirty(Image_Entry *ie_dst, const Image_Entry *ie_src)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Estimates the RAM usage of an Image_Entry and its associated data.
+ *
+ * This function calculates an approximate memory footprint for an image, including:
+ * - Size of the RGBA_Image structure itself.
+ * - Length of `cache_key`, `file`, and `key` strings if they exist.
+ * - Size of the mmapped file if `ie->f` is a virtual Eina_File.
+ * - Size of the pixel data (`im->image.data`) if allocated and not `no_free`,
+ *   approximated as `w * h * sizeof(DATA32)`.
+ * - Usage reported by `evas_common_rgba_image_scalecache_usage_get`.
+ *
+ * @param ie The Image_Entry for which to estimate RAM usage.
+ * @return The estimated total RAM usage in bytes.
+ * @note The pixel data size calculation is a simplification and might not be
+ *       accurate for all colorspaces, especially compressed ones or those not
+ *       using 4 bytes per pixel.
+ */
 static int
 _evas_common_rgba_image_ram_usage(Image_Entry *ie)
 {
@@ -865,6 +1263,14 @@ _evas_common_rgba_image_ram_usage(Image_Entry *ie)
    return size;
 }
 
+/**
+ * @internal
+ * @brief Retrieves a direct pointer to the pixel data of an Image_Entry's surface.
+ * This is typically a callback function for the image cache.
+ * @param ie The Image_Entry.
+ * @return A pointer to the raw pixel data (DATA32*), or NULL if the surface
+ *         is not allocated or `ie` is invalid.
+ */
 static DATA32 *
 _evas_common_rgba_image_surface_pixels(Image_Entry *ie)
 {
@@ -872,6 +1278,21 @@ _evas_common_rgba_image_surface_pixels(Image_Entry *ie)
    return im->image.data;
 }
 
+/**
+ * @internal
+ * @brief Creates a new RGBA_Image with specified dimensions, without an alpha channel.
+ *
+ * This function allocates a new RGBA_Image structure using
+ * `_evas_common_rgba_image_new`, sets its width and height, and then
+ * allocates its pixel surface using `_evas_common_rgba_image_surface_alloc`.
+ * The image is marked as not having an alpha channel by default and is not
+ * considered part of the cache (`im->cache_entry.flags.cached = 0`).
+ *
+ * @param w The width of the image to create.
+ * @param h The height of the image to create.
+ * @return A pointer to the newly created RGBA_Image, or NULL on failure
+ *         (either structure allocation or surface allocation fails).
+ */
 static RGBA_Image *
 evas_common_image_create(unsigned int w, unsigned int h)
 {
@@ -890,6 +1311,21 @@ evas_common_image_create(unsigned int w, unsigned int h)
    return im;
 }
 
+/**
+ * @brief Creates a new RGBA_Image with specified dimensions and an alpha channel.
+ * @api
+ *
+ * This function allocates a new RGBA_Image structure using
+ * `_evas_common_rgba_image_new`, sets its width and height, and explicitly
+ * marks it as having an alpha channel (`im->cache_entry.flags.alpha = 1`).
+ * It then allocates its pixel surface using `_evas_common_rgba_image_surface_alloc`.
+ * The image is not considered part of the cache (`im->cache_entry.flags.cached = 0`).
+ *
+ * @param w The width of the image to create.
+ * @param h The height of the image to create.
+ * @return A pointer to the newly created RGBA_Image, or NULL on failure
+ *         (either structure allocation or surface allocation fails).
+ */
 EVAS_API RGBA_Image *
 evas_common_image_alpha_create(unsigned int w, unsigned int h)
 {
@@ -909,6 +1345,20 @@ evas_common_image_alpha_create(unsigned int w, unsigned int h)
    return im;
 }
 
+/**
+ * @brief Creates a new RGBA_Image with specified dimensions, optionally with an alpha channel.
+ * @api
+ *
+ * This is a convenience function that calls either `evas_common_image_alpha_create`
+ * (if `alpha` is non-zero) or `evas_common_image_create` (if `alpha` is zero)
+ * to construct the image.
+ *
+ * @param w The width of the image to create.
+ * @param h The height of the image to create.
+ * @param alpha If non-zero, the image will be created with an alpha channel.
+ *              If zero, it will be created without an alpha channel.
+ * @return A pointer to the newly created RGBA_Image, or NULL on failure.
+ */
 EVAS_API RGBA_Image *
 evas_common_image_new(unsigned int w, unsigned int h, unsigned int alpha)
 {
@@ -916,6 +1366,28 @@ evas_common_image_new(unsigned int w, unsigned int h, unsigned int alpha)
    return evas_common_image_create(w, h);
 }
 
+/**
+ * @internal
+ * @brief Normalizes an image's pixel data to the ARGB8888 colorspace if necessary.
+ *
+ * This function checks if an image's colorspace-specific data (`im->cs.data`)
+ * needs to be converted to the canonical ARGB8888 format stored in `im->image.data`.
+ * This typically happens if `im->cs.dirty` is set or the image has the
+ * `RGBA_IMAGE_IS_DIRTY` flag.
+ *
+ * - If the image is already in ARGB8888, GRY8, or AGRY88:
+ *   It ensures `im->image.data` points to `im->cs.data`. If `im->image.data`
+ *   was previously separate and not marked `no_free`, it's deallocated.
+ * - For YUV colorspaces (e.g., YCBCR422P601_PL, YCBCR420NV12601_PL):
+ *   It calls the appropriate YUV-to-RGBA conversion function (e.g.,
+ *   `evas_common_convert_yuv_422p_601_rgba`) to convert data from
+ *   `im->cs.data` (which holds YUV planes) into `im->image.data` (ARGB8888).
+ * - Other colorspaces are currently not handled for conversion in this function.
+ *
+ * After processing, `im->cs.dirty` is cleared.
+ *
+ * @param im The RGBA_Image to normalize.
+ */
 void
 evas_common_image_colorspace_normalize(RGBA_Image *im)
 {
@@ -989,6 +1461,21 @@ evas_common_image_colorspace_normalize(RGBA_Image *im)
 #endif
 }
 
+/**
+ * @brief Marks an image's colorspace data as dirty.
+ * @api
+ *
+ * This function sets the `cs.dirty` flag on the given RGBA_Image to 1,
+ * indicating that its colorspace-specific data (`im->cs.data`) may be out of
+ * sync with its canonical ARGB representation (`im->image.data`) or that
+ * a conversion is needed. It also marks the image's scale cache entry as dirty.
+ * If Pixman support is enabled, it unrefs any existing Pixman image associated
+ * with this RGBA_Image and triggers an update via
+ * `_evas_common_rgba_image_post_surface`. This ensures that subsequent
+ * operations will correctly handle or reconvert the data.
+ *
+ * @param im The RGBA_Image to mark as dirty.
+ */
 EVAS_API void
 evas_common_image_colorspace_dirty(RGBA_Image *im)
 {
@@ -1006,6 +1493,13 @@ evas_common_image_colorspace_dirty(RGBA_Image *im)
 #endif
 }
 
+/**
+ * @brief Sets the maximum size of the Evas image cache.
+ * @api
+ * @param size The desired maximum cache size in bytes.
+ * If the global image cache (`eci`) is initialized, this function calls
+ * `evas_cache_image_set` to adjust its size.
+ */
 EVAS_API void
 evas_common_image_set_cache(unsigned int size)
 {
@@ -1013,12 +1507,30 @@ evas_common_image_set_cache(unsigned int size)
      evas_cache_image_set(eci, size);
 }
 
+/**
+ * @brief Gets the current maximum size of the Evas image cache.
+ * @api
+ * @return The current maximum cache size in bytes, or 0 if the cache
+ *         is not initialized.
+ */
 EVAS_API int
 evas_common_image_get_cache(void)
 {
    return evas_cache_image_get(eci);
 }
 
+/**
+ * @brief Loads an image from a file using the Evas image cache.
+ * @api
+ * @param file The path to the image file.
+ * @param key Optional key for caching; can be NULL.
+ * @param lo Pointer to Evas_Image_Load_Opts structure for load options; can be NULL.
+ * @param[out] error Pointer to an integer where the load error code will be stored.
+ * @return A pointer to the loaded RGBA_Image, or NULL on failure.
+ *         The image is managed by the cache.
+ * If `file` is NULL, sets `*error` to `EVAS_LOAD_ERROR_GENERIC` and returns NULL.
+ * Otherwise, requests the image from the global cache `eci`.
+ */
 EVAS_API RGBA_Image *
 evas_common_load_image_from_file(const char *file, const char *key,
                                  Evas_Image_Load_Opts *lo, int *error)
@@ -1031,6 +1543,18 @@ evas_common_load_image_from_file(const char *file, const char *key,
    return (RGBA_Image *) evas_cache_image_request(eci, file, key, lo, error);
 }
 
+/**
+ * @brief Loads an image from an Eina_File (memory-mapped file) using the Evas image cache.
+ * @api
+ * @param f Pointer to the Eina_File representing the memory-mapped image.
+ * @param key Optional key for caching; can be NULL.
+ * @param lo Pointer to Evas_Image_Load_Opts structure for load options; can be NULL.
+ * @param[out] error Pointer to an integer where the load error code will be stored.
+ * @return A pointer to the loaded RGBA_Image, or NULL on failure.
+ *         The image is managed by the cache.
+ * If `f` is NULL, sets `*error` to `EVAS_LOAD_ERROR_GENERIC` and returns NULL.
+ * Otherwise, requests the image from the global cache `eci` using `evas_cache_image_mmap_request`.
+ */
 EVAS_API RGBA_Image *
 evas_common_load_image_from_mmap(Eina_File *f, const char *key,
                                  Evas_Image_Load_Opts *lo, int *error)
@@ -1043,18 +1567,45 @@ evas_common_load_image_from_mmap(Eina_File *f, const char *key,
    return (RGBA_Image *) evas_cache_image_mmap_request(eci, f, key, lo, error);
 }
 
+/**
+ * @brief Frees the Evas image cache by setting its size to 0.
+ * @api
+ * This effectively unloads all images from the cache that are not currently
+ * referenced elsewhere.
+ */
 EVAS_API void
 evas_common_image_cache_free(void)
 {
    evas_common_image_set_cache(0);
 }
 
+/**
+ * @brief Gets the global Evas_Cache_Image instance.
+ * @api
+ * @return A pointer to the global Evas_Cache_Image instance (`eci`).
+ *         This can be used for more direct interaction with the cache.
+ */
 EVAS_API Evas_Cache_Image*
 evas_common_image_cache_get(void)
 {
    return eci;
 }
 
+/**
+ * @brief Obtains a temporary RGBA_Image suitable for use as a line buffer.
+ * @api
+ *
+ * Creates an RGBA_Image of 1 pixel height and the specified length.
+ * The length is clamped to be between `EVAS_RGBA_LINE_BUFFER_MIN_LEN`
+ * and `EVAS_RGBA_LINE_BUFFER_MAX_LEN` (though MAX_LEN is not currently enforced here,
+ * only MIN_LEN). The image is created without an alpha channel by default.
+ *
+ * @param len The desired length (width) of the line buffer.
+ * @return A pointer to the created RGBA_Image, or NULL if `len` is less than 1
+ *         or if allocation fails.
+ * @see evas_common_image_line_buffer_release()
+ * @see evas_common_image_line_buffer_free()
+ */
 EVAS_API RGBA_Image *
 evas_common_image_line_buffer_obtain(int len)
 {
@@ -1064,18 +1615,43 @@ evas_common_image_line_buffer_obtain(int len)
    return evas_common_image_create(len, 1);
 }
 
+/**
+ * @brief Releases a temporary RGBA_Image previously obtained via `evas_common_image_line_buffer_obtain`.
+ * @api
+ * @param im The RGBA_Image to release.
+ * Internally calls `_evas_common_rgba_image_delete` to free the image.
+ */
 EVAS_API void
 evas_common_image_line_buffer_release(RGBA_Image *im)
 {
    _evas_common_rgba_image_delete(&im->cache_entry);
 }
 
+/**
+ * @brief Frees a temporary RGBA_Image previously obtained via `evas_common_image_line_buffer_obtain`.
+ * @api
+ * @param im The RGBA_Image to free.
+ * This is an alias for `evas_common_image_line_buffer_release`.
+ * Internally calls `_evas_common_rgba_image_delete` to free the image.
+ */
 EVAS_API void
 evas_common_image_line_buffer_free(RGBA_Image *im)
 {
    _evas_common_rgba_image_delete(&im->cache_entry);
 }
 
+/**
+ * @brief Obtains a temporary RGBA_Image with an alpha channel, suitable for use as a line buffer.
+ * @api
+ *
+ * Creates an RGBA_Image of 1 pixel height and the specified length, with an alpha channel.
+ * The length is clamped to be at least `EVAS_ALPHA_LINE_BUFFER_MIN_LEN`.
+ *
+ * @param len The desired length (width) of the alpha line buffer.
+ * @return A pointer to the created RGBA_Image (with alpha), or NULL if `len` is less than 1
+ *         or if allocation fails.
+ * @see evas_common_image_alpha_line_buffer_release()
+ */
 EVAS_API RGBA_Image *
 evas_common_image_alpha_line_buffer_obtain(int len)
 {
@@ -1085,12 +1661,33 @@ evas_common_image_alpha_line_buffer_obtain(int len)
    return evas_common_image_alpha_create(len, 1);
 }
 
+/**
+ * @brief Releases a temporary RGBA_Image (with alpha) previously obtained via `evas_common_image_alpha_line_buffer_obtain`.
+ * @api
+ * @param im The RGBA_Image to release.
+ * Internally calls `_evas_common_rgba_image_delete` to free the image.
+ */
 EVAS_API void
 evas_common_image_alpha_line_buffer_release(RGBA_Image *im)
 {
    _evas_common_rgba_image_delete(&im->cache_entry);
 }
 
+/**
+ * @brief Premultiplies the alpha channel of an image.
+ * @api
+ *
+ * If the image has an alpha channel (`ie->flags.alpha` is set) and its pixel
+ * data is available, this function converts its pixel data to premultiplied alpha
+ * format. It supports `EVAS_COLORSPACE_ARGB8888` and `EVAS_COLORSPACE_AGRY88`.
+ * After premultiplication, it counts the number of pixels that are either fully
+ * transparent or fully opaque (`nas`). If this count suggests that the alpha
+ * channel is sparse (i.e., `ALPHA_SPARSE_INV_FRACTION * nas >= total_pixels`),
+ * the `ie->flags.alpha_sparse` flag is set.
+ *
+ * @param ie The Image_Entry whose pixel data is to be premultiplied.
+ *           The image data must be loaded.
+ */
 EVAS_API void
 evas_common_image_premul(Image_Entry *ie)
 {
@@ -1115,6 +1712,24 @@ evas_common_image_premul(Image_Entry *ie)
      ie->flags.alpha_sparse = 1;
 }
 
+/**
+ * @brief Checks and sets the `alpha_sparse` flag for an image.
+ * @api
+ *
+ * This function iterates through the pixels of an image (assuming ARGB8888 format
+ * after `evas_cache_image_pixels` which usually normalizes to it). It counts
+ * the number of pixels (`nas`) that are either fully transparent (alpha = 0)
+ * or fully opaque (alpha = 0xFF).
+ * If this count, scaled by `ALPHA_SPARSE_INV_FRACTION`, is greater than or
+ * equal to the total number of pixels in the image, the `ie->flags.alpha_sparse`
+ * flag is set to 1. This indicates that the alpha channel has large areas of
+ * uniform transparency or opacity, which might allow for rendering optimizations.
+ *
+ * @param ie The Image_Entry to check. The image must have an alpha channel and
+ *           its pixel data must be loaded and accessible.
+ * @note This function assumes the pixel data is in a format where the alpha
+ *       channel is in the most significant byte of a DATA32 (e.g., ARGB8888).
+ */
 EVAS_API void
 evas_common_image_set_alpha_sparse(Image_Entry *ie)
 {

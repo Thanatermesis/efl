@@ -4,6 +4,28 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Sets up and applies a complex Evas_Map to an object.
+ *
+ * This function creates an 8-point map, effectively splitting the object's
+ * visual representation into two quadrilaterals and mapping different parts of
+ * the source object to them. This creates a distorted, folded-paper-like effect.
+ *
+ * The map consists of two parts:
+ * 1. A 100x100 pixel rectangle on screen at position (100, 0), which displays
+ *    the left half of the source image.
+ *    - Vertices: (100,0), (200,0), (200,100), (100,100)
+ *    - UV mapping: (0,0), (w/2,0), (w/2,h), (0,h)
+ *
+ * 2. A distorted quadrilateral on screen, which displays the right half of the
+ *    source image.
+ *    - Vertices: (200,0), (100,200), (100,300), (200,100)
+ *    - UV mapping: (w/2,0), (w,0), (w,h), (w/2,h)
+ *
+ * @param obj The Evas_Object to apply the map to.
+ * @param w The width of the source object for UV mapping.
+ * @param h The height of the source object for UV mapping.
+ */
 static void
 _map_set(Evas_Object *obj, Evas_Coord w, Evas_Coord h)
 {
@@ -37,6 +59,19 @@ _map_set(Evas_Object *obj, Evas_Coord w, Evas_Coord h)
    evas_map_free(map);
 }
 
+/**
+ * @brief Callback function for the EVAS_CALLBACK_RESIZE event on the image object.
+ *
+ * Whenever the image object is resized, this function is called. It retrieves
+ * the new size of the object and calls _map_set() to recalculate and re-apply
+ * the Evas_Map based on the new dimensions. This ensures the map distortion
+ * scales correctly with the object's size.
+ *
+ * @param data Custom data pointer (unused).
+ * @param e The Evas canvas (unused).
+ * @param obj The object that triggered the event.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _image_resize_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -46,6 +81,20 @@ _image_resize_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, 
    _map_set(obj, sz.w, sz.h);
 }
 
+/**
+ * @brief Test function for Evas_Map functionality.
+ *
+ * This test creates a window and an image object. It then applies a complex
+ * 8-point Evas_Map to the image, demonstrating how maps can be used to create
+ * non-trivial geometric transformations and distortions of Evas objects.
+ *
+ * The function also sets up a resize callback to ensure the map is correctly
+ * updated when the object's size changes.
+ *
+ * @param data Custom data, passed from elementary_test (unused).
+ * @param obj The parent object, passed from elementary_test (unused).
+ * @param event_info Event information, passed from elementary_test (unused).
+ */
 void
 test_evas_map(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
               void *event_info EINA_UNUSED)

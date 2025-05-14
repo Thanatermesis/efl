@@ -10,90 +10,116 @@
 #define MY_CLASS_NAME_LEGACY "Evas_Object_Table"
 
 typedef struct _Evas_Table_Data              Evas_Table_Data;
+/**
+ * @brief Represents the options for a child object within a table.
+ *
+ * This structure holds all the packing and layout properties for an
+ * Evas_Object that has been added to an Evas_Table.
+ */
 typedef struct _Evas_Object_Table_Option     Evas_Object_Table_Option;
+/**
+ * @brief Caches layout calculation results for a table.
+ *
+ * This structure is used to store intermediate and final results of
+ * table layout calculations, such as cell sizes, weights, and expansion flags.
+ * This helps to optimize recalculations when the table or its children change.
+ */
 typedef struct _Evas_Object_Table_Cache      Evas_Object_Table_Cache;
 typedef struct _Evas_Object_Table_Iterator   Evas_Object_Table_Iterator;
 typedef struct _Evas_Object_Table_Accessor   Evas_Object_Table_Accessor;
 
 struct _Evas_Object_Table_Option
 {
-   Evas_Object *obj;
-   unsigned short col, row, colspan, rowspan, end_col, end_row;
+   Evas_Object *obj; /**< The child object. */
+   unsigned short col, row, colspan, rowspan, end_col, end_row; /**< Column, row, column span, row span, end column, and end row of the child. */
    struct {
-      Evas_Coord w, h;
+      Evas_Coord w, h; /**< Minimum and maximum width/height hints for the child. */
    } min, max;
    struct {
-      double h, v;
+      double h, v; /**< Horizontal and vertical alignment hints for the child. */
    } align;
    struct {
-      Evas_Coord l, r, t, b;
+      Evas_Coord l, r, t, b; /**< Left, right, top, and bottom padding hints for the child. */
    } pad;
-   Eina_Bool expand_h : 1; /* XXX required? */
-   Eina_Bool expand_v : 1; /* XXX required? */
-   Eina_Bool fill_h : 1;
-   Eina_Bool fill_v : 1;
+   Eina_Bool expand_h : 1; /**< Horizontal expansion flag. @deprecated XXX required? */
+   Eina_Bool expand_v : 1; /**< Vertical expansion flag. @deprecated XXX required? */
+   Eina_Bool fill_h : 1; /**< Horizontal fill flag. If true, the object will fill available horizontal space within its cell. */
+   Eina_Bool fill_v : 1; /**< Vertical fill flag. If true, the object will fill available vertical space within its cell. */
 };
 
 struct _Evas_Object_Table_Cache
 {
-   int ref;
+   int ref; /**< Reference count for the cache. */
    struct {
       struct {
-         double h, v;
+         double h, v; /**< Total horizontal and vertical weights of all columns/rows. */
       } weights;
       struct {
-         int h, v;
+         int h, v; /**< Total number of horizontally and vertically expanding columns/rows. */
       } expands;
       struct {
-         Evas_Coord w, h;
+         Evas_Coord w, h; /**< Total minimum width and height of the table content. */
       } min;
-   } total;
+   } total; /**< Aggregated values for the entire table. */
    struct {
-      double *h, *v;
+      double *h, *v; /**< Array of horizontal (column) and vertical (row) weights. Example: `h = {0.2, 0.5, 0.3}` for 3 columns. */
    } weights;
    struct {
-      Evas_Coord *h, *v;
+      Evas_Coord *h, *v; /**< Array of calculated horizontal (column) and vertical (row) sizes. Example: `h = {100, 200, 150}` for 3 columns with specific pixel widths. */
    } sizes;
    struct {
-      Eina_Bool *h, *v;
+      Eina_Bool *h, *v; /**< Array of horizontal (column) and vertical (row) expansion flags. Example: `h = {EINA_TRUE, EINA_FALSE, EINA_TRUE}` for 3 columns. */
    } expands;
    double ___pad; // padding to make sure doubles at end can be aligned
 };
 
+/**
+ * @brief Private data for an Evas_Table object.
+ *
+ * This structure holds all the internal state of an Evas_Table,
+ * including its children, padding, alignment, size, layout cache,
+ * and various mode flags.
+ */
 struct _Evas_Table_Data
 {
-   Eina_List *children;
+   Eina_List *children; /**< List of Evas_Object_Table_Option, representing packed children. */
    struct {
-      Evas_Coord h, v;
+      Evas_Coord h, v; /**< Horizontal and vertical padding between cells. */
    } pad;
    struct {
-      double h, v;
+      double h, v; /**< Horizontal and vertical alignment of the entire table content within its allocated space. */
    } align;
    struct {
-      int cols, rows;
+      int cols, rows; /**< Number of columns and rows in the table. */
    } size;
-   Evas_Object_Table_Cache *cache;
-   Evas_Object_Table_Homogeneous_Mode homogeneous;
-   Eina_Bool hints_changed : 1;
-   Eina_Bool expand_h : 1;
-   Eina_Bool expand_v : 1;
-   Eina_Bool is_mirrored : 1;
+   Evas_Object_Table_Cache *cache; /**< Pointer to the layout cache. */
+   Evas_Object_Table_Homogeneous_Mode homogeneous; /**< Homogeneous mode setting. */
+   Eina_Bool hints_changed : 1; /**< Flag indicating if size hints of children have changed, requiring recalculation. */
+   Eina_Bool expand_h : 1; /**< Flag indicating if the table has any horizontally expanding children (homogeneous mode). */
+   Eina_Bool expand_v : 1; /**< Flag indicating if the table has any vertically expanding children (homogeneous mode). */
+   Eina_Bool is_mirrored : 1; /**< Flag indicating if the table layout is mirrored (for RTL languages). */
 };
 
+/**
+ * @brief Iterator for traversing children of an Evas_Table.
+ */
 struct _Evas_Object_Table_Iterator
 {
-   Eina_Iterator iterator;
+   Eina_Iterator iterator; /**< Base Eina_Iterator structure. */
 
-   Eina_Iterator *real_iterator;
-   const Evas_Object *table;
+   Eina_Iterator *real_iterator; /**< The underlying list iterator for children. */
+   const Evas_Object *table; /**< The table object being iterated. */
 };
 
+/**
+ * @brief Accessor for children of an Evas_Table.
+ */
 struct _Evas_Object_Table_Accessor
 {
-   Eina_Accessor accessor;
+   Eina_Accessor accessor; /**< Base Eina_Accessor structure. */
 
-   Eina_Accessor *real_accessor;
-   const Evas_Object *table;
+   Eina_Accessor *real_accessor; /**< The underlying list accessor for children. */
+   const Evas_Object *table; /**< The table object being accessed. */
 };
 
 #define EVAS_OBJECT_TABLE_DATA_GET(o, ptr)                              \
@@ -117,8 +143,14 @@ if (!ptr)                                                               \
    return val;                                                          \
 }
 
-static const char EVAS_OBJECT_TABLE_OPTION_KEY[] = "|EvTb";
+static const char EVAS_OBJECT_TABLE_OPTION_KEY[] = "|EvTb"; /**< Key used to store Evas_Object_Table_Option data on a child object. */
 
+/**
+ * @brief Advances the table iterator to the next child object.
+ * @param it The table iterator.
+ * @param data Pointer to store the next child object.
+ * @return EINA_TRUE if successful, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _evas_object_table_iterator_next(Evas_Object_Table_Iterator *it, void **data)
 {
@@ -130,12 +162,21 @@ _evas_object_table_iterator_next(Evas_Object_Table_Iterator *it, void **data)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the container (table) of the iterator.
+ * @param it The table iterator.
+ * @return The table object.
+ */
 static Evas_Object *
 _evas_object_table_iterator_get_container(Evas_Object_Table_Iterator *it)
 {
    return (Evas_Object *)it->table;
 }
 
+/**
+ * @brief Frees the table iterator.
+ * @param it The table iterator to free.
+ */
 static void
 _evas_object_table_iterator_free(Evas_Object_Table_Iterator *it)
 {
@@ -143,6 +184,13 @@ _evas_object_table_iterator_free(Evas_Object_Table_Iterator *it)
    free(it);
 }
 
+/**
+ * @brief Gets the child object at a specific index using the accessor.
+ * @param it The table accessor.
+ * @param idx The index of the child object.
+ * @param data Pointer to store the child object.
+ * @return EINA_TRUE if successful, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _evas_object_table_accessor_get_at(Evas_Object_Table_Accessor *it, unsigned int idx, void **data)
 {
@@ -154,12 +202,21 @@ _evas_object_table_accessor_get_at(Evas_Object_Table_Accessor *it, unsigned int 
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the container (table) of the accessor.
+ * @param it The table accessor.
+ * @return The table object.
+ */
 static Evas_Object *
 _evas_object_table_accessor_get_container(Evas_Object_Table_Accessor *it)
 {
    return (Evas_Object *)it->table;
 }
 
+/**
+ * @brief Frees the table accessor.
+ * @param it The table accessor to free.
+ */
 static void
 _evas_object_table_accessor_free(Evas_Object_Table_Accessor *it)
 {
@@ -167,6 +224,16 @@ _evas_object_table_accessor_free(Evas_Object_Table_Accessor *it)
    free(it);
 }
 
+/**
+ * @brief Allocates and initializes a new table cache.
+ * @param cols Number of columns.
+ * @param rows Number of rows.
+ * @return A new Evas_Object_Table_Cache instance or NULL on failure.
+ *
+ * The cache structure is allocated as a single block of memory.
+ * Pointers within the cache (weights, sizes, expands) are set up to
+ * point to appropriate offsets within this block.
+ */
 static Evas_Object_Table_Cache *
 _evas_object_table_cache_alloc(int cols, int rows)
 {
@@ -195,6 +262,10 @@ _evas_object_table_cache_alloc(int cols, int rows)
    return cache;
 }
 
+/**
+ * @brief Decrements the reference count of a table cache and frees it if the count reaches zero.
+ * @param cache The table cache to release.
+ */
 static void
 _evas_object_table_cache_free(Evas_Object_Table_Cache *cache)
 {
@@ -202,6 +273,13 @@ _evas_object_table_cache_free(Evas_Object_Table_Cache *cache)
    if (cache->ref == 0) free(cache);
 }
 
+/**
+ * @brief Resets the values in an existing table cache to their defaults.
+ * @param priv The private data of the table.
+ *
+ * This function clears calculated totals and zeros out the arrays for
+ * weights, sizes, and expands within the cache.
+ */
 static void
 _evas_object_table_cache_reset(Evas_Table_Data *priv)
 {
@@ -219,6 +297,13 @@ _evas_object_table_cache_reset(Evas_Table_Data *priv)
    memset(c + 1, 0, size);
 }
 
+/**
+ * @brief Invalidates the table cache.
+ * @param priv The private data of the table.
+ *
+ * This marks hints as changed and frees the existing cache,
+ * forcing a recalculation on the next layout pass.
+ */
 static void
 _evas_object_table_cache_invalidate(Evas_Table_Data *priv)
 {
@@ -230,24 +315,46 @@ _evas_object_table_cache_invalidate(Evas_Table_Data *priv)
      }
 }
 
+/**
+ * @brief Retrieves the Evas_Object_Table_Option associated with a child object.
+ * @param o The child object.
+ * @return The Evas_Object_Table_Option for the child, or NULL if not found.
+ */
 static Evas_Object_Table_Option *
 _evas_object_table_option_get(Evas_Object *o)
 {
    return evas_object_data_get(o, EVAS_OBJECT_TABLE_OPTION_KEY);
 }
 
+/**
+ * @brief Associates an Evas_Object_Table_Option with a child object.
+ * @param o The child object.
+ * @param opt The Evas_Object_Table_Option to set.
+ */
 static void
 _evas_object_table_option_set(Evas_Object *o, const Evas_Object_Table_Option *opt)
 {
    evas_object_data_set(o, EVAS_OBJECT_TABLE_OPTION_KEY, opt);
 }
 
+/**
+ * @brief Removes and returns the Evas_Object_Table_Option associated with a child object.
+ * @param o The child object.
+ * @return The removed Evas_Object_Table_Option, or NULL if not found.
+ */
 static Evas_Object_Table_Option *
 _evas_object_table_option_del(Evas_Object *o)
 {
    return evas_object_data_del(o, EVAS_OBJECT_TABLE_OPTION_KEY);
 }
 
+/**
+ * @brief Callback for when a child object is invalidated (e.g., deleted).
+ * @param data The table object (user data).
+ * @param event The Efl_Event details.
+ *
+ * This function unpacks the child from the table.
+ */
 static void
 _on_child_invalidate(void *data, const Efl_Event *event)
 {
@@ -255,6 +362,13 @@ _on_child_invalidate(void *data, const Efl_Event *event)
    evas_object_table_unpack(table, event->object);
 }
 
+/**
+ * @brief Callback for when a child object's size hints change.
+ * @param data The table object (user data).
+ * @param event The Efl_Event details (unused).
+ *
+ * This function invalidates the table's layout cache and triggers a smart recalculation.
+ */
 static void
 _on_child_hints_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -269,18 +383,39 @@ EFL_CALLBACKS_ARRAY_DEFINE(evas_object_table_callbacks,
   { EFL_GFX_ENTITY_EVENT_HINTS_CHANGED, _on_child_hints_changed }
 );
 
+/**
+ * @brief Connects event callbacks to a child object when it's added to the table.
+ * @param o The table object.
+ * @param child The child object being added.
+ */
 static void
 _evas_object_table_child_connect(Evas_Object *o, Evas_Object *child)
 {
    efl_event_callback_array_add(child, evas_object_table_callbacks(), o);
 }
 
+/**
+ * @brief Disconnects event callbacks from a child object when it's removed from the table.
+ * @param o The table object.
+ * @param child The child object being removed.
+ */
 static void
 _evas_object_table_child_disconnect(Evas_Object *o, Evas_Object *child)
 {
    efl_event_callback_array_del(child, evas_object_table_callbacks(), o);
 }
 
+/**
+ * @brief Calculates the final geometry of a child object within its allocated cell space.
+ * @param opt The packing options for the child.
+ * @param x Pointer to the cell's X coordinate (input/output).
+ * @param y Pointer to the cell's Y coordinate (input/output).
+ * @param w Pointer to the cell's width (input/output).
+ * @param h Pointer to the cell's height (input/output).
+ *
+ * This function applies padding, alignment, min/max constraints, and fill flags
+ * to determine the child's actual position and size.
+ */
 static void
 _evas_object_table_calculate_cell(const Evas_Object_Table_Option *opt, Evas_Coord *x, Evas_Coord *y, Evas_Coord *w, Evas_Coord *h)
 {
@@ -321,6 +456,15 @@ _evas_object_table_calculate_cell(const Evas_Object_Table_Option *opt, Evas_Coor
      }
 }
 
+/**
+ * @brief Calculates size hints for the table when in homogeneous mode.
+ * @param o The table object.
+ * @param priv The private data of the table.
+ *
+ * In homogeneous mode, all cells are assumed to have the same size.
+ * This function iterates over children to determine the maximum minimum cell
+ * size required and whether the table should expand.
+ */
 static void
 _evas_object_table_calculate_hints_homogeneous(Evas_Object *o, Evas_Table_Data *priv)
 {
@@ -427,6 +571,19 @@ _evas_object_table_calculate_hints_homogeneous(Evas_Object *o, Evas_Table_Data *
    // XXX hint max?
 }
 
+/**
+ * @brief Adjusts the table's overall size for homogeneous layout based on item hints.
+ * @param o The table object.
+ * @param priv The private data of the table.
+ * @param x Pointer to the table's X coordinate (input/output).
+ * @param y Pointer to the table's Y coordinate (input/output).
+ * @param w Pointer to the table's width (input/output).
+ * @param h Pointer to the table's height (input/output).
+ *
+ * If the table is smaller than its minimum hinted size and not set to expand,
+ * its content area is shrunk and aligned according to the table's alignment properties.
+ * This is specifically for EVAS_OBJECT_TABLE_HOMOGENEOUS_ITEM mode.
+ */
 static void
 _evas_object_table_calculate_layout_homogeneous_sizes_item(const Evas_Object *o, const Evas_Table_Data *priv, Evas_Coord *x, Evas_Coord *y, Evas_Coord *w, Evas_Coord *h)
 {
@@ -454,6 +611,20 @@ _evas_object_table_calculate_layout_homogeneous_sizes_item(const Evas_Object *o,
      }
 }
 
+/**
+ * @brief Calculates the overall content area and individual cell size for homogeneous layout.
+ * @param o The table object.
+ * @param priv The private data of the table.
+ * @param x Pointer to store the content area's X coordinate.
+ * @param y Pointer to store the content area's Y coordinate.
+ * @param w Pointer to store the content area's width.
+ * @param h Pointer to store the content area's height.
+ * @param cellw Pointer to store the calculated cell width.
+ * @param cellh Pointer to store the calculated cell height.
+ *
+ * This function gets the table's geometry and, if in HOMOGENEOUS_ITEM mode,
+ * adjusts the content area size. Then, it calculates the uniform cell width and height.
+ */
 static void
 _evas_object_table_calculate_layout_homogeneous_sizes(const Evas_Object *o, const Evas_Table_Data *priv, Evas_Coord *x, Evas_Coord *y, Evas_Coord *w, Evas_Coord *h, Evas_Coord *cellw, Evas_Coord *cellh)
 {
@@ -466,6 +637,15 @@ _evas_object_table_calculate_layout_homogeneous_sizes(const Evas_Object *o, cons
    *cellh = (*h + priv->size.rows - 1) / priv->size.rows;
 }
 
+/**
+ * @brief Calculates and applies the layout for all children in homogeneous mode.
+ * @param o The table object.
+ * @param priv The private data of the table.
+ *
+ * This function determines the size of each cell (which is uniform in homogeneous mode)
+ * and then positions and sizes each child within its respective cell(s),
+ * taking into account colspans, rowspans, padding, and alignment.
+ */
 static void
 _evas_object_table_calculate_layout_homogeneous(Evas_Object *o, Evas_Table_Data *priv)
 {
@@ -521,6 +701,14 @@ _evas_object_table_calculate_layout_homogeneous(Evas_Object *o, Evas_Table_Data 
      }
 }
 
+/**
+ * @brief Top-level function for calculating layout in homogeneous mode.
+ * @param o The table object.
+ * @param priv The private data of the table.
+ *
+ * If hints have changed, it first recalculates them. Then, it proceeds
+ * to calculate and apply the layout for children.
+ */
 static void
 _evas_object_table_smart_calculate_homogeneous(Evas_Object *o, Evas_Table_Data *priv)
 {
@@ -529,6 +717,13 @@ _evas_object_table_smart_calculate_homogeneous(Evas_Object *o, Evas_Table_Data *
    _evas_object_table_calculate_layout_homogeneous(o, priv);
 }
 
+/**
+ * @brief Counts the number of true (expanding) flags in a range of an Eina_Bool array.
+ * @param expands Array of boolean flags. Example: `{EINA_TRUE, EINA_FALSE, EINA_TRUE}`.
+ * @param start Starting index of the range (inclusive).
+ * @param end Ending index of the range (exclusive).
+ * @return The number of true flags in the specified range.
+ */
 static int
 _evas_object_table_count_expands(const Eina_Bool *expands, int start, int end)
 {
@@ -544,6 +739,13 @@ _evas_object_table_count_expands(const Eina_Bool *expands, int start, int end)
    return count;
 }
 
+/**
+ * @brief Sums the values in a range of an Evas_Coord array.
+ * @param sizes Array of Evas_Coord values. Example: `{10, 20, 30}`.
+ * @param start Starting index of the range (inclusive).
+ * @param end Ending index of the range (exclusive).
+ * @return The sum of Evas_Coord values in the specified range.
+ */
 static Evas_Coord
 _evas_object_table_sum_sizes(const Evas_Coord *sizes, int start, int end)
 {
@@ -556,6 +758,17 @@ _evas_object_table_sum_sizes(const Evas_Coord *sizes, int start, int end)
    return sum;
 }
 
+/**
+ * @brief Distributes extra space evenly among a range of cells that do not expand.
+ * @param sizes Array of cell sizes (input/output). Example: `sizes = {10, 10, 10}`.
+ * @param start Starting index of the range.
+ * @param end Ending index of the range (exclusive).
+ * @param space The total extra space to distribute.
+ *
+ * This function is used when cells need to accommodate extra space, but none of them
+ * are marked to expand (e.g., due to minimum size constraints). The space is
+ * divided equally.
+ */
 static void
 _evas_object_table_sizes_calc_noexpand(Evas_Coord *sizes, int start, int end, Evas_Coord space)
 {
@@ -572,6 +785,22 @@ _evas_object_table_sizes_calc_noexpand(Evas_Coord *sizes, int start, int end, Ev
    *itr += space - step * (units - 1);
 }
 
+/**
+ * @brief Distributes extra space among a range of cells that are marked to expand.
+ * @param sizes Array of cell sizes (input/output). Example: `sizes = {10, 20, 10}`.
+ * @param start Starting index of the range.
+ * @param end Ending index of the range (exclusive).
+ * @param space The total extra space to distribute.
+ * @param expands Array of boolean flags indicating if a cell expands. Example: `expands = {EINA_TRUE, EINA_FALSE, EINA_TRUE}`.
+ * @param expand_count The number of expanding cells in the range.
+ * @param weights Array of cell weights. Example: `weights = {0.5, 0.0, 0.5}`.
+ * @param weighttot Total weight of expanding cells in the range.
+ *
+ * This function distributes `space` among the cells in the given range
+ * that are marked by `expands`. If `weighttot` is positive, space is
+ * distributed proportionally to `weights`. Otherwise, it's distributed evenly
+ * among expanding cells.
+ */
 static void
 _evas_object_table_sizes_calc_expand(Evas_Coord *sizes, int start, int end, Evas_Coord space, const Eina_Bool *expands, int expand_count, double *weights, double weighttot)
 {
@@ -624,6 +853,24 @@ _evas_object_table_sizes_calc_expand(Evas_Coord *sizes, int start, int end, Evas
      }
 }
 
+/**
+ * @brief Calculates size hints for the table when in regular (non-homogeneous) mode.
+ * @param o The table object.
+ * @param priv The private data of the table.
+ *
+ * This is the core logic for determining the minimum size of the table based on
+ * its children's hints. It involves:
+ * 1. Caching child hints (min/max sizes, padding, alignment, weight, expand flags).
+ * 2. Determining which columns/rows can expand based on children.
+ * 3. Iteratively calculating minimum column widths and row heights:
+ *    - For each child, if its minimum required span (considering its own min size and padding)
+ *      is greater than the current sum of min sizes of columns/rows it spans,
+ *      the extra space needed is distributed among those columns/rows.
+ *      - If any of those columns/rows can expand, space is distributed according to weights.
+ *      - Otherwise, space is distributed evenly.
+ * 4. Summing up all column/row minimums and inter-cell padding to get the table's total minimum size.
+ * 5. Storing these calculated values in the layout cache.
+ */
 static void
 _evas_object_table_calculate_hints_regular(Evas_Object *o, Evas_Table_Data *priv)
 {
@@ -770,6 +1017,25 @@ _evas_object_table_calculate_hints_regular(Evas_Object *o, Evas_Table_Data *priv
    // XXX hint max?
 }
 
+/**
+ * @brief Calculates and applies the layout for all children in regular (non-homogeneous) mode.
+ * @param o The table object.
+ * @param priv The private data of the table.
+ *
+ * This function uses the pre-calculated (or cached) column widths and row heights.
+ * 1. It gets the table's actual geometry.
+ * 2. It determines the final sizes for each column and row:
+ *    - If the table's available space is less than its calculated minimum,
+ *      the content is aligned within the available space using the table's
+ *      alignment hints, and the cached minimum column/row sizes are used.
+ *    - If there's extra space and there are expanding columns/rows,
+ *      this extra space is distributed among them according to their weights
+ *      (or evenly if weights are zero).
+ * 3. It then iterates through each child, calculates its cell's geometry based on
+ *    the final column/row sizes and its col/row span, and then calls
+ *    `_evas_object_table_calculate_cell()` to position the child within that cell.
+ * 4. Handles mirroring if enabled.
+ */
 static void
 _evas_object_table_calculate_layout_regular(Evas_Object *o, Evas_Table_Data *priv)
 {
@@ -871,6 +1137,14 @@ _evas_object_table_calculate_layout_regular(Evas_Object *o, Evas_Table_Data *pri
    _evas_object_table_cache_free(c);
 }
 
+/**
+ * @brief Top-level function for calculating layout in regular (non-homogeneous) mode.
+ * @param o The table object.
+ * @param priv The private data of the table.
+ *
+ * If hints have changed (or cache is invalid), it first recalculates them.
+ * Then, it proceeds to calculate and apply the layout for children.
+ */
 static void
 _evas_object_table_smart_calculate_regular(Evas_Object *o, Evas_Table_Data *priv)
 {
@@ -879,6 +1153,14 @@ _evas_object_table_smart_calculate_regular(Evas_Object *o, Evas_Table_Data *priv
    _evas_object_table_calculate_layout_regular(o, priv);
 }
 
+/**
+ * @brief Initializes the Evas_Table_Data when the object is added to a canvas group.
+ * @param obj The Evas_Table object.
+ * @param priv The private data of the table.
+ *
+ * Sets default values for padding, alignment, size, cache, homogeneous mode,
+ * and flags. Calls the superclass's group_add function.
+ */
 EOLIAN static void
 _evas_table_efl_canvas_group_group_add(Eo *obj, Evas_Table_Data *priv)
 {
@@ -897,6 +1179,14 @@ _evas_table_efl_canvas_group_group_add(Eo *obj, Evas_Table_Data *priv)
    efl_canvas_group_add(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Cleans up the Evas_Table_Data when the object is removed from a canvas group.
+ * @param obj The Evas_Table object.
+ * @param priv The private data of the table.
+ *
+ * Frees all child packing options, disconnects callbacks from children,
+ * releases the layout cache, and calls the superclass's group_del function.
+ */
 EOLIAN static void
 _evas_table_efl_canvas_group_group_del(Eo *obj, Evas_Table_Data *priv)
 {
@@ -921,6 +1211,15 @@ _evas_table_efl_canvas_group_group_del(Eo *obj, Evas_Table_Data *priv)
    efl_canvas_group_del(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Handles size setting for the table.
+ * @param obj The Evas_Table object.
+ * @param _pd Private data (unused).
+ * @param sz The new size.
+ *
+ * Calls interceptors, then the superclass's size_set, and finally
+ * marks the smart object as changed to trigger recalculation.
+ */
 EOLIAN static void
 _evas_table_efl_gfx_entity_size_set(Eo *obj, Evas_Table_Data *_pd EINA_UNUSED, Eina_Size2D sz)
 {
@@ -931,6 +1230,16 @@ _evas_table_efl_gfx_entity_size_set(Eo *obj, Evas_Table_Data *_pd EINA_UNUSED, E
    evas_object_smart_changed(obj);
 }
 
+/**
+ * @brief Handles position setting for the table.
+ * @param obj The Evas_Table object.
+ * @param _pd Private data (unused).
+ * @param pos The new position.
+ *
+ * Calls interceptors, then the superclass's position_set, and finally
+ * marks the smart object as changed (though position change doesn't directly
+ * affect table's internal layout, it's good practice for smart objects).
+ */
 EOLIAN static void
 _evas_table_efl_gfx_entity_position_set(Eo *obj, Evas_Table_Data *_pd EINA_UNUSED, Eina_Position2D pos)
 {
@@ -941,6 +1250,15 @@ _evas_table_efl_gfx_entity_position_set(Eo *obj, Evas_Table_Data *_pd EINA_UNUSE
    evas_object_smart_changed(obj);
 }
 
+/**
+ * @brief Performs the layout calculation for the table.
+ * @param o The Evas_Table object.
+ * @param priv The private data of the table.
+ *
+ * This is the main entry point for table layout. It freezes Evas events,
+ * calls the appropriate calculation function based on homogeneous mode,
+ * and then thaws Evas events.
+ */
 EOLIAN static void
 _evas_table_efl_canvas_group_group_calculate(Eo *o, Evas_Table_Data *priv)
 {
@@ -965,6 +1283,12 @@ _evas_table_efl_canvas_group_group_calculate(Eo *o, Evas_Table_Data *priv)
    evas_event_thaw_eval(e);
 }
 
+/**
+ * @brief Creates a new Evas_Object_Table.
+ * @param evas The Evas canvas to add the table to.
+ * @return The new Evas_Object_Table, or NULL on failure.
+ * @ingroup Evas_Object_Table
+ */
 EVAS_API Evas_Object *
 evas_object_table_add(Evas *evas)
 {
@@ -973,6 +1297,15 @@ evas_object_table_add(Evas *evas)
    return efl_add(MY_CLASS, evas, efl_canvas_object_legacy_ctor(efl_added));
 }
 
+/**
+ * @brief Constructor for the Evas_Table EFL object.
+ * @param obj The Evas_Table object being constructed.
+ * @param class_data Private class data (unused).
+ * @return The constructed object.
+ *
+ * Sets the object to be clipped by default, calls the superclass constructor,
+ * and sets the legacy type name.
+ */
 EOLIAN static Eo *
 _evas_table_efl_object_constructor(Eo *obj, Evas_Table_Data *class_data EINA_UNUSED)
 {
@@ -983,6 +1316,15 @@ _evas_table_efl_object_constructor(Eo *obj, Evas_Table_Data *class_data EINA_UNU
    return obj;
 }
 
+/**
+ * @brief Adds a new table as a smart member of a parent object.
+ * @param parent The parent Evas_Object.
+ * @param _pd Private data (unused).
+ * @return The new Evas_Object_Table, or NULL on failure.
+ *
+ * This is typically used by container widgets that want to provide a table
+ * as part of their internal implementation.
+ */
 EOLIAN static Evas_Object*
 _evas_table_add_to(Eo *parent, Evas_Table_Data *_pd EINA_UNUSED)
 {
@@ -996,6 +1338,15 @@ _evas_table_add_to(Eo *parent, Evas_Table_Data *_pd EINA_UNUSED)
    return ret;
 }
 
+/**
+ * @brief Sets the homogeneous mode of the table.
+ * @param o The Evas_Table object.
+ * @param priv The private data of the table.
+ * @param homogeneous The new homogeneous mode.
+ *        Example: `EVAS_OBJECT_TABLE_HOMOGENEOUS_NONE`, `EVAS_OBJECT_TABLE_HOMOGENEOUS_TABLE`, `EVAS_OBJECT_TABLE_HOMOGENEOUS_ITEM`.
+ *
+ * If the mode changes, the cache is invalidated and the table is marked for recalculation.
+ */
 EOLIAN static void
 _evas_table_homogeneous_set(Eo *o, Evas_Table_Data *priv, Evas_Object_Table_Homogeneous_Mode homogeneous)
 {
@@ -1006,12 +1357,27 @@ _evas_table_homogeneous_set(Eo *o, Evas_Table_Data *priv, Evas_Object_Table_Homo
    evas_object_smart_changed(o);
 }
 
+/**
+ * @brief Gets the homogeneous mode of the table.
+ * @param o The Evas_Table object (unused).
+ * @param priv The private data of the table.
+ * @return The current homogeneous mode.
+ */
 EOLIAN static Evas_Object_Table_Homogeneous_Mode
 _evas_table_homogeneous_get(const Eo *o EINA_UNUSED, Evas_Table_Data *priv)
 {
    return priv->homogeneous;
 }
 
+/**
+ * @brief Sets the overall alignment of the table content within its allocated space.
+ * @param o The Evas_Table object.
+ * @param priv The private data of the table.
+ * @param horizontal Horizontal alignment (0.0 to 1.0, or -1.0 for fill).
+ * @param vertical Vertical alignment (0.0 to 1.0, or -1.0 for fill).
+ *
+ * If alignment changes, the table is marked for recalculation.
+ */
 EOLIAN static void
 _evas_table_align_set(Eo *o, Evas_Table_Data *priv, double horizontal, double vertical)
 {
@@ -1023,6 +1389,13 @@ _evas_table_align_set(Eo *o, Evas_Table_Data *priv, double horizontal, double ve
    evas_object_smart_changed(o);
 }
 
+/**
+ * @brief Gets the overall alignment of the table content.
+ * @param o The Evas_Table object (unused).
+ * @param priv The private data of the table.
+ * @param horizontal Pointer to store horizontal alignment.
+ * @param vertical Pointer to store vertical alignment.
+ */
 EOLIAN static void
 _evas_table_align_get(const Eo *o EINA_UNUSED, Evas_Table_Data *priv, double *horizontal, double *vertical)
 {
@@ -1033,11 +1406,20 @@ _evas_table_align_get(const Eo *o EINA_UNUSED, Evas_Table_Data *priv, double *ho
      }
    else
      {
-        if (horizontal) *horizontal = 0.5;
-        if (vertical) *vertical = 0.5;
+        if (horizontal) *horizontal = 0.5; // Default alignment
+        if (vertical) *vertical = 0.5;   // Default alignment
      }
 }
 
+/**
+ * @brief Sets the padding between cells in the table.
+ * @param o The Evas_Table object.
+ * @param priv The private data of the table.
+ * @param horizontal Horizontal padding between columns.
+ * @param vertical Vertical padding between rows.
+ *
+ * If padding changes, the cache is invalidated and the table is marked for recalculation.
+ */
 EOLIAN static void
 _evas_table_padding_set(Eo *o, Evas_Table_Data *priv, Evas_Coord horizontal, Evas_Coord vertical)
 {
@@ -1049,6 +1431,13 @@ _evas_table_padding_set(Eo *o, Evas_Table_Data *priv, Evas_Coord horizontal, Eva
    evas_object_smart_changed(o);
 }
 
+/**
+ * @brief Gets the padding between cells in the table.
+ * @param o The Evas_Table object (unused).
+ * @param priv The private data of the table.
+ * @param horizontal Pointer to store horizontal padding.
+ * @param vertical Pointer to store vertical padding.
+ */
 EOLIAN static void
 _evas_table_padding_get(const Eo *o EINA_UNUSED, Evas_Table_Data *priv, Evas_Coord *horizontal, Evas_Coord *vertical)
 {
@@ -1059,11 +1448,22 @@ _evas_table_padding_get(const Eo *o EINA_UNUSED, Evas_Table_Data *priv, Evas_Coo
      }
    else
      {
-        if (horizontal) *horizontal = 0;
-        if (vertical) *vertical = 0;
+        if (horizontal) *horizontal = 0; // Default padding
+        if (vertical) *vertical = 0;   // Default padding
      }
 }
 
+/**
+ * @brief Gets the packing information for a child object.
+ * @param o The Evas_Table object (unused).
+ * @param _pd Private data (unused).
+ * @param child The child object.
+ * @param col Pointer to store the column.
+ * @param row Pointer to store the row.
+ * @param colspan Pointer to store the column span.
+ * @param rowspan Pointer to store the row span.
+ * @return EINA_TRUE if the child is packed and info is retrieved, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _evas_table_pack_get(const Eo *o EINA_UNUSED, Evas_Table_Data *_pd EINA_UNUSED, Evas_Object *child, unsigned short *col, unsigned short *row, unsigned short *colspan, unsigned short *rowspan)
 {
@@ -1086,6 +1486,22 @@ _evas_table_pack_get(const Eo *o EINA_UNUSED, Evas_Table_Data *_pd EINA_UNUSED, 
    return EINA_TRUE;
 }
 
+/**
+ * @brief Packs a child object into the table at a specified location and span.
+ * @param o The Evas_Table object.
+ * @param priv The private data of the table.
+ * @param child The child object to pack.
+ * @param col The column to pack the child into (0-indexed).
+ * @param row The row to pack the child into (0-indexed).
+ * @param colspan The number of columns the child should span. Must be >= 1.
+ * @param rowspan The number of rows the child should span. Must be >= 1.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., invalid parameters, memory allocation failure).
+ *
+ * If the child is already packed in this table, its packing options are updated.
+ * If it's a new child, packing options are created, and it's added as a smart member.
+ * The table's dimensions (cols, rows) are updated if necessary.
+ * The cache is invalidated and the table is marked for recalculation.
+ */
 EOLIAN static Eina_Bool
 _evas_table_pack(Eo *o, Evas_Table_Data *priv, Evas_Object *child, unsigned short col, unsigned short row, unsigned short colspan, unsigned short rowspan)
 {
@@ -1210,6 +1626,16 @@ _evas_table_pack(Eo *o, Evas_Table_Data *priv, Evas_Object *child, unsigned shor
    return EINA_TRUE;
 }
 
+/**
+ * @brief Removes a child's packing option from the internal list and updates table dimensions if needed.
+ * @param priv The private data of the table.
+ * @param opt The Evas_Object_Table_Option of the child to remove.
+ *
+ * This function is an internal helper for unpack operations. It removes the `opt`
+ * from `priv->children`. If the removed child defined the maximum column or row
+ * extent of the table, the table's `size.cols` and `size.rows` are recalculated
+ * by iterating through the remaining children.
+ */
 static void
 _evas_object_table_remove_opt(Evas_Table_Data *priv, Evas_Object_Table_Option *opt)
 {
@@ -1256,6 +1682,16 @@ _evas_object_table_remove_opt(Evas_Table_Data *priv, Evas_Object_Table_Option *o
      }
 }
 
+/**
+ * @brief Unpacks (removes) a child object from the table.
+ * @param o The Evas_Table object.
+ * @param priv The private data of the table.
+ * @param child The child object to unpack.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., child not packed or not a child of this table).
+ *
+ * Removes the child as a smart member, disconnects callbacks, frees its packing options,
+ * invalidates the cache, and marks the table for recalculation.
+ */
 EOLIAN static Eina_Bool
 _evas_table_unpack(Eo *o, Evas_Table_Data *priv, Evas_Object *child)
 {
@@ -1284,6 +1720,15 @@ _evas_table_unpack(Eo *o, Evas_Table_Data *priv, Evas_Object *child)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Removes all children from the table.
+ * @param o The Evas_Table object.
+ * @param priv The private data of the table.
+ * @param clear If EINA_TRUE, also delete the child objects. If EINA_FALSE, only unpack them.
+ *
+ * Iterates through all children, unpacks them, and optionally deletes them.
+ * Resets table dimensions, invalidates cache, and marks for recalculation.
+ */
 EOLIAN static void
 _evas_table_clear(Eo *o, Evas_Table_Data *priv, Eina_Bool clear)
 {
@@ -1310,6 +1755,15 @@ _evas_table_clear(Eo *o, Evas_Table_Data *priv, Eina_Bool clear)
    evas_event_thaw(e);
 }
 
+/**
+ * @brief Gets the number of columns and rows currently in the table.
+ * @param o The Evas_Table object (unused).
+ * @param priv The private data of the table.
+ * @param cols Pointer to store the number of columns.
+ * @param rows Pointer to store the number of rows.
+ *
+ * These dimensions are determined by the maximum column/row + span of packed children.
+ */
 EOLIAN static void
 _evas_table_col_row_size_get(const Eo *o EINA_UNUSED, Evas_Table_Data *priv, int *cols, int *rows)
 {
@@ -1320,11 +1774,19 @@ _evas_table_col_row_size_get(const Eo *o EINA_UNUSED, Evas_Table_Data *priv, int
      }
    else
      {
-        if (cols) *cols = -1;
-        if (rows) *rows = -1;
+        if (cols) *cols = -1; // Indicate error or uninitialized state
+        if (rows) *rows = -1; // Indicate error or uninitialized state
      }
 }
 
+/**
+ * @brief Creates a new iterator for the children of the table.
+ * @param o The Evas_Table object.
+ * @param priv The private data of the table.
+ * @return A new Eina_Iterator, or NULL if there are no children or on allocation failure.
+ *
+ * The iterator will yield Evas_Object pointers (the children).
+ */
 EOLIAN static Eina_Iterator*
 _evas_table_iterator_new(const Eo *o, Evas_Table_Data *priv)
 {
@@ -1353,6 +1815,14 @@ _evas_table_iterator_new(const Eo *o, Evas_Table_Data *priv)
    return &it->iterator;
 }
 
+/**
+ * @brief Creates a new accessor for the children of the table.
+ * @param o The Evas_Table object.
+ * @param priv The private data of the table.
+ * @return A new Eina_Accessor, or NULL if there are no children or on allocation failure.
+ *
+ * The accessor allows random access to children by index, yielding Evas_Object pointers.
+ */
 EOLIAN static Eina_Accessor*
 _evas_table_accessor_new(const Eo *o, Evas_Table_Data *priv)
 {
@@ -1375,6 +1845,14 @@ _evas_table_accessor_new(const Eo *o, Evas_Table_Data *priv)
    return &it->accessor;
 }
 
+/**
+ * @brief Gets a new list containing all child objects of the table.
+ * @param o The Evas_Table object (unused).
+ * @param priv The private data of the table.
+ * @return A new Eina_List containing Evas_Object pointers of the children.
+ *         The caller is responsible for freeing this list (but not its contents).
+ *         Returns NULL if there are no children.
+ */
 EOLIAN static Eina_List*
 _evas_table_children_get(const Eo *o EINA_UNUSED, Evas_Table_Data *priv)
 {
@@ -1387,12 +1865,29 @@ _evas_table_children_get(const Eo *o EINA_UNUSED, Evas_Table_Data *priv)
    return new_list;
 }
 
+/**
+ * @brief Gets the number of children packed into the table.
+ * @param o The Evas_Table object (unused).
+ * @param priv The private data of the table.
+ * @return The count of child objects.
+ */
 EOLIAN static int
 _evas_table_count(Eo *o EINA_UNUSED, Evas_Table_Data *priv)
 {
    return eina_list_count(priv->children);
 }
 
+/**
+ * @brief Gets the child object packed at a specific cell (top-left corner).
+ * @param o The Evas_Table object (unused).
+ * @param priv The private data of the table.
+ * @param col The column of the cell.
+ * @param row The row of the cell.
+ * @return The Evas_Object at the specified cell, or NULL if no child starts at that cell.
+ *
+ * Note: This finds a child whose packing `col` and `row` match the parameters.
+ * It does not consider colspans or rowspans for cells other than the top-left.
+ */
 EOLIAN static Evas_Object *
 _evas_table_child_get(const Eo *o EINA_UNUSED, Evas_Table_Data *priv, unsigned short col, unsigned short row)
 {
@@ -1405,18 +1900,38 @@ _evas_table_child_get(const Eo *o EINA_UNUSED, Evas_Table_Data *priv, unsigned s
    return NULL;
 }
 
+/**
+ * @brief Gets the mirrored mode of the table (for RTL language support).
+ * @param o The Evas_Table object (unused).
+ * @param priv The private data of the table.
+ * @return EINA_TRUE if mirrored, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _evas_table_efl_ui_i18n_mirrored_get(const Eo *o EINA_UNUSED, Evas_Table_Data *priv)
 {
    return priv->is_mirrored;
 }
 
+/**
+ * @brief Gets the mirrored mode of the table.
+ * @param obj The Evas_Table object.
+ * @return EINA_TRUE if mirrored, EINA_FALSE otherwise.
+ * @ingroup Evas_Object_Table
+ */
 EVAS_API Eina_Bool
 evas_object_table_mirrored_get(const Eo *obj)
 {
    return efl_ui_mirrored_get(obj);
 }
 
+/**
+ * @brief Sets the mirrored mode of the table (for RTL language support).
+ * @param o The Evas_Table object.
+ * @param priv The private data of the table.
+ * @param mirrored EINA_TRUE to enable mirrored mode, EINA_FALSE to disable.
+ *
+ * If the mode changes, triggers a recalculation of the table layout.
+ */
 EOLIAN static void
 _evas_table_efl_ui_i18n_mirrored_set(Eo *o, Evas_Table_Data *priv, Eina_Bool mirrored)
 {
@@ -1427,12 +1942,24 @@ _evas_table_efl_ui_i18n_mirrored_set(Eo *o, Evas_Table_Data *priv, Eina_Bool mir
      }
 }
 
+/**
+ * @brief Sets the mirrored mode of the table.
+ * @param obj The Evas_Table object.
+ * @param mirrored EINA_TRUE to enable mirrored mode, EINA_FALSE to disable.
+ * @ingroup Evas_Object_Table
+ */
 EVAS_API void
 evas_object_table_mirrored_set(Eo *obj, Eina_Bool mirrored)
 {
    efl_ui_mirrored_set(obj, mirrored);
 }
 
+/**
+ * @brief Class constructor for Evas_Table.
+ * @param klass The Efl_Class being constructed.
+ *
+ * Registers the legacy smart type name for this class.
+ */
 EOLIAN static void
 _evas_table_class_constructor(Efl_Class *klass)
 {

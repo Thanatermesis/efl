@@ -184,7 +184,41 @@
  * @image latex eina_array-growth.eps "" width=\textwidth
  *
  * Eina_Array only stores pointers but it can store data of any type in the form
- * of void pointers.
+ * of void pointers. For example, an Eina_Array can store `int*`, `char*` (strings),
+ * or pointers to custom structs. The user is responsible for managing the memory
+ * of the data pointed to by the elements in the array.
+ *
+ * Example of storing pointers to a custom struct:
+ * @code
+ * typedef struct {
+ *     int id;
+ *     const char *name;
+ * } My_Struct;
+ *
+ * Eina_Array *my_array = eina_array_new(10);
+ *
+ * // Create and add first element
+ * My_Struct *element1 = malloc(sizeof(My_Struct));
+ * if (element1) {
+ *     element1->id = 1;
+ *     element1->name = "First Element";
+ *     if (!eina_array_push(my_array, element1)) {
+ *         free(element1); // Handle push failure
+ *     }
+ * }
+ *
+ * // ... add more elements ...
+ *
+ * // Later, when removing elements or freeing the array,
+ * // ensure to free the memory for each My_Struct instance.
+ * // For example, using EINA_ARRAY_ITER_NEXT:
+ * // My_Struct *item;
+ * // Eina_Array_Iterator iterator;
+ * // unsigned int i;
+ * // EINA_ARRAY_ITER_NEXT(my_array, i, item, iterator)
+ * //   free(item);
+ * // eina_array_free(my_array);
+ * @endcode
  *
  * See here some examples:
  * @li @ref eina_array_01_example_page

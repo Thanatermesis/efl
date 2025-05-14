@@ -1,5 +1,14 @@
 #include "edje_private.h"
 
+/**
+ * @file
+ * @brief Edje entry handling logic.
+ *
+ * This file implements the functionality for text entries within Edje,
+ * including cursor management, selection, text manipulation, input method
+ * framework (IMF) integration, and anchor/item handling.
+ */
+
 #ifdef HAVE_ECORE_IMF
 static Eina_Bool _edje_entry_imf_retrieve_surrounding_cb(void *data, Ecore_IMF_Context *ctx, char **text, int *cursor_pos);
 static void      _edje_entry_imf_event_commit_cb(void *data, Ecore_IMF_Context *ctx, void *event_info);
@@ -9,9 +18,32 @@ static void      _edje_entry_imf_event_selection_set_cb(void *data, Ecore_IMF_Co
 static Eina_Bool _edje_entry_imf_retrieve_selection_cb(void *data, Ecore_IMF_Context *ctx, char **text);
 #endif
 
+/**
+ * @brief Represents an Edje entry instance.
+ *
+ * This structure holds all the data associated with a single text entry
+ * part in an Edje object. It manages cursors, selections, text content,
+ * and interaction with the input method framework.
+ */
 typedef struct _Entry  Entry;
+/**
+ * @brief Represents a selection rectangle in an Edje entry.
+ *
+ * Selections can span multiple lines and are rendered as a list of
+ * these rectangles.
+ */
 typedef struct _Sel    Sel;
+/**
+ * @brief Represents an anchor (link or item) within an Edje entry.
+ *
+ * Anchors define clickable or interactive regions in the text.
+ */
 typedef struct _Anchor Anchor;
+/**
+ * @brief Represents an Evas object associated with an item anchor.
+ *
+ * Item anchors can have custom Evas objects embedded in the text.
+ */
 typedef struct _Item_Obj Item_Obj;
 
 static void _edje_entry_imf_cursor_location_set(Entry *en);
@@ -20,6 +52,10 @@ static void _range_del_emit(Edje *ed, Evas_Textblock_Cursor *c EINA_UNUSED, Evas
 static void _text_filter_format_prepend(Edje *ed, Entry *en, Evas_Textblock_Cursor *c, const char *text);
 static void _free_entry_change_info(void *_info);
 
+/**
+ * @struct _Entry
+ * @brief Detailed structure for an Edje entry.
+ */
 struct _Entry
 {
    Edje_Real_Part        *rp;
@@ -54,36 +90,58 @@ struct _Entry
    Eina_Bool              have_link_pressed : 1;
 
 #ifdef HAVE_ECORE_IMF
-   Eina_Bool              have_preedit : 1;
-   Eina_Bool              commit_cancel : 1; // For skipping useless commit
-   Ecore_IMF_Context     *imf_context;
+   Eina_Bool              have_preedit : 1; /**< True if there is preedit text */
+   Eina_Bool              commit_cancel : 1; /**< Flag to skip a commit operation if it's deemed useless (e.g., empty commit after preedit) */
+   Ecore_IMF_Context     *imf_context; /**< Input Method Framework context */
 #endif
 };
 
+/**
+ * @struct _Sel
+ * @brief Detailed structure for a selection rectangle.
+ */
 struct _Sel
 {
-   Evas_Textblock_Rectangle rect;
-   Evas_Object             *obj_fg, *obj_bg, *obj, *sobj;
+   Evas_Textblock_Rectangle rect; /**< Geometry of the selection rectangle */
+   Evas_Object             *obj_fg; /**< Foreground Evas object for selection rendering */
+   Evas_Object             *obj_bg; /**< Background Evas object for selection rendering */
+   Evas_Object             *obj;    /**< Main Evas object for selection (if applicable) */
+   Evas_Object             *sobj;   /**< Secondary Evas object for selection (if applicable) */
 };
 
+/**
+ * @struct _Anchor
+ * @brief Detailed structure for an anchor.
+ */
 struct _Anchor
 {
-   Entry                 *en;
-   char                  *name;
-   Evas_Textblock_Cursor *start, *end;
-   Eina_List             *sel;
-   Eina_Bool              item : 1;
+   Entry                 *en; /**< Parent entry */
+   char                  *name; /**< Name of the anchor (e.g., URL for a link) */
+   Evas_Textblock_Cursor *start, *end; /**< Cursors defining the anchor's range */
+   Eina_List             *sel; /**< List of Sel objects for rendering the anchor */
+   Eina_Bool              item : 1; /**< True if this is an item anchor */
 };
 
+/**
+ * @struct _Item_Obj
+ * @brief Detailed structure for an item object.
+ *
+ * This structure links an Anchor (specifically an item anchor) to its
+ * corresponding Evas_Object. It's managed as an inlist.
+ */
 struct _Item_Obj
 {
-   EINA_INLIST;
-   Anchor                *an;
-   char                  *name;
-   Evas_Object           *obj;
+   EINA_INLIST; /**< Macro for Eina_Inlist node */
+   Anchor                *an; /**< The Anchor this item object belongs to */
+   char                  *name; /**< Name of the item, copied from the anchor */
+   Evas_Object           *obj; /**< The Evas_Object representing this item */
 };
 
 #ifdef HAVE_ECORE_IMF
+/**
+ * @brief Clears the preedit state and frees associated cursors.
+ * @param en The entry data.
+ */
 static void
 _preedit_clear(Entry *en)
 {
@@ -102,6 +160,13 @@ _preedit_clear(Entry *en)
    en->have_preedit = EINA_FALSE;
 }
 
+/**
+ * @brief Deletes the current preedit text from the textblock.
+ * @param en The entry data.
+ *
+ * This function removes the characters that are part of the active
+ * preedit composition.
+ */
 static void
 _preedit_del(Entry *en)
 {
@@ -113,6 +178,16 @@ _preedit_del(Entry *en)
    evas_textblock_cursor_range_delete(en->preedit_start, en->preedit_end);
 }
 
+/**
+ * @brief Callback for "focus,part,in" signal on an entry part.
+ * @param data The Edje_Real_Part associated with the entry.
+ * @param o The Edje object.
+ * @param emission The full emission string (e.g., "focus,part,in,seat_name").
+ * @param source The source of the signal.
+ *
+ * This function handles focus-in events for a specific entry part,
+ * notifying the IMF context and updating cursor information.
+ */
 static void
 _edje_entry_focus_in_cb(void *data, Evas_Object *o, const char *emission, const char *source EINA_UNUSED)
 {
@@ -143,6 +218,16 @@ _edje_entry_focus_in_cb(void *data, Evas_Object *o, const char *emission, const 
      }
 }
 
+/**
+ * @brief Callback for "focus,part,out" signal on an entry part.
+ * @param data The Edje_Real_Part associated with the entry.
+ * @param o The Edje object.
+ * @param emission The emission string.
+ * @param source The source of the signal.
+ *
+ * This function handles focus-out events for a specific entry part,
+ * resetting and notifying the IMF context.
+ */
 static void
 _edje_entry_focus_out_cb(void *data, Evas_Object *o EINA_UNUSED, const char *emission EINA_UNUSED, const char *source EINA_UNUSED)
 {
@@ -163,6 +248,14 @@ _edje_entry_focus_out_cb(void *data, Evas_Object *o EINA_UNUSED, const char *emi
 
 #endif
 
+/**
+ * @brief Handles focus-in event for the entire Edje object.
+ * @param ed The Edje object.
+ * @param seat The input device (seat) that gained focus.
+ *
+ * This function emits a "focus,in" signal and, if an entry part
+ * has focus, notifies its IMF context.
+ */
 static void
 _edje_focus_in(Edje *ed, Efl_Input_Device *seat)
 {
@@ -189,6 +282,11 @@ _edje_focus_in(Edje *ed, Efl_Input_Device *seat)
 #endif
 }
 
+/**
+ * @brief EFL event callback for focus in on the Edje object.
+ * @param data The Edje object.
+ * @param event The EFL focus event information.
+ */
 static void
 _edje_focus_in_cb(void *data, const Efl_Event *event)
 {
@@ -197,6 +295,14 @@ _edje_focus_in_cb(void *data, const Efl_Event *event)
    _edje_focus_in(data, efl_input_device_get(ev));
 }
 
+/**
+ * @brief Handles focus-out event for the entire Edje object.
+ * @param ed The Edje object.
+ * @param seat The input device (seat) that lost focus.
+ *
+ * This function emits a "focus,out" signal and, if an entry part
+ * had focus, resets and notifies its IMF context.
+ */
 static void
 _edje_focus_out(Edje *ed, Efl_Input_Device *seat)
 {
@@ -224,6 +330,11 @@ _edje_focus_out(Edje *ed, Efl_Input_Device *seat)
 #endif
 }
 
+/**
+ * @brief EFL event callback for focus out on the Edje object.
+ * @param data The Edje object.
+ * @param event The EFL focus event information.
+ */
 static void
 _edje_focus_out_cb(void *data, const Efl_Event *event)
 {
@@ -232,6 +343,22 @@ _edje_focus_out_cb(void *data, const Efl_Event *event)
    _edje_focus_out(data, efl_input_device_get(ev));
 }
 
+/**
+ * @brief Internal function to prepend markup text after filtering.
+ * @param ed The Edje object.
+ * @param en The entry data.
+ * @param c The cursor at which to prepend the text.
+ * @param text The markup text to prepend (will be freed by this function).
+ * @param fmtpre Optional formatting string to prepend before the text.
+ * @param fmtpost Optional formatting string to prepend after the text.
+ * @param clearsel If EINA_TRUE, clears the current selection before prepending.
+ * @param changeinfo If EINA_TRUE, creates and returns an Edje_Entry_Change_Info struct.
+ * @return An Edje_Entry_Change_Info struct if changeinfo is EINA_TRUE and text is prepended, otherwise NULL.
+ *
+ * This function applies markup filters, handles IMF commit cancellation logic,
+ * and prepends the (potentially modified) markup text to the textblock.
+ * It also handles optional surrounding formatting tags.
+ */
 static Edje_Entry_Change_Info *
 _text_filter_markup_prepend_internal(Edje *ed, Entry *en, Evas_Textblock_Cursor *c,
                                      char *text,
@@ -300,6 +427,21 @@ _text_filter_markup_prepend_internal(Edje *ed, Entry *en, Evas_Textblock_Cursor 
    return NULL;
 }
 
+/**
+ * @brief Prepends plain text to an entry, applying text filters and converting to markup.
+ * @param ed The Edje object.
+ * @param en The entry data.
+ * @param c The cursor at which to prepend the text.
+ * @param text The plain text to prepend.
+ * @param fmtpre Optional formatting string to prepend before the text (applied after markup conversion).
+ * @param fmtpost Optional formatting string to prepend after the text (applied after markup conversion).
+ * @param clearsel If EINA_TRUE, clears the current selection before prepending.
+ * @param changeinfo If EINA_TRUE, creates and returns an Edje_Entry_Change_Info struct.
+ * @return An Edje_Entry_Change_Info struct if changeinfo is EINA_TRUE and text is prepended, otherwise NULL.
+ *
+ * This function first applies plain text insertion filters, then converts the
+ * text to markup, and finally calls _text_filter_markup_prepend_internal.
+ */
 static Edje_Entry_Change_Info *
 _text_filter_text_prepend(Edje *ed, Entry *en, Evas_Textblock_Cursor *c,
                           const char *text,
@@ -342,6 +484,21 @@ _text_filter_text_prepend(Edje *ed, Entry *en, Evas_Textblock_Cursor *c,
    return NULL;
 }
 
+/**
+ * @brief Prepends a formatting tag to an entry, applying format filters.
+ * @param ed The Edje object.
+ * @param en The entry data.
+ * @param c The cursor at which to prepend the format tag.
+ * @param text The format string (e.g., "+ b", "- i", "font=Sans").
+ *
+ * This function applies format insertion filters and then prepends the
+ * resulting markup tag (e.g., "<b>", "</i>", "<font=Sans/>") using
+ * _text_filter_markup_prepend_internal.
+ * The format string syntax is:
+ * - `+ tag`: Opens a tag (e.g., `+ b` becomes `<b>`).
+ * - `- tag`: Closes a tag (e.g., `- b` becomes `</b>`).
+ * - `tag`:  Becomes a self-closing tag (e.g., `font=Sans` becomes `<font=Sans/>`).
+ */
 static void
 _text_filter_format_prepend(Edje *ed, Entry *en, Evas_Textblock_Cursor *c, const char *text)
 {
@@ -465,6 +622,17 @@ _text_filter_markup_prepend(Edje *ed, Entry *en, Evas_Textblock_Cursor *c,
    return NULL;
 }
 
+/**
+ * @brief Updates coordinates based on the current cursor position and geometry.
+ * @param c The cursor to get geometry from (must be en->cursor).
+ * @param o The textblock object (unused).
+ * @param en The entry data.
+ * @param[out] cx The x-coordinate to update (center of cursor).
+ * @param[out] cy The y-coordinate to update (center of cursor).
+ *
+ * This function is typically used to get a reference point for operations
+ * like jumping lines based on the current cursor's horizontal position.
+ */
 static void
 _curs_update_from_curs(Evas_Textblock_Cursor *c, Evas_Object *o EINA_UNUSED, Entry *en, Evas_Coord *cx, Evas_Coord *cy)
 {
@@ -487,6 +655,13 @@ _curs_update_from_curs(Evas_Textblock_Cursor *c, Evas_Object *o EINA_UNUSED, Ent
    *cy += (ch / 2);
 }
 
+/**
+ * @brief Gets the index of the last line in the textblock.
+ * @param c A cursor (unused, but implies context of an entry).
+ * @param o The textblock object.
+ * @param en The entry data (unused).
+ * @return The index of the last line.
+ */
 static int
 _curs_line_last_get(Evas_Textblock_Cursor *c EINA_UNUSED, Evas_Object *o, Entry *en EINA_UNUSED)
 {
@@ -500,6 +675,12 @@ _curs_line_last_get(Evas_Textblock_Cursor *c EINA_UNUSED, Evas_Object *o, Entry 
    return ln;
 }
 
+/**
+ * @brief Moves the cursor to the beginning of its current line.
+ * @param c The cursor to move.
+ * @param o The textblock object (unused).
+ * @param en The entry data (unused).
+ */
 static void
 _curs_lin_start(Evas_Textblock_Cursor *c, Evas_Object *o EINA_UNUSED,
                 Entry *en EINA_UNUSED)
@@ -507,6 +688,12 @@ _curs_lin_start(Evas_Textblock_Cursor *c, Evas_Object *o EINA_UNUSED,
    evas_textblock_cursor_line_char_first(c);
 }
 
+/**
+ * @brief Moves the cursor to the end of its current line.
+ * @param c The cursor to move.
+ * @param o The textblock object (unused).
+ * @param en The entry data (unused).
+ */
 static void
 _curs_lin_end(Evas_Textblock_Cursor *c, Evas_Object *o EINA_UNUSED,
               Entry *en EINA_UNUSED)
@@ -514,6 +701,12 @@ _curs_lin_end(Evas_Textblock_Cursor *c, Evas_Object *o EINA_UNUSED,
    evas_textblock_cursor_line_char_last(c);
 }
 
+/**
+ * @brief Moves the cursor to the beginning of the textblock (first paragraph).
+ * @param c The cursor to move.
+ * @param o The textblock object (unused).
+ * @param en The entry data (unused).
+ */
 static void
 _curs_start(Evas_Textblock_Cursor *c, Evas_Object *o EINA_UNUSED,
             Entry *en EINA_UNUSED)
@@ -521,12 +714,26 @@ _curs_start(Evas_Textblock_Cursor *c, Evas_Object *o EINA_UNUSED,
    evas_textblock_cursor_paragraph_first(c);
 }
 
+/**
+ * @brief Moves the cursor to the end of the textblock (last paragraph).
+ * @param c The cursor to move.
+ * @param o The textblock object (unused).
+ * @param en The entry data (unused).
+ */
 static void
 _curs_end(Evas_Textblock_Cursor *c, Evas_Object *o EINA_UNUSED, Entry *en EINA_UNUSED)
 {
    evas_textblock_cursor_paragraph_last(c);
 }
 
+/**
+ * @brief Jumps the cursor to a specific line number, trying to maintain horizontal position.
+ * @param c The cursor to move.
+ * @param o The textblock object.
+ * @param en The entry data.
+ * @param ln The target line number.
+ * @return EINA_TRUE if the jump was successful, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _curs_jump_line(Evas_Textblock_Cursor *c, Evas_Object *o, Entry *en, int ln)
 {
@@ -559,6 +766,14 @@ _curs_jump_line(Evas_Textblock_Cursor *c, Evas_Object *o, Entry *en, int ln)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Jumps the cursor by a relative number of lines.
+ * @param c The cursor to move.
+ * @param o The textblock object.
+ * @param en The entry data.
+ * @param by The number of lines to jump (positive for down, negative for up).
+ * @return EINA_TRUE if the jump was successful, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _curs_jump_line_by(Evas_Textblock_Cursor *c, Evas_Object *o, Entry *en, int by)
 {
@@ -568,18 +783,42 @@ _curs_jump_line_by(Evas_Textblock_Cursor *c, Evas_Object *o, Entry *en, int by)
    return _curs_jump_line(c, o, en, ln);
 }
 
+/**
+ * @brief Moves the cursor up one line.
+ * @param c The cursor to move.
+ * @param o The textblock object.
+ * @param en The entry data.
+ * @return EINA_TRUE if successful, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _curs_up(Evas_Textblock_Cursor *c, Evas_Object *o, Entry *en)
 {
    return _curs_jump_line_by(c, o, en, -1);
 }
 
+/**
+ * @brief Moves the cursor down one line.
+ * @param c The cursor to move.
+ * @param o The textblock object.
+ * @param en The entry data.
+ * @return EINA_TRUE if successful, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _curs_down(Evas_Textblock_Cursor *c, Evas_Object *o, Entry *en)
 {
    return _curs_jump_line_by(c, o, en, 1);
 }
 
+/**
+ * @brief Initializes the selection start and end cursors at the current main cursor position.
+ * @param c The main cursor (en->cursor).
+ * @param o The textblock object.
+ * @param en The entry data.
+ *
+ * This function is called when a selection operation begins.
+ * It creates en->sel_start and en->sel_end if they don't exist
+ * and copies the main cursor's position to them.
+ */
 static void
 _sel_start(Evas_Textblock_Cursor *c, Evas_Object *o, Entry *en)
 {
@@ -597,6 +836,16 @@ _sel_start(Evas_Textblock_Cursor *c, Evas_Object *o, Entry *en)
      }
 }
 
+/**
+ * @brief Enables selection mode and emits "selection,start" signal.
+ * @param ed The Edje object.
+ * @param c The main cursor (unused).
+ * @param o The textblock object (unused).
+ * @param en The entry data.
+ *
+ * This sets en->have_selection to EINA_TRUE and resets any cached
+ * selection string. It also resets the IMF context.
+ */
 static void
 _sel_enable(Edje *ed, Evas_Textblock_Cursor *c EINA_UNUSED,
             Evas_Object *o EINA_UNUSED, Entry *en)
@@ -613,6 +862,14 @@ _sel_enable(Edje *ed, Evas_Textblock_Cursor *c EINA_UNUSED,
    _edje_emit(ed, "selection,start", en->rp->part->name);
 }
 
+/**
+ * @brief Emits "selection,reset" or "selection,changed" based on selection state.
+ * @param ed The Edje object.
+ * @param en The entry data.
+ *
+ * If sel_start and sel_end are at the same position, "selection,reset" is emitted.
+ * Otherwise, "selection,changed" is emitted.
+ */
 static void
 _emit_sel_state(Edje *ed, Entry *en)
 {
@@ -626,6 +883,16 @@ _emit_sel_state(Edje *ed, Entry *en)
      }
 }
 
+/**
+ * @brief Extends the selection to the current main cursor position (updates sel_end).
+ * @param ed The Edje object.
+ * @param c The main cursor (en->cursor), representing the new end of the selection.
+ * @param o The textblock object.
+ * @param en The entry data.
+ *
+ * This function enables selection if not already enabled, copies the main
+ * cursor to en->sel_end, updates IMF cursor info, and emits selection state.
+ */
 static void
 _sel_extend(Edje *ed, Evas_Textblock_Cursor *c, Evas_Object *o, Entry *en)
 {
@@ -645,6 +912,17 @@ _sel_extend(Edje *ed, Evas_Textblock_Cursor *c, Evas_Object *o, Entry *en)
    _emit_sel_state(ed, en);
 }
 
+/**
+ * @brief Extends the selection to the current main cursor position (updates sel_start).
+ * @param ed The Edje object.
+ * @param c The main cursor (en->cursor), representing the new start of the selection.
+ * @param o The textblock object.
+ * @param en The entry data.
+ *
+ * This function enables selection if not already enabled, copies the main
+ * cursor to en->sel_start, updates IMF cursor info, and emits selection state.
+ * This is used for extending selection backwards.
+ */
 static void
 _sel_preextend(Edje *ed, Evas_Textblock_Cursor *c, Evas_Object *o, Entry *en)
 {
@@ -664,6 +942,17 @@ _sel_preextend(Edje *ed, Evas_Textblock_Cursor *c, Evas_Object *o, Entry *en)
    _emit_sel_state(ed, en);
 }
 
+/**
+ * @brief Clears the current selection.
+ * @param ed The Edje object.
+ * @param c The main cursor (unused).
+ * @param o The textblock object (unused).
+ * @param en The entry data.
+ *
+ * This function frees selection cursors, deletes selection rendering objects,
+ * clears the cached selection string, and emits "selection,cleared" if
+ * a selection existed.
+ */
 static void
 _sel_clear(Edje *ed, Evas_Textblock_Cursor *c EINA_UNUSED, Evas_Object *o EINA_UNUSED, Entry *en)
 {
@@ -697,6 +986,18 @@ _sel_clear(Edje *ed, Evas_Textblock_Cursor *c EINA_UNUSED, Evas_Object *o EINA_U
      }
 }
 
+/**
+ * @brief Updates the visual representation of the current selection.
+ * @param ed The Edje object.
+ * @param c The main cursor (unused).
+ * @param o The textblock object.
+ * @param en The entry data.
+ *
+ * This function gets the geometry of the selection range (between en->sel_start
+ * and en->sel_end) and creates/updates Evas objects (Sel structs) to visually
+ * highlight the selected text. It reuses existing Sel objects if possible and
+ * deletes redundant ones.
+ */
 static void
 _sel_update(Edje *ed, Evas_Textblock_Cursor *c EINA_UNUSED, Evas_Object *o, Entry *en)
 {
@@ -796,6 +1097,15 @@ _sel_update(Edje *ed, Evas_Textblock_Cursor *c EINA_UNUSED, Evas_Object *o, Entr
      }
 }
 
+/**
+ * @brief Checks if a given style tag exists in the textblock's style.
+ * @param rp The Edje real part.
+ * @param tag The style tag to check for (e.g., "link_pressed=").
+ * @return EINA_TRUE if the tag is found in the style string, EINA_FALSE otherwise.
+ *
+ * This is used to determine if specific visual effects (like link pressed state)
+ * should be applied based on the theme's style definition.
+ */
 static Eina_Bool
 _edje_entry_style_tag_check(Edje_Real_Part *rp, const char *tag)
 {
@@ -814,6 +1124,16 @@ _edje_entry_style_tag_check(Edje_Real_Part *rp, const char *tag)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Callback for mouse down events on an anchor.
+ * @param data The Anchor data.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas object that received the event (unused).
+ * @param event_info The Evas_Event_Mouse_Down details.
+ *
+ * Emits "anchor,mouse,down" signals and applies "link_pressed" visual style
+ * if defined in the theme.
+ */
 static void
 _edje_anchor_mouse_down_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -859,6 +1179,16 @@ _edje_anchor_mouse_down_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EIN
    ev->event_flags |= rp->mask_flags;
 }
 
+/**
+ * @brief Callback for mouse up events on an anchor.
+ * @param data The Anchor data.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas object that received the event (unused).
+ * @param event_info The Evas_Event_Mouse_Up details.
+ *
+ * Emits "anchor,mouse,up" and "anchor,mouse,clicked" signals.
+ * Removes the "link_pressed" visual style if it was applied.
+ */
 static void
 _edje_anchor_mouse_up_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -918,6 +1248,15 @@ _edje_anchor_mouse_up_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_
    ev->event_flags |= rp->mask_flags;
 }
 
+/**
+ * @brief Callback for mouse move events over an anchor.
+ * @param data The Anchor data.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas object that received the event (unused).
+ * @param event_info The Evas_Event_Mouse_Move details.
+ *
+ * Emits "anchor,mouse,move" signals.
+ */
 static void
 _edje_anchor_mouse_move_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -950,6 +1289,17 @@ _edje_anchor_mouse_move_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EIN
    ev->event_flags |= rp->mask_flags;
 }
 
+/**
+ * @brief Callback for mouse in events over an anchor.
+ * @param data The Anchor data.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas object that received the event (unused).
+ * @param event_info The Evas_Event_Mouse_In details.
+ *
+ * Emits "anchor,mouse,in" signals. Sets EVAS_EVENT_FLAG_ON_HOLD
+ * to allow higher-level widgets (like Elementary) to handle the event
+ * if needed, preventing unwanted propagation.
+ */
 static void
 _edje_anchor_mouse_in_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -978,6 +1328,16 @@ _edje_anchor_mouse_in_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_
    ev->event_flags |= rp->mask_flags;
 }
 
+/**
+ * @brief Callback for mouse out events from an anchor.
+ * @param data The Anchor data.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas object that received the event (unused).
+ * @param event_info The Evas_Event_Mouse_Out details.
+ *
+ * Emits "anchor,mouse,out" signals. Sets EVAS_EVENT_FLAG_ON_HOLD
+ * for similar reasons as _edje_anchor_mouse_in_cb.
+ */
 static void
 _edje_anchor_mouse_out_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -1006,6 +1366,17 @@ _edje_anchor_mouse_out_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA
    ev->event_flags |= rp->mask_flags;
 }
 
+/**
+ * @brief Callback for the deletion of an item object (Evas_Object).
+ * @param data The Item_Obj data associated with the Evas_Object.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object being deleted (unused).
+ * @param event_info Event details (unused).
+ *
+ * This function cleans up the Item_Obj structure when its corresponding
+ * Evas_Object is deleted. It removes the Item_Obj from the entry's list
+ * and frees its memory.
+ */
 static void
 _item_obj_del_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -1027,6 +1398,22 @@ _item_obj_del_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, 
    free(io);
 }
 
+/**
+ * @brief Gets or creates an Evas_Object for an item anchor.
+ * @param an The item anchor.
+ * @param o The main textblock object of the entry.
+ * @param smart The smart object parent for the new item object.
+ * @param clip The clip object for the new item object.
+ * @return The Evas_Object for the item, or NULL on failure.
+ *
+ * This function first checks if an Item_Obj already exists for the given
+ * anchor (it might have been detached if the anchor was temporarily
+ * out of view). If not, or if no matching Item_Obj is found, it calls the
+ * Edje's item_provider function to create a new Evas_Object.
+ * The new or retrieved object is configured (parent, clip, event callbacks)
+ * and associated with an Item_Obj structure, which is added to the entry's
+ * list of item objects.
+ */
 static Evas_Object *
 _item_obj_get(Anchor *an, Evas_Object *o, Evas_Object *smart, Evas_Object *clip)
 {
@@ -1069,6 +1456,14 @@ _item_obj_get(Anchor *an, Evas_Object *o, Evas_Object *smart, Evas_Object *clip)
    return io->obj;
 }
 
+/**
+ * @brief Frees item objects that are no longer associated with any visible anchor.
+ * @param en The entry data.
+ *
+ * Iterates through the entry's item_objs list. If an Item_Obj has its
+ * `an` (anchor) field set to NULL (meaning its anchor is no longer active
+ * or visible), its Evas_Object is deleted, and the Item_Obj struct is freed.
+ */
 static void
 _unused_item_objs_free(Entry *en)
 {
@@ -1093,6 +1488,15 @@ _unused_item_objs_free(Entry *en)
      }
 }
 
+/**
+ * @brief Checks if an anchor is completely outside the viewport on one axis.
+ * @param oxy Origin of the textblock object (x or y).
+ * @param axy Anchor's relative coordinate within the textblock (x or y).
+ * @param awh Anchor's size (width or height).
+ * @param vxy Viewport's origin (x or y).
+ * @param vwh Viewport's end coordinate (origin + size, x or y).
+ * @return EINA_TRUE if the anchor is outside the viewport, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _is_anchors_outside_viewport(Evas_Coord oxy, Evas_Coord axy, Evas_Coord awh,
                                                  Evas_Coord vxy, Evas_Coord vwh)
@@ -1105,6 +1509,20 @@ _is_anchors_outside_viewport(Evas_Coord oxy, Evas_Coord axy, Evas_Coord awh,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Updates the visual representation (geometry and visibility) of all anchors.
+ * @param c The main cursor (unused, but implies context).
+ * @param o The textblock object.
+ * @param en The entry data.
+ *
+ * This function iterates through all anchors (both item and link types).
+ * For item anchors, it gets/creates their Evas_Object and sets its geometry.
+ * For link anchors, it calculates their geometry (which can be multiple
+ * rectangles for multi-line links) and creates/updates Evas_Objects
+ * (background, foreground, and an invisible event catcher rectangle)
+ * for each part of the link.
+ * Anchors outside the current viewport are hidden to optimize rendering.
+ */
 static void
 _anchors_update(Evas_Textblock_Cursor *c EINA_UNUSED, Evas_Object *o, Entry *en)
 {
@@ -1321,6 +1739,18 @@ _anchors_update(Evas_Textblock_Cursor *c EINA_UNUSED, Evas_Object *o, Entry *en)
    _unused_item_objs_free(en);
 }
 
+/**
+ * @brief Checks if the entry part is outside the viewport and updates anchors accordingly.
+ * @param ed The Edje object.
+ * @param rp The real part associated with the entry.
+ *
+ * This function determines if the entire entry part is outside the viewport.
+ * If so, it sets `en->anchors_updated` to EINA_TRUE to potentially skip
+ * detailed anchor updates in `_anchors_update`. It then calls `_anchors_update`
+ * regardless, and finally sets `en->anchors_updated` based on the viewport check.
+ * The logic seems to ensure `_anchors_update` is called but allows it to optimize
+ * if `en->anchors_updated` was true at its start.
+ */
 static void
 _anchors_update_check(Edje *ed, Edje_Real_Part *rp)
 {
@@ -1345,6 +1775,15 @@ _anchors_update_check(Edje *ed, Edje_Real_Part *rp)
    en->anchors_updated = anchors_updated;
 }
 
+/**
+ * @brief Forces an update of anchors, preserving the original `anchors_updated` state.
+ * @param rp The real part associated with the entry.
+ *
+ * This is typically called when an immediate anchor update is needed,
+ * for example, when querying anchor geometry. It temporarily sets
+ * `en->anchors_updated` to EINA_FALSE to ensure `_anchors_update`
+ * performs a full update, then restores the original state.
+ */
 static void
 _anchors_need_update(Edje_Real_Part *rp)
 {
@@ -1358,6 +1797,18 @@ _anchors_need_update(Edje_Real_Part *rp)
    en->anchors_updated = anchors_updated;
 }
 
+/**
+ * @brief Clears all anchor data, including visual elements and internal lists.
+ * @param c The main cursor (unused).
+ * @param o The textblock object (unused).
+ * @param en The entry data.
+ *
+ * This function iterates through all anchors, frees their associated Sel objects
+ * (visual rectangles), cursors, and names. It also clears the cached
+ * anchorlist and itemlist. For item objects, it detaches them from their
+ * anchors (sets `io->an = NULL`) so they can be cleaned up by
+ * `_unused_item_objs_free` if necessary.
+ */
 static void
 _anchors_clear(Evas_Textblock_Cursor *c EINA_UNUSED, Evas_Object *o EINA_UNUSED, Entry *en)
 {
@@ -1400,6 +1851,20 @@ _anchors_clear(Evas_Textblock_Cursor *c EINA_UNUSED, Evas_Object *o EINA_UNUSED,
 /* FIXME: This is horrible. It's just a copy&paste (with some adjustments)
  * from textblock. I didn't want to introduce any non-API links between the
  * libs so I just copied it. Should have been handled differently. */
+/* FIXME: This is horrible. It's just a copy&paste (with some adjustments)
+ * from textblock. I didn't want to introduce any non-API links between the
+ * libs so I just copied it. Should have been handled differently. */
+/**
+ * @brief Parses an anchor format string (e.g., "href='value'" or "href=value").
+ * @param item The format string part (e.g., "href='foo'").
+ * @return A newly allocated string containing the parsed value (e.g., "foo"),
+ *         or NULL on failure or if no value is found. The caller must free
+ *         the returned string.
+ *
+ * This function extracts the value part of a key-value pair from a format string,
+ * handling optional single quotes and escaped characters.
+ * It's a utility function used for parsing anchor attributes like 'href'.
+ */
 static char *
 _anchor_format_parse(const char *item)
 {
@@ -1446,6 +1911,18 @@ _anchor_format_parse(const char *item)
    return tmp;
 }
 
+/**
+ * @brief Scans the textblock for 'a' (link) and 'item' format nodes and populates the entry's anchor list.
+ * @param c The main cursor (used for context, cleared anchors are relative to it).
+ * @param o The textblock object.
+ * @param en The entry data.
+ *
+ * This function first clears any existing anchors using `_anchors_clear`.
+ * It then retrieves lists of all "a" (hyperlink) and "item" format nodes
+ * from the textblock. For each node, it creates an Anchor struct, parses
+ * the 'href' attribute for the anchor's name, and sets up start and end
+ * cursors for the anchor's range.
+ */
 static void
 _anchors_get(Evas_Textblock_Cursor *c, Evas_Object *o, Entry *en)
 {
@@ -1542,6 +2019,15 @@ _anchors_get(Evas_Textblock_Cursor *c, Evas_Object *o, Entry *en)
      }
 }
 
+/**
+ * @brief Frees an Edje_Entry_Change_Info structure.
+ * @param _info Pointer to the Edje_Entry_Change_Info structure to free.
+ *
+ * This function is used as a callback for _edje_emit_full to clean up
+ * change information after it has been processed by signal handlers.
+ * It correctly frees the content stringshare based on whether it was
+ * an insert or delete operation.
+ */
 static void
 _free_entry_change_info(void *_info)
 {
@@ -1557,6 +2043,21 @@ _free_entry_change_info(void *_info)
    free(info);
 }
 
+/**
+ * @brief Deletes the currently selected range and emits change signals.
+ * @param ed The Edje object.
+ * @param c The main cursor (unused).
+ * @param o The textblock object (unused).
+ * @param en The entry data.
+ *
+ * If there is a selection (en->sel_start and en->sel_end define a non-empty range),
+ * this function:
+ * 1. Creates an Edje_Entry_Change_Info struct detailing the deletion.
+ * 2. Gets the markup text of the range to be deleted.
+ * 3. Deletes the range from the textblock.
+ * 4. Emits "entry,changed" and "entry,changed,user" (with the change info) signals.
+ * 5. Clears the selection.
+ */
 static void
 _range_del_emit(Edje *ed, Evas_Textblock_Cursor *c EINA_UNUSED, Evas_Object *o EINA_UNUSED, Entry *en)
 {
@@ -1597,6 +2098,29 @@ noop:
 //   _sel_clear(ed, en->cursor, en->rp->object, en);
 //}
 
+//_range_del(Evas_Textblock_Cursor *c EINA_UNUSED, Evas_Object *o EINA_UNUSED, Entry *en)
+//{
+//   evas_textblock_cursor_range_delete(en->sel_start, en->sel_end);
+//   _sel_clear(ed, en->cursor, en->rp->object, en);
+//}
+
+/**
+ * @brief Deletes a character or cluster at the cursor and emits change signals.
+ * @param ed The Edje object.
+ * @param c The cursor at which to delete.
+ * @param en The entry data.
+ * @param pos The original cursor position before any movement (used for change info).
+ * @param backspace EINA_TRUE if deleting backwards (like backspace key),
+ *                  EINA_FALSE if deleting forwards (like delete key).
+ *
+ * This function handles character/cluster deletion. It:
+ * 1. Moves the cursor appropriately (char_prev for backspace, char_next then prev for delete).
+ * 2. Creates an Edje_Entry_Change_Info struct.
+ * 3. Determines the range to delete (single char or whole cluster).
+ * 4. Gets the markup of the text to be deleted.
+ * 5. Deletes the range.
+ * 6. Emits "entry,changed" and "entry,changed,user" signals.
+ */
 static void
 _delete_emit(Edje *ed, Evas_Textblock_Cursor *c, Entry *en, size_t pos,
              Eina_Bool backspace)
@@ -1681,6 +2205,17 @@ _delete_emit(Edje *ed, Evas_Textblock_Cursor *c, Entry *en, size_t pos,
                    info, _free_entry_change_info);
 }
 
+/**
+ * @brief Hides any temporarily visible password characters.
+ * @param ed The Edje object.
+ * @param rp The real part of the password entry.
+ * @return EINA_TRUE if any password characters were hidden, EINA_FALSE otherwise.
+ *
+ * This function searches for text formatted with "+ password=off" (which makes
+ * password characters temporarily visible) and removes this formatting,
+ * effectively reverting them to the standard password replacement character.
+ * It's used for the "show last typed character" feature in password fields.
+ */
 Eina_Bool
 _edje_entry_hide_visible_password(Edje *ed, Edje_Real_Part *rp)
 {
@@ -1707,6 +2242,11 @@ _edje_entry_hide_visible_password(Edje *ed, Edje_Real_Part *rp)
    return int_ret;
 }
 
+/**
+ * @brief Timer callback to hide the last typed password character after a delay.
+ * @param data The Entry data for the password field.
+ * @return ECORE_CALLBACK_CANCEL to stop the timer.
+ */
 static Eina_Bool
 _password_timer_cb(void *data)
 {
@@ -1716,6 +2256,11 @@ _password_timer_cb(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Checks if a key name is a modifier key.
+ * @param key The key name string (e.g., "Shift_L", "Control_R", "Alt_L").
+ * @return EINA_TRUE if the key is a known modifier, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _is_modifier(const char *key)
 {
@@ -1732,6 +2277,13 @@ _is_modifier(const char *key)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Resets the compose sequence state.
+ * @param en The entry data.
+ *
+ * Clears the list of keys in the current compose sequence (en->seq)
+ * and sets en->composing to EINA_FALSE.
+ */
 static void
 _compose_seq_reset(Entry *en)
 {
@@ -1742,6 +2294,27 @@ _compose_seq_reset(Entry *en)
    en->composing = EINA_FALSE;
 }
 
+/**
+ * @brief Callback for key down events on the Edje object.
+ * @param data The Edje object.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas object that received the event (unused, should be ed->obj).
+ * @param event_info The Evas_Event_Key_Down details.
+ *
+ * This is the primary handler for keyboard input in Edje entries.
+ * It performs several actions:
+ * - Emits "entry,keydown" signal.
+ * - Filters the event through the IMF context if available and not composing.
+ * - Handles various key presses for navigation (arrows, home, end, pgup, pgdn),
+ *   deletion (backspace, delete), selection (shift + navigation),
+ *   clipboard operations (Ctrl+C/V/X/A), undo/redo (Ctrl+Z/Y),
+ *   special characters (Return, Tab), and text composition.
+ * - Updates cursor position, selection, and emits relevant signals
+ *   ("entry,changed", "cursor,changed", "entry,changed,user", etc.).
+ * - Manages password visibility timer for password fields.
+ * - Updates IMF cursor information.
+ * - Triggers a reconfigure of the entry part.
+ */
 static void
 _edje_key_down_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -2421,6 +2994,17 @@ end:
    _edje_entry_real_part_configure(ed, rp);
 }
 
+/**
+ * @brief Callback for key up events on the Edje object.
+ * @param data The Edje object.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas object that received the event (unused).
+ * @param event_info The Evas_Event_Key_Up details.
+ *
+ * Handles key up events, primarily for IMF integration.
+ * - Emits "entry,keyup" signal.
+ * - Filters the event through the IMF context if available.
+ */
 static void
 _edje_key_up_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -2457,6 +3041,22 @@ _edje_key_up_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, v
 #endif
 }
 
+/**
+ * @brief Sets the main cursor position based on canvas coordinates.
+ * @param rp The real part of the entry.
+ * @param canvasx The canvas x-coordinate.
+ * @param canvasy The canvas y-coordinate.
+ * @param[out] cx The calculated x-coordinate relative to the textblock object.
+ * @param[out] cy The calculated y-coordinate relative to the textblock object.
+ * @return A new cursor positioned at the original location of en->cursor before modification.
+ *         The caller is responsible for freeing this returned cursor.
+ *
+ * This function converts canvas coordinates to textblock-local coordinates
+ * and then uses evas_textblock_cursor_cluster_coord_set() to position
+ * the entry's main cursor (en->cursor). It includes logic to handle
+ * clicks slightly outside the textblock's vertical bounds by snapping
+ * to the nearest valid line.
+ */
 static Evas_Textblock_Cursor *
 _edje_cursor_cluster_coord_set(Edje_Real_Part *rp, Evas_Coord canvasx, Evas_Coord canvasy, Evas_Coord *cx, Evas_Coord *cy)
 {
@@ -2495,6 +3095,15 @@ _edje_cursor_cluster_coord_set(Edje_Real_Part *rp, Evas_Coord canvasx, Evas_Coor
    return tc;
 }
 
+/**
+ * @brief Callback for EVAS_CALLBACK_MOVE on the entry's textblock object.
+ * @param data The Edje_Real_Part.
+ * @param e The Evas canvas (unused).
+ * @param obj The textblock object (unused).
+ * @param event_info Event details (unused).
+ *
+ * When the textblock object itself moves, this updates the IMF cursor location.
+ */
 static void
 _edje_part_move_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -2508,6 +3117,23 @@ _edje_part_move_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED
    _edje_entry_imf_cursor_location_set(en);
 }
 
+/**
+ * @brief Callback for mouse down events on the entry's textblock object.
+ * @param data The Edje_Real_Part.
+ * @param e The Evas canvas (unused).
+ * @param obj The textblock object (unused).
+ * @param event_info The Evas_Event_Mouse_Down details.
+ *
+ * Handles mouse down events for positioning the cursor and initiating selection.
+ * - Filters event through IMF if context exists.
+ * - Resets IMF context.
+ * - Handles single, double, and triple clicks for word/line selection.
+ * - Manages selection start/extend logic based on Shift key and current selection state.
+ * - For explicit selection mode, allows modifying selection start/end if clicking near them.
+ * - Emits "cursor,changed" and "cursor,changed,manual" signals.
+ * - Triggers paste request on button 2 click.
+ * - Reconfigures the entry part.
+ */
 static void
 _edje_part_mouse_down_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -2692,6 +3318,23 @@ end:
      }
 }
 
+/**
+ * @brief Callback for mouse up events on the entry's textblock object.
+ * @param data The Edje_Real_Part.
+ * @param e The Evas canvas (unused).
+ * @param obj The textblock object (unused).
+ * @param event_info The Evas_Event_Mouse_Up details.
+ *
+ * Handles mouse up events, primarily to finalize selection.
+ * - Filters event through IMF if context exists.
+ * - Updates cursor position based on mouse up location.
+ * - Finalizes selection extension (copies current cursor to sel_end or sel_start
+ *   depending on selection mode and previous state).
+ * - Sets `en->had_sel` if a selection was made.
+ * - Emits "cursor,changed" and "cursor,changed,manual" signals if cursor moved.
+ * - Updates IMF cursor info.
+ * - Reconfigures the entry part.
+ */
 static void
 _edje_part_mouse_up_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -2769,6 +3412,22 @@ _edje_part_mouse_up_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UN
    _edje_entry_real_part_configure(en->ed, rp);
 }
 
+/**
+ * @brief Callback for mouse move events on the entry's textblock object.
+ * @param data The Edje_Real_Part.
+ * @param e The Evas canvas (unused).
+ * @param obj The textblock object (unused).
+ * @param event_info The Evas_Event_Mouse_Move details.
+ *
+ * Handles mouse move events, primarily for extending selection when dragging.
+ * - Filters event through IMF if context exists.
+ * - If `en->selecting` is true (mouse button is down):
+ *   - Updates cursor position based on mouse move location.
+ *   - Extends the selection (updates sel_end or sel_start).
+ *   - Enables selection and updates visual representation if a selection range exists.
+ *   - Emits "cursor,changed" and "cursor,changed,manual" signals if cursor moved.
+ *   - Reconfigures the entry part.
+ */
 static void
 _edje_part_mouse_move_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -2866,6 +3525,15 @@ _edje_part_mouse_move_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_
      }
 }
 
+/**
+ * @brief Callback for Evas canvas viewport resize events.
+ * @param data The Edje_Real_Part associated with an entry.
+ * @param e The Evas canvas (unused).
+ * @param event_info Event details (unused).
+ *
+ * When the canvas viewport resizes, anchors might need to be re-evaluated
+ * for visibility and positioning. This triggers an anchor update.
+ */
 static void
 _canvas_viewport_resize_cb(void *data, Evas *e EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -2883,6 +3551,14 @@ _canvas_viewport_resize_cb(void *data, Evas *e EINA_UNUSED, void *event_info EIN
    _anchors_need_update(rp);
 }
 
+/**
+ * @brief EFL event callback for scene focus in on the Evas canvas.
+ * @param data The Edje object.
+ * @param event The EFL focus event information.
+ *
+ * If the Edje object itself is the one gaining scene focus,
+ * this calls `_edje_focus_in` to propagate the focus event internally.
+ */
 static void
 _evas_focus_in_cb(void *data, const Efl_Event *event)
 {
@@ -2900,6 +3576,14 @@ _evas_focus_in_cb(void *data, const Efl_Event *event)
      }
 }
 
+/**
+ * @brief EFL event callback for scene focus out on the Evas canvas.
+ * @param data The Edje object.
+ * @param event The EFL focus event information.
+ *
+ * If the Edje object itself is the one losing scene focus,
+ * this calls `_edje_focus_out` to propagate the focus event internally.
+ */
 static void
 _evas_focus_out_cb(void *data, const Efl_Event *event)
 {

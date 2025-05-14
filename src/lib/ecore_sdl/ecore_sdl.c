@@ -12,24 +12,37 @@
 #include "Ecore_Sdl_Keys.h"
 #include "ecore_sdl_private.h"
 
-int _ecore_sdl_log_dom = -1;
+int _ecore_sdl_log_dom = -1; /**< Log domain for Ecore SDL messages. */
 
+/**
+ * @brief Structure to keep track of pressed keys for repeat event generation.
+ * This structure is used in an Eina_Rbtree to efficiently store and retrieve
+ * currently pressed keys.
+ */
 typedef struct _Ecore_SDL_Pressed Ecore_SDL_Pressed;
 struct _Ecore_SDL_Pressed
 {
-   EINA_RBTREE;
+   EINA_RBTREE; /**< Macro to make this struct usable with Eina_Rbtree. */
 
-   SDL_Keycode key;
+   SDL_Keycode key; /**< The SDL keycode of the pressed key. */
 };
 
-EAPI int ECORE_SDL_EVENT_GOT_FOCUS = 0;
-EAPI int ECORE_SDL_EVENT_LOST_FOCUS = 0;
-EAPI int ECORE_SDL_EVENT_RESIZE = 0;
-EAPI int ECORE_SDL_EVENT_EXPOSE = 0;
+EAPI int ECORE_SDL_EVENT_GOT_FOCUS = 0; /**< Ecore event type for window focus gain. */
+EAPI int ECORE_SDL_EVENT_LOST_FOCUS = 0; /**< Ecore event type for window focus loss. */
+EAPI int ECORE_SDL_EVENT_RESIZE = 0; /**< Ecore event type for window resize. */
+EAPI int ECORE_SDL_EVENT_EXPOSE = 0; /**< Ecore event type for window expose/redraw. */
 
-static int _ecore_sdl_init_count = 0;
-static Eina_Rbtree *repeat = NULL;
+static int _ecore_sdl_init_count = 0; /**< Counter for ecore_sdl_init() calls. */
+static Eina_Rbtree *repeat = NULL; /**< Rbtree to store currently pressed keys for repeat handling. */
 
+/**
+ * @brief Comparison function for Eina_Rbtree storing Ecore_SDL_Pressed structures.
+ * Compares two Ecore_SDL_Pressed nodes based on their SDL_Keycode.
+ * @param left The left node for comparison.
+ * @param right The right node for comparison.
+ * @param data User data (unused).
+ * @return EINA_RBTREE_LEFT if left->key < right->key, EINA_RBTREE_RIGHT otherwise.
+ */
 static Eina_Rbtree_Direction
 _ecore_sdl_pressed_key(const Ecore_SDL_Pressed *left,
                        const Ecore_SDL_Pressed *right,
@@ -38,6 +51,15 @@ _ecore_sdl_pressed_key(const Ecore_SDL_Pressed *left,
    return left->key < right->key ? EINA_RBTREE_LEFT : EINA_RBTREE_RIGHT;
 }
 
+/**
+ * @brief Key comparison function for Eina_Rbtree storing Ecore_SDL_Pressed structures.
+ * Compares an Ecore_SDL_Pressed node with a given SDL_Keycode.
+ * @param node The Ecore_SDL_Pressed node.
+ * @param key The SDL_Keycode to compare against.
+ * @param length Length of the key (unused).
+ * @param data User data (unused).
+ * @return The difference between node->key and *key. 0 if equal.
+ */
 static int
 _ecore_sdl_pressed_node(const Ecore_SDL_Pressed *node,
                         const SDL_Keycode *key,
@@ -111,6 +133,16 @@ ecore_sdl_shutdown(void)
    return _ecore_sdl_init_count;
 }
 
+/**
+ * @brief Converts SDL modifier key states to Ecore_Event_Modifier flags.
+ * @param mod The SDL_Keymod value representing current modifier states.
+ * @return An unsigned int bitmask of Ecore_Event_Modifier flags.
+ * @see ECORE_EVENT_MODIFIER_SHIFT
+ * @see ECORE_EVENT_MODIFIER_CTRL
+ * @see ECORE_EVENT_MODIFIER_ALT
+ * @see ECORE_EVENT_LOCK_NUM
+ * @see ECORE_EVENT_LOCK_CAPS
+ */
 static unsigned int
 _ecore_sdl_event_modifiers(int mod)
 {
@@ -128,6 +160,17 @@ _ecore_sdl_event_modifiers(int mod)
    return modifiers;
 }
 
+/**
+ * @brief Creates an Ecore_Event_Key from an SDL_KeyboardEvent.
+ * This function allocates and populates an Ecore_Event_Key structure
+ * based on the provided SDL key event. It maps SDL keycodes and symbols
+ * to Ecore key names and compose strings using the `keystable`.
+ * @param event Pointer to the SDL_Event (specifically, an SDL_KeyboardEvent).
+ * @param timestamp The timestamp for the event.
+ * @return A pointer to a newly allocated Ecore_Event_Key structure, or NULL on failure
+ *         or if the key is not found in the `keystable`. The caller is responsible
+ *         for freeing the returned structure.
+ */
 static Ecore_Event_Key*
 _ecore_sdl_event_key(SDL_Event *event, double timestamp)
 {

@@ -1,4 +1,11 @@
-/* CPP main program, using CPP Library.
+/**
+ * @file cppmain.c
+ * @brief CPP main program, using CPP Library.
+ *
+ * This program serves as a command-line interface to the C Preprocessor (CPP)
+ * library. It handles parsing command-line options, setting up the input
+ * and output files, and then invoking the CPP library to process the input.
+ *
  * Copyright (C) 1995 Free Software Foundation, Inc.
  * Written by Per Bothner, 1994-95.
  * Copyright (C) 2003-2011 Kim Woelders
@@ -32,9 +39,24 @@
 
 #define EPP_DEBUG 0
 
+/** @brief The main CPP reader structure, holding the state of the preprocessor. */
 cpp_reader          parse_in;
+/** @brief Structure holding the command-line options for the preprocessor. */
 cpp_options         options;
 
+/**
+ * @brief Main entry point for the CPP program.
+ *
+ * Initializes the CPP library, parses command-line arguments,
+ * sets up input and output, and processes the input file token by token.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv An array of strings representing the command-line arguments.
+ *             For a command like `cppmain -o output.c input.c`, `argc` would be 4 and
+ *             `argv` would be: `{"cppmain", "-o", "output.c", "input.c"}`.
+ * @return int Returns `SUCCESS_EXIT_CODE` (0) on successful completion,
+ *             `FATAL_EXIT_CODE` (typically non-zero) on error.
+ */
 int
 main(int argc, char **argv)
 {
@@ -47,6 +69,14 @@ main(int argc, char **argv)
    int                 got_text = 0;
 #endif
 
+   /**
+    * @brief Extracts program name from argv[0].
+    *
+    * This part of the code isolates the program's name from its full path
+    * in `argv[0]`. It does so by scanning backwards from the end of the string
+    * for a directory separator ('/' or '\\' on EMX). The result is stored in
+    * the global `progname` variable.
+    */
    p = argv[0] + strlen(argv[0]);
 #ifndef __EMX__
    while (p != argv[0] && p[-1] != '/')
@@ -71,12 +101,18 @@ main(int argc, char **argv)
       return i;
 
    /* Now that we know the input file is valid, open the output.  */
-
+   /* Default to stdout if no output file is specified. */
    if (!opts->out_fname || !strcmp(opts->out_fname, ""))
       opts->out_fname = "stdout";
    else if (!freopen(opts->out_fname, "wb", stdout))
       cpp_pfatal_with_name(&parse_in, opts->out_fname);
 
+   /**
+    * Main processing loop.
+    * Reads tokens from the input stream one by one using cpp_get_token()
+    * and processes them based on their kind.
+    * The loop continues until an CPP_EOF token is encountered or an error occurs.
+    */
    for (i = 0;; i++)
      {
 	kind = cpp_get_token(&parse_in);
@@ -86,16 +122,16 @@ main(int argc, char **argv)
 #endif
 	switch (kind)
 	  {
-	  case CPP_EOF:
+	  case CPP_EOF: /* End Of File token. */
 	     goto done;
 
-	  case CPP_HSPACE:
+	  case CPP_HSPACE: /* Horizontal whitespace. Skip and continue. */
 	     continue;
 
-	  case CPP_VSPACE:
+	  case CPP_VSPACE: /* Vertical whitespace. Output and continue. */
 	     break;
 
-	  default:
+	  default: /* For most tokens, just continue to the output stage. */
 	  case CPP_OTHER:
 	  case CPP_NAME:
 	  case CPP_NUMBER:
@@ -113,9 +149,9 @@ main(int argc, char **argv)
 #endif
 	     continue;
 
-	  case CPP_COMMENT:
-	  case CPP_DIRECTIVE:
-	  case CPP_POP:
+	  case CPP_COMMENT:   /* Comments are handled by the library; skip output here. */
+	  case CPP_DIRECTIVE: /* Directives are handled by the library; skip output here. */
+	  case CPP_POP:       /* Pop file/macro context; skip output here. */
 	     continue;
 	  }
 #if EPP_DEBUG
@@ -138,6 +174,7 @@ main(int argc, char **argv)
      }
 
  done:
+   /** Final cleanup of the CPP library state. */
    cpp_finish(&parse_in);
 
    if (parse_in.errors)

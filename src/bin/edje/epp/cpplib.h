@@ -37,19 +37,51 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 #define STATIC_BUFFERS
 
+/** @file cpplib.h
+ *  @brief Definitions for the C Preprocessor (CPP) library.
+ *
+ *  This file contains the primary data structures, enumerations, and
+ *  function prototypes used by the CPP library.
+ */
+
+/** @struct cpp_reader
+ *  @brief Main structure representing the state of the C preprocessor.
+ *
+ *  This structure holds all the necessary information for the preprocessing
+ *  of a C/C++ file, including input buffers, options, error state, and
+ *  macro definitions.
+ */
 typedef struct cpp_reader cpp_reader;
+
+/** @struct cpp_buffer
+ *  @brief Represents a single input buffer, typically a file or a macro expansion.
+ *
+ *  Buffers are stacked to handle #include directives and macro expansions.
+ *  Each buffer maintains its own read pointers, line/column information,
+ *  and associated filename.
+ */
 typedef struct cpp_buffer cpp_buffer;
+
+/** @struct cpp_options
+ *  @brief Holds the command-line options and other configuration for the preprocessor.
+ *
+ *  This includes settings for include paths, warning levels, language dialects,
+ *  and output generation.
+ */
 typedef struct cpp_options cpp_options;
 
+/** @enum cpp_token
+ *  @brief Enumeration of token types recognized by the preprocessor.
+ */
 enum cpp_token {
-   CPP_EOF = -1,
-   CPP_OTHER = 0,
-   CPP_COMMENT = 1,
-   CPP_HSPACE,
-   CPP_VSPACE,			/* newlines and #line directives */
-   CPP_NAME,
-   CPP_NUMBER,
-   CPP_CHAR,
+   CPP_EOF = -1,      /**< End of file or input stream. */
+   CPP_OTHER = 0,     /**< A character or sequence not forming a specific token type (e.g., operators like '+', ';'). */
+   CPP_COMMENT = 1,   /**< A C or C++ style comment. */
+   CPP_HSPACE,        /**< Horizontal whitespace (spaces, tabs). */
+   CPP_VSPACE,			/* newlines and #line directives */ /**< Vertical whitespace (newlines, or a #line directive which implies a newline). */
+   CPP_NAME,          /**< An identifier. */
+   CPP_NUMBER,        /**< A numeric literal. */
+   CPP_CHAR,          /**< A character constant (e.g., 'a'). */
    CPP_STRING,
    CPP_DIRECTIVE,
    CPP_LPAREN,			/* "(" */
@@ -60,43 +92,100 @@ enum cpp_token {
    CPP_SEMICOLON,		/* ";" */
    CPP_3DOTS,			/* "..." */
    /* POP_TOKEN is returned when we've popped a cpp_buffer. */
-   CPP_POP
+   CPP_POP /**< Indicates that a buffer (file or macro) has been fully processed and popped. */
 };
 
+/** @typedef parse_underflow_t
+ *  @brief Function pointer type for handling buffer underflow.
+ *  @param pfile The current preprocessor state.
+ *  @return The next token after handling the underflow (e.g., by loading more data or switching buffers).
+ */
 typedef enum cpp_token (*parse_underflow_t) (cpp_reader *);
+
+/** @typedef parse_cleanup_t
+ *  @brief Function pointer type for cleaning up a buffer when it's popped.
+ *  @param pbuf The buffer to be cleaned up.
+ *  @param pfile The current preprocessor state.
+ *  @return 0 on success, non-zero on failure.
+ */
 typedef int         (*parse_cleanup_t) (cpp_buffer *, cpp_reader *);
 
-/* A parse_marker indicates a previous position,
-   which we can backtrack to. */
-
+/** @struct parse_marker
+ *  @brief A structure to mark a position in a buffer for backtracking.
+ *
+ *  This is used, for example, when tentatively parsing macro arguments or
+ *  lookahead for directive names.
+ */
 struct parse_marker {
-   cpp_buffer         *buf;
-   struct parse_marker *next;
-   int                 position;
+   cpp_buffer         *buf;       /**< The buffer this marker refers to. */
+   struct parse_marker *next;    /**< Pointer to the next marker in a potential list. */
+   int                 position; /**< The character offset within the buffer. */
 };
 
+/**
+ * @brief Handles command-line options.
+ * @param pfile The preprocessor state.
+ * @param argc Argument count.
+ * @param argv Argument vector.
+ * @return Number of handled arguments.
+ */
 extern int          cpp_handle_options(cpp_reader * pfile, int, char **);
+
+/**
+ * @brief Gets the next token from the input stream.
+ * @param pfile The preprocessor state.
+ * @return The type of the token found.
+ */
 extern enum cpp_token cpp_get_token(cpp_reader * pfile);
+
+/**
+ * @brief Skips horizontal whitespace (spaces, tabs) and comments.
+ * @param pfile The preprocessor state.
+ */
 extern void         cpp_skip_hspace(cpp_reader * pfile);
 
 /* Maintain and search list of included files, for #import.  */
 
-#define IMPORT_HASH_SIZE 31
+#define IMPORT_HASH_SIZE 31 /**< Size of the hash table for imported files. */
 
+/** @struct import_file
+ *  @brief Structure to keep track of files included via #import.
+ *
+ *  This helps in avoiding redundant processing of the same file if #import is used.
+ *  It stores the filename, inode, and device number to uniquely identify a file.
+ */
 struct import_file {
-   char               *name;
-   ino_t               inode;
-   dev_t               dev;
-   struct import_file *next;
+   char               *name;    /**< The full path of the imported file. */
+   ino_t               inode;  /**< The inode number of the file. */
+   dev_t               dev;    /**< The device ID of the file system containing the file. */
+   struct import_file *next;   /**< Pointer to the next imported file in a hash chain. */
 };
 
 /* If we have a huge buffer, may need to cache more recent counts */
+/**
+ * @brief Macro to get the base pointer for line counting within a buffer.
+ * @param BUF The cpp_buffer.
+ * @return Pointer to the character in the buffer from which the current line number (BUF->lineno) is counted.
+ */
 #define CPP_LINE_BASE(BUF) ((BUF)->buf + (BUF)->line_base)
 
+/** @enum dump_type
+ *  @brief Enumeration for different macro dumping modes (e.g., -dM, -dN).
+ */
 enum dump_type {
-   dump_none = 0, dump_only, dump_names, dump_definitions
+   dump_none = 0,    /**< Do not dump macros. */
+   dump_only,        /**< Dump only macro definitions, inhibit normal output. */
+   dump_names,       /**< Dump macro names as they are defined. */
+   dump_definitions  /**< Dump full macro definitions as they are defined. */
 };
 
+/** @struct cpp_buffer
+ *  @brief Represents a single input buffer, typically a file or a macro expansion.
+ *
+ *  Buffers are stacked to handle #include directives and macro expansions.
+ *  Each buffer maintains its own read pointers, line/column information,
+ *  and associated filename.
+ */
 struct cpp_buffer {
    unsigned char      *buf;
    unsigned char      *cur;
@@ -137,22 +226,40 @@ struct cpp_buffer {
     * if not stringizing and needed to separate tokens; otherwise nothing.
     * "@@" means a normal '@'.
     * (An '@' inside a string stands for itself and is never an escape.) */
-   char                has_escapes;
+   char                has_escapes; /**< True if the buffer may contain special '@' escape sequences. */
 };
 
+/** @struct cpp_pending
+ *  @brief Structure to hold pending command-line actions like -D, -U, -A, -include.
+ *  These are processed in order after initial setup.
+ */
 struct cpp_pending;		/* Forward declaration - for C++. */
+
+/** @struct file_name_map_list
+ *  @brief Structure for file name mapping, used on systems with filename restrictions.
+ */
 struct file_name_map_list;
 
+/** @typedef ASSERTION_HASHNODE
+ *  @brief Typedef for the assertion hash node structure.
+ */
 typedef struct assertion_hashnode ASSERTION_HASHNODE;
 
-#define ASSERTION_HASHSIZE 37
+#define ASSERTION_HASHSIZE 37 /**< Size of the hash table for #assert directives. */
 
 #ifdef STATIC_BUFFERS
 /* Maximum nesting of cpp_buffers.  We use a static limit, partly for
    efficiency, and partly to limit runaway recursion.  */
-#define CPP_STACK_MAX 200
+#define CPP_STACK_MAX 200 /**< Maximum depth of buffer stack (includes/macro expansions). */
 #endif
 
+/** @struct cpp_reader
+ *  @brief Main structure representing the state of the C preprocessor.
+ *
+ *  This structure holds all the necessary information for the preprocessing
+ *  of a C/C++ file, including input buffers, options, error state, and
+ *  macro definitions.
+ */
 struct cpp_reader {
    unsigned char      *limit;
    parse_underflow_t   get_token;
@@ -241,54 +348,71 @@ struct cpp_reader {
    int                 deps_size;
 
    /* Number of bytes since the last newline.  */
-   int                 deps_column;
+   int                 deps_column; /**< Current column for dependency output, for line wrapping. */
 };
 
+/** Peeks at the current character in the buffer without advancing. */
 #define CPP_BUF_PEEK(BUFFER) \
   ((BUFFER)->cur < (BUFFER)->rlimit ? *(BUFFER)->cur : EOF)
+/** Gets the current character from the buffer and advances the read pointer. */
 #define CPP_BUF_GET(BUFFER) \
   ((BUFFER)->cur < (BUFFER)->rlimit ? *(BUFFER)->cur++ : EOF)
+/** Advances the read pointer in the buffer by N characters. */
 #define CPP_FORWARD(BUFFER, N) ((BUFFER)->cur += (N))
 
-/* Number of characters currently in PFILE's output buffer. */
+/** Calculates the number of characters currently written to PFILE's token_buffer. */
 #define CPP_WRITTEN(PFILE) ((PFILE)->limit - (PFILE)->token_buffer)
+/** Gets a pointer to the current write position in PFILE's token_buffer. */
 #define CPP_PWRITTEN(PFILE) ((PFILE)->limit)
 
-/* Make sure PFILE->token_buffer has space for at least N more characters. */
+/** Ensures PFILE->token_buffer has space for at least N more characters, growing it if necessary. */
 #define CPP_RESERVE(PFILE, N) \
   ((unsigned int)(CPP_WRITTEN (PFILE) + N) > (unsigned int) (PFILE)->token_buffer_size \
    && (cpp_grow_buffer (PFILE, N), 0))
 
-/* Append string STR (of length N) to PFILE's output buffer.
-   Assume there is enough space. */
+/** Appends string STR (of length N) to PFILE's output buffer, assuming there is enough space. */
 #define CPP_PUTS_Q(PFILE, STR, N) \
   do { memcpy ((PFILE)->limit, STR, (N)); (PFILE)->limit += (N); } while(0)
-/* Append string STR (of length N) to PFILE's output buffer.  Make space. */
+/** Appends string STR (of length N) to PFILE's output buffer, making space if needed. */
 #define CPP_PUTS(PFILE, STR, N) \
   do { CPP_RESERVE(PFILE, N); CPP_PUTS_Q(PFILE, STR,N); } while(0)
-/* Append character CH to PFILE's output buffer.  Assume sufficient space. */
+/** Appends character CH to PFILE's output buffer, assuming sufficient space. */
 #define CPP_PUTC_Q(PFILE, CH) (*(PFILE)->limit++ = (CH))
-/* Append character CH to PFILE's output buffer.  Make space if need be. */
+/** Appends character CH to PFILE's output buffer, making space if need be. */
 #define CPP_PUTC(PFILE, CH) \
   do { CPP_RESERVE (PFILE, 1); CPP_PUTC_Q (PFILE, CH); } while(0)
-/* Make sure PFILE->limit is followed by '\0'. */
+/** Ensures PFILE->limit is followed by '\0', assuming space. */
 #define CPP_NUL_TERMINATE_Q(PFILE) (*(PFILE)->limit = 0)
+/** Ensures PFILE->limit is followed by '\0', making space if needed. */
 #define CPP_NUL_TERMINATE(PFILE) \
   do { CPP_RESERVE(PFILE, 1); *(PFILE)->limit = 0; } while(0)
+/** Adjusts the write pointer in PFILE's token_buffer by DELTA. */
 #define CPP_ADJUST_WRITTEN(PFILE,DELTA) ((PFILE)->limit += (DELTA))
+/** Sets the write position in PFILE's token_buffer to an absolute offset N. */
 #define CPP_SET_WRITTEN(PFILE,N) ((PFILE)->limit = (PFILE)->token_buffer + (N))
 
+/** Accesses the cpp_options structure from a cpp_reader. */
 #define CPP_OPTIONS(PFILE) ((cpp_options*)(PFILE)->data)
+/** Accesses the current cpp_buffer from a cpp_reader. */
 #define CPP_BUFFER(PFILE) ((PFILE)->buffer)
 #ifdef STATIC_BUFFERS
+/** Accesses the previous (outer) cpp_buffer in the static stack. */
 #define CPP_PREV_BUFFER(BUFFER) ((BUFFER)+1)
+/** Represents the null or bottom buffer in the static stack. */
 #define CPP_NULL_BUFFER(PFILE) (&(PFILE)->buffer_stack[CPP_STACK_MAX])
 #else
+/** Accesses the previous (outer) cpp_buffer in the linked list. */
 #define CPP_PREV_BUFFER(BUFFER) ((BUFFER)->chain)
+/** Represents the null or bottom buffer in the linked list. */
 #define CPP_NULL_BUFFER(PFILE) ((cpp_buffer*)0)
 #endif
 
-/* Pointed to by parse_file::data. */
+/** @struct cpp_options
+ *  @brief Holds the command-line options and other configuration for the preprocessor.
+ *
+ *  This includes settings for include paths, warning levels, language dialects,
+ *  and output generation. It is typically accessed via `CPP_OPTIONS(pfile)`.
+ */
 struct cpp_options {
    const char         *in_fname;
 
@@ -474,15 +598,19 @@ struct cpp_options {
    char               *deps_target;
 
    /* Target file to write all include file */
-   const char         *watchfile;
+   const char         *watchfile; /**< If non-NULL, path to a file where all accessed include files are logged. */
 };
 
+/** Accesses the traditional mode flag from cpp_options. */
 #define CPP_TRADITIONAL(PFILE) (CPP_OPTIONS(PFILE)-> traditional)
+/** Accesses the pedantic mode flag from cpp_options. */
 #define CPP_PEDANTIC(PFILE) (CPP_OPTIONS (PFILE)->pedantic)
+/** Accesses the dependency printing flag from cpp_options. */
 #define CPP_PRINT_DEPS(PFILE) (CPP_OPTIONS (PFILE)->print_deps)
 
-/* Name under which this program was invoked.  */
-
+/** @var progname
+ *  @brief Name under which this program was invoked. Used in error messages.
+ */
 extern char        *progname;
 
 /* The structure of a node in the hash table.  The hash table
@@ -494,45 +622,55 @@ extern char        *progname;
 
 /* different flavors of hash nodes --- also used in keyword table */
 enum node_type {
-   T_DEFINE = 1,		/* the `#define' keyword */
-   T_INCLUDE,			/* the `#include' keyword */
-   T_INCLUDE_NEXT,		/* the `#include_next' keyword */
-   T_IMPORT,			/* the `#import' keyword */
-   T_IFDEF,			/* the `#ifdef' keyword */
-   T_IFNDEF,			/* the `#ifndef' keyword */
-   T_IF,			/* the `#if' keyword */
-   T_ELSE,			/* `#else' */
-   T_PRAGMA,			/* `#pragma' */
-   T_ELIF,			/* `#elif' */
-   T_UNDEF,			/* `#undef' */
-   T_LINE,			/* `#line' */
-   T_ERROR,			/* `#error' */
-   T_WARNING,			/* `#warning' */
-   T_ENDIF,			/* `#endif' */
-   T_SCCS,			/* `#sccs', used on system V.  */
-   T_IDENT,			/* `#ident', used on system V.  */
-   T_ASSERT,			/* `#assert', taken from system V.  */
-   T_UNASSERT,			/* `#unassert', taken from system V.  */
-   T_SPECLINE,			/* special symbol `__LINE__' */
-   T_DATE,			/* `__DATE__' */
-   T_FILE,			/* `__FILE__' */
-   T_BASE_FILE,			/* `__BASE_FILE__' */
-   T_INCLUDE_LEVEL,		/* `__INCLUDE_LEVEL__' */
-   T_VERSION,			/* `__VERSION__' */
-   T_SIZE_TYPE,			/* `__SIZE_TYPE__' */
-   T_PTRDIFF_TYPE,		/* `__PTRDIFF_TYPE__' */
-   T_WCHAR_TYPE,		/* `__WCHAR_TYPE__' */
-   T_USER_LABEL_PREFIX_TYPE,	/* `__USER_LABEL_PREFIX__' */
-   T_REGISTER_PREFIX_TYPE,	/* `__REGISTER_PREFIX__' */
-   T_TIME,			/* `__TIME__' */
-   T_CONST,			/* Constant value, used by `__STDC__' */
-   T_MACRO,			/* macro defined by `#define' */
-   T_DISABLED,			/* macro temporarily turned off for rescan */
-   T_SPEC_DEFINED,		/* special `defined' macro for use in #if statements */
-   T_PCSTRING,			/* precompiled string (hashval is KEYDEF *) */
-   T_UNUSED			/* Used for something not defined.  */
+   T_DEFINE = 1,		/* the `#define' keyword */ /**< Represents the `#define` directive. */
+   T_INCLUDE,			/* the `#include' keyword */ /**< Represents the `#include` directive. */
+   T_INCLUDE_NEXT,		/* the `#include_next' keyword */ /**< Represents the `#include_next` directive. */
+   T_IMPORT,			/* the `#import' keyword */ /**< Represents the `#import` directive (Objective-C). */
+   T_IFDEF,			/* the `#ifdef' keyword */ /**< Represents the `#ifdef` directive. */
+   T_IFNDEF,			/* the `#ifndef' keyword */ /**< Represents the `#ifndef` directive. */
+   T_IF,			/* the `#if' keyword */ /**< Represents the `#if` directive. */
+   T_ELSE,			/* `#else' */ /**< Represents the `#else` directive. */
+   T_PRAGMA,			/* `#pragma' */ /**< Represents the `#pragma` directive. */
+   T_ELIF,			/* `#elif' */ /**< Represents the `#elif` directive. */
+   T_UNDEF,			/* `#undef' */ /**< Represents the `#undef` directive. */
+   T_LINE,			/* `#line' */ /**< Represents the `#line` directive. */
+   T_ERROR,			/* `#error' */ /**< Represents the `#error` directive. */
+   T_WARNING,			/* `#warning' */ /**< Represents the `#warning` directive. */
+   T_ENDIF,			/* `#endif' */ /**< Represents the `#endif` directive. */
+   T_SCCS,			/* `#sccs', used on system V.  */ /**< Represents the `#sccs` directive. */
+   T_IDENT,			/* `#ident', used on system V.  */ /**< Represents the `#ident` directive. */
+   T_ASSERT,			/* `#assert', taken from system V.  */ /**< Represents the `#assert` directive. */
+   T_UNASSERT,			/* `#unassert', taken from system V.  */ /**< Represents the `#unassert` directive. */
+   T_SPECLINE,			/* special symbol `__LINE__' */ /**< Internal type for the `__LINE__` predefined macro. */
+   T_DATE,			/* `__DATE__' */ /**< Internal type for the `__DATE__` predefined macro. */
+   T_FILE,			/* `__FILE__' */ /**< Internal type for the `__FILE__` predefined macro. */
+   T_BASE_FILE,			/* `__BASE_FILE__' */ /**< Internal type for the `__BASE_FILE__` predefined macro. */
+   T_INCLUDE_LEVEL,		/* `__INCLUDE_LEVEL__' */ /**< Internal type for the `__INCLUDE_LEVEL__` predefined macro. */
+   T_VERSION,			/* `__VERSION__' */ /**< Internal type for the `__VERSION__` predefined macro. */
+   T_SIZE_TYPE,			/* `__SIZE_TYPE__' */ /**< Internal type for the `__SIZE_TYPE__` predefined macro. */
+   T_PTRDIFF_TYPE,		/* `__PTRDIFF_TYPE__' */ /**< Internal type for the `__PTRDIFF_TYPE__` predefined macro. */
+   T_WCHAR_TYPE,		/* `__WCHAR_TYPE__' */ /**< Internal type for the `__WCHAR_TYPE__` predefined macro. */
+   T_USER_LABEL_PREFIX_TYPE,	/* `__USER_LABEL_PREFIX__' */ /**< Internal type for the `__USER_LABEL_PREFIX__` predefined macro. */
+   T_REGISTER_PREFIX_TYPE,	/* `__REGISTER_PREFIX__' */ /**< Internal type for the `__REGISTER_PREFIX__` predefined macro. */
+   T_TIME,			/* `__TIME__' */ /**< Internal type for the `__TIME__` predefined macro. */
+   T_CONST,			/* Constant value, used by `__STDC__' */ /**< Represents a predefined constant macro (e.g., `__STDC__`). */
+   T_MACRO,			/* macro defined by `#define' */ /**< Represents a user-defined macro. */
+   T_DISABLED,			/* macro temporarily turned off for rescan */ /**< A macro that is temporarily disabled during its own expansion to prevent recursion. */
+   T_SPEC_DEFINED,		/* special `defined' macro for use in #if statements */ /**< Internal type for the `defined` operator. */
+   T_PCSTRING,			/* precompiled string (hashval is KEYDEF *) */ /**< Represents a precompiled string, potentially from a precompiled header. */
+   T_UNUSED			/* Used for something not defined.  */ /**< Placeholder for unused or undefined node types. */
 };
 
+/** @struct definition
+ *  @brief Structure representing a macro definition.
+ *
+ *  For a simple replacement such as `#define foo bar`, `nargs` is -1,
+ *  the `pattern` list is null, and the `expansion` is just the replacement text.
+ *  `nargs = 0` means a function-like macro with no args, e.g., `#define getchar() getc(stdin)`.
+ *  When there are args, the `expansion` is the replacement text with the
+ *  args squashed out, and the `reflist` (`pattern`) describes how to
+ *  build the output from the input.
+ */
 /* Structure allocated for every #define.  For a simple replacement
    such as
    	#define foo bar ,
@@ -554,90 +692,269 @@ enum node_type {
      { (0, 1), (1, 1), (1, 1), ..., (1, 1), NULL }
    where (x, y) means (nchars, argno). */
 
+/** @struct reflist
+ *  @brief Node in a list describing how to substitute arguments into a macro expansion.
+ *
+ *  Each node specifies a segment of literal text from the macro definition,
+ *  followed by an argument substitution, or just a segment of literal text if it's the last part.
+ */
 typedef struct reflist reflist;
 struct reflist {
-   reflist            *next;
-   char                stringify;	/* nonzero if this arg was preceded by a
-					 * # operator. */
-   char                raw_before;	/* Nonzero if a ## operator before arg. */
-   char                raw_after;	/* Nonzero if a ## operator after arg. */
-   char                rest_args;	/* Nonzero if this arg. absorbs the rest */
-   int                 nchars;	/* Number of literal chars to copy before
-				 * this arg occurrence.  */
-   int                 argno;	/* Number of arg to substitute (origin-0) */
+   reflist            *next;        /**< Next item in the pattern list. */
+   char                stringify;  /**< Nonzero if this arg was preceded by a # operator (stringification). */
+   char                raw_before; /**< Nonzero if a ## operator (token pasting) appeared before this argument. */
+   char                raw_after;  /**< Nonzero if a ## operator (token pasting) appeared after this argument. */
+   char                rest_args;  /**< Nonzero if this argument absorbs the rest of the actual arguments (variadic). */
+   int                 nchars;     /**< Number of literal characters from the definition to copy before this argument occurrence. */
+   int                 argno;      /**< Index of the argument to substitute (0-based). */
 };
 
+/** @typedef DEFINITION
+ *  @brief Typedef for the macro definition structure.
+ */
 typedef struct definition DEFINITION;
+/** @struct definition
+ *  @brief Structure representing a macro definition.
+ */
 struct definition {
-   int                 nargs;
-   int                 length;	/* length of expansion string */
-   int                 predefined;	/* True if the macro was builtin or */
-   /* came from the command line */
-   unsigned char      *expansion;
-   int                 line;	/* Line number of definition */
-   const char         *file;	/* File of definition */
-   char                rest_args;	/* Nonzero if last arg. absorbs the rest */
-   reflist            *pattern;
+   int                 nargs;        /**< Number of arguments. -1 for object-like, 0 for func-like with no args. */
+   int                 length;       /**< Length of the `expansion` string. */
+   int                 predefined;   /**< True if the macro was builtin or from the command line. */
+   unsigned char      *expansion;    /**< The macro expansion text, with argument placeholders removed. */
+   int                 line;         /**< Line number where the macro was defined. */
+   const char         *file;        /**< File where the macro was defined. */
+   char                rest_args;    /**< Nonzero if the last argument is variadic (absorbs remaining actual arguments). */
+   reflist            *pattern;     /**< List describing how to substitute arguments. See struct reflist. */
    union {
-      /* Names of macro args, concatenated in reverse order
+      /** Names of macro arguments, concatenated in reverse order
        * with comma-space between them.
        * The only use of this is that we warn on redefinition
        * if this differs between the old and new definitions.  */
-      unsigned char      *argnames;
+      unsigned char      *argnames;  /**< Concatenated string of argument names, for redefinition checks. */
    } args;
 };
 
+/** @var is_idchar
+ *  @brief Lookup table: is_idchar[c] is true if character c can be part of an identifier (but not necessarily start one).
+ */
 extern unsigned char is_idchar[256];
 
-/* Stack of conditionals currently in progress
-   (including both successful and failing conditionals).  */
-
+/** @struct if_stack
+ *  @brief Structure for managing the stack of conditional compilation blocks (#if, #ifdef, etc.).
+ *
+ *  Each frame on this stack represents an active conditional block.
+ */
 struct if_stack {
-   struct if_stack    *next;	/* for chaining to the next stack frame */
-   const char         *fname;	/* copied from input when frame is made */
-   int                 lineno;	/* similarly */
-   int                 if_succeeded;	/* true if a leg of this if-group
-					 * has been passed through rescan */
-   unsigned char      *control_macro;	/* For #ifndef at start of file,
-					 * this is the macro name tested.  */
-   enum node_type      type;	/* type of last directive seen in this group */
+   struct if_stack    *next;	/**< Pointer to the next (enclosing) conditional stack frame. */
+   const char         *fname;	/**< Filename where the conditional directive was encountered. */
+   int                 lineno;	/**< Line number of the conditional directive. */
+   int                 if_succeeded;	/**< True if a branch of this if-group (e.g. #if, #elif) has already been processed. */
+   unsigned char      *control_macro;	/**< For `#ifndef` at the start of a file, this is the macro name tested (for include guards). */
+   enum node_type      type;	/**< Type of the last directive seen in this group (e.g., T_IF, T_ELSE). */
 };
+/** @typedef IF_STACK_FRAME
+ *  @brief Typedef for the conditional compilation stack frame structure.
+ */
 typedef struct if_stack IF_STACK_FRAME;
 
+/**
+ * @brief Get the current line and column number from a buffer.
+ * @param pbuf The buffer.
+ * @param linep Pointer to store the line number.
+ * @param colp Pointer to store the column number.
+ */
 extern void         cpp_buf_line_and_col(cpp_buffer *, long *, long *);
+
+/**
+ * @brief Find the cpp_buffer that corresponds to a file (not a macro expansion).
+ * @param pfile The preprocessor state.
+ * @return The file buffer, or NULL if not in any file (e.g., only macro expansions on stack).
+ */
 extern cpp_buffer  *cpp_file_buffer(cpp_reader *);
+
+/**
+ * @brief Defines a macro programmatically.
+ * @param pfile The preprocessor state.
+ * @param str The definition string, e.g., "MACRO=VALUE" or "MACRO".
+ *            If only "MACRO", it's defined as 1.
+ */
 extern void         cpp_define(cpp_reader *, unsigned char *);
 
+/**
+ * @brief Reports an error.
+ * @param pfile The preprocessor state.
+ * @param msg The error message format string.
+ * @param ... Arguments for the format string.
+ */
 extern void         cpp_error(cpp_reader * pfile, const char *msg, ...);
+
+/**
+ * @brief Reports a warning.
+ * @param pfile The preprocessor state.
+ * @param msg The warning message format string.
+ * @param ... Arguments for the format string.
+ */
 extern void         cpp_warning(cpp_reader * pfile, const char *msg, ...);
+
+/**
+ * @brief Reports a pedantic warning (or error if -pedantic-errors).
+ * @param pfile The preprocessor state.
+ * @param msg The message format string.
+ * @param ... Arguments for the format string.
+ */
 extern void         cpp_pedwarn(cpp_reader * pfile, const char *msg, ...);
+
+/**
+ * @brief Reports a fatal error and exits.
+ * @param msg The error message format string.
+ * @param ... Arguments for the format string.
+ */
 extern void         cpp_fatal(const char *msg, ...);
+
+/**
+ * @brief Formats a file:line:column string for an error/warning message.
+ * @param pfile The preprocessor state.
+ * @param filename The name of the file.
+ * @param line The line number.
+ * @param column The column number (-1 if not applicable).
+ */
 extern void         cpp_file_line_for_message(cpp_reader * pfile,
 					      const char *filename, int line,
 					      int column);
+/**
+ * @brief Reports an error related to a file operation, including errno.
+ * @param pfile The preprocessor state.
+ * @param name The name of the file or operation that failed.
+ */
 extern void         cpp_perror_with_name(cpp_reader * pfile, const char *name);
+
+/**
+ * @brief Reports a fatal error related to a file operation, including errno, and exits.
+ * @param pfile The preprocessor state.
+ * @param name The name of the file or operation that failed.
+ */
 extern void         cpp_pfatal_with_name(cpp_reader * pfile, const char *name);
+
+/**
+ * @brief Generic message reporting function.
+ * @param pfile The preprocessor state.
+ * @param is_error True if it's an error, false for a warning.
+ * @param msg The message format string.
+ * @param ... Arguments for the format string.
+ */
 extern void         cpp_message(cpp_reader * pfile, int is_error,
 				const char *msg, ...);
+/**
+ * @brief Generic message reporting function (va_list version).
+ * @param pfile The preprocessor state.
+ * @param is_error True if it's an error, false for a warning.
+ * @param msg The message format string.
+ * @param args va_list of arguments for the format string.
+ */
 extern void         cpp_message_v(cpp_reader * pfile, int is_error,
 				  const char *msg, va_list args);
 
+/**
+ * @brief Ensures the token buffer has enough capacity for more data.
+ *
+ * If the current token buffer cannot hold at least `n` more characters,
+ * it is reallocated to a larger size. The new size is typically double the
+ * old size plus the required extra space, to amortize the cost of reallocation.
+ *
+ * @param pfile The preprocessor state.
+ * @param n The minimum number of additional characters needed in the buffer.
+ */
 extern void         cpp_grow_buffer(cpp_reader * pfile, long n);
+
+/**
+ * @brief Parses an escape sequence within a string or character literal.
+ * @param pfile The preprocessor state.
+ * @param string_ptr Pointer to a pointer to the current character in the string.
+ *                   This will be advanced past the escape sequence.
+ * @return The value of the escape sequence, or -1 on error.
+ */
 extern int          cpp_parse_escape(cpp_reader * pfile, char **string_ptr);
 
+/**
+ * @brief Prints the chain of including files for context in error messages.
+ * @param pfile The preprocessor state.
+ */
 void                cpp_print_containing_files(cpp_reader * pfile);
+
+/**
+ * @brief Parses and evaluates a preprocessor constant expression (e.g., in #if).
+ * @param pfile The preprocessor state.
+ * @return The result of the expression.
+ */
 HOST_WIDE_INT       cpp_parse_expr(cpp_reader * pfile);
+
+/**
+ * @brief Skips the rest of the current line in the input buffer.
+ * @param pfile The preprocessor state.
+ */
 void                skip_rest_of_line(cpp_reader * pfile);
+
+/**
+ * @brief Initializes the cpp_reader structure for parsing a new file.
+ * @param pfile The preprocessor state to initialize.
+ */
 void                init_parse_file(cpp_reader * pfile);
+
+/**
+ * @brief Initializes the cpp_options structure to default values.
+ * @param opts The options structure to initialize.
+ */
 void                init_parse_options(struct cpp_options *opts);
+
+/**
+ * @brief Pushes a new file onto the input stack for processing.
+ * @param pfile The preprocessor state.
+ * @param fname The name of the file to push. If NULL or empty, reads from stdin.
+ * @return SUCCESS_EXIT_CODE or FATAL_EXIT_CODE.
+ */
 int                 push_parse_file(cpp_reader * pfile, const char *fname);
+
+/**
+ * @brief Finalizes preprocessing, e.g., writing out dependency files.
+ * @param pfile The preprocessor state.
+ */
 void                cpp_finish(cpp_reader * pfile);
+
+/**
+ * @brief Reads and checks an assertion in a #if #assertion construct.
+ * @param pfile The preprocessor state.
+ * @return 1 if the assertion holds, 0 otherwise.
+ */
 int                 cpp_read_check_assertion(cpp_reader * pfile);
 
+/**
+ * @brief Allocates memory, exiting on failure.
+ * @param size The number of bytes to allocate.
+ * @return Pointer to the allocated memory.
+ */
 void               *xmalloc(unsigned size);
+
+/**
+ * @brief Reallocates memory, exiting on failure.
+ * @param old Pointer to the previously allocated memory.
+ * @param size The new size in bytes.
+ * @return Pointer to the reallocated memory.
+ */
 void               *xrealloc(void *old, unsigned size);
+
+/**
+ * @brief Allocates and zero-initializes memory, exiting on failure.
+ * @param number The number of elements to allocate.
+ * @param size The size of each element in bytes.
+ * @return Pointer to the allocated and zeroed memory.
+ */
 void               *xcalloc(unsigned number, unsigned size);
 
+/**
+ * @brief Logs the usage of a file if a watchfile is specified.
+ * @param filename The name of the file being used.
+ * @param type A character indicating the type of usage (e.g., 'E' for #include).
+ */
 void                using_file(const char *filename, const char type);
 
 #ifdef __EMX__

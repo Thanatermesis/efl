@@ -14,6 +14,17 @@
 #include "Embryo.h"
 #include "embryo_private.h"
 
+/**
+ * @brief Macro to retrieve a string from Embryo data space.
+ * @param ep The Embryo_Program instance.
+ * @param str Pointer to a char* which will be allocated on the stack
+ *            and filled with the string data.
+ * @param par The Embryo_Cell containing the address of the string.
+ *
+ * This macro allocates memory on the stack using alloca() for the string.
+ * The caller does not need to free this memory.
+ * If the string cannot be retrieved, str will be set to NULL.
+ */
 #define STRGET(ep, str, par) {                                \
      Embryo_Cell *___cptr;                                    \
      str = NULL;                                              \
@@ -25,6 +36,16 @@
        } }
 /* exported time api */
 
+/**
+ * @brief Get the current time in seconds since midnight.
+ * @param ep The Embryo_Program instance (unused).
+ * @param params The Embryo_Cell parameters (unused).
+ * @return An Embryo_Cell containing the time as a float (seconds since midnight).
+ *
+ * This function calculates the number of seconds elapsed since the beginning
+ * of the current day (midnight).
+ * Example: If current time is 00:00:30.500, returns 30.5.
+ */
 static Embryo_Cell
 _embryo_time_seconds(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params EINA_UNUSED)
 {
@@ -39,6 +60,27 @@ _embryo_time_seconds(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params EINA_UN
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Get the current date and time components.
+ * @param ep The Embryo_Program instance.
+ * @param params An array of Embryo_Cell parameters.
+ *        params[0] must be (8 * sizeof(Embryo_Cell)).
+ *        params[1] to params[8] are pointers to Embryo_Cell where
+ *        the date/time components will be stored:
+ *        - params[1]: year (e.g., 2023)
+ *        - params[2]: month (1-12)
+ *        - params[3]: day of month (1-31)
+ *        - params[4]: day of year (0-365)
+ *        - params[5]: day of week (0=Monday, 1=Tuesday, ..., 6=Sunday)
+ *        - params[6]: hour (0-23)
+ *        - params[7]: minute (0-59)
+ *        - params[8]: second (float, 0.0-59.999999)
+ * @return 0 on success, or if parameter validation fails.
+ *
+ * This function populates the provided Embryo_Cell addresses with the
+ * current local date and time components. It calls tzset() periodically
+ * to ensure timezone information is up-to-date.
+ */
 static Embryo_Cell
 _embryo_time_date(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -85,6 +127,30 @@ _embryo_time_date(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
+/**
+ * @brief Get the date and time components for a specified timezone.
+ * @param ep The Embryo_Program instance.
+ * @param params An array of Embryo_Cell parameters.
+ *        params[0] must be (9 * sizeof(Embryo_Cell)).
+ *        params[1] is a pointer to an Embryo_Cell containing the timezone string
+ *                  (e.g., "America/New_York", "PST8PDT").
+ *        params[2] to params[9] are pointers to Embryo_Cell where
+ *        the date/time components will be stored:
+ *        - params[2]: year (e.g., 2023)
+ *        - params[3]: month (1-12)
+ *        - params[4]: day of month (1-31)
+ *        - params[5]: day of year (0-365)
+ *        - params[6]: day of week (0=Monday, 1=Tuesday, ..., 6=Sunday)
+ *        - params[7]: hour (0-23)
+ *        - params[8]: minute (0-59)
+ *        - params[9]: second (float, 0.0-59.999999)
+ * @return 0 on success, or if parameter validation fails.
+ *
+ * This function temporarily sets the TZ environment variable to the specified
+ * timezone, retrieves the local time, and then restores the original TZ setting.
+ * It populates the provided Embryo_Cell addresses with the date and time
+ * components for that timezone.
+ */
 static Embryo_Cell
 _embryo_time_tzdate(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -145,6 +211,15 @@ _embryo_time_tzdate(Embryo_Program *ep, Embryo_Cell *params)
 
 /* functions used by the rest of embryo */
 
+/**
+ * @brief Initializes the time-related native calls for an Embryo program.
+ * @param ep The Embryo_Program instance to register the functions with.
+ *
+ * This function registers the following native calls:
+ * - "seconds": maps to _embryo_time_seconds()
+ * - "date": maps to _embryo_time_date()
+ * - "tzdate": maps to _embryo_time_tzdate()
+ */
 void
 _embryo_time_init(Embryo_Program *ep)
 {

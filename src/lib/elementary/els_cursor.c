@@ -18,13 +18,21 @@
 
 #define _cursor_key "_elm_cursor"
 
+/**
+ * @struct _Cursor_Id
+ * @brief Maps a cursor name to its platform-specific identifiers.
+ *
+ * This structure is used to associate a string-based cursor name
+ * (e.g., "arrow") with its corresponding integer IDs for different
+ * windowing systems like X11, Cocoa, and Win32.
+ */
 struct _Cursor_Id
 {
-   const char *name;
+   const char *name; /**< The name of the cursor, e.g., ELM_CURSOR_ARROW. */
 
 #if defined(HAVE_ELEMENTARY_X) || defined(HAVE_ELEMENTARY_COCOA) || defined(HAVE_ELEMENTARY_WIN32)
-   int id; /* For X */
-   int cid; /* For Cocoa */
+   int id; /**< The cursor ID for X11 (from Ecore_X_Cursor.h) or Win32. */
+   int cid; /**< The cursor ID for Cocoa (from Ecore_Cocoa.h). */
 #endif
 };
 
@@ -43,6 +51,26 @@ struct _Cursor_Id
 #endif
 
 #if defined(HAVE_ELEMENTARY_X) || defined(HAVE_ELEMENTARY_COCOA) || defined(HAVE_ELEMENTARY_WIN32)
+/**
+ * @var _cursors
+ * @brief A static array of predefined cursors.
+ *
+ * This array holds the mappings between Elementary cursor names and their
+ * native counterparts in different windowing systems (X11, Cocoa, Win32).
+ * It is sorted alphabetically by cursor name to allow for efficient
+ * searching using `bsearch`.
+ *
+ * Each element is a `_Cursor_Id` struct. For example:
+ * @code
+ * CURSOR(ELM_CURSOR_ARROW, ARROW, ECORE_COCOA_CURSOR_ARROW)
+ * @endcode
+ * This expands to:
+ * @code
+ * { "arrow", ECORE_X_CURSOR_ARROW, ECORE_COCOA_CURSOR_ARROW }
+ * @endcode
+ * under the assumption that both X and Cocoa are available. If a platform is
+ * not available, its corresponding ID is set to a default value (e.g., -1).
+ */
 /* Please keep order in sync with Ecore_X_Cursor.h values! */
 static struct _Cursor_Id _cursors[] =
 {
@@ -146,51 +174,79 @@ static const int _cursors_count = sizeof(_cursors)/sizeof(struct _Cursor_Id);
     }                                                   \
   while (0)
 
+/**
+ * @struct _Elm_Cursor
+ * @brief Represents a cursor instance attached to an Evas object.
+ *
+ * This structure holds all the state for a cursor, including its visual
+ * representation, hotspot coordinates, and platform-specific handles for
+ * engine-based cursors.
+ */
 struct _Elm_Cursor
 {
-   Evas_Object *obj, *hotobj;
-   Evas_Object *eventarea, *owner;
-   const char *style, *cursor_name;
-   int hot_x, hot_y;
-   Ecore_Evas *ee;
-   Evas *evas;
-   Ecore_Job *hotupdate_job;
+   Evas_Object *obj, *hotobj; /**< Themed cursor object and its hotspot part. */
+   Evas_Object *eventarea, *owner; /**< The object that triggers the cursor and its owner widget. */
+   const char *style, *cursor_name; /**< The cursor style and name (e.g., "default", "arrow"). */
+   int hot_x, hot_y; /**< The (x, y) coordinates of the cursor's hotspot. */
+   Ecore_Evas *ee; /**< The Ecore_Evas instance. */
+   Evas *evas; /**< The Evas canvas. */
+   Ecore_Job *hotupdate_job; /**< Job for deferred hotspot updates. */
 #ifdef HAVE_ELEMENTARY_X
    struct {
-     Ecore_X_Cursor cursor;
-     Ecore_X_Window win;
+     Ecore_X_Cursor cursor; /**< The X11 cursor resource. */
+     Ecore_X_Window win; /**< The X11 window ID. */
    } x;
 #endif
 #ifdef HAVE_ELEMENTARY_WL2
    struct {
-     Ecore_Wl2_Window *win;
+     Ecore_Wl2_Window *win; /**< The Wayland window. */
    } wl;
 #endif
 #ifdef HAVE_ELEMENTARY_WIN32
    struct {
-     Ecore_Win32_Cursor *cursor;
-     Ecore_Win32_Window *win;
+     Ecore_Win32_Cursor *cursor; /**< The Win32 cursor handle. */
+     Ecore_Win32_Window *win; /**< The Win32 window handle. */
    } win32;
 #endif
 
 #ifdef HAVE_ELEMENTARY_COCOA
    struct {
-      Ecore_Cocoa_Cursor  cursor;
-      Ecore_Cocoa_Window *win;
+      Ecore_Cocoa_Cursor  cursor; /**< The Cocoa cursor object. */
+      Ecore_Cocoa_Window *win; /**< The Cocoa window. */
    } cocoa;
 #endif
+   /**
+    * @struct prev
+    * @brief Holds information about the previously active cursor.
+    *
+    * This is used to restore the cursor when the current one is unset or
+    * the mouse moves out of the event area.
+    */
    struct
    {
-      Evas_Object *obj;
-      int layer;
-      int x, y;
+      Evas_Object *obj; /**< The previous cursor's Evas object. */
+      int layer; /**< The layer of the previous cursor object. */
+      int x, y; /**< The hotspot coordinates of the previous cursor. */
    } prev;
 
-   Eina_Bool visible:1;
-   Eina_Bool use_engine:1;
-   Eina_Bool theme_search:1;
+   Eina_Bool visible:1; /**< Flag indicating if the cursor is currently visible. */
+   Eina_Bool use_engine:1; /**< Flag to use engine cursor instead of themed one. */
+   Eina_Bool theme_search:1; /**< Flag to enable searching for the cursor in the theme. */
 };
 
+/**
+ * @internal
+ * @brief Callback for when the cursor object's size hints change.
+ *
+ * This function ensures the cursor object has a minimum size.
+ * If the size hint is smaller than 8x8, it's enforced to be 8x8.
+ * This prevents the cursor from becoming too small to be visible.
+ *
+ * @param data The Elm_Cursor data structure.
+ * @param evas The Evas canvas.
+ * @param obj The Evas object whose hints changed.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _elm_cursor_obj_hints(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -206,6 +262,20 @@ _elm_cursor_obj_hints(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_
    evas_object_resize(cur->obj, x, y);
 }
 
+/**
+ * @internal
+ * @brief Callback for the deletion of the cursor's Evas object.
+ *
+ * When the underlying Evas object for a cursor is deleted, this function
+ * cleans up associated resources. It removes event callbacks and nullifies
+ * the object pointer within the Elm_Cursor structure to prevent use-after-free
+ * errors.
+ *
+ * @param data The Elm_Cursor data structure.
+ * @param evas The Evas canvas.
+ * @param obj The Evas object being deleted.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _elm_cursor_obj_del(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -222,6 +292,18 @@ _elm_cursor_obj_del(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_UN
      }
 }
 
+/**
+ * @internal
+ * @brief Calculates and sets the cursor's hotspot.
+ *
+ * The hotspot is the specific pixel of the cursor image that aligns with the
+ * mouse pointer's coordinates. This function determines the hotspot position,
+ * either from the center of the "hotspot" swallow part of the Edje theme or
+ * from explicit "hot_x" and "hot_y" data fields in the theme.
+ * If the hotspot changes, it updates the cursor in ecore_evas.
+ *
+ * @param cur The cursor data structure.
+ */
 static void
 _elm_cursor_set_hot_spots(Elm_Cursor *cur)
 {
@@ -253,6 +335,16 @@ _elm_cursor_set_hot_spots(Elm_Cursor *cur)
      }
 }
 
+/**
+ * @internal
+ * @brief Ecore job to update the cursor hotspot.
+ *
+ * This function is scheduled as an Ecore job to asynchronously update the
+ * cursor's hotspot. This is useful for batching updates that might occur
+ * rapidly, such as during object resizing or moving.
+ *
+ * @param data The Elm_Cursor data structure.
+ */
 static void
 _elm_cursor_set_hot_spots_job(void *data)
 {
@@ -263,6 +355,20 @@ _elm_cursor_set_hot_spots_job(void *data)
    _elm_cursor_set_hot_spots(cur);
 }
 
+/**
+ * @internal
+ * @brief Callback for move or resize events on the cursor or hotspot object.
+ *
+ * When the cursor's visual representation (or its hotspot part) is moved or
+ * resized, this function is called. It schedules a job to recalculate the
+ * hotspot coordinates, avoiding redundant calculations on rapid successive
+ * events.
+ *
+ * @param data The Elm_Cursor data structure.
+ * @param evas The Evas canvas.
+ * @param obj The Evas object that changed.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _elm_cursor_hot_change(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -271,6 +377,18 @@ _elm_cursor_hot_change(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA
    cur->hotupdate_job = ecore_job_add(_elm_cursor_set_hot_spots_job, data);
 }
 
+/**
+ * @internal
+ * @brief Creates and configures the Evas object for a themed cursor.
+ *
+ * This function attempts to create a cursor from the theme. It creates an
+ * Edje object, applies the cursor theme, and sets up a hotspot object.
+ * It's used for software-rendered cursors.
+ *
+ * @param obj The widget owning the cursor.
+ * @param cur The cursor data structure to populate.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 _elm_cursor_obj_add(Evas_Object *obj, Elm_Cursor *cur)
 {
@@ -343,6 +461,21 @@ _elm_cursor_obj_add(Evas_Object *obj, Elm_Cursor *cur)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Activates the specified cursor.
+ *
+ * This function is the core logic for displaying a cursor. It determines
+ * whether to use a software-rendered (themed) cursor or a hardware
+ * (engine-provided) cursor.
+ *
+ * For software cursors, it uses `ecore_evas_object_cursor_set()` with the
+ * themed cursor object. It also saves the previous cursor to restore it later.
+ * For hardware cursors, it uses platform-specific functions
+ * (e.g., `ecore_x_window_cursor_set`) to set the native window cursor.
+ *
+ * @param cur The cursor to be set.
+ */
 static void
 _elm_cursor_set(Elm_Cursor *cur)
 {
@@ -407,6 +540,19 @@ end:
    evas_event_thaw(cur->evas);
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse-in events on the cursor's event area.
+ *
+ * When the mouse enters the object associated with this cursor, this function
+ * is called. It triggers the display of the cursor by calling `_elm_cursor_set`.
+ * It ignores events that are on hold.
+ *
+ * @param data The Elm_Cursor data structure.
+ * @param evas The Evas canvas.
+ * @param obj The object the mouse entered.
+ * @param event_info The `Evas_Event_Mouse_In` event details.
+ */
 static void
 _elm_cursor_mouse_in(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -418,6 +564,21 @@ _elm_cursor_mouse_in(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_U
    _elm_cursor_set(cur);
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse-out events on the cursor's event area.
+ *
+ * When the mouse leaves the object's area, this function is responsible for
+ * hiding the cursor. It either restores the previous cursor (if one was saved)
+ * or sets the cursor to the default for the window. If the mouse moves into a
+ * parent widget that also has a custom cursor, this function will activate
+ * the parent's cursor. It ignores events that are on hold.
+ *
+ * @param data The Elm_Cursor data structure.
+ * @param evas The Evas canvas.
+ * @param obj The object the mouse left.
+ * @param event_info The `Evas_Event_Mouse_Out` event details.
+ */
 static void
 _elm_cursor_mouse_out(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -488,6 +649,19 @@ _elm_cursor_mouse_out(void *data, Evas *evas EINA_UNUSED, Evas_Object *obj EINA_
    evas_event_thaw(cur->evas);
 }
 
+/**
+ * @internal
+ * @brief Callback for the deletion of the object that has a cursor.
+ *
+ * This is attached to the `EVAS_CALLBACK_DEL` of the `eventarea` object.
+ * When this object is deleted, we must unset the cursor to clean up all
+ * associated resources.
+ *
+ * @param data Unused.
+ * @param evas The Evas canvas.
+ * @param obj The object being deleted.
+ * @param event_info Unused.
+ */
 static void
 _elm_cursor_del(void *data EINA_UNUSED, Evas *evas EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -495,6 +669,20 @@ _elm_cursor_del(void *data EINA_UNUSED, Evas *evas EINA_UNUSED, Evas_Object *obj
 }
 
 #if defined(HAVE_ELEMENTARY_X) || defined(HAVE_ELEMENTARY_COCOA) || defined(HAVE_ELEMENTARY_WIN32)
+/**
+ * @internal
+ * @brief Comparison function for `bsearch` on the `_cursors` array.
+ *
+ * This function is used to compare two `_Cursor_Id` structures based on their
+ * string names. It is a requirement for using `bsearch` to find a cursor
+ * in the sorted `_cursors` array.
+ *
+ * @param data1 A pointer to the first `_Cursor_Id` struct.
+ * @param data2 A pointer to the second `_Cursor_Id` struct.
+ * @return An integer less than, equal to, or greater than zero if the first
+ *         name is found, respectively, to be less than, to match, or be
+ *         greater than the second.
+ */
 static int
 _elm_cursor_strcmp(const void *data1, const void *data2)
 {
@@ -504,6 +692,22 @@ _elm_cursor_strcmp(const void *data1, const void *data2)
 }
 #endif
 
+/**
+ * @internal
+ * @brief Initializes and configures the cursor settings.
+ *
+ * This function is called when a cursor is first set on an object. It decides
+ * the cursor handling strategy: either engine-only (hardware) or theme-first.
+ *
+ * If theme search is enabled, it tries to load a themed cursor via
+ * `_elm_cursor_obj_add`. If that fails, or if engine-only is configured, it
+ * falls back to using an engine cursor.
+ *
+ * For engine cursors, it finds the platform-specific cursor ID by searching
+ * in the `_cursors` array and then caches the native window handles.
+ *
+ * @param cur The cursor data structure to initialize.
+ */
 static void
 _elm_cursor_cur_set(Elm_Cursor *cur)
 {

@@ -1,11 +1,62 @@
 #include "edje_private.h"
 
+/**
+ * @brief Callback for handling emitted signals.
+ *
+ * This function is responsible for processing signals that have been emitted
+ * within an Edje object. It invokes registered callbacks that match the
+ * signal and source.
+ *
+ * @param ed The Edje object.
+ * @param sig The signal string (e.g., "mouse,clicked,1").
+ * @param src The source string (e.g., "my_button").
+ * @param data Additional data associated with the signal.
+ * @param prop Propagation flag; if EINA_TRUE, propagated signals are skipped.
+ */
 static void _edje_emit_cb(Edje *ed, const char *sig, const char *src, Edje_Message_Signal_Data *data, Eina_Bool prop);
+
+/**
+ * @brief Copies a parameter value from a source part to a destination part.
+ *
+ * This function handles parameter copying between parts, including type
+ * conversion and validation if necessary. It supports both native Edje part
+ * parameters and parameters of external (swallowed) objects.
+ *
+ * @param ed The Edje object.
+ * @param src_part The source Edje_Real_Part.
+ * @param src_param The name of the source parameter.
+ * @param dst_part The destination Edje_Real_Part.
+ * @param dst_param The name of the destination parameter.
+ */
 static void _edje_param_copy(Edje *ed, Edje_Real_Part *src_part, const char *src_param, Edje_Real_Part *dst_part, const char *dst_param);
+
+/**
+ * @brief Sets a parameter value for a specific part.
+ *
+ * This function sets a parameter on an Edje part. The value is provided as a
+ * string and will be converted to the appropriate type for the parameter.
+ * It supports both native Edje part parameters and parameters of external
+ * (swallowed) objects.
+ *
+ * @param ed The Edje object.
+ * @param part The Edje_Real_Part to modify.
+ * @param param The name of the parameter to set.
+ * @param value The string representation of the value to set.
+ */
 static void _edje_param_set(Edje *ed, Edje_Real_Part *part, const char *param, const char *value);
 
 static double _edje_transition_duration_scale = 0;
 
+/**
+ * @brief Animator callback for Edje timers.
+ *
+ * This function is used by Ecore_Animator to drive Edje's internal timer
+ * processing (_edje_timer_cb). It ensures that Edje animations and timed
+ * events are updated in sync with the main loop.
+ *
+ * @param data The Edje object passed as user data.
+ * @return EINA_TRUE to continue the animator, EINA_FALSE to stop.
+ */
 static Eina_Bool
 _edje_animator_cb(void *data)
 {
@@ -14,6 +65,20 @@ _edje_animator_cb(void *data)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Emits a signal for an aliased part.
+ *
+ * If the given part name is an alias for another part (or a path to a part
+ * in a child Edje object), this function constructs the fully resolved
+ * signal string (e.g., "alias_target:signal") and emits it.
+ *
+ * @param ed The Edje object.
+ * @param part The name of the part, which might be an alias.
+ * @param sig The signal string.
+ * @param src The source string.
+ * @return EINA_TRUE if an alias was found and the signal was emitted,
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _edje_emit_aliased(Edje *ed, const char *part, const char *sig, const char *src)
 {
@@ -38,6 +103,25 @@ _edje_emit_aliased(Edje *ed, const char *part, const char *sig, const char *src)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Emits a signal to a child Edje object or an external object.
+ *
+ * This function handles the logic for directing a signal to a child object
+ * that is part of a GROUP, EXTERNAL, BOX, or TABLE part. It can target
+ * specific children within BOX or TABLE parts using an index in the part path
+ * (e.g., "my_table[2]:some_signal").
+ *
+ * @param ed The parent Edje object.
+ * @param rp The Edje_Real_Part that might contain the child. If NULL, it's looked up.
+ * @param part The name of the part, potentially including an index (e.g., "my_table[2]").
+ * @param sig The signal string to emit to the child.
+ * @param src The source string for the signal.
+ * @return EINA_TRUE if the signal should be broadcast further by the caller,
+ *         EINA_FALSE if the signal was consumed by a child or should not be broadcast.
+ *         Specifically, for GROUP and EXTERNAL types, it returns EINA_FALSE as the signal
+ *         is directly emitted to the child/external object. For BOX/TABLE with an index,
+ *         it also returns EINA_FALSE. Otherwise, it returns ed->collection->broadcast_signal.
+ */
 static Eina_Bool
 _edje_emit_child(Edje *ed, Edje_Real_Part *rp, const char *part, const char *sig, const char *src)
 {
@@ -127,6 +211,20 @@ _edje_emit_child(Edje *ed, Edje_Real_Part *rp, const char *part, const char *sig
    return ed->collection->broadcast_signal;
 }
 
+/**
+ * @brief Allocates and initializes an Edje_Message_Signal_Data structure.
+ *
+ * This structure is used to pass custom data along with signals. It includes
+ * reference counting to manage its lifecycle.
+ *
+ * @param data Custom data to be associated with the signal.
+ * @param free_func A callback function to free @p data when no longer needed.
+ * @param seat_data Custom data related to the input seat.
+ * @param seat_free_func A callback function to free @p seat_data.
+ * @return A pointer to the newly allocated Edje_Message_Signal_Data,
+ *         or NULL if both @p data and @p seat_data are NULL or on allocation failure.
+ *         The returned structure has a reference count of 1.
+ */
 static Edje_Message_Signal_Data *
 _edje_signal_data_setup(void *data, Ecore_Cb free_func, void *seat_data, Ecore_Cb seat_free_func)
 {
@@ -146,6 +244,15 @@ _edje_signal_data_setup(void *data, Ecore_Cb free_func, void *seat_data, Ecore_C
    return out;
 }
 
+/**
+ * @brief Decrements the reference count of an Edje_Message_Signal_Data structure
+ *        and frees it if the count reaches zero.
+ *
+ * If custom data and/or seat data were provided with free functions during
+ * setup, those functions will be called to release the associated memory.
+ *
+ * @param mdata The Edje_Message_Signal_Data structure to unreference.
+ */
 void
 _edje_signal_data_free(Edje_Message_Signal_Data *mdata)
 {
@@ -163,12 +270,32 @@ _edje_signal_data_free(Edje_Message_Signal_Data *mdata)
    free(mdata);
 }
 
+/**
+ * @brief Increments the reference count of an Edje_Message_Signal_Data structure.
+ *
+ * @param mdata The Edje_Message_Signal_Data structure to reference.
+ */
 void
 _edje_signal_data_ref(Edje_Message_Signal_Data *mdata)
 {
    if (mdata) mdata->ref++;
 }
 
+/**
+ * @brief Sends an Edje signal message.
+ *
+ * This function constructs an Edje_Message_Signal and sends it either to the
+ * Edje object's script queue or broadcasts it, depending on the @p broadcast flag.
+ *
+ * @param ed The Edje object.
+ * @param broadcast If EINA_TRUE, the message is sent using edje_object_message_send
+ *                  (typically for signals that should be processed by the object itself
+ *                  and potentially its hierarchy). If EINA_FALSE, it's sent via
+ *                  _edje_util_message_send to the script queue (for internal processing).
+ * @param sig The signal string.
+ * @param src The source string.
+ * @param mdata The Edje_Message_Signal_Data containing any associated data.
+ */
 static void
 _edje_emit_send(Edje *ed, Eina_Bool broadcast, const char *sig, const char *src, Edje_Message_Signal_Data *mdata)
 {

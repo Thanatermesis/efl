@@ -2,6 +2,15 @@
 # include <config.h>
 #endif
 
+/**
+ * @file
+ * @brief Wayland input handling for Ecore.
+ *
+ * This file implements the input handling logic for Ecore when running
+ * on a Wayland display server. It manages pointers, keyboards, touch devices,
+ * and data transfer (drag-and-drop, selections).
+ */
+
 /*
  * NB: Events that receive a 'serial' instead of timestamp
  *

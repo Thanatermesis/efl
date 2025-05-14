@@ -1,5 +1,24 @@
 #include "evas_engine_filter.h"
 
+/**
+ * @brief Applies displacement mapping to an alpha channel buffer using the CPU.
+ * @param w Width of the source and destination buffers.
+ * @param h Height of the source and destination buffers.
+ * @param map_w Width of the displacement map buffer.
+ * @param map_h Height of the displacement map buffer.
+ * @param intensity Displacement intensity factor. Controls the magnitude of displacement.
+ * @param src Pointer to the source alpha buffer (8-bit).
+ * @param dst Pointer to the destination alpha buffer (8-bit).
+ * @param map_start Pointer to the start of the displacement map buffer (RGBA, 32-bit).
+ *                  The Red channel controls X displacement, Green channel controls Y displacement.
+ *                  The Alpha channel modulates the final pixel value.
+ * @param stretch If EINA_TRUE, pixels outside the source bounds are fetched from the edge (clamped).
+ *                If EINA_FALSE, pixels outside the source bounds are treated as transparent black (0).
+ * @param smooth If EINA_TRUE, bilinear interpolation is used for fetching displaced pixels.
+ *               If EINA_FALSE, nearest neighbor sampling is used.
+ * @param blend If EINA_TRUE, the displaced pixel is alpha-blended with the existing destination pixel.
+ *              If EINA_FALSE, the destination pixel is overwritten.
+ */
 static void
 _filter_displace_cpu_alpha_do(int w, int h, int map_w, int map_h, int intensity,
                               uint8_t *src, uint8_t *dst, uint32_t *map_start,
@@ -75,6 +94,25 @@ _filter_displace_cpu_alpha_do(int w, int h, int map_w, int map_h, int intensity,
      }
 }
 
+/**
+ * @brief Applies displacement mapping to an RGBA buffer using the CPU.
+ * @param w Width of the source and destination buffers.
+ * @param h Height of the source and destination buffers.
+ * @param map_w Width of the displacement map buffer.
+ * @param map_h Height of the displacement map buffer.
+ * @param intensity Displacement intensity factor. Controls the magnitude of displacement.
+ * @param src Pointer to the source RGBA buffer (32-bit ARGB).
+ * @param dst Pointer to the destination RGBA buffer (32-bit ARGB).
+ * @param map_start Pointer to the start of the displacement map buffer (RGBA, 32-bit).
+ *                  The Red channel controls X displacement, Green channel controls Y displacement.
+ *                  The Alpha channel modulates the final pixel value.
+ * @param stretch If EINA_TRUE, pixels outside the source bounds are fetched from the edge (clamped).
+ *                If EINA_FALSE, pixels outside the source bounds are treated as transparent black (0).
+ * @param smooth If EINA_TRUE, bilinear interpolation is used for fetching displaced pixels.
+ *               If EINA_FALSE, nearest neighbor sampling is used.
+ * @param blend If EINA_TRUE, the displaced pixel is alpha-blended with the existing destination pixel.
+ *              If EINA_FALSE, the destination pixel is overwritten.
+ */
 static void
 _filter_displace_cpu_rgba_do(int w, int h, int map_w, int map_h, int intensity,
                              uint32_t *src, uint32_t *dst, uint32_t *map_start,
@@ -188,13 +226,20 @@ _filter_displace_cpu_rgba_do(int w, int h, int map_w, int map_h, int intensity,
 /**
  * Apply distortion map on alpha image
  * input:  alpha
- * output: alpha
- * map:    rg+a (rgba)
+ * @param cmd The filter command structure containing input, output, mask, and parameters.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ *
+ * @details This function orchestrates the displacement mapping for alpha-only buffers.
+ * It handles buffer mapping/unmapping, potential map scaling, and calls the
+ * core processing function `_filter_displace_cpu_alpha_do`.
+ * Input buffer format: Alpha (8-bit)
+ * Output buffer format: Alpha (8-bit)
+ * Mask buffer format: RGBA (32-bit ARGB)
  */
 static Eina_Bool
 _filter_displace_cpu_alpha(Evas_Filter_Command *cmd)
 {
-   unsigned int src_len, src_stride, map_len, map_stride, dst_len, dst_stride;
+   unsigned int src_len, src_stride = 0, map_len, map_stride = 0, dst_len, dst_stride = 0;
    int w, h, map_w, map_h, intensity;
    uint8_t *dst, *src;
    uint32_t *map_start;
@@ -250,13 +295,20 @@ end:
 /**
  * Apply distortion map on rgba image
  * input:  rgba
- * output: rgba
- * map:    rg+a (rgba)
+ * @param cmd The filter command structure containing input, output, mask, and parameters.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ *
+ * @details This function orchestrates the displacement mapping for RGBA buffers.
+ * It handles buffer mapping/unmapping, potential map scaling, unpremultiplication
+ * if needed, and calls the core processing function `_filter_displace_cpu_rgba_do`.
+ * Input buffer format: RGBA (32-bit ARGB)
+ * Output buffer format: RGBA (32-bit ARGB)
+ * Mask buffer format: RGBA (32-bit ARGB)
  */
 static Eina_Bool
 _filter_displace_cpu_rgba(Evas_Filter_Command *cmd)
 {
-   unsigned int src_len, src_stride, map_len, map_stride, dst_len, dst_stride;
+   unsigned int src_len, src_stride = 0, map_len, map_stride = 0, dst_len, dst_stride = 0;
    int w, h, map_w, map_h, intensity;
    uint32_t *dst, *src, *map_start;
    Eina_Bool stretch, smooth, blend;
@@ -308,6 +360,12 @@ end:
    return ret;
 }
 
+/**
+ * @brief Gets the appropriate CPU displacement filter function based on the output format.
+ * @param cmd The filter command structure.
+ * @return A function pointer to either `_filter_displace_cpu_alpha` or
+ *         `_filter_displace_cpu_rgba`, or NULL on error.
+ */
 Software_Filter_Func
 eng_filter_displace_func_get(Evas_Filter_Command *cmd)
 {

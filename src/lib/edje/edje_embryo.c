@@ -239,7 +239,18 @@
  *
  */
 
-/* get_int(id) */
+/**
+ * @brief Retrieves an integer variable from Edje's internal variable pool.
+ *
+ * This function is exposed to Embryo scripts as `get_int(id)`.
+ * It fetches an integer value associated with the given ID.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the integer variable to retrieve.
+ * @return The integer value associated with the ID, or 0 if not found or on error.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_int(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -250,7 +261,19 @@ _edje_embryo_fn_get_int(Embryo_Program *ep, Embryo_Cell *params)
    return (Embryo_Cell)_edje_var_int_get(ed, (int)params[1]);
 }
 
-/* set_int(id, v) */
+/**
+ * @brief Sets an integer variable in Edje's internal variable pool.
+ *
+ * This function is exposed to Embryo scripts as `set_int(id, v)`.
+ * It sets an integer value for the given ID.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the integer variable to set.
+ *               params[2] is the integer value to set.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_int(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -262,7 +285,19 @@ _edje_embryo_fn_set_int(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_float(id) */
+/**
+ * @brief Retrieves a float variable from Edje's internal variable pool.
+ *
+ * This function is exposed to Embryo scripts as `Float:get_float(id)`.
+ * It fetches a float value associated with the given ID.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the float variable to retrieve.
+ * @return The float value associated with the ID, converted to an Embryo_Cell.
+ *         Returns 0.0 if not found or on error.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_float(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -275,7 +310,19 @@ _edje_embryo_fn_get_float(Embryo_Program *ep, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(v);
 }
 
-/* set_float(id, v) */
+/**
+ * @brief Sets a float variable in Edje's internal variable pool.
+ *
+ * This function is exposed to Embryo scripts as `set_float(id, Float:v)`.
+ * It sets a float value for the given ID.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the float variable to set.
+ *               params[2] is the float value (as Embryo_Cell) to set.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_float(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -289,7 +336,23 @@ _edje_embryo_fn_set_float(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_str(id, dst[], maxlen) */
+/**
+ * @brief Retrieves a string variable from Edje's internal variable pool.
+ *
+ * This function is exposed to Embryo scripts as `get_str(id, dst[], maxlen)`.
+ * It fetches a string associated with the given ID and copies it into the
+ * destination buffer `dst` provided by the Embryo script, up to `maxlen` characters.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the string variable to retrieve.
+ *               params[2] is the Embryo cell address of the destination string buffer.
+ *               params[3] is the maximum length of the destination buffer.
+ * @return Always 0. The string is written to the `dst` buffer.
+ *         If the string is longer than `maxlen`, it is truncated.
+ *         If the ID is not found, an empty string is written.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_str(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -323,7 +386,18 @@ _edje_embryo_fn_get_str(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_strlen(id) */
+/**
+ * @brief Retrieves the length of a string variable from Edje's internal variable pool.
+ *
+ * This function is exposed to Embryo scripts as `get_strlen(id)`.
+ * It returns the length of the string associated with the given ID.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the string variable.
+ * @return The length of the string, or 0 if the string is not found or is NULL.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_strlen(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -340,7 +414,19 @@ _edje_embryo_fn_get_strlen(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* set_str(id, str[]) */
+/**
+ * @brief Sets a string variable in Edje's internal variable pool.
+ *
+ * This function is exposed to Embryo scripts as `set_str(id, str[])`.
+ * It sets a string value for the given ID.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the string variable to set.
+ *               params[2] is the Embryo cell address of the string to set.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_str(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -357,7 +443,18 @@ _edje_embryo_fn_set_str(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* count(id) */
+/**
+ * @brief Gets the number of items in an Edje data collection (list).
+ *
+ * This function is exposed to Embryo scripts as `count(id)`.
+ * It returns the count of elements in the list identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the data collection.
+ * @return The number of items in the specified collection.
+ */
 static Embryo_Cell
 _edje_embryo_fn_count(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -368,7 +465,20 @@ _edje_embryo_fn_count(Embryo_Program *ep, Embryo_Cell *params)
    return (Embryo_Cell)_edje_var_list_count_get(ed, (int)params[1]);
 }
 
-/* remove(id, n) */
+/**
+ * @brief Removes the Nth item from an Edje data collection (list).
+ *
+ * This function is exposed to Embryo scripts as `remove(id, n)`.
+ * It removes the item at the 0-indexed position `n` from the list
+ * identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the data collection.
+ *               params[2] is the 0-indexed position of the item to remove.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_remove(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -381,7 +491,19 @@ _edje_embryo_fn_remove(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* append_int(id, var) */
+/**
+ * @brief Appends an integer to an Edje data collection (list).
+ *
+ * This function is exposed to Embryo scripts as `append_int(id, v)`.
+ * It appends the integer `v` to the end of the list identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the data collection.
+ *               params[2] is the integer value to append.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_append_int(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -394,7 +516,19 @@ _edje_embryo_fn_append_int(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* prepend_int(id, var) */
+/**
+ * @brief Prepends an integer to an Edje data collection (list).
+ *
+ * This function is exposed to Embryo scripts as `prepend_int(id, v)`.
+ * It prepends the integer `v` to the beginning of the list identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the data collection.
+ *               params[2] is the integer value to prepend.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_prepend_int(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -407,7 +541,21 @@ _edje_embryo_fn_prepend_int(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* insert_int(id, pos, var) */
+/**
+ * @brief Inserts an integer into an Edje data collection (list) at a specific position.
+ *
+ * This function is exposed to Embryo scripts as `insert_int(id, n, v)`.
+ * It inserts the integer `v` at the 0-indexed position `n` in the list
+ * identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the data collection.
+ *               params[2] is the 0-indexed position at which to insert.
+ *               params[3] is the integer value to insert.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_insert_int(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -421,7 +569,21 @@ _edje_embryo_fn_insert_int(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* replace_int(id, pos, var) */
+/**
+ * @brief Replaces an integer in an Edje data collection (list) at a specific position.
+ *
+ * This function is exposed to Embryo scripts as `replace_int(id, n, v)`.
+ * It replaces the integer at the 0-indexed position `n` in the list
+ * identified by `id` with the new integer `v`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the data collection.
+ *               params[2] is the 0-indexed position of the item to replace.
+ *               params[3] is the new integer value.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_replace_int(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -435,7 +597,20 @@ _edje_embryo_fn_replace_int(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* fetch_int(id, pos) */
+/**
+ * @brief Fetches an integer from an Edje data collection (list) at a specific position.
+ *
+ * This function is exposed to Embryo scripts as `fetch_int(id, n)`.
+ * It retrieves the integer at the 0-indexed position `n` from the list
+ * identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the data collection.
+ *               params[2] is the 0-indexed position of the item to fetch.
+ * @return The integer value at the specified position, or 0 if out of bounds or on error.
+ */
 static Embryo_Cell
 _edje_embryo_fn_fetch_int(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -447,7 +622,19 @@ _edje_embryo_fn_fetch_int(Embryo_Program *ep, Embryo_Cell *params)
                                      (int)params[2]);
 }
 
-/* append_str(id, str[]) */
+/**
+ * @brief Appends a string to an Edje data collection (list).
+ *
+ * This function is exposed to Embryo scripts as `append_str(id, str[])`.
+ * It appends the string `str` to the end of the list identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the data collection.
+ *               params[2] is the Embryo cell address of the string to append.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_append_str(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -463,7 +650,19 @@ _edje_embryo_fn_append_str(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* prepend_str(id, str[]) */
+/**
+ * @brief Prepends a string to an Edje data collection (list).
+ *
+ * This function is exposed to Embryo scripts as `prepend_str(id, str[])`.
+ * It prepends the string `str` to the beginning of the list identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the data collection.
+ *               params[2] is the Embryo cell address of the string to prepend.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_prepend_str(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -479,7 +678,21 @@ _edje_embryo_fn_prepend_str(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* insert_str(id, pos, str[]) */
+/**
+ * @brief Inserts a string into an Edje data collection (list) at a specific position.
+ *
+ * This function is exposed to Embryo scripts as `insert_str(id, n, str[])`.
+ * It inserts the string `str` at the 0-indexed position `n` in the list
+ * identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the data collection.
+ *               params[2] is the 0-indexed position at which to insert.
+ *               params[3] is the Embryo cell address of the string to insert.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_insert_str(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -495,7 +708,21 @@ _edje_embryo_fn_insert_str(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* replace_str(id, pos, str[]) */
+/**
+ * @brief Replaces a string in an Edje data collection (list) at a specific position.
+ *
+ * This function is exposed to Embryo scripts as `replace_str(id, n, str[])`.
+ * It replaces the string at the 0-indexed position `n` in the list
+ * identified by `id` with the new string `str`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the data collection.
+ *               params[2] is the 0-indexed position of the item to replace.
+ *               params[3] is the Embryo cell address of the new string.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_replace_str(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -511,7 +738,25 @@ _edje_embryo_fn_replace_str(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* fetch_str(id, pos, dst[], maxlen) */
+/**
+ * @brief Fetches a string from an Edje data collection (list) at a specific position.
+ *
+ * This function is exposed to Embryo scripts as `fetch_str(id, n, dst[], maxlen)`.
+ * It retrieves the string at the 0-indexed position `n` from the list
+ * identified by `id` and copies it into the destination buffer `dst`,
+ * up to `maxlen` characters.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the data collection.
+ *               params[2] is the 0-indexed position of the item to fetch.
+ *               params[3] is the Embryo cell address of the destination string buffer.
+ *               params[4] is the maximum length of the destination buffer.
+ * @return Always 0. The string is written to the `dst` buffer.
+ *         If the string is longer than `maxlen`, it is truncated.
+ *         If the item is not found or is not a string, an empty string is written.
+ */
 static Embryo_Cell
 _edje_embryo_fn_fetch_str(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -546,7 +791,19 @@ _edje_embryo_fn_fetch_str(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* append_float(id, Float:f) */
+/**
+ * @brief Appends a float to an Edje data collection (list).
+ *
+ * This function is exposed to Embryo scripts as `append_float(id, Float:v)`.
+ * It appends the float `v` to the end of the list identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the data collection.
+ *               params[2] is the float value (as Embryo_Cell) to append.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_append_float(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -561,7 +818,19 @@ _edje_embryo_fn_append_float(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* prepend_float(id, Float:f) */
+/**
+ * @brief Prepends a float to an Edje data collection (list).
+ *
+ * This function is exposed to Embryo scripts as `prepend_float(id, Float:v)`.
+ * It prepends the float `v` to the beginning of the list identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the data collection.
+ *               params[2] is the float value (as Embryo_Cell) to prepend.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_prepend_float(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -576,7 +845,21 @@ _edje_embryo_fn_prepend_float(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* insert_float(id, pos, Float:f) */
+/**
+ * @brief Inserts a float into an Edje data collection (list) at a specific position.
+ *
+ * This function is exposed to Embryo scripts as `insert_float(id, n, Float:v)`.
+ * It inserts the float `v` at the 0-indexed position `n` in the list
+ * identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the data collection.
+ *               params[2] is the 0-indexed position at which to insert.
+ *               params[3] is the float value (as Embryo_Cell) to insert.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_insert_float(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -591,7 +874,21 @@ _edje_embryo_fn_insert_float(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* replace_float(id, pos, Float:f) */
+/**
+ * @brief Replaces a float in an Edje data collection (list) at a specific position.
+ *
+ * This function is exposed to Embryo scripts as `replace_float(id, n, Float:v)`.
+ * It replaces the float at the 0-indexed position `n` in the list
+ * identified by `id` with the new float `v`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the data collection.
+ *               params[2] is the 0-indexed position of the item to replace.
+ *               params[3] is the new float value (as Embryo_Cell).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_replace_float(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -605,7 +902,21 @@ _edje_embryo_fn_replace_float(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* Float:fetch_float(id, pos) */
+/**
+ * @brief Fetches a float from an Edje data collection (list) at a specific position.
+ *
+ * This function is exposed to Embryo scripts as `Float:fetch_float(id, n)`.
+ * It retrieves the float at the 0-indexed position `n` from the list
+ * identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the data collection.
+ *               params[2] is the 0-indexed position of the item to fetch.
+ * @return The float value (as Embryo_Cell) at the specified position.
+ *         Returns 0.0 if out of bounds or on error.
+ */
 static Embryo_Cell
 _edje_embryo_fn_fetch_float(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -619,7 +930,21 @@ _edje_embryo_fn_fetch_float(Embryo_Program *ep, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
-/* timer(Float:in, fname[], val) */
+/**
+ * @brief Creates a timer that calls an Embryo function after a specified delay.
+ *
+ * This function is exposed to Embryo scripts as `timer(Float:in, fname[], val)`.
+ * It schedules the Embryo function `fname` to be called after `in` seconds,
+ * passing `val` as an argument to it.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the delay in seconds (float, as Embryo_Cell).
+ *               params[2] is the Embryo cell address of the function name string.
+ *               params[3] is an integer value to pass to the timer function.
+ * @return A unique ID for the created timer, or 0 on failure.
+ */
 static Embryo_Cell
 _edje_embryo_fn_timer(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -639,7 +964,18 @@ _edje_embryo_fn_timer(Embryo_Program *ep, Embryo_Cell *params)
    return _edje_var_timer_add(ed, in, fname, val);
 }
 
-/* cancel_timer(id) */
+/**
+ * @brief Cancels a previously created timer.
+ *
+ * This function is exposed to Embryo scripts as `cancel_timer(id)`.
+ * It cancels the timer identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the timer to cancel.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_cancel_timer(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -654,7 +990,18 @@ _edje_embryo_fn_cancel_timer(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* reset_timer(id) */
+/**
+ * @brief Resets a previously created timer.
+ *
+ * This function is exposed to Embryo scripts as `reset_timer(id)`.
+ * It resets the timer identified by `id`, causing it to restart its countdown.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the timer to reset.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_reset_timer(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -669,7 +1016,22 @@ _edje_embryo_fn_reset_timer(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* anim(Float:len, fname[], val) */
+/**
+ * @brief Creates an animation that calls an Embryo function repeatedly over a duration.
+ *
+ * This function is exposed to Embryo scripts as `anim(Float:len, fname[], val)`.
+ * It schedules the Embryo function `fname` to be called repeatedly for `len` seconds.
+ * The function `fname` will receive the current animation position (0.0 to 1.0)
+ * and `val` as arguments.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the duration of the animation in seconds (float, as Embryo_Cell).
+ *               params[2] is the Embryo cell address of the function name string.
+ *               params[3] is an integer value to pass to the animation function.
+ * @return A unique ID for the created animation, or 0 on failure.
+ */
 static Embryo_Cell
 _edje_embryo_fn_anim(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -689,7 +1051,18 @@ _edje_embryo_fn_anim(Embryo_Program *ep, Embryo_Cell *params)
    return _edje_var_anim_add(ed, len, fname, val);
 }
 
-/* cancel_anim(id) */
+/**
+ * @brief Cancels a previously created animation.
+ *
+ * This function is exposed to Embryo scripts as `cancel_anim(id)`.
+ * It cancels the animation identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the animation to cancel.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_cancel_anim(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -704,7 +1077,25 @@ _edje_embryo_fn_cancel_anim(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_anim_pos_map(Float:pos, Tween_Mode_Type:tween, Float:v1, Float:v2, &Float:ret) */
+/**
+ * @brief Calculates a mapped animation position based on a tweening mode.
+ *
+ * This function is exposed to Embryo scripts as
+ * `get_anim_pos_map(Float:pos, Tween_Mode_Type:tween, Float:v1, Float:v2, &Float:ret)`.
+ * It takes a linear position `pos` (0.0 to 1.0) and applies a tweening
+ * function (`tween` type with optional parameters `v1`, `v2`) to it,
+ * storing the result in `ret`.
+ *
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the input position (0.0 to 1.0, float as Embryo_Cell).
+ *               params[2] is the `Ecore_Pos_Map` tweening mode type (integer).
+ *               params[3] is the first optional float parameter `v1` for the tween mode.
+ *               params[4] is the second optional float parameter `v2` for the tween mode.
+ *               params[5] is the Embryo cell address to store the resulting mapped position (float).
+ * @return Always 0. The result is stored via the `ret` parameter.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_anim_pos_map(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -757,7 +1148,19 @@ _edje_embryo_fn_get_anim_pos_map(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* set_min_size(Float:w, Float:h) */
+/**
+ * @brief Sets the minimum size of the Edje object.
+ *
+ * This function is exposed to Embryo scripts as `set_min_size(Float:w, Float:h)`.
+ * It sets the minimum width `w` and height `h` for the current Edje object's collection.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the minimum width (float, as Embryo_Cell).
+ *               params[2] is the minimum height (float, as Embryo_Cell).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_min_size(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -785,7 +1188,19 @@ _edje_embryo_fn_set_min_size(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* set_max_size(Float:w, Float:h) */
+/**
+ * @brief Sets the maximum size of the Edje object.
+ *
+ * This function is exposed to Embryo scripts as `set_max_size(Float:w, Float:h)`.
+ * It sets the maximum width `w` and height `h` for the current Edje object's collection.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the maximum width (float, as Embryo_Cell).
+ *               params[2] is the maximum height (float, as Embryo_Cell).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_max_size(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -814,7 +1229,19 @@ _edje_embryo_fn_set_max_size(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* stop_program(program_id) */
+/**
+ * @brief Stops a running or pending Edje program.
+ *
+ * This function is exposed to Embryo scripts as `stop_program(program_id)`.
+ * It stops the Edje program identified by `program_id`. This includes
+ * currently running instances and any pending (timer-delayed) instances.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the program to stop.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_stop_program(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -847,7 +1274,19 @@ _edje_embryo_fn_stop_program(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* stop_programs_on(part_id) */
+/**
+ * @brief Stops all Edje programs currently acting on a specific part.
+ *
+ * This function is exposed to Embryo scripts as `stop_programs_on(part_id)`.
+ * It finds the part identified by `part_id` and stops any program
+ * currently running on it, as well as any pending programs targeting it.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the part.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_stop_programs_on(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -883,7 +1322,20 @@ _edje_embryo_fn_stop_programs_on(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_mouse(&x, &y) */
+/**
+ * @brief Gets the current mouse pointer coordinates relative to the Edje object.
+ *
+ * This function is exposed to Embryo scripts as `get_mouse(&x, &y)`.
+ * It retrieves the canvas X and Y coordinates of the mouse pointer and
+ * adjusts them to be relative to the Edje object's origin.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the Embryo cell address to store the X coordinate (integer).
+ *               params[2] is the Embryo cell address to store the Y coordinate (integer).
+ * @return Always 0. The coordinates are stored via the `x` and `y` parameters.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_mouse(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -900,7 +1352,17 @@ _edje_embryo_fn_get_mouse(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_mouse_buttons() */
+/**
+ * @brief Gets the current state of mouse buttons.
+ *
+ * This function is exposed to Embryo scripts as `get_mouse_buttons()`.
+ * It returns a bitmask representing the currently pressed mouse buttons
+ * on the Evas canvas associated with the Edje object.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells (params[0] is the number of arguments, expected to be 0).
+ * @return A bitmask of pressed mouse buttons (e.g., 1 for button 1, 2 for button 2, 4 for button 3).
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_mouse_buttons(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -911,7 +1373,20 @@ _edje_embryo_fn_get_mouse_buttons(Embryo_Program *ep, Embryo_Cell *params)
    return evas_pointer_button_down_mask_get(ed->base.evas);
 }
 
-/* emit(sig[], src[]) */
+/**
+ * @brief Emits an Edje signal.
+ *
+ * This function is exposed to Embryo scripts as `emit(sig[], src[])`.
+ * It triggers an Edje signal with the given signal string `sig` and
+ * source string `src`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the Embryo cell address of the signal string.
+ *               params[2] is the Embryo cell address of the source string.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_emit(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -927,7 +1402,19 @@ _edje_embryo_fn_emit(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_part_id(part[]) */
+/**
+ * @brief Gets the ID of an Edje part by its name.
+ *
+ * This function is exposed to Embryo scripts as `get_part_id(part[])`.
+ * It searches for a part with the given name `part[]` within the current
+ * Edje object's collection and returns its numerical ID.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the Embryo cell address of the part name string.
+ * @return The ID of the part if found, otherwise -1.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_part_id(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -952,7 +1439,19 @@ _edje_embryo_fn_get_part_id(Embryo_Program *ep, Embryo_Cell *params)
    return -1;
 }
 
-/* get_image_id(img[]) */
+/**
+ * @brief Gets the ID of an image resource by its name.
+ *
+ * This function is exposed to Embryo scripts as `get_image_id(img[])`.
+ * It searches for an image with the given name `img[]` within the Edje file's
+ * image directory and returns its numerical ID.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the Embryo cell address of the image name string.
+ * @return The ID of the image if found, otherwise -1.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_image_id(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -979,7 +1478,19 @@ _edje_embryo_fn_get_image_id(Embryo_Program *ep, Embryo_Cell *params)
    return -1;
 }
 
-/* get_program_id(program[]) */
+/**
+ * @brief Gets the ID of an Edje program by its name.
+ *
+ * This function is exposed to Embryo scripts as `get_program_id(program[])`.
+ * It searches for an Edje program with the given name `program[]` within the
+ * current collection and returns its numerical ID.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the Embryo cell address of the program name string.
+ * @return The ID of the program if found, otherwise -1.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_program_id(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1002,6 +1513,21 @@ _edje_embryo_fn_get_program_id(Embryo_Program *ep, Embryo_Cell *params)
    return -1;
 }
 
+/**
+ * @brief Plays a sound sample.
+ *
+ * This function is exposed to Embryo scripts as `play_sample(sample_name, speed, ...)`.
+ * It plays the sound sample identified by `sample_name` at the given `speed`.
+ * An optional channel can be specified.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the total size of parameters in bytes.
+ *               params[1] is the Embryo cell address of the sample name string.
+ *               params[2] is the playback speed (float, as Embryo_Cell).
+ *               params[3] (optional) is the channel to play on (integer).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_play_sample(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1023,6 +1549,21 @@ _edje_embryo_fn_play_sample(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
+/**
+ * @brief Plays a sound tone.
+ *
+ * This function is exposed to Embryo scripts as `play_tone(tone_name, duration, ...)`.
+ * It plays the sound tone identified by `tone_name` for the given `duration`.
+ * An optional channel can be specified.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the total size of parameters in bytes.
+ *               params[1] is the Embryo cell address of the tone name string.
+ *               params[2] is the duration in seconds (float, as Embryo_Cell).
+ *               params[3] (optional) is the channel to play on (integer).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_play_tone(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1044,6 +1585,19 @@ _edje_embryo_fn_play_tone(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
+/**
+ * @brief Plays a vibration sample.
+ *
+ * This function is exposed to Embryo scripts as `play_vibration(sample_name, repeat)`.
+ * It plays the vibration sample identified by `sample_name`, repeating it `repeat` times.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the total size of parameters in bytes.
+ *               params[1] is the Embryo cell address of the sample name string.
+ *               params[2] (optional) is the number of repetitions (integer, default 10).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_play_vibration(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1064,7 +1618,22 @@ _edje_embryo_fn_play_vibration(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* set_state(part_id, state[], Float:state_val) */
+/**
+ * @brief Sets the state of an Edje part.
+ *
+ * This function is exposed to Embryo scripts as `set_state(part_id, state[], Float:state_val)`.
+ * It applies the specified `state` (e.g., "default", "clicked") with `state_val`
+ * to the part identified by `part_id`. Any existing program on the part is stopped.
+ * The part's position is reset with a linear tween.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments (must be 2 or 3).
+ *               params[1] is the ID of the part.
+ *               params[2] is the Embryo cell address of the state name string.
+ *               params[3] (optional) is the state value (float, as Embryo_Cell, default 0.0).
+ * @return 0 on success, -1 if the wrong number of parameters is provided.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_state(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1101,6 +1670,42 @@ _edje_embryo_fn_set_state(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
+/**
+ * @brief Sets the state of an Edje part with animation parameters.
+ *
+ * This function is exposed to Embryo scripts as
+ * `set_state_anim(part_id, state_name[], Float:state_val, anim_type, Float:tween_time, ...)`.
+ * It applies the specified `state_name` with `state_val` to the part identified by `part_id`.
+ * The transition to this state is animated according to `anim_type`, `tween_time`, and
+ * other optional animation parameters (v1, v2, v3, v4, "CURRENT" flag).
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the part.
+ *               params[2] is the Embryo cell address of the state name string.
+ *               params[3] is the state value (float, as Embryo_Cell).
+ *               params[4] is the animation type (Edje_Tween_Mode).
+ *               params[5] is the tween duration (float, as Embryo_Cell).
+ *               params[6+] Optional parameters depending on anim_type:
+ *                        - For factor-based tweens (ACCELERATE_FACTOR, etc.):
+ *                          params[6]: factor (Float:v1)
+ *                          params[7] (optional): "CURRENT" string
+ *                        - For interpolator-based tweens (DIVISOR_INTERP, BOUNCE, SPRING):
+ *                          params[6]: v1 (e.g., divisor for DIVISOR_INTERP)
+ *                          params[7]: v2 (e.g., count for BOUNCE/SPRING)
+ *                          params[8] (optional): "CURRENT" string
+ *                        - For CUBIC_BEZIER:
+ *                          params[6]: x1
+ *                          params[7]: y1
+ *                          params[8]: x2 (or "CURRENT" if 12 params)
+ *                          params[9]: y2 (or x2 if 10 params)
+ *                          params[10] (optional): y2 if 10 params
+ *                          params[11] (optional): "CURRENT" string if 12 params
+ *                        - For simple tweens (LINEAR, ACCELERATE, DECELERATE, SINUSOIDAL):
+ *                          params[6] (optional): "CURRENT" string
+ * @return 0 on success, -1 on parsing error or if wrong number of parameters.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_state_anim(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1206,7 +1811,23 @@ _edje_embryo_fn_set_state_anim(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_state(part_id, dst[], maxlen, &Float:val) */
+/**
+ * @brief Gets the current state of an Edje part.
+ *
+ * This function is exposed to Embryo scripts as `get_state(part_id, dst[], maxlen, &Float:val)`.
+ * It retrieves the name and value of the current state of the part identified by `part_id`.
+ * The state name is copied into `dst` (up to `maxlen`), and the state value is stored in `val`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the part.
+ *               params[2] is the Embryo cell address of the destination string buffer for the state name.
+ *               params[3] is the maximum length of the destination buffer.
+ *               params[4] is the Embryo cell address to store the state value (float).
+ * @return Always 0. State name and value are returned via output parameters.
+ *         If no description is chosen, an empty string and 0.0 are returned.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_state(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1253,7 +1874,26 @@ _edje_embryo_fn_get_state(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* set_tween_state(part_id, Float:tween, state1[], Float:state1_val, state2[], Float:state2_val) */
+/**
+ * @brief Sets a part to an intermediate state between two defined states using linear tweening.
+ *
+ * This function is exposed to Embryo scripts as
+ * `set_tween_state(part_id, Float:tween, state1[], Float:state1_val, state2[], Float:state2_val)`.
+ * It positions a part at an interpolated point `tween` (0.0 to 1.0) between
+ * `state1` (at `state1_val`) and `state2` (at `state2_val`).
+ * Any existing program on the part is stopped.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the part.
+ *               params[2] is the tween factor (0.0 to 1.0, float as Embryo_Cell).
+ *               params[3] is the Embryo cell address of the first state name string.
+ *               params[4] is the value for the first state (float, as Embryo_Cell).
+ *               params[5] is the Embryo cell address of the second state name string.
+ *               params[6] is the value for the second state (float, as Embryo_Cell).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_tween_state(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1289,6 +1929,45 @@ _edje_embryo_fn_set_tween_state(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
+/**
+ * @brief Sets a part to an intermediate state between two defined states with animation parameters.
+ *
+ * This function is exposed to Embryo scripts as
+ * `set_tween_state_anim(part_id, state1_name[], Float:state1_val, state2_name[], Float:state2_val, anim_type, Float:tween_pos, ...)`.
+ * It transitions a part to an interpolated point `tween_pos` (0.0 to 1.0) between
+ * `state1_name` (at `state1_val`) and `state2_name` (at `state2_val`).
+ * The transition itself is animated according to `anim_type` and other optional
+ * animation parameters (v1, v2, v3, v4, "CURRENT" flag).
+ * Any existing program on the part is stopped.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the part.
+ *               params[2] is the Embryo cell address of the first state name string.
+ *               params[3] is the value for the first state (float, as Embryo_Cell).
+ *               params[4] is the Embryo cell address of the second state name string.
+ *               params[5] is the value for the second state (float, as Embryo_Cell).
+ *               params[6] is the animation type (Edje_Tween_Mode) for the transition.
+ *               params[7] is the target tween position (0.0 to 1.0, float as Embryo_Cell) between state1 and state2.
+ *               params[8+] Optional parameters depending on anim_type, similar to _edje_embryo_fn_set_state_anim:
+ *                        - For factor-based tweens:
+ *                          params[8]: factor (Float:v1)
+ *                          params[9] (optional): "CURRENT" string
+ *                        - For interpolator-based tweens:
+ *                          params[8]: v1
+ *                          params[9]: v2
+ *                          params[10] (optional): "CURRENT" string
+ *                        - For CUBIC_BEZIER:
+ *                          params[8]: x1
+ *                          params[9]: y1
+ *                          params[10]: x2 (or "CURRENT" if 12 params)
+ *                          params[11]: y2 (or x2 if 12 params)
+ *                          params[12] (optional): y2 if 12 params
+ *                        - For simple tweens:
+ *                          params[8] (optional): "CURRENT" string
+ * @return 0 on success, -1 on parsing error or if wrong number of parameters.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_tween_state_anim(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1401,7 +2080,18 @@ _edje_embryo_fn_set_tween_state_anim(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* run_program(program_id) */
+/**
+ * @brief Runs an Edje program.
+ *
+ * This function is exposed to Embryo scripts as `run_program(program_id)`.
+ * It executes the Edje program identified by `program_id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the program to run.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_run_program(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1421,7 +2111,20 @@ _edje_embryo_fn_run_program(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_drag_dir(part_id) */
+/**
+ * @brief Gets the drag direction of a draggable part.
+ *
+ * This function is exposed to Embryo scripts as `Direction:get_drag_dir(part_id)`.
+ * It returns the drag direction (e.g., EDJE_DRAG_DIR_X, EDJE_DRAG_DIR_XY)
+ * for the part identified by `part_id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the draggable part.
+ * @return The `Edje_Drag_Dir` enum value representing the drag direction.
+ *         Returns 0 if the part is not found or not draggable.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_drag_dir(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1437,7 +2140,21 @@ _edje_embryo_fn_get_drag_dir(Embryo_Program *ep, Embryo_Cell *params)
    return edje_object_part_drag_dir_get(ed->obj, rp->part->name);
 }
 
-/* get_drag(part_id, &Float:dx, &Float:dy) */
+/**
+ * @brief Gets the current drag amount of a draggable part.
+ *
+ * This function is exposed to Embryo scripts as `get_drag(part_id, &Float:dx, &Float:dy)`.
+ * It retrieves the current drag displacement (dx, dy) for the part
+ * identified by `part_id`. The values are typically between 0.0 and 1.0.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the draggable part.
+ *               params[2] is the Embryo cell address to store the X drag amount (float).
+ *               params[3] is the Embryo cell address to store the Y drag amount (float).
+ * @return Always 0. Drag amounts are returned via output parameters.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_drag(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1458,7 +2175,21 @@ _edje_embryo_fn_get_drag(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* set_drag(part_id, Float:dx, Float:dy) */
+/**
+ * @brief Sets the current drag amount of a draggable part.
+ *
+ * This function is exposed to Embryo scripts as `set_drag(part_id, Float:dx, Float:dy)`.
+ * It sets the current drag displacement to (dx, dy) for the part
+ * identified by `part_id`. The values are typically between 0.0 and 1.0.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the draggable part.
+ *               params[2] is the X drag amount (float, as Embryo_Cell).
+ *               params[3] is the Y drag amount (float, as Embryo_Cell).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_drag(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1477,7 +2208,21 @@ _edje_embryo_fn_set_drag(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_drag_size(part_id, &Float:dx, &Float:dy) */
+/**
+ * @brief Gets the size of a draggable part.
+ *
+ * This function is exposed to Embryo scripts as `get_drag_size(part_id, &Float:dx, &Float:dy)`.
+ * It retrieves the size (dx, dy) of the draggable area for the part
+ * identified by `part_id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the draggable part.
+ *               params[2] is the Embryo cell address to store the width (float).
+ *               params[3] is the Embryo cell address to store the height (float).
+ * @return Always 0. Drag size is returned via output parameters.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_drag_size(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1498,7 +2243,21 @@ _edje_embryo_fn_get_drag_size(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* set_drag_size(part_id, Float:dx, Float:dy) */
+/**
+ * @brief Sets the size of a draggable part.
+ *
+ * This function is exposed to Embryo scripts as `set_drag_size(part_id, Float:dx, Float:dy)`.
+ * It sets the size of the draggable area to (dx, dy) for the part
+ * identified by `part_id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the draggable part.
+ *               params[2] is the width (float, as Embryo_Cell).
+ *               params[3] is the height (float, as Embryo_Cell).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_drag_size(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1517,7 +2276,20 @@ _edje_embryo_fn_set_drag_size(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* set_text(part_id, str[]) */
+/**
+ * @brief Sets the text of a text part.
+ *
+ * This function is exposed to Embryo scripts as `set_text(part_id, str[])`.
+ * It sets the text content of the TEXT or TEXTBLOCK part identified by `part_id`
+ * to the given string `str`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the text part.
+ *               params[2] is the Embryo cell address of the text string to set.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_text(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1539,7 +2311,23 @@ _edje_embryo_fn_set_text(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_text(part_id, dst[], maxlen) */
+/**
+ * @brief Gets the text of a text part.
+ *
+ * This function is exposed to Embryo scripts as `get_text(part_id, dst[], maxlen)`.
+ * It retrieves the text content of the TEXT or TEXTBLOCK part identified by `part_id`
+ * and copies it into the destination buffer `dst`, up to `maxlen` characters.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the text part.
+ *               params[2] is the Embryo cell address of the destination string buffer.
+ *               params[3] is the maximum length of the destination buffer.
+ * @return Always 0. The text is written to the `dst` buffer.
+ *         If the text is longer than `maxlen`, it is truncated.
+ *         If the part is not a text part or has no text, an empty string is written.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_text(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1577,7 +2365,20 @@ _edje_embryo_fn_get_text(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_min_size(&w, &h) */
+/**
+ * @brief Gets the minimum size of the Edje object.
+ *
+ * This function is exposed to Embryo scripts as `get_min_size(&w, &h)`.
+ * It retrieves the minimum width `w` and height `h` that the Edje object
+ * can be resized to.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the Embryo cell address to store the minimum width (integer).
+ *               params[2] is the Embryo cell address to store the minimum height (integer).
+ * @return Always 0. Minimum size is returned via output parameters.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_min_size(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1592,7 +2393,20 @@ _edje_embryo_fn_get_min_size(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_max_size(&w, &h) */
+/**
+ * @brief Gets the maximum size of the Edje object.
+ *
+ * This function is exposed to Embryo scripts as `get_max_size(&w, &h)`.
+ * It retrieves the maximum width `w` and height `h` that the Edje object
+ * can be resized to.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the Embryo cell address to store the maximum width (integer).
+ *               params[2] is the Embryo cell address to store the maximum height (integer).
+ * @return Always 0. Maximum size is returned via output parameters.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_max_size(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1607,7 +2421,24 @@ _edje_embryo_fn_get_max_size(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_color_class(class[], &r, &g, &b, &a) */
+/**
+ * @brief Gets the RGBA values of a defined color class.
+ *
+ * This function is exposed to Embryo scripts as `get_color_class(class[], &r, &g, &b, &a)`.
+ * It retrieves the red, green, blue, and alpha components of the color class
+ * specified by `class[]`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the Embryo cell address of the color class name string.
+ *               params[2] is the Embryo cell address to store the red component (0-255).
+ *               params[3] is the Embryo cell address to store the green component (0-255).
+ *               params[4] is the Embryo cell address to store the blue component (0-255).
+ *               params[5] is the Embryo cell address to store the alpha component (0-255).
+ * @return 0 if the color class is found and values are retrieved, otherwise 0 (no explicit error return).
+ *         If the class is not found, the output parameters are not modified.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_color_class(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1628,7 +2459,23 @@ _edje_embryo_fn_get_color_class(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* set_color_class(class[], r, g, b, a) */
+/**
+ * @brief Sets the RGBA values of a defined color class.
+ *
+ * This function is exposed to Embryo scripts as `set_color_class(class[], r, g, b, a)`.
+ * It sets the red, green, blue, and alpha components for the color class
+ * specified by `class[]`. This also sets outline and shadow colors to the same values.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the Embryo cell address of the color class name string.
+ *               params[2] is the red component (0-255).
+ *               params[3] is the green component (0-255).
+ *               params[4] is the blue component (0-255).
+ *               params[5] is the alpha component (0-255).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_color_class(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1646,7 +2493,20 @@ _edje_embryo_fn_set_color_class(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* set_text_class(class[], font[], Float:size) */
+/**
+ * @brief Sets the font and size for a defined text class.
+ *
+ * This function is exposed to Embryo scripts as `set_text_class(class[], font[], Float:size)`.
+ * It sets the font name and font size for the text class specified by `class[]`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the Embryo cell address of the text class name string.
+ *               params[2] is the Embryo cell address of the font name string.
+ *               params[3] is the font size (float, as Embryo_Cell).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_text_class(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1664,7 +2524,23 @@ _edje_embryo_fn_set_text_class(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_text_class(class[], font[], &Float:size) */
+/**
+ * @brief Gets the font and size of a defined text class.
+ *
+ * This function is exposed to Embryo scripts as `get_text_class(class[], font[], &Float:size)`.
+ * It retrieves the font name and font size for the text class specified by `class[]`.
+ * The font name is copied into the `font[]` buffer.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the Embryo cell address of the text class name string.
+ *               params[2] is the Embryo cell address of the destination string buffer for the font name.
+ *                        (Note: The size of this buffer is not passed, ensure it's large enough.)
+ *               params[3] is the Embryo cell address to store the font size (float).
+ * @return 0 if the text class is found and values are retrieved, otherwise 0 (no explicit error return).
+ *         If the class is not found, the output parameters are not modified.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_text_class(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1683,7 +2559,21 @@ _edje_embryo_fn_get_text_class(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_drag_step(part_id, &Float:dx, &Float:&dy) */
+/**
+ * @brief Gets the step values for a draggable part.
+ *
+ * This function is exposed to Embryo scripts as `get_drag_step(part_id, &Float:dx, &Float:dy)`.
+ * It retrieves the X and Y step values (dx, dy) for the draggable part
+ * identified by `part_id`. Step values control how much the drag value changes per pixel moved.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the draggable part.
+ *               params[2] is the Embryo cell address to store the X step value (float).
+ *               params[3] is the Embryo cell address to store the Y step value (float).
+ * @return Always 0. Step values are returned via output parameters.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_drag_step(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1704,7 +2594,21 @@ _edje_embryo_fn_get_drag_step(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* set_drag_step(part_id, Float:dx, Float:dy) */
+/**
+ * @brief Sets the step values for a draggable part.
+ *
+ * This function is exposed to Embryo scripts as `set_drag_step(part_id, Float:dx, Float:dy)`.
+ * It sets the X and Y step values to (dx, dy) for the draggable part
+ * identified by `part_id`. Step values control how much the drag value changes per pixel moved.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the draggable part.
+ *               params[2] is the X step value (float, as Embryo_Cell).
+ *               params[3] is the Y step value (float, as Embryo_Cell).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_drag_step(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1723,7 +2627,21 @@ _edje_embryo_fn_set_drag_step(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_drag_page(part_id, &Float:dx, &Float:&dy) */
+/**
+ * @brief Gets the page values for a draggable part.
+ *
+ * This function is exposed to Embryo scripts as `get_drag_page(part_id, &Float:dx, &Float:dy)`.
+ * It retrieves the X and Y page values (dx, dy) for the draggable part
+ * identified by `part_id`. Page values are used for page-by-page scrolling/dragging.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the draggable part.
+ *               params[2] is the Embryo cell address to store the X page value (float).
+ *               params[3] is the Embryo cell address to store the Y page value (float).
+ * @return Always 0. Page values are returned via output parameters.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_drag_page(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1744,7 +2662,23 @@ _edje_embryo_fn_get_drag_page(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_geometry(pard_id, &x, &y, &w, &h) */
+/**
+ * @brief Gets the geometry of an Edje part.
+ *
+ * This function is exposed to Embryo scripts as `get_geometry(part_id, &x, &y, &w, &h)`.
+ * It retrieves the X, Y, width, and height of the part identified by `part_id`.
+ * Coordinates are relative to the Edje object.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the part.
+ *               params[2] is the Embryo cell address to store the X coordinate (integer).
+ *               params[3] is the Embryo cell address to store the Y coordinate (integer).
+ *               params[4] is the Embryo cell address to store the width (integer).
+ *               params[5] is the Embryo cell address to store the height (integer).
+ * @return Always 0. Geometry is returned via output parameters.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_geometry(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1767,7 +2701,21 @@ _edje_embryo_fn_get_geometry(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* set_drag_page(part_id, Float:dx, Float:dy) */
+/**
+ * @brief Sets the page values for a draggable part.
+ *
+ * This function is exposed to Embryo scripts as `set_drag_page(part_id, Float:dx, Float:dy)`.
+ * It sets the X and Y page values to (dx, dy) for the draggable part
+ * identified by `part_id`. Page values are used for page-by-page scrolling/dragging.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the draggable part.
+ *               params[2] is the X page value (float, as Embryo_Cell).
+ *               params[3] is the Y page value (float, as Embryo_Cell).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_drag_page(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -1786,7 +2734,39 @@ _edje_embryo_fn_set_drag_page(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* send_message(Msg_Type:type, id,...); */
+/**
+ * @brief Sends a message from an Edje script to the application or other Edje objects.
+ *
+ * This function is exposed to Embryo scripts as `send_message(Msg_Type:type, id, ...)`.
+ * It constructs and sends a message of a specific `type` with an `id` and
+ * variable payload depending on the message type.
+ *
+ * Message types and their expected parameters:
+ * - `EDJE_MESSAGE_NONE`: `id`
+ * - `EDJE_MESSAGE_STRING`: `id, string_val[]`
+ * - `EDJE_MESSAGE_INT`: `id, int_val`
+ * - `EDJE_MESSAGE_FLOAT`: `id, Float:float_val`
+ * - `EDJE_MESSAGE_STRING_SET`: `id, string1[], string2[], ...`
+ *   - `params[0]` indicates total size, used to determine count of strings.
+ * - `EDJE_MESSAGE_INT_SET`: `id, int1, int2, ...`
+ *   - `params[0]` indicates total size, used to determine count of ints.
+ * - `EDJE_MESSAGE_FLOAT_SET`: `id, Float:float1, Float:float2, ...`
+ *   - `params[0]` indicates total size, used to determine count of floats.
+ * - `EDJE_MESSAGE_STRING_INT`: `id, string_val[], int_val`
+ * - `EDJE_MESSAGE_STRING_FLOAT`: `id, string_val[], Float:float_val`
+ * - `EDJE_MESSAGE_STRING_INT_SET`: `id, string_val[], int1, int2, ...`
+ *   - `params[0]` indicates total size, used to determine count of ints.
+ * - `EDJE_MESSAGE_STRING_FLOAT_SET`: `id, string_val[], Float:float1, Float:float2, ...`
+ *   - `params[0]` indicates total size, used to determine count of floats.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the total size of parameters in bytes.
+ *               params[1] is the `Edje_Message_Type` (integer).
+ *               params[2] is the message ID (integer).
+ *               params[3+] are the message payload, varying by type.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_send_message(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -2058,7 +3038,25 @@ _edje_embryo_fn_send_message(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* custom_state(part_id, state[], Float:state_val = 0.0) */
+/**
+ * @brief Creates a new custom state for a part, based on an existing state.
+ *
+ * This function is exposed to Embryo scripts as `custom_state(part_id, state[], Float:state_val = 0.0)`.
+ * It allows a script to define a new, modifiable state named "custom" for a part.
+ * This "custom" state is initialized as a copy of an existing `state` definition
+ * (e.g., "default") at a specific `state_val`. Once created, properties of this
+ * "custom" state can be modified using `set_state_val()`.
+ *
+ * If a "custom" state already exists for the part, this function does nothing.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the part.
+ *               params[2] is the Embryo cell address of the base state name string (e.g., "default").
+ *               params[3] is the value of the base state (float, as Embryo_Cell).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_custom_state(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -2199,7 +3197,26 @@ case EDJE_PART_TYPE_##Short:                               \
    return 0;
 }
 
-/* set_state_val(part_id, State_Param:p, ...) */
+/**
+ * @brief Modifies a specific parameter of a part's "custom" state.
+ *
+ * This function is exposed to Embryo scripts as `set_state_val(part_id, State_Param:p, ...)`.
+ * It allows changing individual properties (e.g., alignment, color, text) of the
+ * "custom" state previously created for `part_id` by `custom_state()`.
+ * The `State_Param:p` determines which property to change, and subsequent parameters
+ * provide the new value(s) for that property.
+ *
+ * Example: `set_state_val(my_part_id, EDJE_STATE_PARAM_COLOR, 255, 0, 0, 255);` // Set color to red
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the total size of parameters in bytes.
+ *               params[1] is the ID of the part.
+ *               params[2] is the `Edje_State_Param` enum value indicating the property to set.
+ *               params[3+] are the value(s) for the specified property. The number and type
+ *                          of these values depend on `params[2]`.
+ * @return Always 0. Triggers a recalc of the Edje object.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_state_val(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -2912,7 +3929,27 @@ _edje_embryo_fn_set_state_val(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_state_val(part_id, State_Param:p, ...) */
+/**
+ * @brief Retrieves a specific parameter of a part's "custom" state.
+ *
+ * This function is exposed to Embryo scripts as `get_state_val(part_id, State_Param:p, ...)`.
+ * It allows reading individual properties (e.g., alignment, color, text) of the
+ * "custom" state previously created for `part_id` by `custom_state()`.
+ * The `State_Param:p` determines which property to read, and subsequent parameters
+ * are pointers to where the retrieved value(s) should be stored.
+ *
+ * Example: `get_state_val(my_part_id, EDJE_STATE_PARAM_COLOR, &r, &g, &b, &a);`
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the total size of parameters in bytes.
+ *               params[1] is the ID of the part.
+ *               params[2] is the `Edje_State_Param` enum value indicating the property to get.
+ *               params[3+] are Embryo cell addresses to store the retrieved value(s).
+ *                          The number and type of these depend on `params[2]`.
+ *                          For string types, `params[3]` is the destination buffer and `params[4]` is max length.
+ * @return Always 0. Values are returned via output parameters.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_state_val(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3565,7 +4602,20 @@ _edje_embryo_fn_get_state_val(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* set_mouse_events(part_id, ev) */
+/**
+ * @brief Sets the mouse event flags for a specific part.
+ *
+ * This function is exposed to Embryo scripts as `set_mouse_events(part_id, ev)`.
+ * It enables or disables mouse event processing for the part identified by `part_id`.
+ * `ev` is a bitmask of flags; 0 typically means no mouse events, >0 means enabled.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the part.
+ *               params[2] is the mouse event flags (integer).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_mouse_events(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3587,7 +4637,18 @@ _edje_embryo_fn_set_mouse_events(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_mouse_events(part_id) */
+/**
+ * @brief Gets the mouse event flags for a specific part.
+ *
+ * This function is exposed to Embryo scripts as `get_mouse_events(part_id)`.
+ * It retrieves the current mouse event flags for the part identified by `part_id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the part.
+ * @return The current mouse event flags (integer) for the part, or 0 if part not found.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_mouse_events(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3610,7 +4671,26 @@ _edje_embryo_fn_get_mouse_events(Embryo_Program *ep, Embryo_Cell *params)
 
 }
 
-/* set_pointer_mode(part_id, mode) */
+/**
+ * @brief Sets the pointer mode for a specific part.
+ *
+ * This function is exposed to Embryo scripts as `set_pointer_mode(part_id, mode)`.
+ * It configures how a part interacts with pointer events, specifically regarding
+ * auto-grabbing or not grabbing the pointer.
+ *
+ * Pointer_Mode {
+ *   POINTER_MODE_AUTOGRAB = 0, // Default: part grabs pointer on mouse down
+ *   POINTER_MODE_NOGRAB = 1,   // Part does not grab pointer
+ *   POINTER_MODE_NOGREP = 2    // Part does not grab pointer and events are not repeated
+ * }
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the part.
+ *               params[2] is the pointer mode (integer, corresponds to Pointer_Mode enum).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_pointer_mode(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3632,7 +4712,19 @@ _edje_embryo_fn_set_pointer_mode(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* set_repeat_events(part_id, rep) */
+/**
+ * @brief Sets whether a part should repeat events.
+ *
+ * This function is exposed to Embryo scripts as `set_repeat_events(part_id, rep)`.
+ * If `rep` is non-zero, events like mouse button holds might be repeated.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the part.
+ *               params[2] is the repeat events flag (integer, 0 or 1).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_repeat_events(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3654,7 +4746,17 @@ _edje_embryo_fn_set_repeat_events(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_repeat_events(part_id) */
+/**
+ * @brief Gets whether a part repeats events.
+ *
+ * This function is exposed to Embryo scripts as `get_repeat_events(part_id)`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the part.
+ * @return The repeat events flag (integer, 0 or 1) for the part, or 0 if part not found.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_repeat_events(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3677,7 +4779,20 @@ _edje_embryo_fn_get_repeat_events(Embryo_Program *ep, Embryo_Cell *params)
 
 }
 
-/* set_ignore_flags(part_id, flags) */
+/**
+ * @brief Sets the event ignore flags for a specific part.
+ *
+ * This function is exposed to Embryo scripts as `set_ignore_flags(part_id, flags)`.
+ * `flags` is a bitmask of `Evas_Object_Event_Flags` that specifies which events
+ * the part should ignore (pass through to objects below it).
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the part.
+ *               params[2] is the ignore flags bitmask (integer).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_ignore_flags(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3699,7 +4814,17 @@ _edje_embryo_fn_set_ignore_flags(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_ignore_flags(part_id) */
+/**
+ * @brief Gets the event ignore flags for a specific part.
+ *
+ * This function is exposed to Embryo scripts as `get_ignore_flags(part_id)`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the part.
+ * @return The current ignore flags bitmask (integer) for the part, or 0 if part not found.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_ignore_flags(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3722,7 +4847,23 @@ _edje_embryo_fn_get_ignore_flags(Embryo_Program *ep, Embryo_Cell *params)
 
 }
 
-/* set_mask_flags(part_id, flags) */
+/**
+ * @brief Sets the event mask flags for a specific part.
+ * (Note: This function seems to be intended for masking events, but its
+ * implementation might be similar to ignore_flags or have a specific nuance
+ * within Edje's event handling. The name suggests it might prevent events
+ * from propagating further up or down in a specific way.)
+ *
+ * This function is exposed to Embryo scripts as `set_mask_flags(part_id, flags)`.
+ * `flags` is a bitmask that likely influences event propagation.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the part.
+ *               params[2] is the mask flags bitmask (integer).
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_mask_flags(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3744,7 +4885,17 @@ _edje_embryo_fn_set_mask_flags(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* get_mask_flags(part_id) */
+/**
+ * @brief Gets the event mask flags for a specific part.
+ *
+ * This function is exposed to Embryo scripts as `get_mask_flags(part_id)`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the part.
+ * @return The current mask flags bitmask (integer) for the part, or 0 if part not found.
+ */
 static Embryo_Cell
 _edje_embryo_fn_get_mask_flags(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3767,7 +4918,20 @@ _edje_embryo_fn_get_mask_flags(Embryo_Program *ep, Embryo_Cell *params)
 
 }
 
-/* part_swallow(part_id, group_name) */
+/**
+ * @brief Makes a SWALLOW part swallow a new Edje object from the same Edje file.
+ *
+ * This function is exposed to Embryo scripts as `part_swallow(part_id, group_name)`.
+ * It creates a new Edje object using the group `group_name` from the current
+ * Edje file and swallows it into the SWALLOW part identified by `part_id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the SWALLOW part.
+ *               params[2] is the Embryo cell address of the group name string to load and swallow.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_part_swallow(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3804,7 +4968,21 @@ _edje_embryo_fn_part_swallow(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* set_focus(part_id, seat_name[]) */
+/**
+ * @brief Sets the focus to a specific part for a given seat.
+ *
+ * This function is exposed to Embryo scripts as `set_focus(part_id, seat_name[])`.
+ * It directs keyboard focus to the Edje part identified by `part_id`.
+ * If `seat_name` is provided, focus is set for that specific seat; otherwise,
+ * the default seat is used.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments (1 or 2).
+ *               params[1] is the ID of the part to focus.
+ *               params[2] (optional) is the Embryo cell address of the seat name string.
+ * @return 0 on success, -1 if the wrong number of parameters is provided.
+ */
 static Embryo_Cell
 _edje_embryo_fn_set_focus(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3834,7 +5012,19 @@ _edje_embryo_fn_set_focus(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* unset_focus(seat_name[]) */
+/**
+ * @brief Removes focus from any part for a given seat (or default seat).
+ *
+ * This function is exposed to Embryo scripts as `unset_focus(seat_name[])`.
+ * It clears the focus for the specified `seat_name`. If `seat_name` is not
+ * provided, focus is cleared for the default seat.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments (0 or 1).
+ *               params[1] (optional) is the Embryo cell address of the seat name string.
+ * @return 0 on success, -1 if the wrong number of parameters is provided.
+ */
 static Embryo_Cell
 _edje_embryo_fn_unset_focus(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3857,7 +5047,20 @@ _edje_embryo_fn_unset_focus(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* external_param_get_int(id, param_name[]) */
+/**
+ * @brief Gets an integer value from an external parameter of an EXTERNAL part.
+ *
+ * This function is exposed to Embryo scripts as `external_param_get_int(id, param_name[])`.
+ * It retrieves an integer value for the parameter `param_name` from the
+ * EXTERNAL part identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the EXTERNAL part.
+ *               params[2] is the Embryo cell address of the parameter name string.
+ * @return The integer value of the parameter, or 0 if not found or on error.
+ */
 static Embryo_Cell
 _edje_embryo_fn_external_param_get_int(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3883,7 +5086,21 @@ _edje_embryo_fn_external_param_get_int(Embryo_Program *ep, Embryo_Cell *params)
    return eep.i;
 }
 
-/* external_param_set_int(id, param_name[], val) */
+/**
+ * @brief Sets an integer value for an external parameter of an EXTERNAL part.
+ *
+ * This function is exposed to Embryo scripts as `external_param_set_int(id, param_name[], value)`.
+ * It sets an integer `value` for the parameter `param_name` of the
+ * EXTERNAL part identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the EXTERNAL part.
+ *               params[2] is the Embryo cell address of the parameter name string.
+ *               params[3] is the integer value to set.
+ * @return Non-zero on success, 0 on failure (e.g., part not found, param not found, type mismatch).
+ */
 static Embryo_Cell
 _edje_embryo_fn_external_param_set_int(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3908,7 +5125,20 @@ _edje_embryo_fn_external_param_set_int(Embryo_Program *ep, Embryo_Cell *params)
    return _edje_external_param_set(NULL, rp, &eep);
 }
 
-/* Float:external_param_get_float(id, param_name[]) */
+/**
+ * @brief Gets a float value from an external parameter of an EXTERNAL part.
+ *
+ * This function is exposed to Embryo scripts as `Float:external_param_get_float(id, param_name[])`.
+ * It retrieves a float (double precision internally) value for the parameter `param_name`
+ * from the EXTERNAL part identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the EXTERNAL part.
+ *               params[2] is the Embryo cell address of the parameter name string.
+ * @return The float value of the parameter (as Embryo_Cell), or 0.0 if not found or on error.
+ */
 static Embryo_Cell
 _edje_embryo_fn_external_param_get_float(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3936,7 +5166,21 @@ _edje_embryo_fn_external_param_get_float(Embryo_Program *ep, Embryo_Cell *params
    return EMBRYO_FLOAT_TO_CELL(v);
 }
 
-/* external_param_set_float(id, param_name[], Float:val) */
+/**
+ * @brief Sets a float value for an external parameter of an EXTERNAL part.
+ *
+ * This function is exposed to Embryo scripts as `external_param_set_float(id, param_name[], Float:value)`.
+ * It sets a float `value` for the parameter `param_name` of the
+ * EXTERNAL part identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the EXTERNAL part.
+ *               params[2] is the Embryo cell address of the parameter name string.
+ *               params[3] is the float value (as Embryo_Cell) to set.
+ * @return Non-zero on success, 0 on failure.
+ */
 static Embryo_Cell
 _edje_embryo_fn_external_param_set_float(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3961,7 +5205,20 @@ _edje_embryo_fn_external_param_set_float(Embryo_Program *ep, Embryo_Cell *params
    return _edje_external_param_set(NULL, rp, &eep);
 }
 
-/* external_param_get_strlen(id, param_name[]) */
+/**
+ * @brief Gets the length of a string external parameter of an EXTERNAL part.
+ *
+ * This function is exposed to Embryo scripts as `external_param_get_strlen(id, param_name[])`.
+ * It retrieves the length of the string value for the parameter `param_name`
+ * from the EXTERNAL part identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the EXTERNAL part.
+ *               params[2] is the Embryo cell address of the parameter name string.
+ * @return The length of the string parameter, or 0 if not found, not a string, or on error.
+ */
 static Embryo_Cell
 _edje_embryo_fn_external_param_get_strlen(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -3988,7 +5245,24 @@ _edje_embryo_fn_external_param_get_strlen(Embryo_Program *ep, Embryo_Cell *param
    return strlen(eep.s);
 }
 
-/* external_param_get_str(id, param_name[], val[], val_maxlen) */
+/**
+ * @brief Gets a string value from an external parameter of an EXTERNAL part.
+ *
+ * This function is exposed to Embryo scripts as `external_param_get_str(id, param_name[], value[], value_maxlen)`.
+ * It retrieves the string value for the parameter `param_name` from the
+ * EXTERNAL part identified by `id`, copying it into the `value[]` buffer
+ * up to `value_maxlen` characters.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the EXTERNAL part.
+ *               params[2] is the Embryo cell address of the parameter name string.
+ *               params[3] is the Embryo cell address of the destination string buffer.
+ *               params[4] is the maximum length of the destination buffer.
+ * @return 1 on success, 0 on failure (e.g., param not found, buffer too small, type mismatch).
+ *         On failure or if param not found, `value[]` is set to an empty string.
+ */
 static Embryo_Cell
 _edje_embryo_fn_external_param_get_str(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4035,7 +5309,21 @@ error:
    return 0;
 }
 
-/* external_param_set_str(id, param_name[], val[]) */
+/**
+ * @brief Sets a string value for an external parameter of an EXTERNAL part.
+ *
+ * This function is exposed to Embryo scripts as `external_param_set_str(id, param_name[], value[])`.
+ * It sets a string `value` for the parameter `param_name` of the
+ * EXTERNAL part identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the EXTERNAL part.
+ *               params[2] is the Embryo cell address of the parameter name string.
+ *               params[3] is the Embryo cell address of the string value to set.
+ * @return Non-zero on success, 0 on failure.
+ */
 static Embryo_Cell
 _edje_embryo_fn_external_param_set_str(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4062,7 +5350,21 @@ _edje_embryo_fn_external_param_set_str(Embryo_Program *ep, Embryo_Cell *params)
    return _edje_external_param_set(NULL, rp, &eep);
 }
 
-/* external_param_get_choice_len(id, param_name[]) */
+/**
+ * @brief Gets the length of the current choice string of an EXTERNAL part's choice parameter.
+ *
+ * This function is exposed to Embryo scripts as `external_param_get_choice_len(id, param_name[])`.
+ * It retrieves the length of the currently selected choice string for the parameter `param_name`
+ * (which must be of type EDJE_EXTERNAL_PARAM_TYPE_CHOICE) from the EXTERNAL part
+ * identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the EXTERNAL part.
+ *               params[2] is the Embryo cell address of the parameter name string.
+ * @return The length of the choice string, or 0 if not found, not a choice type, or on error.
+ */
 static Embryo_Cell
 _edje_embryo_fn_external_param_get_choice_len(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4089,7 +5391,23 @@ _edje_embryo_fn_external_param_get_choice_len(Embryo_Program *ep, Embryo_Cell *p
    return strlen(eep.s);
 }
 
-/* external_param_get_choice(id, param_name[], val[], val_maxlen) */
+/**
+ * @brief Gets the current choice string of an EXTERNAL part's choice parameter.
+ *
+ * This function is exposed to Embryo scripts as `external_param_get_choice(id, param_name[], value[], value_maxlen)`.
+ * It retrieves the currently selected choice string for the parameter `param_name`
+ * (which must be of type EDJE_EXTERNAL_PARAM_TYPE_CHOICE) from the EXTERNAL part
+ * identified by `id`, copying it into the `value[]` buffer up to `value_maxlen` characters.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the EXTERNAL part.
+ *               params[2] is the Embryo cell address of the parameter name string.
+ *               params[3] is the Embryo cell address of the destination string buffer.
+ *               params[4] is the maximum length of the destination buffer.
+ * @return 1 on success, 0 on failure. On failure, `value[]` is set to an empty string.
+ */
 static Embryo_Cell
 _edje_embryo_fn_external_param_get_choice(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4136,7 +5454,22 @@ error:
    return 0;
 }
 
-/* external_param_set_choice(id, param_name[], val[]) */
+/**
+ * @brief Sets the current choice for an EXTERNAL part's choice parameter.
+ *
+ * This function is exposed to Embryo scripts as `external_param_set_choice(id, param_name[], value[])`.
+ * It sets the choice for the parameter `param_name` (which must be of type
+ * EDJE_EXTERNAL_PARAM_TYPE_CHOICE) of the EXTERNAL part identified by `id`
+ * to the string `value[]`. The `value[]` must be one of the valid choices for that parameter.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the EXTERNAL part.
+ *               params[2] is the Embryo cell address of the parameter name string.
+ *               params[3] is the Embryo cell address of the choice string to set.
+ * @return Non-zero on success, 0 on failure.
+ */
 static Embryo_Cell
 _edje_embryo_fn_external_param_set_choice(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4163,7 +5496,20 @@ _edje_embryo_fn_external_param_set_choice(Embryo_Program *ep, Embryo_Cell *param
    return _edje_external_param_set(NULL, rp, &eep);
 }
 
-/* external_param_get_bool(id, param_name[]) */
+/**
+ * @brief Gets a boolean value from an external parameter of an EXTERNAL part.
+ *
+ * This function is exposed to Embryo scripts as `external_param_get_bool(id, param_name[])`.
+ * It retrieves a boolean (integer 0 or 1) value for the parameter `param_name`
+ * from the EXTERNAL part identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the EXTERNAL part.
+ *               params[2] is the Embryo cell address of the parameter name string.
+ * @return The boolean value (0 or 1) of the parameter, or 0 if not found or on error.
+ */
 static Embryo_Cell
 _edje_embryo_fn_external_param_get_bool(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4189,7 +5535,21 @@ _edje_embryo_fn_external_param_get_bool(Embryo_Program *ep, Embryo_Cell *params)
    return eep.i;
 }
 
-/* external_param_set_bool(id, param_name[], val) */
+/**
+ * @brief Sets a boolean value for an external parameter of an EXTERNAL part.
+ *
+ * This function is exposed to Embryo scripts as `external_param_set_bool(id, param_name[], value)`.
+ * It sets a boolean `value` (0 or 1) for the parameter `param_name` of the
+ * EXTERNAL part identified by `id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the EXTERNAL part.
+ *               params[2] is the Embryo cell address of the parameter name string.
+ *               params[3] is the boolean value (0 or 1) to set.
+ * @return Non-zero on success, 0 on failure.
+ */
 static Embryo_Cell
 _edje_embryo_fn_external_param_set_bool(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4215,9 +5575,26 @@ _edje_embryo_fn_external_param_set_bool(Embryo_Program *ep, Embryo_Cell *params)
 }
 
 #ifdef HAVE_EPHYSICS
-/* Generic function to call ephysics functions that apply an action to
-* a body using 3 double values.
-* To be used by the other functions only avoiding code duplication. */
+/**
+ * @brief Generic helper function to call EPhysics body functions that take three double components.
+ *
+ * This internal helper is used by various `physics_*_set` and `physics_*_apply`
+ * Embryo-exposed functions to reduce code duplication. It retrieves an Edje part,
+ * checks if it has an associated EPhysics_Body, converts three float parameters
+ * from Embryo cells to doubles, and calls the provided `func` with the body and
+ * these three doubles.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments (expected to be 4).
+ *               params[1] is the ID of the part with an EPhysics_Body.
+ *               params[2] is the X component (float, as Embryo_Cell).
+ *               params[3] is the Y component (float, as Embryo_Cell).
+ *               params[4] is the Z component (float, as Embryo_Cell).
+ * @param func A function pointer to an EPhysics call like `ephysics_body_central_impulse_apply`.
+ *             The signature must be `void (*func)(EPhysics_Body *body, double x, double y, double z)`.
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_physics_components_set(Embryo_Program *ep, Embryo_Cell *params, void (*func)(EPhysics_Body *body, double x, double y, double z))
 {
@@ -4246,9 +5623,25 @@ _edje_embryo_fn_physics_components_set(Embryo_Program *ep, Embryo_Cell *params, 
    return 0;
 }
 
-/* Generic function to call ephysics functions that get components related
- * to actions from a body using 3 double values.
- * To be used by the other functions only avoiding code duplication. */
+/**
+ * @brief Generic helper function to call EPhysics body functions that get three double components.
+ *
+ * This internal helper is used by various `physics_*_get` Embryo-exposed functions
+ * to reduce code duplication. It retrieves an Edje part, checks if it has an
+ * associated EPhysics_Body, calls the provided `func` to get three double values,
+ * and then sets these values back into the provided Embryo cell addresses as floats.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments (expected to be 4).
+ *               params[1] is the ID of the part with an EPhysics_Body.
+ *               params[2] is the Embryo cell address to store the X component (float).
+ *               params[3] is the Embryo cell address to store the Y component (float).
+ *               params[4] is the Embryo cell address to store the Z component (float).
+ * @param func A function pointer to an EPhysics call like `ephysics_body_forces_get`.
+ *             The signature must be `void (*func)(const EPhysics_Body *body, double *x, double *y, double *z)`.
+ * @return Always 0. Values are returned via output parameters.
+ */
 static Embryo_Cell
 _edje_embryo_fn_physics_components_get(Embryo_Program *ep, Embryo_Cell *params, void (*func)(const EPhysics_Body *body, double *x, double *y, double *z))
 {
@@ -4275,7 +5668,21 @@ _edje_embryo_fn_physics_components_get(Embryo_Program *ep, Embryo_Cell *params, 
    return 0;
 }
 
-/* physics_impulse(part_id, Float:x, Float:y, Float:z) */
+/**
+ * @brief Applies a central impulse to a physics-enabled part.
+ *
+ * This function is exposed to Embryo scripts as `physics_impulse(part_id, Float:x, Float:y, Float:z)`.
+ * It applies an impulse (force over a short time) to the center of mass of the
+ * EPhysics_Body associated with the part `part_id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[1]: part_id
+ *               params[2]: X component of impulse
+ *               params[3]: Y component of impulse
+ *               params[4]: Z component of impulse
+ * @return 0 if EPhysics is loaded and function is called, otherwise 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_physics_impulse(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4284,7 +5691,21 @@ _edje_embryo_fn_physics_impulse(Embryo_Program *ep, Embryo_Cell *params)
             ep, params, EPH_CALL(ephysics_body_central_impulse_apply));
 }
 
-/* physics_torque_impulse(part_id, Float:x, Float:y, Float:z) */
+/**
+ * @brief Applies a torque impulse to a physics-enabled part.
+ *
+ * This function is exposed to Embryo scripts as `physics_torque_impulse(part_id, Float:x, Float:y, Float:z)`.
+ * It applies an angular impulse (torque over a short time) to the EPhysics_Body
+ * associated with the part `part_id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[1]: part_id
+ *               params[2]: X component of torque impulse
+ *               params[3]: Y component of torque impulse
+ *               params[4]: Z component of torque impulse
+ * @return 0 if EPhysics is loaded and function is called, otherwise 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_physics_torque_impulse(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4293,7 +5714,21 @@ _edje_embryo_fn_physics_torque_impulse(Embryo_Program *ep, Embryo_Cell *params)
             ep, params, EPH_CALL(ephysics_body_torque_impulse_apply));
 }
 
-/* physics_force(part_id, Float:x, Float:y, Float:z) */
+/**
+ * @brief Applies a continuous central force to a physics-enabled part.
+ *
+ * This function is exposed to Embryo scripts as `physics_force(part_id, Float:x, Float:y, Float:z)`.
+ * It applies a continuous force to the center of mass of the EPhysics_Body
+ * associated with the part `part_id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[1]: part_id
+ *               params[2]: X component of force
+ *               params[3]: Y component of force
+ *               params[4]: Z component of force
+ * @return 0 if EPhysics is loaded and function is called, otherwise 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_physics_force(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4302,7 +5737,21 @@ _edje_embryo_fn_physics_force(Embryo_Program *ep, Embryo_Cell *params)
             ep, params, EPH_CALL(ephysics_body_central_force_apply));
 }
 
-/* physics_torque(part_id, Float:x, Float:y, Float:z) */
+/**
+ * @brief Applies a continuous torque to a physics-enabled part.
+ *
+ * This function is exposed to Embryo scripts as `physics_torque(part_id, Float:x, Float:y, Float:z)`.
+ * It applies a continuous angular force (torque) to the EPhysics_Body
+ * associated with the part `part_id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[1]: part_id
+ *               params[2]: X component of torque
+ *               params[3]: Y component of torque
+ *               params[4]: Z component of torque
+ * @return 0 if EPhysics is loaded and function is called, otherwise 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_physics_torque(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4311,7 +5760,18 @@ _edje_embryo_fn_physics_torque(Embryo_Program *ep, Embryo_Cell *params)
             ep, params, EPH_CALL(ephysics_body_torque_apply));
 }
 
-/* physics_clear_forces(part_id) */
+/**
+ * @brief Clears all forces and torques acting on a physics-enabled part.
+ *
+ * This function is exposed to Embryo scripts as `physics_clear_forces(part_id)`.
+ * It removes any continuous forces and torques currently applied to the
+ * EPhysics_Body associated with the part `part_id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[1]: part_id
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_physics_clear_forces(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4333,7 +5793,21 @@ _edje_embryo_fn_physics_clear_forces(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* physics_get_forces(part_id, &Float:x, &Float:y, &Float:z) */
+/**
+ * @brief Gets the total applied forces on a physics-enabled part.
+ *
+ * This function is exposed to Embryo scripts as `physics_get_forces(part_id, &Float:x, &Float:y, &Float:z)`.
+ * It retrieves the sum of all continuous forces currently acting on the
+ * EPhysics_Body associated with the part `part_id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[1]: part_id
+ *               params[2]: Embryo cell address for X component of force
+ *               params[3]: Embryo cell address for Y component of force
+ *               params[4]: Embryo cell address for Z component of force
+ * @return 0 if EPhysics is loaded and values are retrieved, otherwise 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_physics_get_forces(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4342,7 +5816,21 @@ _edje_embryo_fn_physics_get_forces(Embryo_Program *ep, Embryo_Cell *params)
             ep, params, EPH_CALL(ephysics_body_forces_get));
 }
 
-/* physics_get_torques(part_id, &Float:x, &Float:y, &Float:z) */
+/**
+ * @brief Gets the total applied torques on a physics-enabled part.
+ *
+ * This function is exposed to Embryo scripts as `physics_get_torques(part_id, &Float:x, &Float:y, &Float:z)`.
+ * It retrieves the sum of all continuous torques currently acting on the
+ * EPhysics_Body associated with the part `part_id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[1]: part_id
+ *               params[2]: Embryo cell address for X component of torque
+ *               params[3]: Embryo cell address for Y component of torque
+ *               params[4]: Embryo cell address for Z component of torque
+ * @return 0 if EPhysics is loaded and values are retrieved, otherwise 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_physics_get_torques(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4351,7 +5839,21 @@ _edje_embryo_fn_physics_get_torques(Embryo_Program *ep, Embryo_Cell *params)
             ep, params, EPH_CALL(ephysics_body_torques_get));
 }
 
-/* physics_set_velocity(part_id, Float:x, Float:y, Float:z) */
+/**
+ * @brief Sets the linear velocity of a physics-enabled part.
+ *
+ * This function is exposed to Embryo scripts as `physics_set_velocity(part_id, Float:x, Float:y, Float:z)`.
+ * It directly sets the linear velocity of the EPhysics_Body associated
+ * with the part `part_id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[1]: part_id
+ *               params[2]: X component of linear velocity
+ *               params[3]: Y component of linear velocity
+ *               params[4]: Z component of linear velocity
+ * @return 0 if EPhysics is loaded and velocity is set, otherwise 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_physics_set_velocity(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4360,7 +5862,21 @@ _edje_embryo_fn_physics_set_velocity(Embryo_Program *ep, Embryo_Cell *params)
             ep, params, EPH_CALL(ephysics_body_linear_velocity_set));
 }
 
-/* physics_get_velocity(part_id, &Float:x, &Float:y, &Float:z) */
+/**
+ * @brief Gets the linear velocity of a physics-enabled part.
+ *
+ * This function is exposed to Embryo scripts as `physics_get_velocity(part_id, &Float:x, &Float:y, &Float:z)`.
+ * It retrieves the current linear velocity of the EPhysics_Body associated
+ * with the part `part_id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[1]: part_id
+ *               params[2]: Embryo cell address for X component of linear velocity
+ *               params[3]: Embryo cell address for Y component of linear velocity
+ *               params[4]: Embryo cell address for Z component of linear velocity
+ * @return 0 if EPhysics is loaded and values are retrieved, otherwise 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_physics_get_velocity(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4369,7 +5885,21 @@ _edje_embryo_fn_physics_get_velocity(Embryo_Program *ep, Embryo_Cell *params)
             ep, params, EPH_CALL(ephysics_body_linear_velocity_get));
 }
 
-/* physics_set_ang_velocity(part_id, Float:x, Float:y, Float:z) */
+/**
+ * @brief Sets the angular velocity of a physics-enabled part.
+ *
+ * This function is exposed to Embryo scripts as `physics_set_ang_velocity(part_id, Float:x, Float:y, Float:z)`.
+ * It directly sets the angular velocity of the EPhysics_Body associated
+ * with the part `part_id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[1]: part_id
+ *               params[2]: X component of angular velocity (radians/sec)
+ *               params[3]: Y component of angular velocity (radians/sec)
+ *               params[4]: Z component of angular velocity (radians/sec)
+ * @return 0 if EPhysics is loaded and velocity is set, otherwise 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_physics_set_ang_velocity(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4378,7 +5908,21 @@ _edje_embryo_fn_physics_set_ang_velocity(Embryo_Program *ep, Embryo_Cell *params
             ep, params, EPH_CALL(ephysics_body_angular_velocity_set));
 }
 
-/* physics_get_ang_velocity(part_id, &Float:x, &Float:y, &Float:z) */
+/**
+ * @brief Gets the angular velocity of a physics-enabled part.
+ *
+ * This function is exposed to Embryo scripts as `physics_get_ang_velocity(part_id, &Float:x, &Float:y, &Float:z)`.
+ * It retrieves the current angular velocity of the EPhysics_Body associated
+ * with the part `part_id`.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[1]: part_id
+ *               params[2]: Embryo cell address for X component of angular velocity (radians/sec)
+ *               params[3]: Embryo cell address for Y component of angular velocity (radians/sec)
+ *               params[4]: Embryo cell address for Z component of angular velocity (radians/sec)
+ * @return 0 if EPhysics is loaded and values are retrieved, otherwise 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_physics_get_ang_velocity(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4387,7 +5931,18 @@ _edje_embryo_fn_physics_get_ang_velocity(Embryo_Program *ep, Embryo_Cell *params
             ep, params, EPH_CALL(ephysics_body_angular_velocity_get));
 }
 
-/* physics_stop(part_id) */
+/**
+ * @brief Stops all motion of a physics-enabled part.
+ *
+ * This function is exposed to Embryo scripts as `physics_stop(part_id)`.
+ * It sets both linear and angular velocities of the EPhysics_Body associated
+ * with the part `part_id` to zero and clears any applied forces/torques.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[1]: part_id
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_physics_stop(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4409,7 +5964,22 @@ _edje_embryo_fn_physics_stop(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* physics_set_rotation(part_id, Float:w, Float:x, Float:y, Float:z) */
+/**
+ * @brief Sets the rotation of a physics-enabled part using a quaternion.
+ *
+ * This function is exposed to Embryo scripts as `physics_set_rotation(part_id, Float:w, Float:x, Float:y, Float:z)`.
+ * It sets the orientation of the EPhysics_Body associated with the part `part_id`
+ * using the provided quaternion components (w, x, y, z). The quaternion will be normalized.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[1]: part_id
+ *               params[2]: W component of the quaternion
+ *               params[3]: X component of the quaternion
+ *               params[4]: Y component of the quaternion
+ *               params[5]: Z component of the quaternion
+ * @return Always 0.
+ */
 static Embryo_Cell
 _edje_embryo_fn_physics_set_rotation(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4443,7 +6013,22 @@ _edje_embryo_fn_physics_set_rotation(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
-/* physics_get_rotation(part_id, &Float:w, &Float:x, &Float:y, &Float:z) */
+/**
+ * @brief Gets the rotation of a physics-enabled part as a quaternion.
+ *
+ * This function is exposed to Embryo scripts as `physics_get_rotation(part_id, &Float:w, &Float:x, &Float:y, &Float:z)`.
+ * It retrieves the current orientation of the EPhysics_Body associated with
+ * the part `part_id` as quaternion components (w, x, y, z).
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[1]: part_id
+ *               params[2]: Embryo cell address for W component of the quaternion
+ *               params[3]: Embryo cell address for X component of the quaternion
+ *               params[4]: Embryo cell address for Y component of the quaternion
+ *               params[5]: Embryo cell address for Z component of the quaternion
+ * @return Always 0. Quaternion components are returned via output parameters.
+ */
 static Embryo_Cell
 _edje_embryo_fn_physics_get_rotation(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4478,7 +6063,19 @@ _edje_embryo_fn_physics_get_rotation(Embryo_Program *ep, Embryo_Cell *params)
 
 #endif
 
-/* swallow_has_content(part_id) */
+/**
+ * @brief Checks if a SWALLOW part currently contains a swallowed object.
+ *
+ * This function is exposed to Embryo scripts as `swallow_has_content(part_id)`.
+ * It determines if the SWALLOW part identified by `part_id` has an object
+ * currently swallowed within it.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the ID of the SWALLOW part.
+ * @return 1 if the part is a SWALLOW part and has content, 0 otherwise.
+ */
 static Embryo_Cell
 _edje_embryo_fn_swallow_has_content(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4502,7 +6099,20 @@ _edje_embryo_fn_swallow_has_content(Embryo_Program *ep, Embryo_Cell *params)
    return 1;
 }
 
-/* get_part_id(part[]) */
+/**
+ * @brief Prints a message to stderr, prefixed with Edje object information.
+ *
+ * This function is exposed to Embryo scripts as `echo(message[])`.
+ * It's primarily a debugging utility to print messages from an Embryo script
+ * to the standard error output. The output includes the Edje object's memory
+ * address, file path, and group name.
+ *
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the number of arguments.
+ *               params[1] is the Embryo cell address of the message string to print.
+ * @return 0 on success, -1 if the message string is NULL.
+ */
 static Embryo_Cell
 _edje_embryo_fn_echo(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -4522,6 +6132,18 @@ _edje_embryo_fn_echo(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
+/**
+ * @brief Initializes the Embryo script environment for an Edje part collection.
+ *
+ * This function registers all the Edje-specific native functions (like `get_int`,
+ * `set_state`, `emit`, etc.) with the Embryo program associated with the
+ * given Edje part collection (`edc`). This makes these functions callable
+ * from Embryo scripts within that collection.
+ *
+ * This is typically called when an Edje object is created or its file/group is set.
+ *
+ * @param edc Pointer to the Edje_Part_Collection whose script environment is to be initialized.
+ */
 void
 _edje_embryo_script_init(Edje_Part_Collection *edc)
 {
@@ -4656,6 +6278,18 @@ _edje_embryo_script_init(Edje_Part_Collection *edc)
    embryo_program_native_call_add(ep, "echo", _edje_embryo_fn_echo);
 }
 
+/**
+ * @brief Shuts down and frees the Embryo script environment for an Edje part collection.
+ *
+ * This function frees the Embryo_Program associated with the given
+ * Edje_Part_Collection, provided there are no active recursions into the script.
+ * It effectively unloads the script and cleans up its resources.
+ *
+ * This is typically called when an Edje object is being destroyed or its
+ * file/group is changed, and the old collection's script is no longer needed.
+ *
+ * @param edc Pointer to the Edje_Part_Collection whose script environment is to be shut down.
+ */
 void
 _edje_embryo_script_shutdown(Edje_Part_Collection *edc)
 {
@@ -4666,6 +6300,19 @@ _edje_embryo_script_shutdown(Edje_Part_Collection *edc)
    edc->script = NULL;
 }
 
+/**
+ * @brief Resets the Embryo virtual machine and re-initializes global variables for an Edje object.
+ *
+ * This function resets the VM state of the Embryo script associated with the
+ * Edje object's current collection. It also re-initializes any global variables
+ * defined in the Embryo script to their Edje-specific magic values, allowing
+ * them to be used as IDs for Edje data elements (like variables from `data` blocks).
+ *
+ * This is called, for example, before running an Edje program to ensure a clean
+ * script environment. It only proceeds if there are no active recursions into the script.
+ *
+ * @param ed Pointer to the Edje object whose script is to be reset.
+ */
 void
 _edje_embryo_script_reset(Edje *ed)
 {
@@ -4677,7 +6324,24 @@ _edje_embryo_script_reset(Edje *ed)
    _edje_embryo_globals_init(ed);
 }
 
-/* this may change in future - thus "test_run" is its name */
+/**
+ * @brief Executes a specific Edje program (Embryo function) within an Edje object's script.
+ *
+ * This function is responsible for running an Edje program, which is essentially
+ * an Embryo function (conventionally named `_p<program_id>`). It sets up the
+ * Embryo VM, pushes the signal and source strings as parameters to the Embryo
+ * function, sets the Edje object as context data for native calls, and then
+ * runs the function. It also handles error reporting if the script fails or
+ * runs for too long.
+ *
+ * The name "test_run" might be historical; this is the core execution path for
+ * Edje programs triggered by signals.
+ *
+ * @param ed Pointer to the Edje object.
+ * @param pr Pointer to the Edje_Program to be executed.
+ * @param sig The signal string that triggered this program run.
+ * @param src The source string associated with the signal.
+ */
 void
 _edje_embryo_test_run(Edje *ed, Edje_Program *pr, const char *sig, const char *src)
 {
@@ -4756,6 +6420,25 @@ _edje_embryo_test_run(Edje *ed, Edje_Program *pr, const char *sig, const char *s
    embryo_program_vm_pop(ed->collection->script);
 }
 
+/**
+ * @brief Initializes global variables in an Edje object's Embryo script.
+ *
+ * Embryo scripts in Edje can define global variables. This function iterates
+ * through these global variables and assigns them a "magic" value. This magic
+ * value (`EDJE_VAR_MAGIC_BASE + variable_index`) allows Edje's native functions
+ * (like `get_int`, `set_str`) to identify which Edje data item (often defined
+ * in the `data` block of the EDC file) the script is referring to when it uses
+ * that global variable as an ID.
+ *
+ * For example, if an EDC has:
+ * `data { item: "my_value" "0"; }`
+ * and the script has:
+ * `global my_value_id;`
+ * After this function, `my_value_id` in the script will hold a cell that, when
+ * passed to `get_int()`, resolves to the Edje data item "my_value".
+ *
+ * @param ed Pointer to the Edje object whose script globals are to be initialized.
+ */
 void
 _edje_embryo_globals_init(Edje *ed)
 {

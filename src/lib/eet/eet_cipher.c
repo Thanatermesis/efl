@@ -47,15 +47,36 @@
 #define MAX_KEY_LEN   EVP_MAX_KEY_LENGTH
 #define MAX_IV_LEN    EVP_MAX_IV_LENGTH
 
+/**
+ * @brief Structure to hold an Eet identity (certificate and private key).
+ *
+ * This structure is reference-counted.
+ */
 struct _Eet_Key
 {
-   int                   references;
+   int                   references; /**< The number of references to this key. */
 #ifdef HAVE_SIGNATURE
-   X509                 *certificate;
-   EVP_PKEY             *private_key;
+   X509                 *certificate; /**< The X509 certificate. */
+   EVP_PKEY             *private_key; /**< The private key. */
 #endif /* ifdef HAVE_SIGNATURE */
 };
 
+/**
+ * @brief Opens an Eet identity from certificate and private key files.
+ *
+ * This function loads an X509 certificate and a private key from the specified
+ * files. The private key can be password protected, in which case the provided
+ * callback function will be invoked to retrieve the password.
+ *
+ * @param certificate_file Path to the X509 certificate file (PEM format).
+ * @param private_key_file Path to the private key file (PEM format).
+ * @param cb Optional callback function to provide a password for an encrypted private key.
+ *           It should return a newly allocated string containing the password,
+ *           or NULL if no password is required or an error occurs. The caller
+ *           (OpenSSL) will free this string.
+ * @return A pointer to an Eet_Key structure on success, or NULL on failure.
+ *         The returned Eet_Key must be freed using eet_identity_close() when no longer needed.
+ */
 EAPI Eet_Key *
 eet_identity_open(const char               *certificate_file,
                   const char               *private_key_file,
@@ -119,6 +140,15 @@ on_error:
    return NULL;
 }
 
+/**
+ * @brief Closes an Eet identity and frees associated resources.
+ *
+ * This function decrements the reference count of the Eet_Key. If the
+ * reference count reaches zero, it frees the X509 certificate, the private key,
+ * and the Eet_Key structure itself.
+ *
+ * @param key The Eet_Key to close. If NULL, the function does nothing.
+ */
 EAPI void
 eet_identity_close(Eet_Key *key)
 {
@@ -136,6 +166,15 @@ eet_identity_close(Eet_Key *key)
 #endif /* ifdef HAVE_SIGNATURE */
 }
 
+/**
+ * @brief Prints the details of an Eet identity to a file stream.
+ *
+ * This function prints information about the private key (RSA, DSA, or DH)
+ * and the public certificate to the specified output stream.
+ *
+ * @param key The Eet_Key to print. If NULL, the function does nothing.
+ * @param out The file stream to print to (e.g., stdout, stderr).
+ */
 EAPI void
 eet_identity_print(Eet_Key *key,
                    FILE    *out)
@@ -189,6 +228,11 @@ eet_identity_print(Eet_Key *key,
 #endif /* ifdef HAVE_SIGNATURE */
 }
 
+/**
+ * @brief Increments the reference count of an Eet_Key.
+ *
+ * @param key The Eet_Key to reference. If NULL, the function does nothing.
+ */
 void
 eet_identity_ref(Eet_Key *key)
 {
@@ -198,6 +242,14 @@ eet_identity_ref(Eet_Key *key)
    key->references++;
 }
 
+/**
+ * @brief Decrements the reference count of an Eet_Key.
+ *
+ * If the reference count drops to zero, this function will call
+ * eet_identity_close() to free the key.
+ *
+ * @param key The Eet_Key to unreference. If NULL, the function does nothing.
+ */
 void
 eet_identity_unref(Eet_Key *key)
 {
@@ -208,6 +260,17 @@ eet_identity_unref(Eet_Key *key)
    eet_identity_close(key);
 }
 
+/**
+ * @brief Computes the SHA1 hash of a block of data.
+ *
+ * @param data_base Pointer to the data to hash.
+ * @param data_length Length of the data in bytes.
+ * @param[out] sha1_length Pointer to an integer where the length of the SHA1 hash
+ *                         (SHA_DIGEST_LENGTH) will be stored. Can be NULL.
+ * @return A pointer to a newly allocated buffer containing the SHA1 hash,
+ *         or NULL on failure (e.g., out of memory). The caller is responsible
+ *         for freeing this buffer.
+ */
 void *
 eet_identity_compute_sha1(const void  *data_base,
                           unsigned int data_length,
@@ -234,6 +297,27 @@ eet_identity_compute_sha1(const void  *data_base,
    return result;
 }
 
+/**
+ * @brief Signs the content of a file and appends the signature and certificate.
+ *
+ * This function reads the entire content of the given file, computes its SHA1
+ * hash, signs the hash using the private key from the Eet_Key, and then
+ * appends a header, the signature, and the DER-encoded X509 certificate
+ * to the end of the file.
+ *
+ * The appended data structure is:
+ * - EET_MAGIC_SIGN (4 bytes, network byte order)
+ * - Signature length (4 bytes, network byte order)
+ * - Certificate length (4 bytes, network byte order)
+ * - Signature data (variable length)
+ * - Certificate data (DER encoded, variable length)
+ *
+ * @param fp A file pointer to an open file (opened for read and append, e.g., "r+b").
+ *           The file will be modified by appending the signature information.
+ * @param key The Eet_Key containing the private key for signing and the
+ *            certificate to append.
+ * @return EET_ERROR_NONE on success, or an Eet_Error code on failure.
+ */
 Eet_Error
 eet_identity_sign(FILE    *fp,
                   Eet_Key *key)
@@ -360,6 +444,43 @@ on_error:
 #endif /* ifdef HAVE_SIGNATURE */
 }
 
+/**
+ * @brief Verifies the signature of a data block.
+ *
+ * This function checks if a given data block matches a signature block.
+ * The signature block is expected to contain a header, the signature itself,
+ * and a DER-encoded X509 certificate. The function extracts the public key
+ * from the certificate and uses it to verify the signature against the SHA1
+ * hash of the data block.
+ *
+ * The signature block structure is expected to be:
+ * - EET_MAGIC_SIGN (4 bytes, network byte order)
+ * - Signature length (4 bytes, network byte order)
+ * - Certificate length (4 bytes, network byte order)
+ * - Signature data (variable length)
+ * - Certificate data (DER encoded, variable length)
+ *
+ * @param data_base Pointer to the original data that was signed.
+ * @param data_length Length of the original data in bytes.
+ * @param[out] sha1 If not NULL, this will be set to a pointer to the computed SHA1
+ *                  hash of data_base. The memory for this hash is managed internally
+ *                  or may be set to NULL if not computed or applicable.
+ *                  *sha1_length will indicate its length.
+ * @param[out] sha1_length If not NULL, this will be set to the length of the SHA1 hash.
+ * @param signature_base Pointer to the signature block.
+ * @param signature_length Length of the signature block in bytes.
+ * @param[out] raw_signature_base If not NULL, this will be set to point to the
+ *                                start of the raw signature data within the
+ *                                signature_base block.
+ * @param[out] raw_signature_length If not NULL, this will be set to the length
+ *                                  of the raw signature data.
+ * @param[out] x509_length If not NULL, this will be set to the length of the
+ *                         DER-encoded X509 certificate.
+ * @return On successful verification, returns a pointer to the start of the
+ *         DER-encoded X509 certificate within the signature_base block.
+ *         Returns NULL if verification fails, if input parameters are invalid,
+ *         or if an internal error occurs.
+ */
 const void *
 eet_identity_check(const void   *data_base,
                    unsigned int  data_length,
@@ -490,6 +611,16 @@ eet_identity_check(const void   *data_base,
 #endif /* ifdef HAVE_SIGNATURE */
 }
 
+/**
+ * @brief Prints the details of a DER-encoded X509 certificate.
+ *
+ * This function decodes a DER-encoded X509 certificate and prints its
+ * human-readable representation to the specified output stream.
+ *
+ * @param certificate Pointer to the DER-encoded X509 certificate data.
+ * @param der_length Length of the certificate data in bytes.
+ * @param out The file stream to print to (e.g., stdout, stderr).
+ */
 EAPI void
 eet_identity_certificate_print(const unsigned char *certificate,
                                int                  der_length,
@@ -529,6 +660,24 @@ eet_identity_certificate_print(const unsigned char *certificate,
 #endif /* ifdef HAVE_SIGNATURE */
 }
 
+/**
+ * @brief Encrypts data using AES-256-CBC.
+ *
+ * This function encrypts the given data using the provided key with the
+ * AES-256-CBC algorithm. The key material is derived from the `key` parameter.
+ *
+ * @param data Pointer to the data to encrypt.
+ * @param size Size of the data in bytes.
+ * @param key Pointer to the encryption key.
+ * @param length Length of the encryption key in bytes.
+ * @param[out] result Pointer to a variable that will receive the pointer to
+ *                    the newly allocated buffer containing the encrypted data.
+ *                    The caller is responsible for freeing this buffer using free().
+ *                    Set to NULL if encryption fails.
+ * @param[out] result_length Pointer to a variable that will receive the length
+ *                           of the encrypted data. Set to 0 if encryption fails.
+ * @return EET_ERROR_NONE on success, or EET_ERROR_ENCRYPT_FAILED on failure.
+ */
 Eet_Error
 eet_cipher(const void   *data,
            unsigned int  size,
@@ -551,6 +700,24 @@ eet_cipher(const void   *data,
    return out ? EET_ERROR_NONE : EET_ERROR_ENCRYPT_FAILED;
 }
 
+/**
+ * @brief Decrypts data using AES-256-CBC.
+ *
+ * This function decrypts the given data using the provided key with the
+ * AES-256-CBC algorithm. The key material is derived from the `key` parameter.
+ *
+ * @param data Pointer to the encrypted data.
+ * @param size Size of the encrypted data in bytes.
+ * @param key Pointer to the decryption key.
+ * @param length Length of the decryption key in bytes.
+ * @param[out] result Pointer to a variable that will receive the pointer to
+ *                    the newly allocated buffer containing the decrypted data.
+ *                    The caller is responsible for freeing this buffer using free().
+ *                    Set to NULL if decryption fails.
+ * @param[out] result_length Pointer to a variable that will receive the length
+ *                           of the decrypted data. Set to 0 if decryption fails.
+ * @return EET_ERROR_NONE on success, or EET_ERROR_DECRYPT_FAILED on failure.
+ */
 Eet_Error
 eet_decipher(const void   *data,
              unsigned int  size,

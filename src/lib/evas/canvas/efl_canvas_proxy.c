@@ -3,6 +3,20 @@
 
 #define MY_CLASS EFL_CANVAS_PROXY_CLASS
 
+/**
+ * @internal
+ * @brief Sets the source object for a proxy image.
+ *
+ * This function establishes a link between a proxy image object and its source object.
+ * The proxy image will then render the content of the source object.
+ * It performs several checks to ensure the validity of both the proxy and source objects,
+ * their layers, and prevents self-referencing or setting a source from a different Evas canvas.
+ * If a previous source or image file was set, it cleans them up.
+ *
+ * @param eo_obj The proxy image object.
+ * @param eo_src The Evas object to be used as the source. If NULL, the current source is unset.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 Eina_Bool
 _evas_image_proxy_source_set(Eo *eo_obj, Evas_Object *eo_src)
 {
@@ -66,12 +80,24 @@ _evas_image_proxy_source_set(Eo *eo_obj, Evas_Object *eo_src)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Efl_Canvas_Proxy_Source_Set EOLIAN wrapper.
+ * @see _evas_image_proxy_source_set
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_proxy_source_set(Eo *eo_obj, void *_pd EINA_UNUSED, Evas_Object *eo_src)
 {
    return _evas_image_proxy_source_set(eo_obj, eo_src);
 }
 
+/**
+ * @internal
+ * @brief Gets the source object of a proxy image.
+ *
+ * @param eo_obj The proxy image object.
+ * @return The source Evas object, or @c NULL if no source is set or on error.
+ */
 Evas_Object *
 _evas_image_proxy_source_get(const Eo *eo_obj)
 {
@@ -79,12 +105,27 @@ _evas_image_proxy_source_get(const Eo *eo_obj)
    return o->cur->source;
 }
 
+/**
+ * @internal
+ * @brief Efl_Canvas_Proxy_Source_Get EOLIAN wrapper.
+ * @see _evas_image_proxy_source_get
+ */
 EOLIAN static Evas_Object *
 _efl_canvas_proxy_source_get(const Eo *eo_obj, void *_pd EINA_UNUSED)
 {
    return _evas_image_proxy_source_get(eo_obj);
 }
 
+/**
+ * @internal
+ * @brief Sets whether the proxy image should be clipped by its source's clipper.
+ *
+ * If @p source_clip is @c EINA_TRUE, the proxy image will be clipped by the
+ * clipper object set on its source object.
+ *
+ * @param eo_obj The proxy image object.
+ * @param source_clip @c EINA_TRUE to enable source clipping, @c EINA_FALSE otherwise.
+ */
 void
 _evas_image_proxy_source_clip_set(Eo *eo_obj, Eina_Bool source_clip)
 {
@@ -103,12 +144,24 @@ _evas_image_proxy_source_clip_set(Eo *eo_obj, Eina_Bool source_clip)
    evas_object_change(o->cur->source, src_obj);
 }
 
+/**
+ * @internal
+ * @brief Efl_Canvas_Proxy_Source_Clip_Set EOLIAN wrapper.
+ * @see _evas_image_proxy_source_clip_set
+ */
 EOLIAN static void
 _efl_canvas_proxy_source_clip_set(Eo *eo_obj, void *_pd EINA_UNUSED, Eina_Bool source_clip)
 {
    return _evas_image_proxy_source_clip_set(eo_obj, source_clip);
 }
 
+/**
+ * @internal
+ * @brief Gets whether the proxy image is clipped by its source's clipper.
+ *
+ * @param eo_obj The proxy image object.
+ * @return @c EINA_TRUE if source clipping is enabled, @c EINA_FALSE otherwise.
+ */
 Eina_Bool
 _evas_image_proxy_source_clip_get(const Eo *eo_obj)
 {
@@ -116,12 +169,27 @@ _evas_image_proxy_source_clip_get(const Eo *eo_obj)
    return o->proxy_src_clip;
 }
 
+/**
+ * @internal
+ * @brief Efl_Canvas_Proxy_Source_Clip_Get EOLIAN wrapper.
+ * @see _evas_image_proxy_source_clip_get
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_proxy_source_clip_get(const Eo *eo_obj, void *_pd EINA_UNUSED)
 {
    return _evas_image_proxy_source_clip_get(eo_obj);
 }
 
+/**
+ * @internal
+ * @brief Sets whether mouse events on the proxy object are passed to its source.
+ *
+ * If @p source_events is @c EINA_TRUE, mouse events occurring on the proxy
+ * object will be propagated to its source object.
+ *
+ * @param eo_obj The proxy image object.
+ * @param source_events @c EINA_TRUE to enable event propagation, @c EINA_FALSE otherwise.
+ */
 void
 _evas_image_proxy_source_events_set(Eo *eo_obj, Eina_Bool source_events)
 {
@@ -140,12 +208,24 @@ _evas_image_proxy_source_events_set(Eo *eo_obj, Eina_Bool source_events)
    //FIXME: Feed mouse events here.
 }
 
+/**
+ * @internal
+ * @brief Efl_Canvas_Proxy_Source_Events_Set EOLIAN wrapper.
+ * @see _evas_image_proxy_source_events_set
+ */
 EOLIAN static void
 _efl_canvas_proxy_source_events_set(Eo *eo_obj, void *_pd EINA_UNUSED, Eina_Bool repeat)
 {
    return _evas_image_proxy_source_events_set(eo_obj, repeat);
 }
 
+/**
+ * @internal
+ * @brief Gets whether mouse events on the proxy object are passed to its source.
+ *
+ * @param eo_obj The proxy image object.
+ * @return @c EINA_TRUE if event propagation is enabled, @c EINA_FALSE otherwise.
+ */
 Eina_Bool
 _evas_image_proxy_source_events_get(const Eo *eo_obj)
 {
@@ -153,12 +233,30 @@ _evas_image_proxy_source_events_get(const Eo *eo_obj)
    return obj->proxy->src_events;
 }
 
+/**
+ * @internal
+ * @brief Efl_Canvas_Proxy_Source_Events_Get EOLIAN wrapper.
+ * @see _evas_image_proxy_source_events_get
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_proxy_source_events_get(const Eo *eo_obj, void *_pd EINA_UNUSED)
 {
    return _evas_image_proxy_source_events_get(eo_obj);
 }
 
+/**
+ * @internal
+ * @brief Gets the scaling factor between the proxy object and its source.
+ *
+ * This function calculates the ratio of the source object's dimensions to the
+ * proxy object's dimensions.
+ *
+ * @param eo_obj The proxy image object.
+ * @param[out] sw Pointer to a double to store the width scaling factor.
+ *                Set to 1.0 if source is not set or proxy width is 0.
+ * @param[out] sh Pointer to a double to store the height scaling factor.
+ *                Set to 1.0 if source is not set or proxy height is 0.
+ */
 void
 _evas_image_proxy_source_scale_get(const Eo *eo_obj, double *sw, double *sh)
 {
@@ -179,6 +277,15 @@ _evas_image_proxy_source_scale_get(const Eo *eo_obj, double *sw, double *sh)
      *sh = (double) source->cur->geometry.h / obj->cur->geometry.h;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the source object of an Evas image object, if it's acting as a proxy.
+ *
+ * This is a legacy accessor. For Eo-based objects, prefer _evas_image_proxy_source_get.
+ *
+ * @param eo_obj The Evas image object.
+ * @return The source Evas object if @p eo_obj is a proxy and has a source, otherwise @c NULL.
+ */
 Evas_Object *
 _evas_object_image_source_get(Evas_Object *eo_obj)
 {
@@ -186,6 +293,19 @@ _evas_object_image_source_get(Evas_Object *eo_obj)
    return o->cur->source;
 }
 
+/**
+ * @internal
+ * @brief Unsets the source from a proxy object.
+ *
+ * This function cleans up the proxy relationship. It removes the proxy from its
+ * source's list of proxies. If the source has no more proxies, its proxy surface
+ * is freed. It also updates visibility and invalidates caches if necessary.
+ * The proxy's internal source reference and definition map are cleared.
+ *
+ * @param proxy The proxy Evas_Object.
+ * @param cur_proxy The protected data of the proxy object.
+ * @param o The image data of the proxy object.
+ */
 void
 _evas_image_proxy_unset(Evas_Object *proxy, Evas_Object_Protected_Data *cur_proxy, Evas_Image_Data *o)
 {
@@ -242,6 +362,18 @@ _evas_image_proxy_unset(Evas_Object *proxy, Evas_Object_Protected_Data *cur_prox
    EINA_COW_WRITE_END(evas_object_proxy_cow, cur_proxy->proxy, proxy_write);
 }
 
+/**
+ * @internal
+ * @brief Sets up the proxy relationship between two Evas objects.
+ *
+ * This function establishes @p eo_src as the source for @p eo_proxy.
+ * It marks @p eo_proxy as a proxy, sets its source, and adds @p eo_proxy
+ * to the list of proxies managed by @p eo_src. It also triggers a redraw
+ * for the source. If the proxy object had a legacy file/key set, it's cleared.
+ *
+ * @param eo_proxy The Evas object that will act as a proxy.
+ * @param eo_src The Evas object that will be the source for the proxy.
+ */
 void
 _evas_image_proxy_set(Evas_Object *eo_proxy, Evas_Object *eo_src)
 {
@@ -272,6 +404,17 @@ _evas_image_proxy_set(Evas_Object *eo_proxy, Evas_Object *eo_src)
    EINA_COW_WRITE_END(evas_object_proxy_cow, src->proxy, proxy_src_write);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the underlying image data or surface of a proxy's source.
+ *
+ * This function determines if the source of the proxy is an image itself or another
+ * object with a proxy surface, and returns the appropriate engine data or surface.
+ *
+ * @param o The image data of the proxy object.
+ * @return A pointer to the engine data of the source image or the proxy surface
+ *         of the source object. Returns @c NULL if the source is not set or invalid.
+ */
 static inline void *
 _proxy_image_get(Evas_Image_Data *o)
 {
@@ -290,6 +433,28 @@ _proxy_image_get(Evas_Image_Data *o)
      return source->proxy->surface;
 }
 
+/**
+ * @internal
+ * @brief Implements efl_gfx_buffer_map for proxy objects.
+ *
+ * This function allows mapping the pixel data of the proxy's source.
+ * It currently only supports read access and does not allow mapping specific planes
+ * other than the main one. It retrieves the source's image data and then
+ * attempts to map it using the engine's image_data_map function.
+ *
+ * @param eo_obj The proxy object.
+ * @param _pd Private data (unused).
+ * @param mode The access mode for mapping (only read is supported).
+ * @param region The rectangular region to map. If NULL, maps the whole image.
+ * @param cspace The desired colorspace for the mapped data.
+ * @param plane The plane to map (only 0 is currently supported).
+ * @param[out] stride Pointer to store the stride (bytes per line) of the mapped data.
+ * @return An Eina_Rw_Slice representing the mapped buffer. The slice will have a NULL
+ *         memory pointer and zero length on failure or if not implemented.
+ *
+ * @warning Writing to the returned slice is not supported and will result in an error.
+ * @warning Mapping specific planes (plane != 0) is not supported.
+ */
 EOLIAN static Eina_Rw_Slice
 _efl_canvas_proxy_efl_gfx_buffer_buffer_map(Eo *eo_obj, void *_pd EINA_UNUSED,
                                             Efl_Gfx_Buffer_Access_Mode mode,
@@ -364,6 +529,19 @@ end:
    return slice;
 }
 
+/**
+ * @internal
+ * @brief Implements efl_gfx_buffer_unmap for proxy objects.
+ *
+ * This function unmaps a previously mapped buffer slice obtained via
+ * _efl_canvas_proxy_efl_gfx_buffer_buffer_map.
+ *
+ * @param eo_obj The proxy object.
+ * @param _pd Private data (unused).
+ * @param slice The Eina_Rw_Slice that was previously mapped.
+ * @return @c EINA_TRUE on successful unmap, @c EINA_FALSE otherwise (e.g., if slice
+ *         is invalid, unmap function is not available, or engine data is missing).
+ */
 EOLIAN static Eina_Bool
 _efl_canvas_proxy_efl_gfx_buffer_buffer_unmap(Eo *eo_obj, void *_pd EINA_UNUSED,
                                               const Eina_Rw_Slice slice)
@@ -382,6 +560,24 @@ _efl_canvas_proxy_efl_gfx_buffer_buffer_unmap(Eo *eo_obj, void *_pd EINA_UNUSED,
 
 /* Some moron just set a proxy on a proxy.
  * Give them some pixels.  A random color
+ */
+/**
+ * @internal
+ * @brief Handles rendering for a proxy object when a recursive proxy situation is detected.
+ *
+ * This function is called when a proxy's source is another proxy, creating a
+ * potential infinite loop or undefined behavior. To provide visual feedback for this
+ * error state, it draws a solid black rectangle where the proxy would be rendered.
+ * An error message is logged the first time this occurs for a given proxy object.
+ *
+ * @param eo_proxy The proxy object that is part of a recursive proxy chain.
+ * @param engine The Evas engine pointer.
+ * @param output The Evas engine output target.
+ * @param context The Evas engine drawing context.
+ * @param surface The surface to draw upon.
+ * @param x The x-coordinate for drawing the error rectangle.
+ * @param y The y-coordinate for drawing the error rectangle.
+ * @param do_async Flag indicating if rendering should be asynchronous.
  */
 void
 _evas_image_proxy_error(Evas_Object *eo_proxy,

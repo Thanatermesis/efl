@@ -76,9 +76,9 @@ typedef struct _Elm_Sys_Notify_Action_Invoked
  * available notification servers.
  *
  * @param[in] obj The object.
- * @param[in] servers Binary mask of servers to enable. If a server is not
- * present in the binary mask but was previously registered, it will be
- * unregistered.
+ * @param[in] servers Binary mask of servers to enable (e.g., @c ELM_SYS_NOTIFY_SERVER_DBUS, or @c ELM_SYS_NOTIFY_SERVER_NONE to disable all).
+ *                    If a server is not present in the binary mask but was previously registered, it will be
+ *                    unregistered.
  *
  * @return @c true on success, @c false on failure
  *
@@ -93,8 +93,8 @@ EAPI Eina_Bool elm_sys_notify_servers_set(Elm_Sys_Notify *obj, Elm_Sys_Notify_Se
  *
  * @param[in] obj The object.
  *
- * @return Binary mask of servers to enable. If a server is not present in the
- * binary mask but was previously registered, it will be unregistered.
+ * @return Binary mask of currently enabled servers (e.g., @c ELM_SYS_NOTIFY_SERVER_DBUS if the DBus server is active,
+ *         or @c ELM_SYS_NOTIFY_SERVER_NONE if no servers are active).
  *
  * @since 1.17
  *

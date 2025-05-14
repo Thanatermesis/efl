@@ -9,6 +9,17 @@
 
 #define MY_CLASS ECTOR_RENDERER_CLASS
 
+/**
+ * @internal
+ * @brief Destructor for the Ector_Renderer object.
+ *
+ * This function is called when the Ector_Renderer object is being destroyed.
+ * It cleans up resources allocated by the renderer, such as the transformation
+ * matrix and the surface reference.
+ *
+ * @param obj The Efl_Object being destroyed.
+ * @param pd The private data of the Ector_Renderer.
+ */
 static void
 _ector_renderer_efl_object_destructor(Eo *obj, Ector_Renderer_Data *pd)
 {
@@ -22,6 +33,18 @@ _ector_renderer_efl_object_destructor(Eo *obj, Ector_Renderer_Data *pd)
      efl_unref(pd->surface);
 }
 
+/**
+ * @internal
+ * @brief Finalizes the Ector_Renderer object.
+ *
+ * This function is called when the Ector_Renderer object is being finalized.
+ * It ensures that a surface has been set before finalizing. If not, it logs
+ * a critical error.
+ *
+ * @param obj The Efl_Object being finalized.
+ * @param pd The private data of the Ector_Renderer.
+ * @return The finalized Efl_Object, or NULL if finalization fails (e.g., surface not set).
+ */
 static Efl_Object *
 _ector_renderer_efl_object_finalize(Eo *obj, Ector_Renderer_Data *pd)
 {
@@ -34,12 +57,31 @@ _ector_renderer_efl_object_finalize(Eo *obj, Ector_Renderer_Data *pd)
    return efl_finalize(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Gets the rendering surface associated with the renderer.
+ *
+ * @param obj The Ector_Renderer object (unused).
+ * @param pd The private data of the Ector_Renderer.
+ * @return The Ector_Surface used for rendering.
+ */
 static Ector_Surface *
 _ector_renderer_surface_get(const Eo *obj EINA_UNUSED, Ector_Renderer_Data *pd)
 {
    return pd->surface;
 }
 
+/**
+ * @internal
+ * @brief Sets the rendering surface for the renderer.
+ *
+ * This function can only be called during object creation (before finalization).
+ * It takes a reference to the provided surface.
+ *
+ * @param obj The Ector_Renderer object (unused).
+ * @param pd The private data of the Ector_Renderer.
+ * @param s The Ector_Surface to be used for rendering.
+ */
 static void
 _ector_renderer_surface_set(Eo *obj EINA_UNUSED, Ector_Renderer_Data *pd, Ector_Surface *s)
 {
@@ -51,6 +93,22 @@ _ector_renderer_surface_set(Eo *obj EINA_UNUSED, Ector_Renderer_Data *pd, Ector_
    pd->surface = efl_xref(s, obj);
 }
 
+/**
+ * @internal
+ * @brief Sets the transformation matrix for the renderer.
+ *
+ * If @p m is NULL, the existing transformation matrix is freed. Otherwise,
+ * the provided matrix @p m is copied.
+ *
+ * @param obj The Ector_Renderer object (unused).
+ * @param pd The private data of the Ector_Renderer.
+ * @param m The 3x3 transformation matrix to set, or NULL to clear the transformation.
+ *          Example:
+ *          Eina_Matrix3 matrix;
+ *          eina_matrix3_identity(&matrix);
+ *          // ... modify matrix ...
+ *          ector_renderer_transformation_set(renderer, &matrix);
+ */
 static void
 _ector_renderer_transformation_set(Eo *obj EINA_UNUSED,
                                    Ector_Renderer_Data *pd,
@@ -69,6 +127,15 @@ _ector_renderer_transformation_set(Eo *obj EINA_UNUSED,
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the current transformation matrix of the renderer.
+ *
+ * @param obj The Ector_Renderer object (unused).
+ * @param pd The private data of the Ector_Renderer.
+ * @return A pointer to the constant Eina_Matrix3 representing the transformation,
+ *         or NULL if no transformation is set.
+ */
 static const Eina_Matrix3 *
 _ector_renderer_transformation_get(const Eo *obj EINA_UNUSED,
                                    Ector_Renderer_Data *pd)
@@ -76,6 +143,17 @@ _ector_renderer_transformation_get(const Eo *obj EINA_UNUSED,
    return pd->m;
 }
 
+/**
+ * @internal
+ * @brief Sets the origin point for transformations.
+ *
+ * The origin is the point around which transformations like rotation and scaling occur.
+ *
+ * @param obj The Ector_Renderer object (unused).
+ * @param pd The private data of the Ector_Renderer.
+ * @param x The x-coordinate of the origin.
+ * @param y The y-coordinate of the origin.
+ */
 static void
 _ector_renderer_origin_set(Eo *obj EINA_UNUSED,
                            Ector_Renderer_Data *pd,
@@ -85,6 +163,15 @@ _ector_renderer_origin_set(Eo *obj EINA_UNUSED,
    pd->origin.y = y;
 }
 
+/**
+ * @internal
+ * @brief Gets the origin point for transformations.
+ *
+ * @param obj The Ector_Renderer object (unused).
+ * @param pd The private data of the Ector_Renderer.
+ * @param x Pointer to store the x-coordinate of the origin. Can be NULL.
+ * @param y Pointer to store the y-coordinate of the origin. Can be NULL.
+ */
 static void
 _ector_renderer_origin_get(const Eo *obj EINA_UNUSED,
                            Ector_Renderer_Data *pd,
@@ -94,6 +181,14 @@ _ector_renderer_origin_get(const Eo *obj EINA_UNUSED,
    if (y) *y = pd->origin.y;
 }
 
+/**
+ * @internal
+ * @brief Sets the visibility of the rendered object.
+ *
+ * @param obj The Ector_Renderer object (unused).
+ * @param pd The private data of the Ector_Renderer.
+ * @param v EINA_TRUE if visible, EINA_FALSE otherwise.
+ */
 static void
 _ector_renderer_visibility_set(Eo *obj EINA_UNUSED,
                                Ector_Renderer_Data *pd,
@@ -102,6 +197,14 @@ _ector_renderer_visibility_set(Eo *obj EINA_UNUSED,
    pd->visibility = v;
 }
 
+/**
+ * @internal
+ * @brief Gets the visibility of the rendered object.
+ *
+ * @param obj The Ector_Renderer object (unused).
+ * @param pd The private data of the Ector_Renderer.
+ * @return EINA_TRUE if visible, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _ector_renderer_visibility_get(const Eo *obj EINA_UNUSED,
                                Ector_Renderer_Data *pd)
@@ -109,6 +212,19 @@ _ector_renderer_visibility_get(const Eo *obj EINA_UNUSED,
    return pd->visibility;
 }
 
+/**
+ * @internal
+ * @brief Sets the color used for rendering operations.
+ *
+ * Color components are integers ranging from 0 to 255.
+ *
+ * @param obj The Ector_Renderer object (unused).
+ * @param pd The private data of the Ector_Renderer.
+ * @param r Red component (0-255).
+ * @param g Green component (0-255).
+ * @param b Blue component (0-255).
+ * @param a Alpha component (0-255, 0 is transparent, 255 is opaque).
+ */
 static void
 _ector_renderer_color_set(Eo *obj EINA_UNUSED,
                           Ector_Renderer_Data *pd,
@@ -120,6 +236,17 @@ _ector_renderer_color_set(Eo *obj EINA_UNUSED,
    pd->color.a = a;
 }
 
+/**
+ * @internal
+ * @brief Gets the current color used for rendering operations.
+ *
+ * @param obj The Ector_Renderer object (unused).
+ * @param pd The private data of the Ector_Renderer.
+ * @param r Pointer to store the red component. Can be NULL.
+ * @param g Pointer to store the green component. Can be NULL.
+ * @param b Pointer to store the blue component. Can be NULL.
+ * @param a Pointer to store the alpha component. Can be NULL.
+ */
 static void
 _ector_renderer_color_get(const Eo *obj EINA_UNUSED,
                           Ector_Renderer_Data *pd,
@@ -131,6 +258,17 @@ _ector_renderer_color_get(const Eo *obj EINA_UNUSED,
    if (a) *a = pd->color.a;
 }
 
+/**
+ * @internal
+ * @brief Calculates a CRC checksum for the renderer's current state.
+ *
+ * The CRC is based on the current color, origin, and transformation matrix (if set).
+ * This can be used to quickly check if the renderer's state has changed.
+ *
+ * @param obj The Ector_Renderer object (unused).
+ * @param pd The private data of the Ector_Renderer.
+ * @return The calculated CRC value.
+ */
 static unsigned int
 _ector_renderer_crc_get(const Eo *obj EINA_UNUSED,
                         Ector_Renderer_Data *pd)
@@ -145,6 +283,17 @@ _ector_renderer_crc_get(const Eo *obj EINA_UNUSED,
    return crc;
 }
 
+/**
+ * @internal
+ * @brief Sets the composition method for vector graphics.
+ *
+ * @note This function is currently a no-op (does nothing).
+ *
+ * @param obj The Ector_Renderer object (unused).
+ * @param pd The private data of the Ector_Renderer (unused).
+ * @param comp The Ector_Buffer to be used for composition (unused).
+ * @param method The Efl_Gfx_Vg_Composite_Method to apply (unused).
+ */
 static void
 _ector_renderer_comp_method_set(Eo *obj EINA_UNUSED,
                                 Ector_Renderer_Data *pd EINA_UNUSED,

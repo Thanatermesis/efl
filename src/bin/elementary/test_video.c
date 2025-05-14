@@ -3,6 +3,17 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback function for when a video file is selected.
+ *
+ * This function is called when the "file,chosen" smart callback is emitted
+ * from the file selector button. It sets the chosen file on the video object
+ * and starts playback.
+ *
+ * @param data The video object (Evas_Object *) to control.
+ * @param obj The object that emitted the signal (unused).
+ * @param event_info The selected file path (const char *).
+ */
 static void
 my_bt_open(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -16,6 +27,18 @@ my_bt_open(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
      }
 }
 
+/**
+ * @brief Creates the video test window.
+ *
+ * This function sets up a window with an elm_player widget that contains an
+ * elm_video object. It also adds a file selector button to allow the user
+ * to choose a video file to play. This serves as a test case for the
+ * Elementary video player functionality.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_video(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

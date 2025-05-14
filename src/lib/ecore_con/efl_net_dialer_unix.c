@@ -21,15 +21,18 @@
 
 #define MY_CLASS EFL_NET_DIALER_UNIX_CLASS
 
+/**
+ * @brief Private data for the Efl_Net_Dialer_Unix class.
+ */
 typedef struct _Efl_Net_Dialer_Unix_Data
 {
    struct {
-      Ecore_Thread *thread;
-      Eina_Future *timeout;
-   } connect;
-   Eina_Stringshare *address_dial;
-   Eina_Bool connected;
-   double timeout_dial;
+      Ecore_Thread *thread; /**< Thread used for asynchronous connection attempts. */
+      Eina_Future *timeout; /**< Future for handling connection timeouts. */
+   } connect; /**< Connection-related data. */
+   Eina_Stringshare *address_dial; /**< The Unix domain socket address to dial. Can be a path or an abstract address prefixed with "abstract:". */
+   Eina_Bool connected; /**< Flag indicating if the dialer is currently connected. */
+   double timeout_dial; /**< Timeout in seconds for the dial operation. */
 } Efl_Net_Dialer_Unix_Data;
 
 EOLIAN static Eo*
@@ -42,6 +45,12 @@ _efl_net_dialer_unix_efl_object_constructor(Eo *o, Efl_Net_Dialer_Unix_Data *pd 
    return o;
 }
 
+/**
+ * @brief Handles object invalidation.
+ *
+ * Cleans up resources, such as closing the connection if configured to do so
+ * and cancelling any ongoing connection threads.
+ */
 EOLIAN static void
 _efl_net_dialer_unix_efl_object_invalidate(Eo *o, Efl_Net_Dialer_Unix_Data *pd)
 {
@@ -62,6 +71,11 @@ _efl_net_dialer_unix_efl_object_invalidate(Eo *o, Efl_Net_Dialer_Unix_Data *pd)
    efl_invalidate(efl_super(o, MY_CLASS));
 }
 
+/**
+ * @brief Handles object destruction.
+ *
+ * Frees allocated resources, such as the stored dial address.
+ */
 EOLIAN static void
 _efl_net_dialer_unix_efl_object_destructor(Eo *o, Efl_Net_Dialer_Unix_Data *pd)
 {
@@ -70,6 +84,18 @@ _efl_net_dialer_unix_efl_object_destructor(Eo *o, Efl_Net_Dialer_Unix_Data *pd)
    eina_stringshare_replace(&pd->address_dial, NULL);
 }
 
+/**
+ * @brief Callback function executed when a connection attempt times out.
+ *
+ * This function is triggered by an Eina_Future. It cancels any ongoing
+ * connection thread, sets the End-Of-Stream (EOS) flag, and emits a
+ * 'dialer,error' event with ETIMEDOUT.
+ *
+ * @param o The Efl_Net_Dialer_Unix object.
+ * @param data User data (unused in this context).
+ * @param v The Eina_Value associated with the future (unused in this context).
+ * @return The input Eina_Value v.
+ */
 static Eina_Value
 _efl_net_dialer_unix_connect_timeout(Eo *o, void *data EINA_UNUSED, const Eina_Value v)
 {
@@ -89,6 +115,21 @@ _efl_net_dialer_unix_connect_timeout(Eo *o, void *data EINA_UNUSED, const Eina_V
    return v;
 }
 
+/**
+ * @brief Callback function executed when an asynchronous connection attempt completes.
+ *
+ * This function is called by the efl_net_connect_async_new thread.
+ * It handles both successful connections and errors. On success, it sets up
+ * the socket, emits 'dialer,resolved' and 'dialer,connected' events.
+ * On error, it cleans up and emits a 'dialer,error' event.
+ *
+ * @param data The Efl_Net_Dialer_Unix object, passed as user data.
+ * @param addr The socket address of the connected peer.
+ * @param addrlen The length of the socket address.
+ * @param sockfd The file descriptor of the connected socket.
+ * @param err An Eina_Error code indicating the result of the connection attempt.
+ *            0 on success, or an error code otherwise.
+ */
 static void
 _efl_net_dialer_unix_connected(void *data, const struct sockaddr *addr, socklen_t addrlen EINA_UNUSED, SOCKET sockfd, Eina_Error err)
 {
@@ -127,6 +168,16 @@ _efl_net_dialer_unix_connected(void *data, const struct sockaddr *addr, socklen_
    efl_unref(o);
 }
 
+/**
+ * @brief Schedules a connection timeout.
+ *
+ * If a timeout value is set (pd->timeout_dial > 0), this function
+ * creates an Eina_Future that will trigger the
+ * _efl_net_dialer_unix_connect_timeout callback after the specified delay.
+ *
+ * @param o The Efl_Net_Dialer_Unix object.
+ * @param pd The private data for the object.
+ */
 static void
 _timeout_schedule(Eo *o, Efl_Net_Dialer_Unix_Data *pd)
 {
@@ -135,6 +186,24 @@ _timeout_schedule(Eo *o, Efl_Net_Dialer_Unix_Data *pd)
                    .storage = &pd->connect.timeout);
 }
 
+/**
+ * @brief Initiates a connection to a Unix domain socket.
+ *
+ * This function attempts to connect to the specified Unix domain socket address.
+ * The address can be a filesystem path or an abstract namespace path
+ * (prefixed with "abstract:").
+ * The connection is performed asynchronously.
+ *
+ * @param o The Efl_Net_Dialer_Unix object.
+ * @param pd The private data for the object.
+ * @param address The Unix domain socket address to connect to.
+ *                Examples: "/tmp/mysocket", "abstract:my_abstract_socket".
+ * @return 0 on success, or an Eina_Error code on failure.
+ *         Possible errors include EINVAL for invalid arguments,
+ *         EISCONN if already connected, EBADF if closed,
+ *         EALREADY if a connection is in progress, or
+ *         EFL_NET_ERROR_COULDNT_RESOLVE_HOST if the path is too long.
+ */
 EOLIAN static Eina_Error
 _efl_net_dialer_unix_efl_net_dialer_dial(Eo *o, Efl_Net_Dialer_Unix_Data *pd, const char *address)
 {
@@ -190,18 +259,41 @@ _efl_net_dialer_unix_efl_net_dialer_dial(Eo *o, Efl_Net_Dialer_Unix_Data *pd, co
    return 0;
 }
 
+/**
+ * @brief Sets the Unix domain socket address to be dialed.
+ *
+ * @param o The Efl_Net_Dialer_Unix object (unused).
+ * @param pd The private data for the object.
+ * @param address The Unix domain socket address.
+ *                Example: "/tmp/mysocket" or "abstract:my_abstract_socket".
+ */
 EOLIAN static void
 _efl_net_dialer_unix_efl_net_dialer_address_dial_set(Eo *o EINA_UNUSED, Efl_Net_Dialer_Unix_Data *pd, const char *address)
 {
    eina_stringshare_replace(&pd->address_dial, address);
 }
 
+/**
+ * @brief Gets the Unix domain socket address to be dialed.
+ *
+ * @param o The Efl_Net_Dialer_Unix object (unused).
+ * @param pd The private data for the object.
+ * @return The currently set Unix domain socket address.
+ */
 EOLIAN static const char *
 _efl_net_dialer_unix_efl_net_dialer_address_dial_get(const Eo *o EINA_UNUSED, Efl_Net_Dialer_Unix_Data *pd)
 {
    return pd->address_dial;
 }
 
+/**
+ * @brief Sets the timeout for the dial operation.
+ *
+ * @param o The Efl_Net_Dialer_Unix object.
+ * @param pd The private data for the object.
+ * @param seconds The timeout duration in seconds. A value of 0.0 or less
+ *                disables the timeout.
+ */
 EOLIAN static void
 _efl_net_dialer_unix_efl_net_dialer_timeout_dial_set(Eo *o, Efl_Net_Dialer_Unix_Data *pd, double seconds)
 {
@@ -211,12 +303,30 @@ _efl_net_dialer_unix_efl_net_dialer_timeout_dial_set(Eo *o, Efl_Net_Dialer_Unix_
    if ((pd->timeout_dial > 0.0) && (pd->connect.thread)) _timeout_schedule(o, pd);
 }
 
+/**
+ * @brief Gets the timeout for the dial operation.
+ *
+ * @param o The Efl_Net_Dialer_Unix object (unused).
+ * @param pd The private data for the object.
+ * @return The timeout duration in seconds.
+ */
 EOLIAN static double
 _efl_net_dialer_unix_efl_net_dialer_timeout_dial_get(const Eo *o EINA_UNUSED, Efl_Net_Dialer_Unix_Data *pd)
 {
    return pd->timeout_dial;
 }
 
+/**
+ * @brief Sets the connected state of the dialer.
+ *
+ * This function updates the internal connected flag and emits the
+ * 'dialer,connected' event if the state changes to connected.
+ * It also cancels any pending connection timeout.
+ *
+ * @param o The Efl_Net_Dialer_Unix object.
+ * @param pd The private data for the object.
+ * @param connected EINA_TRUE if connected, EINA_FALSE otherwise.
+ */
 EOLIAN static void
 _efl_net_dialer_unix_efl_net_dialer_connected_set(Eo *o, Efl_Net_Dialer_Unix_Data *pd, Eina_Bool connected)
 {
@@ -226,12 +336,29 @@ _efl_net_dialer_unix_efl_net_dialer_connected_set(Eo *o, Efl_Net_Dialer_Unix_Dat
    if (connected) efl_event_callback_call(o, EFL_NET_DIALER_EVENT_DIALER_CONNECTED, NULL);
 }
 
+/**
+ * @brief Gets the connected state of the dialer.
+ *
+ * @param o The Efl_Net_Dialer_Unix object (unused).
+ * @param pd The private data for the object.
+ * @return EINA_TRUE if connected, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_net_dialer_unix_efl_net_dialer_connected_get(const Eo *o EINA_UNUSED, Efl_Net_Dialer_Unix_Data *pd)
 {
    return pd->connected;
 }
 
+/**
+ * @brief Closes the connection.
+ *
+ * This function sets the connected state to EINA_FALSE and then calls the
+ * parent class's close method.
+ *
+ * @param o The Efl_Net_Dialer_Unix object.
+ * @param pd The private data for the object (unused).
+ * @return 0 on success, or an Eina_Error code on failure.
+ */
 EOLIAN static Eina_Error
 _efl_net_dialer_unix_efl_io_closer_close(Eo *o, Efl_Net_Dialer_Unix_Data *pd EINA_UNUSED)
 {

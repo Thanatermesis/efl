@@ -57,7 +57,14 @@
 #define RTNICENESS 1
 #define NICENESS 5
 
-
+/**
+ * @internal
+ * @brief Waits for a thread to terminate.
+ * This is a wrapper around pthread_join.
+ * @param t The thread to wait for.
+ * @return The value passed to pthread_exit() by the terminated thread.
+ *         Returns NULL on error.
+ */
 static inline void *
 _eina_thread_join(Eina_Thread t)
 {
@@ -68,6 +75,18 @@ _eina_thread_join(Eina_Thread t)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Creates a new thread.
+ * This is a wrapper around pthread_create, with additional handling
+ * for thread affinity and signal masking.
+ * @param t Pointer to an Eina_Thread variable, which will store the ID of the new thread.
+ * @param affinity The CPU core to which the thread should be affinitized.
+ *                 If negative, no affinity is set.
+ * @param func The function to be executed by the new thread.
+ * @param data A pointer to data that will be passed to the thread function.
+ * @return EINA_TRUE on success, EINA_FALSE on error.
+ */
 static inline Eina_Bool
 _eina_thread_create(Eina_Thread *t, int affinity, void *(*func)(void *data), void *data)
 {
@@ -114,29 +133,59 @@ _eina_thread_create(Eina_Thread *t, int affinity, void *(*func)(void *data), voi
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Compares two thread IDs.
+ * This is a wrapper around pthread_equal.
+ * @param t1 The first thread ID.
+ * @param t2 The second thread ID.
+ * @return EINA_TRUE if the thread IDs are equal, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _eina_thread_equal(Eina_Thread t1, Eina_Thread t2)
 {
    return pthread_equal((pthread_t)t1, (pthread_t)t2);
 }
 
+/**
+ * @internal
+ * @brief Gets the ID of the calling thread.
+ * This is a wrapper around pthread_self.
+ * @return The ID of the calling thread.
+ */
 static inline Eina_Thread
 _eina_thread_self(void)
 {
    return (Eina_Thread)pthread_self();
 }
 
-
+/**
+ * @internal
+ * @struct _Eina_Thread_Call
+ * @brief Structure to hold data for the internal thread call.
+ *
+ * This structure is used to pass the user's callback function, data,
+ * priority, and affinity settings to the newly created thread.
+ */
 typedef struct _Eina_Thread_Call Eina_Thread_Call;
 struct _Eina_Thread_Call
 {
-   Eina_Thread_Cb func;
-   const void *data;
+   Eina_Thread_Cb func; /**< The user-provided callback function. */
+   const void *data; /**< The user-provided data for the callback. */
 
-   Eina_Thread_Priority prio;
-   int affinity;
+   Eina_Thread_Priority prio; /**< The priority for the new thread. */
+   int affinity; /**< The CPU affinity for the new thread. */
 };
 
+/**
+ * @internal
+ * @brief Internal function executed by newly created Eina threads.
+ * This function sets up the thread environment (cancellability, priority),
+ * calls the user-provided callback, and handles cleanup.
+ * @param context A pointer to an Eina_Thread_Call structure containing
+ *                the callback function and its arguments.
+ * @return The return value of the user-provided callback function.
+ */
 static void *
 _eina_internal_call(void *context)
 {
@@ -205,18 +254,79 @@ _eina_internal_call(void *context)
    return r;
 }
 
+/**
+ * @brief Get the ID of the calling thread.
+ * @return The ID of the calling thread.
+ * @see pthread_self()
+ *
+ * This function returns the Eina_Thread ID of the calling thread.
+ *
+ * @ingroup Eina_Thread_Group
+ */
 EINA_API Eina_Thread
 eina_thread_self(void)
 {
    return _eina_thread_self();
 }
 
+/**
+ * @brief Compare two thread IDs.
+ * @param t1 The first thread ID.
+ * @param t2 The second thread ID.
+ * @return EINA_TRUE if the thread IDs refer to the same thread,
+ *         EINA_FALSE otherwise.
+ * @see pthread_equal()
+ *
+ * This function checks if two Eina_Thread IDs refer to the same thread.
+ *
+ * @ingroup Eina_Thread_Group
+ */
 EINA_API Eina_Bool
 eina_thread_equal(Eina_Thread t1, Eina_Thread t2)
 {
    return !!_eina_thread_equal(t1, t2);
 }
 
+/**
+ * @brief Create a new thread.
+ * @param t Pointer to an Eina_Thread variable, which will store the ID of
+ *        the new thread upon successful creation.
+ * @param prio The priority of the new thread. See #Eina_Thread_Priority.
+ * @param affinity The CPU core to which the thread should be affinitized.
+ *                 A value less than 0 means no specific affinity.
+ * @param func The function to be executed by the new thread. This function
+ *             will receive the @p data pointer and the new thread's ID as arguments.
+ * @param data A pointer to data that will be passed to the @p func.
+ * @return EINA_TRUE on success, EINA_FALSE on error.
+ * @see pthread_create()
+ *
+ * This function creates a new thread that will execute the given @p func
+ * with @p data. The thread's priority and CPU affinity can be specified.
+ * The new thread is created with deferred cancellation type and cancellability
+ * initially disabled.
+ *
+ * Example:
+ * @code
+ * void *my_thread_func(void *data, Eina_Thread thread_id)
+ * {
+ *    printf("Hello from thread %p with data: %s\n", thread_id, (char *)data);
+ *    return NULL;
+ * }
+ *
+ * Eina_Thread my_thread;
+ * if (!eina_thread_create(&my_thread, EINA_THREAD_NORMAL, -1, my_thread_func, "my_data"))
+ * {
+ *    fprintf(stderr, "Error creating thread\n");
+ * }
+ * else
+ * {
+ *    // Thread created successfully
+ *    eina_thread_join(my_thread); // Wait for it to finish
+ * }
+ * @endcode
+ *
+ * @ingroup Eina_Thread_Group
+ */
 EINA_API Eina_Bool
 eina_thread_create(Eina_Thread *t,
                    Eina_Thread_Priority prio, int affinity,
@@ -244,12 +354,42 @@ eina_thread_create(Eina_Thread *t,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Wait for a thread to terminate.
+ * @param t The thread to wait for.
+ * @return The value passed to pthread_exit() or returned by the thread function.
+ *         Returns #EINA_THREAD_JOIN_CANCELED if the thread was canceled.
+ *         Returns NULL on other errors (e.g., invalid thread ID).
+ * @see pthread_join()
+ *
+ * This function blocks the calling thread until the specified thread @p t
+ * terminates.
+ *
+ * @ingroup Eina_Thread_Group
+ */
 EINA_API void *
 eina_thread_join(Eina_Thread t)
 {
    return _eina_thread_join(t);
 }
 
+/**
+ * @brief Set the name of a thread.
+ * @param t The thread whose name is to be set.
+ * @param name The new name for the thread. The name is usually truncated
+ *             to a system-defined limit (e.g., 15 characters on Linux).
+ *             If NULL or empty, the thread name might be cleared or set to empty,
+ *             depending on the system.
+ * @return EINA_TRUE on success, EINA_FALSE on error or if the feature is
+ *         not supported on the current platform.
+ * @see pthread_setname_np()
+ *
+ * This function attempts to set the name of the specified thread. This can be
+ * useful for debugging. The actual behavior and support for this feature
+ * depend on the operating system.
+ *
+ * @ingroup Eina_Thread_Group
+ */
 EINA_API Eina_Bool
 eina_thread_name_set(Eina_Thread t, const char *name)
 {
@@ -274,6 +414,19 @@ eina_thread_name_set(Eina_Thread t, const char *name)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Request cancellation of a thread.
+ * @param t The thread to be canceled.
+ * @return EINA_TRUE on success, EINA_FALSE on error (e.g., invalid thread ID).
+ * @see pthread_cancel()
+ *
+ * This function sends a cancellation request to the specified thread @p t.
+ * Whether and when the thread is actually canceled depends on its
+ * cancellability state and type, and whether it calls a cancellation point.
+ * By default, Eina threads are created with cancellability disabled.
+ *
+ * @ingroup Eina_Thread_Group
+ */
 EINA_API Eina_Bool
 eina_thread_cancel(Eina_Thread t)
 {
@@ -281,6 +434,22 @@ eina_thread_cancel(Eina_Thread t)
    return pthread_cancel((pthread_t)t) == 0;
 }
 
+/**
+ * @brief Set the cancellability state of the calling thread.
+ * @param cancellable If EINA_TRUE, enable cancellation; if EINA_FALSE, disable it.
+ * @param was_cancellable If not NULL, this will be set to the previous
+ *                        cancellability state (EINA_TRUE if was enabled,
+ *                        EINA_FALSE if was disabled).
+ * @return EINA_TRUE on success, EINA_FALSE on error.
+ * @see pthread_setcancelstate()
+ * @see pthread_setcanceltype()
+ *
+ * This function sets the cancellability state of the calling thread.
+ * It also ensures that the cancellation type is set to PTHREAD_CANCEL_DEFERRED,
+ * which is the Eina default.
+ *
+ * @ingroup Eina_Thread_Group
+ */
 EINA_API Eina_Bool
 eina_thread_cancellable_set(Eina_Bool cancellable, Eina_Bool *was_cancellable)
 {
@@ -298,14 +467,43 @@ eina_thread_cancellable_set(Eina_Bool cancellable, Eina_Bool *was_cancellable)
    return r == 0;
 }
 
+/**
+ * @brief Create a cancellation point in the calling thread.
+ * @see pthread_testcancel()
+ *
+ * If thread cancellation is enabled and a cancellation request is pending
+ * for the calling thread, this function will cause the thread to terminate.
+ * If cancellation is disabled or no request is pending, this function has no effect.
+ * This should be called periodically in long-running computations or blocking
+ * operations within a cancellable thread to ensure timely response to cancellation
+ * requests.
+ *
+ * @ingroup Eina_Thread_Group
+ */
 EINA_API void
 eina_thread_cancel_checkpoint(void)
 {
    pthread_testcancel();
 }
 
+/**
+ * @brief Value returned by eina_thread_join() if the joined thread was canceled.
+ * @see PTHREAD_CANCELED
+ * @ingroup Eina_Thread_Group
+ */
 EINA_API const void *EINA_THREAD_JOIN_CANCELED = PTHREAD_CANCELED;
 
+/**
+ * @brief Lower the scheduling priority of the current thread.
+ *
+ * This function attempts to lower the scheduling priority of the calling thread.
+ * For real-time scheduling policies (SCHED_RR, SCHED_FIFO), it decreases the
+ * priority by #RTNICENESS. For other policies (e.g., SCHED_OTHER on Linux),
+ * it increases the "nice" value by #NICENESS, effectively lowering its priority.
+ * The exact behavior is system-dependent.
+ *
+ * @ingroup Eina_Thread_Group
+ */
 EINA_API void
 eina_sched_prio_drop(void)
 {
@@ -355,12 +553,36 @@ eina_sched_prio_drop(void)
 # endif
 }
 
+/**
+ * @brief Initialize the Eina thread module.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ *
+ * This function initializes the Eina threading subsystem.
+ * Currently, this function does nothing and always returns EINA_TRUE,
+ * as pthreads typically do not require explicit library-level initialization
+ * beyond what the system provides.
+ * It is provided for consistency and future extensibility.
+ *
+ * @ingroup Eina_Thread_Group
+ */
 EINA_API Eina_Bool
 eina_thread_init(void)
 {
    return EINA_TRUE;
 }
 
+/**
+ * @brief Shut down the Eina thread module.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ *
+ * This function shuts down the Eina threading subsystem.
+ * Currently, this function does nothing and always returns EINA_TRUE,
+ * as pthreads typically do not require explicit library-level cleanup
+ * that Eina would manage globally.
+ * It is provided for consistency and future extensibility.
+ *
+ * @ingroup Eina_Thread_Group
+ */
 EINA_API Eina_Bool
 eina_thread_shutdown(void)
 {

@@ -1,11 +1,31 @@
 #include "private.h"
 
+/**
+ * @internal
+ * @brief The item types supported by this widget implementation.
+ *
+ * This array lists the Elm_Prefs_Item_Type values that this swallow
+ * item interface can handle. It is terminated by ELM_PREFS_TYPE_UNKNOWN.
+ */
 static Elm_Prefs_Item_Type supported_types[] =
 {
    ELM_PREFS_TYPE_SWALLOW,
    ELM_PREFS_TYPE_UNKNOWN
 };
 
+/**
+ * @internal
+ *
+ * @brief Adds a new swallow widget to the prefs object.
+ *
+ * @param iface The item interface.
+ * @param prefs The prefs widget to add the swallow item to.
+ * @param type The item type.
+ * @param spec The item specification.
+ * @param cb The changed callback.
+ *
+ * @return The new swallow widget.
+ */
 static Evas_Object *
 elm_prefs_swallow_add(const Elm_Prefs_Item_Iface *iface EINA_UNUSED,
                       Evas_Object *prefs,
@@ -23,6 +43,20 @@ elm_prefs_swallow_add(const Elm_Prefs_Item_Iface *iface EINA_UNUSED,
    return obj;
 }
 
+/**
+ * @internal
+ *
+ * @brief Swallows a sub-object into the swallow widget.
+ *
+ * This function takes a value which is expected to contain an Evas_Object
+ * and sets it as the content of the swallow layout.
+ *
+ * @param obj The swallow widget.
+ * @param value A pointer to an Eina_Value of type EINA_VALUE_TYPE_UINT64,
+ *              which holds the Evas_Object* to be swallowed.
+ *
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 elm_prefs_swallow_swallow(Evas_Object *obj,
                           Eina_Value *value)
@@ -38,6 +72,20 @@ elm_prefs_swallow_swallow(Evas_Object *obj,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ *
+ * @brief Unswallows a sub-object from the swallow widget.
+ *
+ * This function unsets the content from the swallow layout and stores
+ * the previously swallowed Evas_Object back into the provided Eina_Value.
+ *
+ * @param obj The swallow widget.
+ * @param value A pointer to an Eina_Value that will be set up to hold the
+ *              unswallowed Evas_Object*.
+ *
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 elm_prefs_swallow_unswallow(Evas_Object *obj,
                             Eina_Value *value)

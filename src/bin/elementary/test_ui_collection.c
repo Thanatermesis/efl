@@ -4,18 +4,35 @@
 
 #include <Efl_Ui.h>
 
+/**
+ * @brief Callback function to select all items in a multi-selectable UI element.
+ * @param data The multi-selectable UI element.
+ * @param ev The event information (unused).
+ */
 static void
 _all_select(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    efl_ui_multi_selectable_all_select(data);
 }
 
+/**
+ * @brief Callback function to unselect all items in a multi-selectable UI element.
+ * @param data The multi-selectable UI element.
+ * @param ev The event information (unused).
+ */
 static void
 _all_unselect(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    efl_ui_multi_selectable_all_unselect(data);
 }
 
+/**
+ * @brief Callback function to change layout orientation based on selection.
+ * If the event object is selected, sets the layout to vertical.
+ * Otherwise, sets the layout to horizontal.
+ * @param data The UI layout element whose orientation will be changed.
+ * @param ev The event information, where ev->object is the selectable item.
+ */
 static void
 _selection_changed_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -25,6 +42,11 @@ _selection_changed_cb(void *data, const Efl_Event *ev EINA_UNUSED)
      efl_ui_layout_orientation_set(data, EFL_UI_LAYOUT_ORIENTATION_HORIZONTAL);
 }
 
+/**
+ * @brief Callback function to focus the first item in a collection.
+ * @param data The UI collection (pack container).
+ * @param ev The event information (unused).
+ */
 static void
 _focus_item_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -35,6 +57,11 @@ _focus_item_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_focus_manager_focus_set(data, element_0);
 }
 
+/**
+ * @brief Callback function to scroll to a specific item (index 1154) with animation.
+ * @param data The UI collection.
+ * @param ev The event information (unused).
+ */
 static void
 _scroll_to_animated_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -45,6 +72,11 @@ _scroll_to_animated_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_collection_item_scroll(data, element_1154, EINA_TRUE);
 }
 
+/**
+ * @brief Callback function to scroll to a specific item (index 10) without animation.
+ * @param data The UI collection.
+ * @param ev The event information (unused).
+ */
 static void
 _scroll_to_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -55,6 +87,12 @@ _scroll_to_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_collection_item_scroll(data, element_10, EINA_FALSE);
 }
 
+/**
+ * @brief Callback function to toggle the minimum size of the first item in a collection.
+ * Alternates between EINA_SIZE2D(40, 200) and EINA_SIZE2D(40, 40).
+ * @param data The UI collection (pack container).
+ * @param ev The event information (unused).
+ */
 static void
 _change_min_size_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
@@ -74,11 +112,22 @@ _change_min_size_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
    b = !b;
 }
 
+/**
+ * @brief Context structure for managing match content settings.
+ * Holds references to vertical and horizontal match checkboxes and the target collection.
+ */
 typedef struct {
-  Efl_Ui_Check *v, *h;
-  Efl_Ui_Collection *c;
+  Efl_Ui_Check *v; /**< Checkbox for vertical match content. */
+  Efl_Ui_Check *h; /**< Checkbox for horizontal match content. */
+  Efl_Ui_Collection *c; /**< The collection to apply match content settings to. */
 } Match_Content_Ctx;
 
+/**
+ * @brief Callback function to update the match_content property of a scrollable collection.
+ * Reads the selected state of vertical and horizontal match checkboxes and applies it.
+ * @param data A pointer to Match_Content_Ctx containing the checkboxes and collection.
+ * @param ev The event information (unused).
+ */
 static void
 _selection_changed_match_content_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -91,12 +140,24 @@ _selection_changed_match_content_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_ui_scrollable_match_content_set(c->c, v, h);
 }
 
+/**
+ * @brief Callback function to free data associated with a widget when it's deleted.
+ * @param data The data to be freed (expected to be Match_Content_Ctx).
+ * @param ev The event information (unused).
+ */
 static void
 _widget_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Adds a new item to the specified collection and container.
+ * The item consists of a text label and a colored rectangle.
+ * The item's appearance (color, size) varies based on its index.
+ * @param c The Efl_Ui_Collection object.
+ * @param cont The container (parent Eo object) to pack the item into.
+ */
 static void
 _add_item(Efl_Ui_Collection *c, Eo *cont)
 {
@@ -141,18 +202,33 @@ _add_item(Efl_Ui_Collection *c, Eo *cont)
    efl_pack_end(cont, il);
 }
 
+/**
+ * @brief Callback function to remove all items from a pack container.
+ * @param data The pack container.
+ * @param ev The event information (unused).
+ */
 static void
 _remove_all_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    efl_pack_clear(data);
 }
 
+/**
+ * @brief Callback function to add a single item to a collection.
+ * @param data The UI collection, which also serves as the container.
+ * @param ev The event information (unused).
+ */
 static void
 _add_one_item(void *data, const Efl_Event *ev EINA_UNUSED)
 {
    _add_item(data, data);
 }
 
+/**
+ * @brief Callback function to add a thousand items to a collection.
+ * @param data The UI collection, which also serves as the container.
+ * @param ev The event information (unused).
+ */
 static void
 _add_thousend_items(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -162,6 +238,12 @@ _add_thousend_items(void *data, const Efl_Event *ev EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback function to change the selection mode of a collection.
+ * Triggered when the value of a radio button group changes.
+ * @param data The UI collection whose selection mode will be changed.
+ * @param ev The event information, where ev->object is the radio group.
+ */
 static void
 _select_value_cb(void *data, const Efl_Event *ev)
 {
@@ -170,6 +252,14 @@ _select_value_cb(void *data, const Efl_Event *ev)
    efl_ui_multi_selectable_select_mode_set(c, efl_ui_radio_group_selected_value_get(ev->object));
 }
 
+/**
+ * @brief Creates a UI window with an item container (collection) and control buttons.
+ * This function sets up a test environment for various collection features like
+ * item addition, removal, scrolling, selection, and layout adjustments.
+ * @param collection_class The Efl_Class for the collection widget (e.g., EFL_UI_GRID_CLASS).
+ * @param item The Efl_Class for the items within the collection (e.g., EFL_UI_GRID_DEFAULT_ITEM_CLASS).
+ * @param name The title for the window.
+ */
 void create_item_container_ui(const Efl_Class *collection_class, const Efl_Class *item, const char *name)
 {
    Efl_Ui_Win *win, *o, *tbl, *item_container, *bx, *git;
@@ -310,6 +400,12 @@ void create_item_container_ui(const Efl_Class *collection_class, const Efl_Class
    efl_pack_end(bx, o);
 }
 
+/**
+ * @brief Test function to create and display an Efl_Ui_Grid collection.
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void test_efl_ui_collection_grid(void *data EINA_UNUSED,
                                    Efl_Object *obj EINA_UNUSED,
                                    void *event_info EINA_UNUSED)
@@ -317,6 +413,12 @@ void test_efl_ui_collection_grid(void *data EINA_UNUSED,
    create_item_container_ui(EFL_UI_GRID_CLASS, EFL_UI_GRID_DEFAULT_ITEM_CLASS, "Efl.Ui.Grid");
 }
 
+/**
+ * @brief Test function to create and display an Efl_Ui_List collection.
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void test_efl_ui_collection_list(void *data EINA_UNUSED,
                                    Efl_Object *obj EINA_UNUSED,
                                    void *event_info EINA_UNUSED)

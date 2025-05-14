@@ -3,6 +3,17 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback function to turn on the glow effect for window focus highlight.
+ *
+ * This function is called when the associated object receives focus. It checks if
+ * the glow effect is enabled via a checkbox and, if so, sets the window's
+ * focus highlight style to "glow_effect".
+ *
+ * @param data The window object (Evas_Object *) to apply the style to.
+ * @param obj The object that received focus.
+ * @param event_info Evas event info (unused).
+ */
 static void
 glow_effect_on_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -12,6 +23,17 @@ glow_effect_on_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      elm_win_focus_highlight_style_set(data, "glow_effect");
 }
 
+/**
+ * @brief Callback function to turn off the glow effect for window focus highlight.
+ *
+ * This function is called when the associated object loses focus. It checks if
+ * the glow effect is enabled via a checkbox and, if so, resets the window's
+ * focus highlight style to "glow".
+ *
+ * @param data The window object (Evas_Object *) to apply the style to.
+ * @param obj The object that lost focus.
+ * @param event_info Evas event info (unused).
+ */
 static void
 glow_effect_off_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -21,6 +43,18 @@ glow_effect_off_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      elm_win_focus_highlight_style_set(data, "glow");
 }
 
+/**
+ * @brief Test function for demonstrating various window focus highlight styles.
+ *
+ * This test sets up a window with several widgets to showcase the focus
+ * highlight features of Elementary. It allows enabling/disabling a "glow"
+ * effect on a specific button when it gains or loses focus.
+ * The test loads a custom theme for focus styles from an .edj file.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_focus_style(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -117,6 +151,18 @@ test_focus_style(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *eve
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for demonstrating focus highlight on specific widget parts.
+ *
+ * This test creates a window to show how focus can be set on a specific
+ * part of a widget, like the text or an icon, instead of the entire widget.
+ * It uses a custom layout and styles to achieve this.
+ * For example, a checkbox can have its focus highlight only on its text part.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_focus_part(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -180,6 +226,18 @@ test_focus_part(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *even
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function for demonstrating per-object focus highlight styles.
+ *
+ * This test sets up a window with several buttons to show that a focus
+ * highlight style can be applied to an individual object, overriding the
+ * window's default focus style. One button is configured to have a "glow"
+ * style, while others will use the default.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_focus_object_style(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

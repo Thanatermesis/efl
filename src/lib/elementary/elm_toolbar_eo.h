@@ -4,6 +4,10 @@
 #ifndef _ELM_TOOLBAR_EO_CLASS_TYPE
 #define _ELM_TOOLBAR_EO_CLASS_TYPE
 
+/**
+ * @brief The Efl object representing an Elementary Toolbar.
+ * @ingroup Elm_Toolbar
+ */
 typedef Eo Elm_Toolbar;
 
 #endif
@@ -40,7 +44,7 @@ typedef enum
 } Elm_Toolbar_Shrink_Mode;
 
 
-#endif
+#endif /* _ELM_TOOLBAR_EO_TYPES */
 /** Elementary toolbar class
  *
  * @ingroup Elm_Toolbar
@@ -548,4 +552,4 @@ EWAPI extern const Efl_Event_Description _ELM_TOOLBAR_EVENT_ITEM_UNFOCUSED;
  */
 #define ELM_TOOLBAR_EVENT_ITEM_UNFOCUSED (&(_ELM_TOOLBAR_EVENT_ITEM_UNFOCUSED))
 
-#endif
+#endif /* _ELM_TOOLBAR_EO_H_ */

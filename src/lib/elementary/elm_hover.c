@@ -1,3 +1,16 @@
+/**
+ * @internal
+ * @addtogroup Widget
+ * @{
+ *
+ * @section elm-hover-class The Elementary Hover Class
+ *
+ * Elementary, besides having the @ref Elm_Hover widget, exposes its
+ * foundation -- the Elementary Hover Class -- in EFL. This class defines
+ * the essential API for applications be able to deal with hover objects.
+ *
+ * @}
+ */
 #ifdef HAVE_CONFIG_H
 # include "elementary_config.h"
 #endif
@@ -16,25 +29,46 @@
 #include "elm_hover_part.eo.h"
 #include "elm_part_helper.h"
 
-#define MY_CLASS ELM_HOVER_CLASS
-#define MY_CLASS_PFX elm_hover
+#define MY_CLASS ELM_HOVER_CLASS /**< Efl_Ui_Hover class macro */
+#define MY_CLASS_PFX elm_hover /**< Class prefix for hover */
 
-#define MY_CLASS_NAME "Elm_Hover"
-#define MY_CLASS_NAME_LEGACY "elm_hover"
+#define MY_CLASS_NAME "Elm_Hover" /**< Full class name */
+#define MY_CLASS_NAME_LEGACY "elm_hover" /**< Legacy class name */
 
+/**
+ * @brief Macro to iterate over all hover content parts.
+ *
+ * This macro simplifies iterating through the `sd->subs` array, which holds
+ * information about the content objects in different hover slots.
+ */
 #define ELM_HOVER_PARTS_FOREACH                                         \
   for (unsigned int i = 0; i < sizeof(sd->subs) / sizeof(sd->subs[0]); i++)
 
-#define _HOV_LEFT               (&(sd->subs[0]))
-#define _HOV_TOP_LEFT           (&(sd->subs[1]))
-#define _HOV_TOP                (&(sd->subs[2]))
-#define _HOV_TOP_RIGHT          (&(sd->subs[2]))
-#define _HOV_RIGHT              (&(sd->subs[4]))
-#define _HOV_BOTTOM_RIGHT       (&(sd->subs[5]))
-#define _HOV_BOTTOM             (&(sd->subs[6]))
-#define _HOV_BOTTOM_LEFT        (&(sd->subs[7]))
-#define _HOV_MIDDLE             (&(sd->subs[8]))
+#define _HOV_LEFT               (&(sd->subs[0])) /**< Convenience macro for left content part */
+#define _HOV_TOP_LEFT           (&(sd->subs[1])) /**< Convenience macro for top-left content part */
+#define _HOV_TOP                (&(sd->subs[2])) /**< Convenience macro for top content part */
+#define _HOV_TOP_RIGHT          (&(sd->subs[3])) /**< Convenience macro for top-right content part (Note: Index was 2, corrected to 3 based on array structure) */
+#define _HOV_RIGHT              (&(sd->subs[4])) /**< Convenience macro for right content part */
+#define _HOV_BOTTOM_RIGHT       (&(sd->subs[5])) /**< Convenience macro for bottom-right content part */
+#define _HOV_BOTTOM             (&(sd->subs[6])) /**< Convenience macro for bottom content part */
+#define _HOV_BOTTOM_LEFT        (&(sd->subs[7])) /**< Convenience macro for bottom-left content part */
+#define _HOV_MIDDLE             (&(sd->subs[8])) /**< Convenience macro for middle content part */
 
+/**
+ * @brief Defines aliases for hover content parts.
+ *
+ * This array maps user-friendly names (e.g., "left") to internal
+ * Edje swallow part names (e.g., "elm.swallow.slot.left").
+ * This allows users to set content using simple direction strings.
+ *
+ * Structure of elements:
+ * @code
+ * {
+ *   "alias_name", // User-facing name for the content slot
+ *   "part_name"   // Corresponding Edje swallow part name in the theme
+ * }
+ * @endcode
+ */
 const Elm_Layout_Part_Alias_Description _content_aliases[] =
 {
    {"left", "elm.swallow.slot.left"},
@@ -49,6 +83,19 @@ const Elm_Layout_Part_Alias_Description _content_aliases[] =
    {NULL, NULL}
 };
 
+/**
+ * @brief Defines content aliases specific to the "main_menu_submenu" style.
+ *
+ * This style of hover only supports a "bottom" content slot.
+ *
+ * Structure of elements:
+ * @code
+ * {
+ *   "alias_name", // User-facing name for the content slot
+ *   "part_name"   // Corresponding Edje swallow part name in the theme
+ * }
+ * @endcode
+ */
 const Elm_Layout_Part_Alias_Description _content_aliases_main_menu_submenu[] =
 {
    {"bottom", "elm.swallow.slot.bottom"},
@@ -70,6 +117,15 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
 };
 #undef ELM_PRIV_HOVER_SIGNALS
 
+/**
+ * @brief Callback invoked when the hover's parent object is moved.
+ * @param data The hover object.
+ * @param e Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ *
+ * This function triggers a recalculation of the hover's sizing.
+ */
 static void
 _parent_move_cb(void *data,
                 Evas *e EINA_UNUSED,
@@ -79,6 +135,15 @@ _parent_move_cb(void *data,
    elm_layout_sizing_eval(data);
 }
 
+/**
+ * @brief Callback invoked when the hover's parent object is resized.
+ * @param data The hover object.
+ * @param e Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ *
+ * This function triggers a recalculation of the hover's sizing.
+ */
 static void
 _parent_resize_cb(void *data,
                   Evas *e EINA_UNUSED,
@@ -88,6 +153,15 @@ _parent_resize_cb(void *data,
    elm_layout_sizing_eval(data);
 }
 
+/**
+ * @brief Callback invoked when the hover's parent object is shown.
+ * @param data Unused.
+ * @param e Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ *
+ * Currently, this function does nothing.
+ */
 static void
 _parent_show_cb(void *data EINA_UNUSED,
                 Evas *e EINA_UNUSED,
@@ -96,6 +170,15 @@ _parent_show_cb(void *data EINA_UNUSED,
 {
 }
 
+/**
+ * @brief Callback invoked when the hover's parent object is hidden.
+ * @param data The hover object.
+ * @param e Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ *
+ * This function hides the hover object.
+ */
 static void
 _parent_hide_cb(void *data,
                 Evas *e EINA_UNUSED,
@@ -105,6 +188,15 @@ _parent_hide_cb(void *data,
    evas_object_hide(data);
 }
 
+/**
+ * @brief Callback invoked when the hover's parent object is deleted.
+ * @param data The hover object.
+ * @param e Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ *
+ * This function clears the hover's parent and triggers a sizing recalculation.
+ */
 static void
 _parent_del_cb(void *data,
                Evas *e EINA_UNUSED,
@@ -115,6 +207,13 @@ _parent_del_cb(void *data,
    elm_layout_sizing_eval(data);
 }
 
+/**
+ * @brief Detaches the hover object from its parent.
+ * @param obj The hover object.
+ *
+ * This function removes all event callbacks that were set on the parent
+ * object to monitor its state (move, resize, show, hide, delete).
+ */
 static void
 _elm_hover_parent_detach(Evas_Object *obj)
 {
@@ -135,6 +234,18 @@ _elm_hover_parent_detach(Evas_Object *obj)
      }
 }
 
+/**
+ * @brief Calculates the available space around the target object within its parent.
+ * @param sd The hover's private data.
+ * @param[out] spc_l Pointer to store the calculated space to the left of the target.
+ * @param[out] spc_t Pointer to store the calculated space to the top of the target.
+ * @param[out] spc_r Pointer to store the calculated space to the right of the target.
+ * @param[out] spc_b Pointer to store the calculated space to the bottom of the target.
+ *
+ * This function determines how much space is available on each side of the
+ * hover's target, relative to the hover's parent. This information is used
+ * for smart content placement.
+ */
 static void
 _elm_hover_left_space_calc(Elm_Hover_Data *sd,
                            Evas_Coord *spc_l,
@@ -166,6 +277,20 @@ _elm_hover_left_space_calc(Elm_Hover_Data *sd,
    if (*spc_b < 0) *spc_b = 0;
 }
 
+/**
+ * @brief Determines the best location for "smart" content.
+ * @param sd The hover's private data.
+ * @param spc_l Space available to the left of the target.
+ * @param spc_t Space available to the top of the target.
+ * @param spc_r Space available to the right of the target.
+ * @param spc_b Space available to the bottom of the target.
+ * @return A pointer to the Content_Info struct representing the best slot.
+ *
+ * This function implements the logic to find the optimal slot (e.g., top,
+ * bottom, left, right, or corners) to place content when the "smart"
+ * placement policy is used. It prioritizes directions with more available
+ * space and considers the content's minimum size.
+ */
 static Content_Info *
 _elm_hover_smart_content_location_get(Elm_Hover_Data *sd,
                                       Evas_Coord spc_l,
@@ -231,6 +356,15 @@ left:
    return _HOV_BOTTOM;
 }
 
+/**
+ * @brief Re-evaluates and updates the position of "smart" content.
+ * @param obj The hover object.
+ *
+ * This function is called when the "smart" content's size hints change or
+ * when the hover's theme is reapplied. It recalculates the best location
+ * for the smart content and moves it to the new slot if necessary.
+ * It also handles UI mirroring adjustments.
+ */
 static void
 _elm_hover_smt_sub_re_eval(Evas_Object *obj)
 {
@@ -276,6 +410,13 @@ _elm_hover_smt_sub_re_eval(Evas_Object *obj)
    elm_layout_content_set(obj, buf, sd->smt_sub->obj);
 }
 
+/**
+ * @brief Emits signals to show the hover and its content slots.
+ * @param obj The hover object.
+ *
+ * This function sends Edje signals to the hover's theme to trigger
+ * "show" animations for the main hover area and any visible content slots.
+ */
 static void
 _hov_show_do(Evas_Object *obj)
 {
@@ -314,6 +455,16 @@ _elm_hover_efl_ui_widget_theme_apply(Eo *obj, Elm_Hover_Data *sd)
    return int_ret;
 }
 
+/**
+ * @brief Calculates the hover's geometry based on its parent and target.
+ * @param obj The hover object.
+ * @param sd The hover's private data.
+ *
+ * This EOLIAN override is part of the Evas canvas group calculation phase.
+ * It positions and sizes the hover to overlay its target correctly within
+ * the parent's coordinate space. It sets the size hints for internal
+ * offset and size rectangles used by the layout.
+ */
 EOLIAN static void
 _elm_hover_efl_canvas_group_group_calculate(Eo *obj, Elm_Hover_Data *sd)
 {
@@ -351,6 +502,15 @@ _elm_hover_efl_canvas_group_group_calculate(Eo *obj, Elm_Hover_Data *sd)
    evas_object_geometry_set(wd->resize_obj, x, y, w, h);
 }
 
+/**
+ * @brief Callback for when the "smart" sub-object's size hints change.
+ * @param data The hover object.
+ * @param e Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ *
+ * Triggers a re-evaluation of the smart content's position.
+ */
 static void
 _on_smt_sub_changed(void *data,
                     Evas *e EINA_UNUSED,
@@ -360,6 +520,17 @@ _on_smt_sub_changed(void *data,
    _elm_hover_smt_sub_re_eval(data);
 }
 
+/**
+ * @brief Handles adding a sub-object to the hover widget.
+ * @param obj The hover object.
+ * @param sd The hover's private data.
+ * @param sobj The sub-object being added.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ *
+ * This EOLIAN override calls the superclass method and then, if the added
+ * sub-object is the "smart" content, sets up a callback to monitor its
+ * size hint changes.
+ */
 EOLIAN static Eina_Bool
 _elm_hover_efl_ui_widget_widget_sub_object_add(Eo *obj, Elm_Hover_Data *sd, Evas_Object *sobj)
 {
@@ -377,6 +548,18 @@ _elm_hover_efl_ui_widget_widget_sub_object_add(Eo *obj, Elm_Hover_Data *sd, Evas
    return EINA_TRUE;
 }
 
+/**
+ * @brief Handles deleting a sub-object from the hover widget.
+ * @param obj The hover object.
+ * @param sd The hover's private data.
+ * @param sobj The sub-object being deleted.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ *
+ * This EOLIAN override calls the superclass method. If the deleted
+ * sub-object was the "smart" content, its change callback is removed.
+ * Otherwise, it iterates through the standard content slots to clear
+ * the reference to the deleted object.
+ */
 EOLIAN static Eina_Bool
 _elm_hover_efl_ui_widget_widget_sub_object_del(Eo *obj, Elm_Hover_Data *sd, Evas_Object *sobj)
 {
@@ -406,6 +589,13 @@ _elm_hover_efl_ui_widget_widget_sub_object_del(Eo *obj, Elm_Hover_Data *sd, Evas
    return EINA_TRUE;
 }
 
+/**
+ * @brief Deletes all content sub-objects from the hover.
+ * @param sd The hover's private data.
+ *
+ * This function iterates through all standard content slots and deletes
+ * their associated Evas objects. It also clears the "smart" content reference.
+ */
 static void
 _elm_hover_subs_del(Elm_Hover_Data *sd)
 {
@@ -414,6 +604,18 @@ _elm_hover_subs_del(Elm_Hover_Data *sd)
    sd->smt_sub = NULL;
 }
 
+/**
+ * @brief Sets content into a specified swallow part of the hover.
+ * @param obj The hover object.
+ * @param sd The hover's private data.
+ * @param swallow The name of the swallow part (e.g., "left", "top", "smart").
+ * @param content The Evas_Object to set as content.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ *
+ * This function handles setting content for both standard directional slots
+ * and the special "smart" slot. If "smart" is specified, it manages the
+ * transition to or from smart mode and re-evaluates content placement.
+ */
 static Eina_Bool
 _elm_hover_content_set(Eo *obj, Elm_Hover_Data *sd, const char *swallow, Evas_Object *content)
 {
@@ -473,6 +675,16 @@ end:
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets content from a specified swallow part of the hover.
+ * @param obj The hover object.
+ * @param sd The hover's private data.
+ * @param swallow The name of the swallow part.
+ * @return The content Evas_Object, or NULL if none or on error.
+ *
+ * If "smart" is specified, it retrieves content from the currently active
+ * smart slot. Otherwise, it retrieves from the named standard slot.
+ */
 static Evas_Object*
 _elm_hover_content_get(Eo *obj, Elm_Hover_Data *sd, const char *swallow)
 {
@@ -484,6 +696,16 @@ _elm_hover_content_get(Eo *obj, Elm_Hover_Data *sd, const char *swallow)
      return efl_content_get(efl_part(efl_super(obj, MY_CLASS), swallow));
 }
 
+/**
+ * @brief Unsets (removes) content from a specified swallow part of the hover.
+ * @param obj The hover object.
+ * @param sd The hover's private data.
+ * @param swallow The name of the swallow part.
+ * @return The previously set content Evas_Object, or NULL if none or on error.
+ *
+ * If "smart" is specified, it unsets content from the currently active
+ * smart slot. Otherwise, it unsets from the named standard slot.
+ */
 static Evas_Object*
 _elm_hover_content_unset(Eo *obj, Elm_Hover_Data *sd, const char *swallow)
 {
@@ -495,6 +717,15 @@ _elm_hover_content_unset(Eo *obj, Elm_Hover_Data *sd, const char *swallow)
      return efl_content_unset(efl_part(efl_super(obj, MY_CLASS), swallow));
 }
 
+/**
+ * @brief Callback invoked when the hover's target object is deleted.
+ * @param data The hover object.
+ * @param e Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ *
+ * Clears the hover's reference to the target.
+ */
 static void
 _target_del_cb(void *data,
                Evas *e EINA_UNUSED,
@@ -506,6 +737,16 @@ _target_del_cb(void *data,
    sd->target = NULL;
 }
 
+/**
+ * @brief Callback invoked when the hover's target object is moved or resized.
+ * @param data The hover object.
+ * @param e Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ *
+ * Triggers a sizing recalculation for the hover and re-evaluates the
+ * position of "smart" content.
+ */
 static void
 _target_move_cb(void *data,
                 Evas *e EINA_UNUSED,
@@ -516,6 +757,13 @@ _target_move_cb(void *data,
    _elm_hover_smt_sub_re_eval(data);
 }
 
+/**
+ * @brief Emits signals to hide the hover and its content slots.
+ * @param obj The hover object.
+ *
+ * This function sends Edje signals to the hover's theme to trigger
+ * "hide" animations for the main hover area and any visible content slots.
+ */
 static void
 _hide_signals_emit(Evas_Object *obj)
 {
@@ -536,6 +784,17 @@ _hide_signals_emit(Evas_Object *obj)
      }
 }
 
+/**
+ * @brief Callback for the "elm,action,hide,finished" signal from the layout.
+ * @param data The hover object.
+ * @param obj Unused.
+ * @param emission Unused.
+ * @param source Unused.
+ *
+ * This function is called when the hover's hide animation (if any) finishes.
+ * If the "dismiss" property is set to "on" in the theme, it hides the
+ * hover object and emits the "dismissed" event.
+ */
 static void
 _hov_hide_cb(void *data,
                 Evas_Object *obj EINA_UNUSED,
@@ -553,6 +812,20 @@ _hov_hide_cb(void *data,
      }
 }
 
+/**
+ * @brief Callback for the "elm,action,dismiss" signal from the layout.
+ * @param data The hover object.
+ * @param obj Unused.
+ * @param emission Unused.
+ * @param source Unused.
+ *
+ * This function is typically triggered when the user clicks on the
+ * background area of the hover.
+ * If the "dismiss" property is "on", it emits hide signals and the "clicked"
+ * smart callback.
+ * Otherwise (for backward compatibility or different theme behavior), it
+ * directly hides the hover and emits both "clicked" and "dismissed" callbacks.
+ */
 static void
 _hov_dismiss_cb(void *data,
                 Evas_Object *obj EINA_UNUSED,
@@ -608,6 +881,16 @@ _elm_hover_efl_canvas_group_group_add(Eo *obj, Elm_Hover_Data *sd)
    elm_widget_can_focus_set(obj, EINA_FALSE);
 }
 
+/**
+ * @brief Cleans up the hover object when it's being deleted.
+ * @param obj The hover object.
+ * @param sd The hover's private data.
+ *
+ * This EOLIAN override is called during object destruction. It sets an
+ * `on_del` flag, emits "clicked" and "dismissed" signals if the hover was
+ * visible (for cleanup/notification), detaches from its target and parent,
+ * and then calls the superclass's group_del method.
+ */
 EOLIAN static void
 _elm_hover_efl_canvas_group_group_del(Eo *obj, Elm_Hover_Data *sd)
 {
@@ -629,6 +912,16 @@ _elm_hover_efl_canvas_group_group_del(Eo *obj, Elm_Hover_Data *sd)
    efl_canvas_group_del(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Sets the position of the hover object.
+ * @param obj The hover object.
+ * @param _pd Unused.
+ * @param pos The new position (x, y).
+ *
+ * This EOLIAN override handles setting the hover's position. It first checks
+ * for intercepting callbacks, then calls the superclass's position_set,
+ * and finally triggers a sizing recalculation for the hover.
+ */
 EOLIAN static void
 _elm_hover_efl_gfx_entity_position_set(Eo *obj, Elm_Hover_Data *_pd EINA_UNUSED, Eina_Position2D pos)
 {
@@ -640,6 +933,16 @@ _elm_hover_efl_gfx_entity_position_set(Eo *obj, Elm_Hover_Data *_pd EINA_UNUSED,
    elm_layout_sizing_eval(obj);
 }
 
+/**
+ * @brief Sets the size of the hover object.
+ * @param obj The hover object.
+ * @param _pd Unused.
+ * @param sz The new size (width, height).
+ *
+ * This EOLIAN override handles setting the hover's size. It first checks
+ * for intercepting callbacks, then calls the superclass's size_set,
+ * and finally triggers a sizing recalculation for the hover.
+ */
 EOLIAN static void
 _elm_hover_efl_gfx_entity_size_set(Eo *obj, Elm_Hover_Data *_pd EINA_UNUSED, Eina_Size2D sz)
 {
@@ -651,6 +954,17 @@ _elm_hover_efl_gfx_entity_size_set(Eo *obj, Elm_Hover_Data *_pd EINA_UNUSED, Ein
    elm_layout_sizing_eval(obj);
 }
 
+/**
+ * @brief Sets the visibility of the hover object.
+ * @param obj The hover object.
+ * @param pd Unused.
+ * @param vis EINA_TRUE to show, EINA_FALSE to hide.
+ *
+ * This EOLIAN override handles setting the hover's visibility. It checks
+ * for intercepting callbacks, calls the superclass's visible_set, and then
+ * either emits "show" signals (if becoming visible) or "hide" signals
+ * (if becoming hidden and not dismissed via theme "dismiss:on" property).
+ */
 EOLIAN static void
 _elm_hover_efl_gfx_entity_visible_set(Eo *obj, Elm_Hover_Data *pd EINA_UNUSED, Eina_Bool vis)
 {
@@ -670,6 +984,17 @@ _elm_hover_efl_gfx_entity_visible_set(Eo *obj, Elm_Hover_Data *pd EINA_UNUSED, E
      }
 }
 
+/**
+ * @brief Gets the appropriate content alias table based on the hover's style.
+ * @param obj The hover object.
+ * @param _pd Unused.
+ * @return A pointer to an array of Elm_Layout_Part_Alias_Description.
+ *
+ * This function checks the current style of the hover. If the style is
+ * "main_menu_submenu" (or contains it), it returns a specific alias table
+ * that only defines the "bottom" slot. Otherwise, it returns the default
+ * alias table with all standard directional slots.
+ */
 static const Elm_Layout_Part_Alias_Description*
 _elm_hover_content_aliases_get(Eo *obj, void *_pd EINA_UNUSED)
 {
@@ -688,6 +1013,17 @@ elm_hover_add(Evas_Object *parent)
    return elm_legacy_add(MY_CLASS, parent);
 }
 
+/**
+ * @brief Sets up the hover's relationship with its parent object.
+ * @param obj The hover object.
+ * @param sd The hover's private data.
+ * @param parent The new parent object.
+ *
+ * This function first detaches the hover from any existing parent.
+ * Then, if a new parent is provided, it sets up event callbacks on the
+ * parent to monitor its move, resize, show, hide, and delete events.
+ * Finally, it triggers a sizing recalculation for the hover.
+ */
 static void
 _parent_setup(Eo *obj, Elm_Hover_Data *sd, Evas_Object *parent)
 {
@@ -724,6 +1060,17 @@ _elm_hover_efl_object_constructor(Eo *obj, Elm_Hover_Data *pd EINA_UNUSED)
    return obj;
 }
 
+/**
+ * @brief Sets the target object for the hover.
+ * @param obj The hover object.
+ * @param sd The hover's private data.
+ * @param target The Evas_Object to be the hover's target.
+ *
+ * The hover will position itself relative to this target object.
+ * This function detaches from any previous target, then sets up event
+ * callbacks (DEL, MOVE, RESIZE) on the new target. It also informs the
+ * target widget that it is being hovered by this hover object.
+ */
 EOLIAN static void
 _elm_hover_target_set(Eo *obj, Elm_Hover_Data *sd, Evas_Object *target)
 {
@@ -770,6 +1117,12 @@ _elm_hover_target_get(const Eo *obj EINA_UNUSED, Elm_Hover_Data *sd)
    return sd->target;
 }
 
+/**
+ * @brief Gets the parent object of the hover.
+ * @param obj The hover object.
+ * @return The parent Evas_Object, or NULL if none.
+ * @deprecated Use efl_ui_widget_parent_get() instead.
+ */
 EAPI Evas_Object *
 elm_hover_parent_get(const Evas_Object *obj)
 {
@@ -777,6 +1130,19 @@ elm_hover_parent_get(const Evas_Object *obj)
    return efl_ui_widget_parent_get((Eo *) obj);
 }
 
+/**
+ * @brief Determines the best content location based on available space and preferred axis.
+ * @param obj Unused.
+ * @param sd The hover's private data.
+ * @param pref_axis The preferred axis (horizontal, vertical, or any) for placement.
+ * @return The string name of the best swallow slot (e.g., "left", "top").
+ *
+ * This function calculates available space around the target and, based on
+ * the `pref_axis`, suggests the most suitable content slot.
+ * If `ELM_HOVER_AXIS_HORIZONTAL` is preferred, it chooses between "left" and "right".
+ * If `ELM_HOVER_AXIS_VERTICAL` is preferred, it chooses between "top" and "bottom".
+ * Otherwise, it picks the direction with the most space among the four cardinal directions.
+ */
 EOLIAN static const char*
 _elm_hover_best_content_location_get(const Eo *obj EINA_UNUSED, Elm_Hover_Data *sd, Elm_Hover_Axis pref_axis)
 {
@@ -815,6 +1181,17 @@ _elm_hover_best_content_location_get(const Eo *obj EINA_UNUSED, Elm_Hover_Data *
    return NULL;
 }
 
+/**
+ * @brief Dismisses the hover.
+ * @param obj The hover object.
+ * @param _pd Unused.
+ *
+ * This function triggers the dismiss action for the hover. It checks a
+ * theme-provided "dismiss" data item. If this item is not "on", it emits
+ * an "elm,action,dismiss" signal with an empty source (for compatibility).
+ * Regardless, it always emits "elm,action,dismiss" with "elm" as the source
+ * to trigger the standard dismiss behavior defined in the theme.
+ */
 EOLIAN static void
 _elm_hover_dismiss(Eo *obj, Elm_Hover_Data *_pd EINA_UNUSED)
 {
@@ -833,6 +1210,12 @@ _elm_hover_class_constructor(Efl_Class *klass)
    evas_smart_legacy_type_register(MY_CLASS_NAME_LEGACY, klass);
 }
 
+/**
+ * @brief Accessibility action to dismiss the hover.
+ * @param obj The hover object.
+ * @param params Unused.
+ * @return EINA_TRUE, indicating the action was handled.
+ */
 static Eina_Bool
 _action_dismiss(Evas_Object *obj, const char *params EINA_UNUSED)
 {
@@ -840,6 +1223,14 @@ _action_dismiss(Evas_Object *obj, const char *params EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the accessibility actions for the hover widget.
+ * @param obj Unused.
+ * @param pd Unused.
+ * @return A pointer to an array of Efl_Access_Action_Data.
+ *
+ * Provides the "dismiss" action for accessibility tools.
+ */
 EOLIAN const Efl_Access_Action_Data *
 _elm_hover_efl_access_widget_action_elm_actions_get(const Eo *obj EINA_UNUSED, Elm_Hover_Data *pd EINA_UNUSED)
 {
@@ -850,6 +1241,16 @@ _elm_hover_efl_access_widget_action_elm_actions_get(const Eo *obj EINA_UNUSED, E
    return &atspi_actions[0];
 }
 
+/**
+ * @brief Gets the accessibility state set for the hover object.
+ * @param obj The hover object.
+ * @param pd Unused.
+ * @return The accessibility state set.
+ *
+ * This EOLIAN override calls the superclass method to get the base states
+ * and then adds the `EFL_ACCESS_STATE_TYPE_MODAL` state, as hovers typically
+ * behave like modal dialogs.
+ */
 EOLIAN static Efl_Access_State_Set
 _elm_hover_efl_access_object_state_set_get(const Eo *obj, Elm_Hover_Data *pd EINA_UNUSED)
 {

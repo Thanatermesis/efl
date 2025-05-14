@@ -28,16 +28,19 @@
 
 #define MY_CLASS EFL_NET_DIALER_UDP_CLASS
 
+/**
+ * @brief Private data for the Efl_Net_Dialer_Udp class.
+ */
 typedef struct _Efl_Net_Dialer_Udp_Data
 {
    struct {
-      Ecore_Thread *thread;
-      Eina_Future *timeout;
+      Ecore_Thread *thread; /**< Thread used for asynchronous address resolution. */
+      Eina_Future *timeout; /**< Future for handling resolver timeout. */
    } resolver;
-   Eina_Stringshare *address_dial;
-   Eina_Bool connected;
-   Eina_Bool closed;
-   double timeout_dial;
+   Eina_Stringshare *address_dial; /**< The address string to dial (e.g., "hostname:port"). */
+   Eina_Bool connected; /**< EINA_TRUE if the dialer is connected, EINA_FALSE otherwise. */
+   Eina_Bool closed; /**< EINA_TRUE if the dialer has been explicitly closed. */
+   double timeout_dial; /**< Timeout in seconds for the dial operation. */
 } Efl_Net_Dialer_Udp_Data;
 
 EOLIAN static Eo*
@@ -53,6 +56,11 @@ _efl_net_dialer_udp_efl_object_constructor(Eo *o, Efl_Net_Dialer_Udp_Data *pd EI
 EOLIAN static void
 _efl_net_dialer_udp_efl_object_invalidate(Eo *o, Efl_Net_Dialer_Udp_Data *pd)
 {
+   /**
+    * @brief Handles object invalidation.
+    * If close_on_invalidate is set and the dialer is not already closed,
+    * it closes the dialer. It also cancels any ongoing resolver thread.
+    */
    if (efl_io_closer_close_on_invalidate_get(o) &&
        (!efl_io_closer_closed_get(o)))
      {
@@ -73,11 +81,27 @@ _efl_net_dialer_udp_efl_object_invalidate(Eo *o, Efl_Net_Dialer_Udp_Data *pd)
 EOLIAN static void
 _efl_net_dialer_udp_efl_object_destructor(Eo *o, Efl_Net_Dialer_Udp_Data *pd)
 {
+   /**
+    * @brief Handles object destruction.
+    * Releases the stored dial address string.
+    */
    efl_destructor(efl_super(o, MY_CLASS));
 
    eina_stringshare_replace(&pd->address_dial, NULL);
 }
 
+/**
+ * @brief Callback function triggered when the address resolution times out.
+ *
+ * This function cancels the resolver thread if it's still running,
+ * sets the End-Of-Stream (EOS) flag for the reader, and emits a
+ * EFL_NET_DIALER_EVENT_DIALER_ERROR event with ETIMEDOUT.
+ *
+ * @param o The Efl_Net_Dialer_Udp object.
+ * @param data User data (unused).
+ * @param v The Eina_Value associated with the timeout future (unused).
+ * @return The input Eina_Value v.
+ */
 static Eina_Value
 _efl_net_dialer_udp_resolver_timeout(Eo *o, void *data EINA_UNUSED, const Eina_Value v)
 {
@@ -97,6 +121,16 @@ _efl_net_dialer_udp_resolver_timeout(Eo *o, void *data EINA_UNUSED, const Eina_V
    return v;
 }
 
+/**
+ * @brief Schedules the resolver timeout.
+ *
+ * If a dial timeout is configured, this function sets up a future
+ * that will call _efl_net_dialer_udp_resolver_timeout after the
+ * specified duration.
+ *
+ * @param o The Efl_Net_Dialer_Udp object.
+ * @param pd The private data of the dialer.
+ */
 static void
 _timeout_schedule(Eo *o, Efl_Net_Dialer_Udp_Data *pd)
 {
@@ -105,6 +139,20 @@ _timeout_schedule(Eo *o, Efl_Net_Dialer_Udp_Data *pd)
                    .storage = &pd->resolver.timeout);
 }
 
+/**
+ * @brief Attempts to bind the UDP socket using a resolved address.
+ *
+ * This function is called for each address returned by the resolver.
+ * It creates a socket, sets necessary socket options (like SO_BROADCAST
+ * for IPv4 broadcast addresses or IPV6_JOIN_GROUP for IPv6 multicast),
+ * binds the socket if a local address is specified, and initializes
+ * the UDP socket with the remote address.
+ *
+ * @param o The Efl_Net_Dialer_Udp object.
+ * @param pd The private data of the dialer (unused).
+ * @param addr The addrinfo structure containing the resolved address.
+ * @return 0 on success, or an Eina_Error code on failure.
+ */
 static Eina_Error
 _efl_net_dialer_udp_resolved_bind(Eo *o, Efl_Net_Dialer_Udp_Data *pd EINA_UNUSED, struct addrinfo *addr)
 {
@@ -194,6 +242,22 @@ _efl_net_dialer_udp_resolved_bind(Eo *o, Efl_Net_Dialer_Udp_Data *pd EINA_UNUSED
    return err;
 }
 
+/**
+ * @brief Callback function for asynchronous address resolution.
+ *
+ * This function is called when efl_net_ip_resolve_async_new() completes.
+ * It processes the list of resolved addresses, attempting to bind to one.
+ * If successful, it emits EFL_NET_DIALER_EVENT_DIALER_RESOLVED and
+ * EFL_NET_DIALER_EVENT_DIALER_CONNECTED.
+ * If resolution or binding fails, it emits EFL_NET_DIALER_EVENT_DIALER_ERROR.
+ *
+ * @param data The Efl_Net_Dialer_Udp object (passed as user data).
+ * @param host The hostname that was resolved (unused).
+ * @param port The port that was resolved (unused).
+ * @param hints The addrinfo hints used for resolution (unused).
+ * @param result A linked list of addrinfo structures containing resolved addresses.
+ * @param gai_error Error code from getaddrinfo(), 0 on success.
+ */
 static void
 _efl_net_dialer_udp_resolved(void *data, const char *host EINA_UNUSED, const char *port EINA_UNUSED, const struct addrinfo *hints EINA_UNUSED, struct addrinfo *result, int gai_error)
 {
@@ -240,8 +304,20 @@ _efl_net_dialer_udp_resolved(void *data, const char *host EINA_UNUSED, const cha
 }
 
 EOLIAN static Eina_Error
-_efl_net_dialer_udp_efl_net_dialer_dial(Eo *o, Efl_Net_Dialer_Udp_Data *pd EINA_UNUSED, const char *address)
+_efl_net_dialer_udp_efl_net_dialer_dial(Eo *o, Efl_Net_Dialer_Udp_Data *pd, const char *address)
 {
+   /**
+    * @brief Initiates a UDP connection (address resolution).
+    *
+    * Parses the given address (e.g., "hostname:port" or "ip_address:port"),
+    * then starts an asynchronous DNS resolution.
+    *
+    * @param address The address to dial. For example, "localhost:1234" or "[::1]:5678".
+    *                If the port is omitted, it defaults to "0".
+    * @return 0 on success, or an Eina_Error code on failure.
+    *         Common errors include EINVAL for invalid address format,
+    *         EISCONN if already connected, EBADF if closed, EALREADY if dialing.
+    */
    char *str;
    const char *host, *port;
    struct addrinfo hints = {
@@ -287,18 +363,21 @@ _efl_net_dialer_udp_efl_net_dialer_dial(Eo *o, Efl_Net_Dialer_Udp_Data *pd EINA_
 EOLIAN static void
 _efl_net_dialer_udp_efl_net_dialer_address_dial_set(Eo *o EINA_UNUSED, Efl_Net_Dialer_Udp_Data *pd, const char *address)
 {
+   // This is an EOLIAN generated function, documentation is in the .eo file.
    eina_stringshare_replace(&pd->address_dial, address);
 }
 
 EOLIAN static const char *
 _efl_net_dialer_udp_efl_net_dialer_address_dial_get(const Eo *o EINA_UNUSED, Efl_Net_Dialer_Udp_Data *pd)
 {
+   // This is an EOLIAN generated function, documentation is in the .eo file.
    return pd->address_dial;
 }
 
 EOLIAN static void
-_efl_net_dialer_udp_efl_net_dialer_timeout_dial_set(Eo *o EINA_UNUSED, Efl_Net_Dialer_Udp_Data *pd, double seconds)
+_efl_net_dialer_udp_efl_net_dialer_timeout_dial_set(Eo *o, Efl_Net_Dialer_Udp_Data *pd, double seconds)
 {
+   // This is an EOLIAN generated function, documentation is in the .eo file.
    pd->timeout_dial = seconds;
    if (pd->resolver.timeout) eina_future_cancel(pd->resolver.timeout);
    if ((pd->timeout_dial > 0.0) && (pd->resolver.thread)) _timeout_schedule(o, pd);
@@ -307,12 +386,15 @@ _efl_net_dialer_udp_efl_net_dialer_timeout_dial_set(Eo *o EINA_UNUSED, Efl_Net_D
 EOLIAN static double
 _efl_net_dialer_udp_efl_net_dialer_timeout_dial_get(const Eo *o EINA_UNUSED, Efl_Net_Dialer_Udp_Data *pd)
 {
+   // This is an EOLIAN generated function, documentation is in the .eo file.
    return pd->timeout_dial;
 }
 
 EOLIAN static void
 _efl_net_dialer_udp_efl_net_dialer_connected_set(Eo *o, Efl_Net_Dialer_Udp_Data *pd, Eina_Bool connected)
 {
+   // This is an EOLIAN generated function, documentation is in the .eo file.
+   // Internally, this also cancels any pending resolver timeout if we are setting connected state.
    if (pd->resolver.timeout) eina_future_cancel(pd->resolver.timeout);
    if (pd->connected == connected) return;
    pd->connected = connected;
@@ -322,12 +404,21 @@ _efl_net_dialer_udp_efl_net_dialer_connected_set(Eo *o, Efl_Net_Dialer_Udp_Data 
 EOLIAN static Eina_Bool
 _efl_net_dialer_udp_efl_net_dialer_connected_get(const Eo *o EINA_UNUSED, Efl_Net_Dialer_Udp_Data *pd)
 {
+   // This is an EOLIAN generated function, documentation is in the .eo file.
    return pd->connected;
 }
 
 EOLIAN static Eina_Error
 _efl_net_dialer_udp_efl_io_closer_close(Eo *o, Efl_Net_Dialer_Udp_Data *pd)
 {
+   /**
+    * @brief Closes the dialer.
+    *
+    * Marks the dialer as closed, sets its connected state to EINA_FALSE,
+    * and then calls the parent class's close method.
+    *
+    * @return 0 on success, or an Eina_Error code on failure from the parent close.
+    */
    pd->closed = EINA_TRUE;
    efl_net_dialer_connected_set(o, EINA_FALSE);
    return efl_io_closer_close(efl_super(o, MY_CLASS));

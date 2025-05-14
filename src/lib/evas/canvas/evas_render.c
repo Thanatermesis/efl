@@ -100,21 +100,86 @@ rend_dbg(const char *txt)
 typedef struct _Render_Updates Render_Updates;
 typedef struct _Cutout_Margin  Cutout_Margin;
 
+/**
+ * @internal
+ * @brief Represents an area of a surface that has been updated.
+ *
+ * This structure is used to track updated regions during rendering.
+ */
 struct _Render_Updates
 {
-   void *surface;
-   Eina_Rectangle *area;
+   void *surface; /**< The surface that was updated. */
+   Eina_Rectangle *area; /**< The rectangular area of the update. */
 };
 
+/**
+ * @internal
+ * @brief Defines margins for a cutout area.
+ *
+ * This is used to expand or shrink a cutout region, for example to
+ * accommodate for filter effects like blur that extend beyond the
+ * object's geometry.
+ */
 struct _Cutout_Margin
 {
-   int l, r, t, b;
+   int l, r, t, b; /**< Left, right, top, and bottom margins. */
 };
 
+/**
+ * @internal
+ * @brief Wakes up the render pipe for asynchronous rendering.
+ *
+ * This function is executed in the render thread. It takes the pending updates
+ * for each output and pushes them to the engine for display. After pushing
+ * the updates, it schedules `evas_render_async_wakeup` to be called in the
+ * main thread to finalize the async rendering process.
+ *
+ * @param data The Evas public data.
+ */
 static void
 evas_render_pipe_wakeup(void *data);
+/**
+ * @internal
+ * @brief The core rendering loop of Evas.
+ *
+ * This function orchestrates the entire process of rendering a frame. It
+ * performs several phases:
+ * 1. Calculates which objects have changed and need updates.
+ * 2. Handles special cases like object restacking, proxy objects, and masks.
+ * 3. Manages damage and obscure regions.
+ * 4. Determines which objects can be rendered on hardware planes (overlays).
+ * 5. Iterates through update rectangles and renders the necessary objects.
+ * 6. Flushes updates to the output, either synchronously or asynchronously.
+ * 7. Performs post-render cleanup.
+ *
+ * @param eo_e The Evas canvas object.
+ * @param make_updates If true, update information will be generated.
+ * @param do_draw If true, drawing operations will be performed.
+ * @param do_async If true, rendering will be performed asynchronously in a
+ *        separate thread.
+ * @return EINA_TRUE if any rendering occurred, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 evas_render_updates_internal(Evas *eo_e, unsigned char make_updates, unsigned char do_draw, Eina_Bool do_async);
+/**
+ * @internal
+ * @brief Renders a mask object into an offscreen surface.
+ *
+ * This function is responsible for preparing a mask for use. It renders the
+ * mask object into a dedicated surface. This surface can then be used by the
+ * engine to clip other objects. It handles nested masks by using `prev_mask`.
+ *
+ * For software engines, it may convert the rendered RGBA surface into an
+ * alpha-only surface for efficiency.
+ *
+ * @param evas The Evas public data.
+ * @param output The rendering output context.
+ * @param mask The mask object to render.
+ * @param prev_mask The previous mask in a chain of masks, if any. This is
+ *        used to correctly multiply masks.
+ * @param level The recursion level for debugging.
+ * @param do_async Whether to perform rendering asynchronously.
+ */
 static void
 evas_render_mask_subrender(Evas_Public_Data *evas,
                            void *output,
@@ -198,12 +263,37 @@ _accumulate_time(double before, Eina_Bool async)
 
 static int _render_busy = 0;
 
+/**
+ * @internal
+ * @brief Checks if an object is part of the framespace.
+ *
+ * The framespace is a special region of the canvas, typically used for
+ * window manager decorations, that is not part of the regular canvas content
+ * area. Objects in framespace may be clipped or handled differently.
+ *
+ * @param obj The object to check.
+ * @param evas The Evas public data.
+ * @return EINA_TRUE if the object is in framespace, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _is_obj_in_framespace(Evas_Object_Protected_Data *obj, Evas_Public_Data *evas EINA_UNUSED)
 {
    return obj->is_frame;
 }
 
+/**
+ * @internal
+ * @brief Applies an additional clip to a rendering context to exclude the framespace.
+ *
+ * This function clips the rendering context `ctx` to the area *outside* the
+ * framespace. This is used to ensure that normal objects do not draw over
+ * window decorations.
+ *
+ * @param evas The Evas public data, containing framespace geometry.
+ * @param ctx The rendering context to clip.
+ * @param ox The x offset of the current drawing operation.
+ * @param oy The y offset of the current drawing operation.
+ */
 static inline void
 _evas_render_framespace_context_clip_clip(Evas_Public_Data *evas, void *ctx,
                                           int ox, int oy)
@@ -218,6 +308,14 @@ _evas_render_framespace_context_clip_clip(Evas_Public_Data *evas, void *ctx,
    ENFN->context_clip_clip(ENC, ctx, fx + ox, fy + oy, fw, fh);
 }
 
+/**
+ * @internal
+ * @brief Performs post-render cleanup tasks.
+ *
+ * This function is called when the renderer is no longer busy. It's
+ * responsible for cleaning up resources that were used during rendering,
+ * such as unloading pending RGBA image data.
+ */
 static void
 _evas_render_cleanup(void)
 {
@@ -225,12 +323,26 @@ _evas_render_cleanup(void)
    evas_common_rgba_pending_unloads_cleanup();
 }
 
+/**
+ * @internal
+ * @brief Increments the render busy counter.
+ *
+ * This indicates that a rendering operation has started. It prevents cleanup
+ * functions from running while rendering is in progress.
+ */
 static void
 _evas_render_busy_begin(void)
 {
    _render_busy++;
 }
 
+/**
+ * @internal
+ * @brief Decrements the render busy counter.
+ *
+ * This indicates that a rendering operation has finished. When the counter
+ * reaches zero, it triggers post-render cleanup tasks.
+ */
 static void
 _evas_render_busy_end(void)
 {
@@ -273,6 +385,18 @@ _evas_canvas_obscured_clear(Eo *eo_e EINA_UNUSED, Evas_Public_Data *e)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback function to free a rectangle from a container.
+ *
+ * This is used with eina_array_foreach to clean up the `clip_changes` array,
+ * which stores rectangles representing areas affected by clip changes.
+ *
+ * @param container The container being iterated.
+ * @param data The rectangle to free.
+ * @param fdata User data (unused).
+ * @return EINA_TRUE to continue iteration.
+ */
 static Eina_Bool
 _evas_clip_changes_free(const void *container EINA_UNUSED, void *data, void *fdata EINA_UNUSED)
 {
@@ -280,6 +404,19 @@ _evas_clip_changes_free(const void *container EINA_UNUSED, void *data, void *fda
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Calculates the effective clipped geometry of an object by traversing static clippers.
+ *
+ * This function walks up the clipper hierarchy from the given object state.
+ * It accumulates clipping from each parent clipper, as long as the clipper
+ * is "static" (meaning it has a fixed size and won't be resized by its content).
+ * This provides a final, smallest possible rectangle that the object is visible within,
+ * which is useful for optimizations like sizing mask surfaces.
+ *
+ * @param state The protected state of the object to start from.
+ * @return The final clipped rectangle.
+ */
 static inline Eina_Rectangle
 _evas_render_smallest_static_clipped_geometry_get(const Evas_Object_Protected_State *state)
 {
@@ -303,12 +440,35 @@ _evas_render_smallest_static_clipped_geometry_get(const Evas_Object_Protected_St
    return (Eina_Rectangle){cx, cy, cw, ch};
 }
 
+/**
+ * @internal
+ * @brief Checks if an object had a map enabled in the previous rendering frame.
+ *
+ * A "map" provides transformations like rotation and 3D effects. This function
+ * checks the object's previous state (`prev`) to see if a map was active. This
+ * is used to detect when a map is turned on or off to correctly calculate damage.
+ *
+ * @param obj The object to check.
+ * @return EINA_TRUE if the object had a map in the previous frame, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _evas_render_had_map(Evas_Object_Protected_Data *obj)
 {
    return ((obj->map->prev.map) && (obj->map->prev.usemap));
 }
 
+/**
+ * @internal
+ * @brief Determines if an object is relevant for the current rendering pass.
+ *
+ * An object is considered relevant if it is currently visible or was visible
+ * in the previous frame, and is not a clipper for other objects (have_clipees).
+ * This helps to quickly filter out objects that don't need detailed processing
+ * during damage calculation.
+ *
+ * @param obj The object to check.
+ * @return EINA_TRUE if the object is relevant, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _evas_render_is_relevant(Evas_Object_Protected_Data *obj)
 {
@@ -316,6 +476,17 @@ _evas_render_is_relevant(Evas_Object_Protected_Data *obj)
            (evas_object_was_visible(obj) && (!obj->prev->have_clipees)));
 }
 
+/**
+ * @internal
+ * @brief Checks if an object is currently in a state where it can be rendered.
+ *
+ * This checks for visibility, whether it's used as a clipper, and if it has the
+ * `no_render` flag set. This is a stricter check than `_evas_render_is_relevant`
+ * and is used to decide whether to actually issue draw calls for an object.
+ *
+ * @param obj The object to check.
+ * @return EINA_TRUE if the object can be rendered, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _evas_render_can_render(Evas_Object_Protected_Data *obj)
 {
@@ -323,6 +494,17 @@ _evas_render_can_render(Evas_Object_Protected_Data *obj)
            !obj->no_render);
 }
 
+/**
+ * @internal
+ * @brief Adds damage rectangles for an object's previous and current geometries.
+ *
+ * When an object moves, changes size, or its visibility changes, both its old
+ * area (`prev` state) and its new area (`cur` state) need to be redrawn.
+ * This function adds both of these areas to the list of redraws for the frame.
+ *
+ * @param evas The Evas public data.
+ * @param obj The object that has changed.
+ */
 static void
 _evas_render_prev_cur_clip_cache_add(Evas_Public_Data *evas, Evas_Object_Protected_Data *obj)
 {
@@ -339,6 +521,19 @@ _evas_render_prev_cur_clip_cache_add(Evas_Public_Data *evas, Evas_Object_Protect
                                  obj->cur->cache.clip.h);
 }
 
+/**
+ * @internal
+ * @brief Removes an area from the set of pending redraws.
+ *
+ * This is an optimization. If an opaque object has not changed, its area
+ * can be subtracted from the total damage area for the frame, because it will
+ * fully obscure anything behind it. This function calculates the object's
+ * current clipped area and tells the engine to delete that rectangle from
+ * its update list.
+ *
+ * @param e The Evas public data.
+ * @param obj The opaque, unchanged object.
+ */
 static void
 _evas_render_cur_clip_cache_del(Evas_Public_Data *e, Evas_Object_Protected_Data *obj)
 {
@@ -359,7 +554,20 @@ _evas_render_cur_clip_cache_del(Evas_Public_Data *e, Evas_Object_Protected_Data 
    evas_render_update_del(e, x + e->framespace.x, y + e->framespace.y, w, h);
 }
 
-/* sets the redraw flag for all the proxies depending on this obj as a source */
+/**
+ * @internal
+ * @brief Propagates a redraw request to all proxy objects of a given source object.
+ *
+ * When a source object for a proxy changes, all proxies that use this source
+ * must be marked for redraw. This function recursively traverses the list of
+ * proxies and sets their `redraw` flag.
+ *
+ * @param e The Evas public data.
+ * @param obj The source object that has changed.
+ * @param render If true, also triggers pre-render calculation and damage update
+ *        for the proxies. This is needed if the change happens late in the
+ *        render cycle.
+ */
 static void
 _evas_proxy_redraw_set(Evas_Public_Data *e, Evas_Object_Protected_Data *obj,
                        Eina_Bool render)
@@ -392,7 +600,18 @@ _evas_proxy_redraw_set(Evas_Public_Data *e, Evas_Object_Protected_Data *obj,
      }
 }
 
-/* sets the mask redraw flag for all the objects clipped by this mask */
+/**
+ * @internal
+ * @brief Propagates a redraw request to all objects clipped by a given mask object.
+ *
+ * When an object that is used as a mask changes, it needs to be re-rendered
+ * into its mask surface. Furthermore, all objects that are clipped by this
+ * mask (clippees) must have their clipping recalculated. This function marks
+ * the mask for redraw and triggers clip recalculation for all its clippees.
+ *
+ * @param e The Evas public data.
+ * @param obj The mask object that has changed.
+ */
 static void
 _evas_mask_redraw_set(Evas_Public_Data *e EINA_UNUSED,
                       Evas_Object_Protected_Data *obj)
@@ -421,6 +640,17 @@ _evas_mask_redraw_set(Evas_Public_Data *e EINA_UNUSED,
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the changed state of an object, handling smart objects correctly.
+ *
+ * For a normal object, this just returns its `changed` flag. For a smart
+ * object, it queries the smart object's implementation to see if it or any
+ * of its members have changed.
+ *
+ * @param obj The object to check.
+ * @return EINA_TRUE if the object is considered changed, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _evas_render_object_changed_get(Evas_Object_Protected_Data *obj)
 {
@@ -430,6 +660,16 @@ _evas_render_object_changed_get(Evas_Object_Protected_Data *obj)
      return obj->changed;
 }
 
+/**
+ * @internal
+ * @brief Checks if an object is currently being used as a mask.
+ *
+ * An object is considered a mask if it has the `is_mask` flag set and it
+ * is actually clipping at least one other object (`clipees`).
+ *
+ * @param obj The object to check. Can be NULL.
+ * @return EINA_TRUE if the object is an active mask, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _evas_render_object_is_mask(Evas_Object_Protected_Data *obj)
 {

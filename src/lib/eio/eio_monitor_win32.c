@@ -30,6 +30,12 @@
  * @cond LOCAL
  */
 
+/**
+ * @brief Structure to hold information for a single Win32 file/directory watcher.
+ *
+ * This structure contains the necessary handles, buffers, and state
+ * for monitoring a specific path using ReadDirectoryChangesW.
+ */
 typedef struct _Eio_Monitor_Win32_Watcher Eio_Monitor_Win32_Watcher;
 
 /* 4096 = 256 * sizeof(FILE_NOTIFY_INFORMATION) */
@@ -47,17 +53,34 @@ struct _Eio_Monitor_Win32_Watcher
    Eina_Stringshare    *file;
    DWORD                buf_length;
    Eina_Bool            monitor_file : 1;
-   Eina_Bool            monitor_parent : 1;
+   Eina_Bool            monitor_parent : 1; /**< EINA_TRUE if this watcher monitors the parent directory for self-deletion events. */
 };
 
+/**
+ * @brief Backend-specific data for Win32 Eio_Monitor.
+ *
+ * This structure holds the watchers for the file itself, its directory,
+ * and its parent directory (for detecting deletion of the monitored path).
+ */
 struct _Eio_Monitor_Backend
 {
-   Eio_Monitor               *parent;
+   Eio_Monitor               *parent; /**< Pointer to the parent Eio_Monitor object. */
    Eio_Monitor_Win32_Watcher *watcher_file;
    Eio_Monitor_Win32_Watcher *watcher_dir;
-   Eio_Monitor_Win32_Watcher *watcher_parent;
+   Eio_Monitor_Win32_Watcher *watcher_parent; /**< Watcher for the parent directory. */
 };
 
+/**
+ * @brief Callback function invoked when a file system event occurs.
+ *
+ * This function is called by Ecore_Win32 when an event is signaled on
+ * the watcher's event handle. It processes the FILE_NOTIFY_INFORMATION
+ * buffer, determines the type of event, and notifies the Eio_Monitor.
+ *
+ * @param data Pointer to the Eio_Monitor_Win32_Watcher structure.
+ * @param wh The Ecore_Win32_Handler that triggered this callback (unused).
+ * @return ECORE_CALLBACK_RENEW to keep the handler active, or ECORE_CALLBACK_CANCEL to remove it.
+ */
 static Eina_Bool
 _eio_monitor_win32_cb(void *data, Ecore_Win32_Handler *wh EINA_UNUSED)
 {
@@ -200,6 +223,20 @@ _eio_monitor_win32_cb(void *data, Ecore_Win32_Handler *wh EINA_UNUSED)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Creates and initializes a new Win32 watcher.
+ *
+ * This function sets up a watcher for a given path. It creates necessary
+ * handles, initializes the OVERLAPPED structure, and starts monitoring
+ * for file system changes using ReadDirectoryChangesW.
+ *
+ * @param monitor The Eio_Monitor instance this watcher belongs to.
+ * @param current The directory path to monitor.
+ * @param file The specific file name to monitor within the 'current' directory (can be NULL if monitoring the directory itself).
+ * @param monitor_file EINA_TRUE if this watcher is for a file, EINA_FALSE for a directory.
+ * @param monitor_parent EINA_TRUE if this watcher is for the parent directory (to detect self-deletion).
+ * @return A pointer to the newly created Eio_Monitor_Win32_Watcher, or NULL on failure.
+ */
 static Eio_Monitor_Win32_Watcher *
 _eio_monitor_win32_watcher_new(Eio_Monitor      *monitor,
                                Eina_Stringshare *current,
@@ -294,6 +331,14 @@ _eio_monitor_win32_watcher_new(Eio_Monitor      *monitor,
    return NULL;
 }
 
+/**
+ * @brief Frees resources associated with a Win32 watcher.
+ *
+ * This function cleans up by deleting the Ecore_Win32_Handler,
+ * releasing stringshares, and closing handles.
+ *
+ * @param w The Eio_Monitor_Win32_Watcher to free.
+ */
 static void
 _eio_monitor_win32_watcher_free(Eio_Monitor_Win32_Watcher *w)
 {
@@ -319,14 +364,37 @@ _eio_monitor_win32_watcher_free(Eio_Monitor_Win32_Watcher *w)
  * @cond LOCAL
  */
 
+/**
+ * @brief Initializes the Win32 EIO monitor backend.
+ *
+ * This function is called once when the EIO library is initialized.
+ * Currently, it does nothing for the Win32 backend.
+ */
 void eio_monitor_backend_init(void)
 {
 }
 
+/**
+ * @brief Shuts down the Win32 EIO monitor backend.
+ *
+ * This function is called once when the EIO library is shut down.
+ * Currently, it does nothing for the Win32 backend.
+ */
 void eio_monitor_backend_shutdown(void)
 {
 }
 
+/**
+ * @brief Adds a new path to be monitored by the Win32 backend.
+ *
+ * This function sets up the necessary watchers for the given path.
+ * It determines if the path is a file or directory and creates
+ * watchers for the path itself, its containing directory, and its parent
+ * directory to handle various event types, including self-deletion.
+ * If setting up Win32 watchers fails, it falls back to poll monitoring.
+ *
+ * @param monitor The Eio_Monitor object representing the path to monitor.
+ */
 void eio_monitor_backend_add(Eio_Monitor *monitor)
 {
    char path[PATH_MAX];
@@ -408,6 +476,15 @@ void eio_monitor_backend_add(Eio_Monitor *monitor)
    eio_monitor_fallback_add(monitor);
 }
 
+/**
+ * @brief Removes a path from being monitored by the Win32 backend.
+ *
+ * This function cleans up resources associated with monitoring a path.
+ * If the monitor was using the fallback mechanism, it calls the fallback
+ * deletion function. Otherwise, it frees the Win32 watchers.
+ *
+ * @param monitor The Eio_Monitor object to stop monitoring.
+ */
 void eio_monitor_backend_del(Eio_Monitor *monitor)
 {
    if (monitor->fallback)
@@ -423,6 +500,17 @@ void eio_monitor_backend_del(Eio_Monitor *monitor)
    monitor->backend = NULL;
 }
 
+/**
+ * @brief Checks if a given path is relevant to the monitored context.
+ *
+ * For the Win32 backend, this function currently always returns EINA_TRUE,
+ * implying all paths are considered relevant. This function might be used
+ * by some backends to filter events based on the monitored path's context.
+ *
+ * @param monitor The Eio_Monitor instance (unused in this implementation).
+ * @param path The path to check (unused in this implementation).
+ * @return EINA_TRUE.
+ */
 Eina_Bool eio_monitor_context_check(const Eio_Monitor *monitor, const char *path)
 {
    return EINA_TRUE;

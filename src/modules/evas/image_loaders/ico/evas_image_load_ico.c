@@ -7,6 +7,16 @@
 #include "evas_common_private.h"
 #include "evas_private.h"
 
+/**
+ * @file
+ * @brief Evas image loader module for ICO (Windows Icon) files.
+ *
+ * This module implements the Evas image loader interface for loading
+ * Microsoft Windows Icon (.ico) files. It supports selecting specific
+ * icon images based on size criteria (biggest, smallest, nearest smaller,
+ * nearest bigger) and handles various bit depths and alpha masks.
+ */
+
 static int _evas_loader_ico_log_dom = -1;
 
 #ifdef ERR
@@ -14,14 +24,28 @@ static int _evas_loader_ico_log_dom = -1;
 #endif
 #define ERR(...) EINA_LOG_DOM_ERR(_evas_loader_ico_log_dom, __VA_ARGS__)
 
+/**
+ * @brief Internal data structure for the ICO loader.
+ *
+ * Holds the state needed during the loading process, including the file handle,
+ * the key specifying which image to load (if any), and load options.
+ */
 typedef struct _Evas_Loader_Internal Evas_Loader_Internal;
 struct _Evas_Loader_Internal
 {
-   Eina_File *f;
-   const char *key;
-   Evas_Image_Load_Opts *opts;
+   Eina_File *f;                 /**< The opened Eina_File handle. */
+   const char *key;            /**< Optional key specifying which image to load (e.g., "biggest", "smallest"). */
+   Evas_Image_Load_Opts *opts; /**< Image loading options. */
 };
 
+/**
+ * @brief Reads an unsigned short (2 bytes, little-endian) from the memory map.
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total size of the mapped data.
+ * @param position Current read position in the map (will be advanced by 2).
+ * @param ret Pointer to store the read value.
+ * @return EINA_TRUE on success, EINA_FALSE on read error (out of bounds).
+ */
 static Eina_Bool
 read_ushort(unsigned char *map, size_t length, size_t *position, unsigned short *ret)
 {
@@ -34,6 +58,14 @@ read_ushort(unsigned char *map, size_t length, size_t *position, unsigned short 
    return EINA_TRUE;
 }
 
+/**
+ * @brief Reads an unsigned int (4 bytes, little-endian) from the memory map.
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total size of the mapped data.
+ * @param position Current read position in the map (will be advanced by 4).
+ * @param ret Pointer to store the read value.
+ * @return EINA_TRUE on success, EINA_FALSE on read error (out of bounds).
+ */
 static Eina_Bool
 read_uint(unsigned char *map, size_t length, size_t *position, unsigned int *ret)
 {
@@ -47,6 +79,14 @@ read_uint(unsigned char *map, size_t length, size_t *position, unsigned int *ret
    return EINA_TRUE;
 }
 
+/**
+ * @brief Reads an unsigned char (1 byte) from the memory map.
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total size of the mapped data.
+ * @param position Current read position in the map (will be advanced by 1).
+ * @param ret Pointer to store the read value.
+ * @return EINA_TRUE on success, EINA_FALSE on read error (out of bounds).
+ */
 static Eina_Bool
 read_uchar(unsigned char *map, size_t length, size_t *position, unsigned char *ret)
 {
@@ -55,6 +95,15 @@ read_uchar(unsigned char *map, size_t length, size_t *position, unsigned char *r
    return EINA_TRUE;
 }
 
+/**
+ * @brief Reads a block of memory from the memory map.
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Total size of the mapped data.
+ * @param position Current read position in the map (will be advanced by size).
+ * @param buffer Destination buffer to copy the data into.
+ * @param size Number of bytes to read.
+ * @return EINA_TRUE on success, EINA_FALSE on read error (out of bounds).
+ */
 static Eina_Bool
 read_mem(unsigned char *map, size_t length, size_t *position, void *buffer, int size)
 {
@@ -69,13 +118,18 @@ enum
    SMALLEST,
    BIGGEST,
    SMALLER,
-   BIGGER
+   BIGGER   /**< Select the next image bigger than the requested size. */
 };
 
+/**
+ * @enum
+ * @brief Defines the type of the ICO file (Icon or Cursor).
+ * Based on the `idType` field in the ICONDIR structure.
+ */
 enum
 {
-   ICON = 1,
-   CURSOR = 2
+   ICON = 1,   /**< File contains icons. */
+   CURSOR = 2  /**< File contains cursors. */
 };
 
 static void *
@@ -100,6 +154,11 @@ evas_image_load_file_open_ico(Eina_File *f, Eina_Stringshare *key,
    return loader;
 }
 
+/**
+ * @brief Closes the ICO file and frees the loader data.
+ * Implements the Evas_Image_Load_Func::file_close callback.
+ * @param loader_data The internal loader data created by evas_image_load_file_open_ico.
+ */
 static void
 evas_image_load_file_close_ico(void *loader_data)
 {
@@ -338,6 +397,19 @@ evas_image_load_file_head_ico(void *loader_data,
    return r;
 }
 
+/**
+ * @brief Loads the actual pixel data for the chosen ICO image.
+ * Implements the Evas_Image_Load_Func::file_data callback.
+ * Reads the ICO directory, selects the appropriate image based on criteria,
+ * parses the BMP header within the ICO data, reads palette and pixel data,
+ * applies the alpha mask if necessary, and writes the final ARGB data
+ * into the provided pixel buffer.
+ * @param loader_data The internal loader data.
+ * @param prop Image properties structure (already filled by the header function).
+ * @param pixels The destination buffer for the ARGB pixel data.
+ * @param error Pointer to store the error code on failure.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_data_ico(void *loader_data,
                               Emile_Image_Property *prop,
@@ -800,9 +872,15 @@ static Evas_Image_Load_Func evas_image_load_ico_func =
   (void*) evas_image_load_file_data_ico,
   NULL,
   EINA_TRUE,
-  EINA_FALSE
+  EINA_FALSE /* Evas doesn't query animation frames for ICO */
 };
 
+/**
+ * @brief Evas module initialization function.
+ * Registers the ICO loader module with Evas.
+ * @param em The Evas module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -818,6 +896,11 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Evas module shutdown function.
+ * Unregisters the ICO loader module.
+ * @param em The Evas module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

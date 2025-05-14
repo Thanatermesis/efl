@@ -4,8 +4,21 @@
 
 #include "ecore_x_private.h"
 
+/**
+ * @internal
+ * @brief Stores whether the DPMS extension is available.
+ * This variable is set by _ecore_x_dpms_init().
+ */
 static Eina_Bool _dpms_available = EINA_FALSE;
 
+/**
+ * @internal
+ * @brief Initializes the DPMS extension.
+ *
+ * This function checks if the DPMS extension is available on the X server
+ * and stores the result in the internal _dpms_available variable.
+ * It is called during Ecore-X initialization.
+ */
 void
 _ecore_x_dpms_init(void)
 {

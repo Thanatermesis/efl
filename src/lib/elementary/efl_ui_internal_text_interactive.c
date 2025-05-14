@@ -10,40 +10,46 @@
 
 #define _PARAGRAPH_SEPARATOR_UTF8 "\xE2\x80\xA9"
 
-
+/**
+ * @brief Private data structure for Efl_Ui_Internal_Text_Interactive.
+ *
+ * This structure holds all the internal state for an interactive text object,
+ * including cursors, selection information, input method context, and various
+ * flags controlling behavior like editability and auto-saving.
+ */
 typedef struct _Efl_Ui_Internal_Text_Interactive_Data
 {
-   Efl_Text_Cursor_Object                       *sel_start, *sel_end;
-   Eina_Bool                              watch_selection;
-   Efl_Text_Cursor_Object                       *main_cursor;
-   Efl_Text_Cursor_Object                       *preedit_start, *preedit_end;
-   Ecore_Timer                           *pw_timer;
-   Eina_List                             *seq;
-   char                                  *selection;
-   const char                            *file;
-   Elm_Text_Format                        format;
-   Eina_Bool                              composing : 1;
-   Eina_Bool                              selecting : 1;
-   Eina_Bool                              have_selection : 1;
-   Eina_Bool                              select_allow : 1;
-   Eina_Bool                              editable : 1;
-   Eina_Bool                              had_sel : 1;
-   Eina_Bool                              auto_save : 1;
-   Eina_Bool                              prediction_allow : 1;
-   Eina_Bool                              anchors_updated : 1;
-   Eina_Bool                              auto_return_key : 1;
-   int                                    input_panel_layout_variation;
-   Efl_Input_Text_Panel_Layout_Type       input_panel_layout;
-   Efl_Input_Text_Capitalize_Type         autocapital_type;
-   Efl_Input_Text_Panel_Language_Type     input_panel_lang;
-   Efl_Input_Text_Panel_Return_Key_Type   input_panel_return_key_type;
-   Efl_Input_Text_Content_Type            input_hints;
-   Efl_Input_Text_Panel_Return_Key_State  input_panel_return_key_state;
+   Efl_Text_Cursor_Object                       *sel_start, *sel_end; /**< Cursors marking the start and end of the selection. */
+   Eina_Bool                              watch_selection; /**< Flag to enable/disable watching selection changes. */
+   Efl_Text_Cursor_Object                       *main_cursor; /**< The main text input cursor. */
+   Efl_Text_Cursor_Object                       *preedit_start, *preedit_end; /**< Cursors for the preedit string (IME). */
+   Ecore_Timer                           *pw_timer; /**< Timer for password visibility. */
+   Eina_List                             *seq; /**< List for compose sequence. */
+   char                                  *selection; /**< The currently selected text content. */
+   const char                            *file; /**< Path to the file associated with the text object. */
+   Elm_Text_Format                        format; /**< Text format (e.g., plain, markup). */
+   Eina_Bool                              composing : 1; /**< True if a compose sequence is in progress. */
+   Eina_Bool                              selecting : 1; /**< True if a selection operation is in progress (e.g., mouse drag). */
+   Eina_Bool                              have_selection : 1; /**< True if there is an active selection. */
+   Eina_Bool                              select_allow : 1; /**< True if text selection is allowed. */
+   Eina_Bool                              editable : 1; /**< True if the text content is editable. */
+   Eina_Bool                              had_sel : 1; /**< True if there was a selection previously. */
+   Eina_Bool                              auto_save : 1; /**< True if auto-saving is enabled. */
+   Eina_Bool                              prediction_allow : 1; /**< True if text prediction is allowed. */
+   Eina_Bool                              anchors_updated : 1; /**< Unused. */
+   Eina_Bool                              auto_return_key : 1; /**< Unused. */
+   int                                    input_panel_layout_variation; /**< Variation of the input panel layout. */
+   Efl_Input_Text_Panel_Layout_Type       input_panel_layout; /**< Layout type of the input panel. */
+   Efl_Input_Text_Capitalize_Type         autocapital_type; /**< Autocapitalization type. */
+   Efl_Input_Text_Panel_Language_Type     input_panel_lang; /**< Language of the input panel. */
+   Efl_Input_Text_Panel_Return_Key_Type   input_panel_return_key_type; /**< Type of the return key on the input panel. */
+   Efl_Input_Text_Content_Type            input_hints; /**< Hints for the input content type. */
+   Efl_Input_Text_Panel_Return_Key_State  input_panel_return_key_state; /**< State of the return key on the input panel (enabled/disabled/auto). */
 
 #ifdef HAVE_ECORE_IMF
-   Eina_Bool              have_preedit : 1;
-   Eina_Bool              commit_cancel : 1; // For skipping useless commit
-   Ecore_IMF_Context     *imf_context;
+   Eina_Bool              have_preedit : 1; /**< True if there is an active preedit string. */
+   Eina_Bool              commit_cancel : 1; /**< Flag to skip useless commit operations. */
+   Ecore_IMF_Context     *imf_context; /**< Input Method Framework context. */
 #endif
 } Efl_Ui_Internal_Text_Interactive_Data;
 
@@ -59,6 +65,21 @@ static void _entry_imf_cursor_info_set(Efl_Ui_Internal_Text_Interactive_Data *en
 static void _sel_watch_freeze(Efl_Ui_Internal_Text_Interactive_Data *en);
 static void _sel_watch_thaw(Efl_Ui_Internal_Text_Interactive_Data *en);
 
+/**
+ * @brief Prepends a format string to the text at the given cursor position.
+ *
+ * This function is used to insert formatting tags (e.g., for bold, italics)
+ * into the textblock. The format string can specify opening, closing, or
+ * self-closing tags.
+ *
+ * @param obj The Efl_Canvas_Textblock object.
+ * @param en The private data of the interactive text object.
+ * @param c The cursor indicating where to insert the format.
+ * @param text The format string to prepend.
+ *             - "+ format": Opens the tag <format>.
+ *             - "- format": Closes the tag </format>.
+ *             - "format": Inserts <format/>.
+ */
 static void
 _text_filter_format_prepend(Efl_Canvas_Textblock *obj, Efl_Ui_Internal_Text_Interactive_Data *en,
                             Efl_Text_Cursor_Object *c, const char *text);
@@ -70,6 +91,23 @@ _text_filter_text_prepend(Efl_Canvas_Textblock *obj, Efl_Ui_Internal_Text_Intera
                           const char *fmtpre, const char *fmtpost,
                           Eina_Bool clearsel, Eina_Bool changeinfo);
 
+/**
+ * @brief Internal implementation for prepending markup text.
+ *
+ * This function handles the core logic of inserting markup text, potentially
+ * clearing existing selection and generating change information.
+ *
+ * @param obj The Efl_Canvas_Textblock object.
+ * @param en The private data of the interactive text object.
+ * @param c The cursor indicating where to insert the text.
+ * @param text The markup text to insert (this function takes ownership and frees it).
+ * @param fmtpre Optional format string to prepend before the text.
+ * @param fmtpost Optional format string to append after the text.
+ * @param clearsel If EINA_TRUE, clears the current selection before inserting.
+ * @param changeinfo If EINA_TRUE, allocates and returns an Efl_Text_Change_Info struct.
+ * @return An Efl_Text_Change_Info struct if changeinfo is EINA_TRUE and text is inserted, otherwise NULL.
+ *         The caller is responsible for freeing the returned struct and its `content` field.
+ */
 static Efl_Text_Change_Info *
 _text_filter_markup_prepend_internal(Efl_Canvas_Textblock *obj, Efl_Ui_Internal_Text_Interactive_Data *en,
                                      Efl_Text_Cursor_Object *c,
@@ -77,6 +115,22 @@ _text_filter_markup_prepend_internal(Efl_Canvas_Textblock *obj, Efl_Ui_Internal_
                                      const char *fmtpre, const char *fmtpost,
                                      Eina_Bool clearsel, Eina_Bool changeinfo);
 
+/**
+ * @brief Prepends markup text at the given cursor position.
+ *
+ * This function converts the input text to markup if necessary and then calls
+ * the internal prepend function.
+ *
+ * @param obj The Efl_Canvas_Textblock object.
+ * @param en The private data of the interactive text object.
+ * @param c The cursor indicating where to insert the text.
+ * @param text The markup text to insert.
+ * @param fmtpre Optional format string to prepend before the text.
+ * @param fmtpost Optional format string to append after thetext.
+ * @param clearsel If EINA_TRUE, clears the current selection before inserting.
+ * @param changeinfo If EINA_TRUE, allocates and returns an Efl_Text_Change_Info struct.
+ * @return An Efl_Text_Change_Info struct if changeinfo is EINA_TRUE and text is inserted, otherwise NULL.
+ */
 static Efl_Text_Change_Info *
 _text_filter_markup_prepend(Efl_Canvas_Textblock *obj, Efl_Ui_Internal_Text_Interactive_Data *en,
                             Efl_Text_Cursor_Object *c,
@@ -84,18 +138,32 @@ _text_filter_markup_prepend(Efl_Canvas_Textblock *obj, Efl_Ui_Internal_Text_Inte
                             const char *fmtpre, const char *fmtpost,
                             Eina_Bool clearsel, Eina_Bool changeinfo);
 
+/**
+ * @brief Copies the position of one cursor to another.
+ * @param src The source cursor.
+ * @param dest The destination cursor.
+ */
 static void
 _cur_pos_copy(Efl_Text_Cursor_Object *src, Efl_Text_Cursor_Object *dest)
 {
    efl_text_cursor_object_position_set(dest, efl_text_cursor_object_position_get(src));
 }
 
+/**
+ * @brief Temporarily disables watching for selection changes.
+ * Used to prevent recursive or unwanted selection event handling.
+ * @param en The private data of the interactive text object.
+ */
 static void
 _sel_watch_freeze(Efl_Ui_Internal_Text_Interactive_Data *en)
 {
    en->watch_selection = EINA_FALSE;
 }
 
+/**
+ * @brief Re-enables watching for selection changes.
+ * @param en The private data of the interactive text object.
+ */
 static void
 _sel_watch_thaw(Efl_Ui_Internal_Text_Interactive_Data *en)
 {
@@ -103,6 +171,10 @@ _sel_watch_thaw(Efl_Ui_Internal_Text_Interactive_Data *en)
 }
 
 #ifdef HAVE_ECORE_IMF
+/**
+ * @brief Clears the preedit string and its associated cursors.
+ * @param en The private data of the interactive text object.
+ */
 static void
 _preedit_clear(Efl_Ui_Internal_Text_Interactive_Data *en)
 {
@@ -121,6 +193,11 @@ _preedit_clear(Efl_Ui_Internal_Text_Interactive_Data *en)
    en->have_preedit = EINA_FALSE;
 }
 
+/**
+ * @brief Deletes the current preedit string from the textblock.
+ * @param obj The Efl_Canvas_Textblock object (unused).
+ * @param en The private data of the interactive text object.
+ */
 static void
 _preedit_del(Eo *obj EINA_UNUSED, Efl_Ui_Internal_Text_Interactive_Data *en)
 {
@@ -132,6 +209,20 @@ _preedit_del(Eo *obj EINA_UNUSED, Efl_Ui_Internal_Text_Interactive_Data *en)
    efl_text_cursor_object_range_delete(en->preedit_start, en->preedit_end);
 }
 
+/**
+ * @brief IMF callback to retrieve the surrounding text and cursor position.
+ *
+ * This function is called by the Input Method Framework (IMF) to get the
+ * text content around the current cursor position. This information is
+ * used by IMEs for context-aware input, such as suggestions or auto-correction.
+ *
+ * @param data The Efl_Canvas_Textblock object.
+ * @param ctx The Ecore_IMF_Context (unused).
+ * @param[out] text Pointer to store the duplicated string of the entire text content.
+ *                  The caller is responsible for freeing this string.
+ * @param[out] cursor_pos Pointer to store the current cursor position.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _entry_imf_retrieve_surrounding_cb(void *data, Ecore_IMF_Context *ctx EINA_UNUSED, char **text, int *cursor_pos)
 {
@@ -161,6 +252,14 @@ _entry_imf_retrieve_surrounding_cb(void *data, Ecore_IMF_Context *ctx EINA_UNUSE
    return EINA_TRUE;
 }
 
+/**
+ * @brief Updates the state of the return key on the input panel.
+ *
+ * If the input panel return key state is set to AUTO, this function
+ * enables or disables the return key based on whether the text input is empty.
+ *
+ * @param obj The Evas_Object (Efl_Canvas_Textblock) instance.
+ */
 static void
 _return_key_update(Evas_Object *obj)
 {
@@ -180,6 +279,15 @@ _return_key_update(Evas_Object *obj)
 #endif
 }
 
+/**
+ * @brief Hides visible password characters by removing the "password=off" format.
+ *
+ * When password visibility is toggled off, this function iterates through the
+ * textblock nodes and removes any formatting that makes password characters visible.
+ *
+ * @param obj The Efl_Canvas_Textblock object.
+ * @return EINA_TRUE if any "password=off" format was found and removed, EINA_FALSE otherwise.
+ */
 Eina_Bool
 _entry_hide_visible_password(Eo *obj)
 {
@@ -207,6 +315,17 @@ _entry_hide_visible_password(Eo *obj)
    return b_ret;
 }
 
+/**
+ * @brief IMF callback for committing text from the input method.
+ *
+ * This function is called when the IME commits a string (e.g., after
+ * composition or selection from candidates). It handles deleting any
+ * existing selection or preedit string, and then inserts the committed text.
+ *
+ * @param data The Efl_Canvas_Textblock object.
+ * @param ctx The Ecore_IMF_Context (unused).
+ * @param event_info The commit string (char *).
+ */
 static void
 _entry_imf_event_commit_cb(void *data, Ecore_IMF_Context *ctx EINA_UNUSED, void *event_info)
 {
@@ -260,6 +379,10 @@ _entry_imf_event_commit_cb(void *data, Ecore_IMF_Context *ctx EINA_UNUSED, void 
    _entry_imf_cursor_info_set(en);
 }
 
+/*
+ * _text_filter_markup_prepend_internal is already documented above.
+ * Skipping re-documentation.
+ */
 static Efl_Text_Change_Info *
 _text_filter_markup_prepend_internal(Efl_Canvas_Textblock *obj, Efl_Ui_Internal_Text_Interactive_Data *en,
                                      Efl_Text_Cursor_Object *c,
@@ -313,6 +436,10 @@ _text_filter_markup_prepend_internal(Efl_Canvas_Textblock *obj, Efl_Ui_Internal_
    return NULL;
 }
 
+/*
+ * _text_filter_markup_prepend is already documented above.
+ * Skipping re-documentation.
+ */
 static Efl_Text_Change_Info *
 _text_filter_markup_prepend(Efl_Canvas_Textblock *obj, Efl_Ui_Internal_Text_Interactive_Data *en,
                             Efl_Text_Cursor_Object *c,
@@ -342,6 +469,22 @@ _text_filter_markup_prepend(Efl_Canvas_Textblock *obj, Efl_Ui_Internal_Text_Inte
    return NULL;
 }
 
+/**
+ * @brief Prepends plain text at the given cursor position, converting it to markup.
+ *
+ * This function first converts the plain text to its markup equivalent and then
+ * calls the internal markup prepend function.
+ *
+ * @param obj The Efl_Canvas_Textblock object.
+ * @param en The private data of the interactive text object.
+ * @param c The cursor indicating where to insert the text.
+ * @param text The plain text to insert.
+ * @param fmtpre Optional format string to prepend before the text.
+ * @param fmtpost Optional format string to append after the text.
+ * @param clearsel If EINA_TRUE, clears the current selection before inserting.
+ * @param changeinfo If EINA_TRUE, allocates and returns an Efl_Text_Change_Info struct.
+ * @return An Efl_Text_Change_Info struct if changeinfo is EINA_TRUE and text is inserted, otherwise NULL.
+ */
 static Efl_Text_Change_Info *
 _text_filter_text_prepend(Efl_Canvas_Textblock *obj, Efl_Ui_Internal_Text_Interactive_Data *en,
                           Efl_Text_Cursor_Object *c,
@@ -367,6 +510,10 @@ _text_filter_text_prepend(Efl_Canvas_Textblock *obj, Efl_Ui_Internal_Text_Intera
    return info;
 }
 
+/*
+ * _text_filter_format_prepend is already documented above.
+ * Skipping re-documentation.
+ */
 static void
 _text_filter_format_prepend(Efl_Canvas_Textblock *obj, Efl_Ui_Internal_Text_Interactive_Data *en,
                             Efl_Text_Cursor_Object *c, const char *text)
@@ -439,6 +586,18 @@ _text_filter_format_prepend(Efl_Canvas_Textblock *obj, Efl_Ui_Internal_Text_Inte
      }
 }
 
+/**
+ * @brief IMF callback for preedit string changes.
+ *
+ * This function is called when the IME's preedit string (the tentative text
+ * being composed) changes. It handles deleting the old preedit string,
+ * inserting the new one with appropriate styling based on attributes
+ * (e.g., highlighting parts of the preedit string), and updating cursor positions.
+ *
+ * @param data The Efl_Canvas_Textblock object.
+ * @param ctx The Ecore_IMF_Context (unused).
+ * @param event_info Event specific information (unused).
+ */
 static void
 _entry_imf_event_preedit_changed_cb(void *data, Ecore_IMF_Context *ctx EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -584,6 +743,17 @@ _entry_imf_event_preedit_changed_cb(void *data, Ecore_IMF_Context *ctx EINA_UNUS
    free(preedit_string);
 }
 
+/**
+ * @brief IMF callback to delete surrounding text.
+ *
+ * This function is called by the IME to request deletion of text around
+ * the current cursor position.
+ *
+ * @param data The Efl_Canvas_Textblock object.
+ * @param ctx The Ecore_IMF_Context (unused).
+ * @param event_info Pointer to Ecore_IMF_Event_Delete_Surrounding,
+ *                   containing offset and number of characters to delete.
+ */
 static void
 _entry_imf_event_delete_surrounding_cb(void *data, Ecore_IMF_Context *ctx EINA_UNUSED, void *event_info)
 {
@@ -628,6 +798,16 @@ end:
    efl_del(del_end);
 }
 
+/**
+ * @brief IMF callback to set the selection.
+ *
+ * This function is called by the IME to set the text selection programmatically.
+ *
+ * @param data The Efl_Canvas_Textblock object.
+ * @param ctx The Ecore_IMF_Context (unused).
+ * @param event_info Pointer to Ecore_IMF_Event_Selection,
+ *                   containing start and end positions for the selection.
+ */
 static void
 _entry_imf_event_selection_set_cb(void *data, Ecore_IMF_Context *ctx EINA_UNUSED, void *event_info)
 {
@@ -673,6 +853,15 @@ _entry_imf_retrieve_selection_cb(void *data, Ecore_IMF_Context *ctx EINA_UNUSED,
 
 #endif
 
+/**
+ * @brief Sets the cursor location for the IMF context.
+ *
+ * This informs the IME about the on-screen position and size of the
+ * current text cursor, which can be used by the IME to position candidate
+ * windows or other UI elements.
+ *
+ * @param en The private data of the interactive text object.
+ */
 static void
 _entry_imf_cursor_location_set(Efl_Ui_Internal_Text_Interactive_Data *en)
 {
@@ -688,6 +877,14 @@ _entry_imf_cursor_location_set(Efl_Ui_Internal_Text_Interactive_Data *en)
 #endif
 }
 
+/**
+ * @brief Sets cursor information (position and location) for the IMF context.
+ *
+ * This updates the IME with the current cursor position (character index)
+ * and its on-screen geometry.
+ *
+ * @param en The private data of the interactive text object.
+ */
 static void
 _entry_imf_cursor_info_set(Efl_Ui_Internal_Text_Interactive_Data *en)
 {
@@ -714,6 +911,17 @@ _entry_imf_cursor_info_set(Efl_Ui_Internal_Text_Interactive_Data *en)
 #endif
 }
 
+/**
+ * @brief Callback for focus in events.
+ *
+ * When the text object gains focus, this function notifies the IMF context
+ * and updates cursor information and return key state.
+ *
+ * @param data Unused.
+ * @param e Unused.
+ * @param obj The Evas_Object that gained focus.
+ * @param event_info Unused.
+ */
 static void
 _focus_in_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -729,6 +937,15 @@ _focus_in_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void
 #endif
 }
 
+/**
+ * @brief Resets the IMF context.
+ *
+ * This function is called to reset the state of the input method context,
+ * for example, when focus is lost or when certain operations (like selection changes) occur.
+ * It also resets the commit_cancel flag.
+ *
+ * @param en The private data of the interactive text object.
+ */
 void
 _entry_imf_context_reset(Efl_Ui_Internal_Text_Interactive_Data *en)
 {
@@ -742,6 +959,17 @@ _entry_imf_context_reset(Efl_Ui_Internal_Text_Interactive_Data *en)
 #endif
 }
 
+/**
+ * @brief Callback for focus out events.
+ *
+ * When the text object loses focus, this function resets and notifies the
+ * IMF context.
+ *
+ * @param data Unused.
+ * @param e Unused.
+ * @param obj The Evas_Object that lost focus.
+ * @param event_info Unused.
+ */
 static void
 _focus_out_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -754,6 +982,18 @@ _focus_out_cb(void *data EINA_UNUSED, Evas *e EINA_UNUSED, Evas_Object *obj, voi
 #endif
 }
 
+/**
+ * @brief Retrieves the currently selected text.
+ *
+ * If there is a selection and the `en->selection` cache is NULL, this function
+ * populates the cache with the text content of the current selection range.
+ *
+ * @param obj The Efl_Ui_Internal_Text_Interactive object (unused).
+ * @param en The private data of the interactive text object.
+ * @return A pointer to the selected text string, or NULL if no selection.
+ *         The returned string is owned by the `en` struct and should not be freed by the caller.
+ *         It is valid until the selection changes or is cleared.
+ */
 static const char *
 _entry_selection_get(Efl_Ui_Internal_Text_Interactive *obj EINA_UNUSED, Efl_Ui_Internal_Text_Interactive_Data *en)
 {
@@ -762,6 +1002,17 @@ _entry_selection_get(Efl_Ui_Internal_Text_Interactive *obj EINA_UNUSED, Efl_Ui_I
    return en->selection;
 }
 
+/**
+ * @brief Resets or updates the selection state based on cursor positions.
+ *
+ * This function is called when selection cursors might have changed.
+ * It checks if the selection start and end cursors are at the same position.
+ * If they are, the selection is cleared. Otherwise, the selection state is
+ * updated, and appropriate events are emitted.
+ *
+ * @param obj The Efl_Ui_Internal_Text_Interactive object.
+ * @param en The private data of the interactive text object.
+ */
 static void
 _sel_reset(Eo *obj, Efl_Ui_Internal_Text_Interactive_Data *en){
 
@@ -804,6 +1055,15 @@ _sel_reset(Eo *obj, Efl_Ui_Internal_Text_Interactive_Data *en){
      }
 }
 
+/**
+ * @brief Callback for selection cursor change events.
+ *
+ * This function is triggered when one of the selection cursors (sel_start or sel_end)
+ * changes its position. It then calls _sel_reset to update the overall selection state.
+ *
+ * @param data The Efl_Ui_Internal_Text_Interactive object.
+ * @param event The Efl_Event details (unused).
+ */
 static void
 _sel_cursor_changed(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
 {
@@ -816,6 +1076,16 @@ _sel_cursor_changed(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
    _sel_reset(obj, en);
 }
 
+/**
+ * @brief Initializes the selection cursors to a given cursor's position.
+ *
+ * This function is typically called when a new selection process starts
+ * (e.g., mouse button down). It sets both sel_start and sel_end cursors
+ * to the position of cursor 'c'.
+ *
+ * @param c The cursor whose position will be used to initialize selection cursors.
+ * @param en The private data of the interactive text object.
+ */
 static void
 _sel_init(Efl_Text_Cursor_Object *c, Efl_Ui_Internal_Text_Interactive_Data *en)
 {
@@ -835,6 +1105,14 @@ _sel_init(Efl_Text_Cursor_Object *c, Efl_Ui_Internal_Text_Interactive_Data *en)
      }
 }
 
+/**
+ * @brief Enables the selection state.
+ *
+ * Marks that a selection is now active and emits the HAVE_SELECTION_CHANGED event.
+ *
+ * @param o The Efl_Ui_Internal_Text_Interactive object.
+ * @param en The private data of the interactive text object.
+ */
 static void
 _sel_enable(Eo *o, Efl_Ui_Internal_Text_Interactive_Data *en)
 {
@@ -851,6 +1129,16 @@ _sel_enable(Eo *o, Efl_Ui_Internal_Text_Interactive_Data *en)
    _entry_imf_context_reset(en);
 }
 
+/**
+ * @brief Emits selection state events.
+ *
+ * If the selection start and end cursors are at the same position, it clears
+ * the selection. Otherwise, it emits the SELECTION_CHANGED event with the
+ * current selection range.
+ *
+ * @param o The Efl_Ui_Internal_Text_Interactive object.
+ * @param en The private data of the interactive text object.
+ */
 static void
 _emit_sel_state( Eo *o, Efl_Ui_Internal_Text_Interactive_Data *en)
 {
@@ -866,6 +1154,17 @@ _emit_sel_state( Eo *o, Efl_Ui_Internal_Text_Interactive_Data *en)
      }
 }
 
+/**
+ * @brief Extends the current selection to the given cursor position.
+ *
+ * This function updates the `sel_end` cursor to the position of cursor `c`,
+ * effectively extending or shrinking the selection. It then updates IMF info
+ * and emits selection state events.
+ *
+ * @param c The cursor to extend the selection to.
+ * @param o The Evas_Object (Efl_Ui_Internal_Text_Interactive).
+ * @param en The private data of the interactive text object.
+ */
 static void
 _sel_extend(Efl_Text_Cursor_Object *c, Evas_Object *o, Efl_Ui_Internal_Text_Interactive_Data *en)
 {
@@ -887,6 +1186,15 @@ _sel_extend(Efl_Text_Cursor_Object *c, Evas_Object *o, Efl_Ui_Internal_Text_Inte
    _emit_sel_state(o, en);
 }
 
+/**
+ * @brief Clears the current text selection.
+ *
+ * Resets selection flags, frees cached selection text, moves `sel_end` cursor
+ * to `sel_start` position, and emits HAVE_SELECTION_CHANGED event with EINA_FALSE.
+ *
+ * @param o The Evas_Object (Efl_Ui_Internal_Text_Interactive).
+ * @param en The private data of the interactive text object.
+ */
 static void
 _sel_clear(Evas_Object *o EINA_UNUSED, Efl_Ui_Internal_Text_Interactive_Data *en)
 {

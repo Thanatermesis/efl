@@ -1,5 +1,13 @@
 #include "private.h"
 
+/**
+ * @brief Parameters for the clock widget.
+ *
+ * This structure holds all the parameters that can be used to configure
+ * a clock widget from an Edje theme. It includes time components (hours,
+ * minutes, seconds), flags to indicate which components are set, and
+ * display options like edit mode, AM/PM format, and seconds visibility.
+ */
 typedef struct _Elm_Params_Clock
 {
    Elm_Params base;
@@ -12,6 +20,20 @@ typedef struct _Elm_Params_Clock
    Eina_Bool seconds:1;
 } Elm_Params_Clock;
 
+/**
+ * @brief Set the state of the clock object.
+ *
+ * This function is called by Edje to apply a state to the clock object.
+ * It takes parameter sets for the start and end states and applies
+ * properties to the clock widget. If only one set of parameters is
+ * provided, it's used as the target state.
+ *
+ * @param data Unused.
+ * @param obj The clock Evas_Object to modify.
+ * @param from_params The parameters for the starting state.
+ * @param to_params The parameters for the ending state.
+ * @param pos Unused.
+ */
 static void
 external_clock_state_set(void *data EINA_UNUSED, Evas_Object *obj,
                          const void *from_params, const void *to_params,
@@ -45,6 +67,18 @@ external_clock_state_set(void *data EINA_UNUSED, Evas_Object *obj,
      elm_clock_show_seconds_set(obj, p->seconds);
 }
 
+/**
+ * @brief Set a specific parameter on the clock object.
+ *
+ * This function is called by Edje to set a single parameter on the clock
+ * object. It handles parameters like "hours", "minutes", "seconds",
+ * "editable", "am/pm", and "show seconds".
+ *
+ * @param data Unused.
+ * @param obj The clock Evas_Object to modify.
+ * @param param The parameter to set.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 external_clock_param_set(void *data EINA_UNUSED, Evas_Object *obj,
                          const Edje_External_Param *param)
@@ -110,6 +144,17 @@ external_clock_param_set(void *data EINA_UNUSED, Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Get a specific parameter from the clock object.
+ *
+ * This function is called by Edje to retrieve the value of a single
+ * parameter from the clock object.
+ *
+ * @param data Unused.
+ * @param obj The clock Evas_Object to query.
+ * @param param The parameter to get, its value will be filled in.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 external_clock_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
                          Edje_External_Param *param)
@@ -175,6 +220,19 @@ external_clock_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Parse a list of external parameters.
+ *
+ * This function converts an Eina_List of Edje_External_Param structures
+ * into an Elm_Params_Clock structure. This is used by Edje to prepare
+ * the parameters for a state change.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param params A list of Edje_External_Param to parse.
+ * @return A newly allocated Elm_Params_Clock structure, or NULL on failure.
+ *         The caller is responsible for freeing the returned structure.
+ */
 static void *
 external_clock_params_parse(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                             const Eina_List *params)
@@ -215,6 +273,17 @@ external_clock_params_parse(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED
    return mem;
 }
 
+/**
+ * @brief Get content from the clock object.
+ *
+ * This clock widget does not support content objects. This function
+ * will always return NULL and print an error.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param content Unused.
+ * @return Always NULL.
+ */
 static Evas_Object *external_clock_content_get(void *data EINA_UNUSED,
                                                const Evas_Object *obj EINA_UNUSED, const char *content EINA_UNUSED)
 {
@@ -222,6 +291,14 @@ static Evas_Object *external_clock_content_get(void *data EINA_UNUSED,
    return NULL;
 }
 
+/**
+ * @brief Free the parsed parameters structure.
+ *
+ * This function is called by Edje to free the memory allocated by
+ * external_clock_params_parse().
+ *
+ * @param params The Elm_Params_Clock structure to free.
+ */
 static void
 external_clock_params_free(void *params)
 {

@@ -29,17 +29,39 @@
 
 static void eldbus_pending_dispatch(Eldbus_Pending *pending, Eldbus_Message *msg);
 
+/**
+ * @internal
+ * @brief Initializes the Eldbus_Pending subsystem.
+ * Currently, this function does nothing but return EINA_TRUE.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 Eina_Bool
 eldbus_pending_init(void)
 {
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the Eldbus_Pending subsystem.
+ * Currently, this function does nothing.
+ */
 void
 eldbus_pending_shutdown(void)
 {
 }
 
+/**
+ * @internal
+ * @brief Callback function for DBusPendingCall.
+ *
+ * This function is invoked when a pending D-Bus call completes, times out,
+ * or is canceled. It processes the reply or generates an appropriate error
+ * message.
+ *
+ * @param dbus_pending The DBusPendingCall object associated with the completed call.
+ * @param user_data A pointer to the Eldbus_Pending object.
+ */
 static void
 cb_pending(DBusPendingCall *dbus_pending, void *user_data)
 {
@@ -79,6 +101,19 @@ cleanup:
    eldbus_message_unref(msg);
 }
 
+/**
+ * @internal
+ * @brief Internal callback wrapper for connection-specific message handling.
+ *
+ * This function is used as an intermediary callback when a message is sent
+ * via eldbus_connection_send(). It retrieves the user-provided callback and
+ * connection data stored in the pending object, then calls the user's callback.
+ * It also removes the pending object from the connection's list of pending calls.
+ *
+ * @param data The user-provided data for the callback.
+ * @param msg The received Eldbus_Message (reply or error).
+ * @param pending The Eldbus_Pending object associated with this call.
+ */
 static void
 _on_conn_message_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
 {
@@ -113,6 +148,20 @@ eldbus_connection_send(Eldbus_Connection *conn, Eldbus_Message *msg, Eldbus_Mess
    return pending;
 }
 
+/**
+ * @internal
+ * @brief Creates an Eldbus_Message representing an error.
+ *
+ * This helper function constructs an error message based on an original message,
+ * an error name, and an error description. It attempts to use the serial
+ * of the original message if available.
+ *
+ * @param msg The original Eldbus_Message that triggered the error, or NULL.
+ * @param error_name The D-Bus error name (e.g., "org.freedesktop.DBus.Error.Failed").
+ * @param error_msg A human-readable description of the error.
+ * @return A new Eldbus_Message object representing the error, or NULL on failure.
+ *         The caller is responsible for unreferencing the returned message.
+ */
 static Eldbus_Message *
 _eldbus_message_error_get(const Eldbus_Message *msg, const char *error_name, const char *error_msg)
 {
@@ -130,6 +179,25 @@ _eldbus_message_error_get(const Eldbus_Message *msg, const char *error_name, con
 /*
  * On success @param msg is unref'd or its ref is stolen by the returned
  * Eldbus_Pending.
+ */
+/**
+ * @internal
+ * @brief Sends a D-Bus message and sets up a pending call if a callback is provided.
+ *
+ * This is the core internal function for sending messages. If a callback @p cb
+ * is NULL, the message is sent without expecting a reply (fire and forget),
+ * and @p msg is unreferenced.
+ * If a callback is provided, an Eldbus_Pending object is created to track the
+ * call. The @p msg reference is then "stolen" by the pending object.
+ *
+ * @param conn The Eldbus_Connection to send the message on.
+ * @param msg The Eldbus_Message to send. This function takes ownership (unrefs or stores) of this message.
+ * @param cb The callback function to invoke when a reply is received or an error occurs. If NULL, no reply is expected.
+ * @param cb_data User data to pass to the callback function.
+ * @param timeout The timeout in seconds for the D-Bus call. A negative value means the default D-Bus timeout.
+ * @return An Eldbus_Pending object if a callback is provided and the message is sent successfully, otherwise NULL.
+ *         If NULL is returned and an error occurred, the pending object (if partially created)
+ *         will be dispatched with an error message.
  */
 Eldbus_Pending *
 _eldbus_connection_send(Eldbus_Connection *conn, Eldbus_Message *msg, Eldbus_Message_Cb cb, const void *cb_data, double timeout)
@@ -189,6 +257,22 @@ _eldbus_connection_send(Eldbus_Connection *conn, Eldbus_Message *msg, Eldbus_Mes
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Sends a D-Bus message and blocks until a reply is received or an error occurs.
+ *
+ * This function is intended for use cases where synchronous behavior is required.
+ * It warns if called from within a nested main loop, as blocking can lead to
+ * performance issues like dropped frames.
+ *
+ * @param conn The Eldbus_Connection to send the message on.
+ * @param msg The Eldbus_Message to send. This function takes ownership (unrefs) of this message.
+ * @param timeout The timeout in milliseconds for the D-Bus call. A negative value means the default D-Bus timeout.
+ *                Note: D-Bus uses milliseconds for dbus_connection_send_with_reply_and_block.
+ * @return A new Eldbus_Message object containing the reply, or an error message.
+ *         The caller is responsible for unreferencing the returned message.
+ *         Returns NULL if memory allocation for the reply message fails.
+ */
 Eldbus_Message *
 _eldbus_connection_send_and_block(Eldbus_Connection *conn, Eldbus_Message *msg, double timeout)
 {
@@ -247,6 +331,20 @@ eldbus_pending_data_del(Eldbus_Pending *pending, const char *key)
    return eldbus_data_del(&(((Eldbus_Pending *)pending)->data), key);
 }
 
+/**
+ * @internal
+ * @brief Dispatches the result of a pending call and cleans up resources.
+ *
+ * This function is called when a pending D-Bus call has completed (either
+ * successfully with a reply, with an error, or due to cancellation/timeout).
+ * It invokes the user-provided callback (if any) with the result message,
+ * calls any registered free callbacks, cleans up associated data,
+ * and frees the Eldbus_Pending object itself.
+ *
+ * @param pending The Eldbus_Pending object to dispatch and clean up.
+ * @param msg The Eldbus_Message containing the reply or error. This function
+ *            takes ownership of this message (unrefs it).
+ */
 static void
 eldbus_pending_dispatch(Eldbus_Pending *pending, Eldbus_Message *msg)
 {

@@ -37,14 +37,30 @@
 #define D(fmt, args...)
 #endif
 
+/** @brief File descriptor for the raw image file. */
 static int fd = -1;
+/** @brief Size of the memory mapped segment. */
 static size_t seg_size = 0;
+/** @brief Pointer to the memory mapped segment of the raw file. */
 static unsigned char *seg = MAP_FAILED;
+/** @brief LibRaw data structure. */
 static libraw_data_t *raw_data = NULL;
+/** @brief Pointer to the decoded image data in shared memory or allocated buffer. */
 static void *data = NULL;
+/** @brief Width of the loaded image. */
 static int width = 0;
+/** @brief Height of the loaded image. */
 static int height = 0;
 
+/**
+ * @brief Initializes LibRaw and memory maps the raw image file.
+ *
+ * Opens the specified raw image file, memory maps it, and initializes
+ * the LibRaw library for processing.
+ *
+ * @param file Path to the raw image file.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static int
 _raw_init(const char *file)
 {
@@ -72,6 +88,12 @@ close_file:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Shuts down LibRaw and cleans up resources.
+ *
+ * Closes the LibRaw instance, unmaps the memory segment, and closes
+ * the file descriptor.
+ */
 static void
 _raw_shutdown()
 {
@@ -82,6 +104,14 @@ _raw_shutdown()
    close(fd);
 }
 
+/**
+ * @brief Reads the header of the raw image file to get dimensions.
+ *
+ * Opens the raw image buffer (already memory-mapped) and extracts
+ * image dimensions (width and height) using LibRaw.
+ *
+ * @return 1 on success, 0 on failure.
+ */
 static int
 read_raw_header()
 {
@@ -108,7 +138,20 @@ read_raw_header()
 
 }
 
-
+/**
+ * @brief Reads and decodes the full raw image data.
+ *
+ * Unpacks and processes the raw image data using LibRaw. The decoded
+ * image is converted to an ARGB format and stored in a shared memory
+ * segment or a dynamically allocated buffer.
+ * The image data is stored as a flat array of 32-bit integers, where
+ * each integer represents a pixel in ARGB format (e.g., 0xAARRGGBB).
+ * The pixels are stored in row-major order.
+ * For example, a 2x2 image would be:
+ * [Pixel(0,0), Pixel(0,1), Pixel(1,0), Pixel(1,1)]
+ *
+ * @return 1 on success, 0 on failure.
+ */
 static int
 read_raw_data()
 {
@@ -170,7 +213,26 @@ clean_image:
    return 0;
 }
 
-
+/**
+ * @brief Main entry point for the raw image loader.
+ *
+ * Parses command line arguments, initializes raw processing,
+ * reads either the header or the full image data, and prints
+ * information about the image (size, alpha, shared memory file or data)
+ * to standard output.
+ *
+ * @param argc Number of command line arguments.
+ * @param argv Array of command line argument strings.
+ *             Expected arguments:
+ *             - argv[1]: Path to the raw image file.
+ *             - Optional flags:
+ *               - "-head": Only read and print header information.
+ *               - "-key": (Not used by raw loader)
+ *               - "-opt-scale-down-by": (Not used by raw loader)
+ *               - "-opt-dpi": (Not used by raw loader)
+ *               - "-opt-size": (Not used by raw loader)
+ * @return 0 on success, -1 on failure.
+ */
 int main(int argc, char **argv)
 {
    char *file;

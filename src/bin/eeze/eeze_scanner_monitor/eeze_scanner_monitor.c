@@ -8,10 +8,27 @@
 #include <Ecore_Con.h>
 #include "../eeze_scanner/eeze_scanner.h"
 
+/**
+ * @brief Eet data descriptor for Eeze_Scanner_Event.
+ * Used for serializing and deserializing scanner events.
+ */
 static Eet_Data_Descriptor *edd;
 
+/**
+ * @brief Global return value for the application.
+ * Modified in case of errors to indicate failure.
+ */
 static int retval = EXIT_SUCCESS;
 
+/**
+ * @brief Callback function to handle data received via Eet_Connection.
+ * Decodes the received Eeze_Scanner_Event and prints its details.
+ *
+ * @param eet_data Pointer to the raw Eet data.
+ * @param size Size of the Eet data.
+ * @param user_data User data (unused in this context).
+ * @return EINA_TRUE on successful processing, EINA_FALSE on error.
+ */
 static Eina_Bool
 _eet_read(const void *eet_data, size_t size, void *user_data EINA_UNUSED)
 {
@@ -53,6 +70,15 @@ _eet_read(const void *eet_data, size_t size, void *user_data EINA_UNUSED)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Callback function to handle data writing attempts via Eet_Connection.
+ * This monitor is read-only, so any attempt to write is an error.
+ *
+ * @param eet_data Pointer to the Eet data to write (unused).
+ * @param size Size of the Eet data (unused).
+ * @param user_data User data (unused).
+ * @return EINA_FALSE always, as writing is not supported.
+ */
 static Eina_Bool
 _eet_write(const void *eet_data EINA_UNUSED, size_t size EINA_UNUSED, void *user_data EINA_UNUSED)
 {
@@ -62,6 +88,14 @@ _eet_write(const void *eet_data EINA_UNUSED, size_t size EINA_UNUSED, void *user
    return EINA_FALSE;
 }
 
+/**
+ * @brief Callback for the EFL_IO_BUFFERED_STREAM_EVENT_SLICE_CHANGED event.
+ * Triggered when new data is available on the buffered stream.
+ * It passes the received data to the Eet_Connection for processing.
+ *
+ * @param data The Eet_Connection instance.
+ * @param event The Efl_Event details.
+ */
 static void
 _on_data(void *data, const Efl_Event *event)
 {
@@ -87,12 +121,28 @@ _on_data(void *data, const Efl_Event *event)
    ecore_main_loop_quit();
 }
 
+/**
+ * @brief Callback for the EFL_IO_BUFFERED_STREAM_EVENT_READ_FINISHED event.
+ * Triggered when the read stream has finished (e.g., connection closed by peer).
+ * Quits the main loop.
+ *
+ * @param data User data (unused).
+ * @param event The Efl_Event details (unused).
+ */
 static void
 _finished(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
 {
    ecore_main_loop_quit();
 }
 
+/**
+ * @brief Callback for the EFL_IO_BUFFERED_STREAM_EVENT_ERROR event.
+ * Triggered when an error occurs on the stream.
+ * Prints an error message and quits the main loop.
+ *
+ * @param data User data (unused).
+ * @param event The Efl_Event details, containing the error information.
+ */
 static void
 _error(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -106,6 +156,15 @@ _error(void *data EINA_UNUSED, const Efl_Event *event)
    ecore_main_loop_quit();
 }
 
+/**
+ * @brief Main function for the eeze_scanner_monitor.
+ * Initializes Ecore, Eet, Ecore_Con, sets up an Eet_Connection
+ * to listen for eeze_scanner events, and enters the Ecore main loop.
+ *
+ * @param argc Argument count (unused).
+ * @param argv Argument vector (unused).
+ * @return EXIT_SUCCESS on success, EXIT_FAILURE on error.
+ */
 int
 main(int argc EINA_UNUSED, char **argv EINA_UNUSED)
 {

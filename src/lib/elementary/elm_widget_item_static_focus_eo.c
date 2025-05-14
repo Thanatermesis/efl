@@ -1,3 +1,10 @@
+/**
+ * @file
+ * @brief This file contains the implementation of the Elm_Widget_Item_Static_Focus class.
+ *
+ * This class ensures that at least one focusable target is associated with a widget item.
+ * If no target is registered after a prepare call, the item's view itself is registered.
+ */
 
 Efl_Object *_elm_widget_item_static_focus_efl_object_constructor(Eo *obj, Elm_Widget_Item_Static_Focus_Data *pd);
 
@@ -7,7 +14,15 @@ void _elm_widget_item_static_focus_efl_object_destructor(Eo *obj, Elm_Widget_Ite
 
 void _elm_widget_item_static_focus_efl_ui_focus_object_setup_order_non_recursive(Eo *obj, Elm_Widget_Item_Static_Focus_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Initializes the Elm_Widget_Item_Static_Focus class.
+ *
+ * This function sets up the Efl_Object operations for the class.
+ *
+ * @param klass The Efl_Class to initialize.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_widget_item_static_focus_class_initializer(Efl_Class *klass)
 {
@@ -30,6 +45,13 @@ _elm_widget_item_static_focus_class_initializer(Efl_Class *klass)
    return efl_class_functions_set(klass, opsp, ropsp);
 }
 
+/**
+ * @internal
+ * @brief Describes the Elm_Widget_Item_Static_Focus class.
+ *
+ * This structure provides metadata for the Elm_Widget_Item_Static_Focus class,
+ * including its version, name, type, size of instance data, and initializer functions.
+ */
 static const Efl_Class_Description _elm_widget_item_static_focus_class_desc = {
    EO_VERSION,
    "Elm.Widget.Item.Static_Focus",

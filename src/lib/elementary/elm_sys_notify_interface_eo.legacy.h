@@ -28,10 +28,14 @@ typedef enum
 #endif
 
 /**
- * @brief Causes a notification to be forcefully closed and removed from the
- * user's view. It can be used, for example, in the event that what the
- * notification pertains to is no longer relevant, or to cancel a notification
- * with no expiration time.
+ * @brief Sends a notification with detailed parameters.
+ *
+ * This function requests the notification server to display a notification.
+ * It allows for detailed configuration, including replacing an existing
+ * notification (using @p replaces_id), setting an icon, summary, body text,
+ * urgency level, and a display timeout.
+ * A callback function can be provided to asynchronously receive the
+ * notification ID assigned by the server upon successful sending.
  *
  * @param[in] obj The object.
  * @param[in] replaces_id Notification ID that this notification replaces. The

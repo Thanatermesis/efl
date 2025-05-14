@@ -34,6 +34,11 @@
  * @cond LOCAL
  */
 
+/**
+ * @brief Worker thread function to create a directory.
+ * @param data Pointer to Eio_File_Mkdir structure.
+ * @param thread The Ecore_Thread executing this function.
+ */
 static void
 _eio_file_mkdir(void *data, Ecore_Thread *thread)
 {
@@ -43,6 +48,10 @@ _eio_file_mkdir(void *data, Ecore_Thread *thread)
      eio_file_thread_error(&m->common, thread);
 }
 
+/**
+ * @brief Frees resources associated with an Eio_File_Mkdir operation.
+ * @param m Pointer to the Eio_File_Mkdir structure to free.
+ */
 static void
 _eio_mkdir_free(Eio_File_Mkdir *m)
 {
@@ -50,6 +59,11 @@ _eio_mkdir_free(Eio_File_Mkdir *m)
    eio_file_free(&m->common);
 }
 
+/**
+ * @brief Callback executed in the main loop when directory creation succeeds.
+ * @param data Pointer to Eio_File_Mkdir structure.
+ * @param thread The Ecore_Thread that executed the operation (unused).
+ */
 static void
 _eio_file_mkdir_done(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -61,6 +75,11 @@ _eio_file_mkdir_done(void *data, Ecore_Thread *thread EINA_UNUSED)
    _eio_mkdir_free(m);
 }
 
+/**
+ * @brief Callback executed in the main loop when directory creation fails.
+ * @param data Pointer to Eio_File_Mkdir structure.
+ * @param thread The Ecore_Thread that executed the operation (unused).
+ */
 static void
 _eio_file_mkdir_error(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -70,6 +89,11 @@ _eio_file_mkdir_error(void *data, Ecore_Thread *thread EINA_UNUSED)
    _eio_mkdir_free(m);
 }
 
+/**
+ * @brief Worker thread function to delete a file.
+ * @param data Pointer to Eio_File_Unlink structure.
+ * @param thread The Ecore_Thread executing this function.
+ */
 static void
 _eio_file_unlink(void *data, Ecore_Thread *thread)
 {
@@ -79,6 +103,10 @@ _eio_file_unlink(void *data, Ecore_Thread *thread)
      eio_file_thread_error(&l->common, thread);
 }
 
+/**
+ * @brief Frees resources associated with an Eio_File_Unlink operation.
+ * @param l Pointer to the Eio_File_Unlink structure to free.
+ */
 static void
 _eio_unlink_free(Eio_File_Unlink *l)
 {
@@ -86,6 +114,11 @@ _eio_unlink_free(Eio_File_Unlink *l)
    eio_file_free(&l->common);
 }
 
+/**
+ * @brief Callback executed in the main loop when file deletion succeeds.
+ * @param data Pointer to Eio_File_Unlink structure.
+ * @param thread The Ecore_Thread that executed the operation (unused).
+ */
 static void
 _eio_file_unlink_done(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -97,6 +130,11 @@ _eio_file_unlink_done(void *data, Ecore_Thread *thread EINA_UNUSED)
    _eio_unlink_free(l);
 }
 
+/**
+ * @brief Callback executed in the main loop when file deletion fails.
+ * @param data Pointer to Eio_File_Unlink structure.
+ * @param thread The Ecore_Thread that executed the operation (unused).
+ */
 static void
 _eio_file_unlink_error(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -106,6 +144,11 @@ _eio_file_unlink_error(void *data, Ecore_Thread *thread EINA_UNUSED)
    _eio_unlink_free(l);
 }
 
+/**
+ * @brief Converts a system stat structure (_eio_stat_t) to an Eina_Stat structure.
+ * @param es Pointer to the destination Eina_Stat structure.
+ * @param st Pointer to the source _eio_stat_t structure.
+ */
 static void
 _eio_file_struct_2_eina(Eina_Stat *es, _eio_stat_t *st)
 {
@@ -138,6 +181,11 @@ _eio_file_struct_2_eina(Eina_Stat *es, _eio_stat_t *st)
 #endif
 }
 
+/**
+ * @brief Worker thread function to get file status (stat).
+ * @param data Pointer to Eio_File_Stat structure.
+ * @param thread The Ecore_Thread executing this function.
+ */
 static void
 _eio_file_stat(void *data, Ecore_Thread *thread)
 {
@@ -150,6 +198,11 @@ _eio_file_stat(void *data, Ecore_Thread *thread)
    _eio_file_struct_2_eina(&s->buffer, &buf);
 }
 
+/**
+ * @brief Worker thread function to get file status (lstat, does not follow symlinks).
+ * @param data Pointer to Eio_File_Stat structure.
+ * @param thread The Ecore_Thread executing this function.
+ */
 static void
 _eio_file_lstat(void *data, Ecore_Thread *thread)
 {
@@ -162,6 +215,10 @@ _eio_file_lstat(void *data, Ecore_Thread *thread)
    _eio_file_struct_2_eina(&s->buffer, &buf);
 }
 
+/**
+ * @brief Frees resources associated with an Eio_File_Stat operation.
+ * @param s Pointer to the Eio_File_Stat structure to free.
+ */
 static void
 _eio_stat_free(Eio_File_Stat *s)
 {
@@ -169,6 +226,11 @@ _eio_stat_free(Eio_File_Stat *s)
    eio_file_free(&s->common);
 }
 
+/**
+ * @brief Callback executed in the main loop when stat/lstat operation succeeds.
+ * @param data Pointer to Eio_File_Stat structure.
+ * @param thread The Ecore_Thread that executed the operation (unused).
+ */
 static void
 _eio_file_stat_done(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -180,6 +242,11 @@ _eio_file_stat_done(void *data, Ecore_Thread *thread EINA_UNUSED)
    _eio_stat_free(s);
 }
 
+/**
+ * @brief Callback executed in the main loop when stat/lstat operation fails.
+ * @param data Pointer to Eio_File_Stat structure.
+ * @param thread The Ecore_Thread that executed the operation (unused).
+ */
 static void
 _eio_file_stat_error(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -189,6 +256,11 @@ _eio_file_stat_error(void *data, Ecore_Thread *thread EINA_UNUSED)
    _eio_stat_free(s);
 }
 
+/**
+ * @brief Worker thread function to change file permissions.
+ * @param data Pointer to Eio_File_Chmod structure.
+ * @param thread The Ecore_Thread executing this function.
+ */
 static void
 _eio_file_chmod(void *data, Ecore_Thread *thread)
 {
@@ -199,6 +271,13 @@ _eio_file_chmod(void *data, Ecore_Thread *thread)
 }
 
 #if defined(HAVE_CHOWN) && defined(HAVE_GETPWENT)
+/**
+ * @brief Worker thread function to change file ownership.
+ * @param data Pointer to Eio_File_Chown structure.
+ * @param thread The Ecore_Thread executing this function.
+ * @note This function attempts to resolve user and group names to UID/GID.
+ *       If conversion fails, it sets an error and cancels the thread.
+ */
 static void
 _eio_file_chown(void *data, Ecore_Thread *thread)
 {
@@ -256,6 +335,10 @@ _eio_file_chown(void *data, Ecore_Thread *thread)
    return;
 }
 
+/**
+ * @brief Frees resources associated with an Eio_File_Chown operation.
+ * @param ch Pointer to the Eio_File_Chown structure to free.
+ */
 static void
 _eio_chown_free(Eio_File_Chown *ch)
 {
@@ -265,6 +348,11 @@ _eio_chown_free(Eio_File_Chown *ch)
    eio_file_free(&ch->common);
 }
 
+/**
+ * @brief Callback executed in the main loop when file ownership change succeeds.
+ * @param data Pointer to Eio_File_Chown structure.
+ * @param thread The Ecore_Thread that executed the operation (unused).
+ */
 static void
 _eio_file_chown_done(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -276,6 +364,11 @@ _eio_file_chown_done(void *data, Ecore_Thread *thread EINA_UNUSED)
    _eio_chown_free(ch);
 }
 
+/**
+ * @brief Callback executed in the main loop when file ownership change fails.
+ * @param data Pointer to Eio_File_Chown structure.
+ * @param thread The Ecore_Thread that executed the operation (unused).
+ */
 static void
 _eio_file_chown_error(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -298,6 +391,13 @@ _eio_file_chown_error(void *data, Ecore_Thread *thread EINA_UNUSED)
  * @cond LOCAL
  */
 
+/**
+ * @brief Invokes the error callback for an Eio_File operation.
+ * @param common Pointer to the Eio_File structure.
+ * @details This function is called from the main loop when an error occurs
+ *          in a worker thread and has been signaled. It calls the user-provided
+ *          error callback and sets the thread pointer to NULL.
+ */
 void
 eio_file_error(Eio_File *common)
 {
@@ -306,6 +406,14 @@ eio_file_error(Eio_File *common)
    common->thread = NULL;
 }
 
+/**
+ * @brief Sets the error code and cancels the Ecore_Thread.
+ * @param common Pointer to the Eio_File structure.
+ * @param thread The Ecore_Thread in which the error occurred.
+ * @details This function is called from within a worker thread when an error
+ *          is encountered. It stores `errno` in `common->error` and requests
+ *          the cancellation of the thread.
+ */
 void
 eio_file_thread_error(Eio_File *common, Ecore_Thread *thread)
 {
@@ -313,6 +421,12 @@ eio_file_thread_error(Eio_File *common, Ecore_Thread *thread)
    ecore_thread_cancel(thread);
 }
 
+/**
+ * @brief Frees an Eio_File structure and associated data.
+ * @param common Pointer to the Eio_File structure to free.
+ * @details This function frees any associated data hashes, unregisters the
+ *          file operation, and then frees the common Eio_File structure itself.
+ */
 void
 eio_file_free(Eio_File *common)
 {
@@ -324,6 +438,21 @@ eio_file_free(Eio_File *common)
    eio_common_free(common);
 }
 
+/**
+ * @brief Sets up and starts a long-running Eio_File operation with feedback.
+ * @param common Pointer to the Eio_File structure.
+ * @param done_cb Callback for successful completion (not used directly here, typically for end_cb).
+ * @param error_cb Callback for error conditions.
+ * @param data User data to pass to callbacks.
+ * @param heavy_cb The actual worker function to execute in the thread.
+ * @param notify_cb Callback for progress notifications from the worker thread.
+ * @param end_cb Callback for when the thread finishes successfully (main loop).
+ * @param cancel_cb Callback for when the thread is cancelled or finishes due to error (main loop).
+ * @return EINA_TRUE if the thread was successfully started, EINA_FALSE otherwise.
+ * @details This function initializes the Eio_File structure and launches a new
+ *          thread using `ecore_thread_feedback_run`. It registers the Eio_File
+ *          if the thread starts successfully.
+ */
 Eina_Bool
 eio_long_file_set(Eio_File *common,
 		  Eio_Done_Cb done_cb,
@@ -363,6 +492,20 @@ eio_long_file_set(Eio_File *common,
    return !!thread;
 }
 
+/**
+ * @brief Sets up and starts a standard Eio_File operation.
+ * @param common Pointer to the Eio_File structure.
+ * @param done_cb Callback for successful completion (not used directly here, typically for end_cb).
+ * @param error_cb Callback for error conditions.
+ * @param data User data to pass to callbacks.
+ * @param job_cb The actual worker function to execute in the thread.
+ * @param end_cb Callback for when the thread finishes successfully (main loop).
+ * @param cancel_cb Callback for when the thread is cancelled or finishes due to error (main loop).
+ * @return EINA_TRUE if the thread was successfully started, EINA_FALSE otherwise.
+ * @details This function initializes the Eio_File structure and launches a new
+ *          thread using `ecore_thread_run`. It registers the Eio_File
+ *          if the thread starts successfully.
+ */
 Eina_Bool
 eio_file_set(Eio_File *common,
 	     Eio_Done_Cb done_cb,
@@ -397,6 +540,14 @@ eio_file_set(Eio_File *common,
    return !!thread;
 }
 
+/**
+ * @brief Associates a container object with an Eio_File operation.
+ * @param common Pointer to the Eio_File structure.
+ * @param container Pointer to the container object.
+ * @details This is typically used when an Eio_File operation is part of a larger
+ *          construct, like an Eio_Monitor or Eio_Ls. The container points back
+ *          to that parent object.
+ */
 void
 eio_file_container_set(Eio_File *common, void *container)
 {
@@ -412,6 +563,18 @@ eio_file_container_set(Eio_File *common, void *container)
  *                                   API                                      *
  *============================================================================*/
 
+/**
+ * @brief Asynchronously get file status information (like stat(2)).
+ * @param path The path to the file or directory.
+ * @param done_cb Function to call on success. It receives the user data, the Eio_File handle, and an Eina_Stat buffer.
+ * @param error_cb Function to call on error. It receives the user data, the Eio_File handle, and the error code (errno).
+ * @param data Custom data pointer to pass to callbacks.
+ * @return An Eio_File handle for this operation, or @c NULL on failure to queue.
+ *
+ * This function queues an operation to get metadata about a file, similar to
+ * the stat() system call. The operation is performed in a separate thread.
+ * Callbacks are invoked in the main loop.
+ */
 EIO_API Eio_File *
 eio_file_direct_stat(const char *path,
 		     Eio_Stat_Cb done_cb,
@@ -444,6 +607,19 @@ eio_file_direct_stat(const char *path,
    return &s->common;
 }
 
+/**
+ * @brief Asynchronously get file status information (like lstat(2)).
+ * @param path The path to the file, directory, or symbolic link.
+ * @param done_cb Function to call on success. It receives the user data, the Eio_File handle, and an Eina_Stat buffer.
+ * @param error_cb Function to call on error. It receives the user data, the Eio_File handle, and the error code (errno).
+ * @param data Custom data pointer to pass to callbacks.
+ * @return An Eio_File handle for this operation, or @c NULL on failure to queue.
+ *
+ * This function queues an operation to get metadata about a file, similar to
+ * the lstat() system call. If path is a symbolic link, it stats the link
+ * itself, not the file it points to. The operation is performed in a
+ * separate thread. Callbacks are invoked in the main loop.
+ */
 EIO_API Eio_File *
 eio_file_direct_lstat(const char *path,
 		      Eio_Stat_Cb done_cb,
@@ -474,6 +650,17 @@ eio_file_direct_lstat(const char *path,
    return &s->common;
 }
 
+/**
+ * @brief Asynchronously delete a name and possibly the file it refers to (like unlink(2)).
+ * @param path The path to the file to delete.
+ * @param done_cb Function to call on success. It receives the user data and the Eio_File handle.
+ * @param error_cb Function to call on error. It receives the user data, the Eio_File handle, and the error code (errno).
+ * @param data Custom data pointer to pass to callbacks.
+ * @return An Eio_File handle for this operation, or @c NULL on failure to queue.
+ *
+ * This function queues an operation to delete a file. The operation is
+ * performed in a separate thread. Callbacks are invoked in the main loop.
+ */
 EIO_API Eio_File *
 eio_file_unlink(const char *path,
 		Eio_Done_Cb done_cb,
@@ -503,6 +690,18 @@ eio_file_unlink(const char *path,
    return &l->common;
 }
 
+/**
+ * @brief Asynchronously create a directory (like mkdir(2)).
+ * @param path The path of the directory to create.
+ * @param mode The permissions for the new directory (e.g., 0755).
+ * @param done_cb Function to call on success. It receives the user data and the Eio_File handle.
+ * @param error_cb Function to call on error. It receives the user data, the Eio_File handle, and the error code (errno).
+ * @param data Custom data pointer to pass to callbacks.
+ * @return An Eio_File handle for this operation, or @c NULL on failure to queue.
+ *
+ * This function queues an operation to create a new directory. The operation
+ * is performed in a separate thread. Callbacks are invoked in the main loop.
+ */
 EIO_API Eio_File *
 eio_file_mkdir(const char *path,
 	       mode_t mode,
@@ -534,6 +733,23 @@ eio_file_mkdir(const char *path,
    return &r->common;
 }
 
+/**
+ * @brief Asynchronously change file permissions (like chmod(2)).
+ * @param path The path to the file or directory.
+ * @param mode The new permissions (e.g., 0644).
+ * @param done_cb Function to call on success. It receives the user data and the Eio_File handle.
+ * @param error_cb Function to call on error. It receives the user data, the Eio_File handle, and the error code (errno).
+ * @param data Custom data pointer to pass to callbacks.
+ * @return An Eio_File handle for this operation, or @c NULL on failure to queue.
+ *
+ * This function queues an operation to change the permissions of a file or
+ * directory. The operation is performed in a separate thread. Callbacks are
+ * invoked in the main loop.
+ * @note Internally, this function reuses Eio_File_Mkdir structure for Eio_File_Chmod,
+ * as they share similar basic fields (path, mode, common). The done and error
+ * callbacks are correctly routed to _eio_file_mkdir_done and _eio_file_mkdir_error
+ * but the worker function is _eio_file_chmod. This is a bit of a misnomer in struct usage.
+ */
 EIO_API Eio_File *
 eio_file_chmod(const char *path,
 	       mode_t mode,
@@ -565,6 +781,22 @@ eio_file_chmod(const char *path,
    return &r->common;
 }
 
+/**
+ * @brief Asynchronously change file ownership (like chown(2)).
+ * @param path The path to the file or directory.
+ * @param user The new user name or UID as a string. If NULL, user is not changed.
+ * @param group The new group name or GID as a string. If NULL, group is not changed.
+ * @param done_cb Function to call on success. It receives the user data and the Eio_File handle.
+ * @param error_cb Function to call on error. It receives the user data, the Eio_File handle, and the error code (errno).
+ * @param data Custom data pointer to pass to callbacks.
+ * @return An Eio_File handle for this operation, or @c NULL on failure to queue or if chown is not available.
+ *
+ * This function queues an operation to change the owner and/or group of a file
+ * or directory. The operation is performed in a separate thread. Callbacks are
+ * invoked in the main loop.
+ * If the system does not support chown or getpwent (for name resolution),
+ * this function will immediately call the error_cb with EINVAL and return NULL.
+ */
 EIO_API Eio_File *
 eio_file_chown(const char *path,
 	       const char *user,

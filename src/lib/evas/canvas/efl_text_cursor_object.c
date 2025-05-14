@@ -6,35 +6,72 @@
 #define MY_CLASS EFL_TEXT_CURSOR_OBJECT_CLASS
 #define MY_CLASS_NAME "Efl.Text.Cursor"
 
+/**
+ * @brief Private data for the Efl.Text.Cursor_Object.
+ *
+ * This structure holds the internal data for a text cursor object, including
+ * a handle to the underlying Evas textblock cursor and a reference to the
+ * associated text object.
+ */
 typedef struct
 {
-   Efl_Text_Cursor_Handle *handle;
-   Efl_Canvas_Object *text_obj;
+   Efl_Text_Cursor_Handle *handle; /**< The evas textblock cursor handle. */
+   Efl_Canvas_Object *text_obj; /**< The text object this cursor belongs to. */
 } Efl_Text_Cursor_Object_Data;
 
+/**
+ * @brief An iterator for textblock selections.
+ *
+ * This structure provides an iterator over a list of rectangles that
+ * represent a selection or a range within a textblock.
+ */
 struct _Evas_Textblock_Selection_Iterator
 {
-   Eina_Iterator                       iterator; /**< Eina Iterator. */
-   Eina_List                           *list; /**< Head of list. */
-   Eina_List                           *current; /**< Current node in loop. */
+   Eina_Iterator                       iterator; /**< The Eina iterator superclass. */
+   Eina_List                           *list; /**< The list of rectangles to iterate over. */
+   Eina_List                           *current; /**< The current position in the list. */
 };
 
 typedef struct _Evas_Textblock_Selection_Iterator Evas_Textblock_Selection_Iterator;
 
 EFL_CLASS_SIMPLE_CLASS(efl_text_cursor_object, "Efl.Text.Cursor", EFL_TEXT_CURSOR_OBJECT_CLASS)
 
+/**
+ * @brief Implements the Efl.Text.Cursor.position_set EAPI.
+ *
+ * Sets the cursor position to a given character index in the text.
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @param position The character index to set the cursor to.
+ */
 EOLIAN static void
 _efl_text_cursor_object_position_set(Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd, int position)
 {
    evas_textblock_cursor_pos_set(pd->handle, position);
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.position_get EAPI.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @return The current character index of the cursor.
+ */
 EOLIAN static int
 _efl_text_cursor_object_position_get(const Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd)
 {
    return evas_textblock_cursor_pos_get(pd->handle);
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.content_get EAPI.
+ *
+ * Retrieves the unicode character at the current cursor position.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @return The unicode character at the cursor position, or 0 if at the end.
+ */
 EOLIAN static Eina_Unicode
 _efl_text_cursor_object_content_get(const Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd)
 {
@@ -44,6 +81,17 @@ _efl_text_cursor_object_content_get(const Eo *obj EINA_UNUSED, Efl_Text_Cursor_O
     return 0;
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.content_geometry_get EAPI.
+ *
+ * Gets the geometry of the character content at the current cursor position.
+ * This can be the geometry of a format item (like an image) or the
+ * character itself.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @return The geometry of the content under the cursor.
+ */
 EOLIAN static Eina_Rect
 _efl_text_cursor_object_content_geometry_get(const Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd)
 {
@@ -57,12 +105,30 @@ _efl_text_cursor_object_content_geometry_get(const Eo *obj EINA_UNUSED, Efl_Text
    return rect;
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.line_number_set EAPI.
+ *
+ * Moves the cursor to a specific line number in the text.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @param line_number The line number to move the cursor to.
+ */
 EOLIAN static void
 _efl_text_cursor_object_line_number_set(Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd, int line_number)
 {
    evas_textblock_cursor_line_set(pd->handle, line_number);
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.line_number_get EAPI.
+ *
+ * Retrieves the line number where the cursor is currently located.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @return The current line number.
+ */
 EOLIAN static int
 _efl_text_cursor_object_line_number_get(const Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd)
 {
@@ -71,6 +137,18 @@ _efl_text_cursor_object_line_number_get(const Eo *obj EINA_UNUSED, Efl_Text_Curs
    return evas_textblock_cursor_line_geometry_get(pd->handle, &(rect.x), &(rect.y), &(rect.w), &(rect.h));
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.cursor_geometry_get EAPI.
+ *
+ * Retrieves the geometry of the cursor itself. This can be for the primary cursor
+ * (e.g., the blinking bar). It supports different cursor types for various
+ * visual representations (e.g., before or under the character).
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @param ctype The type of cursor geometry to retrieve.
+ * @return The geometry rectangle for the cursor.
+ */
 EOLIAN static Eina_Rect
 _efl_text_cursor_object_cursor_geometry_get(const Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd, Efl_Text_Cursor_Type ctype)
 {
@@ -80,6 +158,18 @@ _efl_text_cursor_object_cursor_geometry_get(const Eo *obj EINA_UNUSED, Efl_Text_
    return rc;
 }
 
+/**
+ * @brief Implements getting the secondary/lower part of a cursor's geometry.
+ *
+ * This is useful for languages with complex scripts where a single character
+ * might have multiple visual parts, and the cursor needs to be split. This function
+ * gets the geometry for the "lower" or secondary part of such a split cursor.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @param geometry2 A pointer to an Eina_Rect to store the geometry.
+ * @return @c EINA_TRUE if a secondary geometry exists, @c EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_text_cursor_object_lower_cursor_geometry_get(const Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd, Eina_Rect *geometry2)
 {
@@ -93,18 +183,49 @@ _efl_text_cursor_object_lower_cursor_geometry_get(const Eo *obj EINA_UNUSED, Efl
    return b_ret;
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.equal EAPI.
+ *
+ * Checks if two cursors are at the same position.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @param dst The other cursor to compare against.
+ * @return @c EINA_TRUE if cursors are equal, @c EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_text_cursor_object_equal(const Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd, const Efl_Text_Cursor_Object *dst)
 {
    return evas_textblock_cursor_equal(pd->handle, efl_text_cursor_object_handle_get(dst));
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.compare EAPI.
+ *
+ * Compares the position of this cursor with another cursor.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @param dst The other cursor to compare against.
+ * @return -1 if this cursor is before dst, 0 if they are at the same
+ *         position, and 1 if this cursor is after dst.
+ */
 EOLIAN static int
 _efl_text_cursor_object_compare(const Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd, const Efl_Text_Cursor_Object *dst)
 {
    return evas_textblock_cursor_compare(pd->handle, efl_text_cursor_object_handle_get(dst));
 }
 
+/**
+ * @brief Copies the state of one cursor object to another.
+ *
+ * This function is an internal helper to duplicate a cursor's state. It creates a new
+ * underlying evas cursor handle for the destination and copies the properties
+ * from the source handle.
+ *
+ * @param obj The source cursor object.
+ * @param dst The destination cursor object.
+ */
 static void
 _efl_text_cursor_object_copy(const Efl_Text_Cursor_Object *obj, Efl_Text_Cursor_Object *dst)
 {
@@ -123,6 +244,15 @@ _efl_text_cursor_object_copy(const Efl_Text_Cursor_Object *obj, Efl_Text_Cursor_
    evas_textblock_cursor_unref(handle, NULL);
 }
 
+/**
+ * @brief Implements the Efl.Duplicate.duplicate EAPI.
+ *
+ * Creates a new cursor object that is a duplicate of the given object.
+ *
+ * @param obj The object to duplicate.
+ * @param pd Private data for the cursor object.
+ * @return A new Efl_Text_Cursor_Object, or NULL on failure.
+ */
 EOLIAN static Efl_Text_Cursor_Object *
 _efl_text_cursor_object_efl_duplicate_duplicate(const Eo *obj, Efl_Text_Cursor_Object_Data *pd EINA_UNUSED)
 {
@@ -133,6 +263,16 @@ _efl_text_cursor_object_efl_duplicate_duplicate(const Eo *obj, Efl_Text_Cursor_O
   return dup;
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.move EAPI.
+ *
+ * Moves the cursor according to the specified movement type.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @param type The type of movement to perform (e.g., next character, end of line).
+ * @return @c EINA_TRUE if the cursor was moved, @c EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_text_cursor_object_move(Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd, Efl_Text_Cursor_Move_Type type)
 {
@@ -199,12 +339,31 @@ _efl_text_cursor_object_move(Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *p
    return moved;
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.char_delete EAPI.
+ *
+ * Deletes a character at the current cursor position.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ */
 EOLIAN static void
 _efl_text_cursor_object_char_delete(Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd)
 {
    evas_textblock_cursor_char_delete(pd->handle);
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.line_jump_by EAPI.
+ *
+ * Moves the cursor up or down by a specified number of lines.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @param by The number of lines to jump. A positive value moves down,
+ *           and a negative value moves up.
+ * @return @c EINA_TRUE if the cursor moved, @c EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_text_cursor_object_line_jump_by(Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd, int by)
 {
@@ -217,18 +376,48 @@ _efl_text_cursor_object_line_jump_by(Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object
    return moved;
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.char_coord_set EAPI.
+ *
+ * Sets the cursor position to the character that is located at the given coordinates.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @param coord The coordinates to set the cursor at.
+ */
 EOLIAN static void
 _efl_text_cursor_object_char_coord_set(Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd, Eina_Position2D coord)
 {
    evas_textblock_cursor_char_coord_set(pd->handle, coord.x, coord.y);
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.cluster_coord_set EAPI.
+ *
+ * Sets the cursor position to the grapheme cluster that is located at the
+ * given coordinates.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @param coord The coordinates to set the cursor at.
+ */
 EOLIAN static void
 _efl_text_cursor_object_cluster_coord_set(Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd, Eina_Position2D coord)
 {
    evas_textblock_cursor_cluster_coord_set(pd->handle, coord.x, coord.y);
 }
 
+/**
+ * @brief Prepends a substring of text at the given cursor.
+ *
+ * This is a helper function for `_cursor_text_append`. It takes a start (s)
+ * and end (p) pointer and prepends the text between them to the cursor.
+ *
+ * @param cur The cursor handle.
+ * @param s The start of the string to prepend.
+ * @param p The end of the substring to prepend.
+ * @return The number of characters prepended.
+ */
 static int
 _prepend_text_run2(Efl_Text_Cursor_Handle *cur, const char *s, const char *p)
 {
@@ -244,6 +433,17 @@ _prepend_text_run2(Efl_Text_Cursor_Handle *cur, const char *s, const char *p)
    return 0;
 }
 
+/**
+ * @brief Appends text to a cursor, handling special formatting characters.
+ *
+ * This function iterates through the input text and inserts it at the
+ * cursor's position. It specifically handles paragraph separators, newlines,
+ * and tabs by converting them into the appropriate textblock format codes.
+ *
+ * @param cur The cursor handle.
+ * @param text The text to append.
+ * @return The total number of characters and format specifiers inserted.
+ */
 int
 _cursor_text_append(Efl_Text_Cursor_Handle *cur,
       const char *text)
@@ -293,30 +493,83 @@ _cursor_text_append(Efl_Text_Cursor_Handle *cur,
    return len;
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.text_insert EAPI.
+ *
+ * Inserts plain text at the current cursor position. Special characters like
+ * newlines are handled.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @param text The text to insert.
+ */
 EOLIAN static void
 _efl_text_cursor_object_text_insert(Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd, const char *text)
 {
    _cursor_text_append(pd->handle, text);
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.range_text_get EAPI.
+ *
+ * Retrieves the plain text within the range defined by two cursors.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @param cur2 The cursor marking the end of the range.
+ * @return A newly allocated string with the text from the range. The caller
+ *         is responsible for freeing this string.
+ */
 EOLIAN static char *
 _efl_text_cursor_object_range_text_get(const Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd, Efl_Text_Cursor_Object *cur2)
 {
    return evas_textblock_cursor_range_text_get(pd->handle, efl_text_cursor_object_handle_get(cur2), EVAS_TEXTBLOCK_TEXT_PLAIN);
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.markup_insert EAPI.
+ *
+ * Inserts text with markup at the current cursor position.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @param markup The markup text to insert.
+ */
 EOLIAN static void
 _efl_text_cursor_object_markup_insert(Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd, const char *markup)
 {
    evas_object_textblock_text_markup_prepend(pd->handle, markup);
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.range_markup_get EAPI.
+ *
+ * Retrieves the markup text within the range defined by two cursors.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @param cur2 The cursor marking the end of the range.
+ * @return A newly allocated string with the markup from the range. The caller
+ *         is responsible for freeing this string.
+ */
 EOLIAN static char *
 _efl_text_cursor_object_range_markup_get(const Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd, Efl_Text_Cursor_Object *cur2)
 {
    return evas_textblock_cursor_range_text_get(pd->handle,efl_text_cursor_object_handle_get(cur2), EVAS_TEXTBLOCK_TEXT_MARKUP);
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.range_geometry_get EAPI.
+ *
+ * Retrieves an iterator over the rectangles that enclose a range of text.
+ * This provides a "simple" geometry, which might be a single bounding box.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @param cur2 The cursor marking the end of the range.
+ * @return An iterator over Eina_Rect objects. The caller is responsible for
+ *         freeing the iterator.
+ */
 EOLIAN static Eina_Iterator *
 _efl_text_cursor_object_range_geometry_get(Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd, Efl_Text_Cursor_Object *cur2)
 {
@@ -325,15 +578,16 @@ _efl_text_cursor_object_range_geometry_get(Eo *obj EINA_UNUSED, Efl_Text_Cursor_
 
 /** selection iterator */
 /**
-  * @internal
-  * Returns the value of the current data of list node,
-  * and goes to the next list node.
-  *
-  * @param it the iterator.
-  * @param data the data of the current list node.
-  * @return EINA_FALSE if the current list node does not exists.
-  * Otherwise, returns EINA_TRUE.
-  */
+ * @internal
+ * @brief Advances the selection iterator to the next item.
+ *
+ * This function is part of the Eina_Iterator implementation for textblock selections.
+ * It retrieves the data for the current item and moves the iterator to the next one.
+ *
+ * @param it The selection iterator.
+ * @param data A pointer to store the data of the current item (an Eina_Rectangle *).
+ * @return @c EINA_TRUE on success, @c EINA_FALSE if there are no more items.
+ */
 static Eina_Bool
 _evas_textblock_selection_iterator_next(Evas_Textblock_Selection_Iterator *it, void **data)
 {
@@ -347,11 +601,15 @@ _evas_textblock_selection_iterator_next(Evas_Textblock_Selection_Iterator *it, v
 }
 
 /**
-  * @internal
-  * Gets the iterator container (Eina_List) which created the iterator.
-  * @param it the iterator.
-  * @return A pointer to Eina_List.
-  */
+ * @internal
+ * @brief Gets the container of the selection iterator.
+ *
+ * This function is part of the Eina_Iterator implementation. It returns the
+ * underlying list that the iterator is traversing.
+ *
+ * @param it The selection iterator.
+ * @return The Eina_List that serves as the iterator's container.
+ */
 static Eina_List *
 _evas_textblock_selection_iterator_get_container(Evas_Textblock_Selection_Iterator *it)
 {
@@ -359,10 +617,14 @@ _evas_textblock_selection_iterator_get_container(Evas_Textblock_Selection_Iterat
 }
 
 /**
-  * @internal
-  * Frees the iterator container (Eina_List).
-  * @param it the iterator.
-  */
+ * @internal
+ * @brief Frees the selection iterator and its associated data.
+ *
+ * This function is part of the Eina_Iterator implementation. It frees the
+ * list of rectangles and the iterator structure itself.
+ *
+ * @param it The selection iterator to free.
+ */
 static void
 _evas_textblock_selection_iterator_free(Evas_Textblock_Selection_Iterator *it)
 {
@@ -375,12 +637,15 @@ _evas_textblock_selection_iterator_free(Evas_Textblock_Selection_Iterator *it)
 }
 
 /**
-  * @internal
-  * Creates newly allocated  iterator associated to a list.
-  * @param list The list.
-  * @return If the memory cannot be allocated, NULL is returned.
-  * Otherwise, a valid iterator is returned.
-  */
+ * @internal
+ * @brief Creates a new selection iterator for a list of rectangles.
+ *
+ * This function allocates and initializes a new Eina_Iterator for traversing
+ * a list of rectangles, which typically represent the geometry of a text range.
+ *
+ * @param list The list of Eina_Rectangle pointers.
+ * @return A new Eina_Iterator on success, or NULL on allocation failure.
+ */
 static Eina_Iterator *
 _evas_textblock_selection_iterator_new(Eina_List *list)
 {
@@ -404,6 +669,19 @@ _evas_textblock_selection_iterator_new(Eina_List *list)
    return &it->iterator;
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.range_precise_geometry_get EAPI.
+ *
+ * Retrieves an iterator over the rectangles that precisely enclose a range of text.
+ * This is useful for complex text layouts where a range might span multiple lines
+ * or have disconnected parts.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @param cur2 The cursor marking the end of the range.
+ * @return An iterator over Eina_Rect objects. The caller is responsible for
+ *         freeing the iterator.
+ */
 EOLIAN static Eina_Iterator *
 _efl_text_cursor_object_range_precise_geometry_get(Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd, Efl_Text_Cursor_Object *cur2)
 {
@@ -411,12 +689,30 @@ _efl_text_cursor_object_range_precise_geometry_get(Eo *obj EINA_UNUSED, Efl_Text
    return _evas_textblock_selection_iterator_new(rects);
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.range_delete EAPI.
+ *
+ * Deletes the text and formatting within the range defined by two cursors.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @param cur2 The cursor marking the end of the range to delete.
+ */
 EOLIAN static void
 _efl_text_cursor_object_range_delete(Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd, Efl_Text_Cursor_Object *cur2)
 {
    evas_textblock_cursor_range_delete(pd->handle, efl_text_cursor_object_handle_get(cur2));
 }
 
+/**
+ * @brief Sets the internal Evas textblock cursor handle for a cursor object.
+ *
+ * This function is used internally to associate an Evas cursor handle with an
+ * Efl_Text_Cursor_Object. It manages reference counting for the handles.
+ *
+ * @param obj The Efl_Text_Cursor_Object.
+ * @param handle The Evas textblock cursor handle to set.
+ */
 EVAS_API void
 efl_text_cursor_object_handle_set(Eo *obj, Efl_Text_Cursor_Handle *handle)
 {
@@ -435,6 +731,14 @@ efl_text_cursor_object_handle_set(Eo *obj, Efl_Text_Cursor_Handle *handle)
      }
 }
 
+/**
+ * @brief Gets the internal Evas textblock cursor handle from a cursor object.
+ *
+ * This function provides internal access to the underlying Evas cursor handle.
+ *
+ * @param obj The Efl_Text_Cursor_Object.
+ * @return The Evas textblock cursor handle, or NULL on failure.
+ */
 EVAS_API Efl_Text_Cursor_Handle *
 efl_text_cursor_object_handle_get(const Eo *obj)
 {
@@ -443,11 +747,30 @@ efl_text_cursor_object_handle_get(const Eo *obj)
    return pd->handle;
 }
 
+/**
+ * @brief Creates a new text cursor object.
+ *
+ * This function is a convenience wrapper around efl_add to create a new
+ * instance of Efl_Text_Cursor_Object.
+ *
+ * @param parent The parent object.
+ * @return A new Efl_Text_Cursor_Object, or NULL on failure.
+ */
 Eo* efl_text_cursor_object_create(Eo *parent)
 {
    return efl_add(efl_text_cursor_object_realized_class_get(), parent);
 }
 
+/**
+ * @brief Associates a cursor object with a text object and creates a new cursor handle.
+ *
+ * This function connects a cursor to its text object, creating the underlying
+ * Evas textblock cursor handle required for operations.
+ *
+ * @param cursor The cursor object.
+ * @param canvas_text_obj The canvas-level text object (e.g., Efl.Canvas.TextBlock).
+ * @param text_obj The logical text object (e.g., Efl.Text).
+ */
 void efl_text_cursor_object_text_object_set(Eo *cursor, Eo *canvas_text_obj, Eo *text_obj)
 {
    Efl_Text_Cursor_Object_Data *pd = efl_data_scope_safe_get(cursor, MY_CLASS);
@@ -470,12 +793,30 @@ void efl_text_cursor_object_text_object_set(Eo *cursor, Eo *canvas_text_obj, Eo 
      }
 }
 
+/**
+ * @brief Implements the Efl.Text.Cursor.text_object_get EAPI.
+ *
+ * Retrieves the text object that this cursor belongs to.
+ *
+ * @param obj The Efl object.
+ * @param pd Private data for the cursor object.
+ * @return The associated text object.
+ */
 EOLIAN static Efl_Canvas_Object *
 _efl_text_cursor_object_text_object_get(const Eo *obj EINA_UNUSED, Efl_Text_Cursor_Object_Data *pd)
 {
    return pd->text_obj;
 }
 
+/**
+ * @brief Destructor for the Efl_Text_Cursor_Object.
+ *
+ * Cleans up resources used by the cursor object, such as unreferencing the
+ * cursor handle.
+ *
+ * @param obj The Efl object being destroyed.
+ * @param pd Private data for the cursor object.
+ */
 EOLIAN static void
 _efl_text_cursor_object_efl_object_destructor(Eo *obj, Efl_Text_Cursor_Object_Data *pd)
 {

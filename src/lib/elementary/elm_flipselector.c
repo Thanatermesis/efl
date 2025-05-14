@@ -57,6 +57,10 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
 static Eina_Bool _key_action_flip(Evas_Object *obj, const char *params);
 
 static const Elm_Action key_actions[] = {
+   /**
+    * @brief Defines the "flip" action and maps it to the _key_action_flip function.
+    * This allows the flipselector to respond to key events for flipping.
+    */
    {"flip", _key_action_flip},
    {NULL, NULL}
 };
@@ -64,6 +68,15 @@ static const Elm_Action key_actions[] = {
 EOLIAN static void
 _elm_flipselector_efl_canvas_group_group_calculate(Eo *obj, Elm_Flipselector_Data *sd)
 {
+   /**
+    * @brief Calculates the minimum size of the flipselector widget.
+    *
+    * This function is called when the widget needs to recalculate its size.
+    * It considers the finger size for touch interaction and the size of the
+    * largest item (sentinel) to ensure all items can be displayed correctly.
+    * It temporarily sets the "elm.top" text to the sentinel's label to
+    * accurately calculate the required size.
+    */
    char *tmp = NULL;
    Evas_Coord minw = -1, minh = -1, w, h;
 
@@ -105,6 +118,15 @@ _elm_flipselector_efl_canvas_group_group_calculate(Eo *obj, Elm_Flipselector_Dat
    evas_object_size_hint_min_set(obj, minw, minh);
 }
 
+/**
+ * @brief Updates the visual representation of the flipselector.
+ *
+ * Sets the text of the top and bottom parts of the flipselector
+ * to the label of the currently selected item. If no item is
+ * selected, it sets the text to an empty string.
+ *
+ * @param obj The flipselector Evas_Object.
+ */
 static void
 _update_view(Evas_Object *obj)
 {
@@ -131,6 +153,21 @@ _elm_flipselector_item_elm_widget_item_part_text_set(Eo *eo_item,
                                                      const char *part,
                                                      const char *label)
 {
+   /**
+    * @brief Sets the text for a part of a flipselector item.
+    *
+    * Currently, only the "default" part is supported, which corresponds
+    * to the item's main label. The label is truncated if it exceeds
+    * the flipselector's maximum allowed length (sd->max_len).
+    * If the new label is longer than the current sentinel's label,
+    * this item becomes the new sentinel. If the modified item is the
+    * currently selected one, the view is updated.
+    *
+    * @param eo_item The flipselector item.
+    * @param item The internal data of the flipselector item.
+    * @param part The name of the part to set the text for (e.g., "default").
+    * @param label The text to set.
+    */
    Eina_List *l;
 
    if (!label) return;
@@ -162,6 +199,16 @@ _elm_flipselector_item_elm_widget_item_part_text_get(const Eo *eo_it EINA_UNUSED
                                                      Elm_Flipselector_Item_Data *it,
                                                      const char *part)
 {
+   /**
+    * @brief Gets the text of a part of a flipselector item.
+    *
+    * Currently, only the "default" part is supported.
+    *
+    * @param eo_it The flipselector item (unused).
+    * @param it The internal data of the flipselector item.
+    * @param part The name of the part to get the text from (e.g., "default").
+    * @return The text of the specified part, or NULL if the part is not "default".
+    */
    if (part && strcmp(part, "default")) return NULL;
 
    return it->label;
@@ -173,9 +220,27 @@ _elm_flipselector_item_elm_widget_item_signal_emit(Eo *eo_it EINA_UNUSED,
                                                    const char *emission,
                                                    const char *source)
 {
+   /**
+    * @brief Emits a signal from the Edje object associated with the flipselector item.
+    *
+    * This function is a wrapper around edje_object_signal_emit for flipselector items.
+    *
+    * @param eo_it The flipselector item (unused).
+    * @param it The internal data of the flipselector item.
+    * @param emission The signal string to emit.
+    * @param source The source string of the signal.
+    */
    edje_object_signal_emit(VIEW(it), emission, source);
 }
 
+/**
+ * @brief Increments the walking counter.
+ *
+ * The walking counter is used to prevent re-entrant issues during
+ * operations that modify the item list or selection, such as flipping.
+ *
+ * @param sd The flipselector's private data.
+ */
 static inline void
 _flipselector_walk(Elm_Flipselector_Data *sd)
 {
@@ -187,6 +252,16 @@ _flipselector_walk(Elm_Flipselector_Data *sd)
    sd->walking++;
 }
 
+/**
+ * @brief Evaluates and updates the sentinel item.
+ *
+ * The sentinel item is the item with the longest label. It is used
+ * to determine the minimum size required by the flipselector to display
+ * all items without truncation. This function iterates through all items
+ * and updates sd->sentinel to point to the item with the longest label.
+ *
+ * @param sd The flipselector's private data.
+ */
 static void
 _sentinel_eval(Elm_Flipselector_Data *sd)
 {
@@ -209,6 +284,12 @@ _sentinel_eval(Elm_Flipselector_Data *sd)
      }
 }
 
+/**
+ * @brief Decrements the walking counter.
+ *
+ * @see _flipselector_walk
+ * @param sd The flipselector's private data.
+ */
 static inline void
 _flipselector_unwalk(Elm_Flipselector_Data *sd)
 {
@@ -222,6 +303,16 @@ _flipselector_unwalk(Elm_Flipselector_Data *sd)
    if (sd->walking) return;
 }
 
+/**
+ * @brief Handles actions to be taken when the selected item changes.
+ *
+ * This function is called after the current item (sd->current) has been
+ * updated. It invokes the callback function associated with the new
+ * current item (if any) and emits the "selected" smart callback.
+ * It avoids execution if the flipselector is in the process of deleting items.
+ *
+ * @param sd The flipselector's private data.
+ */
 static void
 _on_item_changed(Elm_Flipselector_Data *sd)
 {
@@ -237,6 +328,19 @@ _on_item_changed(Elm_Flipselector_Data *sd)
    evas_object_smart_callback_call(sd->obj, "selected", eo_item);
 }
 
+/**
+ * @brief Sends a message to the Edje object to update its display.
+ *
+ * This function is used to communicate changes in the selected item's
+ * label to the underlying Edje theme object, triggering visual updates
+ * like the flip animation. It also calls _on_item_changed to handle
+ * logic related to item selection changes.
+ *
+ * @param sd The flipselector's private data.
+ * @param flipside An integer message ID (MSG_FLIP_UP or MSG_FLIP_DOWN)
+ *                 indicating the direction of the flip or the part to update.
+ * @param label The new label to display.
+ */
 static void
 _send_msg(Elm_Flipselector_Data *sd,
           int flipside,
@@ -253,6 +357,17 @@ _send_msg(Elm_Flipselector_Data *sd,
    _on_item_changed(sd);
 }
 
+/**
+ * @brief Job function to update the view, typically scheduled when an item is deleted.
+ *
+ * This function is added as an Ecore_Job. It ensures that the view is
+ * updated after potential modifications to the item list (e.g., deletion
+ * of the current item). It sends a message to the Edje object with the
+ * label of the new current item or an empty string if no items are left.
+ * If no items are present, it also emits a signal to hide the flip buttons.
+ *
+ * @param data The Evas_Object of the flipselector.
+ */
 static void
 _view_update(void *data)
 {
@@ -279,6 +394,21 @@ _view_update(void *data)
 EOLIAN static void
 _elm_flipselector_item_efl_object_destructor(Eo *eo_item, Elm_Flipselector_Item_Data *item)
 {
+   /**
+    * @brief Destructor for a flipselector item.
+    *
+    * This function is called when a flipselector item is being deleted.
+    * It removes the item from the flipselector's list of items (sd->items).
+    * If the item being deleted is the currently selected one, it updates
+    * sd->current to the previous item, or the next if no previous exists,
+    * or NULL if it was the only item. It then re-evaluates the sentinel item
+    * and schedules a view update if necessary.
+    * The `sd->deleting` flag is used to distinguish between explicit item
+    * deletion by the user and deletion during widget destruction.
+    *
+    * @param eo_item The flipselector item Eolian object.
+    * @param item The private data of the flipselector item.
+    */
    Eina_List *l;
    ELM_FLIPSELECTOR_DATA_GET(WIDGET(item), sd);
 

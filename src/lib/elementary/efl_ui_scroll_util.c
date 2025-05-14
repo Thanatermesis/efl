@@ -8,18 +8,38 @@
 #include <Efl_Ui.h>
 #include "elm_priv.h"
 
+/**
+ * @internal
+ * @brief Structure to hold the context for a scroll connector.
+ *
+ * This structure maintains the state and associations between a scrollable
+ * object (typically a widget with an Edje theme) and its scroll manager.
+ * It tracks visibility of scroll direction indicators, freeze states,
+ * and other scroll-related properties.
+ */
 typedef struct {
-   Eo *obj;
-   Eo *smanager;
-   int freeze_want;
-   Eina_Bool scroll_count : 1;
-   Eina_Bool need_scroll : 1;
-   Eina_Bool show_up : 1;
-   Eina_Bool show_down : 1;
-   Eina_Bool show_left: 1;
-   Eina_Bool show_right : 1;
+   Eo *obj; /**< The Evas object (widget) this connector is associated with. */
+   Eo *smanager; /**< The scroll manager (e.g., Efl.Ui.Scroll_Manager) controlling the scrollable content. */
+   int freeze_want; /**< Stores the desired scroll freeze state before a drag operation. -1 if not set. */
+   Eina_Bool scroll_count : 1; /**< Flag to manage scroll signal emission, preventing redundant signals. */
+   Eina_Bool need_scroll : 1; /**< Flag indicating if a scroll signal needs to be emitted. */
+   Eina_Bool show_up : 1; /**< Current visibility state of the 'up' direction indicator. */
+   Eina_Bool show_down : 1; /**< Current visibility state of the 'down' direction indicator. */
+   Eina_Bool show_left: 1; /**< Current visibility state of the 'left' direction indicator. */
+   Eina_Bool show_right : 1; /**< Current visibility state of the 'right' direction indicator. */
 } Scroll_Connector_Context;
 
+/**
+ * @internal
+ * @brief Updates the visibility of scroll direction indicators (arrows/buttons)
+ *        based on the current scrollbar positions and visibility.
+ *
+ * This function checks if the content can be scrolled further in each direction
+ * and emits Edje signals to show or hide the corresponding direction indicators
+ * in the theme.
+ *
+ * @param ctx The scroll connector context.
+ */
 static void
 _scroll_connector_bar_direction_show_update(Scroll_Connector_Context *ctx)
 {
@@ -79,6 +99,17 @@ _scroll_connector_bar_direction_show_update(Scroll_Connector_Context *ctx)
      }
 }
 
+/**
+ * @internal
+ * @brief Reads the current drag values from the Edje theme's draggable parts
+ *        (scrollbars) and updates the scroll manager's bar position.
+ *
+ * After updating the scroll manager, it also calls
+ * _scroll_connector_bar_direction_show_update() to refresh the
+ * direction indicators.
+ *
+ * @param ctx The scroll connector context.
+ */
 static void
 _scroll_connector_bar_read_and_update(Scroll_Connector_Context *ctx)
 {
@@ -95,6 +126,20 @@ _scroll_connector_bar_read_and_update(Scroll_Connector_Context *ctx)
    _scroll_connector_bar_direction_show_update(ctx);
 }
 
+/**
+ * @internal
+ * @brief Callback triggered when the Edje theme emits a "reload" signal.
+ *
+ * This function refreshes the visibility state of the horizontal and vertical
+ * scrollbars in the theme based on the scroll manager's state. It also
+ * updates the scrollbar visibility in the manager and refreshes direction
+ * indicators.
+ *
+ * @param data The scroll connector context.
+ * @param obj The Evas object that emitted the signal (unused).
+ * @param emission The Edje signal emitted (unused).
+ * @param source The source of the Edje signal (unused).
+ */
 static void
 _scroll_connector_reload_cb(void *data,
                        Evas_Object *obj EINA_UNUSED,
@@ -121,7 +166,19 @@ _scroll_connector_reload_cb(void *data,
    _scroll_connector_bar_direction_show_update(ctx);
 }
 
-
+/**
+ * @internal
+ * @brief Callback for Edje drag events (drag,set; drag,step; drag,page) on scrollbars.
+ *
+ * This function is called when the user interacts with the scrollbar parts in
+ * the Edje theme (e.g., dragging the thumb, clicking step arrows). It reads
+ * the new scrollbar position and updates the scroll manager.
+ *
+ * @param data The scroll connector context.
+ * @param obj The Evas object that emitted the signal (unused).
+ * @param emission The Edje signal emitted (unused).
+ * @param source The source of the Edje signal (unused).
+ */
 static void
 _scroll_connector_edje_drag_cb(void *data,
                           Evas_Object *obj EINA_UNUSED,
@@ -133,7 +190,19 @@ _scroll_connector_edje_drag_cb(void *data,
    _scroll_connector_bar_read_and_update(ctx);
 }
 
-
+/**
+ * @internal
+ * @brief Callback for the "efl,action,scroll" signal from the Edje theme.
+ *
+ * This function is typically triggered after a scrollbar position change.
+ * It manages the emission of the "efl,action,scroll" signal to the theme,
+ * ensuring it's not emitted excessively.
+ *
+ * @param data The scroll connector context.
+ * @param obj The Evas object that emitted the signal.
+ * @param emission The Edje signal emitted (unused).
+ * @param source The source of the Edje signal (unused).
+ */
 static void
 _scroll(void *data,
                           Evas_Object *obj,
@@ -148,6 +217,20 @@ _scroll(void *data,
    efl_layout_signal_emit(obj, "efl,action,scroll", "efl");
 }
 
+/**
+ * @internal
+ * @brief Callback for Edje "drag,start" signals on scrollbars.
+ *
+ * This function is called when the user starts dragging a scrollbar.
+ * It reads and updates the scrollbar position, freezes scrolling on the
+ * scroll manager to prevent conflicting updates, and emits the
+ * EFL_UI_EVENT_SCROLL_DRAG_STARTED event.
+ *
+ * @param data The scroll connector context.
+ * @param obj The Evas object that emitted the signal (unused).
+ * @param emission The Edje signal emitted (unused).
+ * @param source The source of the Edje signal (unused).
+ */
 static void
 _scroll_connector_edje_drag_start_cb(void *data,
                                 Evas_Object *obj EINA_UNUSED,
@@ -163,6 +246,20 @@ _scroll_connector_edje_drag_start_cb(void *data,
    efl_event_callback_call(ctx->obj, EFL_UI_EVENT_SCROLL_DRAG_STARTED, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for Edje "drag,stop" signals on scrollbars.
+ *
+ * This function is called when the user stops dragging a scrollbar.
+ * It reads and updates the final scrollbar position, unfreezes scrolling
+ * on the scroll manager (restoring its previous freeze state), and emits
+ * the EFL_UI_EVENT_SCROLL_DRAG_FINISHED event.
+ *
+ * @param data The scroll connector context.
+ * @param obj The Evas object that emitted the signal (unused).
+ * @param emission The Edje signal emitted (unused).
+ * @param source The source of the Edje signal (unused).
+ */
 static void
 _scroll_connector_edje_drag_stop_cb(void *data,
                                Evas_Object *obj EINA_UNUSED,
@@ -178,6 +275,18 @@ _scroll_connector_edje_drag_stop_cb(void *data,
    efl_event_callback_call(ctx->obj, EFL_UI_EVENT_SCROLL_DRAG_FINISHED, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for Edje "drag" signals specifically from the vertical scrollbar.
+ *
+ * This function reads and updates the scrollbar position and then emits the
+ * EFL_UI_SCROLLBAR_EVENT_BAR_DRAGGED event with orientation set to vertical.
+ *
+ * @param data The scroll connector context.
+ * @param obj The Evas object that emitted the signal (unused).
+ * @param emission The Edje signal emitted (unused).
+ * @param source The source of the Edje signal (unused).
+ */
 static void
 _scroll_connector_vbar_drag_cb(void *data,
                           Evas_Object *obj EINA_UNUSED,
@@ -193,6 +302,18 @@ _scroll_connector_vbar_drag_cb(void *data,
    efl_event_callback_call(ctx->obj, EFL_UI_SCROLLBAR_EVENT_BAR_DRAGGED, &type);
 }
 
+/**
+ * @internal
+ * @brief Callback for Edje "efl,vertical_bar,press" signals.
+ *
+ * This function is called when the vertical scrollbar is pressed. It emits
+ * the EFL_UI_SCROLLBAR_EVENT_BAR_PRESSED event with orientation set to vertical.
+ *
+ * @param data The scroll connector context.
+ * @param obj The Evas object that emitted the signal (unused).
+ * @param emission The Edje signal emitted (unused).
+ * @param source The source of the Edje signal (unused).
+ */
 static void
 _scroll_connector_vbar_press_cb(void *data,
                            Evas_Object *obj EINA_UNUSED,
@@ -205,6 +326,19 @@ _scroll_connector_vbar_press_cb(void *data,
    efl_event_callback_call(ctx->obj, EFL_UI_SCROLLBAR_EVENT_BAR_PRESSED, &type);
 }
 
+/**
+ * @internal
+ * @brief Callback for Edje "efl,vbar,unpress" signals.
+ *
+ * This function is called when the vertical scrollbar is unpressed (released).
+ * It emits the EFL_UI_SCROLLBAR_EVENT_BAR_UNPRESSED event with orientation
+ * set to vertical.
+ *
+ * @param data The scroll connector context.
+ * @param obj The Evas object that emitted the signal (unused).
+ * @param emission The Edje signal emitted (unused).
+ * @param source The source of the Edje signal (unused).
+ */
 static void
 _scroll_connector_vbar_unpress_cb(void *data,
                              Evas_Object *obj EINA_UNUSED,
@@ -217,6 +351,18 @@ _scroll_connector_vbar_unpress_cb(void *data,
    efl_event_callback_call(ctx->obj, EFL_UI_SCROLLBAR_EVENT_BAR_UNPRESSED, &type);
 }
 
+/**
+ * @internal
+ * @brief Callback for Edje "drag" signals specifically from the horizontal scrollbar.
+ *
+ * This function reads and updates the scrollbar position and then emits the
+ * EFL_UI_SCROLLBAR_EVENT_BAR_DRAGGED event with orientation set to horizontal.
+ *
+ * @param data The scroll connector context.
+ * @param obj The Evas object that emitted the signal (unused).
+ * @param emission The Edje signal emitted (unused).
+ * @param source The source of the Edje signal (unused).
+ */
 static void
 _scroll_connector_hbar_drag_cb(void *data,
                           Evas_Object *obj EINA_UNUSED,
@@ -230,6 +376,18 @@ _scroll_connector_hbar_drag_cb(void *data,
    efl_event_callback_call(ctx->obj, EFL_UI_SCROLLBAR_EVENT_BAR_DRAGGED, &type);
 }
 
+/**
+ * @internal
+ * @brief Callback for Edje "efl,horizontal_bar,press" signals.
+ *
+ * This function is called when the horizontal scrollbar is pressed. It emits
+ * the EFL_UI_SCROLLBAR_EVENT_BAR_PRESSED event with orientation set to horizontal.
+ *
+ * @param data The scroll connector context.
+ * @param obj The Evas object that emitted the signal (unused).
+ * @param emission The Edje signal emitted (unused).
+ * @param source The source of the Edje signal (unused).
+ */
 static void
 _scroll_connector_hbar_press_cb(void *data,
                            Evas_Object *obj EINA_UNUSED,
@@ -242,6 +400,19 @@ _scroll_connector_hbar_press_cb(void *data,
    efl_event_callback_call(ctx->obj, EFL_UI_SCROLLBAR_EVENT_BAR_PRESSED, &type);
 }
 
+/**
+ * @internal
+ * @brief Callback for Edje "efl,hbar,unpress" signals.
+ *
+ * This function is called when the horizontal scrollbar is unpressed (released).
+ * It emits the EFL_UI_SCROLLBAR_EVENT_BAR_UNPRESSED event with orientation
+ * set to horizontal.
+ *
+ * @param data The scroll connector context.
+ * @param obj The Evas object that emitted the signal (unused).
+ * @param emission The Edje signal emitted (unused).
+ * @param source The source of the Edje signal (unused).
+ */
 static void
 _scroll_connector_hbar_unpress_cb(void *data,
                              Evas_Object *obj EINA_UNUSED,
@@ -254,6 +425,17 @@ _scroll_connector_hbar_unpress_cb(void *data,
    efl_event_callback_call(ctx->obj, EFL_UI_SCROLLBAR_EVENT_BAR_UNPRESSED, &type);
 }
 
+/**
+ * @internal
+ * @brief Callback for the EFL_UI_SCROLLBAR_EVENT_BAR_SIZE_CHANGED event from the scroll manager.
+ *
+ * This function is triggered when the scroll manager indicates a change in
+ * scrollbar thumb sizes. It retrieves the new sizes and updates the
+ * corresponding Edje draggable parts (horizontal and vertical bars) in the theme.
+ *
+ * @param data The scroll connector context.
+ * @param event The Efl_Event data (unused).
+ */
 static void
 _scroll_connector_bar_size_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -268,6 +450,19 @@ _scroll_connector_bar_size_changed_cb(void *data, const Efl_Event *event EINA_UN
    edje_object_part_drag_size_set(wd->resize_obj, "efl.draggable.vertical_bar", 1.0, height);
 }
 
+/**
+ * @internal
+ * @brief Callback for the EFL_UI_SCROLLBAR_EVENT_BAR_POS_CHANGED event from the scroll manager.
+ *
+ * This function is triggered when the scroll manager indicates a change in
+ * scrollbar thumb positions. It updates the step size of the Edje draggable
+ * parts based on content size and step size from the scroll manager. Then,
+ * it sets the new position of the draggable parts in the theme and emits
+ * an "efl,action,scroll" signal to the theme.
+ *
+ * @param data The scroll connector context.
+ * @param event The Efl_Event data (unused).
+ */
 static void
 _scroll_connector_bar_pos_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -298,6 +493,19 @@ _scroll_connector_bar_pos_changed_cb(void *data, const Efl_Event *event EINA_UNU
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for the EFL_UI_SCROLLBAR_EVENT_BAR_SHOW event from the scroll manager.
+ *
+ * This function is triggered when the scroll manager indicates that a scrollbar
+ * (horizontal or vertical, specified in event->info) should be shown.
+ * It emits the appropriate Edje signal to make the scrollbar visible in the theme
+ * and updates the direction indicators.
+ *
+ * @param data The scroll connector context.
+ * @param event The Efl_Event data, where event->info is an Efl_Ui_Layout_Orientation*
+ *              indicating which bar to show.
+ */
 static void
 _scroll_connector_bar_show_cb(void *data, const Efl_Event *event)
 {
@@ -312,6 +520,19 @@ _scroll_connector_bar_show_cb(void *data, const Efl_Event *event)
    _scroll_connector_bar_direction_show_update(ctx);
 }
 
+/**
+ * @internal
+ * @brief Callback for the EFL_UI_SCROLLBAR_EVENT_BAR_HIDE event from the scroll manager.
+ *
+ * This function is triggered when the scroll manager indicates that a scrollbar
+ * (horizontal or vertical, specified in event->info) should be hidden.
+ * It emits the appropriate Edje signal to make the scrollbar invisible in the theme
+ * and updates the direction indicators.
+ *
+ * @param data The scroll connector context.
+ * @param event The Efl_Event data, where event->info is an Efl_Ui_Layout_Orientation*
+ *              indicating which bar to hide.
+ */
 static void
 _scroll_connector_bar_hide_cb(void *data, const Efl_Event *event)
 {
@@ -326,6 +547,25 @@ _scroll_connector_bar_hide_cb(void *data, const Efl_Event *event)
    _scroll_connector_bar_direction_show_update(ctx);
 }
 
+/**
+ * @brief Binds a scrollable Evas object (widget) to a scroll manager.
+ *
+ * This function sets up the necessary callbacks and connections to synchronize
+ * the scroll state between an Evas object (typically one that uses an Edje
+ * theme for its scrollbars) and an Efl_Ui_Scroll_Manager. It creates and
+ * stores a Scroll_Connector_Context to manage this binding.
+ *
+ * Callbacks are established for:
+ * - Edje signals from the theme (e.g., drag, press on scrollbar parts) to update the scroll manager.
+ * - Efl events from the scroll manager (e.g., bar size/position changes, show/hide requests)
+ *   to update the Edje theme.
+ *
+ * @param obj The Evas object (widget) to bind. This object is expected to
+ *            have an Edje theme with parts like "efl.draggable.vertical_bar"
+ *            and "efl.draggable.horizontal_bar".
+ * @param manager The Efl_Ui_Scroll_Manager (or compatible) object that
+ *                controls the scrolling logic and state.
+ */
 void
 efl_ui_scroll_connector_bind(Eo *obj, Eo *manager)
 {
@@ -384,6 +624,15 @@ efl_ui_scroll_connector_bind(Eo *obj, Eo *manager)
                           _scroll_connector_bar_hide_cb, ctx);
 }
 
+/**
+ * @brief Unbinds a scrollable Evas object from its scroll manager.
+ *
+ * This function removes all callbacks and connections previously established
+ * by efl_ui_scroll_connector_bind() and frees the associated
+ * Scroll_Connector_Context.
+ *
+ * @param obj The Evas object (widget) to unbind.
+ */
 void
 efl_ui_scroll_connector_unbind(Eo *obj)
 {

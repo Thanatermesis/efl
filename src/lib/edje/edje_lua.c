@@ -1,3 +1,12 @@
+/**
+ * @file
+ * @brief Deprecated Lua bindings for Edje.
+ *
+ * This file contains the old Lua scripting interface for Edje.
+ * It is kept for reference purposes and is not actively maintained.
+ * For the current Lua implementation, refer to edje_lua2.c.
+ */
+
 #include "edje_private.h"
 
 #if 0
@@ -9,114 +18,139 @@
 #include <lauxlib.h>
 #include <lualib.h>
 
-#define EDJE_LUA_GET 1
-#define EDJE_LUA_SET 2
-#define EDJE_LUA_FN  3
+#define EDJE_LUA_GET 1 /**< Identifier for getter operations in Lua registration. */
+#define EDJE_LUA_SET 2 /**< Identifier for setter operations in Lua registration. */
+#define EDJE_LUA_FN  3 /**< Identifier for function operations in Lua registration. */
 
+/** @brief Structure to track memory allocation for Lua. */
 typedef struct _Edje_Lua_Alloc                 Edje_Lua_Alloc;
 
+/** @brief Structure to hold a reference to a Lua object in the registry. */
 typedef struct _Edje_Lua_Ref                   Edje_Lua_Ref;
 
+/** @brief Structure to hold Lua registration tables (metatable, getters, setters, functions). */
 typedef struct _Edje_Lua_Reg                   Edje_Lua_Reg;
 
+/** @brief Structure representing an Ecore_Timer managed by Lua. */
 typedef struct _Edje_Lua_Timer                 Edje_Lua_Timer;
 
+/** @brief Structure representing an Ecore_Animator managed by Lua. */
 typedef struct _Edje_Lua_Animator              Edje_Lua_Animator;
 
+/** @brief Structure representing an Ecore_Poller managed by Lua. */
 typedef struct _Edje_Lua_Poller                Edje_Lua_Poller;
 
+/** @brief Structure representing an Evas_Transform managed by Lua. */
 typedef struct _Edje_Lua_Transform             Edje_Lua_Transform;
 
+/** @brief Structure representing an Edje transition managed by Lua. */
 typedef struct _Edje_Lua_Transition            Edje_Lua_Transition;
 
+/** @brief Structure representing an Evas_Object managed by Lua within an Edje context. */
 typedef struct _Edje_Lua_Evas_Object           Edje_Lua_Evas_Object;
 
+/** @brief Structure representing an Edje part object (Evas_Object) managed by Lua. */
 typedef struct _Edje_Lua_Edje_Part_Object      Edje_Lua_Edje_Part_Object;
 
+/** @brief Structure representing an Edje part description managed by Lua. */
 typedef struct _Edje_Lua_Edje_Part_Description Edje_Lua_Edje_Part_Description;
 
 struct _Edje_Lua_Alloc
 {
-   size_t max, cur; /* maximal and current memory used by Lua */
+   size_t max, cur; /**< Maximal and current memory used by Lua, in bytes. */
 };
 
 struct _Edje_Lua_Ref
 {
-   int        id;
-   lua_State *L;
+   int        id; /**< Lua registry reference ID. */
+   lua_State *L;  /**< Pointer to the Lua state. */
 };
 
 struct _Edje_Lua_Reg
 {
-   const luaL_Reg *mt, *get, *set, *fn;
+   const luaL_Reg *mt;  /**< LuaL_Reg array for metatable methods. */
+   const luaL_Reg *get; /**< LuaL_Reg array for getter methods. */
+   const luaL_Reg *set; /**< LuaL_Reg array for setter methods. */
+   const luaL_Reg *fn;  /**< LuaL_Reg array for regular functions. */
 };
 
 struct _Edje_Lua_Timer
 {
-   lua_State    *L;
-   Ecore_Timer  *et;
-   Edje_Lua_Ref *cb;
+   lua_State    *L;  /**< Pointer to the Lua state. */
+   Ecore_Timer  *et; /**< Pointer to the Ecore_Timer. */
+   Edje_Lua_Ref *cb; /**< Lua reference to the callback function. */
 };
 
 struct _Edje_Lua_Animator
 {
-   lua_State      *L;
-   Ecore_Animator *ea;
-   Edje_Lua_Ref   *cb;
+   lua_State      *L;  /**< Pointer to the Lua state. */
+   Ecore_Animator *ea; /**< Pointer to the Ecore_Animator. */
+   Edje_Lua_Ref   *cb; /**< Lua reference to the callback function. */
 };
 
 struct _Edje_Lua_Poller
 {
-   lua_State    *L;
-   Ecore_Poller *ep;
-   Edje_Lua_Ref *cb;
+   lua_State    *L;  /**< Pointer to the Lua state. */
+   Ecore_Poller *ep; /**< Pointer to the Ecore_Poller. */
+   Edje_Lua_Ref *cb; /**< Lua reference to the callback function. */
 };
 
 struct _Edje_Lua_Transform
 {
-   lua_State     *L;
-   Evas_Transform et;
+   lua_State     *L;  /**< Pointer to the Lua state. */
+   Evas_Transform et; /**< The Evas_Transform data. */
 };
 
 struct _Edje_Lua_Transition
 {
-   lua_State    *L;
-   Ecore_Timer  *et;
-   Edje_Lua_Ref *trans;
-   Edje_Lua_Ref *cb;
-   Edje_Lua_Ref *ref;
-   double        dur;
+   lua_State    *L;     /**< Pointer to the Lua state. */
+   Ecore_Timer  *et;    /**< Ecore_Timer used for the transition. */
+   Edje_Lua_Ref *trans; /**< Lua reference to the transition object itself. */
+   Edje_Lua_Ref *cb;    /**< Lua reference to the completion callback. */
+   Edje_Lua_Ref *ref;   /**< Lua reference to an associated object. */
+   double        dur;   /**< Duration of the transition. */
 };
 
 struct _Edje_Lua_Evas_Object
 {
-   lua_State   *L;
-   Edje        *ed;
-   Evas_Object *eo;
-   Eina_Bool    mouse_events;
-   Eina_List   *cb;
+   lua_State   *L;            /**< Pointer to the Lua state. */
+   Edje        *ed;           /**< Pointer to the Edje object. */
+   Evas_Object *eo;           /**< Pointer to the Evas_Object. */
+   Eina_Bool    mouse_events; /**< Flag indicating if mouse events are enabled for this object. */
+   Eina_List   *cb;           /**< List of Lua references for callbacks associated with this object. */
 };
 
 struct _Edje_Lua_Edje_Part_Object
 {
-   lua_State      *L;
-   Edje           *ed;
-   Evas_Object    *eo;
-   Edje_Real_Part *rp;
-   const char     *key;
+   lua_State      *L;   /**< Pointer to the Lua state. */
+   Edje           *ed;  /**< Pointer to the parent Edje object. */
+   Evas_Object    *eo;  /**< Pointer to the Evas_Object representing the part. */
+   Edje_Real_Part *rp;  /**< Pointer to the Edje_Real_Part structure. */
+   const char     *key; /**< The key (name) of the part. */
 };
 
 struct _Edje_Lua_Edje_Part_Description
 {
-   lua_State             *L;
-   Edje                  *ed;
-   Evas_Object           *eo;
-   Edje_Real_Part        *rp;
-   Edje_Part_Description *pd;
+   lua_State             *L;  /**< Pointer to the Lua state. */
+   Edje                  *ed; /**< Pointer to the parent Edje object. */
+   Evas_Object           *eo; /**< Pointer to the Evas_Object (often the Edje object itself). */
+   Edje_Real_Part        *rp; /**< Pointer to the Edje_Real_Part structure. */
+   Edje_Part_Description *pd; /**< Pointer to the Edje_Part_Description being managed. */
 };
 
+/** @brief Jump buffer for Lua panic situations. */
 jmp_buf _edje_lua_panic_jmp;
 
+/**
+ * @brief Custom Lua panic function.
+ *
+ * This function is called by Lua when a fatal error (panic) occurs.
+ * It logs a critical message and performs a long jump to _edje_lua_panic_jmp.
+ *
+ * @param L The Lua state.
+ * @return int This function never actually returns due to longjmp, but is declared
+ *             to return int to match Lua's panic function signature.
+ */
 static int
 _edje_lua_custom_panic(lua_State *L EINA_UNUSED)
 {
@@ -125,6 +159,18 @@ _edje_lua_custom_panic(lua_State *L EINA_UNUSED)
    return 1; /* longjmp() never returns, but this keep gcc happy */
 }
 
+/**
+ * @brief Logs a Lua error.
+ *
+ * This function formats and logs a Lua error message, including the error type
+ * and the error message from the Lua stack. It does not exit the application.
+ *
+ * @param file The source file where the error occurred (passed from macro).
+ * @param fnc The function where the error occurred (passed from macro).
+ * @param line The line number where the error occurred (passed from macro).
+ * @param L The Lua state.
+ * @param err_code The Lua error code (e.g., LUA_ERRRUN, LUA_ERRSYNTAX).
+ */
 void
 __edje_lua_error(const char *file, const char *fnc, int line, lua_State *L, int err_code)
 {
@@ -160,6 +206,22 @@ __edje_lua_error(const char *file, const char *fnc, int line, lua_State *L, int 
    // exit(-1);
 }
 
+/**
+ * @brief Creates a new Lua execution environment (historically a thread or a table).
+ *
+ * Depending on the `newlua` preprocessor flag, this function either:
+ * 1. (newlua=1): Creates a new table in the main Lua state `L`, sets it as its own
+ *    metatable with `__index` pointing to `LUA_GLOBALSINDEX`, and stores a
+ *    reference to this table in `ed->lua_ref`. This table then acts as the
+ *    environment for scripts associated with the Edje object `ed`.
+ * 2. (newlua=0, deprecated): Creates a new Lua thread from `L` and sets up a new
+ *    environment table for this thread, inheriting from `LUA_GLOBALSINDEX`.
+ *
+ * @param ed The Edje object for which to create the Lua environment.
+ * @param L The parent Lua state (usually the global Edje Lua state).
+ * @return lua_State* Returns the Lua state `L` itself if `newlua` is 1,
+ *         or the new Lua thread if `newlua` is 0.
+ */
 lua_State *
 _edje_lua_new_thread(Edje *ed, lua_State *L)
 {
@@ -189,6 +251,20 @@ _edje_lua_new_thread(Edje *ed, lua_State *L)
 #endif
 }
 
+/**
+ * @brief Frees resources associated with a Lua execution environment.
+ *
+ * Depending on the `newlua` preprocessor flag, this function either:
+ * 1. (newlua=1): Releases the Lua registry reference stored in `ed->lua_ref`
+ *    and triggers a garbage collection cycle.
+ * 2. (newlua=0, deprecated): Clears the environment table of the given Lua thread `L`
+ *    (which is assumed to be a thread associated with `ed`) by iterating through
+ *    its key-value pairs and setting them to nil. It then performs a garbage
+ *    collection cycle.
+ *
+ * @param ed The Edje object whose Lua environment is to be freed.
+ * @param L The Lua state (main state if newlua=1, thread state if newlua=0).
+ */
 void
 _edje_lua_free_thread(Edje *ed, lua_State *L)
 {
@@ -214,6 +290,8 @@ _edje_lua_free_thread(Edje *ed, lua_State *L)
 
 /*
  * only for debug, returns number of objects in registry
+ * @param L The Lua state.
+ * @return The number of items in the Lua registry.
  */
 static int
 _edje_lua_reg_count(lua_State *L)
@@ -231,6 +309,18 @@ _edje_lua_reg_count(lua_State *L)
    return count;
 }
 
+/**
+ * @brief Creates a new Lua registry reference.
+ *
+ * Takes the Lua value at the given stack `index`, creates a reference to it
+ * in the Lua registry, and stores this reference ID along with the Lua state
+ * in a newly allocated Edje_Lua_Ref structure.
+ *
+ * @param L The Lua state.
+ * @param index The stack index of the Lua value to reference.
+ * @return Edje_Lua_Ref* A pointer to the newly created Edje_Lua_Ref, or NULL on failure.
+ *         The caller is responsible for freeing this structure.
+ */
 static Edje_Lua_Ref *
 _edje_lua_new_ref(lua_State *L, int index)
 {
@@ -241,12 +331,31 @@ _edje_lua_new_ref(lua_State *L, int index)
    return ref;
 }
 
+/**
+ * @brief Pushes a Lua value onto the stack from a registry reference.
+ *
+ * Retrieves the Lua value associated with the ID in `ref->id` from the
+ * Lua registry and pushes it onto the Lua stack `L`.
+ *
+ * @param L The Lua state.
+ * @param ref Pointer to the Edje_Lua_Ref containing the registry ID.
+ */
 static void
 _edje_lua_get_ref(lua_State *L, Edje_Lua_Ref *ref)
 {
    lua_rawgeti(L, LUA_REGISTRYINDEX, ref->id);
 }
 
+/**
+ * @brief Frees a Lua registry reference and its associated structure.
+ *
+ * Releases the Lua registry reference identified by `ref->id` and then
+ * frees the `Edje_Lua_Ref` structure itself. It also triggers a garbage
+ * collection cycle.
+ *
+ * @param L The Lua state.
+ * @param ref Pointer to the Edje_Lua_Ref to be freed.
+ */
 static void
 _edje_lua_free_ref(lua_State *L, Edje_Lua_Ref *ref)
 {
@@ -256,6 +365,17 @@ _edje_lua_free_ref(lua_State *L, Edje_Lua_Ref *ref)
    lua_gc(L, LUA_GCCOLLECT, 0);
 }
 
+/**
+ * @brief Stores a Lua value in the registry, keyed by a light userdata pointer.
+ *
+ * Associates the Lua value at the given stack `index` with the light userdata `ptr`
+ * in the Lua registry. This allows C code to retrieve the Lua object later using
+ * the same pointer.
+ *
+ * @param L The Lua state.
+ * @param index The stack index of the Lua value to store.
+ * @param ptr The light userdata pointer to use as the key.
+ */
 void
 _edje_lua_new_reg(lua_State *L, int index, void *ptr)
 {
@@ -266,6 +386,16 @@ _edje_lua_new_reg(lua_State *L, int index, void *ptr)
    lua_rawset(L, LUA_REGISTRYINDEX); /* freed in _edje_lua_free_reg */
 }
 
+/**
+ * @brief Retrieves a Lua value from the registry using a light userdata pointer.
+ *
+ * Pushes the Lua value associated with the light userdata `ptr` (which was
+ * previously stored using `_edje_lua_new_reg`) from the Lua registry onto
+ * the Lua stack.
+ *
+ * @param L The Lua state.
+ * @param ptr The light userdata pointer key.
+ */
 void
 _edje_lua_get_reg(lua_State *L, void *ptr)
 {
@@ -274,6 +404,15 @@ _edje_lua_get_reg(lua_State *L, void *ptr)
    lua_rawget(L, LUA_REGISTRYINDEX);
 }
 
+/**
+ * @brief Removes a Lua value from the registry associated with a light userdata pointer.
+ *
+ * Sets the registry entry keyed by the light userdata `ptr` to nil, effectively
+ * removing the association. Triggers a garbage collection cycle.
+ *
+ * @param L The Lua state.
+ * @param ptr The light userdata pointer key.
+ */
 void
 _edje_lua_free_reg(lua_State *L, void *ptr)
 {
@@ -284,6 +423,17 @@ _edje_lua_free_reg(lua_State *L, void *ptr)
    lua_gc(L, LUA_GCCOLLECT, 0);
 }
 
+/**
+ * @brief Sets a field in a Lua table by key without invoking metamethods.
+ *
+ * Equivalent to `table[key] = value` where `table` is at `index` and `value`
+ * is at the top of the stack before `key` is pushed. This function performs
+ * a raw set, bypassing any `__newindex` metamethod.
+ *
+ * @param L The Lua state.
+ * @param index The stack index of the table.
+ * @param key The string key for the field to set.
+ */
 static void
 _edje_lua_rawsetfield(lua_State *L, int index, const char *key)
 {
@@ -295,6 +445,17 @@ _edje_lua_rawsetfield(lua_State *L, int index, const char *key)
      lua_rawset(L, index);
 }
 
+/**
+ * @brief Gets a field from a Lua table by key without invoking metamethods.
+ *
+ * Pushes `table[key]` onto the stack, where `table` is at `index`.
+ * This function performs a raw get, bypassing any `__index` metamethod
+ * if the key is not present directly in the table.
+ *
+ * @param L The Lua state.
+ * @param index The stack index of the table.
+ * @param key The string key for the field to get.
+ */
 static void
 _edje_lua_rawgetfield(lua_State *L, int index, const char *key)
 {
@@ -305,6 +466,15 @@ _edje_lua_rawgetfield(lua_State *L, int index, const char *key)
      lua_rawget(L, index);
 }
 
+/**
+ * @brief Creates a new global constant in Lua.
+ *
+ * Sets a global variable `id` to the integer value `val`.
+ *
+ * @param L The Lua state.
+ * @param id The name of the global constant.
+ * @param val The integer value of the constant.
+ */
 static void
 _edje_lua_new_const(lua_State *L, const char *id, int val)
 {
@@ -312,6 +482,20 @@ _edje_lua_new_const(lua_State *L, const char *id, int val)
    lua_setglobal(L, id);
 }
 
+/**
+ * @brief Creates and registers a new metatable for a class.
+ *
+ * This function creates a new table to be used as a metatable. It then
+ * stores two references in the Lua registry:
+ * 1. `class_ptr -> metatable`
+ * 2. `metatable -> class_ptr`
+ * This allows retrieval of the metatable given the class pointer, and vice-versa.
+ * The `class` parameter is a pointer to an array of `Edje_Lua_Reg` pointers,
+ * which define the class structure (methods, getters, setters).
+ *
+ * @param L The Lua state.
+ * @param class A pointer to an array of `Edje_Lua_Reg` pointers representing the class.
+ */
 static void
 _edje_lua_new_metatable(lua_State *L, const Edje_Lua_Reg **class)
 {
@@ -324,6 +508,15 @@ _edje_lua_new_metatable(lua_State *L, const Edje_Lua_Reg **class)
    lua_rawset(L, LUA_REGISTRYINDEX); /* freed in _edje_lua_free_metatable */
 }
 
+/**
+ * @brief Retrieves a registered metatable for a class.
+ *
+ * Pushes the metatable associated with the given `class` pointer onto the
+ * Lua stack. It does this by looking up `class_ptr -> metatable` in the registry.
+ *
+ * @param L The Lua state.
+ * @param class A pointer to an array of `Edje_Lua_Reg` pointers representing the class.
+ */
 static void
 _edje_lua_get_metatable(lua_State *L, const Edje_Lua_Reg **class)
 {
@@ -331,6 +524,17 @@ _edje_lua_get_metatable(lua_State *L, const Edje_Lua_Reg **class)
    lua_rawget(L, LUA_REGISTRYINDEX);
 }
 
+/**
+ * @brief Frees a registered metatable and its cross-references.
+ *
+ * Removes the registry entries for `class_ptr -> metatable` and
+ * `metatable -> class_ptr` that were created by `_edje_lua_new_metatable`.
+ * Triggers a garbage collection cycle.
+ *
+ * @param L The Lua state.
+ * @param class A pointer to an array of `Edje_Lua_Reg` pointers representing the class
+ *              whose metatable is to be freed.
+ */
 static void
 _edje_lua_free_metatable(lua_State *L, const Edje_Lua_Reg **class)
 {
@@ -344,6 +548,21 @@ _edje_lua_free_metatable(lua_State *L, const Edje_Lua_Reg **class)
    lua_gc(L, LUA_GCCOLLECT, 0);
 }
 
+/**
+ * @brief Checks if a userdata at a given stack position is of a specific class type.
+ *
+ * Verifies that the value at `pos` is a userdata. It then retrieves its
+ * metatable and, through the registry (metatable -> class_ptr), gets the
+ * `Edje_Lua_Reg **class` array. It iterates through this array to see if
+ * the provided `module` (a specific `Edje_Lua_Reg*` identifying a class or
+ * one of its base classes/mixins) is present. If not, it raises a Lua error.
+ *
+ * @param L The Lua state.
+ * @param pos The stack index of the userdata to check.
+ * @param module A pointer to an `Edje_Lua_Reg` structure that identifies the expected class/module.
+ * @return void* Returns the raw userdata pointer if the type check passes.
+ *               Otherwise, it raises a Lua error and does not return.
+ */
 static void *
 _edje_lua_checkudata(lua_State *L, int pos, const Edje_Lua_Reg *module)
 {
@@ -365,6 +584,31 @@ _edje_lua_checkudata(lua_State *L, int pos, const Edje_Lua_Reg *module)
    return lua_touserdata(L, pos);
 }
 
+/**
+ * @brief Initializes a Lua class by setting up its metatable.
+ *
+ * This function creates a metatable for the given `class` definition.
+ * The `class` is an array of `Edje_Lua_Reg*`, where each `Edje_Lua_Reg`
+ * provides metatable methods (`mt`), getters (`get`), setters (`set`), and
+ * regular functions (`fn`).
+ *
+ * For each `Edje_Lua_Reg` in the `class` array:
+ * - Its `mt` methods are registered into the metatable.
+ * - A `__metatable` field is set in the metatable to prevent Lua scripts
+ *   from modifying it.
+ * - If it's the first `Edje_Lua_Reg` (n=0, the primary class definition):
+ *   - New tables are created within the metatable to store getters, setters,
+ *     and functions, indexed by `EDJE_LUA_GET`, `EDJE_LUA_SET`, `EDJE_LUA_FN`.
+ *   - The respective `get`, `set`, and `fn` methods are registered into these tables.
+ * - If it's a subsequent `Edje_Lua_Reg` (n>0, for inheritance/mixins):
+ *   - The existing getter, setter, and function tables are retrieved from the
+ *     metatable, and the new methods are registered into them, effectively
+ *     merging them.
+ *
+ * @param L The Lua state.
+ * @param class A pointer to a NULL-terminated array of `Edje_Lua_Reg` pointers
+ *              defining the class and its hierarchy/mixins.
+ */
 static void
 _edje_lua_new_class(lua_State *L, const Edje_Lua_Reg **class)
 {
@@ -378,36 +622,53 @@ _edje_lua_new_class(lua_State *L, const Edje_Lua_Reg **class)
 
         if (n == 0)
           {
+             /* Create tables for .get, .set, .fn inside the metatable */
              lua_newtable(L);
              luaL_register(L, NULL, class[n]->set);
-             lua_rawseti(L, -2, EDJE_LUA_SET);
+             lua_rawseti(L, -2, EDJE_LUA_SET); /* metatable[EDJE_LUA_SET] = set_table */
 
              lua_newtable(L);
              luaL_register(L, NULL, class[n]->get);
-             lua_rawseti(L, -2, EDJE_LUA_GET);
+             lua_rawseti(L, -2, EDJE_LUA_GET); /* metatable[EDJE_LUA_GET] = get_table */
 
              lua_newtable(L);
              luaL_register(L, NULL, class[n]->fn);
-             lua_rawseti(L, -2, EDJE_LUA_FN);
+             lua_rawseti(L, -2, EDJE_LUA_FN);  /* metatable[EDJE_LUA_FN] = fn_table */
           }
         else
           {
-             lua_rawgeti(L, -1, EDJE_LUA_SET);
-             luaL_register(L, NULL, class[n]->set);
-             lua_pop(L, 1);
+             /* Append to existing .get, .set, .fn tables for inherited/mixed-in methods */
+             lua_rawgeti(L, -1, EDJE_LUA_SET); /* Get metatable[EDJE_LUA_SET] */
+             luaL_register(L, NULL, class[n]->set); /* Add methods to this table */
+             lua_pop(L, 1); /* Pop the set_table */
 
-             lua_rawgeti(L, -1, EDJE_LUA_GET);
-             luaL_register(L, NULL, class[n]->get);
-             lua_pop(L, 1);
+             lua_rawgeti(L, -1, EDJE_LUA_GET); /* Get metatable[EDJE_LUA_GET] */
+             luaL_register(L, NULL, class[n]->get); /* Add methods to this table */
+             lua_pop(L, 1); /* Pop the get_table */
 
-             lua_rawgeti(L, -1, EDJE_LUA_FN);
-             luaL_register(L, NULL, class[n]->fn);
-             lua_pop(L, 1);
+             lua_rawgeti(L, -1, EDJE_LUA_FN);  /* Get metatable[EDJE_LUA_FN] */
+             luaL_register(L, NULL, class[n]->fn);  /* Add methods to this table */
+             lua_pop(L, 1); /* Pop the fn_table */
           }
         n += 1;
      }
 }
 
+/**
+ * @brief Sets the metatable and a new environment for a Lua userdata object.
+ *
+ * This function is typically called after a new userdata (representing a C object)
+ * is pushed onto the Lua stack.
+ * 1. It creates a new empty table and sets it as the environment (fenv) for the
+ *    userdata at `index`. This provides an isolated table for instance-specific
+ *    Lua data.
+ * 2. It retrieves the pre-registered metatable for the given `class` using
+ *    `_edje_lua_get_metatable` and sets it as the metatable for the userdata.
+ *
+ * @param L The Lua state.
+ * @param index The stack index of the userdata object.
+ * @param class A pointer to an array of `Edje_Lua_Reg` pointers defining the class.
+ */
 static void
 _edje_lua_set_class(lua_State *L, int index, const Edje_Lua_Reg **class)
 {
@@ -424,11 +685,23 @@ _edje_lua_set_class(lua_State *L, int index, const Edje_Lua_Reg **class)
      lua_setmetatable(L, index);
 }
 
+/**
+ * @brief Looks up a function in the class's function table.
+ *
+ * Assumes the metatable is at the top of the stack (-1) and the key (function name)
+ * is at stack index 2.
+ * It retrieves `metatable[EDJE_LUA_FN]` (the function table), then looks up
+ * `function_table[key]`.
+ *
+ * @param L The Lua state.
+ * @return int 1 if a C function is found and is now at the top of the stack,
+ *             0 otherwise (and the stack is cleaned up).
+ */
 static int
 _edje_lua_look_fn(lua_State *L)
 {
-   lua_rawgeti(L, -1, EDJE_LUA_FN);
-   lua_pushvalue(L, 2); // key
+   lua_rawgeti(L, -1, EDJE_LUA_FN);  /* Get metatable[EDJE_LUA_FN] -> fn_table */
+   lua_pushvalue(L, 2);             /* Push key (function name) */
    lua_rawget(L, -2); // .fn[key]
    if (lua_iscfunction(L, -1))
      return 1;
@@ -439,11 +712,24 @@ _edje_lua_look_fn(lua_State *L)
      }
 }
 
+/**
+ * @brief Looks up and calls a getter function from the class's getter table.
+ *
+ * Assumes the metatable is at the top of the stack (-1), the object instance
+ * is at stack index 1, and the key (property name) is at stack index 2.
+ * It retrieves `metatable[EDJE_LUA_GET]` (the getter table), then looks up
+ * `getter_table[key]`. If a C function is found, it's called with the object
+ * instance as an argument. The result of the getter is left on the stack.
+ *
+ * @param L The Lua state.
+ * @return int 1 if a getter function was found and called (result on stack),
+ *             0 otherwise (stack cleaned up).
+ */
 static int
 _edje_lua_look_get(lua_State *L)
 {
-   lua_rawgeti(L, -1, EDJE_LUA_GET);
-   lua_pushvalue(L, 2); // key
+   lua_rawgeti(L, -1, EDJE_LUA_GET);  /* Get metatable[EDJE_LUA_GET] -> get_table */
+   lua_pushvalue(L, 2);             /* Push key (property name) */
    lua_rawget(L, -2); // .get[key]
    if (lua_iscfunction(L, -1))
      {
@@ -462,11 +748,25 @@ _edje_lua_look_get(lua_State *L)
      }
 }
 
+/**
+ * @brief Looks up and calls a setter function from the class's setter table.
+ *
+ * Assumes the metatable is at the top of the stack (-1), the object instance
+ * is at stack index 1, the key (property name) is at stack index 2, and the
+ * value to set is at stack index 3.
+ * It retrieves `metatable[EDJE_LUA_SET]` (the setter table), then looks up
+ * `setter_table[key]`. If a C function is found, it's called with the object
+ * instance and the value as arguments.
+ *
+ * @param L The Lua state.
+ * @return int 1 if a setter function was found and called,
+ *             0 otherwise (stack cleaned up).
+ */
 static int
 _edje_lua_look_set(lua_State *L)
 {
-   lua_rawgeti(L, -1, EDJE_LUA_SET);
-   lua_pushvalue(L, 2); // key
+   lua_rawgeti(L, -1, EDJE_LUA_SET);  /* Get metatable[EDJE_LUA_SET] -> set_table */
+   lua_pushvalue(L, 2);             /* Push key (property name) */
    lua_rawget(L, -2); // .set[key]
    if (lua_iscfunction(L, -1))
      {

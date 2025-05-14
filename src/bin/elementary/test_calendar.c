@@ -25,6 +25,16 @@ typedef enum _api_state api_state;
 #define SEC_PER_DAY   24 * 60 * 60
 #define SEC_PER_YEAR  365 * SEC_PER_DAY
 
+/**
+ * @internal
+ * @brief Sets the state of the calendar widget for API testing.
+ *
+ * This function modifies the calendar widget based on the current state
+ * in the api_data structure. It's used to cycle through different
+ * configurations and features of the calendar for testing purposes.
+ *
+ * @param api The api_data struct containing the test state and widgets.
+ */
 static void
 set_api_state(api_data *api)
 {
@@ -85,6 +95,18 @@ set_api_state(api_data *api)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for the "Next API function" button.
+ *
+ * This function is called when the test button is clicked. It advances
+ * the API test state, updates the calendar via set_api_state(), and
+ * updates the button's text to reflect the next state.
+ *
+ * @param data The api_data struct.
+ * @param obj The button object that was clicked.
+ * @param event_info Evas event info (unused).
+ */
 static void
 _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {  /* Will add here a SWITCH command containing code to modify test-object */
@@ -100,13 +122,33 @@ _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_disabled_set(obj, a->state == API_STATE_LAST);
 }
 
+/**
+ * @internal
+ * @brief Frees the api_data structure when the window is destroyed.
+ *
+ * @param data The api_data struct to free.
+ * @param e The Evas canvas (unused).
+ * @param obj The object that triggered the callback (unused).
+ * @param event_info The event info (unused).
+ */
 static void
 _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    free(data);
 }
 
-/* A simple test, just displaying calendar in it's default state */
+/**
+ * @internal
+ * @brief A simple test, displaying a calendar and a button to test its API.
+ *
+ * This test creates a window with a calendar widget and a button. Clicking
+ * the button cycles through various API functions of the calendar, such as
+ * adding marks and changing the selection mode.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_calendar(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -149,6 +191,17 @@ test_calendar(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_
    evas_object_show(win);
 }
 
+/**
+ * @internal
+ * @brief Prints detailed information about a calendar widget to an entry widget.
+ *
+ * Gathers various properties from the calendar widget, such as selected date,
+ * min/max dates, interval, and weekday names, and displays them in a
+ * formatted string in the provided entry widget.
+ *
+ * @param cal The calendar widget to get information from.
+ * @param en The entry widget to display the information in.
+ */
 void
 _print_cal_info(Evas_Object *cal, Evas_Object *en)
 {
@@ -183,6 +236,13 @@ _print_cal_info(Evas_Object *cal, Evas_Object *en)
    elm_object_text_set(en, info);
 }
 
+/**
+ * @internal
+ * @brief Prints the currently displayed month and year of a calendar.
+ *
+ * @param cal The calendar widget.
+ * @param en The entry widget to display the information in.
+ */
 void
 _print_cal_shown_info(Evas_Object *cal, Evas_Object *en)
 {
@@ -197,18 +257,51 @@ _print_cal_shown_info(Evas_Object *cal, Evas_Object *en)
    elm_object_text_set(en, info);
 }
 
+/**
+ * @internal
+ * @brief Callback that prints the calendar's displayed time.
+ *
+ * This is a wrapper around _print_cal_shown_info() to be used as a
+ * smart callback.
+ *
+ * @param data The entry widget to print to.
+ * @param obj The calendar widget that triggered the callback.
+ * @param event_info Evas event info (unused).
+ */
 void
 _print_cal_shown_info_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    _print_cal_shown_info(obj, data);
 }
 
+/**
+ * @internal
+ * @brief Callback that prints calendar info when the selection changes.
+ *
+ * This is a wrapper around _print_cal_info() to be used as a smart callback,
+ * typically for the "changed" event.
+ *
+ * @param data The entry widget to print to.
+ * @param obj The calendar widget that triggered the callback.
+ * @param event_info Evas event info (unused).
+ */
 static void
 _print_cal_info_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    _print_cal_info(obj, data);
 }
 
+/**
+ * @internal
+ * @brief Formats the month and year from a tm struct.
+ *
+ * This function is used as a custom format function for the calendar. It
+ * formats the given time into a "Mon YY" format (e.g., "Jul 25").
+ *
+ * @param stm The time structure to format.
+ * @return A newly allocated string with the formatted date. The caller is
+ * responsible for freeing this string.
+ */
 static char *
 _format_month_year(struct tm *stm)
 {
@@ -217,6 +310,17 @@ _format_month_year(struct tm *stm)
    return strdup(buf);
 }
 
+/**
+ * @internal
+ * @brief Creates and configures a calendar widget for testing.
+ *
+ * This helper function creates a calendar, sets various properties like
+ * weekdays, date range, interval, and format function, and adds several
+ * marks to it for demonstration and testing purposes.
+ *
+ * @param parent The parent widget.
+ * @return A new, configured calendar widget.
+ */
 static Evas_Object *
 _calendar_create(Evas_Object *parent)
 {
@@ -268,8 +372,22 @@ _calendar_create(Evas_Object *parent)
    return cal;
 }
 
-/* A test intended to cover all the calendar api and much use cases as
-   possible */
+/**
+ * @internal
+ * @brief A comprehensive test for the calendar widget.
+ *
+ * This test is intended to cover as much of the calendar API and as many
+ * use cases as possible. It creates a window with three calendars, each
+ * configured differently, to test various features and their interactions.
+ * - The first calendar is highly customized with marks, a date range, and
+ *   an info display.
+ * - The second calendar has selections disabled.
+ * - The third calendar demonstrates daily marks and clearing marks.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_calendar2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -339,6 +457,19 @@ test_calendar2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event
    evas_object_show(win);
 }
 
+/**
+ * @internal
+ * @brief Tests calendar with "double_spinners" style and on-demand selection.
+ *
+ * This test creates a calendar with the "double_spinners" style, which
+ * shows separate spinners for month and year. It also demonstrates the
+ * ELM_CALENDAR_SELECT_MODE_ONDEMAND selection mode, where month and year
+ * can be selected, and a callback is triggered on display changes.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_calendar3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -381,6 +512,17 @@ test_calendar3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event
    evas_object_show(win);
 }
 
+/**
+ * @internal
+ * @brief Callback for the Efl_Ui_Calendar "changed" event.
+ *
+ * This function is called when the selected date on the Efl_Ui_Calendar
+ * widget changes. It prints the new selected date, as well as the
+ * configured minimum and maximum dates, to standard output.
+ *
+ * @param data User data (unused).
+ * @param ev The Efl_Event structure containing event information.
+ */
 static void
 _cal_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -405,6 +547,18 @@ _cal_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
           max_date.tm_year + 1900);
 }
 
+/**
+ * @internal
+ * @brief Custom date format callback for Efl_Ui_Calendar.
+ *
+ * This function is used to provide a custom format for the calendar's title.
+ * It formats the displayed month and year as "<< Mon YY >>".
+ *
+ * @param data User data (unused).
+ * @param str The string buffer to append the formatted string to.
+ * @param value An Eina_Value containing the `struct tm` to format.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _cal_format_cb(void *data EINA_UNUSED, Eina_Strbuf *str, const Eina_Value value)
 {
@@ -419,6 +573,20 @@ _cal_format_cb(void *data EINA_UNUSED, Eina_Strbuf *str, const Eina_Value value)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Test for the new Efl_Ui_Calendar widget.
+ *
+ * This test creates a window with two Efl_Ui_Calendar widgets to demonstrate
+ * the Eo-based calendar API.
+ * - The first calendar uses a format string (`%b`) for its title.
+ * - The second calendar uses a custom format function (`_cal_format_cb`).
+ * Both calendars have a date range set and print changes to the console.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_efl_ui_calendar(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

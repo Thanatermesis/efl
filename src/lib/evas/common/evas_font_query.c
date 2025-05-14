@@ -5,6 +5,26 @@
 /* FIXME: Check coverage according to the font and not by actually loading */
 /**
  * @internal
+ * @brief Find the end of a run of characters that can be rendered with the same font.
+ *
+ * This function iterates through the input text to find the longest
+ * sequence of characters (a "run") that can be rendered using a single font instance.
+ * It considers the base script of the text and available fonts.
+ * If a specific script font instance (`script_fi`) is provided, it's used as the base.
+ * Otherwise, the function determines a suitable script font instance.
+ * The function also identifies the specific font instance (`cur_fi`) for the current run.
+ * Variation sequences are taken into account for font selection.
+ *
+ * @param[in] fn The base font (RGBA_Font) to use for searching.
+ * @param[in,out] script_fi Pointer to the base font instance for the script.
+ *                          If `*script_fi` is NULL, it will be determined and populated.
+ *                          If non-NULL, this font instance is used as the base.
+ * @param[out] cur_fi Pointer to store the font instance found for the current run.
+ * @param[in] script The script type of the text (Evas_Script_Type). Currently EINA_UNUSED.
+ * @param[in] text Pointer to the start of the Eina_Unicode text string.
+ * @param[in] run_len The maximum length of the text to consider for the current run.
+ * @return The length of the identified run in Eina_Unicode characters.
+ *
  * Find the end of a run according to font coverage, and return the base script
  * font and the current wanted font.
  *
@@ -162,6 +182,22 @@ evas_common_font_query_run_font_end_get(RGBA_Font *fn, RGBA_Font_Int **script_fi
 
 /**
  * @internal
+ * @brief Calculate the kerning adjustment between two glyphs.
+ *
+ * Kerning is the adjustment of space between pairs of characters.
+ * This function retrieves the kerning value for a given pair of glyph indices
+ * using a specific font instance. It uses a cache (`fi->kerning`) to store
+ * and retrieve kerning pairs to avoid redundant FreeType calls.
+ * If the kerning pair is not in the cache, it calls `FT_Get_Kerning`
+ * and stores the result in the cache.
+ *
+ * @param[in] fi The font instance (RGBA_Font_Int) to use for kerning lookup.
+ * @param[in] left The FreeType glyph index of the left character.
+ * @param[in] right The FreeType glyph index of the right character.
+ * @param[out] kerning Pointer to an integer where the calculated kerning value (in 26.6 fractional pixels) will be stored.
+ *                     Positive values typically mean characters should be further apart, negative closer.
+ * @return 1 (TRUE) on success, 0 (FALSE) if FreeType fails to get kerning.
+ *
  * Calculate the kerning between "left" and "right.
  *
  * @param fi the font instance to use
@@ -227,6 +263,18 @@ evas_common_font_query_kerning(RGBA_Font_Int *fi, FT_UInt left, FT_UInt right,
 
 /**
  * @internal
+ * @brief Calculate the left inset of the rendered text.
+ *
+ * The inset (or left bearing) is the horizontal distance from the initial pen
+ * position (origin) of the first glyph to the leftmost pixel of that glyph.
+ * This value can be negative if the glyph extends to the left of its origin.
+ *
+ * @param[in] fn The font set (RGBA_Font). EINA_UNUSED in the current implementation.
+ * @param[in] text_props Pointer to the Evas_Text_Props structure containing layout information for the text.
+ *                       This includes the array of glyphs and their properties.
+ *                       Example `text_props->info->glyph[text_props->start]` refers to the first glyph.
+ * @return The calculated left inset in pixels. Returns 0 if the text length is 0.
+ *
  * Calculate the inset of the text. Inset is the difference between the pen
  * position of the first char in the string, and the first pixel drawn.
  * (can be negative).
@@ -244,6 +292,20 @@ evas_common_font_query_inset(RGBA_Font *fn EINA_UNUSED, const Evas_Text_Props *t
 
 /**
  * @internal
+ * @brief Calculate the right inset of the rendered text.
+ *
+ * The right inset is the horizontal distance from the rightmost pixel of the
+ * last glyph to the pen position after rendering that glyph (its advance width).
+ * Essentially, it's `advance - (width + x_bearing)` for the last glyph.
+ * If the last character is whitespace (width == 0), the right inset is 0.
+ *
+ * @param[in] fn The font set (RGBA_Font). EINA_UNUSED in the current implementation.
+ * @param[in] text_props Pointer to the Evas_Text_Props structure containing layout information for the text.
+ *                       `text_props->info->glyph` is an array of Evas_Font_Glyph_Info.
+ *                       `text_props->start` is the index of the first glyph in the current segment.
+ *                       `text_props->len` is the number of glyphs in the current segment.
+ * @return The calculated right inset in pixels. Returns 0 if the text length is 0 or the last char is whitespace.
+ *
  * Calculate the right inset of the text. This is the difference between the
  * pen position of the glyph after the last glyph in the text, and the last
  * pixel drawn in the text (essentially "advance - width" of the last char).
@@ -278,6 +340,21 @@ evas_common_font_query_right_inset(RGBA_Font *fn EINA_UNUSED, const Evas_Text_Pr
 
 /**
  * @internal
+ * @brief Calculate the actual visual ascent and descent of a rendered text run.
+ *
+ * This function determines the maximum vertical extent of the rendered glyphs
+ * above (ascent) and below (descent) the baseline. It iterates through the
+ * glyphs in the `text_props` and considers their vertical bearings and offsets.
+ * The results are capped by the font's maximum ascent/descent if the calculated
+ * values are smaller.
+ *
+ * @param[in] fn The font set (RGBA_Font) used for rendering.
+ * @param[in] text_props Pointer to the Evas_Text_Props structure containing the laid-out text.
+ * @param[out] ascent Pointer to an integer where the calculated ascent will be stored.
+ *                    This is the distance from the baseline to the highest point reached by any glyph.
+ * @param[out] descent Pointer to an integer where the calculated descent will be stored.
+ *                     This is the distance from the baseline to the lowest point reached by any glyph (usually a positive value).
+ *
  * Calculate the ascent/descent of a run. This is different from
  * evas_common_font_[max]_ascent/descent_get because this one returns the
  * actual sizee (i.e including accents), and not just what the font reports.
@@ -318,6 +395,20 @@ evas_common_font_ascent_descent_get(RGBA_Font *fn, const Evas_Text_Props *text_p
 
 /**
  * @internal
+ * @brief Calculate the visual bounding box (width and height) of the rendered text.
+ *
+ * The width is calculated as the distance from the origin of the first glyph
+ * to the rightmost edge of the last glyph in the last cluster. This considers
+ * individual glyph widths, bearings, and OpenType offsets.
+ * The height is determined by the font's maximum ascent and descent.
+ *
+ * @param[in] fn The font set (RGBA_Font) used for rendering.
+ * @param[in] text_props Pointer to the Evas_Text_Props structure containing layout information.
+ *                       `text_props->info->glyph` is an array of Evas_Font_Glyph_Info.
+ *                       `text_props->info->ot` (if OT_SUPPORT is defined) is an array of Evas_Font_OT_Info.
+ * @param[out] w Pointer to an integer where the calculated width will be stored.
+ * @param[out] h Pointer to an integer where the calculated height (max_ascent + max_descent) will be stored.
+ *
  * Calculate the size of the string (width and height).
  * The width is the disntance between the first pen position and the last pixel
  * drawn.
@@ -384,6 +475,20 @@ evas_common_font_query_size(RGBA_Font *fn, const Evas_Text_Props *text_props, in
 
 /**
  * @internal
+ * @brief Calculate the horizontal and vertical advance of the rendered text string.
+ *
+ * Horizontal advance is the total width the pen would move horizontally after
+ * drawing the string. It's typically the `pen_after` position of the last glyph,
+ * adjusted for the starting position if `text_props->start > 0`.
+ * Vertical advance is the standard line advance for the font.
+ *
+ * @param[in] fn The font set (RGBA_Font) used for rendering.
+ * @param[in] text_props Pointer to the Evas_Text_Props structure containing layout information.
+ *                       `text_props->info->glyph[text_props->start + text_props->len - 1].pen_after`
+ *                       gives the pen position after the last glyph of the current segment.
+ * @param[out] h_adv Pointer to an integer where the calculated horizontal advance will be stored. Can be NULL.
+ * @param[out] v_adv Pointer to an integer where the calculated vertical advance (line height) will be stored. Can be NULL.
+ *
  * Calculate the advance of the string. Advance is the distance between the
  * first pen position and the pen position after the string.
  *
@@ -424,6 +529,29 @@ evas_common_font_query_advance(RGBA_Font *fn, const Evas_Text_Props *text_props,
 
 /**
  * @internal
+ * @brief Query the bounding box coordinates (x, y, width, height) of a character at a given logical position.
+ *
+ * This function determines the visual screen coordinates and dimensions of a character
+ * specified by its logical index (`pos`) within the source text.
+ * It handles BiDi text:
+ * - For LTR text, it iterates visually from left to right.
+ * - For RTL text, it iterates visually (which might be complex due to BiDi reordering).
+ * If `pos` is equal to `text_props->text_len` (i.e., the position after the last character),
+ * it returns the coordinates for a zero-width cursor at that position. The x-coordinate
+ * will be at the end of the line for LTR text and at the beginning for RTL text.
+ * The coordinates are relative to the start of the text layout.
+ *
+ * @param[in] fn The font set (RGBA_Font) used for rendering.
+ * @param[in] text_props Pointer to the Evas_Text_Props structure containing layout and BiDi information.
+ *                       `text_props->text_len` is the total length of the source Unicode string.
+ *                       `text_props->bidi_dir` indicates the base direction (LTR or RTL).
+ * @param[in] pos The logical 0-based index of the character in the source `Eina_Unicode` string.
+ * @param[out] cx Pointer to store the x-coordinate of the character's bounding box (leftmost pixel). Can be NULL.
+ * @param[out] cy Pointer to store the y-coordinate of the character's bounding box (topmost pixel, typically -ascent). Can be NULL.
+ * @param[out] cw Pointer to store the width of the character's bounding box. Can be NULL.
+ * @param[out] ch Pointer to store the height of the character's bounding box (typically ascent + descent). Can be NULL.
+ * @return 1 (TRUE) on success (character found or end-of-string position determined), 0 (FALSE) otherwise (e.g., pos out of bounds).
+ *
  * Query the coordinates of the char at position pos. If the position is at the
  * end of the string (i.e where the finishing null would be) it returns the
  * coordinates of the position right after the last char. This is either on
@@ -556,6 +684,24 @@ end:
 
 /**
  * @internal
+ * @brief Query the pen coordinates and advance of a character at a given logical position.
+ *
+ * This function is similar to `evas_common_font_query_char_coords`, but instead of returning
+ * the visual bounding box (actual pixel coverage), it returns the pen's starting x-position
+ * for the character and the character's advance width.
+ * If `pos` is equal to `text_props->text_len` (i.e., the position after the last character),
+ * it returns the pen position for a cursor. The advance (`cadv`) will be 0.
+ * The coordinates are relative to the start of the text layout.
+ *
+ * @param[in] fn The font set (RGBA_Font) used for rendering.
+ * @param[in] text_props Pointer to the Evas_Text_Props structure containing layout and BiDi information.
+ * @param[in] pos The logical 0-based index of the character in the source `Eina_Unicode` string.
+ * @param[out] cpen_x Pointer to store the pen's starting x-coordinate for the character. Can be NULL.
+ * @param[out] cy Pointer to store the y-coordinate (typically -ascent, relative to baseline). Can be NULL.
+ * @param[out] cadv Pointer to store the advance width of the character. Can be NULL.
+ * @param[out] ch Pointer to store the character cell height (typically ascent + descent). Can be NULL.
+ * @return 1 (TRUE) on success, 0 (FALSE) otherwise.
+ *
  * Query the coordinates of the char at position pos. If the position is at the
  * end of the string (i.e where the finishing null would be) it returns the
  * coordinates of the position right after the last char. This is either on
@@ -688,6 +834,27 @@ end:
 
 /**
  * @internal
+ * @brief Find the logical character index at specific visual (x, y) coordinates.
+ *
+ * This function performs a "hit test" to determine which character in the
+ * rendered text falls under the given x and y coordinates. It returns the
+ * logical index of that character in the original source string.
+ * It also calculates the bounding box of the identified character.
+ * The function considers the visual layout, including BiDi effects.
+ * If the coordinate is in the right half of an LTR character or the left half of an RTL character,
+ * the position returned will be for inserting *after* that character.
+ *
+ * @param[in] fn The font set (RGBA_Font) used for rendering.
+ * @param[in] text_props Pointer to the Evas_Text_Props structure containing layout information.
+ * @param[in] x The x-coordinate to test, relative to the text layout's origin.
+ * @param[in] y The y-coordinate to test, relative to the text layout's origin (baseline is y=0).
+ * @param[out] cx Pointer to store the x-coordinate of the found character's bounding box. Can be NULL.
+ * @param[out] cy Pointer to store the y-coordinate of the found character's bounding box. Can be NULL.
+ * @param[out] cw Pointer to store the width of the found character's bounding box. Can be NULL.
+ * @param[out] ch Pointer to store the height of the found character's bounding box. Can be NULL.
+ * @return The 0-based logical index of the character in the source string at the given coordinates.
+ *         Returns -1 if no character is found at the coordinates (e.g., outside text bounds).
+ *
  * Find the character at a specific x, y coordinates and return it's position
  * in the text (not in the text object, but in the source text). Also calculate
  * the char's geometry.
@@ -803,6 +970,31 @@ end:
 
 /**
  * @internal
+ * @brief Find the logical index of the last character that fits within given x, y boundaries.
+ *
+ * This function iterates through the text logically (respecting source order)
+ * and determines the index of the last character whose rendered form
+ * starts within the specified x-coordinate boundary and vertical (y) font extents.
+ * This is useful for text wrapping, to find where a line should break.
+ * For RTL text, the logic is more complex as it involves checking from the
+ * right edge of the layout.
+ * The `width_offset` parameter allows a glyph to be considered fitting even if
+ * its pen position is slightly outside `x`, but part of the glyph itself is within `x + width_offset`.
+ *
+ * @param[in] fn The font set (RGBA_Font) used for rendering.
+ * @param[in] text_props Pointer to the Evas_Text_Props structure containing layout information.
+ *                       `text_props->bidi_dir` is used to handle LTR and RTL cases differently.
+ *                       `text_props->info->glyph` provides glyph metrics.
+ *                       `text_props->info->ot` (if OT_SUPPORT) provides original character positions.
+ * @param[in] x The x-coordinate boundary. Characters must start at or before this x to be included.
+ * @param[in] y The y-coordinate. Used to check if the point is within the font's vertical extents.
+ * @param[in] width_offset An additional width tolerance. A character might be considered
+ *                         fitting if `x_pen_after < x` OR `x_pen_start + x_bear + width < x + width_offset`.
+ *                         This helps include characters whose body might extend slightly beyond `x`
+ *                         if their starting pen position is within `x`.
+ * @return The 0-based logical index in the source string of the last character that fits.
+ *         Returns -1 if no character fits or on failure.
+ *
  * Find one after the last character that fits until the boundaries set by x
  * and y. I.e find the first char that doesn't fit.
  * This LOGICALLY walks the string. This is needed for wrapping for example

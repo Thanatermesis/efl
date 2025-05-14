@@ -6,8 +6,18 @@ TPROT(02);
 #endif
 #if !defined(T1) && !defined(T2)
 # include "perf.h"
+/** @brief Array to store Evas_Object pointers for the rectangles. */
 static Evas_Object *objs[NUM_FEW];
 
+/**
+ * @brief Initializes the test by creating a few rectangle objects.
+ *
+ * This function creates NUM_FEW rectangle objects, sets their initial color
+ * randomly, makes them pass events, and shows them on the canvas.
+ * Each object is added to the cleanup list.
+ *
+ * @param e The Evas canvas.
+ */
 TST(02, init) (Evas *e) {
    Evas_Object *o;
    int i;
@@ -24,6 +34,20 @@ TST(02, init) (Evas *e) {
      }
 }
 
+/**
+ * @brief Updates the geometry of the rectangles on each tick.
+ *
+ * This function is called repeatedly to update the position and size
+ * of each rectangle object. The new geometry is calculated based on
+ * trigonometric functions of the time factor 'f' and the object's index 'i',
+ * creating an animated effect.
+ *
+ * @param e The Evas canvas (unused in this function).
+ * @param f A time factor, typically incrementing, used for animation.
+ *          Example: 0.0, 0.01, 0.02, ...
+ * @param win_w The width of the window.
+ * @param win_h The height of the window.
+ */
 TST(02, tick) (Evas *e EINA_UNUSED, double f, Evas_Coord win_w, Evas_Coord win_h) {
    int i;
    Evas_Coord x, y, w, h, w0, h0;

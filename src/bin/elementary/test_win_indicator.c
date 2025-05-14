@@ -4,12 +4,26 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Callback function invoked when the clock value changes.
+ * @param data User data, unused in this callback.
+ * @param ev Event information, unused in this callback.
+ */
 static void
 _changed_cb(void *data EINA_UNUSED, const Efl_Event *ev EINA_UNUSED)
 {
    printf("Clock value is changed\n");
 }
 
+/**
+ * @brief Creates and configures the indicator window.
+ *
+ * This function sets up a socket window to act as an indicator,
+ * adds a clock to it, and configures the clock's appearance and behavior.
+ *
+ * @return A pointer to the created Evas_Object (the indicator window),
+ *         or NULL on failure.
+ */
 static Evas_Object *
 _create_indicator(void)
 {
@@ -54,36 +68,76 @@ _create_indicator(void)
    return win;
 }
 
+/**
+ * @brief Callback function invoked when the "Indicator Off" button is clicked.
+ * Sets the indicator mode to OFF.
+ * @param data The window object whose indicator mode is to be changed.
+ * @param ev Event information, unused in this callback.
+ */
 static void
 _off_clicked(void *data, const Efl_Event *ev EINA_UNUSED)
 {
 	efl_ui_win_indicator_mode_set(data, EFL_UI_WIN_INDICATOR_MODE_OFF);
 }
 
+/**
+ * @brief Callback function invoked when the "Bg Opaque" button is clicked.
+ * Sets the indicator mode to BG_OPAQUE.
+ * @param data The window object whose indicator mode is to be changed.
+ * @param ev Event information, unused in this callback.
+ */
 static void
 _opaque_clicked(void *data, const Efl_Event *ev EINA_UNUSED)
 {
 	efl_ui_win_indicator_mode_set(data, EFL_UI_WIN_INDICATOR_MODE_BG_OPAQUE);
 }
 
+/**
+ * @brief Callback function invoked when the "Bg Transparent" button is clicked.
+ * Sets the indicator mode to BG_TRANSPARENT.
+ * @param data The window object whose indicator mode is to be changed.
+ * @param ev Event information, unused in this callback.
+ */
 static void
 _transparent_clicked(void *data, const Efl_Event *ev EINA_UNUSED)
 {
 	efl_ui_win_indicator_mode_set(data, EFL_UI_WIN_INDICATOR_MODE_BG_TRANSPARENT);
 }
 
+/**
+ * @brief Callback function invoked when the "Hidden" button is clicked.
+ * Sets the indicator mode to HIDDEN.
+ * @param data The window object whose indicator mode is to be changed.
+ * @param ev Event information, unused in this callback.
+ */
 static void
 _hidden_clicked(void *data, const Efl_Event *ev EINA_UNUSED)
 {
 	efl_ui_win_indicator_mode_set(data, EFL_UI_WIN_INDICATOR_MODE_HIDDEN);
 }
 
+/**
+ * @brief Callback function invoked when the main window is deleted.
+ * Deletes the associated indicator window.
+ * @param data The indicator window object to be deleted.
+ * @param ev Event information, unused in this callback.
+ */
 static void
 _win_del(void *data, const Efl_Event *ev EINA_UNUSED)
 {
 	efl_del(data);
 }
 
+/**
+ * @brief Main test function for the Efl.Win.Indicator.
+ *
+ * This function creates an indicator window and a main control window.
+ * The control window contains buttons to change the indicator's mode.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_win_indicator(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

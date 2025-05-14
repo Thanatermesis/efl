@@ -10,74 +10,148 @@
 #include "Ecore_Fb.h"
 #include "ecore_fb_private.h"
 
+/**
+ * @internal
+ * @brief Structure to hold raw touchscreen event data.
+ */
 typedef struct _Ecore_Fb_Ts_Event Ecore_Fb_Ts_Event;
+/**
+ * @internal
+ * @brief Structure to hold touchscreen calibration data.
+ */
 typedef struct _Ecore_Fb_Ts_Calibrate Ecore_Fb_Ts_Calibrate;
+/**
+ * @internal
+ * @brief Structure to control touchscreen backlight.
+ */
 typedef struct _Ecore_Fb_Ts_Backlight Ecore_Fb_Ts_Backlight;
+/**
+ * @internal
+ * @brief Structure to control touchscreen contrast.
+ */
 typedef struct _Ecore_Fb_Ts_Contrast Ecore_Fb_Ts_Contrast;
+/**
+ * @internal
+ * @brief Structure to control touchscreen LED.
+ */
 typedef struct _Ecore_Fb_Ts_Led Ecore_Fb_Ts_Led;
+/**
+ * @internal
+ * @brief Structure for flite (front light) control.
+ */
 typedef struct _Ecore_Fb_Ts_Flite Ecore_Fb_Ts_Flite;
 
+/**
+ * @internal
+ * @struct _Ecore_Fb_Ts_Event
+ * @brief Raw touchscreen event data.
+ */
 struct _Ecore_Fb_Ts_Event
 {
-   unsigned short pressure;
-   unsigned short x;
-   unsigned short y;
-   unsigned short _unused;
+   unsigned short pressure; /**< Pressure value of the touch event. */
+   unsigned short x;        /**< X coordinate of the touch event. */
+   unsigned short y;        /**< Y coordinate of the touch event. */
+   unsigned short _unused;  /**< Unused field. */
 };
 
+/**
+ * @internal
+ * @struct _Ecore_Fb_Ts_Calibrate
+ * @brief Touchscreen calibration parameters.
+ */
 struct _Ecore_Fb_Ts_Calibrate
 {
-   int xscale;
-   int xtrans;
-   int yscale;
-   int ytrans;
-   int xyswap;
+   int xscale; /**< Scaling factor for the X-axis. */
+   int xtrans; /**< Translation offset for the X-axis. */
+   int yscale; /**< Scaling factor for the Y-axis. */
+   int ytrans; /**< Translation offset for the Y-axis. */
+   int xyswap; /**< Flag to indicate if X and Y axes should be swapped. */
 };
 
+/**
+ * @internal
+ * @struct _Ecore_Fb_Ts_Backlight
+ * @brief Touchscreen backlight control.
+ */
 struct _Ecore_Fb_Ts_Backlight
 {
-   int           on;
-   unsigned char brightness;
+   int           on;         /**< Backlight state (1 for on, 0 for off). */
+   unsigned char brightness; /**< Backlight brightness level. */
 };
 
+/**
+ * @internal
+ * @struct _Ecore_Fb_Ts_Contrast
+ * @brief Touchscreen contrast control.
+ */
 struct _Ecore_Fb_Ts_Contrast
 {
-   unsigned char contrast;
+   unsigned char contrast; /**< Contrast level. */
 };
 
+/**
+ * @internal
+ * @struct _Ecore_Fb_Ts_Led
+ * @brief Touchscreen LED control.
+ */
 struct _Ecore_Fb_Ts_Led
 {
-   unsigned char on;
-   unsigned char blink_time;
-   unsigned char on_time;
-   unsigned char off_time;
+   unsigned char on;         /**< LED state (1 for on, 0 for off). */
+   unsigned char blink_time; /**< LED blink time duration. */
+   unsigned char on_time;    /**< Duration LED stays on during a blink cycle. */
+   unsigned char off_time;   /**< Duration LED stays off during a blink cycle. */
 };
 
+/**
+ * @internal
+ * @struct _Ecore_Fb_Ts_Flite
+ * @brief Touchscreen front light (flite) control.
+ */
 struct _Ecore_Fb_Ts_Flite
 {
-   unsigned char mode;
-   unsigned char pwr;
-   unsigned char brightness;
+   unsigned char mode;       /**< Front light mode. */
+   unsigned char pwr;        /**< Front light power state. */
+   unsigned char brightness; /**< Front light brightness level. */
 };
 
 static Eina_Bool _ecore_fb_ts_fd_handler(void *data, Ecore_Fd_Handler *fd_handler);
+/**< File descriptor for the touchscreen device. Initialized to -1. */
 static int _ecore_fb_ts_fd = -1;
+/**< Flag indicating whether to apply calibration data manually. 0 by default. */
 static int _ecore_fb_ts_apply_cal = 0;
 #ifndef HAVE_TSLIB
+/**< Counter for bytes read for a touchscreen event when not using tslib. */
 static int _ecore_fb_ts_event_byte_count = 0;
+/**< Buffer for a single touchscreen event when not using tslib. */
 static Ecore_Fb_Ts_Event _ecore_fb_ts_event;
 #endif
+/**< Stores the current calibration data. Initialized with default values. */
 static Ecore_Fb_Ts_Calibrate _ecore_fb_ts_cal = {1,1,0,0,0};
+/**< Handle for the Ecore file descriptor handler. Initialized to NULL. */
 static Ecore_Fd_Handler *_ecore_fb_ts_fd_handler_handle = NULL;
 
 #ifdef HAVE_TSLIB
+/**< Pointer to the tslib device structure. Initialized to NULL. */
 struct tsdev *_ecore_fb_tslib_tsdev = NULL;
+/**< Buffer for a single tslib sample event. */
 struct ts_sample _ecore_fb_tslib_event;
 #endif
 
+/**< Time window in seconds to detect a double click. Default is 0.25s. */
 static double _ecore_fb_double_click_time = 0.25;
+/**< Window associated with touchscreen events. Initialized to NULL. */
 static void *_ecore_fb_ts_event_window = NULL;
 
+/**
+ * @brief Initializes the framebuffer touchscreen input system.
+ *
+ * This function attempts to open and configure the touchscreen device.
+ * If TSLIB is available, it will be used. Otherwise, it falls back to
+ * reading directly from "/dev/touchscreen/0".
+ * An Ecore_Fd_Handler is set up to listen for touchscreen events.
+ *
+ * @return 1 on success, 0 on failure.
+ */
 EAPI int
 ecore_fb_ts_init(void)
 {
@@ -130,6 +204,12 @@ ecore_fb_ts_init(void)
    return 0;
 }
 
+/**
+ * @brief Shuts down the framebuffer touchscreen input system.
+ *
+ * This function closes the touchscreen device file descriptor and
+ * removes the Ecore_Fd_Handler.
+ */
 EAPI void
 ecore_fb_ts_shutdown(void)
 {
@@ -141,12 +221,25 @@ ecore_fb_ts_shutdown(void)
    _ecore_fb_ts_event_window = NULL;
 }
 
+/**
+ * @brief Sets the window to be associated with touchscreen events.
+ *
+ * This function is currently not used to set window properties on
+ * the events themselves, but stores the window pointer for later retrieval.
+ *
+ * @param window A pointer to the window.
+ */
 EAPI void
 ecore_fb_ts_event_window_set(void *window)
 {
    _ecore_fb_ts_event_window = window;
 }
 
+/**
+ * @brief Gets the window associated with touchscreen events.
+ *
+ * @return A pointer to the window previously set by ecore_fb_ts_event_window_set().
+ */
 EAPI void *
 ecore_fb_ts_event_window_get(void)
 {
@@ -218,13 +311,29 @@ ecore_fb_touch_screen_calibrate_get(int *xscale, int *xtrans, int *yscale, int *
    if (xyswap) *xyswap = cal.xyswap;
 }
 
+/**
+ * @internal
+ * @brief Callback function for handling touchscreen file descriptor events.
+ *
+ * This function is called by the Ecore main loop when there is data
+ * available to read from the touchscreen file descriptor. It reads the
+ * raw touch data, applies calibration if necessary, and generates
+ * Ecore_Event_Mouse_Move, Ecore_Event_Mouse_Button_Down, and
+ * Ecore_Event_Mouse_Button_Up events. It also handles double and
+ * triple click detection.
+ *
+ * @param data User data associated with the fd_handler (unused).
+ * @param fd_handler The Ecore_Fd_Handler that triggered this callback (unused).
+ * @return EINA_TRUE to keep the handler active, EINA_FALSE to remove it.
+ *         Always returns EINA_TRUE in this implementation.
+ */
 static Eina_Bool
 _ecore_fb_ts_fd_handler(void *data EINA_UNUSED, Ecore_Fd_Handler *fd_handler EINA_UNUSED)
 {
-   static int prev_x = 0, prev_y = 0, prev_pressure = 0;
-   static double last_time = 0;
-   static double last_last_time = 0;
-   int v = 0;
+   static int prev_x = 0, prev_y = 0, prev_pressure = 0; /**< Previous touch coordinates and pressure. */
+   static double last_time = 0; /**< Timestamp of the last button event. */
+   static double last_last_time = 0; /**< Timestamp of the event before the last button event, for triple click. */
+   int v = 0; /**< Return value from read() or flag indicating more samples. */
 
    do
      {

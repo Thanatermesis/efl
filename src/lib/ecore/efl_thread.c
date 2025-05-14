@@ -21,16 +21,23 @@
 
 #define APPTHREAD_CLASS EFL_APPTHREAD_CLASS
 
+/**
+ * @brief Structure to hold data for the thread.
+ * This structure is passed to the thread's main function.
+ */
 typedef struct
 {
-   const char *name;
+   const char *name; /**< Optional name for the thread. */
    struct {
-      int in, out;
-      Eo *in_handler, *out_handler;
-   } fd, ctrl;
-   Eina_Array *argv;
-   Efl_Callback_Array_Item_Full *event_cb;
-   void *indata, *outdata;
+      int in, out; /**< File descriptors for input and output. */
+      Eo *in_handler, *out_handler; /**< Efl_Loop_Handler objects for input and output. */
+   } fd, /**< File descriptor and handler information for standard I/O. */
+     ctrl; /**< File descriptor and handler information for control communication. */
+   Eina_Array *argv; /**< Array of command line arguments for the thread's loop. Example: ["arg1", "arg2"] */
+   Efl_Callback_Array_Item_Full *event_cb; /**< Array of event callbacks to be registered in the thread's loop.
+                                            * Example: [{EFL_LOOP_EVENT_ARGUMENTS, 0, my_func, my_data}, {NULL, 0, NULL, NULL}] */
+   void *indata; /**< User data to be passed as input to the thread. */
+   void *outdata; /**< User data to be received as output from the thread. */
 } Thread_Data;
 
 #define CMD_EXIT        1
@@ -38,12 +45,19 @@ typedef struct
 #define CMD_CALL        3
 #define CMD_CALL_SYNC   4
 
+/**
+ * @brief Structure for handling replies from synchronous control commands.
+ */
 typedef struct
 {
-   Eina_Semaphore sem;
-   void *data;
+   Eina_Semaphore sem; /**< Semaphore used for synchronization. */
+   void *data; /**< Data returned by the synchronous call. */
 } Control_Reply;
 
+/**
+ * @brief Structure for control data exchanged between threads.
+ * This is used for commands like exit, call, and call_sync.
+ */
 typedef struct
 {
    union {
@@ -61,25 +75,35 @@ typedef struct _Efl_Thread_Data Efl_Thread_Data;
 struct _Efl_Thread_Data
 {
    struct {
-      int in, out;
-      Eo *in_handler, *out_handler;
-      Eina_Bool can_read : 1;
-      Eina_Bool eos_read : 1;
-      Eina_Bool can_write : 1;
-   } fd, ctrl;
-   int read_listeners;
-   Eo *loop;
+      int in, out; /**< File descriptors for standard I/O. */
+      Eo *in_handler, *out_handler; /**< Efl_Loop_Handler objects for standard I/O. */
+      Eina_Bool can_read : 1; /**< Flag indicating if the standard output can be read. */
+      Eina_Bool eos_read : 1; /**< Flag indicating if End-Of-Stream has been reached on standard output. */
+      Eina_Bool can_write : 1; /**< Flag indicating if standard input can be written to. */
+   } fd, /**< Data related to standard I/O file descriptors and handlers. */
+     ctrl; /**< Data related to control pipe file descriptors and handlers. */
+   int read_listeners; /**< Count of listeners for the read event on the output fd. */
+   Eo *loop; /**< The parent loop object. */
    Thread_Data *thdat;
-   Efl_Callback_Array_Item_Full *event_cb;
-   Eina_Thread thread;
-   Eina_Bool end_sent : 1;
-   Eina_Bool exit_read : 1;
-   Eina_Bool exit_called : 1;
-   Eina_Bool run : 1;
+   Efl_Callback_Array_Item_Full *event_cb; /**< Array of event callbacks to be passed to the child thread.
+                                            * Example: [{EFL_LOOP_EVENT_ARGUMENTS, 0, my_func, my_data}, {NULL, 0, NULL, NULL}] */
+   Eina_Thread thread; /**< The Eina_Thread handle for the worker thread. */
+   Eina_Bool end_sent : 1; /**< Flag indicating if an end/exit command has been sent to the worker thread. */
+   Eina_Bool exit_read : 1; /**< Flag indicating if the exit status from the worker thread has been read. */
+   Eina_Bool exit_called : 1; /**< Flag indicating if the exit event has been called. */
+   Eina_Bool run : 1; /**< Flag indicating if the thread is currently running. */
 };
 
 //////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief Callback invoked when the thread's standard output (from parent's perspective) is readable.
+ *
+ * Sets the can_read property of the Efl_Io_Reader interface to EINA_TRUE.
+ *
+ * @param data The Efl_Thread object.
+ * @param event The Efl_Event structure (unused).
+ */
 static void
 _cb_thread_out(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -87,6 +111,14 @@ _cb_thread_out(void *data, const Efl_Event *event EINA_UNUSED)
    efl_io_reader_can_read_set(obj, EINA_TRUE);
 }
 
+/**
+ * @brief Callback invoked when the thread's standard input (from parent's perspective) is writable.
+ *
+ * Sets the can_write property of the Efl_Io_Writer interface to EINA_TRUE.
+ *
+ * @param data The Efl_Thread object.
+ * @param event The Efl_Event structure (unused).
+ */
 static void
 _cb_thread_in(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -94,6 +126,15 @@ _cb_thread_in(void *data, const Efl_Event *event EINA_UNUSED)
    efl_io_writer_can_write_set(obj, EINA_TRUE);
 }
 
+/**
+ * @brief Callback invoked when the thread's control output pipe (from parent's perspective) is readable.
+ *
+ * This function reads control commands sent from the worker thread (Efl_Appthread)
+ * and processes them. Supported commands are CMD_EXIT, CMD_CALL, CMD_CALL_SYNC.
+ *
+ * @param data The Efl_Appthread object (running in the worker thread).
+ * @param event The Efl_Event structure (unused).
+ */
 static void
 _cb_thread_ctrl_out(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -143,6 +184,18 @@ _cb_thread_ctrl_out(void *data, const Efl_Event *event EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Sends the EFL_LOOP_EVENT_ARGUMENTS event within the worker thread's loop.
+ *
+ * This function is scheduled as a job in the worker thread's loop after it starts.
+ * It retrieves command line arguments from the Efl_Thread object and emits them
+ * as an event.
+ *
+ * @param obj The Efl_Appthread object (running in the worker thread).
+ * @param data User data for the future callback (unused).
+ * @param v The Eina_Value passed by the future (unused).
+ * @return The original Eina_Value v.
+ */
 static Eina_Value
 _efl_loop_arguments_send(Eo *obj, void *data EINA_UNUSED, const Eina_Value v)
 
@@ -179,6 +232,15 @@ _efl_loop_arguments_send(Eo *obj, void *data EINA_UNUSED, const Eina_Value v)
    return v;
 }
 
+/**
+ * @brief Modifies the count of read listeners for the appthread's output and adjusts handler activity.
+ *
+ * This is called from within the worker thread (Efl_Appthread context) when a listener
+ * for EFL_IO_READER_EVENT_CAN_READ_CHANGED is added or removed on the parent Efl_Thread.
+ *
+ * @param ad Pointer to the Efl_Appthread_Data.
+ * @param mod Integer value to add to the read_listeners count (+1 for add, -1 for del).
+ */
 static void
 _appthread_parent_read_listeners_modify(Efl_Appthread_Data *ad, int mod)
 {
@@ -195,6 +257,17 @@ _appthread_parent_read_listeners_modify(Efl_Appthread_Data *ad, int mod)
      }
 }
 
+/**
+ * @brief Callback invoked when an event callback is added to the Efl_Appthread object.
+ *
+ * Specifically, it monitors for additions of EFL_IO_READER_EVENT_CAN_READ_CHANGED
+ * listeners to manage the activity of the output handler.
+ *
+ * @param data The Efl_Appthread_Data.
+ * @param event The Efl_Event containing callback information.
+ *              `event->info` is expected to be `const Efl_Callback_Array_Item_Full *`.
+ *              Example for `event->info`: `[{ EFL_IO_READER_EVENT_CAN_READ_CHANGED, 0, my_can_read_cb, user_data }, { NULL, 0, NULL, NULL }]`
+ */
 static void
 _cb_appthread_event_callback_add(void *data, const Efl_Event *event)
 {
@@ -209,6 +282,17 @@ _cb_appthread_event_callback_add(void *data, const Efl_Event *event)
      }
 }
 
+/**
+ * @brief Callback invoked when an event callback is removed from the Efl_Appthread object.
+ *
+ * Specifically, it monitors for removals of EFL_IO_READER_EVENT_CAN_READ_CHANGED
+ * listeners to manage the activity of the output handler.
+ *
+ * @param data The Efl_Appthread_Data.
+ * @param event The Efl_Event containing callback information.
+ *              `event->info` is expected to be `const Efl_Callback_Array_Item_Full *`.
+ *              Example for `event->info`: `[{ EFL_IO_READER_EVENT_CAN_READ_CHANGED, 0, my_can_read_cb, user_data }, { NULL, 0, NULL, NULL }]`
+ */
 static void
 _cb_appthread_event_callback_del(void *data, const Efl_Event *event)
 {
@@ -223,6 +307,16 @@ _cb_appthread_event_callback_del(void *data, const Efl_Event *event)
      }
 }
 
+/**
+ * @brief Writes data to a pipe file descriptor, handling interruptions and partial writes.
+ *
+ * This function attempts to write the entire `count` bytes from `buf` to `fd`.
+ * It retries on EINTR and EAGAIN and handles other errors by logging them.
+ *
+ * @param fd The file descriptor to write to.
+ * @param buf Pointer to the data buffer to write.
+ * @param count Number of bytes to write.
+ */
 static void
 _efl_thread_pipe_write(int fd, const void *buf, size_t count)
 {
@@ -264,6 +358,17 @@ EFL_CALLBACKS_ARRAY_DEFINE(_appthread_event_callback_watch,
                            { EFL_EVENT_CALLBACK_ADD, _cb_appthread_event_callback_add },
                            { EFL_EVENT_CALLBACK_DEL, _cb_appthread_event_callback_del });
 
+/**
+ * @brief The main function executed by the worker thread.
+ *
+ * This function initializes an Efl_Appthread object, sets up I/O and control
+ * pipe handlers, processes arguments, and starts the Efl_Loop for the thread.
+ * It communicates back to the parent thread via control pipes.
+ *
+ * @param data Pointer to Thread_Data containing initialization parameters.
+ * @param t The Eina_Thread handle for this thread.
+ * @return NULL when the thread exits.
+ */
 static void *
 _efl_thread_main(void *data, Eina_Thread t)
 {

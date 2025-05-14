@@ -5,11 +5,17 @@
 #include <Elementary.h>
 #include <regex.h>
 
+/**
+ * @internal
+ * @brief Structure to hold regular expression validation data.
+ * This structure is used internally to manage the state and components
+ * of a regular expression validator.
+ */
 struct _Elm_Validator_Regexp
 {
-   Eina_Stringshare *signal;
-   int status;
-   regex_t regex;
+   Eina_Stringshare *signal; /**< The signal string to be emitted on validation. e.g., "valid", "invalid_format" */
+   int status;               /**< Current status of the regular expression. See Elm_Regexp_Status for possible values. */
+   regex_t regex;            /**< Compiled regular expression object from regex.h. */
 };
 
 EAPI Elm_Validator_Regexp *

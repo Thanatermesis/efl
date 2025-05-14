@@ -24,18 +24,32 @@
 // mainloop thread (whihc is expected). also a growable array of thread
 // id's for other threads is held here so we can loop over them and do things
 // like get them to stop and dump a backtrace for us
-Eina_Spinlock         _eina_debug_thread_lock;
+Eina_Spinlock         _eina_debug_thread_lock; /**< Spinlock to protect access to thread tracking data structures. */
 
-Eina_Thread             _eina_debug_thread_mainloop = 0;
-Eina_Debug_Thread    *_eina_debug_thread_active = NULL;
-int                   _eina_debug_thread_active_num = 0;
+Eina_Thread             _eina_debug_thread_mainloop = 0; /**< Identifier for the main loop thread. */
+Eina_Debug_Thread    *_eina_debug_thread_active = NULL; /**< Dynamically allocated array of active Eina_Debug_Thread structures. */
+int                   _eina_debug_thread_active_num = 0; /**< Number of currently active threads stored in _eina_debug_thread_active. */
 
-static int            _thread_active_size = 0;
-static int            _thread_id_counter = 1;
+static int            _thread_active_size = 0; /**< Current allocated size (number of elements) of the _eina_debug_thread_active array. */
+static int            _thread_id_counter = 1; /**< Counter to assign unique IDs to threads. */
 
 // add a thread id to our tracking array - very simple. add to end, and
 // if array to small, reallocate it to be bigger by 16 slots AND double that
 // size (so grows should slow down FAST). we will never shrink this array
+
+/**
+ * @internal
+ * @brief Adds a thread to the internal tracking array.
+ *
+ * This function registers a new thread for debugging purposes. It stores the
+ * thread identifier and assigns a unique internal ID. The array holding active
+ * threads will grow dynamically if needed.
+ * The growth strategy is to add 16 slots and then double the size to minimize
+ * frequent reallocations. The array is never shrunk.
+ *
+ * @param th Pointer to an Eina_Thread identifier. This is cast from `void *`.
+ *           Example: `Eina_Thread my_thread_id = eina_thread_self(); _eina_debug_thread_add(&my_thread_id);`
+ */
 void
 _eina_debug_thread_add(void *th)
 {
@@ -71,6 +85,18 @@ _eina_debug_thread_add(void *th)
 // remove a thread id from our tracking array - simply find and shuffle all
 // later elements down. this array should be small almsot all the time and
 // shouldn't bew changing THAT often for this to matter
+
+/**
+ * @internal
+ * @brief Removes a thread from the internal tracking array.
+ *
+ * This function unregisters a thread. It finds the thread by its identifier
+ * and removes it from the `_eina_debug_thread_active` array by shifting
+ * subsequent elements down.
+ *
+ * @param th Pointer to an Eina_Thread identifier to be removed. This is cast from `void *`.
+ *           Example: `Eina_Thread my_thread_id = eina_thread_self(); _eina_debug_thread_del(&my_thread_id);`
+ */
 void
 _eina_debug_thread_del(void *th)
 {
@@ -96,6 +122,18 @@ _eina_debug_thread_del(void *th)
 }
 
 // register the thread that is the mainloop - always there
+
+/**
+ * @internal
+ * @brief Sets the identifier for the main loop thread.
+ *
+ * This function is called to register the Eina_Thread identifier of the
+ * application's main loop. This thread is considered special for debugging.
+ * It is assumed that Eina is initialized in the main loop thread.
+ *
+ * @param th Pointer to an Eina_Thread identifier representing the main loop. This is cast from `void *`.
+ *           Example: `Eina_Thread main_thread_id = eina_thread_self(); _eina_debug_thread_mainloop_set(&main_thread_id);`
+ */
 void
 _eina_debug_thread_mainloop_set(void *th)
 {

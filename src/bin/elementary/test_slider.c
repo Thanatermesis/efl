@@ -3,20 +3,37 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @struct _api_data
+ * @brief  Holds data for a slider with a value limit and associated popup.
+ */
 struct _api_data
 {
-   Evas_Object *slider;
-   Evas_Object *popup;
-   Eina_Bool limit;
+   Evas_Object *slider; /**< The slider widget to which the limit applies. */
+   Evas_Object *popup; /**< The popup shown when the limit is reached. */
+   Eina_Bool limit; /**< A flag to enable or disable the value limit. */
 };
 typedef struct _api_data api_data;
 
+/**
+ * @brief Callback for the "delay,changed" event on a slider.
+ * @details This is called only when the user releases the slider knob or after
+ * a short timeout. It prints the slider's current value.
+ */
 void
 _delay_change_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    printf("delay,changed! slider value : %d\n", (int)round(elm_slider_value_get(obj)));
 }
 
+/**
+ * @brief Callback for the "changed" event on a slider.
+ * @details This function synchronizes the value of two sliders. The value of
+ * the slider that triggered the event (`obj`) is set on another slider passed
+ * as `data`.
+ * @param data The Evas_Object (slider) to update.
+ * @param obj The Evas_Object (slider) that initiated the event.
+ */
 void
 _change_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -24,18 +41,34 @@ _change_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_slider_value_set(data, val);
 }
 
+/**
+ * @brief Callback for the "slider,drag,start" event.
+ * @details Prints a message indicating that the user has started dragging the
+ * slider knob.
+ */
 void
 _drag_start_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    printf("drag,started! slider value : %d\n", (int)round(elm_slider_value_get(obj)));
 }
 
+/**
+ * @brief Callback for the "slider,drag,stop" event.
+ * @details Prints a message indicating that the user has stopped dragging the
+ * slider knob.
+ */
 void
 _drag_stop_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    printf("drag,stopped! slider value : %d\n", (int)round(elm_slider_value_get(obj)));
 }
 
+/**
+ * @brief Callback for the "clicked" event on the popup's "Ok" button.
+ * @details This function is called when the user clicks "Ok" on the popup.
+ * It disables the slider limit, allowing the value to exceed 80, and deletes
+ * the popup.
+ */
 static void
 _ok_btn_clicked(void *data, Evas_Object *obj EINA_UNUSED,
 		        void *event_info EINA_UNUSED)
@@ -46,6 +79,10 @@ _ok_btn_clicked(void *data, Evas_Object *obj EINA_UNUSED,
    api->popup = NULL;
 }
 
+/**
+ * @brief Callback for the "clicked" event on the popup's "Close" button.
+ * @details Deletes the popup window when the user clicks the "Close" button.
+ */
 static void
 _close_btn_clicked(void *data, Evas_Object *obj EINA_UNUSED,
                    void *event_info EINA_UNUSED)
@@ -55,6 +92,13 @@ _close_btn_clicked(void *data, Evas_Object *obj EINA_UNUSED,
    api->popup = NULL;
 }
 
+/**
+ * @brief Creates and displays a popup message.
+ * @details This popup informs the user that the slider has reached a limit
+ * and provides an option to remove that limit. It is only created if it doesn't
+ * already exist.
+ * @param api The api_data structure associated with the limited slider.
+ */
 void
 _popup_add(api_data *api)
 {
@@ -82,6 +126,13 @@ _popup_add(api_data *api)
      }
 }
 
+/**
+ * @brief Callback for the "changed" event on the limited slider.
+ * @details This function enforces an upper limit on the slider's value. If the
+ * user tries to move the slider above 80.0 and the limit is active, the value
+ * is capped at 80.0 and a popup is shown. If the value is moved below the
+ * limit, any existing popup is destroyed.
+ */
 void
 _change_cb2(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -98,6 +149,11 @@ _change_cb2(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
     }
 }
 
+/**
+ * @brief Callback for the "changed" event that prints the slider value.
+ * @details Prints the slider's current value with three decimal places of
+ * precision.
+ */
 void
 _change_print_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -105,30 +161,49 @@ _change_print_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA
    printf("change to %3.3f\n", val);
 }
 
+/**
+ * @brief Callback to set slider value to 0.0.
+ */
 void
 _bt_0(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_slider_value_set(data, 0.0);
 }
 
+/**
+ * @brief Callback to set slider value to 1.0.
+ */
 void
 _bt_1(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_slider_value_set(data, 1.0);
 }
 
+/**
+ * @brief Callback to increment slider value by 0.1.
+ */
 void
 _bt_p1(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_slider_value_set(data, elm_slider_value_get(data) + 0.1);
 }
 
+/**
+ * @brief Callback to decrement slider value by 0.1.
+ */
 void
 _bt_m1(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_slider_value_set(data, elm_slider_value_get(data) - 0.1);
 }
 
+/**
+ * @brief Calculates the step value for a slider to have discrete integer steps.
+ * @param min The minimum value of the slider.
+ * @param max The maximum value of the slider.
+ * @return The calculated step value. For a range of [0, 9], the step will be
+ * 1.0/9, which allows 10 discrete steps (0, 1, ..., 9).
+ */
 static double
 _step_size_calculate(double min, double max)
 {
@@ -140,6 +215,10 @@ _step_size_calculate(double min, double max)
    return step;
 }
 
+/**
+ * @brief Callback for "changed" event on a range slider.
+ * @details Prints the current "from" and "to" values of the range slider.
+ */
 static void
 _change_range_print_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -150,12 +229,22 @@ _change_range_print_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_inf
    printf("range values:- from: %f, to: %f\n", from, to);
 }
 
+/**
+ * @brief Callback for the EVAS_CALLBACK_FREE event on the window.
+ * @details Frees the allocated api_data structure when the window is destroyed.
+ */
 static void
 _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Callback for "changed" event on a range slider with a limited interval.
+ * @details Enforces the slider's range to stay within a predefined interval
+ * [100, 500]. If the user tries to move the range handles outside this
+ * interval, they are pushed back to the boundaries.
+ */
 static void
 _change_cb_range_slider(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -168,6 +257,20 @@ _change_cb_range_slider(void *data EINA_UNUSED, Evas_Object *obj, void *event_in
      elm_slider_range_set(obj, from, 500);
 }
 
+/**
+ * @brief The main function for the slider test application.
+ * @details This function creates a window and populates it with various
+ * examples of slider widgets to demonstrate their features, including:
+ * - Disabled sliders
+ * - Sliders with manual step
+ * - Sliders with indicator on focus
+ * - Horizontal and vertical sliders
+ * - Inverted sliders
+ * - Limited value sliders
+ * - Sliders with doubled scale
+ * - Range sliders
+ * - Limited interval range sliders
+ */
 void
 test_slider(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

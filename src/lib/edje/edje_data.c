@@ -1,87 +1,191 @@
 #include "edje_private.h"
 
+/** @file edje_data.c
+ * @brief This file defines the Eet_Data_Descriptor structures used for
+ * serializing and deserializing Edje theme files (.edj).
+ *
+ * These descriptors map C structures to a format that Eet can store in a file
+ * and retrieve later. This allows Edje to save and load its complex theme
+ * data, including parts, programs, styles, images, fonts, and other resources.
+ */
+
+// EAPI (Exported API) Eet_Data_Descriptors. These are top-level descriptors
+// for major components of an Edje file.
+/** @brief Eet_Data_Descriptor for the main Edje_File structure. */
 EAPI Eet_Data_Descriptor * _edje_edd_edje_file = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Collection structures. */
 EAPI Eet_Data_Descriptor * _edje_edd_edje_part_collection = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Color_Class_Info structures. */
 EAPI Eet_Data_Descriptor * _edje_edd_edje_color_class_info = NULL;
 
+// Static Eet_Data_Descriptors. These are used internally to define
+// sub-components or specific data types within the Edje file structure.
+
+/** @brief Eet_Data_Descriptor for Edje_String (localizable string with ID). */
 Eet_Data_Descriptor *_edje_edd_edje_string = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Style. */
 Eet_Data_Descriptor *_edje_edd_edje_style = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Style_Tag (key-value pair for styles). */
 Eet_Data_Descriptor *_edje_edd_edje_style_tag = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Color_Tree_Node (nodes in the color class hierarchy). */
 Eet_Data_Descriptor *_edje_edd_edje_color_tree_node = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Color_Class. */
 Eet_Data_Descriptor *_edje_edd_edje_color_class = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Text_Class. */
 Eet_Data_Descriptor *_edje_edd_edje_text_class = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Size_Class. */
 Eet_Data_Descriptor *_edje_edd_edje_size_class = NULL;
+/** @brief Eet_Data_Descriptor for Edje_External_Directory. */
 Eet_Data_Descriptor *_edje_edd_edje_external_directory = NULL;
+/** @brief Eet_Data_Descriptor for Edje_External_Directory_Entry. */
 Eet_Data_Descriptor *_edje_edd_edje_external_directory_entry = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Font_Directory_Entry. */
 Eet_Data_Descriptor *_edje_edd_edje_font_directory_entry = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Image_Hash (mapping image IDs). */
 Eet_Data_Descriptor *_edje_edd_edje_image_id_hash = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Image_Directory. */
 Eet_Data_Descriptor *_edje_edd_edje_image_directory = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Image_Directory_Entry. */
 Eet_Data_Descriptor *_edje_edd_edje_image_directory_entry = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Image_Directory_Set. */
 Eet_Data_Descriptor *_edje_edd_edje_image_directory_set = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Image_Directory_Set_Entry. */
 Eet_Data_Descriptor *_edje_edd_edje_image_directory_set_entry = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Vector_Directory_Entry (for vector graphics like SVG). */
 Eet_Data_Descriptor *_edje_edd_edje_vector_directory_entry = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Model_Directory (for 3D models). */
 Eet_Data_Descriptor *_edje_edd_edje_model_directory = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Model_Directory_Entry. */
 Eet_Data_Descriptor *_edje_edd_edje_model_directory_entry = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Limit (named numerical limits). */
 Eet_Data_Descriptor *_edje_edd_edje_limit = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Limit. */
 Eet_Data_Descriptor *_edje_edd_edje_limit_pointer = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Sound_Sample. */
 Eet_Data_Descriptor *_edje_edd_edje_sound_sample = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Mo (translation file information). */
 Eet_Data_Descriptor *_edje_edd_edje_translation_file = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Sound_Tone. */
 Eet_Data_Descriptor *_edje_edd_edje_sound_tone = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Sound_Directory. */
 Eet_Data_Descriptor *_edje_edd_edje_sound_directory = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Mo_Directory (directory of translation files). */
 Eet_Data_Descriptor *_edje_edd_edje_mo_directory = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Vibration_Sample. */
 Eet_Data_Descriptor *_edje_edd_edje_vibration_sample = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Vibration_Directory. */
 Eet_Data_Descriptor *_edje_edd_edje_vibration_directory = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Program. */
 Eet_Data_Descriptor *_edje_edd_edje_program = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Program. */
 Eet_Data_Descriptor *_edje_edd_edje_program_pointer = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Program_Target. */
 Eet_Data_Descriptor *_edje_edd_edje_program_target = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Program_After (dependencies between programs). */
 Eet_Data_Descriptor *_edje_edd_edje_program_after = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Collection_Directory_Entry. */
 Eet_Data_Descriptor *_edje_edd_edje_part_collection_directory_entry = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Pack_Element (elements in box/table layouts). */
 Eet_Data_Descriptor *_edje_edd_edje_pack_element = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Pack_Element. */
 Eet_Data_Descriptor *_edje_edd_edje_pack_element_pointer = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part. */
 Eet_Data_Descriptor *_edje_edd_edje_part = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Part. */
 Eet_Data_Descriptor *_edje_edd_edje_part_pointer = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Allowed_Seat (seat restrictions for a part). */
 Eet_Data_Descriptor *_edje_edd_edje_part_allowed_seat = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Part_Allowed_Seat. */
 Eet_Data_Descriptor *_edje_edd_edje_part_allowed_seat_pointer = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Description_Variant (variant part descriptions). */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_variant = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Description_Common (rectangle type). */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_rectangle = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Description_Snapshot. */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_snapshot = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Description_Common (spacer type). */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_spacer = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Description_Common (swallow type). */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_swallow = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Description_Common (group type). */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_group = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Description_Image. */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_image = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Description_Proxy. */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_proxy = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Description_Text. */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_text = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Description_Text (textblock type). */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_textblock = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Description_Box. */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_box = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Description_Table. */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_table = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Description_External. */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_external = NULL;
+/** @brief Eet_Data_Descriptor for a list of Edje_Part_Description_Variant. */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_variant_list = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Part_Description_Common (rectangle). */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_rectangle_pointer = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Part_Description_Snapshot. */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_snapshot_pointer = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Part_Description_Common (spacer). */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_spacer_pointer = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Part_Description_Common (swallow). */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_swallow_pointer = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Part_Description_Common (group). */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_group_pointer = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Part_Description_Image. */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_image_pointer = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Part_Description_Proxy. */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_proxy_pointer = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Part_Description_Text. */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_text_pointer = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Part_Description_Text (textblock). */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_textblock_pointer = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Part_Description_Box. */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_box_pointer = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Part_Description_Table. */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_table_pointer = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Part_Description_External. */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_external_pointer = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Description_Spec_Filter_Data (filter data key-value). */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_filter_data = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Image_Id (image ID with set flag). */
 Eet_Data_Descriptor *_edje_edd_edje_part_image_id = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Part_Image_Id. */
 Eet_Data_Descriptor *_edje_edd_edje_part_image_id_pointer = NULL;
+/** @brief Eet_Data_Descriptor for Edje_External_Param (parameters for external parts). */
 Eet_Data_Descriptor *_edje_edd_edje_external_param = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Limit (limit applied to a specific part). */
 Eet_Data_Descriptor *_edje_edd_edje_part_limit = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Physics_Face (physics properties of a face). */
 Eet_Data_Descriptor *_edje_edd_edje_physics_face = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Map_Color (color definition for map points). */
 Eet_Data_Descriptor *_edje_edd_edje_map_colors = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Map_Color. */
 Eet_Data_Descriptor *_edje_edd_edje_map_colors_pointer = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Gfx_Filter (gfx filter definition). */
 Eet_Data_Descriptor *_edje_edd_edje_filter = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Gfx_Filter_Directory. */
 Eet_Data_Descriptor *_edje_edd_edje_filter_directory = NULL;
+/** @brief Eet_Data_Descriptor for Edje_Part_Description_Vector. */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_vector = NULL;
+/** @brief Eet_Data_Descriptor for a pointer to Edje_Part_Description_Vector. */
 Eet_Data_Descriptor *_edje_edd_edje_part_description_vector_pointer = NULL;
 
 
+/**
+ * @brief Macro to define a mempool, allocator, and deallocator for a specific Edje part description type.
+ *
+ * This macro simplifies the creation of memory pools for different types of
+ * Edje_Part_Description_Common derived structures. It initializes common fields
+ * like `clip_to_id`, `map.zoom.x`, `map.zoom.y`, and `map.zoom.id_center`
+ * to default values upon allocation.
+ *
+ * @param Type The suffix for the mempool variable (e.g., RECTANGLE for _emp_RECTANGLE).
+ * @param Minus The suffix for the allocator/deallocator functions (e.g., rectangle for mem_alloc_rectangle).
+ */
 /* allocate a description struct.
  * this initializes clip_to_id as this field will not be present in most
  * edje files.
@@ -108,23 +212,43 @@ Eet_Data_Descriptor *_edje_edd_edje_part_description_vector_pointer = NULL;
      eina_mempool_free(_emp_##Type, data);          \
   }
 
+/** @brief Mempool for Edje_Part_Description_Common of type RECTANGLE. */
 EMP(RECTANGLE, rectangle)
+/** @brief Mempool for Edje_Part_Description_Text. */
 EMP(TEXT, text)
+/** @brief Mempool for Edje_Part_Description_Image. */
 EMP(IMAGE, image)
+/** @brief Mempool for Edje_Part_Description_Proxy. */
 EMP(PROXY, proxy)
+/** @brief Mempool for Edje_Part_Description_Common of type SWALLOW. */
 EMP(SWALLOW, swallow)
+/** @brief Mempool for Edje_Part_Description_Text of type TEXTBLOCK. */
 EMP(TEXTBLOCK, textblock)
+/** @brief Mempool for Edje_Part_Description_Common of type GROUP. */
 EMP(GROUP, group)
+/** @brief Mempool for Edje_Part_Description_Box. */
 EMP(BOX, box)
+/** @brief Mempool for Edje_Part_Description_Table. */
 EMP(TABLE, table)
+/** @brief Mempool for Edje_Part_Description_External. */
 EMP(EXTERNAL, external)
+/** @brief Mempool for Edje_Part_Description_Common of type SPACER. */
 EMP(SPACER, spacer)
+/** @brief Mempool for Edje_Part_Description_Snapshot. */
 EMP(SNAPSHOT, snapshot)
+/** @brief Mempool for Edje_Part_Description_Vector. */
 EMP(VECTOR, vector)
 #undef EMP
 
+/** @brief Mempool for Edje_Part structures. */
 EAPI Eina_Mempool *_emp_part = NULL;
 
+/**
+ * @brief Allocates memory for an Edje_Part from its mempool.
+ * Initializes `dragable.threshold_id` to -1.
+ * @param size The size of the memory to allocate (should be sizeof(Edje_Part)).
+ * @return A pointer to the allocated Edje_Part, or NULL on failure.
+ */
 static void *
 mem_alloc_part(size_t size)
 {
@@ -138,12 +262,20 @@ mem_alloc_part(size_t size)
    return ep;
 }
 
+/**
+ * @brief Frees memory previously allocated for an Edje_Part back to its mempool.
+ * @param data Pointer to the Edje_Part to free.
+ */
 static void
 mem_free_part(void *data)
 {
    eina_mempool_free(_emp_part, data);
 }
 
+/**
+ * @brief Macro to safely free an Eet_Data_Descriptor and set its pointer to NULL.
+ * @param eed The Eet_Data_Descriptor pointer to free.
+ */
 #define FREED(eed)                      \
   if (eed)                              \
     {                                   \
@@ -151,10 +283,14 @@ mem_free_part(void *data)
        (eed) = NULL;                    \
     }
 
+/**
+ * @brief Structure to map Edje_Part_Type enum values to their string representations.
+ * Used for converting part types during serialization/deserialization of variant descriptions.
+ */
 struct
 {
-   Edje_Part_Type type;
-   const char    *name;
+   Edje_Part_Type type; /**< The enum value of the part type. */
+   const char    *name; /**< The string name of the part type. */
 } variant_convertion[] = {
    { EDJE_PART_TYPE_RECTANGLE, "rectangle" },
    { EDJE_PART_TYPE_SWALLOW, "swallow" },
@@ -186,6 +322,15 @@ _edje_description_variant_type_get(const void *data, Eina_Bool *unknow EINA_UNUS
    return NULL;
 }
 
+/**
+ * @brief Sets the part type in a data structure based on its string name.
+ * This function is used by Eet to set the type of a variant part description
+ * when deserializing from a string representation.
+ * @param type The string name of the part type (e.g., "rectangle", "text").
+ * @param data Pointer to an unsigned char where the Edje_Part_Type enum value will be stored.
+ * @param unknow Eina_UNUSED parameter, not used.
+ * @return EINA_TRUE if the type string was recognized and set, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _edje_description_variant_type_set(const char *type, void *data, Eina_Bool unknow EINA_UNUSED)
 {
@@ -204,9 +349,28 @@ _edje_description_variant_type_set(const char *type, void *data, Eina_Bool unkno
    return EINA_FALSE;
 }
 
+/** @brief Size of the memory-mapped string data block from an Edje file.
+ * Used for a workaround with ancient Edje files where strings might be direct pointers
+ * into a mapped region rather than separately allocated.
+ */
 size_t  _edje_data_string_mapping_size = 0;
+/** @brief Pointer to the start of the memory-mapped string data block.
+ * @see _edje_data_string_mapping_size
+ */
 void   *_edje_data_string_mapping = NULL;
 
+/**
+ * @brief Custom hash add function for Eet_Data_Descriptor.
+ * This function includes a workaround for ancient Edje files. If a string key
+ * falls within a known memory-mapped region (_edje_data_string_mapping),
+ * it uses eina_hash_direct_add to avoid duplicating the key string. Otherwise,
+ * it uses the standard eina_hash_add.
+ *
+ * @param hash The Eina_Hash to add to. If NULL, a new small string hash is created.
+ * @param key The string key to add.
+ * @param data The data associated with the key.
+ * @return The hash table (possibly newly created), or NULL on failure to create a new hash.
+ */
 static Eina_Hash *
 _edje_eina_hash_add_alloc(Eina_Hash *hash,
                           const char *key,
@@ -228,6 +392,12 @@ _edje_eina_hash_add_alloc(Eina_Hash *hash,
    return hash;
 }
 
+/**
+ * @brief Shuts down the Edje data descriptor system.
+ * This function frees all globally allocated Eet_Data_Descriptor structures
+ * that were initialized by _edje_edd_init().
+ * FIXME: remove EAPI when edje_convert goes, should be static.
+ */
 // FIXME: remove EAPI when edje_convert goes
 EAPI void
 _edje_edd_shutdown(void)
@@ -314,6 +484,20 @@ _edje_edd_shutdown(void)
    FREED(_edje_edd_edje_color_class_info);
 }
 
+/**
+ * @brief Macro to define an Eet_Data_Descriptor for a pointer to a given Edje type.
+ * This creates a helper struct `_Edje_Type_Pointer` containing a single member `pointer`
+ * of type `Edje_Type *`. It then creates an Eet_Data_Descriptor for this helper struct,
+ * effectively describing a pointer to `Edje_Type`.
+ *
+ * @param Type The base Edje type (e.g., `Program`, `Part`).
+ * @param Name The name suffix for the Eet_Data_Descriptor variable (e.g., `program` for `_edje_edd_edje_program_pointer`).
+ *             The corresponding descriptor for `Edje_Type` itself is assumed to be `_edje_edd_edje_Name`.
+ *
+ * Example: `EDJE_DEFINE_POINTER_TYPE(Program, program)` will define `_edje_edd_edje_program_pointer`
+ *          which describes a structure holding an `Edje_Program *`. This pointer descriptor will
+ *          refer to `_edje_edd_edje_program` for the actual `Edje_Program` structure definition.
+ */
 #define EDJE_DEFINE_POINTER_TYPE(Type, Name)                                                                                         \
   {                                                                                                                                  \
      typedef struct _Edje_##Type##_Pointer Edje_##Type## _Pointer;                                                                   \
@@ -328,166 +512,231 @@ _edje_edd_shutdown(void)
      EET_DATA_DESCRIPTOR_ADD_SUB(_edje_edd_edje_##Name##_pointer, Edje_##Type##_Pointer, "pointer", pointer, _edje_edd_edje_##Name); \
   }
 
+/**
+ * @brief Initializes all Eet_Data_Descriptors for Edje structures.
+ * This function is responsible for creating and configuring all the necessary
+ * Eet_Data_Descriptor instances that define how Edje data is serialized and
+ * deserialized. It sets up descriptors for basic types, complex structures,
+ * lists, hashes, and variants.
+ * FIXME: remove EAPI when edje_convert goes, should be static.
+ */
 // FIXME: remove EAPI when edje_convert goes
 EAPI void
 _edje_edd_init(void)
 {
    Eet_Data_Descriptor_Class eddc;
 
-   /* localisable string */
+   /* Edje_String: Represents a string that can be localized, associated with an ID. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_String);
    _edje_edd_edje_string = eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_string, Edje_String, "str", str, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_string, Edje_String, "id", id, EET_T_UINT);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_string, Edje_String, "str", str, EET_T_STRING); // The actual string content.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_string, Edje_String, "id", id, EET_T_UINT);     // Numeric ID for the string.
 
-   /* external directory */
+   /* Edje_External_Directory_Entry: An entry in the external file directory. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_External_Directory_Entry);
    _edje_edd_edje_external_directory_entry =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_external_directory_entry, Edje_External_Directory_Entry, "entry", entry, EET_T_STRING);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_external_directory_entry, Edje_External_Directory_Entry, "entry", entry, EET_T_STRING); // Name of the external entry.
 
+   /* Edje_External_Directory: A list of external file entries.
+    * Example `entries` array structure:
+    * [
+    *   { "entry": "external_program_name" },
+    *   { "entry": "another_external_resource" }
+    * ]
+    */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_External_Directory);
    _edje_edd_edje_external_directory =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_external_directory, Edje_External_Directory, "entries", entries, _edje_edd_edje_external_directory_entry);
+   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_external_directory, Edje_External_Directory, "entries", entries, _edje_edd_edje_external_directory_entry); // Variable array of Edje_External_Directory_Entry.
 
-   /* font directory */
+   /* Edje_Font_Directory_Entry: An entry in the font directory, mapping a font name to a file. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Font_Directory_Entry);
    _edje_edd_edje_font_directory_entry =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_font_directory_entry, Edje_Font_Directory_Entry, "entry", entry, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_font_directory_entry, Edje_Font_Directory_Entry, "file", file, EET_T_STRING);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_font_directory_entry, Edje_Font_Directory_Entry, "entry", entry, EET_T_STRING); // Font name used in EDC.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_font_directory_entry, Edje_Font_Directory_Entry, "file", file, EET_T_STRING);   // Actual font file path.
 
-   /* image hash */
+   /* Edje_Image_Hash: A simple structure to hold an image ID, used in a hash table. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Image_Hash);
    _edje_edd_edje_image_id_hash = eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_id_hash, Edje_Image_Hash, "id", id, EET_T_INT);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_id_hash, Edje_Image_Hash, "id", id, EET_T_INT); // Image ID.
 
-   /* image directory */
+   /* Edje_Image_Directory_Entry: An entry in the image directory. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Image_Directory_Entry);
    _edje_edd_edje_image_directory_entry =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_entry, Edje_Image_Directory_Entry, "entry", entry, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_entry, Edje_Image_Directory_Entry, "source_type", source_type, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_entry, Edje_Image_Directory_Entry, "source_param", source_param, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_entry, Edje_Image_Directory_Entry, "id", id, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_entry, Edje_Image_Directory_Entry, "external_id", external_id, EET_T_STRING);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_entry, Edje_Image_Directory_Entry, "entry", entry, EET_T_STRING);             // Image file path or identifier.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_entry, Edje_Image_Directory_Entry, "source_type", source_type, EET_T_INT);   // Type of image source (e.g., bitmap, svg).
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_entry, Edje_Image_Directory_Entry, "source_param", source_param, EET_T_INT); // Parameter for the source type (e.g., compression level).
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_entry, Edje_Image_Directory_Entry, "id", id, EET_T_INT);                       // Unique ID for this image entry.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_entry, Edje_Image_Directory_Entry, "external_id", external_id, EET_T_STRING); // ID for externally stored images.
 
+   /* Edje_Image_Directory_Set_Entry: An entry within an image set, defining properties for a specific image in the set. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Image_Directory_Set_Entry);
    _edje_edd_edje_image_directory_set_entry =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "name", name, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "id", id, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "w", size.w, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "h", size.h, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "min.w", size.min.w, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "min.h", size.min.h, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "max.w", size.max.w, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "max.h", size.max.h, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "border.l", border.l, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "border.r", border.r, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "border.t", border.t, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "border.b", border.b, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "border.scale_by", border.scale_by, EDJE_T_FLOAT);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "name", name, EET_T_STRING);             // Name of the image within the set.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "id", id, EET_T_INT);                   // ID of this specific image in the set.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "w", size.w, EET_T_INT);                 // Nominal width.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "h", size.h, EET_T_INT);                 // Nominal height.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "min.w", size.min.w, EET_T_INT);         // Minimum width for scaling.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "min.h", size.min.h, EET_T_INT);         // Minimum height for scaling.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "max.w", size.max.w, EET_T_INT);         // Maximum width for scaling.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "max.h", size.max.h, EET_T_INT);         // Maximum height for scaling.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "border.l", border.l, EET_T_INT);         // Left border size.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "border.r", border.r, EET_T_INT);         // Right border size.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "border.t", border.t, EET_T_INT);         // Top border size.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "border.b", border.b, EET_T_INT);         // Bottom border size.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set_entry, Edje_Image_Directory_Set_Entry, "border.scale_by", border.scale_by, EDJE_T_FLOAT); // Border scale factor.
 
+   /* Edje_Image_Directory_Set: A set of related images, often different sizes or states of the same conceptual image.
+    * Example `entries` list structure:
+    * [
+    *   { "name": "button_normal.png", "id": 0, "w": 100, "h": 30, ... },
+    *   { "name": "button_pressed.png", "id": 1, "w": 100, "h": 30, ... }
+    * ]
+    */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Image_Directory_Set);
    _edje_edd_edje_image_directory_set =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set, Edje_Image_Directory_Set, "name", name, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set, Edje_Image_Directory_Set, "id", id, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_LIST(_edje_edd_edje_image_directory_set, Edje_Image_Directory_Set, "entries", entries, _edje_edd_edje_image_directory_set_entry);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set, Edje_Image_Directory_Set, "name", name, EET_T_STRING); // Name of the image set.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_image_directory_set, Edje_Image_Directory_Set, "id", id, EET_T_INT);         // Unique ID for this image set.
+   EET_DATA_DESCRIPTOR_ADD_LIST(_edje_edd_edje_image_directory_set, Edje_Image_Directory_Set, "entries", entries, _edje_edd_edje_image_directory_set_entry); // List of Edje_Image_Directory_Set_Entry.
 
-   /* vector directory */
+   /* Edje_Vector_Directory_Entry: An entry for vector graphics (e.g., SVG) in the image directory. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Vector_Directory_Entry);
    _edje_edd_edje_vector_directory_entry =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_vector_directory_entry, Edje_Vector_Directory_Entry, "entry", entry, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_vector_directory_entry, Edje_Vector_Directory_Entry, "id", id, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_vector_directory_entry, Edje_Vector_Directory_Entry, "type", type, EET_T_INT);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_vector_directory_entry, Edje_Vector_Directory_Entry, "entry", entry, EET_T_STRING); // Vector file path or identifier.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_vector_directory_entry, Edje_Vector_Directory_Entry, "id", id, EET_T_INT);             // Unique ID for this vector entry.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_vector_directory_entry, Edje_Vector_Directory_Entry, "type", type, EET_T_INT);         // Type of vector (e.g., SVG, Lottie).
 
+   /* Edje_Image_Directory: Contains lists of image entries, image sets, and vector entries.
+    * Example `entries` array structure:
+    * [ { "entry": "image1.png", "id": 10, ... }, { "entry": "image2.jpg", "id": 11, ... } ]
+    * Example `sets` array structure:
+    * [ { "name": "button_states", "id": 20, "entries": [...] }, ... ]
+    * Example `vectors` array structure:
+    * [ { "entry": "icon.svg", "id": 30, "type": 0 }, ... ]
+    */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Image_Directory);
    _edje_edd_edje_image_directory =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_image_directory, Edje_Image_Directory, "entries", entries, _edje_edd_edje_image_directory_entry);
-   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_image_directory, Edje_Image_Directory, "sets", sets, _edje_edd_edje_image_directory_set);
-   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_image_directory, Edje_Image_Directory, "vectors", vectors, _edje_edd_edje_vector_directory_entry);
+   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_image_directory, Edje_Image_Directory, "entries", entries, _edje_edd_edje_image_directory_entry); // Variable array of Edje_Image_Directory_Entry.
+   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_image_directory, Edje_Image_Directory, "sets", sets, _edje_edd_edje_image_directory_set);       // Variable array of Edje_Image_Directory_Set.
+   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_image_directory, Edje_Image_Directory, "vectors", vectors, _edje_edd_edje_vector_directory_entry); // Variable array of Edje_Vector_Directory_Entry.
 
-   /* collection directory */
+   /* Edje_Color_Class_Info: Information about color classes, primarily a list of color names.
+    * Example `colors` list structure:
+    * [ "background_color", "text_color", "highlight_color" ]
+    */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Color_Class_Info);
    _edje_edd_edje_color_class_info = eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_LIST_STRING(_edje_edd_edje_color_class_info, Edje_Color_Class_Info, "colors", colors);
+   EET_DATA_DESCRIPTOR_ADD_LIST_STRING(_edje_edd_edje_color_class_info, Edje_Color_Class_Info, "colors", colors); // List of color class names (strings).
 
-   /*MO*/
-
+   /* Edje_Mo: Information about a Gettext MO translation file. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Mo);
    _edje_edd_edje_translation_file = eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_translation_file, Edje_Mo, "locale", locale, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_translation_file, Edje_Mo, "mo_src", mo_src, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_translation_file, Edje_Mo, "id", id, EET_T_INT);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_translation_file, Edje_Mo, "locale", locale, EET_T_STRING); // Locale string (e.g., "en_US", "fr_FR").
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_translation_file, Edje_Mo, "mo_src", mo_src, EET_T_STRING); // Path or identifier for the MO file.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_translation_file, Edje_Mo, "id", id, EET_T_INT);           // Unique ID for this translation.
 
+   /* Edje_Mo_Directory: A list of MO file entries.
+    * Example `mo_entries` array structure:
+    * [
+    *   { "locale": "en_US", "mo_src": "translations/en_US.mo", "id": 0 },
+    *   { "locale": "fr_FR", "mo_src": "translations/fr_FR.mo", "id": 1 }
+    * ]
+    */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Mo_Directory);
    _edje_edd_edje_mo_directory = eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_mo_directory, Edje_Mo_Directory, "mo_entries", mo_entries, _edje_edd_edje_translation_file);
+   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_mo_directory, Edje_Mo_Directory, "mo_entries", mo_entries, _edje_edd_edje_translation_file); // Variable array of Edje_Mo.
 
-   /* model directory */
+   /* Edje_Model_Directory_Entry: An entry in the 3D model directory. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Model_Directory_Entry);
    _edje_edd_edje_model_directory_entry =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_model_directory_entry, Edje_Model_Directory_Entry, "entry", entry, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_model_directory_entry, Edje_Model_Directory_Entry, "id", id, EET_T_INT);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_model_directory_entry, Edje_Model_Directory_Entry, "entry", entry, EET_T_STRING); // Model file path or identifier.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_model_directory_entry, Edje_Model_Directory_Entry, "id", id, EET_T_INT);             // Unique ID for this model entry.
 
+   /* Edje_Model_Directory: A list of 3D model entries.
+    * Example `entries` array structure:
+    * [
+    *   { "entry": "models/object1.obj", "id": 0 },
+    *   { "entry": "models/character.glb", "id": 1 }
+    * ]
+    */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Model_Directory);
    _edje_edd_edje_model_directory =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_model_directory, Edje_Model_Directory, "entries", entries, _edje_edd_edje_model_directory_entry);
+   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_model_directory, Edje_Model_Directory, "entries", entries, _edje_edd_edje_model_directory_entry); // Variable array of Edje_Model_Directory_Entry.
 
-   /* Sound */
+   /* Edje_Sound_Sample: Describes a sound sample. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Sound_Sample);
    _edje_edd_edje_sound_sample =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_sample, Edje_Sound_Sample, "name", name, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_sample, Edje_Sound_Sample, "snd_src", snd_src, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_sample, Edje_Sound_Sample, "compression", compression, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_sample, Edje_Sound_Sample, "mode", mode, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_sample, Edje_Sound_Sample, "quality", quality, EET_T_DOUBLE);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_sample, Edje_Sound_Sample, "id", id, EET_T_INT);
+   _edje_edd_edje_sound_sample =
+     eet_data_descriptor_file_new(&eddc);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_sample, Edje_Sound_Sample, "name", name, EET_T_STRING);             // Name of the sound sample.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_sample, Edje_Sound_Sample, "snd_src", snd_src, EET_T_STRING);       // Source path/identifier of the sound file.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_sample, Edje_Sound_Sample, "compression", compression, EET_T_INT); // Compression type/level.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_sample, Edje_Sound_Sample, "mode", mode, EET_T_INT);                 // Playback mode.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_sample, Edje_Sound_Sample, "quality", quality, EET_T_DOUBLE);       // Quality factor.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_sample, Edje_Sound_Sample, "id", id, EET_T_INT);                     // Unique ID for the sound sample.
+
+   /* Edje_Sound_Tone: Describes a sound tone (e.g., a specific frequency or predefined tone). */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Sound_Tone);
    _edje_edd_edje_sound_tone =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_tone, Edje_Sound_Tone, "name", name, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_tone, Edje_Sound_Tone, "value", value, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_tone, Edje_Sound_Tone, "id", id, EET_T_INT);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_tone, Edje_Sound_Tone, "name", name, EET_T_STRING); // Name of the tone.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_tone, Edje_Sound_Tone, "value", value, EET_T_INT);   // Value associated with the tone (e.g., frequency).
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_sound_tone, Edje_Sound_Tone, "id", id, EET_T_INT);         // Unique ID for the tone.
 
+   /* Edje_Sound_Directory: Contains lists of sound samples and tones.
+    * Example `samples` array structure:
+    * [ { "name": "click.wav", "id": 0, ... }, { "name": "alert.ogg", "id": 1, ... } ]
+    * Example `tones` array structure:
+    * [ { "name": "DTMF_1", "value": 697, "id": 100 }, ... ]
+    */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Sound_Directory);
    _edje_edd_edje_sound_directory =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_sound_directory, Edje_Sound_Directory, "samples", samples, _edje_edd_edje_sound_sample);
-   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_sound_directory, Edje_Sound_Directory, "tones", tones, _edje_edd_edje_sound_tone);
+   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_sound_directory, Edje_Sound_Directory, "samples", samples, _edje_edd_edje_sound_sample); // Variable array of Edje_Sound_Sample.
+   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_sound_directory, Edje_Sound_Directory, "tones", tones, _edje_edd_edje_sound_tone);       // Variable array of Edje_Sound_Tone.
 
-   /* Vibration */
+   /* Edje_Vibration_Sample: Describes a vibration pattern. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Vibration_Sample);
    _edje_edd_edje_vibration_sample =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_vibration_sample, Edje_Vibration_Sample, "name", name, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_vibration_sample, Edje_Vibration_Sample, "src", src, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_vibration_sample, Edje_Vibration_Sample, "id", id, EET_T_INT);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_vibration_sample, Edje_Vibration_Sample, "name", name, EET_T_STRING); // Name of the vibration pattern.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_vibration_sample, Edje_Vibration_Sample, "src", src, EET_T_STRING);     // Source or definition of the vibration.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_vibration_sample, Edje_Vibration_Sample, "id", id, EET_T_INT);         // Unique ID for the vibration sample.
 
+   /* Edje_Vibration_Directory: Contains a list of vibration samples.
+    * Example `samples` array structure:
+    * [ { "name": "short_buzz", "id": 0, ... }, { "name": "long_pulse", "id": 1, ... } ]
+    */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Vibration_Directory);
    _edje_edd_edje_vibration_directory =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_vibration_directory, Edje_Vibration_Directory, "samples", samples, _edje_edd_edje_vibration_sample);
+   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_vibration_directory, Edje_Vibration_Directory, "samples", samples, _edje_edd_edje_vibration_sample); // Variable array of Edje_Vibration_Sample.
 
-   /* Efl.Gfx.Filter */
+   /* Edje_Gfx_Filter: Describes a graphics filter program. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Gfx_Filter);
    _edje_edd_edje_filter = eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_filter, Edje_Gfx_Filter, "name", name, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_filter, Edje_Gfx_Filter, "script", script, EET_T_STRING);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_filter, Edje_Gfx_Filter, "name", name, EET_T_STRING);     // Name of the filter.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_filter, Edje_Gfx_Filter, "script", script, EET_T_STRING); // Lua script code for the filter.
 
+   /* Edje_Gfx_Filter_Directory: Contains a list of graphics filter programs.
+    * Example `filters` array structure:
+    * [ { "name": "blur_filter", "script": "..." }, { "name": "sharpen_filter", "script": "..." } ]
+    */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Gfx_Filter_Directory);
    _edje_edd_edje_filter_directory = eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_filter_directory, Edje_Gfx_Filter_Directory, "filters", filters, _edje_edd_edje_filter);
+   EET_DATA_DESCRIPTOR_ADD_VAR_ARRAY(_edje_edd_edje_filter_directory, Edje_Gfx_Filter_Directory, "filters", filters, _edje_edd_edje_filter); // Variable array of Edje_Gfx_Filter.
 
-   /* collection directory */
+   /* Edje_Part_Collection_Directory_Entry: An entry in the directory of part collections (groups). */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Part_Collection_Directory_Entry);
    _edje_edd_edje_part_collection_directory_entry =
      eet_data_descriptor_file_new(&eddc);
@@ -506,32 +755,46 @@ _edje_edd_init(void)
    EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_part_collection_directory_entry, Edje_Part_Collection_Directory_Entry, "count.SPACER", count.SPACER, EET_T_INT);
    EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_part_collection_directory_entry, Edje_Part_Collection_Directory_Entry, "count.SNAPSHOT", count.SNAPSHOT, EET_T_INT);
    EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_part_collection_directory_entry, Edje_Part_Collection_Directory_Entry, "count.VECTOR", count.VECTOR, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_part_collection_directory_entry, Edje_Part_Collection_Directory_Entry, "count.part", count.part, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_part_collection_directory_entry, Edje_Part_Collection_Directory_Entry, "group_alias", group_alias, EET_T_UCHAR);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_part_collection_directory_entry, Edje_Part_Collection_Directory_Entry, "count.part", count.part, EET_T_INT); // Total count of parts in the collection.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_part_collection_directory_entry, Edje_Part_Collection_Directory_Entry, "group_alias", group_alias, EET_T_UCHAR); // Flag indicating if this collection is an alias.
 
+   /* Edje_Style_Tag: A key-value pair defining a style property. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Style_Tag);
    _edje_edd_edje_style_tag =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_style_tag, Edje_Style_Tag, "key", key, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_style_tag, Edje_Style_Tag, "value", value, EET_T_STRING);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_style_tag, Edje_Style_Tag, "key", key, EET_T_STRING);     // Style property key (e.g., "font-size").
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_style_tag, Edje_Style_Tag, "value", value, EET_T_STRING); // Style property value (e.g., "12").
 
+   /* Edje_Part_Allowed_Seat: Defines a seat name that a part is allowed to interact with. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Part_Allowed_Seat);
    _edje_edd_edje_part_allowed_seat =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_part_allowed_seat, Edje_Part_Allowed_Seat, "name", name, EET_T_STRING);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_part_allowed_seat, Edje_Part_Allowed_Seat, "name", name, EET_T_STRING); // Name of the allowed seat.
 
+   /* Edje_Style: A named collection of style tags.
+    * Example `tags` list structure:
+    * [
+    *   { "key": "font", "value": "Sans" },
+    *   { "key": "font_size", "value": "10" }
+    * ]
+    */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Style);
    _edje_edd_edje_style =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_style, Edje_Style, "name", name, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_LIST(_edje_edd_edje_style, Edje_Style, "tags", tags, _edje_edd_edje_style_tag);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_style, Edje_Style, "name", name, EET_T_STRING); // Name of the style.
+   EET_DATA_DESCRIPTOR_ADD_LIST(_edje_edd_edje_style, Edje_Style, "tags", tags, _edje_edd_edje_style_tag); // List of Edje_Style_Tag.
 
+   /* Edje_Color_Tree_Node: A node in the color class hierarchy, can contain child color classes.
+    * Example `color_classes` list structure:
+    * [ "base_color", "accent_color" ]
+    */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Color_Tree_Node);
    _edje_edd_edje_color_tree_node =
      eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_color_tree_node, Edje_Color_Tree_Node, "name", name, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_LIST_STRING(_edje_edd_edje_color_tree_node, Edje_Color_Tree_Node, "color_classes", color_classes);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_color_tree_node, Edje_Color_Tree_Node, "name", name, EET_T_STRING); // Name of this color tree node.
+   EET_DATA_DESCRIPTOR_ADD_LIST_STRING(_edje_edd_edje_color_tree_node, Edje_Color_Tree_Node, "color_classes", color_classes); // List of child color class names (strings).
 
+   /* Edje_Color_Class: Defines a named color with primary and optional secondary/tertiary colors. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Color_Class);
    _edje_edd_edje_color_class =
      eet_data_descriptor_file_new(&eddc);
@@ -548,31 +811,33 @@ _edje_edd_init(void)
    EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_color_class, Edje_Color_Class, "g3", g3, EET_T_UCHAR);
    EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_color_class, Edje_Color_Class, "b3", b3, EET_T_UCHAR);
    EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_color_class, Edje_Color_Class, "a3", a3, EET_T_UCHAR);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_color_class, Edje_Color_Class, "desc", desc, EET_T_STRING);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_color_class, Edje_Color_Class, "desc", desc, EET_T_STRING);     // Description of the color class.
 
+   /* Edje_Text_Class: Defines a named text style with font and size. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Text_Class);
    _edje_edd_edje_text_class =
       eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_text_class, Edje_Text_Class, "name", name, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_text_class, Edje_Text_Class, "font", font, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_text_class, Edje_Text_Class, "size", size, EET_T_INT);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_text_class, Edje_Text_Class, "name", name, EET_T_STRING); // Name of the text class.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_text_class, Edje_Text_Class, "font", font, EET_T_STRING); // Font name (e.g., "Sans", "Serif").
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_text_class, Edje_Text_Class, "size", size, EET_T_INT);    // Font size in points.
 
+   /* Edje_Size_Class: Defines a named size constraint with min/max width and height. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Size_Class);
    _edje_edd_edje_size_class =
       eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_size_class, Edje_Size_Class, "name", name, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_size_class, Edje_Size_Class, "minw", minw, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_size_class, Edje_Size_Class, "minh", minh, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_size_class, Edje_Size_Class, "maxw", maxw, EET_T_INT);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_size_class, Edje_Size_Class, "maxh", maxh, EET_T_INT);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_size_class, Edje_Size_Class, "name", name, EET_T_STRING); // Name of the size class.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_size_class, Edje_Size_Class, "minw", minw, EET_T_INT);    // Minimum width.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_size_class, Edje_Size_Class, "minh", minh, EET_T_INT);    // Minimum height.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_size_class, Edje_Size_Class, "maxw", maxw, EET_T_INT);    // Maximum width.
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_size_class, Edje_Size_Class, "maxh", maxh, EET_T_INT);    // Maximum height.
 
-   /* evas filters */
+   /* Edje_Part_Description_Spec_Filter_Data: Key-value pair for filter data. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_Part_Description_Spec_Filter_Data);
    _edje_edd_edje_part_description_filter_data = eet_data_descriptor_file_new(&eddc);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_part_description_filter_data, Edje_Part_Description_Spec_Filter_Data, "name", name, EET_T_STRING);
-   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_part_description_filter_data, Edje_Part_Description_Spec_Filter_Data, "value", value, EET_T_STRING);
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_part_description_filter_data, Edje_Part_Description_Spec_Filter_Data, "name", name, EET_T_STRING);   // Data item name (key).
+   EET_DATA_DESCRIPTOR_ADD_BASIC(_edje_edd_edje_part_description_filter_data, Edje_Part_Description_Spec_Filter_Data, "value", value, EET_T_STRING); // Data item value.
 
-   /* the main file directory */
+   /* Edje_File: The root structure of an Edje file, containing all other directories and global properties. */
    EET_EINA_FILE_DATA_DESCRIPTOR_CLASS_SET(&eddc, Edje_File);
    eddc.func.hash_add = (void * (*)(void *, const char *, void *))_edje_eina_hash_add_alloc;
    _edje_edd_edje_file = eet_data_descriptor_file_new(&eddc);

@@ -1,5 +1,16 @@
 #include "evas_engine_filter.h"
 
+/**
+ * @internal
+ * @brief Applies an inverse color filter to an Ector buffer.
+ *
+ * This function reads pixel data from the input buffer, inverts the RGB
+ * components (leaving alpha unchanged), and writes the result to the
+ * output buffer. The inversion is calculated as `NewColor = Alpha - OldColor`.
+ *
+ * @param cmd The filter command structure containing input and output buffers.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _evas_filter_inverse_color(Evas_Filter_Command *cmd)
 {
@@ -46,6 +57,18 @@ end:
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Returns the function pointer for the inverse color filter.
+ *
+ * This function validates the filter command and its input/output buffers,
+ * then returns a pointer to the `_evas_filter_inverse_color` function.
+ *
+ * @param cmd The filter command structure.
+ * @return A function pointer to the inverse color filter implementation
+ *         (`_evas_filter_inverse_color`) on success, or NULL on failure
+ *         (e.g., if command or buffers are invalid).
+ */
 Software_Filter_Func
 eng_filter_inverse_color_func_get(Evas_Filter_Command *cmd)
 {

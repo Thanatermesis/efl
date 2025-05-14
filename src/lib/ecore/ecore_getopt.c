@@ -35,12 +35,59 @@ static int _argc = 0;
 static int cols = 80;
 static int helpcol = 80 / 3;
 
-
+/**
+ * @internal
+ * @brief Checks if the given option descriptor is a sentinel.
+ *
+ * A sentinel descriptor marks the end of the options array.
+ * It is identified by having a NUL shortname, a NULL longname,
+ * and not being an ECORE_GETOPT_ACTION_CATEGORY.
+ *
+ * @param desc The option descriptor to check.
+ * @return EINA_TRUE if the descriptor is a sentinel, EINA_FALSE otherwise.
+ */
 static Eina_Bool _ecore_getopt_desc_is_sentinel(const Ecore_Getopt_Desc *desc);
+
+/**
+ * @internal
+ * @brief Determines the argument requirement for a given option descriptor.
+ *
+ * Based on the action type of the descriptor, this function returns whether
+ * an argument is required, optional, or not allowed.
+ *
+ * @param desc The option descriptor.
+ * @return The argument requirement status.
+ */
 static Ecore_Getopt_Desc_Arg_Requirement _ecore_getopt_desc_arg_requirement(const Ecore_Getopt_Desc *desc);
+
+/**
+ * @internal
+ * @brief Sets up the metavar string for an option descriptor for help display.
+ *
+ * If a metavar is explicitly provided in the descriptor, it's used.
+ * Otherwise, if a longname is present, an uppercased version of it is used.
+ * The resulting string is copied to the `metavar` buffer.
+ *
+ * @param desc The option descriptor.
+ * @param metavar Output buffer to store the metavar string.
+ * @param metavarlen Pointer to store the length of the generated metavar string.
+ * @param maxsize The maximum size of the `metavar` buffer.
+ */
 static void _ecore_getopt_help_desc_setup_metavar(const Ecore_Getopt_Desc *desc, char *metavar, int *metavarlen, int maxsize);
 
-
+/**
+ * @internal
+ * @brief Prints a text string to a file, replacing "%prog" with the program name.
+ *
+ * This function iterates through the input text. If it encounters "%prog",
+ * it substitutes it with the program name (or "???" if not set).
+ * Other occurrences of '%' are printed literally, unless followed by another '%',
+ * in which case a single '%' is printed. A newline is appended at the end.
+ *
+ * @param fp The file pointer to print to.
+ * @param parser The Ecore_Getopt parser (currently unused in this function but kept for API consistency).
+ * @param text The text string to print, possibly containing "%prog".
+ */
 static void
 _ecore_getopt_help_print_replace_program(FILE               *fp,
                                          const Ecore_Getopt *parser EINA_UNUSED,
@@ -78,6 +125,16 @@ _ecore_getopt_help_print_replace_program(FILE               *fp,
    fputc('\n', fp);
 }
 
+/**
+ * @internal
+ * @brief Prints the program version information to a file.
+ *
+ * It prepends "Version: " to the version string defined in the parser.
+ * If the version string contains "%prog", it's replaced by the program name.
+ *
+ * @param fp The file pointer to print to.
+ * @param parser The Ecore_Getopt parser containing the version string.
+ */
 static void
 _ecore_getopt_version(FILE               *fp,
                       const Ecore_Getopt *parser)
@@ -87,6 +144,19 @@ _ecore_getopt_version(FILE               *fp,
    _ecore_getopt_help_print_replace_program(fp, parser, parser->version);
 }
 
+/**
+ * @internal
+ * @brief Prints the usage line for the program to a file.
+ *
+ * If a custom usage string is provided in the parser, it's used (with "%prog" replacement).
+ * Otherwise, a default usage line is constructed: "prog [options]".
+ * If there are positional arguments defined (sentinel descriptor with metavar),
+ * they are appended to the usage line, enclosed in "[]" if not strictly required,
+ * and followed by "..." if the action is ECORE_GETOPT_ACTION_APPEND.
+ *
+ * @param fp The file pointer to print to.
+ * @param parser The Ecore_Getopt parser.
+ */
 static void
 _ecore_getopt_help_usage(FILE               *fp,
                          const Ecore_Getopt *parser)
@@ -138,6 +208,23 @@ _ecore_getopt_help_usage(FILE               *fp,
    _ecore_getopt_help_print_replace_program(fp, parser, gettext(parser->usage));
 }
 
+/**
+ * @internal
+ * @brief Prints a segment of text to a file, handling line wrapping and indentation.
+ *
+ * This function attempts to print `len` characters from `text` to `fp`.
+ * It wraps lines at spaces to fit within `total` columns.
+ * New lines in the input text force a line break. Tabs are expanded to the next
+ * multiple of 8 columns.
+ *
+ * @param fp The file pointer to print to.
+ * @param base The base indentation (number of spaces) for subsequent wrapped lines.
+ * @param total The total available width for the line (columns).
+ * @param used The number of columns already used on the current line.
+ * @param text The text to print.
+ * @param len The length of the text to print.
+ * @return The number of columns used on the last printed line.
+ */
 static int
 _ecore_getopt_help_line(FILE       *fp,
                         const int   base,
@@ -236,6 +323,17 @@ _ecore_getopt_help_line(FILE       *fp,
    return used;
 }
 
+/**
+ * @internal
+ * @brief Prints the program's description text to a file.
+ *
+ * The description is retrieved from the parser. Occurrences of "%prog" and
+ * "%version" are replaced with the program name and version respectively.
+ * The text is wrapped to fit within the configured column width.
+ *
+ * @param fp The file pointer to print to.
+ * @param parser The Ecore_Getopt parser containing the description and version.
+ */
 static void
 _ecore_getopt_help_description(FILE               *fp,
                                const Ecore_Getopt *parser)
@@ -293,6 +391,16 @@ _ecore_getopt_help_description(FILE               *fp,
    fputs("\n\n", fp);
 }
 
+/**
+ * @internal
+ * @brief Prints the program's copyright information to a file.
+ *
+ * The copyright text is retrieved from the parser. It's prefixed with "Copyright:"
+ * and indented. The text is wrapped to fit within the configured column width.
+ *
+ * @param fp The file pointer to print to.
+ * @param parser The Ecore_Getopt parser containing the copyright string.
+ */
 static void
 _ecore_getopt_copyright(FILE               *fp,
                         const Ecore_Getopt *parser)
@@ -305,6 +413,16 @@ _ecore_getopt_copyright(FILE               *fp,
    fputc('\n', fp);
 }
 
+/**
+ * @internal
+ * @brief Prints the program's license information to a file.
+ *
+ * The license text is retrieved from the parser. It's prefixed with "License:"
+ * and indented. The text is wrapped to fit within the configured column width.
+ *
+ * @param fp The file pointer to print to.
+ * @param parser The Ecore_Getopt parser containing the license string.
+ */
 static void
 _ecore_getopt_license(FILE               *fp,
                       const Ecore_Getopt *parser)

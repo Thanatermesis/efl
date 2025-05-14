@@ -3,6 +3,16 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback function invoked when a radio button's value changes.
+ *
+ * This function prints the memory address of the radio object and its new
+ * integer value to standard output.
+ *
+ * @param data Custom data pointer (unused).
+ * @param obj The Evas_Object that triggered the event (the radio button).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _rd_changed_cb(void *data EINA_UNUSED, Evas_Object *obj,
                void *event_info EINA_UNUSED)
@@ -10,6 +20,16 @@ _rd_changed_cb(void *data EINA_UNUSED, Evas_Object *obj,
    printf("radio(%p) value : %d\n", obj, elm_radio_value_get(obj));
 }
 
+/**
+ * @brief Callback function invoked when the selected radio button in a group changes.
+ *
+ * This function prints the memory address of the radio group object and the
+ * new selected value to standard output.
+ *
+ * @param data Custom data pointer (unused).
+ * @param obj The Evas_Object that triggered the event (the radio group).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _rdg_changed_cb(void *data EINA_UNUSED, Evas_Object *obj,
                 void *event_info EINA_UNUSED)
@@ -17,6 +37,24 @@ _rdg_changed_cb(void *data EINA_UNUSED, Evas_Object *obj,
    printf("radio(%p) group value : %d\n", obj, elm_radio_value_get(obj));
 }
 
+/**
+ * @brief Creates a frame containing a complex group of radio buttons.
+ *
+ * This function demonstrates various features of radio buttons, including:
+ * - Sizing an icon to the radio button.
+ * - Using an icon with no scaling.
+ * - A radio button with only a label.
+ * - A disabled radio button with a label.
+ * - A radio button with only an icon.
+ * - A disabled radio button with only an icon.
+ *
+ * The created radio buttons are added to a radio group, and the entire
+ * group is placed inside a new frame, which is then packed into the
+ * provided box container.
+ *
+ * @param bx The box container to which the new frame will be added.
+ * @param style The visual style to apply to the radio buttons (e.g., "default", "plain").
+ */
 static void
 _group_1_create(Evas_Object *bx, const char *style)
 {
@@ -122,6 +160,16 @@ _group_1_create(Evas_Object *bx, const char *style)
    elm_radio_value_set(rdg, 2);
 }
 
+/**
+ * @brief Creates a frame containing a simple group of radio buttons.
+ *
+ * This function demonstrates a basic radio group with three radio buttons,
+ * each having a text label. The group is placed inside a new frame, which
+ * is then packed into the provided box container.
+ *
+ * @param bx The box container to which the new frame will be added.
+ * @param style The visual style to apply to the radio buttons (e.g., "default", "plain").
+ */
 static void
 _group_2_create(Evas_Object *bx, const char *style)
 {
@@ -177,6 +225,22 @@ _group_2_create(Evas_Object *bx, const char *style)
    evas_object_show(rd);
 }
 
+/**
+ * @brief The main function for the radio button test.
+ *
+ * This function creates a new window and populates it with several groups of
+ * radio buttons to demonstrate different styles and configurations. It sets up
+ * a horizontal layout and adds four columns, each containing two radio groups
+ * (_group_1_create and _group_2_create) with a specific style: "default",
+ * "plain", "icon", and "sort_header".
+ *
+ * This function is typically registered as a callback for a main menu or
+ * test launcher in the Elementary test suite.
+ *
+ * @param data Custom data pointer (unused).
+ * @param obj The Evas_Object that triggered the action (unused).
+ * @param event_info Event-specific information (unused).
+ */
 void
 test_radio(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
            void *event_info EINA_UNUSED)

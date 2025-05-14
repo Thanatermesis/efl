@@ -104,308 +104,389 @@ typedef struct Input_Sequence
 typedef struct Comp_Subsurface Comp_Subsurface;
 typedef struct Comp_Surface Comp_Surface;
 
+/**
+ * @brief Represents a Wayland buffer attached to a surface.
+ *
+ * This structure holds information about a Wayland buffer, including its
+ * resource, associated surface, dimensions, and listeners. It can be
+ * an SHM buffer or a DMA-BUF buffer.
+ */
 typedef struct Comp_Buffer
 {
-   struct wl_resource *res;
-   Comp_Surface *cs;
-   Eina_List *renders;
-   Eina_List *post_renders;
-   int x, y, w, h;
-   struct wl_listener destroy_listener;
-   struct wl_shm_buffer *shm_buffer;
-   struct wl_shm_pool *pool;
-   struct linux_dmabuf_buffer *dmabuf_buffer;
-   Eina_Bool dbg : 1;
+   struct wl_resource *res; /**< The Wayland buffer resource. */
+   Comp_Surface *cs; /**< The compositor surface this buffer is associated with. */
+   Eina_List *renders; /**< List of Evas canvases that need to render this buffer. */
+   Eina_List *post_renders; /**< List of Evas canvases for post-render operations. */
+   int x, y, w, h; /**< Buffer position (relative to surface) and dimensions. */
+   struct wl_listener destroy_listener; /**< Listener for buffer destruction. */
+   struct wl_shm_buffer *shm_buffer; /**< Pointer to SHM buffer, if applicable. */
+   struct wl_shm_pool *pool; /**< SHM pool, if applicable. */
+   struct linux_dmabuf_buffer *dmabuf_buffer; /**< Pointer to DMA-BUF buffer, if applicable. */
+   Eina_Bool dbg : 1; /**< Debug flag. */
 } Comp_Buffer;
 
+/**
+ * @brief Main compositor structure.
+ *
+ * Holds all global state for the Wayland compositor instance, including
+ * display connections, surfaces, seats, and rendering context.
+ */
 typedef struct Comp
 {
-   Efl_Canvas_Wl_Rotation rotation;
-   double scale;
-   char *env;
-   Efl_Exe_Flags flags;
-   Ecore_Wl2_Display *disp;
-   Ecore_Wl2_Display *parent_disp;
-   Ecore_Wl2_Display *client_disp;
-   struct wl_display *display;
+   Efl_Canvas_Wl_Rotation rotation; /**< Current output rotation. */
+   double scale; /**< Current output scale factor. */
+   char *env; /**< Original WAYLAND_DISPLAY value for client processes. */
+   Efl_Exe_Flags flags; /**< Execution flags for child processes. */
+   Ecore_Wl2_Display *disp; /**< Ecore_Wl2 display for the compositor itself. */
+   Ecore_Wl2_Display *parent_disp; /**< Ecore_Wl2 display connection to a parent compositor (if nested). */
+   Ecore_Wl2_Display *client_disp; /**< Ecore_Wl2 display connection used by proxied clients. */
+   struct wl_display *display; /**< The Wayland display object. */
 
-   double wayland_time_base;
-   Eo *obj;
-   Eo *clip;
-   Eo *events;
+   double wayland_time_base; /**< Time base for Wayland timestamps. */
+   Eo *obj; /**< The Efl_Canvas_Wl object. */
+   Eo *clip; /**< Clipper object for the canvas. */
+   Eo *events; /**< Event handling rectangle. */
 
-   Eina_Hash *exes;
+   Eina_Hash *exes; /**< Hash of PIDs of allowed client executables. If NULL, all clients are allowed. */
 
-   Eina_Inlist *surfaces;
-   unsigned int surfaces_count;
-   Eina_Hash *client_surfaces;
-   Comp_Surface *active_surface;
+   Eina_Inlist *surfaces; /**< Inlist of top-level Comp_Surface objects. */
+   unsigned int surfaces_count; /**< Number of top-level surfaces. */
+   Eina_Hash *client_surfaces; /**< Hash mapping wl_client to Eina_List of Comp_Surface. */
+   Comp_Surface *active_surface; /**< The currently active (focused) surface. */
 
-   Eina_Inlist *shells;
-   Eina_List *render_queue;
-   Eina_List *post_render_queue;
-   Evas *evas;
-   Evas_GL *gl;
-   Evas_GL_Config *glcfg;
-   Evas_GL_Context *glctx;
-   Evas_GL_Surface *glsfc;
-   Evas_GL_API *glapi;
-   Eina_List *output_resources;
-   Eina_Inlist *seats;
-   Eina_Bool rendering : 1;
-   Eina_Bool data_device_proxy : 1;
-   Eina_Bool x11_selection : 1;
-   Eina_Bool rtl : 1;
-   Eina_Bool aspect : 1;
-   Eina_Bool minmax : 1;
+   Eina_Inlist *shells; /**< Inlist of Shell_Data (xdg_wm_base instances). */
+   Eina_List *render_queue; /**< List of surfaces needing rendering. */
+   Eina_List *post_render_queue; /**< List of surfaces for post-render processing. */
+   Evas *evas; /**< The Evas canvas. */
+   Evas_GL *gl; /**< Evas GL context, if available. */
+   Evas_GL_Config *glcfg; /**< Evas GL configuration. */
+   Evas_GL_Context *glctx; /**< Evas GL context. */
+   Evas_GL_Surface *glsfc; /**< Evas GL surface. */
+   Evas_GL_API *glapi; /**< Evas GL API. */
+   Eina_List *output_resources; /**< List of wl_output resources. */
+   Eina_Inlist *seats; /**< Inlist of Comp_Seat objects. */
+   Eina_Bool rendering : 1; /**< Flag indicating if a render cycle is in progress. */
+   Eina_Bool data_device_proxy : 1; /**< Flag to enable data device proxying. */
+   Eina_Bool x11_selection : 1; /**< Flag indicating if this compositor owns the X11 selection. */
+   Eina_Bool rtl : 1; /**< Flag for right-to-left output transform. */
+   Eina_Bool aspect : 1; /**< Flag to propagate aspect hints. */
+   Eina_Bool minmax : 1; /**< Flag to propagate min/max size hints. */
 } Comp;
 
 typedef struct Comp_Data_Device_Source Comp_Data_Device_Source;
 
+/**
+ * @brief Represents a seat (a collection of input devices).
+ *
+ * This structure manages input devices like keyboard, pointer, and touch
+ * for a specific seat. It handles input events, focus, and data device
+ * operations (drag & drop, clipboard).
+ */
 typedef struct Comp_Seat
 {
-   EINA_INLIST;
-   Comp *c;
-   Eina_Stringshare *name;
-   struct wl_global *global;
+   EINA_INLIST; /**< Inlist node for Comp->seats. */
+   Comp *c; /**< Pointer to the main compositor structure. */
+   Eina_Stringshare *name; /**< Name of the seat. */
+   struct wl_global *global; /**< Wayland global for this seat. */
 
-   Ecore_Wl2_Input *seat;
-   Ecore_Wl2_Input *client_seat;
-   Ecore_Wl2_Offer *client_offer;
-   uint32_t client_selection_serial;
-   Eo *dev;
-   Eina_List *resources;
+   Ecore_Wl2_Input *seat; /**< Ecore_Wl2 input for this seat (if nested). */
+   Ecore_Wl2_Input *client_seat; /**< Ecore_Wl2 input for proxied clients. */
+   Ecore_Wl2_Offer *client_offer; /**< Current DND offer for proxied clients. */
+   uint32_t client_selection_serial; /**< Serial for client-side selection. */
+   Eo *dev; /**< Evas device object for this seat. */
+   Eina_List *resources; /**< List of wl_seat resources for this seat. */
 
-   Eina_Hash *data_devices;
+   Eina_Hash *data_devices; /**< Hash mapping wl_client to wl_data_device resource. */
+   /** @brief Drag and drop state. */
    struct
    {
-      struct wl_resource *res;
-      Comp_Data_Device_Source *source;
-      Comp_Surface *surface;
-      Comp_Surface *enter;
-      uint32_t id;
-      Ecore_Evas *proxy_win;
-      Ecore_Window x11_owner;
-      Eina_List *x11_types;
-      Eina_Bool tch : 1;
+      struct wl_resource *res; /**< The wl_data_device resource initiating the drag. */
+      Comp_Data_Device_Source *source; /**< The data source for the drag. */
+      Comp_Surface *surface; /**< The surface used as the drag icon. */
+      Comp_Surface *enter; /**< The surface currently under the drag cursor. */
+      uint32_t id; /**< ID of the touch point or mouse button initiating drag. */
+      Ecore_Evas *proxy_win; /**< Proxy window for external drag operations. */
+      Ecore_Window x11_owner; /**< X11 window owning the drag (if proxied from X11). */
+      Eina_List *x11_types; /**< MIME types for X11 drag. */
+      Eina_Bool tch : 1; /**< True if drag is touch-initiated. */
    } drag;
-   Comp_Data_Device_Source *selection_source;
-   uint32_t selection_serial;
-   Ecore_Window x11_selection_owner;
+   Comp_Data_Device_Source *selection_source; /**< Current clipboard selection source. */
+   uint32_t selection_serial; /**< Serial for the current selection. */
+   Ecore_Window x11_selection_owner; /**< X11 window owning the selection (if proxied from X11). */
 
-   struct wl_client *active_client;
-   Comp_Surface *grab;
+   struct wl_client *active_client; /**< The client that currently has keyboard focus. */
+   Comp_Surface *grab; /**< Surface that has an active pointer or touch grab. */
 
+   /** @brief Keyboard-specific state. */
    struct
    {
-      struct wl_array keys;
-      struct wl_array *keys_external;
+      struct wl_array keys; /**< Array of currently pressed key codes (sent to client). */
+      struct wl_array *keys_external; /**< Array of pressed keys from an external source. */
+      /** @brief Keyboard modifier state. */
       struct
       {
-         xkb_mod_mask_t depressed;
-         xkb_mod_mask_t latched;
-         xkb_mod_mask_t locked;
-         xkb_layout_index_t group;
-         Eina_Bool changed : 1;
+         xkb_mod_mask_t depressed; /**< Depressed modifiers. */
+         xkb_mod_mask_t latched; /**< Latched modifiers. */
+         xkb_mod_mask_t locked; /**< Locked modifiers. */
+         xkb_layout_index_t group; /**< Current layout group. */
+         Eina_Bool changed : 1; /**< True if modifier state has changed. */
       } mods;
-      struct xkb_context *context;
-      struct xkb_keymap *keymap;
-      struct xkb_state *state;
-      const char *keymap_str;
-      int keymap_str_size;
-      int repeat_rate;
-      int repeat_delay;
-      Eina_Hash *resources;
-      Comp_Surface *enter;
-      Eina_Bool external : 1;
+      struct xkb_context *context; /**< XKB context. */
+      struct xkb_keymap *keymap; /**< XKB keymap. */
+      struct xkb_state *state; /**< XKB state. */
+      const char *keymap_str; /**< String representation of the keymap. */
+      int keymap_str_size; /**< Size of the keymap string. */
+      int repeat_rate; /**< Keyboard repeat rate. */
+      int repeat_delay; /**< Keyboard repeat delay. */
+      Eina_Hash *resources; /**< Hash mapping wl_client to Eina_List of wl_keyboard resources. */
+      Comp_Surface *enter; /**< Surface with keyboard focus. */
+      Eina_Bool external : 1; /**< True if keyboard is managed externally. */
    } kbd;
 
+   /** @brief Pointer-specific state. */
    struct
    {
-      Eina_Hash *resources;
-      uint32_t button_mask;
-      uint32_t enter_serial;
-      Eina_Inlist *events;
-      Comp_Surface *enter;
+      Eina_Hash *resources; /**< Hash mapping wl_client to Eina_List of wl_pointer resources. */
+      uint32_t button_mask; /**< Mask of currently pressed pointer buttons. */
+      uint32_t enter_serial; /**< Serial for the last pointer enter event. */
+      Eina_Inlist *events; /**< Inlist of Input_Sequence for pointer events. */
+      Comp_Surface *enter; /**< Surface currently under the pointer. */
+      /** @brief Cursor state. */
       struct
       {
-         Comp_Surface *surface;
-         int x, y;
+         Comp_Surface *surface; /**< Surface used for the cursor image. */
+         int x, y; /**< Hotspot coordinates for the cursor. */
       } cursor;
+      /** @brief EFL-specific cursor state (for nested compositors). */
       struct
       {
-         Eo *obj;
-         int layer;
-         int x, y;
+         Eo *obj; /**< Original cursor object from parent compositor. */
+         int layer; /**< Original cursor layer. */
+         int x, y; /**< Original cursor hotspot. */
       } efl;
-      Evas_Point pos;
-      Eina_Bool in : 1;
+      Evas_Point pos; /**< Current pointer position. */
+      Eina_Bool in : 1; /**< True if pointer is inside the compositor window. */
    } ptr;
 
+   /** @brief Touch-specific state. */
    struct
    {
-      Eina_Hash *resources;
-      Eina_Inlist *events;
-      Comp_Surface *enter;
-      Evas_Point pos;
+      Eina_Hash *resources; /**< Hash mapping wl_client to Eina_List of wl_touch resources. */
+      Eina_Inlist *events; /**< Inlist of Input_Sequence for touch events. */
+      Comp_Surface *enter; /**< Surface currently under touch focus. */
+      Evas_Point pos; /**< Current primary touch point position. */
    } tch;
 
-   Eina_Bool pointer : 1;
-   Eina_Bool keyboard : 1;
-   Eina_Bool touch : 1;
-   Eina_Bool focused : 1;
-   Eina_Bool selection_changed : 1;
-   Eina_Bool selection_exists : 1;
-   Eina_Bool event_propagate : 1;
+   Eina_Bool pointer : 1; /**< Seat has pointer capability. */
+   Eina_Bool keyboard : 1; /**< Seat has keyboard capability. */
+   Eina_Bool touch : 1; /**< Seat has touch capability. */
+   Eina_Bool focused : 1; /**< Compositor window has focus from parent. */
+   Eina_Bool selection_changed : 1; /**< Clipboard selection has changed (in parent). */
+   Eina_Bool selection_exists : 1; /**< Clipboard selection exists (in parent). */
+   Eina_Bool event_propagate : 1; /**< Flag to control event propagation. */
 } Comp_Seat;
 
+/**
+ * @brief Represents the pending state of a buffer attached to a surface.
+ *
+ * This structure holds information about a buffer that is pending commit,
+ * including damage regions, opaque regions, input regions, and frame callbacks.
+ */
 typedef struct Comp_Buffer_State
 {
-   Comp_Buffer *buffer;
-   Eina_Tiler *opaque;
-   Eina_Tiler *damages;
-   Eina_Tiler *input;
-   Eina_List *frames;
-   Eina_Bool attach : 1;
-   Eina_Bool set_opaque : 1;
-   Eina_Bool set_input : 1;
+   Comp_Buffer *buffer; /**< The buffer associated with this state. */
+   Eina_Tiler *opaque; /**< Tiler for opaque regions. */
+   Eina_Tiler *damages; /**< Tiler for damage regions. */
+   Eina_Tiler *input; /**< Tiler for input regions. */
+   Eina_List *frames; /**< List of wl_callback resources for frame notifications. */
+   Eina_Bool attach : 1; /**< True if a buffer is attached in this state. */
+   Eina_Bool set_opaque : 1; /**< True if opaque region is set in this state. */
+   Eina_Bool set_input : 1; /**< True if input region is set in this state. */
 } Comp_Buffer_State;
 
+/**
+ * @brief Represents an xdg_wm_base (shell) instance.
+ *
+ * This structure holds data associated with an xdg_wm_base global,
+ * including its surfaces and positioners.
+ */
 typedef struct Shell_Data
 {
-   EINA_INLIST;
-   Comp *c;
-   struct wl_resource *res;
-   Eina_List *surfaces;
-   Eina_Inlist *positioners;
-   Eina_Bool ping : 1;
+   EINA_INLIST; /**< Inlist node for Comp->shells. */
+   Comp *c; /**< Pointer to the main compositor structure. */
+   struct wl_resource *res; /**< The xdg_wm_base resource. */
+   Eina_List *surfaces; /**< List of xdg_surface resources associated with this shell. */
+   Eina_Inlist *positioners; /**< Inlist of Shell_Positioner objects. */
+   Eina_Bool ping : 1; /**< True if a ping has been sent and pong is awaited. */
 } Shell_Data;
 
 
+/**
+ * @brief Represents an xdg_positioner object.
+ *
+ * This structure defines rules for positioning a popup surface relative
+ * to its parent.
+ */
 typedef struct Shell_Positioner
 {
-   EINA_INLIST;
-   Shell_Data *sd;
-   struct wl_resource *res;
-   Evas_Coord_Size size;
-   Eina_Rectangle anchor_rect;
-   enum xdg_positioner_anchor anchor;
-   enum xdg_positioner_gravity gravity;
-   enum xdg_positioner_constraint_adjustment constrain;
-   Evas_Coord_Point offset;
+   EINA_INLIST; /**< Inlist node for Shell_Data->positioners. */
+   Shell_Data *sd; /**< Pointer to the parent Shell_Data. */
+   struct wl_resource *res; /**< The xdg_positioner resource. */
+   Evas_Coord_Size size; /**< Size of the popup. */
+   Eina_Rectangle anchor_rect; /**< Anchor rectangle for positioning. */
+   enum xdg_positioner_anchor anchor; /**< Anchor point. */
+   enum xdg_positioner_gravity gravity; /**< Gravity for positioning. */
+   enum xdg_positioner_constraint_adjustment constrain; /**< Constraint adjustment rules. */
+   Evas_Coord_Point offset; /**< Offset from the anchor point. */
 } Shell_Positioner;
 
+/**
+ * @brief Represents a Wayland surface in the compositor.
+ *
+ * This structure holds all information about a client's surface, including
+ * its Evas objects, associated buffers, role (toplevel, popup, subsurface),
+ * and state.
+ */
 struct Comp_Surface
 {
-   EINA_INLIST;
-   Comp *c;
-   Eo *obj;
-   Eo *clip;
-   Eo *img;
-   Eina_Array *input_rects;
-   Eina_Array *opaque_rects;
-   Eina_List *proxies;
-   struct wl_resource *res;
-   struct wl_resource *role;
-   Comp_Seat *drag; //drag surface
-   Comp_Buffer *buffer[2]; // new, prev
+   EINA_INLIST; /**< Inlist node for Comp->surfaces or parent->children. */
+   Comp *c; /**< Pointer to the main compositor structure. */
+   Eo *obj; /**< The Efl_Canvas_Wl_Surface Evas object. */
+   Eo *clip; /**< Clipper object for this surface. */
+   Eo *img; /**< Evas image object displaying the surface content. */
+   Eina_Array *input_rects; /**< Array of Evas_Object rectangles for custom input regions. */
+   Eina_Array *opaque_rects; /**< Array of Evas_Object rectangles for custom opaque regions. */
+   Eina_List *proxies; /**< List of Evas objects proxying this surface (e.g., for drag icons). */
+   struct wl_resource *res; /**< The wl_surface resource. */
+   struct wl_resource *role; /**< The role resource (e.g., xdg_toplevel, xdg_popup, wl_subsurface). */
+   Comp_Seat *drag; /**< Seat associated with this surface if it's a drag icon. */
+   Comp_Buffer *buffer[2]; /**< Current and previous attached buffers: [0] is new/pending, [1] is current/previous. */
    /* subsurface stacking order */
-   Eina_List *subsurfaces;
-   Eina_List *pending_subsurfaces;
+   Eina_List *subsurfaces; /**< List of Comp_Subsurface children, in stacking order. */
+   Eina_List *pending_subsurfaces; /**< Pending list of subsurfaces before commit. */
    /* any child surface (xdg or subsurface */
-   Eina_Inlist *children;
-   Comp_Surface *parent;
+   Eina_Inlist *children; /**< Inlist of all child surfaces (subsurfaces or popups). */
+   Comp_Surface *parent; /**< Parent surface, if this is a subsurface or popup. */
 
-   Eina_Tiler *opaque;
-   Eina_Tiler *input;
-   Eina_List *frames;
-   Comp_Subsurface *subsurface;
-   Comp_Buffer_State pending;
+   Eina_Tiler *opaque; /**< Current opaque region. */
+   Eina_Tiler *input; /**< Current input region. */
+   Eina_List *frames; /**< List of wl_callback resources for frame notifications. */
+   Comp_Subsurface *subsurface; /**< Subsurface-specific data, if this is a subsurface. */
+   Comp_Buffer_State pending; /**< Pending state for the next commit. */
+   /** @brief Shell-specific (xdg_surface) state. */
    struct
    {
-      struct wl_resource *surface;
-      Eina_Rectangle geom;
-      Shell_Data *data;
-      Eina_Stringshare *title;
-      Eina_Stringshare *app_id;
-      Shell_Positioner *positioner;
-      Eina_List *grabs;
-      Eina_Bool popup : 1;
-      Eina_Bool new : 1;
-      Eina_Bool activated : 1;
+      struct wl_resource *surface; /**< The xdg_surface resource. */
+      Eina_Rectangle geom; /**< Window geometry requested by client. */
+      Shell_Data *data; /**< Associated Shell_Data (xdg_wm_base). */
+      Eina_Stringshare *title; /**< Window title. */
+      Eina_Stringshare *app_id; /**< Application ID. */
+      Shell_Positioner *positioner; /**< Positioner for popups. */
+      Eina_List *grabs; /**< List of Comp_Seat that grabbed this popup. */
+      Eina_Bool popup : 1; /**< True if this is an xdg_popup. */
+      Eina_Bool new : 1; /**< True if this is a new shell surface awaiting first configure. */
+      Eina_Bool activated : 1; /**< True if this shell surface is activated (focused). */
    } shell;
-   Eina_Bool mapped : 1;
-   Eina_Bool cursor : 1;
-   Eina_Bool render_queue : 1;
-   Eina_Bool post_render_queue : 1;
-   Eina_Bool dead : 1;
-   Eina_Bool commit : 1;
-   Eina_Bool extracted : 1;
-   Eina_Bool hint_set_weight : 1;
+   Eina_Bool mapped : 1; /**< True if the surface is currently mapped (visible and has a buffer). */
+   Eina_Bool cursor : 1; /**< True if this surface is used as a cursor. */
+   Eina_Bool render_queue : 1; /**< True if this surface is in the render_queue. */
+   Eina_Bool post_render_queue : 1; /**< True if this surface is in the post_render_queue. */
+   Eina_Bool dead : 1; /**< True if the surface resource has been destroyed but Evas object still exists. */
+   Eina_Bool commit : 1; /**< True if a commit operation is in progress for this surface. */
+   Eina_Bool extracted : 1; /**< True if the surface has been extracted from the main scene graph. */
+   Eina_Bool hint_set_weight : 1; /**< True if weight hint has been set by client. */
 };
 
+/**
+ * @brief Represents a subsurface.
+ *
+ * This structure holds data specific to a wl_subsurface, linking it to its
+ * parent surface and managing its cached state.
+ */
 struct Comp_Subsurface
 {
-   Comp_Surface *surface;
-   Comp_Buffer_State cache;
-   Evas_Point offset;
-   Evas_Point pending_offset;
-   Eina_Bool set_offset : 1;
-   Eina_Bool sync : 1;
-   Eina_Bool cached : 1;
+   Comp_Surface *surface; /**< The Comp_Surface acting as a subsurface. */
+   Comp_Buffer_State cache; /**< Cached state for synchronized subsurfaces. */
+   Evas_Point offset; /**< Current offset relative to the parent surface. */
+   Evas_Point pending_offset; /**< Pending offset for the next commit. */
+   Eina_Bool set_offset : 1; /**< True if offset is pending. */
+   Eina_Bool sync : 1; /**< True if the subsurface is synchronized. */
+   Eina_Bool cached : 1; /**< True if the subsurface state is currently cached. */
 };
 
+/**
+ * @brief Type of data device offer.
+ */
 typedef enum Comp_Data_Device_Offer_Type
 {
-   COMP_DATA_DEVICE_OFFER_TYPE_DND,
-   COMP_DATA_DEVICE_OFFER_TYPE_CLIPBOARD,
+   COMP_DATA_DEVICE_OFFER_TYPE_DND, /**< Drag and drop offer. */
+   COMP_DATA_DEVICE_OFFER_TYPE_CLIPBOARD, /**< Clipboard offer. */
 } Comp_Data_Device_Offer_Type;
 
+/**
+ * @brief Represents a data offer from a wl_data_source.
+ *
+ * This structure is created when a client offers data for drag-and-drop
+ * or clipboard operations.
+ */
 typedef struct Comp_Data_Device_Offer
 {
-   Comp_Data_Device_Offer_Type type;
-   struct wl_resource *res;
-   Comp_Data_Device_Source *source;
-   Ecore_Wl2_Offer *proxy_offer;
-   uint32_t dnd_actions;
-   uint32_t preferred_dnd_action;
-   Eina_Bool in_ask : 1;
-   Eina_Bool proxy : 1;
+   Comp_Data_Device_Offer_Type type; /**< Type of the offer (DND or clipboard). */
+   struct wl_resource *res; /**< The wl_data_offer resource. */
+   Comp_Data_Device_Source *source; /**< The source of this offer. */
+   Ecore_Wl2_Offer *proxy_offer; /**< Proxied offer from a parent compositor. */
+   uint32_t dnd_actions; /**< Supported DND actions by the source. */
+   uint32_t preferred_dnd_action; /**< Preferred DND action by the source. */
+   Eina_Bool in_ask : 1; /**< True if the DND action is "ask". */
+   Eina_Bool proxy : 1; /**< True if this is a proxied offer. */
 } Comp_Data_Device_Offer;
 
+/**
+ * @brief Represents a wl_data_source.
+ *
+ * This structure holds information about a data source, including its
+ * MIME types, DND actions, and ongoing data transfers.
+ */
 typedef struct Comp_Data_Device_Source
 {
-   struct wl_resource *res;
-   Comp_Seat *seat;
-   Comp_Data_Device_Offer *offer;
-   Ecore_Window x11_owner;
-   Eina_Inlist *transfers;
-   Eina_Binbuf *reader_data;
-   Ecore_Fd_Handler *reader;
-   Eina_List *mime_types;
-   uint32_t dnd_actions;
-   uint32_t current_dnd_action;
-   uint32_t compositor_action;
-   Ecore_Event_Handler *proxy_send_handler;
-   uint32_t proxy_serial;
-   Eina_Bool actions_set : 1;
-   Eina_Bool accepted : 1;
-   Eina_Bool proxy : 1;
+   struct wl_resource *res; /**< The wl_data_source resource. */
+   Comp_Seat *seat; /**< The seat associated with this data source. */
+   Comp_Data_Device_Offer *offer; /**< The current offer made from this source. */
+   Ecore_Window x11_owner; /**< X11 window owning this source (if proxied from X11). */
+   Eina_Inlist *transfers; /**< Inlist of Comp_Data_Device_Transfer. */
+   Eina_Binbuf *reader_data; /**< Buffer for reading data from selection. */
+   Ecore_Fd_Handler *reader; /**< FD handler for reading selection data. */
+   Eina_List *mime_types; /**< List of offered MIME types (Eina_Stringshare). */
+   uint32_t dnd_actions; /**< Supported DND actions. */
+   uint32_t current_dnd_action; /**< Current DND action chosen by the target. */
+   uint32_t compositor_action; /**< DND action chosen by the compositor. */
+   Ecore_Event_Handler *proxy_send_handler; /**< Handler for proxied data_source.send events. */
+   uint32_t proxy_serial; /**< Serial for proxied data_source.send events. */
+   Eina_Bool actions_set : 1; /**< True if DND actions have been set. */
+   Eina_Bool accepted : 1; /**< True if the offer has been accepted. */
+   Eina_Bool proxy : 1; /**< True if this is a proxied data source. */
 } Comp_Data_Device_Source;
 
+/**
+ * @brief Represents an ongoing data transfer for a wl_data_offer.receive call.
+ */
 typedef struct Comp_Data_Device_Transfer
 {
-   EINA_INLIST;
-   Comp_Data_Device_Offer_Type type;
-   Ecore_Fd_Handler *fdh;
-   size_t offset;
-   Eina_Stringshare *mime_type;
-   Comp_Data_Device_Source *source;
+   EINA_INLIST; /**< Inlist node for Comp_Data_Device_Source->transfers. */
+   Comp_Data_Device_Offer_Type type; /**< Type of the transfer (DND or clipboard). */
+   Ecore_Fd_Handler *fdh; /**< FD handler for writing data to the client's pipe. */
+   size_t offset; /**< Current offset in the data being transferred. */
+   Eina_Stringshare *mime_type; /**< MIME type of the data being transferred. */
+   Comp_Data_Device_Source *source; /**< The source providing the data. */
 } Comp_Data_Device_Transfer;
 
-static Eina_List *comps;
-static Eina_List *handlers;
+static Eina_List *comps; /**< List of active Comp instances. */
+static Eina_List *handlers; /**< List of global Ecore_Event_Handler instances. */
 
+/**
+ * @brief Creates a new Eina_Tiler with default settings.
+ * @return A new Eina_Tiler instance.
+ */
 static inline Eina_Tiler *
 tiler_new(void)
 {
@@ -416,6 +497,10 @@ tiler_new(void)
    return t;
 }
 
+/**
+ * @brief Deletes an Ecore_Fd_Handler and closes its associated file descriptor.
+ * @param fdh The Ecore_Fd_Handler to delete.
+ */
 static inline void
 fdh_del(Ecore_Fd_Handler *fdh)
 {
@@ -423,12 +508,17 @@ fdh_del(Ecore_Fd_Handler *fdh)
    if (!fdh) return;
    fd = ecore_main_fd_handler_fd_get(fdh);
    if (fd >= 0)
-     close(fd);
+     close(fd); // Ensure the fd is closed before deleting the handler
    ecore_main_fd_handler_del(fdh);
 }
 
 #define PTR_SWAP(A, B) ptr_swap((void**)A, (void**)B)
 
+/**
+ * @brief Swaps the values of two pointers.
+ * @param a Pointer to the first pointer.
+ * @param b Pointer to the second pointer.
+ */
 static inline void
 ptr_swap(void **a, void **b)
 {
@@ -439,6 +529,13 @@ ptr_swap(void **a, void **b)
    *b = c;
 }
 
+/**
+ * @brief Clears an Eina_Array of Evas_Object pointers, deleting each object.
+ * @param arr Pointer to the Eina_Array to clear. The array itself is freed and the pointer set to NULL.
+ *
+ * Example of array elements:
+ * Eina_Array* arr; // contains [Eo* obj1, Eo* obj2, ...]
+ */
 static inline void
 array_clear(Eina_Array **arr)
 {
@@ -446,11 +543,22 @@ array_clear(Eina_Array **arr)
 
    if (!a) return;
    while (eina_array_count(a))
-     evas_object_del(eina_array_pop(a));
+     evas_object_del(eina_array_pop(a)); // Pop and delete each Evas object
    eina_array_free(a);
    *arr = NULL;
 }
 
+/**
+ * @brief Checks if a client is allowed to connect based on its PID.
+ *
+ * If Comp->exes is NULL, all clients are allowed. Otherwise, the client's PID
+ * must be present in the Comp->exes hash.
+ *
+ * @param c The compositor instance.
+ * @param client The Wayland client.
+ * @return EINA_TRUE if the client is allowed, EINA_FALSE otherwise.
+ *         If not allowed, wl_client_post_no_memory() is sent to the client.
+ */
 static inline Eina_Bool
 client_allowed_check(Comp *c, struct wl_client *client)
 {
@@ -463,10 +571,17 @@ client_allowed_check(Comp *c, struct wl_client *client)
    pid = p;
    err = (!c->exes) || !eina_hash_find(c->exes, &pid);
    if (err)
-     wl_client_post_no_memory(client);
+     wl_client_post_no_memory(client); // Send an error if not allowed
    return !err;
 }
 
+/**
+ * @brief Clears the reader associated with a data device source.
+ *
+ * This involves deleting the Ecore_Fd_Handler and freeing the Eina_Binbuf.
+ *
+ * @param ds The data device source.
+ */
 static inline void
 comp_data_device_source_reader_clear(Comp_Data_Device_Source *ds)
 {
@@ -476,63 +591,116 @@ comp_data_device_source_reader_clear(Comp_Data_Device_Source *ds)
    ds->reader_data = NULL;
 }
 
+/**
+ * @brief Reparents a compositor surface.
+ *
+ * Moves a surface `cs` to be a child of `pcs`. If `pcs` is NULL, `cs` becomes
+ * a top-level surface. This function handles Evas smart object membership
+ * and updates the compositor's surface lists accordingly.
+ *
+ * @param cs The surface to reparent.
+ * @param pcs The new parent surface, or NULL for top-level.
+ */
 static inline void
 comp_surface_reparent(Comp_Surface *cs, Comp_Surface *pcs)
 {
-   if (cs->parent == pcs) return;
+   if (cs->parent == pcs) return; // No change needed
+
+   // Remove from old parent's smart object hierarchy if not extracted
    if (!cs->extracted)
      evas_object_smart_member_del(cs->obj);
+
+   // Remove from old parent's child list
    if (cs->parent)
      cs->parent->children = eina_inlist_remove(cs->parent->children, EINA_INLIST_GET(cs));
-   if (pcs)
+
+   if (pcs) // New parent exists
      {
+        // Remove from top-level list and decrement count
         cs->c->surfaces = eina_inlist_remove(cs->c->surfaces, EINA_INLIST_GET(cs));
         cs->c->surfaces_count--;
+        // Add to new parent's smart object hierarchy if not extracted
         if (!cs->extracted)
           evas_object_smart_member_add(cs->obj, pcs->obj);
+        // Add to new parent's child list
         pcs->children = eina_inlist_append(pcs->children, EINA_INLIST_GET(cs));
      }
-   else
+   else // No new parent, becoming top-level
      {
+        // Add to compositor's main smart object if not extracted
         if (!cs->extracted)
           evas_object_smart_member_add(cs->obj, cs->c->obj);
+        // Add to top-level list and increment count
         cs->c->surfaces = eina_inlist_append(cs->c->surfaces, EINA_INLIST_GET(cs));
         cs->c->surfaces_count++;
      }
-   cs->parent = pcs;
+   cs->parent = pcs; // Update parent pointer
 }
 
+/**
+ * @brief Finds the wl_data_device resource for a given client on a seat.
+ * @param s The compositor seat.
+ * @param resource A resource belonging to the client (e.g., wl_surface).
+ * @return The wl_data_device resource for that client, or NULL if not found.
+ */
 static inline struct wl_resource *
 data_device_find(Comp_Seat *s, struct wl_resource *resource)
 {
    struct wl_client *client = wl_resource_get_client(resource);
-   return eina_hash_find(s->data_devices, &client);
+   return eina_hash_find(s->data_devices, &client); // Hash key is wl_client*
 }
 
+/**
+ * @brief Resets the drag state for a seat.
+ * @param s The compositor seat.
+ */
 static inline void
 seat_drag_end(Comp_Seat *s)
 {
-   s->drag.tch = 0;
-   s->drag.id = 0;
-   s->drag.surface = NULL;
-   s->drag.res = NULL;
-   s->drag.enter = NULL;
+   s->drag.tch = 0; // Reset touch drag flag
+   s->drag.id = 0; // Reset drag ID
+   s->drag.surface = NULL; // Clear drag icon surface
+   s->drag.res = NULL; // Clear data device resource for drag
+   s->drag.enter = NULL; // Clear surface entered during drag
 }
 
+/**
+ * @brief Finds the Comp_Seat associated with an Evas device for a given surface.
+ *
+ * If the compositor is not nested, it returns the first seat. Otherwise, it
+ * finds the seat matching the Evas device (or its parent seat device).
+ *
+ * @param cs The compositor surface (used to access the Comp instance).
+ * @param dev The Evas input device.
+ * @return The Comp_Seat, or NULL if not found.
+ */
 static inline Comp_Seat *
 seat_find(Comp_Surface *cs, const Eo *dev)
 {
    const Eo *seat = dev;
    Comp_Seat *s;
 
+   // If not nested, there's usually one seat.
    if (!cs->c->parent_disp) return EINA_INLIST_CONTAINER_GET(cs->c->seats, Comp_Seat);
+
+   // If 'dev' is not a seat device, get its parent seat device.
    if (evas_device_class_get(seat) != EVAS_DEVICE_CLASS_SEAT)
      seat = evas_device_parent_get(seat);
+
    EINA_INLIST_FOREACH(cs->c->seats, s)
      if (s->dev == seat) return s;
    return NULL;
 }
 
+/**
+ * @brief Finds the Comp_Seat associated with an Evas device for a compositor.
+ *
+ * Similar to seat_find, but takes Comp* directly.
+ *
+ * @param c The compositor instance.
+ * @param dev The Evas input device.
+ * @return The Comp_Seat, or NULL if not found.
+ */
 static inline Comp_Seat *
 comp_seat_find(Comp *c, const Eo *dev)
 {
@@ -547,29 +715,61 @@ comp_seat_find(Comp *c, const Eo *dev)
    return NULL;
 }
 
+/**
+ * @brief Gets the list of active wl_keyboard resources for a seat.
+ *
+ * "Active" means resources belonging to the client that owns the currently
+ * focused non-popup surface.
+ *
+ * @param s The compositor seat.
+ * @return An Eina_List of wl_keyboard resources, or NULL if none are active.
+ *         The list is owned by the seat's kbd.resources hash and should not be freed.
+ */
 static inline Eina_List *
 seat_kbd_active_resources_get(Comp_Seat *s)
 {
    Eina_List *l, *lcs, *llcs;
    Comp_Surface *cs;
 
-   if (!s->active_client) return NULL;
-   if (!s->kbd.resources) return NULL;
+   if (!s->active_client) return NULL; // No client has focus
+   if (!s->kbd.resources) return NULL; // No keyboard resources for any client
+
+   // Get list of keyboard resources for the active client
    l = eina_hash_find(s->kbd.resources, &s->active_client);
    if (!l) return NULL;
+
+   // Get list of surfaces for the active client
    lcs = eina_hash_find(s->c->client_surfaces, &s->active_client);
    if (!lcs) return NULL;
+
+   // Iterate surfaces to find a non-popup, role-assigned surface (typically a toplevel)
+   // This ensures keyboard events go to the main window, not transient popups.
    EINA_LIST_REVERSE_FOREACH(lcs, llcs, cs)
-     if (cs->role && (!cs->shell.popup)) return l;
-   return NULL;
+     if (cs->role && (!cs->shell.popup)) return l; // Found one, return the list of kbd resources
+
+   return NULL; // No suitable surface found
 }
 
+/**
+ * @brief Gets the list of wl_pointer resources for a specific client on a seat.
+ * @param s The compositor seat.
+ * @param client The Wayland client.
+ * @return An Eina_List of wl_pointer resources, or NULL if none.
+ *         The list is owned by the seat's ptr.resources hash and should not be freed.
+ */
 static inline Eina_List *
 seat_ptr_resources_get(Comp_Seat *s, struct wl_client *client)
 {
    return s->ptr.resources ? eina_hash_find(s->ptr.resources, &client) : NULL;
 }
 
+/**
+ * @brief Gets the list of wl_touch resources for a specific client on a seat.
+ * @param s The compositor seat.
+ * @param client The Wayland client.
+ * @return An Eina_List of wl_touch resources, or NULL if none.
+ *         The list is owned by the seat's tch.resources hash and should not be freed.
+ */
 static inline Eina_List *
 seat_tch_resources_get(Comp_Seat *s, struct wl_client *client)
 {
@@ -580,6 +780,18 @@ static void comp_render_pre_proxied(Eo *o, Evas *e, void *event_info);
 static void comp_render_post_proxied(Comp_Surface *cs, Evas *e, void *event_info);
 static void comp_surface_commit_image_state(Comp_Surface *cs, Comp_Buffer *buffer, Eo *o);
 
+/**
+ * @brief Callback for EVAS_CALLBACK_DEL on a proxied surface image object.
+ *
+ * Cleans up resources associated with a proxied surface image when it's deleted.
+ * This includes removing it from the parent surface's proxy list and
+ * unregistering render callbacks.
+ *
+ * @param data The Comp_Surface whose image is being proxied.
+ * @param e The Evas canvas of the proxy object.
+ * @param obj The proxy Evas_Object (image) being deleted.
+ * @param event_info Unused.
+ */
 static void
 comp_surface_proxy_del(void *data, Evas *e, Eo *obj, void *event_info EINA_UNUSED)
 {

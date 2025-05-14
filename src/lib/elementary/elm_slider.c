@@ -57,6 +57,19 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {NULL, NULL}
 };
 
+/**
+ * @internal
+ * @brief Timer callback that is called a short while after a slider's value
+ * has changed.
+ *
+ * This function emits the "delay,changed" signal and, if AT-SPI is enabled,
+ * an accessibility value-changed signal.
+ * It is used to avoid possibly expensive reactions to rapid value changes
+ * during continuous dragging.
+ *
+ * @param data The slider Evas_Object.
+ * @return ECORE_CALLBACK_CANCEL to automatically delete the timer.
+ */
 static Eina_Bool
 _delay_change(void *data)
 {
@@ -72,12 +85,33 @@ _delay_change(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @internal
+ * @brief Checks if the given layout orientation is horizontal.
+ *
+ * @param dir The Efl_Ui_Layout_Orientation to check.
+ * @return EINA_TRUE if horizontal (left-to-right or right-to-left),
+ *         EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _is_horizontal(Efl_Ui_Layout_Orientation dir)
 {
    return efl_ui_layout_orientation_is_horizontal(dir, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Determines if the slider is effectively inverted.
+ *
+ * This considers both the slider's explicit inverted property and
+ * the UI mirroring state (for LTR/RTL layouts).
+ * For example, a non-inverted horizontal slider in an RTL context
+ * behaves as if it's inverted.
+ *
+ * @param obj The slider Evas_Object.
+ * @param sd The slider's private data.
+ * @return EINA_TRUE if the slider is effectively inverted, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _is_inverted(Eo *obj, Elm_Slider_Data *sd)
 {
@@ -93,6 +127,18 @@ _is_inverted(Eo *obj, Elm_Slider_Data *sd)
      return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Sets or updates the text of the slider's unit display.
+ *
+ * If a unit format callback (sd->format_cb) is set, it's used to
+ * format the current value (or range span if interval mode is enabled)
+ * into sd->format_strbuf, which is then displayed.
+ * If no callback is set, the unit text is cleared.
+ * It also manages the visibility state of the units part via Edje signals.
+ *
+ * @param obj The slider Evas_Object.
+ */
 static void
 _units_set(Evas_Object *obj)
 {
@@ -137,6 +183,18 @@ _units_set(Evas_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Sets or updates the text of the slider's indicator display.
+ *
+ * This function uses the indicator format callback (sd->indi_format_cb)
+ * to format the slider's current value (sd->val) and, if range mode is
+ * enabled, the 'to' value (sd->intvl_to). The formatted string is then
+ * applied to the "elm.indicator" text part of the main layout, the
+ * draggable slider part, and any associated popups (sd->popup, sd->popup2).
+ *
+ * @param obj The slider Evas_Object.
+ */
 static void
 _indicator_set(Evas_Object *obj)
 {
@@ -172,6 +230,17 @@ _indicator_set(Evas_Object *obj)
     eina_value_flush(&val);
 }
 
+/**
+ * @internal
+ * @brief Sets or updates the text for the minimum and maximum value indicators.
+ *
+ * This function is typically used by styles that display the min/max values
+ * at the ends of the slider. It uses the main format callback (sd->format_cb)
+ * to format sd->val_max and sd->val_min, then sets these formatted strings
+ * to the "elm.units.min" and "elm.units.max" text parts of the layout.
+ *
+ * @param obj The slider Evas_Object.
+ */
 static void
 _min_max_set(Evas_Object *obj)
 {
@@ -205,6 +274,8 @@ _popup_show(void *data,
             const char *source EINA_UNUSED)
 {
    ELM_SLIDER_DATA_GET(data, sd);
+
+   // Show the primary popup if it exists and visibility mode allows
    if (sd->popup &&
        (sd->indicator_visible_mode != ELM_SLIDER_INDICATOR_VISIBLE_MODE_NONE))
      {
@@ -214,6 +285,7 @@ _popup_show(void *data,
         edje_object_signal_emit(sd->popup, "popup,show", "elm"); // XXX: for compat
         edje_object_signal_emit(sd->popup, "elm,popup,show", "elm");
      }
+   // Show the secondary popup (for range sliders) if it exists and visibility mode allows
    if (sd->popup2 &&
        (sd->indicator_visible_mode != ELM_SLIDER_INDICATOR_VISIBLE_MODE_NONE))
      {
@@ -235,14 +307,18 @@ _popup_hide(void *data,
 
    if (!sd->popup_visible || !sd->popup) return;
 
+   // Don't hide if mode is ALWAYS
    if (sd->indicator_visible_mode == ELM_SLIDER_INDICATOR_VISIBLE_MODE_ALWAYS) return;
+   // Don't hide if mode is ON_FOCUS and the widget is focused
    if ((sd->indicator_visible_mode == ELM_SLIDER_INDICATOR_VISIBLE_MODE_ON_FOCUS) &&
        efl_ui_focus_object_focus_get(data))
      return;
 
+   // Emit signals to trigger hide animation for the primary popup
    edje_object_signal_emit(sd->popup, "popup,hide", "elm"); // XXX: for compat
    edje_object_signal_emit(sd->popup, "elm,popup,hide", "elm");
 
+   // Emit signals to trigger hide animation for the secondary popup (if it exists)
    if (sd->popup2)
      {
         edje_object_signal_emit(sd->popup2, "popup,hide", "elm"); // XXX: for compat
@@ -250,6 +326,19 @@ _popup_hide(void *data,
      }
 }
 
+/**
+ * @internal
+ * @brief Callback triggered when a popup's hide animation is complete.
+ *
+ * This function actually hides the Evas object of the popup(s),
+ * unless certain conditions (like focus and indicator_visible_mode)
+ * dictate it should remain visible.
+ *
+ * @param data The slider Evas_Object.
+ * @param obj The Edje object that emitted the signal (the popup).
+ * @param emission The emitted signal string (e.g., "elm,popup,hide,done").
+ * @param source The source of the signal.
+ */
 static void
 _popup_hide_done(void *data,
                  Evas_Object *obj EINA_UNUSED,
@@ -257,6 +346,8 @@ _popup_hide_done(void *data,
                  const char *source EINA_UNUSED)
 {
    ELM_SLIDER_DATA_GET(data, sd);
+
+   // Handle primary popup
    if (sd->popup)
      {
         if (!((efl_ui_focus_object_focus_get(data)) &&
@@ -283,26 +374,53 @@ _popup_emit(void *data,
             const char *source)
 {
    ELM_SLIDER_DATA_GET(data, sd);
+
+   // Relay signal to the primary popup if it exists
    if (sd->popup)
      {
         edje_object_signal_emit(sd->popup, emission, source);
      }
+   // Relay signal to the secondary popup (for range sliders) if it exists
    if (sd->popup2)
      {
         edje_object_signal_emit(sd->popup2, emission, source);
      }
 }
 
+/**
+ * @internal
+ * @brief Timer callback to hide the indicator popup after a mouse wheel event.
+ *
+ * This is used to briefly show the indicator when the value changes via
+ * the mouse wheel, then hide it again.
+ *
+ * @param data The slider Evas_Object.
+ * @return ECORE_CALLBACK_CANCEL to automatically delete the timer.
+ */
 static Eina_Bool
 _wheel_indicator_timer_cb(void *data)
 {
    ELM_SLIDER_DATA_GET(data, sd);
    sd->wheel_indicator_timer = NULL;
 
-   _popup_hide(data, NULL, NULL, NULL);
+   _popup_hide(data, NULL, NULL, NULL); // Attempt to hide the popup
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @internal
+ * @brief Updates the visual position of the slider's draggable handle(s).
+ *
+ * Calculates the normalized position (0.0 to 1.0) of the slider handle(s)
+ * based on the current value (sd->val), min/max range (sd->val_min, sd->val_max),
+ * and whether the slider is inverted. For range sliders, it also updates
+ * the position of the second handle based on sd->intvl_to.
+ * These normalized positions are then applied to the "elm.dragable.slider"
+ * and "elm.dragable2.slider" parts.
+ * Also emits an accessibility event if AT-SPI mode is active.
+ *
+ * @param obj The slider Evas_Object.
+ */
 static void
 _val_set(Evas_Object *obj)
 {

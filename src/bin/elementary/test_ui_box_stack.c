@@ -5,6 +5,22 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Test Efl.Ui.Box_Stack.
+ *
+ * This test creates a window and an Efl.Ui.Box_Stack layout within it.
+ * It then populates the box stack with several graphical objects
+ * with varying size hints to demonstrate and test the stacking behavior.
+ *
+ * The box stack will contain:
+ * - A rectangle that stretches to fill available space.
+ * - A rectangle with a maximum size, aligned to the bottom-center.
+ * - An image with a minimum size.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_ui_box_stack(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                   void *event_info EINA_UNUSED)

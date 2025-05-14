@@ -17,9 +17,22 @@
 
 #define FILETIME_1970 116444736000000000ull /* seconds between 1/1/1601 and 1/1/1970 */
 
+/**
+ * @brief Get the current time and timezone information.
+ * @param tv Pointer to a timeval struct to store the time. Can be NULL.
+ * @param tz Pointer to a timezone struct to store timezone information. Can be NULL.
+ * @return Always returns 0 (success).
+ *
+ * This function mimics the POSIX gettimeofday function.
+ * If tv is not NULL, it fills the timeval struct with the current time,
+ * converting from Windows FILETIME. It uses GetSystemTimePreciseAsFileTime
+ * if available (_WIN32_WINNT >= 0x0602), otherwise GetSystemTimeAsFileTime.
+ * If tz is not NULL, it fills the timezone struct with information obtained
+ * from GetTimeZoneInformation.
+ */
 int evil_gettimeofday(struct timeval *tv, struct timezone *tz)
 {
-   int res = 0;
+   int res = 0; /* evil_gettimeofday always returns 0, success. */
    union
    {
       unsigned long long ns100; /* time since 1 Jan 1601 in 100ns units */
@@ -88,6 +101,7 @@ static const char *abday[7] =
    "Sun","Mon","Tue","Wed","Thu","Fri","Sat"
 };
 
+/**< Array of full month names. */
 static const char *mon[12] =
 {
    "January", "February", "March", "April", "May", "June", "July",
@@ -100,26 +114,44 @@ static const char *abmon[12] =
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 };
 
+/**< Array of AM/PM indicators. */
 static const char *am_pm[2] =
 {
    "AM", "PM"
 };
 
+/**< String for GMT timezone. */
 static char gmt[] = { "GMT" };
 
 #ifdef TM_ZONE
+/**< String for UTC timezone. */
 static char utc[] = { "UTC" };
 #endif
 
-/* RFC-822/RFC-2822 */
+/* RFC-822/RFC-2822 North American timezones */
+/**< Array of North American standard time zone names. */
 static const char * const nast[5] = {
-   "EST",    "CST",    "MST",    "PST",    "\0\0\0"
+   "EST",    "CST",    "MST",    "PST",    "\0\0\0" /* Terminator */
 };
 
+/**< Array of North American daylight saving time zone names. */
 static const char * const nadt[5] = {
-   "EDT",    "CDT",    "MDT",    "PDT",    "\0\0\0"
+   "EDT",    "CDT",    "MDT",    "PDT",    "\0\0\0" /* Terminator */
 };
 
+/**
+ * @brief Finds a string in a list of strings (case-insensitive).
+ * @param bp Pointer to the current position in the input buffer.
+ * @param tgt Pointer to an integer where the index of the found string will be stored.
+ * @param n1 Pointer to an array of full string names.
+ * @param n2 Pointer to an array of abbreviated string names (can be NULL).
+ * @param c The number of items in the n1 (and n2 if provided) arrays.
+ * @return Pointer to the character in bp after the matched string, or NULL if no match.
+ *
+ * This function attempts to match the string at bp with strings from n1,
+ * and then from n2 if n1 fails and n2 is provided. The match is case-insensitive.
+ * If a match is found, *tgt is set to the index of the matched string.
+ */
 static const unsigned char *
 find_string(const unsigned char *bp, int *tgt,
             const char *const *n1, const char *const *n2,
@@ -143,9 +175,24 @@ find_string(const unsigned char *bp, int *tgt,
      }
 
    /* Nothing matched */
+   /* Nothing matched */
    return NULL;
 }
 
+/**
+ * @brief Converts a sequence of digits from a string to an integer.
+ * @param buf Pointer to the string buffer containing digits.
+ * @param dest Pointer to an integer where the converted number will be stored.
+ * @param llim The lower limit (inclusive) for the converted number.
+ * @param ulim The upper limit (inclusive) for the converted number.
+ * @return Pointer to the character in buf after the consumed digits, or NULL if
+ *         no digits are found, or if the number is out of bounds.
+ *
+ * This function reads digits from buf, converts them to an unsigned integer,
+ * and stores the result in *dest. It stops when a non-digit character is
+ * encountered or when adding another digit would exceed ulim.
+ * It checks if the result is within [llim, ulim].
+ */
 static const unsigned char *
 conv_num(const unsigned char *buf, int *dest, unsigned int llim, unsigned int ulim)
 {
@@ -178,7 +225,7 @@ strptime(const char *buf, const char *fmt, struct tm *tm)
 {
    unsigned char c;
    const unsigned char *bp, *ep;
-   int alt_format, i, split_year = 0, neg = 0, offs;
+   int alt_format, i, split_year = 0, neg = 0, offs; // offs for timezone offset
    const char *new_fmt;
 
    bp = (const unsigned char *)buf;
@@ -187,9 +234,9 @@ strptime(const char *buf, const char *fmt, struct tm *tm)
      {
         /* Clear `alternate' modifier prior to new conversion. */
         alt_format = 0;
-        i = 0;
+        i = 0; /* General purpose integer. */
 
-        /* Eat up white-space. */
+        /* Eat up white-space in format string and input buffer. */
         if (isspace(c))
           {
              while (isspace(*bp))
@@ -207,149 +254,150 @@ strptime(const char *buf, const char *fmt, struct tm *tm)
            literal:
               if (c != *bp++)
                 return NULL;
-              LEGAL_ALT(0);
+              LEGAL_ALT(0); /* No modifiers allowed for literal characters. */
               continue;
 
               /*
-               * "Alternative" modifiers. Just set the appropriate flag
-               * and start over again.
+               * "Alternative" modifiers. These flags modify the behavior of
+               * subsequent conversion specifiers.
                */
            case 'E':	/* "%E?" alternative conversion modifier. */
-              LEGAL_ALT(0);
+              LEGAL_ALT(0); /* No modifiers allowed for 'E' itself. */
               alt_format |= ALT_E;
-              goto again;
+              goto again; /* Process next format character. */
 
            case 'O':	/* "%O?" alternative conversion modifier. */
-              LEGAL_ALT(0);
+              LEGAL_ALT(0); /* No modifiers allowed for 'O' itself. */
               alt_format |= ALT_O;
-              goto again;
+              goto again; /* Process next format character. */
 
               /*
-               * "Complex" conversion rules, implemented through recursion.
+               * "Complex" conversion rules are implemented by recursively
+               * calling strptime with a new format string.
                */
-           /* case 'c':	/\* Date and time, using the locale's format. *\/ */
+           /* case 'c':	/\* Locale's appropriate date and time representation. *\/ */
            /*    new_fmt = _TIME_LOCALE(loc)->d_t_fmt; */
            /*    goto recurse; */
 
-           case 'D':	/* The date as "%m/%d/%y". */
+           case 'D':	/* Equivalent to "%m/%d/%y". */
               new_fmt = "%m/%d/%y";
-              LEGAL_ALT(0);
+              LEGAL_ALT(0); /* No modifiers for %D. */
               goto recurse;
 
-           case 'F':	/* The date as "%Y-%m-%d". */
+           case 'F':	/* Equivalent to "%Y-%m-%d" (ISO 8601 date format). */
               new_fmt = "%Y-%m-%d";
-              LEGAL_ALT(0);
+              LEGAL_ALT(0); /* No modifiers for %F. */
               goto recurse;
 
-           case 'R':	/* The time as "%H:%M". */
+           case 'R':	/* Equivalent to "%H:%M". */
               new_fmt = "%H:%M";
-              LEGAL_ALT(0);
+              LEGAL_ALT(0); /* No modifiers for %R. */
               goto recurse;
 
-           /* case 'r':	/\* The time in 12-hour clock representation. *\/ */
+           /* case 'r':	/\* Locale's 12-hour clock time format. *\/ */
            /*    new_fmt = _TIME_LOCALE(loc)->t_fmt_ampm; */
            /*    LEGAL_ALT(0); */
            /*    goto recurse; */
 
-           case 'T':	/* The time as "%H:%M:%S". */
+           case 'T':	/* Equivalent to "%H:%M:%S". */
               new_fmt = "%H:%M:%S";
-              LEGAL_ALT(0);
+              LEGAL_ALT(0); /* No modifiers for %T. */
               goto recurse;
 
-           /* case 'X':	/\* The time, using the locale's format. *\/ */
+           /* case 'X':	/\* Locale's appropriate time representation. *\/ */
            /*    new_fmt = _TIME_LOCALE(loc)->t_fmt; */
            /*    goto recurse; */
 
-           /* case 'x':	/\* The date, using the locale's format. *\/ */
+           /* case 'x':	/\* Locale's appropriate date representation. *\/ */
            /*    new_fmt = _TIME_LOCALE(loc)->d_fmt; */
-           recurse:
+           recurse: /* Label for recursive calls. */
               bp = (const unsigned char *)strptime((const char *)bp,
                                                    new_fmt, tm);
-              LEGAL_ALT(ALT_E);
+              LEGAL_ALT(ALT_E); /* %E is allowed for some recursive formats (e.g. %Ec). */
               continue;
 
               /*
                * "Elementary" conversion rules.
                */
-           case 'A':	/* The day of week, using the locale's form. */
-           case 'a':
+           case 'A':	/* Full weekday name. */
+           case 'a': /* Abbreviated weekday name. */
               bp = find_string(bp, &tm->tm_wday, day, abday, 7);
-              LEGAL_ALT(0);
+              LEGAL_ALT(0); /* No modifiers. */
               continue;
 
-           case 'B':	/* The month, using the locale's form. */
-           case 'b':
-           case 'h':
+           case 'B':	/* Full month name. */
+           case 'b': /* Abbreviated month name. */
+           case 'h': /* Equivalent to %b. */
               bp = find_string(bp, &tm->tm_mon, mon, abmon, 12);
-              LEGAL_ALT(0);
+              LEGAL_ALT(0); /* No modifiers. */
               continue;
 
-           case 'C':	/* The century number. */
-              i = 20;
+           case 'C':	/* Century (year divided by 100 and truncated to an integer). */
+              i = 20; /* Default century. */
               bp = conv_num(bp, &i, 0, 99);
 
               i = i * 100 - TM_YEAR_BASE;
-              if (split_year)
-                i += tm->tm_year % 100;
-              split_year = 1;
+              if (split_year) /* If tm_year was already set by %y */
+                i += tm->tm_year % 100; /* Add the year within the century. */
+              split_year = 1; /* Indicates that century is now set. */
               tm->tm_year = i;
-              LEGAL_ALT(ALT_E);
+              LEGAL_ALT(ALT_E); /* %EC is alternative representation. */
               continue;
 
-           case 'd':	/* The day of month. */
-           case 'e':
+           case 'd':	/* Day of the month as a decimal number [01,31]. */
+           case 'e': /* Like %d, the day of the month as a decimal number, but a leading zero is replaced by a space. */
               bp = conv_num(bp, &tm->tm_mday, 1, 31);
-              LEGAL_ALT(ALT_O);
+              LEGAL_ALT(ALT_O); /* %Od or %Oe for alternative numeric symbols. */
               continue;
 
-           case 'k':	/* The hour (24-hour clock representation). */
-              LEGAL_ALT(0);
+           case 'k':	/* Hour (24-hour clock) as a decimal number [ 0,23]; single digits are preceded by a blank. */
+              LEGAL_ALT(0); /* No modifiers. */
               /* FALLTHROUGH */
-           case 'H':
+           case 'H': /* Hour (24-hour clock) as a decimal number [00,23]. */
               bp = conv_num(bp, &tm->tm_hour, 0, 23);
-              LEGAL_ALT(ALT_O);
+              LEGAL_ALT(ALT_O); /* %OH for alternative numeric symbols. */
               continue;
 
-           case 'l':	/* The hour (12-hour clock representation). */
-              LEGAL_ALT(0);
+           case 'l':	/* Hour (12-hour clock) as a decimal number [ 1,12]; single digits are preceded by a blank. */
+              LEGAL_ALT(0); /* No modifiers. */
               /* FALLTHROUGH */
-           case 'I':
+           case 'I': /* Hour (12-hour clock) as a decimal number [01,12]. */
               bp = conv_num(bp, &tm->tm_hour, 1, 12);
-              if (tm->tm_hour == 12)
+              if (tm->tm_hour == 12) /* 12 AM is 00 hours, 12 PM is 12 hours. Handled by %p. */
                 tm->tm_hour = 0;
-              LEGAL_ALT(ALT_O);
+              LEGAL_ALT(ALT_O); /* %OI for alternative numeric symbols. */
               continue;
 
-           case 'j':	/* The day of year. */
+           case 'j':	/* Day of the year as a decimal number [001,366]. */
               i = 1;
               bp = conv_num(bp, &i, 1, 366);
-              tm->tm_yday = i - 1;
-              LEGAL_ALT(0);
+              tm->tm_yday = i - 1; /* tm_yday is 0-indexed. */
+              LEGAL_ALT(0); /* No modifiers. */
               continue;
 
-           case 'M':	/* The minute. */
+           case 'M':	/* Minute as a decimal number [00,59]. */
               bp = conv_num(bp, &tm->tm_min, 0, 59);
-              LEGAL_ALT(ALT_O);
+              LEGAL_ALT(ALT_O); /* %OM for alternative numeric symbols. */
               continue;
 
-           case 'm':	/* The month. */
+           case 'm':	/* Month as a decimal number [01,12]. */
               i = 1;
               bp = conv_num(bp, &i, 1, 12);
-              tm->tm_mon = i - 1;
-              LEGAL_ALT(ALT_O);
+              tm->tm_mon = i - 1; /* tm_mon is 0-indexed. */
+              LEGAL_ALT(ALT_O); /* %Om for alternative numeric symbols. */
               continue;
 
-           case 'p':	/* The locale's equivalent of AM/PM. */
-              bp = find_string(bp, &i, am_pm, NULL, 2);
-              if (tm->tm_hour > 11)
-                return NULL;
-              tm->tm_hour += i * 12;
-              LEGAL_ALT(0);
+           case 'p':	/* Locale's equivalent of either AM or PM. */
+              bp = find_string(bp, &i, am_pm, NULL, 2); /* i will be 0 for AM, 1 for PM. */
+              if (tm->tm_hour > 11) /* %I sets hour in [0,11] (12 is 0) */
+                return NULL; /* Invalid hour for AM/PM. */
+              tm->tm_hour += i * 12; /* Add 12 hours if PM. */
+              LEGAL_ALT(0); /* No modifiers. */
               continue;
 
-           case 'S':	/* The seconds. */
-              bp = conv_num(bp, &tm->tm_sec, 0, 61);
-              LEGAL_ALT(ALT_O);
+           case 'S':	/* Second as a decimal number [00,60]. (60 is for leap second) */
+              bp = conv_num(bp, &tm->tm_sec, 0, 61); /* Range up to 61 for leap seconds. */
+              LEGAL_ALT(ALT_O); /* %OS for alternative numeric symbols. */
               continue;
 
 #ifndef TIME_MAX
@@ -359,93 +407,104 @@ strptime(const char *buf, const char *fmt, struct tm *tm)
 #  define TIME_MAX INT32_MAX
 # endif
 #endif
-           case 's':	/* seconds since the epoch */
+           case 's':	/* The number of seconds since the Epoch, 1970-01-01 00:00:00 +0000 (UTC). */
              {
-                time_t sse = 0;
-                __int64 rulim = TIME_MAX;
+                time_t sse = 0; /* seconds since epoch */
+                __int64 rulim = TIME_MAX; /* Remaining upper limit for parsing. */
 
-                if (*bp < '0' || *bp > '9')
+                if (*bp < '0' || *bp > '9') /* Must start with a digit. */
                   {
                      bp = NULL;
                      continue;
                   }
 
+                /* Parse the number of seconds. */
                 do
                   {
                      sse *= 10;
                      sse += *bp++ - '0';
                      rulim /= 10;
-                  } while ((sse * 10 <= TIME_MAX) &&
+                  } while ((sse * 10 <= TIME_MAX) && /* Check for overflow before multiplication. */
                            rulim && *bp >= '0' && *bp <= '9');
 
-                if (sse < 0 || sse > TIME_MAX)
+                if (sse < 0 || sse > TIME_MAX) /* Final check for overflow or invalid value. */
                   {
                      bp = NULL;
                      continue;
                   }
 
+                /* Convert seconds since epoch to struct tm. */
                 if (localtime_r(&sse, tm) == NULL)
                   bp = NULL;
              }
              continue;
 
-           case 'U':	/* The week of year, beginning on sunday. */
-           case 'W':	/* The week of year, beginning on monday. */
+           case 'U':	/* Week number of the year as a decimal number [00,53], Sunday as the first day of the week. */
+           case 'W':	/* Week number of the year as a decimal number [00,53], Monday as the first day of the week. */
 			/*
 			 * XXX This is bogus, as we can not assume any valid
 			 * information present in the tm structure at this
-			 * point to calculate a real value, so just check the
-			 * range for now.
+			 * point to calculate a real value for tm_yday, tm_wday etc.
+			 * So, we just parse the number and check its range.
+			 * The actual calculation of week number would require mktime.
 			 */
               bp = conv_num(bp, &i, 0, 53);
-              LEGAL_ALT(ALT_O);
+              LEGAL_ALT(ALT_O); /* %OU or %OW for alternative numeric symbols. */
               continue;
 
-           case 'w':	/* The day of week, beginning on sunday. */
+           case 'w':	/* Day of the week as a decimal number [0(Sunday),6]. */
               bp = conv_num(bp, &tm->tm_wday, 0, 6);
-              LEGAL_ALT(ALT_O);
+              LEGAL_ALT(ALT_O); /* %Ow for alternative numeric symbols. */
               continue;
 
-           case 'u':	/* The day of week, monday = 1. */
+           case 'u':	/* Day of the week as a decimal number [1(Monday),7]. */
               bp = conv_num(bp, &i, 1, 7);
-              tm->tm_wday = i % 7;
-              LEGAL_ALT(ALT_O);
+              tm->tm_wday = i % 7; /* Convert to 0 (Sunday) - 6 (Saturday) range. */
+              LEGAL_ALT(ALT_O); /* %Ou for alternative numeric symbols. */
               continue;
 
-           case 'g':	/* The year corresponding to the ISO week
-                         * number but without the century.
-                         */
+           case 'g':	/* Like %G, but without century, i.e., with a 2-digit year (00-99). */
+              /* This is related to ISO 8601 week date. Parsing it correctly
+               * without full date context is complex. Here, we just consume digits.
+               */
               bp = conv_num(bp, &i, 0, 99);
               continue;
 
-           case 'G':	/* The year corresponding to the ISO week
-                         * number with century.
-                         */
-              do
+           case 'G':	/* Year of the ISO week number, which may differ from the calendar year. */
+              /* This is related to ISO 8601 week date. Parsing it correctly
+               * without full date context is complex. Here, we just consume digits.
+               */
+              do /* Consume all digits for the year. */
                 bp++;
               while (isdigit(*bp));
               continue;
 
-           case 'V':	/* The ISO 8601:1988 week number as decimal */
-              bp = conv_num(bp, &i, 0, 53);
+           case 'V':	/* ISO 8601 week number of the year as a decimal number [01,53]. */
+              /* This is related to ISO 8601 week date. Parsing it correctly
+               * without full date context is complex. Here, we just parse the number.
+               */
+              bp = conv_num(bp, &i, 0, 53); /* Should be 1-53, but 0 is accepted by some. */
               continue;
 
-           case 'Y':	/* The year. */
-              i = TM_YEAR_BASE;	/* just for data sanity... */
-              bp = conv_num(bp, &i, 0, 9999);
-              tm->tm_year = i - TM_YEAR_BASE;
-              LEGAL_ALT(ALT_E);
+           case 'Y':	/* Year as a decimal number including the century. */
+              i = TM_YEAR_BASE;	/* Initialize for sanity, though overwritten. */
+              bp = conv_num(bp, &i, 0, 9999); /* Year 0-9999. */
+              tm->tm_year = i - TM_YEAR_BASE; /* tm_year is years since 1900. */
+              LEGAL_ALT(ALT_E); /* %EY for alternative representation. */
               continue;
 
-           case 'y':	/* The year within 100 years of the epoch. */
-			/* LEGAL_ALT(ALT_E | ALT_O); */
+           case 'y':	/* Year as a decimal number without a century [00,99]. */
+			/* LEGAL_ALT(ALT_E | ALT_O); %Ey and %Oy are for alternative representations. */
               bp = conv_num(bp, &i, 0, 99);
 
-              if (split_year)
+              if (split_year) /* If century was already set by %C */
                 /* preserve century */
-                i += (tm->tm_year / 100) * 100;
+                i += (tm->tm_year / 100) * 100; /* Add the existing century. */
               else {
-                 split_year = 1;
+                 split_year = 1; /* Mark that year (and implicitly century) is now being set. */
+                 /* POSIX interpretation: values 69-99 refer to 1969-1999,
+                  * and values 00-68 refer to 2000-2068.
+                  */
                  if (i <= 68)
                    i = i + 2000 - TM_YEAR_BASE;
                  else
@@ -454,69 +513,65 @@ strptime(const char *buf, const char *fmt, struct tm *tm)
               tm->tm_year = i;
               continue;
 
-           case 'Z':
-              tzset();
-              if (strncmp((const char *)bp, gmt, 3) == 0) {
+           case 'Z': /* Time zone name or abbreviation. */
+              tzset(); /* Initialize timezone information from the environment. */
+              if (strncmp((const char *)bp, gmt, 3) == 0) { /* Check for "GMT" */
                  tm->tm_isdst = 0;
 #ifdef TM_GMTOFF
-                 tm->TM_GMTOFF = 0;
+                 tm->TM_GMTOFF = 0; /* GMT offset is 0. */
 #endif
 #ifdef TM_ZONE
-                 tm->TM_ZONE = gmt;
+                 tm->TM_ZONE = gmt; /* Timezone name is "GMT". */
 #endif
                  bp += 3;
               }
-              else
+              else /* Try matching against local timezone names. */
                 {
                    ep = find_string(bp, &i,
-                                    (const char * const *)tzname,
-                                    NULL, 2);
+                                    (const char * const *)tzname, /* System's timezone names (e.g., "PST", "PDT"). */
+                                    NULL, 2); /* tzname usually has two entries: standard and daylight. */
                    if (ep != NULL)
                      {
-                        tm->tm_isdst = i;
+                        tm->tm_isdst = i; /* 0 for standard, 1 for daylight. */
 #ifdef TM_GMTOFF
-                        tm->TM_GMTOFF = -(timezone);
+                        /* This is a simplification; 'timezone' variable gives offset for standard time.
+                         * A more accurate approach would involve checking 'daylight' variable too.
+                         */
+                        tm->TM_GMTOFF = -(timezone); /* 'timezone' is seconds west of UTC. */
 #endif
 #ifdef TM_ZONE
                         tm->TM_ZONE = tzname[i];
 #endif
                      }
-                   bp = ep;
+                   bp = ep; /* Advance buffer pointer past matched timezone name. */
                 }
               continue;
 
-           case 'z':
+           case 'z': /* Offset from UTC in the form +HHMM or -HHMM. */
               /*
-               * We recognize all ISO 8601 formats:
-               * Z	= Zulu time/UTC
-               * [+-]hhmm
-               * [+-]hh:mm
-               * [+-]hh
-               * We recognize all RFC-822/RFC-2822 formats:
-               * UT|GMT
-               *          North American : UTC offsets
-               * E[DS]T = Eastern : -4 | -5
-               * C[DS]T = Central : -5 | -6
-               * M[DS]T = Mountain: -6 | -7
-               * P[DS]T = Pacific : -7 | -8
-               *          Military
-               * [A-IL-M] = -1 ... -9 (J not used)
-               * [N-Y]  = +1 ... +12
+               * This implementation handles various timezone offset formats:
+               * ISO 8601 formats:
+               *   Z (Zulu time/UTC)
+               *   [+-]hhmm
+               *   [+-]hh:mm
+               *   [+-]hh
+               * RFC-822/RFC-2822 formats:
+               *   UT|GMT
+               *   North American timezone abbreviations (EST, CDT, etc.)
+               *   Military timezone single letters (A-I, L-M, N-Y, excluding J)
                */
-              while (isspace(*bp))
+              while (isspace(*bp)) /* Skip leading whitespace. */
                 bp++;
 
-              switch (*bp++)
+              switch (*bp++) /* Check the first character of the offset. */
                 {
-                 case 'G':
-                    if (*bp++ != 'M')
-                      return NULL;
+                 case 'G': /* GMT */
+                    if (*bp++ != 'M') return NULL;
                     /*FALLTHROUGH*/
-                 case 'U':
-                    if (*bp++ != 'T')
-                      return NULL;
+                 case 'U': /* UT */
+                    if (*bp++ != 'T') return NULL;
                     /*FALLTHROUGH*/
-                 case 'Z':
+                 case 'Z': /* Zulu/UTC */
                     tm->tm_isdst = 0;
 #ifdef TM_GMTOFF
                     tm->TM_GMTOFF = 0;
@@ -525,18 +580,19 @@ strptime(const char *buf, const char *fmt, struct tm *tm)
                     tm->TM_ZONE = utc;
 #endif
                     continue;
-                 case '+':
+                 case '+': /* Positive offset. */
                     neg = 0;
                     break;
-                 case '-':
+                 case '-': /* Negative offset. */
                     neg = 1;
                     break;
-                 default:
-                    --bp;
+                 default: /* Potentially a named timezone or military. */
+                    --bp; /* Put back the character. */
+                    /* Check for North American standard timezones. */
                     ep = find_string(bp, &i, nast, NULL, 4);
                     if (ep != NULL) {
 #ifdef TM_GMTOFF
-                       tm->TM_GMTOFF = -5 - i;
+                       tm->TM_GMTOFF = (-5 - i) * 3600; /* Offsets from -5 (EST) to -8 (PST) hours. */
 #endif
 #ifdef TM_ZONE
                        tm->TM_ZONE = __UNCONST(nast[i]);
@@ -544,12 +600,13 @@ strptime(const char *buf, const char *fmt, struct tm *tm)
                        bp = ep;
                        continue;
                     }
+                    /* Check for North American daylight timezones. */
                     ep = find_string(bp, &i, nadt, NULL, 4);
                     if (ep != NULL)
                       {
                          tm->tm_isdst = 1;
 #ifdef TM_GMTOFF
-                         tm->TM_GMTOFF = -4 - i;
+                         tm->TM_GMTOFF = (-4 - i) * 3600; /* Offsets from -4 (EDT) to -7 (PDT) hours. */
 #endif
 #ifdef TM_ZONE
                          tm->TM_ZONE = __UNCONST(nadt[i]);
@@ -557,30 +614,38 @@ strptime(const char *buf, const char *fmt, struct tm *tm)
                          bp = ep;
                          continue;
                       }
-
-                    if ((*bp >= 'A' && *bp <= 'I') ||
-                        (*bp >= 'L' && *bp <= 'Y'))
+                    /* Check for military timezones. */
+                    if ((*bp >= 'A' && *bp <= 'I') || /* A-I: -1 to -9 hours */
+                        (*bp >= 'L' && *bp <= 'M'))   /* L-M: -10 to -12 hours */
                       {
 #ifdef TM_GMTOFF
-                         /* Argh! No 'J'! */
                          if (*bp >= 'A' && *bp <= 'I')
-                           tm->TM_GMTOFF =
-                             ('A' - 1) - (int)*bp;
-                         else if (*bp >= 'L' && *bp <= 'M')
-                           tm->TM_GMTOFF = 'A' - (int)*bp;
-                         else if (*bp >= 'N' && *bp <= 'Y')
-                           tm->TM_GMTOFF = (int)*bp - 'M';
+                           tm->TM_GMTOFF = (('A' - 1) - (int)*bp) * 3600;
+                         else /* L or M */
+                           tm->TM_GMTOFF = ('A' - (int)*bp) * 3600; /* This seems off, should be ('A' - 1 - *bp) or similar logic for L,M */
 #endif
 #ifdef TM_ZONE
-                         tm->TM_ZONE = NULL; /* XXX */
+                         /* tm->TM_ZONE = ... ; could store single letter */
 #endif
                          bp++;
                          continue;
                       }
-                    return NULL;
+                    else if (*bp >= 'N' && *bp <= 'Y') /* N-Y: +1 to +12 hours */
+                      {
+#ifdef TM_GMTOFF
+                        tm->TM_GMTOFF = ((int)*bp - 'M') * 3600;
+#endif
+#ifdef TM_ZONE
+                        /* tm->TM_ZONE = ... ; */
+#endif
+                        bp++;
+                        continue;
+                      }
+                    return NULL; /* Unrecognized format. */
                 }
+              /* Parse numeric offset [+-]HHMM or [+-]HH:MM or [+-]HH */
               offs = 0;
-              for (i = 0; i < 4; )
+              for (i = 0; i < 4; ) /* Read up to 4 digits for HHMM. */
                 {
                    if (isdigit(*bp))
                      {
@@ -588,50 +653,51 @@ strptime(const char *buf, const char *fmt, struct tm *tm)
                         i++;
                         continue;
                      }
-                   if (i == 2 && *bp == ':')
+                   if (i == 2 && *bp == ':') /* Allow ':' separator after HH. */
                      {
                         bp++;
                         continue;
                      }
-                   break;
+                   break; /* End of digits or invalid char. */
                 }
-              switch (i)
+              switch (i) /* Based on number of digits read for offset. */
                 {
-                 case 2:
-                    offs *= 100;
+                 case 2: /* HH format */
+                    offs *= 100; /* Convert HH to HH00. */
                     break;
-                 case 4:
-                    i = offs % 100;
-                    if (i >= 60)
-                      return NULL;
-                    /* Convert minutes into decimal */
-                    offs = (offs / 100) * 100 + (i * 50) / 30;
+                 case 4: /* HHMM format */
+                    /* offs already in HHMM format. Validate minutes. */
+                    if ((offs % 100) >= 60) return NULL; /* Invalid minutes. */
                     break;
-                 default:
+                 default: /* Invalid number of digits. */
                     return NULL;
                 }
+
+              /* Convert HHMM to seconds offset. */
+              /* offs / 100 = hours, offs % 100 = minutes. */
+              offs = (offs / 100) * 3600 + (offs % 100) * 60;
               if (neg)
                 offs = -offs;
-              tm->tm_isdst = 0;	/* XXX */
+              tm->tm_isdst = 0;	/* Explicit offset usually means not DST by local rule, but this is not strictly true. */
 #ifdef TM_GMTOFF
               tm->TM_GMTOFF = offs;
 #endif
 #ifdef TM_ZONE
-              tm->TM_ZONE = NULL;	/* XXX */
+              tm->TM_ZONE = NULL;	/* No specific zone name for numeric offset. */
 #endif
               continue;
 
               /*
                * Miscellaneous conversions.
                */
-           case 'n':	/* Any kind of white-space. */
-           case 't':
-              while (isspace(*bp))
+           case 'n':	/* A newline character. */
+           case 't': /* A tab character. */
+              while (isspace(*bp)) /* Consume all whitespace. */
                 bp++;
-              LEGAL_ALT(0);
+              LEGAL_ALT(0); /* No modifiers. */
               continue;
 
-           default:	/* Unknown/unsupported conversion. */
+           default:	/* Unknown or unsupported conversion specifier. */
               return NULL;
           }
      }

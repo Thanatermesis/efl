@@ -3,6 +3,17 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Test basic table functionality.
+ *
+ * This test creates a window with a table containing several buttons arranged
+ * in a grid. It demonstrates how to add objects to a table, specifying their
+ * column, row, and span.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_table(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -61,6 +72,17 @@ test_table(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_inf
    evas_object_show(win);
 }
 
+/**
+ * @brief Test homogeneous table functionality.
+ *
+ * This test demonstrates a table with the homogeneous property set. In a
+ * homogeneous table, all cells are sized equally based on the largest child.
+ * This example shows various objects spanning multiple rows and columns.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_table2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -120,6 +142,17 @@ test_table2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback to dynamically change table packing.
+ *
+ * This callback function is triggered by a "clicked" event. It unpacks
+ * a button ("b2") from the table and repacks it into a new position with
+ * a different row span, demonstrating dynamic layout changes.
+ *
+ * @param data The window object, used to retrieve other objects.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 my_tb_ch(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -131,6 +164,18 @@ my_tb_ch(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_table_pack(tb, b2, 1, 0, 1, 2);
 }
 
+/**
+ * @brief Test dynamic repacking of table children.
+ *
+ * This test sets up a table where clicking on buttons triggers the
+ * my_tb_ch() callback. This callback alters the layout of the table
+ * by moving one of the buttons, demonstrating how to modify a table
+ * at runtime.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_table3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -175,6 +220,18 @@ test_table3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
    evas_object_show(win);
 }
 
+/**
+ * @brief Test table layout with different weight hints.
+ *
+ * This test demonstrates how size hint weights affect the distribution of
+ * space among table cells. The buttons are given different horizontal and
+ * vertical weights, causing them to occupy different proportions of the
+ * available space.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_table4(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -219,6 +276,18 @@ test_table4(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
    evas_object_show(win);
 }
 
+/**
+ * @brief Test a large, sparse, homogeneous table.
+ *
+ * This test creates a homogeneous table conceptually divided into a 100x100 grid.
+ * It places objects at distant coordinates, demonstrating the table's ability
+ * to handle large virtual layouts efficiently. The five buttons are positioned
+ * to form a cross shape in the center and corners of this large grid.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_table5(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -271,6 +340,19 @@ test_table5(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
    evas_object_show(win);
 }
 
+/**
+ * @brief Test packing multiple objects into the same table cells.
+ *
+ * This test shows the behavior of a table when multiple objects are packed
+ * into overlapping cells. Objects are drawn in the order they are packed, so
+ * later objects will appear on top of earlier ones if they occupy the same
+ * space. In this example, "A" is packed on top of "C", and "B" is packed
+ * on top of "A".
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_table6(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -330,6 +412,17 @@ test_table6(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
    evas_object_show(win);
 }
 
+/**
+ * @brief Test table cell padding.
+ *
+ * This test demonstrates the use of elm_table_padding_set() to define the
+ * horizontal and vertical spacing between cells in a table. It reuses a
+ * layout similar to test_table6 to show the effect of padding.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_table7(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -389,6 +482,12 @@ test_table7(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback to update horizontal table padding from a slider.
+ * @param data The table object whose padding will be changed.
+ * @param obj The slider object that triggered the callback.
+ * @param event_info Not used.
+ */
 static void
 _hor_sl_delay_changed_cb(void *data, Evas_Object *obj,
                          void *event_info EINA_UNUSED)
@@ -399,6 +498,12 @@ _hor_sl_delay_changed_cb(void *data, Evas_Object *obj,
    elm_table_padding_set(data, elm_slider_value_get(obj), h);
 }
 
+/**
+ * @brief Callback to update vertical table padding from a slider.
+ * @param data The table object whose padding will be changed.
+ * @param obj The slider object that triggered the callback.
+ * @param event_info Not used.
+ */
 static void
 _vert_sl_delay_changed_cb(void *data, Evas_Object *obj,
                           void *event_info EINA_UNUSED)
@@ -409,6 +514,20 @@ _vert_sl_delay_changed_cb(void *data, Evas_Object *obj,
    elm_table_padding_set(data, w, elm_slider_value_get(obj));
 }
 
+/**
+ * @brief Interactive test for table padding and alignment.
+ *
+ * This test provides a complex layout to demonstrate table padding and
+ * alignment. It features a table nested inside another table, with a
+ * background to visualize the inner table's bounds. Sliders are provided
+ * to dynamically adjust the horizontal and vertical padding of the inner
+ * table, allowing for real-time observation of layout changes. The table
+ * contains buttons with various column and row spans.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_table8(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

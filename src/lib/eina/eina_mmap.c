@@ -60,12 +60,20 @@
  *                                 Local                                      *
  *============================================================================*/
 
+/** @internal
+ * @brief Global flag indicating if mmap safety is currently enabled.
+ * EINA_TRUE if enabled, EINA_FALSE otherwise.
+ */
 static Eina_Bool mmap_safe = EINA_FALSE;
 #ifdef HAVE_SIGINFO_T
 
+/** @internal @brief Log domain for eina_mmap messages. */
 static int _eina_mmap_log_dom = -1;
+/** @internal @brief File descriptor for /dev/zero, used for mmaping zero pages. */
 static int _eina_mmap_zero_fd = -1;
+/** @internal @brief System's memory page size, in bytes. */
 static long _eina_mmap_pagesize = -1;
+/** @internal @brief Stores the previous signal action for SIGBUS before eina_mmap overwrites it. */
 static struct sigaction _eina_mmap_prev_sigaction;
 
 #ifdef ERR
@@ -78,6 +86,22 @@ static struct sigaction _eina_mmap_prev_sigaction;
 #endif
 #define DBG(...) EINA_LOG_DOM_DBG(_eina_mmap_log_dom, __VA_ARGS__)
 
+/**
+ * @internal
+ * @brief Signal handler for SIGBUS.
+ *
+ * This function is invoked when a SIGBUS signal is received. It attempts
+ * to handle the error gracefully if it occurred within an mmaped Eina_File.
+ * If the faulting address is part of an Eina_File mmap, this handler
+ * replaces the faulty page with a page of zeros. Otherwise, it forwards
+ * the signal to the previously registered handler or aborts.
+ *
+ * @param sig The signal number (should be SIGBUS).
+ * @param siginfo A pointer to a siginfo_t structure containing information
+ *                about the signal. This includes the faulting address (si_addr)
+ *                and the reason for the signal (si_code).
+ * @param ptr User-defined data (unused in this handler, typically points to ucontext_t).
+ */
 static void
 _eina_mmap_safe_sigbus(int sig, siginfo_t *siginfo, void *ptr)
 {
@@ -86,7 +110,14 @@ _eina_mmap_safe_sigbus(int sig, siginfo_t *siginfo, void *ptr)
 
    /* save previous errno */
    perrno = errno;
-   /* if problems was an unaligned access - complain accordingly and abort */
+   /*
+    * If the SIGBUS was not due to a non-existent physical address (BUS_ADRERR),
+    * it might be due to other reasons like unaligned access or hardware errors.
+    * In such cases, we log the specific error and then chain to the previous
+    * signal handler or abort if none was effectively registered.
+    * BUS_ADRERR is the case we primarily want to handle for mmaped files
+    * where the underlying file might have been truncated or had an I/O error.
+    */
    if (siginfo->si_code != BUS_ADRERR)
      {
         if (siginfo->si_code == BUS_ADRALN)
@@ -129,6 +160,11 @@ _eina_mmap_safe_sigbus(int sig, siginfo_t *siginfo, void *ptr)
                }
           }
      }
+   /*
+    * If the SIGBUS was due to BUS_ADRERR (or we fell through from other codes
+    * that didn't abort/return), check if the faulting address belongs to an
+    * mmaped region managed by Eina_File.
+    */
    // Look into mmaped Eina_File if it was one of them, mark it as having
    // I/O errors and then mmap a zero page in place here
    if (eina_file_mmap_faulty(addr, _eina_mmap_pagesize))
@@ -138,15 +174,20 @@ _eina_mmap_safe_sigbus(int sig, siginfo_t *siginfo, void *ptr)
                 "EINA: Data at address 0x%lx is invalid. "
                 "Replacing with zero page.\n",
                 (unsigned long)addr);
-        /* align address to the lower page boundary */
+        /* Align address to the lower page boundary. The faulting address
+         * could be anywhere within the page. */
         addr = (unsigned char *)((long)addr & (~(_eina_mmap_pagesize - 1)));
-        /* mmap a pzge of zero's from /dev/zero in there */
+        /* mmap a page of zeros from /dev/zero in place of the faulty page.
+         * MAP_FIXED is used to ensure the mapping occurs at the exact address.
+         * PROT_EXEC is included to match potential original mapping permissions,
+         * though typically data files wouldn't be PROT_EXEC.
+         */
         if (mmap(addr, _eina_mmap_pagesize,
                  PROT_READ | PROT_WRITE | PROT_EXEC,
                  MAP_PRIVATE | MAP_FIXED,
                  _eina_mmap_zero_fd, 0) == MAP_FAILED)
           {
-             /* mmap of /dev/zero failed :( */
+             /* mmap of /dev/zero failed :( This is a critical failure. */
              perror("mmap");
              ERR("Failed to mmap() /dev/zero in place of page. SIGBUS!!!");
              errno = perrno;
@@ -155,6 +196,9 @@ _eina_mmap_safe_sigbus(int sig, siginfo_t *siginfo, void *ptr)
      }
    else
      {
+        /* The SIGBUS occurred at an address not managed by eina_file_mmap_faulty.
+         * This is an unexpected SIGBUS; log and abort.
+         */
         ERR("Regular SIGBUS not in an eina_file mmaped file");
         abort();
      }

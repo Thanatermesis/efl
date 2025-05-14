@@ -245,6 +245,14 @@ static const Eldbus_Signal _ethumb_dbus_objects_signals[] = {
 static void _ethumb_dbus_generated_signal(Ethumbd *ed, int *id, const char *thumb_path, const char *thumb_key, Eina_Bool success);
 static Eina_Bool _ethumbd_slave_spawn(Ethumbd_Slave *slave, Ethumbd *ed);
 
+/**
+ * @brief Ecore timer callback to quit the main loop on inactivity.
+ *
+ * This function is called when the inactivity timeout is reached. It quits the
+ * main loop, causing the daemon to exit gracefully.
+ * @param data The Ethumbd context.
+ * @return EINA_FALSE to stop the timer from recurring.
+ */
 static Eina_Bool
 _ethumbd_timeout_cb(void *data)
 {
@@ -255,6 +263,14 @@ _ethumbd_timeout_cb(void *data)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Starts the inactivity timeout timer.
+ *
+ * If the timeout value is non-negative and the timer is not already running,
+ * this function starts a timer that will call _ethumbd_timeout_cb after
+ * the specified duration of inactivity.
+ * @param ed The Ethumbd context.
+ */
 static void
 _ethumbd_timeout_start(Ethumbd *ed)
 {
@@ -263,6 +279,13 @@ _ethumbd_timeout_start(Ethumbd *ed)
      ed->timeout_timer = ecore_timer_add(ed->timeout, _ethumbd_timeout_cb, ed);
 }
 
+/**
+ * @brief Stops the inactivity timeout timer.
+ *
+ * This is called when there is activity, to prevent the daemon from
+ * shutting down.
+ * @param ed The Ethumbd context.
+ */
 static void
 _ethumbd_timeout_stop(Ethumbd *ed)
 {
@@ -271,6 +294,13 @@ _ethumbd_timeout_stop(Ethumbd *ed)
    ed->timeout_timer = NULL;
 }
 
+/**
+ * @brief Resets the inactivity timeout timer.
+ *
+ * This is a convenience function to stop and then start the timer again,
+ * effectively resetting the inactivity period.
+ * @param ed The Ethumbd context.
+ */
 static void
 _ethumbd_timeout_redo(Ethumbd *ed)
 {
@@ -278,6 +308,15 @@ _ethumbd_timeout_redo(Ethumbd *ed)
    _ethumbd_timeout_start(ed);
 }
 
+/**
+ * @brief Ecore timer callback to detect and handle a hung slave process.
+ *
+ * If a thumbnail request is being processed and takes too long, this function
+ * is called. It logs an error and kills the slave process, which will then
+ * be respawned by the _ethumbd_slave_del_cb handler.
+ * @param data The Ethumbd context.
+ * @return EINA_FALSE to stop the timer from recurring.
+ */
 static Eina_Bool
 _ethumbd_hang_cb(void *data)
 {
@@ -292,6 +331,14 @@ _ethumbd_hang_cb(void *data)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Starts the hang detection timer.
+ *
+ * This timer is started when a file is sent to the slave for processing.
+ * If the slave doesn't respond within a certain time, it's considered hung.
+ * The timeout is a fraction of the main inactivity timeout, with a cap.
+ * @param ed The Ethumbd context.
+ */
 static void
 _ethumbd_hang_start(Ethumbd *ed)
 {
@@ -307,6 +354,12 @@ _ethumbd_hang_start(Ethumbd *ed)
      ed->hang_timer = ecore_timer_add(tim, _ethumbd_hang_cb, ed);
 }
 
+/**
+ * @brief Stops the hang detection timer.
+ *
+ * This should be called when the slave process completes a task.
+ * @param ed The Ethumbd context.
+ */
 static void
 _ethumbd_hang_stop(Ethumbd *ed)
 {
@@ -315,6 +368,12 @@ _ethumbd_hang_stop(Ethumbd *ed)
    ed->hang_timer = NULL;
 }
 
+/**
+ * @brief Resets the hang detection timer.
+ *
+ * This is a convenience function to stop and then start the timer again.
+ * @param ed The Ethumbd context.
+ */
 static void
 _ethumbd_hang_redo(Ethumbd *ed)
 {
@@ -322,6 +381,17 @@ _ethumbd_hang_redo(Ethumbd *ed)
    _ethumbd_hang_start(ed);
 }
 
+/**
+ * @brief Checks if a request ID is valid for a given client object.
+ *
+ * A request ID is considered invalid if it falls within the range of
+ * IDs currently in the queue for that client object. This prevents
+ * duplicate request IDs from being added. The range can wrap around MAX_ID.
+ *
+ * @param eobject The client object context.
+ * @param id The request ID to check.
+ * @return 0 if the ID is valid (not in the queue), 1 if it is invalid.
+ */
 static int
 _ethumb_dbus_check_id(Ethumbd_Object *eobject, int id)
 {
@@ -336,6 +406,14 @@ _ethumb_dbus_check_id(Ethumbd_Object *eobject, int id)
      return id != eobject->max_id;
 }
 
+/**
+ * @brief Updates the maximum request ID for a client object.
+ *
+ * This is called when a new request is added to the queue. It is used
+ * by _ethumb_dbus_check_id to manage the range of in-use IDs.
+ * @param eobject The client object context.
+ * @param id The new maximum ID.
+ */
 static void
 _ethumb_dbus_inc_max_id(Ethumbd_Object *eobject, int id)
 {
@@ -345,6 +423,14 @@ _ethumb_dbus_inc_max_id(Ethumbd_Object *eobject, int id)
    eobject->max_id = id;
 }
 
+/**
+ * @brief Updates the minimum request ID for a client object.
+ *
+ * This is called after a request has been processed. It finds the next
+ * request in the queue and sets its ID as the new minimum. If the queue
+ * is empty, the min/max range is reset.
+ * @param eobject The client object context.
+ */
 static void
 _ethumb_dbus_inc_min_id(Ethumbd_Object *eobject)
 {
@@ -370,6 +456,16 @@ _ethumb_dbus_inc_min_id(Ethumbd_Object *eobject)
      }
 }
 
+/**
+ * @brief Safely writes data to the slave process pipe.
+ *
+ * This function wraps ecore_exe_send to provide a check that the slave
+ * process is running before attempting to send data.
+ * @param slave The slave context.
+ * @param buf The data buffer to send.
+ * @param size The number of bytes to send.
+ * @return 1 on success, 0 on failure (if slave is not running).
+ */
 int
 _ethumbd_write_safe(Ethumbd_Slave *slave, const void *buf, ssize_t size)
 {
@@ -384,6 +480,14 @@ _ethumbd_write_safe(Ethumbd_Slave *slave, const void *buf, ssize_t size)
    return 1;
 }
 
+/**
+ * @brief Sends an OP_NEW command to the slave.
+ *
+ * This informs the slave process that a new client object has been created,
+ * allowing it to allocate any necessary per-client resources.
+ * @param slave The slave context.
+ * @param idx The index of the new client object.
+ */
 static void
 _ethumbd_child_write_op_new(Ethumbd_Slave *slave, int idx)
 {
@@ -392,6 +496,14 @@ _ethumbd_child_write_op_new(Ethumbd_Slave *slave, int idx)
    _ethumbd_write_safe(slave, &idx, sizeof(idx));
 }
 
+/**
+ * @brief Sends an OP_DEL command to the slave.
+ *
+ * This informs the slave process that a client object has been deleted,
+ * allowing it to free associated resources.
+ * @param slave The slave context.
+ * @param idx The index of the deleted client object.
+ */
 static void
 _ethumbd_child_write_op_del(Ethumbd_Slave *slave, int idx)
 {
@@ -400,6 +512,14 @@ _ethumbd_child_write_op_del(Ethumbd_Slave *slave, int idx)
    _ethumbd_write_safe(slave, &idx, sizeof(idx));
 }
 
+/**
+ * @brief Writes a length-prefixed string to the slave process.
+ *
+ * This serialization format allows the slave to know how many bytes to read
+ * for the string.
+ * @param slave The slave context.
+ * @param str The null-terminated string to write. Can be NULL.
+ */
 static void
 _ethumbd_pipe_str_write(Ethumbd_Slave *slave, const char *str)
 {
@@ -414,6 +534,19 @@ _ethumbd_pipe_str_write(Ethumbd_Slave *slave, const char *str)
    _ethumbd_write_safe(slave, str, len);
 }
 
+/**
+ * @brief Sends an OP_GENERATE command to the slave.
+ *
+ * This command instructs the slave to generate a thumbnail for the given file.
+ * All string parameters are sent using the length-prefixed format.
+ *
+ * @param slave The slave context.
+ * @param idx The index of the client object this request belongs to.
+ * @param path The path to the source file.
+ * @param key A key associated with the source file (e.g., for Evas Eet files).
+ * @param thumb_path The destination path for the thumbnail file.
+ * @param thumb_key The key for the thumbnail file.
+ */
 static void
 _ethumbd_child_write_op_generate(Ethumbd_Slave *slave,
 				 int idx, const char *path, const char *key,
@@ -430,6 +563,19 @@ _ethumbd_child_write_op_generate(Ethumbd_Slave *slave,
    _ethumbd_pipe_str_write(slave, thumb_key);
 }
 
+/**
+ * @brief Callback invoked when a thumbnail generation is complete.
+ *
+ * This function is called after the slave process signals completion of a
+ * thumbnail request. It sends the "generated" D-Bus signal to the client,
+ * cleans up the processed request object, and resets the inactivity and
+ * hang timers.
+ *
+ * @param ed The main daemon context.
+ * @param success EINA_TRUE if generation was successful, EINA_FALSE otherwise.
+ * @param thumb_path The path to the generated thumbnail file.
+ * @param thumb_key The key of the generated thumbnail.
+ */
 static void
 _generated_cb(Ethumbd *ed, Eina_Bool success, const char *thumb_path, const char *thumb_key)
 {
@@ -450,6 +596,16 @@ _generated_cb(Ethumbd *ed, Eina_Bool success, const char *thumb_path, const char
    _ethumbd_hang_stop(ed);
 }
 
+/**
+ * @brief Processes a complete command received from the slave process.
+ *
+ * Once a full command message has been read from the slave's stdout, this
+ * function is called to parse the message and act on it. The message
+ * format is a success flag, followed by two length-prefixed strings for
+ * thumb_path and thumb_key.
+ *
+ * @param ed The main daemon context.
+ */
 static void
 _ethumbd_slave_cmd_ready(Ethumbd *ed)
 {
@@ -489,6 +645,17 @@ _ethumbd_slave_cmd_ready(Ethumbd *ed)
    ed->slave.scmd = 0;
 }
 
+/**
+ * @brief Allocates memory for an incoming command from the slave.
+ *
+ * The slave sends messages prefixed with their total size. This function reads
+ * that size and allocates a buffer to hold the rest of the message.
+ *
+ * @param ed The main daemon context.
+ * @param ssize The size of the available data chunk from the slave.
+ * @param sdata Pointer to the available data.
+ * @return The number of bytes consumed (the size of the size prefix), or 0 on error.
+ */
 static int
 _ethumbd_slave_alloc_cmd(Ethumbd *ed, int ssize, char *sdata)
 {
@@ -509,6 +676,18 @@ _ethumbd_slave_alloc_cmd(Ethumbd *ed, int ssize, char *sdata)
    return sizeof(*scmd);
 }
 
+/**
+ * @brief Ecore event handler for data received from the slave process.
+ *
+ * This function is called whenever the slave process writes to its stdout.
+ * It handles the asynchronous and potentially fragmented nature of pipe I/O
+ * by assembling the data into complete command messages.
+ *
+ * @param data The Ethumbd context.
+ * @param type The event type (unused).
+ * @param event The Ecore_Exe_Event_Data event structure.
+ * @return ECORE_CALLBACK_PASS_ON (1).
+ */
 static Eina_Bool
 _ethumbd_slave_data_read_cb(void *data, int type EINA_UNUSED, void *event)
 {
@@ -555,6 +734,19 @@ _ethumbd_slave_data_read_cb(void *data, int type EINA_UNUSED, void *event)
    return 1;
 }
 
+/**
+ * @brief Ecore event handler for slave process deletion/exit.
+ *
+ * This function is called when the slave process terminates for any reason.
+ * It handles cleanup, logs errors, and if a request was being processed, it
+ * sends a failure signal. It then attempts to respawn the slave and
+ * re-initialize it with all existing client contexts.
+ *
+ * @param data The Ethumbd context.
+ * @param type The event type (unused).
+ * @param event The Ecore_Exe_Event_Del event structure.
+ * @return ECORE_CALLBACK_RENEW (EINA_TRUE) to keep the handler, or ECORE_CALLBACK_CANCEL (EINA_FALSE) on failure.
+ */
 static Eina_Bool
 _ethumbd_slave_del_cb(void *data, int type EINA_UNUSED, void *event)
 {
@@ -604,6 +796,17 @@ end:
    return EINA_TRUE;
 }
 
+/**
+ * @brief Writes a single setup parameter to the slave process.
+ *
+ * This function serializes a setup option (e.g., size, quality) and sends
+ * it to the slave. The data is sent as a type identifier followed by the
+ * value, which can be an integer, a float, or a length-prefixed string.
+ *
+ * @param slave The slave context.
+ * @param type The Ethumbd_Op type for the setting.
+ * @param data A pointer to the value for the setting.
+ */
 static void
 _ethumbd_pipe_write_setup(Ethumbd_Slave *slave, int type, const void *data)
 {
@@ -650,6 +853,16 @@ _ethumbd_pipe_write_setup(Ethumbd_Slave *slave, int type, const void *data)
      }
 }
 
+/**
+ * @brief Processes a setup request by sending it to the slave.
+ *
+ * A setup request is a special request with a negative ID that contains
+ * configuration for subsequent thumbnail generations for a specific client.
+ * This function iterates over the flags in the request's setup struct and
+ * sends each configured option to the slave.
+ *
+ * @param ed The main daemon context.
+ */
 static void
 _process_setup(Ethumbd *ed)
 {
@@ -721,6 +934,13 @@ _process_setup(Ethumbd *ed)
    ed->processing = NULL;
 }
 
+/**
+ * @brief Processes a file generation request by sending it to the slave.
+ *
+ * This function takes the currently processing request and sends an
+ * OP_GENERATE command to the slave. It also starts the hang detection timer.
+ * @param ed The main daemon context.
+ */
 static void
 _process_file(Ethumbd *ed)
 {
@@ -730,6 +950,17 @@ _process_file(Ethumbd *ed)
       ed->processing->key, ed->processing->thumb, ed->processing->thumb_key);
 }
 
+/**
+ * @brief Selects the next client object to process a request from.
+ *
+ * This function implements a simple round-robin scheduling algorithm. It
+ * iterates through the list of active client objects, starting from the one
+ * after the last one serviced, and returns the index of the first one found
+ * with a non-empty request queue.
+ *
+ * @param queue The main request queue.
+ * @return The index of the next client object to service.
+ */
 static int
 _get_next_on_queue(Ethumbd_Queue *queue)
 {
@@ -754,6 +985,17 @@ _get_next_on_queue(Ethumbd_Queue *queue)
    return queue->list[i];
 }
 
+/**
+ * @brief Ecore idle enterer callback to process the thumbnail request queue.
+ *
+ * This function runs when the main loop is idle. It pulls one request from the
+ * queue (using round-robin scheduling across clients), and sends it to the
+ * slave process for generation or configuration. It ensures only one request
+ * is processing at a time.
+ *
+ * @param data The main daemon context.
+ * @return ECORE_CALLBACK_RENEW (1) to continue processing, or ECORE_CALLBACK_CANCEL (0) if queue is empty.
+ */
 static Eina_Bool
 _process_queue_cb(void *data)
 {
@@ -799,6 +1041,13 @@ _process_queue_cb(void *data)
    return 1;
 }
 
+/**
+ * @brief Starts the queue processing idle enterer.
+ *
+ * If the idle enterer is not already running, this function adds it.
+ * This is typically called when a new request is added to an empty queue.
+ * @param ed The main daemon context.
+ */
 static void
 _process_queue_start(Ethumbd *ed)
 {
@@ -806,6 +1055,13 @@ _process_queue_start(Ethumbd *ed)
      ed->idle_enterer = ecore_idle_enterer_add(_process_queue_cb, ed);
 }
 
+/**
+ * @brief Stops the queue processing idle enterer.
+ *
+ * This is not heavily used, but could be called to pause queue processing.
+ * The enterer typically removes itself when the queue becomes empty.
+ * @param ed The main daemon context.
+ */
 static void
 _process_queue_stop(Ethumbd *ed)
 {
@@ -816,6 +1072,15 @@ _process_queue_stop(Ethumbd *ed)
      }
 }
 
+/**
+ * @brief Appends a new client object to the table.
+ *
+ * Finds a free slot in the client object table (reallocating if necessary)
+ * and initializes it for a new client.
+ *
+ * @param ed The main daemon context.
+ * @return The index of the newly created object, or -1 on failure.
+ */
 static int
 _ethumb_table_append(Ethumbd *ed)
 {
@@ -880,6 +1145,16 @@ _ethumb_table_append(Ethumbd *ed)
 
 static void _name_owner_changed_cb(void *context, const char *bus, const char *old_id, const char *new_id);
 
+/**
+ * @brief Deletes a client object from the table and cleans up its resources.
+ *
+ * This function frees all memory associated with a client object, including
+ * its request queue. It also unregisters its D-Bus object and informs the
+ * slave process that the client is gone.
+ *
+ * @param ed The main daemon context.
+ * @param i The index of the client object to delete.
+ */
 static void
 _ethumb_table_del(Ethumbd *ed, int i)
 {
@@ -924,6 +1199,12 @@ _ethumb_table_del(Ethumbd *ed, int i)
      _ethumbd_timeout_redo(ed);
 }
 
+/**
+ * @brief Clears all client objects from the table.
+ *
+ * This is called during shutdown to ensure all client resources are released.
+ * @param ed The main daemon context.
+ */
 static void
 _ethumb_table_clear(Ethumbd *ed)
 {
@@ -934,6 +1215,18 @@ _ethumb_table_clear(Ethumbd *ed)
        _ethumb_table_del(ed, i);
 }
 
+/**
+ * @brief D-Bus callback for when a client's connection is lost.
+ *
+ * This function is registered to be called by Eldbus when a client that has
+ * created a thumbnailing object disconnects from the D-Bus. It triggers the
+ * deletion of the corresponding client object and its resources.
+ *
+ * @param context The Ethumbd_Object_Data associated with the client.
+ * @param bus The name of the bus the client was on.
+ * @param old_id The old owner ID of the client name.
+ * @param new_id The new owner ID of the client name (empty on disconnect).
+ */
 static void
 _name_owner_changed_cb(void *context, const char *bus, const char *old_id, const char *new_id)
 {
@@ -951,6 +1244,18 @@ static const Eldbus_Service_Interface_Desc client_desc = {
    _ethumb_dbus_objects_signals, NULL, NULL, NULL
 };
 
+/**
+ * @brief D-Bus method handler for creating a new thumbnailing session object.
+ *
+ * When a client calls the "new" method, this function is invoked. It creates
+ * a new client object, registers a new D-Bus object path for it (e.g.,
+ * /org/enlightenment/Ethumb/0), and returns this path to the client. The client
+ * then uses this object path for all subsequent communication for that session.
+ *
+ * @param interface The D-Bus service interface.
+ * @param msg The incoming D-Bus message.
+ * @return A reply message containing the object path of the new session object.
+ */
 static Eldbus_Message *
 _ethumb_dbus_ethumb_new_cb(const Eldbus_Service_Interface *interface, const Eldbus_Message *msg)
 {
@@ -1009,6 +1314,17 @@ static const Eldbus_Method _ethumb_dbus_methods[] = {
     { }
 };
 
+/**
+ * @brief Helper function to extract a string from a D-Bus byte array ('ay').
+ *
+ * D-Bus strings are often sent as byte arrays. This function reads an 'ay'
+ * iterator, extracts the content, and returns it as a new eina_stringshare
+ * instance. It handles empty or NULL strings correctly.
+ *
+ * @param iter The D-Bus message iterator positioned at the byte array.
+ * @return A new stringshared string, or NULL if the array is empty or invalid.
+ * The caller is responsible for freeing the returned stringshare.
+ */
 static const char *
 _ethumb_dbus_get_bytearray(Eldbus_Message_Iter *iter)
 {
@@ -1029,6 +1345,16 @@ _ethumb_dbus_get_bytearray(Eldbus_Message_Iter *iter)
      return eina_stringshare_add_length(result, length);
 }
 
+/**
+ * @brief Helper function to append a string as a D-Bus byte array ('ay').
+ *
+ * This function takes a C string and appends it to a D-Bus message as a
+ * byte array, including the null terminator.
+ *
+ * @param parent The parent message iterator.
+ * @param array The iterator for the byte array container.
+ * @param string The string to append. An empty string is used if NULL.
+ */
 static void
 _ethumb_dbus_append_bytearray(Eldbus_Message_Iter *parent, Eldbus_Message_Iter *array, const char *string)
 {
@@ -1043,6 +1369,17 @@ _ethumb_dbus_append_bytearray(Eldbus_Message_Iter *parent, Eldbus_Message_Iter *
    eldbus_message_iter_container_close(parent, array);
 }
 
+/**
+ * @brief D-Bus method handler for adding a file to the thumbnail queue.
+ *
+ * Parses the arguments for a new thumbnail request (ID, file, key, etc.)
+ * from the D-Bus message, creates a request object, and adds it to the
+ * appropriate client's queue.
+ *
+ * @param iface The D-Bus service interface for the client object.
+ * @param msg The incoming D-Bus message.
+ * @return A reply message containing the ID of the queued request.
+ */
 static Eldbus_Message *
 _ethumb_dbus_queue_add_cb(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
@@ -1109,6 +1446,15 @@ end:
    return reply;
 }
 
+/**
+ * @brief D-Bus method handler for removing a request from the queue.
+ *
+ * Finds and removes a pending request from a client's queue, identified by its ID.
+ *
+ * @param iface The D-Bus service interface for the client object.
+ * @param msg The incoming D-Bus message containing the request ID.
+ * @return A reply message with a boolean indicating success.
+ */
 static Eldbus_Message *
 _ethumb_dbus_queue_remove_cb(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
@@ -1164,6 +1510,15 @@ _ethumb_dbus_queue_remove_cb(const Eldbus_Service_Interface *iface, const Eldbus
    return reply;
 }
 
+/**
+ * @brief D-Bus method handler for clearing a client's entire request queue.
+ *
+ * Removes all pending requests for a specific client.
+ *
+ * @param iface The D-Bus service interface for the client object.
+ * @param msg The incoming D-Bus message.
+ * @return An empty reply message.
+ */
 static Eldbus_Message *
 _ethumb_dbus_queue_clear_cb(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
@@ -1199,6 +1554,16 @@ _ethumb_dbus_queue_clear_cb(const Eldbus_Service_Interface *iface, const Eldbus_
    return eldbus_message_method_return_new(msg);
 }
 
+/**
+ * @brief D-Bus method handler for deleting a thumbnailing session object.
+ *
+ * This is called when the client explicitly wants to end its session.
+ * It cleans up and removes the client object.
+ *
+ * @param iface The D-Bus service interface for the client object.
+ * @param msg The incoming D-Bus message.
+ * @return An empty reply message.
+ */
 static Eldbus_Message *
 _ethumb_dbus_delete_cb(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
@@ -1571,6 +1936,19 @@ static struct
   {NULL, NULL}
 };
 
+/**
+ * @brief Parses a single element from the setup options array.
+ *
+ * The setup options are passed as an array of dictionary entries ('a{sv}').
+ * This function parses one entry, which consists of a string key (the option
+ * name) and a variant value. It looks up the option name and calls the
+ * corresponding `_ethumb_dbus_*_set` function to handle the value.
+ *
+ * @param eobject The client object.
+ * @param data An iterator for a dictionary entry ('e') containing 'sv'.
+ * @param request The request object to populate.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 _ethumb_dbus_ethumb_setup_parse_element(Ethumbd_Object *eobject, Eldbus_Message_Iter *data, Ethumbd_Request *request)
 {
@@ -1598,6 +1976,25 @@ _ethumb_dbus_ethumb_setup_parse_element(Ethumbd_Object *eobject, Eldbus_Message_
    return _option_cbs[i].setup_func(eobject, variant, request);
 }
 
+/**
+ * @brief D-Bus method handler for setting up thumbnail generation options.
+ *
+ * Clients call this method with an array of key-value pairs to configure
+ * how subsequent thumbnails should be generated (e.g., size, quality, etc.).
+ * This function creates a special "setup" request and adds it to the queue.
+ *
+ * The array is of type 'a{sv}', an array of dictionary entries where 's' is
+ * the option name and 'v' is the variant value.
+ * Example structure:
+ * [
+ *   {"size", (128, 128)},
+ *   {"quality", 80}
+ * ]
+ *
+ * @param iface The D-Bus service interface for the client object.
+ * @param msg The incoming D-Bus message.
+ * @return A reply message with a boolean indicating success.
+ */
 static Eldbus_Message *
 _ethumb_dbus_ethumb_setup_cb(const Eldbus_Service_Interface *iface, const Eldbus_Message *msg)
 {
@@ -1646,6 +2043,19 @@ end:
    return reply;
 }
 
+/**
+ * @brief Sends the "generated" D-Bus signal to a client.
+ *
+ * This signal informs the client that a thumbnail request has been completed.
+ * It includes the original request ID, the path and key of the generated
+ * thumbnail, and a success flag.
+ *
+ * @param ed The main daemon context.
+ * @param id The ID of the completed request.
+ * @param thumb_path The path to the generated thumbnail file (or NULL on failure).
+ * @param thumb_key The key for the thumbnail (or NULL on failure).
+ * @param success EINA_TRUE if generation was successful.
+ */
 static void
 _ethumb_dbus_generated_signal(Ethumbd *ed, int *id, const char *thumb_path, const char *thumb_key, Eina_Bool success)
 {
@@ -1673,6 +2083,17 @@ static const Eldbus_Service_Interface_Desc server_desc = {
    _ethumb_dbus_interface, _ethumb_dbus_methods, NULL, NULL, NULL, NULL
 };
 
+/**
+ * @brief Callback for the D-Bus name request.
+ *
+ * This function is called after attempting to acquire the service name
+ * "org.enlightenment.Ethumb". If successful, it proceeds to register the main
+ * D-Bus service object at "/org/enlightenment/Ethumb".
+ *
+ * @param data The Ethumbd context.
+ * @param msg The reply message from the D-Bus daemon.
+ * @param pending The pending call object (unused).
+ */
 static void
 _ethumb_dbus_request_name_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending EINA_UNUSED)
 {
@@ -1696,6 +2117,15 @@ _ethumb_dbus_request_name_cb(void *data, const Eldbus_Message *msg, Eldbus_Pendi
    _ethumbd_timeout_redo(ed);
 }
 
+/**
+ * @brief Initializes the D-Bus service.
+ *
+ * This function starts the D-Bus integration by requesting the well-known
+ * service name on the session bus.
+ *
+ * @param ed The main daemon context.
+ * @return 1 on success.
+ */
 static int
 _ethumb_dbus_setup(Ethumbd *ed)
 {
@@ -1704,6 +2134,14 @@ _ethumb_dbus_setup(Ethumbd *ed)
    return 1;
 }
 
+/**
+ * @brief Shuts down the D-Bus service.
+ *
+ * This function cleans up all D-Bus related resources, including unregistering
+ * all client objects and closing the connection.
+ *
+ * @param ed The main daemon context.
+ */
 static void
 _ethumb_dbus_finish(Ethumbd *ed)
 {
@@ -1714,6 +2152,18 @@ _ethumb_dbus_finish(Ethumbd *ed)
    free(ed->queue.list);
 }
 
+/**
+ * @brief Spawns the ethumbd_slave helper process.
+ *
+ * This function locates and executes the slave process, setting up pipes
+ * for inter-process communication. The slave process does the actual
+ * thumbnail generation work in a separate address space to isolate the
+ * main daemon from potential crashes in image loading libraries.
+ *
+ * @param slave The slave context to initialize.
+ * @param ed The main daemon context, passed as user data to the Ecore_Exe.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _ethumbd_slave_spawn(Ethumbd_Slave *slave, Ethumbd *ed)
 {
@@ -1737,6 +2187,16 @@ _ethumbd_slave_spawn(Ethumbd_Slave *slave, Ethumbd *ed)
    return 1;
 }
 
+/**
+ * @brief Main function of the ethumbd daemon.
+ *
+ * Initializes libraries, parses command line options, sets up the D-Bus
+ * connection, spawns the slave process, and enters the Ecore main loop.
+ *
+ * @param argc Argument count.
+ * @param argv Argument vector.
+ * @return Exit code.
+ */
 int
 main(int argc, char *argv[])
 {

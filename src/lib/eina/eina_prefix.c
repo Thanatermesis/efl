@@ -115,6 +115,19 @@ struct _Eina_Prefix
 
 static int _eina_prefix_log_dom = -1;
 
+/**
+ * @internal
+ * @brief Joins multiple path components into a single path string.
+ *
+ * This function takes a buffer and a variable number of string arguments
+ * representing path components. It concatenates these components, separated
+ * by EINA_PATH_SEP_C, into the provided buffer.
+ *
+ * @param[out] buf The buffer to store the resulting path.
+ * @param[in] bufsize The size of the buffer.
+ * @param[in] ... A NULL-terminated list of const char * path components.
+ * @return The length of the resulting path string, or -1 on error (e.g., buffer too small).
+ */
 static int
 _path_join_multiple(char *buf, int bufsize, ...)
 {
@@ -152,6 +165,16 @@ _path_join_multiple(char *buf, int bufsize, ...)
    return used;
 }
 
+/**
+ * @internal
+ * @brief Normalizes path separators in a string.
+ *
+ * On Windows, this function replaces all forward slashes ('/') with
+ * backslashes ('\'), which is the native path separator (EINA_PATH_SEP_C).
+ * On other platforms, this function does nothing.
+ *
+ * @param[in,out] buf The path string to normalize.
+ */
 static void
 _path_sep_fix(char *buf)
 {
@@ -166,6 +189,23 @@ _path_sep_fix(char *buf)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Sets prefix paths to compiled-in defaults as a fallback.
+ *
+ * This function is called when the prefix cannot be determined dynamically.
+ * It sets the prefix paths (bin, lib, data, locale) to the values
+ * provided at compile time (pkg_bin, pkg_lib, etc.). It also logs a warning
+ * suggesting environment variables that can be set to override these defaults.
+ *
+ * @param[in,out] pfx The Eina_Prefix structure to update.
+ * @param[in] pkg_bin The compile-time binary directory path.
+ * @param[in] pkg_lib The compile-time library directory path.
+ * @param[in] pkg_data The compile-time data directory path.
+ * @param[in] pkg_locale The compile-time locale directory path.
+ * @param[in] envprefix The prefix string for environment variables (e.g., "MYAPP").
+ * @return 1 on success (paths are set), 0 if memory allocation fails for prefix_path.
+ */
 static int
 _fallback(Eina_Prefix *pfx, const char *pkg_bin, const char *pkg_lib,
           const char *pkg_data, const char *pkg_locale, const char *envprefix)
@@ -202,6 +242,19 @@ _fallback(Eina_Prefix *pfx, const char *pkg_bin, const char *pkg_lib,
    return 1;
 }
 
+/**
+ * @internal
+ * @brief Tries to determine the executable path by examining /proc/self/maps.
+ *
+ * This function is specific to Linux and other systems with a /proc filesystem.
+ * It reads /proc/self/maps to find the memory mapping that contains the given
+ * @p symbol. If found, and the mapping corresponds to a file, that file's path
+ * is considered the executable path.
+ *
+ * @param[in,out] pfx The Eina_Prefix structure to update with the exe_path if found.
+ * @param[in] symbol A pointer to a symbol (e.g., a function) within the desired executable or library.
+ * @return 1 if the path is found and set, 0 otherwise.
+ */
 static int
 _try_proc(Eina_Prefix *pfx, void *symbol)
 {
@@ -266,6 +319,22 @@ _try_proc(Eina_Prefix *pfx, void *symbol)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Tries to determine the absolute path of the executable from argv[0].
+ *
+ * This function attempts to resolve @p argv0 to an absolute executable path
+ * using several strategies:
+ * 1. If @p argv0 is already an absolute path, it's used directly if executable.
+ * 2. If @p argv0 is a relative path (contains a separator), it's joined with the
+ *    current working directory, and realpath() is used.
+ * 3. If @p argv0 is a simple filename (no separators), it searches for the
+ *    executable in the directories listed in the PATH environment variable.
+ *
+ * @param[in,out] pfx The Eina_Prefix structure to update with the exe_path if found.
+ * @param[in] argv0 The value of argv[0] from the main function.
+ * @return 1 if a valid, executable path is found and set in pfx->exe_path, 0 otherwise.
+ */
 static int
 _try_argv(Eina_Prefix *pfx, const char *argv0)
 {
@@ -359,6 +428,27 @@ _try_argv(Eina_Prefix *pfx, const char *argv0)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Retrieves a specific directory path from environment variables or constructs it from a base prefix.
+ *
+ * This function first checks for an environment variable in the format:
+ *   ${envprefix}_${envsuffix}_DIR (e.g., "MYAPP_BIN_DIR").
+ * If found, its value is used.
+ * Otherwise, if @p prefix is provided, it constructs the path by joining
+ * @p prefix and @p dir (e.g., "/usr/local" and "bin" becomes "/usr/local/bin").
+ * If neither is available, it sets @p var to an empty string.
+ * This function typically does not operate if UID != EUID, unless HAVE_GETUID or HAVE_GETEUID is not defined.
+ *
+ * @param[out] var Pointer to a char* that will be updated with the duplicated path string.
+ *                 The caller is responsible for freeing this if it's not NULL later.
+ * @param[in] envprefix The prefix for environment variables (e.g., "MYAPP").
+ * @param[in] envsuffix The suffix for the specific directory type (e.g., "BIN", "LIB").
+ * @param[in] prefix Optional base prefix path (e.g., "/usr/local"). If NULL, only the
+ *                   specific environment variable is checked.
+ * @param[in] dir The default directory name relative to the prefix (e.g., "bin", "lib").
+ * @return 1 if a path was successfully retrieved or constructed and assigned to @p var, 0 otherwise.
+ */
 static int
 _get_env_var(char **var, const char *envprefix, const char *envsuffix, const char *prefix, const char *dir)
 {
@@ -395,6 +485,26 @@ _get_env_var(char **var, const char *envprefix, const char *envsuffix, const cha
      }
 }
 
+/**
+ * @internal
+ * @brief Populates Eina_Prefix paths from environment variables.
+ *
+ * This function attempts to determine the prefix and specific directory paths
+ * (bin, lib, data, locale) using environment variables.
+ * It first checks for a master prefix variable: ${envprefix}_PREFIX.
+ * Then, for each directory type, it calls _get_env_var to check for specific
+ * overrides (e.g., ${envprefix}_BIN_DIR) or construct paths based on the
+ * master prefix.
+ * This function typically does not operate if UID != EUID, unless HAVE_GETUID or HAVE_GETEUID is not defined.
+ *
+ * @param[in,out] pfx The Eina_Prefix structure to populate.
+ * @param[in] envprefix The prefix for environment variables (e.g., "MYAPP").
+ * @param[in] bindir The default binary directory name (e.g., "bin").
+ * @param[in] libdir The default library directory name (e.g., "lib").
+ * @param[in] datadir The default data directory name (e.g., "share").
+ * @param[in] localedir The default locale directory name (e.g., "share/locale").
+ * @return The number of paths successfully set from environment variables.
+ */
 static int
 _get_env_vars(Eina_Prefix *pfx,
               const char *envprefix,
@@ -422,6 +532,25 @@ _get_env_vars(Eina_Prefix *pfx,
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Finds the length of the longest common prefix among four path strings.
+ *
+ * This function compares the four input path strings (typically representing
+ * compiled-in binary, library, data, and locale directories) character by
+ * character to find the longest sequence of characters that is identical
+ * at the beginning of all four strings.
+ *
+ * @param[in] bin Path string for the binary directory.
+ * @param[in] lib Path string for the library directory.
+ * @param[in] data Path string for the data directory.
+ * @param[in] locale Path string for the locale directory.
+ * @return The length of the common prefix. If there's no common prefix
+ *         (e.g., paths start with different characters), returns 0.
+ *         Example:
+ *           bin="/usr/local/bin", lib="/usr/local/lib", data="/usr/local/share", locale="/usr/local/share/locale"
+ *           Returns strlen("/usr/local/")
+ */
 static int
 _common_prefix_find(const char *bin, const char *lib, const char *data, const char *locale)
 {

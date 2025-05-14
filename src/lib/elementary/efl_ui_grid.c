@@ -15,6 +15,17 @@
 
 #define MY_CLASS_NAME "Efl.Ui.Grid"
 
+/**
+ * @internal
+ * @brief Constructor for the Efl.Ui.Grid class.
+ *
+ * This function is called when a new Efl.Ui.Grid object is created.
+ * It initializes the object and sets up its default position manager.
+ *
+ * @param[in] obj The Efl.Ui.Grid object to construct.
+ * @param[in] pd Private data for the Efl.Ui.Grid class (unused).
+ * @return The constructed Efl.Ui.Grid object, or @c NULL on failure.
+ */
 EOLIAN static Eo *
 _efl_ui_grid_efl_object_constructor(Eo *obj, void *pd EINA_UNUSED)
 {

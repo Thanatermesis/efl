@@ -3,14 +3,31 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Application data structure.
+ *
+ * This struct holds all the necessary data for the application,
+ * including pointers to the animation, the button to be animated,
+ * and a flag to track the button's visibility state.
+ */
 typedef struct _App_Data
 {
-   Efl_Canvas_Animation        *parallel_hide_anim;
-   Elm_Button                  *button;
+   Efl_Canvas_Animation        *parallel_hide_anim; /**< The parallel group animation for hiding/showing the button. */
+   Elm_Button                  *button; /**< The button that will be animated. */
 
-   Eina_Bool             is_btn_visible;
+   Eina_Bool             is_btn_visible; /**< Flag to toggle between showing and hiding the button. */
 } App_Data;
 
+/**
+ * @brief Callback for animation state changes.
+ *
+ * This function is called when an animation starts or ends. It prints
+ * a message to the console indicating the change.
+ *
+ * @param data User data, not used here.
+ * @param event The EFL event data. The event info is the animation object
+ *              when starting, or NULL when ending.
+ */
 static void
 _anim_changed_cb(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
 {
@@ -26,6 +43,16 @@ _anim_changed_cb(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback for animation progress updates.
+ *
+ * This function is called periodically as the animation runs, providing
+ * the current progress of the animation.
+ *
+ * @param data User data, not used here.
+ * @param event The EFL event data. The event info is a pointer to a double
+ *              representing the progress (0.0 to 1.0).
+ */
 static void
 _anim_running_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -33,11 +60,38 @@ _anim_running_cb(void *data EINA_UNUSED, const Efl_Event *event)
    printf("Animation is running! Current progress(%lf)\n", *progress);
 }
 
+/**
+ * @brief Array of callbacks for monitoring animation status.
+ *
+ * This array maps animation events to their respective callback functions.
+ * It's used to add multiple event listeners to the animated object at once.
+ *
+ * The structure of elements in this array is:
+ * { event_descriptor, callback_function }
+ *
+ * - `EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_CHANGED`: Triggered when animation starts or stops.
+ * - `EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_PROGRESS_UPDATED`: Triggered during animation playback.
+ */
 EFL_CALLBACKS_ARRAY_DEFINE(animation_stats_cb,
   {EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_CHANGED, _anim_changed_cb },
   {EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_PROGRESS_UPDATED, _anim_running_cb },
 )
 
+/**
+ * @brief Callback for the "Start/Stop Animation" button click.
+ *
+ * This function is triggered when the control button is clicked. It toggles
+ * the visibility state and starts the parallel group animation to either
+ * hide or show the target button.
+ *
+ * The animation is played forwards to hide the button and backwards to show it.
+ * The state variable `is_btn_visible` is toggled to control which direction
+ * the animation should play.
+ *
+ * @param data The application data (`App_Data *`).
+ * @param obj The button object that was clicked.
+ * @param event_info Not used.
+ */
 static void
 _btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -60,6 +114,16 @@ _btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 
 }
 
+/**
+ * @brief Callback for window deletion request.
+ *
+ * This function is called when the window is closed. It frees the
+ * application data.
+ *
+ * @param data The application data (`App_Data *`) to be freed.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _win_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -67,6 +131,25 @@ _win_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    free(ad);
 }
 
+/**
+ * @brief Test function for parallel animation group.
+ *
+ * This test sets up a window with two buttons. One button is the target
+ * of a parallel animation group. The other button controls the animation.
+ *
+ * The parallel animation group consists of three animations that run
+ * simultaneously:
+ * 1. Alpha animation (fade out).
+ * 2. Rotation animation (0 to 45 degrees).
+ * 3. Scale animation (zoom in).
+ *
+ * Clicking the control button starts the animation to hide the target button,
+ * and clicking it again reverses the animation to show it.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_efl_anim_group_parallel(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

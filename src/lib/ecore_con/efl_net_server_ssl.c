@@ -13,12 +13,24 @@
 
 #define MY_CLASS EFL_NET_SERVER_SSL_CLASS
 
+/**
+ * @brief Private data for the Efl_Net_Server_Ssl class.
+ */
 typedef struct _Efl_Net_Server_Ssl_Data
 {
-   Eo *server;
-   Eo *ssl_ctx;
+   Eo *server; /**< The underlying TCP server object. */
+   Eo *ssl_ctx; /**< The SSL context to be used for new connections. */
 } Efl_Net_Server_Ssl_Data;
 
+/**
+ * @brief Callback for when a client connection is closed.
+ *
+ * This function is registered as an event callback for the EFL_IO_CLOSER_EVENT_CLOSED
+ * event on each client. It ensures proper cleanup when a client disconnects.
+ *
+ * @param data The server object (Eo *).
+ * @param event The event information.
+ */
 static void
 _efl_net_server_ssl_client_event_closed(void *data, const Efl_Event *event)
 {
@@ -33,6 +45,20 @@ _efl_net_server_ssl_client_event_closed(void *data, const Efl_Event *event)
    //efl_net_server_clients_count_set(server, efl_net_server_clients_count_get(server) - 1);
 }
 
+/**
+ * @brief Announces a new client to the server.
+ *
+ * This function is called by the underlying TCP server when a new client
+ * has been wrapped with SSL. It performs safety checks, emits the
+ * EFL_NET_SERVER_EVENT_CLIENT_ADD event, and sets up a callback for when
+ * the client closes.
+ *
+ * @param o The server object.
+ * @param pd The private data of the server.
+ * @param client The newly connected and SSL-wrapped client socket.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., client was reparented,
+ *         not handled, or closed immediately).
+ */
 static Eina_Bool
 _efl_net_server_ssl_efl_net_server_client_announce(Eo *o, Efl_Net_Server_Ssl_Data *pd EINA_UNUSED, Eo *client)
 {
@@ -80,6 +106,18 @@ _efl_net_server_ssl_efl_net_server_client_announce(Eo *o, Efl_Net_Server_Ssl_Dat
    return EINA_FALSE;
 }
 
+/**
+ * @brief Handles a new client connection accepted via a file descriptor.
+ *
+ * This function is called when the underlying server (which could be a
+ * Efl_Net_Server_Fd) accepts a new client connection represented by a
+ * file descriptor. It creates a TCP socket from the fd, then wraps it
+ * with an SSL socket using the server's SSL context.
+ *
+ * @param o The server object.
+ * @param pd The private data of the server.
+ * @param client_fd The file descriptor of the newly accepted client.
+ */
 static void
 _efl_net_server_ssl_efl_net_server_fd_client_add(Eo *o, Efl_Net_Server_Ssl_Data *pd, int client_fd)
 {
@@ -120,6 +158,16 @@ _efl_net_server_ssl_efl_net_server_fd_client_add(Eo *o, Efl_Net_Server_Ssl_Data 
    efl_net_server_client_announce(o, client_ssl);
 }
 
+/**
+ * @brief Constructor for the Efl_Net_Server_Ssl object.
+ *
+ * Initializes the SSL server by creating an underlying TCP server and
+ * compositing it.
+ *
+ * @param o The object being constructed.
+ * @param pd The private data for the object.
+ * @return The constructed object, or NULL on failure.
+ */
 EOLIAN Efl_Object *
 _efl_net_server_ssl_efl_object_constructor(Eo *o, Efl_Net_Server_Ssl_Data *pd)
 {
@@ -140,6 +188,16 @@ _efl_net_server_ssl_efl_object_constructor(Eo *o, Efl_Net_Server_Ssl_Data *pd)
    return NULL;
 }
 
+/**
+ * @brief Callback for when the associated SSL context is deleted.
+ *
+ * This function is registered as an event callback for the EFL_EVENT_DEL
+ * event on the SSL context. It ensures that the server's reference to the
+ * SSL context is cleared if the context is deleted externally.
+ *
+ * @param data The server object (Eo *).
+ * @param event The event information (unused).
+ */
 static void
 _efl_net_server_ssl_ctx_del(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -148,6 +206,15 @@ _efl_net_server_ssl_ctx_del(void *data, const Efl_Event *event EINA_UNUSED)
    pd->ssl_ctx = NULL;
 }
 
+/**
+ * @brief Invalidates the Efl_Net_Server_Ssl object.
+ *
+ * Called when the object is being invalidated. It clears the reference
+ * to the underlying TCP server.
+ *
+ * @param o The object being invalidated.
+ * @param pd The private data for the object.
+ */
 EOLIAN void
 _efl_net_server_ssl_efl_object_invalidate(Eo *o, Efl_Net_Server_Ssl_Data *pd)
 {
@@ -156,6 +223,15 @@ _efl_net_server_ssl_efl_object_invalidate(Eo *o, Efl_Net_Server_Ssl_Data *pd)
    efl_invalidate(efl_super(o, MY_CLASS));
 }
 
+/**
+ * @brief Destructor for the Efl_Net_Server_Ssl object.
+ *
+ * Cleans up resources, specifically unreferencing the SSL context and
+ * removing the EFL_EVENT_DEL callback from it.
+ *
+ * @param o The object being destructed.
+ * @param pd The private data for the object.
+ */
 EOLIAN void
 _efl_net_server_ssl_efl_object_destructor(Eo *o, Efl_Net_Server_Ssl_Data *pd)
 {
@@ -169,6 +245,15 @@ _efl_net_server_ssl_efl_object_destructor(Eo *o, Efl_Net_Server_Ssl_Data *pd)
    efl_destructor(efl_super(o, MY_CLASS));
 }
 
+/**
+ * @brief Sets the SSL context for the server.
+ *
+ * This context will be used for all new client connections.
+ *
+ * @param o The server object (unused).
+ * @param pd The private data of the server.
+ * @param ssl_ctx The SSL context to use. Must be an Efl_Net_Ssl_Context object.
+ */
 EOLIAN static void
 _efl_net_server_ssl_ssl_context_set(Eo *o EINA_UNUSED, Efl_Net_Server_Ssl_Data *pd, Eo *ssl_ctx)
 {
@@ -181,6 +266,13 @@ _efl_net_server_ssl_ssl_context_set(Eo *o EINA_UNUSED, Efl_Net_Server_Ssl_Data *
      efl_event_callback_add(ssl_ctx, EFL_EVENT_DEL, _efl_net_server_ssl_ctx_del, o);
 }
 
+/**
+ * @brief Gets the SSL context currently used by the server.
+ *
+ * @param o The server object (unused).
+ * @param pd The private data of the server.
+ * @return The current SSL context, or NULL if none is set.
+ */
 EOLIAN static Eo *
 _efl_net_server_ssl_ssl_context_get(const Eo *o EINA_UNUSED, Efl_Net_Server_Ssl_Data *pd)
 {

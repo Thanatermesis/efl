@@ -1,3 +1,13 @@
+/**
+ * @file
+ * @brief These routines are for the Efl.Ui.Tags widget.
+ *
+ * The Tags widget allows users to input or display a list of textual tags.
+ * Tags can be added, removed, and interacted with. The widget supports
+ * an editable mode for input and a shrink mode to display more tags in
+ * limited space.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include "elementary_config.h"
 #endif
@@ -19,9 +29,35 @@ static const char PART_NAME_BUTTON[] = "btn";
 static const char PART_NAME_LABEL[] = "label";
 static const char PART_NAME_NUMBER[] = "number";
 
+/**
+ * @brief Controls whether smart focus direction is enabled for the tags widget.
+ *
+ * When EINA_TRUE, focus movement behaves normally. When EINA_FALSE (typically in
+ * shrink mode), focus direction might be altered to prevent focusing on
+ * hidden or non-interactive elements.
+ */
 static Eina_Bool _efl_ui_tags_smart_focus_direction_enable = EINA_TRUE;
 
+/**
+ * @brief Callback invoked when the text in the entry changes.
+ * @param data The Efl_Ui_Tags object.
+ * @param event The Efl_Event details (unused).
+ */
 static void _entry_changed_cb(void *data, const Efl_Event *event);
+
+/**
+ * @brief Callback invoked when the focus state of the entry changes.
+ * @param data The Efl_Ui_Tags object.
+ * @param event The Efl_Event details, including the focus state.
+ */
+static void _entry_focus_changed_cb(void *data, const Efl_Event *event);
+
+/**
+ * @brief Callback invoked when the entry is clicked.
+ * @param data The Efl_Ui_Tags object.
+ * @param event The Efl_Event details (unused).
+ */
+static void _entry_clicked_cb(void *data, const Efl_Event *event);
 static void _entry_focus_changed_cb(void *data, const Efl_Event *event);
 static void _entry_clicked_cb(void *data, const Efl_Event *event);
 
@@ -31,6 +67,15 @@ EFL_CALLBACKS_ARRAY_DEFINE(_tags_cb,
    { EFL_INPUT_EVENT_CLICKED, _entry_clicked_cb }
 );
 
+/**
+ * @brief Sets the shrink mode of the tags widget.
+ *
+ * In shrink mode, if tags exceed the available width, they are hidden and
+ * a counter ("+N") is shown for the remaining tags.
+ *
+ * @param obj The Efl_Ui_Tags object.
+ * @param shrink EINA_TRUE to enable shrink mode, EINA_FALSE to disable.
+ */
 static void
 _shrink_mode_set(Eo *obj,
                  Eina_Bool shrink)
@@ -172,6 +217,12 @@ _shrink_mode_set(Eo *obj,
      _efl_ui_tags_smart_focus_direction_enable = EINA_TRUE;
 }
 
+/**
+ * @brief Updates the view of the tags widget, typically after a change
+ * that might affect layout, like resizing or item changes in shrink mode.
+ *
+ * @param sd The private data of the Efl_Ui_Tags object.
+ */
 static void
 _view_update(Efl_Ui_Tags_Data *sd)
 {
@@ -184,6 +235,15 @@ _view_update(Efl_Ui_Tags_Data *sd)
      _shrink_mode_set(obj, EINA_TRUE);
 }
 
+/**
+ * @brief Changes the visual state of the currently selected item.
+ *
+ * Emits signals to change the item's appearance (e.g., "efl,state,focused"
+ * or "efl,state,default") and triggers relevant event callbacks.
+ *
+ * @param obj The Efl_Ui_Tags object.
+ * @param state The new state for the item (TAGS_IT_STATE_SELECTED or TAGS_IT_STATE_DEFAULT).
+ */
 static void
 _current_item_state_change(Evas_Object *obj, Tags_It_State state)
 {
@@ -208,6 +268,16 @@ _current_item_state_change(Evas_Object *obj, Tags_It_State state)
      }
 }
 
+/**
+ * @brief Sets the specified item as the currently selected one.
+ *
+ * This function updates the internal state to reflect the new selected item
+ * and changes the visual state of both the previously selected and newly
+ * selected items.
+ *
+ * @param obj The Efl_Ui_Tags object.
+ * @param it The tag item (layout object) to be set as current.
+ */
 static void
 _current_item_change(Evas_Object *obj, Evas_Object *it)
 {
@@ -232,6 +302,16 @@ _current_item_change(Evas_Object *obj, Evas_Object *it)
    _current_item_state_change(obj, TAGS_IT_STATE_SELECTED);
 }
 
+/**
+ * @brief Handles the selection of a tag item.
+ *
+ * This function updates the current item, manages focus between the entry
+ * and the selected item, and sets the state of the item.
+ *
+ * @param obj The Efl_Ui_Tags object.
+ * @param it The tag item (layout object) that was selected. If NULL,
+ *           deselects the current item and focuses the entry if editable.
+ */
 static void
 _item_select(Evas_Object *obj, Evas_Object *it)
 {
@@ -256,6 +336,15 @@ _item_select(Evas_Object *obj, Evas_Object *it)
      }
 }
 
+/**
+ * @brief Callback for a long press event on a tag item.
+ *
+ * This function is triggered by a timer. It emits the
+ * EFL_UI_TAGS_EVENT_ITEM_LONGPRESSED event.
+ *
+ * @param data The Efl_Ui_Tags object.
+ * @return ECORE_CALLBACK_CANCEL to stop the timer.
+ */
 static Eina_Bool
 _long_press_cb(void *data)
 {
@@ -270,6 +359,16 @@ _long_press_cb(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Callback for a mouse down event on a tag item.
+ *
+ * Starts a timer for detecting a long press.
+ *
+ * @param data The Efl_Ui_Tags object.
+ * @param evas The Evas canvas (unused).
+ * @param obj The Evas_Object that received the event (the tag item).
+ * @param event_info Pointer to Evas_Event_Mouse_Down structure.
+ */
 static void
 _mouse_down_cb(void  *data,
                Evas *evas EINA_UNUSED,
@@ -288,6 +387,16 @@ _mouse_down_cb(void  *data,
       (_elm_config->longpress_timeout, _long_press_cb, data);
 }
 
+/**
+ * @brief Callback for a mouse up event on a tag item.
+ *
+ * Cancels the long press timer if it's active.
+ *
+ * @param data The Efl_Ui_Tags object.
+ * @param evas The Evas canvas (unused).
+ * @param obj The Evas_Object that received the event (unused).
+ * @param event_info Pointer to Evas_Event_Mouse_Up structure (unused).
+ */
 static void
 _mouse_up_cb(void *data,
              Evas *evas EINA_UNUSED,
@@ -300,7 +409,12 @@ _mouse_up_cb(void *data,
    ELM_SAFE_FREE(sd->longpress_timer, ecore_timer_del);
 }
 
-
+/**
+ * @brief Callback invoked when a tag item receives focus.
+ * @param data The Efl_Ui_Tags object.
+ * @param obj The tag item (layout object) that received focus.
+ * @param event_info Event specific information (unused).
+ */
 static void
 _on_item_focused(void *data,
                  Evas_Object *obj,
@@ -311,6 +425,12 @@ _on_item_focused(void *data,
    sd->focused_it = obj;
 }
 
+/**
+ * @brief Callback invoked when a tag item loses focus.
+ * @param data The Efl_Ui_Tags object.
+ * @param obj The tag item (layout object) that lost focus (unused).
+ * @param event_info Event specific information (unused).
+ */
 static void
 _on_item_unfocused(void *data,
                    Evas_Object *obj EINA_UNUSED,
@@ -321,6 +441,18 @@ _on_item_unfocused(void *data,
    sd->focused_it = NULL;
 }
 
+/**
+ * @brief Callback invoked when a tag item is deleted (e.g., via a signal).
+ *
+ * Removes the item from the internal list, unpacks it from the box,
+ * updates selection and focus if necessary, and calls the
+ * EFL_UI_TAGS_EVENT_ITEM_DELETED event if not part of a batch item setting.
+ *
+ * @param data The Efl_Ui_Tags object.
+ * @param obj The tag item (layout object) to be deleted.
+ * @param emission The emitted signal string (unused).
+ * @param source The source of the signal (unused).
+ */
 static void
 _on_item_deleted(void *data,
                  Evas_Object *obj,
@@ -361,6 +493,16 @@ _on_item_deleted(void *data,
      }
 }
 
+/**
+ * @brief Callback invoked when a tag item is clicked.
+ *
+ * Selects the clicked item and emits the EFL_UI_TAGS_EVENT_ITEM_CLICKED event.
+ *
+ * @param data The Efl_Ui_Tags object.
+ * @param obj The tag item (layout object) that was clicked.
+ * @param emission The emitted signal string (unused).
+ * @param source The source of the signal (unused).
+ */
 static void
 _on_item_clicked(void *data,
                  Evas_Object *obj,
@@ -375,6 +517,17 @@ _on_item_clicked(void *data,
         (data, EFL_UI_TAGS_EVENT_ITEM_CLICKED, (void *)elm_object_part_text_get(obj, "efl.btn.text"));
 }
 
+/**
+ * @brief Creates a new tag item with the given string.
+ *
+ * This function creates a new layout for the tag, sets its text,
+ * registers callbacks for interaction (click, focus, delete, mouse events),
+ * and adds it to the tags widget's box.
+ *
+ * @param sd The private data of the Efl_Ui_Tags object.
+ * @param str The text content for the new tag.
+ * @return The newly created tag item (layout object), or NULL on failure.
+ */
 static Eo *
 _item_new(Efl_Ui_Tags_Data *sd,
                  const char *str)
@@ -457,6 +610,19 @@ _item_new(Efl_Ui_Tags_Data *sd,
 
 //FIXME: having an empty event handling function and reacting on Evas
 //events on specific objects is crazy, someone should fix that.
+/**
+ * @brief Handles widget input events.
+ *
+ * Currently, this function returns EINA_FALSE to prevent the widget from
+ * consuming all input events, allowing underlying Evas object event handlers
+ * to process them. This is noted as a FIXME in the code.
+ *
+ * @param obj The Efl_Ui_Tags object (unused).
+ * @param sd The private data of the Efl_Ui_Tags object (unused).
+ * @param eo_event The Efl_Event details (unused).
+ * @param src The source Evas_Object of the event (unused).
+ * @return EINA_FALSE to indicate the event was not handled (allowing further processing).
+ */
 EOLIAN static Eina_Bool
 _efl_ui_tags_efl_ui_widget_widget_input_event_handler(Eo *obj EINA_UNUSED, Efl_Ui_Tags_Data *sd EINA_UNUSED, const Efl_Event *eo_event EINA_UNUSED, Evas_Object *src EINA_UNUSED)
 {
@@ -464,6 +630,18 @@ _efl_ui_tags_efl_ui_widget_widget_input_event_handler(Eo *obj EINA_UNUSED, Efl_U
    return EINA_FALSE;
 }
 
+/**
+ * @brief Callback for the "mouse,clicked,1" signal on the main widget layout.
+ *
+ * This is typically triggered when clicking on the background area of the tags widget.
+ * If editable, it shows the input panel for the entry. It also calls the
+ * EFL_INPUT_EVENT_CLICKED event.
+ *
+ * @param data Unused.
+ * @param obj The Efl_Ui_Tags object.
+ * @param emission The emitted signal string (unused).
+ * @param source The source of the signal (unused).
+ */
 static void
 _mouse_clicked_signal_cb(void *data EINA_UNUSED,
                          Evas_Object *obj,
@@ -477,6 +655,19 @@ _mouse_clicked_signal_cb(void *data EINA_UNUSED,
    efl_event_callback_call(obj, EFL_INPUT_EVENT_CLICKED, NULL);
 }
 
+/**
+ * @brief Callback invoked when the internal box container is resized.
+ *
+ * This function handles adjustments related to the widget's size,
+ * such as emitting "expanded" or "contracted" events, adjusting
+ * item sizes if they exceed the box width, and re-applying shrink mode
+ * if active.
+ *
+ * @param data The Efl_Ui_Tags object.
+ * @param evas The Evas canvas (unused).
+ * @param obj The box Evas_Object that was resized.
+ * @param event Event specific information (unused).
+ */
 static void
 _box_resize_cb(void *data,
                Evas *evas EINA_UNUSED,
@@ -527,6 +718,17 @@ _box_resize_cb(void *data,
      _shrink_mode_set(data, EINA_TRUE);
 }
 
+/**
+ * @brief Callback invoked when the entry field is resized.
+ *
+ * If the parent tags widget has focus, this ensures the entry's current
+ * input region (e.g., cursor position) is shown.
+ *
+ * @param data The Efl_Ui_Tags object.
+ * @param e The Evas canvas (unused).
+ * @param obj The entry Evas_Object that was resized (unused).
+ * @param event_info Event specific information (unused).
+ */
 static void
 _entry_resize_cb(void *data,
                  Evas *e EINA_UNUSED,
@@ -548,6 +750,8 @@ _entry_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
    str = efl_text_get(sd->entry);
    sd->n_str = str ? strlen(str) : 0;
 }
+
+// _entry_focus_changed_cb: Documentation added earlier with the callback array definition.
 
 static void
 _entry_focus_changed_cb(void *data, const Efl_Event *event)
@@ -575,6 +779,8 @@ _entry_focus_changed_cb(void *data, const Efl_Event *event)
      }
 }
 
+// _entry_clicked_cb: Documentation added earlier with the callback array definition.
+
 static void
 _entry_clicked_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -584,6 +790,17 @@ _entry_clicked_cb(void *data, const Efl_Event *event EINA_UNUSED)
    elm_object_focus_set(sd->entry, EINA_TRUE);
 }
 
+/**
+ * @brief Callback for key down events on the main widget layout (resize_obj).
+ *
+ * Handles key presses like BackSpace, Delete, Enter when a tag item
+ * is selected or focused, or when the entry is empty to select the last tag.
+ *
+ * @param data The Efl_Ui_Tags object.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object that received the event (unused, should be resize_obj).
+ * @param event_info Pointer to Evas_Event_Key_Down structure.
+ */
 static void
 _layout_key_down_cb(void *data,
                   Evas *e EINA_UNUSED,
@@ -631,6 +848,18 @@ _layout_key_down_cb(void *data,
      sd->last_it_select = EINA_TRUE;
 }
 
+/**
+ * @brief Callback for key down events on the entry field.
+ *
+ * Specifically handles BackSpace/Delete when the entry has only one character,
+ * to influence subsequent BackSpace behavior in `_layout_key_down_cb`
+ * (related to `sd->last_it_select`).
+ *
+ * @param data The Efl_Ui_Tags object.
+ * @param e The Evas canvas (unused).
+ * @param obj The entry Evas_Object (unused).
+ * @param event_info Pointer to Evas_Event_Key_Down structure.
+ */
 static void
 _entry_key_down_cb(void *data,
                    Evas *e EINA_UNUSED,
@@ -645,6 +874,16 @@ _entry_key_down_cb(void *data,
      sd->last_it_select = EINA_FALSE;
 }
 
+/**
+ * @brief Callback for key up events on the entry field.
+ *
+ * Handles Enter/KP_Enter to create a new tag item from the entry's text.
+ *
+ * @param data The Efl_Ui_Tags object.
+ * @param e The Evas canvas (unused).
+ * @param obj The entry Evas_Object (unused).
+ * @param event_info Pointer to Evas_Event_Key_Up structure.
+ */
 static void
 _entry_key_up_cb(void *data,
                  Evas *e EINA_UNUSED,
@@ -668,6 +907,15 @@ _entry_key_up_cb(void *data,
      }
 }
 
+/**
+ * @brief Registers various event callbacks for the tags widget and its components.
+ *
+ * This includes signal callbacks for mouse clicks on the main layout,
+ * Evas event callbacks for key presses on the layout and entry,
+ * resize events for the box and entry, and Efl_Event callbacks for the entry.
+ *
+ * @param obj The Efl_Ui_Tags object.
+ */
 static void
 _callbacks_register(Evas_Object *obj)
 {
@@ -693,6 +941,16 @@ _callbacks_register(Evas_Object *obj)
    efl_event_callback_array_add(sd->entry, _tags_cb(), obj);
 }
 
+/**
+ * @brief Sets the main label text for the tags widget.
+ *
+ * If the provided string is empty, the label is hidden. Otherwise,
+ * the label text is updated, its minimum size recalculated, and it's
+ * packed into the box.
+ *
+ * @param obj The Efl_Ui_Tags object.
+ * @param str The text to set for the label.
+ */
 static void
 _label_set(Evas_Object *obj,
            const char *str)
@@ -727,6 +985,16 @@ _label_set(Evas_Object *obj,
    _view_update(sd);
 }
 
+/**
+ * @brief Initializes the view components of the tags widget.
+ *
+ * This function creates and configures the main box container, the label,
+ * the text entry field, and the "end" object (used for the "+N" indicator
+ * in shrink mode).
+ *
+ * @param obj The Efl_Ui_Tags object.
+ * @param sd The private data for the Efl_Ui_Tags object.
+ */
 static void
 _view_init(Evas_Object *obj, Efl_Ui_Tags_Data *sd)
 {
@@ -784,6 +1052,16 @@ _view_init(Evas_Object *obj, Efl_Ui_Tags_Data *sd)
      }
 }
 
+/**
+ * @brief Legacy focus handling callback.
+ *
+ * This function is part of a compatibility layer to emit old "focused"
+ * and "unfocused" smart callbacks when focus changes within the widget's
+ * children (items or entry) relative to the outside.
+ *
+ * @param data The Efl_Ui_Tags object.
+ * @param ev The EFL_UI_FOCUS_MANAGER_EVENT_MANAGER_FOCUS_CHANGED event.
+ */
 static void
 _legacy_focused(void *data, const Efl_Event *ev)
 {
@@ -814,6 +1092,17 @@ _legacy_focused(void *data, const Efl_Event *ev)
      }
 }
 
+/**
+ * @brief Callback for focus manager changes.
+ *
+ * This is part of the legacy focus handling. When the focus manager for the
+ * tags widget changes, this function updates the listener for manager focus
+ * changes to ensure the `_legacy_focused` callback is correctly registered
+ * with the new manager.
+ *
+ * @param data Unused.
+ * @param ev The EFL_UI_FOCUS_OBJECT_EVENT_FOCUS_MANAGER_CHANGED event.
+ */
 static void
 _legacy_manager_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -853,6 +1142,16 @@ _efl_ui_tags_efl_object_constructor(Eo *obj, Efl_Ui_Tags_Data *sd)
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Efl.Object.destructor implementation for Efl.Ui.Tags.
+ *
+ * Cleans up all resources allocated by the tags widget, including
+ * tag items, internal lists, stringshares, and timers.
+ *
+ * @param obj The Efl_Ui_Tags object being destructed.
+ * @param sd The private data of the Efl_Ui_Tags object.
+ */
 EOLIAN static void
 _efl_ui_tags_efl_object_destructor(Eo *obj, Efl_Ui_Tags_Data *sd)
 {
@@ -877,18 +1176,42 @@ _efl_ui_tags_efl_object_destructor(Eo *obj, Efl_Ui_Tags_Data *sd)
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Efl.Text.text_set implementation for Efl.Ui.Tags.
+ * Sets the main label of the tags widget.
+ * @param obj The Efl_Ui_Tags object.
+ * @param sd Private data (unused in this specific function after passing to _label_set).
+ * @param label The text to set as the label.
+ */
 EOLIAN static void
 _efl_ui_tags_efl_text_text_set(Eo *obj, Efl_Ui_Tags_Data *sd EINA_UNUSED, const char *label)
 {
    if (label) _label_set(obj, label);
 }
 
+/**
+ * @internal
+ * @brief Efl.Text.text_get implementation for Efl.Ui.Tags.
+ * Gets the main label of the tags widget.
+ * @param obj The Efl_Ui_Tags object (unused).
+ * @param sd Private data containing the label string.
+ * @return The current label text, or NULL if not set.
+ */
 EOLIAN static const char *
 _efl_ui_tags_efl_text_text_get(const Eo *obj EINA_UNUSED, Efl_Ui_Tags_Data *sd)
 {
    return (sd->label_str ? sd->label_str : NULL);
 }
 
+/**
+ * @internal
+ * @brief Efl.Ui.Tags.expanded_get implementation.
+ * Checks if the tags widget is currently in an expanded (not shrunk) state.
+ * @param obj The Efl_Ui_Tags object (unused).
+ * @param sd Private data containing the view state.
+ * @return EINA_TRUE if expanded, EINA_FALSE if in shrink mode.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_tags_expanded_get(const Eo *obj EINA_UNUSED, Efl_Ui_Tags_Data *sd)
 {
@@ -896,6 +1219,14 @@ _efl_ui_tags_expanded_get(const Eo *obj EINA_UNUSED, Efl_Ui_Tags_Data *sd)
           EINA_FALSE : EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Efl.Ui.Tags.expanded_set implementation.
+ * Sets the expanded state of the tags widget (enables or disables shrink mode).
+ * @param obj The Efl_Ui_Tags object.
+ * @param sd Private data containing the view state.
+ * @param expanded EINA_TRUE to expand (disable shrink mode), EINA_FALSE to contract (enable shrink mode).
+ */
 EOLIAN static void
 _efl_ui_tags_expanded_set(Eo *obj, Efl_Ui_Tags_Data *sd, Eina_Bool expanded)
 {
@@ -908,6 +1239,14 @@ _efl_ui_tags_expanded_set(Eo *obj, Efl_Ui_Tags_Data *sd, Eina_Bool expanded)
      _shrink_mode_set(obj, EINA_TRUE);
 }
 
+/**
+ * @internal
+ * @brief Efl.Ui.Tags.editable_set implementation.
+ * Sets whether the tags widget is editable (i.e., if the text entry is shown).
+ * @param obj The Efl_Ui_Tags object (unused).
+ * @param sd Private data.
+ * @param editable EINA_TRUE to make editable, EINA_FALSE for read-only.
+ */
 EOLIAN static void
 _efl_ui_tags_editable_set(Eo *obj EINA_UNUSED, Efl_Ui_Tags_Data *sd, Eina_Bool editable)
 {
@@ -927,12 +1266,37 @@ _efl_ui_tags_editable_set(Eo *obj EINA_UNUSED, Efl_Ui_Tags_Data *sd, Eina_Bool e
      }
 }
 
+/**
+ * @internal
+ * @brief Efl.Ui.Tags.editable_get implementation.
+ * Gets whether the tags widget is currently editable.
+ * @param obj The Efl_Ui_Tags object (unused).
+ * @param sd Private data.
+ * @return EINA_TRUE if editable, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_tags_editable_get(const Eo *obj EINA_UNUSED, Efl_Ui_Tags_Data *sd)
 {
    return sd->editable;
 }
 
+/**
+ * @internal
+ * @brief Efl.Ui.Tags.items_set implementation.
+ * Sets all tag items in the widget from an array of strings.
+ * Existing items are cleared before adding new ones.
+ * Example Eina_Array structure:
+ * @code
+ * Eina_Array *array = eina_array_new(2);
+ * eina_array_push(array, "tag1");
+ * eina_array_push(array, "tag2");
+ * // efl_ui_tags_items_set(tags_widget, array);
+ * eina_array_free(array);
+ * @endcode
+ * @param obj The Efl_Ui_Tags object.
+ * @param sd Private data.
+ * @param items An Eina_Array of C strings (const char *) representing the tags.
+ */
 EOLIAN static void
 _efl_ui_tags_items_set(Eo *obj, Efl_Ui_Tags_Data *sd, const Eina_Array *items)
 {
@@ -957,6 +1321,25 @@ _efl_ui_tags_items_set(Eo *obj, Efl_Ui_Tags_Data *sd, const Eina_Array *items)
    sd->item_setting = EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Efl.Ui.Tags.items_get implementation.
+ * Retrieves all current tag items as an array of strings.
+ * The returned array is owned by the widget and should not be modified or freed.
+ * Its content is valid until the next call to `items_set` or `items_get`, or
+ * until the widget is destroyed.
+ * The Eina_Array will contain `const char *` elements. For example:
+ * @code
+ * // const Eina_Array *items = efl_ui_tags_items_get(tags_widget);
+ * // unsigned int i;
+ * // const char *item_text;
+ * // EINA_ARRAY_FOREACH(items, i, item_text)
+ * //   printf("Tag: %s\n", item_text);
+ * @endcode
+ * @param obj The Efl_Ui_Tags object (unused).
+ * @param sd Private data.
+ * @return A const Eina_Array containing C strings (const char *) of the tag items.
+ */
 EOLIAN static const Eina_Array*
 _efl_ui_tags_items_get(const Eo *obj EINA_UNUSED, Efl_Ui_Tags_Data *sd)
 {
@@ -971,6 +1354,19 @@ _efl_ui_tags_items_get(const Eo *obj EINA_UNUSED, Efl_Ui_Tags_Data *sd)
 
    return sd->it_array;
 }
+
+/**
+ * @internal
+ * @brief Efl.Ui.Format.apply_formatted_value implementation for Efl.Ui.Tags.
+ *
+ * This function is called when the formatted string for numbers (e.g., the "+N"
+ * indicator in shrink mode) might have changed due to locale or other formatting
+ * settings. It triggers a view update to re-render the tags, ensuring the
+ * number display is correct.
+ *
+ * @param obj The Efl_Ui_Tags object (unused).
+ * @param pd The private data of the Efl_Ui_Tags object.
+ */
 EOLIAN static void
 _efl_ui_tags_efl_ui_format_apply_formatted_value(Eo *obj EINA_UNUSED, Efl_Ui_Tags_Data *pd)
 {

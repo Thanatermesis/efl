@@ -30,13 +30,29 @@
 #include "eina_value.h"
 #include "eina_stringshare.h"
 
-
+/**
+ * @internal
+ * @brief Structure extending Eina_Value_Struct_Desc to include a reference count.
+ * This is used to manage the lifecycle of the struct description, especially
+ * when shared across multiple Eina_Value instances.
+ */
 typedef struct _Eina_Value_Util_Struct_Desc
 {
-   Eina_Value_Struct_Desc base;
-   int refcount;
+   Eina_Value_Struct_Desc base; /**< The base Eina_Value_Struct_Desc structure. */
+   int refcount; /**< The reference count for this structure descriptor. */
 } Eina_Value_Util_Struct_Desc;
 
+/**
+ * @internal
+ * @brief Allocates memory for a struct member based on its description.
+ *
+ * This function is part of the Eina_Value_Struct_Operations. It increments
+ * the reference count of the Eina_Value_Util_Struct_Desc.
+ *
+ * @param ops The struct operations (unused).
+ * @param desc The struct descriptor.
+ * @return A pointer to the allocated memory for the struct, or @c NULL on failure.
+ */
 static void *
 _ops_malloc(const Eina_Value_Struct_Operations *ops EINA_UNUSED, const Eina_Value_Struct_Desc *desc)
 {
@@ -46,6 +62,19 @@ _ops_malloc(const Eina_Value_Struct_Operations *ops EINA_UNUSED, const Eina_Valu
    return malloc(desc->size);
 }
 
+/**
+ * @internal
+ * @brief Frees memory previously allocated for a struct member.
+ *
+ * This function is part of the Eina_Value_Struct_Operations. It decrements
+ * the reference count of the Eina_Value_Util_Struct_Desc. If the reference
+ * count drops to zero, it also frees the struct descriptor itself and its
+ * associated member names.
+ *
+ * @param ops The struct operations (unused).
+ * @param desc The struct descriptor.
+ * @param memory Pointer to the memory to be freed.
+ */
 static void
 _ops_free(const Eina_Value_Struct_Operations *ops EINA_UNUSED, const Eina_Value_Struct_Desc *desc, void *memory)
 {
@@ -63,9 +92,16 @@ _ops_free(const Eina_Value_Struct_Operations *ops EINA_UNUSED, const Eina_Value_
      }
 }
 
+/**
+ * @internal
+ * @brief Defines the operations for managing Eina_Value structs with refcounting.
+ *
+ * This static structure provides the Eina_Value core with functions to allocate
+ * and free memory for struct types that use the Eina_Value_Util_Struct_Desc.
+ */
 static Eina_Value_Struct_Operations operations =
 {
-   EINA_VALUE_STRUCT_OPERATIONS_VERSION,
+   EINA_VALUE_STRUCT_OPERATIONS_VERSION, /**< Version of the operations structure. */
    _ops_malloc,
    _ops_free,
    NULL,

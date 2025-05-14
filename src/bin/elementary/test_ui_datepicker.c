@@ -4,6 +4,16 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Callback for the date_changed event of the datepicker.
+ *
+ * This function is called whenever the user changes the date in the
+ * datepicker widget. It retrieves the newly selected date and prints
+ * it to the console.
+ *
+ * @param data User data pointer (unused).
+ * @param ev The event information. ev->object is the datepicker widget.
+ */
 static void
 _date_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -13,6 +23,21 @@ _date_changed_cb(void *data EINA_UNUSED, const Efl_Event *ev)
    printf("Current date is %d %d %d\n", year, month, day);
 }
 
+/**
+ * @brief Creates a datepicker test window.
+ *
+ * This function sets up a new window containing an Efl.Ui.Datepicker widget.
+ * The datepicker is initialized with a specific date, and constrained by
+ * minimum and maximum dates. A callback is registered to print the selected
+ * date whenever it's changed by the user.
+ *
+ * This is an elementary test function. The parameters are passed by the
+ * test infrastructure.
+ *
+ * @param data Unused user data.
+ * @param obj Unused parent object.
+ * @param event_info Unused event information.
+ */
 void
 test_ui_datepicker(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

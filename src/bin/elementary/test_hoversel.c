@@ -23,6 +23,14 @@ enum _api_state
 };
 typedef enum _api_state api_state;
 
+/**
+ * @brief Sequentially test hoversel API functions.
+ * @param api The api_data struct with the test state.
+ *
+ * This function is part of the API test harness. It is called when the
+ * "Next API function" button is clicked. It modifies the hoversel widgets
+ * based on the current test state.
+ */
 static void
 set_api_state(api_data *api)
 {
@@ -72,6 +80,16 @@ set_api_state(api_data *api)
      }
 }
 
+/**
+ * @brief Callback for the "Next API function" button.
+ * @param data The api_data struct.
+ * @param obj The button object.
+ * @param event_info Not used.
+ *
+ * This function advances the API test to the next state, calls set_api_state()
+ * to apply the changes for the new state, and updates the button label.
+ * The button is disabled when the last test state is reached.
+ */
 static void
 _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {  /* Will add here a SWITCH command containing code to modify test-object */
@@ -87,12 +105,28 @@ _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_disabled_set(obj, a->state == API_STATE_LAST);
 }
 
+/**
+ * @brief Frees the api_data structure when the window is closed.
+ * @param data The api_data struct to free.
+ * @param e Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Callback for the "clicked" smart event of a hoversel.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This function is called when the hoversel button itself is clicked,
+ * before it expands.
+ */
 static void
 _hoversel_clicked_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                      void *event_info EINA_UNUSED)
@@ -100,6 +134,15 @@ _hoversel_clicked_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    printf("Hover button is clicked and 'clicked' callback is called.\n");
 }
 
+/**
+ * @brief Callback for the "clicked" smart event to dynamically populate items.
+ * @param data Not used.
+ * @param obj The hoversel object to populate.
+ * @param event_info Not used.
+ *
+ * This demonstrates adding hoversel items dynamically when the hoversel
+ * button is clicked.
+ */
 static void
 _hoversel_clicked_populate_cb(void *data EINA_UNUSED, Evas_Object *obj,
                               void *event_info EINA_UNUSED)
@@ -111,6 +154,14 @@ _hoversel_clicked_populate_cb(void *data EINA_UNUSED, Evas_Object *obj,
    elm_hoversel_item_add(obj, "Item 4", NULL, ELM_ICON_NONE, NULL, NULL);
 }
 
+/**
+ * @brief Callback for the "selected" smart event.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info The selected Elm_Object_Item.
+ *
+ * This function is called when an item in the hoversel is selected.
+ */
 static void
 _hoversel_selected_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                       void *event_info)
@@ -120,6 +171,15 @@ _hoversel_selected_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    printf("'selected' callback is called. (selected item : %s)\n", txt);
 }
 
+/**
+ * @brief Callback for the "dismissed" smart event.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This is called when the hoversel popup is dismissed, either by selecting an
+ * item or by clicking outside the popup.
+ */
 static void
 _hoversel_dismissed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                        void *event_info EINA_UNUSED)
@@ -127,6 +187,16 @@ _hoversel_dismissed_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    printf("'dismissed' callback is called.\n");
 }
 
+/**
+ * @brief Callback for the "expanded" smart event.
+ * @param data An Elm_Object_Item to be modified.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This is called when the hoversel expands to show its items. If data is
+ * not NULL, it demonstrates changing the style of the provided hoversel item
+ * dynamically.
+ */
 static void
 _hoversel_expanded_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                        void *event_info EINA_UNUSED)
@@ -143,6 +213,21 @@ _hoversel_expanded_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
      }
 }
 
+/**
+ * @brief Main test function for hoversel widgets.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This function creates a window and populates it with various hoversel
+ * widgets to test different configurations and features, including:
+ * - Simple hoversel with text items.
+ * - Hoversel with icons.
+ * - Dynamically populated hoversel.
+ * - Disabled hoversel.
+ * - Hoversel with custom item style.
+ * - An API test runner to check various API functions.
+ */
 void
 test_hoversel(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -319,6 +404,14 @@ test_hoversel(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_
    evas_object_show(win);
 }
 
+/**
+ * @brief Callback for the "item,focused" smart event.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info The Elm_Object_Item that received focus.
+ *
+ * This function is called when an item within the hoversel's popup gains focus.
+ */
 static void
 _item_focused_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -327,6 +420,14 @@ _item_focused_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *eve
    printf("item,focused: %p\n", it);
 }
 
+/**
+ * @brief Callback for the "item,unfocused" smart event.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info The Elm_Object_Item that lost focus.
+ *
+ * This function is called when an item within the hoversel's popup loses focus.
+ */
 static void
 _item_unfocused_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -334,6 +435,15 @@ _item_unfocused_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *e
 
    printf("item,unfocused: %p\n", it);
 }
+/**
+ * @brief Another "expanded" callback for focus testing.
+ * @param data The Elm_Object_Item to focus.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This callback is used in the focus test to programmatically set focus to a
+ * specific item when the hoversel is expanded.
+ */
 static void
 _hoversel_expanded_cb2(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -344,6 +454,18 @@ _hoversel_expanded_cb2(void *data, Evas_Object *obj EINA_UNUSED, void *event_inf
    printf("focus set to item: %p\n", it);
 }
 
+/**
+ * @brief Test function for hoversel focus handling.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ *
+ * This function creates a window to test focus behavior on hoversel widgets and
+ * their items. It includes tests for:
+ * - Vertical and horizontal hoversels.
+ * - Programmatically setting focus on an item.
+ * - Callbacks for item focus events.
+ */
 void
 test_hoversel_focus(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

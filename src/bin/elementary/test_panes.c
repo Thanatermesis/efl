@@ -3,24 +3,64 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback function for the "press" event on the panes widget.
+ *
+ * This function is called when the user presses the bar of the panes widget.
+ *
+ * @param data Unused user data pointer.
+ * @param obj Unused Evas_Object pointer to the panes widget.
+ * @param event_info Unused event information.
+ */
 static void
 _press(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("press\n");
 }
 
+/**
+ * @brief Callback function for the "unpress" event on the panes widget.
+ *
+ * This function is called when the user releases the bar of the panes widget.
+ * It prints the size of the left content pane.
+ *
+ * @param data Unused user data pointer.
+ * @param obj The Evas_Object pointer to the panes widget.
+ * @param event_info Unused event information.
+ */
 static void
 _unpress(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    printf("unpress, size : %f\n", elm_panes_content_left_size_get(obj));
 }
 
+/**
+ * @brief Callback function for the "clicked" event on the panes widget.
+ *
+ * This function is called when the user clicks the bar of the panes widget.
+ *
+ * @param data Unused user data pointer.
+ * @param obj Unused Evas_Object pointer to the panes widget.
+ * @param event_info Unused event information.
+ */
 static void
 _clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("clicked\n");
 }
 
+/**
+ * @brief Callback for a double-click event on the panes widget's bar.
+ *
+ * This function toggles the size of the left pane. If the pane is visible,
+ * it collapses it to 0.0 and stores its original size. If it's collapsed,
+ * it restores it to its previous size. This provides a hide/show functionality
+ * on double-click.
+ *
+ * @param data A pointer to a double, used to store the pane's size.
+ * @param obj The panes widget that was double-clicked.
+ * @param event_info Unused event information.
+ */
 static void
 _clicked_double(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -38,6 +78,17 @@ _clicked_double(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      elm_panes_content_left_size_set(obj, *size);
 }
 
+/**
+ * @brief Creates and sets up the main test window with panes widgets.
+ *
+ * This function initializes a window and a vertical panes widget. The left
+ * pane contains a button, and the right pane contains a horizontal panes
+ * widget. This nested panes widget then contains two more buttons in its top
+ * and bottom panes. Callbacks for various events on the panes' bars are set up.
+ *
+ * @param style The style to be applied to the panes widgets.
+ *              Example values: "default", "flush", "left-fold".
+ */
 static void
 _test_panes(const char *style)
 {
@@ -107,36 +158,93 @@ _test_panes(const char *style)
    evas_object_show(win);
 }
 
+/**
+ * @brief Test function to create a panes widget with the "default" style.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_panes(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    _test_panes("default");
 }
 
+/**
+ * @brief Test function to create a panes widget with the "flush" style.
+ *
+ * The "flush" style typically renders the panes without a visible border
+ * or handle, making the separation appear seamless.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_panes_flush(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    _test_panes("flush");
 }
 
+/**
+ * @brief Test function to create a panes widget with the "left-fold" style.
+ *
+ * This style might provide a specific visual effect for folding or collapsing
+ * the left pane.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_panes_left_fold(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    _test_panes("left-fold");
 }
 
+/**
+ * @brief Test function to create a panes widget with the "right-fold" style.
+ *
+ * This style might provide a specific visual effect for folding or collapsing
+ * the right pane.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_panes_right_fold(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    _test_panes("right-fold");
 }
 
+/**
+ * @brief Test function to create a panes widget with the "up-fold" style.
+ *
+ * This style might provide a specific visual effect for folding or collapsing
+ * the top pane in a horizontal panes widget.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_panes_up_fold(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    _test_panes("up-fold");
 }
 
+/**
+ * @brief Test function to create a panes widget with the "down-fold" style.
+ *
+ * This style might provide a specific visual effect for folding or collapsing
+ * the bottom pane in a horizontal panes widget.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_panes_down_fold(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

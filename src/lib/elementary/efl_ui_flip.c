@@ -16,8 +16,18 @@
 #define MY_CLASS EFL_UI_FLIP_CLASS
 #define MY_CLASS_NAME "Efl.Ui.Flip"
 
+/** @brief Signal emitted when flip animation begins. */
 static const char SIG_ANIMATE_BEGIN[] = "animate,begin";
+/** @brief Signal emitted when flip animation is done. */
 static const char SIG_ANIMATE_DONE[] = "animate,done";
+/** @brief Smart callback descriptions for the Efl.Ui.Flip widget.
+ *
+ *  Each element is a struct:
+ *  {
+ *    const char *name;  // Name of the callback signal, e.g., "animate,begin"
+ *    const char *type;  // Type signature of the callback data (empty here)
+ *  }
+ */
 static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {SIG_ANIMATE_BEGIN, ""},
    {SIG_ANIMATE_DONE, ""},
@@ -28,6 +38,10 @@ static Eina_Bool _flip(Evas_Object *obj);
 
 static void _update_front_back(Eo *obj, Efl_Ui_Flip_Data *sd);
 
+/**
+ * @brief Frees a Slice object and its associated Evas image object.
+ * @param sl The Slice to free.
+ */
 static void
 _slice_free(Slice *sl)
 {
@@ -35,6 +49,14 @@ _slice_free(Slice *sl)
    free(sl);
 }
 
+/**
+ * @brief Clears all slices used for the page curl effect.
+ *
+ * This function iterates through the 2D array of slices (front and back)
+ * and frees each one. It then resets the slice dimensions in the widget data.
+ *
+ * @param sd Pointer to the Efl_Ui_Flip_Data structure.
+ */
 static void
 _state_slices_clear(Efl_Ui_Flip_Data *sd)
 {
@@ -63,6 +85,14 @@ _state_slices_clear(Efl_Ui_Flip_Data *sd)
    sd->slices_h = 0;
 }
 
+/**
+ * @brief Evaluates and sets the minimum and maximum size hints for the flip widget.
+ *
+ * This function considers the size hints of both front and back content,
+ * and adjusts for finger interaction areas if enabled.
+ *
+ * @param obj The Efl_Ui_Flip widget object.
+ */
 static void
 _sizing_eval(Evas_Object *obj)
 {
@@ -109,6 +139,13 @@ _efl_ui_flip_efl_ui_widget_theme_apply(Eo *obj, Efl_Ui_Flip_Data *sd EINA_UNUSED
    return int_ret;
 }
 
+/**
+ * @brief Callback invoked when the size hints of a sub-object change.
+ * @param data The Efl_Ui_Flip widget object (passed as user data).
+ * @param e The Evas canvas.
+ * @param obj The sub-object whose hints changed.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _changed_size_hints_cb(void *data,
                        Evas *e EINA_UNUSED,
@@ -170,6 +207,21 @@ _efl_ui_flip_efl_ui_widget_widget_sub_object_del(Eo *obj, Efl_Ui_Flip_Data *sd, 
    return EINA_TRUE;
 }
 
+/**
+ * @brief Creates a new Slice object.
+ *
+ * A slice is an Evas image object that displays a portion of another Evas object (the source).
+ * It's used to create the page curl effect by dividing the content into multiple deformable pieces.
+ *
+ * @param container_obj The parent Evas object for the new slice (the flip widget itself).
+ * @param obj The Evas object to use as the image source for the slice.
+ * @return A pointer to the newly created Slice, or NULL on failure.
+ *
+ * @note The Slice struct contains:
+ *  - obj: The Evas_Object representing the image slice.
+ *  - x, y, z: Arrays for 3D coordinates of the slice's vertices.
+ *  - u, v: Arrays for UV texture coordinates of the slice's vertices.
+ */
 static Slice *
 _slice_new(Evas_Object *container_obj,
            Evas_Object *obj)
@@ -190,6 +242,24 @@ _slice_new(Evas_Object *container_obj,
    return sl;
 }
 
+/**
+ * @brief Applies transformations to a slice based on the flip direction and state.
+ *
+ * This function sets up an Evas_Map with 4 points and applies it to the slice's
+ * Evas object. The coordinates and UV mapping depend on the current flip direction
+ * (left, right, up, down) and the pre-calculated vertex data in the Slice struct.
+ *
+ * @param sd Pointer to the Efl_Ui_Flip_Data structure.
+ * @param sl The Slice to transform.
+ * @param x Unused X coordinate of the flip widget.
+ * @param y Unused Y coordinate of the flip widget.
+ * @param w Width of the flip widget (or height if vertical flip).
+ * @param h Unused height of the flip widget.
+ * @param ox Origin X of the flip widget on canvas.
+ * @param oy Origin Y of the flip widget on canvas.
+ * @param ow Original width of the content being mapped.
+ * @param oh Original height of the content being mapped.
+ */
 static void
 _slice_apply(Efl_Ui_Flip_Data *sd,
              Slice *sl,
@@ -247,6 +317,19 @@ _slice_apply(Efl_Ui_Flip_Data *sd,
    evas_object_map_set(sl->obj, m);
 }
 
+/**
+ * @brief Applies a 3D perspective transformation to a slice.
+ *
+ * It uses a vanishing point at the center of the page and a fixed focal distance.
+ * The slice is hidden if it's not clockwise after transformation (facing away).
+ *
+ * @param sd Pointer to the Efl_Ui_Flip_Data structure (unused).
+ * @param sl The Slice to apply 3D perspective to.
+ * @param x X coordinate of the flip widget.
+ * @param y Y coordinate of the flip widget.
+ * @param w Width of the flip widget.
+ * @param h Height of the flip widget.
+ */
 static void
 _slice_3d(Efl_Ui_Flip_Data *sd EINA_UNUSED,
           Slice *sl,
@@ -276,6 +359,19 @@ _slice_3d(Efl_Ui_Flip_Data *sd EINA_UNUSED,
    evas_map_free(m);
 }
 
+/**
+ * @brief Applies lighting to a slice.
+ *
+ * This function simulates a light source positioned above the center of the page,
+ * affecting the color of the slice's vertices. It also brightens the colors slightly.
+ *
+ * @param sd Pointer to the Efl_Ui_Flip_Data structure (unused).
+ * @param sl The Slice to apply lighting to.
+ * @param x X coordinate of the flip widget.
+ * @param y Y coordinate of the flip widget.
+ * @param w Width of the flip widget.
+ * @param h Height of the flip widget.
+ */
 static void
 _slice_light(Efl_Ui_Flip_Data *sd EINA_UNUSED,
              Slice *sl,
@@ -312,6 +408,24 @@ _slice_light(Efl_Ui_Flip_Data *sd EINA_UNUSED,
    evas_object_map_set(sl->obj, m);
 }
 
+/**
+ * @brief Sets the 3D world coordinates (x, y, z) for the four vertices of a slice.
+ *
+ * @param sd Pointer to the Efl_Ui_Flip_Data structure (unused).
+ * @param sl The Slice whose vertex coordinates are to be set.
+ * @param xx1 X-coordinate of the first vertex.
+ * @param yy1 Y-coordinate of the first vertex.
+ * @param zz1 Z-coordinate of the first vertex.
+ * @param xx2 X-coordinate of the second vertex.
+ * @param yy2 Y-coordinate of the second vertex.
+ * @param zz2 Z-coordinate of the second vertex.
+ * @param xx3 X-coordinate of the third vertex.
+ * @param yy3 Y-coordinate of the third vertex.
+ * @param zz3 Z-coordinate of the third vertex.
+ * @param xx4 X-coordinate of the fourth vertex.
+ * @param yy4 Y-coordinate of the fourth vertex.
+ * @param zz4 Z-coordinate of the fourth vertex.
+ */
 static void
 _slice_xyz(Efl_Ui_Flip_Data *sd EINA_UNUSED,
            Slice *sl,
@@ -334,6 +448,22 @@ _slice_xyz(Efl_Ui_Flip_Data *sd EINA_UNUSED,
    sl->x[3] = xx4; sl->y[3] = yy4; sl->z[3] = zz4;
 }
 
+/**
+ * @brief Sets the UV texture coordinates for the four vertices of a slice.
+ *
+ * These coordinates map a region of the source image onto the slice.
+ *
+ * @param sd Pointer to the Efl_Ui_Flip_Data structure (unused).
+ * @param sl The Slice whose UV coordinates are to be set.
+ * @param u1 U-coordinate of the first vertex.
+ * @param v1 V-coordinate of the first vertex.
+ * @param u2 U-coordinate of the second vertex.
+ * @param v2 V-coordinate of the second vertex.
+ * @param u3 U-coordinate of the third vertex.
+ * @param v3 V-coordinate of the third vertex.
+ * @param u4 U-coordinate of the fourth vertex.
+ * @param v4 V-coordinate of the fourth vertex.
+ */
 static void
 _slice_uv(Efl_Ui_Flip_Data *sd EINA_UNUSED,
           Slice *sl,
@@ -352,6 +482,19 @@ _slice_uv(Efl_Ui_Flip_Data *sd EINA_UNUSED,
    sl->u[3] = u4; sl->v[3] = v4;
 }
 
+/**
+ * @brief Deforms a 2D point into a 3D point to simulate a page curl.
+ *
+ * This function implements the core mathematical transformation for the page curl effect.
+ * It models the page as being wrapped around a cone.
+ *
+ * @param vi Input 2D vertex (x, y).
+ * @param vo Output 3D vertex (x, y, z).
+ * @param rho Angle of the cone from the vertical axis (controls page turn amount).
+ *            Ranges from ...-PI/2 to PI/2...
+ * @param theta Cone angle (controls curliness). Ranges from 0 to PI/2.
+ * @param A Distance of the cone apex from the origin.
+ */
 static void
 _deform_point(Vertex2 *vi,
               Vertex3 *vo,
@@ -382,6 +525,14 @@ _deform_point(Vertex2 *vi,
    vo->z = (v1.x * sin(rho)) + (v1.z * cos(rho));
 }
 
+/**
+ * @brief Interpolates linearly between two 3D points.
+ *
+ * @param vi1 First input 3D vertex.
+ * @param vi2 Second input 3D vertex.
+ * @param vo Output interpolated 3D vertex.
+ * @param v Interpolation factor (0.0 means vi1, 1.0 means vi2).
+ */
 static void
 _interp_point(Vertex3 *vi1,
               Vertex3 *vi2,
@@ -393,6 +544,17 @@ _interp_point(Vertex3 *vi1,
    vo->z = (v * vi2->z) + ((1.0 - v) * vi1->z);
 }
 
+/**
+ * @brief Retrieves the color of a specific vertex of a slice and adds it to accumulator variables.
+ *
+ * @param s The Slice object.
+ * @param p The vertex index (0-3) on the slice's map.
+ * @param r Accumulator for the red component.
+ * @param g Accumulator for the green component.
+ * @param b Accumulator for the blue component.
+ * @param a Accumulator for the alpha component.
+ * @return 1 if successful, 0 otherwise (e.g., if slice or map is NULL).
+ */
 static int
 _slice_obj_color_sum(Slice *s,
                      int p,
@@ -415,6 +577,16 @@ _slice_obj_color_sum(Slice *s,
    return 1;
 }
 
+/**
+ * @brief Sets the color of a specific vertex of a slice.
+ *
+ * @param s The Slice object.
+ * @param p The vertex index (0-3) on the slice's map.
+ * @param r Red component (0-255).
+ * @param g Green component (0-255).
+ * @param b Blue component (0-255).
+ * @param a Alpha component (0-255).
+ */
 static void
 _slice_obj_color_set(Slice *s,
                      int p,
@@ -434,6 +606,22 @@ _slice_obj_color_set(Slice *s,
    evas_object_map_set(s->obj, m);
 }
 
+/**
+ * @brief Merges the colors of corresponding vertices from up to four adjacent slices.
+ *
+ * This function calculates the average color of the specified vertices from the
+ * provided slices and then sets this average color to each of those vertices.
+ * This is used to smooth lighting/shading across slice boundaries.
+ *
+ * @param s1 First slice (or NULL).
+ * @param p1 Vertex index for s1.
+ * @param s2 Second slice (or NULL).
+ * @param p2 Vertex index for s2.
+ * @param s3 Third slice (or NULL).
+ * @param p3 Vertex index for s3.
+ * @param s4 Fourth slice (or NULL).
+ * @param p4 Vertex index for s4.
+ */
 static void
 _slice_obj_vert_color_merge(Slice *s1,
                             int p1,
@@ -460,6 +648,17 @@ _slice_obj_vert_color_merge(Slice *s1,
    _slice_obj_color_set(s4, p4, r, g, b, a);
 }
 
+/**
+ * @brief Updates the state of the page curl effect.
+ *
+ * This is the core function for rendering the page curl. It calculates the
+ * deformation of each slice based on the current interaction (mouse/touch position)
+ * and flip parameters (curliness, angle). It then applies these deformations,
+ * lighting, and 3D perspective to the slices.
+ *
+ * @param obj The Efl_Ui_Flip widget object.
+ * @return 1 on success, 0 on failure (e.g., memory allocation error).
+ */
 static int
 _state_update(Evas_Object *obj)
 {
@@ -824,6 +1023,15 @@ _state_update(Evas_Object *obj)
    return 1;
 }
 
+/**
+ * @brief Updates the state of a cross-fade animation.
+ *
+ * This function calculates the alpha values for the front and back content
+ * based on the animation progress `t`. The fade is sinusoidal.
+ *
+ * @param obj The Efl_Ui_Flip widget object.
+ * @param t Animation progress (0.0 to 1.0).
+ */
 static void
 _cross_fade_update(Evas_Object *obj, double t)
 {
@@ -859,12 +1067,24 @@ _cross_fade_update(Evas_Object *obj, double t)
    evas_object_color_set(bclip, cb, cb, cb, cb);
 }
 
+/**
+ * @brief Cleans up resources used by the page curl effect at the end of an animation.
+ * @param sd Pointer to the Efl_Ui_Flip_Data structure.
+ */
 static void
 _state_end(Efl_Ui_Flip_Data *sd)
 {
    _state_slices_clear(sd);
 }
 
+/**
+ * @brief Shows/hides the front and back content clips based on the current flip state and mode.
+ *
+ * For page flip mode, it might move content off-screen to prepare for slicing.
+ * For regular flip, it shows the active face and hides the inactive one.
+ *
+ * @param obj The Efl_Ui_Flip widget object.
+ */
 static void
 _flip_show_hide(Evas_Object *obj)
 {
@@ -921,6 +1141,16 @@ _flip_show_hide(Evas_Object *obj)
      }
 }
 
+/**
+ * @brief Sets the UV coordinates for an Evas_Map based on an object's geometry.
+ *
+ * For image objects without a source (filled images), it uses the image's
+ * internal dimensions for UV mapping. Otherwise, it maps the object's
+ * geometry (0,0 to w,h) to the UV coordinates.
+ *
+ * @param obj The Evas_Object whose UVs are to be mapped.
+ * @param map The Evas_Map to populate with UV coordinates.
+ */
 static void
 _map_uv_set(Evas_Object *obj, Evas_Map *map)
 {
@@ -946,6 +1176,19 @@ _map_uv_set(Evas_Object *obj, Evas_Map *map)
      }
 }
 
+/**
+ * @brief Performs the core 3D transformation for various flip animations (rotate, cube).
+ *
+ * This function applies rotations and perspective to the front and back content
+ * based on the animation progress `t` and the specified flip `mode`.
+ *
+ * @param obj The Efl_Ui_Flip widget object.
+ * @param t Animation progress (0.0 to 1.0). 1.0 means animation is starting (or at rest),
+ *          0.0 means animation is complete (fully flipped).
+ * @param mode The type of flip animation (e.g., ELM_FLIP_ROTATE_Y_CENTER_AXIS, ELM_FLIP_CUBE_LEFT).
+ * @param lin If true, use linear interpolation for progress; otherwise, squared.
+ * @param rev If true, reverse the direction of rotation for some modes.
+ */
 static void
 _flip_do(Evas_Object *obj,
          double t,
@@ -1152,6 +1395,14 @@ _flip_do(Evas_Object *obj,
    evas_map_free(mb);
 }
 
+/**
+ * @brief Manages the position and size of front and back content.
+ *
+ * This is primarily used to ensure content is correctly positioned, especially
+ * when not animating or when pageflip moves content off-screen.
+ *
+ * @param obj The Efl_Ui_Flip widget object.
+ */
 static void
 _show_hide(Evas_Object *obj)
 {
@@ -1198,27 +1449,28 @@ _configure(Evas_Object *obj)
    _show_hide(obj);
    evas_object_geometry_get(obj, &x, &y, &w, &h);
    // FIXME: manual flip wont get fixed
-   if (sd->animator) _flip(obj);
+   if (sd->animator) _flip(obj); // Continue animation if one is in progress
 
-   if (sd->event[0])
+   // Update geometry of interactive event rectangles
+   if (sd->event[0]) // Up
      {
         fsize = (double)w * sd->dir_hitsize[0];
         elm_coords_finger_size_adjust(0, NULL, 1, &fsize);
         evas_object_geometry_set(sd->event[0], x, y, w, fsize);
      }
-   if (sd->event[1])
+   if (sd->event[1]) // Down
      {
         fsize = (double)w * sd->dir_hitsize[1];
         elm_coords_finger_size_adjust(0, NULL, 1, &fsize);
         evas_object_geometry_set(sd->event[1], x, y + h - fsize, w, fsize);
      }
-   if (sd->event[2])
+   if (sd->event[2]) // Left
      {
         fsize = (double)h * sd->dir_hitsize[2];
         elm_coords_finger_size_adjust(1, &fsize, 0, NULL);
         evas_object_geometry_set(sd->event[2], x, y, fsize, h);
      }
-   if (sd->event[3])
+   if (sd->event[3]) // Right
      {
         fsize = (double)h * sd->dir_hitsize[3];
         elm_coords_finger_size_adjust(1, &fsize, 0, NULL);
@@ -1226,6 +1478,17 @@ _configure(Evas_Object *obj)
      }
 }
 
+/**
+ * @brief Main animation tick function for all flip types.
+ *
+ * This function is called by an animator on each frame. It calculates the
+ * current animation progress `t` and calls the appropriate update function
+ * (_state_update for page flips, _cross_fade_update for cross-fade, or _flip_do
+ * for other 3D flips). It handles animation completion and cleanup.
+ *
+ * @param obj The Efl_Ui_Flip widget object.
+ * @return ECORE_CALLBACK_RENEW to continue animation, ECORE_CALLBACK_CANCEL to stop.
+ */
 static Eina_Bool
 _flip(Evas_Object *obj)
 {
@@ -1367,12 +1630,31 @@ _on_resize(void *data EINA_UNUSED,
    _configure(obj);
 }
 
+/**
+ * @brief Animator callback function. Simply calls _flip.
+ * @param data The Efl_Ui_Flip widget object.
+ * @return Result of _flip (ECORE_CALLBACK_RENEW or ECORE_CALLBACK_CANCEL).
+ */
 static Eina_Bool
 _animate(void *data)
 {
    return _flip(data);
 }
 
+/**
+ * @brief Calculates the animation progress for interactive rotate/cube flips.
+ *
+ * Based on the current mouse/touch position relative to the initial down position
+ * and widget dimensions, this determines the effective animation progress `t`,
+ * the flip mode `m` (e.g., Y-axis rotation for horizontal drag), and
+ * whether the animation should be reversed `rev`.
+ *
+ * @param obj The Efl_Ui_Flip widget object.
+ * @param sd Pointer to the Efl_Ui_Flip_Data structure.
+ * @param[out] rev Pointer to store whether the animation is reversed.
+ * @param[out] m Pointer to store the determined Elm_Flip_Mode.
+ * @return Animation progress (0.0 to 1.0).
+ */
 static double
 _pos_get(Evas_Object *obj,
          Efl_Ui_Flip_Data *sd,
@@ -1448,6 +1730,17 @@ _pos_get(Evas_Object *obj,
    return t;
 }
 
+/**
+ * @brief Timeline animator callback for completing an interactive flip (snap-to-finish or snap-back).
+ *
+ * This function is called by a timeline animator after an interactive drag ends.
+ * It animates the flip to its final state (either completing the flip or
+ * returning to the original state) based on the `sd->finish` flag.
+ *
+ * @param data Pointer to the Efl_Ui_Flip_Data structure.
+ * @param pos Current position in the timeline animation (0.0 to 1.0).
+ * @return ECORE_CALLBACK_RENEW to continue animation, ECORE_CALLBACK_CANCEL to stop.
+ */
 static Eina_Bool
 _event_anim(void *data,
             double pos)
@@ -1525,6 +1818,16 @@ _event_anim(void *data,
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Ecore_Job callback to update the visual state during an interactive drag.
+ *
+ * This function is scheduled as a job to avoid excessive updates during
+ * rapid mouse/touch movements. It calls the appropriate rendering function
+ * (_flip_do for rotate/cube, _state_update for page) based on the
+ * current interaction mode.
+ *
+ * @param data The Efl_Ui_Flip widget object.
+ */
 static void
 _update_job(void *data)
 {
@@ -1580,6 +1883,18 @@ _down_cb(void *data,
    sd->down_y = sd->y;
 }
 
+/**
+ * @brief Callback for EVAS_CALLBACK_MOUSE_UP events on interactive areas.
+ *
+ * Handles the end of an interactive flip. It determines whether to complete
+ * the flip or revert to the original state based on how far the user dragged.
+ * It then starts a timeline animation (_event_anim) to smoothly transition.
+ *
+ * @param data The Efl_Ui_Flip widget object.
+ * @param e The Evas canvas (unused).
+ * @param obj The event rectangle object (unused).
+ * @param event_info Pointer to Evas_Event_Mouse_Up structure.
+ */
 static void
 _up_cb(void *data,
        Evas *e EINA_UNUSED,
@@ -1639,6 +1954,18 @@ _up_cb(void *data,
    _event_anim(sd, 0.0);
 }
 
+/**
+ * @brief Callback for EVAS_CALLBACK_MOUSE_MOVE events on interactive areas.
+ *
+ * Handles the dragging part of an interactive flip. It determines the flip
+ * direction when the drag starts and then schedules an _update_job to
+ * update the visuals.
+ *
+ * @param data The Efl_Ui_Flip widget object.
+ * @param e The Evas canvas (unused).
+ * @param obj The event rectangle object (unused).
+ * @param event_info Pointer to Evas_Event_Mouse_Move structure.
+ */
 static void
 _move_cb(void *data,
          Evas *e EINA_UNUSED,
@@ -1716,6 +2043,14 @@ _move_cb(void *data,
    sd->job = ecore_job_add(_update_job, fl);
 }
 
+/**
+ * @brief Sets the content for either the front or back face of the flip widget.
+ *
+ * @param obj The Efl_Ui_Flip widget object.
+ * @param content The Evas_Object to set as content.
+ * @param front EINA_TRUE to set front content, EINA_FALSE for back content.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _flip_content_set(Evas_Object *obj,
                   Evas_Object *content,
@@ -1759,6 +2094,13 @@ _flip_content_set(Evas_Object *obj,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Unsets and returns the content from either the front or back face.
+ *
+ * @param obj The Efl_Ui_Flip widget object.
+ * @param front EINA_TRUE to unset front content, EINA_FALSE for back content.
+ * @return The unset Evas_Object, or NULL if no content was set.
+ */
 static Evas_Object *
 _flip_content_unset(Evas_Object *obj,
                     Eina_Bool front)
@@ -1848,7 +2190,7 @@ _efl_ui_flip_efl_canvas_group_group_add(Eo *obj, Efl_Ui_Flip_Data *priv)
 EOLIAN static void
 _efl_ui_flip_efl_canvas_group_group_del(Eo *obj, Efl_Ui_Flip_Data *sd)
 {
-   ecore_animator_del(sd->animator);
+   ELM_SAFE_FREE(sd->animator, ecore_animator_del);
    _state_slices_clear(sd);
 
    efl_canvas_group_del(efl_super(obj, MY_CLASS));
@@ -1883,13 +2225,25 @@ elm_flip_perspective_set(Evas_Object *obj,
 
 // FIXME: add ambient and lighting control
 
+/**
+ * @brief Internal function to initiate a flip animation to a specified face.
+ *
+ * This function sets up and starts an animation to transition the flip widget
+ * to either its front or back face, using the specified animation mode.
+ *
+ * @param obj The Efl_Ui_Flip widget object.
+ * @param sd Pointer to the Efl_Ui_Flip_Data structure.
+ * @param front EINA_TRUE to flip to the front face, EINA_FALSE to the back face.
+ * @param mode The Elm_Flip_Mode to use for the animation.
+ */
 static void
 _internal_elm_flip_go_to(Evas_Object *obj,
                 Efl_Ui_Flip_Data *sd,
                 Eina_Bool front,
                 Elm_Flip_Mode mode)
 {
-   if (!sd->animator) sd->animator = ecore_evas_animator_add(obj, _animate, obj);
+   ELM_SAFE_FREE(sd->animator, ecore_animator_del);
+   sd->animator = ecore_evas_animator_add(obj, _animate, obj);
 
    sd->mode = mode;
    sd->start = ecore_loop_time_get();
@@ -1960,7 +2314,8 @@ _internal_elm_flip_go_to(Evas_Object *obj,
 EOLIAN static void
 _efl_ui_flip_go_to(Eo *obj, Efl_Ui_Flip_Data *sd, Eina_Bool front, Efl_Ui_Flip_Mode mode)
 {
-   if (sd->next_state == front) return;
+   if (sd->next_state == front && sd->animator) return; // Already animating to this state
+   if (sd->state == front && !sd->animator) return; // Already at this state and not animating
 
    _internal_elm_flip_go_to(obj, sd, front, (Elm_Flip_Mode)mode);
 }
@@ -1971,6 +2326,17 @@ _efl_ui_flip_go(Eo *obj, Efl_Ui_Flip_Data *sd, Efl_Ui_Flip_Mode mode)
    _internal_elm_flip_go_to(obj, sd, !sd->state, (Elm_Flip_Mode)mode);
 }
 
+/**
+ * @brief Creates an event rectangle for a specific interaction direction.
+ *
+ * These transparent rectangles are placed at the edges of the flip widget
+ * to capture mouse/touch events for interactive flipping.
+ *
+ * @param obj The Efl_Ui_Flip widget object.
+ * @param sd Pointer to the Efl_Ui_Flip_Data structure.
+ * @param i Index representing the direction (0: up, 1: down, 2: left, 3: right).
+ *          Note: This index maps to sd->event array, which might be different from Elm_Flip_Direction enum.
+ */
 static void
 _event_rect_create(Eo *obj, Efl_Ui_Flip_Data *sd, int i)
 {
@@ -2027,6 +2393,11 @@ _efl_ui_flip_interaction_get(const Eo *obj EINA_UNUSED, Efl_Ui_Flip_Data *sd)
    return sd->intmode;
 }
 
+/**
+ * @brief Converts Elm_Flip_Direction to Efl_Ui_Layout_Orientation.
+ * @param dir The Elm_Flip_Direction.
+ * @return The corresponding Efl_Ui_Layout_Orientation.
+ */
 static Efl_Ui_Layout_Orientation
 _flip_dir_to_efl_ui_dir(Elm_Flip_Direction dir)
 {
@@ -2041,6 +2412,11 @@ _flip_dir_to_efl_ui_dir(Elm_Flip_Direction dir)
    return EFL_UI_LAYOUT_ORIENTATION_DEFAULT;
 }
 
+/**
+ * @brief Converts Efl_Ui_Layout_Orientation to Elm_Flip_Direction.
+ * @param dir The Efl_Ui_Layout_Orientation.
+ * @return The corresponding Elm_Flip_Direction.
+ */
 static Elm_Flip_Direction
 _efl_ui_dir_to_flip_dir(Efl_Ui_Layout_Orientation dir)
 {
@@ -2053,7 +2429,7 @@ _efl_ui_dir_to_flip_dir(Efl_Ui_Layout_Orientation dir)
       case EFL_UI_LAYOUT_ORIENTATION_HORIZONTAL | EFL_UI_LAYOUT_ORIENTATION_INVERTED:
         return ELM_FLIP_DIRECTION_LEFT;
       case EFL_UI_LAYOUT_ORIENTATION_VERTICAL:
-      case EFL_UI_LAYOUT_ORIENTATION_DEFAULT:
+      case EFL_UI_LAYOUT_ORIENTATION_DEFAULT: // Default to UP for vertical unspecified
         return ELM_FLIP_DIRECTION_UP;
      }
    ERR("Invalid value for Efl_Ui_Layout_Orientation: %d", (int) dir);
@@ -2111,6 +2487,16 @@ _efl_ui_flip_interaction_direction_hitsize_set(Eo *obj, Efl_Ui_Flip_Data *sd, Ef
    _configure(obj);
 }
 
+/**
+ * @brief Updates the front and back content when using the Efl.Pack interface with more than two items.
+ *
+ * When items are packed into the flip widget and an animation completes, this function
+ * ensures that the "next" item in the packed list becomes the new back (or front,
+ * depending on the flip direction) face, allowing for continuous flipping through a list of items.
+ *
+ * @param obj The Efl_Ui_Flip widget object.
+ * @param pd Pointer to the Efl_Ui_Flip_Data structure.
+ */
 static void
 _update_front_back(Eo *obj, Efl_Ui_Flip_Data *pd)
 {
@@ -2131,6 +2517,15 @@ _update_front_back(Eo *obj, Efl_Ui_Flip_Data *pd)
    _flip_content_set(obj, content, !pd->state);
 }
 
+/**
+ * @brief Handles logic when a new content object is added via Efl.Pack.
+ *
+ * If front or back faces are empty, the new content is set to one of them.
+ *
+ * @param obj The Efl_Ui_Flip widget object.
+ * @param pd Pointer to the Efl_Ui_Flip_Data structure.
+ * @param content The content object that was added.
+ */
 static void
 _content_added(Eo *obj, Efl_Ui_Flip_Data *pd, Efl_Gfx_Entity *content)
 {
@@ -2189,6 +2584,8 @@ _content_removed(Eo *obj, Efl_Ui_Flip_Data *pd, Efl_Gfx_Entity *content)
 EOLIAN static double
 _efl_ui_flip_interaction_direction_hitsize_get(Eo *obj EINA_UNUSED, Efl_Ui_Flip_Data *sd, Efl_Ui_Layout_Orientation dir)
 {
+   // Convert Efl_Ui_Layout_Orientation to the internal index used for dir_hitsize.
+   // This internal index corresponds to Elm_Flip_Direction values.
    int i = _efl_ui_dir_to_flip_dir(dir);
 
    return sd->dir_hitsize[i];

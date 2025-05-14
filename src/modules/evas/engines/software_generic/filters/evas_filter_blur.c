@@ -5,6 +5,20 @@
 
 // FIXME: Add proper stride support
 
+/**
+ * @brief Calculates the radii for multiple box blur passes to approximate a larger radius.
+ *
+ * This function splits a given blur radius 'r' into up to three smaller radii
+ * for consecutive box blur passes. This technique approximates a Gaussian blur
+ * more closely than a single large box blur, especially for larger radii.
+ * The resulting radii are stored in the `radii` array, terminated by a 0.
+ *
+ * @param[out] radii An array to store the calculated radii for each pass.
+ *                   Must be large enough to hold up to 4 integers (3 radii + terminator).
+ *                   Example for r=10: radii = {4, 3, 3, 0}
+ * @param[in] r The target blur radius.
+ * @return The number of blur passes (radii) calculated (1, 2, or 3).
+ */
 static int
 _box_blur_auto_radius(int *radii, int r)
 {
@@ -45,6 +59,20 @@ _box_blur_auto_radius(int *radii, int r)
 #include "./blur/blur_box_rgba_neon.c"
 #endif
 
+/**
+ * @brief Dispatches horizontal box blur for RGBA data to the best available implementation.
+ *
+ * Selects the appropriate horizontal box blur function (SSE3, MMX, NEON, or C)
+ * based on runtime CPU feature detection.
+ *
+ * @param src Source buffer pointer (RGBA).
+ * @param src_stride Source buffer stride in pixels.
+ * @param dst Destination buffer pointer (RGBA).
+ * @param dst_stride Destination buffer stride in pixels.
+ * @param radii Array of radii for multiple passes, terminated by 0.
+ *              Example: {5, 5, 4, 0} for radius 14 split into 3 passes.
+ * @param region The rectangular region within the buffers to process.
+ */
 static void
 _box_blur_horiz_rgba(const uint32_t *src, int src_stride,
                      uint32_t *dst, int dst_stride,
@@ -81,6 +109,20 @@ end:
    DEBUG_TIME_END();
 }
 
+/**
+ * @brief Dispatches vertical box blur for RGBA data to the best available implementation.
+ *
+ * Selects the appropriate vertical box blur function (SSE3, MMX, NEON, or C)
+ * based on runtime CPU feature detection.
+ *
+ * @param src Source buffer pointer (RGBA).
+ * @param src_stride Source buffer stride in pixels.
+ * @param dst Destination buffer pointer (RGBA).
+ * @param dst_stride Destination buffer stride in pixels.
+ * @param radii Array of radii for multiple passes, terminated by 0.
+ *              Example: {5, 5, 4, 0} for radius 14 split into 3 passes.
+ * @param region The rectangular region within the buffers to process.
+ */
 static void
 _box_blur_vert_rgba(const uint32_t *src, int src_stride,
                     uint32_t *dst, int dst_stride,
@@ -128,6 +170,20 @@ end:
 #include "./blur/blur_box_alpha_neon.c"
 #endif
 
+/**
+ * @brief Dispatches horizontal box blur for Alpha data to the best available implementation.
+ *
+ * Selects the appropriate horizontal box blur function (SSE3, MMX, NEON, or C)
+ * based on runtime CPU feature detection.
+ *
+ * @param src Source buffer pointer (Alpha).
+ * @param src_stride Source buffer stride in bytes.
+ * @param dst Destination buffer pointer (Alpha).
+ * @param dst_stride Destination buffer stride in bytes.
+ * @param radii Array of radii for multiple passes, terminated by 0.
+ *              Example: {5, 5, 4, 0} for radius 14 split into 3 passes.
+ * @param region The rectangular region within the buffers to process.
+ */
 static void
 _box_blur_horiz_alpha(const uint8_t *src, int src_stride,
                       uint8_t *dst, int dst_stride,
@@ -164,6 +220,20 @@ end:
    DEBUG_TIME_END();
 }
 
+/**
+ * @brief Dispatches vertical box blur for Alpha data to the best available implementation.
+ *
+ * Selects the appropriate vertical box blur function (SSE3, MMX, NEON, or C)
+ * based on runtime CPU feature detection.
+ *
+ * @param src Source buffer pointer (Alpha).
+ * @param src_stride Source buffer stride in bytes.
+ * @param dst Destination buffer pointer (Alpha).
+ * @param dst_stride Destination buffer stride in bytes.
+ * @param radii Array of radii for multiple passes, terminated by 0.
+ *              Example: {5, 5, 4, 0} for radius 14 split into 3 passes.
+ * @param region The rectangular region within the buffers to process.
+ */
 static void
 _box_blur_vert_alpha(const uint8_t *src, int src_stride,
                      uint8_t *dst, int dst_stride,
@@ -200,6 +270,20 @@ end:
    DEBUG_TIME_END();
 }
 
+/**
+ * @brief Creates and clamps a rectangle to given boundaries.
+ *
+ * Ensures the resulting rectangle coordinates and dimensions are non-negative
+ * and fit within the maximum width (maxw) and height (maxh).
+ *
+ * @param x The initial X coordinate.
+ * @param y The initial Y coordinate.
+ * @param w The initial width.
+ * @param h The initial height.
+ * @param maxw The maximum allowed width (exclusive bound for x + w).
+ * @param maxh The maximum allowed height (exclusive bound for y + h).
+ * @return The clamped Eina_Rectangle.
+ */
 static inline Eina_Rectangle
 _rect(int x, int y, int w, int h, int maxw, int maxh)
 {
@@ -226,9 +310,23 @@ _rect(int x, int y, int w, int h, int maxw, int maxh)
    rect.h = h;
    return rect;
 }
-
+/** @brief Macro to simplify calling _rect within the context of _box_blur_apply. */
 #define RECT(_x, _y, _w, _h) _rect(_x, _y, _w, _h, w, h)
 
+/**
+ * @brief Applies a box blur (horizontal or vertical) to an image buffer.
+ *
+ * This function handles the core logic for applying a box blur. It maps the
+ * input and output buffers, determines the regions to process (avoiding obscured
+ * areas if necessary), calculates the radii for multiple passes if auto_count is set,
+ * and calls the appropriate low-level blur function (_box_blur_horiz/vert_rgba/alpha)
+ * for each region.
+ *
+ * @param cmd The filter command containing blur parameters and buffer information.
+ * @param vert EINA_TRUE for vertical blur, EINA_FALSE for horizontal blur.
+ * @param rgba EINA_TRUE for RGBA data, EINA_FALSE for alpha-only data.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., buffer mapping failed).
+ */
 static Eina_Bool
 _box_blur_apply(Evas_Filter_Command *cmd, Eina_Bool vert, Eina_Bool rgba)
 {
@@ -305,24 +403,28 @@ unmap:
    return ret;
 }
 
+/** @brief Wrapper for applying horizontal box blur to alpha channel. */
 static Eina_Bool
 _box_blur_horiz_apply_alpha(Evas_Filter_Command *cmd)
 {
    return _box_blur_apply(cmd, 0, 0);
 }
 
+/** @brief Wrapper for applying vertical box blur to alpha channel. */
 static Eina_Bool
 _box_blur_vert_apply_alpha(Evas_Filter_Command *cmd)
 {
    return _box_blur_apply(cmd, 1, 0);
 }
 
+/** @brief Wrapper for applying horizontal box blur to RGBA data. */
 static Eina_Bool
 _box_blur_horiz_apply_rgba(Evas_Filter_Command *cmd)
 {
    return _box_blur_apply(cmd, 0, 1);
 }
 
+/** @brief Wrapper for applying vertical box blur to RGBA data. */
 static Eina_Bool
 _box_blur_vert_apply_rgba(Evas_Filter_Command *cmd)
 {
@@ -331,6 +433,22 @@ _box_blur_vert_apply_rgba(Evas_Filter_Command *cmd)
 
 /* Gaussian blur */
 
+/**
+ * @brief Calculates weights for a Gaussian-like blur using a sine approximation.
+ *
+ * Generates a kernel of weights based on a shifted and scaled sine curve,
+ * approximating a Gaussian distribution. The weights are normalized so that
+ * their sum is a power of 2, allowing for efficient division using bit shifts.
+ *
+ * @param[out] weights An array to store the calculated weights. Must be large
+ *                     enough to hold `2 * radius + 1` integers.
+ *                     The weights represent the contribution of neighboring pixels,
+ *                     centered around the middle element (index `radius`).
+ *                     Example (radius=1): weights = { W(-1), W(0), W(1) }
+ * @param[out] pow2_divider Pointer to store the exponent for the power-of-2 divider (optional, can be NULL).
+ *                          The sum of weights equals `1 << (*pow2_divider)`.
+ * @param[in] radius The radius of the blur kernel. The total kernel size is `2 * radius + 1`.
+ */
 static void
 _sin_blur_weights_get(int *weights, int *pow2_divider, int radius)
 {
@@ -368,23 +486,39 @@ _sin_blur_weights_get(int *weights, int *pow2_divider, int radius)
      *pow2_divider = nextpow2;
 }
 
+/* Include implementations for Gaussian blur steps (Alpha) */
 #define FUNCTION_NAME _gaussian_blur_horiz_alpha_step
-#define STEP 1
+#define STEP 1 /* Process pixel by pixel horizontally */
 #include "./blur/blur_gaussian_alpha_.c"
 
-// Step size is w (row by row), loops = w, so STEP = 'loops'
 #define FUNCTION_NAME _gaussian_blur_vert_alpha_step
-#define STEP loops
+#define STEP loops /* Process pixel by pixel vertically (step is image width) */
 #include "./blur/blur_gaussian_alpha_.c"
 
+/* Include implementations for Gaussian blur steps (RGBA) */
 #define FUNCTION_NAME _gaussian_blur_horiz_rgba_step
-#define STEP 1
+#define STEP 1 /* Process pixel by pixel horizontally */
 #include "./blur/blur_gaussian_rgba_.c"
 
 #define FUNCTION_NAME _gaussian_blur_vert_rgba_step
-#define STEP loops
+#define STEP loops /* Process pixel by pixel vertically (step is image width) */
 #include "./blur/blur_gaussian_rgba_.c"
 
+/**
+ * @brief Applies a Gaussian-like blur (horizontal or vertical) to an image buffer.
+ *
+ * This function handles the core logic for applying the sine-approximated
+ * Gaussian blur. It maps the input and output buffers, calculates the blur
+ * weights using _sin_blur_weights_get(), and calls the appropriate low-level
+ * blur step function (_gaussian_blur_horiz/vert_rgba/alpha_step).
+ * Unlike box blur, this currently processes the entire buffer without
+ * considering obscured regions.
+ *
+ * @param cmd The filter command containing blur parameters and buffer information.
+ * @param vert EINA_TRUE for vertical blur, EINA_FALSE for horizontal blur.
+ * @param rgba EINA_TRUE for RGBA data, EINA_FALSE for alpha-only data.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., buffer mapping failed).
+ */
 static Eina_Bool
 _gaussian_blur_apply(Evas_Filter_Command *cmd, Eina_Bool vert, Eina_Bool rgba)
 {
@@ -430,24 +564,28 @@ _gaussian_blur_apply(Evas_Filter_Command *cmd, Eina_Bool vert, Eina_Bool rgba)
    return ret;
 }
 
+/** @brief Wrapper for applying horizontal Gaussian blur to alpha channel. */
 static Eina_Bool
 _gaussian_blur_horiz_apply_alpha(Evas_Filter_Command *cmd)
 {
    return _gaussian_blur_apply(cmd, 0, 0);
 }
 
+/** @brief Wrapper for applying vertical Gaussian blur to alpha channel. */
 static Eina_Bool
 _gaussian_blur_vert_apply_alpha(Evas_Filter_Command *cmd)
 {
    return _gaussian_blur_apply(cmd, 1, 0);
 }
 
+/** @brief Wrapper for applying horizontal Gaussian blur to RGBA data. */
 static Eina_Bool
 _gaussian_blur_horiz_apply_rgba(Evas_Filter_Command *cmd)
 {
    return _gaussian_blur_apply(cmd, 0, 1);
 }
 
+/** @brief Wrapper for applying vertical Gaussian blur to RGBA data. */
 static Eina_Bool
 _gaussian_blur_vert_apply_rgba(Evas_Filter_Command *cmd)
 {
@@ -456,6 +594,18 @@ _gaussian_blur_vert_apply_rgba(Evas_Filter_Command *cmd)
 
 /* Main entry point */
 
+/**
+ * @brief Gets the appropriate software filter function for a blur command.
+ *
+ * This function acts as the main dispatcher for blur operations. Based on the
+ * blur type (Box, Gaussian), direction (dx/dy), and color format (RGBA/Alpha)
+ * specified in the Evas_Filter_Command, it returns a pointer to the
+ * corresponding specialized blur function (e.g., _box_blur_horiz_apply_rgba).
+ *
+ * @param cmd The filter command describing the desired blur operation.
+ * @return A function pointer (Software_Filter_Func) to the appropriate blur
+ *         implementation, or NULL if the command is invalid or unsupported.
+ */
 Software_Filter_Func
 eng_filter_blur_func_get(Evas_Filter_Command *cmd)
 {

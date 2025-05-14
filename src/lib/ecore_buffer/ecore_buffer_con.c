@@ -12,12 +12,26 @@ struct _Ecore_Buffer_Con
    Ecore_Fd_Handler *fd_hdl;
    Ecore_Idle_Enterer *idle_enterer;
    int fd;
-   Eina_Bool init_done;
+   Eina_Bool init_done; /**< Flag indicating if the initial Wayland sync is complete. */
 };
 
+/** @brief Global flag indicating if a fatal error occurred in the Wayland connection. */
 static Eina_Bool   _connection_fatal_error = EINA_FALSE;
+/** @brief Global pointer to the Ecore_Buffer_Con structure, representing the active connection. */
 Ecore_Buffer_Con  *_connection = NULL;
 
+/**
+ * @brief Wayland registry listener callback for global object announcements.
+ *
+ * This function is called when the Wayland compositor announces a new global
+ * object. It specifically looks for the "bq_mgr" interface and binds to it.
+ *
+ * @param data User data, expected to be an Ecore_Buffer_Con pointer.
+ * @param wl_registry The Wayland registry object.
+ * @param id The numeric ID of the global object.
+ * @param interface The interface name of the global object.
+ * @param version The version of the interface.
+ */
 static void
 _ecore_buffer_con_cb_registry_global(void *data, struct wl_registry *wl_registry, uint32_t id, const char *interface, uint32_t version)
 {
@@ -33,18 +47,40 @@ _ecore_buffer_con_cb_registry_global(void *data, struct wl_registry *wl_registry
      }
 }
 
+/**
+ * @brief Wayland registry listener callback for global object removal.
+ *
+ * This function is called when a previously announced global object is removed
+ * by the Wayland compositor.
+ *
+ * @param data User data (unused).
+ * @param wl_registry The Wayland registry object (unused).
+ * @param name The numeric ID of the removed global object (unused).
+ */
 static void
 _ecore_buffer_con_cb_registry_global_remove(void *data EINA_UNUSED, struct wl_registry *wl_registry EINA_UNUSED, uint32_t name EINA_UNUSED)
 {
    DBG("Removed Wl Global Registry - name %d", name);
 }
 
+/**
+ * @brief Frees an Ecore_Event_Signal_Exit event.
+ *
+ * @param data User data (unused).
+ * @param event The event to free.
+ */
 static void
 _ecore_buffer_con_signal_exit_free(void *data EINA_UNUSED, void *event)
 {
    free(event);
 }
 
+/**
+ * @brief Emits an ECORE_EVENT_SIGNAL_EXIT event.
+ *
+ * This function is called when a fatal error occurs in the Wayland connection,
+ * signaling the application to terminate.
+ */
 static void
 _ecore_buffer_con_signal_exit(void)
 {
@@ -58,6 +94,17 @@ _ecore_buffer_con_signal_exit(void)
                    _ecore_buffer_con_signal_exit_free, NULL);
 }
 
+/**
+ * @brief Ecore idle enterer callback for Wayland display processing.
+ *
+ * This function is called when the Ecore main loop is idle. It attempts to
+ * flush and dispatch pending Wayland events. It handles errors and
+ * potential EAGAIN scenarios by adjusting the fd handler flags.
+ *
+ * @param data User data, expected to be an Ecore_Buffer_Con pointer.
+ * @return ECORE_CALLBACK_RENEW to keep the idle enterer active,
+ *         ECORE_CALLBACK_CANCEL on fatal error.
+ */
 static Eina_Bool
 _ecore_buffer_con_cb_idle_enterer(void *data)
 {
@@ -95,6 +142,18 @@ err:
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Ecore Fd Handler callback for the Wayland display file descriptor.
+ *
+ * This function is called when there is activity on the Wayland display's
+ * file descriptor. It dispatches Wayland events if data is available for
+ * reading, or flushes the display if it's writable.
+ *
+ * @param data User data, expected to be an Ecore_Buffer_Con pointer.
+ * @param hdl The Ecore_Fd_Handler that triggered the callback.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active,
+ *         ECORE_CALLBACK_CANCEL on fatal error.
+ */
 static Eina_Bool
 _ecore_buffer_con_cb_fd_handle(void *data, Ecore_Fd_Handler *hdl)
 {
@@ -135,6 +194,16 @@ _ecore_buffer_con_cb_fd_handle(void *data, Ecore_Fd_Handler *hdl)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Wayland callback listener for display sync.
+ *
+ * This function is called when a `wl_display_sync` operation completes.
+ * It marks the connection initialization as done.
+ *
+ * @param data User data, expected to be an Ecore_Buffer_Con pointer.
+ * @param callback The Wayland callback object.
+ * @param serial The serial number associated with the sync event (unused).
+ */
 static void
 _ecore_buffer_con_init_callback(void *data, struct wl_callback *callback, uint32_t serial EINA_UNUSED)
 {
@@ -154,6 +223,7 @@ static const struct wl_callback_listener _ecore_buffer_con_init_sync_listener =
    _ecore_buffer_con_init_callback
 };
 
+/** @brief Wayland registry listener structure. */
 struct wl_registry_listener _ecore_buffer_registry_listener =
 {
    _ecore_buffer_con_cb_registry_global,

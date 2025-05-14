@@ -39,6 +39,12 @@
  * @cond LOCAL
  */
 
+/**
+ * @brief Structure to hold a magic number and its associated string representation.
+ *
+ * This internal structure is used to map an Eina_Magic value to a human-readable
+ * string, which is useful for debugging and error reporting.
+ */
 typedef struct _Eina_Magic_String Eina_Magic_String;
 struct _Eina_Magic_String
 {
@@ -47,7 +53,7 @@ struct _Eina_Magic_String
    const char *string;
 };
 
-static int _eina_magic_string_log_dom = -1;
+static int _eina_magic_string_log_dom = -1; /**< Log domain for magic string operations. */
 
 #ifdef ERR
 #undef ERR
@@ -59,11 +65,19 @@ static int _eina_magic_string_log_dom = -1;
 #endif
 #define DBG(...) EINA_LOG_DOM_DBG(_eina_magic_string_log_dom, __VA_ARGS__)
 
-static Eina_Magic_String *_eina_magic_strings = NULL;
-static size_t _eina_magic_strings_count = 0;
-static size_t _eina_magic_strings_allocated = 0;
-static Eina_Bool _eina_magic_strings_dirty = 0;
+static Eina_Magic_String *_eina_magic_strings = NULL; /**< Array of magic string mappings. */
+static size_t _eina_magic_strings_count = 0; /**< Number of currently stored magic string mappings. */
+static size_t _eina_magic_strings_allocated = 0; /**< Number of allocated slots in _eina_magic_strings. */
+static Eina_Bool _eina_magic_strings_dirty = 0; /**< Flag indicating if _eina_magic_strings needs sorting. */
 
+/**
+ * @brief Comparison function for qsort, used to sort Eina_Magic_String entries by magic value.
+ * @param p1 Pointer to the first Eina_Magic_String.
+ * @param p2 Pointer to the second Eina_Magic_String.
+ * @return An integer less than, equal to, or greater than zero if the first
+ *         argument is considered to be respectively less than, equal to, or
+ *         greater than the second.
+ */
 static int
 _eina_magic_strings_sort_cmp(const void *p1, const void *p2)
 {
@@ -71,6 +85,14 @@ _eina_magic_strings_sort_cmp(const void *p1, const void *p2)
    return a->magic - b->magic;
 }
 
+/**
+ * @brief Comparison function for bsearch, used to find an Eina_Magic_String by magic value.
+ * @param p1 Pointer to an Eina_Magic value (cast to void*).
+ * @param p2 Pointer to an Eina_Magic_String.
+ * @return An integer less than, equal to, or greater than zero if the first
+ *         argument is considered to be respectively less than, equal to, or
+ *         greater than the second.
+ */
 static int
 _eina_magic_strings_find_cmp(const void *p1, const void *p2)
 {
@@ -79,6 +101,13 @@ _eina_magic_strings_find_cmp(const void *p1, const void *p2)
    return a - b->magic;
 }
 
+/**
+ * @brief Allocates space for a new Eina_Magic_String in the internal array.
+ * @return A pointer to the newly allocated Eina_Magic_String, or NULL on failure.
+ *
+ * This function manages the dynamic array `_eina_magic_strings`. If the array
+ * is full, it attempts to reallocate it with a larger size.
+ */
 static Eina_Magic_String *
 _eina_magic_strings_alloc(void)
 {

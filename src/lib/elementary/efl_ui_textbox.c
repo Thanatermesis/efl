@@ -24,93 +24,116 @@ typedef struct _Efl_Ui_Text_Rectangle   Efl_Ui_Text_Rectangle;
 typedef struct _Anchor                  Anchor;
 
 /**
- * Base widget smart data extended with entry instance data.
+ * @internal
+ * @brief Structure holding the private data for the Efl_Ui_Textbox widget.
+ *
+ * This structure contains all internal state, objects, and flags
+ * necessary for the textbox functionality, including text manipulation,
+ * rendering, scrolling, selection, and interaction.
  */
 struct _Efl_Ui_Textbox_Data
 {
-   Evas_Object                          *hit_rect, *entry_edje;
+   Evas_Object                          *hit_rect; /**< Transparent rectangle for input event handling. */
+   Evas_Object                          *entry_edje; /**< Main Edje object for the textbox. */
 
-   Eo                                   *popup;
-   Eo                                   *popup_list;
-   Eo                                   *text_obj;
-   Eo                                   *text_guide_obj;
-   Eo                                   *text_table;
-   Eo                                   *pan;
-   Eo                                   *scroller;
-   Eo                                   *manager;
-   Eo                                   *cursor;
-   Eo                                   *cursor_bidi;
-   Evas_Object                          *start_handler;
-   Evas_Object                          *end_handler;
-   Eina_Future                          *deferred_decoration_job;
+   Eo                                   *popup; /**< Context menu popup object. */
+   Eo                                   *popup_list; /**< List within the context menu popup. */
+   Eo                                   *text_obj; /**< Efl_Canvas_Textblock object for displaying text. */
+   Eo                                   *text_guide_obj; /**< Efl_Canvas_Textblock object for placeholder/guide text. */
+   Eo                                   *text_table; /**< Table to hold text_obj and text_guide_obj. */
+   Eo                                   *pan; /**< Smart pan (scroller's child). @deprecated Not directly used, part of scroller. */
+   Eo                                   *scroller; /**< Scroller object if the textbox is scrollable. */
+   Eo                                   *manager; /**< Input method context manager. @deprecated Likely related to older input handling. */
+   Eo                                   *cursor; /**< Main cursor decoration object. */
+   Eo                                   *cursor_bidi; /**< Secondary cursor decoration for BiDi text. */
+   Evas_Object                          *start_handler; /**< Visual handler for the start of a selection. */
+   Evas_Object                          *end_handler; /**< Visual handler for the end of a selection. */
+   Eina_Future                          *deferred_decoration_job; /**< Future for deferring decoration updates. */
+
    /* for deferred appending */
-   int                                   append_text_position;
-   int                                   append_text_len;
+   int                                   append_text_position; /**< Position for deferred text appending. */
+   int                                   append_text_len; /**< Length of text for deferred appending. */
+
    /* Only for clipboard */
-   const char                           *text;
-   Evas_Coord                            ent_w, ent_h;
-   Evas_Coord                            downx, downy;
-   Evas_Coord                            ox, oy;
-   Eina_List                            *anchors;
-   int                                  gen;
-   Eina_List                            *sel;
-   Efl_Canvas_Textblock_Factory              *item_factory;
-   Efl_Canvas_Textblock_Factory              *item_fallback_factory;
-   Mod_Api                              *api; // module api if supplied
-   int                                   cursor_pos;
-   Elm_Scroller_Policy                   policy_h, policy_v;
-   Efl_Text_Cursor_Object                      *sel_handler_cursor;
+   const char                           *text; /**< Text content, primarily for clipboard operations. */
+
+   Evas_Coord                            ent_w, ent_h; /**< Width and height of the entry_edje. */
+   Evas_Coord                            downx, downy; /**< Coordinates of the last mouse down event. */
+   Evas_Coord                            ox, oy; /**< Offset coordinates for selection handler movement. */
+   Eina_List                            *anchors; /**< List of @ref Anchor structures for text anchors/links. */
+   int                                  gen; /**< Generation number for anchor updates. */
+   Eina_List                            *sel; /**< List of @ref Efl_Ui_Text_Rectangle for visual selection. */
+   Efl_Canvas_Textblock_Factory              *item_factory; /**< Factory for creating custom items in text. */
+   Efl_Canvas_Textblock_Factory              *item_fallback_factory; /**< Fallback factory for items if item_factory is not set or fails. */
+   Mod_Api                              *api; /**< Module API if supplied for extending functionality. */
+   int                                   cursor_pos; /**< Current cursor position (character index). */
+   Elm_Scroller_Policy                   policy_h, policy_v; /**< Horizontal and vertical scrollbar policies. */
+   Efl_Text_Cursor_Object                      *sel_handler_cursor; /**< Cursor object being manipulated by a selection handler. */
+
+   /** @brief Data for anchor hover effects. */
    struct
      {
-        Evas_Object *hover_parent; /**< hover parent object. entry is a hover parent object by default */
-        Evas_Object *pop; /**< hidden icon for hover target */
-        Evas_Object *hover; /**< hover object */
-        const char  *hover_style; /**< style of a hover object */
+        Evas_Object *hover_parent; /**< Parent object for the hover effect. Defaults to the entry itself. */
+        Evas_Object *pop; /**< Hidden icon used as a target for hover. @deprecated Potentially unused or for specific themes. */
+        Evas_Object *hover; /**< The hover visual object (e.g., a tooltip). */
+        const char  *hover_style; /**< Style to apply to the hover object. */
      } anchor_hover;
 
-   const char                           *cnp_mime_type;
-   Elm_Sel_Format                        drop_format;
+   const char                           *cnp_mime_type; /**< MIME type for copy and paste operations. @deprecated Use Efl_Ui_Textbox_Cnp_Content. */
+   Elm_Sel_Format                        drop_format; /**< Format for drag and drop operations. @deprecated Use Efl_Ui_Textbox_Cnp_Content. */
 
+   /** @brief Data for asynchronous text operations. */
    struct {
-        char                             *text;
-        Eina_Bool                        enabled;
+        char                             *text; /**< Text being processed asynchronously. */
+        Eina_Bool                        enabled; /**< Flag indicating if async operations are enabled. */
    } async;
 
+   /** @brief Stores last known sizes to optimize calculations. */
    struct {
-        Eina_Size2D                      scroll;
-        Eina_Size2D                      layout;
+        Eina_Size2D                      scroll; /**< Last known scroll size. */
+        Eina_Size2D                      layout; /**< Last known layout size of the widget. */
    } last;
-   Efl_Ui_Textbox_Cnp_Content            content;
-   Eina_Bool                             sel_handles_enabled : 1;
-   Eina_Bool                             start_handler_down : 1;
-   Eina_Bool                             start_handler_shown : 1;
-   Eina_Bool                             end_handler_down : 1;
-   Eina_Bool                             end_handler_shown : 1;
-   Eina_Bool                             deferred_decoration_selection : 1;
-   Eina_Bool                             deferred_decoration_cursor : 1;
-   Eina_Bool                             deferred_decoration_anchor : 1;
-   Eina_Bool                             context_menu_enabled : 1;
-   Eina_Bool                             long_pressed : 1;
-   Eina_Bool                             has_text : 1;
-   Eina_Bool                             use_down : 1;
-   Eina_Bool                             sel_mode : 1;
-   Eina_Bool                             changed : 1;
-   Eina_Bool                             scroll : 1;
-   Eina_Bool                             text_changed : 1;
-   Eina_Bool                             calc_force : 1;
-   Eina_Bool                             cursor_update : 1;
-   Eina_Bool                             color_is_set : 1;
+
+   Efl_Ui_Textbox_Cnp_Content            content; /**< Defines what content types are supported for CnP and DND. */
+
+   /* Boolean flags for various states */
+   Eina_Bool                             sel_handles_enabled : 1; /**< True if selection handles are enabled. */
+   Eina_Bool                             start_handler_down : 1; /**< True if the start selection handler is being pressed. */
+   Eina_Bool                             start_handler_shown : 1; /**< True if the start selection handler is visible. */
+   Eina_Bool                             end_handler_down : 1; /**< True if the end selection handler is being pressed. */
+   Eina_Bool                             end_handler_shown : 1; /**< True if the end selection handler is visible. */
+   Eina_Bool                             deferred_decoration_selection : 1; /**< True if selection decoration update is deferred. */
+   Eina_Bool                             deferred_decoration_cursor : 1; /**< True if cursor decoration update is deferred. */
+   Eina_Bool                             deferred_decoration_anchor : 1; /**< True if anchor decoration update is deferred. */
+   Eina_Bool                             context_menu_enabled : 1; /**< True if the context menu is enabled. */
+   Eina_Bool                             long_pressed : 1; /**< True if a long press event has occurred. */
+   Eina_Bool                             has_text : 1; /**< True if the textbox contains text (not just guide text). */
+   Eina_Bool                             use_down : 1; /**< True if mouse down coordinates should be used for popup positioning. */
+   Eina_Bool                             sel_mode : 1; /**< True if in selection mode. */
+   Eina_Bool                             changed : 1; /**< True if the widget's state has changed and needs recalculation. */
+   Eina_Bool                             scroll : 1; /**< True if the textbox is scrollable. */
+   Eina_Bool                             text_changed : 1; /**< True if the text content has changed. */
+   Eina_Bool                             calc_force : 1; /**< True to force a recalculation of the layout. */
+   Eina_Bool                             cursor_update : 1; /**< True if the cursor visuals need an update. */
+   Eina_Bool                             color_is_set : 1; /**< True if the text color has been explicitly set by the user. */
 };
 
+/**
+ * @internal
+ * @brief Represents an anchor (hyperlink or item) within the textbox.
+ *
+ * Anchors can be either clickable text links (like HTML `<a>` tags)
+ * or embedded items (like images).
+ */
 struct _Anchor
 {
-   Eo                    *obj;
-   char                  *name;
-   Efl_Text_Attribute_Handle *annotation;
-   Eina_List             *rects;
-   int                   gen;
-   Eina_Bool              item : 1;
-   Eina_Bool              updated : 1;
+   Eo                    *obj; /**< The parent Efl_Ui_Textbox object. */
+   char                  *name; /**< Name of the anchor, e.g., the URL for a link or identifier for an item. */
+   Efl_Text_Attribute_Handle *annotation; /**< Handle to the text attribute defining this anchor. */
+   Eina_List             *rects; /**< List of @ref Efl_Ui_Text_Rectangle representing the geometry of the anchor. For items, this is usually one rectangle. For text links that span lines, it can be multiple. */
+   int                   gen; /**< Generation number used during anchor updates to track processed anchors. */
+   Eina_Bool              item : 1; /**< True if this anchor represents an embedded item (e.g., image). False if it's a text link. */
+   Eina_Bool              updated : 1; /**< Flag to indicate if the anchor's visual representation needs an update. @deprecated Potentially unused or handled by `gen`. */
 };
 
 #define EFL_UI_TEXT_DATA_GET(o, sd) \
@@ -138,9 +161,18 @@ struct _Anchor
   if (EINA_UNLIKELY(!efl_isa((obj), EFL_UI_TEXTBOX_CLASS))) \
     return
 
+/**
+ * @internal
+ * @brief Represents a rectangular area, typically for visual decorations like selection.
+ *
+ * This structure holds Evas_Object(s) that form a visual rectangle.
+ * It's used for drawing selection highlights and potentially other overlay/underlay effects.
+ */
 struct _Efl_Ui_Text_Rectangle
 {
-   Evas_Object             *obj_bg, *obj_fg, *obj;
+   Evas_Object             *obj_bg; /**< Evas_Object for the background of the rectangle (e.g., selection highlight color). */
+   Evas_Object             *obj_fg; /**< Evas_Object for the foreground of the rectangle (rarely used for selection). */
+   Evas_Object             *obj;    /**< Main Evas_Object, often a hit rectangle or a combined visual. For items in anchors, this is the item object itself. */
 };
 
 #define MY_CLASS EFL_UI_TEXTBOX_CLASS
@@ -163,11 +195,19 @@ struct _Efl_Ui_Text_Rectangle
 
 static Eina_List *entries = NULL;
 
+/**
+ * @internal
+ * @brief Defines an API for modules to interact with the textbox.
+ *
+ * This allows external modules or plugins to hook into specific events
+ * or behaviors of the textbox, such as handling long presses or performing
+ * actions when the textbox is created or destroyed.
+ */
 struct _Mod_Api
 {
-   void (*obj_hook)(Evas_Object *obj);
-   void (*obj_unhook)(Evas_Object *obj);
-   void (*obj_longpress)(Evas_Object *obj);
+   void (*obj_hook)(Evas_Object *obj); /**< Called when the textbox object is hooked by the module. Typically for initialization. */
+   void (*obj_unhook)(Evas_Object *obj); /**< Called when the textbox object is unhooked by the module. Typically for cleanup. */
+   void (*obj_longpress)(Evas_Object *obj); /**< Called when a long press event occurs on the textbox, allowing the module to provide custom handling. */
 };
 
 static const char PART_NAME_HANDLER_START[] = "handler/start";
@@ -205,6 +245,23 @@ static Eina_Bool _key_action_paste(Evas_Object *obj, const char *params);
 static Eina_Bool _key_action_cut(Evas_Object *obj, const char *params);
 static Eina_Bool _key_action_menu(Evas_Object *obj, const char *params);
 
+/**
+ * @internal
+ * @brief Array defining key actions and their corresponding callback functions.
+ *
+ * This table maps action names (e.g., "copy", "paste") to functions
+ * that implement these actions. It's used by the widget to handle
+ * predefined keyboard shortcuts or commands.
+ * Each Elm_Action struct contains:
+ * - const char *action_name: The name of the action (e.g., "copy").
+ * - Eina_Bool (*callback_function)(Evas_Object *obj, const char *params):
+ *   A function pointer to the handler for this action.
+ *   - Evas_Object *obj: The textbox widget instance.
+ *   - const char *params: Optional parameters for the action (often NULL).
+ *   - Returns: EINA_TRUE if the action was handled, EINA_FALSE otherwise.
+ *
+ * Example: `{"copy", _key_action_copy}` maps the "copy" action to the `_key_action_copy` function.
+ */
 static const Elm_Action key_actions[] = {
    {"copy", _key_action_copy},
    {"paste", _key_action_paste},
@@ -213,6 +270,16 @@ static const Elm_Action key_actions[] = {
    {NULL, NULL}
 };
 
+/**
+ * @internal
+ * @brief Updates the visibility of the guide text based on whether the entry has actual text.
+ *
+ * If the entry contains text, the guide text (placeholder) is hidden.
+ * If the entry is empty, the guide text is shown.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param has_text EINA_TRUE if the entry has text, EINA_FALSE otherwise.
+ */
 static void
 _efl_ui_textbox_guide_update(Evas_Object *obj,
                         Eina_Bool has_text)
@@ -227,6 +294,16 @@ _efl_ui_textbox_guide_update(Evas_Object *obj,
    sd->has_text = has_text;
 }
 
+/**
+ * @internal
+ * @brief Sets the mirrored (RTL/LTR) mode for the textbox and its relevant sub-objects.
+ *
+ * This function propagates the mirrored setting to the main Edje object
+ * and the anchor hover object if it exists.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param rtl EINA_TRUE for Right-To-Left mode, EINA_FALSE for Left-To-Right.
+ */
 static void
 _mirrored_set(Evas_Object *obj,
               Eina_Bool rtl)
@@ -239,6 +316,14 @@ _mirrored_set(Evas_Object *obj,
      efl_ui_mirrored_set(sd->anchor_hover.hover, rtl);
 }
 
+/**
+ * @internal
+ * @brief Hides the selection start and end handlers.
+ *
+ * Emits signals to the handler objects to make them visually disappear.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ */
 static void
 _hide_selection_handler(Evas_Object *obj)
 {
@@ -258,6 +343,18 @@ _hide_selection_handler(Evas_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Gets the current visible viewport region of the textbox.
+ *
+ * If the textbox is scrollable, it returns the scroller's viewport.
+ * Otherwise, it returns the geometry of the text object itself.
+ * It also considers clipping by parent scrollable widgets.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @return The Eina_Rect representing the viewport region.
+ *         Returns EINA_RECT_EMPTY() if intersection with parent scrollers results in an empty region.
+ */
 static Eina_Rect
 _viewport_region_get(Evas_Object *obj)
 {
@@ -292,6 +389,17 @@ _viewport_region_get(Evas_Object *obj)
    return rect;
 }
 
+/**
+ * @internal
+ * @brief Updates the position and visibility of selection handlers.
+ *
+ * If there's a selection and handlers are enabled, this function calculates
+ * the positions for the start and end selection handlers based on the
+ * selection geometry and the current viewport. Handlers are hidden if they
+ * fall outside the viewport.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ */
 static void
 _update_selection_handler(Eo *obj)
 {
@@ -397,6 +505,25 @@ _update_selection_handler(Eo *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for handling pasted or dropped data.
+ *
+ * This function is called when data (e.g., from clipboard paste or DND drop)
+ * is received. It processes the data based on its MIME type (text, markup, image)
+ * and inserts it into the textbox at the current cursor position.
+ * If there's an active selection, it's deleted before insertion.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param data User data (unused).
+ * @param value An Eina_Value containing an Eina_Content with the data to be inserted.
+ *              The Eina_Content should have a `type` (MIME type) and `data` (Eina_Slice).
+ *              Supported types:
+ *              - "application/x-elementary-markup": Inserts as markup.
+ *              - "image/*": Inserts as an image item (wrapped in markup).
+ *              - Default (e.g., "text/plain"): Inserts as plain text.
+ * @return EINA_VALUE_EMPTY on success or if the value type is not EINA_VALUE_TYPE_CONTENT.
+ */
 static Eina_Value
 _selection_data_cb(Efl_Ui_Textbox *obj, void *data EINA_UNUSED, const Eina_Value value)
 {
@@ -443,6 +570,24 @@ _selection_data_cb(Efl_Ui_Textbox *obj, void *data EINA_UNUSED, const Eina_Value
    return EINA_VALUE_EMPTY;
 }
 
+/**
+ * @internal
+ * @brief Determines the list of supported MIME types for CnP/DND operations.
+ *
+ * Based on the `sd->content` flags (EFL_UI_TEXTBOX_CNP_CONTENT_MARKUP,
+ * EFL_UI_TEXTBOX_CNP_CONTENT_IMAGE, EFL_UI_TEXTBOX_CNP_CONTENT_TEXT),
+ * this function builds an array of MIME type strings that the textbox
+ * can currently handle for paste or drop operations.
+ *
+ * @param obj The Efl_Ui_Textbox object (unused).
+ * @param sd The private data of the textbox.
+ * @return An Eina_Array* containing C strings of supported MIME types.
+ *         The caller is responsible for freeing this array using eina_array_free().
+ *         Example array elements:
+ *         - "application/x-elementary-markup"
+ *         - "image/png"
+ *         - "text/plain;charset=utf-8"
+ */
 static Eina_Array*
 _figure_out_types(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd)
 {
@@ -467,6 +612,20 @@ _figure_out_types(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd)
    return types;
 }
 
+/**
+ * @internal
+ * @brief Checks if the textbox can accept a drop operation based on available MIME types.
+ *
+ * Iterates through the MIME types offered by the drag source and checks if any
+ * of them are supported by the textbox according to its `sd->content` settings.
+ * Also checks if the widget is disabled.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param sd The private data of the textbox.
+ * @param mime_types An Eina_Accessor providing the list of MIME types from the drag source.
+ * @return EINA_TRUE if the textbox can accept at least one of the offered MIME types
+ *         and is not disabled, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _accepting_drops(Eo *obj, Efl_Ui_Textbox_Data *sd, Eina_Accessor *mime_types)
 {
@@ -492,6 +651,16 @@ _accepting_drops(Eo *obj, Efl_Ui_Textbox_Data *sd, Eina_Accessor *mime_types)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Callback for when a drag operation enters the textbox bounds.
+ *
+ * If the textbox can accept the offered drop types, it requests focus.
+ *
+ * @param data User data (unused).
+ * @param ev The Efl_Event of type EFL_UI_DND_EVENT_DROP_ENTERED.
+ *           `ev->info` is an Efl_Ui_Drop_Event.
+ */
 static void
 _dnd_enter_cb(void *data EINA_UNUSED,
               const Efl_Event *ev)
@@ -502,6 +671,20 @@ _dnd_enter_cb(void *data EINA_UNUSED,
      efl_ui_focus_util_focus(ev->object);
 }
 
+/**
+ * @internal
+ * @brief Callback for when a drag operation moves over the textbox.
+ *
+ * If the textbox can accept the drop, this function updates the
+ * text cursor position (EDJE_CURSOR_USER) to match the drag pointer's
+ * current coordinates within the text area. It then sets the main
+ * cursor (EDJE_CURSOR_MAIN) to this new position, providing visual
+ * feedback for the potential drop location.
+ *
+ * @param data User data (unused).
+ * @param ev The Efl_Event of type EFL_UI_DND_EVENT_DROP_POSITION_CHANGED.
+ *           `ev->info` is an Efl_Ui_Drop_Event.
+ */
 static void
 _dnd_pos_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -526,6 +709,19 @@ _dnd_pos_cb(void *data EINA_UNUSED, const Efl_Event *ev)
                                         EDJE_CURSOR_MAIN, cursor_pos);
 }
 
+/**
+ * @internal
+ * @brief Callback for when a drop operation occurs on the textbox.
+ *
+ * If the textbox accepts the drop (based on MIME types), it requests
+ * the drop data. The actual data processing and insertion happen
+ * in the `_selection_data_cb` function, which is set up as a
+ * future callback.
+ *
+ * @param data User data (unused).
+ * @param ev The Efl_Event of type EFL_UI_DND_EVENT_DROP_DROPPED.
+ *           `ev->info` is an Efl_Ui_Drop_Event.
+ */
 static void
 _dnd_drop_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -638,6 +834,17 @@ _efl_ui_textbox_efl_ui_widget_theme_apply(Eo *obj, Efl_Ui_Textbox_Data *sd)
    return theme_apply;
 }
 
+/**
+ * @internal
+ * @brief Recalculates and updates the geometry of the visual cursor(s) and ensures it's scrolled into view.
+ *
+ * This function is called when the cursor position changes or the text layout
+ * is updated. It gets the main cursor's geometry, adjusts its size based
+ * on theme constraints, and then scrolls the scroller (if present) to make
+ * the cursor visible.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ */
 static void
 _cursor_geometry_recalc(Evas_Object *obj)
 {
@@ -801,6 +1008,16 @@ _efl_ui_textbox_efl_ui_widget_interest_region_get(const Eo *obj EINA_UNUSED, Efl
    return r;
 }
 
+/**
+ * @internal
+ * @brief Positions the context menu popup relative to the textbox.
+ *
+ * The popup is positioned either at the mouse down coordinates (if `sd->use_down` is true)
+ * or at the current text cursor position. It ensures the popup stays within
+ * the bounds of the textbox's edje object.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ */
 static void
 _popup_position(Evas_Object *obj)
 {
@@ -832,6 +1049,18 @@ _popup_position(Evas_Object *obj)
    efl_gfx_entity_geometry_set(sd->popup, EINA_RECT(r.x + cx, r.y + cy, m.w, m.h));
 }
 
+/**
+ * @internal
+ * @brief Callback for when the window manager selection changes (selection lost).
+ *
+ * If the selection buffer (X11 primary selection) changes and the cause
+ * is not the textbox itself, this function clears the current selection
+ * within the textbox.
+ *
+ * @param data User data (unused).
+ * @param ev The Efl_Event of type EFL_UI_SELECTION_EVENT_WM_SELECTION_CHANGED.
+ *           `ev->info` is an Efl_Ui_Wm_Selection_Changed.
+ */
 static void
 _selection_lost_cb(void *data EINA_UNUSED, const Efl_Event *ev)
 {
@@ -845,6 +1074,17 @@ _selection_lost_cb(void *data EINA_UNUSED, const Efl_Event *ev)
      }
 }
 
+/**
+ * @internal
+ * @brief Stores the current text selection into the specified clipboard buffer.
+ *
+ * Retrieves the selected text as markup, and if valid, sets it as the
+ * content of the given clipboard buffer (e.g., primary selection or copy/paste buffer).
+ *
+ * @param buffer The Efl_Ui_Cnp_Buffer to store the selection into (e.g.,
+ *               EFL_UI_CNP_BUFFER_SELECTION or EFL_UI_CNP_BUFFER_COPY_AND_PASTE).
+ * @param obj The Efl_Ui_Textbox object.
+ */
 static void
 _selection_store(Efl_Ui_Cnp_Buffer buffer,
                  Evas_Object *obj)
@@ -865,6 +1105,12 @@ _selection_store(Efl_Ui_Cnp_Buffer buffer,
    free(sel);
 }
 
+/**
+ * @internal
+ * @brief Dismisses (deletes) the currently active context menu popup.
+ *
+ * @param sd The private data of the textbox.
+ */
 static void
 _popup_dismiss( Efl_Ui_Textbox_Data *sd)
 {
@@ -874,6 +1120,15 @@ _popup_dismiss( Efl_Ui_Textbox_Data *sd)
    sd->popup_list = NULL;
 }
 
+/**
+ * @internal
+ * @brief Callback for when the backwall (area outside the popup) is clicked.
+ *
+ * Dismisses the context menu popup.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param ev The Efl_Event (unused).
+ */
 static void
 _backwall_clicked(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -881,6 +1136,15 @@ _backwall_clicked(void *data, const Efl_Event *ev EINA_UNUSED)
    _popup_dismiss(sd);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the "Cut" item in the context menu is selected.
+ *
+ * Performs the cut operation and dismisses the popup.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param ev The Efl_Event (unused).
+ */
 static void
 _popup_item_cut_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -889,6 +1153,15 @@ _popup_item_cut_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    _popup_dismiss(sd);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the "Copy" item in the context menu is selected.
+ *
+ * Performs the copy operation and dismisses the popup.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param ev The Efl_Event (unused).
+ */
 static void
 _popup_item_copy_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -897,6 +1170,16 @@ _popup_item_copy_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    _popup_dismiss(sd);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the "Cancel" item in the context menu is selected.
+ *
+ * Clears the current selection (if selection is allowed and not in desktop entry mode)
+ * and dismisses the popup.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param ev The Efl_Event (unused).
+ */
 static void
 _popup_item_cancel_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -912,6 +1195,15 @@ _popup_item_cancel_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    _popup_dismiss(sd);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the "Paste" item in the context menu is selected.
+ *
+ * Performs the paste operation and dismisses the popup.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param ev The Efl_Event (unused).
+ */
 static void
 _popup_item_paste_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -920,6 +1212,17 @@ _popup_item_paste_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    _popup_dismiss(sd);
 }
 
+/**
+ * @internal
+ * @brief Displays the context menu (popup).
+ *
+ * This function is called on long press or right-click (depending on configuration).
+ * It creates and populates a popup menu with relevant actions like Cut, Copy, Paste,
+ * and Cancel, based on the current state (e.g., whether there's a selection,
+ * if the textbox is editable, if there's content in the clipboard).
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ */
 static void
 _menu_call(Evas_Object *obj)
 {
@@ -1030,6 +1333,19 @@ _menu_call(Evas_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Checks if the current mouse pointer position is inside the scroller's viewport.
+ *
+ * This is used to prevent actions like opening a context menu if the
+ * triggering event (e.g., long press, right click) happens outside
+ * the visible text area when scrolling is active.
+ *
+ * @param textbox The Efl_Ui_Textbox object.
+ * @param sd The private data of the textbox.
+ * @return EINA_TRUE if the pointer is inside the viewport or if not scrolling,
+ *         EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _is_pointer_inside_viewport(Eo *textbox,Efl_Ui_Textbox_Data *sd)
 {
@@ -1047,6 +1363,17 @@ _is_pointer_inside_viewport(Eo *textbox,Efl_Ui_Textbox_Data *sd)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Callback for a long press event on the textbox.
+ *
+ * If the pointer is inside the viewport and context menus are not globally disabled
+ * (and not in desktop entry mode which handles menus differently), it calls `_menu_call`
+ * to display the context menu. Sets the `long_pressed` flag.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param ev The Efl_Event (unused).
+ */
 static void
 _long_press_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -1065,6 +1392,16 @@ _long_press_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 }
 
 
+/**
+ * @internal
+ * @brief Handles the "copy" key action.
+ *
+ * Calls the public API function to copy the current selection.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param params Action parameters (unused).
+ * @return EINA_TRUE, indicating the action was handled.
+ */
 static Eina_Bool
 _key_action_copy(Evas_Object *obj, const char *params EINA_UNUSED)
 {
@@ -1072,6 +1409,16 @@ _key_action_copy(Evas_Object *obj, const char *params EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Handles the "cut" key action.
+ *
+ * Calls the public API function to cut the current selection.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param params Action parameters (unused).
+ * @return EINA_TRUE, indicating the action was handled.
+ */
 static Eina_Bool
 _key_action_cut(Evas_Object *obj, const char *params EINA_UNUSED)
 {
@@ -1079,6 +1426,16 @@ _key_action_cut(Evas_Object *obj, const char *params EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Handles the "paste" key action.
+ *
+ * Calls the public API function to paste content from the clipboard.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param params Action parameters (unused).
+ * @return EINA_TRUE, indicating the action was handled.
+ */
 static Eina_Bool
 _key_action_paste(Evas_Object *obj, const char *params EINA_UNUSED)
 {
@@ -1086,6 +1443,17 @@ _key_action_paste(Evas_Object *obj, const char *params EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Handles the "menu" key action (e.g., dedicated menu key).
+ *
+ * If context menus are not globally disabled, it calls `_menu_call`
+ * to display the context menu.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param params Action parameters (unused).
+ * @return EINA_TRUE if the menu was called, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _key_action_menu(Evas_Object *obj, const char *params EINA_UNUSED)
 {
@@ -1098,6 +1466,20 @@ _key_action_menu(Evas_Object *obj, const char *params EINA_UNUSED)
    return b_ret;
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse down events on the textbox's edje object.
+ *
+ * Handles:
+ * - Storing mouse down coordinates.
+ * - Resetting `long_pressed` flag.
+ * - Middle-click paste (pastes from selection buffer).
+ * - Right-click to show context menu (in desktop entry mode, if pointer is inside viewport).
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event of type EFL_EVENT_POINTER_DOWN.
+ *              `event->info` is an Efl_Input_Pointer_Data.
+ */
 static void
 _mouse_down_cb(void *data, const Efl_Event *event)
 {
@@ -1131,6 +1513,20 @@ _mouse_down_cb(void *data, const Efl_Event *event)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse up events on the textbox's edje object.
+ *
+ * Handles:
+ * - Aborting any pending long press.
+ * - If a long press occurred and context menus are not disabled, shows the context menu.
+ * - Otherwise (if not a long press), and if input panel is show-on-demand, shows the input panel.
+ * - Right-click to show context menu (if not desktop entry mode and context menus not disabled).
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event of type EFL_EVENT_POINTER_UP.
+ *              `event->info` is an Efl_Input_Pointer_Data.
+ */
 static void
 _mouse_up_cb(void *data, const Efl_Event *event)
 {
@@ -1172,6 +1568,20 @@ _mouse_up_cb(void *data, const Efl_Event *event)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse move events on the textbox's edje object.
+ *
+ * Handles:
+ * - If left button is pressed and a long press has occurred (implying selection drag):
+ *   Updates the user cursor based on mouse position and copies it to the main cursor.
+ * - If not in selection mode and mouse is held, aborts long press.
+ * - If mouse moves significantly from the down position, aborts long press.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event of type EFL_EVENT_POINTER_MOVE.
+ *              `event->info` is an Efl_Input_Pointer_Data.
+ */
 static void
 _mouse_move_cb(void *data, const Efl_Event *event)
 {
@@ -1222,6 +1632,20 @@ _mouse_move_cb(void *data, const Efl_Event *event)
      }
 }
 
+/**
+ * @internal
+ * @brief Creates an Evas_Object for a given item string using the configured item factories.
+ *
+ * This function is used to instantiate visual representations of items
+ * embedded in the text (e.g., `<item href="foo">`). It first tries the
+ * primary `item_factory`, and if that's not set or fails, it tries the
+ * `item_fallback_factory`.
+ *
+ * @param data The Efl_Ui_Textbox object (passed as `void *` to factory).
+ * @param item The item string (e.g., "foo" from `href="foo"`).
+ * @return A new Evas_Object* representing the item, or NULL if creation fails or no item string is provided.
+ *         The caller may need to manage the lifecycle of the returned object if it's not parented.
+ */
 static Evas_Object *
 _item_get(void *data, const char *item)
 {
@@ -1244,6 +1668,19 @@ _item_get(void *data, const char *item)
    return o;
 }
 
+/**
+ * @internal
+ * @brief Calculates the offset for positioning a selection handler.
+ *
+ * This function determines the base coordinates (`sd->ox`, `sd->oy`)
+ * from which a selection handler (start or end) should be positioned
+ * during a drag operation. It uses the main text cursor's geometry
+ * and the handler's minimum height. It also aborts any pending long press.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param handler The selection handler Evas_Object (either start_handler or end_handler)
+ *                whose minimum height is considered.
+ */
 static void
 _selection_handlers_offset_calc(Evas_Object *obj, Evas_Object *handler)
 {
@@ -1278,6 +1715,19 @@ _selection_handlers_offset_calc(Evas_Object *obj, Evas_Object *handler)
    sd->long_pressed = EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse down events on the start selection handler.
+ *
+ * Sets `start_handler_down` flag.
+ * Determines which selection cursor (start or end of the logical selection)
+ * this handler corresponds to and sets it as `sel_handler_cursor`.
+ * Moves the main text cursor to this handler's position.
+ * Calculates the initial offset for dragging this handler.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event (unused).
+ */
 static void
 _start_handler_mouse_down_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -1312,6 +1762,17 @@ _start_handler_mouse_down_cb(void *data, const Efl_Event *event EINA_UNUSED)
    _selection_handlers_offset_calc(data, sd->start_handler);
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse up events on the start selection handler.
+ *
+ * Clears `start_handler_down` flag.
+ * If a long press occurred on the handler and context menus are enabled
+ * (and not in desktop entry mode), it shows the context menu.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event (unused).
+ */
 static void
 _start_handler_mouse_up_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -1325,6 +1786,23 @@ _start_handler_mouse_up_cb(void *data, const Efl_Event *event EINA_UNUSED)
      _menu_call(data);
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse move events on the start selection handler.
+ *
+ * If `start_handler_down` is true (i.e., dragging the handler):
+ * - Calculates the new character position based on the mouse cursor's
+ *   current coordinates relative to the initial offset (`sd->ox`, `sd->oy`)
+ *   and the edje object's position.
+ * - Sets the `sel_handler_cursor` (the selection cursor being dragged)
+ *   to this new character position.
+ * - Updates the main text cursor to match.
+ * - Aborts any pending long press.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event of type EFL_EVENT_POINTER_MOVE.
+ *              `event->info` is an Efl_Input_Pointer_Data.
+ */
 static void
 _start_handler_mouse_move_cb(void *data, const Efl_Event *event)
 {
@@ -1353,6 +1831,20 @@ _start_handler_mouse_move_cb(void *data, const Efl_Event *event)
    sd->long_pressed = EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse down events on the end selection handler.
+ *
+ * Similar to `_start_handler_mouse_down_cb`, but for the end handler.
+ * Sets `end_handler_down` flag.
+ * Determines which selection cursor this handler corresponds to and sets it
+ * as `sel_handler_cursor`.
+ * Moves the main text cursor to this handler's position.
+ * Calculates the initial offset for dragging.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event (unused).
+ */
 static void
 _end_handler_mouse_down_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -1387,6 +1879,18 @@ _end_handler_mouse_down_cb(void *data, const Efl_Event *event EINA_UNUSED)
    _selection_handlers_offset_calc(data, sd->end_handler);
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse up events on the end selection handler.
+ *
+ * Similar to `_start_handler_mouse_up_cb`.
+ * Clears `end_handler_down` flag.
+ * If a long press occurred on the handler and context menus are enabled
+ * (and not in desktop entry mode), it shows the context menu.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event (unused).
+ */
 static void
 _end_handler_mouse_up_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -1400,6 +1904,21 @@ _end_handler_mouse_up_cb(void *data, const Efl_Event *event EINA_UNUSED)
      _menu_call(data);
 }
 
+/**
+ * @internal
+ * @brief Callback for mouse move events on the end selection handler.
+ *
+ * Similar to `_start_handler_mouse_move_cb`.
+ * If `end_handler_down` is true (i.e., dragging the handler):
+ * - Calculates the new character position based on mouse coordinates.
+ * - Sets the `sel_handler_cursor` to this new position.
+ * - Updates the main text cursor.
+ * - Aborts any pending long press.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event of type EFL_EVENT_POINTER_MOVE.
+ *              `event->info` is an Efl_Input_Pointer_Data.
+ */
 static void
 _end_handler_mouse_move_cb(void *data, const Efl_Event *event)
 {
@@ -1425,6 +1944,19 @@ _end_handler_mouse_move_cb(void *data, const Efl_Event *event)
    sd->long_pressed = EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Creates and initializes the visual handlers for text selection.
+ *
+ * This function creates two Edje objects (start_handler and end_handler)
+ * using the `_decoration_create` helper. It sets them up with appropriate
+ * themes, makes them non-pass-through for events, and attaches mouse
+ * event callbacks (`_start_handler_mouse_*_cb`, `_end_handler_mouse_*_cb`)
+ * to enable dragging and interaction.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param sd The private data of the textbox.
+ */
 static void
 _create_selection_handlers(Evas_Object *obj, Efl_Ui_Textbox_Data *sd)
 {
@@ -1487,6 +2019,16 @@ _efl_ui_textbox_efl_canvas_group_group_member_add(Eo *obj, Efl_Ui_Textbox_Data *
      efl_gfx_stack_raise_to_top(sd->hit_rect);
 }
 
+/**
+ * @internal
+ * @brief Updates the visibility of the guide (placeholder) text.
+ *
+ * If the main text content is empty, the guide text object is made visible.
+ * Otherwise, it's hidden.
+ *
+ * @param obj The Efl_Ui_Textbox object (unused).
+ * @param sd The private data of the textbox.
+ */
 static void
 _update_guide_text(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd)
 {
@@ -1509,6 +2051,14 @@ _update_guide_text(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd)
  * @param ch The HEX char.
  * @return numeric value of HEX.
  */
+/**
+ * @internal
+ * @brief Converts a hexadecimal character to its integer value.
+ *
+ * @param ch The hexadecimal character (0-9, a-f, A-F).
+ * @param[out] ok Set to EINA_FALSE if `ch` is not a valid hex character, EINA_TRUE otherwise.
+ * @return The integer value (0-15) of the hex character, or 0 if invalid.
+ */
 static int
 _hex_string_get(char ch, Eina_Bool *ok)
 {
@@ -1520,6 +2070,21 @@ _hex_string_get(char ch, Eina_Bool *ok)
 }
 
 
+/**
+ * @internal
+ * @brief Parses a color string in various hex formats (#RGB, #RGBA, #RRGGBB, #RRGGBBAA).
+ *
+ * Converts a hex color string into its RGBA components.
+ * The output R, G, B values are pre-multiplied by alpha.
+ *
+ * @param str The color string (e.g., "#FF0000", "#F00A").
+ * @param slen The length of the color string.
+ * @param[out] r Pointer to store the red component (0-255).
+ * @param[out] g Pointer to store the green component (0-255).
+ * @param[out] b Pointer to store the blue component (0-255).
+ * @param[out] a Pointer to store the alpha component (0-255).
+ * @return EINA_TRUE if parsing was successful, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _format_color_parse(const char *str, int slen,
       unsigned char *r, unsigned char *g,
@@ -1853,6 +2418,16 @@ _efl_ui_textbox_efl_text_style_text_color_set(Eo *obj EINA_UNUSED, Efl_Ui_Textbo
    pd->color_is_set = EINA_TRUE;
    efl_text_color_set(pd->text_obj, r, g, b, a);
 }
+/**
+ * @internal
+ * @brief Forces a recalculation of the textbox layout.
+ *
+ * Sets the `calc_force` flag, forces the edje object to recalculate,
+ * and then triggers a group calculation on the textbox widget itself.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param sd The private data of the textbox.
+ */
 static void
 _efl_ui_textbox_calc_force(Eo *obj, Efl_Ui_Textbox_Data *sd)
 {
@@ -1861,6 +2436,20 @@ _efl_ui_textbox_calc_force(Eo *obj, Efl_Ui_Textbox_Data *sd)
    efl_canvas_group_calculate(obj);
 }
 
+/**
+ * @internal
+ * @brief Gets the currently selected text as a string.
+ *
+ * If the textbox is in password mode, it returns NULL. Otherwise, it
+ * retrieves the text content between the start and end selection cursors.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param sd The private data of the textbox (unused).
+ * @return A string containing the selected text, or NULL if in password mode
+ *         or no selection. The caller should not free this string as it's
+ *         typically managed by the textblock object or is a view into it.
+ *         For persistent storage, the string should be copied.
+ */
 static const char*
 _efl_ui_textbox_selection_get(const Eo *obj, Efl_Ui_Textbox_Data *sd EINA_UNUSED)
 {
@@ -1885,6 +2474,14 @@ _efl_ui_textbox_selection_handles_enabled_get(const Eo *obj EINA_UNUSED, Efl_Ui_
    return sd->sel_handles_enabled;
 }
 
+/**
+ * @internal
+ * @brief Inserts text at the current main cursor position.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param sd The private data of the textbox.
+ * @param entry The text string to insert.
+ */
 static void
 _efl_ui_textbox_entry_insert(Eo *obj, Efl_Ui_Textbox_Data *sd, const char *entry)
 {
@@ -1926,6 +2523,19 @@ _efl_ui_textbox_efl_text_interactive_editable_set(Eo *obj, Efl_Ui_Textbox_Data *
      }
 }
 
+/**
+ * @internal
+ * @brief Sets the text selection region by character positions.
+ *
+ * If the textbox is in password mode, this function does nothing.
+ * Otherwise, it moves the start and end selection cursors to the
+ * specified character offsets.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param sd The private data of the textbox (unused).
+ * @param start The character position for the start of the selection.
+ * @param end The character position for the end of the selection.
+ */
 static void
 _efl_ui_textbox_select_region_set(Eo *obj, Efl_Ui_Textbox_Data *sd EINA_UNUSED, int start, int end)
 {
@@ -1939,6 +2549,16 @@ _efl_ui_textbox_select_region_set(Eo *obj, Efl_Ui_Textbox_Data *sd EINA_UNUSED, 
    efl_text_cursor_object_position_set(sel_end, end);
 }
 
+/**
+ * @internal
+ * @brief Gets the current text selection region by character positions.
+ *
+ * Retrieves the character positions of the start and end selection cursors.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param[out] start Pointer to store the start character position of the selection. Can be NULL.
+ * @param[out] end Pointer to store the end character position of the selection. Can be NULL.
+ */
 static void
 _efl_ui_textbox_select_region_get(Eo *obj, int *start, int *end)
 {
@@ -2005,6 +2625,22 @@ _efl_ui_textbox_selection_copy(Eo *obj, Efl_Ui_Textbox_Data *sd)
    _selection_store(EFL_UI_CNP_BUFFER_COPY_AND_PASTE, obj);
    efl_event_callback_call(obj, EFL_UI_TEXTBOX_EVENT_SELECTION_COPY, NULL);
 }
+
+/**
+ * @internal
+ * @brief Pastes content from the specified clipboard buffer type.
+ *
+ * This function initiates a request to get content from the given clipboard
+ * buffer (e.g., primary selection or copy/paste buffer). It figures out
+ * the acceptable MIME types and then uses `efl_ui_selection_get` to
+ * asynchronously retrieve the data. The actual insertion is handled by
+ * `_selection_data_cb` when the future resolves.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param sd The private data of the textbox.
+ * @param type The Efl_Ui_Cnp_Buffer from which to paste (e.g., EFL_UI_CNP_BUFFER_SELECTION,
+ *             EFL_UI_CNP_BUFFER_COPY_AND_PASTE).
+ */
 static void
 _efl_ui_textbox_selection_paste_type(Eo *obj, Efl_Ui_Textbox_Data *sd, Efl_Ui_Cnp_Buffer type)
 {
@@ -2432,6 +3068,22 @@ _efl_ui_textbox_efl_access_text_range_extents_get(const Eo *obj, Efl_Ui_Textbox_
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Converts an Efl_Text_Attribute_Handle (textblock annotation) to an Efl_Access_Text_Attribute.
+ *
+ * This is used for providing text attributes to accessibility services (AT-SPI).
+ * The name and value of the AT-SPI attribute are derived from the annotation's string content.
+ *
+ * @param annotation The Efl_Text_Attribute_Handle from the textblock.
+ * @return A newly allocated Efl_Access_Text_Attribute structure, or NULL on failure.
+ *         The caller is responsible for freeing the returned structure and its stringshare members
+ *         (e.g., using `elm_atspi_text_text_attribute_free`).
+ *         Example: If annotation is "font=Sans:style=bold",
+ *                  ret->name might be "font=Sans:style=bold"
+ *                  ret->value might be "font=Sans:style=bold"
+ *                  (Note: This simple conversion might need refinement for more structured AT-SPI attributes).
+ */
 static Efl_Access_Text_Attribute*
 _textblock_node_format_to_atspi_text_attr(Efl_Text_Attribute_Handle *annotation)
 {
@@ -2664,6 +3316,18 @@ _efl_ui_textbox_efl_access_object_i18n_name_get(const Eo *obj, Efl_Ui_Textbox_Da
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Emits an Edje signal to the main entry Edje object and cursor objects.
+ *
+ * This is a utility function to send the same signal and source
+ * to multiple Edje objects associated with the textbox, typically for
+ * visual state changes (e.g., focus, unfocus).
+ *
+ * @param sd The private data of the textbox.
+ * @param sig The signal string to emit (e.g., "efl,action,focus").
+ * @param src The source string for the signal (e.g., "efl").
+ */
 static void
 _edje_signal_emit(Efl_Ui_Textbox_Data *sd, const char *sig, const char *src)
 {
@@ -2672,6 +3336,21 @@ _edje_signal_emit(Efl_Ui_Textbox_Data *sd, const char *sig, const char *src)
    efl_layout_signal_emit(sd->cursor_bidi, sig, src);
 }
 
+/**
+ * @internal
+ * @brief Creates a decoration layout object (e.g., for cursors, selection, handlers).
+ *
+ * This helper function creates an Efl_Canvas_Layout object, applies a theme
+ * to it based on `group_name`, adds it as a member to the main entry_edje,
+ * stacks it appropriately (above or below the text table), sets its clipper,
+ * and makes it pass events by default.
+ *
+ * @param obj The Efl_Ui_Textbox object (parent for the new layout).
+ * @param sd The private data of the textbox.
+ * @param group_name The Edje group name to be used for theming the decoration (e.g., "cursor", "selection").
+ * @param above If EINA_TRUE, the decoration is stacked above the text content; otherwise, below.
+ * @return The newly created Efl_Canvas_Layout Eo object for the decoration.
+ */
 static inline Eo *
 _decoration_create(Eo *obj, Efl_Ui_Textbox_Data *sd,
       const char *group_name, Eina_Bool above)
@@ -2695,6 +3374,17 @@ _decoration_create(Eo *obj, Efl_Ui_Textbox_Data *sd,
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Creates the visual cursor objects (main and BiDi).
+ *
+ * Uses `_decoration_create` to instantiate the Edje objects for the
+ * primary cursor and the BiDi (bidirectional text) cursor.
+ * If the textbox is not editable, these cursors are initially hidden.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param sd The private data of the textbox.
+ */
 static void
 _create_text_cursors(Eo *obj, Efl_Ui_Textbox_Data *sd)
 {
@@ -2708,6 +3398,17 @@ _create_text_cursors(Eo *obj, Efl_Ui_Textbox_Data *sd)
      }
 }
 
+/**
+ * @internal
+ * @brief Calculates the base offset for positioning decorations (cursors, selections, anchors).
+ *
+ * This offset represents the top-left position of the text_obj within the
+ * textbox's coordinate system. It's used to correctly place decorations
+ * that are relative to the text content.
+ *
+ * @param sd The private data of the textbox.
+ * @return An Eina_Position2D containing the (x, y) offset.
+ */
 static Eina_Position2D
 _decoration_calc_offset(Efl_Ui_Textbox_Data *sd)
 {
@@ -2723,6 +3424,20 @@ _decoration_calc_offset(Efl_Ui_Textbox_Data *sd)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Updates the geometry and visibility of the text cursors.
+ *
+ * This function is called when the cursor position or text layout changes.
+ * It retrieves the geometry of the main text cursor (and BiDi cursor if applicable),
+ * calculates their positions using `_decoration_calc_offset`, and sets the
+ * geometry of the visual cursor Edje objects (`sd->cursor`, `sd->cursor_bidi`).
+ * It also handles splitting the main cursor's visual height if a BiDi cursor is present.
+ * If `sd->cursor_update` is set, it calls `_cursor_geometry_recalc` to ensure
+ * the cursor is scrolled into view.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ */
 static void
 _update_text_cursors(Eo *obj)
 {
@@ -2776,6 +3491,15 @@ _update_text_cursors(Eo *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Clears all visual representations of the text selection.
+ *
+ * Frees the Efl_Ui_Text_Rectangle structures and their associated
+ * Evas_Object(s) that were used to draw the selection highlight.
+ *
+ * @param sd The private data of the textbox.
+ */
 static void
 _clear_text_selection(Efl_Ui_Textbox_Data *sd)
 {
@@ -2788,6 +3512,23 @@ _clear_text_selection(Efl_Ui_Textbox_Data *sd)
 
 }
 
+/**
+ * @internal
+ * @brief Updates the visual representation of the text selection.
+ *
+ * This function is called when the selection changes or the layout is updated.
+ * It retrieves the geometry of the current text selection as a list of rectangles
+ * from the text_obj. For each rectangle in the selection:
+ * - If not enough visual rectangle objects (`Efl_Ui_Text_Rectangle`) exist in `sd->sel`,
+ *   new ones are created using `_decoration_create`.
+ * - The geometry of the visual rectangle object is set to match the corresponding
+ *   selection rectangle, adjusted by `_decoration_calc_offset`.
+ * - Any surplus visual rectangle objects are deleted.
+ * Finally, it calls `_update_selection_handler` to update the selection handles.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param text_obj The Efl_Canvas_Textblock object containing the text and selection info.
+ */
 static void
 _update_text_selection(Eo *obj, Eo *text_obj)
 {
@@ -2854,6 +3595,16 @@ _update_text_selection(Eo *obj, Eo *text_obj)
    _update_selection_handler(obj);
 }
 
+/**
+ * @internal
+ * @brief Frees all anchor data and their visual representations.
+ *
+ * Iterates through the list of anchors (`sd->anchors`), frees each
+ * anchor's name, its list of Efl_Ui_Text_Rectangle (and their associated
+ * Evas_Objects if any), and the Anchor structure itself.
+ *
+ * @param sd The private data of the textbox.
+ */
 static void
 _anchors_free(Efl_Ui_Textbox_Data *sd)
 {
@@ -2871,6 +3622,17 @@ _anchors_free(Efl_Ui_Textbox_Data *sd)
      }
 }
 
+/**
+ * @internal
+ * @brief Parses an anchor format string (e.g., "href='value'" or "href=value") to extract the value.
+ *
+ * This function is typically used to get the target of a hyperlink (the `href` attribute)
+ * from a textblock annotation string. It handles quoted and unquoted values.
+ *
+ * @param item The attribute string part, e.g., "href='http://example.com'" or "href=some_id".
+ * @return A newly allocated string containing the extracted value (e.g., "http://example.com" or "some_id").
+ *         The caller is responsible for freeing this string. Returns NULL on parsing failure.
+ */
 static char *
 _anchor_format_parse(const char *item)
 {
@@ -2912,6 +3674,21 @@ _anchor_format_parse(const char *item)
    return tmp;
 }
 
+/**
+ * @internal
+ * @brief Retrieves or creates an Anchor structure for a given text attribute handle.
+ *
+ * Searches the existing list of anchors (`sd->anchors`) for one that matches
+ * the provided `Efl_Text_Attribute_Handle`. If not found, and the attribute
+ * represents an item or a link (starts with "a "), a new Anchor structure
+ * is created, populated (including parsing the `href` if it's a link),
+ * and added to `sd->anchors`.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param sd The private data of the textbox.
+ * @param an The Efl_Text_Attribute_Handle representing the annotation in the text.
+ * @return A pointer to the existing or newly created Anchor structure, or NULL on failure.
+ */
 static Anchor *
 _anchor_get(Eo *obj, Efl_Ui_Textbox_Data *sd, Efl_Text_Attribute_Handle *an)
 {
@@ -2951,6 +3728,27 @@ _anchor_get(Eo *obj, Efl_Ui_Textbox_Data *sd, Efl_Text_Attribute_Handle *an)
 /**
  * @internal
  * Recreates and updates the anchors in the text.
+ */
+/**
+ * @internal
+ * @brief Updates all visual representations of anchors (links and items) in the text.
+ *
+ * This function iterates through all text annotations (attributes) that define
+ * anchors. For each anchor:
+ * - It ensures an `Anchor` struct exists (using `_anchor_get`).
+ * - Marks the anchor with the current generation number (`sd->gen`).
+ * - If it's an item anchor:
+ *   - Creates/updates the item's Evas_Object using `_item_get`.
+ *   - Sets its geometry based on `efl_text_formatter_item_geometry_get`.
+ * - If it's a link anchor (e.g., "a href=..."):
+ *   - Gets the geometry of the link as a list of rectangles.
+ *   - Creates/updates visual Evas_Objects (foreground and hit rectangle) for each
+ *     part of the link, adjusting their count and geometry as needed.
+ * - After processing all annotations, it removes any `Anchor` structs (and their visuals)
+ *   that were not matched in the current generation (i.e., anchors that no longer exist).
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param sd The private data of the textbox.
  */
 static void
 _anchors_update(Eo *obj, Efl_Ui_Textbox_Data *sd)
@@ -3126,6 +3924,16 @@ _anchors_update(Eo *obj, Efl_Ui_Textbox_Data *sd)
      }
 }
 
+/**
+ * @internal
+ * @brief Updates all text decorations: cursors, selection, and anchors.
+ *
+ * This function calls the respective update functions for cursors,
+ * selection visuals, and anchor visuals. It freezes events on the
+ * text_obj during the update to prevent potential issues.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ */
 static void
 _update_decorations(Eo *obj)
 {
@@ -3139,6 +3947,19 @@ _update_decorations(Eo *obj)
    efl_event_thaw(sd->text_obj);
 }
 
+/**
+ * @internal
+ * @brief Job function that executes deferred decoration updates.
+ *
+ * This function is called by the main loop when a deferred decoration
+ * update is scheduled. It calls `_update_decorations` to perform the
+ * actual updates and then clears the `deferred_decoration_job` future.
+ *
+ * @param o The Efl_Ui_Textbox object.
+ * @param data User data (unused).
+ * @param value Eina_Value from the future (unused).
+ * @return EINA_VALUE_EMPTY.
+ */
 static Eina_Value
 _deferred_decoration_job(Eo *o, void *data EINA_UNUSED, const Eina_Value value EINA_UNUSED)
 {
@@ -3149,6 +3970,19 @@ _deferred_decoration_job(Eo *o, void *data EINA_UNUSED, const Eina_Value value E
    return EINA_VALUE_EMPTY;
 }
 
+/**
+ * @internal
+ * @brief Schedules a deferred update for all decorations that have pending changes.
+ *
+ * If a decoration update job (`sd->deferred_decoration_job`) is not already pending,
+ * this function schedules one using `efl_loop_job`. This is used to coalesce
+ * multiple rapid changes into a single visual update.
+ * The actual update logic is in `_deferred_decoration_job` which calls `_update_decorations`.
+ * Which specific decorations (cursor, selection, anchor) are updated depends on
+ * their respective `deferred_decoration_*` flags being set.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ */
 static void
 _decoration_defer(Eo *obj)
 {
@@ -3159,6 +3993,16 @@ _decoration_defer(Eo *obj)
    sd->deferred_decoration_job = efl_future_then(obj, f, _deferred_decoration_job);
 }
 
+/**
+ * @internal
+ * @brief Specifically schedules a deferred update for the selection decoration.
+ *
+ * Sets the `deferred_decoration_selection` flag to true and then calls
+ * `_decoration_defer` to ensure an update job is scheduled.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ * @param sd The private data of the textbox.
+ */
 static void
 _selection_defer(Eo *obj, Efl_Ui_Textbox_Data *sd)
 {
@@ -3166,6 +4010,17 @@ _selection_defer(Eo *obj, Efl_Ui_Textbox_Data *sd)
    _decoration_defer(obj);
 }
 
+/**
+ * @internal
+ * @brief Schedules a deferred update for all decorations (anchors, cursor, selection).
+ *
+ * Sets all `deferred_decoration_*` flags (anchor, cursor, selection) to true
+ * and then calls `_decoration_defer` to schedule the update job.
+ * This is typically used when a significant change occurs that might affect
+ * all visual aspects of the text.
+ *
+ * @param obj The Efl_Ui_Textbox object.
+ */
 static void
 _decoration_defer_all(Eo *obj)
 {
@@ -3176,6 +4031,19 @@ _decoration_defer_all(Eo *obj)
    _decoration_defer(obj);
 }
 
+/**
+ * @internal
+ * @brief Callback for general changes within the textblock (EFL_CANVAS_TEXTBLOCK_EVENT_CHANGED).
+ *
+ * This is a generic change callback from the underlying textblock.
+ * It indicates that something in the text or its formatting has changed.
+ * Sets flags for text change and cursor update, updates guide text visibility,
+ * emits the EFL_UI_TEXTBOX_EVENT_CHANGED event, signals a canvas group change,
+ * and defers decoration updates.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event from the textblock.
+ */
 static void
 _efl_ui_textbox_changed_cb(void *data, const Efl_Event *event)
 {
@@ -3189,6 +4057,20 @@ _efl_ui_textbox_changed_cb(void *data, const Efl_Event *event)
    _decoration_defer(data);
 }
 
+/**
+ * @internal
+ * @brief Callback for user-initiated changes within the textblock (EFL_TEXT_INTERACTIVE_EVENT_CHANGED_USER).
+ *
+ * This callback is triggered when a change is made directly by user input
+ * (e.g., typing, pasting, deleting).
+ * It sets the text_changed flag, updates guide text visibility, signals a canvas group change,
+ * and defers updates for all decorations (anchors, cursor, selection) as user actions
+ * can significantly alter the layout.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event from the text_interactive object. `event->info` might
+ *              contain Efl_Text_Change_Info with details about the change.
+ */
 static void
 _efl_ui_textbox_changed_user_cb(void *data, const Efl_Event *event)
 {
@@ -3202,6 +4084,17 @@ _efl_ui_textbox_changed_user_cb(void *data, const Efl_Event *event)
    _decoration_defer_all(obj);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the main text cursor object changes (EFL_TEXT_CURSOR_OBJECT_EVENT_CHANGED).
+ *
+ * This is typically due to cursor movement.
+ * Sets flags for cursor update and deferred cursor decoration update, then
+ * schedules a general decoration update.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event from the cursor object (unused).
+ */
 static void
 _efl_ui_textbox_cursor_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -3212,6 +4105,17 @@ _efl_ui_textbox_cursor_changed_cb(void *data, const Efl_Event *event EINA_UNUSED
    _decoration_defer(data);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the scroller's size changes.
+ *
+ * If the scroller size changes (e.g., due to widget resize), all decorations
+ * (anchors, cursor, selection) might need repositioning.
+ * Schedules a deferred update for all decorations.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event from the scroller (unused).
+ */
 static void
 _scroller_size_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -3220,6 +4124,16 @@ _scroller_size_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
    _decoration_defer_all(data);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the textbox widget's own size changes (EFL_GFX_ENTITY_EVENT_SIZE_CHANGED).
+ *
+ * A change in the widget's size can affect the layout of text and decorations.
+ * Schedules a deferred update for all decorations.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event from the textbox itself (unused).
+ */
 static void
 _text_size_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -3228,6 +4142,17 @@ _text_size_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
    _decoration_defer_all(data);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the position of the internal text_obj changes.
+ *
+ * This can happen if the text_obj is moved within its parent (e.g., due to padding changes
+ * in the entry_edje or scroller adjustments).
+ * Schedules a deferred update for all decorations as their positions are relative to the text_obj.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event from the text_obj (unused).
+ */
 static void
 _text_position_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -3236,6 +4161,17 @@ _text_position_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
    _decoration_defer_all(data);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the "have_selection" state changes (EFL_TEXT_INTERACTIVE_EVENT_HAVE_SELECTION_CHANGED).
+ *
+ * This event signals whether a selection exists or has just been cleared.
+ * - If a selection now exists: emits "selection,start" signal and defers selection decoration update.
+ * - If selection was cleared: emits "selection,cleared" signal and defers selection decoration update.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event from the text_interactive object (unused).
+ */
 static void
 _efl_ui_textbox_selection_start_clear_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -3257,6 +4193,17 @@ _efl_ui_textbox_selection_start_clear_cb(void *data, const Efl_Event *event EINA
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for when the selection range itself changes (EFL_TEXT_INTERACTIVE_EVENT_SELECTION_CHANGED).
+ *
+ * This is called when the boundaries of an existing selection are modified.
+ * Emits "selection,changed" signal, stores the new selection to the
+ * primary selection buffer (X11), and defers selection decoration update.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event from the text_interactive object (unused).
+ */
 static void
 _efl_ui_textbox_selection_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -3268,12 +4215,32 @@ _efl_ui_textbox_selection_changed_cb(void *data, const Efl_Event *event EINA_UNU
    _selection_defer(obj, sd);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the main entry_edje object moves (EFL_GFX_ENTITY_EVENT_POSITION_CHANGED).
+ *
+ * If the main Edje part of the textbox moves, all decorations (which are positioned
+ * relative to it or its children) need to be updated.
+ * Schedules a deferred update for all decorations.
+ *
+ * @param data The Efl_Ui_Textbox object.
+ * @param event The Efl_Event from the entry_edje (unused).
+ */
 static void
 _efl_ui_textbox_move_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
    _decoration_defer_all(data);
 }
 
+/**
+ * @internal
+ * @brief Sets the item factory used to create embedded items in the text.
+ *
+ * @param obj The Efl_Ui_Textbox object (unused).
+ * @param pd The private data of the textbox.
+ * @param item_factory The Efl_Canvas_Textblock_Factory to use for creating items.
+ *                     The previous factory, if any, is unreferenced. The new one is referenced.
+ */
 static void
 _efl_ui_textbox_item_factory_set(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *pd,
       Efl_Canvas_Textblock_Factory *item_factory)
@@ -3282,6 +4249,14 @@ _efl_ui_textbox_item_factory_set(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *pd,
    pd->item_factory = efl_ref(item_factory);
 }
 
+/**
+ * @internal
+ * @brief Gets the currently set item factory.
+ *
+ * @param obj The Efl_Ui_Textbox object (unused).
+ * @param pd The private data of the textbox.
+ * @return The current Efl_Canvas_Textblock_Factory, or NULL if none is set.
+ */
 static Eo *
 _efl_ui_textbox_item_factory_get(const Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *pd)
 {
@@ -3289,6 +4264,11 @@ _efl_ui_textbox_item_factory_get(const Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data 
 }
 
 /*Efl.Ui.Scrollable*/
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_content_size_get for the textbox.
+ * Delegates to the internal scroller if it exists.
+ */
 EOLIAN static Eina_Size2D
 _efl_ui_textbox_efl_ui_scrollable_content_size_get(const Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd)
 {
@@ -3296,6 +4276,11 @@ _efl_ui_textbox_efl_ui_scrollable_content_size_get(const Eo *obj EINA_UNUSED, Ef
    return efl_ui_scrollable_content_size_get(sd->scroller);
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_viewport_geometry_get for the textbox.
+ * Delegates to the internal scroller if it exists.
+ */
 EOLIAN static Eina_Rect
 _efl_ui_textbox_efl_ui_scrollable_viewport_geometry_get(const Eo *obj EINA_UNUSED,
                                                                        Efl_Ui_Textbox_Data *sd)
@@ -3304,6 +4289,12 @@ _efl_ui_textbox_efl_ui_scrollable_viewport_geometry_get(const Eo *obj EINA_UNUSE
    return efl_ui_scrollable_viewport_geometry_get(sd->scroller);
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_match_content_set for the textbox.
+ * Delegates to the internal scroller if it exists.
+ * This controls whether the scroller should match its size to its content.
+ */
 EOLIAN static void
 _efl_ui_textbox_efl_ui_scrollable_match_content_set(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd, Eina_Bool w, Eina_Bool h)
 {
@@ -3311,6 +4302,12 @@ _efl_ui_textbox_efl_ui_scrollable_match_content_set(Eo *obj EINA_UNUSED, Efl_Ui_
    return efl_ui_scrollable_match_content_set(sd->scroller, !!w, !!h);
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_step_size_set for the textbox.
+ * Delegates to the internal scroller if it exists.
+ * Sets the step size for scrolling (e.g., by arrow keys or wheel).
+ */
 EOLIAN static void
 _efl_ui_textbox_efl_ui_scrollable_step_size_set(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd, Eina_Position2D step)
 {
@@ -3318,6 +4315,11 @@ _efl_ui_textbox_efl_ui_scrollable_step_size_set(Eo *obj EINA_UNUSED, Efl_Ui_Text
    efl_ui_scrollable_step_size_set(sd->scroller, step);
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_step_size_get for the textbox.
+ * Delegates to the internal scroller if it exists.
+ */
 EOLIAN static Eina_Position2D
 _efl_ui_textbox_efl_ui_scrollable_step_size_get(const Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd)
 {
@@ -3325,6 +4327,12 @@ _efl_ui_textbox_efl_ui_scrollable_step_size_get(const Eo *obj EINA_UNUSED, Efl_U
    return efl_ui_scrollable_step_size_get(sd->scroller);
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_content_pos_get for the textbox.
+ * Delegates to the internal scroller if it exists.
+ * Gets the current scroll position of the content.
+ */
 EOLIAN static Eina_Position2D
 _efl_ui_textbox_efl_ui_scrollable_content_pos_get(const Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd)
 {
@@ -3332,6 +4340,12 @@ _efl_ui_textbox_efl_ui_scrollable_content_pos_get(const Eo *obj EINA_UNUSED, Efl
    return efl_ui_scrollable_content_pos_get(sd->scroller);
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_content_pos_set for the textbox.
+ * Delegates to the internal scroller if it exists.
+ * Sets the current scroll position of the content.
+ */
 EOLIAN static void
 _efl_ui_textbox_efl_ui_scrollable_content_pos_set(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd, Eina_Position2D pos)
 {
@@ -3339,6 +4353,12 @@ _efl_ui_textbox_efl_ui_scrollable_content_pos_set(Eo *obj EINA_UNUSED, Efl_Ui_Te
    efl_ui_scrollable_content_pos_set(sd->scroller, pos);
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_scroll_hold_get for the textbox.
+ * Delegates to the internal scroller if it exists.
+ * Checks if scrolling is currently held (paused).
+ */
 EOLIAN static Eina_Bool
 _efl_ui_textbox_efl_ui_scrollable_scroll_hold_get(const Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd)
 {
@@ -3346,12 +4366,18 @@ _efl_ui_textbox_efl_ui_scrollable_scroll_hold_get(const Eo *obj EINA_UNUSED, Efl
    return efl_ui_scrollable_scroll_hold_get(sd->scroller);
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_scroll_hold_set for the textbox.
+ * Delegates to the internal scroller if it exists and if scrolling is enabled (`sd->scroll`).
+ * Holds or unholds scrolling.
+ */
 EOLIAN static void
 _efl_ui_textbox_efl_ui_scrollable_scroll_hold_set(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd, Eina_Bool hold)
 {
    /* Can be called by efl_ui_widget_scroll_hold_{pop, push} from another
-    * widget (ex., efl_ui_slider) without _efl_ui_textbox_scrollable_set() 
-    * invocation with undefined sd->scroller here as the result. 
+    * widget (ex., efl_ui_slider) without _efl_ui_textbox_scrollable_set()
+    * invocation with undefined sd->scroller here as the result.
     * So, check if sd->scroll is true to avoid this. */
    if(sd->scroll)
    {
@@ -3360,6 +4386,12 @@ _efl_ui_textbox_efl_ui_scrollable_scroll_hold_set(Eo *obj EINA_UNUSED, Efl_Ui_Te
    }
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_scroll_freeze_get for the textbox.
+ * Delegates to the internal scroller if it exists.
+ * Checks if scrolling is currently frozen (completely disabled).
+ */
 EOLIAN static Eina_Bool
 _efl_ui_textbox_efl_ui_scrollable_scroll_freeze_get(const Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd)
 {
@@ -3367,6 +4399,12 @@ _efl_ui_textbox_efl_ui_scrollable_scroll_freeze_get(const Eo *obj EINA_UNUSED, E
    return efl_ui_scrollable_scroll_freeze_get(sd->scroller);
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_scroll_freeze_set for the textbox.
+ * Delegates to the internal scroller if it exists and if scrolling is enabled (`sd->scroll`).
+ * Freezes or unfreezes scrolling.
+ */
 EOLIAN static void
 _efl_ui_textbox_efl_ui_scrollable_scroll_freeze_set(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd, Eina_Bool freeze)
 {
@@ -3378,6 +4416,12 @@ _efl_ui_textbox_efl_ui_scrollable_scroll_freeze_set(Eo *obj EINA_UNUSED, Efl_Ui_
    }
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_bounce_enabled_set for the textbox.
+ * Delegates to the internal scroller if it exists.
+ * Enables or disables bounce effect when scrolling reaches the content edge.
+ */
 EOLIAN static void
 _efl_ui_textbox_efl_ui_scrollable_bounce_enabled_set(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd, Eina_Bool horiz, Eina_Bool vert)
 {
@@ -3385,6 +4429,11 @@ _efl_ui_textbox_efl_ui_scrollable_bounce_enabled_set(Eo *obj EINA_UNUSED, Efl_Ui
    efl_ui_scrollable_bounce_enabled_set(sd->scroller, !!horiz, !!vert);
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_bounce_enabled_get for the textbox.
+ * Delegates to the internal scroller if it exists.
+ */
 EOLIAN static void
 _efl_ui_textbox_efl_ui_scrollable_bounce_enabled_get(const Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd, Eina_Bool *horiz, Eina_Bool *vert)
 {
@@ -3392,6 +4441,12 @@ _efl_ui_textbox_efl_ui_scrollable_bounce_enabled_get(const Eo *obj EINA_UNUSED, 
    efl_ui_scrollable_bounce_enabled_get(sd->scroller, horiz, vert);
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_scroll for the textbox.
+ * Delegates to the internal scroller if it exists.
+ * Scrolls the content to make the given rectangle visible.
+ */
 EOLIAN static void
 _efl_ui_textbox_efl_ui_scrollable_scroll(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd, Eina_Rect rect, Eina_Bool animation)
 {
@@ -3399,6 +4454,12 @@ _efl_ui_textbox_efl_ui_scrollable_scroll(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Dat
    efl_ui_scrollable_scroll(sd->scroller, rect, animation);
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_gravity_get for the textbox.
+ * Delegates to the internal scroller if it exists.
+ * Gets the gravity settings for how content aligns when smaller than the viewport.
+ */
 EOLIAN static void
 _efl_ui_textbox_efl_ui_scrollable_gravity_get(const Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd, double *x, double *y)
 {
@@ -3406,6 +4467,12 @@ _efl_ui_textbox_efl_ui_scrollable_gravity_get(const Eo *obj EINA_UNUSED, Efl_Ui_
    efl_ui_scrollable_gravity_get(sd->scroller, x, y);
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_gravity_set for the textbox.
+ * Delegates to the internal scroller if it exists.
+ * Sets the gravity for content alignment.
+ */
 EOLIAN static void
 _efl_ui_textbox_efl_ui_scrollable_gravity_set(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd, double x, double y)
 {
@@ -3413,6 +4480,12 @@ _efl_ui_textbox_efl_ui_scrollable_gravity_set(Eo *obj EINA_UNUSED, Efl_Ui_Textbo
    efl_ui_scrollable_gravity_set(sd->scroller, x, y);
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_movement_block_set for the textbox.
+ * Delegates to the internal scroller if it exists.
+ * Blocks scrolling in specified orientations.
+ */
 EOLIAN static void
 _efl_ui_textbox_efl_ui_scrollable_movement_block_set(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd, Efl_Ui_Layout_Orientation block)
 {
@@ -3420,6 +4493,11 @@ _efl_ui_textbox_efl_ui_scrollable_movement_block_set(Eo *obj EINA_UNUSED, Efl_Ui
    efl_ui_scrollable_movement_block_set(sd->scroller, block);
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_movement_block_get for the textbox.
+ * Delegates to the internal scroller if it exists.
+ */
 EOLIAN static Efl_Ui_Layout_Orientation
 _efl_ui_textbox_efl_ui_scrollable_movement_block_get(const Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd)
 {
@@ -3427,6 +4505,12 @@ _efl_ui_textbox_efl_ui_scrollable_movement_block_get(const Eo *obj EINA_UNUSED, 
    return efl_ui_scrollable_movement_block_get(sd->scroller);
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_looping_set for the textbox.
+ * Delegates to the internal scroller if it exists.
+ * Enables or disables looping (infinite scrolling) for horizontal and vertical directions.
+ */
 EOLIAN static void
 _efl_ui_textbox_efl_ui_scrollable_looping_set(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd, Eina_Bool loop_h, Eina_Bool loop_v)
 {
@@ -3434,6 +4518,11 @@ _efl_ui_textbox_efl_ui_scrollable_looping_set(Eo *obj EINA_UNUSED, Efl_Ui_Textbo
    efl_ui_scrollable_looping_set(sd->scroller, !!loop_h, !!loop_v);
 }
 
+/**
+ * @internal
+ * @brief Implements efl_ui_scrollable_looping_get for the textbox.
+ * Delegates to the internal scroller if it exists.
+ */
 EOLIAN static void
 _efl_ui_textbox_efl_ui_scrollable_looping_get(const Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *sd, Eina_Bool *loop_h, Eina_Bool *loop_v)
 {
@@ -3443,6 +4532,20 @@ _efl_ui_textbox_efl_ui_scrollable_looping_get(const Eo *obj EINA_UNUSED, Efl_Ui_
 
 /* Efl.Part begin */
 
+/**
+ * @internal
+ * @brief Implements efl_part_text_set for specific textbox parts.
+ *
+ * Handles setting text for "efl.text_guide" (guide/placeholder text) and
+ * "efl.text" (main content text) by delegating to the respective
+ * textblock objects (`pd->text_guide_obj`, `pd->text_obj`).
+ *
+ * @param obj The Efl_Ui_Textbox object (unused).
+ * @param pd The private data of the textbox.
+ * @param part The name of the part to set text for (e.g., "efl.text_guide", "efl.text").
+ * @param text The text string to set.
+ * @return EINA_TRUE if the part was recognized and text set, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _efl_ui_textbox_text_set(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *pd,
       const char *part, const char *text)
@@ -3463,6 +4566,19 @@ _efl_ui_textbox_text_set(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *pd,
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Implements efl_part_text_get for specific textbox parts.
+ *
+ * Handles getting text from "efl.text_guide" and "efl.text" parts
+ * by delegating to the respective textblock objects.
+ *
+ * @param obj The Efl_Ui_Textbox object (unused).
+ * @param pd The private data of the textbox.
+ * @param part The name of the part to get text from.
+ * @return The text string from the specified part, or NULL if the part is not recognized or has no text.
+ *         The returned string is managed by the underlying textblock and should not be freed by the caller.
+ */
 static const char *
 _efl_ui_textbox_text_get(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *pd,
       const char *part)
@@ -3481,6 +4597,17 @@ _efl_ui_textbox_text_get(Eo *obj EINA_UNUSED, Efl_Ui_Textbox_Data *pd,
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Checks if a given part name is one of the special text parts handled by the textbox.
+ *
+ * Used by the ELM_PART_OVERRIDE_PARTIAL macro to determine if custom
+ * text_set/get logic should be used for a part.
+ *
+ * @param obj The Efl_Ui_Textbox object (unused).
+ * @param part The part name string to check.
+ * @return EINA_TRUE if the part is "efl.text_guide" or "efl.text", EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _part_is_efl_ui_textbox_part(const Eo *obj EINA_UNUSED, const char *part)
 {

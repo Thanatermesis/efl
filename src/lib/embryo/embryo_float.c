@@ -21,6 +21,15 @@
  *  3.  This notice may not be removed or altered from any source distribution.
  */
 
+/**
+ * @file
+ * @brief Float arithmetic functions for the Small AMX engine.
+ *
+ * This file implements a set of floating-point arithmetic operations
+ * that can be called from Embryo scripts. These functions provide
+ * basic math capabilities, trigonometric functions, and type conversions.
+ */
+
 /* CHANGES -
  * 2002-08-27: Basic conversion of source from C++ to C by Adam D. Moss
  *             <adam@gimp.org> <aspirin@icculus.org>
@@ -55,6 +64,17 @@
 
 /* internally useful calls */
 
+/**
+ * @internal
+ * @brief Converts an angle from degrees or grades to radians.
+ *
+ * @param angle The angle value.
+ * @param radix The unit of the input angle:
+ *              - 1: degrees (sexagesimal system)
+ *              - 2: grades (centesimal system)
+ *              - other: radians (no conversion)
+ * @return The angle in radians.
+ */
 static float
 _embryo_fp_degrees_to_radians(float angle, int radix)
 {
@@ -74,6 +94,15 @@ _embryo_fp_degrees_to_radians(float angle, int radix)
 
 /* exported float api */
 
+/**
+ * @brief Converts an integer to a float.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the integer value to convert.
+ * @return The float value as an Embryo_Cell, or 0 on error.
+ * @note Native function: `float(value)`
+ */
 static Embryo_Cell
 _embryo_fp(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -85,6 +114,15 @@ _embryo_fp(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Converts a string to a float.
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the virtual address of the string to convert.
+ * @return The float value as an Embryo_Cell, or 0 on error or if the string is invalid.
+ * @note Native function: `atof(string_address)`
+ */
 static Embryo_Cell
 _embryo_fp_str(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -103,6 +141,16 @@ _embryo_fp_str(Embryo_Program *ep, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Multiplies two float numbers.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the first float operand.
+ *               params[2] is the second float operand.
+ * @return The product of the two floats as an Embryo_Cell, or 0 on error.
+ * @note Native function: `float_mul(operand1, operand2)`
+ */
 static Embryo_Cell
 _embryo_fp_mul(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -115,6 +163,19 @@ _embryo_fp_mul(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Divides the first float by the second float.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float dividend.
+ *               params[2] is the float divisor.
+ * @return The result of the division as an Embryo_Cell.
+ *         Returns 0.0 if both dividend and divisor are 0.0.
+ *         Returns -MAXFLOAT or MAXFLOAT for division by zero, depending on the sign of the dividend.
+ *         Returns 0 on parameter error.
+ * @note Native function: `float_div(dividend, divisor)`
+ */
 static Embryo_Cell
 _embryo_fp_div(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -138,6 +199,16 @@ _embryo_fp_div(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Adds two float numbers.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the first float operand.
+ *               params[2] is the second float operand.
+ * @return The sum of the two floats as an Embryo_Cell, or 0 on error.
+ * @note Native function: `float_add(operand1, operand2)`
+ */
 static Embryo_Cell
 _embryo_fp_add(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -150,6 +221,16 @@ _embryo_fp_add(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Subtracts the second float from the first float.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the first float operand.
+ *               params[2] is the second float operand.
+ * @return The difference of the two floats as an Embryo_Cell, or 0 on error.
+ * @note Native function: `float_sub(operand1, operand2)`
+ */
 static Embryo_Cell
 _embryo_fp_sub(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -162,7 +243,16 @@ _embryo_fp_sub(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
-/* Return fractional part of float */
+/**
+ * @brief Returns the fractional part of a float.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float operand.
+ * @return The fractional part of the float as an Embryo_Cell, or 0 on error.
+ *         Example: `fract(3.14)` returns `0.14`.
+ * @note Native function: `fract(value)`
+ */
 static Embryo_Cell
 _embryo_fp_fract(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -175,7 +265,20 @@ _embryo_fp_fract(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
-/* Return integer part of float, rounded */
+/**
+ * @brief Rounds a float to an integer value based on the specified rounding type.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float operand.
+ *               params[2] is the type of rounding (integer):
+ *                         - 1: round downwards (truncate, floor). Example: `round(3.7, 1)` returns `3`.
+ *                         - 2: round upwards (ceil). Example: `round(3.1, 2)` returns `4`.
+ *                         - 3: round towards zero. Example: `round(-3.7, 3)` returns `-3`.
+ *                         - default: standard round to nearest (floor(f + 0.5)). Example: `round(3.7)` returns `4`, `round(3.2)` returns `3`.
+ * @return The rounded integer value as an Embryo_Cell, or 0 on error.
+ * @note Native function: `round(value, type)`
+ */
 static Embryo_Cell
 _embryo_fp_round(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -207,6 +310,20 @@ _embryo_fp_round(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return (Embryo_Cell)f;
 }
 
+/**
+ * @brief Compares two float numbers.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the first float operand.
+ *               params[2] is the second float operand.
+ * @return An integer Embryo_Cell:
+ *         - 0 if operand1 is equal to operand2.
+ *         - 1 if operand1 is greater than operand2.
+ *         - -1 if operand1 is less than operand2.
+ *         Returns 0 on parameter error.
+ * @note Native function: `float_cmp(operand1, operand2)`
+ */
 static Embryo_Cell
 _embryo_fp_cmp(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -223,6 +340,17 @@ _embryo_fp_cmp(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return -1;
 }
 
+/**
+ * @brief Calculates the square root of a float.
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float operand.
+ * @return The square root of the operand as an Embryo_Cell.
+ *         Sets EMBRYO_ERROR_DOMAIN and returns 0 if the operand is negative.
+ *         Returns 0 on parameter error.
+ * @note Native function: `sqrt(value)`
+ */
 static Embryo_Cell
 _embryo_fp_sqroot(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -240,6 +368,17 @@ _embryo_fp_sqroot(Embryo_Program *ep, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Calculates the value of the first float raised to the power of the second float.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the base float operand.
+ *               params[2] is the exponent float operand.
+ * @return The result of base raised to the power of exponent, as an Embryo_Cell.
+ *         Returns 0 on parameter error.
+ * @note Native function: `pow(base, exponent)`
+ */
 static Embryo_Cell
 _embryo_fp_power(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -254,6 +393,22 @@ _embryo_fp_power(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Calculates the logarithm of a float value with a specified base.
+ * @param ep The Embryo program instance.
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float value.
+ *               params[2] is the float base of the logarithm.
+ * @return The logarithm of the value with the specified base, as an Embryo_Cell.
+ *         Uses `log10f()` if base is 10.0.
+ *         Uses `log2f()` if base is 2.0.
+ *         Otherwise, calculates `log(value) / log(base)`.
+ *         Sets EMBRYO_ERROR_DOMAIN and returns 0 if value or base is non-positive.
+ *         Returns 0.0 if base is 1.0 (log(1) = 0, division by zero).
+ *         Returns 0 on parameter error.
+ * @note Native function: `log(value, base)`
+ */
 static Embryo_Cell
 _embryo_fp_log(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -283,6 +438,16 @@ _embryo_fp_log(Embryo_Program *ep, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Calculates the sine of an angle.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float angle.
+ *               params[2] is the radix of the angle (see _embryo_fp_degrees_to_radians()).
+ * @return The sine of the angle as an Embryo_Cell, or 0 on error.
+ * @note Native function: `sin(angle, radix)`
+ */
 static Embryo_Cell
 _embryo_fp_sin(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -297,6 +462,16 @@ _embryo_fp_sin(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Calculates the cosine of an angle.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float angle.
+ *               params[2] is the radix of the angle (see _embryo_fp_degrees_to_radians()).
+ * @return The cosine of the angle as an Embryo_Cell, or 0 on error.
+ * @note Native function: `cos(angle, radix)`
+ */
 static Embryo_Cell
 _embryo_fp_cos(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -311,6 +486,16 @@ _embryo_fp_cos(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Calculates the tangent of an angle.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float angle.
+ *               params[2] is the radix of the angle (see _embryo_fp_degrees_to_radians()).
+ * @return The tangent of the angle as an Embryo_Cell, or 0 on error.
+ * @note Native function: `tan(angle, radix)`
+ */
 static Embryo_Cell
 _embryo_fp_tan(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -325,6 +510,15 @@ _embryo_fp_tan(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Calculates the absolute value of a float.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float operand.
+ * @return The absolute value of the float as an Embryo_Cell, or 0 on error.
+ * @note Native function: `abs(value)`
+ */
 static Embryo_Cell
 _embryo_fp_abs(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -337,6 +531,17 @@ _embryo_fp_abs(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Calculates the arc sine of a value.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float value (between -1.0 and 1.0).
+ *               params[2] is the desired radix for the output angle (see _embryo_fp_degrees_to_radians()).
+ * @return The arc sine of the value in the specified radix, as an Embryo_Cell.
+ *         Returns 0 on parameter error. Domain errors from asinf() (input out of range [-1,1]) result in NaN, which is converted to a cell.
+ * @note Native function: `asin(value, radix)`
+ */
 static Embryo_Cell
 _embryo_fp_asin(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -351,6 +556,17 @@ _embryo_fp_asin(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Calculates the arc cosine of a value.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float value (between -1.0 and 1.0).
+ *               params[2] is the desired radix for the output angle (see _embryo_fp_degrees_to_radians()).
+ * @return The arc cosine of the value in the specified radix, as an Embryo_Cell.
+ *         Returns 0 on parameter error. Domain errors from acosf() (input out of range [-1,1]) result in NaN, which is converted to a cell.
+ * @note Native function: `acos(value, radix)`
+ */
 static Embryo_Cell
 _embryo_fp_acos(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -365,6 +581,17 @@ _embryo_fp_acos(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Calculates the arc tangent of a value.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float value.
+ *               params[2] is the desired radix for the output angle (see _embryo_fp_degrees_to_radians()).
+ * @return The arc tangent of the value in the specified radix, as an Embryo_Cell.
+ *         Returns 0 on parameter error.
+ * @note Native function: `atan(value, radix)`
+ */
 static Embryo_Cell
 _embryo_fp_atan(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -379,6 +606,18 @@ _embryo_fp_atan(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Calculates the arc tangent of y/x, using the signs of both arguments to determine the quadrant of the result.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float y-coordinate.
+ *               params[2] is the float x-coordinate.
+ *               params[3] is the desired radix for the output angle (see _embryo_fp_degrees_to_radians()).
+ * @return The arc tangent of y/x in the specified radix, as an Embryo_Cell.
+ *         Returns 0 on parameter error.
+ * @note Native function: `atan2(y, x, radix)`
+ */
 static Embryo_Cell
 _embryo_fp_atan2(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -395,6 +634,17 @@ _embryo_fp_atan2(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Calculates the natural logarithm of 1 plus the given number (log(1+x)).
+ * This function is more accurate than `log(1.0 + x)` for small values of x.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float operand x.
+ * @return The natural logarithm of (1+x) as an Embryo_Cell.
+ *         Returns 0 on parameter error. Domain errors from log1pf() (input <= -1) result in -HUGE_VAL or NaN, which is converted to a cell.
+ * @note Native function: `log1p(value)`
+ */
 static Embryo_Cell
 _embryo_fp_log1p(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -407,6 +657,15 @@ _embryo_fp_log1p(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Calculates the cubic root of a float.
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float operand.
+ * @return The cubic root of the operand as an Embryo_Cell, or 0 on error.
+ * @note Native function: `cbrt(value)`
+ */
 static Embryo_Cell
 _embryo_fp_cbrt(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -419,6 +678,16 @@ _embryo_fp_cbrt(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Calculates the base-e exponential of a float (e^x).
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float operand (exponent).
+ * @return e raised to the power of the operand, as an Embryo_Cell.
+ *         Returns 0 on parameter error.
+ * @note Native function: `exp(value)`
+ */
 static Embryo_Cell
 _embryo_fp_exp(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -431,6 +700,16 @@ _embryo_fp_exp(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Calculates the base-2 exponential of a float (2^x).
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float operand (exponent).
+ * @return 2 raised to the power of the operand, as an Embryo_Cell.
+ *         Returns 0 on parameter error.
+ * @note Native function: `exp2(value)`
+ */
 static Embryo_Cell
 _embryo_fp_exp2(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -443,6 +722,17 @@ _embryo_fp_exp2(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
    return EMBRYO_FLOAT_TO_CELL(f);
 }
 
+/**
+ * @brief Calculates the hypotenuse of a right-angled triangle (sqrt(x*x + y*y)).
+ * @param ep The Embryo program instance (unused).
+ * @param params An array of Embryo cells.
+ *               params[0] is the size of the parameters in bytes.
+ *               params[1] is the float x.
+ *               params[2] is the float y.
+ * @return The length of the hypotenuse as an Embryo_Cell.
+ *         Returns 0 on parameter error.
+ * @note Native function: `hypot(x, y)`
+ */
 static Embryo_Cell
 _embryo_fp_hypot(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 {
@@ -458,6 +748,14 @@ _embryo_fp_hypot(Embryo_Program *ep EINA_UNUSED, Embryo_Cell *params)
 
 /* functions used by the rest of embryo */
 
+/**
+ * @brief Initializes and registers all float native functions for an Embryo program.
+ * @param ep The Embryo program instance to register the functions with.
+ *
+ * This function is called to make the float arithmetic functions available
+ * to Embryo scripts. It maps script function names (e.g., "float", "sin")
+ * to their corresponding C implementations.
+ */
 void
 _embryo_fp_init(Embryo_Program *ep)
 {

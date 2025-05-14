@@ -8,6 +8,25 @@ extern const DATA8 _evas_dither_44[4][4];
 extern const DATA8 _evas_dither_128128[128][128];
 #endif
 
+/**
+ * @brief Converts RGBA data to 8bpp RGB (332 format) with dithering.
+ *
+ * This function takes a source RGBA image and converts it to an 8-bit
+ * paletted image using an RGB 332 color space (3 bits for red, 3 bits for green,
+ * 2 bits for blue). Dithering is applied to reduce color banding.
+ *
+ * @param src Pointer to the source RGBA data (32-bit per pixel).
+ * @param dst Pointer to the destination 8-bit paletted data.
+ * @param src_jump Number of bytes to jump to get to the next row in the source image.
+ * @param dst_jump Number of bytes to jump to get to the next row in the destination image.
+ * @param w Width of the image in pixels.
+ * @param h Height of the image in pixels.
+ * @param dith_x X offset for the dithering matrix.
+ * @param dith_y Y offset for the dithering matrix.
+ * @param pal Pointer to the color palette. The palette should be pre-calculated
+ *            to map RGB 332 values to palette indices.
+ *            Example: pal[(r_3bit << 5) | (g_3bit << 2) | (b_2bit)] = palette_index;
+ */
 void evas_common_convert_rgba_to_8bpp_rgb_332_dith     (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal)
 {
    DATA32 *src_ptr;
@@ -40,9 +59,31 @@ void evas_common_convert_rgba_to_8bpp_rgb_332_dith     (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP_END_ROT_0();
 }
 
+/** @brief Lookup table for converting 8-bit color channel to 6-level (0-5) representation. */
 static DATA8 p_to_6[256];
+/** @brief Lookup table for the error term in 8-bit to 6-level conversion, scaled for dithering. */
 static DATA8 p_to_6_err[256];
 
+/**
+ * @brief Converts RGBA data to 8bpp RGB (666 format) with dithering.
+ *
+ * This function takes a source RGBA image and converts it to an 8-bit
+ * paletted image using an RGB 666 color space (6 levels for red, 6 for green,
+ * 6 for blue, totaling 216 colors). Dithering is applied.
+ * It uses pre-calculated lookup tables (p_to_6, p_to_6_err) for efficiency.
+ *
+ * @param src Pointer to the source RGBA data (32-bit per pixel).
+ * @param dst Pointer to the destination 8-bit paletted data.
+ * @param src_jump Number of bytes to jump to get to the next row in the source image.
+ * @param dst_jump Number of bytes to jump to get to the next row in the destination image.
+ * @param w Width of the image in pixels.
+ * @param h Height of the image in pixels.
+ * @param dith_x X offset for the dithering matrix.
+ * @param dith_y Y offset for the dithering matrix.
+ * @param pal Pointer to the color palette. The palette should be pre-calculated
+ *            to map RGB 666 values to palette indices.
+ *            Example: pal[(r_6level * 36) + (g_6level * 6) + (b_6level)] = palette_index;
+ */
 void evas_common_convert_rgba_to_8bpp_rgb_666_dith     (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal)
 {
    DATA32 *src_ptr;
@@ -79,6 +120,25 @@ void evas_common_convert_rgba_to_8bpp_rgb_666_dith     (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP_END_ROT_0();
 }
 
+/**
+ * @brief Converts RGBA data to 8bpp RGB (232 format) with dithering.
+ *
+ * This function takes a source RGBA image and converts it to an 8-bit
+ * paletted image using an RGB 232 color space (2 bits for red, 3 bits for green,
+ * 2 bits for blue). Dithering is applied to reduce color banding.
+ *
+ * @param src Pointer to the source RGBA data (32-bit per pixel).
+ * @param dst Pointer to the destination 8-bit paletted data.
+ * @param src_jump Number of bytes to jump to get to the next row in the source image.
+ * @param dst_jump Number of bytes to jump to get to the next row in the destination image.
+ * @param w Width of the image in pixels.
+ * @param h Height of the image in pixels.
+ * @param dith_x X offset for the dithering matrix.
+ * @param dith_y Y offset for the dithering matrix.
+ * @param pal Pointer to the color palette. The palette should be pre-calculated
+ *            to map RGB 232 values to palette indices.
+ *            Example: pal[(r_2bit << 5) | (g_3bit << 2) | (b_2bit)] = palette_index;
+ */
 void evas_common_convert_rgba_to_8bpp_rgb_232_dith     (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal)
 {
    DATA32 *src_ptr;
@@ -111,6 +171,25 @@ void evas_common_convert_rgba_to_8bpp_rgb_232_dith     (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP_END_ROT_0();
 }
 
+/**
+ * @brief Converts RGBA data to 8bpp RGB (222 format) with dithering.
+ *
+ * This function takes a source RGBA image and converts it to an 8-bit
+ * paletted image using an RGB 222 color space (2 bits for red, 2 bits for green,
+ * 2 bits for blue). Dithering is applied to reduce color banding.
+ *
+ * @param src Pointer to the source RGBA data (32-bit per pixel).
+ * @param dst Pointer to the destination 8-bit paletted data.
+ * @param src_jump Number of bytes to jump to get to the next row in the source image.
+ * @param dst_jump Number of bytes to jump to get to the next row in the destination image.
+ * @param w Width of the image in pixels.
+ * @param h Height of the image in pixels.
+ * @param dith_x X offset for the dithering matrix.
+ * @param dith_y Y offset for the dithering matrix.
+ * @param pal Pointer to the color palette. The palette should be pre-calculated
+ *            to map RGB 222 values to palette indices.
+ *            Example: pal[(r_2bit << 4) | (g_2bit << 2) | (b_2bit)] = palette_index;
+ */
 void evas_common_convert_rgba_to_8bpp_rgb_222_dith     (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal)
 {
    DATA32 *src_ptr;
@@ -142,6 +221,25 @@ void evas_common_convert_rgba_to_8bpp_rgb_222_dith     (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP_END_ROT_0();
 }
 
+/**
+ * @brief Converts RGBA data to 8bpp RGB (221 format) with dithering.
+ *
+ * This function takes a source RGBA image and converts it to an 8-bit
+ * paletted image using an RGB 221 color space (2 bits for red, 2 bits for green,
+ * 1 bit for blue). Dithering is applied to reduce color banding.
+ *
+ * @param src Pointer to the source RGBA data (32-bit per pixel).
+ * @param dst Pointer to the destination 8-bit paletted data.
+ * @param src_jump Number of bytes to jump to get to the next row in the source image.
+ * @param dst_jump Number of bytes to jump to get to the next row in the destination image.
+ * @param w Width of the image in pixels.
+ * @param h Height of the image in pixels.
+ * @param dith_x X offset for the dithering matrix.
+ * @param dith_y Y offset for the dithering matrix.
+ * @param pal Pointer to the color palette. The palette should be pre-calculated
+ *            to map RGB 221 values to palette indices.
+ *            Example: pal[(r_2bit << 3) | (g_2bit << 1) | (b_1bit)] = palette_index;
+ */
 void evas_common_convert_rgba_to_8bpp_rgb_221_dith     (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal)
 {
    DATA32 *src_ptr;
@@ -174,6 +272,25 @@ void evas_common_convert_rgba_to_8bpp_rgb_221_dith     (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP_END_ROT_0();
 }
 
+/**
+ * @brief Converts RGBA data to 8bpp RGB (121 format) with dithering.
+ *
+ * This function takes a source RGBA image and converts it to an 8-bit
+ * paletted image using an RGB 121 color space (1 bit for red, 2 bits for green,
+ * 1 bit for blue). Dithering is applied to reduce color banding.
+ *
+ * @param src Pointer to the source RGBA data (32-bit per pixel).
+ * @param dst Pointer to the destination 8-bit paletted data.
+ * @param src_jump Number of bytes to jump to get to the next row in the source image.
+ * @param dst_jump Number of bytes to jump to get to the next row in the destination image.
+ * @param w Width of the image in pixels.
+ * @param h Height of the image in pixels.
+ * @param dith_x X offset for the dithering matrix.
+ * @param dith_y Y offset for the dithering matrix.
+ * @param pal Pointer to the color palette. The palette should be pre-calculated
+ *            to map RGB 121 values to palette indices.
+ *            Example: pal[(r_1bit << 3) | (g_2bit << 1) | (b_1bit)] = palette_index;
+ */
 void evas_common_convert_rgba_to_8bpp_rgb_121_dith     (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal)
 {
    DATA32 *src_ptr;
@@ -207,6 +324,25 @@ void evas_common_convert_rgba_to_8bpp_rgb_121_dith     (DATA32 *src, DATA8 *dst,
    CONVERT_LOOP_END_ROT_0();
 }
 
+/**
+ * @brief Converts RGBA data to 8bpp RGB (111 format) with dithering.
+ *
+ * This function takes a source RGBA image and converts it to an 8-bit
+ * paletted image using an RGB 111 color space (1 bit for red, 1 bit for green,
+ * 1 bit for blue). Dithering is applied to reduce color banding.
+ *
+ * @param src Pointer to the source RGBA data (32-bit per pixel).
+ * @param dst Pointer to the destination 8-bit paletted data.
+ * @param src_jump Number of bytes to jump to get to the next row in the source image.
+ * @param dst_jump Number of bytes to jump to get to the next row in the destination image.
+ * @param w Width of the image in pixels.
+ * @param h Height of the image in pixels.
+ * @param dith_x X offset for the dithering matrix.
+ * @param dith_y Y offset for the dithering matrix.
+ * @param pal Pointer to the color palette. The palette should be pre-calculated
+ *            to map RGB 111 values to palette indices.
+ *            Example: pal[(r_1bit << 2) | (g_1bit << 1) | (b_1bit)] = palette_index;
+ */
 void evas_common_convert_rgba_to_8bpp_rgb_111_dith     (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x, int dith_y, DATA8 *pal)
 {
    DATA32 *src_ptr;

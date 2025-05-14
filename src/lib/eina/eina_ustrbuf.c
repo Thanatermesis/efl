@@ -14,6 +14,21 @@
  * @cond LOCAL
  */
 
+/**
+ * @internal
+ * @brief Macros for Eina_UStrbuf template instantiation.
+ *
+ * These macros define the specific types, functions, and constants
+ * required by the generic string buffer implementation in
+ * eina_strbuf_template_c.x to create the Eina_UStrbuf API
+ * for Eina_Unicode strings.
+ *
+ * For example:
+ * - _STRBUF_DATA_TYPE defines the character type (Eina_Unicode).
+ * - _STRBUF_STRLEN_FUNC defines the string length function (eina_unicode_strlen).
+ * - _STRBUF_MAGIC provides a unique identifier for this string buffer type.
+ */
+
 #ifdef _STRBUF_DATA_TYPE
 # undef _STRBUF_DATA_TYPE
 #endif

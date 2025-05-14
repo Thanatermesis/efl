@@ -4,6 +4,10 @@
 #ifndef _ELM_HOVERSEL_ITEM_EO_CLASS_TYPE
 #define _ELM_HOVERSEL_ITEM_EO_CLASS_TYPE
 
+/**
+ * @brief Represents an item in an Elementary Hoversel widget.
+ * @ingroup Elm_Hoversel_Item
+ */
 typedef Eo Elm_Hoversel_Item;
 
 #endif

@@ -4,6 +4,10 @@
 #ifndef _EFL_UI_VIDEO_LEGACY_EO_CLASS_TYPE
 #define _EFL_UI_VIDEO_LEGACY_EO_CLASS_TYPE
 
+/**
+ * @brief Opaque handle to an Efl_Ui_Video_Legacy instance.
+ * @ingroup Efl_Ui_Video_Legacy
+ */
 typedef Eo Efl_Ui_Video_Legacy;
 
 #endif

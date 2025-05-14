@@ -43,24 +43,46 @@
 #include <sys/mman.h>
 #include "ecore_wl2_private.h"
 
+/**
+ * @brief Structure to store information about mouse button down events.
+ * This is used to detect double and triple clicks.
+ */
 typedef struct _Ecore_Wl2_Mouse_Down_Info
 {
-   EINA_INLIST;
-   int device, sx, sy;
-   Ecore_Wl2_Window *last_win;
-   Ecore_Wl2_Window *last_last_win;
-   Ecore_Wl2_Window *last_event_win;
-   Ecore_Wl2_Window *last_last_event_win;
-   unsigned int last_time;
-   unsigned int last_last_time;
-   Eina_Bool double_click : 1;
-   Eina_Bool triple_click : 1;
+   EINA_INLIST; /**< Macro for Eina Inlist node */
+   int device; /**< Device ID for the mouse event */
+   int sx; /**< Screen X coordinate of the mouse event */
+   int sy; /**< Screen Y coordinate of the mouse event */
+   Ecore_Wl2_Window *last_win; /**< Window of the last mouse down event */
+   Ecore_Wl2_Window *last_last_win; /**< Window of the second to last mouse down event */
+   Ecore_Wl2_Window *last_event_win; /**< Event window of the last mouse down event */
+   Ecore_Wl2_Window *last_last_event_win; /**< Event window of the second to last mouse down event */
+   unsigned int last_time; /**< Timestamp of the last mouse down event */
+   unsigned int last_last_time; /**< Timestamp of the second to last mouse down event */
+   Eina_Bool double_click : 1; /**< Flag indicating if the last event was a double click */
+   Eina_Bool triple_click : 1; /**< Flag indicating if the last event was a triple click */
 } Ecore_Wl2_Mouse_Down_Info;
 
+/**
+ * @brief List of mouse down information structures.
+ * Used to track mouse down events for different devices.
+ */
 static Eina_Inlist *_ecore_wl2_mouse_down_info_list = NULL;
 
 static void _keyboard_cb_key(void *data, struct wl_keyboard *keyboard EINA_UNUSED, unsigned int serial, unsigned int timestamp, unsigned int keycode, unsigned int state);
 
+/**
+ * @internal
+ * @brief Retrieves or creates mouse down information for a given device.
+ *
+ * This function searches for an existing Ecore_Wl2_Mouse_Down_Info structure
+ * for the specified device. If not found, it allocates and initializes a new
+ * one, adding it to the global list.
+ *
+ * @param device The device ID.
+ * @return A pointer to the Ecore_Wl2_Mouse_Down_Info structure for the device,
+ *         or NULL on allocation failure.
+ */
 static Ecore_Wl2_Mouse_Down_Info *
 _ecore_wl2_input_mouse_down_info_get(int device)
 {
@@ -81,6 +103,17 @@ _ecore_wl2_input_mouse_down_info_get(int device)
    return info;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the Ecore_Wl2_Input_Devices structure for a given input and window.
+ *
+ * This function iterates through the list of input devices associated with the
+ * Ecore_Wl2_Input object and returns the one matching the specified window.
+ *
+ * @param input The Ecore_Wl2_Input object.
+ * @param window The Ecore_Wl2_Window object.
+ * @return A pointer to the Ecore_Wl2_Input_Devices structure if found, otherwise NULL.
+ */
 static Ecore_Wl2_Input_Devices *
 _ecore_wl2_devices_get(const Ecore_Wl2_Input *input, const Ecore_Wl2_Window *window)
 {
@@ -96,6 +129,19 @@ _ecore_wl2_devices_get(const Ecore_Wl2_Input *input, const Ecore_Wl2_Window *win
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the EFL input device object for the mouse associated with a window.
+ *
+ * This function gets the Ecore_Wl2_Input_Devices for the given input and window,
+ * and if found, returns a reference to its pointer_dev (mouse device).
+ * The caller is responsible for unreferencing the returned object using efl_unref().
+ *
+ * @param input The Ecore_Wl2_Input object.
+ * @param window The Ecore_Wl2_Window object.
+ * @return A new reference to the Eo (EFL object) representing the mouse device,
+ *         or NULL if not found.
+ */
 static Eo *
 _ecore_wl2_mouse_dev_get(Ecore_Wl2_Input *input, Ecore_Wl2_Window *window)
 {
@@ -108,6 +154,19 @@ _ecore_wl2_mouse_dev_get(Ecore_Wl2_Input *input, Ecore_Wl2_Window *window)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the EFL input device object for touch associated with a window.
+ *
+ * This function gets the Ecore_Wl2_Input_Devices for the given input and window,
+ * and if found, returns a reference to its touch_dev.
+ * The caller is responsible for unreferencing the returned object using efl_unref().
+ *
+ * @param input The Ecore_Wl2_Input object.
+ * @param window The Ecore_Wl2_Window object.
+ * @return A new reference to the Eo (EFL object) representing the touch device,
+ *         or NULL if not found.
+ */
 static Eo *
 _ecore_wl2_touch_dev_get(Ecore_Wl2_Input *input, Ecore_Wl2_Window *window)
 {
@@ -120,6 +179,19 @@ _ecore_wl2_touch_dev_get(Ecore_Wl2_Input *input, Ecore_Wl2_Window *window)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the EFL input device object for the seat associated with a window.
+ *
+ * This function gets the Ecore_Wl2_Input_Devices for the given input and window,
+ * and if found, returns a reference to its seat_dev.
+ * The caller is responsible for unreferencing the returned object using efl_unref().
+ *
+ * @param input The Ecore_Wl2_Input object.
+ * @param window The Ecore_Wl2_Window object.
+ * @return A new reference to the Eo (EFL object) representing the seat device,
+ *         or NULL if not found.
+ */
 static Eo *
 _ecore_wl2_seat_dev_get(Ecore_Wl2_Input *input, Ecore_Wl2_Window *window)
 {
@@ -132,6 +204,18 @@ _ecore_wl2_seat_dev_get(Ecore_Wl2_Input *input, Ecore_Wl2_Window *window)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Callback function to free an Ecore event and its associated data.
+ *
+ * This function is typically used as the `func_free` argument for `ecore_event_add`.
+ * It unreferences the `data` (expected to be an EFL object) if it's not NULL,
+ * and then frees the `event` structure.
+ *
+ * @param data User data, expected to be an EFL object (Eo *) or NULL.
+ *             If not NULL, efl_unref() will be called on it.
+ * @param event The event structure to be freed.
+ */
 static void
 _input_event_cb_free(void *data, void *event)
 {
@@ -140,6 +224,17 @@ _input_event_cb_free(void *data, void *event)
    free(event);
 }
 
+/**
+ * @internal
+ * @brief Sends an ECORE_EVENT_MOUSE_IN event.
+ *
+ * This function allocates and populates an Ecore_Event_Mouse_IO structure
+ * to signify that the mouse pointer has entered a window. It then adds this
+ * event to the Ecore event queue.
+ *
+ * @param input The Ecore_Wl2_Input object associated with this event.
+ * @param window The Ecore_Wl2_Window that the mouse pointer entered.
+ */
 static void
 _ecore_wl2_input_mouse_in_send(Ecore_Wl2_Input *input, Ecore_Wl2_Window *window)
 {
@@ -159,6 +254,17 @@ _ecore_wl2_input_mouse_in_send(Ecore_Wl2_Input *input, Ecore_Wl2_Window *window)
    ecore_event_add(ECORE_EVENT_MOUSE_IN, ev, _input_event_cb_free, ev->dev);
 }
 
+/**
+ * @internal
+ * @brief Sends an ECORE_EVENT_MOUSE_OUT event.
+ *
+ * This function allocates and populates an Ecore_Event_Mouse_IO structure
+ * to signify that the mouse pointer has left a window. It then adds this
+ * event to the Ecore event queue.
+ *
+ * @param input The Ecore_Wl2_Input object associated with this event.
+ * @param window The Ecore_Wl2_Window that the mouse pointer left.
+ */
 static void
 _ecore_wl2_input_mouse_out_send(Ecore_Wl2_Input *input, Ecore_Wl2_Window *window)
 {
@@ -178,6 +284,20 @@ _ecore_wl2_input_mouse_out_send(Ecore_Wl2_Input *input, Ecore_Wl2_Window *window
    ecore_event_add(ECORE_EVENT_MOUSE_OUT, ev, _input_event_cb_free, ev->dev);
 }
 
+/**
+ * @internal
+ * @brief Sends an ECORE_EVENT_MOUSE_MOVE event.
+ *
+ * This function allocates and populates an Ecore_Event_Mouse_Move structure
+ * to signify that the mouse pointer has moved. It then adds this event to
+ * the Ecore event queue. It also updates the stored coordinates in the
+ * Ecore_Wl2_Mouse_Down_Info for the given device.
+ *
+ * @param input The Ecore_Wl2_Input object associated with this event.
+ * @param window The Ecore_Wl2_Window where the mouse move occurred.
+ * @param device The device ID for multi-touch/multi-pointer scenarios.
+ *               For regular mouse, this is typically 0.
+ */
 static void
 _ecore_wl2_input_mouse_move_send(Ecore_Wl2_Input *input, Ecore_Wl2_Window *window, int device)
 {

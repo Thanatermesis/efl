@@ -17,12 +17,32 @@
 #include "Ecore_X.h"
 #include "Ecore_X_Atoms.h"
 
+/**
+ * @brief Initializes the ICCCM module.
+ * @since 1.2
+ *
+ * This function currently does not perform any operations but is
+ * reserved for future initialization needs of the ICCCM handling
+ * within Ecore_X.
+ */
 EAPI void
 ecore_x_icccm_init(void)
 {
    LOGFN;
 }
 
+/**
+ * @brief Sets the WM_STATE property of a window.
+ * @param win The window whose state is to be set.
+ * @param state The desired state for the window.
+ * @since 1.2
+ *
+ * This function changes the WM_STATE property on the given window.
+ * The state can be one of:
+ * - ECORE_X_WINDOW_STATE_HINT_WITHDRAWN: The window is withdrawn.
+ * - ECORE_X_WINDOW_STATE_HINT_NORMAL: The window is in its normal state.
+ * - ECORE_X_WINDOW_STATE_HINT_ICONIC: The window is iconified.
+ */
 EAPI void
 ecore_x_icccm_state_set(Ecore_X_Window win,
                         Ecore_X_Window_State_Hint state)
@@ -44,6 +64,14 @@ ecore_x_icccm_state_set(Ecore_X_Window win,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * @brief Retrieves the WM_STATE property of a window.
+ * @param win The window whose state is to be retrieved.
+ * @return The current state hint of the window.
+ *         Returns ECORE_X_WINDOW_STATE_HINT_NONE if the property
+ *         is not set or cannot be read.
+ * @since 1.2
+ */
 EAPI Ecore_X_Window_State_Hint
 ecore_x_icccm_state_get(Ecore_X_Window win)
 {
@@ -76,6 +104,15 @@ ecore_x_icccm_state_get(Ecore_X_Window win)
    return hint;
 }
 
+/**
+ * @brief Sends a WM_DELETE_WINDOW client message to a window.
+ * @param win The window to which the message will be sent.
+ * @param t The timestamp for the event.
+ * @since 1.2
+ *
+ * This function is typically used by a window manager to request
+ * that a client window close itself.
+ */
 EAPI void
 ecore_x_icccm_delete_window_send(Ecore_X_Window win,
                                  Ecore_X_Time t)
@@ -87,6 +124,16 @@ ecore_x_icccm_delete_window_send(Ecore_X_Window win,
                                  t, 0, 0, 0);
 }
 
+/**
+ * @brief Sends a WM_TAKE_FOCUS client message to a window.
+ * @param win The window to which the message will be sent.
+ * @param t The timestamp for the event.
+ * @since 1.2
+ *
+ * This function is used to offer the input focus to a window.
+ * A client should respond to this message by setting the input
+ * focus to one of its windows if it wants focus.
+ */
 EAPI void
 ecore_x_icccm_take_focus_send(Ecore_X_Window win,
                               Ecore_X_Time t)
@@ -98,6 +145,15 @@ ecore_x_icccm_take_focus_send(Ecore_X_Window win,
                                  t, 0, 0, 0);
 }
 
+/**
+ * @brief Sends a WM_SAVE_YOURSELF client message to a window.
+ * @param win The window to which the message will be sent.
+ * @param t The timestamp for the event.
+ * @since 1.2
+ *
+ * This function is used by a session manager to request that a client
+ * save its state before termination.
+ */
 EAPI void
 ecore_x_icccm_save_yourself_send(Ecore_X_Window win,
                                  Ecore_X_Time t)
@@ -109,6 +165,20 @@ ecore_x_icccm_save_yourself_send(Ecore_X_Window win,
                                  t, 0, 0, 0);
 }
 
+/**
+ * @brief Sends a synthetic ConfigureNotify event to a window.
+ * @param win The window to configure.
+ * @param x The new x-coordinate of the window.
+ * @param y The new y-coordinate of the window.
+ * @param w The new width of the window.
+ * @param h The new height of the window.
+ * @since 1.2
+ *
+ * This function sends a ConfigureNotify event to the specified window,
+ * effectively instructing it (or informing it, if it's a client window
+ * being managed) about a change in its geometry. This is often used
+ * by window managers.
+ */
 EAPI void
 ecore_x_icccm_move_resize_send(Ecore_X_Window win,
                                int x,
@@ -134,6 +204,21 @@ ecore_x_icccm_move_resize_send(Ecore_X_Window win,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * @brief Sets the WM_HINTS property for a window.
+ * @param win The window for which to set the hints.
+ * @param accepts_focus EINA_TRUE if the window accepts input focus, EINA_FALSE otherwise.
+ * @param initial_state The initial state of the window (e.g., normal, iconic, withdrawn).
+ * @param icon_pixmap The pixmap to be used as an icon. Can be 0.
+ * @param icon_mask The mask for the icon pixmap. Can be 0.
+ * @param icon_window A window to be used as an icon. Can be 0.
+ * @param window_group The leader of a group of windows. Can be 0.
+ * @param is_urgent EINA_TRUE if the window requires urgent attention, EINA_FALSE otherwise.
+ * @since 1.2
+ *
+ * This function sets various hints for the window manager regarding
+ * the window's behavior and appearance.
+ */
 EAPI void
 ecore_x_icccm_hints_set(Ecore_X_Window win,
                         Eina_Bool accepts_focus,
@@ -192,6 +277,22 @@ ecore_x_icccm_hints_set(Ecore_X_Window win,
    XFree(hints);
 }
 
+/**
+ * @brief Retrieves the WM_HINTS property for a window.
+ * @param win The window from which to get the hints.
+ * @param accepts_focus Pointer to store whether the window accepts input focus. Can be NULL.
+ * @param initial_state Pointer to store the initial state of the window. Can be NULL.
+ * @param icon_pixmap Pointer to store the icon pixmap. Can be NULL.
+ * @param icon_mask Pointer to store the icon mask. Can be NULL.
+ * @param icon_window Pointer to store the icon window. Can be NULL.
+ * @param window_group Pointer to store the window group leader. Can be NULL.
+ * @param is_urgent Pointer to store the urgency hint. Can be NULL.
+ * @return EINA_TRUE if hints were successfully retrieved, EINA_FALSE otherwise.
+ * @since 1.2
+ *
+ * This function retrieves various hints set for the window.
+ * Output parameters are initialized to default values before attempting to read.
+ */
 EAPI Eina_Bool
 ecore_x_icccm_hints_get(Ecore_X_Window win,
                         Eina_Bool *accepts_focus,
@@ -270,6 +371,26 @@ ecore_x_icccm_hints_get(Ecore_X_Window win,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Sets the WM_NORMAL_HINTS property for a window.
+ * @param win The window for which to set the size/position hints.
+ * @param request_pos EINA_TRUE if the window's initial position (if set in hints) is a request, not an absolute.
+ * @param gravity The window gravity (e.g., ECORE_X_GRAVITY_NW for NorthWest).
+ * @param min_w Minimum width. Set to 0 or less if no preference.
+ * @param min_h Minimum height. Set to 0 or less if no preference.
+ * @param max_w Maximum width. Set to 0 or less if no preference.
+ * @param max_h Maximum height. Set to 0 or less if no preference.
+ * @param base_w Base width for size increments. Set to 0 or less if no preference.
+ * @param base_h Base height for size increments. Set to 0 or less if no preference.
+ * @param step_x Width increment step. Set to 1 or less if no preference.
+ * @param step_y Height increment step. Set to 1 or less if no preference.
+ * @param min_aspect Minimum aspect ratio (width/height). Set to 0.0 or less if no preference.
+ * @param max_aspect Maximum aspect ratio (width/height). Set to 0.0 or less if no preference.
+ * @since 1.2
+ *
+ * This function sets hints related to the window's size, position,
+ * and resizing behavior.
+ */
 EAPI void
 ecore_x_icccm_size_pos_hints_set(Ecore_X_Window win,
                                  Eina_Bool request_pos,
@@ -344,6 +465,28 @@ ecore_x_icccm_size_pos_hints_set(Ecore_X_Window win,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+/**
+ * @brief Retrieves the WM_NORMAL_HINTS property for a window.
+ * @param win The window from which to get the size/position hints.
+ * @param request_pos Pointer to store whether the window's position is a request. Can be NULL.
+ * @param gravity Pointer to store the window gravity. Can be NULL.
+ * @param min_w Pointer to store the minimum width. Can be NULL.
+ * @param min_h Pointer to store the minimum height. Can be NULL.
+ * @param max_w Pointer to store the maximum width. Can be NULL.
+ * @param max_h Pointer to store the maximum height. Can be NULL.
+ * @param base_w Pointer to store the base width. Can be NULL.
+ * @param base_h Pointer to store the base height. Can be NULL.
+ * @param step_x Pointer to store the width increment step. Can be NULL.
+ * @param step_y Pointer to store the height increment step. Can be NULL.
+ * @param min_aspect Pointer to store the minimum aspect ratio. Can be NULL.
+ * @param max_aspect Pointer to store the maximum aspect ratio. Can be NULL.
+ * @return EINA_TRUE if hints were successfully retrieved, EINA_FALSE otherwise.
+ * @since 1.2
+ *
+ * This function retrieves hints related to the window's size, position,
+ * and resizing behavior. Output parameters are initialized to default/sensible
+ * values before attempting to read.
+ */
 EAPI Eina_Bool
 ecore_x_icccm_size_pos_hints_get(Ecore_X_Window win,
                                  Eina_Bool *request_pos,
@@ -472,6 +615,17 @@ ecore_x_icccm_size_pos_hints_get(Ecore_X_Window win,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets the WM_NAME property (window title) for a window.
+ * @param win The window for which to set the title.
+ * @param t The title string. Must be UTF-8 encoded.
+ * @since 1.2
+ *
+ * This function sets the title of the window, which is typically
+ * displayed in the window's title bar by the window manager.
+ * It attempts to set the title using UTF-8 encoding first,
+ * then falls back to standard ICCCM text style if needed.
+ */
 EAPI void
 ecore_x_icccm_title_set(Ecore_X_Window win,
                         const char *t)
@@ -515,6 +669,15 @@ ecore_x_icccm_title_set(Ecore_X_Window win,
    free(list[0]);
 }
 
+/**
+ * @brief Retrieves the WM_NAME property (window title) for a window.
+ * @param win The window from which to get the title.
+ * @return A newly allocated string containing the window title,
+ *         or NULL if the title cannot be retrieved. The caller
+ *         is responsible for freeing this string.
+ *         The returned string is UTF-8 encoded.
+ * @since 1.2
+ */
 EAPI char *
 ecore_x_icccm_title_get(Ecore_X_Window win)
 {
@@ -571,10 +734,15 @@ ecore_x_icccm_title_get(Ecore_X_Window win)
 }
 
 /**
- * Set protocol atoms explicitly
- * @param win The Window
- * @param protos An array of protocol atoms
- * @param num the number of members of the array
+ * @brief Sets the WM_PROTOCOLS property for a window using an explicit list of atoms.
+ * @param win The window for which to set the protocols.
+ * @param protos An array of Ecore_X_Atom representing the protocols.
+ *               Example: `{ ECORE_X_ATOM_WM_DELETE_WINDOW, ECORE_X_ATOM_WM_TAKE_FOCUS }`
+ * @param num The number of atoms in the @p protos array.
+ * @since 1.2
+ *
+ * This function directly sets the WM_PROTOCOLS property with the provided
+ * list of atoms. If @p num is 0, the property is deleted.
  */
 EAPI void
 ecore_x_icccm_protocol_atoms_set(Ecore_X_Window win,
@@ -594,10 +762,15 @@ ecore_x_icccm_protocol_atoms_set(Ecore_X_Window win,
 }
 
 /**
- * Set or unset a wm protocol property.
- * @param win The Window
- * @param protocol The protocol to enable/disable
- * @param on On/Off
+ * @brief Sets or unsets a specific WM protocol for a window.
+ * @param win The window for which to modify the protocol.
+ * @param protocol The Ecore_X_WM_Protocol to set or unset.
+ *                 Example: ECORE_X_WM_PROTOCOL_DELETE_WINDOW
+ * @param on EINA_TRUE to enable the protocol, EINA_FALSE to disable it.
+ * @since 1.2
+ *
+ * This function modifies the WM_PROTOCOLS property by adding or removing
+ * the specified protocol. It handles existing protocols correctly.
  */
 EAPI void
 ecore_x_icccm_protocol_set(Ecore_X_Window win,
@@ -682,10 +855,12 @@ leave:
 }
 
 /**
- * Determines whether a protocol is set for a window.
- * @param win The Window
- * @param protocol The protocol to query
- * @return 1 if the protocol is set, else 0.
+ * @brief Checks if a specific WM protocol is set for a window.
+ * @param win The window to check.
+ * @param protocol The Ecore_X_WM_Protocol to query.
+ *                 Example: ECORE_X_WM_PROTOCOL_TAKE_FOCUS
+ * @return EINA_TRUE if the protocol is set for the window, EINA_FALSE otherwise.
+ * @since 1.2
  */
 EAPI Eina_Bool
 ecore_x_icccm_protocol_isset(Ecore_X_Window win,
@@ -720,12 +895,15 @@ ecore_x_icccm_protocol_isset(Ecore_X_Window win,
 }
 
 /**
- * Set a window name & class.
- * @param win The window
- * @param n The name string
- * @param c The class string
+ * @brief Sets the WM_CLASS property for a window.
+ * @param win The window for which to set the name and class.
+ * @param n The resource name string (e.g., "myApp").
+ * @param c The resource class string (e.g., "MyAppClass").
+ * @since 1.2
  *
- * Set a window name * class
+ * The WM_CLASS property contains two strings: the resource name
+ * and the resource class. These are used by window managers and
+ * session managers to identify and group windows.
  */
 EAPI void
 ecore_x_icccm_name_class_set(Ecore_X_Window win,
@@ -747,12 +925,17 @@ ecore_x_icccm_name_class_set(Ecore_X_Window win,
 }
 
 /**
- * Get a window name & class.
- * @param win The window
- * @param n The name string
- * @param c The class string
+ * @brief Retrieves the WM_CLASS property for a window.
+ * @param win The window from which to get the name and class.
+ * @param n Pointer to store the resource name string. The caller
+ *          is responsible for freeing this string if not NULL.
+ * @param c Pointer to store the resource class string. The caller
+ *          is responsible for freeing this string if not NULL.
+ * @since 1.2
  *
- * Get a window name * class
+ * Retrieves the resource name and class for the window.
+ * If @p n or @p c are not NULL, they will be set to newly allocated
+ * strings containing the respective values, or NULL if not set.
  */
 EAPI void
 ecore_x_icccm_name_class_get(Ecore_X_Window win,
@@ -787,11 +970,15 @@ ecore_x_icccm_name_class_get(Ecore_X_Window win,
 }
 
 /**
- * Get a window client machine string.
- * @param win The window
- * @return The windows client machine string
+ * @brief Retrieves the WM_CLIENT_MACHINE property for a window.
+ * @param win The window from which to get the client machine string.
+ * @return A newly allocated string containing the client machine name,
+ *         or NULL if the property is not set or cannot be retrieved.
+ *         The caller is responsible for freeing this string.
+ * @since 1.2
  *
- * Return the client machine of a window. String must be free'd when done with.
+ * This property stores the hostname of the machine where the client
+ * application is running.
  */
 EAPI char *
 ecore_x_icccm_client_machine_get(Ecore_X_Window win)
@@ -804,11 +991,16 @@ ecore_x_icccm_client_machine_get(Ecore_X_Window win)
 }
 
 /**
- * Sets the WM_COMMAND property for @a win.
+ * @brief Sets the WM_COMMAND property for a window.
+ * @param win The window for which to set the command.
+ * @param argc The number of arguments in @p argv.
+ * @param argv An array of strings representing the command and its arguments.
+ *             Example: `argv` could be `{"my_app", "--file", "/path/to/file.txt"}`
+ *             with `argc = 3`. The strings in `argv` are copied.
+ * @since 1.2
  *
- * @param win  The window.
- * @param argc Number of arguments.
- * @param argv Arguments.
+ * This property stores the command used to start the application,
+ * which can be used by session managers to restart the application.
  */
 EAPI void
 ecore_x_icccm_command_set(Ecore_X_Window win,
@@ -821,13 +1013,18 @@ ecore_x_icccm_command_set(Ecore_X_Window win,
 }
 
 /**
- * Get the WM_COMMAND property for @a win.
+ * @brief Retrieves the WM_COMMAND property for a window.
+ * @param win The window from which to get the command.
+ * @param argc Pointer to store the number of arguments. Can be NULL.
+ * @param argv Pointer to store the array of argument strings.
+ *             If not NULL, `*argv` will be set to a newly allocated array
+ *             of newly allocated strings. The caller is responsible for
+ *             freeing each string in `*argv` and then `*argv` itself.
+ *             Example: `*argv` might be `{"my_app", "-o", "output.log"}`.
+ * @since 1.2
  *
- * Return the command of a window. String must be free'd when done with.
- *
- * @param win  The window.
- * @param argc Number of arguments.
- * @param argv Arguments.
+ * This function retrieves the command and arguments used to start the
+ * application associated with the window.
  */
 EAPI void
 ecore_x_icccm_command_get(Ecore_X_Window win,
@@ -885,11 +1082,13 @@ ecore_x_icccm_command_get(Ecore_X_Window win,
 }
 
 /**
- * Set a window icon name.
- * @param win The window
- * @param t The icon name string
+ * @brief Sets the WM_ICON_NAME property for a window.
+ * @param win The window for which to set the icon name.
+ * @param t The icon name string. Must be UTF-8 encoded.
+ * @since 1.2
  *
- * Set a window icon name
+ * This function sets the name that should be displayed with the
+ * window's icon. It attempts to use UTF-8 encoding.
  */
 EAPI void
 ecore_x_icccm_icon_name_set(Ecore_X_Window win,
@@ -930,11 +1129,13 @@ ecore_x_icccm_icon_name_set(Ecore_X_Window win,
 }
 
 /**
- * Get a window icon name.
- * @param win The window
- * @return The windows icon name string
- *
- * Return the icon name of a window. String must be free'd when done with.
+ * @brief Retrieves the WM_ICON_NAME property for a window.
+ * @param win The window from which to get the icon name.
+ * @return A newly allocated string containing the icon name,
+ *         or NULL if the property is not set or cannot be retrieved.
+ *         The caller is responsible for freeing this string.
+ *         The returned string is UTF-8 encoded.
+ * @since 1.2
  */
 EAPI char *
 ecore_x_icccm_icon_name_get(Ecore_X_Window win)
@@ -995,9 +1196,15 @@ ecore_x_icccm_icon_name_get(Ecore_X_Window win)
 }
 
 /**
- * Add a subwindow to the list of windows that need a different colormap installed.
- * @param win The toplevel window
- * @param subwin The subwindow to be added to the colormap windows list
+ * @brief Adds a subwindow to the WM_COLORMAP_WINDOWS property of a top-level window.
+ * @param win The top-level window whose WM_COLORMAP_WINDOWS property will be modified.
+ * @param subwin The subwindow that requires its own colormap to be installed.
+ * @since 1.2
+ *
+ * This function informs the window manager that @p subwin (which should be
+ * a child of @p win) has a colormap different from @p win and may need
+ * special handling when @p win gets focus. The list of such subwindows
+ * is stored in the WM_COLORMAP_WINDOWS property on @p win.
  */
 EAPI void
 ecore_x_icccm_colormap_window_set(Ecore_X_Window win,
@@ -1059,9 +1266,13 @@ ecore_x_icccm_colormap_window_set(Ecore_X_Window win,
 }
 
 /**
- * Remove a window from the list of colormap windows.
- * @param win The toplevel window
- * @param subwin The window to be removed from the colormap window list.
+ * @brief Removes a subwindow from the WM_COLORMAP_WINDOWS property of a top-level window.
+ * @param win The top-level window whose WM_COLORMAP_WINDOWS property will be modified.
+ * @param subwin The subwindow to be removed from the list.
+ * @since 1.2
+ *
+ * This function removes @p subwin from the list of windows in the
+ * WM_COLORMAP_WINDOWS property of @p win.
  */
 EAPI void
 ecore_x_icccm_colormap_window_unset(Ecore_X_Window win,
@@ -1126,9 +1337,15 @@ ecore_x_icccm_colormap_window_unset(Ecore_X_Window win,
 }
 
 /**
- * Specify that a window is transient for another top-level window and should be handled accordingly.
- * @param win the transient window
- * @param forwin the toplevel window
+ * @brief Sets the WM_TRANSIENT_FOR hint for a window.
+ * @param win The window that is transient (e.g., a dialog box).
+ * @param forwin The main top-level window for which @p win is transient.
+ * @since 1.2
+ *
+ * This hint indicates to the window manager that @p win is a temporary
+ * window (like a dialog) associated with @p forwin. Window managers
+ * may use this to keep transient windows above their main windows,
+ * or to close them when the main window is closed.
  */
 EAPI void
 ecore_x_icccm_transient_for_set(Ecore_X_Window win,
@@ -1140,8 +1357,9 @@ ecore_x_icccm_transient_for_set(Ecore_X_Window win,
 }
 
 /**
- * Remove the transient_for setting from a window.
- * @param win The window
+ * @brief Removes the WM_TRANSIENT_FOR hint from a window.
+ * @param win The window from which to remove the hint.
+ * @since 1.2
  */
 EAPI void
 ecore_x_icccm_transient_for_unset(Ecore_X_Window win)
@@ -1152,9 +1370,11 @@ ecore_x_icccm_transient_for_unset(Ecore_X_Window win)
 }
 
 /**
- * Get the window this window is transient for, if any.
- * @param win The window to check
- * @return The window ID of the top-level window, or 0 if the property does not exist.
+ * @brief Retrieves the WM_TRANSIENT_FOR hint for a window.
+ * @param win The window to check.
+ * @return The Ecore_X_Window ID of the window for which @p win is transient,
+ *         or 0 if the hint is not set or cannot be retrieved.
+ * @since 1.2
  */
 EAPI Ecore_X_Window
 ecore_x_icccm_transient_for_get(Ecore_X_Window win)
@@ -1172,9 +1392,14 @@ ecore_x_icccm_transient_for_get(Ecore_X_Window win)
 }
 
 /**
- * Set the window role hint.
- * @param win The window
- * @param role The role string
+ * @brief Sets the WM_WINDOW_ROLE hint for a window.
+ * @param win The window for which to set the role.
+ * @param role A string defining the role of the window (e.g., "browser", "editor").
+ * @since 1.2
+ *
+ * The WM_WINDOW_ROLE hint can be used by session managers or window managers
+ * to identify windows with specific functionalities, aiding in session restoration
+ * or specialized window handling.
  */
 EAPI void
 ecore_x_icccm_window_role_set(Ecore_X_Window win,
@@ -1186,9 +1411,12 @@ ecore_x_icccm_window_role_set(Ecore_X_Window win,
 }
 
 /**
- * Get the window role.
- * @param win The window
- * @return The window's role string.
+ * @brief Retrieves the WM_WINDOW_ROLE hint for a window.
+ * @param win The window from which to get the role.
+ * @return A newly allocated string containing the window's role,
+ *         or NULL if the hint is not set or cannot be retrieved.
+ *         The caller is responsible for freeing this string.
+ * @since 1.2
  */
 EAPI char *
 ecore_x_icccm_window_role_get(Ecore_X_Window win)
@@ -1198,12 +1426,17 @@ ecore_x_icccm_window_role_get(Ecore_X_Window win)
 }
 
 /**
- * Set the window's client leader.
- * @param win The window
- * @param l The client leader window
+ * @brief Sets the WM_CLIENT_LEADER hint for a window.
+ * @param win The window for which to set the client leader. This is typically
+ *            a secondary top-level window of an application.
+ * @param l The Ecore_X_Window ID of the main window of the application,
+ *          which acts as the client leader.
+ * @since 1.2
  *
- * All non-transient top-level windows created by an app other than
- * the main window must have this property set to the app's main window.
+ * The WM_CLIENT_LEADER hint is used to group related top-level windows
+ * of an application. All non-transient, top-level windows created by an
+ * application, other than its main window, should have this property set
+ * to point to the application's main window.
  */
 EAPI void
 ecore_x_icccm_client_leader_set(Ecore_X_Window win,
@@ -1215,9 +1448,12 @@ ecore_x_icccm_client_leader_set(Ecore_X_Window win,
 }
 
 /**
- * Get the window's client leader.
- * @param win The window
- * @return The window's client leader window, or 0 if unset */
+ * @brief Retrieves the WM_CLIENT_LEADER hint for a window.
+ * @param win The window to check.
+ * @return The Ecore_X_Window ID of the client leader window,
+ *         or 0 if the hint is not set or cannot be retrieved.
+ * @since 1.2
+ */
 EAPI Ecore_X_Window
 ecore_x_icccm_client_leader_get(Ecore_X_Window win)
 {
@@ -1231,6 +1467,17 @@ ecore_x_icccm_client_leader_get(Ecore_X_Window win)
    return 0;
 }
 
+/**
+ * @brief Sends a client message to request that a window be iconified.
+ * @param win The window to be iconified.
+ * @param root The root window. If 0, the default root window of the
+ *             display is used.
+ * @since 1.2
+ *
+ * This function sends a WM_CHANGE_STATE client message to the root window,
+ * requesting that the specified window (@p win) be changed to the IconicState.
+ * This is typically used by applications to request their own iconification.
+ */
 EAPI void
 ecore_x_icccm_iconic_request_send(Ecore_X_Window win,
                                   Ecore_X_Window root)

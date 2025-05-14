@@ -46,74 +46,445 @@
 #define VERSION_STR "2.4"
 #define VERSION_INT 240
 
+/** @brief Resets a subset of global variables to their initial states.
+ *
+ *  This function is called to reset global variables that are modified during
+ *  the first pass of the compiler, preparing for a subsequent pass or a new
+ *  compilation.
+ */
 static void         resetglobals(void);
+
+/** @brief Initializes all global variables to their default states.
+ *
+ *  This function is called at the beginning of the compilation process to ensure
+ *  all global settings and tables are in a known, clean state.
+ */
 static void         initglobals(void);
 static void         setopt(int argc, char **argv,
                            char *iname, char *oname,
                            char *pname, char *rname);
+
+/** @brief Configures include paths based on the root directory of the compiler.
+ *
+ *  @param root The path to the executable, used to derive the default include directory.
+ */
 static void         setconfig(char *root);
+
+/** @brief Prints usage information and exits.
+ *
+ *  This function is called when the command-line arguments are invalid or
+ *  when help is requested. It displays the available options and terminates
+ *  the program.
+ */
 static void         about(void);
+
+/** @brief Sets predefined constants and tagnames.
+ *
+ *  Initializes built-in constants like `true`, `false`, `EOS`, `cellbits`,
+ *  `cellmax`, `cellmin`, `charbits`, `charmin`, `charmax`, `__Small` (version),
+ *  and `debug`. Also sets up initial tagnames like `_` (untagged) and `bool`.
+ */
 static void         setconstants(void);
+
+/** @brief Main parsing loop that processes the input source file.
+ *
+ *  This function reads tokens from the input stream and handles top-level
+ *  declarations, such as global variables, functions (native, public, static, stock),
+ *  constants, and enums. It's the entry point for the syntactic analysis of the code.
+ */
 static void         parse(void);
+
+/** @brief Dumps the literal pool to the output assembly file.
+ *
+ *  The literal pool contains strings and other constant data. This function
+ *  writes these literals to the data segment of the assembly output.
+ *  It formats the output with a fixed number of values per line.
+ */
 static void         dumplits(void);
 static void         dumpzero(int count);
+
+/** @brief Declares a function or a global variable based on the parsed token.
+ *
+ * This function handles the common logic for declarations that can be
+ * either functions or variables, such as those prefixed with `static`,
+ * `public`, or `stock`. It disambiguates based on subsequent tokens
+ * (e.g., an opening parenthesis for a function).
+ *
+ * @param tok The token type (e.g., tSYMBOL, tOPERATOR).
+ * @param symname The name of the symbol being declared.
+ * @param tag The tag associated with the symbol.
+ * @param fpublic Flag indicating if the symbol is public.
+ * @param fstatic Flag indicating if the symbol is static.
+ * @param fstock Flag indicating if the symbol is stock.
+ * @param fconst Flag indicating if the symbol is const.
+ */
 static void         declfuncvar(int tok, char *symname,
 				int tag, int fpublic,
 				int fstatic, int fstock, int fconst);
+
+/** @brief Declares global variables.
+ *
+ * This function handles the declaration of global variables, including arrays.
+ * It processes the variable name, tag, dimensions, and initializers.
+ * Global variables are allocated in the DATA segment.
+ *
+ * @param firstname The name of the first variable in a potential series of declarations.
+ *                  If NULL, the name is lexed from the input.
+ * @param firsttag The tag of the first variable.
+ * @param fpublic Flag indicating if the variable is public.
+ * @param fstatic Flag indicating if the variable is static (file scope).
+ * @param stock Flag indicating if the variable is a stock variable.
+ * @param fconst Flag indicating if the variable is constant.
+ */
 static void         declglb(char *firstname, int firsttag,
 			    int fpublic, int fstatic, int stock, int fconst);
+
+/** @brief Declares local variables.
+ *
+ * This function handles the declaration of local (automatic) variables within a function
+ * or a compound block. These variables are allocated on the stack and can be initialized.
+ *
+ * @param fstatic If true, declares a static local variable (persists across function calls,
+ *                stored in the data segment, initialized to zero by default).
+ * @return The identifier type of the last variable declared (e.g., iVARIABLE, iARRAY).
+ */
 static int          declloc(int fstatic);
+
+/** @brief Declares a constant.
+ *
+ * Parses a constant declaration syntax like `const name = value;`.
+ *
+ * @param table Scope of the constant (sGLOBAL or sLOCAL).
+ */
 static void         decl_const(int table);
+
+/** @brief Declares an enumeration.
+ *
+ * Parses an enum declaration, which defines a set of named integer constants.
+ * Supports optional enum name, explicit tag, and custom increment/multiplier.
+ * Example: `enum MyEnum ( +2 ) { ONE, TWO, THREE = 10, FOUR }`
+ *
+ * @param table Scope of the enum constants (sGLOBAL or sLOCAL).
+ */
 static void         decl_enum(int table);
+
+/** @brief Parses and returns an array subscript (dimension size).
+ *
+ * Expects a constant expression enclosed in square brackets `[]`.
+ * If the brackets are empty, it returns 0 (for unsized arrays).
+ *
+ * @param[out] tag The tag of the subscript expression, if any.
+ * @return The size of the array dimension. Returns 0 for `[]`.
+ */
 static cell         needsub(int *tag);
 static void         initials(int ident, int tag,
 			     cell * size, int dim[], int numdim);
+
+/** @brief Initializes a single-dimensional array (vector).
+ *
+ * Parses initializers for a vector, which can be a list of expressions
+ * in curly braces `{}` or a single expression (for single-element init,
+ * though typically used for arrays). Supports ellipsis for series initialization.
+ *
+ * @param ident Identifier type (iARRAY or iREFARRAY).
+ * @param tag The required tag for the elements.
+ * @param size Input: declared size of the vector. If 0, it's determined by initializers.
+ *             Output: actual size of the initialized vector.
+ * @param fillzero If true and the number of initializers is less than `size`,
+ *                 the remaining elements are filled with zero.
+ * @return The actual number of elements initialized or the declared size if `fillzero` is true.
+ *         Example of an array structure for `litq` (literal queue) after initialization:
+ *         `litq` might contain `[val1, val2, val3, ...]`
+ */
 static cell         initvector(int ident, int tag, cell size, int fillzero);
+
+/** @brief Evaluates a single initializer expression.
+ *
+ * Handles a string literal (for array initialization) or a constant expression.
+ * The result is stored in the literal queue (`litq`).
+ *
+ * @param ident Identifier type (iVARIABLE, iARRAY).
+ * @param[out] tag The tag of the evaluated expression.
+ * @return The value of the constant expression, or 0 for strings (string index is handled by lexer).
+ */
 static cell         init(int ident, int *tag);
+
+/** @brief Creates a function stub for a native or forward-declared function.
+ *
+ * Parses the function signature (name, arguments) and registers it.
+ * For native functions, it also handles optional aliasing to an exported name or index.
+ *
+ * @param native If true, declares a native function. Otherwise, a forward declaration.
+ */
 static void         funcstub(int native);
+
+/** @brief Begins the definition of a new function.
+ *
+ * Parses the function header, including name, operator overloading syntax,
+ * arguments, and return tag. It sets up the function's symbol table entry
+ * and prepares for parsing the function body.
+ *
+ * @param firstname The function name if already known (e.g., from `static funcname(...)`),
+ *                  or NULL if it needs to be lexed.
+ * @param firsttag The return tag if already known, or -1.
+ * @param fpublic True if the function is declared public.
+ * @param fstatic True if the function is declared static.
+ * @param stock True if the function is a stock function.
+ * @return True if a function was successfully started or if it was a variable
+ *         declaration (signaled by not finding an opening parenthesis).
+ *         False on a syntax error that prevents determining if it's a function.
+ */
 static int          newfunc(char *firstname, int firsttag,
 			    int fpublic, int fstatic, int stock);
+
+/** @brief Declares the arguments of a function.
+ *
+ * Parses the argument list within the parentheses of a function definition or
+ * prototype. It populates the `arginfo` structure for the function symbol.
+ * Handles various argument types: simple variables, references, const, arrays,
+ * default values, varargs (...), and sizeof/tagof.
+ *
+ * @param sym The symbol table entry for the function.
+ * @return The number of arguments declared.
+ *         Example of `sym->dim.arglist` structure:
+ *         `arglist` is an array of `arginfo` structs. Each `arginfo` contains:
+ *         - `name`: argument name
+ *         - `ident`: iVARIABLE, iREFERENCE, iREFARRAY, iVARARGS
+ *         - `tags`: array of accepted tags
+ *         - `numtags`: number of tags
+ *         - `hasdefault`: boolean, or flags like uSIZEOF, uTAGOF
+ *         - `defvalue`: union for default value (scalar, array pointer, or sizeof/tagof info)
+ *         - `dim`: array dimensions for array arguments
+ *         - `numdim`: number of dimensions
+ */
 static int          declargs(symbol * sym);
 static void         doarg(char *name, int ident, int offset,
 			  int tags[], int numtags,
 			  int fpublic, int fconst, arginfo * arg);
+
+/** @brief Reduces the referrer lists of symbols.
+ *
+ * This function implements a form of dead code elimination. If a function
+ * is not public, not main, not native, and has no referrers (no other
+ * functions call it), it's marked as unused. This process is repeated
+ * because removing one function might make other functions it called also
+ * unreferenced. Similarly for unused global variables.
+ *
+ * @param root The root of the global symbol table.
+ */
 static void         reduce_referrers(symbol * root);
+
+/** @brief Tests symbols for usage (e.g., unused variables, undefined labels).
+ *
+ * Iterates through a symbol table (global or local) and checks for common
+ * issues like unused variables, unread variables, undefined labels, or
+ * uncalled functions.
+ *
+ * @param root The symbol table to check.
+ * @param level The nesting level; symbols at a lower level are ignored.
+ *              Used for checking block-local symbols.
+ * @param testlabs If true, check labels for definition and usage.
+ * @param testconst If true, check constants for usage.
+ * @return True if an entry point (main function or public function) is found
+ *         in the global symbol table, false otherwise.
+ */
 static int          testsymbols(symbol * root, int level,
 				int testlabs, int testconst);
+
+/** @brief Generates calls to destructor operators (~) for local variables.
+ *
+ * When a scope is exited (e.g., end of a compound block or function return),
+ * this function checks local variables that have a corresponding destructor
+ * operator defined for their tag. If found, code is generated to call it.
+ *
+ * @param root The local symbol table.
+ * @param level The nesting level; only symbols at or above this level are considered.
+ */
 static void         destructsymbols(symbol * root, int level);
+
+/** @brief Finds a constant value entry by its numerical value in a constvalue table.
+ *
+ * @param table The constant value table (e.g., tagname_tab).
+ * @param val The numerical value to search for.
+ * @return Pointer to the constvalue entry if found, NULL otherwise.
+ */
 static constvalue  *find_constval_byval(constvalue * table, cell val);
+
+/** @brief Parses a single statement.
+ *
+ * This is the main dispatcher for different types of statements like `if`,
+ * `while`, `for`, `return`, `new`, expressions, compound statements (`{}`), etc.
+ *
+ * @param[in,out] lastindent Pointer to the indentation level of the previous statement.
+ *                           Used for checking consistent indentation. Can be NULL.
+ * @param allow_decl True if variable declarations (`new`, `static`) are allowed
+ *                   at this point (typically true inside a compound statement).
+ */
 static void         statement(int *lastindent, int allow_decl);
+
+/** @brief Parses a compound statement (a block enclosed in curly braces {}).
+ *
+ * Handles a sequence of statements and declarations within a new scope.
+ * Manages nesting levels, local symbol tables, and stack cleanup for local variables.
+ */
 static void         compound(void);
 static void         doexpr(int comma, int chkeffect,
 			   int allowarray, int mark_endexpr,
 			   int *tag, int chkfuncresult);
+
+/** @brief Parses an `assert` statement.
+ *
+ * `assert(expression);`
+ * If debugging is enabled (sCHKBOUNDS), generates code to evaluate the
+ * expression and abort if it's false. Otherwise, the expression is parsed
+ * for syntax errors but no code is generated.
+ */
 static void         doassert(void);
+
+/** @brief Parses an `exit` statement.
+ *
+ * `exit;` or `exit value;`
+ * Generates code to terminate the program, optionally with an exit code.
+ * The tag of the exit value is exported.
+ */
 static void         doexit(void);
-static void         test(int label, int parens, int invert);
+
+/** @brief Parses and generates code for a conditional test (e.g., in `if`, `while`).
+ *
+ * Evaluates an expression and generates a conditional jump.
+ * Handles warnings for possibly unintended assignments within tests.
+ *
+ * @param label The label to jump to if the condition (possibly inverted) is met.
+ * @param parens If true, expects the expression to be enclosed in parentheses.
+ * @param inv If true, inverts the condition (jumps if expression is true,
+ *            otherwise jumps if expression is false).
+ */
+static void         test(int label, int parens, int inv);
+
+/** @brief Parses an `if` statement.
+ *
+ * `if (condition) statement [else statement]`
+ */
 static void         doif(void);
+
+/** @brief Parses a `while` statement.
+ *
+ * `while (condition) statement`
+ */
 static void         dowhile(void);
+
+/** @brief Parses a `do...while` statement.
+ *
+ * `do statement while (condition);`
+ */
 static void         dodo(void);
+
+/** @brief Parses a `for` statement.
+ *
+ * `for ([expr1]; [expr2]; [expr3]) statement`
+ * Handles optional variable declarations in `expr1`.
+ */
 static void         dofor(void);
+
+/** @brief Parses a `switch` statement.
+ *
+ * `switch (expression) { case val1[, val2 ...]: statement ... [default: statement] }`
+ * Note: Cases are not fall-through. Ranges like `case 1 .. 5:` are supported.
+ */
 static void         doswitch(void);
+
+/** @brief Parses a `goto` statement.
+ *
+ * `goto label;`
+ */
 static void         dogoto(void);
+
+/** @brief Parses a label definition.
+ *
+ * `label:`
+ */
 static void         dolabel(void);
+
+/** @brief Fetches a label symbol from the local table or creates it.
+ *
+ * @param name The name of the label.
+ * @return Pointer to the symbol table entry for the label.
+ */
 static symbol      *fetchlab(char *name);
+
+/** @brief Parses a `return` statement.
+ *
+ * `return;` or `return value;`
+ * Handles return type checking and calls destructors for local variables.
+ */
 static void         doreturn(void);
+
+/** @brief Parses a `break` statement.
+ *
+ * Jumps out of the innermost loop or switch. Calls destructors for local
+ * variables in the exited scope.
+ */
 static void         dobreak(void);
+
+/** @brief Parses a `continue` statement.
+ *
+ * Jumps to the next iteration of the innermost loop. Calls destructors for
+ * local variables in the scope up to the loop condition/increment.
+ */
 static void         docont(void);
+
+/** @brief Parses a `sleep` statement.
+ *
+ * `sleep;` or `sleep value;`
+ * Generates code to pause execution, optionally with a duration.
+ * The tag of the duration value is exported.
+ */
 static void         dosleep(void);
+
+/** @brief Adds an entry to the while queue (wq) for loop control.
+ *
+ * The while queue stores information for `break` and `continue` statements,
+ * including loop start/exit labels and stack declaration levels.
+ *
+ * @param ptr Pointer to a local `wqSIZE` integer array to be filled and
+ *            copied to the global while queue.
+ *            Structure of `ptr` (and `wq` entries):
+ *            - `ptr[wqBRK]`: `declared` value at loop entry (for `break`).
+ *            - `ptr[wqCONT]`: `declared` value for `continue` (can be adjusted for `for` loops).
+ *            - `ptr[wqLOOP]`: Label for loop start / `continue` target.
+ *            - `ptr[wqEXIT]`: Label for loop exit / `break` target.
+ */
 static void         addwhile(int *ptr);
+
+/** @brief Removes the last entry from the while queue. */
 static void         delwhile(void);
+
+/** @brief Reads the current (topmost) entry from the while queue.
+ *
+ * @return Pointer to the current while queue entry, or NULL if the queue is empty
+ *         (and issues an error).
+ */
 static int         *readwhile(void);
 
 static int          lastst = 0;	/* last executed statement type */
 static int          nestlevel = 0;	/* number of active (open) compound statements */
-static int          rettype = 0;	/* the type that a "return" expression should have */
+static int          rettype = 0;	/* the type that a "return" expression should have:
+                                 * 0: unknown, uRETVALUE: must return a value,
+                                 * uRETNONE: must not return a value (return;) */
 static int          skipinput = 0;	/* number of lines to skip from the first input file */
-static int          wq[wqTABSZ];	/* "while queue", internal stack for nested loops */
-static int         *wqptr;	/* pointer to next entry */
+static int          wq[wqTABSZ];	/* "while queue", internal stack for nested loops.
+                                 * Each entry is wqSIZE cells. See addwhile() for structure. */
+static int         *wqptr;	/* pointer to next entry in wq */
 static char         binfname[PATH_MAX];	/* binary file name */
 
+/** @brief Main entry point of the standalone compiler application.
+ *
+ * Initializes the prefix for path resolution and calls sc_compile.
+ * @param argc Number of command-line arguments.
+ * @param argv Array of command-line argument strings.
+ * @param env Array of environment variable strings (unused).
+ * @return Exit status of the compilation.
+ */
 int
 main(int argc, char *argv[], char *env[] EINA_UNUSED)
 {
@@ -121,6 +492,22 @@ main(int argc, char *argv[], char *env[] EINA_UNUSED)
    return sc_compile(argc, argv);
 }
 
+/**
+ * @brief Displays an error message.
+ *
+ * This function is the central error reporting mechanism for the compiler.
+ * It formats and prints error messages to stderr, including the filename,
+ * line numbers, error type (error, fatal error, warning), and error code.
+ *
+ * @param number The error code. Errors are typically 1xx, fatal errors 2xx, warnings 3xx.
+ * @param message The error message format string (printf-style).
+ * @param filename The name of the source file where the error occurred.
+ * @param firstline The starting line number of the error.
+ * @param lastline The ending line number of the error (often same as firstline).
+ * @param argptr Variable argument list for the message format string.
+ * @return Always returns 0. The actual error handling (e.g., termination)
+ *         is managed by the `error()` macro and `setjmp`/`longjmp`.
+ */
 int
 sc_error(int number, char *message, char *filename, int firstline,
 	 int lastline, va_list argptr)
@@ -144,12 +531,17 @@ sc_error(int number, char *message, char *filename, int firstline,
    return 0;
 }
 
+/** @brief Opens a source file for reading.
+ *  @param filename The name of the source file.
+ *  @return A file handle (void*) or NULL on failure. */
 void               *
 sc_opensrc(char *filename)
 {
    return fopen(filename, "rb");
 }
 
+/** @brief Closes a source file.
+ *  @param handle The file handle obtained from sc_opensrc(). */
 void
 sc_closesrc(void *handle)
 {
@@ -157,6 +549,9 @@ sc_closesrc(void *handle)
    fclose((FILE *) handle);
 }
 
+/** @brief Resets the read position of a source file.
+ *  @param handle The file handle.
+ *  @param position The position to reset to, obtained from sc_getpossrc(). */
 void
 sc_resetsrc(void *handle, void *position)
 {
@@ -165,12 +560,20 @@ sc_resetsrc(void *handle, void *position)
      fprintf(stderr, "embryo_xx - ERR - fsetpos()\n");
 }
 
+/** @brief Reads a line from a source file.
+ *  @param handle The file handle.
+ *  @param target Buffer to store the read line.
+ *  @param maxchars Maximum number of characters to read.
+ *  @return Pointer to target on success, NULL on EOF or error. */
 char               *
 sc_readsrc(void *handle, char *target, int maxchars)
 {
    return fgets(target, maxchars, (FILE *) handle);
 }
 
+/** @brief Gets the current read position of a source file.
+ *  @param handle The file handle.
+ *  @return A position indicator (void*) for use with sc_resetsrc(). */
 void               *
 sc_getpossrc(void *handle)
 {
@@ -182,18 +585,26 @@ sc_getpossrc(void *handle)
    return &lastpos;
 }
 
+/** @brief Checks for end-of-file on a source file.
+ *  @param handle The file handle.
+ *  @return Non-zero if EOF is reached, 0 otherwise. */
 int
 sc_eofsrc(void *handle)
 {
    return feof((FILE *) handle);
 }
 
+/** @brief Opens an assembler output file from a file descriptor.
+ *  @param fd File descriptor for the assembler output.
+ *  @return A file handle (void*) or NULL on failure. */
 void               *
 sc_openasm(int fd)
 {
    return fdopen(fd, "wb+");
 }
 
+/** @brief Closes the assembler output file.
+ *  @param handle The file handle obtained from sc_openasm(). */
 void
 sc_closeasm(void *handle)
 {
@@ -201,6 +612,9 @@ sc_closeasm(void *handle)
       fclose((FILE *) handle);
 }
 
+/** @brief Resets the assembler output file for reading (after writing).
+ *  Flushes the buffer and seeks to the beginning.
+ *  @param handle The file handle. */
 void
 sc_resetasm(void *handle)
 {
@@ -208,24 +622,39 @@ sc_resetasm(void *handle)
    fseek((FILE *) handle, 0, SEEK_SET);
 }
 
+/** @brief Writes a string to the assembler output file.
+ *  @param handle The file handle.
+ *  @param st The string to write.
+ *  @return Non-negative on success, EOF on error. */
 int
 sc_writeasm(void *handle, char *st)
 {
    return fputs(st, (FILE *) handle) >= 0;
 }
 
+/** @brief Reads a line from the assembler file (used when assembling).
+ *  @param handle The file handle.
+ *  @param target Buffer to store the read line.
+ *  @param maxchars Maximum number of characters to read.
+ *  @return Pointer to target on success, NULL on EOF or error. */
 char               *
 sc_readasm(void *handle, char *target, int maxchars)
 {
    return fgets(target, maxchars, (FILE *) handle);
 }
 
+/** @brief Opens a binary output file for writing.
+ *  @param filename The name of the binary file.
+ *  @return A file handle (void*) or NULL on failure. */
 void               *
 sc_openbin(char *filename)
 {
    return fopen(filename, "wb");
 }
 
+/** @brief Closes the binary output file.
+ *  @param handle The file handle.
+ *  @param deletefile If true and an error occurred, delete the binary file. */
 void
 sc_closebin(void *handle, int deletefile)
 {
@@ -234,6 +663,9 @@ sc_closebin(void *handle, int deletefile)
       unlink(binfname);
 }
 
+/** @brief Resets the binary output file (e.g., for overwriting).
+ *  Flushes the buffer and seeks to the beginning.
+ *  @param handle The file handle. */
 void
 sc_resetbin(void *handle)
 {
@@ -241,19 +673,43 @@ sc_resetbin(void *handle)
    fseek((FILE *) handle, 0, SEEK_SET);
 }
 
+/** @brief Writes data to the binary output file.
+ *  @param handle The file handle.
+ *  @param buffer Pointer to the data to write.
+ *  @param size Number of bytes to write.
+ *  @return True if all bytes were written, false otherwise. */
 int
 sc_writebin(void *handle, void *buffer, int size)
 {
    return (int)fwrite(buffer, 1, size, (FILE *) handle) == size;
 }
 
+/** @brief Gets the current length (position) of the binary output file.
+ *  @param handle The file handle.
+ *  @return The current file offset. */
 long
 sc_lengthbin(void *handle)
 {
    return ftell((FILE *) handle);
 }
 
-/*  "main" of the compiler
+/**
+ * @brief Main compilation function.
+ *
+ * This function orchestrates the entire compilation process, including:
+ * - Initializing global state and tables.
+ * - Parsing command-line options.
+ * - Opening input and output files.
+ * - Performing two passes over the source code:
+ *   1. First pass: Symbol table construction, preprocessing, basic syntax checks.
+ *   2. Second pass: Code generation, final symbol checks.
+ * - Assembling the generated P-code into a binary file.
+ * - Cleaning up resources and reporting errors/warnings.
+ *
+ * @param argc Number of command-line arguments.
+ * @param argv Array of command-line argument strings.
+ * @return 0 on success, 1 if warnings occurred, 2 if errors occurred,
+ *         3 if user aborted (e.g., via help option).
  */
 int
 sc_compile(int argc, char *argv[])
@@ -443,6 +899,18 @@ sc_compile(int argc, char *argv[])
    return retcode;
 }
 
+/**
+ * @brief Adds a constant to the global symbol table.
+ *
+ * This function is typically used by host applications embedding the compiler
+ * to predefine constants before compilation begins.
+ *
+ * @param name The name of the constant.
+ * @param val The value of the constant.
+ * @param tag The tag associated with the constant.
+ * @return Always returns 1 (success). Errors during constant addition are
+ *         handled internally by `add_constant`.
+ */
 int
 sc_addconstant(char *name, cell val, int tag)
 {
@@ -452,6 +920,20 @@ sc_addconstant(char *name, cell val, int tag)
    return 1;
 }
 
+/**
+ * @brief Adds a new tagname or retrieves the ID of an existing one.
+ *
+ * Tagnames are used for type checking. This function manages a table of
+ * tagnames and their corresponding integer IDs. If a name is provided,
+ * it's looked up or added. If `name` is NULL, it attempts to lex a
+ * label token from the input stream to use as the tagname.
+ *
+ * Tags starting with an uppercase letter are considered "fixed" (FIXEDTAG bit set).
+ *
+ * @param name The tagname string. If NULL, a tagname is lexed from input.
+ * @return The integer ID of the tag. Returns 0 if no tagname is provided (and
+ *         none could be lexed) signifying an untagged type.
+ */
 int
 sc_addtag(char *name)
 {

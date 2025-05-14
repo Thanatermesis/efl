@@ -28,6 +28,13 @@
 #  define os_unfair_lock_trylock(LCK) OSSpinLockTry(LCK)
 # endif
 
+/**
+ * @internal
+ * @brief Takes a spinlock on macOS using os_unfair_lock.
+ * @param spinlock The spinlock to take.
+ * @return #EINA_LOCK_SUCCEED on success.
+ * @details This is an internal helper function for macOS specific spinlock implementation.
+ */
 EINA_API Eina_Lock_Result
 _eina_spinlock_macos_take(Eina_Spinlock *spinlock)
 {
@@ -35,6 +42,14 @@ _eina_spinlock_macos_take(Eina_Spinlock *spinlock)
    return EINA_LOCK_SUCCEED;
 }
 
+/**
+ * @internal
+ * @brief Tries to take a spinlock on macOS using os_unfair_lock.
+ * @param spinlock The spinlock to try to take.
+ * @return #EINA_LOCK_SUCCEED if the lock was taken, #EINA_LOCK_FAIL otherwise.
+ * @details This is an internal helper function for macOS specific spinlock implementation.
+ *          It does not block if the lock is already held.
+ */
 EINA_API Eina_Lock_Result
 _eina_spinlock_macos_take_try(Eina_Spinlock *spinlock)
 {
@@ -43,6 +58,13 @@ _eina_spinlock_macos_take_try(Eina_Spinlock *spinlock)
       : EINA_LOCK_FAIL;
 }
 
+/**
+ * @internal
+ * @brief Releases a spinlock on macOS using os_unfair_lock.
+ * @param spinlock The spinlock to release.
+ * @return #EINA_LOCK_SUCCEED on success.
+ * @details This is an internal helper function for macOS specific spinlock implementation.
+ */
 EINA_API Eina_Lock_Result
 _eina_spinlock_macos_release(Eina_Spinlock *spinlock)
 {
@@ -51,9 +73,23 @@ _eina_spinlock_macos_release(Eina_Spinlock *spinlock)
 }
 #endif /* EINA_HAVE_OSX_SPINLOCK */
 
-
+/**
+ * @internal
+ * @brief Flag to indicate if the process is currently resetting after a fork.
+ * @details When true, some error handling like aborting on lock errors might be suppressed.
+ */
 Eina_Bool fork_resetting;
 
+/**
+ * @internal
+ * @brief Aborts the program after printing a lock-related error message.
+ * @param err The error code (e.g., from `strerror`).
+ * @param fn The function name where the error occurred.
+ * @param ptr The pointer to the lock structure that caused the error.
+ * @details This function is typically called when a non-recoverable lock operation error occurs.
+ *          It prints an error message to stderr and then calls `abort()` if `EINA_HAVE_DEBUG_THREADS` is defined.
+ *          If `fork_resetting` is true, this function will return without aborting.
+ */
 EINA_API void
 _eina_lock_debug_abort(int err, const char *fn, const volatile void *ptr)
 {
@@ -64,6 +100,14 @@ _eina_lock_debug_abort(int err, const char *fn, const volatile void *ptr)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Reports a deadlock condition and aborts the program.
+ * @param fn The function name where the deadlock was detected.
+ * @param ptr The pointer to the lock structure involved in the deadlock.
+ * @details This function is called when a deadlock is detected. It prints a deadlock
+ *          error message to stderr and then calls `abort()` if `EINA_HAVE_DEBUG_THREADS` is defined.
+ */
 EINA_API void
 _eina_lock_debug_deadlock(const char *fn, const volatile void *ptr)
 {
@@ -85,6 +129,16 @@ eina_lock_debug(const Eina_Lock *mutex)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Initializes a new Eina_Lock (mutex).
+ * @param mutex Pointer to the Eina_Lock structure to initialize.
+ * @param recursive If #EINA_TRUE, creates a recursive mutex; otherwise, a non-recursive one.
+ *                  If `EINA_HAVE_DEBUG_THREADS` is defined, non-recursive mutexes are
+ *                  created with error checking.
+ * @return #EINA_TRUE on success, #EINA_FALSE on failure.
+ * @details This is the internal implementation for eina_lock_new() and eina_lock_recursive_new().
+ */
 EINA_API Eina_Bool
 _eina_lock_new(Eina_Lock *mutex, Eina_Bool recursive)
 {
@@ -106,6 +160,15 @@ fail_release:
    return ok;
 }
 
+/**
+ * @internal
+ * @brief Frees an Eina_Lock (mutex).
+ * @param mutex Pointer to the Eina_Lock structure to free.
+ * @details This is the internal implementation for eina_lock_free().
+ *          It destroys the underlying pthread mutex.
+ *          If `EINA_HAVE_DEBUG_THREADS` is defined and destruction fails,
+ *          it calls EINA_LOCK_ABORT_DEBUG.
+ */
 EINA_API void
 _eina_lock_free(Eina_Lock *mutex)
 {
@@ -115,6 +178,16 @@ _eina_lock_free(Eina_Lock *mutex)
    if (ok != 0) EINA_LOCK_ABORT_DEBUG(ok, mutex_destroy, mutex);
 }
 
+/**
+ * @internal
+ * @brief Initializes a new Eina_Condition variable.
+ * @param cond Pointer to the Eina_Condition structure to initialize.
+ * @param mutex Pointer to the Eina_Lock that will be associated with this condition variable.
+ * @return #EINA_TRUE on success, #EINA_FALSE on failure.
+ * @details This is the internal implementation for eina_condition_new().
+ *          It initializes a pthread_cond_t and associates it with the given lock.
+ *          It attempts to set the clock for timed waits to a monotonic clock if available.
+ */
 EINA_API Eina_Bool
 _eina_condition_new(Eina_Condition *cond, Eina_Lock *mutex)
 {
@@ -161,12 +234,28 @@ _eina_condition_new(Eina_Condition *cond, Eina_Lock *mutex)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Frees an Eina_Condition variable.
+ * @param cond Pointer to the Eina_Condition structure to free.
+ * @details This is the internal implementation for eina_condition_free().
+ *          It destroys the underlying pthread_cond_t.
+ */
 EINA_API void
 _eina_condition_free(Eina_Condition *cond)
 {
    pthread_cond_destroy(&(cond->condition));
 }
 
+/**
+ * @internal
+ * @brief Initializes a new Eina_RWLock (read-write lock).
+ * @param mutex Pointer to the Eina_RWLock structure to initialize.
+ * @return #EINA_TRUE on success, #EINA_FALSE on failure (e.g., out of resources).
+ *         Aborts if `EINA_HAVE_DEBUG_THREADS` is defined and an unexpected error occurs.
+ * @details This is the internal implementation for eina_rwlock_new().
+ *          It initializes a pthread_rwlock_t.
+ */
 EINA_API Eina_Bool
 _eina_rwlock_new(Eina_RWLock *mutex)
 {
@@ -179,12 +268,30 @@ _eina_rwlock_new(Eina_RWLock *mutex)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Frees an Eina_RWLock (read-write lock).
+ * @param mutex Pointer to the Eina_RWLock structure to free.
+ * @details This is the internal implementation for eina_rwlock_free().
+ *          It destroys the underlying pthread_rwlock_t.
+ */
 EINA_API void
 _eina_rwlock_free(Eina_RWLock *mutex)
 {
    pthread_rwlock_destroy(&(mutex->mutex));
 }
 
+/**
+ * @internal
+ * @brief Initializes a new Eina_Barrier.
+ * @param barrier Pointer to the Eina_Barrier structure to initialize.
+ * @param needed The number of threads that must call eina_barrier_wait() before
+ *               any of them successfully return from the call.
+ * @return #EINA_TRUE on success, #EINA_FALSE on failure.
+ * @details This is the internal implementation for eina_barrier_new().
+ *          If `EINA_HAVE_PTHREAD_BARRIER` is defined, it uses `pthread_barrier_init`.
+ *          Otherwise, it implements a barrier using an Eina_Lock and Eina_Condition.
+ */
 EINA_API Eina_Bool
 _eina_barrier_new(Eina_Barrier *barrier, int needed)
 {
@@ -206,6 +313,14 @@ _eina_barrier_new(Eina_Barrier *barrier, int needed)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Frees an Eina_Barrier.
+ * @param barrier Pointer to the Eina_Barrier structure to free.
+ * @details This is the internal implementation for eina_barrier_free().
+ *          If `EINA_HAVE_PTHREAD_BARRIER` is defined, it uses `pthread_barrier_destroy`.
+ *          Otherwise, it frees the Eina_Lock and Eina_Condition used in its custom implementation.
+ */
 EINA_API void
 _eina_barrier_free(Eina_Barrier *barrier)
 {
@@ -220,6 +335,16 @@ _eina_barrier_free(Eina_Barrier *barrier)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Initializes a new Eina_Spinlock.
+ * @param spinlock Pointer to the Eina_Spinlock structure to initialize.
+ * @return #EINA_TRUE on success, #EINA_FALSE on failure.
+ * @details This is the internal implementation for eina_spinlock_new().
+ *          If `EINA_HAVE_POSIX_SPINLOCK` is defined, it uses `pthread_spin_init`.
+ *          If `EINA_HAVE_OSX_SPINLOCK` is defined, it initializes the spinlock for macOS.
+ *          Otherwise, it falls back to initializing a regular Eina_Lock.
+ */
 EINA_API Eina_Bool
 _eina_spinlock_new(Eina_Spinlock *spinlock)
 {
@@ -237,6 +362,15 @@ _eina_spinlock_new(Eina_Spinlock *spinlock)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Frees an Eina_Spinlock.
+ * @param spinlock Pointer to the Eina_Spinlock structure to free.
+ * @details This is the internal implementation for eina_spinlock_free().
+ *          If `EINA_HAVE_POSIX_SPINLOCK` is defined, it uses `pthread_spin_destroy`.
+ *          If `EINA_HAVE_OSX_SPINLOCK` is defined, this is a no-op for the underlying type.
+ *          Otherwise, it falls back to freeing a regular Eina_Lock.
+ */
 EINA_API void
 _eina_spinlock_free(Eina_Spinlock *spinlock)
 {
@@ -251,6 +385,16 @@ _eina_spinlock_free(Eina_Spinlock *spinlock)
 #endif
 }
 
+/**
+ * @internal
+ * @brief Initializes a new Eina_Semaphore.
+ * @param sem Pointer to the Eina_Semaphore structure to initialize.
+ * @param count_init The initial value for the semaphore. Must be non-negative.
+ * @return #EINA_TRUE on success, #EINA_FALSE on failure (e.g., invalid `count_init` or system error).
+ * @details This is the internal implementation for eina_semaphore_new().
+ *          If `EINA_HAVE_OSX_SEMAPHORE` is defined, it uses `semaphore_create` (Mach semaphore).
+ *          Otherwise, it uses `sem_init` (POSIX unnamed semaphore).
+ */
 EINA_API Eina_Bool
 _eina_semaphore_new(Eina_Semaphore *sem, int count_init)
 {
@@ -266,6 +410,15 @@ _eina_semaphore_new(Eina_Semaphore *sem, int count_init)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Frees an Eina_Semaphore.
+ * @param sem Pointer to the Eina_Semaphore structure to free.
+ * @return #EINA_TRUE on success, #EINA_FALSE on failure.
+ * @details This is the internal implementation for eina_semaphore_free().
+ *          If `EINA_HAVE_OSX_SEMAPHORE` is defined, it uses `semaphore_destroy` (Mach semaphore).
+ *          Otherwise, it uses `sem_destroy` (POSIX unnamed semaphore).
+ */
 EINA_API Eina_Bool
 _eina_semaphore_free(Eina_Semaphore *sem)
 {

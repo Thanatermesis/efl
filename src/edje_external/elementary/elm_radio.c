@@ -1,15 +1,33 @@
 #include "private.h"
 
+/**
+ * @brief Parameters for creating a radio widget.
+ *
+ * This structure holds all the parameters that can be used when creating
+ * a radio widget externally.
+ */
 typedef struct _Elm_Params_Radio
 {
-   Elm_Params base;
-   const char *label;
-   Evas_Object *icon;
-   const char* group_name;
-   int value;
-   Eina_Bool value_exists:1;
+   Elm_Params base; /**< Base parameters */
+   const char *label; /**< The label text for the radio widget */
+   Evas_Object *icon; /**< The icon object for the radio widget */
+   const char* group_name; /**< The name of the group this radio belongs to */
+   int value; /**< The integer value associated with this radio state */
+   Eina_Bool value_exists:1; /**< Flag indicating if the value parameter is set */
 } Elm_Params_Radio;
 
+/**
+ * @brief Sets the state of an external radio widget.
+ *
+ * This function is called to apply parameters to a radio widget,
+ * typically during transitions or initial setup.
+ *
+ * @param data Unused.
+ * @param obj The radio widget object.
+ * @param from_params The previous state parameters (can be NULL).
+ * @param to_params The new state parameters (can be NULL).
+ * @param pos Unused.
+ */
 static void
 external_radio_state_set(void *data EINA_UNUSED, Evas_Object *obj,
                          const void *from_params, const void *to_params,
@@ -35,6 +53,17 @@ external_radio_state_set(void *data EINA_UNUSED, Evas_Object *obj,
      }
 }
 
+/**
+ * @brief Sets a specific parameter for an external radio widget.
+ *
+ * This function is called by Edje to set individual parameters on the
+ * radio widget.
+ *
+ * @param data Unused.
+ * @param obj The radio widget object.
+ * @param param The parameter to set.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 external_radio_param_set(void *data EINA_UNUSED, Evas_Object *obj,
                          const Edje_External_Param *param)
@@ -82,6 +111,17 @@ external_radio_param_set(void *data EINA_UNUSED, Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Gets a specific parameter from an external radio widget.
+ *
+ * This function is called by Edje to retrieve individual parameters from the
+ * radio widget.
+ *
+ * @param data Unused.
+ * @param obj The radio widget object.
+ * @param param The parameter to get (name is input, value is output).
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 external_radio_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
                          Edje_External_Param *param)
@@ -119,6 +159,26 @@ external_radio_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Parses a list of Edje_External_Param to create an Elm_Params_Radio structure.
+ *
+ * This function converts a list of generic Edje parameters into a
+ * radio-specific parameter structure.
+ *
+ * @param data Unused.
+ * @param obj The Evas_Object this parameter structure is for (used for icon parsing).
+ * @param params A list of Edje_External_Param objects.
+ *        Example of params list structure:
+ *        params = [
+ *          (Edje_External_Param){ .name = "label", .type = EDJE_EXTERNAL_PARAM_TYPE_STRING, .s = "Option 1" },
+ *          (Edje_External_Param){ .name = "icon", .type = EDJE_EXTERNAL_PARAM_TYPE_STRING, .s = "my_icon" },
+ *          (Edje_External_Param){ .name = "group", .type = EDJE_EXTERNAL_PARAM_TYPE_STRING, .s = "group1" },
+ *          (Edje_External_Param){ .name = "value", .type = EDJE_EXTERNAL_PARAM_TYPE_INT, .i = 10 }
+ *        ]
+ * @return A newly allocated Elm_Params_Radio structure, or NULL on failure.
+ *         The caller is responsible for freeing the returned structure using
+ *         external_radio_params_free().
+ */
 static void *
 external_radio_params_parse(void *data EINA_UNUSED, Evas_Object *obj, const Eina_List *params)
 {
@@ -148,6 +208,17 @@ external_radio_params_parse(void *data EINA_UNUSED, Evas_Object *obj, const Eina
    return mem;
 }
 
+/**
+ * @brief Gets content from an external radio widget.
+ *
+ * Radio widgets typically do not have named content parts that can be
+ * retrieved this way. This function currently always returns NULL.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param content Unused.
+ * @return Always NULL.
+ */
 static Evas_Object *external_radio_content_get(void *data EINA_UNUSED,
                                                const Evas_Object *obj EINA_UNUSED,
                                                const char *content EINA_UNUSED)
@@ -156,6 +227,11 @@ static Evas_Object *external_radio_content_get(void *data EINA_UNUSED,
    return NULL;
 }
 
+/**
+ * @brief Frees the memory allocated for Elm_Params_Radio.
+ *
+ * @param params The Elm_Params_Radio structure to free.
+ */
 static void
 external_radio_params_free(void *params)
 {

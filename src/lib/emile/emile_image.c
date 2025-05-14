@@ -21,18 +21,57 @@
 #include <arm_neon.h>
 #endif
 
+/** @internal Maximum dimension (width or height) for an image. */
 #define IMG_MAX_SIZE 65000
 
+/**
+ * @internal
+ * @brief Checks if the image dimensions w * h would result in a size
+ * that is too large to handle.
+ * The calculation `(1ULL << (29 * (sizeof(void *) / 4))) - 2048`
+ * attempts to define a practical upper limit for image data size,
+ * scaling somewhat with pointer size (32-bit vs 64-bit systems).
+ * For 32-bit (sizeof(void*) == 4): (1ULL << 29) - 2048 approx 512MB.
+ * For 64-bit (sizeof(void*) == 8): (1ULL << 58) - 2048 very large.
+ * This helps prevent excessive memory allocation.
+ */
 #define IMG_TOO_BIG(w, h)                                 \
   ((((unsigned long long)w) * ((unsigned long long)h)) >= \
    ((1ULL << (29 * (sizeof(void *) / 4))) - 2048))
 
+/**
+ * @internal
+ * @brief Checks if two 1D spans overlap.
+ * @param x1 Start of the first span.
+ * @param w1 Width of the first span.
+ * @param x2 Start of the second span.
+ * @param w2 Width of the second span.
+ * @return EINA_TRUE if spans overlap, EINA_FALSE otherwise.
+ */
 #define SPANS_COMMON(x1, w1, x2, w2) \
   (!(((int)((x2) + (int)(w2)) <= (int)(x1)) || (int)((x2) >= (int)((x1) + (int)(w1)))))
 
+/**
+ * @internal
+ * @brief Checks if two rectangles intersect.
+ * @param x X-coordinate of the first rectangle.
+ * @param y Y-coordinate of the first rectangle.
+ * @param w Width of the first rectangle.
+ * @param h Height of the first rectangle.
+ * @param xx X-coordinate of the second rectangle.
+ * @param yy Y-coordinate of the second rectangle.
+ * @param ww Width of the second rectangle.
+ * @param hh Height of the second rectangle.
+ * @return EINA_TRUE if rectangles intersect, EINA_FALSE otherwise.
+ */
 #define RECTS_INTERSECT(x, y, w, h, xx, yy, ww, hh) \
   ((SPANS_COMMON((x), (w), (xx), (ww))) && (SPANS_COMMON((y), (h), (yy), (hh))))
 
+/**
+ * @internal
+ * @brief Clips a rectangle (_x, _y, _w, _h) to fit within a clipping rectangle (_cx, _cy, _cw, _ch).
+ * Modifies _x, _y, _w, _h in place. If there's no intersection, _w and _h are set to 0.
+ */
 #define RECTS_CLIP_TO_RECT(_x, _y, _w, _h, _cx, _cy, _cw, _ch)    \
   {                                                               \
      if (RECTS_INTERSECT(_x, _y, _w, _h, _cx, _cy, _cw, _ch))     \
@@ -61,68 +100,114 @@
   }
 
 #ifndef WORDS_BIGENDIAN
-/* x86 */
+/* x86 - Little Endian memory layout for ARGB (BGRA in memory) */
+/** @internal Access Alpha component from a 32-bit ARGB pixel pointer on Little Endian systems. */
 #define A_VAL(p) (((uint8_t *)(p))[3])
+/** @internal Access Red component from a 32-bit ARGB pixel pointer on Little Endian systems. */
 #define R_VAL(p) (((uint8_t *)(p))[2])
+/** @internal Access Green component from a 32-bit ARGB pixel pointer on Little Endian systems. */
 #define G_VAL(p) (((uint8_t *)(p))[1])
+/** @internal Access Blue component from a 32-bit ARGB pixel pointer on Little Endian systems. */
 #define B_VAL(p) (((uint8_t *)(p))[0])
 #else
-/* ppc */
+/* ppc - Big Endian memory layout for ARGB (ARGB in memory) */
+/** @internal Access Alpha component from a 32-bit ARGB pixel pointer on Big Endian systems. */
 #define A_VAL(p) (((uint8_t *)(p))[0])
+/** @internal Access Red component from a 32-bit ARGB pixel pointer on Big Endian systems. */
 #define R_VAL(p) (((uint8_t *)(p))[1])
+/** @internal Access Green component from a 32-bit ARGB pixel pointer on Big Endian systems. */
 #define G_VAL(p) (((uint8_t *)(p))[2])
+/** @internal Access Blue component from a 32-bit ARGB pixel pointer on Big Endian systems. */
 #define B_VAL(p) (((uint8_t *)(p))[3])
 #endif
 
+/**
+ * @internal
+ * @brief Joins individual Alpha, Red, Green, and Blue components into a single 32-bit ARGB integer.
+ * Assumes standard ARGB order with Alpha in the most significant byte.
+ */
 #define ARGB_JOIN(a, r, g, b) \
   (((a) << 24) + ((r) << 16) + ((g) << 8) + (b))
 
+/** @internal Offset in TGV header for block size information. */
 #define OFFSET_BLOCK_SIZE 4
+/** @internal Offset in TGV header for algorithm information. */
 #define OFFSET_ALGORITHM  5
+/** @internal Offset in TGV header for options flags. */
 #define OFFSET_OPTIONS    6
+/** @internal Offset in TGV header for image width. */
 #define OFFSET_WIDTH      8
+/** @internal Offset in TGV header for image height. */
 #define OFFSET_HEIGHT     12
+/** @internal Offset in TGV header where block data begins. */
 #define OFFSET_BLOCKS     16
 
+/**
+ * @internal
+ * @brief Internal structure representing an opened image, its properties,
+ * and function pointers for format-specific operations.
+ */
 struct _Emile_Image
 {
-   Emile_Image_Load_Opts opts;
+   Emile_Image_Load_Opts opts; /**< Load options for the image. */
 
    struct
    {
-      unsigned int width;
-      unsigned int height;
-   } size, block;
+      unsigned int width;  /**< Original width of the image. */
+      unsigned int height; /**< Original height of the image. */
+   } size; /**< Dimensions of the full image. */
 
-   Eina_Rectangle        region;
+   struct
+   {
+      unsigned int width;  /**< Width of a processing block (TGV). */
+      unsigned int height; /**< Height of a processing block (TGV). */
+   } block; /**< Dimensions of image blocks, if applicable (e.g., TGV format). */
+
+   Eina_Rectangle        region; /**< The specific region of the image to be loaded or processed. */
 
    union
    {
-      Eina_Binbuf *bin;
-      Eina_File   *f;
-   } source;
+      Eina_Binbuf *bin; /**< Eina_Binbuf source if image is from memory. */
+      Eina_File   *f;   /**< Eina_File source if image is from a file. */
+   } source; /**< Union representing the source of the image data. */
 
-   const unsigned char  *source_data;
+   const unsigned char  *source_data; /**< Memory-mapped pointer to file data, if applicable. Null if from binbuf or not yet mapped. */
 
+   /** @brief Function pointer to bind/validate the image source.
+    * @return EINA_TRUE on success, EINA_FALSE on failure. */
    Eina_Bool             (*bind)(Emile_Image *image, Emile_Image_Load_Opts *opts, Emile_Image_Animated *animated, Emile_Image_Load_Error *error);
+   /** @brief Function pointer to read the image header.
+    * @return EINA_TRUE on success, EINA_FALSE on failure. */
    Eina_Bool             (*head)(Emile_Image *image, Emile_Image_Property *prop, unsigned int property_size, Emile_Image_Load_Error *error);
+   /** @brief Function pointer to read the image pixel data.
+    * @return EINA_TRUE on success, EINA_FALSE on failure. */
    Eina_Bool             (*data)(Emile_Image *image, Emile_Image_Property *prop, unsigned int property_size, void *pixels, Emile_Image_Load_Error *error);
+   /** @brief Function pointer to close/free resources associated with the image format. */
    void                  (*close)(Emile_Image *image);
 
-   Emile_Action_Cb       cancelled;
-   const void           *cancelled_data;
+   Emile_Action_Cb       cancelled; /**< Callback function to check for cancellation. */
+   const void           *cancelled_data; /**< User data for the cancellation callback. */
 
-   Emile_Colorspace      cspace;
+   Emile_Colorspace      cspace; /**< Native colorspace of the image as determined by the loader. */
 
-   Eina_Bool             bin_source : 1;
+   Eina_Bool             bin_source : 1; /**< Flag: EINA_TRUE if source is Eina_Binbuf, EINA_FALSE if Eina_File. */
 
-   /* TGV option */
-   Eina_Bool             unpremul : 1;
-   Eina_Bool             compress : 1;
-   Eina_Bool             blockless : 1;
-   Eina_Bool             load_opts : 1;
+   /* TGV specific options, cached from header */
+   Eina_Bool             unpremul : 1;  /**< TGV Flag: EINA_TRUE if image data is unpremultiplied alpha. */
+   Eina_Bool             compress : 1;  /**< TGV Flag: EINA_TRUE if image data is compressed (e.g., LZ4). */
+   Eina_Bool             blockless : 1; /**< TGV Flag: EINA_TRUE if image is stored without block structure. */
+   Eina_Bool             load_opts : 1; /**< Flag: EINA_TRUE if load options were provided. */
 };
 
+/**
+ * @internal
+ * @brief Checks if the image loading process has been cancelled.
+ *
+ * This function calls the registered cancellation callback, if any.
+ *
+ * @param image The Emile_Image being processed.
+ * @return EINA_TRUE if cancellation is requested, EINA_FALSE otherwise.
+ */
 static inline Eina_Bool
 _emile_image_cancelled_is(Emile_Image *image)
 {
@@ -130,6 +215,20 @@ _emile_image_cancelled_is(Emile_Image *image)
    return image->cancelled((void*) image->cancelled_data, image, EMILE_ACTION_CANCELLED);
 }
 
+/**
+ * @internal
+ * @brief Macro to periodically check for cancellation during long operations.
+ *
+ * This macro increments a counter and, when the counter matches a mask,
+ * checks if the operation has been cancelled. If cancelled, it sets an error
+ * and jumps to a specified error handler.
+ *
+ * @param Image The Emile_Image being processed.
+ * @param Count A counter variable (unsigned short or int).
+ * @param Mask A bitmask to determine check frequency (e.g., 0xF for every 16 iterations).
+ * @param Error Pointer to an Emile_Image_Load_Error variable to set on cancellation.
+ * @param Error_Handler A goto label for error handling.
+ */
 #define EMILE_IMAGE_TASK_CHECK(Image, Count, Mask, Error, Error_Handler) \
   do {                                                                  \
      Count++;                                                           \
@@ -144,6 +243,18 @@ _emile_image_cancelled_is(Emile_Image *image)
        }                                                                \
   } while (0);
 
+/**
+ * @internal
+ * @brief Maps the image source (file or binbuf) to a memory region.
+ *
+ * If the source is an Eina_File, it memory-maps the entire file.
+ * If the source is an Eina_Binbuf, it returns a pointer to its internal buffer.
+ * The mapped data for Eina_File is cached in `image->source_data`.
+ *
+ * @param image The Emile_Image structure.
+ * @param[out] length Pointer to store the length of the mapped data. Can be NULL.
+ * @return Pointer to the start of the image data, or NULL on failure.
+ */
 static const unsigned char *
 _emile_image_file_source_map(Emile_Image *image, unsigned int *length)
 {
@@ -166,6 +277,16 @@ _emile_image_file_source_map(Emile_Image *image, unsigned int *length)
    return image->source_data;
 }
 
+/**
+ * @internal
+ * @brief Unmaps a previously memory-mapped Eina_File source.
+ *
+ * This function is only relevant if the image source was an Eina_File and
+ * was mapped using `_emile_image_file_source_map`. It frees the map
+ * and resets `image->source_data` to NULL.
+ *
+ * @param image The Emile_Image structure.
+ */
 static void
 _emile_image_file_source_unmap(Emile_Image *image)
 {
@@ -175,6 +296,16 @@ _emile_image_file_source_unmap(Emile_Image *image)
    image->source_data = NULL;
 }
 
+/**
+ * @internal
+ * @brief Rounds up a value to the nearest multiple of another value.
+ *
+ * @param val The value to round up.
+ * @param rup The multiple to round up to. Must be positive.
+ * @return The rounded-up value. Returns 0 if val is negative or rup is not positive.
+ * @example _roundup(7, 4) == 8
+ * @example _roundup(8, 4) == 8
+ */
 static int
 _roundup(int val, int rup)
 {
@@ -185,27 +316,32 @@ _roundup(int val, int rup)
 
 /* TGV Handling */
 
+/** @internal Supported colorspaces for ETC1 TGV images, in order of preference or compatibility. */
 static const Emile_Colorspace cspaces_etc1[] = {
    EMILE_COLORSPACE_ETC1,
    EMILE_COLORSPACE_RGB8_ETC2,
    EMILE_COLORSPACE_ARGB8888
 };
 
+/** @internal Supported colorspaces for ETC2 RGB TGV images. */
 static const Emile_Colorspace cspaces_rgb8_etc2[] = {
    EMILE_COLORSPACE_RGB8_ETC2,
    EMILE_COLORSPACE_ARGB8888
 };
 
+/** @internal Supported colorspaces for ETC2 RGBA (EAC) TGV images. */
 static const Emile_Colorspace cspaces_rgba8_etc2_eac[] = {
    EMILE_COLORSPACE_RGBA8_ETC2_EAC,
    EMILE_COLORSPACE_ARGB8888
 };
 
+/** @internal Supported colorspaces for ETC1 with separate Alpha plane TGV images. */
 static const Emile_Colorspace cspaces_etc1_alpha[] = {
    EMILE_COLORSPACE_ETC1_ALPHA,
    EMILE_COLORSPACE_ARGB8888
 };
 
+/** @internal Supported colorspaces for Grayscale JPEG images. */
 static const Emile_Colorspace cspaces_gry[] = {
    EMILE_COLORSPACE_GRY8,
    EMILE_COLORSPACE_AGRY88,

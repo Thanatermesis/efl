@@ -1,26 +1,43 @@
 #include <assert.h>
 #include "private.h"
 
+/**
+ * @brief Structure to hold parameters for an Elm_Icon widget.
+ *
+ * This structure is used to parse and store parameters from an Edje external
+ * definition for an icon object.
+ */
 typedef struct _Elm_Params_Icon
 {
-   const char *file;
-   Eina_Bool scale_up_exists;
-   Eina_Bool scale_up : 1;
-   Eina_Bool scale_down_exists;
-   Eina_Bool scale_down : 1;
-   Eina_Bool smooth_exists;
-   Eina_Bool smooth : 1;
-   Eina_Bool fill_outside_exists;
-   Eina_Bool fill_outside : 1;
-   Eina_Bool no_scale_exists;
-   Eina_Bool no_scale : 1;
-   Eina_Bool prescale_size_exists;
-   int prescale_size;
-   Elm_Params base;
-   const char *icon;
+   const char *file; /**< The image file path. */
+   Eina_Bool scale_up_exists; /**< Flag indicating if scale_up parameter is set. */
+   Eina_Bool scale_up : 1; /**< Whether to scale up the image if it's smaller than the object. */
+   Eina_Bool scale_down_exists; /**< Flag indicating if scale_down parameter is set. */
+   Eina_Bool scale_down : 1; /**< Whether to scale down the image if it's larger than the object. */
+   Eina_Bool smooth_exists; /**< Flag indicating if smooth parameter is set. */
+   Eina_Bool smooth : 1; /**< Whether to apply smooth scaling. */
+   Eina_Bool fill_outside_exists; /**< Flag indicating if fill_outside parameter is set. */
+   Eina_Bool fill_outside : 1; /**< Whether to fill outside the image area. */
+   Eina_Bool no_scale_exists; /**< Flag indicating if no_scale parameter is set. */
+   Eina_Bool no_scale : 1; /**< Whether to disable scaling. */
+   Eina_Bool prescale_size_exists; /**< Flag indicating if prescale_size parameter is set. */
+   int prescale_size; /**< The prescale size for the image. */
+   Elm_Params base; /**< Base parameters. */
+   const char *icon; /**< The standard icon name. */
 } Elm_Params_Icon;
 
-
+/**
+ * @brief Sets the state of an external icon object.
+ *
+ * This function is called to apply parameters to an icon object,
+ * typically during Edje theme transitions or initial setup.
+ *
+ * @param data Unused.
+ * @param obj The Evas_Object (icon) to set the state for.
+ * @param from_params The previous state parameters (can be NULL).
+ * @param to_params The new state parameters to apply.
+ * @param pos Unused.
+ */
 static void
 external_icon_state_set(void *data EINA_UNUSED, Evas_Object *obj,
                         const void *from_params, const void *to_params,
@@ -90,6 +107,17 @@ external_icon_state_set(void *data EINA_UNUSED, Evas_Object *obj,
      }
 }
 
+/**
+ * @brief Sets a specific parameter for an external icon object.
+ *
+ * This function is called by Edje to set individual parameters on the icon
+ * object. It handles various icon properties like file, smooth, scale, etc.
+ *
+ * @param data Unused.
+ * @param obj The Evas_Object (icon) to modify.
+ * @param param The Edje_External_Param to apply.
+ * @return EINA_TRUE on success, EINA_FALSE on failure or if the parameter is unknown.
+ */
 static Eina_Bool
 external_icon_param_set(void *data EINA_UNUSED, Evas_Object *obj,
                         const Edje_External_Param *param)
@@ -168,6 +196,18 @@ external_icon_param_set(void *data EINA_UNUSED, Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Gets a specific parameter from an external icon object.
+ *
+ * This function is called by Edje to retrieve the current value of
+ * individual parameters from the icon object.
+ *
+ * @param data Unused.
+ * @param obj The Evas_Object (icon) to query.
+ * @param param An Edje_External_Param structure to fill with the parameter's value.
+ *              The `name` and `type` fields are pre-filled.
+ * @return EINA_TRUE on success, EINA_FALSE on failure or if the parameter is unknown/unreadable.
+ */
 static Eina_Bool
 external_icon_param_get(void *data EINA_UNUSED,
                         const Evas_Object *obj,
@@ -228,6 +268,23 @@ external_icon_param_get(void *data EINA_UNUSED,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Parses a list of Edje external parameters into an Elm_Params_Icon structure.
+ *
+ * This function converts a list of Edje_External_Param objects into a more
+ * usable Elm_Params_Icon structure, allocating memory for it.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param params A list of Edje_External_Param to parse.
+ *               Example of params list structure:
+ *               Eina_List* containing Edje_External_Param* elements.
+ *               Each Edje_External_Param has:
+ *                 - const char* name (e.g., "file", "smooth")
+ *                 - Edje_External_Param_Type type (e.g., EDJE_EXTERNAL_PARAM_TYPE_STRING)
+ *                 - union { int i; double d; const char *s; } value
+ * @return A pointer to the newly allocated Elm_Params_Icon structure, or NULL on failure.
+ */
 static void *
 external_icon_params_parse(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
                            const Eina_List *params)
@@ -282,6 +339,17 @@ external_icon_params_parse(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
    return mem;
 }
 
+/**
+ * @brief Gets a content part from an external icon object.
+ *
+ * Icons typically do not have named content parts that can be retrieved
+ * this way, so this function currently returns NULL and logs an error.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param content Unused.
+ * @return Always NULL for icons.
+ */
 static Evas_Object *
 external_icon_content_get(void *data EINA_UNUSED,
                           const Evas_Object *obj EINA_UNUSED,
@@ -291,6 +359,14 @@ external_icon_content_get(void *data EINA_UNUSED,
    return NULL;
 }
 
+/**
+ * @brief Frees the memory allocated for Elm_Params_Icon.
+ *
+ * This function is responsible for releasing the resources held by an
+ * Elm_Params_Icon structure, including any stringshared strings.
+ *
+ * @param params A pointer to the Elm_Params_Icon structure to free.
+ */
 static void
 external_icon_params_free(void *params)
 {
@@ -304,9 +380,15 @@ external_icon_params_free(void *params)
    free(mem);
 }
 
+/**
+ * @brief Defines the parameters accepted by an external icon object.
+ *
+ * This array provides metadata about the parameters that can be used
+ * in an Edje file to configure an icon object.
+ */
 static Edje_External_Param_Info external_icon_params[] = {
-   DEFINE_EXTERNAL_COMMON_PARAMS,
-   EDJE_EXTERNAL_PARAM_INFO_STRING("icon"),
+   DEFINE_EXTERNAL_COMMON_PARAMS, /**< Common parameters like "visible", "clip_to", etc. */
+   EDJE_EXTERNAL_PARAM_INFO_STRING("icon"), /**< Standard icon name (e.g., "home", "close"). */
    EDJE_EXTERNAL_PARAM_INFO_STRING("file"),
    EDJE_EXTERNAL_PARAM_INFO_BOOL("smooth"),
    EDJE_EXTERNAL_PARAM_INFO_BOOL("no scale"),

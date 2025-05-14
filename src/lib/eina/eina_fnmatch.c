@@ -17,6 +17,11 @@
  * if not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * @file
+ * @brief Implementation of the eina_fnmatch function.
+ */
+
 #include <string.h>
 #include <stdlib.h>
 #include <wchar.h>
@@ -40,6 +45,17 @@
  *                                   API                                      *
  *============================================================================*/
 
+/**
+ * @brief Matches a string against a glob pattern.
+ * @param glob The glob pattern.
+ * @param string The string to match.
+ * @param flags Flags to modify matching behavior.
+ * @return EINA_TRUE if the string matches the pattern, EINA_FALSE otherwise.
+ *
+ * This function is a wrapper around the internal __fnmatch implementation.
+ * It converts the integer return value of __fnmatch (0 for match, non-zero
+ * for no match or error) to an Eina_Bool.
+ */
 EINA_API Eina_Bool
 eina_fnmatch(const char *glob, const char *string, Eina_Fnmatch_Flags flags)
 {

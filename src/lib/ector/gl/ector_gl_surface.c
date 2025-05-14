@@ -10,26 +10,49 @@
 #include "ector_private.h"
 #include "ector_gl_private.h"
 
+/**
+ * @brief Private data for the Ector_GL_Surface class.
+ *
+ * This structure holds data specific to an Ector GL surface instance,
+ * including the reference point for drawing operations and the current
+ * rendering operation.
+ */
 typedef struct _Ector_GL_Surface_Data Ector_GL_Surface_Data;
 struct _Ector_GL_Surface_Data
 {
    struct {
-      int x, y;
-   } reference_point;
+      int x, y; /**< The x and y coordinates of the reference point. */
+   } reference_point; /**< Reference point for drawing operations. Typically the top-left corner of a buffer. */
 
-   Efl_Gfx_Render_Op op;
+   Efl_Gfx_Render_Op op; /**< Current graphics rendering operation (e.g., blend, copy). */
 };
 
+/**
+ * @brief Represents a cached shader program.
+ *
+ * This structure stores a compiled GL shader program along with the flags
+ * that were used to generate or identify it. This allows for efficient
+ * reuse of shaders.
+ */
 typedef struct _Ector_Shader Ector_Shader;
 struct _Ector_Shader
 {
-   uint64_t flags;
-   GLuint prg;
+   uint64_t flags; /**< Flags identifying the shader's capabilities and configuration. */
+   GLuint prg;     /**< The OpenGL shader program ID. */
 };
 
-static Eina_Hash *shader_cache = NULL;
-static Eet_File *shader_file = NULL;
+static Eina_Hash *shader_cache = NULL; /**< Hash table for caching compiled Ector_Shader objects. Keyed by shader flags. */
+static Eet_File *shader_file = NULL;   /**< Eet file handle for storing and retrieving pre-compiled shader binaries. */
 
+/**
+ * @brief Frees an Ector_Shader object.
+ *
+ * This function is used as a callback for the shader_cache hash table to
+ * clean up Ector_Shader instances when they are removed from the cache.
+ * It deletes the GL program and frees the structure memory.
+ *
+ * @param s Pointer to the Ector_Shader data to be freed.
+ */
 static void
 _shader_free(void *s)
 {
@@ -39,6 +62,20 @@ _shader_free(void *s)
    free(shd);
 }
 
+/**
+ * @brief Factory function to create renderer objects for the GL surface.
+ *
+ * Based on the requested renderer type (e.g., shape, linear gradient, radial gradient),
+ * this function instantiates and returns the appropriate GL-specific renderer.
+ * The created renderer is associated with the given Ector surface.
+ *
+ * @param obj The Ector_GL_Surface object.
+ * @param pd Private data of the Ector_GL_Surface object (unused in this function).
+ * @param type The Efl_Class of the renderer mixin to be created (e.g., ECTOR_RENDERER_SHAPE_MIXIN).
+ * @return A new Ector_Renderer instance of the specified type, or NULL if the type is not supported.
+ *         The caller is responsible for decrementing the reference count of the returned object
+ *         when it's no longer needed, as efl_add_ref is used.
+ */
 static Ector_Renderer *
 _ector_gl_surface_ector_surface_renderer_factory_new(Eo *obj,
                                                              Ector_GL_Surface_Data *pd EINA_UNUSED,
@@ -55,6 +92,17 @@ _ector_gl_surface_ector_surface_renderer_factory_new(Eo *obj,
    return NULL;
 }
 
+/**
+ * @brief Sets the reference point for drawing operations on the GL surface.
+ *
+ * The reference point is typically the origin (e.g., top-left corner) against which
+ * drawing coordinates are interpreted.
+ *
+ * @param obj The Ector_GL_Surface object (unused in this function).
+ * @param pd Private data of the Ector_GL_Surface object.
+ * @param x The x-coordinate of the reference point.
+ * @param y The y-coordinate of the reference point.
+ */
 static void
 _ector_gl_surface_ector_surface_reference_point_set(Eo *obj EINA_UNUSED,
                                                             Ector_GL_Surface_Data *pd,
@@ -64,9 +112,26 @@ _ector_gl_surface_ector_surface_reference_point_set(Eo *obj EINA_UNUSED,
    pd->reference_point.y = y;
 }
 
-#define VERTEX_CNT 3
-#define COLOR_CNT 4
+#define VERTEX_CNT 3 /**< Number of components per vertex (e.g., x, y, z). */
+#define COLOR_CNT 4  /**< Number of components per color (e.g., r, g, b, a). */
 
+/**
+ * @brief Pushes vertex data to the GPU for rendering.
+ *
+ * This function selects an appropriate shader based on the provided flags,
+ * sets up the GL state (vertex attributes, uniforms), and issues a draw call.
+ *
+ * @param obj The Ector_GL_Surface object.
+ * @param pd Private data of the Ector_GL_Surface object (unused in this function).
+ * @param flags Shader flags used to select or compile the appropriate shader program.
+ *              These flags define features like texturing, color modes, etc.
+ * @param vertex Pointer to an array of vertex coordinates. Each vertex consists of VERTEX_CNT GLshort values.
+ *               Example for one triangle: {x1, y1, z1,  x2, y2, z2,  x3, y3, z3}
+ * @param vertex_count The number of vertices to draw. For GL_TRIANGLES, this should be a multiple of 3.
+ * @param mul_col A packed unsigned integer representing the multiplication color (e.g., 0xAARRGGBB).
+ *                This color is applied uniformly to all vertices.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (though currently always returns EINA_TRUE).
+ */
 static Eina_Bool
 _ector_gl_surface_push(Eo *obj,
                        Ector_GL_Surface_Data *pd EINA_UNUSED,
@@ -89,6 +154,23 @@ _ector_gl_surface_push(Eo *obj,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Defines the rendering state, such as blend operation and clipping.
+ *
+ * This function sets up the GL state according to the specified rendering operation
+ * (e.g., blend, copy) and applies clipping regions.
+ *
+ * @param obj The Ector_GL_Surface object (unused in this function).
+ * @param pd Private data of the Ector_GL_Surface object.
+ * @param op The rendering operation to apply (e.g., EFL_GFX_RENDER_OP_BLEND, EFL_GFX_RENDER_OP_COPY).
+ * @param clips An Eina_Array of Eina_Rect structures defining the clipping regions.
+ *              Currently, clipping is not fully implemented (FIXME).
+ *              Example of clips array structure:
+ *              Eina_Array *clips = eina_array_new(1);
+ *              Eina_Rect clip_rect = { .x = 10, .y = 10, .w = 100, .h = 100 };
+ *              eina_array_push(clips, &clip_rect);
+ * @return EINA_TRUE if the state was successfully set, EINA_FALSE if the operation is invalid.
+ */
 static Eina_Bool
 _ector_gl_surface_state_define(Eo *obj EINA_UNUSED, Ector_GL_Surface_Data *pd, Efl_Gfx_Render_Op op, Eina_Array *clips)
 {
@@ -119,6 +201,17 @@ _ector_gl_surface_state_define(Eo *obj EINA_UNUSED, Ector_GL_Surface_Data *pd, E
    return EINA_TRUE;
 }
 
+/**
+ * @brief Binds texture units for a given shader program.
+ *
+ * This function inspects the flags of the provided Ector_Shader to determine
+ * which texture samplers are active (e.g., main texture, mask texture, YUV planes).
+ * It then binds these samplers to sequential texture units (GL_TEXTURE0, GL_TEXTURE1, etc.)
+ * by setting their corresponding uniform locations in the shader program.
+ *
+ * @param p Pointer to the Ector_Shader whose textures need to be bound.
+ *          If NULL, the function does nothing.
+ */
 static void
 _ector_gl_shader_textures_bind(Ector_Shader *p)
 {
@@ -185,6 +278,21 @@ _ector_gl_shader_textures_bind(Ector_Shader *p)
      }
 }
 
+/**
+ * @brief Loads a pre-compiled shader binary from the Eet cache file.
+ *
+ * This function attempts to read a shader program that was previously compiled
+ * and stored in an Eet file. The shader is identified by its flags.
+ * If successful, it creates an Ector_Shader object, configures it, and binds
+ * its texture samplers.
+ *
+ * @param flags A bitmask of flags that uniquely identifies the shader program.
+ *              These flags determine the features and configuration of the shader.
+ * @return A pointer to a newly allocated Ector_Shader object if the shader was
+ *         successfully loaded and configured. Returns NULL on failure (e.g., shader
+ *         not found in cache, GL error during program binary loading).
+ *         The caller is responsible for freeing the returned Ector_Shader.
+ */
 static Ector_Shader *
 _ector_gl_shader_load(uint64_t flags)
 {
@@ -265,6 +373,22 @@ _ector_gl_shader_load(uint64_t flags)
    return r;
 }
 
+/**
+ * @brief Retrieves or creates a shader program based on the given flags.
+ *
+ * This function implements a multi-level caching strategy for shader programs:
+ * 1. Checks an in-memory hash table (shader_cache) for an existing Ector_Shader.
+ * 2. If not found, attempts to load a pre-compiled binary from an Eet file using _ector_gl_shader_load().
+ * 3. If still not found (or loading fails), compiles the shader on-the-fly using ector_gl_shader_compile().
+ * 4. If a new shader is compiled and program binary support is available, the binary is saved to the Eet cache file.
+ * The retrieved or created shader is added to the in-memory cache for future use.
+ *
+ * @param obj The Ector_GL_Surface object (unused in this function).
+ * @param pd Private data of the Ector_GL_Surface object (unused in this function).
+ * @param flags A bitmask of flags that uniquely identifies the desired shader program.
+ *              These flags determine features like texturing, color modes, etc.
+ * @return The OpenGL program ID (GLuint) of the shader. Returns (unsigned int)-1 on failure.
+ */
 static unsigned int
 _ector_gl_surface_shader_get(Eo *obj EINA_UNUSED, Ector_GL_Surface_Data *pd EINA_UNUSED, uint64_t flags)
 {
@@ -326,6 +450,17 @@ _ector_gl_surface_shader_get(Eo *obj EINA_UNUSED, Ector_GL_Surface_Data *pd EINA
    return prg;
 }
 
+/**
+ * @brief Destructor for the Ector_GL_Surface object.
+ *
+ * This function is called when an Ector_GL_Surface object is being destroyed.
+ * It performs cleanup operations, primarily freeing the global shader cache
+ * and closing the shader cache Eet file if they were initialized.
+ * It also calls the destructor of the parent class.
+ *
+ * @param obj The Ector_GL_Surface object being destroyed.
+ * @param pd Private data of the Ector_GL_Surface object (unused in this function).
+ */
 static void
 _ector_gl_surface_efl_object_destructor(Eo *obj, Ector_GL_Surface_Data *pd EINA_UNUSED)
 {
@@ -337,6 +472,19 @@ _ector_gl_surface_efl_object_destructor(Eo *obj, Ector_GL_Surface_Data *pd EINA_
    shader_file = NULL;
 }
 
+/**
+ * @brief Constructor for the Ector_GL_Surface object.
+ *
+ * This function is called when a new Ector_GL_Surface object is being created.
+ * It initializes the global shader cache (if not already initialized) and attempts
+ * to open or create an Eet file for storing/retrieving pre-compiled shader binaries.
+ * The path for this cache file is constructed based on user's home or temporary directory
+ * and EFL version. It also calls the constructor of the parent class.
+ *
+ * @param obj The Ector_GL_Surface object being constructed.
+ * @param pd Private data of the Ector_GL_Surface object (unused in this function).
+ * @return The constructed Efl_Object, or NULL on failure.
+ */
 static Efl_Object *
 _ector_gl_surface_efl_object_constructor(Eo *obj, Ector_GL_Surface_Data *pd EINA_UNUSED)
 {

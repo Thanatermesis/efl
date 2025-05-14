@@ -74,23 +74,41 @@ static const char EINA_MAGIC_ARRAY_ACCESSOR_STR[] = "Eina Array Accessor";
      } while (0)
 
 
+/**
+ * @internal
+ * @struct _Eina_Iterator_Array
+ * @brief Internal structure representing an iterator for an Eina_Array.
+ *
+ * This structure holds the state of an iterator, including a pointer to the
+ * array being iterated and the current position (index) within that array.
+ * It embeds an Eina_Iterator structure to integrate with the generic iterator API.
+ */
 typedef struct _Eina_Iterator_Array Eina_Iterator_Array;
 struct _Eina_Iterator_Array
 {
-   Eina_Iterator iterator;
+   Eina_Iterator iterator; /**< Base Eina_Iterator interface. */
 
-   const Eina_Array *array;
-   unsigned int index;
+   const Eina_Array *array; /**< The Eina_Array being iterated. */
+   unsigned int index;      /**< Current 0-based index in the array. */
 
-   EINA_MAGIC
+   EINA_MAGIC              /**< Magic number for runtime type checking. */
 };
 
+/**
+ * @internal
+ * @struct _Eina_Accessor_Array
+ * @brief Internal structure representing an accessor for an Eina_Array.
+ *
+ * This structure holds the state of an accessor, primarily a pointer to the
+ * array being accessed. It embeds an Eina_Accessor structure to integrate
+ * with the generic accessor API, allowing random access to array elements.
+ */
 typedef struct _Eina_Accessor_Array Eina_Accessor_Array;
 struct _Eina_Accessor_Array
 {
-   Eina_Accessor accessor;
-   const Eina_Array *array;
-   EINA_MAGIC
+   Eina_Accessor accessor;   /**< Base Eina_Accessor interface. */
+   const Eina_Array *array;  /**< The Eina_Array being accessed. */
+   EINA_MAGIC                /**< Magic number for runtime type checking. */
 };
 
 static int _eina_array_log_dom = -1;
@@ -105,15 +123,48 @@ static int _eina_array_log_dom = -1;
 #endif
 #define DBG(...) EINA_LOG_DOM_DBG(_eina_array_log_dom, __VA_ARGS__)
 
+/**
+ * @internal @brief Frees the memory allocated for an Eina_Array iterator.
+ * @param it The array iterator to free.
+ */
 static void        eina_array_iterator_free(Eina_Iterator_Array *it) EINA_ARG_NONNULL(1);
+/**
+ * @internal @brief Retrieves the container (Eina_Array) associated with an iterator.
+ * @param it The array iterator.
+ * @return A pointer to the Eina_Array being iterated.
+ */
 static Eina_Array *eina_array_iterator_get_container(Eina_Iterator_Array *it) EINA_ARG_NONNULL(1);
+/**
+ * @internal @brief Advances the iterator to the next element in the array.
+ * @param it The array iterator.
+ * @param data Pointer to a `void*` where the data of the next element will be stored.
+ *             The caller should not free this data if it's managed by the array.
+ * @return #EINA_TRUE if a next element is found, #EINA_FALSE otherwise (end of iteration).
+ */
 static Eina_Bool   eina_array_iterator_next(Eina_Iterator_Array *it,
                                             void **data) EINA_ARG_NONNULL(1);
 
+/**
+ * @internal @brief Retrieves the element at a specific index using an accessor.
+ * @param it The array accessor.
+ * @param idx The 0-based index of the element to retrieve.
+ * @param data Pointer to a `void*` where the data of the element will be stored.
+ *             The caller should not free this data if it's managed by the array.
+ * @return #EINA_TRUE if the element is found at the index, #EINA_FALSE otherwise (index out of bounds).
+ */
 static Eina_Bool   eina_array_accessor_get_at(Eina_Accessor_Array *it,
                                               unsigned int idx,
                                               void **data) EINA_ARG_NONNULL(1);
+/**
+ * @internal @brief Retrieves the container (Eina_Array) associated with an accessor.
+ * @param it The array accessor.
+ * @return A pointer to the Eina_Array being accessed.
+ */
 static Eina_Array *eina_array_accessor_get_container(Eina_Accessor_Array *it) EINA_ARG_NONNULL(1);
+/**
+ * @internal @brief Frees the memory allocated for an Eina_Array accessor.
+ * @param it The array accessor to free.
+ */
 static void        eina_array_accessor_free(Eina_Accessor_Array *it) EINA_ARG_NONNULL(1);
 
 static Eina_Bool
@@ -175,6 +226,16 @@ eina_array_accessor_free(Eina_Accessor_Array *it)
    MAGIC_FREE(it);
 }
 
+/**
+ * @internal
+ * @brief Clones an Eina_Array accessor.
+ *
+ * Creates a new accessor that is a copy of the provided accessor.
+ * Both accessors will point to the same underlying Eina_Array.
+ *
+ * @param it The array accessor to clone.
+ * @return A new Eina_Accessor instance, or @c NULL on allocation failure or if @p it is invalid.
+ */
 static Eina_Accessor *
 eina_array_accessor_clone(const Eina_Accessor_Array *it)
 {
@@ -190,7 +251,19 @@ eina_array_accessor_clone(const Eina_Accessor_Array *it)
    return &ac->accessor;
 }
 
-/* used from eina_inline_array.x, thus a needed symbol */
+/**
+ * @internal
+ * @brief Increases the allocated memory for an array.
+ *
+ * This function is typically called internally (e.g., by eina_array_push() via
+ * eina_inline_array.x) when an array needs to expand its capacity to accommodate
+ * new elements. It reallocates the internal data buffer to be larger by
+ * `array->step` elements.
+ *
+ * @param array The array to grow. Must be a valid, initialized Eina_Array.
+ * @return #EINA_TRUE on success (memory allocated or reallocated),
+ *         #EINA_FALSE on failure (e.g., realloc failed or @p array is invalid).
+ */
 EINA_API Eina_Bool
 eina_array_grow(Eina_Array *array)
 {

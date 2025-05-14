@@ -2,6 +2,22 @@
 # include "elementary_config.h"
 #endif
 
+/**
+ * @internal
+ * @addtogroup Widget
+ * @{
+ *
+ * @section elm-table-class The Elm_Table Class
+ *
+ * Elementary table widget.
+ *
+ * A table is a widget that arranges its children (sub-objects) in a
+ * grid. It can have an arbitrary number of rows and columns. Children
+ * can span multiple rows or columns.
+ *
+ * This is the internal implementation of the Elm_Table widget.
+ */
+
 #define EFL_ACCESS_OBJECT_PROTECTED
 #define EFL_UI_FOCUS_COMPOSITION_PROTECTED
 
@@ -15,6 +31,17 @@
 #define MY_CLASS_NAME "Elm_Table"
 #define MY_CLASS_NAME_LEGACY "elm_table"
 
+/**
+ * @internal
+ * @brief Prepares the focus composition for the table.
+ *
+ * This function retrieves the children of the table, filters out any
+ * non-widget elements, and sets the remaining elements as the focus
+ * composition order. This is used for keyboard navigation.
+ *
+ * @param obj The Evas object (table).
+ * @param pd Private data (unused).
+ */
 static void
 _elm_table_efl_ui_focus_composition_prepare(Eo *obj, void *pd EINA_UNUSED)
 {
@@ -33,6 +60,16 @@ _elm_table_efl_ui_focus_composition_prepare(Eo *obj, void *pd EINA_UNUSED)
    efl_ui_focus_composition_elements_set(obj, order);
 }
 
+/**
+ * @internal
+ * @brief Sets the mirrored mode of the table's internal Evas object.
+ *
+ * This function is called when the widget's mirrored mode changes,
+ * typically due to a change in the UI language (RTL/LTR).
+ *
+ * @param obj The Evas object (table).
+ * @param rtl EINA_TRUE if right-to-left mode is enabled, EINA_FALSE otherwise.
+ */
 static void
 _mirrored_set(Evas_Object *obj, Eina_Bool rtl)
 {
@@ -41,6 +78,17 @@ _mirrored_set(Evas_Object *obj, Eina_Bool rtl)
    evas_object_table_mirrored_set(wd->resize_obj, rtl);
 }
 
+/**
+ * @internal
+ * @brief Applies the theme to the table widget.
+ *
+ * This function calls the parent class's theme_apply function and then
+ * applies mirroring settings.
+ *
+ * @param obj The Evas object (table).
+ * @param sd Private data (unused).
+ * @return Eina_Error Standard Efl_Ui_Theme_Apply error code.
+ */
 EOLIAN static Eina_Error
 _elm_table_efl_ui_widget_theme_apply(Eo *obj, void *sd EINA_UNUSED)
 {
@@ -53,6 +101,16 @@ _elm_table_efl_ui_widget_theme_apply(Eo *obj, void *sd EINA_UNUSED)
    return int_ret;
 }
 
+/**
+ * @internal
+ * @brief Evaluates and sets the minimum size of the table.
+ *
+ * This function retrieves the combined minimum size of the table's
+ * internal Evas object (which considers all packed children) and
+ * sets it as the minimum size hint for the table widget itself.
+ *
+ * @param obj The Evas object (table).
+ */
 static void
 _sizing_eval(Evas_Object *obj)
 {
@@ -65,6 +123,17 @@ _sizing_eval(Evas_Object *obj)
    evas_object_size_hint_min_set(obj, minw, minh);
 }
 
+/**
+ * @internal
+ * @brief Callback function invoked when the size hints of the internal table object change.
+ *
+ * This triggers a re-evaluation of the table widget's own size.
+ *
+ * @param data The Evas object (table widget) passed as user data.
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas object whose size hints changed (internal table, unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _on_size_hints_changed(void *data,
                        Evas *e EINA_UNUSED,
@@ -74,6 +143,18 @@ _on_size_hints_changed(void *data,
    _sizing_eval(data);
 }
 
+/**
+ * @internal
+ * @brief Handles deletion of a sub-object from the table.
+ *
+ * This function calls the parent class's sub_object_del and then
+ * re-evaluates the table's size.
+ *
+ * @param obj The Evas object (table).
+ * @param _pd Private data (unused).
+ * @param child The sub-object being deleted.
+ * @return EINA_TRUE if the sub-object was successfully deleted, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _elm_table_efl_ui_widget_widget_sub_object_del(Eo *obj, void *_pd EINA_UNUSED, Evas_Object *child)
 {
@@ -87,6 +168,17 @@ _elm_table_efl_ui_widget_widget_sub_object_del(Eo *obj, void *_pd EINA_UNUSED, E
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Adds the table to the canvas group.
+ *
+ * This function creates the internal Evas table object, sets it as the
+ * resize object for the widget, registers a callback for size hints changes,
+ * calls the parent's group_add, and sets initial widget properties.
+ *
+ * @param obj The Evas object (table).
+ * @param _pd Private data (unused).
+ */
 EOLIAN static void
 _elm_table_efl_canvas_group_group_add(Eo *obj, void *_pd EINA_UNUSED)
 {
@@ -106,6 +198,17 @@ _elm_table_efl_canvas_group_group_add(Eo *obj, void *_pd EINA_UNUSED)
    efl_ui_widget_theme_apply(obj);
 }
 
+/**
+ * @internal
+ * @brief Deletes the table from the canvas group.
+ *
+ * This function removes the size hints changed callback and ensures the
+ * internal table object is processed last during deletion, as it might
+ * parent other sub-objects. Finally, it calls the parent's group_del.
+ *
+ * @param obj The Evas object (table).
+ * @param _pd Private data (unused).
+ */
 EOLIAN static void
 _elm_table_efl_canvas_group_group_del(Eo *obj, void *_pd EINA_UNUSED)
 {
@@ -130,6 +233,14 @@ _elm_table_efl_canvas_group_group_del(Eo *obj, void *_pd EINA_UNUSED)
    efl_canvas_group_del(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Add a new table to the parent
+ *
+ * @param parent The parent object
+ * @return The new object or NULL if it cannot be created
+ *
+ * @ingroup Elm_Table_Group
+ */
 EAPI Evas_Object *
 elm_table_add(Evas_Object *parent)
 {
@@ -137,6 +248,17 @@ elm_table_add(Evas_Object *parent)
    return elm_legacy_add(MY_CLASS, parent);
 }
 
+/**
+ * @internal
+ * @brief Constructor for the Elm_Table object.
+ *
+ * Initializes the object, sets its legacy type name, and default
+ * accessibility role.
+ *
+ * @param obj The Evas object (table).
+ * @param _pd Private data (unused).
+ * @return The constructed Evas object.
+ */
 EOLIAN static Eo *
 _elm_table_efl_object_constructor(Eo *obj, void *_pd EINA_UNUSED)
 {
@@ -147,6 +269,11 @@ _elm_table_efl_object_constructor(Eo *obj, void *_pd EINA_UNUSED)
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Sets the homogeneous mode for the table.
+ * @see elm_table_homogeneous_set()
+ */
 EOLIAN static void
 _elm_table_homogeneous_set(Eo *obj, void *_pd EINA_UNUSED, Eina_Bool homogeneous)
 {
@@ -156,6 +283,11 @@ _elm_table_homogeneous_set(Eo *obj, void *_pd EINA_UNUSED, Eina_Bool homogeneous
      (wd->resize_obj, homogeneous);
 }
 
+/**
+ * @internal
+ * @brief Gets the homogeneous mode for the table.
+ * @see elm_table_homogeneous_get()
+ */
 EOLIAN static Eina_Bool
 _elm_table_homogeneous_get(const Eo *obj, void *_pd EINA_UNUSED)
 {
@@ -163,6 +295,11 @@ _elm_table_homogeneous_get(const Eo *obj, void *_pd EINA_UNUSED)
    return evas_object_table_homogeneous_get(wd->resize_obj);
 }
 
+/**
+ * @internal
+ * @brief Sets the padding between cells for the table.
+ * @see elm_table_padding_set()
+ */
 EOLIAN static void
 _elm_table_padding_set(Eo *obj, void *_pd EINA_UNUSED, Evas_Coord horizontal, Evas_Coord vertical)
 {
@@ -172,6 +309,11 @@ _elm_table_padding_set(Eo *obj, void *_pd EINA_UNUSED, Evas_Coord horizontal, Ev
      (wd->resize_obj, horizontal, vertical);
 }
 
+/**
+ * @internal
+ * @brief Gets the padding between cells for the table.
+ * @see elm_table_padding_get()
+ */
 EOLIAN static void
 _elm_table_padding_get(const Eo *obj, void *_pd EINA_UNUSED, Evas_Coord *horizontal, Evas_Coord *vertical)
 {
@@ -181,6 +323,11 @@ _elm_table_padding_get(const Eo *obj, void *_pd EINA_UNUSED, Evas_Coord *horizon
      (wd->resize_obj, horizontal, vertical);
 }
 
+/**
+ * @internal
+ * @brief Sets the alignment of the whole table object.
+ * @see elm_table_align_set()
+ */
 EOLIAN static void
 _elm_table_align_set(Eo *obj, void *_pd EINA_UNUSED, double horizontal, double vertical)
 {
@@ -190,6 +337,11 @@ _elm_table_align_set(Eo *obj, void *_pd EINA_UNUSED, double horizontal, double v
      (wd->resize_obj, horizontal, vertical);
 }
 
+/**
+ * @internal
+ * @brief Gets the alignment of the whole table object.
+ * @see elm_table_align_get()
+ */
 EOLIAN static void
 _elm_table_align_get(const Eo *obj, void *_pd EINA_UNUSED, double *horizontal, double *vertical)
 {
@@ -199,6 +351,19 @@ _elm_table_align_get(const Eo *obj, void *_pd EINA_UNUSED, double *horizontal, d
      (wd->resize_obj, horizontal, vertical);
 }
 
+/**
+ * @internal
+ * @brief Add a subobject to a table.
+ * @see elm_table_pack()
+ *
+ * @param obj The table object.
+ * @param _pd Private data (unused).
+ * @param subobj The subobject to add.
+ * @param col The column in which to add the subobject (0-indexed).
+ * @param row The row in which to add the subobject (0-indexed).
+ * @param colspan The number of columns to span (1 or more).
+ * @param rowspan The number of rows to span (1 or more).
+ */
 EOLIAN static void
 _elm_table_pack(Eo *obj, void *_pd EINA_UNUSED, Evas_Object *subobj, int col, int row, int colspan, int rowspan)
 {
@@ -248,6 +413,15 @@ _elm_table_pack(Eo *obj, void *_pd EINA_UNUSED, Evas_Object *subobj, int col, in
    efl_ui_focus_composition_dirty(obj);
 }
 
+/**
+ * @internal
+ * @brief Unpack a subobject from the table.
+ * @see elm_table_unpack()
+ *
+ * @param obj The table object.
+ * @param _pd Private data (unused).
+ * @param subobj The subobject to unpack.
+ */
 EOLIAN static void
 _elm_table_unpack(Eo *obj, void *_pd EINA_UNUSED, Evas_Object *subobj)
 {
@@ -257,6 +431,20 @@ _elm_table_unpack(Eo *obj, void *_pd EINA_UNUSED, Evas_Object *subobj)
    evas_object_table_unpack(wd->resize_obj, subobj);
 }
 
+/**
+ * @brief Set the packing location of an existing child of the table
+ *
+ * Modifies the position of an object already in the table.
+ *
+ * @param subobj The subobject to be modified in the table.
+ * @param col The column in which to add the subobject (0-indexed).
+ * @param row The row in which to add the subobj (0-indexed).
+ * @param colspan The number of columns to span (1 or more).
+ * @param rowspan The number of rows to span (1 or more).
+ *
+ * @see elm_table_pack() for more details
+ * @ingroup Elm_Table_Group
+ */
 EAPI void
 elm_table_pack_set(Evas_Object *subobj,
                    int col,
@@ -270,6 +458,25 @@ elm_table_pack_set(Evas_Object *subobj,
    elm_obj_table_pack_set(obj, subobj, col, row, colspan, rowspan);
 }
 
+/**
+ * @internal
+ * @brief Sets the packing of a subobject within the table.
+ * @see elm_table_pack_set() (legacy API)
+ * @see _elm_table_pack() (EO API for adding new subobject)
+ *
+ * This function is similar to _elm_table_pack, but it's intended for
+ * modifying the packing of an *existing* subobject rather than adding a new one.
+ * It directly calls evas_object_table_pack without adding the subobject
+ * as a widget child again.
+ *
+ * @param obj The table object.
+ * @param _pd Private data (unused).
+ * @param subobj The subobject whose packing is to be set.
+ * @param col The new column.
+ * @param row The new row.
+ * @param colspan The new column span.
+ * @param rowspan The new row span.
+ */
 EOLIAN static void
 _elm_table_pack_set(Eo *obj, void *_pd EINA_UNUSED, Evas_Object *subobj, int col, int row, int colspan, int rowspan)
 {
@@ -279,6 +486,18 @@ _elm_table_pack_set(Eo *obj, void *_pd EINA_UNUSED, Evas_Object *subobj, int col
    efl_ui_focus_composition_dirty(obj);
 }
 
+/**
+ * @brief Get the packing location of an existing child of the table
+ *
+ * @param subobj The subobject to be queried
+ * @param[out] col The column in which the subobject is packed.
+ * @param[out] row The row in which the subobject is packed.
+ * @param[out] colspan The number of columns the subobject spans.
+ * @param[out] rowspan The number of rows the subobject spans.
+ *
+ * @see elm_table_pack() for more details
+ * @ingroup Elm_Table_Group
+ */
 EAPI void
 elm_table_pack_get(Evas_Object *subobj,
                    int *col,
@@ -291,6 +510,11 @@ elm_table_pack_get(Evas_Object *subobj,
    elm_obj_table_pack_get(obj, subobj, col, row, colspan, rowspan);
 }
 
+/**
+ * @internal
+ * @brief Gets the packing of a subobject within the table.
+ * @see elm_table_pack_get()
+ */
 EOLIAN static void
 _elm_table_pack_get(Eo *obj, void *_pd EINA_UNUSED, Evas_Object *subobj, int *col, int *row, int *colspan, int *rowspan)
 {
@@ -305,6 +529,11 @@ _elm_table_pack_get(Eo *obj, void *_pd EINA_UNUSED, Evas_Object *subobj, int *co
    if (rowspan) *rowspan = irowspan;
 }
 
+/**
+ * @internal
+ * @brief Clears the table of all children.
+ * @see elm_table_clear()
+ */
 EOLIAN static void
 _elm_table_clear(Eo *obj, void *_pd EINA_UNUSED, Eina_Bool clear)
 {
@@ -314,6 +543,11 @@ _elm_table_clear(Eo *obj, void *_pd EINA_UNUSED, Eina_Bool clear)
    efl_ui_focus_composition_dirty(obj);
 }
 
+/**
+ * @internal
+ * @brief Gets the child object at a specific cell in the table.
+ * @see elm_table_child_get()
+ */
 EOLIAN static Evas_Object*
 _elm_table_child_get(const Eo *obj, void *_pd EINA_UNUSED, int col, int row)
 {
@@ -322,12 +556,30 @@ _elm_table_child_get(const Eo *obj, void *_pd EINA_UNUSED, int col, int row)
    return evas_object_table_child_get(wd->resize_obj, col, row);
 }
 
+/**
+ * @internal
+ * @brief Class constructor for Elm_Table.
+ *
+ * Registers the legacy type name for the class.
+ *
+ * @param klass The Efl_Class.
+ */
 EOLIAN static void
 _elm_table_class_constructor(Efl_Class *klass)
 {
    evas_smart_legacy_type_register(MY_CLASS_NAME_LEGACY, klass);
 }
 
+/**
+ * @internal
+ * @brief Calculates the layout of the table.
+ *
+ * This function is called when the canvas group needs recalculation.
+ * It triggers the smart calculation of the internal Evas table object.
+ *
+ * @param obj The Evas object (table).
+ * @param pd Private data (unused).
+ */
 EOLIAN void
 _elm_table_efl_canvas_group_group_calculate(Eo *obj, void *pd EINA_UNUSED)
 {
@@ -343,3 +595,7 @@ _elm_table_efl_canvas_group_group_calculate(Eo *obj, void *pd EINA_UNUSED)
    EFL_CANVAS_GROUP_ADD_DEL_OPS(elm_table)
 
 #include "elm_table_eo.c"
+
+/**
+ * @}
+ */

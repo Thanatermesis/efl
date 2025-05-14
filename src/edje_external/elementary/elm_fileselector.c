@@ -1,19 +1,36 @@
 #include <assert.h>
 #include "private.h"
 
+/**
+ * @brief Structure to hold the parameters for the fileselector widget.
+ * This structure is used to store the state of the fileselector widget,
+ * particularly when it's being created or modified through external parameters.
+ */
 typedef struct _Elm_Params_Fileselector
 {
-   Elm_Params base;
-   Eina_Bool is_save:1;
-   Eina_Bool is_save_set:1;
-   Eina_Bool folder_only:1;
-   Eina_Bool folder_only_set:1;
-   Eina_Bool show_buttons:1;
-   Eina_Bool show_buttons_set:1;
-   Eina_Bool expandable:1;
-   Eina_Bool expandable_set:1;
+   Elm_Params base; /**< Base parameters, common to all Elm widgets. */
+   Eina_Bool is_save:1; /**< If true, the fileselector is in 'save' mode. */
+   Eina_Bool is_save_set:1; /**< Tracks if the is_save parameter has been set. */
+   Eina_Bool folder_only:1; /**< If true, only folders can be selected. */
+   Eina_Bool folder_only_set:1; /**< Tracks if the folder_only parameter has been set. */
+   Eina_Bool show_buttons:1; /**< If true, 'OK' and 'Cancel' buttons are shown. */
+   Eina_Bool show_buttons_set:1; /**< Tracks if the show_buttons parameter has been set. */
+   Eina_Bool expandable:1; /**< If true, the fileselector view is expandable. */
+   Eina_Bool expandable_set:1; /**< Tracks if the expandable parameter has been set. */
 } Elm_Params_Fileselector;
 
+/**
+ * @brief Sets the state of the fileselector widget based on parameters.
+ *
+ * This function is called to apply a new state to the fileselector widget,
+ * typically during transitions or initial setup from external parameters.
+ *
+ * @param data Unused user data.
+ * @param obj The Evas_Object (fileselector widget) to modify.
+ * @param from_params The previous state parameters (can be NULL).
+ * @param to_params The new state parameters to apply (can be NULL).
+ * @param pos Unused position value for transitions.
+ */
 static void
 external_fileselector_state_set(void *data EINA_UNUSED, Evas_Object *obj,
                                 const void *from_params, const void *to_params,
@@ -35,6 +52,17 @@ external_fileselector_state_set(void *data EINA_UNUSED, Evas_Object *obj,
      elm_fileselector_expandable_set(obj, p->expandable);
 }
 
+/**
+ * @brief Sets a specific external parameter on the fileselector widget.
+ *
+ * This function is called by the Edje external interface to set individual
+ * properties of the fileselector widget.
+ *
+ * @param data Unused user data.
+ * @param obj The Evas_Object (fileselector widget) to modify.
+ * @param param The Edje_External_Param to apply.
+ * @return EINA_TRUE if the parameter was successfully set, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 external_fileselector_param_set(void *data EINA_UNUSED, Evas_Object *obj,
                                 const Edje_External_Param *param)
@@ -78,6 +106,20 @@ external_fileselector_param_set(void *data EINA_UNUSED, Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Gets a specific external parameter from the fileselector widget.
+ *
+ * This function is called by the Edje external interface to retrieve individual
+ * properties of the fileselector widget.
+ *
+ * @param data Unused user data.
+ * @param obj The Evas_Object (fileselector widget) to query.
+ * @param param The Edje_External_Param to fill with the retrieved value.
+ *              The `name` field indicates which parameter to get.
+ *              The `type` field indicates the expected type.
+ *              The value (e.g., `i` for int/bool) will be set if successful.
+ * @return EINA_TRUE if the parameter was successfully retrieved, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 external_fileselector_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
                                 Edje_External_Param *param)
@@ -121,6 +163,23 @@ external_fileselector_param_get(void *data EINA_UNUSED, const Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Parses a list of Edje external parameters and creates an Elm_Params_Fileselector structure.
+ *
+ * This function converts a list of Edje parameters into a structured
+ * Elm_Params_Fileselector object, which can then be used to set the state
+ * of a fileselector widget.
+ *
+ * @param data Unused user data.
+ * @param obj Unused Evas_Object.
+ * @param params A list of Edje_External_Param objects to parse.
+ *               Example of params list structure:
+ *               - param1: name="save", type=EDJE_EXTERNAL_PARAM_TYPE_BOOL, i=1
+ *               - param2: name="folder only", type=EDJE_EXTERNAL_PARAM_TYPE_BOOL, i=0
+ * @return A newly allocated Elm_Params_Fileselector structure filled with parsed values,
+ *         or NULL on failure. The caller is responsible for freeing this structure
+ *         using external_fileselector_params_free().
+ */
 static void *
 external_fileselector_params_parse(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, const Eina_List *params)
 {
@@ -159,6 +218,17 @@ external_fileselector_params_parse(void *data EINA_UNUSED, Evas_Object *obj EINA
    return mem;
 }
 
+/**
+ * @brief Retrieves content from the fileselector widget.
+ *
+ * This function is part of the Edje external interface but is not
+ * implemented for the fileselector widget as it does not provide named content parts.
+ *
+ * @param data Unused user data.
+ * @param obj Unused Evas_Object.
+ * @param content Unused content name.
+ * @return Always NULL for fileselector.
+ */
 static Evas_Object *external_fileselector_content_get(void *data EINA_UNUSED,
                                                       const Evas_Object *obj EINA_UNUSED,
                                                       const char *content EINA_UNUSED)
@@ -167,6 +237,11 @@ static Evas_Object *external_fileselector_content_get(void *data EINA_UNUSED,
    return NULL;
 }
 
+/**
+ * @brief Frees the memory allocated for Elm_Params_Fileselector.
+ *
+ * @param params A pointer to the Elm_Params_Fileselector structure to be freed.
+ */
 static void
 external_fileselector_params_free(void *params)
 {
@@ -174,6 +249,12 @@ external_fileselector_params_free(void *params)
    free(mem);
 }
 
+/**
+ * @brief Defines the external parameters available for the fileselector widget.
+ *
+ * This array provides metadata about the parameters that can be set or retrieved
+ * for the fileselector widget via the Edje external interface.
+ */
 static Edje_External_Param_Info external_fileselector_params[] =
 {
    DEFINE_EXTERNAL_COMMON_PARAMS,

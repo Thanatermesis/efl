@@ -34,7 +34,7 @@ typedef struct _Ecore_Con_Reply Ecore_Con_Reply;
  * @param[in] name The name of the eet stream.
  * @param[in] edd The Eet.Data.Descriptor that is to be registered.
  *
- * @ingroup (null)_Group
+ * @ingroup Ecore_Con
  */
 ECORE_CON_API void ecore_con_eet(Ecore_Con_Eet_Base *obj, const char *name, Eet_Data_Descriptor *edd);
 

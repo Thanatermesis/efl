@@ -103,96 +103,149 @@ static const char EINA_MAGIC_MATRIXSPARSE_CELL_ITERATOR_STR[] =
           }                                                                \
      } while(0)
 
+/**
+ * @internal
+ * @struct _Eina_Matrixsparse_Cell
+ * @brief Represents a single cell within a sparse matrix row.
+ *
+ * This structure holds the actual data for a cell, its column index,
+ * and pointers to navigate within the doubly linked list of cells in a row.
+ * It also contains a pointer to its parent row.
+ */
 struct _Eina_Matrixsparse_Cell
 {
-   Eina_Matrixsparse_Cell *next;
-   Eina_Matrixsparse_Cell *prev;
+   Eina_Matrixsparse_Cell *next; /**< Pointer to the next cell in the row. */
+   Eina_Matrixsparse_Cell *prev; /**< Pointer to the previous cell in the row. */
 
-   void *data;
-   unsigned long col;
+   void *data;                   /**< Pointer to the data stored in the cell. */
+   unsigned long col;            /**< Column index of this cell. */
 
-   Eina_Matrixsparse_Row *parent;
+   Eina_Matrixsparse_Row *parent; /**< Pointer to the parent row containing this cell. */
 
-   EINA_MAGIC
+   EINA_MAGIC /**< Magic number for type checking. */
 };
 
+/**
+ * @internal
+ * @struct _Eina_Matrixsparse_Row
+ * @brief Represents a single row within a sparse matrix.
+ *
+ * This structure holds a list of cells for the row, its row index,
+ * and pointers to navigate within the doubly linked list of rows in a matrix.
+ * It also contains a pointer to its parent matrix and a `last_used` pointer
+ * for optimizing sequential cell access.
+ */
 struct _Eina_Matrixsparse_Row
 {
-   Eina_Matrixsparse_Row *next;
-   Eina_Matrixsparse_Row *prev;
+   Eina_Matrixsparse_Row *next; /**< Pointer to the next row in the matrix. */
+   Eina_Matrixsparse_Row *prev; /**< Pointer to the previous row in the matrix. */
 
-   Eina_Matrixsparse_Cell *cols;
-   Eina_Matrixsparse_Cell *last_col;
-   Eina_Matrixsparse_Cell *last_used; /* fast sequential access */
-   unsigned long row;
+   Eina_Matrixsparse_Cell *cols;     /**< Pointer to the first cell in this row's linked list. */
+   Eina_Matrixsparse_Cell *last_col; /**< Pointer to the last cell in this row's linked list. */
+   Eina_Matrixsparse_Cell *last_used; /**< Pointer to the last accessed cell in this row, for optimization. */
+   unsigned long row;                /**< Row index of this row. */
 
-   Eina_Matrixsparse *parent;
+   Eina_Matrixsparse *parent; /**< Pointer to the parent matrix containing this row. */
 
-   EINA_MAGIC
+   EINA_MAGIC /**< Magic number for type checking. */
 };
 
+/**
+ * @internal
+ * @struct _Eina_Matrixsparse
+ * @brief Represents a sparse matrix.
+ *
+ * This structure holds a list of rows, the dimensions of the matrix (rows and columns),
+ * and a function pointer for freeing cell data. It also contains a `last_used` pointer
+ * for optimizing sequential row access.
+ */
 struct _Eina_Matrixsparse
 {
-   Eina_Matrixsparse_Row *rows;
-   Eina_Matrixsparse_Row *last_row;
-   Eina_Matrixsparse_Row *last_used; /* fast sequential access */
+   Eina_Matrixsparse_Row *rows;     /**< Pointer to the first row in this matrix's linked list. */
+   Eina_Matrixsparse_Row *last_row; /**< Pointer to the last row in this matrix's linked list. */
+   Eina_Matrixsparse_Row *last_used; /**< Pointer to the last accessed row in this matrix, for optimization. */
 
    struct
    {
-      unsigned long rows;
-      unsigned long cols;
+      unsigned long rows; /**< Total number of rows defined for the matrix. */
+      unsigned long cols; /**< Total number of columns defined for the matrix. */
    } size;
 
    struct
    {
-      void (*func)(void *user_data, void *cell_data);
-      void *user_data;
+      void (*func)(void *user_data, void *cell_data); /**< Function to free cell data. */
+      void *user_data; /**< User data to be passed to the free function. */
    } free;
 
-   EINA_MAGIC
+   EINA_MAGIC /**< Magic number for type checking. */
 };
 
+/**
+ * @internal
+ * @typedef Eina_Matrixsparse_Iterator
+ * @brief Iterator for traversing existing cells in a sparse matrix.
+ */
 typedef struct _Eina_Matrixsparse_Iterator Eina_Matrixsparse_Iterator;
+
+/**
+ * @internal
+ * @typedef Eina_Matrixsparse_Iterator_Complete
+ * @brief Iterator for traversing all potential cells (including empty ones) in a sparse matrix.
+ */
 typedef struct _Eina_Matrixsparse_Iterator_Complete
 Eina_Matrixsparse_Iterator_Complete;
 
+/**
+ * @internal
+ * @struct _Eina_Matrixsparse_Iterator
+ * @brief Internal structure for an iterator over existing matrix cells.
+ *
+ * This iterator skips empty cells.
+ */
 struct _Eina_Matrixsparse_Iterator
 {
-   Eina_Iterator iterator;
+   Eina_Iterator iterator; /**< The public Eina_Iterator interface. */
 
-   const Eina_Matrixsparse *m;
+   const Eina_Matrixsparse *m; /**< The matrix being iterated. */
    struct
    {
-      const Eina_Matrixsparse_Row *row;
-      const Eina_Matrixsparse_Cell *col;
+      const Eina_Matrixsparse_Row *row; /**< Current row in iteration. */
+      const Eina_Matrixsparse_Cell *col;/**< Current cell in iteration. */
    } ref;
 
-   EINA_MAGIC
+   EINA_MAGIC /**< Magic number for type checking. */
 };
 
+/**
+ * @internal
+ * @struct _Eina_Matrixsparse_Iterator_Complete
+ * @brief Internal structure for an iterator over all matrix cells (including empty ones).
+ *
+ * This iterator will return dummy cells for empty positions.
+ */
 struct _Eina_Matrixsparse_Iterator_Complete
 {
-   Eina_Iterator iterator;
+   Eina_Iterator iterator; /**< The public Eina_Iterator interface. */
 
-   const Eina_Matrixsparse *m;
+   const Eina_Matrixsparse *m; /**< The matrix being iterated. */
    struct
    {
-      const Eina_Matrixsparse_Row *row;
-      const Eina_Matrixsparse_Cell *col;
+      const Eina_Matrixsparse_Row *row; /**< Current actual row in iteration (if any). */
+      const Eina_Matrixsparse_Cell *col;/**< Current actual cell in iteration (if any). */
    } ref;
 
    struct
    {
-      unsigned long row, col;
+      unsigned long row, col; /**< Current row and column index for the complete iteration. */
    } idx;
 
    struct
    {
-      Eina_Matrixsparse_Row row;
-      Eina_Matrixsparse_Cell col;
+      Eina_Matrixsparse_Row row;  /**< Dummy row structure for empty cells. */
+      Eina_Matrixsparse_Cell col; /**< Dummy cell structure for empty cells. */
    } dummy;
 
-   EINA_MAGIC
+   EINA_MAGIC /**< Magic number for type checking. */
 };
 
 /**
@@ -217,6 +270,16 @@ static int _eina_matrixsparse_log_dom = -1;
 static Eina_Mempool *_eina_matrixsparse_cell_mp = NULL;
 static Eina_Mempool *_eina_matrixsparse_row_mp = NULL;
 
+/**
+ * @internal
+ * @brief Frees a matrix cell and its associated data.
+ * @param c The cell to free.
+ * @param free_func The function to call to free the cell's data.
+ * @param user_data User data for the free_func.
+ *
+ * If free_func is provided, it is called with user_data and the cell's data.
+ * The cell's memory is then returned to its mempool.
+ */
 static inline void
 _eina_matrixsparse_cell_free(Eina_Matrixsparse_Cell *c, void (*free_func)(
                                 void *,
@@ -229,6 +292,15 @@ _eina_matrixsparse_cell_free(Eina_Matrixsparse_Cell *c, void (*free_func)(
    eina_mempool_free(_eina_matrixsparse_cell_mp, c);
 }
 
+/**
+ * @internal
+ * @brief Unlinks a cell from its row's linked list.
+ * @param c The cell to unlink.
+ *
+ * This function adjusts the `next` and `prev` pointers of the neighboring
+ * cells and updates the parent row's `cols`, `last_col`, and `last_used`
+ * pointers if necessary. The cell itself is not freed.
+ */
 static inline void
 _eina_matrixsparse_cell_unlink(Eina_Matrixsparse_Cell *c)
 {
@@ -259,6 +331,16 @@ _eina_matrixsparse_cell_unlink(Eina_Matrixsparse_Cell *c)
       c->prev->next = NULL;
 }
 
+/**
+ * @internal
+ * @brief Frees all cells within a given row.
+ * @param r The row whose cells are to be freed.
+ * @param free_func The function to call to free each cell's data.
+ * @param user_data User data for the free_func.
+ *
+ * Iterates through all cells in the row and calls _eina_matrixsparse_cell_free()
+ * for each one.
+ */
 static inline void
 _eina_matrixsparse_row_cells_free(Eina_Matrixsparse_Row *r, void (*free_func)(
                                      void *,
@@ -273,6 +355,16 @@ _eina_matrixsparse_row_cells_free(Eina_Matrixsparse_Row *r, void (*free_func)(
      }
 }
 
+/**
+ * @internal
+ * @brief Frees a matrix row and all its cells.
+ * @param r The row to free.
+ * @param free_func The function to call to free cell data.
+ * @param user_data User data for the free_func.
+ *
+ * First, frees all cells in the row using _eina_matrixsparse_row_cells_free().
+ * Then, the row's memory is returned to its mempool.
+ */
 static inline void
 _eina_matrixsparse_row_free(Eina_Matrixsparse_Row *r, void (*free_func)(void *,
                                                                         void *),
@@ -283,6 +375,15 @@ _eina_matrixsparse_row_free(Eina_Matrixsparse_Row *r, void (*free_func)(void *,
    eina_mempool_free(_eina_matrixsparse_row_mp, r);
 }
 
+/**
+ * @internal
+ * @brief Unlinks a row from its matrix's linked list.
+ * @param r The row to unlink.
+ *
+ * This function adjusts the `next` and `prev` pointers of the neighboring
+ * rows and updates the parent matrix's `rows`, `last_row`, and `last_used`
+ * pointers if necessary. The row itself and its cells are not freed.
+ */
 static inline void
 _eina_matrixsparse_row_unlink(Eina_Matrixsparse_Row *r)
 {
@@ -313,6 +414,19 @@ _eina_matrixsparse_row_unlink(Eina_Matrixsparse_Row *r)
       r->prev->next = NULL;
 }
 
+/**
+ * @internal
+ * @brief Determines the starting row and direction for searching a specific row index.
+ * @param m The matrix to search within.
+ * @param row The row index to find.
+ * @param[out] p_r Pointer to store the starting Eina_Matrixsparse_Row for the search.
+ * @param[out] p_dir Pointer to store the direction of search (1 for forward, -1 for backward).
+ *
+ * This function optimizes row searching by choosing the closest starting point:
+ * the beginning of the list, the end of the list, or the last accessed row (`m->last_used`).
+ * It calculates the distance from these points to the target `row` and selects
+ * the one with the minimum distance.
+ */
 static inline void
 _eina_matrixsparse_row_find_parms_get(const Eina_Matrixsparse *m,
                                       unsigned long row,
@@ -356,6 +470,18 @@ _eina_matrixsparse_row_find_parms_get(const Eina_Matrixsparse *m,
    *p_dir = dir;
 }
 
+/**
+ * @internal
+ * @brief Determines the starting cell and direction for searching a specific column index within a row.
+ * @param r The row to search within.
+ * @param col The column index to find.
+ * @param[out] p_c Pointer to store the starting Eina_Matrixsparse_Cell for the search.
+ * @param[out] p_dir Pointer to store the direction of search (1 for forward, -1 for backward).
+ *
+ * Similar to _eina_matrixsparse_row_find_parms_get(), this function optimizes
+ * cell searching within a row by choosing the closest starting point:
+ * the beginning of the cell list, the end of the list, or the last accessed cell (`r->last_used`).
+ */
 static inline void
 _eina_matrixsparse_row_cell_find_parms_get(const Eina_Matrixsparse_Row *r,
                                            unsigned long col,
@@ -399,6 +525,18 @@ _eina_matrixsparse_row_cell_find_parms_get(const Eina_Matrixsparse_Row *r,
    *p_dir = dir;
 }
 
+/**
+ * @internal
+ * @brief Retrieves a row from the matrix by its index.
+ * @param m The matrix to search.
+ * @param row The index of the row to retrieve.
+ * @return The Eina_Matrixsparse_Row if found, otherwise NULL.
+ *
+ * This function performs an optimized search for the row. It first checks
+ * common cases (first row, last row, last used row). If not found, it uses
+ * _eina_matrixsparse_row_find_parms_get() to determine the best starting
+ * point and direction for a linear scan. Updates `m->last_used` if the row is found.
+ */
 static inline Eina_Matrixsparse_Row *
 _eina_matrixsparse_row_idx_get(const Eina_Matrixsparse *m, unsigned long row)
 {
@@ -450,6 +588,19 @@ _eina_matrixsparse_row_idx_get(const Eina_Matrixsparse *m, unsigned long row)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Retrieves a cell from a row by its column index.
+ * @param r The row to search.
+ * @param col The index of the column (cell) to retrieve.
+ * @return The Eina_Matrixsparse_Cell if found, otherwise NULL.
+ *
+ * This function performs an optimized search for the cell within the given row.
+ * It first checks common cases (first cell, last cell, last used cell in the row).
+ * If not found, it uses _eina_matrixsparse_row_cell_find_parms_get() to
+ * determine the best starting point and direction for a linear scan.
+ * Updates `r->last_used` if the cell is found.
+ */
 static inline Eina_Matrixsparse_Cell *
 _eina_matrixsparse_row_cell_idx_get(const Eina_Matrixsparse_Row *r,
                                     unsigned long col)
@@ -502,6 +653,18 @@ _eina_matrixsparse_row_cell_idx_get(const Eina_Matrixsparse_Row *r,
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Retrieves a cell from the matrix by its row and column index.
+ * @param m The matrix to search.
+ * @param row The row index.
+ * @param col The column index.
+ * @return The Eina_Matrixsparse_Cell if found, otherwise NULL.
+ *
+ * This is a convenience function that first calls _eina_matrixsparse_row_idx_get()
+ * to find the row, then _eina_matrixsparse_row_cell_idx_get() to find the cell
+ * within that row.
+ */
 static inline Eina_Matrixsparse_Cell *
 _eina_matrixsparse_cell_idx_get(const Eina_Matrixsparse *m,
                                 unsigned long row,
@@ -514,6 +677,19 @@ _eina_matrixsparse_cell_idx_get(const Eina_Matrixsparse *m,
    return _eina_matrixsparse_row_cell_idx_get(r, col);
 }
 
+/**
+ * @internal
+ * @brief Finds the preceding and succeeding rows for a given row index.
+ * @param m The matrix.
+ * @param row The row index for which to find siblings.
+ * @param[out] p_prev Pointer to store the preceding row.
+ * @param[out] p_next Pointer to store the succeeding row.
+ *
+ * This function is used when inserting a new row to find its correct
+ * position in the sorted linked list of rows. It uses
+ * _eina_matrixsparse_row_find_parms_get() to efficiently locate the
+ * insertion point.
+ */
 static inline void
 _eina_matrixsparse_row_idx_siblings_find(const Eina_Matrixsparse *m,
                                          unsigned long row,
@@ -547,6 +723,19 @@ _eina_matrixsparse_row_idx_siblings_find(const Eina_Matrixsparse *m,
      }
 }
 
+/**
+ * @internal
+ * @brief Finds the preceding and succeeding cells for a given column index within a row.
+ * @param r The row.
+ * @param col The column index for which to find siblings.
+ * @param[out] p_prev Pointer to store the preceding cell.
+ * @param[out] p_next Pointer to store the succeeding cell.
+ *
+ * This function is used when inserting a new cell into a row to find its
+ * correct position in the sorted linked list of cells. It uses
+ * _eina_matrixsparse_row_cell_find_parms_get() to efficiently locate the
+ * insertion point.
+ */
 static inline void
 _eina_matrixsparse_row_cell_idx_siblings_find(const Eina_Matrixsparse_Row *r,
                                               unsigned long col,
@@ -580,6 +769,18 @@ _eina_matrixsparse_row_cell_idx_siblings_find(const Eina_Matrixsparse_Row *r,
      }
 }
 
+/**
+ * @internal
+ * @brief Adds a new, empty row to the matrix at the specified row index.
+ * @param m The matrix to add the row to.
+ * @param row The index for the new row.
+ * @return The newly created Eina_Matrixsparse_Row, or NULL on allocation failure.
+ *
+ * Allocates a new row from the mempool and inserts it into the matrix's
+ * sorted linked list of rows. Handles cases for an empty matrix, insertion
+ * at the beginning, at the end, or in the middle. Updates `m->last_used`
+ * to point to the new row.
+ */
 static inline Eina_Matrixsparse_Row *
 _eina_matrixsparse_row_idx_add(Eina_Matrixsparse *m, unsigned long row)
 {
@@ -631,6 +832,19 @@ _eina_matrixsparse_row_idx_add(Eina_Matrixsparse *m, unsigned long row)
    return r;
 }
 
+/**
+ * @internal
+ * @brief Adds a new cell with data to a row at the specified column index.
+ * @param r The row to add the cell to.
+ * @param col The column index for the new cell.
+ * @param data The data to store in the new cell.
+ * @return The newly created Eina_Matrixsparse_Cell, or NULL on allocation failure.
+ *
+ * Allocates a new cell from the mempool and inserts it into the row's
+ * sorted linked list of cells. Handles cases for an empty row, insertion
+ * at the beginning, at the end, or in the middle. Updates `r->last_used`
+ * to point to the new cell.
+ */
 static inline Eina_Matrixsparse_Cell *
 _eina_matrixsparse_row_cell_idx_add(Eina_Matrixsparse_Row *r,
                                     unsigned long col,
@@ -682,6 +896,21 @@ _eina_matrixsparse_row_cell_idx_add(Eina_Matrixsparse_Row *r,
    return c;
 }
 
+/**
+ * @internal
+ * @brief Adds a cell with data to the matrix at the specified row and column.
+ * @param m The matrix.
+ * @param row The row index.
+ * @param col The column index.
+ * @param data The data for the new cell.
+ * @return #EINA_TRUE on success, #EINA_FALSE on failure (e.g., allocation error).
+ *
+ * This function first tries to get the specified row. If the row doesn't exist,
+ * it creates it using _eina_matrixsparse_row_idx_add(). Then, it adds the cell
+ * to the row using _eina_matrixsparse_row_cell_idx_add(). If adding the cell
+ * fails and the row was newly created and is still empty, the empty row is
+ * removed and freed.
+ */
 static inline Eina_Bool
 _eina_matrixsparse_cell_idx_add(Eina_Matrixsparse *m,
                                 unsigned long row,
@@ -698,7 +927,9 @@ _eina_matrixsparse_cell_idx_add(Eina_Matrixsparse *m,
    if (_eina_matrixsparse_row_cell_idx_add(r, col, data))
       return 1;
 
-   if (r->cols)
+   /* If cell add failed, and the row was newly created (and thus empty),
+    * clean up the empty row. */
+   if (r->cols) /* Should not happen if _eina_matrixsparse_row_cell_idx_add failed to add the first cell */
       return 0;
 
    _eina_matrixsparse_row_unlink(r);
@@ -709,6 +940,17 @@ _eina_matrixsparse_cell_idx_add(Eina_Matrixsparse *m,
 /*============================================================================*
 *                Iterators                                    *
 *============================================================================*/
+
+/**
+ * @internal
+ * @brief Advances the sparse matrix iterator to the next existing cell.
+ * @param it The iterator.
+ * @param[out] data Pointer to store the Eina_Matrixsparse_Cell.
+ * @return #EINA_TRUE if a next cell exists, #EINA_FALSE otherwise.
+ *
+ * Iterates through cells in the current row, then moves to the next row
+ * if the current row is exhausted. Skips empty cells.
+ */
 static Eina_Bool
 _eina_matrixsparse_iterator_next(Eina_Matrixsparse_Iterator *it, void **data)
 {
@@ -732,6 +974,12 @@ _eina_matrixsparse_iterator_next(Eina_Matrixsparse_Iterator *it, void **data)
    return 1;
 }
 
+/**
+ * @internal
+ * @brief Gets the container (matrix) of a sparse matrix iterator.
+ * @param it The iterator.
+ * @return The Eina_Matrixsparse container.
+ */
 static Eina_Matrixsparse *
 _eina_matrixsparse_iterator_get_container(Eina_Matrixsparse_Iterator *it)
 {
@@ -739,6 +987,11 @@ _eina_matrixsparse_iterator_get_container(Eina_Matrixsparse_Iterator *it)
    return (Eina_Matrixsparse *)it->m;
 }
 
+/**
+ * @internal
+ * @brief Frees a sparse matrix iterator.
+ * @param it The iterator to free.
+ */
 static void
 _eina_matrixsparse_iterator_free(Eina_Matrixsparse_Iterator *it)
 {
@@ -748,6 +1001,19 @@ _eina_matrixsparse_iterator_free(Eina_Matrixsparse_Iterator *it)
    free(it);
 }
 
+/**
+ * @internal
+ * @brief Advances the complete matrix iterator to the next cell (empty or existing).
+ * @param it The complete iterator.
+ * @param[out] data Pointer to store the Eina_Matrixsparse_Cell (can be a dummy cell).
+ * @return #EINA_TRUE if a next cell position exists within matrix bounds, #EINA_FALSE otherwise.
+ *
+ * Iterates through all possible cell positions (row by row, column by column).
+ * If an actual cell exists at the current position, it's returned.
+ * Otherwise, a pre-configured dummy cell representing an empty cell is returned.
+ * The `it->idx.row` and `it->idx.col` track the current logical position,
+ * while `it->ref.row` and `it->ref.col` track the actual data cells.
+ */
 static Eina_Bool
 _eina_matrixsparse_iterator_complete_next(
    Eina_Matrixsparse_Iterator_Complete *it,
@@ -792,6 +1058,12 @@ _eina_matrixsparse_iterator_complete_next(
    return 1;
 }
 
+/**
+ * @internal
+ * @brief Gets the container (matrix) of a complete matrix iterator.
+ * @param it The complete iterator.
+ * @return The Eina_Matrixsparse container.
+ */
 static Eina_Matrixsparse *
 _eina_matrixsparse_iterator_complete_get_container(
    Eina_Matrixsparse_Iterator_Complete *it)
@@ -800,6 +1072,14 @@ _eina_matrixsparse_iterator_complete_get_container(
    return (Eina_Matrixsparse *)it->m;
 }
 
+/**
+ * @internal
+ * @brief Frees a complete matrix iterator.
+ * @param it The complete iterator to free.
+ *
+ * Checks if the dummy cell data was inadvertently modified, which could
+ * indicate a misuse of the iterator.
+ */
 static void
 _eina_matrixsparse_iterator_complete_free(
    Eina_Matrixsparse_Iterator_Complete *it)

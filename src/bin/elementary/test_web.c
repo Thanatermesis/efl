@@ -3,6 +3,13 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Holds all the UI components and state for the web test application.
+ *
+ * This structure is passed around as a data pointer to callbacks to allow
+ * them to access the various Evas_Object widgets and other state information
+ * like the list of sub-windows.
+ */
 typedef struct
 {
    Evas_Object *web;
@@ -15,6 +22,14 @@ typedef struct
    Eina_Bool js_hooks : 1;
 } Web_Test;
 
+/**
+ * @brief Callback for the "Back" button.
+ * @param data The web object.
+ * @param obj The button object that triggered the callback.
+ * @param event_info Event-specific information (unused).
+ *
+ * This function navigates the web object back to the previous page in history.
+ */
 static void
 _btn_back_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -23,6 +38,14 @@ _btn_back_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNU
    elm_web_back(web);
 }
 
+/**
+ * @brief Callback for the "Forward" button.
+ * @param data The web object.
+ * @param obj The button object that triggered the callback.
+ * @param event_info Event-specific information (unused).
+ *
+ * This function navigates the web object forward to the next page in history.
+ */
 static void
 _btn_fwd_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -31,6 +54,14 @@ _btn_fwd_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    elm_web_forward(web);
 }
 
+/**
+ * @brief Callback for the "Reload" button.
+ * @param data The web object.
+ * @param obj The button object that triggered the callback.
+ * @param event_info Event-specific information (unused).
+ *
+ * This function reloads the current page in the web object.
+ */
 static void
 _btn_reload_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -39,6 +70,15 @@ _btn_reload_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_U
    elm_web_reload(web);
 }
 
+/**
+ * @brief Callback for the URL entry "activated" event (e.g., Enter pressed).
+ * @param data The web object.
+ * @param obj The entry object.
+ * @param event_info Event-specific information (unused).
+ *
+ * This function gets the URL from the entry and instructs the web object to
+ * load it.
+ */
 static void
 _url_entry_changed_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -48,12 +88,29 @@ _url_entry_changed_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED
    elm_web_url_set(web, url);
 }
 
+/**
+ * @brief Toggles the "inwin" mode for the web view.
+ * @param data The web object.
+ * @param obj The button object that triggered the callback.
+ * @param event_info Event-specific information (unused).
+ *
+ * Inwin mode means that instead of opening a new window for popups, it will
+ * try to open them in a small area on top of the current web view.
+ */
 static void
 _toggle_inwin_mode_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_web_inwin_mode_set(data, !elm_web_inwin_mode_get(data));
 }
 
+/**
+ * @brief Callback for the "title,changed" smart event from the web object.
+ * @param data The window object.
+ * @param obj The web object that triggered the event.
+ * @param event_info The new page title as a const char*.
+ *
+ * Updates the window title to reflect the current page's title.
+ */
 static void
 _title_changed_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -62,6 +119,15 @@ _title_changed_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
    elm_win_title_set(data, buf);
 }
 
+/**
+ * @brief Callback for the "url,changed" smart event from the web object.
+ * @param data The Web_Test struct.
+ * @param obj The web object that triggered the event.
+ * @param event_info The new URL as a const char*.
+ *
+ * Updates the URL entry to show the new URL, and enables/disables the
+ * back and forward buttons based on navigation history availability.
+ */
 static void
 _url_changed_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -73,6 +139,14 @@ _url_changed_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
    elm_object_disabled_set(wt->btn_fwd, !elm_web_forward_possible_get(wt->web));
 }
 
+/**
+ * @brief Callback for when a sub-window (popup) is deleted.
+ * @param data The Web_Test struct.
+ * @param obj The sub-window that is being deleted.
+ * @param event_info Event-specific information (unused).
+ *
+ * Removes the sub-window from the list of managed sub-windows.
+ */
 static void
 _new_win_del_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -80,12 +154,32 @@ _new_win_del_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    wt->sub_wins = eina_list_remove(wt->sub_wins, obj);
 }
 
+/**
+ * @brief Callback for when a web page requests to close its window.
+ * @param data The window object to be closed.
+ * @param obj The web object that made the request.
+ * @param event_info Event-specific information (unused).
+ *
+ * This handles JavaScript's `window.close()` and deletes the corresponding
+ * popup window.
+ */
 static void
 _web_win_close_request_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    evas_object_del(data);
 }
 
+/**
+ * @brief Hook to handle JavaScript's `window.open()`.
+ * @param data The Web_Test struct.
+ * @param obj The parent web object.
+ * @param js Whether the call was initiated by JavaScript (unused).
+ * @param wf Window features requested (e.g. width, height) (unused).
+ * @return The new web object created for the popup window.
+ *
+ * This function creates a new standard window, places a new web object in it,
+ * and sets up callbacks to manage the new window's lifecycle.
+ */
 static Evas_Object *
 _new_window_hook(void *data, Evas_Object *obj, Eina_Bool js EINA_UNUSED, const Elm_Web_Window_Features *wf EINA_UNUSED)
 {
@@ -112,12 +206,28 @@ _new_window_hook(void *data, Evas_Object *obj, Eina_Bool js EINA_UNUSED, const E
    return new_web;
 }
 
+/**
+ * @brief Deletes the object when the alert popup is clicked.
+ * @param data Custom data (unused).
+ * @param obj The popup object to be deleted.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _alert_del(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    evas_object_del(obj);
 }
 
+/**
+ * @brief Hook to handle JavaScript's `window.alert()`.
+ * @param data Custom data (unused).
+ * @param obj The parent web object.
+ * @param message The message passed to `alert()`.
+ * @return A new popup object (an elm_notify widget).
+ *
+ * This function creates and shows a simple notification popup with the
+ * alert message. The popup is dismissed when clicked.
+ */
 static Evas_Object *
 _alert_hook(void *data EINA_UNUSED, Evas_Object *obj, const char *message)
 {
@@ -140,6 +250,14 @@ _alert_hook(void *data EINA_UNUSED, Evas_Object *obj, const char *message)
    return popup;
 }
 
+/**
+ * @brief Callback for the "Ok" button in the confirm dialog.
+ * @param data A pointer to an Eina_Bool to store the result.
+ * @param obj The button that was clicked.
+ * @param event_info Event-specific information (unused).
+ *
+ * Sets the response to EINA_TRUE, indicating the user confirmed.
+ */
 static void
 _confirm_ok_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -147,6 +265,14 @@ _confirm_ok_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_U
    *response = EINA_TRUE;
 }
 
+/**
+ * @brief Callback for the "Cancel" button in the confirm dialog.
+ * @param data A pointer to an Eina_Bool to store the result.
+ * @param obj The button that was clicked.
+ * @param event_info Event-specific information (unused).
+ *
+ * Sets the response to EINA_FALSE, indicating the user canceled.
+ */
 static void
 _confirm_cancel_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -154,12 +280,30 @@ _confirm_cancel_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EI
    *response = EINA_FALSE;
 }
 
+/**
+ * @brief Callback to dismiss the confirm dialog.
+ * @param data The popup object to be deleted.
+ * @param obj The button that was clicked.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _confirm_dismiss_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    evas_object_del(data);
 }
 
+/**
+ * @brief Hook to handle JavaScript's `window.confirm()`.
+ * @param data Custom data (unused).
+ * @param obj The parent web object.
+ * @param message The message for the confirmation dialog.
+ * @param response A pointer to an Eina_Bool where the result (TRUE for OK,
+ *                 FALSE for Cancel) will be stored.
+ * @return A new popup object representing the confirm dialog.
+ *
+ * Creates a notification with "Ok" and "Cancel" buttons. The user's choice
+ * is written to the `response` pointer.
+ */
 static Evas_Object *
 _confirm_hook(void *data EINA_UNUSED, Evas_Object *obj, const char *message, Eina_Bool *response)
 {
@@ -205,6 +349,21 @@ _confirm_hook(void *data EINA_UNUSED, Evas_Object *obj, const char *message, Ein
    return popup;
 }
 
+/**
+ * @brief Hook to handle JavaScript's `window.prompt()`.
+ * @param data Custom data (unused).
+ * @param obj The parent web object (unused).
+ * @param message The message for the prompt dialog (unused).
+ * @param default_value The default value for the text input.
+ * @param value A pointer to a char* where the entered string will be stored.
+ * @param response A pointer to an Eina_Bool for the result (OK/Cancel).
+ * @return NULL, as this hook provides a synchronous response.
+ *
+ * This is a simplified implementation that does not show a real prompt dialog.
+ * It immediately returns success and provides either the default value or
+ * a hardcoded string as the result. The returned string must be freed by the
+ * caller.
+ */
 static Evas_Object *
 _prompt_hook(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, const char *message EINA_UNUSED, const char *default_value, const char **value, Eina_Bool *response)
 {
@@ -213,6 +372,23 @@ _prompt_hook(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, const char *m
    return NULL;
 }
 
+/**
+ * @brief Hook for file selector requests.
+ * @param data Custom data (unused).
+ * @param obj The parent web object (unused).
+ * @param allow_multiple Whether multiple files can be selected (unused).
+ * @param accept_types A list of accepted MIME types (unused).
+ * @param selected_files A pointer to an Eina_List* to store selected file paths.
+ * @param response A pointer to an Eina_Bool for the result (OK/Cancel).
+ * @return NULL, as this hook provides a synchronous response.
+ *
+ * This is a simplified implementation that does not show a file dialog.
+ * It immediately returns success and provides a hardcoded, non-existing
+ * file path. The returned list and its string content must be freed.
+ *
+ * Example of `selected_files` structure after return:
+ * Eina_List -> ["/path/to/non_existing_file"]
+ */
 static Evas_Object *
 _file_selector_hook(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, Eina_Bool allow_multiple EINA_UNUSED, Eina_List *accept_types EINA_UNUSED, Eina_List **selected_files, Eina_Bool *response)
 {
@@ -222,12 +398,32 @@ _file_selector_hook(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, Eina_B
    return NULL;
 }
 
+/**
+ * @brief Hook for JavaScript's `console.log()` messages.
+ * @param data Custom data (unused).
+ * @param obj The web object (unused).
+ * @param message The console message.
+ * @param line_number The line number in the source where the message originated.
+ * @param source_id The ID of the source file or script.
+ *
+ * This function simply prints the console message to standard output.
+ */
 static void
 _console_message_hook(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, const char *message, unsigned int line_number, const char *source_id)
 {
    printf("CONSOLE: %s:%u:%s\n", source_id, line_number, message);
 }
 
+/**
+ * @brief Toggles the installation of custom JavaScript popup hooks.
+ * @param data The Web_Test struct.
+ * @param obj The button object (unused).
+ * @param event_info Event-specific data (unused).
+ *
+ * This function enables or disables all the custom hooks for handling
+ * `alert`, `confirm`, `prompt`, file selectors, and console messages. When
+ * hooks are disabled, the web engine's default handlers are used.
+ */
 static void
 _js_popup_hooks_set(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -253,6 +449,14 @@ _js_popup_hooks_set(void *data, Evas_Object *obj EINA_UNUSED, void *event_info E
      }
 }
 
+/**
+ * @brief Callback for the zoom out button.
+ * @param data The Web_Test struct.
+ * @param obj The button object (unused).
+ * @param event_info Event-specific data (unused).
+ *
+ * Decreases the zoom level of the web view, with a lower bound.
+ */
 static void
 _zoom_out_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -269,6 +473,14 @@ _zoom_out_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNU
    elm_web_zoom_set(wt->web, zoom);
 }
 
+/**
+ * @brief Callback for the zoom in button.
+ * @param data The Web_Test struct.
+ * @param obj The button object (unused).
+ * @param event_info Event-specific data (unused).
+ *
+ * Increases the zoom level of the web view, with an upper bound.
+ */
 static void
 _zoom_in_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -286,6 +498,15 @@ _zoom_in_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    elm_web_zoom_set(wt->web, zoom);
 }
 
+/**
+ * @brief Callback for selecting a zoom mode from the hoversel.
+ * @param data The Web_Test struct.
+ * @param obj The hoversel object (unused).
+ * @param event_info The selected hoversel item.
+ *
+ * Sets the zoom mode of the web view based on the selected item.
+ * Modes can be Manual, Auto Fit, or Auto Fill.
+ */
 static void
 _zoom_mode_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -301,6 +522,14 @@ _zoom_mode_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
      elm_web_zoom_mode_set(wt->web, ELM_WEB_ZOOM_MODE_AUTO_FILL);
 }
 
+/**
+ * @brief Callback to show a specific region of the web page.
+ * @param data The Web_Test struct.
+ * @param obj The button object (unused).
+ * @param event_info Event-specific data (unused).
+ *
+ * Scrolls the web view to show the region at coordinates (300, 300).
+ */
 static void
 _show_region_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -308,6 +537,14 @@ _show_region_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_
    elm_web_region_show(wt->web, 300, 300, 1, 1);
 }
 
+/**
+ * @brief Callback to bring a specific region into view.
+ * @param data The Web_Test struct.
+ * @param obj The button object (unused).
+ * @param event_info Event-specific data (unused).
+ *
+ * Scrolls the web view to make the region at coordinates (50, 0) visible.
+ */
 static void
 _bring_in_region_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -315,6 +552,15 @@ _bring_in_region_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info E
    elm_web_region_bring_in(wt->web, 50, 0, 1, 1);
 }
 
+/**
+ * @brief Callback executed when the window enters fullscreen mode.
+ * @param data The Web_Test struct.
+ * @param obj The window object (unused).
+ * @param event_info Event-specific data (unused).
+ *
+ * This is used in the UI test scenario (`test_web_ui`) to hide the
+ * test case hoversel when fullscreen is activated.
+ */
 static void
 _on_fullscreen_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -323,6 +569,15 @@ _on_fullscreen_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EIN
    evas_object_hide(wt->hoversel);
 }
 
+/**
+ * @brief Callback executed when the window leaves fullscreen mode.
+ * @param data The Web_Test struct.
+ * @param obj The window object (unused).
+ * @param event_info Event-specific data (unused).
+ *
+ * This is used in the UI test scenario (`test_web_ui`) to restore the
+ * test case hoversel when fullscreen is exited.
+ */
 static void
 _on_unfullscreen_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -331,10 +586,13 @@ _on_unfullscreen_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info E
    evas_object_show(wt->hoversel);
 }
 
+/**
+ * @brief Associates a friendly name with a full user agent string.
+ */
 typedef struct
 {
-   const char* name;
-   const char* useragent;
+   const char* name;      /**< A short, readable name for the user agent. */
+   const char* useragent; /**< The full user agent string. NULL for default. */
 } User_Agent;
 
 static User_Agent ua[] = {
@@ -346,6 +604,14 @@ static User_Agent ua[] = {
     {"Desktop/Chrome", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.17 (KHTML, like Gecko) Chrome/24.0.1312.57 Safari/537.17"}
 };
 
+/**
+ * @brief Callback for selecting a user agent from the hoversel.
+ * @param data The Web_Test struct.
+ * @param obj The hoversel object (unused).
+ * @param event_info The selected hoversel item.
+ *
+ * Sets the user agent string for the web view based on the user's selection.
+ */
 static void
 _useragent_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -362,6 +628,16 @@ _useragent_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info)
        }
 }
 
+/**
+ * @brief Loads an HTML string to test JavaScript dialogs (alert, confirm, prompt).
+ * @param data The Web_Test struct.
+ * @param obj The hoversel object.
+ * @param event_info The selected hoversel item.
+ *
+ * This function is a test case selected from the `test_web_ui` hoversel.
+ * It loads a specific HTML content into the web view to trigger and test
+ * the dialog handling hooks.
+ */
 static void
 _dialog_test_cb(void *data, Evas_Object *obj, void *event_info)
 {
@@ -392,6 +668,16 @@ _dialog_test_cb(void *data, Evas_Object *obj, void *event_info)
    elm_web_html_string_load(wt->web, dialog_html, NULL, NULL);
 }
 
+/**
+ * @brief Loads an HTML string to test the `<select>` tag.
+ * @param data The Web_Test struct.
+ * @param obj The hoversel object.
+ * @param event_info The selected hoversel item.
+ *
+ * This function is a test case selected from the `test_web_ui` hoversel.
+ * It loads HTML containing a `<select>` element to test its rendering
+ * and interaction.
+ */
 static void
 _select_tag_test_cb(void *data, Evas_Object *obj, void *event_info)
 {
@@ -415,6 +701,16 @@ _select_tag_test_cb(void *data, Evas_Object *obj, void *event_info)
    elm_web_html_string_load(wt->web, select_html, NULL, NULL);
 }
 
+/**
+ * @brief Loads an HTML string to test `window.open()`.
+ * @param data The Web_Test struct.
+ * @param obj The hoversel object.
+ * @param event_info The selected hoversel item.
+ *
+ * This function is a test case selected from the `test_web_ui` hoversel.
+ * It loads HTML with JavaScript that calls `window.open()` and `window.close()`
+ * to test the new window creation hook.
+ */
 static void
 _new_window_test_cb(void *data, Evas_Object *obj, void *event_info)
 {
@@ -443,6 +739,16 @@ _new_window_test_cb(void *data, Evas_Object *obj, void *event_info)
    elm_web_html_string_load(wt->web, new_window_html, NULL, NULL);
 }
 
+/**
+ * @brief Loads an HTML string to test the JavaScript Fullscreen API.
+ * @param data The Web_Test struct.
+ * @param obj The hoversel object.
+ * @param event_info The selected hoversel item.
+ *
+ * This function is a test case selected from the `test_web_ui` hoversel.
+ * It loads HTML with JavaScript that uses `webkitRequestFullscreen` to test
+ * the fullscreen functionality.
+ */
 static void
 _fullscreen_test_cb(void *data, Evas_Object *obj, void *event_info)
 {
@@ -469,6 +775,16 @@ _fullscreen_test_cb(void *data, Evas_Object *obj, void *event_info)
    elm_web_html_string_load(wt->web, fullscreen_html, NULL, NULL);
 }
 
+/**
+ * @brief Callback for when the main web object is deleted.
+ * @param data The Web_Test struct.
+ * @param e The Evas canvas (unused).
+ * @param obj The web object being deleted (unused).
+ * @param event_info Event-specific data (unused).
+ *
+ * This function performs cleanup when the application is closing. It deletes
+ * any open sub-windows and frees the Web_Test struct.
+ */
 static void
 _main_web_del_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -481,6 +797,14 @@ _main_web_del_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, 
    free(wt);
 }
 
+/**
+ * @brief Main function to create the primary web test window.
+ *
+ * This test creates a window with a web view, navigation controls (back,
+ * forward, reload), a URL entry bar, and buttons for various features like
+ * zoom, inwin mode, custom JS hooks, and user agent switching. It's a general
+ * purpose browser-like interface for testing the web widget.
+ */
 void
 test_web(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -636,6 +960,14 @@ test_web(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info 
    evas_object_show(win);
 }
 
+/**
+ * @brief Creates a test window focused on specific UI interaction scenarios.
+ *
+ * This test creates a window with a web view and a hoversel menu. The menu
+ * allows loading different HTML content to test specific features like
+ * dialogs, `<select>` tags, new windows, and fullscreen. This is more of a
+ * targeted test case runner than a general browser.
+ */
 void
 test_web_ui(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

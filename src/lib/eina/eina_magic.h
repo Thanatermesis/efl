@@ -129,6 +129,20 @@
 
 /**
  * @brief An abstract type for a magic number.
+ * @typedef Eina_Magic
+ * An Eina_Magic is typically a unique constant value assigned to a structure type
+ * to allow runtime type identification.
+ * Example:
+ * @code
+ * #define MY_TYPE_MAGIC EINA_MAGIC_MAKE(M, Y, _, T) // Example of creating a unique magic
+ * typedef struct _My_Type {
+ *   EINA_MAGIC; // Embeds the __magic field
+ *   // ... other members
+ * } My_Type;
+ *
+ * My_Type *my_obj = calloc(1, sizeof(My_Type));
+ * EINA_MAGIC_SET(my_obj, MY_TYPE_MAGIC);
+ * @endcode
  */
 typedef unsigned int Eina_Magic;
 
@@ -192,7 +206,8 @@ EINA_API Eina_Bool   eina_magic_string_static_set(Eina_Magic  magic,
  *        feature has already been freed. It is used by eina_magic_fail().
  *
  * @note If the magic feature of Eina is disabled, #EINA_MAGIC_NONE is just
- *       @c 0.
+ *       @c 0. This specific value is chosen to be an unlikely random value
+ *       to reduce collision chances with valid magic numbers.
  */
 #define EINA_MAGIC_NONE 0x1234fedc
 
@@ -220,6 +235,7 @@ EINA_API extern Eina_Error EINA_ERROR_MAGIC_FAILED;
  * @endcode
  *
  * @note If the magic feature of Eina is disabled, #EINA_MAGIC does nothing.
+ *       The `__magic` field name is by convention.
  */
 #define EINA_MAGIC Eina_Magic __magic;
 
@@ -229,8 +245,10 @@ EINA_API extern Eina_Error EINA_ERROR_MAGIC_FAILED;
  *        to a structure holding an Eina magic number declaration.
  *        Use #EINA_MAGIC to add such a declaration.
  *
- * @note If the magic feature of Eina is disabled, #EINA_MAGIC_CHECK is just
- *       the value @c 0.
+ * @param d Pointer to the structure instance.
+ * @param m The magic number to set (e.g., MY_TYPE_MAGIC).
+ *
+ * @note If the magic feature of Eina is disabled, #EINA_MAGIC_SET is a no-op.
  */
 #define EINA_MAGIC_SET(d, m)   (d)->__magic = (m)
 
@@ -241,8 +259,13 @@ EINA_API extern Eina_Error EINA_ERROR_MAGIC_FAILED;
  *        holds an Eina magic number declaration. Use #EINA_MAGIC to add such a
  *        declaration.
  *
- * @note If the magic feature of Eina is disabled, #EINA_MAGIC_CHECK is just
- *       the value @c 1.
+ * @param d Pointer to the structure instance.
+ * @param m The magic number to check against (e.g., MY_TYPE_MAGIC).
+ * @return #EINA_TRUE if the pointer @p d is not NULL and its magic number matches @p m.
+ *         Otherwise, returns #EINA_FALSE.
+ *
+ * @note If the magic feature of Eina is disabled, #EINA_MAGIC_CHECK always
+ *       evaluates to @c 1 (true), effectively bypassing the check.
  */
 #define EINA_MAGIC_CHECK(d, m) (EINA_LIKELY((d) && ((d)->__magic == (m))))
 
@@ -253,8 +276,12 @@ EINA_API extern Eina_Error EINA_ERROR_MAGIC_FAILED;
  *        holds an Eina magic number declaration. Use #EINA_MAGIC to add such a
  *        declaration.
  *
- * @note If the magic feature of Eina is disabled, #EINA_MAGIC_FAIL does
- *       nothing.
+ * @param d Pointer to the structure instance that failed the magic check.
+ * @param m The expected magic number (e.g., MY_TYPE_MAGIC).
+ *
+ * @note If the magic feature of Eina is disabled, #EINA_MAGIC_FAIL is a no-op.
+ *       When enabled, this macro calls eina_magic_fail() with detailed
+ *       context information (file, function, line number).
  */
 #define EINA_MAGIC_FAIL(d, m)             \
   eina_magic_fail((void *)(d),            \

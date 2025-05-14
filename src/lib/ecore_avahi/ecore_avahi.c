@@ -10,35 +10,50 @@
 #ifdef HAVE_AVAHI
 #include <avahi-common/watch.h>
 
+/**
+ * @brief Structure to hold an Avahi watch integrated with Ecore's main loop.
+ */
 typedef struct _Ecore_Avahi_Watch Ecore_Avahi_Watch;
+/**
+ * @brief Structure to hold an Avahi timeout integrated with Ecore's main loop.
+ */
 typedef struct _Ecore_Avahi_Timeout Ecore_Avahi_Timeout;
 
 struct _Ecore_Avahi_Watch
 {
-   Ecore_Fd_Handler  *handler;
-   Ecore_Avahi       *parent;
+   Ecore_Fd_Handler  *handler; /**< Ecore file descriptor handler for this watch. */
+   Ecore_Avahi       *parent; /**< Pointer to the parent Ecore_Avahi instance. */
 
-   AvahiWatchCallback callback;
-   void              *callback_data;
+   AvahiWatchCallback callback; /**< User-provided callback function for Avahi watch events. */
+   void              *callback_data; /**< User-provided data for the Avahi watch callback. */
 };
 
 struct _Ecore_Avahi_Timeout
 {
-   Ecore_Timer         *timer;
-   Ecore_Avahi         *parent;
+   Ecore_Timer         *timer; /**< Ecore timer for this timeout. */
+   Ecore_Avahi         *parent; /**< Pointer to the parent Ecore_Avahi instance. */
 
-   AvahiTimeoutCallback callback;
-   void                *callback_data;
+   AvahiTimeoutCallback callback; /**< User-provided callback function for Avahi timeout events. */
+   void                *callback_data; /**< User-provided data for the Avahi timeout callback. */
 };
 
+/**
+ * @brief Main structure for Ecore Avahi integration.
+ * This structure holds the AvahiPoll API functions and lists of active watches and timeouts.
+ */
 struct _Ecore_Avahi
 {
-   AvahiPoll  api;
+   AvahiPoll  api; /**< AvahiPoll structure with function pointers for main loop integration. */
 
-   Eina_List *watches;
-   Eina_List *timeouts;
+   Eina_List *watches; /**< List of active Ecore_Avahi_Watch instances. */
+   Eina_List *timeouts; /**< List of active Ecore_Avahi_Timeout instances. */
 };
 
+/**
+ * @brief Converts AvahiWatchEvent flags to Ecore_Fd_Handler_Flags.
+ * @param events The Avahi watch events.
+ * @return The corresponding Ecore file descriptor handler flags.
+ */
 static Ecore_Fd_Handler_Flags
 _ecore_avahi_events2ecore(AvahiWatchEvent events)
 {
@@ -47,6 +62,14 @@ _ecore_avahi_events2ecore(AvahiWatchEvent events)
      ECORE_FD_ERROR;
 }
 
+/**
+ * @brief Callback function for Ecore file descriptor handlers.
+ * This function is called when there is activity on a watched file descriptor.
+ * It translates Ecore FD events back to Avahi watch events and calls the user's AvahiWatchCallback.
+ * @param data Pointer to the Ecore_Avahi_Watch structure.
+ * @param fd_handler The Ecore_Fd_Handler that triggered the callback.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
+ */
 static Eina_Bool
 _ecore_avahi_watch_cb(void *data, Ecore_Fd_Handler *fd_handler)
 {
@@ -62,6 +85,16 @@ _ecore_avahi_watch_cb(void *data, Ecore_Fd_Handler *fd_handler)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Creates a new Avahi watch.
+ * This function is part of the AvahiPoll API and is called by Avahi to register a new file descriptor watch.
+ * @param api The AvahiPoll API structure.
+ * @param fd The file descriptor to watch.
+ * @param events The events to watch for (AVAHI_WATCH_IN, AVAHI_WATCH_OUT, etc.).
+ * @param callback The function to call when an event occurs.
+ * @param userdata User data to pass to the callback.
+ * @return A pointer to the new AvahiWatch structure, or NULL on failure.
+ */
 static AvahiWatch *
 _ecore_avahi_watch_new(const AvahiPoll *api,
                        int fd, AvahiWatchEvent events,
@@ -85,6 +118,12 @@ _ecore_avahi_watch_new(const AvahiPoll *api,
    return (AvahiWatch*) watch;
 }
 
+/**
+ * @brief Updates the events for an existing Avahi watch.
+ * This function is part of the AvahiPoll API.
+ * @param w The AvahiWatch to update.
+ * @param events The new set of events to watch for.
+ */
 static void
 _ecore_avahi_watch_update(AvahiWatch *w, AvahiWatchEvent events)
 {
@@ -93,6 +132,11 @@ _ecore_avahi_watch_update(AvahiWatch *w, AvahiWatchEvent events)
    ecore_main_fd_handler_active_set(watch->handler, _ecore_avahi_events2ecore(events));
 }
 
+/**
+ * @brief Frees an Avahi watch.
+ * This function is part of the AvahiPoll API.
+ * @param w The AvahiWatch to free.
+ */
 static void
 _ecore_avahi_watch_free(AvahiWatch *w)
 {
@@ -103,6 +147,12 @@ _ecore_avahi_watch_free(AvahiWatch *w)
    free(watch);
 }
 
+/**
+ * @brief Gets the currently monitored events for an Avahi watch.
+ * This function is part of the AvahiPoll API.
+ * @param w The AvahiWatch to query.
+ * @return The AvahiWatchEvent flags representing the monitored events.
+ */
 static AvahiWatchEvent
 _ecore_avahi_watch_get_events(AvahiWatch *w)
 {
@@ -116,6 +166,12 @@ _ecore_avahi_watch_get_events(AvahiWatch *w)
    return flags;
 }
 
+/**
+ * @brief Converts a struct timeval to a double representing seconds from now.
+ * If the timeval is in the past or NULL, it returns a small positive value or a default large value respectively.
+ * @param tv Pointer to the struct timeval to convert. If NULL, a default timeout of 3600 seconds is assumed.
+ * @return The time difference in seconds as a double.
+ */
 static double
 _ecore_avahi_timeval2double(const struct timeval *tv)
 {
@@ -132,6 +188,13 @@ _ecore_avahi_timeval2double(const struct timeval *tv)
    return tm;
 }
 
+/**
+ * @brief Callback function for Ecore timers.
+ * This function is called when an Avahi timeout expires.
+ * It calls the user's AvahiTimeoutCallback.
+ * @param data Pointer to the Ecore_Avahi_Timeout structure.
+ * @return ECORE_CALLBACK_CANCEL to remove the timer after it fires.
+ */
 static Eina_Bool
 _ecore_avahi_timeout_cb(void *data)
 {
@@ -143,6 +206,15 @@ _ecore_avahi_timeout_cb(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Creates a new Avahi timeout.
+ * This function is part of the AvahiPoll API and is called by Avahi to register a new timeout.
+ * @param api The AvahiPoll API structure.
+ * @param tv The timeval specifying when the timeout should fire. If NULL, the timeout is initially disabled.
+ * @param callback The function to call when the timeout expires.
+ * @param userdata User data to pass to the callback.
+ * @return A pointer to the new AvahiTimeout structure, or NULL on failure.
+ */
 static AvahiTimeout *
 _ecore_avahi_timeout_new(const AvahiPoll *api, const struct timeval *tv,
                          AvahiTimeoutCallback callback, void *userdata)
@@ -164,6 +236,12 @@ _ecore_avahi_timeout_new(const AvahiPoll *api, const struct timeval *tv,
    return (AvahiTimeout*) timeout;
 }
 
+/**
+ * @brief Updates an existing Avahi timeout.
+ * This function is part of the AvahiPoll API.
+ * @param t The AvahiTimeout to update.
+ * @param tv The new timeval for the timeout. If NULL, the timeout is disabled.
+ */
 static void
 _ecore_avahi_timeout_update(AvahiTimeout *t, const struct timeval *tv)
 {
@@ -177,6 +255,11 @@ _ecore_avahi_timeout_update(AvahiTimeout *t, const struct timeval *tv)
                                       _ecore_avahi_timeout_cb, timeout);
 }
 
+/**
+ * @brief Frees an Avahi timeout.
+ * This function is part of the AvahiPoll API.
+ * @param t The AvahiTimeout to free.
+ */
 static void
 _ecore_avahi_timeout_free(AvahiTimeout *t)
 {
@@ -188,6 +271,22 @@ _ecore_avahi_timeout_free(AvahiTimeout *t)
 }
 #endif
 
+/**
+ * @brief Creates and initializes a new Ecore_Avahi handler.
+ * This handler provides the AvahiPoll API implementation for Ecore.
+ * @return A pointer to the new Ecore_Avahi handler, or NULL on failure or if Avahi support is not compiled in.
+ * @see ecore_avahi_del()
+ * @see ecore_avahi_poll_get()
+ *
+ * Example:
+ * @code
+ * Ecore_Avahi *ea = ecore_avahi_add();
+ * if (ea) {
+ *     const AvahiPoll *poll_api = ecore_avahi_poll_get(ea);
+ *     // Use poll_api with Avahi client creation
+ * }
+ * @endcode
+ */
 EAPI Ecore_Avahi *
 ecore_avahi_add(void)
 {
@@ -213,6 +312,19 @@ ecore_avahi_add(void)
 #endif
 }
 
+/**
+ * @brief Deletes an Ecore_Avahi handler and frees associated resources.
+ * This function cleans up all watches and timers associated with the handler.
+ * @param handler The Ecore_Avahi handler to delete.
+ * @see ecore_avahi_add()
+ *
+ * Example:
+ * @code
+ * Ecore_Avahi *ea = ecore_avahi_add();
+ * // ... use ea ...
+ * ecore_avahi_del(ea);
+ * @endcode
+ */
 EAPI void
 ecore_avahi_del(Ecore_Avahi *handler)
 {
@@ -238,6 +350,22 @@ ecore_avahi_del(Ecore_Avahi *handler)
 #endif
 }
 
+/**
+ * @brief Gets the AvahiPoll API structure from an Ecore_Avahi handler.
+ * This structure contains function pointers that Avahi uses to integrate with the Ecore main loop.
+ * @param handler The Ecore_Avahi handler.
+ * @return A pointer to the const AvahiPoll API structure, or NULL if the handler is NULL or Avahi support is not compiled in.
+ * @see ecore_avahi_add()
+ *
+ * Example:
+ * @code
+ * Ecore_Avahi *ea = ecore_avahi_add();
+ * const AvahiPoll *poll_api = ecore_avahi_poll_get(ea);
+ * if (poll_api) {
+ *     // Pass poll_api to avahi_client_new()
+ * }
+ * @endcode
+ */
 EAPI const void *
 ecore_avahi_poll_get(Ecore_Avahi *handler)
 {

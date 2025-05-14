@@ -33,16 +33,62 @@ typedef enum
    ECORE_WIN32_KEY_MASK_RMENU = 1 << 5
 } Ecore_Win32_Key_Mask;
 
+/** @internal
+ * @brief Stores the window that received the last mouse button down event.
+ * Used for detecting double/triple clicks.
+ */
 static Ecore_Win32_Window  *_ecore_win32_mouse_down_last_window = NULL;
+/** @internal
+ * @brief Stores the window that received the second to last mouse button down event.
+ * Used for detecting triple clicks.
+ */
 static Ecore_Win32_Window  *_ecore_win32_mouse_down_last_last_window = NULL;
+/** @internal
+ * @brief Timestamp of the last mouse button down event.
+ * Used for detecting double/triple clicks.
+ */
 static long                 _ecore_win32_mouse_down_last_time = 0  ;
+/** @internal
+ * @brief Timestamp of the second to last mouse button down event.
+ * Used for detecting triple clicks.
+ */
 static long                 _ecore_win32_mouse_down_last_last_time = 0  ;
+/** @internal
+ * @brief Flag indicating if a triple click was just detected.
+ */
 static int                  _ecore_win32_mouse_down_did_triple = 0;
+/** @internal
+ * @brief Counter for mouse button up events, used in multi-click detection.
+ */
 static int                  _ecore_win32_mouse_up_count = 0;
+/** @internal
+ * @brief Bitmask storing the current state of individual modifier keys (LShift, RShift, etc.).
+ * @see Ecore_Win32_Key_Mask
+ */
 static Ecore_Win32_Key_Mask _ecore_win32_key_mask = 0;
+/** @internal
+ * @brief Flag to indicate a 'fake' Ctrl press, typically part of an AltGr sequence.
+ * This helps in distinguishing a true Ctrl press from one synthesized for AltGr.
+ */
 static Eina_Bool            _ecore_win32_ctrl_fake = EINA_FALSE;
+/** @internal
+ * @brief Flag indicating whether the clipboard is known to contain data relevant to Ecore.
+ * Used to detect when clipboard content changes (e.g., text added or removed).
+ */
 static Eina_Bool            _ecore_win32_clipboard_has_data = EINA_FALSE;
 
+/**
+ * @internal
+ * @brief Retrieves the current state of Ecore modifiers.
+ *
+ * This function checks the state of various virtual keys (Shift, Ctrl, Alt, Win,
+ * ScrollLock, NumLock, CapsLock) and constructs a bitmask representing the
+ * active Ecore modifiers. It also handles the `_ecore_win32_ctrl_fake` logic
+ * for AltGr.
+ *
+ * @return An unsigned integer bitmask of Ecore_Event_Modifier flags.
+ *         Example: ECORE_EVENT_MODIFIER_SHIFT | ECORE_EVENT_MODIFIER_CTRL
+ */
 static unsigned int
 _ecore_win32_modifiers_get(void)
 {
@@ -85,6 +131,21 @@ _ecore_win32_modifiers_get(void)
    return modifiers;
 }
 
+/**
+ * @internal
+ * @brief Saves the state of Alt keys and clears them from the keyboard state.
+ *
+ * This function checks if Left Alt, Right Alt, or general Alt keys are pressed
+ * in the provided keyboard state array. If pressed, it sets corresponding bits
+ * in the `modifiers` variable and clears their pressed state in `kbd_state`.
+ * This is typically used before calling `ToUnicode` to get a character
+ * representation without the Alt modifier affecting the result.
+ *
+ * @param kbd_state Pointer to a 256-byte array representing the keyboard state.
+ *                  This array will be modified.
+ * @param modifiers Pointer to an unsigned short where the state of Alt keys
+ *                  will be stored. Bits 0 (LAlt), 1 (RAlt), 2 (Alt) are used.
+ */
 static void
 _ecore_win32_modifiers_alt_save(BYTE *kbd_state, unsigned short *modifiers)
 {
@@ -105,6 +166,19 @@ _ecore_win32_modifiers_alt_save(BYTE *kbd_state, unsigned short *modifiers)
      }
 }
 
+/**
+ * @internal
+ * @brief Restores the state of Alt keys in the keyboard state array.
+ *
+ * This function sets the pressed state for Left Alt, Right Alt, or general Alt
+ * keys in `kbd_state` based on the bits set in the `modifiers` variable.
+ * This is used to revert changes made by `_ecore_win32_modifiers_alt_save`.
+ *
+ * @param kbd_state Pointer to a 256-byte array representing the keyboard state.
+ *                  This array will be modified.
+ * @param modifiers An unsigned short containing the saved state of Alt keys.
+ *                  Bits 0 (LAlt), 1 (RAlt), 2 (Alt) are used.
+ */
 static void
 _ecore_win32_modifiers_alt_restore(BYTE *kbd_state, unsigned short modifiers)
 {
@@ -116,6 +190,18 @@ _ecore_win32_modifiers_alt_restore(BYTE *kbd_state, unsigned short modifiers)
      kbd_state[VK_MENU] |= 128;
 }
 
+/**
+ * @internal
+ * @brief Saves the state of Control keys and clears them from the keyboard state.
+ *
+ * Similar to `_ecore_win32_modifiers_alt_save`, but for Control keys (LControl,
+ * RControl, Control).
+ *
+ * @param kbd_state Pointer to a 256-byte array representing the keyboard state.
+ *                  This array will be modified.
+ * @param modifiers Pointer to an unsigned short where the state of Control keys
+ *                  will be stored. Bits 3 (LCtrl), 4 (RCtrl), 5 (Ctrl) are used.
+ */
 static void
 _ecore_win32_modifiers_ctrl_save(BYTE *kbd_state, unsigned short *modifiers)
 {
@@ -136,6 +222,17 @@ _ecore_win32_modifiers_ctrl_save(BYTE *kbd_state, unsigned short *modifiers)
      }
 }
 
+/**
+ * @internal
+ * @brief Restores the state of Control keys in the keyboard state array.
+ *
+ * Similar to `_ecore_win32_modifiers_alt_restore`, but for Control keys.
+ *
+ * @param kbd_state Pointer to a 256-byte array representing the keyboard state.
+ *                  This array will be modified.
+ * @param modifiers An unsigned short containing the saved state of Control keys.
+ *                  Bits 3 (LCtrl), 4 (RCtrl), 5 (Ctrl) are used.
+ */
 static void
 _ecore_win32_modifiers_ctrl_restore(BYTE *kbd_state, unsigned short modifiers)
 {
@@ -147,6 +244,18 @@ _ecore_win32_modifiers_ctrl_restore(BYTE *kbd_state, unsigned short modifiers)
      kbd_state[VK_CONTROL] |= 128;
 }
 
+/**
+ * @internal
+ * @brief Saves the state of Shift keys and clears them from the keyboard state.
+ *
+ * Similar to `_ecore_win32_modifiers_alt_save`, but for Shift keys (LShift,
+ * RShift, Shift).
+ *
+ * @param kbd_state Pointer to a 256-byte array representing the keyboard state.
+ *                  This array will be modified.
+ * @param modifiers Pointer to an unsigned short where the state of Shift keys
+ *                  will be stored. Bits 6 (LShift), 7 (RShift), 8 (Shift) are used.
+ */
 static void
 _ecore_win32_modifiers_shift_save(BYTE *kbd_state, unsigned short *modifiers)
 {
@@ -167,6 +276,17 @@ _ecore_win32_modifiers_shift_save(BYTE *kbd_state, unsigned short *modifiers)
      }
 }
 
+/**
+ * @internal
+ * @brief Restores the state of Shift keys in the keyboard state array.
+ *
+ * Similar to `_ecore_win32_modifiers_alt_restore`, but for Shift keys.
+ *
+ * @param kbd_state Pointer to a 256-byte array representing the keyboard state.
+ *                  This array will be modified.
+ * @param modifiers An unsigned short containing the saved state of Shift keys.
+ *                  Bits 6 (LShift), 7 (RShift), 8 (Shift) are used.
+ */
 static void
 _ecore_win32_modifiers_shift_restore(BYTE *kbd_state, unsigned short modifiers)
 {
@@ -178,6 +298,17 @@ _ecore_win32_modifiers_shift_restore(BYTE *kbd_state, unsigned short modifiers)
      kbd_state[VK_SHIFT] |= 128;
 }
 
+/**
+ * @internal
+ * @brief Saves the state of Windows keys and clears them from the keyboard state.
+ *
+ * Similar to `_ecore_win32_modifiers_alt_save`, but for Windows keys (LWin, RWin).
+ *
+ * @param kbd_state Pointer to a 256-byte array representing the keyboard state.
+ *                  This array will be modified.
+ * @param modifiers Pointer to an unsigned short where the state of Windows keys
+ *                  will be stored. Bits 9 (LWin), 10 (RWin) are used.
+ */
 static void
 _ecore_win32_modifiers_win_save(BYTE *kbd_state, unsigned short *modifiers)
 {
@@ -193,6 +324,17 @@ _ecore_win32_modifiers_win_save(BYTE *kbd_state, unsigned short *modifiers)
      }
 }
 
+/**
+ * @internal
+ * @brief Restores the state of Windows keys in the keyboard state array.
+ *
+ * Similar to `_ecore_win32_modifiers_alt_restore`, but for Windows keys.
+ *
+ * @param kbd_state Pointer to a 256-byte array representing the keyboard state.
+ *                  This array will be modified.
+ * @param modifiers An unsigned short containing the saved state of Windows keys.
+ *                  Bits 9 (LWin), 10 (RWin) are used.
+ */
 static void
 _ecore_win32_modifiers_win_restore(BYTE *kbd_state, unsigned short modifiers)
 {
@@ -202,6 +344,20 @@ _ecore_win32_modifiers_win_restore(BYTE *kbd_state, unsigned short modifiers)
      kbd_state[VK_RWIN] |= 128;
 }
 
+/**
+ * @internal
+ * @brief Gets the offset of a keysym name string in the `_ecore_win32_keysym_names` array.
+ *
+ * This function performs a binary search on the `_ecore_win32_name_to_keysym` table
+ * to find the given Ecore keysym value and returns the corresponding offset
+ * into the `_ecore_win32_keysym_names` string table. This offset can then be
+ * used to retrieve the string name of the keysym.
+ *
+ * @param keysym The Ecore keysym value (e.g., ECORE_KEY_A, ECORE_KEY_Return).
+ *               These are typically Unicode codepoints for printable characters
+ *               or special values for non-printable keys.
+ * @return The offset in `_ecore_win32_keysym_names` if found, otherwise 0xffffffff.
+ */
 static uint32_t
 _ecore_win32_keysym_offset_get(uint32_t keysym)
 {
@@ -240,6 +396,19 @@ _ecore_win32_keysym_offset_get(uint32_t keysym)
    return 0xffffffff;
 }
 
+/**
+ * @internal
+ * @brief Gets the Ecore key name for a given diacritic character.
+ *
+ * This function maps a Unicode wide character (WCHAR) representing a diacritic
+ * (e.g., grave accent, acute accent) to its corresponding Ecore "dead key" name
+ * (e.g., "dead_grave", "dead_acute").
+ *
+ * @param wc The wide character representing the diacritic.
+ *           Example: 0x0060 for grave accent.
+ * @return A C-string for the Ecore key name if a mapping exists, otherwise NULL.
+ *         Example: "dead_grave"
+ */
 static const char *
 _ecore_win32_diacritic_get(WCHAR wc)
 {
@@ -265,6 +434,43 @@ _ecore_win32_diacritic_get(WCHAR wc)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Constructs an Ecore_Event_Key from a Windows key message.
+ *
+ * This function is responsible for translating a Windows keyboard message
+ * (WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP) into an Ecore_Event_Key
+ * structure. It determines the key name, key symbol, and composed string
+ * based on the virtual key code, scan code, and current keyboard state.
+ *
+ * It handles:
+ * - Special keys (Return, Tab, BackSpace, Escape, F-keys, etc.).
+ * - Modifier keys (Shift, Control, Alt), including AltGr detection.
+ * - Numpad keys.
+ * - Arrow keys, Home, End, PageUp, PageDown, Insert, Delete.
+ * - Multimedia and browser keys.
+ * - Character keys, using `ToUnicode` for translation, considering dead keys
+ *   and current keyboard layout.
+ *
+ * The logic for `keyname`, `key`, and `compose` fields:
+ * - `keyname`: Generally the X11-style keysym name (e.g., "space", "Shift_L", "Return", "a", "A").
+ *              For dead keys, it's like "dead_grave".
+ * - `key`:     The "unmodified" key symbol (e.g., "space", "Shift_L", "Return", "a").
+ *              For dead keys, it's like "dead_grave".
+ * - `compose`: The string that would be composed by this key press, considering modifiers.
+ *              (e.g., " ", "\n", "\t", "a", "A", "@"). For non-composing keys or dead keys
+ *              that don't immediately compose, this can be NULL or a special character
+ *              (like 0x1b for Escape).
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing message details
+ *            (window, message type, wParam, lParam, timestamp).
+ *            - `msg->window_param` (WPARAM) is the virtual-key code.
+ *            - `msg->data_param` (LPARAM) contains repeat count, scan code, extended-key flag, etc.
+ * @param is_down EINA_TRUE if it's a key down event, EINA_FALSE for key up.
+ * @return A pointer to a newly allocated Ecore_Event_Key structure, or NULL on failure
+ *         or if the event should be ignored (e.g., key repeat for modifier keys,
+ *         discarded Ctrl from AltGr). The caller is responsible for freeing the event.
+ */
 static Ecore_Event_Key *
 _ecore_win32_event_keystroke_get(Ecore_Win32_Callback_Data *msg,
                                  Eina_Bool is_down)
@@ -1394,6 +1600,17 @@ _ecore_win32_event_keystroke_get(Ecore_Win32_Callback_Data *msg,
 
 /***** Global functions definitions *****/
 
+/**
+ * @internal
+ * @brief Handles a key press event from the Windows message loop.
+ *
+ * This function is called when a WM_KEYDOWN or WM_SYSKEYDOWN message is received.
+ * It uses `_ecore_win32_event_keystroke_get` to translate the Windows key data
+ * into an Ecore_Event_Key, populates common event fields (window, timestamp,
+ * modifiers), and adds an ECORE_EVENT_KEY_DOWN event to the Ecore event queue.
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ */
 void
 _ecore_win32_event_handle_key_press(Ecore_Win32_Callback_Data *msg)
 {
@@ -1422,6 +1639,17 @@ _ecore_win32_event_handle_key_press(Ecore_Win32_Callback_Data *msg)
    ecore_event_add(ECORE_EVENT_KEY_DOWN, e, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles a key release event from the Windows message loop.
+ *
+ * This function is called when a WM_KEYUP or WM_SYSKEYUP message is received.
+ * It uses `_ecore_win32_event_keystroke_get` to translate the Windows key data
+ * into an Ecore_Event_Key, populates common event fields (window, timestamp,
+ * modifiers), and adds an ECORE_EVENT_KEY_UP event to the Ecore event queue.
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ */
 void
 _ecore_win32_event_handle_key_release(Ecore_Win32_Callback_Data *msg)
 {
@@ -1450,6 +1678,31 @@ _ecore_win32_event_handle_key_release(Ecore_Win32_Callback_Data *msg)
    ecore_event_add(ECORE_EVENT_KEY_UP, e, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles a mouse button press event from the Windows message loop.
+ *
+ * This function is called for messages like WM_LBUTTONDOWN, WM_RBUTTONDOWN,
+ * WM_MBUTTONDOWN, WM_XBUTTONDOWN, and also for mouse wheel events (WM_MOUSEWHEEL,
+ * WM_MOUSEHWHEEL) which are treated as button presses for buttons > 3.
+ *
+ * For standard button presses (1-3):
+ * - It generates an ECORE_EVENT_MOUSE_MOVE event first (as Windows messages
+ *   for button presses also contain coordinates).
+ * - Then, it generates an ECORE_EVENT_MOUSE_BUTTON_DOWN event, filling in
+ *   details like button number, coordinates, timestamp, modifiers, and
+ *   detecting double/triple clicks based on time and window.
+ *
+ * For mouse wheel events (button > 3):
+ * - It generates an ECORE_EVENT_MOUSE_WHEEL event, calculating wheel direction
+ *   and amount.
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ *            - `msg->window_param` (WPARAM) contains key state for buttons, or wheel delta.
+ *            - `msg->data_param` (LPARAM) contains mouse coordinates.
+ * @param button The button number (1:left, 2:middle, 3:right, 4:wheel up, 5:wheel down,
+ *               6:wheel left, 7:wheel right, 8:XBUTTON1, 9:XBUTTON2).
+ */
 void
 _ecore_win32_event_handle_button_press(Ecore_Win32_Callback_Data *msg,
                                        int                        button)
@@ -1567,6 +1820,28 @@ _ecore_win32_event_handle_button_press(Ecore_Win32_Callback_Data *msg,
      }
 }
 
+/**
+ * @internal
+ * @brief Handles a mouse button release event from the Windows message loop.
+ *
+ * This function is called for messages like WM_LBUTTONUP, WM_RBUTTONUP,
+ * WM_MBUTTONUP, WM_XBUTTONUP.
+ *
+ * It performs two main actions:
+ * 1. Generates an ECORE_EVENT_MOUSE_MOVE event, as Windows button release
+ *    messages also contain coordinates.
+ * 2. Generates an ECORE_EVENT_MOUSE_BUTTON_UP event, filling in details like
+ *    button number, coordinates, timestamp, modifiers. It also updates
+ *    double/triple click detection state.
+ *
+ * Mouse wheel events do not typically have a separate "release" in the same way,
+ * so this function primarily deals with standard mouse buttons.
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ *            - `msg->window_param` (WPARAM) contains key state.
+ *            - `msg->data_param` (LPARAM) contains mouse coordinates.
+ * @param button The button number (1:left, 2:middle, 3:right, 8:XBUTTON1, 9:XBUTTON2).
+ */
 void
 _ecore_win32_event_handle_button_release(Ecore_Win32_Callback_Data *msg,
                                          int                        button)
@@ -1630,6 +1905,16 @@ _ecore_win32_event_handle_button_release(Ecore_Win32_Callback_Data *msg,
    }
 }
 
+/**
+ * @internal
+ * @brief Handles a mouse motion event (WM_MOUSEMOVE) from the Windows message loop.
+ *
+ * Creates and adds an ECORE_EVENT_MOUSE_MOVE event to the Ecore event queue,
+ * populating it with coordinates, timestamp, and modifiers from the message data.
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ *            - `msg->data_param` (LPARAM) contains mouse coordinates.
+ */
 void
 _ecore_win32_event_handle_motion_notify(Ecore_Win32_Callback_Data *msg)
 {
@@ -1650,6 +1935,19 @@ _ecore_win32_event_handle_motion_notify(Ecore_Win32_Callback_Data *msg)
    ecore_event_add(ECORE_EVENT_MOUSE_MOVE, e, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles a mouse enter event (WM_MOUSEHOVER related, synthesized by Ecore_Win32).
+ *
+ * This function is called when the mouse pointer enters a window. It performs two actions:
+ * 1. Generates an ECORE_EVENT_MOUSE_MOVE event, as an enter event implies the mouse
+ *    is now at a specific coordinate within the window.
+ * 2. Generates an ECORE_WIN32_EVENT_MOUSE_IN event, specific to the Win32 backend,
+ *    signaling the mouse entering the window area.
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ *            - `msg->x`, `msg->y` contain the mouse coordinates relative to the window.
+ */
 void
 _ecore_win32_event_handle_enter_notify(Ecore_Win32_Callback_Data *msg)
 {
@@ -1692,6 +1990,19 @@ _ecore_win32_event_handle_enter_notify(Ecore_Win32_Callback_Data *msg)
    }
 }
 
+/**
+ * @internal
+ * @brief Handles a mouse leave event (WM_MOUSELEAVE related, synthesized by Ecore_Win32).
+ *
+ * This function is called when the mouse pointer leaves a window. It performs two actions:
+ * 1. Generates an ECORE_EVENT_MOUSE_MOVE event. The coordinates provided are typically
+ *    the last known coordinates before leaving or coordinates just outside the window.
+ * 2. Generates an ECORE_WIN32_EVENT_MOUSE_OUT event, specific to the Win32 backend,
+ *    signaling the mouse leaving the window area.
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ *            - `msg->x`, `msg->y` contain the mouse coordinates.
+ */
 void
 _ecore_win32_event_handle_leave_notify(Ecore_Win32_Callback_Data *msg)
 {
@@ -1734,6 +2045,14 @@ _ecore_win32_event_handle_leave_notify(Ecore_Win32_Callback_Data *msg)
    }
 }
 
+/**
+ * @internal
+ * @brief Handles a window focus in event (WM_SETFOCUS) from the Windows message loop.
+ *
+ * Creates and adds an ECORE_WIN32_EVENT_WINDOW_FOCUS_IN event to the Ecore event queue.
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ */
 void
 _ecore_win32_event_handle_focus_in(Ecore_Win32_Callback_Data *msg)
 {
@@ -1752,6 +2071,14 @@ _ecore_win32_event_handle_focus_in(Ecore_Win32_Callback_Data *msg)
    ecore_event_add(ECORE_WIN32_EVENT_WINDOW_FOCUS_IN, e, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles a window focus out event (WM_KILLFOCUS) from the Windows message loop.
+ *
+ * Creates and adds an ECORE_WIN32_EVENT_WINDOW_FOCUS_OUT event to the Ecore event queue.
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ */
 void
 _ecore_win32_event_handle_focus_out(Ecore_Win32_Callback_Data *msg)
 {
@@ -1770,6 +2097,17 @@ _ecore_win32_event_handle_focus_out(Ecore_Win32_Callback_Data *msg)
    ecore_event_add(ECORE_WIN32_EVENT_WINDOW_FOCUS_OUT, e, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles a window expose event (WM_PAINT) from the Windows message loop.
+ *
+ * Creates and adds an ECORE_WIN32_EVENT_WINDOW_DAMAGE event to the Ecore event queue.
+ * The damage region (rectangle that needs repainting) is extracted from
+ * `msg->update` (which corresponds to the `PAINTSTRUCT::rcPaint` from `BeginPaint`).
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ *            - `msg->update` contains the RECT of the damaged area.
+ */
 void
 _ecore_win32_event_handle_expose(Ecore_Win32_Callback_Data *msg)
 {
@@ -1792,6 +2130,16 @@ _ecore_win32_event_handle_expose(Ecore_Win32_Callback_Data *msg)
    ecore_event_add(ECORE_WIN32_EVENT_WINDOW_DAMAGE, e, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles a window creation notification (WM_CREATE or WM_NCCREATE).
+ *
+ * Creates and adds an ECORE_WIN32_EVENT_WINDOW_CREATE event to the Ecore event queue.
+ * This signals that a new window associated with Ecore has been created.
+ * It ignores creation events for the internal monitor window.
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ */
 void
 _ecore_win32_event_handle_create_notify(Ecore_Win32_Callback_Data *msg)
 {
@@ -1812,6 +2160,18 @@ _ecore_win32_event_handle_create_notify(Ecore_Win32_Callback_Data *msg)
    ecore_event_add(ECORE_WIN32_EVENT_WINDOW_CREATE, e, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles a window destruction notification (WM_DESTROY or WM_NCDESTROY).
+ *
+ * Creates and adds an ECORE_WIN32_EVENT_WINDOW_DESTROY event to the Ecore event queue.
+ * This signals that an Ecore-associated window is being destroyed.
+ * It ignores destruction events for the internal monitor window and updates
+ * `_ecore_win32_event_last_window` if the destroyed window was the last one to
+ * receive an event.
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ */
 void
 _ecore_win32_event_handle_destroy_notify(Ecore_Win32_Callback_Data *msg)
 {
@@ -1833,6 +2193,15 @@ _ecore_win32_event_handle_destroy_notify(Ecore_Win32_Callback_Data *msg)
    ecore_event_add(ECORE_WIN32_EVENT_WINDOW_DESTROY, e, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles a window map (show) notification (WM_SHOWWINDOW with SW_PARENTOPENING or SW_SHOW).
+ *
+ * Creates and adds an ECORE_WIN32_EVENT_WINDOW_SHOW event to the Ecore event queue,
+ * signaling that an Ecore window has become visible.
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ */
 void
 _ecore_win32_event_handle_map_notify(Ecore_Win32_Callback_Data *msg)
 {
@@ -1850,6 +2219,15 @@ _ecore_win32_event_handle_map_notify(Ecore_Win32_Callback_Data *msg)
    ecore_event_add(ECORE_WIN32_EVENT_WINDOW_SHOW, e, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles a window unmap (hide) notification (WM_SHOWWINDOW with SW_HIDE).
+ *
+ * Creates and adds an ECORE_WIN32_EVENT_WINDOW_HIDE event to the Ecore event queue,
+ * signaling that an Ecore window has been hidden.
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ */
 void
 _ecore_win32_event_handle_unmap_notify(Ecore_Win32_Callback_Data *msg)
 {
@@ -1867,6 +2245,20 @@ _ecore_win32_event_handle_unmap_notify(Ecore_Win32_Callback_Data *msg)
    ecore_event_add(ECORE_WIN32_EVENT_WINDOW_HIDE, e, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles a window configure notification (WM_WINDOWPOSCHANGED).
+ *
+ * This function is called when a window's size, position, or Z-order changes.
+ * It creates and adds an ECORE_WIN32_EVENT_WINDOW_CONFIGURE event to the Ecore
+ * event queue. The event contains the new client area coordinates (x, y, width, height)
+ * and potentially the window it's now placed above in Z-order.
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ *            - `msg->data_param` (LPARAM) points to a WINDOWPOS structure.
+ * @param wmsize EINA_TRUE if the notification originated from WM_SIZE, EINA_FALSE otherwise.
+ *               This affects whether `abovewin` is populated.
+ */
 void
 _ecore_win32_event_handle_configure_notify(Ecore_Win32_Callback_Data *msg, Eina_Bool wmsize)
 {
@@ -1899,6 +2291,18 @@ _ecore_win32_event_handle_configure_notify(Ecore_Win32_Callback_Data *msg, Eina_
    ecore_event_add(ECORE_WIN32_EVENT_WINDOW_CONFIGURE, e, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles a window resize notification (WM_SIZE).
+ *
+ * Creates and adds an ECORE_WIN32_EVENT_WINDOW_RESIZE event to the Ecore event queue.
+ * The event contains the new width and height of the window's client area.
+ * Note that WM_SIZE also often triggers WM_WINDOWPOSCHANGED, which is handled by
+ * `_ecore_win32_event_handle_configure_notify`. This handler is more specific
+ * to the size change aspect.
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ */
 void
 _ecore_win32_event_handle_resize(Ecore_Win32_Callback_Data *msg)
 {
@@ -1921,6 +2325,18 @@ _ecore_win32_event_handle_resize(Ecore_Win32_Callback_Data *msg)
    ecore_event_add(ECORE_WIN32_EVENT_WINDOW_RESIZE, e, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles a generic window property change notification.
+ *
+ * This function is called for events like WM_STYLECHANGED or other messages
+ * that indicate a change in window properties not covered by more specific handlers.
+ * It creates and adds an ECORE_WIN32_EVENT_WINDOW_PROPERTY event to the Ecore
+ * event queue. This event is a generic notification that some property of the
+ * window has changed.
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ */
 void
 _ecore_win32_event_handle_property_notify(Ecore_Win32_Callback_Data *msg)
 {
@@ -1937,6 +2353,18 @@ _ecore_win32_event_handle_property_notify(Ecore_Win32_Callback_Data *msg)
    ecore_event_add(ECORE_WIN32_EVENT_WINDOW_PROPERTY, e, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles a window delete request (WM_CLOSE).
+ *
+ * This function is called when a WM_CLOSE message is received for a window,
+ * indicating that the user or system has requested to close the window.
+ * It creates and adds an ECORE_WIN32_EVENT_WINDOW_DELETE_REQUEST event to the
+ * Ecore event queue. Applications typically handle this event to perform
+ * cleanup or confirm closure before actually destroying the window.
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ */
 void
 _ecore_win32_event_handle_delete_request(Ecore_Win32_Callback_Data *msg)
 {
@@ -1964,7 +2392,27 @@ _ecore_win32_event_free_selection_notify(void *data EINA_UNUSED, void *ev)
    free(e);
 }
 
-
+/**
+ * @internal
+ * @brief Handles clipboard update notifications (WM_CLIPBOARDUPDATE).
+ *
+ * This function is called when the content of the clipboard changes. It attempts
+ * to retrieve text data (preferring Unicode CF_UNICODETEXT, falling back to CF_TEXT)
+ * from the clipboard.
+ *
+ * - If new text data is found and `_ecore_win32_clipboard_has_data` was false,
+ *   it means text was just added. An ECORE_WIN32_EVENT_SELECTION_NOTIFY event
+ *   is generated with the clipboard content. `_ecore_win32_clipboard_has_data`
+ *   is set to true.
+ * - If `_ecore_win32_clipboard_has_data` was true, but no text data (neither
+ *   CF_UNICODETEXT nor CF_TEXT) is currently available, it means text was cleared.
+ *   An ECORE_WIN32_EVENT_SELECTION_CLEAR event is generated.
+ *   `_ecore_win32_clipboard_has_data` is set to false.
+ *
+ * The `selection` field in the event is set to "text/plain;charset=utf-8".
+ *
+ * @param msg Pointer to Ecore_Win32_Callback_Data containing the message details.
+ */
 void
 _ecore_win32_event_handle_selection_notify(Ecore_Win32_Callback_Data *msg)
 {

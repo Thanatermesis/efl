@@ -4,6 +4,23 @@
 /* blend pixel --> dst */
 
 #ifdef BUILD_NEON
+/**
+ * @brief Blend a span of source pixels onto a destination span using NEON.
+ *
+ * This function implements the porter-duff "source-over" blending operation:
+ *   D_out = S + D_in * (1 - S_alpha)
+ * Where S is the source pixel (already multiplied by its alpha if not opaque),
+ * and D_in is the destination pixel. S_alpha is the alpha of the source pixel.
+ * Pixels are in DATA32 (typically ARGB) format.
+ *
+ * @param s Pointer to the source pixel array. Each pixel is a DATA32.
+ *          Example: `s[0] = 0x80FF0000` (semi-transparent red).
+ * @param m Pointer to the mask array (unused in this function).
+ * @param c Color value (unused in this function).
+ * @param d Pointer to the destination pixel array. Pixels will be overwritten.
+ *          Example: `d[0] = 0xFF00FF00` (opaque green).
+ * @param l Number of pixels to process.
+ */
 static void
 _op_blend_p_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c EINA_UNUSED, DATA32 *d, int l) {
 #ifdef BUILD_NEON_INTRINSICS
@@ -363,6 +380,22 @@ _op_blend_p_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c EINA_UNUSED, DATA3
 #endif
 }
 
+/**
+ * @brief Blend a span of source pixels (premultiplied alpha) onto a destination span using NEON.
+ *
+ * This function implements the porter-duff "source-over" blending operation
+ * assuming the source pixels `s` are already in premultiplied alpha format.
+ * The formula is: D_out = S_premultiplied + D_in * (1 - S_alpha)
+ * Pixels are in DATA32 (typically ARGB) format.
+ *
+ * @param s Pointer to the source pixel array (premultiplied alpha).
+ *          Example: `s[0] = 0x80800000` (semi-transparent red, R component is 0xFF * 0x80/0xFF = 0x80).
+ * @param m Pointer to the mask array (unused in this function).
+ * @param c Color value (unused in this function).
+ * @param d Pointer to the destination pixel array. Pixels will be overwritten.
+ *          Example: `d[0] = 0xFF00FF00` (opaque green).
+ * @param l Number of pixels to process.
+ */
 static void
 _op_blend_pas_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c EINA_UNUSED, DATA32 *d, int l) {
 #ifdef BUILD_NEON_INTRINSICS
@@ -697,6 +730,13 @@ _op_blend_pas_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c EINA_UNUSED, DAT
 #define _op_blend_pas_dpan_neon _op_blend_pas_dp_neon
 #define _op_blend_pan_dpan_neon _op_blend_pan_dp_neon
 
+/**
+ * @brief Initializes the NEON-optimized span blending functions.
+ *
+ * This function populates the `op_blend_span_funcs` table with pointers
+ * to the NEON implementations for various pixel blending operations.
+ * It is called during Evas engine initialization if NEON support is detected.
+ */
 static void
 init_blend_pixel_span_funcs_neon(void)
 {
@@ -711,9 +751,22 @@ init_blend_pixel_span_funcs_neon(void)
 #endif
 
 #ifdef BUILD_NEON
+/**
+ * @brief Blend a single source pixel onto a destination pixel using NEON.
+ *
+ * This function implements the "source-over" blending for a single pixel:
+ *   D_out = S + D_in * (1 - S_alpha)
+ *
+ * @param s The source pixel (DATA32, typically ARGB).
+ *          Example: `0x80FF0000` (semi-transparent red).
+ * @param m Mask value (unused in this function).
+ * @param c Color value, used as a temporary variable for alpha calculation.
+ * @param d Pointer to the destination pixel (DATA32). Value will be overwritten.
+ *          Example: `*d = 0xFF00FF00` (opaque green).
+ */
 static void
 _op_blend_pt_p_dp_neon(DATA32 s, DATA8 m EINA_UNUSED, DATA32 c, DATA32 *d) {
-   c = 256 - (s >> 24);
+   c = 256 - (s >> 24); // c becomes inverse source alpha
    *d = s + MUL_256(c, *d);
 }
 
@@ -725,6 +778,13 @@ _op_blend_pt_p_dp_neon(DATA32 s, DATA8 m EINA_UNUSED, DATA32 c, DATA32 *d) {
 #define _op_blend_pt_pan_dpan_neon _op_blend_pt_pan_dp_neon
 #define _op_blend_pt_pas_dpan_neon _op_blend_pt_pas_dp_neon
 
+/**
+ * @brief Initializes the NEON-optimized point (single pixel) blending functions.
+ *
+ * This function populates the `op_blend_pt_funcs` table with pointers
+ * to the NEON implementations for various single-pixel blending operations.
+ * It is called during Evas engine initialization if NEON support is detected.
+ */
 static void
 init_blend_pixel_pt_funcs_neon(void)
 {
@@ -743,6 +803,27 @@ init_blend_pixel_pt_funcs_neon(void)
 /* blend_rel pixel -> dst */
 
 #ifdef BUILD_NEON
+/**
+ * @brief Blend a span of source pixels onto a destination span using a "relative" alpha compositing.
+ *
+ * This function implements a blending operation that considers both source and
+ * destination alpha components in a specific way:
+ *   D_out_alpha = S_alpha + D_alpha * (1 - S_alpha)
+ *   D_out_color = (S_color * S_alpha * D_alpha_factor + D_color * D_alpha * (1 - S_alpha)) / D_out_alpha
+ * Or more directly, as implemented for non-NEON:
+ *   l = 256 - (s_alpha)
+ *   c_factor = 1 + (d_alpha)
+ *   *d = MUL_256(c_factor, *s) + MUL_256(l, *d);
+ * This is not a standard Porter-Duff operation but might be used for specific effects.
+ *
+ * @param s Pointer to the source pixel array.
+ *          Example: `s[0] = 0x80FF0000` (semi-transparent red).
+ * @param m Pointer to the mask array (unused).
+ * @param c Color value (unused as input, used as a local NEON register).
+ * @param d Pointer to the destination pixel array. Pixels will be overwritten.
+ *          Example: `d[0] = 0x8000FF00` (semi-transparent green).
+ * @param l Number of pixels to process.
+ */
 static void
 _op_blend_rel_p_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, int l) {
    uint16x8_t cs0_16x8;
@@ -861,6 +942,25 @@ _op_blend_rel_p_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, in
    }
 }
 
+/**
+ * @brief Blend a span of source pixels onto a destination span using a "relative" alpha compositing,
+ *        assuming source pixels have no alpha (pan - pixel alpha none).
+ *
+ * This function implements a blending operation:
+ *   c_factor = 1 + (d_alpha)
+ *   *d = MUL_256(c_factor, *s);
+ * The source pixel's alpha is effectively ignored or treated as opaque for its color contribution,
+ * but the destination pixel is scaled by its own alpha + 1.
+ * This is a specialized operation.
+ *
+ * @param s Pointer to the source pixel array. Alpha channel of source pixels is not used in the standard way.
+ *          Example: `s[0] = 0xXXRRGGBB` (XX is ignored, RGB used).
+ * @param m Pointer to the mask array (unused).
+ * @param c Color value (unused as input, used as a local NEON register).
+ * @param d Pointer to the destination pixel array. Pixels will be overwritten.
+ *          Example: `d[0] = 0x8000FF00` (semi-transparent green).
+ * @param l Number of pixels to process.
+ */
 static void
 _op_blend_rel_pan_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, int l) {
    uint16x8_t cs0_16x8;
@@ -943,6 +1043,13 @@ _op_blend_rel_pan_dp_neon(DATA32 *s, DATA8 *m EINA_UNUSED, DATA32 c, DATA32 *d, 
 #define _op_blend_rel_pan_dpan_neon _op_blend_pan_dpan_neon
 #define _op_blend_rel_pas_dpan_neon _op_blend_pas_dpan_neon
 
+/**
+ * @brief Initializes the NEON-optimized relative blending span functions.
+ *
+ * This function populates the `op_blend_rel_span_funcs` table with pointers
+ * to the NEON implementations for various "relative" pixel blending operations.
+ * It is called during Evas engine initialization if NEON support is detected.
+ */
 static void
 init_blend_rel_pixel_span_funcs_neon(void)
 {
@@ -957,9 +1064,24 @@ init_blend_rel_pixel_span_funcs_neon(void)
 #endif
 
 #ifdef BUILD_NEON
+/**
+ * @brief Blend a single source pixel onto a destination pixel using "relative" alpha compositing.
+ *
+ * Implements the single-pixel version of the relative blend:
+ *   c_s_inv_alpha = 256 - (s_alpha)
+ *   *d = MUL_SYM(d_alpha, s) + MUL_256(c_s_inv_alpha, *d);
+ * Where MUL_SYM(A, B) is typically (A*B)/255 or similar for symmetric scaling.
+ *
+ * @param s The source pixel (DATA32).
+ *          Example: `0x80FF0000` (semi-transparent red).
+ * @param m Mask value (unused).
+ * @param c Color value (unused as input, used as a local variable for inverse source alpha).
+ * @param d Pointer to the destination pixel (DATA32). Value will be overwritten.
+ *          Example: `*d = 0x8000FF00` (semi-transparent green).
+ */
 static void
 _op_blend_rel_pt_p_dp_neon(DATA32 s, DATA8 m EINA_UNUSED, DATA32 c, DATA32 *d) {
-   c = 256 - (s >> 24);
+   c = 256 - (s >> 24); // c becomes inverse source alpha
    *d = MUL_SYM(*d >> 24, s) + MUL_256(c, *d);
 }
 
@@ -970,6 +1092,13 @@ _op_blend_rel_pt_p_dp_neon(DATA32 s, DATA8 m EINA_UNUSED, DATA32 c, DATA32 *d) {
 #define _op_blend_rel_pt_pas_dpan_neon _op_blend_pt_pas_dpan_neon
 #define _op_blend_rel_pt_pan_dpan_neon _op_blend_pt_pan_dpan_neon
 
+/**
+ * @brief Initializes the NEON-optimized relative point (single pixel) blending functions.
+ *
+ * This function populates the `op_blend_rel_pt_funcs` table with pointers
+ * to the NEON implementations for various "relative" single-pixel blending operations.
+ * It is called during Evas engine initialization if NEON support is detected.
+ */
 static void
 init_blend_rel_pixel_pt_funcs_neon(void)
 {

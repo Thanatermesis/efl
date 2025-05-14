@@ -1,3 +1,13 @@
+/**
+ * @file ecore_evas_drm.c
+ * @brief Ecore_Evas module for DRM (Direct Rendering Manager).
+ *
+ * This module provides an Ecore_Evas engine that allows applications to
+ * render directly to the screen using DRM/KMS. It handles DRM device
+ * initialization, output management, event handling, and Evas canvas
+ * integration.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -44,30 +54,49 @@
 
 #define VSYNC_ANIMATOR 1
 
+/**
+ * @brief Private data structure for the Ecore_Evas DRM engine.
+ *
+ * This structure holds all the necessary information for managing a DRM-based
+ * Ecore_Evas instance, including DRM device contexts, output details,
+ * event handlers, and rendering state.
+ */
 typedef struct _Ecore_Evas_Engine_Drm_Data
 {
-   int cw, ch;
-   int clockid;
-   int x, y, w, h;
-   int depth, bpp;
-   unsigned int format;
-   double offset;
-   double tick_job_timestamp;
-   Ecore_Drm2_Context ctx;
-   Ecore_Fd_Handler *hdlr;
-   Ecore_Drm2_Device *dev;
-   Ecore_Drm2_Output *output;
-   Evas_Device *seat;
-   Eina_Bool ticking : 1;
-   Eina_Bool once : 1;
-   Ecore_Job *tick_job;
-   Ecore_Job *focus_job;
+   int cw, ch; /**< Cursor width and height */
+   int clockid; /**< Clock ID for DRM events */
+   int x, y, w, h; /**< Geometry of the Ecore_Evas window */
+   int depth, bpp; /**< Preferred color depth and bits per pixel */
+   unsigned int format; /**< Pixel format (e.g., DRM_FORMAT_XRGB8888) */
+   double offset; /**< Time offset between GPU and system clock */
+   double tick_job_timestamp; /**< Timestamp for the next tick job */
+   Ecore_Drm2_Context ctx; /**< DRM context for event handling */
+   Ecore_Fd_Handler *hdlr; /**< FD handler for DRM events */
+   Ecore_Drm2_Device *dev; /**< Ecore_Drm2 device handle */
+   Ecore_Drm2_Output *output; /**< Ecore_Drm2 output handle */
+   Evas_Device *seat; /**< Evas device representing the input seat */
+   Eina_Bool ticking : 1; /**< Flag indicating if the animator is ticking */
+   Eina_Bool once : 1; /**< Flag for one-time initialization tasks */
+   Ecore_Job *tick_job; /**< Ecore_Job for scheduling animator ticks */
+   Ecore_Job *focus_job; /**< Ecore_Job for handling focus changes */
 } Ecore_Evas_Engine_Drm_Data;
 
-static int _drm_init_count = 0;
-static Eina_List *handlers;
-static Eina_List *canvases;
+static int _drm_init_count = 0; /**< Counter for DRM initialization state */
+static Eina_List *handlers; /**< List of Ecore_Event_Handler for input device changes */
+static Eina_List *canvases; /**< List of active Ecore_Evas DRM canvases */
 
+/**
+ * @brief Handles input device change events (added/removed).
+ *
+ * This function is called when an input device (e.g., mouse, keyboard, touch)
+ * is added to or removed from the system. It updates the Evas devices
+ * accordingly for the relevant Ecore_Evas instance.
+ *
+ * @param d Unused user data.
+ * @param t Unused event type.
+ * @param event The Elput_Event_Device_Change event data.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
+ */
 static Eina_Bool
 _drm_device_change(void *d EINA_UNUSED, int t EINA_UNUSED, void *event)
 {
@@ -135,6 +164,18 @@ _drm_device_change(void *d EINA_UNUSED, int t EINA_UNUSED, void *event)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Initializes the Ecore_Evas DRM engine.
+ *
+ * This function sets up the DRM device, finds an appropriate output,
+ * and initializes event handling for input devices. It's called when
+ * the first Ecore_Evas DRM instance is created.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param edata The engine-specific data for this Ecore_Evas.
+ * @param device The DRM device name (e.g., "seat0") or NULL to autodetect.
+ * @return The initialization count, or 0 on failure.
+ */
 static int
 _ecore_evas_drm_init(Ecore_Evas *ee, Ecore_Evas_Engine_Drm_Data *edata, const char *device)
 {
@@ -195,6 +236,16 @@ init_err:
    return --_drm_init_count;
 }
 
+/**
+ * @brief Shuts down the Ecore_Evas DRM engine.
+ *
+ * This function cleans up DRM resources, closes the device, and removes
+ * event handlers. It's called when the last Ecore_Evas DRM instance
+ * is destroyed.
+ *
+ * @param edata The engine-specific data for this Ecore_Evas.
+ * @return The decremented initialization count.
+ */
 static int
 _ecore_evas_drm_shutdown(Ecore_Evas_Engine_Drm_Data *edata)
 {
@@ -227,6 +278,17 @@ _ecore_evas_drm_shutdown(Ecore_Evas_Engine_Drm_Data *edata)
    return _drm_init_count;
 }
 
+/**
+ * @brief Frees resources associated with an Ecore_Evas DRM instance.
+ *
+ * This function is part of the Ecore_Evas engine function table and is
+ * called when an Ecore_Evas instance is freed. It unregisters input events,
+ * removes the canvas from the global list, deletes the FD handler,
+ * shuts down the DRM engine if this is the last instance, and frees
+ * the engine-specific data.
+ *
+ * @param ee The Ecore_Evas instance to free.
+ */
 static void
 _drm_free(Ecore_Evas *ee)
 {
@@ -242,6 +304,17 @@ _drm_free(Ecore_Evas *ee)
    free(edata);
 }
 
+/**
+ * @brief Applies rotation to the Evas canvas and updates its size.
+ *
+ * This function configures the Evas DRM engine with the new rotation
+ * and, if necessary, resizes the Evas output and viewport. It also
+ * triggers a redraw of the affected area.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param rotation The new rotation angle (0, 90, 180, 270).
+ * @param resize Boolean indicating if a resize operation should accompany the rotation.
+ */
 static void
 _drm_rotation_do(Ecore_Evas *ee, int rotation, int resize)
 {
@@ -322,6 +395,17 @@ _drm_rotation_do(Ecore_Evas *ee, int rotation, int resize)
      }
 }
 
+/**
+ * @brief Callback function for Evas render post updates.
+ *
+ * This function is called after Evas has finished rendering. It's used
+ * here to apply any delayed rotation changes that were queued during
+ * an asynchronous render.
+ *
+ * @param data The Ecore_Evas instance.
+ * @param evas EINA_UNUSED The Evas canvas.
+ * @param event EINA_UNUSED The event information.
+ */
 static void
 _drm_render_updates(void *data, Evas *evas EINA_UNUSED, void *event EINA_UNUSED)
 {
@@ -334,6 +418,15 @@ _drm_render_updates(void *data, Evas *evas EINA_UNUSED, void *event EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Gets the geometry of the screen/output associated with the Ecore_Evas.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param x Pointer to store the x-coordinate of the screen.
+ * @param y Pointer to store the y-coordinate of the screen.
+ * @param w Pointer to store the width of the screen.
+ * @param h Pointer to store the height of the screen.
+ */
 static void
 _drm_screen_geometry_get(const Ecore_Evas *ee, int *x, int *y, int *w, int *h)
 {
@@ -343,6 +436,13 @@ _drm_screen_geometry_get(const Ecore_Evas *ee, int *x, int *y, int *w, int *h)
    ecore_drm2_output_info_get(edata->output, x, y, w, h, NULL);
 }
 
+/**
+ * @brief Gets the DPI (dots per inch) of the screen/output.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param xdpi Pointer to store the horizontal DPI.
+ * @param ydpi Pointer to store the vertical DPI.
+ */
 static void
 _drm_screen_dpi_get(const Ecore_Evas *ee, int *xdpi, int *ydpi)
 {
@@ -352,6 +452,13 @@ _drm_screen_dpi_get(const Ecore_Evas *ee, int *xdpi, int *ydpi)
    ecore_drm2_output_dpi_get(edata->output, xdpi, ydpi);
 }
 
+/**
+ * @brief Gets the current pointer (mouse cursor) coordinates.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param x Pointer to store the x-coordinate of the pointer.
+ * @param y Pointer to store the y-coordinate of the pointer.
+ */
 static void
 _drm_pointer_xy_get(const Ecore_Evas *ee, Evas_Coord *x, Evas_Coord *y)
 {
@@ -361,6 +468,14 @@ _drm_pointer_xy_get(const Ecore_Evas *ee, Evas_Coord *x, Evas_Coord *y)
    ecore_drm2_device_pointer_xy_get(edata->dev, x, y);
 }
 
+/**
+ * @brief Warps (moves) the pointer to the specified coordinates.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param x The target x-coordinate for the pointer.
+ * @param y The target y-coordinate for the pointer.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise (though currently always returns EINA_TRUE).
+ */
 static Eina_Bool
 _drm_pointer_warp(const Ecore_Evas *ee, Evas_Coord x, Evas_Coord y)
 {
@@ -371,6 +486,14 @@ _drm_pointer_warp(const Ecore_Evas *ee, Evas_Coord x, Evas_Coord y)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Ecore_Job callback to set focus after the Ecore_Evas is shown.
+ *
+ * This job ensures that focus is correctly applied to the Ecore_Evas
+ * after it becomes visible.
+ *
+ * @param data The Ecore_Evas instance.
+ */
 static void
 _drm_show_focus_job(void *data)
 {
@@ -382,6 +505,17 @@ _drm_show_focus_job(void *data)
    edata->focus_job = NULL;
 }
 
+/**
+ * @brief Shows the Ecore_Evas window.
+ *
+ * This function makes the Ecore_Evas visible. It handles properties like
+ * 'avoid_damage' and 'override', calls the user-defined show callback,
+ * and schedules a job to set focus. It also triggers a DRM flip to
+ * refresh the display, which can help with visual glitches after a
+ * virtual console switch.
+ *
+ * @param ee The Ecore_Evas instance to show.
+ */
 static void
 _drm_show(Ecore_Evas *ee)
 {
@@ -416,6 +550,15 @@ _drm_show(Ecore_Evas *ee)
    ecore_drm2_fb_flip(NULL, edata->output);
 }
 
+/**
+ * @brief Hides the Ecore_Evas window.
+ *
+ * This function makes the Ecore_Evas invisible. It handles the 'override'
+ * property, updates visibility flags, synchronizes with Evas, and calls
+ * the user-defined hide callback.
+ *
+ * @param ee The Ecore_Evas instance to hide.
+ */
 static void
 _drm_hide(Ecore_Evas *ee)
 {
@@ -435,6 +578,20 @@ _drm_hide(Ecore_Evas *ee)
    if (ee->func.fn_hide) ee->func.fn_hide(ee);
 }
 
+/**
+ * @brief Moves the Ecore_Evas window to the specified coordinates.
+ *
+ * Note: In a typical DRM/KMS setup, "windows" don't move in the
+ * traditional sense as there's no window manager. This function
+ * updates the Ecore_Evas's internal position and calls the user-defined
+ * move callback. The actual effect on screen depends on how the
+ * application uses this information (e.g., for positioning elements
+ * on a single, fullscreen output).
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param x The new x-coordinate.
+ * @param y The new y-coordinate.
+ */
 static void
 _drm_move(Ecore_Evas *ee, int x, int y)
 {
@@ -446,6 +603,16 @@ _drm_move(Ecore_Evas *ee, int x, int y)
    if (ee->func.fn_move) ee->func.fn_move(ee);
 }
 
+/**
+ * @brief Resizes the Ecore_Evas window.
+ *
+ * This function updates the Ecore_Evas's internal size, sets the
+ * Evas output size and viewport, and calls the user-defined resize callback.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param w The new width.
+ * @param h The new height.
+ */
 static void
 _drm_resize(Ecore_Evas *ee, int w, int h)
 {
@@ -459,6 +626,18 @@ _drm_resize(Ecore_Evas *ee, int w, int h)
    if (ee->func.fn_resize) ee->func.fn_resize(ee);
 }
 
+/**
+ * @brief Moves and resizes the Ecore_Evas window in a single operation.
+ *
+ * This is a convenience function that calls _drm_move and _drm_resize
+ * if the respective geometry components have changed.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param x The new x-coordinate.
+ * @param y The new y-coordinate.
+ * @param w The new width.
+ * @param h The new height.
+ */
 static void
 _drm_move_resize(Ecore_Evas *ee, int x, int y, int w, int h)
 {
@@ -468,6 +647,17 @@ _drm_move_resize(Ecore_Evas *ee, int x, int y, int w, int h)
      _drm_resize(ee, w, h);
 }
 
+/**
+ * @brief Sets the rotation of the Ecore_Evas.
+ *
+ * If the Ecore_Evas is currently in an asynchronous render operation,
+ * the rotation change is delayed until the render is complete. Otherwise,
+ * it's applied immediately.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param rotation The new rotation angle (0, 90, 180, 270).
+ * @param resize Boolean indicating if a resize operation should accompany the rotation.
+ */
 static void
 _drm_rotation_set(Ecore_Evas *ee, int rotation, int resize)
 {
@@ -483,6 +673,15 @@ _drm_rotation_set(Ecore_Evas *ee, int rotation, int resize)
      _drm_rotation_do(ee, rotation, resize);
 }
 
+/**
+ * @brief Sets the title of the Ecore_Evas.
+ *
+ * In a DRM context, the "title" might not be displayed by a window
+ * manager, but it can be useful for application logic or debugging.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param title The new title string.
+ */
 static void
 _drm_title_set(Ecore_Evas *ee, const char *title)
 {
@@ -492,6 +691,16 @@ _drm_title_set(Ecore_Evas *ee, const char *title)
    if (title) ee->prop.title = strdup(title);
 }
 
+/**
+ * @brief Sets the name and class hints for the Ecore_Evas.
+ *
+ * Similar to the title, these are typically used by window managers
+ * but can be stored for other purposes in a DRM environment.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param n The new name string.
+ * @param c The new class string.
+ */
 static void
 _drm_name_class_set(Ecore_Evas *ee, const char *n, const char *c)
 {
@@ -510,6 +719,13 @@ _drm_name_class_set(Ecore_Evas *ee, const char *n, const char *c)
      }
 }
 
+/**
+ * @brief Sets the minimum size hint for the Ecore_Evas.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param w The minimum width.
+ * @param h The minimum height.
+ */
 static void
 _drm_size_min_set(Ecore_Evas *ee, int w, int h)
 {
@@ -518,6 +734,13 @@ _drm_size_min_set(Ecore_Evas *ee, int w, int h)
    ee->prop.min.h = h;
 }
 
+/**
+ * @brief Sets the maximum size hint for the Ecore_Evas.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param w The maximum width.
+ * @param h The maximum height.
+ */
 static void
 _drm_size_max_set(Ecore_Evas *ee, int w, int h)
 {
@@ -526,6 +749,16 @@ _drm_size_max_set(Ecore_Evas *ee, int w, int h)
    ee->prop.max.h = h;
 }
 
+/**
+ * @brief Sets the base size hint for the Ecore_Evas.
+ *
+ * This is often used in conjunction with size step hints for
+ * applications like terminals that resize in character cell units.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param w The base width.
+ * @param h The base height.
+ */
 static void
 _drm_size_base_set(Ecore_Evas *ee, int w, int h)
 {
@@ -534,6 +767,15 @@ _drm_size_base_set(Ecore_Evas *ee, int w, int h)
    ee->prop.base.h = h;
 }
 
+/**
+ * @brief Sets the size step hint for the Ecore_Evas.
+ *
+ * This defines the increments by which the Ecore_Evas prefers to be resized.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param w The width step.
+ * @param h The height step.
+ */
 static void
 _drm_size_step_set(Ecore_Evas *ee, int w, int h)
 {
@@ -542,6 +784,16 @@ _drm_size_step_set(Ecore_Evas *ee, int w, int h)
    ee->prop.step.h = h;
 }
 
+/**
+ * @brief Sets the layer of the Ecore_Evas.
+ *
+ * In windowing systems, this controls stacking order. In DRM, its
+ * direct effect might be limited, but the value is stored.
+ * The layer is clamped between 1 and 255.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param layer The desired layer.
+ */
 static void
 _drm_layer_set(Ecore_Evas *ee, int layer)
 {
@@ -551,6 +803,12 @@ _drm_layer_set(Ecore_Evas *ee, int layer)
    ee->prop.layer = layer;
 }
 
+/**
+ * @brief Sets the iconified state of the Ecore_Evas.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param on EINA_TRUE if iconified, EINA_FALSE otherwise.
+ */
 static void
 _drm_iconified_set(Ecore_Evas *ee, Eina_Bool on)
 {
@@ -558,6 +816,12 @@ _drm_iconified_set(Ecore_Evas *ee, Eina_Bool on)
    ee->prop.iconified = on;
 }
 
+/**
+ * @brief Sets the borderless state of the Ecore_Evas.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param on EINA_TRUE if borderless, EINA_FALSE otherwise.
+ */
 static void
 _drm_borderless_set(Ecore_Evas *ee, Eina_Bool on)
 {
@@ -565,6 +829,12 @@ _drm_borderless_set(Ecore_Evas *ee, Eina_Bool on)
    ee->prop.borderless = on;
 }
 
+/**
+ * @brief Sets the maximized state of the Ecore_Evas.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param on EINA_TRUE if maximized, EINA_FALSE otherwise.
+ */
 static void
 _drm_maximized_set(Ecore_Evas *ee, Eina_Bool on)
 {
@@ -572,6 +842,16 @@ _drm_maximized_set(Ecore_Evas *ee, Eina_Bool on)
    ee->prop.maximized = on;
 }
 
+/**
+ * @brief Sets the fullscreen state of the Ecore_Evas.
+ *
+ * When entering fullscreen, the Ecore_Evas is resized to the dimensions
+ * of the DRM output. When exiting, it reverts to its previous size.
+ * Evas output, viewport, and damage rectangles are updated accordingly.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param on EINA_TRUE to enter fullscreen, EINA_FALSE to exit.
+ */
 static void
 _drm_fullscreen_set(Ecore_Evas *ee, Eina_Bool on)
 {
@@ -619,6 +899,15 @@ _drm_fullscreen_set(Ecore_Evas *ee, Eina_Bool on)
      }
 }
 
+/**
+ * @brief Sets the withdrawn state of the Ecore_Evas.
+ *
+ * A withdrawn Ecore_Evas is hidden. This function updates the
+ * property and calls ecore_evas_hide() or ecore_evas_show() accordingly.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param on EINA_TRUE if withdrawn, EINA_FALSE otherwise.
+ */
 static void
 _drm_withdrawn_set(Ecore_Evas *ee, Eina_Bool on)
 {
@@ -628,6 +917,12 @@ _drm_withdrawn_set(Ecore_Evas *ee, Eina_Bool on)
    else ecore_evas_show(ee);
 }
 
+/**
+ * @brief Sets whether the Ecore_Evas should ignore input events.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param on Non-zero to ignore events, 0 to process them.
+ */
 static void
 _drm_ignore_events_set(Ecore_Evas *ee, int on)
 {
@@ -635,6 +930,18 @@ _drm_ignore_events_set(Ecore_Evas *ee, int on)
    ee->ignore_events = on;
 }
 
+/**
+ * @brief Sets the alpha channel state for the Ecore_Evas.
+ *
+ * If the Ecore_Evas is in an asynchronous render, the change is delayed.
+ * Note: True alpha blending with the underlying desktop (if any)
+ * depends on DRM/KMS capabilities and compositor behavior, which is
+ * generally not present in a pure DRM setup. This might affect how
+ * Evas renders objects with alpha.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param alpha EINA_TRUE to enable alpha channel, EINA_FALSE otherwise.
+ */
 static void
 _drm_alpha_set(Ecore_Evas *ee, int alpha)
 {
@@ -645,6 +952,15 @@ _drm_alpha_set(Ecore_Evas *ee, int alpha)
      }
 }
 
+/**
+ * @brief Sets the transparent state for the Ecore_Evas.
+ *
+ * If the Ecore_Evas is in an asynchronous render, the change is delayed.
+ * Similar to alpha, true transparency depends on system capabilities.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param transparent EINA_TRUE to enable transparency, EINA_FALSE otherwise.
+ */
 static void
 _drm_transparent_set(Ecore_Evas *ee, int transparent)
 {
@@ -655,6 +971,12 @@ _drm_transparent_set(Ecore_Evas *ee, int transparent)
      }
 }
 
+/**
+ * @brief Sets the aspect ratio hint for the Ecore_Evas.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param aspect The desired aspect ratio (width / height).
+ */
 static void
 _drm_aspect_set(Ecore_Evas *ee, double aspect)
 {
@@ -662,6 +984,14 @@ _drm_aspect_set(Ecore_Evas *ee, double aspect)
    ee->prop.aspect = aspect;
 }
 
+/**
+ * @brief Creates a new Ecore_Evas_Interface_Drm structure.
+ *
+ * This interface provides DRM-specific functionalities for an Ecore_Evas.
+ *
+ * @return A pointer to the newly allocated Ecore_Evas_Interface_Drm,
+ *         or NULL on allocation failure.
+ */
 static Ecore_Evas_Interface_Drm *
 _ecore_evas_drm_interface_new(void)
 {
@@ -676,6 +1006,17 @@ _ecore_evas_drm_interface_new(void)
    return iface;
 }
 
+/**
+ * @brief Callback for handling DRM events from the file descriptor.
+ *
+ * This function is registered with an Ecore_Fd_Handler and is called
+ * when there is activity on the DRM device's file descriptor. It then
+ * calls ecore_drm2_event_handle to process the DRM event.
+ *
+ * @param data The Ecore_Evas instance.
+ * @param hdlr EINA_UNUSED The Ecore_Fd_Handler that triggered the callback.
+ * @return EINA_TRUE to keep the handler active, EINA_FALSE on error to remove it.
+ */
 static Eina_Bool
 _cb_drm_event(void *data, Ecore_Fd_Handler *hdlr EINA_UNUSED)
 {
@@ -695,6 +1036,20 @@ _cb_drm_event(void *data, Ecore_Fd_Handler *hdlr EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for DRM page flip events.
+ *
+ * This function is invoked by the Ecore_Drm2 library when a page flip
+ * (vblank) event occurs. It completes the flip operation and, if the
+ * animator is ticking, calls ecore_evas_animator_tick to drive animations
+ * synchronized with the display refresh.
+ *
+ * @param fd EINA_UNUSED The file descriptor associated with the DRM device.
+ * @param frame EINA_UNUSED The frame count.
+ * @param sec Seconds part of the timestamp for the event.
+ * @param usec Microseconds part of the timestamp for the event.
+ * @param data The Ecore_Drm2_Output associated with this page flip.
+ */
 static void
 _cb_pageflip(int fd EINA_UNUSED, unsigned int frame EINA_UNUSED, unsigned int sec, unsigned int usec, void *data)
 {
@@ -728,6 +1083,19 @@ _cb_pageflip(int fd EINA_UNUSED, unsigned int frame EINA_UNUSED, unsigned int se
      ecore_drm2_fb_flip(NULL, output);
 }
 
+/**
+ * @brief Handles Evas canvas change notifications.
+ *
+ * This function is called when the Evas canvas content has changed (or not).
+ * If the content has not changed (meaning rendering is complete and there
+ * are no further updates from Evas itself), and the animator is ticking
+ * and no flip is pending, it explicitly requests a DRM page flip. This
+ * ensures that even if Evas doesn't have new content, the animator
+ * continues to be driven by vblank events.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param changed EINA_TRUE if Evas content changed, EINA_FALSE otherwise.
+ */
 static void
 _drm_evas_changed(Ecore_Evas *ee, Eina_Bool changed)
 {
@@ -740,6 +1108,15 @@ _drm_evas_changed(Ecore_Evas *ee, Eina_Bool changed)
      ecore_drm2_fb_flip(NULL, edata->output);
 }
 
+/**
+ * @brief Ecore_Job callback to perform an animator tick.
+ *
+ * This job is scheduled when a vblank event is received and the animator
+ * needs to be ticked. It calls ecore_evas_animator_tick with the
+ * appropriate timestamp.
+ *
+ * @param data The Ecore_Evas instance.
+ */
 static void
 _tick_job(void *data)
 {
@@ -757,6 +1134,19 @@ _tick_job(void *data)
                             edata->tick_job_timestamp - edata->offset);
 }
 
+/**
+ * @brief Registers the Ecore_Evas animator for DRM vblank synchronization.
+ *
+ * This function is called when an animator (e.g., Ecore_Animator) wants
+ * to be driven by display refresh. It sets up the necessary state for
+ * vblank-based ticking. It also performs a one-time calculation to estimate
+ * the offset between the GPU's clock and the system clock if not disabled
+ * by an environment variable.
+ * If vblank is not immediately available or a tick is already scheduled,
+ * it might schedule an Ecore_Job as a fallback or to ensure the first tick.
+ *
+ * @param ee The Ecore_Evas instance.
+ */
 static void
 _drm_animator_register(Ecore_Evas *ee)
 {
@@ -821,6 +1211,15 @@ _drm_animator_register(Ecore_Evas *ee)
    edata->ticking = EINA_TRUE;
 }
 
+/**
+ * @brief Unregisters the Ecore_Evas animator from DRM vblank synchronization.
+ *
+ * This function is called when an animator no longer needs to be driven
+ * by display refresh. It clears the ticking state and cancels any pending
+ * tick jobs.
+ *
+ * @param ee The Ecore_Evas instance.
+ */
 static void
 _drm_animator_unregister(Ecore_Evas *ee)
 {
@@ -836,6 +1235,12 @@ _drm_animator_unregister(Ecore_Evas *ee)
      }
 }
 
+/**
+ * @brief Gets the timestamp of the last vblank event.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @return The timestamp of the last vblank in seconds, or -1.0 on failure.
+ */
 static double
 _drm_last_tick_get(Ecore_Evas *ee)
 {
@@ -942,9 +1347,21 @@ static Ecore_Evas_Engine_Func _ecore_evas_drm_engine_func =
    NULL, //fn_pointer_device_xy_get
    NULL, //fn_prepare
    _drm_last_tick_get,
-};
+}; /**< Structure defining the Ecore_Evas engine functions for DRM. */
 
 #ifdef BUILD_ECORE_EVAS_GL_DRM
+/**
+ * @brief Sets up the Evas GL DRM engine information.
+ *
+ * This function retrieves the Evas_Engine_Info_GL_Drm structure and populates
+ * it with DRM-specific details like the DRM device, output, BPP, depth,
+ * format, and rotation. It also configures vsync based on an environment
+ * variable.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param edata The engine-specific data for this Ecore_Evas.
+ * @return A pointer to the Evas_Engine_Info_GL_Drm structure, or NULL on failure.
+ */
 static void *
 _drm_gl_canvas_setup(Ecore_Evas *ee, Ecore_Evas_Engine_Drm_Data *edata)
 {
@@ -971,6 +1388,17 @@ _drm_gl_canvas_setup(Ecore_Evas *ee, Ecore_Evas_Engine_Drm_Data *edata)
 }
 #endif
 
+/**
+ * @brief Sets up the Evas software DRM engine information.
+ *
+ * This function retrieves the Evas_Engine_Info_Drm structure and populates
+ * it with DRM-specific details like the DRM device, output, BPP, depth,
+ * format, and rotation.
+ *
+ * @param ee The Ecore_Evas instance.
+ * @param edata The engine-specific data for this Ecore_Evas.
+ * @return A pointer to the Evas_Engine_Info_Drm structure, or NULL on failure.
+ */
 static void *
 _drm_canvas_setup(Ecore_Evas *ee, Ecore_Evas_Engine_Drm_Data *edata)
 {
@@ -989,6 +1417,22 @@ _drm_canvas_setup(Ecore_Evas *ee, Ecore_Evas_Engine_Drm_Data *edata)
    return einfo;
 }
 
+/**
+ * @brief Internal function to create a new Ecore_Evas DRM instance.
+ *
+ * This function handles the common logic for creating both software DRM
+ * and GL DRM Ecore_Evas instances. It initializes Ecore_Evas, sets up
+ * the engine data, configures the Evas canvas with the appropriate
+ * DRM engine info, and sets up event handling.
+ *
+ * @param device The DRM device name (e.g., "seat0") or NULL to autodetect.
+ * @param x The initial x-coordinate (often 0 for DRM).
+ * @param y The initial y-coordinate (often 0 for DRM).
+ * @param w The initial width.
+ * @param h The initial height.
+ * @param gl EINA_TRUE to use the GL DRM engine, EINA_FALSE for software DRM.
+ * @return A pointer to the new Ecore_Evas instance, or NULL on failure.
+ */
 static Ecore_Evas *
 _ecore_evas_new_internal(const char *device, int x, int y, int w, int h, Eina_Bool gl)
 {
@@ -1137,6 +1581,20 @@ eng_err:
    return NULL;
 }
 
+/**
+ * @brief Creates a new Ecore_Evas using the software DRM engine.
+ *
+ * This is an EMODAPI function, making it an exported symbol from the module.
+ * It serves as a public entry point for creating a software DRM Ecore_Evas.
+ *
+ * @param device The DRM device name (e.g., "seat0") or NULL to autodetect.
+ * @param parent EINA_UNUSED Unused parent window ID (DRM doesn't have parent windows).
+ * @param x The initial x-coordinate.
+ * @param y The initial y-coordinate.
+ * @param w The initial width.
+ * @param h The initial height.
+ * @return A pointer to the new Ecore_Evas instance, or NULL on failure.
+ */
 EMODAPI Ecore_Evas *
 ecore_evas_drm_new_internal(const char *device, unsigned int parent EINA_UNUSED, int x, int y, int w, int h)
 {
@@ -1144,6 +1602,22 @@ ecore_evas_drm_new_internal(const char *device, unsigned int parent EINA_UNUSED,
 }
 
 #ifdef BUILD_ECORE_EVAS_GL_DRM
+/**
+ * @brief Creates a new Ecore_Evas using the GL DRM engine.
+ *
+ * This is an EMODAPI function, making it an exported symbol from the module.
+ * It serves as a public entry point for creating a GL-accelerated DRM Ecore_Evas.
+ * It attempts to load `libglapi.so.0` if not already loaded, as it's a
+ * common dependency for GL operations.
+ *
+ * @param device The DRM device name (e.g., "seat0") or NULL to autodetect.
+ * @param parent EINA_UNUSED Unused parent window ID.
+ * @param x The initial x-coordinate.
+ * @param y The initial y-coordinate.
+ * @param w The initial width.
+ * @param h The initial height.
+ * @return A pointer to the new Ecore_Evas instance, or NULL on failure (e.g., if libglapi cannot be loaded).
+ */
 EMODAPI Ecore_Evas *
 ecore_evas_gl_drm_new_internal(const char *device, unsigned int parent EINA_UNUSED, int x, int y, int w, int h)
 {

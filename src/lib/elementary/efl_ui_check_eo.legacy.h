@@ -1,9 +1,23 @@
+/**
+ * @file
+ * @brief These routines are legacy routines from the old EFL UI Check widget.
+ *
+ * They cast an Efl_Ui_Check instance to Eo type when calling the legacy
+ * functions.
+ *
+ * @ingroup Elm_Check_Group
+ */
+
 #ifndef _EFL_UI_CHECK_EO_LEGACY_H_
 #define _EFL_UI_CHECK_EO_LEGACY_H_
 
 #ifndef _EFL_UI_CHECK_EO_CLASS_TYPE
 #define _EFL_UI_CHECK_EO_CLASS_TYPE
 
+/**
+ * @brief Opaque handle to an Efl_Ui_Check instance.
+ * @ingroup Elm_Check_Group
+ */
 typedef Eo Efl_Ui_Check;
 
 #endif

@@ -15,12 +15,36 @@ static Evas_Image_Save_Func evas_image_save_webp_func =
    evas_image_save_file_webp
 };
 
+/**
+ * @brief Callback function for WebPEncode to write encoded data to a file.
+ *
+ * This function is registered with the WebPPicture object and is called by
+ * WebPEncode to write chunks of the encoded WebP data.
+ *
+ * @param data Pointer to the encoded data chunk.
+ * @param data_size Size of the data chunk.
+ * @param pic Pointer to the WebPPicture object (contains custom_ptr pointing to the FILE).
+ * @return 1 on success, 0 on failure (fwrite error).
+ */
 static int writer(const uint8_t *data, size_t data_size, const WebPPicture *const pic)
 {
 	FILE *out = (FILE *)pic->custom_ptr;
 	return data_size ? (fwrite(data, data_size, 1, out) == 1) : 1;
 }
 
+/**
+ * @brief Saves an RGBA_Image to a WebP file.
+ *
+ * This function handles the core logic of converting an Evas RGBA_Image
+ * to the WebP format and writing it to a file. It sets up the WebP
+ * configuration and picture objects, performs the encoding, and manages
+ * resources.
+ *
+ * @param im Pointer to the RGBA_Image to save.
+ * @param file Path to the output WebP file.
+ * @param quality Quality factor (0-100). 100 implies lossless compression.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 save_image_webp(RGBA_Image *im, const char *file, int quality)
 {
@@ -72,12 +96,34 @@ save_image_webp(RGBA_Image *im, const char *file, int quality)
 	return result;
 }
 
+/**
+ * @brief Evas image saver function for WebP format.
+ *
+ * This function conforms to the Evas_Image_Save_Func interface for saving
+ * images. It acts as a wrapper around save_image_webp.
+ *
+ * @param im Pointer to the RGBA_Image to save.
+ * @param file Path to the output WebP file.
+ * @param key Optional key (unused for WebP).
+ * @param quality Quality factor (0-100).
+ * @param compress Compression level (unused for WebP, quality is used instead).
+ * @param encoding Specific encoding details (unused for WebP).
+ * @return 1 on success, 0 on failure.
+ */
 static int evas_image_save_file_webp(RGBA_Image *im, const char *file, const char *key EINA_UNUSED,
                                      int quality, int compress EINA_UNUSED, const char *encoding EINA_UNUSED)
 {
 	return save_image_webp(im, file, quality);
 }
 
+/**
+ * @brief Opens the Evas image saver module for WebP.
+ *
+ * Called by Evas when loading the module. It registers the save function.
+ *
+ * @param em Pointer to the Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -86,6 +132,13 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Closes the Evas image saver module for WebP.
+ *
+ * Called by Evas when unloading the module. Currently does nothing.
+ *
+ * @param em Pointer to the Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

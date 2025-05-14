@@ -62,6 +62,19 @@ static const Elm_Action key_actions[] = {
    {NULL, NULL}
 };
 
+/**
+ * @internal
+ * @brief Sets up a proxy image object for looped scrolling.
+ * @param obj The scroller object.
+ * @param sd The scroller's private data.
+ * @param proxy The Evas_Object to be used as a proxy image.
+ *
+ * This function configures a given Evas_Object to act as a proxy
+ * for the scroller's content. This is used when content looping
+ * is enabled, allowing seamless wrapping of the content. It sets
+ * the image source to the scroller's content, configures fill and
+ * size hints, and makes the proxy visible.
+ */
 static void
 _elm_scroller_proxy_set(Evas_Object *obj, Elm_Scroller_Data *sd, Evas_Object *proxy)
 {
@@ -84,6 +97,21 @@ _elm_scroller_proxy_set(Evas_Object *obj, Elm_Scroller_Data *sd, Evas_Object *pr
    evas_object_show(proxy);
 }
 
+/**
+ * @internal
+ * @brief Handles key actions for moving the scroller content.
+ * @param obj The scroller object.
+ * @param params A string indicating the direction or type of move.
+ *        Possible values: "prior", "next", "left", "right", "up", "down",
+ *        "first", "last".
+ * @return EINA_TRUE if the action was handled, EINA_FALSE otherwise.
+ *
+ * This function processes keyboard input to scroll the content. It determines
+ * the scroll direction based on the `params` argument and current focus state.
+ * It handles page-based scrolling, step-based scrolling, and scrolling to
+ * the beginning or end of the content. It also considers focus movement
+ * and adjusts the scroller viewport if a focused child moves out of view.
+ */
 static Eina_Bool
 _key_action_move(Evas_Object *obj, const char *params)
 {
@@ -398,6 +426,14 @@ _elm_scroller_efl_canvas_group_group_calculate(Eo *obj, Elm_Scroller_Data *sd)
    evas_object_size_hint_min_set(obj, w, h);
 }
 
+/**
+ * @internal
+ * @brief Sets the mirrored mode of the scroller widget.
+ * @param obj The scroller object.
+ * @param mirrored EINA_TRUE to set mirrored mode, EINA_FALSE otherwise.
+ *
+ * This is a helper function to apply the mirrored setting to the object.
+ */
 static void
 _mirrored_set(Evas_Object *obj,
               Eina_Bool mirrored)
@@ -420,12 +456,35 @@ _elm_scroller_efl_ui_widget_theme_apply(Eo *obj, Elm_Scroller_Data *sd EINA_UNUS
    return int_ret;
 }
 
+/**
+ * @internal
+ * @brief Hook function called when a child widget requests to be shown.
+ * @param data The scroller object (passed as user data).
+ * @param content_obj The content object (unused).
+ * @param r The Eina_Rect defining the region to be shown.
+ *
+ * This function is a callback that gets triggered when a child widget
+ * (typically the content of the scroller) uses `elm_widget_show_region_set`
+ * to request a specific area to be made visible. It translates this
+ * request into a scroller action to bring the specified region into view.
+ */
 static void
 _show_region_hook(void *data, Evas_Object *content_obj EINA_UNUSED, Eina_Rect r)
 {
    elm_interface_scrollable_content_region_show(data, r.x, r.y, r.w, r.h);
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_CHANGED_SIZE_HINTS event on the scroller.
+ * @param data The scroller object (passed as user data).
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object that emitted the event (unused).
+ * @param event_info Additional event information (unused).
+ *
+ * This function is called when the size hints of the scroller object change.
+ * It triggers a re-evaluation of the scroller's layout and sizing.
+ */
 static void
 _changed_size_hints_cb(void *data,
                        Evas *e EINA_UNUSED,
@@ -453,6 +512,17 @@ _elm_scroller_efl_ui_widget_widget_sub_object_del(Eo *obj, Elm_Scroller_Data *sd
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Callback for EVAS_CALLBACK_RESIZE event on the scroller.
+ * @param data The scroller object (passed as user data).
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas_Object that emitted the event (unused).
+ * @param event_info Additional event information (unused).
+ *
+ * This function is called when the scroller object is resized.
+ * It triggers a re-evaluation of the scroller's layout and sizing.
+ */
 static void
 _resize_cb(void *data,
            Evas *e EINA_UNUSED,
@@ -462,6 +532,14 @@ _resize_cb(void *data,
    elm_layout_sizing_eval(data);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the left edge of the content is reached.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "edge,left" legacy signal.
+ */
 static void
 _edge_left_cb(Evas_Object *obj,
               void *data EINA_UNUSED)
@@ -469,6 +547,14 @@ _edge_left_cb(Evas_Object *obj,
    efl_event_callback_legacy_call(obj, ELM_SCROLLER_EVENT_EDGE_LEFT, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the right edge of the content is reached.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "edge,right" legacy signal.
+ */
 static void
 _edge_right_cb(Evas_Object *obj,
                void *data EINA_UNUSED)
@@ -476,6 +562,14 @@ _edge_right_cb(Evas_Object *obj,
    efl_event_callback_legacy_call(obj, ELM_SCROLLER_EVENT_EDGE_RIGHT, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the top edge of the content is reached.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "edge,top" legacy signal.
+ */
 static void
 _edge_top_cb(Evas_Object *obj,
              void *data EINA_UNUSED)
@@ -483,6 +577,14 @@ _edge_top_cb(Evas_Object *obj,
    efl_event_callback_legacy_call(obj, ELM_SCROLLER_EVENT_EDGE_TOP, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the bottom edge of the content is reached.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "edge,bottom" legacy signal.
+ */
 static void
 _edge_bottom_cb(Evas_Object *obj,
                 void *data EINA_UNUSED)
@@ -490,6 +592,14 @@ _edge_bottom_cb(Evas_Object *obj,
    efl_event_callback_legacy_call(obj, ELM_SCROLLER_EVENT_EDGE_BOTTOM, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the content has been scrolled.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "scroll" smart callback.
+ */
 static void
 _scroll_cb(Evas_Object *obj,
            void *data EINA_UNUSED)
@@ -497,6 +607,14 @@ _scroll_cb(Evas_Object *obj,
    evas_object_smart_callback_call(obj, "scroll", NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the content has been scrolled leftwards.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "scroll,left" legacy signal.
+ */
 static void
 _scroll_left_cb(Evas_Object *obj,
            void *data EINA_UNUSED)
@@ -504,6 +622,14 @@ _scroll_left_cb(Evas_Object *obj,
    efl_event_callback_legacy_call(obj, ELM_SCROLLER_EVENT_SCROLL_LEFT, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the content has been scrolled rightwards.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "scroll,right" legacy signal.
+ */
 static void
 _scroll_right_cb(Evas_Object *obj,
            void *data EINA_UNUSED)
@@ -511,6 +637,14 @@ _scroll_right_cb(Evas_Object *obj,
    efl_event_callback_legacy_call(obj, ELM_SCROLLER_EVENT_SCROLL_RIGHT, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the content has been scrolled upwards.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "scroll,up" legacy signal.
+ */
 static void
 _scroll_up_cb(Evas_Object *obj,
            void *data EINA_UNUSED)
@@ -518,6 +652,14 @@ _scroll_up_cb(Evas_Object *obj,
    efl_event_callback_legacy_call(obj, ELM_SCROLLER_EVENT_SCROLL_UP, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the content has been scrolled downwards.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "scroll,down" legacy signal.
+ */
 static void
 _scroll_down_cb(Evas_Object *obj,
            void *data EINA_UNUSED)
@@ -525,6 +667,14 @@ _scroll_down_cb(Evas_Object *obj,
    efl_event_callback_legacy_call(obj, ELM_SCROLLER_EVENT_SCROLL_DOWN, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when scrolling animation has started.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "scroll,anim,start" smart callback.
+ */
 static void
 _scroll_anim_start_cb(Evas_Object *obj,
                       void *data EINA_UNUSED)
@@ -532,6 +682,14 @@ _scroll_anim_start_cb(Evas_Object *obj,
    evas_object_smart_callback_call(obj, "scroll,anim,start", NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when scrolling animation has stopped.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "scroll,anim,stop" smart callback.
+ */
 static void
 _scroll_anim_stop_cb(Evas_Object *obj,
                      void *data EINA_UNUSED)
@@ -539,6 +697,14 @@ _scroll_anim_stop_cb(Evas_Object *obj,
    evas_object_smart_callback_call(obj, "scroll,anim,stop", NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when dragging the contents around has started.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "scroll,drag,start" smart callback.
+ */
 static void
 _scroll_drag_start_cb(Evas_Object *obj,
                       void *data EINA_UNUSED)
@@ -546,7 +712,14 @@ _scroll_drag_start_cb(Evas_Object *obj,
    evas_object_smart_callback_call(obj, "scroll,drag,start", NULL);
 }
 
-
+/**
+ * @internal
+ * @brief Callback for when dragging the contents around has stopped.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "scroll,drag,stop" smart callback.
+ */
 static void
 _scroll_drag_stop_cb(Evas_Object *obj,
                      void *data EINA_UNUSED)
@@ -554,6 +727,14 @@ _scroll_drag_stop_cb(Evas_Object *obj,
    evas_object_smart_callback_call(obj, "scroll,drag,stop", NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the vertical scroll bar has been dragged.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "vbar,drag" legacy signal.
+ */
 static void
 _vbar_drag_cb(Evas_Object *obj,
                 void *data EINA_UNUSED)
@@ -561,6 +742,14 @@ _vbar_drag_cb(Evas_Object *obj,
    efl_event_callback_legacy_call(obj, ELM_SCROLLER_EVENT_VBAR_DRAG, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the vertical scroll bar has been pressed.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "vbar,press" legacy signal.
+ */
 static void
 _vbar_press_cb(Evas_Object *obj,
                 void *data EINA_UNUSED)
@@ -568,6 +757,14 @@ _vbar_press_cb(Evas_Object *obj,
    efl_event_callback_legacy_call(obj, ELM_SCROLLER_EVENT_VBAR_PRESS, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the vertical scroll bar has been unpressed.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "vbar,unpress" legacy signal.
+ */
 static void
 _vbar_unpress_cb(Evas_Object *obj,
                 void *data EINA_UNUSED)
@@ -575,6 +772,14 @@ _vbar_unpress_cb(Evas_Object *obj,
    efl_event_callback_legacy_call(obj, ELM_SCROLLER_EVENT_VBAR_UNPRESS, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the horizontal scroll bar has been dragged.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "hbar,drag" legacy signal.
+ */
 static void
 _hbar_drag_cb(Evas_Object *obj,
                 void *data EINA_UNUSED)
@@ -582,6 +787,14 @@ _hbar_drag_cb(Evas_Object *obj,
    efl_event_callback_legacy_call(obj, ELM_SCROLLER_EVENT_HBAR_DRAG, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the horizontal scroll bar has been pressed.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "hbar,press" legacy signal.
+ */
 static void
 _hbar_press_cb(Evas_Object *obj,
                 void *data EINA_UNUSED)
@@ -589,6 +802,14 @@ _hbar_press_cb(Evas_Object *obj,
    efl_event_callback_legacy_call(obj, ELM_SCROLLER_EVENT_HBAR_PRESS, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the horizontal scroll bar has been unpressed.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "hbar,unpress" legacy signal.
+ */
 static void
 _hbar_unpress_cb(Evas_Object *obj,
                 void *data EINA_UNUSED)
@@ -596,6 +817,14 @@ _hbar_unpress_cb(Evas_Object *obj,
    efl_event_callback_legacy_call(obj, ELM_SCROLLER_EVENT_HBAR_UNPRESS, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the visible page has changed.
+ * @param obj The scroller object.
+ * @param data User data (unused).
+ *
+ * Emits the "scroll,page,changed" legacy signal.
+ */
 static void
 _page_change_cb(Evas_Object *obj,
                 void *data EINA_UNUSED)
@@ -604,6 +833,20 @@ _page_change_cb(Evas_Object *obj,
      (obj, ELM_SCROLLER_EVENT_SCROLL_PAGE_CHANGED, NULL);
 }
 
+/**
+ * @internal
+ * @brief Sets up the content and proxy objects for looped scrolling.
+ * @param obj The scroller object.
+ * @param sd The scroller's private data.
+ * @param content The main content object to be scrolled.
+ *
+ * This function is responsible for configuring the scroller's content
+ * when looping is enabled. It creates a container layout (`sd->contents`)
+ * if it doesn't exist, and sets the main `content` into this layout.
+ * It then creates and configures up to three proxy image objects
+ * (`sd->proxy_content`) to display duplicates of the main content,
+ * enabling seamless horizontal, vertical, or combined looping.
+ */
 static void
 _loop_content_set(Evas_Object *obj, Elm_Scroller_Data *sd, Evas_Object *content)
 {
@@ -657,6 +900,25 @@ _loop_content_set(Evas_Object *obj, Elm_Scroller_Data *sd, Evas_Object *content)
      }
 }
 
+/**
+ * @internal
+ * @brief Sets or replaces the main content of the scroller.
+ * @param obj The scroller object (Eo pointer).
+ * @param sd The scroller's private data.
+ * @param part The name of the swallow part to set content to. If NULL or
+ *        "elm.swallow.content", it sets the main scrollable content.
+ *        Otherwise, it forwards to the parent's part content set.
+ * @param content The Evas_Object to set as content.
+ * @return EINA_TRUE on success, EINA_FALSE on failure or if part is not handled.
+ *
+ * This function handles setting the content for the scroller. If a specific
+ * `part` other than the default content swallow is given, it delegates to the
+ * parent class. Otherwise, it manages the main scrollable content.
+ * It handles previous content deletion, new content addition, setting up
+ * show region hooks for elm widgets, and configuring looped content if
+ * looping is enabled. Finally, it notifies about content change and
+ * triggers a layout re-evaluation.
+ */
 static Eina_Bool
 _elm_scroller_content_set(Eo *obj, Elm_Scroller_Data *sd, const char *part, Evas_Object *content)
 {
@@ -701,6 +963,20 @@ _elm_scroller_content_set(Eo *obj, Elm_Scroller_Data *sd, const char *part, Evas
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Gets the main content of the scroller.
+ * @param obj The scroller object (Eo pointer).
+ * @param sd The scroller's private data.
+ * @param part The name of the swallow part to get content from. If NULL or
+ *        "elm.swallow.content", it gets the main scrollable content.
+ *        Otherwise, it forwards to the parent's part content get.
+ * @return The Evas_Object set as content, or NULL if none or part is not handled.
+ *
+ * This function retrieves the content of the scroller. If a specific `part`
+ * other than the default content swallow is given, it delegates to the parent
+ * class. Otherwise, it returns the main scrollable content stored in `sd->content`.
+ */
 static Evas_Object*
 _elm_scroller_content_get(const Eo *obj, Elm_Scroller_Data *sd, const char *part)
 {
@@ -712,6 +988,23 @@ _elm_scroller_content_get(const Eo *obj, Elm_Scroller_Data *sd, const char *part
    return sd->content;
 }
 
+/**
+ * @internal
+ * @brief Unsets (removes) the main content of the scroller.
+ * @param obj The scroller object (Eo pointer).
+ * @param sd The scroller's private data.
+ * @param part The name of the swallow part to unset content from. If NULL or
+ *        "elm.swallow.content", it unsets the main scrollable content.
+ *        Otherwise, it forwards to the parent's part content unset.
+ * @return The previously set Evas_Object, or NULL if none or part is not handled.
+ *
+ * This function removes the content from the scroller. If a specific `part`
+ * other than the default content swallow is given, it delegates to the parent
+ * class. Otherwise, it manages unsetting the main scrollable content.
+ * It ensures that the sub-object (either the direct content or the loop container)
+ * is properly handled for focus and then clears the scrollable interface's content.
+ * The actual deletion of the returned object is up to the caller.
+ */
 static Evas_Object*
 _elm_scroller_content_unset(Eo *obj, Elm_Scroller_Data *sd, const char *part)
 {
@@ -766,6 +1059,17 @@ _elm_scroller_content_min_limit_cb(Evas_Object *obj,
    elm_layout_sizing_eval(obj);
 }
 
+/**
+ * @internal
+ * @brief Callback for when the scrollable interface's content viewport is resized.
+ * @param obj The scroller object.
+ * @param w The new width of the viewport (unused).
+ * @param h The new height of the viewport (unused).
+ *
+ * This function is called by the scrollable interface when its viewport
+ * (the visible area for the content) changes size. It triggers a
+ * re-evaluation of the scroller's layout and sizing.
+ */
 static void
 _elm_scroller_content_viewport_resize_cb(Evas_Object *obj,
                                    Evas_Coord w EINA_UNUSED,
@@ -869,6 +1173,19 @@ elm_scroller_add(Evas_Object *parent)
    return elm_legacy_add(MY_CLASS, parent);
 }
 
+/**
+ * @internal
+ * @brief Callback for focus manager's "manager,focus,changed" event.
+ * @param data The scroller object (passed as user data).
+ * @param event The Efl_Event data.
+ *
+ * This function is triggered when the focus within the scroller's focus
+ * manager changes. If an element inside the scroller receives focus,
+ * this function ensures that the focused element is brought into the
+ * visible region of the scroller. It calculates the geometry of the
+ * focused element relative to the scroller's content area and then
+ * calls `elm_interface_scrollable_region_bring_in` to make it visible.
+ */
 static void
 _focused_element(void *data, const Efl_Event *event)
 {
@@ -908,6 +1225,17 @@ _elm_scroller_efl_object_constructor(Eo *obj, Elm_Scroller_Data *_pd EINA_UNUSED
 }
 
 /* deprecated */
+/**
+ * @internal
+ * @brief Sets the theme for the scroller using custom class and group. (Deprecated)
+ * @param obj The scroller object.
+ * @param _pd Scroller private data (unused).
+ * @param klass The class name for the theme.
+ * @param group The group name for the theme.
+ *
+ * This function is a deprecated way to set a custom theme for the scroller.
+ * It updates the widget's theme class and element, then applies the theme.
+ */
 EOLIAN static void
 _elm_scroller_custom_widget_base_theme_set(Eo *obj, Elm_Scroller_Data *_pd EINA_UNUSED, const char *klass, const char *group)
 {
@@ -1358,6 +1686,14 @@ elm_scroller_propagate_events_get(const Evas_Object *obj)
    return evas_object_propagate_events_get(elm_layout_edje_get(obj));
 }
 
+/**
+ * @internal
+ * @brief Class constructor for Elm_Scroller.
+ * @param klass The Efl_Class being constructed.
+ *
+ * This function is called once when the Elm_Scroller class is being set up.
+ * It registers the legacy type name "elm_scroller" with the Evas smart system.
+ */
 static void
 _elm_scroller_class_constructor(Efl_Class *klass)
 {

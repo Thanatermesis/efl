@@ -21,19 +21,38 @@
 #define D(fmt, args...)
 #endif
 
-
+/** @brief The main Spectre document object. */
 static SpectreDocument *psdoc;
+/** @brief Total number of pages in the document. */
 static int page_count;
 
+/** @brief The currently loaded Spectre page object. */
 static SpectrePage *page;
 
+/** @brief Width of the rendered page in pixels. */
 static int width = 0;
+/** @brief Height of the rendered page in pixels. */
 static int height = 0;
+/** @brief Pointer to the rendered pixel data in shared memory. */
 static void *data = NULL;
+/** @brief Dots per inch for rendering. If < 0, it's calculated based on size or default. */
 static double dpi = -1.0;
 
+/** @brief Default DPI to use if not specified or calculable. */
 #define DEF_DPI 72.0
 
+/**
+ * @brief Initializes the Spectre library, loads a PostScript document, and prepares a page for rendering.
+ *
+ * This function sets up the Eina library, creates a Spectre document, loads the specified file,
+ * retrieves page information, and calculates the rendering dimensions based on requested size or DPI.
+ *
+ * @param file Path to the PostScript file.
+ * @param page_nbr The page number to load (0-indexed).
+ * @param size_w Desired width for rendering. If 0, calculated from DPI or original size.
+ * @param size_h Desired height for rendering. If 0, calculated from DPI or original size.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _spectre_init(const char *file, int page_nbr, int size_w, int size_h)
 {
@@ -132,6 +151,11 @@ _spectre_init(const char *file, int page_nbr, int size_w, int size_h)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Shuts down the Spectre library and cleans up resources.
+ *
+ * Frees the loaded page and document, and shuts down the Eina library.
+ */
 static void
 _spectre_shutdown()
 {
@@ -140,6 +164,17 @@ _spectre_shutdown()
    eina_shutdown();
 }
 
+/**
+ * @brief Copies pixel data from Spectre's BGRA format to a DATA32 (ARGB) buffer.
+ *
+ * Spectre provides data in BGRA format (Blue, Green, Red, Alpha), but it seems
+ * this application expects ARGB (Alpha, Red, Green, Blue) where Alpha is set to 0xff (opaque).
+ *
+ * @param dst Pointer to the destination buffer (DATA32 format, effectively ARGB).
+ * @param src Pointer to the source buffer (unsigned char, BGRA format from Spectre).
+ * @param size The total number of bytes to process in the source buffer (src).
+ *             This is typically height * stride.
+ */
 static void
 _pixcopy(DATA32 *dst, unsigned char *src, int size)
 {
@@ -161,6 +196,17 @@ _pixcopy(DATA32 *dst, unsigned char *src, int size)
      }
 }
 
+/**
+ * @brief Renders the currently loaded page into a shared memory buffer.
+ *
+ * This function creates a Spectre render context, renders the page,
+ * allocates shared memory, and copies the pixel data into it using _pixcopy.
+ *
+ * @param size_w Expected width of the rendered image (currently unused in function body,
+ *               width is taken from global `width`).
+ * @param size_h Expected height of the rendered image (currently unused in function body,
+ *               height is taken from global `height`).
+ */
 static void
 _spectre_load_image(int size_w EINA_UNUSED, int size_h EINA_UNUSED)
 {
@@ -202,6 +248,24 @@ _spectre_load_image(int size_w EINA_UNUSED, int size_h EINA_UNUSED)
    spectre_render_context_free(rc);
 }
 
+/**
+ * @brief Main entry point for the PostScript to image converter.
+ *
+ * Parses command line arguments, initializes Spectre, optionally loads image data,
+ * and prints metadata and image data (or shared memory file info) to stdout.
+ *
+ * @param argc Number of command-line arguments.
+ * @param argv Array of command-line argument strings.
+ *             Expected arguments:
+ *             - argv[1]: path to the PostScript file (required).
+ *             - Optional flags:
+ *               - "-head": Only load header information, do not render image data.
+ *               - "-key <page_num>": Specify the page number to render (0-indexed).
+ *               - "-opt-dpi <dpi_val>": Specify DPI (integer, e.g., 72000 for 72.0 DPI).
+ *               - "-opt-size <w> <h>": Specify output width and height (currently not fully utilized by PS loader for scaling, but affects DPI calculation).
+ *               - "-opt-scale-down-by <val>": (Not used by this PS loader).
+ * @return 0 on success, -1 on failure.
+ */
 int
 main(int argc, char **argv)
 {

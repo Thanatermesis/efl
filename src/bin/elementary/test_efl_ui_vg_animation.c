@@ -14,12 +14,26 @@
 
 #ifdef BUILD_VG_LOADER_JSON
 
+/**
+ * @brief Structure to hold application specific data.
+ *
+ * This structure is used to pass around pointers to UI elements
+ * that need to be accessed by different callback functions.
+ */
 typedef struct _App_Data
 {
-   Eo *label;
-   Eo *slider;
+   Eo *label;   /**< Pointer to the label widget displaying animation state. */
+   Eo *slider;  /**< Pointer to the slider widget controlling animation progress. */
 } App_Data;
 
+/**
+ * @brief Callback function for button click events.
+ *
+ * Handles play, pause, resume, play backwards, and stop actions for the animation.
+ *
+ * @param data Pointer to the Evas_Object (animation view) to be controlled.
+ * @param ev The Efl_Event structure containing event information.
+ */
 static void
 btn_clicked_cb(void *data , const Efl_Event *ev )
 {
@@ -48,6 +62,14 @@ btn_clicked_cb(void *data , const Efl_Event *ev )
      efl_player_playing_set(anim_view, EINA_FALSE);
 }
 
+/**
+ * @brief Callback function for check (checkbox) state changes.
+ *
+ * Toggles the loop mode of the animation.
+ *
+ * @param data Pointer to the Evas_Object (animation view) whose loop mode is to be set.
+ * @param event The Efl_Event structure containing event information, specifically the checkbox state.
+ */
 static void
 check_changed_cb(void *data, const Efl_Event *event)
 {
@@ -55,6 +77,14 @@ check_changed_cb(void *data, const Efl_Event *event)
    efl_player_playback_loop_set(anim_view, efl_ui_selectable_selected_get(event->object));
 }
 
+/**
+ * @brief Callback function for speed control check (checkbox) state changes.
+ *
+ * Sets the playback speed of the animation (e.g., normal speed or 0.25x).
+ *
+ * @param data Pointer to the Evas_Object (animation view) whose speed is to be set.
+ * @param event The Efl_Event structure containing event information, specifically the checkbox state.
+ */
 static void
 speed_changed_cb(void *data, const Efl_Event *event)
 {
@@ -64,6 +94,15 @@ speed_changed_cb(void *data, const Efl_Event *event)
    efl_player_playback_speed_set(anim_view, speed);
 }
 
+/**
+ * @brief Callback function for limit frame check (checkbox) state changes.
+ *
+ * Sets the minimum and maximum frames for the animation playback, effectively
+ * limiting the animation to a specific segment.
+ *
+ * @param data Pointer to the Evas_Object (animation view) whose frame limits are to be set.
+ * @param event The Efl_Event structure containing event information, specifically the checkbox state.
+ */
 static void
 limit_frame_cb(void *data, const Efl_Event *event)
 {
@@ -84,6 +123,14 @@ limit_frame_cb(void *data, const Efl_Event *event)
      }
 }
 
+/**
+ * @brief Callback function for slider value changes.
+ *
+ * Sets the playback progress of the animation based on the slider's value.
+ *
+ * @param data Pointer to the Evas_Object (animation view) whose progress is to be set.
+ * @param ev The Efl_Event structure containing event information, specifically the slider value.
+ */
 static void
 _slider_changed_cb(void *data, const Efl_Event *ev)
 {
@@ -91,6 +138,12 @@ _slider_changed_cb(void *data, const Efl_Event *ev)
    efl_player_playback_progress_set(anim_view, efl_ui_range_value_get(ev->object));
 }
 
+/**
+ * @brief Updates the text of a label to reflect the current state of the animation.
+ *
+ * @param anim_view The animation view object whose state is to be queried.
+ * @param label The label object whose text is to be updated.
+ */
 static void
 update_anim_view_state(Evas_Object *anim_view, Evas_Object *label)
 {
@@ -116,6 +169,14 @@ update_anim_view_state(Evas_Object *anim_view, Evas_Object *label)
      }
 }
 
+/**
+ * @brief Callback for EFL_PLAYER_EVENT_PLAYING_CHANGED event.
+ *
+ * Updates the animation state label and resets the slider if the animation stops.
+ *
+ * @param data Pointer to App_Data containing UI elements.
+ * @param event The Efl_Event structure. The event->info is a pointer to Eina_Bool indicating playing state.
+ */
 static void
 _animation_playing_changed_cb(void *data, const Efl_Event *event)
 {
@@ -127,6 +188,14 @@ _animation_playing_changed_cb(void *data, const Efl_Event *event)
      efl_ui_range_value_set(ad->slider, 0);
 }
 
+/**
+ * @brief Callback for EFL_PLAYER_EVENT_PAUSED_CHANGED event.
+ *
+ * Updates the animation state label.
+ *
+ * @param data Pointer to App_Data containing UI elements.
+ * @param event The Efl_Event structure.
+ */
 static void
 _animation_paused_changed_cb(void *data, const Efl_Event *event)
 {
@@ -134,6 +203,14 @@ _animation_paused_changed_cb(void *data, const Efl_Event *event)
    update_anim_view_state(event->object, ad->label);
 }
 
+/**
+ * @brief Callback for EFL_PLAYER_EVENT_PLAYBACK_PROGRESS_CHANGED event.
+ *
+ * Updates the slider position based on animation progress.
+ *
+ * @param data Pointer to App_Data containing UI elements.
+ * @param event The Efl_Event structure. The event->info is a pointer to double indicating progress (0.0 to 1.0).
+ */
 static void
 _animation_playback_progress_changed_cb(void *data, const Efl_Event *event)
 {
@@ -142,6 +219,14 @@ _animation_playback_progress_changed_cb(void *data, const Efl_Event *event)
    efl_ui_range_value_set(ad->slider, progress);
 }
 
+/**
+ * @brief Callback for EFL_PLAYER_EVENT_PLAYBACK_REPEATED event.
+ *
+ * Prints a message indicating the animation has looped.
+ *
+ * @param data Unused.
+ * @param event The Efl_Event structure. The event->info is a pointer to int indicating repeat count.
+ */
 static void
 _animation_playback_repeated_changed_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -149,12 +234,32 @@ _animation_playback_repeated_changed_cb(void *data EINA_UNUSED, const Efl_Event 
    printf("repeated! (times: %d)\n", repeated_times);
 }
 
+/**
+ * @brief Callback for EFL_PLAYER_EVENT_PLAYBACK_FINISHED event.
+ *
+ * Prints a message indicating the animation has finished.
+ *
+ * @param data Unused.
+ * @param event Unused.
+ */
 static void
 _animation_playback_finished_changed_cb(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
 {
    printf("done!\n");
 }
 
+/**
+ * @brief Array defining callbacks for various animation player events.
+ *
+ * This array maps player events (like playing changed, paused changed, etc.)
+ * to their respective handler functions.
+ *
+ * Structure of elements:
+ * @code
+ * { EFL_PLAYER_EVENT_PLAYING_CHANGED, _animation_playing_changed_cb }
+ * //  ^ Event to listen for          ^ Callback function to execute
+ * @endcode
+ */
 EFL_CALLBACKS_ARRAY_DEFINE(animation_stats_cb,
   {EFL_PLAYER_EVENT_PLAYING_CHANGED, _animation_playing_changed_cb },
   {EFL_PLAYER_EVENT_PAUSED_CHANGED, _animation_paused_changed_cb },
@@ -163,6 +268,14 @@ EFL_CALLBACKS_ARRAY_DEFINE(animation_stats_cb,
   {EFL_PLAYER_EVENT_PLAYBACK_FINISHED, _animation_playback_finished_changed_cb },
 )
 
+/**
+ * @brief Callback function for window deletion (close) event.
+ *
+ * Frees the allocated App_Data structure.
+ *
+ * @param data Pointer to App_Data to be freed.
+ * @param ev Unused.
+ */
 static void
 _win_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -170,6 +283,17 @@ _win_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    free(ad);
 }
 
+/**
+ * @brief Main function to set up and run the Efl_Ui_Vg_Animation demo.
+ *
+ * This function creates the window, layout, animation view, and control widgets
+ * for the Lottie animation player demo. It handles the case where JSON Vg
+ * loader is not available by displaying a static SVG image instead.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_efl_ui_vg_animation(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -321,6 +445,16 @@ test_efl_ui_vg_animation(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, v
 
 #else
 
+/**
+ * @brief Fallback function for the Efl_Ui_Vg_Animation demo when JSON Vg loader is not available.
+ *
+ * This function creates a window and displays a static SVG image with a message
+ * indicating that the Lottie loader is not supported.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_efl_ui_vg_animation(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

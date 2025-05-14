@@ -19,7 +19,7 @@ struct _Evas_Loader_Internal
    double duration;
 };
 
-static int _evas_loader_avif_log_dom = -1;
+static int _evas_loader_avif_log_dom = -1; /**< Log domain for the AVIF loader module. */
 
 #ifdef ERR
 # undef ERR
@@ -36,6 +36,18 @@ static int _evas_loader_avif_log_dom = -1;
 #endif
 #define INF(...) EINA_LOG_DOM_INFO(_evas_loader_avif_log_dom, __VA_ARGS__)
 
+/**
+ * @brief Internal function to read the header of an AVIF image file.
+ * Parses the AVIF header from memory-mapped data to extract image properties
+ * like dimensions, alpha channel presence, and animation details.
+ *
+ * @param loader The internal loader structure.
+ * @param prop Pointer to the structure to store image properties.
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Size of the memory-mapped data.
+ * @param error Pointer to an integer to store the error code on failure.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 evas_image_load_file_head_avif_internal(Evas_Loader_Internal *loader,
                                         Emile_Image_Property *prop,
@@ -132,6 +144,18 @@ evas_image_load_file_head_avif_internal(Evas_Loader_Internal *loader,
    return ret;
 }
 
+/**
+ * @brief Internal function to load the image data of an AVIF file.
+ * Decodes the AVIF image data from memory-mapped content into the provided pixel buffer.
+ * Handles both static and animated images (decoding the current frame).
+ *
+ * @param loader The internal loader structure.
+ * @param pixels Pointer to the destination buffer for decoded pixel data (ARGB or BGRA).
+ * @param map Pointer to the memory-mapped file data.
+ * @param length Size of the memory-mapped data.
+ * @param error Pointer to an integer to store the error code on failure.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 evas_image_load_file_data_avif_internal(Evas_Loader_Internal *loader,
                                         void *pixels,
@@ -232,6 +256,17 @@ evas_image_load_file_data_avif_internal(Evas_Loader_Internal *loader,
    return ret;
 }
 
+/**
+ * @brief Opens an AVIF image file for loading. Evas loader API function.
+ * Allocates and initializes the internal loader structure.
+ *
+ * @param f Eina file handle.
+ * @param key Optional key associated with the image. (Unused)
+ * @param opts Load options.
+ * @param animated Pointer to store animation details if applicable.
+ * @param error Pointer to store error code on failure.
+ * @return A handle (loader_data) to the internal loader structure on success, NULL otherwise.
+ */
 static void *
 evas_image_load_file_open_avif(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
 			       Evas_Image_Load_Opts *opts,
@@ -254,6 +289,13 @@ evas_image_load_file_open_avif(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
    return loader;
 }
 
+/**
+ * @brief Closes an AVIF image file previously opened by evas_image_load_file_open_avif.
+ * Evas loader API function.
+ * Frees resources associated with the loader, including the decoder instance.
+ *
+ * @param loader_data The handle returned by evas_image_load_file_open_avif.
+ */
 static void
 evas_image_load_file_close_avif(void *loader_data)
 {
@@ -269,6 +311,15 @@ evas_image_load_file_close_avif(void *loader_data)
    free(loader_data);
 }
 
+/**
+ * @brief Reads the header information of an opened AVIF file. Evas loader API function.
+ * Maps the file to memory and calls the internal header reading function.
+ *
+ * @param loader_data The handle returned by evas_image_load_file_open_avif.
+ * @param prop Pointer to the structure to store image properties.
+ * @param error Pointer to store error code on failure.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 evas_image_load_file_head_avif(void *loader_data,
                                Evas_Image_Property *prop,
@@ -298,6 +349,17 @@ evas_image_load_file_head_avif(void *loader_data,
    return val;
 }
 
+/**
+ * @brief Loads the image data from an opened AVIF file into a pixel buffer.
+ * Evas loader API function.
+ * Maps the file to memory and calls the internal data loading function.
+ *
+ * @param loader_data The handle returned by evas_image_load_file_open_avif.
+ * @param prop Image properties (unused in this function).
+ * @param pixels Pointer to the destination buffer for decoded pixel data.
+ * @param error Pointer to store error code on failure.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 evas_image_load_file_data_avif(void *loader_data,
                                Evas_Image_Property *prop EINA_UNUSED,
@@ -330,6 +392,16 @@ evas_image_load_file_data_avif(void *loader_data,
    return val;
 }
 
+/**
+ * @brief Gets the duration for a specific frame or sequence of frames in an animated AVIF.
+ * Evas loader API function.
+ * Currently returns a fixed duration per frame calculated during header loading.
+ *
+ * @param loader_data The handle returned by evas_image_load_file_open_avif.
+ * @param start_frame The starting frame index (currently ignored, assumes uniform duration).
+ * @param frame_num The frame number relative to start_frame (used for validation).
+ * @return The duration of the frame in seconds, or -1.0 on error or if not animated.
+ */
 static double
 evas_image_load_frame_duration_avif(void *loader_data,
                                     int start_frame,
@@ -356,6 +428,9 @@ evas_image_load_frame_duration_avif(void *loader_data,
    return loader->duration;
 }
 
+/**
+ * @brief Structure defining the Evas image loader functions for AVIF.
+ */
 static Evas_Image_Load_Func evas_image_load_avif_func =
 {
    EVAS_IMAGE_LOAD_VERSION,
@@ -366,9 +441,16 @@ static Evas_Image_Load_Func evas_image_load_avif_func =
    evas_image_load_file_data_avif,
    evas_image_load_frame_duration_avif,
    EINA_TRUE,
-   EINA_FALSE
+   EINA_FALSE /**< Does not provide slice loading capabilities. */
 };
 
+/**
+ * @brief Initializes the AVIF image loader module. Evas module API function.
+ * Registers the log domain and sets the loader functions.
+ *
+ * @param em The Evas module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -386,6 +468,12 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Shuts down the AVIF image loader module. Evas module API function.
+ * Unregisters the log domain.
+ *
+ * @param em The Evas module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {
@@ -396,6 +484,9 @@ module_close(Evas_Module *em EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Module API structure definition for the AVIF loader.
+ */
 static Evas_Module_Api evas_modapi =
 {
    EVAS_MODULE_API_VERSION,

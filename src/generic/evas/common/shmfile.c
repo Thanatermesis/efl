@@ -2,6 +2,17 @@
 # include <config.h>
 #endif
 
+/**
+ * @file shmfile.c
+ * @brief Implementation of shared memory allocation and management.
+ *
+ * This file provides functions to allocate and free shared memory segments
+ * using platform-specific mechanisms (Windows API, POSIX shm_open) or
+ * a fallback to standard malloc if shared memory is not available/supported.
+ * The primary use case appears to be for an Evas loader, potentially to
+ * share image data or other resources.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -31,14 +42,31 @@ extern "C" {
 #endif
 
 #ifdef _WIN32
+/** @brief Handle to the shared memory mapping object (Windows). NULL if not used. */
 HANDLE shm_fd = NULL;
 #else
+/** @brief File descriptor for the shared memory object (POSIX). -1 if not used. */
 int shm_fd = -1;
 #endif
+/** @brief Size of the allocated shared memory segment in bytes. */
 static int shm_size = 0;
+/** @brief Pointer to the mapped shared memory address. NULL if not mapped. */
 void *shm_addr = NULL;
+/** @brief Name of the shared memory object. Dynamically generated. NULL if not used. */
 char *shmfile = NULL;
 
+/**
+ * @brief Allocates or maps a shared memory segment.
+ *
+ * Attempts to create a shared memory segment using platform-specific methods.
+ * On Windows, it uses `CreateFileMapping` and `MapViewOfFile`.
+ * On POSIX systems with `HAVE_SHM_OPEN`, it uses `shm_open` and `mmap`.
+ * If these methods are unavailable or fail, it falls back to `malloc`.
+ * The shared memory object name is generated to be unique using the process ID
+ * and a random number to avoid collisions.
+ *
+ * @param dsize The size in bytes of the memory segment to allocate.
+ */
 void
 shm_alloc(unsigned long dsize)
 {
@@ -98,14 +126,26 @@ failed:
    return;
 failed:
 #endif
+   // Fallback: if shared memory mechanisms are not available or fail, use malloc.
+   // This is not true shared memory but provides a memory buffer.
    shm_addr = malloc(dsize);
 }
 
+/**
+ * @brief Frees and unmaps the shared memory segment.
+ *
+ * Releases the resources associated with the shared memory segment.
+ * On Windows, it unmaps the view, closes the handle.
+ * On POSIX systems with `HAVE_SHM_OPEN`, it unmaps the memory, closes the
+ * file descriptor, and unlinks the shared memory object.
+ * If memory was allocated via the `malloc` fallback, it calls `free`.
+ * Resets global shared memory state variables.
+ */
 void
 shm_free(void)
 {
 #ifdef _WIN32
-   if (shm_fd)
+   if (shm_fd) // Check if a valid shared memory handle exists
      {
         UnmapViewOfFile(shm_addr);
         CloseHandle(shm_fd);
@@ -127,6 +167,7 @@ shm_free(void)
         return;
      }
 #endif
+   // Fallback: if shm_addr was allocated by malloc (e.g., shm_alloc failed or no SHM support)
    free(shm_addr);
    shm_addr = NULL;
 #ifdef _WIN32

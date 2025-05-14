@@ -112,7 +112,7 @@ typedef struct _Eina_Accessor Eina_Accessor;
 
 /**
  * @typedef Eina_Accessor_Get_At_Callback
- * @brief Type for a callback that returns the data of a container as the given index.
+ * @brief Type for a callback that returns the data of a container at the given index.
  */
 typedef Eina_Bool (*Eina_Accessor_Get_At_Callback)(Eina_Accessor *it,
                                                    unsigned int   idx,
@@ -349,17 +349,37 @@ EINA_API Eina_Bool eina_accessor_unlock(Eina_Accessor *accessor) EINA_ARG_NONNUL
        (counter)++)
 
 /**
- * @brief Creates an Eina_Accessor that wraps a plain fixed size C array
+ * @brief Creates an Eina_Accessor that wraps a plain fixed size C array, copying element values.
+ * @details This accessor copies the content of the array element into the `data` output parameter of `eina_accessor_data_get()`.
+ *          The `EINA_ACCESSOR_FOREACH` macro can be used with a variable of the array's element type, and the value will be copied into it.
  *
- * @param[in] array The array
- * @param[in] step  The size of one element in the array
- * @param[in] length The number of elements in the array
- * @return The accessor that will give access to the passed array
+ * @param[in] array Pointer to the C array's first element, cast to `void**`.
+ *                  For an array `TYPE my_array[]`, this is typically passed as `(void**)my_array` (as done by the EINA_C_ARRAY_ACCESSOR_NEW macro).
+ *                  The accessor internally treats this as the base address of the array's data.
+ * @param[in] step  The size (in bytes) of one element in the array (e.g., `sizeof(int)` for an integer array, `sizeof(my_struct_t)` for a struct array).
+ * @param[in] length The number of elements in the array (e.g., `EINA_C_ARRAY_LENGTH(my_array)`).
+ * @return The accessor that will give access to the passed array, or @c NULL on failure (e.g., memory allocation failure).
  *
- * You can create it like this:
- * int array[] = {1, 2, 3, 4, 1337, 42};
+ * Example:
+ * @code
+ * int my_c_array[] = {1, 2, 3, 4, 5};
+ * // Using the function directly:
+ * // Eina_Accessor* acc = eina_carray_length_accessor_new((void**)my_c_array, sizeof(int), EINA_C_ARRAY_LENGTH(my_c_array));
+ * // Or, more simply using the macro:
+ * Eina_Accessor* acc = EINA_C_ARRAY_ACCESSOR_NEW(my_c_array);
  *
- * Eina_Accessor* accessor = eina_carray_length_accessor_new(array, sizeof(int), sizeof(array)/sizeof(int));
+ * if (acc)
+ * {
+ *   unsigned int i;
+ *   int copied_value; // EINA_ACCESSOR_FOREACH will place the copied int here
+ *   EINA_ACCESSOR_FOREACH(acc, i, copied_value)
+ *   {
+ *     // 'copied_value' now holds the integer value from the array, not a pointer
+ *     printf("Element at index %u is %d (copied value)\n", i, copied_value);
+ *   }
+ *   eina_accessor_free(acc);
+ * }
+ * @endcode
  *
  * @since 1.23
  */
@@ -367,19 +387,45 @@ EINA_API Eina_Accessor* eina_carray_length_accessor_new(void** array, unsigned i
 
 
 /**
- * @brief Creates an Eina_Accessor that wraps a plain fixed size C array
+ * @brief Creates an Eina_Accessor that wraps a plain fixed size C array, providing pointers to elements.
+ * @details This accessor provides a direct pointer to the array element via the `data` output parameter of `eina_accessor_data_get()`.
+ *          The `EINA_ACCESSOR_FOREACH` macro can be used with a pointer variable, which will then point to the element within the original array.
+ *          This is different from eina_carray_length_accessor_new(), which copies the element's content.
  *
- * @param[in] array The array
- * @param[in] step  The size of one element in the array
- * @param[in] length The number of elements in the array
- * @return The accessor that will give access to the passed array
+ * @param[in] array Pointer to the C array's first element, cast to `void**`.
+ *                  For an array `TYPE my_array[]`, this is typically passed as `(void**)my_array` (as done by the EINA_C_ARRAY_ACCESSOR_PTR_NEW macro).
+ *                  The accessor internally treats this as the base address of the array's data.
+ * @param[in] step  The size (in bytes) of one element in the array (e.g., `sizeof(int)`).
+ * @param[in] length The number of elements in the array (e.g., `EINA_C_ARRAY_LENGTH(my_array)`).
+ * @return The accessor that will give access to the passed array, or @c NULL on failure.
  *
- * You can create it like this:
- * int array[] = {1, 2, 3, 4, 1337, 42};
+ * Example:
+ * @code
+ * typedef struct { char name[32]; int id; } MyStruct;
+ * MyStruct struct_array[] = { {"First", 1}, {"Second", 2}, {"Third", 3} };
  *
- * Eina_Accessor* accessor = eina_carray_length_accessor_new(array, sizeof(int), sizeof(array)/sizeof(int));
+ * // Using the function directly:
+ * // Eina_Accessor* acc = eina_carray_length_ptr_accessor_new((void**)struct_array, sizeof(MyStruct), EINA_C_ARRAY_LENGTH(struct_array));
+ * // Or, more simply using the macro:
+ * Eina_Accessor* acc = EINA_C_ARRAY_ACCESSOR_PTR_NEW(struct_array);
  *
- * Note: The difference to eina_carray_length_accessor_new is that this will fill the pointer to the value into the data pointer. *
+ * if (acc)
+ * {
+ *   unsigned int i;
+ *   MyStruct *p_element; // EINA_ACCESSOR_FOREACH will set this pointer
+ *   EINA_ACCESSOR_FOREACH(acc, i, p_element)
+ *   {
+ *     // 'p_element' now points directly to the element in 'struct_array'
+ *     printf("Element at index %u: ID=%d, Name='%s'\n", i, p_element->id, p_element->name);
+ *   }
+ *   eina_accessor_free(acc);
+ * }
+ * @endcode
+ *
+ * @note The primary difference from eina_carray_length_accessor_new() is that this function's accessor
+ *       fills the `data` parameter of `eina_accessor_data_get()` with a pointer to the element within the
+ *       original array, rather than copying the element's value. Accessing data via this pointer reads directly
+ *       from the original array.
 
  * @since 1.24
  */

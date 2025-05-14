@@ -7,8 +7,38 @@
  * it's loaded into memory only once at most. it's about as compact as you
  * get (a bit less than 64k) UNLESS you get into some exotic compression
  * algorithms.
+ *
+ * @brief The static compose table.
+ *
+ * This string represents a tree of compose sequences. Each node in the tree
+ * consists of:
+ * 1. A null-terminated string representing the key symbol for this node (e.g., "dead_acute").
+ * 2. A sequence of bytes encoding the "jump" value. This value indicates the offset
+ *    to the next sibling node at the current level or, if this node is part of a
+ *    matched sequence, the offset to the start of its child nodes. The encoding is:
+ *    - If the first byte is < 0x80: The jump value is the byte itself (1 byte total).
+ *    - If the first byte & 0xC0 == 0xC0: The jump value is ((byte[0] & 0x1F) << 16) | (byte[1] << 8) | byte[2] (3 bytes total).
+ *    - Otherwise (first byte & 0x80 == 0x80): The jump value is ((byte[0] & 0x3F) << 8) | byte[1] (2 bytes total).
+ * 3. If this node represents a completed compose sequence (a leaf node), the bytes
+ *    following the jump value contain:
+ *    a. The null-terminated string of the composed character (e.g., "á").
+ *    b. A single byte indicating the total length of the composed character string
+ *       (including its null terminator) plus the length of this length byte itself (i.e., strlen(composed_char) + 1 + 1).
+ *       This is used as a quick check for leaf nodes.
+ *
+ * Example entry for "Multi_key" -> "a" -> "e" resulting in "æ":
+ *
+ * "Multi_key\x00" JUMP_BYTES_FOR_MULTI_KEY
+ *   ... (other Multi_key children)
+ *   "a\x00" JUMP_BYTES_FOR_A_CHILD_OF_MULTI_KEY
+ *     ... (other 'a' children)
+ *     "e\x00" JUMP_BYTES_FOR_E_CHILD_OF_A  // This jump points past the "æ" entry
+ *       "æ\x00" LENGTH_BYTE_FOR_AE (which would be strlen("æ") + 1 + 1 = 2 + 1 + 1 = 4, so \x04)
+ *     ... (other 'e' children or siblings of 'e')
+ *   ... (other Multi_key children)
+ *
+ * The table ends with four null bytes ("\x00\x00\x00\x00") as a sentinel.
  */
-
 static const char *const comp =
   "dead_breve\x00"  "\x83\x07" /* 'dead_breve' 775 */
     "dead_breve\x00"  "\x10" /* 'dead_breve' 16 */

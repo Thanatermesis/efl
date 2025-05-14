@@ -12,8 +12,26 @@
 #include "eeze_udev_private.h"
 #include "eeze_net_private.h"
 
+/**
+ * @internal
+ * @brief Cache for Eeze_Net objects.
+ *
+ * This hash table stores Eeze_Net objects, keyed by their interface name (e.g., "eth0").
+ * It is used to avoid redundant allocations and lookups for the same network interface.
+ * Access to this hash is managed by eeze_net_new() and eeze_net_free().
+ * It is initialized by eeze_net_init() and freed by eeze_net_shutdown().
+ */
 static Eina_Hash *eeze_nets = NULL;
 
+/**
+ * @brief Initializes the Eeze_Net subsystem.
+ *
+ * This function sets up the necessary resources for Eeze_Net operations,
+ * primarily initializing the cache for Eeze_Net objects. It should be
+ * called before any other Eeze_Net functions.
+ *
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 Eina_Bool
 eeze_net_init(void)
 {
@@ -21,6 +39,13 @@ eeze_net_init(void)
    return !!eeze_nets;
 }
 
+/**
+ * @brief Shuts down the Eeze_Net subsystem.
+ *
+ * This function cleans up resources allocated by the Eeze_Net subsystem,
+ * primarily freeing the cache of Eeze_Net objects. It should be called
+ * when Eeze_Net services are no longer needed, typically at application exit.
+ */
 void
 eeze_net_shutdown(void)
 {

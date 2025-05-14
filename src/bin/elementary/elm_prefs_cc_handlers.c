@@ -67,12 +67,28 @@ int params_min_check(int n);
  * <table class="edcref" border="0">
  */
 
+/**
+ * @brief Pointer to the currently processed page node in the EPC file.
+ * This global variable holds the context of the page being parsed, allowing
+ * subsequent item and property handlers to associate data with the correct page.
+ */
 static Elm_Prefs_Page_Node *current_page = NULL;
+/**
+ * @brief Pointer to the currently processed item node within a page in the EPC file.
+ * This global variable holds the context of the item being parsed, allowing
+ * property handlers to associate data with the correct item.
+ */
 static Elm_Prefs_Item_Node *current_item = NULL;
 
 /* objects and statments */
 
 /* Collection */
+/**
+ * @brief Handler for the 'collection' object.
+ * This function is called when a 'collection' block is encountered in the
+ * EPC file. It currently performs no specific actions but serves as a
+ * placeholder and entry point for parsing the top-level structure.
+ */
 static void ob_collection(void);
 
 /**
@@ -176,14 +192,60 @@ static void ob_collection(void);
 */
 
 /* Page */
+/**
+ * @brief Handler for the 'page' object within a 'collection'.
+ * This function is called when a 'page' block is encountered. It allocates
+ * a new Elm_Prefs_Page_Node and appends it to the list of pages in the
+ * global elm_prefs_file structure. It also sets current_page to this new node.
+ */
 static void ob_collection_page(void);
+/**
+ * @brief Handler for the 'name' property of a 'page' object.
+ * Parses and assigns the page name. The name is expected as a single string argument.
+ * Example in .epc: name: "main_settings";
+ */
 static void st_collection_page_name(void);
+/**
+ * @brief Handler for the 'version' property of a 'page' object.
+ * Parses and assigns the page version. The version is expected as a single integer argument.
+ * Example in .epc: version: 1;
+ */
 static void st_collection_page_version(void);
+/**
+ * @brief Handler for the 'title' property of a 'page' object.
+ * Parses and assigns the page title. The title is expected as a single string argument.
+ * Example in .epc: title: "General Settings";
+ */
 static void st_collection_page_title(void);
+/**
+ * @brief Handler for the 'subtitle' property of a 'page' object.
+ * Parses and assigns the page subtitle. The subtitle is expected as a single string argument.
+ * Example in .epc: subtitle: "Configure basic application settings";
+ */
 static void st_collection_page_subtitle(void);
+/**
+ * @brief Handler for the 'widget' property of a 'page' object.
+ * Parses and assigns the page widget type. The widget type is expected as a single string argument.
+ * Example in .epc: widget: "elm/vertical_frame";
+ */
 static void st_collection_page_widget(void);
+/**
+ * @brief Handler for the 'style' property of a 'page' object.
+ * Parses and assigns the page style. The style is expected as a single string argument.
+ * Example in .epc: style: "custom_page_style";
+ */
 static void st_collection_page_style(void);
+/**
+ * @brief Handler for the 'icon' property of a 'page' object.
+ * Parses and assigns the page icon. The icon is expected as a single string argument (e.g., a file path or theme icon name).
+ * Example in .epc: icon: "preferences-system";
+ */
 static void st_collection_page_icon(void);
+/**
+ * @brief Handler for the 'autosave' property of a 'page' object.
+ * Parses and assigns the page autosave behavior. Expected as a single boolean argument (1 for true, 0 for false).
+ * Example in .epc: autosave: 0;
+ */
 static void st_collection_page_autosave(void);
 
 /**
@@ -309,18 +371,85 @@ static void st_collection_page_autosave(void);
 */
 /* Items */
 
+/**
+ * @brief Handler for the 'items' object within a 'page'.
+ * This function is called when an 'items' block is encountered inside a 'page'
+ * block. It currently performs no specific actions but serves as a structural
+ * placeholder for grouping item definitions.
+ */
 static void ob_collection_page_items(void);
 
+/**
+ * @brief Handler for an 'item' object within 'items'.
+ * This function is called when an 'item' block is encountered. It allocates
+ * a new Elm_Prefs_Item_Node, initializes its default visibility, persistence,
+ * and editability, and appends it to the list of items in the current_page.
+ * It also sets current_item to this new node.
+ */
 static void ob_collection_page_items_item(void);
+/**
+ * @brief Handler for the 'name' property of an 'item' object.
+ * Parses and assigns the item name. The name is expected as a single string argument.
+ * Example in .epc: name: "enable_feature_x";
+ */
 static void st_collection_page_items_item_name(void);
+/**
+ * @brief Handler for the 'type' property of an 'item' object.
+ * Parses and assigns the item type (e.g., BOOL, INT, TEXT). It also sets
+ * default values for editability, persistence, and type-specific fields
+ * (like min/max for INT/FLOAT, default date for DATE) based on the parsed type.
+ * Example in .epc: type: BOOL;
+ */
 static void st_collection_page_items_item_type(void);
+/**
+ * @brief Handler for the 'label' property of an 'item' object.
+ * Parses and assigns the item label. The label is expected as a single string argument.
+ * Example in .epc: label: "Enable Feature X";
+ */
 static void st_collection_page_items_item_label(void);
+/**
+ * @brief Handler for the 'icon' property of an 'item' object.
+ * Parses and assigns the item icon. The icon is expected as a single string argument.
+ * Example in .epc: icon: "object-select";
+ */
 static void st_collection_page_items_item_icon(void);
+/**
+ * @brief Handler for the 'persistent' property of an 'item' object.
+ * Parses and assigns the item persistence flag. Expected as a single boolean argument.
+ * Example in .epc: persistent: 0;
+ */
 static void st_collection_page_items_item_persistent(void);
+/**
+ * @brief Handler for the 'editable' property of an 'item' object.
+ * Parses and assigns the item editable flag. Expected as a single boolean argument.
+ * Example in .epc: editable: 0;
+ */
 static void st_collection_page_items_item_editable(void);
+/**
+ * @brief Handler for the 'visible' property of an 'item' object.
+ * Parses and assigns the item visibility flag. Expected as a single boolean argument.
+ * Example in .epc: visible: 0;
+ */
 static void st_collection_page_items_item_visible(void);
+/**
+ * @brief Handler for the 'source' property of a 'PAGE' type 'item' object.
+ * Parses and assigns the source page name for a subpage item. Expected as a single string argument.
+ * This is used when an item is of type ELM_PREFS_TYPE_PAGE.
+ * Example in .epc: source: "advanced_settings_page";
+ */
 static void st_collection_page_items_item_source(void);
+/**
+ * @brief Handler for the 'style' property of an 'item' object.
+ * Parses and assigns the item style. The style is expected as a single string argument.
+ * Example in .epc: style: "custom_item_style";
+ */
 static void st_collection_page_items_item_style(void);
+/**
+ * @brief Handler for the 'widget' property of an 'item' object.
+ * Parses and assigns a custom widget for the item. Expected as a single string argument.
+ * This allows overriding the default widget associated with the item's type.
+ * Example in .epc: widget: "custom/my_bool_widget";
+ */
 static void st_collection_page_items_item_widget(void);
 
 /**
@@ -354,7 +483,18 @@ static void st_collection_page_items_item_widget(void);
 */
 
 /* Item: Bool */
+/**
+ * @brief Handler for the 'bool' object within an 'item'.
+ * This function is called when a 'bool' block is encountered inside an 'item'
+ * block. It's intended for type-specific properties of a boolean item.
+ * Currently, it includes a TODO to check if the current item's type matches ELM_PREFS_TYPE_BOOL.
+ */
 static void ob_collection_page_items_item_bool(void);
+/**
+ * @brief Handler for the 'default' property of a 'bool' item.
+ * Parses and assigns the default boolean value for the item. Expected as a single boolean argument.
+ * Example in .epc: default: true;
+ */
 static void st_collection_page_items_item_bool_default(void);
 
 /**
@@ -414,9 +554,30 @@ static void st_collection_page_items_item_bool_default(void);
 */
 
 /* Item: Integer */
+/**
+ * @brief Handler for the 'int' object within an 'item'.
+ * This function is called when an 'int' block is encountered inside an 'item'
+ * block. It's intended for type-specific properties of an integer item.
+ * Currently, it includes a TODO to check if the current item's type matches ELM_PREFS_TYPE_INT.
+ */
 static void ob_collection_page_items_item_int(void);
+/**
+ * @brief Handler for the 'default' property of an 'int' item.
+ * Parses and assigns the default integer value for the item. Expected as a single integer argument.
+ * Example in .epc: default: 100;
+ */
 static void st_collection_page_items_item_int_default(void);
+/**
+ * @brief Handler for the 'max' property of an 'int' item.
+ * Parses and assigns the maximum integer value for the item. Expected as a single integer argument.
+ * Example in .epc: max: 255;
+ */
 static void st_collection_page_items_item_int_max(void);
+/**
+ * @brief Handler for the 'min' property of an 'int' item.
+ * Parses and assigns the minimum integer value for the item. Expected as a single integer argument.
+ * Example in .epc: min: 0;
+ */
 static void st_collection_page_items_item_int_min(void);
 
 /**
@@ -475,9 +636,30 @@ static void st_collection_page_items_item_int_min(void);
 */
 
 /* Item: Float */
+/**
+ * @brief Handler for the 'float' object within an 'item'.
+ * This function is called when a 'float' block is encountered inside an 'item'
+ * block. It's intended for type-specific properties of a float item.
+ * Currently, it includes a TODO to check if the current item's type matches ELM_PREFS_TYPE_FLOAT.
+ */
 static void ob_collection_page_items_item_float(void);
+/**
+ * @brief Handler for the 'default' property of a 'float' item.
+ * Parses and assigns the default float value for the item. Expected as a single float argument.
+ * Example in .epc: default: 0.75;
+ */
 static void st_collection_page_items_item_float_default(void);
+/**
+ * @brief Handler for the 'max' property of a 'float' item.
+ * Parses and assigns the maximum float value for the item. Expected as a single float argument.
+ * Example in .epc: max: 1.0;
+ */
 static void st_collection_page_items_item_float_max(void);
+/**
+ * @brief Handler for the 'min' property of a 'float' item.
+ * Parses and assigns the minimum float value for the item. Expected as a single float argument.
+ * Example in .epc: min: 0.0;
+ */
 static void st_collection_page_items_item_float_min(void);
 
 /**
@@ -531,9 +713,33 @@ static void st_collection_page_items_item_float_min(void);
 */
 
 /* Item: Date */
+/**
+ * @brief Handler for the 'date' object within an 'item'.
+ * This function is called when a 'date' block is encountered inside an 'item'
+ * block. It's intended for type-specific properties of a date item.
+ * Currently, it includes a TODO to check if the current item's type matches ELM_PREFS_TYPE_DATE.
+ */
 static void ob_collection_page_items_item_date(void);
+/**
+ * @brief Handler for the 'default' property of a 'date' item.
+ * Parses and assigns the default date for the item.
+ * Accepts either "today" as a string or three integer arguments: year, month, day.
+ * Example in .epc: default: 2023 12 25; or default: "today";
+ */
 static void st_collection_page_items_item_date_default(void);
+/**
+ * @brief Handler for the 'max' property of a 'date' item.
+ * Parses and assigns the maximum allowable date for the item.
+ * Accepts either "today" as a string or three integer arguments: year, month, day.
+ * Example in .epc: max: 2030 12 31; or max: "today";
+ */
 static void st_collection_page_items_item_date_max(void);
+/**
+ * @brief Handler for the 'min' property of a 'date' item.
+ * Parses and assigns the minimum allowable date for the item.
+ * Accepts either "today" as a string or three integer arguments: year, month, day.
+ * Example in .epc: min: 2000 01 01; or min: "today";
+ */
 static void st_collection_page_items_item_date_min(void);
 
 /**
@@ -649,18 +855,81 @@ static void st_collection_page_items_item_date_min(void);
 */
 
 /* Item: Text and Text Area */
+/**
+ * @brief Handler for the 'text' object within an 'item'.
+ * This function is called when a 'text' block is encountered inside an 'item'
+ * block. It's intended for type-specific properties of a single-line text item.
+ * Currently, it includes a TODO to check if the current item's type matches ELM_PREFS_TYPE_TEXT.
+ */
 static void ob_collection_page_items_item_text(void);
+/**
+ * @brief Handler for the 'textarea' object within an 'item'.
+ * This function is called when a 'textarea' block is encountered inside an 'item'
+ * block. It's intended for type-specific properties of a multi-line text item.
+ * Currently, it includes a TODO to check if the current item's type matches ELM_PREFS_TYPE_TEXTAREA.
+ */
 static void ob_collection_page_items_item_textarea(void);
 
 /* String shared statements */
+/**
+ * @brief Handler for the 'default' property of a 'text' or 'textarea' item.
+ * Parses and assigns the default string value. Expected as a single string argument.
+ * Example in .epc: default: "Initial text";
+ */
 static void st_collection_page_items_item_string_default(void);
+/**
+ * @brief Handler for the 'placeholder' property of a 'text' or 'textarea' item.
+ * Parses and assigns the placeholder string value. Expected as a single string argument.
+ * Example in .epc: placeholder: "Enter your name here";
+ */
 static void st_collection_page_items_item_string_placeholder(void);
+/**
+ * @brief Handler for the 'accept' property of a 'text' or 'textarea' item.
+ * Parses and assigns a regular expression for accepted input. Expected as a single string argument.
+ * Also checks if the provided regex is valid.
+ * Example in .epc: accept: "^[a-zA-Z]+$";
+ */
 static void st_collection_page_items_item_string_accept(void);
+/**
+ * @brief Handler for the 'deny' property of a 'text' or 'textarea' item.
+ * Parses and assigns a regular expression for denied input. Expected as a single string argument.
+ * Also checks if the provided regex is valid.
+ * Example in .epc: deny: "[0-9]";
+ */
 static void st_collection_page_items_item_string_deny(void);
+/**
+ * @brief Handler for the 'max' property (length) of a 'text' or 'textarea' item.
+ * Parses and assigns the maximum allowed length for the string. Expected as a single integer argument.
+ * Example in .epc: max: 255; (for max length)
+ */
 static void st_collection_page_items_item_string_max(void);
+/**
+ * @brief Handler for the 'min' property (length) of a 'text' or 'textarea' item.
+ * Parses and assigns the minimum allowed length for the string. Expected as a single integer argument.
+ * Example in .epc: min: 5; (for min length)
+ */
 static void st_collection_page_items_item_string_min(void);
 
-/* Statement Array */
+/**
+ * @brief Array of statement handlers.
+ * This array maps EPC statement paths (e.g., "collection.page.name") to their
+ * corresponding handler functions. The parser uses this table to dispatch
+ * handling of properties found in the EPC file.
+ *
+ * Each element is a New_Statement_Handler struct:
+ * @code
+ * typedef struct _New_Statement_Handler New_Statement_Handler;
+ * struct _New_Statement_Handler
+ * {
+ *    const char *name; // The full path of the statement, e.g., "collection.page.items.item.bool.default"
+ *    void (*func)(void); // Pointer to the function that handles this statement
+ * };
+ * @endcode
+ * Example entry:
+ * `{"collection.page.name", st_collection_page_name}`
+ * This means if the parser encounters "name: ..." inside a "page" block,
+ * which is inside a "collection" block, it will call `st_collection_page_name()`.
+ */
 New_Statement_Handler statement_handlers[] =
 {
    {"collection.page.name", st_collection_page_name},
@@ -713,7 +982,26 @@ New_Statement_Handler statement_handlers[] =
    {"collection.page.items.item.textarea.min", st_collection_page_items_item_string_min}
 };
 
-/* Object Array */
+/**
+ * @brief Array of object handlers.
+ * This array maps EPC object block paths (e.g., "collection.page.items") to their
+ * corresponding handler functions. The parser uses this table to dispatch
+ * handling of blocks found in the EPC file.
+ *
+ * Each element is a New_Object_Handler struct:
+ * @code
+ * typedef struct _New_Object_Handler New_Object_Handler;
+ * struct _New_Object_Handler
+ * {
+ *    const char *name; // The full path of the object block, e.g., "collection.page.items.item"
+ *    void (*func)(void); // Pointer to the function that handles this object block
+ * };
+ * @endcode
+ * Example entry:
+ * `{"collection.page", ob_collection_page}`
+ * This means if the parser encounters a "page { ... }" block inside a
+ * "collection { ... }" block, it will call `ob_collection_page()`.
+ */
 New_Object_Handler object_handlers[] =
 {
    {"collection", ob_collection},
@@ -729,12 +1017,22 @@ New_Object_Handler object_handlers[] =
    {"collection.page.items.item.textarea", ob_collection_page_items_item_textarea}
 };
 
+/**
+ * @brief Gets the number of registered object handlers.
+ * @return The total count of object handlers in the object_handlers array.
+ * This is used by the parser to know the bounds of the handler table.
+ */
 int
 object_handler_num(void)
 {
    return (sizeof(object_handlers) / sizeof (New_Object_Handler));
 }
 
+/**
+ * @brief Gets the number of registered statement handlers.
+ * @return The total count of statement handlers in the statement_handlers array.
+ * This is used by the parser to know the bounds of the handler table.
+ */
 int
 statement_handler_num(void)
 {

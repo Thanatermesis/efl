@@ -14,35 +14,49 @@
 
 #define MY_CLASS ELM_CODE_WIDGET_CLASS
 
+/**
+ * @brief Defines specific color indices used by the Elm_Code_Widget.
+ * These colors are used in addition to the standard Elm_Code_Token_Type colors.
+ * They are typically used for theming widget-specific elements like gutters,
+ * selection, and whitespace indicators.
+ */
 typedef enum {
-   ELM_CODE_WIDGET_COLOR_GUTTER_BG = ELM_CODE_TOKEN_TYPE_COUNT,
-   ELM_CODE_WIDGET_COLOR_GUTTER_SCOPE_BG,
-   ELM_CODE_WIDGET_COLOR_GUTTER_FG,
-   ELM_CODE_WIDGET_COLOR_WHITESPACE,
-   ELM_CODE_WIDGET_COLOR_SELECTION,
+   ELM_CODE_WIDGET_COLOR_GUTTER_BG = ELM_CODE_TOKEN_TYPE_COUNT, /**< Background color for the gutter. */
+   ELM_CODE_WIDGET_COLOR_GUTTER_SCOPE_BG, /**< Background color for the gutter when indicating scope. */
+   ELM_CODE_WIDGET_COLOR_GUTTER_FG,       /**< Foreground color for text/icons in the gutter. */
+   ELM_CODE_WIDGET_COLOR_WHITESPACE,      /**< Color for visible whitespace characters. */
+   ELM_CODE_WIDGET_COLOR_SELECTION,       /**< Background color for selected text. */
 
-   ELM_CODE_WIDGET_COLOR_COUNT
+   ELM_CODE_WIDGET_COLOR_COUNT           /**< Total count of widget-specific colors. */
 } Elm_Code_Widget_Colors;
 
+/**
+ * @brief Array of Unicode characters used as status icons in the gutter.
+ * The index in this array typically corresponds to an Elm_Code_Status_Type.
+ * For example:
+ * - status_icons[ELM_CODE_STATUS_TYPE_ERROR] might be '!'
+ * - status_icons[ELM_CODE_STATUS_TYPE_ADDED] might be '+'
+ * - status_icons[ELM_CODE_STATUS_TYPE_PASSED] might be a checkmark (0x2713)
+ */
 static Eina_Unicode status_icons[] = {
- ' ',
- ' ',
- ' ',
- ' ',
- '!',
- '!',
- '!',
+ ' ', // ELM_CODE_STATUS_TYPE_DEFAULT (placeholder, actual icon depends on context)
+ ' ', // ELM_CODE_STATUS_TYPE_CURRENT (placeholder, usually no icon, just bg change)
+ ' ', // ELM_CODE_STATUS_TYPE_IGNORED
+ ' ', // ELM_CODE_STATUS_TYPE_NOTE
+ '!', // ELM_CODE_STATUS_TYPE_WARNING
+ '!', // ELM_CODE_STATUS_TYPE_ERROR
+ '!', // ELM_CODE_STATUS_TYPE_FATAL
 
- '+',
- '-',
- ' ',
+ '+', // ELM_CODE_STATUS_TYPE_ADDED
+ '-', // ELM_CODE_STATUS_TYPE_REMOVED
+ ' ', // ELM_CODE_STATUS_TYPE_CHANGED (often indicated by color, not icon)
 
- 0x2713,
- 0x2717,
+ 0x2713, // ELM_CODE_STATUS_TYPE_PASSED (checkmark)
+ 0x2717, // ELM_CODE_STATUS_TYPE_FAILED (cross mark)
 
- 0x2691,
+ 0x2691, // ELM_CODE_STATUS_TYPE_TODO (flag)
 
- 0
+ 0 // Null terminator for the array
 };
 
 #define EO_CONSTRUCTOR_CHECK_RETURN(obj) do { \
@@ -56,10 +70,31 @@ static Eina_Unicode status_icons[] = {
      } \
 } while (0)
 
+/**
+ * @brief Resizes the internal textgrid objects based on content and widget size.
+ * This function is responsible for calculating the required dimensions for the
+ * text grids that display the code lines, ensuring they can accommodate the
+ * longest line and the total number of lines. It also handles expanding the
+ * scroller area if needed.
+ *
+ * @param widget The Elm_Code_Widget instance.
+ * @param newline If not NULL, indicates a specific new line that might have
+ *                triggered the resize, allowing for potential optimizations.
+ */
 static void _elm_code_widget_resize(Elm_Code_Widget *widget, Elm_Code_Line *newline);
 
 #include "elm_code_widget_legacy_eo.h"
 
+/**
+ * @brief Adds a new Elm_Code_Widget object to a parent Evas_Object.
+ * This is the primary function to create an instance of the code widget.
+ *
+ * @param parent The parent Evas_Object.
+ * @param code The Elm_Code model object that this widget will display.
+ * @return A new Elm_Code_Widget Evas_Object, or NULL on failure.
+ *
+ * @see elm_code_widget_code_set()
+ */
 EAPI Evas_Object *
 elm_code_widget_add(Evas_Object *parent, Elm_Code *code)
 {
@@ -83,6 +118,16 @@ _elm_code_widget_efl_object_constructor(Eo *obj, Elm_Code_Widget_Data *pd)
    return obj;
 }
 
+/**
+ * @brief Finalizes the Elm_Code_Widget object.
+ * This function is part of the EO object lifecycle. It ensures that an
+ * Elm_Code object has been set before finalization, as the widget is
+ * unusable without it.
+ *
+ * @param obj The Elm_Code_Widget Eo object.
+ * @param pd The private data for the Elm_Code_Widget.
+ * @return The finalized Eo object, or NULL if finalization fails (e.g., no Elm_Code set).
+ */
 EOLIAN static Eo *
 _elm_code_widget_efl_object_finalize(Eo *obj, Elm_Code_Widget_Data *pd)
 {
@@ -95,12 +140,28 @@ _elm_code_widget_efl_object_finalize(Eo *obj, Elm_Code_Widget_Data *pd)
    return NULL;
 }
 
+/**
+ * @brief Class constructor for Elm_Code_Widget.
+ * This function is called once when the Elm_Code_Widget class is initialized.
+ * It can be used for setting up class-wide properties or resources.
+ *
+ * @param klass The Efl_Class being constructed.
+ */
 EOLIAN static void
 _elm_code_widget_class_constructor(Efl_Class *klass EINA_UNUSED)
 {
 
 }
 
+/**
+ * @brief Retrieves the size of a single character cell in the widget.
+ * The cell size is determined by the font and is crucial for calculating
+ * positions and dimensions within the widget.
+ *
+ * @param widget The Elm_Code_Widget instance.
+ * @param[out] width Pointer to store the cell width. Can be NULL.
+ * @param[out] height Pointer to store the cell height. Can be NULL.
+ */
 void
 _elm_code_widget_cell_size_get(Elm_Code_Widget *widget, Evas_Coord *width, Evas_Coord *height)
 {
@@ -122,6 +183,14 @@ _elm_code_widget_cell_size_get(Elm_Code_Widget *widget, Evas_Coord *width, Evas_
    if (height) *height = h;
 }
 
+/**
+ * @brief Scrolls the content of the widget by a specified delta.
+ * This function adjusts the visible region of the internal scroller.
+ *
+ * @param widget The Elm_Code_Widget instance.
+ * @param by_x The horizontal amount to scroll by (in pixels).
+ * @param by_y The vertical amount to scroll by (in pixels).
+ */
 static void
 _elm_code_widget_scroll_by(Elm_Code_Widget *widget, int by_x, int by_y)
 {
@@ -136,6 +205,17 @@ _elm_code_widget_scroll_by(Elm_Code_Widget *widget, int by_x, int by_y)
    elm_scroller_region_show(pd->scroller, x, y, w, h);
 }
 
+/**
+ * @brief Applies a token type (color) to a range of cells in a line.
+ * This is used for syntax highlighting. It sets either the foreground or
+ * background color of the cells based on the token type.
+ *
+ * @param cells Array of Evas_Textgrid_Cell to modify.
+ * @param count Total number of cells in the `cells` array.
+ * @param start The starting column index (1-based) for applying the token.
+ * @param end The ending column index (1-based) for applying the token.
+ * @param type The Elm_Code_Token_Type to apply.
+ */
 static void
 _elm_code_widget_fill_line_token(Evas_Textgrid_Cell *cells, int count, int start, int end, Elm_Code_Token_Type type)
 {
@@ -151,6 +231,18 @@ _elm_code_widget_fill_line_token(Evas_Textgrid_Cell *cells, int count, int start
      }
 }
 
+/**
+ * @brief Determines the appropriate status type for a cell.
+ * This is used to color the background of cells, often in the gutter or for
+ * the current line highlight. It considers line status, cursor position,
+ * and line width markers.
+ *
+ * @param pd The private data for the Elm_Code_Widget.
+ * @param line The Elm_Code_Line being rendered.
+ * @param col The column index (1-based, relative to the start of the text area after gutter)
+ *            for which to determine the status.
+ * @return The Elm_Code_Status_Type or an Elm_Code_Widget_Colors value to be used for styling.
+ */
 static unsigned int
 _elm_code_widget_status_type_get(Elm_Code_Widget_Data *pd, Elm_Code_Line *line, unsigned int col)
 {
@@ -160,12 +252,23 @@ _elm_code_widget_status_type_get(Elm_Code_Widget_Data *pd, Elm_Code_Line *line, 
    if (pd->editable && pd->focused && pd->cursor_line == line->number)
      return ELM_CODE_STATUS_TYPE_CURRENT;
 
-   if (pd->line_width_marker > 0 && pd->line_width_marker == col-1)
-     return ELM_CODE_WIDGET_COLOR_GUTTER_BG;
+   // Note: col is 1-based from start of text area. line_width_marker is 0-based from start of text.
+   if (pd->line_width_marker > 0 && pd->line_width_marker == col -1)
+     return ELM_CODE_WIDGET_COLOR_GUTTER_BG; // Re-using gutter bg for line width marker
 
    return ELM_CODE_STATUS_TYPE_DEFAULT;
 }
 
+/**
+ * @brief Applies all syntax highlighting tokens to a given line.
+ * Iterates through the tokens associated with an Elm_Code_Line and uses
+ * _elm_code_widget_fill_line_token to color the corresponding cells.
+ *
+ * @param widget The Elm_Code_Widget instance.
+ * @param cells Array of Evas_Textgrid_Cell to modify for the current line.
+ * @param count Total number of cells available in the `cells` array for this line.
+ * @param line The Elm_Code_Line whose tokens are to be rendered.
+ */
 static void
 _elm_code_widget_fill_line_tokens(Elm_Code_Widget *widget, Evas_Textgrid_Cell *cells,
                                   unsigned int count, Elm_Code_Line *line)

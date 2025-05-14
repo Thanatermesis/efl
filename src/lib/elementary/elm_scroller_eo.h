@@ -1,9 +1,27 @@
+/**
+ * @file
+ * @brief This file defines the Evas Object (EO) C API for the Elm Scroller class.
+ *
+ * Elm Scroller is a widget that provides a scrollable view for its content.
+ * This header declares the functions, types, and events that make up the
+ * public C API for interacting with Elm Scroller objects.
+ *
+ * @ingroup Elm_Scroller
+ */
 #ifndef _ELM_SCROLLER_EO_H_
 #define _ELM_SCROLLER_EO_H_
 
 #ifndef _ELM_SCROLLER_EO_CLASS_TYPE
 #define _ELM_SCROLLER_EO_CLASS_TYPE
 
+/**
+ * @typedef Elm_Scroller
+ * @brief Represents an instance of the Elementary Scroller widget.
+ *
+ * This type is an alias for Eo, specifically for objects of the
+ * Elm_Scroller class.
+ * @ingroup Elm_Scroller
+ */
 typedef Eo Elm_Scroller;
 
 #endif
@@ -13,7 +31,12 @@ typedef Eo Elm_Scroller;
 
 
 #endif
-/** Elementary scroller class
+/**
+ * @brief Get the Efl_Class for the Elm_Scroller.
+ *
+ * This macro provides a convenient way to get the Efl_Class object
+ * for Elm_Scroller, which can be used for class-level operations
+ * or type checking.
  *
  * @ingroup Elm_Scroller
  */

@@ -1,11 +1,20 @@
 #include "edje_private.h"
 
-/*
- * Legacy function for min/max calculation of textblock part.
+/**
+ * @internal
+ * @brief Legacy function for min/max calculation of textblock part.
  * It can't calculate min/max properly in many cases.
  *
  * To keep backward compatibility, it will be used for old version of EDJ files.
- * You can't see proper min/max result accroding to documents with this function.
+ * You can't see proper min/max result according to documents with this function.
+ *
+ * @param ep The real part to calculate.
+ * @param chosen_desc The chosen text description.
+ * @param params Calculation parameters.
+ * @param[out] minw Pointer to store the minimum width.
+ * @param[out] minh Pointer to store the minimum height.
+ * @param[out] maxw Pointer to store the maximum width.
+ * @param[out] maxh Pointer to store the maximum height.
  */
 static void
 _edje_part_recalc_single_textblock_min_max_calc_legacy(Edje_Real_Part *ep,
@@ -89,6 +98,30 @@ _edje_part_recalc_single_textblock_min_max_calc_legacy(Edje_Real_Part *ep,
      }
 }
 
+/**
+ * @internal
+ * @brief Calculates the minimum and maximum dimensions for a textblock part.
+ *
+ * This function determines the appropriate min/max width and height
+ * for a textblock part based on its content, style, and fitting options.
+ * It considers text properties like min/max flags from the theme (EDJ)
+ * or expand flags from the part itself.
+ *
+ * @param ep The real part (Edje_Real_Part) associated with the textblock.
+ * @param chosen_desc The specific text description (Edje_Part_Description_Text)
+ *        being used for this calculation.
+ * @param params General calculation parameters (Edje_Calc_Params) for the Edje object.
+ * @param[out] minw Pointer to an integer where the calculated minimum width will be stored.
+ *             This value is updated if the calculated width is greater than the current *minw.
+ * @param[out] minh Pointer to an integer where the calculated minimum height will be stored.
+ *             This value is updated if the calculated height is greater than the current *minh.
+ * @param[out] maxw Pointer to an integer where the calculated maximum width will be stored.
+ *             This value is updated if the calculated width is greater than the current *maxw.
+ *             It's also ensured that *maxw is not less than *minw.
+ * @param[out] maxh Pointer to an integer where the calculated maximum height will be stored.
+ *             This value is updated if the calculated height is greater than the current *maxh.
+ *             It's also ensured that *maxh is not less than *minh.
+ */
 static void
 _edje_part_recalc_single_textblock_min_max_calc(Edje_Real_Part *ep,
                                                 Edje_Part_Description_Text *chosen_desc,
@@ -417,6 +450,20 @@ _edje_part_recalc_single_textblock_min_max_calc(Edje_Real_Part *ep,
      }
 }
 
+/**
+ * @internal
+ * @brief Sets the text style and content for a textblock part.
+ *
+ * This function retrieves the appropriate style and text string (possibly translated)
+ * for the given textblock part based on its description and source configurations.
+ * It then applies the style and text to the underlying Evas textblock object.
+ *
+ * @param ed The Edje object.
+ * @param ep The real part to set the text and style for.
+ * @param chosen_desc The chosen text description containing style and text information.
+ * @return EINA_TRUE if the style was successfully found and applied, EINA_FALSE otherwise.
+ *         If EINA_FALSE is returned, further calculations for this part might be skipped.
+ */
 Eina_Bool
 _edje_part_textblock_style_text_set(Edje *ed,
                                     Edje_Real_Part *ep,
@@ -493,6 +540,20 @@ _edje_part_textblock_style_text_set(Edje *ed,
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Finds the last occurrence of a substring within a string.
+ *
+ * This function mimics the behavior of the standard strrstr (which is not
+ * available on all platforms, e.g., some BSDs or Windows). It searches for
+ * the last occurrence of the null-terminated string `violate` (needle)
+ * within the null-terminated string `haystack`.
+ *
+ * @param haystack The string to search within.
+ * @param violate The substring to search for.
+ * @return A pointer to the beginning of the last occurrence of `violate` in
+ *         `haystack`, or NULL if `violate` is not found.
+ */
 static char*
 strrstr(const char* haystack, const char* violate)
 {
@@ -507,6 +568,26 @@ strrstr(const char* haystack, const char* violate)
    return s_ret;
 }
 
+/**
+ * @internal
+ * @brief Recalculates properties for a single textblock part.
+ *
+ * This function is responsible for updating a textblock part based on its
+ * current state, description, and scale. It sets the text style, content,
+ * text fitting options, and then triggers the min/max size calculation.
+ * Finally, it sets the vertical alignment.
+ *
+ * @param sc The current scale factor.
+ * @param ed The Edje object.
+ * @param ep The real part (Edje_Real_Part) representing the textblock.
+ * @param chosen_desc The chosen text description (Edje_Part_Description_Text)
+ *        for the current state of the part.
+ * @param params General calculation parameters (Edje_Calc_Params).
+ * @param[out] minw Pointer to store the calculated minimum width.
+ * @param[out] minh Pointer to store the calculated minimum height.
+ * @param[out] maxw Pointer to store the calculated maximum width.
+ * @param[out] maxh Pointer to store the calculated maximum height.
+ */
 void
 _edje_part_recalc_single_textblock(FLOAT_T sc,
                                    Edje *ed,

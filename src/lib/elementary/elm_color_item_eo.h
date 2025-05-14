@@ -3,14 +3,20 @@
 
 #ifndef _ELM_COLOR_ITEM_EO_CLASS_TYPE
 #define _ELM_COLOR_ITEM_EO_CLASS_TYPE
-
+/**
+ * @brief Type definition for the Elm_Color_Item class.
+ * @ingroup Elm_Color_Item
+ */
 typedef Eo Elm_Color_Item;
 
 #endif
 
 #ifndef _ELM_COLOR_ITEM_EO_TYPES
 #define _ELM_COLOR_ITEM_EO_TYPES
-
+/**
+ * @brief Placeholder for future enum or struct type definitions specific to Elm_Color_Item.
+ * @ingroup Elm_Color_Item
+ */
 
 #endif
 /** Elementary color item class

@@ -8,6 +8,12 @@
 #include "elm_entry_eo.h"
 #include "elm_popup_eo.h"
 
+/**
+ * @brief Clears the text of the entry widget.
+ * @param data The entry widget.
+ * @param obj The calling object (unused).
+ * @param event_info Event data (unused).
+ */
 static void
 my_entry_bt_1(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -15,6 +21,12 @@ my_entry_bt_1(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UN
    elm_object_text_set(en, "");
 }
 
+/**
+ * @brief Prints the entry's markup and plain text content to stdout.
+ * @param data The entry widget.
+ * @param obj The calling object (unused).
+ * @param event_info Event data (unused).
+ */
 static void
 my_entry_bt_2(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -34,6 +46,14 @@ my_entry_bt_2(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UN
      }
 }
 
+/**
+ * @brief Prints the entry's selection to stdout.
+ *
+ * This includes the selection region, markup text, and plain UTF-8 text.
+ * @param data The entry widget.
+ * @param obj The calling object (unused).
+ * @param event_info Event data (unused).
+ */
 static void
 my_entry_bt_3(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -56,6 +76,12 @@ my_entry_bt_3(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UN
      }
 }
 
+/**
+ * @brief Inserts bold text into the entry at the current cursor position.
+ * @param data The entry widget.
+ * @param obj The calling object (unused).
+ * @param event_info Event data (unused).
+ */
 static void
 my_entry_bt_4(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -63,6 +89,12 @@ my_entry_bt_4(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UN
    elm_entry_entry_insert(en, "Insert some <b>BOLD</> text");
 }
 
+/**
+ * @brief Toggles the scrollable property of the entry widget.
+ * @param data The entry widget.
+ * @param obj The calling object (unused).
+ * @param event_info Event data (unused).
+ */
 static void
 my_entry_bt_5(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -70,6 +102,15 @@ my_entry_bt_5(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UN
    elm_entry_scrollable_set(en, !elm_entry_scrollable_get(en));
 }
 
+/**
+ * @brief Cycles through the available line wrap types for the entry.
+ *
+ * A static variable is used to keep track of the current wrap type,
+ * cycling from ELM_WRAP_NONE to ELM_WRAP_LAST.
+ * @param data The entry widget.
+ * @param obj The calling object (unused).
+ * @param event_info Event data (unused).
+ */
 static void
 my_entry_bt_6(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -82,6 +123,12 @@ my_entry_bt_6(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UN
    elm_entry_line_wrap_set(en, wr);
 }
 
+/**
+ * @brief Toggles the editable property of the entry widget.
+ * @param data The entry widget.
+ * @param obj The calling object (unused).
+ * @param event_info Event data (unused).
+ */
 static void
 my_entry_bt_7(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -89,6 +136,12 @@ my_entry_bt_7(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UN
    elm_entry_editable_set(en, !elm_entry_editable_get(en));
 }
 
+/**
+ * @brief Sets focus to the entry widget.
+ * @param data The entry widget.
+ * @param obj The calling object (unused).
+ * @param event_info Event data (unused).
+ */
 static void
 my_entry_bt_8(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -96,6 +149,12 @@ my_entry_bt_8(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UN
    elm_object_focus_set(en, EINA_TRUE);
 }
 
+/**
+ * @brief Unfocuses the entry widget.
+ * @param data The entry widget.
+ * @param obj The calling object (unused).
+ * @param event_info Event data (unused).
+ */
 static void
 my_entry_bt_9(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -103,6 +162,15 @@ my_entry_bt_9(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UN
    elm_object_focus_set(en, EINA_FALSE);
 }
 
+/**
+ * @brief Callback for when the "Context Menu Disable" check changes.
+ *
+ * Toggles the global context menu disabled setting based on the state of
+ * the checkbox.
+ * @param data The check widget that was changed.
+ * @param obj The same check widget.
+ * @param event_info Event data (unused).
+ */
 static void
 changed_cb1(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -112,6 +180,14 @@ changed_cb1(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    printf("ck2 %p is now %i\n", ck, elm_check_state_get(ck));
 }
 
+/**
+ * @brief Callback for when the "Select Allow" check changes.
+ *
+ * Toggles whether text selection is allowed in the entry.
+ * @param data The entry widget.
+ * @param obj The check widget that was changed.
+ * @param event_info Event data (unused).
+ */
 static void
 select_allow_check_changed_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -124,6 +200,14 @@ select_allow_check_changed_cb(void *data, Evas_Object *obj, void *event_info EIN
      printf("Entry %p is now unselectable.\n", en);
 }
 
+/**
+ * @brief Callback for the "changed" and "changed,user" smart events of the entry.
+ *
+ * Prints the name of the event that was triggered.
+ * @param data A string representing the event name.
+ * @param obj The entry widget that changed (unused).
+ * @param event_info Event data (unused).
+ */
 static void
 entry_changed_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -132,18 +216,42 @@ entry_changed_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA
    
 }
 
+/**
+ * @brief Callback for the "focused" smart event of the entry.
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 entry_focused_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("Entry 'focused' callback called\n");
 }
 
+/**
+ * @brief Callback for the "unfocused" smart event of the entry.
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 entry_unfocused_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("Entry 'unfocused' callback called\n");
 }
 
+/**
+ * @brief Test case for a non-scrolled entry widget.
+ *
+ * Creates a window with an entry and various buttons to test its
+ * functionality, such as clearing, printing text, selection, insertion,
+ * and toggling properties like scrollability, wrapping, and editability.
+ * It also tests various smart callbacks and other settings.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_entry(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

@@ -39,13 +39,19 @@ static int          match(char *st, int end);
 static cell         litchar(char **lptr, int rawmode);
 static int          alpha(char c);
 
-static int          icomment;	/* currently in multiline comment? */
-static int          iflevel;	/* nesting level if #if/#else/#endif */
-static int          skiplevel;	/* level at which we started skipping */
-static int          elsedone;	/* level at which we have seen an #else */
-static char         term_expr[] = "";
-static int          listline = -1;	/* "current line" for the list file */
+static int          icomment;	/**< Flag indicating if currently inside a multi-line comment. */
+static int          iflevel;	/**< Nesting level of #if/#else/#endif directives. */
+static int          skiplevel;	/**< Level at which conditional compilation started skipping code. */
+static int          elsedone;	/**< Level at which an #else directive was encountered for the current #if. */
+static char         term_expr[] = ""; /**< Special expression terminator for preprocessor. */
+static int          listline = -1;	/**< "Current line" for the listing file, used to force #line directives. */
 
+/** @brief LIFO stack for storing various parser states.
+ *
+ *  This stack is used by functions like doinclude(), doswitch(), etc.,
+ *  to save and restore context during parsing. It can store integers
+ *  and pointers (assuming stkitem can hold both).
+ */
 /*  pushstk & popstk
  *
  *  Uses a LIFO stack to store information. The stack is used by doinclude(),
@@ -58,8 +64,14 @@ static int          listline = -1;	/* "current line" for the list file */
  *
  *  Global references: stack,stkidx (private to pushstk() and popstk())
  */
-static stkitem      stack[sSTKMAX];
-static int          stkidx;
+static stkitem      stack[sSTKMAX]; /**< The actual stack storage. */
+static int          stkidx; /**< The current stack pointer/index. */
+
+/**
+ * @brief Pushes an item onto the LIFO stack.
+ * @param val The item to push onto the stack.
+ *            This can be an integer or a pointer, cast to stkitem.
+ */
 void
 pushstk(stkitem val)
 {
@@ -69,6 +81,10 @@ pushstk(stkitem val)
    stkidx += 1;
 }
 
+/**
+ * @brief Pops an item from the LIFO stack.
+ * @return The item popped from the stack. Returns (stkitem)-1 if the stack is empty.
+ */
 stkitem
 popstk(void)
 {
@@ -78,6 +94,12 @@ popstk(void)
    return stack[stkidx];
 }
 
+/**
+ * @brief Attempts to open a source file and set it as the current input file.
+ *        This function tries appending standard extensions if the initial open fails.
+ * @param name The name of the file to open. This string may be modified by appending extensions.
+ * @return TRUE if the file was successfully opened and plunged, FALSE otherwise.
+ */
 int
 plungequalifiedfile(char *name)
 {
@@ -130,6 +152,14 @@ plungequalifiedfile(char *name)
    return TRUE;
 }
 
+/**
+ * @brief Attempts to open and "plunge" into a new source file for parsing.
+ *        It can search in the current path and/or in specified include paths.
+ * @param name The name of the file to include.
+ * @param try_currentpath If TRUE, attempts to open the file from the current directory.
+ * @param try_includepaths If TRUE, attempts to open the file from the registered include paths.
+ * @return TRUE if the file was successfully opened and plunged, FALSE otherwise.
+ */
 int
 plungefile(char *name, int try_currentpath, int try_includepaths)
 {
@@ -154,6 +184,11 @@ plungefile(char *name, int try_currentpath, int try_includepaths)
    return result;
 }
 
+/**
+ * @brief Verifies that the remainder of a line (from sptr onwards) contains only whitespace.
+ *        If non-whitespace characters are found, it issues an error.
+ * @param sptr Pointer to the character in the line to start checking from.
+ */
 static void
 check_empty(const char *sptr)
 {
@@ -174,6 +209,11 @@ check_empty(const char *sptr)
  *                     inpfname (altered)
  *                     fline    (altered)
  *                     lptr     (altered)
+ */
+/**
+ * @brief Handles the #include directive.
+ *        It parses the include filename, determines the search path (current vs. include paths),
+ *        and then calls plungefile() to open and switch to the new file.
  */
 static void
 doinclude(void)
@@ -228,6 +268,13 @@ doinclude(void)
  *  from the stack. If that fails too, it sets "freading" to 0.
  *
  *  Global references: inpf,fline,inpfname,freading,icomment (altered)
+ */
+/**
+ * @brief Reads a line from the current input file.
+ *        Handles line concatenation (lines ending with '\').
+ *        If EOF is reached on the current file, it attempts to pop the previous file
+ *        from the include stack. Sets freading to FALSE if no more input is available.
+ * @param line Buffer to store the read line. Must be at least sLINEMAX characters.
  */
 static void
 readline(char *line)
@@ -332,6 +379,13 @@ readline(char *line)
  *
  *  Global references: icomment  (private to "stripcom")
  */
+/**
+ * @brief Removes comments from a line of source code.
+ *        Replaces both C-style block comments (/* ... * /) and C++ style
+ *        single-line comments (// ...) with spaces.
+ *        Updates the global `icomment` state for multi-line comments.
+ * @param line The line of source code to process. This string is modified in place.
+ */
 static void
 stripcom(char *line)
 {
@@ -401,6 +455,14 @@ stripcom(char *line)
  *
  *  A boolean value must start with "0b"
  */
+/**
+ * @brief Converts a binary string representation (e.g., "0b1010") to a cell value.
+ *        The binary string can contain underscores for readability (e.g., "0b1010_0101").
+ * @param val Pointer to a cell where the converted value will be stored.
+ * @param curptr Pointer to the string containing the binary number.
+ * @return The number of characters processed if successful, 0 otherwise.
+ *         `val` is updated on success.
+ */
 static int
 btoi(cell * val, char *curptr)
 {
@@ -434,6 +496,15 @@ btoi(cell * val, char *curptr)
  *  it returns the number of characters processed and the value is stored in
  *  "val". Otherwise it returns 0 and "val" is garbage.
  */
+/**
+ * @brief Converts a decimal string representation (e.g., "123") to a cell value.
+ *        The decimal string can contain underscores for readability (e.g., "1_000_000").
+ *        It does not handle signed numbers or floating-point numbers.
+ * @param val Pointer to a cell where the converted value will be stored.
+ * @param curptr Pointer to the string containing the decimal number.
+ * @return The number of characters processed if successful, 0 otherwise.
+ *         `val` is updated on success.
+ */
 static int
 dtoi(cell * val, char *curptr)
 {
@@ -461,6 +532,15 @@ dtoi(cell * val, char *curptr)
  *  Attempts to interpret a numeric symbol as a hexadecimal value. On
  *  success it returns the number of characters processed and the value is
  *  stored in "val". Otherwise it return 0 and "val" is garbage.
+ */
+/**
+ * @brief Converts a hexadecimal string representation (e.g., "0xFF") to a cell value.
+ *        The hexadecimal string must start with "0x" and can contain underscores
+ *        for readability (e.g., "0xDEAD_BEEF").
+ * @param val Pointer to a cell where the converted value will be stored.
+ * @param curptr Pointer to the string containing the hexadecimal number.
+ * @return The number of characters processed if successful, 0 otherwise.
+ *         `val` is updated on success.
  */
 static int
 htoi(cell * val, char *curptr)
@@ -499,6 +579,13 @@ htoi(cell * val, char *curptr)
 }
 
 #if defined LINUX
+/**
+ * @brief Calculates 10 raised to the power of `value`.
+ *        This is a custom implementation, possibly for environments where
+ *        `pow()` might not be available or suitable.
+ * @param value The exponent.
+ * @return 10.0 raised to the power of `value`.
+ */
 static double
 pow10(int value)
 {
@@ -537,6 +624,19 @@ pow10(int value)
  *     is not a valid number, you should write "2.0e3"
  *  o  at least one digit must follow the period; "6." is not a valid number,
  *     you should write "6.0"
+ */
+/**
+ * @brief Converts a floating-point or fixed-point rational number string to a cell value.
+ *        The number can be in standard decimal notation (e.g., "3.14") or scientific
+ *        notation (e.g., "6.02e23").
+ *        If `sc_rationaltag` is set, it converts to a fixed-point integer based on
+ *        `rational_digits`. Otherwise, it converts to an IEEE 754 single-precision float.
+ * @param val Pointer to a cell where the converted value will be stored.
+ *            For floats, this is the bit pattern of the float.
+ *            For fixed-point, this is the scaled integer.
+ * @param curptr Pointer to the string containing the rational number.
+ * @return The number of characters processed if successful, 0 otherwise.
+ *         `val` is updated on success.
  */
 static int
 ftoi(cell * val, char *curptr)
@@ -688,6 +788,15 @@ ftoi(cell * val, char *curptr)
  *        for at "hier2()" (in fact, it is viewed as an operator, not as a
  *        sign) and the + is invalid (as in K&R C, and unlike ANSI C).
  */
+/**
+ * @brief Attempts to parse a number from the input string.
+ *        It tries binary (btoi), hexadecimal (htoi), and decimal (dtoi) formats in that order.
+ *        It does not handle signs (+/-) or floating-point numbers directly (ftoi is separate).
+ * @param val Pointer to a cell where the converted numeric value will be stored.
+ * @param curptr Pointer to the string potentially starting with a number.
+ * @return The number of characters processed if a valid number is found, 0 otherwise.
+ *         `val` is updated on success.
+ */
 static int
 number(cell * val, char *curptr)
 {
@@ -707,6 +816,11 @@ number(cell * val, char *curptr)
      }				/* if */
 }
 
+/**
+ * @brief Appends a single character to a null-terminated string.
+ * @param str The string to append to. Must have enough space.
+ * @param chr The character to append.
+ */
 static void
 chrcat(char *str, char chr)
 {
@@ -715,6 +829,14 @@ chrcat(char *str, char chr)
    *str = '\0';
 }
 
+/**
+ * @brief Evaluates a preprocessor constant expression.
+ *        It temporarily appends a special termination character to the current line
+ *        to ensure the expression parser `constexpress` doesn't read past the line.
+ * @param val Pointer to a cell where the result of the expression will be stored.
+ * @param tag Pointer to an integer where the tag of the expression result will be stored (can be NULL).
+ * @return TRUE if the expression was successfully evaluated, FALSE on error.
+ */
 static int
 preproc_expr(cell * val, int *tag)
 {
@@ -751,6 +873,14 @@ preproc_expr(cell * val, int *tag)
 /* getstring
  * Returns returns a pointer behind the closing quote or to the other
  * character that caused the input to be ended.
+ */
+/**
+ * @brief Extracts a string literal (enclosed in double quotes) from the input line.
+ *        Skips leading whitespace before the opening quote.
+ * @param dest Buffer to store the extracted string content (without quotes).
+ * @param max Maximum number of characters to store in `dest` (including null terminator).
+ * @return A pointer to the character in the input line immediately after the closing quote,
+ *         or to the character that caused parsing to stop (e.g., null terminator if quote is missing).
  */
 static char        *
 getstring(char *dest, int max)

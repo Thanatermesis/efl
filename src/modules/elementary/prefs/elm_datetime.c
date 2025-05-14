@@ -6,6 +6,12 @@ static Elm_Prefs_Item_Type supported_types[] =
    ELM_PREFS_TYPE_UNKNOWN
 };
 
+/**
+ * @internal
+ * @brief Callback for when the datetime widget value changes.
+ * @param data The user-provided change callback function.
+ * @param event The event information.
+ */
 static void
 _item_changed_cb(void *data, const Efl_Event *event)
 {
@@ -14,6 +20,21 @@ _item_changed_cb(void *data, const Efl_Event *event)
    prefs_it_changed_cb(event->object);
 }
 
+/**
+ * @internal
+ * @brief Adds a datetime widget to the prefs UI.
+ *
+ * This function creates and configures an elm_datetime widget for use as a
+ * preferences item. It specifically configures it as a date picker by
+ * hiding time-related fields.
+ *
+ * @param iface The prefs item interface (unused).
+ * @param prefs The parent prefs widget.
+ * @param type The item type (unused, expected to be ELM_PREFS_TYPE_DATE).
+ * @param spec The specification for the item, containing min/max date values.
+ * @param cb The callback to be invoked when the item's value changes.
+ * @return The newly created datetime widget object.
+ */
 static Evas_Object *
 elm_prefs_datetime_add(const Elm_Prefs_Item_Iface *iface EINA_UNUSED,
                        Evas_Object *prefs,
@@ -48,6 +69,18 @@ elm_prefs_datetime_add(const Elm_Prefs_Item_Iface *iface EINA_UNUSED,
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Sets the value of the datetime widget.
+ *
+ * The value is provided as an Eina_Value of type EINA_VALUE_TYPE_TIMEVAL.
+ * The time_t from the timeval is converted to a broken-down time structure
+ * using gmtime(), which interprets the timestamp as UTC.
+ *
+ * @param obj The datetime widget object.
+ * @param value The new value to set.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 elm_prefs_datetime_value_set(Evas_Object *obj,
                              Eina_Value *value)
@@ -68,6 +101,19 @@ elm_prefs_datetime_value_set(Evas_Object *obj,
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Gets the value of the datetime widget.
+ *
+ * The function retrieves the date as a `struct tm` and converts it to a
+ * `time_t` timestamp using mktime(). Note that mktime() interprets the
+ * `struct tm` components as local time. The resulting timestamp is stored
+ * in an Eina_Value of type EINA_VALUE_TYPE_TIMEVAL.
+ *
+ * @param obj The datetime widget object.
+ * @param value A pointer to an Eina_Value to store the retrieved value.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 elm_prefs_datetime_value_get(Evas_Object *obj,
                              Eina_Value *value)
@@ -87,6 +133,14 @@ elm_prefs_datetime_value_get(Evas_Object *obj,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Registers the datetime widget as a prefs item handler.
+ *
+ * This macro call defines and registers the implementation for handling
+ * datetime preference items, mapping the functions for creation, value
+ * setting/getting, etc.
+ */
 PREFS_ITEM_WIDGET_ADD(datetime,
                       supported_types,
                       elm_prefs_datetime_value_set,

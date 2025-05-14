@@ -43,6 +43,11 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
 
 static Eina_Bool _key_action_escape(Evas_Object *obj, const char *params);
 
+/**
+ * @internal
+ * @brief Defines actions for key events.
+ * Currently, only "escape" action is defined.
+ */
 static const Elm_Action key_actions[] = {
    {"escape", _key_action_escape},
    {NULL, NULL}
@@ -62,6 +67,15 @@ _elm_ctxpopup_efl_ui_l10n_translation_update(Eo *obj, Elm_Ctxpopup_Data *sd)
    efl_ui_l10n_translation_update(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Handles the "escape" key action.
+ * This function is called when the escape key is pressed and the ctxpopup has focus.
+ * It dismisses the ctxpopup.
+ * @param obj The ctxpopup object.
+ * @param params The action parameters (unused).
+ * @return EINA_TRUE if the action was handled, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _key_action_escape(Evas_Object *obj, const char *params EINA_UNUSED)
 {
@@ -69,44 +83,91 @@ _key_action_escape(Evas_Object *obj, const char *params EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Adjusts the X position and width of the Ctxpopup.
+ * This function ensures the Ctxpopup fits horizontally within the hover_area.
+ * It centers the Ctxpopup if possible, otherwise aligns it to the edges.
+ *
+ * @param pos The current top-left position of the Ctxpopup (input/output).
+ *            On input, pos->x is the desired center point.
+ *            On output, pos->x is the adjusted left edge.
+ * @param base_size The size of the Ctxpopup's base (input/output).
+ *                  base_size->x might be reduced if it's larger than hover_area->w.
+ * @param hover_area The rectangle representing the available area for the Ctxpopup.
+ */
 static void
 _x_pos_adjust(Evas_Coord_Point *pos,
               Evas_Coord_Point *base_size,
               Eina_Rectangle *hover_area)
 {
+   // Center the Ctxpopup horizontally around the initial pos->x
    pos->x -= (base_size->x / 2);
+
+   // Adjust if Ctxpopup goes out of bounds on the left
 
    if (pos->x < hover_area->x)
      pos->x = hover_area->x;
+   // Adjust if Ctxpopup goes out of bounds on the right
    else if ((pos->x + base_size->x) > (hover_area->x + hover_area->w))
      pos->x = (hover_area->x + hover_area->w) - base_size->x;
 
+   // If Ctxpopup width is still larger than hover area width, shrink Ctxpopup
    if (base_size->x > hover_area->w)
      base_size->x -= (base_size->x - hover_area->w);
 
+   // Final check to ensure Ctxpopup is within left bound (e.g., if shrinking made it too small for original adjustment)
    if (pos->x < hover_area->x)
      pos->x = hover_area->x;
 }
 
+/**
+ * @internal
+ * @brief Adjusts the Y position and height of the Ctxpopup.
+ * This function ensures the Ctxpopup fits vertically within the hover_area.
+ * It centers the Ctxpopup if possible, otherwise aligns it to the edges.
+ *
+ * @param pos The current top-left position of the Ctxpopup (input/output).
+ *            On input, pos->y is the desired center point.
+ *            On output, pos->y is the adjusted top edge.
+ * @param base_size The size of the Ctxpopup's base (input/output).
+ *                  base_size->y might be reduced if it's larger than hover_area->h.
+ * @param hover_area The rectangle representing the available area for the Ctxpopup.
+ */
 static void
 _y_pos_adjust(Evas_Coord_Point *pos,
               Evas_Coord_Point *base_size,
               Eina_Rectangle *hover_area)
 {
+   // Center the Ctxpopup vertically around the initial pos->y
    pos->y -= (base_size->y / 2);
 
    if (pos->y < hover_area->y)
      pos->y = hover_area->y;
+   // Adjust if Ctxpopup goes out of bounds on the bottom
    else if ((pos->y + base_size->y) > (hover_area->y + hover_area->h))
      pos->y = hover_area->y + hover_area->h - base_size->y;
 
+   // If Ctxpopup height is still larger than hover area height, shrink Ctxpopup
    if (base_size->y > hover_area->h)
      base_size->y -= (base_size->y - hover_area->h);
 
+   // Final check to ensure Ctxpopup is within top bound
    if (pos->y < hover_area->y)
      pos->y = hover_area->y;
 }
 
+/**
+ * @internal
+ * @brief Calculates the base geometry (position and size) for the Ctxpopup.
+ * This function determines the best direction (Up, Down, Left, Right) to display
+ * the Ctxpopup relative to its initial position, considering available space
+ * within the hover parent. It adjusts the Ctxpopup's size to fit if necessary.
+ *
+ * @param obj The Ctxpopup object.
+ * @param rect The rectangle to store the calculated geometry (output).
+ * @return The chosen direction for the Ctxpopup.
+ */
 static Elm_Ctxpopup_Direction
 _base_geometry_calc(Evas_Object *obj,
                     Eina_Rectangle *rect)
@@ -287,6 +348,18 @@ _base_geometry_calc(Evas_Object *obj,
    return dir;
 }
 
+/**
+ * @internal
+ * @brief Updates the Ctxpopup arrow's visual state and position.
+ * This function sets the arrow's direction (e.g., "elm,state,left"),
+ * swallows it into the correct part of the Ctxpopup's layout,
+ * and adjusts its position along the Ctxpopup's edge using edje_object_part_drag_value_set.
+ *
+ * @param obj The Ctxpopup object.
+ * @param dir The direction the Ctxpopup is pointing (where the arrow should be).
+ * @param base_size The geometry of the Ctxpopup's base (main content area).
+ *                  Used to calculate the arrow's relative position.
+ */
 static void
 _arrow_update(Evas_Object *obj,
               Elm_Ctxpopup_Direction dir,
@@ -410,9 +483,19 @@ _arrow_update(Evas_Object *obj,
      }
 
    //should be here for getting accurate geometry value
+   // Recalculate the smart object (layout) to apply arrow changes
    evas_object_smart_calculate(wd->resize_obj);
 }
 
+/**
+ * @internal
+ * @brief Emits Edje signals to show the Ctxpopup.
+ * This function triggers animations and state changes in the Ctxpopup's theme
+ * to make it appear. It emits signals based on the Ctxpopup's direction.
+ *
+ * @param obj The Ctxpopup object.
+ * @param dir The direction the Ctxpopup is displayed in.
+ */
 static void
 _show_signals_emit(Evas_Object *obj,
                    Elm_Ctxpopup_Direction dir)
@@ -454,6 +537,15 @@ _show_signals_emit(Evas_Object *obj,
    elm_layout_signal_emit(obj, "elm,state,show", "elm");
 }
 
+/**
+ * @internal
+ * @brief Emits Edje signals to hide the Ctxpopup.
+ * This function triggers animations and state changes in the Ctxpopup's theme
+ * to make it disappear. It emits signals based on the Ctxpopup's direction.
+ *
+ * @param obj The Ctxpopup object.
+ * @param dir The direction the Ctxpopup was displayed in.
+ */
 static void
 _hide_signals_emit(Evas_Object *obj,
                    Elm_Ctxpopup_Direction dir)
@@ -491,6 +583,17 @@ _hide_signals_emit(Evas_Object *obj,
    elm_layout_signal_emit(obj, "elm,state,hide", "elm");
 }
 
+/**
+ * @internal
+ * @brief Shifts the Ctxpopup's base rectangle to account for the arrow's dimensions.
+ * After the main Ctxpopup position is calculated, this function adjusts its
+ * coordinates so that the arrow appears to point from the edge of the Ctxpopup,
+ * rather than having the Ctxpopup overlap where the arrow will be.
+ *
+ * @param arrow The arrow Evas_Object.
+ * @param dir The direction in which the Ctxpopup is displayed (and thus, the arrow points).
+ * @param rect The Ctxpopup's base geometry (input/output), which will be shifted.
+ */
 static void
 _base_shift_by_arrow(Evas_Object *arrow,
                      Elm_Ctxpopup_Direction dir,

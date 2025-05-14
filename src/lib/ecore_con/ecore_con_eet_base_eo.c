@@ -1,49 +1,91 @@
 
+/** @internal
+ * @brief Implements @ref ecore_con_eet_base_server_set.
+ */
 void _ecore_con_eet_base_server_set(Eo *obj, Ecore_Con_Eet_Base_Data *pd, Ecore_Con_Server *data);
 
 ECORE_CON_API ECORE_CON_API_WEAK EFL_VOID_FUNC_BODYV(ecore_con_eet_base_server_set, EFL_FUNC_CALL(data), Ecore_Con_Server *data);
 
+/** @internal
+ * @brief Implements @ref ecore_con_eet_base_server_get.
+ */
 Ecore_Con_Server *_ecore_con_eet_base_server_get(const Eo *obj, Ecore_Con_Eet_Base_Data *pd);
 
 ECORE_CON_API ECORE_CON_API_WEAK EFL_FUNC_BODY_CONST(ecore_con_eet_base_server_get, Ecore_Con_Server *, NULL);
 
+/** @internal
+ * @brief Implements @ref ecore_con_eet_base_data_callback_set.
+ */
 void _ecore_con_eet_base_data_callback_set(Eo *obj, Ecore_Con_Eet_Base_Data *pd, const char *name, Ecore_Con_Eet_Data_Cb func, const void *data);
 
 ECORE_CON_API ECORE_CON_API_WEAK EFL_VOID_FUNC_BODYV(ecore_con_eet_base_data_callback_set, EFL_FUNC_CALL(name, func, data), const char *name, Ecore_Con_Eet_Data_Cb func, const void *data);
 
+/** @internal
+ * @brief Implements @ref ecore_con_eet_base_raw_data_callback_set.
+ */
 void _ecore_con_eet_base_raw_data_callback_set(Eo *obj, Ecore_Con_Eet_Base_Data *pd, const char *name, Ecore_Con_Eet_Raw_Data_Cb func, const void *data);
 
 ECORE_CON_API ECORE_CON_API_WEAK EFL_VOID_FUNC_BODYV(ecore_con_eet_base_raw_data_callback_set, EFL_FUNC_CALL(name, func, data), const char *name, Ecore_Con_Eet_Raw_Data_Cb func, const void *data);
 
+/** @internal
+ * @brief Implements @ref ecore_con_eet_base_data_callback_del.
+ */
 void _ecore_con_eet_base_data_callback_del(Eo *obj, Ecore_Con_Eet_Base_Data *pd, const char *name);
 
 ECORE_CON_API ECORE_CON_API_WEAK EFL_VOID_FUNC_BODYV(ecore_con_eet_base_data_callback_del, EFL_FUNC_CALL(name), const char *name);
 
+/** @internal
+ * @brief Implements @ref ecore_con_eet_base_raw_data_callback_del.
+ */
 void _ecore_con_eet_base_raw_data_callback_del(Eo *obj, Ecore_Con_Eet_Base_Data *pd, const char *name);
 
 ECORE_CON_API ECORE_CON_API_WEAK EFL_VOID_FUNC_BODYV(ecore_con_eet_base_raw_data_callback_del, EFL_FUNC_CALL(name), const char *name);
 
+/** @internal
+ * @brief Implements @ref ecore_con_eet_base_register.
+ */
 void _ecore_con_eet_base_register(Eo *obj, Ecore_Con_Eet_Base_Data *pd, const char *name, Eet_Data_Descriptor *edd);
 
 ECORE_CON_API ECORE_CON_API_WEAK EFL_VOID_FUNC_BODYV(ecore_con_eet_base_register, EFL_FUNC_CALL(name, edd), const char *name, Eet_Data_Descriptor *edd);
 
+/** @internal
+ * @brief Implements @ref ecore_con_eet_base_send.
+ */
 void _ecore_con_eet_base_send(Eo *obj, Ecore_Con_Eet_Base_Data *pd, Ecore_Con_Reply *reply, const char *name, void *value);
 
 ECORE_CON_API ECORE_CON_API_WEAK EFL_VOID_FUNC_BODYV(ecore_con_eet_base_send, EFL_FUNC_CALL(reply, name, value), Ecore_Con_Reply *reply, const char *name, void *value);
 
+/** @internal
+ * @brief Implements @ref ecore_con_eet_base_raw_send.
+ */
 void _ecore_con_eet_base_raw_send(Eo *obj, Ecore_Con_Eet_Base_Data *pd, Ecore_Con_Reply *reply, const char *protocol_name, const char *section, Eina_Binbuf *section_data);
 
 ECORE_CON_API ECORE_CON_API_WEAK EFL_VOID_FUNC_BODYV(ecore_con_eet_base_raw_send, EFL_FUNC_CALL(reply, protocol_name, section, section_data), Ecore_Con_Reply *reply, const char *protocol_name, const char *section, Eina_Binbuf *section_data);
 
+/** @internal
+ * @brief Implements @ref efl_constructor for @ref Ecore_Con_Eet_Base.
+ */
 Efl_Object *_ecore_con_eet_base_efl_object_constructor(Eo *obj, Ecore_Con_Eet_Base_Data *pd);
 
-
+/** @internal
+ * @brief Implements @ref efl_destructor for @ref Ecore_Con_Eet_Base.
+ */
 void _ecore_con_eet_base_efl_object_destructor(Eo *obj, Ecore_Con_Eet_Base_Data *pd);
 
-
+/** @internal
+ * @brief Implements @ref efl_finalize for @ref Ecore_Con_Eet_Base.
+ */
 Efl_Object *_ecore_con_eet_base_efl_object_finalize(Eo *obj, Ecore_Con_Eet_Base_Data *pd);
 
-
+/** @internal
+ * @brief Initializes the Ecore_Con_Eet_Base class.
+ *
+ * This function is called once when the class is first used.
+ * It sets up the Efl_Object operations for this class.
+ *
+ * @param klass The class to initialize.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _ecore_con_eet_base_class_initializer(Efl_Class *klass)
 {
@@ -75,6 +117,12 @@ _ecore_con_eet_base_class_initializer(Efl_Class *klass)
    return efl_class_functions_set(klass, opsp, ropsp);
 }
 
+/** @internal
+ * @brief Describes the Ecore_Con_Eet_Base class.
+ *
+ * This structure provides metadata about the Ecore_Con_Eet_Base class,
+ * such as its version, name, type, and initializer functions.
+ */
 static const Efl_Class_Description _ecore_con_eet_base_class_desc = {
    EO_VERSION,
    "Ecore.Con.Eet.Base",
@@ -85,6 +133,13 @@ static const Efl_Class_Description _ecore_con_eet_base_class_desc = {
    NULL
 };
 
+/** @internal
+ * @brief Defines the Ecore_Con_Eet_Base class.
+ *
+ * This macro effectively registers the Ecore_Con_Eet_Base class with the
+ * Eo system, making it available for instantiation and use. It uses the
+ * class description defined in @ref _ecore_con_eet_base_class_desc.
+ */
 EFL_DEFINE_CLASS(ecore_con_eet_base_class_get, &_ecore_con_eet_base_class_desc, EFL_OBJECT_CLASS, NULL);
 
 #include "ecore_con_eet_base_eo.legacy.c"

@@ -51,49 +51,94 @@ static int _vsync_log_dom = -1;
 // relevant header bits of dri/drm inlined here to avoid needing external
 // headers to build
 /// drm
+/**
+ * @brief Specifies the type of vblank request or reply.
+ *
+ * These flags control the behavior of DRM vblank operations, such as
+ * whether the sequence number is absolute or relative, and whether
+ * an event should be generated.
+ */
 typedef enum
 {
-   DRM_VBLANK_ABSOLUTE = 0x00000000,
-   DRM_VBLANK_RELATIVE = 0x00000001,
-   DRM_VBLANK_EVENT = 0x04000000,
-   DRM_VBLANK_FLIP = 0x08000000,
-   DRM_VBLANK_NEXTONMISS = 0x10000000,
-   DRM_VBLANK_SECONDARY = 0x20000000,
-   DRM_VBLANK_SIGNAL = 0x40000000
+   DRM_VBLANK_ABSOLUTE = 0x00000000, /**< Request an absolute sequence number. */
+   DRM_VBLANK_RELATIVE = 0x00000001, /**< Request a relative sequence number. */
+   DRM_VBLANK_EVENT = 0x04000000,    /**< Request an event to be generated. */
+   DRM_VBLANK_FLIP = 0x08000000,     /**< Request a page flip. */
+   DRM_VBLANK_NEXTONMISS = 0x10000000,/**< If missed, wait for the next vblank. */
+   DRM_VBLANK_SECONDARY = 0x20000000,/**< Use secondary CRTC. */
+   DRM_VBLANK_SIGNAL = 0x40000000   /**< Send a signal when vblank occurs. */
 }
 drmVBlankSeqType;
 
+/**
+ * @brief DRM VBlank Request structure.
+ *
+ * This structure is used to request a vblank wait.
+ */
 typedef struct _drmVBlankReq
 {
-   drmVBlankSeqType type;
-   unsigned int     sequence;
-   unsigned long    signal;
+   drmVBlankSeqType type;      /**< Type of vblank request (absolute, relative, event). */
+   unsigned int     sequence;  /**< Vblank sequence number. */
+   unsigned long    signal;    /**< Signal to be sent (if DRM_VBLANK_SIGNAL is set). */
 } drmVBlankReq;
 
+/**
+ * @brief DRM VBlank Reply structure.
+ *
+ * This structure is returned after a vblank wait, containing timing information.
+ */
 typedef struct _drmVBlankReply
 {
-   drmVBlankSeqType type;
-   unsigned int     sequence;
-   long             tval_sec;
-   long             tval_usec;
+   drmVBlankSeqType type;      /**< Type of vblank reply. */
+   unsigned int     sequence;  /**< Vblank sequence number. */
+   long             tval_sec;  /**< Seconds part of the timestamp. */
+   long             tval_usec; /**< Microseconds part of the timestamp. */
 } drmVBlankReply;
 
+/**
+ * @brief Union for DRM VBlank request and reply.
+ *
+ * This union allows handling both vblank requests and replies
+ * using the same memory space.
+ */
 typedef union _drmVBlank
 {
-   drmVBlankReq   request;
-   drmVBlankReply reply;
+   drmVBlankReq   request; /**< VBlank request data. */
+   drmVBlankReply reply;   /**< VBlank reply data. */
 } drmVBlank;
 
 #define DRM_EVENT_CONTEXT_VERSION 2
 
+/**
+ * @brief DRM Event Context structure.
+ *
+ * This structure holds callbacks for handling DRM events like vblank
+ * and page flips.
+ */
 typedef struct _drmEventContext
 {
-   int version;
+   int version; /**< Version of the event context structure (should be DRM_EVENT_CONTEXT_VERSION). */
+   /**
+    * @brief Callback for vblank events.
+    * @param fd File descriptor for the DRM device.
+    * @param sequence The vblank sequence number.
+    * @param tv_sec Seconds part of the event timestamp.
+    * @param tv_usec Microseconds part of the event timestamp.
+    * @param user_data User-provided data.
+    */
    void (*vblank_handler)(int fd,
                           unsigned int sequence,
                           unsigned int tv_sec,
                           unsigned int tv_usec,
                           void *user_data);
+   /**
+    * @brief Callback for page flip events.
+    * @param fd File descriptor for the DRM device.
+    * @param sequence The page flip sequence number.
+    * @param tv_sec Seconds part of the event timestamp.
+    * @param tv_usec Microseconds part of the event timestamp.
+    * @param user_data User-provided data.
+    */
    void (*page_flip_handler)(int fd,
                              unsigned int sequence,
                              unsigned int tv_sec,
@@ -101,68 +146,87 @@ typedef struct _drmEventContext
                              void *user_data);
 } drmEventContext;
 
+/**
+ * @brief DRM Version structure (for older, ABI-broken versions).
+ *
+ * This structure represents DRM version information. It is specifically
+ * defined to handle cases where the system's drm.h might have an ABI
+ * incompatible version of this struct.
+ */
 typedef struct _drmVersionBroken
 {
-   int version_major;
-   int version_minor;
-//   int version_patchlevel;
-   size_t name_len;
+   int version_major; /**< Major version number. */
+   int version_minor; /**< Minor version number. */
+//   int version_patchlevel; /**< Patch level (commented out as per original). */
+   size_t name_len;   /**< Length of the driver name string. */
    // WARNING! this does NOT match the system drm.h headers because
    // literally drm.h is wrong. the below is correct. drm hapily
    // broke its ABI at some point.
-   char *name;
-   size_t date_len;
-   char *date;
-   size_t desc_len;
-   char *desc;
+   char *name;         /**< Driver name. */
+   size_t date_len;   /**< Length of the driver date string. */
+   char *date;         /**< Driver date string. */
+   size_t desc_len;   /**< Length of the driver description string. */
+   char *desc;         /**< Driver description string. */
 } drmVersionBroken;
 
+/**
+ * @brief DRM Version structure (intended to be correct).
+ *
+ * This structure represents DRM version information, aiming for
+ * correctness despite potential ABI issues in system headers.
+ */
 typedef struct _drmVersion
 {
-   int version_major;
-   int version_minor;
-   int version_patchlevel;
-   size_t name_len;
+   int version_major;      /**< Major version number. */
+   int version_minor;      /**< Minor version number. */
+   int version_patchlevel; /**< Patch level. */
+   size_t name_len;        /**< Length of the driver name string. */
    // WARNING! this does NOT match the system drm.h headers because
    // literally drm.h is wrong. the below is correct. drm hapily
    // broke its ABI at some point.
-   char *name;
-   size_t date_len;
-   char *date;
-   size_t desc_len;
-   char *desc;
+   char *name;              /**< Driver name. */
+   size_t date_len;        /**< Length of the driver date string. */
+   char *date;              /**< Driver date string. */
+   size_t desc_len;        /**< Length of the driver description string. */
+   char *desc;              /**< Driver description string. */
 } drmVersion;
 
-static int (*sym_drmClose)(int fd) = NULL;
-static int (*sym_drmWaitVBlank)(int fd,
-                                drmVBlank *vbl) = NULL;
-static int (*sym_drmHandleEvent)(int fd,
-                                 drmEventContext *evctx) = NULL;
-static void *(*sym_drmGetVersion)(int fd) = NULL;
-static void (*sym_drmFreeVersion)(void *drmver) = NULL;
-static int drm_fd = -1;
-static volatile int drm_event_is_busy = 0;
-static int drm_animators_interval = 1;
-static drmEventContext drm_evctx;
-static double _drm_fail_time = 0.1;
-static double _drm_fail_time2 = 1.0 / 60.0;
-static int _drm_fail_count = 0;
+// Pointers to dynamically loaded DRM functions
+static int (*sym_drmClose)(int fd) = NULL;                     /**< Pointer to drmClose function. */
+static int (*sym_drmWaitVBlank)(int fd, drmVBlank *vbl) = NULL; /**< Pointer to drmWaitVBlank function. */
+static int (*sym_drmHandleEvent)(int fd, drmEventContext *evctx) = NULL; /**< Pointer to drmHandleEvent function. */
+static void *(*sym_drmGetVersion)(int fd) = NULL;               /**< Pointer to drmGetVersion function. */
+static void (*sym_drmFreeVersion)(void *drmver) = NULL;         /**< Pointer to drmFreeVersion function. */
 
-static void *drm_lib = NULL;
+static int drm_fd = -1; /**< File descriptor for the DRM device. */
+static volatile int drm_event_is_busy = 0; /**< Flag indicating if DRM event handling is active. */
+static int drm_animators_interval = 1;    /**< Interval for DRM animator ticks. */
+static drmEventContext drm_evctx;         /**< DRM event context for handling vblank events. */
+static double _drm_fail_time = 0.1;       /**< Timeout for DRM failure detection (initial). */
+static double _drm_fail_time2 = 1.0 / 60.0; /**< Timeout for DRM failure detection (after multiple fails). */
+static int _drm_fail_count = 0;           /**< Counter for consecutive DRM failures. */
 
-static Eina_Thread_Queue *thq = NULL;
-static Ecore_Thread *drm_thread = NULL;
-static Eina_Spinlock tick_queue_lock;
-static int           tick_queue_count = 0;
-static Eina_Bool     tick_skip = EINA_FALSE;
-static Eina_Bool     threaded_vsync = EINA_TRUE;
-static Ecore_Timer  *fail_timer = NULL;
-static Ecore_Timer  *fallback_timer = NULL;
+static void *drm_lib = NULL; /**< Handle for the dynamically loaded DRM library. */
 
+// Threading and synchronization for vsync
+static Eina_Thread_Queue *thq = NULL;        /**< Thread queue for communication with the DRM thread. */
+static Ecore_Thread *drm_thread = NULL;      /**< Ecore thread for handling DRM events. */
+static Eina_Spinlock tick_queue_lock;      /**< Spinlock for protecting tick_queue_count. */
+static int           tick_queue_count = 0; /**< Number of ticks currently queued. */
+static Eina_Bool     tick_skip = EINA_FALSE; /**< Flag to indicate if animator ticks should be skipped. */
+static Eina_Bool     threaded_vsync = EINA_TRUE; /**< Flag to enable/disable threaded vsync. */
+static Ecore_Timer  *fail_timer = NULL;      /**< Timer to handle DRM operation failures. */
+static Ecore_Timer  *fallback_timer = NULL;  /**< Timer for fallback mechanism when DRM fails repeatedly. */
+
+/**
+ * @brief Message structure for the thread queue.
+ *
+ * Used to send simple commands or data to the DRM handling thread.
+ */
 typedef struct
 {
-   Eina_Thread_Queue_Msg head;
-   char val;
+   Eina_Thread_Queue_Msg head; /**< Standard thread queue message header. */
+   char val;                   /**< Value of the message (e.g., 0 for stop, 1 for start). */
 } Msg;
 
 #if 0
@@ -171,8 +235,28 @@ typedef struct
 # define D(args...)
 #endif
 
+/**
+ * @brief Sends a timestamp to the main loop for animator ticking.
+ *
+ * This function is called when a vsync event occurs (or is simulated).
+ * If threaded vsync is enabled, it queues the timestamp to be processed
+ * by the main thread. Otherwise, it directly sets the loop time and
+ * triggers animator ticks.
+ *
+ * @param t The timestamp to send, typically from ecore_time_get() or vblank.
+ */
 static void _drm_send_time(double t);
 
+/**
+ * @brief Timer callback for fallback mechanism when DRM fails repeatedly.
+ *
+ * If DRM operations fail consistently, this timer provides a fallback
+ * by sending a synthetic tick at a regular interval (e.g., 60Hz)
+ * if `drm_event_is_busy` is still true.
+ *
+ * @param data User data (unused).
+ * @return EINA_TRUE to reschedule the timer, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _fallback_timeout(void *data EINA_UNUSED)
 {
@@ -185,6 +269,17 @@ _fallback_timeout(void *data EINA_UNUSED)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Timer callback to handle DRM operation failures.
+ *
+ * This timer is started when a DRM operation is expected but doesn't complete
+ * in time. It increments a failure counter. If failures persist, it may
+ * trigger a fallback mechanism. If `drm_event_is_busy` is true, it sends
+ * the current time as a tick.
+ *
+ * @param data User data (unused).
+ * @return EINA_FALSE, as this timer is typically a one-shot or reset.
+ */
 static Eina_Bool
 _fail_timeout(void *data EINA_UNUSED)
 {
@@ -202,6 +297,14 @@ _fail_timeout(void *data EINA_UNUSED)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Schedules a DRM vblank wait operation.
+ *
+ * Requests the DRM to notify on the next vblank event.
+ * The request is for a relative vblank event.
+ *
+ * @return EINA_TRUE if scheduling was successful, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _drm_tick_schedule(void)
 {
@@ -215,6 +318,15 @@ _drm_tick_schedule(void)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sends a message to the DRM handling thread via a thread queue.
+ *
+ * This is used to communicate state changes (like starting/stopping
+ * event processing) to the dedicated DRM thread.
+ *
+ * @param val The character value to send in the message.
+ *            Typically 1 to start/continue, 0 to stop.
+ */
 static void
 _tick_send(char val)
 {
@@ -226,6 +338,15 @@ _tick_send(char val)
    eina_thread_queue_send_done(thq, ref);
 }
 
+/**
+ * @brief Callback function invoked when the custom animator source begins ticking.
+ *
+ * This function initializes or signals the DRM vsync mechanism to start
+ * generating ticks. If using threaded vsync, it sends a message to the
+ * DRM thread. Otherwise, it sets up timers and schedules the first DRM tick.
+ *
+ * @param data User data (unused).
+ */
 static void
 _drm_tick_begin(void *data EINA_UNUSED)
 {
@@ -260,6 +381,15 @@ _drm_tick_begin(void *data EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback function invoked when the custom animator source stops ticking.
+ *
+ * This function signals the DRM vsync mechanism to stop generating ticks.
+ * If using threaded vsync, it sends a message to the DRM thread.
+ * Otherwise, it cleans up any active timers.
+ *
+ * @param data User data (unused).
+ */
 static void
 _drm_tick_end(void *data EINA_UNUSED)
 {
@@ -367,6 +497,19 @@ _drm_send_time(double t)
      }
 }
 
+/**
+ * @brief DRM vblank event handler callback.
+ *
+ * This function is called by the DRM system when a vblank event occurs.
+ * It processes the event, potentially adjusting the timestamp, and then
+ * calls _drm_send_time() to propagate the tick to the Ecore animator system.
+ *
+ * @param fd The DRM file descriptor (unused in this function body).
+ * @param frame The vblank frame counter.
+ * @param sec Seconds part of the vblank timestamp.
+ * @param usec Microseconds part of the vblank timestamp.
+ * @param data User data (unused).
+ */
 static void
 _drm_vblank_handler(int fd EINA_UNUSED,
                     unsigned int frame,
@@ -428,13 +571,31 @@ _drm_vblank_handler(int fd EINA_UNUSED,
      }
 }
 
-static double _ecore_x_vsync_wakeup_time = 0.0;
+static double _ecore_x_vsync_wakeup_time = 0.0; /**< Stores the time when the vsync mechanism last woke up. */
 
+/**
+ * @brief Gets the last time the vsync mechanism woke up.
+ *
+ * This is primarily used for debugging or performance analysis to understand
+ * the timing of vsync events.
+ *
+ * @return The timestamp of the last vsync wakeup.
+ */
 EAPI double _ecore_x_vsync_wakeup_time_get(void)
 {
    return _ecore_x_vsync_wakeup_time;
 }
 
+/**
+ * @brief Core function for the dedicated DRM event handling thread.
+ *
+ * This thread waits for messages on a queue (to start/stop) and for
+ * DRM events. When a DRM event (vblank) occurs, or a timeout happens,
+ * it notifies the main thread with a timestamp.
+ *
+ * @param data User data (unused).
+ * @param thread The Ecore_Thread context for this thread.
+ */
 static void
 _drm_tick_core(void *data EINA_UNUSED, Ecore_Thread *thread)
 {
@@ -541,6 +702,17 @@ _drm_tick_core(void *data EINA_UNUSED, Ecore_Thread *thread)
      }
 }
 
+/**
+ * @brief Notification callback executed in the main thread when the DRM thread sends data.
+ *
+ * This function receives timestamps from the DRM thread. It updates the
+ * Ecore loop time and triggers a custom animator tick if vsync events are
+ * active and not being skipped.
+ *
+ * @param data User data (unused).
+ * @param thread The Ecore_Thread that sent the notification (unused).
+ * @param msg The message data, which is a pointer to a double (timestamp).
+ */
 static void
 _drm_tick_notify(void *data EINA_UNUSED, Ecore_Thread *thread EINA_UNUSED, void *msg)
 {
@@ -573,6 +745,17 @@ _drm_tick_notify(void *data EINA_UNUSED, Ecore_Thread *thread EINA_UNUSED, void 
    free(msg);
 }
 
+/**
+ * @brief Ecore file descriptor handler for DRM events (non-threaded mode).
+ *
+ * This function is called when there is activity on the DRM file descriptor,
+ * indicating a DRM event (like vblank) is ready to be processed.
+ * It calls sym_drmHandleEvent to process the event.
+ *
+ * @param data User data (unused).
+ * @param fd_handler The Ecore_Fd_Handler that triggered this callback (unused).
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
+ */
 static Eina_Bool
 _ecore_vsync_fd_handler(void *data EINA_UNUSED,
                         Ecore_Fd_Handler *fd_handler EINA_UNUSED)
@@ -586,6 +769,17 @@ _ecore_vsync_fd_handler(void *data EINA_UNUSED,
 // so we can be as compatible as possible given the whole mess of the
 // gl/dri/drm etc. world. and handle graceful failure at runtime not
 // compile time
+/**
+ * @brief Dynamically loads the DRM library and resolves necessary symbols.
+ *
+ * This function attempts to dlopen a DRM library (e.g., libdrm.so.2) and
+ * dlsym the required DRM functions (drmClose, drmWaitVBlank, etc.).
+ * This allows Ecore to use DRM vsync without a hard build-time dependency
+ * on libdrm development headers and to gracefully degrade if DRM is not
+ * available or symbols cannot be found.
+ *
+ * @return 1 if linking was successful and all symbols were found, 0 otherwise.
+ */
 static int
 _drm_link(void)
 {
@@ -630,8 +824,17 @@ _drm_link(void)
    return 1;
 }
 
-#define DRM_HAVE_NVIDIA 1
+#define DRM_HAVE_NVIDIA 1 /**< Flag indicating if an NVIDIA binary driver is detected, which might affect vsync behavior. */
 
+/**
+ * @brief Performs a glob pattern match.
+ *
+ * A simple wrapper around eina_fnmatch to check if a string matches a glob pattern.
+ *
+ * @param glob The glob pattern. If NULL, it's considered a match.
+ * @param str The string to match against the pattern. If NULL, it's not a match (unless glob is also NULL).
+ * @return EINA_TRUE if the string matches the glob pattern, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 glob_match(const char *glob, const char *str)
 {
@@ -641,6 +844,21 @@ glob_match(const char *glob, const char *str)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Initializes the DRM vsync mechanism.
+ *
+ * This function performs several checks:
+ * - Verifies kernel version and presence of specific DRM-related modules (e.g., vboxvideo).
+ * - Opens the DRM device (typically /dev/dri/card0 or card1).
+ * - Retrieves and validates the DRM driver version and information.
+ * - Checks the driver against a whitelist of known-to-work configurations.
+ * - Sets up DRM event handling (vblank handlers).
+ * - Schedules the first vblank tick.
+ * - Initializes threading or fd_handler based on `threaded_vsync` setting.
+ *
+ * @param flags Pointer to an integer where flags like DRM_HAVE_NVIDIA can be set.
+ * @return 1 on successful initialization, 0 on failure.
+ */
 static int
 _drm_init(int *flags)
 {
@@ -874,6 +1092,18 @@ checkdone:
    return 1;
 }
 
+/**
+ * @brief Sets or unsets the DRM-based custom animator tick source.
+ *
+ * If a `vsync_root` window is set (meaning vsync is desired for a specific
+ * root window), this function configures Ecore's animator to use custom
+ * tick callbacks (_drm_tick_begin, _drm_tick_end).
+ * If `vsync_root` is 0, it reverts the animator source to the default timer
+ * and cleans up DRM-related callbacks.
+ *
+ * @return EINA_TRUE always, though the success of setting the source depends
+ *         on internal Ecore animator functions.
+ */
 static Eina_Bool
 _drm_animator_tick_source_set(void)
 {
@@ -910,8 +1140,16 @@ _drm_animator_tick_source_set(void)
 // XXX: missing mode 3 == separate x connection with compiled in dri2 proto
 // handling ala mesa (taken from mesa likely)
 
-static int mode = 0;
+static int mode = 0; /**< Vsync mode: 0 = none/unknown, 1 = DRM. Other modes were planned but not fully implemented. */
 
+/**
+ * @brief Initializes the vsync subsystem.
+ *
+ * This function is called once to set up the vsync mechanism.
+ * It registers a log domain and attempts to initialize DRM-based vsync
+ * if shared memory is available and a DRM device (/dev/dri/card0 or card1) exists.
+ * Sets the `mode` variable based on successful initialization.
+ */
 static void
 _vsync_init(void)
 {
@@ -939,6 +1177,22 @@ _vsync_init(void)
    done = 1;
 }
 
+/**
+ * @brief Sets the animator tick source to use DRM-based vsync for a given X window.
+ *
+ * This function determines if DRM-based vsync should be enabled. It checks:
+ * - Environment variables (ECORE_VSYNC_THREAD, ECORE_VSYNC_NO_THREAD, ECORE_NO_VSYNC).
+ * - Veto files (~/.ecore-no-vsync, /etc/.ecore-no-vsync).
+ * If not vetoed, it gets the root window for the given `win`. If this root
+ * is different from the currently active `vsync_root`, it calls `_vsync_init`
+ * (if not already done) and then `_drm_animator_tick_source_set` to
+ * configure Ecore's animator to use DRM vsync.
+ *
+ * @param win The Ecore_X_Window for which vsync is being configured.
+ *            The root window of this window will be used.
+ * @return EINA_TRUE if the tick source was successfully set or vsync is active,
+ *         EINA_FALSE if vsync is vetoed or initialization fails.
+ */
 static Eina_Bool
 _drm_ecore_x_vsync_animator_tick_source_set(Ecore_X_Window win)
 {
@@ -987,6 +1241,18 @@ static Ecore_Event_Handler *_ecore_x_vsync_complete_handler = NULL;
 static double last_t = 0.0;
 #endif
 
+/**
+ * @brief Timer callback to introduce a delay before ticking the animator.
+ *
+ * This function is used when `_ecore_x_vsync_animator_tick_delay` is positive.
+ * After a Present Complete event, instead of ticking immediately, a timer
+ * is started. This callback, when fired, calls `ecore_animator_custom_tick()`.
+ * This helps in offsetting the animator tick from the actual vblank,
+ * potentially for smoother animations or to align with compositor schedules.
+ *
+ * @param data User data (unused).
+ * @return EINA_FALSE as the timer is one-shot.
+ */
 static Eina_Bool
 _ecore_x_cb_vsync_delay(void *data EINA_UNUSED)
 {
@@ -1005,6 +1271,13 @@ _ecore_x_cb_vsync_delay(void *data EINA_UNUSED)
   return EINA_FALSE;
 }
 
+/**
+ * @brief Requests a Present extension NotifyMSC event.
+ *
+ * This function increments the Media Stream Counter (MSC) and sends a request
+ * to the X server (via the Present extension) to be notified when the display
+ * pipeline reaches this MSC. This is the core mechanism for Present-based vsync.
+ */
 static void
 _ecore_x_vsync_req(void)
 {
@@ -1012,6 +1285,21 @@ _ecore_x_vsync_req(void)
   ecore_x_present_notify_msc(_ecore_x_vsync_win, 0, _ecore_x_vsync_msc, 1, 0);
 }
 
+/**
+ * @brief Event handler for X Present Complete events.
+ *
+ * This function is called when the X server sends a Present Complete event,
+ * indicating that a previously requested frame (identified by MSC) has been
+ * displayed (or its vblank time has passed).
+ * It updates timing information, potentially triggers a delayed animator tick
+ * (if `_ecore_x_vsync_animator_tick_delay` is set), or ticks the animator
+ * immediately. It then re-requests another vsync notification if ticking is active.
+ *
+ * @param data User data (unused).
+ * @param type The type of the event (unused, expected to be ECORE_X_EVENT_PRESENT_COMPLETE).
+ * @param info The event structure, cast to Ecore_X_Event_Present_Complete.
+ * @return EINA_TRUE to continue handling events.
+ */
 static Eina_Bool
 _ecore_x_cb_pres_complete(void *data EINA_UNUSED, int type EINA_UNUSED, void *info EINA_UNUSED)
 {
@@ -1052,6 +1340,14 @@ _ecore_x_cb_pres_complete(void *data EINA_UNUSED, int type EINA_UNUSED, void *in
   return EINA_TRUE;
 }
 
+/**
+ * @brief Callback function invoked when the custom animator source (Present-based) begins ticking.
+ *
+ * Sets the `_ecore_x_vsync_ticking` flag to true, resets previous timing info,
+ * and makes the first request for a vsync notification using `_ecore_x_vsync_req()`.
+ *
+ * @param data User data (unused).
+ */
 static void
 _ecore_x_vsync_present_tick_begin(void *data EINA_UNUSED)
 {
@@ -1063,6 +1359,14 @@ _ecore_x_vsync_present_tick_begin(void *data EINA_UNUSED)
     }
 }
 
+/**
+ * @brief Callback function invoked when the custom animator source (Present-based) stops ticking.
+ *
+ * Sets the `_ecore_x_vsync_ticking` flag to false, which will prevent further
+ * vsync requests in `_ecore_x_cb_pres_complete`.
+ *
+ * @param data User data (unused).
+ */
 static void
 _ecore_x_vsync_present_tick_end(void *data EINA_UNUSED)
 {
@@ -1072,6 +1376,20 @@ _ecore_x_vsync_present_tick_end(void *data EINA_UNUSED)
     }
 }
 
+/**
+ * @brief Initializes or deinitializes the X Present extension based vsync mechanism.
+ *
+ * If `_ecore_x_vsync_win` is set (a valid window is targeted for vsync):
+ *  - Sets up Ecore animator custom source tick callbacks for Present.
+ *  - Selects Present Complete Notify events for the window.
+ *  - Adds an event handler for ECORE_X_EVENT_PRESENT_COMPLETE if not already present.
+ * If `_ecore_x_vsync_win` is 0 (vsync is being disabled or no target window):
+ *  - Stops any ongoing Present ticking.
+ *  - Resets Ecore animator custom source callbacks.
+ *  - Reverts animator source to the default timer.
+ *  - (Implicitly, the event handler for Present Complete remains, but won't be triggered
+ *    if no events are selected or no window is targeted).
+ */
 static void
 _ecore_x_vsync_init(void)
 {
@@ -1098,6 +1416,24 @@ _ecore_x_vsync_init(void)
     }
 }
 
+/**
+ * @brief Sets the animator tick source for Ecore X, choosing between Present extension or DRM.
+ *
+ * This is the main public API function to enable vsync for an Ecore X window.
+ * It first checks if the X Present extension is available and if the
+ * ECORE_X_VSYNC_PRESENT environment variable is set. If both are true,
+ * it attempts to use Present extension-based vsync by calling `_ecore_x_vsync_init()`.
+ * Otherwise, it falls back to trying DRM-based vsync via
+ * `_drm_ecore_x_vsync_animator_tick_source_set()`.
+ *
+ * The `win` parameter is used to determine the root window, ensuring vsync is
+ * tied to a specific display/screen.
+ *
+ * @param win The Ecore_X_Window for which to enable vsync.
+ * @return EINA_TRUE if a vsync mechanism was successfully configured or is already active
+ *         for the window's root, EINA_FALSE otherwise (e.g., neither Present nor DRM
+ *         could be initialized, or vsync is vetoed).
+ */
 EAPI Eina_Bool
 ecore_x_vsync_animator_tick_source_set(Ecore_X_Window win)
 {
@@ -1114,6 +1450,19 @@ ecore_x_vsync_animator_tick_source_set(Ecore_X_Window win)
   else return _drm_ecore_x_vsync_animator_tick_source_set(win);
 }
 
+/**
+ * @brief Sets a delay for animator ticks relative to the vsync event.
+ *
+ * This allows animator ticks to be offset from the actual vblank time.
+ * The delay is a fraction of the detected frame time. For example, a delay
+ * of 0.5 would attempt to tick halfway between vblanks.
+ * This is used by both DRM and Present vsync mechanisms if they support it.
+ *
+ * @param delay The delay factor, typically between 0.0 (no delay) and 1.0.
+ *              A value of 0.0 means the tick will happen as close as possible
+ *              to the vsync event. A value of 0.5 means it will be delayed
+ *              by half the frame duration.
+ */
 EAPI void
 ecore_x_vsync_animator_tick_delay_set(double delay)
 {

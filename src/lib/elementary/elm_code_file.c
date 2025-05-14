@@ -6,6 +6,18 @@
 
 #include "elm_code_private.h"
 
+/**
+ * @internal
+ * @brief Creates a new, blank Elm_Code_Line.
+ *
+ * This function allocates and initializes a new Elm_Code_Line structure.
+ * The line is initially empty and associated with the given file and line number.
+ *
+ * @param file The Elm_Code_File this line will belong to.
+ * @param line The line number for this new line.
+ * @param data User-specific data to associate with this line.
+ * @return A pointer to the newly created Elm_Code_Line, or NULL on failure.
+ */
 static Elm_Code_Line *_elm_code_file_line_blank_create(Elm_Code_File *file, int line, void *data)
 {
    Elm_Code_Line *ecl;
@@ -21,6 +33,17 @@ static Elm_Code_Line *_elm_code_file_line_blank_create(Elm_Code_File *file, int 
    return ecl;
 }
 
+/**
+ * @internal
+ * @brief Determines the line ending type from a character.
+ *
+ * This function inspects the first character of the provided string
+ * to determine if it represents a Windows ('\r') or Unix ('\n', or other) line ending.
+ *
+ * @param ending A pointer to the character(s) representing the line ending.
+ *                Only the first character is currently inspected.
+ * @return The detected Elm_Code_File_Line_Ending type.
+ */
 static Elm_Code_File_Line_Ending _elm_code_line_ending_get(const char *ending)
 {
    switch (*ending)
@@ -32,6 +55,22 @@ static Elm_Code_File_Line_Ending _elm_code_line_ending_get(const char *ending)
      }
 }
 
+/**
+ * @internal
+ * @brief Inserts a line of text into the file structure.
+ *
+ * This function creates a new line and inserts it into the file's list of lines
+ * at the specified row. The content can be either a reference to mapped memory
+ * or a new string that will be copied.
+ *
+ * @param file The Elm_Code_File to insert the line into.
+ * @param content The character buffer containing the line's text.
+ * @param length The length of the line's text.
+ * @param row The row number (1-based) at which to insert the line.
+ * @param mapped EINA_TRUE if content points to mmaped memory (no copy),
+ *               EINA_FALSE to copy content.
+ * @param data User-specific data to associate with the new line.
+ */
 static void _elm_code_file_line_insert_data(Elm_Code_File *file, const char *content, unsigned int length,
                                             unsigned int row, Eina_Bool mapped, void *data)
 {
@@ -86,6 +125,17 @@ EAPI const char *elm_code_file_path_get(Elm_Code_File *file)
    return eina_file_filename_get(file->file);
 }
 
+/**
+ * @internal
+ * @brief Generates a temporary file path based on the original file path.
+ *
+ * This function creates a temporary filename by prepending a "." and appending ".tmp"
+ * to the original filename. For example, "/path/to/file.txt" becomes "/path/to/.file.txt.tmp".
+ * The caller is responsible for freeing the returned string.
+ *
+ * @param file The Elm_Code_File for which to generate a temporary path.
+ * @return A newly allocated string containing the temporary path, or NULL on failure.
+ */
 EAPI char *_elm_code_file_tmp_path_get(Elm_Code_File *file)
 {
    const char *name, *path;

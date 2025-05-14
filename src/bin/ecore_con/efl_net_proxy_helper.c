@@ -12,6 +12,13 @@
 
 #include "Eina.h"
 
+/**
+ * @file
+ * @brief This file implements a helper process for EFL applications to query
+ *        proxy settings using libproxy. It communicates with the main
+ *        application via stdin/stdout.
+ */
+
 #ifdef ERR
 # undef ERR
 #endif
@@ -37,22 +44,37 @@
 #endif
 #define CRI(...) EINA_LOG_DOM_CRIT(EINA_LOG_DOMAIN_GLOBAL, __VA_ARGS__)
 
-typedef struct pxProxyFactory_  pxProxyFactory;
+typedef struct pxProxyFactory_  pxProxyFactory; /**< Opaque type for libproxy's proxy factory. */
+
+/**
+ * @brief Structure to hold libproxy related data and function pointers.
+ */
 typedef struct _Libproxy
 {
-   pxProxyFactory    *factory;
-   char           **(*px_proxy_factory_get_proxies) (pxProxyFactory *factory, const char *url);
-   void            *(*px_proxy_factory_new)         (void);
-   void             (*px_proxy_factory_free)        (pxProxyFactory *);
-   Eina_Module       *mod;
+   pxProxyFactory    *factory; /**< Pointer to the libproxy factory instance. */
+   char           **(*px_proxy_factory_get_proxies) (pxProxyFactory *factory, const char *url); /**< Function pointer to get proxies for a URL. */
+   void            *(*px_proxy_factory_new)         (void); /**< Function pointer to create a new proxy factory. */
+   void             (*px_proxy_factory_free)        (pxProxyFactory *); /**< Function pointer to free a proxy factory. */
+   Eina_Module       *mod; /**< Eina_Module handle for the loaded libproxy library. */
 } Libproxy;
-static Libproxy _libproxy = { 0 };
 
-static Eina_Spinlock pending_lock;
-static int pending = 0;
-static int opcount = 0;
-static Eina_List *join_list = NULL;
+static Libproxy _libproxy = { 0 }; /**< Global instance of the Libproxy structure. */
 
+static Eina_Spinlock pending_lock; /**< Spinlock to protect access to pending and opcount. */
+static int pending = 0; /**< Counter for the number of currently active proxy lookup threads. */
+static int opcount = 0; /**< Counter for the total number of proxy lookup operations initiated. */
+static Eina_List *join_list = NULL; /**< List of threads that have finished their work and are waiting to be joined. */
+
+/**
+ * @brief Initializes libproxy by loading the library and its symbols.
+ *
+ * This function attempts to load the libproxy shared library (e.g., libproxy.so.1)
+ * and resolve necessary function symbols (px_proxy_factory_new,
+ * px_proxy_factory_free, px_proxy_factory_get_proxies).
+ * If successful, it creates a new proxy factory.
+ *
+ * @return @c EINA_TRUE on successful initialization, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 init(void)
 {
@@ -107,6 +129,12 @@ init(void)
    return !!_libproxy.factory;
 }
 
+/**
+ * @brief Shuts down libproxy by freeing the factory and unloading the module.
+ *
+ * This function frees the libproxy factory if it exists and then unloads
+ * the libproxy shared library module.
+ */
 static void
 shutdown(void)
 {
@@ -122,6 +150,27 @@ shutdown(void)
      }
 }
 
+/**
+ * @brief Thread function to perform a proxy lookup for a given URL.
+ *
+ * This function is executed in a separate thread. It parses the command,
+ * calls libproxy to get the proxies for the URL, and prints the results
+ * to stdout.
+ * The format of the output for each proxy is "P <id> P <proxy_string>\n".
+ * After all proxies are printed, it prints "P <id> E\n" to signify the end.
+ *
+ * Example `cmd` (data): "P 1234 http://example.com"
+ * Example output:
+ * P 1234 P direct://
+ * P 1234 P http://proxy.example.com:8080
+ * P 1234 E
+ *
+ * @param data A string containing the command. The format is "P <id> <URL>".
+ *             The function takes ownership of this string and frees it.
+ * @param t The Eina_Thread handle of the current thread. Used for potential
+ *          re-queuing if the thread pool is busy.
+ * @return NULL.
+ */
 static void *
 proxy_lookup(void *data, Eina_Thread t)
 {
@@ -180,6 +229,16 @@ proxy_lookup(void *data, Eina_Thread t)
    return NULL;
 }
 
+/**
+ * @brief Handles a command received from stdin.
+ *
+ * Currently, it only supports the 'P' command for proxy lookup.
+ * "P <id> <URL>" - Initiates a proxy lookup for the given URL with a specific ID.
+ * The lookup is performed in a new background thread.
+ *
+ * @param cmd The command string received from stdin.
+ *            Example: "P 1234 http://www.example.com"
+ */
 static void
 handle(const char *cmd)
 {
@@ -208,6 +267,14 @@ handle(const char *cmd)
      }
 }
 
+/**
+ * @brief Joins completed threads.
+ *
+ * This function iterates through the `join_list` (populated by
+ * `proxy_lookup` when threads finish) and joins each thread.
+ * This is necessary to clean up thread resources.
+ * It is called after handling each command in the main loop.
+ */
 static void
 clean_threads(void)
 {
@@ -224,6 +291,33 @@ clean_threads(void)
    eina_spinlock_release(&pending_lock);
 }
 
+/**
+ * @brief Main function of the efl_net_proxy_helper.
+ *
+ * Initializes Eina and libproxy. Then enters a loop, reading commands
+ * from stdin, one per line. Each command is processed by `handle()`.
+ * After processing each command, `clean_threads()` is called to join
+ * any completed worker threads.
+ * If libproxy initialization fails, it prints "F\n" to stdout and enters
+ * an infinite sleep loop.
+ *
+ * Input commands from stdin:
+ *   - "P <id> <URL>": Request proxy information for the given URL.
+ *     Example: "P 1 http://example.com"
+ *
+ * Output to stdout:
+ *   - "P <id> P <proxy_info>": A proxy found for the request.
+ *     Example: "P 1 P direct://"
+ *              "P 1 P socks5://localhost:1080"
+ *   - "P <id> E": End of proxy information for the request.
+ *     Example: "P 1 E"
+ *   - "F\n": Sent if libproxy initialization fails.
+ *
+ * @param argc Argument count (unused).
+ * @param argv Argument vector (unused).
+ * @return 0 on successful completion, though it typically runs indefinitely
+ *         or exits via `exit(0)` in `proxy_lookup` under certain conditions.
+ */
 int
 main(int argc EINA_UNUSED, char **argv EINA_UNUSED)
 {

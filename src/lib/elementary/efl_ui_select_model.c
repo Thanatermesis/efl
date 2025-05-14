@@ -14,18 +14,32 @@
 
 typedef struct _Efl_Ui_Select_Model_Data Efl_Ui_Select_Model_Data;
 
+/**
+ * @brief Private data structure for Efl_Ui_Select_Model.
+ *
+ * This structure holds the internal state of a select model instance,
+ * including its parent, pending selection events, fallback model,
+ * last selected model, and current selection mode.
+ */
 struct _Efl_Ui_Select_Model_Data
 {
-   Efl_Ui_Select_Model_Data *parent;
+   Efl_Ui_Select_Model_Data *parent; /**< Pointer to the parent model's private data, if any. */
 
-   Eina_Future *pending_selection_event;
+   Eina_Future *pending_selection_event; /**< Future for a pending selection changed event. */
 
-   Efl_Ui_Select_Model *fallback_model;
-   Efl_Ui_Select_Model *last_model;
+   Efl_Ui_Select_Model *fallback_model; /**< The model to select if the current selection is removed (in single selection mode). */
+   Efl_Ui_Select_Model *last_model; /**< The last model that was selected. */
 
-   Efl_Ui_Select_Mode selection;
+   Efl_Ui_Select_Mode selection; /**< The current selection mode (none, single, multi). */
 };
 
+/**
+ * @brief Updates the last selected model and notifies property changes.
+ *
+ * @param obj The Efl_Ui_Select_Model object.
+ * @param pd The private data of the Efl_Ui_Select_Model.
+ * @param last_model The new last selected model. Can be NULL.
+ */
 static void
 _efl_ui_select_model_apply_last_model(Eo *obj, Efl_Ui_Select_Model_Data *pd, Eo *last_model)
 {
@@ -33,6 +47,15 @@ _efl_ui_select_model_apply_last_model(Eo *obj, Efl_Ui_Select_Model_Data *pd, Eo 
    efl_model_properties_changed(obj, "child.selected");
 }
 
+/**
+ * @brief Callback for when a child model is removed.
+ *
+ * If the removed child was the last selected model, this function
+ * clears the last selected model.
+ *
+ * @param data The private data of the Efl_Ui_Select_Model.
+ * @param event The Efl_Event containing information about the removed child.
+ */
 static void
 _efl_ui_select_model_child_removed(void *data, const Efl_Event *event)
 {
@@ -72,6 +95,16 @@ _efl_ui_select_model_efl_object_invalidate(Eo *obj,
    efl_invalidate(efl_super(obj, EFL_UI_SELECT_MODEL_CLASS));
 }
 
+/**
+ * @brief Applies the fallback selection if necessary.
+ *
+ * This function is called when an item is unselected, and it checks if
+ * a fallback model should be selected. This typically happens in single
+ * selection mode when the currently selected item is unselected and a
+ * fallback has been specified.
+ *
+ * @param pd The private data of the parent Efl_Ui_Select_Model.
+ */
 static void
 _efl_ui_select_model_fallback(Efl_Ui_Select_Model_Data *pd)
 {
@@ -88,6 +121,18 @@ _efl_ui_select_model_fallback(Efl_Ui_Select_Model_Data *pd)
    eina_value_flush(&selected);
 }
 
+/**
+ * @brief Callback for the selection notification future.
+ *
+ * This function is executed when the future associated with a selection
+ * change resolves. It triggers the EFL_UI_SELECTABLE_EVENT_SELECTION_CHANGED event
+ * and clears the pending selection event future.
+ *
+ * @param o The Efl_Ui_Select_Model object.
+ * @param data User data (unused).
+ * @param v The value from the resolved future.
+ * @return The original Eina_Value v.
+ */
 static Eina_Value
 _select_notification_cb(Eo *o, void *data EINA_UNUSED, const Eina_Value v)
 {
@@ -100,6 +145,16 @@ _select_notification_cb(Eo *o, void *data EINA_UNUSED, const Eina_Value v)
    return v;
 }
 
+/**
+ * @brief Schedules a selection changed notification.
+ *
+ * If there isn't already a pending notification, this function schedules
+ * a job to emit the EFL_UI_SELECTABLE_EVENT_SELECTION_CHANGED event.
+ * This is used to coalesce multiple selection changes into a single event.
+ *
+ * @param parent The parent Efl_Ui_Select_Model object that will emit the event.
+ * @param pd The private data of the parent Efl_Ui_Select_Model.
+ */
 static void
 _efl_ui_select_model_selection_notification(Eo *parent, Efl_Ui_Select_Model_Data *pd)
 {
@@ -111,6 +166,21 @@ _efl_ui_select_model_selection_notification(Eo *parent, Efl_Ui_Select_Model_Data
                                                  .success = _select_notification_cb);
 }
 
+/**
+ * @brief Commits a selection change on a child model.
+ *
+ * This function is called after a child's "selected" property has been
+ * successfully set. It updates the parent's last_model, emits selection
+ * events (SELECTED or UNSELECTED) for the child, and triggers a general
+ * selection notification on the parent. It also handles fallback selection
+ * if an item is unselected.
+ *
+ * @param child The child Efl_Ui_Select_Model object whose selection changed.
+ * @param data User data (unused).
+ * @param v The Eina_Value representing the result of the property set operation.
+ *          Expected to be a boolean indicating the new selection state.
+ * @return The original Eina_Value v, or an error value if issues occur.
+ */
 static Eina_Value
 _commit_change(Eo *child, void *data EINA_UNUSED, const Eina_Value v)
 {
@@ -156,6 +226,13 @@ _commit_change(Eo *child, void *data EINA_UNUSED, const Eina_Value v)
    return v;
 }
 
+/**
+ * @brief Frees a child object, typically used as a future cleanup callback.
+ *
+ * @param child The child Eo object to unreference.
+ * @param data User data (unused).
+ * @param dead_future The future that has completed (unused).
+ */
 static void
 _clear_child(Eo *child,
              void *data EINA_UNUSED,
@@ -164,6 +241,15 @@ _clear_child(Eo *child,
    efl_unref(child);
 }
 
+/**
+ * @brief Retrieves a child model from an Eina_Value array at a specific index.
+ *
+ * @param array Pointer to an Eina_Value of type EINA_VALUE_TYPE_ARRAY.
+ *              Example: Eina_Value containing [child1_ptr, child2_ptr, ...].
+ * @param idx The index of the child model to retrieve.
+ * @return The Efl_Model at the specified index, or NULL if the index is
+ *         out of bounds or the value is not an array.
+ */
 static Efl_Model *
 _select_child_get(const Eina_Value *array, unsigned int idx)
 {
@@ -180,6 +266,18 @@ _select_child_get(const Eina_Value *array, unsigned int idx)
    return ret;
 }
 
+/**
+ * @brief Checks if a child's selection state needs to change and initiates the change.
+ *
+ * If the child's current selection state is different from the desired `value`,
+ * this function sets the "selected" property on the child. The actual commit
+ * of the change is handled by the `_commit_change` callback.
+ *
+ * @param child The child Efl_Model to potentially change.
+ * @param value The desired selection state (EINA_TRUE for selected, EINA_FALSE for unselected).
+ * @return A future that resolves with the new selection state (as a boolean Eina_Value)
+ *         after the change is committed, or a resolved future if no change was needed.
+ */
 static Eina_Future *
 _check_child_change(Efl_Model *child, Eina_Bool value)
 {
@@ -206,18 +304,46 @@ _check_child_change(Efl_Model *child, Eina_Bool value)
    return r;
 }
 
+/**
+ * @brief Initiates the selection of a child model.
+ *
+ * @param child The Efl_Model to select.
+ * @return A future that resolves after the selection is committed.
+ * @see _check_child_change
+ */
 static Eina_Future *
 _select_child(Efl_Model *child)
 {
    return _check_child_change(child, EINA_TRUE);
 }
 
+/**
+ * @brief Initiates the unselection of a child model.
+ *
+ * @param child The Efl_Model to unselect.
+ * @return A future that resolves after the unselection is committed.
+ * @see _check_child_change
+ */
 static Eina_Future *
 _unselect_child(Efl_Model *child)
 {
    return _check_child_change(child, EINA_FALSE);
 }
 
+/**
+ * @brief Callback executed after a child slice is retrieved for selection.
+ *
+ * This function takes the first child from the retrieved slice (expected to be
+ * an array containing one child) and initiates its selection.
+ *
+ * @param obj The Efl_Ui_Select_Model object (unused).
+ * @param data User data (unused).
+ * @param v An Eina_Value of type EINA_VALUE_TYPE_ARRAY, expected to contain
+ *          the child model to be selected at index 0.
+ *          Example: Eina_Value containing [child_to_select_ptr].
+ * @return An Eina_Value wrapping the future from `_select_child`, or the
+ *         original Eina_Value `v` if an error occurs (e.g., child not found).
+ */
 static Eina_Value
 _select_slice_then(Eo *obj EINA_UNUSED,
                    void *data EINA_UNUSED,
@@ -236,6 +362,20 @@ _select_slice_then(Eo *obj EINA_UNUSED,
    return v;
 }
 
+/**
+ * @brief Callback executed after a child slice is retrieved for unselection.
+ *
+ * This function takes the first child from the retrieved slice (expected to be
+ * an array containing one child) and initiates its unselection.
+ *
+ * @param obj The Efl_Ui_Select_Model object (unused).
+ * @param data User data (unused).
+ * @param v An Eina_Value of type EINA_VALUE_TYPE_ARRAY, expected to contain
+ *          the child model to be unselected at index 0.
+ *          Example: Eina_Value containing [child_to_unselect_ptr].
+ * @return An Eina_Value wrapping the future from `_unselect_child`, or the
+ *         original Eina_Value `v` if an error occurs (e.g., child not found).
+ */
 static Eina_Value
 _unselect_slice_then(Eo *obj EINA_UNUSED,
                      void *data EINA_UNUSED,
@@ -254,6 +394,18 @@ _unselect_slice_then(Eo *obj EINA_UNUSED,
    return v;
 }
 
+/**
+ * @brief Regenerates an Eina_Error value, typically used in a future chain.
+ *
+ * This function is used to propagate an error that was stored earlier.
+ * If the input value `v` is already an error, it's returned directly.
+ * Otherwise, a new error value is created from the `error` data.
+ *
+ * @param data Pointer to an Eina_Error that was previously stored. This memory is freed by the function.
+ * @param v The current Eina_Value in the future chain.
+ * @param dead_future The future that has completed (unused).
+ * @return An Eina_Value containing an error.
+ */
 static Eina_Value
 _regenerate_error(void *data,
                   const Eina_Value v,
@@ -273,6 +425,20 @@ _regenerate_error(void *data,
    return r;
 }
 
+/**
+ * @brief Extracts the first element from an Eina_Value array.
+ *
+ * This is used in scenarios where a future chain (like `eina_future_all`)
+ * returns an array of results, but only the first result (typically from
+ * the primary operation, not a side effect like unselecting a previous item)
+ * is needed.
+ *
+ * @param data User data (unused).
+ * @param v An Eina_Value of type EINA_VALUE_TYPE_ARRAY.
+ *          Example: Eina_Value containing [result_of_commit_ptr, result_of_unselect_ptr].
+ * @return The first Eina_Value from the input array. If `v` is not an array
+ *         or is empty, an empty Eina_Value is returned.
+ */
 static Eina_Value
 _untangle_array(void *data EINA_UNUSED,
                 const Eina_Value v)
@@ -284,6 +450,19 @@ _untangle_array(void *data EINA_UNUSED,
    return va;
 }
 
+/**
+ * @brief Handles errors during complex selection operations, potentially rolling back changes.
+ *
+ * In single selection mode, if selecting a new item fails after the old item
+ * has been told to unselect, this function attempts to roll back the state by
+ * re-selecting the "selected" property of the `child` to EINA_FALSE (as the
+ * operation to make it TRUE failed). It then re-propagates the original error.
+ *
+ * @param data The Efl_Model object (`child`) that was intended to be selected.
+ * @param err The Eina_Error that occurred.
+ * @return An Eina_Value wrapping a future that will resolve after the rollback
+ *         attempt and error propagation.
+ */
 static Eina_Value
 _untangle_error(void *data, Eina_Error err)
 {
@@ -304,6 +483,12 @@ _untangle_error(void *data, Eina_Error err)
    return eina_future_as_value(f);
 }
 
+/**
+ * @brief Frees data associated with an untangle operation, typically an Eo object.
+ *
+ * @param data The Eo object to unreference.
+ * @param dead_future The future that has completed (unused).
+ */
 static void
 _untangle_free(void *data,
                const Eina_Future *dead_future EINA_UNUSED)

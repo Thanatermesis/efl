@@ -4,6 +4,16 @@
 #include <Efl_Ui.h>
 #include <Elementary.h>
 
+/**
+ * @brief Callback function for when an item is added to the tags widget.
+ *
+ * This function is called when the EFL_UI_TAGS_EVENT_ITEM_ADDED event is
+ * triggered. It adds the new item's string to a persistent Eina_Array.
+ *
+ * @param data An Eina_Array to which the new item's string will be added.
+ * @param ev The Efl_Event structure containing event information. The
+ *        event info (`ev->info`) is the string of the added item.
+ */
 static void
 _item_added_cb(void *data, const Efl_Event *ev)
 {
@@ -14,6 +24,17 @@ _item_added_cb(void *data, const Efl_Event *ev)
    eina_array_push(array, str);
 }
 
+/**
+ * @brief Callback function for when an item is deleted from the tags widget.
+ *
+ * This function is called when the EFL_UI_TAGS_EVENT_ITEM_DELETED event is
+ * triggered. It synchronizes an Eina_Array with the tags widget's current
+ * items by clearing the array and refilling it.
+ *
+ * @param data An Eina_Array which is synchronized with the tags widget's items.
+ * @param ev The Efl_Event structure. The event info (`ev->info`) is the
+ *        string of the deleted item.
+ */
 static void
 _item_deleted_cb(void *data, const Efl_Event *ev)
 {
@@ -34,6 +55,15 @@ _item_deleted_cb(void *data, const Efl_Event *ev)
      }
 }
 
+/**
+ * @brief Callback function for a button click to toggle the tags widget's mode.
+ *
+ * This function toggles the expanded state of the tags widget between
+ * expanded and collapsed.
+ *
+ * @param data The tags widget object (Eo *tags).
+ * @param ev The Efl_Event structure for the click event (unused).
+ */
 static void
 _clicked(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -46,6 +76,29 @@ _clicked(void *data, const Efl_Event *ev EINA_UNUSED)
 }
 
 
+/**
+ * @brief Main test function for the Efl.Ui.Tags widget.
+ *
+ * This function sets up a window containing an Efl.Ui.Tags widget to
+ * demonstrate its functionality. It initializes the widget with a predefined
+ * set of tags and sets up callbacks for adding, deleting, and toggling
+ * the expanded view.
+ *
+ * The Eina_Array `array` is initialized with string pointers. For example:
+ * @code
+ * Eina_Array *array;
+ * array = eina_array_new(10);
+ * eina_array_push(array, "one");
+ * eina_array_push(array, "two");
+ * // ...and so on.
+ * @endcode
+ * This array is then passed to the tags widget and also to the callbacks
+ * to keep track of the items.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_ui_tags(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

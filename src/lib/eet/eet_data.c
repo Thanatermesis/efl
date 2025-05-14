@@ -53,15 +53,51 @@
 
 /*---*/
 
+/**
+ * @brief Describes a single element within an Eet_Data_Descriptor.
+ * This structure defines how a member of a C struct is serialized/deserialized.
+ */
 typedef struct _Eet_Data_Element          Eet_Data_Element;
+/**
+ * @brief Defines codec functions (encoder/decoder) for basic data types.
+ */
 typedef struct _Eet_Data_Basic_Type_Codec Eet_Data_Basic_Type_Codec;
+/**
+ * @brief Defines codec functions (encoder/decoder) for group data types (like arrays, lists).
+ */
 typedef struct _Eet_Data_Group_Type_Codec Eet_Data_Group_Type_Codec;
+/**
+ * @brief Represents a named chunk of data in the Eet stream.
+ * Chunks are the fundamental units of data storage in an Eet file.
+ */
 typedef struct _Eet_Data_Chunk            Eet_Data_Chunk;
+/**
+ * @brief A dynamic buffer used for constructing Eet data streams during encoding.
+ */
 typedef struct _Eet_Data_Stream           Eet_Data_Stream;
+/**
+ * @brief Internal structure for hashing Eet_Data_Element within an Eet_Data_Descriptor.
+ * Used for quick lookups of elements by name.
+ */
 typedef struct _Eet_Data_Descriptor_Hash  Eet_Data_Descriptor_Hash;
+/**
+ * @brief Helper structure to pass information during hash encoding.
+ */
 typedef struct _Eet_Data_Encode_Hash_Info Eet_Data_Encode_Hash_Info;
+/**
+ * @brief Structure to manage a list of allocated memory blocks that need to be freed.
+ * Used during decoding to track allocations.
+ */
 typedef struct _Eet_Free                  Eet_Free;
+/**
+ * @brief Contextual structure holding multiple Eet_Free lists for different allocation types.
+ * This helps in organized memory cleanup after decoding.
+ */
 typedef struct _Eet_Free_Context          Eet_Free_Context;
+/**
+ * @brief Structure to hold data for an unknown variant type encountered during decoding.
+ * This allows preserving data that cannot be mapped to a known type.
+ */
 typedef struct _Eet_Variant_Unknow        Eet_Variant_Unknow;
 
 /*---*/
@@ -70,19 +106,56 @@ typedef struct _Eet_Variant_Unknow        Eet_Variant_Unknow;
  * Eet_Data_Basic_Type_Codec (Coder, Decoder)
  * Eet_Data_Group_Type_Codec (Coder, Decoder)
  */
+/**
+ * @struct _Eet_Data_Basic_Type_Codec
+ * @brief Defines codec functions for basic data types.
+ */
 struct _Eet_Data_Basic_Type_Codec
 {
-   int         size;
-   const char *name;
+   int         size; /**< Size of the basic type in bytes (e.g., sizeof(int)). */
+   const char *name; /**< String representation of the type name (e.g., "int"). */
+   /**
+    * @brief Decoder function for this basic type.
+    * @param ed The Eet dictionary (optional, used for string interning).
+    * @param src Pointer to the source buffer containing encoded data.
+    * @param src_end Pointer to the end of the source buffer.
+    * @param dest Pointer to the destination memory where decoded data will be written.
+    * @return The number of bytes read from src, or -1 on error.
+    */
    int         (*get)(const Eet_Dictionary *ed,
                       const void           *src,
                       const void           *src_end,
                       void                 *dest);
+   /**
+    * @brief Encoder function for this basic type.
+    * @param ed The Eet dictionary (optional, used for string interning).
+    * @param src Pointer to the source data to be encoded.
+    * @param[out] size_ret Pointer to store the size of the encoded data.
+    * @return A pointer to the malloced encoded data, or NULL on error. Caller must free.
+    */
    void      * (*put)(Eet_Dictionary *ed, const void *src, int *size_ret);
 };
 
+/**
+ * @struct _Eet_Data_Group_Type_Codec
+ * @brief Defines codec functions for group data types (array, list, hash, etc.).
+ */
 struct _Eet_Data_Group_Type_Codec
 {
+   /**
+    * @brief Decoder function for this group type.
+    * @param context The memory free context for tracking allocations.
+    * @param ed The Eet dictionary.
+    * @param edd The data descriptor for the structure containing this group.
+    * @param ede The data element descriptor for this specific group field.
+    * @param echnk The current data chunk being processed.
+    * @param type The basic type of elements within the group (if applicable).
+    * @param group_type The specific group type (EET_G_ARRAY, EET_G_LIST, etc.).
+    * @param data_in Pointer to the target memory location in the C struct being populated.
+    * @param p Pointer to the current position in the Eet data stream. Will be updated.
+    * @param size Remaining size of the Eet data stream. Will be updated.
+    * @return 1 on success, 0 or -1 on error.
+    */
    int  (*get)(Eet_Free_Context *context,
                const             Eet_Dictionary *ed,
                Eet_Data_Descriptor *edd,
@@ -93,6 +166,14 @@ struct _Eet_Data_Group_Type_Codec
                void             *data_in,
                char            **p,
                int              *size);
+   /**
+    * @brief Encoder function for this group type.
+    * @param ed The Eet dictionary.
+    * @param edd The data descriptor for the structure containing this group.
+    * @param ede The data element descriptor for this specific group field.
+    * @param ds The Eet data stream to write encoded data to.
+    * @param data_in Pointer to the C struct member (the group) to be encoded.
+    */
    void (*put)(Eet_Dictionary *ed,
                Eet_Data_Descriptor *edd,
                Eet_Data_Element *ede,
@@ -100,267 +181,638 @@ struct _Eet_Data_Group_Type_Codec
                void           *data_in);
 };
 
+/**
+ * @struct _Eet_Data_Chunk
+ * @brief Represents a named chunk of data in the Eet stream.
+ */
 struct _Eet_Data_Chunk
 {
-   const char   *name;
-   int           len;
-   int           size;
-   int           hash;
-   void         *data;
-   unsigned char type;
-   unsigned char group_type;
+   const char   *name; /**< Name of the data chunk. */
+   int           len; /**< Length of the name string (including null terminator if not from dictionary). */
+   int           size; /**< Size of the data payload. */
+   int           hash; /**< Pre-calculated hash of the name (used if dictionary is present). */
+   void         *data; /**< Pointer to the data payload within the Eet stream. */
+   unsigned char type; /**< Basic type of the data in the chunk (EET_T_XXX), or EET_T_UNKNOW if group_type is set. */
+   unsigned char group_type; /**< Group type of the data in the chunk (EET_G_XXX), or EET_G_UNKNOWN if type is set. */
 };
 
+/**
+ * @struct _Eet_Data_Stream
+ * @brief A dynamic buffer used for constructing Eet data streams during encoding.
+ */
 struct _Eet_Data_Stream
 {
-   void *data;
-   int   size;
-   int   pos;
+   void *data; /**< Pointer to the allocated buffer for the stream. */
+   int   size; /**< Currently allocated size of the buffer. */
+   int   pos;  /**< Current writing position (offset) in the buffer. */
 };
 
+/**
+ * @struct _Eet_Data_Descriptor_Hash
+ * @brief A node in a hash table bucket list, used for resolving collisions
+ *        when looking up elements in an Eet_Data_Descriptor by name.
+ */
 struct _Eet_Data_Descriptor_Hash
 {
-   Eet_Data_Element         *element;
-   Eet_Data_Descriptor_Hash *next;
+   Eet_Data_Element         *element; /**< Pointer to the Eet_Data_Element. */
+   Eet_Data_Descriptor_Hash *next;   /**< Pointer to the next entry in the same bucket (for collision handling). */
 };
 
+/**
+ * @struct _Eet_Data_Descriptor
+ * @brief Describes the layout of a C structure for serialization/deserialization.
+ * This is the central piece for defining how data is mapped between memory and Eet format.
+ */
 struct _Eet_Data_Descriptor
 {
-   const char           *name;
-   const Eet_Dictionary *ed;
-   int                   size;
+   const char           *name; /**< Name of the described structure (e.g., "My_Struct_Type"). */
+   const Eet_Dictionary *ed;   /**< Associated Eet dictionary, used for optimizing string storage. Can be NULL. */
+   int                   size; /**< Size of the C structure in bytes (e.g., sizeof(My_Struct_Type)). */
+
+   /**
+    * @brief Callbacks for various operations needed during encoding/decoding.
+    * These allow customization of memory management, list/hash handling, etc.
+    */
    struct
    {
-      void      * (*mem_alloc)(size_t size);
-      void        (*mem_free)(void *mem);
-      char      * (*str_alloc)(const char *str);
-      char      * (*str_direct_alloc)(const char *str);
-      void        (*str_free)(const char *str);
-      void        (*str_direct_free)(const char *str);
-      void      * (*list_next)(void *l);
-      void      * (*list_append)(void *l, void *d);
-      void      * (*list_data)(void *l);
-      void      * (*list_free)(void *l);
+      void      * (*mem_alloc)(size_t size); /**< Allocates general memory. Default: calloc. */
+      void        (*mem_free)(void *mem);    /**< Frees general memory. Default: free. */
+      char      * (*str_alloc)(const char *str); /**< Allocates memory for a string and copies it. Default: strdup or eina_stringshare_add. */
+      char      * (*str_direct_alloc)(const char *str); /**< "Allocates" a string without copying (e.g., if string is already in dictionary). Default: returns str. */
+      void        (*str_free)(const char *str); /**< Frees a string allocated by str_alloc. Default: free or eina_stringshare_del. */
+      void        (*str_direct_free)(const char *str); /**< Frees a string "allocated" by str_direct_alloc (often a no-op). */
+      void      * (*list_next)(void *l); /**< Gets the next element in a linked list. Example: eina_list_next. */
+      void      * (*list_append)(void *l, void *d); /**< Appends data to a linked list. Example: eina_list_append. */
+      void      * (*list_data)(void *l); /**< Gets the data from a list node. Example: eina_list_data_get. */
+      void      * (*list_free)(void *l); /**< Frees a linked list. Example: eina_list_free. */
+      /**
+       * @brief Iterates over a hash table.
+       * @param h The hash table.
+       * @param func The callback function to execute for each key-value pair.
+       * @param fdt User data to pass to the callback function.
+       */
       void        (*hash_foreach)(void *h,
                                   int (*func)(void *h,
 					      const char *k,
 					      void       *dt,
 					      void       *fdt),
                                   void *fdt);
-      void      * (*hash_add)(void *h, const char *k, void *d);
-      void        (*hash_free)(void *h);
+      void      * (*hash_add)(void *h, const char *k, void *d); /**< Adds a key-value pair to a hash table. Example: eina_hash_add. */
+      void        (*hash_free)(void *h); /**< Frees a hash table. Example: eina_hash_free. */
+      /**
+       * @brief For EET_G_UNION or EET_G_VARIANT, gets the string name of the currently active type within the union/variant.
+       * @param data Pointer to the type selector field in the C union/variant structure.
+       * @param[out] unknow Set to EINA_TRUE if the type is unknown and data is opaque.
+       * @return The string name of the active type, or NULL.
+       */
       const char *(*type_get)(const void *data, Eina_Bool *unknow);
+      /**
+       * @brief For EET_G_UNION or EET_G_VARIANT, sets the active type in the C union/variant structure.
+       * @param type The string name of the type being set.
+       * @param data Pointer to the type selector field in the C union/variant structure.
+       * @param unknow EINA_TRUE if the type being set is an opaque/unknown one.
+       * @return EINA_TRUE on success, EINA_FALSE on failure.
+       */
       Eina_Bool   (*type_set)(const char *type,
                               void       *data,
                               Eina_Bool   unknow);
-      void      * (*array_alloc)(size_t size);
-      void        (*array_free)(void *mem);
-   } func;
+      void      * (*array_alloc)(size_t size); /**< Allocates memory for an array. Default: mem_alloc. */
+      void        (*array_free)(void *mem);    /**< Frees memory allocated for an array. Default: mem_free. */
+   } func; /**< Collection of function pointers for custom operations. */
+
+   /**
+    * @brief Describes the individual elements (fields) of the C structure.
+    */
    struct
    {
-      int               num;
-      Eet_Data_Element *set;
+      int               num;  /**< Number of elements (fields) in the structure. */
+      Eet_Data_Element *set;  /**< Array of Eet_Data_Element, one for each field. */
+      /**
+       * @brief Hash table for fast lookup of elements by name.
+       */
       struct
       {
-         int                       size;
-         Eet_Data_Descriptor_Hash *buckets;
-      } hash;
-   } elements;
+         int                       size;    /**< Size of the hash bucket array. */
+         Eet_Data_Descriptor_Hash *buckets; /**< Array of hash buckets. */
+      } hash; /**< Hash table for elements. */
+   } elements; /**< Information about the structure's elements. */
 
-   Eina_Bool unified_type : 1;
+   Eina_Bool unified_type : 1; /**< EINA_TRUE if this descriptor is for a "unified type" (used with EET_G_VARIANT where all members are pointers to other described types). */
 //   char *strings;
 //   int   strings_len;
 };
 
+/**
+ * @struct _Eet_Data_Element
+ * @brief Describes a single element (field) within an Eet_Data_Descriptor.
+ */
 struct _Eet_Data_Element
 {
-   const char          *name;
-   const char          *counter_name;
-   const char          *directory_name_ptr;
-   Eet_Data_Descriptor *subtype;
-   int                  offset;  /* offset in bytes from the base element */
-   int                  count;  /* number of elements for a fixed array */
-   int                  counter_offset;  /* for a variable array we need the offset of the count variable */
-   unsigned char        type;  /* EET_T_XXX */
-   unsigned char        group_type;  /* EET_G_XXX */
-   Eina_Bool            subtype_free : 1;
+   const char          *name; /**< Name of this element (field name in the C struct). */
+   const char          *counter_name; /**< Name of another element in the same struct that holds the count for this element, if this element is a variable-sized array. (Currently unused, counter_offset is used). */
+   const char          *directory_name_ptr; /**< Cached pointer to the name string, potentially from an Eet_Dictionary, for faster comparisons. */
+   Eet_Data_Descriptor *subtype; /**< If this element is a nested struct, a pointer to its Eet_Data_Descriptor. NULL for basic types. For arrays/lists/hashes of structs, this points to the struct's descriptor. */
+   int                  offset;  /**< Offset of this element in bytes from the beginning of the C struct. Use offsetof(). */
+   int                  count;  /**< For fixed-size arrays (EET_G_ARRAY), this is the number of elements. For variable-size arrays (EET_G_VAR_ARRAY), unions (EET_G_UNION), and variants (EET_G_VARIANT), this field stores the offset of the integer member (for VAR_ARRAY) or the type selector member (for UNION/VARIANT) within the C struct. */
+   int                  counter_offset;  /**< For variable-size arrays (EET_G_VAR_ARRAY), this stores the offset of the integer member within the C struct that holds the number of elements in the array. (Note: often `count` field is used for this purpose in element_add). */
+   unsigned char        type;  /**< The basic Eet type of this element (EET_T_INT, EET_T_STRING, etc.). Set to EET_T_UNKNOW if group_type is used. */
+   unsigned char        group_type;  /**< The group Eet type of this element (EET_G_ARRAY, EET_G_LIST, EET_G_HASH, EET_G_UNION, EET_G_VARIANT, etc.). Set to EET_G_UNKNOWN if it's a simple type or a direct struct. */
+   Eina_Bool            subtype_free : 1; /**< EINA_TRUE if the `subtype` Eet_Data_Descriptor was implicitly created (e.g., for an array of basic types) and should be freed when this element's parent descriptor is freed. */
 };
 
+/**
+ * @struct _Eet_Data_Encode_Hash_Info
+ * @brief Helper structure to pass necessary information to the hash encoding callback.
+ */
 struct _Eet_Data_Encode_Hash_Info
 {
-   Eet_Data_Stream  *ds;
-   Eet_Data_Element *ede;
-   Eet_Dictionary   *ed;
+   Eet_Data_Stream  *ds;    /**< The data stream to write encoded hash elements to. */
+   Eet_Data_Element *ede;  /**< The data element descriptor for the hash value type. */
+   Eet_Dictionary   *ed;    /**< The Eet dictionary, for string interning. */
 };
 
+/**
+ * @struct _Eet_Free
+ * @brief Manages a list of memory pointers that need to be freed, with reference counting.
+ * This is used during decoding to track allocations that are part of the decoded structure.
+ */
 struct _Eet_Free
 {
-   int        ref;
-   Eina_Array list;
+   int        ref;  /**< Reference count to prevent premature freeing if shared. */
+   Eina_Array list; /**< An Eina_Array storing void pointers to allocated memory. */
 };
 
+/**
+ * @struct _Eet_Free_Context
+ * @brief Holds multiple Eet_Free lists, categorized by the type of allocation.
+ * This allows for more granular control over memory management during the decoding process.
+ * For example, strings allocated via `str_alloc` might need different cleanup than
+ * lists allocated via `list_append`.
+ */
 struct _Eet_Free_Context
 {
-   Eet_Free freelist;
-   Eet_Free freelist_array;
-   Eet_Free freelist_list;
-   Eet_Free freelist_hash;
-   Eet_Free freelist_str;
-   Eet_Free freelist_direct_str;
+   Eet_Free freelist;            /**< List for general memory allocations (e.g., nested structs). */
+   Eet_Free freelist_array;      /**< List for array allocations. */
+   Eet_Free freelist_list;       /**< List for list structure allocations (e.g., if list_append allocates new list head). */
+   Eet_Free freelist_hash;       /**< List for hash structure allocations. */
+   Eet_Free freelist_str;        /**< List for strings allocated by `Eet_Data_Descriptor::func::str_alloc`. */
+   Eet_Free freelist_direct_str; /**< List for strings "allocated" by `Eet_Data_Descriptor::func::str_direct_alloc`. */
 };
 
+/**
+ * @struct _Eet_Variant_Unknow
+ * @brief Represents an unknown type encountered within an EET_G_VARIANT during decoding.
+ * This structure allows Eet to store the raw binary data of the unknown variant member
+ * so that it can be re-encoded faithfully, even if the application doesn't understand its type.
+ */
 struct _Eet_Variant_Unknow
 {
-   EINA_MAGIC
+   EINA_MAGIC /**< Magic number (EET_MAGIC_VARIANT) to identify this structure. */
 
-   int  size;
-   char data[1];
+   int  size;       /**< Size of the opaque data in bytes. */
+   char data[1];    /**< Flexible array member holding the opaque data. */
 };
 
 /*---*/
 
+/**
+ * @brief Initializes an Eet_Free_Context structure.
+ * Sets up the internal Eina_Array structures for each freelist category.
+ * @param context Pointer to the Eet_Free_Context to initialize.
+ */
 static void
  eet_free_context_init(Eet_Free_Context *context);
+/**
+ * @brief Shuts down an Eet_Free_Context structure.
+ * Flushes (cleans) all internal Eina_Array structures. Does not free the data
+ * pointed to by the elements in the arrays; that's typically handled by
+ * functions like _eet_freelist_free.
+ * @param context Pointer to the Eet_Free_Context to shut down.
+ */
 static void
  eet_free_context_shutdown(Eet_Free_Context *context);
 
+/**
+ * @brief Decodes a character from the Eet stream.
+ * @param ed Eet dictionary (unused for char).
+ * @param src Source buffer.
+ * @param src_end End of source buffer.
+ * @param dest Destination buffer (char*).
+ * @return sizeof(char) on success, -1 on error (buffer too small).
+ */
 static int
 eet_data_get_char(const Eet_Dictionary *ed,
                   const void           *src,
                   const void           *src_end,
                   void                 *dest);
+/**
+ * @brief Encodes a character into an Eet stream representation.
+ * @param ed Eet dictionary (unused for char).
+ * @param src Source data (char*).
+ * @param[out] size_ret Size of the encoded data (will be sizeof(char)).
+ * @return Malloc'ed buffer containing the encoded char, NULL on error. Caller must free.
+ */
 static void *
 eet_data_put_char(Eet_Dictionary *ed,
                   const void     *src,
                   int            *size_ret);
+/**
+ * @brief Decodes a short integer from the Eet stream.
+ * Handles endian conversion if necessary.
+ * @param ed Eet dictionary (unused for short).
+ * @param src Source buffer.
+ * @param src_end End of source buffer.
+ * @param dest Destination buffer (short*).
+ * @return sizeof(short) on success, -1 on error.
+ */
 static int
 eet_data_get_short(const Eet_Dictionary *ed,
                    const void           *src,
                    const void           *src_end,
                    void                 *dest);
+/**
+ * @brief Encodes a short integer into an Eet stream representation.
+ * Handles endian conversion if necessary.
+ * @param ed Eet dictionary (unused for short).
+ * @param src Source data (short*).
+ * @param[out] size_ret Size of the encoded data (will be sizeof(short)).
+ * @return Malloc'ed buffer containing the encoded short, NULL on error. Caller must free.
+ */
 static void *
 eet_data_put_short(Eet_Dictionary *ed,
                    const void     *src,
                    int            *size_ret);
+/**
+ * @brief Decodes an integer from the Eet stream.
+ * Handles endian conversion if necessary.
+ * @param ed Eet dictionary (unused for int).
+ * @param src Source buffer.
+ * @param src_end End of source buffer.
+ * @param dest Destination buffer (int*).
+ * @return sizeof(int) on success, -1 on error.
+ */
 static inline int
 eet_data_get_int(const Eet_Dictionary *ed,
                  const void           *src,
                  const void           *src_end,
                  void                 *dest);
+/**
+ * @brief Encodes an integer into an Eet stream representation.
+ * Handles endian conversion if necessary.
+ * @param ed Eet dictionary (unused for int).
+ * @param src Source data (int*).
+ * @param[out] size_ret Size of the encoded data (will be sizeof(int)).
+ * @return Malloc'ed buffer containing the encoded int, NULL on error. Caller must free.
+ */
 static void *
 eet_data_put_int(Eet_Dictionary *ed,
                  const void     *src,
                  int            *size_ret);
+/**
+ * @brief Decodes a long long integer from the Eet stream.
+ * Handles endian conversion if necessary.
+ * @param ed Eet dictionary (unused for long long).
+ * @param src Source buffer.
+ * @param src_end End of source buffer.
+ * @param dest Destination buffer (unsigned long long*).
+ * @return sizeof(long long) on success, -1 on error.
+ */
 static int
 eet_data_get_long_long(const Eet_Dictionary *ed,
                        const void           *src,
                        const void           *src_end,
                        void                 *dest);
+/**
+ * @brief Encodes a long long integer into an Eet stream representation.
+ * Handles endian conversion if necessary.
+ * @param ed Eet dictionary (unused for long long).
+ * @param src Source data (unsigned long long*).
+ * @param[out] size_ret Size of the encoded data (will be sizeof(long long)).
+ * @return Malloc'ed buffer containing the encoded long long, NULL on error. Caller must free.
+ */
 static void *
 eet_data_put_long_long(Eet_Dictionary *ed,
                        const void     *src,
                        int            *size_ret);
+/**
+ * @brief Decodes a float from the Eet stream.
+ * Floats are stored as strings (e.g., "0x1.23456p+0") if no dictionary is used,
+ * or as an index into the dictionary if a dictionary is present.
+ * @param ed Eet dictionary. If NULL, float is read as a string.
+ * @param src Source buffer.
+ * @param src_end End of source buffer.
+ * @param dest Destination buffer (float*).
+ * @return Number of bytes read on success, -1 on error.
+ */
 static int
 eet_data_get_float(const Eet_Dictionary *ed,
                    const void           *src,
                    const void           *src_end,
                    void                 *dest);
+/**
+ * @brief Encodes a float into an Eet stream representation.
+ * Converts float to a string representation. If a dictionary is used,
+ * the string is added to the dictionary and its index is stored.
+ * Otherwise, the string itself is stored.
+ * @param ed Eet dictionary. If NULL, float is stored as a string.
+ * @param src Source data (float*).
+ * @param[out] size_ret Size of the encoded data.
+ * @return Malloc'ed buffer containing the encoded float representation, NULL on error. Caller must free.
+ */
 static void *
 eet_data_put_float(Eet_Dictionary *ed,
                    const void     *src,
                    int            *size_ret);
+/**
+ * @brief Decodes a double from the Eet stream.
+ * Doubles are stored as strings (e.g., "0x1.23456789abcdp+0") if no dictionary is used,
+ * or as an index into the dictionary if a dictionary is present.
+ * @param ed Eet dictionary. If NULL, double is read as a string.
+ * @param src Source buffer.
+ * @param src_end End of source buffer.
+ * @param dest Destination buffer (double*).
+ * @return Number of bytes read on success, -1 on error.
+ */
 static int
 eet_data_get_double(const Eet_Dictionary *ed,
                     const void           *src,
                     const void           *src_end,
                     void                 *dest);
+/**
+ * @brief Encodes a double into an Eet stream representation.
+ * Converts double to a string representation. If a dictionary is used,
+ * the string is added to the dictionary and its index is stored.
+ * Otherwise, the string itself is stored.
+ * @param ed Eet dictionary. If NULL, double is stored as a string.
+ * @param src Source data (double*).
+ * @param[out] size_ret Size of the encoded data.
+ * @return Malloc'ed buffer containing the encoded double representation, NULL on error. Caller must free.
+ */
 static void *
 eet_data_put_double(Eet_Dictionary *ed,
                     const void     *src,
                     int            *size_ret);
+/**
+ * @brief Decodes an Eina_F32p32 fixed-point number from the Eet stream.
+ * Fixed-point numbers are stored as strings if no dictionary is used,
+ * or as an index into the dictionary if a dictionary is present.
+ * @param ed Eet dictionary.
+ * @param src Source buffer.
+ * @param src_end End of source buffer.
+ * @param dest Destination buffer (Eina_F32p32*).
+ * @return 1 on success (fixed size for dictionary index) or string length + 1, -1 on error.
+ */
 static int
 eet_data_get_f32p32(const Eet_Dictionary *ed,
                     const void           *src,
                     const void           *src_end,
                     void                 *dest);
+/**
+ * @brief Encodes an Eina_F32p32 fixed-point number into an Eet stream representation.
+ * Converts the fixed-point number to a string. If a dictionary is used,
+ * the string is added to the dictionary and its index is stored.
+ * Otherwise, the string itself is stored.
+ * @param ed Eet dictionary.
+ * @param src Source data (Eina_F32p32*).
+ * @param[out] size_ret Size of the encoded data.
+ * @return Malloc'ed buffer containing the encoded representation, NULL on error. Caller must free.
+ */
 static void *
 eet_data_put_f32p32(Eet_Dictionary *ed,
                     const void     *src,
                     int            *size_ret);
+/**
+ * @brief Decodes an Eina_F16p16 fixed-point number from the Eet stream.
+ * Internally uses f32p32 representation for storage and converts.
+ * @param ed Eet dictionary.
+ * @param src Source buffer.
+ * @param src_end End of source buffer.
+ * @param dest Destination buffer (Eina_F16p16*).
+ * @return 1 on success, -1 on error.
+ */
 static int
 eet_data_get_f16p16(const Eet_Dictionary *ed,
                     const void           *src,
                     const void           *src_end,
                     void                 *dest);
+/**
+ * @brief Encodes an Eina_F16p16 fixed-point number into an Eet stream representation.
+ * Converts to f32p32 for storage.
+ * @param ed Eet dictionary.
+ * @param src Source data (Eina_F16p16*).
+ * @param[out] size_ret Size of the encoded data.
+ * @return Malloc'ed buffer containing the encoded representation, NULL on error. Caller must free.
+ */
 static void *
 eet_data_put_f16p16(Eet_Dictionary *ed,
                     const void     *src,
                     int            *size_ret);
+/**
+ * @brief Decodes an Eina_F8p24 fixed-point number from the Eet stream.
+ * Internally uses f32p32 representation for storage and converts.
+ * @param ed Eet dictionary.
+ * @param src Source buffer.
+ * @param src_end End of source buffer.
+ * @param dest Destination buffer (Eina_F8p24*).
+ * @return 1 on success, -1 on error.
+ */
 static int
 eet_data_get_f8p24(const Eet_Dictionary *ed,
                    const void           *src,
                    const void           *src_end,
                    void                 *dest);
+/**
+ * @brief Encodes an Eina_F8p24 fixed-point number into an Eet stream representation.
+ * Converts to f32p32 for storage.
+ * @param ed Eet dictionary.
+ * @param src Source data (Eina_F8p24*).
+ * @param[out] size_ret Size of the encoded data.
+ * @return Malloc'ed buffer containing the encoded representation, NULL on error. Caller must free.
+ */
 static void *
 eet_data_put_f8p24(Eet_Dictionary *ed,
                    const void     *src,
                    int            *size_ret);
+/**
+ * @brief Decodes a string from the Eet stream.
+ * If a dictionary is used, it reads an index and retrieves the string from the dictionary.
+ * The retrieved string pointer is directly assigned to *dest (char**).
+ * If no dictionary, it assumes the string is null-terminated in the stream and
+ * assigns a pointer to it within the stream to *dest.
+ * @param ed Eet dictionary. If NULL, string is read directly from stream.
+ * @param src Source buffer.
+ * @param src_end End of source buffer.
+ * @param dest Destination buffer (char**). The char* will point into dictionary or stream.
+ * @return Size of string data in stream (index size or strlen+1) on success, -1 on error.
+ */
 static inline int
 eet_data_get_string(const Eet_Dictionary *ed,
                     const void           *src,
                     const void           *src_end,
                     void                 *dest);
+/**
+ * @brief Encodes a string into an Eet stream representation.
+ * If a dictionary is used, the string is added to the dictionary and its index is stored.
+ * Otherwise, the string itself (null-terminated) is copied.
+ * @param ed Eet dictionary. If NULL, string is copied directly.
+ * @param src Source data (char** pointing to the string).
+ * @param[out] size_ret Size of the encoded data (index size or strlen+1).
+ * @return Malloc'ed buffer containing the encoded string representation, NULL on error. Caller must free.
+ */
 static void *
 eet_data_put_string(Eet_Dictionary *ed,
                     const void     *src,
                     int            *size_ret);
+/**
+ * @brief Decodes an inlined string from the Eet stream.
+ * This is equivalent to eet_data_get_string with a NULL dictionary, meaning
+ * the string is always read directly from the stream.
+ * @param ed Eet dictionary (unused).
+ * @param src Source buffer.
+ * @param src_end End of source buffer.
+ * @param dest Destination buffer (char**). The char* will point into the stream.
+ * @return strlen+1 on success, -1 on error.
+ */
 static int
 eet_data_get_istring(const Eet_Dictionary *ed,
                      const void           *src,
                      const void           *src_end,
                      void                 *dest);
+/**
+ * @brief Encodes an inlined string into an Eet stream representation.
+ * This is equivalent to eet_data_put_string with a NULL dictionary, meaning
+ * the string is always copied directly into the Eet stream.
+ * @param ed Eet dictionary (unused).
+ * @param src Source data (char** pointing to the string).
+ * @param[out] size_ret Size of the encoded data (strlen+1).
+ * @return Malloc'ed buffer containing the copied string, NULL on error. Caller must free.
+ */
 static void *
 eet_data_put_istring(Eet_Dictionary *ed,
                      const void     *src,
                      int            *size_ret);
+/**
+ * @brief "Decodes" a NULL pointer type.
+ * This effectively sets the destination pointer (char**) to NULL.
+ * It consumes 1 byte from the stream conceptually, though the stream content is ignored.
+ * @param ed Eet dictionary (unused).
+ * @param src Source buffer (unused).
+ * @param src_end End of source buffer (unused).
+ * @param dest Destination buffer (char**), will be set to NULL.
+ * @return 1 (representing minimal consumption).
+ */
 static int
 eet_data_get_null(const Eet_Dictionary *ed,
                   const void           *src,
                   const void           *src_end,
                   void                 *dest);
+/**
+ * @brief Encodes a NULL pointer type.
+ * This produces no actual data in the stream.
+ * @param ed Eet dictionary (unused).
+ * @param src Source data (unused, assumed to represent a NULL pointer).
+ * @param[out] size_ret Size of the encoded data (will be 0).
+ * @return NULL, as no data is encoded.
+ */
 static void *
 eet_data_put_null(Eet_Dictionary *ed,
                   const void     *src,
                   int            *size_ret);
 
+/**
+ * @brief Decodes an Eina_Value from the Eet stream.
+ * The Eet stream first contains an integer representing the Eet_T_XXX type of the value,
+ * followed by the data for that type. This function reads the type, then uses the
+ * appropriate basic type decoder to read the value, and finally constructs an Eina_Value.
+ * @param ed Eet dictionary.
+ * @param src Source buffer.
+ * @param src_end End of source buffer.
+ * @param dst Destination buffer (Eina_Value**). A new Eina_Value will be allocated.
+ * @return Number of bytes read on success, -1 on error.
+ */
 static int
 eet_data_get_value(const Eet_Dictionary *ed,
 		   const void           *src,
 		   const void           *src_end,
 		   void                 *dst);
 
+/**
+ * @brief Encodes an Eina_Value into an Eet stream representation.
+ * It first writes an integer representing the Eet_T_XXX type corresponding to the Eina_Value's type,
+ * then uses the appropriate basic type encoder to write the value's data.
+ * If the Eina_Value is NULL, EET_T_NULL is encoded.
+ * If the Eina_Value type doesn't map directly, it attempts to convert to string.
+ * @param ed Eet dictionary.
+ * @param src Source data (Eina_Value**).
+ * @param[out] size_ret Size of the encoded data.
+ * @return Malloc'ed buffer containing the encoded Eina_Value, NULL on error. Caller must free.
+ */
 static void *
 eet_data_put_value(Eet_Dictionary *ed,
                    const void     *src,
                    int            *size_ret);
 
+/**
+ * @brief Generic decoder for any basic Eet_T_XXX type.
+ * This function dispatches to the appropriate eet_data_get_* function based on the type.
+ * @param ed Eet dictionary.
+ * @param type The Eet_T_XXX type to decode.
+ * @param src Source buffer.
+ * @param src_end End of source buffer.
+ * @param dest Destination buffer.
+ * @return Number of bytes read on success, -1 on error.
+ */
 static int
 eet_data_get_type(const Eet_Dictionary *ed,
                   int                   type,
                   const void           *src,
                   const void           *src_end,
                   void                 *dest);
+/**
+ * @brief Generic encoder for any basic Eet_T_XXX type.
+ * This function dispatches to the appropriate eet_data_put_* function based on the type.
+ * @param ed Eet dictionary.
+ * @param type The Eet_T_XXX type to encode.
+ * @param src Source data.
+ * @param[out] size_ret Size of the encoded data.
+ * @return Malloc'ed buffer containing the encoded data, NULL on error. Caller must free.
+ */
 static void *
 eet_data_put_type(Eet_Dictionary *ed,
                   int             type,
                   const void     *src,
                   int            *size_ret);
 
+/**
+ * @brief Creates an Eet_Node representing a simple data type.
+ * Used when decoding into a generic Eet_Node structure instead of a C struct.
+ * @param type The Eet_T_XXX type of the data.
+ * @param name The name for the Eet_Node.
+ * @param dd Pointer to the actual data value (e.g., int*, char**).
+ * @return A newly allocated Eet_Node, or NULL on error.
+ */
 static Eet_Node *
 eet_data_node_simple_type(int         type,
                           const char *name,
                           void       *dd);
 
+/**
+ * @brief Decodes an element when its type is not a group type (i.e., basic types or nested structures).
+ * This function handles decoding simple types directly into a C struct field or
+ * recursively decoding a nested structure. If decoding to Eet_Node, it creates appropriate nodes.
+ * @param context The memory free context.
+ * @param ed The Eet dictionary.
+ * @param edd The data descriptor for the parent structure. If NULL, decoding to Eet_Node.
+ * @param ede The data element descriptor for the current field. Can be NULL if decoding to Eet_Node.
+ * @param echnk The current data chunk being processed.
+ * @param type The Eet_T_XXX type of the element.
+ * @param group_type The Eet_G_XXX group type (should be EET_G_UNKNOWN or EET_G_UNKNOWN_NESTED).
+ * @param data For C struct decoding: pointer to the field in the C struct.
+ *             For Eet_Node decoding: pointer to an Eet_Node* to store the result.
+ * @param p Pointer to the current position in the Eet data stream (unused by this function, but part of group codec signature).
+ * @param size Remaining size of the Eet data stream (unused by this function).
+ * @return 1 on success, 0 or negative on error.
+ */
 static int
 eet_data_get_unknown(Eet_Free_Context     *context,
                      const Eet_Dictionary *ed,
@@ -372,18 +824,83 @@ eet_data_get_unknown(Eet_Free_Context     *context,
                      void                 *data_in,
                      char                **p,
                      int                  *size);
+/**
+ * @brief Encodes an element when its type is not a group type.
+ * This handles encoding simple types from a C struct field or recursively encoding
+ * a nested structure.
+ * @param ed The Eet dictionary.
+ * @param edd The data descriptor for the parent structure (unused by this function).
+ * @param ede The data element descriptor for the current field.
+ * @param ds The Eet data stream to write to.
+ * @param data_in Pointer to the field in the C struct to be encoded.
+ */
 static void
 eet_data_put_unknown(Eet_Dictionary      *ed,
                      Eet_Data_Descriptor *edd,
                      Eet_Data_Element    *ede,
                      Eet_Data_Stream     *ds,
                      void                *data_in);
+/**
+ * @brief Encodes an array (fixed or variable) from a C struct into an Eet data stream.
+ *
+ * Eet File Structure for an array (e.g., `int numbers[3]` or `char **names` with a count field):
+ * 1. Array Header Chunk:
+ *    - Name: `ede->name` (e.g., "numbers", "names")
+ *    - Type: `ede->type` (e.g., EET_T_INT for `numbers`, EET_T_STRING for `names`)
+ *    - Group Type: `ede->group_type` (EET_G_ARRAY or EET_G_VAR_ARRAY)
+ *    - Payload:
+ *      - `int count`: The number of elements in the array.
+ *
+ * 2. Element Chunks (`count` times):
+ *    For each element in the C array:
+ *    - Element Chunk:
+ *      - Name: `ede->name` (same as array header)
+ *      - Type: `ede->type` (or EET_T_NULL if the element itself is NULL, e.g. a NULL string in a string array)
+ *      - Group Type: `ede->group_type`
+ *      - Payload: The encoded data for the current element. (e.g., the int value, the string data)
+ *                 If an element is NULL (like a NULL string pointer in an array of strings),
+ *                 a chunk with EET_T_NULL type and no payload might be written to maintain array layout.
+ *
+ * @param ed The Eet dictionary.
+ * @param edd The data descriptor for the parent structure (unused by this function).
+ * @param ede The data element descriptor for the array field.
+ * @param ds The Eet data stream to write to.
+ * @param data_in Pointer to the C struct (not the array field itself, but the containing struct).
+ *                 The offset in `ede` is used to find the array field.
+ */
 static void
 eet_data_put_array(Eet_Dictionary      *ed,
                    Eet_Data_Descriptor *edd,
                    Eet_Data_Element    *ede,
                    Eet_Data_Stream     *ds,
                    void                *data_in);
+/**
+ * @brief Decodes an array (fixed or variable) from an Eet data stream into a C struct.
+ *
+ * It expects the Eet file structure as described in `eet_data_put_array`.
+ * - It first reads the array header chunk to get the element count.
+ * - For variable arrays (EET_G_VAR_ARRAY), it allocates memory for the array elements
+ *   using `edd->func.array_alloc` or `mem_alloc` and stores the count in the
+ *   designated counter field in the C struct.
+ * - For fixed-size arrays (EET_G_ARRAY), it populates the existing array in the C struct.
+ * - It then iterates `count` times, reading each element chunk and decoding its payload
+ *   into the appropriate position in the C array.
+ * - If decoding to Eet_Node structures, it builds an Eet_Node of type EET_G_ARRAY or
+ *   EET_G_VAR_ARRAY containing child nodes for each element.
+ *
+ * @param context The memory free context for tracking allocations (especially for VAR_ARRAY).
+ * @param ed The Eet dictionary.
+ * @param edd The data descriptor for the parent structure. If NULL, decodes to Eet_Node.
+ * @param ede The data element descriptor for the array field. Can be NULL if decoding to Eet_Node.
+ * @param echnk The initial data chunk for the array (the header chunk).
+ * @param type The Eet_T_XXX type of the elements in the array.
+ * @param group_type The Eet_G_XXX type of the array (EET_G_ARRAY or EET_G_VAR_ARRAY).
+ * @param data For C struct decoding: pointer to the array field (or pointer field for VAR_ARRAY) in the C struct.
+ *             For Eet_Node decoding: pointer to an Eet_Node* to store the resulting array node.
+ * @param p Pointer to the current position in the Eet data stream (after the array header chunk). Will be updated.
+ * @param size Remaining size of the Eet data stream. Will be updated.
+ * @return 1 on success, 0 or negative on error.
+ */
 static int
 eet_data_get_array(Eet_Free_Context     *context,
                    const Eet_Dictionary *ed,
@@ -395,6 +912,36 @@ eet_data_get_array(Eet_Free_Context     *context,
                    void                 *data,
                    char                **p,
                    int                  *size);
+/**
+ * @brief Decodes a list from an Eet data stream into a C struct's list field.
+ *
+ * Eet File Structure for a list (e.g., `Eina_List *my_list_of_structs`):
+ * A sequence of chunks, one for each element in the list.
+ * - Element Chunk (repeated for each list item):
+ *   - Name: `ede->name` (e.g., "my_list_of_structs")
+ *   - Type: `ede->type` (e.g., EET_T_UNKNOW if elements are structs) or element's basic type.
+ *   - Group Type: `ede->group_type` (EET_G_LIST)
+ *   - Payload: The encoded data for the current list element.
+ * The list ends when no more chunks with the specified name and group type are found.
+ *
+ * This function reads each element chunk, decodes its payload (which could be a basic type
+ * or a nested structure via `_eet_data_descriptor_decode`), and appends the decoded
+ * data to the list in the C struct using `edd->func.list_append`.
+ * If decoding to Eet_Node, it appends Eet_Nodes to a parent list node.
+ *
+ * @param context The memory free context.
+ * @param ed The Eet dictionary.
+ * @param edd The data descriptor for the parent structure. If NULL, decodes to Eet_Node.
+ * @param ede The data element descriptor for the list field. Can be NULL if decoding to Eet_Node.
+ * @param echnk The current data chunk, representing one list element.
+ * @param type The Eet_T_XXX type of the list elements (often EET_T_UNKNOW for lists of structs).
+ * @param group_type The Eet_G_XXX group type (should be EET_G_LIST).
+ * @param data_in For C struct decoding: pointer to the list field (e.g., Eina_List**) in the C struct.
+ *                For Eet_Node decoding: pointer to an Eet_Node* representing the list.
+ * @param p Pointer to the current position in the Eet data stream. Will be updated.
+ * @param size Remaining size of the Eet data stream. Will be updated.
+ * @return 1 on success (per element), 0 or negative on error.
+ */
 static int
 eet_data_get_list(Eet_Free_Context     *context,
                   const Eet_Dictionary *ed,
@@ -406,18 +953,75 @@ eet_data_get_list(Eet_Free_Context     *context,
                   void                 *data_in,
                   char                **p,
                   int                  *size);
+/**
+ * @brief Encodes a list from a C struct's list field into an Eet data stream.
+ * It iterates through the list using `edd->func.list_next` and `edd->func.list_data`.
+ * For each element in the C list, it encodes the element and writes it as a separate chunk
+ * to the Eet stream. The structure of these chunks is as described in `eet_data_get_list`.
+ *
+ * @param ed The Eet dictionary.
+ * @param edd The data descriptor for the parent structure.
+ * @param ede The data element descriptor for the list field.
+ * @param ds The Eet data stream to write to.
+ * @param data_in Pointer to the C struct (not the list field itself).
+ *                 The offset in `ede` is used to find the list field.
+ */
 static void
 eet_data_put_list(Eet_Dictionary      *ed,
                   Eet_Data_Descriptor *edd,
                   Eet_Data_Element    *ede,
                   Eet_Data_Stream     *ds,
                   void                *data_in);
+/**
+ * @brief Encodes a hash table from a C struct into an Eet data stream.
+ * It iterates through the hash table using `edd->func.hash_foreach`.
+ * For each key-value pair in the C hash table:
+ * 1. Key Chunk:
+ *    - Name: `ede->name` (e.g., "my_hash_table")
+ *    - Type: EET_T_STRING
+ *    - Group Type: `ede->group_type` (EET_G_HASH)
+ *    - Payload: The key string.
+ * 2. Value Chunk:
+ *    - Name: `ede->name`
+ *    - Type: Type of the value (e.g., `ede->type` or determined from value's subtype)
+ *    - Group Type: `ede->group_type`
+ *    - Payload: The encoded value data.
+ *
+ * @param ed The Eet dictionary.
+ * @param edd The data descriptor for the parent structure.
+ * @param ede The data element descriptor for the hash table field.
+ * @param ds The Eet data stream to write to.
+ * @param data_in Pointer to the C struct. Offset in `ede` finds the hash field.
+ */
 static void
 eet_data_put_hash(Eet_Dictionary      *ed,
                   Eet_Data_Descriptor *edd,
                   Eet_Data_Element    *ede,
                   Eet_Data_Stream     *ds,
                   void                *data_in);
+/**
+ * @brief Decodes a hash table from an Eet data stream into a C struct's hash field.
+ *
+ * It expects pairs of chunks in the Eet stream for each hash entry, as described
+ * in `eet_data_put_hash`: first a chunk for the key (string), then a chunk for the value.
+ * - It reads the key chunk and decodes the key string.
+ * - It then reads the value chunk and decodes the value data (which could be basic or a nested struct).
+ * - The decoded key-value pair is added to the C hash table using `edd->func.hash_add`.
+ * - If decoding to Eet_Node, it adds key-value pairs to a parent hash node.
+ *
+ * @param context The memory free context.
+ * @param ed The Eet dictionary.
+ * @param edd The data descriptor for the parent structure. If NULL, decodes to Eet_Node.
+ * @param ede The data element descriptor for the hash field. Can be NULL if decoding to Eet_Node.
+ * @param echnk The current data chunk, representing the key of a hash entry.
+ * @param type The Eet_T_XXX type of the hash values (often EET_T_UNKNOW for complex values).
+ * @param group_type The Eet_G_XXX group type (should be EET_G_HASH).
+ * @param data For C struct decoding: pointer to the hash field (e.g., Eina_Hash**) in the C struct.
+ *             For Eet_Node decoding: pointer to an Eet_Node* representing the hash.
+ * @param p Pointer to the current position in the Eet data stream. Will be updated past key & value chunks.
+ * @param size Remaining size of the Eet data stream. Will be updated.
+ * @return 1 on success (per key-value pair), 0 or negative on error.
+ */
 static int
 eet_data_get_hash(Eet_Free_Context     *context,
                   const Eet_Dictionary *ed,
@@ -429,12 +1033,63 @@ eet_data_get_hash(Eet_Free_Context     *context,
                   void                 *data,
                   char                **p,
                   int                  *size);
+/**
+ * @brief Encodes a C union from a C struct into an Eet data stream.
+ *
+ * Eet File Structure for a union (e.g., `MyUnion u; int type_selector;`):
+ * 1. Type Selector Chunk:
+ *    - Name: `ede->name` (e.g., "my_union_field")
+ *    - Type: EET_T_STRING
+ *    - Group Type: `ede->group_type` (EET_G_UNION)
+ *    - Payload: A string representing the name of the active member of the union
+ *               (e.g., "int_val", "float_val"). This name is obtained from
+ *               `ede->subtype->func.type_get()`.
+ *
+ * 2. Active Member Data Chunk:
+ *    - Name: `ede->name`
+ *    - Type: Type of the active member (e.g., EET_T_INT, EET_T_FLOAT)
+ *    - Group Type: `ede->group_type`
+ *    - Payload: The encoded data of the active union member.
+ *
+ * The `ede->subtype` for a union is a special Eet_Data_Descriptor where each
+ * element represents a possible member of the C union. The `type_get` callback
+ * (associated with `ede->subtype`) is used to determine which member is active.
+ *
+ * @param ed The Eet dictionary.
+ * @param edd The data descriptor for the parent structure (unused).
+ * @param ede The data element descriptor for the union field. `ede->count` (misnomer here)
+ *            is the offset to the type selector field in the C struct.
+ * @param ds The Eet data stream to write to.
+ * @param data_in Pointer to the C struct containing the union.
+ */
 static void
 eet_data_put_union(Eet_Dictionary      *ed,
                    Eet_Data_Descriptor *edd,
                    Eet_Data_Element    *ede,
                    Eet_Data_Stream     *ds,
                    void                *data_in);
+/**
+ * @brief Decodes a C union from an Eet data stream into a C struct's union field.
+ *
+ * It expects the Eet file structure as described in `eet_data_put_union`.
+ * 1. Reads the Type Selector Chunk to get the string name of the active member.
+ * 2. Uses this name to find the corresponding Eet_Data_Element within `ede->subtype->elements`.
+ * 3. Reads the Active Member Data Chunk and decodes its payload into the C union field,
+ *    according to the type of the active member.
+ * 4. Calls `ede->subtype->func.type_set()` to update the type selector field in the C struct.
+ *
+ * @param context The memory free context.
+ * @param ed The Eet dictionary.
+ * @param edd The data descriptor for the parent structure (unused).
+ * @param ede The data element descriptor for the union field.
+ * @param echnk The current data chunk (Type Selector Chunk).
+ * @param type Expected Eet_T_XXX type for the union (usually EET_T_UNKNOW).
+ * @param group_type Expected Eet_G_XXX group type (EET_G_UNION).
+ * @param data Pointer to the C union field within the C struct.
+ * @param p Pointer to the current position in the Eet data stream. Will be updated.
+ * @param size Remaining size of the Eet data stream. Will be updated.
+ * @return 1 on success, 0 or negative on error.
+ */
 static int
 eet_data_get_union(Eet_Free_Context     *context,
                    const Eet_Dictionary *ed,
@@ -446,12 +1101,64 @@ eet_data_get_union(Eet_Free_Context     *context,
                    void                 *data,
                    char                **p,
                    int                  *size);
+/**
+ * @brief Encodes a variant type from a C struct into an Eet data stream.
+ * Variants are similar to unions but more flexible, potentially handling types
+ * not known at compile time (by storing them as opaque blobs if `unknow` is true).
+ *
+ * Eet File Structure for a variant:
+ * 1. Type Name Chunk:
+ *    - Name: `ede->name`
+ *    - Type: EET_T_STRING
+ *    - Group Type: `ede->group_type` (EET_G_VARIANT)
+ *    - Payload: String name of the active type, from `ede->subtype->func.type_get()`.
+ *
+ * 2. Data Chunk:
+ *    - Name: `ede->name`
+ *    - Type: `ede->type` (often EET_T_UNKNOW)
+ *    - Group Type: `ede->group_type`
+ *    - Payload: If known type: encoded data of the active member.
+ *               If `unknow` is true: the raw data from `Eet_Variant_Unknow::data`.
+ *
+ * @param ed The Eet dictionary.
+ * @param edd The data descriptor for the parent structure (unused).
+ * @param ede The data element descriptor for the variant field.
+ * @param ds The Eet data stream to write to.
+ * @param data_in Pointer to the C struct containing the variant.
+ */
 static void
 eet_data_put_variant(Eet_Dictionary      *ed,
                      Eet_Data_Descriptor *edd,
                      Eet_Data_Element    *ede,
                      Eet_Data_Stream     *ds,
                      void                *data_in);
+/**
+ * @brief Decodes a variant type from an Eet data stream into a C struct's variant field.
+ *
+ * Expects the Eet file structure described in `eet_data_put_variant`.
+ * 1. Reads the Type Name Chunk to get the string name of the active type.
+ * 2. If a corresponding element is found in `ede->subtype->elements`:
+ *    - Decodes the Data Chunk based on the found element's descriptor.
+ *    - Stores the decoded data (often a pointer to a new structure) in `*(void **)data`.
+ *    - Calls `ede->subtype->func.type_set()` with `unknow = EINA_FALSE`.
+ * 3. If no corresponding element is found (type is unknown to the descriptor):
+ *    - Allocates an `Eet_Variant_Unknow` structure.
+ *    - Copies the raw payload of the Data Chunk into `Eet_Variant_Unknow::data`.
+ *    - Stores a pointer to this `Eet_Variant_Unknow` in `*(void **)data`.
+ *    - Calls `ede->subtype->func.type_set()` with `unknow = EINA_TRUE`.
+ *
+ * @param context The memory free context.
+ * @param ed The Eet dictionary.
+ * @param edd The data descriptor for the parent structure (unused).
+ * @param ede The data element descriptor for the variant field.
+ * @param echnk The current data chunk (Type Name Chunk).
+ * @param type Expected Eet_T_XXX type for the variant (usually EET_T_UNKNOW).
+ * @param group_type Expected Eet_G_XXX group type (EET_G_VARIANT).
+ * @param data Pointer to the C variant field (e.g., `void **my_variant_ptr`) in the C struct.
+ * @param p Pointer to the current position in the Eet data stream. Will be updated.
+ * @param size Remaining size of the Eet data stream. Will be updated.
+ * @return 1 on success, 0 or negative on error.
+ */
 static int
 eet_data_get_variant(Eet_Free_Context     *context,
                      const Eet_Dictionary *ed,
@@ -464,43 +1171,141 @@ eet_data_get_variant(Eet_Free_Context     *context,
                      char                **p,
                      int                  *size);
 
+/**
+ * @brief Parses a raw data buffer to populate an Eet_Data_Chunk structure.
+ * Reads the chunk header (magic, type, size, name) and sets up the
+ * `chnk->data` pointer and `chnk->size` for the payload.
+ * Handles different chunk magic ("CHnK" for untyped/legacy, "CHKx" for typed).
+ * @param ed The Eet dictionary (used for name lookup if dictionary is active).
+ * @param[out] chnk Pointer to the Eet_Data_Chunk structure to populate.
+ * @param src Pointer to the raw data buffer containing the chunk.
+ * @param size Total size of the raw data buffer.
+ */
 static void
 eet_data_chunk_get(const Eet_Dictionary *ed,
                    Eet_Data_Chunk       *chnk,
                    const void           *src,
                    int                   size);
+/**
+ * @brief Allocates and initializes a new Eet_Data_Chunk.
+ * @param data Pointer to the payload data for this chunk.
+ * @param size Size of the payload data.
+ * @param name Name of the chunk.
+ * @param type Basic type of the chunk (EET_T_XXX).
+ * @param group_type Group type of the chunk (EET_G_XXX).
+ * @return A pointer to the newly allocated Eet_Data_Chunk, or NULL on failure. Caller must free.
+ */
 static Eet_Data_Chunk *
 eet_data_chunk_new(void       *data,
                    int         size,
                    const char *name,
                    int         type,
                    int         group_type);
+/**
+ * @brief Frees an Eet_Data_Chunk structure.
+ * Note: This only frees the Eet_Data_Chunk struct itself, not the data it might point to
+ * if `data` was separately allocated.
+ * @param chnk Pointer to the Eet_Data_Chunk to free.
+ */
 static void
 eet_data_chunk_free(Eet_Data_Chunk *chnk);
 
+/**
+ * @brief Allocates and initializes a new Eet_Data_Stream.
+ * @return Pointer to the new Eet_Data_Stream, or NULL on failure. Caller must free.
+ */
 static Eet_Data_Stream *
  eet_data_stream_new(void);
+/**
+ * @brief Writes data to an Eet_Data_Stream.
+ * Appends the given data to the stream's buffer, reallocating the buffer if necessary.
+ * @param ds The Eet_Data_Stream to write to.
+ * @param data Pointer to the data to write.
+ * @param size Number of bytes to write.
+ */
 static void
  eet_data_stream_write(Eet_Data_Stream *ds,
                       const void       *data,
                       int               size);
+/**
+ * @brief Frees an Eet_Data_Stream and its internal buffer.
+ * @param ds The Eet_Data_Stream to free.
+ */
 static void
 eet_data_stream_free(Eet_Data_Stream *ds);
 
+/**
+ * @brief Writes an Eet_Data_Chunk (header and payload) to an Eet_Data_Stream.
+ * Constructs the chunk header (magic, size, name) and writes it, followed by the
+ * chunk's payload data, into the provided stream.
+ * @param ed The Eet dictionary (used for encoding the chunk name if dictionary is active).
+ * @param chnk The Eet_Data_Chunk to write.
+ * @param ds The Eet_Data_Stream to write to.
+ */
 static void
 eet_data_chunk_put(Eet_Dictionary  *ed,
                    Eet_Data_Chunk  *chnk,
                    Eet_Data_Stream *ds);
 
+/**
+ * @brief Callback function used when iterating over a hash table for encoding.
+ * This function is called for each key-value pair in the hash table.
+ * It encodes the key as a string chunk, then encodes the value chunk.
+ * @param hash The hash table being iterated (unused).
+ * @param key The current key from the hash table.
+ * @param hdata Pointer to the current value data from the hash table.
+ * @param fdata Pointer to an Eet_Data_Encode_Hash_Info structure containing stream, element descriptor, and dictionary.
+ * @return 1 to continue iteration, 0 to stop.
+ */
 static int
 eet_data_descriptor_encode_hash_cb(void       *hash,
                                    const char *key,
                                    void       *hdata,
                                    void       *fdata);
+/**
+ * @brief Core recursive function to encode a C structure into an Eet data stream.
+ * It iterates through all elements defined in the Eet_Data_Descriptor. For each element,
+ * it calls the appropriate `put` function (from `eet_group_codec` or `eet_basic_codec`)
+ * to encode the element's data from the `data_in` C structure into an intermediate stream.
+ * Finally, it wraps the entire encoded structure data into a single top-level chunk.
+ * @param ed The Eet dictionary.
+ * @param edd The Eet_Data_Descriptor describing the C structure `data_in`.
+ * @param data_in Pointer to the C structure to be encoded.
+ * @param[out] size_ret Pointer to store the total size of the encoded data (including the top-level chunk header).
+ * @return A pointer to a newly allocated buffer containing the fully encoded data. Caller must free. NULL on error.
+ */
 static void *_eet_data_descriptor_encode(Eet_Dictionary      *ed,
                                          Eet_Data_Descriptor *edd,
                                          const void          *data_in,
                                          int                 *size_ret);
+/**
+ * @brief Core recursive function to decode Eet data into a C structure or an Eet_Node tree.
+ *
+ * If `edd` is provided, it decodes data into a C structure:
+ * - Allocates memory for the C structure using `edd->func.mem_alloc` if `data_out` is NULL.
+ * - Parses the top-level chunk from `data_in`.
+ * - Iterates through sub-chunks within the top-level chunk. For each sub-chunk:
+ *   - Finds the corresponding Eet_Data_Element in `edd` by name.
+ *   - Calls the appropriate `get` function (from `eet_group_codec`) to decode the
+ *     sub-chunk's data into the correct field of the C structure.
+ * - Manages memory allocations using the `context` (Eet_Free_Context).
+ *
+ * If `edd` is NULL, it decodes data into a generic Eet_Node tree:
+ * - Parses chunks and creates corresponding Eet_Nodes (struct, array, list, simple types).
+ * - Recursively calls itself for nested structures.
+ *
+ * @param context The memory free context for managing allocations during decoding.
+ * @param ed The Eet dictionary.
+ * @param edd The Eet_Data_Descriptor for the target C structure. If NULL, decodes to an Eet_Node tree.
+ * @param data_in Pointer to the raw Eet data to be decoded.
+ * @param size_in Size of the `data_in` buffer.
+ * @param data_out Optional. If `edd` is provided and `data_out` is non-NULL, this is a pre-allocated
+ *                 buffer for the C structure. Its size must be at least `edd->size`.
+ * @param size_out Size of the `data_out` buffer if provided.
+ * @return If `edd` is provided: Pointer to the populated C structure (either `data_out` or newly allocated).
+ *         If `edd` is NULL: Pointer to the root Eet_Node of the decoded tree.
+ *         Returns NULL on error. If newly allocated, caller is responsible for freeing (often via `eet_data_descriptor_free_all`).
+ */
 static void *_eet_data_descriptor_decode(Eet_Free_Context     *context,
                                          const Eet_Dictionary *ed,
                                          Eet_Data_Descriptor  *edd,
@@ -541,9 +1346,14 @@ static const Eet_Data_Group_Type_Codec eet_group_codec[] =
    { eet_data_get_hash, eet_data_put_hash },
    { eet_data_get_union, eet_data_put_union },
    { eet_data_get_variant, eet_data_put_variant },
-   { eet_data_get_unknown, eet_data_put_unknown }
+   { eet_data_get_unknown, eet_data_put_unknown } /**< Fallback for unknown or nested structures not part of other groups. */
 };
 
+/** @internal
+ * @brief Global flag indicating if the current architecture is big-endian.
+ * -1: not yet determined. 0: little-endian. 1: big-endian.
+ * Initialized on first use.
+ */
 static int _eet_data_words_bigendian = -1;
 
 /*---*/
@@ -561,32 +1371,66 @@ static int _eet_data_words_bigendian = -1;
   ((((int)(x) & 0x000000ff) << 24) | \
    (((int)(x) & 0x0000ff00) << 8) |  \
    (((int)(x) & 0x00ff0000) >> 8) |  \
-   (((int)(x) & 0xff000000) >> 24))
+   (((int)(x) & 0xff000000) >> 24)) /**< Macro to byte-swap a 32-bit integer. */
 #define SWAP16(x) (x) =           \
   ((((short)(x) & 0x00ff) << 8) | \
-   (((short)(x) & 0xff00) >> 8))
+   (((short)(x) & 0xff00) >> 8)) /**< Macro to byte-swap a 16-bit integer. */
 
+/** @internal
+ * @def CONV8(x)
+ * @brief Macro for endian conversion of 8-bit data (no-op).
+ */
 #ifdef CONV8
 # undef CONV8
 #endif /* ifdef CONV8 */
 #ifdef CONV16
 # undef CONV16
 #endif /* ifdef CONV16 */
+/** @internal
+ * @def CONV32(x)
+ * @brief Macro for conditional endian conversion of 32-bit data.
+ * Swaps bytes if the architecture is big-endian.
+ */
 #ifdef CONV32
 # undef CONV32
 #endif /* ifdef CONV32 */
+/** @internal
+ * @def CONV64(x)
+ * @brief Macro for conditional endian conversion of 64-bit data.
+ * Swaps bytes if the architecture is big-endian.
+ */
 #ifdef CONV64
 # undef CONV64
 #endif /* ifdef CONV64 */
 
 #define CONV8(x)
+/** @internal @brief Conditionally swaps a 16-bit value if on a big-endian system. */
 #define CONV16(x)             {if (_eet_data_words_bigendian) {SWAP16(x); }}
+/** @internal @brief Conditionally swaps a 32-bit value if on a big-endian system. */
 #define CONV32(x)             {if (_eet_data_words_bigendian) {SWAP32(x); }}
+/** @internal @brief Conditionally swaps a 64-bit value if on a big-endian system. */
 #define CONV64(x)             {if (_eet_data_words_bigendian) {SWAP64(x); }}
 
+/** @internal @brief Checks if a type is a simple, non-group Eet type. */
 #define IS_SIMPLE_TYPE(Type)  (Type > EET_T_UNKNOW && Type < EET_T_LAST)
+/** @internal @brief Checks if a type is one that typically involves pointers (string, inlined string, NULL, Eina_Value). */
 #define IS_POINTER_TYPE(Type) ((Type >= EET_T_STRING && Type <= EET_T_NULL) || Type == EET_T_VALUE)
 
+/**
+ * @internal
+ * @brief Macro helper for decoding pointer types (string, inlined string, NULL, Eina_Value).
+ * Calls eet_data_get_unknown to handle the actual decoding of these types.
+ * @param Context The Eet_Free_Context.
+ * @param Ed The Eet_Dictionary.
+ * @param Edd The parent Eet_Data_Descriptor.
+ * @param Ede The Eet_Data_Element for the current field.
+ * @param Echnk The Eet_Data_Chunk containing the data.
+ * @param Type The Eet_T_XXX type to decode.
+ * @param Data Pointer to where the decoded data (usually a pointer itself) will be stored.
+ * @param P Pointer to the current position in the Eet stream.
+ * @param Size Remaining size of the Eet stream.
+ * @param Label Goto label for error handling.
+ */
 #define POINTER_TYPE_DECODE(Context,                    \
                             Ed,                         \
                             Edd,                        \
@@ -608,6 +1452,20 @@ static int _eet_data_words_bigendian = -1;
        if (!___r) { goto Label; }                       \
     } while (0)
 
+/**
+ * @internal
+ * @brief Macro helper for decoding nested structures.
+ * Calls _eet_data_descriptor_decode recursively to decode a sub-structure.
+ * @param Data_Ret Variable to store the pointer to the decoded sub-structure.
+ * @param Context The Eet_Free_Context.
+ * @param Ed The Eet_Dictionary.
+ * @param Ede The Eet_Data_Descriptor for the sub-structure type.
+ * @param Data Pointer to the Eet chunk data for the sub-structure.
+ * @param Size Size of the Eet chunk data.
+ * @param SubSize If > 0, `Data_Ret` is assumed to be pre-allocated buffer of this size.
+ *                If <=0, `_eet_data_descriptor_decode` will allocate memory.
+ * @param Label Goto label for error handling.
+ */
 #define STRUCT_TYPE_DECODE(Data_Ret, Context, Ed, Ede, Data, Size, SubSize, Label) \
   do {                                                                             \
        Data_Ret = _eet_data_descriptor_decode(Context,                             \
@@ -620,11 +1478,16 @@ static int _eet_data_words_bigendian = -1;
        EINA_SAFETY_ON_NULL_GOTO(Data_Ret, Label);                                 \
     } while (0)
 
+/** @internal @brief Internal type identifier for string when combined with a group type. */
 #define EET_I_STRING         1 << 4
+/** @internal @brief Internal type identifier for inlined string when combined with a group type. */
 #define EET_I_INLINED_STRING 2 << 4
+/** @internal @brief Internal type identifier for NULL when combined with a group type. */
 #define EET_I_NULL           3 << 4
+/** @internal @brief Internal type identifier for Eina_Value when combined with a group type. */
 #define EET_I_VALUE          4 << 4
 
+/** @internal @brief Magic number for Eet_Variant_Unknow structures. */
 #define EET_MAGIC_VARIANT    0xF1234BC
 /*---*/
 
@@ -1925,6 +2788,7 @@ eet_eina_stream_data_descriptor_class_set(Eet_Data_Descriptor_Class *eddc,
                                           const char                *name,
                                           int                        size)
 {
+   // TODO: Add Doxygen comment for this function
    if (!eddc || !name || eddc_size != sizeof (Eet_Data_Descriptor_Class))
      return EINA_FALSE;
 
@@ -1962,6 +2826,7 @@ eet_eina_file_data_descriptor_class_set(Eet_Data_Descriptor_Class *eddc,
                                         const char                *name,
                                         int                        size)
 {
+   // TODO: Add Doxygen comment for this function
    if (!eet_eina_stream_data_descriptor_class_set(eddc, eddc_size, name, size))
      return EINA_FALSE;
 
@@ -2132,6 +2997,19 @@ eet_data_descriptor_element_add(Eet_Data_Descriptor *edd,
                                 const char          *counter_name /* FIXME: Useless should go on a major release */,
                                 Eet_Data_Descriptor *subtype)
 {
+   // TODO: Add Doxygen comment for this function, including examples for array structures.
+   // Example for fixed array of 5 integers:
+   // eet_data_descriptor_element_add(my_edd, "fixed_ints", EET_T_INT, EET_G_ARRAY, offsetof(S, fixed_ints), 5, NULL, NULL);
+   // Example for variable array of strings (char **):
+   // eet_data_descriptor_element_add(my_edd, "var_strings", EET_T_STRING, EET_G_VAR_ARRAY, offsetof(S, var_strings_ptr), offsetof(S, var_strings_count), NULL, NULL);
+   //   Here, 'count' parameter is the offset of the integer field storing the array's length.
+   // Example for a list of MySubStruct:
+   // eet_data_descriptor_element_add(my_edd, "list_subs", EET_T_UNKNOW, EET_G_LIST, offsetof(S, list_of_subs), 0, NULL, my_sub_struct_edd);
+   // Example for a nested struct:
+   // eet_data_descriptor_element_add(my_edd, "nested_item", EET_T_UNKNOW, EET_G_UNKNOWN_NESTED, offsetof(S, nested_item_instance), 0, NULL, my_sub_struct_edd);
+   // Example for a pointer to a struct:
+   // eet_data_descriptor_element_add(my_edd, "ptr_item", EET_T_UNKNOW, EET_G_UNKNOWN, offsetof(S, ptr_to_item_instance), 0, NULL, my_sub_struct_edd);
+
    Eet_Data_Element *ede;
    Eet_Data_Element *tmp;
 
@@ -2264,6 +3142,7 @@ eet_data_read_cipher(Eet_File            *ef,
                      const char          *name,
                      const char          *cipher_key)
 {
+   // TODO: Add Doxygen comment for this function
    const Eet_Dictionary *ed = NULL;
    const void *data = NULL;
    void *data_dec;
@@ -2305,6 +3184,7 @@ eet_data_read_cipher_buffer(Eet_File            *ef,
                             char* buffer,
                             int buffer_size)
 {
+   // TODO: Add Doxygen comment for this function
    const Eet_Dictionary *ed = NULL;
    const void *data = NULL;
    void *data_dec;
@@ -2343,6 +3223,7 @@ eet_data_node_read_cipher(Eet_File   *ef,
                           const char *name,
                           const char *cipher_key)
 {
+   // TODO: Add Doxygen comment for this function
    const Eet_Dictionary *ed = NULL;
    const void *data = NULL;
    Eet_Node *result;
@@ -2391,6 +3272,7 @@ eet_data_write_cipher(Eet_File            *ef,
                       const void          *data,
                       int                  comp)
 {
+   // TODO: Add Doxygen comment for this function
    Eet_Dictionary *ed;
    void *data_enc;
    int size;
@@ -2495,6 +3377,7 @@ static void
 _eet_freelist_free(Eet_Free_Context    *context,
                    Eet_Data_Descriptor *edd)
 {
+   // TODO: Add Doxygen comment for this function
    void *track;
    Eina_Array_Iterator it;
    unsigned int i;
@@ -2522,6 +3405,7 @@ static void
 _eet_freelist_array_free(Eet_Free_Context    *context,
                          Eet_Data_Descriptor *edd)
 {
+   // TODO: Add Doxygen comment for this function
    void *track;
    Eina_Array_Iterator it;
    unsigned int i;
@@ -2554,6 +3438,7 @@ static void
 _eet_freelist_list_free(Eet_Free_Context    *context,
                         Eet_Data_Descriptor *edd)
 {
+   // TODO: Add Doxygen comment for this function
    void *track;
    Eina_Array_Iterator it;
    unsigned int i;
@@ -2579,6 +3464,7 @@ static void
 _eet_freelist_str_free(Eet_Free_Context    *context,
                        Eet_Data_Descriptor *edd)
 {
+   // TODO: Add Doxygen comment for this function
    void *track;
    Eina_Array_Iterator it;
    unsigned int i;
@@ -2606,6 +3492,7 @@ static void
 _eet_freelist_direct_str_free(Eet_Free_Context    *context,
                               Eet_Data_Descriptor *edd)
 {
+   // TODO: Add Doxygen comment for this function
    void *track;
    Eina_Array_Iterator it;
    unsigned int i;
@@ -2633,6 +3520,7 @@ static void
 _eet_freelist_hash_free(Eet_Free_Context    *context,
                         Eet_Data_Descriptor *edd)
 {
+   // TODO: Add Doxygen comment for this function
    void *track;
    Eina_Array_Iterator it;
    unsigned int i;

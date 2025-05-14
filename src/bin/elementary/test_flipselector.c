@@ -3,6 +3,12 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback for item selection in a flipselector.
+ * @param data User data, unused here.
+ * @param obj The flipselector object, unused here.
+ * @param event_info The selected item.
+ */
 void
 _sel_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -12,6 +18,12 @@ _sel_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
    printf("label of selected item is: %s\n", elm_object_item_text_get(it));
 }
 
+/**
+ * @brief Callback to unselect the currently selected item in a flipselector.
+ * @param data The flipselector widget.
+ * @param obj The object that triggered the callback, unused here.
+ * @param event_info Event info, unused here.
+ */
 void
 _unsel_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -21,6 +33,12 @@ _unsel_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED
    elm_flipselector_item_selected_set(it, EINA_FALSE);
 }
 
+/**
+ * @brief Callback to select the last item in a flipselector.
+ * @param data The flipselector widget.
+ * @param obj The object that triggered the callback, unused here.
+ * @param event_info Event info, unused here.
+ */
 void
 _last_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -30,6 +48,15 @@ _last_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_flipselector_item_selected_set(it, EINA_TRUE);
 }
 
+/**
+ * @brief Callback to select the third item from the end in a flipselector.
+ *
+ * This demonstrates traversing items backwards from the last item.
+ *
+ * @param data The flipselector widget.
+ * @param obj The object that triggered the callback, unused here.
+ * @param event_info Event info, unused here.
+ */
 void
 _third_from_end_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -41,18 +68,42 @@ _third_from_end_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EI
    elm_flipselector_item_selected_set(it, EINA_TRUE);
 }
 
+/**
+ * @brief Callback for the "underflowed" event of a flipselector.
+ *
+ * This is called when the flipselector is flipped backwards from the first item.
+ *
+ * @param data User data, unused here.
+ * @param obj The flipselector object, unused here.
+ * @param event_info Event info, unused here.
+ */
 void
 _underflow_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("underflow!\n");
 }
 
+/**
+ * @brief Callback for the "overflowed" event of a flipselector.
+ *
+ * This is called when the flipselector is flipped forwards from the last item.
+ *
+ * @param data User data, unused here.
+ * @param obj The flipselector object, unused here.
+ * @param event_info Event info, unused here.
+ */
 void
 _overflow_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    printf("overflow!\n");
 }
 
+/**
+ * @brief Callback for slider value change to update flipselector's interval.
+ * @param data The flipselector widget to modify.
+ * @param obj The slider widget that triggered the event.
+ * @param event_info Event info, unused here.
+ */
 void
 slider_change_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -62,6 +113,12 @@ slider_change_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_flipselector_first_interval_set(fl, val);
 }
 
+/**
+ * @brief Callback to programmatically flip to the next item.
+ * @param data The flipselector widget.
+ * @param obj The object that triggered the callback, unused here.
+ * @param event_info Event info, unused here.
+ */
 void
 flip_next_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -69,6 +126,12 @@ flip_next_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNU
    elm_flipselector_flip_next(fp);
 }
 
+/**
+ * @brief Callback to programmatically flip to the previous item.
+ * @param data The flipselector widget.
+ * @param obj The object that triggered the callback, unused here.
+ * @param event_info Event info, unused here.
+ */
 void
 flip_prev_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -76,6 +139,34 @@ flip_prev_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNU
    elm_flipselector_flip_prev(fp);
 }
 
+/**
+ * @brief Main test function for the flipselector widget.
+ *
+ * This function creates a window and populates it with several flipselector
+ * widgets and other controls to test various features of the flipselector.
+ *
+ * It demonstrates:
+ * - Creating flipselectors with static and dynamically generated items.
+ * - Setting callbacks for selection, overflow, and underflow.
+ * - Programmatic selection and flipping of items.
+ * - A disabled flipselector.
+ * - Adjusting flip interval with a slider.
+ * - Using a flipselector with numerical range values.
+ *
+ * The `lbl` array provides labels for the first flipselector.
+ * Example structure:
+ * @code
+ * static const char *lbl[] = {
+ *     "Elementary", // Item 1
+ *     "Evas",       // Item 2
+ *     ...
+ * };
+ * @endcode
+ *
+ * @param data User data, unused here.
+ * @param obj The object that triggered the callback, unused here.
+ * @param event_info Event info, unused here.
+ */
 void
 test_flipselector(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

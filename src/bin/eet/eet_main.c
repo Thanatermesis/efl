@@ -36,6 +36,19 @@ static int _eet_main_log_dom = -1;
 #endif /* ifdef CRI */
 #define CRI(...) EINA_LOG_DOM_CRIT(_eet_main_log_dom, __VA_ARGS__)
 
+/**
+ * @brief Lists all entries in an Eet file.
+ *
+ * This function opens an Eet file, iterates through its entries,
+ * and prints their names. If verbose mode is enabled, it also
+ * prints additional details like alias information, offset, size,
+ * and uncompressed size for each entry, as well as the total
+ * payload size.
+ *
+ * @param file The path to the Eet file.
+ * @param verbose If EINA_TRUE, print detailed information for each entry.
+ *                Otherwise, print only entry names.
+ */
 static void
 do_eet_list(const char *file, Eina_Bool verbose)
 {
@@ -88,6 +101,17 @@ do_eet_list(const char *file, Eina_Bool verbose)
    eet_close(ef);
 } /* do_eet_list */
 
+/**
+ * @brief Prints statistics about an Eet file.
+ *
+ * This function opens an Eet file and displays statistics, including:
+ * - Information about each section (compressed or not, size).
+ * - Dictionary information (number of strings).
+ * - Global statistics (total sections, number and percentage of
+ *   compressed/uncompressed sections, and their respective total sizes).
+ *
+ * @param file The path to the Eet file.
+ */
 static void
 do_eet_stats(const char *file)
 {
@@ -145,6 +169,18 @@ do_eet_stats(const char *file)
    eet_close(ef);
 }
 
+/**
+ * @brief Extracts data associated with a key from an Eet file.
+ *
+ * This function opens an Eet file, reads the data associated with the
+ * specified key (optionally decrypting it if a crypto_key is provided),
+ * and writes it to an output file or standard output.
+ *
+ * @param file The path to the Eet file.
+ * @param key The key of the data entry to extract.
+ * @param out The path to the output file. If NULL, data is written to stdout.
+ * @param crypto_key The key for decryption. If NULL, no decryption is performed.
+ */
 static void
 do_eet_extract(const char *file,
                const char *key,
@@ -191,6 +227,15 @@ do_eet_extract(const char *file,
    eet_close(ef);
 } /* do_eet_extract */
 
+/**
+ * @brief Callback function to write decoded string data to a file.
+ *
+ * This function is used by eet_data_dump_cipher (via do_eet_decode)
+ * to write chunks of decoded string data.
+ *
+ * @param data A pointer to a FILE structure where the string will be written.
+ * @param str The null-terminated string to write.
+ */
 static void
 do_eet_decode_dump(void       *data,
                    const char *str)
@@ -198,6 +243,19 @@ do_eet_decode_dump(void       *data,
    fputs(str, (FILE *)data);
 } /* do_eet_decode_dump */
 
+/**
+ * @brief Decodes and dumps data associated with a key from an Eet file.
+ *
+ * This function opens an Eet file, decodes the data associated with the
+ * specified key (optionally decrypting it if a crypto_key is provided),
+ * and writes the decoded string representation to an output file or
+ * standard output using the do_eet_decode_dump callback.
+ *
+ * @param file The path to the Eet file.
+ * @param key The key of the data entry to decode.
+ * @param out The path to the output file. If NULL, data is written to stdout.
+ * @param crypto_key The key for decryption. If NULL, no decryption is performed.
+ */
 static void
 do_eet_decode(const char *file,
               const char *key,
@@ -234,6 +292,20 @@ do_eet_decode(const char *file,
    eet_close(ef);
 } /* do_eet_decode */
 
+/**
+ * @brief Inserts data from a file into an Eet file under a specified key.
+ *
+ * This function reads data from an input file and writes it into an Eet file
+ * associated with the given key. The data can be optionally compressed and
+ * encrypted. If the Eet file does not exist, it will be created. If it
+ * exists, it will be opened in read-write mode.
+ *
+ * @param file The path to the Eet file.
+ * @param key The key under which to store the data in the Eet file.
+ * @param in The path to the input file containing the data to insert.
+ * @param compress An integer flag (0 or 1). If 1, the data will be compressed.
+ * @param crypto_key The key for encryption. If NULL, no encryption is performed.
+ */
 static void
 do_eet_insert(const char *file,
               const char *key,
@@ -292,6 +364,22 @@ do_eet_insert(const char *file,
    eet_close(ef);
 } /* do_eet_insert */
 
+/**
+ * @brief Encodes and inserts text data from a file into an Eet file.
+ *
+ * This function reads text data from an input file, encodes it (which might
+ * involve parsing it based on an Eet data descriptor if one were used, though
+ * this function uses eet_data_undump_cipher which implies a simpler text dump),
+ * and writes it into an Eet file associated with the given key. The data can be
+ * optionally compressed and encrypted. If the Eet file does not exist, it will
+ * be created. If it exists, it will be opened in read-write mode.
+ *
+ * @param file The path to the Eet file.
+ * @param key The key under which to store the encoded data in the Eet file.
+ * @param in The path to the input file containing the text data to encode.
+ * @param compress An integer flag (0 or 1). If 1, the data will be compressed.
+ * @param crypto_key The key for encryption. If NULL, no encryption is performed.
+ */
 static void
 do_eet_encode(const char *file,
               const char *key,
@@ -356,6 +444,15 @@ do_eet_encode(const char *file,
    eet_close(ef);
 } /* do_eet_encode */
 
+/**
+ * @brief Removes an entry from an Eet file.
+ *
+ * This function opens an Eet file in read-write mode and deletes the
+ * entry associated with the specified key.
+ *
+ * @param file The path to the Eet file.
+ * @param key The key of the entry to remove.
+ */
 static void
 do_eet_remove(const char *file,
               const char *key)
@@ -373,6 +470,16 @@ do_eet_remove(const char *file,
    eet_close(ef);
 } /* do_eet_remove */
 
+/**
+ * @brief Checks and reports the signature information of an Eet file.
+ *
+ * This function opens an Eet file and attempts to retrieve and display
+ * information about its X.509 certificate and signature. It prints the
+ * certificate length, the certificate details, and the signature length.
+ * If no certificate is found, it reports that.
+ *
+ * @param file The path to the Eet file to check.
+ */
 static void
 do_eet_check(const char *file)
 {
@@ -406,6 +513,17 @@ do_eet_check(const char *file)
    eet_close(ef);
 } /* do_eet_check */
 
+/**
+ * @brief Signs an Eet file with a private key and attaches a public key certificate.
+ *
+ * This function opens an Eet file in read-write mode, loads a private/public
+ * key pair, and then signs the Eet file using this identity. The public key
+ * part of the identity is stored as the certificate in the Eet file.
+ *
+ * @param file The path to the Eet file to sign.
+ * @param private_key The path to the file containing the private key.
+ * @param public_key The path to the file containing the public key (certificate).
+ */
 static void
 do_eet_sign(const char *file,
             const char *private_key,
@@ -436,6 +554,24 @@ do_eet_sign(const char *file,
    eet_close(ef);
 } /* do_eet_sign */
 
+/**
+ * @brief Main entry point for the Eet command-line utility.
+ *
+ * Parses command-line arguments to perform various operations on Eet files,
+ * such as listing entries, extracting data, inserting data, encoding/decoding
+ * data, removing entries, checking signatures, signing files, and displaying
+ * file statistics.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv An array of command-line argument strings.
+ *             Example: `argv[0]` is program name, `argv[1]` is first argument.
+ *             Structure of argv for listing:
+ *             `argv = {"eet", "-l", "FILE.EET", NULL}` or
+ *             `argv = {"eet", "-l", "-v", "FILE.EET", NULL}`
+ *             Structure of argv for extracting:
+ *             `argv = {"eet", "-x", "FILE.EET", "KEY", "[OUT-FILE]", "[CRYPTO_KEY]", NULL}`
+ * @return Returns 0 on success, -1 on failure or for help/version display.
+ */
 int
 main(int    argc,
      char **argv)

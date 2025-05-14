@@ -48,6 +48,17 @@ EAPI Elm_Version *elm_version = &_version;
 
 Eina_FreeQ *postponed_fq = NULL;
 
+/**
+ * @internal
+ * @brief Callback function to redirect focus geometry changed events.
+ *
+ * This function is called when the position or size of a monitored object changes.
+ * It retrieves the new focus geometry from the @p data (the goal object)
+ * and calls the EFL_UI_FOCUS_OBJECT_EVENT_FOCUS_GEOMETRY_CHANGED event on it.
+ *
+ * @param data The Efl_Ui_Focus_Object that is the target for the geometry change event.
+ * @param ev The Efl_Event that triggered this callback (unused).
+ */
 static void
 _focus_ev_redirect_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -55,6 +66,17 @@ _focus_ev_redirect_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_event_callback_call(data, EFL_UI_FOCUS_OBJECT_EVENT_FOCUS_GEOMETRY_CHANGED, &rect);
 }
 
+/**
+ * @internal
+ * @brief Sets up redirection of position and size change events from one focus object to another.
+ *
+ * When @p obj's position or size changes, the _focus_ev_redirect_cb function
+ * will be called with @p goal as its data. This effectively makes @p goal
+ * aware of geometry changes in @p obj.
+ *
+ * @param obj The Efl_Ui_Focus_Object whose geometry changes are to be monitored.
+ * @param goal The Efl_Ui_Focus_Object to which the geometry change notifications are redirected.
+ */
 void
 _efl_ui_focus_event_redirector(Efl_Ui_Focus_Object *obj, Efl_Ui_Focus_Object *goal)
 {
@@ -62,6 +84,17 @@ _efl_ui_focus_event_redirector(Efl_Ui_Focus_Object *obj, Efl_Ui_Focus_Object *go
    efl_event_callback_add(obj, EFL_GFX_ENTITY_EVENT_SIZE_CHANGED, _focus_ev_redirect_cb, goal);
 }
 
+/**
+ * @internal
+ * @brief Deletes event forwarders from a focus manager to a specific object.
+ *
+ * This function removes the forwarding of several focus manager events
+ * (FLUSH_PRE, REDIRECT_CHANGED, MANAGER_FOCUS_CHANGED, COORDS_DIRTY,
+ * DIRTY_LOGIC_FREEZE_CHANGED) from the @p manager to the given @p obj.
+ *
+ * @param manager The Efl_Ui_Focus_Manager from which to delete event forwarders.
+ * @param obj The Eo object that was previously the target of forwarded events.
+ */
 void
 _efl_ui_focus_manager_redirect_events_del(Efl_Ui_Focus_Manager *manager, Eo *obj)
 {
@@ -72,6 +105,17 @@ _efl_ui_focus_manager_redirect_events_del(Efl_Ui_Focus_Manager *manager, Eo *obj
    efl_event_callback_forwarder_del(manager, EFL_UI_FOCUS_MANAGER_EVENT_DIRTY_LOGIC_FREEZE_CHANGED, obj);
 }
 
+/**
+ * @internal
+ * @brief Adds event forwarders from a focus manager to a specific object.
+ *
+ * This function sets up forwarding for several focus manager events
+ * (FLUSH_PRE, REDIRECT_CHANGED, MANAGER_FOCUS_CHANGED, COORDS_DIRTY,
+ * DIRTY_LOGIC_FREEZE_CHANGED) from the @p manager to the given @p obj.
+ *
+ * @param manager The Efl_Ui_Focus_Manager from which to forward events.
+ * @param obj The Eo object that will be the target of forwarded events.
+ */
 void
 _efl_ui_focus_manager_redirect_events_add(Efl_Ui_Focus_Manager *manager, Eo *obj)
 {
@@ -82,6 +126,20 @@ _efl_ui_focus_manager_redirect_events_add(Efl_Ui_Focus_Manager *manager, Eo *obj
    efl_event_callback_forwarder_add(manager, EFL_UI_FOCUS_MANAGER_EVENT_DIRTY_LOGIC_FREEZE_CHANGED, obj);
 }
 
+/**
+ * @internal
+ * @brief Checks if a "dangerous" Elementary function call is being made and warns the user.
+ *
+ * Some Elementary functions are considered "dangerous" because their misuse can lead
+ * to unexpected behavior or crashes. This function checks if the environment variable
+ * ELM_NO_FINGER_WAGGLING is set to the current Elementary version. If not, and a
+ * dangerous function (identified by @p call) is used, an error message is printed
+ * to the console.
+ *
+ * @param call A string identifying the dangerous function being called (e.g., "elm_object_focus_set").
+ * @return EINA_TRUE if the warning was printed (i.e., the call is considered dangerous
+ *         and the environment variable is not set correctly), EINA_FALSE otherwise.
+ */
 Eina_Bool
 _elm_dangerous_call_check(const char *call)
 {
@@ -112,6 +170,7 @@ static Eina_Bool _elm_signal_exit(void *data,
                                   int   ev_type,
                                   void *ev);
 
+// Global prefix for Elementary library paths
 static Eina_Prefix *pfx = NULL;
 char *_elm_appname = NULL;
 const char *_elm_data_dir = NULL;
@@ -127,9 +186,23 @@ static int _elm_sub_init_count = 0;
 static int _elm_ql_init_count = 0;
 static Eina_Bool _elm_prefs_initted = EINA_FALSE;
 static int _elm_policies[ELM_POLICY_LAST];
+// Event handler for exit signals
 static Ecore_Event_Handler *_elm_exit_handler = NULL;
+// Flag indicating if quicklaunch mode is active
 static Eina_Bool quicklaunch_on = 0;
 
+/**
+ * @internal
+ * @brief Handles exit signals (e.g., SIGINT, SIGTERM) by calling elm_exit().
+ *
+ * This function is registered as an Ecore event handler for ECORE_EVENT_SIGNAL_EXIT.
+ * When an exit signal is received, it initiates the Elementary shutdown sequence.
+ *
+ * @param data User data associated with the event handler (unused).
+ * @param ev_type The type of event that occurred (unused, expected to be ECORE_EVENT_SIGNAL_EXIT).
+ * @param ev Event-specific information (unused).
+ * @return ECORE_CALLBACK_PASS_ON to allow other handlers to process the event.
+ */
 static Eina_Bool
 _elm_signal_exit(void *data  EINA_UNUSED,
                  int ev_type EINA_UNUSED,
@@ -139,6 +212,14 @@ _elm_signal_exit(void *data  EINA_UNUSED,
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @internal
+ * @brief Applies the current Elementary scaling factor to Edje and all windows.
+ *
+ * This function retrieves the global scaling factor from Elementary's configuration
+ * and applies it to the Edje library (for UI elements) and then triggers a
+ * rescale operation for all Elementary windows.
+ */
 void
 _elm_rescale(void)
 {

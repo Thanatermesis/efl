@@ -4,6 +4,10 @@
 #ifndef _ELM_SLIDESHOW_ITEM_EO_CLASS_TYPE
 #define _ELM_SLIDESHOW_ITEM_EO_CLASS_TYPE
 
+/**
+ * @brief Represents an item within a slideshow widget.
+ * @ingroup Elm_Slideshow_Item_Group
+ */
 typedef Eo Elm_Slideshow_Item;
 
 #endif

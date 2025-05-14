@@ -1,3 +1,13 @@
+/**
+ * @file
+ * @brief This file contains the implementation of the Efl.Ui.Calendar widget.
+ *
+ * The Efl.Ui.Calendar widget provides a user interface for selecting dates.
+ * It displays a month view and allows navigation between months and years.
+ * It supports setting minimum and maximum selectable dates, customizing the
+ * first day of the week, and provides accessibility features.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include "elementary_config.h"
 #endif
@@ -56,21 +66,43 @@ static const Elm_Action key_actions[] = {
 
 /* Should not be translated, it's used if we failed
  * getting from locale. */
+/** @internal
+ * @brief Default abbreviated day names.
+ * Used as a fallback if locale-specific names cannot be retrieved.
+ * For example: `_days_abbrev[0]` is "Sun".
+ */
 static const char *_days_abbrev[] =
 {
    "Sun", "Mon", "Tue", "Wed",
    "Thu", "Fri", "Sat"
 };
 
+/** @internal
+ * @brief Number of days in each month for common and leap years.
+ * `_days_in_month[0]` is for common years, `_days_in_month[1]` for leap years.
+ * For example: `_days_in_month[0][1]` is 28 (February in a common year).
+ *              `_days_in_month[1][1]` is 29 (February in a leap year).
+ */
 static int _days_in_month[2][12] =
 {
-   {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
-   {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+   {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}, // Common year
+   {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}  // Leap year
 };
 
 static Eina_Bool _efl_ui_calendar_smart_focus_next_enable = EINA_FALSE;
 
-// Get the max day number for each month
+/**
+ * @internal
+ * @brief Get the maximum number of days for a given month and year.
+ *
+ * This function calculates the number of days in a month, considering leap years.
+ * The month is determined by `date->tm_mon + month_offset`.
+ *
+ * @param date A pointer to a `struct tm` representing the base date.
+ * @param month_offset An integer offset to add to the month of `date`.
+ *                     For example, 0 for the current month, -1 for the previous, 1 for the next.
+ * @return The number of days in the specified month.
+ */
 static inline int
 _maxdays_get(struct tm *date, int month_offset)
 {
@@ -85,6 +117,13 @@ _maxdays_get(struct tm *date, int month_offset)
           [((!(year % 4)) && ((!(year % 400)) || (year % 100)))][month];
 }
 
+/**
+ * @internal
+ * @brief Emits a signal to visually unselect a calendar item (day).
+ *
+ * @param obj The calendar widget object.
+ * @param selected The index of the calendar item to unselect (0-41).
+ */
 static inline void
 _unselect(Evas_Object *obj,
           int selected)
@@ -95,6 +134,13 @@ _unselect(Evas_Object *obj,
    elm_layout_signal_emit(obj, emission, "efl");
 }
 
+/**
+ * @internal
+ * @brief Emits a signal to visually select a calendar item (day) and updates focused item.
+ *
+ * @param obj The calendar widget object.
+ * @param selected The index of the calendar item to select (0-41).
+ */
 static inline void
 _select(Evas_Object *obj,
         int selected)
@@ -108,6 +154,12 @@ _select(Evas_Object *obj,
    elm_layout_signal_emit(obj, emission, "efl");
 }
 
+/**
+ * @internal
+ * @brief Emits a signal to visually mark a calendar item as not being "today".
+ *
+ * @param sd Pointer to the private data of the calendar widget.
+ */
 static inline void
 _not_today(Efl_Ui_Calendar_Data *sd)
 {
@@ -118,6 +170,13 @@ _not_today(Efl_Ui_Calendar_Data *sd)
    sd->today_it = -1;
 }
 
+/**
+ * @internal
+ * @brief Emits a signal to visually mark a calendar item as "today".
+ *
+ * @param sd Pointer to the private data of the calendar widget.
+ * @param it The index of the calendar item to mark as today (0-41).
+ */
 static inline void
 _today(Efl_Ui_Calendar_Data *sd,
        int it)
@@ -129,6 +188,13 @@ _today(Efl_Ui_Calendar_Data *sd,
    sd->today_it = it;
 }
 
+/**
+ * @internal
+ * @brief Emits a signal to visually enable a calendar item (day).
+ *
+ * @param sd Pointer to the private data of the calendar widget.
+ * @param it The index of the calendar item to enable (0-41).
+ */
 static inline void
 _enable(Efl_Ui_Calendar_Data *sd,
         int it)
@@ -139,6 +205,13 @@ _enable(Efl_Ui_Calendar_Data *sd,
    elm_layout_signal_emit(sd->obj, emission, "efl");
 }
 
+/**
+ * @internal
+ * @brief Emits a signal to visually disable a calendar item (day).
+ *
+ * @param sd Pointer to the private data of the calendar widget.
+ * @param it The index of the calendar item to disable (0-41).
+ */
 static inline void
 _disable(Efl_Ui_Calendar_Data *sd,
          int it)
@@ -149,6 +222,15 @@ _disable(Efl_Ui_Calendar_Data *sd,
    elm_layout_signal_emit(sd->obj, emission, "efl");
 }
 
+/**
+ * @internal
+ * @brief Sets the displayed month and year text in the calendar header.
+ *
+ * It formats the `sd->shown_date` using the widget's formatter and
+ * updates the "month_text" layout part.
+ *
+ * @param sd Pointer to the private data of the calendar widget.
+ */
 static void
 _set_month_year(Efl_Ui_Calendar_Data *sd)
 {
@@ -167,6 +249,15 @@ _set_month_year(Efl_Ui_Calendar_Data *sd)
    sd->filling = EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Callback to provide accessibility information for a calendar item (day).
+ *
+ * @param data User data (unused).
+ * @param obj The Evas_Object for which accessibility information is requested (a calendar day item).
+ * @return A newly allocated string containing the accessibility information (e.g., "day 15").
+ *         The caller is responsible for freeing this string.
+ */
 static char *
 _access_info_cb(void *data EINA_UNUSED, Evas_Object *obj)
 {
@@ -181,6 +272,16 @@ _access_info_cb(void *data EINA_UNUSED, Evas_Object *obj)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Registers accessibility objects for individual calendar day items.
+ *
+ * Iterates through the visible day cells (up to 42) and, for valid days
+ * in the current month, registers an accessibility object.
+ * It sets the type to "calendar item" and provides the day number as info.
+ *
+ * @param obj The calendar widget object.
+ */
 static void
 _access_calendar_item_register(Evas_Object *obj)
 {
@@ -218,6 +319,14 @@ _access_calendar_item_register(Evas_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Registers accessibility objects for the calendar's month/year spinner controls.
+ *
+ * This includes the previous/next month buttons and the month/year display text.
+ *
+ * @param obj The calendar widget object.
+ */
 static void
 _access_calendar_spinner_register(Evas_Object *obj)
 {
@@ -249,6 +358,15 @@ _access_calendar_spinner_register(Evas_Object *obj)
    evas_object_pass_events_set(po, EINA_FALSE);
 }
 
+/**
+ * @internal
+ * @brief Registers all accessibility objects for the calendar.
+ *
+ * This function calls helper functions to register accessibility for
+ * both the spinner controls and the individual day items.
+ *
+ * @param obj The calendar widget object.
+ */
 static void
 _access_calendar_register(Evas_Object *obj)
 {
@@ -256,6 +374,16 @@ _access_calendar_register(Evas_Object *obj)
    _access_calendar_item_register(obj);
 }
 
+/**
+ * @internal
+ * @brief Updates the list of composite elements for focus composition.
+ *
+ * This function gathers all focusable elements within the calendar (month/year controls,
+ * and visible day items) and sets them for focus management.
+ *
+ * @param obj The calendar widget object.
+ * @param sd Pointer to the private data of the calendar widget.
+ */
 static void
 _flush_calendar_composite_elements(Evas_Object *obj, Efl_Ui_Calendar_Data *sd)
 {
@@ -277,6 +405,20 @@ _flush_calendar_composite_elements(Evas_Object *obj, Efl_Ui_Calendar_Data *sd)
    efl_ui_focus_composition_elements_set(obj, items);
 }
 
+/**
+ * @internal
+ * @brief Populates the calendar grid with day numbers for the currently shown month.
+ *
+ * This function is responsible for:
+ * - Setting the month and year display.
+ * - Determining the starting day of the week for the current month.
+ * - Filling in the day numbers in the 6x7 grid.
+ * - Marking "today", the selected day, and disabled days (outside min/max range).
+ * - Handling accessibility registration for items if needed.
+ * - Flushing composite elements for focus.
+ *
+ * @param obj The calendar widget object.
+ */
 static void
 _populate(Evas_Object *obj)
 {
@@ -369,6 +511,15 @@ _populate(Evas_Object *obj)
    _flush_calendar_composite_elements(obj, sd);
 }
 
+/**
+ * @internal
+ * @brief Sets the weekday headers (e.g., Sun, Mon, Tue) in the calendar.
+ *
+ * It retrieves abbreviated weekday names based on the locale (or defaults)
+ * and displays them according to the `first_week_day` setting.
+ *
+ * @param obj The calendar widget object.
+ */
 static void
 _set_headers(Evas_Object *obj)
 {
@@ -417,6 +568,15 @@ _set_headers(Evas_Object *obj)
    elm_layout_thaw(obj);
 }
 
+/**
+ * @internal
+ * @brief Creates a button for the calendar (e.g., previous/next month).
+ *
+ * @param obj The parent calendar widget object.
+ * @param style The style to apply to the button (unused, uses part name as style).
+ * @param part The Edje part name in the parent's layout to swallow the button.
+ * @return The newly created button object, or NULL on failure.
+ */
 static Eo *
 _btn_create(Eo *obj, const char *style, char *part)
 {
@@ -432,6 +592,16 @@ _btn_create(Eo *obj, const char *style, char *part)
                   efl_content_set(efl_part(obj, part), efl_added));
 }
 
+/**
+ * @internal
+ * @brief Adds or updates the increment/decrement month buttons.
+ *
+ * Checks if the theme defines parts for left/right buttons and creates/destroys
+ * them as necessary. This is typically called during theme updates.
+ *
+ * @param obj The calendar widget object.
+ * @param sd Pointer to the private data of the calendar widget.
+ */
 static void
 _spinner_buttons_add(Evas_Object *obj, Efl_Ui_Calendar_Data *sd)
 {
@@ -475,6 +645,18 @@ _spinner_buttons_add(Evas_Object *obj, Efl_Ui_Calendar_Data *sd)
      }
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_ui_widget_theme_apply.
+ *
+ * Applies the theme to the calendar widget. It calls the superclass's
+ * theme apply function and then specifically handles the creation or
+ * update of spinner buttons based on the new theme.
+ *
+ * @param obj The calendar widget object.
+ * @param sd Pointer to the private data of the calendar widget.
+ * @return An Eina_Error code indicating success or failure.
+ */
 EOLIAN static Eina_Error
 _efl_ui_calendar_efl_ui_widget_theme_apply(Eo *obj, Efl_Ui_Calendar_Data *sd)
 {
@@ -489,7 +671,22 @@ _efl_ui_calendar_efl_ui_widget_theme_apply(Eo *obj, Efl_Ui_Calendar_Data *sd)
    return int_ret;
 }
 
-/* Set correct tm_wday and tm_yday after other fields changes*/
+/**
+ * @internal
+ * @brief Adjusts the calendar's selected date (`sd->date`) to be within min/max limits.
+ *
+ * If the current `sd->date` is outside the `sd->date_min` or `sd->date_max`
+ * boundaries, it clamps `sd->date` to the respective limit. It also ensures
+ * `sd->shown_date` (the currently displayed month/year) is updated if `sd->date`
+ * changes due to clamping.
+ * This function does not directly update `tm_wday` or `tm_yday`; `mktime`
+ * should be used elsewhere if those fields need to be canonicalized.
+ *
+ * @param sd Pointer to the private data of the calendar widget.
+ * @return EINA_TRUE if the date was already within limits or successfully adjusted,
+ *         EINA_FALSE if clamping occurred (indicating the original date was out of bounds).
+ *         Note: The return value primarily indicates if a change was made due to clamping.
+ */
 static inline Eina_Bool
 _fix_date(Efl_Ui_Calendar_Data *sd)
 {
@@ -531,6 +728,20 @@ _fix_date(Efl_Ui_Calendar_Data *sd)
    return no_change;
 }
 
+/**
+ * @internal
+ * @brief Updates the `shown_date` of the calendar by a given month delta.
+ *
+ * This function changes the month (and year, if necessary) of `sd->shown_date`
+ * by `delta` months. It respects the `date_min` and `date_max` limits,
+ * preventing navigation beyond these boundaries. It also adjusts `sd->date.tm_mday`
+ * if the new month has fewer days than the current `tm_mday`.
+ *
+ * @param obj The calendar widget object.
+ * @param delta The number of months to change by (e.g., 1 for next, -1 for previous).
+ * @return EINA_TRUE if the `shown_date` was successfully updated,
+ *         EINA_FALSE if the update was prevented by min/max limits or `mktime` failure.
+ */
 static Eina_Bool
 _update_data(Evas_Object *obj, int delta)
 {
@@ -591,6 +802,16 @@ _update_data(Evas_Object *obj, int delta)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Callback function to change the displayed month.
+ *
+ * This is typically called by spinner buttons (next/prev month) when clicked or
+ * due to autorepeat. It uses `sd->spin_speed` to determine the direction
+ * (1 for next month, -1 for previous month).
+ *
+ * @param data The calendar widget object (passed as `void *`).
+ */
 static void
 _spin_value(void *data)
 {
@@ -622,6 +843,17 @@ _inc_dec_btn_repeated_cb(void *data,
    _spin_value(data);
 }
 
+/**
+ * @internal
+ * @brief Gets the day number (1-31) corresponding to a calendar item index.
+ *
+ * Converts a flat item index (0-41) from the calendar grid to a day of the month.
+ * It also checks if this day is within the allowed min/max date range.
+ *
+ * @param obj The calendar widget object.
+ * @param selected_it The index of the calendar item (0-41).
+ * @return The day of the month (1-31) if valid and within range, otherwise 0.
+ */
 static int
 _get_item_day(Evas_Object *obj,
               int selected_it)
@@ -650,6 +882,16 @@ _get_item_day(Evas_Object *obj,
    return day;
 }
 
+/**
+ * @internal
+ * @brief Updates the visual state of a calendar item to "unfocused".
+ *
+ * If the item corresponds to a valid day, it emits a signal to mark it as unfocused
+ * and resets the internal `focused_it` tracker.
+ *
+ * @param obj The calendar widget object.
+ * @param unfocused_it The index of the calendar item to unfocus (0-41).
+ */
 static void
 _update_unfocused_it(Evas_Object *obj, int unfocused_it)
 {
@@ -668,6 +910,18 @@ _update_unfocused_it(Evas_Object *obj, int unfocused_it)
    elm_layout_signal_emit(obj, emission, "efl");
 }
 
+/**
+ * @internal
+ * @brief Updates the visual state of a calendar item to "focused".
+ *
+ * If the `focused_it` corresponds to a valid day, it unfocuses the previously
+ * focused item (if any), updates the internal `focused_it` tracker, and emits
+ * a signal to mark the new item as focused.
+ *
+ * @param obj The calendar widget object.
+ * @param focused_it The index of the calendar item to focus (0-41).
+ * @return EINA_TRUE if the item was successfully focused, EINA_FALSE otherwise (e.g., invalid day).
+ */
 static Eina_Bool
 _update_focused_it(Evas_Object *obj, int focused_it)
 {
@@ -691,6 +945,18 @@ _update_focused_it(Evas_Object *obj, int focused_it)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Updates the selected day in the calendar.
+ *
+ * This function is called when a day item `sel_it` is chosen.
+ * It validates the day, unselects the previously selected item, updates
+ * the internal date (`sd->date`), selects the new item visually,
+ * and emits the "changed" signal.
+ *
+ * @param obj The calendar widget object.
+ * @param sel_it The index of the calendar item to select (0-41).
+ */
 static void
 _update_sel_it(Evas_Object *obj,
                int sel_it)
@@ -715,6 +981,19 @@ _update_sel_it(Evas_Object *obj,
    efl_event_callback_legacy_call(obj, EFL_UI_CALENDAR_EVENT_CHANGED, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for when a day is selected via an Edje signal.
+ *
+ * This function is triggered by the "efl,action,selected" signal from the
+ * Edje layout, where the `source` string contains the index of the selected item.
+ *
+ * @param data The calendar widget object (passed as `void *`).
+ * @param obj The Evas_Object that emitted the signal (unused).
+ * @param emission The emission string of the signal (unused).
+ * @param source The source string of the signal, expected to be the integer index
+ *               of the selected calendar item.
+ */
 static void
 _day_selected(void *data,
               Evas_Object *obj EINA_UNUSED,
@@ -728,12 +1007,32 @@ _day_selected(void *data,
    _update_sel_it(data, sel_it);
 }
 
+/**
+ * @internal
+ * @brief Calculates the number of seconds remaining until the next day.
+ *
+ * @param t A pointer to a `struct tm` representing the current time.
+ * @return The number of seconds from the given time `t` until midnight.
+ */
 static inline int
 _time_to_next_day(struct tm *t)
 {
    return ((((24 - t->tm_hour) * 60) - t->tm_min) * 60) - t->tm_sec;
 }
 
+/**
+ * @internal
+ * @brief Timer callback to update the "today" marker in the calendar.
+ *
+ * This function is called by a timer, typically once a day or when the
+ * calendar is first created. It updates `sd->current_date` to the current system
+ * date/time. If the currently displayed month (`sd->shown_date`) is the same as
+ * the new current month, it marks the correct day item as "today".
+ * It reschedules itself to run again at the start of the next day.
+ *
+ * @param data The calendar widget object (passed as `void *`).
+ * @return ECORE_CALLBACK_RENEW to keep the timer active.
+ */
 static Eina_Bool
 _update_cur_date(void *data)
 {
@@ -758,6 +1057,16 @@ _update_cur_date(void *data)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @internal
+ * @brief Handles the "activate" action, typically triggered by keyboard (e.g., Enter key).
+ *
+ * This function selects the currently focused calendar item (`sd->focused_it`).
+ *
+ * @param obj The calendar widget object.
+ * @param params Action parameters (unused).
+ * @return EINA_TRUE if the action was handled (always true in this case).
+ */
 static Eina_Bool
 _key_action_activate(Evas_Object *obj, const char *params EINA_UNUSED)
 {
@@ -768,6 +1077,18 @@ _key_action_activate(Evas_Object *obj, const char *params EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_ui_focus_object_on_focus_update.
+ *
+ * Handles focus state changes for the calendar widget. When the calendar gains
+ * focus, it visually marks the selected item as focused. When it loses focus,
+ * it visually unfocuses the item.
+ *
+ * @param obj The calendar widget object.
+ * @param sd Pointer to the private data of the calendar widget.
+ * @return EINA_TRUE if focus update was handled, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_calendar_efl_ui_focus_object_on_focus_update(Eo *obj, Efl_Ui_Calendar_Data *sd)
 {
@@ -788,6 +1109,16 @@ _efl_ui_calendar_efl_ui_focus_object_on_focus_update(Eo *obj, Efl_Ui_Calendar_Da
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_canvas_group_group_calculate.
+ *
+ * This function is called when the calendar widget needs to recalculate its layout.
+ * It sets the weekday headers and populates the calendar grid with day numbers.
+ *
+ * @param obj The calendar widget object.
+ * @param _pd Pointer to the private data of the calendar widget (unused in this function).
+ */
 EOLIAN static void
 _efl_ui_calendar_efl_canvas_group_group_calculate(Eo *obj, Efl_Ui_Calendar_Data *_pd EINA_UNUSED)
 {
@@ -798,6 +1129,16 @@ _efl_ui_calendar_efl_canvas_group_group_calculate(Eo *obj, Efl_Ui_Calendar_Data 
    efl_canvas_group_calculate(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_object_destructor.
+ *
+ * Cleans up resources used by the calendar widget upon its destruction.
+ * This includes deleting the "today" update timer and freeing stringshared weekday names.
+ *
+ * @param obj The calendar widget object.
+ * @param sd Pointer to the private data of the calendar widget.
+ */
 EOLIAN static void
 _efl_ui_calendar_efl_object_destructor(Eo *obj, Efl_Ui_Calendar_Data *sd)
 {
@@ -811,6 +1152,18 @@ _efl_ui_calendar_efl_object_destructor(Eo *obj, Efl_Ui_Calendar_Data *sd)
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Manages the registration or unregistration of accessibility objects.
+ *
+ * Based on the `is_access` flag, this function either calls
+ * `_access_calendar_register` to set up accessibility information for calendar
+ * elements (day items, spinner buttons, month text) or unregisters them.
+ *
+ * @param obj The calendar widget object.
+ * @param is_access If EINA_TRUE, register accessibility objects;
+ *                  if EINA_FALSE, unregister them.
+ */
 static void
 _access_obj_process(Evas_Object *obj, Eina_Bool is_access)
 {
@@ -856,6 +1209,17 @@ _access_obj_process(Evas_Object *obj, Eina_Bool is_access)
      }
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_ui_widget_on_access_update.
+ *
+ * Called when the accessibility state changes. It enables or disables
+ * accessibility features for the calendar based on the `acs` parameter.
+ *
+ * @param obj The calendar widget object (unused in this function).
+ * @param _pd Pointer to the private data of the calendar widget (unused in this function).
+ * @param acs EINA_TRUE if accessibility is enabled, EINA_FALSE otherwise.
+ */
 EOLIAN static void
 _efl_ui_calendar_efl_ui_widget_on_access_update(Eo *obj EINA_UNUSED, Efl_Ui_Calendar_Data *_pd EINA_UNUSED, Eina_Bool acs)
 {
@@ -863,6 +1227,19 @@ _efl_ui_calendar_efl_ui_widget_on_access_update(Eo *obj EINA_UNUSED, Efl_Ui_Cale
    _access_obj_process(obj, _efl_ui_calendar_smart_focus_next_enable);
 }
 
+/**
+ * @internal
+ * @brief Internal constructor logic for the Efl.Ui.Calendar widget.
+ *
+ * This function initializes the calendar's private data, sets default min/max dates,
+ * registers signal callbacks for day selection, sets up the current date and
+ * "today" update timer, configures focusability, and applies the theme.
+ * It also creates the internal calendar item objects.
+ *
+ * @param obj The calendar widget object being constructed.
+ * @param priv Pointer to the private data of the calendar widget.
+ * @return The constructed calendar object, or NULL on failure.
+ */
 static Eo *
 _efl_ui_calendar_constructor_internal(Eo *obj, Efl_Ui_Calendar_Data *priv)
 {
@@ -918,6 +1295,18 @@ _efl_ui_calendar_constructor_internal(Eo *obj, Efl_Ui_Calendar_Data *priv)
    return obj;
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_object_constructor.
+ *
+ * Main constructor for the Efl.Ui.Calendar widget. It calls the superclass
+ * constructor, sets up smart callbacks, sets the accessibility role,
+ * and then calls the internal constructor logic.
+ *
+ * @param obj The calendar widget object being constructed.
+ * @param sd Pointer to the private data of the calendar widget.
+ * @return The constructed calendar object.
+ */
 EOLIAN static Eo *
 _efl_ui_calendar_efl_object_constructor(Eo *obj, Efl_Ui_Calendar_Data *sd)
 {
@@ -933,6 +1322,18 @@ _efl_ui_calendar_efl_object_constructor(Eo *obj, Efl_Ui_Calendar_Data *sd)
    return obj;
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_ui_calendar_date_min_set.
+ *
+ * Sets the minimum selectable date for the calendar.
+ *
+ * @param obj The calendar widget object.
+ * @param sd Pointer to the private data of the calendar widget.
+ * @param min The minimum date to set, as an `Efl_Time` (struct tm).
+ *            Example: `{ .tm_year = 120, .tm_mon = 0, .tm_mday = 1 }` for Jan 1, 2020.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., invalid date, min > max).
+ */
 EOLIAN static Eina_Bool
 _efl_ui_calendar_date_min_set(Eo *obj, Efl_Ui_Calendar_Data *sd, Efl_Time min)
 {
@@ -1000,12 +1401,34 @@ _efl_ui_calendar_date_min_set(Eo *obj, Efl_Ui_Calendar_Data *sd, Efl_Time min)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_ui_calendar_date_min_get.
+ *
+ * Gets the minimum selectable date of the calendar.
+ *
+ * @param obj The calendar widget object (unused).
+ * @param sd Pointer to the private data of the calendar widget.
+ * @return The minimum date, as an `Efl_Time` (struct tm).
+ */
 EOLIAN static Efl_Time
 _efl_ui_calendar_date_min_get(const Eo *obj EINA_UNUSED, Efl_Ui_Calendar_Data *sd)
 {
    return sd->date_min;
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_ui_calendar_date_max_set.
+ *
+ * Sets the maximum selectable date for the calendar.
+ *
+ * @param obj The calendar widget object.
+ * @param sd Pointer to the private data of the calendar widget.
+ * @param max The maximum date to set, as an `Efl_Time` (struct tm).
+ *            Example: `{ .tm_year = 125, .tm_mon = 11, .tm_mday = 31 }` for Dec 31, 2025.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., invalid date, max < min).
+ */
 EOLIAN static Eina_Bool
 _efl_ui_calendar_date_max_set(Eo *obj, Efl_Ui_Calendar_Data *sd, Efl_Time max)
 {
@@ -1061,12 +1484,34 @@ _efl_ui_calendar_date_max_set(Eo *obj, Efl_Ui_Calendar_Data *sd, Efl_Time max)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_ui_calendar_date_max_get.
+ *
+ * Gets the maximum selectable date of the calendar.
+ *
+ * @param obj The calendar widget object (unused).
+ * @param sd Pointer to the private data of the calendar widget.
+ * @return The maximum date, as an `Efl_Time` (struct tm).
+ */
 EOLIAN static Efl_Time
 _efl_ui_calendar_date_max_get(const Eo *obj EINA_UNUSED, Efl_Ui_Calendar_Data *sd)
 {
    return sd->date_max;
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_ui_calendar_date_set.
+ *
+ * Sets the currently selected date of the calendar.
+ *
+ * @param obj The calendar widget object.
+ * @param sd Pointer to the private data of the calendar widget.
+ * @param date The date to select, as an `Efl_Time` (struct tm).
+ *             Example: `{ .tm_year = 123, .tm_mon = 4, .tm_mday = 15 }` for May 15, 2023.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., invalid date, date out of min/max range).
+ */
 EOLIAN static Eina_Bool
 _efl_ui_calendar_date_set(Eo *obj, Efl_Ui_Calendar_Data *sd, Efl_Time date)
 {
@@ -1101,18 +1546,48 @@ _efl_ui_calendar_date_set(Eo *obj, Efl_Ui_Calendar_Data *sd, Efl_Time date)
    return ret;
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_ui_calendar_date_get.
+ *
+ * Gets the currently selected date of the calendar.
+ *
+ * @param obj The calendar widget object (unused).
+ * @param sd Pointer to the private data of the calendar widget.
+ * @return The currently selected date, as an `Efl_Time` (struct tm).
+ */
 EOLIAN static Efl_Time
 _efl_ui_calendar_date_get(const Eo *obj EINA_UNUSED, Efl_Ui_Calendar_Data *sd)
 {
    return sd->date;
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_ui_format_apply_formatted_value.
+ *
+ * Called when the formatting of the calendar (e.g., date format for month/year display)
+ * needs to be reapplied. This typically triggers a redraw/repopulation of the calendar.
+ *
+ * @param obj The calendar widget object.
+ * @param pd Pointer to the private data of the calendar widget (unused in this function).
+ */
 EOLIAN static void
 _efl_ui_calendar_efl_ui_format_apply_formatted_value(Eo *obj, Efl_Ui_Calendar_Data *pd EINA_UNUSED)
 {
    evas_object_smart_changed(obj);
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_ui_calendar_first_day_of_week_set.
+ *
+ * Sets the first day of the week for the calendar display.
+ *
+ * @param obj The calendar widget object.
+ * @param sd Pointer to the private data of the calendar widget.
+ * @param day The weekday to set as the first day (e.g., @ref EFL_UI_CALENDAR_WEEKDAY_SUNDAY).
+ */
 EOLIAN static void
 _efl_ui_calendar_first_day_of_week_set(Eo *obj, Efl_Ui_Calendar_Data *sd, Efl_Ui_Calendar_Weekday day)
 {
@@ -1124,12 +1599,31 @@ _efl_ui_calendar_first_day_of_week_set(Eo *obj, Efl_Ui_Calendar_Data *sd, Efl_Ui
      }
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_ui_calendar_first_day_of_week_get.
+ *
+ * Gets the first day of the week used by the calendar.
+ *
+ * @param obj The calendar widget object (unused).
+ * @param sd Pointer to the private data of the calendar widget.
+ * @return The first day of the week (e.g., @ref EFL_UI_CALENDAR_WEEKDAY_MONDAY).
+ */
 EOLIAN static Efl_Ui_Calendar_Weekday
 _efl_ui_calendar_first_day_of_week_get(const Eo *obj EINA_UNUSED, Efl_Ui_Calendar_Data *sd)
 {
    return sd->first_week_day;
 }
 
+/**
+ * @internal
+ * @brief Class constructor for Efl.Ui.Calendar.
+ *
+ * Registers the legacy smart type and initializes global settings related to
+ * accessibility for the calendar class.
+ *
+ * @param klass The Efl_Class being constructed.
+ */
 static void
 _efl_ui_calendar_class_constructor(Efl_Class *klass)
 {
@@ -1139,6 +1633,19 @@ _efl_ui_calendar_class_constructor(Efl_Class *klass)
       _efl_ui_calendar_smart_focus_next_enable = EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_access_widget_action_elm_actions_get.
+ *
+ * Provides the list of supported accessibility actions for the calendar widget.
+ * Currently, only the "activate" action is supported.
+ *
+ * @param obj The calendar widget object (unused).
+ * @param sd Pointer to the private data of the calendar widget (unused).
+ * @return A pointer to a static array of `Efl_Access_Action_Data` structures,
+ *         terminated by a NULL entry.
+ *         Example of an action: `{ "activate", "activate", NULL, _key_action_activate}`.
+ */
 EOLIAN static const Efl_Access_Action_Data*
 _efl_ui_calendar_efl_access_widget_action_elm_actions_get(const Eo *obj EINA_UNUSED, Efl_Ui_Calendar_Data *sd EINA_UNUSED)
 {
@@ -1160,6 +1667,18 @@ typedef struct {
    Evas_Object *part;
 }  Efl_Ui_Calendar_Item_Data;
 
+/**
+ * @internal
+ * @brief Sets the day number (item index) for a calendar item.
+ *
+ * This function associates a calendar item object with its corresponding
+ * Edje part in the main calendar layout and sets up focus event redirection.
+ * The day number `i` here is the flat index (0-41) in the 6x7 grid.
+ *
+ * @param obj The calendar item object.
+ * @param pd Pointer to the private data of the calendar item.
+ * @param i The day number (index 0-41) to associate with this item.
+ */
 EOLIAN static void
 _efl_ui_calendar_item_day_number_set(Eo *obj, Efl_Ui_Calendar_Item_Data *pd, int i)
 {
@@ -1183,12 +1702,33 @@ _efl_ui_calendar_item_day_number_set(Eo *obj, Efl_Ui_Calendar_Item_Data *pd, int
    EINA_SAFETY_ON_NULL_RETURN(pd->part);
 }
 
+/**
+ * @internal
+ * @brief Gets the day number (item index) of a calendar item.
+ *
+ * The day number returned is the flat index (0-41) in the 6x7 grid.
+ *
+ * @param obj The calendar item object (unused).
+ * @param pd Pointer to the private data of the calendar item.
+ * @return The day number (index 0-41) associated with this item.
+ */
 EOLIAN static int
 _efl_ui_calendar_item_day_number_get(const Eo *obj EINA_UNUSED, Efl_Ui_Calendar_Item_Data *pd)
 {
    return pd->v;
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_ui_focus_object_focus_set for a calendar item.
+ *
+ * Sets the focus state of an individual calendar item (day).
+ * It updates the focus state in the parent calendar and on the item's Edje part.
+ *
+ * @param obj The calendar item object.
+ * @param pd Pointer to the private data of the calendar item.
+ * @param focus EINA_TRUE to set focus, EINA_FALSE to unset.
+ */
 EOLIAN static void
 _efl_ui_calendar_item_efl_ui_focus_object_focus_set(Eo *obj, Efl_Ui_Calendar_Item_Data *pd, Eina_Bool focus)
 {
@@ -1198,12 +1738,32 @@ _efl_ui_calendar_item_efl_ui_focus_object_focus_set(Eo *obj, Efl_Ui_Calendar_Ite
    evas_object_focus_set(pd->part, efl_ui_focus_object_focus_get(obj));
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_ui_focus_object_focus_geometry_get for a calendar item.
+ *
+ * Gets the geometry of the calendar item, which is derived from its Edje part.
+ *
+ * @param obj The calendar item object (unused).
+ * @param pd Pointer to the private data of the calendar item.
+ * @return The geometry of the item as an `Eina_Rect`.
+ */
 EOLIAN static Eina_Rect
 _efl_ui_calendar_item_efl_ui_focus_object_focus_geometry_get(const Eo *obj EINA_UNUSED, Efl_Ui_Calendar_Item_Data *pd)
 {
    return efl_gfx_entity_geometry_get(pd->part);
 }
 
+/**
+ * @internal
+ * @brief EOLIAN implementation for @ref efl_ui_focus_object_focus_parent_get for a calendar item.
+ *
+ * Gets the focus parent of the calendar item, which is the main calendar widget.
+ *
+ * @param obj The calendar item object.
+ * @param pd Pointer to the private data of the calendar item (unused).
+ * @return The focus parent object (the main calendar widget).
+ */
 EOLIAN static Efl_Ui_Focus_Object*
 _efl_ui_calendar_item_efl_ui_focus_object_focus_parent_get(const Eo *obj, Efl_Ui_Calendar_Item_Data *pd EINA_UNUSED)
 {

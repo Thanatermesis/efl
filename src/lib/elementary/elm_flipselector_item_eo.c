@@ -1,7 +1,18 @@
 
 void _elm_flipselector_item_selected_set(Eo *obj, Elm_Flipselector_Item_Data *pd, Eina_Bool selected);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the Eolian property selected.set.
+ *
+ * This function is called by the Eolian reflection system to set the 'selected'
+ * property. It converts the Eina_Value to a C boolean and calls the
+ * C implementation elm_obj_flipselector_item_selected_set.
+ *
+ * @param[in] obj The Efl object.
+ * @param[in] val The Eina_Value containing the boolean to set.
+ * @return EINA_ERROR_VALUE_FAILED on failure to convert value, 0 on success.
+ */
 static Eina_Error
 __eolian_elm_flipselector_item_selected_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -21,7 +32,17 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_flipselector_item_selected_set, EFL_FUNC_CALL(
 
 Eina_Bool _elm_flipselector_item_selected_get(const Eo *obj, Elm_Flipselector_Item_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Reflection function for the Eolian property selected.get.
+ *
+ * This function is called by the Eolian reflection system to get the 'selected'
+ * property. It calls the C implementation elm_obj_flipselector_item_selected_get
+ * and wraps the returned boolean in an Eina_Value.
+ *
+ * @param[in] obj The Efl object.
+ * @return An Eina_Value initialized with the boolean state of the 'selected' property.
+ */
 static Eina_Value
 __eolian_elm_flipselector_item_selected_get_reflect(const Eo *obj)
 {
@@ -53,7 +74,18 @@ void _elm_flipselector_item_elm_widget_item_part_text_set(Eo *obj, Elm_Flipselec
 
 const char *_elm_flipselector_item_elm_widget_item_part_text_get(const Eo *obj, Elm_Flipselector_Item_Data *pd, const char *part);
 
-
+/**
+ * @internal
+ * @brief Initializes the Elm_Flipselector_Item class.
+ *
+ * This function is called once when the class is being set up.
+ * It defines the Efl_Object operations (methods) for this class,
+ * mapping Eolian functions to their C implementations. It also sets up
+ * the property reflection operations.
+ *
+ * @param[in] klass The Efl_Class to initialize.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_flipselector_item_class_initializer(Efl_Class *klass)
 {
@@ -90,6 +122,14 @@ _elm_flipselector_item_class_initializer(Efl_Class *klass)
    return efl_class_functions_set(klass, opsp, ropsp);
 }
 
+/**
+ * @internal
+ * @brief Describes the Elm_Flipselector_Item Efl class.
+ *
+ * This static structure provides metadata for the Elm.Flipselector.Item class,
+ * including its version, name, type, instance data size, and pointers to
+ * initializer and constructor/destructor functions.
+ */
 static const Efl_Class_Description _elm_flipselector_item_class_desc = {
    EO_VERSION,
    "Elm.Flipselector.Item",

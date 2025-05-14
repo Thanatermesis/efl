@@ -14,6 +14,13 @@ _edje_file_set(const Edje_File *edf)
    _current_edje_file = edf;
 }
 
+/**
+ * @brief Frees an Edje_Font_Directory_Entry structure.
+ * This function is typically used as a callback for eina_hash_free_cb.
+ * It deletes the stringshare reference to the font path and frees the entry itself.
+ *
+ * @param data A pointer to the Edje_Font_Directory_Entry to be freed.
+ */
 static void
 _edje_font_string_free(void *data)
 {
@@ -23,6 +30,18 @@ _edje_font_string_free(void *data)
    free(fe);
 }
 
+/**
+ * @brief Frees an Edje_Part_Collection_Directory_Entry structure.
+ * This function is typically used as a callback for eina_hash_free_cb.
+ * It deletes the stringshare reference to the collection entry string.
+ * If the collection entry still has a reference to an Edje_Part_Collection (ce->ref),
+ * it means there's a potential resource leak (e.g., edje_shutdown called
+ * while Edje objects are still active). In such cases, it logs a warning/error
+ * and attempts to free the associated Edje_Part_Collection.
+ * Finally, it frees the Edje_Part_Collection_Directory_Entry itself.
+ *
+ * @param data A pointer to the Edje_Part_Collection_Directory_Entry to be freed.
+ */
 static void
 _edje_collection_string_free(void *data)
 {
@@ -58,6 +77,16 @@ _edje_collection_string_free(void *data)
    free(ce);
 }
 
+/**
+ * @brief Converts the external directory from an old Edje file format to the new format.
+ * It allocates memory for the new external directory and its entries in the Edje_File (edf),
+ * then copies the entry data from the Old_Edje_File (oedf).
+ * The old external directory in oedf is freed after conversion.
+ *
+ * @param edf The target Edje_File structure to populate with the converted external directory.
+ * @param oedf The source Old_Edje_File structure containing the old external directory.
+ * @return EINA_TRUE on success, EINA_FALSE on memory allocation failure.
+ */
 static Eina_Bool
 _edje_file_convert_external(Edje_File *edf, Old_Edje_File *oedf)
 {
@@ -88,6 +117,17 @@ _edje_file_convert_external(Edje_File *edf, Old_Edje_File *oedf)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Converts the image directory from an old Edje file format to the new format.
+ * This involves converting both image entries and image sets.
+ * It determines the required size for the entries and sets arrays based on the maximum ID,
+ * allocates memory, and copies the data from the Old_Edje_File (oedf) to the Edje_File (edf).
+ * The old image directory entries and sets in oedf are freed after conversion.
+ *
+ * @param edf The target Edje_File structure to populate with the converted image directory.
+ * @param oedf The source Old_Edje_File structure containing the old image directory.
+ * @return EINA_TRUE on success, EINA_FALSE on memory allocation failure or if counts are inconsistent.
+ */
 static Eina_Bool
 _edje_file_convert_images(Edje_File *edf, Old_Edje_File *oedf)
 {
@@ -240,6 +280,18 @@ on_error:
    return NULL;
 }
 
+/**
+ * @brief Adds an Edje_Program to a dynamically sized array of Edje_Program pointers.
+ * This function reallocates the array to accommodate the new program and increments the count.
+ * The array is expected to be a pointer to an array of Edje_Program pointers (e.g., edc->programs.nocmp).
+ * The count is a pointer to the current number of elements in that array (e.g., edc->programs.nocmp_count).
+ *
+ * @param array Pointer to the array of Edje_Program pointers.
+ *              Example: &edc->programs.nocmp
+ * @param count Pointer to the count of programs in the array.
+ *              Example: &edc->programs.nocmp_count
+ * @param add The Edje_Program to add to the array.
+ */
 static void
 _edje_collection_program_add(Edje_Program ***array,
                              unsigned int *count,

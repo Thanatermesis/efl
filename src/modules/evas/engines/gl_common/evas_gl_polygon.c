@@ -11,22 +11,33 @@ typedef struct _RGBA_Span RGBA_Span;
 typedef struct _RGBA_Edge RGBA_Edge;
 typedef struct _RGBA_Vertex RGBA_Vertex;
 
+/**
+ * @brief Represents a horizontal span of pixels to be rendered.
+ * Used to build a list of scanlines for the polygon.
+ */
 struct _RGBA_Span
 {
-   EINA_INLIST;
-   int x, y, w;
+   EINA_INLIST; /**< Macro for Eina Inlist membership. */
+   int x, y, w; /**< y-coordinate, and the starting x and width of the span. */
 };
 
+/**
+ * @brief Represents an edge of the polygon in the active edge table.
+ */
 struct _RGBA_Edge
 {
-   double x, dx;
-   int i;
+   double x;  /**< The x-coordinate of the edge's intersection with the current scanline. */
+   double dx; /**< The inverse of the edge's slope (dx/dy). Used to update x for the next scanline. */
+   int i;     /**< The index of the edge's starting vertex. */
 };
 
+/**
+ * @brief Represents a vertex of the polygon.
+ */
 struct _RGBA_Vertex
 {
-   double x, y;
-   int i;
+   double x, y; /**< The coordinates of the vertex. */
+   int i;       /**< The original index of the vertex in the point list. */
 };
 
 #define POLY_EDGE_DEL(_i)                                               \
@@ -65,6 +76,17 @@ struct _RGBA_Vertex
       num_active_edges++;                                                  \
    }
 
+/**
+ * @brief Adds a point to a polygon.
+ *
+ * This function appends a new point to the polygon's point list. If the
+ * provided polygon is NULL, a new one is allocated.
+ *
+ * @param poly The polygon to add the point to, or NULL to create a new one.
+ * @param x The x-coordinate of the point.
+ * @param y The y-coordinate of the point.
+ * @return The polygon with the added point, or NULL on failure.
+ */
 Evas_GL_Polygon *
 evas_gl_common_poly_point_add(Evas_GL_Polygon *poly, int x, int y)
 {
@@ -87,6 +109,12 @@ evas_gl_common_poly_point_add(Evas_GL_Polygon *poly, int x, int y)
    return poly;
 }
 
+/**
+ * @brief Clears all points from a polygon and frees the polygon structure.
+ *
+ * @param poly The polygon to clear.
+ * @return Always returns NULL.
+ */
 Evas_GL_Polygon *
 evas_gl_common_poly_points_clear(Evas_GL_Polygon *poly)
 {
@@ -103,6 +131,14 @@ evas_gl_common_poly_points_clear(Evas_GL_Polygon *poly)
    return NULL;
 }
 
+/**
+ * @brief A qsort comparison function to sort vertices by their y-coordinate.
+ *
+ * @param a Pointer to the first RGBA_Vertex.
+ * @param b Pointer to the second RGBA_Vertex.
+ * @return -1 if the first vertex's y is less than or equal to the second's,
+ *         1 otherwise.
+ */
 static int
 polygon_point_sorter(const void *a, const void *b)
 {
@@ -114,6 +150,14 @@ polygon_point_sorter(const void *a, const void *b)
    return 1;
 }
 
+/**
+ * @brief A qsort comparison function to sort active edges by their x-intercept.
+ *
+ * @param a Pointer to the first RGBA_Edge.
+ * @param b Pointer to the second RGBA_Edge.
+ * @return -1 if the first edge's x is less than or equal to the second's,
+ *         1 otherwise.
+ */
 static int
 polygon_edge_sorter(const void *a, const void *b)
 {
@@ -125,6 +169,31 @@ polygon_edge_sorter(const void *a, const void *b)
    return 1;
 }
 
+/**
+ * @brief Renders a polygon using a scanline filling algorithm.
+ *
+ * This function converts a polygon into a series of horizontal spans
+ * (scanlines) and then renders these spans as 1-pixel-high rectangles.
+ * It implements a standard scanline polygon rasterization algorithm which
+ * involves an active edge table.
+ *
+ * The basic algorithm is:
+ * 1. Create a list of all edges from the polygon's vertices.
+ * 2. Sort vertices by their y-coordinate.
+ * 3. Iterate through scanlines from the polygon's minimum y to maximum y.
+ * 4. For each scanline, maintain an Active Edge Table (AET).
+ *    - Add edges to the AET when the scanline intersects their starting vertex.
+ *    - Remove edges from the AET when the scanline passes their ending vertex.
+ * 5. Sort the AET by the x-coordinate of the edge intersections.
+ * 6. Fill the horizontal spans between pairs of edges in the sorted AET.
+ * 7. The spans are then rendered as rectangles, taking into account clipping
+ *    and cutouts.
+ *
+ * @param gc The Evas GL engine context.
+ * @param poly The polygon to draw.
+ * @param dx The x-offset to apply to the polygon's coordinates.
+ * @param dy The y-offset to apply to the polygon's coordinates.
+ */
 void
 evas_gl_common_poly_draw(Evas_Engine_GL_Context *gc, Evas_GL_Polygon *poly, int dx, int dy)
 {

@@ -1,11 +1,32 @@
 /* @file blur_box_alpha_.c
- * Defines the following functions:
- * _box_blur_alpha_horiz_step
- * _box_blur_alpha_vert_step
+/**
+ * @file blur_box_alpha_.c
+ * @brief Implements horizontal and vertical box blur steps for the alpha channel.
+ *
+ * These functions apply one or more box blurs iteratively to the alpha
+ * channel data within a specified region. They are optimized for either
+ * horizontal or vertical passes.
  */
 
 #include "evas_filter_private.h"
 
+/**
+ * @brief Applies one or more horizontal box blurs to the alpha channel.
+ *
+ * This function performs iterative horizontal box blurring on the alpha channel
+ * data within the specified region. It can apply multiple blur passes with
+ * different radii in a single call. Temporary buffers (`span1`, `span2`) are
+ * used to store intermediate results between passes.
+ *
+ * @param srcdata Pointer to the beginning of the source image data (alpha channel).
+ * @param src_stride Bytes per row in the source image (unused in this horizontal step).
+ * @param dstdata Pointer to the beginning of the destination image data (alpha channel).
+ * @param dst_stride Bytes per row in the destination image (unused in this horizontal step).
+ * @param radii An array of blur radii (integers). The array is terminated by a 0.
+ *              Example: `{10, 5, 0}` applies a blur with radius 10, then radius 5.
+ *              Example: `{7, 0}` applies a single blur with radius 7.
+ * @param region The rectangular area within the image data to process.
+ */
 static inline void
 _box_blur_alpha_horiz_step(const uint8_t* restrict srcdata, int src_stride EINA_UNUSED,
                            uint8_t* restrict dstdata, int dst_stride EINA_UNUSED,
@@ -127,15 +148,34 @@ _box_blur_alpha_horiz_step(const uint8_t* restrict srcdata, int src_stride EINA_
 
 // ATTENTION: Make sure the below code's inner loop is the SAME as above.
 
+/**
+ * @brief Applies one or more vertical box blurs to the alpha channel.
+ *
+ * This function performs iterative vertical box blurring on the alpha channel
+ * data within the specified region. It can apply multiple blur passes with
+ * different radii in a single call.
+ *
+ * @note To optimize for cache locality during vertical processing, this function
+ * reads columns from the source, rotates them into temporary horizontal spans
+ * (`span1`, `span2`), performs the blur calculations horizontally on these spans,
+ * and then writes the result back to the destination columns. The core blurring
+ * logic within the inner loop is identical to the horizontal step function.
+ *
+ * @param srcdata Pointer to the beginning of the source image data (alpha channel).
+ * @param src_stride Bytes per row in the source image. Used to step vertically.
+ * @param dstdata Pointer to the beginning of the destination image data (alpha channel).
+ * @param dst_stride Bytes per row in the destination image. Used to step vertically.
+ * @param radii An array of blur radii (integers). The array is terminated by a 0.
+ *              Example: `{10, 5, 0}` applies a blur with radius 10, then radius 5.
+ *              Example: `{7, 0}` applies a single blur with radius 7.
+ * @param region The rectangular area within the image data to process.
+ */
 static inline void
-_box_blur_alpha_vert_step(const uint8_t* restrict srcdata, int src_stride  EINA_UNUSED,
-                          uint8_t* restrict dstdata, int dst_stride EINA_UNUSED,
+_box_blur_alpha_vert_step(const uint8_t* restrict srcdata, int src_stride,
+                          uint8_t* restrict dstdata, int dst_stride,
                           const int* restrict const radii,
                           Eina_Rectangle region)
 {
-   /* Note: This function tries to optimize cache hits by working on
-    * contiguous horizontal spans.
-    */
 
    const int len = region.h;
    const int loops = region.w;

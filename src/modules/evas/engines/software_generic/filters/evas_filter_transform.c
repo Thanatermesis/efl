@@ -1,11 +1,31 @@
 #include "evas_engine_filter.h"
 
+/**
+ * @file
+ * @brief Implements software-based geometrical transformations for Evas filters.
+ *
+ * This file contains functions for applying transformations like vertical flip
+ * to image buffers using CPU operations.
+ */
+
 /* Apply geometrical transformations to a buffer.
  *
  * This filter is a very simplistic at the moment, future improvements require
  * more options to the API.
  */
 
+/**
+ * @brief Apply vertical flip transformation to a buffer using CPU.
+ *
+ * This function performs a vertical flip on the input buffer and writes the
+ * result to the output buffer. It handles different rendering operations
+ * (blend, copy) and colorspaces (ARGB, Alpha). The flip is centered based
+ * on the object's geometry and padding, considering the draw offset `oy`.
+ *
+ * @param cmd The filter command containing input/output buffers, draw context,
+ *            and transformation details.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _vflip_cpu(Evas_Filter_Command *cmd)
 {
@@ -116,6 +136,17 @@ end:
    return ret;
 }
 
+/**
+ * @brief Get the appropriate software transformation function based on the command flags.
+ *
+ * This function selects the correct CPU-based transformation function (e.g., _vflip_cpu)
+ * based on the `cmd->transform.flags`.
+ *
+ * @param cmd The filter command containing transformation details.
+ * @return A function pointer to the appropriate software transformation function,
+ *         or NULL if the transformation flag is unknown or the command is invalid.
+ * @see Evas_Filter_Transform_Flags
+ */
 Software_Filter_Func
 eng_filter_transform_func_get(Evas_Filter_Command *cmd)
 {

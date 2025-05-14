@@ -11,35 +11,66 @@
 #include "eeze_sensor_private.h"
 #include "../../static_libs/buildsystem/buildsystem.h"
 
+/** @file
+ * @brief This file implements the Eeze sensor API.
+ */
+
+/** @brief Event type for accelerometer sensor data. */
 EAPI int EEZE_SENSOR_EVENT_ACCELEROMETER;
+/** @brief Event type for gravity sensor data. */
 EAPI int EEZE_SENSOR_EVENT_GRAVITY;
+/** @brief Event type for linear acceleration sensor data. */
 EAPI int EEZE_SENSOR_EVENT_LINEAR_ACCELERATION;
+/** @brief Event type for device orientation sensor data. */
 EAPI int EEZE_SENSOR_EVENT_DEVICE_ORIENTATION;
+/** @brief Event type for magnetic field sensor data. */
 EAPI int EEZE_SENSOR_EVENT_MAGNETIC;
+/** @brief Event type for orientation sensor data. */
 EAPI int EEZE_SENSOR_EVENT_ORIENTATION;
+/** @brief Event type for gyroscope sensor data. */
 EAPI int EEZE_SENSOR_EVENT_GYROSCOPE;
+/** @brief Event type for light sensor data. */
 EAPI int EEZE_SENSOR_EVENT_LIGHT;
+/** @brief Event type for proximity sensor data. */
 EAPI int EEZE_SENSOR_EVENT_PROXIMITY;
+/** @brief Event type for snap gesture sensor data. */
 EAPI int EEZE_SENSOR_EVENT_SNAP;
+/** @brief Event type for shake gesture sensor data. */
 EAPI int EEZE_SENSOR_EVENT_SHAKE;
+/** @brief Event type for double tap gesture sensor data. */
 EAPI int EEZE_SENSOR_EVENT_DOUBLETAP;
+/** @brief Event type for panning gesture sensor data. */
 EAPI int EEZE_SENSOR_EVENT_PANNING;
+/** @brief Event type for panning browse gesture sensor data. */
 EAPI int EEZE_SENSOR_EVENT_PANNING_BROWSE;
+/** @brief Event type for tilt gesture sensor data. */
 EAPI int EEZE_SENSOR_EVENT_TILT;
+/** @brief Event type for facedown gesture sensor data. */
 EAPI int EEZE_SENSOR_EVENT_FACEDOWN;
+/** @brief Event type for direct call gesture sensor data. */
 EAPI int EEZE_SENSOR_EVENT_DIRECT_CALL;
+/** @brief Event type for smart alert gesture sensor data. */
 EAPI int EEZE_SENSOR_EVENT_SMART_ALERT;
+/** @brief Event type for no move gesture sensor data. */
 EAPI int EEZE_SENSOR_EVENT_NO_MOVE;
+/** @brief Event type for barometer sensor data. */
 EAPI int EEZE_SENSOR_EVENT_BAROMETER;
+/** @brief Event type for temperature sensor data. */
 EAPI int EEZE_SENSOR_EVENT_TEMPERATURE;
 
+/** @internal Global handle for Eeze_Sensor library. */
 static Eeze_Sensor *g_handle;
+/** @internal Eina_Prefix for library path handling. */
 static Eina_Prefix *pfx;
 
 /* Priority order for modules. The one with the highest order of the available
  * ones will be used. This in good enough for now as we only have three modules
  * and one is a test harness anyway. If the number of modules grows we might
  * re-think the priority handling, but we should do this when the need arise.
+ */
+/** @internal Array defining the priority order of sensor modules.
+ * Modules are checked in this order, and the first one found is used.
+ * Example: {"fake", "udev", NULL} means "fake" is checked first, then "udev".
  */
 static const char *_module_priority[] = {
    "fake",
@@ -49,6 +80,16 @@ static const char *_module_priority[] = {
 
 /* Search through the list of loaded module and return the one with the highest
  * priority.
+ */
+/**
+ * @internal
+ * @brief Retrieves the loaded sensor module with the highest priority.
+ *
+ * This function iterates through the `_module_priority` list and returns the
+ * first module found in the `g_handle->modules` hash.
+ *
+ * @return A pointer to the highest priority Eeze_Sensor_Module, or NULL if no
+ *         suitable module is found.
  */
 Eeze_Sensor_Module *
 _highest_priority_module_get(void)
@@ -67,6 +108,20 @@ _highest_priority_module_get(void)
 
 /* Utility function to take the given sensor type and get the matching sensor
  * object from the highest priority module.
+ */
+/**
+ * @brief Retrieves a sensor object for a given sensor type from the
+ *        highest priority module.
+ *
+ * This function first determines the highest priority module available.
+ * Then, it searches within that module's sensor list for a sensor matching
+ * the specified `sensor_type`. If found, a copy of the sensor object is
+ * allocated and returned. The caller is responsible for freeing this object
+ * using `eeze_sensor_free()`.
+ *
+ * @param sensor_type The type of sensor to retrieve (e.g., EEZE_SENSOR_TYPE_ACCELEROMETER).
+ * @return A newly allocated Eeze_Sensor_Obj for the requested sensor type,
+ *         or NULL if the sensor type is not available or an error occurs.
  */
 EAPI Eeze_Sensor_Obj *
 eeze_sensor_obj_get(Eeze_Sensor_Type sensor_type)
@@ -94,6 +149,16 @@ eeze_sensor_obj_get(Eeze_Sensor_Type sensor_type)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Loads available Eeze sensor modules.
+ *
+ * This function searches for sensor modules in predefined locations.
+ * It prioritizes modules in the build directory if the `EFL_RUN_IN_TREE`
+ * environment variable is set and effective UIDs match. Otherwise, it looks
+ * in the system library directory.
+ * All found modules are added to `g_handle->modules_array` and then loaded.
+ */
 static void
 eeze_sensor_modules_load(void)
 {
@@ -140,6 +205,13 @@ eeze_sensor_modules_load(void)
    eina_module_list_load(g_handle->modules_array);
 }
 
+/**
+ * @internal
+ * @brief Unloads all loaded Eeze sensor modules.
+ *
+ * This function unloads modules listed in `g_handle->modules_array`,
+ * frees the list, and clears the array.
+ */
 static void
 eeze_sensor_modules_unload(void)
 {
@@ -153,6 +225,17 @@ eeze_sensor_modules_unload(void)
 /* This function is offered to the modules to register itself after they have
  * been loaded in initialized. They stay in the hash function until they
  * unregister themself.
+ */
+/**
+ * @brief Registers a sensor module with the Eeze sensor system.
+ *
+ * This function is called by sensor modules themselves after they have been
+ * loaded and initialized. The module is added to a hash table for later lookup.
+ * The module's `init` function is called as part of the registration.
+ *
+ * @param name The name of the module to register (e.g., "udev", "fake").
+ * @param mod A pointer to the Eeze_Sensor_Module structure representing the module.
+ * @return EINA_TRUE on successful registration, EINA_FALSE otherwise.
  */
 EAPI Eina_Bool
 eeze_sensor_module_register(const char *name, Eeze_Sensor_Module *mod)
@@ -173,6 +256,17 @@ eeze_sensor_module_register(const char *name, Eeze_Sensor_Module *mod)
 
 /* This function is offered to the modules to unregsiter itself. When requested
  * we remove them safely from the hash.
+ */
+/**
+ * @brief Unregisters a sensor module from the Eeze sensor system.
+ *
+ * This function is called by sensor modules when they are being unloaded.
+ * It removes the module from the internal hash table.
+ * The module's `shutdown` function is called before removal if it exists.
+ *
+ * @param name The name of the module to unregister.
+ * @return EINA_TRUE on successful unregistration, EINA_FALSE if the module
+ *         was not found or an error occurred.
  */
 EAPI Eina_Bool
 eeze_sensor_module_unregister(const char *name)
@@ -196,6 +290,19 @@ eeze_sensor_module_unregister(const char *name)
  * with values.
  * Make sure to use the eeze_sensor_free function to remove this sensor object
  * when it is no longer needed.
+ */
+/**
+ * @brief Creates a new sensor object for a given sensor type.
+ *
+ * This function allocates memory for a new Eeze_Sensor_Obj and links it
+ * with the corresponding sensor from the highest priority loaded module.
+ * It performs an initial synchronous read to populate the sensor object
+ * with current values.
+ *
+ * @param type The type of sensor to create (e.g., EEZE_SENSOR_TYPE_ACCELEROMETER).
+ * @return A pointer to the newly created Eeze_Sensor_Obj, or NULL if the
+ *         sensor type is not available, no module provides it, or an error occurs.
+ *         The returned object must be freed using `eeze_sensor_free()`.
  */
 EAPI Eeze_Sensor_Obj *
 eeze_sensor_new(Eeze_Sensor_Type type)
@@ -234,6 +341,11 @@ eeze_sensor_new(Eeze_Sensor_Type type)
 }
 
 /* Free sensor object created with eeze_sensor_new */
+/**
+ * @brief Frees a sensor object created with `eeze_sensor_new()`.
+ *
+ * @param sens The sensor object to free. If NULL, the function does nothing.
+ */
 EAPI void
 eeze_sensor_free(Eeze_Sensor_Obj *sens)
 {
@@ -245,6 +357,17 @@ eeze_sensor_free(Eeze_Sensor_Obj *sens)
  * sensor read. It is way faster this way but also means that the timestamp
  * should be checked to ensure recent data if needed.
  */
+/**
+ * @brief Gets the accuracy level of the sensor reading.
+ *
+ * This function retrieves the cached accuracy value from the sensor object.
+ *
+ * @param sens The sensor object.
+ * @param[out] accuracy Pointer to an integer where the accuracy level will be stored.
+ *                      The meaning of this value is sensor-dependent but generally
+ *                      higher values mean better accuracy.
+ * @return EINA_TRUE on success, EINA_FALSE if `sens` is NULL.
+ */
 EAPI Eina_Bool
 eeze_sensor_accuracy_get(Eeze_Sensor_Obj *sens, int *accuracy)
 {
@@ -254,6 +377,18 @@ eeze_sensor_accuracy_get(Eeze_Sensor_Obj *sens, int *accuracy)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the three-axis (X, Y, Z) sensor data.
+ *
+ * This function retrieves cached X, Y, and Z values from the sensor object.
+ * Applicable to sensors like accelerometers, gyroscopes, magnetometers.
+ *
+ * @param sens The sensor object.
+ * @param[out] x Pointer to a float where the X-axis value will be stored.
+ * @param[out] y Pointer to a float where the Y-axis value will be stored.
+ * @param[out] z Pointer to a float where the Z-axis value will be stored.
+ * @return EINA_TRUE on success, EINA_FALSE if `sens` is NULL.
+ */
 EAPI Eina_Bool
 eeze_sensor_xyz_get(Eeze_Sensor_Obj *sens, float *x, float *y, float *z)
 {
@@ -265,6 +400,16 @@ eeze_sensor_xyz_get(Eeze_Sensor_Obj *sens, float *x, float *y, float *z)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the two-axis (X, Y) sensor data.
+ *
+ * This function retrieves cached X and Y values from the sensor object.
+ *
+ * @param sens The sensor object.
+ * @param[out] x Pointer to a float where the X-axis value will be stored.
+ * @param[out] y Pointer to a float where the Y-axis value will be stored.
+ * @return EINA_TRUE on success, EINA_FALSE if `sens` is NULL.
+ */
 EAPI Eina_Bool
 eeze_sensor_xy_get(Eeze_Sensor_Obj *sens, float *x, float *y)
 {
@@ -275,6 +420,16 @@ eeze_sensor_xy_get(Eeze_Sensor_Obj *sens, float *x, float *y)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets single-axis (X) sensor data.
+ *
+ * This function retrieves the cached X value (data[0]) from the sensor object.
+ * Applicable to sensors like light, proximity, temperature, barometer.
+ *
+ * @param sens The sensor object.
+ * @param[out] x Pointer to a float where the sensor value will be stored.
+ * @return EINA_TRUE on success, EINA_FALSE if `sens` is NULL.
+ */
 EAPI Eina_Bool
 eeze_sensor_x_get(Eeze_Sensor_Obj *sens, float *x)
 {
@@ -284,6 +439,17 @@ eeze_sensor_x_get(Eeze_Sensor_Obj *sens, float *x)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the timestamp of the last sensor reading.
+ *
+ * This function retrieves the cached timestamp from the sensor object.
+ * The timestamp typically represents time in seconds since the Epoch or
+ * system boot, depending on the underlying module.
+ *
+ * @param sens The sensor object.
+ * @param[out] timestamp Pointer to a double where the timestamp will be stored.
+ * @return EINA_TRUE on success, EINA_FALSE if `sens` is NULL.
+ */
 EAPI Eina_Bool
 eeze_sensor_timestamp_get(Eeze_Sensor_Obj *sens, double *timestamp)
 {
@@ -295,6 +461,16 @@ eeze_sensor_timestamp_get(Eeze_Sensor_Obj *sens, double *timestamp)
 
 /* Synchronous read. Blocked until the data was readout from the hardware
  * sensor
+ */
+/**
+ * @brief Performs a synchronous read of the sensor data.
+ *
+ * This function blocks until the data has been read from the hardware sensor.
+ * The sensor object's cached values are updated upon successful read.
+ *
+ * @param sens The sensor object to read data for.
+ * @return EINA_TRUE if the read was successful, EINA_FALSE otherwise (e.g.,
+ *         `sens` is NULL, no module found, or module's read function fails).
  */
 EAPI Eina_Bool
 eeze_sensor_read(Eeze_Sensor_Obj *sens)
@@ -315,6 +491,20 @@ eeze_sensor_read(Eeze_Sensor_Obj *sens)
 /* Asynchronous read. Schedule a new read out that will update the cached values
  * as soon as it arrives.
  */
+/**
+ * @brief Performs an asynchronous read of the sensor data.
+ *
+ * This function schedules a new readout from the hardware sensor.
+ * The sensor object's cached values will be updated when the data arrives.
+ * An event (specific to the sensor type) is typically generated upon completion.
+ *
+ * @param sens The sensor object to read data for.
+ * @param user_data User-defined data to be passed to the completion callback
+ *                  or event, if applicable by the module.
+ * @return EINA_TRUE if the asynchronous read was successfully initiated,
+ *         EINA_FALSE otherwise (e.g., `sens` is NULL, no module found, or
+ *         module's async_read function is not implemented or fails).
+ */
 EAPI Eina_Bool
 eeze_sensor_async_read(Eeze_Sensor_Obj *sens, void *user_data)
 {
@@ -330,6 +520,14 @@ eeze_sensor_async_read(Eeze_Sensor_Obj *sens, void *user_data)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Shuts down the Eeze sensor system.
+ *
+ * This function performs necessary cleanup for the Eeze sensor library.
+ * It flushes all sensor-related ecore events, unloads sensor modules,
+ * frees global handles and the Eina_Prefix.
+ * It also calls `eina_shutdown()`.
+ */
 void
 eeze_sensor_shutdown(void)
 {
@@ -366,6 +564,17 @@ eeze_sensor_shutdown(void)
    eina_shutdown();
 }
 
+/**
+ * @brief Initializes the Eeze sensor system.
+ *
+ * This function initializes necessary components for the Eeze sensor library.
+ * It initializes Eina, sets up an Eina_Prefix for path resolution,
+ * allocates global handles, creates ecore event types for various sensors,
+ * and loads available sensor modules.
+ * This must be called before any other eeze_sensor_* functions.
+ *
+ * @return EINA_TRUE on successful initialization, EINA_FALSE otherwise.
+ */
 Eina_Bool
 eeze_sensor_init(void)
 {

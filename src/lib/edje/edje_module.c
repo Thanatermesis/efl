@@ -1,8 +1,25 @@
 #include "edje_private.h"
 
+/**
+ * @internal
+ * @brief Hash table of loaded Edje modules.
+ * Key: module name (const char *)
+ * Value: Eina_Module *
+ */
 Eina_Hash *_registered_modules = NULL;
+
+/**
+ * @internal
+ * @brief List of paths to search for Edje modules.
+ * Each element is a (char *).
+ */
 Eina_List *_modules_paths = NULL;
 
+/**
+ * @internal
+ * @brief List of found available Edje module names.
+ * Each element is a (const char *) (stringshared).
+ */
 Eina_List *_modules_found = NULL;
 
 #if _WIN32
@@ -11,6 +28,15 @@ Eina_List *_modules_found = NULL;
 # define EDJE_MODULE_NAME "module.so"
 #endif
 
+/**
+ * @brief Loads an Edje module.
+ *
+ * This function attempts to load the specified Edje module.
+ * It's a wrapper around _edje_module_handle_load().
+ *
+ * @param module The name of the module to load.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 EAPI Eina_Bool
 edje_module_load(const char *module)
 {
@@ -18,6 +44,18 @@ edje_module_load(const char *module)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Loads and registers an Edje module.
+ *
+ * This function searches for the specified module in the configured module
+ * paths. If found, it loads the module and adds it to the
+ * _registered_modules hash. It also handles "run-in-tree" scenarios
+ * for development.
+ *
+ * @param module The name of the module to load.
+ * @return A pointer to the loaded Eina_Module on success, or NULL on failure.
+ */
 Eina_Module *
 _edje_module_handle_load(const char *module)
 {
@@ -76,12 +114,30 @@ _edje_module_handle_load(const char *module)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Frees an Eina_Module.
+ *
+ * This function is used as a callback for eina_hash_free_cb to free
+ * Eina_Module structures stored in the _registered_modules hash.
+ *
+ * @param mod Pointer to the Eina_Module to free.
+ */
 static void
 module_free(void *mod)
 {
    eina_module_free(mod);
 }
 
+/**
+ * @internal
+ * @brief Initializes the Edje module system.
+ *
+ * This function initializes the _registered_modules hash and populates
+ * the _modules_paths list with default search paths for Edje modules.
+ * It considers "run-in-tree" development environments and standard
+ * installation paths.
+ */
 void
 _edje_module_init(void)
 {
@@ -127,6 +183,14 @@ _edje_module_init(void)
        _modules_paths = eina_list_append(_modules_paths, paths[i]);
 }
 
+/**
+ * @internal
+ * @brief Shuts down the Edje module system.
+ *
+ * This function frees all resources associated with the Edje module system,
+ * including the _registered_modules hash, the _modules_paths list, and
+ * the _modules_found list.
+ */
 void
 _edje_module_shutdown(void)
 {
@@ -145,6 +209,23 @@ _edje_module_shutdown(void)
      eina_stringshare_del(path);
 }
 
+/**
+ * @brief Gets a list of available Edje modules.
+ *
+ * This function scans the configured module search paths for available
+ * Edje modules. It checks for the existence of "module.so" (or "module.dll")
+ * within subdirectories corresponding to module names and architecture.
+ *
+ * @note The returned list and its stringshared contents should not be modified
+ *       by the caller. The list is owned by the Edje module system and is
+ *       valid until the next call to this function or _edje_module_shutdown().
+ *
+ * @return A const Eina_List of available module names (const char *).
+ *         Each string is stringshared. Returns NULL on failure or if no
+ *         modules are found.
+ *         Example list structure:
+ *         ("module_name1", "module_name2", ...)
+ */
 EAPI const Eina_List *
 edje_available_modules_get(void)
 {

@@ -8,6 +8,10 @@
 // by default.
 #define TILE_ROTATE 1
 
+/**
+ * @brief Converts an ARGB source image to a 32bpp ARGB destination image.
+ * @see evas_common_convert_rgba_to_32bpp_rgb_8888 in evas_convert_rgb_32.h
+ */
 void
 evas_common_convert_rgba_to_32bpp_rgb_8888 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x EINA_UNUSED, int dith_y EINA_UNUSED, DATA8 *pal EINA_UNUSED)
 {
@@ -30,6 +34,10 @@ evas_common_convert_rgba_to_32bpp_rgb_8888 (DATA32 *src, DATA8 *dst, int src_jum
    return;
 }
 
+/**
+ * @brief Converts an ARGB source image to a 32bpp ARGB destination image, with 180-degree rotation.
+ * @see evas_common_convert_rgba_to_32bpp_rgb_8888_rot_180 in evas_convert_rgb_32.h
+ */
 void
 evas_common_convert_rgba_to_32bpp_rgb_8888_rot_180 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x EINA_UNUSED, int dith_y EINA_UNUSED, DATA8 *pal EINA_UNUSED)
 {
@@ -47,8 +55,23 @@ evas_common_convert_rgba_to_32bpp_rgb_8888_rot_180 (DATA32 *src, DATA8 *dst, int
    return;
 }
 
+// {{{ TILE_ROTATE implementation
 #ifdef TILE_ROTATE
+
+// {{{ NEON optimized rotation macros
 # ifdef BUILD_NEON
+/**
+ * @def ROT90_QUAD_COPY_LOOP(pix_type)
+ * @brief Macro for NEON-optimized 90-degree rotation of 4xN blocks.
+ *
+ * This macro, if NEON is available and width is a multiple of 4, rotates
+ * a block of pixels by processing 4 pixels (a quad) at a time using NEON intrinsics.
+ * It reads 4 vertically adjacent pixels from the source (transposed) and writes them
+ * as 4 horizontally adjacent pixels to the destination.
+ * Falls back to a generic loop for widths not divisible by 4 or if NEON is not available.
+ *
+ * @param pix_type The data type of a pixel (e.g., DATA32).
+ */
 #  define ROT90_QUAD_COPY_LOOP(pix_type) \
    if (evas_common_cpu_has_feature(CPU_FEATURE_NEON)) { \
       if ((w % 4) == 0) { \
@@ -83,6 +106,17 @@ evas_common_convert_rgba_to_32bpp_rgb_8888_rot_180 (DATA32 *src, DATA8 *dst, int
       } \
    } \
    else
+/**
+ * @def ROT270_QUAD_COPY_LOOP(pix_type)
+ * @brief Macro for NEON-optimized 270-degree rotation of 4xN blocks.
+ *
+ * Similar to ROT90_QUAD_COPY_LOOP, but performs a 270-degree rotation.
+ * It reads 4 vertically adjacent pixels from the source (transposed, reversed order)
+ * and writes them as 4 horizontally adjacent pixels to the destination.
+ * Falls back to a generic loop for widths not divisible by 4 or if NEON is not available.
+ *
+ * @param pix_type The data type of a pixel (e.g., DATA32).
+ */
 #  define ROT270_QUAD_COPY_LOOP(pix_type) \
    if (evas_common_cpu_has_feature(CPU_FEATURE_NEON)) { \
       if ((w % 4) == 0) { \
@@ -117,12 +151,33 @@ evas_common_convert_rgba_to_32bpp_rgb_8888_rot_180 (DATA32 *src, DATA8 *dst, int
       } \
    } \
    else
-# else
+# else // BUILD_NEON not defined
+// Define empty macros if NEON is not being built
 #  define ROT90_QUAD_COPY_LOOP(pix_type)
 #  define ROT270_QUAD_COPY_LOOP(pix_type)
-# endif
+# endif // BUILD_NEON
+// }}} NEON optimized rotation macros
 
+/**
+ * @def FAST_SIMPLE_ROTATE(suffix, pix_type)
+ * @brief Macro to generate a set of optimized rotation functions for a given pixel type.
+ *
+ * This macro generates four static functions for a given `pix_type` and `suffix`:
+ * - `blt_rotated_90_trivial_##suffix`: Performs a basic 90-degree clockwise rotation.
+ * - `blt_rotated_270_trivial_##suffix`: Performs a basic 270-degree clockwise (90-degree counter-clockwise) rotation.
+ * - `blt_rotated_90_##suffix`: Performs a 90-degree rotation optimized for cache performance using tiling.
+ * - `blt_rotated_270_##suffix`: Performs a 270-degree rotation optimized for cache performance using tiling.
+ *
+ * The `_trivial_` versions are the core rotation logic, potentially using NEON via
+ * `ROT90_QUAD_COPY_LOOP` and `ROT270_QUAD_COPY_LOOP`.
+ * The non-trivial versions wrap the trivial ones, adding logic to process the image in
+ * cache-line-sized tiles to improve memory access patterns.
+ *
+ * @param suffix Suffix to append to the generated function names (e.g., "8888").
+ * @param pix_type The data type of a pixel (e.g., DATA32).
+ */
 # define FAST_SIMPLE_ROTATE(suffix, pix_type) \
+   /** @brief Performs a basic 90-degree clockwise rotation of an image block. */ \
    static void \
    blt_rotated_90_trivial_##suffix(pix_type       * restrict dst, \
                                    int              dst_stride, \
@@ -143,6 +198,7 @@ evas_common_convert_rgba_to_32bpp_rgb_8888_rot_180 (DATA32 *src, DATA8 *dst, int
          } \
       } \
    } \
+   /** @brief Performs a basic 270-degree clockwise rotation (90-degree counter-clockwise) of an image block. */ \
    static void \
    blt_rotated_270_trivial_##suffix(pix_type       * restrict dst, \
                                     int              dst_stride, \
@@ -163,6 +219,7 @@ evas_common_convert_rgba_to_32bpp_rgb_8888_rot_180 (DATA32 *src, DATA8 *dst, int
          } \
       } \
    } \
+   /** @brief Performs a 90-degree clockwise rotation using tiling for cache optimization. */ \
    static void \
    blt_rotated_90_##suffix(pix_type       * restrict dst, \
                            int              dst_stride, \
@@ -209,6 +266,7 @@ evas_common_convert_rgba_to_32bpp_rgb_8888_rot_180 (DATA32 *src, DATA8 *dst, int
                                         trailing_pixels, \
                                         h); \
    } \
+   /** @brief Performs a 270-degree clockwise rotation (90-degree counter-clockwise) using tiling for cache optimization. */ \
    static void \
    blt_rotated_270_##suffix(pix_type       * restrict dst, \
                             int              dst_stride, \
@@ -257,8 +315,14 @@ evas_common_convert_rgba_to_32bpp_rgb_8888_rot_180 (DATA32 *src, DATA8 *dst, int
    }
 
 FAST_SIMPLE_ROTATE(8888, DATA32)
-#endif
 
+#endif // TILE_ROTATE
+// }}} TILE_ROTATE implementation
+
+/**
+ * @brief Converts an ARGB source image to a 32bpp ARGB destination image, with 270-degree rotation.
+ * @see evas_common_convert_rgba_to_32bpp_rgb_8888_rot_270 in evas_convert_rgb_32.h
+ */
 void
 evas_common_convert_rgba_to_32bpp_rgb_8888_rot_270 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x EINA_UNUSED, int dith_y EINA_UNUSED, DATA8 *pal EINA_UNUSED)
 {
@@ -281,6 +345,11 @@ evas_common_convert_rgba_to_32bpp_rgb_8888_rot_270 (DATA32 *src, DATA8 *dst, int
    return;
 }
 
+/*
+ * The following section includes commented-out performance measuring code.
+ * It can be enabled during optimization work to compare different implementations.
+ * It uses clock_gettime(CLOCK_MONOTONIC, ...) to measure execution time.
+ */
 /* speed measuring code - enable when optimizing to compare
 #include <time.h>
 static double
@@ -293,6 +362,10 @@ get_time(void)
 }
 */
 
+/**
+ * @brief Converts an ARGB source image to a 32bpp ARGB destination image, with 90-degree rotation.
+ * @see evas_common_convert_rgba_to_32bpp_rgb_8888_rot_90 in evas_convert_rgb_32.h
+ */
 void
 evas_common_convert_rgba_to_32bpp_rgb_8888_rot_90 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x EINA_UNUSED, int dith_y EINA_UNUSED, DATA8 *pal EINA_UNUSED)
 {
@@ -324,6 +397,10 @@ evas_common_convert_rgba_to_32bpp_rgb_8888_rot_90 (DATA32 *src, DATA8 *dst, int 
 */
 }
 
+/**
+ * @brief Converts an ARGB source image to a 32bpp RGB0 destination image.
+ * @see evas_common_convert_rgba_to_32bpp_rgbx_8888 in evas_convert_rgb_32.h
+ */
 void
 evas_common_convert_rgba_to_32bpp_rgbx_8888 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x EINA_UNUSED, int dith_y EINA_UNUSED, DATA8 *pal EINA_UNUSED)
 {
@@ -341,6 +418,10 @@ evas_common_convert_rgba_to_32bpp_rgbx_8888 (DATA32 *src, DATA8 *dst, int src_ju
    return;
 }
 
+/**
+ * @brief Converts an ARGB source image to a 32bpp RGB0 destination image, with 180-degree rotation.
+ * @see evas_common_convert_rgba_to_32bpp_rgbx_8888_rot_180 in evas_convert_rgb_32.h
+ */
 void
 evas_common_convert_rgba_to_32bpp_rgbx_8888_rot_180 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x EINA_UNUSED, int dith_y EINA_UNUSED, DATA8 *pal EINA_UNUSED)
 {
@@ -358,6 +439,10 @@ evas_common_convert_rgba_to_32bpp_rgbx_8888_rot_180 (DATA32 *src, DATA8 *dst, in
    return;
 }
 
+/**
+ * @brief Converts an ARGB source image to a 32bpp RGB0 destination image, with 270-degree rotation.
+ * @see evas_common_convert_rgba_to_32bpp_rgbx_8888_rot_270 in evas_convert_rgb_32.h
+ */
 void
 evas_common_convert_rgba_to_32bpp_rgbx_8888_rot_270 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x EINA_UNUSED, int dith_y EINA_UNUSED, DATA8 *pal EINA_UNUSED)
 {
@@ -375,6 +460,10 @@ evas_common_convert_rgba_to_32bpp_rgbx_8888_rot_270 (DATA32 *src, DATA8 *dst, in
    return;
 }
 
+/**
+ * @brief Converts an ARGB source image to a 32bpp RGB0 destination image, with 90-degree rotation.
+ * @see evas_common_convert_rgba_to_32bpp_rgbx_8888_rot_90 in evas_convert_rgb_32.h
+ */
 void
 evas_common_convert_rgba_to_32bpp_rgbx_8888_rot_90 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x EINA_UNUSED, int dith_y EINA_UNUSED, DATA8 *pal EINA_UNUSED)
 {
@@ -392,6 +481,10 @@ evas_common_convert_rgba_to_32bpp_rgbx_8888_rot_90 (DATA32 *src, DATA8 *dst, int
    return;
 }
 
+/**
+ * @brief Converts an ARGB source image to a 32bpp 0BGR destination image.
+ * @see evas_common_convert_rgba_to_32bpp_bgr_8888 in evas_convert_rgb_32.h
+ */
 void
 evas_common_convert_rgba_to_32bpp_bgr_8888 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x EINA_UNUSED, int dith_y EINA_UNUSED, DATA8 *pal EINA_UNUSED)
 {
@@ -408,6 +501,10 @@ evas_common_convert_rgba_to_32bpp_bgr_8888 (DATA32 *src, DATA8 *dst, int src_jum
    return;
 }
 
+/**
+ * @brief Converts an ARGB source image to a 32bpp 0BGR destination image, with 180-degree rotation.
+ * @see evas_common_convert_rgba_to_32bpp_bgr_8888_rot_180 in evas_convert_rgb_32.h
+ */
 void
 evas_common_convert_rgba_to_32bpp_bgr_8888_rot_180 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x EINA_UNUSED, int dith_y EINA_UNUSED, DATA8 *pal EINA_UNUSED)
 {
@@ -424,6 +521,10 @@ evas_common_convert_rgba_to_32bpp_bgr_8888_rot_180 (DATA32 *src, DATA8 *dst, int
    return;
 }
 
+/**
+ * @brief Converts an ARGB source image to a 32bpp 0BGR destination image, with 270-degree rotation.
+ * @see evas_common_convert_rgba_to_32bpp_bgr_8888_rot_270 in evas_convert_rgb_32.h
+ */
 void
 evas_common_convert_rgba_to_32bpp_bgr_8888_rot_270 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x EINA_UNUSED, int dith_y EINA_UNUSED, DATA8 *pal EINA_UNUSED)
 {
@@ -440,6 +541,10 @@ evas_common_convert_rgba_to_32bpp_bgr_8888_rot_270 (DATA32 *src, DATA8 *dst, int
    return;
 }
 
+/**
+ * @brief Converts an ARGB source image to a 32bpp 0BGR destination image, with 90-degree rotation.
+ * @see evas_common_convert_rgba_to_32bpp_bgr_8888_rot_90 in evas_convert_rgb_32.h
+ */
 void
 evas_common_convert_rgba_to_32bpp_bgr_8888_rot_90 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x EINA_UNUSED, int dith_y EINA_UNUSED, DATA8 *pal EINA_UNUSED)
 {
@@ -456,6 +561,10 @@ evas_common_convert_rgba_to_32bpp_bgr_8888_rot_90 (DATA32 *src, DATA8 *dst, int 
    return;
 }
 
+/**
+ * @brief Converts an ARGB source image to a 32bpp BGR0 destination image.
+ * @see evas_common_convert_rgba_to_32bpp_bgrx_8888 in evas_convert_rgb_32.h
+ */
 void
 evas_common_convert_rgba_to_32bpp_bgrx_8888 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x EINA_UNUSED, int dith_y EINA_UNUSED, DATA8 *pal EINA_UNUSED)
 {
@@ -472,6 +581,10 @@ evas_common_convert_rgba_to_32bpp_bgrx_8888 (DATA32 *src, DATA8 *dst, int src_ju
    return;
 }
 
+/**
+ * @brief Converts an ARGB source image to a 32bpp BGR0 destination image, with 180-degree rotation.
+ * @see evas_common_convert_rgba_to_32bpp_bgrx_8888_rot_180 in evas_convert_rgb_32.h
+ */
 void
 evas_common_convert_rgba_to_32bpp_bgrx_8888_rot_180 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x EINA_UNUSED, int dith_y EINA_UNUSED, DATA8 *pal EINA_UNUSED)
 {
@@ -488,6 +601,10 @@ evas_common_convert_rgba_to_32bpp_bgrx_8888_rot_180 (DATA32 *src, DATA8 *dst, in
    return;
 }
 
+/**
+ * @brief Converts an ARGB source image to a 32bpp BGR0 destination image, with 270-degree rotation.
+ * @see evas_common_convert_rgba_to_32bpp_bgrx_8888_rot_270 in evas_convert_rgb_32.h
+ */
 void
 evas_common_convert_rgba_to_32bpp_bgrx_8888_rot_270 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x EINA_UNUSED, int dith_y EINA_UNUSED, DATA8 *pal EINA_UNUSED)
 {
@@ -504,6 +621,10 @@ evas_common_convert_rgba_to_32bpp_bgrx_8888_rot_270 (DATA32 *src, DATA8 *dst, in
    return;
 }
 
+/**
+ * @brief Converts an ARGB source image to a 32bpp BGR0 destination image, with 90-degree rotation.
+ * @see evas_common_convert_rgba_to_32bpp_bgrx_8888_rot_90 in evas_convert_rgb_32.h
+ */
 void
 evas_common_convert_rgba_to_32bpp_bgrx_8888_rot_90 (DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x EINA_UNUSED, int dith_y EINA_UNUSED, DATA8 *pal EINA_UNUSED)
 {
@@ -520,6 +641,10 @@ evas_common_convert_rgba_to_32bpp_bgrx_8888_rot_90 (DATA32 *src, DATA8 *dst, int
    return;
 }
 
+/**
+ * @brief Converts an ARGB source image to a 32bpp RGB666 destination image.
+ * @see evas_common_convert_rgba_to_32bpp_rgb_666 in evas_convert_rgb_32.h
+ */
 void
 evas_common_convert_rgba_to_32bpp_rgb_666(DATA32 *src, DATA8 *dst, int src_jump, int dst_jump, int w, int h, int dith_x EINA_UNUSED, int dith_y EINA_UNUSED, DATA8 *pal EINA_UNUSED)
 {

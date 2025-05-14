@@ -59,6 +59,17 @@ struct _Callback_Data
    Ecore_X_Window xid;
 };
 
+/**
+ * @brief Recursively traverses menu items and adds them to the D-Bus menu hash.
+ *
+ * This function assigns a unique integer ID to each menu item and stores it in
+ * a hash table for quick lookup. The ID is used to reference the item in
+ * D-Bus calls.
+ *
+ * @param dbus_menu The D-Bus menu instance.
+ * @param item The menu item to start traversal from.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _menu_add_recursive(Elm_DBus_Menu *dbus_menu, Elm_Menu_Item_Data *item)
 {
@@ -82,6 +93,16 @@ _menu_add_recursive(Elm_DBus_Menu *dbus_menu, Elm_Menu_Item_Data *item)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for the result of the RegisterWindow D-Bus call.
+ *
+ * This is called asynchronously after attempting to register a window with the
+ * AppMenu Registrar. It invokes the user-provided result callback.
+ *
+ * @param data The Elm_DBus_Menu instance.
+ * @param msg The reply message from D-Bus.
+ * @param pending The pending D-Bus call.
+ */
 static void
 _app_register_cb(void *data, const Eldbus_Message *msg,
                  Eldbus_Pending *pending EINA_UNUSED)
@@ -103,6 +124,20 @@ _app_register_cb(void *data, const Eldbus_Message *msg,
    if (cd->result_cb) cd->result_cb(result, cd->data);
 }
 
+/**
+ * @brief Callback for monitoring the AppMenu Registrar on D-Bus.
+ *
+ * This function is triggered when the AppMenu Registrar service becomes
+ * available or disappears. If it becomes available (`new_id` is not empty),
+ * it calls RegisterWindow. If it disappears, it notifies the user via
+ * the result callback.
+ *
+ * @param data The Elm_DBus_Menu instance.
+ * @param bus The bus name being watched (unused).
+ * @param old_id The old owner of the name (unused).
+ * @param new_id The new owner of the name. An empty string means the name
+ *               has no owner.
+ */
 static void
 _app_menu_watch_cb(void *data, const char *bus EINA_UNUSED,
                    const char *old_id EINA_UNUSED, const char *new_id)
@@ -131,6 +166,16 @@ _app_menu_watch_cb(void *data, const char *bus EINA_UNUSED,
      }
 }
 
+/**
+ * @brief Idler function to emit the LayoutUpdated D-Bus signal.
+ *
+ * Using an idler ensures that multiple layout changes within a single main
+ * loop iteration result in only one D-Bus signal being emitted, avoiding
+ * unnecessary traffic.
+ *
+ * @param data The Elm_DBus_Menu instance.
+ * @return ECORE_CALLBACK_CANCEL to automatically remove the idler after it runs.
+ */
 static Eina_Bool
 _layout_idler(void *data)
 {
@@ -143,6 +188,14 @@ _layout_idler(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Schedules the layout idler to be called.
+ *
+ * This function ensures that the idler is only added once, even if this
+ * function is called multiple times before the idler has a chance to run.
+ *
+ * @param dbus_menu The D-Bus menu instance.
+ */
 static void
 _layout_signal(Elm_DBus_Menu *dbus_menu)
 {
@@ -152,6 +205,13 @@ _layout_signal(Elm_DBus_Menu *dbus_menu)
    dbus_menu->signal_idler = ecore_idler_add(_layout_idler, dbus_menu);
 }
 
+/**
+ * @brief Converts a property name string to its corresponding enum value.
+ *
+ * @param str The property name as a string (e.g., "label", "enabled").
+ * @return The Elm_DBus_Property enum value, or ELM_DBUS_PROPERTY_UNKNOWN
+ *         if the string is not a recognized property.
+ */
 static Elm_DBus_Property
 _str_to_property(const char *str)
 {
@@ -169,6 +229,16 @@ _str_to_property(const char *str)
    return ELM_DBUS_PROPERTY_UNKNOWN;
 }
 
+/**
+ * @brief Checks if a menu item has a freedesktop-compliant icon.
+ *
+ * D-Bus menus primarily work with icon names that follow the freedesktop.org
+ * icon naming specification. This function verifies if the item's icon is of
+ * that type.
+ *
+ * @param item The menu item to check.
+ * @return EINA_TRUE if the item has a freedesktop icon, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _freedesktop_icon_exists(Elm_Menu_Item_Data *item)
 {
@@ -182,6 +252,17 @@ _freedesktop_icon_exists(Elm_Menu_Item_Data *item)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Checks if a specific D-Bus property is applicable to a given menu item.
+ *
+ * For example, a separator item only has a "type" property, while a regular
+ * item might have "label", "enabled", etc. This function determines if a
+ * property makes sense for an item before trying to retrieve its value.
+ *
+ * @param item The menu item.
+ * @param property The D-Bus property to check.
+ * @return EINA_TRUE if the property exists for the item, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _property_exists(Elm_Menu_Item_Data *item,
                  Elm_DBus_Property property)
@@ -216,8 +297,18 @@ _property_exists(Elm_Menu_Item_Data *item,
    return EINA_FALSE;
 }
 
-// Ad-hoc dbusmenu property dictionary subset implementation
-// Depends on _property_exists results
+/**
+ * @brief Appends a single property (as a D-Bus variant) to a message iterator.
+ *
+ * This function retrieves the value for a given property from a menu item
+ * and appends it to the D-Bus message being constructed. It assumes that
+ * _property_exists() has already been called to verify the property is valid
+ * for this item.
+ *
+ * @param item The menu item from which to get the property value.
+ * @param property The property to append.
+ * @param iter The D-Bus message iterator to append to.
+ */
 static void
 _property_append(Elm_Menu_Item_Data *item,
                  Elm_DBus_Property property,
@@ -268,6 +359,17 @@ _property_append(Elm_Menu_Item_Data *item,
    eldbus_message_iter_container_close(iter, variant);
 }
 
+/**
+ * @brief Constructs a D-Bus dictionary of properties for a menu item.
+ *
+ * Iterates through a list of requested property names, checks if each property
+ * exists for the given item, and if so, appends it to a D-Bus dictionary
+ * (a{sv}).
+ *
+ * @param item The menu item.
+ * @param property_list A list of strings, where each string is a property name.
+ * @param iter The D-Bus message iterator to append the dictionary to.
+ */
 static void
 _property_dict_build(Elm_Menu_Item_Data *item,
                      Eina_List *property_list, Eldbus_Message_Iter *iter)
@@ -295,6 +397,22 @@ _property_dict_build(Elm_Menu_Item_Data *item,
    eldbus_message_iter_container_close(iter, array);
 }
 
+/**
+ * @brief Recursively builds the layout structure for a menu item and its children.
+ *
+ * This function generates the D-Bus structure for a single menu item, including
+ * its properties and any sub-menus, up to a specified recursion depth.
+ * The D-Bus layout for an item is a struct: (ia{sv}av).
+ * - i: The integer ID of the menu item.
+ * - a{sv}: A dictionary of properties (e.g., "label", "enabled").
+ * - av: An array of variants, where each variant is a struct for a child item.
+ *
+ * @param item The menu item to process.
+ * @param property_list The list of property names to include.
+ * @param recursion_depth How many levels of sub-menus to include. A value of 0
+ *                        means only the current item is processed.
+ * @param iter The D-Bus message iterator to append the layout to.
+ */
 static void
 _layout_build_recursive(Elm_Menu_Item_Data *item,
                         Eina_List *property_list, unsigned recursion_depth,
@@ -326,6 +444,19 @@ _layout_build_recursive(Elm_Menu_Item_Data *item,
    eldbus_message_iter_container_close(iter, layout);
 }
 
+/**
+ * @brief Builds the layout structure for the root of the menu.
+ *
+ * The root (parent ID 0) is a special case. It doesn't represent a real menu
+ * item but acts as a container for the top-level items. This function
+ * constructs its layout and then calls _layout_build_recursive() for each
+ * top-level item.
+ *
+ * @param dbus_menu The D-Bus menu instance.
+ * @param property_list The list of property names to include.
+ * @param recursion_depth The recursion depth for child items.
+ * @param iter The D-Bus message iterator.
+ */
 static void
 _root_layout_build(Elm_DBus_Menu *dbus_menu, Eina_List *property_list,
                    unsigned recursion_depth, Eldbus_Message_Iter *iter)
@@ -374,6 +505,18 @@ _root_layout_build(Elm_DBus_Menu *dbus_menu, Eina_List *property_list,
    eldbus_message_iter_container_close(iter, layout);
 }
 
+/**
+ * @brief Ensures the property list is not empty.
+ *
+ * If the client requests layout information without specifying any properties,
+ * the D-Bus specification implies that a default set of common properties
+ * should be returned. This function populates the list with these defaults
+ * if it's empty.
+ *
+ * @param property_list The list of properties, which may be empty.
+ * @return The original list, or a new list containing default properties if
+ *         the original was empty. The caller is responsible for freeing the list.
+ */
 static Eina_List *
 _empty_properties_handle(Eina_List *property_list)
 {
@@ -388,6 +531,18 @@ _empty_properties_handle(Eina_List *property_list)
    return property_list;
 }
 
+/**
+ * @brief Handles a single D-Bus menu event, such as 'clicked'.
+ *
+ * This function parses an event from a D-Bus message, finds the corresponding
+ * menu item, and triggers the appropriate action (e.g., simulates a click).
+ *
+ * @param dbus_menu The D-Bus menu instance.
+ * @param iter An iterator positioned at the start of the event data.
+ *             The expected signature is (isvu).
+ * @param[out] error_id If the item ID is invalid, it is written to this pointer.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., invalid item ID).
+ */
 static Eina_Bool
 _event_handle(Elm_DBus_Menu *dbus_menu, Eldbus_Message_Iter *iter, int *error_id)
 {
@@ -415,6 +570,16 @@ _event_handle(Elm_DBus_Menu *dbus_menu, Eldbus_Message_Iter *iter, int *error_id
    return EINA_TRUE;
 }
 
+/**
+ * @brief Creates and initializes a D-Bus menu representation from an Elm_Menu widget.
+ *
+ * This function allocates the Elm_DBus_Menu structure and populates its internal
+ * hash table by recursively scanning all items in the provided menu widget.
+ * It does not yet connect to D-Bus or register any interfaces.
+ *
+ * @param menu The Elm_Menu widget.
+ * @return A new Elm_DBus_Menu instance, or NULL on failure.
+ */
 static Elm_DBus_Menu *
 _elm_dbus_menu_add(Eo *menu)
 {
@@ -466,6 +631,16 @@ error_menu:
 // =============================================================================
 // Methods
 // =============================================================================
+/**
+ * @brief Implements the GetLayout D-Bus method.
+ *
+ * This method is called by clients to retrieve the structure of the menu.
+ * It can return the entire menu tree or a specific sub-tree.
+ *
+ * @param iface The service interface that received the call.
+ * @param msg The incoming D-Bus message.
+ * @return A new D-Bus message containing the layout reply or an error.
+ */
 static Eldbus_Message *
 _method_layout_get(const Eldbus_Service_Interface *iface,
                    const Eldbus_Message *msg)
@@ -518,6 +693,16 @@ _method_layout_get(const Eldbus_Service_Interface *iface,
    return reply;
 }
 
+/**
+ * @brief Implements the GetGroupProperties D-Bus method.
+ *
+ * Retrieves a list of specified properties for a list of specified menu items.
+ * This is more efficient than calling GetProperty for each item individually.
+ *
+ * @param iface The service interface.
+ * @param msg The incoming D-Bus message.
+ * @return A new D-Bus message containing the properties or an error.
+ */
 static Eldbus_Message *
 _method_group_properties_get(const Eldbus_Service_Interface *iface,
                              const Eldbus_Message *msg)
@@ -583,6 +768,15 @@ _method_group_properties_get(const Eldbus_Service_Interface *iface,
    return reply;
 }
 
+/**
+ * @brief Implements the GetProperty D-Bus method.
+ *
+ * Retrieves a single property for a single menu item.
+ *
+ * @param iface The service interface.
+ * @param msg The incoming D-Bus message.
+ * @return A new D-Bus message containing the property value or an error.
+ */
 static Eldbus_Message *
 _method_property_get(const Eldbus_Service_Interface *iface,
                      const Eldbus_Message *msg)
@@ -651,6 +845,16 @@ _method_property_get(const Eldbus_Service_Interface *iface,
    return reply;
 }
 
+/**
+ * @brief Implements the Event D-Bus method.
+ *
+ * This is called by the client to notify the application of an event, such as
+ * a menu item being clicked.
+ *
+ * @param iface The service interface.
+ * @param msg The incoming D-Bus message.
+ * @return A new D-Bus message for method return (or an error).
+ */
 static Eldbus_Message *
 _method_event(const Eldbus_Service_Interface *iface,
               const Eldbus_Message *msg)
@@ -669,6 +873,16 @@ _method_event(const Eldbus_Service_Interface *iface,
    return reply;
 }
 
+/**
+ * @brief Implements the EventGroup D-Bus method.
+ *
+ * A batch version of Event, allowing multiple events to be sent in a single
+ * call.
+ *
+ * @param iface The service interface.
+ * @param msg The incoming D-Bus message.
+ * @return A new D-Bus message for method return (or an error).
+ */
 static Eldbus_Message *
 _method_event_group(const Eldbus_Service_Interface *iface,
                     const Eldbus_Message *msg)
@@ -709,6 +923,17 @@ _method_event_group(const Eldbus_Service_Interface *iface,
    return reply;
 }
 
+/**
+ * @brief Implements the AboutToShow D-Bus method.
+ *
+ * This method is called by the client just before a submenu is displayed.
+ * It allows the application to dynamically update the submenu if needed.
+ * This implementation currently just returns true, indicating no update is needed.
+ *
+ * @param iface The service interface (unused).
+ * @param msg The incoming D-Bus message.
+ * @return A new D-Bus message reply.
+ */
 static Eldbus_Message *
 _method_about_to_show(const Eldbus_Service_Interface *iface EINA_UNUSED,
                       const Eldbus_Message *msg)
@@ -719,6 +944,16 @@ _method_about_to_show(const Eldbus_Service_Interface *iface EINA_UNUSED,
    return reply;
 }
 
+/**
+ * @brief Implements the AboutToShowGroup D-Bus method.
+ *
+ * A batch version of AboutToShow. This implementation currently does nothing
+ * and returns empty lists.
+ *
+ * @param iface The service interface (unused).
+ * @param msg The incoming D-Bus message.
+ * @return A new D-Bus message reply.
+ */
 static Eldbus_Message *
 _method_about_to_show_group(const Eldbus_Service_Interface *iface EINA_UNUSED,
                             const Eldbus_Message *msg)
@@ -810,6 +1045,18 @@ static const Eldbus_Signal _signals[] = {
 // =============================================================================
 // Properties
 // =============================================================================
+/**
+ * @brief Getter for the 'Version' D-Bus property.
+ *
+ * Returns the version of the D-Bus menu protocol supported.
+ *
+ * @param iface The service interface (unused).
+ * @param propname The property name (unused).
+ * @param iter The iterator to append the value to.
+ * @param request_msg The original request message (unused).
+ * @param error D-Bus error to be set on failure (unused).
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _prop_version_get(const Eldbus_Service_Interface *iface EINA_UNUSED,
                   const char *propname EINA_UNUSED,
@@ -822,6 +1069,19 @@ _prop_version_get(const Eldbus_Service_Interface *iface EINA_UNUSED,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Getter for the 'TextDirection' D-Bus property.
+ *
+ * Returns whether the application is in a right-to-left ("rtl") or
+ * left-to-right ("ltr") mode.
+ *
+ * @param iface Unused.
+ * @param propname Unused.
+ * @param iter The iterator to append the value to.
+ * @param request_msg Unused.
+ * @param error Unused.
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _prop_text_direction_get(const Eldbus_Service_Interface *iface EINA_UNUSED,
                          const char *propname EINA_UNUSED,
@@ -837,6 +1097,18 @@ _prop_text_direction_get(const Eldbus_Service_Interface *iface EINA_UNUSED,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Getter for the 'Status' D-Bus property.
+ *
+ * Returns the status of the menu, which is always "normal".
+ *
+ * @param iface Unused.
+ * @param propname Unused.
+ * @param iter The iterator to append the value to.
+ * @param request_msg Unused.
+ * @param error Unused.
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _prop_status_get(const Eldbus_Service_Interface *iface EINA_UNUSED,
                  const char *propname EINA_UNUSED,
@@ -850,6 +1122,19 @@ _prop_status_get(const Eldbus_Service_Interface *iface EINA_UNUSED,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Getter for the 'IconThemePath' D-Bus property.
+ *
+ * Returns the search paths for icon themes. This implementation returns only
+ * Elementary's own icon directory.
+ *
+ * @param iface Unused.
+ * @param propname Unused.
+ * @param iter The iterator to append the value to.
+ * @param request_msg Unused.
+ * @param error Unused.
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _prop_icon_theme_path_get(const Eldbus_Service_Interface *iface EINA_UNUSED,
                           const char *propname EINA_UNUSED,
@@ -878,6 +1163,16 @@ static const Eldbus_Service_Interface_Desc _interface = {
 };
 // =============================================================================
 
+/**
+ * @brief Registers an Elementary menu widget on D-Bus.
+ *
+ * This function exposes an Elm_Menu widget over D-Bus using the
+ * com.canonical.dbusmenu interface. It creates a D-Bus object with a unique
+ * path and registers the interface on it.
+ *
+ * @param obj The menu widget to register.
+ * @return The D-Bus object path of the registered menu, or NULL on failure.
+ */
 const char *
 _elm_dbus_menu_register(Eo *obj)
 {
@@ -903,6 +1198,14 @@ end:
    return eldbus_service_object_path_get(sd->dbus_menu->iface);
 }
 
+/**
+ * @brief Unregisters an Elementary menu widget from D-Bus.
+ *
+ * Cleans up all resources associated with the D-Bus menu, including unregistering
+ * the D-Bus interface and freeing allocated memory.
+ *
+ * @param obj The menu widget to unregister.
+ */
 void
 _elm_dbus_menu_unregister(Eo *obj)
 {
@@ -923,6 +1226,18 @@ _elm_dbus_menu_unregister(Eo *obj)
    ELM_SAFE_FREE(sd->dbus_menu, free);
 }
 
+/**
+ * @brief Registers the menu as the application menu for a specific window.
+ *
+ * This communicates with the 'com.canonical.AppMenu.Registrar' service to
+ * associate this D-Bus menu with a given X11 window ID. This is how services
+ * like the Unity panel or MATE menu bar find the menu for a window.
+ *
+ * @param xid The X11 window ID.
+ * @param obj The menu widget.
+ * @param result_cb A callback to be invoked with the result of the registration.
+ * @param data User data to be passed to the result callback.
+ */
 void
 _elm_dbus_menu_app_menu_register(Ecore_X_Window xid, Eo *obj,
                                  void (*result_cb)(Eina_Bool, void *), void *data)
@@ -960,6 +1275,14 @@ _elm_dbus_menu_app_menu_register(Ecore_X_Window xid, Eo *obj,
                                          EINA_TRUE);
 }
 
+/**
+ * @brief Unregisters the application menu for a window.
+ *
+ * Notifies the 'com.canonical.AppMenu.Registrar' that the menu for the given
+ * window is no longer available.
+ *
+ * @param obj The menu widget that was registered.
+ */
 void
 _elm_dbus_menu_app_menu_unregister(Eo *obj)
 {
@@ -992,6 +1315,16 @@ _elm_dbus_menu_app_menu_unregister(Eo *obj)
    sd->dbus_menu->app_menu_data = NULL;
 }
 
+/**
+ * @brief Informs the D-Bus service that a new menu item has been added.
+ *
+ * This adds the new item to the internal hash and schedules a LayoutUpdated
+ * signal to be sent.
+ *
+ * @param dbus_menu The D-Bus menu instance.
+ * @param item_obj The new menu item that was added.
+ * @return The new unique ID assigned to the item, or -1 on failure.
+ */
 int
 _elm_dbus_menu_item_add(Elm_DBus_Menu *dbus_menu, Elm_Object_Item *item_obj)
 {
@@ -1008,6 +1341,15 @@ _elm_dbus_menu_item_add(Elm_DBus_Menu *dbus_menu, Elm_Object_Item *item_obj)
    return ++dbus_menu->timestamp;
 }
 
+/**
+ * @brief Informs the D-Bus service that a menu item has been removed.
+ *
+ * Removes the item from the internal hash and schedules a LayoutUpdated
+ * signal to be sent.
+ *
+ * @param dbus_menu The D-Bus menu instance.
+ * @param id The unique ID of the item that was removed.
+ */
 void
 _elm_dbus_menu_item_delete(Elm_DBus_Menu *dbus_menu, int id)
 {
@@ -1025,6 +1367,15 @@ _elm_dbus_menu_item_delete(Elm_DBus_Menu *dbus_menu, int id)
    _layout_signal(dbus_menu);
 }
 
+/**
+ * @brief Signals a generic update to the menu layout.
+ *
+ * This should be called when properties of existing items change (e.g., a label
+ * or enabled state). It increments the revision timestamp and schedules a
+ * LayoutUpdated signal.
+ *
+ * @param dbus_menu The D-Bus menu instance to update.
+ */
 void
 _elm_dbus_menu_update(Elm_DBus_Menu *dbus_menu)
 {

@@ -8,6 +8,13 @@
    elm_object_tooltip_text_set((BT), (TEXT)); \
    elm_object_tooltip_window_mode_set((BT), EINA_TRUE)
 
+/**
+ * @brief Get the text for a genlist item.
+ * @param data The item data, used here as an integer index.
+ * @param obj The genlist object.
+ * @param part The part name.
+ * @return A newly allocated string for the item's text.
+ */
 static char *
 gl_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
@@ -16,6 +23,13 @@ gl_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUS
    return strdup(buf);
 }
 
+/**
+ * @brief Get the content for a genlist item.
+ * @param data The item data.
+ * @param obj The genlist object.
+ * @param part The swallow part name to place content in.
+ * @return A new icon object for the item's content.
+ */
 static Evas_Object *
 gl_content_get(void *data EINA_UNUSED, Evas_Object *obj, const char *part)
 {
@@ -43,6 +57,12 @@ static Elm_Genlist_Item_Class itc =
      }
 };
 
+/**
+ * @brief Create a new image object for content.
+ * @param parent The parent widget.
+ * @param img Path to the image file.
+ * @return A new icon object.
+ */
 static Evas_Object *
 _content_image_new(Evas_Object *parent, const char *img)
 {
@@ -54,24 +74,50 @@ _content_image_new(Evas_Object *parent, const char *img)
    return ic;
 }
 
+/**
+ * @brief Callback for when a genlist item is selected.
+ * @param data The user data.
+ * @param obj The genlist object.
+ * @param event_info The selected item.
+ */
 static void
 _gl_selected(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
    printf("selected: %p\n", event_info);
 }
 
+/**
+ * @brief Callback for when a genlist item is double-clicked.
+ * @param data The user data.
+ * @param obj The genlist object.
+ * @param event_info The double-clicked item.
+ */
 static void
 _gl_double_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
    printf("double clicked: %p\n", event_info);
 }
 
+/**
+ * @brief Callback for when a genlist item is long-pressed.
+ * @param data The user data.
+ * @param obj The genlist object.
+ * @param event_info The long-pressed item.
+ */
 static void
 _gl_longpress(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
    printf("longpress %p\n", event_info);
 }
 
+/**
+ * @brief Populates a genlist with items asynchronously using an Ecore_Job.
+ *
+ * This function adds a small batch of items and then reschedules itself
+ * if the total number of items is below a threshold. This prevents blocking
+ * the main loop for a long time when adding many items.
+ * @param gl The genlist to populate.
+ */
 static void
 _content_list_populate_cb(Evas_Object *gl)
 {
@@ -82,6 +128,11 @@ _content_list_populate_cb(Evas_Object *gl)
      ecore_job_add((Ecore_Cb)_content_list_populate_cb, gl);
 }
 
+/**
+ * @brief Create a new genlist and starts its population.
+ * @param parent The parent widget.
+ * @return A new genlist object.
+ */
 static Evas_Object *
 _content_list_new(Evas_Object *parent)
 {
@@ -99,18 +150,36 @@ _content_list_new(Evas_Object *parent)
    return gl;
 }
 
+/**
+ * @brief Callback to pop an item from the naviframe stack.
+ * @param data The naviframe widget.
+ * @param obj The button object that was clicked.
+ * @param event_info The event information.
+ */
 static void
 _navi_pop(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_naviframe_item_pop(data);
 }
 
+/**
+ * @brief Callback to delete a specific naviframe item.
+ * @param data The naviframe item to delete.
+ * @param obj The button object that was clicked.
+ * @param event_info The event information.
+ */
 static void
 _navi_it_del(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_object_item_del(data);
 }
 
+/**
+ * @brief Callback to toggle the visibility of the naviframe item's title.
+ * @param data The naviframe item.
+ * @param obj The object that was clicked.
+ * @param event_info The event information.
+ */
 static void
 _title_visible(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -119,12 +188,27 @@ _title_visible(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_U
                                         EINA_TRUE);
 }
 
+/**
+ * @brief Callback to promote a naviframe item to the top of the stack.
+ * @param data The naviframe item to promote.
+ * @param obj The object that was clicked.
+ * @param event_info The event information.
+ */
 static void
 _promote(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    elm_naviframe_item_promote(data);
 }
 
+/**
+ * @brief Create and push page 7 onto the naviframe.
+ *
+ * This page uses the "overlap" style and has buttons to pop a page
+ * or promote page 1 to the top.
+ * @param data The naviframe widget.
+ * @param obj The button object that was clicked.
+ * @param event_info The event information.
+ */
 static void
 _page7(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -149,6 +233,14 @@ _page7(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    evas_object_smart_callback_add(bt, "clicked", _navi_pop, nf);
 }
 
+/**
+ * @brief Create and push page 6 onto the naviframe.
+ *
+ * This page also uses the "overlap" style.
+ * @param data The naviframe widget.
+ * @param obj The button object that was clicked.
+ * @param event_info The event information.
+ */
 static void
 _page6(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -173,6 +265,15 @@ _page6(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    evas_object_smart_callback_add(bt, "clicked", _navi_pop, nf);
 }
 
+/**
+ * @brief Create and insert page 5 after the top item of the naviframe.
+ *
+ * This demonstrates inserting a page without a transition animation.
+ * The "Prev" button on this page deletes the item itself instead of popping.
+ * @param data The naviframe widget.
+ * @param obj The button object that was clicked.
+ * @param event_info The event information.
+ */
 static void
 _page5(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -202,6 +303,15 @@ _page5(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    evas_object_smart_callback_add(bt, "clicked", _navi_it_del, it);
 }
 
+/**
+ * @brief Create and push page 4 onto the naviframe.
+ *
+ * This page demonstrates hiding the title area of a naviframe item
+ * and provides a clickable content area to toggle its visibility.
+ * @param data The naviframe widget.
+ * @param obj The button object that was clicked.
+ * @param event_info The event information.
+ */
 static void
 _page4(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -242,6 +352,14 @@ _page4(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    evas_object_smart_callback_add(content, "clicked", _title_visible, it);
 }
 
+/**
+ * @brief Create and push page 3 onto the naviframe.
+ *
+ * This is a standard page with "Prev" and "Next" buttons.
+ * @param data The naviframe widget.
+ * @param obj The button object that was clicked.
+ * @param event_info The event information.
+ */
 static void
 _page3(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -277,6 +395,14 @@ _page3(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_object_item_part_content_set(it, "icon", ic);
 }
 
+/**
+ * @brief Create and push page 2 onto the naviframe.
+ *
+ * This page demonstrates adding a subtitle to the naviframe item.
+ * @param data The naviframe widget.
+ * @param obj The button object that was clicked.
+ * @param event_info The event information.
+ */
 static void
 _page2(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -303,6 +429,15 @@ _page2(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_object_item_part_text_set(it, "subtitle", "Here is sub-title part!");
 }
 
+/**
+ * @brief The main function for the naviframe complex test.
+ *
+ * This test creates a complex layout with a toolbar controlling multiple
+ * naviframe "views". Each view is itself a naviframe, demonstrating nesting
+ * and various features like different content types (image, list),
+ * item promotion, item insertion, title visibility control, and different
+ * page transition styles.
+ */
 void
 test_naviframe_complex(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

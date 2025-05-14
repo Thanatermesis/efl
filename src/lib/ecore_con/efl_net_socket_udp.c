@@ -32,24 +32,37 @@
 
 #define MY_CLASS EFL_NET_SOCKET_UDP_CLASS
 
+/**
+ * @brief Private data structure for Efl_Net_Socket_Udp.
+ */
 typedef struct _Efl_Net_Socket_Udp_Data
 {
    struct {
-      Eina_List *groups; /* list of newly allocated strings */
-      Eina_List *pending; /* list of nodes of groups pending join */
-      uint8_t ttl;
-      Eina_Bool loopback;
-      Eina_Bool ttl_set;
-   } multicast;
-   Eina_Stringshare *address_bind;
-   struct sockaddr *addr_remote;
-   socklen_t addr_remote_len;
-   Eina_Bool cork;
-   Eina_Bool dont_route;
-   Eina_Bool reuse_address;
-   Eina_Bool reuse_port;
+      Eina_List *groups; /**< List of joined multicast group addresses (strings). */
+      Eina_List *pending; /**< List of multicast group addresses pending to be joined once a FD is available. Each element is a node from 'groups'. */
+      uint8_t ttl; /**< Multicast time-to-live. */
+      Eina_Bool loopback; /**< Multicast loopback state. 0xff if not yet set/queried. */
+      Eina_Bool ttl_set; /**< EINA_TRUE if TTL has been explicitly set, EINA_FALSE otherwise. */
+   } multicast; /**< Multicast related data. */
+   Eina_Stringshare *address_bind; /**< The local address to bind to, in "host:port" format. */
+   struct sockaddr *addr_remote; /**< The remote address for connected UDP sockets. */
+   socklen_t addr_remote_len; /**< The length of addr_remote. */
+   Eina_Bool cork; /**< UDP corking state. 0xff if not yet set/queried. */
+   Eina_Bool dont_route; /**< SO_DONTROUTE state. 0xff if not yet set/queried. */
+   Eina_Bool reuse_address; /**< SO_REUSEADDR state. 0xff if not yet set/queried. */
+   Eina_Bool reuse_port; /**< SO_REUSEPORT state. 0xff if not yet set/queried. */
 } Efl_Net_Socket_Udp_Data;
 
+/**
+ * @brief Initializes the UDP socket with a remote address.
+ *
+ * This function is typically called when creating a "connected" UDP socket,
+ * where send/receive operations will implicitly use this remote address.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @param remote_address The remote IP address to associate with this socket.
+ */
 void
 _efl_net_socket_udp_init(Eo *o, Efl_Net_Socket_Udp_Data *pd, Efl_Net_Ip_Address *remote_address)
 {
@@ -68,6 +81,17 @@ _efl_net_socket_udp_init(Eo *o, Efl_Net_Socket_Udp_Data *pd, Efl_Net_Ip_Address 
    efl_net_socket_address_remote_set(o, efl_net_ip_address_string_get(remote_address));
 }
 
+/**
+ * @brief Binds the UDP socket to the address specified in pd->address_bind.
+ *
+ * This function parses the host and port from pd->address_bind,
+ * resolves the host to an IP address, and then calls bind().
+ * If pd->address_bind is NULL, this function does nothing and returns 0.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @return 0 on success, or an Eina_Error code on failure.
+ */
 static Eina_Error
 _efl_net_socket_udp_bind(Eo *o, Efl_Net_Socket_Udp_Data *pd)
 {
@@ -141,6 +165,19 @@ _efl_net_socket_udp_bind(Eo *o, Efl_Net_Socket_Udp_Data *pd)
    return err;
 }
 
+/**
+ * @brief Sets the file descriptor for the UDP socket and applies pending settings.
+ *
+ * This function is called when a file descriptor is assigned to the socket.
+ * It applies various socket options that might have been set before the
+ * FD was available (e.g., cork, don't route, reuse address/port, multicast settings).
+ * It also attempts to bind the socket if an address_bind is set.
+ * Finally, it queries and sets the local socket address.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @param pfd The new file descriptor.
+ */
 EOLIAN static void
 _efl_net_socket_udp_efl_loop_fd_fd_set(Eo *o, Efl_Net_Socket_Udp_Data *pd, int pfd)
 {
@@ -209,6 +246,16 @@ _efl_net_socket_udp_efl_loop_fd_fd_set(Eo *o, Efl_Net_Socket_Udp_Data *pd, int p
      }
 }
 
+/**
+ * @brief Queries the size of the next pending datagram.
+ *
+ * This function uses efl_net_udp_datagram_size_query to determine
+ * the size of the next datagram that can be read from the socket.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd EINA_UNUSED The private data of the Efl_Net_Socket_Udp object.
+ * @return The size of the next datagram in bytes, or 0 if no FD or error.
+ */
 EOLIAN static size_t
 _efl_net_socket_udp_next_datagram_size_query(Eo *o, Efl_Net_Socket_Udp_Data *pd EINA_UNUSED)
 {
@@ -217,6 +264,14 @@ _efl_net_socket_udp_next_datagram_size_query(Eo *o, Efl_Net_Socket_Udp_Data *pd 
    return efl_net_udp_datagram_size_query(fd);
 }
 
+/**
+ * @brief Gets the appropriate socket option for UDP corking.
+ *
+ * This function returns the platform-specific socket option value
+ * for enabling UDP corking (e.g., UDP_CORK on Linux).
+ *
+ * @return The socket option value for UDP_CORK, or -1 if not available.
+ */
 static inline int
 _cork_option_get(void)
 {
@@ -227,6 +282,17 @@ _cork_option_get(void)
 #endif
 }
 
+/**
+ * @brief Sets the UDP corking option for the socket.
+ *
+ * UDP corking allows multiple small packets to be accumulated and sent as a single datagram.
+ * If the socket FD is not yet available, the setting is postponed.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @param cork EINA_TRUE to enable corking, EINA_FALSE to disable.
+ * @return EINA_TRUE on success or if postponed, EINA_FALSE on error.
+ */
 EOLIAN static Eina_Bool
 _efl_net_socket_udp_cork_set(Eo *o, Efl_Net_Socket_Udp_Data *pd, Eina_Bool cork)
 {
@@ -259,6 +325,16 @@ _efl_net_socket_udp_cork_set(Eo *o, Efl_Net_Socket_Udp_Data *pd, Eina_Bool cork)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the current UDP corking state of the socket.
+ *
+ * If the socket FD is not yet available, returns the cached value.
+ * Otherwise, queries the actual socket option.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @return EINA_TRUE if corking is enabled, EINA_FALSE otherwise or on error.
+ */
 EOLIAN static Eina_Bool
 _efl_net_socket_udp_cork_get(const Eo *o, Efl_Net_Socket_Udp_Data *pd)
 {
@@ -292,6 +368,17 @@ _efl_net_socket_udp_cork_get(const Eo *o, Efl_Net_Socket_Udp_Data *pd)
    return pd->cork;
 }
 
+/**
+ * @brief Sets the SO_DONTROUTE option for the socket.
+ *
+ * The SO_DONTROUTE option bypasses the normal routing tables.
+ * If the socket FD is not yet available, the setting is postponed.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @param dont_route EINA_TRUE to enable SO_DONTROUTE, EINA_FALSE to disable.
+ * @return EINA_TRUE on success or if postponed, EINA_FALSE on error.
+ */
 EOLIAN static Eina_Bool
 _efl_net_socket_udp_dont_route_set(Eo *o, Efl_Net_Socket_Udp_Data *pd, Eina_Bool dont_route)
 {
@@ -318,6 +405,16 @@ _efl_net_socket_udp_dont_route_set(Eo *o, Efl_Net_Socket_Udp_Data *pd, Eina_Bool
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the current SO_DONTROUTE state of the socket.
+ *
+ * If the socket FD is not yet available, returns the cached value.
+ * Otherwise, queries the actual socket option.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @return EINA_TRUE if SO_DONTROUTE is enabled, EINA_FALSE otherwise or on error.
+ */
 EOLIAN static Eina_Bool
 _efl_net_socket_udp_dont_route_get(const Eo *o, Efl_Net_Socket_Udp_Data *pd)
 {
@@ -346,7 +443,17 @@ _efl_net_socket_udp_dont_route_get(const Eo *o, Efl_Net_Socket_Udp_Data *pd)
    return pd->dont_route;
 }
 
-
+/**
+ * @brief Sets the SO_REUSEADDR option for the socket.
+ *
+ * The SO_REUSEADDR option allows binding to an address that is already in use.
+ * If the socket FD is not yet available, the setting is postponed.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @param reuse_address EINA_TRUE to enable SO_REUSEADDR, EINA_FALSE to disable.
+ * @return EINA_TRUE on success or if postponed, EINA_FALSE on error.
+ */
 EOLIAN static Eina_Bool
 _efl_net_socket_udp_reuse_address_set(Eo *o, Efl_Net_Socket_Udp_Data *pd, Eina_Bool reuse_address)
 {
@@ -371,6 +478,16 @@ _efl_net_socket_udp_reuse_address_set(Eo *o, Efl_Net_Socket_Udp_Data *pd, Eina_B
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the current SO_REUSEADDR state of the socket.
+ *
+ * If the socket FD is not yet available, returns the cached value.
+ * Otherwise, queries the actual socket option.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @return EINA_TRUE if SO_REUSEADDR is enabled, EINA_FALSE otherwise or on error.
+ */
 EOLIAN static Eina_Bool
 _efl_net_socket_udp_reuse_address_get(const Eo *o, Efl_Net_Socket_Udp_Data *pd)
 {
@@ -396,6 +513,18 @@ _efl_net_socket_udp_reuse_address_get(const Eo *o, Efl_Net_Socket_Udp_Data *pd)
    return pd->reuse_address;
 }
 
+/**
+ * @brief Sets the SO_REUSEPORT option for the socket.
+ *
+ * The SO_REUSEPORT option allows multiple sockets to bind to the same address and port.
+ * If the socket FD is not yet available, or if SO_REUSEPORT is not defined,
+ * the setting is postponed or ignored respectively.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @param reuse_port EINA_TRUE to enable SO_REUSEPORT, EINA_FALSE to disable.
+ * @return EINA_TRUE on success, if postponed, or if SO_REUSEPORT is not available. EINA_FALSE on error.
+ */
 EOLIAN static Eina_Bool
 _efl_net_socket_udp_reuse_port_set(Eo *o, Efl_Net_Socket_Udp_Data *pd, Eina_Bool reuse_port)
 {
@@ -426,6 +555,16 @@ _efl_net_socket_udp_reuse_port_set(Eo *o, Efl_Net_Socket_Udp_Data *pd, Eina_Bool
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the current SO_REUSEPORT state of the socket.
+ *
+ * If the socket FD is not yet available, or if SO_REUSEPORT is not defined,
+ * returns the cached value. Otherwise, queries the actual socket option.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @return EINA_TRUE if SO_REUSEPORT is enabled, EINA_FALSE otherwise, if not available, or on error.
+ */
 EOLIAN static Eina_Bool
 _efl_net_socket_udp_reuse_port_get(const Eo *o, Efl_Net_Socket_Udp_Data *pd)
 {
@@ -456,6 +595,18 @@ _efl_net_socket_udp_reuse_port_get(const Eo *o, Efl_Net_Socket_Udp_Data *pd)
    return pd->reuse_port;
 }
 
+/**
+ * @brief Sets the local address to bind the socket to.
+ *
+ * The address should be in "host:port" format (e.g., "127.0.0.1:1234" or "[::1]:1234").
+ * This function can only be called before a file descriptor is assigned to the socket.
+ * The actual bind operation occurs when the FD is set or explicitly by calling bind().
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @param address The address string to bind to.
+ * @return 0 on success, EALREADY if the socket already has an FD.
+ */
 EOLIAN static Eina_Error
 _efl_net_socket_udp_bind_set(Eo *o, Efl_Net_Socket_Udp_Data *pd, const char *address)
 {
@@ -467,12 +618,29 @@ _efl_net_socket_udp_bind_set(Eo *o, Efl_Net_Socket_Udp_Data *pd, const char *add
    return 0;
 }
 
+/**
+ * @brief Gets the local address the socket is configured to bind to.
+ *
+ * @param o EINA_UNUSED The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @return The address string previously set by efl_net_socket_udp_bind_set(), or NULL.
+ */
 EOLIAN static const char *
 _efl_net_socket_udp_bind_get(const Eo *o EINA_UNUSED, Efl_Net_Socket_Udp_Data *pd)
 {
    return pd->address_bind;
 }
 
+/**
+ * @brief Constructor for Efl_Net_Socket_Udp.
+ *
+ * Initializes default values for multicast, cork, dont_route, reuse_address, and reuse_port.
+ * The 0xff value for boolean flags indicates that the state has not been set or queried yet.
+ *
+ * @param o The Efl_Net_Socket_Udp object being constructed.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @return The constructed Efl_Object.
+ */
 EOLIAN Efl_Object *
 _efl_net_socket_udp_efl_object_constructor(Eo *o, Efl_Net_Socket_Udp_Data *pd)
 {
@@ -486,6 +654,15 @@ _efl_net_socket_udp_efl_object_constructor(Eo *o, Efl_Net_Socket_Udp_Data *pd)
    return efl_constructor(efl_super(o, MY_CLASS));
 }
 
+/**
+ * @brief Destructor for Efl_Net_Socket_Udp.
+ *
+ * Frees resources associated with the UDP socket, including multicast group lists,
+ * bind address string, and remote address structure.
+ *
+ * @param o The Efl_Net_Socket_Udp object being destructed.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ */
 EOLIAN void
 _efl_net_socket_udp_efl_object_destructor(Eo *o, Efl_Net_Socket_Udp_Data *pd)
 {
@@ -507,6 +684,19 @@ _efl_net_socket_udp_efl_object_destructor(Eo *o, Efl_Net_Socket_Udp_Data *pd)
    pd->addr_remote_len = 0;
 }
 
+/**
+ * @brief Reads a datagram from the UDP socket.
+ *
+ * This function attempts to read a single UDP datagram into the provided rw_slice.
+ * If the socket is "connected" (i.e., pd->addr_remote is set), it verifies that
+ * the received datagram is from the expected remote address. Spurious datagrams
+ * from other sources are dropped, and EAGAIN is returned.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @param rw_slice The slice to store the received data. Its len will be updated.
+ * @return 0 on success, or an Eina_Error code on failure (e.g., EINVAL, EAGAIN, or socket errors).
+ */
 EOLIAN static Eina_Error
 _efl_net_socket_udp_efl_io_reader_read(Eo *o, Efl_Net_Socket_Udp_Data *pd, Eina_Rw_Slice *rw_slice)
 {
@@ -587,6 +777,18 @@ _efl_net_socket_udp_efl_io_reader_read(Eo *o, Efl_Net_Socket_Udp_Data *pd, Eina_
    return EINVAL;
 }
 
+/**
+ * @brief Writes a datagram to the UDP socket.
+ *
+ * This function sends the data in ro_slice as a single UDP datagram
+ * to the remote address stored in pd->addr_remote.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @param ro_slice The slice containing the data to send. Its len will be updated to bytes sent.
+ * @param remaining If not NULL, will be filled with the unsent part of ro_slice on partial writes (though UDP sends are usually atomic).
+ * @return 0 on success, or an Eina_Error code on failure (e.g., EINVAL or socket errors).
+ */
 EOLIAN static Eina_Error
 _efl_net_socket_udp_efl_io_writer_write(Eo *o, Efl_Net_Socket_Udp_Data *pd, Eina_Slice *ro_slice, Eina_Slice *remaining)
 {
@@ -632,6 +834,13 @@ _efl_net_socket_udp_efl_io_writer_write(Eo *o, Efl_Net_Socket_Udp_Data *pd, Eina
    return EINVAL;
 }
 
+/**
+ * @brief Finds a multicast group address in a list of strings.
+ *
+ * @param lst The Eina_List of C-strings (multicast addresses).
+ * @param address The multicast address string to search for.
+ * @return The Eina_List node if found, otherwise NULL.
+ */
 static Eina_List *
 _efl_net_socket_udp_multicast_find(const Eina_List *lst, const char *address)
 {
@@ -647,6 +856,19 @@ _efl_net_socket_udp_multicast_find(const Eina_List *lst, const char *address)
    return NULL;
 }
 
+/**
+ * @brief Joins a multicast group.
+ *
+ * Adds the specified multicast address to the list of joined groups.
+ * If the socket FD is available, it attempts to join the group immediately.
+ * Otherwise, the join operation is added to a pending list and executed
+ * when the FD is set.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @param address The multicast group address string (e.g., "224.0.0.1").
+ * @return 0 on success or if pending, EEXIST if already joined, or an Eina_Error code on failure.
+ */
 EOLIAN static Eina_Error
 _efl_net_socket_udp_multicast_join(Eo *o, Efl_Net_Socket_Udp_Data *pd, const char *address)
 {
@@ -669,6 +891,18 @@ _efl_net_socket_udp_multicast_join(Eo *o, Efl_Net_Socket_Udp_Data *pd, const cha
    return efl_net_multicast_join(fd, efl_net_socket_fd_family_get(o), address);
 }
 
+/**
+ * @brief Leaves a multicast group.
+ *
+ * Removes the specified multicast address from the list of joined groups.
+ * If the socket FD is available, it attempts to leave the group immediately.
+ * If the join was pending, it's removed from the pending list.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @param address The multicast group address string.
+ * @return 0 on success, ENOENT if not joined, or an Eina_Error code on failure.
+ */
 EOLIAN static Eina_Error
 _efl_net_socket_udp_multicast_leave(Eo *o, Efl_Net_Socket_Udp_Data *pd, const char *address)
 {
@@ -696,12 +930,31 @@ _efl_net_socket_udp_multicast_leave(Eo *o, Efl_Net_Socket_Udp_Data *pd, const ch
    return err;
 }
 
+/**
+ * @brief Gets an iterator over the currently joined multicast groups.
+ *
+ * The iterator will yield C-strings representing the multicast group addresses.
+ *
+ * @param o EINA_UNUSED The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @return A new Eina_Iterator for the list of multicast groups. The caller owns the iterator.
+ */
 EOLIAN static Eina_Iterator *
 _efl_net_socket_udp_multicast_groups_get(Eo *o EINA_UNUSED, Efl_Net_Socket_Udp_Data *pd)
 {
    return eina_list_iterator_new(pd->multicast.groups);
 }
 
+/**
+ * @brief Sets the time-to-live (TTL) for outgoing multicast datagrams.
+ *
+ * If the socket FD is not yet available, the setting is cached and applied later.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @param ttl The TTL value (0-255).
+ * @return 0 on success or if postponed, or an Eina_Error code on failure.
+ */
 EOLIAN static Eina_Error
 _efl_net_socket_udp_multicast_time_to_live_set(Eo *o, Efl_Net_Socket_Udp_Data *pd, uint8_t ttl)
 {
@@ -724,6 +977,16 @@ _efl_net_socket_udp_multicast_time_to_live_set(Eo *o, Efl_Net_Socket_Udp_Data *p
    return err;
 }
 
+/**
+ * @brief Gets the current time-to-live (TTL) for outgoing multicast datagrams.
+ *
+ * If the socket FD is not yet available, returns the cached value.
+ * Otherwise, queries the actual socket option.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @return The current TTL value (0-255).
+ */
 EOLIAN static uint8_t
 _efl_net_socket_udp_multicast_time_to_live_get(const Eo *o, Efl_Net_Socket_Udp_Data *pd)
 {
@@ -742,6 +1005,16 @@ _efl_net_socket_udp_multicast_time_to_live_get(const Eo *o, Efl_Net_Socket_Udp_D
    return pd->multicast.ttl;
 }
 
+/**
+ * @brief Sets whether outgoing multicast datagrams are looped back to the local socket.
+ *
+ * If the socket FD is not yet available, the setting is cached and applied later.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @param loopback EINA_TRUE to enable loopback, EINA_FALSE to disable.
+ * @return 0 on success or if postponed, or an Eina_Error code on failure.
+ */
 EOLIAN static Eina_Error
 _efl_net_socket_udp_multicast_loopback_set(Eo *o, Efl_Net_Socket_Udp_Data *pd, Eina_Bool loopback)
 {
@@ -763,6 +1036,16 @@ _efl_net_socket_udp_multicast_loopback_set(Eo *o, Efl_Net_Socket_Udp_Data *pd, E
    return err;
 }
 
+/**
+ * @brief Gets whether outgoing multicast datagrams are looped back to the local socket.
+ *
+ * If the socket FD is not yet available, returns the cached value.
+ * Otherwise, queries the actual socket option.
+ *
+ * @param o The Efl_Net_Socket_Udp object.
+ * @param pd The private data of the Efl_Net_Socket_Udp object.
+ * @return EINA_TRUE if loopback is enabled, EINA_FALSE otherwise.
+ */
 EOLIAN static Eina_Bool
 _efl_net_socket_udp_multicast_loopback_get(const Eo *o, Efl_Net_Socket_Udp_Data *pd)
 {

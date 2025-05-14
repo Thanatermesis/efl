@@ -15,15 +15,35 @@
 
 #ifdef BUILD_VG_LOADER_JSON
 
+/**
+ * @brief Structure to hold application-specific data.
+ */
 typedef struct _App_Data
 {
-   Eo *label;
-   Eo *slider;
+   Eo *label;   /**< Label to display animation state. */
+   Eo *slider;  /**< Slider to control animation progress. */
 } App_Data;
 
-Evas_Object *values[4], *anim_view;
-Evas_Object *path_entry, *type_hoversel;
+Evas_Object *values[4], *anim_view; /**< Array to store Evas_Object pointers for value inputs and the animation view. `values` can hold up to 4 input fields. */
+Evas_Object *path_entry, *type_hoversel; /**< Evas_Object pointers for the path input entry and type selection hoversel. */
 
+/**
+ * @brief Adds a value provider to the animation view based on user input.
+ *
+ * This function reads the keypath, type, and values from the UI elements,
+ * creates a new value provider, and applies it to the animation view.
+ * It then updates the output parameters with the path, type, and values used.
+ *
+ * @param new_path Output buffer to store the keypath string used for the provider.
+ *                 Example: "layer.box1.Fill 1"
+ * @param new_type Output buffer to store the type string of the provider.
+ *                 Example: "FillColor"
+ * @param new_values Output buffer to store the string representation of the values applied.
+ *                   Example for FillColor: "255 0 0 255" (R G B A)
+ *                   Example for StrokeWidth: "5.000000"
+ *                   Example for TrPosition: "10.000000 20.000000" (X Y)
+ * @return EINA_TRUE if the value provider was successfully added, EINA_FALSE otherwise.
+ */
 Eina_Bool
 add_value_provider(char* new_path, char* new_type, char* new_values)
 {
@@ -116,6 +136,17 @@ add_value_provider(char* new_path, char* new_type, char* new_values)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback function for button click events.
+ *
+ * Handles various actions based on the text of the clicked button,
+ * such as playing, pausing, stopping animation, or adding/deleting value providers.
+ *
+ * @param data Custom data passed to the callback. For "ADD" and "DEL" buttons,
+ *             this is expected to be the Evas_Object* of the list widget.
+ *             For other player control buttons, this is the Evas_Object* of the anim_view.
+ * @param ev The Efl_Event structure containing event information.
+ */
 static void
 btn_clicked_cb(void *data , const Efl_Event *ev )
 {
@@ -195,6 +226,11 @@ btn_clicked_cb(void *data , const Efl_Event *ev )
      }
 }
 
+/**
+ * @brief Callback function for check widget state changes (e.g., loop toggle).
+ * @param data Custom data (Evas_Object *anim_view).
+ * @param event The Efl_Event structure containing event information.
+ */
 static void
 check_changed_cb(void *data, const Efl_Event *event)
 {
@@ -202,6 +238,11 @@ check_changed_cb(void *data, const Efl_Event *event)
    efl_player_playback_loop_set(anim_view, efl_ui_selectable_selected_get(event->object));
 }
 
+/**
+ * @brief Callback function for speed selection check widget changes.
+ * @param data Custom data (Evas_Object *anim_view).
+ * @param event The Efl_Event structure containing event information.
+ */
 static void
 speed_changed_cb(void *data, const Efl_Event *event)
 {
@@ -211,6 +252,12 @@ speed_changed_cb(void *data, const Efl_Event *event)
    efl_player_playback_speed_set(anim_view, speed);
 }
 
+/**
+ * @brief Callback function for limit frame check widget changes.
+ * Toggles between showing all frames or a limited range (5-10).
+ * @param data Custom data (Evas_Object *anim_view).
+ * @param event The Efl_Event structure containing event information.
+ */
 static void
 limit_frame_cb(void *data, const Efl_Event *event)
 {
@@ -231,6 +278,12 @@ limit_frame_cb(void *data, const Efl_Event *event)
      }
 }
 
+/**
+ * @brief Callback function for slider value changes.
+ * Sets the animation playback progress based on the slider's value.
+ * @param data Custom data (Evas_Object *anim_view).
+ * @param ev The Efl_Event structure containing event information.
+ */
 static void
 _slider_changed_cb(void *data, const Efl_Event *ev)
 {
@@ -238,6 +291,15 @@ _slider_changed_cb(void *data, const Efl_Event *ev)
    efl_player_playback_progress_set(anim_view, efl_ui_range_value_get(ev->object));
 }
 
+/**
+ * @brief Dynamically creates input fields based on the selected value provider type.
+ *
+ * Clears existing input fields and creates new ones appropriate for the
+ * specified type (e.g., R, G, B, A inputs for color types, width input for StrokeWidth).
+ *
+ * @param box The parent Eo (EFL_UI_BOX_CLASS) where the input fields will be packed.
+ * @param type A string indicating the type of value provider, e.g., "FillColor", "StrokeWidth", "TrPosition".
+ */
 void values_input(Eo* box, const char* type)
 {
    for (int i = 0; i < 4; i++)
@@ -308,6 +370,17 @@ void values_input(Eo* box, const char* type)
      }
 }
 
+/**
+ * @brief Callback function for hoversel item selection.
+ *
+ * When a value provider type is selected from the hoversel, this function
+ * updates the hoversel's text and calls values_input() to refresh the
+ * input fields accordingly.
+ *
+ * @param data Custom data (Evas_Object* box - the container for value inputs).
+ * @param obj The hoversel Evas_Object.
+ * @param event_info The selected Elm_Object_Item.
+ */
 static void
 _hover_item_selected_cb(void *data, Evas_Object *obj, void *event_info)
 {
@@ -318,6 +391,11 @@ _hover_item_selected_cb(void *data, Evas_Object *obj, void *event_info)
    values_input(box, selected);
 }
 
+/**
+ * @brief Updates the text of a label to reflect the current state of the animation view.
+ * @param anim_view The animation view object.
+ * @param label The label object whose text will be updated.
+ */
 static void
 update_anim_view_state(Evas_Object *anim_view, Evas_Object *label)
 {
@@ -344,6 +422,12 @@ update_anim_view_state(Evas_Object *anim_view, Evas_Object *label)
      }
 }
 
+/**
+ * @brief Callback for EFL_PLAYER_EVENT_PLAYING_CHANGED event.
+ * Updates the animation state label and resets the progress slider if animation stopped.
+ * @param data Custom data (App_Data *ad).
+ * @param event The Efl_Event structure containing event information (Eina_Bool *playing).
+ */
 static void
 _animation_playing_changed_cb(void *data, const Efl_Event *event)
 {
@@ -355,6 +439,12 @@ _animation_playing_changed_cb(void *data, const Efl_Event *event)
      efl_ui_range_value_set(ad->slider, 0);
 }
 
+/**
+ * @brief Callback for EFL_PLAYER_EVENT_PAUSED_CHANGED event.
+ * Updates the animation state label.
+ * @param data Custom data (App_Data *ad).
+ * @param event The Efl_Event structure containing event information.
+ */
 static void
 _animation_paused_changed_cb(void *data, const Efl_Event *event)
 {
@@ -362,6 +452,12 @@ _animation_paused_changed_cb(void *data, const Efl_Event *event)
    update_anim_view_state(event->object, ad->label);
 }
 
+/**
+ * @brief Callback for EFL_PLAYER_EVENT_PLAYBACK_PROGRESS_CHANGED event.
+ * Updates the progress slider's value.
+ * @param data Custom data (App_Data *ad).
+ * @param event The Efl_Event structure containing event information (double *progress).
+ */
 static void
 _animation_playback_progress_changed_cb(void *data, const Efl_Event *event)
 {
@@ -370,6 +466,12 @@ _animation_playback_progress_changed_cb(void *data, const Efl_Event *event)
    efl_ui_range_value_set(ad->slider, progress);
 }
 
+/**
+ * @brief Callback for EFL_PLAYER_EVENT_PLAYBACK_REPEATED event.
+ * Prints a message indicating the animation has repeated.
+ * @param data Custom data (unused).
+ * @param event The Efl_Event structure containing event information (int *repeated_times).
+ */
 static void
 _animation_playback_repeated_changed_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -377,12 +479,27 @@ _animation_playback_repeated_changed_cb(void *data EINA_UNUSED, const Efl_Event 
    printf("repeated! (times: %d)\n", repeated_times);
 }
 
+/**
+ * @brief Callback for EFL_PLAYER_EVENT_PLAYBACK_FINISHED event.
+ * Prints a message indicating the animation has finished.
+ * @param data Custom data (unused).
+ * @param event The Efl_Event structure (unused).
+ */
 static void
 _animation_playback_finished_changed_cb(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
 {
    printf("done!\n");
 }
 
+/**
+ * @brief Array defining callbacks for various animation player events.
+ * This array maps specific player events to their handler functions.
+ * - EFL_PLAYER_EVENT_PLAYING_CHANGED: Triggered when the playing state changes.
+ * - EFL_PLAYER_EVENT_PAUSED_CHANGED: Triggered when the paused state changes.
+ * - EFL_PLAYER_EVENT_PLAYBACK_PROGRESS_CHANGED: Triggered as playback progresses.
+ * - EFL_PLAYER_EVENT_PLAYBACK_REPEATED: Triggered when the animation loops.
+ * - EFL_PLAYER_EVENT_PLAYBACK_FINISHED: Triggered when the animation completes.
+ */
 EFL_CALLBACKS_ARRAY_DEFINE(animation_stats_cb,
   {EFL_PLAYER_EVENT_PLAYING_CHANGED, _animation_playing_changed_cb },
   {EFL_PLAYER_EVENT_PAUSED_CHANGED, _animation_paused_changed_cb },
@@ -391,6 +508,12 @@ EFL_CALLBACKS_ARRAY_DEFINE(animation_stats_cb,
   {EFL_PLAYER_EVENT_PLAYBACK_FINISHED, _animation_playback_finished_changed_cb },
 )
 
+/**
+ * @brief Callback for window deletion event (EFL_EVENT_DEL).
+ * Frees the application data structure.
+ * @param data Custom data (App_Data *ad).
+ * @param ev The Efl_Event structure (unused).
+ */
 static void
 _win_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -398,6 +521,19 @@ _win_del_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    free(ad);
 }
 
+/**
+ * @brief Main function to set up and run the Efl_Ui_Vg_Animation value provider test.
+ *
+ * This function creates a window, an animation view for a Lottie JSON file,
+ * and various UI controls (buttons, sliders, input fields, checkboxes) to
+ * interact with the animation and its value providers.
+ * It demonstrates how to override animation properties at runtime using
+ * Efl_Gfx_Vg_Value_Provider.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_efl_gfx_vg_value_provider(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -675,6 +811,17 @@ test_efl_gfx_vg_value_provider(void *data EINA_UNUSED, Evas_Object *obj EINA_UNU
 
 #else
 
+/**
+ * @brief Fallback function for when BUILD_VG_LOADER_JSON is not defined.
+ *
+ * This function is called if the Vg JSON (Lottie) loader is not available.
+ * It creates a window and displays a message indicating that only static
+ * vector images are supported, then shows a sample SVG image.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_efl_gfx_vg_value_provider(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

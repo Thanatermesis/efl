@@ -7,14 +7,30 @@
 #include "Eet.h"
 #include "Eet_private.h"
 
+/**
+ * @internal
+ * @brief Structure to hold information about a memory pool.
+ */
 typedef struct _Eet_Mempool Eet_Mempool;
 struct _Eet_Mempool
 {
-   const char *name;
-   Eina_Mempool *mp;
-   size_t size;
+   const char *name; /**< Name of the memory pool. */
+   Eina_Mempool *mp; /**< Pointer to the Eina memory pool. */
+   size_t size;      /**< Size of the elements in the pool. */
 };
 
+/**
+ * @internal
+ * @brief Macro to generate allocation and free functions for a given type.
+ *
+ * This macro defines a static Eet_Mempool instance and three functions:
+ * - Type##_malloc: Allocates memory for a number of elements of TYPE.
+ * - Type##_calloc: Allocates and zero-initializes memory for a number of elements of TYPE.
+ * - Type##_mp_free: Frees an element previously allocated from the mempool.
+ *
+ * @param TYPE The data type for which to generate functions (e.g., Eet_File_Node).
+ * @param Type The prefix for the generated functions (e.g., eet_file_node).
+ */
 #define GENERIC_ALLOC_FREE(TYPE, Type)                                  \
   Eet_Mempool Type##_mp = { #TYPE,  NULL, sizeof (TYPE) };              \
                                                                         \

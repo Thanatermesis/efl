@@ -1,9 +1,18 @@
+/**
+ * @file
+ * @brief These routines are bindings to Efl system notification interface.
+ */
 #ifndef _ELM_SYS_NOTIFY_EO_H_
 #define _ELM_SYS_NOTIFY_EO_H_
 
 #ifndef _ELM_SYS_NOTIFY_EO_CLASS_TYPE
 #define _ELM_SYS_NOTIFY_EO_CLASS_TYPE
 
+/**
+ * @typedef Elm_Sys_Notify
+ * @brief Represents an Elementary system notification object.
+ * @ingroup Elm_Sys_Notify
+ */
 typedef Eo Elm_Sys_Notify;
 
 #endif

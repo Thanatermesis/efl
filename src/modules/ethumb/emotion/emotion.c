@@ -29,25 +29,43 @@ static int _log_dom = -1;
 #define WRN(...) EINA_LOG_DOM_WARN(_log_dom, __VA_ARGS__)
 #define ERR(...) EINA_LOG_DOM_ERR(_log_dom, __VA_ARGS__)
 
+/**
+ * @brief Private data for the emotion thumbnailer plugin.
+ *
+ * This structure holds all the state required for generating a thumbnail from a
+ * video file using Emotion.
+ */
 struct _emotion_plugin
 {
-   unsigned int fps;
-   double ptotal, len, pi;
-   double total_time, tmp_time;
-   unsigned int pcount;
-   unsigned int frnum;
-   unsigned int okfr;
-   Eina_Bool first;
-   Eet_File *ef;
-   Evas_Object *video;
-   Evas_Object *edje_frame;
-   Ethumb *e;
-   int w, h;
+   unsigned int fps; /**< Frames per second (not currently used). */
+   double ptotal; /**< Total time for one segment of an animated thumbnail. */
+   double len; /**< Total length of the video in seconds. */
+   double pi; /**< Current position to seek to in the video. */
+   double total_time; /**< Total accumulated time for the animated thumbnail. */
+   double tmp_time; /**< Time of the current segment being processed. */
+   unsigned int pcount; /**< Number of segments processed for animated thumbnail. */
+   unsigned int frnum; /**< Frame number for animated thumbnail. */
+   unsigned int okfr; /**< Counter for decoded frames to ensure seeking is complete. */
+   Eina_Bool first; /**< Flag to indicate if it is the first frame grab. */
+   Eet_File *ef; /**< Eet file handle for animated thumbnails. */
+   Evas_Object *video; /**< Emotion video object. */
+   Evas_Object *edje_frame; /**< Edje object for framing the video. */
+   Ethumb *e; /**< Ethumb context. */
+   int w, h; /**< Thumbnail width and height. */
 };
 
 static Eina_Bool _frame_grab(void *data);
 static Eina_Bool _frame_grab_single(void *data);
 
+/**
+ * @brief Resizes the video object based on thumbnail parameters.
+ *
+ * This function calculates the aspect ratio and fill for the thumbnail and
+ * resizes the Emotion video object and its containing frame accordingly.
+ * It also mutes the audio of the video.
+ *
+ * @param _plugin The emotion plugin private data.
+ */
 static void
 _resize_movie(struct _emotion_plugin *_plugin)
 {
@@ -77,6 +95,16 @@ _resize_movie(struct _emotion_plugin *_plugin)
    emotion_object_audio_mute_set(_plugin->video, 1);
 }
 
+/**
+ * @brief Callback for when a video frame is decoded.
+ *
+ * This callback is triggered by Emotion whenever a new frame is decoded. It
+ * then calls the appropriate frame grabbing function depending on whether an
+ * animated or static thumbnail is being generated.
+ *
+ * @param data The emotion plugin private data.
+ * @param event The EFL event data (unused).
+ */
 static void
 _frame_decode_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -90,12 +118,27 @@ _frame_decode_cb(void *data, const Efl_Event *event EINA_UNUSED)
    return;
  }
 
+/**
+ * @brief Callback for when the video is resized.
+ *
+ * @param data The emotion plugin private data.
+ * @param event The EFL event data (unused).
+ */
 static void
 _frame_resized_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
    _resize_movie(data);
 }
 
+/**
+ * @brief Callback for when video playback stops.
+ *
+ * Resets state related to frame grabbing and time accumulation when the
+ * video playback stops unexpectedly or at the end of a segment.
+ *
+ * @param data The emotion plugin private data.
+ * @param event The EFL event data (unused).
+ */
 static void
 _video_stopped_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -108,6 +151,19 @@ _video_stopped_cb(void *data, const Efl_Event *event EINA_UNUSED)
    _plugin->total_time = _plugin->tmp_time;
 }
 
+/**
+ * @brief Sets the video position for the next frame grab.
+ *
+ * Calculates the time (in seconds) to seek to in the video for the next
+ * thumbnail frame. This depends on whether it's the first frame for a static
+ * thumbnail or one of many for an animated one.
+ *
+ * For static thumbnails, it uses `ethumb_video_start_get()`. If not set, it
+ * defaults to 10% into the video.
+ * For animated thumbnails, it calculates positions based on `ethumb_video_interval_get()`.
+ *
+ * @param _plugin The emotion plugin private data.
+ */
 static void
 _video_pos_set(struct _emotion_plugin *_plugin)
 {
@@ -131,6 +187,17 @@ _video_pos_set(struct _emotion_plugin *_plugin)
    emotion_object_position_set(_plugin->video, _plugin->pi);
 }
 
+/**
+ * @brief Configures the Edje file for an animated thumbnail.
+ *
+ * After all frames have been generated and stored in an Eet file (which is
+ * also the thumbnail Edje file), this function updates the Edje file. It adds
+ * references to the generated images and sets up the "animate" and "animate_loop"
+ * programs to create the animation. It also sets the group's min/max dimensions.
+ *
+ * @param _plugin The emotion plugin private data.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 _setup_thumbnail(struct _emotion_plugin *_plugin)
 {
@@ -193,6 +260,16 @@ exit_error:
    return 0;
 }
 
+/**
+ * @brief Cleans up thumbnailing objects.
+ *
+ * This function is called as an Ecore job to delete the Emotion video object
+ * and the Edje frame object, and to free the plugin data structure. This is
+ * done in a job to avoid issues with object deletion from within an event
+ * callback.
+ *
+ * @param data The emotion plugin private data.
+ */
 static void
 _finish_thumb_obj(void *data)
 {
@@ -202,6 +279,18 @@ _finish_thumb_obj(void *data)
    free(_plugin);
 }
 
+/**
+ * @brief Finalizes the thumbnail generation process.
+ *
+ * This function is called when thumbnail generation is complete (either
+ * successfully or with an error). It unregisters event callbacks, closes the
+ * Eet file for animated thumbnails, sets up the final Edje file via
+ * _setup_thumbnail(), calls the ethumb finished callback, and schedules the
+ * cleanup of plugin resources.
+ *
+ * @param _plugin The emotion plugin private data.
+ * @param success A boolean indicating if the thumbnail was generated successfully.
+ */
 static void
 _finish_thumb_generation(struct _emotion_plugin *_plugin, int success)
 {
@@ -231,6 +320,17 @@ _finish_thumb_generation(struct _emotion_plugin *_plugin, int success)
    ecore_job_add(_finish_thumb_obj, _plugin);
 }
 
+/**
+ * @brief Grabs a single frame for a static thumbnail.
+ *
+ * This function is called repeatedly from the frame decode callback. It waits
+ * for a few frames to be decoded (`okfr < 5`) to ensure the video has properly
+ * seeked to the desired position. Once ready, it saves the current frame as
+ * the thumbnail image and finalizes the process.
+ *
+ * @param data The emotion plugin private data.
+ * @return EINA_TRUE to continue being called, EINA_FALSE to stop.
+ */
 static Eina_Bool
 _frame_grab_single(void *data)
 {
@@ -266,6 +366,20 @@ _frame_grab_single(void *data)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Grabs a frame for an animated thumbnail.
+ *
+ * Called from the frame decode callback. This function checks if the video
+ * has reached the target position for the current frame grab. If so, it extracts
+ * the pixel data and writes it as a compressed image into the Eet file.
+ *
+ * It manages multiple segments of video for creating the animated thumbnail,
+ * advancing through segments and seeking to new positions as needed until the
+ * required number of frames (`ethumb_video_ntimes_get()`) is generated.
+ *
+ * @param data The emotion plugin private data.
+ * @return EINA_TRUE to continue grabbing frames, EINA_FALSE when done.
+ */
 static Eina_Bool
 _frame_grab(void *data)
 {
@@ -328,6 +442,16 @@ _frame_grab(void *data)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Prepares for animated thumbnail generation.
+ *
+ * For animated thumbnails, this function prepares the target thumbnail file.
+ * It copies a template Edje file to the final thumbnail location and opens it
+ * as an Eet file in read/write mode. This file will be populated with image
+ * data by `_frame_grab`.
+ *
+ * @param _plugin The emotion plugin private data.
+ */
 static void
 _generate_animated_thumb(struct _emotion_plugin *_plugin)
 {
@@ -358,6 +482,21 @@ _generate_animated_thumb(struct _emotion_plugin *_plugin)
      }
 }
 
+/**
+ * @brief The main thumbnail generation function for this plugin.
+ *
+ * This is the entry point for the plugin, called by Ethumb to start
+ * generating a thumbnail for a video file. It creates and initializes an
+ * Emotion object, sets up necessary callbacks, determines if a static or
+ * animated thumbnail is requested, and starts video playback to begin the
+ * frame grabbing process.
+ *
+ * If a custom frame is specified via `ethumb_frame_get()`, it will be used
+ * to wrap the video content.
+ *
+ * @param e The Ethumb context for this thumbnail request.
+ * @return A pointer to the private plugin data on success, NULL on failure.
+ */
 static void *
 _thumb_generate(Ethumb *e)
 {
@@ -442,6 +581,15 @@ _thumb_generate(Ethumb *e)
    return _plugin;
 }
 
+/**
+ * @brief Cancels an in-progress thumbnail generation.
+ *
+ * Called by Ethumb when a thumbnail request is cancelled. It cleans up all
+ * resources associated with the generation process.
+ *
+ * @param e The Ethumb context (unused).
+ * @param data The private plugin data.
+ */
 static void
 _thumb_cancel(Ethumb *e EINA_UNUSED, void *data)
 {
@@ -512,6 +660,14 @@ static const Ethumb_Plugin plugin =
     _thumb_cancel
 };
 
+/**
+ * @brief Initializes the emotion thumbnailer module.
+ *
+ * This function is called by Eina when the module is loaded. It initializes
+ * Emotion, registers a log domain, and registers the plugin with Ethumb.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _module_init(void)
 {
@@ -553,6 +709,12 @@ _module_init(void)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Shuts down the emotion thumbnailer module.
+ *
+ * This function is called by Eina when the module is unloaded. It unregisters
+ * the plugin from Ethumb, shuts down Emotion, and cleans up resources.
+ */
 static void
 _module_shutdown(void)
 {

@@ -82,7 +82,8 @@ typedef struct _Elm_Theme Elm_Theme;
  * Return a list of strings of color classes used in the given theme
  *
  * @param th The theme to get the reference from (NULL will be default)
- * @return The list of color classes
+ * @return A list of Eina_Stringshare strings representing the names of all
+ *         color classes defined in the theme (e.g., "bg_color", "font_color").
  *
  * Free the returned list using elm_theme_color_class_list_free() when done.
  *
@@ -374,7 +375,8 @@ EAPI void             elm_theme_set(Elm_Theme *th, const char *theme);
  * Return the theme search order
  *
  * @param th The theme to get the search order, or if NULL, the default theme
- * @return The internal search order path
+ * @return The internal search order path, as a colon-separated string.
+ *         For example: "shiny:/path/to/file.edj:default".
  *
  * This function returns a colon separated string of theme elements as
  * returned by elm_theme_list_get().
@@ -390,7 +392,9 @@ EAPI const char      *elm_theme_get(Elm_Theme *th);
  * Return a list of theme elements to be used in a theme.
  *
  * @param th Theme to get the list of theme elements from.
- * @return The internal list of theme elements
+ * @return The internal list of theme elements. This is a list of
+ *         Eina_Stringshare strings. For example, if the theme was set with
+ *         "mytheme:default", this list would contain ("mytheme", "default").
  *
  * This returns the internal list of theme elements (will only be valid as
  * long as the theme is not modified by elm_theme_set() or theme is not
@@ -412,9 +416,10 @@ EAPI const Eina_List *elm_theme_list_get(const Elm_Theme *th);
 /**
  * Return the full path for a theme element
  *
- * @param f The theme element name
- * @param in_search_path Pointer to a boolean to indicate if item is in the search path or not
- * @return The full path to the file found.
+ * @param f The theme element name (e.g., "default").
+ * @param in_search_path Pointer to a boolean to indicate if item is in the search path or not.
+ * @return The full path to the file found (e.g., "/usr/share/elementary/themes/default.edj").
+ *         The caller must free this string.
  *
  * This returns a string you should free with free() on success, NULL on
  * failure. This will search for the given theme element, and if it is a
@@ -456,7 +461,9 @@ EAPI void             elm_theme_full_flush(void);
 /**
  * Return a list of theme elements in the theme search path
  *
- * @return A list of strings that are the theme element names.
+ * @return A list of strings (char *) that are the theme element names.
+ *         The caller is responsible for freeing the list and its string
+ *         contents. For example: ("default", "dark", "light").
  *
  * This lists all available theme files in the standard Elementary search path
  * for theme elements, and returns them in alphabetical order as theme
@@ -554,7 +561,10 @@ EAPI const char *elm_theme_group_path_find(Elm_Theme *th, const char *group);
  *
  * @param th The theme, or NULL for default theme
  * @param base The base string group collection to look for
- * @return A list of collection names (sorted) or NULL if none found
+ * @return A list of Eina_Stringshare strings that are the full names of
+ *         matching groups, or @c NULL if none are found. For example, if @p base
+ *         is "elm/button/", the list might contain ("elm/button/base/default",
+ *         "elm/button/base/check").
  *
  * This function will walk all theme files configured in the theme @p th (or
  * NULL if it's the default) and find all groups that BEGIN with the string

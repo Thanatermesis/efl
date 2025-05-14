@@ -1,5 +1,24 @@
 #include "edje_private.h"
 
+/**
+ * @file
+ * @brief Callbacks for Edje object events.
+ *
+ * This file contains the callback functions that Edje uses to handle
+ * various input and timer events. These callbacks are responsible for
+ * translating low-level Evas events into Edje signals and managing
+ * part-specific event handling like drag operations.
+ */
+
+/**
+ * @brief Callback for EFL_EVENT_HOLD events.
+ *
+ * Emits "hold,on" or "hold,off" signals for the Edje part
+ * associated with the event object.
+ *
+ * @param data The Edje object.
+ * @param event The EFL_EVENT_HOLD event information.
+ */
 static void
 _edje_hold_signal_cb(void *data, const Efl_Event *event)
 {
@@ -19,6 +38,15 @@ _edje_hold_signal_cb(void *data, const Efl_Event *event)
                      "hold,off", rp->part->name);
 }
 
+/**
+ * @brief Callback for EFL_EVENT_FOCUS_IN events.
+ *
+ * Emits a "focus,part,in" signal for the Edje part
+ * associated with the event object when it gains focus.
+ *
+ * @param data The Edje object.
+ * @param event The EFL_EVENT_FOCUS_IN event information.
+ */
 static void
 _edje_focus_in_signal_cb(void *data, const Efl_Event *event)
 {
@@ -36,6 +64,15 @@ _edje_focus_in_signal_cb(void *data, const Efl_Event *event)
                    "focus,part,in", rp->part->name);
 }
 
+/**
+ * @brief Callback for EFL_EVENT_FOCUS_OUT events.
+ *
+ * Emits a "focus,part,out" signal for the Edje part
+ * associated with the event object when it loses focus.
+ *
+ * @param data The Edje object.
+ * @param event The EFL_EVENT_FOCUS_OUT event information.
+ */
 static void
 _edje_focus_out_signal_cb(void *data, const Efl_Event *event)
 {
@@ -53,6 +90,15 @@ _edje_focus_out_signal_cb(void *data, const Efl_Event *event)
                    "focus,part,out", rp->part->name);
 }
 
+/**
+ * @brief Callback for EFL_EVENT_POINTER_IN (mouse in) events.
+ *
+ * Emits a "mouse,in" signal for the Edje part if the event is not ignored.
+ * Updates event flags based on the part's mask flags.
+ *
+ * @param data The Edje object.
+ * @param event The EFL_EVENT_POINTER_IN event information.
+ */
 static void
 _edje_mouse_in_signal_cb(void *data, const Efl_Event *event)
 {
@@ -72,6 +118,15 @@ _edje_mouse_in_signal_cb(void *data, const Efl_Event *event)
      }
 }
 
+/**
+ * @brief Callback for EFL_EVENT_POINTER_OUT (mouse out) events.
+ *
+ * Emits a "mouse,out" signal for the Edje part if the event is not ignored.
+ * Updates event flags based on the part's mask flags.
+ *
+ * @param data The Edje object.
+ * @param event The EFL_EVENT_POINTER_OUT event information.
+ */
 static void
 _edje_mouse_out_signal_cb(void *data, const Efl_Event *event)
 {
@@ -91,6 +146,17 @@ _edje_mouse_out_signal_cb(void *data, const Efl_Event *event)
      }
 }
 
+/**
+ * @brief Callback for EFL_EVENT_POINTER_DOWN (mouse down) events.
+ *
+ * Handles mouse button down events. Emits "mouse,down,BUTTON" signals,
+ * potentially with ",double" or ",triple" suffixes for multi-clicks.
+ * Initializes drag operations if the part is draggable.
+ * Manages `clicked_button` and `still_in` states for click detection.
+ *
+ * @param data The Edje object.
+ * @param event The EFL_EVENT_POINTER_DOWN event information.
+ */
 static void
 _edje_mouse_down_signal_cb(void *data, const Efl_Event *event)
 {
@@ -160,6 +226,17 @@ _edje_mouse_down_signal_cb(void *data, const Efl_Event *event)
    ev->event_flags |= rp->mask_flags;
 }
 
+/**
+ * @brief Callback for EFL_EVENT_POINTER_UP (mouse up) events.
+ *
+ * Handles mouse button up events. Emits "mouse,up,BUTTON" signals.
+ * Finalizes drag operations if active, emitting "drag,stop".
+ * Emits "mouse,clicked,BUTTON" if a click is completed (down and up on the same part).
+ * Resets `clicked_button` and `still_in` states.
+ *
+ * @param data The Edje object.
+ * @param event The EFL_EVENT_POINTER_UP event information.
+ */
 static void
 _edje_mouse_up_signal_cb(void *data, const Efl_Event *event)
 {
@@ -234,6 +311,18 @@ _edje_mouse_up_signal_cb(void *data, const Efl_Event *event)
    ev->event_flags |= rp->mask_flags;
 }
 
+/**
+ * @brief Callback for EFL_EVENT_POINTER_MOVE (mouse move) events.
+ *
+ * Handles mouse movement. Emits "mouse,move" signals.
+ * Updates `still_in` state based on pointer position relative to the part.
+ * Emits "mouse,pressed,in" or "mouse,pressed,out" if a button is pressed
+ * and the mouse moves into or out of the part.
+ * Manages drag operations: updates drag values, emits "drag,start" and "drag" signals.
+ *
+ * @param data The Edje object.
+ * @param event The EFL_EVENT_POINTER_MOVE event information.
+ */
 static void
 _edje_mouse_move_signal_cb(void *data, const Efl_Event *event)
 {
@@ -344,6 +433,16 @@ _edje_mouse_move_signal_cb(void *data, const Efl_Event *event)
    ev->event_flags |= rp->mask_flags;
 }
 
+/**
+ * @brief Callback for EFL_EVENT_POINTER_WHEEL (mouse wheel) events.
+ *
+ * Emits "mouse,wheel,DIRECTION,VALUE" signals for the Edje part
+ * if the event is not ignored. DIRECTION is 0 for vertical, 1 for horizontal.
+ * VALUE is -1 or 1 indicating wheel direction.
+ *
+ * @param data The Edje object.
+ * @param event The EFL_EVENT_POINTER_WHEEL event information.
+ */
 static void
 _edje_mouse_wheel_signal_cb(void *data, const Efl_Event *event)
 {
@@ -369,6 +468,16 @@ _edje_mouse_wheel_signal_cb(void *data, const Efl_Event *event)
      }
 }
 
+/**
+ * @brief Timer callback for processing Edje animations and programs.
+ *
+ * This function is called periodically by a timer (likely ecore_animator or similar).
+ * It iterates through active Edje programs (actions) and updates their states
+ * based on the current time. Handles program execution, completion, and cleanup.
+ *
+ * @param data The Edje object.
+ * @param event The Efl_Event (unused in this function).
+ */
 void
 _edje_timer_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -442,6 +551,16 @@ break_prog:
    _edje_unref(ed);
 }
 
+/**
+ * @brief Callback for pending Edje programs.
+ *
+ * This function is typically scheduled by a timer (e.g., ecore_timer_add)
+ * to execute an Edje program after a delay. It removes the program
+ * from the pending list and runs it.
+ *
+ * @param data Pointer to an Edje_Pending_Program structure.
+ * @return ECORE_CALLBACK_CANCEL to automatically remove the timer.
+ */
 Eina_Bool
 _edje_pending_timer_cb(void *data)
 {
@@ -455,6 +574,19 @@ _edje_pending_timer_cb(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Array defining standard Edje event callbacks.
+ *
+ * This array maps EFL input events to their respective Edje callback handlers.
+ * It is used with efl_event_callback_array_add() to register these callbacks
+ * on Evas objects that are part of an Edje layout.
+ *
+ * The structure of elements is { Efl_Event_Description, Efl_Event_Cb }.
+ * Example:
+ *   { EFL_EVENT_HOLD, _edje_hold_signal_cb } means that when an EFL_EVENT_HOLD
+ *   occurs on an object where this array is registered, _edje_hold_signal_cb
+ *   will be called.
+ */
 EFL_CALLBACKS_ARRAY_DEFINE(edje_callbacks,
                           { EFL_EVENT_HOLD, _edje_hold_signal_cb },
                           { EFL_EVENT_POINTER_IN, _edje_mouse_in_signal_cb },
@@ -464,10 +596,34 @@ EFL_CALLBACKS_ARRAY_DEFINE(edje_callbacks,
                           { EFL_EVENT_POINTER_MOVE, _edje_mouse_move_signal_cb },
                           { EFL_EVENT_POINTER_WHEEL, _edje_mouse_wheel_signal_cb });
 
+/**
+ * @brief Array defining Edje focus event callbacks.
+ *
+ * This array maps EFL focus events (EFL_EVENT_FOCUS_IN, EFL_EVENT_FOCUS_OUT)
+ * to their respective Edje callback handlers.
+ * It is used with efl_event_callback_array_add() to register these callbacks
+ * for focus handling.
+ *
+ * The structure of elements is { Efl_Event_Description, Efl_Event_Cb }.
+ * Example:
+ *   { EFL_EVENT_FOCUS_IN, _edje_focus_in_signal_cb } means that when an
+ *   EFL_EVENT_FOCUS_IN occurs, _edje_focus_in_signal_cb will be called.
+ */
 EFL_CALLBACKS_ARRAY_DEFINE(edje_focus_callbacks,
                           { EFL_EVENT_FOCUS_IN, _edje_focus_in_signal_cb },
                           { EFL_EVENT_FOCUS_OUT, _edje_focus_out_signal_cb });
 
+/**
+ * @brief Adds standard Edje event callbacks to an Evas object.
+ *
+ * Registers the set of callbacks defined in `edje_callbacks` array
+ * for the given Evas object. Also stores the Edje_Real_Part associated
+ * with this object for use within the callbacks.
+ *
+ * @param obj The Evas object to add callbacks to.
+ * @param ed The Edje object parent.
+ * @param rp The Edje_Real_Part associated with obj.
+ */
 void
 _edje_callbacks_add(Evas_Object *obj, Edje *ed, Edje_Real_Part *rp)
 {
@@ -475,6 +631,15 @@ _edje_callbacks_add(Evas_Object *obj, Edje *ed, Edje_Real_Part *rp)
    evas_object_data_set(obj, "real_part", rp);
 }
 
+/**
+ * @brief Deletes standard Edje event callbacks from an Evas object.
+ *
+ * Unregisters the set of callbacks defined in `edje_callbacks` array
+ * from the given Evas object and removes the associated Edje_Real_Part data.
+ *
+ * @param obj The Evas object to delete callbacks from.
+ * @param ed The Edje object parent.
+ */
 void
 _edje_callbacks_del(Evas_Object *obj, Edje *ed)
 {
@@ -482,6 +647,17 @@ _edje_callbacks_del(Evas_Object *obj, Edje *ed)
    evas_object_data_del(obj, "real_part");
 }
 
+/**
+ * @brief Adds Edje focus event callbacks to an Evas object.
+ *
+ * Registers the set of callbacks defined in `edje_focus_callbacks` array
+ * for the given Evas object. Also stores the Edje_Real_Part associated
+ * with this object for use within the focus callbacks.
+ *
+ * @param obj The Evas object to add focus callbacks to.
+ * @param ed The Edje object parent.
+ * @param rp The Edje_Real_Part associated with obj.
+ */
 void
 _edje_callbacks_focus_add(Evas_Object *obj, Edje *ed, Edje_Real_Part *rp)
 {
@@ -489,6 +665,15 @@ _edje_callbacks_focus_add(Evas_Object *obj, Edje *ed, Edje_Real_Part *rp)
    evas_object_data_set(obj, "real_part", rp);
 }
 
+/**
+ * @brief Deletes Edje focus event callbacks from an Evas object.
+ *
+ * Unregisters the set of callbacks defined in `edje_focus_callbacks` array
+ * from the given Evas object and removes the associated Edje_Real_Part data.
+ *
+ * @param obj The Evas object to delete focus callbacks from.
+ * @param ed The Edje object parent.
+ */
 void
 _edje_callbacks_focus_del(Evas_Object *obj, Edje *ed)
 {

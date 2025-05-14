@@ -6,8 +6,27 @@ TPROT(05);
 #endif
 #if !defined(T1) && !defined(T2)
 # include "perf.h"
+
+/**
+ * @file
+ * @brief Performance test for rendering many rectangle objects.
+ *
+ * This test creates NUM_MANY rectangle objects and animates their
+ * size and position.
+ */
+
+/** @brief Array to store pointers to the Evas_Object rectangles. */
 static Evas_Object *objs[NUM_MANY];
 
+/**
+ * @brief Initializes the rectangle objects for the performance test.
+ *
+ * Creates NUM_MANY rectangle objects, sets their initial color (semi-transparent
+ * random colors), makes them pass events, and shows them.
+ * Each object is added to a cleanup list.
+ *
+ * @param e The Evas canvas.
+ */
 TST(05, init) (Evas *e) {
    Evas_Object *o;
    int i;
@@ -24,6 +43,24 @@ TST(05, init) (Evas *e) {
      }
 }
 
+/**
+ * @brief Updates the geometry of the rectangle objects for each frame.
+ *
+ * This function is called on every tick (frame) to update the position
+ * and size of all rectangle objects, creating an animation effect.
+ * The new width (w) and height (h) are calculated using cosine and sine
+ * functions of the frame time (f) and object index (i), resulting in
+ * a pulsating effect.
+ * The new x and y coordinates are calculated to keep the rectangles
+ * generally centered while also moving them based on sine/cosine functions
+ * of frame time and object index.
+ *
+ * @param e The Evas canvas (unused).
+ * @param f The current frame time, typically a value that increments with time.
+ *          Used to drive the animation. Example: 0.0, 0.016, 0.032, ...
+ * @param win_w The width of the window.
+ * @param win_h The height of the window.
+ */
 TST(05, tick) (Evas *e EINA_UNUSED, double f, Evas_Coord win_w, Evas_Coord win_h) {
    int i;
    Evas_Coord x, y, w, h, w0, h0;

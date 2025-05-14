@@ -37,6 +37,20 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {NULL, NULL}
 };
 
+/**
+ * @internal
+ * @brief Evaluates and sets the minimum size hint of the animation object.
+ *
+ * This function is called when the widget needs to recalculate its size,
+ * typically after a file is loaded or size hints change. It retrieves the
+ * default size from the internal vector object and sets the minimum size hint
+ * for the widget. If the weight hint for a dimension is set (not 0.0), it
+ * implies the widget can stretch, so the minimum size for that dimension
+ * is not restricted.
+ *
+ * @param[in] obj The Evas object.
+ * @param[in] data The private data of the object.
+ */
 static void
 _sizing_eval(Eo *obj, void *data)
 {
@@ -55,12 +69,34 @@ _sizing_eval(Eo *obj, void *data)
    efl_gfx_hint_size_min_set(obj, min);
 }
 
+/**
+ * @internal
+ * @brief Callback for the hints changed event.
+ *
+ * This function triggers a re-evaluation of the widget's sizing when its
+ * size hints have changed.
+ *
+ * @param[in] data The private data of the object.
+ * @param[in] event The event information.
+ */
 static void
 _size_hint_event_cb(void *data, const Efl_Event *event)
 {
    _sizing_eval(event->object, data);
 }
 
+/**
+ * @internal
+ * @brief Starts the animation playback transit.
+ *
+ * This function acts as a facade to begin the animation. It sets the
+ * animation state to playing (forwards or backwards), resets repeat counts,
+ * emits the appropriate "play,start" or EFL_PLAYER_EVENT_PLAYING_CHANGED
+ * event, and starts the underlying Elm_Transit.
+ *
+ * @param[in] obj The Evas object.
+ * @param[in] pd The private data of the object.
+ */
 static void
 _transit_go_facade(Eo* obj, Efl_Ui_Vg_Animation_Data *pd)
 {
@@ -76,6 +112,19 @@ _transit_go_facade(Eo* obj, Efl_Ui_Vg_Animation_Data *pd)
      efl_event_callback_call(obj, EFL_PLAYER_EVENT_PLAYING_CHANGED, &playing);
    if (pd->transit) elm_transit_go(pd->transit);}
 
+/**
+ * @internal
+ * @brief Checks if the object is currently visible within the viewport.
+ *
+ * This function determines if the animation object is visible on the screen.
+ * It checks not only the object's visibility property but also its size and
+ * position relative to the canvas output dimensions. An object is considered
+ * not visible if it has zero width or height, or if it is positioned
+ * completely outside the canvas boundaries.
+ *
+ * @param[in] obj The Evas object to check.
+ * @return @c EINA_TRUE if the object is visible, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _visible_check(Eo *obj)
 {
@@ -100,6 +149,20 @@ _visible_check(Eo *obj)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Manages autoplay behavior based on object visibility.
+ *
+ * This function is responsible for automatically pausing or resuming the
+ * animation when the object's visibility changes, but only if autoplay is
+ * enabled. When the object becomes visible, it resumes the animation if it
+ * was previously auto-paused. When it becomes invisible, it pauses the
+ * animation and flags that it was paused by the autoplay logic.
+ *
+ * @param[in] obj The Evas object.
+ * @param[in] pd The private data of the object.
+ * @param[in] vis The current visibility state of the object.
+ */
 static void
 _autoplay(Eo *obj, Efl_Ui_Vg_Animation_Data *pd, Eina_Bool vis)
 {
@@ -141,6 +204,18 @@ _autoplay(Eo *obj, Efl_Ui_Vg_Animation_Data *pd, Eina_Bool vis)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for when the animation transit is deleted.
+ *
+ * This function is called when the underlying Elm_Transit object is deleted,
+ * which typically happens when the animation completes or is explicitly
+ * stopped. It handles emitting the "play,done" or "play,stop" signals,
+ * resetting the animation state to stopped, and cleaning up transit-related data.
+ *
+ * @param[in] effect The transit effect, which is the animation object itself.
+ * @param[in] transit The transit object being deleted.
+ */
 static void
 _transit_del_cb(Elm_Transit_Effect *effect, Elm_Transit *transit)
 {
@@ -175,6 +250,20 @@ _transit_del_cb(Elm_Transit_Effect *effect, Elm_Transit *transit)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for each step (frame) of the animation transit.
+ *
+ * This is the main "tick" function for the animation, called by Elm_Transit
+ * for each frame update. It translates the animation progress (a value from
+ * 0.0 to 1.0) into a specific frame number of the vector animation and
+ * applies it. It manages playback direction, handles looping by checking
+ * repeat counts, and emits update signals/events.
+ *
+ * @param[in] effect The transit effect, which is the animation object itself.
+ * @param[in] transit The transit object.
+ * @param[in] progress The current animation progress (0.0 to 1.0).
+ */
 static void
 _transit_cb(Elm_Transit_Effect *effect, Elm_Transit *transit, double progress)
 {
@@ -243,6 +332,17 @@ _transit_cb(Elm_Transit_Effect *effect, Elm_Transit *transit, double progress)
      }
 }
 
+/**
+ * @internal
+ * @brief Implements the Efl.Canvas.Group add method.
+ *
+ * Creates the internal vector graphics object (Efl.Canvas.Vg.Object) which will
+ * render the animation, and sets it as the resize object for this widget.
+ * It also initializes animation properties to their default values.
+ *
+ * @param[in] obj The Evas object.
+ * @param[out] priv The private data of the object.
+ */
 EOLIAN static void
 _efl_ui_vg_animation_efl_canvas_group_group_add(Eo *obj, Efl_Ui_Vg_Animation_Data *priv)
 {
@@ -261,6 +361,15 @@ _efl_ui_vg_animation_efl_canvas_group_group_add(Eo *obj, Efl_Ui_Vg_Animation_Dat
    priv->max_progress = 1.0;
 }
 
+/**
+ * @internal
+ * @brief Implements the Efl.Canvas.Group del method.
+ *
+ * Cleans up resources, including deleting any active Elm_Transit object.
+ *
+ * @param[in] obj The Evas object.
+ * @param[in] pd The private data of the object.
+ */
 EOLIAN static void
 _efl_ui_vg_animation_efl_canvas_group_group_del(Eo *obj, Efl_Ui_Vg_Animation_Data *pd EINA_UNUSED)
 {
@@ -275,6 +384,15 @@ _efl_ui_vg_animation_efl_canvas_group_group_del(Eo *obj, Efl_Ui_Vg_Animation_Dat
    efl_canvas_group_del(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Implements the Efl.Object destructor.
+ *
+ * Frees any custom value providers that have been set.
+ *
+ * @param[in] obj The Evas object.
+ * @param[in] pd The private data of the object.
+ */
 EOLIAN static void
 _efl_ui_vg_animation_efl_object_destructor(Eo *obj,
                                           Efl_Ui_Vg_Animation_Data *pd EINA_UNUSED)
@@ -297,6 +415,18 @@ _efl_ui_vg_animation_efl_object_constructor(Eo *obj,
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Recalculates and updates the animation duration.
+ *
+ * This function computes the effective duration of the animation based on
+ * the current playback speed, the total number of frames, and the configured
+ * min/max progress range. The result is then used to set the duration of the
+ * underlying Elm_Transit object. This is necessary when playback speed or
+ * the animation range changes.
+ *
+ * @param[in,out] pd The private data of the object.
+ */
 static void
 _update_frame_duration(Efl_Ui_Vg_Animation_Data *pd)
 {
@@ -311,6 +441,20 @@ _update_frame_duration(Efl_Ui_Vg_Animation_Data *pd)
      elm_transit_duration_set(pd->transit, EINA_DBL_NONZERO(speed) ? pd->frame_duration * (1 / speed) : 0);
 }
 
+/**
+ * @internal
+ * @brief Prepares the animation object for playback.
+ *
+ * This function sets up the necessary resources for playing the animation,
+ * primarily by creating and configuring an Elm_Transit object. It's called
+ * when playback is initiated and no transit is currently active. It sets the
+ * animation callbacks, loop mode, duration, and other properties on the
+ * new transit.
+ *
+ * @param[in] obj The Evas object.
+ * @param[in,out] pd The private data of the object.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure (e.g., no frames).
+ */
 static Eina_Bool
 _ready_play(Eo *obj, Efl_Ui_Vg_Animation_Data *pd)
 {
@@ -352,6 +496,15 @@ _efl_ui_vg_animation_efl_file_unload(Eo *obj EINA_UNUSED, Efl_Ui_Vg_Animation_Da
    if (pd->transit) elm_transit_del(pd->transit);
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.File.load.
+ *
+ * Loads the vector animation from the specified file. After loading, it
+ * prepares the animation for playback. If autoplay is enabled, it will
+ * start playing immediately, unless the widget is not currently visible,
+ * in which case it will be paused until it becomes visible.
+ */
 EOLIAN static Eina_Error
 _efl_ui_vg_animation_efl_file_load(Eo *obj, Efl_Ui_Vg_Animation_Data *pd)
 {
@@ -494,6 +647,23 @@ _efl_ui_vg_animation_efl_player_autoplay_get(const Eo *obj EINA_UNUSED, Efl_Ui_V
    return pd->autoplay;
 }
 
+/**
+ * @internal
+ * @brief Plays a specific named section of the animation.
+ *
+ * This function allows playing a segment of the animation defined by start
+ * and end marker names within the vector file (e.g., Lottie JSON).
+ * It resolves these names to frame numbers, sets the min/max frame range for
+ * playback accordingly, and then starts the animation.
+ *
+ * @param[in] obj The Evas object.
+ * @param[in] pd The private data of the object.
+ * @param[in] start The name of the start marker. If NULL, starts from the
+ * beginning of the animation or the start of the end marker's section.
+ * @param[in] end The name of the end marker. If NULL, plays until the end of
+ * the animation or the end of the start marker's section.
+ * @return @c EINA_TRUE if playback started successfully, @c EINA_FALSE otherwise.
+ */
 Eina_Bool _efl_ui_vg_animation_playing_sector(Eo *obj, Efl_Ui_Vg_Animation_Data *pd, const char *start, const char *end)
 {
    int start_frame = 0;
@@ -525,6 +695,19 @@ Eina_Bool _efl_ui_vg_animation_playing_sector(Eo *obj, Efl_Ui_Vg_Animation_Data 
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Stops the animation playback.
+ *
+ * This function handles the logic for stopping the animation. It checks if the
+ * animation is currently in a state where it can be stopped. If so, it resets
+ * the current frame to the beginning, updates the state to stopped, emits the
+ * appropriate signals, and deletes the underlying Elm_Transit object.
+ *
+ * @param[in] obj The Evas object.
+ * @param[in] pd The private data of the object.
+ * @return @c EINA_TRUE if the animation was successfully stopped, @c EINA_FALSE if it was not in a stoppable state.
+ */
 Eina_Bool
 _playing_stop(Eo* obj, Efl_Ui_Vg_Animation_Data *pd)
 {
@@ -547,6 +730,18 @@ _playing_stop(Eo* obj, Efl_Ui_Vg_Animation_Data *pd)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Sets the current frame of the animation.
+ *
+ * This is an implementation of efl_ui_vg_animation_frame_set.
+ * It works by converting the frame number to a progress value (0.0 - 1.0)
+ * and then calling efl_player_playback_progress_set.
+ *
+ * @param[in] obj The Evas object.
+ * @param[in] pd The private data of the object.
+ * @param[in] frame_num The frame number to set.
+ */
 EOLIAN static void
 _efl_ui_vg_animation_frame_set(Eo *obj EINA_UNUSED, Efl_Ui_Vg_Animation_Data *pd, int frame_num)
 {
@@ -683,6 +878,24 @@ _efl_ui_vg_animation_value_provider_override(Eo *obj EINA_UNUSED, Efl_Ui_Vg_Anim
    efl_key_data_set(pd->vg, "_vg_value_providers", pd->vp_list);
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Player.playing_set.
+ *
+ * This function contains the core logic for starting and stopping animation
+ * playback.
+ *
+ * When `playing` is true:
+ * - It checks if the animation is already in the desired playback state.
+ * - It handles reversing direction mid-playback if the playback speed has
+ *   changed sign.
+ * - It ensures the animation is ready to play, creating a transit if needed.
+ * - If stopped, it starts the animation from the beginning (or end if
+ *   reversing).
+ *
+ * When `playing` is false:
+ * - It calls _playing_stop() to halt the animation.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_vg_animation_efl_player_playing_set(Eo *obj, Efl_Ui_Vg_Animation_Data *pd, Eina_Bool playing)
 {
@@ -734,6 +947,14 @@ _efl_ui_vg_animation_efl_player_playing_get(const Eo *obj EINA_UNUSED, Efl_Ui_Vg
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Player.paused_set.
+ *
+ * Handles pausing and resuming the animation. It changes the animation state
+ * and pauses/unpauses the underlying Elm_Transit object. It also emits the
+ * appropriate signals for pause and resume.
+ */
 EOLIAN static Eina_Bool
 _efl_ui_vg_animation_efl_player_paused_set(Eo *obj EINA_UNUSED, Efl_Ui_Vg_Animation_Data *pd, Eina_Bool paused)
 {
@@ -800,6 +1021,14 @@ _efl_ui_vg_animation_efl_player_playback_progress_get(const Eo *obj EINA_UNUSED,
    return pd->progress;
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Player.playback_progress_set.
+ *
+ * Sets the current animation progress. This updates the displayed frame
+ * of the vector object and also updates the progress of the underlying
+ * Elm_Transit so that playback can resume smoothly from the new position.
+ */
 EOLIAN static void
 _efl_ui_vg_animation_efl_player_playback_progress_set(Eo *obj EINA_UNUSED, Efl_Ui_Vg_Animation_Data *pd, double progress)
 {
@@ -821,6 +1050,15 @@ _efl_ui_vg_animation_efl_player_playback_progress_set(Eo *obj EINA_UNUSED, Efl_U
      }
 }
 
+/**
+ * @internal
+ * @brief Implements Efl.Player.playback_speed_set.
+ *
+ * Sets the playback speed. A negative value will cause the animation to play
+ * in reverse. This function handles changes in speed and direction, even
+ * during playback. If the direction of playback is flipped mid-animation,
+ * it flags a direction change to be handled by the transit callback.
+ */
 EOLIAN static void
 _efl_ui_vg_animation_efl_player_playback_speed_set(Eo *obj EINA_UNUSED, Efl_Ui_Vg_Animation_Data *pd, double speed)
 {
@@ -889,6 +1127,14 @@ _efl_ui_vg_animation_legacy_efl_object_constructor(Eo *obj, void *pd EINA_UNUSED
    return obj;
 }
 
+/**
+ * @brief Adds a new animation view widget to the given parent.
+ *
+ * @param[in] parent The parent object.
+ * @return The new object or @c NULL on error.
+ *
+ * @ingroup Elm_Animation_View
+ */
 EAPI Elm_Animation_View*
 elm_animation_view_add(Evas_Object *parent)
 {
@@ -896,12 +1142,33 @@ elm_animation_view_add(Evas_Object *parent)
    return elm_legacy_add(EFL_UI_VG_ANIMATION_LEGACY_CLASS, parent);
 }
 
+/**
+ * @brief Sets the file that contains the animation.
+ *
+ * @param[in] obj The animation view object.
+ * @param[in] file The path to the file.
+ * @param[in] key An optional key for animations inside a container file (e.g. EET).
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ *
+ * @ingroup Elm_Animation_View
+ */
 EAPI Eina_Bool
 elm_animation_view_file_set(Elm_Animation_View *obj, const char *file, const char *key)
 {
    return efl_file_simple_load(obj, file, key);
 }
 
+/**
+ * @brief Gets the current state of the animation view.
+ *
+ * @param[in] obj The animation view object.
+ * @return The current state of the animation.
+ *
+ * @note This is a legacy function that maps the new Efl_Ui_Vg_Animation_State
+ * to the old Elm_Animation_View_State enum.
+ *
+ * @ingroup Elm_Animation_View
+ */
 EAPI Elm_Animation_View_State
 elm_animation_view_state_get(Elm_Animation_View *obj)
 {

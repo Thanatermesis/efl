@@ -4,6 +4,7 @@
 #ifndef _EVAS_GRID_EO_CLASS_TYPE
 #define _EVAS_GRID_EO_CLASS_TYPE
 
+/** @brief Evas_Grid class type. Represents an instance of the Evas_Grid class. */
 typedef Eo Evas_Grid;
 
 #endif

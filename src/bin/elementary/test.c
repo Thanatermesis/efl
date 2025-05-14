@@ -413,27 +413,59 @@ void test_ui_separator(void *data EINA_UNUSED, Eo *obj EINA_UNUSED, void *event_
 
 static void _list_update(void);
 
+/** Global widgets: `win` is the main window, `tbx` is the test list container, `entry` is the search field. */
 static Evas_Object *win, *tbx, *entry; // TODO: refactoring
+/** Pointer to the frame of the test to be brought into view on startup. */
 static void *tt;
+/** `tests` is the list of all tests, `cur_test` points to the current one for navigation. */
 static Eina_List *tests, *cur_test;;
+/** If EINA_TRUE, legacy tests (non-EO) are hidden from the list. */
 static Eina_Bool hide_legacy = EINA_FALSE;
+/** If EINA_TRUE, beta API tests (EO) are hidden from the list. */
 static Eina_Bool hide_beta = EINA_FALSE;
+/** If EINA_TRUE, all tests are run automatically on startup. */
 static Eina_Bool all_tests = EINA_FALSE;
 
+/**
+ * @brief Represents a single test case in the application.
+ *
+ * This structure holds all the necessary information to display and run a test,
+ * including its name, category, callback function, and associated UI widgets.
+ */
 struct elm_test
 {
+   /** The icon file name for the test button. Can be NULL. */
    const char *icon;
+   /** The category under which the test is grouped. */
    const char *category;
+   /** The display name of the test. */
    const char *name;
+   /** A pointer to the collapsible frame widget that contains this test's category. */
    Evas_Object *frame;
+   /** The box container holding the button for this test. */
    Evas_Object *box;
+   /** The button widget that launches the test. */
    Evas_Object *btn;
 
+   /** The callback function to execute when the test is launched. */
    void (*cb)(void *, Evas_Object *, void *);
 
+   /** A flag indicating if the test uses the new EO APIs (EINA_TRUE) or legacy APIs (EINA_FALSE). */
    Eina_Bool is_eo;
 };
 
+/**
+ * @brief Comparison function to sort tests.
+ *
+ * Sorts tests primarily by category, and secondarily by name, both case-insensitively.
+ * This is used with `eina_list_sorted_insert` to keep the test list ordered.
+ *
+ * @param pa A pointer to the first elm_test struct.
+ * @param pb A pointer to the second elm_test struct.
+ * @return An integer less than, equal to, or greater than zero if the first
+ *         argument is considered to be respectively less than, equal to, or
+ *         greater than the second.
+ */
 static int
 _elm_test_sort(const void *pa, const void *pb)
 {
@@ -443,6 +475,19 @@ _elm_test_sort(const void *pa, const void *pb)
    return strcasecmp(a->name, b->name);
 }
 
+/**
+ * @brief Creates and adds a new test to the test list.
+ *
+ * Allocates a new `elm_test` structure, populates it with the provided
+ * data, and inserts it into the given list in sorted order.
+ *
+ * @param p_list A pointer to the Eina_List of tests.
+ * @param icon The icon for the test button (can be NULL).
+ * @param category The category of the test.
+ * @param name The name of the test.
+ * @param cb The callback function to run the test.
+ * @param is_eo EINA_TRUE if the test uses EO APIs, EINA_FALSE otherwise.
+ */
 static void
 _elm_test_add(Eina_List **p_list, const char *icon, const char *category, const char *name, void (*cb)(void *, Evas_Object *, void *), Eina_Bool is_eo)
 {
@@ -455,12 +500,28 @@ _elm_test_add(Eina_List **p_list, const char *icon, const char *category, const 
    *p_list = eina_list_sorted_insert(*p_list, _elm_test_sort, t);
 }
 
+/**
+ * @brief Callback for the main window's "delete,request" event.
+ *
+ * This function is called when the user attempts to close the main window.
+ * It terminates the application's main loop, causing the program to exit.
+ */
 void
 my_win_del(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    efl_exit(0); /* exit the program's main loop that runs in elm_run() */
 }
 
+/**
+ * @brief Callback for the "UI-Mirroring" toggle switch.
+ *
+ * When the toggle state changes, this function updates the global Elementary
+ * configuration for mirrored (RTL) mode.
+ *
+ * @param data User data. Not used.
+ * @param obj The toggle widget that triggered the event.
+ * @param event_info Event-specific information. Not used.
+ */
 static void
 _ui_tg_changed(void *data, Evas_Object *obj, void *event_info)
 {
@@ -468,6 +529,12 @@ _ui_tg_changed(void *data, Evas_Object *obj, void *event_info)
    elm_config_mirrored_set(elm_check_state_get(obj));
 }
 
+/**
+ * @brief Callback for the "Hide Legacy" checkbox.
+ *
+ * Updates the `hide_legacy` flag based on the checkbox state and refreshes
+ * the test list to apply the filter.
+ */
 static void
 _legacy_chk_changed(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -475,6 +542,12 @@ _legacy_chk_changed(void *data EINA_UNUSED, Evas_Object *obj, void *event_info E
    _list_update();
 }
 
+/**
+ * @brief Callback for the "Hide beta" checkbox.
+ *
+ * Updates the `hide_beta` flag based on the checkbox state and refreshes
+ * the test list to apply the filter.
+ */
 static void
 _beta_chk_changed(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -482,12 +555,26 @@ _beta_chk_changed(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EIN
    _list_update();
 }
 
+/**
+ * @brief Callback for when a category frame is clicked.
+ *
+ * Prints the current collapse state of the frame to standard output.
+ * Used for debugging purposes.
+ */
 static void
 _frame_clicked(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
    printf("frame %p is: %s\n", obj, elm_frame_collapse_get(obj) ? "collapsed" : "expanded");
 }
 
+/**
+ * @brief Clears the test menu display.
+ *
+ * This function iterates through the visible test categories and buttons,
+ * hiding them and unpacking them from their containers. The widgets are not
+ * destroyed, allowing them to be reused when the menu is recreated by
+ * `_menu_create`. This is an optimization to avoid widget recreation.
+ */
 static void
 _clear_menu()
 {
@@ -509,6 +596,20 @@ _clear_menu()
    elm_box_unpack_all(tbx);
 }
 
+/**
+ * @brief Creates or updates the test menu.
+ *
+ * This function populates the test list based on the full `tests` list. It
+ * handles filtering by name/category, and hiding legacy or beta tests. It also
+ * groups tests into collapsible frames by category.
+ *
+ * To improve performance, it reuses existing widgets (`Evas_Object` instances
+ * for frames, boxes, and buttons) if they have been created before.
+ *
+ * @param option_str A string to filter tests by. If not NULL, only tests
+ *        whose name or category contains this string (case-insensitively)
+ *        will be shown.
+ */
 static void
 _menu_create(const char *option_str)
 {
@@ -594,6 +695,12 @@ _menu_create(const char *option_str)
      }
 }
 
+/**
+ * @brief Callback for when the text in the search entry changes.
+ *
+ * This function is triggered on user input. It retrieves the current text from
+ * the entry and calls `_menu_create` to filter and update the test list.
+ */
 static void
 _entry_changed_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -602,6 +709,13 @@ _entry_changed_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EIN
    _menu_create(str);
 }
 
+/**
+ * @brief Refreshes the test list display.
+ *
+ * This is a helper function called when a filter state changes (e.g., hiding
+ * legacy tests). It reads the current search term from the entry and rebuilds
+ * the menu.
+ */
 static void
 _list_update(void)
 {
@@ -610,6 +724,14 @@ _list_update(void)
    _menu_create(str);
 }
 
+/**
+ * @brief Callback for when the search entry is "activated" (e.g., Enter pressed).
+ *
+ * This function attempts to automatically launch a test. It first looks for
+ * an exact, case-insensitive match for the entered text. If not found, it
+ * checks if there is exactly one partial match. If either of these conditions
+ * is met, it programmatically "clicks" the corresponding test button to launch it.
+ */
 static void
 _entry_activated_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -633,6 +755,17 @@ _entry_activated_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info E
      evas_object_smart_callback_call(found->btn, "clicked", NULL);
 }
 
+/**
+ * @brief Removes all space characters from a string.
+ *
+ * This is used to compare test names provided as command-line arguments
+ * with the registered test names, allowing for flexible matching (e.g.,
+ * "BoxVert2" can match "Box Vert 2").
+ *
+ * @param name The input string.
+ * @return A newly allocated string with spaces removed. The caller is
+ *         responsible for freeing this string.
+ */
 static char *
 _space_removed_string_get(const char *name)
 {
@@ -655,6 +788,19 @@ _space_removed_string_get(const char *name)
    return ret;
 }
 
+/**
+ * @brief Global key up event handler.
+ *
+ * Implements keyboard navigation through the test list.
+ * - `Alt+comma`: Runs the previous test in the list.
+ * - `Alt+period`: Runs the next test in the list.
+ * The list wraps around at both ends.
+ *
+ * @param d User data. Not used.
+ * @param type Event type. Not used.
+ * @param ev The key event information.
+ * @return ECORE_CALLBACK_RENEW to continue receiving events.
+ */
 static Eina_Bool
 _my_win_key_up(void *d EINA_UNUSED, int type EINA_UNUSED, Ecore_Event_Key *ev)
 {
@@ -681,6 +827,15 @@ _my_win_key_up(void *d EINA_UNUSED, int type EINA_UNUSED, Ecore_Event_Key *ev)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Timer callback to automatically close the application.
+ *
+ * This function is scheduled when the `--autoclose` command-line argument
+ * is used. It simply calls `elm_exit()` to terminate the main loop.
+ *
+ * @param data User data. Not used.
+ * @return EINA_FALSE to prevent the timer from firing again.
+ */
 static Eina_Bool
 _auto_close(void *data EINA_UNUSED)
 {
@@ -688,6 +843,22 @@ _auto_close(void *data EINA_UNUSED)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Creates the main application window and its contents.
+ *
+ * This function is responsible for setting up the entire user interface,
+ * including the main window, background, search bar, filter checkboxes, and
+ * the scrollable list of tests. It also populates the list of tests by
+ * calling `_elm_test_add` for each available test.
+ *
+ * @param autorun If not NULL, specifies the name of a test to run
+ *        automatically on startup.
+ * @param test_win_only If EINA_TRUE, only the window for the specified
+ *        autorun test is created, without the main test selection UI. This is
+ *        useful for tools like `shot`.
+ * @param autoclose If EINA_TRUE, a timer is set to automatically close the
+ *        application after a short delay.
+ */
 static void
 my_win_main(const char *autorun, Eina_Bool test_win_only, Eina_Bool autoclose)
 {
@@ -1375,6 +1546,15 @@ add_tests:
    evas_object_show(win);
 }
 
+/**
+ * @brief Translation callback for color classes.
+ *
+ * This is a placeholder for translating color class names. Currently, it
+ * just returns the original string.
+ *
+ * @param str The string to translate.
+ * @return The (un)translated string.
+ */
 static char *
 colorclass_tl_cb(char *str)
 {
@@ -1382,6 +1562,15 @@ colorclass_tl_cb(char *str)
    return str;
 }
 
+/**
+ * @brief Callback to get a list of all available color classes.
+ *
+ * This function iterates through all loaded Edje theme files and collects
+ * the color classes defined within them.
+ *
+ * @return A new Eina_List containing the names of all found color classes.
+ *         The caller is responsible for freeing this list.
+ */
 static Eina_List *
 colorclass_list_cb(void)
 {
@@ -1401,6 +1590,15 @@ colorclass_list_cb(void)
    return ret;
 }
 
+/**
+ * @brief Callback executed when the EFL main loop is being destroyed.
+ *
+ * This function handles cleanup of resources allocated for the test runner,
+ * such as the list of tests and the Eina log domain.
+ *
+ * @param data User data. Not used.
+ * @param ev The event information. Not used.
+ */
 static void
 _main_loop_death(void *data EINA_UNUSED,
                  const Efl_Event *ev EINA_UNUSED)
@@ -1416,6 +1614,23 @@ _main_loop_death(void *data EINA_UNUSED,
 /* this is your elementary main function - it MUST be called IMMEDIATELY
  * after elm_init() and MUST be passed argc and argv, and MUST be called
  * efl_main and not be static - must be a visible symbol with EAPI_MAIN infront */
+/**
+ * @brief The main entry point for the Elementary test application.
+ *
+ * This function initializes the application, sets up Elementary policies and
+ * paths, parses command-line arguments, and creates the main window by
+ * calling `my_win_main`.
+ *
+ * Command-line arguments handled:
+ * - `--help`, `-h`: Show usage information and exit.
+ * - `--test-win-only`, `-to`: Only show the specific test window, not the main menu.
+ * - `--all`, `-a`: Run all tests on startup.
+ * - `--autoclose`: Automatically close the application after a short delay.
+ * - `[TEST_NAME]`: Name of a test to run on startup.
+ *
+ * @param data User data. Not used.
+ * @param ev The application lifecycle event.
+ */
 EAPI_MAIN void
 efl_main(void *data EINA_UNUSED,
          const Efl_Event *ev)

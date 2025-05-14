@@ -6,6 +6,19 @@
 #define GREEN_MASK 0x00ff00
 #define BLUE_MASK 0x0000ff
 
+/**
+ * @brief Sets up and initializes an Evas output buffer (Outbuf).
+ *
+ * This function allocates and configures an Outbuf structure, which represents
+ * the drawing surface for an Evas canvas, typically associated with a Wayland
+ * window. It creates the necessary Wayland surface resources.
+ *
+ * @param w The width of the output buffer.
+ * @param h The height of the output buffer.
+ * @param info Pointer to the Evas Wayland engine specific information.
+ * @return A pointer to the newly created Outbuf structure on success,
+ *         or NULL on allocation failure or surface creation failure.
+ */
 Outbuf *
 _evas_outbuf_setup(int w, int h, Evas_Engine_Info_Wayland *info)
 {
@@ -38,6 +51,14 @@ surf_err:
    return NULL;
 }
 
+/**
+ * @brief Frees the resources associated with an Evas output buffer.
+ *
+ * This function cleans up and deallocates all resources used by the Outbuf,
+ * including pending image writes, Wayland surfaces, and internal arrays.
+ *
+ * @param ob The Outbuf structure to free.
+ */
 void
 _evas_outbuf_free(Outbuf *ob)
 {
@@ -69,6 +90,15 @@ _evas_outbuf_free(Outbuf *ob)
    free(ob);
 }
 
+/**
+ * @brief Flushes idle resources associated with the output buffer.
+ *
+ * This function is typically called when the buffer is idle. It releases
+ * cached image data (either the single buffer `onebuf` or previous pending
+ * writes) that are no longer needed for the current rendering cycle.
+ *
+ * @param ob The Outbuf structure to flush.
+ */
 void
 _evas_outbuf_idle_flush(Outbuf *ob)
 {
@@ -101,6 +131,20 @@ _evas_outbuf_idle_flush(Outbuf *ob)
      }
 }
 
+/**
+ * @brief Processes and prepares damage regions for rendering.
+ *
+ * This function consolidates the updated regions (damage) recorded either
+ * in `ob->priv.onebuf_regions` (for non-rotated cases) or
+ * `ob->priv.pending_writes` (for rotated cases). It calculates the final
+ * rectangles to be redrawn, taking rotation into account, and stores them
+ * in `ob->priv.rects`. It also releases the associated image cache entries.
+ *
+ * @param ob The Outbuf structure.
+ * @param surface_damage Unused parameter.
+ * @param buffer_damage Unused parameter.
+ * @param render_mode The current render mode. If ASYNC_INIT, the function returns early.
+ */
 void
 _evas_outbuf_flush(Outbuf *ob, Tilebuf_Rect *surface_damage EINA_UNUSED, Tilebuf_Rect *buffer_damage EINA_UNUSED, Evas_Render_Mode render_mode)
 {
@@ -207,6 +251,17 @@ _evas_outbuf_flush(Outbuf *ob, Tilebuf_Rect *surface_damage EINA_UNUSED, Tilebuf
      }
 }
 
+/**
+ * @brief Determines the buffer swap mode based on surface age.
+ *
+ * Queries the underlying Wayland surface for its age (number of frames
+ * since last update) to determine the optimal swap mode (e.g., full redraw,
+ * copy, double/triple/quadruple buffering).
+ *
+ * @param ob The Outbuf structure.
+ * @return The recommended Render_Output_Swap_Mode.
+ * @see Render_Output_Swap_Mode
+ */
 Render_Output_Swap_Mode
 _evas_outbuf_swap_mode_get(Outbuf *ob)
 {
@@ -225,6 +280,12 @@ _evas_outbuf_swap_mode_get(Outbuf *ob)
    return MODE_FULL;
 }
 
+/**
+ * @brief Gets the current rotation of the output buffer.
+ *
+ * @param ob The Outbuf structure.
+ * @return The rotation angle (0, 90, 180, or 270 degrees).
+ */
 int
 _evas_outbuf_rotation_get(Outbuf *ob)
 {
@@ -233,6 +294,22 @@ _evas_outbuf_rotation_get(Outbuf *ob)
    return ob->rotation;
 }
 
+/**
+ * @brief Reconfigures the output buffer properties.
+ *
+ * Updates the dimensions, rotation, depth, and alpha properties of the
+ * output buffer and its associated Wayland surface. Flushes idle resources
+ * if any properties change.
+ *
+ * @param ob The Outbuf structure to reconfigure.
+ * @param w The new width.
+ * @param h The new height.
+ * @param rot The new rotation (0, 90, 180, 270).
+ * @param depth The new color depth (e.g., OUTBUF_DEPTH_RGB_32BPP_ARGB_8888).
+ *              If OUTBUF_DEPTH_NONE or OUTBUF_DEPTH_INHERIT, the existing depth is kept.
+ * @param alpha EINA_TRUE if the destination surface should have an alpha channel, EINA_FALSE otherwise.
+ * @param resize EINA_TRUE if the underlying Wayland surface should be resized, EINA_FALSE otherwise.
+ */
 void
 _evas_outbuf_reconfigure(Outbuf *ob, int w, int h, int rot, Outbuf_Depth depth, Eina_Bool alpha, Eina_Bool resize)
 {
@@ -265,6 +342,38 @@ _evas_outbuf_reconfigure(Outbuf *ob, int w, int h, int rot, Outbuf_Depth depth, 
    _evas_outbuf_idle_flush(ob);
 }
 
+/**
+ * @brief Creates a new region within the output buffer for updating.
+ *
+ * This function prepares a portion of the output buffer to receive pixel data.
+ * Depending on the rotation:
+ * - If rotation is 0: It potentially reuses a single backing buffer (`ob->priv.onebuf`)
+ *   and adds the specified rectangle (`x, y, w, h`) to the `ob->priv.onebuf_regions` array.
+ *   `ob->priv.onebuf_regions` is an Eina_Array containing pointers to Eina_Rectangle structs,
+ *   e.g., `[Eina_Rectangle*, Eina_Rectangle*, ...]`.
+ *   The returned image points to this shared buffer, and the output parameters
+ *   `cx, cy, cw, ch` reflect the coordinates within this buffer.
+ * - If rotation is non-0: It allocates a new temporary image buffer for the update.
+ *   This image is added to the `ob->priv.pending_writes` list. The output parameters
+ *   `cx, cy, cw, ch` are set to 0, 0, w, h, indicating the update should be written
+ *   to the beginning of this temporary buffer.
+ *
+ * The function clips the requested region to the buffer boundaries.
+ *
+ * @param ob The Outbuf structure.
+ * @param x The x-coordinate of the region's top-left corner.
+ * @param y The y-coordinate of the region's top-left corner.
+ * @param w The width of the region.
+ * @param h The height of the region.
+ * @param[out] cx Pointer to store the clipped x-coordinate within the returned buffer.
+ * @param[out] cy Pointer to store the clipped y-coordinate within the returned buffer.
+ * @param[out] cw Pointer to store the clipped width within the returned buffer.
+ * @param[out] ch Pointer to store the clipped height within the returned buffer.
+ * @return A pointer to an RGBA_Image representing the buffer region to update,
+ *         or NULL if the region is invalid, clipping results in an empty area,
+ *         or allocation fails. The `extended_info` field of the returned image
+ *         stores the original requested Eina_Rectangle.
+ */
 void *
 _evas_outbuf_update_region_new(Outbuf *ob, int x, int y, int w, int h, int *cx, int *cy, int *cw, int *ch)
 {
@@ -353,6 +462,27 @@ _evas_outbuf_update_region_new(Outbuf *ob, int x, int y, int w, int h, int *cx, 
    return NULL;
 }
 
+/**
+ * @brief Pushes updated pixel data to a previously created region.
+ *
+ * This function copies pixel data from the source `update` image (obtained
+ * from `_evas_outbuf_update_region_new` when rotation is non-0) into the
+ * actual Wayland surface buffer associated with the Outbuf. It handles
+ * color conversion and rotation adjustments.
+ *
+ * This function is primarily used when rotation is non-zero, as the update
+ * needs to be copied from a temporary buffer (`update`) to the final
+ * destination surface, applying rotation during the copy. For zero rotation,
+ * updates are typically written directly to the buffer obtained via
+ * `_evas_outbuf_update_region_new`.
+ *
+ * @param ob The Outbuf structure.
+ * @param update The RGBA_Image containing the updated pixel data.
+ * @param x The original x-coordinate of the update region (before rotation).
+ * @param y The original y-coordinate of the update region (before rotation).
+ * @param w The original width of the update region (before rotation).
+ * @param h The original height of the update region (before rotation).
+ */
 void
 _evas_outbuf_update_region_push(Outbuf *ob, RGBA_Image *update, int x, int y, int w, int h)
 {
@@ -480,6 +610,16 @@ _evas_outbuf_update_region_push(Outbuf *ob, RGBA_Image *update, int x, int y, in
         rect.w, rect.h, x + rx, y + ry, NULL);
 }
 
+/**
+ * @brief Clears the redraw regions and posts updates to the Wayland surface.
+ *
+ * After `_evas_outbuf_flush` has prepared the list of rectangles to be
+ * redrawn (`ob->priv.rects`), this function sends these damage regions
+ * to the Wayland compositor via `ecore_wl2_surface_post`. It then frees
+ * the rectangle list and resets the count.
+ *
+ * @param ob The Outbuf structure.
+ */
 void
 _evas_outbuf_redraws_clear(Outbuf *ob)
 {

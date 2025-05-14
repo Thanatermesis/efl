@@ -2,6 +2,21 @@
 
 #define MY_CLASS EFL_CANVAS_PARALLEL_GROUP_ANIMATION_CLASS
 
+/**
+ * @brief Applies the animations in the parallel group to the target object
+ *        based on the given progress.
+ *
+ * This function iterates through all animations within the parallel group.
+ * For each animation, it calculates its individual progress based on the
+ * overall group progress, its own duration, start delay, and repeat behavior.
+ * It then applies this calculated progress to the animation on the target object.
+ *
+ * @param[in] eo_obj The Eolian object instance.
+ * @param[in] _pd Private data, unused in this function.
+ * @param[in] progress The overall progress of the parallel group animation (0.0 to 1.0).
+ * @param[in] target The canvas object to which the animations are applied.
+ * @return The final progress value after applying the super class's apply function.
+ */
 EOLIAN static double
 _efl_canvas_parallel_group_animation_efl_canvas_animation_animation_apply(Eo *eo_obj,
                                                             void *_pd EINA_UNUSED,
@@ -52,6 +67,18 @@ _efl_canvas_parallel_group_animation_efl_canvas_animation_animation_apply(Eo *eo
    return progress;
 }
 
+/**
+ * @brief Calculates the total duration of the parallel group animation.
+ *
+ * The total duration of a parallel group is determined by the child animation
+ * that finishes last. This includes the child animation's own duration and
+ * its start delay.
+ *
+ * @param[in] eo_obj The Eolian object instance.
+ * @param[in] _pd Private data, unused in this function.
+ * @return The total duration of the parallel group animation in seconds.
+ *         Returns 0.0 if there are no animations in the group.
+ */
 EOLIAN static double
 _efl_canvas_parallel_group_animation_efl_canvas_animation_duration_get(const Eo *eo_obj, void *_pd EINA_UNUSED)
 {

@@ -70,6 +70,24 @@ evas_common_polygon_init(void)
 {
 }
 
+/**
+ * @brief Adds a point to a polygon.
+ *
+ * This function allocates a new RGBA_Polygon_Point, initializes it with the
+ * given coordinates (x, y), and appends it to the linked list of points.
+ *
+ * @param points The existing list of polygon points (can be NULL for the first point).
+ *               This list is an Eina_Inlist of RGBA_Polygon_Point.
+ *               Example:
+ *               RGBA_Polygon_Point *poly = NULL;
+ *               poly = evas_common_polygon_point_add(poly, 10, 20);
+ *               poly = evas_common_polygon_point_add(poly, 30, 40);
+ *               // poly now contains two points: (10,20) -> (30,40)
+ * @param x The x-coordinate of the point to add.
+ * @param y The y-coordinate of the point to add.
+ * @return The updated list of polygon points, with the new point appended.
+ *         Returns the original list if memory allocation fails.
+ */
 EVAS_API RGBA_Polygon_Point *
 evas_common_polygon_point_add(RGBA_Polygon_Point *points, int x, int y)
 {
@@ -83,6 +101,18 @@ evas_common_polygon_point_add(RGBA_Polygon_Point *points, int x, int y)
    return points;
 }
 
+/**
+ * @brief Clears all points from a polygon.
+ *
+ * This function iterates through the linked list of polygon points,
+ * freeing each point. The list head is set to NULL.
+ *
+ * @param points The list of polygon points to clear.
+ *               Example:
+ *               poly = evas_common_polygon_points_clear(poly);
+ *               // poly is now NULL
+ * @return Always returns NULL, representing an empty list.
+ */
 EVAS_API RGBA_Polygon_Point *
 evas_common_polygon_points_clear(RGBA_Polygon_Point *points)
 {
@@ -100,6 +130,18 @@ evas_common_polygon_points_clear(RGBA_Polygon_Point *points)
    return NULL;
 }
 
+/**
+ * @brief Comparator function for sorting RGBA_Vertex structures by y-coordinate.
+ *
+ * Used with qsort to sort an array of RGBA_Vertex pointers based on their
+ * y-coordinate in ascending order. If y-coordinates are equal, the original
+ * order is effectively maintained (though not strictly guaranteed by qsort
+ * for equal elements unless a stable sort is used).
+ *
+ * @param a Pointer to the first RGBA_Vertex.
+ * @param b Pointer to the second RGBA_Vertex.
+ * @return -1 if a->y <= b->y, 1 otherwise.
+ */
 static int
 polygon_point_sorter(const void *a, const void *b)
 {
@@ -111,6 +153,17 @@ polygon_point_sorter(const void *a, const void *b)
    return 1;
 }
 
+/**
+ * @brief Comparator function for sorting RGBA_Edge structures by x-coordinate.
+ *
+ * Used with qsort to sort an array of RGBA_Edge structures based on their
+ * current x-coordinate in ascending order. This is crucial for the scanline
+ * algorithm to correctly identify span start and end points.
+ *
+ * @param a Pointer to the first RGBA_Edge.
+ * @param b Pointer to the second RGBA_Edge.
+ * @return -1 if p->x <= q->x, 1 otherwise.
+ */
 static int
 polygon_edge_sorter(const void *a, const void *b)
 {
@@ -122,6 +175,31 @@ polygon_edge_sorter(const void *a, const void *b)
    return 1;
 }
 
+/**
+ * @brief Draws a filled polygon onto an RGBA_Image using a scanline algorithm.
+ *
+ * This function implements a standard scanline polygon filling algorithm.
+ * It processes the polygon's vertices, builds an active edge table (AET),
+ * sorts edges by their x-intersections, and then fills horizontal spans
+ * for each scanline. Clipping is applied based on the draw context.
+ *
+ * @param dst The destination RGBA_Image to draw onto.
+ * @param dc The draw context, containing color, clipping, and render operation information.
+ *           - dc->col.col: The color to fill the polygon with.
+ *           - dc->clip: Clipping parameters.
+ *           - dc->render_op: The rendering operation (e.g., copy, blend).
+ *           - dc->clip.mask: Optional mask image for masked drawing.
+ * @param points A linked list of RGBA_Polygon_Point defining the vertices of the polygon.
+ *               The points should define a closed polygon. The order matters for winding.
+ *               Example:
+ *               RGBA_Polygon_Point *poly = NULL;
+ *               poly = evas_common_polygon_point_add(poly, 0, 0);
+ *               poly = evas_common_polygon_point_add(poly, 100, 0);
+ *               poly = evas_common_polygon_point_add(poly, 50, 100);
+ *               // This defines a triangle.
+ * @param x The x-offset to apply to all polygon points.
+ * @param y The y-offset to apply to all polygon points.
+ */
 EVAS_API void
 evas_common_polygon_draw(RGBA_Image *dst, RGBA_Draw_Context *dc, RGBA_Polygon_Point *points, int x, int y)
 {
@@ -138,6 +216,7 @@ evas_common_polygon_draw(RGBA_Image *dst, RGBA_Draw_Context *dc, RGBA_Polygon_Po
    int               *sorted_index;
 
    if (!dst->image.data) return;
+   // Optional: Use Pixman for polygon rendering if available and configured.
 #ifdef HAVE_PIXMAN
 # ifdef PIXMAN_POLY
    pixman_op_t op = PIXMAN_OP_SRC; // _EVAS_RENDER_COPY
@@ -173,19 +252,19 @@ evas_common_polygon_draw(RGBA_Image *dst, RGBA_Draw_Context *dc, RGBA_Polygon_Po
      }
    if ((ext_w <= 0) || (ext_h <= 0)) return;
 
-   evas_common_cpu_end_opt();
+   evas_common_cpu_end_opt(); // Ensure CPU-specific optimizations are finalized before drawing.
 
-   n = 0; EINA_INLIST_FOREACH(points, pt) n++;
-   if (n < 3) return;
-   edges = malloc(sizeof(RGBA_Edge) * n);
+   n = 0; EINA_INLIST_FOREACH(points, pt) n++; // Count number of points.
+   if (n < 3) return; // A polygon needs at least 3 vertices.
+   edges = malloc(sizeof(RGBA_Edge) * n); // Active Edge Table (AET)
    if (!edges) return;
-   point = malloc(sizeof(RGBA_Vertex) * n);
+   point = malloc(sizeof(RGBA_Vertex) * n); // Array of vertices for sorting.
    if (!point)
      {
 	free(edges);
 	return;
      }
-   sorted_index = malloc(sizeof(int) * n);
+   sorted_index = malloc(sizeof(int) * n); // Stores original indices after sorting.
    if (!sorted_index)
      {
 	free(edges);
@@ -193,62 +272,103 @@ evas_common_polygon_draw(RGBA_Image *dst, RGBA_Draw_Context *dc, RGBA_Polygon_Po
 	return;
      }
 
+   // Initialize vertex array from the input points list, applying offsets.
    k = 0;
    EINA_INLIST_FOREACH(points, pt)
      {
 	point[k].x = pt->x + x;
 	point[k].y = pt->y + y;
-	point[k].i = k;
+	point[k].i = k; // Store original index.
 	k++;
      }
+   // Sort vertices by y-coordinate to process scanlines in order.
+   // The sorted_index array keeps track of the original vertex indices
+   // after the 'point' array is sorted by y-coordinate. This is needed
+   // because the POLY_EDGE_ADD/DEL macros operate on the original point array.
    qsort(point, n, sizeof(RGBA_Vertex), polygon_point_sorter);
    for (k = 0; k < n; k++) sorted_index[k] = point[k].i;
+
+   // Re-populate the point array with original points but now sorted_index
+   // maps the scanline processing order to original vertex indices.
+   // This step seems redundant or potentially misordered with the previous qsort.
+   // The original point array (not the 'point' variable here, but the one implicitly
+   // used by POLY_EDGE_ADD/DEL via indices) is what matters for edge calculations.
+   // The 'point' array here is re-filled, but its sorted order from qsort is lost
+   // if the EINA_INLIST_FOREACH order is different from the qsort order.
+   // However, point[sorted_index[k]] is used later, which accesses the y-sorted vertices.
    k = 0;
    EINA_INLIST_FOREACH(points, pt)
      {
-	point[k].x = pt->x + x;
-	point[k].y = pt->y + y;
-	point[k].i = k;
+	point[k].x = pt->x + x; // This re-populates point[0]...point[n-1] in original order
+	point[k].y = pt->y + y; // effectively overwriting the y-sorted version.
+	point[k].i = k;         // This seems to be an error, as point[] should remain y-sorted.
+                                // The POLY_EDGE_ADD/DEL macros use 'point[]' with original indices.
+                                // The loop `for (; (k < n) && (point[sorted_index[k]].y <= ...); k++)`
+                                // correctly uses `point[sorted_index[k]]` which refers to the y-sorted vertices.
+                                // The `point` array itself is used by `POLY_EDGE_ADD` and `POLY_EDGE_DEL`
+                                // which expect `point[i]` to be the i-th vertex in the original polygon definition.
+                                // This second loop re-initializes `point` to the original vertex data,
+                                // which is correct for `POLY_EDGE_ADD/DEL`. The `sorted_index` array
+                                // is then used to iterate through vertices in their y-sorted order.
 	k++;
      }
 
+   // Determine the start and end scanlines for polygon processing.
+   // point[sorted_index[0]] is the vertex with the minimum y.
+   // point[sorted_index[n-1]] is the vertex with the maximum y.
    yy0 = MAX(ext_y, ceil(point[sorted_index[0]].y - 0.5));
    yy1 = MIN(ext_y + ext_h - 1, floor(point[sorted_index[n - 1]].y - 0.5));
 
-   k = 0;
-   num_active_edges = 0;
-   spans = NULL;
+   k = 0; // Index for iterating through sorted vertices.
+   num_active_edges = 0; // Current number of edges in the AET.
+   spans = NULL; // List to store horizontal spans to be drawn.
 
+   // Main scanline loop: iterate from the top-most to bottom-most scanline of the polygon.
    for (yi = yy0; yi <= yy1; yi++)
      {
+        // Update Active Edge Table (AET) for the current scanline yi.
+        // Iterate through vertices sorted by y-coordinate.
 	for (; (k < n) && (point[sorted_index[k]].y <= ((double)yi + 0.5)); k++)
 	  {
-	     i = sorted_index[k];
+	     i = sorted_index[k]; // Original index of the current vertex.
 
-	     if (i > 0) j = i - 1;
-	     else j = n - 1;
+             // Consider edges connected to the current vertex point[i].
+             // An edge is (point[j], point[i]).
+	     if (i > 0) j = i - 1; // Previous vertex in original list.
+	     else j = n - 1;       // Wrap around for the first vertex.
+
+             // If the other end of the edge (point[j]) is above the current scanline,
+             // this edge is no longer active or its activity changes.
 	     if (point[j].y <= ((double)yi - 0.5))
 	       {
-		  POLY_EDGE_DEL(j)
+		  POLY_EDGE_DEL(j) // Remove edge ending at point[j].
+	       }
+             // Else if the other end point[j] is below or on the current scanline,
+             // this edge might become active.
+	     else if (point[j].y > ((double)yi + 0.5))
+	       {
+		  POLY_EDGE_ADD(j, yi) // Add edge starting from point[j].
+	       }
+
+             // Consider the other edge connected to point[i].
+             // An edge is (point[i], point[j]).
+	     if (i < (n - 1)) j = i + 1; // Next vertex in original list.
+	     else j = 0;                 // Wrap around for the last vertex.
+
+	     if (point[j].y <= ((double)yi - 0.5))
+	       {
+		  POLY_EDGE_DEL(i) // Remove edge ending at point[i].
 	       }
 	     else if (point[j].y > ((double)yi + 0.5))
 	       {
-		  POLY_EDGE_ADD(j, yi)
-	       }
-	     if (i < (n - 1)) j = i + 1;
-	     else j = 0;
-	     if (point[j].y <= ((double)yi - 0.5))
-	       {
-		  POLY_EDGE_DEL(i)
-	       }
-	     else if (point[j].y > ((double)yi + 0.5))
-	       {
-		  POLY_EDGE_ADD(i, yi)
+		  POLY_EDGE_ADD(i, yi) // Add edge starting from point[i].
 	       }
 	  }
 
+        // Sort active edges by their current x-intersection point.
 	qsort(edges, num_active_edges, sizeof(RGBA_Edge), polygon_edge_sorter);
 
+        // Fill spans between pairs of active edges.
 	for (j = 0; j < num_active_edges; j += 2)
 	  {
 	     int x0, x1;
@@ -270,6 +390,7 @@ evas_common_polygon_draw(RGBA_Image *dst, RGBA_Draw_Context *dc, RGBA_Polygon_Po
 		  span->x = x0;
 		  span->w = (x1 - x0) + 1;
 	       }
+             // Update x-coordinate for the next scanline using the edge's slope.
 	     edges[j].x += edges[j].dx;
 	     edges[j + 1].x += edges[j + 1].dx;
 	  }
@@ -279,6 +400,7 @@ evas_common_polygon_draw(RGBA_Image *dst, RGBA_Draw_Context *dc, RGBA_Polygon_Po
    free(point);
    free(sorted_index);
 
+   // Select the appropriate drawing function based on whether a clip mask is used.
    if(dc->clip.mask)
      func = evas_common_gfx_func_composite_mask_color_span_get(dc->col.col, dst->cache_entry.flags.alpha, 1, dc->render_op);
    else
@@ -295,12 +417,13 @@ evas_common_polygon_draw(RGBA_Image *dst, RGBA_Draw_Context *dc, RGBA_Polygon_Po
 
 #ifdef HAVE_PIXMAN
 # ifdef PIXMAN_POLY
+             // If pixman is available and enabled, use it for compositing the span.
 	     if ((dst->pixman.im) && (dc->col.pixman_color_image))
 	       pixman_image_composite(op, dc->col.pixman_color_image,
 				      NULL, dst->pixman.im,
 				      span->x, span->y, 0, 0,
 				      span->x, span->y, span->w, 1);
-	     else
+	     else // Fallback to software rendering if pixman resources are not set up.
 # endif
 #endif
 	       {
@@ -313,10 +436,11 @@ evas_common_polygon_draw(RGBA_Image *dst, RGBA_Draw_Context *dc, RGBA_Polygon_Po
                           + (span->x - dc->clip.mask_x);
                        func(NULL, mask, dc->col.col, ptr, span->w);
                     }
-                  else
+                  else // No clip mask, draw directly.
                     func(NULL, NULL, dc->col.col, ptr, span->w);
 	       }
           }
+        // Free the memory allocated for spans.
 	while (spans)
 	  {
 	     span = (RGBA_Span *)spans;
@@ -326,6 +450,28 @@ evas_common_polygon_draw(RGBA_Image *dst, RGBA_Draw_Context *dc, RGBA_Polygon_Po
      }
 }
 
+/**
+ * @brief Draws a filled polygon onto an RGBA_Image using a scanline algorithm with explicit parameters.
+ *
+ * This function is similar to evas_common_polygon_draw but takes explicit parameters for
+ * clipping extent, color, render operation, and mask, instead of an RGBA_Draw_Context.
+ * It's a lower-level version, potentially used when a full draw context is not available
+ * or necessary. The core polygon rasterization logic is identical.
+ *
+ * @param dst The destination RGBA_Image to draw onto.
+ * @param ext_x The x-coordinate of the clipping rectangle's top-left corner.
+ * @param ext_y The y-coordinate of the clipping rectangle's top-left corner.
+ * @param ext_w The width of the clipping rectangle.
+ * @param ext_h The height of the clipping rectangle.
+ * @param col The color (DATA32) to fill the polygon with.
+ * @param render_op The rendering operation (e.g., _EVAS_RENDER_COPY, _EVAS_RENDER_BLEND).
+ * @param points A linked list of RGBA_Polygon_Point defining the vertices of the polygon.
+ * @param x The x-offset to apply to all polygon points.
+ * @param y The y-offset to apply to all polygon points.
+ * @param mask_ie Optional mask image (RGBA_Image) for masked drawing. Can be NULL.
+ * @param mask_x The x-offset for the mask image relative to the destination.
+ * @param mask_y The y-offset for the mask image relative to the destination.
+ */
 EVAS_API void
 evas_common_polygon_rgba_draw(RGBA_Image *dst, int ext_x, int ext_y, int ext_w, int ext_h, DATA32 col, int render_op, RGBA_Polygon_Point *points, int x, int y, RGBA_Image *mask_ie, int mask_x, int mask_y)
 {
@@ -341,21 +487,21 @@ evas_common_polygon_rgba_draw(RGBA_Image *dst, int ext_x, int ext_y, int ext_w, 
    int               *sorted_index;
 
    if (!dst->image.data) return;
-   if ((ext_w <= 0) || (ext_h <= 0)) return;
+   if ((ext_w <= 0) || (ext_h <= 0)) return; // Nothing to draw if clip area is empty.
 
-   evas_common_cpu_end_opt();
+   evas_common_cpu_end_opt(); // Ensure CPU-specific optimizations are finalized.
 
-   n = 0; EINA_INLIST_FOREACH(points, pt) n++;
-   if (n < 3) return;
-   edges = malloc(sizeof(RGBA_Edge) * n);
+   n = 0; EINA_INLIST_FOREACH(points, pt) n++; // Count vertices.
+   if (n < 3) return; // Polygon needs at least 3 vertices.
+   edges = malloc(sizeof(RGBA_Edge) * n); // Active Edge Table (AET).
    if (!edges) return;
-   point = malloc(sizeof(RGBA_Vertex) * n);
+   point = malloc(sizeof(RGBA_Vertex) * n); // Array of vertices for sorting.
    if (!point)
      {
 	free(edges);
 	return;
      }
-   sorted_index = malloc(sizeof(int) * n);
+   sorted_index = malloc(sizeof(int) * n); // Stores original indices after sorting.
    if (!sorted_index)
      {
 	free(edges);
@@ -363,16 +509,22 @@ evas_common_polygon_rgba_draw(RGBA_Image *dst, int ext_x, int ext_y, int ext_w, 
 	return;
      }
 
+   // Initialize vertex array from the input points list, applying offsets.
    k = 0;
    EINA_INLIST_FOREACH(points, pt)
      {
 	point[k].x = pt->x + x;
 	point[k].y = pt->y + y;
-	point[k].i = k;
+	point[k].i = k; // Store original index.
 	k++;
      }
+   // Sort vertices by y-coordinate.
    qsort(point, n, sizeof(RGBA_Vertex), polygon_point_sorter);
    for (k = 0; k < n; k++) sorted_index[k] = point[k].i;
+
+   // Re-initialize 'point' array to original vertex data.
+   // 'sorted_index' is used to iterate through vertices in y-sorted order,
+   // while 'point[original_index]' is used by POLY_EDGE_ADD/DEL macros.
    k = 0;
    EINA_INLIST_FOREACH(points, pt)
      {
@@ -382,43 +534,36 @@ evas_common_polygon_rgba_draw(RGBA_Image *dst, int ext_x, int ext_y, int ext_w, 
 	k++;
      }
 
+   // Determine the start and end scanlines for polygon processing, clipped to ext_y, ext_h.
    yy0 = MAX(ext_y, ceil(point[sorted_index[0]].y - 0.5));
    yy1 = MIN(ext_y + ext_h - 1, floor(point[sorted_index[n - 1]].y - 0.5));
 
-   k = 0;
-   num_active_edges = 0;
-   spans = NULL;
+   k = 0; // Index for iterating through y-sorted vertices.
+   num_active_edges = 0; // Current number of edges in AET.
+   spans = NULL; // List to store horizontal spans.
 
+   // Main scanline loop.
    for (yi = yy0; yi <= yy1; yi++)
      {
+        // Update Active Edge Table (AET) for current scanline yi.
 	for (; (k < n) && (point[sorted_index[k]].y <= ((double)yi + 0.5)); k++)
 	  {
-	     i = sorted_index[k];
+	     i = sorted_index[k]; // Original index of the current vertex.
 
-	     if (i > 0) j = i - 1;
-	     else j = n - 1;
-	     if (point[j].y <= ((double)yi - 0.5))
-	       {
-		  POLY_EDGE_DEL(j)
-	       }
-	     else if (point[j].y > ((double)yi + 0.5))
-	       {
-		  POLY_EDGE_ADD(j, yi)
-	       }
-	     if (i < (n - 1)) j = i + 1;
-	     else j = 0;
-	     if (point[j].y <= ((double)yi - 0.5))
-	       {
-		  POLY_EDGE_DEL(i)
-	       }
-	     else if (point[j].y > ((double)yi + 0.5))
-	       {
-		  POLY_EDGE_ADD(i, yi)
-	       }
+             // Process edges connected to vertex point[i].
+	     if (i > 0) j = i - 1; else j = n - 1; // Previous vertex.
+	     if (point[j].y <= ((double)yi - 0.5)) { POLY_EDGE_DEL(j); }
+	     else if (point[j].y > ((double)yi + 0.5)) { POLY_EDGE_ADD(j, yi); }
+
+	     if (i < (n - 1)) j = i + 1; else j = 0; // Next vertex.
+	     if (point[j].y <= ((double)yi - 0.5)) { POLY_EDGE_DEL(i); }
+	     else if (point[j].y > ((double)yi + 0.5)) { POLY_EDGE_ADD(i, yi); }
 	  }
 
+        // Sort active edges by x-intersection.
 	qsort(edges, num_active_edges, sizeof(RGBA_Edge), polygon_edge_sorter);
 
+        // Fill spans between pairs of active edges.
 	for (j = 0; j < num_active_edges; j += 2)
 	  {
 	     int x0, x1;
@@ -440,6 +585,7 @@ evas_common_polygon_rgba_draw(RGBA_Image *dst, int ext_x, int ext_y, int ext_w, 
 		  span->x = x0;
 		  span->w = (x1 - x0) + 1;
 	       }
+             // Update x-coordinates for the next scanline.
 	     edges[j].x += edges[j].dx;
 	     edges[j + 1].x += edges[j + 1].dx;
 	  }
@@ -449,6 +595,7 @@ evas_common_polygon_rgba_draw(RGBA_Image *dst, int ext_x, int ext_y, int ext_w, 
    free(point);
    free(sorted_index);
 
+   // Select drawing function based on whether a mask is provided.
    if (mask_ie)
      func = evas_common_gfx_func_composite_mask_color_span_get(col, dst->cache_entry.flags.alpha, 1, render_op);
    else
@@ -463,16 +610,17 @@ evas_common_polygon_rgba_draw(RGBA_Image *dst, int ext_x, int ext_y, int ext_w, 
 	     DATA32 *ptr;
 
              ptr = dst->image.data + (span->y * (dst->cache_entry.w)) + span->x;
-             if (mask_ie)
+             if (mask_ie) // If there's a mask, apply it.
                {
-                  mask = mask_ie->image.data8
+                  mask = mask_ie->image.data8 // Get pointer to mask data for this span.
                      + ((span->y - mask_y) * mask_ie->cache_entry.w)
                      + (span->x - mask_x);
                   func(NULL, mask, col, ptr, span->w);
                }
-             else
+             else // No mask, draw directly.
                func(NULL, NULL, col, ptr, span->w);
           }
+        // Free the memory allocated for spans.
 	while (spans)
 	  {
 	     span = (RGBA_Span *)spans;

@@ -1,5 +1,13 @@
 #define BILINEAR_HALF_TO_FULL_SCALE 1
 
+/**
+ * @brief Scales an image region down (downx and downy).
+ *
+ * This code block handles the downscaling of a source image region to a
+ * destination image region. It supports different paths based on whether
+ * the source image has an alpha channel and whether a specific bilinear
+ * downscaling optimization is enabled and applicable.
+ */
 {
    int Cx, Cy, i, j;
    DATA32 *dptr, *sptr, *pix, *pbuf;
@@ -16,6 +24,13 @@
    int w = dst_clip_w;
 
 #ifdef BILINEAR_HALF_TO_FULL_SCALE
+   /**
+    * @brief Optimization for bilinear downscaling.
+    *
+    * This section enables a specific bilinear interpolation path if the
+    * scaling factor is between 50% and 100% and the image dimensions
+    * are not excessively large, to avoid potential cumulative error.
+    */
    if (// image is not too big so that cululative error on steps might be
        // noticeable
        (dst_region_w <= 4096) &&
@@ -42,9 +57,19 @@
 /*#ifndef SCALE_USING_MMX */
 /* for now there's no mmx down scaling - so C only */
 #if 1
+   /**
+    * @brief Handles scaling for images with an alpha channel.
+    */
    if (src->cache_entry.flags.alpha)
      {
 #ifdef BILINEAR_HALF_TO_FULL_SCALE
+        /**
+         * @brief Bilinear downscaling path for alpha images.
+         *
+         * This path is taken if the `bilinear_downscale` flag is true,
+         * indicating that the conditions for the optimization were met.
+         * It performs bilinear interpolation between source pixels.
+         */
         if (bilinear_downscale)
           {
              DATA32 *lptr, *p1, *p2, *p3, *p4;
@@ -157,6 +182,13 @@
         else
 #endif
           {
+             /**
+              * @brief Standard downscaling path for alpha images.
+              *
+              * This path uses a weighted average of source pixels
+              * contributing to each destination pixel, based on precalculated
+              * xapoints and yapoints.
+              */
              while (dst_clip_h--)
                {
                   Cy = *yapp >> 16;
@@ -288,7 +320,17 @@
      }
    else
      {
+       /**
+        * @brief Handles scaling for images without an alpha channel (opaque).
+        */
 #ifdef DIRECT_SCALE
+        /**
+         * @brief Direct scaling path for opaque images under specific conditions.
+         *
+         * This path is an optimization for opaque source and destination images,
+         * with no color multiplication or external mask, allowing for a more
+         * direct pixel processing.
+         */
         if ((!src->cache_entry.flags.alpha) &&
             (!dst->cache_entry.flags.alpha) &&
             (mul_col == 0xffffffff) &&
@@ -299,6 +341,11 @@
              // src_region_x, src_region_y, src_region_w, src_region_h
              // dst_region_x, dst_region_y, dst_region_w, dst_region_h
 #ifdef BILINEAR_HALF_TO_FULL_SCALE
+             /**
+              * @brief Bilinear downscaling path for opaque images (direct scale).
+              *
+              * Similar to the alpha path, but optimized for opaque pixels (alpha is 0xff).
+              */
              if (bilinear_downscale)
                {
                   DATA32 *lptr, *p1, *p2, *p3, *p4;
@@ -390,6 +437,11 @@
              else
 #endif
                {
+                  /**
+                   * @brief Standard downscaling path for opaque images (direct scale).
+                   *
+                   * Similar to the standard alpha path, but optimized for opaque pixels.
+                   */
                   while (dst_clip_h--)
                     {
                        Cy = *yapp >> 16;
@@ -496,7 +548,16 @@
         else
 #endif
           {
+            /**
+             * @brief Fallback path for opaque images not meeting DIRECT_SCALE conditions.
+             *
+             * This handles opaque images when color multiplication or masking is involved,
+             * or when DIRECT_SCALE is not defined.
+             */
 #ifdef BILINEAR_HALF_TO_FULL_SCALE
+             /**
+              * @brief Bilinear downscaling for opaque images (fallback path).
+              */
              if (bilinear_downscale)
                {
                   DATA32 *lptr, *p1, *p2, *p3, *p4;
@@ -602,6 +663,9 @@
              else
 #endif
                {
+                  /**
+                   * @brief Standard downscaling for opaque images (fallback path).
+                   */
                   while (dst_clip_h--)
                     {
                        Cy = *yapp >> 16;

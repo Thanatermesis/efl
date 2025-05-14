@@ -25,9 +25,26 @@
 #include "eina_log.h"
 #include "eina_safety_checks.h"
 
+/**
+ * @internal
+ * @brief Global error variable indicating a safety check failure.
+ * Initialized by eina_safety_checks_init() and set by _eina_safety_error().
+ */
 EINA_API Eina_Error EINA_ERROR_SAFETY_FAILED = 0;
 
+/**
+ * @internal
+ * @brief Log domain specific to Eina safety checks.
+ * Used to categorize log messages originating from safety check failures.
+ * Registered in eina_safety_checks_init().
+ */
 static int EINA_SAFETY_LOG_DOMAIN = 0;
+/**
+ * @internal
+ * @brief Initialization counter for the safety checks module.
+ * Ensures that initialization and shutdown logic are performed correctly,
+ * especially when eina_init() and eina_shutdown() might be called multiple times.
+ */
 static int initcnt = 0;
 
 /**

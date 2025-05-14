@@ -17,6 +17,18 @@
 #define MY_CLASS_NAME_LEGACY "elm_clock"
 
 #define DEFAULT_FIRST_INTERVAL 0.85
+/**
+ * @brief Updates the clock display with the current time values.
+ *
+ * This function is responsible for redrawing the clock digits and AM/PM
+ * indicator based on the internal state (sd->hrs, sd->min, sd->sec).
+ * It handles theme updates and changes in display configuration (e.g.,
+ * showing/hiding seconds or AM/PM).
+ *
+ * @param obj The clock widget object.
+ * @param theme_update EINA_TRUE if a full theme update is required,
+ *                     EINA_FALSE for a regular time update.
+ */
 static void _time_update(Evas_Object *obj, Eina_Bool theme_update);
 
 static const char SIG_CHANGED[] = "changed";
@@ -30,6 +42,18 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {NULL, NULL}
 };
 
+/**
+ * @brief Callback function to increment the selected time unit.
+ *
+ * This function is called repeatedly by a timer when the user holds
+ * down an increment button in edit mode. It increases the hour, minute,
+ * or second, handling rollovers (e.g., 59 minutes to 00).
+ * The interval of the timer is reduced over time to accelerate the change.
+ *
+ * @param data The clock widget object.
+ * @return ECORE_CALLBACK_RENEW to continue the timer,
+ *         ECORE_CALLBACK_CANCEL to stop.
+ */
 static Eina_Bool
 _on_clock_val_up(void *data)
 {
@@ -86,6 +110,18 @@ clock_val_up_cancel:
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Callback function to decrement the selected time unit.
+ *
+ * This function is called repeatedly by a timer when the user holds
+ * down a decrement button in edit mode. It decreases the hour, minute,
+ * or second, handling rollovers (e.g., 00 minutes to 59).
+ * The interval of the timer is reduced over time to accelerate the change.
+ *
+ * @param data The clock widget object.
+ * @return ECORE_CALLBACK_RENEW to continue the timer,
+ *         ECORE_CALLBACK_CANCEL to stop.
+ */
 static Eina_Bool
 _on_clock_val_down(void *data)
 {
@@ -140,6 +176,17 @@ clock_val_down_cancel:
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Initializes the timer for incrementing a time unit.
+ *
+ * This function is called when an increment button is pressed.
+ * It sets up and starts a timer that repeatedly calls _on_clock_val_up.
+ *
+ * @param data The clock widget object.
+ * @param obj The Edje object that received the signal (a digit or AM/PM).
+ * @param emission The emitted signal string (unused).
+ * @param source The source of the signal (unused).
+ */
 static void
 _on_clock_val_up_start(void *data,
                        Evas_Object *obj,
@@ -156,6 +203,17 @@ _on_clock_val_up_start(void *data,
    _on_clock_val_up(data);
 }
 
+/**
+ * @brief Initializes the timer for decrementing a time unit.
+ *
+ * This function is called when a decrement button is pressed.
+ * It sets up and starts a timer that repeatedly calls _on_clock_val_down.
+ *
+ * @param data The clock widget object.
+ * @param obj The Edje object that received the signal (a digit or AM/PM).
+ * @param emission The emitted signal string (unused).
+ * @param source The source of the signal (unused).
+ */
 static void
 _on_clock_val_down_start(void *data,
                          Evas_Object *obj,
@@ -172,6 +230,17 @@ _on_clock_val_down_start(void *data,
    _on_clock_val_down(data);
 }
 
+/**
+ * @brief Stops the timer for changing time unit values.
+ *
+ * This function is called when an increment/decrement button is released.
+ * It deletes the timer responsible for continuous value changes.
+ *
+ * @param data The clock widget object.
+ * @param obj The Edje object that received the signal (unused).
+ * @param emission The emitted signal string (unused).
+ * @param source The source of the signal (unused).
+ */
 static void
 _on_clock_val_change_stop(void *data,
                           Evas_Object *obj EINA_UNUSED,
@@ -184,6 +253,17 @@ _on_clock_val_change_stop(void *data,
    sd->sel_obj = NULL;
 }
 
+/**
+ * @brief Accessibility callback for activating a clock part (digit/AM-PM).
+ *
+ * This function is triggered when an accessible part of the clock
+ * (increment/decrement button for a digit or AM/PM) is activated.
+ * It simulates a button press and release to change the time value.
+ *
+ * @param data The clock widget object.
+ * @param part_obj The Evas_Object representing the activated part (e.g., access.t or access.b).
+ * @param item The Elm_Object_Item associated with the part (unused).
+ */
 static void
 _access_activate_cb(void *data,
                     Evas_Object *part_obj,
@@ -207,6 +287,17 @@ _access_activate_cb(void *data,
    _on_clock_val_change_stop(sd, NULL, NULL, NULL);
 }
 
+/**
+ * @brief Registers or unregisters accessibility features for time editing parts.
+ *
+ * This function sets up or tears down the accessibility objects (increment/decrement
+ * buttons) for each editable digit and the AM/PM selector. It also adjusts
+ * event propagation based on whether accessibility is active.
+ *
+ * @param obj The clock widget object.
+ * @param is_access EINA_TRUE if accessibility features should be registered,
+ *                  EINA_FALSE to unregister them.
+ */
 static void
 _access_time_register(Evas_Object *obj, Eina_Bool is_access)
 {
@@ -345,6 +436,18 @@ _access_time_register(Evas_Object *obj, Eina_Bool is_access)
    edje_object_thaw(sd->am_pm_obj);
 }
 
+/**
+ * @brief Retrieves or creates a focus adapter for a given part of an Edje object.
+ *
+ * This function is used to get a focusable Evas_Object (an adapter)
+ * for a specific part within an Edje object (e.g., "access.t" or "access.b"
+ * of a digit). If accessibility is on, it gets the accessibility object
+ * associated with the part first. If an adapter doesn't exist, it creates one.
+ *
+ * @param part The Edje object containing the part (e.g., a clock digit).
+ * @param part_name The name of the part within the Edje object (e.g., "access.t").
+ * @return The focus adapter Evas_Object, or NULL on failure.
+ */
 static Evas_Object*
 _focus_part_get(Evas_Object *part, const char *part_name)
 {
@@ -370,6 +473,17 @@ _focus_part_get(Evas_Object *part, const char *part_name)
    return adapter;
 }
 
+/**
+ * @brief Updates the list of focusable elements for focus composition.
+ *
+ * This function rebuilds the list of focusable child elements (the
+ * increment/decrement buttons for each digit and AM/PM if applicable)
+ * and sets them for the clock widget's focus composition manager.
+ * This is important for keyboard navigation.
+ *
+ * @param obj The clock widget object.
+ * @param sd The clock widget's private data.
+ */
 static void
 _flush_clock_composite_elements(Evas_Object *obj, Elm_Clock_Data *sd)
 {
@@ -640,6 +754,16 @@ _elm_clock_efl_ui_widget_theme_apply(Eo *obj, Elm_Clock_Data *sd EINA_UNUSED)
    return int_ret;
 }
 
+/**
+ * @brief Timer callback to update the clock time periodically.
+ *
+ * This function is called by a timer (usually every second, but adjusted
+ * for precision) to update the clock's displayed time based on the
+ * system time, unless the clock is in edit mode.
+ *
+ * @param data The clock widget object.
+ * @return ECORE_CALLBACK_CANCEL to stop this timer instance (a new one is scheduled).
+ */
 static Eina_Bool
 _ticker(void *data)
 {
@@ -671,6 +795,18 @@ _ticker(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Provides accessibility information for the clock widget.
+ *
+ * This function generates a string describing the current time displayed
+ * by the clock, formatted for accessibility (e.g., screen readers).
+ * Example: "10, 30, AM" or "22, 30".
+ *
+ * @param data User data, unused in this callback.
+ * @param obj The clock widget object.
+ * @return A newly allocated string with the accessibility information,
+ *         or NULL on failure. The caller is responsible for freeing this string.
+ */
 static char *
 _access_info_cb(void *data EINA_UNUSED, Evas_Object *obj)
 {
@@ -706,6 +842,18 @@ _access_info_cb(void *data EINA_UNUSED, Evas_Object *obj)
    return ret;
 }
 
+/**
+ * @brief Provides the accessibility state for the clock widget.
+ *
+ * This function returns a string indicating the current state of the clock,
+ * specifically if it's editable.
+ * Example: "State: Editable" if in edit mode.
+ *
+ * @param data User data, unused in this callback.
+ * @param obj The clock widget object.
+ * @return A newly allocated string with the state information if editable,
+ *         otherwise NULL. The caller is responsible for freeing the string if not NULL.
+ */
 static char *
 _access_state_cb(void *data EINA_UNUSED, Evas_Object *obj)
 {
@@ -767,6 +915,16 @@ _elm_clock_efl_canvas_group_group_del(Eo *obj, Elm_Clock_Data *sd)
 
 static Eina_Bool _elm_clock_smart_focus_next_enable = EINA_FALSE;
 
+/**
+ * @brief Processes accessibility state changes for the clock and its parts.
+ *
+ * This function is called when the global accessibility state changes.
+ * It enables or disables accessibility features for the main clock object
+ * and its time editing parts (digits, AM/PM).
+ *
+ * @param obj The clock widget object.
+ * @param is_access EINA_TRUE if accessibility is now enabled, EINA_FALSE otherwise.
+ */
 static void
 _access_obj_process(Evas_Object *obj, Eina_Bool is_access)
 {
@@ -812,6 +970,15 @@ _elm_clock_efl_object_constructor(Eo *obj, Elm_Clock_Data *_pd EINA_UNUSED)
    return obj;
 }
 
+/**
+ * @brief Calculates and stores the time difference between the clock's
+ *        current time and the system's local time.
+ *
+ * This difference is used when the clock is not in edit mode to ensure
+ * it ticks relative to the system time, even if a custom time was set.
+ *
+ * @param sd The clock widget's private data.
+ */
 static void
 _timediff_set(Elm_Clock_Data *sd)
 {
@@ -949,6 +1116,15 @@ _elm_clock_pause_get(const Eo *obj EINA_UNUSED, Elm_Clock_Data *sd)
    return sd->paused;
 }
 
+/**
+ * @brief Class constructor for the Elm_Clock widget.
+ *
+ * This function is called once when the Elm_Clock class is being set up.
+ * It registers the legacy smart type for the clock widget and initializes
+ * the accessibility focus enable flag based on the global configuration.
+ *
+ * @param klass The Efl_Class for Elm_Clock.
+ */
 static void
 _elm_clock_class_constructor(Efl_Class *klass)
 {

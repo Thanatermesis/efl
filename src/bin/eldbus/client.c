@@ -4,6 +4,11 @@
 
 #include "codegen.h"
 
+/**
+ * @brief Directory where the generated files will be stored.
+ * This path is set via the '-O' or '--output-dir' command-line option.
+ * If not specified, files are generated in the current directory.
+ */
 char *output_dir = NULL;
 
 static const Ecore_Getopt optdesc = {
@@ -27,6 +32,19 @@ static const Ecore_Getopt optdesc = {
   }
 };
 
+/**
+ * @brief Main entry point for the eldbus_codegen client.
+ *
+ * Parses command line arguments, reads an XML DBus introspection file,
+ * parses the XML, and then generates client-side C code.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv An array of command-line argument strings.
+ *             The program expects at least one argument: the path to the XML file.
+ *             Optional arguments can control the output prefix, specific interface generation,
+ *             output file naming, and output directory.
+ * @return 0 on success, -1 on error.
+ */
 int
 main(int argc, char **argv)
 {

@@ -11,68 +11,120 @@
 # include <sys/stat.h>
 # include <fcntl.h>
 
+/** @brief Flag to ensure dynamic library loading is attempted only once. */
 static Eina_Bool tried = EINA_FALSE;
 ////////////////////////////////////
 //libdrm.so.2
+/** @brief Handle for the dynamically loaded libdrm library. */
 static void *drm_lib = NULL;
 
+/** @brief Type definition for DRM authentication magic number. */
 typedef unsigned int drm_magic_t;
+/** @brief Function pointer for drmGetMagic from libdrm. */
 static int (*sym_drmGetMagic)(int fd, drm_magic_t *magic) = NULL;
 
 ////////////////////////////////////
 // libtbm.so.1
+/** @brief TBM device type for CPU access. */
 #define TBM_DEVICE_CPU   1
+/** @brief TBM mapping option for read access. */
 #define TBM_OPTION_READ  (1 << 0)
+/** @brief TBM mapping option for write access. */
 #define TBM_OPTION_WRITE (1 << 1)
+/** @brief Handle for the dynamically loaded libtbm or libdrm_slp library. */
 static void *lib_tbm = NULL;
 
+/** @brief Function pointer for tbm_bo_import from libtbm. */
 static tbm_bo (*sym_tbm_bo_import)(tbm_bufmgr bufmgr, unsigned int key) = NULL;
+/** @brief Function pointer for tbm_bo_map from libtbm. */
 static tbm_bo_handle (*sym_tbm_bo_map)(tbm_bo bo, int device, int opt) = NULL;
+/** @brief Function pointer for tbm_bo_unmap from libtbm. */
 static int (*sym_tbm_bo_unmap)(tbm_bo bo) = NULL;
+/** @brief Function pointer for tbm_bo_unref from libtbm. */
 static void (*sym_tbm_bo_unref)(tbm_bo bo) = NULL;
+/** @brief Function pointer for tbm_bufmgr_init from libtbm. */
 static tbm_bufmgr (*sym_tbm_bufmgr_init)(int fd) = NULL;
+/** @brief Function pointer for tbm_bufmgr_deinit from libtbm. */
 static void (*sym_tbm_bufmgr_deinit)(tbm_bufmgr bufmgr) = NULL;
 
 // legacy compatibility
+/** @brief Function pointer for drm_slp_bo_map (legacy). */
 static void *(*sym_drm_slp_bo_map)(tbm_bo bo, int device, int opt) = NULL;
+/** @brief Function pointer for drm_slp_bo_unmap (legacy). */
 static int (*sym_drm_slp_bo_unmap)(tbm_bo bo, int device) = NULL;
+/** @brief Function pointer for drm_slp_bufmgr_init (legacy). */
 static tbm_bufmgr (*sym_drm_slp_bufmgr_init)(int fd, void *arg) = NULL;
 
 ////////////////////////////////////
 // libdri2.so.0
+/** @brief DRI2 buffer attachment point for the front left buffer. */
 #define DRI2BufferFrontLeft 0
+/** @brief Handle for the dynamically loaded libdri2 library. */
 static void *dri_lib = NULL;
 
+/** @brief Type definition used internally by DRI2 (unused here). */
 typedef unsigned long long CD64;
 
+/** @brief Function pointer for DRI2GetBuffers from libdri2. */
 static DRI2Buffer *(*sym_DRI2GetBuffers)(Display * display, XID drawable, int *width, int *height, unsigned int *attachments, int count, int *outCount) = NULL;
+/** @brief Function pointer for DRI2QueryExtension from libdri2. */
 static Bool (*sym_DRI2QueryExtension)(Display *display, int *eventBase, int *errorBase) = NULL;
+/** @brief Function pointer for DRI2QueryVersion from libdri2. */
 static Bool (*sym_DRI2QueryVersion)(Display *display, int *major, int *minor) = NULL;
+/** @brief Function pointer for DRI2Connect from libdri2. */
 static Bool (*sym_DRI2Connect)(Display *display, XID window, char **driverName, char **deviceName) = NULL;
+/** @brief Function pointer for DRI2Authenticate from libdri2. */
 static Bool (*sym_DRI2Authenticate)(Display *display, XID window, unsigned int magic) = NULL;
+/** @brief Function pointer for DRI2CreateDrawable from libdri2. */
 static void (*sym_DRI2CreateDrawable)(Display *display, XID drawable) = NULL;
+/** @brief Function pointer for DRI2DestroyDrawable from libdri2. */
 static void (*sym_DRI2DestroyDrawable)(Display *display, XID handle) = NULL;
 
 ////////////////////////////////////
 // libXfixes.so.3
+/** @brief Handle for the dynamically loaded libXfixes library. */
 static void *xfixes_lib = NULL;
 
+/** @brief Function pointer for XFixesQueryExtension from libXfixes. */
 static Bool (*sym_XFixesQueryExtension)(Display *display, int *event_base_return, int *error_base_return) = NULL;
+/** @brief Function pointer for XFixesQueryVersion from libXfixes. */
 static Status (*sym_XFixesQueryVersion)(Display *display, int *major_version_return, int *minor_version_return) = NULL;
+/** @brief Function pointer for XFixesCreateRegion from libXfixes. */
 static XID (*sym_XFixesCreateRegion)(Display *display, XRectangle *rectangles, int nrectangles) = NULL;
+/** @brief Function pointer for XFixesDestroyRegion from libXfixes. */
 static void (*sym_XFixesDestroyRegion)(Display *dpy, XID region) = NULL;
 
+/** @brief Global initialization counter for the DRI subsystem. */
 static int inits = 0;
+/** @brief XFixes extension event and error bases. */
 static int xfixes_ev_base = 0, xfixes_err_base = 0;
+/** @brief XFixes extension major and minor versions. */
 static int xfixes_major = 0, xfixes_minor = 0;
+/** @brief DRI2 extension event and error bases. */
 static int dri2_ev_base = 0, dri2_err_base = 0;
+/** @brief DRI2 extension major and minor versions. */
 static int dri2_major = 0, dri2_minor = 0;
+/** @brief File descriptor for the DRM device. */
 static int drm_fd = -1;
+/** @brief TBM buffer manager handle. */
 static tbm_bufmgr bufmgr = NULL;
+/** @brief Debug flag for DRI image operations (read from environment). -1 means not checked yet. */
 static int exim_debug = -1;
+/** @brief Flag to enable/disable DRI buffer caching (read from environment). */
 static Eina_Bool use_cache = EINA_TRUE;
+/** @brief Flag indicating if legacy SLP mode (libdrm_slp) is used instead of standard TBM. */
 static Eina_Bool slp_mode = EINA_FALSE;
 
+/**
+ * @brief Initializes the DRI/TBM subsystem.
+ * Loads necessary libraries (libdrm, libtbm/libdrm_slp, libdri2, libXfixes),
+ * resolves function symbols, connects to DRI2, authenticates with DRM,
+ * and initializes the TBM buffer manager. This is called only once when
+ * the first DRI image is initialized.
+ * @param disp The X Display connection.
+ * @param scr The screen number.
+ * @return EINA_TRUE on successful initialization, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _drm_init(Display *disp, int scr)
 {
@@ -267,6 +319,12 @@ err:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Shuts down the DRI/TBM subsystem.
+ * Deinitializes the TBM buffer manager, closes the DRM file descriptor,
+ * and unloads the dynamically loaded libraries. Called when the last
+ * DRI image is freed (inits counter reaches 0). Resets global state.
+ */
 static void
 _drm_shutdown(void)
 {
@@ -286,13 +344,25 @@ _drm_shutdown(void)
    xfixes_lib = NULL;
 }
 
+/**
+ * @brief Sets up DRI resources for a specific drawable associated with an Evas_DRI_Image.
+ * Calls DRI2CreateDrawable for the drawable in the Evas_DRI_Image.
+ * @param disp The X Display connection (unused in current implementation but kept for consistency).
+ * @param exim The Evas_DRI_Image structure containing the drawable.
+ * @return EINA_TRUE on success (currently always returns TRUE as DRI2CreateDrawable is void).
+ */
 static Eina_Bool
-_drm_setup(Display *disp, Evas_DRI_Image *exim)
+_drm_setup(Display *disp EINA_UNUSED, Evas_DRI_Image *exim)
 {
    sym_DRI2CreateDrawable(disp, exim->draw);
    return EINA_TRUE;
 }
 
+/**
+ * @brief Cleans up DRI resources associated with a specific Evas_DRI_Image's drawable.
+ * Calls DRI2DestroyDrawable for the drawable in the Evas_DRI_Image.
+ * @param exim The Evas_DRI_Image structure containing the drawable and display info.
+ */
 static void
 _drm_cleanup(Evas_DRI_Image *exim)
 {
@@ -332,6 +402,13 @@ evas_xlib_image_dri_used()
    return EINA_FALSE;
 }
 
+/**
+ * @brief Unmaps the TBM buffer associated with the Evas_DRI_Image.
+ * Handles both standard TBM and legacy SLP unmap functions based on `slp_mode`.
+ * Frees the DRI2Buffer structure (`exim->buf`) obtained from DRI2GetBuffers
+ * and resets the mapped data pointer (`exim->buf_data`).
+ * @param exim The Evas_DRI_Image structure holding the buffer information.
+ */
 void
 evas_xlib_image_buffer_unmap(Evas_DRI_Image *exim)
 {
@@ -345,6 +422,18 @@ evas_xlib_image_buffer_unmap(Evas_DRI_Image *exim)
    exim->buf_data = NULL;
 }
 
+/**
+ * @brief Imports or retrieves a cached TBM buffer object (`tbm_bo`) for a DRI2 buffer.
+ * Checks if the current DRI2 buffer (`exim->buf`) is marked as reused.
+ * If not reused, it clears any existing cache entry.
+ * If reused, it checks if the current buffer name matches the cached buffer name.
+ *   - If match: Reuses the cached `tbm_bo`.
+ *   - If no match: Clears the old cache entry.
+ * If no `tbm_bo` was found in the cache, it imports the buffer using `tbm_bo_import`
+ * and creates a new cache entry.
+ * @param exim The Evas_DRI_Image structure containing buffer info and cache pointer.
+ * @return EINA_TRUE on successful import (cached or new), EINA_FALSE on import failure or allocation failure.
+ */
 Eina_Bool
 _evas_xlib_image_cache_import(Evas_DRI_Image *exim)
 {
@@ -391,6 +480,14 @@ _evas_xlib_image_cache_import(Evas_DRI_Image *exim)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Imports a TBM buffer object (`tbm_bo`) without using or updating the cache.
+ * If a `tbm_bo` already exists in `exim`, it's unreferenced first.
+ * Then, it imports the buffer based on the name in `exim->buf->name`.
+ * Used when `use_cache` is EINA_FALSE.
+ * @param exim The Evas_DRI_Image structure containing buffer info.
+ * @return EINA_TRUE on successful import, EINA_FALSE on import failure.
+ */
 Eina_Bool
 _evas_xlib_image_no_cache_import(Evas_DRI_Image *exim)
 {
@@ -400,6 +497,14 @@ _evas_xlib_image_no_cache_import(Evas_DRI_Image *exim)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Helper function to ungrab the X server and sync the display connection.
+ * This is typically called in error paths within `evas_xlib_image_get_buffers`
+ * after an XGrabServer call.
+ * @param d The X Display connection.
+ * @return Always returns EINA_FALSE, intended for use in error returns like:
+ *         `return _evas_xlib_image_x_free(d);`
+ */
 Eina_Bool
 _evas_xlib_image_x_free(Display *d)
 {
@@ -472,6 +577,17 @@ evas_xlib_image_get_buffers(RGBA_Image *im)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Frees an Evas_DRI_Image structure and associated resources.
+ * Handles buffer cache cleanup (if `use_cache` is true) by unreferencing
+ * the cached `tbm_bo` and freeing the cache structure, or directly
+ * unreferencing the current `tbm_bo` if caching is disabled.
+ * Calls `_drm_cleanup` to destroy the DRI drawable resource.
+ * Frees the `exim` structure itself.
+ * Decrements the global initialization counter `inits` and calls `_drm_shutdown`
+ * if the counter reaches zero.
+ * @param exim The Evas_DRI_Image structure to free.
+ */
 void
 evas_xlib_image_dri_free(Evas_DRI_Image *exim)
 {
@@ -511,6 +627,17 @@ evas_xlib_image_dri_new(int w, int h, Visual *vis, int depth)
    return exim;
 }
 
+/**
+ * @brief Callback function invoked when an RGBA_Image associated with a native DRI surface
+ * needs to update its pixel data (e.g., before rendering).
+ * It retrieves the latest DRI buffers for the image via `evas_xlib_image_get_buffers`,
+ * which maps the buffer and updates the image's data pointer.
+ * @param image The RGBA_Image being bound/updated.
+ * @param x Unused X coordinate.
+ * @param y Unused Y coordinate.
+ * @param w Unused width.
+ * @param h Unused height.
+ */
 static void
 _native_bind_cb(void *image, int x EINA_UNUSED, int y EINA_UNUSED, int w EINA_UNUSED, int h EINA_UNUSED)
 {
@@ -526,6 +653,15 @@ _native_bind_cb(void *image, int x EINA_UNUSED, int y EINA_UNUSED, int w EINA_UN
      }
 }
 
+/**
+ * @brief Callback function invoked when an RGBA_Image associated with a native DRI surface
+ * is no longer needed and should be freed.
+ * It frees the associated `Evas_DRI_Image` structure (`exim`) using
+ * `evas_xlib_image_dri_free` (which handles DRI cleanup and shutdown logic)
+ * and frees the `Native` structure (`n`) containing the link.
+ * It also nullifies pointers in the RGBA_Image to prevent dangling references.
+ * @param image The RGBA_Image being freed.
+ */
 static void
 _native_free_cb(void *image)
 {

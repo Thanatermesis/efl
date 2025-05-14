@@ -4,20 +4,37 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Structure to hold data for the inwin API test.
+ * This structure contains the current state of the test and a pointer to the
+ * inwin widget.
+ */
 struct _api_data
 {
-   unsigned int state;  /* What state we are testing       */
-   void *inwin;
+   unsigned int state;  /**< Current test state, corresponds to api_state enum. */
+   void *inwin;         /**< The inwin widget being tested. */
 };
 typedef struct _api_data api_data;
 
+/**
+ * @brief Defines the different states for the inwin API test.
+ * These states are used to cycle through different API function tests.
+ */
 enum _api_state
 {
-   CONTENT_UNSET,
-   API_STATE_LAST
+   CONTENT_UNSET, /**< State to test unsetting the inwin content. */
+   API_STATE_LAST /**< Marker for the last state, used to end the test cycle. */
 };
 typedef enum _api_state api_state;
 
+/**
+ * @brief Executes a test case based on the current API state.
+ *
+ * This function modifies the inwin widget based on the state stored in @p api.
+ * It's part of a sequence of tests that are run by clicking a button in the UI.
+ *
+ * @param api The API test data, containing the current state and the inwin object.
+ */
 static void
 set_api_state(api_data *api)
 {
@@ -37,10 +54,22 @@ set_api_state(api_data *api)
      }
 }
 
+/**
+ * @brief Callback for the "Next API function" button's "clicked" event.
+ *
+ * This function is called when the user clicks the button to proceed to the
+ * next test case. It calls set_api_state() to perform the test for the
+ * current state, then increments the state for the next click. It also
+ * updates the button's text to reflect the next state and disables the
+ * button when all tests are done.
+ *
+ * @param data The api_data struct.
+ * @param obj The button object that was clicked.
+ * @param event_info Not used.
+ */
 static void
 _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
-{  /* Will add here a SWITCH command containing code to modify test-object */
-   /* in accordance a->state value. */
+{
    api_data *a = data;
    char str[128];
 
@@ -52,12 +81,31 @@ _api_bt_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_object_disabled_set(obj, a->state == API_STATE_LAST);
 }
 
+/**
+ * @brief Callback to free the api_data struct when the window is freed.
+ * @param data The api_data struct to free.
+ * @param e Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 static void
 _cleanup_cb(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
    free(data);
 }
 
+/**
+ * @brief Test case for inwin widget API.
+ *
+ * This test creates a window with an inwin widget. The inwin contains a
+ * button that allows cycling through different API function tests on the
+ * inwin. This demonstrates the basic usage and programmatic manipulation of
+ * an inwin.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_inwin(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -99,6 +147,17 @@ test_inwin(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_inf
    evas_object_show(win);
 }
 
+/**
+ * @brief Test case for inwin with "minimal_vertical" style.
+ *
+ * This test demonstrates an inwin widget using the "minimal_vertical" style.
+ * This style makes the inwin compact itself vertically to the minimum size
+ * of its content.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_inwin2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -130,6 +189,17 @@ test_inwin2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_in
    evas_object_show(win);
 }
 
+/**
+ * @brief Another test case for "minimal_vertical" style inwin.
+ *
+ * This test shows an inwin with the "minimal_vertical" style. The content
+ * is a box containing two buttons, demonstrating how the inwin sizes to
+ * fit multiple child objects.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_inwin3(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

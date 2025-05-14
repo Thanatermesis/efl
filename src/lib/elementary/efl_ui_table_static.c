@@ -4,6 +4,17 @@
 #define MY_CLASS_NAME "Efl.Ui.Table_Static"
 #define MY_CLASS_NAME_LEGACY "elm_grid"
 
+/**
+ * @brief Constructor for the Efl.Ui.Table_Static class.
+ *
+ * This function is called when a new Efl.Ui.Table_Static object is created.
+ * It initializes the object, sets its canvas type, accessibility role,
+ * and default requested columns and rows for the table.
+ *
+ * @param obj The Efl.Object to be constructed.
+ * @param pd Private data for the Efl.Ui.Table_Static class (unused).
+ * @return The constructed Efl.Object.
+ */
 EOLIAN static Eo *
 _efl_ui_table_static_efl_object_constructor(Eo *obj, void *pd EINA_UNUSED)
 {
@@ -20,6 +31,34 @@ _efl_ui_table_static_efl_object_constructor(Eo *obj, void *pd EINA_UNUSED)
    return obj;
 }
 
+/**
+ * @brief Updates the layout of the table and its items.
+ *
+ * This function is called when the layout of the table needs to be recalculated.
+ * It iterates through all packed items and sets their geometry (position and size)
+ * based on the table's current dimensions, the item's specified column, row,
+ * column span, and row span, and whether the UI is mirrored.
+ *
+ * The position and size of each item are calculated proportionally to the
+ * table's total width and height, and the requested number of columns and rows.
+ *
+ * For example, if an item is at `col=0`, `row=0` with `col_span=1`, `row_span=1`
+ * in a table with `req_cols=10`, `req_rows=10`, and the table's geometry is
+ * `x=0, y=0, w=100, h=100`:
+ * - If not mirrored:
+ *   - x1 = 0 + (100 * 0) / 10 = 0
+ *   - x2 = 0 + (100 * (0 + 1)) / 10 = 10
+ *   - y1 = 0 + (100 * 0) / 10 = 0
+ *   - y2 = 0 + (100 * (0 + 1)) / 10 = 10
+ *   - Item geometry: x=0, y=0, w=10, h=10
+ * - If mirrored:
+ *   - x1 = 0 + (100 * (10 - (0 + 1))) / 10 = 90
+ *   - x2 = 0 + (100 * (10 - 0)) / 10 = 100
+ *   - Item geometry: x=90, y=0, w=10, h=10
+ *
+ * @param obj The Efl.Ui.Table_Static object whose layout is to be updated.
+ * @param _pd Private data for the Efl.Ui.Table_Static class (unused).
+ */
 EOLIAN static void
 _efl_ui_table_static_efl_pack_layout_layout_update(Eo *obj, void *_pd EINA_UNUSED)
 {

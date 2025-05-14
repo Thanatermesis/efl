@@ -17,44 +17,62 @@
 #include <ibus.h>
 #include "ibus_imcontext.h"
 
+/**
+ * @struct _IBusIMContext
+ * @brief Internal structure representing an IBus Input Method Context.
+ *
+ * This structure holds all the necessary information for an IBus IM context,
+ * including the Ecore IMF context, the IBus input context, preedit string
+ * information, cursor position, focus state, and client window/canvas.
+ */
 struct _IBusIMContext
 {
    /* instance members */
-   Ecore_IMF_Context *ctx;
+   Ecore_IMF_Context *ctx;        /**< The parent Ecore IMF context. */
 
-   IBusInputContext *ibuscontext;
+   IBusInputContext *ibuscontext; /**< The actual IBus input context object. */
 
    /* preedit status */
-   char            *preedit_string;
-   Eina_List       *preedit_attrs;
-   int              preedit_cursor_pos;
-   Eina_Bool        preedit_visible;
+   char            *preedit_string;    /**< The current preedit string. */
+   Eina_List       *preedit_attrs;     /**< List of Ecore_IMF_Preedit_Attr for the preedit string. */
+   int              preedit_cursor_pos; /**< Cursor position within the preedit string. */
+   Eina_Bool        preedit_visible;    /**< Whether the preedit string is currently visible. */
 
-   int              cursor_x;
-   int              cursor_y;
-   int              cursor_w;
-   int              cursor_h;
+   int              cursor_x; /**< X-coordinate of the cursor relative to the client canvas. */
+   int              cursor_y; /**< Y-coordinate of the cursor relative to the client canvas. */
+   int              cursor_w; /**< Width of the cursor area. */
+   int              cursor_h; /**< Height of the cursor area. */
 
-   Eina_Bool        has_focus;
+   Eina_Bool        has_focus; /**< Whether this context currently has input focus. */
 
-   Ecore_X_Window   client_window;
-   Evas            *client_canvas;
+   Ecore_X_Window   client_window; /**< The client X11 window. */
+   Evas            *client_canvas; /**< The Evas canvas associated with the input. */
 
-   int              caps;
+   int              caps; /**< IBus capabilities flags (e.g., IBUS_CAP_PREEDIT_TEXT). */
 };
 
+/**
+ * @struct _KeyEvent
+ * @brief Structure to hold key event details for asynchronous processing.
+ *
+ * Used to pass key event information to the GAsyncResult callback when
+ * processing key events asynchronously with IBus.
+ */
 typedef struct _KeyEvent KeyEvent;
 
 struct _KeyEvent
 {
-   int keysym;
-   int keycode;
-   int state;
+   int keysym;  /**< The X11 keysym of the event. */
+   int keycode; /**< The X11 keycode of the event. */
+   int state;   /**< The X11 modifier state of the event. */
 };
 
+/** @brief Global flag to determine if synchronous IBus mode should be used. Defaults to EINA_TRUE. */
 static Eina_Bool _sync_mode_use = EINA_TRUE;
 
+/** @brief Pointer to the Ecore_IMF_Context that currently has focus. */
 static Ecore_IMF_Context *_focus_im_context = NULL;
+/** @brief Global IBusBus object, representing the connection to the IBus daemon. */
 static IBusBus           *_bus = NULL;
 
 /* functions prototype */
@@ -68,6 +86,16 @@ static XKeyEvent _ecore_imf_ibus_x_key_event_generate(Window win,
                                                       int keycode,
                                                       int modifiers);
 
+/**
+ * @brief Converts a UTF-8 character offset to a byte index.
+ *
+ * IBus often works with character offsets, while string manipulations in C
+ * often require byte indices. This function performs the conversion.
+ *
+ * @param str The UTF-8 string.
+ * @param offset The character offset.
+ * @return The byte index corresponding to the character offset.
+ */
 static unsigned int
 utf8_offset_to_index(const char *str, int offset)
 {
@@ -79,6 +107,15 @@ utf8_offset_to_index(const char *str, int offset)
    return index;
 }
 
+/**
+ * @brief Comparison function for sorting Ecore_IMF_Preedit_Attr by start_index.
+ *
+ * Used with eina_list_sort to ensure preedit attributes are ordered correctly.
+ *
+ * @param d1 Pointer to the first Ecore_IMF_Preedit_Attr.
+ * @param d2 Pointer to the second Ecore_IMF_Preedit_Attr.
+ * @return -1 if attr1 starts before attr2, 1 otherwise.
+ */
 static int
 sort_cb(const void *d1, const void *d2)
 {
@@ -94,6 +131,16 @@ sort_cb(const void *d1, const void *d2)
      return 1;
 }
 
+/**
+ * @brief Gets the screen coordinates of a given X11 window.
+ *
+ * This function traverses the X11 window hierarchy from the client window
+ * up to the root window to calculate its absolute screen position.
+ *
+ * @param client_win The Ecore_X_Window whose screen coordinates are needed.
+ * @param x Pointer to store the resulting screen x-coordinate. Can be NULL.
+ * @param y Pointer to store the resulting screen y-coordinate. Can be NULL.
+ */
 static void
 _ecore_imf_ibus_window_to_screen_geometry_get(Ecore_X_Window client_win,
                                               int *x,
@@ -123,6 +170,11 @@ end:
      *y = sum_y;
 }
 
+/**
+ * @brief Converts Ecore IMF keyboard modifiers to IBus modifier flags.
+ * @param modifier The Ecore IMF modifier flags (e.g., ECORE_IMF_KEYBOARD_MODIFIER_CTRL).
+ * @return The corresponding IBus modifier flags (e.g., IBUS_CONTROL_MASK).
+ */
 static unsigned int
 _ecore_imf_modifier_to_ibus_modifier(unsigned int modifier)
 {
@@ -151,6 +203,11 @@ _ecore_imf_modifier_to_ibus_modifier(unsigned int modifier)
    return state;
 }
 
+/**
+ * @brief Converts Ecore IMF keyboard lock states to IBus modifier flags.
+ * @param locks The Ecore IMF lock flags (e.g., ECORE_IMF_KEYBOARD_LOCK_CAPS).
+ * @return The corresponding IBus modifier flags (e.g., IBUS_LOCK_MASK).
+ */
 static unsigned int
 _ecore_imf_locks_to_ibus_modifier(unsigned int locks)
 {
@@ -167,6 +224,16 @@ _ecore_imf_locks_to_ibus_modifier(unsigned int locks)
    return state;
 }
 
+/**
+ * @brief Sends a synthesized XKeyEvent to the currently focused X11 window.
+ *
+ * This is used when IBus does not consume a key event, and it needs to be
+ * forwarded to the application.
+ *
+ * @param keysym The X11 keysym of the key.
+ * @param keycode The X11 keycode of the key.
+ * @param state The X11 modifier state (including IBUS_RELEASE_MASK if it's a key release).
+ */
 static void
 _ecore_imf_ibus_key_event_put(int keysym, int keycode, int state)
 {
@@ -198,6 +265,18 @@ _ecore_imf_ibus_key_event_put(int keysym, int keycode, int state)
      }
 }
 
+/**
+ * @brief Creates a copy of key event data.
+ *
+ * Allocates and populates a KeyEvent structure, used for asynchronous
+ * key event processing.
+ *
+ * @param keysym The X11 keysym.
+ * @param keycode The X11 keycode.
+ * @param state The X11 modifier state.
+ * @return A newly allocated KeyEvent structure containing the event data.
+ *         The caller is responsible for freeing this structure.
+ */
 static KeyEvent *
 _ecore_imf_ibus_key_event_copy(int keysym, int keycode, int state)
 {
@@ -209,6 +288,17 @@ _ecore_imf_ibus_key_event_copy(int keysym, int keycode, int state)
    return kev;
 }
 
+/**
+ * @brief Callback for asynchronous key event processing completion.
+ *
+ * This function is called when ibus_input_context_process_key_event_async()
+ * finishes. It checks if IBus handled the event; if not, it forwards
+ * the event to the application using _ecore_imf_ibus_key_event_put().
+ *
+ * @param object The IBusInputContext on which the async operation was called.
+ * @param res The GAsyncResult of the operation.
+ * @param user_data A pointer to the KeyEvent data associated with this event.
+ */
 static void
 _ecore_imf_ibus_process_key_event_done(GObject      *object,
                                        GAsyncResult *res,
@@ -237,6 +327,15 @@ _ecore_imf_ibus_process_key_event_done(GObject      *object,
    free(event);
 }
 
+/**
+ * @brief Requests surrounding text from the application if IBus needs it.
+ *
+ * Some input methods require context (the text around the cursor) to function
+ * correctly. This function checks if IBus needs surrounding text and, if so,
+ * retrieves it from the Ecore IMF context and provides it to IBus.
+ *
+ * @param ibusimcontext The IBusIMContext.
+ */
 static void
 _request_surrounding_text(IBusIMContext *ibusimcontext)
 {
@@ -284,6 +383,14 @@ _request_surrounding_text(IBusIMContext *ibusimcontext)
      }
 }
 
+/**
+ * @brief Creates a new IBusIMContext structure.
+ *
+ * Initializes an IBusIMContext structure and establishes a connection to the
+ * IBus daemon if one doesn't already exist.
+ *
+ * @return A pointer to the newly allocated IBusIMContext, or NULL on failure.
+ */
 IBusIMContext *
 ecore_imf_context_ibus_new(void)
 {
@@ -307,6 +414,12 @@ ecore_imf_context_ibus_new(void)
    return context;
 }
 
+/**
+ * @brief Shuts down the global IBus connection.
+ *
+ * Releases the global IBusBus object. This should be called when the
+ * application is exiting.
+ */
 void
 ecore_imf_context_ibus_shutdown(void)
 {
@@ -317,6 +430,15 @@ ecore_imf_context_ibus_shutdown(void)
      }
 }
 
+/**
+ * @brief Initializes an IBusIMContext for a given Ecore_IMF_Context.
+ *
+ * Sets up the IBus-specific data, initializes preedit status, cursor area,
+ * and connects to the IBus "connected" signal to create the IBus input
+ * context once the bus is ready.
+ *
+ * @param ctx The Ecore_IMF_Context to associate with IBus.
+ */
 void
 ecore_imf_context_ibus_add(Ecore_IMF_Context *ctx)
 {
@@ -355,6 +477,14 @@ ecore_imf_context_ibus_add(Ecore_IMF_Context *ctx)
    g_signal_connect(_bus, "connected", G_CALLBACK (_ecore_imf_context_ibus_bus_connected_cb), ibusimcontext);
 }
 
+/**
+ * @brief Cleans up and destroys an IBusIMContext.
+ *
+ * Disconnects signals, destroys the IBus input context proxy, frees preedit
+ * string and attributes, and frees the IBusIMContext structure itself.
+ *
+ * @param ctx The Ecore_IMF_Context whose IBus data is to be deleted.
+ */
 void
 ecore_imf_context_ibus_del(Ecore_IMF_Context *ctx)
 {
@@ -389,6 +519,18 @@ ecore_imf_context_ibus_del(Ecore_IMF_Context *ctx)
    free(ibusimcontext);
 }
 
+/**
+ * @brief Filters key events through the IBus input context.
+ *
+ * Converts Ecore IMF key events to IBus key events and sends them to the
+ * IBus input context for processing. This can be done synchronously or
+ * asynchronously based on the _sync_mode_use flag.
+ *
+ * @param ctx The Ecore_IMF_Context.
+ * @param type The type of Ecore IMF event (ECORE_IMF_EVENT_KEY_UP or ECORE_IMF_EVENT_KEY_DOWN).
+ * @param event The Ecore_IMF_Event data.
+ * @return EINA_TRUE if IBus handled (consumed) the event, EINA_FALSE otherwise.
+ */
 Eina_Bool
 ecore_imf_context_ibus_filter_event(Ecore_IMF_Context *ctx,
                                     Ecore_IMF_Event_Type type,
@@ -487,6 +629,14 @@ ecore_imf_context_ibus_filter_event(Ecore_IMF_Context *ctx,
      return EINA_FALSE;
 }
 
+/**
+ * @brief Handles the focus-in event for the IBus context.
+ *
+ * Notifies the IBus input context that it has gained focus. Also requests
+ * surrounding text if needed. Manages the global _focus_im_context.
+ *
+ * @param ctx The Ecore_IMF_Context that gained focus.
+ */
 void
 ecore_imf_context_ibus_focus_in(Ecore_IMF_Context *ctx)
 {
@@ -511,6 +661,14 @@ ecore_imf_context_ibus_focus_in(Ecore_IMF_Context *ctx)
      _focus_im_context = ctx;
 }
 
+/**
+ * @brief Handles the focus-out event for the IBus context.
+ *
+ * Notifies the IBus input context that it has lost focus. Updates the
+ * global _focus_im_context.
+ *
+ * @param ctx The Ecore_IMF_Context that lost focus.
+ */
 void
 ecore_imf_context_ibus_focus_out(Ecore_IMF_Context *ctx)
 {
@@ -530,6 +688,13 @@ ecore_imf_context_ibus_focus_out(Ecore_IMF_Context *ctx)
      ibus_input_context_focus_out(ibusimcontext->ibuscontext);
 }
 
+/**
+ * @brief Resets the IBus input context.
+ *
+ * Tells the IBus input context to clear its current state (e.g., preedit string).
+ *
+ * @param ctx The Ecore_IMF_Context to reset.
+ */
 void
 ecore_imf_context_ibus_reset(Ecore_IMF_Context *ctx)
 {
@@ -540,6 +705,18 @@ ecore_imf_context_ibus_reset(Ecore_IMF_Context *ctx)
      ibus_input_context_reset(ibusimcontext->ibuscontext);
 }
 
+/**
+ * @brief Retrieves the current preedit string and cursor position.
+ *
+ * Provides the application with the current preedit text being composed by
+ * the input method.
+ *
+ * @param ctx The Ecore_IMF_Context.
+ * @param[out] str Pointer to a char* that will be allocated and filled with the
+ *                 preedit string. The caller must free this string.
+ * @param[out] cursor_pos Pointer to an int that will be filled with the byte offset
+ *                        of the cursor within the preedit string.
+ */
 void
 ecore_imf_context_ibus_preedit_string_get(Ecore_IMF_Context *ctx,
                                           char          **str,
@@ -572,6 +749,27 @@ ecore_imf_context_ibus_preedit_string_get(Ecore_IMF_Context *ctx,
      EINA_LOG_DBG("cursor_pos : %d", *cursor_pos);
 }
 
+/**
+ * @brief Retrieves the current preedit string, attributes, and cursor position.
+ *
+ * Provides the application with the current preedit text and a list of
+ * attributes (e.g., underlining) that describe how to render it.
+ *
+ * @param ctx The Ecore_IMF_Context.
+ * @param[out] str Pointer to a char* that will be allocated and filled with the
+ *                 preedit string. The caller must free this string.
+ * @param[out] attrs Pointer to an Eina_List* that will be filled with
+ *                   Ecore_IMF_Preedit_Attr elements. The caller must free this
+ *                   list and its contents.
+ *                   Example of Ecore_IMF_Preedit_Attr structure:
+ *                   struct _Ecore_IMF_Preedit_Attr {
+ *                       Ecore_IMF_Preedit_Type preedit_type; // e.g., ECORE_IMF_PREEDIT_TYPE_SUB1 (underline)
+ *                       unsigned int           start_index;  // Start character index of the attribute
+ *                       unsigned int           end_index;    // End character index of the attribute
+ *                   };
+ * @param[out] cursor_pos Pointer to an int that will be filled with the byte offset
+ *                        of the cursor within the preedit string.
+ */
 void
 ecore_imf_context_ibus_preedit_string_with_attributes_get(Ecore_IMF_Context *ctx,
                                                           char          **str,
@@ -605,6 +803,15 @@ ecore_imf_context_ibus_preedit_string_with_attributes_get(Ecore_IMF_Context *ctx
      }
 }
 
+/**
+ * @brief Sets the client window associated with the IBus context.
+ *
+ * The client window is typically the top-level window containing the input widget.
+ * IBus uses this for various purposes, like positioning candidate windows.
+ *
+ * @param ctx The Ecore_IMF_Context.
+ * @param window A pointer to the client window (expected to be an Ecore_X_Window).
+ */
 void
 ecore_imf_context_ibus_client_window_set(Ecore_IMF_Context *ctx, void *window)
 {
@@ -616,6 +823,15 @@ ecore_imf_context_ibus_client_window_set(Ecore_IMF_Context *ctx, void *window)
      ibusimcontext->client_window = (Ecore_X_Window)(Ecore_Window)window;
 }
 
+/**
+ * @brief Sets the client Evas canvas associated with the IBus context.
+ *
+ * The client canvas is used to determine the screen position of the input area
+ * if a specific client window is not set or to get window from Evas.
+ *
+ * @param ctx The Ecore_IMF_Context.
+ * @param canvas A pointer to the client Evas canvas.
+ */
 void
 ecore_imf_context_ibus_client_canvas_set(Ecore_IMF_Context *ctx, void *canvas)
 {
@@ -627,6 +843,15 @@ ecore_imf_context_ibus_client_canvas_set(Ecore_IMF_Context *ctx, void *canvas)
      ibusimcontext->client_canvas = canvas;
 }
 
+/**
+ * @brief Updates the IBus input context with the current cursor location.
+ *
+ * Calculates the absolute screen coordinates of the cursor based on the
+ * client window/canvas and the relative cursor position, then informs IBus.
+ * This is typically called internally when the cursor position changes.
+ *
+ * @param ctx The Ecore_IMF_Context.
+ */
 static void
 _ecore_imf_context_ibus_cursor_location_set(Ecore_IMF_Context *ctx)
 {
@@ -663,6 +888,19 @@ _ecore_imf_context_ibus_cursor_location_set(Ecore_IMF_Context *ctx)
                                           ibusimcontext->cursor_h);
 }
 
+/**
+ * @brief Sets the cursor location relative to the client widget.
+ *
+ * Informs the IBus context about the position and size of the text cursor
+ * within the input widget. This is used by IBus to position helper UIs
+ * like candidate lists.
+ *
+ * @param ctx The Ecore_IMF_Context.
+ * @param x The x-coordinate of the cursor rectangle, relative to the client widget.
+ * @param y The y-coordinate of the cursor rectangle, relative to the client widget.
+ * @param w The width of the cursor rectangle.
+ * @param h The height of the cursor rectangle.
+ */
 void
 ecore_imf_context_ibus_cursor_location_set(Ecore_IMF_Context *ctx,
                                            int x,
@@ -688,6 +926,16 @@ ecore_imf_context_ibus_cursor_location_set(Ecore_IMF_Context *ctx,
      }
 }
 
+/**
+ * @brief Enables or disables the use of preedit text for the IBus context.
+ *
+ * Informs IBus whether the application can display preedit text. If disabled,
+ * IBus might use an alternative way to show preedit (e.g., a separate window).
+ *
+ * @param ctx The Ecore_IMF_Context.
+ * @param use_preedit EINA_TRUE if the application handles preedit display,
+ *                    EINA_FALSE otherwise.
+ */
 void
 ecore_imf_context_ibus_use_preedit_set(Ecore_IMF_Context *ctx, Eina_Bool use_preedit)
 {
@@ -706,6 +954,16 @@ ecore_imf_context_ibus_use_preedit_set(Ecore_IMF_Context *ctx, Eina_Bool use_pre
      }
 }
 
+/**
+ * @brief Callback invoked when the IBus bus (connection to daemon) is established.
+ *
+ * When the connection to the IBus daemon is successfully made, this function
+ * proceeds to create the actual IBus input context using
+ * _ecore_imf_context_ibus_create().
+ *
+ * @param bus The IBusBus object (unused in this function).
+ * @param ibusimcontext The IBusIMContext associated with this connection.
+ */
 static void
 _ecore_imf_context_ibus_bus_connected_cb(IBusBus       *bus EINA_UNUSED,
                                          IBusIMContext *ibusimcontext)
@@ -716,6 +974,17 @@ _ecore_imf_context_ibus_bus_connected_cb(IBusBus       *bus EINA_UNUSED,
      _ecore_imf_context_ibus_create(ibusimcontext);
 }
 
+/**
+ * @brief Callback invoked when IBus commits text.
+ *
+ * This function is called when the input method finalizes a string (e.g.,
+ * after preediting). It sends an ECORE_IMF_CALLBACK_COMMIT event to the
+ * application with the committed string.
+ *
+ * @param ibuscontext The IBusInputContext that emitted the signal (unused).
+ * @param text The IBusText object containing the text to be committed.
+ * @param ibusimcontext The IBusIMContext associated with this event.
+ */
 static void
 _ecore_imf_context_ibus_commit_text_cb(IBusInputContext *ibuscontext EINA_UNUSED,
                                        IBusText         *text,
@@ -737,6 +1006,19 @@ _ecore_imf_context_ibus_commit_text_cb(IBusInputContext *ibuscontext EINA_UNUSED
      }
 }
 
+/**
+ * @brief Generates an XKeyEvent structure.
+ *
+ * Helper function to create an XKeyEvent, which can then be sent to an
+ * X11 window. This is used for forwarding key events not handled by IBus.
+ *
+ * @param win The target X11 window for the event.
+ * @param press EINA_TRUE for KeyPress, EINA_FALSE for KeyRelease.
+ * @param keysym The X11 keysym.
+ * @param keycode The X11 keycode. If -1, it's derived from keysym.
+ * @param modifiers The X11 modifier state.
+ * @return The generated XKeyEvent structure.
+ */
 static XKeyEvent _ecore_imf_ibus_x_key_event_generate(Window win,
                                                       Eina_Bool press,
                                                       int keysym,
@@ -776,6 +1058,18 @@ static XKeyEvent _ecore_imf_ibus_x_key_event_generate(Window win,
    return event;
 }
 
+/**
+ * @brief Callback invoked when IBus decides to forward a key event.
+ *
+ * This means IBus did not consume the key event and it should be passed
+ * on to the application. This function uses _ecore_imf_ibus_key_event_put()
+ * to send the event.
+ *
+ * @param ibuscontext The IBusInputContext (unused).
+ * @param keyval The keysym of the event.
+ * @param state The IBus modifier state of the event.
+ * @param ibusimcontext The IBusIMContext (unused).
+ */
 static void
 _ecore_imf_context_ibus_forward_key_event_cb(IBusInputContext  *ibuscontext EINA_UNUSED,
                                              guint              keyval,
@@ -787,6 +1081,19 @@ _ecore_imf_context_ibus_forward_key_event_cb(IBusInputContext  *ibuscontext EINA
    _ecore_imf_ibus_key_event_put(keyval, -1, state);
 }
 
+/**
+ * @brief Callback invoked when IBus requests deletion of surrounding text.
+ *
+ * Some input methods need to delete text around the cursor (e.g., to replace
+ * it with a candidate). This function sends an
+ * ECORE_IMF_CALLBACK_DELETE_SURROUNDING event to the application.
+ *
+ * @param ibuscontext The IBusInputContext (unused).
+ * @param offset_from_cursor The character offset from the cursor where deletion
+ *                           should start. Negative values mean before the cursor.
+ * @param nchars The number of characters to delete.
+ * @param ibusimcontext The IBusIMContext associated with this event.
+ */
 static void
 _ecore_imf_context_ibus_delete_surrounding_text_cb(IBusInputContext *ibuscontext EINA_UNUSED,
                                                    gint              offset_from_cursor,
@@ -807,6 +1114,21 @@ _ecore_imf_context_ibus_delete_surrounding_text_cb(IBusInputContext *ibuscontext
                                          &ev);
 }
 
+/**
+ * @brief Callback invoked when IBus updates the preedit text.
+ *
+ * This function is called when the preedit string, its attributes, cursor
+ * position, or visibility changes. It updates the internal preedit state
+ * in IBusIMContext and sends ECORE_IMF_CALLBACK_PREEDIT_START,
+ * ECORE_IMF_CALLBACK_PREEDIT_CHANGED, or ECORE_IMF_CALLBACK_PREEDIT_END
+ * events to the application as appropriate.
+ *
+ * @param ibuscontext The IBusInputContext (unused).
+ * @param text The IBusText object containing the updated preedit string and attributes.
+ * @param cursor_pos The new cursor position within the preedit string (character offset).
+ * @param visible Whether the preedit text should be visible.
+ * @param ibusimcontext The IBusIMContext associated with this event.
+ */
 static void
 _ecore_imf_context_ibus_update_preedit_text_cb(IBusInputContext  *ibuscontext EINA_UNUSED,
                                                IBusText          *text,
@@ -950,6 +1272,16 @@ _ecore_imf_context_ibus_update_preedit_text_cb(IBusInputContext  *ibuscontext EI
      }
 }
 
+/**
+ * @brief Callback invoked when IBus requests to show the preedit text.
+ *
+ * This typically happens when preedit text becomes active. It updates the
+ * visibility state and sends ECORE_IMF_CALLBACK_PREEDIT_START and
+ * ECORE_IMF_CALLBACK_PREEDIT_CHANGED events to the application.
+ *
+ * @param ibuscontext The IBusInputContext (unused).
+ * @param ibusimcontext The IBusIMContext associated with this event.
+ */
 static void
 _ecore_imf_context_ibus_show_preedit_text_cb(IBusInputContext *ibuscontext EINA_UNUSED,
                                              IBusIMContext    *ibusimcontext)
@@ -975,6 +1307,16 @@ _ecore_imf_context_ibus_show_preedit_text_cb(IBusInputContext *ibuscontext EINA_
    _request_surrounding_text(ibusimcontext);
 }
 
+/**
+ * @brief Callback invoked when IBus requests to hide the preedit text.
+ *
+ * This typically happens when preedit text is cleared or committed. It updates
+ * the visibility state and sends ECORE_IMF_CALLBACK_PREEDIT_CHANGED and
+ * ECORE_IMF_CALLBACK_PREEDIT_END events to the application.
+ *
+ * @param ibuscontext The IBusInputContext (unused).
+ * @param ibusimcontext The IBusIMContext associated with this event.
+ */
 static void
 _ecore_imf_context_ibus_hide_preedit_text_cb(IBusInputContext *ibuscontext EINA_UNUSED,
                                              IBusIMContext    *ibusimcontext)
@@ -998,6 +1340,15 @@ _ecore_imf_context_ibus_hide_preedit_text_cb(IBusInputContext *ibuscontext EINA_
                                          NULL);
 }
 
+/**
+ * @brief Callback invoked when the IBus input context is destroyed on the IBus server side.
+ *
+ * This function handles the cleanup of the local IBusInputContext proxy,
+ * clears preedit state, and notifies the application that preediting has ended.
+ *
+ * @param ibuscontext The IBusInputContext that was destroyed (unused, as it's being unreffed).
+ * @param ibusimcontext The IBusIMContext associated with the destroyed context.
+ */
 static void
 _ecore_imf_context_ibus_destroy_cb(IBusInputContext *ibuscontext EINA_UNUSED,
                                    IBusIMContext    *ibusimcontext)
@@ -1025,6 +1376,16 @@ _ecore_imf_context_ibus_destroy_cb(IBusInputContext *ibuscontext EINA_UNUSED,
                                          NULL);
 }
 
+/**
+ * @brief Creates and initializes the IBusInputContext object.
+ *
+ * This function is called once the IBus bus is connected. It creates the
+ * IBusInputContext proxy, connects to its various signals (commit-text,
+ * forward-key-event, etc.), sets capabilities, and focuses the context if
+ * it already has application-level focus.
+ *
+ * @param ibusimcontext The IBusIMContext for which to create the IBus input context.
+ */
 static void
 _ecore_imf_context_ibus_create(IBusIMContext *ibusimcontext)
 {

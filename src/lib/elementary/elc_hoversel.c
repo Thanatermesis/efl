@@ -27,15 +27,21 @@ static const char SIG_ITEM_FOCUSED[] = "item,focused";
 static const char SIG_ITEM_UNFOCUSED[] = "item,unfocused";
 static const char SIG_CLICKED[] = "clicked";
 
+/**
+ * @brief Smart callback function descriptions.
+ *
+ * This array defines the smart callbacks available for the hoversel widget.
+ * Each entry consists of the signal name and a (currently unused) type string.
+ */
 static const Evas_Smart_Cb_Description _smart_callbacks[] = {
-   {SIG_SELECTED, ""},
-   {SIG_DISMISSED, ""},
+   {SIG_SELECTED, ""}, /**< User selected an item. event_info is the selected Elm_Object_Item. */
+   {SIG_DISMISSED, ""}, /**< Hoversel was dismissed. */
    {SIG_EXPANDED, ""},
-   {SIG_ITEM_FOCUSED, ""},
-   {SIG_ITEM_UNFOCUSED, ""},
-   {SIG_CLICKED, ""}, /**< handled by parent button class */
-   {SIG_WIDGET_LANG_CHANGED, ""}, /**< handled by elm_widget */
-   {SIG_WIDGET_ACCESS_CHANGED, ""}, /**< handled by elm_widget */
+   {SIG_ITEM_FOCUSED, ""}, /**< An item in the hoversel received focus. */
+   {SIG_ITEM_UNFOCUSED, ""}, /**< An item in the hoversel lost focus. */
+   {SIG_CLICKED, ""}, /**< Hoversel button was clicked. Handled by parent button class. */
+   {SIG_WIDGET_LANG_CHANGED, ""}, /**< Language changed. Handled by elm_widget. */
+   {SIG_WIDGET_ACCESS_CHANGED, ""}, /**< Accessibility state changed. Handled by elm_widget. */
    {NULL, NULL}
 };
 
@@ -44,10 +50,16 @@ static Eina_Bool _key_action_activate(Evas_Object *obj, const char *params);
 static Eina_Bool _key_action_escape(Evas_Object *obj, const char *params);
 static Eina_Bool _hoversel_efl_ui_widget_widget_input_event_handler(Eo *obj, Elm_Hoversel_Data *_pd EINA_UNUSED, const Efl_Event *eo_event, Evas_Object *src EINA_UNUSED);
 
+/**
+ * @brief Defines the key actions for the hoversel widget.
+ *
+ * This array maps action names (strings) to their corresponding handler functions.
+ * These actions are typically triggered by key events or accessibility features.
+ */
 static const Elm_Action key_actions[] = {
-   {"move", _key_action_move},
-   {"activate", _key_action_activate},
-   {"escape", _key_action_escape},
+   {"move", _key_action_move}, /**< Handles item navigation within the hoversel popup. Params: "up", "down", "left", "right". */
+   {"activate", _key_action_activate}, /**< Activates the hoversel (opens popup) or selects the focused item. */
+   {"escape", _key_action_escape}, /**< Dismisses the hoversel popup. */
    {NULL, NULL}
 };
 
@@ -113,6 +125,17 @@ _elm_hoversel_efl_ui_widget_theme_apply(Eo *obj, Elm_Hoversel_Data *sd)
    return int_ret;
 }
 
+/**
+ * @brief Callback invoked when the hover (popup) itself is clicked.
+ *
+ * This function handles clicks on the background of the hoversel's popup.
+ * It typically dismisses the hoversel unless a specific layout data
+ * "dismiss" is set to "off" (legacy behavior).
+ *
+ * @param data The hoversel Evas_Object.
+ * @param obj The Evas_Object that was clicked (the hover layout).
+ * @param event_info Unused event information.
+ */
 static void
 _on_hover_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -124,6 +147,18 @@ _on_hover_clicked(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      elm_hoversel_hover_end(data); // for backward compatibility
 }
 
+/**
+ * @brief Callback to automatically update the hoversel button's content after an item is selected.
+ *
+ * This function is called when the hover object is deleted (after an item is selected and
+ * the hover is about to be dismissed). If auto_update is enabled for the hoversel,
+ * it updates the main hoversel button's icon and label to match the selected item.
+ *
+ * @param data Pointer to the Elm_Hoversel_Item_Data of the selected item.
+ * @param e Unused Evas canvas.
+ * @param obj Unused Evas_Object (the hover).
+ * @param event_info Unused event information.
+ */
 static void
 _auto_update(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -166,6 +201,18 @@ _auto_update(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void
      }
 }
 
+/**
+ * @brief Callback invoked when an item in the hoversel's list is clicked.
+ *
+ * This function is called when a user clicks on one of the items displayed
+ * in the hoversel's popup. It executes the item's callback function (if any),
+ * emits the "selected" signal, and then dismisses the hoversel.
+ * It also registers the _auto_update function to be called upon hover deletion.
+ *
+ * @param data Pointer to the Elm_Hoversel_Item_Data of the clicked item.
+ * @param obj Unused Evas_Object (the item's button).
+ * @param event_info Unused event information.
+ */
 static void
 _on_item_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -183,6 +230,15 @@ _on_item_clicked(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *eve
    elm_hoversel_hover_end(obj2);
 }
 
+/**
+ * @brief Callback invoked when the focus state of a hoversel item changes.
+ *
+ * This function is triggered when an item in the hoversel's list gains or loses focus.
+ * It emits the "item,focused" or "item,unfocused" legacy signals accordingly.
+ *
+ * @param data Pointer to the Elm_Hoversel_Item_Data of the item whose focus changed.
+ * @param event The Efl_Event structure containing focus change information.
+ */
 static void
 _item_focus_changed(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
 {
@@ -198,6 +254,16 @@ _item_focus_changed(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Creates and configures the scroller and table for the hoversel popup.
+ *
+ * This function sets up the necessary Evas objects (table, spacer, scroller)
+ * that will contain the hoversel items within the popup. The scroller's
+ * policies are set based on the hoversel's orientation (horizontal/vertical).
+ *
+ * @param obj The hoversel Evas_Object.
+ * @param sd Pointer to the hoversel's private data (Elm_Hoversel_Data).
+ */
 static void
 _create_scroller(Evas_Object *obj, Elm_Hoversel_Data *sd)
 {

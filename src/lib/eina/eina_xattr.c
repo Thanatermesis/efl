@@ -67,6 +67,23 @@ struct _Eina_Xattr_Iterator
 };
 
 #ifdef HAVE_XATTR
+/**
+ * @internal
+ * @brief Advances the iterator to the next extended attribute of a file descriptor.
+ *
+ * This function retrieves the name and value of the next extended attribute.
+ * The retrieved attribute information is stored in it->attr, and a pointer
+ * to it->attr is returned via the data parameter.
+ *
+ * @param it The extended attribute iterator.
+ * @param data Pointer to store the Eina_Xattr structure for the current attribute.
+ *             Example: If the attribute is "user.mime_type" with value "text/plain",
+ *             (*data) will be an Eina_Xattr* where:
+ *             (*data)->name points to "user.mime_type"
+ *             (*data)->value points to "text/plain"
+ *             (*data)->length is strlen("text/plain")
+ * @return EINA_TRUE on success, EINA_FALSE if there are no more attributes or an error occurs.
+ */
 static Eina_Bool
 _eina_xattr_value_ls_fd_iterator_next(Eina_Xattr_Iterator *it, void **data)
 {
@@ -102,6 +119,23 @@ _eina_xattr_value_ls_fd_iterator_next(Eina_Xattr_Iterator *it, void **data)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Advances the iterator to the next extended attribute of a file.
+ *
+ * This function retrieves the name and value of the next extended attribute from a file path.
+ * The retrieved attribute information is stored in it->attr, and a pointer
+ * to it->attr is returned via the data parameter.
+ *
+ * @param it The extended attribute iterator.
+ * @param data Pointer to store the Eina_Xattr structure for the current attribute.
+ *             Example: If the attribute is "user.icon_name" with value "my-icon.png",
+ *             (*data) will be an Eina_Xattr* where:
+ *             (*data)->name points to "user.icon_name"
+ *             (*data)->value points to "my-icon.png"
+ *             (*data)->length is strlen("my-icon.png")
+ * @return EINA_TRUE on success, EINA_FALSE if there are no more attributes or an error occurs.
+ */
 static Eina_Bool
 _eina_xattr_value_ls_iterator_next(Eina_Xattr_Iterator *it, void **data)
 {
@@ -137,9 +171,25 @@ _eina_xattr_value_ls_iterator_next(Eina_Xattr_Iterator *it, void **data)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Advances the iterator to the next extended attribute name.
+ *
+ * This function retrieves only the name of the next extended attribute.
+ * The name is a pointer into the internal buffer it->xattr.
+ *
+ * @param it The extended attribute iterator.
+ * @param data Pointer to store the char* for the current attribute name.
+ *             Example: If the next attribute name is "user.description",
+ *             (*data) will point to "user.description".
+ * @return EINA_TRUE on success, EINA_FALSE if there are no more attributes.
+ */
 static Eina_Bool
 _eina_xattr_ls_iterator_next(Eina_Xattr_Iterator *it, void **data)
 {
+   // Check if we have iterated through all attribute names.
+   // it->xattr is a buffer of null-terminated strings, e.g., "name1\0name2\0".
+   // it->offset tracks the current position in this buffer.
    if (it->offset >= it->length)
      return EINA_FALSE;
 
@@ -149,16 +199,35 @@ _eina_xattr_ls_iterator_next(Eina_Xattr_Iterator *it, void **data)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Gets the container of the iterator.
+ *
+ * For this specific iterator type, there is no container.
+ *
+ * @param it The extended attribute iterator (unused).
+ * @return Always NULL.
+ */
 static void *
 _eina_xattr_ls_iterator_container(Eina_Xattr_Iterator *it EINA_UNUSED)
 {
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Frees the resources associated with an Eina_Xattr_Iterator.
+ *
+ * This function is called when the iterator is no longer needed. It releases
+ * memory allocated for attribute values, stringshared filenames, and the iterator
+ * structure itself.
+ *
+ * @param it The extended attribute iterator to free.
+ */
 static void
 _eina_xattr_ls_iterator_free(Eina_Xattr_Iterator *it)
 {
-   EINA_MAGIC_SET(&it->iterator, 0);
+   EINA_MAGIC_SET(&it->iterator, 0); // Invalidate iterator magic number
    if (it->attr) free((void *) it->attr->value);
    eina_stringshare_del(it->file);
    free(it->attr);
@@ -354,7 +423,10 @@ eina_xattr_get(const char *file, const char *attribute, ssize_t *size)
    EINA_SAFETY_ON_NULL_RETURN_VAL(size, NULL);
 
    *size = getxattr(file, attribute, NULL, 0);
-   /* Size should be less than 2MB (already huge in my opinion) */
+   /* Size should be less than 2MB (already huge in my opinion).
+    * This is a sanity check to prevent allocating excessive memory for an xattr.
+    * A positive size is expected.
+    */
    if (!(*size > 0 && *size < 2 * 1024 * 1024))
      goto on_error;
 
@@ -392,7 +464,10 @@ eina_xattr_fd_get(int fd, const char *attribute, ssize_t *size)
    EINA_SAFETY_ON_NULL_RETURN_VAL(size, NULL);
 
    *size = fgetxattr(fd, attribute, NULL, 0);
-   /* Size should be less than 2MB (already huge in my opinion) */
+   /* Size should be less than 2MB (already huge in my opinion).
+    * This is a sanity check to prevent allocating excessive memory for an xattr.
+    * A positive size is expected.
+    */
    if (!(*size > 0 && *size < 2 * 1024 * 1024))
      goto on_error;
 
@@ -428,6 +503,7 @@ eina_xattr_set(const char *file, const char *attribute, const void *data, ssize_
    EINA_SAFETY_ON_NULL_RETURN_VAL(file, EINA_FALSE);
    EINA_SAFETY_ON_NULL_RETURN_VAL(attribute, EINA_FALSE);
    EINA_SAFETY_ON_NULL_RETURN_VAL(data, EINA_FALSE);
+   // Ensure length is positive and within a reasonable limit (2MB)
    EINA_SAFETY_ON_TRUE_RETURN_VAL(!(length > 0 && length < 2 * 1024 * 1024), EINA_FALSE);
 
    switch (flags)
@@ -460,6 +536,7 @@ eina_xattr_fd_set(int fd, const char *attribute, const void *data, ssize_t lengt
 
    EINA_SAFETY_ON_NULL_RETURN_VAL(attribute, EINA_FALSE);
    EINA_SAFETY_ON_NULL_RETURN_VAL(data, EINA_FALSE);
+   // Ensure length is positive and within a reasonable limit (2MB)
    EINA_SAFETY_ON_TRUE_RETURN_VAL(!(length > 0 && length < 2 * 1024 * 1024), EINA_FALSE);
 
    switch (flags)
@@ -528,8 +605,11 @@ eina_xattr_string_get(const char *file, const char *attribute)
    tmp = eina_xattr_get(file, attribute, &size);
    if (!tmp) return NULL;
 
+   // Ensure the retrieved attribute value is properly null-terminated if it's meant to be a string.
+   // The size returned by eina_xattr_get includes the null terminator if set by eina_xattr_string_set.
    if (tmp[size - 1] != '\0')
      {
+        // If not null-terminated, it's not a valid string by our convention or was corrupted.
         free(tmp);
         return NULL;
      }
@@ -645,8 +725,10 @@ eina_xattr_fd_copy(int src, int dst)
    EINA_SAFETY_ON_NULL_RETURN_VAL(buf, EINA_FALSE);
 
    attr = buf;
-   length = flistxattr(src, attr, length);
+   length = flistxattr(src, attr, length); // Populate buf with attribute names
    ret = EINA_TRUE;
+   // Iterate through each attribute name in the buffer.
+   // attr points to the current name, and advances by its length + 1 (for null terminator).
    for (i = 0; i < length; i += strlen(attr) + 1, attr += strlen(attr) + 1)
      {
         ssize_t attr_length;

@@ -6,6 +6,21 @@
 
 #include "evas_filter_private.h"
 
+/**
+ * @brief Applies a horizontal box blur to an RGBA image region.
+ *
+ * This function performs one or more horizontal box blur passes on a specified
+ * region of an RGBA image. The blur is applied iteratively if multiple radii
+ * are provided.
+ *
+ * @param srcdata Pointer to the source image data (array of uint32_t RGBA pixels).
+ * @param src_stride Stride of the source image data in pixels (width of the source image).
+ * @param dstdata Pointer to the destination image data (array of uint32_t RGBA pixels).
+ * @param dst_stride Stride of the destination image data in pixels (width of the destination image).
+ * @param radii An array of integers representing the radius for each blur pass.
+ *              The array is terminated by a 0. Example: `{10, 5, 0}` for two passes.
+ * @param region The rectangular region of the image to process.
+ */
 static inline void
 _box_blur_rgba_horiz_step(const uint32_t* restrict srcdata, int src_stride,
                           uint32_t* restrict dstdata, int dst_stride,
@@ -40,19 +55,19 @@ _box_blur_rgba_horiz_step(const uint32_t* restrict srcdata, int src_stride,
    memset(span2, 0, len * sizeof(DATA32));
 
    // For each line, apply as many blurs as requested
-   for (int l = 0; l < loops; l++)
+   for (int l = 0; l < loops; l++) // Iterate over each row in the region
      {
         int run;
 
         // New line: reset source & destination pointers
         src = srcdata + src_stride * l;
-        if (!radii[1]) // Only one run
-          dst = dstdata + dst_stride * l;
+        if (!radii[1]) // Only one blur run requested
+          dst = dstdata + dst_stride * l; // Write directly to destination
         else
-          dst = span1;
+          dst = span1; // Use temporary span for intermediate results
 
         // Apply blur with current radius
-        for (run = 0; radii[run]; run++)
+        for (run = 0; radii[run]; run++) // Iterate over each requested blur radius
           {
              const int radius = radii[run];
              const int left = MIN(radius, len);
@@ -130,21 +145,21 @@ _box_blur_rgba_horiz_step(const uint32_t* restrict srcdata, int src_stride,
                     acc[k] -= sl[k];
                }
 
-             // More runs to go: swap spans
+             // More runs to go: swap spans and prepare for next pass
              if (radii[run + 1])
                {
-                  src = dst;
-                  if (radii[run + 2])
+                  src = dst; // Current destination becomes source for next pass
+                  if (radii[run + 2]) // If there are at least two more runs
                     {
-                       // Two more runs: swap
+                       // Swap span1 and span2 to reuse them
                        DATA32* swap = span1;
                        span1 = span2;
                        span2 = swap;
-                       dst = span1;
+                       dst = span1; // Next destination is the (now new) span1
                     }
-                  else
+                  else // This was the second to last run
                     {
-                       // Last run: write directly to dstdata
+                       // Next run is the last one: write directly to final destination
                        dst = dstdata + dst_stride * l;
                     }
                }
@@ -152,6 +167,22 @@ _box_blur_rgba_horiz_step(const uint32_t* restrict srcdata, int src_stride,
      }
 }
 
+/**
+ * @brief Applies a vertical box blur to an RGBA image region.
+ *
+ * This function performs one or more vertical box blur passes on a specified
+ * region of an RGBA image. The blur is applied iteratively if multiple radii
+ * are provided.
+ * It optimizes for cache hits by processing data in rotated horizontal spans.
+ *
+ * @param srcdata Pointer to the source image data (array of uint32_t RGBA pixels).
+ * @param src_stride Stride of the source image data in pixels (width of the source image).
+ * @param dstdata Pointer to the destination image data (array of uint32_t RGBA pixels).
+ * @param dst_stride Stride of the destination image data in pixels (width of the destination image).
+ * @param radii An array of integers representing the radius for each blur pass.
+ *              The array is terminated by a 0. Example: `{10, 5, 0}` for two passes.
+ * @param region The rectangular region of the image to process.
+ */
 static inline void
 _box_blur_rgba_vert_step(const uint32_t* restrict srcdata, int src_stride,
                          uint32_t* restrict dstdata, int dst_stride,
@@ -189,25 +220,25 @@ _box_blur_rgba_vert_step(const uint32_t* restrict srcdata, int src_stride,
    memset(span1, 0, len * sizeof(DATA32));
    memset(span2, 0, len * sizeof(DATA32));
 
-   // For each line, apply as many blurs as requested
-   for (int l = 0; l < loops; l++)
+   // For each column (processed as a horizontal span after rotation), apply blurs
+   for (int l = 0; l < loops; l++) // Iterate over each column in the region
      {
         int run;
 
-        // Rotate input into work span
-        const DATA32* srcptr = srcdata + l;
+        // Rotate input column into a horizontal work span (span1) for cache efficiency
+        const DATA32* srcptr = srcdata + l; // Start of current column in source
         DATA32* s = span1;
-        for (int k = len; k; --k)
+        for (int k = len; k; --k) // 'len' is region.h (height of the column)
           {
              *s++ = *srcptr;
-             srcptr += src_stride;
+             srcptr += src_stride; // Move to next row in the same column
           }
 
-        src = span1;
-        dst = span2;
+        src = span1; // Source for the first blur pass is the rotated column
+        dst = span2; // Destination for the first blur pass (or intermediate)
 
         // Apply blur with current radius
-        for (run = 0; radii[run]; run++)
+        for (run = 0; radii[run]; run++) // Iterate over each requested blur radius
           {
              const int radius = radii[run];
              const int left = MIN(radius, len);
@@ -285,21 +316,22 @@ _box_blur_rgba_vert_step(const uint32_t* restrict srcdata, int src_stride,
                     acc[k] -= sl[k];
                }
 
-             // More runs to go: swap spans
+             // More runs to go: swap source and destination spans for the next pass
              if (radii[run + 1])
                {
                   DATA32* swap = src;
-                  src = dst;
-                  dst = swap;
+                  src = dst; // Current destination becomes source for the next pass
+                  dst = swap; // Reuse the old source span as the new destination
                }
           }
 
-        // Last run: rotate & copy back to destination
-        DATA32* restrict dstptr = dstdata + l;
-        for (int k = len; k; --k)
+        // After all blur passes for this column are done,
+        // rotate the final blurred span (dst) back into the destination image column.
+        DATA32* restrict dstptr = dstdata + l; // Start of current column in destination
+        for (int k = len; k; --k) // 'len' is region.h (height of the column)
           {
-             *dstptr = *dst++;
-             dstptr += dst_stride;
+             *dstptr = *dst++; // Copy pixel from processed horizontal span
+             dstptr += dst_stride; // Move to next row in the same column
           }
      }
 }

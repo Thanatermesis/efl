@@ -4,13 +4,24 @@
 #include <Elementary.h>
 
 // 16 ^ 4 = 65k
-#define BLOK 16
+#define BLOK 16 /**< Defines the number of items to create in each level of the factory. */
 // homogeneous layout
-//#define HOMOG 1
+//#define HOMOG 1 /**< If defined, sets the box layout to be homogeneous. */
 // aligned to top of box
-#define ZEROALIGN 1
-#define DEFSZ 64
+#define ZEROALIGN 1 /**< If defined, aligns the box content to the top (0.0). */
+#define DEFSZ 64 /**< Default initial size (height) for factory created items. */
 
+/**
+ * @brief Callback function invoked when a factory item is unrealized.
+ *
+ * This function is responsible for cleaning up the content of the factory item
+ * when it is no longer visible or needed. It sets the factory's content to NULL,
+ * which effectively deletes the previously set content.
+ *
+ * @param data User data passed to the callback (unused).
+ * @param obj The Evas_Object (factory item) that triggered the callback.
+ * @param event_info Additional event information (unused).
+ */
 static void
 fac_unrealize(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -19,6 +30,17 @@ fac_unrealize(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UN
    elm_object_content_set(obj, NULL);
 }
 
+/**
+ * @brief Callback function invoked to realize the final level of factory items.
+ *
+ * This function creates a box container and populates it with a set of buttons.
+ * Each button is labeled with a number derived from its position and the factory's
+ * "num" data. This represents the deepest level of content in the nested factory structure.
+ *
+ * @param data User data, expected to be the parent Evas_Object (window).
+ * @param obj The Evas_Object (factory item) that triggered the callback.
+ * @param event_info Additional event information (unused).
+ */
 static void
 fac_realize_end(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -54,6 +76,18 @@ fac_realize_end(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    evas_object_show(bx);
 }
 
+/**
+ * @brief Callback function invoked to realize the second level of factory items.
+ *
+ * This function creates a box container and populates it with another set of
+ * factory items (`elm_factory_add`). Each of these nested factory items will,
+ * in turn, realize its content using the `fac_realize_end` callback.
+ * It also sets up "unrealize" callbacks for these nested factories.
+ *
+ * @param data User data, expected to be the parent Evas_Object (window).
+ * @param obj The Evas_Object (factory item) that triggered the callback.
+ * @param event_info Additional event information (unused).
+ */
 static void
 fac_realize2(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -92,6 +126,18 @@ fac_realize2(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    evas_object_show(bx);
 }
 
+/**
+ * @brief Callback function invoked to realize the first level of factory items.
+ *
+ * This function creates a box container and populates it with a set of
+ * factory items (`elm_factory_add`). Each of these nested factory items will,
+ * in turn, realize its content using the `fac_realize2` callback.
+ * Note: The "unrealize" callback is commented out for this level in the original code.
+ *
+ * @param data User data, expected to be the parent Evas_Object (window).
+ * @param obj The Evas_Object (factory item) that triggered the callback.
+ * @param event_info Additional event information (unused).
+ */
 static void
 fac_realize1(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -130,6 +176,20 @@ fac_realize1(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    evas_object_show(bx);
 }
 
+/**
+ * @brief Sets up and displays a test window for `elm_factory`.
+ *
+ * This function creates a window with a scroller containing a box.
+ * The box is populated with a series of `elm_factory` objects.
+ * Each factory object is configured to realize its content (another level of factories or buttons)
+ * when it becomes visible within the scroller. This demonstrates a nested factory setup.
+ * The `BLOK` define controls how many items are created at each level, leading to
+ * `BLOK` * `BLOK` * `BLOK` * `BLOK` (BLOK^4) total items at the deepest level if all are realized.
+ *
+ * @param data User data passed to the test function (unused).
+ * @param obj The Evas_Object that might have triggered this test (unused).
+ * @param event_info Additional event information (unused).
+ */
 void
 test_factory(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

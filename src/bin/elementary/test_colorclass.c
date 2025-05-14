@@ -4,6 +4,19 @@
 #include <Elementary.h>
 
 
+/**
+ * @brief Test function for the Color Class Editor widget.
+ *
+ * This function creates a new window and adds an Elementary Color Class
+ * Editor widget to it. The widget allows for viewing and editing
+ * color classes used in an Elementary theme.
+ *
+ * This function is typically used as a callback for a test launcher.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_colorclass(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

@@ -3,15 +3,31 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Application data structure.
+ *
+ * This structure holds all the necessary data for the application,
+ * including animations, widgets, and state flags.
+ */
 typedef struct _App_Data
 {
-   Efl_Canvas_Animation        *cw_45_degrees_anim;
-   Efl_Canvas_Animation        *ccw_45_degrees_anim;
-   Elm_Button                  *button;
+   Efl_Canvas_Animation        *cw_45_degrees_anim; /**< Animation for clockwise rotation. */
+   Efl_Canvas_Animation        *ccw_45_degrees_anim; /**< Animation for counter-clockwise rotation. */
+   Elm_Button                  *button; /**< The button widget to be animated. */
 
-   Eina_Bool             is_btn_rotated;
+   Eina_Bool             is_btn_rotated; /**< Flag to track the rotation state of the button. */
 } App_Data;
 
+/**
+ * @brief Callback function for animation changed event.
+ *
+ * This function is called when an animation starts or ends. It prints a
+ * message to the console indicating the state change.
+ *
+ * @param data The user data passed to the callback (unused).
+ * @param event The EFL event structure. `event->info` is the animation object
+ *        that started, or `NULL` if it ended.
+ */
 static void
 _anim_changed_cb(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
 {
@@ -27,6 +43,16 @@ _anim_changed_cb(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback function for animation progress update event.
+ *
+ * This function is called periodically as an animation runs. It prints the
+ * current progress of the animation to the console.
+ *
+ * @param data The user data passed to the callback (unused).
+ * @param event The EFL event structure. `event->info` is a pointer to a
+ *        double representing the animation progress (from 0.0 to 1.0).
+ */
 static void
 _anim_running_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -34,11 +60,30 @@ _anim_running_cb(void *data EINA_UNUSED, const Efl_Event *event)
    printf("Animation is running! Current progress(%lf)\n", *progress);
 }
 
+/**
+ * @brief Array of callbacks for animation statistics.
+ *
+ * This array maps animation events to their respective callback functions.
+ * - `EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_CHANGED`: Triggered when an animation starts or ends.
+ * - `EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_PROGRESS_UPDATED`: Triggered during animation playback.
+ */
 EFL_CALLBACKS_ARRAY_DEFINE(animation_stats_cb,
   {EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_CHANGED, _anim_changed_cb },
   {EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_PROGRESS_UPDATED, _anim_running_cb },
 )
 
+/**
+ * @brief Callback function for the "clicked" event on the control button.
+ *
+ * This function toggles the rotation state of the target button and starts
+ * the corresponding rotation animation (clockwise or counter-clockwise).
+ * It also updates the text of the control button to reflect the next
+ * available action.
+ *
+ * @param data The application data (`App_Data *`).
+ * @param obj The control button that was clicked.
+ * @param event_info The event-specific information (unused).
+ */
 static void
 _btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -60,6 +105,16 @@ _btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback for the window "delete,request" event.
+ *
+ * This function is called when the window is requested to be closed.
+ * It frees the application data structure.
+ *
+ * @param data The application data (`App_Data *`) to be freed.
+ * @param obj The window object (unused).
+ * @param event_info The event-specific information (unused).
+ */
 static void
 _win_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -67,6 +122,20 @@ _win_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    free(ad);
 }
 
+/**
+ * @brief Test for EFL rotation animation around the object's center.
+ *
+ * This test creates a window with two buttons. One button ("Target") is the
+ * subject of the animation. The other button is a control that starts the
+ * animation. The rotation animation pivots around the center of the "Target"
+ * button itself.
+ *
+ * The test defines two animations:
+ * - A clockwise rotation from 0 to 45 degrees.
+ * - A counter-clockwise rotation from 45 to 0 degrees.
+ *
+ * Clicking the control button toggles between these two animations.
+ */
 void
 test_efl_anim_rotate(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -118,6 +187,20 @@ test_efl_anim_rotate(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void 
    evas_object_show(win);
 }
 
+/**
+ * @brief Test for EFL rotation animation relative to another object.
+ *
+ * This test creates a window with three objects: a "Target" button to be
+ * animated, a "Pivot" button that serves as the center of rotation, and a
+ * control button to start the animations.
+ *
+ * The test defines two animations:
+ * - A clockwise rotation from 0 to 45 degrees around the pivot object.
+ * - A counter-clockwise rotation from 45 to 0 degrees around the pivot object.
+ *
+ * Clicking the control button toggles between these two animations. The center
+ * of rotation is specified as the center (0.5, 0.5) of the "Pivot" button.
+ */
 void
 test_efl_anim_rotate_relative(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -177,6 +260,19 @@ test_efl_anim_rotate_relative(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUS
    evas_object_show(win);
 }
 
+/**
+ * @brief Test for EFL rotation animation with an absolute center.
+ *
+ * This test creates a window with a "Target" button to be animated and a
+ * control button. The rotation is centered at an absolute coordinate on the
+ * canvas (0, 0), which is marked by a small button for visualization.
+ *
+ * The test defines two animations:
+ * - A clockwise rotation from 0 to 45 degrees around the absolute point (0, 0).
+ * - A counter-clockwise rotation from 45 to 0 degrees around the same point.
+ *
+ * Clicking the control button toggles between these two animations.
+ */
 void
 test_efl_anim_rotate_absolute(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

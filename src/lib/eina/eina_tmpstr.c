@@ -38,17 +38,41 @@
 
 typedef struct _Str Str;
 
+/**
+ * @internal
+ * @brief Structure for a temporary string entry in a linked list.
+ *
+ * This structure is used internally to manage temporary strings. It is
+ * part of a singly linked list.
+ */
 struct _Str
 {
-   size_t length;
-   Str *next;
-   char *str;
+   size_t length; /**< The length of the string, not including the NUL terminator. */
+   Str *next; /**< Pointer to the next temporary string in the list. */
+   char *str; /**< The string itself. */
+   /**
+    * @brief Flag indicating if the string memory is managed separately.
+    *
+    * If EINA_TRUE, 'str' was allocated separately and must be freed when
+    * the tmpstr is deleted.
+    * If EINA_FALSE, 'str' points to memory allocated along with the 'Str'
+    * struct itself, and should not be freed separately.
+    */
    Eina_Bool ma : 1;
 };
 
-static Eina_Lock _mutex;
-static Str *strs = NULL;
+static Eina_Lock _mutex; /**< Mutex for thread-safe access to the 'strs' list. */
+static Str *strs = NULL; /**< Head of the global linked list of temporary strings. */
 
+/*
+ * @internal
+ * @brief Initializes the tmpstr subsystem.
+ *
+ * This must be called before any other eina_tmpstr function. It sets up
+ * the mutex for thread safety. It is called by eina_init().
+ *
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 Eina_Bool
 eina_tmpstr_init(void)
 {
@@ -56,6 +80,15 @@ eina_tmpstr_init(void)
    return EINA_TRUE;
 }
 
+/*
+ * @internal
+ * @brief Shuts down the tmpstr subsystem.
+ *
+ * This should be called when eina is shut down. It cleans up resources
+ * used by the tmpstr subsystem (the mutex). It is called by eina_shutdown().
+ *
+ * @return EINA_TRUE on success.
+ */
 Eina_Bool
 eina_tmpstr_shutdown(void)
 {
@@ -69,12 +102,15 @@ eina_tmpstr_add_length(const char *str, size_t length)
    Str *s;
 
    if (!str || !length) return NULL;
+   /* Allocate space for the Str struct and the string data in one block. */
    s = malloc(sizeof(Str) + length + 1);
    if (!s) return NULL;
    s->length = length;
+   /* The string buffer starts immediately after the Str struct. */
    s->str = ((char *)s) + sizeof(Str);
    strncpy(s->str, str, length);
    s->str[length] = '\0';
+   /* String is not separately allocated, so 'ma' is false. */
    s->ma = EINA_FALSE;
    eina_lock_take(&_mutex);
    s->next = strs;
@@ -93,6 +129,7 @@ eina_tmpstr_manage_new_length(char *str, size_t length)
    if (!s) return NULL;
    s->length = length;
    s->str = str;
+   /* The provided string is from a separate allocation, so mark it for freeing. */
    s->ma = EINA_TRUE;
    eina_lock_take(&_mutex);
    s->next = strs;
@@ -130,11 +167,15 @@ eina_tmpstr_del(Eina_Tmpstr *tmpstr)
    eina_lock_take(&_mutex);
    for (sp = NULL, s = strs; s; sp = s, s = s->next)
      {
+        /* We can compare pointers because tmpstr must be the exact pointer
+         * returned by an add/manage function. */
         if (s->str == tmpstr)
           {
              if (sp) sp->next = s->next;
              else strs = s->next;
+             /* If the string was separately allocated, free it. */
              if (s->ma) free(s->str);
+             /* Free the list node structure itself. */
              free(s);
              break;
           }
@@ -157,6 +198,7 @@ eina_tmpstr_len(Eina_Tmpstr *tmpstr)
    if (!tmpstr) return 0;
    if (!strs) return strlen(tmpstr);
    eina_lock_take(&_mutex);
+   /* Find the string in the list of tmpstrs to get its cached length. */
    for (s = strs; s; s = s->next)
      {
         if (s->str == tmpstr)
@@ -168,5 +210,9 @@ eina_tmpstr_len(Eina_Tmpstr *tmpstr)
      }
    eina_lock_release(&_mutex);
 
+   /*
+    * If the string is not in our list, it's not a tmpstr we manage.
+    * Fallback to strlen() to handle regular C strings safely.
+    */
    return strlen(tmpstr);
 }

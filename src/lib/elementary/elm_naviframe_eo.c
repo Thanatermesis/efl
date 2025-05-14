@@ -1,12 +1,39 @@
+/**
+ * @brief Event descriptor for the "transition,finished" event.
+ * @ingroup Elm_Naviframe
+ */
 EWAPI const Efl_Event_Description _ELM_NAVIFRAME_EVENT_TRANSITION_FINISHED =
    EFL_EVENT_DESCRIPTION("transition,finished");
+/**
+ * @brief Event descriptor for the "title,transition,finished" event.
+ * @ingroup Elm_Naviframe
+ */
 EWAPI const Efl_Event_Description _ELM_NAVIFRAME_EVENT_TITLE_TRANSITION_FINISHED =
    EFL_EVENT_DESCRIPTION("title,transition,finished");
+/**
+ * @brief Event descriptor for the "title,clicked" event.
+ * @ingroup Elm_Naviframe
+ */
 EWAPI const Efl_Event_Description _ELM_NAVIFRAME_EVENT_TITLE_CLICKED =
    EFL_EVENT_DESCRIPTION("title,clicked");
+/**
+ * @brief Event descriptor for the "item,activated" event.
+ * @ingroup Elm_Naviframe
+ */
 EWAPI const Efl_Event_Description _ELM_NAVIFRAME_EVENT_ITEM_ACTIVATED =
    EFL_EVENT_DESCRIPTION("item,activated");
 
+/**
+ * @internal
+ * @brief Implements the Eolian reflection for the elm_naviframe_event_enabled_set property.
+ *
+ * This function is called when the "event_enabled" property is set via Eolian.
+ * It converts the Eina_Value to a boolean and calls the actual implementation.
+ *
+ * @param obj The Efl_Object instance.
+ * @param val The Eina_Value containing the boolean value to set.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 void _elm_naviframe_event_enabled_set(Eo *obj, Elm_Naviframe_Data *pd, Eina_Bool enabled);
 
 
@@ -27,6 +54,16 @@ __eolian_elm_naviframe_event_enabled_set_reflect(Eo *obj, Eina_Value val)
 
 EOAPI EFL_VOID_FUNC_BODYV(elm_obj_naviframe_event_enabled_set, EFL_FUNC_CALL(enabled), Eina_Bool enabled);
 
+/**
+ * @internal
+ * @brief Implements the Eolian reflection for the elm_naviframe_event_enabled_get property.
+ *
+ * This function is called when the "event_enabled" property is read via Eolian.
+ * It calls the actual implementation and converts the boolean result to an Eina_Value.
+ *
+ * @param obj The Efl_Object instance.
+ * @return An Eina_Value containing the boolean state of the "event_enabled" property.
+ */
 Eina_Bool _elm_naviframe_event_enabled_get(const Eo *obj, Elm_Naviframe_Data *pd);
 
 
@@ -39,6 +76,17 @@ __eolian_elm_naviframe_event_enabled_get_reflect(const Eo *obj)
 
 EOAPI EFL_FUNC_BODY_CONST(elm_obj_naviframe_event_enabled_get, Eina_Bool, 0);
 
+/**
+ * @internal
+ * @brief Implements the Eolian reflection for the elm_naviframe_content_preserve_on_pop_set property.
+ *
+ * This function is called when the "content_preserve_on_pop" property is set via Eolian.
+ * It converts the Eina_Value to a boolean and calls the actual implementation.
+ *
+ * @param obj The Efl_Object instance.
+ * @param val The Eina_Value containing the boolean value to set.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 void _elm_naviframe_content_preserve_on_pop_set(Eo *obj, Elm_Naviframe_Data *pd, Eina_Bool preserve);
 
 
@@ -59,6 +107,16 @@ __eolian_elm_naviframe_content_preserve_on_pop_set_reflect(Eo *obj, Eina_Value v
 
 EOAPI EFL_VOID_FUNC_BODYV(elm_obj_naviframe_content_preserve_on_pop_set, EFL_FUNC_CALL(preserve), Eina_Bool preserve);
 
+/**
+ * @internal
+ * @brief Implements the Eolian reflection for the elm_naviframe_content_preserve_on_pop_get property.
+ *
+ * This function is called when the "content_preserve_on_pop" property is read via Eolian.
+ * It calls the actual implementation and converts the boolean result to an Eina_Value.
+ *
+ * @param obj The Efl_Object instance.
+ * @return An Eina_Value containing the boolean state of the "content_preserve_on_pop" property.
+ */
 Eina_Bool _elm_naviframe_content_preserve_on_pop_get(const Eo *obj, Elm_Naviframe_Data *pd);
 
 
@@ -71,6 +129,17 @@ __eolian_elm_naviframe_content_preserve_on_pop_get_reflect(const Eo *obj)
 
 EOAPI EFL_FUNC_BODY_CONST(elm_obj_naviframe_content_preserve_on_pop_get, Eina_Bool, 0);
 
+/**
+ * @internal
+ * @brief Implements the Eolian reflection for the elm_naviframe_prev_btn_auto_pushed_set property.
+ *
+ * This function is called when the "prev_btn_auto_pushed" property is set via Eolian.
+ * It converts the Eina_Value to a boolean and calls the actual implementation.
+ *
+ * @param obj The Efl_Object instance.
+ * @param val The Eina_Value containing the boolean value to set.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code on failure.
+ */
 void _elm_naviframe_prev_btn_auto_pushed_set(Eo *obj, Elm_Naviframe_Data *pd, Eina_Bool auto_pushed);
 
 
@@ -91,6 +160,16 @@ __eolian_elm_naviframe_prev_btn_auto_pushed_set_reflect(Eo *obj, Eina_Value val)
 
 EOAPI EFL_VOID_FUNC_BODYV(elm_obj_naviframe_prev_btn_auto_pushed_set, EFL_FUNC_CALL(auto_pushed), Eina_Bool auto_pushed);
 
+/**
+ * @internal
+ * @brief Implements the Eolian reflection for the elm_naviframe_prev_btn_auto_pushed_get property.
+ *
+ * This function is called when the "prev_btn_auto_pushed" property is read via Eolian.
+ * It calls the actual implementation and converts the boolean result to an Eina_Value.
+ *
+ * @param obj The Efl_Object instance.
+ * @return An Eina_Value containing the boolean state of the "prev_btn_auto_pushed" property.
+ */
 Eina_Bool _elm_naviframe_prev_btn_auto_pushed_get(const Eo *obj, Elm_Naviframe_Data *pd);
 
 
@@ -165,6 +244,16 @@ void _elm_naviframe_efl_ui_widget_resize_object_set(Eo *obj, Elm_Naviframe_Data 
 Efl_Object *_elm_naviframe_efl_part_part_get(const Eo *obj, Elm_Naviframe_Data *pd, const char *name);
 
 
+/**
+ * @internal
+ * @brief Initializes the Elm_Naviframe class.
+ *
+ * This function sets up the Efl_Object operations and property reflections
+ * for the Elm_Naviframe class. It is called once when the class is initialized.
+ *
+ * @param klass The Efl_Class to initialize.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_naviframe_class_initializer(Efl_Class *klass)
 {

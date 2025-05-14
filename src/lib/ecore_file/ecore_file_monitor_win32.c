@@ -15,38 +15,61 @@
 
 #include "ecore_file_private.h"
 
+/**
+ * @file ecore_file_monitor_win32.c
+ * @brief Ecore file monitor Win32 backend implementation.
+ */
 
-typedef struct _Ecore_File_Monitor_Win32      Ecore_File_Monitor_Win32;
-typedef struct _Ecore_File_Monitor_Win32_Data Ecore_File_Monitor_Win32_Data;
+typedef struct _Ecore_File_Monitor_Win32      Ecore_File_Monitor_Win32; /**< Alias for the main Win32 monitor structure */
+typedef struct _Ecore_File_Monitor_Win32_Data Ecore_File_Monitor_Win32_Data; /**< Alias for the Win32 monitor data structure */
 
 /* 4096 = 256 * sizeof(FILE_NOTIFY_INFORMATION) */
-# define ECORE_FILE_MONITOR_WIN32_BUFFER_SIZE 4096
-# define ECORE_FILE_MONITOR_WIN32(x) ((Ecore_File_Monitor_Win32 *)(x))
+# define ECORE_FILE_MONITOR_WIN32_BUFFER_SIZE 4096 /**< Buffer size for ReadDirectoryChangesW */
+# define ECORE_FILE_MONITOR_WIN32(x) ((Ecore_File_Monitor_Win32 *)(x)) /**< Macro to cast to Ecore_File_Monitor_Win32 */
 
+/**
+ * @brief Structure to hold data for a single monitored item (file or directory).
+ */
 struct _Ecore_File_Monitor_Win32_Data
 {
-   char                 buffer[ECORE_FILE_MONITOR_WIN32_BUFFER_SIZE];
-   OVERLAPPED           overlapped;
-   HANDLE               handle;
-   HANDLE               event;
-   Ecore_File_Monitor  *monitor;
-   Ecore_Win32_Handler *h;
-   DWORD                buf_length;
-   int                  is_dir;
+   char                 buffer[ECORE_FILE_MONITOR_WIN32_BUFFER_SIZE]; /**< Buffer for ReadDirectoryChangesW */
+   OVERLAPPED           overlapped; /**< OVERLAPPED structure for asynchronous I/O */
+   HANDLE               handle; /**< Handle to the directory being monitored */
+   HANDLE               event; /**< Event handle for asynchronous I/O completion */
+   Ecore_File_Monitor  *monitor; /**< Pointer to the parent Ecore_File_Monitor */
+   Ecore_Win32_Handler *h; /**< Ecore Win32 handler for the event */
+   DWORD                buf_length; /**< Length of the data returned by ReadDirectoryChangesW */
+   int                  is_dir; /**< Flag indicating if this monitors a directory (1) or file (0) changes within a directory */
 };
 
+/**
+ * @brief Main structure for a Win32 file monitor.
+ *
+ * This structure extends Ecore_File_Monitor and holds separate data
+ * for monitoring file-specific changes and directory-specific changes
+ * within the monitored path.
+ */
 struct _Ecore_File_Monitor_Win32
 {
-   Ecore_File_Monitor             monitor;
-   Ecore_File_Monitor_Win32_Data *file;
-   Ecore_File_Monitor_Win32_Data *dir;
+   Ecore_File_Monitor             monitor; /**< Base Ecore_File_Monitor structure */
+   Ecore_File_Monitor_Win32_Data *file; /**< Data for monitoring file changes */
+   Ecore_File_Monitor_Win32_Data *dir; /**< Data for monitoring directory changes */
 };
 
-static Ecore_File_Monitor *_monitors = NULL;
+static Ecore_File_Monitor *_monitors = NULL; /**< Global list of active monitors */
 
 static Eina_Bool _ecore_file_monitor_win32_cb(void *data, Ecore_Win32_Handler *wh);
 
-
+/**
+ * @brief Creates and initializes a new Ecore_File_Monitor_Win32_Data structure.
+ *
+ * This function sets up monitoring for either file changes or directory changes
+ * within the path specified by the Ecore_File_Monitor.
+ *
+ * @param monitor The parent Ecore_File_Monitor.
+ * @param type 0 for monitoring file name changes, 1 for directory name changes.
+ * @return A pointer to the newly created Ecore_File_Monitor_Win32_Data, or NULL on failure.
+ */
 static Ecore_File_Monitor_Win32_Data *
 _ecore_file_monitor_win32_data_new(Ecore_File_Monitor *monitor, int type)
 {
@@ -115,6 +138,11 @@ _ecore_file_monitor_win32_data_new(Ecore_File_Monitor *monitor, int type)
    return NULL;
 }
 
+/**
+ * @brief Frees an Ecore_File_Monitor_Win32_Data structure and its resources.
+ *
+ * @param md The Ecore_File_Monitor_Win32_Data structure to free.
+ */
 static void
 _ecore_file_monitor_win32_data_free(Ecore_File_Monitor_Win32_Data *md)
 {
@@ -125,6 +153,17 @@ _ecore_file_monitor_win32_data_free(Ecore_File_Monitor_Win32_Data *md)
    free (md);
 }
 
+/**
+ * @brief Callback function triggered when a file system change is detected.
+ *
+ * This function is called by the Ecore main loop when the event associated
+ * with a directory change is signaled. It processes the notification
+ * information and triggers the user-defined callback.
+ *
+ * @param data Pointer to the Ecore_File_Monitor_Win32_Data structure.
+ * @param wh The Ecore_Win32_Handler that triggered the callback (unused).
+ * @return EINA_TRUE to keep the handler active, EINA_FALSE to remove it.
+ */
 static Eina_Bool
 _ecore_file_monitor_win32_cb(void *data, Ecore_Win32_Handler *wh EINA_UNUSED)
 {
@@ -224,18 +263,40 @@ _ecore_file_monitor_win32_cb(void *data, Ecore_Win32_Handler *wh EINA_UNUSED)
    return 1;
 }
 
+/**
+ * @brief Initializes the Win32 file monitor backend.
+ * @return 1 on success, 0 on failure.
+ */
 int
 ecore_file_monitor_backend_init(void)
 {
    return 1;
 }
 
+/**
+ * @brief Shuts down the Win32 file monitor backend.
+ * @return 1 on success, 0 on failure.
+ */
 int
 ecore_file_monitor_backend_shutdown(void)
 {
    return 1;
 }
 
+/**
+ * @brief Adds a new file monitor for the given path using the Win32 backend.
+ *
+ * This function creates a new file monitor for the specified directory path.
+ * It sets up two internal monitors: one for file changes (creation, deletion, modification)
+ * and one for subdirectory changes (creation, deletion).
+ *
+ * @param path The directory path to monitor. Must be an existing directory.
+ * @param func The callback function to execute when an event occurs.
+ *             Example: `void my_callback(void *data, Ecore_File_Monitor *mon, Ecore_File_Event event, const char *path)`
+ * @param data User-specific data to pass to the callback function.
+ * @return A pointer to the newly created Ecore_File_Monitor, or NULL on failure.
+ *         The returned monitor should be freed using ecore_file_monitor_del().
+ */
 Ecore_File_Monitor *
 ecore_file_monitor_backend_add(const char *path,
                              void (*func) (void *data, Ecore_File_Monitor *em,
@@ -289,6 +350,11 @@ ecore_file_monitor_backend_add(const char *path,
    return em;
 }
 
+/**
+ * @brief Deletes a file monitor previously added with ecore_file_monitor_backend_add().
+ *
+ * @param em The Ecore_File_Monitor to delete.
+ */
 void
 ecore_file_monitor_backend_del(Ecore_File_Monitor *em)
 {

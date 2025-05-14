@@ -1,3 +1,12 @@
+/**
+ * @file
+ * @brief Wayland Display handling for Ecore.
+ *
+ * This file contains the Ecore_Wl2_Display related functions,
+ * which manage the connection to a Wayland compositor, handle
+ * global Wayland objects, and dispatch events.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -7,14 +16,25 @@
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
 #include "efl-hints-client-protocol.h"
 
-static Eina_Hash *_server_displays = NULL;
-static Eina_Hash *_client_displays = NULL;
+static Eina_Hash *_server_displays = NULL; /**< Hash table for server-side displays, keyed by display name */
+static Eina_Hash *_client_displays = NULL; /**< Hash table for client-side displays, keyed by display name */
 
 static Eina_Bool _cb_connect_data(void *data, Ecore_Fd_Handler *hdl);
 static Eina_Bool _ecore_wl2_display_connect(Ecore_Wl2_Display *ewd, Eina_Bool sync);
 
 static void _ecore_wl2_display_sync_add(Ecore_Wl2_Display *ewd);
 
+/**
+ * @internal
+ * @brief Frees an Ecore_Wl2_Event_Connect event.
+ *
+ * This function is called when an ECORE_WL2_EVENT_CONNECT or
+ * ECORE_WL2_EVENT_DISCONNECT event is no longer needed. It decrements
+ * the reference count of the display and frees the event structure.
+ *
+ * @param d The Ecore_Wl2_Display associated with the event.
+ * @param event The Ecore_Wl2_Event_Connect to free.
+ */
 void
 _display_event_free(void *d, void *event)
 {
@@ -22,6 +42,17 @@ _display_event_free(void *d, void *event)
    free(event);
 }
 
+/**
+ * @internal
+ * @brief Creates and adds a display connection event.
+ *
+ * This function allocates and populates an Ecore_Wl2_Event_Connect
+ * structure and adds it to the Ecore event queue. This is used for
+ * ECORE_WL2_EVENT_CONNECT and ECORE_WL2_EVENT_DISCONNECT events.
+ *
+ * @param ewd The Ecore_Wl2_Display that connected or disconnected.
+ * @param event The type of event to create (ECORE_WL2_EVENT_CONNECT or ECORE_WL2_EVENT_DISCONNECT).
+ */
 static void
 _ecore_wl2_display_event(Ecore_Wl2_Display *ewd, int event)
 {
@@ -34,6 +65,13 @@ _ecore_wl2_display_event(Ecore_Wl2_Display *ewd, int event)
    ecore_event_add(event, ev, _display_event_free, ewd);
 }
 
+/**
+ * @internal
+ * @brief Signals Ecore to exit.
+ *
+ * This function creates and adds an ECORE_EVENT_SIGNAL_EXIT event to
+ * the Ecore event queue, typically used when a fatal Wayland error occurs.
+ */
 static void
 _ecore_wl2_display_signal_exit(void)
 {
@@ -46,6 +84,19 @@ _ecore_wl2_display_signal_exit(void)
    ecore_event_add(ECORE_EVENT_SIGNAL_EXIT, ev, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for zwp_linux_dmabuf_v1.format event.
+ * @since 1.18
+ *
+ * This callback is supposed to be invoked by the compositor to announce
+ * supported DMA-BUF formats. However, it's noted that this might not
+ * always happen.
+ *
+ * @param data User data (Ecore_Wl2_Display).
+ * @param dmabuf The zwp_linux_dmabuf_v1 object.
+ * @param format The supported DMA-BUF format.
+ */
 static void
 _dmabuf_cb_format(void *data EINA_UNUSED, struct zwp_linux_dmabuf_v1 *dmabuf EINA_UNUSED, uint32_t format EINA_UNUSED)
 {
@@ -55,9 +106,20 @@ _dmabuf_cb_format(void *data EINA_UNUSED, struct zwp_linux_dmabuf_v1 *dmabuf EIN
 static const struct zwp_linux_dmabuf_v1_listener _dmabuf_listener =
 {
    _dmabuf_cb_format,
-   NULL
+   NULL /* modifier */
 };
 
+/**
+ * @internal
+ * @brief Callback for xdg_wm_base.ping event.
+ *
+ * Responds to a ping event from the compositor for the xdg_wm_base interface.
+ * This is used to check if the client is responsive.
+ *
+ * @param data User data (Ecore_Wl2_Display).
+ * @param shell The xdg_wm_base object.
+ * @param serial The serial of the ping event.
+ */
 static void
 _xdg_shell_cb_ping(void *data, struct xdg_wm_base *shell, uint32_t serial)
 {
@@ -70,6 +132,17 @@ static const struct xdg_wm_base_listener _xdg_shell_listener =
    _xdg_shell_cb_ping,
 };
 
+/**
+ * @internal
+ * @brief Callback for zxdg_shell_v6.ping event.
+ *
+ * Responds to a ping event from the compositor for the zxdg_shell_v6 interface.
+ * This is used to check if the client is responsive.
+ *
+ * @param data User data (Ecore_Wl2_Display).
+ * @param shell The zxdg_shell_v6 object.
+ * @param serial The serial of the ping event.
+ */
 static void
 _zxdg_shell_cb_ping(void *data, struct zxdg_shell_v6 *shell, uint32_t serial)
 {
@@ -82,6 +155,19 @@ static const struct zxdg_shell_v6_listener _zxdg_shell_listener =
    _zxdg_shell_cb_ping,
 };
 
+/**
+ * @internal
+ * @brief Callback for zwp_e_session_recovery.create_uuid event.
+ * @since 1.20
+ *
+ * Associates a UUID with a window surface for session recovery purposes.
+ * The UUID is provided by the compositor.
+ *
+ * @param data User data (unused).
+ * @param session_recovery The zwp_e_session_recovery object (unused).
+ * @param surface The wl_surface to associate the UUID with.
+ * @param uuid The UUID string.
+ */
 static void
 _session_recovery_create_uuid(void *data EINA_UNUSED, struct zwp_e_session_recovery *session_recovery EINA_UNUSED, struct wl_surface *surface, const char *uuid)
 {
@@ -99,6 +185,24 @@ static const struct zwp_e_session_recovery_listener _session_listener =
    _session_recovery_create_uuid,
 };
 
+/**
+ * @internal
+ * @brief Callback for efl_aux_hints.supported_aux_hints event.
+ * @since 1.20
+ *
+ * Receives the list of supported auxiliary hints for a given surface
+ * from the compositor. Stores these hints in the Ecore_Wl2_Window structure
+ * and emits an ECORE_WL2_EVENT_AUX_HINT_SUPPORTED event.
+ *
+ * The `hints` wl_array contains a series of null-terminated strings.
+ * Example: `hints->data` might be "hint1\0hint2\0hint3\0"
+ *
+ * @param data User data (Ecore_Wl2_Display).
+ * @param aux_hints The efl_aux_hints object (unused).
+ * @param surface_resource The wl_surface for which hints are supported.
+ * @param hints A wl_array containing the names of supported hints.
+ * @param num_hints The number of hints in the array.
+ */
 static void
 _aux_hints_supported_aux_hints(void *data, struct efl_aux_hints *aux_hints EINA_UNUSED, struct wl_surface *surface_resource, struct wl_array *hints, uint32_t num_hints)
 {
@@ -152,6 +256,20 @@ _aux_hints_supported_aux_hints(void *data, struct efl_aux_hints *aux_hints EINA_
                    _display_event_free, ewd);
 }
 
+/**
+ * @internal
+ * @brief Callback for efl_aux_hints.allowed_aux_hint event.
+ * @since 1.20
+ *
+ * Notifies that a specific auxiliary hint has been allowed (or processed)
+ * by the compositor for a given surface. Emits an
+ * ECORE_WL2_EVENT_AUX_HINT_ALLOWED event.
+ *
+ * @param data User data (Ecore_Wl2_Display).
+ * @param aux_hints The efl_aux_hints object (unused).
+ * @param surface_resource The wl_surface for which the hint was allowed.
+ * @param id The ID of the allowed hint.
+ */
 static void
 _aux_hints_allowed_aux_hint(void *data, struct efl_aux_hints *aux_hints  EINA_UNUSED, struct wl_surface *surface_resource, int id)
 {
@@ -173,6 +291,18 @@ _aux_hints_allowed_aux_hint(void *data, struct efl_aux_hints *aux_hints  EINA_UN
                    _display_event_free, ewd);
 }
 
+/**
+ * @internal
+ * @brief Frees an Ecore_Wl2_Event_Aux_Message event.
+ * @since 1.20
+ *
+ * This function is called when an ECORE_WL2_EVENT_AUX_MESSAGE event
+ * is no longer needed. It decrements the display reference count and
+ * frees the event structure, including stringshared key, value, and options.
+ *
+ * @param data User data (unused).
+ * @param event The Ecore_Wl2_Event_Aux_Message to free.
+ */
  static void
 _cb_aux_message_free(void *data EINA_UNUSED, void *event)
 {
@@ -188,6 +318,25 @@ _cb_aux_message_free(void *data EINA_UNUSED, void *event)
    free(ev);
 }
 
+/**
+ * @internal
+ * @brief Callback for efl_aux_hints.aux_message event.
+ * @since 1.20
+ *
+ * Receives an auxiliary message (key-value pair with optional parameters)
+ * from the compositor for a given surface. Emits an
+ * ECORE_WL2_EVENT_AUX_MESSAGE event.
+ *
+ * The `options` wl_array contains a series of null-terminated strings.
+ * Example: `options->data` might be "opt1\0opt2\0opt3\0"
+ *
+ * @param data User data (Ecore_Wl2_Display).
+ * @param aux_hints The efl_aux_hints object (unused).
+ * @param surface_resource The wl_surface the message is for.
+ * @param key The key of the message.
+ * @param val The value of the message.
+ * @param options A wl_array containing optional parameters for the message.
+ */
  static void
 _aux_hints_aux_message(void *data, struct efl_aux_hints *aux_hints EINA_UNUSED, struct wl_surface *surface_resource, const char *key, const char *val, struct wl_array *options)
 {
@@ -231,6 +380,18 @@ static const struct efl_aux_hints_listener _aux_hints_listener =
    _aux_hints_aux_message,
 };
 
+/**
+ * @internal
+ * @brief Frees an Ecore_Wl2_Event_Global event.
+ *
+ * This function is called when an ECORE_WL2_EVENT_GLOBAL_ADDED or
+ * ECORE_WL2_EVENT_GLOBAL_REMOVED event is no longer needed.
+ * It decrements the display reference count and frees the event structure,
+ * including the stringshared interface name.
+ *
+ * @param data User data (unused).
+ * @param event The Ecore_Wl2_Event_Global to free.
+ */
 static void
 _cb_global_event_free(void *data EINA_UNUSED, void *event)
 {
@@ -242,6 +403,22 @@ _cb_global_event_free(void *data EINA_UNUSED, void *event)
    free(ev);
 }
 
+/**
+ * @internal
+ * @brief Callback for wl_registry.global event (global object added).
+ *
+ * This function is called by the Wayland library when the compositor
+ * announces a new global object. It binds to known interfaces
+ * (like wl_compositor, wl_shm, xdg_wm_base, etc.) and stores information
+ * about the global in the display's `globals` hash.
+ * It also emits an ECORE_WL2_EVENT_GLOBAL_ADDED event.
+ *
+ * @param data User data (Ecore_Wl2_Display).
+ * @param registry The wl_registry object.
+ * @param id The unique ID of the global object.
+ * @param interface The interface name of the global object (e.g., "wl_compositor").
+ * @param version The version of the interface.
+ */
 static void
 _cb_global_add(void *data, struct wl_registry *registry, unsigned int id, const char *interface, unsigned int version)
 {
@@ -363,6 +540,19 @@ event:
                    _cb_global_event_free, NULL);
 }
 
+/**
+ * @internal
+ * @brief Callback for wl_registry.global_remove event (global object removed).
+ *
+ * This function is called by the Wayland library when the compositor
+ * announces that a global object has been removed. It removes the
+ * global's information from the display's `globals` hash and emits an
+ * ECORE_WL2_EVENT_GLOBAL_REMOVED event.
+ *
+ * @param data User data (Ecore_Wl2_Display).
+ * @param registry The wl_registry object (unused).
+ * @param id The unique ID of the global object that was removed.
+ */
 static void
 _cb_global_remove(void *data, struct wl_registry *registry EINA_UNUSED, unsigned int id)
 {
@@ -400,6 +590,19 @@ static const struct wl_registry_listener _registry_listener =
    _cb_global_remove
 };
 
+/**
+ * @internal
+ * @brief Ecore_Fd_Handler callback for server-side display event loop.
+ *
+ * This function is called when there is data to be read on the Wayland
+ * display's file descriptor for a server-side display (created with
+ * ecore_wl2_display_create()). It dispatches events from the Wayland
+ * event loop.
+ *
+ * @param data User data (Ecore_Wl2_Display).
+ * @param hdl The Ecore_Fd_Handler (unused).
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
+ */
 static Eina_Bool
 _cb_create_data(void *data, Ecore_Fd_Handler *hdl EINA_UNUSED)
 {
@@ -414,6 +617,16 @@ _cb_create_data(void *data, Ecore_Fd_Handler *hdl EINA_UNUSED)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @internal
+ * @brief Ecore_Fd_Handler prepare callback for server-side display.
+ *
+ * This function is called before polling the file descriptors. For a
+ * server-side display, it flushes any pending client requests.
+ *
+ * @param data User data (Ecore_Wl2_Display).
+ * @param hdlr The Ecore_Fd_Handler (unused).
+ */
 static void
 _cb_create_prepare(void *data, Ecore_Fd_Handler *hdlr EINA_UNUSED)
 {
@@ -422,6 +635,19 @@ _cb_create_prepare(void *data, Ecore_Fd_Handler *hdlr EINA_UNUSED)
    wl_display_flush_clients(ewd->wl.display);
 }
 
+/**
+ * @internal
+ * @brief Timer callback for attempting session recovery.
+ * @since 1.20
+ *
+ * This function is called by an Ecore_Timer when a display connection
+ * was lost and session recovery is being attempted. It tries to reconnect
+ * to the Wayland display.
+ *
+ * @param ewd The Ecore_Wl2_Display attempting to recover.
+ * @return EINA_TRUE to reschedule the timer if connection fails,
+ *         EINA_FALSE if connection succeeds or recovery is abandoned.
+ */
 static Eina_Bool
 _recovery_timer(Ecore_Wl2_Display *ewd)
 {
@@ -432,6 +658,16 @@ _recovery_timer(Ecore_Wl2_Display *ewd)
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Cleans up global Wayland objects associated with a display.
+ *
+ * Destroys all global Wayland proxy objects (compositor, shm, shell, etc.)
+ * that were bound for the given Ecore_Wl2_Display. This is typically
+ * called during display disconnection or session recovery.
+ *
+ * @param ewd The Ecore_Wl2_Display whose globals are to be cleaned up.
+ */
 static void
 _ecore_wl2_display_globals_cleanup(Ecore_Wl2_Display *ewd)
 {
@@ -451,6 +687,18 @@ _ecore_wl2_display_globals_cleanup(Ecore_Wl2_Display *ewd)
    if (ewd->wl.registry) wl_registry_destroy(ewd->wl.registry);
 }
 
+/**
+ * @internal
+ * @brief Initiates the session recovery process for a display.
+ * @since 1.20
+ *
+ * This function is called when a connection error occurs and session
+ * recovery is possible. It cleans up existing Wayland resources,
+ * resets display state, and schedules a timer to attempt reconnection.
+ * An ECORE_WL2_EVENT_DISCONNECT event is emitted.
+ *
+ * @param ewd The Ecore_Wl2_Display for which to start recovery.
+ */
 static void
 _recovery_timer_add(Ecore_Wl2_Display *ewd)
 {
@@ -499,6 +747,19 @@ _recovery_timer_add(Ecore_Wl2_Display *ewd)
    _ecore_wl2_display_event(ewd, ECORE_WL2_EVENT_DISCONNECT);
 }
 
+/**
+ * @internal
+ * @brief Decides whether to initiate session recovery or signal exit.
+ * @since 1.20
+ *
+ * Called when a Wayland display error occurs. If session recovery is
+ * enabled and applicable for the error, `_recovery_timer_add` is called.
+ * Otherwise, if it's a client-side display error that's not recoverable,
+ * `_ecore_wl2_display_signal_exit` is called to terminate the application.
+ *
+ * @param ewd The Ecore_Wl2_Display experiencing the error.
+ * @param code The errno code from the display error.
+ */
 static void
 _begin_recovery_maybe(Ecore_Wl2_Display *ewd, int code)
 {
@@ -511,6 +772,18 @@ _begin_recovery_maybe(Ecore_Wl2_Display *ewd, int code)
      }
 }
 
+/**
+ * @internal
+ * @brief Ecore_Fd_Handler prepare callback for client-side display connection.
+ *
+ * This function is called before polling the file descriptors for a
+ * client-side display. It attempts to dispatch any pending Wayland events
+ * and checks for display errors. If a non-recoverable error occurs,
+ * it may trigger session recovery or application exit.
+ *
+ * @param data User data (Ecore_Wl2_Display).
+ * @param hdl The Ecore_Fd_Handler (unused).
+ */
 static void
 _cb_connect_pre(void *data, Ecore_Fd_Handler *hdl EINA_UNUSED)
 {
@@ -535,6 +808,23 @@ err:
      }
 }
 
+/**
+ * @internal
+ * @brief Ecore_Fd_Handler callback for client-side display connection events.
+ *
+ * This function is called when there is data to be read or written on the
+ * Wayland display's file descriptor for a client-side display (connected
+ * with ecore_wl2_display_connect()). It reads incoming Wayland events,
+ * dispatches pending events, and flushes outgoing requests.
+ * If a display error occurs, it may trigger session recovery or
+ * application exit.
+ *
+ * @param data User data (Ecore_Wl2_Display).
+ * @param hdl The Ecore_Fd_Handler.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active, or
+ *         ECORE_CALLBACK_CANCEL if a fatal error occurs and the handler
+ *         is removed.
+ */
 static Eina_Bool
 _cb_connect_data(void *data, Ecore_Fd_Handler *hdl)
 {
@@ -570,6 +860,16 @@ err:
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @internal
+ * @brief Frees an Ecore_Wl2_Global structure.
+ *
+ * This function is used as a callback when an Ecore_Wl2_Global entry
+ * is removed from the `ewd->globals` hash table. It frees the
+ * stringshared interface name and the structure itself.
+ *
+ * @param data Pointer to the Ecore_Wl2_Global structure to free.
+ */
 static void
 _cb_globals_hash_del(void *data)
 {
@@ -582,6 +882,17 @@ _cb_globals_hash_del(void *data)
    free(global);
 }
 
+/**
+ * @internal
+ * @brief Finds a global object by interface name.
+ *
+ * Iterates through the display's known global objects to find one
+ * that matches the given interface name.
+ *
+ * @param ewd The Ecore_Wl2_Display to search within.
+ * @param interface The interface name to search for (e.g., "xdg_wm_base").
+ * @return A pointer to the Ecore_Wl2_Global if found, otherwise NULL.
+ */
 static Ecore_Wl2_Global *
 _ecore_wl2_global_find(Ecore_Wl2_Display *ewd, const char *interface)
 {
@@ -604,6 +915,17 @@ _ecore_wl2_global_find(Ecore_Wl2_Display *ewd, const char *interface)
    return global;
 }
 
+/**
+ * @internal
+ * @brief Binds to a Wayland shell interface (xdg_wm_base or zxdg_shell_v6).
+ *
+ * This function attempts to find and bind to a supported shell interface.
+ * It prioritizes "xdg_wm_base" and falls back to "zxdg_shell_v6".
+ * Once a shell is successfully bound, `ewd->shell_done` is set to EINA_TRUE.
+ * This is typically called after the initial display sync is complete.
+ *
+ * @param ewd The Ecore_Wl2_Display for which to bind a shell.
+ */
 static void
 _ecore_wl2_shell_bind(Ecore_Wl2_Display *ewd)
 {
@@ -647,6 +969,20 @@ _ecore_wl2_shell_bind(Ecore_Wl2_Display *ewd)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback for wl_display.sync completion.
+ *
+ * This function is invoked when a `wl_display_sync` operation completes.
+ * It decrements the `ewd->syncs` counter. If this is the last pending sync
+ * and `ewd->sync_done` is not yet true, it sets `ewd->sync_done` to EINA_TRUE,
+ * attempts to bind the shell interface, destroys the wl_callback, flushes
+ * the display, and emits an ECORE_WL2_EVENT_SYNC_DONE event.
+ *
+ * @param data User data (Ecore_Wl2_Display).
+ * @param cb The wl_callback object for the completed sync.
+ * @param serial The serial associated with the sync callback (unused).
+ */
 static void
 _cb_sync_done(void *data, struct wl_callback *cb, uint32_t serial EINA_UNUSED)
 {
@@ -677,6 +1013,16 @@ static const struct wl_callback_listener _sync_listener =
    _cb_sync_done
 };
 
+/**
+ * @internal
+ * @brief Initiates a wl_display_sync operation.
+ *
+ * Increments the `ewd->syncs` counter and requests a sync callback from
+ * the Wayland display. This is used to ensure all pending requests have
+ * been processed by the compositor.
+ *
+ * @param ewd The Ecore_Wl2_Display to sync.
+ */
 static void
 _ecore_wl2_display_sync_add(Ecore_Wl2_Display *ewd)
 {
@@ -687,6 +1033,21 @@ _ecore_wl2_display_sync_add(Ecore_Wl2_Display *ewd)
    wl_callback_add_listener(cb, &_sync_listener, ewd);
 }
 
+/**
+ * @internal
+ * @brief Connects to a Wayland display and sets up initial resources.
+ *
+ * This function attempts to connect to the Wayland display specified by
+ * `ewd->name`. If successful, it retrieves the wl_registry, adds a listener
+ * for global events, and initiates a display sync.
+ * If `sync` is EINA_TRUE, it will block until the initial sync is complete.
+ * It then sets up an Ecore_Fd_Handler to manage events on the display's
+ * file descriptor and emits an ECORE_WL2_EVENT_CONNECT event.
+ *
+ * @param ewd The Ecore_Wl2_Display to connect.
+ * @param sync If EINA_TRUE, block until the initial display sync completes.
+ * @return EINA_TRUE on successful connection, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _ecore_wl2_display_connect(Ecore_Wl2_Display *ewd, Eina_Bool sync)
 {
@@ -734,6 +1095,17 @@ _ecore_wl2_display_connect(Ecore_Wl2_Display *ewd, Eina_Bool sync)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Cleans up resources associated with an Ecore_Wl2_Display.
+ *
+ * This function is called when a display is being disconnected or destroyed.
+ * It unrefs the XKB context, frees all inputs and outputs, removes the
+ * Ecore_Fd_Handler, frees the globals hash, and cleans up global Wayland
+ * proxy objects.
+ *
+ * @param ewd The Ecore_Wl2_Display to clean up.
+ */
 static void
 _ecore_wl2_display_cleanup(Ecore_Wl2_Display *ewd)
 {
@@ -758,6 +1130,17 @@ _ecore_wl2_display_cleanup(Ecore_Wl2_Display *ewd)
    _ecore_wl2_display_globals_cleanup(ewd);
 }
 
+/**
+ * @internal
+ * @brief Finds an Ecore_Wl2_Window associated with a given wl_surface.
+ *
+ * Iterates through the windows managed by the display to find the one
+ * whose `surface` member matches the provided `wl_surface`.
+ *
+ * @param display The Ecore_Wl2_Display to search within.
+ * @param wl_surface The wl_surface to find the Ecore_Wl2_Window for.
+ * @return A pointer to the Ecore_Wl2_Window if found, otherwise NULL.
+ */
 Ecore_Wl2_Window *
 _ecore_wl2_display_window_surface_find(Ecore_Wl2_Display *display, struct wl_surface *wl_surface)
 {
@@ -775,6 +1158,29 @@ _ecore_wl2_display_window_surface_find(Ecore_Wl2_Display *display, struct wl_sur
    return NULL;
 }
 
+/**
+ * @brief Creates a new Wayland display (server-side).
+ *
+ * This function creates a new Wayland display that other clients can connect to.
+ * If @p name is NULL, a default socket name will be automatically chosen
+ * (e.g., "wayland-0", "wayland-1", etc.). If @p name is provided, that
+ * specific socket name will be used.
+ *
+ * The created display is added to a global hash of server displays.
+ * Subsequent calls with the same name will return the existing display
+ * and increment its reference count.
+ *
+ * An Ecore_Fd_Handler is set up to manage events on the display's
+ * event loop. The WAYLAND_DISPLAY environment variable is set to the
+ * name of the created display socket.
+ *
+ * @param name The desired socket name for the display, or NULL for auto.
+ * @return A pointer to the newly created Ecore_Wl2_Display on success,
+ *         NULL on failure.
+ *
+ * @see ecore_wl2_display_destroy()
+ * @see ecore_wl2_display_connect()
+ */
 EAPI Ecore_Wl2_Display *
 ecore_wl2_display_create(const char *name)
 {
@@ -862,12 +1268,50 @@ found:
    return ewd;
 }
 
+/**
+ * @internal
+ * @brief Determines if a synchronous connection is needed.
+ *
+ * This function checks if there are any active server-side displays.
+ * If there are no server displays (meaning we are likely a standalone client),
+ * or if the server display hash hasn't been initialized, it returns EINA_TRUE,
+ * indicating that a synchronous connection (waiting for initial globals)
+ * is appropriate. Otherwise, it returns EINA_FALSE.
+ *
+ * @return EINA_TRUE if a synchronous connection is recommended, EINA_FALSE otherwise.
+ */
 Eina_Bool
 _ecore_wl2_display_sync_get(void)
 {
    return !_server_displays || !eina_hash_population(_server_displays);
 }
 
+/**
+ * @brief Connects to an existing Wayland display (client-side).
+ *
+ * This function establishes a connection to a Wayland compositor.
+ * If @p name is NULL, it attempts to connect to the display specified by
+ * the WAYLAND_DISPLAY environment variable. If WAYLAND_DISPLAY is not set,
+ * it defaults to "wayland-0".
+ * If @p name is provided, it attempts to connect to that specific display.
+ *
+ * The connected display is added to a global hash of client displays.
+ * Subsequent calls to connect to the same display name will return the
+ * existing Ecore_Wl2_Display object and increment its reference count.
+ *
+ * An XKB context is initialized for keyboard handling.
+ * The connection process involves retrieving the Wayland registry, listening
+ * for global objects, and performing an initial synchronization with the
+ * compositor.
+ *
+ * @param name The name of the Wayland display to connect to (e.g., "wayland-0"),
+ *             or NULL to use the default.
+ * @return A pointer to the Ecore_Wl2_Display on successful connection,
+ *         NULL on failure.
+ *
+ * @see ecore_wl2_display_disconnect()
+ * @see ecore_wl2_display_create()
+ */
 EAPI Ecore_Wl2_Display *
 ecore_wl2_display_connect(const char *name)
 {
@@ -945,6 +1389,20 @@ found:
    return ewd;
 }
 
+/**
+ * @brief Disconnects from a Wayland display (client-side).
+ *
+ * Decrements the reference count of the Ecore_Wl2_Display. If the reference
+ * count reaches zero, it cleans up all associated resources, disconnects
+ * from the Wayland display, removes it from the client display cache,
+ * and frees the Ecore_Wl2_Display structure.
+ *
+ * Before disconnecting, it dispatches any pending Wayland events.
+ *
+ * @param display The Ecore_Wl2_Display to disconnect.
+ *
+ * @see ecore_wl2_display_connect()
+ */
 EAPI void
 ecore_wl2_display_disconnect(Ecore_Wl2_Display *display)
 {
@@ -971,6 +1429,20 @@ ecore_wl2_display_disconnect(Ecore_Wl2_Display *display)
      }
 }
 
+/**
+ * @brief Destroys a Wayland display (server-side).
+ *
+ * Decrements the reference count of the Ecore_Wl2_Display. If the reference
+ * count reaches zero, it cleans up all associated resources (including
+ * destroying the underlying wl_display), removes it from the server
+ * display cache, cancels any recovery timer, and frees the
+ * Ecore_Wl2_Display structure.
+ *
+ * @param display The Ecore_Wl2_Display to destroy (must have been created
+ *                with ecore_wl2_display_create()).
+ *
+ * @see ecore_wl2_display_create()
+ */
 EAPI void
 ecore_wl2_display_destroy(Ecore_Wl2_Display *display)
 {
@@ -994,6 +1466,17 @@ ecore_wl2_display_destroy(Ecore_Wl2_Display *display)
      }
 }
 
+/**
+ * @brief Terminates a Wayland display server.
+ *
+ * This function calls `wl_display_terminate()` on the underlying
+ * Wayland display. This will cause the display server to stop accepting
+ * new connections and to eventually shut down once all clients have
+ * disconnected.
+ *
+ * @param display The Ecore_Wl2_Display (server-side) to terminate.
+ * @since 1.8
+ */
 EAPI void
 ecore_wl2_display_terminate(Ecore_Wl2_Display *display)
 {
@@ -1001,6 +1484,15 @@ ecore_wl2_display_terminate(Ecore_Wl2_Display *display)
    wl_display_terminate(display->wl.display);
 }
 
+/**
+ * @brief Retrieves the native `struct wl_display` from an Ecore_Wl2_Display.
+ *
+ * This allows direct interaction with the Wayland library's display object
+ * if needed, though most operations should be possible through Ecore_Wl2 APIs.
+ *
+ * @param display The Ecore_Wl2_Display.
+ * @return The underlying `struct wl_display`, or NULL if @p display is NULL.
+ */
 EAPI struct wl_display *
 ecore_wl2_display_get(Ecore_Wl2_Display *display)
 {
@@ -1008,6 +1500,16 @@ ecore_wl2_display_get(Ecore_Wl2_Display *display)
    return display->wl.display;
 }
 
+/**
+ * @brief Retrieves the `wl_shm` global object for the display.
+ *
+ * The `wl_shm` interface is used for creating shared memory buffers
+ * that can be used by clients to draw pixel data and share it with
+ * the compositor.
+ *
+ * @param display The Ecore_Wl2_Display.
+ * @return The `struct wl_shm` proxy, or NULL if not available or @p display is NULL.
+ */
 EAPI struct wl_shm *
 ecore_wl2_display_shm_get(Ecore_Wl2_Display *display)
 {
@@ -1015,6 +1517,18 @@ ecore_wl2_display_shm_get(Ecore_Wl2_Display *display)
    return display->wl.shm;
 }
 
+/**
+ * @brief Retrieves the `zwp_linux_dmabuf_v1` global object for the display.
+ *
+ * The `zwp_linux_dmabuf_v1` interface is used for creating buffers from
+ * DMA-BUF file descriptors, allowing for zero-copy buffer sharing between
+ * clients (like Mesa, GStreamer) and the compositor.
+ *
+ * @param display The Ecore_Wl2_Display.
+ * @return The `struct zwp_linux_dmabuf_v1` proxy (cast to void*),
+ *         or NULL if not available or @p display is NULL.
+ * @since 1.18
+ */
 EAPI void *
 ecore_wl2_display_dmabuf_get(Ecore_Wl2_Display *display)
 {
@@ -1022,6 +1536,29 @@ ecore_wl2_display_dmabuf_get(Ecore_Wl2_Display *display)
    return display->wl.dmabuf;
 }
 
+/**
+ * @brief Retrieves an iterator for the global Wayland objects of a display.
+ *
+ * This allows iterating over all global objects (Ecore_Wl2_Global)
+ * that the compositor has announced and Ecore_Wl2 is aware of.
+ * Each item in the iterator is an Ecore_Wl2_Global structure.
+ *
+ * Example:
+ * @code
+ * Eina_Iterator *it;
+ * Ecore_Wl2_Global *global;
+ * it = ecore_wl2_display_globals_get(display);
+ * EINA_ITERATOR_FOREACH(it, global)
+ *   printf("Global: %s, ID: %u, Version: %u\n",
+ *          global->interface, global->id, global->version);
+ * eina_iterator_free(it);
+ * @endcode
+ *
+ * @param display The Ecore_Wl2_Display.
+ * @return An Eina_Iterator over Ecore_Wl2_Global structures,
+ *         or NULL if @p display or its globals hash is NULL.
+ *         The iterator must be freed using eina_iterator_free().
+ */
 EAPI Eina_Iterator *
 ecore_wl2_display_globals_get(Ecore_Wl2_Display *display)
 {
@@ -1031,6 +1568,21 @@ ecore_wl2_display_globals_get(Ecore_Wl2_Display *display)
    return eina_hash_iterator_data_new(display->globals);
 }
 
+/**
+ * @brief Gets the total screen size aggregated from all outputs.
+ *
+ * This function calculates the total dimensions of the screen space by summing
+ * up the widths and heights of all connected outputs, considering their
+ * transformations (rotations).
+ *
+ * Note: This provides a logical sum of dimensions and might not represent
+ * a single contiguous rectangular area if outputs are arranged in a complex layout.
+ * For individual output details, iterate through ecore_wl2_display_outputs_get().
+ *
+ * @param display The Ecore_Wl2_Display.
+ * @param[out] w Pointer to store the total width. Can be NULL.
+ * @param[out] h Pointer to store the total height. Can be NULL.
+ */
 EAPI void
 ecore_wl2_display_screen_size_get(Ecore_Wl2_Display *display, int *w, int *h)
 {
@@ -1064,6 +1616,15 @@ ecore_wl2_display_screen_size_get(Ecore_Wl2_Display *display, int *w, int *h)
    if (h) *h = oh;
 }
 
+/**
+ * @brief Retrieves the `wl_registry` for the display.
+ *
+ * The `wl_registry` is the Wayland object used to bind to global interfaces
+ * announced by the compositor.
+ *
+ * @param display The Ecore_Wl2_Display.
+ * @return The `struct wl_registry` proxy, or NULL if @p display is NULL.
+ */
 EAPI struct wl_registry *
 ecore_wl2_display_registry_get(Ecore_Wl2_Display *display)
 {
@@ -1072,6 +1633,16 @@ ecore_wl2_display_registry_get(Ecore_Wl2_Display *display)
    return display->wl.registry;
 }
 
+/**
+ * @brief Gets the version of the `wl_compositor` interface supported by the display.
+ *
+ * The `wl_compositor` is a fundamental Wayland interface used for creating
+ * surfaces (`wl_surface`). The version indicates which features of the
+ * compositor interface are available. Ecore_Wl2 will bind up to version 4.
+ *
+ * @param display The Ecore_Wl2_Display.
+ * @return The version of the `wl_compositor` interface, or 0 if @p display is NULL.
+ */
 EAPI int
 ecore_wl2_display_compositor_version_get(Ecore_Wl2_Display *display)
 {
@@ -1080,6 +1651,29 @@ ecore_wl2_display_compositor_version_get(Ecore_Wl2_Display *display)
    return display->wl.compositor_version;
 }
 
+/**
+ * @brief Retrieves an iterator for the input devices (seats) of a display.
+ *
+ * This function is only relevant for client-side displays. Server-side
+ * displays (created with ecore_wl2_display_create()) do not manage inputs
+ * in this way and will return NULL.
+ * Each item in the iterator is an Ecore_Wl2_Input structure.
+ *
+ * Example:
+ * @code
+ * Eina_Iterator *it;
+ * Ecore_Wl2_Input *input;
+ * it = ecore_wl2_display_inputs_get(display);
+ * EINA_ITERATOR_FOREACH(it, input)
+ *   printf("Input ID: %u, Name: %s\n", input->id, ecore_wl2_input_name_get(input));
+ * eina_iterator_free(it);
+ * @endcode
+ *
+ * @param display The Ecore_Wl2_Display.
+ * @return An Eina_Iterator over Ecore_Wl2_Input structures, or NULL if
+ *         @p display is NULL or it's a server-side display.
+ *         The iterator must be freed using eina_iterator_free().
+ */
 EAPI Eina_Iterator *
 ecore_wl2_display_inputs_get(Ecore_Wl2_Display *display)
 {
@@ -1088,6 +1682,16 @@ ecore_wl2_display_inputs_get(Ecore_Wl2_Display *display)
    return eina_inlist_iterator_new(display->inputs);
 }
 
+/**
+ * @brief Finds an input device (seat) by its ID.
+ *
+ * This function is only relevant for client-side displays.
+ *
+ * @param display The Ecore_Wl2_Display.
+ * @param id The ID of the input device to find.
+ * @return The Ecore_Wl2_Input if found, otherwise NULL.
+ *         Returns NULL if @p display is NULL or it's a server-side display.
+ */
 EAPI Ecore_Wl2_Input *
 ecore_wl2_display_input_find(const Ecore_Wl2_Display *display, unsigned int id)
 {
@@ -1100,6 +1704,19 @@ ecore_wl2_display_input_find(const Ecore_Wl2_Display *display, unsigned int id)
    return NULL;
 }
 
+/**
+ * @brief Finds an input device (seat) by its name.
+ *
+ * This function is only relevant for client-side displays.
+ * The name of an input device is typically provided by the compositor
+ * via the `wl_seat.name` event (if supported and sent).
+ *
+ * @param display The Ecore_Wl2_Display.
+ * @param name The name of the input device to find.
+ * @return The Ecore_Wl2_Input if found, otherwise NULL.
+ *         Returns NULL if @p display is NULL, @p name is NULL, or it's a server-side display.
+ * @since 1.20
+ */
 EAPI Ecore_Wl2_Input *
 ecore_wl2_display_input_find_by_name(const Ecore_Wl2_Display *display, const char *name)
 {
@@ -1112,6 +1729,18 @@ ecore_wl2_display_input_find_by_name(const Ecore_Wl2_Display *display, const cha
    return NULL;
 }
 
+/**
+ * @brief Checks if the initial display synchronization is complete.
+ *
+ * After connecting to a Wayland display, Ecore_Wl2 performs an initial
+ * synchronization to receive all initial global objects and other setup
+ * information from the compositor. This function returns whether that
+ * initial sync process has finished.
+ *
+ * @param display The Ecore_Wl2_Display.
+ * @return EINA_TRUE if the initial sync is done, EINA_FALSE otherwise
+ *         (or if @p display is NULL).
+ */
 EAPI Eina_Bool
 ecore_wl2_display_sync_is_done(const Ecore_Wl2_Display *display)
 {
@@ -1119,6 +1748,17 @@ ecore_wl2_display_sync_is_done(const Ecore_Wl2_Display *display)
    return display->sync_done;
 }
 
+/**
+ * @brief Gets the name of the Wayland display.
+ *
+ * For client connections, this is the name used to connect (e.g., "wayland-0"
+ * or the value of $WAYLAND_DISPLAY). For server-side displays, this is the
+ * socket name the server is listening on.
+ *
+ * @param display The Ecore_Wl2_Display.
+ * @return The name of the display, or NULL if @p display is NULL.
+ *         The returned string is an internal string and should not be modified or freed.
+ */
 EAPI const char *
 ecore_wl2_display_name_get(const Ecore_Wl2_Display *display)
 {
@@ -1126,6 +1766,19 @@ ecore_wl2_display_name_get(const Ecore_Wl2_Display *display)
    return display->name;
 }
 
+/**
+ * @brief Flushes pending Wayland requests to the compositor.
+ *
+ * Most Wayland requests are buffered client-side and sent to the compositor
+ * at appropriate times (e.g., before blocking for events). This function
+ * explicitly flushes any buffered requests.
+ *
+ * If flushing results in an EAGAIN error, it means the write would block,
+ * so the fd_handler is set to monitor for write readiness.
+ * If another error occurs, it may trigger session recovery.
+ *
+ * @param display The Ecore_Wl2_Display.
+ */
 EAPI void
 ecore_wl2_display_flush(Ecore_Wl2_Display *display)
 {
@@ -1147,12 +1800,40 @@ ecore_wl2_display_flush(Ecore_Wl2_Display *display)
    _begin_recovery_maybe(display, code);
 }
 
+/**
+ * @brief Finds an Ecore_Wl2_Window associated with a given wl_surface.
+ *
+ * This is a public wrapper around the internal
+ * `_ecore_wl2_display_window_surface_find` function.
+ *
+ * @param display The Ecore_Wl2_Display to search within.
+ * @param surface The wl_surface to find the Ecore_Wl2_Window for.
+ * @return A pointer to the Ecore_Wl2_Window if found, otherwise NULL.
+ * @since 1.8
+ */
 EAPI Ecore_Wl2_Window *
 ecore_wl2_display_window_find_by_surface(Ecore_Wl2_Display *display, struct wl_surface *surface)
 {
    return _ecore_wl2_display_window_surface_find(display, surface);
 }
 
+/**
+ * @brief Retrieves a pointer to an already connected Ecore_Wl2_Display.
+ *
+ * This function checks the cache of connected client displays. If a display
+ * matching @p name (or the default if @p name is NULL) is found in the cache,
+ * a pointer to it is returned. This function does not increment the display's
+ * reference count.
+ *
+ * This is useful for obtaining a handle to an Ecore_Wl2_Display that was
+ * connected elsewhere in the application, without establishing a new connection.
+ *
+ * @param name The name of the Wayland display (e.g., "wayland-0"), or NULL
+ *             to use the default (checks $WAYLAND_DISPLAY, then "wayland-0").
+ * @return A pointer to the cached Ecore_Wl2_Display if connected,
+ *         otherwise NULL.
+ * @since 1.8
+ */
 EAPI Ecore_Wl2_Display *
 ecore_wl2_connected_display_get(const char *name)
 {
@@ -1184,6 +1865,15 @@ ecore_wl2_connected_display_get(const char *name)
    return ewd;
 }
 
+/**
+ * @brief Retrieves the `wl_compositor` global object for the display.
+ *
+ * The `wl_compositor` interface is used for creating surfaces (`wl_surface`).
+ *
+ * @param display The Ecore_Wl2_Display.
+ * @return The `struct wl_compositor` proxy, or NULL if not available or @p display is NULL.
+ * @since 1.8
+ */
 EAPI struct wl_compositor *
 ecore_wl2_display_compositor_get(Ecore_Wl2_Display *display)
 {

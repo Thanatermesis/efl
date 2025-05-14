@@ -4,6 +4,15 @@
 #include <Elementary.h>
 #include <Efl_Ui.h>
 
+/**
+ * @brief Maps image orientation enums to human-readable names.
+ * This array is used to populate UI elements like radio buttons
+ * that control image orientation.
+ * Each element is a struct with:
+ *  - orient: The Efl_Gfx_Image_Orientation enum value.
+ *  - name: The string representation for the UI.
+ * The list is terminated by an element with a NULL name.
+ */
 static const struct {
    Efl_Gfx_Image_Orientation orient;
    const char *name;
@@ -17,6 +26,16 @@ static const struct {
   { 0, NULL }
 };
 
+/**
+ * @brief Creates and configures a new EFL UI window.
+ *
+ * This is a helper function to reduce boilerplate code when creating
+ * a new window for a test case.
+ *
+ * @param name The internal name of the window.
+ * @param title The visible title of the window.
+ * @return A new Eo window object.
+ */
 static Eo *
 win_add(const char *name, const char *title)
 {
@@ -26,6 +45,18 @@ win_add(const char *name, const char *title)
      efl_text_set(efl_added, title));
 }
 
+/**
+ * @brief Creates a new image object and adds it to a window.
+ *
+ * This helper function creates an Efl_Ui_Image, sets it to expand and fill,
+ * loads an image file if provided, and stores the image object in the
+ * window's data with the key "im".
+ *
+ * @param win The parent window for the image.
+ * @param file The path to the image file relative to the app's data directory.
+ *        If NULL, no file is loaded initially. Example: "/images/logo.png".
+ * @return The new Eo image object.
+ */
 static Eo *
 img_add(Eo *win, const char *file)
 {
@@ -45,6 +76,16 @@ img_add(Eo *win, const char *file)
    return im;
 }
 
+/**
+ * @brief Callback for when the image orientation radio button changes.
+ *
+ * This function is triggered by the EFL_UI_RADIO_GROUP_EVENT_VALUE_CHANGED event.
+ * It retrieves the selected orientation value and applies it to the image
+ * object stored in the window's data.
+ *
+ * @param data The user data, which is the window (Eo *).
+ * @param ev The event information.
+ */
 static void
 my_im_ch(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -59,6 +100,13 @@ my_im_ch(void *data, const Efl_Event *ev EINA_UNUSED)
            v, efl_gfx_image_orientation_get(im));
 }
 
+/**
+ * @brief Test case for basic image orientation.
+ *
+ * Creates a window with an image and a set of radio buttons to control
+ * the image's orientation (rotation and flipping). This tests the
+ * efl_gfx_image_orientation_set() API.
+ */
 void
 test_ui_image(void *data EINA_UNUSED, Eo *obj  EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -90,6 +138,16 @@ test_ui_image(void *data EINA_UNUSED, Eo *obj  EINA_UNUSED, void *event_info EIN
 }
 
 
+/**
+ * @brief Callback for when the alignment sliders change value.
+ *
+ * Retrieves the values from the horizontal and vertical alignment sliders
+ * and applies them to the image's alignment hint.
+ *
+ * @param data The user data, which is the window (Eo *).
+ * @param obj The object that triggered the callback (slider).
+ * @param event_info Unused event information.
+ */
 static void
 im_align_cb(void *data, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -106,6 +164,15 @@ im_align_cb(void *data, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    printf("align %.3f %.3f\n", h, v);
 }
 
+/**
+ * @brief Maps image scale methods to human-readable names.
+ * This array is used to populate UI elements that control how an
+ * image is scaled within its bounds.
+ * Each element is a struct with:
+ *  - scale_type: The Efl_Gfx_Image_Scale_Method enum value.
+ *  - name: The string representation for the UI.
+ * The list is terminated by an element with a NULL name.
+ */
 static const struct {
    Efl_Gfx_Image_Scale_Method scale_type;
    const char *name;
@@ -120,6 +187,15 @@ static const struct {
   { 0, NULL }
 };
 
+/**
+ * @brief Callback for when the image scale method radio button changes.
+ *
+ * This function is triggered by the EFL_UI_RADIO_GROUP_EVENT_VALUE_CHANGED event.
+ * It retrieves the selected scale method and applies it to the image object.
+ *
+ * @param data The user data, which is the window (Eo *).
+ * @param ev The event information.
+ */
 static void
 my_im_scale_ch(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -133,6 +209,13 @@ my_im_scale_ch(void *data, const Efl_Event *ev EINA_UNUSED)
    images_scale_type[v].scale_type, images_scale_type[v].name, efl_gfx_image_scale_method_get(im));
 }
 
+/**
+ * @brief Test case for image scaling methods.
+ *
+ * Creates a window with an image and a set of radio buttons to control
+ * the image's scaling method (e.g., fill, fit, tile). This tests the
+ * efl_gfx_image_scale_method_set() API.
+ */
 void
 test_ui_image_scale_type(void *data EINA_UNUSED, Eo *obj  EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -169,6 +252,14 @@ test_ui_image_scale_type(void *data EINA_UNUSED, Eo *obj  EINA_UNUSED, void *eve
    efl_gfx_entity_size_set(win, EINA_SIZE2D(320, 480));
 }
 
+/**
+ * @brief Test case for image alignment within a layout's swallow part.
+ *
+ * This test places an image inside a "swallow" part of an Edje layout
+ * and provides sliders to control the image's horizontal and vertical
+ * alignment within that part. It tests the interaction between image
+ * alignment hints and layouts.
+ */
 void
 test_ui_image_swallow_align(void *data EINA_UNUSED, Eo *obj  EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -216,6 +307,15 @@ test_ui_image_swallow_align(void *data EINA_UNUSED, Eo *obj  EINA_UNUSED, void *
    efl_gfx_entity_size_set(win, EINA_SIZE2D(300, 600));
 }
 
+/**
+ * @brief Callback for the "download,start" smart event.
+ *
+ * Updates a text display to indicate that the remote image download has begun.
+ *
+ * @param data The user data, which is the window (Eo *).
+ * @param obj The image object that started downloading.
+ * @param event_info Unused event information.
+ */
 static void
 _download_start_cb(void *data, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -232,6 +332,15 @@ _download_start_cb(void *data, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED
    fflush(stdout);
 }
 
+/**
+ * @brief Callback for the "download,progress" smart event.
+ *
+ * Updates a text display with the current download progress.
+ *
+ * @param data The user data, which is the window (Eo *).
+ * @param obj The image object that is downloading.
+ * @param event_info The progress information (Elm_Image_Progress *).
+ */
 static void
 _download_progress_cb(void *data EINA_UNUSED, Eo *obj EINA_UNUSED, void *event_info)
 {
@@ -246,6 +355,16 @@ _download_progress_cb(void *data EINA_UNUSED, Eo *obj EINA_UNUSED, void *event_i
    fflush(stdout);
 }
 
+/**
+ * @brief Callback for the "download,done" smart event.
+ *
+ * Updates a text display to indicate that the download has finished
+ * successfully, and then hides the text display.
+ *
+ * @param data The user data, which is the window (Eo *).
+ * @param obj The image object.
+ * @param event_info Unused event information.
+ */
 static void
 _download_done_cb(void *data, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -261,6 +380,15 @@ _download_done_cb(void *data, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    evas_object_hide(txt);
 }
 
+/**
+ * @brief Callback for the "download,error" smart event.
+ *
+ * Updates a text display to indicate that the download has failed.
+ *
+ * @param data The user data, which is the window (Eo *).
+ * @param obj The image object.
+ * @param event_info Unused event information.
+ */
 static void
 _download_error_cb(void *data, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -275,6 +403,16 @@ _download_error_cb(void *data, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED
 
 }
 
+/**
+ * @brief Callback for when the URL entry is activated (e.g., Enter pressed).
+ *
+ * Retrieves the URL from the entry, sets it as the file for the image
+ * object, which triggers the download process. It also shows the status text.
+ *
+ * @param data The user data, which is the window (Eo *).
+ * @param obj The entry object containing the URL.
+ * @param event_info Unused event information.
+ */
 static void
 _url_activate_cb(void *data, Eo *obj, void *event_info EINA_UNUSED)
 {
@@ -290,6 +428,13 @@ _url_activate_cb(void *data, Eo *obj, void *event_info EINA_UNUSED)
    evas_object_show(txt);
 }
 
+/**
+ * @brief Test case for loading remote images over HTTP.
+ *
+ * Creates a window with an image view, a text entry for a URL, and status
+ * text. It demonstrates the asynchronous download of an image from a URL
+ * and the associated events for start, progress, completion, and error.
+ */
 void
 test_remote_ui_image(void *data EINA_UNUSED, Eo *obj  EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -364,12 +509,28 @@ test_remote_ui_image(void *data EINA_UNUSED, Eo *obj  EINA_UNUSED, void *event_i
    efl_gfx_entity_size_set(win, EINA_SIZE2D(320, 480));
 }
 
+/**
+ * @brief Callback for the "clicked" smart event on an image.
+ *
+ * Simply prints a message to stderr when the image is clicked.
+ *
+ * @param data Unused user data.
+ * @param obj The image object that was clicked.
+ * @param event_info Unused event information.
+ */
 static void
 _img_clicked_cb(void *data EINA_UNUSED, Eo *obj, void *event_info EINA_UNUSED)
 {
    fprintf(stderr, "%p - clicked\n", obj);
 }
 
+/**
+ * @brief Test case for image clickability.
+ *
+ * Creates a window with a focusable image. When the image is clicked or
+ * activated with the keyboard, the `_img_clicked_cb` is called. This
+ * tests that an image can receive focus and handle input events.
+ */
 void
 test_click_ui_image(void *data EINA_UNUSED, Eo *obj  EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -397,11 +558,25 @@ test_click_ui_image(void *data EINA_UNUSED, Eo *obj  EINA_UNUSED, void *event_in
    efl_gfx_entity_size_set(win, EINA_SIZE2D(320, 480));
 }
 
+/**
+ * @brief A macro to set the text of a status label and print it to stderr.
+ * @param obj The text object to update.
+ * @param fmt The format string for the status message.
+ */
 #define STATUS_SET(obj, fmt) do { \
    efl_text_set(obj, fmt); \
    fprintf(stderr, "%s\n", fmt); fflush(stderr); \
    } while (0)
 
+/**
+ * @brief Callback for the "load,open" smart event.
+ *
+ * Called when an asynchronous file open operation is completed.
+ *
+ * @param data The status text object.
+ * @param obj The image object.
+ * @param event_info Unused event info.
+ */
 static void
 _img_load_open_cb(void *data, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -410,6 +585,15 @@ _img_load_open_cb(void *data, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    STATUS_SET(status_text, "Async file open done.");
 }
 
+/**
+ * @brief Callback for the "load,ready" smart event.
+ *
+ * Called when the image data has been loaded and is ready to be displayed.
+ *
+ * @param data The status text object.
+ * @param obj The image object.
+ * @param event_info Unused event info.
+ */
 static void
 _img_load_ready_cb(void *data, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -418,6 +602,15 @@ _img_load_ready_cb(void *data, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED
    STATUS_SET(status_text, "Image is ready to show.");
 }
 
+/**
+ * @brief Callback for the "load,error" smart event.
+ *
+ * Called if an error occurs during asynchronous file loading.
+ *
+ * @param data The status text object.
+ * @param obj The image object.
+ * @param event_info Unused event info.
+ */
 static void
 _img_load_error_cb(void *data, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -426,6 +619,15 @@ _img_load_error_cb(void *data, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED
    STATUS_SET(status_text, "Async file load failed.");
 }
 
+/**
+ * @brief Callback for the "load,cancel" smart event.
+ *
+ * Called if the asynchronous file open operation is cancelled before it starts.
+ *
+ * @param data The status text object.
+ * @param obj The image object.
+ * @param event_info Unused event info.
+ */
 static void
 _img_load_cancel_cb(void *data, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -434,6 +636,19 @@ _img_load_cancel_cb(void *data, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSE
    STATUS_SET(status_text, "Async file open has been cancelled.");
 }
 
+/**
+ * @brief Creates and configures an image for async loading tests.
+ *
+ * This helper function creates an image, sets up its async loading and
+ * preload properties, attaches callbacks for loading events, and starts
+ * loading either a very large image or a small logo.
+ *
+ * @param data The parent window object.
+ * @param async Whether to use asynchronous file opening.
+ * @param preload Whether to disable preloading of image data.
+ * @param logo If EINA_TRUE, load "logo.png"; otherwise, load
+ *        "insanely_huge_test_image.jpg".
+ */
 static void
 _create_image(Eo *data, Eina_Bool async, Eina_Bool preload, Eina_Bool logo)
 {
@@ -471,6 +686,16 @@ _create_image(Eo *data, Eina_Bool async, Eina_Bool preload, Eina_Bool logo)
    efl_file_simple_load(im, buf, NULL);
 }
 
+/**
+ * @brief Callback for the "Reload" button's clicked event.
+ *
+ * Deletes the current image and creates a new one with the same file
+ * but with async/preload settings taken from the UI checkboxes. This
+ * effectively re-runs the load process with new settings.
+ *
+ * @param data The window object.
+ * @param ev The click event information.
+ */
 static void
 _reload_clicked(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -490,6 +715,15 @@ _reload_clicked(void *data, const Efl_Event *ev EINA_UNUSED)
    _create_image(win, async, preload, logo);
 }
 
+/**
+ * @brief Callback for the "Switch" button's clicked event.
+ *
+ * Switches the image file between a large image and a small logo,
+ * applying the current async/preload settings from the UI checkboxes.
+ *
+ * @param data The window object.
+ * @param ev The click event information.
+ */
 static void
 _switch_clicked(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -520,6 +754,15 @@ _switch_clicked(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_file_simple_load(im, buf, NULL);
 }
 
+/**
+ * @brief Test case for asynchronous image loading.
+ *
+ * This test creates a window that loads a large image and provides UI
+ * controls (checkboxes and buttons) to test different asynchronous loading
+ * behaviors, including async open, preload disabling, reloading, and
+ * switching images. It uses various "load,*" smart callbacks to display
+ * status updates.
+ */
 void
 test_load_ui_image(void *data EINA_UNUSED, Eo *obj  EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -589,6 +832,14 @@ test_load_ui_image(void *data EINA_UNUSED, Eo *obj  EINA_UNUSED, void *event_inf
    efl_gfx_entity_size_set(win, EINA_SIZE2D(320, 480));
 }
 
+/**
+ * @brief Callback for when the prescale radio button selection changes.
+ *
+ * Sets the image prescale size based on the selected radio button's value.
+ *
+ * @param data The image object to modify.
+ * @param ev The value changed event.
+ */
 static void
 _cb_prescale_radio_changed(void *data, const Efl_Event *ev)
 {
@@ -600,6 +851,14 @@ _cb_prescale_radio_changed(void *data, const Efl_Event *ev)
    elm_image_prescale_set(o_bg, size);
 }
 
+/**
+ * @brief Test case for image prescaling.
+ *
+ * Creates a window with an image and radio buttons to change the prescale
+ * size. Prescaling tells the loader to load a smaller version of the image
+ * from the file directly, which can save memory and improve performance
+ * for large images when only a smaller version is needed.
+ */
 void
 test_ui_image_prescale(void *data EINA_UNUSED, Eo *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

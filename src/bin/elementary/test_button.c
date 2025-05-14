@@ -3,6 +3,16 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Callback for the "repeated" event of a button.
+ * @param data User data pointer (unused).
+ * @param obj The Evas_Object that emitted the signal.
+ * @param event_info The event-specific information (unused).
+ *
+ * This function is called when a button's "repeated" event is triggered.
+ * It increments a static counter and updates the button's text to show
+ * the current count. The counter resets to 0 after reaching 9999.
+ */
 static void
 _bt_repeated(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -15,6 +25,16 @@ _bt_repeated(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNU
    elm_object_text_set(obj, buf);
 }
 
+/**
+ * @brief Callback for the "clicked" event of a button.
+ * @param data User data pointer, cast to an integer for identification.
+ * @param obj The Evas_Object that emitted the signal (unused).
+ * @param event_info The event-specific information (unused).
+ *
+ * This function is called when a button is clicked. It prints a message
+ * to standard output, indicating which button was clicked based on the
+ * integer value passed in @p data.
+ */
 static void
 _bt_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -23,12 +43,32 @@ _bt_clicked(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    printf("clicked event on Button:%d\n", param);
 }
 
+/**
+ * @brief An array of strings used as labels for a button.
+ *
+ * The `_bt_clicked_label_change_cb` callback cycles through these labels
+ * when the associated button is clicked.
+ * The elements are:
+ * - "Label Only"
+ * - "Label Only Test"
+ * - "Label Only Test 2"
+ * - "Short"
+ */
 #define NUM_LABEL 4
 const char *btn_label[NUM_LABEL] =
 {
    "Label Only", "Label Only Test", "Label Only Test 2", "Short"
 };
 
+/**
+ * @brief Callback to change a button's label on click.
+ * @param data User data pointer (unused).
+ * @param obj The Evas_Object (button) that was clicked.
+ * @param event_info The event-specific information (unused).
+ *
+ * This function cycles through the labels defined in the global `btn_label`
+ * array and sets the button's text to the next label in the sequence.
+ */
 static void
 _bt_clicked_label_change_cb(void *data EINA_UNUSED, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -38,6 +78,16 @@ _bt_clicked_label_change_cb(void *data EINA_UNUSED, Evas_Object *obj, void *even
    if (i >= NUM_LABEL) i = 0;
 }
 
+/**
+ * @brief Callback for the "unpressed" event of a button.
+ * @param data User data pointer, cast to an integer for identification.
+ * @param obj The Evas_Object that emitted the signal (unused).
+ * @param event_info The event-specific information (unused).
+ *
+ * This function is called when a button is released after being pressed.
+ * It prints a message to standard output, indicating which button was
+ * unpressed based on the integer value passed in @p data.
+ */
 static void
 _bt_unpressed(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -46,6 +96,17 @@ _bt_unpressed(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UN
    printf("unpressed event on Button:%d\n", param);
 }
 
+/**
+ * @brief Main function to create and run the button test window.
+ * @param data User data pointer (unused).
+ * @param obj The Evas_Object that emitted the signal (unused).
+ * @param event_info The event-specific information (unused).
+ *
+ * This function sets up a new window with a scroller and a box layout.
+ * It then populates the box with various `elm_button` widgets to test
+ * different styles, content (icons, labels), states (disabled), and
+ * events (clicked, unpressed, repeated).
+ */
 void
 test_button(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

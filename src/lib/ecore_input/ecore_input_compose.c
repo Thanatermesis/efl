@@ -16,6 +16,29 @@
 // isolate compose tree into its own file - hand crafted into static const c
 #include "ecore_input_compose.h"
 
+/**
+ * @brief Retrieves a composed character string based on a sequence of input key symbols.
+ *
+ * This function traverses a statically defined compose tree (@ref comp) to find a match
+ * for the provided sequence of key symbols.
+ *
+ * @param seq A list of strings, where each string is a key symbol (e.g., "dead_acute", "a").
+ *            Example:
+ *            Eina_List *my_seq = NULL;
+ *            my_seq = eina_list_append(my_seq, "Multi_key");
+ *            my_seq = eina_list_append(my_seq, "a");
+ *            my_seq = eina_list_append(my_seq, "e");
+ * @param seqstr_ret If a composed character is found (ECORE_COMPOSE_DONE), this pointer
+ *                   will be updated to point to a newly allocated string containing the
+ *                   composed character. The caller is responsible for freeing this string.
+ *                   Example: If seq results in "æ", *seqstr_ret will point to "æ".
+ * @return An Ecore_Compose_State indicating the result of the composition:
+ *         - ECORE_COMPOSE_NONE: No matching sequence found, or input sequence is invalid.
+ *         - ECORE_COMPOSE_MIDDLE: The input sequence is a valid prefix of one or more
+ *                                 longer compose sequences. More input is needed.
+ *         - ECORE_COMPOSE_DONE: A complete compose sequence was matched, and the
+ *                               composed character is available in @p seqstr_ret.
+ */
 EAPI Ecore_Compose_State
 ecore_compose_get(const Eina_List *seq, char **seqstr_ret)
 {

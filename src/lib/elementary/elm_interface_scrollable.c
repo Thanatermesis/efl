@@ -80,6 +80,14 @@ static const char iface_scr_legacy_dragable_vbar[]  = "elm.dragable.vbar";
 static const char iface_scr_efl_ui_dragable_hbar[]  = "efl.draggable.horizontal_bar";
 static const char iface_scr_efl_ui_dragable_vbar[]  = "efl.draggable.vertical_bar";
 
+/**
+ * @brief Rounds a double-precision floating-point number to a specified number of decimal places.
+ * @param value The double value to round.
+ * @param pos The number of decimal places to round to.
+ * @return The rounded double value.
+ *
+ * Example: _round(3.14159, 2) would return 3.14.
+ */
 static double
 _round(double value, int pos)
 {
@@ -92,6 +100,14 @@ _round(double value, int pos)
    return temp;
 }
 
+/**
+ * @brief Updates the position of the content within the pan object.
+ * @param psd Pointer to the Elm_Pan_Smart_Data structure.
+ *
+ * This function moves the content object based on the pan object's
+ * current position (psd->x, psd->y) and the content's pan position (psd->px, psd->py).
+ * It also handles focus manager updates related to the move.
+ */
 static void
 _elm_pan_update(Elm_Pan_Smart_Data *psd)
 {
@@ -232,6 +248,16 @@ _elm_pan_efl_object_constructor(Eo *obj, Elm_Pan_Smart_Data *_pd EINA_UNUSED)
    return obj;
 }
 
+/**
+ * @brief Callback invoked when the content of an Elm_Pan object is deleted.
+ * @param data The Elm_Pan_Smart_Data associated with the pan object.
+ * @param e Evas canvas (unused).
+ * @param obj The content object being deleted (unused).
+ * @param event_info Event-specific information (unused).
+ *
+ * This function nullifies the content pointer in the pan data, resets
+ * content dimensions and pan position, and emits a "changed" event.
+ */
 static void
 _elm_pan_content_del_cb(void *data,
                         Evas *e EINA_UNUSED,
@@ -246,6 +272,16 @@ _elm_pan_content_del_cb(void *data,
    efl_event_callback_legacy_call(psd->self, ELM_PAN_EVENT_CHANGED, NULL);
 }
 
+/**
+ * @brief Callback invoked when the content of an Elm_Pan object is resized.
+ * @param data The Elm_Pan_Smart_Data associated with the pan object.
+ * @param e Evas canvas (unused).
+ * @param obj The content object that was resized (unused).
+ * @param event_info Event-specific information (unused).
+ *
+ * This function updates the stored content dimensions in the pan data if they
+ * have changed, updates the pan view, and emits a "changed" event.
+ */
 static void
 _elm_pan_content_resize_cb(void *data,
                            Evas *e EINA_UNUSED,
@@ -266,6 +302,16 @@ _elm_pan_content_resize_cb(void *data,
    efl_event_callback_legacy_call(psd->self, ELM_PAN_EVENT_CHANGED, NULL);
 }
 
+/**
+ * @brief Sets or unsets the content object for an Elm_Pan widget.
+ * @param obj The Elm_Pan widget.
+ * @param content The Evas_Object to set as content, or NULL to unset.
+ *
+ * This function manages the lifecycle of the content within the pan.
+ * It removes old content, adds new content as a smart member,
+ * sets up event callbacks for deletion and resizing of the content,
+ * and updates the pan view.
+ */
 static void
 _elm_pan_content_set(Evas_Object *obj,
                      Evas_Object *content)
@@ -346,10 +392,50 @@ _elm_pan_class_constructor(Efl_Class *klass)
 
 static void _elm_scroll_scroll_bar_size_adjust(
   Elm_Scrollable_Smart_Interface_Data *);
+/**
+ * @brief Sets the scrollable area to show the "wanted" region.
+ * @param obj The scrollable object.
+ *
+ * This function is typically called after a resize or when the
+ * "wanted" coordinates (sid->wx, sid->wy, sid->ww, sid->wh) need to be
+ * applied to the scroller, especially considering gravity settings.
+ * It ensures the content is positioned correctly based on these desired
+ * values if no animations or user interactions are active.
+ */
 static void _elm_scroll_wanted_region_set(Evas_Object *);
+
+/**
+ * @brief Checks if paging is enabled for the scroller.
+ * @param sid The scrollable interface data.
+ * @return EINA_TRUE if paging (relative or absolute) is configured, EINA_FALSE otherwise.
+ */
 static Eina_Bool _paging_is_enabled(Elm_Scrollable_Smart_Interface_Data *sid);
+
+/**
+ * @brief Calculates the target X-coordinate for a given horizontal page offset.
+ * @param sid The scrollable interface data.
+ * @param offset The page offset (e.g., +1 for next page, -1 for previous).
+ *               If limit is EINA_FALSE, this is a direct pixel offset.
+ * @param limit If EINA_TRUE, offset is treated as a page limit factor for large jumps.
+ * @return The calculated X-coordinate for the target page.
+ *
+ * This function determines the scroll position based on page sizes (absolute or relative)
+ * and the current viewport, handling mirroring and looping if enabled.
+ */
 static Evas_Coord _elm_scroll_page_x_get(
    Elm_Scrollable_Smart_Interface_Data *sid, int offset, Eina_Bool limit);
+
+/**
+ * @brief Calculates the target Y-coordinate for a given vertical page offset.
+ * @param sid The scrollable interface data.
+ * @param offset The page offset (e.g., +1 for next page, -1 for previous).
+ *               If limit is EINA_FALSE, this is a direct pixel offset.
+ * @param limit If EINA_TRUE, offset is treated as a page limit factor for large jumps.
+ * @return The calculated Y-coordinate for the target page.
+ *
+ * This function determines the scroll position based on page sizes (absolute or relative)
+ * and the current viewport, handling looping if enabled.
+ */
 static Evas_Coord _elm_scroll_page_y_get(
    Elm_Scrollable_Smart_Interface_Data *sid, int offset, Eina_Bool limit);
 
@@ -466,6 +552,17 @@ _elm_scroll_smooth_debug_shutdown(void)
    DBG(" Standard deviation of Y-axis velocity: %9.3f\n", sqrt(y_dev));
 }
 
+/**
+ * @brief Evaluates and updates the visibility of directional arrow signals.
+ * @param sid The scrollable interface data.
+ * @param rely_on_cache If EINA_TRUE, only emit signals if the state changed from the cached state.
+ *                      If EINA_FALSE, always emit signals.
+ *
+ * This function checks if scrolling is possible in each direction (left, right, up, down)
+ * based on current content position and max/min scrollable area. It then emits Edje signals
+ * (e.g., "elm,action,show,left", "elm,action,hide,left") to show or hide corresponding
+ * visual indicators in the theme, considering looping modes.
+ */
 static void
 _elm_direction_arrows_eval(Elm_Scrollable_Smart_Interface_Data *sid, Eina_Bool rely_on_cache)
 {
@@ -584,6 +681,14 @@ _elm_scroll_smooth_debug_movetime_add(int x,
 
 #endif
 
+/**
+ * @brief Applies the calculated visibility state to the horizontal scrollbar.
+ * @param sid The scrollable interface data.
+ *
+ * Emits Edje signals to show or hide the horizontal scrollbar based on
+ * `sid->hbar_visible` and `sid->hbar_flags`. Also triggers a size adjustment
+ * and direction arrow evaluation.
+ */
 static void
 _elm_scroll_scroll_bar_h_visibility_apply(Elm_Scrollable_Smart_Interface_Data *sid)
 {
@@ -605,6 +710,14 @@ _elm_scroll_scroll_bar_h_visibility_apply(Elm_Scrollable_Smart_Interface_Data *s
      sid->cb_func.content_min_limit(sid->obj, sid->min_w, sid->min_h);
 }
 
+/**
+ * @brief Applies the calculated visibility state to the vertical scrollbar.
+ * @param sid The scrollable interface data.
+ *
+ * Emits Edje signals to show or hide the vertical scrollbar based on
+ * `sid->vbar_visible` and `sid->vbar_flags`. Also triggers a size adjustment
+ * and direction arrow evaluation.
+ */
 static void
 _elm_scroll_scroll_bar_v_visibility_apply(Elm_Scrollable_Smart_Interface_Data *sid)
 {
@@ -627,6 +740,16 @@ _elm_scroll_scroll_bar_v_visibility_apply(Elm_Scrollable_Smart_Interface_Data *s
      sid->cb_func.content_min_limit(sid->obj, sid->min_w, sid->min_h);
 }
 
+/**
+ * @brief Adjusts the visibility of the horizontal scrollbar based on policy and content size.
+ * @param sid The scrollable interface data.
+ * @return 1 if the visibility changed, 0 otherwise.
+ *
+ * This function determines if the horizontal scrollbar should be visible
+ * based on `sid->hbar_flags` (ON, OFF, AUTO), the content width, and the
+ * viewport width. If the visibility state changes, it calls
+ * `_elm_scroll_scroll_bar_h_visibility_apply`.
+ */
 static int
 _elm_scroll_scroll_bar_h_visibility_adjust(
   Elm_Scrollable_Smart_Interface_Data *sid)
@@ -700,6 +823,16 @@ _elm_scroll_scroll_bar_h_visibility_adjust(
    return scroll_h_vis_change;
 }
 
+/**
+ * @brief Adjusts the visibility of the vertical scrollbar based on policy and content size.
+ * @param sid The scrollable interface data.
+ * @return 1 if the visibility changed, 0 otherwise.
+ *
+ * This function determines if the vertical scrollbar should be visible
+ * based on `sid->vbar_flags` (ON, OFF, AUTO), the content height, and the
+ * viewport height. If the visibility state changes, it calls
+ * `_elm_scroll_scroll_bar_v_visibility_apply`.
+ */
 static int
 _elm_scroll_scroll_bar_v_visibility_adjust(
   Elm_Scrollable_Smart_Interface_Data *sid)
@@ -772,6 +905,16 @@ _elm_scroll_scroll_bar_v_visibility_adjust(
    return scroll_v_vis_change;
 }
 
+/**
+ * @brief Adjusts scrollbar visibility specifically for ELM_SCROLLER_POLICY_AUTO.
+ * @param sid The scrollable interface data.
+ *
+ * This function handles a specific case for the AUTO policy: if both scrollbars
+ * are currently visible but the content *might* fit without them (e.g., after a
+ * resize that made the viewport larger), it attempts to hide them and then
+ * re-evaluates their visibility. This helps avoid situations where scrollbars
+ * remain visible unnecessarily.
+ */
 static inline void
 _elm_scroll_scroll_bar_auto_visibility_adjust(Elm_Scrollable_Smart_Interface_Data *sid)
 {
@@ -802,6 +945,16 @@ _elm_scroll_scroll_bar_auto_visibility_adjust(Elm_Scrollable_Smart_Interface_Dat
      }
 }
 
+/**
+ * @brief Adjusts the visibility of both horizontal and vertical scrollbars.
+ * @param sid The scrollable interface data.
+ *
+ * This function calls the individual visibility adjustment functions for
+ * horizontal and vertical scrollbars. If any visibility changed, it
+ * re-runs the adjustments to handle cases where hiding one scrollbar might
+ * make space for the other to be hidden as well (or vice-versa).
+ * Finally, it calls the auto-visibility adjustment.
+ */
 static void
 _elm_scroll_scroll_bar_visibility_adjust(
   Elm_Scrollable_Smart_Interface_Data *sid)
@@ -820,6 +973,15 @@ _elm_scroll_scroll_bar_visibility_adjust(
    _elm_scroll_scroll_bar_auto_visibility_adjust(sid);
 }
 
+/**
+ * @brief Checks if the current Edje theme defines draggable scrollbar parts.
+ * @param sid The scrollable interface data.
+ * @return EINA_TRUE if either horizontal or vertical draggable scrollbar parts exist in the theme, EINA_FALSE otherwise.
+ *
+ * This function determines if the scroller's Edje object has parts named
+ * "elm.dragable.hbar"/"elm.dragable.vbar" (legacy) or
+ * "efl.draggable.horizontal_bar"/"efl.draggable.vertical_bar" (efl).
+ */
 static inline EINA_PURE Eina_Bool
 _elm_scroll_has_bars(const Elm_Scrollable_Smart_Interface_Data *sid)
 {
@@ -839,6 +1001,16 @@ _elm_scroll_has_bars(const Elm_Scrollable_Smart_Interface_Data *sid)
          edje_object_part_exists(sid->edje_obj, iface_scr_dragable_vbar);
 }
 
+/**
+ * @brief Adjusts the size and position of the scrollbars.
+ * @param sid The scrollable interface data.
+ *
+ * This function is responsible for setting the draggable size of the scrollbar
+ * thumbs based on the ratio of viewport size to content size. It also sets
+ * the step and page increments for the scrollbars and ensures the pan position
+ * is synchronized with the scrollbar values. It includes recursion guards
+ * to prevent infinite loops during size adjustments.
+ */
 static void
 _elm_scroll_scroll_bar_size_adjust(Elm_Scrollable_Smart_Interface_Data *sid)
 {
@@ -997,6 +1169,16 @@ skip_bars:
      }
 }
 
+/**
+ * @brief Reads the current values from the Edje scrollbars and updates the content position.
+ * @param sid The scrollable interface data.
+ *
+ * This function is typically called when a scrollbar is dragged by the user.
+ * It gets the drag values (0.0 to 1.0) from the Edje parts, calculates the
+ * corresponding content position based on content max/min scrollable area,
+ * and then sets the content position via elm_interface_scrollable_content_pos_set().
+ * It avoids updating if an animation or drag operation is already in progress.
+ */
 static void
 _elm_scroll_scroll_bar_read_and_update(
   Elm_Scrollable_Smart_Interface_Data *sid)
@@ -1037,6 +1219,13 @@ _elm_scroll_scroll_bar_read_and_update(
    _elm_scroll_wanted_coordinates_update(sid, x, y);
 }
 
+/**
+ * @brief Handles logic at the start of a drag operation.
+ * @param sid The scrollable interface data.
+ *
+ * Updates the current page information if paging is enabled and
+ * calls the user-provided `drag_start` callback.
+ */
 static void
 _elm_scroll_drag_start(Elm_Scrollable_Smart_Interface_Data *sid)
 {
@@ -1047,6 +1236,14 @@ _elm_scroll_drag_start(Elm_Scrollable_Smart_Interface_Data *sid)
      sid->cb_func.drag_start(sid->obj, NULL);
 }
 
+/**
+ * @brief Handles logic at the end of a drag operation.
+ * @param sid The scrollable interface data.
+ *
+ * If no bounce or scroll_to animations are active, it checks if the
+ * current page has changed and calls the `page_change` callback if so.
+ * Then, it calls the user-provided `drag_stop` callback.
+ */
 static void
 _elm_scroll_drag_stop(Elm_Scrollable_Smart_Interface_Data *sid)
 {
@@ -1068,6 +1265,13 @@ _elm_scroll_drag_stop(Elm_Scrollable_Smart_Interface_Data *sid)
      sid->cb_func.drag_stop(sid->obj, NULL);
 }
 
+/**
+ * @brief Handles logic at the start of a scroll animation.
+ * @param sid The scrollable interface data.
+ *
+ * Updates the current page information if paging is enabled and
+ * calls the user-provided `animate_start` callback.
+ */
 static void
 _elm_scroll_anim_start(Elm_Scrollable_Smart_Interface_Data *sid)
 {
@@ -1078,6 +1282,14 @@ _elm_scroll_anim_start(Elm_Scrollable_Smart_Interface_Data *sid)
      sid->cb_func.animate_start(sid->obj, NULL);
 }
 
+/**
+ * @brief Handles logic at the end of a scroll animation.
+ * @param sid The scrollable interface data.
+ *
+ * Checks if the current page has changed due to the animation and
+ * calls the `page_change` callback if so. Then, it calls the
+ * user-provided `animate_stop` callback.
+ */
 static void
 _elm_scroll_anim_stop(Elm_Scrollable_Smart_Interface_Data *sid)
 {
@@ -1097,6 +1309,16 @@ _elm_scroll_anim_stop(Elm_Scrollable_Smart_Interface_Data *sid)
      sid->cb_func.animate_stop(sid->obj, NULL);
 }
 
+/**
+ * @brief Emits Edje signals based on the current scrollbar policies.
+ * @param sid The scrollable interface data.
+ *
+ * This function sends signals like "elm,action,show_always,hbar",
+ * "elm,action,hide,hbar", or "elm,action,show_notalways,hbar" to the
+ * Edje object based on `sid->hbar_flags` and `sid->vbar_flags`.
+ * This allows the theme to react to policy changes (e.g., always show,
+ * always hide, or auto-hide scrollbars).
+ */
 static void
 _elm_scroll_policy_signal_emit(Elm_Scrollable_Smart_Interface_Data *sid)
 {
@@ -1123,6 +1345,16 @@ _elm_scroll_policy_signal_emit(Elm_Scrollable_Smart_Interface_Data *sid)
    _elm_direction_arrows_eval(sid, EINA_FALSE);
 }
 
+/**
+ * @brief Callback for the "reload" signal from the Edje object.
+ * @param data The scrollable interface data (Elm_Scrollable_Smart_Interface_Data *).
+ * @param obj The Edje object that emitted the signal (unused).
+ * @param emission The emitted signal string (unused).
+ * @param source The source of the signal (unused).
+ *
+ * This is typically triggered when the theme is reloaded. It re-applies
+ * scrollbar policies and visibility.
+ */
 static void
 _elm_scroll_reload_cb(void *data,
                       Evas_Object *obj EINA_UNUSED,
@@ -1135,6 +1367,16 @@ _elm_scroll_reload_cb(void *data,
    _elm_scroll_scroll_bar_v_visibility_apply(sid);
 }
 
+/**
+ * @brief Callback for vertical scrollbar "drag" signal.
+ * @param data The scrollable interface data.
+ * @param obj The Edje object (unused).
+ * @param emission Signal name (unused).
+ * @param source Signal source (unused).
+ *
+ * Calls the user-provided `vbar_drag` callback and then updates the
+ * content position based on the scrollbar's new value.
+ */
 static void
 _elm_scroll_vbar_drag_cb(void *data,
                          Evas_Object *obj EINA_UNUSED,
@@ -1149,6 +1391,15 @@ _elm_scroll_vbar_drag_cb(void *data,
    _elm_scroll_scroll_bar_read_and_update(sid);
 }
 
+/**
+ * @brief Callback for vertical scrollbar "elm,vbar,press" signal.
+ * @param data The scrollable interface data.
+ * @param obj The Edje object (unused).
+ * @param emission Signal name (unused).
+ * @param source Signal source (unused).
+ *
+ * Calls the user-provided `vbar_press` callback.
+ */
 static void
 _elm_scroll_vbar_press_cb(void *data,
                           Evas_Object *obj EINA_UNUSED,
@@ -1161,6 +1412,15 @@ _elm_scroll_vbar_press_cb(void *data,
      sid->cb_func.vbar_press(sid->obj, NULL);
 }
 
+/**
+ * @brief Callback for vertical scrollbar "elm,vbar,unpress" signal.
+ * @param data The scrollable interface data.
+ * @param obj The Edje object (unused).
+ * @param emission Signal name (unused).
+ * @param source Signal source (unused).
+ *
+ * Calls the user-provided `vbar_unpress` callback.
+ */
 static void
 _elm_scroll_vbar_unpress_cb(void *data,
                             Evas_Object *obj EINA_UNUSED,
@@ -1173,6 +1433,16 @@ _elm_scroll_vbar_unpress_cb(void *data,
      sid->cb_func.vbar_unpress(sid->obj, NULL);
 }
 
+/**
+ * @brief Callback for Edje vertical scrollbar "drag,start" signal.
+ * @param data The scrollable interface data.
+ * @param obj The Edje object (unused).
+ * @param emission Signal name (unused).
+ * @param source Signal source (unused).
+ *
+ * Updates content position, calls `_elm_scroll_drag_start`, and freezes
+ * other scroll interactions.
+ */
 static void
 _elm_scroll_edje_drag_v_start_cb(void *data,
                                  Evas_Object *obj EINA_UNUSED,
@@ -1186,6 +1456,16 @@ _elm_scroll_edje_drag_v_start_cb(void *data,
    sid->freeze = EINA_TRUE;
 }
 
+/**
+ * @brief Callback for Edje vertical scrollbar "drag,stop" signal.
+ * @param data The scrollable interface data.
+ * @param obj The Edje object (unused).
+ * @param emission Signal name (unused).
+ * @param source Signal source (unused).
+ *
+ * Updates content position, calls `_elm_scroll_drag_stop`, and restores
+ * the freeze state.
+ */
 static void
 _elm_scroll_edje_drag_v_stop_cb(void *data,
                                 Evas_Object *obj EINA_UNUSED,
@@ -1199,6 +1479,15 @@ _elm_scroll_edje_drag_v_stop_cb(void *data,
    sid->freeze = sid->freeze_want;
 }
 
+/**
+ * @brief Callback for Edje vertical scrollbar "drag,set", "drag,step", "drag,page" signals.
+ * @param data The scrollable interface data.
+ * @param obj The Edje object (unused).
+ * @param emission Signal name (unused).
+ * @param source Signal source (unused).
+ *
+ * Updates the content position based on the scrollbar's new value.
+ */
 static void
 _elm_scroll_edje_drag_v_cb(void *data,
                            Evas_Object *obj EINA_UNUSED,
@@ -1210,6 +1499,16 @@ _elm_scroll_edje_drag_v_cb(void *data,
    _elm_scroll_scroll_bar_read_and_update(sid);
 }
 
+/**
+ * @brief Callback for horizontal scrollbar "drag" signal.
+ * @param data The scrollable interface data.
+ * @param obj The Edje object (unused).
+ * @param emission Signal name (unused).
+ * @param source Signal source (unused).
+ *
+ * Calls the user-provided `hbar_drag` callback and then updates the
+ * content position based on the scrollbar's new value.
+ */
 static void
 _elm_scroll_hbar_drag_cb(void *data,
                          Evas_Object *obj EINA_UNUSED,
@@ -1224,6 +1523,15 @@ _elm_scroll_hbar_drag_cb(void *data,
    _elm_scroll_scroll_bar_read_and_update(sid);
 }
 
+/**
+ * @brief Callback for horizontal scrollbar "elm,hbar,press" signal.
+ * @param data The scrollable interface data.
+ * @param obj The Edje object (unused).
+ * @param emission Signal name (unused).
+ * @param source Signal source (unused).
+ *
+ * Calls the user-provided `hbar_press` callback.
+ */
 static void
 _elm_scroll_hbar_press_cb(void *data,
                           Evas_Object *obj EINA_UNUSED,
@@ -1236,6 +1544,15 @@ _elm_scroll_hbar_press_cb(void *data,
      sid->cb_func.hbar_press(sid->obj, NULL);
 }
 
+/**
+ * @brief Callback for horizontal scrollbar "elm,hbar,unpress" signal.
+ * @param data The scrollable interface data.
+ * @param obj The Edje object (unused).
+ * @param emission Signal name (unused).
+ * @param source Signal source (unused).
+ *
+ * Calls the user-provided `hbar_unpress` callback.
+ */
 static void
 _elm_scroll_hbar_unpress_cb(void *data,
                             Evas_Object *obj EINA_UNUSED,
@@ -1248,6 +1565,16 @@ _elm_scroll_hbar_unpress_cb(void *data,
      sid->cb_func.hbar_unpress(sid->obj, NULL);
 }
 
+/**
+ * @brief Callback for Edje horizontal scrollbar "drag,start" signal.
+ * @param data The scrollable interface data.
+ * @param obj The Edje object (unused).
+ * @param emission Signal name (unused).
+ * @param source Signal source (unused).
+ *
+ * Updates content position, calls `_elm_scroll_drag_start`, and freezes
+ * other scroll interactions.
+ */
 static void
 _elm_scroll_edje_drag_h_start_cb(void *data,
                                  Evas_Object *obj EINA_UNUSED,
@@ -1261,6 +1588,16 @@ _elm_scroll_edje_drag_h_start_cb(void *data,
    sid->freeze = EINA_TRUE;
 }
 
+/**
+ * @brief Callback for Edje horizontal scrollbar "drag,stop" signal.
+ * @param data The scrollable interface data.
+ * @param obj The Edje object (unused).
+ * @param emission Signal name (unused).
+ * @param source Signal source (unused).
+ *
+ * Updates content position, calls `_elm_scroll_drag_stop`, and restores
+ * the freeze state.
+ */
 static void
 _elm_scroll_edje_drag_h_stop_cb(void *data,
                                 Evas_Object *obj EINA_UNUSED,
@@ -1274,6 +1611,15 @@ _elm_scroll_edje_drag_h_stop_cb(void *data,
    sid->freeze = sid->freeze_want;
 }
 
+/**
+ * @brief Callback for Edje horizontal scrollbar "drag,set", "drag,step", "drag,page" signals.
+ * @param data The scrollable interface data.
+ * @param obj The Edje object (unused).
+ * @param emission Signal name (unused).
+ * @param source Signal source (unused).
+ *
+ * Updates the content position based on the scrollbar's new value.
+ */
 static void
 _elm_scroll_edje_drag_h_cb(void *data,
                            Evas_Object *obj EINA_UNUSED,
@@ -1322,6 +1668,18 @@ _elm_interface_scrollable_content_min_limit(Eo *obj EINA_UNUSED, Elm_Scrollable_
    sid->cb_func.content_min_limit(sid->obj, w, h);
 }
 
+/**
+ * @brief Calculates the equivalent X-coordinate in a mirrored (Right-To-Left) layout.
+ * @param obj The scrollable Evas_Object.
+ * @param x The X-coordinate in a Left-To-Right layout.
+ * @return The corresponding X-coordinate for a mirrored layout.
+ *
+ * This is used to convert scroll positions when the UI is in RTL mode.
+ * The formula effectively reverses the coordinate from the right edge.
+ * Example: If content width is 1000, viewport width is 200, min pan x is 0.
+ * An LTR x of 0 (scrolled to left) becomes 1000 - 200 - 0 = 800 in RTL (scrolled to right).
+ * An LTR x of 800 (scrolled to right) becomes 1000 - 200 - 800 = 0 in RTL (scrolled to left).
+ */
 static Evas_Coord
 _elm_scroll_x_mirrored_get(const Evas_Object *obj,
                            Evas_Coord x)
@@ -1341,8 +1699,19 @@ _elm_scroll_x_mirrored_get(const Evas_Object *obj,
    return (ret >= min) ? ret : min;
 }
 
-/* Update the wanted coordinates according to the x, y passed
- * widget directionality, content size and etc. */
+/**
+ * @brief Updates the "wanted" scroll coordinates (sid->wx, sid->wy).
+ * @param sid The scrollable interface data.
+ * @param x The desired horizontal scroll position.
+ * @param y The desired vertical scroll position.
+ *
+ * This function takes target x and y coordinates and stores them in
+ * `sid->wx` and `sid->wy`. It applies constraints such as min/max scroll
+ * positions, mirroring (RTL), and looping. These "wanted" coordinates
+ * are then used by other functions (e.g., `_elm_scroll_wanted_region_set`)
+ * to actually perform the scroll, often after resizes or at the end of
+ * animations.
+ */
 static void
 _elm_scroll_wanted_coordinates_update(Elm_Scrollable_Smart_Interface_Data *sid,
                                       Evas_Coord x,
@@ -1381,6 +1750,17 @@ _elm_scroll_wanted_coordinates_update(Elm_Scrollable_Smart_Interface_Data *sid,
    else sid->wy = y;
 }
 
+/**
+ * @brief Finalizes a momentum scroll animation.
+ * @param sid The scrollable interface data.
+ *
+ * This function is called when a momentum animation naturally completes or
+ * needs to be stopped. It disconnects the momentum animator, resets related
+ * state variables (like acceleration, displacement), and if the content was
+ * resized during the animation, it calls `_elm_scroll_wanted_region_set`
+ * to ensure the view is consistent. It avoids stopping if bounce animations
+ * are still active, as momentum might transition into a bounce.
+ */
 static void
 _elm_scroll_momentum_end(Elm_Scrollable_Smart_Interface_Data *sid)
 {
@@ -1511,6 +1891,16 @@ _elm_scroll_bounce_y_animator(void *data, const Efl_Event *event EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Evaluates if a bounce animation is needed and initiates it.
+ * @param sid The scrollable interface data.
+ *
+ * This function is called when the content is scrolled beyond its boundaries
+ * (if bouncing is enabled). It calculates the target bounce-back position
+ * (to the edge of the content) and starts the bounce animator(s) for X and/or Y axes
+ * if not already running and not disabled. It also handles stopping any
+ * scroll_to animators if a bounce is initiated.
+ */
 static void
 _elm_scroll_bounce_eval(Elm_Scrollable_Smart_Interface_Data *sid)
 {
@@ -1816,8 +2206,23 @@ _elm_interface_scrollable_efl_ui_i18n_mirrored_set(Eo *obj, Elm_Scrollable_Smart
    efl_ui_mirrored_set(efl_super(obj, ELM_INTERFACE_SCROLLABLE_MIXIN), mirrored);
 }
 
-/* returns TRUE when we need to move the scroller, FALSE otherwise.
- * Updates w and h either way, so save them if you need them. */
+/**
+ * @brief Internal logic to calculate the scroll position to make a specific region visible.
+ * @param obj The scrollable Evas_Object.
+ * @param[in,out] _x Pointer to the target X-coordinate of the region to show.
+ *                   On output, this is updated to the actual X scroll position.
+ * @param[in,out] _y Pointer to the target Y-coordinate of the region to show.
+ *                   On output, this is updated to the actual Y scroll position.
+ * @param w Width of the region to show.
+ * @param h Height of the region to show.
+ * @return EINA_TRUE if the scroller needs to be moved to show the region, EINA_FALSE otherwise.
+ *
+ * This function calculates the necessary scroll position (px, py) to ensure the
+ * rectangle defined by (*_x, *_y, w, h) is visible within the viewport.
+ * It handles cases where the region is already visible, or needs to be panned
+ * into view. It also stops any ongoing animations (scroll_to, bounce, momentum, hold)
+ * and considers paging if enabled. The calculated scroll position is returned via _x and _y.
+ */
 static Eina_Bool
 _elm_scroll_content_region_show_internal(Evas_Object *obj,
                                          Evas_Coord *_x,
@@ -2008,6 +2413,18 @@ _elm_scroll_wanted_region_set(Evas_Object *obj)
    elm_interface_scrollable_content_region_set(obj, wx, sid->wy, ww, wh);
 }
 
+/**
+ * @brief Job function to handle scroll wheel events when animations are disabled.
+ * @param data The scrollable interface data (Elm_Scrollable_Smart_Interface_Data *).
+ * @param v The Eina_Value passed through the future chain.
+ * @param dead The future that resolved to trigger this job (unused).
+ * @return The input Eina_Value `v`.
+ *
+ * This function is scheduled as a job when scroll animations are disabled
+ * (`_elm_config->scroll_animation_disable` is true). It directly sets the
+ * content position to the wanted coordinates (sid->wx, sid->wy) and updates
+ * current page info if paging is enabled.
+ */
 static Eina_Value
 _scroll_wheel_post_event_job(void *data, const Eina_Value v,
                              const Eina_Future *dead EINA_UNUSED)
@@ -2024,6 +2441,17 @@ _scroll_wheel_post_event_job(void *data, const Eina_Value v,
    return v;
 }
 
+/**
+ * @brief Initiates scrolling based on wheel event calculations.
+ * @param sid The scrollable interface data.
+ * @param x The target horizontal scroll position.
+ * @param y The target vertical scroll position.
+ *
+ * This function is called after wheel event processing to actually move the
+ * scroller. If animations are disabled, it posts a job (`_scroll_wheel_post_event_job`)
+ * to set the position. Otherwise, it starts `scroll_to_x` and `scroll_to_y`
+ * animations. It respects hold and freeze states.
+ */
 static inline void
 _scroll_wheel_post_event_go(Elm_Scrollable_Smart_Interface_Data *sid, int x, int y)
 {
@@ -2044,6 +2472,19 @@ _scroll_wheel_post_event_go(Elm_Scrollable_Smart_Interface_Data *sid, int x, int
      }
 }
 
+/**
+ * @brief Post-event callback for mouse wheel events.
+ * @param data The scrollable interface data (Elm_Scrollable_Smart_Interface_Data *).
+ * @param e Evas canvas (unused).
+ * @return EINA_TRUE if the event should not propagate further (if it caused a scroll and hold), EINA_FALSE otherwise.
+ *
+ * This function is pushed by `_elm_scroll_wheel_event_cb` to be executed after
+ * other event handlers. It calculates the scroll delta based on wheel input (ev->z),
+ * step sizes, paging configuration, and acceleration. It stops any ongoing
+ * animations and then calls `_scroll_wheel_post_event_go` to initiate the scroll.
+ * It also implements a "hold" mechanism for continuous scrolling if wheel events
+ * arrive rapidly.
+ */
 static Eina_Bool
 _scroll_wheel_post_event_cb(void *data, Evas *e EINA_UNUSED)
 {
@@ -2242,6 +2683,19 @@ _scroll_wheel_post_event_cb(void *data, Evas *e EINA_UNUSED)
    return !hold;
 }
 
+/**
+ * @brief Main Evas callback for mouse wheel events on the event rectangle.
+ * @param data The scrollable interface data (Elm_Scrollable_Smart_Interface_Data *).
+ * @param e Evas canvas.
+ * @param obj The event rectangle object (unused).
+ * @param event_info Pointer to Evas_Event_Mouse_Wheel structure.
+ *
+ * This function is the initial handler for EVAS_CALLBACK_MOUSE_WHEEL.
+ * It checks for event flags (ON_HOLD), modifiers (Ctrl, Alt, etc.), and
+ * movement block flags. If the event is valid for scrolling, it pushes
+ * `_scroll_wheel_post_event_cb` to Evas's post-event callback queue
+ * for deferred processing.
+ */
 static void
 _elm_scroll_wheel_event_cb(void *data,
                            Evas *e,
@@ -2276,6 +2730,15 @@ _elm_scroll_wheel_event_cb(void *data,
    evas_post_event_callback_push(e, _scroll_wheel_post_event_cb, sid);
 }
 
+/**
+ * @brief Post-event callback for mouse up events.
+ * @param data The scrollable interface data (Elm_Scrollable_Smart_Interface_Data *).
+ * @param e Evas canvas (unused).
+ * @return EINA_TRUE always.
+ *
+ * This function is pushed by `_elm_scroll_mouse_up_event_cb` to be executed
+ * after other event handlers. It resets the scroll lock on the widget to default.
+ */
 static Eina_Bool
 _elm_scroll_post_event_up(void *data,
                           Evas *e EINA_UNUSED)
@@ -3085,6 +3548,16 @@ _elm_scroll_mouse_down_event_cb(void *data,
      sid->down.want_reset = EINA_FALSE;
 }
 
+/**
+ * @brief Checks if scrolling is currently possible in a given direction.
+ * @param sid The scrollable interface data.
+ * @param dir The direction to check (LEFT, RIGHT, UP, DOWN).
+ * @return EINA_TRUE if scrolling is possible in the given direction, EINA_FALSE otherwise.
+ *
+ * This function compares the current pan position (px, py) with the minimum
+ * (minx, miny) and maximum (mx, my) scrollable positions to determine if
+ * further movement in the specified `dir` is feasible.
+ */
 static Eina_Bool
 _elm_scroll_can_scroll(Elm_Scrollable_Smart_Interface_Data *sid,
                        int dir)
@@ -3120,6 +3593,19 @@ _elm_scroll_can_scroll(Elm_Scrollable_Smart_Interface_Data *sid,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Traverses widget hierarchy upwards to check if any parent scrollable allows bouncing.
+ * @param obj The starting Evas_Object (typically the current scrollable widget).
+ * @param[out] horiz Pointer to store EINA_TRUE if horizontal bounce is allowed by any parent, EINA_FALSE otherwise.
+ * @param[out] vert Pointer to store EINA_TRUE if vertical bounce is allowed by any parent, EINA_FALSE otherwise.
+ *
+ * This function iterates through the parent widgets of `obj`. If a parent
+ * implements the scrollable interface, it queries its bounce allowance settings.
+ * The output parameters `horiz` and `vert` are set to EINA_TRUE if any parent
+ * in the chain allows bouncing in the respective direction. This is used to
+ * determine if a drag should be passed up to a parent scroller if the current
+ * scroller cannot scroll further and bouncing is disallowed by parents.
+ */
 static inline void
 _elm_widget_parents_bounce_get(Eo *obj, Eina_Bool *horiz, Eina_Bool *vert)
 {
@@ -3144,6 +3630,19 @@ _elm_widget_parents_bounce_get(Eo *obj, Eina_Bool *horiz, Eina_Bool *vert)
    while (parent_obj);
 }
 
+/**
+ * @brief Post-event callback for mouse move events to initiate dragging.
+ * @param data The scrollable interface data (Elm_Scrollable_Smart_Interface_Data *).
+ * @param e Evas canvas (unused).
+ * @return EINA_TRUE always.
+ *
+ * This function is pushed by `_elm_scroll_mouse_move_event_cb` after a potential
+ * drag has been detected (i.e., `sid->down.want_dragged` is true).
+ * It checks if dragging can actually start based on scroll locks, parent bounce
+ * allowance, and whether the current scroller can scroll in the intended direction.
+ * If dragging starts, it sets `sid->down.dragged` to EINA_TRUE, updates the
+ * widget's scroll lock, and calls `_elm_scroll_drag_start`.
+ */
 static Eina_Bool
 _elm_scroll_post_event_move(void *data,
                             Evas *e EINA_UNUSED)
@@ -3226,6 +3725,19 @@ _elm_scroll_post_event_move(void *data,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Evaluates and adjusts scroll coordinates during a drag operation, applying border friction.
+ * @param sid The scrollable interface data.
+ * @param[in,out] x Pointer to the current horizontal scroll target. Modified by this function.
+ * @param[in,out] y Pointer to the current vertical scroll target. Modified by this function.
+ *
+ * This function calculates the new scroll position based on the mouse/touch
+ * movement since the drag started (`sid->down.x`, `sid->down.y`). It considers
+ * whether scrolling is active in X and/or Y directions (`sid->down.dir_x`,
+ * `sid->down.dir_y`) and applies "border friction" if the drag attempts to
+ * pull the content beyond its boundaries (and looping is not enabled).
+ * Border friction makes it harder to drag past the edge, giving a rubber-band effect.
+ */
 static void
 _elm_scroll_down_coord_eval(Elm_Scrollable_Smart_Interface_Data *sid,
                             Evas_Coord *x,
@@ -3268,6 +3780,18 @@ _elm_scroll_down_coord_eval(Elm_Scrollable_Smart_Interface_Data *sid,
        _elm_config->thumbscroll_border_friction;
 }
 
+/**
+ * @brief Ecore_Idle_Enterer callback for smooth scrolling during drag.
+ * @param data The scrollable interface data (Elm_Scrollable_Smart_Interface_Data *).
+ * @return EINA_FALSE to remove the idle enterer after execution.
+ *
+ * This function is scheduled by `_elm_scroll_hold_animator` to run just before
+ * drawing the next frame. It calculates a smoothed scroll position based on
+ * recent drag history (`sid->down.history`) if smooth scrolling is enabled.
+ * It then applies this smoothed position (or the direct target position
+ * `sid->down.hold_x/y` if smoothing is off) to the scroller.
+ * This helps make drag scrolling feel less jerky.
+ */
 static Eina_Bool
 _elm_scroll_hold_enterer(void *data)
 {
@@ -3774,6 +4298,16 @@ _elm_scroll_mouse_move_event_cb(void *data,
      }
 }
 
+/**
+ * @brief Adjusts the scroll position to snap to page boundaries if paging is enabled.
+ * @param sid The scrollable interface data.
+ *
+ * If paging is active, this function calculates the correct X and Y coordinates
+ * for the current page (based on `_elm_scroll_page_x_get` and `_elm_scroll_page_y_get`
+ * with no offset) and sets the content region to that page. This is often
+ * called after resizes or when paging parameters change to ensure the view
+ * aligns with page boundaries.
+ */
 static void
 _elm_scroll_page_adjust(Elm_Scrollable_Smart_Interface_Data *sid)
 {
@@ -3790,6 +4324,13 @@ _elm_scroll_page_adjust(Elm_Scrollable_Smart_Interface_Data *sid)
    elm_interface_scrollable_content_region_set(sid->obj, x, y, w, h);
 }
 
+/**
+ * @brief Reconfigures the scroller, typically after size or content changes.
+ * @param sid The scrollable interface data.
+ *
+ * This function calls `_elm_scroll_scroll_bar_size_adjust` to update
+ * scrollbar sizes and `_elm_scroll_page_adjust` to snap to pages if needed.
+ */
 static void
 _elm_scroll_reconfigure(Elm_Scrollable_Smart_Interface_Data *sid)
 {
@@ -3797,6 +4338,16 @@ _elm_scroll_reconfigure(Elm_Scrollable_Smart_Interface_Data *sid)
    _elm_scroll_page_adjust(sid);
 }
 
+/**
+ * @brief Callback for EVAS_CALLBACK_MOVE on the Edje object.
+ * @param data The scrollable interface data.
+ * @param e Evas canvas (unused).
+ * @param edje_obj The Edje object that moved.
+ * @param event_info Event-specific information (unused).
+ *
+ * Updates the stored x, y coordinates of the scroller and calls
+ * `_elm_scroll_reconfigure`.
+ */
 static void
 _on_edje_move(void *data,
               Evas *e EINA_UNUSED,
@@ -3814,6 +4365,18 @@ _on_edje_move(void *data,
    _elm_scroll_reconfigure(sid);
 }
 
+/**
+ * @brief Callback for EVAS_CALLBACK_RESIZE on the Edje object.
+ * @param data The scrollable interface data.
+ * @param e Evas canvas.
+ * @param edje_obj The Edje object that was resized.
+ * @param event_info Event-specific information (unused).
+ *
+ * Updates the stored w, h dimensions of the scroller. It includes logic
+ * to prevent excessive reconfiguration if multiple resize events occur
+ * within the same Evas calculation cycle. Calls `_elm_scroll_reconfigure`
+ * and `_elm_scroll_wanted_region_set`.
+ */
 static void
 _on_edje_resize(void *data,
                 Evas *e,
@@ -3845,6 +4408,15 @@ _on_edje_resize(void *data,
    _elm_scroll_wanted_region_set(sid->obj);
 }
 
+/**
+ * @brief Attaches necessary event callbacks and signal handlers to the Edje object.
+ * @param obj The scrollable Evas_Object.
+ *
+ * Sets up callbacks for Edje object's move, resize, and "reload" signals.
+ * If the theme has scrollbars, it also attaches callbacks for various
+ * drag-related signals from the scrollbar parts (e.g., "drag", "drag,start",
+ * "drag,stop", "elm,vbar,press").
+ */
 static void
 _scroll_edje_object_attach(Evas_Object *obj)
 {
@@ -3924,6 +4496,13 @@ _scroll_edje_object_attach(Evas_Object *obj)
      _elm_scroll_hbar_unpress_cb, sid);
 }
 
+/**
+ * @brief Attaches mouse event callbacks to the event rectangle.
+ * @param obj The scrollable Evas_Object.
+ *
+ * Sets up Evas callbacks on `sid->event_rect` for MOUSE_WHEEL, MOUSE_DOWN,
+ * MOUSE_UP, and MOUSE_MOVE events, which drive the core scrolling interactions.
+ */
 static void
 _scroll_event_object_attach(Evas_Object *obj)
 {
@@ -3943,6 +4522,13 @@ _scroll_event_object_attach(Evas_Object *obj)
      _elm_scroll_mouse_move_event_cb, sid);
 }
 
+/**
+ * @brief Detaches event callbacks and signal handlers from the Edje object.
+ * @param obj The scrollable Evas_Object.
+ *
+ * This is the counterpart to `_scroll_edje_object_attach`, removing all
+ * previously added callbacks and signal handlers from `sid->edje_obj`.
+ */
 static void
 _scroll_edje_object_detach(Evas_Object *obj)
 {
@@ -4019,6 +4605,13 @@ _scroll_edje_object_detach(Evas_Object *obj)
      _elm_scroll_hbar_unpress_cb, sid);
 }
 
+/**
+ * @brief Detaches mouse event callbacks from the event rectangle.
+ * @param obj The scrollable Evas_Object.
+ *
+ * This is the counterpart to `_scroll_event_object_attach`, removing all
+ * Evas event callbacks from `sid->event_rect`.
+ */
 static void
 _scroll_event_object_detach(Evas_Object *obj)
 {
@@ -4126,6 +4719,15 @@ _elm_interface_scrollable_objects_set(Eo *obj, Elm_Scrollable_Smart_Interface_Da
    _elm_scroll_scroll_bar_visibility_adjust(sid);
 }
 
+/**
+ * @brief Resets the scrollbars and pan position to their initial state.
+ * @param sid The scrollable interface data.
+ *
+ * Sets scrollbar drag values to 0.0 (top/left). If there's no content,
+ * it sets scrollbar thumb sizes to full (1.0). It also sets the pan
+ * position to its minimum (usually 0,0) and emits a scroll signal if
+ * the position changed. Finally, it re-evaluates direction arrows.
+ */
 static void
 _elm_scroll_scroll_bar_reset(Elm_Scrollable_Smart_Interface_Data *sid)
 {
@@ -4171,6 +4773,17 @@ _elm_scroll_scroll_bar_reset(Elm_Scrollable_Smart_Interface_Data *sid)
    _elm_direction_arrows_eval(sid, EINA_TRUE);
 }
 
+/**
+ * @brief Callback for EVAS_CALLBACK_RESIZE on the pan object.
+ * @param data The scrollable interface data.
+ * @param e Evas canvas (unused).
+ * @param obj The pan object that was resized (unused).
+ * @param event_info Event-specific information (unused).
+ *
+ * This callback is invoked when the pan object itself (the viewport for
+ * the content) is resized. If a `content_viewport_resize` callback is
+ * registered by the user, it's called with the new viewport dimensions.
+ */
 static void
 _elm_scroll_pan_resized_cb(void *data,
                           Evas *e EINA_UNUSED,
@@ -4188,7 +4801,18 @@ _elm_scroll_pan_resized_cb(void *data,
      }
 }
 
-/* even external pan objects get this */
+/**
+ * @brief Callback for ELM_PAN_EVENT_CHANGED from the pan object.
+ * @param data The scrollable interface data.
+ * @param event The Efl_Event (unused).
+ *
+ * This callback is invoked when the pan object's content size changes.
+ * It updates the stored content dimensions (`sid->content_info.w`, `sid->content_info.h`),
+ * adjusts scrollbar sizes, updates the Edje object's min size hint,
+ * marks content as resized, and calls `_elm_scroll_wanted_region_set`
+ * to potentially adjust scroll position due to gravity or other factors.
+ * This applies to both internal and external pan objects.
+ */
 static void
 _elm_scroll_pan_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -4211,6 +4835,18 @@ _elm_scroll_pan_changed_cb(void *data, const Efl_Event *event EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback for EVAS_CALLBACK_DEL on the scrollable content object.
+ * @param data The scrollable interface data.
+ * @param e Evas canvas (unused).
+ * @param obj The content object being deleted (unused).
+ * @param event_info Event-specific information (unused).
+ *
+ * When the main scrollable content (`sid->content`) is deleted, this
+ * function nullifies the `sid->content` pointer and calls functions to
+ * adjust and reset the scrollbars, reflecting that there's no longer
+ * content to scroll.
+ */
 static void
 _elm_scroll_content_del_cb(void *data,
                            Evas *e EINA_UNUSED,
@@ -4967,6 +5603,17 @@ _elm_interface_scrollable_efl_object_constructor(Eo *obj, Elm_Scrollable_Smart_I
    return o;
 }
 
+/**
+ * @brief Iterator filter callback for focus manager's border elements.
+ * @param iterator The Eina_Iterator being filtered (unused).
+ * @param data The current element from the iterator (an Efl_Ui_Focus_Object *).
+ * @param fdata The filter data (an Eina_Rectangle * representing the viewport).
+ * @return EINA_TRUE if the element `data` is at least partially inside the viewport `fdata`, EINA_FALSE otherwise.
+ *
+ * This function is used to filter the list of all focusable elements
+ * managed by the focus manager, returning only those that are currently
+ * (at least partially) visible within the scroller's viewport.
+ */
 static Eina_Bool
 _filter_cb(const void *iterator EINA_UNUSED, void *data, void *fdata)
 {

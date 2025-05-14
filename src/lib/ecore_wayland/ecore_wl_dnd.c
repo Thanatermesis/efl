@@ -31,36 +31,219 @@
 #include "ecore_wl_private.h"
 
 /* local structures */
+/**
+ * @internal
+ * @brief Helper structure to associate a DND source with its read file descriptor.
+ *
+ * This is used when asynchronously reading data from a DND offer, particularly
+ * within the epoll-based data reading mechanism.
+ */
 struct _dnd_source
 {
-   Ecore_Wl_Dnd_Source *source;
-   int read_fd;
+   Ecore_Wl_Dnd_Source *source; /**< The Ecore Wayland DND source object, which holds the wl_data_offer. */
+   int read_fd;                 /**< The file descriptor created from a pipe, used to read incoming data. */
 };
 
+/**
+ * @internal
+ * @brief Structure to hold data and callback for an Ecore Fd Handler-like task.
+ *
+ * This structure is used with the epoll mechanism to encapsulate the context
+ * (struct _dnd_source) and the callback function (_ecore_wl_dnd_selection_data_read)
+ * for handling DND data reading when the associated file descriptor becomes readable.
+ */
 struct _dnd_task
 {
-   void *data;
-   Ecore_Fd_Cb cb;
+   void *data;    /**< Custom data to be passed to the callback, typically a struct _dnd_source. */
+   Ecore_Fd_Cb cb; /**< The callback function to execute when the fd is ready for I/O. */
 };
 
+/**
+ * @internal
+ * @brief Context for managing epoll-based DND data reading.
+ *
+ * This structure holds the epoll file descriptor and the event structure
+ * used for monitoring the DND data pipe. It's passed to the idler callback
+ * `_ecore_wl_dnd_selection_cb_idle`.
+ */
 struct _dnd_read_ctx
 {
-   int epoll_fd;
-   struct epoll_event *ep;
+   int epoll_fd;          /**< The epoll instance file descriptor. */
+   struct epoll_event *ep; /**< Pointer to the epoll_event structure used for monitoring. */
 };
 
 /* local function prototypes */
+/**
+ * @internal
+ * @brief Initiates the process of receiving data for a specific MIME type from a DND source.
+ *
+ * This function sets up a pipe and uses epoll to asynchronously read data
+ * offered by the DND source (via its `wl_data_offer`). It is called when the
+ * application requests data of a certain `type` from the current selection or drag
+ * (e.g., via `ecore_wl_dnd_selection_get` or `ecore_wl_dnd_drag_get`).
+ * The actual reading is handled by `_ecore_wl_dnd_selection_data_read` triggered
+ * by `_ecore_wl_dnd_selection_cb_idle`.
+ *
+ * @param source The DND source (encapsulating a `wl_data_offer`) from which to receive data.
+ * @param type The MIME type of the data to receive (e.g., "text/plain").
+ */
 static void _ecore_wl_dnd_selection_data_receive(Ecore_Wl_Dnd_Source *source, const char *type);
+
+/**
+ * @internal
+ * @brief Reads available data from the DND source's file descriptor.
+ *
+ * This function is registered as a callback (indirectly via an idler and epoll)
+ * to be called when data is available on the pipe set up by
+ * `_ecore_wl_dnd_selection_data_receive`. It reads a chunk of data and
+ * emits an `ECORE_WL_EVENT_SELECTION_DATA_READY` Ecore event.
+ *
+ * @param data A pointer to a `struct _dnd_source` containing the DND source
+ *             and the read file descriptor.
+ * @param fd_handler The Ecore_Fd_Handler that triggered this callback (unused, as
+ *                   this is driven by an epoll mechanism managed by an idler).
+ * @return `ECORE_CALLBACK_RENEW` if more data might be available or data was read,
+ *         `ECORE_CALLBACK_CANCEL` if reading is complete (EOF) or an error occurred.
+ */
 static Eina_Bool _ecore_wl_dnd_selection_data_read(void *data, Ecore_Fd_Handler *fd_handler EINA_UNUSED);
+
+/**
+ * @internal
+ * @brief Frees the data associated with an `ECORE_WL_EVENT_SELECTION_DATA_READY` event.
+ *
+ * This function is registered as the free callback when an
+ * `ECORE_WL_EVENT_SELECTION_DATA_READY` event is added to the Ecore event queue.
+ * It is responsible for freeing the event structure itself and any dynamically
+ * allocated data within it (specifically, the `data` buffer containing the
+ * received content).
+ *
+ * @param data User data passed to `ecore_event_add` (unused in this case).
+ * @param event A pointer to the `Ecore_Wl_Event_Selection_Data_Ready` event structure.
+ */
 static void _ecore_wl_dnd_selection_data_ready_cb_free(void *data EINA_UNUSED, void *event);
+
+/**
+ * @internal
+ * @brief Idle handler callback for processing DND data using epoll.
+ *
+ * This function is added as an Ecore idler. On each invocation, it calls
+ * `epoll_wait` with a timeout of 0 (non-blocking) to check if the DND data
+ * file descriptor (monitored by epoll) has data available for reading.
+ * If data is ready, it invokes the registered callback (which is
+ * `_ecore_wl_dnd_selection_data_read`) to process the data.
+ * This idler is removed when the callback signals completion or an error.
+ *
+ * This approach is used as an alternative to `ecore_main_fd_handler_add`
+ * due to issues mentioned in http://trac.enlightenment.org/e/ticket/1208.
+ *
+ * @param data A pointer to a `struct _dnd_read_ctx`, which contains the
+ *             epoll file descriptor and event structure.
+ * @return `ECORE_CALLBACK_RENEW` to keep the idler running.
+ *         `ECORE_CALLBACK_CANCEL` to remove the idler (e.g., when the
+ *         data transfer is complete or an error occurs).
+ */
 static Eina_Bool _ecore_wl_dnd_selection_cb_idle(void *data);
 
-static void _ecore_wl_dnd_source_cb_target(void *data, struct wl_data_source *source EINA_UNUSED, const char *mime_type EINA_UNUSED);
+/**
+ * @internal
+ * @brief Wayland data source listener callback for the 'target' event.
+ *
+ * This callback is invoked by the Wayland compositor when a client (the target
+ * application of a drag or selection) indicates it can accept one of the
+ * MIME types offered by our data source. If `mime_type` is NULL, it means
+ * the target is no longer interested in any of the offered types, or the
+ * data source is being destroyed.
+ *
+ * This function creates and sends an `ECORE_WL_EVENT_DATA_SOURCE_TARGET` Ecore
+ * event to notify the application.
+ *
+ * @param data The `Ecore_Wl_Input` associated with this data source.
+ * @param source The `wl_data_source` object that emitted this event (unused).
+ * @param mime_type The MIME type that the target has chosen. If NULL, it
+ *                  indicates the target is no longer interested or the data
+ *                  source is being destroyed without a target.
+ */
+static void _ecore_wl_dnd_source_cb_target(void *data, struct wl_data_source *source EINA_UNUSED, const char *mime_type);
+
+/**
+ * @internal
+ * @brief Frees data associated with an `ECORE_WL_EVENT_DATA_SOURCE_TARGET` event.
+ *
+ * Registered as a free callback for `ECORE_WL_EVENT_DATA_SOURCE_TARGET` events.
+ * Frees the event structure and its `type` string.
+ *
+ * @param data User data (unused).
+ * @param event The `Ecore_Wl_Event_Data_Source_Target` event to free.
+ */
 static void _ecore_wl_dnd_source_cb_target_free(void *data EINA_UNUSED, void *event);
+
+/**
+ * @internal
+ * @brief Wayland data source listener callback for the 'send' event.
+ *
+ * This callback is invoked when a client (target application) requests
+ * the actual data for a specific MIME type that our data source offers.
+ * The compositor provides a file descriptor (`fd`) into which our
+ * application should write the data.
+ *
+ * This function generates an `ECORE_WL_EVENT_DATA_SOURCE_SEND` Ecore event,
+ * passing the MIME type and file descriptor to the application. The
+ * application is then responsible for writing the data to the `fd` and
+ * closing it.
+ *
+ * @param data The `Ecore_Wl_Input` associated with this data source.
+ * @param source The `wl_data_source` object (unused in this function).
+ * @param mime_type The MIME type for which data is requested.
+ * @param fd The file descriptor to write the data into.
+ */
 static void _ecore_wl_dnd_source_cb_send(void *data, struct wl_data_source *source EINA_UNUSED, const char *mime_type, int32_t fd);
+/**
+ * @internal
+ * @brief Frees data associated with an `ECORE_WL_EVENT_DATA_SOURCE_SEND` event.
+ *
+ * Registered as a free callback for `ECORE_WL_EVENT_DATA_SOURCE_SEND` events.
+ * Frees the event structure and its `type` string.
+ *
+ * @param data User data (unused).
+ * @param event The `Ecore_Wl_Event_Data_Source_Send` event to free.
+ */
 static void _ecore_wl_dnd_source_cb_send_free(void *data EINA_UNUSED, void *event);
+
+/**
+ * @internal
+ * @brief Wayland data source listener callback for the 'cancelled' event.
+ *
+ * This callback is invoked by the Wayland compositor when the data source
+ * is no longer valid and will not be used again (e.g., the drag was
+ * cancelled, selection was replaced, or the client was destroyed).
+ * The application should destroy the `wl_data_source` object.
+ *
+ * This function destroys the `source` and generates an
+ * `ECORE_WL_EVENT_DATA_SOURCE_CANCELLED` Ecore event.
+ *
+ * @param data The `Ecore_Wl_Input` associated with this data source.
+ * @param source The `wl_data_source` object that was cancelled.
+ */
 static void _ecore_wl_dnd_source_cb_cancelled(void *data EINA_UNUSED, struct wl_data_source *source);
 
+/**
+ * @internal
+ * @brief Wayland data offer listener callback for the 'offer' event.
+ *
+ * This callback is invoked by the Wayland compositor for each MIME type
+ * that a data offer supports. When a new data offer is introduced (e.g.,
+ * during a drag enter or when a new selection is available), this event
+ * will be emitted multiple times, once for each type like "text/plain",
+ * "image/png", etc., that the source is offering.
+ *
+ * This function adds the advertised `type` (by duplicating it) to the list of types
+ * stored in the `Ecore_Wl_Dnd_Source` associated with the `data_offer`.
+ *
+ * @param data A pointer to the `Ecore_Wl_Dnd_Source` associated with this data offer.
+ *             This is the private data set when the listener was added.
+ * @param data_offer The `wl_data_offer` object that is advertising the type (unused).
+ * @param type The MIME type being offered (e.g., "text/plain").
+ */
 static void _ecore_wl_dnd_offer_cb_offer(void *data, struct wl_data_offer *data_offer EINA_UNUSED, const char *type);
 
 /* local wayland interfaces */
@@ -134,6 +317,18 @@ ecore_wl_dnd_selection_has_owner(Ecore_Wl_Dnd *dnd)
 
 /**
  * @ingroup Ecore_Wl_Dnd_Group
+ * @brief Sets the current selection (clipboard) data source.
+ *
+ * This function creates a new Wayland data source, offers the specified MIME types,
+ * and sets it as the current selection for the given input device.
+ * The application will later receive 'target' and 'send' events on this
+ * data source when another application attempts to paste the selection.
+ *
+ * @param input The Ecore_Wl_Input representing the seat.
+ * @param types_offered A NULL-terminated array of C strings, where each string is a
+ *                      MIME type being offered.
+ *                      Example: `const char *types[] = {"text/plain;charset=utf-8", "text/uri-list", NULL};`
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., cannot create data source).
  * @since 1.8
  */
 EAPI Eina_Bool
@@ -190,6 +385,17 @@ ecore_wl_dnd_selection_set(Ecore_Wl_Input *input, const char **types_offered)
 
 /**
  * @ingroup Ecore_Wl_Dnd_Group
+ * @brief Requests data for a specific MIME type from the current selection owner.
+ *
+ * If there is a current selection and it offers the requested `type`, this
+ * function initiates the data transfer. The actual data will be delivered
+ * asynchronously via `ECORE_WL_EVENT_SELECTION_DATA_READY` events.
+ *
+ * @param input The Ecore_Wl_Input representing the seat.
+ * @param type The desired MIME type to request from the selection.
+ *             Example: `"text/plain;charset=utf-8"`.
+ * @return EINA_TRUE if the request was successfully initiated, EINA_FALSE otherwise
+ *         (e.g., no selection owner, or requested type not offered).
  * @since 1.8
  */
 EAPI Eina_Bool
@@ -371,6 +577,17 @@ ecore_wl_dnd_drag_get(Ecore_Wl_Input *input, const char *type)
 
 /**
  * @ingroup Ecore_Wl_Dnd_Group
+ * @brief Sets the MIME types offered for an upcoming drag-and-drop operation.
+ *
+ * This function creates or updates the data source that will be used when
+ * `ecore_wl_dnd_drag_start()` is called. It specifies the list of MIME types
+ * that this client can provide if a drop occurs.
+ *
+ * @param input The Ecore_Wl_Input representing the seat. If NULL, the default
+ *              display's input is used.
+ * @param types_offered A NULL-terminated array of C strings, where each string is a
+ *                      MIME type being offered for the drag.
+ *                      Example: `const char *types[] = {"text/plain", "application/x-my-custom-type", NULL};`
  * @since 1.8
  */
 EAPI void
@@ -421,6 +638,28 @@ ecore_wl_dnd_drag_types_set(Ecore_Wl_Input *input, const char **types_offered)
 
 /**
  * @ingroup Ecore_Wl_Dnd_Group
+ * @brief Gets the list of MIME types currently set for an outgoing drag operation.
+ *
+ * This retrieves the types previously set by `ecore_wl_dnd_drag_types_set()`.
+ *
+ * @param input The Ecore_Wl_Input representing the seat. If NULL, the default
+ *              display's input is used.
+ * @return A pointer to a `struct wl_array` containing the offered MIME types.
+ *         Each element in the array is a `char *` (string).
+ *         The array is owned by `Ecore_Wl_Input` and must not be modified or freed
+ *         by the caller. Its lifetime is tied to the input's internal data source
+ *         state for DND operations. Returns NULL if input is invalid or no types are set.
+ *         Example of iterating:
+ *         <pre>
+ *         struct wl_array *types_array = ecore_wl_dnd_drag_types_get(input);
+ *         if (types_array) {
+ *            char **type_ptr;
+ *            wl_array_for_each(type_ptr, types_array) {
+ *               if (*type_ptr) // Important: last element might be NULL from _ecore_wl_dnd_selection
+ *                 printf("Offered DND type: %s\n", *type_ptr);
+ *            }
+ *         }
+ *         </pre>
  * @since 1.8
  */
 EAPI struct wl_array *
@@ -436,6 +675,29 @@ ecore_wl_dnd_drag_types_get(Ecore_Wl_Input *input)
 }
 
 /* private functions */
+/**
+ * @internal
+ * @brief Creates and initializes an `Ecore_Wl_Dnd_Source` for a new Wayland data offer.
+ *
+ * This function is called when the compositor introduces a new data offer,
+ * typically associated with a drag-and-drop operation entering a window or
+ * a new clipboard selection becoming available. It allocates an
+ * `Ecore_Wl_Dnd_Source` structure, initializes its type array, sets its
+ * reference count, associates it with the given `Ecore_Wl_Input` and
+ * `wl_data_offer`, and adds a listener (`_ecore_wl_dnd_offer_listener`)
+ * to the `wl_data_offer`. This listener will subsequently receive the
+ * offered MIME types via the `_ecore_wl_dnd_offer_cb_offer` callback.
+ *
+ * The newly created `Ecore_Wl_Dnd_Source` is then set as user data for the
+ * `wl_data_offer`, allowing it to be retrieved later when events related
+ * to this offer are received.
+ *
+ * @param input The `Ecore_Wl_Input` associated with the current seat/device.
+ * @param data_device The `wl_data_device` (unused in this function, but part of
+ *                    the Wayland event signature that might lead to this call).
+ * @param offer The new `wl_data_offer` object provided by the compositor.
+ *              This represents the data being offered by another client.
+ */
 void
 _ecore_wl_dnd_add(Ecore_Wl_Input *input, struct wl_data_device *data_device EINA_UNUSED, struct wl_data_offer *offer)
 {
@@ -455,6 +717,28 @@ _ecore_wl_dnd_add(Ecore_Wl_Input *input, struct wl_data_device *data_device EINA
                               &_ecore_wl_dnd_offer_listener, source);
 }
 
+/**
+ * @internal
+ * @brief Handles the Wayland `data_device` 'enter' event.
+ *
+ * This function is called when a drag operation enters a surface (window)
+ * managed by this Ecore_Wl instance. It updates the input state (pointer focus,
+ * serial, drag source) and creates and dispatches an `ECORE_WL_EVENT_DND_ENTER`
+ * Ecore event.
+ *
+ * The event contains information about the window entered, the source window
+ * (if available via keyboard focus), the Wayland data offer, serial, position,
+ * and the list of MIME types offered by the `input->drag_source`.
+ *
+ * @param data A pointer to the `Ecore_Wl_Input` associated with the data device.
+ * @param data_device The `wl_data_device` that received the enter event (unused).
+ * @param timestamp The timestamp of the enter event (serial).
+ * @param surface The `wl_surface` that was entered by the drag.
+ * @param x The x-coordinate of the pointer relative to the surface, in surface-local coordinates (fixed-point).
+ * @param y The y-coordinate of the pointer relative to the surface, in surface-local coordinates (fixed-point).
+ * @param offer The `wl_data_offer` associated with the current drag operation.
+ *              If NULL, it means there's no data associated with this enter event.
+ */
 void
 _ecore_wl_dnd_enter(void *data, struct wl_data_device *data_device EINA_UNUSED, unsigned int timestamp, struct wl_surface *surface, int x, int y, struct wl_data_offer *offer)
 {
@@ -504,6 +788,23 @@ _ecore_wl_dnd_enter(void *data, struct wl_data_device *data_device EINA_UNUSED, 
    ecore_event_add(ECORE_WL_EVENT_DND_ENTER, ev, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles the Wayland `data_device` 'leave' event.
+ *
+ * This function is called when a drag operation leaves a surface (window)
+ * that it had previously entered. It creates and dispatches an
+ * `ECORE_WL_EVENT_DND_LEAVE` Ecore event.
+ *
+ * The event contains information about the window that was left and
+ * potentially the source window (based on current keyboard focus).
+ * After a leave event, `input->pointer_focus` is typically set to NULL by
+ * the caller or Wayland event dispatch, and `input->drag_source` might be
+ * disassociated or cleaned up if the drag is over.
+ *
+ * @param data A pointer to the `Ecore_Wl_Input` associated with the data device.
+ * @param data_device The `wl_data_device` that received the leave event (unused).
+ */
 void
 _ecore_wl_dnd_leave(void *data, struct wl_data_device *data_device EINA_UNUSED)
 {
@@ -525,6 +826,25 @@ _ecore_wl_dnd_leave(void *data, struct wl_data_device *data_device EINA_UNUSED)
    ecore_event_add(ECORE_WL_EVENT_DND_LEAVE, ev, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles the Wayland `data_device` 'motion' event.
+ *
+ * This function is called when the pointer moves during a drag operation
+ * while over a surface managed by this Ecore_Wl instance. It updates
+ * the stored pointer coordinates (`input->sx`, `input->sy` after conversion
+ * from fixed-point) and creates and dispatches an `ECORE_WL_EVENT_DND_POSITION`
+ * Ecore event.
+ *
+ * The event contains the current window under the pointer (from `input->pointer_focus`)
+ * and the new pointer coordinates.
+ *
+ * @param data A pointer to the `Ecore_Wl_Input` associated with the data device.
+ * @param data_device The `wl_data_device` that received the motion event (unused).
+ * @param timestamp The timestamp of the motion event (unused in this function).
+ * @param x The new x-coordinate of the pointer in surface-local, fixed-point format.
+ * @param y The new y-coordinate of the pointer in surface-local, fixed-point format.
+ */
 void
 _ecore_wl_dnd_motion(void *data, struct wl_data_device *data_device EINA_UNUSED, unsigned int timestamp EINA_UNUSED, int x, int y)
 {
@@ -552,6 +872,23 @@ _ecore_wl_dnd_motion(void *data, struct wl_data_device *data_device EINA_UNUSED,
    ecore_event_add(ECORE_WL_EVENT_DND_POSITION, ev, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles the Wayland `data_device` 'drop' event.
+ *
+ * This function is called when the user performs the drop action (e.g.,
+ * releases the mouse button) during a drag operation over one of our surfaces.
+ * It creates and dispatches an `ECORE_WL_EVENT_DND_DROP` Ecore event.
+ *
+ * The event includes the window where the drop occurred (from `input->pointer_focus`)
+ * and the coordinates of the drop (from `input->sx`, `input->sy`). The application
+ * is then expected to interact with the `wl_data_offer` (retrieved via
+ * `input->drag_source`) to select a MIME type and receive the data using functions
+ * like `ecore_wl_dnd_drag_get` (which internally calls `wl_data_offer_receive`).
+ *
+ * @param data A pointer to the `Ecore_Wl_Input` associated with the data device.
+ * @param data_device The `wl_data_device` that received the drop event (unused).
+ */
 void
 _ecore_wl_dnd_drop(void *data, struct wl_data_device *data_device EINA_UNUSED)
 {
@@ -578,6 +915,29 @@ _ecore_wl_dnd_drop(void *data, struct wl_data_device *data_device EINA_UNUSED)
    ecore_event_add(ECORE_WL_EVENT_DND_DROP, ev, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles the Wayland `data_device` 'selection' event.
+ *
+ * This function is called when the clipboard selection changes. The `offer`
+ * parameter represents the new selection data. If `offer` is NULL, it means
+ * the selection has been cleared or lost.
+ *
+ * This function updates the `input->selection_source`. If there was a previous
+ * selection source, it's dereferenced (and potentially freed by `_ecore_wl_dnd_del`).
+ * If a new `offer` is provided, it retrieves the associated `Ecore_Wl_Dnd_Source`
+ * (which should have been created by `_ecore_wl_dnd_add` and set as user data
+ * on the `offer`) and sets it as the new `input->selection_source`.
+ *
+ * A NULL entry is added to the `types` array of the new selection source. This
+ * acts as a sentinel for the `wl_array_for_each` macro used elsewhere, as
+ * `_ecore_wl_dnd_offer_cb_offer` populates the actual types before this sentinel.
+ *
+ * @param data A pointer to the `Ecore_Wl_Input` associated with the data device.
+ * @param data_device The `wl_data_device` that received the selection event (unused).
+ * @param offer The new `wl_data_offer` for the selection, or NULL if the
+ *              selection is cleared.
+ */
 void
 _ecore_wl_dnd_selection(void *data, struct wl_data_device *data_device EINA_UNUSED, struct wl_data_offer *offer)
 {
@@ -600,6 +960,21 @@ _ecore_wl_dnd_selection(void *data, struct wl_data_device *data_device EINA_UNUS
      }
 }
 
+/**
+ * @internal
+ * @brief Decrements the reference count of an `Ecore_Wl_Dnd_Source` and frees it if count reaches zero.
+ *
+ * This function is used for managing the lifecycle of `Ecore_Wl_Dnd_Source`
+ * objects. These objects encapsulate a `wl_data_offer` and its associated MIME types.
+ * When a DND source is no longer needed (e.g., selection changes,
+ * data transfer complete, drag ends), its reference count is decremented. If the count
+ * drops to zero, the associated `wl_data_offer` is destroyed, the internal
+ * types array (which stores `char *` MIME types) is released (including freeing
+ * each string), and the `Ecore_Wl_Dnd_Source` structure itself is freed.
+ *
+ * @param source The `Ecore_Wl_Dnd_Source` object to dereference and potentially delete.
+ *               If NULL, the function does nothing.
+ */
 void
 _ecore_wl_dnd_del(Ecore_Wl_Dnd_Source *source)
 {
@@ -616,6 +991,29 @@ _ecore_wl_dnd_del(Ecore_Wl_Dnd_Source *source)
 }
 
 /* local functions */
+/**
+ * @internal
+ * @brief Initiates receiving data for a specific MIME type from a DND source.
+ *
+ * This function sets up a pipe and uses epoll to asynchronously read data
+ * offered by the DND source (via its `wl_data_offer`). It is called when the
+ * application requests data of a certain `type` from the current selection or drag
+ * (e.g., via `ecore_wl_dnd_selection_get` or `ecore_wl_dnd_drag_get`).
+ *
+ * A pipe is created, and `wl_data_offer_receive` is called to instruct the
+ * source to write data of the specified `type` into the write-end of the pipe.
+ * The read-end of the pipe is then monitored using `epoll`. An idler
+ * (`_ecore_wl_dnd_selection_cb_idle`) periodically checks epoll for readability.
+ * When data is available, `_ecore_wl_dnd_selection_data_read` is invoked.
+ *
+ * The use of epoll and an idler is a workaround for issues with
+ * `ecore_main_fd_handler_add`, as noted by http://trac.enlightenment.org/e/ticket/1208.
+ *
+ * @param source The DND source from which to receive data. This contains the
+ *               Wayland data offer object (`source->data_offer`).
+ * @param type The MIME type of the data to receive (e.g., "text/plain", "text/uri-list").
+ *             This type must be one of the types offered by the source.
+ */
 static void
 _ecore_wl_dnd_selection_data_receive(Ecore_Wl_Dnd_Source *source, const char *type)
 {
@@ -679,6 +1077,33 @@ err:
    return;
 }
 
+/**
+ * @internal
+ * @brief Reads available data from the DND source's file descriptor.
+ *
+ * This function is invoked via the epoll mechanism managed by `_ecore_wl_dnd_selection_cb_idle`
+ * when data is available on the read-end of the pipe set up by `_ecore_wl_dnd_selection_data_receive`.
+ * It reads a chunk of data (up to `PATH_MAX` bytes) from `read_source->read_fd`.
+ *
+ * An `ECORE_WL_EVENT_SELECTION_DATA_READY` Ecore event is then created and sent:
+ * - If data is read (`len > 0`): The event contains the data chunk, and `done` is `EINA_FALSE`.
+ *   This function returns `ECORE_CALLBACK_RENEW` to signal the idler to continue polling.
+ * - If EOF is reached (`len == 0`) or an error occurs (`len < 0`): The pipe is closed,
+ *   the DND source is dereferenced. The event's `done` flag is set to `EINA_TRUE`,
+ *   and `data` and `len` are set to NULL/0. This function returns `ECORE_CALLBACK_CANCEL`
+ *   to signal the idler to stop and clean up.
+ *
+ * @param data A pointer to a `struct _dnd_source`. This structure contains the
+ *             `Ecore_Wl_Dnd_Source` and the file descriptor (`read_fd`) from which
+ *             to read the data.
+ * @param fd_handler The Ecore_Fd_Handler that would have triggered this callback if
+ *                   `ecore_main_fd_handler_add` were used (unused here).
+ * @return `ECORE_CALLBACK_RENEW` if data was read successfully and more might be
+ *         available (signaling the idler to continue).
+ *         `ECORE_CALLBACK_CANCEL` if reading is complete (EOF or error),
+ *         or if a critical error like memory allocation failure occurs
+ *         (signaling the idler to stop).
+ */
 static Eina_Bool
 _ecore_wl_dnd_selection_data_read(void *data, Ecore_Fd_Handler *fd_handler EINA_UNUSED)
 {
@@ -728,6 +1153,20 @@ _ecore_wl_dnd_selection_data_read(void *data, Ecore_Fd_Handler *fd_handler EINA_
    return ret;
 }
 
+/**
+ * @internal
+ * @brief Frees the data associated with an `ECORE_WL_EVENT_SELECTION_DATA_READY` event.
+ *
+ * This function is registered as the free callback when an
+ * `ECORE_WL_EVENT_SELECTION_DATA_READY` event is added to the Ecore event queue.
+ * It is responsible for freeing the event structure itself and any dynamically
+ * allocated data within it (specifically, the `data` buffer containing the
+ * received selection content).
+ *
+ * @param data User data passed to `ecore_event_add` (unused in this specific callback).
+ * @param event A pointer to the `Ecore_Wl_Event_Selection_Data_Ready` event structure
+ *              that needs to be freed.
+ */
 static void
 _ecore_wl_dnd_selection_data_ready_cb_free(void *data EINA_UNUSED, void *event)
 {
@@ -741,6 +1180,31 @@ _ecore_wl_dnd_selection_data_ready_cb_free(void *data EINA_UNUSED, void *event)
    free(ev);
 }
 
+/**
+ * @internal
+ * @brief Idle handler callback for processing DND data using epoll.
+ *
+ * This function is added as an Ecore idler when `_ecore_wl_dnd_selection_data_receive`
+ * sets up data transfer. On each invocation, it calls `epoll_wait` with a timeout
+ * of 0 (non-blocking) to check if the DND data file descriptor (monitored by epoll)
+ * has data available for reading (`EPOLLIN`).
+ *
+ * If `epoll_wait` indicates an event on the monitored fd:
+ *  - It retrieves the associated task (`struct _dnd_task` containing `_ecore_wl_dnd_selection_data_read`
+ *    and its `struct _dnd_source` data).
+ *  - It executes the task's callback (`_ecore_wl_dnd_selection_data_read`).
+ *  - If the callback returns `ECORE_CALLBACK_CANCEL` (signaling completion or error),
+ *    this idler cleans up the epoll context (`ctx`), the task data, and removes itself
+ *    by returning `ECORE_CALLBACK_CANCEL`.
+ *  - Otherwise (callback returns `ECORE_CALLBACK_RENEW`), this idler returns `ECORE_CALLBACK_RENEW`
+ *    to continue polling.
+ *
+ * @param data A pointer to a `struct _dnd_read_ctx`, which contains the
+ *             epoll file descriptor and the `epoll_event` structure used for polling.
+ * @return `ECORE_CALLBACK_RENEW` to keep the idler running for further checks.
+ *         `ECORE_CALLBACK_CANCEL` to remove the idler once the data transfer
+ *         is complete or an unrecoverable error occurs during reading.
+ */
 static Eina_Bool
 _ecore_wl_dnd_selection_cb_idle(void *data)
 {
@@ -767,8 +1231,31 @@ _ecore_wl_dnd_selection_cb_idle(void *data)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @internal
+ * @brief Wayland data source listener callback for the 'target' event.
+ *
+ * This callback is invoked by the Wayland compositor when a client (the target
+ * application of a drag or selection) indicates it can accept one of the
+ * MIME types offered by our data source (`input->data_source`). If `mime_type` is NULL,
+ * it means the target is no longer interested in any of the offered types, or the
+ * data source is being destroyed without a target having expressed interest.
+ *
+ * This function creates and sends an `ECORE_WL_EVENT_DATA_SOURCE_TARGET` Ecore
+ * event to notify the application. The `mime_type` in the event will be
+ * a copy of the `mime_type` argument if it's not NULL. This event informs the
+ * application that a potential consumer has shown interest (or disinterest if NULL)
+ * in one of its offered types. The actual data transfer is initiated by a subsequent 'send' event.
+ *
+ * @param data A pointer to the `Ecore_Wl_Input` that owns this data source.
+ *             This is the private data set when the listener was added.
+ * @param source The `wl_data_source` object that emitted this event (unused).
+ * @param mime_type The MIME type that the target has chosen, or NULL if the
+ *                  target is no longer interested or the data source is being
+ *                  destroyed without a target.
+ */
 static void
-_ecore_wl_dnd_source_cb_target(void *data, struct wl_data_source *source EINA_UNUSED, const char *mime_type EINA_UNUSED)
+_ecore_wl_dnd_source_cb_target(void *data, struct wl_data_source *source EINA_UNUSED, const char *mime_type)
 {
    Ecore_Wl_Event_Data_Source_Target *event;
 
@@ -784,6 +1271,19 @@ _ecore_wl_dnd_source_cb_target(void *data, struct wl_data_source *source EINA_UN
                    _ecore_wl_dnd_source_cb_target_free, NULL);
 }
 
+/**
+ * @internal
+ * @brief Frees data associated with an `ECORE_WL_EVENT_DATA_SOURCE_TARGET` event.
+ *
+ * This function is registered as the free callback when an
+ * `ECORE_WL_EVENT_DATA_SOURCE_TARGET` event is added to the Ecore event queue.
+ * It is responsible for freeing the event structure itself and the duplicated
+ * `type` string (MIME type) within it.
+ *
+ * @param data User data passed to `ecore_event_add` (unused in this specific callback).
+ * @param event A pointer to the `Ecore_Wl_Event_Data_Source_Target` event structure
+ *              that needs to be freed.
+ */
 static void
 _ecore_wl_dnd_source_cb_target_free(void *data EINA_UNUSED, void *event)
 {
@@ -797,6 +1297,28 @@ _ecore_wl_dnd_source_cb_target_free(void *data EINA_UNUSED, void *event)
    free(ev);
 }
 
+/**
+ * @internal
+ * @brief Wayland data source listener callback for the 'send' event.
+ *
+ * This callback is invoked by the Wayland compositor when a client (the target
+ * application) requests the actual data for a specific MIME type that our
+ * data source offers and the target has accepted (usually after a 'target' event).
+ * The compositor provides a file descriptor (`fd`) into which our
+ * application must write the data corresponding to the `mime_type`.
+ *
+ * This function creates and sends an `ECORE_WL_EVENT_DATA_SOURCE_SEND` Ecore
+ * event. This event carries the `mime_type` (duplicated) and the `fd`. The application
+ * handling this Ecore event is responsible for writing the data for the requested
+ * `mime_type` to the `fd` and then closing the `fd` to signal completion of the
+ * data transfer for that type.
+ *
+ * @param data A pointer to the `Ecore_Wl_Input` that owns this data source.
+ * @param source The `wl_data_source` object that emitted this event (unused).
+ * @param mime_type The MIME type for which data is requested by the target.
+ * @param fd The file descriptor to which the application should write the data.
+ *           The application must close this fd when done writing.
+ */
 static void
 _ecore_wl_dnd_source_cb_send(void *data, struct wl_data_source *source EINA_UNUSED, const char *mime_type, int32_t fd)
 {
@@ -815,6 +1337,19 @@ _ecore_wl_dnd_source_cb_send(void *data, struct wl_data_source *source EINA_UNUS
                    _ecore_wl_dnd_source_cb_send_free, NULL);
 }
 
+/**
+ * @internal
+ * @brief Frees data associated with an `ECORE_WL_EVENT_DATA_SOURCE_SEND` event.
+ *
+ * This function is registered as the free callback when an
+ * `ECORE_WL_EVENT_DATA_SOURCE_SEND` event is added to the Ecore event queue.
+ * It is responsible for freeing the event structure itself and the duplicated
+ * `type` string (MIME type) within it.
+ *
+ * @param data User data passed to `ecore_event_add` (unused in this specific callback).
+ * @param event A pointer to the `Ecore_Wl_Event_Data_Source_Send` event structure
+ *              that needs to be freed.
+ */
 static void
 _ecore_wl_dnd_source_cb_send_free(void *data EINA_UNUSED, void *event)
 {
@@ -828,6 +1363,28 @@ _ecore_wl_dnd_source_cb_send_free(void *data EINA_UNUSED, void *event)
    free(ev);
 }
 
+/**
+ * @internal
+ * @brief Wayland data source listener callback for the 'cancelled' event.
+ *
+ * This callback is invoked by the Wayland compositor when the data source
+ * (`source`) is no longer valid and will not be used by the compositor again.
+ * This can happen if a drag-and-drop operation is cancelled, if the selection is
+ * claimed by another client, or if the client owning the data source
+ * unsets the selection or destroys the data source.
+ *
+ * Upon receiving this event, the `wl_data_source` object should be destroyed.
+ * This function handles the destruction of the `source` and also clears
+ * the reference to it in the associated `Ecore_Wl_Input` (`input->data_source`)
+ * if it matches the cancelled `source`.
+ *
+ * An `ECORE_WL_EVENT_DATA_SOURCE_CANCELLED` Ecore event is then generated to
+ * notify the application that its data source is no longer active.
+ *
+ * @param data A pointer to the `Ecore_Wl_Input` that owns this data source.
+ * @param source The `wl_data_source` object that has been cancelled by the
+ *               compositor and should be destroyed.
+ */
 static void
 _ecore_wl_dnd_source_cb_cancelled(void *data, struct wl_data_source *source)
 {
@@ -852,6 +1409,35 @@ _ecore_wl_dnd_source_cb_cancelled(void *data, struct wl_data_source *source)
    ecore_event_add(ECORE_WL_EVENT_DATA_SOURCE_CANCELLED, ev, NULL, NULL);
 }
 
+/**
+ * @internal
+ * @brief Wayland data offer listener callback for the 'offer' event.
+ *
+ * This callback is invoked by the Wayland compositor for each MIME type
+ * that a `wl_data_offer` supports. When a new data offer is introduced (e.g.,
+ * when a drag enters a window, or when a new clipboard selection becomes
+ * available), this event will be emitted by the `wl_data_offer` one or more
+ * times, once for each MIME type (e.g., "text/plain", "text/uri-list",
+ * "image/png") that the source of the data is offering.
+ *
+ * This function takes the advertised `type`, duplicates it, and adds it to
+ * an internal array (`source->types`) within the `Ecore_Wl_Dnd_Source`
+ * structure that corresponds to this `wl_data_offer`. This allows Ecore
+ * to know all available types for a given DND source or selection.
+ * The `Ecore_Wl_Dnd_Source` itself is typically created and associated with
+ * the `wl_data_offer` (as its user data) in `_ecore_wl_dnd_add`.
+ *
+ * @param data A pointer to the `Ecore_Wl_Dnd_Source` structure that is
+ *             associated with this `wl_data_offer`. This private data is
+ *             set when `wl_data_offer_add_listener` is called.
+ * @param data_offer The `wl_data_offer` object that is advertising the
+ *                   MIME type (unused in this function, as the relevant
+ *                   information is in `data` which points to the `Ecore_Wl_Dnd_Source`
+ *                   that already holds this `data_offer`).
+ * @param type A C-string representing the MIME type being offered by the source
+ *             (e.g., "text/plain"). This string is owned by Wayland and
+ *             must be duplicated if stored long-term.
+ */
 static void
 _ecore_wl_dnd_offer_cb_offer(void *data, struct wl_data_offer *data_offer EINA_UNUSED, const char *type)
 {

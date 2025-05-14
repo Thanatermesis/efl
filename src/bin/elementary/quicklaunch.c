@@ -48,6 +48,15 @@ static int _log_dom = -1;
 #define INF(...) EINA_LOG_DOM_INFO(_log_dom, __VA_ARGS__)
 #define DBG(...) EINA_LOG_DOM_DBG(_log_dom, __VA_ARGS__)
 
+/**
+ * @brief Restores original signal handlers in the child process after fork.
+ *
+ * This function is called after a fork to ensure the child process
+ * does not inherit the parent's special signal handling, particularly
+ * for crash recovery and IPC.
+ *
+ * @param data Unused.
+ */
 static void
 post_fork(void *data EINA_UNUSED)
 {
@@ -71,6 +80,15 @@ post_fork(void *data EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Handles SIGCHLD signals to reap terminated child processes.
+ *
+ * This prevents zombie processes by waiting for any child that has exited.
+ *
+ * @param x Unused signal number.
+ * @param info Unused signal information.
+ * @param data Unused.
+ */
 static void
 child_handler(int x EINA_UNUSED, siginfo_t *info EINA_UNUSED, void *data EINA_UNUSED)
 {
@@ -78,6 +96,16 @@ child_handler(int x EINA_UNUSED, siginfo_t *info EINA_UNUSED, void *data EINA_UN
    while (waitpid(-1, &status, WNOHANG) > 0);
 }
 
+/**
+ * @brief Handles critical signals (like SIGSEGV, SIGILL, etc.) indicating a crash.
+ *
+ * It logs the crash and attempts to restart the application.
+ * A rate limit is in place to prevent rapid restart loops.
+ *
+ * @param x Unused signal number.
+ * @param info Unused signal information.
+ * @param data Unused.
+ */
 static void
 crash_handler(int x EINA_UNUSED, siginfo_t *info EINA_UNUSED, void *data EINA_UNUSED)
 {
@@ -93,6 +121,22 @@ crash_handler(int x EINA_UNUSED, siginfo_t *info EINA_UNUSED, void *data EINA_UN
    ecore_app_restart();
 }
 
+/**
+ * @brief Reads application launch data from a file descriptor and executes the application.
+ *
+ * The data is expected in a specific format:
+ * - First `sizeof(unsigned long)`: `argc` (argument count)
+ * - Next `sizeof(unsigned long)`: `envnum` (environment variable count)
+ * - Next `argc * sizeof(unsigned long)`: offsets to argument strings
+ * - Next `envnum * sizeof(unsigned long)`: offsets to environment strings
+ * - Next `sizeof(unsigned long)`: offset to current working directory string
+ * - Followed by the actual null-terminated strings for arguments, environment variables, and CWD.
+ * All offsets are relative to the start of the buffer, adjusted by `- sizeof(unsigned long)`.
+ * The last byte of the buffer is expected to be a null terminator for safety.
+ *
+ * @param fd The file descriptor to read launch data from.
+ * @param bytes The total number of bytes to read from fd.
+ */
 static void
 handle_run(int fd, unsigned long bytes)
 {
@@ -174,6 +218,21 @@ handle_run(int fd, unsigned long bytes)
    elm_quicklaunch_cleanup();
 }
 
+/**
+ * @brief Main entry point for the Elementary Quicklauncher.
+ *
+ * The quicklauncher sets up a UNIX domain socket to listen for application
+ * launch requests. When a request is received, it forks and executes the
+ * requested application. It also handles signal management for crash recovery
+ * and child process reaping.
+ *
+ * The socket path is determined by the user's UID and the display
+ * environment (WAYLAND_DISPLAY or DISPLAY).
+ *
+ * @param argc Argument count.
+ * @param argv Argument vector.
+ * @return 0 on successful exit, -1 on critical errors.
+ */
 int
 main(int argc, char **argv)
 {

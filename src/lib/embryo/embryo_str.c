@@ -20,6 +20,13 @@
 #include "Embryo.h"
 #include "embryo_private.h"
 
+/**
+ * @brief Macro to retrieve a string from Embryo data space.
+ * @param ep Pointer to the Embryo_Program.
+ * @param str Pointer to a char* which will store the retrieved string.
+ *            The string is allocated on the stack using alloca().
+ * @param par Embryo_Cell containing the address of the string in Embryo data space.
+ */
 #define STRGET(ep, str, par) {                                \
      Embryo_Cell *___cptr;                                    \
      str = NULL;                                              \
@@ -29,6 +36,13 @@
           (str) = alloca(___l + 1);                           \
           if (str) embryo_data_string_get(ep, ___cptr, str);  \
        } }
+
+/**
+ * @brief Macro to set a string in Embryo data space.
+ * @param ep Pointer to the Embryo_Program.
+ * @param par Embryo_Cell containing the address in Embryo data space where the string will be set.
+ * @param str The string to set.
+ */
 #define STRSET(ep, par, str) {                           \
      Embryo_Cell *___cptr;                               \
      if ((___cptr = embryo_data_address_get(ep, par))) { \
@@ -37,6 +51,14 @@
 
 /* exported string api */
 
+/**
+ * @brief Converts a string to an integer.
+ * @param ep The Embryo program.
+ * @param params Parameters for the native call.
+ *               params[0] is the number of bytes for the arguments.
+ *               params[1] is the Embryo_Cell address of the string to convert.
+ * @return The converted integer, or 0 on error or if the string is invalid.
+ */
 static Embryo_Cell
 _embryo_str_atoi(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -49,6 +71,16 @@ _embryo_str_atoi(Embryo_Program *ep, Embryo_Cell *params)
    return (Embryo_Cell)atoi(s1);
 }
 
+/**
+ * @brief Matches a string against a shell wildcard pattern.
+ * @param ep The Embryo program.
+ * @param params Parameters for the native call.
+ *               params[0] is the number of bytes for the arguments.
+ *               params[1] is the Embryo_Cell address of the glob pattern.
+ *               params[2] is the Embryo_Cell address of the string to match.
+ * @return 1 if the string matches the pattern, 0 if it does not, -1 on error.
+ * @note Uses eina_fnmatch for the matching logic.
+ */
 static Embryo_Cell
 _embryo_str_fnmatch(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -63,6 +95,17 @@ _embryo_str_fnmatch(Embryo_Program *ep, Embryo_Cell *params)
    return (Embryo_Cell)!eina_fnmatch(s1, s2, 0);
 }
 
+/**
+ * @brief Compares two strings.
+ * @param ep The Embryo program.
+ * @param params Parameters for the native call.
+ *               params[0] is the number of bytes for the arguments.
+ *               params[1] is the Embryo_Cell address of the first string.
+ *               params[2] is the Embryo_Cell address of the second string.
+ * @return An integer less than, equal to, or greater than zero if s1 is found,
+ *         respectively, to be less than, to match, or be greater than s2.
+ *         Returns -1 on error (e.g., if strings cannot be retrieved).
+ */
 static Embryo_Cell
 _embryo_str_strcmp(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -77,6 +120,19 @@ _embryo_str_strcmp(Embryo_Program *ep, Embryo_Cell *params)
    return (Embryo_Cell)strcmp(s1, s2);
 }
 
+/**
+ * @brief Compares at most n bytes of two strings.
+ * @param ep The Embryo program.
+ * @param params Parameters for the native call.
+ *               params[0] is the number of bytes for the arguments.
+ *               params[1] is the Embryo_Cell address of the first string.
+ *               params[2] is the Embryo_Cell address of the second string.
+ *               params[3] is the maximum number of bytes to compare.
+ * @return An integer less than, equal to, or greater than zero if the first n
+ *         bytes of s1 is found, respectively, to be less than, to match, or
+ *         be greater than the first n bytes of s2.
+ *         Returns -1 on error (e.g., if strings cannot be retrieved).
+ */
 static Embryo_Cell
 _embryo_str_strncmp(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -93,6 +149,16 @@ _embryo_str_strncmp(Embryo_Program *ep, Embryo_Cell *params)
    return (Embryo_Cell)strncmp(s1, s2, (size_t)params[3]);
 }
 
+/**
+ * @brief Copies a string.
+ * @param ep The Embryo program.
+ * @param params Parameters for the native call.
+ *               params[0] is the number of bytes for the arguments.
+ *               params[1] is the Embryo_Cell address of the destination buffer.
+ *               params[2] is the Embryo_Cell address of the source string.
+ * @return 0 on success, or if the source string is NULL.
+ * @note The destination buffer in Embryo must be large enough.
+ */
 static Embryo_Cell
 _embryo_str_strcpy(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -107,6 +173,19 @@ _embryo_str_strcpy(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
+/**
+ * @brief Copies at most n bytes of a string.
+ * @param ep The Embryo program.
+ * @param params Parameters for the native call.
+ *               params[0] is the number of bytes for the arguments.
+ *               params[1] is the Embryo_Cell address of the destination buffer.
+ *               params[2] is the Embryo_Cell address of the source string.
+ *               params[3] is the maximum number of bytes to copy.
+ * @return 0 on success, or if the source string is NULL.
+ * @note The destination buffer in Embryo must be large enough. If the length
+ *       of the source string is greater than n, the copied string will be
+ *       null-terminated at n characters.
+ */
 static Embryo_Cell
 _embryo_str_strncpy(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -126,6 +205,14 @@ _embryo_str_strncpy(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
+/**
+ * @brief Calculates the length of a string.
+ * @param ep The Embryo program.
+ * @param params Parameters for the native call.
+ *               params[0] is the number of bytes for the arguments.
+ *               params[1] is the Embryo_Cell address of the string.
+ * @return The length of the string, or 0 on error or if the string is NULL.
+ */
 static Embryo_Cell
 _embryo_str_strlen(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -138,6 +225,17 @@ _embryo_str_strlen(Embryo_Program *ep, Embryo_Cell *params)
    return (Embryo_Cell)strlen(s1);
 }
 
+/**
+ * @brief Concatenates two strings.
+ * @param ep The Embryo program.
+ * @param params Parameters for the native call.
+ *               params[0] is the number of bytes for the arguments.
+ *               params[1] is the Embryo_Cell address of the destination string.
+ *               params[2] is the Embryo_Cell address of the source string to append.
+ * @return 0 on success, or if either string is NULL or memory allocation fails.
+ * @note The destination string in Embryo (params[1]) is updated with the
+ *       concatenated result. A temporary buffer is allocated on the stack using alloca().
+ */
 static Embryo_Cell
 _embryo_str_strcat(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -157,6 +255,19 @@ _embryo_str_strcat(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
+/**
+ * @brief Concatenates at most n bytes from one string to another.
+ * @param ep The Embryo program.
+ * @param params Parameters for the native call.
+ *               params[0] is the number of bytes for the arguments.
+ *               params[1] is the Embryo_Cell address of the destination string.
+ *               params[2] is the Embryo_Cell address of the source string to append.
+ *               params[3] is the maximum number of bytes to append from the source string.
+ * @return 0 on success, or if either string is NULL or memory allocation fails.
+ * @note The destination string in Embryo (params[1]) is updated.
+ *       A temporary buffer is allocated on the stack using alloca().
+ *       The resulting string is always null-terminated.
+ */
 static Embryo_Cell
 _embryo_str_strncat(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -182,6 +293,17 @@ _embryo_str_strncat(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
+/**
+ * @brief Prepends one string to another. (str2 + str1)
+ * @param ep The Embryo program.
+ * @param params Parameters for the native call.
+ *               params[0] is the number of bytes for the arguments.
+ *               params[1] is the Embryo_Cell address of the destination string (str1).
+ *               params[2] is the Embryo_Cell address of the string to prepend (str2).
+ * @return 0 on success, or if either string is NULL or memory allocation fails.
+ * @note The destination string in Embryo (params[1]) is updated with the
+ *       result (str2 + str1). A temporary buffer is allocated on the stack using alloca().
+ */
 static Embryo_Cell
 _embryo_str_strprep(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -201,6 +323,19 @@ _embryo_str_strprep(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
+/**
+ * @brief Prepends at most n bytes of one string to another. (first n bytes of str2 + str1)
+ * @param ep The Embryo program.
+ * @param params Parameters for the native call.
+ *               params[0] is the number of bytes for the arguments.
+ *               params[1] is the Embryo_Cell address of the destination string (str1).
+ *               params[2] is the Embryo_Cell address of the string to prepend (str2).
+ *               params[3] is the maximum number of bytes to prepend from str2.
+ * @return 0 on success, or if either string is NULL or memory allocation fails.
+ * @note The destination string in Embryo (params[1]) is updated.
+ *       A temporary buffer is allocated on the stack using alloca().
+ *       The prepended part from str2 is null-terminated if n is less than its length.
+ */
 static Embryo_Cell
 _embryo_str_strnprep(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -226,6 +361,22 @@ _embryo_str_strnprep(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
+/**
+ * @brief Extracts a substring from a string (slice).
+ * @param ep The Embryo program.
+ * @param params Parameters for the native call.
+ *               params[0] is the number of bytes for the arguments.
+ *               params[1] is the Embryo_Cell address of the destination buffer for the substring.
+ *               params[2] is the Embryo_Cell address of the source string.
+ *               params[3] is the starting index (n) of the substring.
+ *               params[4] is the ending index (n2) of the substring (exclusive).
+ * @return 0 on success.
+ * @note Extracts characters from index params[3] up to (but not including) params[4].
+ *       If params[3] or params[4] are out of bounds, they are adjusted.
+ *       If params[4] <= params[3], an empty string is set.
+ *       The result is stored in the Embryo string at params[1].
+ *       A temporary buffer for the substring is allocated on the stack using alloca().
+ */
 static Embryo_Cell
 _embryo_str_strcut(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -256,6 +407,32 @@ _embryo_str_strcut(Embryo_Program *ep, Embryo_Cell *params)
    return 0;
 }
 
+/**
+ * @brief Internal helper function to format a string, similar to snprintf.
+ *
+ * This function processes a format string (s1) and a list of arguments (params)
+ * to produce a formatted output string (s2), respecting a maximum length (max_len).
+ * It supports a subset of printf-style format specifiers:
+ * - %%: Literal '%'
+ * - %c: Character
+ * - %i, %d: Signed decimal integer
+ * - %x: Unsigned hexadecimal integer (lowercase)
+ * - %X: Unsigned hexadecimal integer (uppercase, 8 digits, zero-padded)
+ * - %f: Floating-point number
+ * - %s: String
+ * It also supports escape sequences:
+ * - \\t: Tab
+ * - \\n: Newline
+ * - \\other: Literal 'other' character
+ *
+ * @param ep The Embryo program.
+ * @param s1 The format string.
+ * @param s2 The output buffer for the formatted string.
+ * @param max_len The maximum number of characters to write to s2 (excluding null terminator).
+ * @param pnum The number of arguments in the params array.
+ * @param params Array of Embryo_Cell arguments for the format specifiers.
+ * @return The number of characters written to s2 (excluding the null terminator).
+ */
 static Embryo_Cell
 _str_snprintf(Embryo_Program *ep, char *s1, char *s2, int max_len, int pnum, Embryo_Cell *params)
 {
@@ -405,11 +582,26 @@ _str_snprintf(Embryo_Program *ep, char *s1, char *s2, int max_len, int pnum, Emb
    return o;
 }
 
+/**
+ * @brief Formats a string and stores it in a buffer, similar to C snprintf.
+ * @param ep The Embryo program.
+ * @param params Parameters for the native call.
+ *               params[0] is the number of bytes for the arguments.
+ *               params[1] is the Embryo_Cell address of the destination buffer.
+ *               params[2] is the size of the destination buffer (Embryo_Cell).
+ *               params[3] is the Embryo_Cell address of the format string.
+ *               params[4]... are Embryo_Cell addresses or values for format arguments.
+ * @return The number of characters that would have been written if the buffer
+ *         was large enough (currently returns 0, but should be length of s2).
+ *         Returns -1 on error (e.g., NULL format string, allocation failure).
+ * @note Uses _str_snprintf internally. The result is stored in the Embryo string at params[1].
+ *       A temporary buffer for the formatted string is allocated on the stack using alloca().
+ */
 static Embryo_Cell
 _embryo_str_snprintf(Embryo_Program *ep, Embryo_Cell *params)
 {
    char *s1, *s2;
-   int o = 0;
+   int o = 0; // TODO: This should be the return value from _str_snprintf
    int pnum;
 
    /* params[1] = buf */
@@ -432,11 +624,25 @@ _embryo_str_snprintf(Embryo_Program *ep, Embryo_Cell *params)
    return o;
 }
 
+/**
+ * @brief Formats a string and prints it to the log (INF).
+ * @param ep The Embryo program.
+ * @param params Parameters for the native call.
+ *               params[0] is the number of bytes for the arguments.
+ *               params[1] is the Embryo_Cell address of the format string.
+ *               params[2]... are Embryo_Cell addresses or values for format arguments.
+ * @return Currently returns 0. (Potentially should return number of chars printed).
+ *         Returns -1 on error (e.g., NULL format string, allocation failure).
+ * @note Uses _str_snprintf internally to format the string before printing.
+ *       A temporary buffer for the formatted string is allocated on the stack using alloca().
+ *       The maximum length of this buffer is estimated based on format string length
+ *       and number of arguments.
+ */
 static Embryo_Cell
 _embryo_str_printf(Embryo_Program *ep, Embryo_Cell *params)
 {
    char *s1, *s2;
-   int o = 0;
+   int o = 0; // TODO: This should be the return value from _str_snprintf
    int pnum;
    int max_len = 0;
 
@@ -458,6 +664,16 @@ _embryo_str_printf(Embryo_Program *ep, Embryo_Cell *params)
    return o;
 }
 
+/**
+ * @brief Locates the first occurrence of a substring within a string.
+ * @param ep The Embryo program.
+ * @param params Parameters for the native call.
+ *               params[0] is the number of bytes for the arguments.
+ *               params[1] is the Embryo_Cell address of the string to search in (haystack).
+ *               params[2] is the Embryo_Cell address of the substring to search for (needle).
+ * @return The index of the first occurrence of the needle in the haystack,
+ *         or -1 if the needle is not found or on error.
+ */
 static Embryo_Cell
 _embryo_str_strstr(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -474,6 +690,17 @@ _embryo_str_strstr(Embryo_Program *ep, Embryo_Cell *params)
    return (Embryo_Cell)(p - s1);
 }
 
+/**
+ * @brief Locates the first occurrence of a character in a string.
+ * @param ep The Embryo program.
+ * @param params Parameters for the native call.
+ *               params[0] is the number of bytes for the arguments.
+ *               params[1] is the Embryo_Cell address of the string to search in.
+ *               params[2] is the Embryo_Cell address of a string containing the character to find
+ *                        (only the first character of this string is used).
+ * @return The index of the first occurrence of the character in the string,
+ *         or -1 if the character is not found or on error.
+ */
 static Embryo_Cell
 _embryo_str_strchr(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -490,6 +717,17 @@ _embryo_str_strchr(Embryo_Program *ep, Embryo_Cell *params)
    return (Embryo_Cell)(p - s1);
 }
 
+/**
+ * @brief Locates the last occurrence of a character in a string.
+ * @param ep The Embryo program.
+ * @param params Parameters for the native call.
+ *               params[0] is the number of bytes for the arguments.
+ *               params[1] is the Embryo_Cell address of the string to search in.
+ *               params[2] is the Embryo_Cell address of a string containing the character to find
+ *                        (only the first character of this string is used).
+ * @return The index of the last occurrence of the character in the string,
+ *         or -1 if the character is not found or on error.
+ */
 static Embryo_Cell
 _embryo_str_strrchr(Embryo_Program *ep, Embryo_Cell *params)
 {
@@ -508,6 +746,14 @@ _embryo_str_strrchr(Embryo_Program *ep, Embryo_Cell *params)
 
 /* functions used by the rest of embryo */
 
+/**
+ * @brief Initializes the string manipulation native calls for an Embryo program.
+ *
+ * This function registers all the public string functions (e.g., "atoi", "strcmp")
+ * with the Embryo program, making them available for use within Embryo scripts.
+ *
+ * @param ep Pointer to the Embryo_Program to initialize.
+ */
 void
 _embryo_str_init(Embryo_Program *ep)
 {

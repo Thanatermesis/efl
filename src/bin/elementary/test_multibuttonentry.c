@@ -5,6 +5,12 @@
 
 static Elm_Multibuttonentry_Format_Cb format_func = NULL;
 
+/**
+ * @brief Custom format function for the multibuttonentry.
+ * @param count The number of items not displayed.
+ * @param data User data.
+ * @return A string with the format "+ %d rabbits". This string must be freed.
+ */
 static char *
 _custom_format(int count, void *data EINA_UNUSED)
 {
@@ -14,6 +20,12 @@ _custom_format(int count, void *data EINA_UNUSED)
    return strdup(buf);
 }
 
+/**
+ * @brief Callback for when an item in the multibuttonentry is selected.
+ * @param data User data.
+ * @param obj The evas object.
+ * @param event_info The selected item.
+ */
 static void
 _item_selected_cb(void *data EINA_UNUSED,
                   Evas_Object *obj EINA_UNUSED,
@@ -23,6 +35,12 @@ _item_selected_cb(void *data EINA_UNUSED,
    printf("selected item = %s\n", elm_object_item_text_get(mbe_it));
 }
 
+/**
+ * @brief Callback for when an item is added to the multibuttonentry.
+ * @param data User data.
+ * @param obj The evas object.
+ * @param event_info The added item.
+ */
 // "item,added" smart callback of multibuttonentry.
 static void
 _item_added_cb(void *data EINA_UNUSED,
@@ -33,6 +51,12 @@ _item_added_cb(void *data EINA_UNUSED,
    printf("added item = %s\n", elm_object_item_text_get(mbe_it));
 }
 
+/**
+ * @brief Callback for when an item is deleted from the multibuttonentry.
+ * @param data User data.
+ * @param obj The evas object.
+ * @param event_info The deleted item.
+ */
 // "item,deleted" smart callback
 static void
 _item_deleted_cb(void *data EINA_UNUSED,
@@ -42,6 +66,12 @@ _item_deleted_cb(void *data EINA_UNUSED,
    printf("deleted item\n");
 }
 
+/**
+ * @brief Callback for when an item in the multibuttonentry is clicked.
+ * @param data User data.
+ * @param obj The evas object.
+ * @param event_info The clicked item.
+ */
 // "item,clicked" smart callback
 static void
 _item_clicked_cb(void *data EINA_UNUSED,
@@ -52,6 +82,13 @@ _item_clicked_cb(void *data EINA_UNUSED,
    printf("clicked item = %s\n", elm_object_item_text_get(mbe_it));
 }
 
+/**
+ * @brief Callback for when the multibuttonentry itself is clicked.
+ *        This expands the widget.
+ * @param data User data.
+ * @param obj The multibuttonentry object.
+ * @param event_info Not used.
+ */
 static void
 _mbe_clicked_cb(void *data EINA_UNUSED,
                 Evas_Object *obj,
@@ -75,6 +112,13 @@ _mbe_clicked_cb(void *data EINA_UNUSED,
    printf("%s wd->entry x :%d y:%d w :%d h:%d\n", __func__, x, y, w, h);
 }
 
+/**
+ * @brief Callback for when the multibuttonentry loses focus.
+ *        This contracts the widget to a single line.
+ * @param data User data.
+ * @param obj The multibuttonentry object.
+ * @param event_info Not used.
+ */
 static void
 _mbe_unfocused_cb(void *data EINA_UNUSED,
                   Evas_Object *obj,
@@ -85,6 +129,12 @@ _mbe_unfocused_cb(void *data EINA_UNUSED,
    printf("multibuttonentry unfocused!\n");
 }
 
+/**
+ * @brief Callback for when the multibuttonentry gains focus.
+ * @param data User data.
+ * @param obj The multibuttonentry object.
+ * @param event_info Not used.
+ */
 static void
 _mbe_focused_cb(void *data EINA_UNUSED,
                 Evas_Object *obj EINA_UNUSED,
@@ -93,6 +143,12 @@ _mbe_focused_cb(void *data EINA_UNUSED,
    printf("multibuttonentry focused!\n");
 }
 
+/**
+ * @brief Callback for when the multibuttonentry is expanded.
+ * @param data User data.
+ * @param obj The evas object.
+ * @param event_info Not used.
+ */
 // "expanded" smart callback
 static void
 _expanded_cb(void *data EINA_UNUSED,
@@ -102,6 +158,12 @@ _expanded_cb(void *data EINA_UNUSED,
    printf("expanded!\n");
 }
 
+/**
+ * @brief Callback for when the multibuttonentry is contracted.
+ * @param data User data.
+ * @param obj The evas object.
+ * @param event_info Not used.
+ */
 // "contracted" smart callback
 static void
 _contracted_cb(void *data EINA_UNUSED,
@@ -111,6 +173,13 @@ _contracted_cb(void *data EINA_UNUSED,
    printf("contracted!\n");
 }
 
+/**
+ * @brief Callback for when the expanded/shrank state of the
+ *        multibuttonentry changes.
+ * @param data User data.
+ * @param obj The multibuttonentry object.
+ * @param event_info Not used.
+ */
 // "contracted,state,changed" smart callback
 static void
 _expand_state_changed_cb(void *data EINA_UNUSED,
@@ -123,6 +192,12 @@ _expand_state_changed_cb(void *data EINA_UNUSED,
      printf("expand state changed: SHRANK \n");
 }
 
+/**
+ * @brief Callback for when an item is long-pressed.
+ * @param data User data.
+ * @param obj The evas object.
+ * @param event_info The long-pressed item.
+ */
 // "longpressed" smart callback
 static void
 _longpressed_cb(void *data EINA_UNUSED,
@@ -133,6 +208,14 @@ _longpressed_cb(void *data EINA_UNUSED,
 }
 
 
+/**
+ * @brief Filter callback to verify an item before it is added.
+ * @param obj The multibuttonentry object.
+ * @param item_label The label of the item to be added.
+ * @param item_data The item data.
+ * @param data User data.
+ * @return EINA_TRUE to accept the item, EINA_FALSE to reject it.
+ */
 // "item verified" confirm callback
 static Eina_Bool
 _item_filter_cb(Evas_Object *obj EINA_UNUSED,
@@ -145,6 +228,13 @@ _item_filter_cb(Evas_Object *obj EINA_UNUSED,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for the "Change format function" button.
+ *        Toggles between the default and a custom format function.
+ * @param data The multibuttonentry object.
+ * @param obj The button object.
+ * @param event_info Not used.
+ */
 static void
 _format_change_cb(void *data,
                    Evas_Object *obj EINA_UNUSED,
@@ -160,6 +250,11 @@ _format_change_cb(void *data,
    printf("Changing format function to %p\n", format_func);
 }
 
+/**
+ * @brief Adds a button to change the format function of the multibuttonentry.
+ * @param mbe The multibuttonentry to which the button's callback is associated.
+ * @return The created button object.
+ */
 static Evas_Object*
 _format_change_btn_add(Evas_Object *mbe)
 {
@@ -174,6 +269,12 @@ _format_change_btn_add(Evas_Object *mbe)
    return btn;
 }
 
+/**
+ * @brief Callback for item selection.
+ * @param data User data.
+ * @param obj The evas object.
+ * @param event_info The selected item.
+ */
 void
 _select_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info)
 {
@@ -181,6 +282,12 @@ _select_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_inf
    printf("select function called, item = %s\n", elm_object_item_text_get(it));
 }
 
+/**
+ * @brief Creates and configures a multibuttonentry widget.
+ *        It is set to expanded mode, and several items are added.
+ * @param parent The parent object.
+ * @return The scroller containing the multibuttonentry.
+ */
 static Evas_Object*
 _add_multibuttonentry(Evas_Object *parent)
 {
@@ -234,6 +341,13 @@ _add_multibuttonentry(Evas_Object *parent)
    return scr;
 }
 
+/**
+ * @brief Test function for multibuttonentry.
+ *        Creates a window with a multibuttonentry widget in expanded mode.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_multibuttonentry(void *data EINA_UNUSED,
                       Evas_Object *obj EINA_UNUSED,
@@ -261,6 +375,12 @@ test_multibuttonentry(void *data EINA_UNUSED,
    evas_object_show(win);
 }
 
+/**
+ * @brief Creates and configures a multibuttonentry widget in shrink mode.
+ *        Many items are added to demonstrate the shrink mode behavior.
+ * @param parent The parent object.
+ * @return The scroller containing the multibuttonentry.
+ */
 static Evas_Object*
 _add_multibuttonentry_shrink(Evas_Object *parent)
 {
@@ -321,6 +441,13 @@ _add_multibuttonentry_shrink(Evas_Object *parent)
    return scr;
 }
 
+/**
+ * @brief Test function for multibuttonentry in shrink mode.
+ *        Creates a window with a multibuttonentry widget in shrink mode.
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_multibuttonentry2(void *data EINA_UNUSED,
                       Evas_Object *obj EINA_UNUSED,

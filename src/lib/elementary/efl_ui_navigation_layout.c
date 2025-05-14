@@ -12,6 +12,16 @@
 #define MY_CLASS EFL_UI_NAVIGATION_LAYOUT_CLASS
 #define MY_CLASS_NAME "Efl.Ui.Navigation_Layout"
 
+/**
+ * @brief Sets the bar part of the navigation layout.
+ *
+ * This function sets the layout to be used as the bar (typically a header or toolbar)
+ * for the navigation layout. The bar is usually displayed at the top.
+ *
+ * @param[in] obj The Efl.Ui.Navigation_Layout object.
+ * @param[in] pd The private data of the Efl.Ui.Navigation_Layout object.
+ * @param[in] bar The Efl.Ui.Layout object to set as the bar. Must be a valid Efl.Ui.Layout.
+ */
 EOLIAN static void
 _efl_ui_navigation_layout_bar_set(Eo *obj, Efl_Ui_Navigation_Layout_Data *pd, Efl_Ui_Layout *bar)
 {
@@ -21,12 +31,31 @@ _efl_ui_navigation_layout_bar_set(Eo *obj, Efl_Ui_Navigation_Layout_Data *pd, Ef
    pd->bar = bar;
 }
 
+/**
+ * @brief Gets the bar part of the navigation layout.
+ *
+ * This function retrieves the layout currently set as the bar for the navigation layout.
+ *
+ * @param[in] obj The Efl.Ui.Navigation_Layout object. (Unused)
+ * @param[in] pd The private data of the Efl.Ui.Navigation_Layout object.
+ * @return The Efl.Ui.Layout object used as the bar, or NULL if none is set.
+ */
 EOLIAN static Efl_Ui_Layout *
 _efl_ui_navigation_layout_bar_get(const Eo *obj EINA_UNUSED, Efl_Ui_Navigation_Layout_Data *pd)
 {
    return pd->bar;
 }
 
+/**
+ * @brief Constructor for the Efl.Ui.Navigation_Layout object.
+ *
+ * This function is called when a new Efl.Ui.Navigation_Layout object is created.
+ * It initializes the widget, sets its theme, and prepares it for use.
+ *
+ * @param[in] obj The Efl.Ui.Navigation_Layout object being constructed.
+ * @param[in] pd The private data of the Efl.Ui.Navigation_Layout object. (Unused for initial construction logic here)
+ * @return The constructed Efl.Ui.Navigation_Layout object, or NULL on failure.
+ */
 EOLIAN static Eo *
 _efl_ui_navigation_layout_efl_object_constructor(Eo *obj, Efl_Ui_Navigation_Layout_Data *pd EINA_UNUSED)
 {

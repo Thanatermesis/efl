@@ -1,9 +1,20 @@
 #ifndef _EFL_UI_CHECK_LEGACY_EO_H_
 #define _EFL_UI_CHECK_LEGACY_EO_H_
 
+/**
+ * @file
+ * @brief These routines are legacy routines for the Efl Ui Check widget.
+ *
+ * This is an internal Eo file, which is not meant to be used by applications.
+ */
+
 #ifndef _EFL_UI_CHECK_LEGACY_EO_CLASS_TYPE
 #define _EFL_UI_CHECK_LEGACY_EO_CLASS_TYPE
 
+/**
+ * @brief Opaque handle to the Efl_Ui_Check_Legacy instance.
+ * @ingroup Efl_Ui_Check_Legacy
+ */
 typedef Eo Efl_Ui_Check_Legacy;
 
 #endif

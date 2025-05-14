@@ -158,91 +158,115 @@ __extension__ ({                                                              \
 
 #define MY_CLASS EFL_NET_DIALER_HTTP_CLASS
 
+/**
+ * @brief Manages a CURLM multi handle and associated resources for HTTP dialers.
+ *
+ * This structure holds the state for a CURLM multi handle, which allows
+ * managing multiple CURL easy handles (connections) concurrently within a
+ * single thread. It keeps track of the EFL loop, active users (dialers),
+ * a timer for CURLM timeouts, and the running state of the multi handle.
+ */
 typedef struct _Efl_Net_Dialer_Http_Curlm {
-   Eo *loop;
-   CURLM *multi;
-   Eina_List *users;
-   Eo *timer;
-   int running;
-   unsigned int pending_init;
+   Eo *loop; /**< The EFL main loop associated with this CURLM. */
+   CURLM *multi; /**< The CURLM multi handle. */
+   Eina_List *users; /**< A list of Eo (Efl_Net_Dialer_Http) objects using this CURLM. */
+   Eo *timer; /**< An EFL timer for handling CURLM_TIMERFUNCTION. */
+   int running; /**< The number of running easy handles in the multi handle. */
+   unsigned int pending_init; /**< Counter for pending initializations (not currently used). */
 } Efl_Net_Dialer_Http_Curlm;
 
 
+/**
+ * @brief Private data structure for an Efl_Net_Dialer_Http instance.
+ *
+ * This structure holds all the internal state for an HTTP dialer, including
+ * the CURL easy handle, connection parameters, request and response data,
+ * SSL settings, and various status flags.
+ */
 typedef struct
 {
-   CURL *easy;
-   Efl_Net_Dialer_Http_Curlm *cm;
-   Eo *fdhandler;
-   Eina_Stringshare *address_dial;
-   Eina_Stringshare *proxy;
-   Eina_Stringshare *cookie_jar;
-   Eina_Stringshare *address_local;
-   Eina_Stringshare *address_remote;
-   Eina_Stringshare *method;
-   Eina_Stringshare *user_agent;
-   Ecore_Thread *libproxy_thread;
+   CURL *easy; /**< The CURL easy handle for this specific dialer. */
+   Efl_Net_Dialer_Http_Curlm *cm; /**< Pointer to the shared CURLM manager. */
+   Eo *fdhandler; /**< EFL loop file descriptor handler for the socket. */
+   Eina_Stringshare *address_dial; /**< The target address/URL to dial. */
+   Eina_Stringshare *proxy; /**< The proxy server URL, if any. */
+   Eina_Stringshare *cookie_jar; /**< Path to the cookie jar file. */
+   Eina_Stringshare *address_local; /**< The local address of the connection. */
+   Eina_Stringshare *address_remote; /**< The remote address (resolved effective URL). */
+   Eina_Stringshare *method; /**< The HTTP method (e.g., "GET", "POST"). */
+   Eina_Stringshare *user_agent; /**< The User-Agent string for the request. */
+   Ecore_Thread *libproxy_thread; /**< Thread for asynchronous libproxy lookups. */
    struct {
-      struct curl_slist *headers;
-      int64_t content_length;
-   } request;
+      struct curl_slist *headers; /**< List of custom request headers. */
+      int64_t content_length; /**< Content-Length for the request body. */
+   } request; /**< Request-specific data. */
    struct {
-      Eina_Slice slice;
-   } send;
+      Eina_Slice slice; /**< Slice pointing to data to be sent. */
+   } send; /**< Data for sending (uploading). */
    struct {
-      uint8_t *bytes;
-      size_t used;
-      size_t limit;
-   } recv;
-   uint64_t size;
-   double timeout_dial;
+      uint8_t *bytes; /**< Buffer for received data. */
+      size_t used; /**< Number of bytes used in the receive buffer. */
+      size_t limit; /**< Total size of the receive buffer. */
+   } recv; /**< Data for receiving (downloading). */
+   uint64_t size; /**< Overall size for I/O operations (used by efl_io_sizer). */
+   double timeout_dial; /**< Connection timeout in seconds. */
    struct {
-      Eina_Stringshare *username;
-      char *password;
-      Efl_Net_Http_Authentication_Method method;
-      Eina_Bool restricted;
-   } authentication;
+      Eina_Stringshare *username; /**< Username for authentication. */
+      char *password; /**< Password for authentication (securely handled). */
+      Efl_Net_Http_Authentication_Method method; /**< HTTP authentication method. */
+      Eina_Bool restricted; /**< Whether authentication is restricted. */
+   } authentication; /**< Authentication details. */
    struct {
-      Eina_Stringshare *ca;
-      Eina_Stringshare *crl;
-      Eina_Bool verify_peer;
-      Eina_Bool verify_hostname;
-   } ssl;
-   Eina_Future *pending_close;
-   unsigned int in_curl_callback;
-   SOCKET fd;
-   Eina_Error error;
-   Efl_Net_Http_Version version;
-   Efl_Net_Dialer_Http_Primary_Mode primary_mode;
-   Eina_Bool allow_redirects;
-   uint8_t pause;
-   Eina_Bool connected;
-   Eina_Bool closed;
-   Eina_Bool close_on_exec;
-   Eina_Bool close_on_invalidate;
-   Eina_Bool pending_eos;
-   Eina_Bool eos;
-   Eina_Bool can_read;
-   Eina_Bool can_write;
-   Eina_Bool pending_headers_done;
+      Eina_Stringshare *ca; /**< Path to CA certificate(s) file or directory. */
+      Eina_Stringshare *crl; /**< Path to Certificate Revocation List file. */
+      Eina_Bool verify_peer; /**< Whether to verify the SSL peer certificate. */
+      Eina_Bool verify_hostname; /**< Whether to verify the hostname in the SSL certificate. */
+   } ssl; /**< SSL/TLS settings. */
+   Eina_Future *pending_close; /**< Future for handling close operations initiated from CURL callbacks. */
+   unsigned int in_curl_callback; /**< Counter to track if currently inside a CURL callback. */
+   SOCKET fd; /**< The socket file descriptor used by CURL. */
+   Eina_Error error; /**< Last error code encountered. */
+   Efl_Net_Http_Version version; /**< HTTP protocol version used/negotiated. */
+   Efl_Net_Dialer_Http_Primary_Mode primary_mode; /**< Primary operation mode (download/upload/auto). */
+   Eina_Bool allow_redirects; /**< Whether to follow HTTP redirects. */
+   uint8_t pause; /**< Bitmask of CURLPAUSE flags (send/recv). */
+   Eina_Bool connected; /**< Flag indicating if the dialer is connected. */
+   Eina_Bool closed; /**< Flag indicating if the dialer has been closed. */
+   Eina_Bool close_on_exec; /**< Flag to set FD_CLOEXEC on the socket. */
+   Eina_Bool close_on_invalidate; /**< Flag to close the dialer when the Eo object is invalidated. */
+   Eina_Bool pending_eos; /**< Flag indicating that EOS is pending (data received, but EOS not yet emitted). */
+   Eina_Bool eos; /**< Flag indicating if End-Of-Stream has been reached for reading. */
+   Eina_Bool can_read; /**< Flag indicating if data is available for reading. */
+   Eina_Bool can_write; /**< Flag indicating if the dialer is ready to accept data for writing. */
+   Eina_Bool pending_headers_done; /**< Flag indicating that response headers have been received but not yet processed. */
    struct {
-      Eina_List *headers;
-      const Eina_List *last_request_header;
-      Efl_Net_Http_Status status;
-      Eina_Stringshare *content_type;
-      int64_t content_length;
-   } response;
+      Eina_List *headers; /**< List of received response headers (Efl_Net_Http_Header). */
+      const Eina_List *last_request_header; /**< Pointer to the start of headers for the last (potentially redirected) request. */
+      Efl_Net_Http_Status status; /**< HTTP status code of the response. */
+      Eina_Stringshare *content_type; /**< Content-Type of the response. */
+      int64_t content_length; /**< Content-Length of the response. */
+   } response; /**< Response-specific data. */
    struct {
       struct {
-         uint64_t now;
-         uint64_t total;
-      } download;
+         uint64_t now; /**< Bytes downloaded so far. */
+         uint64_t total; /**< Total bytes to download (if known). */
+      } download; /**< Download progress. */
       struct {
-         uint64_t now;
-         uint64_t total;
-      } upload;
-   } progress;
+         uint64_t now; /**< Bytes uploaded so far. */
+         uint64_t total; /**< Total bytes to upload (if known). */
+      } upload; /**< Upload progress. */
+   } progress; /**< Transfer progress information. */
 } Efl_Net_Dialer_Http_Data;
 
+/**
+ * @brief Callback for EFL_EVENT_DEL on a dialer object.
+ *
+ * Removes the dialer from the list of finished dialers if it's deleted
+ * while still in that list. This prevents use-after-free.
+ *
+ * @param data Pointer to the Eina_List of finished dialers.
+ * @param event The EFL_EVENT_DEL event.
+ */
 static void
 _efl_net_dialer_http_curlm_check_finished_object_deleted(void *data, const Efl_Event *event)
 {
@@ -250,6 +274,15 @@ _efl_net_dialer_http_curlm_check_finished_object_deleted(void *data, const Efl_E
    *p_finished = eina_list_remove(*p_finished, event->object);
 }
 
+/**
+ * @brief Adds a dialer to the list of finished dialers and monitors its deletion.
+ *
+ * If the dialer is not already in the list, it's added, and an EFL_EVENT_DEL
+ * callback is attached to ensure it's removed from the list if deleted.
+ *
+ * @param p_finished Pointer to the Eina_List of finished dialers.
+ * @param dialer The dialer object to add.
+ */
 static void
 _efl_net_dialer_http_curlm_check_finished_object_add(Eina_List **p_finished, Eo *dialer)
 {
@@ -261,6 +294,12 @@ _efl_net_dialer_http_curlm_check_finished_object_add(Eina_List **p_finished, Eo 
    *p_finished = eina_list_append(*p_finished, dialer);
 }
 
+/**
+ * @brief Removes a dialer from the list of finished dialers and stops monitoring its deletion.
+ *
+ * @param p_finished Pointer to the Eina_List of finished dialers.
+ * @param dialer The dialer object to remove.
+ */
 static void
 _efl_net_dialer_http_curlm_check_finished_object_remove(Eina_List **p_finished, Eo *dialer)
 {
@@ -270,6 +309,17 @@ _efl_net_dialer_http_curlm_check_finished_object_remove(Eina_List **p_finished, 
    *p_finished = eina_list_remove(*p_finished, dialer);
 }
 
+/**
+ * @brief Checks for completed or errored CURL transfers.
+ *
+ * Iterates through messages from `curl_multi_info_read` to identify
+ * transfers that have finished (successfully or with an error). For errored
+ * transfers, it sets the error on the dialer. For completed transfers,
+ * it marks them for EOS processing. It then processes these dialers,
+ * emitting error events or setting EOS and closing them as appropriate.
+ *
+ * @param cm The CURLM manager.
+ */
 static void
 _efl_net_dialer_http_curlm_check(Efl_Net_Dialer_Http_Curlm *cm)
 {
@@ -352,6 +402,19 @@ _efl_net_dialer_http_curlm_timer_do(void *data, const Efl_Event *ev EINA_UNUSED)
    _efl_net_dialer_http_curlm_check(cm);
 }
 
+/**
+ * @brief CURLMOPT_TIMERFUNCTION callback.
+ *
+ * Schedules or updates an EFL timer based on the timeout provided by CURL.
+ * This timer, when it fires, will call `_efl_net_dialer_http_curlm_timer_do`
+ * to drive CURLM processing.
+ *
+ * @param multi The CURLM handle (unused).
+ * @param timeout_ms The timeout in milliseconds. A value of -1 means to
+ *        delete the timer, 0 means to fire immediately.
+ * @param data User data, pointer to Efl_Net_Dialer_Http_Curlm.
+ * @return 0 on success, -1 on failure.
+ */
 static int
 _efl_net_dialer_http_curlm_timer_schedule(CURLM *multi EINA_UNUSED, long timeout_ms, void *data)
 {
@@ -404,6 +467,22 @@ _efl_net_dialer_http_curlm_event_fd_write(void *data, const Efl_Event *event)
    _efl_net_dialer_http_curlm_check(cm);
 }
 
+/**
+ * @brief CURLMOPT_SOCKETFUNCTION callback.
+ *
+ * Manages socket monitoring for CURL. This function is called by CURL when
+ * the state of a socket changes (e.g., needs to be monitored for read/write,
+ * or monitoring should stop). It creates, updates, or deletes Efl_Loop_Fd
+ * handlers to integrate CURL's socket events with the EFL main loop.
+ *
+ * @param e The CURL easy handle associated with the socket.
+ * @param fd The socket file descriptor.
+ * @param what The desired polling action (CURL_POLL_IN, CURL_POLL_OUT,
+ *        CURL_POLL_INOUT, CURL_POLL_REMOVE).
+ * @param cm_data User data for the multi handle, pointer to Efl_Net_Dialer_Http_Curlm.
+ * @param fdhandler_data User data for the socket, pointer to an existing Efl_Loop_Fd or NULL.
+ * @return 0 on success, -1 on failure.
+ */
 static int
 _efl_net_dialer_http_curlm_socket_manage(CURL *e, curl_socket_t fd, int what, void *cm_data, void *fdhandler_data)
 {
@@ -474,6 +553,19 @@ _efl_net_dialer_http_curlm_socket_manage(CURL *e, curl_socket_t fd, int what, vo
    return 0;
 }
 
+/**
+ * @brief Adds a CURL easy handle to the CURLM multi handle.
+ *
+ * Initializes the CURLM multi handle if it's not already created.
+ * Sets up socket and timer callback functions for the multi handle.
+ * Adds the given easy handle to the multi handle and tracks the dialer
+ * object as a user of this CURLM.
+ *
+ * @param cm The CURLM manager.
+ * @param o The Efl_Net_Dialer_Http object associated with the handle.
+ * @param handle The CURL easy handle to add.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _efl_net_dialer_http_curlm_add(Efl_Net_Dialer_Http_Curlm *cm, Eo *o, CURL *handle)
 {
@@ -507,6 +599,16 @@ _efl_net_dialer_http_curlm_add(Efl_Net_Dialer_Http_Curlm *cm, Eo *o, CURL *handl
    return EINA_TRUE;
 }
 
+/**
+ * @brief Removes a CURL easy handle from the CURLM multi handle.
+ *
+ * Removes the specified easy handle from the multi handle. If this was the
+ * last user of the CURLM, cleans up the multi handle and associated timer.
+ *
+ * @param cm The CURLM manager.
+ * @param o The Efl_Net_Dialer_Http object associated with the handle.
+ * @param handle The CURL easy handle to remove.
+ */
 static void
 _efl_net_dialer_http_curlm_remove(Efl_Net_Dialer_Http_Curlm *cm, Eo *o, CURL *handle)
 {
@@ -536,8 +638,15 @@ _efl_net_dialer_http_curlm_remove(Efl_Net_Dialer_Http_Curlm *cm, Eo *o, CURL *ha
 }
 
 // TODO: move this per-loop when multiple main loops are possible
-static Efl_Net_Dialer_Http_Curlm _cm_global;
+// TODO: move this per-loop when multiple main loops are possible
+static Efl_Net_Dialer_Http_Curlm _cm_global; /**< Global CURLM manager instance. */
 
+/**
+ * @brief Converts an Efl_Net_Http_Version enum to a CURL_HTTP_VERSION_* constant.
+ * @param version The Efl_Net_Http_Version to convert.
+ * @return The corresponding CURL_HTTP_VERSION_* constant, or CURL_HTTP_VERSION_NONE
+ *         if the version is unsupported.
+ */
 static long
 _efl_net_http_version_to_curl(Efl_Net_Http_Version version)
 {
@@ -1834,7 +1943,7 @@ _efl_net_dialer_http_efl_io_sizer_resize(Eo *o, Efl_Net_Dialer_Http_Data *pd, ui
 
    pm = _efl_net_dialer_http_primary_mode_effective_get(pd);
    if ((pm == EFL_NET_DIALER_HTTP_PRIMARY_MODE_UPLOAD) ||
-       (strcmp(pd->method, "POST") == 0))
+       (strcmp(pd->method, "POST") == 0)) // POST implies upload for sizing
      {
         efl_net_dialer_http_request_content_length_set(o, size);
         return 0;
@@ -1855,14 +1964,27 @@ _efl_net_dialer_http_efl_io_sizer_size_get(const Eo *o, Efl_Net_Dialer_Http_Data
    pm = _efl_net_dialer_http_primary_mode_effective_get(pd);
    if (pm == EFL_NET_DIALER_HTTP_PRIMARY_MODE_UPLOAD)
      len = efl_net_dialer_http_request_content_length_get(o);
-   else
+   else // Includes AUTO, which defaults to DOWNLOAD for size_get unless method implies upload
      len = efl_net_dialer_http_response_content_length_get(o);
 
-   if (len < 0)
+   if (len < 0) // CURL returns -1 if size is unknown
      return 0;
    return len;
 }
 
+/**
+ * @brief Applies the HTTP method and primary mode to the CURL easy handle.
+ *
+ * This function configures CURL options like CURLOPT_PUT, CURLOPT_UPLOAD,
+ * CURLOPT_HTTPGET, CURLOPT_POST, CURLOPT_NOBODY, or CURLOPT_CUSTOMREQUEST
+ * based on the provided HTTP method string and the primary operation mode
+ * (upload or download).
+ *
+ * @param o The Efl_Net_Dialer_Http object.
+ * @param pd The private data of the dialer.
+ * @param method The HTTP method string (e.g., "GET", "POST", "PUT").
+ * @param primary_mode The intended primary mode of operation.
+ */
 static void
 _efl_net_dialer_http_request_apply(Eo *o, Efl_Net_Dialer_Http_Data *pd, const char *method, Efl_Net_Dialer_Http_Primary_Mode primary_mode)
 {
@@ -2151,12 +2273,26 @@ _efl_net_dialer_http_request_headers_get(Eo *o EINA_UNUSED, Efl_Net_Dialer_Http_
    return &it->iterator;
 }
 
+/**
+ * @brief Sets the content length for the HTTP request.
+ *
+ * This informs CURL about the size of the data to be uploaded,
+ * typically used with POST or PUT requests.
+ * If the primary mode is UPLOAD, it also triggers an EFL_IO_SIZER_EVENT_SIZE_CHANGED event.
+ *
+ * @param o The Efl_Net_Dialer_Http object.
+ * @param pd The private data of the dialer.
+ * @param length The content length. Use -1 if unknown (though this might
+ *        cause issues with some servers or require chunked encoding).
+ */
 EOLIAN static void
 _efl_net_dialer_http_request_content_length_set(Eo *o, Efl_Net_Dialer_Http_Data *pd, int64_t length)
 {
    Efl_Net_Dialer_Http_Primary_Mode pm;
    CURLcode r;
 
+   // For POST, use CURLOPT_POSTFIELDSIZE_LARGE. For PUT and other methods
+   // where data is sent from a read callback, use CURLOPT_INFILESIZE_LARGE.
    if (strcmp(pd->method, "POST") == 0)
      r = curl_easy_setopt(pd->easy, CURLOPT_POSTFIELDSIZE_LARGE, length);
    else
@@ -2166,7 +2302,7 @@ _efl_net_dialer_http_request_content_length_set(Eo *o, Efl_Net_Dialer_Http_Data 
          o, length, curl_easy_strerror(r));
 
    pd->request.content_length = length;
-   if (length < 0)
+   if (length < 0) // If length is unknown, no size change event.
      return;
 
    pm = _efl_net_dialer_http_primary_mode_effective_get(pd);
@@ -2180,13 +2316,24 @@ _efl_net_dialer_http_request_content_length_get(const Eo *o EINA_UNUSED, Efl_Net
    return pd->request.content_length;
 }
 
+/**
+ * @brief Sets the content length of the HTTP response.
+ *
+ * This is typically called internally when CURL provides the
+ * Content-Length header from the server's response.
+ * If the primary mode is DOWNLOAD, it also triggers an EFL_IO_SIZER_EVENT_SIZE_CHANGED event.
+ *
+ * @param o The Efl_Net_Dialer_Http object.
+ * @param pd The private data of the dialer.
+ * @param length The content length from the response. -1 if unknown.
+ */
 EOLIAN static void
 _efl_net_dialer_http_response_content_length_set(Eo *o, Efl_Net_Dialer_Http_Data *pd, int64_t length)
 {
    Efl_Net_Dialer_Http_Primary_Mode pm;
 
    pd->response.content_length = length;
-   if (length < 0)
+   if (length < 0) // If length is unknown, no size change event.
      return;
 
    pm = _efl_net_dialer_http_primary_mode_effective_get(pd);
@@ -2229,17 +2376,33 @@ _efl_net_dialer_http_response_headers_get(Eo *o EINA_UNUSED, Efl_Net_Dialer_Http
    return eina_list_iterator_new(lst);
 }
 
+/**
+ * @brief Clears all stored response headers.
+ *
+ * Frees the memory associated with the list of response headers.
+ *
+ * @param o The Efl_Net_Dialer_Http object (unused).
+ * @param pd The private data of the dialer.
+ */
 EOLIAN static void
 _efl_net_dialer_http_response_headers_clear(Eo *o EINA_UNUSED, Efl_Net_Dialer_Http_Data *pd)
 {
    void *mem;
 
    EINA_LIST_FREE(pd->response.headers, mem)
-     free(mem); /* key and value are in the same memory */
+     free(mem); /* key and value are in the same memory block allocated in _efl_net_dialer_http_receive_header_safe */
 
    pd->response.last_request_header = NULL;
 }
 
+/**
+ * @brief Gets the current download progress.
+ *
+ * @param o The Efl_Net_Dialer_Http object (unused).
+ * @param pd The private data of the dialer.
+ * @param[out] now Pointer to store the number of bytes downloaded so far. Can be NULL.
+ * @param[out] total Pointer to store the total number of bytes to download (if known). Can be NULL.
+ */
 EOLIAN static void
 _efl_net_dialer_http_progress_download_get(const Eo *o EINA_UNUSED, Efl_Net_Dialer_Http_Data *pd, uint64_t *now, uint64_t *total)
 {
@@ -2247,6 +2410,14 @@ _efl_net_dialer_http_progress_download_get(const Eo *o EINA_UNUSED, Efl_Net_Dial
    if (total) *total = pd->progress.download.total;
 }
 
+/**
+ * @brief Gets the current upload progress.
+ *
+ * @param o The Efl_Net_Dialer_Http object (unused).
+ * @param pd The private data of the dialer.
+ * @param[out] now Pointer to store the number of bytes uploaded so far. Can be NULL.
+ * @param[out] total Pointer to store the total number of bytes to upload (if known). Can be NULL.
+ */
 EOLIAN static void
 _efl_net_dialer_http_progress_upload_get(const Eo *o EINA_UNUSED, Efl_Net_Dialer_Http_Data *pd, uint64_t *now, uint64_t *total)
 {
@@ -2254,6 +2425,18 @@ _efl_net_dialer_http_progress_upload_get(const Eo *o EINA_UNUSED, Efl_Net_Dialer
    if (total) *total = pd->progress.upload.total;
 }
 
+/**
+ * @brief Sets the path to the cookie jar file.
+ *
+ * CURL will use this file to read existing cookies and store new cookies.
+ * If a previous cookie jar was set, it's flushed and cleared before
+ * setting the new one.
+ *
+ * @param o The Efl_Net_Dialer_Http object.
+ * @param pd The private data of the dialer.
+ * @param path The file system path to the cookie jar. Set to NULL to disable
+ *        cookie jar usage.
+ */
 EOLIAN static void
 _efl_net_dialer_http_cookie_jar_set(Eo *o EINA_UNUSED, Efl_Net_Dialer_Http_Data *pd, const char *path)
 {
@@ -2383,6 +2566,16 @@ _efl_net_dialer_http_date_parse(const char *str)
    return curl_getdate(str, NULL);
 }
 
+/**
+ * @brief Serializes a Unix timestamp into an RFC 1123 formatted date string.
+ *
+ * This format is commonly used in HTTP headers (e.g., "Date", "Last-Modified").
+ * Example: "Sun, 06 Nov 1994 08:49:37 GMT"
+ *
+ * @param ts The Unix timestamp (seconds since epoch).
+ * @return A newly allocated string with the formatted date, or NULL on error.
+ *         The caller is responsible for freeing this string.
+ */
 EOLIAN static char *
 _efl_net_dialer_http_date_serialize(int64_t ts)
 {
@@ -2412,6 +2605,16 @@ _efl_net_dialer_http_date_serialize(int64_t ts)
    return strdup(buf);
 }
 
+/**
+ * @brief Gets the underlying CURL easy handle for this dialer.
+ *
+ * @warning This is an advanced function. Direct manipulation of the CURL handle
+ * may interfere with the Efl_Net_Dialer_Http object's state management.
+ * Use with caution.
+ *
+ * @param o The Efl_Net_Dialer_Http object.
+ * @return The CURL easy handle, or NULL if the object is invalid or not properly initialized.
+ */
 CURL *
 efl_net_dialer_http_curl_get(const Eo *o)
 {

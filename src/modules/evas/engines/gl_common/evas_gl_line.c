@@ -1,5 +1,23 @@
 #include "evas_gl_private.h"
 
+/**
+ * @brief Draws a line within the Evas GL engine context.
+ *
+ * This function is a common entry point for line drawing. It sets up the
+ * necessary context, including color, clipping, and masking, before pushing
+ * the line data to the rendering pipeline.
+ *
+ * It contains a workaround for positioning issues with GL lines on different
+ * hardware (e.g., ARM GPUs), which can be disabled via the
+ * `EVAS_GL_LINE_OFFSET_HACK_DISABLE` environment variable. This hack adjusts
+ * coordinates based on device-specific behavior to ensure consistent output.
+ *
+ * @param gc The Evas GL engine context.
+ * @param x1 The starting X coordinate of the line.
+ * @param y1 The starting Y coordinate of the line.
+ * @param x2 The ending X coordinate of the line.
+ * @param y2 The ending Y coordinate of the line.
+ */
 void
 evas_gl_common_line_draw(Evas_Engine_GL_Context *gc, int x1, int y1, int x2, int y2)
 {

@@ -17,6 +17,21 @@
 #define DRM_FORMAT_ARGB8888           0x34325241
 #define DRM_FORMAT_XRGB8888           0x34325258
 
+/**
+ * @brief Callback function to bind (map) the DMABUF memory for an Evas image.
+ *
+ * This function is called when Evas needs access to the pixel data of an
+ * image associated with a DMABUF native surface. It maps the DMABUF file
+ * descriptor into the process's address space if it hasn't been mapped already.
+ * The mapped memory address is stored within the Native structure and assigned
+ * to the image's data pointer.
+ *
+ * @param image Pointer to the RGBA_Image structure.
+ * @param x Unused X coordinate.
+ * @param y Unused Y coordinate.
+ * @param w Unused width.
+ * @param h Unused height.
+ */
 static void
 _native_bind_cb(void *image, int x EINA_UNUSED, int y EINA_UNUSED, int w EINA_UNUSED, int h EINA_UNUSED)
 {
@@ -45,6 +60,15 @@ _native_bind_cb(void *image, int x EINA_UNUSED, int y EINA_UNUSED, int w EINA_UN
    n->ns_data.wl_surface_dmabuf.ptr = im->image.data;
 }
 
+/**
+ * @brief Callback function to unbind the DMABUF memory for an Evas image.
+ *
+ * This function is called when Evas is finished with a specific access
+ * operation on the image data. In this implementation, it currently
+ * does nothing, as the memory remains mapped until the image is freed.
+ *
+ * @param image Pointer to the RGBA_Image structure.
+ */
 static void
 _native_unbind_cb(void *image)
 {
@@ -57,6 +81,16 @@ _native_unbind_cb(void *image)
      return;
 }
 
+/**
+ * @brief Callback function to free resources associated with a DMABUF native surface.
+ *
+ * This function is called when the Evas image using the DMABUF native surface
+ * is being destroyed. It unmaps the previously mapped DMABUF memory, frees the
+ * associated Native data structure, and resets the native function pointers
+ * on the image.
+ *
+ * @param image Pointer to the RGBA_Image structure being freed.
+ */
 static void
 _native_free_cb(void *image)
 {
@@ -78,6 +112,47 @@ _native_free_cb(void *image)
    free(n);
 }
 
+/**
+ * @brief Sets or creates an Evas image based on a DMABUF native surface.
+ *
+ * This function associates an Evas RGBA_Image with a Wayland DMABUF native
+ * surface.
+ *
+ * If `image` is NULL, it attempts to create a new Evas image matching the
+ * properties specified in the `native` surface's attributes (width, height,
+ * format). It validates that the DMABUF attributes are supported (single plane,
+ * ARGB8888 or XRGB8888 format).
+ *
+ * If `image` is not NULL, it configures the existing image to use the provided
+ * DMABUF native surface. It frees any existing native data, allocates a new
+ * Native structure, copies the native surface information, validates the
+ * attributes, sets up the image properties (width, height, colorspace, alpha),
+ * and assigns the native bind/unbind/free callbacks. The actual memory mapping
+ * is deferred until the `_native_bind_cb` is called.
+ *
+ * @param image Pointer to an existing RGBA_Image, or NULL to create a new one.
+ * @param native Pointer to an Evas_Native_Surface structure of type
+ *               EVAS_NATIVE_SURFACE_WL_DMABUF containing the DMABUF details.
+ *               The `native->data.wl_dmabuf.attr` should point to a valid
+ *               `struct dmabuf_attributes`.
+ *               Example `dmabuf_attributes` structure:
+ *               ```c
+ *               struct dmabuf_attributes {
+ *                   int32_t version; // Must be EVAS_DMABUF_ATTRIBUTE_VERSION
+ *                   int32_t width;   // Width in pixels
+ *                   int32_t height;  // Height in pixels
+ *                   uint32_t format; // Pixel format (e.g., DRM_FORMAT_ARGB8888)
+ *                   int32_t n_planes;// Number of planes (must be 1)
+ *                   int32_t stride[4]; // Stride for each plane (only stride[0] used)
+ *                   int32_t offset[4]; // Offset for each plane (unused here)
+ *                   int fd[4];       // File descriptor for each plane (only fd[0] used)
+ *                   uint64_t modifier[4]; // Modifier for each plane (unused here)
+ *               };
+ *               ```
+ * @return Pointer to the configured or newly created RGBA_Image on success,
+ *         or NULL on failure (e.g., invalid parameters, unsupported format,
+ *         allocation failure).
+ */
 void *
 _evas_native_dmabuf_surface_image_set(void *image, void *native)
 {

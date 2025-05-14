@@ -1,6 +1,12 @@
 #include "private.h"
 #include "elm_spinner_eo.h"
 
+/**
+ * @internal
+ * @brief An array defining the supported data types for the spinner prefs item.
+ *
+ * This widget can handle integer and floating-point values.
+ */
 static Elm_Prefs_Item_Type supported_types[] =
 {
    ELM_PREFS_TYPE_INT,
@@ -8,6 +14,17 @@ static Elm_Prefs_Item_Type supported_types[] =
    ELM_PREFS_TYPE_UNKNOWN
 };
 
+/**
+ * @internal
+ * @brief Callback function invoked when the spinner's value changes.
+ *
+ * This function acts as a bridge. It receives an Efl_Event and invokes the
+ * user-provided Elm_Prefs_Item_Changed_Cb callback, passing the spinner
+ * object itself.
+ *
+ * @param data The user-provided callback function (Elm_Prefs_Item_Changed_Cb).
+ * @param event The event information structure.
+ */
 static void
 _item_changed_cb(void *data, const Efl_Event *event)
 {
@@ -16,6 +33,23 @@ _item_changed_cb(void *data, const Efl_Event *event)
     prefs_it_changed_cb(event->object);
 }
 
+/**
+ * @internal
+ * @brief Creates and configures a spinner widget for a prefs item.
+ *
+ * This function is the factory for creating spinner widgets used within the
+ * prefs system. It initializes the spinner based on the specified type (INT
+ * or FLOAT) and parameters.
+ *
+ * @param iface The prefs item interface (unused).
+ * @param prefs The parent prefs widget.
+ * @param type The data type for the spinner (ELM_PREFS_TYPE_INT or
+ *        ELM_PREFS_TYPE_FLOAT).
+ * @param spec A union (Elm_Prefs_Item_Spec) containing type-specific
+ *        configuration like min, max, and default values.
+ * @param cb A callback function to be invoked when the spinner's value changes.
+ * @return The newly created spinner Evas_Object.
+ */
 static Evas_Object *
 elm_prefs_spinner_add(const Elm_Prefs_Item_Iface *iface EINA_UNUSED,
                       Evas_Object *prefs,
@@ -47,6 +81,19 @@ elm_prefs_spinner_add(const Elm_Prefs_Item_Iface *iface EINA_UNUSED,
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Sets the spinner's value from an Eina_Value.
+ *
+ * This function validates the incoming Eina_Value against the spinner's
+ * configured data type and, if compatible, updates the spinner's displayed
+ * value.
+ *
+ * @param obj The spinner widget.
+ * @param value An Eina_Value containing the new value. It must match the
+ *        spinner's data type (INT or FLOAT).
+ * @return EINA_TRUE on success, EINA_FALSE on type mismatch or other errors.
+ */
 static Eina_Bool
 elm_prefs_spinner_value_set(Evas_Object *obj,
                             Eina_Value *value)
@@ -79,6 +126,19 @@ elm_prefs_spinner_value_set(Evas_Object *obj,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the spinner's current value into an Eina_Value.
+ *
+ * This function reads the numeric value from the spinner widget and populates
+ * the provided Eina_Value structure with it, ensuring the type is set
+ * correctly (INT or FLOAT).
+ *
+ * @param obj The spinner widget.
+ * @param value A pointer to an Eina_Value to be populated with the spinner's
+ *        current value.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 elm_prefs_spinner_value_get(Evas_Object *obj,
                             Eina_Value *value)

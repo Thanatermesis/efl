@@ -27,7 +27,16 @@
 #include "Eio.h"
 #include "eio_sentry_private.h"
 
-
+/**
+ * @internal
+ * @brief Translates an EIO_MONITOR event type to its corresponding EIO_SENTRY event description.
+ *
+ * This function maps integer-based event types from the EIO_MONITOR system
+ * to specific Efl_Event_Description pointers used by EIO_SENTRY.
+ *
+ * @param input_event The EIO_MONITOR event type (e.g., EIO_MONITOR_FILE_CREATED).
+ * @return The corresponding Efl_Event_Description* for EIO_SENTRY, or NULL if no match is found.
+ */
 static const Efl_Event_Description*
 _translate_event(int input_event)
 {
@@ -57,6 +66,20 @@ _translate_event(int input_event)
      return NULL;
 }
 
+/**
+ * @internal
+ * @brief Handles Ecore events from Eio.Monitor instances.
+ *
+ * This function is an Ecore_Event_Handler callback. It receives events
+ * from monitored paths, translates them into Eio_Sentry_Event format,
+ * and then dispatches them using efl_event_callback_call on the sentry object.
+ * If an EIO_MONITOR_ERROR event is received, the corresponding monitor is removed.
+ *
+ * @param data Pointer to Eio_Sentry_Data associated with the sentry object.
+ * @param type The type of the Ecore event (corresponds to EIO_MONITOR event types).
+ * @param event Pointer to the Eio_Monitor_Event structure containing event details.
+ * @return ECORE_CALLBACK_PASS_ON to continue processing, or ECORE_CALLBACK_DONE to stop.
+ */
 static unsigned char
 _handle_event(void *data, int type, void *event)
 {
@@ -84,6 +107,17 @@ _handle_event(void *data, int type, void *event)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @internal
+ * @brief Initializes Ecore event handlers for Eio.Monitor events.
+ *
+ * This function creates and registers Ecore_Event_Handler instances for all
+ * relevant EIO_MONITOR event types. These handlers will call _handle_event
+ * when an event occurs. The handlers are stored in the `handlers` array
+ * within the Eio_Sentry_Data structure.
+ *
+ * @param pd Pointer to the Eio_Sentry_Data structure for the sentry object.
+ */
 static void
 _initialize_handlers(Eio_Sentry_Data *pd)
 {
@@ -117,6 +151,19 @@ _initialize_handlers(Eio_Sentry_Data *pd)
    eina_array_push(pd->handlers, h);
 }
 
+/**
+ * @internal
+ * @brief Adds a path to be monitored by the Eio.Sentry object.
+ * @implements Eio.Sentry.add
+ *
+ * This function creates an Eio.Monitor for the given path and stores it.
+ * If event handlers haven't been initialized yet, it calls _initialize_handlers.
+ *
+ * @param obj The Eio.Sentry Eo object (unused).
+ * @param pd Pointer to the private data of the Eio.Sentry object.
+ * @param path The file or directory path to monitor.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., failed to create monitor or add to hash).
+ */
 Eina_Bool
 _eio_sentry_add(Eo *obj EINA_UNUSED, Eio_Sentry_Data *pd, const char *path)
 {
@@ -147,6 +194,18 @@ _eio_sentry_add(Eo *obj EINA_UNUSED, Eio_Sentry_Data *pd, const char *path)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Removes a path from being monitored by the Eio.Sentry object.
+ * @implements Eio.Sentry.remove
+ *
+ * This function removes the Eio.Monitor associated with the given path.
+ * The monitor itself will be deleted due to the Eina_Free_Cb set on the hash.
+ *
+ * @param obj The Eio.Sentry Eo object (unused).
+ * @param pd Pointer to the private data of the Eio.Sentry object.
+ * @param path The file or directory path to stop monitoring.
+ */
 void
 _eio_sentry_remove(Eo *obj EINA_UNUSED, Eio_Sentry_Data *pd, const char *path)
 {
@@ -156,6 +215,20 @@ _eio_sentry_remove(Eo *obj EINA_UNUSED, Eio_Sentry_Data *pd, const char *path)
    eina_hash_del(pd->targets, path, NULL);
 }
 
+/**
+ * @internal
+ * @brief Checks if the monitor for a given path is using a fallback mechanism.
+ * @implements Eio.Sentry.fallback_check
+ *
+ * This function retrieves the Eio.Monitor for the specified path and then
+ * calls eio_monitor_fallback_check() on it to determine if a less efficient
+ * polling-based fallback is being used instead of native OS events.
+ *
+ * @param obj The Eio.Sentry Eo object (unused).
+ * @param pd Pointer to the private data of the Eio.Sentry object.
+ * @param path The file or directory path to check.
+ * @return EINA_TRUE if the monitor is using a fallback, EINA_FALSE otherwise or if the path is not monitored.
+ */
 Eina_Bool
 _eio_sentry_fallback_check(const Eo *obj EINA_UNUSED, Eio_Sentry_Data *pd, const char *path)
 {
@@ -169,6 +242,19 @@ _eio_sentry_fallback_check(const Eo *obj EINA_UNUSED, Eio_Sentry_Data *pd, const
    return eio_monitor_fallback_check(monitor);
 }
 
+/**
+ * @internal
+ * @brief Constructor for the Eio.Sentry object.
+ * @implements Efl.Object.constructor
+ *
+ * Initializes the Eio.Sentry object by calling the parent constructor
+ * and setting up internal data structures, such as the hash table for
+ * storing monitored paths and their corresponding Eio.Monitor instances.
+ *
+ * @param obj The Eo object being constructed.
+ * @param pd Pointer to the private data for this Eio.Sentry instance.
+ * @return The constructed Eo object.
+ */
 Efl_Object * _eio_sentry_efl_object_constructor(Eo *obj, Eio_Sentry_Data *pd)
 {
    obj = efl_constructor(efl_super(obj, EIO_SENTRY_CLASS));
@@ -179,6 +265,19 @@ Efl_Object * _eio_sentry_efl_object_constructor(Eo *obj, Eio_Sentry_Data *pd)
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Destructor for the Eio.Sentry object.
+ * @implements Efl.Object.destructor
+ *
+ * Cleans up resources used by the Eio.Sentry object. This includes
+ * freeing the hash table of monitored paths (which also deletes the
+ * Eio.Monitor instances) and removing all registered Ecore event handlers.
+ * Finally, it calls the parent object's destructor.
+ *
+ * @param obj The Eo object being destructed.
+ * @param pd Pointer to the private data for this Eio.Sentry instance.
+ */
 void _eio_sentry_efl_object_destructor(Eo *obj, Eio_Sentry_Data *pd)
 {
    eina_hash_free(pd->targets);

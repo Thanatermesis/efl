@@ -1,7 +1,29 @@
+/**
+ * @file
+ * @brief Evas object smart class <Elm_Notify> Eolian C source
+ *
+ * Implements the Eolian interface for Elm_Notify.
+ */
+
+/**
+ * @internal
+ * @brief Event descriptor instance for the "block,clicked" event.
+ * @see ELM_NOTIFY_EVENT_BLOCK_CLICKED
+ */
 EWAPI const Efl_Event_Description _ELM_NOTIFY_EVENT_BLOCK_CLICKED =
    EFL_EVENT_DESCRIPTION("block,clicked");
+/**
+ * @internal
+ * @brief Event descriptor instance for the "timeout" event.
+ * @see ELM_NOTIFY_EVENT_TIMEOUT
+ */
 EWAPI const Efl_Event_Description _ELM_NOTIFY_EVENT_TIMEOUT =
    EFL_EVENT_DESCRIPTION("timeout");
+/**
+ * @internal
+ * @brief Event descriptor instance for the "dismissed" event.
+ * @see ELM_NOTIFY_EVENT_DISMISSED
+ */
 EWAPI const Efl_Event_Description _ELM_NOTIFY_EVENT_DISMISSED =
    EFL_EVENT_DESCRIPTION("dismissed");
 
@@ -15,7 +37,17 @@ EOAPI EFL_VOID_FUNC_BODYV_CONST(elm_obj_notify_align_get, EFL_FUNC_CALL(horizont
 
 void _elm_notify_allow_events_set(Eo *obj, Elm_Notify_Data *pd, Eina_Bool allow);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function for the "allow_events" property setter.
+ *
+ * This function is used by the Eolian reflection system to set the
+ * "allow_events" property using a generic Eina_Value.
+ *
+ * @param obj The Eolian object.
+ * @param val An Eina_Value containing the boolean value to set.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code if conversion fails.
+ */
 static Eina_Error
 __eolian_elm_notify_allow_events_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -35,7 +67,16 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_notify_allow_events_set, EFL_FUNC_CALL(allow),
 
 Eina_Bool _elm_notify_allow_events_get(const Eo *obj, Elm_Notify_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function for the "allow_events" property getter.
+ *
+ * This function is used by the Eolian reflection system to get the
+ * "allow_events" property as a generic Eina_Value.
+ *
+ * @param obj The Eolian object.
+ * @return An Eina_Value containing the boolean value of the property.
+ */
 static Eina_Value
 __eolian_elm_notify_allow_events_get_reflect(const Eo *obj)
 {
@@ -47,7 +88,17 @@ EOAPI EFL_FUNC_BODY_CONST(elm_obj_notify_allow_events_get, Eina_Bool, 0);
 
 void _elm_notify_timeout_set(Eo *obj, Elm_Notify_Data *pd, double timeout);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function for the "timeout" property setter.
+ *
+ * This function is used by the Eolian reflection system to set the
+ * "timeout" property using a generic Eina_Value.
+ *
+ * @param obj The Eolian object.
+ * @param val An Eina_Value containing the double value (timeout in seconds) to set.
+ * @return EINA_ERROR_NO_ERROR on success, or an error code if conversion fails.
+ */
 static Eina_Error
 __eolian_elm_notify_timeout_set_reflect(Eo *obj, Eina_Value val)
 {
@@ -67,7 +118,16 @@ EOAPI EFL_VOID_FUNC_BODYV(elm_obj_notify_timeout_set, EFL_FUNC_CALL(timeout), do
 
 double _elm_notify_timeout_get(const Eo *obj, Elm_Notify_Data *pd);
 
-
+/**
+ * @internal
+ * @brief Eolian reflection function for the "timeout" property getter.
+ *
+ * This function is used by the Eolian reflection system to get the
+ * "timeout" property as a generic Eina_Value.
+ *
+ * @param obj The Eolian object.
+ * @return An Eina_Value containing the double value (timeout in seconds) of the property.
+ */
 static Eina_Value
 __eolian_elm_notify_timeout_get_reflect(const Eo *obj)
 {
@@ -111,6 +171,18 @@ Efl_Gfx_Entity *_elm_notify_efl_content_content_unset(Eo *obj, Elm_Notify_Data *
 Efl_Object *_elm_notify_efl_part_part_get(const Eo *obj, Elm_Notify_Data *pd, const char *name);
 
 
+/**
+ * @internal
+ * @brief Initializes the Elm_Notify Eolian class.
+ *
+ * This function is called by the Eolian system when the Elm_Notify class
+ * is being set up. It registers the operations (methods) and properties
+ * for the class, linking them to their respective implementation functions
+ * and reflection handlers.
+ *
+ * @param klass The Eolian class to initialize.
+ * @return EINA_TRUE on successful initialization, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_notify_class_initializer(Efl_Class *klass)
 {
@@ -156,6 +228,15 @@ _elm_notify_class_initializer(Efl_Class *klass)
    return efl_class_functions_set(klass, opsp, ropsp);
 }
 
+/**
+ * @internal
+ * @brief Structure describing the Elm_Notify Eolian class.
+ *
+ * This structure provides metadata for the Elm_Notify class, including its
+ * Eolian version, name, type (regular class), size of its instance data
+ * (Elm_Notify_Data), and pointers to its class initializer and constructor
+ * functions. This information is used by the Eolian system to manage the class.
+ */
 static const Efl_Class_Description _elm_notify_class_desc = {
    EO_VERSION,
    "Elm.Notify",

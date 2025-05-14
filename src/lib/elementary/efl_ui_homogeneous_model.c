@@ -7,22 +7,42 @@
 
 // For now only vertical logic is implemented. Horizontal list and grid are not supported.
 
+/**
+ * @internal
+ * @brief Private data for the Efl_Ui_Homogeneous_Model class.
+ *
+ * This structure holds the data necessary for managing a homogeneous model,
+ * where all items are assumed to have the same dimensions.
+ */
 typedef struct _Efl_Ui_Homogeneous_Model_Data Efl_Ui_Homogeneous_Model_Data;
 struct _Efl_Ui_Homogeneous_Model_Data
 {
-   Efl_Ui_Homogeneous_Model_Data *parent;
+   Efl_Ui_Homogeneous_Model_Data *parent; /**< Pointer to the parent model's data, if this is a sub-model. */
 
    struct {
-      unsigned int width;
-      unsigned int height;
+      unsigned int width; /**< Width of a single item. */
+      unsigned int height; /**< Height of a single item. */
 
       struct {
-         Eina_Bool width;
-         Eina_Bool height;
-      } defined;
-   } item;
+         Eina_Bool width; /**< Flag indicating if item width has been defined. */
+         Eina_Bool height; /**< Flag indicating if item height has been defined. */
+      } defined; /**< Flags to track if item dimensions are set. */
+   } item; /**< Homogeneous item properties. */
 };
 
+/**
+ * @internal
+ * @brief Sets a specific dimension property (width or height) for an item.
+ *
+ * This function is a helper to set either the width or height of items
+ * in the homogeneous model. It ensures that the property is set only once.
+ *
+ * @param[in] obj The Efl_Model object.
+ * @param[in] value The Eina_Value containing the new dimension (unsigned int).
+ * @param[out] defined Pointer to a boolean flag that tracks if the dimension has been set.
+ * @param[out] r Pointer to store the dimension value.
+ * @return A resolved Eina_Future on success, or a rejected one on error (e.g., read-only, incorrect value).
+ */
 static Eina_Future *
 _efl_ui_homogeneous_model_property_set(Eo *obj, Eina_Value *value,
                                        Eina_Bool *defined, unsigned int *r)
@@ -38,11 +58,26 @@ _efl_ui_homogeneous_model_property_set(Eo *obj, Eina_Value *value,
    return f;
 }
 
+/**
+ * @internal
+ * @brief Implements Efl_Model_Property_Set for Efl_Ui_Homogeneous_Model.
+ *
+ * Handles setting properties like item width/height. If a parent model exists,
+ * it can also set properties related to the parent's item dimensions (selfw, selfh).
+ * Total width/height properties are read-only.
+ *
+ * @param[in] obj The Efl_Model object.
+ * @param[in] pd Private data for the homogeneous model.
+ * @param[in] property The name of the property to set.
+ * @param[in] value The Eina_Value to set for the property.
+ * @return A resolved Eina_Future on success, or a rejected one on error.
+ */
 static Eina_Future *
 _efl_ui_homogeneous_model_efl_model_property_set(Eo *obj,
                                                  Efl_Ui_Homogeneous_Model_Data *pd,
                                                  const char *property, Eina_Value *value)
 {
+   // If this model has a parent, certain properties relate to the parent's item dimensions.
    if (pd->parent)
      {
         if (eina_streq(property, _efl_model_property_selfw))
@@ -74,11 +109,27 @@ _efl_ui_homogeneous_model_efl_model_property_set(Eo *obj,
                                  property, value);
 }
 
+/**
+ * @internal
+ * @brief Implements Efl_Model_Property_Get for Efl_Ui_Homogeneous_Model.
+ *
+ * Retrieves properties such as item width/height, total width/height.
+ * If a parent model exists, it can also retrieve properties related to the
+ * parent's item dimensions (selfw, selfh).
+ * If a requested dimension is not yet defined, it returns an error with EAGAIN.
+ *
+ * @param[in] obj The Efl_Model object.
+ * @param[in] pd Private data for the homogeneous model.
+ * @param[in] property The name of the property to get.
+ * @return An Eina_Value containing the property value on success, or an Eina_Value
+ *         error (e.g., EAGAIN if not yet defined).
+ */
 static Eina_Value *
 _efl_ui_homogeneous_model_efl_model_property_get(const Eo *obj,
                                                  Efl_Ui_Homogeneous_Model_Data *pd,
                                                  const char *property)
 {
+   // If this model has a parent, certain properties relate to the parent's item dimensions.
    if (pd->parent)
      {
         if (eina_streq(property, _efl_model_property_selfw))
@@ -127,11 +178,27 @@ _efl_ui_homogeneous_model_efl_model_property_get(const Eo *obj,
    return eina_value_error_new(EAGAIN);
 }
 
+/**
+ * @internal
+ * @brief Constructor for Efl_Ui_Homogeneous_Model.
+ *
+ * Initializes the homogeneous model. If the model is a child of another
+ * Efl_Ui_Homogeneous_Model, it links to the parent's private data.
+ * This allows child models to access properties (like item dimensions)
+ * defined by their parent.
+ *
+ * @param[in] obj The Efl_Object being constructed.
+ * @param[in] pd Private data for the homogeneous model.
+ * @return The constructed Efl_Object.
+ */
 static Efl_Object *
 _efl_ui_homogeneous_model_efl_object_constructor(Eo *obj, Efl_Ui_Homogeneous_Model_Data *pd)
 {
    Eo *parent = efl_parent_get(obj);
 
+   // Check if the parent is also a homogeneous model. If so, store a reference
+   // to its private data. This is useful for nested homogeneous structures
+   // where child items might inherit or relate to parent item dimensions.
    if (parent && efl_isa(parent, EFL_UI_HOMOGENEOUS_MODEL_CLASS))
      pd->parent = efl_data_scope_get(efl_parent_get(obj), EFL_UI_HOMOGENEOUS_MODEL_CLASS);
 

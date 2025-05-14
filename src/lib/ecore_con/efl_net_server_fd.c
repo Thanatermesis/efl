@@ -16,20 +16,39 @@
 
 #define MY_CLASS EFL_NET_SERVER_FD_CLASS
 
+/**
+ * @brief Private data for the Efl_Net_Server_Fd class.
+ *
+ * This structure holds all the internal state for a server that operates
+ * on an existing file descriptor.
+ */
 typedef struct _Efl_Net_Server_Fd_Data
 {
-   Eina_Stringshare *address;
-   int family;
-   unsigned int clients_count;
-   unsigned int clients_limit;
-   Eina_Bool clients_reject_excess;
-   Eina_Bool waiting_accept;
-   Eina_Bool serving;
-   Eina_Bool close_on_exec;
-   Eina_Bool reuse_address;
-   Eina_Bool reuse_port;
+   Eina_Stringshare *address; /**< The address this server is associated with (if any, usually for systemd activation). */
+   int family; /**< The socket family (e.g., AF_INET, AF_INET6, AF_UNIX). Set before fd_set. */
+   unsigned int clients_count; /**< Current number of connected clients. */
+   unsigned int clients_limit; /**< Maximum number of clients allowed. 0 means no limit. */
+   Eina_Bool clients_reject_excess; /**< If EINA_TRUE, reject new clients when limit is reached. Otherwise, stop accepting. */
+   Eina_Bool waiting_accept; /**< If EINA_TRUE, the server is actively listening for read events to accept new clients. */
+   Eina_Bool serving; /**< If EINA_TRUE, the server is considered to be actively serving. */
+   Eina_Bool close_on_exec; /**< If EINA_TRUE, the server socket will be closed on exec(). */
+   Eina_Bool reuse_address; /**< If EINA_TRUE, SO_REUSEADDR is enabled on the socket. */
+   Eina_Bool reuse_port; /**< If EINA_TRUE, SO_REUSEPORT is enabled on the socket. */
 } Efl_Net_Server_Fd_Data;
 
+/**
+ * @brief Wrapper around accept() or accept4() to handle client connections.
+ *
+ * This function accepts a new connection on the given server socket.
+ * It uses accept4() if available to set SOCK_CLOEXEC atomically.
+ * Otherwise, it falls back to accept() and then fcntl() to set FD_CLOEXEC.
+ *
+ * @param fd The listening server socket descriptor.
+ * @param addr Pointer to a sockaddr structure to receive the client address.
+ * @param addrlen Pointer to a socklen_t to store the client address length.
+ * @param close_on_exec If EINA_TRUE, the new client socket will be set to close-on-exec.
+ * @return The new client socket descriptor on success, or INVALID_SOCKET on error.
+ */
 static SOCKET
 efl_net_accept4(SOCKET fd, struct sockaddr *addr, socklen_t *addrlen, Eina_Bool close_on_exec)
 {
@@ -61,12 +80,30 @@ efl_net_accept4(SOCKET fd, struct sockaddr *addr, socklen_t *addrlen, Eina_Bool 
 #endif
 }
 
+/**
+ * @brief Event callback for readable server file descriptor.
+ *
+ * This function is called when the server's listening socket has pending
+ * incoming connections (is readable). It triggers processing of this data.
+ *
+ * @param data User data (unused).
+ * @param event The event information. The event object is the server itself.
+ */
 static void
 _efl_net_server_fd_event_read(void *data EINA_UNUSED, const Efl_Event *event)
 {
    efl_net_server_fd_process_incoming_data(event->object);
 }
 
+/**
+ * @brief Event callback for an error on the server file descriptor.
+ *
+ * This function is called when an error occurs on the server's listening socket.
+ * It sets the server to not serving and emits a server_error event.
+ *
+ * @param data User data (unused).
+ * @param event The event information. The event object is the server itself.
+ */
 static void
 _efl_net_server_fd_event_error(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -77,6 +114,17 @@ _efl_net_server_fd_event_error(void *data EINA_UNUSED, const Efl_Event *event)
    efl_event_callback_call(o, EFL_NET_SERVER_EVENT_SERVER_ERROR, &err);
 }
 
+/**
+ * @internal
+ * @brief Finalizes the Efl_Net_Server_Fd object.
+ *
+ * Sets up event callbacks for read and error events on the server's fd.
+ * This is called after the object is fully constructed.
+ *
+ * @param o The Efl_Net_Server_Fd object.
+ * @param pd The private data of the object.
+ * @return The finalized object, or NULL on failure.
+ */
 EOLIAN static Efl_Object *
 _efl_net_server_fd_efl_object_finalize(Eo *o, Efl_Net_Server_Fd_Data *pd)
 {
@@ -89,14 +137,35 @@ _efl_net_server_fd_efl_object_finalize(Eo *o, Efl_Net_Server_Fd_Data *pd)
    return o;
 }
 
+/**
+ * @internal
+ * @brief Constructs the Efl_Net_Server_Fd object.
+ *
+ * Initializes default values for the server, such as address family and
+ * close_on_exec behavior.
+ *
+ * @param o The Efl_Net_Server_Fd object.
+ * @param pd The private data of the object.
+ * @return The constructed object.
+ */
 EOLIAN static Efl_Object *
 _efl_net_server_fd_efl_object_constructor(Eo *o, Efl_Net_Server_Fd_Data *pd)
 {
-   pd->family = AF_UNSPEC;
+   pd->family = AF_UNSPEC; // Must be set by user via family_set before fd_set
    pd->close_on_exec = EINA_TRUE;
    return efl_constructor(efl_super(o, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Destroys the Efl_Net_Server_Fd object.
+ *
+ * Cleans up resources, including closing the server socket if it's open
+ * and freeing the stored address.
+ *
+ * @param o The Efl_Net_Server_Fd object.
+ * @param pd The private data of the object.
+ */
 EOLIAN static void
 _efl_net_server_fd_efl_object_destructor(Eo *o, Efl_Net_Server_Fd_Data *pd)
 {
@@ -113,6 +182,19 @@ _efl_net_server_fd_efl_object_destructor(Eo *o, Efl_Net_Server_Fd_Data *pd)
    eina_stringshare_replace(&pd->address, NULL);
 }
 
+/**
+ * @internal
+ * @brief Sets the file descriptor for the server.
+ *
+ * This function is called when the underlying file descriptor for the server
+ * is set. It applies any postponed settings like close_on_exec, reuse_address,
+ * and reuse_port. It also checks if the socket family has been set.
+ * If an invalid FD is set, the server address is cleared.
+ *
+ * @param o The Efl_Net_Server_Fd object.
+ * @param pd The private data of the object.
+ * @param pfd The new file descriptor (cast to int).
+ */
 EOLIAN static void
 _efl_net_server_fd_efl_loop_fd_fd_set(Eo *o, Efl_Net_Server_Fd_Data *pd, int pfd)
 {
@@ -161,6 +243,8 @@ EOLIAN static void
 _efl_net_server_fd_efl_net_server_clients_count_set(Eo *o EINA_UNUSED, Efl_Net_Server_Fd_Data *pd, unsigned int count)
 {
    pd->clients_count = count;
+   // If there's no client limit, or the current count is below the limit,
+   // ensure we are waiting for new connections.
    if ((pd->clients_limit == 0) || (pd->clients_limit > count))
      {
         if (!pd->waiting_accept)
@@ -171,6 +255,17 @@ _efl_net_server_fd_efl_net_server_clients_count_set(Eo *o EINA_UNUSED, Efl_Net_S
      }
 }
 
+/**
+ * @internal
+ * @brief Sets the client limit and rejection policy.
+ *
+ * @param o The Efl_Net_Server_Fd object (unused).
+ * @param pd The private data of the object.
+ * @param limit The maximum number of clients. 0 for unlimited.
+ * @param reject_excess If EINA_TRUE, new connections are actively rejected
+ *        (socket created and immediately closed) when the limit is reached.
+ *        If EINA_FALSE, the server stops accepting new connections.
+ */
 EOLIAN static void
 _efl_net_server_fd_efl_net_server_clients_limit_set(Eo *o EINA_UNUSED, Efl_Net_Server_Fd_Data *pd, unsigned int limit, Eina_Bool reject_excess)
 {
@@ -191,9 +286,23 @@ _efl_net_server_fd_efl_net_server_serving_set(Eo *o EINA_UNUSED, Efl_Net_Server_
    if (pd->serving == serving) return;
    pd->serving = serving;
    if (serving)
-     efl_event_callback_call(o, EFL_NET_SERVER_EVENT_SERVING, NULL);
+     efl_event_callback_call(o, EFL_NET_SERVER_EVENT_SERVING, NULL); // Notify that serving state changed.
 }
 
+/**
+ * @internal
+ * @brief Implements the Efl.Net.Server.serve method.
+ *
+ * For Efl_Net_Server_Fd, this is a no-op as serving is determined by the
+ * presence of a valid file descriptor and the serving_set property.
+ * The address parameter is typically used by subclasses that create their own sockets.
+ *
+ * @param o The Efl_Net_Server_Fd object (unused).
+ * @param pd The private data of the object (unused).
+ * @param address The address to serve on (ignored).
+ * @return Always 0 (success), as this operation doesn't perform actions
+ *         that can fail in this context.
+ */
 EOLIAN static Eina_Error
 _efl_net_server_fd_efl_net_server_serve(Eo *o EINA_UNUSED, Efl_Net_Server_Fd_Data *pd EINA_UNUSED, const char *address)
 {
@@ -210,8 +319,8 @@ _efl_net_server_fd_efl_net_server_serving_get(const Eo *o EINA_UNUSED, Efl_Net_S
 EOLIAN static Eina_Error
 _efl_net_server_fd_socket_activate(Eo *o, Efl_Net_Server_Fd_Data *pd EINA_UNUSED, const char *address)
 {
-   EINA_SAFETY_ON_TRUE_RETURN_VAL((SOCKET)efl_loop_fd_get(o) != INVALID_SOCKET, EALREADY);
-   EINA_SAFETY_ON_NULL_RETURN_VAL(address, EINVAL);
+   EINA_SAFETY_ON_TRUE_RETURN_VAL((SOCKET)efl_loop_fd_get(o) != INVALID_SOCKET, EALREADY); // Already has an FD
+   EINA_SAFETY_ON_NULL_RETURN_VAL(address, EINVAL); // Address is not used by this function but API requires it.
 
 #ifndef HAVE_SYSTEMD
    DBG("systemd support is disabled");
@@ -267,16 +376,17 @@ _efl_net_server_fd_close_on_exec_set(Eo *o, Efl_Net_Server_Fd_Data *pd, Eina_Boo
    Eina_Bool old = pd->close_on_exec;
 #endif
 
-   pd->close_on_exec = close_on_exec;
+   pd->close_on_exec = close_on_exec; // Store the desired state.
 
 #ifdef FD_CLOEXEC
    fd = efl_loop_fd_get(o);
-   if (fd == INVALID_SOCKET) return EINA_TRUE; /* postpone until fd_set() */
+   if (fd == INVALID_SOCKET) return EINA_TRUE; /* postpone application until fd_set() */
 
+   // Try to apply the setting immediately if FD is valid.
    if (!eina_file_close_on_exec(fd, close_on_exec))
      {
         ERR("fcntl(" SOCKET_FMT ", F_SETFD,): %s", fd, eina_error_msg_get(errno));
-        pd->close_on_exec = old;
+        pd->close_on_exec = old; // Revert to old state on failure.
         return EINA_FALSE;
      }
 #else
@@ -322,17 +432,18 @@ _efl_net_server_fd_reuse_address_set(Eo *o, Efl_Net_Server_Fd_Data *pd, Eina_Boo
    int value;
    Eina_Bool old = pd->reuse_address;
 
-   pd->reuse_address = reuse_address;
+   pd->reuse_address = reuse_address; // Store the desired state.
 
    fd = efl_loop_fd_get(o);
-   if (fd == INVALID_SOCKET) return EINA_TRUE; /* postpone until fd_set() */
+   if (fd == INVALID_SOCKET) return EINA_TRUE; /* postpone application until fd_set() */
 
    value = reuse_address;
+   // Try to apply the setting immediately if FD is valid.
    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&value, sizeof(value)) != 0)
      {
         ERR("setsockopt(" SOCKET_FMT ", SOL_SOCKET, SO_REUSEADDR, %d): %s",
             fd, value, eina_error_msg_get(efl_net_socket_error_get()));
-        pd->reuse_address = old;
+        pd->reuse_address = old; // Revert to old state on failure.
         return EINA_FALSE;
      }
 
@@ -373,18 +484,19 @@ _efl_net_server_fd_reuse_port_set(Eo *o, Efl_Net_Server_Fd_Data *pd, Eina_Bool r
    Eina_Bool old = pd->reuse_port;
 #endif
 
-   pd->reuse_port = reuse_port;
+   pd->reuse_port = reuse_port; // Store the desired state.
 
 #ifdef SO_REUSEPORT
    fd = efl_loop_fd_get(o);
-   if (fd == INVALID_SOCKET) return EINA_TRUE; /* postpone until fd_set() */
+   if (fd == INVALID_SOCKET) return EINA_TRUE; /* postpone application until fd_set() */
 
    value = reuse_port;
+   // Try to apply the setting immediately if FD is valid.
    if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, (const char *)&value, sizeof(value)) != 0)
      {
         ERR("setsockopt(" SOCKET_FMT ", SOL_SOCKET, SO_REUSEPORT, %d): %s",
             fd, value, eina_error_msg_get(efl_net_socket_error_get()));
-        pd->reuse_port = old;
+        pd->reuse_port = old; // Revert to old state on failure.
         return EINA_FALSE;
      }
 #else
@@ -440,22 +552,23 @@ EOLIAN static void
 _efl_net_server_fd_process_incoming_data(Eo *o, Efl_Net_Server_Fd_Data *pd)
 {
    Eina_Bool do_reject = EINA_FALSE;
-   struct sockaddr_storage addr;
+   struct sockaddr_storage addr; // To store client address information.
    SOCKET client, fd;
    socklen_t addrlen;
 
+   // Check if client limit is reached.
    if ((pd->clients_limit > 0) && (pd->clients_count >= pd->clients_limit))
      {
-        if (!pd->clients_reject_excess)
+        if (!pd->clients_reject_excess) // If not rejecting, just stop listening for new connections.
           {
-             if (pd->waiting_accept)
+             if (pd->waiting_accept) // If we were waiting, stop.
                {
                   pd->waiting_accept = EINA_FALSE;
                   efl_event_callback_del(o, EFL_LOOP_FD_EVENT_READ, _efl_net_server_fd_event_read, NULL);
                }
-             return;
+             return; // Do not accept new clients.
           }
-        do_reject = EINA_TRUE;
+        do_reject = EINA_TRUE; // Mark that this client should be rejected after accept.
      }
 
    fd = efl_loop_fd_get(o);
@@ -474,15 +587,27 @@ _efl_net_server_fd_process_incoming_data(Eo *o, Efl_Net_Server_Fd_Data *pd)
    if (do_reject)
      efl_net_server_fd_client_reject(o, client);
    else
-     efl_net_server_fd_client_add(o, client);
+     efl_net_server_fd_client_add(o, client); // Add the client (implementation specific, usually creates an Efl.Net.Socket).
 }
 
+/**
+ * @brief Event callback for when a client connection is closed.
+ *
+ * This function is called when a client that was previously accepted by this
+ * server emits the EFL_IO_CLOSER_EVENT_CLOSED event. It decrements the
+ * server's client count and unparents the client object if it was parented
+ * to the server.
+ *
+ * @param data The server object (Eo *).
+ * @param event The event information. The event object is the client.
+ */
 static void
 _efl_net_server_fd_client_event_closed(void *data, const Efl_Event *event)
 {
    Eo *server = data;
    Eo *client = event->object;
 
+   // Clean up callback and parent relationship.
    efl_event_callback_del(client, EFL_IO_CLOSER_EVENT_CLOSED, _efl_net_server_fd_client_event_closed, server);
    if (efl_parent_get(client) == server)
      efl_parent_set(client, NULL);
@@ -490,6 +615,23 @@ _efl_net_server_fd_client_event_closed(void *data, const Efl_Event *event)
    efl_net_server_clients_count_set(server, efl_net_server_clients_count_get(server) - 1);
 }
 
+/**
+ * @internal
+ * @brief Announces a new client to the server.
+ *
+ * This function is called by subclasses (like Efl.Net.Server.Simple) after
+ * they have created a client object (e.g., Efl.Net.Socket) for a new connection.
+ * It performs safety checks, emits the "client,add" event, and manages the
+ * client's lifecycle based on user interaction with the event.
+ * If the client is not referenced or is closed during the event, it's deleted.
+ * Otherwise, its client count is incremented and a "closed" event handler is attached.
+ *
+ * @param o The Efl_Net_Server_Fd object (server).
+ * @param pd The private data of the server (unused).
+ * @param client The newly created client object. Must implement Efl.Net.Socket.
+ * @return EINA_TRUE if the client was successfully announced and handled,
+ *         EINA_FALSE otherwise (e.g., wrong type, wrong parent, or closed/unhandled).
+ */
 static Eina_Bool
 _efl_net_server_fd_efl_net_server_client_announce(Eo *o, Efl_Net_Server_Fd_Data *pd EINA_UNUSED, Eo *client)
 {

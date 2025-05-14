@@ -15,6 +15,17 @@
 
 #define MY_CLASS_NAME "Efl.Ui.Spin"
 
+/**
+ * @internal
+ * @brief Formats and sets the current value as the text label of the spin widget.
+ *
+ * This function takes the current value from the spin data, formats it
+ * using efl_ui_format_formatted_value_get, and then sets the resulting
+ * string as the text of the "efl.text" part of the spin widget.
+ *
+ * @param obj The Evas_Object (spin widget) whose label is to be updated.
+ * @param sd Pointer to the Efl_Ui_Spin_Data structure containing the current value.
+ */
 static void
 _label_write(Evas_Object *obj, Efl_Ui_Spin_Data *sd)
 {
@@ -28,6 +39,18 @@ _label_write(Evas_Object *obj, Efl_Ui_Spin_Data *sd)
    eina_strbuf_free(strbuf);
 }
 
+/**
+ * @internal
+ * @brief Constructor for the Efl.Ui.Spin widget.
+ *
+ * Initializes the spin widget, sets its default theme,
+ * initializes default range values, applies the theme style,
+ * writes the initial label, and enables focus.
+ *
+ * @param obj The Evas_Object to construct.
+ * @param sd Pointer to the Efl_Ui_Spin_Data structure for this widget.
+ * @return The constructed Evas_Object, or NULL on failure.
+ */
 EOLIAN static Eo *
 _efl_ui_spin_efl_object_constructor(Eo *obj, Efl_Ui_Spin_Data *sd)
 {
@@ -51,12 +74,31 @@ _efl_ui_spin_efl_object_constructor(Eo *obj, Efl_Ui_Spin_Data *sd)
    return obj;
 }
 
+/**
+ * @internal
+ * @brief Destructor for the Efl.Ui.Spin widget.
+ *
+ * Cleans up resources used by the spin widget.
+ *
+ * @param obj The Evas_Object to destruct.
+ * @param sd Pointer to the Efl_Ui_Spin_Data structure (unused in this function).
+ */
 EOLIAN static void
 _efl_ui_spin_efl_object_destructor(Eo *obj, Efl_Ui_Spin_Data *sd EINA_UNUSED)
 {
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @internal
+ * @brief Applies the current formatting to the spin widget's value display.
+ *
+ * This function is typically called when the formatting string or locale changes.
+ * It re-formats and updates the displayed value.
+ *
+ * @param obj The Evas_Object (spin widget).
+ * @param sd Pointer to the Efl_Ui_Spin_Data structure.
+ */
 EOLIAN static void
 _efl_ui_spin_efl_ui_format_apply_formatted_value(Eo *obj, Efl_Ui_Spin_Data *sd EINA_UNUSED)
 {
@@ -64,6 +106,19 @@ _efl_ui_spin_efl_ui_format_apply_formatted_value(Eo *obj, Efl_Ui_Spin_Data *sd E
    efl_canvas_group_change(obj);
 }
 
+/**
+ * @internal
+ * @brief Sets the minimum and maximum limits for the spin widget's range.
+ *
+ * Validates that min is not greater than max and that they are not equal.
+ * Updates the internal min/max values and adjusts the current value if it
+ * falls outside the new range. Finally, updates the displayed label.
+ *
+ * @param obj The Evas_Object (spin widget).
+ * @param sd Pointer to the Efl_Ui_Spin_Data structure.
+ * @param min The minimum value for the range.
+ * @param max The maximum value for the range.
+ */
 EOLIAN static void
 _efl_ui_spin_efl_ui_range_display_range_limits_set(Eo *obj, Efl_Ui_Spin_Data *sd, double min, double max)
 {
@@ -88,6 +143,15 @@ _efl_ui_spin_efl_ui_range_display_range_limits_set(Eo *obj, Efl_Ui_Spin_Data *sd
    _label_write(obj, sd);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the minimum and maximum limits of the spin widget's range.
+ *
+ * @param obj The Evas_Object (spin widget, unused in this function).
+ * @param sd Pointer to the Efl_Ui_Spin_Data structure containing the range limits.
+ * @param min Pointer to a double where the minimum value will be stored. Can be NULL.
+ * @param max Pointer to a double where the maximum value will be stored. Can be NULL.
+ */
 EOLIAN static void
 _efl_ui_spin_efl_ui_range_display_range_limits_get(const Eo *obj EINA_UNUSED, Efl_Ui_Spin_Data *sd, double *min, double *max)
 {
@@ -95,6 +159,19 @@ _efl_ui_spin_efl_ui_range_display_range_limits_get(const Eo *obj EINA_UNUSED, Ef
    if (max) *max = sd->val_max;
 }
 
+/**
+ * @internal
+ * @brief Sets the current value of the spin widget.
+ *
+ * Validates that the new value is within the defined min/max range.
+ * If the value changes, it updates the internal value, emits "min,reached"
+ * or "max,reached" events if the new value is at a limit, emits a "changed"
+ * event, and updates the displayed label.
+ *
+ * @param obj The Evas_Object (spin widget).
+ * @param sd Pointer to the Efl_Ui_Spin_Data structure.
+ * @param val The new value to set.
+ */
 EOLIAN static void
 _efl_ui_spin_efl_ui_range_display_range_value_set(Eo *obj, Efl_Ui_Spin_Data *sd, double val)
 {
@@ -124,6 +201,14 @@ _efl_ui_spin_efl_ui_range_display_range_value_set(Eo *obj, Efl_Ui_Spin_Data *sd,
    _label_write(obj, sd);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the current value of the spin widget.
+ *
+ * @param obj The Evas_Object (spin widget, unused in this function).
+ * @param sd Pointer to the Efl_Ui_Spin_Data structure containing the current value.
+ * @return The current value of the spin widget.
+ */
 EOLIAN static double
 _efl_ui_spin_efl_ui_range_display_range_value_get(const Eo *obj EINA_UNUSED, Efl_Ui_Spin_Data *sd)
 {

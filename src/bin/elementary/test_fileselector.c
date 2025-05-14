@@ -18,6 +18,17 @@
 
 #include <Elementary.h>
 
+/**
+ * @brief Callback for the "done" event of the fileselector.
+ *
+ * This function is called when the user clicks the "OK" button or cancels
+ * the dialog. If a file was selected, its path is printed. Otherwise,
+ * if the user cancelled, the test window is closed.
+ *
+ * @param data The test window (Evas_Object *).
+ * @param obj The fileselector widget.
+ * @param event_info The full path of the selected file, or NULL on cancel.
+ */
 static void
 my_fileselector_done(void            *data,
                      Evas_Object *obj EINA_UNUSED,
@@ -33,6 +44,17 @@ my_fileselector_done(void            *data,
       evas_object_del(data);  /* delete the test window */
 }
 
+/**
+ * @brief Callback for the "selected" event of the fileselector.
+ *
+ * This function is called whenever a file is selected in the list.
+ * It prints the selected file's path. If multi-selection is enabled,
+ * it also demonstrates how to retrieve and print all selected paths.
+ *
+ * @param data User data (unused).
+ * @param obj The fileselector widget.
+ * @param event_info The full path of the last selected file.
+ */
 static void
 my_fileselector_selected(void *data   EINA_UNUSED,
                          Evas_Object *obj,
@@ -56,6 +78,15 @@ my_fileselector_selected(void *data   EINA_UNUSED,
      printf("or: %s\n", elm_fileselector_selected_get(obj));
 }
 
+/**
+ * @brief Callback to close the popup.
+ *
+ * Deletes the popup object when its "OK" button is clicked.
+ *
+ * @param data The popup object to delete.
+ * @param obj The button that was clicked.
+ * @param event_info Unused event info.
+ */
 static void
 _popup_close_cb(void *data, Evas_Object *obj EINA_UNUSED,
                 void *event_info EINA_UNUSED)
@@ -63,6 +94,16 @@ _popup_close_cb(void *data, Evas_Object *obj EINA_UNUSED,
    evas_object_del(data);
 }
 
+/**
+ * @brief Callback for the "selected,invalid" event of the fileselector.
+ *
+ * This is triggered when the user enters a non-existent file name in the
+ * entry when in "save" mode. It displays a popup with an error message.
+ *
+ * @param data The main window, used as parent for the popup.
+ * @param obj The fileselector widget.
+ * @param event_info The invalid path string that was entered.
+ */
 static void
 my_fileselector_invalid(void *data   EINA_UNUSED,
                         Evas_Object *obj EINA_UNUSED,
@@ -87,6 +128,15 @@ my_fileselector_invalid(void *data   EINA_UNUSED,
    evas_object_show(popup);
 }
 
+/**
+ * @brief Callback for the "activated" event of the fileselector.
+ *
+ * This is called when a user double-clicks an item or presses Enter on it.
+ *
+ * @param data User data (unused).
+ * @param obj The fileselector widget.
+ * @param event_info The path of the activated file.
+ */
 static void
 my_fileselector_activated(void *data EINA_UNUSED,
                           Evas_Object *obj EINA_UNUSED,
@@ -95,6 +145,16 @@ my_fileselector_activated(void *data EINA_UNUSED,
    printf("Activated file: %s\n", (char *)event_info);
 }
 
+/**
+ * @brief Toggles the "is save" mode of the fileselector.
+ *
+ * When "is save" mode is active, an entry for the filename is shown,
+ * allowing the user to specify a name for a file to be saved.
+ *
+ * @param data The fileselector widget.
+ * @param obj The checkbox that was clicked.
+ * @param event_info Unused event info.
+ */
 static void
 _is_save_clicked(void            *data,
                  Evas_Object *obj EINA_UNUSED,
@@ -108,6 +168,15 @@ _is_save_clicked(void            *data,
      elm_fileselector_is_save_set(fs, EINA_TRUE);
 }
 
+/**
+ * @brief Toggles the "folder only" mode of the fileselector.
+ *
+ * In "folder only" mode, the view will only show directories.
+ *
+ * @param data The fileselector widget.
+ * @param obj The checkbox that was clicked.
+ * @param event_info Unused event info.
+ */
 static void
 _folder_only_clicked(void            *data,
                      Evas_Object *obj EINA_UNUSED,
@@ -121,6 +190,16 @@ _folder_only_clicked(void            *data,
      elm_fileselector_folder_only_set(fs, EINA_TRUE);
 }
 
+/**
+ * @brief Toggles the "expandable" mode of the fileselector.
+ *
+ * In "expandable" mode, directories can be expanded in-place within the list
+ * to show their contents, rather than navigating into them.
+ *
+ * @param data The fileselector widget.
+ * @param obj The checkbox that was clicked.
+ * @param event_info Unused event info.
+ */
 static void
 _expandable_clicked(void            *data,
                     Evas_Object *obj EINA_UNUSED,
@@ -134,6 +213,13 @@ _expandable_clicked(void            *data,
      elm_fileselector_expandable_set(fs, EINA_TRUE);
 }
 
+/**
+ * @brief Toggles multi-selection mode for the fileselector.
+ *
+ * @param data The fileselector widget.
+ * @param obj The checkbox that was clicked.
+ * @param event_info Unused event info.
+ */
 static void
 _multi_clicked(void            *data,
                Evas_Object *obj EINA_UNUSED,
@@ -145,6 +231,13 @@ _multi_clicked(void            *data,
    elm_fileselector_multi_select_set(fs, !enabled);
 }
 
+/**
+ * @brief Toggles the visibility of the "OK" and "Cancel" buttons.
+ *
+ * @param data The fileselector widget.
+ * @param obj The checkbox that was clicked.
+ * @param event_info Unused event info.
+ */
 static void
 _buttons_clicked(void            *data,
                  Evas_Object *obj EINA_UNUSED,
@@ -158,6 +251,13 @@ _buttons_clicked(void            *data,
      elm_fileselector_buttons_ok_cancel_set(fs, EINA_TRUE);
 }
 
+/**
+ * @brief Toggles the visibility of hidden files and directories.
+ *
+ * @param data The fileselector widget.
+ * @param obj The checkbox that was clicked.
+ * @param event_info Unused event info.
+ */
 static void
 _hidden_clicked(void            *data,
                 Evas_Object *obj EINA_UNUSED,
@@ -171,6 +271,13 @@ _hidden_clicked(void            *data,
      elm_fileselector_hidden_visible_set(fs, EINA_TRUE);
 }
 
+/**
+ * @brief Callback to get and print the currently selected path.
+ *
+ * @param data The fileselector widget.
+ * @param obj The button that was clicked.
+ * @param event_info Unused event info.
+ */
 static void
 _sel_get_clicked(void            *data,
                  Evas_Object *obj EINA_UNUSED,
@@ -180,6 +287,13 @@ _sel_get_clicked(void            *data,
    printf("Get Selected: %s\n", elm_fileselector_selected_get(fs));
 }
 
+/**
+ * @brief Callback to get and print the current fileselector path.
+ *
+ * @param data The fileselector widget.
+ * @param obj The button that was clicked.
+ * @param event_info Unused event info.
+ */
 static void
 _path_get_clicked(void            *data,
                   Evas_Object *obj EINA_UNUSED,
@@ -189,6 +303,16 @@ _path_get_clicked(void            *data,
    printf("Get Path: %s\n", elm_fileselector_path_get(fs));
 }
 
+/**
+ * @brief Create a frame with various fileselector options.
+ *
+ * This function creates a set of checkboxes to control boolean properties
+ * of the fileselector, such as "is save", "folder only", etc.
+ *
+ * @param parent The parent widget for the new frame.
+ * @param fs The fileselector widget to be controlled by the options.
+ * @return The created frame object.
+ */
 static Evas_Object *
 _option_create(Evas_Object *parent, Evas_Object *fs)
 {
@@ -266,6 +390,13 @@ _option_create(Evas_Object *parent, Evas_Object *fs)
    return frame;
 }
 
+/**
+ * @brief Create a frame with buttons to test fileselector getter functions.
+ *
+ * @param parent The parent widget for the new frame.
+ * @param fs The fileselector widget whose getters will be tested.
+ * @return The created frame object.
+ */
 static Evas_Object *
 _getter_option_create(Evas_Object *parent, Evas_Object *fs)
 {
@@ -297,6 +428,15 @@ _getter_option_create(Evas_Object *parent, Evas_Object *fs)
    return frame;
 }
 
+/**
+ * @brief Callback for when the fileselector mode is changed.
+ *
+ * Sets the fileselector mode (list or grid) based on the radio button state.
+ *
+ * @param data The fileselector widget.
+ * @param obj The radio button group.
+ * @param event_info Unused event info.
+ */
 static void
 _mode_changed_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -319,6 +459,15 @@ _mode_changed_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
    elm_fileselector_mode_set(data, mode);
 }
 
+/**
+ * @brief Create a frame with radio buttons to control the fileselector mode.
+ *
+ * Allows switching between "List" and "Grid" view modes.
+ *
+ * @param parent The parent widget for the new frame.
+ * @param fs The fileselector widget to be controlled.
+ * @return The created frame object.
+ */
 static Evas_Object *
 _mode_option_create(Evas_Object *parent, Evas_Object *fs)
 {
@@ -353,6 +502,16 @@ _mode_option_create(Evas_Object *parent, Evas_Object *fs)
    return frame;
 }
 
+/**
+ * @brief Callback for when a sort method is selected.
+ *
+ * This is called when an item is chosen from the sort method hoversel.
+ * It sets the sort method on the fileselector.
+ *
+ * @param data The sort method to apply (Elm_Fileselector_Sort).
+ * @param obj The hoversel widget.
+ * @param event_info The selected hoversel item.
+ */
 static void
 _sort_selected_cb(void *data, Evas_Object *obj, void *event_info)
 {
@@ -364,6 +523,14 @@ _sort_selected_cb(void *data, Evas_Object *obj, void *event_info)
    elm_fileselector_sort_method_set(fs, (Elm_Fileselector_Sort)data);
 }
 
+/**
+ * @brief Create a frame with a hoversel to control file sorting.
+ *
+ * @param win The main window, used as the hover parent.
+ * @param parent The parent widget for the new frame.
+ * @param fs The fileselector widget to be controlled.
+ * @return The created frame object.
+ */
 static Evas_Object *
 _sort_option_create(Evas_Object *win, Evas_Object *parent, Evas_Object *fs)
 {
@@ -416,6 +583,12 @@ _sort_option_create(Evas_Object *win, Evas_Object *parent, Evas_Object *fs)
    return frame;
 }
 
+/**
+ * @brief Sets the fileselector thumbnail size to small (56x56).
+ * @param data The fileselector widget.
+ * @param obj The button that was clicked.
+ * @param event_info Unused event info.
+ */
 static void
 _small_icon_clicked(void *data,
                     Evas_Object *obj EINA_UNUSED,
@@ -430,6 +603,12 @@ _small_icon_clicked(void *data,
    printf("Thumbnail icon was changed from %dx%d to 56x56\n", w, h);
 }
 
+/**
+ * @brief Sets the fileselector thumbnail size to medium (78x78).
+ * @param data The fileselector widget.
+ * @param obj The button that was clicked.
+ * @param event_info Unused event info.
+ */
 static void
 _middle_icon_clicked(void *data,
                      Evas_Object *obj EINA_UNUSED,
@@ -444,6 +623,12 @@ _middle_icon_clicked(void *data,
    printf("Thumbnail icon was changed from %dx%d to 78x78\n", w, h);
 }
 
+/**
+ * @brief Sets the fileselector thumbnail size to large (131x131).
+ * @param data The fileselector widget.
+ * @param obj The button that was clicked.
+ * @param event_info Unused event info.
+ */
 static void
 _big_icon_clicked(void *data,
                   Evas_Object *obj EINA_UNUSED,
@@ -458,6 +643,13 @@ _big_icon_clicked(void *data,
    printf("Thumbnail icon was changed from %dx%d to 131x131\n", w, h);
 }
 
+/**
+ * @brief Create a frame with buttons to change the thumbnail size.
+ *
+ * @param parent The parent widget for the new frame.
+ * @param fs The fileselector widget to be controlled.
+ * @return The created frame object.
+ */
 static Evas_Object *
 _thumbnail_size_option_create(Evas_Object *parent, Evas_Object *fs)
 {
@@ -495,6 +687,14 @@ _thumbnail_size_option_create(Evas_Object *parent, Evas_Object *fs)
    return frame;
 }
 
+/**
+ * @brief A custom fileselector filter that accepts all files and directories.
+ *
+ * @param path The full path of the item to check.
+ * @param dir EINA_TRUE if the item is a directory.
+ * @param data User data (unused).
+ * @return EINA_TRUE to show the item, EINA_FALSE to hide it.
+ */
 static Eina_Bool
 _all_filter(const char *path  EINA_UNUSED,
             Eina_Bool dir     EINA_UNUSED,
@@ -503,6 +703,16 @@ _all_filter(const char *path  EINA_UNUSED,
    return EINA_TRUE;
 }
 
+/**
+ * @brief A custom fileselector filter that shows directories and Edje files.
+ *
+ * It accepts any directory, and any file with a ".edc" or ".edj" extension.
+ *
+ * @param path The full path of the item to check.
+ * @param dir EINA_TRUE if the item is a directory.
+ * @param data User data (unused).
+ * @return EINA_TRUE to show the item, EINA_FALSE to hide it.
+ */
 static Eina_Bool
 _edje_filter(const char *path, Eina_Bool dir,
              void *data EINA_UNUSED)
@@ -515,6 +725,13 @@ _edje_filter(const char *path, Eina_Bool dir,
    return EINA_FALSE;
 }
 
+/**
+ * @brief Creates a temporary directory structure for testing purposes.
+ *
+ * This function creates a directory "/tmp/test_fs" and populates it with
+ * some files and a subdirectory to provide a consistent environment for
+ * the fileselector test.
+ */
 static void
 _create_dir_struct(void)
 {
@@ -536,6 +753,17 @@ _create_dir_struct(void)
    if (fp) fclose(fp);
 }
 
+/**
+ * @brief The main test function for the fileselector widget.
+ *
+ * This function sets up a window containing a fileselector and a side panel
+ * with various options to test the widget's functionality. It also creates a
+ * temporary directory structure to test against.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_fileselector(void *data       EINA_UNUSED,
                   Evas_Object *obj EINA_UNUSED,

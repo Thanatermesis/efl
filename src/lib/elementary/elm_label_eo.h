@@ -4,7 +4,7 @@
 #ifndef _ELM_LABEL_EO_CLASS_TYPE
 #define _ELM_LABEL_EO_CLASS_TYPE
 
-typedef Eo Elm_Label;
+typedef Eo Elm_Label; /**< Elementary Label instance */
 
 #endif
 
@@ -29,7 +29,7 @@ typedef enum
  *
  * @ingroup Elm_Label
  */
-#define ELM_LABEL_CLASS elm_label_class_get()
+#define ELM_LABEL_CLASS elm_label_class_get() /**< Macro to get the Elementary Label class */
 
 EWAPI const Efl_Class *elm_label_class_get(void) EINA_CONST;
 

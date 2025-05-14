@@ -35,6 +35,18 @@
  *
  */
 
+/**
+ * @internal
+ * @brief Internal helper function to create a framebuffer object using DRM_IOCTL_MODE_ADDFB2.
+ *
+ * This function attempts to create a framebuffer using the newer ADDFB2 ioctl,
+ * which supports modifiers.
+ *
+ * @param fd The DRM device file descriptor.
+ * @param fb Pointer to the Ecore_Drm_Fb structure to populate.
+ *           The structure should have w, h, hdl, and stride pre-filled.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _ecore_drm_fb_create2(int fd, Ecore_Drm_Fb *fb)
 {
@@ -74,6 +86,27 @@ _ecore_drm_fb_create2(int fd, Ecore_Drm_Fb *fb)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Creates a new dumb framebuffer.
+ *
+ * This function allocates a dumb buffer and creates a DRM framebuffer object
+ * associated with it. The framebuffer is also memory-mapped for CPU access.
+ *
+ * @param dev The Ecore_Drm_Device to create the framebuffer for.
+ * @param width The width of the framebuffer in pixels.
+ * @param height The height of the framebuffer in pixels.
+ * @return A pointer to the newly created Ecore_Drm_Fb on success,
+ *         NULL otherwise. The returned Ecore_Drm_Fb structure contains:
+ *         - id: The DRM framebuffer ID.
+ *         - hdl: The GEM handle for the buffer.
+ *         - stride: The pitch (bytes per line) of the buffer.
+ *         - size: The total size of the buffer in bytes.
+ *         - fd: The DRM device file descriptor.
+ *         - w: The width of the framebuffer.
+ *         - h: The height of the framebuffer.
+ *         - mmap: Pointer to the memory-mapped region of the buffer.
+ *         - from_client: Flag indicating if the buffer was created by ecore_drm.
+ */
 EAPI Ecore_Drm_Fb *
 ecore_drm_fb_create(Ecore_Drm_Device *dev, int width, int height)
 {
@@ -148,6 +181,14 @@ create_err:
    return NULL;
 }
 
+/**
+ * @brief Destroys a framebuffer.
+ *
+ * This function unmaps the framebuffer's memory, removes the DRM framebuffer
+ * object, and frees the associated dumb buffer and Ecore_Drm_Fb structure.
+ *
+ * @param fb The Ecore_Drm_Fb to destroy.
+ */
 EAPI void
 ecore_drm_fb_destroy(Ecore_Drm_Fb *fb)
 {
@@ -163,6 +204,25 @@ ecore_drm_fb_destroy(Ecore_Drm_Fb *fb)
    free(fb);
 }
 
+/**
+ * @brief Marks regions of a framebuffer as dirty.
+ *
+ * This function informs the DRM subsystem that specified rectangular regions
+ * of the framebuffer have been updated and need to be redrawn.
+ * This is typically used for damage tracking and partial updates.
+ * The coordinates in Eina_Rectangle are relative to the framebuffer.
+ *
+ * @param fb The Ecore_Drm_Fb to mark dirty.
+ * @param rects An array of Eina_Rectangle structures defining the dirty regions.
+ *              Example:
+ *              @code
+ *              Eina_Rectangle regions[2];
+ *              regions[0].x = 0; regions[0].y = 0; regions[0].w = 100; regions[0].h = 50;
+ *              regions[1].x = 200; regions[1].y = 100; regions[1].w = 50; regions[1].h = 50;
+ *              ecore_drm_fb_dirty(my_fb, regions, 2);
+ *              @endcode
+ * @param count The number of rectangles in the rects array.
+ */
 EAPI void
 ecore_drm_fb_dirty(Ecore_Drm_Fb *fb, Eina_Rectangle *rects, unsigned int count)
 {
@@ -193,6 +253,16 @@ ecore_drm_fb_dirty(Ecore_Drm_Fb *fb, Eina_Rectangle *rects, unsigned int count)
 #endif
 }
 
+/**
+ * @brief Sets a framebuffer for a device (NO-OP).
+ *
+ * @deprecated This function is a NO-OP and should not be used.
+ *             It previously had functionality distinct from ecore_drm_fb_send,
+ *             but is now redundant.
+ *
+ * @param dev The Ecore_Drm_Device (unused).
+ * @param fb The Ecore_Drm_Fb (unused).
+ */
 EAPI void
 ecore_drm_fb_set(Ecore_Drm_Device *dev EINA_UNUSED, Ecore_Drm_Fb *fb EINA_UNUSED)
 {
@@ -201,6 +271,20 @@ ecore_drm_fb_set(Ecore_Drm_Device *dev EINA_UNUSED, Ecore_Drm_Fb *fb EINA_UNUSED
    */
 }
 
+/**
+ * @internal
+ * @brief Sends a framebuffer to a specific output.
+ *
+ * This function handles the actual display of a framebuffer on an output.
+ * It will perform a modeset (drmModeSetCrtc) if necessary (e.g., first frame,
+ * or stride change), or a page flip (drmModePageFlip) for subsequent frames.
+ * If a page flip fails (e.g., one is already pending), the framebuffer is
+ * queued to be displayed later by the page flip event handler.
+ *
+ * @param dev The Ecore_Drm_Device.
+ * @param fb The Ecore_Drm_Fb to display.
+ * @param output The Ecore_Drm_Output to display the framebuffer on.
+ */
 void
 _ecore_drm_output_fb_send(Ecore_Drm_Device *dev, Ecore_Drm_Fb *fb, Ecore_Drm_Output *output)
 {
@@ -253,6 +337,21 @@ _ecore_drm_output_fb_send(Ecore_Drm_Device *dev, Ecore_Drm_Fb *fb, Ecore_Drm_Out
    output->current = fb;
 }
 
+/**
+ * @brief Sends a framebuffer to all enabled outputs of a device.
+ *
+ * This function iterates over all enabled outputs associated with the
+ * Ecore_Drm_Device and calls _ecore_drm_output_fb_send for each one
+ * to display the given framebuffer.
+ * It also checks if the framebuffer dimensions match the device's dumb buffer
+ * dimensions if dumb buffers are being used.
+ *
+ * @param dev The Ecore_Drm_Device.
+ * @param fb The Ecore_Drm_Fb to send to the outputs.
+ * @param func A callback function for page flip events (currently unused in this function,
+ *             but might be used by underlying mechanisms or for future extensions).
+ * @param data User data for the page flip callback (currently unused).
+ */
 EAPI void
 ecore_drm_fb_send(Ecore_Drm_Device *dev, Ecore_Drm_Fb *fb, Ecore_Drm_Pageflip_Cb func EINA_UNUSED, void *data EINA_UNUSED)
 {

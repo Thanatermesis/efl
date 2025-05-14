@@ -66,6 +66,17 @@
 /*============================================================================*
  *                                   API                                      *
  *============================================================================*/
+
+/**
+ * @internal
+ * @brief Retrieves the type of a 3x3 floating-point matrix.
+ * This function analyzes the components of the matrix @p m to determine if it's
+ * an identity, affine, or projective matrix.
+ *
+ * @param m The matrix to analyze. Must not be NULL.
+ * @return The type of the matrix (EINA_MATRIX_TYPE_IDENTITY,
+ *         EINA_MATRIX_TYPE_AFFINE, or EINA_MATRIX_TYPE_PROJECTIVE).
+ */
 EINA_API Eina_Matrix_Type
 eina_matrix3_type_get(const Eina_Matrix3 *m)
 {
@@ -87,6 +98,18 @@ eina_matrix3_type_get(const Eina_Matrix3 *m)
      }
 }
 
+/**
+ * @internal
+ * @brief Retrieves the type of a 4x4 floating-point matrix.
+ * This function checks if the matrix @p m is an identity matrix or a more
+ * general affine matrix. Note that 4x4 matrices in this context are
+ * typically used for 3D affine transformations, so it distinguishes
+ * between identity and general affine.
+ *
+ * @param m The matrix to analyze. Must not be NULL.
+ * @return EINA_MATRIX_TYPE_IDENTITY if it's an identity matrix,
+ *         otherwise EINA_MATRIX_TYPE_AFFINE.
+ */
 EINA_API Eina_Matrix_Type
 eina_matrix4_type_get(const Eina_Matrix4 *m)
 {
@@ -110,6 +133,17 @@ eina_matrix4_type_get(const Eina_Matrix4 *m)
    return EINA_MATRIX_TYPE_AFFINE;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the type of a 3x3 fixed-point (Eina_F16p16) matrix.
+ * This function analyzes the components of the fixed-point matrix @p m
+ * to determine if it's an identity, affine, or projective matrix.
+ * The value 65536 represents 1.0 in Eina_F16p16 format.
+ *
+ * @param m The fixed-point matrix to analyze. Must not be NULL.
+ * @return The type of the matrix (EINA_MATRIX_TYPE_IDENTITY,
+ *         EINA_MATRIX_TYPE_AFFINE, or EINA_MATRIX_TYPE_PROJECTIVE).
+ */
 EINA_API Eina_Matrix_Type
 eina_matrix3_f16p16_type_get(const Eina_Matrix3_F16p16 *m)
 {
@@ -125,6 +159,21 @@ eina_matrix3_f16p16_type_get(const Eina_Matrix3_F16p16 *m)
      }
 }
 
+/**
+ * @internal
+ * @brief Sets the individual component values of a 3x3 floating-point matrix.
+ *
+ * @param[out] m The matrix to modify. Must not be NULL.
+ * @param[in] xx Value for the [0][0] component.
+ * @param[in] xy Value for the [0][1] component.
+ * @param[in] xz Value for the [0][2] component (translation X).
+ * @param[in] yx Value for the [1][0] component.
+ * @param[in] yy Value for the [1][1] component.
+ * @param[in] yz Value for the [1][2] component (translation Y).
+ * @param[in] zx Value for the [2][0] component (perspective X).
+ * @param[in] zy Value for the [2][1] component (perspective Y).
+ * @param[in] zz Value for the [2][2] component (perspective W).
+ */
 EINA_API void
 eina_matrix3_values_set(Eina_Matrix3 *m,
                         double xx, double xy, double xz,
@@ -142,6 +191,21 @@ eina_matrix3_values_set(Eina_Matrix3 *m,
    MATRIX_ZZ(m) = zz;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the individual component values of a 3x3 floating-point matrix.
+ *
+ * @param[in] m The matrix to read from. Must not be NULL.
+ * @param[out] xx Pointer to store the [0][0] component. Can be NULL.
+ * @param[out] xy Pointer to store the [0][1] component. Can be NULL.
+ * @param[out] xz Pointer to store the [0][2] component. Can be NULL.
+ * @param[out] yx Pointer to store the [1][0] component. Can be NULL.
+ * @param[out] yy Pointer to store the [1][1] component. Can be NULL.
+ * @param[out] yz Pointer to store the [1][2] component. Can be NULL.
+ * @param[out] zx Pointer to store the [2][0] component. Can be NULL.
+ * @param[out] zy Pointer to store the [2][1] component. Can be NULL.
+ * @param[out] zz Pointer to store the [2][2] component. Can be NULL.
+ */
 EINA_API void
 eina_matrix3_values_get(const Eina_Matrix3 *m,
                         double *xx, double *xy, double *xz,
@@ -159,6 +223,28 @@ eina_matrix3_values_get(const Eina_Matrix3 *m,
    if (zz) *zz = MATRIX_ZZ(m);
 }
 
+/**
+ * @internal
+ * @brief Sets the individual component values of a 4x4 floating-point matrix.
+ *
+ * @param[out] m The matrix to modify. Must not be NULL.
+ * @param[in] xx Value for the [0][0] component.
+ * @param[in] xy Value for the [0][1] component.
+ * @param[in] xz Value for the [0][2] component.
+ * @param[in] xw Value for the [0][3] component (translation X).
+ * @param[in] yx Value for the [1][0] component.
+ * @param[in] yy Value for the [1][1] component.
+ * @param[in] yz Value for the [1][2] component.
+ * @param[in] yw Value for the [1][3] component (translation Y).
+ * @param[in] zx Value for the [2][0] component.
+ * @param[in] zy Value for the [2][1] component.
+ * @param[in] zz Value for the [2][2] component.
+ * @param[in] zw Value for the [2][3] component (translation Z).
+ * @param[in] wx Value for the [3][0] component (perspective X).
+ * @param[in] wy Value for the [3][1] component (perspective Y).
+ * @param[in] wz Value for the [3][2] component (perspective Z).
+ * @param[in] ww Value for the [3][3] component (perspective W).
+ */
 EINA_API void
 eina_matrix4_values_set(Eina_Matrix4 *m,
                         double xx, double xy, double xz, double xw,
@@ -184,6 +270,28 @@ eina_matrix4_values_set(Eina_Matrix4 *m,
    MATRIX_WW(m) = ww;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the individual component values of a 4x4 floating-point matrix.
+ *
+ * @param[in] m The matrix to read from. Must not be NULL.
+ * @param[out] xx Pointer to store the [0][0] component. Can be NULL.
+ * @param[out] xy Pointer to store the [0][1] component. Can be NULL.
+ * @param[out] xz Pointer to store the [0][2] component. Can be NULL.
+ * @param[out] xw Pointer to store the [0][3] component. Can be NULL.
+ * @param[out] yx Pointer to store the [1][0] component. Can be NULL.
+ * @param[out] yy Pointer to store the [1][1] component. Can be NULL.
+ * @param[out] yz Pointer to store the [1][2] component. Can be NULL.
+ * @param[out] yw Pointer to store the [1][3] component. Can be NULL.
+ * @param[out] zx Pointer to store the [2][0] component. Can be NULL.
+ * @param[out] zy Pointer to store the [2][1] component. Can be NULL.
+ * @param[out] zz Pointer to store the [2][2] component. Can be NULL.
+ * @param[out] zw Pointer to store the [2][3] component. Can be NULL.
+ * @param[out] wx Pointer to store the [3][0] component. Can be NULL.
+ * @param[out] wy Pointer to store the [3][1] component. Can be NULL.
+ * @param[out] wz Pointer to store the [3][2] component. Can be NULL.
+ * @param[out] ww Pointer to store the [3][3] component. Can be NULL.
+ */
 EINA_API void
 eina_matrix4_values_get(const Eina_Matrix4 *m,
                         double *xx, double *xy, double *xz, double *xw,
@@ -209,6 +317,22 @@ eina_matrix4_values_get(const Eina_Matrix4 *m,
    if (ww) *ww = MATRIX_WW(m);
 }
 
+/**
+ * @internal
+ * @brief Retrieves the individual component values of a 3x3 floating-point matrix
+ * and converts them to Eina_F16p16 fixed-point format.
+ *
+ * @param[in] m The floating-point matrix to read from. Must not be NULL.
+ * @param[out] xx Pointer to store the [0][0] component as Eina_F16p16. Can be NULL.
+ * @param[out] xy Pointer to store the [0][1] component as Eina_F16p16. Can be NULL.
+ * @param[out] xz Pointer to store the [0][2] component as Eina_F16p16. Can be NULL.
+ * @param[out] yx Pointer to store the [1][0] component as Eina_F16p16. Can be NULL.
+ * @param[out] yy Pointer to store the [1][1] component as Eina_F16p16. Can be NULL.
+ * @param[out] yz Pointer to store the [1][2] component as Eina_F16p16. Can be NULL.
+ * @param[out] zx Pointer to store the [2][0] component as Eina_F16p16. Can be NULL.
+ * @param[out] zy Pointer to store the [2][1] component as Eina_F16p16. Can be NULL.
+ * @param[out] zz Pointer to store the [2][2] component as Eina_F16p16. Can be NULL.
+ */
 EINA_API void
 eina_matrix3_fixed_values_get(const Eina_Matrix3 *m,
                               Eina_F16p16 *xx, Eina_F16p16 *xy, Eina_F16p16 *xz,
@@ -226,6 +350,13 @@ eina_matrix3_fixed_values_get(const Eina_Matrix3 *m,
    if (zz) *zz = eina_f16p16_double_from(MATRIX_ZZ(m));
 }
 
+/**
+ * @internal
+ * @brief Converts a 3x3 floating-point matrix to a 3x3 fixed-point (Eina_F16p16) matrix.
+ *
+ * @param[in] m The source floating-point matrix. Must not be NULL.
+ * @param[out] fm The destination fixed-point matrix. Must not be NULL.
+ */
 EINA_API void
 eina_matrix3_matrix3_f16p16_to(const Eina_Matrix3 *m,
                                Eina_Matrix3_F16p16 *fm)
@@ -236,6 +367,19 @@ eina_matrix3_matrix3_f16p16_to(const Eina_Matrix3 *m,
                                  &fm->zx, &fm->zy, &fm->zz);
 }
 
+/**
+ * @internal
+ * @brief Transforms a 2D point (x, y) using a 3x3 matrix.
+ * This function applies the transformation defined by matrix @p m to the
+ * point (@p x, @p y). If the matrix is projective (zx or zy is non-zero),
+ * a perspective division is performed.
+ *
+ * @param[in] m The 3x3 transformation matrix. Must not be NULL.
+ * @param[in] x The x-coordinate of the point to transform.
+ * @param[in] y The y-coordinate of the point to transform.
+ * @param[out] xr Pointer to store the transformed x-coordinate. Can be NULL.
+ * @param[out] yr Pointer to store the transformed y-coordinate. Can be NULL.
+ */
 EINA_API void
 eina_matrix3_point_transform(const Eina_Matrix3 *m,
                              double x, double y,
@@ -261,6 +405,18 @@ eina_matrix3_point_transform(const Eina_Matrix3 *m,
    if (yr) *yr = yrr;
 }
 
+/**
+ * @internal
+ * @brief Transforms the four corners of a rectangle using a 3x3 matrix,
+ * resulting in a quadrangle.
+ *
+ * @param[in] m The 3x3 transformation matrix. Must not be NULL.
+ * @param[in] r The source rectangle. Its (x,y) are top-left, (x+w,y) top-right,
+ *              (x+w,y+h) bottom-right, (x,y+h) bottom-left. Must not be NULL.
+ * @param[out] q The destination quadrangle to store the transformed corner points.
+ *               The points are stored in order: top-left (x0,y0), top-right (x1,y1),
+ *               bottom-right (x2,y2), bottom-left (x3,y3). Must not be NULL.
+ */
 EINA_API void
 eina_matrix3_rectangle_transform(const Eina_Matrix3 *m,
                                  const Eina_Rectangle *r,
@@ -272,6 +428,16 @@ eina_matrix3_rectangle_transform(const Eina_Matrix3 *m,
    eina_matrix3_point_transform(m, r->x, r->y + r->h, &((Eina_Quad *)q)->x3, &((Eina_Quad *)q)->y3);
 }
 
+/**
+ * @internal
+ * @brief Computes the cofactor matrix of a given 3x3 matrix.
+ * The cofactor of an element a_ij is C_ij = (-1)^(i+j) * M_ij, where M_ij
+ * is the determinant of the submatrix obtained by deleting row i and column j.
+ *
+ * @param[in] m The source 3x3 matrix. Must not be NULL.
+ * @param[out] a The resulting cofactor matrix. Must not be NULL.
+ *               @p a can be the same as @p m.
+ */
 EINA_API void
 eina_matrix3_cofactor(const Eina_Matrix3 *m, Eina_Matrix3 *a)
 {
@@ -302,6 +468,20 @@ eina_matrix3_cofactor(const Eina_Matrix3 *m, Eina_Matrix3 *a)
    MATRIX_ZZ(a) = a33;
 }
 
+/**
+ * @internal
+ * @brief Computes the transpose of a given 3x3 matrix.
+ * The transpose of a matrix is obtained by swapping its rows and columns.
+ *
+ * @param[in] m The source 3x3 matrix. Must not be NULL.
+ * @param[out] a The resulting transposed matrix. Must not be NULL.
+ *               @p a can be the same as @p m if only diagonal elements are affected,
+ *               but it's generally safer if @p a is distinct from @p m for transpose,
+ *               though this implementation handles in-place for some elements.
+ *               For a full in-place transpose, temporary variables would be needed
+ *               if m and a are the same. This implementation is safe if m and a are distinct.
+ *               If m and a are the same, it will correctly transpose.
+ */
 EINA_API void
 eina_matrix3_transpose(const Eina_Matrix3 *m, Eina_Matrix3 *a)
 {
@@ -318,6 +498,15 @@ eina_matrix3_transpose(const Eina_Matrix3 *m, Eina_Matrix3 *a)
    MATRIX_ZZ(a) = MATRIX_ZZ(m);
 }
 
+/**
+ * @internal
+ * @brief Computes the adjoint (or adjugate) of a given 3x3 matrix.
+ * The adjoint of a matrix is the transpose of its cofactor matrix.
+ *
+ * @param[in] m The source 3x3 matrix. Must not be NULL.
+ * @param[out] a The resulting adjoint matrix. Must not be NULL.
+ *               @p a can be the same as @p m.
+ */
 EINA_API void
 eina_matrix3_adjoint(const Eina_Matrix3 *m, Eina_Matrix3 *a)
 {
@@ -329,6 +518,13 @@ eina_matrix3_adjoint(const Eina_Matrix3 *m, Eina_Matrix3 *a)
    eina_matrix3_transpose(&cofactor, a);
 }
 
+/**
+ * @internal
+ * @brief Calculates the determinant of a 3x3 matrix.
+ *
+ * @param[in] m The 3x3 matrix. Must not be NULL.
+ * @return The determinant of the matrix.
+ */
 EINA_API double
 eina_matrix3_determinant(const Eina_Matrix3 *m)
 {
@@ -341,6 +537,13 @@ eina_matrix3_determinant(const Eina_Matrix3 *m)
    return det;
 }
 
+/**
+ * @internal
+ * @brief Divides all elements of a 3x3 matrix by a scalar value.
+ *
+ * @param[in,out] m The matrix to be divided. Must not be NULL.
+ * @param[in] scalar The scalar value to divide by. Should not be zero.
+ */
 EINA_API void
 eina_matrix3_divide(Eina_Matrix3 *m, double scalar)
 {
@@ -357,6 +560,17 @@ eina_matrix3_divide(Eina_Matrix3 *m, double scalar)
    MATRIX_ZZ(m) /= scalar;
 }
 
+/**
+ * @internal
+ * @brief Computes the inverse of a 3x3 matrix.
+ * The inverse is calculated as (1/determinant) * adjoint(matrix).
+ * If the determinant is zero, the matrix is singular and cannot be inverted;
+ * in this case, @p m2 is set to the identity matrix.
+ *
+ * @param[in] m The source 3x3 matrix to invert. Must not be NULL.
+ * @param[out] m2 The resulting inverse matrix. Must not be NULL.
+ *                @p m2 can be the same as @p m.
+ */
 EINA_API void
 eina_matrix3_inverse(const Eina_Matrix3 *m, Eina_Matrix3 *m2)
 {
@@ -375,6 +589,16 @@ eina_matrix3_inverse(const Eina_Matrix3 *m, Eina_Matrix3 *m2)
    eina_matrix3_divide(m2, scalar);
 }
 
+/**
+ * @internal
+ * @brief Composes (multiplies) two 3x3 matrices (dst = m1 * m2).
+ * Matrix multiplication is not commutative, so the order of @p m1 and @p m2 matters.
+ *
+ * @param[in] m1 The first matrix (left-hand side). Must not be NULL.
+ * @param[in] m2 The second matrix (right-hand side). Must not be NULL.
+ * @param[out] dst The resulting matrix. Must not be NULL.
+ *                 @p dst can be the same as @p m1 or @p m2.
+ */
 EINA_API void
 eina_matrix3_compose(const Eina_Matrix3 *m1,
                      const Eina_Matrix3 *m2,
@@ -405,6 +629,15 @@ eina_matrix3_compose(const Eina_Matrix3 *m1,
    MATRIX_ZZ(dst) = a33;
 }
 
+/**
+ * @internal
+ * @brief Checks if two 3x3 matrices are equal within a small tolerance (EINA_DBL_EQ).
+ *
+ * @param[in] m1 The first matrix. Must not be NULL.
+ * @param[in] m2 The second matrix. Must not be NULL.
+ * @return EINA_TRUE if all corresponding elements are equal within tolerance,
+ *         EINA_FALSE otherwise.
+ */
 EINA_API Eina_Bool
 eina_matrix3_equal(const Eina_Matrix3 *m1, const Eina_Matrix3 *m2)
 {
@@ -421,6 +654,16 @@ eina_matrix3_equal(const Eina_Matrix3 *m1, const Eina_Matrix3 *m2)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Composes (multiplies) two 3x3 fixed-point (Eina_F16p16) matrices (dst = m1 * m2).
+ * Matrix multiplication is not commutative.
+ *
+ * @param[in] m1 The first fixed-point matrix (left-hand side). Must not be NULL.
+ * @param[in] m2 The second fixed-point matrix (right-hand side). Must not be NULL.
+ * @param[out] dst The resulting fixed-point matrix. Must not be NULL.
+ *                 @p dst can be the same as @p m1 or @p m2.
+ */
 EINA_API void
 eina_matrix3_f16p16_compose(const Eina_Matrix3_F16p16 *m1,
                             const Eina_Matrix3_F16p16 *m2,
@@ -469,6 +712,16 @@ eina_matrix3_f16p16_compose(const Eina_Matrix3_F16p16 *m1,
    MATRIX_ZZ(dst) = a33;
 }
 
+/**
+ * @internal
+ * @brief Applies a translation to a 3x3 matrix (m = m * translation_matrix).
+ * The existing matrix @p m is post-multiplied by a translation matrix
+ * created from @p tx and @p ty.
+ *
+ * @param[in,out] m The matrix to translate. Must not be NULL.
+ * @param[in] tx The translation amount along the X-axis.
+ * @param[in] ty The translation amount along the Y-axis.
+ */
 EINA_API void
 eina_matrix3_translate(Eina_Matrix3 *m, double tx, double ty)
 {
@@ -485,6 +738,16 @@ eina_matrix3_translate(Eina_Matrix3 *m, double tx, double ty)
    eina_matrix3_compose(m, &tmp, m);
 }
 
+/**
+ * @internal
+ * @brief Applies a scaling operation to a 3x3 matrix (m = m * scale_matrix).
+ * The existing matrix @p m is post-multiplied by a scaling matrix
+ * created from @p sx and @p sy.
+ *
+ * @param[in,out] m The matrix to scale. Must not be NULL.
+ * @param[in] sx The scaling factor along the X-axis.
+ * @param[in] sy The scaling factor along the Y-axis.
+ */
 EINA_API void
 eina_matrix3_scale(Eina_Matrix3 *m, double sx, double sy)
 {
@@ -501,6 +764,15 @@ eina_matrix3_scale(Eina_Matrix3 *m, double sx, double sy)
    eina_matrix3_compose(m, &tmp, m);
 }
 
+/**
+ * @internal
+ * @brief Applies a rotation to a 3x3 matrix (m = m * rotation_matrix).
+ * The existing matrix @p m is post-multiplied by a 2D rotation matrix
+ * created from the angle @p rad (in radians) around the Z-axis.
+ *
+ * @param[in,out] m The matrix to rotate. Must not be NULL.
+ * @param[in] rad The rotation angle in radians.
+ */
 EINA_API void
 eina_matrix3_rotate(Eina_Matrix3 *m, double rad)
 {
@@ -536,6 +808,13 @@ eina_matrix3_rotate(Eina_Matrix3 *m, double rad)
    eina_matrix3_compose(m, &tmp, m);
 }
 
+/**
+ * @internal
+ * @brief Sets a 3x3 matrix to the identity matrix.
+ * An identity matrix has 1s on the main diagonal and 0s elsewhere.
+ *
+ * @param[out] m The matrix to set to identity. Must not be NULL.
+ */
 EINA_API void
 eina_matrix3_identity(Eina_Matrix3 *m)
 {
@@ -550,6 +829,14 @@ eina_matrix3_identity(Eina_Matrix3 *m)
    MATRIX_ZZ(m) = 1;
 }
 
+/**
+ * @internal
+ * @brief Sets a 3x3 fixed-point (Eina_F16p16) matrix to the identity matrix.
+ * An identity matrix has 1.0 (represented as 65536 in Eina_F16p16) on the
+ * main diagonal and 0s elsewhere.
+ *
+ * @param[out] m The fixed-point matrix to set to identity. Must not be NULL.
+ */
 EINA_API void
 eina_matrix3_f16p16_identity(Eina_Matrix3_F16p16 *m)
 {
@@ -564,10 +851,29 @@ eina_matrix3_f16p16_identity(Eina_Matrix3_F16p16 *m)
    MATRIX_ZZ(m) = 65536;
 }
 
+/**
+ * @internal
+ * @brief Creates a 3x3 matrix that maps the unit square (0,0)-(1,1) to a given quadrangle.
+ * The unit square corners are: (0,0), (1,0), (1,1), (0,1).
+ * The quadrangle @p q defines the target coordinates for these corners.
+ * If the quadrangle is a parallelogram, a simpler affine transformation is used.
+ * Otherwise, a full projective transformation is computed.
+ *
+ * @param[out] m The resulting transformation matrix. Must not be NULL.
+ * @param[in] q The target quadrangle. Its points (x0,y0) to (x3,y3) correspond
+ *              to the transformed unit square corners in order:
+ *              (0,0) -> (q->x0, q->y0)
+ *              (1,0) -> (q->x1, q->y1)
+ *              (0,1) -> (q->x3, q->y3) (Note: Evas mapping, (0,1) is often qx3,qy3)
+ *              (1,1) -> (q->x2, q->y2)
+ *              Must not be NULL.
+ * @return EINA_TRUE if the matrix was successfully created, EINA_FALSE otherwise
+ *         (e.g., if the quadrangle is degenerate in a way that prevents mapping).
+ */
 EINA_API Eina_Bool
 eina_matrix3_square_quad_map(Eina_Matrix3 *m, const Eina_Quad *q)
 {
-   // x0 - x1 + x2 - x3
+   // ex = x0 - x1 + x2 - x3
    double ex = QUAD_X0(q) - QUAD_X1(q) + QUAD_X2(q) - QUAD_X3(q);
    // y0 - y1 + y2 - y3
    double ey = QUAD_Y0(q) - QUAD_Y1(q) + QUAD_Y2(q) - QUAD_Y3(q);
@@ -615,6 +921,16 @@ eina_matrix3_square_quad_map(Eina_Matrix3 *m, const Eina_Quad *q)
      }
 }
 
+/**
+ * @internal
+ * @brief Creates a 3x3 matrix that maps a given quadrangle to the unit square (0,0)-(1,1).
+ * This is the inverse operation of eina_matrix3_square_quad_map().
+ * The resulting matrix will have its zz component normalized to 1.0 if it's projective.
+ *
+ * @param[out] m The resulting transformation matrix. Must not be NULL.
+ * @param[in] q The source quadrangle. Must not be NULL.
+ * @return EINA_TRUE if the matrix was successfully created, EINA_FALSE otherwise.
+ */
 EINA_API Eina_Bool
 eina_matrix3_quad_square_map(Eina_Matrix3 *m,
                              const Eina_Quad *q)
@@ -635,6 +951,18 @@ eina_matrix3_quad_square_map(Eina_Matrix3 *m,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Creates a 3x3 matrix that maps a source quadrangle to a destination quadrangle.
+ * This is achieved by first mapping the source quadrangle to the unit square,
+ * and then mapping the unit square to the destination quadrangle.
+ * M = map_unit_to_dst * map_src_to_unit
+ *
+ * @param[out] m The resulting transformation matrix. Must not be NULL.
+ * @param[in] src The source quadrangle. Must not be NULL.
+ * @param[in] dst The destination quadrangle. Must not be NULL.
+ * @return EINA_TRUE if the matrix was successfully created, EINA_FALSE otherwise.
+ */
 EINA_API Eina_Bool
 eina_matrix3_quad_quad_map(Eina_Matrix3 *m,
                            const Eina_Quad *src,
@@ -652,6 +980,18 @@ eina_matrix3_quad_quad_map(Eina_Matrix3 *m,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Converts a 4x4 matrix to a 3x3 matrix.
+ * This is a projection, typically discarding the Z-axis information for 2D representation.
+ * The 3x3 matrix is formed as follows:
+ *   m3.xx = m4.xx, m3.xy = m4.xy, m3.xz = m4.xw (translation X)
+ *   m3.yx = m4.yx, m3.yy = m4.yy, m3.yz = m4.yw (translation Y)
+ *   m3.zx = m4.wx, m3.zy = m4.wy, m3.zz = m4.ww (perspective)
+ *
+ * @param[out] m3 The destination 3x3 matrix. Must not be NULL.
+ * @param[in] m4 The source 4x4 matrix. Must not be NULL.
+ */
 EINA_API void
 eina_matrix4_matrix3_to(Eina_Matrix3 *m3, const Eina_Matrix4 *m4)
 {
@@ -666,6 +1006,20 @@ eina_matrix4_matrix3_to(Eina_Matrix3 *m3, const Eina_Matrix4 *m4)
    MATRIX_ZZ(m3) = MATRIX_WW(m4);
 }
 
+/**
+ * @internal
+ * @brief Converts a 3x3 matrix to a 4x4 matrix.
+ * This typically embeds the 2D transformation of the 3x3 matrix into a 3D space,
+ * setting Z-axis transformations to identity (no change in Z, no Z perspective).
+ * The 4x4 matrix is formed as follows:
+ *   m4.xx = m3.xx, m4.xy = m3.xy, m4.xz = 0,   m4.xw = m3.xz (translation X)
+ *   m4.yx = m3.yx, m4.yy = m3.yy, m4.yz = 0,   m4.yw = m3.yz (translation Y)
+ *   m4.zx = 0,     m4.zy = 0,     m4.zz = 1,   m4.zw = 0
+ *   m4.wx = m3.zx, m4.wy = m3.zy, m4.wz = 0,   m4.ww = m3.zz (perspective)
+ *
+ * @param[out] m4 The destination 4x4 matrix. Must not be NULL.
+ * @param[in] m3 The source 3x3 matrix. Must not be NULL.
+ */
 EINA_API void
 eina_matrix3_matrix4_to(Eina_Matrix4 *m4, const Eina_Matrix3 *m3)
 {
@@ -687,6 +1041,13 @@ eina_matrix3_matrix4_to(Eina_Matrix4 *m4, const Eina_Matrix3 *m3)
    MATRIX_WW(m4) = MATRIX_ZZ(m3);
 }
 
+/**
+ * @internal
+ * @brief Calculates the determinant of a 4x4 matrix.
+ *
+ * @param[in] m The 4x4 matrix. Must not be NULL.
+ * @return The determinant of the matrix.
+ */
 EINA_API double
 eina_matrix4_determinant(const Eina_Matrix4 *m)
 {
@@ -717,6 +1078,17 @@ eina_matrix4_determinant(const Eina_Matrix4 *m)
      + MATRIX_XX(m) * MATRIX_YY(m) * MATRIX_ZZ(m) * MATRIX_WW(m);
 }
 
+/**
+ * @internal
+ * @brief Normalizes a 4x4 matrix by dividing all its elements by its determinant.
+ * If the determinant is close to zero, normalization is not possible.
+ *
+ * @param[out] out The resulting normalized matrix. Must not be NULL.
+ *                 Can be the same as @p in.
+ * @param[in] in The source 4x4 matrix. Must not be NULL.
+ * @return EINA_TRUE if normalization was successful (determinant was non-zero),
+ *         EINA_FALSE otherwise.
+ */
 EINA_API Eina_Bool
 eina_matrix4_normalized(Eina_Matrix4 *out, const Eina_Matrix4 *in)
 {
@@ -745,6 +1117,18 @@ eina_matrix4_normalized(Eina_Matrix4 *out, const Eina_Matrix4 *in)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Computes the inverse of a 4x4 matrix.
+ * The inverse is calculated using the adjugate matrix method and division by determinant.
+ * If the determinant is close to zero, the matrix is singular and cannot be inverted.
+ *
+ * @param[out] out The resulting inverse matrix. Must not be NULL.
+ *                 Can be the same as @p in.
+ * @param[in] in The source 4x4 matrix to invert. Must not be NULL.
+ * @return EINA_TRUE if the matrix was successfully inverted (determinant non-zero),
+ *         EINA_FALSE otherwise.
+ */
 EINA_API Eina_Bool
 eina_matrix4_inverse(Eina_Matrix4 *out, const Eina_Matrix4 *in)
 {
@@ -908,6 +1292,15 @@ eina_matrix4_inverse(Eina_Matrix4 *out, const Eina_Matrix4 *in)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Computes the transpose of a given 4x4 matrix.
+ * The transpose of a matrix is obtained by swapping its rows and columns.
+ *
+ * @param[out] out The resulting transposed matrix. Must not be NULL.
+ *                 Can be the same as @p in.
+ * @param[in] in The source 4x4 matrix. Must not be NULL.
+ */
 EINA_API void
 eina_matrix4_transpose(Eina_Matrix4 *out, const Eina_Matrix4 *in)
 {
@@ -929,6 +1322,17 @@ eina_matrix4_transpose(Eina_Matrix4 *out, const Eina_Matrix4 *in)
    MATRIX_WW(out) = MATRIX_WW(in);
 }
 
+/**
+ * @internal
+ * @brief Multiplies two 4x4 matrices (out = mat_a * mat_b), safely handling
+ * cases where @p out might be the same as @p mat_a or @p mat_b.
+ * Uses a temporary matrix for intermediate calculations if @p out overlaps
+ * with an input matrix.
+ *
+ * @param[out] out The resulting matrix. Must not be NULL.
+ * @param[in] mat_a The first matrix (left-hand side). Must not be NULL.
+ * @param[in] mat_b The second matrix (right-hand side). Must not be NULL.
+ */
 EINA_API void
 eina_matrix4_multiply_copy(Eina_Matrix4 *out,
                       const Eina_Matrix4 *mat_a, const Eina_Matrix4 *mat_b)
@@ -946,6 +1350,13 @@ eina_matrix4_multiply_copy(Eina_Matrix4 *out,
      }
 }
 
+/**
+ * @internal
+ * @brief Sets a 4x4 matrix to the identity matrix.
+ * An identity matrix has 1.0s on the main diagonal and 0s elsewhere.
+ *
+ * @param[out] out The matrix to set to identity. Must not be NULL.
+ */
 EINA_API void
 eina_matrix4_identity(Eina_Matrix4 *out)
 {
@@ -957,6 +1368,16 @@ eina_matrix4_identity(Eina_Matrix4 *out)
    MATRIX_WW(out) = 1.0;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the type of a 2x2 floating-point matrix.
+ * This function checks if the matrix @p m is an identity matrix or a more
+ * general affine matrix.
+ *
+ * @param m The matrix to analyze. Must not be NULL.
+ * @return EINA_MATRIX_TYPE_IDENTITY if it's an identity matrix,
+ *         otherwise EINA_MATRIX_TYPE_AFFINE.
+ */
 EINA_API Eina_Matrix_Type
 eina_matrix2_type_get(const Eina_Matrix2 *m)
 {
@@ -968,18 +1389,48 @@ eina_matrix2_type_get(const Eina_Matrix2 *m)
    return EINA_MATRIX_TYPE_AFFINE;
 }
 
+/**
+ * @internal
+ * @brief Sets the values of a 4x4 matrix from a C array of 16 doubles.
+ * The array elements are copied in row-major order into the matrix structure.
+ * Example: v = {xx, xy, xz, xw, yx, yy, yz, yw, ...}
+ *
+ * @param[out] m The matrix to set. Must not be NULL.
+ * @param[in] v Pointer to an array of 16 double values. Must not be NULL.
+ */
 EINA_API void
 eina_matrix4_array_set(Eina_Matrix4 *m, const double *v)
 {
    memcpy(&MATRIX_XX(m), v, sizeof(double) * 16);
 }
 
+/**
+ * @internal
+ * @brief Copies the content of one 4x4 matrix to another.
+ *
+ * @param[out] dst The destination matrix. Must not be NULL.
+ * @param[in] src The source matrix. Must not be NULL.
+ */
 EINA_API void
 eina_matrix4_copy(Eina_Matrix4 *dst, const Eina_Matrix4 *src)
 {
    memcpy(dst, src, sizeof(Eina_Matrix4));
 }
 
+/**
+ * @internal
+ * @brief Multiplies two 4x4 matrices (out = mat_a * mat_b).
+ * This function provides an optimization: if either @p mat_a or @p mat_b
+ * is an identity matrix, it performs a copy instead of a full multiplication.
+ * Otherwise, it calls eina_matrix4_compose().
+ * Note: This function assumes @p out is distinct from @p mat_a and @p mat_b
+ * if a full multiplication occurs via eina_matrix4_compose. For safe in-place
+ * operations or overlapping buffers, use eina_matrix4_multiply_copy().
+ *
+ * @param[out] out The resulting matrix. Must not be NULL.
+ * @param[in] mat_a The first matrix (left-hand side). Must not be NULL.
+ * @param[in] mat_b The second matrix (right-hand side). Must not be NULL.
+ */
 EINA_API void
 eina_matrix4_multiply(Eina_Matrix4 *out, const Eina_Matrix4 *mat_a,
                            const Eina_Matrix4 *mat_b)
@@ -999,6 +1450,21 @@ eina_matrix4_multiply(Eina_Matrix4 *out, const Eina_Matrix4 *mat_a,
    eina_matrix4_compose(mat_a, mat_b, out);
 }
 
+/**
+ * @internal
+ * @brief Sets up a 4x4 orthographic projection matrix.
+ * This matrix transforms coordinates from a 3D box defined by left, right,
+ * bottom, top, dnear, and dfar into normalized device coordinates (-1 to 1
+ * on each axis).
+ *
+ * @param[out] m The resulting orthographic projection matrix. Must not be NULL.
+ * @param[in] left The coordinate for the left vertical clipping plane.
+ * @param[in] right The coordinate for the right vertical clipping plane.
+ * @param[in] bottom The coordinate for the bottom horizontal clipping plane.
+ * @param[in] top The coordinate for the top horizontal clipping plane.
+ * @param[in] dnear The distance to the near depth clipping plane.
+ * @param[in] dfar The distance to the far depth clipping plane.
+ */
 EINA_API void
 eina_matrix4_ortho_set(Eina_Matrix4 *m,
                     double left, double right, double bottom, double top,
@@ -1029,6 +1495,17 @@ eina_matrix4_ortho_set(Eina_Matrix4 *m,
    MATRIX_WW(m) = 1.0f;
 }
 
+/**
+ * @internal
+ * @brief Composes (multiplies) two 4x4 matrices (out = mat_a * mat_b).
+ * Matrix multiplication is not commutative, so the order of @p mat_a and @p mat_b matters.
+ * This is the core multiplication logic.
+ *
+ * @param[in] mat_a The first matrix (left-hand side). Must not be NULL.
+ * @param[in] mat_b The second matrix (right-hand side). Must not be NULL.
+ * @param[out] out The resulting matrix. Must not be NULL.
+ *                 @p out can be the same as @p mat_a or @p mat_b.
+ */
 EINA_API void
 eina_matrix4_compose(const Eina_Matrix4 *mat_a,
                      const Eina_Matrix4 *mat_b,
@@ -1096,6 +1573,18 @@ eina_matrix4_compose(const Eina_Matrix4 *mat_a,
    MATRIX_WW(out) = ww;
 }
 
+/**
+ * @internal
+ * @brief Applies a translation to a 4x4 matrix (t = translation_matrix * t).
+ * The existing matrix @p t is pre-multiplied by a translation matrix
+ * created from @p tx, @p ty, and @p tz.
+ * Note the order of multiplication: eina_matrix4_compose(&tmp, t, t) means t_new = tmp * t_old.
+ *
+ * @param[in,out] t The matrix to translate. Must not be NULL.
+ * @param[in] tx The translation amount along the X-axis.
+ * @param[in] ty The translation amount along the Y-axis.
+ * @param[in] tz The translation amount along the Z-axis.
+ */
 EINA_API void
 eina_matrix4_translate(Eina_Matrix4 *t, double tx, double ty, double tz)
 {
@@ -1123,6 +1612,18 @@ eina_matrix4_translate(Eina_Matrix4 *t, double tx, double ty, double tz)
    eina_matrix4_compose(&tmp, t, t);
 }
 
+/**
+ * @internal
+ * @brief Applies a scaling operation to a 4x4 matrix (t = scale_matrix * t).
+ * The existing matrix @p t is pre-multiplied by a scaling matrix
+ * created from @p sx, @p sy, and @p sz.
+ * Note the order of multiplication: eina_matrix4_compose(&tmp, t, t) means t_new = tmp * t_old.
+ *
+ * @param[in,out] t The matrix to scale. Must not be NULL.
+ * @param[in] sx The scaling factor along the X-axis.
+ * @param[in] sy The scaling factor along the Y-axis.
+ * @param[in] sz The scaling factor along the Z-axis.
+ */
 EINA_API void
 eina_matrix4_scale(Eina_Matrix4 *t, double sx, double sy, double sz)
 {
@@ -1150,6 +1651,17 @@ eina_matrix4_scale(Eina_Matrix4 *t, double sx, double sy, double sz)
    eina_matrix4_compose(&tmp, t, t);
 }
 
+/**
+ * @internal
+ * @brief Applies a rotation to a 4x4 matrix (t = rotation_matrix * t).
+ * The existing matrix @p t is pre-multiplied by a rotation matrix
+ * created from the angle @p rad (in radians) around the specified @p axis.
+ * Note the order of multiplication: eina_matrix4_compose(&tmp, t, t) means t_new = tmp * t_old.
+ *
+ * @param[in,out] t The matrix to rotate. Must not be NULL.
+ * @param[in] rad The rotation angle in radians.
+ * @param[in] axis The axis of rotation (EINA_MATRIX_AXIS_X, EINA_MATRIX_AXIS_Y, or EINA_MATRIX_AXIS_Z).
+ */
 EINA_API void
 eina_matrix4_rotate(Eina_Matrix4 *t, double rad, Eina_Matrix_Axis axis)
 {
@@ -1199,18 +1711,48 @@ eina_matrix4_rotate(Eina_Matrix4 *t, double rad, Eina_Matrix_Axis axis)
    eina_matrix4_compose(&tmp, t, t);
 }
 
+/**
+ * @internal
+ * @brief Sets the values of a 3x3 matrix from a C array of 9 doubles.
+ * The array elements are copied in row-major order into the matrix structure.
+ * Example: v = {xx, xy, xz, yx, yy, yz, zx, zy, zz}
+ *
+ * @param[out] m The matrix to set. Must not be NULL.
+ * @param[in] v Pointer to an array of 9 double values. Must not be NULL.
+ */
 EINA_API void
 eina_matrix3_array_set(Eina_Matrix3 *m, const double *v)
 {
    memcpy(&MATRIX_XX(m), v, sizeof(double) * 9);
 }
 
+/**
+ * @internal
+ * @brief Copies the content of one 3x3 matrix to another.
+ *
+ * @param[out] dst The destination matrix. Must not be NULL.
+ * @param[in] src The source matrix. Must not be NULL.
+ */
 EINA_API void
 eina_matrix3_copy(Eina_Matrix3 *dst, const Eina_Matrix3 *src)
 {
    memcpy(dst, src, sizeof(Eina_Matrix3));
 }
 
+/**
+ * @internal
+ * @brief Multiplies two 3x3 matrices (out = mat_a * mat_b).
+ * This function provides an optimization: if either @p mat_a or @p mat_b
+ * is an identity matrix, it performs a copy instead of a full multiplication.
+ * Otherwise, it calls eina_matrix3_compose().
+ * Note: This function assumes @p out is distinct from @p mat_a and @p mat_b
+ * if a full multiplication occurs via eina_matrix3_compose. For safe in-place
+ * operations or overlapping buffers, use eina_matrix3_multiply_copy().
+ *
+ * @param[out] out The resulting matrix. Must not be NULL.
+ * @param[in] mat_a The first matrix (left-hand side). Must not be NULL.
+ * @param[in] mat_b The second matrix (right-hand side). Must not be NULL.
+ */
 EINA_API void
 eina_matrix3_multiply(Eina_Matrix3 *out, const Eina_Matrix3 *mat_a, const Eina_Matrix3 *mat_b)
 {
@@ -1229,6 +1771,17 @@ eina_matrix3_multiply(Eina_Matrix3 *out, const Eina_Matrix3 *mat_a, const Eina_M
    eina_matrix3_compose(mat_a, mat_b, out);
 }
 
+/**
+ * @internal
+ * @brief Multiplies two 3x3 matrices (out = mat_a * mat_b), safely handling
+ * cases where @p out might be the same as @p mat_a or @p mat_b.
+ * Uses a temporary matrix for intermediate calculations if @p out overlaps
+ * with an input matrix.
+ *
+ * @param[out] out The resulting matrix. Must not be NULL.
+ * @param[in] mat_a The first matrix (left-hand side). Must not be NULL.
+ * @param[in] mat_b The second matrix (right-hand side). Must not be NULL.
+ */
 EINA_API void
 eina_matrix3_multiply_copy(Eina_Matrix3 *out, const Eina_Matrix3 *mat_a, const Eina_Matrix3 *mat_b)
 {
@@ -1245,6 +1798,16 @@ eina_matrix3_multiply_copy(Eina_Matrix3 *out, const Eina_Matrix3 *mat_a, const E
      }
 }
 
+/**
+ * @internal
+ * @brief Creates a 3x3 matrix representing only a translation (position).
+ * The matrix is initialized to identity, then its translation components
+ * (xz, yz) are set to @p p_x and @p p_y.
+ *
+ * @param[out] out The resulting translation matrix. Must not be NULL.
+ * @param[in] p_x The translation amount along the X-axis.
+ * @param[in] p_y The translation amount along the Y-axis.
+ */
 EINA_API void
 eina_matrix3_position_transform_set(Eina_Matrix3 *out, const double p_x,
 								 const double p_y)
@@ -1254,6 +1817,16 @@ eina_matrix3_position_transform_set(Eina_Matrix3 *out, const double p_x,
    MATRIX_YZ(out) = p_y;
 }
 
+/**
+ * @internal
+ * @brief Creates a 3x3 matrix representing only a scaling operation.
+ * The matrix is initialized to identity, then its scaling components
+ * (xx, yy) are set to @p s_x and @p s_y.
+ *
+ * @param[out] out The resulting scaling matrix. Must not be NULL.
+ * @param[in] s_x The scaling factor along the X-axis.
+ * @param[in] s_y The scaling factor along the Y-axis.
+ */
 EINA_API void
 eina_matrix3_scale_transform_set(Eina_Matrix3 *out, double s_x, double s_y)
 {
@@ -1262,6 +1835,16 @@ eina_matrix3_scale_transform_set(Eina_Matrix3 *out, double s_x, double s_y)
    MATRIX_YY(out) = s_y;
 }
 
+/**
+ * @internal
+ * @brief Calculates the normal matrix from a 4x4 modelview matrix.
+ * The normal matrix is the transpose of the inverse of the upper-left 3x3
+ * portion of the modelview matrix @p m. It's used to transform normal vectors
+ * correctly when the modelview matrix involves non-uniform scaling.
+ *
+ * @param[out] out The resulting 3x3 normal matrix. Must not be NULL.
+ * @param[in] m The source 4x4 modelview matrix. Must not be NULL.
+ */
 EINA_API void
 eina_normal3_matrix_get(Eina_Matrix3 *out, const Eina_Matrix4 *m)
 {
@@ -1300,6 +1883,16 @@ eina_normal3_matrix_get(Eina_Matrix3 *out, const Eina_Matrix4 *m)
    MATRIX_ZZ(out) = (a * e - d * b) * det;
 }
 
+/**
+ * @internal
+ * @brief Sets the individual component values of a 2x2 floating-point matrix.
+ *
+ * @param[out] m The matrix to modify. Must not be NULL.
+ * @param[in] xx Value for the [0][0] component.
+ * @param[in] xy Value for the [0][1] component.
+ * @param[in] yx Value for the [1][0] component.
+ * @param[in] yy Value for the [1][1] component.
+ */
 EINA_API void
 eina_matrix2_values_set(Eina_Matrix2 *m,
                         double xx, double xy,
@@ -1311,6 +1904,16 @@ eina_matrix2_values_set(Eina_Matrix2 *m,
    MATRIX_YY(m) = yy;
 }
 
+/**
+ * @internal
+ * @brief Retrieves the individual component values of a 2x2 floating-point matrix.
+ *
+ * @param[in] m The matrix to read from. Must not be NULL.
+ * @param[out] xx Pointer to store the [0][0] component. Can be NULL.
+ * @param[out] xy Pointer to store the [0][1] component. Can be NULL.
+ * @param[out] yx Pointer to store the [1][0] component. Can be NULL.
+ * @param[out] yy Pointer to store the [1][1] component. Can be NULL.
+ */
 EINA_API void
 eina_matrix2_values_get(const Eina_Matrix2 *m,
                         double *xx, double *xy,
@@ -1322,6 +1925,18 @@ eina_matrix2_values_get(const Eina_Matrix2 *m,
    if (yy) *yy = MATRIX_YY(m);
 }
 
+/**
+ * @internal
+ * @brief Computes the inverse of a 2x2 matrix.
+ * If the matrix is identity, it's copied directly.
+ * If the determinant is zero, the matrix is singular, and the function returns
+ * without modifying @p out (it should ideally set to identity or return a status).
+ * Current behavior: if det is 0, @p out is not modified from its previous state.
+ *
+ * @param[out] out The resulting inverse matrix. Must not be NULL.
+ *                 Can be the same as @p mat.
+ * @param[in] mat The source 2x2 matrix to invert. Must not be NULL.
+ */
 EINA_API void
 eina_matrix2_inverse(Eina_Matrix2 *out, const Eina_Matrix2 *mat)
 {
@@ -1346,6 +1961,13 @@ eina_matrix2_inverse(Eina_Matrix2 *out, const Eina_Matrix2 *mat)
    MATRIX_YY(out) =  MATRIX_XX(mat) * det;
 }
 
+/**
+ * @internal
+ * @brief Sets a 2x2 matrix to the identity matrix.
+ * An identity matrix has 1.0s on the main diagonal and 0s elsewhere.
+ *
+ * @param[out] m The matrix to set to identity. Must not be NULL.
+ */
 EINA_API void
 eina_matrix2_identity(Eina_Matrix2 *m)
 {
@@ -1356,18 +1978,48 @@ eina_matrix2_identity(Eina_Matrix2 *m)
    MATRIX_YY(m) = 1.0;
 }
 
+/**
+ * @internal
+ * @brief Sets the values of a 2x2 matrix from a C array of 4 doubles.
+ * The array elements are copied in row-major order into the matrix structure.
+ * Example: v = {xx, xy, yx, yy}
+ *
+ * @param[out] m The matrix to set. Must not be NULL.
+ * @param[in] v Pointer to an array of 4 double values. Must not be NULL.
+ */
 EINA_API void
 eina_matrix2_array_set(Eina_Matrix2 *m, const double *v)
 {
    memcpy(&MATRIX_XX(m), v, sizeof(double) * 4);
 }
 
+/**
+ * @internal
+ * @brief Copies the content of one 2x2 matrix to another.
+ *
+ * @param[out] dst The destination matrix. Must not be NULL.
+ * @param[in] src The source matrix. Must not be NULL.
+ */
 EINA_API void
 eina_matrix2_copy(Eina_Matrix2 *dst, const Eina_Matrix2 *src)
 {
    memcpy(dst, src, sizeof(Eina_Matrix2));
 }
 
+/**
+ * @internal
+ * @brief Multiplies two 2x2 matrices (out = mat_a * mat_b).
+ * This function provides an optimization: if either @p mat_a or @p mat_b
+ * is an identity matrix, it performs a copy instead of a full multiplication.
+ * Otherwise, it performs the direct multiplication.
+ * Note: This function assumes @p out is distinct from @p mat_a and @p mat_b
+ * for the direct multiplication part. For safe in-place operations or
+ * overlapping buffers, use eina_matrix2_multiply_copy().
+ *
+ * @param[out] out The resulting matrix. Must not be NULL.
+ * @param[in] mat_a The first matrix (left-hand side). Must not be NULL.
+ * @param[in] mat_b The second matrix (right-hand side). Must not be NULL.
+ */
 EINA_API void
 eina_matrix2_multiply(Eina_Matrix2 *out, const Eina_Matrix2 *mat_a, const Eina_Matrix2 *mat_b)
 {
@@ -1390,6 +2042,17 @@ eina_matrix2_multiply(Eina_Matrix2 *out, const Eina_Matrix2 *mat_a, const Eina_M
    MATRIX_YY(out) = MATRIX_XY(mat_a) * MATRIX_YX(mat_b) + MATRIX_YY(mat_a) * MATRIX_YY(mat_b);
 }
 
+/**
+ * @internal
+ * @brief Multiplies two 2x2 matrices (out = mat_a * mat_b), safely handling
+ * cases where @p out might be the same as @p mat_a or @p mat_b.
+ * Uses a temporary matrix for intermediate calculations if @p out overlaps
+ * with an input matrix.
+ *
+ * @param[out] out The resulting matrix. Must not be NULL.
+ * @param[in] mat_a The first matrix (left-hand side). Must not be NULL.
+ * @param[in] mat_b The second matrix (right-hand side). Must not be NULL.
+ */
 EINA_API void
 eina_matrix2_multiply_copy(Eina_Matrix2 *out, const Eina_Matrix2 *mat_a, const Eina_Matrix2 *mat_b)
 {

@@ -14,6 +14,17 @@
 
 #include "Ecore.h"
 
+/**
+ * @file
+ * @brief This file provides an ABI compatibility layer for the legacy Ecore_Con networking library,
+ * mapping its functionalities to the newer Efl_Net library. It is intended to allow older
+ * applications using Ecore_Con to continue functioning without major rewrites when built
+ * against newer EFL versions that have transitioned to Efl_Net.
+ *
+ * This layer emulates the behavior of Ecore_Con servers, clients, and event handling
+ * by using Efl_Net objects and their corresponding events internally.
+ */
+
 #include "Efl_Net.h"
 
 #include "ecore_private.h"
@@ -26,66 +37,90 @@
 
 /* This file exists solely to provide ABI compatibility */
 
+/**
+ * @brief Represents a legacy Ecore_Con server or a connection initiator (dialer).
+ *
+ * This structure holds the state for either a listening server (created by
+ * ecore_con_server_add()) or an outgoing connection (created by
+ * ecore_con_server_connect()). It bridges the Ecore_Con API to the
+ * underlying Efl_Net objects (Eo *dialer or Eo *server).
+ */
 struct _Ecore_Con_Server
 {
-   ECORE_MAGIC;
-   Eo *dialer;
-   Eo *server;
+   ECORE_MAGIC; /**< Magic number for type checking. */
+   Eo *dialer; /**< Efl_Net_Dialer object if this is an outgoing connection. NULL otherwise. */
+   Eo *server; /**< Efl_Net_Server object if this is a listening server. NULL otherwise. */
    struct {
-      Eina_Future *job;
-      Eina_Binbuf *pending_send; /* until job is fulfilled, no dialer exists,
+      Eina_Future *job; /**< Future for deferred SSL setup. */
+      Eina_Binbuf *pending_send; /**< Buffer for data sent before SSL dialer is fully set up.
+                                  * until job is fulfilled, no dialer exists,
                                   * this binbuf allows immediate
                                   * ecore_con_server_send() in that situation */
-      Eo *clients_ctx;
+      Eo *clients_ctx; /**< SSL context for clients connecting to an SSL server or for upgrading client connections. */
       Eina_List *certs;
       Eina_List *privkeys;
       Eina_List *crls;
-      Eina_List *cafiles;
-      Eina_Stringshare *verify_name;
-      Eina_Bool verify;
-      Eina_Bool verify_basic;
-      Eina_Bool upgrading;
-      Ecore_Con_Type upgrade_type;
-   } ssl;
-   Eina_List *clients;
-   Eina_List *event_count;
-   const void *data;
-   Eina_Stringshare *name;
-   Eina_Stringshare *ip;
-   size_t pending_write;
-   double start_time;
-   double timeout;
-   Ecore_Con_Type type;
-   int port;
-   Eina_Bool want_mcast;
-   Eina_Bool is_dialer;
-   Eina_Bool connecting;
-   Eina_Bool delete_me;
+      Eina_List *cafiles; /**< List of CA file paths for SSL. */
+      Eina_Stringshare *verify_name; /**< Hostname to verify against for SSL. */
+      Eina_Bool verify; /**< Whether to verify peer SSL certificate. */
+      Eina_Bool verify_basic; /**< Whether to perform basic SSL verification. */
+      Eina_Bool upgrading; /**< Flag indicating if an SSL upgrade is in progress. */
+      Ecore_Con_Type upgrade_type; /**< Target SSL type for upgrade. */
+   } ssl; /**< SSL-specific settings. */
+   Eina_List *clients; /**< List of connected Ecore_Con_Client objects (if this is a server). */
+   Eina_List *event_count; /**< List of pending Ecore_Events associated with this server. */
+   const void *data; /**< User-supplied data. */
+   Eina_Stringshare *name; /**< Hostname or path for the server/dialer. */
+   Eina_Stringshare *ip; /**< Resolved IP address. */
+   size_t pending_write; /**< Number of bytes pending write in the underlying Efl_Io_Buffered_Stream. */
+   double start_time; /**< Timestamp of creation or connection. */
+   double timeout; /**< Inactivity timeout. */
+   Ecore_Con_Type type; /**< Connection type (e.g., TCP, UDP, SSL flags). */
+   int port; /**< Port number. */
+   Eina_Bool want_mcast; /**< Flag indicating if multicast is desired (for UDP servers). */
+   Eina_Bool is_dialer; /**< True if this is an outgoing connection (dialer), false if a listening server. */
+   Eina_Bool connecting; /**< True if the dialer is currently attempting to connect. */
+   Eina_Bool delete_me; /**< Flag indicating if this server object is marked for deletion. */
 };
 
+/**
+ * @brief Represents a legacy Ecore_Con client connection.
+ *
+ * This structure holds the state for an individual client connection,
+ * typically created by an Ecore_Con_Server when a new client connects,
+ * or representing the server-side of a connection initiated by
+ * ecore_con_server_connect(). It bridges the Ecore_Con API to an
+ * underlying Efl_Net_Socket (Eo *socket).
+ */
 struct _Ecore_Con_Client
 {
-   ECORE_MAGIC;
-   Eo *socket;
-   Ecore_Con_Server *svr;
-   Eina_List *event_count;
-   const void *data;
-   Eina_Stringshare *ip;
+   ECORE_MAGIC; /**< Magic number for type checking. */
+   Eo *socket; /**< The underlying Efl_Net_Socket (usually Efl_Io_Buffered_Stream wrapping a socket). */
+   Ecore_Con_Server *svr; /**< The parent Ecore_Con_Server that owns this client or represents the connection. */
+   Eina_List *event_count; /**< List of pending Ecore_Events associated with this client. */
+   const void *data; /**< User-supplied data. */
+   Eina_Stringshare *ip; /**< IP address of the remote peer. */
    struct {
-      Eina_Future *job;
-      Eo *ctx;
-      Eina_Bool upgrading;
-   } ssl;
-   size_t pending_write;
-   double start_time;
-   int port;
-   Eina_Bool delete_me;
+      Eina_Future *job; /**< Future for deferred SSL upgrade. */
+      Eo *ctx; /**< SSL context for this client, used during SSL upgrade. */
+      Eina_Bool upgrading; /**< Flag indicating if an SSL upgrade is in progress for this client. */
+   } ssl; /**< SSL-specific settings for this client. */
+   size_t pending_write; /**< Number of bytes pending write in the underlying Efl_Io_Buffered_Stream. */
+   double start_time; /**< Timestamp of connection establishment. */
+   int port; /**< Remote port number. */
+   Eina_Bool delete_me; /**< Flag indicating if this client object is marked for deletion. */
 };
 
+/**
+ * @brief Context for an asynchronous DNS lookup operation.
+ *
+ * Stores information needed to manage an ecore_con_lookup() call,
+ * including the callback function and user data.
+ */
 typedef struct _Ecore_Con_Lookup_Ctx {
-   Ecore_Thread *thread;
-   Ecore_Con_Dns_Cb cb;
-   const void *data;
+   Ecore_Thread *thread; /**< The Ecore_Thread performing the lookup, or NULL if completed/cancelled. */
+   Ecore_Con_Dns_Cb cb; /**< User-provided callback function to invoke when lookup is done. */
+   const void *data; /**< User-provided data for the callback. */
 } Ecore_Con_Lookup_Ctx;
 
 /* allows delete_me to be true */
@@ -131,6 +166,17 @@ typedef struct _Ecore_Con_Lookup_Ctx {
 
 
 /* from ecore_con_alloc.c */
+/**
+ * @def GENERIC_ALLOC_FREE_HEADER
+ * @brief Macro to generate function declarations for allocation and deallocation
+ *        of Ecore_Con_Event_* structures.
+ * @param TYPE The full type name of the event structure (e.g., Ecore_Con_Event_Client_Add).
+ * @param Type The base name for the alloc/free functions (e.g., ecore_con_event_client_add).
+ *
+ * This macro simplifies the declaration of allocator and deallocator functions
+ * for various event types used by Ecore_Con. These functions are typically
+ * implemented in ecore_con_alloc.c using EINA_MEMPOOL_DEFINE.
+ */
 #define GENERIC_ALLOC_FREE_HEADER(TYPE, Type) \
   TYPE *Type##_alloc(void); \
   void Type##_free(TYPE *e);
@@ -168,13 +214,21 @@ ECORE_CON_API int ECORE_CON_EVENT_CLIENT_WRITE = 0;
 ECORE_CON_API int ECORE_CON_EVENT_CLIENT_ERROR = 0;
 ECORE_CON_API int ECORE_CON_EVENT_CLIENT_UPGRADE = 0;
 
-static Eina_List *_servers = NULL;
-static Eina_List *_ecore_con_lookups = NULL;
-static int _ecore_con_event_count = 0;
+static Eina_List *_servers = NULL; /**< Global list of active Ecore_Con_Server objects. */
+static Eina_List *_ecore_con_lookups = NULL; /**< Global list of active Ecore_Con_Lookup_Ctx for DNS lookups. */
+static int _ecore_con_event_count = 0; /**< Counter for outstanding Ecore_Con events to manage mempool shutdown. */
 
-Ecore_Con_Socks *_ecore_con_proxy_once = NULL;
-Ecore_Con_Socks *_ecore_con_proxy_global = NULL;
+Ecore_Con_Socks *_ecore_con_proxy_once = NULL; /**< Per-connection proxy settings (applied once). */
+Ecore_Con_Socks *_ecore_con_proxy_global = NULL; /**< Global proxy settings. */
 
+/**
+ * @brief Initializes the Ecore_Con legacy compatibility layer.
+ *
+ * This function must be called before any other Ecore_Con legacy functions.
+ * It registers new Ecore event types for all Ecore_Con events and initializes
+ * magic strings for structure validation. It also initializes the SOCKS proxy
+ * subsystem.
+ */
 void
 ecore_con_legacy_init(void)
 {
@@ -201,6 +255,14 @@ ecore_con_legacy_init(void)
 
 static void _ecore_con_server_free(Ecore_Con_Server *svr);
 
+/**
+ * @brief Shuts down the Ecore_Con legacy compatibility layer.
+ *
+ * This function should be called when Ecore_Con legacy services are no longer needed,
+ * typically at application exit. It cleans up all active servers, client connections,
+ * pending DNS lookups, and Ecore_Con events. It also shuts down the SOCKS proxy
+ * subsystem and attempts to release mempools if no events are outstanding.
+ */
 void
 ecore_con_legacy_shutdown(void)
 {
@@ -256,6 +318,14 @@ ecore_con_legacy_shutdown(void)
 static Efl_Callback_Array_Item *_ecore_con_client_socket_cbs(void);
 static Efl_Callback_Array_Item *_ecore_con_client_socket_ssl_cbs(void);
 
+/**
+ * @brief Closes the underlying socket for an Ecore_Con_Client.
+ *
+ * If the socket is open, it calls efl_io_closer_close(). It also removes
+ * the standard event callbacks associated with the client's socket.
+ *
+ * @param cl The Ecore_Con_Client whose socket is to be closed.
+ */
 static void
 _ecore_con_client_socket_close(Ecore_Con_Client *cl)
 {
@@ -268,6 +338,17 @@ _ecore_con_client_socket_close(Ecore_Con_Client *cl)
    efl_event_callback_array_del(cl->socket, _ecore_con_client_socket_cbs(), cl);
 }
 
+/**
+ * @brief Frees an Ecore_Con_Client object and its associated resources.
+ *
+ * Marks the client for deletion, removes it from its server's client list,
+ * closes and unrefs its socket, cancels any pending SSL jobs, and unrefs
+ * its SSL context. If this client was the last reference holding its server
+ * alive and the server is also marked for deletion, the server is freed as well.
+ * Finally, it frees the client structure itself if no events are pending for it.
+ *
+ * @param cl The Ecore_Con_Client to free.
+ */
 static void
 _ecore_con_client_free(Ecore_Con_Client *cl)
 {
@@ -317,7 +398,20 @@ _ecore_con_client_free(Ecore_Con_Client *cl)
 }
 
 /* BEGIN: post of Ecore_Event for ecore_con_server_connect() ************/
+// Corresponds to clients added to a server created by ecore_con_server_add()
+// or the "server" object itself when ecore_con_server_connect() establishes a connection.
 
+/**
+ * @brief Frees an Ecore_Con_Event_Client_Add event.
+ *
+ * This is a callback function for ecore_event_add. It decrements the event
+ * count on the associated client. If the client is marked for deletion and
+ * has no more pending events, it frees the client. It also frees the event
+ * structure itself and decrements the global Ecore_Con event count.
+ *
+ * @param data Unused user data.
+ * @param event The Ecore_Con_Event_Client_Add event to free.
+ */
 static void
 _ecore_con_free_event_client_add(void *data EINA_UNUSED, void *event)
 {
@@ -334,6 +428,16 @@ _ecore_con_free_event_client_add(void *data EINA_UNUSED, void *event)
    _ecore_con_event_count--;
 }
 
+/**
+ * @brief Posts an ECORE_CON_EVENT_CLIENT_ADD event.
+ *
+ * Allocates and populates an Ecore_Con_Event_Client_Add event for the given
+ * client, then adds it to the Ecore event queue. This event signals that a
+ * new client has connected to a server or that an outgoing connection
+ * (dialer) has been established.
+ *
+ * @param cl The Ecore_Con_Client for which to post the event.
+ */
 static void
 _ecore_con_post_event_client_add(Ecore_Con_Client *cl)
 {
@@ -351,6 +455,18 @@ _ecore_con_post_event_client_add(Ecore_Con_Client *cl)
    _ecore_con_client_free(cl);
 }
 
+/**
+ * @brief Frees an Ecore_Con_Event_Client_Del event.
+ *
+ * This is a callback function for ecore_event_add. It decrements the event
+ * count on the associated client. If the client has no more pending events
+ * (and might already be marked for deletion), it frees the client.
+ * It also frees the event structure itself and decrements the global
+ * Ecore_Con event count.
+ *
+ * @param data Unused user data.
+ * @param event The Ecore_Con_Event_Client_Del event to free.
+ */
 static void
 _ecore_con_free_event_client_del(void *data EINA_UNUSED, void *event)
 {
@@ -369,6 +485,17 @@ _ecore_con_free_event_client_del(void *data EINA_UNUSED, void *event)
    _ecore_con_event_count--;
 }
 
+/**
+ * @brief Posts an ECORE_CON_EVENT_CLIENT_DEL event.
+ *
+ * Allocates and populates an Ecore_Con_Event_Client_Del event for the given
+ * client, then adds it to the Ecore event queue. This event signals that a
+ * client has disconnected or an outgoing connection has been terminated.
+ * For legacy compatibility, the client's IP is set to NULL.
+ *
+ * @param cl The Ecore_Con_Client for which to post the event.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., allocation error).
+ */
 static Eina_Bool
 _ecore_con_post_event_client_del(Ecore_Con_Client *cl)
 {
@@ -390,6 +517,18 @@ _ecore_con_post_event_client_del(Ecore_Con_Client *cl)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Frees an Ecore_Con_Event_Client_Data event.
+ *
+ * This is a callback function for ecore_event_add. It decrements the event
+ * count on the associated client. If the client is marked for deletion and
+ * has no more pending events, it frees the client. It also frees the data
+ * buffer within the event, the event structure itself, and decrements the
+ * global Ecore_Con event count.
+ *
+ * @param data Unused user data.
+ * @param event The Ecore_Con_Event_Client_Data event to free.
+ */
 static void
 _ecore_con_free_event_client_data(void *data EINA_UNUSED, void *event)
 {
@@ -407,6 +546,19 @@ _ecore_con_free_event_client_data(void *data EINA_UNUSED, void *event)
    _ecore_con_event_count--;
 }
 
+/**
+ * @brief Posts an ECORE_CON_EVENT_CLIENT_DATA event.
+ *
+ * Allocates and populates an Ecore_Con_Event_Client_Data event for the given
+ * client and data slice, then adds it to the Ecore event queue. This event
+ * signals that data has been received from a client. The provided slice's
+ * memory is taken over by the event.
+ *
+ * @param cl The Ecore_Con_Client that received data.
+ * @param slice The Eina_Rw_Slice containing the received data. The memory
+ *              pointed to by slice.mem will be freed by
+ *              _ecore_con_free_event_client_data.
+ */
 static void
 _ecore_con_post_event_client_data(Ecore_Con_Client *cl, Eina_Rw_Slice slice)
 {
@@ -426,6 +578,17 @@ _ecore_con_post_event_client_data(Ecore_Con_Client *cl, Eina_Rw_Slice slice)
    free(slice.mem);
 }
 
+/**
+ * @brief Frees an Ecore_Con_Event_Client_Write event.
+ *
+ * This is a callback function for ecore_event_add. It decrements the event
+ * count on the associated client. If the client is marked for deletion and
+ * has no more pending events, it frees the client. It also frees the event
+ * structure itself and decrements the global Ecore_Con event count.
+ *
+ * @param data Unused user data.
+ * @param event The Ecore_Con_Event_Client_Write event to free.
+ */
 static void
 _ecore_con_free_event_client_write(void *data EINA_UNUSED, void *event)
 {
@@ -442,6 +605,16 @@ _ecore_con_free_event_client_write(void *data EINA_UNUSED, void *event)
    _ecore_con_event_count--;
 }
 
+/**
+ * @brief Posts an ECORE_CON_EVENT_CLIENT_WRITE event.
+ *
+ * Allocates and populates an Ecore_Con_Event_Client_Write event for the given
+ * client, indicating that `size` bytes of previously sent data have been
+ * flushed from the write buffer. It then adds the event to the Ecore event queue.
+ *
+ * @param cl The Ecore_Con_Client for which data was written.
+ * @param size The number of bytes written.
+ */
 static void
 _ecore_con_post_event_client_write(Ecore_Con_Client *cl, size_t size)
 {
@@ -456,6 +629,18 @@ _ecore_con_post_event_client_write(Ecore_Con_Client *cl, size_t size)
    _ecore_con_event_count++;
 }
 
+/**
+ * @brief Frees an Ecore_Con_Event_Client_Error event.
+ *
+ * This is a callback function for ecore_event_add. It decrements the event
+ * count on the associated client. If the client is marked for deletion and
+ * has no more pending events, it frees the client. It also frees the error
+ * message string within the event, the event structure itself, and decrements
+ * the global Ecore_Con event count.
+ *
+ * @param data Unused user data.
+ * @param event The Ecore_Con_Event_Client_Error event to free.
+ */
 static void
 _ecore_con_free_event_client_error(void *data EINA_UNUSED, void *event)
 {
@@ -473,6 +658,17 @@ _ecore_con_free_event_client_error(void *data EINA_UNUSED, void *event)
    _ecore_con_event_count--;
 }
 
+/**
+ * @brief Posts an ECORE_CON_EVENT_CLIENT_ERROR event.
+ *
+ * Allocates and populates an Ecore_Con_Event_Client_Error event for the given
+ * client and error message, then adds it to the Ecore event queue. This event
+ * signals that an error has occurred on the client connection.
+ *
+ * @param cl The Ecore_Con_Client on which the error occurred.
+ * @param err A string describing the error. This string is duplicated.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., allocation error).
+ */
 static Eina_Bool
 _ecore_con_post_event_client_error(Ecore_Con_Client *cl, const char *err)
 {
@@ -494,6 +690,17 @@ _ecore_con_post_event_client_error(Ecore_Con_Client *cl, const char *err)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Frees an Ecore_Con_Event_Client_Upgrade event.
+ *
+ * This is a callback function for ecore_event_add. It decrements the event
+ * count on the associated client. If the client is marked for deletion and
+ * has no more pending events, it frees the client. It also frees the event
+ * structure itself and decrements the global Ecore_Con event count.
+ *
+ * @param data Unused user data.
+ * @param event The Ecore_Con_Event_Client_Upgrade event to free.
+ */
 static void
 _ecore_con_free_event_client_upgrade(void *data EINA_UNUSED, void *event)
 {
@@ -510,6 +717,15 @@ _ecore_con_free_event_client_upgrade(void *data EINA_UNUSED, void *event)
    _ecore_con_event_count--;
 }
 
+/**
+ * @brief Posts an ECORE_CON_EVENT_CLIENT_UPGRADE event.
+ *
+ * Allocates and populates an Ecore_Con_Event_Client_Upgrade event for the given
+ * client, then adds it to the Ecore event queue. This event signals that a
+ * client connection has been successfully upgraded (e.g., to SSL/TLS).
+ *
+ * @param cl The Ecore_Con_Client that was upgraded.
+ */
 static void
 _ecore_con_post_event_client_upgrade(Ecore_Con_Client *cl)
 {
@@ -528,7 +744,22 @@ _ecore_con_post_event_client_upgrade(Ecore_Con_Client *cl)
 }
 
 /* END: post of Ecore_Event for ecore_con_server_add() ******************/
+// Note: The section comment seems to be a slight misnomer here, as the preceding
+// functions handle events for individual clients, which can arise from both
+// ecore_con_server_add() (incoming connections) and ecore_con_server_connect()
+// (the "client" side of an outgoing connection).
 
+/**
+ * @brief Callback for EFL_IO_BUFFERED_STREAM_EVENT_PROGRESS on a client socket.
+ *
+ * This function is called when the amount of data pending in the write buffer
+ * of the client's underlying Efl_Io_Buffered_Stream changes. It calculates
+ * the amount of data written since the last progress event and posts an
+ * ECORE_CON_EVENT_CLIENT_WRITE event.
+ *
+ * @param data The Ecore_Con_Client associated with the socket.
+ * @param event The Efl_Event details (unused).
+ */
 static void
 _ecore_con_client_socket_progress(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -547,6 +778,17 @@ _ecore_con_client_socket_progress(void *data, const Efl_Event *event EINA_UNUSED
    cl->pending_write = now;
 }
 
+/**
+ * @brief Callback for EFL_IO_BUFFERED_STREAM_EVENT_SLICE_CHANGED on a client socket.
+ *
+ * This function is called when new data is available in the read buffer of the
+ * client's underlying Efl_Io_Buffered_Stream. It retrieves the data as an
+ * Eina_Slice, duplicates it into an Eina_Rw_Slice, clears the buffered stream,
+ * and then posts an ECORE_CON_EVENT_CLIENT_DATA event with the received data.
+ *
+ * @param data The Ecore_Con_Client associated with the socket.
+ * @param event The Efl_Event details (unused).
+ */
 static void
 _ecore_con_client_socket_slice_changed(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -565,6 +807,16 @@ _ecore_con_client_socket_slice_changed(void *data, const Efl_Event *event EINA_U
    _ecore_con_post_event_client_data(cl, rw_slice);
 }
 
+/**
+ * @brief Callback for EFL_IO_BUFFERED_STREAM_EVENT_READ_FINISHED on a client socket.
+ *
+ * This function is called when the read side of the client's socket has been
+ * closed by the remote peer (e.g., EOF received). It marks the underlying
+ * Efl_Io_Buffered_Stream as EOS (End Of Stream) if it's not already closed.
+ *
+ * @param data The Ecore_Con_Client associated with the socket.
+ * @param event The Efl_Event details (unused).
+ */
 static void
 _ecore_con_client_socket_read_finished(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -576,6 +828,17 @@ _ecore_con_client_socket_read_finished(void *data, const Efl_Event *event EINA_U
      efl_io_buffered_stream_eos_mark(cl->socket);
 }
 
+/**
+ * @brief Callback for EFL_IO_BUFFERED_STREAM_EVENT_FINISHED on a client socket.
+ *
+ * This function is called when the client's underlying Efl_Io_Buffered_Stream
+ * is completely finished (both read and write sides are closed, or an
+ * unrecoverable error occurred leading to closure). It closes the client's
+ * socket representation and posts an ECORE_CON_EVENT_CLIENT_DEL event.
+ *
+ * @param data The Ecore_Con_Client associated with the socket.
+ * @param event The Efl_Event details (unused).
+ */
 static void
 _ecore_con_client_socket_finished(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -588,6 +851,17 @@ _ecore_con_client_socket_finished(void *data, const Efl_Event *event EINA_UNUSED
    _ecore_con_post_event_client_del(cl);
 }
 
+/**
+ * @brief Callback for EFL_IO_BUFFERED_STREAM_EVENT_ERROR on a client socket.
+ *
+ * This function is called when an error occurs on the client's underlying
+ * Efl_Io_Buffered_Stream. It logs the error, closes the client's socket
+ * representation, and posts an ECORE_CON_EVENT_CLIENT_ERROR event with the
+ * error message.
+ *
+ * @param data The Ecore_Con_Client associated with the socket.
+ * @param event The Efl_Event containing the Eina_Error details in event->info.
+ */
 static void
 _ecore_con_client_socket_error(void *data, const Efl_Event *event)
 {
@@ -609,6 +883,20 @@ EFL_CALLBACKS_ARRAY_DEFINE(_ecore_con_client_socket_cbs,
                            { EFL_IO_BUFFERED_STREAM_EVENT_FINISHED, _ecore_con_client_socket_finished },
                            { EFL_IO_BUFFERED_STREAM_EVENT_ERROR, _ecore_con_client_socket_error });
 
+/**
+ * @brief Creates and initializes a new Ecore_Con_Client object.
+ *
+ * This internal function is called when a new client connection is established,
+ * either by an incoming connection to an Ecore_Con_Server or as the result of
+ * a successful ecore_con_server_connect() call.
+ * It allocates an Ecore_Con_Client, associates it with the provided Efl_Net_Socket,
+ * extracts IP and port information, and sets up event callbacks on the socket.
+ * The new client is added to the server's list of clients.
+ *
+ * @param svr The parent Ecore_Con_Server.
+ * @param socket The Efl_Net_Socket (typically an Efl_Io_Buffered_Stream) representing the connection.
+ * @return A pointer to the newly created Ecore_Con_Client, or NULL on failure.
+ */
 static Ecore_Con_Client *
 ecore_con_client_add(Ecore_Con_Server *svr, Eo *socket)
 {
@@ -807,6 +1095,16 @@ ecore_con_client_fd_get(const Ecore_Con_Client *cl)
    return SOCKET_TO_LOOP_FD(INVALID_SOCKET);
 }
 
+/**
+ * @brief Callback for EFL_NET_SOCKET_SSL_EVENT_SSL_READY on a client's SSL socket.
+ *
+ * This function is called when the SSL handshake has successfully completed for
+ * a client connection that was being upgraded to SSL. It clears the `ssl.upgrading`
+ * flag and posts an ECORE_CON_EVENT_CLIENT_UPGRADE event.
+ *
+ * @param data The Ecore_Con_Client associated with the SSL socket.
+ * @param event The Efl_Event details (unused).
+ */
 static void
 _ecore_con_client_socket_ssl_ready(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -817,6 +1115,16 @@ _ecore_con_client_socket_ssl_ready(void *data, const Efl_Event *event EINA_UNUSE
    _ecore_con_post_event_client_upgrade(cl);
 }
 
+/**
+ * @brief Callback for EFL_NET_SOCKET_SSL_EVENT_SSL_ERROR on a client's SSL socket.
+ *
+ * This function is called if an error occurs during the SSL handshake or other
+ * SSL operations for a client connection. It logs the error, closes the client's
+ * socket representation, and posts an ECORE_CON_EVENT_CLIENT_ERROR event.
+ *
+ * @param data The Ecore_Con_Client associated with the SSL socket.
+ * @param event The Efl_Event containing the Eina_Error details in event->info.
+ */
 static void
 _ecore_con_client_socket_ssl_error(void *data, const Efl_Event *event)
 {
@@ -835,6 +1143,21 @@ EFL_CALLBACKS_ARRAY_DEFINE(_ecore_con_client_socket_ssl_cbs,
                            { EFL_NET_SOCKET_SSL_EVENT_SSL_READY, _ecore_con_client_socket_ssl_ready },
                            { EFL_NET_SOCKET_SSL_EVENT_SSL_ERROR, _ecore_con_client_socket_ssl_error });
 
+/**
+ * @brief Job function to perform the SSL upgrade for an Ecore_Con_Client.
+ *
+ * This function is scheduled as an Efl_Loop_Job when ecore_con_ssl_client_upgrade()
+ * is called. It takes the existing TCP socket from the client, creates a new
+ * Efl_Net_Socket_Ssl, adopts the TCP socket into it, and then wraps this SSL
+ * socket with an Efl_Net_Socket_Simple (buffered stream). The client's `socket`
+ * member is updated to this new SSL-enabled socket, and appropriate event
+ * callbacks are transferred or added.
+ *
+ * @param data The Ecore_Con_Client to upgrade.
+ * @param v The Eina_Value from the future (checked for cancellation).
+ * @param dead The Eina_Future that triggered this job (unused).
+ * @return The input Eina_Value `v`, or an error value if setup fails.
+ */
 static Eina_Value
 _ecore_con_client_ssl_upgrade_job(void *data, const Eina_Value v,
                                   const Eina_Future *dead EINA_UNUSED)
@@ -889,6 +1212,18 @@ _ecore_con_client_ssl_upgrade_job(void *data, const Eina_Value v,
 
 static Eo * _ecore_con_server_ssl_ctx_create(const Ecore_Con_Server *svr);
 
+/**
+ * @brief Schedules a job on the main loop for an Ecore_Con_Server.
+ *
+ * This is a helper function to schedule an Efl_Loop_Job and store the
+ * resulting Eina_Future in `svr->ssl.job`. Used for deferring SSL setup
+ * operations to allow the user to configure SSL parameters after calling
+ * ecore_con_server_add() or ecore_con_server_connect() with SSL flags.
+ *
+ * @param svr The Ecore_Con_Server for which the job is scheduled.
+ * @param loop The Efl_Loop to schedule the job on.
+ * @param cb The callback function to execute when the job runs.
+ */
 static void
 _ecore_con_server_job_schedule(Ecore_Con_Server *svr, Eo *loop,
                                Eina_Future_Cb cb)

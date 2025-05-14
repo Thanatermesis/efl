@@ -9,10 +9,18 @@
 #include "Ecore_Con.h"
 #include "ecore_con_private.h"
 
-#define BUFSIZE 512
+#define BUFSIZE 512 /**< Default buffer size for pipe operations. */
 
-static int _ecore_con_local_init_count = 0;
+static int _ecore_con_local_init_count = 0; /**< Reference counter for local connection module initialization. */
 
+/**
+ * @brief Initializes the Ecore_Con local module.
+ *
+ * This function increments a counter for local module initialization.
+ * It should be called before any other ecore_con_local_* functions are used.
+ *
+ * @return The current initialization count.
+ */
 int
 ecore_con_local_init(void)
 {
@@ -22,6 +30,16 @@ ecore_con_local_init(void)
    return _ecore_con_local_init_count;
 }
 
+/**
+ * @brief Shuts down the Ecore_Con local module.
+ *
+ * This function decrements a counter for local module initialization.
+ * When the count reaches zero, it implies that the local connection
+ * facilities can be cleaned up, though this function itself doesn't
+ * perform explicit cleanup.
+ *
+ * @return The current initialization count.
+ */
 int
 ecore_con_local_shutdown(void)
 {
@@ -31,6 +49,19 @@ ecore_con_local_shutdown(void)
    return _ecore_con_local_init_count;
 }
 
+/**
+ * @internal
+ * @brief Handler for reading data sent by a client to the server.
+ *
+ * This function is called when there is data to be read from a client's pipe.
+ * It reads the data and triggers a client data event.
+ *
+ * @param data Pointer to the Ecore_Con_Client object.
+ * @param wh The Ecore_Win32_Handler that triggered this callback.
+ * @return ECORE_CALLBACK_RENEW if the event needs to be reset,
+ *         ECORE_CALLBACK_CANCEL if the client is disconnected or an error occurs,
+ *         ECORE_CALLBACK_DONE if processing is complete.
+ */
 static Eina_Bool
 _ecore_con_local_win32_server_read_client_handler(void *data, Ecore_Win32_Handler *wh)
 {
@@ -77,6 +108,19 @@ _ecore_con_local_win32_server_read_client_handler(void *data, Ecore_Win32_Handle
    return ECORE_CALLBACK_DONE;
 }
 
+/**
+ * @internal
+ * @brief Handler for server-side pipe peek events from a client.
+ *
+ * This function is called when a pipe event (like a broken pipe) is detected
+ * by peeking the client's pipe from the server side. It typically handles
+ * client disconnection or errors.
+ *
+ * @param data Pointer to the Ecore_Con_Client object.
+ * @param wh The Ecore_Win32_Handler that triggered this callback.
+ * @return ECORE_CALLBACK_RENEW if the event needs to be reset,
+ *         ECORE_CALLBACK_CANCEL if the server should be killed.
+ */
 static Eina_Bool
 _ecore_con_local_win32_server_peek_client_handler(void *data, Ecore_Win32_Handler *wh)
 {
@@ -101,6 +145,19 @@ _ecore_con_local_win32_server_peek_client_handler(void *data, Ecore_Win32_Handle
    return ECORE_CALLBACK_DONE;
 }
 
+/**
+ * @internal
+ * @brief Handler for client-side pipe peek events from the server.
+ *
+ * This function is called when a pipe event (like a broken pipe) is detected
+ * by peeking the server's pipe from the client side. It typically handles
+ * server disconnection or errors.
+ *
+ * @param data Pointer to the Ecore_Con_Server object (acting as client).
+ * @param wh The Ecore_Win32_Handler that triggered this callback.
+ * @return ECORE_CALLBACK_RENEW if the event needs to be reset,
+ *         ECORE_CALLBACK_CANCEL if the server (client connection) should be killed.
+ */
 static Eina_Bool
 _ecore_con_local_win32_client_peek_server_handler(void *data, Ecore_Win32_Handler *wh)
 {
@@ -123,6 +180,19 @@ _ecore_con_local_win32_client_peek_server_handler(void *data, Ecore_Win32_Handle
    return ECORE_CALLBACK_DONE;
 }
 
+/**
+ * @internal
+ * @brief Handler for reading data sent by the server to a client.
+ *
+ * This function is called when there is data to be read from the server's pipe
+ * by a client. It reads the data and triggers a server data event.
+ *
+ * @param data Pointer to the Ecore_Con_Server object (acting as client).
+ * @param wh The Ecore_Win32_Handler that triggered this callback.
+ * @return ECORE_CALLBACK_RENEW if the event needs to be reset,
+ *         ECORE_CALLBACK_CANCEL if the server is disconnected or an error occurs,
+ *         ECORE_CALLBACK_DONE if processing is complete.
+ */
 static Eina_Bool
 _ecore_con_local_win32_client_read_server_handler(void *data, Ecore_Win32_Handler *wh)
 {
@@ -168,7 +238,18 @@ _ecore_con_local_win32_client_read_server_handler(void *data, Ecore_Win32_Handle
    return ECORE_CALLBACK_DONE;
 }
 
-/* thread to read data sent by the server to the client */
+/**
+ * @internal
+ * @brief Thread function for a client to continuously read data from the server.
+ *
+ * This thread monitors the named pipe connected to the server. When data is
+ * available (PeekNamedPipe indicates bytes to read), it sets an event
+ * (svr->event_read) to signal the main loop to handle the read.
+ * If the pipe breaks, it sets another event (svr->event_peek).
+ *
+ * @param data Pointer to the Ecore_Con_Server object (representing the client's connection to the server).
+ * @return 0 on successful thread termination.
+ */
 static unsigned int __stdcall
 _ecore_con_local_win32_client_read_server_thread(void *data)
 {
@@ -205,7 +286,18 @@ _ecore_con_local_win32_client_read_server_thread(void *data)
    return 0;
 }
 
-/* thread to read data sent by the client to the server */
+/**
+ * @internal
+ * @brief Thread function for a server to continuously read data from a specific client.
+ *
+ * This thread monitors the named pipe connected to a client. When data is
+ * available (PeekNamedPipe indicates bytes to read), it sets an event
+ * (host_svr->event_read) to signal the main loop to handle the read for that client.
+ * If the pipe breaks, it sets another event (host_svr->event_peek).
+ *
+ * @param data Pointer to the Ecore_Con_Client object.
+ * @return 0 on successful thread termination.
+ */
 static unsigned int __stdcall
 _ecore_con_local_win32_server_read_client_thread(void *data)
 {
@@ -243,6 +335,20 @@ _ecore_con_local_win32_server_read_client_thread(void *data)
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Handler called when a new client has connected to the server.
+ *
+ * This function is triggered after ConnectNamedPipe succeeds in the listening thread.
+ * It sets up the necessary structures and handlers for communication with the newly
+ * connected client, including creating events and a dedicated thread for reading
+ * data from this client.
+ *
+ * @param data Pointer to the Ecore_Con_Server object representing the listening server.
+ * @param wh The Ecore_Win32_Handler associated with the listening thread completion.
+ * @return ECORE_CALLBACK_CANCEL on failure or if client limit is reached,
+ *         ECORE_CALLBACK_DONE on success.
+ */
 static Eina_Bool
 _ecore_con_local_win32_client_add(void *data, Ecore_Win32_Handler *wh)
 {
@@ -336,6 +442,18 @@ free_cl:
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @internal
+ * @brief Thread function for the server to listen for incoming client connections.
+ *
+ * This thread calls ConnectNamedPipe, which blocks until a client connects to
+ * the named pipe instance associated with the server. Once a client connects,
+ * the thread terminates. The main loop is then signaled (via the thread handle
+ * becoming signaled) to call _ecore_con_local_win32_client_add.
+ *
+ * @param data Pointer to the Ecore_Con_Server object.
+ * @return 0 on successful thread termination (client connected or error).
+ */
 static unsigned int __stdcall
 _ecore_con_local_win32_listening(void *data)
 {
@@ -361,6 +479,24 @@ _ecore_con_local_win32_listening(void *data)
    return 0;
 }
 
+/**
+ * @brief Generates a path for a local named pipe on Windows.
+ *
+ * Constructs a named pipe path string. The path format is:
+ * - User-specific: "\\\\.\\pipe\\<name><ProcessId>"
+ * - System-wide: "\\\\<COMPUTERNAME>\\pipe\\<name><ProcessId>"
+ *
+ * @param is_system If EINA_TRUE, creates a system-wide accessible path.
+ *                  If EINA_FALSE, creates a user-specific path.
+ * @param name The base name for the pipe.
+ * @param port The port number (currently unused in Win32 implementation,
+ *             but included for API compatibility with UNIX-like systems).
+ * @return A newly allocated string containing the pipe path, or NULL on failure.
+ *         The caller is responsible for freeing this string.
+ * @note The `port` parameter is currently ignored in the Win32 implementation
+ *       but is appended to the name to maintain some similarity with UNIX domain socket naming.
+ *       However, GetProcessId is used to ensure uniqueness, which might differ from typical port usage.
+ */
 ECORE_CON_API char *
 ecore_con_local_path_new(Eina_Bool is_system, const char *name, int port)
 {
@@ -380,6 +516,16 @@ ecore_con_local_path_new(Eina_Bool is_system, const char *name, int port)
    (void)port; // CHECK-ME: shouldn't we use port to be similar to UNIX?
 }
 
+/**
+ * @brief Starts a local server listening for connections on a named pipe.
+ *
+ * This function creates a named pipe based on the server's configuration
+ * (name, port, type - user or system) and starts a listening thread.
+ * The listening thread waits for clients to connect.
+ *
+ * @param obj The Ecore_Con_Server object to start listening.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 Eina_Bool
 ecore_con_local_listen(Ecore_Con_Server *obj)
 {
@@ -460,6 +606,16 @@ free_path:
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Cleans up resources associated with a Win32 local server.
+ *
+ * This function is called when an Ecore_Con_Server (configured for local Win32 pipes)
+ * is being deleted. It stops associated threads, closes handles (pipe, events),
+ * and frees allocated memory like the pipe path.
+ *
+ * @param obj The Ecore_Con_Server object to delete.
+ */
 void
 ecore_con_local_win32_server_del(Ecore_Con_Server *obj)
 {
@@ -490,6 +646,21 @@ ecore_con_local_win32_server_del(Ecore_Con_Server *obj)
    svr->pipe = NULL;
 }
 
+/**
+ * @internal
+ * @brief Cleans up resources associated with a Win32 local client.
+ *
+ * This function is called when an Ecore_Con_Client (connected via a local Win32 pipe)
+ * is being deleted. It stops associated threads, closes handles (pipe, events
+ * which are actually part of the host server's data for this client connection),
+ * and frees allocated memory.
+ *
+ * @param obj The Ecore_Con_Client object to delete.
+ * @note The pipe and event handles cleaned here are typically those managed by
+ *       the server (`cl->host_server`) for this specific client connection,
+ *       not the client's own connection pipe handle if it were a standalone client.
+ *       This function seems to be for server-side representation of a client.
+ */
 void
 ecore_con_local_win32_client_del(Ecore_Con_Client *obj)
 {
@@ -520,6 +691,20 @@ ecore_con_local_win32_client_del(Ecore_Con_Client *obj)
    svr->pipe = NULL;
 }
 
+/**
+ * @brief Connects a client to a local named pipe server.
+ *
+ * This function attempts to connect to a named pipe server specified by the
+ * server object's properties (name, port, type). It creates the pipe path,
+ * then tries to open the pipe. If the pipe is busy, it waits.
+ * On successful connection, it sets up event handlers and a read thread.
+ *
+ * @param obj The Ecore_Con_Server object representing the client's connection
+ *            details and state. (Note: Ecore_Con_Server is used here to store
+ *            client-side connection info for a local connection).
+ * @param cb_done Callback function (currently unused in this Win32 implementation).
+ * @return EINA_TRUE on successful connection, EINA_FALSE otherwise.
+ */
 Eina_Bool
 ecore_con_local_connect(Ecore_Con_Server *obj,
                         Eina_Bool (*cb_done)(void *data,
@@ -639,6 +824,18 @@ close_pipe:
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Flushes data from the server's write buffer to a connected client via named pipe.
+ *
+ * Writes pending data from the server's output buffer (svr->buf) to the named pipe
+ * connected to a client.
+ *
+ * @param obj The Ecore_Con_Server object.
+ * @return EINA_TRUE if flush was successful or no data to flush,
+ *         EINA_FALSE if the connection type is invalid.
+ *         May trigger server error events and kill the server on WriteFile failure.
+ */
 Eina_Bool
 ecore_con_local_win32_server_flush(Ecore_Con_Server *obj)
 {
@@ -679,6 +876,18 @@ ecore_con_local_win32_server_flush(Ecore_Con_Server *obj)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Flushes data from the client's write buffer to the server via named pipe.
+ *
+ * Writes pending data from the client's output buffer (cl->buf) to the named pipe
+ * connected to the server.
+ *
+ * @param obj The Ecore_Con_Client object.
+ * @return EINA_TRUE if flush was successful or no data to flush,
+ *         EINA_FALSE if the connection type is invalid.
+ *         May trigger client error events and kill the client on WriteFile failure.
+ */
 Eina_Bool
 ecore_con_local_win32_client_flush(Ecore_Con_Client *obj)
 {

@@ -14,23 +14,42 @@
 #define MY_CLASS EFL_UI_ALERT_POPUP_CLASS
 #define MY_CLASS_NAME "Efl.Ui.Alert_Popup"
 
+// Constant for the "button" part name.
 static const char PART_NAME_BUTTON[] = "button";
+// Array of part names for button layouts, indexed by button count (1, 2, or 3).
+// e.g., "button_layout1" for one button, "button_layout2" for two buttons.
 static const char PART_NAME_BUTTON_LAYOUT[EFL_UI_ALERT_POPUP_BUTTON_COUNT][15] =
                                                 {"button_layout1",
                                                  "button_layout2",
                                                  "button_layout3"};
 
+// Array of swallow names for buttons in the layout.
+// These correspond to "efl.button1", "efl.button2", "efl.button3" swallow parts in the theme.
 static const char BUTTON_SWALLOW_NAME[EFL_UI_ALERT_POPUP_BUTTON_COUNT][20] =
                                                 {"efl.button1",
                                                  "efl.button2",
                                                  "efl.button3"};
 
+// Defines aliases for text parts. "title" maps to "efl.text.title".
 static const Elm_Layout_Part_Alias_Description _text_aliases[] =
 {
    {"title", "efl.text.title"},
    {NULL, NULL}
 };
 
+/**
+ * @brief Sets the text for a given part of the alert popup.
+ *
+ * This function handles text setting for aliased parts, specifically the title.
+ * It updates the internal stringshare for the title and emits signals
+ * for visibility changes.
+ *
+ * @param obj The Efl.Ui.Alert_Popup object.
+ * @param pd The private data of the Efl.Ui.Alert_Popup object.
+ * @param part The name of the part to set text for (e.g., "title").
+ * @param label The text to set.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _efl_ui_alert_popup_text_set(Eo *obj, Efl_Ui_Alert_Popup_Data *pd, const char *part, const char *label)
 {
@@ -57,6 +76,16 @@ _efl_ui_alert_popup_text_set(Eo *obj, Efl_Ui_Alert_Popup_Data *pd, const char *p
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the text for a given part of the alert popup.
+ *
+ * This function handles text retrieval for aliased parts, specifically the title.
+ *
+ * @param obj The Efl.Ui.Alert_Popup object.
+ * @param pd The private data of the Efl.Ui.Alert_Popup object.
+ * @param part The name of the part to get text from (e.g., "title").
+ * @return The text of the part, or NULL if not found or on error.
+ */
 const char *
 _efl_ui_alert_popup_text_get(Eo *obj EINA_UNUSED, Efl_Ui_Alert_Popup_Data *pd, const char *part)
 {
@@ -73,6 +102,15 @@ _efl_ui_alert_popup_text_get(Eo *obj EINA_UNUSED, Efl_Ui_Alert_Popup_Data *pd, c
    return efl_text_get(efl_part(efl_super(obj, MY_CLASS), part));
 }
 
+/**
+ * @brief Callback function for when the positive button is clicked.
+ *
+ * Emits the EFL_UI_ALERT_POPUP_EVENT_BUTTON_CLICKED event with
+ * button_type set to EFL_UI_ALERT_POPUP_BUTTON_POSITIVE.
+ *
+ * @param data The Efl.Ui.Alert_Popup object.
+ * @param ev The Efl_Event data (unused).
+ */
 static void
 _positive_button_clicked_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -84,6 +122,15 @@ _positive_button_clicked_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_event_callback_call(popup_obj, EFL_UI_ALERT_POPUP_EVENT_BUTTON_CLICKED, &event);
 }
 
+/**
+ * @brief Callback function for when the negative button is clicked.
+ *
+ * Emits the EFL_UI_ALERT_POPUP_EVENT_BUTTON_CLICKED event with
+ * button_type set to EFL_UI_ALERT_POPUP_BUTTON_NEGATIVE.
+ *
+ * @param data The Efl.Ui.Alert_Popup object.
+ * @param ev The Efl_Event data (unused).
+ */
 static void
 _negative_button_clicked_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -95,6 +142,15 @@ _negative_button_clicked_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_event_callback_call(popup_obj, EFL_UI_ALERT_POPUP_EVENT_BUTTON_CLICKED, &event);
 }
 
+/**
+ * @brief Callback function for when the user-defined button is clicked.
+ *
+ * Emits the EFL_UI_ALERT_POPUP_EVENT_BUTTON_CLICKED event with
+ * button_type set to EFL_UI_ALERT_POPUP_BUTTON_USER.
+ *
+ * @param data The Efl.Ui.Alert_Popup object.
+ * @param ev The Efl_Event data (unused).
+ */
 static void
 _user_button_clicked_cb(void *data, const Efl_Event *ev EINA_UNUSED)
 {
@@ -106,6 +162,18 @@ _user_button_clicked_cb(void *data, const Efl_Event *ev EINA_UNUSED)
    efl_event_callback_call(popup_obj, EFL_UI_ALERT_POPUP_EVENT_BUTTON_CLICKED, &event);
 }
 
+/**
+ * @brief Applies the appropriate style to buttons based on their count and type.
+ *
+ * This function ensures buttons are styled correctly (e.g., "left_button", "right_button")
+ * depending on how many buttons are visible and which specific buttons they are.
+ * For example, if there are two buttons, the user button (if present) might be styled
+ * as "left_button" and the positive button as "right_button".
+ *
+ * @param obj The Efl.Ui.Alert_Popup object.
+ * @param pd The private data of the Efl.Ui.Alert_Popup object.
+ * @param button_cnt The total number of currently visible buttons.
+ */
 static void
 _apply_button_style(Eo *obj, Efl_Ui_Alert_Popup_Data *pd, int button_cnt)
 {
@@ -141,6 +209,21 @@ _apply_button_style(Eo *obj, Efl_Ui_Alert_Popup_Data *pd, int button_cnt)
      }
 }
 
+/**
+ * @brief Sets or updates a button in the alert popup.
+ *
+ * This function handles the creation or modification of a button of a specific type
+ * (positive, negative, or user). It sets the button's text and icon.
+ * If the button is newly created, it updates the layout to accommodate the
+ * new button count and applies the correct styles.
+ *
+ * @param obj The Efl.Ui.Alert_Popup object.
+ * @param pd The private data of the Efl.Ui.Alert_Popup object.
+ * @param type The type of button to set (EFL_UI_ALERT_POPUP_BUTTON_POSITIVE,
+ *             EFL_UI_ALERT_POPUP_BUTTON_NEGATIVE, or EFL_UI_ALERT_POPUP_BUTTON_USER).
+ * @param text The text to display on the button. Can be NULL.
+ * @param icon The icon object to display on the button. Can be NULL.
+ */
 EOLIAN static void
 _efl_ui_alert_popup_button_set(Eo *obj, Efl_Ui_Alert_Popup_Data *pd, Efl_Ui_Alert_Popup_Button type, const char *text, Eo *icon)
 {
@@ -232,6 +315,16 @@ _efl_ui_alert_popup_button_set(Eo *obj, Efl_Ui_Alert_Popup_Data *pd, Efl_Ui_Aler
    efl_canvas_group_change(obj);
 }
 
+/**
+ * @brief Constructor for the Efl.Ui.Alert_Popup object.
+ *
+ * Initializes the alert popup, sets its theme class, and creates
+ * the layout for buttons.
+ *
+ * @param obj The Efl.Ui.Alert_Popup object being constructed.
+ * @param pd The private data of the Efl.Ui.Alert_Popup object (unused in this function).
+ * @return The constructed Efl.Ui.Alert_Popup object.
+ */
 EOLIAN static Eo *
 _efl_ui_alert_popup_efl_object_constructor(Eo *obj,
                                            Efl_Ui_Alert_Popup_Data *pd EINA_UNUSED)
@@ -249,6 +342,14 @@ _efl_ui_alert_popup_efl_object_constructor(Eo *obj,
    return obj;
 }
 
+/**
+ * @brief Destructor for the Efl.Ui.Alert_Popup object.
+ *
+ * Frees resources allocated by the alert popup, such as the title text.
+ *
+ * @param obj The Efl.Ui.Alert_Popup object being destructed.
+ * @param pd The private data of the Efl.Ui.Alert_Popup object.
+ */
 EOLIAN static void
 _efl_ui_alert_popup_efl_object_destructor(Eo *obj, Efl_Ui_Alert_Popup_Data *pd)
 {
@@ -256,6 +357,15 @@ _efl_ui_alert_popup_efl_object_destructor(Eo *obj, Efl_Ui_Alert_Popup_Data *pd)
    efl_destructor(efl_super(obj, MY_CLASS));
 }
 
+/**
+ * @brief Checks if a given part name corresponds to the title part.
+ *
+ * This function resolves part aliasing before performing the check.
+ *
+ * @param obj The Efl.Ui.Alert_Popup object.
+ * @param part The name of the part to check.
+ * @return EINA_TRUE if the part is the title part, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _part_is_efl_ui_alert_popup_part_title(const Eo *obj, const char *part)
 {
@@ -264,6 +374,18 @@ _part_is_efl_ui_alert_popup_part_title(const Eo *obj, const char *part)
 }
 
 /* Efl.Part begin */
+/**
+ * @brief Implements Efl.Part.part_get for the alert popup.
+ *
+ * Retrieves a specific part of the alert popup. If the requested part is the title,
+ * it returns an EFL_UI_ALERT_POPUP_PART_TITLE_CLASS object. Otherwise, it
+ * calls the superclass's implementation.
+ *
+ * @param obj The Efl.Ui.Alert_Popup object.
+ * @param priv The private data of the Efl.Ui.Alert_Popup object (unused).
+ * @param part The name of the part to retrieve.
+ * @return The Efl_Object representing the part, or NULL if not found.
+ */
 EOLIAN static Efl_Object *
 _efl_ui_alert_popup_efl_part_part_get(const Eo *obj, Efl_Ui_Alert_Popup_Data *priv EINA_UNUSED, const char *part)
 {
@@ -273,6 +395,17 @@ _efl_ui_alert_popup_efl_part_part_get(const Eo *obj, Efl_Ui_Alert_Popup_Data *pr
    return efl_part_get(efl_super(obj, EFL_UI_ALERT_POPUP_CLASS), part);
 }
 
+/**
+ * @brief Implements Efl.Text.text_set for the title part of the alert popup.
+ *
+ * This function is called when efl_text_set is used on the title part object.
+ * It retrieves the parent alert popup and its private data, then calls
+ * _efl_ui_alert_popup_text_set to perform the actual text setting.
+ *
+ * @param obj The title part object (EFL_UI_ALERT_POPUP_PART_TITLE_CLASS).
+ * @param _pd The private data of the title part object (unused).
+ * @param text The text to set for the title.
+ */
 EOLIAN static void
 _efl_ui_alert_popup_part_title_efl_text_text_set(Eo *obj, void *_pd EINA_UNUSED, const char *text)
 {
@@ -282,6 +415,17 @@ _efl_ui_alert_popup_part_title_efl_text_text_set(Eo *obj, void *_pd EINA_UNUSED,
    _efl_ui_alert_popup_text_set(pd->obj, sd, pd->part, text);
 }
 
+/**
+ * @brief Implements Efl.Text.text_get for the title part of the alert popup.
+ *
+ * This function is called when efl_text_get is used on the title part object.
+ * It retrieves the parent alert popup and its private data, then calls
+ * _efl_ui_alert_popup_text_get to perform the actual text retrieval.
+ *
+ * @param obj The title part object (EFL_UI_ALERT_POPUP_PART_TITLE_CLASS).
+ * @param _pd The private data of the title part object (unused).
+ * @return The text of the title part.
+ */
 EOLIAN static const char*
 _efl_ui_alert_popup_part_title_efl_text_text_get(const Eo *obj, void *_pd EINA_UNUSED)
 {

@@ -6,12 +6,41 @@
 
 #include "ecore_x_private.h"
 
+/**
+ * @brief Checks if color cursors are supported by the X server.
+ *
+ * @return @c EINA_TRUE if color cursors are supported, @c EINA_FALSE otherwise.
+ */
 EAPI Eina_Bool
 ecore_x_cursor_color_supported_get(void)
 {
    return _ecore_x_xcursor;
 }
 
+/**
+ * @brief Creates a new cursor from pixel data.
+ *
+ * This function creates an X cursor from the given pixel data.
+ * If Xcursor is available, it uses XcursorImageCreate and XcursorImageLoadCursor.
+ * Otherwise, it falls back to creating a 2-color pixmap cursor by
+ * dithering the input image.
+ *
+ * @param win The window for which the cursor is created.
+ * @param pixels A pointer to an array of integers representing the pixel data.
+ *               Each integer is a 32-bit ARGB value (e.g., 0xAARRGGBB).
+ *               Example:
+ *               For a 2x2 cursor with a red top-left pixel and a blue bottom-right pixel:
+ *               pixels[0] = 0xFFFF0000; // Red
+ *               pixels[1] = 0x00000000; // Transparent or black
+ *               pixels[2] = 0x00000000; // Transparent or black
+ *               pixels[3] = 0xFF0000FF; // Blue
+ * @param w The width of the cursor.
+ * @param h The height of the cursor.
+ * @param hot_x The x-coordinate of the cursor's hot spot.
+ * @param hot_y The y-coordinate of the cursor's hot spot.
+ * @return The newly created Ecore_X_Cursor, or 0 on failure.
+ *         The returned cursor must be freed using ecore_x_cursor_free().
+ */
 EAPI Ecore_X_Cursor
 ecore_x_cursor_new(Ecore_X_Window win,
                    int *pixels,
@@ -215,6 +244,11 @@ ecore_x_cursor_new(Ecore_X_Window win,
    return 0;
 }
 
+/**
+ * @brief Frees an Ecore_X_Cursor.
+ *
+ * @param c The cursor to free.
+ */
 EAPI void
 ecore_x_cursor_free(Ecore_X_Cursor c)
 {
@@ -228,6 +262,11 @@ ecore_x_cursor_free(Ecore_X_Cursor c)
  * Returns the cursor for the given shape.
  * Note that the return value must not be freed with
  * ecore_x_cursor_free()!
+ *
+ * @param shape The shape identifier (e.g., XC_left_ptr, XC_watch).
+ *              These are standard X11 cursor shapes defined in `<X11/cursorfont.h>`.
+ * @return The Ecore_X_Cursor for the given shape, or 0 on failure.
+ *         This cursor should not be freed with ecore_x_cursor_free().
  */
 EAPI Ecore_X_Cursor
 ecore_x_cursor_shape_get(int shape)
@@ -241,6 +280,14 @@ ecore_x_cursor_shape_get(int shape)
    return cur;
 }
 
+/**
+ * @brief Sets the default cursor size.
+ *
+ * This function sets the preferred size for cursors. This is only
+ * effective if Xcursor is available.
+ *
+ * @param size The desired default cursor size.
+ */
 EAPI void
 ecore_x_cursor_size_set(int size)
 {
@@ -254,6 +301,14 @@ ecore_x_cursor_size_set(int size)
 #endif /* ifdef ECORE_XCURSOR */
 }
 
+/**
+ * @brief Gets the default cursor size.
+ *
+ * This function retrieves the preferred size for cursors. This is only
+ * effective if Xcursor is available.
+ *
+ * @return The default cursor size, or 0 if Xcursor is not available.
+ */
 EAPI int
 ecore_x_cursor_size_get(void)
 {

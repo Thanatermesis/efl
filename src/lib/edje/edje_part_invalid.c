@@ -5,6 +5,17 @@
 PROXY_IMPLEMENTATION(invalid, MY_CLASS, EINA_FALSE)
 #undef PROXY_IMPLEMENTATION
 
+/**
+ * @internal
+ * @brief Generic handler for calls to an invalid Edje part.
+ *
+ * This function is called when an Efl_Canvas_Layout_Part API is invoked on an
+ * object that represents an invalid (non-existent) part. It logs a warning
+ * and emits an EFL_LAYOUT_EVENT_PART_INVALID event.
+ *
+ * @param proxy The Efl_Canvas_Layout_Part_Invalid proxy object.
+ * @param function The name of the function that was called.
+ */
 static void
 _edje_part_invalid_call(const Eo *proxy, const char *function)
 {
@@ -18,15 +29,51 @@ _edje_part_invalid_call(const Eo *proxy, const char *function)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
+/**
+ * @internal
+ * @brief Macro to define a void function implementation for an invalid part API.
+ * This macro generates a static EOLIAN function that calls _edje_part_invalid_call.
+ * @param api The original API function name (as a string for logging).
+ * @param impl The implementation function name.
+ * @param ... Variadic arguments representing the function parameters (unused in the macro body but part of the signature).
+ */
 #define EDJE_PART_INVALID_VOID(api, impl, ...) \
    EOLIAN static void impl(Eo *proxy, void *_pd EINA_UNUSED, ## __VA_ARGS__) { _edje_part_invalid_call(proxy, #api); }
 
+/**
+ * @internal
+ * @brief Macro to define a const void function implementation for an invalid part API.
+ * Similar to EDJE_PART_INVALID_VOID, but for const Eo *proxy.
+ * @param api The original API function name (as a string for logging).
+ * @param impl The implementation function name.
+ * @param ... Variadic arguments representing the function parameters (unused in the macro body but part of the signature).
+ */
 #define EDJE_PART_INVALID_VOID_CONST(api, impl, ...) \
    EOLIAN static void impl(const Eo *proxy, void *_pd EINA_UNUSED, ## __VA_ARGS__) { _edje_part_invalid_call(proxy, #api); }
 
+/**
+ * @internal
+ * @brief Macro to define a function implementation with a return value for an invalid part API.
+ * This macro generates a static EOLIAN function that calls _edje_part_invalid_call and returns a default value.
+ * @param type The return type of the function.
+ * @param ret The default value to return.
+ * @param api The original API function name (as a string for logging).
+ * @param impl The implementation function name.
+ * @param ... Variadic arguments representing the function parameters (unused in the macro body but part of the signature).
+ */
 #define EDJE_PART_INVALID(type, ret, api, impl, ...) \
    EOLIAN static type impl(Eo *proxy, void *_pd EINA_UNUSED, ## __VA_ARGS__) { _edje_part_invalid_call(proxy, #api); return (type)ret; }
 
+/**
+ * @internal
+ * @brief Macro to define a const function implementation with a return value for an invalid part API.
+ * Similar to EDJE_PART_INVALID, but for const Eo *proxy.
+ * @param type The return type of the function.
+ * @param ret The default value to return.
+ * @param api The original API function name (as a string for logging).
+ * @param impl The implementation function name.
+ * @param ... Variadic arguments representing the function parameters (unused in the macro body but part of the signature).
+ */
 #define EDJE_PART_INVALID_CONST(type, ret, api, impl, ...) \
    EOLIAN static type impl(const Eo *proxy, void *_pd EINA_UNUSED, ## __VA_ARGS__) { _edje_part_invalid_call(proxy, #api); return (type)ret; }
 
@@ -37,6 +84,14 @@ _efl_canvas_layout_part_invalid_efl_canvas_layout_part_state_get(const Eo *proxy
    if (val) *val = 0.0;
 }
 
+/**
+ * @internal
+ * @brief Implementation of efl_canvas_layout_part_type_provider_part_type_get for invalid parts.
+ * Always returns EFL_CANVAS_LAYOUT_PART_TYPE_NONE for invalid parts.
+ * @param proxy The Efl_Canvas_Layout_Part_Invalid proxy object (unused).
+ * @param _pd Private data (unused).
+ * @return EFL_CANVAS_LAYOUT_PART_TYPE_NONE.
+ */
 EOLIAN static Efl_Canvas_Layout_Part_Type
 _efl_canvas_layout_part_invalid_efl_canvas_layout_part_type_provider_part_type_get(const Eo *proxy EINA_UNUSED, void *_pd EINA_UNUSED)
 {

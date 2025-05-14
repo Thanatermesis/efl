@@ -42,27 +42,61 @@
 #define ABORT_COLOR 255, 0, 0, 255
 #define END_COLOR 0, 255, 0, 255
 
+/**
+ * @brief Holds properties for an icon representing a gesture type.
+ *
+ * This structure links a visual icon to a gesture's state, including its
+ * current color and a unique name for identification.
+ */
 struct _icon_properties
 {
-   Evas_Object *icon;
-   int r; /* current r */
-   int g;
-   int b;
-   int a;
+   Evas_Object *icon; /**< The Evas object for the icon. */
+   int r; /**< Current red component of the icon's color. */
+   int g; /**< Current green component of the icon's color. */
+   int b; /**< Current blue component of the icon's color. */
+   int a; /**< Current alpha component of the icon's color. */
 
-   const char *name;
+   const char *name; /**< The name of the gesture (e.g., "tap", "zoom"). */
 };
 typedef struct _icon_properties icon_properties;
 
+/**
+ * @brief Application context data passed between callbacks.
+ *
+ * This structure centralizes data needed by various parts of the application,
+ * avoiding the use of global variables. It includes gesture icons, an animation
+ * timer, a utility buffer, and state-specific counters.
+ */
 struct _infra_data
 {  /* Some data that is passed aroung between callbacks (replacing globals) */
+   /**
+    * @brief Array of icon properties for each gesture type.
+    *
+    * The array is indexed and managed based on the N_GESTURE_TYPE define.
+    * Example of an element's structure:
+    * @code
+    *   icons[0] = {
+    *       .icon = evas_object,
+    *       .r = 60, .g = 66, .b = 64, .a = 128,
+    *       .name = "tap"
+    *   };
+    * @endcode
+    */
    icon_properties *icons;
-   Ecore_Timer *colortimer;
-   char buf[1024];
-   int long_tap_count;
+   Ecore_Timer *colortimer; /**< Timer for periodic color updates (animations). */
+   char buf[1024]; /**< General-purpose buffer, typically for file paths. */
+   int long_tap_count; /**< Counter for move events during a long tap gesture. */
 };
 typedef struct _infra_data infra_data;
 
+/**
+ * @brief Frees the resources associated with infra_data.
+ *
+ * This function safely deallocates the infra_data structure and its managed
+ * resources, such as the color timer and the icons array.
+ *
+ * @param infra The infra_data structure to free.
+ */
 void
 _infra_data_free(infra_data *infra)
 {
@@ -78,6 +112,13 @@ _infra_data_free(infra_data *infra)
      }
 }
 
+/**
+ * @brief Allocates and initializes an infra_data structure.
+ *
+ * @return A newly allocated and partially initialized infra_data structure,
+ *         or NULL on failure. The caller is responsible for freeing the
+ *         structure using _infra_data_free().
+ */
 infra_data *
 _infra_data_alloc(void)
 {
@@ -90,12 +131,31 @@ _infra_data_alloc(void)
    return infra;
 }
 
+/**
+ * @brief Callback invoked when the main window is requested to be deleted.
+ *
+ * This function ensures that application resources held by `infra_data`
+ * are properly freed when the window closes.
+ *
+ * @param data The user data (infra_data) associated with the window.
+ * @param obj The window object being deleted.
+ * @param event_info Additional event information (unused).
+ */
 static void
 my_win_del(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {  /* called when my_win_main is requested to be deleted */
    _infra_data_free(data);
 }
 
+/**
+ * @brief Finds an icon_properties structure by its name.
+ *
+ * Searches through the array of icons to find the one matching the given name.
+ *
+ * @param icons An array of icon_properties structures to search within.
+ * @param name The name of the icon to find (e.g., "tap").
+ * @return A pointer to the matching icon_properties structure, or NULL if not found.
+ */
 icon_properties *
 _icon_properties_find(icon_properties *icons, char *name)
 {
@@ -108,6 +168,17 @@ _icon_properties_find(icon_properties *icons, char *name)
    return NULL;
 }
 
+/**
+ * @brief Sets the color of a gesture icon.
+ *
+ * Updates both the icon_properties structure and the Evas object's color.
+ *
+ * @param i Pointer to the icon_properties to modify.
+ * @param r The red component (0-255).
+ * @param g The green component (0-255).
+ * @param b The blue component (0-255).
+ * @param a The alpha component (0-255).
+ */
 void
 _icon_color_set(icon_properties *i, int r, int g, int b, int a)
 {
@@ -118,6 +189,16 @@ _icon_color_set(icon_properties *i, int r, int g, int b, int a)
    evas_object_color_set(i->icon, i->r,  i->g,  i->b,  i->a);
 }
 
+/**
+ * @brief Periodically updates icon colors to return them to their initial state.
+ *
+ * This timer callback creates a smooth transition effect by incrementally
+ * changing the color of each icon back to its default (INI_*) values.
+ *
+ * @param data The icon_properties array.
+ * @return ECORE_CALLBACK_RENEW to continue the timer, or ECORE_CALLBACK_CANCEL
+ *         to stop it.
+ */
 static Eina_Bool
 _icon_color_set_cb(void *data)
 {
@@ -149,6 +230,24 @@ _icon_color_set_cb(void *data)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Updates a gesture icon's image and color.
+ *
+ * This function changes the icon's visual representation based on gesture
+ * events. It selects an image file based on a counter and applies a specific
+ * color to indicate the gesture state (e.g., start, move, end).
+ *
+ * @param infra The application context data.
+ * @param name The name of the gesture icon to update (e.g., "tap").
+ * @param n The current count or finger number for the gesture, used to select
+ *          the image (e.g., tap_1.png, tap_2.png).
+ * @param max The maximum value for `n`. Values of `n` greater than `max` will
+ *            be capped to `max`.
+ * @param r The red color component for the icon.
+ * @param g The green color component for the icon.
+ * @param b The blue color component for the icon.
+ * @param a The alpha color component for the icon.
+ */
 void
 _color_and_icon_set(infra_data *infra, char *name, int n, int max,
       int r, int g, int b, int a)
@@ -172,6 +271,16 @@ _color_and_icon_set(infra_data *infra, char *name, int n, int max,
 }
 
 /* START - Callbacks for gestures */
+/**
+ * @brief Callback for the start of an N-finger tap gesture.
+ *
+ * This function is invoked when an N-finger tap gesture begins. It updates
+ * the corresponding icon to a "start" state color.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the tap event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD to indicate the event is being handled.
+ */
 static Evas_Event_Flags
 n_finger_tap_start(void *data , void *event_info)
 {
@@ -182,6 +291,15 @@ n_finger_tap_start(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the end of an N-finger tap gesture.
+ *
+ * Updates the icon to an "end" state color.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the tap event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 n_finger_tap_end(void *data , void *event_info)
 {
@@ -193,6 +311,15 @@ n_finger_tap_end(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the abortion of an N-finger tap gesture.
+ *
+ * Updates the icon to an "abort" state color.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the tap event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 n_finger_tap_abort(void *data , void *event_info)
 {
@@ -202,6 +329,15 @@ n_finger_tap_abort(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the start of an N-finger long-tap gesture.
+ *
+ * Initializes the long tap counter and updates the icon.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the tap event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 n_long_tap_start(void *data , void *event_info)
 {
@@ -215,6 +351,15 @@ n_long_tap_start(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the move phase of an N-finger long-tap gesture.
+ *
+ * Increments a counter and updates the icon color to a "move" state.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the tap event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 n_long_tap_move(void *data , void *event_info)
 {
@@ -232,6 +377,13 @@ n_long_tap_move(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the end of an N-finger long-tap gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the tap event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 n_long_tap_end(void *data , void *event_info)
 {
@@ -243,6 +395,13 @@ n_long_tap_end(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the abortion of an N-finger long-tap gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the tap event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 n_long_tap_abort(void *data , void *event_info)
 {
@@ -252,6 +411,13 @@ n_long_tap_abort(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the start of a double-tap gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the tap event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 dbl_click_start(void *data , void *event_info)
 {
@@ -263,6 +429,13 @@ dbl_click_start(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the move phase of a double-tap gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the tap event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 dbl_click_move(void *data , void *event_info)
 {
@@ -274,6 +447,13 @@ dbl_click_move(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the end of a double-tap gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the tap event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 dbl_click_end(void *data , void *event_info)
 {
@@ -285,6 +465,13 @@ dbl_click_end(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the abortion of a double-tap gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the tap event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 dbl_click_abort(void *data , void *event_info)
 {
@@ -295,6 +482,13 @@ dbl_click_abort(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the start of a triple-tap gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the tap event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 triple_click_start(void *data , void *event_info)
 {
@@ -306,6 +500,13 @@ triple_click_start(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the move phase of a triple-tap gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the tap event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 triple_click_move(void *data , void *event_info)
 {
@@ -317,6 +518,13 @@ triple_click_move(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the end of a triple-tap gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the tap event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 triple_click_end(void *data , void *event_info)
 {
@@ -328,6 +536,13 @@ triple_click_end(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the abortion of a triple-tap gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the tap event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 triple_click_abort(void *data , void *event_info)
 {
@@ -338,6 +553,13 @@ triple_click_abort(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the start of a momentum gesture (e.g., a swipe).
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the momentum event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 momentum_start(void *data , void *event_info)
 {
@@ -349,6 +571,13 @@ momentum_start(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the end of a momentum gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the momentum event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 momentum_end(void *data , void *event_info)
 {
@@ -358,6 +587,13 @@ momentum_end(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the abortion of a momentum gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the momentum event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 momentum_abort(void *data , void *event_info)
 {
@@ -367,6 +603,13 @@ momentum_abort(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the move phase of a momentum gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the momentum event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 momentum_move(void *data , void *event_info)
 {
@@ -376,6 +619,15 @@ momentum_move(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the start of a line gesture.
+ *
+ * A line gesture is a swipe with specific constraints on deviation.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the line event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 line_start(void *data , void *event_info)
 {
@@ -386,6 +638,13 @@ line_start(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the move phase of a line gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the line event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 line_move(void *data , void *event_info)
 {
@@ -396,6 +655,13 @@ line_move(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the end of a line gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the line event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 line_end(void *data , void *event_info)
 {
@@ -405,6 +671,13 @@ line_end(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the abortion of a line gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the line event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 line_abort(void *data , void *event_info)
 {
@@ -414,6 +687,15 @@ line_abort(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the start of a flick gesture.
+ *
+ * A flick is a fast swipe.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the flick (line) event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 flick_start(void *data , void *event_info)
 {
@@ -426,6 +708,13 @@ flick_start(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the end of a flick gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the flick (line) event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 flick_end(void *data , void *event_info)
 {
@@ -436,6 +725,13 @@ flick_end(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the abortion of a flick gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the flick (line) event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 flick_abort(void *data , void *event_info)
 {
@@ -445,6 +741,13 @@ flick_abort(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the start of a zoom gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the zoom event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 zoom_start(void *data , void *event_info)
 {
@@ -455,6 +758,13 @@ zoom_start(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the move phase of a zoom gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the zoom event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 zoom_move(void *data , void *event_info)
 {
@@ -465,6 +775,13 @@ zoom_move(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the end of a zoom gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the zoom event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 zoom_end(void *data , void *event_info)
 {
@@ -475,6 +792,13 @@ zoom_end(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the abortion of a zoom gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Unused.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 zoom_abort(void *data , void *event_info EINA_UNUSED)
 {
@@ -483,6 +807,13 @@ zoom_abort(void *data , void *event_info EINA_UNUSED)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the start of a rotate gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the rotate event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 rotate_start(void *data , void *event_info)
 {
@@ -492,6 +823,13 @@ rotate_start(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the move phase of a rotate gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the rotate event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 rotate_move(void *data , void *event_info)
 {
@@ -501,6 +839,13 @@ rotate_move(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the end of a rotate gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Information about the rotate event.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 rotate_end(void *data , void *event_info)
 {
@@ -510,6 +855,13 @@ rotate_end(void *data , void *event_info)
    return EVAS_EVENT_FLAG_ON_HOLD;
 }
 
+/**
+ * @brief Callback for the abortion of a rotate gesture.
+ *
+ * @param data The user data (infra_data).
+ * @param event_info Unused.
+ * @return EVAS_EVENT_FLAG_ON_HOLD.
+ */
 static Evas_Event_Flags
 rotate_abort(void *data , void *event_info EINA_UNUSED)
 {
@@ -519,6 +871,20 @@ rotate_abort(void *data , void *event_info EINA_UNUSED)
 }
 /* END   - Callbacks for gestures */
 
+/**
+ * @brief Creates a UI box containing a gesture icon and its label.
+ *
+ * This helper function constructs a vertical box with an icon representing a
+ * gesture and a text label below it. The created icon is registered in the
+ * `icons` array.
+ *
+ * @param win The parent window.
+ * @param icons The array of icon_properties to store the new icon's data.
+ * @param idx The index in the `icons` array where the new icon data will be stored.
+ * @param name The internal name for the gesture (e.g., "tap").
+ * @param lb_txt The visible text for the label (e.g., "Tap").
+ * @return The newly created Evas_Object (the box).
+ */
 Evas_Object *create_gesture_box(Evas_Object *win, icon_properties *icons,
       int idx, const char *name, const char *lb_txt)
 {  /* Creates a box with icon and label, later placed in a table */
@@ -548,6 +914,17 @@ Evas_Object *create_gesture_box(Evas_Object *win, icon_properties *icons,
    return bx;
 }
 
+/**
+ * @brief Main function to set up and run the gesture layer test.
+ *
+ * This function creates the main window, sets up a grid of gesture icons,
+ * and initializes the gesture layer to capture and report various gestures.
+ * It also sets up a legend to show the color-coding for gesture states.
+ *
+ * @param data Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 void
 test_gesture_layer2(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
       void *event_info EINA_UNUSED)

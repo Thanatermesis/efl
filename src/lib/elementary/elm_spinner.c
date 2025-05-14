@@ -46,16 +46,46 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
 
 static Eina_Bool _key_action_toggle(Evas_Object *obj, const char *params);
 
+/**
+ * @brief Callback for increment/decrement button click events.
+ * @param data The spinner object.
+ * @param event The Efl_Event data.
+ */
 static void
 _inc_dec_button_clicked_cb(void *data, const Efl_Event *event);
+/**
+ * @brief Callback for increment/decrement button press events.
+ * @param data The spinner object.
+ * @param event The Efl_Event data.
+ */
 static void
 _inc_dec_button_pressed_cb(void *data, const Efl_Event *event);
+/**
+ * @brief Callback for increment/decrement button unpress events.
+ * @param data The spinner object.
+ * @param event The Efl_Event data.
+ */
 static void
 _inc_dec_button_unpressed_cb(void *data, const Efl_Event *event);
+/**
+ * @brief Callback for increment/decrement button mouse move events.
+ * @param data The spinner object.
+ * @param event The Efl_Event data.
+ */
 static void
 _inc_dec_button_mouse_move_cb(void *data, const Efl_Event *event);
+/**
+ * @brief Callback for entry focus change events.
+ * @param data The spinner object.
+ * @param event The Efl_Event data.
+ */
 static void
 _entry_focus_change(void *data, const Efl_Event *event);
+/**
+ * @brief Callback for entry activation (e.g., Enter key press).
+ * @param data The spinner object.
+ * @param event The Efl_Event data.
+ */
 static void
 _entry_activated_cb(void *data, const Efl_Event *event);
 
@@ -66,15 +96,30 @@ EFL_CALLBACKS_ARRAY_DEFINE(_inc_dec_button_cb,
    { EFL_EVENT_POINTER_MOVE, _inc_dec_button_mouse_move_cb }
 );
 
+/**
+ * @brief Announces accessibility information when the spinner value is incremented or decremented.
+ * @param obj The spinner object.
+ * @param is_incremented EINA_TRUE if incremented, EINA_FALSE if decremented.
+ */
 static void _access_increment_decrement_info_say(Evas_Object *obj,
                                                  Eina_Bool is_incremented);
 
+/**
+ * @brief Checks if a character is a valid digit (0-9 or '.').
+ * @param x The character to check.
+ * @return EINA_TRUE if the character is a valid digit, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _is_valid_digit(char x)
 {
    return ((x >= '0' && x <= '9') || (x == '.')) ? EINA_TRUE : EINA_FALSE;
 }
 
+/**
+ * @brief Determines if the label format string is for an integer or float.
+ * @param fmt The format string (e.g., "%.0f", "%d").
+ * @return SPINNER_FORMAT_INT if integer, SPINNER_FORMAT_FLOAT if float, SPINNER_FORMAT_INVALID otherwise.
+ */
 static Elm_Spinner_Format_Type
 _is_label_format_integer(const char *fmt)
 {
@@ -125,6 +170,11 @@ _is_label_format_integer(const char *fmt)
    return ret_type;
 }
 
+/**
+ * @brief Shows the entry field and populates it with the current spinner value or special value label.
+ * @param obj The spinner object.
+ * @param sd The spinner's private data.
+ */
 static void
 _entry_show(Evas_Object *obj, Elm_Spinner_Data *sd)
 {
@@ -186,6 +236,11 @@ apply:
    elm_object_text_set(sd->ent, buf);
 }
 
+/**
+ * @brief Updates the spinner's displayed label based on the current value and format.
+ *        This handles both regular numeric values and special predefined values.
+ * @param obj The spinner object.
+ */
 static void
 _label_write(Evas_Object *obj)
 {
@@ -224,6 +279,12 @@ apply:
    if (sd->entry_visible) _entry_show(obj, sd);
 }
 
+/**
+ * @brief Timer callback that fires after a delay when the spinner value has changed.
+ *        This emits the SIG_DELAY_CHANGED signal.
+ * @param data The spinner object.
+ * @return ECORE_CALLBACK_CANCEL to stop the timer.
+ */
 static Eina_Bool
 _delay_change_timer_cb(void *data)
 {
@@ -235,6 +296,16 @@ _delay_change_timer_cb(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Sets the spinner's value, applying rounding, wrapping, and min/max constraints.
+ *        It also triggers relevant signals like "changed", "min,reached", "max,reached".
+ * @param obj The spinner object.
+ * @param val The base value to set or modify.
+ * @param changed The amount to change the value by (if not setting directly).
+ *                If EINA_DBL_NONZERO(changed), 'val' is treated as the current value and 'changed' is the delta.
+ *                Otherwise, 'val' is the new target value.
+ * @return EINA_TRUE if the value was actually changed, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _value_set(Evas_Object *obj,
            double val, double changed)
@@ -289,6 +360,11 @@ _value_set(Evas_Object *obj,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Sets the position of the draggable slider part based on the current spinner value
+ *        relative to its min/max range.
+ * @param obj The spinner object.
+ */
 static void
 _val_set(Evas_Object *obj)
 {
@@ -307,6 +383,14 @@ _val_set(Evas_Object *obj)
      (wd->resize_obj, "elm.dragable.slider", pos, pos);
 }
 
+/**
+ * @brief Callback for drag events on the spinner's slider.
+ *        Updates the spinner value based on drag movement.
+ * @param data The spinner object.
+ * @param _obj The edje object that emitted the signal.
+ * @param emission The emitted signal string.
+ * @param source The source of the signal.
+ */
 static void
 _drag_cb(void *data,
          Evas_Object *_obj EINA_UNUSED,
@@ -353,6 +437,14 @@ _drag_cb(void *data,
    sd->dragging = 1;
 }
 
+/**
+ * @brief Callback for the start of a drag operation on the spinner's slider.
+ *        Emits the SIG_DRAG_START signal.
+ * @param data The spinner object.
+ * @param obj The edje object that emitted the signal.
+ * @param emission The emitted signal string.
+ * @param source The source of the signal.
+ */
 static void
 _drag_start_cb(void *data,
                Evas_Object *obj EINA_UNUSED,
@@ -368,6 +460,14 @@ _drag_start_cb(void *data,
      (obj, ELM_SPINNER_EVENT_SPINNER_DRAG_START, NULL);
 }
 
+/**
+ * @brief Callback for the end of a drag operation on the spinner's slider.
+ *        Resets drag state and emits the SIG_DRAG_STOP signal.
+ * @param data The spinner object.
+ * @param obj The edje object that emitted the signal.
+ * @param emission The emitted signal string.
+ * @param source The source of the signal.
+ */
 static void
 _drag_stop_cb(void *data,
               Evas_Object *obj EINA_UNUSED,
@@ -387,6 +487,11 @@ _drag_stop_cb(void *data,
      (obj, ELM_SPINNER_EVENT_SPINNER_DRAG_STOP, NULL);
 }
 
+/**
+ * @brief Hides the editable entry field of the spinner.
+ *        Sets the visual state to inactive.
+ * @param obj The spinner object.
+ */
 static void
 _entry_hide(Evas_Object *obj)
 {
@@ -406,6 +511,11 @@ _entry_hide(Evas_Object *obj)
    sd->entry_visible = EINA_FALSE;
 }
 
+/**
+ * @brief Applies the value entered in the editable entry field to the spinner.
+ *        Hides the entry field after applying.
+ * @param obj The spinner object.
+ */
 static void
 _entry_value_apply(Evas_Object *obj)
 {
@@ -429,6 +539,11 @@ _entry_value_apply(Evas_Object *obj)
    if (_value_set(obj, val, 0.0)) _label_write(obj);
 }
 
+/**
+ * @brief Extracts the number of decimal points specified in a printf-style float format string.
+ * @param label The format string (e.g., "%.2f").
+ * @return The number of decimal points (e.g., 2 for "%.2f"), or 0 if not specified or not a float format.
+ */
 static int
 _decimal_points_get(const char *label)
 {
@@ -459,6 +574,13 @@ _decimal_points_get(const char *label)
    return atoi(result);
 }
 
+/**
+ * @brief Elm_Entry filter to prevent obviously invalid character input.
+ *        For example, prevents multiple decimal points or a minus sign not at the beginning.
+ * @param data User data (unused).
+ * @param obj The entry object.
+ * @param text Pointer to the text to be inserted; modified to empty if invalid.
+ */
 static void
 _invalid_input_validity_filter(void *data EINA_UNUSED, Evas_Object *obj, char **text)
 {
@@ -508,6 +630,12 @@ invalid_input:
    *insert = 0;
 }
 
+/**
+ * @brief Adds or updates the accept filter for the spinner's entry field.
+ *        This filter restricts input to valid characters based on whether
+ *        the spinner is for integers or floats (allowing '.' for floats).
+ * @param obj The spinner object.
+ */
 static void
 _entry_accept_filter_add(Evas_Object *obj)
 {
@@ -526,6 +654,14 @@ _entry_accept_filter_add(Evas_Object *obj)
    elm_entry_markup_filter_prepend(sd->ent, elm_entry_filter_accept_set, &digits_filter_data);
 }
 
+/**
+ * @brief Inserts a string into another string at a given position.
+ * @param text The original string.
+ * @param input The string to insert.
+ * @param pos The character position in 'text' where 'input' should be inserted.
+ * @return A newly allocated string with the insertion, or NULL on failure. The caller must free the result.
+ * @note This function handles UTF-8 character positions.
+ */
 char *
 _text_insert(const char *text, const char *input, int pos)
 {
@@ -544,6 +680,13 @@ _text_insert(const char *text, const char *input, int pos)
    return result;
 }
 
+/**
+ * @brief Elm_Entry filter to prevent input that would result in a value outside the spinner's min/max range
+ *        or exceed the allowed number of decimal places for floats.
+ * @param data The spinner object.
+ * @param obj The entry object.
+ * @param text Pointer to the text to be inserted; modified to empty if invalid.
+ */
 static void
 _min_max_validity_filter(void *data, Evas_Object *obj, char **text)
 {
@@ -592,6 +735,15 @@ end:
    free(new_str);
 }
 
+/**
+ * @brief Callback invoked when the spinner's entry part is shown (EVAS_CALLBACK_SHOW).
+ *        This typically happens when the entry is first created and made visible.
+ *        It ensures the entry is populated and focus is set.
+ * @param data The spinner object (passed as user data to the callback).
+ * @param e The Evas canvas.
+ * @param obj The entry Evas_Object itself.
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _entry_show_cb(void *data,
                Evas *e EINA_UNUSED,
@@ -607,6 +759,12 @@ _entry_show_cb(void *data,
    sd->entry_visible = EINA_TRUE;
 }
 
+/**
+ * @brief Toggles the visibility and editability of the spinner's entry field.
+ *        If the entry is visible, it applies the current value and hides it.
+ *        If hidden, it creates (if necessary) and shows the entry, setting focus.
+ * @param obj The spinner object.
+ */
 static void
 _toggle_entry(Evas_Object *obj)
 {
@@ -669,6 +827,13 @@ _toggle_entry(Evas_Object *obj)
      }
 }
 
+/**
+ * @brief Callback for the "elm,action,entry,toggle" signal, which toggles the entry's visibility.
+ * @param data User data (unused, but typically the spinner object if not NULL).
+ * @param obj The spinner object that received the signal.
+ * @param emission The emitted signal string.
+ * @param source The source of the signal.
+ */
 static void
 _entry_toggle_cb(void *data EINA_UNUSED,
                  Evas_Object *obj,
@@ -678,6 +843,15 @@ _entry_toggle_cb(void *data EINA_UNUSED,
    _toggle_entry(obj);
 }
 
+/**
+ * @brief Increments or decrements the spinner value by one step.
+ *        This function is called repeatedly by a timer during continuous spinning
+ *        or once for single step changes (e.g., wheel event).
+ *        It also handles acceleration of spinning speed.
+ * @param data The spinner object.
+ * @return ECORE_CALLBACK_RENEW if called from a timer to continue spinning,
+ *         otherwise the return value might not be significant if called directly.
+ */
 static Eina_Bool
 _spin_value(void *data)
 {
@@ -701,6 +875,13 @@ _spin_value(void *data)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Starts the continuous spinning process (incrementing or decrementing).
+ *        This is typically called after a long press on an increment/decrement button.
+ *        It initializes the spin speed, interval, and starts the spin timer.
+ * @param data The spinner object.
+ * @return ECORE_CALLBACK_CANCEL to stop the longpress timer that triggered this.
+ */
 static Eina_Bool
 _val_inc_dec_start(void *data)
 {
@@ -718,6 +899,11 @@ _val_inc_dec_start(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Stops the continuous spinning process.
+ *        Deletes the spin timer and resets spin-related state.
+ * @param obj The spinner object.
+ */
 static void
 _spin_stop(Evas_Object *obj)
 {
@@ -730,6 +916,13 @@ _spin_stop(Evas_Object *obj)
    elm_widget_scroll_freeze_pop(obj);
 }
 
+/**
+ * @brief Action callback for the "toggle" action, typically from accessibility.
+ *        If spinning, stops it. If entry is visible, toggles it (applies value).
+ * @param obj The spinner object.
+ * @param params Parameters for the action (unused).
+ * @return EINA_FALSE, indicating the action was handled.
+ */
 static Eina_Bool
 _key_action_toggle(Evas_Object *obj, const char *params EINA_UNUSED)
 {
@@ -778,6 +971,15 @@ _elm_spinner_efl_ui_widget_widget_input_event_handler(Eo *obj, Elm_Spinner_Data 
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback for "elm,action,increment,start" or "elm,action,decrement,start" signals.
+ *        These signals are typically from the theme when an increment/decrement button is pressed.
+ *        Sets up a timer for long press to start continuous spinning.
+ * @param data The spinner object.
+ * @param obj The spinner object (same as data, but passed by signal system).
+ * @param emission The specific signal string (e.g., "elm,action,increment,start").
+ * @param source The source of the signal.
+ */
 static void
 _button_inc_dec_start_cb(void *data,
                      Evas_Object *obj,
@@ -811,6 +1013,16 @@ _button_inc_dec_start_cb(void *data,
      (_elm_config->longpress_timeout, _val_inc_dec_start, data);
 }
 
+/**
+ * @brief Callback for "elm,action,increment,stop" or "elm,action,decrement,stop" signals.
+ *        These signals are typically from the theme when an increment/decrement button is released.
+ *        If a long press timer is active, it's cancelled. If no continuous spin started,
+ *        a single step spin is performed. Otherwise, continuous spinning is stopped.
+ * @param data The spinner object.
+ * @param obj The spinner object (unused here).
+ * @param emission The specific signal string (unused here).
+ * @param source The source of the signal (unused here).
+ */
 static void
 _button_inc_dec_stop_cb(void *data,
                     Evas_Object *obj EINA_UNUSED,
@@ -848,6 +1060,14 @@ _inc_dec_button_clicked_cb(void *data, const Efl_Event *event)
      _access_increment_decrement_info_say(data, EINA_TRUE);
 }
 
+/**
+ * @brief Callback for EFL_INPUT_EVENT_PRESSED on increment/decrement buttons.
+ *        Sets a flag indicating which button was pressed (inc or dec).
+ *        Starts a long press timer to initiate continuous spinning if held.
+ *        If the entry is visible, applies its value first.
+ * @param data The spinner object.
+ * @param event The Efl_Event data, where event->object is the pressed button.
+ */
 static void
 _inc_dec_button_pressed_cb(void *data, const Efl_Event *event)
 {
@@ -864,6 +1084,13 @@ _inc_dec_button_pressed_cb(void *data, const Efl_Event *event)
    if (sd->entry_visible) _entry_value_apply(data);
 }
 
+/**
+ * @brief Callback for EFL_INPUT_EVENT_UNPRESSED on increment/decrement buttons.
+ *        Cancels the long press timer if it's active (meaning it was a short click).
+ *        Stops any continuous spinning.
+ * @param data The spinner object.
+ * @param event The Efl_Event data (unused).
+ */
 static void
 _inc_dec_button_unpressed_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -878,6 +1105,12 @@ _inc_dec_button_unpressed_cb(void *data, const Efl_Event *event EINA_UNUSED)
    _spin_stop(data);
 }
 
+/**
+ * @brief Callback for focus changes on the text button part of the spinner.
+ *        If the text button gains focus (and is editable), it toggles the entry to become visible.
+ * @param data The spinner object.
+ * @param event The Efl_Event data, where event->object is the text button.
+ */
 static void
 _text_button_focus_change(void *data, const Efl_Event *event)
 {
@@ -885,12 +1118,25 @@ _text_button_focus_change(void *data, const Efl_Event *event)
      _toggle_entry(data);
 }
 
+/**
+ * @brief Callback for ELM_ENTRY_EVENT_ACTIVATED on the spinner's entry field.
+ *        This typically occurs when Enter is pressed in the entry.
+ *        Toggles the entry (applies value and hides it).
+ * @param data The spinner object.
+ * @param event The Efl_Event data (unused).
+ */
 static void
 _entry_activated_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
    _toggle_entry(data);
 }
 
+/**
+ * @brief Callback for EFL_UI_FOCUS_OBJECT_EVENT_FOCUS_CHANGED on the spinner's entry field.
+ *        If the entry loses focus, it toggles the entry (applies value and hides it).
+ * @param data The spinner object.
+ * @param event The Efl_Event data, where event->object is the entry.
+ */
 static void
 _entry_focus_change(void *data, const Efl_Event *event)
 {
@@ -898,6 +1144,12 @@ _entry_focus_change(void *data, const Efl_Event *event)
      _toggle_entry(data);
 }
 
+/**
+ * @brief Callback for EFL_INPUT_EVENT_CLICKED on the text button part of the spinner.
+ *        If the entry is not already visible, it toggles the entry to become visible.
+ * @param data The spinner object.
+ * @param event The Efl_Event data (unused).
+ */
 static void
 _text_button_clicked_cb(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -907,6 +1159,14 @@ _text_button_clicked_cb(void *data, const Efl_Event *event EINA_UNUSED)
    _toggle_entry(data);
 }
 
+/**
+ * @brief Callback for EFL_EVENT_POINTER_MOVE on increment/decrement buttons.
+ *        If a pointer move event is processed (e.g., mouse moved off the button while pressed)
+ *        and a long press timer is active, this cancels the long press timer to prevent
+ *        continuous spinning if the press is released outside the button.
+ * @param data The spinner object.
+ * @param event The Efl_Event data, where event->info is Efl_Input_Pointer.
+ */
 static void
 _inc_dec_button_mouse_move_cb(void *data, const Efl_Event *event)
 {
@@ -947,6 +1207,14 @@ _elm_spinner_efl_ui_focus_object_on_focus_update(Eo *obj, Elm_Spinner_Data *sd)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Accessibility action callback for activating (clicking) increment/decrement parts.
+ *        This is used when the spinner style doesn't have separate button objects.
+ *        It simulates a click, updates the value, and announces the change.
+ * @param data The spinner object.
+ * @param part_obj The specific edje part object that was activated (e.g., "up_bt", "down_bt").
+ * @param item The Elm_Object_Item associated with the action (unused).
+ */
 static void
 _access_activate_cb(void *data,
                     Evas_Object *part_obj,
@@ -994,6 +1262,13 @@ _access_activate_cb(void *data,
    eina_strbuf_free(buf);
 }
 
+/**
+ * @brief Accessibility callback to get supplementary information about the spinner.
+ *        Returns the current textual representation of the spinner's value.
+ * @param data The spinner object.
+ * @param obj The accessible object (unused).
+ * @return A newly allocated string with the spinner's current text, or NULL. Caller must free.
+ */
 static char *
 _access_info_cb(void *data, Evas_Object *obj EINA_UNUSED)
 {
@@ -1018,6 +1293,13 @@ _access_info_cb(void *data, Evas_Object *obj EINA_UNUSED)
    return NULL;
 }
 
+/**
+ * @brief Accessibility callback to get the state of the spinner.
+ *        Indicates if the spinner is disabled.
+ * @param data The spinner object.
+ * @param obj The accessible object (unused).
+ * @return A newly allocated string describing the state (e.g., "State: Disabled"), or NULL. Caller must free.
+ */
 static char *
 _access_state_cb(void *data, Evas_Object *obj EINA_UNUSED)
 {
@@ -1027,6 +1309,14 @@ _access_state_cb(void *data, Evas_Object *obj EINA_UNUSED)
    return NULL;
 }
 
+/**
+ * @brief Accessibility action callback for activating the spinner itself (the text part).
+ *        If the spinner is not disabled and the entry is not visible, it toggles the entry to show it.
+ *        This is typically for styles where the text part is a button.
+ * @param data The spinner object.
+ * @param part_obj The specific edje part object that was activated (unused).
+ * @param item The Elm_Object_Item associated with the action (unused).
+ */
 static void
 _access_activate_spinner_cb(void *data,
                             Evas_Object *part_obj EINA_UNUSED,
@@ -1068,6 +1358,14 @@ _access_increment_decrement_info_say(Evas_Object *obj,
    eina_strbuf_free(buf);
 }
 
+/**
+ * @brief Registers or unregisters accessibility features for the spinner and its parts.
+ *        This function sets up accessible names, roles, and actions for the spinner,
+ *        its increment/decrement buttons (or parts), and the text display area.
+ *        It adapts to different spinner styles (button_layout or integrated).
+ * @param obj The spinner object.
+ * @param is_access EINA_TRUE to register accessibility, EINA_FALSE to unregister.
+ */
 static void
 _access_spinner_register(Evas_Object *obj, Eina_Bool is_access)
 {

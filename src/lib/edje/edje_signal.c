@@ -3,12 +3,37 @@
 
 static Eina_Hash *signal_match = NULL;
 
+/**
+ * @internal
+ * @brief Get the length of the key for the signal_match hash table.
+ *
+ * This function is used by Eina_Hash to determine the size of the key
+ * structure Edje_Signal_Callback_Matches.
+ *
+ * @param key Unused.
+ * @return The size of Edje_Signal_Callback_Matches.
+ */
 static unsigned int
 _edje_signal_match_key_length(const void *key EINA_UNUSED)
 {
    return sizeof(Edje_Signal_Callback_Matches);
 }
 
+/**
+ * @internal
+ * @brief Compare two keys for the signal_match hash table.
+ *
+ * This function is used by Eina_Hash to compare two Edje_Signal_Callback_Matches
+ * structures. It compares the matches_count, and then each individual match's
+ * signal, source, callback pointer, and free_cb if present.
+ *
+ * @param key1 The first key to compare.
+ * @param key1_length Unused.
+ * @param key2 The second key to compare.
+ * @param key2_length Unused.
+ * @return 0 if keys are equal, a negative value if key1 < key2,
+ *         or a positive value if key1 > key2.
+ */
 static int
 _edje_signal_match_key_cmp(const void *key1, int key1_length EINA_UNUSED, const void *key2, int key2_length EINA_UNUSED)
 {
@@ -34,6 +59,19 @@ _edje_signal_match_key_cmp(const void *key1, int key1_length EINA_UNUSED, const 
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Generate a hash value for a key in the signal_match hash table.
+ *
+ * This function is used by Eina_Hash to generate a hash value for an
+ * Edje_Signal_Callback_Matches structure. The hash is computed based on
+ * matches_count and the signal, source, callback pointer, and free_cb
+ * (if present) of each match.
+ *
+ * @param key The key to hash.
+ * @param key_length Unused.
+ * @return The computed hash value.
+ */
 static int
 _edje_signal_match_key_hash(const void *key, int key_length EINA_UNUSED)
 {
@@ -57,6 +95,19 @@ _edje_signal_match_key_hash(const void *key, int key_length EINA_UNUSED)
    return hash;
 }
 
+/**
+ * @internal
+ * @brief Duplicate an Edje_Signal_Callback_Matches structure.
+ *
+ * This function creates a deep copy of the source Edje_Signal_Callback_Matches
+ * structure, including all its associated matches and free_cb functions.
+ * Stringshare references are incremented for signals and sources.
+ * The new structure has its refcount initialized to 1.
+ *
+ * @param src The source Edje_Signal_Callback_Matches structure to duplicate.
+ * @return A pointer to the newly allocated and duplicated
+ *         Edje_Signal_Callback_Matches structure, or NULL on allocation failure.
+ */
 static Edje_Signal_Callback_Matches *
 _edje_signal_callback_matches_dup(const Edje_Signal_Callback_Matches *src)
 {
@@ -97,6 +148,16 @@ err:
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Clean (unref and NULLify) the patterns associated with a callback group.
+ *
+ * This function unreferences the Edje_Signals_Sources_Patterns structure
+ * within the Edje_Signal_Callback_Matches of the given group and sets the
+ * pointer to NULL.
+ *
+ * @param gp The callback group whose patterns are to be cleaned.
+ */
 void
 _edje_callbacks_patterns_clean(Edje_Signal_Callback_Group *gp)
 {
@@ -107,6 +168,17 @@ _edje_callbacks_patterns_clean(Edje_Signal_Callback_Group *gp)
    tmp->patterns = NULL;
 }
 
+/**
+ * @internal
+ * @brief Initialize the signal/source patterns for a callback group.
+ *
+ * If patterns do not already exist for the group's matches, this function
+ * allocates and initializes an Edje_Signals_Sources_Patterns structure.
+ * It then builds the hash for exact matches and initializes signal and source
+ * patterns for globbing. The patterns structure is refcounted.
+ *
+ * @param gp The callback group for which to initialize patterns.
+ */
 static void
 _edje_callbacks_patterns_init(Edje_Signal_Callback_Group *gp)
 {
@@ -134,6 +206,13 @@ err:
    ERR("Alloc error on patterns init");
 }
 
+/**
+ * @internal
+ * @brief Initialize the Edje signal subsystem.
+ *
+ * This function creates the global hash table `signal_match` used for storing
+ * and finding shared Edje_Signal_Callback_Matches structures.
+ */
 void
 edje_signal_init(void)
 {
@@ -144,6 +223,14 @@ edje_signal_init(void)
                                 3);
 }
 
+/**
+ * @internal
+ * @brief Shutdown the Edje signal subsystem.
+ *
+ * This function frees the global hash table `signal_match`.
+ * @note There is a FIXME to iterate and destroy leftover signal matchers,
+ *       implying potential resource leaks if not handled properly before shutdown.
+ */
 void
 edje_signal_shutdown(void)
 {
@@ -151,6 +238,16 @@ edje_signal_shutdown(void)
    eina_hash_free(signal_match);
 }
 
+/**
+ * @internal
+ * @brief Unset (clear) a callback at a specific index within a group.
+ *
+ * This function releases the stringshare references for the signal and source
+ * of the callback match at the given index.
+ *
+ * @param gp The callback group.
+ * @param idx The index of the callback to unset.
+ */
 static void
 _edje_signal_callback_unset(Edje_Signal_Callback_Group *gp, int idx)
 {
@@ -166,6 +263,26 @@ _edje_signal_callback_unset(Edje_Signal_Callback_Group *gp, int idx)
    m->source = NULL;
 }
 
+/**
+ * @internal
+ * @brief Set a callback at a specific index within a group.
+ *
+ * This function populates the callback match at the given index with the
+ * provided signal, source, callback function (legacy or EO), free callback,
+ * user data, and flags. It takes stringshare references for signal and source.
+ * If a `func_free_cb` is provided and the `free_cb` array in `tmp` doesn't exist,
+ * it's allocated.
+ *
+ * @param gp The callback group.
+ * @param idx The index where the callback will be set.
+ * @param sig The signal string (e.g., "mouse,clicked,1").
+ * @param src The source string (e.g., "my_button").
+ * @param func_legacy The legacy Edje_Signal_Cb callback function.
+ * @param func_eo The EFL Efl_Signal_Cb callback function.
+ * @param func_free_cb Optional callback to free user data when the callback is removed.
+ * @param data User data to be passed to the callback.
+ * @param flags Flags for the callback (e.g., delete_me, just_added).
+ */
 static void
 _edje_signal_callback_set(Edje_Signal_Callback_Group *gp, int idx,
                           const char *sig, const char *src,
@@ -197,6 +314,23 @@ err:
    ERR("Alloc err in callback set");
 }
 
+/**
+ * @internal
+ * @brief Grow the arrays within an Edje_Signal_Callback_Group.
+ *
+ * This function increases the size of the `matches`, `free_cb` (if it exists),
+ * `custom_data`, and `flags` arrays within the callback group by one element.
+ * The `matches_count` in `tmp` (gp->matches) is incremented.
+ * New elements are initialized to zero/NULL.
+ *
+ * @warning This function might reallocate `tmp->matches`. If `tmp->matches`
+ *          changes, any previously built patterns based on the old pointer
+ *          become invalid. This is handled in `_edje_signal_callback_push`.
+ *
+ * @param gp The callback group to grow.
+ * @return The (potentially reallocated) callback group, or NULL on allocation failure.
+ *         If an error occurs, `tmp->matches_count` is decremented back.
+ */
 static Edje_Signal_Callback_Group *
 _edje_signal_callback_grow(Edje_Signal_Callback_Group *gp)
 {
@@ -238,6 +372,31 @@ err:
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Add a new callback to an Edje_Signal_Callback_Group.
+ *
+ * This function adds a new signal callback to the group.
+ * It handles several cases:
+ * 1. If the group's matches are shared (hashed and refcount > 1), it
+ *    duplicates the matches to make a private copy before modification.
+ * 2. If the group's matches are hashed but refcount is 1, it removes them
+ *    from the shared hash to make them private.
+ * 3. It searches for an empty (marked as `delete_me`) slot to reuse.
+ * 4. If no empty slot is found, it grows the callback group.
+ * If growing the group reallocates the `matches` array, it cleans and
+ * reinitializes the associated patterns.
+ *
+ * @param gp The callback group to add to.
+ * @param sig The signal string.
+ * @param src The source string.
+ * @param func_legacy The legacy Edje_Signal_Cb callback function.
+ * @param func_eo The EFL Efl_Signal_Cb callback function.
+ * @param func_free_cb Optional callback to free user data.
+ * @param data User data for the callback.
+ * @param propagate EINA_TRUE if the signal should propagate, EINA_FALSE otherwise.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., allocation error).
+ */
 Eina_Bool
 _edje_signal_callback_push(Edje_Signal_Callback_Group *gp,
                            const char *sig, const char *src,
@@ -323,6 +482,17 @@ err:
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Allocate a new Edje_Signal_Callback_Group.
+ *
+ * This function allocates memory for an Edje_Signal_Callback_Group and its
+ * initial Edje_Signal_Callback_Matches structure. The matches structure
+ * is refcounted and initialized with a refcount of 1.
+ *
+ * @return A pointer to the newly allocated Edje_Signal_Callback_Group,
+ *         or NULL on allocation failure.
+ */
 const Edje_Signal_Callback_Group *
 _edje_signal_callback_alloc(void)
 {
@@ -342,6 +512,24 @@ err:
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Unreference an Edje_Signal_Callback_Matches structure.
+ *
+ * Decrements the reference count of the given Edje_Signal_Callback_Matches `m`.
+ * If the reference count drops to zero, this function performs cleanup:
+ * - Calls `free_cb` for each valid (not `delete_me`) match if `m->free_cb` exists.
+ * - If `m` was hashed, removes it from the global `signal_match` hash table.
+ * - Deletes stringshare references for all signals and sources in `m->matches`.
+ * - Unreferences and cleans associated patterns (`m->patterns`).
+ * - Frees `m->matches`, `m->free_cb`, and `m` itself.
+ *
+ * @param m The Edje_Signal_Callback_Matches structure to unreference.
+ * @param flags Array of flags corresponding to each match in `m`. Used to check
+ *              `delete_me` status before calling `free_cb`.
+ * @param custom_data Array of custom data pointers corresponding to each match.
+ *                    Passed to `free_cb`.
+ */
 void
 _edje_signal_callback_matches_unref(Edje_Signal_Callback_Matches *m,
                                     Edje_Signal_Callback_Flags *flags,
@@ -385,6 +573,17 @@ _edje_signal_callback_matches_unref(Edje_Signal_Callback_Matches *m,
      }
 }
 
+/**
+ * @internal
+ * @brief Free an Edje_Signal_Callback_Group.
+ *
+ * This function frees all resources associated with an Edje_Signal_Callback_Group.
+ * It unreferences the `matches` structure (which handles its own deallocation
+ * and cleanup via `_edje_signal_callback_matches_unref`), frees the `flags`
+ * and `custom_data` arrays, and then frees the group structure itself.
+ *
+ * @param cgp The callback group to free.
+ */
 void
 _edje_signal_callback_free(const Edje_Signal_Callback_Group *cgp)
 {
@@ -401,6 +600,26 @@ _edje_signal_callback_free(const Edje_Signal_Callback_Group *cgp)
    free(gp);
 }
 
+/**
+ * @internal
+ * @brief Disable (mark for deletion) a specific callback in a group.
+ *
+ * Searches for a callback matching the provided signal, source, function pointer
+ * (legacy or EO), free callback (if applicable for EO), and data.
+ * If a match is found and it's not already marked for deletion:
+ * - If it's an EO callback (`func`) and `func_free_cb` is provided, `func_free_cb(data)` is called.
+ * - The callback's `delete_me` flag is set to EINA_TRUE.
+ *
+ * @param gp The callback group.
+ * @param sig The signal string to match.
+ * @param src The source string to match.
+ * @param func_legacy The legacy Edje_Signal_Cb function to match.
+ * @param func The EflLayoutSignalCb (EO) function to match.
+ * @param func_free_cb The Eina_Free_Cb associated with `func` to match.
+ * @param data The user data to match.
+ * @return EINA_TRUE if a callback was found and marked for deletion,
+ *         EINA_FALSE otherwise or if `gp` or `gp->matches` is NULL.
+ */
 Eina_Bool
 _edje_signal_callback_disable(Edje_Signal_Callback_Group *gp,
                               const char *sig, const char *src,
@@ -434,6 +653,29 @@ _edje_signal_callback_disable(Edje_Signal_Callback_Group *gp,
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Compact the callback array by moving a valid entry into a deleted slot.
+ *
+ * This function is typically called when compacting the callback list after
+ * some callbacks have been marked with `delete_me`. It attempts to move the
+ * last valid (not `delete_me`) callback from the end of the `matches` array
+ * into the slot at index `i`.
+ *
+ * If the `matches` structure `m` is hashed, it's temporarily removed from
+ * the `signal_match` hash before modification and re-added afterwards.
+ * The function iterates backwards from the end of the `matches` array.
+ * If a non-`delete_me` entry is found at index `j`:
+ *  - The entry at index `i` is unset (strings unref'd).
+ *  - The entry from `j` is copied to `i`.
+ *  - Corresponding `flags` and `custom_data` are also copied.
+ *  - `m->matches_count` is decremented.
+ * If an entry at `j` is `delete_me`, it's unset and `m->matches_count` is
+ * decremented, and the loop continues.
+ *
+ * @param gp The callback group.
+ * @param i The index of the slot to fill (which was presumably marked `delete_me`).
+ */
 static void
 _edje_signal_callback_move_last(Edje_Signal_Callback_Group *gp,
                                 unsigned int i)
@@ -473,6 +715,38 @@ _edje_signal_callback_move_last(Edje_Signal_Callback_Group *gp,
      eina_hash_add(signal_match, m, m);
 }
 
+/**
+ * @internal
+ * @brief Get a reference to the signal/source patterns for a callback group.
+ *
+ * This function ensures that the callback group `gp` uses a shared, canonical
+ * `Edje_Signal_Callback_Matches` structure if an identical one already exists
+ * in the `signal_match` hash. It also ensures that the associated
+ * `Edje_Signals_Sources_Patterns` are initialized.
+ *
+ * Logic:
+ * 1. If `gp->matches` (aliased as `tmp`) is already hashed, its patterns are returned.
+ * 2. If not hashed, it searches `signal_match` for an identical `Edje_Signal_Callback_Matches` (`m`).
+ *    a. If no match `m` is found:
+ *       - Compacts `tmp->matches` by removing `delete_me` entries if its patterns
+ *         are not shared (refcount <= 1). This is done before building new patterns.
+ *       - Cleans any existing patterns on `tmp`.
+ *       - Initializes new patterns for `tmp` using `_edje_callbacks_patterns_init`.
+ *       - Tries to find `m` again (should ideally not be found if logic is correct,
+ *         but a WRN exists if it is).
+ *       - Adds `tmp` to `signal_match` and marks it as hashed.
+ *    b. If a match `m` is found and `m` is different from `tmp`:
+ *       - It means `tmp` is a duplicate of an existing shared `m`.
+ *       - `tmp` is unreferenced (which might free it).
+ *       - `gp->matches` is updated to point to the shared `m`.
+ *       - The refcount of the new `gp->matches` (which is `m`) is incremented.
+ *       - Handles potential size mismatches between `tmp` and `m` for `custom_data` and `flags`.
+ * 3. Finally, the refcount of `gp->matches->patterns` is incremented and it's returned.
+ *
+ * @param gp The callback group.
+ * @return A refcounted pointer to the `Edje_Signals_Sources_Patterns` for the group,
+ *         or NULL if `gp` or `gp->matches` is NULL.
+ */
 const Edje_Signals_Sources_Patterns *
 _edje_signal_callback_patterns_ref(Edje_Signal_Callback_Group *gp)
 {
@@ -550,6 +824,16 @@ got_it:
    return tmp->patterns;
 }
 
+/**
+ * @internal
+ * @brief Unreference an Edje_Signals_Sources_Patterns structure.
+ *
+ * Decrements the reference count of the given patterns structure `ssp`.
+ * If the reference count drops to zero, this function cleans up its internal
+ * data (exact_match rbtree, globing inarray) and frees the `ssp` structure itself.
+ *
+ * @param essp The Edje_Signals_Sources_Patterns structure to unreference.
+ */
 void
 _edje_signal_callback_patterns_unref(const Edje_Signals_Sources_Patterns *essp)
 {
@@ -568,6 +852,17 @@ _edje_signal_callback_patterns_unref(const Edje_Signals_Sources_Patterns *essp)
      }
 }
 
+/**
+ * @internal
+ * @brief Reset the `just_added` flag for all callbacks in a flag array.
+ *
+ * Iterates through an array of `Edje_Signal_Callback_Flags` and sets the
+ * `just_added` member of each flag to `EINA_FALSE`. This is typically called
+ * after processing newly added callbacks in a signal emission cycle.
+ *
+ * @param flags Pointer to the array of Edje_Signal_Callback_Flags.
+ * @param length The number of elements in the `flags` array.
+ */
 void
 _edje_signal_callback_reset(Edje_Signal_Callback_Flags *flags, unsigned int length)
 {

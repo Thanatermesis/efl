@@ -31,6 +31,15 @@ static Eina_List  *_font_overlays_del = NULL;
 static Eina_List  *_color_overlays_del = NULL;
 
 static Ecore_Poller *_elm_cache_flush_poller = NULL;
+
+/**
+ * @internal
+ * @brief Build the hash table for key bindings.
+ *
+ * This function populates the `_elm_key_bindings` hash table from the
+ * key bindings defined in the configuration. The hash table maps widget
+ * class names to a list of key bindings for that widget.
+ */
 static void _elm_config_key_binding_hash(void);
 
 Eina_Bool _config_profile_lock = EINA_FALSE;
@@ -97,11 +106,63 @@ static const Elm_Text_Class _elm_text_classes[] = {
    {NULL, NULL}
 };
 
+/**
+ * @internal
+ * @brief Frees an Elm_Config structure.
+ *
+ * This function deallocates all memory associated with the given
+ * configuration structure, including all stringshares and lists.
+ *
+ * @param cfg The configuration structure to free.
+ */
 static void        _config_free(Elm_Config *cfg);
+/**
+ * @internal
+ * @brief Applies the main configuration settings.
+ *
+ * This function applies configuration settings that have a global effect,
+ * such as the theme and the animator framerate. It should be called when
+ * the configuration is loaded or reloaded.
+ */
 static void        _config_apply(void);
+/**
+ * @internal
+ * @brief Applies sub-configuration settings.
+ *
+ * This function applies configuration settings that affect various
+ * subsystems, such as Edje frametime, scale, and audio channel mutes.
+ * It's called after the main configuration has been applied.
+ */
 static void        _config_sub_apply(void);
+/**
+ * @internal
+ * @brief Updates an older user configuration to the current version.
+ *
+ * This function compares the user's configuration version with the current
+ * version and applies necessary updates to bring it up to date. It loads
+ * the system default configuration to get default values for new options.
+ * The updated configuration is saved back to the user's profile.
+ */
 static void        _config_update(void);
+/**
+ * @internal
+ * @brief Overrides configuration settings with environment variables.
+ *
+ * This function checks for various `ELM_*` environment variables and
+ * uses their values to override the settings loaded from the configuration
+ * file. This allows for temporary changes to the configuration for debugging
+ * or testing purposes without modifying the configuration files.
+ */
 static void        _env_get(void);
+/**
+ * @internal
+ * @brief Deletes all currently applied color class overlays from Edje.
+ *
+ * This function is used to clear existing color overlays before applying
+ * new ones or when the configuration is being reloaded. It iterates through
+ * the color overlays in the current configuration and calls
+ * `edje_color_class_del` for each one.
+ */
 static void        _color_overlays_cancel(void);
 
 #define ELM_CONFIG_VAL(edd, type, member, dtype) \
@@ -131,7 +192,17 @@ _elm_config_win32_proc(HWND   window,
      }
 }
 
-/* Create a hidden window and retrieve the monitor from it */
+/**
+ * @internal
+ * @brief Create a hidden window and retrieve the monitor from it.
+ *
+ * This is a helper function on Windows to get a handle to the primary
+ * monitor. It works by creating a temporary, hidden window and then
+ * using `MonitorFromWindow` to get the monitor handle. The window is
+ * destroyed immediately afterwards.
+ *
+ * @return A handle to the default monitor, or NULL on failure.
+ */
 static HMONITOR
 _elm_config_win32_monitor_get(void)
 {
@@ -185,6 +256,20 @@ _elm_config_win32_monitor_get(void)
    return mon;
 }
 
+/**
+ * @internal
+ * @brief Makes the application DPI aware on Windows.
+ *
+ * This function attempts to call the appropriate Windows API function to
+ * declare the application as DPI aware. It tries several functions in
+ * order of preference, from newest to oldest, to support different
+ * versions of Windows:
+ * - `SetProcessDpiAwarenessContext()` (Windows 10 v1607+)
+ * - `SetProcessDpiAwareness()` (Windows 8.1+)
+ * - `SetProcessDPIAware()` (Windows Vista+)
+ *
+ * This is necessary for proper scaling of the UI on high-DPI displays.
+ */
 static void
 _elm_config_win32_awareness(void)
 {
@@ -267,6 +352,18 @@ _elm_config_win32_awareness(void)
    SetProcessDpiAware_();
 }
 
+/**
+ * @internal
+ * @brief Sets the DPI awareness and initial scale factor on Windows.
+ *
+ * This function determines the appropriate scaling factor for the application
+ * based on the system's DPI settings. It uses modern Windows APIs where
+ * available to get the scale factor, falling back to older GDI methods if
+ * necessary. After determining the scale, it calls
+ * `_elm_config_win32_awareness()` to make the process DPI aware.
+ *
+ * @param cfg The configuration structure to update with the scale factor.
+ */
 static void
 _elm_config_win32_dpi_awareness_set(Elm_Config *cfg)
 {
@@ -377,6 +474,14 @@ _elm_config_win32_dpi_awareness_set(Elm_Config *cfg)
 
 #endif
 
+/**
+ * @internal
+ * @brief Frees the list of font overlays marked for deletion.
+ *
+ * This function clears the `_font_overlays_del` list, which contains
+ * text class names for font overlays that have been unset and are
+ * waiting to be removed from Edje.
+ */
 static void
 _elm_font_overlays_del_free(void)
 {
@@ -387,6 +492,15 @@ _elm_font_overlays_del_free(void)
    _font_overlays_del = eina_list_free(_font_overlays_del);
 }
 
+/**
+ * @internal
+ * @brief Deletes all currently applied font overlays from Edje.
+ *
+ * This function is used to clear existing font overlays before applying
+ * new ones or when the configuration is reloaded. It iterates through
+ * the font overlays in the current configuration and calls
+ * `edje_text_class_del` for each one.
+ */
 static void
 _elm_config_font_overlays_cancel(void)
 {
@@ -396,6 +510,15 @@ _elm_config_font_overlays_cancel(void)
      edje_text_class_del(efd->text_class);
 }
 
+/**
+ * @internal
+ * @brief Initializes all Eet data descriptors for configuration serialization.
+ *
+ * This function creates the `Eet_Data_Descriptor` structures needed to
+ * read and write the various parts of the Elementary configuration to
+ * and from `.eet` files. This includes descriptors for the main config
+ * structure, font overlays, color overlays, key bindings, and palettes.
+ */
 static void
 _desc_init(void)
 {
@@ -773,6 +896,14 @@ _desc_init(void)
 #undef T_UCHAR
 }
 
+/**
+ * @internal
+ * @brief Shuts down and frees all Eet data descriptors.
+ *
+ * This function is the counterpart to `_desc_init`. It frees all the
+ * `Eet_Data_Descriptor` structures that were allocated for configuration
+ * serialization. It should be called during Elementary shutdown.
+ */
 static void
 _desc_shutdown(void)
 {
@@ -831,6 +962,19 @@ _desc_shutdown(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Callback function for sorting file lists alphabetically.
+ *
+ * This function is used with `eina_list_sorted_insert` to maintain
+ * alphabetical order in lists of file or directory names.
+ *
+ * @param f1 The first string to compare.
+ * @param f2 The second string to compare.
+ * @return A value less than, equal to, or greater than zero if f1 is
+ *         found, respectively, to be less than, to match, or be
+ *         greater than f2.
+ */
 static int
 _sort_files_cb(const void *f1,
                const void *f2)
@@ -838,12 +982,33 @@ _sort_files_cb(const void *f1,
    return strcmp(f1, f2);
 }
 
+/**
+ * @internal
+ * @brief Gets the name of the currently active profile.
+ *
+ * @return The name of the current profile.
+ */
 const char *
 _elm_config_current_profile_get(void)
 {
    return _elm_profile;
 }
 
+/**
+ * @internal
+ * @brief Constructs a path relative to the Elementary data directory.
+ *
+ * This is a convenience function that prepends the system-wide
+ * Elementary data directory path (`_elm_data_dir`) to a given
+ * format string and arguments, similar to `snprintf`.
+ *
+ * @param dst The destination buffer.
+ * @param size The size of the destination buffer.
+ * @param fmt The format string.
+ * @param ... Additional arguments for the format string.
+ * @return The number of characters that would have been written if `size`
+ *         had been sufficiently large, not counting the terminating null byte.
+ */
 static size_t
 _elm_data_dir_snprintf(char       *dst,
                        size_t      size,
@@ -869,6 +1034,14 @@ end:
    return off;
 }
 
+/**
+ * @internal
+ * @brief Loads a palette from a file.
+ *
+ * @param file The full path to the palette file (.pal).
+ * @return A new #Elm_Palette object on success, or NULL on failure.
+ *         The returned object must be freed with _palette_free().
+ */
 static Elm_Palette *
 _palette_load(const char *file)
 {
@@ -881,6 +1054,12 @@ _palette_load(const char *file)
    return pal;
 }
 
+/**
+ * @internal
+ * @brief Frees an #Elm_Palette object.
+ *
+ * @param pal The palette object to free.
+ */
 static void
 _palette_free(Elm_Palette *pal)
 {
@@ -894,6 +1073,14 @@ _palette_free(Elm_Palette *pal)
    free(pal);
 }
 
+/**
+ * @internal
+ * @brief Saves a palette to a file.
+ *
+ * @param pal The palette object to save.
+ * @param file The full path to the destination file.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 _palette_save(Elm_Palette *pal, const char *file)
 {
@@ -907,6 +1094,17 @@ _palette_save(Elm_Palette *pal, const char *file)
    return ok;
 }
 
+/**
+ * @internal
+ * @brief Finds and loads a palette by name.
+ *
+ * It first searches in the user's color directory, then falls back to the
+ * system-wide color directory.
+ *
+ * @param name The name of the palette to find.
+ * @return A loaded #Elm_Palette object if found, otherwise NULL. The returned
+ *         object must be freed with _palette_free().
+ */
 static Elm_Palette *
 _palette_find(const char *name)
 {
@@ -925,6 +1123,12 @@ _palette_find(const char *name)
    return pal;
 }
 
+/**
+ * @internal
+ * @brief Creates a new, empty palette object.
+ *
+ * @return A new, empty #Elm_Palette object, or NULL on allocation failure.
+ */
 static Elm_Palette *
 _palette_new(void)
 {
@@ -934,6 +1138,17 @@ _palette_new(void)
    return pal;
 }
 
+/**
+ * @internal
+ * @brief Stores a palette in the user's configuration directory.
+ *
+ * This function ensures the user's `colors` directory exists and then saves
+ * the palette to a file named `[name].pal` within it.
+ *
+ * @param pal The palette to store.
+ * @param name The name to give the palette.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
 static Eina_Bool
 _palette_store(Elm_Palette *pal, const char *name)
 {
@@ -946,6 +1161,20 @@ _palette_store(Elm_Palette *pal, const char *name)
    return _palette_save(pal, buf);
 }
 
+/**
+ * @internal
+ * @brief Sets or updates a color in a palette.
+ *
+ * If a color with the given name exists, its RGBA values are updated.
+ * Otherwise, a new color is added to the palette.
+ *
+ * @param pal The palette to modify.
+ * @param clas The name of the color class to set.
+ * @param r Red component (0-255).
+ * @param g Green component (0-255).
+ * @param b Blue component (0-255).
+ * @param a Alpha component (0-255).
+ */
 static void
 _palette_set(Elm_Palette *pal, const char *clas, int r, int g, int b, int a)
 {
@@ -974,6 +1203,13 @@ _palette_set(Elm_Palette *pal, const char *clas, int r, int g, int b, int a)
    pal->colors = eina_list_append(pal->colors, c);
 }
 
+/**
+ * @internal
+ * @brief Removes a color from a palette.
+ *
+ * @param pal The palette to modify.
+ * @param clas The name of the color class to remove.
+ */
 static void
 _palette_unset(Elm_Palette *pal, const char *clas)
 {
@@ -1102,6 +1338,16 @@ elm_config_palette_list_free(Eina_List *list)
    EINA_LIST_FREE(list, s) eina_stringshare_del(s);
 }
 
+/**
+ * @internal
+ * @brief Applies a palette to the current application.
+ *
+ * This function loads the specified palette and sets its colors as
+ * Edje color classes, effectively changing the application's color scheme.
+ * It first clears any existing color classes.
+ *
+ * @param name The name of the palette to apply.
+ */
 static void
 _palette_apply(const char *name)
 {
@@ -1139,6 +1385,21 @@ _palette_apply(const char *name)
 static Eina_Hash *_getenv_once_envs = NULL;
 static const char *_getenv_once_empty = "";
 
+/**
+ * @internal
+ * @brief Gets an environment variable's value, caching the result.
+ *
+ * This function is a wrapper around `getenv` that caches the results in a
+ * hash table. This avoids repeated calls to `getenv` for the same variable,
+ * which can be inefficient. The first call for a given variable name will
+ * call `getenv`, store the result (including NULL if the variable is not
+ * set), and all subsequent calls for the same variable will return the
+ * cached value.
+ *
+ * @param env The name of the environment variable.
+ * @return The value of the environment variable, or NULL if not set.
+ *         The returned string is a stringshare and should not be freed.
+ */
 static const char *
 _getenv_once(const char *env)
 {
@@ -1165,6 +1426,22 @@ _getenv_once(const char *env)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Constructs a path relative to the user's Elementary config directory.
+ *
+ * This is a convenience function that prepends the user-specific
+ * Elementary config directory path to a given format string and arguments,
+ * similar to `snprintf`. The path is either `~/.elementary` or
+ * `$XDG_CONFIG_HOME/elementary`, depending on environment.
+ *
+ * @param dst The destination buffer.
+ * @param size The size of the destination buffer.
+ * @param fmt The format string.
+ * @param ... Additional arguments for the format string.
+ * @return The number of characters that would have been written if `size`
+ *         had been sufficiently large, not counting the terminating null byte.
+ */
 size_t
 _elm_config_user_dir_snprintf(char       *dst,
                               size_t      size,
@@ -1216,6 +1493,10 @@ struct _Elm_Config_Derived_Profile
 static Eet_Data_Descriptor *_config_derived_edd = NULL;
 static Eet_Data_Descriptor *_config_derived_profile_edd = NULL;
 
+/**
+ * @internal
+ * @brief Initializes Eet data descriptors for derived profiles.
+ */
 static void
 _elm_config_profile_derived_init(void)
 {
@@ -1246,6 +1527,10 @@ _elm_config_profile_derived_init(void)
 #undef D
 }
 
+/**
+ * @internal
+ * @brief Shuts down and frees Eet data descriptors for derived profiles.
+ */
 static void
 _elm_config_profile_derived_shutdown(void)
 {
@@ -1261,6 +1546,18 @@ _elm_config_profile_derived_shutdown(void)
      }
 }
 
+/**
+ * @internal
+ * @brief Loads the derived profile information for a given base profile.
+ *
+ * It looks for a `derived.cfg` file in the user's and then the system's
+ * config directory for the specified profile.
+ *
+ * @param profile The base profile name. If NULL, the current profile is used.
+ * @return An #Elm_Config_Derived structure containing the list of derived
+ *         profiles, or NULL if not found or on error. Must be freed with
+ *         _elm_config_derived_free().
+ */
 static Elm_Config_Derived *
 _elm_config_derived_load(const char *profile)
 {
@@ -1290,6 +1587,16 @@ _elm_config_derived_load(const char *profile)
    return NULL;
 }
 
+/**
+ * @internal
+ * @brief Saves the derived profile information for a base profile.
+ *
+ * This writes the list of derived profiles to the `derived.cfg` file in the
+ * user's configuration directory for the specified base profile.
+ *
+ * @param profile The base profile name.
+ * @param derived The derived profile data to save.
+ */
 static void
 _elm_config_profile_derived_save(const char *profile, Elm_Config_Derived *derived)
 {
@@ -1324,6 +1631,12 @@ _elm_config_profile_derived_save(const char *profile, Elm_Config_Derived *derive
      }
 }
 
+/**
+ * @internal
+ * @brief Frees an #Elm_Config_Derived structure.
+ *
+ * @param derived The structure to free.
+ */
 static void
 _elm_config_derived_free(Elm_Config_Derived *derived)
 {
@@ -1339,6 +1652,17 @@ _elm_config_derived_free(Elm_Config_Derived *derived)
    free(derived);
 }
 
+/**
+ * @internal
+ * @brief Applies a single derivation operation to a configuration.
+ *
+ * This function modifies a configuration structure based on a single
+ * operation string (e.g., "scale-mul") and its parameters.
+ *
+ * @param cfg The configuration to modify.
+ * @param op The operation to perform (e.g., "scale-mul").
+ * @param params The parameters for the operation.
+ */
 static void
 _elm_config_derived_option_op_apply(Elm_Config *cfg, const char *op, const char *params)
 {
@@ -1353,6 +1677,17 @@ _elm_config_derived_option_op_apply(Elm_Config *cfg, const char *op, const char 
    // Add more derivation commands here
 }
 
+/**
+ * @internal
+ * @brief Parses and applies a single derivation option string.
+ *
+ * An option string can contain an operation and its parameters. This function
+ * extracts them and calls _elm_config_derived_option_op_apply().
+ * For example: "scale-mul 150"
+ *
+ * @param cfg The configuration to modify.
+ * @param option The full option string.
+ */
 static void
 _elm_config_derived_option_apply(Elm_Config *cfg, const char *option)
 {
@@ -1380,6 +1715,17 @@ _elm_config_derived_option_apply(Elm_Config *cfg, const char *option)
      }
 }
 
+/**
+ * @internal
+ * @brief Parses and applies a full string of derivation options.
+ *
+ * The `derive_options` string is a semicolon-separated list of individual
+ * options to be applied to a configuration.
+ * For example: "scale-mul 120; some-other-op param"
+ *
+ * @param cfg The configuration to modify.
+ * @param derive_options The string of derivation options.
+ */
 static void
 _elm_config_derived_apply(Elm_Config *cfg, const char *derive_options)
 {
@@ -1408,6 +1754,18 @@ _elm_config_derived_apply(Elm_Config *cfg, const char *derive_options)
      }
 }
 
+/**
+ * @internal
+ * @brief Saves all derived profiles based on a given base configuration.
+ *
+ * This function iterates through all the derived profiles defined in the
+ * `derived` structure. For each one, it creates a copy of the base
+ * configuration `cfg`, applies the derivation options, and saves the
+ * resulting configuration as a new profile.
+ *
+ * @param cfg The base configuration to derive from.
+ * @param derived A structure containing the list of profiles to derive.
+ */
 static void
 _elm_config_derived_save(Elm_Config *cfg, Elm_Config_Derived *derived)
 {

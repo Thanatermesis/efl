@@ -20,12 +20,15 @@
 
 /* define macros and variable for using the eina logging system  */
 #define EFREET_MODULE_LOG_DOM _efreet_base_log_dom
+/**< Log domain for the efreet_base module. */
 static int _efreet_base_log_dom = -1;
 
 #include "Efreet.h"
 #include "efreet_private.h"
 
+/**< Efreet library version information. */
 static Efreet_Version _version = { VMAJ, VMIN, VMIC, VREV };
+/**< Publicly accessible Efreet library version information. */
 EAPI Efreet_Version *efreet_version = &_version;
 
 #ifdef _WIN32
@@ -34,29 +37,85 @@ EAPI Efreet_Version *efreet_version = &_version;
 # define EFREET_PATH_SEP ':'
 #endif
 
+/**< Cached path to the user's home directory. */
 static const char *efreet_home_dir = NULL;
+/**< Cached path to the XDG Data Home directory ($XDG_DATA_HOME). */
 static const char *xdg_data_home = NULL;
+/**< Cached path to the XDG Config Home directory ($XDG_CONFIG_HOME). */
 static const char *xdg_config_home = NULL;
+/**< Cached path to the XDG Cache Home directory ($XDG_CACHE_HOME). */
 static const char *xdg_cache_home = NULL;
+/**< Cached path to the XDG Runtime directory ($XDG_RUNTIME_DIR). */
 static const char *xdg_runtime_dir = NULL;
+/**< Cached list of XDG Data directories ($XDG_DATA_DIRS). List of (const char *). */
 static Eina_List  *xdg_data_dirs = NULL;
+/**< Cached list of XDG Config directories ($XDG_CONFIG_DIRS). List of (const char *). */
 static Eina_List  *xdg_config_dirs = NULL;
+/**< Cached path to the XDG Desktop directory. */
 static const char *xdg_desktop_dir = NULL;
+/**< Cached path to the XDG Download directory. */
 static const char *xdg_download_dir = NULL;
+/**< Cached path to the XDG Templates directory. */
 static const char *xdg_templates_dir = NULL;
+/**< Cached path to the XDG Public Share directory. */
 static const char *xdg_publicshare_dir = NULL;
+/**< Cached path to the XDG Documents directory. */
 static const char *xdg_documents_dir = NULL;
+/**< Cached path to the XDG Music directory. */
 static const char *xdg_music_dir = NULL;
+/**< Cached path to the XDG Pictures directory. */
 static const char *xdg_pictures_dir = NULL;
+/**< Cached path to the XDG Videos directory. */
 static const char *xdg_videos_dir = NULL;
+/**< Cached hostname of the current machine. */
 static const char *hostname = NULL;
 
+/**< Eina_Prefix for Efreet library, used for locating data files. */
 Eina_Prefix *_efreet_pfx= NULL;
 
+/**
+ * @internal
+ * @brief Initializes all XDG base directory paths and related settings.
+ * This function is called by efreet_base_init() to populate the static
+ * global variables holding XDG directory paths. It determines these paths
+ * based on environment variables and fallback defaults.
+ */
 static void efreet_dirs_init(void);
+/**
+ * @internal
+ * @brief Retrieves a single directory path based on an environment variable or a fallback.
+ * @param key The environment variable name (e.g., "XDG_DATA_HOME").
+ * @param fallback The fallback path suffix to append to the home directory if the environment variable is not set (e.g., "/.local/share").
+ * @return The stringshared path. It's the responsibility of the caller to ensure this stringshared pointer is managed correctly if it's stored globally.
+ * This function checks if the environment variable @p key is set. If so, its value is used.
+ * Otherwise, the @p fallback path is appended to the user's home directory.
+ * The resulting path is returned as an eina_stringshare string.
+ */
 static const char *efreet_dir_get(const char *key, const char *fallback);
+/**
+ * @internal
+ * @brief Retrieves a list of directory paths based on an environment variable or a fallback string.
+ * @param key The environment variable name (e.g., "XDG_DATA_DIRS").
+ * @param fallback The fallback colon-separated string of paths if the environment variable is not set (e.g., "/usr/local/share/:/usr/share/").
+ * @return An Eina_List of stringshared paths. The caller is responsible for freeing this list and its contents if not stored globally.
+ * This function checks if the environment variable @p key is set. If so, its value (a colon-separated list of paths) is used.
+ * Otherwise, the @p fallback string is used. The path string is split by the EFREET_PATH_SEP (':' on Unix, ';' on Windows),
+ * sanitized, and unique paths are added to the returned Eina_List as eina_stringshare strings.
+ */
 static Eina_List  *efreet_dirs_get(const char *key,
                                    const char *fallback);
+/**
+ * @internal
+ * @brief Retrieves a specific XDG user directory path (e.g., Desktop, Downloads).
+ * @param key The XDG user directory key (e.g., "XDG_DESKTOP_DIR").
+ * @param fallback The fallback directory name relative to the home directory if not found in user-dirs.dirs or environment (e.g., "Desktop").
+ * @return The stringshared path to the user directory.
+ * This function first checks if an environment variable @p key is set.
+ * If not, it attempts to read the path from the `user-dirs.dirs` file located in XDG_CONFIG_HOME.
+ * If still not found, it constructs a path by appending @p fallback to the user's home directory.
+ * The path may contain environment variables (e.g., "$HOME"), which are expanded.
+ * The resulting path is returned as an eina_stringshare string.
+ */
 static const char *efreet_user_dir_get(const char *key, const char *fallback);
 
 /**
@@ -309,6 +368,15 @@ efreet_default_dirs_get(const char *user_dir, Eina_List *system_dirs,
     return list;
 }
 
+/**
+ * @internal
+ * @brief Resets cached XDG user directory paths.
+ * This function is primarily used for testing or scenarios where XDG user
+ * directories might change during runtime and need to be re-evaluated.
+ * It clears the stringshared values for various XDG user-specific directories,
+ * forcing them to be re-read from environment or configuration files on
+ * subsequent calls to their respective `efreet_*_dir_get()` functions.
+ */
 void
 efreet_dirs_reset(void)
 {
@@ -478,6 +546,19 @@ efreet_dirs_get(const char *key, const char *fallback)
     return dirs;
 }
 
+/**
+ * @internal
+ * @brief Expands environment variables in a string.
+ * @param in The input string possibly containing environment variables (e.g., "$HOME/foo" or "${XDG_DATA_HOME}/bar").
+ * @return A new stringshared string with environment variables expanded, or a stringshare of the original string if no expansion occurred or if input was NULL.
+ *         Returns NULL if memory allocation fails.
+ * This function parses the input string @p in for patterns like `$VAR` or `${VAR}`.
+ * For each found variable, it attempts to get its value using `getenv()`.
+ * If the variable is found, its value is substituted. Otherwise, the variable part is effectively removed (replaced with an empty string).
+ * Non-variable parts of the string are copied as is.
+ * Example: if `HOME` is "/home/user", `efreet_env_expand("$HOME/Desktop")` returns "/home/user/Desktop".
+ * Example: `efreet_env_expand("Path: $UNDEFINED_VAR/data")` might return "Path: /data".
+ */
 static const char *
 efreet_env_expand(const char *in)
 {

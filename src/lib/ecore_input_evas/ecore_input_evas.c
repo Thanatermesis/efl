@@ -13,62 +13,88 @@
 #include "Ecore_Input_Evas.h"
 #include "ecore_input_evas_private.h"
 
-int _ecore_input_evas_log_dom = -1;
+int _ecore_input_evas_log_dom = -1; /**< Log domain for ecore_input_evas */
 
+/**
+ * @brief Structure to hold information about a window registered for input events.
+ */
 typedef struct _Ecore_Input_Window Ecore_Input_Window;
 struct _Ecore_Input_Window
 {
-   Evas *evas;
-   void *window;
-   Ecore_Event_Mouse_Move_Cb move_mouse;
-   Ecore_Event_Multi_Move_Cb move_multi;
-   Ecore_Event_Multi_Down_Cb down_multi;
-   Ecore_Event_Multi_Up_Cb up_multi;
-   Ecore_Event_Direct_Input_Cb direct;
-   int ignore_event;
+   Evas *evas; /**< The Evas canvas associated with the window */
+   void *window; /**< The native window handle */
+   Ecore_Event_Mouse_Move_Cb move_mouse; /**< Callback for mouse move events */
+   Ecore_Event_Multi_Move_Cb move_multi; /**< Callback for multi-touch move events */
+   Ecore_Event_Multi_Down_Cb down_multi; /**< Callback for multi-touch down events */
+   Ecore_Event_Multi_Up_Cb up_multi;     /**< Callback for multi-touch up events */
+   Ecore_Event_Direct_Input_Cb direct;   /**< Callback for direct input events, bypassing Evas */
+   int ignore_event; /**< Flag to indicate if events for this window should be ignored */
 };
 
+/**
+ * @brief Represents the state of an input event, typically for mouse buttons.
+ */
 typedef enum _Ecore_Input_State {
-  ECORE_INPUT_NONE = 0,
-  ECORE_INPUT_DOWN,
-  ECORE_INPUT_MOVE,
-  ECORE_INPUT_UP,
-  ECORE_INPUT_CANCEL
+  ECORE_INPUT_NONE = 0, /**< No specific input state */
+  ECORE_INPUT_DOWN,     /**< Input (e.g., button) is currently pressed down */
+  ECORE_INPUT_MOVE,     /**< Input (e.g., mouse) is moving while a button is pressed */
+  ECORE_INPUT_UP,       /**< Input (e.g., button) has been released */
+  ECORE_INPUT_CANCEL    /**< Input event has been cancelled */
 } Ecore_Input_State;
 
+/**
+ * @brief Defines actions to take based on the current and previous input event state.
+ * This is used to handle potentially erroneous or out-of-order input sequences.
+ */
 typedef enum _Ecore_Input_Action {
-  ECORE_INPUT_CONTINUE = 0,
-  ECORE_INPUT_IGNORE,
-  ECORE_INPUT_FAKE_UP
+  ECORE_INPUT_CONTINUE = 0, /**< Continue processing the event normally */
+  ECORE_INPUT_IGNORE,       /**< Ignore the current event */
+  ECORE_INPUT_FAKE_UP       /**< Generate a fake "up" event before processing the current event */
 } Ecore_Input_Action;
 
+/**
+ * @brief Structure to store information about the last mouse button event.
+ * This is used for detecting double/triple clicks and handling event sequences.
+ */
 typedef struct _Ecore_Input_Last Ecore_Event_Last;
 struct _Ecore_Input_Last
 {
-   Ecore_Event_Mouse_Button *ev;
-   Ecore_Timer *timer;
-   Evas_Device *evas_device;
+   Ecore_Event_Mouse_Button *ev; /**< The last mouse button event data */
+   Ecore_Timer *timer;           /**< Timer for handling event timeouts (e.g., for fake up events) */
+   Evas_Device *evas_device;     /**< The Evas device associated with the event */
 
-   unsigned int device;
-   unsigned int buttons;
-   Ecore_Input_State state;
-   Ecore_Window win;
+   unsigned int device;          /**< The device ID */
+   unsigned int buttons;         /**< The button(s) involved in the event */
+   Ecore_Input_State state;      /**< The current state of the input (down, up, etc.) */
+   Ecore_Window win;             /**< The window where the event occurred */
 
-   Eina_Bool faked : 1;
+   Eina_Bool faked : 1;          /**< Flag indicating if the last event was a faked one */
 };
 
-static int _ecore_event_evas_init_count = 0;
-static Ecore_Event_Handler *ecore_event_evas_handlers[10];
-static Eina_Hash *_window_hash = NULL;
+static int _ecore_event_evas_init_count = 0; /**< Counter for ecore_event_evas_init() calls */
+static Ecore_Event_Handler *ecore_event_evas_handlers[10]; /**< Array of Ecore event handlers */
+static Eina_Hash *_window_hash = NULL; /**< Hash table mapping Ecore_Window IDs to Ecore_Input_Window structures */
 
-static Eina_List *_last_events = NULL;
-static double _last_events_timeout = 0.5;
-static Eina_Bool _last_events_enable = EINA_FALSE;
+static Eina_List *_last_events = NULL; /**< List of Ecore_Event_Last structures for tracking recent button events */
+static double _last_events_timeout = 0.5; /**< Timeout in seconds for generating fake UP events if no real UP event is received */
+static Eina_Bool _last_events_enable = EINA_FALSE; /**< Flag to enable the fake UP event generation logic */
 
 static Eina_Bool _ecore_event_evas_mouse_button(Ecore_Event_Mouse_Button *e,
                                                 Ecore_Event_Press press,
                                                 Eina_Bool faked);
 
+/**
+ * @brief Checks the consistency of the current mouse button event against the last recorded state.
+ *
+ * This function determines if the current event is valid in sequence or if
+ * corrective actions (like faking an UP event or ignoring the current event)
+ * are needed. This helps to handle cases where input events might be
+ * received out of order or duplicated.
+ *
+ * @param eel Pointer to the Ecore_Event_Last structure holding the state of the last event.
+ * @param press The type of the current press event (ECORE_DOWN, ECORE_UP, ECORE_CANCEL).
+ * @return Ecore_Input_Action indicating how to proceed with the current event.
+ */
 static Ecore_Input_Action
 _ecore_event_last_check(Ecore_Event_Last *eel, Ecore_Event_Press press)
 {
@@ -122,6 +148,22 @@ _ecore_event_last_check(Ecore_Event_Last *eel, Ecore_Event_Press press)
   return ECORE_INPUT_IGNORE;
 }
 
+/**
+ * @brief Looks up or creates an Ecore_Event_Last structure for a given device, button, and window.
+ *
+ * This function searches a global list (_last_events) for an existing
+ * Ecore_Event_Last entry that matches the provided Evas device, device ID,
+ * button ID, and window. If an entry is found, it is returned.
+ * If no entry is found and `create_new` is EINA_TRUE, a new Ecore_Event_Last
+ * structure is allocated, initialized, and added to the list before being returned.
+ *
+ * @param evas_device The Evas_Device associated with the event.
+ * @param device The device ID.
+ * @param buttons The button ID.
+ * @param win The Ecore_Window where the event occurred.
+ * @param create_new If EINA_TRUE, a new entry will be created if one is not found.
+ * @return Pointer to the found or newly created Ecore_Event_Last structure, or NULL on failure or if not found and create_new is EINA_FALSE.
+ */
 static Ecore_Event_Last *
 _ecore_event_evas_lookup(Evas_Device *evas_device, unsigned int device,
                          unsigned int buttons, Ecore_Window win,
@@ -151,6 +193,17 @@ _ecore_event_evas_lookup(Evas_Device *evas_device, unsigned int device,
    return eel;
 }
 
+/**
+ * @brief Timer callback to generate a fake mouse button UP event.
+ *
+ * This function is called when a timer expires, indicating that a mouse button
+ * was pressed (ECORE_INPUT_DOWN) or moved while pressed (ECORE_INPUT_MOVE),
+ * but no corresponding UP event was received within the `_last_events_timeout` period.
+ * It then calls _ecore_event_evas_mouse_button() to inject a faked UP event.
+ *
+ * @param data Pointer to the Ecore_Event_Last structure associated with the timed-out event.
+ * @return EINA_FALSE to indicate the timer should not be rescheduled.
+ */
 static Eina_Bool
 _ecore_event_evas_push_fake(void *data)
 {
@@ -179,6 +232,23 @@ _ecore_event_evas_push_fake(void *data)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Processes and validates a mouse button event before feeding it to Evas.
+ *
+ * This function is a core part of handling mouse button events. It:
+ * 1. Looks up the last event state for the given device and button.
+ * 2. Checks the validity of the current event sequence using `_ecore_event_last_check`.
+ * 3. Based on the check, it might generate a fake UP event if necessary.
+ * 4. Updates the last event state (e.g., to ECORE_INPUT_DOWN or ECORE_INPUT_UP).
+ * 5. If `_last_events_enable` is true and a timeout is set, it starts a timer
+ *    for DOWN events to potentially generate a fake UP event later if no
+ *    actual UP event is received. For UP events, it clears any existing timer.
+ *
+ * @param e The Ecore_Event_Mouse_Button event data.
+ * @param press The type of press (ECORE_DOWN or ECORE_UP).
+ * @return EINA_TRUE if the event is considered valid and should be processed further,
+ *         EINA_FALSE if the event is invalid or should be ignored.
+ */
 static Eina_Bool
 _ecore_event_evas_push_mouse_button(Ecore_Event_Mouse_Button *e, Ecore_Event_Press press)
 {
@@ -242,6 +312,17 @@ _ecore_event_evas_push_mouse_button(Ecore_Event_Mouse_Button *e, Ecore_Event_Pre
    return EINA_TRUE;
 }
 
+/**
+ * @brief Processes mouse move events, primarily to update the state for fake event generation.
+ *
+ * If `_last_events_enable` is active, this function iterates through the tracked
+ * last button events. If a button is currently in a DOWN or MOVE state,
+ * this function resets its associated timer (delaying a potential fake UP event)
+ * and updates the stored event's coordinates to the current mouse position.
+ * It also changes the state to ECORE_INPUT_MOVE.
+ *
+ * @param e The Ecore_Event_Mouse_Move event data.
+ */
 static void
 _ecore_event_evas_push_mouse_move(Ecore_Event_Mouse_Move *e)
 {
@@ -278,6 +359,16 @@ _ecore_event_evas_push_mouse_move(Ecore_Event_Mouse_Move *e)
        }
 }
 
+/**
+ * @brief Updates Evas seat key modifiers and locks based on Ecore event modifiers.
+ *
+ * This function translates Ecore modifier and lock flags (like Shift, Ctrl, Alt,
+ * Caps Lock, Num Lock) into Evas seat-specific key modifier/lock states.
+ *
+ * @param e The Evas canvas.
+ * @param modifiers A bitmask of Ecore_Event_Modifier and Ecore_Event_Lock flags.
+ * @param seat The Evas_Device representing the seat, or NULL for the default seat.
+ */
 EAPI void
 ecore_event_evas_seat_modifier_lock_update(Evas *e, unsigned int modifiers,
                                            Evas_Device *seat)
@@ -326,12 +417,38 @@ ecore_event_evas_seat_modifier_lock_update(Evas *e, unsigned int modifiers,
    else evas_seat_key_lock_off(e, "Shift_Lock", seat);
 }
 
+/**
+ * @brief Updates Evas key modifiers and locks based on Ecore event modifiers for the default seat.
+ *
+ * This is a convenience wrapper around ecore_event_evas_seat_modifier_lock_update,
+ * passing NULL for the seat to affect the default Evas seat.
+ *
+ * @param e The Evas canvas.
+ * @param modifiers A bitmask of Ecore_Event_Modifier and Ecore_Event_Lock flags.
+ */
 EAPI void
 ecore_event_evas_modifier_lock_update(Evas *e, unsigned int modifiers)
 {
    ecore_event_evas_seat_modifier_lock_update(e, modifiers, NULL);
 }
 
+/**
+ * @brief Registers an Ecore_Window with an Evas canvas for input event handling.
+ *
+ * This function associates an Ecore_Window ID with a native window handle,
+ * an Evas canvas, and optional custom callbacks for specific input events.
+ * It stores this information in the `_window_hash` for later retrieval
+ * when Ecore input events are received. It also adds standard Evas key
+ * modifiers and locks to the Evas canvas.
+ *
+ * @param id The Ecore_Window ID.
+ * @param window The native window handle (e.g., X11 Window, Wayland surface).
+ * @param evas The Evas canvas associated with the window.
+ * @param move_mouse Optional callback for mouse move events. If NULL, default Evas feeding is used.
+ * @param move_multi Optional callback for multi-touch move events. If NULL, default Evas feeding is used.
+ * @param down_multi Optional callback for multi-touch down events. If NULL, default Evas feeding is used.
+ * @param up_multi Optional callback for multi-touch up events. If NULL, default Evas feeding is used.
+ */
 EAPI void
 ecore_event_window_register(Ecore_Window id, void *window, Evas *evas,
                             Ecore_Event_Mouse_Move_Cb move_mouse,
@@ -366,12 +483,34 @@ ecore_event_window_register(Ecore_Window id, void *window, Evas *evas,
    evas_key_lock_add(evas, "Scroll_Lock");
 }
 
+/**
+ * @brief Unregisters an Ecore_Window from input event handling.
+ *
+ * Removes the window's registration information from the `_window_hash`.
+ *
+ * @param id The Ecore_Window ID to unregister.
+ */
 EAPI void
 ecore_event_window_unregister(Ecore_Window id)
 {
    eina_hash_del(_window_hash, &id, NULL);
 }
 
+/**
+ * @brief Sets a direct input callback for a registered window.
+ *
+ * This allows an application to receive raw Ecore input events for a specific
+ * window before (or instead of) they are fed to Evas. If the callback
+ * handles the event and returns EINA_TRUE, the event is not fed to Evas.
+ *
+ * @param id The Ecore_Window ID.
+ * @param fptr The callback function pointer of type Ecore_Event_Direct_Input_Cb.
+ *             Example: `Eina_Bool my_direct_cb(void *window, Ecore_Event_Type type, void *event)`
+ *                      `window` is the `window` parameter from `ecore_event_window_register`.
+ *                      `type` is the Ecore event type (e.g., ECORE_EVENT_KEY_DOWN).
+ *                      `event` is a pointer to the Ecore event structure.
+ *                      Return EINA_TRUE to consume the event, EINA_FALSE to let it pass to Evas.
+ */
 EAPI void
 _ecore_event_window_direct_cb_set(Ecore_Window id, Ecore_Event_Direct_Input_Cb fptr)
 {
@@ -382,6 +521,12 @@ _ecore_event_window_direct_cb_set(Ecore_Window id, Ecore_Event_Direct_Input_Cb f
    lookup->direct = fptr;
 }
 
+/**
+ * @brief Retrieves the native window handle associated with an Ecore_Window ID.
+ *
+ * @param id The Ecore_Window ID.
+ * @return The native window handle (e.g., X11 Window) if found, otherwise NULL.
+ */
 EAPI void *
 ecore_event_window_match(Ecore_Window id)
 {
@@ -392,6 +537,16 @@ ecore_event_window_match(Ecore_Window id)
    return NULL;
 }
 
+/**
+ * @brief Sets whether to ignore input events for a specific registered window.
+ *
+ * If `ignore_event` is non-zero, subsequent input events for this window
+ * will be passed on by `_ecore_event_window_match` and thus not processed
+ * by the Evas event feeding logic in this module.
+ *
+ * @param id The Ecore_Window ID.
+ * @param ignore_event A non-zero value to ignore events, 0 to process them.
+ */
 EAPI void
 ecore_event_window_ignore_events(Ecore_Window id, int ignore_event)
 {
@@ -402,6 +557,16 @@ ecore_event_window_ignore_events(Ecore_Window id, int ignore_event)
    lookup->ignore_event = ignore_event;
 }
 
+/**
+ * @brief Internal function to find a registered Ecore_Input_Window, considering the ignore_event flag.
+ *
+ * This function retrieves the Ecore_Input_Window structure associated with the
+ * given Ecore_Window ID. If the window is found and its `ignore_event` flag
+ * is not set, the structure is returned. Otherwise, NULL is returned.
+ *
+ * @param id The Ecore_Window ID.
+ * @return Pointer to the Ecore_Input_Window structure if found and not ignoring events, otherwise NULL.
+ */
 static Ecore_Input_Window*
 _ecore_event_window_match(Ecore_Window id)
 {
@@ -413,6 +578,21 @@ _ecore_event_window_match(Ecore_Window id)
    return lookup;
 }
 
+/**
+ * @brief Handles Ecore key down and key up events and feeds them to Evas.
+ *
+ * This function is called by Ecore event handlers for key events. It:
+ * 1. Finds the registered Ecore_Input_Window for the event.
+ * 2. Updates Evas modifier/lock states.
+ * 3. If a direct input callback is registered for the window, it's called.
+ *    If the callback handles the event (returns EINA_TRUE), Evas feeding is skipped.
+ * 4. Otherwise, it feeds the key event (down or up) to the Evas canvas
+ *    using `evas_event_feed_key_down_with_keycode` or `evas_event_feed_key_up_with_keycode`.
+ *
+ * @param e The Ecore_Event_Key event data.
+ * @param press Indicates whether it's a key down (ECORE_DOWN) or key up (ECORE_UP) event.
+ * @return ECORE_CALLBACK_PASS_ON to allow other handlers to process the event.
+ */
 static Eina_Bool
 _ecore_event_evas_key(Ecore_Event_Key *e, Ecore_Event_Press press)
 {
@@ -457,6 +637,21 @@ _ecore_event_evas_key(Ecore_Event_Key *e, Ecore_Event_Press press)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Handles Ecore mouse button cancel events and feeds them to Evas.
+ *
+ * This function is called when a mouse button event sequence is cancelled
+ * (e.g., due to a touch gesture ending unexpectedly). It:
+ * 1. Finds the registered Ecore_Input_Window.
+ * 2. If a direct input callback is set, calls it. If it handles the event,
+ *    Evas feeding is skipped.
+ * 3. Otherwise, feeds a mouse cancel event to Evas.
+ * 4. Updates the state of tracked last button events to ECORE_INPUT_CANCEL
+ *    if their current state allows for a cancel.
+ *
+ * @param e The Ecore_Event_Mouse_Button event data (though it's a cancel event).
+ * @return ECORE_CALLBACK_PASS_ON.
+ */
 static Eina_Bool
 _ecore_event_evas_mouse_button_cancel(Ecore_Event_Mouse_Button *e)
 {
@@ -485,6 +680,28 @@ _ecore_event_evas_mouse_button_cancel(Ecore_Event_Mouse_Button *e)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Handles Ecore mouse button down and up events, validates them, and feeds them to Evas.
+ *
+ * This is the primary function for processing mouse button presses and releases. It:
+ * 1. Finds the registered Ecore_Input_Window.
+ * 2. Determines Evas button flags (double/triple click).
+ * 3. For UP or CANCEL events (implicitly, as CANCEL is handled by a separate function but shares some logic here if called directly),
+ *    it checks if there's a valid preceding DOWN/MOVE state. If not, the event might be ignored.
+ * 4. If the event is not faked, it calls `_ecore_event_evas_push_mouse_button` to
+ *    validate the event sequence and manage timers for potential fake UP events.
+ *    If `_ecore_event_evas_push_mouse_button` indicates the event is invalid, it's ignored.
+ * 5. Updates Evas modifier/lock states.
+ * 6. If a direct input callback is registered, it's called. If it handles the event, Evas feeding is skipped.
+ * 7. Otherwise, it feeds the mouse button event (down or up) to Evas, either as a
+ *    standard mouse event or a multi-touch event depending on `e->multi.device`.
+ *    It uses custom multi-touch callbacks if they were provided during window registration.
+ *
+ * @param e The Ecore_Event_Mouse_Button event data.
+ * @param press Indicates ECORE_DOWN or ECORE_UP.
+ * @param faked EINA_TRUE if this is a synthetically generated event (e.g., a fake UP), EINA_FALSE otherwise.
+ * @return ECORE_CALLBACK_PASS_ON.
+ */
 static Eina_Bool
 _ecore_event_evas_mouse_button(Ecore_Event_Mouse_Button *e, Ecore_Event_Press press, Eina_Bool faked)
 {
@@ -600,6 +817,27 @@ _ecore_event_evas_mouse_button(Ecore_Event_Mouse_Button *e, Ecore_Event_Press pr
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Ecore event handler for mouse move events.
+ *
+ * This function is registered as a callback for ECORE_EVENT_MOUSE_MOVE. It:
+ * 1. Finds the registered Ecore_Input_Window.
+ * 2. If it's a standard mouse move (not multi-touch):
+ *    a. Calls `_ecore_event_evas_push_mouse_move` to update timers for fake UP events.
+ *    b. Updates Evas modifier/lock states.
+ *    c. If a direct input callback is set, calls it. If it handles the event, Evas feeding is skipped.
+ *    d. Otherwise, calls the custom `move_mouse` callback if provided, or feeds the
+ *       event to Evas using `evas_event_input_mouse_move`.
+ * 3. If it's a multi-touch move:
+ *    a. If a direct input callback is set, calls it. If it handles the event, Evas feeding is skipped.
+ *    b. Otherwise, calls the custom `move_multi` callback if provided, or feeds the
+ *       event to Evas using `evas_event_input_multi_move`.
+ *
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param event Pointer to the Ecore_Event_Mouse_Move structure.
+ * @return ECORE_CALLBACK_PASS_ON.
+ */
 EAPI Eina_Bool
 ecore_event_evas_mouse_move(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -647,24 +885,63 @@ ecore_event_evas_mouse_move(void *data EINA_UNUSED, int type EINA_UNUSED, void *
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Ecore event handler for mouse button down events.
+ * Wraps _ecore_event_evas_mouse_button with ECORE_DOWN and faked=EINA_FALSE.
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param event Pointer to the Ecore_Event_Mouse_Button structure.
+ * @return Result of _ecore_event_evas_mouse_button.
+ */
 EAPI Eina_Bool
 ecore_event_evas_mouse_button_down(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
    return _ecore_event_evas_mouse_button((Ecore_Event_Mouse_Button *)event, ECORE_DOWN, EINA_FALSE);
 }
 
+/**
+ * @brief Ecore event handler for mouse button up events.
+ * Wraps _ecore_event_evas_mouse_button with ECORE_UP and faked=EINA_FALSE.
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param event Pointer to the Ecore_Event_Mouse_Button structure.
+ * @return Result of _ecore_event_evas_mouse_button.
+ */
 EAPI Eina_Bool
 ecore_event_evas_mouse_button_up(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
    return _ecore_event_evas_mouse_button((Ecore_Event_Mouse_Button *)event, ECORE_UP, EINA_FALSE);
 }
 
+/**
+ * @brief Ecore event handler for mouse button cancel events.
+ * Wraps _ecore_event_evas_mouse_button_cancel.
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param event Pointer to the Ecore_Event_Mouse_Button structure.
+ * @return Result of _ecore_event_evas_mouse_button_cancel.
+ */
 EAPI Eina_Bool
 ecore_event_evas_mouse_button_cancel(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
    return _ecore_event_evas_mouse_button_cancel((Ecore_Event_Mouse_Button *)event);
 }
 
+/**
+ * @brief Handles Ecore mouse in and mouse out events and feeds them to Evas.
+ *
+ * This function is called for ECORE_EVENT_MOUSE_IN and ECORE_EVENT_MOUSE_OUT. It:
+ * 1. Finds the registered Ecore_Input_Window.
+ * 2. Updates Evas modifier/lock states.
+ * 3. If a direct input callback is set, calls it. If it handles the event, Evas feeding is skipped.
+ * 4. Otherwise, feeds the mouse in/out event to Evas.
+ * 5. Calls the custom `move_mouse` callback with the current coordinates, as mouse in/out
+ *    events often imply a position.
+ *
+ * @param e The Ecore_Event_Mouse_IO event data.
+ * @param io Indicates ECORE_IN or ECORE_OUT.
+ * @return ECORE_CALLBACK_PASS_ON.
+ */
 static Eina_Bool
 _ecore_event_evas_mouse_io(Ecore_Event_Mouse_IO *e, Ecore_Event_IO io)
 {
@@ -700,18 +977,48 @@ _ecore_event_evas_mouse_io(Ecore_Event_Mouse_IO *e, Ecore_Event_IO io)
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Ecore event handler for key down events.
+ * Wraps _ecore_event_evas_key with ECORE_DOWN.
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param event Pointer to the Ecore_Event_Key structure.
+ * @return Result of _ecore_event_evas_key.
+ */
 EAPI Eina_Bool
 ecore_event_evas_key_down(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
    return _ecore_event_evas_key((Ecore_Event_Key *)event, ECORE_DOWN);
 }
 
+/**
+ * @brief Ecore event handler for key up events.
+ * Wraps _ecore_event_evas_key with ECORE_UP.
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param event Pointer to the Ecore_Event_Key structure.
+ * @return Result of _ecore_event_evas_key.
+ */
 EAPI Eina_Bool
 ecore_event_evas_key_up(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
    return _ecore_event_evas_key((Ecore_Event_Key *)event, ECORE_UP);
 }
 
+/**
+ * @brief Ecore event handler for mouse wheel events.
+ *
+ * This function is registered as a callback for ECORE_EVENT_MOUSE_WHEEL. It:
+ * 1. Finds the registered Ecore_Input_Window.
+ * 2. Updates Evas modifier/lock states.
+ * 3. If a direct input callback is set, calls it. If it handles the event, Evas feeding is skipped.
+ * 4. Otherwise, feeds the mouse wheel event to Evas.
+ *
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param event Pointer to the Ecore_Event_Mouse_Wheel structure.
+ * @return ECORE_CALLBACK_PASS_ON.
+ */
 EAPI Eina_Bool
 ecore_event_evas_mouse_wheel(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -733,18 +1040,51 @@ ecore_event_evas_mouse_wheel(void *data EINA_UNUSED, int type EINA_UNUSED, void 
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Ecore event handler for mouse in events.
+ * Wraps _ecore_event_evas_mouse_io with ECORE_IN.
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param event Pointer to the Ecore_Event_Mouse_IO structure.
+ * @return Result of _ecore_event_evas_mouse_io.
+ */
 EAPI Eina_Bool
 ecore_event_evas_mouse_in(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
    return _ecore_event_evas_mouse_io((Ecore_Event_Mouse_IO *)event, ECORE_IN);
 }
 
+/**
+ * @brief Ecore event handler for mouse out events.
+ * Wraps _ecore_event_evas_mouse_io with ECORE_OUT.
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param event Pointer to the Ecore_Event_Mouse_IO structure.
+ * @return Result of _ecore_event_evas_mouse_io.
+ */
 EAPI Eina_Bool
 ecore_event_evas_mouse_out(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
    return _ecore_event_evas_mouse_io((Ecore_Event_Mouse_IO *)event, ECORE_OUT);
 }
 
+/**
+ * @brief Ecore event handler for axis update events (e.g., from a tablet stylus).
+ *
+ * This function is registered as a callback for ECORE_EVENT_AXIS_UPDATE. It:
+ * 1. Finds the registered Ecore_Input_Window.
+ * 2. If a direct input callback is set, calls it. If it handles the event, Evas feeding is skipped.
+ * 3. Otherwise, feeds the axis update event to Evas.
+ *    The `e->axis` field is an array of Ecore_Axis structures.
+ *    Example `e->axis` structure:
+ *    `Ecore_Axis axis_data[] = { { label = "X Tilt", value = 10.5 }, { label = "Y Tilt", value = -5.2 } };`
+ *    `e->naxis` would be 2 in this case.
+ *
+ * @param data User data (unused).
+ * @param type Event type (unused).
+ * @param event Pointer to the Ecore_Event_Axis_Update structure.
+ * @return ECORE_CALLBACK_PASS_ON.
+ */
 EAPI Eina_Bool
 ecore_event_evas_axis_update(void *data EINA_UNUSED, int type EINA_UNUSED, void *event)
 {
@@ -765,6 +1105,21 @@ ecore_event_evas_axis_update(void *data EINA_UNUSED, int type EINA_UNUSED, void 
    return ECORE_CALLBACK_PASS_ON;
 }
 
+/**
+ * @brief Initializes the Ecore Evas event handling module.
+ *
+ * This function sets up the necessary Ecore event handlers to intercept
+ * input events (key, mouse, axis) and feed them to registered Evas canvases.
+ * It also initializes a log domain for this module and the `_window_hash`
+ * for mapping Ecore_Window IDs to Evas instances.
+ * It reads environment variables `ECORE_INPUT_FIX` and `ECORE_INPUT_TIMEOUT_FIX`
+ * to enable and configure a workaround for missing mouse UP events.
+ *
+ * This function uses a reference counter (`_ecore_event_evas_init_count`).
+ * Ecore and Ecore_Event are initialized only on the first call.
+ *
+ * @return The current initialization count. Returns 0 or a negative value on failure.
+ */
 EAPI int
 ecore_event_evas_init(void)
 {
@@ -841,6 +1196,17 @@ ecore_event_evas_init(void)
    return --_ecore_event_evas_init_count;
 }
 
+/**
+ * @brief Shuts down the Ecore Evas event handling module.
+ *
+ * This function cleans up resources allocated by `ecore_event_evas_init`.
+ * It removes the Ecore event handlers, frees the `_window_hash`, clears
+ * the list of last events, and unregisters the log domain.
+ * Ecore_Event and Ecore are shut down only when the reference counter
+ * (`_ecore_event_evas_init_count`) reaches zero.
+ *
+ * @return The current initialization count (0 if fully shut down).
+ */
 EAPI int
 ecore_event_evas_shutdown(void)
 {

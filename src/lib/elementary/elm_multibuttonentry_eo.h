@@ -11,6 +11,29 @@ typedef Eo Elm_Multibuttonentry;
 #ifndef _ELM_MULTIBUTTONENTRY_EO_TYPES
 #define _ELM_MULTIBUTTONENTRY_EO_TYPES
 
+/**
+ * @brief Callback function type for formatting the hidden items counter string.
+ *
+ * @param[in] count The number of hidden items.
+ * @return A newly allocated string representing the formatted count, or @c NULL on failure.
+ *         The caller is responsible for freeing the returned string.
+ * @ingroup Elm_Multibuttonentry
+ */
+typedef char * (*Elm_Multibuttonentry_Format_Cb)(unsigned int count);
+
+/**
+ * @brief Callback function type for filtering items.
+ *
+ * @param[in] obj The multibuttonentry object.
+ * @param[in] text The text of the item to be filtered. This string can be modified by the callback.
+ *                 If the callback modifies this string, it must free the original @p text and return the new string.
+ *                 If the item is to be discarded, set @p text to @c NULL.
+ * @param[in] data User data passed to the callback.
+ * @return @c EINA_TRUE if the item should be added, @c EINA_FALSE otherwise.
+ * @ingroup Elm_Multibuttonentry
+ */
+typedef Eina_Bool (*Elm_Multibuttonentry_Item_Filter_Cb)(Evas_Object *obj, char **text, void *data);
+
 
 #endif
 /** Elementary multibuttonentry class

@@ -7,12 +7,40 @@
 
 typedef struct _Item_Calc Item_Calc;
 
+/**
+ * @brief Internal structure to hold calculation data for each item in the box layout.
+ *
+ * This structure stores a pointer to the Evas_Object representing the item
+ * and its layout hints for both X and Y axes.
+ */
 struct _Item_Calc
 {
-   Evas_Object *obj;
-   Efl_Ui_Container_Item_Hints hints[2]; /* 0 is x-axis, 1 is y-axis */
+   Evas_Object *obj; /**< The Evas_Object (child item) being processed. */
+   Efl_Ui_Container_Item_Hints hints[2]; /**< Layout hints for the item. Index 0 for X-axis, 1 for Y-axis.
+                                          * hints[0].space: desired width
+                                          * hints[0].margin: left and right margins
+                                          * hints[0].align: horizontal alignment
+                                          * hints[0].weight: horizontal weight
+                                          * hints[0].fill: horizontal fill policy
+                                          * hints[0].aspect: aspect ratio control
+                                          * hints[1] follows the same pattern for the Y-axis (height, top/bottom margins, etc.)
+                                          */
 };
 
+/**
+ * @brief Updates the layout of the box stack.
+ *
+ * This function is called when the layout of the box needs to be recalculated.
+ * It iterates over all child items, calculates their desired sizes and positions
+ * based on their hints (margins, alignment, weight, fill, aspect ratio),
+ * and then arranges them in a stack. All items will occupy the same area,
+ * stacked on top of each other, with the last child added being on top.
+ * The overall minimum size of the box is determined by the largest child's
+ * dimensions, considering padding.
+ *
+ * @param obj The Efl_Ui_Box_Stack object.
+ * @param _pd Private data for the Efl_Ui_Box_Stack class (unused in this function).
+ */
 EOLIAN static void
 _efl_ui_box_stack_efl_pack_layout_layout_update(Eo *obj, void *_pd EINA_UNUSED)
 {
@@ -27,19 +55,24 @@ _efl_ui_box_stack_efl_pack_layout_layout_update(Eo *obj, void *_pd EINA_UNUSED)
    int i = 0, count;
 
    count = eina_list_count(bd->children);
+   // If there are no children, set the minimum size to zero and return.
    if (!count)
      {
         efl_gfx_hint_size_restricted_min_set(obj, EINA_SIZE2D(0, 0));
         return;
      }
 
+   // Initialize the box calculation data (e.g., padding, alignment for the box itself).
    _efl_ui_container_layout_init(obj, box_calc);
 
+   // Allocate space on the stack for storing per-item calculation data.
    items = alloca(count * sizeof(*items));
 #ifdef DEBUG
    memset(items, 0, count * sizeof(*items));
 #endif
 
+   // First pass: Iterate over children to initialize their layout hints
+   // and determine the maximum desired space (want.w, want.h) among all children.
    EINA_LIST_FOREACH(bd->children, l, child)
      {
         item = &items[i++];
@@ -54,11 +87,15 @@ _efl_ui_box_stack_efl_pack_layout_layout_update(Eo *obj, void *_pd EINA_UNUSED)
           want.h = hints[1].space;
      }
 
+   // The box's content area size is at least the maximum space wanted by any child.
    if (box_calc[0].size < want.w)
      box_calc[0].size = want.w;
    if (box_calc[1].size < want.h)
      box_calc[1].size = want.h;
 
+   // Second pass: Calculate and apply geometry for each item.
+   // All items in a stack layout share the same conceptual space,
+   // determined by box_calc.size, adjusted for individual margins.
    for (i = 0; i < count; i++)
      {
         hints = items[i].hints;
@@ -82,16 +119,21 @@ _efl_ui_box_stack_efl_pack_layout_layout_update(Eo *obj, void *_pd EINA_UNUSED)
 
         efl_gfx_entity_geometry_set(items[i].obj, item_geom);
 
+        // Stack items on top of each other. The current item is stacked above the previous one.
+        // This ensures that the last item in the children list appears on top.
         if (old_child)
           efl_gfx_stack_above(items[i].obj, old_child);
         old_child = items[i].obj;
      }
 
+   // The total minimum size required by the box includes its own margins/padding.
    want.w += (box_calc[0].margin[0] + box_calc[0].margin[1]);
    want.h += (box_calc[1].margin[0] + box_calc[1].margin[1]);
 
+   // Set the calculated minimum size for the box widget.
    efl_gfx_hint_size_restricted_min_set(obj, want);
 
+   // Notify that the layout has been updated.
    efl_event_callback_call(obj, EFL_PACK_EVENT_LAYOUT_UPDATED, NULL);
 }
 

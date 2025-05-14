@@ -39,6 +39,15 @@ static int _evas_loader_jxl_log_dom = -1;
 #endif
 #define INF(...) EINA_LOG_DOM_INFO(_evas_loader_jxl_log_dom, __VA_ARGS__)
 
+/**
+ * @brief Converts an RGBA pixel buffer to BGRA in-place.
+ *
+ * This function iterates through the pixel data and swaps the R and B channels.
+ * It processes two pixels at a time (as unsigned long long int) for efficiency.
+ *
+ * @param pixels Pointer to the pixel data.
+ * @param size Total number of pixels (not bytes).
+ */
 void _rgba_to_bgra(void *pixels, int size /* in pixels */)
 {
    unsigned long long int *iter = pixels;
@@ -56,6 +65,19 @@ void _rgba_to_bgra(void *pixels, int size /* in pixels */)
      }
 }
 
+/**
+ * @brief Reads the header of a JXL image file to get properties.
+ *
+ * This function decodes the JXL image header to extract information like
+ * width, height, alpha presence, and animation details.
+ *
+ * @param loader Pointer to the internal loader structure.
+ * @param prop Pointer to store the image properties.
+ * @param map Memory-mapped content of the JXL file.
+ * @param length Size of the memory-mapped file.
+ * @param error Pointer to an integer to store error codes.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_head_jxl_internal(Evas_Loader_Internal *loader,
                                        Emile_Image_Property *prop,
@@ -184,6 +206,21 @@ evas_image_load_file_head_jxl_internal(Evas_Loader_Internal *loader,
    return ret;
 }
 
+/**
+ * @brief Loads the image data from a JXL file.
+ *
+ * This function decodes the JXL image data into the provided pixel buffer.
+ * It handles both static and animated JXL images. For animated images,
+ * it loads the current frame specified in loader->animated->cur_frame.
+ *
+ * @param loader Pointer to the internal loader structure.
+ * @param prop Pointer to the image properties.
+ * @param pixels Buffer to store the decoded pixel data (BGRA format).
+ * @param map Memory-mapped content of the JXL file.
+ * @param length Size of the memory-mapped file.
+ * @param error Pointer to an integer to store error codes.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_data_jxl_internal(Evas_Loader_Internal *loader,
                                        Emile_Image_Property *prop,
@@ -325,6 +362,19 @@ evas_image_load_file_data_jxl_internal(Evas_Loader_Internal *loader,
    return ret;
 }
 
+/**
+ * @brief Opens a JXL image file for loading.
+ *
+ * This function is called by Evas to initialize the loading process for a JXL image.
+ * It allocates and initializes an Evas_Loader_Internal structure.
+ *
+ * @param f Eina_File handle for the image file.
+ * @param key Optional key associated with the image file (unused).
+ * @param opts Load options for the image.
+ * @param animated Pointer to store animated image properties.
+ * @param error Pointer to an integer to store error codes.
+ * @return Pointer to an Evas_Loader_Internal structure on success, NULL on failure.
+ */
 static void *
 evas_image_load_file_open_jxl(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
                               Evas_Image_Load_Opts *opts,
@@ -347,6 +397,14 @@ evas_image_load_file_open_jxl(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
    return loader;
 }
 
+/**
+ * @brief Closes a JXL image file and cleans up resources.
+ *
+ * This function is called by Evas when the image loading process is finished
+ * or aborted. It frees resources allocated by evas_image_load_file_open_jxl.
+ *
+ * @param loader_data Pointer to the Evas_Loader_Internal structure.
+ */
 static void
 evas_image_load_file_close_jxl(void *loader_data)
 {
@@ -363,6 +421,18 @@ evas_image_load_file_close_jxl(void *loader_data)
    free(loader_data);
 }
 
+/**
+ * @brief Reads the header of a JXL image file (Evas plugin interface).
+ *
+ * This function is part of the Evas image loader plugin interface.
+ * It maps the file to memory and calls evas_image_load_file_head_jxl_internal
+ * to do the actual header parsing.
+ *
+ * @param loader_data Pointer to the Evas_Loader_Internal structure.
+ * @param prop Pointer to store the image properties.
+ * @param error Pointer to an integer to store error codes.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_head_jxl(void *loader_data,
                               Evas_Image_Property *prop,
@@ -392,6 +462,19 @@ evas_image_load_file_head_jxl(void *loader_data,
    return val;
 }
 
+/**
+ * @brief Loads the image data from a JXL file (Evas plugin interface).
+ *
+ * This function is part of the Evas image loader plugin interface.
+ * It maps the file to memory and calls evas_image_load_file_data_jxl_internal
+ * to do the actual image data decoding.
+ *
+ * @param loader_data Pointer to the Evas_Loader_Internal structure.
+ * @param prop Pointer to the image properties.
+ * @param pixels Buffer to store the decoded pixel data.
+ * @param error Pointer to an integer to store error codes.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_data_jxl(void *loader_data,
                               Evas_Image_Property *prop,
@@ -425,6 +508,19 @@ evas_image_load_file_data_jxl(void *loader_data,
    return val;
 }
 
+/**
+ * @brief Gets the duration of a specific frame or sequence of frames in an animated JXL.
+ *
+ * This function is part of the Evas image loader plugin interface.
+ * It returns the duration for a given frame number. In the current JXL
+ * implementation, it seems all frames have the same duration as reported
+ * by the header.
+ *
+ * @param loader_data Pointer to the Evas_Loader_Internal structure.
+ * @param start_frame The starting frame index (currently unused by this loader).
+ * @param frame_num The frame number for which to get the duration. If < 1, it's treated as 1.
+ * @return The duration of the frame in seconds, or -1.0 on error or if not animated.
+ */
 static double
 evas_image_load_frame_duration_jxl(void *loader_data,
                                    int start_frame,
@@ -464,6 +560,15 @@ static Evas_Image_Load_Func evas_image_load_jxl_func =
    EINA_FALSE
 };
 
+/**
+ * @brief Opens the Evas JXL image loader module.
+ *
+ * This function is called when the Evas module is loaded.
+ * It registers a log domain and sets up the module functions.
+ *
+ * @param em Pointer to the Evas_Module structure.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 module_open(Evas_Module *em)
 {
@@ -481,6 +586,14 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Closes the Evas JXL image loader module.
+ *
+ * This function is called when the Evas module is unloaded.
+ * It unregisters the log domain.
+ *
+ * @param em Pointer to the Evas_Module structure (unused).
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {

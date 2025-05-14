@@ -5,6 +5,13 @@
 
 static Elm_Genlist_Item_Class *it_desk = NULL;
 
+/**
+ * @brief Get the text for a desktop entry in the genlist.
+ * @param data The Efreet_Desktop object.
+ * @param obj The genlist object.
+ * @param part The theme part name.
+ * @return The name of the desktop application.
+ */
 static char *
 desk_gl_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA_UNUSED)
 {
@@ -16,6 +23,14 @@ desk_gl_text_get(void *data, Evas_Object *obj EINA_UNUSED, const char *part EINA
    (void)data;
 #endif
 }
+
+/**
+ * @brief Get the icon for a desktop entry in the genlist.
+ * @param data The Efreet_Desktop object.
+ * @param obj The genlist object.
+ * @param part The theme part name to swallow the icon into.
+ * @return The icon object.
+ */
 static Evas_Object *
 desk_gl_content_get(void *data, Evas_Object *obj, const char *part)
 {
@@ -36,6 +51,12 @@ desk_gl_content_get(void *data, Evas_Object *obj, const char *part)
    (void)part;
 #endif
 }
+
+/**
+ * @brief Callback for desktop entry deletion from the genlist.
+ * @param data The Efreet_Desktop object to free.
+ * @param obj The genlist object.
+ */
 static void
 desk_gl_del(void *data, Evas_Object *obj EINA_UNUSED)
 {
@@ -49,6 +70,12 @@ desk_gl_del(void *data, Evas_Object *obj EINA_UNUSED)
 }
 
 #ifdef ELM_EFREET
+/**
+ * @brief Callback for when a desktop entry is selected in the genlist.
+ * @param data The selected Efreet_Desktop object.
+ * @param obj The genlist object.
+ * @param event_info The event information.
+ */
 static void
 desktop_sel(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -61,6 +88,17 @@ desktop_sel(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
 }
 #endif
 
+/**
+ * @brief Test function to display all desktop file icons in a genlist.
+ *
+ * This function creates a window with a genlist. If Efreet is available,
+ * it populates the genlist with all applications found on the system,
+ * showing their icon and name.
+ *
+ * @param data Not used.
+ * @param obj Not used.
+ * @param event_info Not used.
+ */
 void
 test_icon_desktops(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

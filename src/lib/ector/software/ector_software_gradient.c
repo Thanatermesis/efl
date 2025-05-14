@@ -1,22 +1,67 @@
+/**
+ * @file
+ * @brief Software gradient rendering implementation for Ector.
+ *
+ * This file contains the core logic for rendering linear and radial gradients
+ * using software-based methods. It includes generic C implementations as well
+ * as SSE3 optimized versions where available. It manages color table generation
+ * for gradients and provides functions to fetch gradient pixels for spans.
+ */
+
 #include "ector_software_gradient.h"
 
 #ifdef BUILD_SSE3
+/**
+ * @brief SSE3 optimized helper function for radial gradient calculation.
+ * @param buffer The destination buffer for pixel data.
+ * @param length The number of pixels to calculate.
+ * @param g_data Pointer to the gradient data.
+ * @param det Initial determinant value.
+ * @param delta_det Change in determinant per pixel.
+ * @param delta_delta_det Change in delta_det per pixel.
+ * @param b Initial 'b' term in the quadratic equation.
+ * @param delta_b Change in 'b' term per pixel.
+ */
 void _radial_helper_sse3(uint32_t *buffer, int length, Ector_Renderer_Software_Gradient_Data *g_data, float det, float delta_det, float delta_delta_det, float b, float delta_b);
+/**
+ * @brief SSE3 optimized helper function for linear gradient calculation.
+ * @param buffer The destination buffer for pixel data.
+ * @param length The number of pixels to calculate.
+ * @param g_data Pointer to the gradient data.
+ * @param t_fixed Initial fixed-point position value.
+ * @param inc_fixed Fixed-point increment value per pixel.
+ */
 void _linear_helper_sse3(uint32_t *buffer, int length, Ector_Renderer_Software_Gradient_Data *g_data, int t, int inc);
 #endif
 
-#define GRADIENT_STOPTABLE_SIZE 1024
-#define FIXPT_BITS 8
-#define FIXPT_SIZE (1<<FIXPT_BITS)
+#define GRADIENT_STOPTABLE_SIZE 1024 /**< Size of the pre-calculated gradient color table. */
+#define FIXPT_BITS 8 /**< Number of bits for fixed-point arithmetic precision. */
+#define FIXPT_SIZE (1<<FIXPT_BITS) /**< Scaling factor for fixed-point arithmetic (2^FIXPT_BITS). */
 
+/**
+ * @brief Function pointer type for radial gradient helper functions.
+ * These functions calculate and fill a buffer with radial gradient pixels.
+ */
 typedef void (*Ector_Radial_Helper_Func)(uint32_t *buffer, int length, Ector_Renderer_Software_Gradient_Data *g_data,
                                           float det, float delta_det, float delta_delta_det, float b, float delta_b);
+/**
+ * @brief Function pointer type for linear gradient helper functions.
+ * These functions calculate and fill a buffer with linear gradient pixels using fixed-point arithmetic.
+ */
 typedef void (*Ector_Linear_Helper_Func)(uint32_t *buffer, int length, Ector_Renderer_Software_Gradient_Data *g_data,
                                           int t_fixed, int inc_fixed);
 
-static Ector_Radial_Helper_Func _ector_radial_helper;
-static Ector_Linear_Helper_Func _ector_linear_helper;
+static Ector_Radial_Helper_Func _ector_radial_helper; /**< Pointer to the current radial gradient helper function (generic or SSE3). */
+static Ector_Linear_Helper_Func _ector_linear_helper; /**< Pointer to the current linear gradient helper function (generic or SSE3). */
 
+/**
+ * @brief Updates the gradient color table.
+ * This function is typically scheduled to run in a software rendering thread.
+ * It generates a table of colors based on the gradient stops.
+ *
+ * @param data Pointer to Ector_Renderer_Software_Gradient_Data.
+ * @param t Pointer to Ector_Software_Thread (unused).
+ */
 static void
 _update_color_table(void *data, Ector_Software_Thread *t EINA_UNUSED)
 {
@@ -25,6 +70,12 @@ _update_color_table(void *data, Ector_Software_Thread *t EINA_UNUSED)
                                                          gdata->color_table, GRADIENT_STOPTABLE_SIZE);
 }
 
+/**
+ * @brief Marks the color table generation as complete.
+ * This function is called after _update_color_table finishes.
+ *
+ * @param data Pointer to Ector_Renderer_Software_Gradient_Data.
+ */
 static void
 _done_color_table(void *data)
 {
@@ -32,6 +83,13 @@ _done_color_table(void *data)
    gdata->ctable_status = CTABLE_READY_DONE;
 }
 
+/**
+ * @brief Ensures the gradient color table is up-to-date.
+ * If the color table is not ready or is being processed, this function
+ * will either schedule its generation or wait for its completion.
+ *
+ * @param gdata Pointer to the gradient data.
+ */
 void
 ector_software_gradient_color_update(Ector_Renderer_Software_Gradient_Data *gdata)
 {
@@ -52,6 +110,11 @@ ector_software_gradient_color_update(Ector_Renderer_Software_Gradient_Data *gdat
         ector_software_wait(_update_color_table, _done_color_table, gdata);
 }
 
+/**
+ * @brief Frees the memory allocated for the gradient color table.
+ *
+ * @param gdata Pointer to the gradient data.
+ */
 void
 destroy_color_table(Ector_Renderer_Software_Gradient_Data *gdata)
 {
@@ -62,6 +125,19 @@ destroy_color_table(Ector_Renderer_Software_Gradient_Data *gdata)
      }
 }
 
+/**
+ * @brief Generic C implementation for linear gradient calculation.
+ * Fills a buffer with pixels for a linear gradient using fixed-point arithmetic.
+ *
+ * @param buffer The destination buffer for pixel data.
+ *               Example: `uint32_t scanline[width];`
+ * @param length The number of pixels to calculate (width of the span).
+ * @param g_data Pointer to the gradient data, containing color table and spread mode.
+ * @param t_fixed Initial fixed-point position value along the gradient axis.
+ *                This value is scaled by `FIXPT_SIZE`.
+ * @param inc_fixed Fixed-point increment value per pixel along the gradient axis.
+ *                  This value is also scaled by `FIXPT_SIZE`.
+ */
 static void
 _linear_helper_generic(uint32_t *buffer, int length, Ector_Renderer_Software_Gradient_Data *g_data,
                        int t_fixed, int inc_fixed)
@@ -75,6 +151,20 @@ _linear_helper_generic(uint32_t *buffer, int length, Ector_Renderer_Software_Gra
      }
 }
 
+/**
+ * @brief Fetches a span of pixels for a linear gradient.
+ * Calculates the gradient parameters for the given span and then fills the
+ * buffer with the corresponding gradient colors. It may use fixed-point
+ * arithmetic for optimization if the values are within range, otherwise
+ * it falls back to floating-point math.
+ *
+ * @param buffer The destination buffer for pixel data.
+ *               Example: `uint32_t scanline_segment[segment_length];`
+ * @param data Pointer to Span_Data containing transformation matrix and gradient data.
+ * @param y The y-coordinate of the start of the span.
+ * @param x The x-coordinate of the start of the span.
+ * @param length The number of pixels in the span.
+ */
 void
 fetch_linear_gradient(uint32_t *buffer, Span_Data *data, int y, int x, int length)
 {
@@ -134,16 +224,34 @@ _radial_helper_generic(uint32_t *buffer, int length, Ector_Renderer_Software_Gra
 {
    int i;
 
+   // This loop calculates the color for each pixel in the span.
+   // 'det' is related to the squared distance from the gradient center, adjusted by 'a'.
+   // 'b' is related to the linear term in the radial gradient equation.
+   // The gradient position is effectively sqrt(det) - b.
    for (i = 0 ; i < length ; i++)
      {
         *buffer++ = _gradient_pixel(g_data, sqrt(det) - b);
-        det += delta_det;
-        delta_det += delta_delta_det;
-        b += delta_b;
+        det += delta_det; // Update det for the next pixel
+        delta_det += delta_delta_det; // Update the rate of change of det
+        b += delta_b; // Update b for the next pixel
      }
 }
 
-
+/**
+ * @brief Fetches a span of pixels for a radial gradient.
+ * Calculates the complex parameters for a radial gradient across a span
+ * and then fills the buffer with the corresponding gradient colors.
+ * This involves solving a quadratic equation for each pixel to determine
+ * its distance from the gradient's focal point, considering the gradient's
+ * transformation.
+ *
+ * @param buffer The destination buffer for pixel data.
+ *               Example: `uint32_t scanline_segment[segment_length];`
+ * @param data Pointer to Span_Data containing transformation matrix and gradient data.
+ * @param y The y-coordinate of the start of the span.
+ * @param x The x-coordinate of the start of the span.
+ * @param length The number of pixels in the span.
+ */
 void
 fetch_radial_gradient(uint32_t *buffer, Span_Data *data, int y, int x, int length)
 {
@@ -194,15 +302,26 @@ fetch_radial_gradient(uint32_t *buffer, Span_Data *data, int y, int x, int lengt
    _ector_radial_helper(buffer, length, g_data, det, delta_det, delta_delta_det, b, delta_b);
 }
 
+/**
+ * @brief Initializes the software gradient module.
+ * This function sets up the appropriate helper functions for linear and radial
+ * gradients, choosing between generic C versions and SSE3 optimized versions
+ * if available and supported by the CPU. It ensures this initialization
+ * happens only once.
+ *
+ * @return The initialization count. Returns 1 on the first call, and increments
+ *         on subsequent calls (though typically only called once effectively).
+ */
 int
 ector_software_gradient_init(void)
 {
    static int i = 0;
-   if (!(i++))
+   if (!(i++)) // Ensure initialization runs only once
      {
         _ector_radial_helper = _radial_helper_generic;
         _ector_linear_helper = _linear_helper_generic;
 #ifdef BUILD_SSE3
+        // Check for SSE3 CPU support and use optimized versions if available
         if (eina_cpu_features_get() & EINA_CPU_SSE3)
           {
              _ector_radial_helper = _radial_helper_sse3;

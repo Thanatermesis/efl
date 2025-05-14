@@ -11,46 +11,201 @@
 /* The buffer to load pmaps images */
 typedef struct Pmaps_Buffer Pmaps_Buffer;
 
+/**
+ * @brief Structure to manage buffering and parsing of PBM, PGM, and PPM (pmaps) image files.
+ *
+ * This structure holds the state required to read and interpret pmaps image
+ * data, including file handles, memory maps, read buffers, and image properties.
+ * It also contains function pointers for format-specific data retrieval.
+ */
 struct Pmaps_Buffer
 {
-   Eina_File *file;
-   unsigned char *map;
-   size_t position;
+   Eina_File *file;                       /**< Pointer to the Eina_File being read. */
+   unsigned char *map;                    /**< Memory map of the image file. */
+   size_t position;                       /**< Current read position in the memory map. */
 
    /* the buffer */
-   DATA8 buffer[FILE_BUFFER_SIZE];
-   DATA8 unread[FILE_BUFFER_UNREAD_SIZE];
-   DATA8 *current;
-   DATA8 *end;
-   char type[3];
-   unsigned char unread_len:7;
-   unsigned char last_buffer:1;
+   DATA8 buffer[FILE_BUFFER_SIZE];        /**< Main read buffer for file data. */
+   DATA8 unread[FILE_BUFFER_UNREAD_SIZE]; /**< Buffer for characters that were read but need to be processed again (e.g., after a number). */
+   DATA8 *current;                        /**< Pointer to the current position in the `buffer`. */
+   DATA8 *end;                            /**< Pointer to the end of valid data in the `buffer`. */
+   char type[3];                          /**< Stores the PBM/PGM/PPM type (e.g., "P1", "P2", "P3", "P4", "P5", "P6"). type[2] is a null terminator. */
+   unsigned char unread_len:7;            /**< Number of bytes currently stored in the `unread` buffer. */
+   unsigned char last_buffer:1;           /**< Flag indicating if the current `buffer` contains the last chunk of file data. */
 
    /* image properties */
-   int w;
-   int h;
-   int max;
+   int w;                                 /**< Width of the image in pixels. */
+   int h;                                 /**< Height of the image in pixels. */
+   int max;                               /**< Maximum color/gray value (e.g., 255 for 8-bit PGM/PPM). Not used for PBM. */
 
    /* interface */
+   /**
+    * @brief Function pointer to get an integer value from the buffer.
+    * This varies based on whether the format is plain (ASCII) or raw (binary).
+    * @param b The Pmaps_Buffer.
+    * @param val Pointer to store the read integer.
+    * @return 1 on success, 0 on failure (e.g., EOF or parse error).
+    */
    int (*int_get) (Pmaps_Buffer *b, int *val);
+   /**
+    * @brief Function pointer to get a color value (DATA32) from the buffer.
+    * This varies based on the image type (PBM, PGM, PPM).
+    * @param b The Pmaps_Buffer.
+    * @param color Pointer to store the read color (ARGB format).
+    * @return 1 on success, 0 on failure (e.g., EOF or parse error).
+    */
    int (*color_get) (Pmaps_Buffer *b, DATA32 *color);
 };
 
 /* internal used functions */
+
+/**
+ * @brief Opens and initializes a Pmaps_Buffer for reading an image file.
+ *
+ * Maps the file into memory and reads the initial chunk of data to determine
+ * the image type (P1-P6).
+ *
+ * @param b Pointer to the Pmaps_Buffer to initialize.
+ * @param f Pointer to the Eina_File to read from.
+ * @param header If EINA_TRUE, map the file for random access (typically for header reading).
+ *               If EINA_FALSE, map for sequential access (typically for data reading).
+ * @param error Pointer to an integer to store an error code on failure.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool pmaps_buffer_open(Pmaps_Buffer *b, Eina_File *f, Eina_Bool header, int *error);
+
+/**
+ * @brief Closes a Pmaps_Buffer, freeing associated resources.
+ *
+ * Unmaps the file from memory if it was mapped.
+ *
+ * @param b Pointer to the Pmaps_Buffer to close.
+ */
 static void pmaps_buffer_close(Pmaps_Buffer *b);
+
+/**
+ * @brief Parses the header of a pmaps image file.
+ *
+ * Reads image dimensions (width, height) and maximum color value (if applicable).
+ * Sets up appropriate function pointers (`int_get`, `color_get`) based on the
+ * image type (P1-P6) and data format (plain/ASCII or raw/binary).
+ *
+ * @param b Pointer to the Pmaps_Buffer containing the header data.
+ * @param error Pointer to an integer to store an error code on failure.
+ * @return EINA_TRUE on success, EINA_FALSE on failure (e.g., unknown format, corrupt file).
+ */
 static Eina_Bool pmaps_buffer_header_parse(Pmaps_Buffer *b, int *error);
+
+/**
+ * @brief Reads an integer from a plain (ASCII) pmaps data stream.
+ *
+ * Skips whitespace and comments, then parses an ASCII integer.
+ *
+ * @param b Pointer to the Pmaps_Buffer.
+ * @param val Pointer to an integer to store the parsed value.
+ * @return 1 on success, 0 on failure (e.g., EOF or parse error).
+ */
 static int pmaps_buffer_plain_int_get(Pmaps_Buffer *b, int *val);
+
+/**
+ * @brief Reads a single-byte integer from a raw (binary) pmaps data stream.
+ *
+ * @param b Pointer to the Pmaps_Buffer.
+ * @param val Pointer to an integer to store the parsed value (0-255).
+ * @return 1 on success, 0 on failure (e.g., EOF).
+ */
 static int pmaps_buffer_1byte_int_get(Pmaps_Buffer *b, int *val);
+
+/**
+ * @brief Reads a two-byte integer (big-endian) from a raw (binary) pmaps data stream.
+ *
+ * @param b Pointer to the Pmaps_Buffer.
+ * @param val Pointer to an integer to store the parsed value.
+ * @return 1 on success, 0 on failure (e.g., EOF).
+ */
 static int pmaps_buffer_2byte_int_get(Pmaps_Buffer *b, int *val);
+
+/**
+ * @brief Reads a grayscale color value from a PGM (P2, P5) data stream.
+ *
+ * Uses the `int_get` function pointer to read the gray value, then scales it
+ * to the 0-255 range if `b->max` is not 255.
+ *
+ * @param b Pointer to the Pmaps_Buffer.
+ * @param color Pointer to a DATA32 to store the ARGB color (R=G=B=gray, A=0xff).
+ * @return 1 on success, 0 on failure.
+ */
 static int pmaps_buffer_gray_get(Pmaps_Buffer *b, DATA32 *color);
+
+/**
+ * @brief Reads an RGB color value from a PPM (P3, P6) data stream.
+ *
+ * Uses the `int_get` function pointer to read R, G, and B components, then
+ * scales them to the 0-255 range if `b->max` is not 255.
+ *
+ * @param b Pointer to the Pmaps_Buffer.
+ * @param color Pointer to a DATA32 to store the ARGB color (A=0xff).
+ * @return 1 on success, 0 on failure.
+ */
 static int pmaps_buffer_rgb_get(Pmaps_Buffer *b, DATA32 *color);
+
+/**
+ * @brief Reads a black and white color value from a plain PBM (P1) data stream.
+ *
+ * Parses '0' (white) or '1' (black) and converts to ARGB format.
+ *
+ * @param b Pointer to the Pmaps_Buffer.
+ * @param color Pointer to a DATA32 to store the ARGB color (0xffffffff for white, 0xff000000 for black).
+ * @return 1 on success, 0 on failure.
+ */
 static int pmaps_buffer_plain_bw_get(Pmaps_Buffer *b, DATA32 *color);
 
+/**
+ * @brief Updates the buffer for plain (ASCII) pmaps data.
+ *
+ * Reads the next chunk of data from the memory-mapped file into the buffer.
+ * Handles `unread` bytes from previous operations. Null-terminates the buffer
+ * to allow string functions for parsing.
+ *
+ * @param b Pointer to the Pmaps_Buffer.
+ * @return The number of bytes read into the buffer, or 0 if EOF or error.
+ */
 static size_t pmaps_buffer_plain_update(Pmaps_Buffer *b);
+
+/**
+ * @brief Updates the buffer for raw (binary) pmaps data.
+ *
+ * Reads the next chunk of data from the memory-mapped file into the buffer.
+ * Handles `unread` bytes from previous operations.
+ *
+ * @param b Pointer to the Pmaps_Buffer.
+ * @return The number of bytes read into the buffer, or 0 if EOF or error.
+ */
 static size_t pmaps_buffer_raw_update(Pmaps_Buffer *b);
+
+/**
+ * @brief Skips a comment line (from '#' to '\n') in a plain pmaps data stream.
+ *
+ * Handles buffer updates if the comment spans across buffer boundaries.
+ *
+ * @param b Pointer to the Pmaps_Buffer.
+ * @return 1 on success (comment skipped or no comment found), 0 on failure (e.g., EOF within comment).
+ */
 static int pmaps_buffer_comment_skip(Pmaps_Buffer *b);
 
+/**
+ * @brief Opens a pmaps image file for loading. Evas image loader interface function.
+ *
+ * This function is called by Evas to open the image file. It simply returns
+ * the Eina_File handle, as the actual parsing is deferred to the head/data load functions.
+ *
+ * @param f The Eina_File handle for the image.
+ * @param key Unused.
+ * @param opts Unused.
+ * @param animated Unused.
+ * @param error Unused.
+ * @return Returns the Eina_File handle `f` itself as loader data.
+ */
 static void *
 evas_image_load_file_open_pmaps(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
 				Evas_Image_Load_Opts *opts EINA_UNUSED,
@@ -60,11 +215,32 @@ evas_image_load_file_open_pmaps(Eina_File *f, Eina_Stringshare *key EINA_UNUSED,
    return f;
 }
 
+/**
+ * @brief Closes a pmaps image file after loading. Evas image loader interface function.
+ *
+ * This function is called by Evas when the image loader is no longer needed.
+ * For this loader, it's a no-op as the Eina_File is managed externally or
+ * by the Pmaps_Buffer.
+ *
+ * @param loader_data Unused (was the Eina_File handle).
+ */
 static void
 evas_image_load_file_close_pmaps(void *loader_data EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Reads the header of a pmaps image file. Evas image loader interface function.
+ *
+ * This function is called by Evas to get image properties (width, height, alpha)
+ * without loading the full pixel data.
+ *
+ * @param loader_data The Eina_File handle returned by `evas_image_load_file_open_pmaps`.
+ * @param prop Pointer to an Emile_Image_Property struct to fill with image dimensions.
+ *             `prop->w` and `prop->h` will be set. Alpha is assumed to be false (no transparency in pmaps).
+ * @param error Pointer to an integer to store an Evas_Load_Error code.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_head_pmaps(void *loader_data,
                                 Emile_Image_Property *prop,
@@ -93,6 +269,20 @@ evas_image_load_file_head_pmaps(void *loader_data,
    return EINA_TRUE;
 }
 
+/**
+ * @brief Loads the pixel data of a pmaps image file. Evas image loader interface function.
+ *
+ * This function is called by Evas to load the actual image pixel data into a pre-allocated buffer.
+ * It handles all pmaps types (P1-P6).
+ *
+ * @param loader_data The Eina_File handle.
+ * @param prop Pointer to an Emile_Image_Property struct containing expected dimensions.
+ *             Used to verify against header information read from the file.
+ * @param pixels Pointer to the memory buffer where pixel data (in ARGB format) should be written.
+ *               The buffer is assumed to be pre-allocated to `prop->w * prop->h * sizeof(DATA32)`.
+ * @param error Pointer to an integer to store an Evas_Load_Error code.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 evas_image_load_file_data_pmaps(void *loader_data,
 				Emile_Image_Property *prop,
@@ -161,6 +351,7 @@ evas_image_load_file_data_pmaps(void *loader_data,
 }
 
 /* internal used functions */
+// Documentation for pmaps_buffer_open is already added above the struct definition.
 static Eina_Bool
 pmaps_buffer_open(Pmaps_Buffer *b, Eina_File *f, Eina_Bool header, int *error)
 {
@@ -571,11 +762,23 @@ module_open(Evas_Module *em)
    return 1;
 }
 
+/**
+ * @brief Evas module close function.
+ *
+ * Called when the Evas module is being unloaded.
+ *
+ * @param em The Evas_Module structure. Unused in this function.
+ */
 static void
 module_close(Evas_Module *em EINA_UNUSED)
 {
 }
 
+/**
+ * @brief Evas module API structure.
+ *
+ * Defines the API version, module name, and open/close functions for this image loader module.
+ */
 static Evas_Module_Api evas_modapi = {
    EVAS_MODULE_API_VERSION,
    "pmaps",

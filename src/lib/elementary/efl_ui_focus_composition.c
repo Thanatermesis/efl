@@ -11,14 +11,33 @@
 
 #define MY_CLASS EFL_UI_FOCUS_COMPOSITION_MIXIN
 
+/**
+ * @brief Private data structure for Efl_Ui_Focus_Composition_Mixin.
+ *
+ * This structure holds the internal state for managing focus composition,
+ * including lists of focusable objects, their order, and registration status.
+ */
 typedef struct {
-   Eina_List *order, *targets_ordered;
-   Eina_List *register_target, *registered_targets;
-   Efl_Ui_Focus_Manager *registered, *old_manager;
-   Eina_Bool dirty;
-   Eina_Bool logical;
+   Eina_List *order; /**< The user-defined logical order of focusable elements. List of Efl_Ui_Focus_Object. */
+   Eina_List *targets_ordered; /**< The actual order of focusable elements used for composition. List of Efl_Ui_Focus_Object. */
+   Eina_List *register_target; /**< List of elements to be registered with the focus manager. List of Efl_Ui_Focus_Object. */
+   Eina_List *registered_targets; /**< List of elements currently registered with the focus manager. List of Efl_Ui_Focus_Object. */
+   Efl_Ui_Focus_Manager *registered; /**< The current focus manager this composition is registered with. */
+   Efl_Ui_Focus_Manager *old_manager; /**< The previous focus manager, used for cleanup. */
+   Eina_Bool dirty; /**< Flag indicating if the composition order needs recalculation. */
+   Eina_Bool logical; /**< Flag indicating if the composition is in logical mode. */
 } Efl_Ui_Focus_Composition_Data;
 
+/**
+ * @brief Applies the current focus composition state to the focus manager.
+ *
+ * This function registers or unregisters elements with the focus manager
+ * based on the current composition settings (pd->register_target, pd->targets_ordered).
+ * It handles both regular and logical registration modes.
+ *
+ * @param obj The Efl_Ui_Focus_Composition object.
+ * @param pd The private data of the Efl_Ui_Focus_Composition object.
+ */
 static void
 _state_apply(Eo *obj, Efl_Ui_Focus_Composition_Data *pd)
 {

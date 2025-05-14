@@ -16,6 +16,19 @@ static const Efl_Event_Description _EVAS_OBJECT_EVENT_DEL = EFL_EVENT_DESCRIPTIO
 /**
  * Evas events descriptions for Eo.
  */
+
+/**
+ * @brief Macro to define a static array of Efl_Event_Description pointers.
+ *
+ * This macro generates a function that returns an Efl_Event_Description
+ * from a statically initialized array. The array is initialized on the
+ * first call to the generated function.
+ *
+ * @param FUNC The name of the function to generate.
+ * @param LAST The size of the array (number of event descriptions).
+ * @param ... A list of Efl_Event_Description pointers to populate the array.
+ *            Example: EFL_EVENT_POINTER_IN, EFL_EVENT_POINTER_OUT
+ */
 #define DEFINE_EVAS_CALLBACKS(FUNC, LAST, ...)                          \
   static const Efl_Event_Description *FUNC(unsigned int index)          \
   {                                                                     \
@@ -69,6 +82,15 @@ DEFINE_EVAS_CALLBACKS(_legacy_evas_callback_table, EVAS_CALLBACK_LAST,
                       EFL_EVENT_POINTER_AXIS,
                       EVAS_CANVAS_EVENT_VIEWPORT_RESIZE );
 
+/**
+ * @brief Converts an Efl_Event_Description to a legacy Evas_Callback_Type.
+ *
+ * This function iterates through the known legacy Evas callback types and
+ * compares their corresponding Efl_Event_Description with the provided one.
+ *
+ * @param desc The Efl_Event_Description to convert.
+ * @return The corresponding Evas_Callback_Type, or EVAS_CALLBACK_LAST if not found.
+ */
 static inline Evas_Callback_Type
 _legacy_evas_callback_type(const Efl_Event_Description *desc)
 {
@@ -83,29 +105,55 @@ _legacy_evas_callback_type(const Efl_Event_Description *desc)
    return EVAS_CALLBACK_LAST;
 }
 
+/**
+ * @brief Enumerates the types of event information that can be associated with an Efl_Event.
+ *
+ * This enum is used internally to determine how to process and interpret the
+ * `event->info` field of an Efl_Event, particularly when converting to legacy
+ * Evas event information.
+ */
 typedef enum {
-   EFL_EVENT_TYPE_NULL,
-   EFL_EVENT_TYPE_OBJECT,
-   EFL_EVENT_TYPE_STRUCT,
-   EFL_EVENT_TYPE_POINTER,
-   EFL_EVENT_TYPE_KEY,
-   EFL_EVENT_TYPE_HOLD,
-   EFL_EVENT_TYPE_FOCUS
+   EFL_EVENT_TYPE_NULL,    ///< No specific event info type, or event info is NULL.
+   EFL_EVENT_TYPE_OBJECT,  ///< Event info is a pointer to an Efl_Object.
+   EFL_EVENT_TYPE_STRUCT,  ///< Event info is a pointer to a generic struct (e.g., Efl_Canvas_Object_Render_Update).
+   EFL_EVENT_TYPE_POINTER, ///< Event info is related to pointer events (mouse, touch).
+   EFL_EVENT_TYPE_KEY,     ///< Event info is related to key events.
+   EFL_EVENT_TYPE_HOLD,    ///< Event info is related to hold events.
+   EFL_EVENT_TYPE_FOCUS    ///< Event info is related to focus events (but typically handled as NULL type for legacy).
 } Efl_Event_Info_Type;
 
+/**
+ * @brief Wrapper structure for legacy Evas event callbacks.
+ *
+ * This structure holds information needed to manage and invoke legacy
+ * Evas callbacks that are registered through the Efl event system.
+ * It includes the callback function itself, user data, the legacy
+ * Evas callback type, the corresponding Efl event info type, and
+ * the callback priority.
+ */
 typedef struct
 {
-   EINA_INLIST;
+   EINA_INLIST; ///< Macro for intrusive list node.
    union {
-      Evas_Event_Cb         evas_cb;
-      Evas_Object_Event_Cb  object_cb;
-   } func;
-   void                    *data;
-   Evas_Callback_Type       type;
-   Efl_Event_Info_Type      efl_event_type;
-   Evas_Callback_Priority   priority;
+      Evas_Event_Cb         evas_cb;   ///< Legacy Evas canvas event callback function.
+      Evas_Object_Event_Cb  object_cb; ///< Legacy Evas object event callback function.
+   } func; ///< Union of callback function pointers.
+   void                    *data; ///< User data passed to the callback.
+   Evas_Callback_Type       type; ///< The legacy Evas_Callback_Type.
+   Efl_Event_Info_Type      efl_event_type; ///< The type of Efl event info associated.
+   Evas_Callback_Priority   priority; ///< Priority of the callback.
 } Evas_Event_Cb_Wrapper_Info;
 
+/**
+ * @brief Determines the Efl_Event_Info_Type based on a legacy Evas_Callback_Type.
+ *
+ * This function maps a legacy Evas callback type to an internal Efl_Event_Info_Type,
+ * which helps in deciding how to process the event information when a legacy
+ * callback is invoked.
+ *
+ * @param type The legacy Evas_Callback_Type.
+ * @return The corresponding Efl_Event_Info_Type.
+ */
 static int
 _evas_event_efl_event_info_type(Evas_Callback_Type type)
 {
@@ -149,6 +197,17 @@ _evas_event_efl_event_info_type(Evas_Callback_Type type)
      }
 }
 
+/**
+ * @brief EFL event callback handler for legacy Evas object events.
+ *
+ * This function is registered as an EFL event listener. When an EFL event
+ * occurs on an Evas_Object, this handler is invoked. It translates the
+ * EFL event data into the legacy Evas event format and calls the
+ * appropriate legacy Evas_Object_Event_Cb.
+ *
+ * @param data Pointer to an Evas_Event_Cb_Wrapper_Info structure.
+ * @param event The Efl_Event that occurred.
+ */
 static void
 _eo_evas_object_cb(void *data, const Efl_Event *event)
 {
@@ -197,6 +256,17 @@ _eo_evas_object_cb(void *data, const Efl_Event *event)
                                (Efl_Input_Flags)*event_flags);
 }
 
+/**
+ * @brief EFL event callback handler for legacy Evas canvas events.
+ *
+ * This function is registered as an EFL event listener. When an EFL event
+ * occurs on an Evas canvas, this handler is invoked. It translates the
+ * EFL event data into the legacy Evas event format and calls the
+ * appropriate legacy Evas_Event_Cb.
+ *
+ * @param data Pointer to an Evas_Event_Cb_Wrapper_Info structure.
+ * @param event The Efl_Event that occurred.
+ */
 static void
 _eo_evas_cb(void *data, const Efl_Event *event)
 {
@@ -243,6 +313,19 @@ emit:
    info->func.evas_cb(info->data, event->object, event_info);
 }
 
+/**
+ * @brief Processes and calls post-event callbacks for an Evas canvas.
+ *
+ * This function iterates through the list of registered post-event callbacks
+ * for the given Evas canvas and invokes them if their event ID is greater
+ * than or equal to `min_event_id`. It handles canvas deletion and allows
+ * callbacks to stop further processing.
+ *
+ * @param eo_e The Evas canvas object.
+ * @param e The public data of the Evas canvas.
+ * @param min_event_id The minimum event ID for a callback to be processed.
+ *                     If 0, all post-event callbacks are considered.
+ */
 void
 _evas_post_event_callback_call_real(Evas *eo_e, Evas_Public_Data *e, int min_event_id)
 {
@@ -275,6 +358,14 @@ _evas_post_event_callback_call_real(Evas *eo_e, Evas_Public_Data *e, int min_eve
      }
 }
 
+/**
+ * @brief Frees all post-event callbacks associated with an Evas canvas.
+ *
+ * This function is typically called during canvas cleanup to release
+ * resources held by pending post-event callbacks.
+ *
+ * @param eo_e The Evas canvas object.
+ */
 void
 _evas_post_event_callback_free(Evas *eo_e)
 {
@@ -289,6 +380,15 @@ _evas_post_event_callback_free(Evas *eo_e)
      }
 }
 
+/**
+ * @brief Deletes all legacy event callbacks from an Evas object.
+ *
+ * This function iterates through all registered legacy event callbacks
+ * for the given Evas object and removes them. It also frees the
+ * associated wrapper information.
+ *
+ * @param eo_obj The Evas object.
+ */
 void
 evas_object_event_callback_all_del(Evas_Object *eo_obj)
 {
@@ -308,12 +408,29 @@ evas_object_event_callback_all_del(Evas_Object *eo_obj)
      }
 }
 
+/**
+ * @brief Cleans up all event callbacks for an Evas object.
+ *
+ * This is a convenience function that simply calls
+ * evas_object_event_callback_all_del().
+ *
+ * @param eo_obj The Evas object.
+ */
 void
 evas_object_event_callback_cleanup(Evas_Object *eo_obj)
 {
    evas_object_event_callback_all_del(eo_obj);
 }
 
+/**
+ * @brief Deletes all legacy event callbacks from an Evas canvas.
+ *
+ * This function iterates through all registered legacy event callbacks
+ * for the given Evas canvas and removes them. It also frees the
+ * associated wrapper information.
+ *
+ * @param eo_e The Evas canvas object.
+ */
 void
 evas_event_callback_all_del(Evas *eo_e)
 {
@@ -334,18 +451,47 @@ evas_event_callback_all_del(Evas *eo_e)
      }
 }
 
+/**
+ * @brief Cleans up all event callbacks for an Evas canvas.
+ *
+ * This is a convenience function that simply calls
+ * evas_event_callback_all_del().
+ *
+ * @param eo_e The Evas canvas object.
+ */
 void
 evas_event_callback_cleanup(Evas *eo_e)
 {
    evas_event_callback_all_del(eo_e);
 }
 
+/**
+ * @brief Calls legacy Evas event callbacks for a given type on an Evas canvas.
+ *
+ * This function triggers the invocation of all legacy Evas event callbacks
+ * registered for the specified type on the given Evas canvas.
+ *
+ * @param eo_e The Evas canvas object.
+ * @param type The Evas_Callback_Type of the event.
+ * @param event_info The event-specific data.
+ */
 void
 evas_event_callback_call(Evas *eo_e, Evas_Callback_Type type, void *event_info)
 {
    efl_event_callback_legacy_call(eo_e, _legacy_evas_callback_table(type), event_info);
 }
 
+/**
+ * @brief Handles compatibility for smart object legacy events.
+ *
+ * This function ensures that newer EFL events trigger corresponding legacy
+ * smart object events for compatibility. For example, SHOW/HIDE events
+ * also trigger VISIBILITY_CHANGED.
+ *
+ * @param eo_obj The Evas object.
+ * @param efl_event_desc The EFL event description that occurred.
+ * @param event_info The event-specific data.
+ */
 static void
 _evas_callback_legacy_smart_compatibility_do_it(Evas_Object *eo_obj, const Efl_Event_Description *efl_event_desc, void *event_info)
 {
@@ -356,7 +502,22 @@ _evas_callback_legacy_smart_compatibility_do_it(Evas_Object *eo_obj, const Efl_E
      efl_event_callback_call(eo_obj, EFL_GFX_IMAGE_EVENT_IMAGE_PRELOAD_STATE_CHANGED, event_info);
 }
 
-
+/**
+ * @brief Calls legacy Evas event callbacks for a given type on an Evas object.
+ *
+ * This function is responsible for invoking legacy Evas event callbacks
+ * on an Evas object. It handles event propagation to parent objects,
+ * manages event IDs to prevent redundant calls, and deals with
+ * special cases like multi-touch events derived from mouse events.
+ * It also calls smart object callbacks and gesture filtering.
+ *
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @param type The Evas_Callback_Type of the event.
+ * @param event_info The event-specific data.
+ * @param event_id A unique ID for the event instance to prevent re-processing.
+ * @param efl_event_desc The corresponding Efl_Event_Description for this event.
+ */
 void
 evas_object_event_callback_call(Evas_Object *eo_obj, Evas_Object_Protected_Data *obj,
                                 Evas_Callback_Type type, void *event_info, int event_id,
@@ -474,6 +635,15 @@ nothing_here:
    _evas_unwalk(e);
 }
 
+/**
+ * @brief Adds an event callback for a specific event type to an Evas object.
+ * @param eo_obj The object to attach a callback to.
+ * @param type The event type to trigger this callback.
+ * @param func The function to call when the event is triggered.
+ * @param data The data pointer to pass to @p func.
+ * @see evas_object_event_callback_priority_add()
+ * @see evas_object_event_callback_del()
+ */
 EVAS_API void
 evas_object_event_callback_add(Evas_Object *eo_obj, Evas_Callback_Type type, Evas_Object_Event_Cb func, const void *data)
 {
@@ -481,6 +651,16 @@ evas_object_event_callback_add(Evas_Object *eo_obj, Evas_Callback_Type type, Eva
                                            EVAS_CALLBACK_PRIORITY_DEFAULT, func, data);
 }
 
+/**
+ * @brief Adds an event callback for a specific event type to an Evas object with a given priority.
+ * @param eo_obj The object to attach a callback to.
+ * @param type The event type to trigger this callback.
+ * @param priority The priority of the callback. Lower values are called earlier.
+ * @param func The function to call when the event is triggered.
+ * @param data The data pointer to pass to @p func.
+ * @see evas_object_event_callback_add()
+ * @see evas_object_event_callback_del()
+ */
 EVAS_API void
 evas_object_event_callback_priority_add(Evas_Object *eo_obj, Evas_Callback_Type type, Evas_Callback_Priority priority, Evas_Object_Event_Cb func, const void *data)
 {
@@ -509,6 +689,17 @@ evas_object_event_callback_priority_add(Evas_Object *eo_obj, Evas_Callback_Type 
       eina_inlist_append(obj->callbacks, EINA_INLIST_GET(cb_info));
 }
 
+/**
+ * @brief Deletes a callback that was added with evas_object_event_callback_add() or evas_object_event_callback_priority_add().
+ * @param eo_obj The object to delete the callback from.
+ * @param type The event type the callback is registered for.
+ * @param func The function that was registered.
+ * @return The data pointer that was passed to evas_object_event_callback_add() or evas_object_event_callback_priority_add() when the callback was registered.
+ *         Returns @c NULL if the callback is not found.
+ * @see evas_object_event_callback_add()
+ * @see evas_object_event_callback_priority_add()
+ * @see evas_object_event_callback_del_full()
+ */
 EVAS_API void *
 evas_object_event_callback_del(Evas_Object *eo_obj, Evas_Callback_Type type, Evas_Object_Event_Cb func)
 {
@@ -539,6 +730,18 @@ evas_object_event_callback_del(Evas_Object *eo_obj, Evas_Callback_Type type, Eva
    return NULL;
 }
 
+/**
+ * @brief Deletes a callback that was added with evas_object_event_callback_add() or evas_object_event_callback_priority_add(), matching the data pointer as well.
+ * @param eo_obj The object to delete the callback from.
+ * @param type The event type the callback is registered for.
+ * @param func The function that was registered.
+ * @param data The data pointer that was passed when the callback was registered.
+ * @return The data pointer that was passed to evas_object_event_callback_add() or evas_object_event_callback_priority_add() when the callback was registered.
+ *         Returns @c NULL if the callback is not found.
+ * @see evas_object_event_callback_add()
+ * @see evas_object_event_callback_priority_add()
+ * @see evas_object_event_callback_del()
+ */
 EVAS_API void *
 evas_object_event_callback_del_full(Evas_Object *eo_obj, Evas_Callback_Type type, Evas_Object_Event_Cb func, const void *data)
 {
@@ -569,6 +772,15 @@ evas_object_event_callback_del_full(Evas_Object *eo_obj, Evas_Callback_Type type
    return NULL;
 }
 
+/**
+ * @brief Adds an event callback for a specific event type to an Evas canvas.
+ * @param eo_e The Evas canvas to attach a callback to.
+ * @param type The event type to trigger this callback.
+ * @param func The function to call when the event is triggered.
+ * @param data The data pointer to pass to @p func.
+ * @see evas_event_callback_priority_add()
+ * @see evas_event_callback_del()
+ */
 EVAS_API void
 evas_event_callback_add(Evas *eo_e, Evas_Callback_Type type, Evas_Event_Cb func, const void *data)
 {
@@ -576,6 +788,17 @@ evas_event_callback_add(Evas *eo_e, Evas_Callback_Type type, Evas_Event_Cb func,
                                     func, data);
 }
 
+/**
+ * @brief Processes deferred Evas canvas callbacks.
+ *
+ * Callbacks for certain events (like EVAS_CALLBACK_RENDER_POST) might be
+ * deferred if they are added during rendering or post-render phases.
+ * This function processes and adds such deferred callbacks to the main
+ * callback list.
+ *
+ * @param eo_e The Evas canvas object.
+ * @param e The public data of the Evas canvas.
+ */
 void
 _deferred_callbacks_process(Evas *eo_e, Evas_Public_Data *e)
 {
@@ -594,6 +817,16 @@ _deferred_callbacks_process(Evas *eo_e, Evas_Public_Data *e)
      }
 }
 
+/**
+ * @brief Adds an event callback for a specific event type to an Evas canvas with a given priority.
+ * @param eo_e The Evas canvas to attach a callback to.
+ * @param type The event type to trigger this callback.
+ * @param priority The priority of the callback. Lower values are called earlier.
+ * @param func The function to call when the event is triggered.
+ * @param data The data pointer to pass to @p func.
+ * @see evas_event_callback_add()
+ * @see evas_event_callback_del()
+ */
 EVAS_API void
 evas_event_callback_priority_add(Evas *eo_e, Evas_Callback_Type type, Evas_Callback_Priority priority, Evas_Event_Cb func, const void *data)
 {
@@ -630,6 +863,17 @@ evas_event_callback_priority_add(Evas *eo_e, Evas_Callback_Type type, Evas_Callb
      }
 }
 
+/**
+ * @brief Deletes a callback that was added with evas_event_callback_add() or evas_event_callback_priority_add().
+ * @param eo_e The Evas canvas to delete the callback from.
+ * @param type The event type the callback is registered for.
+ * @param func The function that was registered.
+ * @return The data pointer that was passed to evas_event_callback_add() or evas_event_callback_priority_add() when the callback was registered.
+ *         Returns @c NULL if the callback is not found.
+ * @see evas_event_callback_add()
+ * @see evas_event_callback_priority_add()
+ * @see evas_event_callback_del_full()
+ */
 EVAS_API void *
 evas_event_callback_del(Evas *eo_e, Evas_Callback_Type type, Evas_Event_Cb func)
 {
@@ -674,6 +918,18 @@ evas_event_callback_del(Evas *eo_e, Evas_Callback_Type type, Evas_Event_Cb func)
    return NULL;
 }
 
+/**
+ * @brief Deletes a callback that was added with evas_event_callback_add() or evas_event_callback_priority_add(), matching the data pointer as well.
+ * @param eo_e The Evas canvas to delete the callback from.
+ * @param type The event type the callback is registered for.
+ * @param func The function that was registered.
+ * @param data The data pointer that was passed when the callback was registered.
+ * @return The data pointer that was passed to evas_event_callback_add() or evas_event_callback_priority_add() when the callback was registered.
+ *         Returns @c NULL if the callback is not found.
+ * @see evas_event_callback_add()
+ * @see evas_event_callback_priority_add()
+ * @see evas_event_callback_del()
+ */
 EVAS_API void *
 evas_event_callback_del_full(Evas *eo_e, Evas_Callback_Type type, Evas_Event_Cb func, const void *data)
 {
@@ -718,6 +974,17 @@ evas_event_callback_del_full(Evas *eo_e, Evas_Callback_Type type, Evas_Event_Cb 
    return NULL;
 }
 
+/**
+ * @brief Pushes a callback to be called after the current event processing is finished.
+ *
+ * This function registers a callback that will be invoked after the current
+ * input event handling cycle is complete for the Evas canvas. It can only be
+ * called from within an input event callback.
+ *
+ * @param eo_e The Evas canvas.
+ * @param func The post-event callback function to push.
+ * @param data User data to be passed to the callback function.
+ */
 EVAS_API void
 evas_post_event_callback_push(Evas *eo_e, Evas_Object_Event_Post_Cb func, const void *data)
 {
@@ -747,6 +1014,15 @@ evas_post_event_callback_push(Evas *eo_e, Evas_Object_Event_Post_Cb func, const 
    e->post_events = eina_list_prepend(e->post_events, pc);
 }
 
+/**
+ * @brief Removes a previously pushed post-event callback.
+ *
+ * This function marks a post-event callback (identified by its function pointer)
+ * for deletion. The callback will not be invoked if it hasn't run yet.
+ *
+ * @param eo_e The Evas canvas.
+ * @param func The post-event callback function to remove.
+ */
 EVAS_API void
 evas_post_event_callback_remove(Evas *eo_e, Evas_Object_Event_Post_Cb func)
 {
@@ -768,6 +1044,17 @@ evas_post_event_callback_remove(Evas *eo_e, Evas_Object_Event_Post_Cb func)
      }
 }
 
+/**
+ * @brief Removes a previously pushed post-event callback, matching function and data.
+ *
+ * This function marks a post-event callback (identified by its function pointer
+ * and data pointer) for deletion. The callback will not be invoked if it
+ * hasn't run yet.
+ *
+ * @param eo_e The Evas canvas.
+ * @param func The post-event callback function to remove.
+ * @param data The user data associated with the callback to remove.
+ */
 EVAS_API void
 evas_post_event_callback_remove_full(Evas *eo_e, Evas_Object_Event_Post_Cb func, const void *data)
 {
@@ -789,6 +1076,17 @@ evas_post_event_callback_remove_full(Evas *eo_e, Evas_Object_Event_Post_Cb func,
      }
 }
 
+/**
+ * @brief Repeats animator tick events from the canvas to an object.
+ *
+ * This function is a callback that listens for EFL_CANVAS_OBJECT_EVENT_ANIMATOR_TICK
+ * on the Evas canvas. When the event occurs, it forwards (repeats) it as a
+ * legacy animator tick event to the specified Evas object. This is used to
+ * implement animator functionality for objects that need per-frame updates.
+ *
+ * @param data Pointer to the Evas_Object_Protected_Data of the target object.
+ * @param event The EFL_CANVAS_OBJECT_EVENT_ANIMATOR_TICK event from the canvas.
+ */
 static void
 _animator_repeater(void *data, const Efl_Event *event)
 {
@@ -798,6 +1096,17 @@ _animator_repeater(void *data, const Efl_Event *event)
    DBG("Emitting animator tick on %p.", obj->object);
 }
 
+/**
+ * @brief Finalizes animator callback registration for an Evas object.
+ *
+ * This function is called when an Evas object is finalized. If the object
+ * has pending animator references (meaning it needs animator ticks), this
+ * function registers the `_animator_repeater` callback on the canvas to
+ * forward animator ticks to this object.
+ *
+ * @param eo_obj The Evas object being finalized.
+ * @param obj The protected data of the Evas object.
+ */
 void
 evas_object_callbacks_finalized(Eo *eo_obj EINA_UNUSED, Evas_Object_Protected_Data *obj)
 {
@@ -814,6 +1123,22 @@ evas_object_callbacks_finalized(Eo *eo_obj EINA_UNUSED, Evas_Object_Protected_Da
      }
 }
 
+/**
+ * @brief Adds event catchers for an Evas object based on an array of callback descriptions.
+ *
+ * This function processes an array of Efl_Callback_Array_Item. For each item,
+ * it performs actions like hooking into the gesture manager or managing
+ * animator tick registrations. It also updates the object's internal
+ * `callback_mask` to reflect which legacy Evas event types are being listened to.
+ *
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @param array An array of Efl_Callback_Array_Item, terminated by an item with a NULL desc.
+ *              Example of an array item:
+ *              { EFL_EVENT_POINTER_DOWN, _my_pointer_down_cb_func }
+ *              The func pointer in the array item is not directly used here for legacy Evas callbacks,
+ *              but the `desc` field is crucial.
+ */
 void
 evas_object_callbacks_event_catcher_add(Eo *eo_obj EINA_UNUSED, Evas_Object_Protected_Data *obj, const Efl_Callback_Array_Item *array)
 {
@@ -848,6 +1173,21 @@ evas_object_callbacks_event_catcher_add(Eo *eo_obj EINA_UNUSED, Evas_Object_Prot
      }
 }
 
+/**
+ * @brief Deletes event catchers for an Evas object.
+ *
+ * This function processes an array of Efl_Callback_Array_Item. For each item,
+ * it performs cleanup actions like unhooking from the gesture manager or
+ * decrementing animator tick registration counts.
+ *
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ * @param array An array of Efl_Callback_Array_Item, terminated by an item with a NULL desc.
+ *              Example of an array item:
+ *              { EFL_EVENT_POINTER_DOWN, _my_pointer_down_cb_func }
+ *              The func pointer in the array item is not directly used here,
+ *              but the `desc` field is crucial.
+ */
 void
 evas_object_callbacks_event_catcher_del(Eo *eo_obj EINA_UNUSED, Evas_Object_Protected_Data *obj, const Efl_Callback_Array_Item *array)
 {
@@ -873,6 +1213,16 @@ evas_object_callbacks_event_catcher_del(Eo *eo_obj EINA_UNUSED, Evas_Object_Prot
      }
 }
 
+/**
+ * @brief Shuts down callbacks for an Evas object, particularly animator-related ones.
+ *
+ * This function is called during object destruction or when callbacks are being
+ * generally torn down. It ensures that if the object was registered for animator
+ * ticks, its `_animator_repeater` callback is removed from the canvas.
+ *
+ * @param eo_obj The Evas object.
+ * @param obj The protected data of the Evas object.
+ */
 void
 evas_object_callbacks_shutdown(Eo *eo_obj EINA_UNUSED, Evas_Object_Protected_Data *obj)
 {

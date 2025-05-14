@@ -5,15 +5,25 @@
 #include <Eina.h>
 #include "eina_abstract_content.h"
 
+/**
+ * @internal
+ * @struct _Eina_Content
+ * @brief Represents a piece of content with associated metadata.
+ *
+ * This structure holds the actual data as a slice, its MIME type,
+ * an optional file path if the content is written to a temporary file,
+ * and a reference count.
+ */
 struct _Eina_Content
 {
-   Eina_Rw_Slice data;
-   const char *type;
-   const char *file;
-   EINA_REFCOUNT;
+   Eina_Rw_Slice data; /**< The actual content data. */
+   const char *type; /**< The IANA MIME type of the content (e.g., "text/plain"). */
+   const char *file; /**< Optional path to a temporary file holding the content. NULL if not materialized to a file. */
+   EINA_REFCOUNT; /**< Reference count for managing the lifecycle of the content object. */
 };
 EINA_API const Eina_Value_Type *EINA_VALUE_TYPE_CONTENT;
 
+/** @internal @brief Log domain for abstract content operations. */
 static int _eina_abstract_content_log_domain = -1;
 
 #ifdef ERR
@@ -26,13 +36,27 @@ static int _eina_abstract_content_log_domain = -1;
 #endif
 #define DBG(...) EINA_LOG_DOM_DBG(_eina_abstract_content_log_domain, __VA_ARGS__)
 
+/** @internal @brief Hash table storing conversion callbacks. Key: from_type (Eina_Stringshare *), Value: Eina_List* of Eina_Content_Conversion_Node. */
 static Eina_Hash *conversion_callbacks;
 
+/**
+ * @internal
+ * @struct Eina_Content_Conversion_Node
+ * @brief Represents a single conversion capability.
+ *
+ * This structure stores the target MIME type for a conversion and the
+ * callback function that performs this conversion.
+ */
 typedef struct {
-   const char *to;
-   Eina_Content_Conversion_Callback callback;
+   const char *to; /**< The target MIME type (e.g., "text/plain;charset=utf-8"). This is a stringshared pointer. */
+   Eina_Content_Conversion_Callback callback; /**< The function pointer to perform the conversion. */
 } Eina_Content_Conversion_Node;
 
+/**
+ * @internal
+ * @brief Increments the reference count of an Eina_Content object.
+ * @param content The content object to reference.
+ */
 static void
 _eina_content_ref(Eina_Content *content)
 {
@@ -62,6 +86,14 @@ eina_content_converter_conversion_register(const char *from, const char *to, Ein
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Fetches a list of possible conversion nodes for a given source MIME type.
+ * @param from The source MIME type string (e.g., "text/plain").
+ * @return A list of Eina_Content_Conversion_Node structures that can convert from the given type.
+ *         The list itself is owned by the hash and should not be freed by the caller.
+ *         Returns NULL if no conversions are registered for the 'from' type.
+ */
 static inline Eina_List*
 _conversion_callback_fetch_possible(const char *from)
 {
@@ -71,6 +103,14 @@ _conversion_callback_fetch_possible(const char *from)
    return res;
 }
 
+/**
+ * @internal
+ * @brief Fetches a specific conversion callback for a given source and target MIME type.
+ * @param from The source MIME type string (e.g., "text/plain").
+ * @param to The target MIME type string (e.g., "text/plain;charset=utf-8").
+ * @return The Eina_Content_Conversion_Callback function if a direct conversion is registered,
+ *         otherwise NULL.
+ */
 static inline Eina_Content_Conversion_Callback
 _conversion_callback_fetch(const char *from, const char *to)
 {
@@ -99,6 +139,14 @@ eina_content_converter_convert_can(const char *from, const char *to)
    return !!_conversion_callback_fetch(from, to);
 }
 
+/**
+ * @internal
+ * @brief Callback for eina_iterator_processed_new to extract the 'to' type from a conversion node.
+ * @param container Unused.
+ * @param data A pointer to an Eina_Content_Conversion_Node.
+ * @param fdata Unused.
+ * @return The 'to' field (target MIME type string) of the Eina_Content_Conversion_Node.
+ */
 static const void*
 _process_cb(const void *container EINA_UNUSED, void *data, void *fdata EINA_UNUSED)
 {
@@ -215,6 +263,17 @@ eina_content_convert(Eina_Content *content, const char *new_type)
    return callback(content, new_type);
 }
 
+/**
+ * @internal
+ * @brief A generic content converter that simply copies the data and assigns a new type.
+ *
+ * This is used for conversions where the underlying data representation does not change,
+ * but the type information does (e.g., "text/plain" to "text/plain;charset=utf-8"
+ * when the original was already UTF-8 or US-ASCII).
+ * @param from The source Eina_Content object.
+ * @param to_type The target MIME type string.
+ * @return A new Eina_Content object with the same data as 'from' but with 'to_type'.
+ */
 static Eina_Content*
 _copy_converter(Eina_Content *from, const char *to_type)
 {
@@ -222,6 +281,13 @@ _copy_converter(Eina_Content *from, const char *to_type)
    return eina_content_new(slice, to_type);
 }
 
+/**
+ * @internal
+ * @brief Converts content from ISO-8859-1 (Latin-1) encoding to UTF-8.
+ * @param from The source Eina_Content object, assumed to be "text/plain;charset=iso-8859-1".
+ * @param to_type The target MIME type string, typically "text/plain;charset=utf-8".
+ * @return A new Eina_Content object containing the UTF-8 encoded data.
+ */
 static Eina_Content*
 _latin1_to_utf8_converter(Eina_Content *from, const char *to_type)
 {
@@ -247,6 +313,13 @@ _latin1_to_utf8_converter(Eina_Content *from, const char *to_type)
    return c;
 }
 
+/**
+ * @internal
+ * @brief Eina_Value_Type callback: Sets up memory for an Eina_Content value.
+ * @param type Unused.
+ * @param mem Pointer to the memory to be initialized (will hold an Eina_Content*).
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _eina_value_type_content_setup(const Eina_Value_Type *type EINA_UNUSED, void *mem)
 {
@@ -254,9 +327,16 @@ _eina_value_type_content_setup(const Eina_Value_Type *type EINA_UNUSED, void *me
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Eina_Value_Type callback: Flushes (frees) an Eina_Content value.
+ * @param type Unused.
+ * @param mem Pointer to the memory holding the Eina_Content* to be freed.
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _eina_value_type_content_flush(const Eina_Value_Type *type EINA_UNUSED,
-                                 void *mem EINA_UNUSED)
+                                 void *mem)
 {
    Eina_Content **content = mem;
 
@@ -265,6 +345,15 @@ _eina_value_type_content_flush(const Eina_Value_Type *type EINA_UNUSED,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Eina_Value_Type callback: Copies an Eina_Content value.
+ * This involves incrementing the reference count of the Eina_Content object.
+ * @param type Unused.
+ * @param src Pointer to the source Eina_Content* container.
+ * @param dst Pointer to the destination Eina_Content* container.
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _eina_value_type_content_copy(const Eina_Value_Type *type EINA_UNUSED, const void *src, void *dst)
 {
@@ -276,6 +365,17 @@ _eina_value_type_content_copy(const Eina_Value_Type *type EINA_UNUSED, const voi
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Eina_Value_Type callback: Compares two Eina_Content values.
+ * Compares first by type string pointer, then by data content.
+ * @param type Unused.
+ * @param a Pointer to the first Eina_Content* container.
+ * @param b Pointer to the second Eina_Content* container.
+ * @return An integer less than, equal to, or greater than zero if the first content
+ *         is found, respectively, to be less than, to match, or be greater than the second.
+ *         Returns -1 if types are different, otherwise result of eina_rw_slice_compare.
+ */
 static int
 _eina_value_type_content_compare(const Eina_Value_Type *type EINA_UNUSED, const void *a, const void *b)
 {
@@ -288,8 +388,19 @@ _eina_value_type_content_compare(const Eina_Value_Type *type EINA_UNUSED, const 
    return eina_rw_slice_compare((*ra)->data, (*rb)->data);
 }
 
+/**
+ * @internal
+ * @brief Eina_Value_Type callback: Converts an Eina_Content value to another Eina_Value_Type.
+ * Supports conversion to EINA_VALUE_TYPE_STRINGSHARE or EINA_VALUE_TYPE_STRING
+ * if the content is "text/plain;charset=utf-8" or can be converted to it.
+ * @param type Unused.
+ * @param convert The target Eina_Value_Type.
+ * @param type_mem Pointer to the Eina_Content* container to convert from.
+ * @param convert_mem Pointer to the memory for the converted value.
+ * @return EINA_TRUE on successful conversion, EINA_FALSE otherwise.
+ */
 static Eina_Bool
-_eina_value_type_content_convert_to(const Eina_Value_Type *type EINA_UNUSED, const Eina_Value_Type *convert EINA_UNUSED, const void *type_mem EINA_UNUSED, void *convert_mem EINA_UNUSED)
+_eina_value_type_content_convert_to(const Eina_Value_Type *type EINA_UNUSED, const Eina_Value_Type *convert, const void *type_mem, void *convert_mem)
 {
    Eina_Content * const *ra = type_mem;
 
@@ -331,12 +442,31 @@ _eina_value_type_content_convert_to(const Eina_Value_Type *type EINA_UNUSED, con
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Eina_Value_Type callback: Converts from another Eina_Value_Type to Eina_Content.
+ * This conversion is not currently supported.
+ * @param type Unused.
+ * @param convert Unused.
+ * @param type_mem Unused.
+ * @param convert_mem Unused.
+ * @return Always EINA_FALSE.
+ */
 static Eina_Bool
 _eina_value_type_content_convert_from(const Eina_Value_Type *type EINA_UNUSED, const Eina_Value_Type *convert EINA_UNUSED, void *type_mem EINA_UNUSED, const void *convert_mem EINA_UNUSED)
 {
    return EINA_FALSE;
 }
 
+/**
+ * @internal
+ * @brief Eina_Value_Type callback: Sets an Eina_Content value from a pointer.
+ * Increments the reference count of the assigned Eina_Content.
+ * @param type Unused.
+ * @param mem Pointer to the Eina_Content* container to set.
+ * @param ptr Pointer to an Eina_Content* to assign from.
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _eina_value_type_content_pset(const Eina_Value_Type *type EINA_UNUSED, void *mem, const void *ptr)
 {
@@ -348,6 +478,15 @@ _eina_value_type_content_pset(const Eina_Value_Type *type EINA_UNUSED, void *mem
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Eina_Value_Type callback: Sets an Eina_Content value from a va_list.
+ * Increments the reference count of the assigned Eina_Content.
+ * @param type Unused.
+ * @param mem Pointer to the Eina_Content* container to set.
+ * @param args va_list containing the Eina_Content* to assign.
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _eina_value_type_content_vset(const Eina_Value_Type *type EINA_UNUSED, void *mem, va_list args)
 {
@@ -359,6 +498,15 @@ _eina_value_type_content_vset(const Eina_Value_Type *type EINA_UNUSED, void *mem
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Eina_Value_Type callback: Gets an Eina_Content value into a pointer.
+ * Increments the reference count of the retrieved Eina_Content.
+ * @param type Unused.
+ * @param mem Pointer to the Eina_Content* container to get from.
+ * @param ptr Pointer to an Eina_Content* to store the retrieved content.
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _eina_value_type_content_pget(const Eina_Value_Type *type EINA_UNUSED, const void *mem, void *ptr)
 {
@@ -370,6 +518,14 @@ _eina_value_type_content_pget(const Eina_Value_Type *type EINA_UNUSED, const voi
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Definition of the Eina_Value_Type for Eina_Content.
+ *
+ * This structure provides all the necessary function pointers for Eina_Value
+ * to manage Eina_Content objects, including setup, flush, copy, compare,
+ * conversion, and get/set operations.
+ */
 EINA_API const Eina_Value_Type _EINA_VALUE_TYPE_CONTENT ={
   EINA_VALUE_TYPE_VERSION,
   sizeof(Eina_Content*),
@@ -385,6 +541,14 @@ EINA_API const Eina_Value_Type _EINA_VALUE_TYPE_CONTENT ={
   _eina_value_type_content_pget
 };
 
+/**
+ * @internal
+ * @brief Frees an Eina_List of Eina_Content_Conversion_Node structures.
+ * This function is used as a callback for eina_hash_free when destroying
+ * the `conversion_callbacks` hash table. It iterates through the list,
+ * frees the stringshared 'to' type, and then frees the node itself.
+ * @param v A pointer to an Eina_List of Eina_Content_Conversion_Node.
+ */
 static void
 _free_node(void *v)
 {
@@ -396,6 +560,13 @@ _free_node(void *v)
      }
 }
 
+/**
+ * @internal
+ * @brief Initializes the Eina abstract content subsystem.
+ * Registers the log domain, creates the hash table for conversion callbacks,
+ * sets up the EINA_VALUE_TYPE_CONTENT, and registers default text converters.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 Eina_Bool
 eina_abstract_content_init(void)
 {
@@ -414,6 +585,13 @@ eina_abstract_content_init(void)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Shuts down the Eina abstract content subsystem.
+ * Frees the hash table for conversion callbacks. The log domain will be
+ * unregistered by Eina itself.
+ * @return EINA_TRUE on success.
+ */
 Eina_Bool
 eina_abstract_content_shutdown(void)
 {

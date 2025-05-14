@@ -92,7 +92,7 @@ EAPI void elm_multibuttonentry_format_function_set(Elm_Multibuttonentry *obj, El
  *
  * @param[in] obj The object.
  *
- * @return The list of items, or NULL if none
+ * @return The list of items (@ref Elm_Widget_Item pointers), or @c NULL if none. The list is owned by the object and must not be modified.
  *
  * @ingroup Elm_Multibuttonentry_Group
  */

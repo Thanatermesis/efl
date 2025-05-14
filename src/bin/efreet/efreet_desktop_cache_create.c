@@ -32,24 +32,39 @@ static int _efreet_desktop_cache_log_dom = -1;
 #include "efreet_private.h"
 #include "efreet_cache_private.h"
 
-static Eet_Data_Descriptor *edd = NULL;
+static Eet_Data_Descriptor *edd = NULL; /**< Eet data descriptor for Efreet_Desktop */
 
-static Eina_Hash *desktops = NULL;
+static Eina_Hash *desktops = NULL; /**< Hash table to store Efreet_Desktop objects, keyed by original path */
 
-static Eina_Hash         *file_ids = NULL;
-static Efreet_Cache_Hash *old_file_ids = NULL;
-static Eina_Hash         *paths = NULL;
+static Eina_Hash         *file_ids = NULL; /**< Hash table mapping file IDs to desktop file paths */
+static Efreet_Cache_Hash *old_file_ids = NULL; /**< Hash table of file IDs from the previous cache, used to detect changes */
+static Eina_Hash         *paths = NULL; /**< Hash table to keep track of paths already written to the Eet file, to avoid duplicates */
 
-static Eina_Hash *mime_types = NULL;
-static Eina_Hash *categories = NULL;
-static Eina_Hash *startup_wm_class = NULL;
-static Eina_Hash *name = NULL;
-static Eina_Hash *generic_name = NULL;
-static Eina_Hash *comment = NULL;
-static Eina_Hash *exec = NULL;
-static Eina_Hash *environments = NULL;
-static Eina_Hash *keywords = NULL;
+static Eina_Hash *mime_types = NULL; /**< Hash table mapping MIME types to lists of desktop file paths */
+static Eina_Hash *categories = NULL; /**< Hash table mapping categories to lists of desktop file paths */
+static Eina_Hash *startup_wm_class = NULL; /**< Hash table mapping StartupWMClass to lists of desktop file paths */
+static Eina_Hash *name = NULL; /**< Hash table mapping Name to lists of desktop file paths */
+static Eina_Hash *generic_name = NULL; /**< Hash table mapping GenericName to lists of desktop file paths */
+static Eina_Hash *comment = NULL; /**< Hash table mapping Comment to lists of desktop file paths */
+static Eina_Hash *exec = NULL; /**< Hash table mapping Exec to lists of desktop file paths */
+static Eina_Hash *environments = NULL; /**< Hash table mapping desktop environments (OnlyShowIn/NotShowIn) to lists of desktop file paths */
+static Eina_Hash *keywords = NULL; /**< Hash table mapping keywords to lists of desktop file paths */
 
+/**
+ * @brief Adds a desktop file to the cache if it's new or has changed.
+ *
+ * This function processes a single .desktop or .directory file. It checks if the
+ * file is already in the cache and if its modification time has changed.
+ * If the file is new or modified, it's parsed and its data is added to
+ * various hash tables for indexing.
+ *
+ * @param ef The Eet_File handle for the main desktop cache.
+ * @param path The full path to the .desktop or .directory file.
+ * @param file_id The unique file ID for this desktop file (can be NULL).
+ * @param priority The priority of the directory this file was found in (currently unused).
+ * @param changed Pointer to an integer that will be set to 1 if the cache was modified by this addition.
+ * @return 1 on success or if the file is skipped, 0 on failure (e.g., Eet write error).
+ */
 static int
 cache_add(Eet_File *ef, const char *path, const char *file_id, int priority EINA_UNUSED, int *changed)
 {
@@ -152,6 +167,15 @@ cache_add(Eet_File *ef, const char *path, const char *file_id, int priority EINA
     return 1;
 }
 
+/**
+ * @brief Compares two struct stat objects based on device and inode number.
+ *
+ * Used to detect directory cycles during recursive scanning.
+ *
+ * @param a Pointer to the first struct stat.
+ * @param b Pointer to the second struct stat.
+ * @return 0 if the structs refer to the same file, 1 otherwise.
+ */
 static int
 stat_cmp(const void *a, const void *b)
 {
@@ -163,6 +187,23 @@ stat_cmp(const void *a, const void *b)
    return 1;
 }
 
+/**
+ * @brief Recursively scans a directory for .desktop and .directory files.
+ *
+ * This function iterates through files and subdirectories in the given path.
+ * For each .desktop or .directory file found, it calls cache_add().
+ * It uses an Eina_Inarray (stack) to keep track of visited directories
+ * to prevent infinite loops caused by symbolic links.
+ *
+ * @param ef The Eet_File handle for the main desktop cache.
+ * @param stack An Eina_Inarray used to store `struct stat` of visited directories to detect cycles.
+ * @param path The path to the directory to scan.
+ * @param base_id The base part of the file ID, constructed from parent directory names.
+ * @param priority The priority of this directory.
+ * @param recurse If 1, scan subdirectories recursively. If 0, only scan the current directory.
+ * @param changed Pointer to an integer that will be set to 1 if the cache was modified.
+ * @return 1 on success, 0 on failure.
+ */
 static int
 cache_scan(Eet_File *ef,
            Eina_Inarray *stack, const char *path, const char *base_id,
@@ -220,6 +261,15 @@ end:
     return ret;
 }
 
+/**
+ * @brief Creates and locks a lock file to ensure only one instance of the cache generator runs.
+ *
+ * The lock file is created in the efreet cache directory.
+ * If the lock file cannot be created or locked, it means another instance
+ * might be running.
+ *
+ * @return File descriptor of the lock file on success, -1 on failure.
+ */
 static int
 cache_lock_file(void)
 {
@@ -245,8 +295,18 @@ cache_lock_file(void)
     return lockfd;
 }
 
-/* check if old and new caches contain the same number of entries,
- * and are the same version */
+/**
+ * @brief Checks if a cache file has changed compared to a new Eet_File.
+ *
+ * This function compares the number of entries and the cache version
+ * between an existing cache file on disk and a newly generated Eet_File.
+ *
+ * @param old_name The path to the existing cache file.
+ * @param new_ef The Eet_File handle for the newly generated cache data.
+ * @param major The expected major version of the cache.
+ * @param minor The expected minor version of the cache.
+ * @return 1 if the cache has changed (or old cache doesn't exist/is invalid), 0 if it's the same.
+ */
 static int
 check_changed(const char *old_name, Eet_File *new_ef,
               unsigned char major, unsigned char minor)
@@ -277,6 +337,19 @@ changed:
    return 1;
 }
 
+/**
+ * @brief Creates and opens a temporary Eet file for writing.
+ *
+ * A unique temporary filename is generated based on the `rel` path,
+ * typically in the user's cache directory. The actual path of the
+ * created temporary file is returned via the `path` parameter.
+ *
+ * @param path Pointer to an Eina_Tmpstr* which will store the path of the created temporary file.
+ *             This must be freed by the caller using eina_tmpstr_del().
+ * @param rel The relative path used as a base for the temporary filename (e.g., "desktop.cache").
+ * @return An Eet_File handle opened in read-write mode on success, NULL on failure.
+ *         If NULL is returned, *path will also be NULL.
+ */
 static Eet_File *
 _open_temp_eet(Eina_Tmpstr **path, const char *rel)
 {
@@ -309,6 +382,17 @@ _open_temp_eet(Eina_Tmpstr **path, const char *rel)
    return NULL;
 }
 
+/**
+ * @brief Moves a file from a source path to a destination path.
+ *
+ * Attempts to rename the file first. If rename fails (e.g., across
+ * different filesystems), it falls back to copying the file and its
+ * permissions, then deleting the source.
+ *
+ * @param src The source file path.
+ * @param dst The destination file path.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 _file_move(const char *src, const char *dst)
 {
@@ -319,6 +403,30 @@ _file_move(const char *src, const char *dst)
                          NULL, NULL);
 }
 
+/**
+ * @brief Main function for the Efreet desktop cache generator.
+ *
+ * This program scans standard and user-specified directories for .desktop
+ * and .directory files, parses them, and creates two cache files:
+ * 1. A main cache (`efreet_desktop_cache_file()`) containing serialized Efreet_Desktop objects.
+ * 2. A utility cache (`efreet_desktop_util_cache_file()`) containing various indexes
+ *    (MIME types, categories, names, etc.) to speed up lookups.
+ *
+ * It uses a lock file to prevent multiple instances from running simultaneously.
+ * If the generated cache is identical to the existing one, the old files are kept.
+ * Otherwise, the new cache files replace the old ones.
+ *
+ * Command-line options:
+ *   -v: Verbose mode (enables debug logging).
+ *   -d dir1 dir2 ...: Specify extra directories to scan for .desktop files.
+ *                     These directories are scanned non-recursively.
+ *
+ * The program prints 'c' to stdout if the cache was changed, 'n' otherwise.
+ *
+ * @param argc Argument count.
+ * @param argv Argument vector.
+ * @return 0 on success, 1 on error.
+ */
 int
 main(int argc, char **argv)
 {

@@ -21,24 +21,39 @@
 #include "ecore_audio_private.h"
 
 /* Ecore mainloop integration start */
+/**
+ * @brief Structure to hold data for a PulseAudio I/O event integrated with Ecore.
+ */
 struct pa_io_event
 {
-   pa_mainloop_api *mainloop;
-   Ecore_Fd_Handler               *handler;
+   pa_mainloop_api *mainloop; /**< Pointer to the PulseAudio mainloop API. */
+   Ecore_Fd_Handler               *handler; /**< Ecore file descriptor handler. */
 
-   void                           *userdata;
+   void                           *userdata; /**< User data passed to callbacks. */
 
-   pa_io_event_flags_t             flags;
-   pa_io_event_cb_t                callback;
-   pa_io_event_destroy_cb_t        destroy_callback;
+   pa_io_event_flags_t             flags; /**< PulseAudio I/O event flags. */
+   pa_io_event_cb_t                callback; /**< Callback function for I/O events. */
+   pa_io_event_destroy_cb_t        destroy_callback; /**< Callback function for event destruction. */
 };
 
+/**
+ * @brief Maps PulseAudio I/O event flags to Ecore file descriptor handler flags.
+ * @param flags The PulseAudio I/O event flags.
+ * @return The corresponding Ecore file descriptor handler flags.
+ */
 static Ecore_Fd_Handler_Flags
 map_flags_to_ecore(pa_io_event_flags_t flags)
 {
    return (Ecore_Fd_Handler_Flags)((flags & PA_IO_EVENT_INPUT ? ECORE_FD_READ : 0) | (flags & PA_IO_EVENT_OUTPUT ? ECORE_FD_WRITE : 0) | (flags & PA_IO_EVENT_ERROR ? ECORE_FD_ERROR : 0) | (flags & PA_IO_EVENT_HANGUP ? ECORE_FD_READ : 0));
 }
 
+/**
+ * @brief Wrapper function called by Ecore when an I/O event occurs on a file descriptor.
+ * This function translates Ecore events back to PulseAudio events.
+ * @param data Pointer to the pa_io_event structure.
+ * @param handler The Ecore file descriptor handler that triggered the event.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
+ */
 static Eina_Bool
 _ecore_io_wrapper(void *data, Ecore_Fd_Handler *handler)
 {
@@ -83,6 +98,15 @@ _ecore_io_wrapper(void *data, Ecore_Fd_Handler *handler)
    return ECORE_CALLBACK_RENEW;
 }
 
+/**
+ * @brief Creates a new PulseAudio I/O event integrated with Ecore.
+ * @param api Pointer to the PulseAudio mainloop API.
+ * @param fd The file descriptor to monitor.
+ * @param flags The PulseAudio I/O event flags to monitor for.
+ * @param cb The callback function to execute when an event occurs.
+ * @param userdata User data to pass to the callback.
+ * @return A pointer to the newly created pa_io_event, or NULL on failure.
+ */
 static pa_io_event *
 _ecore_pa_io_new(pa_mainloop_api *api, int fd, pa_io_event_flags_t flags, pa_io_event_cb_t cb, void *userdata)
 {
@@ -104,6 +128,11 @@ _ecore_pa_io_new(pa_mainloop_api *api, int fd, pa_io_event_flags_t flags, pa_io_
    return event;
 }
 
+/**
+ * @brief Enables or disables specific I/O event flags for an existing event.
+ * @param event The I/O event to modify.
+ * @param flags The new set of PulseAudio I/O event flags.
+ */
 static void
 _ecore_pa_io_enable(pa_io_event *event, pa_io_event_flags_t flags)
 {
@@ -111,13 +140,26 @@ _ecore_pa_io_enable(pa_io_event *event, pa_io_event_flags_t flags)
    ecore_main_fd_handler_active_set(event->handler, map_flags_to_ecore(flags));
 }
 
+/**
+ * @brief Frees an I/O event.
+ * This function also calls the destroy_callback if it was set.
+ * @param event The I/O event to free.
+ */
 static void
 _ecore_pa_io_free(pa_io_event *event)
 {
+   // The destroy_callback is called by PulseAudio's mainloop abstraction
+   // when pa_mainloop_free() is called, or when the event source itself is freed.
+   // Here, we only clean up Ecore resources.
    ecore_main_fd_handler_del(event->handler);
    free(event);
 }
 
+/**
+ * @brief Sets a destroy callback for an I/O event.
+ * @param event The I/O event.
+ * @param cb The destroy callback function.
+ */
 static void
 _ecore_pa_io_set_destroy(pa_io_event *event, pa_io_event_destroy_cb_t cb)
 {
@@ -125,20 +167,28 @@ _ecore_pa_io_set_destroy(pa_io_event *event, pa_io_event_destroy_cb_t cb)
 }
 
 /* Timed events */
+/**
+ * @brief Structure to hold data for a PulseAudio timed event integrated with Ecore.
+ */
 struct pa_time_event
 {
-   pa_mainloop_api *mainloop;
-   Ecore_Timer                    *timer;
-   struct timeval                  tv;
+   pa_mainloop_api *mainloop; /**< Pointer to the PulseAudio mainloop API. */
+   Ecore_Timer                    *timer; /**< Ecore timer associated with this event. */
+   struct timeval                  tv; /**< The time at which the event should trigger. */
 
-   void                           *userdata;
+   void                           *userdata; /**< User data passed to callbacks. */
 
-   pa_time_event_cb_t              callback;
-   pa_time_event_destroy_cb_t      destroy_callback;
-   Eina_Bool in_event : 1;
-   Eina_Bool dead : 1;
+   pa_time_event_cb_t              callback; /**< Callback function for timed events. */
+   pa_time_event_destroy_cb_t      destroy_callback; /**< Callback function for event destruction. */
+   Eina_Bool in_event : 1; /**< Flag to indicate if the event callback is currently running. */
+   Eina_Bool dead : 1; /**< Flag to indicate if the event is marked for deletion. */
 };
 
+/**
+ * @brief Frees a timed event.
+ * If the event callback is currently running, freeing is deferred.
+ * @param event The timed event to free.
+ */
 void
 _ecore_pa_time_free(pa_time_event *event)
 {
@@ -152,6 +202,12 @@ _ecore_pa_time_free(pa_time_event *event)
    free(event);
 }
 
+/**
+ * @brief Wrapper function called by Ecore when a timer expires.
+ * This function calls the PulseAudio timed event callback.
+ * @param data Pointer to the pa_time_event structure.
+ * @return ECORE_CALLBACK_CANCEL to indicate the timer should not run again (unless restarted).
+ */
 Eina_Bool
 _ecore_time_wrapper(void *data)
 {
@@ -174,6 +230,14 @@ _ecore_time_wrapper(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Creates a new PulseAudio timed event integrated with Ecore.
+ * @param api Pointer to the PulseAudio mainloop API.
+ * @param tv The absolute time at which the event should trigger.
+ * @param cb The callback function to execute when the timer expires.
+ * @param userdata User data to pass to the callback.
+ * @return A pointer to the newly created pa_time_event, or NULL on failure.
+ */
 pa_time_event *
 _ecore_pa_time_new(pa_mainloop_api *api, const struct timeval *tv, pa_time_event_cb_t cb, void *userdata)
 {
@@ -206,6 +270,11 @@ _ecore_pa_time_new(pa_mainloop_api *api, const struct timeval *tv, pa_time_event
    return event;
 }
 
+/**
+ * @brief Restarts a timed event with a new trigger time.
+ * @param event The timed event to restart.
+ * @param tv The new absolute time at which the event should trigger. If NULL, the timer is disabled.
+ */
 void
 _ecore_pa_time_restart(pa_time_event *event, const struct timeval *tv)
 {
@@ -240,6 +309,11 @@ _ecore_pa_time_restart(pa_time_event *event, const struct timeval *tv)
      }
 }
 
+/**
+ * @brief Sets a destroy callback for a timed event.
+ * @param event The timed event.
+ * @param cb The destroy callback function.
+ */
 void
 _ecore_pa_time_set_destroy(pa_time_event *event, pa_time_event_destroy_cb_t cb)
 {
@@ -247,17 +321,27 @@ _ecore_pa_time_set_destroy(pa_time_event *event, pa_time_event_destroy_cb_t cb)
 }
 
 /* Deferred events */
+/**
+ * @brief Structure to hold data for a PulseAudio deferred event integrated with Ecore.
+ * Deferred events are executed when the mainloop is idle.
+ */
 struct pa_defer_event
 {
-   pa_mainloop_api *mainloop;
-   Ecore_Idler                    *idler;
+   pa_mainloop_api *mainloop; /**< Pointer to the PulseAudio mainloop API. */
+   Ecore_Idler                    *idler; /**< Ecore idler associated with this event. */
 
-   void                           *userdata;
+   void                           *userdata; /**< User data passed to callbacks. */
 
-   pa_defer_event_cb_t             callback;
-   pa_defer_event_destroy_cb_t     destroy_callback;
+   pa_defer_event_cb_t             callback; /**< Callback function for deferred events. */
+   pa_defer_event_destroy_cb_t     destroy_callback; /**< Callback function for event destruction. */
 };
 
+/**
+ * @brief Wrapper function called by Ecore when the mainloop is idle.
+ * This function calls the PulseAudio deferred event callback.
+ * @param data Pointer to the pa_defer_event structure.
+ * @return ECORE_CALLBACK_CANCEL to indicate the idler should run only once.
+ */
 Eina_Bool
 _ecore_defer_wrapper(void *data)
 {
@@ -269,6 +353,13 @@ _ecore_defer_wrapper(void *data)
    return ECORE_CALLBACK_CANCEL;
 }
 
+/**
+ * @brief Creates a new PulseAudio deferred event integrated with Ecore.
+ * @param api Pointer to the PulseAudio mainloop API.
+ * @param cb The callback function to execute when the mainloop is idle.
+ * @param userdata User data to pass to the callback.
+ * @return A pointer to the newly created pa_defer_event, or NULL on failure.
+ */
 pa_defer_event *
 _ecore_pa_defer_new(pa_mainloop_api *api, pa_defer_event_cb_t cb, void *userdata)
 {
@@ -290,6 +381,11 @@ _ecore_pa_defer_new(pa_mainloop_api *api, pa_defer_event_cb_t cb, void *userdata
    return event;
 }
 
+/**
+ * @brief Enables or disables a deferred event.
+ * @param event The deferred event.
+ * @param b Non-zero to enable, zero to disable.
+ */
 void
 _ecore_pa_defer_enable(pa_defer_event *event, int b)
 {
@@ -304,9 +400,17 @@ _ecore_pa_defer_enable(pa_defer_event *event, int b)
      }
 }
 
+/**
+ * @brief Frees a deferred event.
+ * This function also calls the destroy_callback if it was set.
+ * @param event The deferred event to free.
+ */
 void
 _ecore_pa_defer_free(pa_defer_event *event)
 {
+   // The destroy_callback is called by PulseAudio's mainloop abstraction
+   // when pa_mainloop_free() is called, or when the event source itself is freed.
+   // Here, we only clean up Ecore resources.
    if (event->idler)
      ecore_idler_del(event->idler);
 
@@ -315,12 +419,23 @@ _ecore_pa_defer_free(pa_defer_event *event)
    free(event);
 }
 
+/**
+ * @brief Sets a destroy callback for a deferred event.
+ * @param event The deferred event.
+ * @param cb The destroy callback function.
+ */
 void
 _ecore_pa_defer_set_destroy(pa_defer_event *event, pa_defer_event_destroy_cb_t cb)
 {
    event->destroy_callback = cb;
 }
 
+/**
+ * @brief Called by PulseAudio when it wants to quit the mainloop.
+ * Currently, this function only logs a warning and does not quit the Ecore mainloop.
+ * @param api Pointer to the PulseAudio mainloop API (unused).
+ * @param retval The return value for the quit operation (unused).
+ */
 static void
 _ecore_pa_quit(pa_mainloop_api *api EINA_UNUSED, int retval EINA_UNUSED)
 {
@@ -328,11 +443,15 @@ _ecore_pa_quit(pa_mainloop_api *api EINA_UNUSED, int retval EINA_UNUSED)
    WRN("Not quitting mainloop, although PA requested it");
 }
 
+/**
+ * @brief The Ecore mainloop integration function table for PulseAudio.
+ * This table maps PulseAudio mainloop operations to their Ecore equivalents.
+ */
 /* Function table for PA mainloop integration */
 const pa_mainloop_api functable = {
-   .userdata = NULL,
+   .userdata = NULL, /**< User data for the mainloop API (not used here). */
 
-   .io_new = _ecore_pa_io_new,
+   .io_new = _ecore_pa_io_new, /**< Creates a new I/O event source. */
    .io_enable = _ecore_pa_io_enable,
    .io_free = _ecore_pa_io_free,
    .io_set_destroy = _ecore_pa_io_set_destroy,

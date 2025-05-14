@@ -1,3 +1,11 @@
+/**
+ * @file
+ * @brief This file contains the parser for D-Bus introspection XML.
+ * It uses Eina_Simple_XML to parse the XML and build an internal
+ * representation of the D-Bus objects, interfaces, methods, signals,
+ * and properties.
+ */
+
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -31,13 +39,39 @@
 
 #define DBUS_INTERFACE "org.freedesktop.DBus."
 
+/** @brief Pointer to the current interface being parsed. */
 static DBus_Interface *iface;
+/** @brief Pointer to the current signal being parsed. */
 static DBus_Signal *d_signal;
+/** @brief Pointer to the current method being parsed. */
 static DBus_Method *method;
+/** @brief Pointer to the current property being parsed. */
 static DBus_Property *property;
 
+/**
+ * @brief Parses attributes of an XML tag.
+ *
+ * This function extracts attributes from an XML tag string and calls a
+ * callback function for each attribute found.
+ *
+ * @param content The XML tag content string.
+ * @param length The length of the content string.
+ * @param func The callback function to be called for each attribute.
+ * @param data User data to be passed to the callback function.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool attributes_parse(const char *content, unsigned length, Eina_Simple_XML_Attribute_Cb func, const void *data);
 
+/**
+ * @brief Parses attributes for an <object> tag.
+ *
+ * Specifically looks for the "name" attribute to set the D-Bus object's name.
+ *
+ * @param data Pointer to the DBus_Object being populated.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return EINA_TRUE always.
+ */
 static Eina_Bool
 obj_attributes_parser(void *data, const char *key, const char *value)
 {
@@ -49,6 +83,16 @@ obj_attributes_parser(void *data, const char *key, const char *value)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Parses attributes for an <interface> tag.
+ *
+ * Specifically looks for the "name" attribute to set the D-Bus interface's name.
+ *
+ * @param data Unused.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return EINA_TRUE always.
+ */
 static Eina_Bool
 iface_attributes_parser(void *data EINA_UNUSED, const char *key, const char *value)
 {
@@ -58,6 +102,16 @@ iface_attributes_parser(void *data EINA_UNUSED, const char *key, const char *val
    return EINA_TRUE;
 }
 
+/**
+ * @brief Parses attributes for a <signal> tag.
+ *
+ * Specifically looks for the "name" attribute to set the D-Bus signal's name.
+ *
+ * @param data Unused.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return EINA_TRUE always.
+ */
 static Eina_Bool
 signal_attributes_parser(void *data EINA_UNUSED, const char *key, const char *value)
 {
@@ -67,6 +121,16 @@ signal_attributes_parser(void *data EINA_UNUSED, const char *key, const char *va
    return EINA_TRUE;
 }
 
+/**
+ * @brief Parses attributes for an <arg> tag (used within methods and signals).
+ *
+ * Looks for "name", "type", and "direction" attributes to populate a DBus_Arg structure.
+ *
+ * @param data Pointer to the DBus_Arg being populated.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return EINA_TRUE always.
+ */
 static Eina_Bool
 arg_attributes_parser(void *data EINA_UNUSED, const char *key, const char *value)
 {
@@ -81,6 +145,16 @@ arg_attributes_parser(void *data EINA_UNUSED, const char *key, const char *value
    return EINA_TRUE;
 }
 
+/**
+ * @brief Parses attributes for a <method> tag.
+ *
+ * Specifically looks for the "name" attribute to set the D-Bus method's name.
+ *
+ * @param data Unused.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return EINA_TRUE always.
+ */
 static Eina_Bool
 method_attributes_parser(void *data EINA_UNUSED, const char *key, const char *value)
 {
@@ -90,6 +164,17 @@ method_attributes_parser(void *data EINA_UNUSED, const char *key, const char *va
    return EINA_TRUE;
 }
 
+/**
+ * @brief Parses attributes for a <property> tag.
+ *
+ * Looks for "name", "type", and "access" attributes to populate a DBus_Property structure.
+ * The "access" attribute can be "read", "write", or "readwrite".
+ *
+ * @param data Unused.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return EINA_TRUE always.
+ */
 static Eina_Bool
 property_attributes_parser(void *data EINA_UNUSED, const char *key, const char *value)
 {
@@ -114,6 +199,18 @@ property_attributes_parser(void *data EINA_UNUSED, const char *key, const char *
    return EINA_TRUE;
 }
 
+/**
+ * @brief Handles the opening of an <object> tag.
+ *
+ * Parses the object's attributes (primarily its name) and allocates
+ * a DBus_Object structure. Only one top-level object is supported per XML file.
+ *
+ * @param content The XML tag content.
+ * @param length The length of the content.
+ * @param is_open_empty EINA_TRUE if the tag is self-closing (e.g., <node .../>).
+ * @param ptr_obj Pointer to the DBus_Object pointer, which will be updated.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 open_object(const char *content, unsigned length, Eina_Bool is_open_empty, DBus_Object **ptr_obj)
 {
@@ -139,6 +236,13 @@ open_object(const char *content, unsigned length, Eina_Bool is_open_empty, DBus_
    return r;
 }
 
+/**
+ * @brief Handles the closing of an <interface> tag.
+ *
+ * If the interface is a standard D-Bus interface (org.freedesktop.DBus.*),
+ * it is freed as code generation for these is typically not required.
+ * Resets the global `iface` pointer.
+ */
 static void
 interface_close(void)
 {
@@ -151,6 +255,19 @@ interface_close(void)
    iface = NULL;
 }
 
+/**
+ * @brief Handles the opening of an <interface> tag.
+ *
+ * Parses the interface's attributes (primarily its name), allocates a
+ * DBus_Interface structure, and associates it with the parent DBus_Object.
+ * It also generates a C-compatible name for the interface.
+ *
+ * @param content The XML tag content.
+ * @param length The length of the content.
+ * @param is_open_empty EINA_TRUE if the tag is self-closing.
+ * @param obj The parent DBus_Object.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 open_interface(const char *content, unsigned length, Eina_Bool is_open_empty, DBus_Object *obj)
 {
@@ -178,6 +295,12 @@ open_interface(const char *content, unsigned length, Eina_Bool is_open_empty, DB
    return r;
 }
 
+/**
+ * @brief Handles the closing of a <signal> tag.
+ *
+ * Determines if the signal involves complex types (structs, arrays, variants)
+ * by inspecting its arguments. Resets the global `d_signal` pointer.
+ */
 static void
 signal_close(void)
 {
@@ -193,6 +316,19 @@ signal_close(void)
    d_signal = NULL;
 }
 
+/**
+ * @brief Handles the opening of a <signal> tag.
+ *
+ * Parses the signal's attributes (primarily its name), allocates a
+ * DBus_Signal structure, and associates it with the current interface.
+ * It generates various C-compatible names for the signal, its callback,
+ * data structure, and event string.
+ *
+ * @param content The XML tag content.
+ * @param length The length of the content.
+ * @param is_open_empty EINA_TRUE if the tag is self-closing.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 open_signal(const char *content, unsigned length, Eina_Bool is_open_empty)
 {
@@ -247,6 +383,17 @@ open_signal(const char *content, unsigned length, Eina_Bool is_open_empty)
 
 #define ANNOTATION_NO_REPLY "org.freedesktop.DBus.Method.NoReply"
 
+/**
+ * @brief Parses attributes for an <annotation> tag.
+ *
+ * Currently, it specifically looks for the "org.freedesktop.DBus.Method.NoReply"
+ * annotation to mark methods that do not expect a reply.
+ *
+ * @param data Pointer to a DBus_Annotation structure to be populated.
+ * @param key The attribute name.
+ * @param value The attribute value.
+ * @return EINA_TRUE always.
+ */
 static Eina_Bool
 annotation_attributes_parser(void *data, const char *key, const char *value)
 {
@@ -267,6 +414,17 @@ annotation_attributes_parser(void *data, const char *key, const char *value)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Handles the opening of an <annotation> tag.
+ *
+ * Parses the annotation's attributes. If it's a "NoReply" annotation
+ * and its value is "true", it updates the current method (`method`)
+ * to indicate it doesn't expect a reply.
+ *
+ * @param content The XML tag content.
+ * @param length The length of the content.
+ * @return EINA_TRUE on success, EINA_FALSE on failure if attribute parsing fails.
+ */
 static Eina_Bool
 open_annotation(const char *content, unsigned length)
 {
@@ -290,6 +448,18 @@ open_annotation(const char *content, unsigned length)
    return r;
 }
 
+/**
+ * @brief Handles the opening of an <arg> tag.
+ *
+ * Parses the argument's attributes (name, type, direction), allocates a
+ * DBus_Arg structure, and appends it to the argument list of the current
+ * signal (`d_signal`) or method (`method`). If an argument name is not
+ * provided in the XML, a default name like "arg0", "arg1" is generated.
+ *
+ * @param content The XML tag content.
+ * @param length The length of the content.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 open_arg(const char *content, unsigned length)
 {
@@ -326,6 +496,13 @@ open_arg(const char *content, unsigned length)
    return r;
 }
 
+/**
+ * @brief Handles the closing of a <method> tag.
+ *
+ * Determines if the method involves complex types for its input or output
+ * arguments. If the method is marked as "no_reply", its callback name is
+ * set to "NULL". Resets the global `method` pointer.
+ */
 static void
 method_close(void)
 {
@@ -348,6 +525,18 @@ method_close(void)
    method = NULL;
 }
 
+/**
+ * @brief Handles the opening of a <method> tag.
+ *
+ * Parses the method's attributes (primarily its name), allocates a
+ * DBus_Method structure, and associates it with the current interface.
+ * It generates various C-compatible names for the method and its callback function.
+ *
+ * @param content The XML tag content.
+ * @param lenght The length of the content.
+ * @param is_open_empty EINA_TRUE if the tag is self-closing.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 open_method(const char *content, unsigned lenght, Eina_Bool is_open_empty)
 {
@@ -385,6 +574,17 @@ open_method(const char *content, unsigned lenght, Eina_Bool is_open_empty)
    return r;
 }
 
+/**
+ * @brief Handles the opening of a <property> tag.
+ *
+ * Parses the property's attributes (name, type, access), allocates a
+ * DBus_Property structure, and associates it with the current interface.
+ * It generates C-compatible names for the property and its callback.
+ *
+ * @param content The XML tag content.
+ * @param length The length of the content.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 open_property(const char *content, unsigned length)
 {
@@ -411,6 +611,19 @@ open_property(const char *content, unsigned length)
    return r;
 }
 
+/**
+ * @brief Generic handler for opening XML tags.
+ *
+ * This function dispatches to the appropriate specific `open_*` function
+ * based on the tag name (e.g., "node", "interface", "method").
+ * It handles D-Bus introspection XML tags.
+ *
+ * @param content The XML tag content, starting with the tag name.
+ * @param length The length of the content.
+ * @param is_open_empty EINA_TRUE if the tag is self-closing.
+ * @param obj Pointer to the DBus_Object pointer, used by `open_object`.
+ * @return EINA_TRUE on success or if the tag is not handled, EINA_FALSE on parsing errors.
+ */
 static Eina_Bool
 open_tag(const char *content, unsigned length, Eina_Bool is_open_empty, DBus_Object **obj)
 {
@@ -438,6 +651,15 @@ open_tag(const char *content, unsigned length, Eina_Bool is_open_empty, DBus_Obj
    return EINA_TRUE;
 }
 
+/**
+ * @brief Generic handler for closing XML tags.
+ *
+ * This function dispatches to the appropriate specific `*_close` function
+ * or resets global state based on the tag name.
+ *
+ * @param content The XML tag content, which is the tag name.
+ * @return EINA_TRUE always.
+ */
 static Eina_Bool
 close_tag(const char *content)
 {
@@ -453,6 +675,20 @@ close_tag(const char *content)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Main callback function for Eina_Simple_XML_Parser.
+ *
+ * This function is called by the Eina XML parser for each XML event
+ * (open tag, close tag, data, etc.). It dispatches to `open_tag` or
+ * `close_tag` based on the event type.
+ *
+ * @param data User data, expected to be a pointer to a DBus_Object pointer (`DBus_Object **`).
+ * @param type The type of XML event (EINA_SIMPLE_XML_OPEN, EINA_SIMPLE_XML_CLOSE, etc.).
+ * @param content The content associated with the event (e.g., tag name, text data).
+ * @param offset Unused.
+ * @param length The length of the content.
+ * @return EINA_TRUE on success, EINA_FALSE on failure, to continue or stop parsing.
+ */
 Eina_Bool
 parser(void *data, Eina_Simple_XML_Type type, const char *content, unsigned offset EINA_UNUSED, unsigned length)
 {

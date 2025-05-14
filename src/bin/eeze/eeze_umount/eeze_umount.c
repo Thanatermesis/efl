@@ -29,6 +29,17 @@ static const Ecore_Getopt opts =
    }
 };
 
+/**
+ * @brief Callback function for successful unmount events.
+ *
+ * This function is called when an Eeze_Event_Disk_Unmount event occurs.
+ * It prints a success message, frees the disk object, and quits the main loop.
+ *
+ * @param data User data passed to the event handler (unused).
+ * @param type The type of the event (unused).
+ * @param info Event-specific information (Eeze_Event_Disk_Unmount).
+ * @return EINA_TRUE to continue processing events, EINA_FALSE to stop.
+ */
 static Eina_Bool
 _unmount_cb(void *data EINA_UNUSED, int type EINA_UNUSED, void *info)
 {
@@ -39,6 +50,18 @@ _unmount_cb(void *data EINA_UNUSED, int type EINA_UNUSED, void *info)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Callback function for unmount error events.
+ *
+ * This function is called when an Eeze_Event_Disk_Error event occurs during unmounting.
+ * It prints an error message including the device path, frees the disk object,
+ * and quits the main loop.
+ *
+ * @param data User data passed to the event handler (unused).
+ * @param type The type of the event (unused).
+ * @param info Event-specific information (Eeze_Event_Disk_Error).
+ * @return EINA_TRUE to continue processing events, EINA_FALSE to stop.
+ */
 static Eina_Bool
 _error_cb(void *data EINA_UNUSED, int type EINA_UNUSED, void *info)
 {
@@ -49,6 +72,19 @@ _error_cb(void *data EINA_UNUSED, int type EINA_UNUSED, void *info)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Main function for the eeze_unmount utility.
+ *
+ * This program unmounts a disk specified by its /sys/ path, /dev/ path,
+ * or mount point. It uses Eeze library for disk operations and Ecore
+ * for the main loop and event handling.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv An array of command-line argument strings.
+ *             Example: eeze_unmount /dev/sdb1
+ *                      eeze_unmount /media/mydisk
+ * @return 0 on success, 1 on failure.
+ */
 int
 main(int argc, char *argv[])
 {

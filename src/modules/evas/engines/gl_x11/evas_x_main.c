@@ -71,6 +71,16 @@ measure(int inout, const char *what)
 # define measure(x, y)
 #endif
 
+/**
+ * @brief Initialize the GL X11 engine.
+ *
+ * This function sets up the necessary resources for the engine, such as
+ * thread-local storage (TLS) for output buffers and GL contexts. It also
+ * dynamically links to GL functions from the common GL library.
+ * This must be called before most other engine functions.
+ *
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 Eina_Bool
 eng_init(void)
 {
@@ -106,6 +116,10 @@ error:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Get the current output buffer from thread-local storage.
+ * @return A pointer to the current Outbuf, or NULL if none is set.
+ */
 static inline Outbuf *
 _tls_outbuf_get(void)
 {
@@ -113,6 +127,11 @@ _tls_outbuf_get(void)
    return eina_tls_get(_outbuf_key);
 }
 
+/**
+ * @brief Set the current output buffer in thread-local storage.
+ * @param xwin The Outbuf to set as current for this thread.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static inline Eina_Bool
 _tls_outbuf_set(Outbuf *xwin)
 {
@@ -120,6 +139,10 @@ _tls_outbuf_set(Outbuf *xwin)
    return eina_tls_set(_outbuf_key, xwin);
 }
 
+/**
+ * @brief Get the current GL context from thread-local storage.
+ * @return The current GLContext, or a null context if none is set.
+ */
 static inline GLContext
 _tls_context_get(void)
 {
@@ -127,6 +150,11 @@ _tls_context_get(void)
    return eina_tls_get(_context_key);
 }
 
+/**
+ * @brief Set the current GL context in thread-local storage.
+ * @param ctx The GLContext to set as current for this thread.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static inline Eina_Bool
 _tls_context_set(GLContext ctx)
 {
@@ -135,6 +163,13 @@ _tls_context_set(GLContext ctx)
 }
 
 #ifndef GL_GLES
+/**
+ * @brief Get the current RGBA GLX context from thread-local storage.
+ *
+ * This is specific to GLX and used for contexts that support alpha.
+ *
+ * @return The current GLXContext for RGBA visuals.
+ */
 static inline GLXContext
 _tls_rgba_context_get(void)
 {
@@ -142,6 +177,14 @@ _tls_rgba_context_get(void)
    return eina_tls_get(_rgba_context_key);
 }
 
+/**
+ * @brief Set the current RGBA GLX context in thread-local storage.
+ *
+ * This is specific to GLX and used for contexts that support alpha.
+ *
+ * @param ctx The GLXContext to set.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static inline Eina_Bool
 _tls_rgba_context_set(GLXContext ctx)
 {
@@ -149,6 +192,17 @@ _tls_rgba_context_set(GLXContext ctx)
    return eina_tls_set(_rgba_context_key, ctx);
 }
 
+/**
+ * @brief Wrapper for glXMakeContextCurrent.
+ *
+ * This simplifies the call to glXMakeContextCurrent by passing the drawable
+ * for both read and write surfaces.
+ *
+ * @param disp The X display.
+ * @param glxwin The GLX drawable.
+ * @param context The GLX context.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 Eina_Bool
 __glXMakeContextCurrent(Display *disp, GLXDrawable glxwin, GLXContext context)
 {
@@ -157,6 +211,10 @@ __glXMakeContextCurrent(Display *disp, GLXDrawable glxwin, GLXContext context)
 }
 #endif
 
+/**
+ * @brief Callback to free an Evas_GL_X11_Visual structure from the hash.
+ * @param data Pointer to the Evas_GL_X11_Visual to be freed.
+ */
 static void
 _visuals_hash_del_cb(void *data)
 {
@@ -166,6 +224,19 @@ _visuals_hash_del_cb(void *data)
    free(evis);
 }
 
+/**
+ * @brief Generates a hash key for a visual based on its properties.
+ *
+ * This function creates a unique integer key by packing alpha, depth,
+ * stencil, and MSAA properties into a 32-bit integer. This key is used
+ * to cache and retrieve visual configurations.
+ *
+ * @param alpha Boolean for alpha support.
+ * @param zdepth Depth buffer bits.
+ * @param stencil Stencil buffer bits.
+ * @param msaa MSAA sample count.
+ * @return A 32-bit integer hash key.
+ */
 static inline int
 _visuals_hash_index_get(int alpha, int zdepth, int stencil, int msaa)
 {
@@ -174,6 +245,11 @@ _visuals_hash_index_get(int alpha, int zdepth, int stencil, int msaa)
    return alpha | (zdepth << 8) | (stencil << 16) | (msaa << 24);
 }
 
+/**
+ * @brief Generates a visual hash key from an Evas_Engine_Info_GL_X11 struct.
+ * @param info The engine info structure.
+ * @return A 32-bit integer hash key, or -1 on error.
+ */
 static inline int
 _visuals_hash_index_get_from_info(Evas_Engine_Info_GL_X11 *info)
 {
@@ -185,6 +261,16 @@ _visuals_hash_index_get_from_info(Evas_Engine_Info_GL_X11 *info)
 
 #ifdef GL_GLES
 
+/**
+ * @brief Get an EGLDisplay from an X11 Display.
+ *
+ * This function attempts to use the EGL_PLATFORM_X11_KHR extension first via
+ * eglGetPlatformDisplay, which is the preferred modern way. If that fails
+ * or is not available, it falls back to the legacy eglGetDisplay.
+ *
+ * @param x11_display The native X11 display connection.
+ * @return An EGLDisplay handle on success, or EGL_NO_DISPLAY on failure.
+ */
 static EGLDisplay *
 _x11_eglGetDisplay(Display *x11_display)
 {
@@ -205,6 +291,32 @@ _x11_eglGetDisplay(Display *x11_display)
 
 #endif
 
+/**
+ * @brief Create a new engine window (Outbuf).
+ *
+ * This function initializes a new output buffer (Outbuf) for rendering. It
+ * sets up the GL context (EGL or GLX), EGL surface, and obtains all necessary
+ * information about the driver and capabilities. It also performs driver
+ * blacklisting for known problematic drivers.
+ *
+ * @param info Engine-specific information.
+ * @param disp The X11 Display.
+ * @param win The X11 Window.
+ * @param screen The X11 screen number.
+ * @param vis The X11 Visual.
+ * @param cmap The X11 Colormap.
+ * @param depth The window depth.
+ * @param w The width of the window.
+ * @param h The height of the window.
+ * @param indirect EINA_TRUE for indirect rendering (GLX only).
+ * @param alpha EINA_TRUE if the window has an alpha channel.
+ * @param rot The rotation angle of the window.
+ * @param swap_mode The buffer swap mode.
+ * @param depth_bits Requested depth buffer bits.
+ * @param stencil_bits Requested stencil buffer bits.
+ * @param msaa_bits Requested MSAA bits.
+ * @return A pointer to the newly created Outbuf, or NULL on failure.
+ */
 Outbuf *
 eng_window_new(Evas_Engine_Info_GL_X11 *info,
                Display *disp,
@@ -639,6 +751,14 @@ try_gles2:
    return gw;
 }
 
+/**
+ * @brief Free an engine window (Outbuf).
+ *
+ * This function cleans up and releases all resources associated with an
+ * Outbuf, including the GL context, EGL surface/context, and memory.
+ *
+ * @param gw The Outbuf to free.
+ */
 void
 eng_window_free(Outbuf *gw)
 {
@@ -692,6 +812,17 @@ eng_window_free(Outbuf *gw)
    free(gw);
 }
 
+/**
+ * @brief A callback function to make a window's GL context current or not.
+ *
+ * This is designed to be used with evas_gl_preload_render_lock, to allow
+ * temporary context switching.
+ *
+ * @param data A pointer to the Outbuf.
+ * @param doit A pointer to a boolean-like value. If non-NULL, make the
+ *             context current. If NULL, release the context.
+ * @return EINA_TRUE on success, EINA_FALSE on failure.
+ */
 static Eina_Bool
 eng_window_make_current(void *data, void *doit)
 {
@@ -727,6 +858,16 @@ eng_window_make_current(void *data, void *doit)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Set the given Outbuf as the current target for rendering operations.
+ *
+ * This function switches the active rendering target. It ensures the
+ * correct GL context is made current and that any pending operations on the
+ * previous context are flushed. It handles both EGL and GLX contexts.
+ *
+ * @param gw The Outbuf to use for subsequent rendering. Can be NULL to
+ *           release the current context.
+ */
 void
 eng_window_use(Outbuf *gw)
 {
@@ -787,6 +928,16 @@ eng_window_use(Outbuf *gw)
    if (gw) glsym_evas_gl_common_context_use(gw->gl_context);
 }
 
+/**
+ * @brief Detach the native surface from the Outbuf.
+ *
+ * This is an optimization for when a window is hidden or unmapped. It
+ * destroys the EGLSurface or GLXWindow, which can save resources. The
+ * surface can be recreated later with eng_window_resurf(). This behavior
+ * is controlled by the EVAS_GL_WIN_RESURF environment variable.
+ *
+ * @param gw The Outbuf to "un-surface".
+ */
 void
 eng_window_unsurf(Outbuf *gw)
 {
@@ -820,6 +971,15 @@ eng_window_unsurf(Outbuf *gw)
    gw->surf = 0;
 }
 
+/**
+ * @brief Re-attach a native surface to the Outbuf.
+ *
+ * This recreates the EGLSurface or GLXWindow that was previously destroyed
+ * by eng_window_unsurf(). This is typically called when a window becomes
+ * visible again.
+ *
+ * @param gw The Outbuf to "re-surface".
+ */
 void
 eng_window_resurf(Outbuf *gw)
 {
@@ -868,6 +1028,17 @@ eng_window_resurf(Outbuf *gw)
    gw->surf = 1;
 }
 
+/**
+ * @brief Find the best available X Visual for the given GL requirements.
+ *
+ * This function queries the system for EGL/GLX configs that match the
+ * requested attributes (alpha, depth, stencil, MSAA). It tries to find an
+ * optimal match and may fall back to less-demanding configurations if the
+ * requested ones are not available. The results are cached for performance.
+ *
+ * @param einfo The engine info containing display connection and requirements.
+ * @return A pointer to the best XVisualInfo found, or NULL on failure.
+ */
 void *
 eng_best_visual_get(Evas_Engine_Info_GL_X11 *einfo)
 {
@@ -1284,6 +1455,15 @@ try_again:
    return evis->info.visual;
 }
 
+/**
+ * @brief Get the best colormap for the given engine info.
+ *
+ * This function relies on eng_best_visual_get() to find the appropriate
+ * visual and then returns the associated colormap.
+ *
+ * @param einfo The engine info.
+ * @return The best Colormap, or 0 on failure.
+ */
 Colormap
 eng_best_colormap_get(Evas_Engine_Info_GL_X11 *einfo)
 {
@@ -1303,6 +1483,15 @@ eng_best_colormap_get(Evas_Engine_Info_GL_X11 *einfo)
    return evis->cmap;
 }
 
+/**
+ * @brief Get the best depth for the given engine info.
+ *
+ * This function relies on eng_best_visual_get() to find the appropriate
+ * visual and then returns its depth.
+ *
+ * @param einfo The engine info.
+ * @return The best depth, or 0 on failure.
+ */
 int
 eng_best_depth_get(Evas_Engine_Info_GL_X11 *einfo)
 {
@@ -1322,6 +1511,16 @@ eng_best_depth_get(Evas_Engine_Info_GL_X11 *einfo)
    return evis->info.depth;
 }
 
+/**
+ * @brief Create a new 3D GL context.
+ *
+ * This creates a new GL context that shares resources with the context of the
+ * provided Outbuf. This is used for integrating 3D object rendering into
+ * the Evas canvas.
+ *
+ * @param win The Outbuf whose context will be shared.
+ * @return A new Context_3D structure, or NULL on failure.
+ */
 Context_3D *
 eng_gl_context_new(Outbuf *win)
 {
@@ -1370,6 +1569,10 @@ error:
    return NULL;
 }
 
+/**
+ * @brief Free a 3D GL context.
+ * @param ctx The Context_3D to free.
+ */
 void
 eng_gl_context_free(Context_3D *ctx)
 {
@@ -1382,6 +1585,10 @@ eng_gl_context_free(Context_3D *ctx)
    free(ctx);
 }
 
+/**
+ * @brief Make a 3D GL context current for rendering.
+ * @param ctx The Context_3D to make current.
+ */
 void
 eng_gl_context_use(Context_3D *ctx)
 {
@@ -1402,6 +1609,17 @@ eng_gl_context_use(Context_3D *ctx)
 #endif
 }
 
+/**
+ * @brief Reconfigure an output buffer with new dimensions and rotation.
+ *
+ * This is called when the window is resized or rotated.
+ *
+ * @param ob The output buffer to reconfigure.
+ * @param w New width.
+ * @param h New height.
+ * @param rot New rotation.
+ * @param depth The new depth (unused).
+ */
 void
 eng_outbuf_reconfigure(Outbuf *ob, int w, int h, int rot, Outbuf_Depth depth EINA_UNUSED)
 {
@@ -1412,12 +1630,29 @@ eng_outbuf_reconfigure(Outbuf *ob, int w, int h, int rot, Outbuf_Depth depth EIN
    glsym_evas_gl_common_context_resize(ob->gl_context, w, h, rot);
 }
 
+/**
+ * @brief Get the current rotation of an output buffer.
+ * @param ob The output buffer.
+ * @return The rotation angle (0, 90, 180, 270).
+ */
 int
 eng_outbuf_get_rot(Outbuf *ob)
 {
    return ob->rot;
 }
 
+/**
+ * @brief Determine the optimal swap mode for the output buffer.
+ *
+ * If the EGL_EXT_buffer_age or GLX_EXT_buffer_age extension is available
+ * and the swap mode is set to AUTO, this function queries the age of the
+ * back buffer to determine if a partial swap (copy, double, triple, etc.)
+ * can be performed instead of a full buffer swap. This can significantly
+ * improve performance for small updates.
+ *
+ * @param ob The output buffer.
+ * @return The determined swap mode.
+ */
 Render_Output_Swap_Mode
 eng_outbuf_swap_mode(Outbuf *ob)
 {
@@ -1467,6 +1702,15 @@ eng_outbuf_swap_mode(Outbuf *ob)
    return ob->swap_mode;
 }
 
+/**
+ * @brief Prepare the output buffer for rendering the first rectangle of a frame.
+ *
+ * This function is called at the beginning of a render cycle. It sets up
+ * the GL context, resizes it if necessary, and prepares it for a new frame.
+ *
+ * @param ob The output buffer.
+ * @return EINA_FALSE if rendering should proceed, EINA_TRUE to skip.
+ */
 Eina_Bool
 eng_outbuf_region_first_rect(Outbuf *ob)
 {
@@ -1497,6 +1741,22 @@ eng_outbuf_region_first_rect(Outbuf *ob)
 }
 
 #ifdef GL_GLES
+/**
+ * @internal
+ * @brief Convert Evas coordinates to OpenGL coordinates.
+ *
+ * This function transforms a rectangle from the Evas coordinate system
+ * (y-down) to the OpenGL coordinate system (y-up), taking into account
+ * the current window rotation.
+ *
+ * @param[out] result An array of 4 integers to store the resulting GL
+ *                    coordinates [x, y, w, h].
+ * @param ob The output buffer, providing rotation and dimensions.
+ * @param x The input x coordinate.
+ * @param y The input y coordinate.
+ * @param w The input width.
+ * @param h The input height.
+ */
 static void
 _convert_to_glcoords(int *result, Outbuf *ob, int x, int y, int w, int h)
 {
@@ -1536,6 +1796,16 @@ _convert_to_glcoords(int *result, Outbuf *ob, int x, int y, int w, int h)
      }
 }
 
+/**
+ * @brief Set the damage region for the EGL surface.
+ *
+ * If the EGL_KHR_partial_update extension is supported, this function passes
+ * the list of damaged rectangles to EGL. This allows the driver to optimize
+ * buffer swaps by only updating the damaged areas.
+ *
+ * @param ob The output buffer.
+ * @param damage A list of damaged rectangles (Tilebuf_Rect).
+ */
 void
 eng_outbuf_damage_region_set(Outbuf *ob, Tilebuf_Rect *damage)
 {
@@ -1557,6 +1827,23 @@ eng_outbuf_damage_region_set(Outbuf *ob, Tilebuf_Rect *damage)
 }
 #endif
 
+/**
+ * @brief Prepare a region of the output buffer for update.
+ *
+ * This function sets the master clip region for subsequent drawing operations.
+ * If the update region covers the entire window, clipping is disabled.
+ *
+ * @param ob The output buffer.
+ * @param x The x-coordinate of the update region.
+ * @param y The y-coordinate of the update region.
+ * @param w The width of the update region.
+ * @param h The height of the update region.
+ * @param[out] cx Unused.
+ * @param[out] cy Unused.
+ * @param[out] cw Unused.
+ * @param[out] ch Unused.
+ * @return A pointer to the default surface to be used for rendering.
+ */
 void*
 eng_outbuf_new_region_for_update(Outbuf *ob,
                                  int x, int y, int w, int h,
@@ -1578,6 +1865,19 @@ eng_outbuf_new_region_for_update(Outbuf *ob,
    return ob->gl_context->def_surface;
 }
 
+/**
+ * @brief Push an updated region to the framebuffer.
+ *
+ * For the GL engine, this function mainly flushes the common GL context to
+ * ensure that all rendering commands for the specified region are executed.
+ *
+ * @param ob The output buffer.
+ * @param update The updated image data (unused).
+ * @param x The x-coordinate of the region (unused).
+ * @param y The y-coordinate of the region (unused).
+ * @param w The width of the region (unused).
+ * @param h The height of the region (unused).
+ */
 void
 eng_outbuf_push_updated_region(Outbuf *ob, RGBA_Image *update EINA_UNUSED,
                                int x EINA_UNUSED, int y EINA_UNUSED, int w EINA_UNUSED, int h EINA_UNUSED)
@@ -1589,6 +1889,19 @@ eng_outbuf_push_updated_region(Outbuf *ob, RGBA_Image *update EINA_UNUSED,
    glsym_evas_gl_common_context_flush(ob->gl_context);
 }
 
+/**
+ * @brief Finalize the frame and flush the back buffer to the screen.
+ *
+ * This function completes the rendering for the current frame. It then
+ * swaps the front and back buffers to make the rendered content visible.
+ * It can perform partial swaps if the hardware supports it and damage
+ * information is provided.
+ *
+ * @param ob The output buffer.
+ * @param surface_damage Damage on the surface (unused).
+ * @param buffer_damage Damage on the buffer, used for partial swaps.
+ * @param render_mode The current render mode.
+ */
 void
 eng_outbuf_flush(Outbuf *ob, Tilebuf_Rect *surface_damage EINA_UNUSED, Tilebuf_Rect *buffer_damage, Evas_Render_Mode render_mode)
 {
@@ -1712,12 +2025,22 @@ eng_outbuf_flush(Outbuf *ob, Tilebuf_Rect *surface_damage EINA_UNUSED, Tilebuf_R
    glsym_evas_gl_preload_render_unlock(eng_preload_make_current, ob);
 }
 
+/**
+ * @brief Get the Evas GL context associated with an output buffer.
+ * @param ob The output buffer.
+ * @return A pointer to the Evas_Engine_GL_Context.
+ */
 Evas_Engine_GL_Context *
 eng_outbuf_gl_context_get(Outbuf *ob)
 {
    return ob->gl_context;
 }
 
+/**
+ * @brief Get the EGL display associated with an output buffer.
+ * @param ob The output buffer.
+ * @return A handle to the EGLDisplay, or NULL if not using EGL.
+ */
 void *
 eng_outbuf_egl_display_get(Outbuf *ob)
 {

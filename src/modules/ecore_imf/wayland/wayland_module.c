@@ -32,9 +32,25 @@
 #include "wayland_imcontext.h"
 #include "text-input-unstable-v1-client-protocol.h"
 
+/**
+ * @brief Logging domain for the Ecore IMF Wayland module.
+ * Initialized to -1 and registered in im_module_init().
+ */
 int _ecore_imf_wayland_log_dom = -1;
+
+/**
+ * @brief Pointer to the Ecore_Wl2_Display structure.
+ * Represents the connection to the Wayland display.
+ * Initialized in im_module_init() and used throughout the module.
+ */
 Ecore_Wl2_Display *ewd;
 
+/**
+ * @brief Information structure for the Wayland Input Method module.
+ *
+ * This structure provides metadata about the IM module, such as its
+ * ID, human-readable name, and supported languages.
+ */
 static const Ecore_IMF_Context_Info wayland_im_info =
 {
    "wayland",
@@ -44,59 +60,95 @@ static const Ecore_IMF_Context_Info wayland_im_info =
    0
 };
 
+/**
+ * @brief Class structure for the Wayland Input Method context.
+ *
+ * This structure defines the set of callback functions that implement
+ * the Ecore_IMF_Context interface for the Wayland backend. Each field
+ * points to a specific function handling an aspect of the input method
+ * context's lifecycle and behavior.
+ */
 static Ecore_IMF_Context_Class wayland_imf_class =
 {
-   wayland_im_context_add,                    /* add */
-   wayland_im_context_del,                    /* del */
-   wayland_im_context_client_window_set,      /* client_window_set */
-   wayland_im_context_client_canvas_set,      /* client_canvas_set */
-   wayland_im_context_show,                   /* show */
-   wayland_im_context_hide,                   /* hide */
-   wayland_im_context_preedit_string_get,     /* get_preedit_string */
-   wayland_im_context_focus_in,               /* focus_in */
-   wayland_im_context_focus_out,              /* focus_out */
-   wayland_im_context_reset,                  /* reset */
-   wayland_im_context_cursor_position_set,    /* cursor_position_set */
-   wayland_im_context_use_preedit_set,        /* use_preedit_set */
-   wayland_im_context_input_mode_set,         /* input_mode_set */
-   wayland_im_context_filter_event,           /* filter_event */
-   wayland_im_context_preedit_string_with_attributes_get, /* preedit_string_with_attribute_get */
-   wayland_im_context_prediction_allow_set,   /* prediction_allow_set */
-   wayland_im_context_autocapital_type_set,   /* autocapital_type_set */
-   NULL,                                      /* control panel show */
-   NULL,                                      /* control panel hide */
-   wayland_im_context_input_panel_layout_set, /* input_panel_layout_set */
-   NULL,                                      /* input_panel_layout_get, */
-   wayland_im_context_input_panel_language_set,/* input_panel_language_set, */
-   NULL,                                      /* input_panel_language_get, */
-   wayland_im_context_cursor_location_set,    /* cursor_location_set */
-   NULL,                                      /* input_panel_imdata_set */
-   NULL,                                      /* input_panel_imdata_get */
-   NULL,                                      /* input_panel_return_key_type_set */
-   NULL,                                      /* input_panel_return_key_disabled_set */
-   NULL,                                      /* input_panel_caps_lock_mode_set */
-   NULL,                                      /* input_panel_geometry_get */
-   NULL,                                      /* input_panel_state_get */
-   NULL,                                      /* input_panel_event_callback_add */
-   NULL,                                      /* input_panel_event_callback_del */
-   wayland_im_context_input_panel_language_locale_get, /* input_panel_language_locale_get */
-   NULL,                                      /* candidate_window_geometry_get */
-   wayland_im_context_input_hint_set,         /* input_hint_set */
-   NULL,                                      /* bidi_direction_set */
-   NULL,                                      /* keyboard_mode_get */
-   NULL,                                      /* prediction_hint_set */
-   NULL,                                      /* mime_type_accept_set */
-   NULL                                       /* input_panel_position_set */
+   wayland_im_context_add,                    /**< Called when a new IM context is added. @see wayland_im_context_add */
+   wayland_im_context_del,                    /**< Called when an IM context is deleted. @see wayland_im_context_del */
+   wayland_im_context_client_window_set,      /**< Sets the client window for the IM context. @see wayland_im_context_client_window_set */
+   wayland_im_context_client_canvas_set,      /**< Sets the client canvas for the IM context. @see wayland_im_context_client_canvas_set */
+   wayland_im_context_show,                   /**< Shows the input panel. @see wayland_im_context_show */
+   wayland_im_context_hide,                   /**< Hides the input panel. @see wayland_im_context_hide */
+   wayland_im_context_preedit_string_get,     /**< Retrieves the preedit string. @see wayland_im_context_preedit_string_get */
+   wayland_im_context_focus_in,               /**< Called when the IM context gains focus. @see wayland_im_context_focus_in */
+   wayland_im_context_focus_out,              /**< Called when the IM context loses focus. @see wayland_im_context_focus_out */
+   wayland_im_context_reset,                  /**< Resets the IM context. @see wayland_im_context_reset */
+   wayland_im_context_cursor_position_set,    /**< Sets the cursor position. @see wayland_im_context_cursor_position_set */
+   wayland_im_context_use_preedit_set,        /**< Enables or disables preedit usage. @see wayland_im_context_use_preedit_set */
+   wayland_im_context_input_mode_set,         /**< Sets the input mode. @see wayland_im_context_input_mode_set */
+   wayland_im_context_filter_event,           /**< Filters an input event. @see wayland_im_context_filter_event */
+   wayland_im_context_preedit_string_with_attributes_get, /**< Retrieves the preedit string with attributes. @see wayland_im_context_preedit_string_with_attributes_get */
+   wayland_im_context_prediction_allow_set,   /**< Sets whether text prediction is allowed. @see wayland_im_context_prediction_allow_set */
+   wayland_im_context_autocapital_type_set,   /**< Sets the autocapitalization type. @see wayland_im_context_autocapital_type_set */
+   NULL,                                      /**< Shows the control panel (not implemented). */
+   NULL,                                      /**< Hides the control panel (not implemented). */
+   wayland_im_context_input_panel_layout_set, /**< Sets the input panel layout. @see wayland_im_context_input_panel_layout_set */
+   NULL,                                      /**< Gets the input panel layout (not implemented). */
+   wayland_im_context_input_panel_language_set,/**< Sets the input panel language. @see wayland_im_context_input_panel_language_set */
+   NULL,                                      /**< Gets the input panel language (not implemented). */
+   wayland_im_context_cursor_location_set,    /**< Sets the cursor location. @see wayland_im_context_cursor_location_set */
+   NULL,                                      /**< Sets input panel IM data (not implemented). */
+   NULL,                                      /**< Gets input panel IM data (not implemented). */
+   NULL,                                      /**< Sets input panel return key type (not implemented). */
+   NULL,                                      /**< Sets input panel return key disabled state (not implemented). */
+   NULL,                                      /**< Sets input panel caps lock mode (not implemented). */
+   NULL,                                      /**< Gets input panel geometry (not implemented). */
+   NULL,                                      /**< Gets input panel state (not implemented). */
+   NULL,                                      /**< Adds input panel event callback (not implemented). */
+   NULL,                                      /**< Deletes input panel event callback (not implemented). */
+   wayland_im_context_input_panel_language_locale_get, /**< Gets the input panel language locale. @see wayland_im_context_input_panel_language_locale_get */
+   NULL,                                      /**< Gets candidate window geometry (not implemented). */
+   wayland_im_context_input_hint_set,         /**< Sets input hints. @see wayland_im_context_input_hint_set */
+   NULL,                                      /**< Sets BiDi direction (not implemented). */
+   NULL,                                      /**< Gets keyboard mode (not implemented). */
+   NULL,                                      /**< Sets prediction hint (not implemented). */
+   NULL,                                      /**< Sets MIME type accept (not implemented). */
+   NULL                                       /**< Sets input panel position (not implemented). */
 };
 
+/**
+ * @brief Global Wayland text input manager (zwp_text_input_manager_v1).
+ *
+ * This object is obtained from the Wayland compositor and is used to create
+ * text_input objects for handling text input. It is initialized in
+ * im_module_create() if not already available.
+ */
 static struct zwp_text_input_manager_v1 *text_input_manager = NULL;
 
+/**
+ * @brief Callback function for exiting/unloading the IM module.
+ *
+ * This function is registered with Ecore_IMF to be called when the
+ * IM module is no longer needed.
+ *
+ * @return Always returns NULL, as per Ecore_IMF_Module_Exit_Func requirements.
+ */
 static Ecore_IMF_Context *
 im_module_exit(void)
 {
    return NULL;
 }
 
+/**
+ * @brief Creates a new Wayland Input Method context.
+ *
+ * This function is called by Ecore_IMF to create a new instance of an
+ * input method context. It attempts to bind to the
+ * `zwp_text_input_manager_v1` Wayland global interface if not already
+ * done. Then, it creates a new WaylandIMContext and associates it
+ * with a new Ecore_IMF_Context.
+ *
+ * @return A pointer to the newly created Ecore_IMF_Context on success,
+ *         or NULL on failure (e.g., if `zwp_text_input_manager_v1`
+ *         is unavailable or context creation fails).
+ */
 static Ecore_IMF_Context *
 im_module_create()
 {
@@ -148,6 +200,21 @@ im_module_create()
    return ctx;
 }
 
+/**
+ * @brief Initializes the Wayland Input Method module.
+ *
+ * This function is the entry point for the IM module, called by Ecore_IMF
+ * during its initialization. It performs several crucial steps:
+ * 1. Registers a logging domain for the module.
+ * 2. Checks for the presence of a Wayland display (WAYLAND_DISPLAY env var).
+ * 3. Optionally checks ELM_DISPLAY environment variable.
+ * 4. Initializes the Ecore_Wl2 library.
+ * 5. Connects to the Wayland display using Ecore_Wl2.
+ * 6. Registers the IM module with Ecore_IMF, providing callbacks for
+ *    creating and exiting IM contexts.
+ *
+ * @return EINA_TRUE on successful initialization, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 im_module_init(void)
 {
@@ -179,6 +246,15 @@ err:
    return EINA_FALSE;
 }
 
+/**
+ * @brief Shuts down the Wayland Input Method module.
+ *
+ * This function is called by Ecore_IMF when the module is being unloaded.
+ * It performs cleanup tasks:
+ * 1. Logs the shutdown event.
+ * 2. Disconnects from the Wayland display using Ecore_Wl2.
+ * 3. Shuts down the Ecore_Wl2 library.
+ */
 static void
 im_module_shutdown(void)
 {

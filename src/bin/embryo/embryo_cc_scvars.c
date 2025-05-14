@@ -23,6 +23,13 @@
  *  Version: $Id$
  */
 
+/** @file
+ *  Global (cross-module) variables for the Small compiler.
+ *
+ *  This file declares all global variables that are shared amongst the
+ *  compiler files.
+ */
+
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>		/* for PATH_MAX */
@@ -35,53 +42,53 @@
  *  All global variables that are shared amongst the compiler files are
  *  declared here.
  */
-symbol   loctab;	/* local symbol table */
-symbol   glbtab;	/* global symbol table */
-cell    *litq;	/* the literal queue */
-char     pline[sLINEMAX + 1];	/* the line read from the input file */
-char    *lptr;	/* points to the current position in "pline" */
-constvalue tagname_tab = { NULL, "", 0, 0 };	/* tagname table */
-constvalue libname_tab = { NULL, "", 0, 0 };	/* library table (#pragma library "..." syntax) */
-constvalue *curlibrary = NULL;	/* current library */
-symbol  *curfunc;	/* pointer to current function */
-char    *inpfname;	/* pointer to name of the file currently read from */
-char     sc_ctrlchar = CTRL_CHAR;	/* the control character (or escape character) */
-int      litidx = 0;	/* index to literal table */
-int      litmax = sDEF_LITMAX;	/* current size of the literal table */
-int      stgidx = 0;	/* index to the staging buffer */
-int      labnum = 0;	/* number of (internal) labels */
-int      staging = 0;	/* true if staging output */
-cell     declared = 0;	/* number of local cells declared */
-cell     glb_declared = 0;	/* number of global cells declared */
-cell     code_idx = 0;	/* number of bytes with generated code */
-int      ntv_funcid = 0;	/* incremental number of native function */
-int      errnum = 0;	/* number of errors */
-int      warnnum = 0;	/* number of warnings */
-int      sc_debug = sCHKBOUNDS;	/* by default: bounds checking+assertions */
-int      charbits = 8;	/* a "char" is 8 bits */
-int      sc_packstr = FALSE;	/* strings are packed by default? */
-int      sc_compress = TRUE;	/* compress bytecode? */
-int      sc_needsemicolon = TRUE;	/* semicolon required to terminate expressions? */
-int      sc_dataalign = sizeof(cell);	/* data alignment value */
-int      sc_alignnext = FALSE;	/* must frame of the next function be aligned? */
-int      curseg = 0;	/* 1 if currently parsing CODE, 2 if parsing DATA */
-cell     sc_stksize = sDEF_AMXSTACK;	/* default stack size */
-int      freading = FALSE;	/* Is there an input file ready for reading? */
-int      fline = 0;	/* the line number in the current file */
-int      fnumber = 0;	/* the file number in the file table (debugging) */
-int      fcurrent = 0;	/* current file being processed (debugging) */
-int      intest = 0;	/* true if inside a test */
-int      sideeffect = 0;	/* true if an expression causes a side-effect */
-int      stmtindent = 0;	/* current indent of the statement */
-int      indent_nowarn = TRUE;	/* skip warning "217 loose indentation" */
-int      sc_tabsize = 8;	/* number of spaces that a TAB represents */
-int      sc_allowtags = TRUE;	/* allow/detect tagnames in lex() */
-int      sc_status;	/* read/write status */
-int      sc_rationaltag = 0;	/* tag for rational numbers */
-int      rational_digits = 0;	/* number of fractional digits */
+symbol   loctab;	/**< local symbol table */
+symbol   glbtab;	/**< global symbol table */
+cell    *litq;	/**< the literal queue, holds constant values */
+char     pline[sLINEMAX + 1];	/**< buffer for a line read from the input file */
+char    *lptr;	/**< pointer to the current position in #pline */
+constvalue tagname_tab = { NULL, "", 0, 0 };	/**< table for tagnames */
+constvalue libname_tab = { NULL, "", 0, 0 };	/**< table for library names, used with #pragma library */
+constvalue *curlibrary = NULL;	/**< pointer to the current library, or NULL if none */
+symbol  *curfunc;	/**< pointer to the symbol table entry of the current function being parsed */
+char    *inpfname;	/**< name of the file currently being read from */
+char     sc_ctrlchar = CTRL_CHAR;	/**< the control character (escape character), default is CTRL_CHAR */
+int      litidx = 0;	/**< current index into the literal table #litq */
+int      litmax = sDEF_LITMAX;	/**< current allocated size of the literal table #litq */
+int      stgidx = 0;	/**< index to the staging buffer, used for optimizing code generation */
+int      labnum = 0;	/**< number of (internal) labels generated */
+int      staging = 0;	/**< flag indicating whether output is being staged (buffered) */
+cell     declared = 0;	/**< number of local cells (variables) declared in the current scope */
+cell     glb_declared = 0;	/**< number of global cells (variables) declared */
+cell     code_idx = 0;	/**< current size in bytes of the generated code */
+int      ntv_funcid = 0;	/**< incremental ID for native functions */
+int      errnum = 0;	/**< count of errors encountered during compilation */
+int      warnnum = 0;	/**< count of warnings encountered during compilation */
+int      sc_debug = sCHKBOUNDS;	/**< debug flags, e.g., sCHKBOUNDS for bounds checking */
+int      charbits = 8;	/**< number of bits in a char, typically 8 */
+int      sc_packstr = FALSE;	/**< flag indicating whether strings should be packed by default */
+int      sc_compress = TRUE;	/**< flag indicating whether to compress the bytecode output */
+int      sc_needsemicolon = TRUE;	/**< flag indicating whether semicolons are required to terminate expressions */
+int      sc_dataalign = sizeof(cell);	/**< data alignment size in bytes, typically the size of a 'cell' */
+int      sc_alignnext = FALSE;	/**< flag indicating if the next function's frame must be aligned */
+int      curseg = 0;	/**< current segment being parsed: 0 for none, 1 for CODE, 2 for DATA */
+cell     sc_stksize = sDEF_AMXSTACK;	/**< default stack size for the compiled script */
+int      freading = FALSE;	/**< flag indicating if an input file is currently open and ready for reading */
+int      fline = 0;	/**< current line number in the input file #inpf */
+int      fnumber = 0;	/**< file number in the file table (used for debugging information) */
+int      fcurrent = 0;	/**< index of the current file being processed (debugging) */
+int      intest = 0;	/**< flag indicating if the parser is inside a compile-time test (#if, #assert) */
+int      sideeffect = 0;	/**< flag indicating if the current expression has side effects */
+int      stmtindent = 0;	/**< current indentation level of statements */
+int      indent_nowarn = TRUE;	/**< flag to skip warning "217 loose indentation" */
+int      sc_tabsize = 8;	/**< number of spaces a TAB character represents */
+int      sc_allowtags = TRUE;	/**< flag to allow or disallow tagnames in lex() */
+int      sc_status;	/**< general status, used for read/write status of files */
+int      sc_rationaltag = 0;	/**< tag ID for rational numbers, if supported */
+int      rational_digits = 0;	/**< number of fractional digits for rational numbers */
 
-FILE    *inpf = NULL;	/* file read from (source or include) */
-FILE    *inpf_org = NULL;	/* main source file */
-FILE    *outf = NULL;	/* file written to */
+FILE    *inpf = NULL;	/**< file pointer for the current input file (source or include) */
+FILE    *inpf_org = NULL;	/**< file pointer for the main source file */
+FILE    *outf = NULL;	/**< file pointer for the output file */
 
-jmp_buf  errbuf;
+jmp_buf  errbuf; /**< buffer for setjmp/longjmp error handling, allows jumping out of parsing functions on error */

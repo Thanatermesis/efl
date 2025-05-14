@@ -37,9 +37,11 @@ static HASHNODE    *hashtab[HASHSIZE];
 
 #define IS_IDCHAR(ch) is_idchar[(unsigned char)(ch)]
 
-/*
- * return hash function on name.  must be compatible with the one
- * computed a step at a time, elsewhere
+/**
+ * @brief Computes a hash value for a name.
+ *
+ * @details The hash function must be compatible with the one computed
+ * incrementally elsewhere in the scanner (using the HASHSTEP macro).
  */
 int
 hashf(const char *name, int len, int hashsize)
@@ -52,15 +54,17 @@ hashf(const char *name, int len, int hashsize)
    return MAKE_POS(r) % hashsize;
 }
 
-/*
- * find the most recent hash node for name name (ending with first
- * non-identifier char) installed by install
+/**
+ * @brief Finds the most recent hash node for a name.
  *
- * If LEN is >= 0, it is the length of the name.
- * Otherwise, compute the length by scanning the entire name.
+ * @details The name is considered to end at the first non-identifier
+ * character. This finds nodes installed by install().
  *
- * If HASH is >= 0, it is the precomputed hash code.
- * Otherwise, compute the hash code.
+ * If @p len is non-negative, it is used as the length of the name.
+ * Otherwise, the length is computed by scanning the name.
+ *
+ * If @p hash is non-negative, it is used as the precomputed hash code.
+ * Otherwise, the hash code is computed.
  */
 HASHNODE           *
 cpp_lookup(const char *name, int len, int hash)
@@ -88,20 +92,14 @@ cpp_lookup(const char *name, int len, int hash)
    return (HASHNODE *) 0;
 }
 
-/*
- * Delete a hash node.  Some weirdness to free junk from macros.
- * More such weirdness will have to be added if you define more hash
- * types that need it.
+/**
+ * @brief Deletes a hash node, with special handling for macros.
+ *
+ * @details When deleting a macro, its DEFINITION struct is not freed. This is
+ * a deliberate choice to prevent a crash if a macro is undefined (`#undef`)
+ * while it is being expanded. While this may result in a memory leak, it is
+ * necessary for stability.
  */
-
-/* Note that the DEFINITION of a macro is removed from the hash table
- * but its storage is not freed.  This would be a storage leak
- * except that it is not reasonable to keep undefining and redefining
- * large numbers of macros many times.
- * In any case, this is necessary, because a macro can be #undef'd
- * in the middle of reading the arguments to a call to it.
- * If #undef freed the DEFINITION, that would crash.  */
-
 void
 delete_macro(HASHNODE * hp)
 {
@@ -132,19 +130,23 @@ delete_macro(HASHNODE * hp)
      }
    free(hp);
 }
-/*
- * install a name in the main hash table, even if it is already there.
- *   name stops with first non alphanumeric, except leading '#'.
- * caller must check against redefinition if that is desired.
- * delete_macro () removes things installed by install () in fifo order.
- * this is important because of the `defined' special symbol used
- * in #if, and also if pushdef/popdef directives are ever implemented.
+/**
+ * @brief Installs a name in the main hash table.
  *
- * If LEN is >= 0, it is the length of the name.
- * Otherwise, compute the length by scanning the entire name.
+ * @details A new entry is created even if one with the same name already
+ * exists. The name is considered to end at the first non-alphanumeric
+ * character. It is the caller's responsibility to check for redefinitions if
+ * necessary.
  *
- * If HASH is >= 0, it is the precomputed hash code.
- * Otherwise, compute the hash code.
+ * Nodes are inserted at the head of the hash bucket's linked list, so they are
+ * found first by lookup. This shadowing is important for handling macro
+ * redefinitions and the `defined` operator.
+ *
+ * If @p len is non-negative, it is the length of the name; otherwise, the
+ * length is computed.
+ *
+ * If @p hash is non-negative, it is the precomputed hash code; otherwise, the
+ * hash code is computed.
  */
 HASHNODE           *
 install(const char *name, int len, enum node_type type, int ivalue, char *value,
@@ -185,6 +187,15 @@ install(const char *name, int len, enum node_type type, int ivalue, char *value,
    return hp;
 }
 
+/**
+ * @brief Frees memory used by the hash table.
+ *
+ * @details This function iterates through all hash table buckets and frees the
+ * head node of each chain via delete_macro().
+ *
+ * @note Since only the head of each chain is deleted, this may result in
+ * memory leaks if chains contain more than one node.
+ */
 void
 cpp_hash_cleanup(cpp_reader * pfile EINA_UNUSED)
 {

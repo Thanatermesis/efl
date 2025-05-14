@@ -1,9 +1,17 @@
+/**
+ * @file
+ * @brief Evas object smart class <Elm_Notify> Eolian header
+ */
 #ifndef _ELM_NOTIFY_EO_H_
 #define _ELM_NOTIFY_EO_H_
 
 #ifndef _ELM_NOTIFY_EO_CLASS_TYPE
 #define _ELM_NOTIFY_EO_CLASS_TYPE
 
+/**
+ * @brief Opaque handle to an Elm_Notify object.
+ * @ingroup Elm_Notify
+ */
 typedef Eo Elm_Notify;
 
 #endif
@@ -118,6 +126,11 @@ EOAPI double elm_obj_notify_timeout_get(const Eo *obj);
  */
 EOAPI void elm_obj_notify_dismiss(Eo *obj);
 
+/**
+ * @brief Event descriptor for the "block,clicked" event.
+ * This event occurs when the area outside the notification is clicked, and events are not allowed to pass.
+ * @ingroup Elm_Notify
+ */
 EWAPI extern const Efl_Event_Description _ELM_NOTIFY_EVENT_BLOCK_CLICKED;
 
 /** Called when block was clicked
@@ -126,6 +139,11 @@ EWAPI extern const Efl_Event_Description _ELM_NOTIFY_EVENT_BLOCK_CLICKED;
  */
 #define ELM_NOTIFY_EVENT_BLOCK_CLICKED (&(_ELM_NOTIFY_EVENT_BLOCK_CLICKED))
 
+/**
+ * @brief Event descriptor for the "timeout" event.
+ * This event occurs when the notification's timeout is reached and it hides.
+ * @ingroup Elm_Notify
+ */
 EWAPI extern const Efl_Event_Description _ELM_NOTIFY_EVENT_TIMEOUT;
 
 /** Called when notify timed out
@@ -134,6 +152,11 @@ EWAPI extern const Efl_Event_Description _ELM_NOTIFY_EVENT_TIMEOUT;
  */
 #define ELM_NOTIFY_EVENT_TIMEOUT (&(_ELM_NOTIFY_EVENT_TIMEOUT))
 
+/**
+ * @brief Event descriptor for the "dismissed" event.
+ * This event occurs when the notification is dismissed by calling elm_obj_notify_dismiss().
+ * @ingroup Elm_Notify
+ */
 EWAPI extern const Efl_Event_Description _ELM_NOTIFY_EVENT_DISMISSED;
 
 /** Called when notify was dismissed

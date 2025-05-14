@@ -61,15 +61,76 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    { NULL, NULL }
 };
 
+/**
+ * @brief Callback invoked when a video frame is decoded or the video position changes.
+ * Updates the position slider accordingly.
+ * @param data The player object (Elm_Player instance).
+ * @param event The Efl_Event details.
+ */
 static void _update_frame(void *data, const Efl_Event *event);
+
+/**
+ * @brief Callback invoked when the video frame resizes or its total length changes.
+ * Updates the position slider's range and current value.
+ * @param data The player object (Elm_Player instance).
+ * @param event The Efl_Event details.
+ */
 static void _update_slider(void *data, const Efl_Event *event);
+
+/**
+ * @brief Callback invoked when video playback starts.
+ * Emits a "elm,player,play" signal.
+ * @param data The player object (Elm_Player instance).
+ * @param event The Efl_Event details.
+ */
 static void _play_started(void *data, const Efl_Event *event);
+
+/**
+ * @brief Callback invoked when video playback finishes/stops.
+ * Emits a "elm,player,pause" signal.
+ * @param data The player object (Elm_Player instance).
+ * @param event The Efl_Event details.
+ */
 static void _play_finished(void *data, const Efl_Event *event);
+
+/**
+ * @brief Callback invoked when the position slider's value changes.
+ * Sets the video playback position to the new slider value.
+ * @param data The player object (Elm_Player instance).
+ * @param event The Efl_Event details.
+ */
 static void _update_position(void *data, const Efl_Event *event);
+
+/**
+ * @brief Callback invoked when the user starts dragging the position slider.
+ * Sets a flag to indicate dragging is in progress.
+ * @param data The player object (Elm_Player instance).
+ * @param event The Efl_Event details.
+ */
 static void _drag_start(void *data, const Efl_Event *event);
+
+/**
+ * @brief Callback invoked when the user stops dragging the position slider.
+ * Clears the dragging flag.
+ * @param data The player object (Elm_Player instance).
+ * @param event The Efl_Event details.
+ */
 static void _drag_stop(void *data, const Efl_Event *event);
 
+/**
+ * @brief Handles accessibility key actions for moving/seeking in the video.
+ * @param obj The player object.
+ * @param params A string indicating direction, e.g., "left" or "right".
+ * @return EINA_TRUE if the action was handled, EINA_FALSE otherwise.
+ */
 static Eina_Bool _key_action_move(Evas_Object *obj, const char *params);
+
+/**
+ * @brief Handles accessibility key actions for play/pause.
+ * @param obj The player object.
+ * @param params Unused.
+ * @return EINA_TRUE if the action was handled, EINA_FALSE otherwise.
+ */
 static Eina_Bool _key_action_play(Evas_Object *obj, const char *params);
 
 static const Elm_Action key_actions[] = {
@@ -147,6 +208,14 @@ _key_action_play(Evas_Object *obj, const char *params EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Updates the theme of a player control button.
+ * Sets the icon and style based on the current widget style and button name.
+ * Re-swallows the button into the layout.
+ * @param obj The player object.
+ * @param bt The button object to update.
+ * @param name The logical name of the button (e.g., "play", "pause").
+ */
 static void
 _update_theme_button(Evas_Object *obj, Evas_Object *bt, const char *name)
 {
@@ -170,6 +239,15 @@ _update_theme_button(Evas_Object *obj, Evas_Object *bt, const char *name)
    elm_object_disabled_set(bt, elm_widget_disabled_get(obj));
 }
 
+/**
+ * @brief Updates the theme of a player control slider.
+ * Sets the style based on the current widget style and slider name.
+ * Re-swallows the slider into the layout.
+ * @param obj The player object.
+ * @param sl The slider object to update.
+ * @param name The base name for the style (e.g., "position", "volume").
+ * @param name2 The swallow part name suffix (e.g., "positionslider", "volumeslider").
+ */
 static void
 _update_theme_slider(Evas_Object *obj, Evas_Object *sl, const char *name, const char *name2)
 {
@@ -265,6 +343,12 @@ _drag_stop(void *data, const Efl_Event *event EINA_UNUSED)
    sd->dragging = EINA_FALSE;
 }
 
+/**
+ * @brief Callback invoked when the volume slider's value changes.
+ * Sets the video audio level based on the slider's new value.
+ * @param data The player object (Elm_Player instance).
+ * @param event The Efl_Event details (unused).
+ */
 static void
 _update_volume(void *data, const Efl_Event *event EINA_UNUSED)
 {
@@ -276,6 +360,14 @@ _update_volume(void *data, const Efl_Event *event EINA_UNUSED)
      elm_video_audio_level_set(sd->video, vol);
 }
 
+/**
+ * @brief Callback for the 'forward' button click.
+ * Seeks the video forward by a fixed amount (30 seconds).
+ * Emits "elm,button,forward" signal and ELM_PLAYER_EVENT_FORWARD_CLICKED legacy event.
+ * @param data The player object.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _forward(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -292,6 +384,14 @@ _forward(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    efl_event_callback_legacy_call(data, ELM_PLAYER_EVENT_FORWARD_CLICKED, NULL);
 }
 
+/**
+ * @brief Callback for the 'info' button click.
+ * Emits "elm,button,info" signal and ELM_PLAYER_EVENT_INFO_CLICKED legacy event.
+ * (Actual info display functionality is not implemented here).
+ * @param data The player object.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _info(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -299,6 +399,14 @@ _info(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    efl_event_callback_legacy_call(data, ELM_PLAYER_EVENT_INFO_CLICKED, NULL);
 }
 
+/**
+ * @brief Callback for the 'next' button click.
+ * Emits "elm,button,next" signal and ELM_PLAYER_EVENT_NEXT_CLICKED legacy event.
+ * (Actual 'next track' functionality is not implemented here).
+ * @param data The player object.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _next(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -306,6 +414,14 @@ _next(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    efl_event_callback_legacy_call(data, ELM_PLAYER_EVENT_NEXT_CLICKED, NULL);
 }
 
+/**
+ * @brief Callback for the 'pause' button click.
+ * Pauses the video playback.
+ * Emits "elm,player,pause" signal and ELM_PLAYER_EVENT_PAUSE_CLICKED legacy event.
+ * @param data The player object.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _pause(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -316,6 +432,14 @@ _pause(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    efl_event_callback_legacy_call(data, ELM_PLAYER_EVENT_PAUSE_CLICKED, NULL);
 }
 
+/**
+ * @brief Callback for the 'play' button click.
+ * Starts or resumes video playback.
+ * Emits "elm,player,play" signal and ELM_PLAYER_EVENT_PLAY_CLICKED legacy event.
+ * @param data The player object.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _play(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -326,6 +450,14 @@ _play(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    efl_event_callback_legacy_call(data, ELM_PLAYER_EVENT_PLAY_CLICKED, NULL);
 }
 
+/**
+ * @brief Callback for the 'previous' button click.
+ * Emits "elm,button,prev" signal and ELM_PLAYER_EVENT_PREV_CLICKED legacy event.
+ * (Actual 'previous track' functionality is not implemented here).
+ * @param data The player object.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _prev(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -333,6 +465,14 @@ _prev(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    elm_layout_signal_emit(data, "elm,button,prev", "elm");
 }
 
+/**
+ * @brief Callback for the 'rewind' button click.
+ * Seeks the video backward by a fixed amount (30 seconds).
+ * Emits "elm,button,rewind" signal and ELM_PLAYER_EVENT_REWIND_CLICKED legacy event.
+ * @param data The player object.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _rewind(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -348,6 +488,15 @@ _rewind(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    efl_event_callback_legacy_call(data, ELM_PLAYER_EVENT_REWIND_CLICKED, NULL);
 }
 
+/**
+ * @brief Callback for the 'stop' button click.
+ * Emits "elm,button,stop" signal and ELM_PLAYER_EVENT_QUALITY_CLICKED legacy event.
+ * Note: The legacy event seems mismatched (QUALITY_CLICKED for a stop action).
+ * (Actual stop functionality, like resetting position, is not implemented here beyond the signal).
+ * @param data The player object.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _stop(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -355,6 +504,14 @@ _stop(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    efl_event_callback_legacy_call(data, ELM_PLAYER_EVENT_QUALITY_CLICKED, NULL);
 }
 
+/**
+ * @brief Callback for the 'eject' button click.
+ * Ejects the media from the underlying emotion object.
+ * Emits "elm,button,eject" signal and ELM_PLAYER_EVENT_EJECT_CLICKED legacy event.
+ * @param data The player object.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _eject(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -365,6 +522,11 @@ _eject(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    efl_event_callback_legacy_call(data, ELM_PLAYER_EVENT_EJECT_CLICKED, NULL);
 }
 
+/**
+ * @brief Toggles the audio mute state of the video.
+ * Emits "elm,player,mute" or "elm,player,unmute" signals accordingly.
+ * @param obj The player object.
+ */
 static void
 _mute_toggle(Evas_Object *obj)
 {
@@ -382,6 +544,14 @@ _mute_toggle(Evas_Object *obj)
      }
 }
 
+/**
+ * @brief Callback for the 'volume' button click.
+ * Toggles the mute state and emits "elm,button,volume" signal.
+ * Also triggers ELM_PLAYER_EVENT_VOLUME_CLICKED legacy event.
+ * @param data The player object.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _volume(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -390,6 +560,14 @@ _volume(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
    efl_event_callback_legacy_call(data, ELM_PLAYER_EVENT_VOLUME_CLICKED, NULL);
 }
 
+/**
+ * @brief Callback for the 'mute' button click.
+ * Toggles the mute state and emits "elm,button,mute" signal.
+ * Also triggers ELM_PLAYER_EVENT_MUTE_CLICKED legacy event.
+ * @param data The player object.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _mute(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -410,6 +588,11 @@ _play_finished(void *data, const Efl_Event *event EINA_UNUSED)
    elm_layout_signal_emit(data, "elm,player,pause", "elm");
 }
 
+/**
+ * @brief Internal handler for when the associated video object is deleted or removed.
+ * Disables all player control UI elements and nullifies video/emotion pointers.
+ * @param sd The player's private data.
+ */
 static void
 _on_video_del(Elm_Player_Data *sd)
 {
@@ -431,6 +614,14 @@ _on_video_del(Elm_Player_Data *sd)
    sd->emotion = NULL;
 }
 
+/**
+ * @brief Evas event callback for when the video Evas_Object is deleted.
+ * Calls _on_video_del to clean up player state.
+ * @param data The player's private data (Elm_Player_Data *).
+ * @param e Unused.
+ * @param obj Unused.
+ * @param event_info Unused.
+ */
 static void
 _video_del(void *data,
            Evas *e EINA_UNUSED,
@@ -440,6 +631,15 @@ _video_del(void *data,
    _on_video_del(data);
 }
 
+/**
+ * @brief Helper function to create and configure a player control button.
+ * Creates an icon, a button, sets their styles, assigns a click callback,
+ * and attempts to swallow the button into the player's layout.
+ * @param obj The parent player object.
+ * @param name The logical name of the button (e.g., "play", "pause"), used for styling and swallow part lookup.
+ * @param func The callback function to invoke when the button is clicked.
+ * @return The newly created button object.
+ */
 static Evas_Object *
 _player_button_add(Evas_Object *obj,
                    const char *name,
@@ -475,6 +675,14 @@ _player_button_add(Evas_Object *obj,
    return bt;
 }
 
+/**
+ * @brief Converts a double value representing seconds into a time string.
+ * The format is HH:MM:SS.ss, MM:SS.ss, or SS.ss depending on the duration.
+ * @param value The time value in seconds.
+ * @return A stringshared string representing the time. The caller does not own this string
+ *         but it should be released with eina_stringshare_del when no longer needed by the
+ *         component that requested it (e.g. a slider's format function).
+ */
 static char *
 _double_to_time(double value)
 {
@@ -498,6 +706,11 @@ _double_to_time(double value)
    return (char *)eina_stringshare_add(buf);
 }
 
+/**
+ * @brief Frees a stringshare string.
+ * Intended for use as a Evas_Object_Textblock_Format_Cb for slider labels.
+ * @param data The stringshare string to delete.
+ */
 static void
 _str_free(char *data)
 {
@@ -508,6 +721,17 @@ _str_free(char *data)
  * treating this special case here and delegating other objects to own
  * layout */
 
+/**
+ * @brief Sets the content of the player, typically a video object.
+ * This function handles the special "video" part, which is an alias for "elm.swallow.content".
+ * If the content is a valid video object, it initializes controls, sets up event listeners,
+ * and updates UI elements based on the video's state.
+ * @param obj The player object.
+ * @param sd The player's private data.
+ * @param part The name of the part to set content for. If NULL or "video", defaults to "elm.swallow.content".
+ * @param content The Evas_Object to set as content. Expected to be an Elm_Video object for the "video" part.
+ * @return EINA_TRUE on success, EINA_FALSE on failure or if content is not a video object for the "video" part.
+ */
 static Eina_Bool
 _elm_player_content_set(Eo *obj, Elm_Player_Data *sd, const char *part, Evas_Object *content)
 {

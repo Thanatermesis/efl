@@ -25,6 +25,11 @@ typedef struct
    Eina_Bool init;
 } Efl_Datetime_Manager_Data;
 
+/**
+ * @brief Initializes an Efl_Time structure with the current system time.
+ *
+ * @param curr_time Pointer to the Efl_Time structure to be initialized.
+ */
 static void
 _time_init(Efl_Time *curr_time)
 {
@@ -34,6 +39,17 @@ _time_init(Efl_Time *curr_time)
    localtime_r(&t, curr_time);
 }
 
+/**
+ * @brief Retrieves the expanded format string for a given single character format specifier.
+ *
+ * This function maps single character format specifiers (like 'c', 'x', 'X', 'r', 'R', 'T', 'D', 'F')
+ * to their corresponding full format strings, often using nl_langinfo for locale-specific formats.
+ *
+ * @param ch The single character format specifier.
+ * @return A pointer to the expanded format string. Returns an empty string if the character is not recognized.
+ * @example
+ * char* format = _expanded_fmt_str_get('c'); // Might return "%a %b %e %H:%M:%S %Y" or similar based on locale
+ */
 static char *
 _expanded_fmt_str_get(char ch)
 {
@@ -96,6 +112,22 @@ _expanded_fmt_str_get(char ch)
    return exp_fmt;
 }
 
+/**
+ * @brief Expands multi-field format characters within a date-time format string.
+ *
+ * This function iteratively replaces recognized multi-field format specifiers
+ * (e.g., %c, %x, %X) with their expanded forms (e.g., from nl_langinfo or predefined).
+ * The expansion is done in-place.
+ *
+ * @param dt_fmt The date-time format string to expand. This string is modified directly.
+ *               It should be a buffer of at least MAX_FORMAT_LEN characters.
+ * @example
+ * char format[MAX_FORMAT_LEN] = "%c";
+ * _expand_format(format); // format might become "%a %b %e %H:%M:%S %Y"
+ *
+ * char format2[MAX_FORMAT_LEN] = "%x %X";
+ * _expand_format(format2); // format2 might become "%m/%d/%y %H:%M:%S"
+ */
 static void
 _expand_format(char *dt_fmt)
 {

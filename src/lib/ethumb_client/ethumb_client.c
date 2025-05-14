@@ -95,106 +95,160 @@ static int _log_dom = -1;
 #define ERR(...)      EINA_LOG_DOM_ERR(_log_dom, __VA_ARGS__)
 #define CRI(...)      EINA_LOG_DOM_CRIT(_log_dom, __VA_ARGS__)
 
+/**
+ * @brief Represents an Ethumb client instance.
+ * This structure holds all the necessary information for a client
+ * to communicate with the Ethumb server.
+ */
 struct _Ethumb_Client
 {
-   Ethumb                *ethumb;
-   int                    id_count;
-   Ethumb                *old_ethumb_conf;
-   Eldbus_Connection      *conn;
+   Ethumb                *ethumb; /**< Local Ethumb instance for configuration. */
+   int                    id_count; /**< Counter for generating unique request IDs. */
+   Ethumb                *old_ethumb_conf; /**< Stores the previous Ethumb configuration to detect changes. */
+   Eldbus_Connection      *conn; /**< Eldbus connection to the D-Bus session bus. */
    struct
    {
-      Ethumb_Client_Connect_Cb cb;
-      void                    *data;
-      Eina_Free_Cb             free_data;
-   } connect;
-   Eina_List             *pending_add;
-   Eina_List             *pending_remove;
-   Eina_List             *pending_gen;
-   Eina_List             *dbus_pending;
+      Ethumb_Client_Connect_Cb cb; /**< Callback function for connection status. */
+      void                    *data; /**< User data for the connection callback. */
+      Eina_Free_Cb             free_data; /**< Function to free user data for connection callback. */
+   } connect; /**< Connection related callbacks and data. */
+   Eina_List             *pending_add; /**< List of pending thumbnail generation requests (_ethumb_pending_add). */
+   Eina_List             *pending_remove; /**< List of pending thumbnail cancellation requests (_ethumb_pending_remove). */
+   Eina_List             *pending_gen; /**< List of generation requests sent to the server, awaiting 'generated' signal (_ethumb_pending_gen). */
+   Eina_List             *dbus_pending; /**< List of pending D-Bus calls (Eldbus_Pending). */
    struct
    {
-      Ethumb_Client_Die_Cb cb;
-      void                *data;
-      Eina_Free_Cb         free_data;
-   } die;
-   Eldbus_Proxy           *proxy;
-   Eldbus_Signal_Handler  *generated_sig_handler;
-   EINA_REFCOUNT;
-   Eina_Bool              connected : 1;
-   Eina_Bool              server_started : 1;
-   Eina_Bool              invalid : 1;
+      Ethumb_Client_Die_Cb cb; /**< Callback function for server disconnection. */
+      void                *data; /**< User data for the server disconnection callback. */
+      Eina_Free_Cb         free_data; /**< Function to free user data for server disconnection callback. */
+   } die; /**< Server disconnection related callbacks and data. */
+   Eldbus_Proxy           *proxy; /**< Eldbus proxy for the remote Ethumb object. */
+   Eldbus_Signal_Handler  *generated_sig_handler; /**< Eldbus signal handler for 'generated' signal. */
+   EINA_REFCOUNT; /**< Reference count for managing the lifecycle of the client object. */
+   Eina_Bool              connected : 1; /**< Flag indicating if the client is connected to the server. */
+   Eina_Bool              server_started : 1; /**< Flag indicating if the server was started by this client. (Currently unused) */
+   Eina_Bool              invalid : 1; /**< Flag indicating if the client object is in an invalid state (e.g., during freeing). */
 };
 
+/**
+ * @brief Represents a pending request to add a thumbnail generation task to the server's queue.
+ * This structure holds information about a thumbnail generation request before it's fully processed
+ * by the server and moved to the `pending_gen` list.
+ */
 struct _ethumb_pending_add
 {
-   int32_t                   id;
-   const char               *file;
-   const char               *key;
-   const char               *thumb;
-   const char               *thumb_key;
-   Ethumb_Client_Generate_Cb generated_cb;
-   void                     *data;
-   Eina_Free_Cb              free_data;
-   Eldbus_Pending           *pending_call;
-   Ethumb_Client            *client;
+   int32_t                   id; /**< Unique ID for this generation request. */
+   const char               *file; /**< Path to the original file. (stringshared) */
+   const char               *key; /**< Optional key within the file (e.g., for EET files). (stringshared) */
+   const char               *thumb; /**< Path where the thumbnail will be stored. (stringshared) */
+   const char               *thumb_key; /**< Optional key for the thumbnail file. (stringshared) */
+   Ethumb_Client_Generate_Cb generated_cb; /**< Callback for when generation is complete. */
+   void                     *data; /**< User data for the `generated_cb`. */
+   Eina_Free_Cb              free_data; /**< Function to free `data`. */
+   Eldbus_Pending           *pending_call; /**< The D-Bus pending call for the `queue_add` method. */
+   Ethumb_Client            *client; /**< Pointer back to the client instance. */
 };
 
+/**
+ * @brief Represents a pending request to remove/cancel a thumbnail generation task.
+ */
 struct _ethumb_pending_remove
 {
-   int32_t                          id;
-   Ethumb_Client_Generate_Cancel_Cb cancel_cb;
-   void                            *data;
-   Eina_Free_Cb                     free_data;
-   Eldbus_Pending                  *pending_call;
-   Ethumb_Client                   *client;
+   int32_t                          id; /**< ID of the generation request to cancel. */
+   Ethumb_Client_Generate_Cancel_Cb cancel_cb; /**< Callback for when cancellation is complete. */
+   void                            *data; /**< User data for the `cancel_cb`. */
+   Eina_Free_Cb                     free_data; /**< Function to free `data`. */
+   Eldbus_Pending                  *pending_call; /**< The D-Bus pending call for the `queue_remove` method. */
+   Ethumb_Client                   *client; /**< Pointer back to the client instance. */
 };
 
+/**
+ * @brief Represents a thumbnail generation task that has been sent to the server and is awaiting the 'generated' signal.
+ * Once the `queue_add` D-Bus call returns successfully, the corresponding `_ethumb_pending_add`
+ * is converted into this structure and added to the `client->pending_gen` list.
+ */
 struct _ethumb_pending_gen
 {
-   int32_t                   id;
-   const char               *file;
-   const char               *key;
-   const char               *thumb;
-   const char               *thumb_key;
-   Ethumb_Client_Generate_Cb generated_cb;
-   void                     *data;
-   Eina_Free_Cb              free_data;
+   int32_t                   id; /**< Unique ID for this generation request, matches the one in `_ethumb_pending_add`. */
+   const char               *file; /**< Path to the original file. (stringshared) */
+   const char               *key; /**< Optional key within the file. (stringshared) */
+   const char               *thumb; /**< Path where the thumbnail will be stored. (stringshared) */
+   const char               *thumb_key; /**< Optional key for the thumbnail file. (stringshared) */
+   Ethumb_Client_Generate_Cb generated_cb; /**< Callback for when generation is complete. */
+   void                     *data; /**< User data for the `generated_cb`. */
+   Eina_Free_Cb              free_data; /**< Function to free `data`. */
 };
 
+/**
+ * @brief Forward declaration for Ethumb_Async_Exists.
+ */
 typedef struct _Ethumb_Async_Exists Ethumb_Async_Exists;
 
+/**
+ * @brief Represents an asynchronous request to check if a thumbnail exists.
+ * This structure manages the state of an asynchronous thumbnail existence check,
+ * which is performed in a separate thread.
+ */
 struct _Ethumb_Async_Exists
 {
-   const char   *path;
+   const char   *path; /**< Path of the file for which thumbnail existence is checked. (stringshared) */
 
-   Ethumb       *dup; /* We will work on that one to prevent race and lock */
+   Ethumb       *dup; /**< A duplicate of the Ethumb configuration at the time of the request.
+                           This is used by the worker thread to prevent race conditions and locking issues
+                           with the main client's Ethumb instance. */
 
-   Eina_List    *callbacks;
-   Ecore_Thread *thread;
+   Eina_List    *callbacks; /**< List of `_Ethumb_Exists` structures (callbacks) associated with this async request. */
+   Ecore_Thread *thread; /**< The worker thread performing the existence check. */
 };
 
+/**
+ * @brief Represents a specific callback and its context for an asynchronous thumbnail existence check.
+ * Multiple `_Ethumb_Exists` can be associated with a single `_Ethumb_Async_Exists` if multiple
+ * requests for the same file are made concurrently.
+ */
 struct _Ethumb_Exists
 {
-   Ethumb_Async_Exists          *parent;
-   Ethumb_Client                *client;
-   Ethumb                       *dup; /* We don't want to loose parameters so keep them around */
+   Ethumb_Async_Exists          *parent; /**< Pointer to the parent asynchronous request. */
+   Ethumb_Client                *client; /**< The client instance that initiated this request. */
+   Ethumb                       *dup; /**< A duplicate of the client's Ethumb settings at the time of the request.
+                                           This ensures that parameters used for the existence check are consistent
+                                           with what the caller expected, even if the main client's Ethumb
+                                           settings change later. */
 
-   Ethumb_Client_Thumb_Exists_Cb exists_cb;
-   const void                   *data;
+   Ethumb_Client_Thumb_Exists_Cb exists_cb; /**< Callback function to be invoked when the existence check is complete. */
+   const void                   *data; /**< User data for the `exists_cb`. */
 };
 
+/** @brief D-Bus service name for Ethumb. */
 static const char _ethumb_dbus_bus_name[] = "org.enlightenment.Ethumb";
+/** @brief Main D-Bus interface for Ethumb service. */
 static const char _ethumb_dbus_interface[] = "org.enlightenment.Ethumb";
+/** @brief D-Bus interface for individual Ethumb objects created by the server. */
 static const char _ethumb_dbus_objects_interface[] = "org.enlightenment.Ethumb.objects";
+/** @brief D-Bus object path for the Ethumb service. */
 static const char _ethumb_dbus_path[] = "/org/enlightenment/Ethumb";
 
+/** @brief Initialization counter for the library. */
 static int _initcount = 0;
+/** @brief Hash table to store active asynchronous thumbnail existence requests (_Ethumb_Async_Exists).
+ * The key is the file path (stringshared), and the value is the _Ethumb_Async_Exists structure.
+ * This helps to coalesce multiple requests for the same file path into a single worker thread.
+ */
 static Eina_Hash *_exists_request = NULL;
 
+/** @brief Callback for the "generated" D-Bus signal from the server. */
 static void _ethumb_client_generated_cb(void *data, const Eldbus_Message *msg);
+/** @brief Initiates the D-Bus call to the server's "new" method to create a new Ethumb object on the server. */
 static void _ethumb_client_call_new(Ethumb_Client *client);
+/** @brief Callback for D-Bus name owner changes, used to detect server connection and disconnection. */
 static void _ethumb_client_name_owner_changed(void *context, const char *bus, const char *old_id, const char *new_id);
 
+/**
+ * @brief Frees an Ethumb_Client instance and all associated resources.
+ * This function is typically called when the reference count of the client drops to zero.
+ * It cancels pending D-Bus calls, frees pending request lists, and releases D-Bus resources.
+ * @param client The Ethumb_Client instance to free.
+ */
 static void
 _ethumb_client_free(Ethumb_Client *client)
 {
@@ -305,6 +359,13 @@ _ethumb_client_free(Ethumb_Client *client)
    free(client);
 }
 
+/**
+ * @brief Frees an Ethumb_Async_Exists structure.
+ * This function is used as a callback for eina_hash_free when removing entries
+ * from the `_exists_request` hash. It ensures that associated resources like
+ * the duplicated Ethumb instance and the path stringshare are released.
+ * @param data Pointer to the Ethumb_Async_Exists structure to be freed.
+ */
 static void
 _ethumb_async_delete(void *data)
 {
@@ -319,6 +380,16 @@ _ethumb_async_delete(void *data)
    free(async);
 }
 
+/**
+ * @brief Handles D-Bus name owner changes for the Ethumb service.
+ * This function is called by Eldbus when the owner of the Ethumb D-Bus name changes.
+ * It's used to detect when the Ethumb server connects (new_id is non-empty) or
+ * disconnects (new_id is empty).
+ * @param context The Ethumb_Client instance.
+ * @param bus The D-Bus name that changed owner (unused).
+ * @param old_id The old owner of the D-Bus name.
+ * @param new_id The new owner of the D-Bus name. If empty, the name has no owner (server disconnected).
+ */
 static void
 _ethumb_client_name_owner_changed(void *context, const char *bus EINA_UNUSED, const char *old_id, const char *new_id)
 {
@@ -352,6 +423,13 @@ _ethumb_client_name_owner_changed(void *context, const char *bus EINA_UNUSED, co
    EINA_REFCOUNT_UNREF(client) _ethumb_client_free(client);
 }
 
+/**
+ * @brief Reports the connection status to the user via the connection callback.
+ * This function invokes the `connect.cb` callback provided by the user during
+ * `ethumb_client_connect()`. It also handles freeing associated user data.
+ * @param client The Ethumb_Client instance.
+ * @param success EINA_TRUE if connection was successful, EINA_FALSE otherwise.
+ */
 static void
 _ethumb_client_report_connect(Ethumb_Client *client, Eina_Bool success)
 {
@@ -378,6 +456,16 @@ _ethumb_client_report_connect(Ethumb_Client *client, Eina_Bool success)
    EINA_REFCOUNT_UNREF(client) _ethumb_client_free(client);
 }
 
+/**
+ * @brief Callback for the D-Bus "new" method call.
+ * This function is invoked when the Ethumb server responds to the "new" method call,
+ * which requests the creation of a new Ethumb object instance on the server.
+ * On success, it retrieves the object path of the newly created server-side Ethumb object,
+ * creates a proxy for it, and sets up a signal handler for the "generated" signal.
+ * @param data The Ethumb_Client instance.
+ * @param msg The D-Bus reply message.
+ * @param pending The Eldbus_Pending object for this call.
+ */
 static void
 _ethumb_client_new_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *pending)
 {
@@ -417,6 +505,12 @@ _ethumb_client_new_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *pen
    _ethumb_client_report_connect(client, 1);
 }
 
+/**
+ * @brief Initiates a D-Bus method call to "new" on the Ethumb server.
+ * This function sends a request to the Ethumb server to create a new
+ * server-side Ethumb object instance that this client will interact with.
+ * @param client The Ethumb_Client instance.
+ */
 static void
 _ethumb_client_call_new(Ethumb_Client *client)
 {
@@ -431,6 +525,14 @@ _ethumb_client_call_new(Ethumb_Client *client)
      client->dbus_pending = eina_list_append(client->dbus_pending, pending);
 }
 
+/**
+ * @brief Performs the potentially blocking part of the thumbnail existence check.
+ * This function is executed in a separate Ecore_Thread. It calls `ethumb_thumb_hash()`
+ * on a duplicated Ethumb instance to calculate the thumbnail path and check for
+ * its existence without blocking the main loop.
+ * @param data Pointer to the Ethumb_Async_Exists structure.
+ * @param thread The Ecore_Thread executing this function (unused).
+ */
 static void
 _ethumb_client_exists_heavy(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -439,6 +541,15 @@ _ethumb_client_exists_heavy(void *data, Ecore_Thread *thread EINA_UNUSED)
    ethumb_thumb_hash(async->dup);
 }
 
+/**
+ * @brief Handles the completion of the asynchronous thumbnail existence check.
+ * This function is called in the main loop when the Ecore_Thread finishes
+ * `_ethumb_client_exists_heavy`. It iterates through all registered callbacks
+ * for this specific file path and invokes them with the result of the existence check.
+ * Finally, it cleans up the Ethumb_Async_Exists structure from the `_exists_request` hash.
+ * @param data Pointer to the Ethumb_Async_Exists structure.
+ * @param thread The Ecore_Thread that finished (unused).
+ */
 static void
 _ethumb_client_exists_end(void *data, Ecore_Thread *thread EINA_UNUSED)
 {
@@ -551,6 +662,15 @@ ethumb_client_shutdown(void)
    return _initcount;
 }
 
+/**
+ * @brief Callback for the eldbus_name_start D-Bus call.
+ * This function is invoked when the attempt to start the Ethumb D-Bus service
+ * (if it wasn't already running) completes. It logs any errors encountered
+ * during the service startup.
+ * @param data User data (unused).
+ * @param msg The D-Bus reply message.
+ * @param pending The Eldbus_Pending object for this call (unused).
+ */
 static void
 _name_start(void *data EINA_UNUSED, const Eldbus_Message *msg, Eldbus_Pending *pending EINA_UNUSED)
 {
@@ -735,6 +855,14 @@ _ethumb_client_ethumb_setup_cb(void *data, const Eldbus_Message *msg, Eldbus_Pen
    EINA_SAFETY_ON_FALSE_RETURN(result);
 }
 
+/**
+ * @brief Reads a D-Bus byte array (ay) and converts it to a stringshared C string.
+ * D-Bus strings are often sent as byte arrays. This helper function reads such an array
+ * from a D-Bus message iterator and returns it as a null-terminated, stringshared C string.
+ * @param array The Eldbus_Message_Iter positioned at the byte array.
+ * @return A new eina_stringshare instance containing the string, or NULL on error.
+ *         The caller is responsible for freeing the returned stringshare.
+ */
 static const char *
 _ethumb_client_dbus_get_bytearray(Eldbus_Message_Iter *array)
 {
@@ -751,6 +879,13 @@ _ethumb_client_dbus_get_bytearray(Eldbus_Message_Iter *array)
      }
 }
 
+/**
+ * @brief Appends a C string to a D-Bus message iterator as a byte array (ay).
+ * This helper function takes a null-terminated C string and appends it to a D-Bus
+ * message as a byte array, including the null terminator.
+ * @param parent The parent Eldbus_Message_Iter to which the byte array container will be added.
+ * @param string The C string to append. If NULL, an empty string (single null byte) is appended.
+ */
 static void
 _ethumb_client_dbus_append_bytearray(Eldbus_Message_Iter *parent, const char *string)
 {
@@ -771,6 +906,28 @@ _ethumb_client_dbus_append_bytearray(Eldbus_Message_Iter *parent, const char *st
  * @endcond
  */
 
+/**
+ * @brief Opens a new dictionary entry (a{sv}) in a D-Bus message iterator for Ethumb setup.
+ * This is a helper function for constructing the D-Bus message in `ethumb_client_ethumb_setup`.
+ * It appends a struct containing a string key and a variant value.
+ *
+ * Example of D-Bus structure created:
+ * @code
+ * // For key "size", type "(ii)"
+ * {
+ *   "size", // string key
+ *   variant ( // variant 'v'
+ *     (int32, int32) // actual type, e.g., (128, 128)
+ *   )
+ * }
+ * @endcode
+ *
+ * @param array The main D-Bus array iterator (a{sv}) to append to.
+ * @param[out] entry Pointer to store the iterator for the created struct '{sv}'.
+ * @param key The string key for the dictionary entry (e.g., "size", "format").
+ * @param type The D-Bus signature string for the variant's content type (e.g., "(ii)", "i").
+ * @return Eldbus_Message_Iter* Iterator for the variant 'v', ready for appending the actual value.
+ */
 static Eldbus_Message_Iter *
 _setup_iterator_open(Eldbus_Message_Iter *array, Eldbus_Message_Iter **entry, const char *key, const char *type)
 {
@@ -783,8 +940,16 @@ _setup_iterator_open(Eldbus_Message_Iter *array, Eldbus_Message_Iter **entry, co
    return variant;
 }
 
+/**
+ * @brief Closes a dictionary entry opened by `_setup_iterator_open`.
+ * This helper function closes the variant container and then the struct container
+ * in the D-Bus message iterator.
+ * @param array The main D-Bus array iterator (a{sv}) (unused in current impl, but good for context).
+ * @param entry The iterator for the struct '{sv}' to be closed.
+ * @param variant The iterator for the variant 'v' to be closed.
+ */
 static void
-_setup_iterator_close(Eldbus_Message_Iter *array, Eldbus_Message_Iter *entry, Eldbus_Message_Iter *variant)
+_setup_iterator_close(Eldbus_Message_Iter *array EINA_UNUSED, Eldbus_Message_Iter *entry, Eldbus_Message_Iter *variant)
 {
    eldbus_message_iter_container_close(entry, variant);
    eldbus_message_iter_container_close(array, entry);
@@ -922,6 +1087,22 @@ ethumb_client_ethumb_setup(Ethumb_Client *client)
 /**
  * @cond LOCAL
  */
+/**
+ * @brief Callback for the "generated" D-Bus signal from the Ethumb server.
+ * This function is invoked when the server emits the "generated" signal, indicating
+ * that a thumbnail generation task has completed (either successfully or with failure).
+ * It finds the corresponding pending generation request in `client->pending_gen`,
+ * invokes the user's callback, and cleans up the request.
+ *
+ * The "generated" signal has the signature "iayayb":
+ * - `i`: The ID of the completed thumbnail request.
+ * - `ay`: The path to the generated thumbnail file (as a byte array).
+ * - `ay`: The key for the generated thumbnail file (as a byte array).
+ * - `b`: A boolean indicating success (EINA_TRUE) or failure (EINA_FALSE).
+ *
+ * @param data The Ethumb_Client instance.
+ * @param msg The D-Bus signal message.
+ */
 static void
 _ethumb_client_generated_cb(void *data, const Eldbus_Message *msg)
 {
@@ -978,6 +1159,19 @@ _ethumb_client_generated_cb(void *data, const Eldbus_Message *msg)
      }
 }
 
+/**
+ * @brief Callback for the "queue_add" D-Bus method call.
+ * This function is invoked when the Ethumb server responds to the "queue_add" request.
+ * On success, the server returns the ID assigned to this generation task. This function
+ * then moves the request from `client->pending_add` to `client->pending_gen`,
+ * awaiting the "generated" signal.
+ *
+ * The "queue_add" method returns an integer `i` (the ID).
+ *
+ * @param data Pointer to the struct _ethumb_pending_add for this request.
+ * @param msg The D-Bus reply message.
+ * @param eldbus_pending The Eldbus_Pending object for this call (unused).
+ */
 static void
 _ethumb_client_queue_add_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *eldbus_pending EINA_UNUSED)
 {
@@ -1028,6 +1222,29 @@ end:
    free(pending);
 }
 
+/**
+ * @brief Sends a "queue_add" D-Bus request to the Ethumb server.
+ * This function constructs and sends a D-Bus message to the server to add a new
+ * thumbnail generation task to its queue. It creates a `_ethumb_pending_add` structure
+ * to track this request.
+ *
+ * The "queue_add" D-Bus method expects parameters with signature "iayayayay":
+ * - `i`: Client-generated ID for the request.
+ * - `ay`: Path to the original file.
+ * - `ay`: Key within the original file.
+ * - `ay`: Path for the thumbnail.
+ * - `ay`: Key for the thumbnail.
+ *
+ * @param client The Ethumb_Client instance.
+ * @param file Path to the original file.
+ * @param key Optional key within the original file.
+ * @param thumb Path where the thumbnail should be stored.
+ * @param thumb_key Optional key for the thumbnail file.
+ * @param generated_cb Callback for when generation is complete.
+ * @param data User data for `generated_cb`.
+ * @param free_data Function to free `data`.
+ * @return The client-side generated ID for this request.
+ */
 static int
 _ethumb_client_queue_add(Ethumb_Client *client, const char *file, const char *key, const char *thumb, const char *thumb_key, Ethumb_Client_Generate_Cb generated_cb, const void *data, Eina_Free_Cb free_data)
 {
@@ -1065,6 +1282,18 @@ _ethumb_client_queue_add(Ethumb_Client *client, const char *file, const char *ke
    return pending->id;
 }
 
+/**
+ * @brief Callback for the "queue_remove" D-Bus method call.
+ * This function is invoked when the Ethumb server responds to a "queue_remove" request,
+ * which is used to cancel a pending thumbnail generation. It calls the user's
+ * cancellation callback with the success status.
+ *
+ * The "queue_remove" method returns a boolean `b` indicating success.
+ *
+ * @param data Pointer to the struct _ethumb_pending_remove for this request.
+ * @param msg The D-Bus reply message.
+ * @param eldbus_pending The Eldbus_Pending object for this call (unused).
+ */
 static void
 _ethumb_client_queue_remove_cb(void *data, const Eldbus_Message *msg, Eldbus_Pending *eldbus_pending EINA_UNUSED)
 {
@@ -2144,17 +2373,33 @@ struct _Ethumb_Client_Async
    Ethumb_Client               *client;
    Ethumb                      *dup;
 
-   Ethumb_Client_Async_Done_Cb  done;
-   Ethumb_Client_Async_Error_Cb error;
-   const void                  *data;
+   Ethumb_Client_Async_Done_Cb  done; /**< Callback for successful completion (thumbnail exists or generated). */
+   Ethumb_Client_Async_Error_Cb error; /**< Callback for errors during the process. */
+   const void                  *data; /**< User data for the callbacks. */
 
-   int                          id;
+   int                          id; /**< ID of the generation request if one was made, -1 otherwise. */
 };
 
+/** @brief Array of Ecore_Idler pointers for managing batched operations.
+ * idler[0] is for batching `ethumb_client_thumb_exists` calls.
+ * idler[1] is for batching `ethumb_client_generate` calls.
+ */
 static Ecore_Idler *idler[2] = { NULL, NULL };
+/** @brief List of active `Ethumb_Client_Async` requests that are currently being processed
+ * (either waiting for `ethumb_client_thumb_exists` callback or `_ethumb_client_thumb_finish` callback).
+ */
 static Eina_List *pending = NULL;
+/** @brief Array of Eina_List pointers for tasks to be processed by idlers.
+ * idle_tasks[0] stores `Ethumb_Client_Async` requests waiting to call `ethumb_client_thumb_exists`.
+ * idle_tasks[1] stores `Ethumb_Client_Async` requests waiting to call `ethumb_client_generate`.
+ */
 static Eina_List *idle_tasks[2] = { NULL, NULL };
 
+/**
+ * @brief Frees an Ethumb_Client_Async structure and its associated resources.
+ * This includes freeing the duplicated Ethumb instance and unreferencing the client.
+ * @param async The Ethumb_Client_Async structure to free.
+ */
 static void
 _ethumb_client_async_free(Ethumb_Client_Async *async)
 {
@@ -2191,6 +2436,14 @@ _ethumb_client_thumb_finish(void *data,
    _ethumb_client_async_free(async);
 }
 
+/**
+ * @brief Ecore_Idler callback to process thumbnail generation requests in batches.
+ * This idler iterates through `idle_tasks[1]` (tasks waiting for generation).
+ * For each task, it calls `ethumb_client_generate`.
+ * It processes tasks until a certain time slice is consumed to avoid blocking the main loop.
+ * @param data User data for the idler (unused).
+ * @return EINA_TRUE if there are more tasks to process, EINA_FALSE otherwise (idler will be removed).
+ */
 static Eina_Bool
 _ethumb_client_thumb_generate_idler(void *data EINA_UNUSED)
 {
@@ -2230,6 +2483,17 @@ _ethumb_client_thumb_generate_idler(void *data EINA_UNUSED)
    return EINA_FALSE;
 }
 
+/**
+ * @brief Callback for `ethumb_client_thumb_exists` used by the asynchronous helper.
+ * This function is called when the local existence check for a thumbnail completes.
+ * If the thumbnail exists, it calls the `done` callback of the `Ethumb_Client_Async` request.
+ * If it doesn't exist, it queues the request for generation by adding it to `idle_tasks[1]`
+ * and ensures the generation idler (`_ethumb_client_thumb_generate_idler`) is running.
+ * @param data Pointer to the `Ethumb_Client_Async` structure.
+ * @param client The Ethumb_Client instance.
+ * @param request The `Ethumb_Exists` request object.
+ * @param exists EINA_TRUE if the thumbnail exists locally, EINA_FALSE otherwise.
+ */
 static void
 _ethumb_client_thumb_exists(void *data, Ethumb_Client *client, Ethumb_Exists *request, Eina_Bool exists)
 {
@@ -2261,6 +2525,14 @@ _ethumb_client_thumb_exists(void *data, Ethumb_Client *client, Ethumb_Exists *re
      }
 }
 
+/**
+ * @brief Ecore_Idler callback to process thumbnail existence check requests in batches.
+ * This idler iterates through `idle_tasks[0]` (tasks waiting for existence check).
+ * For each task, it calls `ethumb_client_thumb_exists`.
+ * It processes tasks until a certain time slice is consumed to avoid blocking the main loop.
+ * @param data User data for the idler (unused).
+ * @return EINA_TRUE if there are more tasks to process, EINA_FALSE otherwise (idler will be removed).
+ */
 static Eina_Bool
 _ethumb_client_thumb_exists_idler(void *data EINA_UNUSED)
 {
@@ -2303,7 +2575,7 @@ ethumb_client_thumb_async_get(Ethumb_Client *client,
                               Ethumb_Client_Async_Error_Cb error,
                               const void *data)
 {
-   Ethumb_Client_Async *async;
+   Ethumb_Client_Async *async; /**< The asynchronous request object to be returned. */
 
    EINA_SAFETY_ON_NULL_RETURN_VAL(client, NULL);
 

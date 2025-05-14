@@ -1,31 +1,71 @@
 #include "edje_private.h"
 #include "edje_convert.h"
 
+/**
+ * @file
+ * @brief This file contains functions and data structures for converting older Edje file formats.
+ *
+ * It defines Eet_Data_Descriptor structures for various elements found in older
+ * Edje files, allowing them to be read and processed. This is crucial for
+ * maintaining backward compatibility with themes and layouts created with
+ * previous versions of Edje.
+ */
+
+/** @brief Eet_Data_Descriptor for the old Edje_File structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_file = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Style structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_style = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Style_Tag structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_style_tag = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Color_Class structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_color_class = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Data structure (key-value pairs). */
 Eet_Data_Descriptor *_edje_edd_old_edje_data = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_External_Directory structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_external_directory = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_External_Directory_Entry structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_external_directory_entry = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Font_Directory structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_font_directory = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Font_Directory_Entry structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_font_directory_entry = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Image_Directory structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_image_directory = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Image_Directory_Entry structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_image_directory_entry = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Image_Directory_Set structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_image_directory_set = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Image_Directory_Set_Entry structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_image_directory_set_entry = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Program structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_program = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Program_Target structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_program_target = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Program_After structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_program_after = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Part_Collection_Directory structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_part_collection_directory = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Part_Collection_Directory_Entry structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_part_collection_directory_entry = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Pack_Element structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_pack_element = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Part_Collection structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_part_collection = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Part structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_part = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Part_Description structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_part_description = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_Part_Image_Id structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_part_image_id = NULL;
+/** @brief Eet_Data_Descriptor for the old Edje_External_Param structure. */
 Eet_Data_Descriptor *_edje_edd_old_edje_external_param = NULL;
 
+/**
+ * @brief Macro to safely free an Eet_Data_Descriptor.
+ *
+ * Checks if the descriptor is non-NULL before freeing and sets it to NULL.
+ * @param eed The Eet_Data_Descriptor to free.
+ */
 #define FREED(eed)                      \
   if (eed)                              \
     {                                   \
@@ -33,6 +73,13 @@ Eet_Data_Descriptor *_edje_edd_old_edje_external_param = NULL;
        (eed) = NULL;                    \
     }
 
+/**
+ * @brief Shuts down and frees all Eet_Data_Descriptors used for old Edje formats.
+ *
+ * This function is called to release resources allocated for handling
+ * older Edje file structures. It iterates through all global Eet_Data_Descriptor
+ * pointers and frees them using the FREED macro.
+ */
 void
 _edje_edd_old_shutdown(void)
 {
@@ -62,6 +109,15 @@ _edje_edd_old_shutdown(void)
    FREED(_edje_edd_old_edje_image_directory_set_entry);
 }
 
+/**
+ * @brief Initializes all Eet_Data_Descriptors for old Edje formats.
+ *
+ * This function sets up the necessary Eet_Data_Descriptor structures
+ * to enable reading and interpreting data from older Edje files. Each descriptor
+ * maps to a specific structure within the old Edje file format, defining its
+ * members and their types. This allows Eet to serialize and deserialize
+ * these old structures.
+ */
 void
 _edje_edd_old_init(void)
 {

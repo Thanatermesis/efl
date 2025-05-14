@@ -13,8 +13,33 @@
 
 // ========================================================================= //
 
+/**
+ * @internal
+ * @brief Initialization counter for the slstr module.
+ *
+ * Incremented by eina_slstr_init() and decremented by eina_slstr_shutdown().
+ * The module is initialized when this counter is greater than 0.
+ */
 static int _slstr_init = 0;
+
+/**
+ * @internal
+ * @brief Main thread's free queue for short-lived strings.
+ *
+ * This queue is used if the operation is performed from the main loop.
+ * Strings added here are freed when eina_slstr_local_clear() is called,
+ * typically at the end of an Ecore main loop iteration.
+ */
 static Eina_FreeQ *_slstr_main_fq = NULL;
+
+/**
+ * @internal
+ * @brief Thread-local storage key for per-thread free queues.
+ *
+ * Each thread (other than the main thread) gets its own Eina_FreeQ
+ * to manage its short-lived strings. This TLS key is used to store
+ * and retrieve the per-thread queue.
+ */
 static Eina_TLS _slstr_tls = 0;
 
 // ========================================================================= //

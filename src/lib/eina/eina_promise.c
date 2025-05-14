@@ -14,7 +14,7 @@
 #include <stdarg.h>
 #include <assert.h>
 
-#define EINA_FUTURE_DISPATCHED ((Eina_Future_Cb)(0x01))
+#define EINA_FUTURE_DISPATCHED ((Eina_Future_Cb)(0x01)) /**< Sentinel value to mark a future as already dispatched. */
 
 #define EFL_MEMPOOL_CHECK_RETURN(_type, _mp, _p)                        \
   if (!eina_mempool_from((_mp), (_p)))                                  \
@@ -100,37 +100,74 @@
 
 #define _eina_promise_value_dbg(_msg, _p, _v) __eina_promise_value_dbg(_msg, _p, _v, __LINE__, __func__)
 
+/**
+ * @internal
+ * @struct _Eina_Promise
+ * @brief Internal structure representing a promise.
+ *
+ * This structure holds the state of a promise, including its associated future,
+ * scheduler, cancellation callback, and user data.
+ */
 struct _Eina_Promise {
-   Eina_Future *future;
-   Eina_Future_Scheduler *scheduler;
-   Eina_Promise_Cancel_Cb cancel;
-   const void *data;
+   Eina_Future *future; /**< The future associated with this promise. NULL if no future is directly attached or if the promise is part of a chain being built. */
+   Eina_Future_Scheduler *scheduler; /**< The scheduler responsible for dispatching this promise's resolution/rejection. */
+   Eina_Promise_Cancel_Cb cancel; /**< The callback function to be invoked if the promise is cancelled. */
+   const void *data; /**< User-provided data for the cancellation callback. */
 };
 
+/**
+ * @internal
+ * @struct _Eina_Future
+ * @brief Internal structure representing a future.
+ *
+ * This structure holds the state of a future, including its associated promise (if any),
+ * links to the next and previous futures in a chain, the completion callback,
+ * user data, an optional storage pointer, and a scheduler entry if scheduled.
+ */
 struct _Eina_Future {
-   Eina_Promise *promise;
-   Eina_Future *next;
-   Eina_Future *prev;
-   Eina_Future_Cb cb;
-   const void *data;
-   Eina_Future **storage;
-   Eina_Future_Schedule_Entry *scheduled_entry;
+   Eina_Promise *promise; /**< The promise that this future is directly linked to. NULL for chained futures. */
+   Eina_Future *next; /**< The next future in a chain. NULL if this is the last future. */
+   Eina_Future *prev; /**< The previous future in a chain. NULL if this is the first future. */
+   Eina_Future_Cb cb; /**< The callback function to be invoked when the future is resolved or rejected. Can be #EINA_FUTURE_DISPATCHED. */
+   const void *data; /**< User-provided data for the callback. */
+   Eina_Future **storage; /**< Optional pointer to a user-provided location to store this future's pointer. Cleared on dispatch/cancellation. */
+   Eina_Future_Schedule_Entry *scheduled_entry; /**< The entry if this future's dispatch is scheduled. NULL otherwise. */
 };
 
-static Eina_Mempool *_promise_mp = NULL;
-static Eina_Mempool *_future_mp = NULL;
-static Eina_Lock _pending_futures_lock;
-static Eina_List *_pending_futures = NULL;
-static int _promise_log_dom = -1;
+static Eina_Mempool *_promise_mp = NULL; /**< Mempool for Eina_Promise structures. */
+static Eina_Mempool *_future_mp = NULL; /**< Mempool for Eina_Future structures. */
+static Eina_Lock _pending_futures_lock; /**< Lock to protect access to the _pending_futures list. */
+static Eina_List *_pending_futures = NULL; /**< List of futures that are scheduled but not yet dispatched. */
+static int _promise_log_dom = -1; /**< Log domain for Eina_Promise related messages. */
 
+/**
+ * @internal
+ * @brief Cancels a promise and cleans up its resources.
+ * @param p The promise to cancel.
+ *
+ * This function unlinks the promise from its future (if any),
+ * calls the user-provided cancellation callback, and frees the promise
+ * from its mempool.
+ */
 static void _eina_promise_cancel(Eina_Promise *p);
 
+/**
+ * @internal
+ * @brief Members for the Eina_Value struct used in race operations.
+ * @see EINA_PROMISE_RACE_STRUCT_DESC
+ */
 static Eina_Value_Struct_Member RACE_STRUCT_MEMBERS[] = {
   EINA_VALUE_STRUCT_MEMBER(NULL, Eina_Future_Race_Result, value),
   EINA_VALUE_STRUCT_MEMBER(NULL, Eina_Future_Race_Result, index),
   EINA_VALUE_STRUCT_MEMBER_SENTINEL
 };
 
+/**
+ * @internal
+ * @brief Descriptor for the Eina_Value struct used in race operations.
+ * This describes a struct with two members: 'value' (the result of the winning future)
+ * and 'index' (the index of the winning future in the input array).
+ */
 static const Eina_Value_Struct_Desc RACE_STRUCT_DESC = {
   .version = EINA_VALUE_STRUCT_DESC_VERSION,
   .ops = NULL,
@@ -143,6 +180,18 @@ static const Eina_Value_Struct_Desc RACE_STRUCT_DESC = {
 EINA_API const Eina_Value_Struct_Desc *EINA_PROMISE_RACE_STRUCT_DESC = &RACE_STRUCT_DESC;
 /** @endcond */
 
+/**
+ * @internal
+ * @brief Debug utility to log promise and value information.
+ * @param msg Custom message prefix.
+ * @param p The promise (can be NULL).
+ * @param v The Eina_Value.
+ * @param line Line number of the call.
+ * @param fname Function name of the call.
+ *
+ * This function logs detailed information about a promise and an Eina_Value
+ * if the debug log level is enabled for the eina_promise domain.
+ */
 static inline void
 __eina_promise_value_dbg(const char *msg,
                          const Eina_Promise *p,
@@ -172,6 +221,15 @@ __eina_promise_value_dbg(const char *msg,
      }
 }
 
+/**
+ * @internal
+ * @brief Sets up memory for an Eina_Value of type EINA_VALUE_TYPE_PROMISE.
+ * @param type The Eina_Value_Type (unused).
+ * @param mem Pointer to the memory to be set up (will hold an Eina_Promise*).
+ * @return EINA_TRUE on success.
+ *
+ * Initializes the memory to hold a NULL Eina_Promise pointer.
+ */
 static Eina_Bool
 _promise_setup(const Eina_Value_Type *type EINA_UNUSED, void *mem)
 {
@@ -180,6 +238,16 @@ _promise_setup(const Eina_Value_Type *type EINA_UNUSED, void *mem)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Flushes an Eina_Value of type EINA_VALUE_TYPE_PROMISE.
+ * @param type The Eina_Value_Type (unused).
+ * @param mem Pointer to the memory holding the Eina_Promise*.
+ * @return EINA_TRUE on success.
+ *
+ * If the Eina_Value holds a non-NULL promise, this function cancels that promise
+ * and sets the stored pointer to NULL.
+ */
 static Eina_Bool
 _promise_flush(const Eina_Value_Type *type EINA_UNUSED, void *mem)
 {
@@ -192,6 +260,15 @@ _promise_flush(const Eina_Value_Type *type EINA_UNUSED, void *mem)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Replaces the promise pointed to by dst with the one pointed to by src.
+ * @param dst Pointer to the destination Eina_Promise* (will be modified).
+ * @param src Pointer to the source Eina_Promise* (const).
+ *
+ * If the current *dst promise is different from *src, the current *dst promise
+ * is cancelled before being replaced by *src.
+ */
 static void
 _promise_replace(Eina_Promise **dst, Eina_Promise * const *src)
 {
@@ -200,6 +277,16 @@ _promise_replace(Eina_Promise **dst, Eina_Promise * const *src)
    *dst = *src;
 }
 
+/**
+ * @internal
+ * @brief Sets an Eina_Value of type EINA_VALUE_TYPE_PROMISE from a va_list.
+ * @param type The Eina_Value_Type (unused).
+ * @param mem Pointer to the memory holding the Eina_Promise* (destination).
+ * @param args va_list containing a pointer to an Eina_Promise*.
+ * @return EINA_TRUE on success.
+ *
+ * Uses _promise_replace to set the promise.
+ */
 static Eina_Bool
 _promise_vset(const Eina_Value_Type *type EINA_UNUSED, void *mem, va_list args)
 {
@@ -209,6 +296,16 @@ _promise_vset(const Eina_Value_Type *type EINA_UNUSED, void *mem, va_list args)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Sets an Eina_Value of type EINA_VALUE_TYPE_PROMISE from a pointer.
+ * @param type The Eina_Value_Type (unused).
+ * @param mem Pointer to the memory holding the Eina_Promise* (destination).
+ * @param ptr Pointer to an Eina_Promise* (source).
+ * @return EINA_TRUE on success.
+ *
+ * Uses _promise_replace to set the promise.
+ */
 static Eina_Bool
 _promise_pset(const Eina_Value_Type *type EINA_UNUSED,
               void *mem, const void *ptr)
@@ -219,6 +316,14 @@ _promise_pset(const Eina_Value_Type *type EINA_UNUSED,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Gets an Eina_Promise* from an Eina_Value of type EINA_VALUE_TYPE_PROMISE.
+ * @param type The Eina_Value_Type (unused).
+ * @param mem Pointer to the memory holding the Eina_Promise* (source).
+ * @param ptr Pointer to an Eina_Promise* (destination, will be written to).
+ * @return EINA_TRUE on success.
+ */
 static Eina_Bool
 _promise_pget(const Eina_Value_Type *type EINA_UNUSED,
               const void *mem, void *ptr)
@@ -229,6 +334,18 @@ _promise_pget(const Eina_Value_Type *type EINA_UNUSED,
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Converts an Eina_Value of type EINA_VALUE_TYPE_PROMISE to another type.
+ * @param type The source Eina_Value_Type (EINA_VALUE_TYPE_PROMISE, unused).
+ * @param convert The target Eina_Value_Type.
+ * @param type_mem Pointer to the memory holding the source Eina_Promise*.
+ * @param convert_mem Pointer to the memory for the converted value.
+ * @return EINA_TRUE if conversion to string was successful, EINA_FALSE otherwise.
+ *
+ * Currently, only conversion to EINA_VALUE_TYPE_STRINGSHARE or EINA_VALUE_TYPE_STRING
+ * is supported, providing a string representation of the promise.
+ */
 static Eina_Bool
 _promise_convert_to(const Eina_Value_Type *type EINA_UNUSED, const Eina_Value_Type *convert, const void *type_mem, void *convert_mem)
 {
@@ -262,6 +379,17 @@ const Eina_Value_Type EINA_VALUE_TYPE_PROMISE = {
   .pget = _promise_pget
 };
 
+/**
+ * @internal
+ * @brief Steals the Eina_Promise from an Eina_Value.
+ * @param value Pointer to the Eina_Value of type EINA_VALUE_TYPE_PROMISE.
+ * @return The stolen Eina_Promise*, or NULL if none.
+ *
+ * This function retrieves the Eina_Promise* from the Eina_Value and then
+ * sets the Eina_Value's internal promise pointer to NULL, effectively
+ * transferring ownership of the promise to the caller without cancelling it.
+ * The Eina_Value itself is not flushed here.
+ */
 static Eina_Promise *
 _eina_value_promise_steal(Eina_Value *value)
 {
@@ -276,6 +404,15 @@ _eina_value_promise_steal(Eina_Value *value)
    return r;
 }
 
+/**
+ * @internal
+ * @brief Frees a future and unlinks it from its neighbors.
+ * @param f The future to free.
+ * @return The next future in the chain, or NULL if this was the last one.
+ *
+ * This function removes the future @p f from its doubly linked list (if part of one)
+ * and frees its memory using the _future_mp mempool.
+ */
 static Eina_Future *
 _eina_future_free(Eina_Future *f)
 {
@@ -288,6 +425,14 @@ _eina_future_free(Eina_Future *f)
    return next;
 }
 
+/**
+ * @internal
+ * @brief Unlinks a promise from its associated future.
+ * @param p The promise to unlink.
+ *
+ * If the promise @p p has an associated future, this function sets the future's
+ * promise pointer to NULL and the promise's future pointer to NULL.
+ */
 static void
 _eina_promise_unlink(Eina_Promise *p)
 {
@@ -299,6 +444,14 @@ _eina_promise_unlink(Eina_Promise *p)
      }
 }
 
+/**
+ * @internal
+ * @brief Links a promise to a future.
+ * @param p The promise to link (can be NULL).
+ * @param f The future to link (must not be NULL).
+ *
+ * Sets the promise's future pointer to @p f and the future's promise pointer to @p p.
+ */
 static void
 _eina_promise_link(Eina_Promise *p, Eina_Future *f)
 {
@@ -308,6 +461,7 @@ _eina_promise_link(Eina_Promise *p, Eina_Future *f)
    DBG("Linking future %p with promise %p", f, p);
 }
 
+// _eina_promise_cancel is documented above its prototype.
 static void
 _eina_promise_cancel(Eina_Promise *p)
 {
@@ -317,6 +471,18 @@ _eina_promise_cancel(Eina_Promise *p)
    eina_mempool_free(_promise_mp, p);
 }
 
+/**
+ * @internal
+ * @brief Steals a promise from an Eina_Value and links it to a future.
+ * @param scheduler The scheduler to associate with the stolen promise if it doesn't have one (for continue promises).
+ * @param value The Eina_Value (of type EINA_VALUE_TYPE_PROMISE) from which to steal the promise.
+ * @param f The future to link the stolen promise to. If NULL, the promise is unlinked.
+ *
+ * This function first steals the promise using _eina_value_promise_steal(),
+ * then flushes the (now empty) Eina_Value. If the stolen promise is a "continue"
+ * promise (i.e., its scheduler is NULL), the provided @p scheduler is assigned to it.
+ * Finally, it links or unlinks the promise with the future @p f.
+ */
 static void
 _eina_promise_value_steal_and_link(Eina_Future_Scheduler *scheduler,
                                    Eina_Value value,
@@ -331,6 +497,18 @@ _eina_promise_value_steal_and_link(Eina_Future_Scheduler *scheduler,
    else _eina_promise_unlink(p);
 }
 
+/**
+ * @internal
+ * @brief Dispatches a future's callback.
+ * @param f The future whose callback is to be dispatched.
+ * @param value The Eina_Value to pass to the callback.
+ * @return The Eina_Value returned by the future's callback.
+ *
+ * This function marks the future as dispatched (by setting its cb to EINA_FUTURE_DISPATCHED),
+ * clears its storage pointer if set, and then calls the future's callback.
+ * It also unlinks the future from its previous and next neighbors in a chain
+ * before calling the callback to prevent re-entrancy issues with the chain structure.
+ */
 static Eina_Value
 _eina_future_cb_dispatch(Eina_Future *f, const Eina_Value value)
 {
@@ -358,6 +536,19 @@ _eina_future_cb_dispatch(Eina_Future *f, const Eina_Value value)
    return cb((void *)f->data, value, f);
 }
 
+/**
+ * @internal
+ * @brief Internal part of future dispatching for a single future.
+ * @param[in,out] f Pointer to the current future. This will be updated to the next future in the chain after dispatch.
+ * @param value The Eina_Value to dispatch.
+ * @return The Eina_Value returned by the dispatched future's callback, or the input @p value if no future was dispatched.
+ *
+ * This function handles the dispatch of a single future. It skips any futures
+ * with NULL callbacks (these are typically placeholders or already processed parts of a chain).
+ * If a valid future is found, its callback is dispatched via _eina_future_cb_dispatch(),
+ * the future is freed, and @p f is updated to point to the next future.
+ * It ensures that the input @p value is not a promise itself.
+ */
 static Eina_Value
 _eina_future_dispatch_internal(Eina_Future **f,
                                const Eina_Value value)
@@ -377,6 +568,13 @@ _eina_future_dispatch_internal(Eina_Future **f,
    return next_value;
 }
 
+/**
+ * @internal
+ * @brief Checks if two Eina_Value instances are identical.
+ * @param v1 The first Eina_Value.
+ * @param v2 The second Eina_Value.
+ * @return EINA_TRUE if they are identical (same type and same memory content), EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _eina_value_is(const Eina_Value v1, const Eina_Value v2)
 {
@@ -388,42 +586,73 @@ _eina_value_is(const Eina_Value v1, const Eina_Value v2)
                   v1.type->value_size);
 }
 
+/**
+ * @internal
+ * @brief Dispatches a value through a chain of futures.
+ * @param scheduler The scheduler to use for subsequent operations or if a new promise is encountered.
+ * @param f The first future in the chain to dispatch to.
+ * @param value The Eina_Value to dispatch.
+ *
+ * This function recursively dispatches a value through a future chain.
+ * It first dispatches the current future @p f using _eina_future_dispatch_internal().
+ * If the result of that dispatch (`next_value`) is another promise, this function
+ * steals that promise and links it to the next future in the chain, pausing execution
+ * of this chain until the new promise resolves.
+ * If `next_value` is not a promise, it continues dispatching `next_value` to the
+ * next future in the chain.
+ * It handles flushing of values that are no longer needed.
+ */
 static void
 _eina_future_dispatch(Eina_Future_Scheduler *scheduler, Eina_Future *f, Eina_Value value)
 {
     Eina_Value next_value = _eina_future_dispatch_internal(&f, value);
     if (!_eina_value_is(next_value, value)) eina_value_flush(&value);
-    if (!f)
+    if (!f) // No more futures in the chain
       {
          if (next_value.type == &EINA_VALUE_TYPE_PROMISE)
            {
+              // The chain ended, but the last callback returned a new promise.
+              // Steal it and effectively orphan it (it will be managed independently).
               DBG("There are no more futures, but next_value is a promise setting p->future to NULL.");
               _eina_promise_value_steal_and_link(scheduler, next_value, NULL);
            }
-         else eina_value_flush(&next_value);
+         else eina_value_flush(&next_value); // No more futures, flush the final value if not a promise.
          return;
       }
 
-    // Break early if finding a cb that is already dispatching
+    // Break early if finding a cb that is already dispatching (e.g. due to cancellation during dispatch)
     if (f->cb == EINA_FUTURE_DISPATCHED)
       {
          eina_value_flush(&next_value);
          return;
       }
-    if (next_value.type == &EINA_VALUE_TYPE_PROMISE)
+
+    if (next_value.type == &EINA_VALUE_TYPE_PROMISE) // Callback returned a new promise
       {
          if (EINA_UNLIKELY(eina_log_domain_level_check(_promise_log_dom, EINA_LOG_LEVEL_DBG)))
            {
               Eina_Promise *p = NULL;
-
               eina_value_pget(&next_value, &p);
               DBG("Future %p will wait for a new promise %p", f, p);
            }
+         // Link the new promise to the rest of the chain.
          _eina_promise_value_steal_and_link(scheduler, next_value, f);
       }
-    else _eina_future_dispatch(scheduler, f, next_value);
+    else // Callback returned a regular value, continue dispatching.
+      _eina_future_dispatch(scheduler, f, next_value);
  }
 
+/**
+ * @internal
+ * @brief Callback executed by the scheduler to dispatch a future's result.
+ * @param f The future to be dispatched.
+ * @param value The Eina_Value (result) to dispatch.
+ *
+ * This function is called by an Eina_Future_Scheduler (e.g., from the main loop)
+ * when a promise has been resolved or rejected. It removes the future from the
+ * list of pending futures and then calls _eina_future_dispatch to process the
+ * value through the future chain.
+ */
 static void
 _scheduled_entry_cb(Eina_Future *f, Eina_Value value)
 {

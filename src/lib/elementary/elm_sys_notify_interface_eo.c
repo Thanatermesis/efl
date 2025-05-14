@@ -2,6 +2,17 @@ EOAPI EFL_VOID_FUNC_BODYV_CONST(elm_obj_sys_notify_interface_send, EFL_FUNC_CALL
 EOAPI EFL_VOID_FUNC_BODYV_CONST(elm_obj_sys_notify_interface_simple_send, EFL_FUNC_CALL(icon, summary, body), const char *icon, const char *summary, const char *body);
 EOAPI EFL_VOID_FUNC_BODYV_CONST(elm_obj_sys_notify_interface_close, EFL_FUNC_CALL(id), unsigned int id);
 
+/**
+ * @internal
+ * @brief Initializes the Elm_Sys_Notify_Interface class.
+ *
+ * This function sets up the Efl_Object operations (methods) for the
+ * Elm_Sys_Notify_Interface. It is called by the EO system when the
+ * class is constructed.
+ *
+ * @param klass The Efl_Class to initialize.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_sys_notify_interface_class_initializer(Efl_Class *klass)
 {
@@ -24,6 +35,14 @@ _elm_sys_notify_interface_class_initializer(Efl_Class *klass)
    return efl_class_functions_set(klass, opsp, ropsp);
 }
 
+/**
+ * @internal
+ * @brief Describes the Elm_Sys_Notify_Interface class.
+ *
+ * This structure provides metadata about the Elm_Sys_Notify_Interface,
+ * such as its version, name, type (interface), and initializer functions.
+ * It is used by the EO system to manage the class.
+ */
 static const Efl_Class_Description _elm_sys_notify_interface_class_desc = {
    EO_VERSION,
    "Elm.Sys_Notify_Interface",

@@ -3,15 +3,31 @@
 #endif
 #include <Elementary.h>
 
+/**
+ * @brief Application data structure for the Efl animation scale test.
+ *
+ * This structure holds all the necessary data for managing the animation
+ * test, including animation objects, widgets, and state flags.
+ */
 typedef struct _App_Data
 {
-   Efl_Canvas_Animation        *scale_double_anim;
-   Efl_Canvas_Animation        *scale_half_anim;
-   Elm_Button                  *button;
+   Efl_Canvas_Animation        *scale_double_anim; /**< Animation to double the object size. */
+   Efl_Canvas_Animation        *scale_half_anim; /**< Animation to halve the object size. */
+   Elm_Button                  *button; /**< The button object that will be animated. */
 
-   Eina_Bool             is_btn_scaled;
+   Eina_Bool             is_btn_scaled; /**< Flag to track if the button is currently scaled up. */
 } App_Data;
 
+/**
+ * @brief Callback function for animation state changes.
+ *
+ * This function is called when an animation starts or ends.
+ * It prints a message indicating the change.
+ *
+ * @param data User data, not used here.
+ * @param event The Efl_Event structure. event->info is the animation object
+ *              on start, and NULL on end.
+ */
 static void
 _anim_changed_cb(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
 {
@@ -27,6 +43,16 @@ _anim_changed_cb(void *data EINA_UNUSED, const Efl_Event *event EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback function for animation progress updates.
+ *
+ * This function is called periodically as an animation runs.
+ * It prints the current progress of the animation.
+ *
+ * @param data User data, not used here.
+ * @param event The Efl_Event structure. event->info is a pointer to a double
+ *              representing the animation progress (0.0 to 1.0).
+ */
 static void
 _anim_running_cb(void *data EINA_UNUSED, const Efl_Event *event)
 {
@@ -34,11 +60,30 @@ _anim_running_cb(void *data EINA_UNUSED, const Efl_Event *event)
    printf("Animation is running! Current progress(%lf)\n", *progress);
 }
 
+/**
+ * @brief Defines an array of callbacks for animation events.
+ *
+ * This array maps animation events to their respective callback functions.
+ * - EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_CHANGED is handled by _anim_changed_cb.
+ * - EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_PROGRESS_UPDATED is handled by _anim_running_cb.
+ */
 EFL_CALLBACKS_ARRAY_DEFINE(animation_stats_cb,
   {EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_CHANGED, _anim_changed_cb },
   {EFL_CANVAS_OBJECT_ANIMATION_EVENT_ANIMATION_PROGRESS_UPDATED, _anim_running_cb },
 )
 
+/**
+ * @brief Callback function for the "clicked" event on the control button.
+ *
+ * Toggles the scaling animation on the target button. When clicked, it
+ * alternates between scaling the button up (doubling its size) and scaling it
+ * down (halving its size). It also updates the control button's text to reflect
+ * the next available action.
+ *
+ * @param data The application data (App_Data *).
+ * @param obj The button that was clicked.
+ * @param event_info Not used.
+ */
 static void
 _btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
 {
@@ -60,6 +105,16 @@ _btn_clicked_cb(void *data, Evas_Object *obj, void *event_info EINA_UNUSED)
      }
 }
 
+/**
+ * @brief Callback for the window's "delete,request" event.
+ *
+ * This function is responsible for freeing the application data when the window
+ * is closed.
+ *
+ * @param data The application data (App_Data *).
+ * @param obj The window object.
+ * @param event_info Not used.
+ */
 static void
 _win_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -67,6 +122,15 @@ _win_del_cb(void *data, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUS
    free(ad);
 }
 
+/**
+ * @brief Test case for basic scale animation.
+ *
+ * This test demonstrates a scale animation applied to a button. The scaling
+ * pivot is the center of the button itself (since the pivot object is NULL in
+ * efl_animation_scale_set). A second button triggers the animation.
+ *
+ * The animation scales the target button from 1.0 to 2.0 and back.
+ */
 void
 test_efl_anim_scale(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -118,6 +182,16 @@ test_efl_anim_scale(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *
    evas_object_show(win);
 }
 
+/**
+ * @brief Test case for relative scale animation.
+ *
+ * This test demonstrates a scale animation where the scaling operation is
+ * relative to another object (a "pivot" button). The target button scales
+ * around the center of the pivot button.
+ *
+ * The animation scales the target button from 1.0 to 2.0 and back, with the
+ * transform origin being the pivot object.
+ */
 void
 test_efl_anim_scale_relative(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -177,6 +251,16 @@ test_efl_anim_scale_relative(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSE
    evas_object_show(win);
 }
 
+/**
+ * @brief Test case for absolute scale animation.
+ *
+ * This test demonstrates a scale animation using absolute coordinates for the
+ * pivot point. The target button is scaled relative to the canvas coordinate (0, 0).
+ * A small object is placed at (0, 0) for visual reference.
+ *
+ * The animation scales the target button from 1.0 to 2.0 and back, with the
+ * transform origin at absolute position (0,0) on the canvas.
+ */
 void
 test_efl_anim_scale_absolute(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {

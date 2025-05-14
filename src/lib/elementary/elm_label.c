@@ -29,6 +29,14 @@ static const Evas_Smart_Cb_Description _smart_callbacks[] = {
    {NULL, NULL}
 };
 
+/**
+ * @internal
+ * @brief Action callback to activate the label (e.g., simulate a click).
+ * This function is typically used by the accessibility framework.
+ * @param obj The label object.
+ * @param params Optional parameters for the action (unused in this case).
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _action_activate(Evas_Object *obj, const char *params EINA_UNUSED)
 {
@@ -36,6 +44,13 @@ _action_activate(Evas_Object *obj, const char *params EINA_UNUSED)
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Recalculates the minimum size of the label.
+ * This is often called when text, wrap settings, or other properties affecting
+ * size have changed. It considers wrap width and calculates restricted minimums.
+ * @param data The label object.
+ */
 static void
 _recalc(void *data)
 {
@@ -68,6 +83,14 @@ _recalc(void *data)
    evas_event_thaw_eval(evas_object_evas_get(data));
 }
 
+/**
+ * @internal
+ * @brief Sets or clears the user-defined text style format string on the label's text part.
+ * This format string can include Edje text tags for styling (e.g., "font_size=20 wrap=word").
+ * @param obj The Edje object part ("elm.text") where the style is applied.
+ *            In practice, this is `wd->resize_obj`.
+ * @param format The format string to apply, or NULL to pop the current user style.
+ */
 static void
 _label_format_set(Evas_Object *obj, const char *format)
 {
@@ -77,6 +100,15 @@ _label_format_set(Evas_Object *obj, const char *format)
      edje_object_part_text_style_user_pop(obj, "elm.text");
 }
 
+/**
+ * @internal
+ * @brief Manages the slide animation of the label.
+ * This function stops any existing slide, checks conditions (e.g., multiline,
+ * empty text), and starts a new slide animation if applicable based on the
+ * current slide mode, text width, and label width. It also handles ellipsis
+ * settings during sliding.
+ * @param obj The label object.
+ */
 static void
 _label_slide_change(Evas_Object *obj)
 {
@@ -178,6 +210,14 @@ _label_slide_change(Evas_Object *obj)
      }
 }
 
+/**
+ * @internal
+ * @brief Updates the horizontal size policy of the label based on ellipsis and wrap settings.
+ * If ellipsis is disabled and line wrap is none, the label is set to be horizontally expandable.
+ * Otherwise, it's set to a fixed horizontal policy.
+ * @param obj The label Evas object.
+ * @param sd The label's smart data.
+ */
 static void
 _elm_label_horizontal_size_policy_update(Eo *obj, Elm_Label_Data *sd)
 {
@@ -242,6 +282,16 @@ _elm_label_efl_canvas_group_group_calculate(Eo *obj, Elm_Label_Data *_pd EINA_UN
      }
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when the label's underlying Edje object is resized.
+ * This function triggers a recalculation of the slide animation if active,
+ * and re-evaluates sizing if line wrapping is enabled.
+ * @param data The label object (passed as user data).
+ * @param e The Evas canvas (unused).
+ * @param obj The Evas object that was resized (the Edje object, unused).
+ * @param event_info Event-specific information (unused).
+ */
 static void
 _on_label_resize(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED)
 {
@@ -251,6 +301,18 @@ _on_label_resize(void *data, Evas *e EINA_UNUSED, Evas_Object *obj EINA_UNUSED, 
    if (sd->linewrap) elm_layout_sizing_eval(data);
 }
 
+/**
+ * @internal
+ * @brief Finds the value associated with a key in a key-value pair string.
+ * The string is expected to be in a format like "key1=value1 key2=value2".
+ * This function locates the `key=` substring and extracts the subsequent value.
+ * @param oldstring The string to search within.
+ * @param key The key to search for (e.g., "wrap").
+ * @param[out] value Pointer to a char* that will be set to the start of the value
+ *                   within `oldstring`. The caller should not free this, as it
+ *                   points into `oldstring`.
+ * @return 0 if the key is found and value is extracted, -1 otherwise.
+ */
 static int
 _get_value_in_key_string(const char *oldstring, const char *key, char **value)
 {
@@ -281,6 +343,24 @@ _get_value_in_key_string(const char *oldstring, const char *key, char **value)
    return -1;
 }
 
+/**
+ * @internal
+ * @brief Replaces or deletes a key-value pair in an Eina_Strbuf.
+ * The buffer is assumed to contain a string of space-separated "key=value" pairs,
+ * potentially wrapped in "DEFAULT='...'" if it's the initial content.
+ *
+ * Example: If srcbuf contains "font_size=10 wrap=word", calling with
+ * key="wrap", value="char", deleteflag=0 would change it to "font_size=10 wrap=char".
+ * If deleteflag=1, it would become "font_size=10".
+ * If key="align" (not present), value="center", deleteflag=0, it would become
+ * "font_size=10 wrap=word align=center" (or "DEFAULT='align=center'" if empty).
+ *
+ * @param srcbuf The string buffer to modify.
+ * @param key The key of the pair to modify/delete (e.g., "wrap", "font_size").
+ * @param value The new value to set if not deleting. Unused if deleteflag is true.
+ * @param deleteflag If non-zero, the key-value pair is deleted. Otherwise, it's updated or added.
+ * @return Always returns 0.
+ */
 static int
 _strbuf_key_value_replace(Eina_Strbuf *srcbuf, const char *key, const char *value, int deleteflag)
 {
@@ -327,6 +407,19 @@ _strbuf_key_value_replace(Eina_Strbuf *srcbuf, const char *key, const char *valu
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Replaces or deletes a key-value pair in an eina_stringshare'd string.
+ * This is a convenience wrapper around `_strbuf_key_value_replace` for
+ * strings managed by eina_stringshare. It creates a temporary Eina_Strbuf,
+ * performs the operation, and then updates the stringshare.
+ * @param srcstring Pointer to the eina_stringshare'd string. This string will be
+ *                  deleted and replaced with the modified version.
+ * @param key The key of the pair to modify/delete.
+ * @param value The new value to set if not deleting.
+ * @param deleteflag If non-zero, the key-value pair is deleted.
+ * @return Always returns 0.
+ */
 static int
 _stringshare_key_value_replace(const char **srcstring, const char *key, const char *value, int deleteflag)
 {
@@ -342,6 +435,17 @@ _stringshare_key_value_replace(const char **srcstring, const char *key, const ch
    return 0;
 }
 
+/**
+ * @internal
+ * @brief Sets the text for a given part of the label widget.
+ * This function applies the current format string, sets the text markup,
+ * and then triggers a re-evaluation of the layout and slide animation.
+ * @param obj The label Evas object.
+ * @param sd The label's smart data.
+ * @param part The name of the text part to set (usually NULL for the default "elm.text").
+ * @param label The text string to set. If NULL, it's treated as an empty string.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _elm_label_text_set(Eo *obj, Elm_Label_Data *sd, const char *part, const char *label)
 {
@@ -359,6 +463,16 @@ _elm_label_text_set(Eo *obj, Elm_Label_Data *sd, const char *part, const char *l
    return EINA_TRUE;
 }
 
+/**
+ * @internal
+ * @brief Provides accessibility information for the label.
+ * Returns the custom accessibility information if set, otherwise, it converts
+ * the label's markup text to plain text.
+ * @param data User data associated with the callback (unused).
+ * @param obj The label object.
+ * @return A newly allocated string containing the accessibility information.
+ *         The caller is responsible for freeing this string.
+ */
 static char *
 _access_info_cb(void *data EINA_UNUSED, Evas_Object *obj)
 {
@@ -369,6 +483,16 @@ _access_info_cb(void *data EINA_UNUSED, Evas_Object *obj)
    else return strdup(txt);
 }
 
+/**
+ * @internal
+ * @brief Callback invoked when a slide animation cycle ends.
+ * This function re-applies ellipsis if it was temporarily disabled for sliding
+ * and emits the "slide,end" signal for the label.
+ * @param data The label object (passed as user data).
+ * @param obj The Edje object that emitted the signal (unused).
+ * @param emission The Edje signal string (e.g., "elm,state,slide,end", unused).
+ * @param source The source of the Edje signal (e.g., "elm", unused).
+ */
 static void
 _on_slide_end(void *data, Evas_Object *obj EINA_UNUSED,
               const char *emission EINA_UNUSED, const char *source EINA_UNUSED)
@@ -417,6 +541,14 @@ _elm_label_efl_canvas_group_group_add(Eo *obj, Elm_Label_Data *priv)
    elm_layout_sizing_eval(obj);
 }
 
+/**
+ * @brief Adds a new label widget to the given parent Evas object.
+ *
+ * @param parent The parent Evas object.
+ * @return The new Evas_Object for the label, or NULL on failure.
+ *
+ * @ingroup Elm_Label_Group
+ */
 EAPI Evas_Object *
 elm_label_add(Evas_Object *parent)
 {
@@ -576,6 +708,14 @@ _elm_label_slide_mode_get(const Eo *obj EINA_UNUSED, Elm_Label_Data *sd)
    return sd->slide_mode;
 }
 
+/**
+ * @brief Enable or disable the slide animation.
+ * @param obj The label object.
+ * @param slide EINA_TRUE to enable sliding, EINA_FALSE to disable.
+ * @deprecated Use elm_label_slide_mode_set() instead with
+ *             ELM_LABEL_SLIDE_MODE_ALWAYS or ELM_LABEL_SLIDE_MODE_NONE.
+ * @ingroup Elm_Label_Group
+ */
 EINA_DEPRECATED EAPI void
 elm_label_slide_set(Evas_Object *obj, Eina_Bool slide)
 {
@@ -585,6 +725,14 @@ elm_label_slide_set(Evas_Object *obj, Eina_Bool slide)
      elm_label_slide_mode_set(obj, ELM_LABEL_SLIDE_MODE_NONE);
 }
 
+/**
+ * @brief Get whether the slide animation is enabled.
+ * @param obj The label object.
+ * @return EINA_TRUE if sliding is enabled (ELM_LABEL_SLIDE_MODE_ALWAYS), EINA_FALSE otherwise.
+ * @deprecated Use elm_label_slide_mode_get() instead and check for
+ *             ELM_LABEL_SLIDE_MODE_ALWAYS.
+ * @ingroup Elm_Label_Group
+ */
 EINA_DEPRECATED EAPI Eina_Bool
 elm_label_slide_get(const Evas_Object *obj)
 {

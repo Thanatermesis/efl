@@ -16,11 +16,17 @@
 
 #define EEZE_MOUNT_DEFAULT_OPTS "noexec,nosuid,utf8"
 
+/** @brief Event ID for disk mount success */
 EAPI int EEZE_EVENT_DISK_MOUNT = 0;
+/** @brief Event ID for disk unmount success */
 EAPI int EEZE_EVENT_DISK_UNMOUNT = 0;
+/** @brief Event ID for disk eject success */
 EAPI int EEZE_EVENT_DISK_EJECT = 0;
+/** @brief Event ID for disk operation error */
 EAPI int EEZE_EVENT_DISK_ERROR = 0;
+/** @internal @brief Ecore event handler for mount/unmount/eject results. */
 static Ecore_Event_Handler *_mount_handler = NULL;
+/** @internal @brief List of Eeze_Disk objects currently undergoing an operation. */
 Eina_List *eeze_events = NULL;
 
 /*
@@ -29,6 +35,13 @@ Eina_List *eeze_events = NULL;
  *
  */
 
+/**
+ * @internal
+ * @brief Frees an Eeze_Event_Disk_Error structure.
+ * This function is used as a callback for ecore_event_add when an error event is emitted.
+ * @param data Unused.
+ * @param de The Eeze_Event_Disk_Error structure to free.
+ */
 static void
 _eeze_disk_mount_error_free(void *data EINA_UNUSED, Eeze_Event_Disk_Error *de)
 {
@@ -39,6 +52,12 @@ _eeze_disk_mount_error_free(void *data EINA_UNUSED, Eeze_Event_Disk_Error *de)
    free(de);
 }
 
+/**
+ * @internal
+ * @brief Handles errors during disk operations and emits an EEZE_EVENT_DISK_ERROR.
+ * @param disk The Eeze_Disk associated with the error.
+ * @param error A string describing the error.
+ */
 static void
 _eeze_disk_mount_error_handler(Eeze_Disk *disk, const char *error)
 {
@@ -54,6 +73,20 @@ _eeze_disk_mount_error_handler(Eeze_Disk *disk, const char *error)
    ecore_event_add(EEZE_EVENT_DISK_ERROR, de, (Ecore_End_Cb)_eeze_disk_mount_error_free, NULL);
 }
 
+/**
+ * @internal
+ * @brief Handles the result of mount, unmount, or eject operations.
+ * This function is an Ecore_Event_Handler_Cb for ECORE_EXE_EVENT_DEL events,
+ * which are triggered when an ecore_exe_run process finishes.
+ * It determines the success or failure of the operation and emits the
+ * appropriate Eeze event (EEZE_EVENT_DISK_MOUNT, EEZE_EVENT_DISK_UNMOUNT,
+ * EEZE_EVENT_DISK_EJECT, or EEZE_EVENT_DISK_ERROR).
+ *
+ * @param data Unused.
+ * @param type Unused.
+ * @param ev The Ecore_Exe_Event_Del event data.
+ * @return ECORE_CALLBACK_RENEW to keep the handler active.
+ */
 static Eina_Bool
 _eeze_disk_mount_result_handler(void *data EINA_UNUSED, int type EINA_UNUSED, Ecore_Exe_Event_Del *ev)
 {
@@ -171,6 +204,14 @@ _eeze_disk_mount_result_handler(void *data EINA_UNUSED, int type EINA_UNUSED, Ec
  *
  */
 
+/**
+ * @internal
+ * @brief Initializes the eeze disk mounting subsystem.
+ * This function registers new ecore event types for disk operations
+ * and sets up an event handler for mount/unmount/eject results.
+ * It also initializes the underlying libmount integration.
+ * @return EINA_TRUE on success, EINA_FALSE otherwise.
+ */
 Eina_Bool
 eeze_mount_init(void)
 {
@@ -183,6 +224,12 @@ eeze_mount_init(void)
    return eeze_libmount_init();
 }
 
+/**
+ * @internal
+ * @brief Shuts down the eeze disk mounting subsystem.
+ * Flushes any pending disk operation events, shuts down libmount integration,
+ * and removes the event handler.
+ */
 void
 eeze_mount_shutdown(void)
 {
@@ -201,6 +248,13 @@ eeze_mount_shutdown(void)
  *
  */
 
+/**
+ * @brief Checks if a disk is currently mounted.
+ * This function queries the system (via libmount) to determine if the specified disk
+ * is mounted.
+ * @param disk The disk to check.
+ * @return EINA_TRUE if the disk is mounted, EINA_FALSE otherwise or on error.
+ */
 EAPI Eina_Bool
 eeze_disk_mounted_get(Eeze_Disk *disk)
 {
@@ -209,6 +263,19 @@ eeze_disk_mounted_get(Eeze_Disk *disk)
    return eeze_disk_libmount_mounted_get(disk);
 }
 
+/**
+ * @brief Sets the mount options for a disk.
+ * These options will be used when @ref eeze_disk_mount is called.
+ * Setting new options marks the internal mount command as changed, so it will
+ * be regenerated on the next mount attempt.
+ * If EEZE_DISK_MOUNTOPT_UID is set, the current user's UID will be stored
+ * for use in the mount command (e.g., "uid=<uid>").
+ *
+ * @param disk The disk for which to set mount options.
+ * @param opts A bitmask of Eeze_Disk_Mount_Opts flags.
+ *        Example: EEZE_DISK_MOUNTOPT_NOEXEC | EEZE_DISK_MOUNTOPT_NOSUID
+ * @return EINA_TRUE on success, EINA_FALSE if disk is NULL.
+ */
 EAPI Eina_Bool
 eeze_disk_mountopts_set(Eeze_Disk *disk, unsigned long opts)
 {
@@ -221,6 +288,11 @@ eeze_disk_mountopts_set(Eeze_Disk *disk, unsigned long opts)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the currently set mount options for a disk.
+ * @param disk The disk to query.
+ * @return A bitmask of Eeze_Disk_Mount_Opts flags, or 0 if disk is NULL.
+ */
 EAPI unsigned long
 eeze_disk_mountopts_get(Eeze_Disk *disk)
 {
@@ -228,6 +300,17 @@ eeze_disk_mountopts_get(Eeze_Disk *disk)
    return disk->mount_opts;
 }
 
+/**
+ * @brief Sets a wrapper command to be prepended to mount/unmount/eject commands.
+ * This can be used, for example, to execute commands via `sudo` or a custom
+ * helper utility. The wrapper string will be prepended to the command line
+ * followed by a space.
+ *
+ * @param disk The disk for which to set the wrapper.
+ * @param wrapper The wrapper command string (e.g., "sudo").
+ *        Pass NULL to remove an existing wrapper.
+ * @return EINA_TRUE on success, EINA_FALSE if disk is NULL or wrapper is an empty string.
+ */
 EAPI Eina_Bool
 eeze_disk_mount_wrapper_set(Eeze_Disk *disk, const char *wrapper)
 {
@@ -243,6 +326,12 @@ eeze_disk_mount_wrapper_set(Eeze_Disk *disk, const char *wrapper)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Gets the currently set mount wrapper command for a disk.
+ * @param disk The disk to query.
+ * @return The wrapper command string, or NULL if no wrapper is set or disk is NULL.
+ *         The returned string is an Eina_Stringshare, do not free it.
+ */
 EAPI const char *
 eeze_disk_mount_wrapper_get(Eeze_Disk *disk)
 {
@@ -250,6 +339,22 @@ eeze_disk_mount_wrapper_get(Eeze_Disk *disk)
    return disk->mount_wrapper;
 }
 
+/**
+ * @brief Mounts a disk.
+ * This function asynchronously attempts to mount the specified disk.
+ * It first checks if a mount point is set for the disk. If not, it tries to
+ * determine one using libmount (looking up by UUID, then devpath).
+ * If the mount point directory does not exist, it attempts to create it.
+ * The actual mount command is constructed based on the disk's properties
+ * (devpath/UUID, mount point, mount options, wrapper).
+ * An ECORE_EXE_EVENT_DEL event will be triggered upon completion (or failure),
+ * which is handled by _eeze_disk_mount_result_handler to emit the appropriate
+ * Eeze event (EEZE_EVENT_DISK_MOUNT or EEZE_EVENT_DISK_ERROR).
+ *
+ * @param disk The disk to mount.
+ * @return EINA_TRUE if the mount process was successfully initiated, EINA_FALSE on error
+ *         (e.g., disk is NULL, no mount point, already mounted, failed to start command).
+ */
 EAPI Eina_Bool
 eeze_disk_mount(Eeze_Disk *disk)
 {
@@ -354,6 +459,22 @@ eeze_disk_mount(Eeze_Disk *disk)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Unmounts a disk.
+ * This function asynchronously attempts to unmount the specified disk.
+ * It first checks if the disk is actually mounted.
+ * The unmount command is constructed based on the disk's devpath and any
+ * configured wrapper.
+ * An ECORE_EXE_EVENT_DEL event will be triggered upon completion (or failure),
+ * which is handled by _eeze_disk_mount_result_handler to emit the appropriate
+ * Eeze event (EEZE_EVENT_DISK_UNMOUNT or EEZE_EVENT_DISK_ERROR).
+ * If unmounting fails, it will retry up to 3 times.
+ *
+ * @param disk The disk to unmount.
+ * @return EINA_TRUE if the unmount process was successfully initiated or if the disk
+ *         was not mounted, EINA_FALSE on other errors (e.g., disk is NULL,
+ *         failed to start command).
+ */
 EAPI Eina_Bool
 eeze_disk_unmount(Eeze_Disk *disk)
 {
@@ -384,6 +505,21 @@ eeze_disk_unmount(Eeze_Disk *disk)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Ejects a disk.
+ * This function asynchronously attempts to eject the specified disk.
+ * If the disk is currently mounted, it will first attempt to unmount it.
+ * The eject command is constructed based on the disk's devpath and any
+ * configured wrapper.
+ * An ECORE_EXE_EVENT_DEL event will be triggered upon completion (or failure),
+ * which is handled by _eeze_disk_mount_result_handler to emit the appropriate
+ * Eeze event (EEZE_EVENT_DISK_EJECT or EEZE_EVENT_DISK_ERROR).
+ * If ejecting fails (or unmounting prior to ejecting fails), it will retry up to 3 times.
+ *
+ * @param disk The disk to eject.
+ * @return EINA_TRUE if the eject (or pre-eject unmount) process was successfully
+ *         initiated, EINA_FALSE on error (e.g., disk is NULL, failed to start command).
+ */
 EAPI Eina_Bool
 eeze_disk_eject(Eeze_Disk *disk)
 {
@@ -415,6 +551,13 @@ eeze_disk_eject(Eeze_Disk *disk)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Cancels an ongoing mount, unmount, or eject operation for a disk.
+ * If there is an active operation (mounter process) for the disk, this function
+ * will kill the process.
+ *
+ * @param disk The disk whose operation should be canceled.
+ */
 EAPI void
 eeze_disk_cancel(Eeze_Disk *disk)
 {
@@ -425,6 +568,22 @@ eeze_disk_cancel(Eeze_Disk *disk)
    disk->mounter = NULL;
 }
 
+/**
+ * @brief Gets the mount point for a disk.
+ * If a mount point has been explicitly set using @ref eeze_disk_mount_point_set,
+ * that value is returned.
+ * Otherwise, it attempts to look up the mount point using libmount by:
+ * 1. Device path (e.g., /dev/sdb1)
+ * 2. UUID
+ * 3. Filesystem label
+ * If a mount point is found via libmount, it is cached on the Eeze_Disk object
+ * for future calls.
+ *
+ * @param disk The disk to query.
+ * @return The mount point string (e.g., "/media/usb_drive") if found,
+ *         otherwise NULL. The returned string is an Eina_Stringshare, do not free it.
+ *         Returns NULL if disk is NULL.
+ */
 EAPI const char *
 eeze_disk_mount_point_get(Eeze_Disk *disk)
 {
@@ -455,6 +614,18 @@ eeze_disk_mount_point_get(Eeze_Disk *disk)
    return NULL;
 }
 
+/**
+ * @brief Sets the mount point for a disk.
+ * This function allows explicitly setting the directory where the disk should be mounted.
+ * Setting a new mount point marks the internal mount and unmount commands as changed,
+ * so they will be regenerated on the next mount/unmount attempt.
+ *
+ * @param disk The disk for which to set the mount point.
+ * @param mount_point The desired mount point path (e.g., "/mnt/my_disk").
+ *        Can be NULL to clear a previously set mount point, though this might
+ *        cause issues if a mount point cannot be automatically determined later.
+ * @return EINA_TRUE on success, EINA_FALSE if disk is NULL.
+ */
 EAPI Eina_Bool
 eeze_disk_mount_point_set(Eeze_Disk *disk, const char *mount_point)
 {

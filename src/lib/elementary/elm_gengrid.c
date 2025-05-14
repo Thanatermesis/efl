@@ -102,6 +102,10 @@ static void _item_mouse_callbacks_del(Elm_Gen_Item *it, Evas_Object *view);
 static void _calc_job(void *data);
 static void _elm_gengrid_item_focused(Elm_Object_Item *eo_it);
 
+/**
+ * @brief Array of key actions and their corresponding callback functions.
+ * Used for handling keyboard input for the Gengrid widget.
+ */
 static const Elm_Action key_actions[] = {
    {"move", _key_action_move},
    {"select", _key_action_select},
@@ -109,6 +113,16 @@ static const Elm_Action key_actions[] = {
    {NULL, NULL}
 };
 
+/**
+ * @brief Flushes a pending focus request to an item when it is realized.
+ *
+ * If an item was set to be focused but was not yet realized (i.e., its
+ * Evas object was not created), this function ensures that focus is
+ * properly set once the item becomes realized.
+ *
+ * @param widget The Gengrid widget.
+ * @param it The Gengrid item that has just been realized.
+ */
 static void
 _flush_focus_on_realization(Eo *widget, Elm_Gen_Item *it)
 {
@@ -125,7 +139,19 @@ _flush_focus_on_realization(Eo *widget, Elm_Gen_Item *it)
 
 
 //-- item cache handle routine --//
-// push item cache into caches
+
+/**
+ * @brief Pushes an item cache (Item_Cache) into the list of caches.
+ *
+ * This function adds a given Item_Cache structure to the beginning of
+ * the item cache list maintained by the Gengrid. This is used to store
+ * unrealized items for potential reuse, improving performance.
+ *
+ * @param sd The Gengrid widget's private data.
+ * @param itc The Item_Cache structure to push into the cache.
+ * @return @c EINA_TRUE on success, @c EINA_FALSE otherwise (e.g., if itc is NULL
+ *         or item_cache_max is not positive).
+ */
 static Eina_Bool
 _item_cache_push(Elm_Gengrid_Data *sd, Item_Cache *itc)
 {
@@ -139,7 +165,16 @@ _item_cache_push(Elm_Gengrid_Data *sd, Item_Cache *itc)
    return EINA_TRUE;
 }
 
-// pop item cache from caches
+/**
+ * @brief Pops (removes) a specific item cache (Item_Cache) from the list of caches.
+ *
+ * This function removes a given Item_Cache structure from the item cache
+ * list. It's typically used when a cached item is being reused.
+ *
+ * @param sd The Gengrid widget's private data.
+ * @param itc The Item_Cache structure to pop from the cache.
+ * @return The popped Item_Cache structure if found and removed, @c NULL otherwise.
+ */
 static Item_Cache *
 _item_cache_pop(Elm_Gengrid_Data *sd, Item_Cache *itc)
 {
@@ -154,7 +189,15 @@ _item_cache_pop(Elm_Gengrid_Data *sd, Item_Cache *itc)
    return itc;
 }
 
-// free one item cache from caches
+/**
+ * @brief Frees the resources associated with a single item cache (Item_Cache).
+ *
+ * This function deletes the Evas objects (spacer, base_view, contents)
+ * held by the Item_Cache and frees the memory allocated for the Item_Cache
+ * structure itself.
+ *
+ * @param itc The Item_Cache structure to free.
+ */
 static void
 _item_cache_free(Item_Cache *itc)
 {
@@ -176,7 +219,16 @@ _item_cache_free(Item_Cache *itc)
    ELM_SAFE_FREE(itc ,free);
 }
 
-// clean up item cache by removing overflowed caches
+/**
+ * @brief Cleans up the item cache by removing older caches if the cache count
+ * exceeds the maximum allowed.
+ *
+ * This function iterates through the cache and frees the oldest items
+ * (from the end of the cache list) until the cache count is within the
+ * configured maximum (sd->item_cache_max).
+ *
+ * @param sd The Gengrid widget's private data.
+ */
 static void
 _item_cache_clean(Elm_Gengrid_Data *sd)
 {
@@ -192,7 +244,15 @@ _item_cache_clean(Elm_Gengrid_Data *sd)
    evas_event_thaw_eval(evas_object_evas_get(sd->obj));
 }
 
-// empty all item caches
+/**
+ * @brief Empties all item caches.
+ *
+ * This function temporarily sets the maximum cache size to 0 and calls
+ * _item_cache_clean to free all cached items. It then restores the
+ * original maximum cache size.
+ *
+ * @param sd The Gengrid widget's private data.
+ */
 static void
 _item_cache_zero(Elm_Gengrid_Data *sd)
 {
@@ -203,7 +263,21 @@ _item_cache_zero(Elm_Gengrid_Data *sd)
    sd->item_cache_max = pmax;
 }
 
-// add an item to item cache
+/**
+ * @brief Adds a Gengrid item to the item cache.
+ *
+ * This function takes a realized Gengrid item (Elm_Gen_Item), prepares it
+ * for caching (e.g., hides its view, removes mouse callbacks), and
+ * creates an Item_Cache entry for it. The Item_Cache is then pushed
+ * into the cache list.
+ *
+ * @param it The Gengrid item (Elm_Gen_Item) to add to the cache.
+ * @param contents A list of content Evas_Objects associated with the item's view.
+ *                 These are stored in the cache entry.
+ * @return @c EINA_TRUE if the item was successfully added to the cache,
+ *         @c EINA_FALSE otherwise (e.g., if caching is disabled for the item,
+ *         or if the cache is full and cannot accommodate new items).
+ */
 static Eina_Bool
 _item_cache_add(Elm_Gen_Item *it, Eina_List *contents)
 {
@@ -266,7 +340,20 @@ _item_cache_add(Elm_Gen_Item *it, Eina_List *contents)
    return EINA_TRUE;
 }
 
-// find an item from item cache and remove it from the cache
+/**
+ * @brief Finds a suitable item from the cache for a given Gengrid item and
+ * removes it from the cache.
+ *
+ * This function searches the item cache for an Item_Cache entry that matches
+ * the style of the provided Gengrid item (Elm_Gen_Item). If a match is found,
+ * the cached view and spacer are transferred to the Gengrid item, and the
+ * Item_Cache entry is removed from the cache and freed.
+ *
+ * @param it The Gengrid item (Elm_Gen_Item) for which to find a cached view.
+ * @return @c EINA_TRUE if a cached item was found and successfully applied,
+ *         @c EINA_FALSE otherwise (e.g., if caching is disabled for the item,
+ *         or no matching item is found in the cache).
+ */
 static Eina_Bool
 _item_cache_find(Elm_Gen_Item *it)
 {
@@ -299,7 +386,19 @@ _item_cache_find(Elm_Gen_Item *it)
    return EINA_FALSE;
 }
 
-//Calculate sum of widths or heights of all items in a row or column
+/**
+ * @brief Calculates the sum of widths (for horizontal Gengrid) or heights
+ * (for vertical Gengrid) of all items in a specific row or column.
+ *
+ * This function is used when `custom_size_mode` is enabled to determine
+ * the total span of items that have custom dimensions within a given
+ * line (row or column) of the grid.
+ *
+ * @param sd The Gengrid widget's private data.
+ * @param idx The index of the row (if horizontal) or column (if vertical)
+ *            for which to calculate the span. This is 0-based.
+ * @return The sum of widths or heights of items in the specified line.
+ */
 static int
 _get_item_span(Elm_Gengrid_Data *sd, int idx)
 {
@@ -318,6 +417,18 @@ _get_item_span(Elm_Gengrid_Data *sd, int idx)
    return sum;
 }
 
+/**
+ * @brief Sets up or resizes arrays used for custom item size calculations.
+ *
+ * If `custom_size_mode` is enabled, this function ensures that the
+ * `custom_size_sum` and `custom_tot_sum` arrays are allocated or reallocated
+ * to match the current number of items per line (`sd->nmax`). These arrays
+ * store cumulative and total sizes for rows/columns with custom-sized items.
+ *
+ * @param sd The Gengrid widget's private data.
+ * @return @c EINA_TRUE on successful allocation/reallocation, @c EINA_FALSE
+ *         if memory allocation fails.
+ */
 static Eina_Bool
 _setup_custom_size_mode(Elm_Gengrid_Data *sd)
 {
@@ -337,6 +448,14 @@ _setup_custom_size_mode(Elm_Gengrid_Data *sd)
    return EINA_TRUE;
 }
 
+/**
+ * @brief Frees memory allocated for custom item size mode arrays.
+ *
+ * This function deallocates the `custom_size_sum` and `custom_tot_sum`
+ * arrays used when `custom_size_mode` is enabled.
+ *
+ * @param sd The Gengrid widget's private data.
+ */
 static inline void
 _cleanup_custom_size_mode(Elm_Gengrid_Data *sd)
 {
@@ -344,6 +463,18 @@ _cleanup_custom_size_mode(Elm_Gengrid_Data *sd)
    ELM_SAFE_FREE(sd->custom_tot_sum, free);
 }
 
+/**
+ * @brief Calculates the total span for each row/column and the maximum span
+ *        when custom item sizes are used.
+ *
+ * This function iterates through each line (row or column, depending on
+ * orientation) and calculates the total width/height of items in that line
+ * using `_get_item_span`. It stores these totals in `sd->custom_tot_sum`
+ * and finds the maximum among them, storing it in `sd->custom_tot_max`.
+ * This is used for layout calculations when `custom_size_mode` is active.
+ *
+ * @param sd The Gengrid widget's private data.
+ */
 static void
 _custom_size_mode_calc(Elm_Gengrid_Data *sd)
 {
@@ -359,6 +490,16 @@ _custom_size_mode_calc(Elm_Gengrid_Data *sd)
    sd->custom_tot_max = max;
 }
 
+/**
+ * @brief Checks if an item is effectively non-selectable.
+ *
+ * An item is considered non-selectable if either the Gengrid's global select
+ * mode or the item's specific select mode is set to
+ * `ELM_OBJECT_SELECT_MODE_NONE` or `ELM_OBJECT_SELECT_MODE_DISPLAY_ONLY`.
+ *
+ * @param it The Gengrid item to check.
+ * @return @c EINA_TRUE if the item is non-selectable, @c EINA_FALSE otherwise.
+ */
 static Eina_Bool
 _is_no_select(Elm_Gen_Item *it)
 {
